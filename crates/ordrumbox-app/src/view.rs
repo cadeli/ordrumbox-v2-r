@@ -249,6 +249,14 @@ impl Layout {
         self.top + track as i32 * self.row
     }
 
+    /// The cell of a step of track `track` (`spb` steps per beat).
+    pub fn cell_rect(&self, track: usize, beat: i32, step: i32, spb: i32) -> Rect {
+        let spb = spb.clamp(1, 16);
+        let at = i64::from(beat) * i64::from(spb) + i64::from(step);
+        let x = self.step_x(at, spb);
+        Rect::new(x, self.row_top(track), self.step_x(at + 1, spb) - x, self.row)
+    }
+
     /// Tracks shown.
     pub fn tracks(&self) -> usize {
         self.tracks
@@ -423,6 +431,16 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
         let height = (layout.tracks as i32 * layout.row).min(layout.bottom - layout.top) - gap;
         canvas.fill_rect(x - scale, layout.top, 2 * scale, height, PLAYHEAD);
     }
+}
+
+/// The hover bubble over a note (`pp-tooltip`): centered above `cell`, kept in the window.
+pub fn draw_tooltip(canvas: &mut Canvas, text: &str, cell: Rect, scale: i32) {
+    let (w, h) = (text_width(text, scale) + 12 * scale, 14 * scale);
+    let x = (cell.x + cell.w / 2 - w / 2).clamp(0, (canvas.width() - w).max(0));
+    let y = (cell.y - h - 4 * scale).max(0);
+    canvas.fill_rect(x, y, w, h, 0x0048_4858);
+    canvas.fill_rect(x + scale, y + scale, w - 2 * scale, h - 2 * scale, 0x0010_1014);
+    canvas.text(x + 6 * scale, y + 3 * scale, text, scale, TEXT);
 }
 
 /// A panel over the window: a title and lines of text (the key list, about).

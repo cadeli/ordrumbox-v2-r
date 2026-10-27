@@ -454,7 +454,9 @@ impl ApplicationHandler for App {
                 self.hover();
                 let size = (self.size().0, self.size().1, self.scale());
                 let shift = self.modifiers.shift_key();
-                if self.session.mouse_move(size, position.x as i32, position.y as i32, shift) {
+                let (x, y) = (position.x as i32, position.y as i32);
+                let moved = self.session.mouse_move(size, x, y, shift);
+                if self.session.grid_hover(size, x, y) || moved {
                     self.request_redraw();
                 }
             }

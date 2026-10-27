@@ -3,7 +3,7 @@
 // and OrSlider (ui/components/or_knob.js, or_slider.js) driven through a
 // minimal fake DOM, and by its formatters (ui_utils.js knobFormat / fmt /
 // formatSignedDb, track_editor_constants.js fmtVal, the loop section's loop
-// point label).
+// point label), and the grid's note tooltip (formatNoteTooltip).
 //
 //   node tools/export_control_fixtures.mjs <path-to-ordrumbox-v2>
 //
@@ -111,7 +111,7 @@ globalThis.document = { createElement: (tag) => new El(tag) }
 const srcUrl = (rel) => pathToFileURL(resolve(jsRepo, 'src', rel)).href
 const { OrKnob } = await import(srcUrl('ui/components/or_knob.js'))
 const { OrSlider } = await import(srcUrl('ui/components/or_slider.js'))
-const { knobFormat, knobUnit, fmt, formatSignedDb } = await import(srcUrl('ui/components/ui_utils.js'))
+const { knobFormat, knobUnit, fmt, formatSignedDb, formatNoteTooltip } = await import(srcUrl('ui/components/ui_utils.js'))
 const { fmtVal, GEN_ENGINE_PROPS } = await import(srcUrl('ui/track_editor/track_editor_constants.js'))
 const { default: LoopSection } = await import(srcUrl('ui/track_editor/loop_section.js'))
 
@@ -219,8 +219,36 @@ for (const spb of [1, 3, 4, 8]) {
     for (const step of [1, 2, 3, 4, 5, 8, 9, 16, 17, 31, 64, 128]) loopPoints.push([spb, step, loopSlider.formatValue(step)])
 }
 
+// The grid's note tooltip (formatNoteTooltip), for notes and track pitches.
+const NOTES = [
+    {},
+    { velocity: 0.5, pitch: 3 },
+    {
+        pitch: -13,
+        prob: 0.25,
+        every: 2,
+        retriggerCount: 3,
+        arp: { intervals: [0, 4, 7], mode: 'up' },
+        arpTriggerProbability: 0.5,
+        euclideanFill: 5,
+        euclideanRotation: 2,
+        rate: 12,
+        pan: -0.333,
+    },
+    { arp: [0, 7] },
+    { arp: { intervals: [3] } },
+    { euclideanFill: 3, velocity: 1 },
+    { pitch: 30 },
+    { pitch: -60, velocity: 0.123456 },
+    { pitch: 0.5 },
+]
+const tooltips = []
+for (const trackPitch of [0, -2, 7]) {
+    for (const note of NOTES) tooltips.push([note, trackPitch, formatNoteTooltip(note, trackPitch)])
+}
+
 const here = dirname(fileURLToPath(import.meta.url))
 const dir = join(here, '..', 'crates/ordrumbox-app/tests/fixtures')
 await mkdir(dir, { recursive: true })
-await writeFile(join(dir, 'controls.json'), JSON.stringify({ cases, formats, loopPoints }) + '\n')
+await writeFile(join(dir, 'controls.json'), JSON.stringify({ cases, formats, loopPoints, tooltips }) + '\n')
 process.stdout.write(`${cases.length} control specs, ${formats.length} formats\n`)
