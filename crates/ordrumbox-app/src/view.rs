@@ -56,7 +56,6 @@ pub struct View<'a> {
     pub pattern: Option<&'a Pattern>,
     pub pattern_index: usize,
     pub pattern_count: usize,
-    pub kit: &'a str,
     pub playing: bool,
     /// Playhead, as a fraction of the pattern length.
     pub playhead: Option<f64>,
@@ -197,6 +196,17 @@ pub fn content_top(scale: i32) -> i32 {
     menu::bar_height(scale) + margin(scale) / 2
 }
 
+/// The header's pattern list and kit list (`PatternNav`'s two selects).
+pub fn header_selects(scale: i32) -> (Rect, Rect) {
+    let (margin, top, text) = (margin(scale), content_top(scale), header_text(scale));
+    let pattern_x = margin + text_width("orDrumbox", text) + 24 * scale;
+    let kit_x = margin + text_width("000 BPM  00 beats", text) + 24 * scale;
+    (
+        Rect::new(pattern_x, top, 200 * scale, 16 * scale),
+        Rect::new(kit_x, top + header_line(scale), 140 * scale, 16 * scale),
+    )
+}
+
 pub fn footer_top(height: i32, scale: i32, status_lines: usize) -> i32 {
     height - margin(scale) - 10 * scale - status_lines as i32 * 10 * scale - 4 * scale
 }
@@ -322,9 +332,10 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
     let x = canvas.text(margin, y, "orDrumbox", text, ACCENT) + 24 * scale;
     match view.pattern {
         Some(pattern) => {
-            let name = pattern.name.as_deref().unwrap_or(&pattern.id);
-            let title = format!("{name}  {}/{}", view.pattern_index + 1, view.pattern_count);
-            let mut x = canvas.text(x, y, &title, text, TEXT) + 24 * scale;
+            // The pattern list (a widget) goes first, then where it is in the library.
+            let (list, kit_list) = header_selects(scale);
+            let title = format!("{}/{}", view.pattern_index + 1, view.pattern_count);
+            let mut x = canvas.text(list.x + list.w + 12 * scale, y, &title, text, TEXT) + 24 * scale;
             let labels = ["DRUMS", "BASS", "CHORDS"];
             for (label, on) in labels.iter().zip(view.generation) {
                 x = canvas.text(x, y + 4 * scale, label, scale, if on { PLAYING } else { DIM }) + 8 * scale;
@@ -334,8 +345,9 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
             }
             y += line;
             let tempo = format!("{} BPM  {} beats", pattern.bpm, pattern.beat_count);
-            let x = canvas.text(margin, y, &tempo, text, TEXT) + 24 * scale;
-            let x = canvas.text(x, y, &format!("kit {}", view.kit), text, DIM) + 24 * scale;
+            canvas.text(margin, y, &tempo, text, TEXT);
+            // The kit list (a widget) is next.
+            let x = kit_list.x + kit_list.w + 24 * scale;
             let (state, color) = if view.playing { ("PLAY", PLAYING) } else { ("STOP", DIM) };
             let x = canvas.text(x, y, state, text, color) + 24 * scale;
             if let Some(song) = view.song {
@@ -577,7 +589,6 @@ mod tests {
                 pattern: library.patterns.first(),
                 pattern_index: 0,
                 pattern_count: 1,
-                kit: "real",
                 playing: true,
                 playhead: Some(0.5),
                 song: Some("SONG demo  measure 3/66"),

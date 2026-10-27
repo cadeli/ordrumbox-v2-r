@@ -98,6 +98,9 @@ keyboard focus through the controls, **Esc** gives the keys back to the grid.
 A list opens on a click (or **Enter**): arrows, a letter to jump, the wheel,
 **Enter** to choose, **Esc** to close.
 
+The header has the pattern list and the kit list (the JS toolbar's two
+selects): a click opens them, the wheel or the arrows move, **Enter** picks.
+
 Menus: the menu bar at the top of the window (File, Edit, View, Pattern,
 Generate, Play, Kit, Help) lists every command with its shortcut; commands that cannot
 run are greyed out, on/off ones (auto modes, mute, solo, the current kit, the
