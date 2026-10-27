@@ -13,10 +13,10 @@ path = "src/main.rs"
 
 [dependencies]
 ordrumbox-core.workspace = true
-ordrumbox-logic.workspace = true
 ordrumbox-engine.workspace = true
 winit.workspace = true
 softbuffer.workspace = true
+cpal.workspace = true
 
 [lints]
 workspace = true

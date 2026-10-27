@@ -1,7 +1,9 @@
 //! Software drawing into the window's pixel buffer (`0x00RRGGBB` per pixel).
 //!
-//! The whole UI is drawn here, without a GUI framework: rectangles now, then
-//! lines, knob arcs and the 8 px bitmap font as the panels are ported.
+//! The whole UI is drawn here, without a GUI framework: rectangles and the
+//! 8 px pixel font; lines and knob arcs come with the editors.
+
+use crate::font;
 
 /// A pixel colour, `0x00RRGGBB` (the softbuffer format).
 pub type Rgb = u32;
@@ -21,12 +23,12 @@ impl<'a> Canvas<'a> {
         Self { pixels, width, height }
     }
 
-    pub fn width(&self) -> usize {
-        self.width
+    pub fn width(&self) -> i32 {
+        self.width as i32
     }
 
-    pub fn height(&self) -> usize {
-        self.height
+    pub fn height(&self) -> i32 {
+        self.height as i32
     }
 
     pub fn clear(&mut self, color: Rgb) {
@@ -48,6 +50,28 @@ impl<'a> Canvas<'a> {
             self.pixels[start + x0..start + x1].fill(color);
         }
     }
+
+    /// Draw `text` with its top-left corner at `(x, y)`, each font pixel a
+    /// `scale × scale` square; returns the x after the last character.
+    pub fn text(&mut self, x: i32, y: i32, text: &str, scale: i32, color: Rgb) -> i32 {
+        let mut pen = x;
+        for c in text.chars() {
+            for (row, bits) in font::glyph(c).iter().enumerate() {
+                for col in 0..8 {
+                    if bits & (0x80 >> col) != 0 {
+                        self.fill_rect(pen + col * scale, y + row as i32 * scale, scale, scale, color);
+                    }
+                }
+            }
+            pen += font::SIZE * scale;
+        }
+        pen
+    }
+}
+
+/// Width of `text` drawn at `scale`.
+pub fn text_width(text: &str, scale: i32) -> i32 {
+    text.chars().count() as i32 * font::SIZE * scale
 }
 
 #[cfg(test)]
@@ -75,5 +99,15 @@ mod tests {
         canvas.fill_rect(5, 5, 2, 2, 1);
         canvas.fill_rect(0, 0, 2, -3, 1);
         assert_eq!(pixels, [0; 4]);
+    }
+
+    #[test]
+    fn text_draws_glyph_pixels() {
+        let mut pixels = vec![0; 16 * 8];
+        let mut canvas = Canvas::new(&mut pixels, 16, 8);
+        assert_eq!(canvas.text(0, 0, "A", 1, 1), 8);
+        // Top row of 'A' is 0x38: pixels 2, 3, 4.
+        assert_eq!(&pixels[..8], &[0, 0, 1, 1, 1, 0, 0, 0]);
+        assert_eq!(text_width("abc", 2), 48);
     }
 }

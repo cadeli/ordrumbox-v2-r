@@ -10,8 +10,8 @@ license = "GPL-3.0-only"
 repository = "https://github.com/cadeli/ordrumbox-v2-r"
 
 # The four domain crates have no third-party dependency. Only the platform
-# bridges used by ordrumbox-app live here (window, pixel buffer; audio and MIDI
-# come in phase 3).
+# bridges used by ordrumbox-app live here: window, pixel buffer, audio output
+# (MIDI comes with the MIDI phase).
 [workspace.dependencies]
 ordrumbox-core = { path = "crates/ordrumbox-core" }
 ordrumbox-logic = { path = "crates/ordrumbox-logic" }
@@ -19,6 +19,7 @@ ordrumbox-dsp = { path = "crates/ordrumbox-dsp" }
 ordrumbox-engine = { path = "crates/ordrumbox-engine" }
 winit = "0.30.13"
 softbuffer = "0.4.8"
+cpal = "0.18.2"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
