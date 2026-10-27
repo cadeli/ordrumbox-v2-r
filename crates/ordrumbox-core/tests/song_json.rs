@@ -20,15 +20,19 @@ fn assert_same_text(written: &str, expected: &str, what: &str) {
     if written == expected {
         return;
     }
-    let at = written.bytes().zip(expected.bytes()).position(|(a, b)| a != b).unwrap_or(written.len().min(expected.len()));
+    let at =
+        written.bytes().zip(expected.bytes()).position(|(a, b)| a != b).unwrap_or(written.len().min(expected.len()));
     let excerpt = |s: &str| {
-        let start = s.floor_char_boundary(at.saturating_sub(30));
-        let end = s.ceil_char_boundary((at + 30).min(s.len()));
+        let start = char_boundary(s, at.saturating_sub(30));
+        let end = char_boundary(s, at + 30);
         format!("{:?}", &s[start..end])
     };
-    let line = expected[..expected.floor_char_boundary(at)].matches('\n').count() + 1;
-    let crlf_hint =
-        if expected.contains("\r\n") { "\n(the expected file has CRLF line endings: check .gitattributes)" } else { "" };
+    let line = expected[..char_boundary(expected, at)].matches('\n').count() + 1;
+    let crlf_hint = if expected.contains("\r\n") {
+        "\n(the expected file has CRLF line endings: check .gitattributes)"
+    } else {
+        ""
+    };
     panic!(
         "{what}: texts differ at byte {at} (line {line}); lengths {} written vs {} expected\n  written:  {}\n  expected: {}{crlf_hint}",
         written.len(),
@@ -36,6 +40,11 @@ fn assert_same_text(written: &str, expected: &str, what: &str) {
         excerpt(written),
         excerpt(expected),
     );
+}
+
+/// The char boundary at or before byte `i` (clamped to the text length).
+fn char_boundary(s: &str, i: usize) -> usize {
+    (0..=i.min(s.len())).rev().find(|&b| s.is_char_boundary(b)).unwrap_or(0)
 }
 
 #[test]
