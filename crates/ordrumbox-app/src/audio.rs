@@ -6,7 +6,7 @@ use std::sync::Arc;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{FromSample, SampleFormat, SizedSample, StreamConfig};
 use ordrumbox_core::Scales;
-use ordrumbox_engine::{AudioSide, Controller, SampleBank};
+use ordrumbox_engine::{AudioSide, Controller, SampleBank, SynthPresets};
 
 /// Frames rendered per engine call inside a callback (scratch size).
 const SCRATCH_FRAMES: usize = 4096;
@@ -25,13 +25,13 @@ impl std::fmt::Debug for Output {
 }
 
 /// Open the default output device and start rendering.
-pub fn start(bank: Arc<SampleBank>, scales: Scales) -> Result<(Output, Controller), String> {
+pub fn start(bank: Arc<SampleBank>, scales: Scales, synths: SynthPresets) -> Result<(Output, Controller), String> {
     let host = cpal::default_host();
     let device = host.default_output_device().ok_or("no audio output device")?;
     let name = device.description().map(|d| d.name().to_owned()).unwrap_or_else(|_| "default".into());
     let supported = device.default_output_config().map_err(|e| format!("{name}: {e}"))?;
     let config: StreamConfig = supported.config();
-    let (controller, audio) = Controller::new(config.sample_rate as f32, bank, scales);
+    let (controller, audio) = Controller::new(config.sample_rate as f32, bank, scales, synths);
 
     let stream = match supported.sample_format() {
         SampleFormat::F32 => build::<f32>(&device, &config, audio),

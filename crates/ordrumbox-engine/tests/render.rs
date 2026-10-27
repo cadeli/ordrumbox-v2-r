@@ -9,7 +9,7 @@ use ordrumbox_core::steps::TICK;
 use ordrumbox_core::{Library, Rng, Scales, recompute_flat_notes};
 use ordrumbox_engine::kit::{BankSample, Instrument, assign_samples};
 use ordrumbox_engine::pass::{PassContext, build_pass, frames_per_tick};
-use ordrumbox_engine::{Engine, SampleBank, wav};
+use ordrumbox_engine::{Engine, SampleBank, SynthPresets, wav};
 
 const RATE: f64 = 48_000.0;
 
@@ -47,15 +47,25 @@ fn every_note_becomes_an_event_on_its_frame() {
     let scales = Scales::default();
     for pattern in &library.patterns {
         let samples = assign_samples(pattern, &bank, "test");
-        let context = PassContext { bank: &bank, samples: &samples, scales: &scales, sample_rate: RATE };
+        let synths = SynthPresets::default();
+        let context = PassContext {
+            bank: &bank,
+            samples: &samples,
+            scales: &scales,
+            synths: &synths,
+            sample_rate: RATE,
+            first_tick: 0,
+        };
         let pass = build_pass(pattern, 0, &mut Rng::new(1), context);
         let flat = recompute_flat_notes(pattern, 0, &mut Rng::new(1), &scales);
         let per_tick = frames_per_tick(pattern.bpm, RATE);
 
+        let any_solo = pattern.tracks.iter().any(|t| t.solo);
+        let audible = |i: usize| if any_solo { pattern.tracks[i].solo } else { !pattern.tracks[i].mute };
         let expected: Vec<u64> = flat
             .iter()
             .flat_map(|(&tick, notes)| {
-                notes.iter().filter(|n| samples[n.track].is_some()).map(move |n| {
+                notes.iter().filter(|n| samples[n.track].is_some() && audible(n.track)).map(move |n| {
                     let swing = n.swing_beats(&pattern.tracks[n.track]) * f64::from(TICK);
                     (((f64::from(tick) + swing) * per_tick).round() as u64).min(pass.frames - 1)
                 })
@@ -75,7 +85,15 @@ fn rock_renders_clean_audio_starting_on_frame_zero() {
     let bank = Arc::new(bank());
     let rock = library.pattern("rock").expect("rock");
     let samples = assign_samples(rock, &bank, "test");
-    let context = PassContext { bank: &bank, samples: &samples, scales: &Scales::default(), sample_rate: RATE };
+    let (scales, synths) = (Scales::default(), SynthPresets::default());
+    let context = PassContext {
+        bank: &bank,
+        samples: &samples,
+        scales: &scales,
+        synths: &synths,
+        sample_rate: RATE,
+        first_tick: 0,
+    };
     let pass = Arc::new(build_pass(rock, 0, &mut Rng::new(1), context));
     let frames = pass.frames as usize;
 

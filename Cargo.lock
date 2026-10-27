@@ -1148,6 +1148,9 @@ version = "0.1.0"
 [[package]]
 name = "ordrumbox-dsp"
 version = "0.1.0"
+dependencies = [
+ "ordrumbox-core",
+]
 
 [[package]]
 name = "ordrumbox-engine"

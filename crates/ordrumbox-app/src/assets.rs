@@ -1,6 +1,6 @@
 //! The `assets` folder of ordrumbox-v2 (`data/song.json`, `data/drumkits.json`,
-//! `data/scales.json`, `kits/**.wav`), found next to the program or given by
-//! `ORDRUMBOX_ASSETS`, and loaded into the model.
+//! `data/scales.json`, `data/generated_sounds.json`, `kits/**.wav`), found
+//! next to the program or given by `ORDRUMBOX_ASSETS`, and loaded into the model.
 
 use std::env;
 use std::fs;
@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 use ordrumbox_core::json;
 use ordrumbox_core::{Library, LoadReport, Scales};
-use ordrumbox_engine::{Kit, SampleBank, kits_from_json};
+use ordrumbox_engine::{Kit, SampleBank, SynthPresets, kits_from_json};
 
 /// Environment variable naming the assets folder.
 pub const ENV_VAR: &str = "ORDRUMBOX_ASSETS";
@@ -19,6 +19,8 @@ pub struct Assets {
     pub report: LoadReport,
     pub kits: Vec<Kit>,
     pub scales: Scales,
+    /// Synth presets (`generated_sounds.json`).
+    pub synths: SynthPresets,
     pub bank: SampleBank,
     /// Samples that could not be read or decoded.
     pub sample_errors: Vec<String>,
@@ -58,7 +60,9 @@ pub fn load(dir: &Path) -> Result<Assets, String> {
     let (library, report) = Library::from_json(&read_json(&data.join("song.json"))?);
     let kits = read_json(&data.join("drumkits.json")).map(|v| kits_from_json(&v)).unwrap_or_default();
     let scales = read_json(&data.join("scales.json")).map(|v| Scales::from_json(&v)).unwrap_or_default();
+    let synths =
+        read_json(&data.join("generated_sounds.json")).map(|v| SynthPresets::from_json(&v)).unwrap_or_default();
     let kits_dir = dir.join("kits");
     let (bank, sample_errors) = SampleBank::load(&kits, |url| fs::read(kits_dir.join(url)));
-    Ok(Assets { library, report, kits, scales, bank, sample_errors })
+    Ok(Assets { library, report, kits, scales, synths, bank, sample_errors })
 }

@@ -12,7 +12,7 @@ const MAX_SLUG_LEN: usize = 48;
 ///
 /// Same output as `slugify()` in ids.js (`normalize('NFD')`, strip
 /// U+0300–U+036F, lowercase, `[^a-z0-9]+` → `-`), without a Unicode table
-/// dependency: see [`fold_char`].
+/// dependency: see `fold_char`.
 pub fn slugify(value: &str) -> String {
     let mut slug = String::new();
     let mut pending_dash = false;
