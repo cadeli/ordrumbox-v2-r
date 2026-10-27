@@ -3,5 +3,6 @@
 # byte-for-byte JSON tests against song.json / song.min.json / flat_notes.
 * text=auto eol=lf
 
-# Golden fixtures produced by the JS app: compared byte for byte, never rewritten.
-crates/ordrumbox-core/tests/fixtures/** -text
+# Golden fixtures produced by the JS app (JSON compared byte for byte, binary
+# renders): never rewritten.
+crates/*/tests/fixtures/** -text
