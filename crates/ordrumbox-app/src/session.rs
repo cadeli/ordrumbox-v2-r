@@ -1385,7 +1385,6 @@ impl Session {
             genre: pattern.and_then(|p| p.extra.get("_autoGenGenre")?.as_str()),
             pattern_index: self.pattern_index,
             pattern_count: library.patterns.len(),
-            kit: self.kits.kits.get(self.kit_index).map_or("-", |k| k.name.as_str()),
             kit_view: self.kit_view(layout.details_top),
             right: layout.right,
             playing: self.playing(),

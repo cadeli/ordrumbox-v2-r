@@ -95,13 +95,37 @@ impl Session {
     pub(super) fn panel_layout(&self, width: i32, height: i32, scale: i32) -> PanelLayout {
         let mut layout = PanelLayout::default();
         let s = scale;
+        // The header's pattern and kit lists (`rebuildPatternSelect`, `rebuildDrumkitSelect`).
+        let (pattern_rect, kit_rect) = view::header_selects(scale);
+        let library = self.editor.library();
+        if !library.patterns.is_empty() {
+            let labels = library
+                .patterns
+                .iter()
+                .enumerate()
+                .map(|(i, p)| p.name.clone().unwrap_or_else(|| format!("Pattern {i}")))
+                .collect();
+            let values = (0..library.patterns.len()).map(|i| i.to_string()).collect();
+            let selected = self.pattern_index.min(library.patterns.len() - 1);
+            layout.items.push(Item::new(
+                Some(Id::PatternList),
+                pattern_rect,
+                Kind::Select { values, labels, selected },
+            ));
+        }
+        if !self.kits.kits.is_empty() {
+            let labels = self.kits.kits.iter().map(|k| k.name.clone()).collect();
+            let values = (0..self.kits.kits.len()).map(|i| i.to_string()).collect();
+            let selected = self.kit_index.min(self.kits.kits.len() - 1);
+            layout.items.push(Item::new(Some(Id::KitList), kit_rect, Kind::Select { values, labels, selected }));
+        }
         if self.kit_editor.is_some() {
             let kit_layout = KitLayout::new(width, height, scale, self.status.len());
             let area = kit_layout.controls_area();
             layout.details_top = area.y;
             if let Some(view) = self.kit_controls() {
                 let (items, bottom) = editors::kit_controls(&view, area, scale);
-                layout.items = items;
+                layout.items.extend(items);
                 layout.details_top = bottom;
             }
             return layout;
@@ -830,6 +854,19 @@ impl Session {
     /// A select set to `value`.
     fn select(&mut self, id: Id, value: &str) {
         match id {
+            Id::PatternList => {
+                // `onPatternSelectChange`: that pattern.
+                if let Ok(index) = value.parse::<usize>() {
+                    self.step_pattern(index as isize - self.pattern_index as isize);
+                }
+                return;
+            }
+            Id::KitList => {
+                if let Ok(index) = value.parse::<usize>() {
+                    self.run(Command::Kit(index));
+                }
+                return;
+            }
             Id::KitKit => {
                 let target = self.kits.kits.iter().position(|k| k.name == value);
                 if let (Some(sample), Some(target)) = (self.kit_editor, target)

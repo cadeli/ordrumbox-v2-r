@@ -113,6 +113,9 @@ pub enum Id {
     KitKit,
     KitInstrument,
     KitKnob(Field),
+    // Header.
+    PatternList,
+    KitList,
     // Grid.
     TrackVolume(usize),
     MasterVolume,
