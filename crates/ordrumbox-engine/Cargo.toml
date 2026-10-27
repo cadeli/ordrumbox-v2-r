@@ -1,0 +1,15 @@
+[package]
+name = "ordrumbox-engine"
+description = "orDrumbox sample-accurate sequencer, mixer, offline render and WAV export"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+ordrumbox-core.workspace = true
+ordrumbox-dsp.workspace = true
+
+[lints]
+workspace = true
