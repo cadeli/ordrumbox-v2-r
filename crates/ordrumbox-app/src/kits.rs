@@ -25,28 +25,12 @@ pub const GAIN_RANGE: (f64, f64) = (-24.0, 6.0);
 pub const TUNE_RANGE: (f64, f64) = (-12.0, 12.0);
 pub const DECAY_RANGE: (f64, f64) = (20.0, 5000.0);
 
-/// What a sample edit changes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// What a kit knob changes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Field {
-    Kit,
-    Instrument,
     Gain,
     Tune,
     Decay,
-}
-
-impl Field {
-    pub const ALL: [Self; 5] = [Self::Kit, Self::Instrument, Self::Gain, Self::Tune, Self::Decay];
-
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Kit => "Kit",
-            Self::Instrument => "Instrument",
-            Self::Gain => "Gain",
-            Self::Tune => "Tune",
-            Self::Decay => "Decay",
-        }
-    }
 }
 
 /// The kits, the decoded audio of their samples, and where they are saved.
@@ -144,60 +128,51 @@ impl KitSet {
 
     // ─── Sample settings ─────────────────────────────────────────────────────
 
-    /// Step `field` of sample `sample` of kit `kit` by `steps` (fine: a tenth
-    /// of a dB or semitone, 5 % of decay). The message, when it changed.
-    pub fn adjust(&mut self, kit: usize, sample: usize, field: Field, steps: i32, fine: bool) -> Option<String> {
-        let names: Vec<String> = self.kits.iter().map(|k| k.name.clone()).collect();
+    /// Where the sample of `url` is: kit and index.
+    pub fn find_url(&self, url: &str) -> Option<(usize, usize)> {
+        self.kits.iter().enumerate().find_map(|(k, kit)| Some((k, kit.instruments.iter().position(|i| i.url == url)?)))
+    }
+
+    /// Set gain (dB), tune (semitones) or decay (ms) of a sample, from a
+    /// knob (`onKnobChange`); the message when it changed.
+    pub fn set_value(&mut self, kit: usize, sample: usize, field: Field, value: f64) -> Option<String> {
         let instrument = self.kits.get_mut(kit)?.instruments.get_mut(sample)?;
         let name = instrument.display_name.clone();
         match field {
-            Field::Gain => {
-                let step = if fine { 0.1 } else { 1.0 };
-                let value = round1(instrument.gain_db + f64::from(steps) * step).clamp(GAIN_RANGE.0, GAIN_RANGE.1);
-                (value != instrument.gain_db).then(|| {
-                    instrument.gain_db = value;
-                    format!("{name}: gain {value:+.1} dB")
-                })
+            Field::Gain if value != instrument.gain_db => {
+                instrument.gain_db = value;
+                Some(format!("{name}: gain {value:+.1} dB"))
             }
-            Field::Tune => {
-                let step = if fine { 0.1 } else { 1.0 };
-                let value = round1(instrument.tune + f64::from(steps) * step).clamp(TUNE_RANGE.0, TUNE_RANGE.1);
-                (value != instrument.tune).then(|| {
-                    instrument.tune = value;
-                    format!("{name}: tune {value:+.1} st")
-                })
+            Field::Tune if value != instrument.tune => {
+                instrument.tune = value;
+                Some(format!("{name}: tune {value:+.1} st"))
             }
-            Field::Decay => {
-                let factor: f64 = if fine { 1.05 } else { 1.25 };
-                let value = (instrument.decay_ms() * factor.powi(steps) / 10.0).round() * 10.0;
-                let value = value.clamp(DECAY_RANGE.0, DECAY_RANGE.1);
-                (Some(value) != instrument.decay).then(|| {
-                    instrument.decay = Some(value);
-                    format!("{name}: decay {value} ms")
-                })
+            Field::Decay if Some(value) != instrument.decay => {
+                instrument.decay = Some(value);
+                Some(format!("{name}: decay {value} ms"))
             }
-            Field::Instrument => {
-                // `setInstrument`: one of the catalog's ids.
-                let ids: Vec<&str> = catalog().instruments.iter().map(|i| i.id.as_str()).collect();
-                let at = ids.iter().position(|id| *id == instrument.key);
-                let next = match at {
-                    Some(i) => (i as i64 + i64::from(steps)).rem_euclid(ids.len() as i64) as usize,
-                    None => 0,
-                };
-                instrument.key = ids[next].to_owned();
-                Some(format!("Set \"{name}\" to instrument \"{}\"", ids[next]))
-            }
-            Field::Kit => {
-                // `moveToKit`: into the next (previous) kit.
-                if names.len() < 2 {
-                    return None;
-                }
-                let target = (kit as i64 + i64::from(steps)).rem_euclid(names.len() as i64) as usize;
-                let moved = self.kits[kit].instruments.remove(sample);
-                self.kits[target].instruments.push(moved);
-                Some(format!("Moved \"{name}\" to kit \"{}\"", names[target]))
-            }
+            _ => None,
         }
+    }
+
+    /// `setInstrument`: the instrument a sample is.
+    pub fn set_instrument(&mut self, kit: usize, sample: usize, id: &str) -> Option<String> {
+        let instrument = self.kits.get_mut(kit)?.instruments.get_mut(sample)?;
+        (instrument.key != id).then(|| {
+            instrument.key = id.to_owned();
+            format!("Set \"{}\" to instrument \"{id}\"", instrument.display_name)
+        })
+    }
+
+    /// `moveToKit`: a sample into kit `target`.
+    pub fn move_to_kit(&mut self, kit: usize, sample: usize, target: usize) -> Option<String> {
+        if target == kit || target >= self.kits.len() || sample >= self.kits.get(kit)?.instruments.len() {
+            return None;
+        }
+        let moved = self.kits[kit].instruments.remove(sample);
+        let message = format!("Moved \"{}\" to kit \"{}\"", moved.display_name, self.kits[target].name);
+        self.kits[target].instruments.push(moved);
+        Some(message)
     }
 
     /// `removeSample`.
@@ -350,10 +325,6 @@ impl KitSet {
     }
 }
 
-fn round1(x: f64) -> f64 {
-    (x * 10.0).round() / 10.0
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -387,15 +358,15 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("ordrumbox-kitset-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         let mut kits = set(&dir);
-        assert_eq!(kits.adjust(0, 0, Field::Gain, -3, false).as_deref(), Some("kick: gain -3.0 dB"));
-        assert_eq!(kits.adjust(0, 0, Field::Gain, -30, false).as_deref(), Some("kick: gain -24.0 dB"));
-        assert_eq!(kits.adjust(0, 0, Field::Gain, -1, true), None); // at the bottom
-        kits.adjust(0, 0, Field::Tune, 3, true);
+        assert_eq!(kits.set_value(0, 0, Field::Gain, -3.0).as_deref(), Some("kick: gain -3.0 dB"));
+        assert_eq!(kits.set_value(0, 0, Field::Gain, -3.0), None); // no change
+        kits.set_value(0, 0, Field::Tune, 0.3);
         assert_eq!(kits.kits[0].instruments[0].tune, 0.3);
-        kits.adjust(0, 0, Field::Decay, 1, false);
-        assert_eq!(kits.kits[0].instruments[0].decay, Some(630.0)); // 500 × 1.25, to 10 ms
-        kits.adjust(0, 0, Field::Instrument, 1, false);
-        assert_ne!(kits.kits[0].instruments[0].key, "KICK");
+        kits.set_value(0, 0, Field::Decay, 630.0);
+        assert_eq!(kits.kits[0].instruments[0].decay, Some(630.0));
+        assert!(kits.set_instrument(0, 0, "SNARE").is_some());
+        assert_eq!(kits.kits[0].instruments[0].key, "SNARE");
+        assert_eq!(kits.find_url("k.wav"), Some((0, 0)));
 
         assert_eq!(kits.normalize(0), Ok(1));
         // The gain comes from the peak in dB to 3 decimals, as in the JS: about 0 dB.
@@ -412,7 +383,8 @@ mod tests {
         assert!(errors.is_empty());
         assert_eq!(bank.samples.len(), 2);
 
-        assert_eq!(kits.adjust(0, 1, Field::Kit, 1, false).as_deref(), Some("Moved \"SnareDrum.wav\" to kit \"b\""));
+        assert_eq!(kits.move_to_kit(0, 1, 1).as_deref(), Some("Moved \"SnareDrum.wav\" to kit \"b\""));
+        assert_eq!(kits.move_to_kit(0, 0, 0), None);
         assert_eq!(kits.kits[1].instruments.len(), 1);
         assert!(kits.remove(1, 0).is_some());
 

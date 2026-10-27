@@ -17,6 +17,7 @@ pub mod strip_settings;
 pub mod synth_preset;
 pub mod wav;
 
+pub use assign::TrackSound;
 pub use controller::{AudioSide, Controller, Mode};
 pub use engine::{Engine, Position};
 pub use kit::{Instrument, Kit, SampleBank, kits_from_json, kits_to_json};

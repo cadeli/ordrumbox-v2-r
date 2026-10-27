@@ -8,6 +8,8 @@ use std::path::{Path, PathBuf};
 
 use ordrumbox_core::json;
 use ordrumbox_core::{Library, LoadReport, Scales};
+
+use crate::editors::ScaleList;
 use ordrumbox_engine::{Kit, SampleBank, SynthPresets, kits_from_json};
 
 use crate::store;
@@ -21,6 +23,8 @@ pub struct Assets {
     pub report: LoadReport,
     pub kits: Vec<Kit>,
     pub scales: Scales,
+    /// The scale names in file order (the note editor's arpeggio scales).
+    pub scale_list: ScaleList,
     /// Synth presets (`generated_sounds.json`).
     pub synths: SynthPresets,
     pub bank: SampleBank,
@@ -94,10 +98,12 @@ pub fn load(dir: &Path) -> Result<Assets, String> {
         Some(Err(e)) => (assets_kits(), Some(e)),
         _ => (assets_kits(), None),
     };
-    let scales = read_json(&data.join("scales.json")).map(|v| Scales::from_json(&v)).unwrap_or_default();
+    let scales_json = read_json(&data.join("scales.json")).ok();
+    let scales = scales_json.as_ref().map(Scales::from_json).unwrap_or_default();
+    let scale_list = scales_json.as_ref().map(ScaleList::from_json).unwrap_or_default();
     let synths =
         read_json(&data.join("generated_sounds.json")).map(|v| SynthPresets::from_json(&v)).unwrap_or_default();
     let sources = SampleSources { assets: dir.join("kits"), user: store::samples_dir() };
     let (bank, sample_errors) = SampleBank::load(&kits, |url| sources.read(url));
-    Ok(Assets { library, report, kits, scales, synths, bank, sample_errors, sources, kits_error })
+    Ok(Assets { library, report, kits, scales, scale_list, synths, bank, sample_errors, sources, kits_error })
 }

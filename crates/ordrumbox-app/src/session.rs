@@ -22,11 +22,17 @@ use ordrumbox_logic::{Editor, Nudge};
 use crate::assets;
 use crate::audio;
 use crate::canvas::Canvas;
-use crate::kits::{Field, KitSet};
+use crate::editors::{EditorState, ScaleList};
+use crate::kits::KitSet;
 use crate::menu::{self, Command, MenuState};
+use crate::panel::{Dropdown, Entry, Id};
 use crate::picker::{self, Outcome, Picker, PickerLayout, Purpose};
 use crate::store;
-use crate::view::{self, Cursor, Hit, KitHit, KitView, View};
+use crate::view::{self, Cursor, Hit, KitView, View};
+
+#[path = "session_panel.rs"]
+mod session_panel;
+pub use session_panel::{Button, PanelKey};
 
 /// Save this long after the last edit.
 const SAVE_DELAY: Duration = Duration::from_secs(1);
@@ -69,8 +75,8 @@ pub struct Session {
     roots: Vec<(String, f64)>,
     kits: KitSet,
     kit_index: usize,
-    /// The kit editor, when open: selected sample of the current kit and field.
-    kit_editor: Option<(usize, Field)>,
+    /// The kit editor, when open: selected sample of the current kit.
+    kit_editor: Option<usize>,
     /// Analysis of the sample the kit editor shows, by url.
     analysis: Option<(String, Analysis)>,
     synths: SynthPresets,
@@ -105,6 +111,54 @@ pub struct Session {
     assets_dir: Option<PathBuf>,
     /// File > Quit was chosen.
     quit: bool,
+    /// The scale names, in file order (arpeggios).
+    scale_list: ScaleList,
+    /// Tabs and selection of the track and note editors.
+    editors: EditorState,
+    /// The track editor (and its note editor) shown on the right.
+    show_track_editor: bool,
+    /// The widget with the keyboard focus.
+    focus: Option<Id>,
+    /// A knob or slider being dragged.
+    drag: Option<Drag>,
+    dropdown: Option<Dropdown>,
+    entry: Option<Entry>,
+    /// Last click on a widget, for double-clicks.
+    last_click: Option<(Id, Instant)>,
+    /// What the note editor follows when no note is selected.
+    note_focus: Option<NoteFocus>,
+    /// The default note the note editor shows for a track without notes
+    /// (edits stay in it, as in the JS): its track and the note.
+    detached: Option<(usize, Note)>,
+    /// Kit knob edits not yet applied to the bank and saved.
+    kits_dirty: Option<Instant>,
+    /// Master volume, 0–2 (not saved, as in the JS).
+    master_volume: f64,
+    /// Sample analyses of the track editor, by url.
+    track_analysis: std::cell::RefCell<std::collections::HashMap<String, Analysis>>,
+}
+
+/// A drag in progress.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Drag {
+    id: Id,
+    spec: crate::control::Spec,
+    start: f64,
+    x: i32,
+    y: i32,
+    /// A slider's bar (left, width), when it follows the mouse.
+    bar: Option<(i32, i32)>,
+    /// A slider dragged finely: from where.
+    fine: bool,
+}
+
+/// What the note editor shows when no note is selected.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum NoteFocus {
+    /// A track was picked: its first note.
+    Track(usize),
+    /// The grid cursor moved to a step: its note, or none.
+    Step { track: usize, beat: i32, step: i32 },
 }
 
 /// What is shown over the window.
@@ -116,10 +170,10 @@ enum Overlay {
 }
 
 /// Every key, for Help > Keyboard shortcuts.
-const SHORTCUTS: [&str; 30] = [
+const SHORTCUTS: [&str; 38] = [
     "MENUS",
     "  F10 or Alt             open the menus: Arrows move, Enter runs, Esc closes",
-    "  F1                     this list",
+    "  F1, F2                 this list, the track editor (shown or hidden)",
     "GRID",
     "  Arrows                 move the cursor",
     "  Enter / click          add a note, select it, delete the selected one",
@@ -144,9 +198,17 @@ const SHORTCUTS: [&str; 30] = [
     "  B                      generate a pattern",
     "  D, S, A                drums, bass, chords in auto mode (again: off)",
     "  Z, X                   track in auto mode, random notes on the track",
+    "KNOBS, SLIDERS, LISTS (track editor, note editor, kit editor, volumes)",
+    "  Tab / Shift+Tab        focus the next / previous control      Esc  back to the grid",
+    "  Arrows, - =, wheel     change (Shift or Alt: finely, Ctrl: x10); a list: next option",
+    "  drag                   a knob up / down, a slider along (Shift: finely)",
+    "  double-click           default value     right-click or Enter: type a value",
+    "  Enter or Space         open a list, press a button",
     "KIT EDITOR (Ctrl+K)",
-    "  Up Down, Left Right    sample, field     - = (Shift: finely)  change    Enter  hear",
-    "  Delete, N, R, E        remove, normalize, assign again, export mapping   (drop files to add)",
+    "  Up Down                sample      Enter  hear      Delete  remove",
+    "  N, R, E                normalize, assign the sounds again, export the mapping",
+    "  drop files             a .wav joins the kit (Shift: replaces the sample), a folder",
+    "                         becomes a kit, a .json mapping loads, a .mid imports",
 ];
 
 impl Session {
@@ -208,6 +270,7 @@ impl Session {
         let mut session = Self::new(library, kits, status);
         session.assets_dir = Some(dir.clone());
         session.scales = assets.scales.clone();
+        session.scale_list = assets.scale_list.clone();
         session.synths = assets.synths.clone();
         session.roots = assets
             .bank
@@ -268,6 +331,19 @@ impl Session {
             last_dir: None,
             assets_dir: None,
             quit: false,
+            scale_list: ScaleList::default(),
+            editors: EditorState::default(),
+            show_track_editor: true,
+            focus: None,
+            drag: None,
+            dropdown: None,
+            entry: None,
+            last_click: None,
+            note_focus: None,
+            detached: None,
+            kits_dirty: None,
+            master_volume: 1.0,
+            track_analysis: std::cell::RefCell::default(),
         }
     }
 
@@ -444,8 +520,8 @@ impl Session {
         if let Some(render) = &mut self.render {
             render.kit.clone_from(&kit.name);
         }
-        if let Some((sample, field)) = self.kit_editor {
-            self.kit_editor = Some((sample.min(kit.instruments.len().saturating_sub(1)), field));
+        if let Some(sample) = self.kit_editor {
+            self.kit_editor = Some(sample.min(kit.instruments.len().saturating_sub(1)));
         }
         self.update_analysis();
     }
@@ -483,6 +559,7 @@ impl Session {
             kits: self.kits.kits.iter().map(|k| k.name.clone()).collect(),
             kit_index: self.kit_index,
             kit_editor: self.kit_editor.is_some(),
+            track_editor: self.show_track_editor,
             kit_sample: self.kit_list().is_some_and(|(s, n)| s < n),
         }
     }
@@ -560,6 +637,7 @@ impl Session {
             C::PreviousKit => self.step_kit(-1),
             C::NextKit => self.step_kit(1),
             C::KitEditor => self.toggle_kit_editor(),
+            C::TrackEditor => self.toggle_track_editor(),
             C::NormalizeKit => self.kit_normalize(),
             C::ExportMapping => self.kit_export(),
             C::LoadMapping => self.open_picker(Purpose::LoadMapping),
@@ -642,6 +720,7 @@ impl Session {
         self.last_dir = picker.dir.clone();
         match picker.purpose {
             Purpose::ImportMidi => self.import_midi(&path),
+            Purpose::ReplaceTrackSample => self.replace_track_sample(&path),
             Purpose::ReplaceSample => self.drop_path(&path, true),
             Purpose::AddSample | Purpose::LoadMapping | Purpose::ImportFolder => self.drop_path(&path, false),
         }
@@ -669,7 +748,7 @@ impl Session {
 
     /// The kit editor's selected sample and the kit's sample count, when open.
     pub fn kit_list(&self) -> Option<(usize, usize)> {
-        let (sample, _) = self.kit_editor?;
+        let sample = self.kit_editor?;
         Some((sample, self.kits.kits.get(self.kit_index).map_or(0, |k| k.instruments.len())))
     }
 
@@ -677,14 +756,16 @@ impl Session {
     pub fn toggle_kit_editor(&mut self) {
         self.kit_editor = match self.kit_editor {
             Some(_) => None,
-            None => Some((0, Field::Instrument)),
+            None => Some(0),
         };
+        self.focus = None;
+        self.dropdown = None;
         self.update_analysis();
     }
 
     /// The analysis of the sample shown, computed when it changes.
     fn update_analysis(&mut self) {
-        let url = self.kit_editor.and_then(|(s, _)| self.kits.sample(self.kit_index, s)).map(|i| i.url.clone());
+        let url = self.kit_editor.and_then(|s| self.kits.sample(self.kit_index, s)).map(|i| i.url.clone());
         match url {
             Some(url) if self.analysis.as_ref().is_some_and(|(u, _)| *u == url) => {}
             Some(url) => {
@@ -697,6 +778,8 @@ impl Session {
     /// The kits changed: a new bank for playback and exports, the root
     /// notes, the kits saved, the selection kept inside.
     fn kits_changed(&mut self, message: String) {
+        self.kits_dirty = None;
+        self.track_analysis.borrow_mut().clear();
         let (bank, errors) = self.kits.bank();
         self.roots =
             bank.samples.iter().filter_map(|s| Some((s.instrument.key.clone(), s.instrument.root_midi?))).collect();
@@ -726,47 +809,27 @@ impl Session {
 
     /// ↑↓: the previous / next sample of the kit.
     pub fn kit_select(&mut self, delta: isize) {
-        let Some((sample, field)) = self.kit_editor else { return };
+        let Some(sample) = self.kit_editor else { return };
         let count = self.kits.kits.get(self.kit_index).map_or(0, |k| k.instruments.len());
         if count > 0 {
-            self.kit_editor = Some(((sample as isize + delta).rem_euclid(count as isize) as usize, field));
+            self.kit_editor = Some((sample as isize + delta).rem_euclid(count as isize) as usize);
             self.update_analysis();
         }
     }
 
-    /// ←→: the previous / next field.
-    pub fn kit_field(&mut self, delta: isize) {
-        let Some((sample, field)) = self.kit_editor else { return };
-        let at = Field::ALL.iter().position(|f| *f == field).unwrap_or(0) as isize;
-        // No wrap-around: a step past Decay must not land on Kit (where - = move the sample).
-        let at = (at + delta).clamp(0, Field::ALL.len() as isize - 1) as usize;
-        self.kit_editor = Some((sample, Field::ALL[at]));
-    }
-
-    /// A click in the kit editor.
-    pub fn kit_click(&mut self, hit: KitHit) {
-        let Some((sample, field)) = self.kit_editor else { return };
-        self.kit_editor = Some(match hit {
-            KitHit::Sample(s) => (s, field),
-            KitHit::Field(f) => (sample, f),
-        });
+    /// A click on the kit editor's list: that sample, heard.
+    pub fn kit_click(&mut self, sample: usize) {
+        if self.kit_editor.is_none() {
+            return;
+        }
+        self.kit_editor = Some(sample);
         self.update_analysis();
-        if let KitHit::Sample(_) = hit {
-            self.kit_audition();
-        }
-    }
-
-    /// - =: the selected field down / up (Shift: finely).
-    pub fn kit_adjust(&mut self, steps: i32, fine: bool) {
-        let Some((sample, field)) = self.kit_editor else { return };
-        if let Some(message) = self.kits.adjust(self.kit_index, sample, field, steps, fine) {
-            self.kits_changed(message);
-        }
+        self.kit_audition();
     }
 
     /// Enter: the selected sample, as it is.
     pub fn kit_audition(&mut self) {
-        let Some((sample, _)) = self.kit_editor else { return };
+        let Some(sample) = self.kit_editor else { return };
         let Some(url) = self.kits.sample(self.kit_index, sample).map(|i| i.url.clone()) else { return };
         if let Some(controller) = &mut self.controller
             && let Some(index) = controller.bank().find_url(&url)
@@ -777,7 +840,7 @@ impl Session {
 
     /// Delete: the selected sample out of the kit.
     pub fn kit_remove(&mut self) {
-        let Some((sample, _)) = self.kit_editor else { return };
+        let Some(sample) = self.kit_editor else { return };
         if let Some(message) = self.kits.remove(self.kit_index, sample) {
             self.kits_changed(message);
         }
@@ -818,7 +881,7 @@ impl Session {
                 "mid" | "midi" => return self.import_midi(path),
                 "json" => self.kits.load_mapping(path).map(|(kit, message)| (kit, 0, message)),
                 "wav" => match self.kit_editor {
-                    Some((sample, _)) if shift => self
+                    Some(sample) if shift => self
                         .kits
                         .replace_sample(self.kit_index, sample, path)
                         .map(|message| (self.kit_index, sample, message)),
@@ -833,7 +896,7 @@ impl Session {
         match result {
             Ok((kit, sample, message)) => {
                 self.kit_index = kit;
-                self.kit_editor = Some((sample, self.kit_editor.map_or(Field::Instrument, |(_, f)| f)));
+                self.kit_editor = Some(sample);
                 self.kits_changed(message);
             }
             Err(e) => self.message = e,
@@ -924,6 +987,7 @@ impl Session {
             Hit::Name(t) => {
                 self.cursor = Some(Cursor { track: t, beat: self.cursor.map_or(0, |c| c.beat), step: 0 });
                 self.selected = None;
+                self.note_focus = Some(NoteFocus::Track(t));
                 self.audition(t, None);
             }
             Hit::Cell { track, beat, step } => {
@@ -944,6 +1008,7 @@ impl Session {
                 let pitch = track.notes[n].pitch;
                 self.editor.delete_note(p, t, beat, step, pitch);
                 self.selected = None;
+                self.note_focus = Some(NoteFocus::Step { track: t, beat, step });
                 self.edited();
             }
             Some(n) => {
@@ -1002,6 +1067,7 @@ impl Session {
         let spb = pattern.tracks[c.track].steps_per_beat.max(1);
         c.step = c.step.min(spb - 1);
         self.cursor = Some(c);
+        self.note_focus = Some(NoteFocus::Step { track: c.track, beat: c.beat, step: c.step });
         let note = pattern.tracks[c.track].notes.iter().position(|n| n.beat == c.beat && n.beat_step == c.step);
         self.selected = note.map(|n| (c.track, n));
         if let Some(n) = note {
@@ -1260,7 +1326,17 @@ impl Session {
     }
 
     /// Save once the edits have settled; when to call again, if a save is pending.
+    /// Save what is due (the library, kit knob edits); when the next save is.
     pub fn autosave(&mut self) -> Option<Instant> {
+        let kits = self.flush_kits();
+        let library = self.autosave_library();
+        match (kits, library) {
+            (Some(a), Some(b)) => Some(a.min(b)),
+            (a, b) => a.or(b),
+        }
+    }
+
+    fn autosave_library(&mut self) -> Option<Instant> {
         let changed = self.changed_at?;
         if self.library_path.is_none() || self.editor.revision() == self.saved_revision {
             self.changed_at = None;
@@ -1277,6 +1353,7 @@ impl Session {
     // ─── Drawing ─────────────────────────────────────────────────────────────
 
     pub fn draw(&self, canvas: &mut Canvas, scale: i32) {
+        let layout = self.panel_layout(canvas.width(), canvas.height(), scale);
         let position = self.controller.as_ref().and_then(Controller::position);
         let history = self.editor.history();
         let library = self.editor.library();
@@ -1309,7 +1386,8 @@ impl Session {
             pattern_index: self.pattern_index,
             pattern_count: library.patterns.len(),
             kit: self.kits.kits.get(self.kit_index).map_or("-", |k| k.name.as_str()),
-            kit_view: self.kit_view(),
+            kit_view: self.kit_view(layout.details_top),
+            right: layout.right,
             playing: self.playing(),
             playhead: position.filter(|_| song_mode.is_none()).map(|p| p.frame as f64 / p.frames.max(1) as f64),
             song: song.as_deref(),
@@ -1321,7 +1399,14 @@ impl Session {
             status: &self.status,
         };
         view::draw(canvas, &view, scale);
+        crate::panel::draw(canvas, &layout.items, self.focus, scale);
         menu::draw(canvas, &self.menus(), self.menu, scale);
+        if let Some(dropdown) = &self.dropdown {
+            dropdown.draw(canvas, scale);
+        }
+        if let Some(entry) = &self.entry {
+            entry.draw(canvas, scale);
+        }
         match &self.overlay {
             Some(Overlay::Picker(p)) => {
                 let layout = PickerLayout::new(canvas.width(), canvas.height(), scale);
@@ -1336,18 +1421,14 @@ impl Session {
         }
     }
 
-    /// What the kit editor shows.
-    fn kit_view(&self) -> Option<KitView<'_>> {
-        let (sample, field) = self.kit_editor?;
+    /// What the kit editor shows; its sample's details start at `details_top`.
+    fn kit_view(&self, details_top: i32) -> Option<KitView<'_>> {
+        let sample = self.kit_editor?;
         let kit = self.kits.kits.get(self.kit_index)?;
         let samples = kit.instruments.iter().map(|i| (i.display_name.as_str(), i.key.as_str())).collect();
         let selected = kit.instruments.get(sample);
         let analysis =
             self.analysis.as_ref().filter(|(url, _)| selected.is_some_and(|i| i.url == *url)).map(|(_, a)| a);
-        let values = selected.map(|i| {
-            let decay = i.decay.map_or_else(|| format!("{} ms (default)", i.decay_ms()), |d| format!("{d} ms"));
-            [kit.name.clone(), i.key.clone(), format!("{:+.1} dB", i.gain_db), format!("{:+.1} st", i.tune), decay]
-        });
         let info = analysis.map(|a| {
             let db = |v: f64| if v.is_finite() { format!("{v:.1}") } else { "-".into() };
             let note = a.note.map_or_else(|| "-".to_owned(), |n| n.to_string());
@@ -1367,8 +1448,7 @@ impl Session {
             kit: &kit.name,
             samples,
             selected: sample,
-            field,
-            values,
+            details_top,
             info,
             detected,
             envelope: analysis.map_or(&[][..], |a| &a.envelope),

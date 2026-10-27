@@ -84,6 +84,7 @@ fn shown(text: &str) -> impl Iterator<Item = char> + '_ {
             '—' | '–' => &['-'],
             '…' => &['.', '.', '.'],
             '×' => &['x'],
+            '·' => &['/'],
             _ => &[],
         };
         let own = replacement.is_empty().then_some(c);

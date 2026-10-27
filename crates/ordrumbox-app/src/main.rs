@@ -12,9 +12,12 @@
 mod assets;
 mod audio;
 mod canvas;
+mod control;
+mod editors;
 mod font;
 mod kits;
 mod menu;
+mod panel;
 mod picker;
 mod session;
 mod store;
@@ -33,7 +36,7 @@ use winit::window::{Window, WindowId};
 
 use canvas::Canvas;
 use menu::Command;
-use session::{Move, OverlayKey, Session};
+use session::{Button, Move, OverlayKey, PanelKey, Session};
 use view::{KitLayout, Layout};
 
 const TITLE: &str = "orDrumbox";
@@ -118,10 +121,18 @@ impl App {
         })
     }
 
-    fn click(&mut self) {
+    fn click(&mut self, button: Button) {
         let (width, height) = self.size();
         let (scale, x, y) = (self.scale(), self.mouse.x as i32, self.mouse.y as i32);
+        let shift = self.modifiers.shift_key();
         let s = &mut self.session;
+        // An open list or number entry takes the click; the right button is the widgets'.
+        if s.popup_open() || button == Button::Right {
+            if s.mouse_down((width, height, scale), x, y, button, shift) {
+                self.request_redraw();
+            }
+            return;
+        }
         let menus = s.menus();
         // The menu bar first: it is over everything.
         match menu::hit(&menus, s.open_menu(), scale, x, y) {
@@ -139,6 +150,7 @@ impl App {
             Some(menu::Hit::Bar) => s.set_menu(None),
             None if s.open_menu().is_some() => s.set_menu(None),
             None if s.overlay_open() => s.overlay_click(width, height, scale, x, y),
+            None if s.mouse_down((width, height, scale), x, y, Button::Left, shift) => {}
             None => return self.click_content(width, height, scale, x, y),
         }
         self.request_redraw();
@@ -154,8 +166,9 @@ impl App {
             }
             return;
         }
+        let right = self.session.track_editor_width(width, scale);
         let Some(pattern) = self.session.pattern() else { return };
-        let layout = Layout::new(width, height, scale, pattern, self.session.status_lines());
+        let layout = Layout::new(width - right, height, scale, pattern, self.session.status_lines());
         if let Some(hit) = layout.hit(pattern, x, y) {
             self.session.click(hit);
             self.request_redraw();
@@ -214,6 +227,10 @@ impl App {
         }
         let shift = self.modifiers.shift_key();
         let control = self.modifiers.control_key() || self.modifiers.super_key();
+        let alt = self.modifiers.alt_key();
+        if self.widget_key(event, code, shift || alt, control) {
+            return self.request_redraw();
+        }
         if let Some(command) = shortcut(code, shift, control) {
             self.session.run(command);
             return self.request_redraw();
@@ -226,10 +243,6 @@ impl App {
                 KeyCode::Escape => s.toggle_kit_editor(),
                 KeyCode::ArrowUp => s.kit_select(-1),
                 KeyCode::ArrowDown => s.kit_select(1),
-                KeyCode::ArrowLeft => s.kit_field(-1),
-                KeyCode::ArrowRight => s.kit_field(1),
-                KeyCode::Minus | KeyCode::NumpadSubtract => s.kit_adjust(-1, shift),
-                KeyCode::Equal | KeyCode::NumpadAdd => s.kit_adjust(1, shift),
                 KeyCode::Enter | KeyCode::NumpadEnter => s.kit_audition(),
                 KeyCode::Delete | KeyCode::Backspace => s.kit_remove(),
                 KeyCode::KeyN => s.kit_normalize(),
@@ -265,6 +278,47 @@ impl App {
             }
         }
         self.request_redraw();
+    }
+
+    /// Keys for the editors' widgets: an open list or number entry takes
+    /// them all; a focused knob, slider, select or button its own; Tab moves
+    /// the focus. Whether the key was theirs.
+    fn widget_key(&mut self, event: &KeyEvent, code: KeyCode, fine: bool, control: bool) -> bool {
+        let size = (self.size().0, self.size().1, self.scale());
+        let key = match code {
+            KeyCode::ArrowUp => Some(PanelKey::Up),
+            KeyCode::ArrowDown => Some(PanelKey::Down),
+            KeyCode::ArrowLeft => Some(PanelKey::Left),
+            KeyCode::ArrowRight => Some(PanelKey::Right),
+            // Ctrl+- and Ctrl+= stay the pattern length.
+            KeyCode::Minus | KeyCode::NumpadSubtract if !control => Some(PanelKey::Minus),
+            KeyCode::Equal | KeyCode::NumpadAdd if !control => Some(PanelKey::Plus),
+            KeyCode::Enter | KeyCode::NumpadEnter => Some(PanelKey::Enter),
+            KeyCode::Space => Some(PanelKey::Space),
+            KeyCode::Escape => Some(PanelKey::Escape),
+            KeyCode::Tab => Some(PanelKey::Tab),
+            KeyCode::PageUp => Some(PanelKey::PageUp),
+            KeyCode::PageDown => Some(PanelKey::PageDown),
+            KeyCode::Home => Some(PanelKey::Home),
+            KeyCode::End => Some(PanelKey::End),
+            KeyCode::Backspace => Some(PanelKey::Backspace),
+            _ => None,
+        };
+        let s = &mut self.session;
+        if s.popup_open() {
+            match key {
+                Some(key) if !(key == PanelKey::Minus || key == PanelKey::Plus) => {
+                    s.panel_key(size, key, fine, control);
+                }
+                _ => {
+                    for c in event.text.as_deref().unwrap_or("").chars() {
+                        s.panel_text(c);
+                    }
+                }
+            }
+            return true;
+        }
+        key.is_some_and(|key| s.panel_key(size, key, fine, control))
     }
 
     /// Keys while a menu is open.
@@ -346,6 +400,7 @@ fn shortcut(code: KeyCode, shift: bool, control: bool) -> Option<Command> {
     } else {
         match code {
             KeyCode::F1 => C::Shortcuts,
+            KeyCode::F2 => C::TrackEditor,
             KeyCode::BracketLeft if shift => C::PreviousSong,
             KeyCode::BracketRight if shift => C::NextSong,
             KeyCode::BracketLeft | KeyCode::PageUp => C::PreviousPattern,
@@ -397,6 +452,11 @@ impl ApplicationHandler for App {
             WindowEvent::CursorMoved { position, .. } => {
                 self.mouse = position;
                 self.hover();
+                let size = (self.size().0, self.size().1, self.scale());
+                let shift = self.modifiers.shift_key();
+                if self.session.mouse_move(size, position.x as i32, position.y as i32, shift) {
+                    self.request_redraw();
+                }
             }
             WindowEvent::MouseWheel { delta, .. } if self.session.overlay_open() => {
                 let lines = match delta {
@@ -408,12 +468,33 @@ impl ApplicationHandler for App {
                     self.request_redraw();
                 }
             }
+            WindowEvent::MouseWheel { delta, .. } => {
+                let lines = match delta {
+                    MouseScrollDelta::LineDelta(_, y) => y.round() as isize,
+                    MouseScrollDelta::PixelDelta(p) => (p.y / 20.0).round() as isize,
+                };
+                let size = (self.size().0, self.size().1, self.scale());
+                let (x, y) = (self.mouse.x as i32, self.mouse.y as i32);
+                let fine = self.modifiers.shift_key() || self.modifiers.alt_key();
+                let coarse = self.modifiers.control_key() || self.modifiers.super_key();
+                if self.session.wheel(size, x, y, lines, fine, coarse) {
+                    self.request_redraw();
+                }
+            }
             WindowEvent::DroppedFile(path) => {
                 self.session.close_overlay();
                 self.session.drop_path(&path, self.modifiers.shift_key());
                 self.request_redraw();
             }
-            WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } => self.click(),
+            WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } => {
+                self.click(Button::Left);
+            }
+            WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Right, .. } => {
+                self.click(Button::Right);
+            }
+            WindowEvent::MouseInput { state: ElementState::Released, button: MouseButton::Left, .. } => {
+                self.session.mouse_up();
+            }
             _ => {}
         }
         if self.session.quit_requested() {

@@ -11,6 +11,7 @@ use crate::canvas::{Canvas, Rgb, text_width};
 /// What a menu item (or its shortcut) does.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Command {
+    TrackEditor,
     Save,
     ImportMidi,
     ExportWav,
@@ -115,6 +116,7 @@ pub struct MenuState {
     pub kits: Vec<String>,
     pub kit_index: usize,
     pub kit_editor: bool,
+    pub track_editor: bool,
     /// The kit editor has a sample selected.
     pub kit_sample: bool,
 }
@@ -178,6 +180,13 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
                 Item::Separator,
                 command("Clear step", "Delete", C::ClearStep, s.has_cursor),
                 command("Deselect", "Esc", C::Deselect, s.has_cursor || s.has_selection),
+            ],
+        },
+        Menu {
+            title: "View",
+            items: vec![
+                check("Track editor", "F2", C::TrackEditor, true, s.track_editor),
+                check("Kit editor", "Ctrl+K", C::KitEditor, true, s.kit_editor),
             ],
         },
         Menu {
