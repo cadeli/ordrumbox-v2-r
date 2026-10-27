@@ -7,7 +7,8 @@ use std::sync::Arc;
 use ordrumbox_core::json;
 use ordrumbox_core::steps::TICK;
 use ordrumbox_core::{Library, Rng, Scales, recompute_flat_notes};
-use ordrumbox_engine::kit::{BankSample, Instrument, assign_samples};
+use ordrumbox_engine::assign::{TrackSound, assign_pattern};
+use ordrumbox_engine::kit::{BankSample, Instrument};
 use ordrumbox_engine::pass::{PassContext, build_pass, frames_per_tick};
 use ordrumbox_engine::{Engine, SampleBank, SynthPresets, wav};
 
@@ -46,11 +47,11 @@ fn every_note_becomes_an_event_on_its_frame() {
     let bank = bank();
     let scales = Scales::default();
     for pattern in &library.patterns {
-        let samples = assign_samples(pattern, &bank, "test");
         let synths = SynthPresets::default();
+        let sounds = assign_pattern(pattern, &bank, "test", &synths, &mut |_| 0);
         let context = PassContext {
             bank: &bank,
-            samples: &samples,
+            sounds: &sounds,
             scales: &scales,
             synths: &synths,
             sample_rate: RATE,
@@ -65,10 +66,12 @@ fn every_note_becomes_an_event_on_its_frame() {
         let expected: Vec<u64> = flat
             .iter()
             .flat_map(|(&tick, notes)| {
-                notes.iter().filter(|n| samples[n.track].is_some() && audible(n.track)).map(move |n| {
-                    let swing = n.swing_beats(&pattern.tracks[n.track]) * f64::from(TICK);
-                    (((f64::from(tick) + swing) * per_tick).round() as u64).min(pass.frames - 1)
-                })
+                notes.iter().filter(|n| matches!(sounds[n.track], TrackSound::Sample(_)) && audible(n.track)).map(
+                    move |n| {
+                        let swing = n.swing_beats(&pattern.tracks[n.track]) * f64::from(TICK);
+                        (((f64::from(tick) + swing) * per_tick).round() as u64).min(pass.frames - 1)
+                    },
+                )
             })
             .collect();
         let mut expected = expected;
@@ -84,11 +87,11 @@ fn rock_renders_clean_audio_starting_on_frame_zero() {
     let library = library();
     let bank = Arc::new(bank());
     let rock = library.pattern("rock").expect("rock");
-    let samples = assign_samples(rock, &bank, "test");
     let (scales, synths) = (Scales::default(), SynthPresets::default());
+    let sounds = assign_pattern(rock, &bank, "test", &synths, &mut |_| 0);
     let context = PassContext {
         bank: &bank,
-        samples: &samples,
+        sounds: &sounds,
         scales: &scales,
         synths: &synths,
         sample_rate: RATE,

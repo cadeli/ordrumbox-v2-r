@@ -5,9 +5,12 @@
 //! Built on the UI side (it allocates); the audio thread only reads it.
 
 use ordrumbox_core::steps::TICK;
-use ordrumbox_core::{FlatNote, Note, Pattern, Rng, Scales, lfo, recompute_flat_notes};
+use std::collections::HashMap;
+
+use ordrumbox_core::{FlatNote, FlatNotes, Note, Pattern, Rng, Scales, Song, lfo, recompute_flat_notes};
 use ordrumbox_dsp::{StripSettings, SynthPatch, VoiceStart};
 
+use crate::assign::TrackSound;
 use crate::kit::SampleBank;
 use crate::strip_settings::{StripLfo, strip_lfo, strip_settings};
 use crate::synth_preset::{SynthNote, SynthPresets, note_seconds, synth_patch};
@@ -82,8 +85,8 @@ impl Pass {
 #[derive(Debug, Clone, Copy)]
 pub struct PassContext<'a> {
     pub bank: &'a SampleBank,
-    /// Sample of each track (see `kit::assign_samples`).
-    pub samples: &'a [Option<usize>],
+    /// What each track plays (see [`crate::assign`]).
+    pub sounds: &'a [TrackSound],
     pub scales: &'a Scales,
     pub synths: &'a SynthPresets,
     pub sample_rate: f64,
@@ -124,7 +127,9 @@ pub fn build_pass(pattern: &Pattern, number: u64, rng: &mut Rng, context: PassCo
             // A note swung past the end still plays, on the last frame.
             let frame = (((f64::from(tick) + swing_ticks) * per_tick).round() as u64).min(frames - 1);
             let lfo_tick = context.first_tick + u64::from(tick);
-            if let Some(sound) = sound_for(pattern, note, bpm, lfo_tick, &context, &mut patches) {
+            let Some(assigned) = context.sounds.get(note.track) else { continue };
+            let voice = Voice { strip: note.track, lfo_tick, bpm };
+            if let Some(sound) = sound_for(pattern, note, assigned, voice, &context, &mut patches) {
                 events.push(Event { frame, sound, mono: track.mono });
             }
         }
@@ -152,33 +157,47 @@ pub fn build_pass(pattern: &Pattern, number: u64, rng: &mut Rng, context: PassCo
     Pass { number, first_tick: context.first_tick, frames, ticks, events, strips, lfos, patches }
 }
 
-/// The voice `note` starts (`None`: nothing to play), its synth patch pushed
-/// to `patches`. `lfo_tick` is the transport tick for the pitch LFO.
+/// Where and how a voice plays.
+#[derive(Debug, Clone, Copy)]
+struct Voice {
+    /// Strip the voice plays into.
+    strip: usize,
+    /// Transport tick, for the pitch LFO.
+    lfo_tick: u64,
+    bpm: f64,
+}
+
+/// The voice `note` starts with `assigned` (`None`: nothing to play), its
+/// synth patch pushed to `patches`.
 fn sound_for(
     pattern: &Pattern,
     note: &FlatNote,
-    bpm: f64,
-    lfo_tick: u64,
+    assigned: &TrackSound,
+    voice: Voice,
     context: &PassContext<'_>,
     patches: &mut Vec<SynthPatch>,
 ) -> Option<Sound> {
+    let Voice { strip, lfo_tick, bpm } = voice;
     let track = &pattern.tracks[note.track];
-    if track.use_soft_synth {
-        let preset = track.synth_sound_key.as_deref().and_then(|key| context.synths.get(key))?;
-        let synth_note = SynthNote {
-            ratio: note.playback_ratio(track),
-            velocity: note.velocity,
-            pan: note.playback_pan(track),
-            bpm,
-        };
-        patches.push(synth_patch(preset, synth_note));
-        return Some(Sound::Synth(SynthStart {
-            track: note.track,
-            patch: patches.len() - 1,
-            length: note_seconds(bpm, track.steps_per_beat),
-        }));
-    }
-    let sample = context.samples.get(note.track).copied().flatten()?;
+    let sample = match assigned {
+        TrackSound::None => return None,
+        TrackSound::Synth(key) => {
+            let preset = context.synths.get(key)?;
+            let synth_note = SynthNote {
+                ratio: note.playback_ratio(track),
+                velocity: note.velocity,
+                pan: note.playback_pan(track),
+                bpm,
+            };
+            patches.push(synth_patch(preset, synth_note));
+            return Some(Sound::Synth(SynthStart {
+                track: strip,
+                patch: patches.len() - 1,
+                length: note_seconds(bpm, track.steps_per_beat),
+            }));
+        }
+        TrackSound::Sample(sample) => *sample,
+    };
     let bank_sample = context.bank.get(sample)?;
     let mut ratio = note.playback_ratio(track);
     if let Some(pitch_lfo) = &track.pitch_lfo {
@@ -186,7 +205,7 @@ fn sound_for(
     }
     Some(Sound::Sample(VoiceStart {
         sample,
-        track: note.track,
+        track: strip,
         ratio,
         peak: note.velocity as f32,
         decay: (bank_sample.instrument.decay_ms / 1000.0) as f32,
@@ -211,10 +230,195 @@ pub fn build_preview(pattern: &Pattern, t: usize, note: Option<&Note>, context: 
         pan: note.map_or(track.pan, |n| n.pan),
     };
     let mut patches = Vec::new();
-    let events = sound_for(pattern, &flat, bpm, context.first_tick, &context, &mut patches)
+    let voice = Voice { strip: t, lfo_tick: context.first_tick, bpm };
+    let events = context
+        .sounds
+        .get(t)
+        .and_then(|assigned| sound_for(pattern, &flat, assigned, voice, &context, &mut patches))
         .map(|sound| Event { frame: 0, sound, mono: track.mono })
         .into_iter()
         .collect();
     let strips = pattern.tracks.iter().map(|t| strip_settings(t, bpm)).collect();
     Pass { frames: 1, ticks: 1, events, strips, patches, ..Pass::default() }
+}
+
+/// Flat notes of a pattern repetition, kept between song passes so a
+/// pattern longer than a measure is drawn once per repetition.
+pub type FlatNotesCache = HashMap<(usize, u64), FlatNotes>;
+
+/// What a song pass is built from.
+#[derive(Debug, Clone, Copy)]
+pub struct SongContext<'a> {
+    pub bank: &'a SampleBank,
+    pub patterns: &'a [Pattern],
+    /// What each track of each pattern plays, by pattern index (empty for
+    /// patterns the song does not use).
+    pub sounds: &'a [Vec<TrackSound>],
+    pub scales: &'a Scales,
+    pub synths: &'a SynthPresets,
+    pub sample_rate: f64,
+}
+
+/// One strip per track name over the song's patterns, in song order
+/// (`Mixer.strips` is keyed by track name): `(pattern, track)` of the first
+/// track with each name.
+pub fn song_strips(song: &Song, patterns: &[Pattern]) -> Vec<(usize, usize)> {
+    let mut strips: Vec<(usize, usize)> = Vec::new();
+    let mut seen = Vec::new();
+    for clip in &song.clips {
+        let Some(p) = patterns.iter().rposition(|p| p.id == clip.pattern) else { continue };
+        if seen.contains(&p) {
+            continue;
+        }
+        seen.push(p);
+        for (t, track) in patterns[p].tracks.iter().enumerate() {
+            if !strips.iter().any(|&(sp, st)| patterns[sp].tracks[st].name == track.name) {
+                strips.push((p, t));
+            }
+        }
+    }
+    strips
+}
+
+/// Pass `measure` (measures since play started) of `song`: every clip
+/// sounding during that measure at the song's tempo (`#playSongNotes`).
+pub fn build_song_pass(
+    song: &Song,
+    measure: u64,
+    rng: &mut Rng,
+    cache: &mut FlatNotesCache,
+    context: SongContext<'_>,
+) -> Pass {
+    let bpm = song.bpm.clamp(20.0, 300.0);
+    let per_tick = frames_per_tick(bpm, context.sample_rate);
+    let ticks = TICK * 4;
+    let frames = (f64::from(ticks) * per_tick).round().max(1.0) as u64;
+    let first_tick = measure * u64::from(ticks);
+    let strips = song_strips(song, context.patterns);
+    let strip_of = |p: usize, t: usize| {
+        let name = &context.patterns[p].tracks[t].name;
+        strips.iter().position(|&(sp, st)| context.patterns[sp].tracks[st].name == *name)
+    };
+    let silent = |p: usize, t: usize| {
+        let tracks = &context.patterns[p].tracks;
+        if tracks.iter().any(|t| t.solo) { !tracks[t].solo } else { tracks[t].mute }
+    };
+
+    let mut events = Vec::new();
+    let mut patches = Vec::new();
+    for t in 0..ticks {
+        let tick = first_tick + u64::from(t);
+        for source in song.sources_at(context.patterns, tick, TICK) {
+            let p = source.pattern;
+            let pattern = &context.patterns[p];
+            let flat = cache.entry((p, source.loop_index)).or_insert_with(|| {
+                recompute_flat_notes(pattern, u32::try_from(source.loop_index).unwrap_or(u32::MAX), rng, context.scales)
+            });
+            let Some(notes) = u32::try_from(source.local_step).ok().and_then(|s| flat.get(&s)) else { continue };
+            let sounds = context.sounds.get(p).map_or(&[][..], Vec::as_slice);
+            let pass_context = PassContext {
+                bank: context.bank,
+                sounds,
+                scales: context.scales,
+                synths: context.synths,
+                sample_rate: context.sample_rate,
+                first_tick,
+            };
+            for note in notes {
+                if silent(p, note.track) {
+                    continue;
+                }
+                let (Some(strip), Some(assigned)) = (strip_of(p, note.track), sounds.get(note.track)) else { continue };
+                let track = &pattern.tracks[note.track];
+                let swing_ticks = note.swing_beats(track) * f64::from(TICK);
+                let frame = (((f64::from(t) + swing_ticks) * per_tick).round() as u64).min(frames - 1);
+                let voice = Voice { strip, lfo_tick: tick, bpm };
+                if let Some(sound) = sound_for(pattern, note, assigned, voice, &pass_context, &mut patches) {
+                    events.push(Event { frame, sound, mono: track.mono });
+                }
+            }
+        }
+    }
+    events.sort_by_key(|e| e.frame);
+    // Repetitions this pass is past are not needed again.
+    cache.retain(|&(p, loop_index), _| {
+        song.sources_at(context.patterns, first_tick + u64::from(ticks), TICK)
+            .iter()
+            .any(|s| s.pattern == p && s.loop_index <= loop_index)
+    });
+
+    let strip_settings_of = |&(p, t): &(usize, usize)| {
+        let mut settings = strip_settings(&context.patterns[p].tracks[t], bpm);
+        if silent(p, t) {
+            settings.volume = 0.0;
+        }
+        settings
+    };
+    let lfos = strips
+        .iter()
+        .enumerate()
+        .filter_map(|(i, &(p, t))| strip_lfo(i, &context.patterns[p].tracks[t], silent(p, t), first_tick, ticks))
+        .collect();
+    Pass {
+        number: measure,
+        first_tick,
+        frames,
+        ticks,
+        events,
+        strips: strips.iter().map(strip_settings_of).collect(),
+        lfos,
+        patches,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::kit::{BankSample, Instrument};
+    use ordrumbox_core::Library;
+    use ordrumbox_dsp::SampleBuffer;
+
+    #[test]
+    fn song_pass_layers_the_clips_of_each_measure() {
+        let (library, _) = Library::parse(
+            r#"{"patterns":[
+                {"id":"a","name":"a","tracks":[{"name":"KICK","notes":[{"beat":0},{"beat":2}]},{"name":"HAT","notes":[{"beat":1}]}]},
+                {"id":"b","name":"b","beatCount":8,"tracks":[{"name":"KICK","notes":[{"beat":5}]},{"name":"SNARE","notes":[{"beat":6}]}]}],
+              "songs":[{"id":"s","name":"s","bpm":120,"clips":[
+                {"pattern":"a","startMeasure":0,"measureCount":2},{"pattern":"b","startMeasure":1,"measureCount":2}]}]}"#,
+        )
+        .unwrap();
+        let instrument = Instrument { key: "X".into(), display_name: "x".into(), url: "x".into(), decay_ms: 100.0 };
+        let bank = SampleBank {
+            samples: vec![BankSample { kit: "k".into(), instrument, buffer: SampleBuffer::mono(vec![1.0], 48_000) }],
+        };
+        let sounds = vec![vec![TrackSound::Sample(0); 2]; 2];
+        let (scales, synths) = (Scales::default(), SynthPresets::default());
+        let context = SongContext {
+            bank: &bank,
+            patterns: &library.patterns,
+            sounds: &sounds,
+            scales: &scales,
+            synths: &synths,
+            sample_rate: 48_000.0,
+        };
+        let song = &library.songs[0];
+        let strips = song_strips(song, &library.patterns);
+        assert_eq!(strips, [(0, 0), (0, 1), (1, 1)], "KICK, HAT, SNARE: one strip per name");
+
+        let mut cache = FlatNotesCache::new();
+        let beat = 24_000; // frames per beat at 120 bpm
+        let events = |measure: u64, cache: &mut FlatNotesCache| -> Vec<(u64, usize)> {
+            let pass = build_song_pass(song, measure, &mut Rng::new(1), cache, context);
+            assert_eq!((pass.frames, pass.first_tick, pass.strips.len()), (4 * beat, measure * 128, 3));
+            pass.events.iter().map(|e| (e.frame / beat, e.sound.track())).collect()
+        };
+        assert_eq!(events(0, &mut cache), [(0, 0), (1, 1), (2, 0)]);
+        // Measure 1: a again; b's first measure (beats 0–3) has nothing.
+        assert_eq!(events(1, &mut cache), [(0, 0), (1, 1), (2, 0)]);
+        // Measure 2: b's second measure: KICK on beat 5 → 1, SNARE on 6 → 2.
+        assert_eq!(events(2, &mut cache), [(1, 0), (2, 2)]);
+        // The song is 3 measures long: measure 3 is measure 0 again.
+        assert_eq!(events(3, &mut cache), [(0, 0), (1, 1), (2, 0)]);
+    }
 }

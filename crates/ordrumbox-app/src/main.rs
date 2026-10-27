@@ -131,6 +131,7 @@ impl App {
                 KeyCode::KeyC => s.copy(shift),
                 KeyCode::KeyV => s.paste(shift),
                 KeyCode::KeyS => s.save(),
+                KeyCode::KeyE => s.export_wav(shift),
                 KeyCode::KeyN => s.new_pattern(),
                 KeyCode::KeyD => s.duplicate_pattern(),
                 KeyCode::KeyT => s.add_track(),
@@ -148,7 +149,10 @@ impl App {
         } else {
             let tempo = if shift { 10.0 } else { 1.0 };
             match code {
+                KeyCode::Space if !event.repeat && shift => s.toggle_play_song(),
                 KeyCode::Space if !event.repeat => s.toggle_play(),
+                KeyCode::BracketLeft if shift => s.step_song(-1),
+                KeyCode::BracketRight if shift => s.step_song(1),
                 KeyCode::BracketLeft | KeyCode::PageUp => s.step_pattern(-1),
                 KeyCode::BracketRight | KeyCode::PageDown => s.step_pattern(1),
                 KeyCode::Minus | KeyCode::NumpadSubtract => s.step_tempo(-tempo),

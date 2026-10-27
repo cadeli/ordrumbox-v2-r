@@ -85,6 +85,11 @@ impl SynthPresets {
         self.0.len()
     }
 
+    /// Preset keys, in file order.
+    pub fn keys(&self) -> Vec<&str> {
+        self.0.iter().map(|(k, _)| k).collect()
+    }
+
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }

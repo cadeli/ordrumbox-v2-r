@@ -149,6 +149,55 @@ impl Song {
     }
 }
 
+/// A clip sounding at a transport tick (`resolveSongSources`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SongSource {
+    /// Index of the clip's pattern in the pattern list.
+    pub pattern: usize,
+    pub clip: usize,
+    /// Repetition of the pattern since the clip started.
+    pub loop_index: u64,
+    /// Tick within the pattern.
+    pub local_step: u64,
+    pub pattern_ticks: u64,
+}
+
+impl Song {
+    /// The clips sounding at transport `tick` (`ticks_per_beat` per beat):
+    /// the arrangement loops over [`Song::length_measures`]; a clip counts
+    /// its repetitions from its start on the unwrapped transport.
+    pub fn sources_at(&self, patterns: &[crate::Pattern], tick: u64, ticks_per_beat: u32) -> Vec<SongSource> {
+        let per_measure = f64::from(ticks_per_beat) * BEATS_PER_MEASURE;
+        let total = self.length_measures();
+        if per_measure <= 0.0 || total <= 0.0 {
+            return Vec::new();
+        }
+        let tick_f = tick as f64;
+        let measures = (tick_f / per_measure) % total;
+        let mut sources = Vec::new();
+        for (index, clip) in self.clips.iter().enumerate() {
+            let start = f64::from(clip.start_measure);
+            let count = if clip.measure_count > 0.0 { clip.measure_count } else { 1.0 };
+            if measures < start || measures >= start + count {
+                continue;
+            }
+            // The last pattern with that id (a JS Map built in list order).
+            let Some(pattern) = patterns.iter().rposition(|p| p.id == clip.pattern) else { continue };
+            let beats = if patterns[pattern].beat_count > 0 { f64::from(patterns[pattern].beat_count) } else { 4.0 };
+            let pattern_ticks = beats * f64::from(ticks_per_beat);
+            let elapsed = (tick_f - start * per_measure).max(0.0);
+            sources.push(SongSource {
+                pattern,
+                clip: index,
+                loop_index: (elapsed / pattern_ticks).floor() as u64,
+                local_step: (elapsed % pattern_ticks).floor() as u64,
+                pattern_ticks: pattern_ticks as u64,
+            });
+        }
+        sources
+    }
+}
+
 /// Load a `songs` array as `normalizeSongs()`: unusable songs skipped, a
 /// repeated id renamed `<id>-alt` (then `-alt-2`…).
 pub fn songs_from_json(raw: &Value, known_ids: &HashSet<String>) -> (Vec<Song>, Vec<DroppedClip>) {

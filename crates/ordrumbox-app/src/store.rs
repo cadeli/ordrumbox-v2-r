@@ -34,6 +34,12 @@ pub fn path() -> Option<PathBuf> {
     env::var_os(ENV_VAR).filter(|v| !v.is_empty()).map(PathBuf::from).or_else(|| Some(data_dir()?.join(FILE_NAME)))
 }
 
+/// Where WAV exports go: `exports` in the user data folder (next to the
+/// library file when `$ORDRUMBOX_LIBRARY` names one).
+pub fn exports_dir() -> Option<PathBuf> {
+    Some(path()?.parent()?.join("exports"))
+}
+
 /// The saved library, if there is one. A file that cannot be read or parsed
 /// is an error (the caller must not overwrite it).
 pub fn load(path: &Path) -> Result<Option<Library>, String> {

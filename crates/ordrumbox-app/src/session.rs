@@ -11,7 +11,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use ordrumbox_core::{Library, Note, Pattern, Track};
-use ordrumbox_engine::{Controller, Kit};
+use ordrumbox_engine::offline::{self, RenderSetup};
+use ordrumbox_engine::{Controller, Kit, Mode, wav};
 use ordrumbox_logic::{Editor, Nudge};
 
 use crate::assets;
@@ -43,6 +44,9 @@ pub struct Session {
     kits: Vec<Kit>,
     kit_index: usize,
     pattern_index: usize,
+    song_index: usize,
+    /// What offline renders (WAV exports) use; `None` without samples.
+    render: Option<RenderSetup>,
     /// `None` when no audio device could be opened.
     controller: Option<Controller>,
     _output: Option<audio::Output>,
@@ -115,7 +119,18 @@ impl Session {
         let mut session = Self::new(library, assets.kits, status);
         session.library_path = library_path;
         session.message = message;
-        match audio::start(Arc::new(assets.bank), assets.scales, assets.synths) {
+        let bank = Arc::new(assets.bank);
+        if !bank.samples.is_empty() {
+            session.render = Some(RenderSetup {
+                bank: bank.clone(),
+                scales: assets.scales.clone(),
+                synths: assets.synths.clone(),
+                kit: session.kits.first().map(|k| k.name.clone()).unwrap_or_default(),
+                sample_rate: offline::EXPORT_RATE,
+                seed: 1,
+            });
+        }
+        match audio::start(bank, assets.scales, assets.synths) {
             Ok((output, controller)) => {
                 session.controller = Some(controller);
                 session._output = Some(output);
@@ -131,6 +146,8 @@ impl Session {
             kits,
             kit_index: 0,
             pattern_index: 0,
+            song_index: 0,
+            render: None,
             controller: None,
             _output: None,
             status,
@@ -163,15 +180,82 @@ impl Session {
 
     // ─── Transport ───────────────────────────────────────────────────────────
 
+    /// Space: play or stop the selected pattern.
     pub fn toggle_play(&mut self) {
-        let Some(pattern) = self.editor.library().patterns.get(self.pattern_index) else { return };
+        self.toggle(Mode::Pattern(self.pattern_index));
+    }
+
+    /// Shift+Space: play or stop the selected song (its arrangement).
+    pub fn toggle_play_song(&mut self) {
+        if self.editor.library().songs.is_empty() {
+            self.message = "no song in the library".into();
+            return;
+        }
+        self.toggle(Mode::Song(self.song_index));
+    }
+
+    fn toggle(&mut self, mode: Mode) {
+        let library = self.editor.library();
         let Some(controller) = &mut self.controller else { return };
         if controller.is_playing() {
             controller.stop();
         } else {
-            controller.play(pattern);
+            controller.play(library, mode);
             self.played_revision = self.editor.revision();
         }
+    }
+
+    /// Shift+[ ]: previous / next song.
+    pub fn step_song(&mut self, delta: isize) {
+        let count = self.editor.library().songs.len();
+        if count == 0 {
+            self.message = "no song in the library".into();
+            return;
+        }
+        self.song_index = (self.song_index as isize + delta).rem_euclid(count as isize) as usize;
+        let song = &self.editor.library().songs[self.song_index];
+        self.message = format!("song {} ({} measures)", song.name, song.length_measures());
+    }
+
+    /// Ctrl+E: the selected pattern (with Shift: the selected song) to a WAV
+    /// file in the exports folder.
+    pub fn export_wav(&mut self, song: bool) {
+        let Some(dir) = store::exports_dir() else {
+            self.message = "no user data folder to export to".into();
+            return;
+        };
+        let Some(setup) = &self.render else {
+            self.message = "nothing to render with (no samples loaded)".into();
+            return;
+        };
+        let library = self.editor.library();
+        let started = Instant::now();
+        let (rendered, name) = if song {
+            let Some(s) = library.songs.get(self.song_index) else {
+                self.message = "no song in the library".into();
+                return;
+            };
+            (offline::render_song(library, self.song_index, setup), format!("song-{}", s.id))
+        } else {
+            let Some(p) = library.patterns.get(self.pattern_index) else { return };
+            (offline::render_pattern(library, self.pattern_index, 1, setup), p.id.clone())
+        };
+        let Some((left, right)) = rendered else {
+            self.message = "nothing to export (no playable clip)".into();
+            return;
+        };
+        let path = dir.join(format!("ordrumbox-{name}.wav"));
+        let bytes = wav::encode(&left, &right, setup.sample_rate);
+        let result = std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(&path, bytes));
+        self.message = match result {
+            Ok(()) => format!(
+                "exported {} ({:.1} s of audio in {:.1} s)",
+                path.display(),
+                left.len() as f64 / f64::from(setup.sample_rate),
+                started.elapsed().as_secs_f64()
+            ),
+            Err(e) => format!("not exported: {}: {e}", path.display()),
+        };
     }
 
     pub fn step_pattern(&mut self, delta: isize) {
@@ -192,26 +276,28 @@ impl Session {
         if let Some(controller) = &mut self.controller {
             controller.set_kit(name);
         }
+        if let Some(render) = &mut self.render {
+            render.kit.clone_from(name);
+        }
         self.message = format!("kit {name}");
     }
 
     /// Keep the engine fed and the playing pass current; call every frame while playing.
     pub fn update(&mut self) {
         let revision = self.editor.revision();
-        let Some(pattern) = self.editor.library().patterns.get(self.pattern_index) else { return };
+        let library = self.editor.library();
         let Some(controller) = &mut self.controller else { return };
+        controller.select_pattern(self.pattern_index);
         if revision != self.played_revision {
-            controller.refresh(pattern);
+            controller.refresh(library);
             self.played_revision = revision;
         }
-        controller.update(pattern);
+        controller.update(library);
     }
 
     fn audition(&mut self, t: usize, note: Option<usize>) {
-        if let (Some(controller), Some(pattern)) =
-            (&mut self.controller, self.editor.library().patterns.get(self.pattern_index))
-        {
-            controller.preview(pattern, t, note);
+        if let Some(controller) = &mut self.controller {
+            controller.preview(self.editor.library(), self.pattern_index, t, note);
         }
     }
 
@@ -568,13 +654,27 @@ impl Session {
     pub fn draw(&self, canvas: &mut Canvas, scale: i32) {
         let position = self.controller.as_ref().and_then(Controller::position);
         let history = self.editor.history();
+        let library = self.editor.library();
+        let song_mode = self.controller.as_ref().and_then(|c| match c.mode() {
+            Mode::Song(s) => library.songs.get(s),
+            Mode::Pattern(_) => None,
+        });
+        let song = match (song_mode, position) {
+            (Some(song), Some(p)) => {
+                let total = song.length_measures().max(1.0);
+                let measure = (p.pass as f64 + p.frame as f64 / p.frames.max(1) as f64) % total;
+                Some(format!("SONG {}  measure {}/{}", song.name, measure.floor() + 1.0, total.ceil()))
+            }
+            _ => library.songs.get(self.song_index).map(|s| format!("song {}", s.name)),
+        };
         let view = View {
             pattern: self.pattern(),
             pattern_index: self.pattern_index,
-            pattern_count: self.editor.library().patterns.len(),
+            pattern_count: library.patterns.len(),
             kit: self.kits.get(self.kit_index).map_or("-", |k| k.name.as_str()),
             playing: self.playing(),
-            playhead: position.map(|p| p.frame as f64 / p.frames.max(1) as f64),
+            playhead: position.filter(|_| song_mode.is_none()).map(|p| p.frame as f64 / p.frames.max(1) as f64),
+            song: song.as_deref(),
             cursor: self.cursor,
             selected: self.selected,
             undo: history.next_undo(),
