@@ -7,16 +7,21 @@
 //   song.json          the library file, copied verbatim (parser input; it is
 //                      itself JSON.stringify(…, null, 2) + "\n", the pretty writer reference)
 //   song.min.json      JSON.stringify(JSON.parse(song.json)) (compact writer reference)
-//   flat_notes/<id>.json  recomputeFlatNotes(fixPattern(p), loop) for loop 0..LOOP_COUNT-1
+//   flat_notes/<id>.json  recomputeFlatNotes(p, loop) for loop 0..LOOP_COUNT-1, p loaded the
+//                         way the app boots (fixPatterns, then importPatternFromJson, which
+//                         defaults the pattern beatCount to 4), for the patterns of song.json
+//                         and of engine_cases.json (a hand-written input kept in out-dir,
+//                         ids prefixed `case-`)
 //   library.export.json   song.json loaded (fixPatterns + fixSongs) then exported
 //                         (Exporter.export per pattern): the model round-trip reference
 //   edge_library.export.json  the same for edge_library.json, a hand-written input
 //                         (kept in out-dir) covering fixer/exporter paths song.json misses
 //   slugify.json          [input, slugify(input)] pairs for the id helpers
 //
-// A pass is `deterministic: false` when Math.random was called while computing
-// it (prob < 1, arp "random", variation…). The Rust golden tests compare only
-// deterministic passes; the others are covered by property tests.
+// A pass is `deterministic: false` when its result depends on Math.random (prob
+// < 1, arp "random", variation…): it is computed with three different random
+// streams and kept deterministic only when all three agree. The Rust golden
+// tests compare deterministic passes; the others are covered by property tests.
 
 import { readFile, writeFile, mkdir, rm } from 'node:fs/promises'
 import { join, resolve, dirname } from 'node:path'
@@ -30,6 +35,10 @@ if (!jsRepo) {
     process.exit(2)
 }
 
+// The app logs a warning for every default the import fills in and every clamp
+// (bpm, beatCount, an arpeggio of 20 notes): expected here, so kept quiet.
+console.warn = () => {}
+
 const here = dirname(fileURLToPath(import.meta.url))
 const outDir = resolve(outArg ?? join(here, '..', 'crates', 'ordrumbox-core', 'tests', 'fixtures'))
 const srcUrl = (rel) => pathToFileURL(resolve(jsRepo, 'src', rel)).href
@@ -38,6 +47,37 @@ const { fixPatterns, fixSongs } = await import(srcUrl('patterns/fixer.js'))
 const { recomputeFlatNotes } = await import(srcUrl('patterns/pattern_engine.js'))
 const { Exporter } = await import(srcUrl('patterns/exporter.js'))
 const { slugify } = await import(srcUrl('core/ids.js'))
+const { importPatternFromJson } = await import(srcUrl('logic/commands/pattern_import.js'))
+const { normalizeTrack, clampStepsPerBeat } = await import(srcUrl('model/track_schema.js'))
+const { NOTE_DEFAULTS } = await import(srcUrl('core/note_schema.js'))
+const { getPanFromTrackName } = await import(srcUrl('core/drum_taxonomy.js'))
+
+/**
+ * A fixed pattern imported as ResourcesLoader does at boot (cmd.importPatternFromJson),
+ * with the Commander's addPattern/addTrack/addNote reduced to what they build.
+ */
+function importAsApp(fixed) {
+    const addPattern = (name) => ({ id: '', name, description: '', tags: [], tracks: [], bpm: 120, beatCount: 4 })
+    const addTrack = (pattern, name) => {
+        const track = normalizeTrack({
+            name,
+            beatCount: pattern.beatCount,
+            stepsPerBeat: 4,
+            loopAtStep: pattern.beatCount * 4,
+            pan: getPanFromTrackName(name),
+        })
+        clampStepsPerBeat(track)
+        pattern.tracks.push(track)
+        return track
+    }
+    const addNote = (track, beat, beatStep, pitch = 0) => {
+        clampStepsPerBeat(track)
+        const note = { ...NOTE_DEFAULTS, beatStep, stepPercent: Math.round((beatStep * 100) / track.stepsPerBeat), beat, pitch }
+        track.notes.push(note)
+        return note
+    }
+    return importPatternFromJson(fixed, addPattern, addTrack, addNote)
+}
 
 const SLUGIFY_INPUTS = [
     'Rock 8a',
@@ -60,11 +100,15 @@ const SLUGIFY_INPUTS = [
     'TR-808 / TR-909 (2026)',
 ]
 
-let randomCalled = false
-Math.random = () => {
-    randomCalled = true
-    return 0.5
-}
+/** Random streams a deterministic pass must not depend on: low, high, and a spread sequence. */
+const RANDOM_STREAMS = [
+    () => () => 0,
+    () => () => 0.999999,
+    () => {
+        let seed = 12345
+        return () => (seed = (seed * 16807) % 2147483647) / 2147483647
+    },
+]
 
 /** One flat note, keyed back to its source: track index and note index (null for a clone). */
 function encodeFlatNote(fn, pattern) {
@@ -79,12 +123,15 @@ function encodeFlatNote(fn, pattern) {
 }
 
 function computePass(pattern, loop) {
-    randomCalled = false
-    const flat = recomputeFlatNotes(pattern, loop)
-    const ticks = [...flat.keys()]
-        .sort((a, b) => a - b)
-        .map((tick) => [tick, flat.get(tick).map((fn) => encodeFlatNote(fn, pattern))])
-    return { loop, deterministic: !randomCalled, ticks }
+    const runs = RANDOM_STREAMS.map((stream) => {
+        Math.random = stream()
+        const flat = recomputeFlatNotes(pattern, loop)
+        return [...flat.keys()]
+            .sort((a, b) => a - b)
+            .map((tick) => [tick, flat.get(tick).map((fn) => encodeFlatNote(fn, pattern))])
+    })
+    const texts = runs.map((ticks) => JSON.stringify(ticks))
+    return { loop, deterministic: texts.every((t) => t === texts[0]), ticks: runs[0] }
 }
 
 const songPath = resolve(jsRepo, 'assets', 'data', 'song.json')
@@ -111,7 +158,8 @@ await writeFile(
     JSON.stringify(SLUGIFY_INPUTS.map((s) => [s, slugify(s)])) + '\n',
 )
 
-const patterns = fixPatterns(structuredClone(parsed.patterns))
+const cases = JSON.parse(await readFile(join(outDir, 'engine_cases.json'), 'utf8'))
+const patterns = fixPatterns(structuredClone([...parsed.patterns, ...cases.patterns])).map(importAsApp)
 let deterministicCount = 0
 for (const pattern of patterns) {
     const passes = Array.from({ length: LOOP_COUNT }, (_, loop) => computePass(pattern, loop))

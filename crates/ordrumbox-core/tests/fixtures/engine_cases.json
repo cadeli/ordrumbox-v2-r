@@ -1,0 +1,116 @@
+{
+  "infos": { "name": "engine cases", "description": "hand-written: pattern-engine paths the demo library does not reach" },
+  "patterns": [
+    {
+      "id": "case-arp",
+      "beatCount": 4,
+      "tracks": [
+        {
+          "name": "BASS",
+          "notes": [
+            { "beat": 0, "arp": [0, 4, 7], "retriggerCount": 4, "rate": 8 },
+            { "beat": 1, "arp": "down", "retriggerCount": 3, "rate": 4, "pitch": -12 },
+            { "beat": 2, "arp": { "intervals": [0, 3, 7], "mode": "updown" }, "retriggerCount": 6, "rate": 2 },
+            { "beat": 3, "arp": "0,5,9", "retriggerCount": 20, "rate": 1 },
+            { "beat": 3, "beatStep": 2, "arp": { "intervals": ["4", "7", "x"] }, "retriggerCount": 2, "rate": 9 }
+          ]
+        },
+        {
+          "name": "PIANO",
+          "notes": [
+            { "beat": 0, "arp": "nothing", "retriggerCount": 2 },
+            { "beat": 1, "arp": [], "retriggerCount": 2 },
+            { "beat": 2, "arp": { "mode": "up" } },
+            { "beat": 3, "arp": 5 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "case-euclid",
+      "beatCount": 4,
+      "tracks": [
+        {
+          "name": "CHH",
+          "notes": [
+            { "beat": 0, "euclideanFill": 3 },
+            { "beat": 2, "euclideanFill": 3, "euclideanRotation": 1 },
+            { "beat": 3, "euclideanFill": 9 }
+          ]
+        },
+        {
+          "name": "SNARE",
+          "loopAtStep": 6,
+          "notes": [{ "beat": 0, "beatStep": 1, "euclideanFill": 4, "euclideanRotation": -2 }]
+        },
+        {
+          "name": "BASS",
+          "notes": [{ "beat": 0, "euclideanFill": 3, "arp": [0, 12], "retriggerCount": 2, "rate": 8 }]
+        },
+        {
+          "name": "TOM",
+          "notes": [
+            { "beat": 1, "euclideanFill": 2 },
+            { "beat": 1, "pitch": 5 },
+            { "beat": 1, "beatStep": 3, "euclideanFill": 5 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "case-loops",
+      "beatCount": 4,
+      "tracks": [
+        { "name": "KICK", "loopAtStep": 3, "notes": [{ "beat": 0 }, { "beat": 0, "beatStep": 2 }, { "beat": 1, "beatStep": 1 }] },
+        { "name": "SNARE", "beatCount": 2, "notes": [{ "beat": 1 }] },
+        { "name": "CLAP", "notes": [{ "beat": 0, "every": 2, "pos": 1 }, { "beat": 1, "every": 3 }, { "beat": 2, "every": 0 }, { "beat": 3, "every": 4, "pos": -1 }] },
+        { "name": "OHH", "loopAtStep": 0, "beatCount": 1, "notes": [{ "beatStep": 3 }] }
+      ]
+    },
+    {
+      "id": "case-grid3",
+      "beatCount": 3,
+      "tracks": [
+        {
+          "name": "CHH",
+          "stepsPerBeat": 3,
+          "notes": [
+            { "beat": 0, "beatStep": 1, "retriggerCount": 3, "rate": 9 },
+            { "beat": 1, "beatStep": 2, "retriggerCount": 4, "rate": 1 },
+            { "beat": 2, "retriggerCount": 5, "rate": 5 }
+          ]
+        },
+        { "name": "COWBELL", "stepsPerBeat": 8, "beatCount": 8, "notes": [{ "beat": 2, "beatStep": 7, "retriggerCount": 9, "rate": 12 }, { "beat": 5 }] }
+      ]
+    },
+    {
+      "id": "case-prob",
+      "tracks": [
+        { "name": "KICK", "probability": 0, "notes": [{ "beat": 0 }] },
+        { "name": "SNARE", "probability": 0.5, "notes": [{ "beat": 1, "prob": 0 }] },
+        { "name": "CLAP", "notes": [{ "beat": 2, "prob": 0 }, { "beat": 3, "prob": 1, "arpTriggerProbability": 0, "retriggerCount": 3 }] },
+        { "name": "TOM", "notes": [{ "beat": 0, "arp": [0, 7], "retriggerCount": 2, "arpTriggerProbability": 0 }] }
+      ]
+    },
+    {
+      "id": "case-variation",
+      "beatCount": 8,
+      "tracks": [
+        { "name": "CHH", "variation": 100, "notes": [{ "beat": 0 }, { "beat": 0, "beatStep": 1 }, { "beat": 0, "beatStep": 2 }, { "beat": 2 }, { "beat": 5, "beatStep": 3 }] },
+        { "name": "SNARE", "variation2": 100, "notes": [{ "beat": 1, "arp": [0, 4, 7] }, { "beat": 3 }] },
+        {
+          "name": "BASS",
+          "auto": true,
+          "scaleName": "dorian",
+          "pitch_scale_lock": true,
+          "pitch_range": 24,
+          "prob_note_depth": 0,
+          "prob_silence": 100,
+          "prob_pitch": 100,
+          "loopAtStep": 8,
+          "notes": [{ "beat": 0 }, { "beat": 0, "beatStep": 1 }, { "beat": 0, "beatStep": 2 }, { "beat": 1, "beatStep": 2 }]
+        }
+      ]
+    }
+  ]
+}

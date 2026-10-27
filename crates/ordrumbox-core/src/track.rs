@@ -81,6 +81,14 @@ json_record! {
         delay_on: bool = true => "delayOn",
         /// Synth preset played when `use_soft_synth` is on.
         synth_sound_key: Option<String> = None => "synthSoundKey",
+        // Not in TRACK_DEFAULTS: written by the auto generator / scale picker,
+        // saved only when set.
+        /// Variation amount the auto generator picked (auto mode); `None` until it ran.
+        auto_variation: Option<f64> = None => "auto_variation",
+        /// Per-note variation amount the auto generator picked (auto mode).
+        auto_variation2: Option<f64> = None => "auto_variation2",
+        /// Scale (a key of scales.json) the pitch variation snaps to when `pitch_scale_lock` is on.
+        scale_name: Option<String> = None => "scaleName",
     }
     other_fields {
         notes: Vec<Note> = Vec::new(),

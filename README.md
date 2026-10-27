@@ -46,9 +46,12 @@ node tools/export_fixtures.mjs ../ordrumbox-v2
 - `edge_library.json` (hand-written, kept by the script) and
   `edge_library.export.json`: the same check on cases `song.json` does not reach.
 - `slugify.json`: pattern/song id slugs.
-- `flat_notes/<id>.json`: `recomputeFlatNotes()` for loops 0–3 of every
-  pattern. Passes marked `deterministic: false` consumed `Math.random()` and are
-  checked by properties instead of equality.
+- `flat_notes/<id>.json`: `recomputeFlatNotes()` for passes 0–3 of every
+  pattern of `song.json` and of `engine_cases.json` (hand-written, kept by the
+  script), loaded the way the app boots (`fixPatterns` then
+  `importPatternFromJson`). A pass is deterministic when three different
+  `Math.random` streams give the same notes: Rust must give exactly those notes
+  and draw no randomness. The other passes are checked by properties.
 
 Re-run the script whenever the JS engine or `song.json` changes.
 
