@@ -97,6 +97,42 @@ json_record! {
     }
 }
 
+/// `TRACK_VALUE_RANGES`: bounds of the numeric settings an edit clamps to.
+const VALUE_RANGES: [(&str, f64, f64); 28] = [
+    ("velocity", 0.0, 1.0),
+    ("pan", -1.0, 1.0),
+    ("pitch", -24.0, 24.0),
+    ("beatCount", 1.0, 16.0),
+    ("stepsPerBeat", 1.0, 8.0),
+    ("loopAtStep", 0.0, 1024.0),
+    ("swingResolution", 1.0, 8.0),
+    ("swingAmount", 0.0, 1.0),
+    ("filterFreq", 20.0, 20_000.0),
+    ("filterQ", 0.707, 18.707),
+    ("reverbAmount", 0.0, 1.0),
+    ("delayTime", 0.0, 4.0),
+    ("delayDepth", 0.0, 1.0),
+    ("saturationAmount", 0.0, 1.0),
+    ("variation", 0.0, 100.0),
+    ("variation2", 0.0, 100.0),
+    ("prob_pitch", 0.0, 100.0),
+    ("prob_velocity", 0.0, 100.0),
+    ("prob_silence", 0.0, 100.0),
+    ("prob_fill", 0.0, 100.0),
+    ("prob_ghost", 0.0, 100.0),
+    ("prob_retrig", 0.0, 100.0),
+    ("prob_euclid", 0.0, 100.0),
+    ("prob_note", 0.0, 100.0),
+    ("prob_note_depth", 0.0, 100.0),
+    ("prob_arp", 0.0, 100.0),
+    ("pitch_range", 1.0, 24.0),
+    ("auto_density", -1.0, 1.0),
+];
+
+/// Table keys that are not track settings (`TRACK_DEFAULTS` lacks them):
+/// an edit never sets them.
+const NOT_SETTINGS: [&str; 3] = ["auto_variation", "auto_variation2", "scaleName"];
+
 /// Keys written rounded to 2 decimals (`ROUND_2D` in exporter.js).
 const ROUND_2D: [&str; 9] = [
     "velocity",
@@ -111,6 +147,30 @@ const ROUND_2D: [&str; 9] = [
 ];
 
 impl Track {
+    /// A new track (`createTrack()`): `beat_count` beats at `steps_per_beat`
+    /// (clamped to 1–8), looping over its whole length, panned from its name.
+    pub fn new(name: &str, beat_count: i32, steps_per_beat: i32) -> Self {
+        let steps_per_beat = steps_per_beat.clamp(1, 8);
+        Self {
+            name: name.to_owned(),
+            beat_count,
+            steps_per_beat,
+            loop_at_step: Some(beat_count * steps_per_beat),
+            pan: pan_from_track_name(name),
+            ..Self::default()
+        }
+    }
+
+    /// Whether `key` is a track setting an edit may change (a key of `TRACK_DEFAULTS`).
+    pub fn is_setting(key: &str) -> bool {
+        Self::KEYS.contains(&key) && !NOT_SETTINGS.contains(&key)
+    }
+
+    /// Bounds an edit clamps the numeric setting `key` to (`TRACK_VALUE_RANGES`).
+    pub fn value_range(key: &str) -> Option<(f64, f64)> {
+        VALUE_RANGES.iter().find(|(k, _, _)| *k == key).map(|&(_, min, max)| (min, max))
+    }
+
     /// Load a track as `fixTrackDefaults()` does: decode compact notes, take
     /// the pan from the name when the file has none, fill defaults, switch
     /// auto-assign off for synth tracks, fold note steps past their beat.

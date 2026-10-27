@@ -1,5 +1,10 @@
-//! Editing layer of orDrumbox: commands with undo/redo, pattern generators
-//! (kick, snare, hat, bass, melody, auto, song structure) and Standard MIDI
-//! File import/export.
+//! Editing layer of orDrumbox: the library being edited, every edit as an
+//! undo step; later the pattern generators and Standard MIDI Files.
 //!
-//! Ported from `src/logic/` of ordrumbox-v2 in phases 5 and 6.
+//! Ported from `src/logic/` of ordrumbox-v2 (`commands/`, `history_manager.js`).
+
+pub mod editor;
+pub mod history;
+
+pub use editor::{Editor, Nudge};
+pub use history::History;

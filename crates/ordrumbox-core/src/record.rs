@@ -83,7 +83,7 @@ impl<T: JsonField> JsonField for Option<T> {
 
 /// Outcome of setting a record field by its JSON key.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum SetField {
+pub enum SetField {
     Set,
     /// The key is a field, but the value has the wrong type: the field keeps its value.
     WrongType,
@@ -140,7 +140,7 @@ macro_rules! json_record {
 
             /// Set the field named `key`. `null` resets it to its default
             /// (what `?? default` does on the JS side).
-            pub(crate) fn set_field(&mut self, key: &str, value: &$crate::json::Value) -> $crate::record::SetField {
+            pub fn set_field(&mut self, key: &str, value: &$crate::json::Value) -> $crate::record::SetField {
                 use $crate::record::{JsonField, SetField};
                 match key {
                     $( $key => match <$ty as JsonField>::from_json(value) {
@@ -149,6 +149,15 @@ macro_rules! json_record {
                         None => SetField::WrongType,
                     }, )*
                     _ => SetField::Unknown,
+                }
+            }
+
+            /// The value of the field named `key`, as JSON.
+            pub fn field(&self, key: &str) -> Option<$crate::json::Value> {
+                use $crate::record::JsonField;
+                match key {
+                    $( $key => Some(<$ty as JsonField>::to_json(&self.$field)), )*
+                    _ => None,
                 }
             }
 
