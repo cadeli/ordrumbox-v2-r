@@ -43,6 +43,8 @@ pub fn round(x: f64) -> f64 {
     if x - floor >= 0.5 { floor + 1.0 } else { floor }
 }
 
+pub use crate::timsort::sort_by;
+
 /// `Number(x.toFixed(digits))`: rounded on the exact decimal value of `x`,
 /// halves away from zero (`(1.005).toFixed(2)` is `"1.00"`: 1.005 is stored
 /// as 1.00499…). Unlike `Math.round(x * 100) / 100`, there is no

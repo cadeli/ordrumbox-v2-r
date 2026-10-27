@@ -134,6 +134,7 @@ impl App {
                 KeyCode::KeyV => s.paste(shift),
                 KeyCode::KeyS => s.save(),
                 KeyCode::KeyE => s.export_wav(shift),
+                KeyCode::KeyM => s.export_midi(),
                 KeyCode::KeyN => s.new_pattern(),
                 KeyCode::KeyD => s.duplicate_pattern(),
                 KeyCode::KeyT => s.add_track(),
@@ -220,6 +221,10 @@ impl ApplicationHandler for App {
             WindowEvent::ModifiersChanged(modifiers) => self.modifiers = modifiers.state(),
             WindowEvent::KeyboardInput { event, .. } => self.key(&event),
             WindowEvent::CursorMoved { position, .. } => self.mouse = position,
+            WindowEvent::DroppedFile(path) => {
+                self.session.import_midi(&path);
+                self.request_redraw();
+            }
             WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } => self.click(),
             _ => {}
         }
@@ -243,9 +248,18 @@ impl ApplicationHandler for App {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let event_loop = EventLoop::new()?;
+    let mut session = Session::load();
+    // MIDI files given on the command line ("open with"): imported.
+    for arg in std::env::args_os().skip(1) {
+        let path = std::path::PathBuf::from(arg);
+        let is_midi = path.extension().is_some_and(|e| e.eq_ignore_ascii_case("mid") || e.eq_ignore_ascii_case("midi"));
+        if is_midi {
+            session.import_midi(&path);
+        }
+    }
     let mut app = App {
         gfx: None,
-        session: Session::load(),
+        session,
         modifiers: ModifiersState::default(),
         mouse: PhysicalPosition::new(0.0, 0.0),
         error: None,

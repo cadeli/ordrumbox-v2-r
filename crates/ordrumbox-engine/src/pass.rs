@@ -388,7 +388,8 @@ mod tests {
                 {"pattern":"a","startMeasure":0,"measureCount":2},{"pattern":"b","startMeasure":1,"measureCount":2}]}]}"#,
         )
         .unwrap();
-        let instrument = Instrument { key: "X".into(), display_name: "x".into(), url: "x".into(), decay_ms: 100.0 };
+        let instrument =
+            Instrument { key: "X".into(), display_name: "x".into(), url: "x".into(), decay_ms: 100.0, root_midi: None };
         let bank = SampleBank {
             samples: vec![BankSample { kit: "k".into(), instrument, buffer: SampleBuffer::mono(vec![1.0], 48_000) }],
         };

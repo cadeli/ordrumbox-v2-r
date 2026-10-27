@@ -113,7 +113,13 @@ mod tests {
     use ordrumbox_dsp::SampleBuffer;
 
     fn setup() -> RenderSetup {
-        let instrument = Instrument { key: "KICK".into(), display_name: "k".into(), url: "k".into(), decay_ms: 200.0 };
+        let instrument = Instrument {
+            key: "KICK".into(),
+            display_name: "k".into(),
+            url: "k".into(),
+            decay_ms: 200.0,
+            root_midi: None,
+        };
         let buffer = SampleBuffer::mono(vec![0.5; 2000], 44_100);
         RenderSetup {
             bank: Arc::new(SampleBank { samples: vec![BankSample { kit: "x".into(), instrument, buffer }] }),

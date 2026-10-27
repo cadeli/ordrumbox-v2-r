@@ -17,6 +17,7 @@ use ordrumbox_core::{Library, Note, Pattern, Scales, SetField, Track};
 
 use crate::generate::{self, AutoGen, MelodicKind, Options};
 use crate::history::{Change, History};
+use crate::midi;
 
 /// Longest pattern, beats (`MAX_BEATS`).
 pub const MAX_BEATS: i32 = 16;
@@ -632,6 +633,30 @@ impl Editor {
         self.edit(p, desc, None, |pattern| generate::toggle_melodic(&mut AutoGen::new(scales, rnd), pattern, kind))
     }
 
+    /// Patterns from the MIDI file `bytes` named `file_name`
+    /// (`MidiImportService.importFile`), one undo step; `roots` are the
+    /// samples' root notes. The index of the last new pattern and the
+    /// message, or why nothing was imported.
+    pub fn import_midi(
+        &mut self,
+        file_name: &str,
+        bytes: &[u8],
+        roots: &[(String, f64)],
+    ) -> Result<(usize, String), String> {
+        let imported = midi::import(file_name, bytes, roots)?;
+        let index = self.edit_patterns("Import MIDI file".to_owned(), |patterns| {
+            let mut taken: HashSet<String> = patterns.iter().map(|p| p.id.clone()).collect();
+            for mut pattern in imported.patterns {
+                pattern.id = unique_id(&slugify(pattern_name(&pattern)), &mut taken);
+                pattern.extra.insert("application", Value::from(APPLICATION));
+                pattern.extra.insert("url", Value::from(URL));
+                patterns.push(pattern);
+            }
+            patterns.len() - 1
+        });
+        Ok((index, imported.message))
+    }
+
     /// Random notes on track `t` (`randomizeTrack`).
     pub fn randomize_track(&mut self, p: usize, t: usize, rnd: &mut dyn FnMut() -> f64) -> bool {
         self.edit_track(
@@ -887,5 +912,28 @@ mod tests {
         assert!(e.randomize_track(0, 0, &mut rnd));
         assert_eq!(e.history().next_undo(), Some("Randomize KICK"));
         assert!(!pattern(&e).tracks[0].notes.is_empty());
+    }
+
+    #[test]
+    fn midi_import_is_one_step() {
+        let mut e = editor();
+        // Format 0, 96 PPQN: a kick (channel 10, note 36) on beats 1 and 3.
+        let mut track = vec![0x00, 0x99, 36, 100, 0x18, 0x89, 36, 0, 0x81, 0x28, 0x99, 36, 64, 0x18, 0x89, 36, 0];
+        track.extend([0x00, 0xff, 0x2f, 0x00]);
+        let mut file = b"MThd\x00\x00\x00\x06\x00\x00\x00\x01\x00\x60MTrk".to_vec();
+        file.extend((track.len() as u32).to_be_bytes());
+        file.extend(track);
+        let (index, message) = e.import_midi("groove.mid", &file, &[]).unwrap();
+        assert_eq!((index, message.as_str()), (1, "MIDI imported: 1 track(s)"));
+        let pattern = &e.library().patterns[1];
+        assert_eq!((pattern.id.as_str(), pattern.name.as_deref(), pattern.beat_count), ("groove", Some("groove"), 32));
+        let kick = &pattern.tracks[0];
+        assert_eq!(kick.name, "KICK");
+        let notes: Vec<_> = kick.notes.iter().map(|n| (n.beat, n.beat_step, n.velocity)).collect();
+        assert_eq!(notes, [(0, 0, 0.79), (2, 0, 0.5)]);
+        assert_eq!(e.history().next_undo(), Some("Import MIDI file"));
+        e.undo();
+        assert_eq!(e.library().patterns.len(), 1);
+        assert_eq!(e.import_midi("x.mid", b"nothing", &[]), Err("No MIDI notes found in file".into()));
     }
 }

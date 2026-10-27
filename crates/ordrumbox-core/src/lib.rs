@@ -23,6 +23,7 @@ pub mod rng;
 pub mod scales;
 pub mod song;
 pub mod steps;
+mod timsort;
 pub mod track;
 mod variation;
 

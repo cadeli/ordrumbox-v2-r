@@ -33,7 +33,7 @@ const HELP: [&str; 5] = [
     "click/ENTER note (again: delete)  ARROWS move  SHIFT ARROWS velocity/pitch  DEL clear step  ESC deselect",
     "B generate a pattern  D drums  S bass  A chords (auto on/off)  Z track auto on/off  X random track",
     "CTRL: Z undo  Y redo  C/V copy/paste step (SHIFT: track)  T add track  BACKSPACE del track  G grid  L loop  -/= length",
-    "CTRL: N new pattern  D duplicate  S save  E export WAV (SHIFT: song)",
+    "CTRL: N new pattern  D duplicate  S save  E export WAV (SHIFT: song)  M export MIDI   drop a .mid file: import",
 ];
 /// Characters of a track name shown.
 const LABEL_CHARS: usize = 10;

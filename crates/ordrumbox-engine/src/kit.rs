@@ -21,6 +21,9 @@ pub struct Instrument {
     pub url: String,
     /// Decay to -60 dB, ms.
     pub decay_ms: f64,
+    /// MIDI note the sample sounds at unpitched (`rootMidi`), when known:
+    /// the note MIDI files map pitch 0 to.
+    pub root_midi: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -50,6 +53,7 @@ pub fn kits_from_json(value: &Value) -> Vec<Kit> {
                     display_name: text(i, "display_name"),
                     url: text(i, "url"),
                     decay_ms: i.get("decay").and_then(Value::as_f64).unwrap_or(DEFAULT_DECAY_MS),
+                    root_midi: i.get("rootMidi").and_then(Value::as_f64),
                 })
                 .collect(),
         })
@@ -138,6 +142,7 @@ mod tests {
                 display_name: "k".into(),
                 url: "x.wav".into(),
                 decay_ms: 1.0,
+                root_midi: None,
             }],
         }];
         let (bank, errors) = SampleBank::load(&kits, |_| Ok(b"garbage".to_vec()));

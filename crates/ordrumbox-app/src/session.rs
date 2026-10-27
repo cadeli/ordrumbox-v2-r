@@ -1,12 +1,12 @@
 //! Everything the window drives: the library being edited, the playback, the
-//! generators, the grid cursor and selection, the clipboard, saving. Edits go through the
+//! generators, MIDI files, the grid cursor and selection, the clipboard, saving. Edits go through the
 //! [`Editor`] (each one an undo step); the playing pass is rebuilt after each.
 //!
 //! The grid follows the JS pattern panel (`pointer_section.js`,
 //! `keyboard_section.js`, `clipboard_section.js`): a click on an empty step
 //! adds a note, on a note selects it, on the selected note deletes it.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -15,6 +15,7 @@ use ordrumbox_core::{Library, Note, Pattern, Rng, Scales, Track};
 use ordrumbox_engine::offline::{self, RenderSetup};
 use ordrumbox_engine::{Controller, Kit, Mode, wav};
 use ordrumbox_logic::generate::{self, AutoGen, MelodicKind};
+use ordrumbox_logic::midi;
 use ordrumbox_logic::{Editor, Nudge};
 
 use crate::assets;
@@ -47,6 +48,8 @@ pub struct Session {
     scales: Scales,
     /// Random draws of the generators.
     rng: Rng,
+    /// Root note of the loaded samples that have one (key, MIDI note), for MIDI files.
+    roots: Vec<(String, f64)>,
     kits: Vec<Kit>,
     kit_index: usize,
     pattern_index: usize,
@@ -124,6 +127,12 @@ impl Session {
 
         let mut session = Self::new(library, assets.kits, status);
         session.scales = assets.scales.clone();
+        session.roots = assets
+            .bank
+            .samples
+            .iter()
+            .filter_map(|s| Some((s.instrument.key.clone(), s.instrument.root_midi?)))
+            .collect();
         session.library_path = library_path;
         session.message = message;
         let bank = Arc::new(assets.bank);
@@ -152,6 +161,7 @@ impl Session {
             editor: Editor::new(library),
             scales: Scales::default(),
             rng: Rng::from_time(),
+            roots: Vec::new(),
             kits,
             kit_index: 0,
             pattern_index: 0,
@@ -275,6 +285,45 @@ impl Session {
             ),
             Err(e) => format!("not exported: {}: {e}", path.display()),
         };
+    }
+
+    /// Ctrl+M: the selected pattern to a MIDI file in the exports folder.
+    pub fn export_midi(&mut self) {
+        let Some(dir) = store::exports_dir() else {
+            self.message = "no user data folder to export to".into();
+            return;
+        };
+        let Some(pattern) = self.pattern() else { return };
+        let mut rng = Rng::new(1);
+        let bytes = midi::export(pattern, 1, &self.roots, &mut rng, &self.scales);
+        let path = dir.join(format!("ordrumbox-{}.mid", pattern.id));
+        let result = std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(&path, &bytes));
+        self.message = match result {
+            Ok(()) => format!("exported {} ({} bytes)", path.display(), bytes.len()),
+            Err(e) => format!("not exported: {}: {e}", path.display()),
+        };
+    }
+
+    /// A MIDI file dropped on the window (or given on the command line):
+    /// new patterns from it, the last one selected.
+    pub fn import_midi(&mut self, path: &Path) {
+        let name = path.file_name().map_or_else(|| "midi".into(), |n| n.to_string_lossy().into_owned());
+        let bytes = match std::fs::read(path) {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                self.message = format!("not imported: {}: {e}", path.display());
+                return;
+            }
+        };
+        match self.editor.import_midi(&name, &bytes, &self.roots) {
+            Ok((index, message)) => {
+                self.pattern_index = index;
+                self.deselect();
+                self.edited();
+                self.message = message;
+            }
+            Err(reason) => self.message = format!("{name}: {reason}"),
+        }
     }
 
     pub fn step_pattern(&mut self, delta: isize) {
