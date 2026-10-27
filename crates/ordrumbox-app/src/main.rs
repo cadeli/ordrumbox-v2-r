@@ -1,10 +1,10 @@
 //! orDrumbox native application.
 //!
-//! Loads the ordrumbox-v2 assets (patterns, kits, samples, synth presets),
-//! plays the selected pattern through the default audio device (per-track
-//! strips with filter, saturation, reverb, delay and LFOs, synth tracks, master
-//! bus), and shows its tracks with a playhead. Keys: Space play/stop, ←/→ pattern, ↑/↓ tempo (Shift: ×10),
-//! K next kit.
+//! Loads the ordrumbox-v2 assets (patterns, kits, samples, synth presets) and
+//! the user's library, plays the selected pattern through the default audio
+//! device (per-track strips, synth tracks, master bus), and edits it with the
+//! mouse and the keyboard (see `view::HELP`), every edit undoable and saved a
+//! moment later.
 
 // No console window in a release build on Windows.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
@@ -13,168 +13,64 @@ mod assets;
 mod audio;
 mod canvas;
 mod font;
+mod session;
+mod store;
 mod view;
 
 use std::num::NonZeroU32;
 use std::rc::Rc;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use ordrumbox_core::{Library, Pattern};
-use ordrumbox_engine::{Controller, Kit};
 use winit::application::ApplicationHandler;
-use winit::dpi::LogicalSize;
-use winit::event::{ElementState, KeyEvent, WindowEvent};
+use winit::dpi::{LogicalSize, PhysicalPosition};
+use winit::event::{ElementState, KeyEvent, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
-use winit::keyboard::{Key, ModifiersState, NamedKey};
+use winit::keyboard::{KeyCode, ModifiersState, PhysicalKey};
 use winit::window::{Window, WindowId};
 
 use canvas::Canvas;
-use view::View;
+use session::{Move, Session};
+use view::Layout;
 
 const TITLE: &str = "orDrumbox";
-const INITIAL_SIZE: LogicalSize<f64> = LogicalSize::new(1024.0, 640.0);
+const INITIAL_SIZE: LogicalSize<f64> = LogicalSize::new(1100.0, 680.0);
 /// Redraw interval while playing (the playhead moves).
 const FRAME: Duration = Duration::from_millis(16);
+/// Keys of the track rows, in order: 1–9 mute (shift: solo), Q–P audition.
+const ROW_DIGITS: [KeyCode; 9] = [
+    KeyCode::Digit1,
+    KeyCode::Digit2,
+    KeyCode::Digit3,
+    KeyCode::Digit4,
+    KeyCode::Digit5,
+    KeyCode::Digit6,
+    KeyCode::Digit7,
+    KeyCode::Digit8,
+    KeyCode::Digit9,
+];
+const ROW_LETTERS: [KeyCode; 10] = [
+    KeyCode::KeyQ,
+    KeyCode::KeyW,
+    KeyCode::KeyE,
+    KeyCode::KeyR,
+    KeyCode::KeyT,
+    KeyCode::KeyY,
+    KeyCode::KeyU,
+    KeyCode::KeyI,
+    KeyCode::KeyO,
+    KeyCode::KeyP,
+];
 
 struct Gfx {
     window: Rc<Window>,
     surface: softbuffer::Surface<Rc<Window>, Rc<Window>>,
 }
 
-/// Everything loaded, and the transport.
-struct Session {
-    library: Library,
-    kits: Vec<Kit>,
-    kit_index: usize,
-    pattern_index: usize,
-    /// `None` when no audio device could be opened.
-    controller: Option<Controller>,
-    _output: Option<audio::Output>,
-    status: Vec<String>,
-}
-
-impl Session {
-    fn load() -> Self {
-        let Some(dir) = assets::find() else {
-            let searched: Vec<String> = assets::candidates().iter().map(|d| d.display().to_string()).collect();
-            return Self::empty(vec![
-                format!(
-                    "assets folder not found: copy ordrumbox-v2/assets next to the program, or set {}",
-                    assets::ENV_VAR
-                ),
-                format!("searched: {}", searched.join(", ")),
-            ]);
-        };
-        let assets = match assets::load(&dir) {
-            Ok(assets) => assets,
-            Err(e) => return Self::empty(vec![e]),
-        };
-        let mut status = Vec::new();
-        if !assets.report.issues.is_empty() {
-            status.push(format!(
-                "song.json: {} value(s) repaired, first: {}",
-                assets.report.issues.len(),
-                assets.report.issues[0].at
-            ));
-        }
-        if let Some(first) = assets.sample_errors.first() {
-            status.push(format!("{} sample(s) not loaded, first: {first}", assets.sample_errors.len()));
-        }
-        let (controller, output) = match audio::start(Arc::new(assets.bank), assets.scales, assets.synths) {
-            Ok((output, controller)) => (Some(controller), Some(output)),
-            Err(e) => {
-                status.push(format!("no sound: {e}"));
-                (None, None)
-            }
-        };
-        Self {
-            library: assets.library,
-            kits: assets.kits,
-            kit_index: 0,
-            pattern_index: 0,
-            controller,
-            _output: output,
-            status,
-        }
-    }
-
-    fn empty(status: Vec<String>) -> Self {
-        Self {
-            library: Library::default(),
-            kits: Vec::new(),
-            kit_index: 0,
-            pattern_index: 0,
-            controller: None,
-            _output: None,
-            status,
-        }
-    }
-
-    fn pattern(&self) -> Option<&Pattern> {
-        self.library.patterns.get(self.pattern_index)
-    }
-
-    fn playing(&self) -> bool {
-        self.controller.as_ref().is_some_and(Controller::is_playing)
-    }
-
-    fn toggle_play(&mut self) {
-        let Some(pattern) = self.library.patterns.get(self.pattern_index) else { return };
-        let Some(controller) = &mut self.controller else { return };
-        if controller.is_playing() { controller.stop() } else { controller.play(pattern) }
-    }
-
-    fn step_pattern(&mut self, delta: isize) {
-        let count = self.library.patterns.len();
-        if count > 0 {
-            self.pattern_index = (self.pattern_index as isize + delta).rem_euclid(count as isize) as usize;
-        }
-    }
-
-    fn step_tempo(&mut self, delta: f64) {
-        if let Some(pattern) = self.library.patterns.get_mut(self.pattern_index) {
-            pattern.bpm = (pattern.bpm + delta).round().clamp(20.0, 300.0);
-        }
-    }
-
-    fn next_kit(&mut self) {
-        if self.kits.is_empty() {
-            return;
-        }
-        self.kit_index = (self.kit_index + 1) % self.kits.len();
-        if let Some(controller) = &mut self.controller {
-            controller.set_kit(&self.kits[self.kit_index].name);
-        }
-    }
-
-    /// Keep the engine fed; call every frame while playing.
-    fn update(&mut self) {
-        if let (Some(controller), Some(pattern)) = (&mut self.controller, self.library.patterns.get(self.pattern_index))
-        {
-            controller.update(pattern);
-        }
-    }
-
-    fn draw(&self, canvas: &mut Canvas, scale: i32) {
-        let position = self.controller.as_ref().and_then(Controller::position);
-        let view = View {
-            pattern: self.pattern(),
-            pattern_index: self.pattern_index,
-            pattern_count: self.library.patterns.len(),
-            kit: self.kits.get(self.kit_index).map_or("-", |k| k.name.as_str()),
-            playing: self.playing(),
-            playhead: position.map(|p| p.frame as f64 / p.frames.max(1) as f64),
-            status: &self.status,
-        };
-        view::draw(canvas, &view, scale);
-    }
-}
-
 struct App {
     gfx: Option<Gfx>,
     session: Session,
     modifiers: ModifiersState,
+    mouse: PhysicalPosition<f64>,
     error: Option<String>,
 }
 
@@ -184,36 +80,96 @@ impl App {
         event_loop.exit();
     }
 
+    fn scale(&self) -> i32 {
+        self.gfx.as_ref().map_or(1, |g| g.window.scale_factor().round().max(1.0) as i32)
+    }
+
+    fn request_redraw(&self) {
+        if let Some(gfx) = &self.gfx {
+            gfx.window.request_redraw();
+        }
+    }
+
     fn redraw(&mut self) -> Result<(), String> {
+        let scale = self.scale();
         let Some(gfx) = &mut self.gfx else { return Ok(()) };
         let size = gfx.window.inner_size();
         let (Some(width), Some(height)) = (NonZeroU32::new(size.width), NonZeroU32::new(size.height)) else {
             return Ok(()); // minimised
         };
-        let scale = gfx.window.scale_factor().round().max(1.0) as i32;
         gfx.surface.resize(width, height).map_err(|e| format!("resize surface: {e}"))?;
         let mut buffer = gfx.surface.buffer_mut().map_err(|e| format!("get frame buffer: {e}"))?;
         self.session.draw(&mut Canvas::new(&mut buffer, width.get() as usize, height.get() as usize), scale);
         buffer.present().map_err(|e| format!("present frame: {e}"))
     }
 
+    fn click(&mut self) {
+        let Some(gfx) = &self.gfx else { return };
+        let size = gfx.window.inner_size();
+        let Some(pattern) = self.session.pattern() else { return };
+        let layout =
+            Layout::new(size.width as i32, size.height as i32, self.scale(), pattern, self.session.status_lines());
+        if let Some(hit) = layout.hit(pattern, self.mouse.x as i32, self.mouse.y as i32) {
+            self.session.click(hit);
+            self.request_redraw();
+        }
+    }
+
     fn key(&mut self, event: &KeyEvent) {
         if event.state != ElementState::Pressed {
             return;
         }
-        let tempo_step = if self.modifiers.shift_key() { 10.0 } else { 1.0 };
-        match &event.logical_key {
-            Key::Named(NamedKey::Space) if !event.repeat => self.session.toggle_play(),
-            Key::Named(NamedKey::ArrowLeft) => self.session.step_pattern(-1),
-            Key::Named(NamedKey::ArrowRight) => self.session.step_pattern(1),
-            Key::Named(NamedKey::ArrowUp) => self.session.step_tempo(tempo_step),
-            Key::Named(NamedKey::ArrowDown) => self.session.step_tempo(-tempo_step),
-            Key::Character(c) if c.eq_ignore_ascii_case("k") && !event.repeat => self.session.next_kit(),
-            _ => return,
+        let PhysicalKey::Code(code) = event.physical_key else { return };
+        let shift = self.modifiers.shift_key();
+        let command = self.modifiers.control_key() || self.modifiers.super_key();
+        let s = &mut self.session;
+        if command {
+            match code {
+                KeyCode::KeyZ if shift => s.redo(),
+                KeyCode::KeyZ => s.undo(),
+                KeyCode::KeyY => s.redo(),
+                KeyCode::KeyC => s.copy(shift),
+                KeyCode::KeyV => s.paste(shift),
+                KeyCode::KeyS => s.save(),
+                KeyCode::KeyN => s.new_pattern(),
+                KeyCode::KeyD => s.duplicate_pattern(),
+                KeyCode::KeyT => s.add_track(),
+                KeyCode::Backspace | KeyCode::Delete => s.remove_track(),
+                KeyCode::KeyG => s.next_grid(),
+                KeyCode::KeyL => s.loop_point_back(),
+                KeyCode::Minus => s.change_length(-1),
+                KeyCode::Equal => s.change_length(1),
+                _ => return,
+            }
+        } else if let Some(row) = ROW_DIGITS.iter().position(|&k| k == code) {
+            s.toggle_row(row, if shift { "solo" } else { "mute" });
+        } else if let Some(row) = ROW_LETTERS.iter().position(|&k| k == code) {
+            s.audition_row(row);
+        } else {
+            let tempo = if shift { 10.0 } else { 1.0 };
+            match code {
+                KeyCode::Space if !event.repeat => s.toggle_play(),
+                KeyCode::BracketLeft | KeyCode::PageUp => s.step_pattern(-1),
+                KeyCode::BracketRight | KeyCode::PageDown => s.step_pattern(1),
+                KeyCode::Minus | KeyCode::NumpadSubtract => s.step_tempo(-tempo),
+                KeyCode::Equal | KeyCode::NumpadAdd => s.step_tempo(tempo),
+                KeyCode::Comma => s.step_kit(-1),
+                KeyCode::Period => s.step_kit(1),
+                KeyCode::ArrowLeft if shift => s.nudge(Move::Left),
+                KeyCode::ArrowRight if shift => s.nudge(Move::Right),
+                KeyCode::ArrowUp if shift => s.nudge(Move::Up),
+                KeyCode::ArrowDown if shift => s.nudge(Move::Down),
+                KeyCode::ArrowLeft => s.move_cursor(Move::Left),
+                KeyCode::ArrowRight => s.move_cursor(Move::Right),
+                KeyCode::ArrowUp => s.move_cursor(Move::Up),
+                KeyCode::ArrowDown => s.move_cursor(Move::Down),
+                KeyCode::Enter | KeyCode::NumpadEnter => s.enter(),
+                KeyCode::Delete | KeyCode::Backspace => s.delete_step(),
+                KeyCode::Escape => s.deselect(),
+                _ => return,
+            }
         }
-        if let Some(gfx) = &self.gfx {
-            gfx.window.request_redraw();
-        }
+        self.request_redraw();
     }
 }
 
@@ -239,39 +195,49 @@ impl ApplicationHandler for App {
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         match event {
-            WindowEvent::CloseRequested => event_loop.exit(),
+            WindowEvent::CloseRequested => {
+                self.session.save_if_changed();
+                event_loop.exit();
+            }
             WindowEvent::RedrawRequested => {
                 if let Err(e) = self.redraw() {
                     self.fail(event_loop, "redraw", e);
                 }
             }
-            WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. } => {
-                if let Some(gfx) = &self.gfx {
-                    gfx.window.request_redraw();
-                }
-            }
+            WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. } => self.request_redraw(),
             WindowEvent::ModifiersChanged(modifiers) => self.modifiers = modifiers.state(),
             WindowEvent::KeyboardInput { event, .. } => self.key(&event),
+            WindowEvent::CursorMoved { position, .. } => self.mouse = position,
+            WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } => self.click(),
             _ => {}
         }
     }
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-        if self.session.playing() {
+        let save_at = self.session.autosave();
+        let playing = self.session.playing();
+        if playing {
             self.session.update();
-            if let Some(gfx) = &self.gfx {
-                gfx.window.request_redraw();
-            }
-            event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + FRAME));
-        } else {
-            event_loop.set_control_flow(ControlFlow::Wait);
+            self.request_redraw();
         }
+        let wake = match (playing, save_at) {
+            (true, _) => Some(Instant::now() + FRAME),
+            (false, Some(at)) => Some(at),
+            (false, None) => None,
+        };
+        event_loop.set_control_flow(wake.map_or(ControlFlow::Wait, ControlFlow::WaitUntil));
     }
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let event_loop = EventLoop::new()?;
-    let mut app = App { gfx: None, session: Session::load(), modifiers: ModifiersState::default(), error: None };
+    let mut app = App {
+        gfx: None,
+        session: Session::load(),
+        modifiers: ModifiersState::default(),
+        mouse: PhysicalPosition::new(0.0, 0.0),
+        error: None,
+    };
     event_loop.run_app(&mut app)?;
     match app.error {
         Some(error) => Err(error.into()),

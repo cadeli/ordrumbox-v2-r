@@ -1137,6 +1137,7 @@ dependencies = [
  "cpal",
  "ordrumbox-core",
  "ordrumbox-engine",
+ "ordrumbox-logic",
  "softbuffer",
  "winit",
 ]

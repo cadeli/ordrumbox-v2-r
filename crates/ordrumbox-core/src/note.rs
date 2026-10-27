@@ -47,7 +47,12 @@ json_record! {
         /// Arpeggio direction picked in the note editor.
         arp_type: Option<String> = None => "_arpType",
     }
-    other_fields {}
+    other_fields {
+        /// Position in the beat, percent (`stepPercent`): never saved, kept
+        /// while editing so a change of steps per beat and back restores the
+        /// step. `None`: derived from `beat_step`.
+        step_percent: Option<f64> = None,
+    }
 }
 
 /// Keys written rounded to 2 decimals (`NOTE_ROUND_2D`).
@@ -69,6 +74,15 @@ impl Note {
         if self.set_field(key, value) == SetField::WrongType {
             issues.push(Issue::new(format!("{at}.{key}"), format!("wrong type ({}), default kept", value.to_json())));
         }
+    }
+
+    /// `stepPercent` at `steps_per_beat` steps per beat.
+    pub fn step_percent(&self, steps_per_beat: i32) -> f64 {
+        self.step_percent.filter(|p| p.is_finite()).unwrap_or_else(|| {
+            crate::js::round(
+                f64::from(self.beat_step) * 100.0 / f64::from(if steps_per_beat == 0 { 4 } else { steps_per_beat }),
+            )
+        })
     }
 
     /// Fold a `beatStep` past the end of its beat into the following beats:

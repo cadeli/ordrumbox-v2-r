@@ -159,6 +159,40 @@ impl Engine {
         }
     }
 
+    /// Start the events of `pass` now, outside the transport (auditioning a
+    /// track or a note). When stopped, its strip settings apply at once.
+    /// The caller keeps a reference to `pass` (this drops its own).
+    pub fn preview(&mut self, pass: Arc<Pass>) {
+        if self.current.is_none() {
+            self.strip_count = self.strip_count.max(pass.strips.len()).min(MAX_TRACKS);
+            for (channel, settings) in self.channels.iter_mut().zip(&pass.strips) {
+                channel.target = *settings;
+                channel.current = *settings;
+                channel.lfo = [false; 4];
+            }
+        }
+        for event in &pass.events {
+            self.start(event, &pass, self.clock);
+        }
+    }
+
+    /// Swap the playing pass for `pass`, a rebuild of the same index (the
+    /// pattern was edited): playback goes on from the same frame with the new
+    /// events still ahead; the queued pass, built from the old pattern, is
+    /// dropped so the next one is requested again.
+    pub fn replace(&mut self, pass: Arc<Pass>) {
+        if self.current.as_ref().is_none_or(|c| c.number != pass.number) || pass.number != self.pass_number {
+            return;
+        }
+        let frame = self.frame;
+        self.next = None;
+        self.load(pass);
+        self.frame = frame;
+        if let Some(current) = &self.current {
+            self.cursor = current.events.partition_point(|e| e.frame < frame);
+        }
+    }
+
     /// Pass to play after the current one, if it is the next index.
     pub fn queue(&mut self, pass: Arc<Pass>) {
         if self.current.is_some() && pass.number == self.pass_number + 1 {
@@ -523,5 +557,19 @@ mod tests {
         loud.strips[0].volume = 2.0;
         engine.play(Arc::new(loud));
         assert!(render(&mut engine, 1000).iter().all(|s| s.abs() <= 1.0));
+    }
+
+    #[test]
+    fn replace_keeps_the_position_and_plays_what_is_ahead() {
+        let mut engine = engine();
+        engine.play(pass(0, &[0, 600], 1000));
+        engine.queue(pass(1, &[0], 1000));
+        render(&mut engine, 300);
+        engine.replace(pass(0, &[100, 400, 800], 1000));
+        assert_eq!(engine.wants_pass(), Some(1), "the old next pass is dropped");
+        let signal = render(&mut engine, 700);
+        assert_eq!(onsets(&signal), [100, 500], "frames 400 and 800 of the pass");
+        engine.replace(pass(5, &[0], 1000)); // not the playing pass: ignored
+        assert_eq!(engine.position().map(|p| p.frame), Some(1000));
     }
 }

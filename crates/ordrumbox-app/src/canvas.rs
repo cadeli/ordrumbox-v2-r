@@ -55,7 +55,7 @@ impl<'a> Canvas<'a> {
     /// `scale × scale` square; returns the x after the last character.
     pub fn text(&mut self, x: i32, y: i32, text: &str, scale: i32, color: Rgb) -> i32 {
         let mut pen = x;
-        for c in text.chars() {
+        for c in shown(text) {
             for (row, bits) in font::glyph(c).iter().enumerate() {
                 for col in 0..8 {
                     if bits & (0x80 >> col) != 0 {
@@ -71,12 +71,35 @@ impl<'a> Canvas<'a> {
 
 /// Width of `text` drawn at `scale`.
 pub fn text_width(text: &str, scale: i32) -> i32 {
-    text.chars().count() as i32 * font::SIZE * scale
+    shown(text).count() as i32 * font::SIZE * scale
+}
+
+/// The characters drawn for `text`: the font is ASCII, so the punctuation the
+/// app's messages use is spelled out (`→` as `->`); anything else shows as `?`.
+fn shown(text: &str) -> impl Iterator<Item = char> + '_ {
+    text.chars().flat_map(|c| {
+        let replacement: &[char] = match c {
+            '→' => &['-', '>'],
+            '←' => &['<', '-'],
+            '—' | '–' => &['-'],
+            '…' => &['.', '.', '.'],
+            '×' => &['x'],
+            _ => &[],
+        };
+        let own = replacement.is_empty().then_some(c);
+        replacement.iter().copied().chain(own)
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn non_ascii_punctuation_is_spelled_out() {
+        assert_eq!(shown("a → b…").collect::<String>(), "a -> b...");
+        assert_eq!(text_width("→", 1), 2 * font::SIZE);
+    }
 
     #[test]
     fn fill_rect_clips_to_bounds() {

@@ -9,7 +9,7 @@ Windows by CI).
 | Crate | Role | Dependencies |
 |---|---|---|
 | `ordrumbox-core` | data model, `song.json` codec, pattern engine, JSON, RNG | none |
-| `ordrumbox-logic` | commands + undo, generators, MIDI files | core |
+| `ordrumbox-logic` | the library being edited: commands with undo/redo (generators and MIDI files to come) | core |
 | `ordrumbox-dsp` | sample voice, synth voice, channel strip (filter, saturation, reverb, delay), master bus; no allocation in render paths | none |
 | `ordrumbox-engine` | WAV decoding, kits, synth presets, passes (events, strip settings, LFO steps), sample-accurate engine, UI ↔ audio link | core, dsp |
 | `ordrumbox-app` | window, software-rendered UI, audio output → `ordrumbox.exe` | winit, softbuffer, cpal |
@@ -26,8 +26,42 @@ in `$ORDRUMBOX_ASSETS`, in `assets/` next to the program, in `assets/` in the
 working folder, then in `../ordrumbox-v2/assets` (so `cargo run` works from
 this repository when both checkouts sit side by side).
 
-Keys: **Space** play/stop, **←/→** previous/next pattern, **↑/↓** tempo
-(**Shift** ×10), **K** next kit.
+The demo `song.json` is only the starting point: the library being edited is
+saved (one second after each edit, and on quit) to `library.json` in the user
+data folder — `%APPDATA%\orDrumbox` on Windows, `~/Library/Application
+Support/orDrumbox` on macOS, `~/.local/share/ordrumbox` elsewhere, or the file
+named by `$ORDRUMBOX_LIBRARY` — and loaded from there next time. Delete that
+file to start again from the demo.
+
+Mouse: a click on an empty step adds a note, on a note selects it (and plays
+it), on the selected note deletes it; **M**/**S** boxes mute/solo; a click on
+a name selects the track (and plays it).
+
+| Keys | |
+|---|---|
+| **Space** | play / stop |
+| **[ ]** | previous / next pattern |
+| **- =** | tempo −1 / +1 (**Shift** ×10) |
+| **, .** | previous / next kit |
+| **1–9** | mute track 1–9 (**Shift**: solo) |
+| **Q–P** | play track 1–10 |
+| **arrows** | move the grid cursor |
+| **Enter** | like a click at the cursor |
+| **Shift + ↑↓ / ←→** | velocity ±0.05 / pitch ±1 of the selected note |
+| **Delete** | clear the cursor step |
+| **Esc** | deselect |
+| **Ctrl Z**, **Ctrl Y** (or **Ctrl Shift Z**) | undo, redo (50 steps) |
+| **Ctrl C / V** | copy / paste the cursor step (**Shift**: the track) |
+| **Ctrl T**, **Ctrl Backspace** | add a track, remove the focused track |
+| **Ctrl G**, **Ctrl L** | next grid (steps per beat), loop point one step back |
+| **Ctrl - =** | pattern length −1 / +1 beat |
+| **Ctrl N**, **Ctrl D** | new pattern, duplicate pattern |
+| **Ctrl S** | save now |
+
+Keys are read by position (like the JS app's shortcuts): on an AZERTY
+keyboard, **[ ]** are the two keys right of **P**, **Q–P** start at **A**.
+**PageUp/PageDown** and the keypad **- +** work too. **Cmd** works for
+**Ctrl** on macOS.
 
 ## Commands
 
@@ -87,6 +121,18 @@ node tools/export_dsp_fixtures.mjs ../ordrumbox-v2
   a range of ticks.
 - `ordrumbox-engine/tests/fixtures/synth_patches.json`: the message
   `WorkletSynthVoice` sends to its processor for each preset.
+
+The editing commands have a third script, which drives the JS `Commander`
+and `HistoryManager`:
+
+```sh
+node tools/export_edit_fixtures.mjs ../ordrumbox-v2
+```
+
+- `ordrumbox-logic/tests/fixtures/edits.json`: 29 edits on `song.json`
+  (notes, tracks, patterns), then undo all, then redo all; after each, the
+  undo/redo sizes, the step description, the pattern ids and the saved
+  patterns.
 
 ## License
 

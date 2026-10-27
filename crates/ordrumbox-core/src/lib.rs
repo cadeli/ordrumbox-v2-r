@@ -29,7 +29,7 @@ pub use library::{Library, LoadReport};
 pub use note::Note;
 pub use pattern::Pattern;
 pub use pattern_engine::{FlatNote, FlatNotes, recompute_flat_notes};
-pub use record::{Issue, JsonField};
+pub use record::{Issue, JsonField, SetField};
 pub use rng::Rng;
 pub use scales::Scales;
 pub use song::{DroppedClip, Song, SongClip};
