@@ -9,5 +9,9 @@ repository.workspace = true
 
 [dependencies]
 
+[dev-dependencies]
+# The golden tests read their JSON index with the core parser.
+ordrumbox-core.workspace = true
+
 [lints]
 workspace = true

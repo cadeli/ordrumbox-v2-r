@@ -11,6 +11,7 @@ pub mod euclidean;
 pub mod ids;
 pub mod js;
 pub mod json;
+pub mod lfo;
 pub mod library;
 pub mod note;
 mod note_params;

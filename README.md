@@ -10,8 +10,8 @@ Windows by CI).
 |---|---|---|
 | `ordrumbox-core` | data model, `song.json` codec, pattern engine, JSON, RNG | none |
 | `ordrumbox-logic` | commands + undo, generators, MIDI files | core |
-| `ordrumbox-dsp` | sample voice, channel strip (no allocation in render paths) | none |
-| `ordrumbox-engine` | WAV decoding, kits, passes, sample-accurate engine, UI ↔ audio link | core, dsp |
+| `ordrumbox-dsp` | sample voice, synth voice, channel strip (filter, saturation, reverb, delay), master bus; no allocation in render paths | none |
+| `ordrumbox-engine` | WAV decoding, kits, synth presets, passes (events, strip settings, LFO steps), sample-accurate engine, UI ↔ audio link | core, dsp |
 | `ordrumbox-app` | window, software-rendered UI, audio output → `ordrumbox.exe` | winit, softbuffer, cpal |
 
 The four domain crates have no third-party dependency. Only the app talks to
@@ -20,7 +20,8 @@ the OS, through small bridges (`winit`, `softbuffer`, `cpal`; `midir` with MIDI)
 ## Running
 
 The app reads the `assets` folder of ordrumbox-v2 (`data/song.json`,
-`data/drumkits.json`, `data/scales.json`, `kits/**.wav`). It looks, in order,
+`data/drumkits.json`, `data/scales.json`, `data/generated_sounds.json`,
+`kits/**.wav`). It looks, in order,
 in `$ORDRUMBOX_ASSETS`, in `assets/` next to the program, in `assets/` in the
 working folder, then in `../ordrumbox-v2/assets` (so `cargo run` works from
 this repository when both checkouts sit side by side).
@@ -36,6 +37,8 @@ cargo test --workspace
 cargo clippy --workspace --all-targets
 cargo fmt --all
 cargo build --release -p ordrumbox-app  # target/release/ordrumbox(.exe)
+# a pattern rendered offline to a WAV file, with its speed
+cargo run --release -p ordrumbox-engine --example render -- ../ordrumbox-v2/assets rock 8 rock.wav
 ```
 
 Windows `.exe`: every push to `main` builds it in CI (artifact
@@ -66,6 +69,24 @@ node tools/export_fixtures.mjs ../ordrumbox-v2
   and draw no randomness. The other passes are checked by properties.
 
 Re-run the script whenever the JS engine or `song.json` changes.
+
+The audio processors have their own script, which runs the JS AudioWorklet
+processors in Node (a minimal worklet scope, 128-frame quanta):
+
+```sh
+node tools/export_dsp_fixtures.mjs ../ordrumbox-v2
+```
+
+- `ordrumbox-dsp/tests/fixtures/renders.{json,bin}`: strip, master bus and
+  synth voice outputs (every preset of `generated_sounds.json`, every LFO
+  target, FM algorithm and modulation target) for inputs both sides compute
+  bit for bit. The Rust processors must match within 2e-5.
+- `ordrumbox-engine/tests/fixtures/strip_settings.json`: the strip parameters
+  `applyTrackToStrip()` sets for every track setup of `song.json`.
+- `ordrumbox-engine/tests/fixtures/lfo_values.json`: `computeLfoValue()` over
+  a range of ticks.
+- `ordrumbox-engine/tests/fixtures/synth_patches.json`: the message
+  `WorkletSynthVoice` sends to its processor for each preset.
 
 ## License
 

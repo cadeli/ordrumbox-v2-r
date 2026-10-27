@@ -1,8 +1,9 @@
 //! orDrumbox native application.
 //!
-//! Phase 3: loads the ordrumbox-v2 assets (patterns, kits, samples), plays the
-//! selected pattern through the default audio device, and shows its tracks
-//! with a playhead. Keys: Space play/stop, ←/→ pattern, ↑/↓ tempo (Shift: ×10),
+//! Loads the ordrumbox-v2 assets (patterns, kits, samples, synth presets),
+//! plays the selected pattern through the default audio device (per-track
+//! strips with filter, saturation, reverb, delay and LFOs, synth tracks, master
+//! bus), and shows its tracks with a playhead. Keys: Space play/stop, ←/→ pattern, ↑/↓ tempo (Shift: ×10),
 //! K next kit.
 
 // No console window in a release build on Windows.
@@ -80,7 +81,7 @@ impl Session {
         if let Some(first) = assets.sample_errors.first() {
             status.push(format!("{} sample(s) not loaded, first: {first}", assets.sample_errors.len()));
         }
-        let (controller, output) = match audio::start(Arc::new(assets.bank), assets.scales) {
+        let (controller, output) = match audio::start(Arc::new(assets.bank), assets.scales, assets.synths) {
             Ok((output, controller)) => (Some(controller), Some(output)),
             Err(e) => {
                 status.push(format!("no sound: {e}"));

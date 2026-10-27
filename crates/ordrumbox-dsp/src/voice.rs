@@ -89,7 +89,7 @@ impl Default for SampleVoice {
     }
 }
 
-/// Gains of a Web Audio `StereoPannerNode` (see [`SampleVoice::pan`]).
+/// Gains of a Web Audio `StereoPannerNode`: `[in_left → out_left, in_right → out_left, in_left → out_right, in_right → out_right]`.
 pub fn stereo_panner(pan: f32, stereo_input: bool) -> [f32; 4] {
     let pan = pan.clamp(-1.0, 1.0);
     if !stereo_input {

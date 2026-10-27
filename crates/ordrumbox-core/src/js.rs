@@ -1,4 +1,5 @@
-//! The JS coercions the file loaders rely on: `Number(x)` and `String(x)`.
+//! The JS coercions the file loaders rely on: `Number(x)`, `String(x)`,
+//! `parseFloat(x)` and truthiness.
 //!
 //! `song_schema.js` reads song files with them (`Number(raw.bpm)`,
 //! `String(raw.id ?? '')`), so `"bpm": "140"` is a valid tempo there. They are
@@ -103,6 +104,61 @@ fn is_decimal_literal(s: &str) -> bool {
     mantissa_ok && exponent_ok
 }
 
+/// `parseFloat(value)`: the longest decimal prefix of `String(value)` after
+/// leading white space (`"0.5 beats"` is 0.5), NaN when there is none.
+pub fn parse_float(value: &Value) -> f64 {
+    if let Value::Number(n) = value {
+        return *n;
+    }
+    let text = to_string(value);
+    let s = text.trim_start_matches(|c: char| c.is_whitespace() || c == '\u{feff}');
+    let (sign, rest) = match s.as_bytes().first() {
+        Some(b'-') => (-1.0, &s[1..]),
+        Some(b'+') => (1.0, &s[1..]),
+        _ => (1.0, s),
+    };
+    if rest.starts_with("Infinity") {
+        return sign * f64::INFINITY;
+    }
+    let bytes = rest.as_bytes();
+    let digits_from = |mut i: usize| {
+        while i < bytes.len() && bytes[i].is_ascii_digit() {
+            i += 1;
+        }
+        i
+    };
+    let int_end = digits_from(0);
+    let mut end = int_end;
+    if bytes.get(end) == Some(&b'.') {
+        let frac_end = digits_from(end + 1);
+        if int_end > 0 || frac_end > end + 1 {
+            end = frac_end;
+        }
+    }
+    if end == 0 {
+        return f64::NAN;
+    }
+    if matches!(bytes.get(end), Some(b'e' | b'E')) {
+        let sign_len = usize::from(matches!(bytes.get(end + 1), Some(b'+' | b'-')));
+        let exp_end = digits_from(end + 1 + sign_len);
+        if exp_end > end + 1 + sign_len {
+            end = exp_end;
+        }
+    }
+    rest[..end].parse::<f64>().map_or(f64::NAN, |n| sign * n)
+}
+
+/// JS truthiness (`!!value`).
+pub fn truthy(value: &Value) -> bool {
+    match value {
+        Value::Null => false,
+        Value::Bool(b) => *b,
+        Value::Number(n) => *n != 0.0 && !n.is_nan(),
+        Value::String(s) => !s.is_empty(),
+        Value::Array(_) | Value::Object(_) => true,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -128,6 +184,33 @@ mod tests {
         assert_eq!(num("[\"7\"]"), 7.0);
         for nan in ["\"abc\"", "\"1,2\"", "\"inf\"", "\"NaN\"", "\"-0x1\"", "\"1e\"", "\".\"", "[1,2]", "{}"] {
             assert!(num(nan).is_nan(), "{nan}");
+        }
+    }
+
+    #[test]
+    fn parse_float_matches_js() {
+        let pf = |text: &str| parse_float(&json::parse(text).unwrap());
+        assert_eq!(pf("2.5"), 2.5);
+        assert_eq!(pf("\"0.5 beats\""), 0.5);
+        assert_eq!(pf("\"  -3e2x\""), -300.0);
+        assert_eq!(pf("\"1e\""), 1.0);
+        assert_eq!(pf("\".5\""), 0.5);
+        assert_eq!(pf("\"5.\""), 5.0);
+        assert_eq!(pf("\"-Infinityx\""), f64::NEG_INFINITY);
+        assert_eq!(pf("[\"7\", 2]"), 7.0);
+        for nan in ["\"\"", "\".\"", "\"abc\"", "null", "true", "{}"] {
+            assert!(pf(nan).is_nan(), "{nan}");
+        }
+        assert_eq!(pf("\"0x10\""), 0.0);
+        assert_eq!(pf("\"0x\""), 0.0);
+    }
+
+    #[test]
+    fn truthiness() {
+        for (text, expected) in
+            [("0", false), ("1", true), ("\"\"", false), ("\"0\"", true), ("null", false), ("[]", true)]
+        {
+            assert_eq!(truthy(&json::parse(text).unwrap()), expected, "{text}");
         }
     }
 

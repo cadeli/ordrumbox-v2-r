@@ -8,7 +8,7 @@ use crate::record::{Issue, SetField, json_record, round2};
 
 json_record! {
     /// One track. Table fields are saved only when they differ from their
-    /// default (except `pan`, see [`Track::to_json`]); their order is the
+    /// default (except `pan`, see `Track::to_json`); their order is the
     /// `TRACK_DEFAULTS` order.
     pub struct Track {
         /// Display name; also picks the default pan (`KICK`, `SNARE`…).
@@ -27,7 +27,7 @@ json_record! {
         swing_amount: f64 = 0.0 => "swingAmount",
         velocity: f64 = 1.0 => "velocity",
         /// LFO objects (`{freq, min, max, phase, type}`) are kept as written
-        /// until the LFO engine is ported (phase 3).
+        /// and read leniently when played (see [`crate::lfo`]).
         velocity_lfo: Option<Object> = None => "velocityLfo",
         /// Transposition in semitones.
         pitch: f64 = 0.0 => "pitch",

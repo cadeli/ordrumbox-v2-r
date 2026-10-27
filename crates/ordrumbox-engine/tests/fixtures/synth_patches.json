@@ -1,0 +1,7212 @@
+[
+ {
+  "name": "BASS0",
+  "preset": {
+   "masterVolume": 0.85,
+   "vco1": {
+    "gain": 0.75,
+    "octave": -1,
+    "detune": 0,
+    "wave": "sawtooth"
+   },
+   "vco2": {
+    "gain": 0.35,
+    "octave": -1,
+    "detune": 5,
+    "wave": "sine"
+   },
+   "vco3": {
+    "gain": 0,
+    "octave": -2,
+    "detune": 0,
+    "wave": "sine"
+   },
+   "subGain": 0.4,
+   "pitchPunch": 0.15,
+   "filter": {
+    "type": "lowpass",
+    "freq": 480,
+    "Q": 2.5,
+    "drive": 0.15
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.35
+   },
+   "fm": {
+    "amount": 0,
+    "algo": 0
+   },
+   "noise": {
+    "mix": 0,
+    "filterType": "highpass",
+    "filterFreq": 1000,
+    "filterQ": 1
+   },
+   "envelope": {
+    "attack": 0.005,
+    "decay": 0.28,
+    "sustain": 0.4,
+    "release": 0.12
+   },
+   "lfo": {
+    "target": "NOT",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "NOT",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.005,
+    "decay": 0.12,
+    "sustain": 0,
+    "release": 0.1,
+    "target": "off"
+   }
+  },
+  "note": {
+   "ratio": 1,
+   "pan": 0,
+   "velocity": 0.8,
+   "bpm": 240,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 65.40639132514966,
+   "osc2Freq": 65.40639132514966,
+   "osc3Freq": 32.70319566257483,
+   "osc1Gain": 0.75,
+   "osc2Gain": 0.35,
+   "osc3Gain": 0,
+   "osc1Detune": 0,
+   "osc2Detune": 5,
+   "osc3Detune": 0,
+   "osc1Wave": 2,
+   "osc2Wave": 0,
+   "osc3Wave": 0,
+   "noiseMix": 0,
+   "noiseFilterType": 1,
+   "noiseFilterFreq": 1000,
+   "noiseFilterQ": 1,
+   "filterType": 0,
+   "filterFreq": 480,
+   "filterQ": 2.5,
+   "drive": 0.15,
+   "pitchPunch": 0.15,
+   "subGain": 0.4,
+   "attack": 0.005,
+   "decay": 0.28,
+   "sustain": 0.4,
+   "release": 0.12,
+   "master": 1,
+   "pan": 0,
+   "velocity": 0.7727272727272727,
+   "lfo1Target": 0,
+   "lfo1Wave": 0,
+   "lfo1Freq": 0,
+   "lfo1Depth": 0,
+   "lfo2Target": 0,
+   "lfo2Wave": 0,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0,
+   "filterEnvAmt": 0.35,
+   "fmAmount": 0,
+   "fmAlgo": 0,
+   "modEnvAttack": 0.005,
+   "modEnvDecay": 0.12,
+   "modEnvSustain": 0,
+   "modEnvRelease": 0.1,
+   "modEnvTarget": 0,
+   "modEnvDepth": 0,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "BASS1",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0,
+    "octave": -2,
+    "detune": 0,
+    "wave": "sine"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0,
+    "algo": 0
+   },
+   "noise": {
+    "mix": 0.02,
+    "filterType": "highpass",
+    "filterFreq": 1500,
+    "filterQ": 1
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "filter.freq",
+    "wave": "sine",
+    "freq": 0.5,
+    "depth": 0.1,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "NOT",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.005,
+    "decay": 0.12,
+    "sustain": 0,
+    "release": 0.1,
+    "target": "off"
+   }
+  },
+  "note": {
+   "ratio": 1,
+   "pan": 0,
+   "velocity": 0.8,
+   "bpm": 240,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 130.8127826502993,
+   "osc2Freq": 32.70319566257483,
+   "osc3Freq": 32.70319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": 0,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 0,
+   "noiseMix": 0.02,
+   "noiseFilterType": 1,
+   "noiseFilterFreq": 1500,
+   "noiseFilterQ": 1,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0,
+   "velocity": 0.23846153846153847,
+   "lfo1Target": 15,
+   "lfo1Wave": 0,
+   "lfo1Freq": 0.5,
+   "lfo1Depth": 0.1,
+   "lfo2Target": 0,
+   "lfo2Wave": 0,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0,
+   "fmAlgo": 0,
+   "modEnvAttack": 0.005,
+   "modEnvDecay": 0.12,
+   "modEnvSustain": 0,
+   "modEnvRelease": 0.1,
+   "modEnvTarget": 0,
+   "modEnvDepth": 0,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "BASS2",
+  "preset": {
+   "masterVolume": 0.85,
+   "vco1": {
+    "gain": 0.7,
+    "octave": -1,
+    "detune": 0,
+    "wave": "triangle"
+   },
+   "vco2": {
+    "gain": 0.4,
+    "octave": -1,
+    "detune": -7,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0,
+    "octave": -2,
+    "detune": 0,
+    "wave": "sine"
+   },
+   "subGain": 0.3,
+   "pitchPunch": 0.1,
+   "filter": {
+    "type": "lowpass",
+    "freq": 520,
+    "Q": 3,
+    "drive": 0.15
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.35
+   },
+   "fm": {
+    "amount": 0,
+    "algo": 0
+   },
+   "noise": {
+    "mix": 0,
+    "filterType": "highpass",
+    "filterFreq": 1000,
+    "filterQ": 1
+   },
+   "envelope": {
+    "attack": 0.005,
+    "decay": 0.32,
+    "sustain": 0.5,
+    "release": 0.15
+   },
+   "lfo": {
+    "target": "NOT",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "NOT",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.005,
+    "decay": 0.12,
+    "sustain": 0,
+    "release": 0.1,
+    "target": "off"
+   }
+  },
+  "note": {
+   "ratio": 1,
+   "pan": 0,
+   "velocity": 0.8,
+   "bpm": 240,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 65.40639132514966,
+   "osc2Freq": 65.40639132514966,
+   "osc3Freq": 32.70319566257483,
+   "osc1Gain": 0.7,
+   "osc2Gain": 0.4,
+   "osc3Gain": 0,
+   "osc1Detune": 0,
+   "osc2Detune": -7,
+   "osc3Detune": 0,
+   "osc1Wave": 1,
+   "osc2Wave": 2,
+   "osc3Wave": 0,
+   "noiseMix": 0,
+   "noiseFilterType": 1,
+   "noiseFilterFreq": 1000,
+   "noiseFilterQ": 1,
+   "filterType": 0,
+   "filterFreq": 520,
+   "filterQ": 3,
+   "drive": 0.15,
+   "pitchPunch": 0.1,
+   "subGain": 0.3,
+   "attack": 0.005,
+   "decay": 0.32,
+   "sustain": 0.5,
+   "release": 0.15,
+   "master": 1,
+   "pan": 0,
+   "velocity": 0.7727272727272727,
+   "lfo1Target": 0,
+   "lfo1Wave": 0,
+   "lfo1Freq": 0,
+   "lfo1Depth": 0,
+   "lfo2Target": 0,
+   "lfo2Wave": 0,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0,
+   "filterEnvAmt": 0.35,
+   "fmAmount": 0,
+   "fmAlgo": 0,
+   "modEnvAttack": 0.005,
+   "modEnvDecay": 0.12,
+   "modEnvSustain": 0,
+   "modEnvRelease": 0.1,
+   "modEnvTarget": 0,
+   "modEnvDepth": 0,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "BASS3",
+  "preset": {
+   "masterVolume": 0.85,
+   "vco1": {
+    "gain": 0.75,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.4,
+    "octave": -1,
+    "detune": 0,
+    "wave": "triangle"
+   },
+   "vco3": {
+    "gain": 0,
+    "octave": -2,
+    "detune": 0,
+    "wave": "sine"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.5,
+   "filter": {
+    "type": "lowpass",
+    "freq": 750,
+    "Q": 6,
+    "drive": 0.2
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.5
+   },
+   "fm": {
+    "amount": 0,
+    "algo": 0
+   },
+   "noise": {
+    "mix": 0.08,
+    "filterType": "highpass",
+    "filterFreq": 2500,
+    "filterQ": 1
+   },
+   "envelope": {
+    "attack": 0.002,
+    "decay": 0.16,
+    "sustain": 0.2,
+    "release": 0.08
+   },
+   "lfo": {
+    "target": "NOT",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "NOT",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.005,
+    "decay": 0.12,
+    "sustain": 0,
+    "release": 0.1,
+    "target": "off"
+   }
+  },
+  "note": {
+   "ratio": 1,
+   "pan": 0,
+   "velocity": 0.8,
+   "bpm": 240,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 130.8127826502993,
+   "osc2Freq": 65.40639132514966,
+   "osc3Freq": 32.70319566257483,
+   "osc1Gain": 0.75,
+   "osc2Gain": 0.4,
+   "osc3Gain": 0,
+   "osc1Detune": 0,
+   "osc2Detune": 0,
+   "osc3Detune": 0,
+   "osc1Wave": 3,
+   "osc2Wave": 1,
+   "osc3Wave": 0,
+   "noiseMix": 0.08,
+   "noiseFilterType": 1,
+   "noiseFilterFreq": 2500,
+   "noiseFilterQ": 1,
+   "filterType": 0,
+   "filterFreq": 750,
+   "filterQ": 6,
+   "drive": 0.2,
+   "pitchPunch": 0.5,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.16,
+   "sustain": 0.2,
+   "release": 0.08,
+   "master": 1,
+   "pan": 0,
+   "velocity": 0.7391304347826088,
+   "lfo1Target": 0,
+   "lfo1Wave": 0,
+   "lfo1Freq": 0,
+   "lfo1Depth": 0,
+   "lfo2Target": 0,
+   "lfo2Wave": 0,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0,
+   "filterEnvAmt": 0.5,
+   "fmAmount": 0,
+   "fmAlgo": 0,
+   "modEnvAttack": 0.005,
+   "modEnvDecay": 0.12,
+   "modEnvSustain": 0,
+   "modEnvRelease": 0.1,
+   "modEnvTarget": 0,
+   "modEnvDepth": 0,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "BASS4",
+  "preset": {
+   "masterVolume": 0.85,
+   "vco1": {
+    "gain": 0.95,
+    "octave": -1,
+    "detune": 0,
+    "wave": "sawtooth"
+   },
+   "vco2": {
+    "gain": 0,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco3": {
+    "gain": 0,
+    "octave": -2,
+    "detune": 0,
+    "wave": "sine"
+   },
+   "subGain": 0.15,
+   "pitchPunch": 0.2,
+   "filter": {
+    "type": "lowpass",
+    "freq": 340,
+    "Q": 14,
+    "drive": 0.35
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.65
+   },
+   "fm": {
+    "amount": 0,
+    "algo": 0
+   },
+   "noise": {
+    "mix": 0,
+    "filterType": "highpass",
+    "filterFreq": 1000,
+    "filterQ": 1
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "NOT",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "NOT",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.005,
+    "decay": 0.12,
+    "sustain": 0,
+    "release": 0.1,
+    "target": "off"
+   }
+  },
+  "note": {
+   "ratio": 1,
+   "pan": 0,
+   "velocity": 0.8,
+   "bpm": 240,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 65.40639132514966,
+   "osc2Freq": 130.8127826502993,
+   "osc3Freq": 32.70319566257483,
+   "osc1Gain": 0.95,
+   "osc2Gain": 0,
+   "osc3Gain": 0,
+   "osc1Detune": 0,
+   "osc2Detune": 0,
+   "osc3Detune": 0,
+   "osc1Wave": 2,
+   "osc2Wave": 3,
+   "osc3Wave": 0,
+   "noiseMix": 0,
+   "noiseFilterType": 1,
+   "noiseFilterFreq": 1000,
+   "noiseFilterQ": 1,
+   "filterType": 0,
+   "filterFreq": 340,
+   "filterQ": 14,
+   "drive": 0.35,
+   "pitchPunch": 0.2,
+   "subGain": 0.15,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0,
+   "velocity": 0.894736842105263,
+   "lfo1Target": 0,
+   "lfo1Wave": 0,
+   "lfo1Freq": 0,
+   "lfo1Depth": 0,
+   "lfo2Target": 0,
+   "lfo2Wave": 0,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0,
+   "filterEnvAmt": 0.65,
+   "fmAmount": 0,
+   "fmAlgo": 0,
+   "modEnvAttack": 0.005,
+   "modEnvDecay": 0.12,
+   "modEnvSustain": 0,
+   "modEnvRelease": 0.1,
+   "modEnvTarget": 0,
+   "modEnvDepth": 0,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "BASS5",
+  "preset": {
+   "masterVolume": 0.85,
+   "vco1": {
+    "gain": 0.85,
+    "octave": -1,
+    "detune": 0,
+    "wave": "sine"
+   },
+   "vco2": {
+    "gain": 0.5,
+    "octave": 0,
+    "detune": 0,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0,
+    "octave": -2,
+    "detune": 0,
+    "wave": "sine"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.2,
+   "filter": {
+    "type": "lowpass",
+    "freq": 600,
+    "Q": 6.5,
+    "drive": 0.3
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.4
+   },
+   "fm": {
+    "amount": 0.45,
+    "algo": 0
+   },
+   "noise": {
+    "mix": 0,
+    "filterType": "highpass",
+    "filterFreq": 1000,
+    "filterQ": 1
+   },
+   "envelope": {
+    "attack": 0.004,
+    "decay": 0.25,
+    "sustain": 0.35,
+    "release": 0.12
+   },
+   "lfo": {
+    "target": "fm.amount",
+    "wave": "sawtooth",
+    "freq": 2,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "NOT",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.005,
+    "decay": 0.12,
+    "sustain": 0,
+    "release": 0.1,
+    "target": "off"
+   }
+  },
+  "note": {
+   "ratio": 1,
+   "pan": 0,
+   "velocity": 0.8,
+   "bpm": 240,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 65.40639132514966,
+   "osc2Freq": 130.8127826502993,
+   "osc3Freq": 32.70319566257483,
+   "osc1Gain": 0.85,
+   "osc2Gain": 0.5,
+   "osc3Gain": 0,
+   "osc1Detune": 0,
+   "osc2Detune": 0,
+   "osc3Detune": 0,
+   "osc1Wave": 0,
+   "osc2Wave": 2,
+   "osc3Wave": 0,
+   "noiseMix": 0,
+   "noiseFilterType": 1,
+   "noiseFilterFreq": 1000,
+   "noiseFilterQ": 1,
+   "filterType": 0,
+   "filterFreq": 600,
+   "filterQ": 6.5,
+   "drive": 0.3,
+   "pitchPunch": 0.2,
+   "subGain": 0.35,
+   "attack": 0.004,
+   "decay": 0.25,
+   "sustain": 0.35,
+   "release": 0.12,
+   "master": 1,
+   "pan": 0,
+   "velocity": 0.6296296296296295,
+   "lfo1Target": 24,
+   "lfo1Wave": 2,
+   "lfo1Freq": 2,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 0,
+   "lfo2Wave": 0,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0,
+   "filterEnvAmt": 0.4,
+   "fmAmount": 0.45,
+   "fmAlgo": 0,
+   "modEnvAttack": 0.005,
+   "modEnvDecay": 0.12,
+   "modEnvSustain": 0,
+   "modEnvRelease": 0.1,
+   "modEnvTarget": 0,
+   "modEnvDepth": 0,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "SYNTH1",
+  "preset": {
+   "masterVolume": 0.8,
+   "vco1": {
+    "gain": 0.6,
+    "octave": 0,
+    "detune": -6,
+    "wave": "sawtooth"
+   },
+   "vco2": {
+    "gain": 0.6,
+    "octave": 0,
+    "detune": 6,
+    "wave": "square"
+   },
+   "vco3": {
+    "gain": 0,
+    "octave": 1,
+    "detune": 0,
+    "wave": "sine"
+   },
+   "subGain": 0,
+   "pitchPunch": 0,
+   "filter": {
+    "type": "lowpass",
+    "freq": 2200,
+    "Q": 2,
+    "drive": 0.05
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.3
+   },
+   "fm": {
+    "amount": 0,
+    "algo": 0
+   },
+   "noise": {
+    "mix": 0,
+    "filterType": "highpass",
+    "filterFreq": 1000,
+    "filterQ": 1
+   },
+   "envelope": {
+    "attack": 0.01,
+    "decay": 0.3,
+    "sustain": 0.6,
+    "release": 0.2
+   },
+   "lfo": {
+    "target": "filter.freq",
+    "wave": "sine",
+    "freq": 3,
+    "depth": 0.15,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "NOT",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.005,
+    "decay": 0.12,
+    "sustain": 0,
+    "release": 0.1,
+    "target": "off"
+   }
+  },
+  "note": {
+   "ratio": 1,
+   "pan": 0,
+   "velocity": 0.8,
+   "bpm": 240,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 130.8127826502993,
+   "osc2Freq": 130.8127826502993,
+   "osc3Freq": 261.6255653005986,
+   "osc1Gain": 0.6,
+   "osc2Gain": 0.6,
+   "osc3Gain": 0,
+   "osc1Detune": -6,
+   "osc2Detune": 6,
+   "osc3Detune": 0,
+   "osc1Wave": 2,
+   "osc2Wave": 3,
+   "osc3Wave": 0,
+   "noiseMix": 0,
+   "noiseFilterType": 1,
+   "noiseFilterFreq": 1000,
+   "noiseFilterQ": 1,
+   "filterType": 0,
+   "filterFreq": 2200,
+   "filterQ": 2,
+   "drive": 0.05,
+   "pitchPunch": 0,
+   "subGain": 0,
+   "attack": 0.01,
+   "decay": 0.3,
+   "sustain": 0.6,
+   "release": 0.2,
+   "master": 1,
+   "pan": 0,
+   "velocity": 0.6666666666666667,
+   "lfo1Target": 15,
+   "lfo1Wave": 0,
+   "lfo1Freq": 3,
+   "lfo1Depth": 0.15,
+   "lfo2Target": 0,
+   "lfo2Wave": 0,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0,
+   "filterEnvAmt": 0.3,
+   "fmAmount": 0,
+   "fmAlgo": 0,
+   "modEnvAttack": 0.005,
+   "modEnvDecay": 0.12,
+   "modEnvSustain": 0,
+   "modEnvRelease": 0.1,
+   "modEnvTarget": 0,
+   "modEnvDepth": 0,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "SYNTH2",
+  "preset": {
+   "masterVolume": 0.8,
+   "vco1": {
+    "gain": 0.7,
+    "octave": 0,
+    "detune": 0,
+    "wave": "sawtooth"
+   },
+   "vco2": {
+    "gain": 0.5,
+    "octave": 1,
+    "detune": 4,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0,
+    "octave": 0,
+    "detune": 0,
+    "wave": "sine"
+   },
+   "subGain": 0,
+   "pitchPunch": 0,
+   "filter": {
+    "type": "lowpass",
+    "freq": 4500,
+    "Q": 1.5,
+    "drive": 0.1
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.2
+   },
+   "fm": {
+    "amount": 0,
+    "algo": 0
+   },
+   "noise": {
+    "mix": 0,
+    "filterType": "highpass",
+    "filterFreq": 1000,
+    "filterQ": 1
+   },
+   "envelope": {
+    "attack": 0.005,
+    "decay": 0.2,
+    "sustain": 0.8,
+    "release": 0.15
+   },
+   "lfo": {
+    "target": "NOT",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "NOT",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.005,
+    "decay": 0.12,
+    "sustain": 0,
+    "release": 0.1,
+    "target": "off"
+   }
+  },
+  "note": {
+   "ratio": 1,
+   "pan": 0,
+   "velocity": 0.8,
+   "bpm": 240,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 130.8127826502993,
+   "osc2Freq": 261.6255653005986,
+   "osc3Freq": 130.8127826502993,
+   "osc1Gain": 0.7,
+   "osc2Gain": 0.5,
+   "osc3Gain": 0,
+   "osc1Detune": 0,
+   "osc2Detune": 4,
+   "osc3Detune": 0,
+   "osc1Wave": 2,
+   "osc2Wave": 2,
+   "osc3Wave": 0,
+   "noiseMix": 0,
+   "noiseFilterType": 1,
+   "noiseFilterFreq": 1000,
+   "noiseFilterQ": 1,
+   "filterType": 0,
+   "filterFreq": 4500,
+   "filterQ": 1.5,
+   "drive": 0.1,
+   "pitchPunch": 0,
+   "subGain": 0,
+   "attack": 0.005,
+   "decay": 0.2,
+   "sustain": 0.8,
+   "release": 0.15,
+   "master": 1,
+   "pan": 0,
+   "velocity": 0.6666666666666667,
+   "lfo1Target": 0,
+   "lfo1Wave": 0,
+   "lfo1Freq": 0,
+   "lfo1Depth": 0,
+   "lfo2Target": 0,
+   "lfo2Wave": 0,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0,
+   "filterEnvAmt": 0.2,
+   "fmAmount": 0,
+   "fmAlgo": 0,
+   "modEnvAttack": 0.005,
+   "modEnvDecay": 0.12,
+   "modEnvSustain": 0,
+   "modEnvRelease": 0.1,
+   "modEnvTarget": 0,
+   "modEnvDepth": 0,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "SYNTH3",
+  "preset": {
+   "masterVolume": 0.85,
+   "vco1": {
+    "gain": 0.8,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.4,
+    "octave": 1,
+    "detune": 0,
+    "wave": "sine"
+   },
+   "vco3": {
+    "gain": 0,
+    "octave": 0,
+    "detune": 0,
+    "wave": "sine"
+   },
+   "subGain": 0,
+   "pitchPunch": 0,
+   "filter": {
+    "type": "lowpass",
+    "freq": 1800,
+    "Q": 4,
+    "drive": 0.1
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.6
+   },
+   "fm": {
+    "amount": 0.1,
+    "algo": 0
+   },
+   "noise": {
+    "mix": 0,
+    "filterType": "highpass",
+    "filterFreq": 1000,
+    "filterQ": 1
+   },
+   "envelope": {
+    "attack": 0.002,
+    "decay": 0.18,
+    "sustain": 0,
+    "release": 0.08
+   },
+   "lfo": {
+    "target": "NOT",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "NOT",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.005,
+    "decay": 0.12,
+    "sustain": 0,
+    "release": 0.1,
+    "target": "off"
+   }
+  },
+  "note": {
+   "ratio": 1,
+   "pan": 0,
+   "velocity": 0.8,
+   "bpm": 240,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 130.8127826502993,
+   "osc2Freq": 261.6255653005986,
+   "osc3Freq": 130.8127826502993,
+   "osc1Gain": 0.8,
+   "osc2Gain": 0.4,
+   "osc3Gain": 0,
+   "osc1Detune": 0,
+   "osc2Detune": 0,
+   "osc3Detune": 0,
+   "osc1Wave": 3,
+   "osc2Wave": 0,
+   "osc3Wave": 0,
+   "noiseMix": 0,
+   "noiseFilterType": 1,
+   "noiseFilterFreq": 1000,
+   "noiseFilterQ": 1,
+   "filterType": 0,
+   "filterFreq": 1800,
+   "filterQ": 4,
+   "drive": 0.1,
+   "pitchPunch": 0,
+   "subGain": 0,
+   "attack": 0.003,
+   "decay": 0.18,
+   "sustain": 0,
+   "release": 0.08,
+   "master": 1,
+   "pan": 0,
+   "velocity": 0.7083333333333333,
+   "lfo1Target": 0,
+   "lfo1Wave": 0,
+   "lfo1Freq": 0,
+   "lfo1Depth": 0,
+   "lfo2Target": 0,
+   "lfo2Wave": 0,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0,
+   "filterEnvAmt": 0.6,
+   "fmAmount": 0.1,
+   "fmAlgo": 0,
+   "modEnvAttack": 0.005,
+   "modEnvDecay": 0.12,
+   "modEnvSustain": 0,
+   "modEnvRelease": 0.1,
+   "modEnvTarget": 0,
+   "modEnvDepth": 0,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "PIANO",
+  "preset": {
+   "masterVolume": 0.85,
+   "vco1": {
+    "gain": 0.7,
+    "octave": 0,
+    "detune": 0,
+    "wave": "sine"
+   },
+   "vco2": {
+    "gain": 0,
+    "octave": 1,
+    "detune": 0,
+    "wave": "sine",
+    "_savedGain": 0.5
+   },
+   "vco3": {
+    "gain": 0,
+    "octave": 2,
+    "detune": -4,
+    "wave": "sine",
+    "_savedGain": 0.2
+   },
+   "subGain": 0,
+   "pitchPunch": 0,
+   "filter": {
+    "type": "lowpass",
+    "freq": 2700,
+    "Q": 3.4000000000000004,
+    "drive": 0
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.1
+   },
+   "fm": {
+    "amount": 0,
+    "algo": 0
+   },
+   "noise": {
+    "mix": 0.01,
+    "filterType": "highpass",
+    "filterFreq": 2000,
+    "filterQ": 1
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.66,
+    "sustain": 0.18,
+    "release": 0.338
+   },
+   "lfo": {
+    "target": "NOT",
+    "wave": "square",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "NOT",
+    "wave": "square",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.005,
+    "decay": 0.45,
+    "sustain": 0.52,
+    "release": 0.248,
+    "target": "off"
+   },
+   "bypassFm": true,
+   "bypassFilter": true,
+   "bypassFilterEnv": true,
+   "bypassModEnv": true,
+   "bypassLfo1": true,
+   "bypassLfo2": true,
+   "bypassNoise": true
+  },
+  "note": {
+   "ratio": 1,
+   "pan": 0,
+   "velocity": 0.8,
+   "bpm": 240,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 130.8127826502993,
+   "osc2Freq": 261.6255653005986,
+   "osc3Freq": 523.2511306011972,
+   "osc1Gain": 0.7,
+   "osc2Gain": 0,
+   "osc3Gain": 0,
+   "osc1Detune": 0,
+   "osc2Detune": 0,
+   "osc3Detune": -4,
+   "osc1Wave": 0,
+   "osc2Wave": 0,
+   "osc3Wave": 0,
+   "noiseMix": 0.01,
+   "noiseFilterType": 1,
+   "noiseFilterFreq": 2000,
+   "noiseFilterQ": 1,
+   "filterType": 0,
+   "filterFreq": 2700,
+   "filterQ": 3.4000000000000004,
+   "drive": 0,
+   "pitchPunch": 0,
+   "subGain": 0,
+   "attack": 0.003,
+   "decay": 0.66,
+   "sustain": 0.18,
+   "release": 0.338,
+   "master": 1,
+   "pan": 0,
+   "velocity": 1.2142857142857144,
+   "lfo1Target": 0,
+   "lfo1Wave": 3,
+   "lfo1Freq": 0,
+   "lfo1Depth": 0,
+   "lfo2Target": 0,
+   "lfo2Wave": 3,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0,
+   "filterEnvAmt": 0.1,
+   "fmAmount": 0,
+   "fmAlgo": 0,
+   "modEnvAttack": 0.005,
+   "modEnvDecay": 0.45,
+   "modEnvSustain": 0.52,
+   "modEnvRelease": 0.248,
+   "modEnvTarget": 0,
+   "modEnvDepth": 0,
+   "bypassNoise": true,
+   "bypassFilter": true,
+   "bypassEnv": false,
+   "bypassLfo1": true,
+   "bypassLfo2": true,
+   "bypassFm": true,
+   "bypassModEnv": true,
+   "bypassFilterEnv": true
+  }
+ },
+ {
+  "name": "SN",
+  "preset": {
+   "masterVolume": 0.85,
+   "vco1": {
+    "gain": 0.6,
+    "octave": 0,
+    "detune": 0,
+    "wave": "triangle"
+   },
+   "vco2": {
+    "gain": 0,
+    "octave": 0,
+    "detune": 0,
+    "wave": "sine"
+   },
+   "vco3": {
+    "gain": 0,
+    "octave": 0,
+    "detune": 0,
+    "wave": "sine"
+   },
+   "subGain": 0,
+   "pitchPunch": 0.8,
+   "filter": {
+    "type": "highpass",
+    "freq": 800,
+    "Q": 2,
+    "drive": 0.2
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.3
+   },
+   "fm": {
+    "amount": 0,
+    "algo": 0
+   },
+   "noise": {
+    "mix": 0.75,
+    "filterType": "highpass",
+    "filterFreq": 1500,
+    "filterQ": 1
+   },
+   "envelope": {
+    "attack": 0.001,
+    "decay": 0.18,
+    "sustain": 0,
+    "release": 0.08
+   },
+   "lfo": {
+    "target": "NOT",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "NOT",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.005,
+    "decay": 0.12,
+    "sustain": 0,
+    "release": 0.1,
+    "target": "off"
+   }
+  },
+  "note": {
+   "ratio": 1,
+   "pan": 0,
+   "velocity": 0.8,
+   "bpm": 240,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 130.8127826502993,
+   "osc2Freq": 130.8127826502993,
+   "osc3Freq": 130.8127826502993,
+   "osc1Gain": 0.6,
+   "osc2Gain": 0,
+   "osc3Gain": 0,
+   "osc1Detune": 0,
+   "osc2Detune": 0,
+   "osc3Detune": 0,
+   "osc1Wave": 1,
+   "osc2Wave": 0,
+   "osc3Wave": 0,
+   "noiseMix": 0.75,
+   "noiseFilterType": 1,
+   "noiseFilterFreq": 1500,
+   "noiseFilterQ": 1,
+   "filterType": 1,
+   "filterFreq": 800,
+   "filterQ": 2,
+   "drive": 0.2,
+   "pitchPunch": 0.8,
+   "subGain": 0,
+   "attack": 0.003,
+   "decay": 0.18,
+   "sustain": 0,
+   "release": 0.08,
+   "master": 1,
+   "pan": 0,
+   "velocity": 1.416666666666667,
+   "lfo1Target": 0,
+   "lfo1Wave": 0,
+   "lfo1Freq": 0,
+   "lfo1Depth": 0,
+   "lfo2Target": 0,
+   "lfo2Wave": 0,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0,
+   "filterEnvAmt": 0.3,
+   "fmAmount": 0,
+   "fmAlgo": 0,
+   "modEnvAttack": 0.005,
+   "modEnvDecay": 0.12,
+   "modEnvSustain": 0,
+   "modEnvRelease": 0.1,
+   "modEnvTarget": 0,
+   "modEnvDepth": 0,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "TOM",
+  "preset": {
+   "masterVolume": 0.85,
+   "vco1": {
+    "gain": 0.9,
+    "octave": -1,
+    "detune": 0,
+    "wave": "sine"
+   },
+   "vco2": {
+    "gain": 0.2,
+    "octave": -1,
+    "detune": 0,
+    "wave": "triangle"
+   },
+   "vco3": {
+    "gain": 0,
+    "octave": 0,
+    "detune": 0,
+    "wave": "sine"
+   },
+   "subGain": 0.2,
+   "pitchPunch": 0.7,
+   "filter": {
+    "type": "lowpass",
+    "freq": 1200,
+    "Q": 3,
+    "drive": 0.15
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.4
+   },
+   "fm": {
+    "amount": 0,
+    "algo": 0
+   },
+   "noise": {
+    "mix": 0.05,
+    "filterType": "highpass",
+    "filterFreq": 1000,
+    "filterQ": 1
+   },
+   "envelope": {
+    "attack": 0.002,
+    "decay": 0.35,
+    "sustain": 0,
+    "release": 0.15
+   },
+   "lfo": {
+    "target": "NOT",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "NOT",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.005,
+    "decay": 0.12,
+    "sustain": 0,
+    "release": 0.1,
+    "target": "off"
+   }
+  },
+  "note": {
+   "ratio": 1,
+   "pan": 0,
+   "velocity": 0.8,
+   "bpm": 240,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 65.40639132514966,
+   "osc2Freq": 65.40639132514966,
+   "osc3Freq": 130.8127826502993,
+   "osc1Gain": 0.9,
+   "osc2Gain": 0.2,
+   "osc3Gain": 0,
+   "osc1Detune": 0,
+   "osc2Detune": 0,
+   "osc3Detune": 0,
+   "osc1Wave": 0,
+   "osc2Wave": 1,
+   "osc3Wave": 0,
+   "noiseMix": 0.05,
+   "noiseFilterType": 1,
+   "noiseFilterFreq": 1000,
+   "noiseFilterQ": 1,
+   "filterType": 0,
+   "filterFreq": 1200,
+   "filterQ": 3,
+   "drive": 0.15,
+   "pitchPunch": 0.7,
+   "subGain": 0.2,
+   "attack": 0.003,
+   "decay": 0.35,
+   "sustain": 0,
+   "release": 0.15,
+   "master": 1,
+   "pan": 0,
+   "velocity": 0.7727272727272727,
+   "lfo1Target": 0,
+   "lfo1Wave": 0,
+   "lfo1Freq": 0,
+   "lfo1Depth": 0,
+   "lfo2Target": 0,
+   "lfo2Wave": 0,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0,
+   "filterEnvAmt": 0.4,
+   "fmAmount": 0,
+   "fmAlgo": 0,
+   "modEnvAttack": 0.005,
+   "modEnvDecay": 0.12,
+   "modEnvSustain": 0,
+   "modEnvRelease": 0.1,
+   "modEnvTarget": 0,
+   "modEnvDepth": 0,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "CHH_SYNTH",
+  "preset": {
+   "masterVolume": 0.75,
+   "vco1": {
+    "gain": 0.2,
+    "octave": 2,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.2,
+    "octave": 2,
+    "detune": 350,
+    "wave": "square"
+   },
+   "vco3": {
+    "gain": 0,
+    "octave": 0,
+    "detune": 0,
+    "wave": "sine"
+   },
+   "subGain": 0,
+   "pitchPunch": 0,
+   "filter": {
+    "type": "highpass",
+    "freq": 6500,
+    "Q": 4,
+    "drive": 0.1
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.1
+   },
+   "fm": {
+    "amount": 0.2,
+    "algo": 0
+   },
+   "noise": {
+    "mix": 0.8,
+    "filterType": "highpass",
+    "filterFreq": 5000,
+    "filterQ": 1
+   },
+   "envelope": {
+    "attack": 0.001,
+    "decay": 0.04,
+    "sustain": 0,
+    "release": 0.02
+   },
+   "lfo": {
+    "target": "NOT",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "NOT",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.005,
+    "decay": 0.12,
+    "sustain": 0,
+    "release": 0.1,
+    "target": "off"
+   }
+  },
+  "note": {
+   "ratio": 1,
+   "pan": 0,
+   "velocity": 0.8,
+   "bpm": 240,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 523.2511306011972,
+   "osc2Freq": 523.2511306011972,
+   "osc3Freq": 130.8127826502993,
+   "osc1Gain": 0.2,
+   "osc2Gain": 0.2,
+   "osc3Gain": 0,
+   "osc1Detune": 0,
+   "osc2Detune": 350,
+   "osc3Detune": 0,
+   "osc1Wave": 3,
+   "osc2Wave": 3,
+   "osc3Wave": 0,
+   "noiseMix": 0.8,
+   "noiseFilterType": 1,
+   "noiseFilterFreq": 5000,
+   "noiseFilterQ": 1,
+   "filterType": 1,
+   "filterFreq": 6500,
+   "filterQ": 4,
+   "drive": 0.1,
+   "pitchPunch": 0,
+   "subGain": 0,
+   "attack": 0.003,
+   "decay": 0.04,
+   "sustain": 0,
+   "release": 0.02,
+   "master": 1,
+   "pan": 0,
+   "velocity": 1.875,
+   "lfo1Target": 0,
+   "lfo1Wave": 0,
+   "lfo1Freq": 0,
+   "lfo1Depth": 0,
+   "lfo2Target": 0,
+   "lfo2Wave": 0,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0,
+   "filterEnvAmt": 0.1,
+   "fmAmount": 0.2,
+   "fmAlgo": 0,
+   "modEnvAttack": 0.005,
+   "modEnvDecay": 0.12,
+   "modEnvSustain": 0,
+   "modEnvRelease": 0.1,
+   "modEnvTarget": 0,
+   "modEnvDepth": 0,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "OHH_SYNTH",
+  "preset": {
+   "masterVolume": 0.75,
+   "vco1": {
+    "gain": 0.2,
+    "octave": 2,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.2,
+    "octave": 2,
+    "detune": 350,
+    "wave": "square"
+   },
+   "vco3": {
+    "gain": 0,
+    "octave": 0,
+    "detune": 0,
+    "wave": "sine"
+   },
+   "subGain": 0,
+   "pitchPunch": 0,
+   "filter": {
+    "type": "highpass",
+    "freq": 5500,
+    "Q": 3,
+    "drive": 0.1
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.1
+   },
+   "fm": {
+    "amount": 0.2,
+    "algo": 0
+   },
+   "noise": {
+    "mix": 0.8,
+    "filterType": "highpass",
+    "filterFreq": 4500,
+    "filterQ": 1
+   },
+   "envelope": {
+    "attack": 0.001,
+    "decay": 0.25,
+    "sustain": 0.1,
+    "release": 0.15
+   },
+   "lfo": {
+    "target": "NOT",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "NOT",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.005,
+    "decay": 0.12,
+    "sustain": 0,
+    "release": 0.1,
+    "target": "off"
+   }
+  },
+  "note": {
+   "ratio": 1,
+   "pan": 0,
+   "velocity": 0.8,
+   "bpm": 240,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 523.2511306011972,
+   "osc2Freq": 523.2511306011972,
+   "osc3Freq": 130.8127826502993,
+   "osc1Gain": 0.2,
+   "osc2Gain": 0.2,
+   "osc3Gain": 0,
+   "osc1Detune": 0,
+   "osc2Detune": 350,
+   "osc3Detune": 0,
+   "osc1Wave": 3,
+   "osc2Wave": 3,
+   "osc3Wave": 0,
+   "noiseMix": 0.8,
+   "noiseFilterType": 1,
+   "noiseFilterFreq": 4500,
+   "noiseFilterQ": 1,
+   "filterType": 1,
+   "filterFreq": 5500,
+   "filterQ": 3,
+   "drive": 0.1,
+   "pitchPunch": 0,
+   "subGain": 0,
+   "attack": 0.003,
+   "decay": 0.25,
+   "sustain": 0.1,
+   "release": 0.15,
+   "master": 1,
+   "pan": 0,
+   "velocity": 1.875,
+   "lfo1Target": 0,
+   "lfo1Wave": 0,
+   "lfo1Freq": 0,
+   "lfo1Depth": 0,
+   "lfo2Target": 0,
+   "lfo2Wave": 0,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0,
+   "filterEnvAmt": 0.1,
+   "fmAmount": 0.2,
+   "fmAlgo": 0,
+   "modEnvAttack": 0.005,
+   "modEnvDecay": 0.12,
+   "modEnvSustain": 0,
+   "modEnvRelease": 0.1,
+   "modEnvTarget": 0,
+   "modEnvDepth": 0,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "BELL1",
+  "preset": {
+   "masterVolume": 0.8,
+   "vco1": {
+    "gain": 0.8,
+    "octave": 1,
+    "detune": 0,
+    "wave": "sine"
+   },
+   "vco2": {
+    "gain": 0.5,
+    "octave": 2,
+    "detune": 3,
+    "wave": "sine"
+   },
+   "vco3": {
+    "gain": 0,
+    "octave": 0,
+    "detune": 0,
+    "wave": "sine"
+   },
+   "subGain": 0,
+   "pitchPunch": 0,
+   "filter": {
+    "type": "lowpass",
+    "freq": 4000,
+    "Q": 2.5,
+    "drive": 0
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.3
+   },
+   "fm": {
+    "amount": 0.6,
+    "algo": 0
+   },
+   "noise": {
+    "mix": 0,
+    "filterType": "highpass",
+    "filterFreq": 1000,
+    "filterQ": 1
+   },
+   "envelope": {
+    "attack": 0.001,
+    "decay": 0.7,
+    "sustain": 0,
+    "release": 0.4
+   },
+   "lfo": {
+    "target": "NOT",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "NOT",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.005,
+    "decay": 0.12,
+    "sustain": 0,
+    "release": 0.1,
+    "target": "off"
+   }
+  },
+  "note": {
+   "ratio": 1,
+   "pan": 0,
+   "velocity": 0.8,
+   "bpm": 240,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 261.6255653005986,
+   "osc2Freq": 523.2511306011972,
+   "osc3Freq": 130.8127826502993,
+   "osc1Gain": 0.8,
+   "osc2Gain": 0.5,
+   "osc3Gain": 0,
+   "osc1Detune": 0,
+   "osc2Detune": 3,
+   "osc3Detune": 0,
+   "osc1Wave": 0,
+   "osc2Wave": 0,
+   "osc3Wave": 0,
+   "noiseMix": 0,
+   "noiseFilterType": 1,
+   "noiseFilterFreq": 1000,
+   "noiseFilterQ": 1,
+   "filterType": 0,
+   "filterFreq": 4000,
+   "filterQ": 2.5,
+   "drive": 0,
+   "pitchPunch": 0,
+   "subGain": 0,
+   "attack": 0.003,
+   "decay": 0.7,
+   "sustain": 0,
+   "release": 0.4,
+   "master": 1,
+   "pan": 0,
+   "velocity": 0.6153846153846154,
+   "lfo1Target": 0,
+   "lfo1Wave": 0,
+   "lfo1Freq": 0,
+   "lfo1Depth": 0,
+   "lfo2Target": 0,
+   "lfo2Wave": 0,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0,
+   "filterEnvAmt": 0.3,
+   "fmAmount": 0.6,
+   "fmAlgo": 0,
+   "modEnvAttack": 0.005,
+   "modEnvDecay": 0.12,
+   "modEnvSustain": 0,
+   "modEnvRelease": 0.1,
+   "modEnvTarget": 0,
+   "modEnvDepth": 0,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "BELL2",
+  "preset": {
+   "masterVolume": 0.8,
+   "vco1": {
+    "gain": 0.7,
+    "octave": 1,
+    "detune": 0,
+    "wave": "sine"
+   },
+   "vco2": {
+    "gain": 0.5,
+    "octave": 2,
+    "detune": 7,
+    "wave": "sine"
+   },
+   "vco3": {
+    "gain": 0.2,
+    "octave": 3,
+    "detune": -3,
+    "wave": "sine"
+   },
+   "subGain": 0,
+   "pitchPunch": 0,
+   "filter": {
+    "type": "lowpass",
+    "freq": 5000,
+    "Q": 3,
+    "drive": 0
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.35
+   },
+   "fm": {
+    "amount": 0.4,
+    "algo": 0
+   },
+   "noise": {
+    "mix": 0,
+    "filterType": "highpass",
+    "filterFreq": 1000,
+    "filterQ": 1
+   },
+   "envelope": {
+    "attack": 0.002,
+    "decay": 0.9,
+    "sustain": 0.05,
+    "release": 0.5
+   },
+   "lfo": {
+    "target": "NOT",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "NOT",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.005,
+    "decay": 0.12,
+    "sustain": 0,
+    "release": 0.1,
+    "target": "off"
+   }
+  },
+  "note": {
+   "ratio": 1,
+   "pan": 0,
+   "velocity": 0.8,
+   "bpm": 240,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 261.6255653005986,
+   "osc2Freq": 523.2511306011972,
+   "osc3Freq": 1046.5022612023945,
+   "osc1Gain": 0.7,
+   "osc2Gain": 0.5,
+   "osc3Gain": 0.2,
+   "osc1Detune": 0,
+   "osc2Detune": 7,
+   "osc3Detune": -3,
+   "osc1Wave": 0,
+   "osc2Wave": 0,
+   "osc3Wave": 0,
+   "noiseMix": 0,
+   "noiseFilterType": 1,
+   "noiseFilterFreq": 1000,
+   "noiseFilterQ": 1,
+   "filterType": 0,
+   "filterFreq": 5000,
+   "filterQ": 3,
+   "drive": 0,
+   "pitchPunch": 0,
+   "subGain": 0,
+   "attack": 0.003,
+   "decay": 0.9,
+   "sustain": 0.05,
+   "release": 0.5,
+   "master": 1,
+   "pan": 0,
+   "velocity": 0.5714285714285715,
+   "lfo1Target": 0,
+   "lfo1Wave": 0,
+   "lfo1Freq": 0,
+   "lfo1Depth": 0,
+   "lfo2Target": 0,
+   "lfo2Wave": 0,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0,
+   "filterEnvAmt": 0.35,
+   "fmAmount": 0.4,
+   "fmAlgo": 0,
+   "modEnvAttack": 0.005,
+   "modEnvDecay": 0.12,
+   "modEnvSustain": 0,
+   "modEnvRelease": 0.1,
+   "modEnvTarget": 0,
+   "modEnvDepth": 0,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "PIANO_variant",
+  "preset": {
+   "masterVolume": 0.85,
+   "vco1": {
+    "gain": 0.7,
+    "octave": 0,
+    "detune": 0,
+    "wave": "sine"
+   },
+   "vco2": {
+    "gain": 0,
+    "octave": 1,
+    "detune": 0,
+    "wave": "sine",
+    "_savedGain": 0.5
+   },
+   "vco3": {
+    "gain": 0,
+    "octave": 2,
+    "detune": -4,
+    "wave": "sine",
+    "_savedGain": 0.2
+   },
+   "subGain": 0,
+   "pitchPunch": 0,
+   "filter": {
+    "type": "lowpass",
+    "freq": 2700,
+    "Q": 3.4000000000000004,
+    "drive": 0
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.1
+   },
+   "fm": {
+    "amount": 0,
+    "algo": 0
+   },
+   "noise": {
+    "mix": 0.01,
+    "filterType": "highpass",
+    "filterFreq": 2000,
+    "filterQ": 1
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.66,
+    "sustain": 0.18,
+    "release": 0.338
+   },
+   "lfo": {
+    "target": "NOT",
+    "wave": "square",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "NOT",
+    "wave": "square",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.005,
+    "decay": 0.45,
+    "sustain": 0.52,
+    "release": 0.248,
+    "target": "off"
+   },
+   "bypassFm": true,
+   "bypassFilter": true,
+   "bypassFilterEnv": true,
+   "bypassModEnv": true,
+   "bypassLfo1": true,
+   "bypassLfo2": true,
+   "bypassNoise": true
+  },
+  "note": {
+   "ratio": 1.5,
+   "pan": 0.5,
+   "velocity": 0.4,
+   "bpm": 180,
+   "stepsPerBeat": 3
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 196.21917397544897,
+   "osc2Freq": 392.43834795089793,
+   "osc3Freq": 784.8766959017959,
+   "osc1Gain": 0.7,
+   "osc2Gain": 0,
+   "osc3Gain": 0,
+   "osc1Detune": 0,
+   "osc2Detune": 0,
+   "osc3Detune": -4,
+   "osc1Wave": 0,
+   "osc2Wave": 0,
+   "osc3Wave": 0,
+   "noiseMix": 0.01,
+   "noiseFilterType": 1,
+   "noiseFilterFreq": 2000,
+   "noiseFilterQ": 1,
+   "filterType": 0,
+   "filterFreq": 2700,
+   "filterQ": 3.4000000000000004,
+   "drive": 0,
+   "pitchPunch": 0,
+   "subGain": 0,
+   "attack": 0.003,
+   "decay": 0.66,
+   "sustain": 0.18,
+   "release": 0.338,
+   "master": 1,
+   "pan": 0.5,
+   "velocity": 0.6071428571428572,
+   "lfo1Target": 0,
+   "lfo1Wave": 3,
+   "lfo1Freq": 0,
+   "lfo1Depth": 0,
+   "lfo2Target": 0,
+   "lfo2Wave": 3,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0,
+   "filterEnvAmt": 0.1,
+   "fmAmount": 0,
+   "fmAlgo": 0,
+   "modEnvAttack": 0.005,
+   "modEnvDecay": 0.45,
+   "modEnvSustain": 0.52,
+   "modEnvRelease": 0.248,
+   "modEnvTarget": 0,
+   "modEnvDepth": 0,
+   "bypassNoise": true,
+   "bypassFilter": true,
+   "bypassEnv": false,
+   "bypassLfo1": true,
+   "bypassLfo2": true,
+   "bypassFm": true,
+   "bypassModEnv": true,
+   "bypassFilterEnv": true
+  }
+ },
+ {
+  "name": "BASS1_low",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0,
+    "octave": -2,
+    "detune": 0,
+    "wave": "sine"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0,
+    "algo": 0
+   },
+   "noise": {
+    "mix": 0.02,
+    "filterType": "highpass",
+    "filterFreq": 1500,
+    "filterQ": 1
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "filter.freq",
+    "wave": "sine",
+    "freq": 0.5,
+    "depth": 0.1,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "NOT",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.005,
+    "decay": 0.12,
+    "sustain": 0,
+    "release": 0.1,
+    "target": "off"
+   }
+  },
+  "note": {
+   "ratio": 0.5,
+   "pan": -0.7,
+   "velocity": 1,
+   "bpm": 300,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 65.40639132514966,
+   "osc2Freq": 16.351597831287414,
+   "osc3Freq": 16.351597831287414,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": 0,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 0,
+   "noiseMix": 0.02,
+   "noiseFilterType": 1,
+   "noiseFilterFreq": 1500,
+   "noiseFilterQ": 1,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": -0.7,
+   "velocity": 0.2980769230769231,
+   "lfo1Target": 15,
+   "lfo1Wave": 0,
+   "lfo1Freq": 0.5,
+   "lfo1Depth": 0.1,
+   "lfo2Target": 0,
+   "lfo2Wave": 0,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0,
+   "fmAlgo": 0,
+   "modEnvAttack": 0.005,
+   "modEnvDecay": 0.12,
+   "modEnvSustain": 0,
+   "modEnvRelease": 0.1,
+   "modEnvTarget": 0,
+   "modEnvDepth": 0,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_0",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0,
+    "algo": 0
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "FLT",
+    "wave": "sine",
+    "freq": 3,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "vco1.octave",
+    "wave": "sawtooth",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "1/16"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "off"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 1,
+   "lfo1Wave": 0,
+   "lfo1Freq": 3,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 8,
+   "lfo2Wave": 2,
+   "lfo2Freq": 13.333333333333334,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0,
+   "fmAlgo": 0,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 0,
+   "modEnvDepth": 0,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_1",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0.1,
+    "algo": 1
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "VCO1",
+    "wave": "triangle",
+    "freq": 4,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "vco2.gain",
+    "wave": "square",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "filter"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 2,
+   "lfo1Wave": 1,
+   "lfo1Freq": 4,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 9,
+   "lfo2Wave": 3,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0.1,
+   "fmAlgo": 1,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 1,
+   "modEnvDepth": 1,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_2",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0.2,
+    "algo": 2
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "VCO2",
+    "wave": "sawtooth",
+    "freq": 5,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "vco2.detune",
+    "wave": "random",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "pitch"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 3,
+   "lfo1Wave": 2,
+   "lfo1Freq": 5,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 10,
+   "lfo2Wave": 4,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0.2,
+   "fmAlgo": 2,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 2,
+   "modEnvDepth": 1,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_3",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0.30000000000000004,
+    "algo": 3
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "VCO3",
+    "wave": "square",
+    "freq": 6,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "vco2.octave",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "1/16"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "fm"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 4,
+   "lfo1Wave": 3,
+   "lfo1Freq": 6,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 11,
+   "lfo2Wave": 0,
+   "lfo2Freq": 13.333333333333334,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0.30000000000000004,
+   "fmAlgo": 3,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 3,
+   "modEnvDepth": 1,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_4",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0,
+    "algo": 4
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "masterVolume",
+    "wave": "random",
+    "freq": 7,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "vco3.gain",
+    "wave": "triangle",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "shape"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 5,
+   "lfo1Wave": 4,
+   "lfo1Freq": 7,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 12,
+   "lfo2Wave": 1,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0,
+   "fmAlgo": 4,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 4,
+   "modEnvDepth": 1,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_5",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0.1,
+    "algo": 0
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "vco1.gain",
+    "wave": "sine",
+    "freq": 8,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "vco3.detune",
+    "wave": "sawtooth",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "off"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 6,
+   "lfo1Wave": 0,
+   "lfo1Freq": 8,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 13,
+   "lfo2Wave": 2,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0.1,
+   "fmAlgo": 0,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 0,
+   "modEnvDepth": 0,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_6",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0.2,
+    "algo": 1
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "vco1.detune",
+    "wave": "triangle",
+    "freq": 9,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "vco3.octave",
+    "wave": "square",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "1/16"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "filter"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 7,
+   "lfo1Wave": 1,
+   "lfo1Freq": 9,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 14,
+   "lfo2Wave": 3,
+   "lfo2Freq": 13.333333333333334,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0.2,
+   "fmAlgo": 1,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 1,
+   "modEnvDepth": 1,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_7",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0.30000000000000004,
+    "algo": 2
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "vco1.octave",
+    "wave": "sawtooth",
+    "freq": 10,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "filter.freq",
+    "wave": "random",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "pitch"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 8,
+   "lfo1Wave": 2,
+   "lfo1Freq": 10,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 15,
+   "lfo2Wave": 4,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0.30000000000000004,
+   "fmAlgo": 2,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 2,
+   "modEnvDepth": 1,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_8",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0,
+    "algo": 3
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "vco2.gain",
+    "wave": "square",
+    "freq": 11,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "filter.filterEnvelopeAmount",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "fm"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 9,
+   "lfo1Wave": 3,
+   "lfo1Freq": 11,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 16,
+   "lfo2Wave": 0,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0,
+   "fmAlgo": 3,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 3,
+   "modEnvDepth": 1,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_9",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0.1,
+    "algo": 4
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "vco2.detune",
+    "wave": "random",
+    "freq": 12,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "filter.Q",
+    "wave": "triangle",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "1/16"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "shape"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 10,
+   "lfo1Wave": 4,
+   "lfo1Freq": 12,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 17,
+   "lfo2Wave": 1,
+   "lfo2Freq": 13.333333333333334,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0.1,
+   "fmAlgo": 4,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 4,
+   "modEnvDepth": 1,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_10",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0.2,
+    "algo": 0
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "vco2.octave",
+    "wave": "sine",
+    "freq": 13,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "noise.mix",
+    "wave": "sawtooth",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "off"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 11,
+   "lfo1Wave": 0,
+   "lfo1Freq": 13,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 18,
+   "lfo2Wave": 2,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0.2,
+   "fmAlgo": 0,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 0,
+   "modEnvDepth": 0,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_11",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0.30000000000000004,
+    "algo": 1
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "vco3.gain",
+    "wave": "triangle",
+    "freq": 14,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "subGain",
+    "wave": "square",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "filter"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 12,
+   "lfo1Wave": 1,
+   "lfo1Freq": 14,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 19,
+   "lfo2Wave": 3,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0.30000000000000004,
+   "fmAlgo": 1,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 1,
+   "modEnvDepth": 1,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_12",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0,
+    "algo": 2
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "vco3.detune",
+    "wave": "sawtooth",
+    "freq": 15,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "pitchPunch",
+    "wave": "random",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "1/16"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "pitch"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 13,
+   "lfo1Wave": 2,
+   "lfo1Freq": 15,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 20,
+   "lfo2Wave": 4,
+   "lfo2Freq": 13.333333333333334,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0,
+   "fmAlgo": 2,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 2,
+   "modEnvDepth": 1,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_13",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0.1,
+    "algo": 3
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "vco3.octave",
+    "wave": "square",
+    "freq": 16,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "filter.drive",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "fm"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 14,
+   "lfo1Wave": 3,
+   "lfo1Freq": 16,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 21,
+   "lfo2Wave": 0,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0.1,
+   "fmAlgo": 3,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 3,
+   "modEnvDepth": 1,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_14",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0.2,
+    "algo": 4
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "filter.freq",
+    "wave": "random",
+    "freq": 17,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "noise.filterFreq",
+    "wave": "triangle",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "shape"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 15,
+   "lfo1Wave": 4,
+   "lfo1Freq": 17,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 22,
+   "lfo2Wave": 1,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0.2,
+   "fmAlgo": 4,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 4,
+   "modEnvDepth": 1,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_15",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0.30000000000000004,
+    "algo": 0
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "filter.filterEnvelopeAmount",
+    "wave": "sine",
+    "freq": 18,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "noise.filterQ",
+    "wave": "sawtooth",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "1/16"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "off"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 16,
+   "lfo1Wave": 0,
+   "lfo1Freq": 18,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 23,
+   "lfo2Wave": 2,
+   "lfo2Freq": 13.333333333333334,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0.30000000000000004,
+   "fmAlgo": 0,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 0,
+   "modEnvDepth": 0,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_16",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0,
+    "algo": 1
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "filter.Q",
+    "wave": "triangle",
+    "freq": 19,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "fm.amount",
+    "wave": "square",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "filter"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 17,
+   "lfo1Wave": 1,
+   "lfo1Freq": 19,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 24,
+   "lfo2Wave": 3,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0,
+   "fmAlgo": 1,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 1,
+   "modEnvDepth": 1,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_17",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0.1,
+    "algo": 2
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "noise.mix",
+    "wave": "sawtooth",
+    "freq": 20,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "fm.algo",
+    "wave": "random",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "pitch"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 18,
+   "lfo1Wave": 2,
+   "lfo1Freq": 20,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 25,
+   "lfo2Wave": 4,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0.1,
+   "fmAlgo": 2,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 2,
+   "modEnvDepth": 1,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_18",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0.2,
+    "algo": 3
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "subGain",
+    "wave": "square",
+    "freq": 21,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "envelope.attack",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "1/16"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "fm"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 19,
+   "lfo1Wave": 3,
+   "lfo1Freq": 21,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 26,
+   "lfo2Wave": 0,
+   "lfo2Freq": 13.333333333333334,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0.2,
+   "fmAlgo": 3,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 3,
+   "modEnvDepth": 1,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_19",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0.30000000000000004,
+    "algo": 4
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "pitchPunch",
+    "wave": "random",
+    "freq": 22,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "envelope.decay",
+    "wave": "triangle",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "shape"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 20,
+   "lfo1Wave": 4,
+   "lfo1Freq": 22,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 27,
+   "lfo2Wave": 1,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0.30000000000000004,
+   "fmAlgo": 4,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 4,
+   "modEnvDepth": 1,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_20",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0,
+    "algo": 0
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "filter.drive",
+    "wave": "sine",
+    "freq": 23,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "envelope.sustain",
+    "wave": "sawtooth",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "off"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 21,
+   "lfo1Wave": 0,
+   "lfo1Freq": 23,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 28,
+   "lfo2Wave": 2,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0,
+   "fmAlgo": 0,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 0,
+   "modEnvDepth": 0,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_21",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0.1,
+    "algo": 1
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "noise.filterFreq",
+    "wave": "triangle",
+    "freq": 24,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "envelope.release",
+    "wave": "square",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "1/16"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "filter"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 22,
+   "lfo1Wave": 1,
+   "lfo1Freq": 24,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 29,
+   "lfo2Wave": 3,
+   "lfo2Freq": 13.333333333333334,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0.1,
+   "fmAlgo": 1,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 1,
+   "modEnvDepth": 1,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_22",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0.2,
+    "algo": 2
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "noise.filterQ",
+    "wave": "sawtooth",
+    "freq": 25,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "modEnvelope.attack",
+    "wave": "random",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "pitch"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 23,
+   "lfo1Wave": 2,
+   "lfo1Freq": 25,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 30,
+   "lfo2Wave": 4,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0.2,
+   "fmAlgo": 2,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 2,
+   "modEnvDepth": 1,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_23",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0.30000000000000004,
+    "algo": 3
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "fm.amount",
+    "wave": "square",
+    "freq": 26,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "modEnvelope.decay",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "fm"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 24,
+   "lfo1Wave": 3,
+   "lfo1Freq": 26,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 31,
+   "lfo2Wave": 0,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0.30000000000000004,
+   "fmAlgo": 3,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 3,
+   "modEnvDepth": 1,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_24",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0,
+    "algo": 4
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "fm.algo",
+    "wave": "random",
+    "freq": 27,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "modEnvelope.sustain",
+    "wave": "triangle",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "1/16"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "shape"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 25,
+   "lfo1Wave": 4,
+   "lfo1Freq": 27,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 32,
+   "lfo2Wave": 1,
+   "lfo2Freq": 13.333333333333334,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0,
+   "fmAlgo": 4,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 4,
+   "modEnvDepth": 1,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_25",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0.1,
+    "algo": 0
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "envelope.attack",
+    "wave": "sine",
+    "freq": 28,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "modEnvelope.release",
+    "wave": "sawtooth",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "off"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 26,
+   "lfo1Wave": 0,
+   "lfo1Freq": 28,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 33,
+   "lfo2Wave": 2,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0.1,
+   "fmAlgo": 0,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 0,
+   "modEnvDepth": 0,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_26",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0.2,
+    "algo": 1
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "envelope.decay",
+    "wave": "triangle",
+    "freq": 29,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "FLT",
+    "wave": "square",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "filter"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 27,
+   "lfo1Wave": 1,
+   "lfo1Freq": 29,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 1,
+   "lfo2Wave": 3,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0.2,
+   "fmAlgo": 1,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 1,
+   "modEnvDepth": 1,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_27",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0.30000000000000004,
+    "algo": 2
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "envelope.sustain",
+    "wave": "sawtooth",
+    "freq": 30,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "VCO1",
+    "wave": "random",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "1/16"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "pitch"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 28,
+   "lfo1Wave": 2,
+   "lfo1Freq": 30,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 2,
+   "lfo2Wave": 4,
+   "lfo2Freq": 13.333333333333334,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0.30000000000000004,
+   "fmAlgo": 2,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 2,
+   "modEnvDepth": 1,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_28",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0,
+    "algo": 3
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "envelope.release",
+    "wave": "square",
+    "freq": 31,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "VCO2",
+    "wave": "sine",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "fm"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 29,
+   "lfo1Wave": 3,
+   "lfo1Freq": 31,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 3,
+   "lfo2Wave": 0,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0,
+   "fmAlgo": 3,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 3,
+   "modEnvDepth": 1,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_29",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0.1,
+    "algo": 4
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "modEnvelope.attack",
+    "wave": "random",
+    "freq": 32,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "VCO3",
+    "wave": "triangle",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "shape"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 30,
+   "lfo1Wave": 4,
+   "lfo1Freq": 32,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 4,
+   "lfo2Wave": 1,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0.1,
+   "fmAlgo": 4,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 4,
+   "modEnvDepth": 1,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_30",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0.2,
+    "algo": 0
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "modEnvelope.decay",
+    "wave": "sine",
+    "freq": 33,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "masterVolume",
+    "wave": "sawtooth",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "1/16"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "off"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 31,
+   "lfo1Wave": 0,
+   "lfo1Freq": 33,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 5,
+   "lfo2Wave": 2,
+   "lfo2Freq": 13.333333333333334,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0.2,
+   "fmAlgo": 0,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 0,
+   "modEnvDepth": 0,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_31",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0.30000000000000004,
+    "algo": 1
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "modEnvelope.sustain",
+    "wave": "triangle",
+    "freq": 34,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "vco1.gain",
+    "wave": "square",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "filter"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 32,
+   "lfo1Wave": 1,
+   "lfo1Freq": 34,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 6,
+   "lfo2Wave": 3,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0.30000000000000004,
+   "fmAlgo": 1,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 1,
+   "modEnvDepth": 1,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "busy_32",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0,
+    "algo": 2
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "modEnvelope.release",
+    "wave": "sawtooth",
+    "freq": 35,
+    "depth": 0.3,
+    "sync": "off"
+   },
+   "lfo2": {
+    "target": "vco1.detune",
+    "wave": "random",
+    "freq": 0,
+    "depth": 0.5,
+    "sync": "off"
+   },
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "pitch"
+   }
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 33,
+   "lfo1Wave": 2,
+   "lfo1Freq": 35,
+   "lfo1Depth": 0.3,
+   "lfo2Target": 7,
+   "lfo2Wave": 4,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0.5,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0,
+   "fmAlgo": 2,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 2,
+   "modEnvDepth": 1,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": false,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ },
+ {
+  "name": "bypassed",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "lowpass",
+    "freq": 380,
+    "Q": 5,
+    "drive": 0.25
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": {
+    "amount": 0.3,
+    "algo": 1
+   },
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": {
+    "target": "FLT",
+    "wave": "sine",
+    "freq": 2,
+    "depth": 0.5
+   },
+   "lfo2": null,
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "pitch"
+   },
+   "bypassNoise": true,
+   "bypassFilter": true,
+   "bypassLfo1": true,
+   "bypassFm": true,
+   "bypassModEnv": true,
+   "bypassFilterEnv": true
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 0,
+   "filterFreq": 380,
+   "filterQ": 5,
+   "drive": 0.25,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 1,
+   "lfo1Wave": 0,
+   "lfo1Freq": 2,
+   "lfo1Depth": 0.5,
+   "lfo2Target": 0,
+   "lfo2Wave": 0,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0.3,
+   "fmAlgo": 1,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 2,
+   "modEnvDepth": 1,
+   "bypassNoise": true,
+   "bypassFilter": true,
+   "bypassEnv": false,
+   "bypassLfo1": true,
+   "bypassLfo2": false,
+   "bypassFm": true,
+   "bypassModEnv": true,
+   "bypassFilterEnv": true
+  }
+ },
+ {
+  "name": "no_env",
+  "preset": {
+   "masterVolume": 0.31,
+   "vco1": {
+    "gain": 0.67,
+    "octave": 0,
+    "detune": 0,
+    "wave": "square"
+   },
+   "vco2": {
+    "gain": 0.63,
+    "octave": -2,
+    "detune": 8,
+    "wave": "sawtooth"
+   },
+   "vco3": {
+    "gain": 0.3,
+    "octave": 1,
+    "detune": -7,
+    "wave": "triangle"
+   },
+   "subGain": 0.35,
+   "pitchPunch": 0.3,
+   "filter": {
+    "type": "notch",
+    "freq": 9000,
+    "Q": 0.5
+   },
+   "filterEnv": {
+    "filterEnvelopeAmount": 0.17
+   },
+   "fm": null,
+   "noise": {
+    "mix": 0.2,
+    "filterType": "bandpass",
+    "filterFreq": 3000,
+    "filterQ": 2
+   },
+   "envelope": {
+    "attack": 0.003,
+    "decay": 0.22,
+    "sustain": 0.35,
+    "release": 0.1
+   },
+   "lfo": null,
+   "lfo2": null,
+   "modEnvelope": {
+    "attack": 0.01,
+    "decay": 0.05,
+    "sustain": 0.3,
+    "release": 0.05,
+    "target": "off"
+   },
+   "bypassEnv": true
+  },
+  "note": {
+   "ratio": 1.25,
+   "pan": 0.2,
+   "velocity": 0.9,
+   "bpm": 200,
+   "stepsPerBeat": 4
+  },
+  "update": {
+   "type": "update",
+   "osc1Freq": 163.51597831287415,
+   "osc2Freq": 40.87899457821854,
+   "osc3Freq": 327.0319566257483,
+   "osc1Gain": 0.67,
+   "osc2Gain": 0.63,
+   "osc3Gain": 0.3,
+   "osc1Detune": 0,
+   "osc2Detune": 8,
+   "osc3Detune": -7,
+   "osc1Wave": 3,
+   "osc2Wave": 2,
+   "osc3Wave": 1,
+   "noiseMix": 0.2,
+   "noiseFilterType": 2,
+   "noiseFilterFreq": 3000,
+   "noiseFilterQ": 2,
+   "filterType": 3,
+   "filterFreq": 9000,
+   "filterQ": 0.5,
+   "drive": 0,
+   "pitchPunch": 0.3,
+   "subGain": 0.35,
+   "attack": 0.003,
+   "decay": 0.22,
+   "sustain": 0.35,
+   "release": 0.1,
+   "master": 1,
+   "pan": 0.2,
+   "velocity": 0.21796875,
+   "lfo1Target": 0,
+   "lfo1Wave": 0,
+   "lfo1Freq": 0,
+   "lfo1Depth": 0,
+   "lfo2Target": 0,
+   "lfo2Wave": 0,
+   "lfo2Freq": 0,
+   "lfo2Depth": 0,
+   "filterEnvAmt": 0.17,
+   "fmAmount": 0,
+   "fmAlgo": 0,
+   "modEnvAttack": 0.01,
+   "modEnvDecay": 0.05,
+   "modEnvSustain": 0.3,
+   "modEnvRelease": 0.05,
+   "modEnvTarget": 0,
+   "modEnvDepth": 0,
+   "bypassNoise": false,
+   "bypassFilter": false,
+   "bypassEnv": true,
+   "bypassLfo1": false,
+   "bypassLfo2": false,
+   "bypassFm": false,
+   "bypassModEnv": false,
+   "bypassFilterEnv": false
+  }
+ }
+]

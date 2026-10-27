@@ -14,10 +14,12 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use ordrumbox_core::{Pattern, Rng, Scales};
+use ordrumbox_dsp::MasterSettings;
 
 use crate::engine::{Engine, Position};
 use crate::kit::{SampleBank, assign_samples};
 use crate::pass::{Pass, PassContext, build_pass};
+use crate::synth_preset::SynthPresets;
 
 /// Passes kept alive. The engine holds at most its current pass and the
 /// queued one, and the inbox one more, all among the last three posted.
@@ -34,7 +36,7 @@ struct Inbox {
     command: Option<Command>,
     next: Option<Arc<Pass>>,
     bank: Option<Arc<SampleBank>>,
-    volume: Option<f32>,
+    master: Option<MasterSettings>,
 }
 
 /// State shared by both sides.
@@ -73,8 +75,8 @@ impl AudioSide {
             if let Some(bank) = inbox.bank.take() {
                 self.engine.set_bank(bank);
             }
-            if let Some(volume) = inbox.volume.take() {
-                self.engine.volume = volume;
+            if let Some(master) = inbox.master.take() {
+                self.engine.set_master(master);
             }
             match inbox.command.take() {
                 Some(Command::Play(pass)) => self.engine.play(pass),
@@ -107,6 +109,8 @@ pub struct Controller {
     /// Banks posted to the engine, kept until it has surely switched.
     old_banks: Vec<Arc<SampleBank>>,
     scales: Scales,
+    synths: SynthPresets,
+    master: MasterSettings,
     kit: String,
     rng: Rng,
     /// Passes posted, oldest first.
@@ -116,7 +120,7 @@ pub struct Controller {
 
 impl Controller {
     /// Both sides for a stream at `sample_rate`.
-    pub fn new(sample_rate: f32, bank: Arc<SampleBank>, scales: Scales) -> (Self, AudioSide) {
+    pub fn new(sample_rate: f32, bank: Arc<SampleBank>, scales: Scales, synths: SynthPresets) -> (Self, AudioSide) {
         let link = Arc::new(Link::default());
         let kit = bank.samples.first().map(|s| s.kit.clone()).unwrap_or_default();
         let audio = AudioSide { engine: Engine::new(sample_rate, bank.clone()), link: link.clone() };
@@ -126,6 +130,8 @@ impl Controller {
             bank,
             old_banks: Vec::new(),
             scales,
+            synths,
+            master: MasterSettings::default(),
             kit,
             rng: Rng::from_time(),
             sent: VecDeque::new(),
@@ -147,14 +153,38 @@ impl Controller {
         &self.bank
     }
 
+    /// Master bus settings (`settings.master` of the JS app).
+    pub fn master(&self) -> MasterSettings {
+        self.master
+    }
+
+    pub fn set_master(&mut self, master: MasterSettings) {
+        self.master = master;
+        self.link.inbox().master = Some(master);
+    }
+
+    /// Master volume, 0–2.
     pub fn set_volume(&mut self, volume: f32) {
-        self.link.inbox().volume = Some(volume.clamp(0.0, 2.0));
+        self.set_master(MasterSettings { master: volume.clamp(0.0, 2.0), ..self.master });
     }
 
     fn build(&mut self, pattern: &Pattern, number: u64) -> Arc<Pass> {
         let samples = assign_samples(pattern, &self.bank, &self.kit);
-        let context =
-            PassContext { bank: &self.bank, samples: &samples, scales: &self.scales, sample_rate: self.sample_rate };
+        // The transport tick runs on from play: after the previous pass.
+        let first_tick = match self.sent.back() {
+            Some(previous) if number > 0 && previous.number + 1 == number => {
+                previous.first_tick + u64::from(previous.ticks)
+            }
+            _ => 0,
+        };
+        let context = PassContext {
+            bank: &self.bank,
+            samples: &samples,
+            scales: &self.scales,
+            synths: &self.synths,
+            sample_rate: self.sample_rate,
+            first_tick,
+        };
         let pass = Arc::new(build_pass(pattern, number, &mut self.rng, context));
         self.sent.push_back(pass.clone());
         pass
@@ -230,7 +260,7 @@ mod tests {
         )
         .unwrap();
         let pattern = &library.patterns[0];
-        let (mut controller, mut audio) = Controller::new(8000.0, bank(), Scales::default());
+        let (mut controller, mut audio) = Controller::new(8000.0, bank(), Scales::default(), SynthPresets::default());
         controller.play(pattern);
         let (mut l, mut r) = (vec![0.0; 256], vec![0.0; 256]);
         let mut seen_passes = Vec::new();
