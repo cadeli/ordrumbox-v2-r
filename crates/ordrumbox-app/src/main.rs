@@ -28,6 +28,8 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{KeyCode, ModifiersState, PhysicalKey};
 use winit::window::{Window, WindowId};
 
+use ordrumbox_logic::generate::MelodicKind;
+
 use canvas::Canvas;
 use session::{Move, Session};
 use view::Layout;
@@ -159,6 +161,12 @@ impl App {
                 KeyCode::Equal | KeyCode::NumpadAdd => s.step_tempo(tempo),
                 KeyCode::Comma => s.step_kit(-1),
                 KeyCode::Period => s.step_kit(1),
+                KeyCode::KeyB => s.generate_pattern(),
+                KeyCode::KeyD => s.toggle_generation(None),
+                KeyCode::KeyS => s.toggle_generation(Some(MelodicKind::Bass)),
+                KeyCode::KeyA => s.toggle_generation(Some(MelodicKind::Chords)),
+                KeyCode::KeyZ => s.toggle_auto(),
+                KeyCode::KeyX => s.randomize_track(),
                 KeyCode::ArrowLeft if shift => s.nudge(Move::Left),
                 KeyCode::ArrowRight if shift => s.nudge(Move::Right),
                 KeyCode::ArrowUp if shift => s.nudge(Move::Up),

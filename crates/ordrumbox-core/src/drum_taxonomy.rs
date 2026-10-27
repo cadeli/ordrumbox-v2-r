@@ -20,6 +20,26 @@ impl TrackType {
     pub fn is_melodic(self) -> bool {
         matches!(self, Self::Bass | Self::Piano | Self::Organ)
     }
+
+    /// KICK, SNARE, HAT, CLAP, COWBELL and PERC: what the drum generation covers (`DRUM_TYPES`).
+    pub fn is_drum(self) -> bool {
+        !self.is_melodic()
+    }
+
+    /// The JS type name (`"KICK"`, `"HAT"`…).
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Kick => "KICK",
+            Self::Snare => "SNARE",
+            Self::Hat => "HAT",
+            Self::Clap => "CLAP",
+            Self::Cowbell => "COWBELL",
+            Self::Perc => "PERC",
+            Self::Bass => "BASS",
+            Self::Piano => "PIANO",
+            Self::Organ => "ORGAN",
+        }
+    }
 }
 
 /// Canonical names: `(name, default pan, type)` (`TRACK_KINDS` + `PAN_MAP`).
@@ -92,5 +112,7 @@ mod tests {
         assert_eq!(detect_track_type("RIDE"), TrackType::Perc);
         assert!(detect_track_type("PIANO").is_melodic());
         assert!(!detect_track_type("CHH").is_melodic());
+        assert!(detect_track_type("COWBELL").is_drum());
+        assert_eq!(detect_track_type("OPEN HAT").name(), "HAT");
     }
 }

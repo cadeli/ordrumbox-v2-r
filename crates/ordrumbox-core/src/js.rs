@@ -43,6 +43,41 @@ pub fn round(x: f64) -> f64 {
     if x - floor >= 0.5 { floor + 1.0 } else { floor }
 }
 
+/// `Number(x.toFixed(digits))`: rounded on the exact decimal value of `x`,
+/// halves away from zero (`(1.005).toFixed(2)` is `"1.00"`: 1.005 is stored
+/// as 1.00499…). Unlike `Math.round(x * 100) / 100`, there is no
+/// multiplication error.
+pub fn to_fixed(x: f64, digits: usize) -> f64 {
+    if !x.is_finite() || x.abs() >= 1e21 {
+        return x;
+    }
+    // A double has at most 1074 fraction digits: 1100 print it exactly.
+    let exact = format!("{:.1100}", x.abs());
+    let (int_part, fraction) = exact.split_once('.').unwrap_or((&exact, ""));
+    let mut kept: Vec<u8> = int_part.bytes().chain(fraction.bytes().take(digits)).collect();
+    if fraction.as_bytes().get(digits).is_some_and(|&d| d >= b'5') {
+        // Carry the round-up through the kept digits.
+        let mut i = kept.len();
+        loop {
+            if i == 0 {
+                kept.insert(0, b'1');
+                break;
+            }
+            i -= 1;
+            if kept[i] == b'9' {
+                kept[i] = b'0';
+            } else {
+                kept[i] += 1;
+                break;
+            }
+        }
+    }
+    let split = kept.len() - digits;
+    let text = format!("{}.{}", String::from_utf8_lossy(&kept[..split]), String::from_utf8_lossy(&kept[split..]));
+    let value: f64 = text.parse().unwrap_or(f64::NAN);
+    if x < 0.0 { -value } else { value }
+}
+
 /// `String(n)`.
 pub fn number_to_string(n: f64) -> String {
     if n.is_nan() {
@@ -203,6 +238,20 @@ mod tests {
         }
         assert_eq!(pf("\"0x10\""), 0.0);
         assert_eq!(pf("\"0x\""), 0.0);
+    }
+
+    #[test]
+    fn to_fixed_matches_js() {
+        assert_eq!(to_fixed(1.005, 2), 1.0); // stored as 1.00499…
+        assert_eq!(to_fixed(0.125, 2), 0.13); // exact tie: up
+        assert_eq!(to_fixed(-0.125, 2), -0.13); // away from zero
+        assert_eq!(to_fixed(0.995, 2), 0.99); // stored as 0.99499…
+        assert_eq!(to_fixed(9.999, 2), 10.0);
+        assert_eq!(to_fixed(0.7250000000000001, 2), 0.73);
+        assert_eq!(to_fixed(0.1 + 0.2, 2), 0.3);
+        assert_eq!(to_fixed(42.0, 0), 42.0);
+        assert_eq!(to_fixed(2.5, 0), 3.0);
+        assert!(to_fixed(f64::NAN, 2).is_nan());
     }
 
     #[test]

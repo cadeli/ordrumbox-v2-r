@@ -3,6 +3,7 @@
 //! The length is the JS one: the pattern's loops or the song's measures,
 //! without a tail.
 
+use std::borrow::Cow;
 use std::sync::Arc;
 
 use ordrumbox_core::steps::TICK;
@@ -38,7 +39,24 @@ fn frames(ticks: f64, bpm: f64, rate: u32, round_up: bool) -> usize {
     (if round_up { frames.ceil() } else { frames.floor() }) as usize
 }
 
-fn render(library: &Library, mode: Mode, length: usize, setup: &RenderSetup) -> (Vec<f32>, Vec<f32>) {
+/// Called before each pass of a pattern render is built, with its number:
+/// where the tracks in auto mode get their new lines (`#handleLoopStart`). It
+/// changes the render's own copy of the library, never the caller's.
+pub type BeforePass<'a> = &'a mut dyn FnMut(&mut Library, usize, u64);
+
+fn render(
+    library: &Library,
+    mode: Mode,
+    length: usize,
+    setup: &RenderSetup,
+    mut before_pass: Option<BeforePass<'_>>,
+) -> (Vec<f32>, Vec<f32>) {
+    let mut library = Cow::Borrowed(library);
+    let mut loop_start = |library: &mut Cow<'_, Library>, number: u64| {
+        if let (Some(hook), Mode::Pattern(p)) = (before_pass.as_mut(), mode) {
+            hook(library.to_mut(), p, number);
+        }
+    };
     let (mut controller, mut audio) = Controller::with_rng(
         setup.sample_rate as f32,
         setup.bank.clone(),
@@ -47,27 +65,33 @@ fn render(library: &Library, mode: Mode, length: usize, setup: &RenderSetup) -> 
         Rng::new(setup.seed),
     );
     controller.set_kit(&setup.kit);
-    controller.play(library, mode);
+    loop_start(&mut library, 0);
+    controller.play(&library, mode);
     let (mut left, mut right) = (vec![0.0; length], vec![0.0; length]);
     for from in (0..length).step_by(CHUNK) {
         let to = (from + CHUNK).min(length);
-        controller.update(library);
+        if let Some(number) = controller.pending_pass() {
+            loop_start(&mut library, number);
+        }
+        controller.update(&library);
         audio.render(&mut left[from..to], &mut right[from..to]);
     }
     (left, right)
 }
 
-/// Pattern `index` played `loops` times (`exportPatternToWav`).
+/// Pattern `index` played `loops` times (`exportPatternToWav`); `before_pass`
+/// regenerates its auto-mode tracks loop after loop.
 pub fn render_pattern(
     library: &Library,
     index: usize,
     loops: u32,
     setup: &RenderSetup,
+    before_pass: Option<BeforePass<'_>>,
 ) -> Option<(Vec<f32>, Vec<f32>)> {
     let pattern = library.patterns.get(index)?;
     let ticks = f64::from(pattern.beat_count.max(1)) * f64::from(TICK) * f64::from(loops.max(1));
     let length = frames(ticks, pattern.bpm.clamp(20.0, 300.0), setup.sample_rate, false);
-    Some(render(library, Mode::Pattern(index), length, setup))
+    Some(render(library, Mode::Pattern(index), length, setup, before_pass))
 }
 
 /// Song `index`, its whole arrangement once (`exportSongToWav`).
@@ -79,7 +103,7 @@ pub fn render_song(library: &Library, index: usize, setup: &RenderSetup) -> Opti
     let measures = song.length_measures().max(1.0);
     let ticks = (measures * BEATS_PER_MEASURE * f64::from(TICK)).ceil();
     let length = frames(ticks, song.bpm.clamp(20.0, 300.0), setup.sample_rate, true);
-    Some(render(library, Mode::Song(index), length, setup))
+    Some(render(library, Mode::Song(index), length, setup, None))
 }
 
 #[cfg(test)]
@@ -109,11 +133,22 @@ mod tests {
         )
         .unwrap();
         let setup = setup();
-        let (left, _) = render_pattern(&library, 0, 2, &setup).unwrap();
+        let (left, _) = render_pattern(&library, 0, 2, &setup, None).unwrap();
         // 3 beats × 2 loops at 100 bpm = 3.6 s.
         assert_eq!(left.len(), 158_760);
         assert!(left.iter().any(|s| s.abs() > 0.01));
-        assert_eq!(render_pattern(&library, 0, 2, &setup).unwrap().0, left, "same seed, same render");
+        assert_eq!(render_pattern(&library, 0, 2, &setup, None).unwrap().0, left, "same seed, same render");
+        // The hook runs before each pass, on a copy.
+        let mut passes = Vec::new();
+        let mut hook = |library: &mut Library, p: usize, number: u64| {
+            library.patterns[p].tracks[0].notes.clear();
+            passes.push(number);
+        };
+        let (silent, _) = render_pattern(&library, 0, 2, &setup, Some(&mut hook)).unwrap();
+        assert!(silent.iter().all(|s| s.abs() < 1e-6));
+        // (the engine asks for the third pass ahead, before the render ends)
+        assert!(passes.starts_with(&[0, 1, 2]), "{passes:?}");
+        assert_eq!(library.patterns[0].tracks[0].notes.len(), 2);
         // 3 measures at 90 bpm = 8 s; the first measure is silent.
         let (song, _) = render_song(&library, 0, &setup).unwrap();
         assert_eq!(song.len(), 352_800);

@@ -1,6 +1,7 @@
-//! The screen: header (pattern, tempo, length, kit, transport, undo), one row
-//! per track (mute and solo boxes, name, steps with their notes), the grid
-//! cursor, the selected note, the playhead, the messages and the key help.
+//! The screen: header (pattern, generation, tempo, length, kit, transport,
+//! undo), one row per track (mute and solo boxes, name — green in auto mode —,
+//! steps with their notes), the grid cursor, the selected note, the playhead,
+//! the messages and the key help.
 //!
 //! [`Layout`] places everything; drawing and mouse hit-testing both use it.
 
@@ -27,9 +28,10 @@ const MUTE_ON: Rgb = 0x00E8_6A5A;
 const SOLO_ON: Rgb = 0x00F2_D43B;
 const BOX_OFF: Rgb = 0x0038_3845;
 
-const HELP: [&str; 4] = [
+const HELP: [&str; 5] = [
     "SPACE play (SHIFT: song)  [ ] pattern (SHIFT: song)  - = tempo (SHIFT x10)  , . kit  1-9 mute (SHIFT: solo)  Q-P hear",
     "click/ENTER note (again: delete)  ARROWS move  SHIFT ARROWS velocity/pitch  DEL clear step  ESC deselect",
+    "B generate a pattern  D drums  S bass  A chords (auto on/off)  Z track auto on/off  X random track",
     "CTRL: Z undo  Y redo  C/V copy/paste step (SHIFT: track)  T add track  BACKSPACE del track  G grid  L loop  -/= length",
     "CTRL: N new pattern  D duplicate  S save  E export WAV (SHIFT: song)",
 ];
@@ -56,6 +58,10 @@ pub struct View<'a> {
     pub playhead: Option<f64>,
     /// The selected song, or the song playing and where.
     pub song: Option<&'a str>,
+    /// Generation on (tracks in auto mode): drums, bass, chords.
+    pub generation: [bool; 3],
+    /// The genre the pattern was generated in.
+    pub genre: Option<&'a str>,
     pub cursor: Option<Cursor>,
     /// Selected note: track and index in its notes.
     pub selected: Option<(usize, usize)>,
@@ -209,7 +215,14 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
         Some(pattern) => {
             let name = pattern.name.as_deref().unwrap_or(&pattern.id);
             let title = format!("{name}  {}/{}", view.pattern_index + 1, view.pattern_count);
-            canvas.text(x, y, &title, text, TEXT);
+            let mut x = canvas.text(x, y, &title, text, TEXT) + 24 * scale;
+            let labels = ["DRUMS", "BASS", "CHORDS"];
+            for (label, on) in labels.iter().zip(view.generation) {
+                x = canvas.text(x, y + 4 * scale, label, scale, if on { PLAYING } else { DIM }) + 8 * scale;
+            }
+            if let Some(genre) = view.genre {
+                canvas.text(x + 8 * scale, y + 4 * scale, genre, scale, DIM);
+            }
             y += line;
             let tempo = format!("{} BPM  {} beats", pattern.bpm, pattern.beat_count);
             let x = canvas.text(margin, y, &tempo, text, TEXT) + 24 * scale;
@@ -270,7 +283,14 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
         }
         let label: String = track.name.chars().take(LABEL_CHARS).collect();
         let label_y = y + (layout.row - 8 * layout.label_scale) / 2;
-        canvas.text(layout.name_x, label_y, &label, layout.label_scale, if track.mute { DIM } else { TEXT });
+        let color = if track.mute {
+            DIM
+        } else if track.auto {
+            PLAYING // a new line every loop
+        } else {
+            TEXT
+        };
+        canvas.text(layout.name_x, label_y, &label, layout.label_scale, color);
         draw_track_steps(canvas, track, i, view, layout);
     }
 
@@ -381,6 +401,8 @@ mod tests {
                 playing: true,
                 playhead: Some(0.5),
                 song: Some("SONG demo  measure 3/66"),
+                generation: [true, false, true],
+                genre: Some("house"),
                 cursor: Some(Cursor { track: 0, beat: 1, step: 2 }),
                 selected: Some((0, 0)),
                 undo: Some("Add note"),
