@@ -41,6 +41,11 @@ node tools/export_fixtures.mjs ../ordrumbox-v2
 ```
 
 - `song.json` / `song.min.json`: the JSON writer must reproduce both byte for byte.
+- `library.export.json`: `song.json` loaded by the app (`fixPatterns`, `fixSongs`)
+  and saved by its exporter; `Library` must hold the same values.
+- `edge_library.json` (hand-written, kept by the script) and
+  `edge_library.export.json`: the same check on cases `song.json` does not reach.
+- `slugify.json`: pattern/song id slugs.
 - `flat_notes/<id>.json`: `recomputeFlatNotes()` for loops 0–3 of every
   pattern. Passes marked `deterministic: false` consumed `Math.random()` and are
   checked by properties instead of equality.

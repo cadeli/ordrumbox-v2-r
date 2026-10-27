@@ -1,0 +1,80 @@
+{
+  "infos": { "name": "edge cases", "description": "hand-written: fixer/exporter paths song.json does not reach" },
+  "songs": [
+    {
+      "id": "  ",
+      "name": "Ébauche n°1",
+      "bpm": "140",
+      "loopMeasureCount": 7.9,
+      "clips": [
+        { "pattern": "objnotes", "startMeasure": "2", "measureCount": 0.75 },
+        { "pattern": " wrap ", "startMeasure": -3 },
+        { "pattern": "ghost", "startMeasure": 1 },
+        { "startMeasure": 4 },
+        [1, 2],
+        null,
+        { "pattern": "objnotes", "startMeasure": 3.7, "measureCount": "2" }
+      ]
+    },
+    { "id": "dup", "name": "first", "bpm": 10, "clips": [] },
+    { "id": "dup", "name": "second", "bpm": 301 },
+    { "name": "***", "bpm": 300, "clips": "nope" },
+    "not an object"
+  ],
+  "patterns": [
+    {
+      "id": "objnotes",
+      "name": "object notes",
+      "beatCount": 3,
+      "bpm": 97.5,
+      "tags": ["a", "b"],
+      "_revision": 12,
+      "_autoGenGenre": "house",
+      "tracks": [
+        {
+          "name": "SNARE",
+          "stepsPerBeat": 3,
+          "velocity": 0.876,
+          "swingAmount": 0.333,
+          "filterFreq": 1234.567,
+          "panLfo": { "freq": 2, "min": -1, "max": 1, "phase": 0.25, "type": "sine" },
+          "customKey": { "kept": true },
+          "notes": [
+            { "beat": 0, "beatStep": 4, "velocity": 0.81234, "stepPercent": 999, "unknown": 1 },
+            { "beat": 1, "beatStep": 7, "pitch": -2.5, "prob": 0.3333, "arp": "0,4,7" },
+            { "beat": 2, "arp": { "intervals": [0, 3, 7], "mode": "down" }, "_arpScale": "minor", "rate": 9 },
+            { "velocity": 0.8 }
+          ]
+        },
+        {
+          "name": "KICK",
+          "pan": 0,
+          "useSoftSynth": true,
+          "synthSoundKey": "acid",
+          "loopAtStep": null,
+          "notes": []
+        },
+        { "name": "CHH", "pan": 0, "notes": [{ "beat": 0 }, { "beat": 0, "beatStep": 0 }] },
+        { "name": "OHH", "notes": [[0.5, 1]], "noteKeys": ["velocity", "beat"] },
+        { "name": "ODD", "pan": "left", "mono": "yes", "notes": [[1, 2, 3]], "noteKeys": ["beat", "velocity"] }
+      ]
+    },
+    {
+      "name": " wrap ",
+      "tags": { "0": "legacy", "1": "object" },
+      "beatCount": 4,
+      "tracks": [
+        {
+          "name": "BASS",
+          "beatCount": 2,
+          "stepsPerBeat": 2,
+          "pitch": -12,
+          "noteKeys": ["velocity", "beat", "beatStep", "pitch", "every", "euclideanFill", "euclideanRotation", "pos"],
+          "notes": [[0.8, 0, 5, 3, 2, 3, 1, 1], [1, 1, 1, 0, 1, 0, 0, 0]]
+        }
+      ]
+    },
+    { "name": " wrap ", "tracks": [] },
+    { "id": "  spaced  ", "name": "spaced id" }
+  ]
+}

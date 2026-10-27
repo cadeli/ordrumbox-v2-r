@@ -601,8 +601,9 @@ fn write_string(out: &mut String, s: &str) {
     out.push('"');
 }
 
-/// ECMAScript `Number#toString(10)`, as `JSON.stringify` writes numbers.
-fn write_number(out: &mut String, n: f64) {
+/// ECMAScript `Number#toString(10)`, as `JSON.stringify` writes numbers
+/// (non-finite numbers are written `null`).
+pub(crate) fn write_number(out: &mut String, n: f64) {
     if !n.is_finite() {
         out.push_str("null");
         return;
