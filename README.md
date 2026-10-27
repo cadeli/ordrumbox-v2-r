@@ -9,7 +9,7 @@ Windows by CI).
 | Crate | Role | Dependencies |
 |---|---|---|
 | `ordrumbox-core` | data model, `song.json` codec, pattern engine, song clips, instrument catalog, JSON, RNG | none |
-| `ordrumbox-logic` | the library being edited: commands with undo/redo (generators and MIDI files to come) | core |
+| `ordrumbox-logic` | the library being edited: commands with undo/redo; pattern generators (every instrument's variants, genre templates, auto mode loop by loop) (MIDI files to come) | core |
 | `ordrumbox-dsp` | sample voice, synth voice, channel strip (filter, saturation, reverb, delay), master bus; no allocation in render paths | none |
 | `ordrumbox-engine` | WAV decoding/encoding, kits, sound auto-assignment, synth presets, passes (pattern and song: events, strip settings, LFO steps), sample-accurate engine, UI ↔ audio link, offline renders | core, dsp |
 | `ordrumbox-app` | window, software-rendered UI, audio output → `ordrumbox.exe` | winit, softbuffer, cpal |
@@ -41,6 +41,17 @@ track without a known preset gets a random one.
 WAV exports (16-bit, 44.1 kHz, the pattern once or the whole song, no tail) go
 to `exports/` next to `library.json`.
 
+Generation (the JS generators, same variants and same choices): **B** makes a
+new pattern from a random genre's template (tracks, lines, key, scale);
+**D**, **S**, **A** are the ↻ Drum, ↻ Bass and ↻ Chords buttons — new lines
+for the drum tracks (the bass and chord tracks, created on the synth when
+missing) and auto mode for them, or auto mode off. A track in auto mode (name
+in green, **Z** toggles it) gets a new line at every loop of playback,
+following the song form (intro, chorus, verse, break…: fills on the last loop
+of a section, a snare crescendo on breaks); those lines are saved but are not
+undo steps. Exports regenerate them on their own copy. **X** puts random notes
+on the focused track.
+
 Mouse: a click on an empty step adds a note, on a note selects it (and plays
 it), on the selected note deletes it; **M**/**S** boxes mute/solo; a click on
 a name selects the track (and plays it).
@@ -51,6 +62,9 @@ a name selects the track (and plays it).
 | **[ ]** | previous / next pattern (**Shift**: song) |
 | **- =** | tempo −1 / +1 (**Shift** ×10) |
 | **, .** | previous / next kit |
+| **B** | generate a new pattern |
+| **D**, **S**, **A** | drums, bass, chords: generate in auto mode / auto mode off |
+| **Z**, **X** | auto mode of the focused track, random notes on it |
 | **1–9** | mute track 1–9 (**Shift**: solo) |
 | **Q–P** | play track 1–10 |
 | **arrows** | move the grid cursor |
@@ -68,7 +82,8 @@ a name selects the track (and plays it).
 | **Ctrl E** | export the pattern to WAV (**Shift**: the song) |
 
 Keys are read by position (like the JS app's shortcuts): on an AZERTY
-keyboard, **[ ]** are the two keys right of **P**, **Q–P** start at **A**.
+keyboard, **[ ]** are the two keys right of **P**, **Q–P** start at **A**,
+**A** and **Z** are **Q** and **W**.
 **PageUp/PageDown** and the keypad **- +** work too. **Cmd** works for
 **Ctrl** on macOS.
 
@@ -159,6 +174,21 @@ node tools/export_assign_fixtures.mjs ../ordrumbox-v2
   name in every kit, with `Math.random` pinned to the first and to the last
   candidate.
 - `ordrumbox-engine/tests/fixtures/wav.json`: `bufferToWav()` bytes.
+
+The generators have a fifth script; it also writes the variant tables the
+port reads (`ordrumbox-logic/data/generators.json`):
+
+```sh
+node tools/export_gen_fixtures.mjs ../ordrumbox-v2
+```
+
+- `ordrumbox-logic/tests/fixtures/generators.json`, with `Math.random`
+  replaced by a seeded stream (mulberry32, also in the Rust test): every
+  variant of every generator on several track setups, densities and seeds;
+  `generateRandom`; `generatePattern` on new and existing patterns; the
+  player's loop-start regeneration over 30–46 loops (auto tracks, `autoGen`
+  patterns); the ↻ Drum / Bass / Chords toggles. Rust must give the same
+  notes, track settings and number of draws.
 
 ## License
 

@@ -373,16 +373,20 @@ impl Controller {
         self.playing
     }
 
+    /// The pass [`Self::update`] builds now, if it builds one: the moment for
+    /// the loop start of auto-mode tracks (a pass is a loop of the pattern).
+    pub fn pending_pass(&self) -> Option<u64> {
+        let wants = self.link.wants.load(Ordering::Acquire);
+        let already_sent = self.sent.back().is_some_and(|p| p.number + 1 == wants);
+        (self.playing && wants > 0 && !already_sent).then(|| wants - 1)
+    }
+
     /// Call regularly (every UI frame) while playing: posts the next pass
     /// when the engine needs it, so tempo, kit and pattern changes take
     /// effect at the next pass boundary.
     pub fn update(&mut self, library: &Library) {
-        let wants = self.link.wants.load(Ordering::Acquire);
-        let already_sent = self.sent.back().is_some_and(|p| p.number + 1 == wants);
-        if self.playing
-            && wants > 0
-            && !already_sent
-            && let Some(pass) = self.build(library, wants - 1)
+        if let Some(number) = self.pending_pass()
+            && let Some(pass) = self.build(library, number)
         {
             self.link.inbox().next = Some(pass);
         }

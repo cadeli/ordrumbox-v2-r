@@ -51,7 +51,7 @@ fn main() {
     } else {
         let index = library.patterns.iter().position(|p| p.id == *what);
         let loops = rest.first().map_or(1, |l| l.parse().expect("loops"));
-        (index.and_then(|i| render_pattern(&library, i, loops, &setup)), rest.get(1))
+        (index.and_then(|i| render_pattern(&library, i, loops, &setup, None)), rest.get(1))
     };
     let Some((left, right)) = rendered else {
         let ids: Vec<&str> = library.patterns.iter().map(|p| p.id.as_str()).collect();

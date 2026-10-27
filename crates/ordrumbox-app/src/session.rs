@@ -1,5 +1,5 @@
 //! Everything the window drives: the library being edited, the playback, the
-//! grid cursor and selection, the clipboard, saving. Edits go through the
+//! generators, the grid cursor and selection, the clipboard, saving. Edits go through the
 //! [`Editor`] (each one an undo step); the playing pass is rebuilt after each.
 //!
 //! The grid follows the JS pattern panel (`pointer_section.js`,
@@ -10,9 +10,11 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use ordrumbox_core::{Library, Note, Pattern, Track};
+use ordrumbox_core::drum_taxonomy::{TrackType, detect_track_type};
+use ordrumbox_core::{Library, Note, Pattern, Rng, Scales, Track};
 use ordrumbox_engine::offline::{self, RenderSetup};
 use ordrumbox_engine::{Controller, Kit, Mode, wav};
+use ordrumbox_logic::generate::{self, AutoGen, MelodicKind};
 use ordrumbox_logic::{Editor, Nudge};
 
 use crate::assets;
@@ -41,6 +43,10 @@ enum Clipboard {
 
 pub struct Session {
     editor: Editor,
+    /// What the generators read (`scales.json`).
+    scales: Scales,
+    /// Random draws of the generators.
+    rng: Rng,
     kits: Vec<Kit>,
     kit_index: usize,
     pattern_index: usize,
@@ -117,6 +123,7 @@ impl Session {
         }
 
         let mut session = Self::new(library, assets.kits, status);
+        session.scales = assets.scales.clone();
         session.library_path = library_path;
         session.message = message;
         let bank = Arc::new(assets.bank);
@@ -143,6 +150,8 @@ impl Session {
     fn new(library: Library, kits: Vec<Kit>, status: Vec<String>) -> Self {
         Self {
             editor: Editor::new(library),
+            scales: Scales::default(),
+            rng: Rng::from_time(),
             kits,
             kit_index: 0,
             pattern_index: 0,
@@ -195,12 +204,15 @@ impl Session {
     }
 
     fn toggle(&mut self, mode: Mode) {
-        let library = self.editor.library();
         let Some(controller) = &mut self.controller else { return };
         if controller.is_playing() {
             controller.stop();
         } else {
-            controller.play(library, mode);
+            if let Mode::Pattern(p) = mode {
+                let rng = &mut self.rng;
+                self.editor.auto_loop(p, 0, &self.scales, &mut || rng.next_f64());
+            }
+            controller.play(self.editor.library(), mode);
             self.played_revision = self.editor.revision();
         }
     }
@@ -238,7 +250,14 @@ impl Session {
             (offline::render_song(library, self.song_index, setup), format!("song-{}", s.id))
         } else {
             let Some(p) = library.patterns.get(self.pattern_index) else { return };
-            (offline::render_pattern(library, self.pattern_index, 1, setup), p.id.clone())
+            // Tracks in auto mode get their new lines loop after loop, on the render's copy.
+            let (scales, mut rng) = (&self.scales, Rng::new(setup.seed));
+            let mut loop_start = |library: &mut Library, p: usize, number: u64| {
+                if let Some(pattern) = library.patterns.get_mut(p).filter(|p| generate::plays_auto(p)) {
+                    generate::run_loop(&mut AutoGen::new(scales, &mut || rng.next_f64()), pattern, number);
+                }
+            };
+            (offline::render_pattern(library, self.pattern_index, 1, setup, Some(&mut loop_start)), p.id.clone())
         };
         let Some((left, right)) = rendered else {
             self.message = "nothing to export (no playable clip)".into();
@@ -282,17 +301,21 @@ impl Session {
         self.message = format!("kit {name}");
     }
 
-    /// Keep the engine fed and the playing pass current; call every frame while playing.
+    /// Keep the engine fed and the playing pass current; call every frame
+    /// while playing. Before the next pass of a pattern is built, its tracks
+    /// in auto mode get their new lines (the JS loop start).
     pub fn update(&mut self) {
-        let revision = self.editor.revision();
-        let library = self.editor.library();
         let Some(controller) = &mut self.controller else { return };
         controller.select_pattern(self.pattern_index);
-        if revision != self.played_revision {
-            controller.refresh(library);
-            self.played_revision = revision;
+        if self.editor.revision() != self.played_revision {
+            controller.refresh(self.editor.library());
         }
-        controller.update(library);
+        if let (Some(number), Mode::Pattern(p)) = (controller.pending_pass(), controller.mode()) {
+            let rng = &mut self.rng;
+            self.editor.auto_loop(p, number, &self.scales, &mut || rng.next_f64());
+        }
+        self.played_revision = self.editor.revision();
+        controller.update(self.editor.library());
     }
 
     fn audition(&mut self, t: usize, note: Option<usize>) {
@@ -555,6 +578,69 @@ impl Session {
         }
     }
 
+    // ─── Generation ──────────────────────────────────────────────────────────
+
+    /// B: a new pattern, generated (genre, tracks and lines).
+    pub fn generate_pattern(&mut self) {
+        let rng = &mut self.rng;
+        self.pattern_index = self.editor.generate_pattern(&self.scales, &mut || rng.next_f64());
+        self.deselect();
+        self.edited();
+        if let Some(pattern) = self.pattern() {
+            let genre = pattern.extra.get("_autoGenGenre").and_then(|g| g.as_str()).unwrap_or_default();
+            self.message = format!("generated {} ({genre})", pattern.name.as_deref().unwrap_or_default());
+        }
+    }
+
+    /// D, S, A: ↻ Drum / Bass / Chords — new lines in auto mode, or auto mode off.
+    pub fn toggle_generation(&mut self, part: Option<MelodicKind>) {
+        let p = self.pattern_index;
+        let rng = &mut self.rng;
+        let rnd = &mut || rng.next_f64();
+        let on = match part {
+            None => self.editor.toggle_drums(p, &self.scales, rnd),
+            Some(kind) => self.editor.toggle_melodic(p, kind, &self.scales, rnd),
+        };
+        let Some(on) = on else { return };
+        self.clamp_selection();
+        self.edited();
+        let name = match part {
+            None => "drums",
+            Some(MelodicKind::Bass) => "bass",
+            Some(MelodicKind::Chords) => "chords",
+        };
+        self.message = if on {
+            let genre = self.pattern().and_then(|p| p.extra.get("_autoGenGenre")?.as_str()).unwrap_or_default();
+            format!("{name}: generated, new lines every loop ({genre})")
+        } else {
+            format!("{name}: auto off")
+        };
+    }
+
+    /// Z: auto mode of the focused track (a new line every loop).
+    pub fn toggle_auto(&mut self) {
+        let Some(t) = self.focus_track() else {
+            self.message = "select a track first".into();
+            return;
+        };
+        if self.editor.toggle_track(self.pattern_index, t, "auto") {
+            self.edited();
+        }
+    }
+
+    /// X: random notes on the focused track.
+    pub fn randomize_track(&mut self) {
+        let Some(t) = self.focus_track() else {
+            self.message = "select a track first".into();
+            return;
+        };
+        let rng = &mut self.rng;
+        if self.editor.randomize_track(self.pattern_index, t, &mut || rng.next_f64()) {
+            self.selected = None;
+            self.edited();
+        }
+    }
+
     pub fn new_pattern(&mut self) {
         self.pattern_index = self.editor.add_pattern(None);
         self.deselect();
@@ -667,8 +753,20 @@ impl Session {
             }
             _ => library.songs.get(self.song_index).map(|s| format!("song {}", s.name)),
         };
+        let pattern = self.pattern();
+        let generating = |kind: fn(TrackType) -> bool| {
+            pattern
+                .is_some_and(|p| p.tracks.iter().any(|t| generate::is_auto_on(t) && kind(detect_track_type(&t.name))))
+        };
+        let generation = [
+            generating(TrackType::is_drum),
+            generating(|k| k == TrackType::Bass),
+            generating(|k| k == TrackType::Piano),
+        ];
         let view = View {
-            pattern: self.pattern(),
+            pattern,
+            generation,
+            genre: pattern.and_then(|p| p.extra.get("_autoGenGenre")?.as_str()),
             pattern_index: self.pattern_index,
             pattern_count: library.patterns.len(),
             kit: self.kits.get(self.kit_index).map_or("-", |k| k.name.as_str()),

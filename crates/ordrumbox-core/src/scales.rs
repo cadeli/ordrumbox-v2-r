@@ -29,6 +29,11 @@ impl Scales {
         Self { steps }
     }
 
+    /// Degrees (semitones from the root, within an octave) of `name`, if loaded.
+    pub fn get(&self, name: &str) -> Option<&[i32]> {
+        self.steps.get(name).map(Vec::as_slice)
+    }
+
     /// Degrees (semitones from the root, within an octave) of `name`, or the
     /// major scale.
     pub fn steps_or_major(&self, name: Option<&str>) -> &[i32] {
