@@ -10,6 +10,7 @@ use ordrumbox_core::{Pattern, Track};
 
 use crate::canvas::{Canvas, Rgb, text_width};
 use crate::kits::Field;
+use crate::menu;
 
 const BACKGROUND: Rgb = 0x0016_1619;
 const CELL: Rgb = 0x002A_2A33;
@@ -29,21 +30,12 @@ const MUTE_ON: Rgb = 0x00E8_6A5A;
 const SOLO_ON: Rgb = 0x00F2_D43B;
 const BOX_OFF: Rgb = 0x0038_3845;
 
-const HELP: [&str; 5] = [
-    "SPACE play (SHIFT: song)  [ ] pattern (SHIFT: song)  - = tempo (SHIFT x10)  , . kit  1-9 mute (SHIFT: solo)  Q-P hear",
-    "click/ENTER note (again: delete)  ARROWS move  SHIFT ARROWS velocity/pitch  DEL clear step  ESC deselect",
-    "B generate a pattern  D drums  S bass  A chords (auto on/off)  Z track auto on/off  X random track",
-    "CTRL: Z undo  Y redo  C/V copy/paste step (SHIFT: track)  T add track  BACKSPACE del track  G grid  L loop  -/= length",
-    "CTRL: N new pattern  D duplicate  S save  E export WAV (SHIFT: song)  M export MIDI  K kit editor   drop a .mid: import",
-];
-/// Key help while the kit editor is open.
-const KIT_HELP: [&str; 5] = [
-    "KIT EDITOR  CTRL K or ESC close   UP DOWN sample  LEFT RIGHT field  - = change (SHIFT: finely)  ENTER hear",
-    "DEL remove sample  N normalize kit  R assign sounds again  E export kit mapping (.json)  , . kit  SPACE play",
-    "drop a .wav: add it to the kit (SHIFT: replace the selected sample)  a folder: import it as a kit",
-    "drop a kit mapping .json: load it   drop a .mid: import it",
-    "changes are saved (kits.json, samples/ in the user data folder)",
-];
+/// The key help line under the grid (every command is in the menus, with
+/// its shortcut; Help > Keyboard shortcuts lists them all).
+const HELP: &str = "F10 or ALT: menus   ARROWS: cursor   ENTER or click: note   SHIFT+ARROWS: velocity/pitch   1-9: mute   Q-P: hear   F1: all keys";
+/// The same in the kit editor.
+const KIT_HELP: &str = "KIT EDITOR   UP DOWN: sample   LEFT RIGHT: field   - =: change (SHIFT: finely)   ENTER: hear   DEL: remove   ESC: close";
+
 /// Characters of a track name shown.
 const LABEL_CHARS: usize = 10;
 
@@ -128,7 +120,7 @@ pub struct KitLayout {
 impl KitLayout {
     pub fn new(width: i32, height: i32, scale: i32, status_lines: usize) -> Self {
         let margin = margin(scale);
-        let top = margin + 3 * header_line(scale) + margin / 2;
+        let top = content_top(scale) + 3 * header_line(scale) + margin / 2;
         let bottom = footer_top(height, scale, status_lines) - margin / 2;
         let list_width = ((width - 2 * margin) / 3).max(40 * scale);
         let row = 12 * scale;
@@ -208,8 +200,13 @@ fn margin(scale: i32) -> i32 {
 }
 
 /// Top of the footer (status lines then help).
+/// Top of the header: under the menu bar.
+fn content_top(scale: i32) -> i32 {
+    menu::bar_height(scale) + margin(scale) / 2
+}
+
 fn footer_top(height: i32, scale: i32, status_lines: usize) -> i32 {
-    height - margin(scale) - (HELP.len() as i32) * 10 * scale - status_lines as i32 * 10 * scale - 4 * scale
+    height - margin(scale) - 10 * scale - status_lines as i32 * 10 * scale - 4 * scale
 }
 
 impl Layout {
@@ -217,7 +214,7 @@ impl Layout {
     /// `status_lines` message lines in the footer.
     pub fn new(width: i32, height: i32, scale: i32, pattern: &Pattern, status_lines: usize) -> Self {
         let margin = margin(scale);
-        let top = margin + 3 * header_line(scale) + margin / 2;
+        let top = content_top(scale) + 3 * header_line(scale) + margin / 2;
         let bottom = footer_top(height, scale, status_lines) - margin / 2;
         let tracks = pattern.tracks.len();
         let row = ((bottom - top) / tracks.max(1) as i32).clamp(10 * scale, 32 * scale);
@@ -303,7 +300,7 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
     let margin = margin(scale);
 
     // Header.
-    let mut y = margin;
+    let mut y = content_top(scale);
     let x = canvas.text(margin, y, "orDrumbox", text, ACCENT) + 24 * scale;
     match view.pattern {
         Some(pattern) => {
@@ -348,11 +345,7 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
         canvas.text(margin, footer_y, message, scale, WARNING);
         footer_y += 10 * scale;
     }
-    let help = if view.kit_view.is_some() { KIT_HELP } else { HELP };
-    for line in help {
-        canvas.text(margin, footer_y, line, scale, DIM);
-        footer_y += 10 * scale;
-    }
+    canvas.text(margin, footer_y, if view.kit_view.is_some() { KIT_HELP } else { HELP }, scale, DIM);
 
     if let Some(kit) = &view.kit_view {
         let layout = KitLayout::new(canvas.width(), canvas.height(), scale, view.status.len());
@@ -397,6 +390,25 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
         let height = (layout.tracks as i32 * layout.row).min(layout.bottom - layout.top) - gap;
         canvas.fill_rect(x - scale, layout.top, 2 * scale, height, PLAYHEAD);
     }
+}
+
+/// A panel over the window: a title and lines of text (the key list, about).
+pub fn draw_notice(canvas: &mut Canvas, title: &str, lines: &[String], scale: i32) {
+    let line_h = 11 * scale;
+    let width =
+        lines.iter().map(|l| text_width(l, scale)).chain([text_width(title, scale)]).max().unwrap_or(0) + 32 * scale;
+    let height = (lines.len() as i32 + 3) * line_h + 16 * scale;
+    let x = ((canvas.width() - width) / 2).max(0);
+    let y = ((canvas.height() - height) / 2).max(menu::bar_height(scale));
+    canvas.fill_rect(x - 4 * scale, y - 4 * scale, width + 8 * scale, height + 8 * scale, 0x0010_1014);
+    canvas.fill_rect(x, y, width, height, 0x0048_4858);
+    canvas.fill_rect(x + scale, y + scale, width - 2 * scale, height - 2 * scale, 0x0024_2430);
+    canvas.text(x + 16 * scale, y + 10 * scale, title, scale, ACCENT);
+    for (i, line) in lines.iter().enumerate() {
+        canvas.text(x + 16 * scale, y + 10 * scale + (i as i32 + 2) * line_h, line, scale, TEXT);
+    }
+    let close = "ESC or click: close";
+    canvas.text(x + width - 16 * scale - text_width(close, scale), y + 10 * scale, close, scale, DIM);
 }
 
 /// The kit editor: the kit's samples on the left, the selected one on the

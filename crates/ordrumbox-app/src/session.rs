@@ -23,6 +23,8 @@ use crate::assets;
 use crate::audio;
 use crate::canvas::Canvas;
 use crate::kits::{Field, KitSet};
+use crate::menu::{self, Command, MenuState};
+use crate::picker::{self, Outcome, Picker, PickerLayout, Purpose};
 use crate::store;
 use crate::view::{self, Cursor, Hit, KitHit, KitView, View};
 
@@ -36,6 +38,19 @@ pub enum Move {
     Right,
     Up,
     Down,
+}
+
+/// Keys a panel over the window reads.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OverlayKey {
+    Escape,
+    Enter,
+    /// Backspace: the parent folder.
+    Back,
+    Move(isize),
+    /// Home (false) / End (true).
+    Edge(bool),
+    Letter(char),
 }
 
 #[derive(Debug, Clone)]
@@ -80,7 +95,59 @@ pub struct Session {
     /// Editor revision the playing pass was built from.
     played_revision: u64,
     changed_at: Option<Instant>,
+    /// The open menu, if any.
+    menu: Option<menu::Open>,
+    /// A panel over everything: the file picker, the key list, about.
+    overlay: Option<Overlay>,
+    /// Folder the file picker last picked in.
+    last_dir: Option<PathBuf>,
+    /// The assets folder in use.
+    assets_dir: Option<PathBuf>,
+    /// File > Quit was chosen.
+    quit: bool,
 }
+
+/// What is shown over the window.
+#[derive(Debug)]
+enum Overlay {
+    Picker(Picker),
+    Shortcuts,
+    About,
+}
+
+/// Every key, for Help > Keyboard shortcuts.
+const SHORTCUTS: [&str; 30] = [
+    "MENUS",
+    "  F10 or Alt             open the menus: Arrows move, Enter runs, Esc closes",
+    "  F1                     this list",
+    "GRID",
+    "  Arrows                 move the cursor",
+    "  Enter / click          add a note, select it, delete the selected one",
+    "  Shift+Arrows           velocity (up/down), pitch (left/right) of the selected note",
+    "  Delete                 clear the cursor step        Esc  deselect",
+    "  1-9 / Shift+1-9        mute / solo track 1-9        Q-P  hear track 1-10",
+    "PLAY",
+    "  Space / Shift+Space    play or stop the pattern / the song",
+    "  [ ] / Shift+[ ]        previous / next pattern / song (also PageUp PageDown)",
+    "  - = (Shift: x10)       tempo",
+    "  , .                    previous / next kit",
+    "FILE AND EDIT",
+    "  Ctrl+S, Ctrl+O, Ctrl+Q save, import a MIDI file, quit",
+    "  Ctrl+E, Ctrl+M         export WAV (Shift: the song), export MIDI",
+    "  Ctrl+Z, Ctrl+Y         undo, redo (also Ctrl+Shift+Z)",
+    "  Ctrl+C, Ctrl+V         copy, paste the step (Shift: the track)",
+    "  Ctrl+N, Ctrl+D         new pattern, duplicate pattern",
+    "  Ctrl+T, Ctrl+Backspace add, remove a track",
+    "  Ctrl+G, Ctrl+L         next grid, loop point one step back",
+    "  Ctrl+- Ctrl+=          pattern length",
+    "GENERATE",
+    "  B                      generate a pattern",
+    "  D, S, A                drums, bass, chords in auto mode (again: off)",
+    "  Z, X                   track in auto mode, random notes on the track",
+    "KIT EDITOR (Ctrl+K)",
+    "  Up Down, Left Right    sample, field     - = (Shift: finely)  change    Enter  hear",
+    "  Delete, N, R, E        remove, normalize, assign again, export mapping   (drop files to add)",
+];
 
 impl Session {
     pub fn load() -> Self {
@@ -139,6 +206,7 @@ impl Session {
         let kits =
             KitSet::new(assets.kits, &assets.bank, Some(assets.sources.clone()), kits_file, store::samples_dir());
         let mut session = Self::new(library, kits, status);
+        session.assets_dir = Some(dir.clone());
         session.scales = assets.scales.clone();
         session.synths = assets.synths.clone();
         session.roots = assets
@@ -195,6 +263,11 @@ impl Session {
             saved_revision: 0,
             played_revision: 0,
             changed_at: None,
+            menu: None,
+            overlay: None,
+            last_dir: None,
+            assets_dir: None,
+            quit: false,
         }
     }
 
@@ -375,6 +448,217 @@ impl Session {
             self.kit_editor = Some((sample.min(kit.instruments.len().saturating_sub(1)), field));
         }
         self.update_analysis();
+    }
+
+    // ─── Menus and commands ──────────────────────────────────────────────────
+
+    /// What the menus show now.
+    fn menu_state(&self) -> MenuState {
+        let history = self.editor.history();
+        let pattern = self.pattern();
+        let generating = |kind: fn(TrackType) -> bool| {
+            pattern
+                .is_some_and(|p| p.tracks.iter().any(|t| generate::is_auto_on(t) && kind(detect_track_type(&t.name))))
+        };
+        let focus = self.focus_track().and_then(|t| self.track(t)).map(|t| (t.auto, t.mute, t.solo));
+        MenuState {
+            can_save: self.library_path.is_some(),
+            can_render: self.render.is_some(),
+            has_pattern: pattern.is_some(),
+            undo: history.next_undo().map(str::to_owned),
+            redo: history.next_redo().map(str::to_owned),
+            has_cursor: self.cursor.is_some(),
+            focus_track: focus,
+            can_remove_track: focus.is_some() && pattern.is_some_and(|p| p.tracks.len() > 1),
+            clipboard_step: matches!(self.clipboard, Some(Clipboard::Step(_))),
+            clipboard_track: matches!(self.clipboard, Some(Clipboard::Track(_))),
+            has_selection: self.selected.is_some(),
+            playing: self.playing(),
+            has_songs: !self.editor.library().songs.is_empty(),
+            generation: [
+                generating(TrackType::is_drum),
+                generating(|k| k == TrackType::Bass),
+                generating(|k| k == TrackType::Piano),
+            ],
+            kits: self.kits.kits.iter().map(|k| k.name.clone()).collect(),
+            kit_index: self.kit_index,
+            kit_editor: self.kit_editor.is_some(),
+            kit_sample: self.kit_list().is_some_and(|(s, n)| s < n),
+        }
+    }
+
+    pub fn menus(&self) -> Vec<menu::Menu> {
+        menu::menus(&self.menu_state())
+    }
+
+    /// The open menu, if any.
+    pub fn open_menu(&self) -> Option<menu::Open> {
+        self.menu
+    }
+
+    pub fn set_menu(&mut self, open: Option<menu::Open>) {
+        self.menu = open;
+    }
+
+    /// File > Quit was chosen.
+    pub fn quit_requested(&self) -> bool {
+        self.quit
+    }
+
+    /// Run a menu command (or its shortcut).
+    pub fn run(&mut self, command: Command) {
+        use Command as C;
+        self.menu = None;
+        match command {
+            C::Save => self.save(),
+            C::ImportMidi => self.open_picker(Purpose::ImportMidi),
+            C::ExportWav => self.export_wav(false),
+            C::ExportSongWav => self.export_wav(true),
+            C::ExportMidi => self.export_midi(),
+            C::Quit => self.quit = true,
+            C::Undo => self.undo(),
+            C::Redo => self.redo(),
+            C::CopyStep => self.copy(false),
+            C::CopyTrack => self.copy(true),
+            C::Paste => self.paste(false),
+            C::PasteTrack => self.paste(true),
+            C::ClearStep => self.delete_step(),
+            C::Deselect => self.deselect(),
+            C::NewPattern => self.new_pattern(),
+            C::DuplicatePattern => self.duplicate_pattern(),
+            C::PreviousPattern => self.step_pattern(-1),
+            C::NextPattern => self.step_pattern(1),
+            C::TempoDown => self.step_tempo(-1.0),
+            C::TempoUp => self.step_tempo(1.0),
+            C::LengthDown => self.change_length(-1),
+            C::LengthUp => self.change_length(1),
+            C::AddTrack => self.add_track(),
+            C::RemoveTrack => self.remove_track(),
+            C::NextGrid => self.next_grid(),
+            C::LoopBack => self.loop_point_back(),
+            C::GeneratePattern => self.generate_pattern(),
+            C::GenerateDrums => self.toggle_generation(None),
+            C::GenerateBass => self.toggle_generation(Some(MelodicKind::Bass)),
+            C::GenerateChords => self.toggle_generation(Some(MelodicKind::Chords)),
+            C::TrackAuto => self.toggle_auto(),
+            C::RandomTrack => self.randomize_track(),
+            C::PlayPattern => self.toggle_play(),
+            C::PlaySong => self.toggle_play_song(),
+            C::PreviousSong => self.step_song(-1),
+            C::NextSong => self.step_song(1),
+            C::Mute | C::Solo => {
+                if let Some(t) = self.focus_track() {
+                    self.toggle_row(t, if command == C::Mute { "mute" } else { "solo" });
+                }
+            }
+            C::Kit(i) => {
+                self.select_kit(i);
+                if let Some(kit) = self.kits.kits.get(i) {
+                    self.message = format!("kit {}", kit.name);
+                }
+            }
+            C::PreviousKit => self.step_kit(-1),
+            C::NextKit => self.step_kit(1),
+            C::KitEditor => self.toggle_kit_editor(),
+            C::NormalizeKit => self.kit_normalize(),
+            C::ExportMapping => self.kit_export(),
+            C::LoadMapping => self.open_picker(Purpose::LoadMapping),
+            C::AddSample => self.open_picker(Purpose::AddSample),
+            C::ReplaceSample => self.open_picker(Purpose::ReplaceSample),
+            C::ImportFolder => self.open_picker(Purpose::ImportFolder),
+            C::Reassign => self.kit_reassign(),
+            C::Shortcuts => self.overlay = Some(Overlay::Shortcuts),
+            C::About => self.overlay = Some(Overlay::About),
+        }
+    }
+
+    fn open_picker(&mut self, purpose: Purpose) {
+        self.overlay = Some(Overlay::Picker(Picker::new(purpose, self.last_dir.as_deref())));
+    }
+
+    /// A panel (file picker, key list, about) is over the window.
+    pub fn overlay_open(&self) -> bool {
+        self.overlay.is_some()
+    }
+
+    pub fn close_overlay(&mut self) {
+        self.overlay = None;
+    }
+
+    /// A key while a panel is open: the file picker's keys, or any key closes it.
+    pub fn overlay_key(&mut self, key: OverlayKey) {
+        let Some(Overlay::Picker(picker)) = &mut self.overlay else {
+            if matches!(key, OverlayKey::Escape | OverlayKey::Enter) {
+                self.overlay = None;
+            }
+            return;
+        };
+        let outcome = match key {
+            OverlayKey::Escape => {
+                self.overlay = None;
+                return;
+            }
+            OverlayKey::Enter => picker.activate(),
+            OverlayKey::Back => {
+                picker.up();
+                Outcome::Browsing
+            }
+            OverlayKey::Move(delta) => {
+                picker.step(delta);
+                Outcome::Browsing
+            }
+            OverlayKey::Edge(end) => {
+                picker.home_end(end);
+                Outcome::Browsing
+            }
+            OverlayKey::Letter(c) => {
+                picker.jump(c);
+                Outcome::Browsing
+            }
+        };
+        self.picker_outcome(outcome);
+    }
+
+    /// A click while a panel is open.
+    pub fn overlay_click(&mut self, width: i32, height: i32, scale: i32, x: i32, y: i32) {
+        let Some(Overlay::Picker(picker)) = &mut self.overlay else {
+            self.overlay = None;
+            return;
+        };
+        let layout = PickerLayout::new(width, height, scale);
+        if !layout.contains(x, y) {
+            self.overlay = None;
+            return;
+        }
+        if let Some(i) = layout.hit(picker, x, y) {
+            let outcome = picker.click(i);
+            self.picker_outcome(outcome);
+        }
+    }
+
+    fn picker_outcome(&mut self, outcome: Outcome) {
+        let Outcome::Picked(path) = outcome else { return };
+        let Some(Overlay::Picker(picker)) = self.overlay.take() else { return };
+        self.last_dir = picker.dir.clone();
+        match picker.purpose {
+            Purpose::ImportMidi => self.import_midi(&path),
+            Purpose::ReplaceSample => self.drop_path(&path, true),
+            Purpose::AddSample | Purpose::LoadMapping | Purpose::ImportFolder => self.drop_path(&path, false),
+        }
+    }
+
+    /// Lines of Help > About.
+    fn about(&self) -> Vec<String> {
+        let shown = |p: Option<PathBuf>| p.map_or_else(|| "-".to_owned(), |p| p.display().to_string());
+        vec![
+            format!("orDrumbox {} - native port of ordrumbox-v2", env!("CARGO_PKG_VERSION")),
+            "GPL-3.0-only - https://www.ordrumbox.com".into(),
+            String::new(),
+            format!("library   {}", shown(self.library_path.clone())),
+            format!("user data {}", shown(store::user_dir())),
+            format!("exports   {}", shown(store::exports_dir())),
+            format!("assets    {}", shown(self.assets_dir.clone())),
+        ]
     }
 
     // ─── Kit editor ──────────────────────────────────────────────────────────
@@ -1037,6 +1321,19 @@ impl Session {
             status: &self.status,
         };
         view::draw(canvas, &view, scale);
+        menu::draw(canvas, &self.menus(), self.menu, scale);
+        match &self.overlay {
+            Some(Overlay::Picker(p)) => {
+                let layout = PickerLayout::new(canvas.width(), canvas.height(), scale);
+                picker::draw(canvas, p, &layout);
+            }
+            Some(Overlay::Shortcuts) => {
+                let lines: Vec<String> = SHORTCUTS.iter().map(|l| (*l).to_owned()).collect();
+                view::draw_notice(canvas, "Keyboard shortcuts", &lines, scale);
+            }
+            Some(Overlay::About) => view::draw_notice(canvas, "About orDrumbox", &self.about(), scale),
+            None => {}
+        }
     }
 
     /// What the kit editor shows.
