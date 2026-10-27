@@ -1,0 +1,22 @@
+[package]
+name = "ordrumbox-app"
+description = "orDrumbox native application (window, software-rendered UI, audio and MIDI I/O)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "ordrumbox"
+path = "src/main.rs"
+
+[dependencies]
+ordrumbox-core.workspace = true
+ordrumbox-logic.workspace = true
+ordrumbox-engine.workspace = true
+winit.workspace = true
+softbuffer.workspace = true
+
+[lints]
+workspace = true

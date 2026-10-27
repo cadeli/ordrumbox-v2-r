@@ -1,0 +1,40 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "GPL-3.0-only"
+repository = "https://github.com/cadeli/ordrumbox-v2-r"
+
+# The four domain crates have no third-party dependency. Only the platform
+# bridges used by ordrumbox-app live here (window, pixel buffer; audio and MIDI
+# come in phase 3).
+[workspace.dependencies]
+ordrumbox-core = { path = "crates/ordrumbox-core" }
+ordrumbox-logic = { path = "crates/ordrumbox-logic" }
+ordrumbox-dsp = { path = "crates/ordrumbox-dsp" }
+ordrumbox-engine = { path = "crates/ordrumbox-engine" }
+winit = "0.30.13"
+softbuffer = "0.4.8"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+float_cmp = "allow"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true

@@ -1,0 +1,14 @@
+[package]
+name = "ordrumbox-logic"
+description = "orDrumbox commands, undo history, pattern generators and MIDI files"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+ordrumbox-core.workspace = true
+
+[lints]
+workspace = true
