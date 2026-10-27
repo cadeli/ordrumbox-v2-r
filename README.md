@@ -61,22 +61,45 @@ name), in one undo step. As in the JS app, the file's tempo is not read
 (120 BPM).
 
 Kit editor (**Ctrl K**, the JS drumkit manager): the current kit's samples
-(**↑↓**), and for the selected one its kit, instrument, gain (dB), tune
-(semitones) and decay (**←→** to pick, **- =** to change, **Shift** finely),
-its note, length, peak and RMS levels and envelope with the decay end;
-**Enter** plays it, **Delete** removes it, **N** normalizes the kit to 0 dB,
-**E** exports the kit mapping (`.json`), **R** assigns the tracks' sounds
-again. Dropped on the window, a `.wav` joins the kit (**Shift**: replaces the
-selected sample), a folder of WAV files becomes a kit, a kit mapping is
-loaded. Gain and tune now play (the JS sample voice uses them). Unlike the
-JS app, where these edits are lost on reload, the kits are saved to
-`kits.json` and the audio of added, replaced or normalized samples to
-`samples/` (32-bit float WAV), both in the user data folder; `samples/`
-wins over the assets' `kits/`. Delete `kits.json` to start again from the
-assets' kits.
+(**↑↓**), and for the selected one its kit and instrument (lists), its gain
+(dB), tune (semitones) and decay (knobs), its note, length, peak and RMS
+levels and envelope with the decay end; **Enter** plays it, **Delete**
+removes it, **N** normalizes the kit to 0 dB, **E** exports the kit mapping
+(`.json`), **R** assigns the tracks' sounds again. Dropped on the window, a
+`.wav` joins the kit (**Shift**: replaces the selected sample), a folder of
+WAV files becomes a kit, a kit mapping is loaded. Gain and tune now play (the
+JS sample voice uses them). Unlike the JS app, where these edits are lost on
+reload, the kits are saved to `kits.json` and the audio of added, replaced or
+normalized samples to `samples/` (32-bit float WAV), both in the user data
+folder; `samples/` wins over the assets' `kits/`. Delete `kits.json` to start
+again from the assets' kits.
 
-Menus: the menu bar at the top of the window (File, Edit, Pattern, Generate,
-Play, Kit, Help) lists every command with its shortcut; commands that cannot
+Track editor (on the right, **F2** or **View › Track editor** shows or hides
+it), for the track of the cursor or of the selected note: the sample bar
+(note, length, peak, envelope with the decay end, **Load** replaces the
+sample), the knob bar (velocity, pan, pitch, the sample's decay) and the JS
+tabs — **fx** (reverb, delay, saturation, filter, each with its on/off LED),
+**sound** (mono, auto-assign, instrument, sample, synth preset), **mod** (an
+LFO per setting: LED, wave, frequency, range, phase), **loop** (steps per
+beat, loop point, swing), **gen** (auto mode; the manual variation settings,
+or the Groove / Engine settings in auto mode). Under it, the note editor: the
+selected note (else the step under the cursor, else the track's first note)
+— velocity, pitch, pan, and the Trig, Retr, Eucl and Arp tabs. While
+playing, a setting with an LFO shows the LFO's value. The grid has a volume
+slider per track and a master volume (not saved, as in the JS).
+
+Knobs and sliders work as in the JS (`OrKnob`, `OrSlider`, checked against
+them): drag a knob up or down (200 px for the whole range), click or drag a
+slider; **Shift** drags finely (sliders too, which the JS range input cannot);
+the mouse wheel and the arrow keys (or **- =**) step the value (**Shift** or
+**Alt**: a tenth of a step, **Ctrl**: ten steps); a double-click restores the
+default; a right-click (or **Enter**) asks for a number. **Tab** moves the
+keyboard focus through the controls, **Esc** gives the keys back to the grid.
+A list opens on a click (or **Enter**): arrows, a letter to jump, the wheel,
+**Enter** to choose, **Esc** to close.
+
+Menus: the menu bar at the top of the window (File, Edit, View, Pattern,
+Generate, Play, Kit, Help) lists every command with its shortcut; commands that cannot
 run are greyed out, on/off ones (auto modes, mute, solo, the current kit, the
 kit editor) show a box. Click a title, or press **F10** or **Alt** alone, then
 **←→** between menus, **↑↓** between items, **Enter** to run, **Esc** to
@@ -125,6 +148,8 @@ a name selects the track (and plays it).
 | **Ctrl Q** | save and quit |
 | **F10**, **Alt** | open the menus |
 | **F1** | the list of keys |
+| **F2** | track editor (shown / hidden) |
+| **Tab**, **Shift Tab** | focus the next / previous control of the editors |
 | drop a `.mid` file on the window | import it (also a `.mid` given on the command line) |
 
 Keys are read by position (like the JS app's shortcuts): on an AZERTY
@@ -262,6 +287,18 @@ node tools/export_kit_fixtures.mjs ../ordrumbox-v2
   note of WAV files in every format the JS decodes (tones, noise, decays,
   silence, very short files, stereo, the kick.wav fixture). Rust decodes the
   same bytes and must report the same values exactly.
+
+The knobs and sliders have an eighth:
+
+```sh
+node tools/export_control_fixtures.mjs ../ordrumbox-v2
+```
+
+- `ordrumbox-app/tests/fixtures/controls.json`: the JS `OrKnob` and `OrSlider`
+  driven through a minimal fake DOM — drags (normal and fine, linear and
+  logarithmic), arrow keys with every modifier, typed numbers, the knob's arc
+  — and the value texts of every formatter (`fmt`, `knobFormat`, `fmtVal`,
+  `formatSignedDb`, the loop point label).
 
 ## License
 

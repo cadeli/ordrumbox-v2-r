@@ -14,6 +14,8 @@ pub enum Purpose {
     ImportMidi,
     AddSample,
     ReplaceSample,
+    /// The track editor's load button: the track's sample replaced.
+    ReplaceTrackSample,
     LoadMapping,
     /// A folder, not a file.
     ImportFolder,
@@ -25,6 +27,7 @@ impl Purpose {
             Self::ImportMidi => "Import MIDI file",
             Self::AddSample => "Add sample to the kit",
             Self::ReplaceSample => "Replace the selected sample",
+            Self::ReplaceTrackSample => "Replace the track's sample",
             Self::LoadMapping => "Load kit mapping",
             Self::ImportFolder => "Import folder as kit",
         }
@@ -34,7 +37,7 @@ impl Purpose {
     fn extensions(self) -> &'static [&'static str] {
         match self {
             Self::ImportMidi => &["mid", "midi"],
-            Self::AddSample | Self::ReplaceSample => &["wav"],
+            Self::AddSample | Self::ReplaceSample | Self::ReplaceTrackSample => &["wav"],
             Self::LoadMapping => &["json"],
             Self::ImportFolder => &[],
         }

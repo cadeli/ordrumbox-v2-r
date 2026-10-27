@@ -254,6 +254,24 @@ impl Controller {
             .collect()
     }
 
+    /// What track `t` of pattern `p` plays: what it was assigned, else
+    /// (not played yet) the first pick of its assignment.
+    pub fn track_sound(&self, library: &Library, p: usize, t: usize) -> TrackSound {
+        let Some(pattern) = library.patterns.get(p) else { return TrackSound::None };
+        let Some(track) = pattern.tracks.get(t) else { return TrackSound::None };
+        match self.assigned.get(&(pattern.id.clone(), t)) {
+            Some((key, sound)) if *key == sound_key(track) => sound.clone(),
+            _ => assign_track(track, &self.bank, &self.kit, &self.synths, &mut |_| 0),
+        }
+    }
+
+    /// The transport tick playing now (what the track LFOs are at); `None` when stopped.
+    pub fn tick(&self) -> Option<u64> {
+        let position = self.position()?;
+        let pass = self.sent.iter().find(|p| p.number == position.pass)?;
+        Some(pass.first_tick + position.frame * u64::from(pass.ticks) / position.frames.max(1))
+    }
+
     /// The transport tick pass `number` starts at: after the previous pass.
     fn first_tick(&self, number: u64) -> u64 {
         self.sent
