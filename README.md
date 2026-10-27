@@ -10,12 +10,23 @@ Windows by CI).
 |---|---|---|
 | `ordrumbox-core` | data model, `song.json` codec, pattern engine, JSON, RNG | none |
 | `ordrumbox-logic` | commands + undo, generators, MIDI files | core |
-| `ordrumbox-dsp` | voices, channel strip, master bus (no allocation in `process()`) | none |
-| `ordrumbox-engine` | sample-accurate sequencer, mixer, offline render, WAV | core, dsp |
-| `ordrumbox-app` | window, software-rendered UI, audio/MIDI I/O → `ordrumbox.exe` | winit, softbuffer |
+| `ordrumbox-dsp` | sample voice, channel strip (no allocation in render paths) | none |
+| `ordrumbox-engine` | WAV decoding, kits, passes, sample-accurate engine, UI ↔ audio link | core, dsp |
+| `ordrumbox-app` | window, software-rendered UI, audio output → `ordrumbox.exe` | winit, softbuffer, cpal |
 
 The four domain crates have no third-party dependency. Only the app talks to
-the OS, through small bridges (`winit`, `softbuffer`; `cpal`, `midir` in phase 3).
+the OS, through small bridges (`winit`, `softbuffer`, `cpal`; `midir` with MIDI).
+
+## Running
+
+The app reads the `assets` folder of ordrumbox-v2 (`data/song.json`,
+`data/drumkits.json`, `data/scales.json`, `kits/**.wav`). It looks, in order,
+in `$ORDRUMBOX_ASSETS`, in `assets/` next to the program, in `assets/` in the
+working folder, then in `../ordrumbox-v2/assets` (so `cargo run` works from
+this repository when both checkouts sit side by side).
+
+Keys: **Space** play/stop, **←/→** previous/next pattern, **↑/↓** tempo
+(**Shift** ×10), **K** next kit.
 
 ## Commands
 
@@ -28,7 +39,8 @@ cargo build --release -p ordrumbox-app  # target/release/ordrumbox(.exe)
 ```
 
 Windows `.exe`: every push to `main` builds it in CI (artifact
-`ordrumbox-windows-x64`). Locally from macOS: `cargo install cargo-xwin`, then
+`ordrumbox-windows-x64`); put the `assets` folder next to it. Locally from
+macOS: `cargo install cargo-xwin`, then
 `cargo xwin build --release -p ordrumbox-app --target x86_64-pc-windows-msvc`.
 
 ## Golden fixtures
