@@ -3,9 +3,7 @@
 
 use std::sync::Arc;
 
-use ordrumbox_core::drum_taxonomy::detect_track_type;
 use ordrumbox_core::json::Value;
-use ordrumbox_core::{Pattern, Track};
 use ordrumbox_dsp::SampleBuffer;
 
 use crate::wav;
@@ -107,45 +105,13 @@ impl SampleBank {
     }
 }
 
-/// Sample of every track of `pattern` (`None`: nothing to play), preferring kit `kit`.
-pub fn assign_samples(pattern: &Pattern, bank: &SampleBank, kit: &str) -> Vec<Option<usize>> {
-    pattern.tracks.iter().map(|track| assign_track(track, bank, kit)).collect()
-}
-
-/// A simplified `AutoAssign.autoAssignTrackSounds()`:
-/// a track with auto-assign off keeps its `sampleId`; otherwise its name (and
-/// the name without a `_01`-style suffix) is matched against the instrument
-/// keys, first in `kit` then in the other kits, then by coarse type
-/// (`detectTrackType`). First match wins (the JS picks at random among them);
-/// synth tracks and unmatched names play nothing.
-fn assign_track(track: &Track, bank: &SampleBank, kit: &str) -> Option<usize> {
-    if track.use_soft_synth {
-        return None;
-    }
-    if !track.use_auto_assign_sound {
-        return bank.find_url(&track.sample_id);
-    }
-    let name = track.name.trim().to_uppercase();
-    let base = name.trim_end_matches(|c: char| c.is_ascii_digit()).trim_end_matches(['_', '-', ' ']).to_owned();
-    let names = [name.as_str(), base.as_str()];
-    let in_kit = |s: &BankSample| s.kit == kit;
-    let exact = |s: &BankSample| names.contains(&s.instrument.key.trim().to_uppercase().as_str());
-    let kind = detect_track_type(&base);
-    let same_kind = |s: &BankSample| detect_track_type(&s.instrument.key) == kind;
-
-    let find = |pred: &dyn Fn(&BankSample) -> bool| bank.samples.iter().position(pred);
-    find(&|s| in_kit(s) && exact(s))
-        .or_else(|| find(&exact))
-        .or_else(|| find(&|s| in_kit(s) && same_kind(s)))
-        .or_else(|| find(&same_kind))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use ordrumbox_core::json;
 
-    fn bank() -> SampleBank {
+    #[test]
+    fn kits_and_samples_load() {
         let kits = kits_from_json(
             &json::parse(
                 r#"[{"name":"a","instruments":[{"key":"KICK","url":"a/k.wav","decay":5000},{"key":"SNARE","url":"a/s.wav"}]},
@@ -159,32 +125,8 @@ mod tests {
         let silence = crate::wav::tests::wav(1, 1, 8_000, 16, &[0, 0]);
         let (bank, errors) = SampleBank::load(&kits, |_| Ok(silence.clone()));
         assert!(errors.is_empty());
-        bank
-    }
-
-    fn assigned(track: Track, kit: &str) -> Option<String> {
-        let bank = bank();
-        assign_track(&track, &bank, kit).map(|i| bank.samples[i].instrument.url.clone())
-    }
-
-    fn named(name: &str) -> Track {
-        Track { name: name.into(), ..Track::default() }
-    }
-
-    #[test]
-    fn tiers() {
-        assert_eq!(assigned(named("KICK"), "b").as_deref(), Some("b/k.wav")); // same kit first
-        assert_eq!(assigned(named("kick_01"), "a").as_deref(), Some("a/k.wav")); // suffix dropped
-        assert_eq!(assigned(named("CHH"), "a").as_deref(), Some("b/h.wav")); // other kit
-        assert_eq!(assigned(named("OHH"), "a").as_deref(), Some("b/h.wav")); // same type (hat)
-        assert_eq!(assigned(named("TOM"), "a").as_deref(), Some("b/t.wav")); // perc
-    }
-
-    #[test]
-    fn explicit_and_synth_tracks() {
-        let explicit = Track { use_auto_assign_sound: false, sample_id: "a/s.wav".into(), ..named("KICK") };
-        assert_eq!(assigned(explicit, "b").as_deref(), Some("a/s.wav"));
-        assert_eq!(assigned(Track { use_soft_synth: true, ..named("KICK") }, "a"), None);
+        assert_eq!(bank.find_url("b/h.wav"), Some(3));
+        assert_eq!(bank.samples[3].kit, "b");
     }
 
     #[test]

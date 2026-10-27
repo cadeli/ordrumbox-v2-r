@@ -27,10 +27,11 @@ const MUTE_ON: Rgb = 0x00E8_6A5A;
 const SOLO_ON: Rgb = 0x00F2_D43B;
 const BOX_OFF: Rgb = 0x0038_3845;
 
-const HELP: [&str; 3] = [
-    "SPACE play  [ ] pattern  - = tempo (SHIFT x10)  CTRL -/= length  , . kit  1-9 mute  SHIFT 1-9 solo  Q-P hear",
+const HELP: [&str; 4] = [
+    "SPACE play (SHIFT: song)  [ ] pattern (SHIFT: song)  - = tempo (SHIFT x10)  , . kit  1-9 mute (SHIFT: solo)  Q-P hear",
     "click/ENTER note (again: delete)  ARROWS move  SHIFT ARROWS velocity/pitch  DEL clear step  ESC deselect",
-    "CTRL: Z undo  Y redo  C/V copy/paste step (SHIFT: track)  T add track  BACKSPACE del track  G grid  L loop  N new  D dup  S save",
+    "CTRL: Z undo  Y redo  C/V copy/paste step (SHIFT: track)  T add track  BACKSPACE del track  G grid  L loop  -/= length",
+    "CTRL: N new pattern  D duplicate  S save  E export WAV (SHIFT: song)",
 ];
 /// Characters of a track name shown.
 const LABEL_CHARS: usize = 10;
@@ -53,6 +54,8 @@ pub struct View<'a> {
     pub playing: bool,
     /// Playhead, as a fraction of the pattern length.
     pub playhead: Option<f64>,
+    /// The selected song, or the song playing and where.
+    pub song: Option<&'a str>,
     pub cursor: Option<Cursor>,
     /// Selected note: track and index in its notes.
     pub selected: Option<(usize, usize)>,
@@ -212,7 +215,10 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
             let x = canvas.text(margin, y, &tempo, text, TEXT) + 24 * scale;
             let x = canvas.text(x, y, &format!("kit {}", view.kit), text, DIM) + 24 * scale;
             let (state, color) = if view.playing { ("PLAY", PLAYING) } else { ("STOP", DIM) };
-            canvas.text(x, y, state, text, color);
+            let x = canvas.text(x, y, state, text, color) + 24 * scale;
+            if let Some(song) = view.song {
+                canvas.text(x, y + 4 * scale, song, scale, if song.starts_with("SONG") { PLAYING } else { DIM });
+            }
         }
         None => {
             canvas.text(x, y, "no pattern", text, DIM);
@@ -374,6 +380,7 @@ mod tests {
                 kit: "real",
                 playing: true,
                 playhead: Some(0.5),
+                song: Some("SONG demo  measure 3/66"),
                 cursor: Some(Cursor { track: 0, beat: 1, step: 2 }),
                 selected: Some((0, 0)),
                 undo: Some("Add note"),

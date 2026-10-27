@@ -13,12 +13,15 @@ use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use ordrumbox_core::{Pattern, Rng, Scales};
+use std::collections::HashMap;
+
+use ordrumbox_core::{Library, Rng, Scales};
 use ordrumbox_dsp::MasterSettings;
 
+use crate::assign::{TrackSound, assign_track};
 use crate::engine::{Engine, Position};
-use crate::kit::{SampleBank, assign_samples};
-use crate::pass::{Pass, PassContext, build_pass, build_preview};
+use crate::kit::SampleBank;
+use crate::pass::{FlatNotesCache, Pass, PassContext, SongContext, build_pass, build_preview, build_song_pass};
 use crate::synth_preset::SynthPresets;
 
 /// Passes kept alive. The engine holds at most its current pass and the
@@ -107,7 +110,16 @@ impl AudioSide {
     }
 }
 
-/// The UI side: transport commands and pass scheduling.
+/// What plays.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Mode {
+    /// Pattern `index`, looped at its own tempo.
+    Pattern(usize),
+    /// Song `index`: its arrangement, a measure per pass, at its tempo.
+    Song(usize),
+}
+
+/// The UI side: transport commands, sound assignment and pass scheduling.
 #[derive(Debug)]
 pub struct Controller {
     link: Arc<Link>,
@@ -120,6 +132,12 @@ pub struct Controller {
     master: MasterSettings,
     kit: String,
     rng: Rng,
+    mode: Mode,
+    /// Sound of each track, by (pattern id, track index), with what it was
+    /// decided from: auto-assignment picks at random, once per play.
+    assigned: HashMap<(String, usize), (String, TrackSound)>,
+    /// Pattern repetitions drawn for the song passes.
+    song_notes: FlatNotesCache,
     /// Passes posted, oldest first.
     sent: VecDeque<Arc<Pass>>,
     /// Previews posted, oldest first.
@@ -127,9 +145,28 @@ pub struct Controller {
     playing: bool,
 }
 
+/// What a track's sound depends on.
+fn sound_key(track: &ordrumbox_core::Track) -> String {
+    format!(
+        "{}|{}|{}|{}|{:?}",
+        track.name, track.use_auto_assign_sound, track.sample_id, track.use_soft_synth, track.synth_sound_key
+    )
+}
+
 impl Controller {
     /// Both sides for a stream at `sample_rate`.
     pub fn new(sample_rate: f32, bank: Arc<SampleBank>, scales: Scales, synths: SynthPresets) -> (Self, AudioSide) {
+        Self::with_rng(sample_rate, bank, scales, synths, Rng::from_time())
+    }
+
+    /// The same with a given random stream (offline renders, tests).
+    pub fn with_rng(
+        sample_rate: f32,
+        bank: Arc<SampleBank>,
+        scales: Scales,
+        synths: SynthPresets,
+        rng: Rng,
+    ) -> (Self, AudioSide) {
         let link = Arc::new(Link::default());
         let kit = bank.samples.first().map(|s| s.kit.clone()).unwrap_or_default();
         let audio = AudioSide { engine: Engine::new(sample_rate, bank.clone()), link: link.clone() };
@@ -142,7 +179,10 @@ impl Controller {
             synths,
             master: MasterSettings::default(),
             kit,
-            rng: Rng::from_time(),
+            rng,
+            mode: Mode::Pattern(0),
+            assigned: HashMap::new(),
+            song_notes: FlatNotesCache::new(),
             sent: VecDeque::new(),
             previews: VecDeque::new(),
             playing: false,
@@ -154,13 +194,25 @@ impl Controller {
         &self.kit
     }
 
-    /// Prefer the samples of kit `name` from the next pass on.
+    /// Use kit `name` (sounds are assigned again: `autoAssignSoundsForNewDrumkit`).
     pub fn set_kit(&mut self, name: &str) {
         self.kit = name.to_owned();
+        self.assigned.clear();
     }
 
     pub fn bank(&self) -> &Arc<SampleBank> {
         &self.bank
+    }
+
+    pub fn mode(&self) -> Mode {
+        self.mode
+    }
+
+    /// Play pattern `index` from the next pass on (pattern mode).
+    pub fn select_pattern(&mut self, index: usize) {
+        if let Mode::Pattern(_) = self.mode {
+            self.mode = Mode::Pattern(index);
+        }
     }
 
     /// Master bus settings (`settings.master` of the JS app).
@@ -178,11 +230,33 @@ impl Controller {
         self.set_master(MasterSettings { master: volume.clamp(0.0, 2.0), ..self.master });
     }
 
-    fn build(&mut self, pattern: &Pattern, number: u64) -> Arc<Pass> {
-        let samples = assign_samples(pattern, &self.bank, &self.kit);
-        // The transport tick runs on from play: after the previous pass.
-        let first_tick = self
-            .sent
+    /// What each track of pattern `p` plays (assigned once, then kept).
+    fn sounds(&mut self, library: &Library, p: usize) -> Vec<TrackSound> {
+        let Some(pattern) = library.patterns.get(p) else { return Vec::new() };
+        let rng = &mut self.rng;
+        let mut pick = |n: usize| rng.below(n as u64) as usize;
+        pattern
+            .tracks
+            .iter()
+            .enumerate()
+            .map(|(t, track)| {
+                let key = sound_key(track);
+                let slot = (pattern.id.clone(), t);
+                match self.assigned.get(&slot) {
+                    Some((known, sound)) if *known == key => sound.clone(),
+                    _ => {
+                        let sound = assign_track(track, &self.bank, &self.kit, &self.synths, &mut pick);
+                        self.assigned.insert(slot, (key, sound.clone()));
+                        sound
+                    }
+                }
+            })
+            .collect()
+    }
+
+    /// The transport tick pass `number` starts at: after the previous pass.
+    fn first_tick(&self, number: u64) -> u64 {
+        self.sent
             .iter()
             .rev()
             .find_map(|p| match p.number {
@@ -190,28 +264,63 @@ impl Controller {
                 n if n + 1 == number => Some(p.first_tick + u64::from(p.ticks)),
                 _ => None,
             })
-            .unwrap_or(0);
-        let context = PassContext {
-            bank: &self.bank,
-            samples: &samples,
-            scales: &self.scales,
-            synths: &self.synths,
-            sample_rate: self.sample_rate,
-            first_tick,
-        };
-        let pass = Arc::new(build_pass(pattern, number, &mut self.rng, context));
-        self.sent.push_back(pass.clone());
-        pass
+            .unwrap_or(0)
     }
 
-    /// Audition track `t` of `pattern` (`simpleBeep`): `note` (an index in
+    /// Pass `number` of what plays; `None` when there is nothing to play.
+    fn build(&mut self, library: &Library, number: u64) -> Option<Arc<Pass>> {
+        let pass = match self.mode {
+            Mode::Pattern(p) => {
+                let pattern = library.patterns.get(p)?;
+                let sounds = self.sounds(library, p);
+                let context = PassContext {
+                    bank: &self.bank,
+                    sounds: &sounds,
+                    scales: &self.scales,
+                    synths: &self.synths,
+                    sample_rate: self.sample_rate,
+                    first_tick: self.first_tick(number),
+                };
+                build_pass(pattern, number, &mut self.rng, context)
+            }
+            Mode::Song(s) => {
+                let song = library.songs.get(s)?;
+                let used: Vec<usize> = song
+                    .clips
+                    .iter()
+                    .filter_map(|c| library.patterns.iter().rposition(|p| p.id == c.pattern))
+                    .collect();
+                let mut sounds = vec![Vec::new(); library.patterns.len()];
+                for &p in &used {
+                    if sounds[p].is_empty() {
+                        sounds[p] = self.sounds(library, p);
+                    }
+                }
+                let context = SongContext {
+                    bank: &self.bank,
+                    patterns: &library.patterns,
+                    sounds: &sounds,
+                    scales: &self.scales,
+                    synths: &self.synths,
+                    sample_rate: self.sample_rate,
+                };
+                build_song_pass(song, number, &mut self.rng, &mut self.song_notes, context)
+            }
+        };
+        let pass = Arc::new(pass);
+        self.sent.push_back(pass.clone());
+        Some(pass)
+    }
+
+    /// Audition track `t` of pattern `p` (`simpleBeep`): `note` (an index in
     /// its notes) or a default note, through the track's strip.
-    pub fn preview(&mut self, pattern: &Pattern, t: usize, note: Option<usize>) {
-        let samples = assign_samples(pattern, &self.bank, &self.kit);
+    pub fn preview(&mut self, library: &Library, p: usize, t: usize, note: Option<usize>) {
+        let Some(pattern) = library.patterns.get(p) else { return };
+        let sounds = self.sounds(library, p);
         let note = note.and_then(|n| pattern.tracks.get(t)?.notes.get(n));
         let context = PassContext {
             bank: &self.bank,
-            samples: &samples,
+            sounds: &sounds,
             scales: &self.scales,
             synths: &self.synths,
             sample_rate: self.sample_rate,
@@ -228,21 +337,25 @@ impl Controller {
         self.link.inbox().preview = Some(pass);
     }
 
-    /// Start `pattern` from its first pass.
-    pub fn play(&mut self, pattern: &Pattern) {
-        let pass = self.build(pattern, 0);
+    /// Start `mode` from its beginning; sounds are assigned afresh.
+    pub fn play(&mut self, library: &Library, mode: Mode) {
+        self.mode = mode;
+        self.assigned.clear();
+        self.song_notes.clear();
+        let Some(pass) = self.build(library, 0) else { return };
         self.link.inbox().command = Some(Command::Play(pass));
         self.playing = true;
     }
 
-    /// `pattern` was edited: rebuild the pass playing now (it goes on from
+    /// The library was edited: rebuild the pass playing now (it goes on from
     /// the same place), and the next ones follow the edit.
-    pub fn refresh(&mut self, pattern: &Pattern) {
+    pub fn refresh(&mut self, library: &Library) {
         if !self.playing || !self.link.playing.load(Ordering::Acquire) {
             return;
         }
         let number = self.link.pass.load(Ordering::Acquire);
-        let pass = self.build(pattern, number);
+        self.song_notes.clear();
+        let Some(pass) = self.build(library, number) else { return };
         let mut inbox = self.link.inbox();
         // A Play still waiting must not be replaced by a rebuild.
         if !matches!(inbox.command, Some(Command::Play(_))) {
@@ -260,14 +373,17 @@ impl Controller {
         self.playing
     }
 
-    /// Call regularly (every UI frame) while playing: posts the next pass of
-    /// `pattern` when the engine needs it, so tempo, kit and pattern changes
-    /// take effect at the next pass boundary.
-    pub fn update(&mut self, pattern: &Pattern) {
+    /// Call regularly (every UI frame) while playing: posts the next pass
+    /// when the engine needs it, so tempo, kit and pattern changes take
+    /// effect at the next pass boundary.
+    pub fn update(&mut self, library: &Library) {
         let wants = self.link.wants.load(Ordering::Acquire);
         let already_sent = self.sent.back().is_some_and(|p| p.number + 1 == wants);
-        if self.playing && wants > 0 && !already_sent {
-            let pass = self.build(pattern, wants - 1);
+        if self.playing
+            && wants > 0
+            && !already_sent
+            && let Some(pass) = self.build(library, wants - 1)
+        {
             self.link.inbox().next = Some(pass);
         }
         while self.sent.len() > KEPT_PASSES {
@@ -282,6 +398,7 @@ impl Controller {
     pub fn set_bank(&mut self, bank: Arc<SampleBank>) {
         self.old_banks.push(std::mem::replace(&mut self.bank, bank.clone()));
         self.link.inbox().bank = Some(bank);
+        self.assigned.clear();
     }
 
     /// Playback position, `None` when stopped.
@@ -313,14 +430,13 @@ mod tests {
             r#"{"patterns":[{"name":"p","bpm":120,"tracks":[{"name":"KICK","notes":[{},{"beat":2}]}]}]}"#,
         )
         .unwrap();
-        let pattern = &library.patterns[0];
         let (mut controller, mut audio) = Controller::new(8000.0, bank(), Scales::default(), SynthPresets::default());
-        controller.play(pattern);
+        controller.play(&library, Mode::Pattern(0));
         let (mut l, mut r) = (vec![0.0; 256], vec![0.0; 256]);
         let mut seen_passes = Vec::new();
         // 4 beats at 120 bpm = 2 s = 16000 frames per pass: run 3 passes.
         for _ in 0..(3 * 16_000 / 256) {
-            controller.update(pattern);
+            controller.update(&library);
             audio.render(&mut l, &mut r);
             let pass = controller.position().expect("playing").pass;
             if seen_passes.last() != Some(&pass) {
@@ -339,8 +455,8 @@ mod tests {
         let (library, _) =
             Library::parse(r#"{"patterns":[{"name":"p","tracks":[{"name":"KICK","notes":[]}]}]}"#).unwrap();
         let (mut controller, mut audio) = Controller::new(8000.0, bank(), Scales::default(), SynthPresets::default());
-        controller.preview(&library.patterns[0], 0, None);
-        controller.preview(&library.patterns[0], 5, None); // no such track: nothing
+        controller.preview(&library, 0, 0, None);
+        controller.preview(&library, 0, 5, None); // no such track: nothing
         let (mut l, mut r) = (vec![0.0; 256], vec![0.0; 256]);
         audio.render(&mut l, &mut r);
         assert!(l.iter().any(|s| s.abs() > 0.01));

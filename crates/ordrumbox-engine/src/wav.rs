@@ -109,6 +109,34 @@ fn decode_samples(format: &Format, data: &[u8]) -> Result<SampleBuffer, WavError
     })
 }
 
+/// A stereo 16-bit PCM WAV file (`bufferToWav`): samples clamped to ±1,
+/// negative ones scaled by 32768 and positive ones by 32767, truncated.
+pub fn encode(left: &[f32], right: &[f32], sample_rate: u32) -> Vec<u8> {
+    let frames = left.len().min(right.len());
+    let data_len = (frames * 4) as u32;
+    let mut out = Vec::with_capacity(44 + frames * 4);
+    out.extend_from_slice(b"RIFF");
+    out.extend_from_slice(&(36 + data_len).to_le_bytes());
+    out.extend_from_slice(b"WAVEfmt ");
+    out.extend_from_slice(&16u32.to_le_bytes());
+    out.extend_from_slice(&1u16.to_le_bytes());
+    out.extend_from_slice(&2u16.to_le_bytes());
+    out.extend_from_slice(&sample_rate.to_le_bytes());
+    out.extend_from_slice(&(sample_rate * 4).to_le_bytes());
+    out.extend_from_slice(&4u16.to_le_bytes());
+    out.extend_from_slice(&16u16.to_le_bytes());
+    out.extend_from_slice(b"data");
+    out.extend_from_slice(&data_len.to_le_bytes());
+    for i in 0..frames {
+        for sample in [left[i], right[i]] {
+            let s = f64::from(sample).clamp(-1.0, 1.0);
+            let value = if s < 0.0 { s * 32768.0 } else { s * 32767.0 };
+            out.extend_from_slice(&(value.trunc() as i16).to_le_bytes());
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;

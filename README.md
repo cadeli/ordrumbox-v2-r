@@ -8,10 +8,10 @@ Windows by CI).
 
 | Crate | Role | Dependencies |
 |---|---|---|
-| `ordrumbox-core` | data model, `song.json` codec, pattern engine, JSON, RNG | none |
+| `ordrumbox-core` | data model, `song.json` codec, pattern engine, song clips, instrument catalog, JSON, RNG | none |
 | `ordrumbox-logic` | the library being edited: commands with undo/redo (generators and MIDI files to come) | core |
 | `ordrumbox-dsp` | sample voice, synth voice, channel strip (filter, saturation, reverb, delay), master bus; no allocation in render paths | none |
-| `ordrumbox-engine` | WAV decoding, kits, synth presets, passes (events, strip settings, LFO steps), sample-accurate engine, UI ↔ audio link | core, dsp |
+| `ordrumbox-engine` | WAV decoding/encoding, kits, sound auto-assignment, synth presets, passes (pattern and song: events, strip settings, LFO steps), sample-accurate engine, UI ↔ audio link, offline renders | core, dsp |
 | `ordrumbox-app` | window, software-rendered UI, audio output → `ordrumbox.exe` | winit, softbuffer, cpal |
 
 The four domain crates have no third-party dependency. Only the app talks to
@@ -33,14 +33,22 @@ Support/orDrumbox` on macOS, `~/.local/share/ordrumbox` elsewhere, or the file
 named by `$ORDRUMBOX_LIBRARY` — and loaded from there next time. Delete that
 file to start again from the demo.
 
+Sounds: a track with auto-assign gets a sample of the selected kit by name,
+then of another kit, then a catalog substitute, then any sample (each a
+random pick among the candidates, made at play and on a kit change); a synth
+track without a known preset gets a random one.
+
+WAV exports (16-bit, 44.1 kHz, the pattern once or the whole song, no tail) go
+to `exports/` next to `library.json`.
+
 Mouse: a click on an empty step adds a note, on a note selects it (and plays
 it), on the selected note deletes it; **M**/**S** boxes mute/solo; a click on
 a name selects the track (and plays it).
 
 | Keys | |
 |---|---|
-| **Space** | play / stop |
-| **[ ]** | previous / next pattern |
+| **Space** | play / stop the pattern (**Shift**: the song) |
+| **[ ]** | previous / next pattern (**Shift**: song) |
 | **- =** | tempo −1 / +1 (**Shift** ×10) |
 | **, .** | previous / next kit |
 | **1–9** | mute track 1–9 (**Shift**: solo) |
@@ -57,6 +65,7 @@ a name selects the track (and plays it).
 | **Ctrl - =** | pattern length −1 / +1 beat |
 | **Ctrl N**, **Ctrl D** | new pattern, duplicate pattern |
 | **Ctrl S** | save now |
+| **Ctrl E** | export the pattern to WAV (**Shift**: the song) |
 
 Keys are read by position (like the JS app's shortcuts): on an AZERTY
 keyboard, **[ ]** are the two keys right of **P**, **Q–P** start at **A**.
@@ -71,8 +80,9 @@ cargo test --workspace
 cargo clippy --workspace --all-targets
 cargo fmt --all
 cargo build --release -p ordrumbox-app  # target/release/ordrumbox(.exe)
-# a pattern rendered offline to a WAV file, with its speed
-cargo run --release -p ordrumbox-engine --example render -- ../ordrumbox-v2/assets rock 8 rock.wav
+# a pattern (2 loops) or a song rendered offline to a WAV file, with its speed
+cargo run --release -p ordrumbox-engine --example render -- ../ordrumbox-v2/assets rock 2 rock.wav
+cargo run --release -p ordrumbox-engine --example render -- ../ordrumbox-v2/assets song:demo demo.wav
 ```
 
 Windows `.exe`: every push to `main` builds it in CI (artifact
@@ -133,6 +143,22 @@ node tools/export_edit_fixtures.mjs ../ordrumbox-v2
   (notes, tracks, patterns), then undo all, then redo all; after each, the
   undo/redo sizes, the step description, the pattern ids and the saved
   patterns.
+
+Sound assignment, song playback and WAV encoding have a fourth script; it
+also writes the instrument catalog the port reads (`ordrumbox-core/data/instruments.json`):
+
+```sh
+node tools/export_assign_fixtures.mjs ../ordrumbox-v2
+```
+
+- `ordrumbox-core/tests/fixtures/instruments.json`: catalog lookups
+  (`findById`, `findByName`, `findInstrumentFromFileName`, MIDI note and program).
+- `ordrumbox-core/tests/fixtures/song_sources.json`: `resolveSongSources()`
+  tick by tick for the demo song and a hand-made one.
+- `ordrumbox-engine/tests/fixtures/assign.json`: `AutoAssign` for every track
+  name in every kit, with `Math.random` pinned to the first and to the last
+  candidate.
+- `ordrumbox-engine/tests/fixtures/wav.json`: `bufferToWav()` bytes.
 
 ## License
 

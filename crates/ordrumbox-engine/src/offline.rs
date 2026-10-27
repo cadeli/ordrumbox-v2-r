@@ -1,0 +1,124 @@
+//! Offline renders (`audio/export/wav_exporter.js`): a pattern or a song
+//! through the same engine as playback, as fast as it computes, at 44.1 kHz.
+//! The length is the JS one: the pattern's loops or the song's measures,
+//! without a tail.
+
+use std::sync::Arc;
+
+use ordrumbox_core::steps::TICK;
+use ordrumbox_core::{Library, Rng, Scales, song::BEATS_PER_MEASURE};
+
+use crate::controller::{Controller, Mode};
+use crate::kit::SampleBank;
+use crate::synth_preset::SynthPresets;
+
+/// Sample rate of the exports.
+pub const EXPORT_RATE: u32 = 44_100;
+/// Frames rendered per engine call (the callback size of playback).
+const CHUNK: usize = 512;
+
+/// What a render needs besides the library.
+#[derive(Debug, Clone)]
+pub struct RenderSetup {
+    pub bank: Arc<SampleBank>,
+    pub scales: Scales,
+    pub synths: SynthPresets,
+    /// Kit the tracks get their samples from.
+    pub kit: String,
+    pub sample_rate: u32,
+    /// Seed of the random choices (sound assignment, probabilities, variations).
+    pub seed: u64,
+}
+
+/// Frames of `ticks` ticks at `bpm`: `floor(rate × duration)` for a pattern,
+/// `ceil` for a song, as the JS sizes its `OfflineAudioContext`.
+fn frames(ticks: f64, bpm: f64, rate: u32, round_up: bool) -> usize {
+    let seconds = ticks * 60.0 / (bpm * f64::from(TICK));
+    let frames = f64::from(rate) * seconds;
+    (if round_up { frames.ceil() } else { frames.floor() }) as usize
+}
+
+fn render(library: &Library, mode: Mode, length: usize, setup: &RenderSetup) -> (Vec<f32>, Vec<f32>) {
+    let (mut controller, mut audio) = Controller::with_rng(
+        setup.sample_rate as f32,
+        setup.bank.clone(),
+        setup.scales.clone(),
+        setup.synths.clone(),
+        Rng::new(setup.seed),
+    );
+    controller.set_kit(&setup.kit);
+    controller.play(library, mode);
+    let (mut left, mut right) = (vec![0.0; length], vec![0.0; length]);
+    for from in (0..length).step_by(CHUNK) {
+        let to = (from + CHUNK).min(length);
+        controller.update(library);
+        audio.render(&mut left[from..to], &mut right[from..to]);
+    }
+    (left, right)
+}
+
+/// Pattern `index` played `loops` times (`exportPatternToWav`).
+pub fn render_pattern(
+    library: &Library,
+    index: usize,
+    loops: u32,
+    setup: &RenderSetup,
+) -> Option<(Vec<f32>, Vec<f32>)> {
+    let pattern = library.patterns.get(index)?;
+    let ticks = f64::from(pattern.beat_count.max(1)) * f64::from(TICK) * f64::from(loops.max(1));
+    let length = frames(ticks, pattern.bpm.clamp(20.0, 300.0), setup.sample_rate, false);
+    Some(render(library, Mode::Pattern(index), length, setup))
+}
+
+/// Song `index`, its whole arrangement once (`exportSongToWav`).
+pub fn render_song(library: &Library, index: usize, setup: &RenderSetup) -> Option<(Vec<f32>, Vec<f32>)> {
+    let song = library.songs.get(index)?;
+    if !song.clips.iter().any(|c| library.patterns.iter().any(|p| p.id == c.pattern)) {
+        return None; // no playable clip
+    }
+    let measures = song.length_measures().max(1.0);
+    let ticks = (measures * BEATS_PER_MEASURE * f64::from(TICK)).ceil();
+    let length = frames(ticks, song.bpm.clamp(20.0, 300.0), setup.sample_rate, true);
+    Some(render(library, Mode::Song(index), length, setup))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::kit::{BankSample, Instrument};
+    use ordrumbox_dsp::SampleBuffer;
+
+    fn setup() -> RenderSetup {
+        let instrument = Instrument { key: "KICK".into(), display_name: "k".into(), url: "k".into(), decay_ms: 200.0 };
+        let buffer = SampleBuffer::mono(vec![0.5; 2000], 44_100);
+        RenderSetup {
+            bank: Arc::new(SampleBank { samples: vec![BankSample { kit: "x".into(), instrument, buffer }] }),
+            scales: Scales::default(),
+            synths: SynthPresets::default(),
+            kit: "x".into(),
+            sample_rate: EXPORT_RATE,
+            seed: 7,
+        }
+    }
+
+    #[test]
+    fn lengths_and_repeatability() {
+        let (library, _) = Library::parse(
+            r#"{"patterns":[{"id":"p","name":"p","bpm":100,"beatCount":3,"tracks":[{"name":"KICK","notes":[{},{"beat":1}]}]}],
+                "songs":[{"id":"s","name":"s","bpm":90,"clips":[{"pattern":"p","startMeasure":1,"measureCount":2}]}]}"#,
+        )
+        .unwrap();
+        let setup = setup();
+        let (left, _) = render_pattern(&library, 0, 2, &setup).unwrap();
+        // 3 beats × 2 loops at 100 bpm = 3.6 s.
+        assert_eq!(left.len(), 158_760);
+        assert!(left.iter().any(|s| s.abs() > 0.01));
+        assert_eq!(render_pattern(&library, 0, 2, &setup).unwrap().0, left, "same seed, same render");
+        // 3 measures at 90 bpm = 8 s; the first measure is silent.
+        let (song, _) = render_song(&library, 0, &setup).unwrap();
+        assert_eq!(song.len(), 352_800);
+        assert!(song[..117_000].iter().all(|s| s.abs() < 1e-6));
+        assert!(song[117_600..].iter().any(|s| s.abs() > 0.01));
+        assert!(render_song(&library, 3, &setup).is_none());
+    }
+}
