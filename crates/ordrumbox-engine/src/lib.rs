@@ -6,6 +6,7 @@
 //! ([`AudioSide`]) renders them without allocating, locking or blocking.
 //! Ported from `src/audio/` and `src/logic/sequencer.js` of ordrumbox-v2.
 
+pub mod analysis;
 pub mod assign;
 pub mod controller;
 pub mod engine;
@@ -18,6 +19,7 @@ pub mod wav;
 
 pub use controller::{AudioSide, Controller, Mode};
 pub use engine::{Engine, Position};
-pub use kit::{Kit, SampleBank, kits_from_json};
+pub use kit::{Instrument, Kit, SampleBank, kits_from_json, kits_to_json};
+pub use ordrumbox_dsp::SampleBuffer;
 pub use pass::Pass;
 pub use synth_preset::SynthPresets;

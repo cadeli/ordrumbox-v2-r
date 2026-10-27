@@ -137,6 +137,35 @@ pub fn encode(left: &[f32], right: &[f32], sample_rate: u32) -> Vec<u8> {
     out
 }
 
+/// A 32-bit float WAV of `buffer` (mono or stereo, its sample rate): what a
+/// processed sample is saved as, without losing precision.
+pub fn encode_float(buffer: &SampleBuffer) -> Vec<u8> {
+    let channels: u16 = if buffer.right.is_some() { 2 } else { 1 };
+    let frames = buffer.right.as_ref().map_or(buffer.left.len(), |r| r.len().min(buffer.left.len()));
+    let block = u32::from(channels) * 4;
+    let data_len = frames as u32 * block;
+    let mut out = Vec::with_capacity(44 + data_len as usize);
+    out.extend_from_slice(b"RIFF");
+    out.extend_from_slice(&(36 + data_len).to_le_bytes());
+    out.extend_from_slice(b"WAVEfmt ");
+    out.extend_from_slice(&16u32.to_le_bytes());
+    out.extend_from_slice(&FORMAT_FLOAT.to_le_bytes());
+    out.extend_from_slice(&channels.to_le_bytes());
+    out.extend_from_slice(&buffer.sample_rate.to_le_bytes());
+    out.extend_from_slice(&(buffer.sample_rate * block).to_le_bytes());
+    out.extend_from_slice(&(block as u16).to_le_bytes());
+    out.extend_from_slice(&32u16.to_le_bytes());
+    out.extend_from_slice(b"data");
+    out.extend_from_slice(&data_len.to_le_bytes());
+    for i in 0..frames {
+        out.extend_from_slice(&buffer.left[i].to_le_bytes());
+        if let Some(right) = &buffer.right {
+            out.extend_from_slice(&right[i].to_le_bytes());
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
@@ -190,5 +219,13 @@ pub(crate) mod tests {
         let mut no_data = wav(1, 1, 8_000, 16, &[]);
         no_data.truncate(no_data.len() - 8);
         assert_eq!(decode(&no_data), Err(WavError::MissingChunk("data")));
+    }
+
+    #[test]
+    fn float_files_round_trip() {
+        let mono = SampleBuffer::mono(vec![0.5, -0.25, 1.5e-7], 22_050);
+        assert_eq!(decode(&encode_float(&mono)).unwrap(), mono);
+        let stereo = SampleBuffer { left: vec![0.1, 0.2], right: Some(vec![-0.3, 0.4]), sample_rate: 48_000 };
+        assert_eq!(decode(&encode_float(&stereo)).unwrap(), stereo);
     }
 }

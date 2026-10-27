@@ -13,6 +13,7 @@ mod assets;
 mod audio;
 mod canvas;
 mod font;
+mod kits;
 mod session;
 mod store;
 mod view;
@@ -32,7 +33,7 @@ use ordrumbox_logic::generate::MelodicKind;
 
 use canvas::Canvas;
 use session::{Move, Session};
-use view::Layout;
+use view::{KitLayout, Layout};
 
 const TITLE: &str = "orDrumbox";
 const INITIAL_SIZE: LogicalSize<f64> = LogicalSize::new(1100.0, 680.0);
@@ -108,6 +109,15 @@ impl App {
     fn click(&mut self) {
         let Some(gfx) = &self.gfx else { return };
         let size = gfx.window.inner_size();
+        if let Some((selected, count)) = self.session.kit_list() {
+            let layout =
+                KitLayout::new(size.width as i32, size.height as i32, self.scale(), self.session.status_lines());
+            if let Some(hit) = layout.hit(selected, count, self.mouse.x as i32, self.mouse.y as i32) {
+                self.session.kit_click(hit);
+                self.request_redraw();
+            }
+            return;
+        }
         let Some(pattern) = self.session.pattern() else { return };
         let layout =
             Layout::new(size.width as i32, size.height as i32, self.scale(), pattern, self.session.status_lines());
@@ -135,6 +145,7 @@ impl App {
                 KeyCode::KeyS => s.save(),
                 KeyCode::KeyE => s.export_wav(shift),
                 KeyCode::KeyM => s.export_midi(),
+                KeyCode::KeyK => s.toggle_kit_editor(),
                 KeyCode::KeyN => s.new_pattern(),
                 KeyCode::KeyD => s.duplicate_pattern(),
                 KeyCode::KeyT => s.add_track(),
@@ -143,6 +154,26 @@ impl App {
                 KeyCode::KeyL => s.loop_point_back(),
                 KeyCode::Minus => s.change_length(-1),
                 KeyCode::Equal => s.change_length(1),
+                _ => return,
+            }
+        } else if s.kit_editor_open() {
+            match code {
+                KeyCode::Escape => s.toggle_kit_editor(),
+                KeyCode::ArrowUp => s.kit_select(-1),
+                KeyCode::ArrowDown => s.kit_select(1),
+                KeyCode::ArrowLeft => s.kit_field(-1),
+                KeyCode::ArrowRight => s.kit_field(1),
+                KeyCode::Minus | KeyCode::NumpadSubtract => s.kit_adjust(-1, shift),
+                KeyCode::Equal | KeyCode::NumpadAdd => s.kit_adjust(1, shift),
+                KeyCode::Enter | KeyCode::NumpadEnter => s.kit_audition(),
+                KeyCode::Delete | KeyCode::Backspace => s.kit_remove(),
+                KeyCode::KeyN => s.kit_normalize(),
+                KeyCode::KeyR => s.kit_reassign(),
+                KeyCode::KeyE => s.kit_export(),
+                KeyCode::Comma => s.step_kit(-1),
+                KeyCode::Period => s.step_kit(1),
+                KeyCode::Space if !event.repeat && shift => s.toggle_play_song(),
+                KeyCode::Space if !event.repeat => s.toggle_play(),
                 _ => return,
             }
         } else if let Some(row) = ROW_DIGITS.iter().position(|&k| k == code) {
@@ -222,7 +253,7 @@ impl ApplicationHandler for App {
             WindowEvent::KeyboardInput { event, .. } => self.key(&event),
             WindowEvent::CursorMoved { position, .. } => self.mouse = position,
             WindowEvent::DroppedFile(path) => {
-                self.session.import_midi(&path);
+                self.session.drop_path(&path, self.modifiers.shift_key());
                 self.request_redraw();
             }
             WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } => self.click(),

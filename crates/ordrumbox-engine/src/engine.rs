@@ -442,10 +442,12 @@ mod tests {
             key: "K".into(),
             display_name: "k".into(),
             url: "k".into(),
-            decay_ms: 10_000.0,
-            root_midi: None,
+            decay: Some(10_000.0),
+            ..Default::default()
         };
-        Arc::new(SampleBank { samples: vec![crate::kit::BankSample { kit: "x".into(), instrument, buffer }] })
+        Arc::new(SampleBank {
+            samples: vec![crate::kit::BankSample { kit: "x".into(), instrument, buffer: buffer.into() }],
+        })
     }
 
     fn sample_event(frame: u64) -> Event {
@@ -514,7 +516,7 @@ mod tests {
         let mut engine = engine();
         let long = SampleBuffer::mono(vec![1.0; 48_000], 48_000);
         engine.bank = Arc::new(SampleBank {
-            samples: vec![crate::kit::BankSample { buffer: long, ..engine.bank.samples[0].clone() }],
+            samples: vec![crate::kit::BankSample { buffer: long.into(), ..engine.bank.samples[0].clone() }],
         });
         engine.play(pass(0, &[0], 48_000));
         render(&mut engine, 1000);

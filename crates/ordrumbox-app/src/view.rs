@@ -9,6 +9,7 @@ use ordrumbox_core::steps::absolute_step;
 use ordrumbox_core::{Pattern, Track};
 
 use crate::canvas::{Canvas, Rgb, text_width};
+use crate::kits::Field;
 
 const BACKGROUND: Rgb = 0x0016_1619;
 const CELL: Rgb = 0x002A_2A33;
@@ -33,7 +34,15 @@ const HELP: [&str; 5] = [
     "click/ENTER note (again: delete)  ARROWS move  SHIFT ARROWS velocity/pitch  DEL clear step  ESC deselect",
     "B generate a pattern  D drums  S bass  A chords (auto on/off)  Z track auto on/off  X random track",
     "CTRL: Z undo  Y redo  C/V copy/paste step (SHIFT: track)  T add track  BACKSPACE del track  G grid  L loop  -/= length",
-    "CTRL: N new pattern  D duplicate  S save  E export WAV (SHIFT: song)  M export MIDI   drop a .mid file: import",
+    "CTRL: N new pattern  D duplicate  S save  E export WAV (SHIFT: song)  M export MIDI  K kit editor   drop a .mid: import",
+];
+/// Key help while the kit editor is open.
+const KIT_HELP: [&str; 5] = [
+    "KIT EDITOR  CTRL K or ESC close   UP DOWN sample  LEFT RIGHT field  - = change (SHIFT: finely)  ENTER hear",
+    "DEL remove sample  N normalize kit  R assign sounds again  E export kit mapping (.json)  , . kit  SPACE play",
+    "drop a .wav: add it to the kit (SHIFT: replace the selected sample)  a folder: import it as a kit",
+    "drop a kit mapping .json: load it   drop a .mid: import it",
+    "changes are saved (kits.json, samples/ in the user data folder)",
 ];
 /// Characters of a track name shown.
 const LABEL_CHARS: usize = 10;
@@ -71,6 +80,91 @@ pub struct View<'a> {
     pub message: &'a str,
     /// Problems to show above the key help, most important first.
     pub status: &'a [String],
+    /// The kit editor, when open (it takes the place of the grid).
+    pub kit_view: Option<KitView<'a>>,
+}
+
+/// What the kit editor shows.
+#[derive(Debug)]
+pub struct KitView<'a> {
+    pub kit: &'a str,
+    /// Display name and instrument key of each sample.
+    pub samples: Vec<(&'a str, &'a str)>,
+    pub selected: usize,
+    pub field: Field,
+    /// Values of the fields of the selected sample, in [`Field::ALL`] order.
+    pub values: Option<[String; 5]>,
+    /// Note, length and levels of the selected sample.
+    pub info: Option<String>,
+    /// The instrument its name suggests.
+    pub detected: Option<String>,
+    /// Peak of each slice, 0–1.
+    pub envelope: &'a [f64],
+    /// Where the decay ends, as a fraction of the sample.
+    pub decay_marker: Option<f64>,
+}
+
+/// What is under the mouse in the kit editor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KitHit {
+    Sample(usize),
+    Field(Field),
+}
+
+/// Where the kit editor's parts are.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct KitLayout {
+    scale: i32,
+    top: i32,
+    bottom: i32,
+    left: i32,
+    list_width: i32,
+    row: i32,
+    detail_x: i32,
+    field_top: i32,
+    width: i32,
+}
+
+impl KitLayout {
+    pub fn new(width: i32, height: i32, scale: i32, status_lines: usize) -> Self {
+        let margin = margin(scale);
+        let top = margin + 3 * header_line(scale) + margin / 2;
+        let bottom = footer_top(height, scale, status_lines) - margin / 2;
+        let list_width = ((width - 2 * margin) / 3).max(40 * scale);
+        let row = 12 * scale;
+        let detail_x = margin + list_width + 16 * scale;
+        Self { scale, top, bottom, left: margin, list_width, row, detail_x, field_top: top + 16 * scale, width }
+    }
+
+    fn shown(&self) -> usize {
+        usize::try_from((self.bottom - self.top) / self.row).unwrap_or(0)
+    }
+
+    /// First list row shown, so that `selected` is visible.
+    fn first(&self, selected: usize) -> usize {
+        selected.saturating_sub(self.shown().saturating_sub(1))
+    }
+
+    fn field_y(&self, i: usize) -> i32 {
+        self.field_top + i as i32 * 14 * self.scale
+    }
+
+    pub fn hit(&self, view_selected: usize, count: usize, x: i32, y: i32) -> Option<KitHit> {
+        if y < self.top || y >= self.bottom {
+            return None;
+        }
+        if (self.left..self.left + self.list_width).contains(&x) {
+            let i = self.first(view_selected) + usize::try_from((y - self.top) / self.row).ok()?;
+            return (i < count).then_some(KitHit::Sample(i));
+        }
+        if x >= self.detail_x && x < self.width {
+            return Field::ALL.iter().enumerate().find_map(|(i, f)| {
+                let fy = self.field_y(i);
+                (fy - 2 * self.scale..fy + 12 * self.scale).contains(&y).then_some(KitHit::Field(*f))
+            });
+        }
+        None
+    }
 }
 
 /// What is under the mouse.
@@ -254,12 +348,16 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
         canvas.text(margin, footer_y, message, scale, WARNING);
         footer_y += 10 * scale;
     }
-    for help in HELP {
-        canvas.text(margin, footer_y, help, scale, DIM);
+    let help = if view.kit_view.is_some() { KIT_HELP } else { HELP };
+    for line in help {
+        canvas.text(margin, footer_y, line, scale, DIM);
         footer_y += 10 * scale;
     }
 
-    if let Some(pattern) = view.pattern {
+    if let Some(kit) = &view.kit_view {
+        let layout = KitLayout::new(canvas.width(), canvas.height(), scale, view.status.len());
+        draw_kit(canvas, kit, &layout);
+    } else if let Some(pattern) = view.pattern {
         let layout = Layout::new(canvas.width(), canvas.height(), scale, pattern, view.status.len());
         draw_grid(canvas, pattern, view, &layout);
     }
@@ -298,6 +396,63 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
         let x = layout.grid_left + (fraction.clamp(0.0, 1.0) * f64::from(layout.grid_width)) as i32;
         let height = (layout.tracks as i32 * layout.row).min(layout.bottom - layout.top) - gap;
         canvas.fill_rect(x - scale, layout.top, 2 * scale, height, PLAYHEAD);
+    }
+}
+
+/// The kit editor: the kit's samples on the left, the selected one on the
+/// right (fields, analysis, envelope with the decay marked).
+fn draw_kit(canvas: &mut Canvas, kit: &KitView, layout: &KitLayout) {
+    let scale = layout.scale;
+    let first = layout.first(kit.selected);
+    if kit.samples.is_empty() {
+        canvas.text(layout.left, layout.top, "No samples in this kit", scale, DIM);
+    }
+    for (row, (i, (name, key))) in kit.samples.iter().enumerate().skip(first).take(layout.shown()).enumerate() {
+        let y = layout.top + row as i32 * layout.row;
+        if i == kit.selected {
+            canvas.fill_rect(layout.left - 2 * scale, y - 2 * scale, layout.list_width, layout.row, FOCUS_ROW);
+        }
+        let color = if i == kit.selected { ACCENT } else { TEXT };
+        let x = canvas.text(layout.left, y, name, scale, color);
+        canvas.text(x + 8 * scale, y, key, scale, DIM);
+    }
+
+    let x = layout.detail_x;
+    let title = format!("kit {}", kit.kit);
+    canvas.text(x, layout.top, &title, scale, DIM);
+    let Some(values) = &kit.values else { return };
+    let label_width = text_width("Instrument  ", scale);
+    for (i, field) in Field::ALL.iter().enumerate() {
+        let y = layout.field_y(i);
+        let selected = *field == kit.field;
+        if selected {
+            canvas.fill_rect(x - 4 * scale, y - 2 * scale, layout.width - x - 12 * scale, 14 * scale, FOCUS_ROW);
+        }
+        canvas.text(x, y, field.label(), scale, if selected { ACCENT } else { DIM });
+        canvas.text(x + label_width, y, &values[i], scale, if selected { ACCENT } else { TEXT });
+    }
+    let mut y = layout.field_y(Field::ALL.len()) + 6 * scale;
+    for line in [kit.info.as_deref(), kit.detected.as_deref()].into_iter().flatten() {
+        canvas.text(x, y, line, scale, DIM);
+        y += 12 * scale;
+    }
+
+    // Envelope: one bar per point, the decay end as a line.
+    let (width, height) = (layout.width - x - 16 * scale, (layout.bottom - y - 4 * scale).min(80 * scale));
+    if kit.envelope.is_empty() || width <= 0 || height <= 4 * scale {
+        return;
+    }
+    canvas.fill_rect(x, y, width, height, CELL);
+    let n = kit.envelope.len() as i32;
+    for (i, v) in kit.envelope.iter().enumerate() {
+        let bar_x = x + i as i32 * width / n;
+        let bar_w = ((i as i32 + 1) * width / n - i as i32 * width / n).max(1);
+        let bar_h = (v.clamp(0.0, 1.0) * f64::from(height)).round() as i32;
+        canvas.fill_rect(bar_x, y + height - bar_h, bar_w, bar_h, NOTE);
+    }
+    if let Some(ratio) = kit.decay_marker {
+        let mx = x + (ratio.clamp(0.0, 1.0) * f64::from(width - 1)) as i32;
+        canvas.fill_rect(mx, y, scale.max(1), height, PLAYHEAD);
     }
 }
 
@@ -403,6 +558,7 @@ mod tests {
                 song: Some("SONG demo  measure 3/66"),
                 generation: [true, false, true],
                 genre: Some("house"),
+                kit_view: None,
                 cursor: Some(Cursor { track: 0, beat: 1, step: 2 }),
                 selected: Some((0, 0)),
                 undo: Some("Add note"),
@@ -412,6 +568,33 @@ mod tests {
             };
             draw(&mut canvas, &view, 1);
         }
+    }
+
+    #[test]
+    fn kit_editor_draws_and_hits() {
+        let samples: Vec<(&str, &str)> = (0..40).map(|_| ("kick.wav", "KICK")).collect();
+        let values = ["real".to_owned(), "KICK".into(), "+0.0 dB".into(), "+0.0 st".into(), "500 ms".into()];
+        let envelope = [0.0, 1.0, 0.5, 0.25];
+        for (w, h) in [(1, 1), (40, 30), (1024, 640)] {
+            let mut pixels = vec![0; w * h];
+            let mut canvas = Canvas::new(&mut pixels, w, h);
+            let kit = KitView {
+                kit: "real",
+                samples: samples.clone(),
+                selected: 39,
+                field: Field::Gain,
+                values: Some(values.clone()),
+                info: Some("A4 0ct".into()),
+                detected: Some("Detected: KICK".into()),
+                envelope: &envelope,
+                decay_marker: Some(0.5),
+            };
+            draw_kit(&mut canvas, &kit, &KitLayout::new(w as i32, h as i32, 1, 0));
+        }
+        let layout = KitLayout::new(1024, 640, 1, 0);
+        assert_eq!(layout.hit(0, 40, layout.left + 2, layout.top + 1), Some(KitHit::Sample(0)));
+        assert_eq!(layout.hit(0, 1, layout.left + 2, layout.top + layout.row + 1), None);
+        assert_eq!(layout.hit(0, 40, layout.detail_x + 2, layout.field_y(2) + 1), Some(KitHit::Field(Field::Gain)));
     }
 
     #[test]

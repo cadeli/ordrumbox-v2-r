@@ -11,7 +11,7 @@ Windows by CI).
 | `ordrumbox-core` | data model, `song.json` codec, pattern engine, song clips, instrument catalog, JSON, RNG, the JS sort and number formatting | none |
 | `ordrumbox-logic` | the library being edited: commands with undo/redo; pattern generators (every instrument's variants, genre templates, auto mode loop by loop); Standard MIDI Files (read, import, export) | core |
 | `ordrumbox-dsp` | sample voice, synth voice, channel strip (filter, saturation, reverb, delay), master bus; no allocation in render paths | none |
-| `ordrumbox-engine` | WAV decoding/encoding, kits, sound auto-assignment, synth presets, passes (pattern and song: events, strip settings, LFO steps), sample-accurate engine, UI ↔ audio link, offline renders | core, dsp |
+| `ordrumbox-engine` | WAV decoding/encoding, kits and their files, sample analysis, sound auto-assignment, synth presets, passes (pattern and song: events, strip settings, LFO steps), sample-accurate engine, UI ↔ audio link, offline renders | core, dsp |
 | `ordrumbox-app` | window, software-rendered UI, audio output → `ordrumbox.exe` | winit, softbuffer, cpal |
 
 The four domain crates have no third-party dependency. Only the app talks to
@@ -60,6 +60,21 @@ melodic instruments on their own channels at the sample's root note) to
 name), in one undo step. As in the JS app, the file's tempo is not read
 (120 BPM).
 
+Kit editor (**Ctrl K**, the JS drumkit manager): the current kit's samples
+(**↑↓**), and for the selected one its kit, instrument, gain (dB), tune
+(semitones) and decay (**←→** to pick, **- =** to change, **Shift** finely),
+its note, length, peak and RMS levels and envelope with the decay end;
+**Enter** plays it, **Delete** removes it, **N** normalizes the kit to 0 dB,
+**E** exports the kit mapping (`.json`), **R** assigns the tracks' sounds
+again. Dropped on the window, a `.wav` joins the kit (**Shift**: replaces the
+selected sample), a folder of WAV files becomes a kit, a kit mapping is
+loaded. Gain and tune now play (the JS sample voice uses them). Unlike the
+JS app, where these edits are lost on reload, the kits are saved to
+`kits.json` and the audio of added, replaced or normalized samples to
+`samples/` (32-bit float WAV), both in the user data folder; `samples/`
+wins over the assets' `kits/`. Delete `kits.json` to start again from the
+assets' kits.
+
 Mouse: a click on an empty step adds a note, on a note selects it (and plays
 it), on the selected note deletes it; **M**/**S** boxes mute/solo; a click on
 a name selects the track (and plays it).
@@ -89,6 +104,7 @@ a name selects the track (and plays it).
 | **Ctrl S** | save now |
 | **Ctrl E** | export the pattern to WAV (**Shift**: the song) |
 | **Ctrl M** | export the pattern to a MIDI file |
+| **Ctrl K** | kit editor (open / close) |
 | drop a `.mid` file on the window | import it (also a `.mid` given on the command line) |
 
 Keys are read by position (like the JS app's shortcuts): on an AZERTY
@@ -214,6 +230,18 @@ node tools/export_midi_fixtures.mjs ../ordrumbox-v2
   and `Array.prototype.sort` permutations — the exporter sorts with a
   comparator that contradicts itself, so the bytes depend on V8's TimSort,
   which `ordrumbox_core::js::sort_by` reproduces step by step.
+
+The kit editor's sample analysis has a seventh script:
+
+```sh
+node tools/export_kit_fixtures.mjs ../ordrumbox-v2
+```
+
+- `ordrumbox-engine/tests/fixtures/analysis.json`: `Analyzer.analyzeWavBuffer()`
+  (envelope, length, peak and RMS dB, fundamental and its confidence) and the
+  note of WAV files in every format the JS decodes (tones, noise, decays,
+  silence, very short files, stereo, the kick.wav fixture). Rust decodes the
+  same bytes and must report the same values exactly.
 
 ## License
 
