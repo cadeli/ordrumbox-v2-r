@@ -75,6 +75,22 @@ JS app, where these edits are lost on reload, the kits are saved to
 wins over the assets' `kits/`. Delete `kits.json` to start again from the
 assets' kits.
 
+Menus: the menu bar at the top of the window (File, Edit, Pattern, Generate,
+Play, Kit, Help) lists every command with its shortcut; commands that cannot
+run are greyed out, on/off ones (auto modes, mute, solo, the current kit, the
+kit editor) show a box. Click a title, or press **F10** or **Alt** alone, then
+**←→** between menus, **↑↓** between items, **Enter** to run, **Esc** to
+close. **Help › Keyboard shortcuts** (**F1**) lists every key; **Help › About**
+shows the version and the folders in use.
+
+Commands ending in "..." (import a MIDI file, add or replace a sample, import a
+folder as a kit, load a kit mapping) open the built-in file picker: **↑↓**,
+**PageUp/PageDown**, **Home/End** or the mouse wheel to move, a letter to jump,
+**Enter** (or a second click) to open a folder or choose, **Backspace** for the
+parent folder, **Esc** to cancel. It lists only the files the command takes;
+on Windows the drives are listed above a drive's root. It starts in the home
+folder, then where it last chose.
+
 Mouse: a click on an empty step adds a note, on a note selects it (and plays
 it), on the selected note deletes it; **M**/**S** boxes mute/solo; a click on
 a name selects the track (and plays it).
@@ -105,6 +121,10 @@ a name selects the track (and plays it).
 | **Ctrl E** | export the pattern to WAV (**Shift**: the song) |
 | **Ctrl M** | export the pattern to a MIDI file |
 | **Ctrl K** | kit editor (open / close) |
+| **Ctrl O** | import a MIDI file (file picker) |
+| **Ctrl Q** | save and quit |
+| **F10**, **Alt** | open the menus |
+| **F1** | the list of keys |
 | drop a `.mid` file on the window | import it (also a `.mid` given on the command line) |
 
 Keys are read by position (like the JS app's shortcuts): on an AZERTY

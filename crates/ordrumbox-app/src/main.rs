@@ -3,8 +3,8 @@
 //! Loads the ordrumbox-v2 assets (patterns, kits, samples, synth presets) and
 //! the user's library, plays the selected pattern through the default audio
 //! device (per-track strips, synth tracks, master bus), and edits it with the
-//! mouse and the keyboard (see `view::HELP`), every edit undoable and saved a
-//! moment later.
+//! menu bar, the mouse and the keyboard (see `menu` and `view::HELP`), every
+//! edit undoable and saved a moment later.
 
 // No console window in a release build on Windows.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
@@ -14,6 +14,8 @@ mod audio;
 mod canvas;
 mod font;
 mod kits;
+mod menu;
+mod picker;
 mod session;
 mod store;
 mod view;
@@ -24,15 +26,14 @@ use std::time::{Duration, Instant};
 
 use winit::application::ApplicationHandler;
 use winit::dpi::{LogicalSize, PhysicalPosition};
-use winit::event::{ElementState, KeyEvent, MouseButton, WindowEvent};
+use winit::event::{ElementState, KeyEvent, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{KeyCode, ModifiersState, PhysicalKey};
 use winit::window::{Window, WindowId};
 
-use ordrumbox_logic::generate::MelodicKind;
-
 use canvas::Canvas;
-use session::{Move, Session};
+use menu::Command;
+use session::{Move, OverlayKey, Session};
 use view::{KitLayout, Layout};
 
 const TITLE: &str = "orDrumbox";
@@ -51,6 +52,8 @@ const ROW_DIGITS: [KeyCode; 9] = [
     KeyCode::Digit8,
     KeyCode::Digit9,
 ];
+/// Rows Page Up / Page Down move in the file picker.
+const PAGE: isize = 10;
 const ROW_LETTERS: [KeyCode; 10] = [
     KeyCode::KeyQ,
     KeyCode::KeyW,
@@ -75,6 +78,8 @@ struct App {
     modifiers: ModifiersState,
     mouse: PhysicalPosition<f64>,
     error: Option<String>,
+    /// Alt is down and no other key was pressed since.
+    alt_alone: bool,
 }
 
 impl App {
@@ -106,56 +111,116 @@ impl App {
         buffer.present().map_err(|e| format!("present frame: {e}"))
     }
 
+    fn size(&self) -> (i32, i32) {
+        self.gfx.as_ref().map_or((0, 0), |g| {
+            let size = g.window.inner_size();
+            (size.width as i32, size.height as i32)
+        })
+    }
+
     fn click(&mut self) {
-        let Some(gfx) = &self.gfx else { return };
-        let size = gfx.window.inner_size();
+        let (width, height) = self.size();
+        let (scale, x, y) = (self.scale(), self.mouse.x as i32, self.mouse.y as i32);
+        let s = &mut self.session;
+        let menus = s.menus();
+        // The menu bar first: it is over everything.
+        match menu::hit(&menus, s.open_menu(), scale, x, y) {
+            Some(menu::Hit::Title(i)) => {
+                let same = s.open_menu().is_some_and(|o| o.menu == i);
+                s.close_overlay();
+                s.set_menu((!same).then(|| menu::Open::new(&menus, i, false)));
+            }
+            Some(menu::Hit::Item(i)) => {
+                if let Some(command) = s.open_menu().and_then(|o| menu::Open { item: Some(i), ..o }.command(&menus)) {
+                    s.run(command);
+                }
+            }
+            Some(menu::Hit::Panel) => {}
+            Some(menu::Hit::Bar) => s.set_menu(None),
+            None if s.open_menu().is_some() => s.set_menu(None),
+            None if s.overlay_open() => s.overlay_click(width, height, scale, x, y),
+            None => return self.click_content(width, height, scale, x, y),
+        }
+        self.request_redraw();
+    }
+
+    /// A click on the grid or the kit editor.
+    fn click_content(&mut self, width: i32, height: i32, scale: i32, x: i32, y: i32) {
         if let Some((selected, count)) = self.session.kit_list() {
-            let layout =
-                KitLayout::new(size.width as i32, size.height as i32, self.scale(), self.session.status_lines());
-            if let Some(hit) = layout.hit(selected, count, self.mouse.x as i32, self.mouse.y as i32) {
+            let layout = KitLayout::new(width, height, scale, self.session.status_lines());
+            if let Some(hit) = layout.hit(selected, count, x, y) {
                 self.session.kit_click(hit);
                 self.request_redraw();
             }
             return;
         }
         let Some(pattern) = self.session.pattern() else { return };
-        let layout =
-            Layout::new(size.width as i32, size.height as i32, self.scale(), pattern, self.session.status_lines());
-        if let Some(hit) = layout.hit(pattern, self.mouse.x as i32, self.mouse.y as i32) {
+        let layout = Layout::new(width, height, scale, pattern, self.session.status_lines());
+        if let Some(hit) = layout.hit(pattern, x, y) {
             self.session.click(hit);
             self.request_redraw();
         }
     }
 
+    /// The mouse moved: an open menu follows it.
+    fn hover(&mut self) {
+        let scale = self.scale();
+        let s = &mut self.session;
+        let Some(open) = s.open_menu() else { return };
+        let menus = s.menus();
+        let next = match menu::hit(&menus, Some(open), scale, self.mouse.x as i32, self.mouse.y as i32) {
+            Some(menu::Hit::Title(i)) if i != open.menu => menu::Open::new(&menus, i, false),
+            Some(menu::Hit::Item(i)) => menu::Open { item: Some(i), ..open },
+            Some(menu::Hit::Title(_)) => open,
+            _ => menu::Open { item: None, ..open },
+        };
+        if next != open {
+            s.set_menu(Some(next));
+            self.request_redraw();
+        }
+    }
+
+    /// Open the first menu from the keyboard, or close the open one.
+    fn toggle_menu(&mut self) {
+        let s = &mut self.session;
+        let open = s.open_menu();
+        s.close_overlay();
+        s.set_menu(if open.is_some() { None } else { Some(menu::Open::new(&s.menus(), 0, true)) });
+        self.request_redraw();
+    }
+
     fn key(&mut self, event: &KeyEvent) {
+        let PhysicalKey::Code(code) = event.physical_key else { return };
+        let is_alt = matches!(code, KeyCode::AltLeft | KeyCode::AltRight);
         if event.state != ElementState::Pressed {
+            // Alt pressed and released alone opens the menus, as on Windows.
+            if is_alt && std::mem::take(&mut self.alt_alone) {
+                self.toggle_menu();
+            }
             return;
         }
-        let PhysicalKey::Code(code) = event.physical_key else { return };
+        self.alt_alone = is_alt && !event.repeat;
+        if is_alt {
+            return;
+        }
+        if code == KeyCode::F10 {
+            return self.toggle_menu();
+        }
+        if let Some(open) = self.session.open_menu() {
+            return self.menu_key(open, code);
+        }
+        if self.session.overlay_open() {
+            return self.overlay_key(event, code);
+        }
         let shift = self.modifiers.shift_key();
-        let command = self.modifiers.control_key() || self.modifiers.super_key();
+        let control = self.modifiers.control_key() || self.modifiers.super_key();
+        if let Some(command) = shortcut(code, shift, control) {
+            self.session.run(command);
+            return self.request_redraw();
+        }
         let s = &mut self.session;
-        if command {
-            match code {
-                KeyCode::KeyZ if shift => s.redo(),
-                KeyCode::KeyZ => s.undo(),
-                KeyCode::KeyY => s.redo(),
-                KeyCode::KeyC => s.copy(shift),
-                KeyCode::KeyV => s.paste(shift),
-                KeyCode::KeyS => s.save(),
-                KeyCode::KeyE => s.export_wav(shift),
-                KeyCode::KeyM => s.export_midi(),
-                KeyCode::KeyK => s.toggle_kit_editor(),
-                KeyCode::KeyN => s.new_pattern(),
-                KeyCode::KeyD => s.duplicate_pattern(),
-                KeyCode::KeyT => s.add_track(),
-                KeyCode::Backspace | KeyCode::Delete => s.remove_track(),
-                KeyCode::KeyG => s.next_grid(),
-                KeyCode::KeyL => s.loop_point_back(),
-                KeyCode::Minus => s.change_length(-1),
-                KeyCode::Equal => s.change_length(1),
-                _ => return,
-            }
+        if control {
+            return;
         } else if s.kit_editor_open() {
             match code {
                 KeyCode::Escape => s.toggle_kit_editor(),
@@ -170,8 +235,6 @@ impl App {
                 KeyCode::KeyN => s.kit_normalize(),
                 KeyCode::KeyR => s.kit_reassign(),
                 KeyCode::KeyE => s.kit_export(),
-                KeyCode::Comma => s.step_kit(-1),
-                KeyCode::Period => s.step_kit(1),
                 KeyCode::Space if !event.repeat && shift => s.toggle_play_song(),
                 KeyCode::Space if !event.repeat => s.toggle_play(),
                 _ => return,
@@ -185,20 +248,8 @@ impl App {
             match code {
                 KeyCode::Space if !event.repeat && shift => s.toggle_play_song(),
                 KeyCode::Space if !event.repeat => s.toggle_play(),
-                KeyCode::BracketLeft if shift => s.step_song(-1),
-                KeyCode::BracketRight if shift => s.step_song(1),
-                KeyCode::BracketLeft | KeyCode::PageUp => s.step_pattern(-1),
-                KeyCode::BracketRight | KeyCode::PageDown => s.step_pattern(1),
                 KeyCode::Minus | KeyCode::NumpadSubtract => s.step_tempo(-tempo),
                 KeyCode::Equal | KeyCode::NumpadAdd => s.step_tempo(tempo),
-                KeyCode::Comma => s.step_kit(-1),
-                KeyCode::Period => s.step_kit(1),
-                KeyCode::KeyB => s.generate_pattern(),
-                KeyCode::KeyD => s.toggle_generation(None),
-                KeyCode::KeyS => s.toggle_generation(Some(MelodicKind::Bass)),
-                KeyCode::KeyA => s.toggle_generation(Some(MelodicKind::Chords)),
-                KeyCode::KeyZ => s.toggle_auto(),
-                KeyCode::KeyX => s.randomize_track(),
                 KeyCode::ArrowLeft if shift => s.nudge(Move::Left),
                 KeyCode::ArrowRight if shift => s.nudge(Move::Right),
                 KeyCode::ArrowUp if shift => s.nudge(Move::Up),
@@ -215,6 +266,101 @@ impl App {
         }
         self.request_redraw();
     }
+
+    /// Keys while a menu is open.
+    fn menu_key(&mut self, open: menu::Open, code: KeyCode) {
+        let s = &mut self.session;
+        let menus = s.menus();
+        match code {
+            KeyCode::Escape => s.set_menu(None),
+            KeyCode::ArrowLeft => s.set_menu(Some(open.switch(&menus, -1))),
+            KeyCode::ArrowRight => s.set_menu(Some(open.switch(&menus, 1))),
+            KeyCode::ArrowUp => s.set_menu(Some(open.step(&menus, -1))),
+            KeyCode::ArrowDown => s.set_menu(Some(open.step(&menus, 1))),
+            KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space => match open.command(&menus) {
+                Some(command) => s.run(command),
+                None => return,
+            },
+            _ => return,
+        }
+        self.request_redraw();
+    }
+
+    /// Keys while the file picker (or another panel) is open.
+    fn overlay_key(&mut self, event: &KeyEvent, code: KeyCode) {
+        let key = match code {
+            KeyCode::Escape => OverlayKey::Escape,
+            KeyCode::Enter | KeyCode::NumpadEnter => OverlayKey::Enter,
+            KeyCode::Backspace => OverlayKey::Back,
+            KeyCode::ArrowUp => OverlayKey::Move(-1),
+            KeyCode::ArrowDown => OverlayKey::Move(1),
+            KeyCode::PageUp => OverlayKey::Move(-PAGE),
+            KeyCode::PageDown => OverlayKey::Move(PAGE),
+            KeyCode::Home => OverlayKey::Edge(false),
+            KeyCode::End => OverlayKey::Edge(true),
+            _ => match event.text.as_ref().and_then(|t| t.chars().next()).filter(|c| c.is_alphanumeric()) {
+                Some(c) => OverlayKey::Letter(c),
+                None => return,
+            },
+        };
+        self.session.overlay_key(key);
+        self.request_redraw();
+    }
+
+    /// Finish: save, then leave.
+    fn quit(&mut self, event_loop: &ActiveEventLoop) {
+        self.session.save_if_changed();
+        event_loop.exit();
+    }
+}
+
+/// The command a key runs, when the menus list it (`view::HELP`).
+fn shortcut(code: KeyCode, shift: bool, control: bool) -> Option<Command> {
+    use Command as C;
+    Some(if control {
+        match code {
+            KeyCode::KeyZ if shift => C::Redo,
+            KeyCode::KeyZ => C::Undo,
+            KeyCode::KeyY => C::Redo,
+            KeyCode::KeyC if shift => C::CopyTrack,
+            KeyCode::KeyC => C::CopyStep,
+            KeyCode::KeyV if shift => C::PasteTrack,
+            KeyCode::KeyV => C::Paste,
+            KeyCode::KeyS => C::Save,
+            KeyCode::KeyO => C::ImportMidi,
+            KeyCode::KeyE if shift => C::ExportSongWav,
+            KeyCode::KeyE => C::ExportWav,
+            KeyCode::KeyM => C::ExportMidi,
+            KeyCode::KeyK => C::KitEditor,
+            KeyCode::KeyN => C::NewPattern,
+            KeyCode::KeyD => C::DuplicatePattern,
+            KeyCode::KeyT => C::AddTrack,
+            KeyCode::Backspace | KeyCode::Delete => C::RemoveTrack,
+            KeyCode::KeyG => C::NextGrid,
+            KeyCode::KeyL => C::LoopBack,
+            KeyCode::Minus => C::LengthDown,
+            KeyCode::Equal => C::LengthUp,
+            KeyCode::KeyQ => C::Quit,
+            _ => return None,
+        }
+    } else {
+        match code {
+            KeyCode::F1 => C::Shortcuts,
+            KeyCode::BracketLeft if shift => C::PreviousSong,
+            KeyCode::BracketRight if shift => C::NextSong,
+            KeyCode::BracketLeft | KeyCode::PageUp => C::PreviousPattern,
+            KeyCode::BracketRight | KeyCode::PageDown => C::NextPattern,
+            KeyCode::Comma => C::PreviousKit,
+            KeyCode::Period => C::NextKit,
+            KeyCode::KeyB => C::GeneratePattern,
+            KeyCode::KeyD => C::GenerateDrums,
+            KeyCode::KeyS => C::GenerateBass,
+            KeyCode::KeyA => C::GenerateChords,
+            KeyCode::KeyZ => C::TrackAuto,
+            KeyCode::KeyX => C::RandomTrack,
+            _ => return None,
+        }
+    })
 }
 
 impl ApplicationHandler for App {
@@ -239,10 +385,7 @@ impl ApplicationHandler for App {
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         match event {
-            WindowEvent::CloseRequested => {
-                self.session.save_if_changed();
-                event_loop.exit();
-            }
+            WindowEvent::CloseRequested => self.quit(event_loop),
             WindowEvent::RedrawRequested => {
                 if let Err(e) = self.redraw() {
                     self.fail(event_loop, "redraw", e);
@@ -251,13 +394,30 @@ impl ApplicationHandler for App {
             WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. } => self.request_redraw(),
             WindowEvent::ModifiersChanged(modifiers) => self.modifiers = modifiers.state(),
             WindowEvent::KeyboardInput { event, .. } => self.key(&event),
-            WindowEvent::CursorMoved { position, .. } => self.mouse = position,
+            WindowEvent::CursorMoved { position, .. } => {
+                self.mouse = position;
+                self.hover();
+            }
+            WindowEvent::MouseWheel { delta, .. } if self.session.overlay_open() => {
+                let lines = match delta {
+                    MouseScrollDelta::LineDelta(_, y) => y.round() as isize,
+                    MouseScrollDelta::PixelDelta(p) => (p.y / 20.0).round() as isize,
+                };
+                if lines != 0 {
+                    self.session.overlay_key(OverlayKey::Move(-lines * 3));
+                    self.request_redraw();
+                }
+            }
             WindowEvent::DroppedFile(path) => {
+                self.session.close_overlay();
                 self.session.drop_path(&path, self.modifiers.shift_key());
                 self.request_redraw();
             }
             WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } => self.click(),
             _ => {}
+        }
+        if self.session.quit_requested() {
+            self.quit(event_loop);
         }
     }
 
@@ -294,6 +454,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         modifiers: ModifiersState::default(),
         mouse: PhysicalPosition::new(0.0, 0.0),
         error: None,
+        alt_alone: false,
     };
     event_loop.run_app(&mut app)?;
     match app.error {
