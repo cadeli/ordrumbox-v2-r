@@ -35,6 +35,13 @@ pub fn to_string(value: &Value) -> String {
     }
 }
 
+/// `Math.round(x)`: ties go up (`-2.5` → `-2`), unlike `f64::round` which goes
+/// away from zero. `x - floor(x)` is exact, so there is no `x + 0.5` error.
+pub fn round(x: f64) -> f64 {
+    let floor = x.floor();
+    if x - floor >= 0.5 { floor + 1.0 } else { floor }
+}
+
 /// `String(n)`.
 pub fn number_to_string(n: f64) -> String {
     if n.is_nan() {

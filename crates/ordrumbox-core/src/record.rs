@@ -106,13 +106,9 @@ impl Issue {
     }
 }
 
-/// Round to 2 decimals like the JS exporter: `Math.round(v * 100) / 100`
-/// (ties go up, `-2.5` rounds to `-2`, unlike `f64::round`).
+/// Round to 2 decimals like the JS exporter: `Math.round(v * 100) / 100`.
 pub(crate) fn round2(value: f64) -> f64 {
-    let scaled = value * 100.0;
-    let floor = scaled.floor();
-    let rounded = if scaled - floor >= 0.5 { floor + 1.0 } else { floor };
-    rounded / 100.0
+    crate::js::round(value * 100.0) / 100.0
 }
 
 macro_rules! json_record {
