@@ -8,8 +8,8 @@ Windows by CI).
 
 | Crate | Role | Dependencies |
 |---|---|---|
-| `ordrumbox-core` | data model, `song.json` codec, pattern engine, song clips, instrument catalog, JSON, RNG | none |
-| `ordrumbox-logic` | the library being edited: commands with undo/redo; pattern generators (every instrument's variants, genre templates, auto mode loop by loop) (MIDI files to come) | core |
+| `ordrumbox-core` | data model, `song.json` codec, pattern engine, song clips, instrument catalog, JSON, RNG, the JS sort and number formatting | none |
+| `ordrumbox-logic` | the library being edited: commands with undo/redo; pattern generators (every instrument's variants, genre templates, auto mode loop by loop); Standard MIDI Files (read, import, export) | core |
 | `ordrumbox-dsp` | sample voice, synth voice, channel strip (filter, saturation, reverb, delay), master bus; no allocation in render paths | none |
 | `ordrumbox-engine` | WAV decoding/encoding, kits, sound auto-assignment, synth presets, passes (pattern and song: events, strip settings, LFO steps), sample-accurate engine, UI ↔ audio link, offline renders | core, dsp |
 | `ordrumbox-app` | window, software-rendered UI, audio output → `ordrumbox.exe` | winit, softbuffer, cpal |
@@ -52,6 +52,14 @@ of a section, a snare crescendo on breaks); those lines are saved but are not
 undo steps. Exports regenerate them on their own copy. **X** puts random notes
 on the focused track.
 
+MIDI files (the JS exporter and import, byte for byte): **Ctrl M** writes the
+pattern as a type 1 file (96 PPQN; drums on channel 10 at their GM keys,
+melodic instruments on their own channels at the sample's root note) to
+`exports/`. A `.mid` dropped on the window becomes new 32-beat patterns (up to
+16), one track per instrument found (by GM program, drum key, then track
+name), in one undo step. As in the JS app, the file's tempo is not read
+(120 BPM).
+
 Mouse: a click on an empty step adds a note, on a note selects it (and plays
 it), on the selected note deletes it; **M**/**S** boxes mute/solo; a click on
 a name selects the track (and plays it).
@@ -80,6 +88,8 @@ a name selects the track (and plays it).
 | **Ctrl N**, **Ctrl D** | new pattern, duplicate pattern |
 | **Ctrl S** | save now |
 | **Ctrl E** | export the pattern to WAV (**Shift**: the song) |
+| **Ctrl M** | export the pattern to a MIDI file |
+| drop a `.mid` file on the window | import it (also a `.mid` given on the command line) |
 
 Keys are read by position (like the JS app's shortcuts): on an AZERTY
 keyboard, **[ ]** are the two keys right of **P**, **Q–P** start at **A**,
@@ -189,6 +199,21 @@ node tools/export_gen_fixtures.mjs ../ordrumbox-v2
   player's loop-start regeneration over 30–46 loops (auto tracks, `autoGen`
   patterns); the ↻ Drum / Bass / Chords toggles. Rust must give the same
   notes, track settings and number of draws.
+
+MIDI files have a sixth script:
+
+```sh
+node tools/export_midi_fixtures.mjs ../ordrumbox-v2
+```
+
+- `ordrumbox-logic/tests/fixtures/midi.json`: `parseMidi()` (events, names,
+  note-ons, program changes) of hand-made files covering the parser's paths
+  (running status, sysex, truncation, garbage) and of exports; the
+  exporter's bytes for every song.json pattern it plays the same with any
+  random stream, 1 and 3 loops; the patterns the import makes of each file;
+  and `Array.prototype.sort` permutations — the exporter sorts with a
+  comparator that contradicts itself, so the bytes depend on V8's TimSort,
+  which `ordrumbox_core::js::sort_by` reproduces step by step.
 
 ## License
 

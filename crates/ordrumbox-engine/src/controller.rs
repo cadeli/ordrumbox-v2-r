@@ -422,8 +422,13 @@ mod tests {
     use ordrumbox_dsp::SampleBuffer;
 
     fn bank() -> Arc<SampleBank> {
-        let instrument =
-            crate::kit::Instrument { key: "KICK".into(), display_name: "k".into(), url: "k".into(), decay_ms: 100.0 };
+        let instrument = crate::kit::Instrument {
+            key: "KICK".into(),
+            display_name: "k".into(),
+            url: "k".into(),
+            decay_ms: 100.0,
+            root_midi: None,
+        };
         let buffer = SampleBuffer::mono(vec![0.5; 400], 8000);
         Arc::new(SampleBank { samples: vec![crate::kit::BankSample { kit: "x".into(), instrument, buffer }] })
     }

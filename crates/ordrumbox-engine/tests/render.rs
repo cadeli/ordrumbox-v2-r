@@ -34,6 +34,7 @@ fn bank() -> SampleBank {
                 display_name: key.to_lowercase(),
                 url: format!("{key}.wav"),
                 decay_ms: 5000.0,
+                root_midi: None,
             },
             buffer: buffer.clone(),
         })
