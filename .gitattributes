@@ -1,0 +1,7 @@
+# LF everywhere, on every OS. A Windows checkout (core.autocrlf=true on the
+# GitHub runners) would otherwise turn the fixtures into CRLF and break the
+# byte-for-byte JSON tests against song.json / song.min.json / flat_notes.
+* text=auto eol=lf
+
+# Golden fixtures produced by the JS app: compared byte for byte, never rewritten.
+crates/ordrumbox-core/tests/fixtures/** -text
