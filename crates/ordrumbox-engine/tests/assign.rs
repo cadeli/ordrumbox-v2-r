@@ -24,7 +24,7 @@ fn bank() -> (SampleBank, Vec<String>) {
             kit.instruments.iter().map(|instrument| BankSample {
                 kit: kit.name.clone(),
                 instrument: instrument.clone(),
-                buffer: SampleBuffer::mono(vec![0.0], 44_100),
+                buffer: SampleBuffer::mono(vec![0.0], 44_100).into(),
             })
         })
         .collect();

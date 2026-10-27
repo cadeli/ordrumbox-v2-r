@@ -199,7 +199,8 @@ fn sound_for(
         TrackSound::Sample(sample) => *sample,
     };
     let bank_sample = context.bank.get(sample)?;
-    let mut ratio = note.playback_ratio(track);
+    // The sample's tune and gain trim (`sample.tune`, `sample.gainDb`).
+    let mut ratio = note.playback_ratio(track) * (bank_sample.instrument.tune / 12.0).exp2();
     if let Some(pitch_lfo) = &track.pitch_lfo {
         ratio *= (lfo::value(pitch_lfo, lfo_tick as f64) / 12.0).exp2();
     }
@@ -207,8 +208,8 @@ fn sound_for(
         sample,
         track: strip,
         ratio,
-        peak: note.velocity as f32,
-        decay: (bank_sample.instrument.decay_ms / 1000.0) as f32,
+        peak: (note.velocity * bank_sample.instrument.gain()) as f32,
+        decay: (bank_sample.instrument.decay_ms() / 1000.0) as f32,
         pan: note.playback_pan(track) as f32,
         delay: 0,
     }))
@@ -388,10 +389,19 @@ mod tests {
                 {"pattern":"a","startMeasure":0,"measureCount":2},{"pattern":"b","startMeasure":1,"measureCount":2}]}]}"#,
         )
         .unwrap();
-        let instrument =
-            Instrument { key: "X".into(), display_name: "x".into(), url: "x".into(), decay_ms: 100.0, root_midi: None };
+        let instrument = Instrument {
+            key: "X".into(),
+            display_name: "x".into(),
+            url: "x".into(),
+            decay: Some(100.0),
+            ..Default::default()
+        };
         let bank = SampleBank {
-            samples: vec![BankSample { kit: "k".into(), instrument, buffer: SampleBuffer::mono(vec![1.0], 48_000) }],
+            samples: vec![BankSample {
+                kit: "k".into(),
+                instrument,
+                buffer: SampleBuffer::mono(vec![1.0], 48_000).into(),
+            }],
         };
         let sounds = vec![vec![TrackSound::Sample(0); 2]; 2];
         let (scales, synths) = (Scales::default(), SynthPresets::default());

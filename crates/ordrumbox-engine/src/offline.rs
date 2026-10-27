@@ -117,12 +117,14 @@ mod tests {
             key: "KICK".into(),
             display_name: "k".into(),
             url: "k".into(),
-            decay_ms: 200.0,
-            root_midi: None,
+            decay: Some(200.0),
+            ..Default::default()
         };
         let buffer = SampleBuffer::mono(vec![0.5; 2000], 44_100);
         RenderSetup {
-            bank: Arc::new(SampleBank { samples: vec![BankSample { kit: "x".into(), instrument, buffer }] }),
+            bank: Arc::new(SampleBank {
+                samples: vec![BankSample { kit: "x".into(), instrument, buffer: buffer.into() }],
+            }),
             scales: Scales::default(),
             synths: SynthPresets::default(),
             kit: "x".into(),

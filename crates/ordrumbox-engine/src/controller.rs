@@ -337,6 +337,35 @@ impl Controller {
         self.link.inbox().preview = Some(pass);
     }
 
+    /// Audition sample `index` of the bank as it is (`DrumkitManager.audition`):
+    /// whole, at its tune and gain trim, centred, through a neutral strip
+    /// (the first track's while playing).
+    pub fn audition_sample(&mut self, index: usize) {
+        let Some(sample) = self.bank.get(index) else { return };
+        let voice = ordrumbox_dsp::VoiceStart {
+            sample: index,
+            track: 0,
+            ratio: (sample.instrument.tune / 12.0).exp2(),
+            peak: sample.instrument.gain() as f32,
+            // No decay envelope: one that outlasts any sample.
+            decay: 600.0,
+            pan: 0.0,
+            delay: 0,
+        };
+        let pass = Arc::new(Pass {
+            frames: 1,
+            ticks: 1,
+            events: vec![crate::pass::Event { frame: 0, sound: crate::pass::Sound::Sample(voice), mono: false }],
+            strips: vec![ordrumbox_dsp::StripSettings::default()],
+            ..Pass::default()
+        });
+        self.previews.push_back(pass.clone());
+        while self.previews.len() > KEPT_PASSES {
+            self.previews.pop_front();
+        }
+        self.link.inbox().preview = Some(pass);
+    }
+
     /// Start `mode` from its beginning; sounds are assigned afresh.
     pub fn play(&mut self, library: &Library, mode: Mode) {
         self.mode = mode;
@@ -426,11 +455,13 @@ mod tests {
             key: "KICK".into(),
             display_name: "k".into(),
             url: "k".into(),
-            decay_ms: 100.0,
-            root_midi: None,
+            decay: Some(100.0),
+            ..Default::default()
         };
         let buffer = SampleBuffer::mono(vec![0.5; 400], 8000);
-        Arc::new(SampleBank { samples: vec![crate::kit::BankSample { kit: "x".into(), instrument, buffer }] })
+        Arc::new(SampleBank {
+            samples: vec![crate::kit::BankSample { kit: "x".into(), instrument, buffer: buffer.into() }],
+        })
     }
 
     #[test]

@@ -33,10 +33,10 @@ fn bank() -> SampleBank {
                 key: (*key).into(),
                 display_name: key.to_lowercase(),
                 url: format!("{key}.wav"),
-                decay_ms: 5000.0,
-                root_midi: None,
+                decay: Some(5000.0),
+                ..Default::default()
             },
-            buffer: buffer.clone(),
+            buffer: buffer.clone().into(),
         })
         .collect();
     SampleBank { samples }

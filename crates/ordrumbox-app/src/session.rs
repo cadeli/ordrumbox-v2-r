@@ -12,8 +12,9 @@ use std::time::{Duration, Instant};
 
 use ordrumbox_core::drum_taxonomy::{TrackType, detect_track_type};
 use ordrumbox_core::{Library, Note, Pattern, Rng, Scales, Track};
+use ordrumbox_engine::analysis::{self, Analysis};
 use ordrumbox_engine::offline::{self, RenderSetup};
-use ordrumbox_engine::{Controller, Kit, Mode, wav};
+use ordrumbox_engine::{Controller, Mode, SynthPresets, wav};
 use ordrumbox_logic::generate::{self, AutoGen, MelodicKind};
 use ordrumbox_logic::midi;
 use ordrumbox_logic::{Editor, Nudge};
@@ -21,8 +22,9 @@ use ordrumbox_logic::{Editor, Nudge};
 use crate::assets;
 use crate::audio;
 use crate::canvas::Canvas;
+use crate::kits::{Field, KitSet};
 use crate::store;
-use crate::view::{self, Cursor, Hit, View};
+use crate::view::{self, Cursor, Hit, KitHit, KitView, View};
 
 /// Save this long after the last edit.
 const SAVE_DELAY: Duration = Duration::from_secs(1);
@@ -50,8 +52,13 @@ pub struct Session {
     rng: Rng,
     /// Root note of the loaded samples that have one (key, MIDI note), for MIDI files.
     roots: Vec<(String, f64)>,
-    kits: Vec<Kit>,
+    kits: KitSet,
     kit_index: usize,
+    /// The kit editor, when open: selected sample of the current kit and field.
+    kit_editor: Option<(usize, Field)>,
+    /// Analysis of the sample the kit editor shows, by url.
+    analysis: Option<(String, Analysis)>,
+    synths: SynthPresets,
     pattern_index: usize,
     song_index: usize,
     /// What offline renders (WAV exports) use; `None` without samples.
@@ -81,7 +88,7 @@ impl Session {
             let searched: Vec<String> = assets::candidates().iter().map(|d| d.display().to_string()).collect();
             return Self::new(
                 Library::default(),
-                Vec::new(),
+                KitSet::empty(),
                 vec![
                     format!(
                         "assets folder not found: copy ordrumbox-v2/assets next to the program, or set {}",
@@ -93,7 +100,7 @@ impl Session {
         };
         let assets = match assets::load(&dir) {
             Ok(assets) => assets,
-            Err(e) => return Self::new(Library::default(), Vec::new(), vec![e]),
+            Err(e) => return Self::new(Library::default(), KitSet::empty(), vec![e]),
         };
         let mut status = Vec::new();
         if let Some(first) = assets.sample_errors.first() {
@@ -125,8 +132,15 @@ impl Session {
             status.push(format!("song.json: {} value(s) repaired", assets.report.issues.len()));
         }
 
-        let mut session = Self::new(library, assets.kits, status);
+        if let Some(e) = &assets.kits_error {
+            status.push(format!("kits.json not loaded, kit edits not saved: {e}"));
+        }
+        let kits_file = if assets.kits_error.is_none() { store::kits_path() } else { None };
+        let kits =
+            KitSet::new(assets.kits, &assets.bank, Some(assets.sources.clone()), kits_file, store::samples_dir());
+        let mut session = Self::new(library, kits, status);
         session.scales = assets.scales.clone();
+        session.synths = assets.synths.clone();
         session.roots = assets
             .bank
             .samples
@@ -141,7 +155,7 @@ impl Session {
                 bank: bank.clone(),
                 scales: assets.scales.clone(),
                 synths: assets.synths.clone(),
-                kit: session.kits.first().map(|k| k.name.clone()).unwrap_or_default(),
+                kit: session.kits.kits.first().map(|k| k.name.clone()).unwrap_or_default(),
                 sample_rate: offline::EXPORT_RATE,
                 seed: 1,
             });
@@ -156,7 +170,7 @@ impl Session {
         session
     }
 
-    fn new(library: Library, kits: Vec<Kit>, status: Vec<String>) -> Self {
+    fn new(library: Library, kits: KitSet, status: Vec<String>) -> Self {
         Self {
             editor: Editor::new(library),
             scales: Scales::default(),
@@ -164,6 +178,9 @@ impl Session {
             roots: Vec::new(),
             kits,
             kit_index: 0,
+            kit_editor: None,
+            analysis: None,
+            synths: SynthPresets::default(),
             pattern_index: 0,
             song_index: 0,
             render: None,
@@ -336,18 +353,207 @@ impl Session {
     }
 
     pub fn step_kit(&mut self, delta: isize) {
-        if self.kits.is_empty() {
+        let count = self.kits.kits.len();
+        if count == 0 {
             return;
         }
-        self.kit_index = (self.kit_index as isize + delta).rem_euclid(self.kits.len() as isize) as usize;
-        let name = &self.kits[self.kit_index].name;
+        self.select_kit((self.kit_index as isize + delta).rem_euclid(count as isize) as usize);
+        self.message = format!("kit {}", self.kits.kits[self.kit_index].name);
+    }
+
+    /// Use kit `index` (its sounds are assigned again).
+    fn select_kit(&mut self, index: usize) {
+        let Some(kit) = self.kits.kits.get(index) else { return };
+        self.kit_index = index;
         if let Some(controller) = &mut self.controller {
-            controller.set_kit(name);
+            controller.set_kit(&kit.name);
         }
         if let Some(render) = &mut self.render {
-            render.kit.clone_from(name);
+            render.kit.clone_from(&kit.name);
         }
-        self.message = format!("kit {name}");
+        if let Some((sample, field)) = self.kit_editor {
+            self.kit_editor = Some((sample.min(kit.instruments.len().saturating_sub(1)), field));
+        }
+        self.update_analysis();
+    }
+
+    // ─── Kit editor ──────────────────────────────────────────────────────────
+
+    pub fn kit_editor_open(&self) -> bool {
+        self.kit_editor.is_some()
+    }
+
+    /// The kit editor's selected sample and the kit's sample count, when open.
+    pub fn kit_list(&self) -> Option<(usize, usize)> {
+        let (sample, _) = self.kit_editor?;
+        Some((sample, self.kits.kits.get(self.kit_index).map_or(0, |k| k.instruments.len())))
+    }
+
+    /// Ctrl+K: the kit editor (the drumkit manager), open or closed.
+    pub fn toggle_kit_editor(&mut self) {
+        self.kit_editor = match self.kit_editor {
+            Some(_) => None,
+            None => Some((0, Field::Instrument)),
+        };
+        self.update_analysis();
+    }
+
+    /// The analysis of the sample shown, computed when it changes.
+    fn update_analysis(&mut self) {
+        let url = self.kit_editor.and_then(|(s, _)| self.kits.sample(self.kit_index, s)).map(|i| i.url.clone());
+        match url {
+            Some(url) if self.analysis.as_ref().is_some_and(|(u, _)| *u == url) => {}
+            Some(url) => {
+                self.analysis = self.kits.buffer(&url).map(|b| (url.clone(), analysis::analyze(b)));
+            }
+            None => self.analysis = None,
+        }
+    }
+
+    /// The kits changed: a new bank for playback and exports, the root
+    /// notes, the kits saved, the selection kept inside.
+    fn kits_changed(&mut self, message: String) {
+        let (bank, errors) = self.kits.bank();
+        self.roots =
+            bank.samples.iter().filter_map(|s| Some((s.instrument.key.clone(), s.instrument.root_midi?))).collect();
+        let bank = Arc::new(bank);
+        if let Some(controller) = &mut self.controller {
+            controller.set_bank(bank.clone());
+            controller.refresh(self.editor.library());
+        }
+        let kit = self.kits.kits.get(self.kit_index).map(|k| k.name.clone()).unwrap_or_default();
+        self.render = (!bank.samples.is_empty()).then(|| RenderSetup {
+            bank: bank.clone(),
+            scales: self.scales.clone(),
+            synths: self.synths.clone(),
+            kit,
+            sample_rate: offline::EXPORT_RATE,
+            seed: 1,
+        });
+        self.message = match (self.kits.save(), errors.first()) {
+            (Err(e), _) => e,
+            (Ok(()), Some(first)) => format!("{message} ({} sample(s) not loaded, first: {first})", errors.len()),
+            (Ok(()), None) => message,
+        };
+        self.kit_index = self.kit_index.min(self.kits.kits.len().saturating_sub(1));
+        self.analysis = None;
+        self.select_kit(self.kit_index);
+    }
+
+    /// ↑↓: the previous / next sample of the kit.
+    pub fn kit_select(&mut self, delta: isize) {
+        let Some((sample, field)) = self.kit_editor else { return };
+        let count = self.kits.kits.get(self.kit_index).map_or(0, |k| k.instruments.len());
+        if count > 0 {
+            self.kit_editor = Some(((sample as isize + delta).rem_euclid(count as isize) as usize, field));
+            self.update_analysis();
+        }
+    }
+
+    /// ←→: the previous / next field.
+    pub fn kit_field(&mut self, delta: isize) {
+        let Some((sample, field)) = self.kit_editor else { return };
+        let at = Field::ALL.iter().position(|f| *f == field).unwrap_or(0) as isize;
+        // No wrap-around: a step past Decay must not land on Kit (where - = move the sample).
+        let at = (at + delta).clamp(0, Field::ALL.len() as isize - 1) as usize;
+        self.kit_editor = Some((sample, Field::ALL[at]));
+    }
+
+    /// A click in the kit editor.
+    pub fn kit_click(&mut self, hit: KitHit) {
+        let Some((sample, field)) = self.kit_editor else { return };
+        self.kit_editor = Some(match hit {
+            KitHit::Sample(s) => (s, field),
+            KitHit::Field(f) => (sample, f),
+        });
+        self.update_analysis();
+        if let KitHit::Sample(_) = hit {
+            self.kit_audition();
+        }
+    }
+
+    /// - =: the selected field down / up (Shift: finely).
+    pub fn kit_adjust(&mut self, steps: i32, fine: bool) {
+        let Some((sample, field)) = self.kit_editor else { return };
+        if let Some(message) = self.kits.adjust(self.kit_index, sample, field, steps, fine) {
+            self.kits_changed(message);
+        }
+    }
+
+    /// Enter: the selected sample, as it is.
+    pub fn kit_audition(&mut self) {
+        let Some((sample, _)) = self.kit_editor else { return };
+        let Some(url) = self.kits.sample(self.kit_index, sample).map(|i| i.url.clone()) else { return };
+        if let Some(controller) = &mut self.controller
+            && let Some(index) = controller.bank().find_url(&url)
+        {
+            controller.audition_sample(index);
+        }
+    }
+
+    /// Delete: the selected sample out of the kit.
+    pub fn kit_remove(&mut self) {
+        let Some((sample, _)) = self.kit_editor else { return };
+        if let Some(message) = self.kits.remove(self.kit_index, sample) {
+            self.kits_changed(message);
+        }
+    }
+
+    /// N: every sample of the kit to a 0 dB peak.
+    pub fn kit_normalize(&mut self) {
+        match self.kits.normalize(self.kit_index) {
+            Ok(0) => self.message = "No samples to normalize".into(),
+            Ok(n) => self.kits_changed(format!("Normalized {n} sample(s)")),
+            Err(e) => self.message = e,
+        }
+    }
+
+    /// R: the sounds of the tracks assigned again (`autoDetectAll`).
+    pub fn kit_reassign(&mut self) {
+        self.select_kit(self.kit_index);
+        self.message = "Auto-detect complete".into();
+    }
+
+    /// E: the kit's mapping to a JSON file in the exports folder.
+    pub fn kit_export(&mut self) {
+        let Some(dir) = store::exports_dir() else {
+            self.message = "no user data folder to export to".into();
+            return;
+        };
+        self.message = self.kits.export_mapping(self.kit_index, &dir).unwrap_or_else(|e| e);
+    }
+
+    /// A file or folder dropped on the window (Shift: a WAV replaces the
+    /// selected sample of the kit editor).
+    pub fn drop_path(&mut self, path: &Path, shift: bool) {
+        let ext = path.extension().map(|e| e.to_string_lossy().to_ascii_lowercase()).unwrap_or_default();
+        let result = if path.is_dir() {
+            self.kits.import_folder(path).map(|(kit, message)| (kit, 0, message))
+        } else {
+            match ext.as_str() {
+                "mid" | "midi" => return self.import_midi(path),
+                "json" => self.kits.load_mapping(path).map(|(kit, message)| (kit, 0, message)),
+                "wav" => match self.kit_editor {
+                    Some((sample, _)) if shift => self
+                        .kits
+                        .replace_sample(self.kit_index, sample, path)
+                        .map(|message| (self.kit_index, sample, message)),
+                    _ => self
+                        .kits
+                        .add_sample(self.kit_index, path)
+                        .map(|(sample, message)| (self.kit_index, sample, message)),
+                },
+                _ => Err(format!("{}: not a MIDI, WAV or kit file", path.display())),
+            }
+        };
+        match result {
+            Ok((kit, sample, message)) => {
+                self.kit_index = kit;
+                self.kit_editor = Some((sample, self.kit_editor.map_or(Field::Instrument, |(_, f)| f)));
+                self.kits_changed(message);
+            }
+            Err(e) => self.message = e,
+        }
     }
 
     /// Keep the engine fed and the playing pass current; call every frame
@@ -818,7 +1024,8 @@ impl Session {
             genre: pattern.and_then(|p| p.extra.get("_autoGenGenre")?.as_str()),
             pattern_index: self.pattern_index,
             pattern_count: library.patterns.len(),
-            kit: self.kits.get(self.kit_index).map_or("-", |k| k.name.as_str()),
+            kit: self.kits.kits.get(self.kit_index).map_or("-", |k| k.name.as_str()),
+            kit_view: self.kit_view(),
             playing: self.playing(),
             playhead: position.filter(|_| song_mode.is_none()).map(|p| p.frame as f64 / p.frames.max(1) as f64),
             song: song.as_deref(),
@@ -830,5 +1037,45 @@ impl Session {
             status: &self.status,
         };
         view::draw(canvas, &view, scale);
+    }
+
+    /// What the kit editor shows.
+    fn kit_view(&self) -> Option<KitView<'_>> {
+        let (sample, field) = self.kit_editor?;
+        let kit = self.kits.kits.get(self.kit_index)?;
+        let samples = kit.instruments.iter().map(|i| (i.display_name.as_str(), i.key.as_str())).collect();
+        let selected = kit.instruments.get(sample);
+        let analysis =
+            self.analysis.as_ref().filter(|(url, _)| selected.is_some_and(|i| i.url == *url)).map(|(_, a)| a);
+        let values = selected.map(|i| {
+            let decay = i.decay.map_or_else(|| format!("{} ms (default)", i.decay_ms()), |d| format!("{d} ms"));
+            [kit.name.clone(), i.key.clone(), format!("{:+.1} dB", i.gain_db), format!("{:+.1} st", i.tune), decay]
+        });
+        let info = analysis.map(|a| {
+            let db = |v: f64| if v.is_finite() { format!("{v:.1}") } else { "-".into() };
+            let note = a.note.map_or_else(|| "-".to_owned(), |n| n.to_string());
+            format!("{note}  {:.0} ms  {} dB peak  {} dB RMS", a.duration_sec * 1000.0, db(a.peak_db), db(a.rms_db))
+        });
+        let detected = selected.map(|i| {
+            let name = if i.display_name.is_empty() { &i.url } else { &i.display_name };
+            ordrumbox_core::instruments::catalog()
+                .from_file_name(name)
+                .map_or_else(|| "No instrument detected".to_owned(), |d| format!("Detected: {}", d.id))
+        });
+        let decay_marker = match (selected, analysis) {
+            (Some(i), Some(a)) if a.duration_sec > 0.0 => Some((i.decay_ms() / 1000.0 / a.duration_sec).min(1.0)),
+            _ => None,
+        };
+        Some(KitView {
+            kit: &kit.name,
+            samples,
+            selected: sample,
+            field,
+            values,
+            info,
+            detected,
+            envelope: analysis.map_or(&[][..], |a| &a.envelope),
+            decay_marker,
+        })
     }
 }
