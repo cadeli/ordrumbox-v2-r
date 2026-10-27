@@ -486,6 +486,39 @@ impl Session {
         false
     }
 
+    /// The mouse over the grid: the step it is on, for the note tooltip; whether it changed.
+    pub fn grid_hover(&mut self, size: (i32, i32, i32), x: i32, y: i32) -> bool {
+        let (width, height, scale) = size;
+        let right = self.track_editor_width(width, scale);
+        let hover = match self.pattern() {
+            Some(pattern) if self.kit_editor.is_none() && self.drag.is_none() => {
+                match Layout::new(width - right, height, scale, pattern, self.status.len()).hit(pattern, x, y) {
+                    Some(view::Hit::Cell { track, beat, step }) => Some((track, beat, step)),
+                    _ => None,
+                }
+            }
+            _ => None,
+        };
+        let changed = hover != self.hover;
+        self.hover = hover;
+        changed
+    }
+
+    /// The tooltip of the note under the mouse (the first of its step), as
+    /// `PointerSection.onMouseOver` shows it.
+    pub(super) fn draw_tooltip(&self, canvas: &mut Canvas, scale: i32, right: i32) {
+        let Some((t, beat, step)) = self.hover else { return };
+        if self.menu.is_some() || self.popup_open() || self.overlay.is_some() || self.kit_editor.is_some() {
+            return;
+        }
+        let Some(pattern) = self.pattern() else { return };
+        let Some(track) = pattern.tracks.get(t) else { return };
+        let Some(note) = track.notes.iter().find(|n| n.beat == beat && n.beat_step == step) else { return };
+        let layout = Layout::new(canvas.width() - right, canvas.height(), scale, pattern, self.status.len());
+        let cell = layout.cell_rect(t, beat, step, track.steps_per_beat);
+        view::draw_tooltip(canvas, &editors::note_tooltip(note, track.pitch), cell, scale);
+    }
+
     pub fn mouse_up(&mut self) {
         self.drag = None;
     }

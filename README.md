@@ -119,7 +119,9 @@ folder, then where it last chose.
 
 Mouse: a click on an empty step adds a note, on a note selects it (and plays
 it), on the selected note deletes it; **M**/**S** boxes mute/solo; a click on
-a name selects the track (and plays it).
+a name selects the track (and plays it). Over a note, a bubble shows its
+pitch, MIDI number and the settings that differ from the defaults (the JS
+`formatNoteTooltip`, checked against it).
 
 | Keys | |
 |---|---|
@@ -301,7 +303,8 @@ node tools/export_control_fixtures.mjs ../ordrumbox-v2
   driven through a minimal fake DOM — drags (normal and fine, linear and
   logarithmic), arrow keys with every modifier, typed numbers, the knob's arc
   — and the value texts of every formatter (`fmt`, `knobFormat`, `fmtVal`,
-  `formatSignedDb`, the loop point label).
+  `formatSignedDb`, the loop point label), and `formatNoteTooltip` for a set of
+  notes and track pitches.
 
 ## License
 

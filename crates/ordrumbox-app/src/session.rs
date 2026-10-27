@@ -134,6 +134,8 @@ pub struct Session {
     kits_dirty: Option<Instant>,
     /// Master volume, 0–2 (not saved, as in the JS).
     master_volume: f64,
+    /// The grid step under the mouse: track, beat, step (its note's tooltip).
+    hover: Option<(usize, i32, i32)>,
     /// Sample analyses of the track editor, by url.
     track_analysis: std::cell::RefCell<std::collections::HashMap<String, Analysis>>,
 }
@@ -343,6 +345,7 @@ impl Session {
             detached: None,
             kits_dirty: None,
             master_volume: 1.0,
+            hover: None,
             track_analysis: std::cell::RefCell::default(),
         }
     }
@@ -1399,6 +1402,7 @@ impl Session {
         };
         view::draw(canvas, &view, scale);
         crate::panel::draw(canvas, &layout.items, self.focus, scale);
+        self.draw_tooltip(canvas, scale, layout.right);
         menu::draw(canvas, &self.menus(), self.menu, scale);
         if let Some(dropdown) = &self.dropdown {
             dropdown.draw(canvas, scale);

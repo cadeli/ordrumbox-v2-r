@@ -4,6 +4,7 @@
 //! what each shows, in the JS order, with the JS ranges, defaults and
 //! formats. What the widgets do is in the session.
 
+use ordrumbox_core::js;
 use ordrumbox_core::json::Value;
 use ordrumbox_core::{Note, Track};
 
@@ -381,6 +382,67 @@ pub fn arp_value(
     object.insert("intervals", Value::Array(intervals));
     object.insert("mode", Value::String(kind.to_owned()));
     Value::Object(object)
+}
+
+// ─── Note tooltip (ui_utils.js) ──────────────────────────────────────────────
+
+const NOTE_NAMES: [&str; 12] = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+
+/// `pitchToNoteName`: the note at `pitch` semitones from C4 (plus the track's pitch).
+fn pitch_to_note_name(pitch: f64, track_pitch: f64) -> String {
+    let midi = 60.0 + track_pitch + pitch;
+    let index = (midi % 12.0 + 12.0) % 12.0;
+    // A fractional pitch has no name: the JS shows `undefined`.
+    let name = if index.fract() == 0.0 { NOTE_NAMES[index as usize] } else { "undefined" };
+    format!("{name}{}", js::number_to_string((midi / 12.0).floor() - 1.0))
+}
+
+/// `formatNoteTooltip`: a note's pitch and MIDI number, then what differs from the defaults.
+pub fn note_tooltip(note: &Note, track_pitch: f64) -> String {
+    let fmt = crate::control::fmt;
+    let midi = 60.0 + track_pitch + note.pitch;
+    let mut parts =
+        vec![format!("{}  MIDI {}", pitch_to_note_name(note.pitch, track_pitch), js::number_to_string(midi))];
+    if note.velocity != 0.8 {
+        parts.push(format!("vel:{}", fmt(note.velocity)));
+    }
+    if note.prob != 1.0 {
+        parts.push(format!("prob:{}", fmt(note.prob)));
+    }
+    if note.every != 1 {
+        parts.push(format!("every:{}", note.every));
+    }
+    if note.retrigger_count != 1 {
+        parts.push(format!("retrig:{}", note.retrigger_count));
+    }
+    let intervals = match &note.arp {
+        Value::Array(a) => Some(a),
+        Value::Object(o) => o.get("intervals").and_then(|v| match v {
+            Value::Array(a) => Some(a),
+            _ => None,
+        }),
+        _ => None,
+    };
+    if let Some(a) = intervals.filter(|a| a.len() >= 2) {
+        parts.push(format!("arp:[{}]", js::to_string(&Value::Array(a.clone()))));
+    }
+    if note.arp_trigger_probability != 1.0 {
+        parts.push(format!("arpProb:{}", fmt(note.arp_trigger_probability)));
+    }
+    if note.euclidean_fill > 0 {
+        parts.push(if note.euclidean_rotation != 0 {
+            format!("eucl:{}@{}", note.euclidean_fill, note.euclidean_rotation)
+        } else {
+            format!("eucl:{}", note.euclidean_fill)
+        });
+    }
+    if note.rate != 1.0 {
+        parts.push(format!("rate:{}", fmt(note.rate)));
+    }
+    if note.pan != 0.0 {
+        parts.push(format!("pan:{}", fmt(note.pan)));
+    }
+    parts.join("  ")
 }
 
 // ─── localeCompare ───────────────────────────────────────────────────────────
@@ -944,6 +1006,22 @@ mod tests {
         assert_eq!(note.arp.to_json(), r#"{"intervals":[0,2,3,5],"mode":"down"}"#);
         assert_eq!(arp_state(&note, &scales), ArpState { scale: "minor".into(), kind: "down".into(), range: 4 });
         assert_eq!(arp_value(&note, &scales, None, None, Some(0)), Value::Null);
+    }
+
+    /// `formatNoteTooltip` (tools/export_control_fixtures.mjs).
+    #[test]
+    fn golden_tooltips() {
+        let fixture = json::parse(include_str!("../tests/fixtures/controls.json")).unwrap();
+        let rows = fixture.get("tooltips").and_then(Value::as_array).unwrap();
+        assert!(rows.len() > 20);
+        for row in rows {
+            let r = row.as_array().unwrap();
+            let mut note = Note::default();
+            for (key, value) in r[0].as_object().unwrap().iter() {
+                let _ = note.set_field(key, value);
+            }
+            assert_eq!(note_tooltip(&note, r[1].as_f64().unwrap()), r[2].as_str().unwrap(), "{r:?}");
+        }
     }
 
     #[test]
