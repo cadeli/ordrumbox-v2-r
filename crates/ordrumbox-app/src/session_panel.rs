@@ -122,6 +122,13 @@ impl Session {
         if let Some(pattern) = self.pattern() {
             self.header_items(&mut layout, pattern, scale);
         }
+        // The view buttons (the JS view switch): the one shown lit.
+        let shown = [Workspace::Grid, Workspace::PianoRoll, Workspace::Song, Workspace::Synth, Workspace::Output];
+        let views = view::header_controls(scale).views;
+        for (i, ((rect, label), workspace)) in views.iter().zip(view::VIEWS).zip(shown).enumerate() {
+            let kind = Kind::Button { label: label.into(), on: self.workspace == workspace };
+            layout.items.push(Item::new(Some(Id::View(i as u8)), *rect, kind));
+        }
         if self.kit_editor.is_some() {
             let kit_layout = KitLayout::new(width, height, scale, self.status.len());
             let area = kit_layout.controls_area();
@@ -141,12 +148,13 @@ impl Session {
             self.output_items(&mut layout, width, scale);
             return layout;
         }
-        let top = view::content_top(scale);
+        // The track editor, under the header, on a panel edged in pink.
+        let top = view::body_top(scale);
         let bottom = view::footer_top(height, scale, self.status.len()) - 8 * s;
         layout.right = self.track_editor_width(width, scale);
         if layout.right > 0 {
             let back = Rect::new(width - layout.right, top - 4 * s, layout.right, bottom - top + 8 * s);
-            layout.items.push(Item::new(None, back, Kind::Highlight));
+            layout.items.push(Item::new(None, back, Kind::Panel));
             let area = Rect::new(back.x + 10 * s, top, back.w - 20 * s, bottom - top);
             match self.editor_track().and_then(|t| Some((t, self.track_view(t)?))) {
                 Some((t, view)) => {
@@ -187,7 +195,7 @@ impl Session {
     fn header_items(&self, layout: &mut PanelLayout, pattern: &Pattern, scale: i32) {
         let controls = view::header_controls(scale);
         let playing = self.playing();
-        let label = if playing { "Stop" } else { "Play" };
+        let label = if playing { "STOP" } else { "PLAY" };
         layout.items.push(Item::new(
             Some(Id::Transport),
             controls.play,
@@ -203,7 +211,7 @@ impl Session {
         let kind = Kind::Select { values: beats.clone(), labels: beats, selected };
         layout.items.push(Item::new(Some(Id::Beats), controls.beats, kind));
         for (i, ((rect, label), on)) in
-            controls.generation.iter().zip(["Drum", "Bass", "Chords"]).zip(self.generation()).enumerate()
+            controls.generation.iter().zip(["DRUM", "BASS", "CHORDS"]).zip(self.generation()).enumerate()
         {
             let kind = Kind::Button { label: label.into(), on };
             layout.items.push(Item::new(Some(Id::Generate(i as u8)), *rect, kind));
@@ -229,20 +237,44 @@ impl Session {
     }
 
     /// The url of the sample track `t` plays (none for a synth track).
-    fn track_sample_url(&self, t: usize) -> Option<String> {
-        let track = self.track(t)?;
-        if track.use_soft_synth {
-            return None;
-        }
+    /// What track `t` plays: what the player assigned it, else its first pick.
+    fn track_sound(&self, t: usize) -> TrackSound {
+        let Some(track) = self.track(t) else { return TrackSound::None };
         let library = self.editor.library();
-        let sound = match (&self.controller, &self.render) {
+        match (&self.controller, &self.render) {
             (Some(c), _) => c.track_sound(library, self.pattern_index, t),
             (None, Some(render)) => {
                 let kit = self.kits.kits.get(self.kit_index).map_or("", |k| k.name.as_str());
                 assign_track(track, &render.bank, kit, &self.synths, &mut |_| 0)
             }
             (None, None) => TrackSound::None,
-        };
+        }
+    }
+
+    /// What the grid shows under track `t`'s name: its sample (`kit/file`),
+    /// its synth preset, or that it has none.
+    pub(super) fn track_sound_label(&self, t: usize) -> String {
+        let Some(track) = self.track(t) else { return String::new() };
+        let bank =
+            self.controller.as_ref().map(|c| c.bank().clone()).or_else(|| self.render.as_ref().map(|r| r.bank.clone()));
+        match self.track_sound(t) {
+            TrackSound::Sample(i) => bank.and_then(|b| b.get(i).map(|s| s.instrument.url.clone())).unwrap_or_default(),
+            TrackSound::Synth(key) => format!("synth {key}"),
+            TrackSound::None if track.use_soft_synth => match &track.synth_sound_key {
+                Some(key) => format!("synth {key}"),
+                None => "synth".to_owned(),
+            },
+            TrackSound::None if !track.use_auto_assign_sound && !track.sample_id.is_empty() => track.sample_id.clone(),
+            TrackSound::None => "no sound".to_owned(),
+        }
+    }
+
+    fn track_sample_url(&self, t: usize) -> Option<String> {
+        let track = self.track(t)?;
+        if track.use_soft_synth {
+            return None;
+        }
+        let sound = self.track_sound(t);
         let bank =
             self.controller.as_ref().map(|c| c.bank().clone()).or_else(|| self.render.as_ref().map(|r| r.bank.clone()));
         match sound {
@@ -1083,6 +1115,7 @@ impl Session {
             Id::LoadSample => self.open_picker(Purpose::ReplaceTrackSample),
             Id::SongButton(button) => self.song_button(button),
             Id::Transport => self.toggle_play(),
+            Id::View(i) => self.show_view(i),
             Id::OutTab(_) | Id::Master(_) => self.output_activate(id),
             Id::SynthTab(_) | Id::SynthButton(_) | Id::SynthPower(_) | Id::SynthIcon(..) | Id::SynthField(_) => {
                 self.synth_activate(id);
@@ -1274,6 +1307,19 @@ mod tests {
         assert_eq!(s.generation(), [true, false, false]);
         let layout = s.panel_layout(SIZE.0, SIZE.1, 1);
         assert!(matches!(panel::find(&layout.items, Id::Generate(0)).unwrap().kind, Kind::Button { on: true, .. }));
+    }
+
+    #[test]
+    fn the_grid_names_what_each_track_plays() {
+        let (library, _) = Library::parse(
+            r#"{"patterns":[{"tracks":[{"name":"KICK"},{"name":"BASS","useSoftSynth":true,"synthSoundKey":"BASS5"},
+                {"name":"X","useAutoAssignSound":false,"sampleId":"real/x.wav"}]}]}"#,
+        )
+        .unwrap();
+        let s = Session::new(library, KitSet::empty(), Vec::new());
+        // No samples loaded: nothing for the kick, the preset, the sample set by hand.
+        let labels: Vec<String> = (0..3).map(|t| s.track_sound_label(t)).collect();
+        assert_eq!(labels, ["no sound", "synth BASS5", "real/x.wav"]);
     }
 
     #[test]

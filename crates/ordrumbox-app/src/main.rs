@@ -28,6 +28,7 @@ mod spectrum;
 mod store;
 mod synth_model;
 mod synth_view;
+mod theme;
 mod view;
 
 use std::num::NonZeroU32;

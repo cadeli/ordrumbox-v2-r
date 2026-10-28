@@ -95,6 +95,7 @@ impl Session {
         let playhead = self.roll_playhead();
         let mut view = RollView {
             track,
+            color: crate::theme::track(t),
             beat_count: pattern.beat_count.max(1),
             page: 0,
             top_row: self.roll_top.map_or_else(

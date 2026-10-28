@@ -628,6 +628,28 @@ impl Session {
 
     // ─── Menus and commands ──────────────────────────────────────────────────
 
+    /// A view button (`view::VIEWS`): show that view, unless it is shown.
+    pub(super) fn show_view(&mut self, i: u8) {
+        let target = [Workspace::Grid, Workspace::PianoRoll, Workspace::Song, Workspace::Synth, Workspace::Output];
+        let Some(&target) = target.get(usize::from(i)) else { return };
+        if self.workspace == target && self.kit_editor.is_none() {
+            return;
+        }
+        if self.workspace != target {
+            match target {
+                Workspace::Grid => {
+                    self.synth = None;
+                    self.set_workspace(Workspace::Grid);
+                }
+                Workspace::PianoRoll => self.toggle_piano_roll(),
+                Workspace::Song => self.toggle_song_view(),
+                Workspace::Synth => self.toggle_synth(),
+                Workspace::Output => self.toggle_output(),
+            }
+        }
+        self.kit_editor = None;
+    }
+
     /// Generation on (tracks in auto mode): drums, bass, chords.
     fn generation(&self) -> [bool; 3] {
         let generating = |kind: fn(TrackType) -> bool| {
@@ -1526,6 +1548,7 @@ impl Session {
         let roll = self.piano_roll_open().then(|| Some((self.roll_view(&roll_layout)?, self.roll_title()))).flatten();
         let view = View {
             pattern,
+            sounds: pattern.map_or_else(Vec::new, |p| (0..p.tracks.len()).map(|t| self.track_sound_label(t)).collect()),
             arrangement: self.song_view_open().then(|| self.song_view_data(&rows, &song_layout)),
             piano_roll: roll,
             output: self.output_view(),

@@ -7,6 +7,7 @@
 //! move, Enter runs, Escape closes.
 
 use crate::canvas::{Canvas, Rgb, text_width};
+use crate::theme;
 
 /// What a menu item (or its shortcut) does.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -343,14 +344,14 @@ fn first_runnable(menu: &Menu) -> Option<usize> {
 
 // ─── Geometry ────────────────────────────────────────────────────────────────
 
-const BAR_BACKGROUND: Rgb = 0x0022_2229;
-const PANEL: Rgb = 0x0024_2430;
-const BORDER: Rgb = 0x0048_4858;
-const HIGHLIGHT: Rgb = 0x0038_3850;
-const TEXT: Rgb = 0x00E6_E6EA;
-const DIM: Rgb = 0x0080_8090;
-const DISABLED: Rgb = 0x0050_5060;
-const ACCENT: Rgb = 0x00F2_A93B;
+const BAR_BACKGROUND: Rgb = theme::PANEL;
+const PANEL: Rgb = theme::PANEL_2;
+const BORDER: Rgb = theme::LINE;
+const HIGHLIGHT: Rgb = theme::HIGHLIGHT;
+const TEXT: Rgb = theme::TEXT;
+const DIM: Rgb = theme::CYAN;
+const DISABLED: Rgb = theme::DISABLED;
+const ACCENT: Rgb = theme::PINK;
 
 /// Height of the menu bar.
 pub fn bar_height(scale: i32) -> i32 {

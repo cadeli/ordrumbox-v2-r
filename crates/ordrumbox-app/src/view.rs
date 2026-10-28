@@ -14,24 +14,29 @@ use crate::output::{self, OutputLayout, OutputView};
 use crate::panel::Rect;
 use crate::piano_roll::{self, RollLayout, RollView};
 use crate::song_view::{self, SongLayout, SongView};
+use crate::theme;
 
-const BACKGROUND: Rgb = 0x0016_1619;
-const CELL: Rgb = 0x002A_2A33;
-const CELL_BEAT: Rgb = 0x0038_3845;
-const NOTE: Rgb = 0x00F2_A93B;
-const TEXT: Rgb = 0x00E6_E6EA;
-const DIM: Rgb = 0x0080_8090;
-const ACCENT: Rgb = 0x00F2_A93B;
-const PLAYING: Rgb = 0x005C_D67A;
-const WARNING: Rgb = 0x00E8_6A5A;
-const PLAYHEAD: Rgb = 0x00FF_FFFF;
-const LOOP_MARK: Rgb = 0x00B0_B0C0;
-const CURSOR: Rgb = 0x006A_B7FF;
-const SELECTED: Rgb = 0x00FF_FFFF;
-const FOCUS_ROW: Rgb = 0x0020_2028;
-const MUTE_ON: Rgb = 0x00E8_6A5A;
-const SOLO_ON: Rgb = 0x00F2_D43B;
-const BOX_OFF: Rgb = 0x0038_3845;
+const BACKGROUND: Rgb = theme::BG;
+const CELL: Rgb = theme::CELL;
+const CELL_BEAT: Rgb = theme::CELL_BEAT;
+const NOTE: Rgb = theme::PINK;
+const TEXT: Rgb = theme::TEXT;
+const DIM: Rgb = theme::MUTED;
+const ACCENT: Rgb = theme::PINK;
+const PLAYING: Rgb = theme::LIME;
+const WARNING: Rgb = theme::RED;
+const PLAYHEAD: Rgb = theme::LIME;
+const LOOP_MARK: Rgb = theme::YELLOW;
+const CURSOR: Rgb = theme::CYAN;
+const SELECTED: Rgb = theme::WHITE;
+const FOCUS_ROW: Rgb = theme::SELECTED_ROW;
+const MUTE_ON: Rgb = theme::RED;
+/// The logo, the header's labels, values.
+const LOGO: Rgb = theme::LIME;
+const LABEL: Rgb = theme::CYAN;
+const VALUE: Rgb = theme::YELLOW;
+const SOLO_ON: Rgb = theme::YELLOW;
+const BOX_OFF: Rgb = theme::LINE;
 
 /// The key help line under the grid (every command is in the menus, with
 /// its shortcut; Help > Keyboard shortcuts lists them all).
@@ -94,6 +99,8 @@ pub struct View<'a> {
     pub output: Option<OutputView>,
     /// The synth editor is shown (the session paints it).
     pub synth: bool,
+    /// What each track plays (its sample, its synth preset), under its name.
+    pub sounds: Vec<String>,
     /// Width kept on the right (for the track editor).
     pub right: i32,
 }
@@ -200,10 +207,6 @@ fn header_text(scale: i32) -> i32 {
     2 * scale
 }
 
-fn header_line(scale: i32) -> i32 {
-    8 * header_text(scale) + 8 * scale
-}
-
 fn margin(scale: i32) -> i32 {
     16 * scale
 }
@@ -213,56 +216,63 @@ pub fn content_top(scale: i32) -> i32 {
     menu::bar_height(scale) + margin(scale) / 2
 }
 
+/// Height of the header's row of controls: a label, then the widget.
+fn controls_height(scale: i32) -> i32 {
+    28 * scale
+}
+
+/// Top of the header's second line (the last action, undo, the song).
+fn status_line(scale: i32) -> i32 {
+    content_top(scale) + controls_height(scale) + 4 * scale
+}
+
 /// Top of what is under the header (the grid, the kit editor, the song panel).
 pub fn body_top(scale: i32) -> i32 {
-    content_top(scale) + 3 * header_line(scale) + margin(scale) / 2
+    status_line(scale) + 10 * scale + margin(scale) / 2
 }
 
 /// The header's pattern list and kit list (`PatternNav`'s two selects).
 pub fn header_selects(scale: i32) -> (Rect, Rect) {
-    let (margin, top, text) = (margin(scale), content_top(scale), header_text(scale));
-    let pattern_x = margin + text_width("orDrumbox", text) + 24 * scale;
-    let kit_x = margin + text_width("000 BPM  00 beats", text) + 24 * scale;
-    (
-        Rect::new(pattern_x, top, 200 * scale, 16 * scale),
-        Rect::new(kit_x, top + header_line(scale), 140 * scale, 16 * scale),
-    )
+    let c = header_controls(scale);
+    (c.pattern, c.kit)
 }
 
-/// The header's transport and generation controls (the JS toolbar's
-/// transport and the pattern settings panel): play, the tempo knob, the
-/// beats list on the second line; drums, bass, chords on the first, after
-/// the pattern list and its place in the library; then where the genre goes.
+/// The header (the JS toolbar and its pattern settings panel), a row of
+/// labelled groups after the logo: play; BPM (the tempo knob); PATTERN;
+/// BEATS; KIT; GENERATE (drums, bass, chords); VIEW (grid, piano roll,
+/// song, synth, output).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HeaderControls {
     pub play: Rect,
     pub bpm: Rect,
+    pub pattern: Rect,
     pub beats: Rect,
+    pub kit: Rect,
     pub generation: [Rect; 3],
-    /// Where the BPM and Beats labels and the genre go: (x, y).
-    pub bpm_label: (i32, i32),
-    pub beats_label: (i32, i32),
-    pub genre: (i32, i32),
+    pub views: [Rect; 5],
 }
+
+/// The view buttons' labels.
+pub const VIEWS: [&str; 5] = ["GRID", "ROLL", "SONG", "SYNTH", "OUT"];
 
 pub fn header_controls(scale: i32) -> HeaderControls {
     let s = scale;
-    let (margin, top, text) = (margin(scale), content_top(scale), header_text(scale));
-    let (list, _) = header_selects(scale);
-    // The library place ("12/42") takes at most 7 characters.
-    let mut x = list.x + list.w + 12 * s + text_width("000/000", text) + 16 * s;
-    let generation = [52, 52, 68].map(|w| {
-        let rect = Rect::new(x, top, w * s, 16 * s);
-        x += (w + 6) * s;
+    let (margin, top) = (margin(scale), content_top(scale));
+    let y = top + 11 * s;
+    let mut x = margin + text_width("orDrumbox", header_text(scale)) + 12 * s;
+    let mut next = |w: i32, gap: i32| {
+        let rect = Rect::new(x, y, w * s, 16 * s);
+        x += (w + gap) * s;
         rect
-    });
-    let y = top + header_line(scale);
-    let play = Rect::new(margin, y, 44 * s, 16 * s);
-    let bpm_label = (play.x + play.w + 8 * s, y + 4 * s);
-    let bpm = Rect::new(bpm_label.0 + 28 * s, y, 64 * s, 16 * s);
-    let beats_label = (bpm.x + bpm.w + 8 * s, y + 4 * s);
-    let beats = Rect::new(beats_label.0 + 48 * s, y, 40 * s, 16 * s);
-    HeaderControls { play, bpm, beats, generation, bpm_label, beats_label, genre: (x + 4 * s, top + 4 * s) }
+    };
+    let play = next(36, 10);
+    let bpm = next(56, 10);
+    let pattern = next(150, 10);
+    let beats = next(40, 10);
+    let kit = next(110, 14);
+    let generation = [next(48, 4), next(48, 4), next(64, 14)];
+    let views = [next(40, 3), next(40, 3), next(40, 3), next(48, 3), next(32, 0)];
+    HeaderControls { play, bpm, pattern, beats, kit, generation, views }
 }
 
 /// Top of the footer (status lines then help).
@@ -391,46 +401,46 @@ fn steps_per_beat(track: &Track) -> i32 {
 pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
     canvas.clear(BACKGROUND);
     let text = header_text(scale);
-    let line = header_line(scale);
     let margin = margin(scale);
 
-    // Header.
-    let mut y = content_top(scale);
-    let x = canvas.text(margin, y, "orDrumbox", text, ACCENT) + 24 * scale;
-    match view.pattern {
-        Some(_) => {
-            // The pattern list (a widget) goes first, then where it is in the library.
-            let (list, kit_list) = header_selects(scale);
-            let title = format!("{}/{}", view.pattern_index + 1, view.pattern_count);
-            canvas.text(list.x + list.w + 12 * scale, y, &title, text, TEXT);
-            // Then the generation buttons, the transport (widgets), the genre.
-            let controls = header_controls(scale);
-            if let Some(genre) = view.genre {
-                canvas.text(controls.genre.0, controls.genre.1, genre, scale, DIM);
-            }
-            y += line;
-            canvas.text(controls.bpm_label.0, controls.bpm_label.1, "BPM", scale, DIM);
-            canvas.text(controls.beats_label.0, controls.beats_label.1, "Beats", scale, DIM);
-            // The kit list (a widget) is next.
-            let x = kit_list.x + kit_list.w + 24 * scale;
-            if let Some(song) = view.song {
-                canvas.text(x, y + 4 * scale, song, scale, if song.starts_with("SONG") { PLAYING } else { DIM });
-            }
-        }
-        None => {
-            canvas.text(x, y, "no pattern", text, DIM);
-            y += line;
-        }
+    // Header: the logo, then the labelled groups (their widgets are panel items).
+    let top = content_top(scale);
+    canvas.text(margin, top + 9 * scale, "orDrumbox", text, LOGO);
+    let c = header_controls(scale);
+    let label = |canvas: &mut Canvas, r: Rect, text: &str| {
+        canvas.text(r.x, top, text, scale, LABEL);
+    };
+    if view.pattern.is_some() {
+        label(canvas, c.bpm, "BPM");
+        label(canvas, c.pattern, &format!("PATTERN {}/{}", view.pattern_index + 1, view.pattern_count));
+        label(canvas, c.beats, "BEATS");
+        label(canvas, c.kit, "KIT");
+        let generate = match view.genre {
+            Some(genre) => format!("GENERATE {genre}"),
+            None => "GENERATE".to_owned(),
+        };
+        label(canvas, c.generation[0], &generate);
+    } else {
+        canvas.text(c.play.x, c.play.y + 4 * scale, "no pattern", scale, DIM);
     }
-    y += line;
+    label(canvas, c.views[0], "VIEW");
+
+    // Second line: the last action, undo and redo, the song.
+    let y = status_line(scale);
     let history = match (view.undo, view.redo) {
         (Some(undo), Some(redo)) => format!("undo: {undo}   redo: {redo}"),
         (Some(undo), None) => format!("undo: {undo}"),
         (None, Some(redo)) => format!("redo: {redo}"),
         (None, None) => String::new(),
     };
-    let x = canvas.text(margin, y, view.message, scale, TEXT) + 24 * scale;
-    canvas.text(x.max(margin + canvas.width() / 3), y, &history, scale, DIM);
+    let x = canvas.text(margin, y, view.message, scale, VALUE) + 24 * scale;
+    let x = canvas.text(x.max(margin + canvas.width() / 3), y, &history, scale, DIM) + 24 * scale;
+    if let Some(song) = view.song {
+        let color = if song.starts_with("SONG") { PLAYING } else { DIM };
+        canvas.text(x.max(margin + canvas.width() * 2 / 3), y, song, scale, color);
+    }
+    // The header's lower edge.
+    canvas.fill_rect(0, body_top(scale) - margin / 2 + 2 * scale, canvas.width(), 2 * scale, ACCENT);
 
     // Footer: status lines then help.
     let mut footer_y = footer_top(canvas.height(), scale, view.status.len()) + 4 * scale;
@@ -478,9 +488,14 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
     let gap = scale.max(1);
     for (i, track) in pattern.tracks.iter().enumerate().take(layout.tracks) {
         let y = layout.row_top(i);
-        if view.cursor.is_some_and(|c| c.track == i) {
-            canvas.fill_rect(layout.left - 4 * scale, y, layout.grid_left - layout.left, layout.row - gap, FOCUS_ROW);
+        let focused = view.cursor.is_some_and(|c| c.track == i);
+        if focused {
+            // The whole row, its steps included.
+            let right = layout.grid_left + layout.grid_width;
+            canvas.fill_rect(layout.left - 4 * scale, y, right - layout.left + 4 * scale, layout.row - gap, FOCUS_ROW);
         }
+        // The track's colour, its notes' too.
+        canvas.fill_rect(layout.left - 8 * scale, y + gap, 3 * scale, layout.row - 3 * gap, theme::track(i));
         let box_y = y + (layout.row - layout.box_size) / 2;
         for (solo, on, color, letter) in [(false, track.mute, MUTE_ON, "M"), (true, track.solo, SOLO_ON, "S")] {
             let x = layout.box_x(solo);
@@ -490,11 +505,22 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
             canvas.text(x + inset, box_y + inset, letter, letter_scale, if on { BACKGROUND } else { DIM });
         }
         let label: String = track.name.chars().take(LABEL_CHARS).collect();
-        let label_y = y + (layout.row - 8 * layout.label_scale) / 2;
+        // The name, and under it what the track plays when there is room.
+        let sound = view.sounds.get(i).filter(|s| !s.is_empty() && layout.row >= 8 * layout.label_scale + 10 * scale);
+        let block = 8 * layout.label_scale + if sound.is_some() { 10 * scale } else { 0 };
+        let label_y = y + (layout.row - block) / 2;
+        if let Some(sound) = sound {
+            let width = layout.volume_x - layout.name_x - 4 * scale;
+            let chars = usize::try_from(width / (8 * scale)).unwrap_or(0);
+            let shown: String = sound.chars().take(chars).collect();
+            canvas.text(layout.name_x, label_y + 8 * layout.label_scale + 2 * scale, &shown, scale, DIM);
+        }
         let color = if track.mute {
             DIM
         } else if track.auto {
             PLAYING // a new line every loop
+        } else if focused {
+            theme::track(i)
         } else {
             TEXT
         };
@@ -517,8 +543,8 @@ pub fn draw_tooltip(canvas: &mut Canvas, text: &str, cell: Rect, scale: i32) {
     let (w, h) = (text_width(text, scale) + 12 * scale, 14 * scale);
     let x = (cell.x + cell.w / 2 - w / 2).clamp(0, (canvas.width() - w).max(0));
     let y = (cell.y - h - 4 * scale).max(0);
-    canvas.fill_rect(x, y, w, h, 0x0048_4858);
-    canvas.fill_rect(x + scale, y + scale, w - 2 * scale, h - 2 * scale, 0x0010_1014);
+    canvas.fill_rect(x, y, w, h, theme::LINE);
+    canvas.fill_rect(x + scale, y + scale, w - 2 * scale, h - 2 * scale, theme::SHADE);
     canvas.text(x + 6 * scale, y + 3 * scale, text, scale, TEXT);
 }
 
@@ -530,9 +556,9 @@ pub fn draw_notice(canvas: &mut Canvas, title: &str, lines: &[String], scale: i3
     let height = (lines.len() as i32 + 3) * line_h + 16 * scale;
     let x = ((canvas.width() - width) / 2).max(0);
     let y = ((canvas.height() - height) / 2).max(menu::bar_height(scale));
-    canvas.fill_rect(x - 4 * scale, y - 4 * scale, width + 8 * scale, height + 8 * scale, 0x0010_1014);
-    canvas.fill_rect(x, y, width, height, 0x0048_4858);
-    canvas.fill_rect(x + scale, y + scale, width - 2 * scale, height - 2 * scale, 0x0024_2430);
+    canvas.fill_rect(x - 4 * scale, y - 4 * scale, width + 8 * scale, height + 8 * scale, theme::SHADE);
+    canvas.fill_rect(x, y, width, height, theme::LINE);
+    canvas.fill_rect(x + scale, y + scale, width - 2 * scale, height - 2 * scale, theme::PANEL);
     canvas.text(x + 16 * scale, y + 10 * scale, title, scale, ACCENT);
     for (i, line) in lines.iter().enumerate() {
         canvas.text(x + 16 * scale, y + 10 * scale + (i as i32 + 2) * line_h, line, scale, TEXT);
@@ -613,7 +639,7 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
         let step = step as i64;
         let (x, width) = cell(step);
         let color = match note {
-            Some(v) => mix(CELL, NOTE, 0.35 + 0.65 * v.clamp(0.0, 1.0)),
+            Some(v) => theme::note(theme::track(index), *v),
             None if step % i64::from(spb) == 0 => CELL_BEAT,
             None => CELL,
         };
@@ -646,16 +672,6 @@ fn stroke(canvas: &mut Canvas, x: i32, y: i32, width: i32, height: i32, thicknes
     canvas.fill_rect(x + width - thickness, y, thickness, height, color);
 }
 
-/// `from` blended towards `to` by `amount` (0–1), per channel.
-fn mix(from: Rgb, to: Rgb, amount: f64) -> Rgb {
-    let channel = |shift: u32| {
-        let a = f64::from((from >> shift) & 0xFF);
-        let b = f64::from((to >> shift) & 0xFF);
-        ((a + (b - a) * amount).round() as u32) << shift
-    };
-    channel(16) | channel(8) | channel(0)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -667,13 +683,6 @@ mod tests {
         )
         .unwrap()
         .0
-    }
-
-    #[test]
-    fn mix_blends_channels() {
-        assert_eq!(mix(0x000000, 0xFF8040, 0.0), 0x000000);
-        assert_eq!(mix(0x000000, 0xFF8040, 1.0), 0xFF8040);
-        assert_eq!(mix(0x000000, 0xFF8040, 0.5), 0x804020);
     }
 
     #[test]
@@ -690,6 +699,7 @@ mod tests {
                 song: Some("SONG demo  measure 3/66"),
                 genre: Some("house"),
                 kit_view: None,
+                sounds: vec!["real/kick.wav".into(), "synth BASS5".into()],
                 arrangement: None,
                 piano_roll: None,
                 output: None,

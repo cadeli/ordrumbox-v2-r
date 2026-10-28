@@ -11,6 +11,7 @@ use ordrumbox_core::{Pattern, Song};
 
 use crate::canvas::{Canvas, Rgb, text_width};
 use crate::panel::Rect;
+use crate::theme;
 use crate::view;
 
 /// The JS grid geometry (`song_panel/layout.js`), in px per scale unit.
@@ -25,20 +26,18 @@ const LIST_ROW: i32 = 12;
 const LIST_WIDTH: i32 = 150;
 const COLUMN_WIDTH: i32 = 210;
 
-const BACKGROUND: Rgb = 0x0016_1619;
-const CELL: Rgb = 0x0020_2028;
-const MAJOR: Rgb = 0x002A_2A33;
-const LINE: Rgb = 0x0038_3845;
-const CLIP: Rgb = 0x00B0_7A2A;
-const CLIP_LONG: Rgb = 0x00F2_A93B;
-const TEXT: Rgb = 0x00E6_E6EA;
-const DIM: Rgb = 0x0080_8090;
-const ACCENT: Rgb = 0x00F2_A93B;
-const ORPHAN: Rgb = 0x00E8_6A5A;
-const SELECTED: Rgb = 0x0026_2632;
-const CURSOR: Rgb = 0x00FF_FFFF;
-const CURSOR_IDLE: Rgb = 0x006A_B7FF;
-const CURRENT: Rgb = 0x005C_D67A;
+const BACKGROUND: Rgb = theme::BG;
+const CELL: Rgb = theme::PANEL_2;
+const MAJOR: Rgb = theme::CELL_BEAT;
+const LINE: Rgb = theme::LINE;
+const TEXT: Rgb = theme::TEXT;
+const DIM: Rgb = theme::MUTED;
+const ACCENT: Rgb = theme::PINK;
+const ORPHAN: Rgb = theme::RED;
+const SELECTED: Rgb = theme::SELECTED_ROW;
+const CURSOR: Rgb = theme::LIME;
+const CURSOR_IDLE: Rgb = theme::CYAN;
+const CURRENT: Rgb = theme::LIME;
 
 /// One row of the arrangement: a pattern it uses.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -319,9 +318,11 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
         canvas.fill_rect(x - s, layout.body_top(), s, body_h, if m % 4 == 0 { MAJOR } else { CELL });
     }
 
+    // A clip takes its row's colour.
     for (i, clip) in song.clips.iter().enumerate() {
         if let Some(r) = layout.clip_rect(view, i) {
-            canvas.fill_rect(r.x, r.y, r.w, r.h, if clip.measure_count > 1.0 { CLIP_LONG } else { CLIP });
+            let row = view.rows.iter().position(|row| row.id == clip.pattern).unwrap_or(0);
+            canvas.fill_rect(r.x, r.y, r.w, r.h, theme::track(row));
         }
     }
 

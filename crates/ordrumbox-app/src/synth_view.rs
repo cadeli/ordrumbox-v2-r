@@ -16,6 +16,7 @@ use crate::canvas::{Canvas, Rgb, text_width};
 use crate::control::Spec;
 use crate::panel::{Id, Item, Kind, Rect};
 use crate::synth_model::{self as model, FILTER_TYPES, LFO_SYNCS, MOD_ENV_TARGETS, TABS, WAVES};
+use crate::theme;
 use crate::view;
 
 /// The preset bar's buttons: id, label, width (scale units).
@@ -36,15 +37,15 @@ const KNOB_W: i32 = 64;
 const KNOB_H: i32 = 56;
 const ROW_H: i32 = 16;
 
-const CARD: Rgb = 0x001E_1E26;
-const CARD_OFF: Rgb = 0x0018_181C;
-const BORDER: Rgb = 0x0030_3040;
-const SURFACE: Rgb = 0x0024_242E;
-const GRID: Rgb = 0x0038_3845;
-const ACCENT: Rgb = 0x00F2_A93B;
-const ACCENT_DIM: Rgb = 0x0060_4520;
-const TEXT: Rgb = 0x00E6_E6EA;
-const DIM: Rgb = 0x0080_8090;
+const CARD: Rgb = theme::PANEL;
+const CARD_OFF: Rgb = theme::BG;
+const BORDER: Rgb = theme::LINE;
+const SURFACE: Rgb = theme::SCREEN;
+const GRID: Rgb = theme::PANEL_2;
+const ACCENT: Rgb = theme::LIME;
+const ACCENT_DIM: Rgb = theme::VIOLET;
+const TEXT: Rgb = theme::TEXT;
+const DIM: Rgb = theme::MUTED;
 
 /// Every field of the draft's cards, card after card: the index a
 /// [`Id::SynthField`] names.
