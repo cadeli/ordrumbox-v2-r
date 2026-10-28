@@ -103,6 +103,27 @@ pub fn save_master(path: &Path, master: &ordrumbox_engine::MasterSettings) -> io
     write_atomic(path, &(json::Value::Object(settings).to_json_pretty(2) + "\n"))
 }
 
+/// The synth presets, once edited (`generated_sounds.json` format).
+pub fn synths_path() -> Option<PathBuf> {
+    Some(user_dir()?.join("generated_sounds.json"))
+}
+
+/// The synth presets saved, if there are some (an unreadable file is an error).
+pub fn load_synths(path: &Path) -> Result<Option<ordrumbox_engine::SynthPresets>, String> {
+    match fs::read_to_string(path) {
+        Ok(text) => json::parse(&text)
+            .map(|v| Some(ordrumbox_engine::SynthPresets::from_json(&v)))
+            .map_err(|e| format!("{}: {e}", path.display())),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(format!("{}: {e}", path.display())),
+    }
+}
+
+/// Write the synth presets.
+pub fn save_synths(path: &Path, synths: &ordrumbox_engine::SynthPresets) -> io::Result<()> {
+    write_atomic(path, &(synths.to_json().to_json_pretty(2) + "\n"))
+}
+
 /// The kits, once edited.
 pub fn kits_path() -> Option<PathBuf> {
     Some(user_dir()?.join("kits.json"))

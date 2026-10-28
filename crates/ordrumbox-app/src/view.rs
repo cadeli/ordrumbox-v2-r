@@ -44,6 +44,8 @@ const ROLL_HELP: &str =
 /// The same in the output panel.
 const OUTPUT_HELP: &str =
     "OUTPUT   TAB: controls   drag, wheel, arrows: change   right-click: type a value   F5 or ESC: grid";
+/// The same in the synth editor.
+const SYNTH_HELP: &str = "SYNTH   TAB: controls   drag, wheel: knobs   click: waves, lists, power   F6 or ESC: grid";
 /// The same in the kit editor.
 const KIT_HELP: &str =
     "KIT EDITOR   UP DOWN: sample   TAB: controls   ENTER: hear   DEL: remove   N: normalize   ESC: close";
@@ -90,6 +92,8 @@ pub struct View<'a> {
     pub piano_roll: Option<(RollView<'a>, String)>,
     /// The output panel, when shown (it takes the place of the grid).
     pub output: Option<OutputView>,
+    /// The synth editor is shown (the session paints it).
+    pub synth: bool,
     /// Width kept on the right (for the track editor).
     pub right: i32,
 }
@@ -442,6 +446,8 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
         ROLL_HELP
     } else if view.output.is_some() {
         OUTPUT_HELP
+    } else if view.synth {
+        SYNTH_HELP
     } else {
         HELP
     };
@@ -453,6 +459,8 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
     } else if let Some(kit) = &view.kit_view {
         let layout = KitLayout::new(canvas.width(), canvas.height(), scale, view.status.len());
         draw_kit(canvas, kit, &layout);
+    } else if view.synth {
+        // Painted by the session (`draw_synth`).
     } else if let Some(out) = &view.output {
         output::draw(canvas, out, &OutputLayout::new(canvas.width(), scale));
     } else if let Some((roll, title)) = &view.piano_roll {
@@ -685,6 +693,7 @@ mod tests {
                 arrangement: None,
                 piano_roll: None,
                 output: None,
+                synth: false,
                 right: 300,
                 cursor: Some(Cursor { track: 0, beat: 1, step: 2 }),
                 selected: Some((0, 0)),
