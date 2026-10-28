@@ -166,6 +166,8 @@ pub struct Session {
     show_track_editor: bool,
     /// Smoothed per-track levels for the VU meter stripe.
     track_levels: Vec<f32>,
+    /// Current page of the pattern grid (BEATS_PER_PAGE beats).
+    current_page: usize,
     /// The widget with the keyboard focus.
     focus: Option<Id>,
     /// A knob or slider being dragged.
@@ -426,6 +428,7 @@ impl Session {
             editors: EditorState::default(),
             show_track_editor: true,
             track_levels: Vec::new(),
+            current_page: 0,
             focus: None,
             drag: None,
             dropdown: None,
@@ -458,6 +461,11 @@ impl Session {
 
     pub fn status_lines(&self) -> usize {
         self.status.len()
+    }
+
+    /// Current page of the pattern grid.
+    pub fn current_page(&self) -> usize {
+        self.current_page
     }
 
     /// The window split for `size` (a real window size): the main editor
@@ -600,6 +608,7 @@ impl Session {
                 self.deselect();
                 self.edited();
                 self.message = message;
+                self.current_page = 0;
             }
             Err(reason) => self.message = format!("{name}: {reason}"),
         }
@@ -1455,6 +1464,7 @@ impl Session {
         self.pattern_index = self.editor.generate_pattern(&self.scales, &mut || rng.next_f64());
         self.deselect();
         self.edited();
+        self.current_page = 0;
         if let Some(pattern) = self.pattern() {
             let genre = pattern.extra.get("_autoGenGenre").and_then(|g| g.as_str()).unwrap_or_default();
             self.message = format!("generated {} ({genre})", pattern.name.as_deref().unwrap_or_default());
@@ -1514,6 +1524,7 @@ impl Session {
         self.pattern_index = self.editor.add_pattern(None);
         self.deselect();
         self.edited();
+        self.current_page = 0;
     }
 
     pub fn duplicate_pattern(&mut self) {
@@ -1521,6 +1532,7 @@ impl Session {
             self.pattern_index = index;
             self.deselect();
             self.edited();
+            self.current_page = 0;
         }
     }
 
@@ -1634,6 +1646,22 @@ impl Session {
             }
             _ => library.songs.get(self.editor.selected_song()).map(|s| format!("song {}", s.name)),
         };
+        // Auto-page: keep the cursor / playhead on the current page.
+        let beat_count = self.pattern().map(|p| p.beat_count.max(1)).unwrap_or(1);
+        let page_count = (beat_count as usize).div_ceil(view::BEATS_PER_PAGE as usize).max(1);
+        let cursor_page = self.cursor.map(|c| (c.beat.max(0) as usize) / view::BEATS_PER_PAGE as usize);
+        let playhead_page = if self.playing() {
+            self.controller.as_ref().and_then(Controller::position).map(|p| {
+                let frac = p.frame as f64 / p.frames.max(1) as f64;
+                let global_beat = (frac * beat_count as f64).floor() as usize;
+                global_beat / view::BEATS_PER_PAGE as usize
+            })
+        } else {
+            None
+        };
+        let new_page = playhead_page.or(cursor_page).unwrap_or(self.current_page);
+        self.current_page = new_page.min(page_count.saturating_sub(1));
+
         // Smoothed per-track levels for the VU meter stripe (peak-hold + decay).
         let raw_levels = self.controller.as_ref().map(|c| c.levels()).unwrap_or_default();
         if self.track_levels.len() < raw_levels.len() {
@@ -1668,6 +1696,7 @@ impl Session {
             pattern_count: library.patterns.len(),
             kit_view: self.kit_view(layout.details_top),
             right: layout.right,
+            current_page: self.current_page,
             levels: self.track_levels.clone(),
             playhead: position.filter(|_| song_mode.is_none()).map(|p| p.frame as f64 / p.frames.max(1) as f64),
             song: song.as_deref(),

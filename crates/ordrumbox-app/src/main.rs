@@ -200,7 +200,7 @@ impl App {
             return;
         }
         let Some(pattern) = self.session.pattern() else { return };
-        let layout = Layout::new(body.main_w, body.editor_h, scale, pattern, self.session.status_lines());
+        let layout = Layout::new(body.main_w, body.editor_h, scale, pattern, self.session.status_lines(), self.session.current_page());
         if let Some(hit) = layout.hit(pattern, x, y) {
             self.session.click(hit);
             self.request_redraw();

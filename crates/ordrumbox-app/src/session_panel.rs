@@ -173,7 +173,7 @@ impl Session {
         } else if self.workspace == Workspace::Synth {
             self.synth_items(&mut layout, (width, height, scale));
         } else if let Some(pattern) = self.pattern() {
-            let grid = Layout::new(body.main_w, body.editor_h, scale, pattern, self.status.len());
+            let grid = Layout::new(body.main_w, body.editor_h, scale, pattern, self.status.len(), self.current_page);
             let spec = Spec::slider(0.0, 1.0, 0.01, 1.0);
             for (t, track) in pattern.tracks.iter().enumerate().take(grid.tracks()) {
                 let kind = Kind::Value { spec, value: track.velocity, label: None, text: String::new(), lfo: false };
@@ -577,7 +577,7 @@ impl Session {
         let scale = size.2;
         let hover = match self.pattern() {
             Some(pattern) if self.kit_editor.is_none() && self.workspace == Workspace::Grid && self.drag.is_none() => {
-                match Layout::new(body.main_w, body.editor_h, scale, pattern, self.status.len()).hit(pattern, x, y) {
+                match Layout::new(body.main_w, body.editor_h, scale, pattern, self.status.len(), self.current_page).hit(pattern, x, y) {
                     Some(view::Hit::Cell { track, beat, step }) => Some((track, beat, step)),
                     _ => None,
                 }
@@ -606,7 +606,7 @@ impl Session {
         let Some(track) = pattern.tracks.get(t) else { return };
         let Some(note) = track.notes.iter().find(|n| n.beat == beat && n.beat_step == step) else { return };
         let body = view::Body::new(canvas.width(), canvas.height(), scale, right, self.status.len());
-        let layout = Layout::new(body.main_w, body.editor_h, scale, pattern, self.status.len());
+        let layout = Layout::new(body.main_w, body.editor_h, scale, pattern, self.status.len(), self.current_page);
         let cell = layout.cell_rect(t, beat, step, track.steps_per_beat);
         view::draw_tooltip(canvas, &editors::note_tooltip(note, track.pitch), cell, scale);
     }
