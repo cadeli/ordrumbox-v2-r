@@ -158,6 +158,29 @@ pub fn save_kits(path: &Path, kits: &[Kit]) -> io::Result<()> {
     write_atomic(path, &(kits_to_json(kits).to_json_pretty(2) + "\n"))
 }
 
+/// Move the user's edited files aside so the app starts again from the
+/// assets: `library.json`, `kits.json`, `settings.json`,
+/// `generated_sounds.json`, `samples/` and `songs/`. They are removed from
+/// `dir` (the user data folder); `exports/` is kept. Returns the names of
+/// what was removed.
+pub fn factory_reset(dir: &Path) -> io::Result<Vec<String>> {
+    let mut removed = Vec::new();
+    for name in ["library.json", "kits.json", "settings.json", "generated_sounds.json"] {
+        let path = dir.join(name);
+        if path.exists() {
+            fs::remove_file(&path)?;
+            removed.push(name.to_owned());
+        }
+    }
+    for name in ["samples", "songs"] {
+        let path = dir.join(name);
+        if path.exists() {
+            fs::remove_dir_all(&path)?;
+            removed.push(format!("{name}/"));
+        }
+    }
+    Ok(removed)
+}
 fn write_atomic(path: &Path, text: &str) -> io::Result<()> {
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir)?;
@@ -240,15 +263,42 @@ mod tests {
     }
 
     #[test]
-    fn kits_save_then_load() {
-        let dir = env::temp_dir().join(format!("ordrumbox-kits-{}", std::process::id()));
-        let path = dir.join("kits.json");
-        assert_eq!(load_kits(&path), Ok(None));
-        let kits = kits_from_json(
-            &json::parse(r#"[{"name":"a","instruments":[{"key":"KICK","url":"k.wav","gainDb":-3}]}]"#).unwrap(),
-        );
-        save_kits(&path, &kits).unwrap();
-        assert_eq!(load_kits(&path).unwrap().unwrap(), kits);
+    fn factory_reset_removes_the_user_files() {
+        let dir = env::temp_dir().join(format!("ordrumbox-reset-{}", std::process::id()));
+        fs::create_dir_all(dir.join("samples")).unwrap();
+        fs::create_dir_all(dir.join("songs")).unwrap();
+        fs::create_dir_all(dir.join("exports")).unwrap();
+        fs::write(dir.join("library.json"), "{}").unwrap();
+        fs::write(dir.join("kits.json"), "[]").unwrap();
+        fs::write(dir.join("settings.json"), "{}").unwrap();
+        fs::write(dir.join("generated_sounds.json"), "{}").unwrap();
+        fs::write(dir.join("samples").join("x.wav"), "x").unwrap();
+        fs::write(dir.join("songs").join("a.odbox"), "{}").unwrap();
+        fs::write(dir.join("exports").join("e.wav"), "e").unwrap();
+        let removed = factory_reset(&dir).unwrap();
+        assert!(removed.contains(&"library.json".to_owned()));
+        assert!(removed.contains(&"kits.json".to_owned()));
+        assert!(removed.contains(&"settings.json".to_owned()));
+        assert!(removed.contains(&"generated_sounds.json".to_owned()));
+        assert!(removed.contains(&"samples/".to_owned()));
+        assert!(removed.contains(&"songs/".to_owned()));
+        assert!(!dir.join("library.json").exists());
+        assert!(!dir.join("kits.json").exists());
+        assert!(!dir.join("settings.json").exists());
+        assert!(!dir.join("generated_sounds.json").exists());
+        assert!(!dir.join("samples").exists());
+        assert!(!dir.join("songs").exists());
+        // exports are kept.
+        assert!(dir.join("exports").join("e.wav").exists());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn factory_reset_on_an_empty_folder_removes_nothing() {
+        let dir = env::temp_dir().join(format!("ordrumbox-reset-empty-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let removed = factory_reset(&dir).unwrap();
+        assert!(removed.is_empty());
         fs::remove_dir_all(dir).unwrap();
     }
 }

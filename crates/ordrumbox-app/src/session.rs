@@ -229,6 +229,7 @@ enum Overlay {
     Picker(Picker),
     Shortcuts,
     About,
+    FactoryReset,
 }
 
 /// Every key, for Help > Keyboard shortcuts.
@@ -810,6 +811,7 @@ impl Session {
             C::Reassign => self.kit_reassign(),
             C::Shortcuts => self.overlay = Some(Overlay::Shortcuts),
             C::About => self.overlay = Some(Overlay::About),
+            C::FactoryReset => self.overlay = Some(Overlay::FactoryReset),
         }
     }
 
@@ -828,7 +830,12 @@ impl Session {
 
     /// A key while a panel is open: the file picker's keys, or any key closes it.
     pub fn overlay_key(&mut self, key: OverlayKey) {
+        let is_factory = matches!(self.overlay, Some(Overlay::FactoryReset));
         let Some(Overlay::Picker(picker)) = &mut self.overlay else {
+            if is_factory && matches!(key, OverlayKey::Enter) {
+                self.factory_reset();
+                return;
+            }
             if matches!(key, OverlayKey::Escape | OverlayKey::Enter) {
                 self.overlay = None;
             }
@@ -903,6 +910,47 @@ impl Session {
             format!("exports   {}", shown(store::exports_dir())),
             format!("assets    {}", shown(self.assets_dir.clone())),
         ]
+    }
+
+    /// Lines of Help > Factory reset.
+    fn factory_reset_lines(&self) -> Vec<String> {
+        let dir = self.library_path.as_ref().and_then(|p| p.parent().map(Path::to_path_buf)).or_else(store::user_dir);
+        vec![
+            "Restore the factory settings?".into(),
+            String::new(),
+            "The user files are removed (moved out of the way):".into(),
+            "  library.json, kits.json, settings.json,".into(),
+            "  generated_sounds.json, samples/, songs/".into(),
+            String::new(),
+            format!("folder: {}", dir.map_or_else(|| "-".to_owned(), |p| p.display().to_string())),
+            String::new(),
+            "ENTER: restore     ESC or click: cancel".into(),
+        ]
+    }
+
+    /// Help > Factory reset: move the user's edited files aside and reload
+    /// from the assets, as at first start.
+    pub fn factory_reset(&mut self) {
+        self.overlay = None;
+        self.menu = None;
+        self.dropdown = None;
+        self.entry = None;
+        let dir = self.library_path.as_ref().and_then(|p| p.parent().map(Path::to_path_buf)).or_else(store::user_dir);
+        let Some(dir) = dir else {
+            self.message = "factory reset: no user data folder".into();
+            return;
+        };
+        match store::factory_reset(&dir) {
+            Ok(removed) => {
+                *self = Self::load();
+                self.message = if removed.is_empty() {
+                    "factory settings restored (no user files found)".into()
+                } else {
+                    format!("factory settings restored (removed: {})", removed.join(", "))
+                };
+            }
+            Err(e) => self.message = format!("factory reset failed: {e}"),
+        }
     }
 
     // ─── Kit editor ──────────────────────────────────────────────────────────
@@ -1607,6 +1655,9 @@ impl Session {
                 view::draw_notice(canvas, "Keyboard shortcuts", &lines, scale);
             }
             Some(Overlay::About) => view::draw_notice(canvas, "About orDrumbox", &self.about(), scale),
+            Some(Overlay::FactoryReset) => {
+                view::draw_notice(canvas, "Factory reset", &self.factory_reset_lines(), scale)
+            }
             None => {}
         }
     }

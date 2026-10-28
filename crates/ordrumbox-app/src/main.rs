@@ -649,6 +649,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok("kit") => session.toggle_kit_editor(),
         Ok("comp") => session.output_activate(panel::Id::OutTab(1)),
         Ok("flt") => session.output_activate(panel::Id::OutTab(2)),
+        Ok("reset") => session.run(Command::FactoryReset),
         _ => {}
     }
     let mut app = App {

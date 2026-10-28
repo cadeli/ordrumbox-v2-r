@@ -1371,4 +1371,15 @@ mod tests {
         strip(s.body(SIZE).output, &layout);
         assert!(layout.right > 0);
     }
+
+    #[test]
+    fn factory_reset_opens_a_confirmation_overlay() {
+        let mut s = session();
+        assert!(!s.overlay_open());
+        s.run(Command::FactoryReset);
+        assert!(s.overlay_open());
+        // Esc cancels without touching anything.
+        s.overlay_key(OverlayKey::Escape);
+        assert!(!s.overlay_open());
+    }
 }
