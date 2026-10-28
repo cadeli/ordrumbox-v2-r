@@ -254,6 +254,17 @@ impl App {
         let shift = self.modifiers.shift_key();
         let control = self.modifiers.control_key() || self.modifiers.super_key();
         let alt = self.modifiers.alt_key();
+        // Space plays or stops wherever the focus is (a button, a knob, an open
+        // list…), except while writing text: an open entry keeps it (it types a
+        // space). Menus and the file picker are modal and take it first.
+        if code == KeyCode::Space && !event.repeat && !control && !self.session.entry_open() {
+            if shift {
+                self.session.toggle_play_song();
+            } else {
+                self.session.toggle_play();
+            }
+            return self.request_redraw();
+        }
         if self.widget_key(event, code, shift || alt, control) {
             return self.request_redraw();
         }
@@ -274,22 +285,16 @@ impl App {
                 KeyCode::KeyN => s.kit_normalize(),
                 KeyCode::KeyR => s.kit_reassign(),
                 KeyCode::KeyE => s.kit_export(),
-                KeyCode::Space if !event.repeat && shift => s.toggle_play_song(),
-                KeyCode::Space if !event.repeat => s.toggle_play(),
                 _ => return,
             }
         } else if s.synth_open() {
             match code {
                 KeyCode::Escape => s.toggle_synth(),
-                KeyCode::Space if !event.repeat && shift => s.toggle_play_song(),
-                KeyCode::Space if !event.repeat => s.toggle_play(),
                 _ => return,
             }
         } else if s.output_open() {
             match code {
                 KeyCode::Escape => s.toggle_output(),
-                KeyCode::Space if !event.repeat && shift => s.toggle_play_song(),
-                KeyCode::Space if !event.repeat => s.toggle_play(),
                 _ => return,
             }
         } else if s.piano_roll_open() {
@@ -301,8 +306,6 @@ impl App {
                 KeyCode::ArrowDown => s.roll_arrow(Move::Down, shift),
                 KeyCode::Enter | KeyCode::NumpadEnter => s.roll_enter(),
                 KeyCode::Delete | KeyCode::Backspace => s.roll_delete(),
-                KeyCode::Space if !event.repeat && shift => s.toggle_play_song(),
-                KeyCode::Space if !event.repeat => s.toggle_play(),
                 _ => return,
             }
         } else if s.song_view_open() {
@@ -312,7 +315,6 @@ impl App {
                 KeyCode::ArrowRight => s.move_song_cursor(1),
                 KeyCode::ArrowUp => s.step_pattern(-1),
                 KeyCode::ArrowDown => s.step_pattern(1),
-                KeyCode::Space if !event.repeat => s.toggle_play(),
                 _ => return,
             }
         } else if let Some(row) = ROW_DIGITS.iter().position(|&k| k == code) {
@@ -322,8 +324,6 @@ impl App {
         } else {
             let tempo = if shift { 10.0 } else { 1.0 };
             match code {
-                KeyCode::Space if !event.repeat && shift => s.toggle_play_song(),
-                KeyCode::Space if !event.repeat => s.toggle_play(),
                 KeyCode::Minus | KeyCode::NumpadSubtract => s.step_tempo(-tempo),
                 KeyCode::Equal | KeyCode::NumpadAdd => s.step_tempo(tempo),
                 KeyCode::ArrowLeft if shift => s.nudge(Move::Left),

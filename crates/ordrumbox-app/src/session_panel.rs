@@ -236,6 +236,12 @@ impl Session {
         self.dropdown.is_some() || self.entry.is_some()
     }
 
+    /// A number or text entry is open. It is the one place that keeps Space:
+    /// a text entry types a space in it.
+    pub fn entry_open(&self) -> bool {
+        self.entry.is_some()
+    }
+
     /// The url of the sample track `t` plays (none for a synth track).
     /// What track `t` plays: what the player assigned it, else its first pick.
     fn track_sound(&self, t: usize) -> TrackSound {
