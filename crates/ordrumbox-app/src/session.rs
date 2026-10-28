@@ -1692,8 +1692,6 @@ impl Session {
             output: self.output_view(),
             synth: self.synth_open(),
             genre: pattern.and_then(|p| p.extra.get("_autoGenGenre")?.as_str()),
-            pattern_index: self.pattern_index,
-            pattern_count: library.patterns.len(),
             kit_view: self.kit_view(layout.details_top),
             right: layout.right,
             current_page: self.current_page,
