@@ -156,7 +156,19 @@ impl KitLayout {
         let list_top = top + row;
         let list_rows = ((bottom - top) / (row * 4)).clamp(3, 10);
         let detail_y = list_top + list_rows * row + 8 * scale;
-        Self { scale, top, list_top, bottom, left: margin, list_width, row, detail_x: margin, detail_y, width, list_rows }
+        Self {
+            scale,
+            top,
+            list_top,
+            bottom,
+            left: margin,
+            list_width,
+            row,
+            detail_x: margin,
+            detail_y,
+            width,
+            list_rows,
+        }
     }
 
     /// Where the selected sample's selects and knobs go.
@@ -813,8 +825,7 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
         let cur = (frac * steps as f64).floor() as i64;
         if (0..steps).contains(&cur) {
             let has_base = note_at.get(cur as usize).copied().flatten().is_some();
-            let has_ghost = ghosts.iter().any(|(p, _, _)| *p == cur)
-                || loop_ghosts.iter().any(|(p, _)| *p == cur);
+            let has_ghost = ghosts.iter().any(|(p, _, _)| *p == cur) || loop_ghosts.iter().any(|(p, _)| *p == cur);
             if has_base || has_ghost {
                 let (x, width) = cell(cur);
                 let base_color = note_at
@@ -830,7 +841,11 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
             }
         }
     }
-    if let Some(loop_at) = track.loop_at_step.map(i64::from).filter(|&l| l > 0 && l < i64::from(track.steps_per_beat) * i64::from(track.beat_count)) {
+    if let Some(loop_at) = track
+        .loop_at_step
+        .map(i64::from)
+        .filter(|&l| l > 0 && l < i64::from(track.steps_per_beat) * i64::from(track.beat_count))
+    {
         let local = loop_at - start;
         if (0..steps).contains(&local) {
             let (x, _) = cell(local);

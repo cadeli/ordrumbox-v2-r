@@ -200,7 +200,14 @@ impl App {
             return;
         }
         let Some(pattern) = self.session.pattern() else { return };
-        let layout = Layout::new(body.main_w, body.editor_h, scale, pattern, self.session.status_lines(), self.session.current_page());
+        let layout = Layout::new(
+            body.main_w,
+            body.editor_h,
+            scale,
+            pattern,
+            self.session.status_lines(),
+            self.session.current_page(),
+        );
         if let Some(hit) = layout.hit(pattern, x, y) {
             self.session.click(hit);
             self.request_redraw();
@@ -281,6 +288,14 @@ impl App {
         let s = &mut self.session;
         if control {
             return;
+        }
+        // Mute (1-9) and hear (Q-P) a track in every view, as in the JS; the
+        // kit editor keeps its own letters (N, R, E).
+        let kit_letter = s.kit_editor_open() && matches!(code, KeyCode::KeyN | KeyCode::KeyR | KeyCode::KeyE);
+        if let Some(row) = ROW_DIGITS.iter().position(|&k| k == code) {
+            s.toggle_row(row, if shift { "solo" } else { "mute" });
+        } else if let Some(row) = ROW_LETTERS.iter().position(|&k| k == code).filter(|_| !kit_letter) {
+            s.audition_row(row);
         } else if s.kit_editor_open() {
             match code {
                 KeyCode::Escape => s.toggle_kit_editor(),
@@ -318,10 +333,6 @@ impl App {
                 KeyCode::ArrowDown => s.step_pattern(1),
                 _ => return,
             }
-        } else if let Some(row) = ROW_DIGITS.iter().position(|&k| k == code) {
-            s.toggle_row(row, if shift { "solo" } else { "mute" });
-        } else if let Some(row) = ROW_LETTERS.iter().position(|&k| k == code) {
-            s.audition_row(row);
         } else {
             let tempo = if shift { 10.0 } else { 1.0 };
             match code {
@@ -444,7 +455,7 @@ fn shortcut(code: KeyCode, shift: bool, control: bool) -> Option<Command> {
             KeyCode::KeyC => C::CopyStep,
             KeyCode::KeyV if shift => C::PasteTrack,
             KeyCode::KeyV => C::Paste,
-            KeyCode::KeyS => C::Save,
+            KeyCode::KeyS => C::ExportPatternJson,
             KeyCode::KeyO => C::ImportMidi,
             KeyCode::KeyE if shift => C::ExportSongWav,
             KeyCode::KeyE => C::ExportWav,
@@ -479,6 +490,9 @@ fn shortcut(code: KeyCode, shift: bool, control: bool) -> Option<Command> {
             KeyCode::KeyF => C::SelectRandomPattern,
             KeyCode::KeyG => C::SelectRandomDrumkit,
             KeyCode::KeyV => C::ToggleVus,
+            KeyCode::KeyH => C::ConvertToSynth,
+            KeyCode::KeyJ => C::AutoAssignAll,
+            KeyCode::KeyK => C::RandomSamples,
             KeyCode::KeyD => C::GenerateDrums,
             KeyCode::KeyS => C::GenerateBass,
             KeyCode::KeyA => C::GenerateChords,
