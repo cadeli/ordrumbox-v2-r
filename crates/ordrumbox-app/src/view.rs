@@ -72,8 +72,6 @@ pub struct Cursor {
 #[derive(Debug)]
 pub struct View<'a> {
     pub pattern: Option<&'a Pattern>,
-    pub pattern_index: usize,
-    pub pattern_count: usize,
     /// Playhead, as a fraction of the pattern length.
     pub playhead: Option<f64>,
     /// The selected song, or the song playing and where.
@@ -469,12 +467,11 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
     };
     if view.pattern.is_some() {
         label(canvas, c.bpm, "BPM");
-        label(canvas, c.pattern, &format!("PATTERN {}/{}", view.pattern_index + 1, view.pattern_count));
-        label(canvas, c.beats, "BEATS");
         if let Some(pattern) = view.pattern {
             let pages = (pattern.beat_count.max(1) as usize).div_ceil(BEATS_PER_PAGE as usize).max(1);
-            canvas.text(c.pattern.x + c.pattern.w + 8 * scale, top, &format!("Page {}/{}", view.current_page + 1, pages), scale, DIM);
+            label(canvas, c.pattern, &format!("Page {}/{}", view.current_page + 1, pages));
         }
+        label(canvas, c.beats, "BEATS");
         label(canvas, c.kit, "KIT");
         let generate = match view.genre {
             Some(genre) => format!("GENERATE {genre}"),
@@ -870,8 +867,6 @@ mod tests {
             let mut canvas = Canvas::new(&mut pixels, w, h);
             let view = View {
                 pattern: library.patterns.first(),
-                pattern_index: 0,
-                pattern_count: 1,
                 playhead: Some(0.5),
                 song: Some("SONG demo  measure 3/66"),
                 genre: Some("house"),
