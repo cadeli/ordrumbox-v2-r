@@ -184,12 +184,24 @@ last change to `settings.json` in the user data folder (`settings.master`,
 as the JS keeps them; the file's other settings are kept), and loaded at
 start. The grid's master volume is this volume.
 
-The header has the pattern list and the kit list (the JS toolbar's two
-selects): a click opens them, the wheel or the arrows move, **Enter** picks.
-Then the JS toolbar's transport and its pattern settings panel: **Play** /
-**Stop**, the tempo knob (20–250, as the JS slider), the **Beats** list
-(1–16), and **Drum**, **Bass**, **Chords** (lit while their tracks are in
-auto mode: the D, S, A keys). **Pattern › Rename pattern...** and **Pattern
+The header, under the menu bar, is a row of labelled groups after the logo
+(the JS toolbar and its pattern settings panel): **PLAY** / **STOP**, **BPM**
+(the tempo knob, 20–250 as the JS slider), **PATTERN** (the pattern list,
+and where it is in the library), **BEATS** (1–16), **KIT** (the kit list),
+**GENERATE** (**DRUM**, **BASS**, **CHORDS**, lit while their tracks are in
+auto mode: the D, S, A keys; then the genre) and **VIEW** (**GRID**,
+**ROLL**, **SONG**, **SYNTH**, **OUT**: the view shown is lit, as F3–F6 do).
+A list opens on a click; the wheel or the arrows move, **Enter** picks. The
+line under it shows the last action, undo and redo, and the song.
+
+The look (`theme.rs`, every colour of the app): a deep indigo ground,
+panels a step lighter, and neon accents with one role each — pink for
+titles, the selection and slider handles, cyan for labels, sliders and
+knobs, lime for play, what is on and the playhead, yellow for values, the
+active tab and button; each track has its colour (pink, cyan, yellow,
+violet, orange, lime, round again): its stripe in the grid, its notes (by
+velocity), its notes in the piano roll, its clips in the song panel. Flat
+colours, no glow. This is a redesign: the JS app looks otherwise. **Pattern › Rename pattern...** and **Pattern
 description...** edit the pattern's name and description; **Pattern ›
 Compact tracks** (the JS tools panel's button) shortens every track whose
 notes repeat to its shortest loop — the loop point set, the notes past it
@@ -210,6 +222,9 @@ sample, import a folder as a kit, load a kit mapping) open the built-in file pic
 parent folder, **Esc** to cancel. It lists only the files the command takes;
 on Windows the drives are listed above a drive's root. It starts in the home
 folder, then where it last chose.
+
+Under each track's name, the grid shows what it plays: its sample (`kit/file`,
+as assigned, perhaps from another kit) or its synth preset (`synth BASS5`).
 
 Mouse: a click on an empty step adds a note, on a note selects it (and plays
 it), on the selected note deletes it; **M**/**S** boxes mute/solo; a click on

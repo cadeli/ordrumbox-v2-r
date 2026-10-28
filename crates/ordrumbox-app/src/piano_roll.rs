@@ -14,6 +14,7 @@ use ordrumbox_core::{Note, Track};
 use crate::canvas::{Canvas, Rgb, text_width};
 use crate::note_drag::{MIDDLE_C, MIDI_MIN, midi_name};
 use crate::panel::Rect;
+use crate::theme;
 use crate::view;
 
 /// Height of a key row, px per scale unit (`NOTE_HEIGHT`).
@@ -28,28 +29,27 @@ pub const TOTAL_KEYS: i32 = 97;
 /// The black keys, by pitch class.
 const BLACK_KEYS: [i32; 5] = [1, 3, 6, 8, 10];
 
-const BACKGROUND: Rgb = 0x0016_1619;
-const ROW_WHITE: Rgb = 0x001E_1E25;
-const ROW_BLACK: Rgb = 0x0018_181E;
-const COLUMN_BEAT: Rgb = 0x0044_4452;
-const COLUMN_HALF: Rgb = 0x0030_303B;
-const COLUMN_STEP: Rgb = 0x0026_262F;
-const OCTAVE: Rgb = 0x0038_3845;
-const KEY_WHITE: Rgb = 0x00D8_D8DE;
-const KEY_BLACK: Rgb = 0x0030_3038;
-const TEXT: Rgb = 0x00E6_E6EA;
-const DIM: Rgb = 0x0080_8090;
+const BACKGROUND: Rgb = theme::BG;
+const ROW_WHITE: Rgb = theme::CELL;
+const ROW_BLACK: Rgb = theme::PANEL_2;
+const COLUMN_BEAT: Rgb = theme::LINE;
+const COLUMN_HALF: Rgb = theme::CELL_BEAT;
+const COLUMN_STEP: Rgb = theme::PANEL_2;
+const OCTAVE: Rgb = theme::LINE;
+const KEY_WHITE: Rgb = theme::TEXT;
+const KEY_BLACK: Rgb = theme::PANEL;
+const TEXT: Rgb = theme::TEXT;
+const DIM: Rgb = theme::MUTED;
 
-const NOTE: Rgb = 0x00F2_A93B;
-const PLAYING: Rgb = 0x005C_D67A;
-const SELECTED: Rgb = 0x00FF_FFFF;
-const CURSOR: Rgb = 0x006A_B7FF;
-const LOOP_MARK: Rgb = 0x00B0_B0C0;
-const PLAYHEAD: Rgb = 0x00FF_FFFF;
-const GHOST_RETRIGGER: Rgb = 0x0080_6030;
-const GHOST_EUCLIDEAN: Rgb = 0x0040_7050;
-const TRIG_RAND: Rgb = 0x00B0_7CFF;
-const TRIG_FIXED: Rgb = 0x006A_B7FF;
+const PLAYING: Rgb = theme::LIME;
+const SELECTED: Rgb = theme::WHITE;
+const CURSOR: Rgb = theme::CYAN;
+const LOOP_MARK: Rgb = theme::YELLOW;
+const PLAYHEAD: Rgb = theme::LIME;
+const GHOST_RETRIGGER: Rgb = theme::ORANGE;
+const GHOST_EUCLIDEAN: Rgb = theme::LIME;
+const TRIG_RAND: Rgb = theme::VIOLET;
+const TRIG_FIXED: Rgb = theme::CYAN;
 
 /// The MIDI note of row `row` (0: the lowest key).
 pub fn row_midi(row: i32) -> i32 {
@@ -75,6 +75,8 @@ fn note_opacity(velocity: f64) -> f64 {
 #[derive(Debug)]
 pub struct RollView<'a> {
     pub track: &'a Track,
+    /// The track's colour (its notes).
+    pub color: Rgb,
     /// The pattern's length, beats.
     pub beat_count: i32,
     /// Page shown.
@@ -337,7 +339,8 @@ pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &s
         let Some(r) = layout.note_rect(view, n) else { continue };
         let note = &view.track.notes[n];
         let lit = view.playhead.is_some_and(|step| view.sounding(n, step));
-        let color = mix(BACKGROUND, if lit { PLAYING } else { NOTE }, note_opacity(note.velocity.clamp(0.0, 1.0)));
+        let color =
+            theme::mix(BACKGROUND, if lit { PLAYING } else { view.color }, note_opacity(note.velocity.clamp(0.0, 1.0)));
         canvas.fill_rect(r.x, r.y, r.w, r.h, color);
         // The trigger kind (`noteTriggerKind`): probability wins over the cycle.
         let trig = if note.prob < 1.0 {
@@ -380,16 +383,6 @@ fn stroke(canvas: &mut Canvas, r: Rect, t: i32, color: Rgb) {
     canvas.fill_rect(r.x + r.w - t, r.y, t, r.h, color);
 }
 
-/// `from` blended towards `to` by `amount` (0–1), per channel.
-fn mix(from: Rgb, to: Rgb, amount: f64) -> Rgb {
-    let channel = |shift: u32| {
-        let a = f64::from((from >> shift) & 0xFF);
-        let b = f64::from((to >> shift) & 0xFF);
-        ((a + (b - a) * amount).round() as u32) << shift
-    };
-    channel(16) | channel(8) | channel(0)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -408,6 +401,7 @@ mod tests {
     fn view(track: &Track, page: i32, top_row: i32) -> RollView<'_> {
         RollView {
             track,
+            color: theme::PINK,
             beat_count: 6,
             page,
             top_row,

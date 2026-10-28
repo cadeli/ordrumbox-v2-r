@@ -13,6 +13,7 @@ use ordrumbox_engine::MasterSettings;
 use crate::canvas::{Canvas, Rgb, text_width};
 use crate::control::{Format, Spec};
 use crate::panel::Rect;
+use crate::theme;
 use crate::view;
 
 /// A master bus setting: its `settings.master` key, label, range, step and
@@ -200,15 +201,14 @@ impl OutputLayout {
     }
 }
 
-const SURFACE: Rgb = 0x0024_242E;
-const GRID: Rgb = 0x0038_3845;
-const MUTED: Rgb = 0x0080_8090;
-const ACCENT: Rgb = 0x00F2_A93B;
-const WARNING: Rgb = 0x00E8_6A5A;
-const SCOPE_BG: Rgb = 0x0008_1410;
-const SCOPE_GRID: Rgb = 0x0010_3030;
-const PHOSPHOR: Rgb = 0x0060_FF90;
-const TEXT: Rgb = 0x00E6_E6EA;
+const SURFACE: Rgb = theme::PANEL_2;
+const GRID: Rgb = theme::LINE;
+const MUTED: Rgb = theme::MUTED;
+const ACCENT: Rgb = theme::PINK;
+const WARNING: Rgb = theme::YELLOW;
+const SCOPE_BG: Rgb = theme::SCREEN;
+const SCOPE_GRID: Rgb = theme::PANEL_2;
+const PHOSPHOR: Rgb = theme::CYAN;
 
 /// What the output panel draws besides its controls.
 #[derive(Debug)]
@@ -221,7 +221,7 @@ pub struct OutputView {
 
 pub fn draw(canvas: &mut Canvas, view: &OutputView, layout: &OutputLayout) {
     let s = layout.scale;
-    canvas.text(layout.title.0, layout.title.1, "Master", s, TEXT);
+    canvas.text(layout.title.0, layout.title.1, "Master", s, ACCENT);
     match view.tab {
         0 => draw_spectrum(canvas, &view.spectrum, layout.spectrum, s),
         1 => {
@@ -301,8 +301,10 @@ fn draw_spectrum(canvas: &mut Canvas, bins: &[u8], r: Rect, s: i32) {
     for (i, &v) in bins.iter().take(count).enumerate() {
         let x = r.x + (i as i32 * r.w) / count as i32;
         let y = r.y + r.h - 1 - (i32::from(v) * (r.h - 1)) / 255;
+        // Low to high: pink, violet, cyan, lime, yellow.
+        let band = [theme::PINK, theme::VIOLET, PHOSPHOR, theme::LIME, theme::YELLOW][i * 5 / count.max(1)];
         if let Some(p) = previous {
-            line(canvas, p, (x, y), 2 * s, PHOSPHOR, None);
+            line(canvas, p, (x, y), 2 * s, band, None);
         }
         previous = Some((x, y));
     }
