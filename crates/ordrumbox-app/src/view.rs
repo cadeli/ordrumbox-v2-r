@@ -712,6 +712,18 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
             }
         }
     }
+    // Ghosts: the sub-events (retriggers, arpeggio steps, euclidean fills)
+    // a note produces, drawn smaller than the base note.
+    let span = ordrumbox_core::pattern_engine::SpanResolver::new(track);
+    let mut rng = ordrumbox_core::Rng::new(0);
+    let mut ghosts: Vec<(i64, ordrumbox_core::note_positions::SubKind, &Note)> = Vec::new();
+    for note in &track.notes {
+        for sub in ordrumbox_core::note_positions::sub_positions(note, track, steps, &span, &mut rng) {
+            if (0..steps).contains(&sub.pos) {
+                ghosts.push((sub.pos, sub.kind, note));
+            }
+        }
+    }
     for (step, note) in note_at.iter().enumerate() {
         let step = step as i64;
         let (x, width) = cell(step);
@@ -720,27 +732,34 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
         canvas.fill_rect(x, y, width, height, bg);
         if let Some(n) = note {
             let color = theme::note(note_color(n), n.velocity);
-            let small = n.retrigger_count > 1 || (n.rate - 1.0).abs() > 1e-9 || n.euclidean_fill > 0;
-            if small {
-                let iw = ((f64::from(width) * 0.5).round() as i32).max(1);
-                let ih = ((f64::from(height) * 0.5).round() as i32).max(1);
-                canvas.fill_rect(x + (width - iw) / 2, y + (height - ih) / 2, iw, ih, color);
-            } else {
-                canvas.fill_rect(x, y, width, height, color);
+            canvas.fill_rect(x, y, width, height, color);
+        }
+        // Ghosts on this step, drawn smaller (half size) and in a distinct colour.
+        for (gpos, gkind, gnote) in &ghosts {
+            if *gpos != step {
+                continue;
             }
+            let gcolor = match gkind {
+                ordrumbox_core::note_positions::SubKind::Euclidean => theme::YELLOW,
+                ordrumbox_core::note_positions::SubKind::Retrigger => theme::MUTED,
+            };
+            let color = theme::note(gcolor, gnote.velocity);
+            let iw = ((f64::from(width) * 0.5).round() as i32).max(1);
+            let ih = ((f64::from(height) * 0.5).round() as i32).max(1);
+            canvas.fill_rect(x + (width - iw) / 2, y + (height - ih) / 2, iw, ih, color);
         }
     }
-    // Flash the special (retrig/euclid) notes currently being played.
+    // Flash (with glow) the cells holding ghosts that are currently played.
     if let Some(frac) = view.playhead {
         let cur = (frac * steps as f64).floor() as i64;
-        if (0..steps).contains(&cur)
-            && let Some(Some(n)) = note_at.get(cur as usize)
-        {
-            let small = n.retrigger_count > 1 || (n.rate - 1.0).abs() > 1e-9 || n.euclidean_fill > 0;
-            if small {
+        if (0..steps).contains(&cur) {
+            let has_ghost = ghosts.iter().any(|(p, _, _)| *p == cur);
+            if has_ghost {
                 let (x, width) = cell(cur);
-                let flash = theme::mix(theme::note(note_color(n), n.velocity), theme::WHITE, 0.55);
-                canvas.fill_rect(x, y, width, height, flash);
+                let glow = theme::mix(theme::WHITE, theme::BG, 0.55);
+                canvas.fill_rect(x - 2 * gap, y - 2 * gap, width + 4 * gap, height + 4 * gap, glow);
+                let core = theme::mix(theme::WHITE, theme::YELLOW, 0.3);
+                canvas.fill_rect(x, y, width, height, core);
             }
         }
     }
