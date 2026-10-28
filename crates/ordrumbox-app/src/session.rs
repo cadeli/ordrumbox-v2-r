@@ -166,6 +166,8 @@ pub struct Session {
     show_track_editor: bool,
     /// Smoothed per-track levels for the VU meter stripe.
     track_levels: Vec<f32>,
+    /// Whether the VU meter stripe is shown.
+    show_vus: bool,
     /// Current page of the pattern grid (BEATS_PER_PAGE beats).
     current_page: usize,
     /// The widget with the keyboard focus.
@@ -237,7 +239,7 @@ enum Overlay {
 }
 
 /// Every key, for Help > Keyboard shortcuts.
-const SHORTCUTS: [&str; 50] = [
+const SHORTCUTS: [&str; 51] = [
     "MENUS",
     "  F10 or Alt             open the menus: Arrows move, Enter runs, Esc closes",
     "  F1 F2 F3 F4 F5 F6      this list, track editor, song, piano roll, grid, synth (Ctrl+K: kit editor)",
@@ -247,6 +249,7 @@ const SHORTCUTS: [&str; 50] = [
     "  Shift+Arrows           velocity (up/down), pitch (left/right) of the selected note",
     "  Delete                 clear the cursor step        Esc  deselect",
     "  1-9 / Shift+1-9        mute / solo track 1-9        Q-P  hear track 1-10",
+    "  F, G, V               random pattern, random drumkit, VU meters on/off",
     "PLAY",
     "  Space / Shift+Space    play or stop the pattern / the song",
     "  [ ] / Shift+[ ]        previous / next pattern / song (also PageUp PageDown)",
@@ -428,6 +431,7 @@ impl Session {
             editors: EditorState::default(),
             show_track_editor: true,
             track_levels: Vec::new(),
+            show_vus: true,
             current_page: 0,
             focus: None,
             drag: None,
@@ -671,6 +675,37 @@ impl Session {
         self.update_analysis();
     }
 
+    /// F: a random pattern.
+    pub fn select_random_pattern(&mut self) {
+        let count = self.editor.library().patterns.len();
+        if count == 0 {
+            return;
+        }
+        let idx = self.rng.below(count as u64) as usize;
+        self.pattern_index = idx;
+        self.deselect();
+        self.edited();
+        self.current_page = 0;
+        self.message = format!("pattern {}", self.pattern().and_then(|p| p.name.as_deref()).unwrap_or_default());
+    }
+
+    /// G: a random drumkit.
+    pub fn select_random_drumkit(&mut self) {
+        let count = self.kits.kits.len();
+        if count == 0 {
+            return;
+        }
+        let idx = self.rng.below(count as u64) as usize;
+        self.select_kit(idx);
+        self.message = format!("kit {}", self.kits.kits[self.kit_index].name);
+    }
+
+    /// V: show/hide the VU meters on the track stripes.
+    pub fn toggle_vus(&mut self) {
+        self.show_vus = !self.show_vus;
+        self.message = if self.show_vus { "VU meters on".into() } else { "VU meters off".into() };
+    }
+
     // ─── Menus and commands ──────────────────────────────────────────────────
 
     /// A view button (`view::VIEWS`): show that view, unless it is shown.
@@ -844,6 +879,9 @@ impl Session {
             C::ReplaceSample => self.open_picker(Purpose::ReplaceSample),
             C::ImportFolder => self.open_picker(Purpose::ImportFolder),
             C::Reassign => self.kit_reassign(),
+            C::SelectRandomPattern => self.select_random_pattern(),
+            C::SelectRandomDrumkit => self.select_random_drumkit(),
+            C::ToggleVus => self.toggle_vus(),
             C::Shortcuts => self.overlay = Some(Overlay::Shortcuts),
             C::About => self.overlay = Some(Overlay::About),
             C::FactoryReset => self.overlay = Some(Overlay::FactoryReset),
@@ -1696,6 +1734,7 @@ impl Session {
             right: layout.right,
             current_page: self.current_page,
             levels: self.track_levels.clone(),
+            show_vus: self.show_vus,
             playhead: if song_mode.is_some() {
                 None
             } else {
