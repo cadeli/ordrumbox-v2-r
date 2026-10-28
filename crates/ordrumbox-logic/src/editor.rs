@@ -1,6 +1,7 @@
 //! The library being edited and every edit the app makes to it
-//! (`src/logic/commands/`: note, track and pattern commands of the
-//! `Commander`), each one an undo step.
+//! (`src/logic/commands/`: note, track, pattern and song commands of the
+//! `Commander`), each one an undo step. The song (arrangement) commands are
+//! in `arrangement.rs`.
 //!
 //! Patterns, tracks and notes are addressed by index (the JS commands take
 //! object references). An edit that changes nothing records nothing.
@@ -16,8 +17,11 @@ use ordrumbox_core::pattern::{APPLICATION, URL};
 use ordrumbox_core::{Library, Note, Pattern, Scales, SetField, Track};
 
 use crate::generate::{self, AutoGen, MelodicKind, Options};
-use crate::history::{Change, History};
+use crate::history::{Change, History, Target};
 use crate::midi;
+
+#[path = "arrangement.rs"]
+mod arrangement;
 
 /// Longest pattern, beats (`MAX_BEATS`).
 pub const MAX_BEATS: i32 = 16;
@@ -71,6 +75,8 @@ fn pattern_name(pattern: &Pattern) -> &str {
 pub struct Editor {
     library: Library,
     history: History,
+    /// The arrangement the song panel edits (`selectedSongIdx`).
+    selected_song: usize,
     /// Bumped by every change (edits, undo, redo).
     revision: u64,
     started: Instant,
@@ -80,7 +86,14 @@ pub struct Editor {
 
 impl Editor {
     pub fn new(library: Library) -> Self {
-        Self { library, history: History::default(), revision: 0, started: Instant::now(), clock: None }
+        Self {
+            library,
+            history: History::default(),
+            selected_song: 0,
+            revision: 0,
+            started: Instant::now(),
+            clock: None,
+        }
     }
 
     pub fn library(&self) -> &Library {
@@ -107,14 +120,14 @@ impl Editor {
 
     /// Undo the last step; what it did.
     pub fn undo(&mut self) -> Option<String> {
-        let desc = self.history.undo(&mut self.library.patterns)?;
+        let desc = self.history.undo(Target { library: &mut self.library, selected_song: &mut self.selected_song })?;
         self.revision += 1;
         Some(desc)
     }
 
     /// Redo the last undone step; what it does.
     pub fn redo(&mut self) -> Option<String> {
-        let desc = self.history.redo(&mut self.library.patterns)?;
+        let desc = self.history.redo(Target { library: &mut self.library, selected_song: &mut self.selected_song })?;
         self.revision += 1;
         Some(desc)
     }

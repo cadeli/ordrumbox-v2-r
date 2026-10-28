@@ -12,6 +12,15 @@ use crate::canvas::{Canvas, Rgb, text_width};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Command {
     TrackEditor,
+    SongView,
+    NewSong,
+    RemoveSong,
+    RenameSong,
+    SongDescription,
+    SaveSong,
+    LoadSong,
+    ExportSong,
+    ImportSong,
     Save,
     ImportMidi,
     ExportWav,
@@ -117,6 +126,11 @@ pub struct MenuState {
     pub kit_index: usize,
     pub kit_editor: bool,
     pub track_editor: bool,
+    pub song_view: bool,
+    /// A folder to save songs in (Save song).
+    pub can_save_song: bool,
+    /// Song files saved (Load song).
+    pub saved_songs: bool,
     /// The kit editor has a sample selected.
     pub kit_sample: bool,
 }
@@ -186,6 +200,7 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
             title: "View",
             items: vec![
                 check("Track editor", "F2", C::TrackEditor, true, s.track_editor),
+                check("Song", "F3", C::SongView, true, s.song_view),
                 check("Kit editor", "Ctrl+K", C::KitEditor, true, s.kit_editor),
             ],
         },
@@ -227,11 +242,30 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
             items: vec![
                 check("Play pattern", "Space", C::PlayPattern, p, s.playing),
                 command("Play song", "Shift+Space", C::PlaySong, s.has_songs),
-                command("Previous song", "Shift+[", C::PreviousSong, s.has_songs),
-                command("Next song", "Shift+]", C::NextSong, s.has_songs),
                 Item::Separator,
                 check("Mute track", "1-9", C::Mute, track, mute),
                 check("Solo track", "Shift+1-9", C::Solo, track, solo),
+            ],
+        },
+        Menu {
+            title: "Song",
+            items: vec![
+                check("Song view", "F3", C::SongView, true, s.song_view),
+                Item::Separator,
+                command("Play song", "Shift+Space", C::PlaySong, s.has_songs),
+                Item::Separator,
+                command("New arrangement...", "", C::NewSong, true),
+                command("Remove arrangement", "", C::RemoveSong, s.has_songs),
+                command("Previous arrangement", "Shift+[", C::PreviousSong, s.has_songs),
+                command("Next arrangement", "Shift+]", C::NextSong, s.has_songs),
+                Item::Separator,
+                command("Rename song...", "", C::RenameSong, true),
+                command("Song description...", "", C::SongDescription, true),
+                Item::Separator,
+                command("Save song", "", C::SaveSong, s.can_save_song),
+                command("Load song...", "", C::LoadSong, s.saved_songs),
+                command("Export song", "", C::ExportSong, true),
+                command("Import song...", "", C::ImportSong, true),
             ],
         },
         Menu { title: "Kit", items: kits },
@@ -477,6 +511,31 @@ mod tests {
         assert_eq!(file.command(&menus), Some(Command::ImportMidi));
         assert_eq!(file.step(&menus, 1).command(&menus), Some(Command::ExportMidi));
         assert_eq!(file.switch(&menus, -1).menu, menus.len() - 1);
+    }
+
+    #[test]
+    fn the_song_menu_has_the_song_panel_commands() {
+        let menus = menus(&MenuState { has_songs: true, can_save_song: true, ..state() });
+        let song = menus.iter().find(|m| m.title == "Song").unwrap();
+        let commands: Vec<Command> = song.items.iter().filter_map(Item::runnable).collect();
+        use Command as C;
+        for command in [
+            C::SongView,
+            C::PlaySong,
+            C::NewSong,
+            C::RemoveSong,
+            C::PreviousSong,
+            C::NextSong,
+            C::RenameSong,
+            C::SongDescription,
+            C::SaveSong,
+            C::ExportSong,
+            C::ImportSong,
+        ] {
+            assert!(commands.contains(&command), "{command:?}");
+        }
+        // Load needs saved songs.
+        assert!(!commands.contains(&C::LoadSong));
     }
 
     #[test]

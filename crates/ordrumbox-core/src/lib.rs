@@ -27,7 +27,7 @@ mod timsort;
 pub mod track;
 mod variation;
 
-pub use library::{Library, LoadReport};
+pub use library::{Library, LoadReport, SongRecord};
 pub use note::Note;
 pub use pattern::Pattern;
 pub use pattern_engine::{FlatNote, FlatNotes, recompute_flat_notes};

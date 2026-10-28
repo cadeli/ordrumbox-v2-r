@@ -1,5 +1,5 @@
 //! The widgets of the editors (track editor, note editor, kit editor, the
-//! grid's volume sliders): a flat list of [`Item`]s, each with its place, an
+//! grid's volume sliders, the song panel's column): a flat list of [`Item`]s, each with its place, an
 //! [`Id`] when it reacts to the mouse or the keyboard, and what it shows.
 //! The list is rebuilt from the state at every frame; drawing and
 //! hit-testing both use it. The open drop-down list and the number entry
@@ -116,6 +116,17 @@ pub enum Id {
     // Header.
     PatternList,
     KitList,
+    // Song panel.
+    /// The arrangement select.
+    SongList,
+    /// Save, load, export, import, new, delete.
+    SongButton(&'static str),
+    SongName,
+    SongDescription,
+    /// A pattern of the song panel's list (its rename entry).
+    SongPattern(usize),
+    /// The right-click menu of the song panel.
+    SongMenu,
     // Grid.
     TrackVolume(usize),
     MasterVolume,
@@ -400,10 +411,12 @@ pub fn draw(canvas: &mut Canvas, items: &[Item], focus: Option<Id>, scale: i32) 
 /// Rows a drop-down list shows at once.
 const LIST_ROWS: usize = 14;
 
-/// An open drop-down list.
+/// An open drop-down list (or a right-click menu, with a title).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Dropdown {
     pub id: Id,
+    /// A line over the options (`ContextMenu`'s title).
+    pub title: Option<String>,
     /// The select's place: the list opens under it (or over it near the bottom).
     pub anchor: Rect,
     pub values: Vec<String>,
@@ -416,9 +429,19 @@ pub struct Dropdown {
 
 impl Dropdown {
     pub fn new(id: Id, anchor: Rect, values: Vec<String>, labels: Vec<String>, selected: usize) -> Self {
-        let mut d = Self { id, anchor, values, labels, at: selected, first: 0 };
+        let mut d = Self { id, title: None, anchor, values, labels, at: selected, first: 0 };
         d.show_at();
         d
+    }
+
+    /// A menu of actions at `(x, y)`, under `title`.
+    pub fn menu(id: Id, x: i32, y: i32, title: String, values: Vec<String>, labels: Vec<String>) -> Self {
+        Self { title: Some(title), ..Self::new(id, Rect::new(x, y, 0, 0), values, labels, 0) }
+    }
+
+    /// Rows over the options (the title).
+    fn head(&self) -> usize {
+        usize::from(self.title.is_some())
     }
 
     fn shown(&self) -> usize {
@@ -464,9 +487,9 @@ impl Dropdown {
     /// The list's place in a `width` × `height` window.
     pub fn rect(&self, width: i32, height: i32, scale: i32) -> Rect {
         let row = row_height(scale);
-        let longest = self.labels.iter().map(|l| text_width(l, scale)).max().unwrap_or(0);
+        let longest = self.labels.iter().chain(&self.title).map(|l| text_width(l, scale)).max().unwrap_or(0);
         let w = (longest + 20 * scale).max(self.anchor.w).min(width);
-        let h = self.shown() as i32 * row + 4 * scale;
+        let h = (self.shown() + self.head()) as i32 * row + 4 * scale;
         let x = self.anchor.x.min(width - w).max(0);
         let below = self.anchor.y + self.anchor.h;
         let y = if below + h <= height { below } else { (self.anchor.y - h).max(0) };
@@ -479,7 +502,8 @@ impl Dropdown {
         if !r.contains(x, y) {
             return None;
         }
-        let i = self.first + usize::try_from((y - r.y - 2 * scale) / row_height(scale)).ok()?;
+        let row = usize::try_from((y - r.y - 2 * scale) / row_height(scale)).ok()?.checked_sub(self.head())?;
+        let i = self.first + row;
         (i < self.labels.len()).then_some(i)
     }
 
@@ -488,8 +512,13 @@ impl Dropdown {
         canvas.fill_rect(r.x, r.y, r.w, r.h, BORDER);
         canvas.fill_rect(r.x + scale, r.y + scale, r.w - 2 * scale, r.h - 2 * scale, BACKGROUND);
         let row = row_height(scale);
+        if let Some(title) = &self.title {
+            let y = r.y + 2 * scale + (row - 8 * scale) / 2;
+            canvas.text(r.x + 6 * scale, y, &fit(title, r.w - 12 * scale, scale), scale, DIM);
+        }
+        let top = r.y + 2 * scale + self.head() as i32 * row;
         for (k, label) in self.labels.iter().enumerate().skip(self.first).take(self.shown()) {
-            let y = r.y + 2 * scale + (k - self.first) as i32 * row;
+            let y = top + (k - self.first) as i32 * row;
             if k == self.at {
                 canvas.fill_rect(r.x + scale, y, r.w - 2 * scale, row, SELECTED_ROW);
             }
@@ -499,8 +528,8 @@ impl Dropdown {
         if self.labels.len() > self.shown() {
             // Scroll bar.
             let total = self.labels.len() as i32;
-            let track = r.h - 4 * scale;
-            let top = r.y + 2 * scale + track * self.first as i32 / total;
+            let track = r.h - 4 * scale - self.head() as i32 * row;
+            let top = top + track * self.first as i32 / total;
             let len = (track * self.shown() as i32 / total).max(4 * scale);
             canvas.fill_rect(r.x + r.w - 4 * scale, top, 2 * scale, len, DIM);
         }
@@ -513,11 +542,12 @@ fn row_height(scale: i32) -> i32 {
 
 // ─── Number entry ────────────────────────────────────────────────────────────
 
-/// The number typed for a control (`promptNumericInput`, right-click or Enter).
+/// The number typed for a control (`promptNumericInput`, right-click or
+/// Enter), or a text (a name, a description: `spec` is `None`).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Entry {
     pub id: Id,
-    pub spec: Spec,
+    pub spec: Option<Spec>,
     pub title: String,
     pub text: String,
 }
@@ -576,6 +606,19 @@ mod tests {
         assert_eq!(d.hit(800, 600, 1, r.x + 5, r.y + 2 + 12 * 3 + 1), Some(3));
         d.jump('i');
         assert_eq!(d.at, LIST_ROWS);
+        // A menu: its title row takes no click.
+        let m = Dropdown::menu(
+            Id::SongMenu,
+            10,
+            10,
+            "title".into(),
+            vec!["a".into(), "b".into()],
+            vec!["A".into(), "B".into()],
+        );
+        let r = m.rect(800, 600, 1);
+        assert_eq!(m.hit(800, 600, 1, r.x + 5, r.y + 3), None);
+        assert_eq!(m.hit(800, 600, 1, r.x + 5, r.y + 2 + 12 + 1), Some(0));
+        assert_eq!(m.hit(800, 600, 1, r.x + 5, r.y + 2 + 24 + 1), Some(1));
     }
 
     #[test]
@@ -616,6 +659,8 @@ mod tests {
         Dropdown::new(Id::Sample, Rect::new(390, 290, 20, 12), vec!["x".into(); 3], vec!["x".into(); 3], 0)
             .draw(&mut canvas, 1);
         let spec = Spec::knob(20.0, 5000.0, 10.0, 500.0);
-        Entry { id: Id::Decay, spec, title: "Enter value".into(), text: "12".into() }.draw(&mut canvas, 1);
+        Entry { id: Id::Decay, spec: Some(spec), title: "Enter value".into(), text: "12".into() }.draw(&mut canvas, 1);
+        Dropdown::menu(Id::SongMenu, 390, 290, "rock".into(), vec!["a".into()], vec!["Add".into()])
+            .draw(&mut canvas, 1);
     }
 }

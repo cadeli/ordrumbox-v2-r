@@ -98,19 +98,47 @@ keyboard focus through the controls, **Esc** gives the keys back to the grid.
 A list opens on a click (or **Enter**): arrows, a letter to jump, the wheel,
 **Enter** to choose, **Esc** to close.
 
+Song panel (**F3**, **View › Song** or **Song › Song view**, the JS song
+view; **Esc** goes back to the grid): in the place of the grid, the
+library's patterns on the left, the selected arrangement in the middle — a
+ruler of measures, one row per pattern it uses (named on the left; a pattern
+gone from the library keeps its row, in red), each clip a bar over its
+measures — and on the right the song's name and description (a click edits
+them), its date, the arrangement list, and **Save**, **Load**, **Export**,
+**Import**. A click on the ruler aims the cursor, where the song plays from
+(**←→** move it a measure; while playing, it jumps there at once); while the
+panel is shown **Space** plays the song. Right-click a pattern of the list
+or a row's name: add it at the playhead (stopped: the cursor), or remove its
+row; a clip: **Next** (the same clip right after it) or **Delete**; the bare
+grid: add the row's pattern there. A click on a pattern selects it, a
+double-click renames it (**↑↓** step through them). The wheel scrolls the
+measures (**Shift**: the rows); while the song plays the grid follows it page
+by page. Every edit is an undo step, and moves the loop onto the end of the
+last clip, as in the JS (`song_commands.js`, checked against it). **Save**
+writes the song (patterns, arrangements, what is selected) to
+`songs/<name>.odbox` in the user data folder, where the JS app uses
+IndexedDB; **Load** lists them; **Export** writes the same file to
+`exports/`; **Import** (or a `.odbox` dropped on the window) reads one; loading
+replaces the library in one undo step. Beyond the JS panel, **New** and
+**Delete** add and remove arrangements — the JS `addSong` / `removeSong`
+commands, which only its MCP tools reach. The **Song** menu has all of these
+too, with or without the panel shown: play the song, new, remove, previous and
+next arrangement, rename the song, its description, save, load, export,
+import.
+
 The header has the pattern list and the kit list (the JS toolbar's two
 selects): a click opens them, the wheel or the arrows move, **Enter** picks.
 
 Menus: the menu bar at the top of the window (File, Edit, View, Pattern,
-Generate, Play, Kit, Help) lists every command with its shortcut; commands that cannot
+Generate, Play, Song, Kit, Help) lists every command with its shortcut; commands that cannot
 run are greyed out, on/off ones (auto modes, mute, solo, the current kit, the
 kit editor) show a box. Click a title, or press **F10** or **Alt** alone, then
 **←→** between menus, **↑↓** between items, **Enter** to run, **Esc** to
 close. **Help › Keyboard shortcuts** (**F1**) lists every key; **Help › About**
 shows the version and the folders in use.
 
-Commands ending in "..." (import a MIDI file, add or replace a sample, import a
-folder as a kit, load a kit mapping) open the built-in file picker: **↑↓**,
+Commands ending in "..." (import a MIDI file or a song, add or replace a
+sample, import a folder as a kit, load a kit mapping) open the built-in file picker: **↑↓**,
 **PageUp/PageDown**, **Home/End** or the mouse wheel to move, a letter to jump,
 **Enter** (or a second click) to open a folder or choose, **Backspace** for the
 parent folder, **Esc** to cancel. It lists only the files the command takes;
@@ -125,7 +153,7 @@ pitch, MIDI number and the settings that differ from the defaults (the JS
 
 | Keys | |
 |---|---|
-| **Space** | play / stop the pattern (**Shift**: the song) |
+| **Space** | play / stop the pattern (**Shift**, or in the song panel: the song, from its cursor) |
 | **[ ]** | previous / next pattern (**Shift**: song) |
 | **- =** | tempo −1 / +1 (**Shift** ×10) |
 | **, .** | previous / next kit |
@@ -154,6 +182,7 @@ pitch, MIDI number and the settings that differ from the defaults (the JS
 | **F10**, **Alt** | open the menus |
 | **F1** | the list of keys |
 | **F2** | track editor (shown / hidden) |
+| **F3** | song panel (shown / hidden) |
 | **Tab**, **Shift Tab** | focus the next / previous control of the editors |
 | drop a `.mid` file on the window | import it (also a `.mid` given on the command line) |
 
@@ -305,6 +334,20 @@ node tools/export_control_fixtures.mjs ../ordrumbox-v2
   — and the value texts of every formatter (`fmt`, `knobFormat`, `fmtVal`,
   `formatSignedDb`, the loop point label), and `formatNoteTooltip` for a set of
   notes and track pitches.
+
+The song panel's commands have a ninth:
+
+```sh
+node tools/export_song_fixtures.mjs ../ordrumbox-v2
+```
+
+- `ordrumbox-logic/tests/fixtures/song_edits.json`: the JS `SongCommands`
+  (clips added by id or name, repeated, removed one by one, by measure or by
+  row; arrangements added, removed and selected; what each one refuses) on
+  `song.json`'s arrangements, then undo all, then redo all; after each, the
+  undo/redo sizes, the step's description, what the command returned, the
+  selected arrangement and every arrangement (with its loop length, which an
+  edit may leave fractional). Also `songMeasureAtTick()`.
 
 ## License
 

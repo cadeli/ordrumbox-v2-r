@@ -20,6 +20,7 @@ mod menu;
 mod panel;
 mod picker;
 mod session;
+mod song_view;
 mod store;
 mod view;
 
@@ -110,6 +111,7 @@ impl App {
         };
         gfx.surface.resize(width, height).map_err(|e| format!("resize surface: {e}"))?;
         let mut buffer = gfx.surface.buffer_mut().map_err(|e| format!("get frame buffer: {e}"))?;
+        self.session.set_size((width.get() as i32, height.get() as i32, scale));
         self.session.draw(&mut Canvas::new(&mut buffer, width.get() as usize, height.get() as usize), scale);
         buffer.present().map_err(|e| format!("present frame: {e}"))
     }
@@ -128,7 +130,11 @@ impl App {
         let s = &mut self.session;
         // An open list or number entry takes the click; the right button is the widgets'.
         if s.popup_open() || button == Button::Right {
-            if s.mouse_down((width, height, scale), x, y, button, shift) {
+            let size = (width, height, scale);
+            let menus_open = s.open_menu().is_some() || s.overlay_open();
+            if s.mouse_down(size, x, y, button, shift)
+                || (button == Button::Right && !menus_open && s.song_view_open() && s.song_click(size, x, y, button))
+            {
                 self.request_redraw();
             }
             return;
@@ -156,8 +162,14 @@ impl App {
         self.request_redraw();
     }
 
-    /// A click on the grid or the kit editor.
+    /// A click on the grid, the song panel or the kit editor.
     fn click_content(&mut self, width: i32, height: i32, scale: i32, x: i32, y: i32) {
+        if self.session.song_view_open() {
+            if self.session.song_click((width, height, scale), x, y, Button::Left) {
+                self.request_redraw();
+            }
+            return;
+        }
         if let Some((selected, count)) = self.session.kit_list() {
             let layout = KitLayout::new(width, height, scale, self.session.status_lines());
             if let Some(hit) = layout.hit(selected, count, x, y) {
@@ -249,6 +261,16 @@ impl App {
                 KeyCode::KeyR => s.kit_reassign(),
                 KeyCode::KeyE => s.kit_export(),
                 KeyCode::Space if !event.repeat && shift => s.toggle_play_song(),
+                KeyCode::Space if !event.repeat => s.toggle_play(),
+                _ => return,
+            }
+        } else if s.song_view_open() {
+            match code {
+                KeyCode::Escape => s.toggle_song_view(),
+                KeyCode::ArrowLeft => s.move_song_cursor(-1),
+                KeyCode::ArrowRight => s.move_song_cursor(1),
+                KeyCode::ArrowUp => s.step_pattern(-1),
+                KeyCode::ArrowDown => s.step_pattern(1),
                 KeyCode::Space if !event.repeat => s.toggle_play(),
                 _ => return,
             }
@@ -401,6 +423,7 @@ fn shortcut(code: KeyCode, shift: bool, control: bool) -> Option<Command> {
         match code {
             KeyCode::F1 => C::Shortcuts,
             KeyCode::F2 => C::TrackEditor,
+            KeyCode::F3 => C::SongView,
             KeyCode::BracketLeft if shift => C::PreviousSong,
             KeyCode::BracketRight if shift => C::NextSong,
             KeyCode::BracketLeft | KeyCode::PageUp => C::PreviousPattern,
@@ -456,7 +479,8 @@ impl ApplicationHandler for App {
                 let shift = self.modifiers.shift_key();
                 let (x, y) = (position.x as i32, position.y as i32);
                 let moved = self.session.mouse_move(size, x, y, shift);
-                if self.session.grid_hover(size, x, y) || moved {
+                let hovered = self.session.grid_hover(size, x, y) | self.session.song_hover(size, x, y);
+                if hovered || moved {
                     self.request_redraw();
                 }
             }
@@ -479,7 +503,10 @@ impl ApplicationHandler for App {
                 let (x, y) = (self.mouse.x as i32, self.mouse.y as i32);
                 let fine = self.modifiers.shift_key() || self.modifiers.alt_key();
                 let coarse = self.modifiers.control_key() || self.modifiers.super_key();
-                if self.session.wheel(size, x, y, lines, fine, coarse) {
+                let shift = self.modifiers.shift_key();
+                if self.session.wheel(size, x, y, lines, fine, coarse)
+                    || self.session.song_wheel(size, x, y, lines, shift)
+                {
                     self.request_redraw();
                 }
             }

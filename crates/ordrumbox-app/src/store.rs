@@ -48,6 +48,33 @@ pub fn user_dir() -> Option<PathBuf> {
     Some(path()?.parent()?.to_path_buf())
 }
 
+/// Where the song panel saves songs (the JS IndexedDB `songs` store).
+pub fn songs_dir() -> Option<PathBuf> {
+    Some(user_dir()?.join("songs"))
+}
+
+/// A song name as a file name (`exportToFile`: what is not a letter, a
+/// digit, `_` or `-` becomes `_`).
+pub fn safe_name(name: &str) -> String {
+    name.chars().map(|c| if c.is_ascii_alphanumeric() || c == '_' || c == '-' { c } else { '_' }).collect()
+}
+
+/// The song files of `dir` (`.odbox`), by name.
+pub fn list_songs(dir: &Path) -> Vec<PathBuf> {
+    let Ok(entries) = fs::read_dir(dir) else { return Vec::new() };
+    let mut songs: Vec<PathBuf> = entries
+        .filter_map(|e| Some(e.ok()?.path()))
+        .filter(|p| p.extension().is_some_and(|e| e.eq_ignore_ascii_case("odbox")))
+        .collect();
+    songs.sort();
+    songs
+}
+
+/// Write a song file (through a temporary file).
+pub fn save_song(path: &Path, record: &json::Value) -> io::Result<()> {
+    write_atomic(path, &(record.to_json_pretty(2) + "\n"))
+}
+
 /// The kits, once edited.
 pub fn kits_path() -> Option<PathBuf> {
     Some(user_dir()?.join("kits.json"))
@@ -123,6 +150,18 @@ mod tests {
         assert_eq!(load(&path).unwrap().unwrap().patterns[0].bpm, 99.0);
         fs::write(&path, "{").unwrap();
         assert!(load(&path).is_err());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn song_files() {
+        assert_eq!(safe_name("My song #1 é"), "My_song__1__");
+        let dir = env::temp_dir().join(format!("ordrumbox-songs-{}", std::process::id()));
+        assert!(list_songs(&dir).is_empty());
+        save_song(&dir.join("b.odbox"), &json::parse(r#"{"name":"b"}"#).unwrap()).unwrap();
+        save_song(&dir.join("a.odbox"), &json::parse(r#"{"name":"a"}"#).unwrap()).unwrap();
+        fs::write(dir.join("c.json"), "{}").unwrap();
+        assert_eq!(list_songs(&dir), [dir.join("a.odbox"), dir.join("b.odbox")]);
         fs::remove_dir_all(dir).unwrap();
     }
 

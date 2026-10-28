@@ -19,6 +19,8 @@ pub enum Purpose {
     LoadMapping,
     /// A folder, not a file.
     ImportFolder,
+    /// A song file (`.odbox`, `.json`), the song panel's Import.
+    ImportSong,
 }
 
 impl Purpose {
@@ -30,6 +32,7 @@ impl Purpose {
             Self::ReplaceTrackSample => "Replace the track's sample",
             Self::LoadMapping => "Load kit mapping",
             Self::ImportFolder => "Import folder as kit",
+            Self::ImportSong => "Import song",
         }
     }
 
@@ -40,6 +43,7 @@ impl Purpose {
             Self::AddSample | Self::ReplaceSample | Self::ReplaceTrackSample => &["wav"],
             Self::LoadMapping => &["json"],
             Self::ImportFolder => &[],
+            Self::ImportSong => &["odbox", "json"],
         }
     }
 }

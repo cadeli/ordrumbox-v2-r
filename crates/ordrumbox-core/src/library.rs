@@ -69,6 +69,60 @@ impl Library {
     pub fn pattern(&self, id: &str) -> Option<&Pattern> {
         self.patterns.iter().find(|p| p.id == id)
     }
+
+    /// A song file (`SongService.buildSongData`, the record the song panel
+    /// saves and exports as `.odbox`): the header's description and date,
+    /// the patterns, the arrangements, what is selected, and `stamp` (key
+    /// and time in ms: `savedAt` or `exportedAt`).
+    pub fn song_record(&self, name: &str, selected_pattern: usize, selected_song: usize, stamp: (&str, f64)) -> Value {
+        let info = |key: &str| self.infos.get(key).cloned().unwrap_or_else(|| Value::from(""));
+        let mut object = Object::new();
+        object.insert("name", Value::from(name));
+        object.insert("description", info("description"));
+        object.insert("date", info("date"));
+        object.insert("patterns", Value::Array(self.patterns.iter().map(Pattern::to_json).collect()));
+        object.insert("selectedPatternIdx", Value::from(selected_pattern as f64));
+        object.insert("songs", Value::Array(self.songs.iter().map(Song::to_json).collect()));
+        object.insert("selectedSongIdx", Value::from(selected_song as f64));
+        object.insert(stamp.0, Value::from(stamp.1));
+        Value::Object(object)
+    }
+
+    /// Read a song file (`parseImportedFile`, then `applyToAppState`):
+    /// `None` without a `patterns` array. Its name, description and date
+    /// replace those of `infos`, the header kept otherwise.
+    pub fn from_song_record(value: &Value, infos: &Object) -> Option<SongRecord> {
+        value.get("patterns").and_then(Value::as_array)?;
+        let (mut library, report) = Self::from_json(value);
+        let text = |key: &str| value.get(key).filter(|v| !v.is_null()).map(crate::js::to_string);
+        let name = text("name");
+        library.infos = infos.clone();
+        for (key, v) in [("description", text("description")), ("date", text("date"))] {
+            library.infos.insert(key, Value::from(v.unwrap_or_default().as_str()));
+        }
+        let index = |key: &str| {
+            let v = value.get(key).map_or(0.0, crate::js::to_number);
+            if v > 0.0 { v as usize } else { 0 }
+        };
+        Some(SongRecord {
+            name,
+            library,
+            report,
+            selected_pattern: index("selectedPatternIdx"),
+            selected_song: index("selectedSongIdx"),
+        })
+    }
+}
+
+/// A song file read back ([`Library::from_song_record`]).
+#[derive(Debug, Clone, PartialEq)]
+pub struct SongRecord {
+    /// Its name, when it has one (else the file's).
+    pub name: Option<String>,
+    pub library: Library,
+    pub report: LoadReport,
+    pub selected_pattern: usize,
+    pub selected_song: usize,
 }
 
 /// Give every pattern an id, in file order, as `ensurePatternId()`: an existing
@@ -96,6 +150,29 @@ mod tests {
         let ids: Vec<_> = library.patterns.iter().map(|p| p.id.as_str()).collect();
         assert_eq!(ids, ["rock", "rock-2", "x", "pattern", "pattern-2"]);
         assert!(report.issues.is_empty());
+    }
+
+    #[test]
+    fn song_records_round_trip() {
+        let (library, _) = Library::parse(
+            r#"{"infos":{"name":"lib","date":"2026","url":"u"},"songs":[{"name":"s","clips":[{"pattern":"b"}]}],
+                "patterns":[{"name":"a"},{"name":"b"}]}"#,
+        )
+        .unwrap();
+        let record = library.song_record("My song", 1, 0, ("savedAt", 5.0));
+        let keys: Vec<_> = record.as_object().unwrap().iter().map(|(k, _)| k.to_owned()).collect();
+        assert_eq!(
+            keys,
+            ["name", "description", "date", "patterns", "selectedPatternIdx", "songs", "selectedSongIdx", "savedAt"]
+        );
+        let read = Library::from_song_record(&record, &library.infos).unwrap();
+        assert_eq!(read.name.as_deref(), Some("My song"));
+        assert_eq!((read.selected_pattern, read.selected_song), (1, 0));
+        assert_eq!(read.library.songs, library.songs);
+        assert_eq!(read.library.patterns, library.patterns);
+        assert_eq!(read.library.infos.get("url").and_then(Value::as_str), Some("u"));
+        assert_eq!(read.library.infos.get("description").and_then(Value::as_str), Some(""));
+        assert!(Library::from_song_record(&json::parse(r#"{"songs":[]}"#).unwrap(), &Object::new()).is_none());
     }
 
     #[test]
