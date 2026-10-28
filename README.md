@@ -60,6 +60,12 @@ melodic instruments on their own channels at the sample's root note) to
 name), in one undo step. As in the JS app, the file's tempo is not read
 (120 BPM).
 
+The window keeps the same three parts whatever is edited: one main editor in
+the top-left (the grid, the piano roll, the song panel, the synth editor, or
+the kit editor over any of them — the **VIEW** buttons and the View menu pick
+one), the track editor down the right edge (**F2** shows or hides it), and the
+output panel as a strip along the bottom, always shown.
+
 Kit editor (**Ctrl K**, the JS drumkit manager): the current kit's samples
 (**↑↓**), and for the selected one its kit and instrument (lists), its gain
 (dB), tune (semitones) and decay (knobs), its note, length, peak and RMS
@@ -171,8 +177,8 @@ plays at once and is saved half a second later to `generated_sounds.json`
 in the user data folder (the JS keeps it in IndexedDB), read at start over
 the assets' presets. The pills under the cards show the modules in use.
 
-Output panel (**F5**, **View › Output**, the JS output panel; **Esc** goes
-back to the grid): the master bus in three tabs — **vol**: the master
+Output panel (a strip along the bottom of the window, always shown — the JS
+output panel): the master bus in three tabs — **vol**: the master
 volume and the spectrum of what plays (the JS analyser's
 `getByteFrequencyData`, computed as the Web Audio specification describes
 it: 4096 samples, Blackman window, smoothing 0.8, -100 to -30 dB, the first
@@ -190,7 +196,8 @@ The header, under the menu bar, is a row of labelled groups after the logo
 and where it is in the library), **BEATS** (1–16), **KIT** (the kit list),
 **GENERATE** (**DRUM**, **BASS**, **CHORDS**, lit while their tracks are in
 auto mode: the D, S, A keys; then the genre) and **VIEW** (**GRID**,
-**ROLL**, **SONG**, **SYNTH**, **OUT**: the view shown is lit, as F3–F6 do).
+**ROLL**, **SONG**, **SYNTH**, **KIT**: the main editor shown is lit, as
+F3–F6 do; **KIT** toggles the kit editor, as Ctrl+K does).
 A list opens on a click; the wheel or the arrows move, **Enter** picks. The
 line under it shows the last action, undo and redo, and the song.
 
@@ -266,7 +273,7 @@ pitch, MIDI number and the settings that differ from the defaults (the JS
 | **F2** | track editor (shown / hidden) |
 | **F3** | song panel (shown / hidden) |
 | **F4** | piano roll (shown / hidden) |
-| **F5** | output panel (shown / hidden) |
+| **F5** | grid (back to the main editor) |
 | **F6** | synth editor (shown / hidden) |
 | **Tab**, **Shift Tab** | focus the next / previous control of the editors |
 | drop a `.mid` file on the window | import it (also a `.mid` given on the command line) |

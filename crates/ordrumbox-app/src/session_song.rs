@@ -134,8 +134,9 @@ impl Session {
         (x, self.song_scroll.1.min(rows.saturating_sub(layout.visible_rows())))
     }
 
-    fn song_layout(&self, size: (i32, i32, i32)) -> SongLayout {
-        SongLayout::new(size.0, size.1, size.2, self.status.len())
+    pub(super) fn song_layout(&self, size: (i32, i32, i32)) -> SongLayout {
+        let body = self.body(size);
+        SongLayout::new(body.main_w, body.editor_h, size.2, self.status.len())
     }
 
     /// What the song panel shows (its rows are `rows`).
@@ -162,7 +163,7 @@ impl Session {
     /// The song's column: name, date, description, arrangement, buttons.
     pub(super) fn song_items(&self, layout: &mut PanelLayout, width: i32, height: i32, scale: i32) {
         let s = scale;
-        let area = SongLayout::new(width, height, scale, self.status.len()).column;
+        let area = self.song_layout((width, height, scale)).column;
         if area.w <= 0 {
             return;
         }
@@ -431,7 +432,7 @@ impl Session {
             return;
         }
         let Some(clip) = self.song().and_then(|s| s.clips.get(c)) else { return };
-        let layout = SongLayout::new(canvas.width(), canvas.height(), scale, self.status.len());
+        let layout = self.song_layout((canvas.width(), canvas.height(), scale));
         let rows = self.song_rows();
         let Some(rect) = layout.clip_rect(&self.song_view_data(&rows, &layout), c) else { return };
         view::draw_tooltip(canvas, &clip_label(&clip.pattern, clip), rect, scale);

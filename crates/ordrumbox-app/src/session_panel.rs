@@ -122,38 +122,24 @@ impl Session {
         if let Some(pattern) = self.pattern() {
             self.header_items(&mut layout, pattern, scale);
         }
-        // The view buttons (the JS view switch): the one shown lit.
-        let shown = [Workspace::Grid, Workspace::PianoRoll, Workspace::Song, Workspace::Synth, Workspace::Output];
+        // The view buttons (the main editor, then the kit editor): the one shown lit.
+        let shown = [Workspace::Grid, Workspace::PianoRoll, Workspace::Song, Workspace::Synth];
         let views = view::header_controls(scale).views;
-        for (i, ((rect, label), workspace)) in views.iter().zip(view::VIEWS).zip(shown).enumerate() {
-            let kind = Kind::Button { label: label.into(), on: self.workspace == workspace };
-            layout.items.push(Item::new(Some(Id::View(i as u8)), *rect, kind));
+        let kit_open = self.kit_editor.is_some();
+        for (i, (rect, label)) in views.iter().zip(view::VIEWS).enumerate() {
+            let on = if i == 4 { kit_open } else { !kit_open && self.workspace == shown[i] };
+            layout.items.push(Item::new(Some(Id::View(i as u8)), *rect, Kind::Button { label: label.into(), on }));
         }
-        if self.kit_editor.is_some() {
-            let kit_layout = KitLayout::new(width, height, scale, self.status.len());
-            let area = kit_layout.controls_area();
-            layout.details_top = area.y;
-            if let Some(view) = self.kit_controls() {
-                let (items, bottom) = editors::kit_controls(&view, area, scale);
-                layout.items.extend(items);
-                layout.details_top = bottom;
-            }
-            return layout;
-        }
-        if self.workspace == Workspace::Song {
-            self.song_items(&mut layout, width, height, scale);
-            return layout;
-        }
-        if self.workspace == Workspace::Output {
-            self.output_items(&mut layout, width, scale);
-            return layout;
-        }
-        // The track editor, under the header, on a panel edged in pink.
-        let top = view::body_top(scale);
-        let bottom = view::footer_top(height, scale, self.status.len()) - 8 * s;
-        layout.right = self.track_editor_width(width, scale);
-        if layout.right > 0 {
-            let back = Rect::new(width - layout.right, top - 4 * s, layout.right, bottom - top + 8 * s);
+        // The window split: the main editor top-left, the track editor down the
+        // right, the output strip along the bottom (always shown).
+        let right = self.track_editor_width(width, scale);
+        let body = view::Body::new(width, height, scale, right, self.status.len());
+        layout.right = right;
+        // The track editor, always down the right edge (when shown).
+        if right > 0 {
+            let top = view::body_top(scale);
+            let bottom = body.main_bottom;
+            let back = Rect::new(width - right, top - 4 * s, right, bottom - top + 8 * s);
             layout.items.push(Item::new(None, back, Kind::Panel));
             let area = Rect::new(back.x + 10 * s, top, back.w - 20 * s, bottom - top);
             match self.editor_track().and_then(|t| Some((t, self.track_view(t)?))) {
@@ -167,16 +153,27 @@ impl Session {
                 None => layout.items.push(Item::text(area.x, area.y, "No track", panel::DIM, s)),
             }
         }
-        if self.workspace == Workspace::PianoRoll {
+        // The output strip, always along the bottom.
+        self.output_items(&mut layout, width, body.output, scale);
+        // The main editor (top-left): exactly one of the kit editor, the song
+        // panel, the piano roll, the synth editor, or the grid.
+        if kit_open {
+            let kit_layout = KitLayout::new(body.main_w, body.editor_h, scale, self.status.len());
+            let area = kit_layout.controls_area();
+            layout.details_top = area.y;
+            if let Some(view) = self.kit_controls() {
+                let (items, bottom) = editors::kit_controls(&view, area, scale);
+                layout.items.extend(items);
+                layout.details_top = bottom;
+            }
+        } else if self.workspace == Workspace::Song {
+            self.song_items(&mut layout, width, height, scale);
+        } else if self.workspace == Workspace::PianoRoll {
             self.roll_items(&mut layout, (width, height, scale));
-            return layout;
-        }
-        if self.workspace == Workspace::Synth {
+        } else if self.workspace == Workspace::Synth {
             self.synth_items(&mut layout, (width, height, scale));
-            return layout;
-        }
-        if let Some(pattern) = self.pattern() {
-            let grid = Layout::new(width - layout.right, height, scale, pattern, self.status.len());
+        } else if let Some(pattern) = self.pattern() {
+            let grid = Layout::new(body.main_w, body.editor_h, scale, pattern, self.status.len());
             let spec = Spec::slider(0.0, 1.0, 0.01, 1.0);
             for (t, track) in pattern.tracks.iter().enumerate().take(grid.tracks()) {
                 let kind = Kind::Value { spec, value: track.velocity, label: None, text: String::new(), lfo: false };
@@ -218,17 +215,11 @@ impl Session {
         }
     }
 
-    /// Width the track editor takes on the right of a `width`-wide window (0: none).
+    /// Width the track editor takes on the right of a `width`-wide window (0:
+    /// none). It is shown for every main editor (grid, piano roll, song, synth,
+    /// the kit editor) whenever it is toggled on and the window is wide enough.
     pub fn track_editor_width(&self, width: i32, scale: i32) -> i32 {
-        if self.show_track_editor
-            && self.kit_editor.is_none()
-            && matches!(self.workspace, Workspace::Grid | Workspace::PianoRoll | Workspace::Synth)
-            && width >= 480 * scale
-        {
-            panel_width(width, scale)
-        } else {
-            0
-        }
+        if self.show_track_editor && width >= 480 * scale { panel_width(width, scale) } else { 0 }
     }
 
     /// A drop-down list or a number entry is open (it takes every key and click).
@@ -582,11 +573,11 @@ impl Session {
 
     /// The mouse over the grid: the step it is on, for the note tooltip; whether it changed.
     pub fn grid_hover(&mut self, size: (i32, i32, i32), x: i32, y: i32) -> bool {
-        let (width, height, scale) = size;
-        let right = self.track_editor_width(width, scale);
+        let body = self.body(size);
+        let scale = size.2;
         let hover = match self.pattern() {
             Some(pattern) if self.kit_editor.is_none() && self.workspace == Workspace::Grid && self.drag.is_none() => {
-                match Layout::new(width - right, height, scale, pattern, self.status.len()).hit(pattern, x, y) {
+                match Layout::new(body.main_w, body.editor_h, scale, pattern, self.status.len()).hit(pattern, x, y) {
                     Some(view::Hit::Cell { track, beat, step }) => Some((track, beat, step)),
                     _ => None,
                 }
@@ -614,7 +605,8 @@ impl Session {
         let Some(pattern) = self.pattern() else { return };
         let Some(track) = pattern.tracks.get(t) else { return };
         let Some(note) = track.notes.iter().find(|n| n.beat == beat && n.beat_step == step) else { return };
-        let layout = Layout::new(canvas.width() - right, canvas.height(), scale, pattern, self.status.len());
+        let body = view::Body::new(canvas.width(), canvas.height(), scale, right, self.status.len());
+        let layout = Layout::new(body.main_w, body.editor_h, scale, pattern, self.status.len());
         let cell = layout.cell_rect(t, beat, step, track.steps_per_beat);
         view::draw_tooltip(canvas, &editors::note_tooltip(note, track.pitch), cell, scale);
     }
@@ -1344,5 +1336,39 @@ mod tests {
         assert_eq!(s.pattern().unwrap().description, "x y");
         s.undo();
         assert_eq!(s.pattern().unwrap().description, "");
+    }
+
+    #[test]
+    fn the_output_strip_and_the_track_editor_stay_with_every_main_editor() {
+        /// The strip's tabs and knobs are there, all inside the bottom band.
+        fn strip(band: Rect, layout: &PanelLayout) {
+            let items: Vec<&Item> =
+                layout.items.iter().filter(|i| matches!(i.id, Some(Id::OutTab(_) | Id::Master(_)))).collect();
+            assert!(items.len() >= 2, "the strip's tabs and controls are missing");
+            for item in items {
+                assert!(
+                    item.rect.y >= band.y && item.rect.y + item.rect.h <= band.y + band.h,
+                    "a strip control is outside the band"
+                );
+            }
+        }
+        let mut s = session();
+        // The grid: its volume sliders, the strip and the track editor together.
+        let layout = s.panel_layout(SIZE.0, SIZE.1, SIZE.2);
+        strip(s.body(SIZE).output, &layout);
+        assert!(layout.items.iter().any(|i| matches!(i.id, Some(Id::MasterVolume))));
+        assert!(layout.right > 0);
+        // The song panel keeps both.
+        s.toggle_song_view();
+        let layout = s.panel_layout(SIZE.0, SIZE.1, SIZE.2);
+        strip(s.body(SIZE).output, &layout);
+        assert!(layout.items.iter().any(|i| matches!(i.id, Some(Id::SongName))));
+        assert!(layout.right > 0);
+        // The kit editor opens over the main editor; the strip stays below.
+        s.toggle_song_view();
+        s.toggle_kit_editor();
+        let layout = s.panel_layout(SIZE.0, SIZE.1, SIZE.2);
+        strip(s.body(SIZE).output, &layout);
+        assert!(layout.right > 0);
     }
 }

@@ -120,6 +120,12 @@ impl App {
         let mut buffer = gfx.surface.buffer_mut().map_err(|e| format!("get frame buffer: {e}"))?;
         self.session.set_size((width.get() as i32, height.get() as i32, scale));
         self.session.draw(&mut Canvas::new(&mut buffer, width.get() as usize, height.get() as usize), scale);
+        // `ORDRUMBOX_SCREENSHOT=path`: keep the first frame as a BMP there and
+        // quit — to check the layout without a screen capture.
+        if let Ok(path) = std::env::var("ORDRUMBOX_SCREENSHOT") {
+            let _ = write_bmp(&path, &buffer, width.get() as usize, height.get() as usize);
+            std::process::exit(0);
+        }
         buffer.present().map_err(|e| format!("present frame: {e}"))
     }
 
@@ -184,17 +190,17 @@ impl App {
             }
             return;
         }
+        let body = self.session.body((width, height, scale));
         if let Some((selected, count)) = self.session.kit_list() {
-            let layout = KitLayout::new(width, height, scale, self.session.status_lines());
+            let layout = KitLayout::new(body.main_w, body.editor_h, scale, self.session.status_lines());
             if let Some(hit) = layout.hit(selected, count, x, y) {
                 self.session.kit_click(hit);
                 self.request_redraw();
             }
             return;
         }
-        let right = self.session.track_editor_width(width, scale);
         let Some(pattern) = self.session.pattern() else { return };
-        let layout = Layout::new(width - right, height, scale, pattern, self.session.status_lines());
+        let layout = Layout::new(body.main_w, body.editor_h, scale, pattern, self.session.status_lines());
         if let Some(hit) = layout.hit(pattern, x, y) {
             self.session.click(hit);
             self.request_redraw();
@@ -290,11 +296,6 @@ impl App {
         } else if s.synth_open() {
             match code {
                 KeyCode::Escape => s.toggle_synth(),
-                _ => return,
-            }
-        } else if s.output_open() {
-            match code {
-                KeyCode::Escape => s.toggle_output(),
                 _ => return,
             }
         } else if s.piano_roll_open() {
@@ -466,7 +467,7 @@ fn shortcut(code: KeyCode, shift: bool, control: bool) -> Option<Command> {
             KeyCode::F2 => C::TrackEditor,
             KeyCode::F3 => C::SongView,
             KeyCode::F4 => C::PianoRoll,
-            KeyCode::F5 => C::Output,
+            KeyCode::F5 => C::Grid,
             KeyCode::F6 => C::SynthEditor,
             KeyCode::BracketLeft if shift => C::PreviousSong,
             KeyCode::BracketRight if shift => C::NextSong,
@@ -598,6 +599,36 @@ impl ApplicationHandler for App {
     }
 }
 
+/// `ORDRUMBOX_SCREENSHOT`: the first frame written as a 24-bit BMP (no image
+/// crate to depend on), from the `0x00RRGGBB` pixels of the frame buffer.
+fn write_bmp(path: &str, pixels: &[u32], width: usize, height: usize) -> std::io::Result<()> {
+    let pad = (4 - width * 3 % 4) % 4;
+    let data_size = (width * 3 + pad) * height;
+    let mut out = Vec::with_capacity(54 + data_size);
+    out.extend_from_slice(b"BM");
+    out.extend_from_slice(&(54 + data_size as u32).to_le_bytes());
+    out.extend_from_slice(&[0; 4]);
+    out.extend_from_slice(&54u32.to_le_bytes());
+    out.extend_from_slice(&40u32.to_le_bytes());
+    out.extend_from_slice(&(width as u32).to_le_bytes());
+    out.extend_from_slice(&(height as u32).to_le_bytes());
+    out.extend_from_slice(&1u16.to_le_bytes()); // one plane
+    out.extend_from_slice(&24u16.to_le_bytes()); // bits per pixel
+    out.extend_from_slice(&[0; 4]); // BI_RGB, no compression
+    out.extend_from_slice(&(data_size as u32).to_le_bytes());
+    out.extend_from_slice(&2835u32.to_le_bytes()); // 72 dpi
+    out.extend_from_slice(&2835u32.to_le_bytes());
+    out.extend_from_slice(&[0; 8]);
+    for y in (0..height).rev() {
+        for x in 0..width {
+            let c = pixels[y * width + x];
+            out.extend_from_slice(&[c as u8, (c >> 8) as u8, (c >> 16) as u8]);
+        }
+        out.extend(std::iter::repeat_n(0u8, pad));
+    }
+    std::fs::write(path, out)
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let event_loop = EventLoop::new()?;
     let mut session = Session::load();
@@ -608,6 +639,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if is_midi {
             session.import_midi(&path);
         }
+    }
+    // `ORDRUMBOX_VIEW=roll|song|synth|kit|comp|flt`: which view the window
+    // starts on (with `ORDRUMBOX_SCREENSHOT`, to capture that layout).
+    match std::env::var("ORDRUMBOX_VIEW").as_deref() {
+        Ok("roll") => session.toggle_piano_roll(),
+        Ok("song") => session.toggle_song_view(),
+        Ok("synth") => session.toggle_synth(),
+        Ok("kit") => session.toggle_kit_editor(),
+        Ok("comp") => session.output_activate(panel::Id::OutTab(1)),
+        Ok("flt") => session.output_activate(panel::Id::OutTab(2)),
+        _ => {}
     }
     let mut app = App {
         gfx: None,
@@ -621,5 +663,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match app.error {
         Some(error) => Err(error.into()),
         None => Ok(()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn write_bmp_writes_24_bit_bottom_up_rows() {
+        let path = std::env::temp_dir().join(format!("ordrumbox_{}.bmp", std::process::id()));
+        // One row, two pixels: red then green, the row padded to four bytes.
+        write_bmp(path.to_str().unwrap(), &[0xff0000, 0x00ff00], 2, 1).unwrap();
+        let bytes = std::fs::read(&path).unwrap();
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(&bytes[..2], b"BM");
+        assert_eq!(u32::from_le_bytes(bytes[2..6].try_into().unwrap()), 54 + 8);
+        assert_eq!(&bytes[54..], &[0, 0, 255, 0, 255, 0, 0, 0]); // BGR, BGR, pad
     }
 }

@@ -120,8 +120,8 @@ impl Session {
     // ─── What is shown ───────────────────────────────────────────────────────
 
     fn synth_layout(&self, size: (i32, i32, i32)) -> SynthLayout {
-        let (width, height, scale) = size;
-        SynthLayout::new(width - self.track_editor_width(width, scale), height, scale, self.status.len())
+        let body = self.body(size);
+        SynthLayout::new(body.main_w, body.editor_h, size.2, self.status.len())
     }
 
     /// Seconds the LFOs are at, and the tempo they sync to.

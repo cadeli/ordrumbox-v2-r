@@ -48,8 +48,9 @@ mod session_song;
 mod session_synth;
 pub use session_panel::{Button, PanelKey};
 
-/// What is shown under the header (the JS view switch; the kit editor
-/// opens over any of them).
+/// What the main editor (top-left) shows under the header. The kit editor
+/// opens over any of them; the track editor (right) and the output strip
+/// (bottom) are always available.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Workspace {
     Grid,
@@ -57,8 +58,6 @@ pub enum Workspace {
     PianoRoll,
     /// The song panel (F3): Space plays the song.
     Song,
-    /// The output panel (F5): the master bus.
-    Output,
     /// The synth editor (F6): the track editor's track's preset.
     Synth,
 }
@@ -236,7 +235,7 @@ enum Overlay {
 const SHORTCUTS: [&str; 50] = [
     "MENUS",
     "  F10 or Alt             open the menus: Arrows move, Enter runs, Esc closes",
-    "  F1 F2 F3 F4 F5 F6      this list, track editor (shown or hidden), song, piano roll, output, synth",
+    "  F1 F2 F3 F4 F5 F6      this list, track editor, song, piano roll, grid, synth (Ctrl+K: kit editor)",
     "GRID",
     "  Arrows                 move the cursor",
     "  Enter / click          add a note, select it, delete the selected one",
@@ -273,7 +272,7 @@ const SHORTCUTS: [&str; 50] = [
     "  a key: hear it, right-click: clear, chord progression     wheel (Shift: pages)",
     "SYNTH EDITOR (F6)",
     "  OSC, FLT, MOD, ENV     the track's preset: knobs, waves, lists, power buttons (saved)",
-    "OUTPUT PANEL (F5)",
+    "OUTPUT PANEL (bottom strip, always shown)",
     "  vol, Comp, Flt         the master volume and spectrum, the compressor, the filters (saved)",
     "SONG PANEL (F3)",
     "  click / right-click    the ruler: aim the cursor; a pattern, row, clip, the grid: menu",
@@ -457,6 +456,13 @@ impl Session {
         self.status.len()
     }
 
+    /// The window split for `size` (a real window size): the main editor
+    /// region (top-left) and the output strip (bottom).
+    pub(super) fn body(&self, size: (i32, i32, i32)) -> view::Body {
+        let (width, height, scale) = size;
+        view::Body::new(width, height, scale, self.track_editor_width(width, scale), self.status.len())
+    }
+
     pub fn playing(&self) -> bool {
         self.controller.as_ref().is_some_and(Controller::is_playing)
     }
@@ -632,12 +638,18 @@ impl Session {
     // ─── Menus and commands ──────────────────────────────────────────────────
 
     /// A view button (`view::VIEWS`): show that view, unless it is shown.
+    /// The last button (KIT) toggles the kit editor over the main editor.
     pub(super) fn show_view(&mut self, i: u8) {
-        let target = [Workspace::Grid, Workspace::PianoRoll, Workspace::Song, Workspace::Synth, Workspace::Output];
+        if i == 4 {
+            self.toggle_kit_editor();
+            return;
+        }
+        let target = [Workspace::Grid, Workspace::PianoRoll, Workspace::Song, Workspace::Synth];
         let Some(&target) = target.get(usize::from(i)) else { return };
         if self.workspace == target && self.kit_editor.is_none() {
             return;
         }
+        self.kit_editor = None;
         if self.workspace != target {
             match target {
                 Workspace::Grid => {
@@ -647,10 +659,14 @@ impl Session {
                 Workspace::PianoRoll => self.toggle_piano_roll(),
                 Workspace::Song => self.toggle_song_view(),
                 Workspace::Synth => self.toggle_synth(),
-                Workspace::Output => self.toggle_output(),
             }
         }
-        self.kit_editor = None;
+    }
+
+    /// Show the grid (View > Grid, F5).
+    pub(super) fn show_grid(&mut self) {
+        self.synth = None;
+        self.set_workspace(Workspace::Grid);
     }
 
     /// Generation on (tracks in auto mode): drums, bass, chords.
@@ -686,10 +702,10 @@ impl Session {
             kit_index: self.kit_index,
             kit_editor: self.kit_editor.is_some(),
             track_editor: self.show_track_editor,
-            song_view: self.workspace == Workspace::Song,
-            piano_roll: self.workspace == Workspace::PianoRoll,
-            output: self.workspace == Workspace::Output,
-            synth: self.workspace == Workspace::Synth,
+            grid: self.workspace == Workspace::Grid && self.kit_editor.is_none(),
+            song_view: self.song_view_open(),
+            piano_roll: self.piano_roll_open(),
+            synth: self.synth_open(),
             can_save_song: store::songs_dir().is_some(),
             saved_songs: store::songs_dir().is_some_and(|d| !store::list_songs(&d).is_empty()),
             kit_sample: self.kit_list().is_some_and(|(s, n)| s < n),
@@ -775,7 +791,7 @@ impl Session {
             C::TrackEditor => self.toggle_track_editor(),
             C::SongView => self.toggle_song_view(),
             C::PianoRoll => self.toggle_piano_roll(),
-            C::Output => self.toggle_output(),
+            C::Grid => self.show_grid(),
             C::SynthEditor => self.toggle_synth(),
             C::NewSong => self.song_button("new"),
             C::RemoveSong => self.song_button("delete"),
@@ -1545,7 +1561,7 @@ impl Session {
             _ => library.songs.get(self.editor.selected_song()).map(|s| format!("song {}", s.name)),
         };
         let pattern = self.pattern();
-        let song_layout = crate::song_view::SongLayout::new(canvas.width(), canvas.height(), scale, self.status.len());
+        let song_layout = self.song_layout((canvas.width(), canvas.height(), scale));
         let rows = if self.workspace == Workspace::Song { self.song_rows() } else { Vec::new() };
         let roll_layout = self.roll_layout((canvas.width(), canvas.height(), scale));
         let roll = self.piano_roll_open().then(|| Some((self.roll_view(&roll_layout)?, self.roll_title()))).flatten();

@@ -69,9 +69,9 @@ impl Session {
     }
 
     pub(super) fn roll_layout(&self, size: (i32, i32, i32)) -> RollLayout {
-        let (width, height, scale) = size;
+        let body = self.body(size);
         let spb = self.roll_track().and_then(|t| self.track(t)).map_or(4, steps_per_beat);
-        RollLayout::new(width - self.track_editor_width(width, scale), height, scale, self.status.len(), spb)
+        RollLayout::new(body.main_w, body.editor_h, size.2, self.status.len(), spb)
     }
 
     /// The step playing on the roll's track, while the pattern plays.
