@@ -13,9 +13,9 @@ use crate::theme;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Command {
     TrackEditor,
+    Grid,
     SongView,
     PianoRoll,
-    Output,
     SynthEditor,
     NewSong,
     RemoveSong,
@@ -133,9 +133,9 @@ pub struct MenuState {
     pub kit_index: usize,
     pub kit_editor: bool,
     pub track_editor: bool,
+    pub grid: bool,
     pub song_view: bool,
     pub piano_roll: bool,
-    pub output: bool,
     pub synth: bool,
     /// A folder to save songs in (Save song).
     pub can_save_song: bool,
@@ -216,9 +216,10 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
             title: "View",
             items: vec![
                 check("Track editor", "F2", C::TrackEditor, true, s.track_editor),
-                check("Song", "F3", C::SongView, true, s.song_view),
+                Item::Separator,
+                check("Grid", "F5", C::Grid, true, s.grid),
                 check("Piano roll", "F4", C::PianoRoll, true, s.piano_roll),
-                check("Output", "F5", C::Output, true, s.output),
+                check("Song", "F3", C::SongView, true, s.song_view),
                 check("Synth", "F6", C::SynthEditor, true, s.synth),
                 check("Kit editor", "Ctrl+K", C::KitEditor, true, s.kit_editor),
             ],

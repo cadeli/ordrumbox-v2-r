@@ -13,16 +13,6 @@ use crate::panel::{Item, Kind, Rect};
 const MASTER_DELAY: Duration = Duration::from_millis(500);
 
 impl Session {
-    /// The output panel is shown (the kit editor opens over it).
-    pub fn output_open(&self) -> bool {
-        self.workspace == Workspace::Output && self.kit_editor.is_none()
-    }
-
-    /// F5, View > Output: the output panel in the place of the grid, or back.
-    pub fn toggle_output(&mut self) {
-        self.set_workspace(if self.workspace == Workspace::Output { Workspace::Grid } else { Workspace::Output });
-    }
-
     /// The master bus settings from `settings.json`, if it has some.
     pub(super) fn load_master(&mut self) {
         let Some(path) = store::settings_path() else { return };
@@ -65,9 +55,9 @@ impl Session {
         None
     }
 
-    /// The output panel's controls: the tabs, then the tab's knobs and sliders.
-    pub(super) fn output_items(&self, layout: &mut session_panel::PanelLayout, width: i32, scale: i32) {
-        let out = OutputLayout::new(width, scale);
+    /// The output strip's controls: the tabs, then the tab's knobs and sliders.
+    pub(super) fn output_items(&self, layout: &mut session_panel::PanelLayout, width: i32, band: Rect, scale: i32) {
+        let out = OutputLayout::strip(width, band, scale);
         for (i, (rect, label)) in out.tabs.iter().zip(output::TABS).enumerate() {
             let kind = Kind::Tab { label: label.into(), active: usize::from(self.output_tab) == i };
             layout.items.push(Item::new(Some(Id::OutTab(i as u8)), *rect, kind));
@@ -100,7 +90,7 @@ impl Session {
     }
 
     /// A tab or the compressor button pressed.
-    pub(super) fn output_activate(&mut self, id: Id) {
+    pub fn output_activate(&mut self, id: Id) {
         match id {
             Id::OutTab(i) => self.output_tab = i.min(2),
             Id::Master("compBypass") => {
@@ -111,12 +101,10 @@ impl Session {
         }
     }
 
-    /// What the output panel draws: on the vol tab, the spectrum of the
+    /// What the output strip draws: on the vol tab, the spectrum of the
     /// last samples played (the analyser keeps its smoothing between frames).
+    /// The strip is always shown.
     pub(super) fn output_view(&self) -> Option<OutputView> {
-        if !self.output_open() {
-            return None;
-        }
         if self.output_tab == 0
             && let Some(controller) = &self.controller
         {
@@ -139,8 +127,11 @@ mod tests {
     fn knobs_tabs_and_the_compressor_button() {
         let mut s = Session::new(Library::default(), KitSet::empty(), Vec::new());
         s.set_size(SIZE);
-        s.toggle_output();
-        let out = OutputLayout::new(SIZE.0, 1);
+        // The output strip is always shown along the bottom.
+        let out = {
+            let band = s.body(SIZE).output;
+            OutputLayout::strip(SIZE.0, band, 1)
+        };
         // vol: the wheel on the volume knob.
         let (x, y) = (out.volume.x + out.volume.w / 2, out.volume.y + 10);
         assert!(s.wheel(SIZE, x, y, -10, false, false));

@@ -46,9 +46,6 @@ const SONG_HELP: &str = "SONG   click the ruler: cursor   right-click: add / rep
 /// The same in the piano roll.
 const ROLL_HELP: &str =
     "PIANO ROLL   click: add / select / delete   drag: velocity / pitch   right-click: menu   F4 or ESC: grid";
-/// The same in the output panel.
-const OUTPUT_HELP: &str =
-    "OUTPUT   TAB: controls   drag, wheel, arrows: change   right-click: type a value   F5 or ESC: grid";
 /// The same in the synth editor.
 const SYNTH_HELP: &str = "SYNTH   TAB: controls   drag, wheel: knobs   click: waves, lists, power   F6 or ESC: grid";
 /// The same in the kit editor.
@@ -95,7 +92,7 @@ pub struct View<'a> {
     pub arrangement: Option<SongView<'a>>,
     /// The piano roll and its title, when shown (it takes the place of the grid).
     pub piano_roll: Option<(RollView<'a>, String)>,
-    /// The output panel, when shown (it takes the place of the grid).
+    /// The output panel, always shown (the bottom strip).
     pub output: Option<OutputView>,
     /// The synth editor is shown (the session paints it).
     pub synth: bool,
@@ -252,8 +249,9 @@ pub struct HeaderControls {
     pub views: [Rect; 5],
 }
 
-/// The view buttons' labels.
-pub const VIEWS: [&str; 5] = ["GRID", "ROLL", "SONG", "SYNTH", "OUT"];
+/// The view buttons' labels: the main editor (grid, piano roll, song, synth)
+/// and the kit editor.
+pub const VIEWS: [&str; 5] = ["GRID", "ROLL", "SONG", "SYNTH", "KIT"];
 
 pub fn header_controls(scale: i32) -> HeaderControls {
     let s = scale;
@@ -271,13 +269,54 @@ pub fn header_controls(scale: i32) -> HeaderControls {
     let beats = next(40, 10);
     let kit = next(110, 14);
     let generation = [next(48, 4), next(48, 4), next(64, 14)];
-    let views = [next(40, 3), next(40, 3), next(40, 3), next(48, 3), next(32, 0)];
+    let views = [next(40, 3), next(40, 3), next(40, 3), next(48, 3), next(40, 0)];
     HeaderControls { play, bpm, pattern, beats, kit, generation, views }
 }
 
 /// Top of the footer (status lines then help).
 pub fn footer_top(height: i32, scale: i32, status_lines: usize) -> i32 {
     height - margin(scale) - 10 * scale - status_lines as i32 * 10 * scale - 4 * scale
+}
+
+/// Height of the output strip always shown along the bottom of the window.
+pub fn output_height(scale: i32) -> i32 {
+    88 * scale
+}
+
+/// How the window is split: one main editor (grid, piano roll, song, synth or
+/// the kit editor) in the top-left, the track editor down the right edge (shown
+/// or hidden), and the output panel as a full-width strip along the bottom,
+/// always shown.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Body {
+    /// The main editor's width (the window minus the track editor).
+    pub main_w: i32,
+    /// The height to hand the main-editor layouts (grid, roll, song, synth,
+    /// kit). They place their bottom edge at `footer_top(height, …)`, so this
+    /// is the height whose `footer_top` lands just above the output strip —
+    /// `height - margin/2 - output_height` — not the region's literal height.
+    pub editor_h: i32,
+    /// The real bottom edge (y) shared by the main editor and the track editor.
+    pub main_bottom: i32,
+    /// The output strip's bounds (full width).
+    pub output: Rect,
+}
+
+impl Body {
+    /// The split of a `width` × `height` window at `scale`, `right` pixels
+    /// wide on the right for the track editor, with `status_lines` footer lines.
+    pub fn new(width: i32, height: i32, scale: i32, right: i32, status_lines: usize) -> Self {
+        let margin = margin(scale);
+        let output_h = output_height(scale);
+        let output_bottom = footer_top(height, scale, status_lines) - margin / 2;
+        let output_top = output_bottom - output_h;
+        Self {
+            main_w: (width - right).max(1),
+            editor_h: height - margin / 2 - output_h,
+            main_bottom: output_top - margin / 2,
+            output: Rect::new(0, output_top, width, output_h),
+        }
+    }
 }
 
 impl Layout {
@@ -454,8 +493,6 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
         SONG_HELP
     } else if view.piano_roll.is_some() {
         ROLL_HELP
-    } else if view.output.is_some() {
-        OUTPUT_HELP
     } else if view.synth {
         SYNTH_HELP
     } else {
@@ -463,23 +500,32 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
     };
     canvas.text(margin, footer_y, help, scale, DIM);
 
+    // The window split: one main editor top-left, the track editor down the
+    // right, the output strip along the bottom.
+    let body = Body::new(canvas.width(), canvas.height(), scale, view.right, view.status.len());
+
+    // The main editor (top-left): exactly one of the song panel, the kit
+    // editor, the synth editor (painted by the session), the piano roll, the grid.
     if let Some(arrangement) = &view.arrangement {
-        let layout = SongLayout::new(canvas.width(), canvas.height(), scale, view.status.len());
+        let layout = SongLayout::new(body.main_w, body.editor_h, scale, view.status.len());
         song_view::draw(canvas, arrangement, &layout);
     } else if let Some(kit) = &view.kit_view {
-        let layout = KitLayout::new(canvas.width(), canvas.height(), scale, view.status.len());
+        let layout = KitLayout::new(body.main_w, body.editor_h, scale, view.status.len());
         draw_kit(canvas, kit, &layout);
     } else if view.synth {
         // Painted by the session (`draw_synth`).
-    } else if let Some(out) = &view.output {
-        output::draw(canvas, out, &OutputLayout::new(canvas.width(), scale));
     } else if let Some((roll, title)) = &view.piano_roll {
         let spb = piano_roll::steps_per_beat(roll.track);
-        let layout = RollLayout::new(canvas.width() - view.right, canvas.height(), scale, view.status.len(), spb);
+        let layout = RollLayout::new(body.main_w, body.editor_h, scale, view.status.len(), spb);
         piano_roll::draw(canvas, roll, &layout, title);
     } else if let Some(pattern) = view.pattern {
-        let layout = Layout::new(canvas.width() - view.right, canvas.height(), scale, pattern, view.status.len());
+        let layout = Layout::new(body.main_w, body.editor_h, scale, pattern, view.status.len());
         draw_grid(canvas, pattern, view, &layout);
+    }
+
+    // The output panel, always shown as a strip along the bottom.
+    if let Some(out) = &view.output {
+        output::draw(canvas, out, &OutputLayout::strip(canvas.width(), body.output, scale));
     }
 }
 
@@ -713,6 +759,30 @@ mod tests {
                 status: &["warning".into()],
             };
             draw(&mut canvas, &view, 1);
+        }
+    }
+
+    #[test]
+    fn body_splits_the_window_above_the_output_strip() {
+        let library = library();
+        let pattern = library.patterns.first().unwrap();
+        for scale in [1, 2] {
+            for (w, h) in [(1100, 680), (1280, 800)] {
+                for status in [0, 1, 3] {
+                    for right in [0, 300 * scale] {
+                        let body = Body::new(w, h, scale, right, status);
+                        assert_eq!(body.main_w, w - right);
+                        // The strip's bottom edge is the footer's top, less a margin.
+                        assert_eq!(body.output.y + body.output.h, footer_top(h, scale, status) - margin(scale) / 2);
+                        // The main editor stops above the strip, with a gap.
+                        assert!(body.main_bottom < body.output.y);
+                        // The editor height is virtual: a layout built with it
+                        // (and the real status count) ends exactly at main_bottom.
+                        let grid = Layout::new(body.main_w, body.editor_h, scale, pattern, status);
+                        assert_eq!(grid.bottom, body.main_bottom);
+                    }
+                }
+            }
         }
     }
 

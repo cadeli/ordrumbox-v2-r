@@ -14,7 +14,6 @@ use crate::canvas::{Canvas, Rgb, text_width};
 use crate::control::{Format, Spec};
 use crate::panel::Rect;
 use crate::theme;
-use crate::view;
 
 /// A master bus setting: its `settings.master` key, label, range, step and
 /// how its value shows (`COMPRESSOR_PARAMS`, the master and filter controls).
@@ -156,6 +155,8 @@ const CURVE_Y: (f64, f64) = (-60.0, 12.0);
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct OutputLayout {
     scale: i32,
+    /// The band the panel is drawn in (the bottom strip; empty in the full layout).
+    pub band: Rect,
     pub title: (i32, i32),
     pub tabs: [Rect; 3],
     /// vol: the volume knob, the spectrum.
@@ -172,31 +173,52 @@ pub struct OutputLayout {
 }
 
 impl OutputLayout {
-    pub fn new(width: i32, scale: i32) -> Self {
+    /// The compact bottom strip: the title and the three tabs stacked on the
+    /// left, the active tab's controls in one horizontal row across `band`.
+    pub fn strip(width: i32, band: Rect, scale: i32) -> Self {
         let s = scale;
-        let margin = 16 * s;
-        let top = view::body_top(scale);
-        let tab_y = top + 14 * s;
-        let tabs = [0, 1, 2].map(|i| Rect::new(margin + i * 64 * s, tab_y, 60 * s, 14 * s));
-        let y = tab_y + 24 * s;
-        let knob = |x: i32, y: i32| Rect::new(x, y, 76 * s, 56 * s);
-        let curve = Rect::new(margin + 80 * s, y, 320 * s, 140 * s);
-        let header_y = curve.y + curve.h + 10 * s;
-        let knobs_y = header_y + 22 * s;
-        let compressor = [0, 1, 2, 3, 4, 5].map(|i| knob(margin + i * 82 * s, knobs_y));
-        let slider_w = (width - 2 * margin).clamp(0, 420 * s);
+        let pad = 8 * s;
+        let top = band.y + pad;
+        let inner_h = (band.h - 2 * pad).max(1);
+        let title = (band.x + pad, top);
+        // The tabs, stacked under the title on the left.
+        let tab_w = 56 * s;
+        let tabs = [0, 1, 2].map(|i| Rect::new(band.x + pad, top + 13 * s + i * 15 * s, tab_w, 12 * s));
+        // The controls fill what is left of the width, one row, vertically centred.
+        let cx = band.x + pad + tab_w + 16 * s;
+        let right = width - pad;
+        let knob_w = 76 * s;
+        let knob_h = inner_h.min(64 * s);
+        let knob_y = band.y + (band.h - knob_h) / 2;
+        let knob = |x: i32, w: i32| Rect::new(x, knob_y, w, knob_h);
+        let after_knobs = |n: i32| cx + n * (knob_w + 4 * s);
+        // vol: the volume knob, then the spectrum filling the rest.
+        let volume = knob(cx, knob_w);
+        let spectrum = Rect::new(cx + knob_w + 12 * s, top, (right - (cx + knob_w + 12 * s)).max(0), inner_h);
+        // Comp: pre-gain + six knobs + the on/off button, the curve on the right.
+        let pre_gain = knob(cx, knob_w);
+        let compressor = [0, 1, 2, 3, 4, 5].map(|i| knob(after_knobs(i + 1), knob_w));
+        let bypass = Rect::new(after_knobs(7), band.y + (band.h - 12 * s) / 2, 40 * s, 12 * s);
+        let curve_x = after_knobs(7) + 52 * s;
+        let curve = Rect::new(curve_x, top, (right - curve_x).max(0), inner_h);
+        // Flt: the two sliders, one under the other, across the width.
+        let filters = [
+            Rect::new(cx, band.y + band.h / 2 - 18 * s, (right - cx).max(0), 16 * s),
+            Rect::new(cx, band.y + band.h / 2 + 2 * s, (right - cx).max(0), 16 * s),
+        ];
         Self {
             scale,
-            title: (margin, top),
+            band,
+            title,
             tabs,
-            volume: knob(margin, y),
-            spectrum: Rect::new(margin, y + 70 * s, 256 * 2 * s, 100 * 2 * s),
-            pre_gain: knob(margin, y + 40 * s),
+            volume,
+            spectrum,
+            pre_gain,
             curve,
-            compressor_title: (margin, header_y + 3 * s),
-            bypass: Rect::new(margin + 100 * s, header_y, 40 * s, 14 * s),
+            compressor_title: (curve_x, band.y + 2 * s),
+            bypass,
             compressor,
-            filters: [Rect::new(margin, y, slider_w, 16 * s), Rect::new(margin, y + 24 * s, slider_w, 16 * s)],
+            filters,
         }
     }
 }
@@ -221,10 +243,17 @@ pub struct OutputView {
 
 pub fn draw(canvas: &mut Canvas, view: &OutputView, layout: &OutputLayout) {
     let s = layout.scale;
+    if layout.band.h > 0 {
+        // The strip: a panel along the bottom, edged on top.
+        canvas.fill_rect(layout.band.x, layout.band.y, layout.band.w, layout.band.h, theme::PANEL);
+        canvas.fill_rect(layout.band.x, layout.band.y, layout.band.w, s.max(1), theme::LINE);
+    }
     canvas.text(layout.title.0, layout.title.1, "Master", s, ACCENT);
     match view.tab {
-        0 => draw_spectrum(canvas, &view.spectrum, layout.spectrum, s),
-        1 => {
+        0 if layout.spectrum.w > 8 * s && layout.spectrum.h > 8 * s => {
+            draw_spectrum(canvas, &view.spectrum, layout.spectrum, s);
+        }
+        1 if layout.curve.w > 8 * s && layout.curve.h > 8 * s => {
             draw_curve(canvas, &view.master, layout.curve, s);
             canvas.text(layout.compressor_title.0, layout.compressor_title.1, "COMPRESSOR", s, MUTED);
         }
@@ -339,11 +368,12 @@ mod tests {
         for (w, h) in [(1, 1), (40, 30), (1100, 680)] {
             let mut pixels = vec![0; w * h];
             let mut canvas = Canvas::new(&mut pixels, w, h);
-            let layout = OutputLayout::new(w as i32, 1);
+            let (wi, hi) = (w as i32, h as i32);
+            let band = Rect::new(0, (hi - 88).max(0), wi, hi.min(88));
+            let layout = OutputLayout::strip(wi, band, 1);
             for tab in 0..3 {
                 let master = MasterSettings { bypass: f32::from(tab == 2), ..MasterSettings::default() };
                 draw(&mut canvas, &OutputView { tab, master, spectrum: bins.clone() }, &layout);
-                draw_curve(&mut canvas, &master, layout.curve, 1);
             }
         }
     }
