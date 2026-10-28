@@ -1,7 +1,8 @@
 # Tests JS d'ordrumbox-v2 face au portage Rust
 
-Inventaire au 2026-10-28 (commit Rust `d84686d`, plus l'output panel,
-les contrôles de l'en-tête, Compact tracks et l'éditeur de synthé). Aucun test JS n'est lancé
+Inventaire au 2026-10-28 (commit Rust `03003a7`, plus les tests de
+scénario portés : `scenarios.rs`, `gen_sliders.rs`, `user_flow.rs`,
+`session_scenarios.rs`). Aucun test JS n'est lancé
 ni porté tel quel : le portage se vérifie contre le **code source** JS, que
 les scripts `tools/export_*_fixtures.mjs` exécutent pour produire les
 fixtures que les tests Rust doivent reproduire.
@@ -23,28 +24,28 @@ Statuts :
 | `auto-generation.spec.js` | 8 | Couvert | ↻ Drum/Bass/Chords et leur bascule : `generators.json` (toggles, notes, mode auto). Les boutons de barre d'outils sont des entrées de menu (D, S, A). |
 | `auto-generation.mobile.spec.js` | 4 | Sans objet | Barre d'outils mobile. |
 | `canvas-rendering.spec.js` | 1 | Partiel | Le spectre (output panel) est porté : la FFT et l'analyseur ont leurs tests (`spectrum.rs`), pas « des pixels non vides pendant la lecture ». |
-| `cold-start.spec.js` | 3 | Partiel | Assignation des sons au premier lancement : `assign.json` ; premier tick : tests du `Controller`. L'AudioContext est sans objet. |
+| `cold-start.spec.js` | 3 | Couvert | Chaque piste a un son avant la première lecture, le premier passage sonne : `scenarios.rs` (moteur), `assign.json`. L'AudioContext est sans objet. |
 | `color-scheme.spec.js` | 4 | Non porté | Thèmes de couleur. |
-| `gen-sliders.spec.js` | 14 | Partiel | Les curseurs de l'onglet gen sont portés ; les variantes sont couvertes par `generators.json`, mais pas l'effet de chaque `prob_*` à 0 et 100 %. |
-| `kit-change.spec.js` | 2 | Partiel | Réassignation au changement de kit : `assign.json` ; pas de test « en pleine lecture ». |
+| `gen-sliders.spec.js` | 14 | Couvert | `gen_sliders.rs` (core) : chaque `prob_*` isolé, à 0 jamais d'effet, à 100 au moins une fois ; `pitch_range`, `pitch_scale_lock`, `prob_note_depth` (plancher 0,2 : test de `variation.rs`). Les curseurs eux-mêmes : `controls.json`. |
+| `kit-change.spec.js` | 2 | Couvert | Changement de kit en pleine lecture : toutes les pistes auto passent au nouveau kit, la lecture continue et les passes suivantes sonnent (`scenarios.rs`, moteur). |
 | `layout.spec.js` | 3 | Sans objet | Disposition DOM (les tests Rust vérifient dessin et hit-test ensemble). |
-| `live-vs-export.spec.js` | 2 | Partiel | Lecture et export partagent le même constructeur de passes ; `render.rs` teste l'export, pas l'égalité avec la lecture en direct. |
+| `live-vs-export.spec.js` | 2 | Couvert | `scenarios.rs` (moteur) : lecture et export identiques au sample près pour des callbacks multiples de 128 frames, dans les tolérances du test JS sinon ; export d'un pattern de synthé audible à chaque rendu. |
 | `mobile-layout.mobile.spec.js` | 4 | Sans objet | Mobile. |
 | `offline.spec.js` | 1 | Sans objet | Service worker. |
 | `page-matrix.spec.js` | 1 | Sans objet | Pagination de la grille : la grille Rust montre tout le pattern. |
 | `panels.spec.js` | 4 | Partiel | About, track editor (F2) et éditeur de synthé (F6) portés ; ces bascules ne sont pas testées telles quelles. |
 | `pattern-grid-drag.spec.js` | 9 | Partiel | Glisser une note (vélocité, hauteur, jauge) non porté ; Shift+flèches porté (`nudge_*`). |
-| `pattern-lifecycle.spec.js` | 5 | Partiel | Chaque étape existe et sa sortie est couverte (sauvegarde `library.json`, octets MIDI `midi.json`, octets WAV `wav.json`, fichier song `.odbox`) ; le parcours complet n'est pas testé. |
+| `pattern-lifecycle.spec.js` | 5 | Partiel | Parcours condensé dans la session (`session_scenarios.rs`) : pattern construit dans la grille, sauvé et rechargé à l'identique, exporté en MIDI (seule la piste solo, tempo, 4/4, note-on/off appariés) et en WAV (longueur, son). Non repris : chaque réglage de piste, de note et de synthé via son contrôle. |
 | `persistence.spec.js` | 3 | Partiel | Sauvegarde et rechargement : test `save_then_load` du store. Version de cache IndexedDB et `clearAllCache` : sans objet. |
 | `piano_roll.spec.js` | 7 | Partiel | Glisser (vélocité, hauteur, axe verrouillé), clic qui sélectionne puis supprime, annuler en une étape, Shift+flèches : tests `session_roll` et `piano_roll.json` (`NoteDrag`). La jauge est une bulle de texte. |
 | `piano-roll.mobile.spec.js` | 4 | Sans objet | Piano roll sur mobile. |
-| `playback.spec.js` | 5 | Partiel | La tête de lecture avance : tests du `Controller` ; clic sur une case qui joue la note : non testé. Écran d'accueil et 404 : sans objet. |
-| `playback_tempo.spec.js` | 3 | Partiel | Tempo du pattern en vue grille, de la song en vue song : porté, non testé au niveau session. Vue synthé : non portée. |
+| `playback.spec.js` | 5 | Couvert | `session_scenarios.rs` : Espace lance, la tête de lecture avance, Espace arrête ; un clic sur une case (vide, note, nom de piste) fait entendre la note à l'arrêt. Écran d'accueil et 404 : sans objet. |
+| `playback_tempo.spec.js` | 3 | Couvert | `session_scenarios.rs` : tempo du pattern en grille (et changé en pleine lecture), inchangé et sans redémarrage en passant par synthé et piano roll, tempo de la song dans la vue song, retour au pattern. |
 | `select_dropdown.spec.js` | 2 | Couvert | `Dropdown` : tests du panel (clavier, molette, clic, fermeture). |
 | `song-arrangement.spec.js` | 34 | Partiel (élevé) | Commandes : `song_edits.json` ; menus, clics, Next/Delete/Add here/Delete row, annuler : tests `session_song` ; lignes, rectangles, règle, hit-test : tests `song_view`. Non vérifiés tels quels : curseur qui revient dans la grille en boucle, boucle d'animation arrêtée en quittant la vue. |
-| `song-playback.spec.js` | 6 | Partiel | Clips superposés résolus ensemble : `song_sources.json` ; démarrage à une mesure et saut : test du `Controller`. Bascule de mode en changeant de vue : non testée. |
+| `song-playback.spec.js` | 6 | Couvert | Clips superposés : `song_sources.json` et le rendu (`scenarios.rs`) ; mode suivant la vue, avance mesure après mesure : `session_scenarios.rs` ; chaque pattern de l'arrangement a ses sons : `scenarios.rs`. |
 | `song-view.spec.js` | 4 | Partiel | Vue, liste d'arrangements, liste de patterns qui défile : portés. Différence : en Rust le track editor est masqué dans la vue song. |
-| `song-wav-export.spec.js` | 5 | Partiel | `render_song` : test de longueur et de refus sans clip jouable (`offline.rs`) ; effet d'un second clip et tempo de la song : non testés. |
+| `song-wav-export.spec.js` | 5 | Couvert | `scenarios.rs` (moteur) : longueur au tempo de la song (120 et 240 bpm), en-tête 16 bits stéréo, son présent, un second clip change plus de la moitié des samples, refus sans clip jouable, boucle de l'arrangement raccourcie. Le bouton : Ctrl+Shift+E. |
 | `synth-modulators.spec.js` | 3 | Couvert (DSP) | Chaque cible de LFO : `renders.bin` (processeurs DSP). L'éditeur de synthé n'est pas porté. |
 | `synth-params.spec.js` | 4 | Couvert (DSP) | Presets, formes d'onde, algorithmes FM, filtres : `renders.bin`, `synth_patches.json`. |
 | `synth_group_titles.spec.js` | 1 | Sans objet | Position du titre dans le DOM. |
@@ -72,6 +73,7 @@ Statuts :
 | DSP | `worklet_synth_voice`, `worklet_master_bus`, `strip_sync`, `fx_values`, `lfo_engine`, `math` | `renders.{json,bin}`, `strip_settings.json`, `lfo_values.json`, `synth_patches.json` |
 | WAV, analyse | `wav_encoder`, `sample_analyzer`, `hz_to_note` | `wav.json`, `analysis.json` |
 | Contrôles | `base_control`, `or_knob_log`, `ui_utils` (formatage) | `controls.json` |
+| Scénarios | `e2e_user_flow`, `wav_midi_roundtrip` (aller-retour MIDI), `e2e_audio_comparison` | `user_flow.rs`, `scenarios.rs`, `wav.json` |
 
 ### Partiels (porté, non testé tel quel)
 
@@ -83,8 +85,8 @@ Statuts :
 `drumkit_manager_autoassign`, `drumkit_service`, `audio_import_service`,
 `select_lists`, `select_dropdown`, `sync_helpers`, `note_nudge`, `seq`,
 `player_cache`, `voices`, `sound`, `wav_export_functional`,
-`wav_export_transport`, `wav_midi_roundtrip`, `wav_analysis`, `wav_render`,
-`e2e_user_flow`, `e2e_audio_comparison`, `export_section_midi`,
+`wav_export_transport`, `wav_analysis`, `wav_render`,
+`export_section_midi`,
 `random`, `numbers`, `pixel_font`, `view_switch`,
 `about_panel_lifecycle`, `tools_panel_clear_rnd`, `output_panel_sliders`,
 `undo_policy` (les réglages du master ne sont pas des étapes d'annulation,
@@ -122,10 +124,16 @@ Démarrage et câblage JS : `bootstrap_*`, `service_registry`,
 
 ## Ce qui manquerait le plus
 
-Les scénarios e2e des fonctionnalités **déjà portées** qui ne sont vérifiés
-nulle part en Rust : la lecture (clic sur une case qui joue la note, tempo
-selon la vue, bascule de mode en changeant de vue), le changement de kit en
-pleine lecture, l'égalité lecture directe / export WAV, l'effet des curseurs
-`prob_*` à 0 et 100 %, l'export WAV d'une song (tempo, second clip), et le
-parcours complet de `pattern-lifecycle`. Ils peuvent devenir des tests au
-niveau de la `Session` ou du `Controller`.
+Les scénarios e2e des fonctionnalités portées sont maintenant vérifiés au
+niveau du moteur (`ordrumbox-engine/tests/scenarios.rs`), du moteur de
+patterns (`ordrumbox-core/tests/gen_sliders.rs`), de la logique
+(`ordrumbox-logic/tests/user_flow.rs`) et de la `Session`
+(`ordrumbox-app/src/session_scenarios.rs`, avec un vrai `Controller` rendu
+comme un callback audio). Restent : le parcours complet de
+`pattern-lifecycle` contrôle par contrôle, et les glisser de notes sur la grille.
+
+Écart relevé en portant `live-vs-export` : `Engine::render` découpe chaque
+callback en quanta de 128 frames à partir de son début. Avec un callback qui
+n'est pas un multiple de 128 (300 frames, par exemple), les paramètres de strip
+ne sont plus lus aux mêmes frames que dans l'export : écart maximal de 0,04
+sur un sample, sous les tolérances du test JS.

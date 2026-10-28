@@ -365,6 +365,25 @@ mod tests {
     }
 
     #[test]
+    fn note_probability_never_falls_below_the_floor() {
+        let track = Track {
+            auto: true,
+            auto_variation2: Some(100.0),
+            prob_retrig: 0.0,
+            prob_euclid: 0.0,
+            prob_note: 100.0,
+            prob_note_depth: 100.0,
+            notes: vec![Note::default(); 4],
+            ..Track::default()
+        };
+        let mut rng = Rng::new(2);
+        let probs: Vec<f64> =
+            (0..50).flat_map(|_| vary_notes(&track, &mut rng).into_values().map(|n| n.prob)).collect();
+        assert!(probs.iter().any(|&p| p < 0.5));
+        assert!(probs.iter().all(|&p| (NOTE_PROB_FLOOR..=1.0).contains(&p)), "{probs:?}");
+    }
+
+    #[test]
     fn no_amount_no_draw() {
         let track = Track { notes: vec![Note::default()], ..Track::default() };
         let mut rng = Rng::new(1);
