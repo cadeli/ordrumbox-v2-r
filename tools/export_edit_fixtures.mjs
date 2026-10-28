@@ -145,3 +145,80 @@ while (history.canRedo) {
 await mkdir(outDir, { recursive: true })
 await writeFile(join(outDir, 'edits.json'), JSON.stringify({ ops: OPS, steps }) + '\n')
 process.stdout.write(`edits: ${OPS.length} operations, ${steps.length} states\n`)
+
+// ─── Compact Tracks (the tools panel's button: compactTrack on every track) ───
+//
+// On every pattern of song.json, and on hand-made patterns that repeat,
+// loaded the way the app boots (fixPatterns, then importPatternFromJson, as
+// tools/export_fixtures.mjs does): the notes are full objects, with a
+// stepPercent, which compactTrack compares. Writes compact.json: the step
+// descriptions and the tracks after (loop point, notes).
+
+const { importPatternFromJson } = await import(srcUrl('logic/commands/pattern_import.js'))
+const { normalizeTrack, clampStepsPerBeat } = await import(srcUrl('model/track_schema.js'))
+const { NOTE_DEFAULTS } = await import(srcUrl('core/note_schema.js'))
+const { getPanFromTrackName } = await import(srcUrl('core/drum_taxonomy.js'))
+
+function importAsApp(fixed) {
+    const addPattern = (name) => ({ id: '', name, description: '', tags: [], tracks: [], bpm: 120, beatCount: 4 })
+    const addTrack = (pattern, name) => {
+        const track = normalizeTrack({
+            name,
+            beatCount: pattern.beatCount,
+            stepsPerBeat: 4,
+            loopAtStep: pattern.beatCount * 4,
+            pan: getPanFromTrackName(name),
+        })
+        clampStepsPerBeat(track)
+        pattern.tracks.push(track)
+        return track
+    }
+    const addNote = (track, beat, beatStep, pitch = 0) => {
+        clampStepsPerBeat(track)
+        const note = { ...NOTE_DEFAULTS, beatStep, stepPercent: Math.round((beatStep * 100) / track.stepsPerBeat), beat, pitch }
+        track.notes.push(note)
+        return note
+    }
+    return importPatternFromJson(fixed, addPattern, addTrack, addNote)
+}
+
+const rep = (period, steps, extra = {}) =>
+    Array.from({ length: steps / period }, (_, k) => ({ beat: Math.floor((k * period) / 4), beatStep: (k * period) % 4, ...extra }))
+const handPatterns = [
+    { name: 'h1', beatCount: 4, tracks: [{ name: 'KICK', stepsPerBeat: 4, beatCount: 4, notes: rep(4, 16) }] },
+    {
+        name: 'h2',
+        beatCount: 8,
+        tracks: [
+            { name: 'HH', stepsPerBeat: 4, beatCount: 8, notes: rep(2, 32, { velocity: 0.5 }) },
+            { name: 'SNARE', stepsPerBeat: 4, beatCount: 8, notes: [...rep(8, 32), { beat: 7, beatStep: 3 }] },
+            { name: 'BASS', stepsPerBeat: 4, beatCount: 8, notes: [...rep(16, 32, { pitch: 3 }), ...rep(16, 32, { pitch: 7 })] },
+            { name: 'TOM', stepsPerBeat: 4, beatCount: 8, loopAtStep: 16, notes: rep(4, 16) },
+            { name: 'EMPTY', stepsPerBeat: 4, beatCount: 8, notes: [] },
+        ],
+    },
+]
+const compacted = []
+for (const [source, list] of [['song', song.patterns], ['hand', handPatterns]]) {
+    appState.patterns = fixPatterns(structuredClone(list)).map(importAsApp)
+    const compactHistory = new HistoryManager(500)
+    const descs = []
+    const recordCompact = compactHistory.record.bind(compactHistory)
+    compactHistory.record = (command) => {
+        descs.push(command.meta?.desc ?? null)
+        recordCompact(command)
+    }
+    const compactCmd = new Commander({ history: compactHistory })
+    appState.patterns.forEach((pattern, p) => {
+        descs.length = 0
+        pattern.tracks.forEach((track) => compactCmd.compactTrack(track))
+        const tracks = pattern.tracks.map((t) => ({
+            name: t.name,
+            loopAtStep: t.loopAtStep,
+            notes: t.notes.map((n) => [n.beat, n.beatStep, n.pitch, n.velocity]),
+        }))
+        compacted.push({ source, p, descs: [...descs], tracks })
+    })
+}
+await writeFile(join(outDir, 'compact.json'), JSON.stringify({ hand: handPatterns, patterns: compacted }) + '\n')
+process.stdout.write(`compact: ${compacted.length} patterns, ${compacted.filter((c) => c.descs.length).length} compacted\n`)

@@ -1,6 +1,8 @@
 //! A track of a pattern (`src/model/track_schema.js`): its parameters, its
 //! notes, and the load/save rules of `fixer.js` and `exporter.js`.
 
+use std::collections::HashMap;
+
 use crate::drum_taxonomy::pan_from_track_name;
 use crate::json::{Object, Value};
 use crate::note::{Note, decode_notes, encode_notes};
@@ -242,6 +244,80 @@ impl Track {
             object.insert("notes", Value::Array(notes));
         }
         Value::Object(object)
+    }
+}
+
+/// What a note sounds like, wherever it is (`getAudibleNoteSignature`):
+/// every field but its beat and step — its `stepPercent` included, as in
+/// the app every note has one (`addNote`), so only notes on the same step
+/// of their beat compare equal.
+fn audible_signature(note: &Note, steps_per_beat: i32) -> String {
+    let mut signature: Vec<String> = note
+        .table_fields()
+        .into_iter()
+        .filter(|(key, ..)| !matches!(*key, "beat" | "beatStep"))
+        .map(|(key, value, _)| format!("{key}={}", value.to_json()))
+        .collect();
+    signature.push(format!("stepPercent={}", Value::from(note.step_percent(steps_per_beat)).to_json()));
+    signature.join(",")
+}
+
+impl Track {
+    /// Steps the track spans (`getTrackStepLength`): its beats, widened to its last note.
+    fn step_length(&self) -> i64 {
+        let spb = i64::from(self.steps_per_beat);
+        let declared = (i64::from(self.beat_count) * spb).max(0);
+        let last = self.notes.iter().map(|n| i64::from(n.beat) * spb + i64::from(n.beat_step) + 1).max().unwrap_or(0);
+        declared.max(last)
+    }
+
+    /// The signatures of the notes on each step, `map` folding the steps
+    /// (`createStepSignatureMap`).
+    fn step_signatures<'a>(
+        notes: impl Iterator<Item = &'a Note>,
+        spb: i32,
+        map: impl Fn(i64) -> i64,
+    ) -> HashMap<i64, String> {
+        let mut steps: HashMap<i64, Vec<String>> = HashMap::new();
+        for note in notes {
+            let step = map(i64::from(note.beat) * i64::from(spb) + i64::from(note.beat_step));
+            if step >= 0 {
+                steps.entry(step).or_default().push(audible_signature(note, spb));
+            }
+        }
+        steps
+            .into_iter()
+            .map(|(step, mut signatures)| {
+                signatures.sort();
+                (step, signatures.join("|"))
+            })
+            .collect()
+    }
+
+    /// Shorten the track to its shortest loop, when its notes repeat one
+    /// (`addLoopToTrackIfPossible`, the tools panel's Compact Tracks): the
+    /// loop point set, the notes past it removed, the rest sorted by step.
+    /// Whether it changed.
+    pub fn compact_loop(&mut self) -> bool {
+        let spb = self.steps_per_beat;
+        let total = self.step_length();
+        if spb <= 0 || total <= 1 || self.notes.is_empty() {
+            return false;
+        }
+        let current = self.loop_at_step.map(i64::from).filter(|&l| l > 0).unwrap_or(total);
+        let step_of = |n: &Note| i64::from(n.beat) * i64::from(spb) + i64::from(n.beat_step);
+        let original = Self::step_signatures(self.notes.iter(), spb, |s| s);
+        let Some(loop_at) = (1..current).find(|&loop_at| {
+            let looped =
+                Self::step_signatures(self.notes.iter().filter(|n| step_of(n) < loop_at), spb, |s| s % loop_at);
+            (0..total).all(|step| original.get(&step) == looped.get(&(step % loop_at)))
+        }) else {
+            return false;
+        };
+        self.notes.retain(|n| step_of(n) < loop_at);
+        self.notes.sort_by_key(step_of);
+        self.loop_at_step = Some(loop_at as i32);
+        true
     }
 }
 

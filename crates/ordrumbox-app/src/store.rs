@@ -75,6 +75,34 @@ pub fn save_song(path: &Path, record: &json::Value) -> io::Result<()> {
     write_atomic(path, &(record.to_json_pretty(2) + "\n"))
 }
 
+/// The app settings (`settings.json`: `settings.master`, the master bus).
+pub fn settings_path() -> Option<PathBuf> {
+    Some(user_dir()?.join("settings.json"))
+}
+
+/// The master bus settings saved, if there are some (an unreadable file is an error).
+pub fn load_master(path: &Path) -> Result<Option<ordrumbox_engine::MasterSettings>, String> {
+    match fs::read_to_string(path) {
+        Ok(text) => {
+            let value = json::parse(&text).map_err(|e| format!("{}: {e}", path.display()))?;
+            Ok(value.get("master").map(crate::output::from_json))
+        }
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(format!("{}: {e}", path.display())),
+    }
+}
+
+/// Write the master bus settings, keeping the file's other settings.
+pub fn save_master(path: &Path, master: &ordrumbox_engine::MasterSettings) -> io::Result<()> {
+    let mut settings = fs::read_to_string(path)
+        .ok()
+        .and_then(|text| json::parse(&text).ok())
+        .and_then(|v| v.as_object().cloned())
+        .unwrap_or_default();
+    settings.insert("master", crate::output::to_json(master));
+    write_atomic(path, &(json::Value::Object(settings).to_json_pretty(2) + "\n"))
+}
+
 /// The kits, once edited.
 pub fn kits_path() -> Option<PathBuf> {
     Some(user_dir()?.join("kits.json"))
@@ -162,6 +190,22 @@ mod tests {
         save_song(&dir.join("a.odbox"), &json::parse(r#"{"name":"a"}"#).unwrap()).unwrap();
         fs::write(dir.join("c.json"), "{}").unwrap();
         assert_eq!(list_songs(&dir), [dir.join("a.odbox"), dir.join("b.odbox")]);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn master_settings_keep_the_other_settings() {
+        let dir = env::temp_dir().join(format!("ordrumbox-settings-{}", std::process::id()));
+        let path = dir.join("settings.json");
+        assert_eq!(load_master(&path), Ok(None));
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(&path, r#"{"colorScheme":3,"master":{"volume":0.5}}"#).unwrap();
+        let mut master = load_master(&path).unwrap().unwrap();
+        assert_eq!((master.master, master.threshold), (0.5, -18.0));
+        master.threshold = -30.0;
+        save_master(&path, &master).unwrap();
+        assert_eq!(load_master(&path).unwrap().unwrap(), master);
+        assert!(fs::read_to_string(&path).unwrap().contains("\"colorScheme\": 3"));
         fs::remove_dir_all(dir).unwrap();
     }
 

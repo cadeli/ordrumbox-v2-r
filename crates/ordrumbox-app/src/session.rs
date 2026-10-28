@@ -33,6 +33,8 @@ use crate::picker::{self, Outcome, Picker, PickerLayout, Purpose};
 use crate::store;
 use crate::view::{self, Cursor, Hit, KitView, View};
 
+#[path = "session_output.rs"]
+mod session_output;
 #[path = "session_panel.rs"]
 mod session_panel;
 #[path = "session_roll.rs"]
@@ -50,6 +52,8 @@ pub enum Workspace {
     PianoRoll,
     /// The song panel (F3): Space plays the song.
     Song,
+    /// The output panel (F5): the master bus.
+    Output,
 }
 
 /// Save this long after the last edit.
@@ -169,8 +173,15 @@ pub struct Session {
     detached: Option<(usize, Note)>,
     /// Kit knob edits not yet applied to the bank and saved.
     kits_dirty: Option<Instant>,
-    /// Master volume, 0–2 (not saved, as in the JS).
-    master_volume: f64,
+    /// The master bus settings (the output panel's; the grid's master
+    /// volume is their volume), and when they changed, not saved yet.
+    master: ordrumbox_engine::MasterSettings,
+    master_dirty: Option<Instant>,
+    /// The output panel's tab: vol, Comp, Flt.
+    output_tab: u8,
+    /// The spectrum's analyser and its last bins.
+    analyser: std::cell::RefCell<crate::spectrum::Analyser>,
+    spectrum: std::cell::RefCell<Vec<u8>>,
     /// The grid step under the mouse: track, beat, step (its note's tooltip).
     hover: Option<(usize, i32, i32)>,
     /// Sample analyses of the track editor, by url.
@@ -209,10 +220,10 @@ enum Overlay {
 }
 
 /// Every key, for Help > Keyboard shortcuts.
-const SHORTCUTS: [&str; 46] = [
+const SHORTCUTS: [&str; 48] = [
     "MENUS",
     "  F10 or Alt             open the menus: Arrows move, Enter runs, Esc closes",
-    "  F1 F2 F3 F4            this list, the track editor (shown or hidden), song panel, piano roll",
+    "  F1 F2 F3 F4 F5         this list, track editor (shown or hidden), song, piano roll, output",
     "GRID",
     "  Arrows                 move the cursor",
     "  Enter / click          add a note, select it, delete the selected one",
@@ -247,6 +258,8 @@ const SHORTCUTS: [&str; 46] = [
     "  click / drag / right-click a cell: add, select, delete; velocity (up/down) or pitch; menu",
     "  Arrows, Shift+Arrows   the cursor; the selected note's velocity / pitch    Enter, Delete",
     "  a key: hear it, right-click: clear, chord progression     wheel (Shift: pages)",
+    "OUTPUT PANEL (F5)",
+    "  vol, Comp, Flt         the master volume and spectrum, the compressor, the filters (saved)",
     "SONG PANEL (F3)",
     "  click / right-click    the ruler: aim the cursor; a pattern, row, clip, the grid: menu",
     "  Left Right, Up Down    the cursor a measure back / on, previous / next pattern",
@@ -345,6 +358,7 @@ impl Session {
             }
             Err(e) => session.status.push(format!("no sound: {e}")),
         }
+        session.load_master();
         session
     }
 
@@ -400,7 +414,11 @@ impl Session {
             note_focus: None,
             detached: None,
             kits_dirty: None,
-            master_volume: 1.0,
+            master: ordrumbox_engine::MasterSettings::default(),
+            master_dirty: None,
+            output_tab: 0,
+            analyser: std::cell::RefCell::default(),
+            spectrum: std::cell::RefCell::default(),
             hover: None,
             track_analysis: std::cell::RefCell::default(),
         }
@@ -592,14 +610,19 @@ impl Session {
 
     // ─── Menus and commands ──────────────────────────────────────────────────
 
+    /// Generation on (tracks in auto mode): drums, bass, chords.
+    fn generation(&self) -> [bool; 3] {
+        let generating = |kind: fn(TrackType) -> bool| {
+            self.pattern()
+                .is_some_and(|p| p.tracks.iter().any(|t| generate::is_auto_on(t) && kind(detect_track_type(&t.name))))
+        };
+        [generating(TrackType::is_drum), generating(|k| k == TrackType::Bass), generating(|k| k == TrackType::Piano)]
+    }
+
     /// What the menus show now.
     fn menu_state(&self) -> MenuState {
         let history = self.editor.history();
         let pattern = self.pattern();
-        let generating = |kind: fn(TrackType) -> bool| {
-            pattern
-                .is_some_and(|p| p.tracks.iter().any(|t| generate::is_auto_on(t) && kind(detect_track_type(&t.name))))
-        };
         let focus = self.focus_track().and_then(|t| self.track(t)).map(|t| (t.auto, t.mute, t.solo));
         MenuState {
             can_save: self.library_path.is_some(),
@@ -615,17 +638,14 @@ impl Session {
             has_selection: self.selected.is_some(),
             playing: self.playing(),
             has_songs: !self.editor.library().songs.is_empty(),
-            generation: [
-                generating(TrackType::is_drum),
-                generating(|k| k == TrackType::Bass),
-                generating(|k| k == TrackType::Piano),
-            ],
+            generation: self.generation(),
             kits: self.kits.kits.iter().map(|k| k.name.clone()).collect(),
             kit_index: self.kit_index,
             kit_editor: self.kit_editor.is_some(),
             track_editor: self.show_track_editor,
             song_view: self.workspace == Workspace::Song,
             piano_roll: self.workspace == Workspace::PianoRoll,
+            output: self.workspace == Workspace::Output,
             can_save_song: store::songs_dir().is_some(),
             saved_songs: store::songs_dir().is_some_and(|d| !store::list_songs(&d).is_empty()),
             kit_sample: self.kit_list().is_some_and(|(s, n)| s < n),
@@ -671,6 +691,8 @@ impl Session {
             C::Deselect => self.deselect(),
             C::NewPattern => self.new_pattern(),
             C::DuplicatePattern => self.duplicate_pattern(),
+            C::RenamePattern => self.song_text_entry(Id::SongPattern(self.pattern_index)),
+            C::PatternDescription => self.song_text_entry(Id::PatternDescription),
             C::PreviousPattern => self.step_pattern(-1),
             C::NextPattern => self.step_pattern(1),
             C::TempoDown => self.step_tempo(-1.0),
@@ -681,6 +703,7 @@ impl Session {
             C::RemoveTrack => self.remove_track(),
             C::NextGrid => self.next_grid(),
             C::LoopBack => self.loop_point_back(),
+            C::CompactTracks => self.compact_tracks(),
             C::GeneratePattern => self.generate_pattern(),
             C::GenerateDrums => self.toggle_generation(None),
             C::GenerateBass => self.toggle_generation(Some(MelodicKind::Bass)),
@@ -708,6 +731,7 @@ impl Session {
             C::TrackEditor => self.toggle_track_editor(),
             C::SongView => self.toggle_song_view(),
             C::PianoRoll => self.toggle_piano_roll(),
+            C::Output => self.toggle_output(),
             C::NewSong => self.song_button("new"),
             C::RemoveSong => self.song_button("delete"),
             C::RenameSong => self.song_text_entry(Id::SongName),
@@ -1176,6 +1200,20 @@ impl Session {
         }
     }
 
+    /// Pattern > Compact tracks (the tools panel's button): every track
+    /// shortened to its shortest loop, when its notes repeat one.
+    pub fn compact_tracks(&mut self) {
+        let count = self.editor.compact_pattern(self.pattern_index);
+        if count == 0 {
+            self.message = "no track repeats a shorter loop".into();
+            return;
+        }
+        self.selected = None;
+        self.clamp_selection();
+        self.edited();
+        self.message = format!("compacted {count} track{}", if count == 1 { "" } else { "s" });
+    }
+
     pub fn delete_step(&mut self) {
         let Some(c) = self.cursor else { return };
         if self.editor.delete_step(self.pattern_index, c.track, c.beat, c.step) {
@@ -1202,7 +1240,12 @@ impl Session {
 
     pub fn step_tempo(&mut self, delta: f64) {
         let Some(bpm) = self.pattern().map(|p| p.bpm) else { return };
-        let bpm = (bpm + delta).round().clamp(20.0, 300.0);
+        self.set_tempo(bpm + delta);
+    }
+
+    /// The pattern at `bpm` (20–300, whole), a run of changes one undo step.
+    pub(super) fn set_tempo(&mut self, bpm: f64) {
+        let bpm = bpm.round().clamp(20.0, 300.0);
         if self.editor.set_pattern_bpm(self.pattern_index, bpm, true) {
             self.edited();
         }
@@ -1210,7 +1253,12 @@ impl Session {
 
     pub fn change_length(&mut self, delta: i32) {
         let Some(beats) = self.pattern().map(|p| p.beat_count) else { return };
-        let beats = (beats + delta).clamp(1, ordrumbox_logic::editor::MAX_BEATS);
+        self.set_length(beats + delta);
+    }
+
+    /// The pattern `beats` long (1–16).
+    pub(super) fn set_length(&mut self, beats: i32) {
+        let beats = beats.clamp(1, ordrumbox_logic::editor::MAX_BEATS);
         if self.editor.set_pattern_beat_count(self.pattern_index, f64::from(beats)) {
             self.edited();
             self.clamp_cursor_to_grid();
@@ -1408,12 +1456,8 @@ impl Session {
     /// Save once the edits have settled; when to call again, if a save is pending.
     /// Save what is due (the library, kit knob edits); when the next save is.
     pub fn autosave(&mut self) -> Option<Instant> {
-        let kits = self.flush_kits();
-        let library = self.autosave_library();
-        match (kits, library) {
-            (Some(a), Some(b)) => Some(a.min(b)),
-            (a, b) => a.or(b),
-        }
+        let due = [self.flush_kits(), self.flush_master(), self.autosave_library()];
+        due.into_iter().flatten().min()
     }
 
     fn autosave_library(&mut self) -> Option<Instant> {
@@ -1455,15 +1499,6 @@ impl Session {
             _ => library.songs.get(self.editor.selected_song()).map(|s| format!("song {}", s.name)),
         };
         let pattern = self.pattern();
-        let generating = |kind: fn(TrackType) -> bool| {
-            pattern
-                .is_some_and(|p| p.tracks.iter().any(|t| generate::is_auto_on(t) && kind(detect_track_type(&t.name))))
-        };
-        let generation = [
-            generating(TrackType::is_drum),
-            generating(|k| k == TrackType::Bass),
-            generating(|k| k == TrackType::Piano),
-        ];
         let song_layout = crate::song_view::SongLayout::new(canvas.width(), canvas.height(), scale, self.status.len());
         let rows = if self.workspace == Workspace::Song { self.song_rows() } else { Vec::new() };
         let roll_layout = self.roll_layout((canvas.width(), canvas.height(), scale));
@@ -1472,13 +1507,12 @@ impl Session {
             pattern,
             arrangement: self.song_view_open().then(|| self.song_view_data(&rows, &song_layout)),
             piano_roll: roll,
-            generation,
+            output: self.output_view(),
             genre: pattern.and_then(|p| p.extra.get("_autoGenGenre")?.as_str()),
             pattern_index: self.pattern_index,
             pattern_count: library.patterns.len(),
             kit_view: self.kit_view(layout.details_top),
             right: layout.right,
-            playing: self.playing(),
             playhead: position.filter(|_| song_mode.is_none()).map(|p| p.frame as f64 / p.frames.max(1) as f64),
             song: song.as_deref(),
             cursor: self.cursor,

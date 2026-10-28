@@ -116,6 +116,12 @@ pub enum Id {
     // Header.
     PatternList,
     KitList,
+    /// Play / stop, the tempo knob, the beats list, the generation
+    /// buttons (drums, bass, chords).
+    Transport,
+    Bpm,
+    Beats,
+    Generate(u8),
     // Song panel.
     /// The arrangement select.
     SongList,
@@ -125,8 +131,14 @@ pub enum Id {
     SongDescription,
     /// A pattern of the song panel's list (its rename entry).
     SongPattern(usize),
+    /// The selected pattern's description entry.
+    PatternDescription,
     /// The right-click menu of the song panel.
     SongMenu,
+    // Output panel.
+    OutTab(u8),
+    /// A master bus setting, by its `settings.master` key.
+    Master(&'static str),
     // Piano roll.
     /// The track it shows.
     RollTrack,

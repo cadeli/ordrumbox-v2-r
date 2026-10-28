@@ -243,6 +243,10 @@ impl Session {
                 let Some(pattern) = self.editor.library().patterns.get(p) else { return };
                 ("Pattern name:", pattern.name.clone().unwrap_or_else(|| format!("Pattern {p}")))
             }
+            Id::PatternDescription => {
+                let Some(pattern) = self.pattern() else { return };
+                ("Pattern description:", pattern.description.clone())
+            }
             _ => return,
         };
         self.entry = Some(Entry { id, spec: None, title: title.into(), text });
@@ -266,6 +270,12 @@ impl Session {
             Id::SongPattern(p) => {
                 let before = self.editor.library().patterns.get(p).and_then(|p| p.name.clone());
                 if !text.is_empty() && before.as_deref() != Some(text) && self.editor.rename_pattern(p, text) {
+                    self.edited();
+                }
+            }
+            Id::PatternDescription => {
+                let changed = self.pattern().is_some_and(|p| p.description != text);
+                if changed && self.editor.set_pattern_description(self.pattern_index, text) {
                     self.edited();
                 }
             }

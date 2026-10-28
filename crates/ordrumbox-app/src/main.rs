@@ -18,11 +18,13 @@ mod font;
 mod kits;
 mod menu;
 mod note_drag;
+mod output;
 mod panel;
 mod piano_roll;
 mod picker;
 mod session;
 mod song_view;
+mod spectrum;
 mod store;
 mod view;
 
@@ -273,6 +275,13 @@ impl App {
                 KeyCode::Space if !event.repeat => s.toggle_play(),
                 _ => return,
             }
+        } else if s.output_open() {
+            match code {
+                KeyCode::Escape => s.toggle_output(),
+                KeyCode::Space if !event.repeat && shift => s.toggle_play_song(),
+                KeyCode::Space if !event.repeat => s.toggle_play(),
+                _ => return,
+            }
         } else if s.piano_roll_open() {
             match code {
                 KeyCode::Escape => s.roll_escape(),
@@ -447,6 +456,7 @@ fn shortcut(code: KeyCode, shift: bool, control: bool) -> Option<Command> {
             KeyCode::F2 => C::TrackEditor,
             KeyCode::F3 => C::SongView,
             KeyCode::F4 => C::PianoRoll,
+            KeyCode::F5 => C::Output,
             KeyCode::BracketLeft if shift => C::PreviousSong,
             KeyCode::BracketRight if shift => C::NextSong,
             KeyCode::BracketLeft | KeyCode::PageUp => C::PreviousPattern,

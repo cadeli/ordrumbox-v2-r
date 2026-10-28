@@ -45,10 +45,29 @@ struct Inbox {
     preview: Option<Arc<Pass>>,
 }
 
+/// Samples the scope keeps (the JS analyser's `fftSize`).
+pub const SCOPE_SIZE: usize = 4096;
+
+/// The last samples played, mono, as a ring (the analyser's input).
+#[derive(Debug)]
+struct Scope {
+    samples: Vec<f32>,
+    /// Where the next sample goes.
+    at: usize,
+}
+
+impl Default for Scope {
+    fn default() -> Self {
+        Self { samples: vec![0.0; SCOPE_SIZE], at: 0 }
+    }
+}
+
 /// State shared by both sides.
 #[derive(Debug, Default)]
 struct Link {
     inbox: Mutex<Inbox>,
+    /// Written by the audio side when it can take it, never waited for.
+    scope: Mutex<Scope>,
     playing: AtomicBool,
     pass: AtomicU64,
     frame: AtomicU64,
@@ -98,6 +117,13 @@ impl AudioSide {
             }
         }
         self.engine.render(left, right);
+        if let Ok(mut scope) = self.link.scope.try_lock() {
+            for (l, r) in left.iter().zip(right.iter()) {
+                let at = scope.at;
+                scope.samples[at] = (l + r) * 0.5;
+                scope.at = (at + 1) % SCOPE_SIZE;
+            }
+        }
 
         let position = self.engine.position();
         self.link.playing.store(position.is_some(), Ordering::Release);
@@ -223,6 +249,15 @@ impl Controller {
     pub fn set_master(&mut self, master: MasterSettings) {
         self.master = master;
         self.link.inbox().master = Some(master);
+    }
+
+    /// The last [`SCOPE_SIZE`] samples played, oldest first, mono (silence
+    /// before anything played).
+    pub fn scope(&self, out: &mut [f32; SCOPE_SIZE]) {
+        let scope = self.link.scope.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let (newer, older) = scope.samples.split_at(scope.at);
+        out[..older.len()].copy_from_slice(older);
+        out[older.len()..].copy_from_slice(newer);
     }
 
     /// Master volume, 0–2.
@@ -571,6 +606,26 @@ mod tests {
             step(&mut controller, true, &mut seen);
         }
         assert_eq!(seen, [3, 4, 5, 1, 2, 3]);
+    }
+
+    #[test]
+    fn the_scope_keeps_the_last_samples_in_order() {
+        let (controller, mut audio) = Controller::new(8000.0, bank(), Scales::default(), SynthPresets::default());
+        let mut out = [1.0; SCOPE_SIZE];
+        controller.scope(&mut out);
+        assert!(out.iter().all(|&s| s == 0.0));
+        // Silence goes in; then the ring is read oldest first.
+        let (mut l, mut r) = (vec![0.0; 3000], vec![0.0; 3000]);
+        audio.render(&mut l, &mut r);
+        audio.render(&mut l, &mut r);
+        {
+            let mut scope = controller.link.scope.lock().unwrap();
+            let at = scope.at;
+            scope.samples[at] = 7.0; // the oldest
+            scope.samples[(at + SCOPE_SIZE - 1) % SCOPE_SIZE] = 9.0; // the newest
+        }
+        controller.scope(&mut out);
+        assert_eq!((out[0], out[SCOPE_SIZE - 1]), (7.0, 9.0));
     }
 
     #[test]

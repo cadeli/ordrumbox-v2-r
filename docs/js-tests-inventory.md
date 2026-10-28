@@ -1,6 +1,7 @@
 # Tests JS d'ordrumbox-v2 face au portage Rust
 
-Inventaire au 2026-10-28 (commit Rust `b669fd9`, plus le piano roll). Aucun test JS n'est lancé
+Inventaire au 2026-10-28 (commit Rust `d84686d`, plus l'output panel,
+les contrôles de l'en-tête et Compact tracks). Aucun test JS n'est lancé
 ni porté tel quel : le portage se vérifie contre le **code source** JS, que
 les scripts `tools/export_*_fixtures.mjs` exécutent pour produire les
 fixtures que les tests Rust doivent reproduire.
@@ -21,7 +22,7 @@ Statuts :
 |---|---|---|---|
 | `auto-generation.spec.js` | 8 | Couvert | ↻ Drum/Bass/Chords et leur bascule : `generators.json` (toggles, notes, mode auto). Les boutons de barre d'outils sont des entrées de menu (D, S, A). |
 | `auto-generation.mobile.spec.js` | 4 | Sans objet | Barre d'outils mobile. |
-| `canvas-rendering.spec.js` | 1 | Non porté | Analyseur de spectre (output panel). |
+| `canvas-rendering.spec.js` | 1 | Partiel | Le spectre (output panel) est porté : la FFT et l'analyseur ont leurs tests (`spectrum.rs`), pas « des pixels non vides pendant la lecture ». |
 | `cold-start.spec.js` | 3 | Partiel | Assignation des sons au premier lancement : `assign.json` ; premier tick : tests du `Controller`. L'AudioContext est sans objet. |
 | `color-scheme.spec.js` | 4 | Non porté | Thèmes de couleur. |
 | `gen-sliders.spec.js` | 14 | Partiel | Les curseurs de l'onglet gen sont portés ; les variantes sont couvertes par `generators.json`, mais pas l'effet de chaque `prob_*` à 0 et 100 %. |
@@ -48,7 +49,7 @@ Statuts :
 | `synth-params.spec.js` | 4 | Couvert (DSP) | Presets, formes d'onde, algorithmes FM, filtres : `renders.bin`, `synth_patches.json`. |
 | `synth_group_titles.spec.js` | 1 | Non porté | Éditeur de synthé. |
 | `synth_implicit_enable.spec.js` | 1 | Non porté | Éditeur de synthé. |
-| `tools-import-export.spec.js` | 8 | Partiel | Import/export MIDI et export WAV (menus, fixtures d'octets), notes aléatoires (X) : portés. « Compact Tracks » : non porté dans l'app. « Exporting... » : sans objet. |
+| `tools-import-export.spec.js` | 8 | Partiel | Import/export MIDI et export WAV (menus, fixtures d'octets), notes aléatoires (X) : portés. « Compact Tracks » : Pattern › Compact tracks, `compact.json`. « Exporting... » : sans objet. |
 | `track-editor-loop.spec.js` | 3 | Couvert | Steps/beat et point de boucle, bornage du point de boucle : `edits.json`, `controls.json`. |
 | `track-editor.mobile.spec.js` | 4 | Sans objet | Mobile. |
 | `undo_redo.spec.js` | 3 | Couvert | `edits.json`, `song_edits.json` (tout annuler, tout refaire). |
@@ -85,7 +86,9 @@ Statuts :
 `wav_export_transport`, `wav_midi_roundtrip`, `wav_analysis`, `wav_render`,
 `e2e_user_flow`, `e2e_audio_comparison`, `export_section_midi`,
 `random`, `numbers`, `pixel_font`, `view_switch`,
-`about_panel_lifecycle`, `tools_panel_clear_rnd`, `piano_roll`, `ghost_sync`
+`about_panel_lifecycle`, `tools_panel_clear_rnd`, `output_panel_sliders`,
+`undo_policy` (les réglages du master ne sont pas des étapes d'annulation,
+comme en JS), `pattern_settings_panel` (ses contrôles sont dans l'en-tête), `piano_roll`, `ghost_sync`
 (les fantômes : `sub_positions.json`).
 
 ### Non portés (fonctionnalité absente)
@@ -93,13 +96,11 @@ Statuts :
 - Éditeur de synthé : `synth_editor`, `synth_editor_display`,
   `synth_editor_implicit`, `synth_editor_import`,
   `synth_editor_preset_section`, `synth_editor_sliders`, `synth_preset_model`.
-- Output panel : `output_panel_sliders`, `undo_policy`.
 - MIDI en direct : `midi_manager`, `midi_out`, `midi_indicator_view`.
 - Thèmes : `color_scheme`, `mcp_color_scheme`.
-- Glisser des notes, onglets, réglages de pattern, outils :
-  `pattern_grid_drag`, `or_tab`, `pattern_settings_panel`,
-  `tools_panel_sliders`, `toolbar_overflow`, `playback_overlay_section`,
-  `page_nav_e2e`.
+- Glisser des notes sur la grille, onglets, outils : `pattern_grid_drag`,
+  `or_tab`, `tools_panel_sliders`, `toolbar_overflow`,
+  `playback_overlay_section`, `page_nav_e2e`.
 - Serveur MCP : `mcp_tools`, `mcp_arrangements`, `mcp_alignment`,
   `mcp_disk_roundtrip`, `mcp_selection_playback`.
 
