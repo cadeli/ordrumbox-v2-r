@@ -86,7 +86,8 @@ or the Groove / Engine settings in auto mode). Under it, the note editor: the
 selected note (else the step under the cursor, else the track's first note)
 — velocity, pitch, pan, and the Trig, Retr, Eucl and Arp tabs. While
 playing, a setting with an LFO shows the LFO's value. The grid has a volume
-slider per track and a master volume (not saved, as in the JS).
+slider per track and a master volume (the output panel's volume, saved
+with it).
 
 Knobs and sliders work as in the JS (`OrKnob`, `OrSlider`, checked against
 them): drag a knob up or down (200 px for the whole range), click or drag a
@@ -152,8 +153,29 @@ progressions and the drag are the JS code's (checked against it). Unlike
 the JS, a drag never counts as a click: there the window's mouseup resets
 the drag before the click arrives, so `consumeClick()` never sees it.
 
+Output panel (**F5**, **View › Output**, the JS output panel; **Esc** goes
+back to the grid): the master bus in three tabs — **vol**: the master
+volume and the spectrum of what plays (the JS analyser's
+`getByteFrequencyData`, computed as the Web Audio specification describes
+it: 4096 samples, Blackman window, smoothing 0.8, -100 to -30 dB, the first
+256 bins); **Comp**: the pre-gain, the compressor's transfer curve
+(-60 to 0 dB in, the unity line, the threshold), its on/off button and its
+threshold, ratio, attack, release, knee and make-up; **Flt**: the low cut
+and the high cut. They play at once and are saved half a second after the
+last change to `settings.json` in the user data folder (`settings.master`,
+as the JS keeps them; the file's other settings are kept), and loaded at
+start. The grid's master volume is this volume.
+
 The header has the pattern list and the kit list (the JS toolbar's two
 selects): a click opens them, the wheel or the arrows move, **Enter** picks.
+Then the JS toolbar's transport and its pattern settings panel: **Play** /
+**Stop**, the tempo knob (20–250, as the JS slider), the **Beats** list
+(1–16), and **Drum**, **Bass**, **Chords** (lit while their tracks are in
+auto mode: the D, S, A keys). **Pattern › Rename pattern...** and **Pattern
+description...** edit the pattern's name and description; **Pattern ›
+Compact tracks** (the JS tools panel's button) shortens every track whose
+notes repeat to its shortest loop — the loop point set, the notes past it
+removed, one undo step per track (`compactTrack`, checked against the JS).
 
 Menus: the menu bar at the top of the window (File, Edit, View, Pattern,
 Generate, Play, Song, Kit, Help) lists every command with its shortcut; commands that cannot
@@ -210,6 +232,7 @@ pitch, MIDI number and the settings that differ from the defaults (the JS
 | **F2** | track editor (shown / hidden) |
 | **F3** | song panel (shown / hidden) |
 | **F4** | piano roll (shown / hidden) |
+| **F5** | output panel (shown / hidden) |
 | **Tab**, **Shift Tab** | focus the next / previous control of the editors |
 | drop a `.mid` file on the window | import it (also a `.mid` given on the command line) |
 
@@ -290,6 +313,11 @@ node tools/export_edit_fixtures.mjs ../ordrumbox-v2
   (notes, tracks, patterns), then undo all, then redo all; after each, the
   undo/redo sizes, the step description, the pattern ids and the saved
   patterns.
+- `ordrumbox-logic/tests/fixtures/compact.json`: `compactTrack` on every
+  track of every pattern of `song.json` and of hand-made patterns that
+  repeat, loaded as the app boots (`importPatternFromJson`: every note has a
+  `stepPercent`, which the comparison of notes includes): the steps recorded,
+  then each track's loop point and notes.
 
 Sound assignment, song playback and WAV encoding have a fourth script; it
 also writes the instrument catalog the port reads (`ordrumbox-core/data/instruments.json`):

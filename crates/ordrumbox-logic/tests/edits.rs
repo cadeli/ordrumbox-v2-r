@@ -190,3 +190,56 @@ fn edits_undo_and_redo_like_the_js_commander() {
         }
     }
 }
+
+/// Compact Tracks against the JS `compactTrack` on every track of every
+/// pattern (`compact.json`): the steps recorded, then each track's loop
+/// point and notes (beat, step, pitch, velocity).
+#[test]
+fn compact_tracks_like_the_js_commander() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let fixture = read(&dir.join("tests/fixtures/compact.json"));
+    let song = read(&dir.join("../ordrumbox-core/tests/fixtures/song.json"));
+    let hand = json::parse(&format!(r#"{{"patterns":{}}}"#, fixture.get("hand").expect("hand").to_json())).unwrap();
+    let libraries = [Library::from_json(&song).0, Library::from_json(&hand).0];
+    let cases = fixture.get("patterns").and_then(Value::as_array).expect("patterns");
+    let mut compacted = 0;
+    for case in cases {
+        let source = usize::from(case.get("source").and_then(Value::as_str) == Some("hand"));
+        // A fresh library each time (the history keeps 50 steps).
+        let editor = &mut Editor::new(libraries[source].clone());
+        let p = usize_of(case, "p");
+        let at = format!("pattern {p} ({})", ["song", "hand"][source]);
+        let changed = editor.compact_pattern(p);
+        let descs = case.get("descs").and_then(Value::as_array).expect("descs");
+        assert_eq!(changed, descs.len(), "{at}: tracks compacted ({})", Value::Array(descs.to_vec()).to_json());
+        assert_eq!(editor.history().undo_len(), descs.len(), "{at}: steps");
+        if let Some(desc) = descs.last().and_then(Value::as_str) {
+            assert_eq!(editor.history().next_undo(), Some(desc), "{at}");
+        }
+        compacted += changed;
+        let tracks = case.get("tracks").and_then(Value::as_array).expect("tracks");
+        for (track, js) in editor.library().patterns[p].tracks.iter().zip(tracks) {
+            let name = js.get("name").and_then(Value::as_str).unwrap();
+            assert_eq!(track.name, name, "{at}");
+            let loop_at = js.get("loopAtStep").and_then(Value::as_f64).map(|l| l as i32);
+            assert_eq!(track.loop_at_step, loop_at, "{at} {name}: loop point");
+            let notes: Vec<String> = track
+                .notes
+                .iter()
+                .map(|n| {
+                    format!(
+                        "[{},{},{},{}]",
+                        n.beat,
+                        n.beat_step,
+                        Value::from(n.pitch).to_json(),
+                        Value::from(n.velocity).to_json()
+                    )
+                })
+                .collect();
+            let js_notes: Vec<String> =
+                js.get("notes").and_then(Value::as_array).unwrap().iter().map(Value::to_json).collect();
+            assert_eq!(notes, js_notes, "{at} {name}: notes");
+        }
+    }
+    assert!(compacted > 10, "{compacted}");
+}

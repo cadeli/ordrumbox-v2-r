@@ -33,11 +33,11 @@ pub struct Spec {
 }
 
 impl Spec {
-    pub fn knob(min: f64, max: f64, step: f64, default: f64) -> Self {
+    pub const fn knob(min: f64, max: f64, step: f64, default: f64) -> Self {
         Self { style: Style::Knob, min, max, step, default, log: false }
     }
 
-    pub fn slider(min: f64, max: f64, step: f64, default: f64) -> Self {
+    pub const fn slider(min: f64, max: f64, step: f64, default: f64) -> Self {
         Self { style: Style::Slider, min, max, step, default, log: false }
     }
 
@@ -146,6 +146,10 @@ pub enum Format {
     SignedFixed1,
     /// The loop point as `beat.step` at this many steps per beat.
     LoopPoint(i32),
+    /// `parseFloat(v.toFixed(3))`.
+    Fmt3,
+    /// `Math.round(v)`.
+    Round,
     /// Auto density: `Auto` below 0.
     Density,
 }
@@ -175,6 +179,8 @@ impl Format {
                 let step = v as i64 - 1;
                 format!("{}.{}", step.div_euclid(spb) + 1, step % spb + 1)
             }
+            Self::Fmt3 => js::number_to_string(js::to_fixed(v, 3)),
+            Self::Round => js::number_to_string(js::round(v)),
             Self::Density => {
                 if v < 0.0 {
                     "Auto".to_owned()

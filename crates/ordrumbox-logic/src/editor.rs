@@ -449,6 +449,19 @@ impl Editor {
     }
 
     /// No notes, loop over the whole track (`cleanTrack`).
+    /// Shorten track `t` to its shortest loop, when its notes repeat one
+    /// (`compactTrack`); whether it changed.
+    pub fn compact_track(&mut self, p: usize, t: usize) -> bool {
+        self.edit_track(p, t, |track| format!("Compact {}", track.name), None, Track::compact_loop).unwrap_or(false)
+    }
+
+    /// Pattern > Compact tracks (the tools panel's button): every track of
+    /// pattern `p`, one undo step each; how many changed.
+    pub fn compact_pattern(&mut self, p: usize) -> usize {
+        let tracks = self.library.patterns.get(p).map_or(0, |pattern| pattern.tracks.len());
+        (0..tracks).filter(|&t| self.compact_track(p, t)).count()
+    }
+
     pub fn clean_track(&mut self, p: usize, t: usize) -> bool {
         self.edit_track(p, t, |track| format!("Clean {}", track.name), None, clean).is_some()
     }

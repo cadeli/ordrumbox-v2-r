@@ -119,6 +119,9 @@ impl Session {
             let selected = self.kit_index.min(self.kits.kits.len() - 1);
             layout.items.push(Item::new(Some(Id::KitList), kit_rect, Kind::Select { values, labels, selected }));
         }
+        if let Some(pattern) = self.pattern() {
+            self.header_items(&mut layout, pattern, scale);
+        }
         if self.kit_editor.is_some() {
             let kit_layout = KitLayout::new(width, height, scale, self.status.len());
             let area = kit_layout.controls_area();
@@ -132,6 +135,10 @@ impl Session {
         }
         if self.workspace == Workspace::Song {
             self.song_items(&mut layout, width, height, scale);
+            return layout;
+        }
+        if self.workspace == Workspace::Output {
+            self.output_items(&mut layout, width, scale);
             return layout;
         }
         let top = view::content_top(scale);
@@ -164,17 +171,46 @@ impl Session {
                 layout.items.push(Item::new(Some(Id::TrackVolume(t)), grid.volume_rect(t), kind));
             }
             let spec = Spec::slider(0.0, 2.0, 0.01, 1.0);
-            let kind = Kind::Value { spec, value: self.master_volume, label: None, text: String::new(), lfo: false };
+            let volume = f64::from(self.master.master);
+            let kind = Kind::Value { spec, value: volume, label: None, text: String::new(), lfo: false };
             layout.items.push(Item::new(Some(Id::MasterVolume), grid.master_rect(), kind));
         }
         layout
+    }
+
+    /// The header's transport and generation controls (the toolbar's
+    /// transport and the pattern settings panel of the JS).
+    fn header_items(&self, layout: &mut PanelLayout, pattern: &Pattern, scale: i32) {
+        let controls = view::header_controls(scale);
+        let playing = self.playing();
+        let label = if playing { "Stop" } else { "Play" };
+        layout.items.push(Item::new(
+            Some(Id::Transport),
+            controls.play,
+            Kind::Button { label: label.into(), on: playing },
+        ));
+        // The JS slider's range (`BPM_MIN`, `BPM_MAX`).
+        let spec = Spec::knob(20.0, 250.0, 1.0, 120.0);
+        let text = js::number_to_string(pattern.bpm);
+        let kind = Kind::Value { spec, value: pattern.bpm, label: None, text, lfo: false };
+        layout.items.push(Item::new(Some(Id::Bpm), controls.bpm, kind));
+        let beats: Vec<String> = (1..=ordrumbox_logic::editor::MAX_BEATS).map(|b| b.to_string()).collect();
+        let selected = usize::try_from(pattern.beat_count - 1).unwrap_or(0).min(beats.len() - 1);
+        let kind = Kind::Select { values: beats.clone(), labels: beats, selected };
+        layout.items.push(Item::new(Some(Id::Beats), controls.beats, kind));
+        for (i, ((rect, label), on)) in
+            controls.generation.iter().zip(["Drum", "Bass", "Chords"]).zip(self.generation()).enumerate()
+        {
+            let kind = Kind::Button { label: label.into(), on };
+            layout.items.push(Item::new(Some(Id::Generate(i as u8)), *rect, kind));
+        }
     }
 
     /// Width the track editor takes on the right of a `width`-wide window (0: none).
     pub fn track_editor_width(&self, width: i32, scale: i32) -> i32 {
         if self.show_track_editor
             && self.kit_editor.is_none()
-            && self.workspace != Workspace::Song
+            && matches!(self.workspace, Workspace::Grid | Workspace::PianoRoll)
             && width >= 480 * scale
         {
             panel_width(width, scale)
@@ -767,12 +803,15 @@ impl Session {
 
     /// A knob or a slider set to `value`.
     fn set_value(&mut self, id: Id, value: f64) {
+        if let Id::Bpm = id {
+            return self.set_tempo(value);
+        }
+        if let Id::Master(key) = id {
+            return self.set_master_value(key, value);
+        }
         if let Id::MasterVolume = id {
-            self.master_volume = value;
-            if let Some(controller) = &mut self.controller {
-                controller.set_volume(value as f32);
-            }
-            return;
+            // The output panel's volume: saved with it.
+            return self.set_master_value("volume", value);
         }
         if let Id::KitKnob(field) = id {
             return self.set_kit_value(field, value);
@@ -937,6 +976,12 @@ impl Session {
                 return;
             }
             Id::SongMenu => return self.song_menu_pick(value),
+            Id::Beats => {
+                if let Ok(beats) = value.parse::<i32>() {
+                    self.set_length(beats);
+                }
+                return;
+            }
             Id::RollTrack => {
                 if let Ok(t) = value.parse::<usize>() {
                     self.select_roll_track(t);
@@ -1029,6 +1074,13 @@ impl Session {
             Id::Row(_) => self.select_row(id),
             Id::LoadSample => self.open_picker(Purpose::ReplaceTrackSample),
             Id::SongButton(button) => self.song_button(button),
+            Id::Transport => self.toggle_play(),
+            Id::OutTab(_) | Id::Master(_) => self.output_activate(id),
+            Id::Generate(i) => {
+                self.run(
+                    [Command::GenerateDrums, Command::GenerateBass, Command::GenerateChords][usize::from(i.min(2))],
+                );
+            }
             Id::SongName | Id::SongDescription => self.song_text_entry(id),
             _ => {
                 let Some(t) = self.editor_track() else { return };
@@ -1118,6 +1170,8 @@ fn control_name(id: Id) -> (&'static str, &'static str) {
     match id {
         Id::KnobBar(key) => KNOB_BAR.iter().find(|(p, _)| p.key == key).map_or(("", ""), |(p, u)| (p.label, *u)),
         Id::Decay => ("Decay", ""),
+        Id::Bpm => ("BPM", ""),
+        Id::Master(key) => crate::output::find(key).map_or(("", ""), |p| (p.label, p.unit)),
         Id::Fx(key) => (prop(&FX_KNOBS, key), ""),
         Id::Gen(key) => {
             let rows = GEN_GROOVE.iter().chain(GEN_ENGINE.iter());
@@ -1158,5 +1212,73 @@ fn control_name(id: Id) -> (&'static str, &'static str) {
         Id::TrackVolume(_) => ("Volume", ""),
         Id::MasterVolume => ("Master Gain", ""),
         _ => ("", ""),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::kits::KitSet;
+
+    const SIZE: (i32, i32, i32) = (1100, 680, 1);
+
+    fn session() -> Session {
+        let (library, _) = Library::parse(
+            r#"{"patterns":[{"name":"p","bpm":100,"beatCount":4,"tracks":[{"name":"KICK","notes":[{}]},{"name":"SNARE"}]}]}"#,
+        )
+        .unwrap();
+        let mut session = Session::new(library, KitSet::empty(), Vec::new());
+        session.set_size(SIZE);
+        session
+    }
+
+    fn center(r: Rect) -> (i32, i32) {
+        (r.x + r.w / 2, r.y + r.h / 2)
+    }
+
+    #[test]
+    fn header_controls_set_tempo_length_and_generation() {
+        let mut s = session();
+        let c = view::header_controls(1);
+        // The tempo knob: the wheel steps it, a typed number sets it.
+        let (x, y) = center(c.bpm);
+        assert!(s.wheel(SIZE, x, y, 3, false, false));
+        assert_eq!(s.pattern().unwrap().bpm, 103.0);
+        s.mouse_down(SIZE, x, y, Button::Right, false);
+        s.entry.as_mut().unwrap().text = "140".into();
+        s.panel_key(SIZE, PanelKey::Enter, false, false);
+        assert_eq!(s.pattern().unwrap().bpm, 140.0);
+        // The beats list: 8.
+        let (x, y) = center(c.beats);
+        s.mouse_down(SIZE, x, y, Button::Left, false);
+        for _ in 0..4 {
+            s.panel_key(SIZE, PanelKey::Down, false, false);
+        }
+        s.panel_key(SIZE, PanelKey::Enter, false, false);
+        assert_eq!(s.pattern().unwrap().beat_count, 8);
+        // Drum: the drum tracks in auto mode, the button lit.
+        let (x, y) = center(c.generation[0]);
+        s.mouse_down(SIZE, x, y, Button::Left, false);
+        assert_eq!(s.generation(), [true, false, false]);
+        let layout = s.panel_layout(SIZE.0, SIZE.1, 1);
+        assert!(matches!(panel::find(&layout.items, Id::Generate(0)).unwrap().kind, Kind::Button { on: true, .. }));
+    }
+
+    #[test]
+    fn the_pattern_menu_renames_and_describes() {
+        let mut s = session();
+        s.run(Command::RenamePattern);
+        s.entry.as_mut().unwrap().text = " Verse ".into();
+        s.panel_key(SIZE, PanelKey::Enter, false, false);
+        assert_eq!(s.pattern().unwrap().name.as_deref(), Some("Verse"));
+        s.run(Command::PatternDescription);
+        assert_eq!(s.entry.as_ref().map(|e| e.text.as_str()), Some(""));
+        s.panel_text('x');
+        s.panel_key(SIZE, PanelKey::Space, false, false);
+        s.panel_text('y');
+        s.panel_key(SIZE, PanelKey::Enter, false, false);
+        assert_eq!(s.pattern().unwrap().description, "x y");
+        s.undo();
+        assert_eq!(s.pattern().unwrap().description, "");
     }
 }

@@ -10,6 +10,7 @@ use ordrumbox_core::{Pattern, Track};
 
 use crate::canvas::{Canvas, Rgb, text_width};
 use crate::menu;
+use crate::output::{self, OutputLayout, OutputView};
 use crate::panel::Rect;
 use crate::piano_roll::{self, RollLayout, RollView};
 use crate::song_view::{self, SongLayout, SongView};
@@ -40,6 +41,9 @@ const SONG_HELP: &str = "SONG   click the ruler: cursor   right-click: add / rep
 /// The same in the piano roll.
 const ROLL_HELP: &str =
     "PIANO ROLL   click: add / select / delete   drag: velocity / pitch   right-click: menu   F4 or ESC: grid";
+/// The same in the output panel.
+const OUTPUT_HELP: &str =
+    "OUTPUT   TAB: controls   drag, wheel, arrows: change   right-click: type a value   F5 or ESC: grid";
 /// The same in the kit editor.
 const KIT_HELP: &str =
     "KIT EDITOR   UP DOWN: sample   TAB: controls   ENTER: hear   DEL: remove   N: normalize   ESC: close";
@@ -63,13 +67,10 @@ pub struct View<'a> {
     pub pattern: Option<&'a Pattern>,
     pub pattern_index: usize,
     pub pattern_count: usize,
-    pub playing: bool,
     /// Playhead, as a fraction of the pattern length.
     pub playhead: Option<f64>,
     /// The selected song, or the song playing and where.
     pub song: Option<&'a str>,
-    /// Generation on (tracks in auto mode): drums, bass, chords.
-    pub generation: [bool; 3],
     /// The genre the pattern was generated in.
     pub genre: Option<&'a str>,
     pub cursor: Option<Cursor>,
@@ -87,6 +88,8 @@ pub struct View<'a> {
     pub arrangement: Option<SongView<'a>>,
     /// The piano roll and its title, when shown (it takes the place of the grid).
     pub piano_roll: Option<(RollView<'a>, String)>,
+    /// The output panel, when shown (it takes the place of the grid).
+    pub output: Option<OutputView>,
     /// Width kept on the right (for the track editor).
     pub right: i32,
 }
@@ -222,6 +225,42 @@ pub fn header_selects(scale: i32) -> (Rect, Rect) {
     )
 }
 
+/// The header's transport and generation controls (the JS toolbar's
+/// transport and the pattern settings panel): play, the tempo knob, the
+/// beats list on the second line; drums, bass, chords on the first, after
+/// the pattern list and its place in the library; then where the genre goes.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct HeaderControls {
+    pub play: Rect,
+    pub bpm: Rect,
+    pub beats: Rect,
+    pub generation: [Rect; 3],
+    /// Where the BPM and Beats labels and the genre go: (x, y).
+    pub bpm_label: (i32, i32),
+    pub beats_label: (i32, i32),
+    pub genre: (i32, i32),
+}
+
+pub fn header_controls(scale: i32) -> HeaderControls {
+    let s = scale;
+    let (margin, top, text) = (margin(scale), content_top(scale), header_text(scale));
+    let (list, _) = header_selects(scale);
+    // The library place ("12/42") takes at most 7 characters.
+    let mut x = list.x + list.w + 12 * s + text_width("000/000", text) + 16 * s;
+    let generation = [52, 52, 68].map(|w| {
+        let rect = Rect::new(x, top, w * s, 16 * s);
+        x += (w + 6) * s;
+        rect
+    });
+    let y = top + header_line(scale);
+    let play = Rect::new(margin, y, 44 * s, 16 * s);
+    let bpm_label = (play.x + play.w + 8 * s, y + 4 * s);
+    let bpm = Rect::new(bpm_label.0 + 28 * s, y, 64 * s, 16 * s);
+    let beats_label = (bpm.x + bpm.w + 8 * s, y + 4 * s);
+    let beats = Rect::new(beats_label.0 + 48 * s, y, 40 * s, 16 * s);
+    HeaderControls { play, bpm, beats, generation, bpm_label, beats_label, genre: (x + 4 * s, top + 4 * s) }
+}
+
 /// Top of the footer (status lines then help).
 pub fn footer_top(height: i32, scale: i32, status_lines: usize) -> i32 {
     height - margin(scale) - 10 * scale - status_lines as i32 * 10 * scale - 4 * scale
@@ -355,25 +394,21 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
     let mut y = content_top(scale);
     let x = canvas.text(margin, y, "orDrumbox", text, ACCENT) + 24 * scale;
     match view.pattern {
-        Some(pattern) => {
+        Some(_) => {
             // The pattern list (a widget) goes first, then where it is in the library.
             let (list, kit_list) = header_selects(scale);
             let title = format!("{}/{}", view.pattern_index + 1, view.pattern_count);
-            let mut x = canvas.text(list.x + list.w + 12 * scale, y, &title, text, TEXT) + 24 * scale;
-            let labels = ["DRUMS", "BASS", "CHORDS"];
-            for (label, on) in labels.iter().zip(view.generation) {
-                x = canvas.text(x, y + 4 * scale, label, scale, if on { PLAYING } else { DIM }) + 8 * scale;
-            }
+            canvas.text(list.x + list.w + 12 * scale, y, &title, text, TEXT);
+            // Then the generation buttons, the transport (widgets), the genre.
+            let controls = header_controls(scale);
             if let Some(genre) = view.genre {
-                canvas.text(x + 8 * scale, y + 4 * scale, genre, scale, DIM);
+                canvas.text(controls.genre.0, controls.genre.1, genre, scale, DIM);
             }
             y += line;
-            let tempo = format!("{} BPM  {} beats", pattern.bpm, pattern.beat_count);
-            canvas.text(margin, y, &tempo, text, TEXT);
+            canvas.text(controls.bpm_label.0, controls.bpm_label.1, "BPM", scale, DIM);
+            canvas.text(controls.beats_label.0, controls.beats_label.1, "Beats", scale, DIM);
             // The kit list (a widget) is next.
             let x = kit_list.x + kit_list.w + 24 * scale;
-            let (state, color) = if view.playing { ("PLAY", PLAYING) } else { ("STOP", DIM) };
-            let x = canvas.text(x, y, state, text, color) + 24 * scale;
             if let Some(song) = view.song {
                 canvas.text(x, y + 4 * scale, song, scale, if song.starts_with("SONG") { PLAYING } else { DIM });
             }
@@ -405,6 +440,8 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
         SONG_HELP
     } else if view.piano_roll.is_some() {
         ROLL_HELP
+    } else if view.output.is_some() {
+        OUTPUT_HELP
     } else {
         HELP
     };
@@ -416,6 +453,8 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
     } else if let Some(kit) = &view.kit_view {
         let layout = KitLayout::new(canvas.width(), canvas.height(), scale, view.status.len());
         draw_kit(canvas, kit, &layout);
+    } else if let Some(out) = &view.output {
+        output::draw(canvas, out, &OutputLayout::new(canvas.width(), scale));
     } else if let Some((roll, title)) = &view.piano_roll {
         let spb = piano_roll::steps_per_beat(roll.track);
         let layout = RollLayout::new(canvas.width() - view.right, canvas.height(), scale, view.status.len(), spb);
@@ -639,14 +678,13 @@ mod tests {
                 pattern: library.patterns.first(),
                 pattern_index: 0,
                 pattern_count: 1,
-                playing: true,
                 playhead: Some(0.5),
                 song: Some("SONG demo  measure 3/66"),
-                generation: [true, false, true],
                 genre: Some("house"),
                 kit_view: None,
                 arrangement: None,
                 piano_roll: None,
+                output: None,
                 right: 300,
                 cursor: Some(Cursor { track: 0, beat: 1, step: 2 }),
                 selected: Some((0, 0)),

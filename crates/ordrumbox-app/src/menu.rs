@@ -14,6 +14,7 @@ pub enum Command {
     TrackEditor,
     SongView,
     PianoRoll,
+    Output,
     NewSong,
     RemoveSong,
     RenameSong,
@@ -38,6 +39,8 @@ pub enum Command {
     Deselect,
     NewPattern,
     DuplicatePattern,
+    RenamePattern,
+    PatternDescription,
     PreviousPattern,
     NextPattern,
     TempoDown,
@@ -48,6 +51,7 @@ pub enum Command {
     RemoveTrack,
     NextGrid,
     LoopBack,
+    CompactTracks,
     GeneratePattern,
     GenerateDrums,
     GenerateBass,
@@ -129,6 +133,7 @@ pub struct MenuState {
     pub track_editor: bool,
     pub song_view: bool,
     pub piano_roll: bool,
+    pub output: bool,
     /// A folder to save songs in (Save song).
     pub can_save_song: bool,
     /// Song files saved (Load song).
@@ -204,6 +209,7 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
                 check("Track editor", "F2", C::TrackEditor, true, s.track_editor),
                 check("Song", "F3", C::SongView, true, s.song_view),
                 check("Piano roll", "F4", C::PianoRoll, true, s.piano_roll),
+                check("Output", "F5", C::Output, true, s.output),
                 check("Kit editor", "Ctrl+K", C::KitEditor, true, s.kit_editor),
             ],
         },
@@ -212,6 +218,8 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
             items: vec![
                 command("New pattern", "Ctrl+N", C::NewPattern, true),
                 command("Duplicate pattern", "Ctrl+D", C::DuplicatePattern, p),
+                command("Rename pattern...", "", C::RenamePattern, p),
+                command("Pattern description...", "", C::PatternDescription, p),
                 Item::Separator,
                 command("Previous pattern", "[", C::PreviousPattern, p),
                 command("Next pattern", "]", C::NextPattern, p),
@@ -225,6 +233,8 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
                 command("Remove track", "Ctrl+Backspace", C::RemoveTrack, s.can_remove_track),
                 command("Next grid", "Ctrl+G", C::NextGrid, track),
                 command("Loop point one step back", "Ctrl+L", C::LoopBack, track),
+                Item::Separator,
+                command("Compact tracks", "", C::CompactTracks, p),
             ],
         },
         Menu {
