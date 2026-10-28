@@ -3,6 +3,7 @@
 //!
 //! Ported from `src/logic/` of ordrumbox-v2 (`commands/`, `history_manager.js`).
 
+pub mod composition;
 pub mod editor;
 pub mod generate;
 pub mod history;

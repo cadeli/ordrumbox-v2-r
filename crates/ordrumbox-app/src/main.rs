@@ -17,7 +17,9 @@ mod editors;
 mod font;
 mod kits;
 mod menu;
+mod note_drag;
 mod panel;
+mod piano_roll;
 mod picker;
 mod session;
 mod song_view;
@@ -134,6 +136,7 @@ impl App {
             let menus_open = s.open_menu().is_some() || s.overlay_open();
             if s.mouse_down(size, x, y, button, shift)
                 || (button == Button::Right && !menus_open && s.song_view_open() && s.song_click(size, x, y, button))
+                || (button == Button::Right && !menus_open && s.piano_roll_open() && s.roll_click(size, x, y, button))
             {
                 self.request_redraw();
             }
@@ -166,6 +169,12 @@ impl App {
     fn click_content(&mut self, width: i32, height: i32, scale: i32, x: i32, y: i32) {
         if self.session.song_view_open() {
             if self.session.song_click((width, height, scale), x, y, Button::Left) {
+                self.request_redraw();
+            }
+            return;
+        }
+        if self.session.piano_roll_open() {
+            if self.session.roll_click((width, height, scale), x, y, Button::Left) {
                 self.request_redraw();
             }
             return;
@@ -260,6 +269,19 @@ impl App {
                 KeyCode::KeyN => s.kit_normalize(),
                 KeyCode::KeyR => s.kit_reassign(),
                 KeyCode::KeyE => s.kit_export(),
+                KeyCode::Space if !event.repeat && shift => s.toggle_play_song(),
+                KeyCode::Space if !event.repeat => s.toggle_play(),
+                _ => return,
+            }
+        } else if s.piano_roll_open() {
+            match code {
+                KeyCode::Escape => s.roll_escape(),
+                KeyCode::ArrowLeft => s.roll_arrow(Move::Left, shift),
+                KeyCode::ArrowRight => s.roll_arrow(Move::Right, shift),
+                KeyCode::ArrowUp => s.roll_arrow(Move::Up, shift),
+                KeyCode::ArrowDown => s.roll_arrow(Move::Down, shift),
+                KeyCode::Enter | KeyCode::NumpadEnter => s.roll_enter(),
+                KeyCode::Delete | KeyCode::Backspace => s.roll_delete(),
                 KeyCode::Space if !event.repeat && shift => s.toggle_play_song(),
                 KeyCode::Space if !event.repeat => s.toggle_play(),
                 _ => return,
@@ -424,6 +446,7 @@ fn shortcut(code: KeyCode, shift: bool, control: bool) -> Option<Command> {
             KeyCode::F1 => C::Shortcuts,
             KeyCode::F2 => C::TrackEditor,
             KeyCode::F3 => C::SongView,
+            KeyCode::F4 => C::PianoRoll,
             KeyCode::BracketLeft if shift => C::PreviousSong,
             KeyCode::BracketRight if shift => C::NextSong,
             KeyCode::BracketLeft | KeyCode::PageUp => C::PreviousPattern,
@@ -479,7 +502,9 @@ impl ApplicationHandler for App {
                 let shift = self.modifiers.shift_key();
                 let (x, y) = (position.x as i32, position.y as i32);
                 let moved = self.session.mouse_move(size, x, y, shift);
-                let hovered = self.session.grid_hover(size, x, y) | self.session.song_hover(size, x, y);
+                let hovered = self.session.grid_hover(size, x, y)
+                    | self.session.song_hover(size, x, y)
+                    | self.session.roll_hover(size, x, y);
                 if hovered || moved {
                     self.request_redraw();
                 }
@@ -506,6 +531,7 @@ impl ApplicationHandler for App {
                 let shift = self.modifiers.shift_key();
                 if self.session.wheel(size, x, y, lines, fine, coarse)
                     || self.session.song_wheel(size, x, y, lines, shift)
+                    || self.session.roll_wheel(size, x, y, lines, shift)
                 {
                     self.request_redraw();
                 }

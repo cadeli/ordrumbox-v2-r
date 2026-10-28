@@ -127,6 +127,11 @@ pub enum Id {
     SongPattern(usize),
     /// The right-click menu of the song panel.
     SongMenu,
+    // Piano roll.
+    /// The track it shows.
+    RollTrack,
+    /// Its right-click menus.
+    RollMenu,
     // Grid.
     TrackVolume(usize),
     MasterVolume,
