@@ -6,7 +6,7 @@
 //! [`Layout`] places everything; drawing and mouse hit-testing both use it.
 
 use ordrumbox_core::steps::absolute_step;
-use ordrumbox_core::{Pattern, Track};
+use ordrumbox_core::{Note, Pattern, Track};
 
 use crate::canvas::{Canvas, Rgb, text_width};
 use crate::menu;
@@ -662,6 +662,24 @@ fn draw_kit(canvas: &mut Canvas, kit: &KitView, layout: &KitLayout) {
     }
 }
 
+/// Base colour of a note in the grid, from its own properties (trigger
+/// probability, retrigger, euclidean, every-Nth-pass) rather than from its
+/// track: a plain note is lime, a probabilistic one cyan, a fixed-trigger
+/// one violet, a retriggered one orange, an euclidean one yellow.
+fn note_color(note: &Note) -> Rgb {
+    if note.euclidean_fill > 0 {
+        theme::YELLOW
+    } else if note.retrigger_count > 1 || (note.rate - 1.0).abs() > 1e-9 {
+        theme::ORANGE
+    } else if note.prob < 1.0 {
+        theme::CYAN
+    } else if note.every > 1 {
+        theme::VIOLET
+    } else {
+        theme::LIME
+    }
+}
+
 /// One track's steps, its notes lit by velocity, the cursor and the selection.
 fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &View, layout: &Layout) {
     let gap = layout.scale.max(1);
@@ -674,18 +692,20 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
         (x, (layout.step_x(step + 1, spb) - x - gap).max(1))
     };
 
-    let mut velocity = vec![None::<f64>; steps as usize];
+    let mut note_at: Vec<Option<&Note>> = vec![None; steps as usize];
     for note in &track.notes {
         let step = absolute_step(note.beat, note.beat_step, spb);
-        if let Some(slot) = usize::try_from(step).ok().and_then(|s| velocity.get_mut(s)) {
-            *slot = Some(slot.unwrap_or(0.0).max(note.velocity));
+        if let Some(slot) = usize::try_from(step).ok().and_then(|s| note_at.get_mut(s)) {
+            if slot.is_none_or(|existing| note.velocity > existing.velocity) {
+                *slot = Some(note);
+            }
         }
     }
-    for (step, note) in velocity.iter().enumerate() {
+    for (step, note) in note_at.iter().enumerate() {
         let step = step as i64;
         let (x, width) = cell(step);
         let color = match note {
-            Some(v) => theme::note(theme::track(index), *v),
+            Some(n) => theme::note(note_color(n), n.velocity),
             None if step % i64::from(spb) == 0 => CELL_BEAT,
             None => CELL,
         };
