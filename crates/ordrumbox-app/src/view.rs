@@ -131,6 +131,7 @@ pub struct KitView<'a> {
 pub struct KitLayout {
     scale: i32,
     top: i32,
+    list_top: i32,
     bottom: i32,
     left: i32,
     list_width: i32,
@@ -150,9 +151,10 @@ impl KitLayout {
         // rows; the selected sample's details go below it.
         let list_width = (width - 2 * margin).max(40 * scale);
         let row = 12 * scale;
-        let list_rows = ((bottom - top) / (row * 4)).clamp(4, 12);
-        let detail_y = top + list_rows * row + 8 * scale;
-        Self { scale, top, bottom, left: margin, list_width, row, detail_x: margin, detail_y, width, list_rows }
+        let list_top = top + row;
+        let list_rows = ((bottom - top) / (row * 4)).clamp(3, 10);
+        let detail_y = list_top + list_rows * row + 8 * scale;
+        Self { scale, top, list_top, bottom, left: margin, list_width, row, detail_x: margin, detail_y, width, list_rows }
     }
 
     /// Where the selected sample's selects and knobs go.
@@ -172,11 +174,11 @@ impl KitLayout {
 
     /// The sample of the list under `(x, y)`.
     pub fn hit(&self, view_selected: usize, count: usize, x: i32, y: i32) -> Option<usize> {
-        let list_bottom = self.top + self.shown() as i32 * self.row;
-        if y < self.top || y >= list_bottom || !(self.left..self.left + self.list_width).contains(&x) {
+        let list_bottom = self.list_top + self.shown() as i32 * self.row;
+        if y < self.list_top || y >= list_bottom || !(self.left..self.left + self.list_width).contains(&x) {
             return None;
         }
-        let i = self.first(view_selected) + usize::try_from((y - self.top) / self.row).ok()?;
+        let i = self.first(view_selected) + usize::try_from((y - self.list_top) / self.row).ok()?;
         (i < count).then_some(i)
     }
 }
@@ -651,12 +653,14 @@ pub fn draw_notice(canvas: &mut Canvas, title: &str, lines: &[String], scale: i3
 /// right (fields, analysis, envelope with the decay marked).
 fn draw_kit(canvas: &mut Canvas, kit: &KitView, layout: &KitLayout) {
     let scale = layout.scale;
+    // Title line above the list.
+    canvas.text(layout.left, layout.top + 2 * scale, &format!("kit {}", kit.kit), scale, DIM);
     let first = layout.first(kit.selected);
     if kit.samples.is_empty() {
-        canvas.text(layout.left, layout.top, "No samples in this kit", scale, DIM);
+        canvas.text(layout.left, layout.list_top, "No samples in this kit", scale, DIM);
     }
     for (row, (i, (name, key))) in kit.samples.iter().enumerate().skip(first).take(layout.shown()).enumerate() {
-        let y = layout.top + row as i32 * layout.row;
+        let y = layout.list_top + row as i32 * layout.row;
         if i == kit.selected {
             canvas.fill_rect(layout.left - 2 * scale, y - 2 * scale, layout.list_width, layout.row, FOCUS_ROW);
         }
@@ -666,11 +670,6 @@ fn draw_kit(canvas: &mut Canvas, kit: &KitView, layout: &KitLayout) {
     }
 
     let x = layout.detail_x;
-    let title = format!("kit {}", kit.kit);
-    canvas.text(x, layout.top, &title, scale, DIM);
-    if kit.samples.is_empty() {
-        return;
-    }
     let mut y = kit.details_top + 4 * scale;
     for line in [kit.info.as_deref(), kit.detected.as_deref()].into_iter().flatten() {
         canvas.text(x, y, line, scale, DIM);
@@ -945,8 +944,8 @@ mod tests {
             draw_kit(&mut canvas, &kit, &KitLayout::new(w as i32, h as i32, 1, 0));
         }
         let layout = KitLayout::new(1024, 640, 1, 0);
-        assert_eq!(layout.hit(0, 40, layout.left + 2, layout.top + 1), Some(0));
-        assert_eq!(layout.hit(0, 1, layout.left + 2, layout.top + layout.row + 1), None);
+        assert_eq!(layout.hit(0, 40, layout.left + 2, layout.list_top + 1), Some(0));
+        assert_eq!(layout.hit(0, 1, layout.left + 2, layout.list_top + layout.row + 1), None);
         assert_eq!(layout.hit(0, 40, layout.left + 2, layout.detail_y), None);
     }
 
