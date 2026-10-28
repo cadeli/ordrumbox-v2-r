@@ -77,6 +77,8 @@ pub struct Engine {
     synths: Vec<SynthVoice>,
     serial: u64,
     channels: Vec<Channel>,
+    /// Per-track peak of the last rendered quantum (0–1), for VU meters.
+    peaks: Vec<f32>,
     /// Strips in use (the most tracks any pass had).
     strip_count: usize,
     input_left: Vec<f32>,
@@ -113,6 +115,7 @@ impl Engine {
             synths: vec![SynthVoice::default(); MAX_SYNTH_VOICES],
             serial: 0,
             channels: vec![channel; MAX_TRACKS],
+            peaks: vec![0.0; MAX_TRACKS],
             strip_count: 0,
             input_left: vec![0.0; MAX_TRACKS * QUANTUM],
             input_right: vec![0.0; MAX_TRACKS * QUANTUM],
@@ -227,6 +230,11 @@ impl Engine {
         (self.current.is_some() && self.next.is_none()).then_some(self.pass_number + 1)
     }
 
+    /// Per-track peak of the last rendered quantum (0–1), for VU meters.
+    pub fn peaks(&self) -> &[f32] {
+        &self.peaks
+    }
+
     fn seconds(&self, clock: u64) -> f64 {
         clock as f64 / f64::from(self.sample_rate)
     }
@@ -299,6 +307,7 @@ impl Engine {
             let (in_l, in_r) = (&self.input_left[range.clone()], &self.input_right[range]);
             let silent_input = in_l.iter().chain(in_r).all(|&s| s == 0.0);
             if silent_input && channel.idle > self.idle_quanta {
+                self.peaks[track] = 0.0;
                 continue;
             }
             // Rendered on the side to measure the strip's own level.
@@ -310,6 +319,7 @@ impl Engine {
                 peak = peak.max(s.abs());
             }
             channel.idle = if silent_input && peak < IDLE_LEVEL { channel.idle.saturating_add(1) } else { 0 };
+            self.peaks[track] = peak;
         }
 
         // Master bus.

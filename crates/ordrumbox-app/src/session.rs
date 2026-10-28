@@ -164,6 +164,8 @@ pub struct Session {
     editors: EditorState,
     /// The track editor (and its note editor) shown on the right.
     show_track_editor: bool,
+    /// Smoothed per-track levels for the VU meter stripe.
+    track_levels: Vec<f32>,
     /// The widget with the keyboard focus.
     focus: Option<Id>,
     /// A knob or slider being dragged.
@@ -423,6 +425,7 @@ impl Session {
             scale_list: ScaleList::default(),
             editors: EditorState::default(),
             show_track_editor: true,
+            track_levels: Vec::new(),
             focus: None,
             drag: None,
             dropdown: None,
@@ -1614,7 +1617,7 @@ impl Session {
         self.panel_size = size;
     }
 
-    pub fn draw(&self, canvas: &mut Canvas, scale: i32) {
+    pub fn draw(&mut self, canvas: &mut Canvas, scale: i32) {
         let layout = self.panel_layout(canvas.width(), canvas.height(), scale);
         let position = self.controller.as_ref().and_then(Controller::position);
         let history = self.editor.history();
@@ -1631,6 +1634,23 @@ impl Session {
             }
             _ => library.songs.get(self.editor.selected_song()).map(|s| format!("song {}", s.name)),
         };
+        // Smoothed per-track levels for the VU meter stripe (peak-hold + decay).
+        let raw_levels = self.controller.as_ref().map(|c| c.levels()).unwrap_or_default();
+        if self.track_levels.len() < raw_levels.len() {
+            self.track_levels.resize(raw_levels.len(), 0.0);
+        }
+        for level in &mut self.track_levels {
+            *level *= 0.88;
+            if *level < 0.001 {
+                *level = 0.0;
+            }
+        }
+        for (i, level) in self.track_levels.iter_mut().enumerate() {
+            let r = raw_levels.get(i).copied().unwrap_or(0.0).abs();
+            if r > *level {
+                *level = r;
+            }
+        }
         let pattern = self.pattern();
         let song_layout = self.song_layout((canvas.width(), canvas.height(), scale));
         let rows = if self.workspace == Workspace::Song { self.song_rows() } else { Vec::new() };
@@ -1648,6 +1668,7 @@ impl Session {
             pattern_count: library.patterns.len(),
             kit_view: self.kit_view(layout.details_top),
             right: layout.right,
+            levels: self.track_levels.clone(),
             playhead: position.filter(|_| song_mode.is_none()).map(|p| p.frame as f64 / p.frames.max(1) as f64),
             song: song.as_deref(),
             cursor: self.cursor,
