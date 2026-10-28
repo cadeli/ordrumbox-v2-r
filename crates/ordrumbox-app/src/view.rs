@@ -724,6 +724,21 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
             }
         }
     }
+    // Loop ghosts: notes that re-trigger when the track loops at loop_at_step.
+    let mut loop_ghosts: Vec<(i64, &Note)> = Vec::new();
+    if let Some(loop_at) = track.loop_at_step.map(i64::from).filter(|&l| l > 0 && l < steps) {
+        for note in &track.notes {
+            let base = absolute_step(note.beat, note.beat_step, spb);
+            if base >= loop_at {
+                continue;
+            }
+            let mut pos = base + loop_at;
+            while pos < steps {
+                loop_ghosts.push((pos, note));
+                pos += loop_at;
+            }
+        }
+    }
     for (step, note) in note_at.iter().enumerate() {
         let step = step as i64;
         let (x, width) = cell(step);
@@ -748,13 +763,23 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
             let ih = ((f64::from(height) * 0.5).round() as i32).max(1);
             canvas.fill_rect(x + (width - iw) / 2, y + (height - ih) / 2, iw, ih, color);
         }
+        for (gpos, gnote) in &loop_ghosts {
+            if *gpos != step {
+                continue;
+            }
+            let color = theme::note(theme::mix(theme::track(index), theme::BG, 0.3), gnote.velocity);
+            let iw = ((f64::from(width) * 0.5).round() as i32).max(1);
+            let ih = ((f64::from(height) * 0.5).round() as i32).max(1);
+            canvas.fill_rect(x + (width - iw) / 2, y + (height - ih) / 2, iw, ih, color);
+        }
     }
     // Flash (with glow) the cells currently being played.
     if let Some(frac) = view.playhead {
         let cur = (frac * steps as f64).floor() as i64;
         if (0..steps).contains(&cur) {
             let has_base = note_at.get(cur as usize).copied().flatten().is_some();
-            let has_ghost = ghosts.iter().any(|(p, _, _)| *p == cur);
+            let has_ghost = ghosts.iter().any(|(p, _, _)| *p == cur)
+                || loop_ghosts.iter().any(|(p, _)| *p == cur);
             if has_base || has_ghost {
                 let (x, width) = cell(cur);
                 let base_color = note_at
