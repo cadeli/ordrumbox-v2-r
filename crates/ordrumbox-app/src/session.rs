@@ -1696,7 +1696,18 @@ impl Session {
             right: layout.right,
             current_page: self.current_page,
             levels: self.track_levels.clone(),
-            playhead: position.filter(|_| song_mode.is_none()).map(|p| p.frame as f64 / p.frames.max(1) as f64),
+            playhead: if song_mode.is_some() {
+                None
+            } else {
+                position.map(|p| {
+                    let global_frac = p.frame as f64 / p.frames.max(1) as f64;
+                    let total_beats = self.pattern().map(|pat| pat.beat_count.max(1)).unwrap_or(1) as f64;
+                    let global_beat = global_frac * total_beats;
+                    let start_beat = self.current_page as f64 * view::BEATS_PER_PAGE as f64;
+                    let page_beats = view::BEATS_PER_PAGE as f64;
+                    ((global_beat - start_beat) / page_beats).clamp(0.0, 1.0)
+                })
+            },
             song: song.as_deref(),
             cursor: self.cursor,
             selected: self.selected,

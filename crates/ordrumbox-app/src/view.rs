@@ -819,9 +819,12 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
             }
         }
     }
-    if let Some(loop_at) = track.loop_at_step.map(i64::from).filter(|&l| l > 0 && l < steps) {
-        let (x, _) = cell(loop_at);
-        canvas.fill_rect(x - gap, y, gap * 2, height, LOOP_MARK);
+    if let Some(loop_at) = track.loop_at_step.map(i64::from).filter(|&l| l > 0 && l < i64::from(track.steps_per_beat) * i64::from(track.beat_count)) {
+        let local = loop_at - start;
+        if (0..steps).contains(&local) {
+            let (x, _) = cell(local);
+            canvas.fill_rect(x - gap, y, gap * 2, height, LOOP_MARK);
+        }
     }
 
     let outline = |canvas: &mut Canvas, step: i64, color: Rgb| {
@@ -831,10 +834,12 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
         }
     };
     if let Some(c) = view.cursor.filter(|c| c.track == index) {
-        outline(canvas, absolute_step(c.beat, c.step, spb), CURSOR);
+        let s = absolute_step(c.beat, c.step, spb) - start;
+        outline(canvas, s, CURSOR);
     }
     if let Some(note) = view.selected.filter(|(t, _)| *t == index).and_then(|(_, n)| track.notes.get(n)) {
-        outline(canvas, absolute_step(note.beat, note.beat_step, spb), SELECTED);
+        let s = absolute_step(note.beat, note.beat_step, spb) - start;
+        outline(canvas, s, SELECTED);
     }
 }
 
