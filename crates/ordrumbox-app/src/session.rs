@@ -611,7 +611,8 @@ impl Session {
             // While playing in pattern mode, switch to the new pattern on the
             // current pass instead of waiting for the next loop.
             let playing = self.playing();
-            let mode_is_pattern = self.controller.as_ref().map(|c| matches!(c.mode(), Mode::Pattern(_))).unwrap_or(false);
+            let mode_is_pattern =
+                self.controller.as_ref().map(|c| matches!(c.mode(), Mode::Pattern(_))).unwrap_or(false);
             if playing && mode_is_pattern {
                 if let Some(controller) = &mut self.controller {
                     controller.select_pattern(self.pattern_index);
