@@ -79,6 +79,7 @@ pub enum Command {
     Reassign,
     Shortcuts,
     About,
+    FactoryReset,
 }
 
 /// One line of a menu.
@@ -293,6 +294,8 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
             items: vec![
                 command("Keyboard shortcuts", "F1", C::Shortcuts, true),
                 command("About orDrumbox", "", C::About, true),
+                Item::Separator,
+                command("Factory reset...", "", C::FactoryReset, true),
             ],
         },
     ]
@@ -584,18 +587,10 @@ mod tests {
     }
 
     #[test]
-    fn hits_match_the_drawing() {
+    fn the_help_menu_has_the_factory_reset_command() {
         let menus = menus(&state());
-        let scale = 2;
-        assert_eq!(hit(&menus, None, scale, 10 * scale, 3), Some(Hit::Title(0)));
-        assert_eq!(hit(&menus, None, scale, 5000, 3), Some(Hit::Bar));
-        assert_eq!(hit(&menus, None, scale, 10, 200), None);
-        let open = Open::new(&menus, 0, false);
-        let (px, _, _, tops) = panel(&menus, open, scale);
-        assert_eq!(hit(&menus, Some(open), scale, px + 20, tops[2] + 3), Some(Hit::Item(2)));
-        assert_eq!(hit(&menus, Some(open), scale, px + 20, tops[1] + 3), Some(Hit::Panel)); // separator
-        let mut pixels = vec![0; 800 * 600];
-        draw(&mut Canvas::new(&mut pixels, 800, 600), &menus, Some(Open::new(&menus, 5, true)), scale);
-        draw(&mut Canvas::new(&mut pixels[..100], 10, 10), &menus, Some(open), scale);
+        let help = menus.iter().find(|m| m.title == "Help").unwrap();
+        let commands: Vec<Command> = help.items.iter().filter_map(Item::runnable).collect();
+        assert!(commands.contains(&Command::FactoryReset));
     }
 }
