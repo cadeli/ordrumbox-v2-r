@@ -608,6 +608,19 @@ impl Session {
             self.pattern_index = (self.pattern_index as isize + delta).rem_euclid(count as isize) as usize;
             self.deselect();
             self.message = format!("pattern {}", self.pattern().and_then(|p| p.name.as_deref()).unwrap_or_default());
+            // While playing in pattern mode, switch to the new pattern on the
+            // current pass instead of waiting for the next loop.
+            let playing = self.playing();
+            let mode_is_pattern = self.controller.as_ref().map(|c| matches!(c.mode(), Mode::Pattern(_))).unwrap_or(false);
+            if playing && mode_is_pattern {
+                if let Some(controller) = &mut self.controller {
+                    controller.select_pattern(self.pattern_index);
+                }
+                let library = self.editor.library();
+                if let Some(controller) = &mut self.controller {
+                    controller.refresh(library);
+                }
+            }
         }
     }
 
@@ -626,6 +639,15 @@ impl Session {
         self.kit_index = index;
         if let Some(controller) = &mut self.controller {
             controller.set_kit(&kit.name);
+        }
+        // A kit change affects every track's sound: rebuild the pass
+        // playing now so it is heard at once (not at the next loop).
+        let playing = self.playing();
+        if playing {
+            let library = self.editor.library();
+            if let Some(controller) = &mut self.controller {
+                controller.refresh(library);
+            }
         }
         if let Some(render) = &mut self.render {
             render.kit.clone_from(&kit.name);
