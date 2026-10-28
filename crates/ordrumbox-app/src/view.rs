@@ -105,6 +105,8 @@ pub struct View<'a> {
     pub current_page: usize,
     /// Per-track levels (0–1) for the VU meter stripe, when playing.
     pub levels: Vec<f32>,
+    /// Whether the VU meter stripe is shown.
+    pub show_vus: bool,
 }
 
 /// What the kit editor shows.
@@ -573,10 +575,14 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
         let stripe_top = y + gap;
         let stripe_h = layout.row - 3 * gap;
         let level = view.levels.get(i).copied().unwrap_or(0.0).clamp(0.0, 1.0);
-        canvas.fill_rect(stripe_x, stripe_top, stripe_w, stripe_h, theme::mix(theme::track(i), theme::BG, 0.75));
-        let fill_h = (f64::from(stripe_h) * f64::from(level)).round() as i32;
-        if fill_h > 0 {
-            canvas.fill_rect(stripe_x, stripe_top + stripe_h - fill_h, stripe_w, fill_h, theme::track(i));
+        if view.show_vus {
+            canvas.fill_rect(stripe_x, stripe_top, stripe_w, stripe_h, theme::mix(theme::track(i), theme::BG, 0.75));
+            let fill_h = (f64::from(stripe_h) * f64::from(level)).round() as i32;
+            if fill_h > 0 {
+                canvas.fill_rect(stripe_x, stripe_top + stripe_h - fill_h, stripe_w, fill_h, theme::track(i));
+            }
+        } else {
+            canvas.fill_rect(stripe_x, stripe_top, stripe_w, stripe_h, theme::track(i));
         }
         let box_y = y + (layout.row - layout.box_size) / 2;
         for (solo, on, color, letter) in [(false, track.mute, MUTE_ON, "M"), (true, track.solo, SOLO_ON, "S")] {
@@ -889,6 +895,7 @@ mod tests {
                 right: 300,
                 current_page: 0,
                 levels: vec![0.0; 2],
+                show_vus: true,
                 cursor: Some(Cursor { track: 0, beat: 1, step: 2 }),
                 selected: Some((0, 0)),
                 undo: Some("Add note"),
