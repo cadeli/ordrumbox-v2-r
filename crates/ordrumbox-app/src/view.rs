@@ -100,6 +100,8 @@ pub struct View<'a> {
     pub sounds: Vec<String>,
     /// Width kept on the right (for the track editor).
     pub right: i32,
+    /// Per-track levels (0–1) for the VU meter stripe, when playing.
+    pub levels: Vec<f32>,
 }
 
 /// What the kit editor shows.
@@ -540,8 +542,17 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
             let right = layout.grid_left + layout.grid_width;
             canvas.fill_rect(layout.left - 4 * scale, y, right - layout.left + 4 * scale, layout.row - gap, FOCUS_ROW);
         }
-        // The track's colour, its notes' too.
-        canvas.fill_rect(layout.left - 8 * scale, y + gap, 3 * scale, layout.row - 3 * gap, theme::track(i));
+        // The track's VU meter stripe (level from the audio engine).
+        let stripe_x = layout.left - 8 * scale;
+        let stripe_w = 3 * scale;
+        let stripe_top = y + gap;
+        let stripe_h = layout.row - 3 * gap;
+        let level = view.levels.get(i).copied().unwrap_or(0.0).clamp(0.0, 1.0);
+        canvas.fill_rect(stripe_x, stripe_top, stripe_w, stripe_h, theme::mix(theme::track(i), theme::BG, 0.75));
+        let fill_h = (f64::from(stripe_h) * f64::from(level)).round() as i32;
+        if fill_h > 0 {
+            canvas.fill_rect(stripe_x, stripe_top + stripe_h - fill_h, stripe_w, fill_h, theme::track(i));
+        }
         let box_y = y + (layout.row - layout.box_size) / 2;
         for (solo, on, color, letter) in [(false, track.mute, MUTE_ON, "M"), (true, track.solo, SOLO_ON, "S")] {
             let x = layout.box_x(solo);
@@ -704,12 +715,34 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
     for (step, note) in note_at.iter().enumerate() {
         let step = step as i64;
         let (x, width) = cell(step);
-        let color = match note {
-            Some(n) => theme::note(note_color(n), n.velocity),
-            None if step % i64::from(spb) == 0 => CELL_BEAT,
-            None => CELL,
-        };
-        canvas.fill_rect(x, y, width, height, color);
+        let is_beat = step % i64::from(spb) == 0;
+        let bg = if is_beat { CELL_BEAT } else { CELL };
+        canvas.fill_rect(x, y, width, height, bg);
+        if let Some(n) = note {
+            let color = theme::note(note_color(n), n.velocity);
+            let small = n.retrigger_count > 1 || (n.rate - 1.0).abs() > 1e-9 || n.euclidean_fill > 0;
+            if small {
+                let iw = ((f64::from(width) * 0.5).round() as i32).max(1);
+                let ih = ((f64::from(height) * 0.5).round() as i32).max(1);
+                canvas.fill_rect(x + (width - iw) / 2, y + (height - ih) / 2, iw, ih, color);
+            } else {
+                canvas.fill_rect(x, y, width, height, color);
+            }
+        }
+    }
+    // Flash the special (retrig/euclid) notes currently being played.
+    if let Some(frac) = view.playhead {
+        let cur = (frac * steps as f64).floor() as i64;
+        if (0..steps).contains(&cur)
+            && let Some(Some(n)) = note_at.get(cur as usize)
+        {
+            let small = n.retrigger_count > 1 || (n.rate - 1.0).abs() > 1e-9 || n.euclidean_fill > 0;
+            if small {
+                let (x, width) = cell(cur);
+                let flash = theme::mix(theme::note(note_color(n), n.velocity), theme::WHITE, 0.55);
+                canvas.fill_rect(x, y, width, height, flash);
+            }
+        }
     }
     if let Some(loop_at) = track.loop_at_step.map(i64::from).filter(|&l| l > 0 && l < steps) {
         let (x, _) = cell(loop_at);
@@ -771,6 +804,7 @@ mod tests {
                 output: None,
                 synth: false,
                 right: 300,
+                levels: vec![0.0; 2],
                 cursor: Some(Cursor { track: 0, beat: 1, step: 2 }),
                 selected: Some((0, 0)),
                 undo: Some("Add note"),

@@ -19,7 +19,7 @@ use ordrumbox_core::{Library, Rng, Scales};
 use ordrumbox_dsp::MasterSettings;
 
 use crate::assign::{TrackSound, assign_track};
-use crate::engine::{Engine, Position};
+use crate::engine::{Engine, MAX_TRACKS, Position};
 use crate::kit::SampleBank;
 use crate::pass::{FlatNotesCache, Pass, PassContext, SongContext, build_pass, build_preview, build_song_pass};
 use crate::synth_preset::SynthPresets;
@@ -68,6 +68,7 @@ struct Link {
     inbox: Mutex<Inbox>,
     /// Written by the audio side when it can take it, never waited for.
     scope: Mutex<Scope>,
+    levels: Mutex<Vec<f32>>,
     playing: AtomicBool,
     pass: AtomicU64,
     frame: AtomicU64,
@@ -117,6 +118,15 @@ impl AudioSide {
             }
         }
         self.engine.render(left, right);
+        if let Ok(mut levels) = self.link.levels.try_lock() {
+            let peaks = self.engine.peaks();
+            if levels.len() < peaks.len() {
+                levels.resize(peaks.len(), 0.0);
+            }
+            for (l, p) in levels.iter_mut().zip(peaks) {
+                *l = *p;
+            }
+        }
         if let Ok(mut scope) = self.link.scope.try_lock() {
             for (l, r) in left.iter().zip(right.iter()) {
                 let at = scope.at;
@@ -193,7 +203,16 @@ impl Controller {
         synths: SynthPresets,
         rng: Rng,
     ) -> (Self, AudioSide) {
-        let link = Arc::new(Link::default());
+        let link = Arc::new(Link {
+            inbox: Mutex::new(Inbox::default()),
+            scope: Mutex::new(Scope::default()),
+            levels: Mutex::new(vec![0.0; MAX_TRACKS]),
+            playing: AtomicBool::new(false),
+            pass: AtomicU64::new(0),
+            frame: AtomicU64::new(0),
+            frames: AtomicU64::new(0),
+            wants: AtomicU64::new(0),
+        });
         let kit = bank.samples.first().map(|s| s.kit.clone()).unwrap_or_default();
         let audio = AudioSide { engine: Engine::new(sample_rate, bank.clone()), link: link.clone() };
         let controller = Self {
@@ -249,6 +268,11 @@ impl Controller {
     pub fn set_master(&mut self, master: MasterSettings) {
         self.master = master;
         self.link.inbox().master = Some(master);
+    }
+
+    /// Per-track peak of the last rendered quantum (0–1), for VU meters.
+    pub fn levels(&self) -> Vec<f32> {
+        self.link.levels.lock().map(|g| g.clone()).unwrap_or_default()
     }
 
     /// The last [`SCOPE_SIZE`] samples played, oldest first, mono (silence
