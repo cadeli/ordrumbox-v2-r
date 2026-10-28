@@ -12,6 +12,9 @@ use crate::canvas::{Canvas, Rgb, text_width};
 use crate::menu;
 use crate::output::{self, OutputLayout, OutputView};
 use crate::panel::Rect;
+
+/// Beats shown per page of the pattern grid (JS `BEATS_PER_PAGE`).
+pub const BEATS_PER_PAGE: i32 = 4;
 use crate::piano_roll::{self, RollLayout, RollView};
 use crate::song_view::{self, SongLayout, SongView};
 use crate::theme;
@@ -100,6 +103,8 @@ pub struct View<'a> {
     pub sounds: Vec<String>,
     /// Width kept on the right (for the track editor).
     pub right: i32,
+    /// Current page of the pattern grid (BEATS_PER_PAGE beats).
+    pub current_page: usize,
     /// Per-track levels (0–1) for the VU meter stripe, when playing.
     pub levels: Vec<f32>,
 }
@@ -198,6 +203,8 @@ pub struct Layout {
     grid_left: i32,
     grid_width: i32,
     beats: i32,
+    /// First beat shown on this page.
+    start_beat: i32,
     tracks: usize,
 }
 
@@ -324,7 +331,7 @@ impl Body {
 impl Layout {
     /// The rows of `pattern` on a `width` × `height` screen, with
     /// `status_lines` message lines in the footer.
-    pub fn new(width: i32, height: i32, scale: i32, pattern: &Pattern, status_lines: usize) -> Self {
+    pub fn new(width: i32, height: i32, scale: i32, pattern: &Pattern, status_lines: usize, page: usize) -> Self {
         let margin = margin(scale);
         let top = body_top(scale);
         let bottom = footer_top(height, scale, status_lines) - margin / 2;
@@ -336,6 +343,10 @@ impl Layout {
         let name_x = left + 2 * (box_size + 3 * scale) + 4 * scale;
         let volume_x = name_x + text_width(&"W".repeat(LABEL_CHARS), label_scale) + 6 * scale;
         let grid_left = volume_x + VOLUME_WIDTH * scale + 8 * scale;
+        // Pagination: BEATS_PER_PAGE beats per page (JS BEATS_PER_PAGE).
+        let total_beats = pattern.beat_count.max(1);
+        let start_beat = (page as i32 * BEATS_PER_PAGE).min(total_beats - 1).max(0);
+        let beats = (total_beats - start_beat).clamp(1, BEATS_PER_PAGE);
         // One row under the tracks for the master volume.
         let shown = usize::try_from((bottom - top - row).max(0) / row.max(1)).unwrap_or(0).min(tracks);
         Self {
@@ -350,7 +361,8 @@ impl Layout {
             volume_x,
             grid_left,
             grid_width: (width - margin - grid_left).max(1),
-            beats: pattern.beat_count.max(1),
+            beats,
+            start_beat,
             tracks: shown,
         }
     }
@@ -362,7 +374,11 @@ impl Layout {
     /// The cell of a step of track `track` (`spb` steps per beat).
     pub fn cell_rect(&self, track: usize, beat: i32, step: i32, spb: i32) -> Rect {
         let spb = spb.clamp(1, 16);
-        let at = i64::from(beat) * i64::from(spb) + i64::from(step);
+        let local_beat = beat - self.start_beat;
+        if local_beat < 0 || local_beat >= self.beats {
+            return Rect::new(0, 0, 0, 0);
+        }
+        let at = i64::from(local_beat) * i64::from(spb) + i64::from(step);
         let x = self.step_x(at, spb);
         Rect::new(x, self.row_top(track), self.step_x(at + 1, spb) - x, self.row)
     }
@@ -428,7 +444,7 @@ impl Layout {
         let steps = i64::from(self.beats) * i64::from(spb);
         (step < steps).then(|| Hit::Cell {
             track,
-            beat: (step / i64::from(spb)) as i32,
+            beat: self.start_beat + (step / i64::from(spb)) as i32,
             step: (step % i64::from(spb)) as i32,
         })
     }
@@ -455,6 +471,10 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
         label(canvas, c.bpm, "BPM");
         label(canvas, c.pattern, &format!("PATTERN {}/{}", view.pattern_index + 1, view.pattern_count));
         label(canvas, c.beats, "BEATS");
+        if let Some(pattern) = view.pattern {
+            let pages = (pattern.beat_count.max(1) as usize).div_ceil(BEATS_PER_PAGE as usize).max(1);
+            canvas.text(c.pattern.x + c.pattern.w + 8 * scale, top, &format!("Page {}/{}", view.current_page + 1, pages), scale, DIM);
+        }
         label(canvas, c.kit, "KIT");
         let generate = match view.genre {
             Some(genre) => format!("GENERATE {genre}"),
@@ -521,7 +541,7 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
         let layout = RollLayout::new(body.main_w, body.editor_h, scale, view.status.len(), spb);
         piano_roll::draw(canvas, roll, &layout, title);
     } else if let Some(pattern) = view.pattern {
-        let layout = Layout::new(body.main_w, body.editor_h, scale, pattern, view.status.len());
+        let layout = Layout::new(body.main_w, body.editor_h, scale, pattern, view.status.len(), view.current_page);
         draw_grid(canvas, pattern, view, &layout);
     }
 
@@ -696,6 +716,7 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
     let gap = layout.scale.max(1);
     let spb = steps_per_beat(track);
     let steps = i64::from(layout.beats) * i64::from(spb);
+    let start = i64::from(layout.start_beat) * i64::from(spb);
     let y = layout.row_top(index);
     let height = layout.row - gap;
     let cell = |step: i64| {
@@ -705,8 +726,9 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
 
     let mut note_at: Vec<Option<&Note>> = vec![None; steps as usize];
     for note in &track.notes {
-        let step = absolute_step(note.beat, note.beat_step, spb);
-        if let Some(slot) = usize::try_from(step).ok().and_then(|s| note_at.get_mut(s)) {
+        let gstep = absolute_step(note.beat, note.beat_step, spb);
+        let local = gstep - start;
+        if let Some(slot) = usize::try_from(local).ok().and_then(|s| note_at.get_mut(s)) {
             if slot.is_none_or(|existing| note.velocity > existing.velocity) {
                 *slot = Some(note);
             }
@@ -714,27 +736,32 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
     }
     // Ghosts: the sub-events (retriggers, arpeggio steps, euclidean fills)
     // a note produces, drawn smaller than the base note.
+    let track_total = i64::from(track.steps_per_beat) * i64::from(track.beat_count);
     let span = ordrumbox_core::pattern_engine::SpanResolver::new(track);
     let mut rng = ordrumbox_core::Rng::new(0);
     let mut ghosts: Vec<(i64, ordrumbox_core::note_positions::SubKind, &Note)> = Vec::new();
     for note in &track.notes {
-        for sub in ordrumbox_core::note_positions::sub_positions(note, track, steps, &span, &mut rng) {
-            if (0..steps).contains(&sub.pos) {
-                ghosts.push((sub.pos, sub.kind, note));
+        for sub in ordrumbox_core::note_positions::sub_positions(note, track, track_total, &span, &mut rng) {
+            let local = sub.pos - start;
+            if (0..steps).contains(&local) {
+                ghosts.push((local, sub.kind, note));
             }
         }
     }
     // Loop ghosts: notes that re-trigger when the track loops at loop_at_step.
     let mut loop_ghosts: Vec<(i64, &Note)> = Vec::new();
-    if let Some(loop_at) = track.loop_at_step.map(i64::from).filter(|&l| l > 0 && l < steps) {
+    if let Some(loop_at) = track.loop_at_step.map(i64::from).filter(|&l| l > 0) {
         for note in &track.notes {
             let base = absolute_step(note.beat, note.beat_step, spb);
             if base >= loop_at {
                 continue;
             }
             let mut pos = base + loop_at;
-            while pos < steps {
-                loop_ghosts.push((pos, note));
+            while pos < track_total {
+                let local = pos - start;
+                if (0..steps).contains(&local) {
+                    loop_ghosts.push((local, note));
+                }
                 pos += loop_at;
             }
         }
@@ -855,6 +882,7 @@ mod tests {
                 output: None,
                 synth: false,
                 right: 300,
+                current_page: 0,
                 levels: vec![0.0; 2],
                 cursor: Some(Cursor { track: 0, beat: 1, step: 2 }),
                 selected: Some((0, 0)),
@@ -883,7 +911,7 @@ mod tests {
                         assert!(body.main_bottom < body.output.y);
                         // The editor height is virtual: a layout built with it
                         // (and the real status count) ends exactly at main_bottom.
-                        let grid = Layout::new(body.main_w, body.editor_h, scale, pattern, status);
+                        let grid = Layout::new(body.main_w, body.editor_h, scale, pattern, status, 0);
                         assert_eq!(grid.bottom, body.main_bottom);
                     }
                 }
@@ -920,7 +948,7 @@ mod tests {
     fn hit_testing_matches_the_drawing() {
         let library = library();
         let pattern = &library.patterns[0];
-        let layout = Layout::new(1024, 640, 1, pattern, 0);
+        let layout = Layout::new(1024, 640, 1, pattern, 0, 0);
         let y = layout.row_top(2) + layout.row / 2;
         assert_eq!(layout.hit(pattern, layout.box_x(false) + 1, y), Some(Hit::Mute(2)));
         assert_eq!(layout.hit(pattern, layout.box_x(true) + 1, y), Some(Hit::Solo(2)));
