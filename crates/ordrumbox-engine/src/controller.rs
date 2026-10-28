@@ -333,9 +333,15 @@ impl Controller {
     /// Audition track `t` of pattern `p` (`simpleBeep`): `note` (an index in
     /// its notes) or a default note, through the track's strip.
     pub fn preview(&mut self, library: &Library, p: usize, t: usize, note: Option<usize>) {
+        let note = note.and_then(|n| library.patterns.get(p)?.tracks.get(t)?.notes.get(n)).cloned();
+        self.preview_note(library, p, t, note.as_ref());
+    }
+
+    /// Audition `note` (else a default note) on track `t` of pattern `p`,
+    /// whether the track has it or not (a piano roll key: `#playKey`).
+    pub fn preview_note(&mut self, library: &Library, p: usize, t: usize, note: Option<&ordrumbox_core::Note>) {
         let Some(pattern) = library.patterns.get(p) else { return };
         let sounds = self.sounds(library, p);
-        let note = note.and_then(|n| pattern.tracks.get(t)?.notes.get(n));
         let context = PassContext {
             bank: &self.bank,
             sounds: &sounds,

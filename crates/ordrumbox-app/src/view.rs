@@ -11,6 +11,7 @@ use ordrumbox_core::{Pattern, Track};
 use crate::canvas::{Canvas, Rgb, text_width};
 use crate::menu;
 use crate::panel::Rect;
+use crate::piano_roll::{self, RollLayout, RollView};
 use crate::song_view::{self, SongLayout, SongView};
 
 const BACKGROUND: Rgb = 0x0016_1619;
@@ -36,6 +37,9 @@ const BOX_OFF: Rgb = 0x0038_3845;
 const HELP: &str = "F10 or ALT: menus   ARROWS: cursor   ENTER or click: note   SHIFT+ARROWS: velocity/pitch   TAB: track editor   F1: all keys";
 /// The same in the song panel.
 const SONG_HELP: &str = "SONG   click the ruler: cursor   right-click: add / repeat / remove   SPACE: play from the cursor   F3 or ESC: grid";
+/// The same in the piano roll.
+const ROLL_HELP: &str =
+    "PIANO ROLL   click: add / select / delete   drag: velocity / pitch   right-click: menu   F4 or ESC: grid";
 /// The same in the kit editor.
 const KIT_HELP: &str =
     "KIT EDITOR   UP DOWN: sample   TAB: controls   ENTER: hear   DEL: remove   N: normalize   ESC: close";
@@ -81,6 +85,8 @@ pub struct View<'a> {
     pub kit_view: Option<KitView<'a>>,
     /// The song panel, when shown (it takes the place of the grid).
     pub arrangement: Option<SongView<'a>>,
+    /// The piano roll and its title, when shown (it takes the place of the grid).
+    pub piano_roll: Option<(RollView<'a>, String)>,
     /// Width kept on the right (for the track editor).
     pub right: i32,
 }
@@ -397,6 +403,8 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
         KIT_HELP
     } else if view.arrangement.is_some() {
         SONG_HELP
+    } else if view.piano_roll.is_some() {
+        ROLL_HELP
     } else {
         HELP
     };
@@ -408,6 +416,10 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
     } else if let Some(kit) = &view.kit_view {
         let layout = KitLayout::new(canvas.width(), canvas.height(), scale, view.status.len());
         draw_kit(canvas, kit, &layout);
+    } else if let Some((roll, title)) = &view.piano_roll {
+        let spb = piano_roll::steps_per_beat(roll.track);
+        let layout = RollLayout::new(canvas.width() - view.right, canvas.height(), scale, view.status.len(), spb);
+        piano_roll::draw(canvas, roll, &layout, title);
     } else if let Some(pattern) = view.pattern {
         let layout = Layout::new(canvas.width() - view.right, canvas.height(), scale, pattern, view.status.len());
         draw_grid(canvas, pattern, view, &layout);
@@ -634,6 +646,7 @@ mod tests {
                 genre: Some("house"),
                 kit_view: None,
                 arrangement: None,
+                piano_roll: None,
                 right: 300,
                 cursor: Some(Cursor { track: 0, beat: 1, step: 2 }),
                 selected: Some((0, 0)),

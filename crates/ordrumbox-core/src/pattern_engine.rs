@@ -115,7 +115,8 @@ fn loop_occurrences(base: i64, loop_ticks: i64, pattern_ticks: i64) -> Vec<i64> 
 /// End (exclusive step) of the span a note's euclidean fill covers: the next
 /// occupied step of the track, the loop point if it comes first, else the
 /// track end (`step_resolver.js`). Built once per track and pass.
-struct SpanResolver {
+#[derive(Debug)]
+pub struct SpanResolver {
     occupied: HashSet<i64>,
     last: i64,
     loop_at: Option<i64>,
@@ -123,7 +124,7 @@ struct SpanResolver {
 }
 
 impl SpanResolver {
-    fn new(track: &Track) -> Self {
+    pub fn new(track: &Track) -> Self {
         let spb = track.steps_per_beat;
         Self {
             occupied: track.notes.iter().map(|n| absolute_step(n.beat, n.beat_step, spb)).collect(),
@@ -133,7 +134,7 @@ impl SpanResolver {
         }
     }
 
-    fn end(&self, note: &Note) -> i64 {
+    pub fn end(&self, note: &Note) -> i64 {
         let first = absolute_step(note.beat, note.beat_step, self.steps_per_beat);
         let end = (first + 1..self.last).find(|step| self.occupied.contains(step)).unwrap_or(self.last);
         match self.loop_at {

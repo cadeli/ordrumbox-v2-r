@@ -13,6 +13,7 @@ use crate::canvas::{Canvas, Rgb, text_width};
 pub enum Command {
     TrackEditor,
     SongView,
+    PianoRoll,
     NewSong,
     RemoveSong,
     RenameSong,
@@ -127,6 +128,7 @@ pub struct MenuState {
     pub kit_editor: bool,
     pub track_editor: bool,
     pub song_view: bool,
+    pub piano_roll: bool,
     /// A folder to save songs in (Save song).
     pub can_save_song: bool,
     /// Song files saved (Load song).
@@ -201,6 +203,7 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
             items: vec![
                 check("Track editor", "F2", C::TrackEditor, true, s.track_editor),
                 check("Song", "F3", C::SongView, true, s.song_view),
+                check("Piano roll", "F4", C::PianoRoll, true, s.piano_roll),
                 check("Kit editor", "Ctrl+K", C::KitEditor, true, s.kit_editor),
             ],
         },

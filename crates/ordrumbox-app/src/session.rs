@@ -2,7 +2,8 @@
 //! generators, MIDI files, the grid cursor and selection, the clipboard, saving. Edits go through the
 //! [`Editor`] (each one an undo step); the playing pass is rebuilt after each.
 //!
-//! The song panel (F3) takes the grid's place: `session_song.rs`.
+//! The song panel (F3) and the piano roll (F4) take the grid's place:
+//! `session_song.rs`, `session_roll.rs`.
 //!
 //! The grid follows the JS pattern panel (`pointer_section.js`,
 //! `keyboard_section.js`, `clipboard_section.js`): a click on an empty step
@@ -34,9 +35,22 @@ use crate::view::{self, Cursor, Hit, KitView, View};
 
 #[path = "session_panel.rs"]
 mod session_panel;
+#[path = "session_roll.rs"]
+mod session_roll;
 #[path = "session_song.rs"]
 mod session_song;
 pub use session_panel::{Button, PanelKey};
+
+/// What is shown under the header (the JS view switch; the kit editor
+/// opens over any of them).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Workspace {
+    Grid,
+    /// The piano roll (F4): the track editor's track.
+    PianoRoll,
+    /// The song panel (F3): Space plays the song.
+    Song,
+}
 
 /// Save this long after the last edit.
 const SAVE_DELAY: Duration = Duration::from_secs(1);
@@ -85,14 +99,24 @@ pub struct Session {
     analysis: Option<(String, Analysis)>,
     synths: SynthPresets,
     pattern_index: usize,
-    /// The song panel is shown (in the place of the grid; Space plays the song).
-    song_view: bool,
+    /// What is shown under the header.
+    workspace: Workspace,
     /// The measure the song plays from (`songCursorMeasure`).
     song_cursor: u32,
     /// First measure and first row of the arrangement shown.
     song_scroll: (u32, usize),
     /// The clip under the mouse (its tooltip).
     hovered_clip: Option<usize>,
+    /// The piano roll's page, highest row shown (`None`: centered on the
+    /// track's pitch), cursor (step, row), note pressed, the edited value
+    /// shown over the note, next progression, note under the mouse.
+    roll_page: i32,
+    roll_top: Option<i32>,
+    roll_cursor: Option<(i64, i32)>,
+    roll_drag: Option<session_roll::RollDrag>,
+    roll_gauge: Option<String>,
+    roll_sequence: i64,
+    roll_hover: Option<usize>,
     /// Window size and scale of the last mouse or key event on the widgets.
     panel_size: (i32, i32, i32),
     /// What offline renders (WAV exports) use; `None` without samples.
@@ -185,10 +209,10 @@ enum Overlay {
 }
 
 /// Every key, for Help > Keyboard shortcuts.
-const SHORTCUTS: [&str; 42] = [
+const SHORTCUTS: [&str; 46] = [
     "MENUS",
     "  F10 or Alt             open the menus: Arrows move, Enter runs, Esc closes",
-    "  F1, F2, F3             this list, the track editor (shown or hidden), the song panel",
+    "  F1 F2 F3 F4            this list, the track editor (shown or hidden), song panel, piano roll",
     "GRID",
     "  Arrows                 move the cursor",
     "  Enter / click          add a note, select it, delete the selected one",
@@ -219,6 +243,10 @@ const SHORTCUTS: [&str; 42] = [
     "  drag                   a knob up / down, a slider along (Shift: finely)",
     "  double-click           default value     right-click or Enter: type a value",
     "  Enter or Space         open a list, press a button",
+    "PIANO ROLL (F4)",
+    "  click / drag / right-click a cell: add, select, delete; velocity (up/down) or pitch; menu",
+    "  Arrows, Shift+Arrows   the cursor; the selected note's velocity / pitch    Enter, Delete",
+    "  a key: hear it, right-click: clear, chord progression     wheel (Shift: pages)",
     "SONG PANEL (F3)",
     "  click / right-click    the ruler: aim the cursor; a pattern, row, clip, the grid: menu",
     "  Left Right, Up Down    the cursor a measure back / on, previous / next pattern",
@@ -332,10 +360,17 @@ impl Session {
             analysis: None,
             synths: SynthPresets::default(),
             pattern_index: 0,
-            song_view: false,
+            workspace: Workspace::Grid,
             song_cursor: 0,
             song_scroll: (0, 0),
             hovered_clip: None,
+            roll_page: 0,
+            roll_top: None,
+            roll_cursor: None,
+            roll_drag: None,
+            roll_gauge: None,
+            roll_sequence: 0,
+            roll_hover: None,
             panel_size: (0, 0, 1),
             render: None,
             controller: None,
@@ -391,7 +426,7 @@ impl Session {
 
     /// Space: play or stop the selected pattern (in the song panel: the song).
     pub fn toggle_play(&mut self) {
-        if self.song_view {
+        if self.workspace == Workspace::Song {
             return self.toggle_play_song();
         }
         self.toggle(Mode::Pattern(self.pattern_index), 0);
@@ -589,7 +624,8 @@ impl Session {
             kit_index: self.kit_index,
             kit_editor: self.kit_editor.is_some(),
             track_editor: self.show_track_editor,
-            song_view: self.song_view,
+            song_view: self.workspace == Workspace::Song,
+            piano_roll: self.workspace == Workspace::PianoRoll,
             can_save_song: store::songs_dir().is_some(),
             saved_songs: store::songs_dir().is_some_and(|d| !store::list_songs(&d).is_empty()),
             kit_sample: self.kit_list().is_some_and(|(s, n)| s < n),
@@ -671,6 +707,7 @@ impl Session {
             C::KitEditor => self.toggle_kit_editor(),
             C::TrackEditor => self.toggle_track_editor(),
             C::SongView => self.toggle_song_view(),
+            C::PianoRoll => self.toggle_piano_roll(),
             C::NewSong => self.song_button("new"),
             C::RemoveSong => self.song_button("delete"),
             C::RenameSong => self.song_text_entry(Id::SongName),
@@ -1428,10 +1465,13 @@ impl Session {
             generating(|k| k == TrackType::Piano),
         ];
         let song_layout = crate::song_view::SongLayout::new(canvas.width(), canvas.height(), scale, self.status.len());
-        let rows = if self.song_view { self.song_rows() } else { Vec::new() };
+        let rows = if self.workspace == Workspace::Song { self.song_rows() } else { Vec::new() };
+        let roll_layout = self.roll_layout((canvas.width(), canvas.height(), scale));
+        let roll = self.piano_roll_open().then(|| Some((self.roll_view(&roll_layout)?, self.roll_title()))).flatten();
         let view = View {
             pattern,
-            arrangement: self.song_view.then(|| self.song_view_data(&rows, &song_layout)),
+            arrangement: self.song_view_open().then(|| self.song_view_data(&rows, &song_layout)),
+            piano_roll: roll,
             generation,
             genre: pattern.and_then(|p| p.extra.get("_autoGenGenre")?.as_str()),
             pattern_index: self.pattern_index,

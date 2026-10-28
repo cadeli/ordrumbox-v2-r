@@ -87,7 +87,7 @@ impl Session {
     // ─── What is shown ───────────────────────────────────────────────────────
 
     /// The track the track editor edits: the focused one, else the first.
-    fn editor_track(&self) -> Option<usize> {
+    pub(super) fn editor_track(&self) -> Option<usize> {
         self.focus_track().or_else(|| self.pattern().filter(|p| !p.tracks.is_empty()).map(|_| 0))
     }
 
@@ -130,7 +130,7 @@ impl Session {
             }
             return layout;
         }
-        if self.song_view {
+        if self.workspace == Workspace::Song {
             self.song_items(&mut layout, width, height, scale);
             return layout;
         }
@@ -152,6 +152,10 @@ impl Session {
                 None => layout.items.push(Item::text(area.x, area.y, "No track", panel::DIM, s)),
             }
         }
+        if self.workspace == Workspace::PianoRoll {
+            self.roll_items(&mut layout, (width, height, scale));
+            return layout;
+        }
         if let Some(pattern) = self.pattern() {
             let grid = Layout::new(width - layout.right, height, scale, pattern, self.status.len());
             let spec = Spec::slider(0.0, 1.0, 0.01, 1.0);
@@ -168,7 +172,11 @@ impl Session {
 
     /// Width the track editor takes on the right of a `width`-wide window (0: none).
     pub fn track_editor_width(&self, width: i32, scale: i32) -> i32 {
-        if self.show_track_editor && self.kit_editor.is_none() && !self.song_view && width >= 480 * scale {
+        if self.show_track_editor
+            && self.kit_editor.is_none()
+            && self.workspace != Workspace::Song
+            && width >= 480 * scale
+        {
             panel_width(width, scale)
         } else {
             0
@@ -466,6 +474,9 @@ impl Session {
 
     /// The mouse moved; whether to redraw.
     pub fn mouse_move(&mut self, size: (i32, i32, i32), x: i32, y: i32, shift: bool) -> bool {
+        if self.roll_drag.is_some() {
+            return self.roll_drag_move(x, y);
+        }
         let (width, height, scale) = size;
         if let Some(dropdown) = &mut self.dropdown {
             if let Some(i) = dropdown.hit(width, height, scale, x, y).filter(|&i| i != dropdown.at) {
@@ -496,7 +507,7 @@ impl Session {
         let (width, height, scale) = size;
         let right = self.track_editor_width(width, scale);
         let hover = match self.pattern() {
-            Some(pattern) if self.kit_editor.is_none() && !self.song_view && self.drag.is_none() => {
+            Some(pattern) if self.kit_editor.is_none() && self.workspace == Workspace::Grid && self.drag.is_none() => {
                 match Layout::new(width - right, height, scale, pattern, self.status.len()).hit(pattern, x, y) {
                     Some(view::Hit::Cell { track, beat, step }) => Some((track, beat, step)),
                     _ => None,
@@ -512,8 +523,11 @@ impl Session {
     /// The tooltip of the note under the mouse (the first of its step), as
     /// `PointerSection.onMouseOver` shows it.
     pub(super) fn draw_tooltip(&self, canvas: &mut Canvas, scale: i32, right: i32) {
-        if self.song_view {
+        if self.song_view_open() {
             return self.draw_song_tooltip(canvas, scale);
+        }
+        if self.piano_roll_open() {
+            return self.draw_roll_tooltip(canvas, scale);
         }
         let Some((t, beat, step)) = self.hover else { return };
         if self.menu.is_some() || self.popup_open() || self.overlay.is_some() || self.kit_editor.is_some() {
@@ -529,6 +543,7 @@ impl Session {
 
     pub fn mouse_up(&mut self) {
         self.drag = None;
+        self.roll_release();
     }
 
     /// The wheel over the widgets (one notch: one step); whether it was theirs.
@@ -922,6 +937,13 @@ impl Session {
                 return;
             }
             Id::SongMenu => return self.song_menu_pick(value),
+            Id::RollTrack => {
+                if let Ok(t) = value.parse::<usize>() {
+                    self.select_roll_track(t);
+                }
+                return;
+            }
+            Id::RollMenu => return self.roll_menu_pick(value),
             Id::KitKit => {
                 let target = self.kits.kits.iter().position(|k| k.name == value);
                 if let (Some(sample), Some(target)) = (self.kit_editor, target)

@@ -41,20 +41,28 @@ fn now_ms() -> f64 {
 impl Session {
     // ─── State ───────────────────────────────────────────────────────────────
 
+    /// The song panel is shown (the kit editor opens over it).
     pub fn song_view_open(&self) -> bool {
-        self.song_view
+        self.workspace == Workspace::Song && self.kit_editor.is_none()
     }
 
     /// F3, View > Song: the song panel in the place of the grid, or back.
-    /// While playing, the playback switches to the view's mode from its
-    /// start (`syncPlaybackMode`).
     pub fn toggle_song_view(&mut self) {
-        self.song_view = !self.song_view;
+        self.set_workspace(if self.workspace == Workspace::Song { Workspace::Grid } else { Workspace::Song });
+    }
+
+    /// Show `workspace`. While playing, a switch to or from the song panel
+    /// switches the playback to the view's mode, from its start
+    /// (`syncPlaybackMode`); the grid and the piano roll share one mode.
+    pub(super) fn set_workspace(&mut self, workspace: Workspace) {
+        let was_song = self.workspace == Workspace::Song;
+        self.workspace = workspace;
         self.kit_editor = None;
         self.focus = None;
         self.dropdown = None;
         self.hovered_clip = None;
-        if self.playing() {
+        self.roll_drag = None;
+        if self.playing() && was_song != (workspace == Workspace::Song) {
             let mode = self.play_mode();
             if let Some(controller) = &mut self.controller {
                 controller.play(self.editor.library(), mode);
@@ -65,7 +73,10 @@ impl Session {
 
     /// What Space plays: the song in the song panel, else the pattern.
     fn play_mode(&self) -> Mode {
-        if self.song_view { Mode::Song(self.editor.selected_song()) } else { Mode::Pattern(self.pattern_index) }
+        match self.workspace {
+            Workspace::Song => Mode::Song(self.editor.selected_song()),
+            _ => Mode::Pattern(self.pattern_index),
+        }
     }
 
     fn song(&self) -> Option<&Song> {
@@ -369,7 +380,7 @@ impl Session {
     pub fn song_wheel(&mut self, size: (i32, i32, i32), x: i32, y: i32, lines: isize, shift: bool) -> bool {
         let layout = self.song_layout(size);
         let Some(song) = self.song() else { return false };
-        if !self.song_view || lines == 0 || !layout.grid.contains(x, y) {
+        if self.workspace != Workspace::Song || lines == 0 || !layout.grid.contains(x, y) {
             return false;
         }
         let rows = self.song_rows().len();
@@ -388,7 +399,7 @@ impl Session {
     /// The mouse over the arrangement: the clip it is on, for its tooltip;
     /// whether it changed.
     pub fn song_hover(&mut self, size: (i32, i32, i32), x: i32, y: i32) -> bool {
-        let hover = if self.song_view && self.drag.is_none() {
+        let hover = if self.workspace == Workspace::Song && self.drag.is_none() {
             let layout = self.song_layout(size);
             let rows = self.song_rows();
             match layout.hit(&self.song_view_data(&rows, &layout), x, y) {

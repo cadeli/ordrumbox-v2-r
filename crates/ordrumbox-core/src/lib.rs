@@ -16,6 +16,7 @@ pub mod lfo;
 pub mod library;
 pub mod note;
 mod note_params;
+pub mod note_positions;
 pub mod pattern;
 pub mod pattern_engine;
 mod record;

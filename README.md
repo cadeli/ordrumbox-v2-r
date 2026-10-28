@@ -126,6 +126,32 @@ too, with or without the panel shown: play the song, new, remove, previous and
 next arrangement, rename the song, its description, save, load, export,
 import.
 
+Piano roll (**F4**, **View › Piano roll**, the JS piano roll; **Esc**
+clears the selection, then goes back to the grid): in the place of the
+grid, the track editor's track (the list next to the title picks another)
+on a grid of steps, a page of 4 beats at a time (**< >**, or **Shift** +
+wheel), and pitches from MIDI 12 to 108 with a keyboard on the left (the
+wheel scrolls it; it opens on the track's pitch). Notes are drawn by
+velocity, a bar on top marks a probability (purple) or a cycle (blue), the
+retriggers, arpeggio steps and euclidean fills are ghosts at their steps
+and pitches, and while playing the playhead moves (the page follows) and
+the notes sounding light up. A click on an empty cell adds a note, on a
+note selects it (and plays it), on the selected note deletes it; dragging a
+note changes its velocity (up, down) or its pitch (sideways, a semitone
+every 12 px), the first movement choosing which, one undo step per drag,
+its value shown over the note. A click on a key plays it. Right-click a key:
+**Clear all**, or **Add sequence** — the track replaced by a chord
+progression from that key, one chord per measure, the next progression
+each time (I-V-vi-IV, I-vi-IV-V, …); a cell: **Add note** or **Delete
+note**, **Add minor chord**, **Add major chord**. **Arrows** move the
+cursor (wrapping; the note there is selected), **Shift + arrows** change the
+selected note's velocity (up, down) and pitch (left, right), **Enter**
+adds, selects or deletes at the cursor, **Delete** deletes the selected
+note. The note editor follows the selected note. The ghosts, the
+progressions and the drag are the JS code's (checked against it). Unlike
+the JS, a drag never counts as a click: there the window's mouseup resets
+the drag before the click arrives, so `consumeClick()` never sees it.
+
 The header has the pattern list and the kit list (the JS toolbar's two
 selects): a click opens them, the wheel or the arrows move, **Enter** picks.
 
@@ -183,6 +209,7 @@ pitch, MIDI number and the settings that differ from the defaults (the JS
 | **F1** | the list of keys |
 | **F2** | track editor (shown / hidden) |
 | **F3** | song panel (shown / hidden) |
+| **F4** | piano roll (shown / hidden) |
 | **Tab**, **Shift Tab** | focus the next / previous control of the editors |
 | drop a `.mid` file on the window | import it (also a `.mid` given on the command line) |
 
@@ -334,6 +361,22 @@ node tools/export_control_fixtures.mjs ../ordrumbox-v2
   — and the value texts of every formatter (`fmt`, `knobFormat`, `fmtVal`,
   `formatSignedDb`, the loop point label), and `formatNoteTooltip` for a set of
   notes and track pitches.
+
+The piano roll has a tenth:
+
+```sh
+node tools/export_piano_fixtures.mjs ../ordrumbox-v2
+```
+
+- `ordrumbox-core/tests/fixtures/sub_positions.json`: `getNoteSubPositions()`
+  (the ghosts) on every track of `song.json` and on hand-made notes
+  (retriggers at every rate, euclidean fills and rotations, loop points,
+  every arpeggio form; a random arpeggio's pitches are drawn, so only its
+  steps are compared).
+- `ordrumbox-logic/tests/fixtures/composition.json`: `getSequence()` and
+  `buildSequenceNotes()` for every progression, tonic and length.
+- `ordrumbox-app/tests/fixtures/piano_roll.json`: `NoteDrag` driven through a
+  fake window (velocity, pitch, the axis lock, the bounds), and `midiName()`.
 
 The song panel's commands have a ninth:
 
