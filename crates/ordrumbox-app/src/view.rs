@@ -749,17 +749,24 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
             canvas.fill_rect(x + (width - iw) / 2, y + (height - ih) / 2, iw, ih, color);
         }
     }
-    // Flash (with glow) the cells holding ghosts that are currently played.
+    // Flash (with glow) the cells currently being played.
     if let Some(frac) = view.playhead {
         let cur = (frac * steps as f64).floor() as i64;
         if (0..steps).contains(&cur) {
+            let has_base = note_at.get(cur as usize).copied().flatten().is_some();
             let has_ghost = ghosts.iter().any(|(p, _, _)| *p == cur);
-            if has_ghost {
+            if has_base || has_ghost {
                 let (x, width) = cell(cur);
-                let glow = theme::mix(theme::WHITE, theme::BG, 0.55);
+                let base_color = note_at
+                    .get(cur as usize)
+                    .copied()
+                    .flatten()
+                    .map(|n| theme::note(note_color(n), n.velocity))
+                    .unwrap_or(CELL);
+                let flash = theme::mix(base_color, theme::WHITE, 0.6);
+                let glow = theme::mix(flash, theme::BG, 0.5);
                 canvas.fill_rect(x - 2 * gap, y - 2 * gap, width + 4 * gap, height + 4 * gap, glow);
-                let core = theme::mix(theme::WHITE, theme::YELLOW, 0.3);
-                canvas.fill_rect(x, y, width, height, core);
+                canvas.fill_rect(x, y, width, height, flash);
             }
         }
     }
