@@ -21,6 +21,8 @@ pub enum Purpose {
     ImportFolder,
     /// A song file (`.odbox`, `.json`), the song panel's Import.
     ImportSong,
+    /// Synth presets (`.json`), the synth editor's Import.
+    ImportSynth,
 }
 
 impl Purpose {
@@ -33,6 +35,7 @@ impl Purpose {
             Self::LoadMapping => "Load kit mapping",
             Self::ImportFolder => "Import folder as kit",
             Self::ImportSong => "Import song",
+            Self::ImportSynth => "Import synth sounds",
         }
     }
 
@@ -44,6 +47,7 @@ impl Purpose {
             Self::LoadMapping => &["json"],
             Self::ImportFolder => &[],
             Self::ImportSong => &["odbox", "json"],
+            Self::ImportSynth => &["json"],
         }
     }
 }

@@ -26,6 +26,8 @@ mod session;
 mod song_view;
 mod spectrum;
 mod store;
+mod synth_model;
+mod synth_view;
 mod view;
 
 use std::num::NonZeroU32;
@@ -275,6 +277,13 @@ impl App {
                 KeyCode::Space if !event.repeat => s.toggle_play(),
                 _ => return,
             }
+        } else if s.synth_open() {
+            match code {
+                KeyCode::Escape => s.toggle_synth(),
+                KeyCode::Space if !event.repeat && shift => s.toggle_play_song(),
+                KeyCode::Space if !event.repeat => s.toggle_play(),
+                _ => return,
+            }
         } else if s.output_open() {
             match code {
                 KeyCode::Escape => s.toggle_output(),
@@ -457,6 +466,7 @@ fn shortcut(code: KeyCode, shift: bool, control: bool) -> Option<Command> {
             KeyCode::F3 => C::SongView,
             KeyCode::F4 => C::PianoRoll,
             KeyCode::F5 => C::Output,
+            KeyCode::F6 => C::SynthEditor,
             KeyCode::BracketLeft if shift => C::PreviousSong,
             KeyCode::BracketRight if shift => C::NextSong,
             KeyCode::BracketLeft | KeyCode::PageUp => C::PreviousPattern,
@@ -572,9 +582,13 @@ impl ApplicationHandler for App {
         let playing = self.session.playing();
         if playing {
             self.session.update();
+        }
+        // While playing (the playhead) or while an LFO moves the synth editor.
+        let animating = playing || self.session.synth_animating();
+        if animating {
             self.request_redraw();
         }
-        let wake = match (playing, save_at) {
+        let wake = match (animating, save_at) {
             (true, _) => Some(Instant::now() + FRAME),
             (false, Some(at)) => Some(at),
             (false, None) => None,

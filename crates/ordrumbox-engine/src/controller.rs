@@ -503,6 +503,13 @@ impl Controller {
         }
     }
 
+    /// Replace the synth presets (an edit in the synth editor): the pass
+    /// playing is rebuilt with them.
+    pub fn set_synths(&mut self, library: &Library, synths: SynthPresets) {
+        self.synths = synths;
+        self.refresh(library);
+    }
+
     /// Replace the samples (after a reload); the engine switches on its next callback.
     pub fn set_bank(&mut self, bank: Arc<SampleBank>) {
         self.old_banks.push(std::mem::replace(&mut self.bank, bank.clone()));

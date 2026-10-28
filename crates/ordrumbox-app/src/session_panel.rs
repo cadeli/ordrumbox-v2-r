@@ -163,6 +163,10 @@ impl Session {
             self.roll_items(&mut layout, (width, height, scale));
             return layout;
         }
+        if self.workspace == Workspace::Synth {
+            self.synth_items(&mut layout, (width, height, scale));
+            return layout;
+        }
         if let Some(pattern) = self.pattern() {
             let grid = Layout::new(width - layout.right, height, scale, pattern, self.status.len());
             let spec = Spec::slider(0.0, 1.0, 0.01, 1.0);
@@ -210,7 +214,7 @@ impl Session {
     pub fn track_editor_width(&self, width: i32, scale: i32) -> i32 {
         if self.show_track_editor
             && self.kit_editor.is_none()
-            && matches!(self.workspace, Workspace::Grid | Workspace::PianoRoll)
+            && matches!(self.workspace, Workspace::Grid | Workspace::PianoRoll | Workspace::Synth)
             && width >= 480 * scale
         {
             panel_width(width, scale)
@@ -809,6 +813,9 @@ impl Session {
         if let Id::Master(key) = id {
             return self.set_master_value(key, value);
         }
+        if let Id::SynthField(fi) = id {
+            return self.synth_value(fi, value);
+        }
         if let Id::MasterVolume = id {
             // The output panel's volume: saved with it.
             return self.set_master_value("volume", value);
@@ -989,6 +996,7 @@ impl Session {
                 return;
             }
             Id::RollMenu => return self.roll_menu_pick(value),
+            Id::SynthPreset | Id::SynthField(_) => return self.synth_select(id, value),
             Id::KitKit => {
                 let target = self.kits.kits.iter().position(|k| k.name == value);
                 if let (Some(sample), Some(target)) = (self.kit_editor, target)
@@ -1076,6 +1084,9 @@ impl Session {
             Id::SongButton(button) => self.song_button(button),
             Id::Transport => self.toggle_play(),
             Id::OutTab(_) | Id::Master(_) => self.output_activate(id),
+            Id::SynthTab(_) | Id::SynthButton(_) | Id::SynthPower(_) | Id::SynthIcon(..) | Id::SynthField(_) => {
+                self.synth_activate(id);
+            }
             Id::Generate(i) => {
                 self.run(
                     [Command::GenerateDrums, Command::GenerateBass, Command::GenerateChords][usize::from(i.min(2))],
@@ -1172,6 +1183,7 @@ fn control_name(id: Id) -> (&'static str, &'static str) {
         Id::Decay => ("Decay", ""),
         Id::Bpm => ("BPM", ""),
         Id::Master(key) => crate::output::find(key).map_or(("", ""), |p| (p.label, p.unit)),
+        Id::SynthField(_) => ("value", ""),
         Id::Fx(key) => (prop(&FX_KNOBS, key), ""),
         Id::Gen(key) => {
             let rows = GEN_GROOVE.iter().chain(GEN_ENGINE.iter());

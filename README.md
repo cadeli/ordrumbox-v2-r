@@ -153,6 +153,24 @@ progressions and the drag are the JS code's (checked against it). Unlike
 the JS, a drag never counts as a click: there the window's mouseup resets
 the drag before the click arrives, so `consumeClick()` never sees it.
 
+Synth editor (**F6**, **View › Synth**, the JS soft-synth editor; **Esc**
+goes back to the grid): the preset of the track editor's track (else the
+first one), in the place of the grid, the track editor beside it. The preset
+bar picks another preset and deletes, creates, duplicates, reverts (to the
+preset as it was when opened), exports (`exports/ordrumbox-synth-sounds.json`)
+and imports presets. Four tabs of cards — **OSC** (the scope: four cycles of
+the oscillators, with their FM, sub and drive; VCO1–3; FM), **FLT** (the
+filter and its response curve, the filter envelope, the mod envelope),
+**MOD** (LFO1, LFO2, noise), **ENV** (master, the envelope and its shape) —
+each with its wave, filter type or FM algorithm choices, its power button,
+its knobs, lists and switches, as the JS lays them out. A knob an LFO moves
+is purple and follows it. Touching a control of a group that is off switches
+it on (an oscillator to 0.5, FM to 0.3, the noise to 0.15, an LFO onto the
+filter, the mod envelope onto the filter), as the JS does. Every change
+plays at once and is saved half a second later to `generated_sounds.json`
+in the user data folder (the JS keeps it in IndexedDB), read at start over
+the assets' presets. The pills under the cards show the modules in use.
+
 Output panel (**F5**, **View › Output**, the JS output panel; **Esc** goes
 back to the grid): the master bus in three tabs — **vol**: the master
 volume and the spectrum of what plays (the JS analyser's
@@ -233,6 +251,7 @@ pitch, MIDI number and the settings that differ from the defaults (the JS
 | **F3** | song panel (shown / hidden) |
 | **F4** | piano roll (shown / hidden) |
 | **F5** | output panel (shown / hidden) |
+| **F6** | synth editor (shown / hidden) |
 | **Tab**, **Shift Tab** | focus the next / previous control of the editors |
 | drop a `.mid` file on the window | import it (also a `.mid` given on the command line) |
 
@@ -405,6 +424,18 @@ node tools/export_piano_fixtures.mjs ../ordrumbox-v2
   `buildSequenceNotes()` for every progression, tonic and length.
 - `ordrumbox-app/tests/fixtures/piano_roll.json`: `NoteDrag` driven through a
   fake window (velocity, pitch, the axis lock, the bounds), and `midiName()`.
+
+The synth editor has an eleventh:
+
+```sh
+node tools/export_synth_fixtures.mjs ../ordrumbox-v2
+```
+
+- `ordrumbox-app/tests/fixtures/synth_editor.json`: `SynthPresetModel`
+  on every preset of `generated_sounds.json` and hand-made ones (the defaults
+  filled in, the cards bypassed), `getOrderedGroupNames()`, the LFO targets
+  and their scales, and `computeLfoMod()` for every target, wave and sync at
+  several times.
 
 The song panel's commands have a ninth:
 

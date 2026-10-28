@@ -93,6 +93,20 @@ impl SynthPresets {
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
+
+    /// Set preset `key` (a new key goes last).
+    pub fn set(&mut self, key: &str, preset: Value) {
+        self.0.insert(key, preset);
+    }
+
+    pub fn remove(&mut self, key: &str) -> Option<Value> {
+        self.0.remove(key)
+    }
+
+    /// The presets as `generated_sounds.json` holds them.
+    pub fn to_json(&self) -> Value {
+        Value::Object(self.0.clone())
+    }
 }
 
 /// The note a patch is built for.
@@ -127,7 +141,7 @@ fn lfo_target(value: Option<&Value>) -> f64 {
 }
 
 /// `syncToHz()`: `None` when off, unknown, or without a tempo.
-fn sync_to_hz(sync: Option<&Value>, bpm: f64) -> Option<f64> {
+pub fn sync_to_hz(sync: Option<&Value>, bpm: f64) -> Option<f64> {
     let sync = sync.filter(|v| truthy(v))?;
     if sync.as_str() == Some("off") || bpm.is_nan() || bpm <= 0.0 {
         return None;

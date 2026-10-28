@@ -1,7 +1,7 @@
 # Tests JS d'ordrumbox-v2 face au portage Rust
 
 Inventaire au 2026-10-28 (commit Rust `d84686d`, plus l'output panel,
-les contrôles de l'en-tête et Compact tracks). Aucun test JS n'est lancé
+les contrôles de l'en-tête, Compact tracks et l'éditeur de synthé). Aucun test JS n'est lancé
 ni porté tel quel : le portage se vérifie contre le **code source** JS, que
 les scripts `tools/export_*_fixtures.mjs` exécutent pour produire les
 fixtures que les tests Rust doivent reproduire.
@@ -32,7 +32,7 @@ Statuts :
 | `mobile-layout.mobile.spec.js` | 4 | Sans objet | Mobile. |
 | `offline.spec.js` | 1 | Sans objet | Service worker. |
 | `page-matrix.spec.js` | 1 | Sans objet | Pagination de la grille : la grille Rust montre tout le pattern. |
-| `panels.spec.js` | 4 | Partiel | About et track editor (F2) portés, non testés ; Soft Synth non porté. |
+| `panels.spec.js` | 4 | Partiel | About, track editor (F2) et éditeur de synthé (F6) portés ; ces bascules ne sont pas testées telles quelles. |
 | `pattern-grid-drag.spec.js` | 9 | Partiel | Glisser une note (vélocité, hauteur, jauge) non porté ; Shift+flèches porté (`nudge_*`). |
 | `pattern-lifecycle.spec.js` | 5 | Partiel | Chaque étape existe et sa sortie est couverte (sauvegarde `library.json`, octets MIDI `midi.json`, octets WAV `wav.json`, fichier song `.odbox`) ; le parcours complet n'est pas testé. |
 | `persistence.spec.js` | 3 | Partiel | Sauvegarde et rechargement : test `save_then_load` du store. Version de cache IndexedDB et `clearAllCache` : sans objet. |
@@ -47,8 +47,8 @@ Statuts :
 | `song-wav-export.spec.js` | 5 | Partiel | `render_song` : test de longueur et de refus sans clip jouable (`offline.rs`) ; effet d'un second clip et tempo de la song : non testés. |
 | `synth-modulators.spec.js` | 3 | Couvert (DSP) | Chaque cible de LFO : `renders.bin` (processeurs DSP). L'éditeur de synthé n'est pas porté. |
 | `synth-params.spec.js` | 4 | Couvert (DSP) | Presets, formes d'onde, algorithmes FM, filtres : `renders.bin`, `synth_patches.json`. |
-| `synth_group_titles.spec.js` | 1 | Non porté | Éditeur de synthé. |
-| `synth_implicit_enable.spec.js` | 1 | Non porté | Éditeur de synthé. |
+| `synth_group_titles.spec.js` | 1 | Sans objet | Position du titre dans le DOM. |
+| `synth_implicit_enable.spec.js` | 1 | Couvert | `implicit_enable_and_cards` (`synth_model.rs`) et le test de session de l'éditeur. |
 | `tools-import-export.spec.js` | 8 | Partiel | Import/export MIDI et export WAV (menus, fixtures d'octets), notes aléatoires (X) : portés. « Compact Tracks » : Pattern › Compact tracks, `compact.json`. « Exporting... » : sans objet. |
 | `track-editor-loop.spec.js` | 3 | Couvert | Steps/beat et point de boucle, bornage du point de boucle : `edits.json`, `controls.json`. |
 | `track-editor.mobile.spec.js` | 4 | Sans objet | Mobile. |
@@ -89,13 +89,12 @@ Statuts :
 `about_panel_lifecycle`, `tools_panel_clear_rnd`, `output_panel_sliders`,
 `undo_policy` (les réglages du master ne sont pas des étapes d'annulation,
 comme en JS), `pattern_settings_panel` (ses contrôles sont dans l'en-tête), `piano_roll`, `ghost_sync`
-(les fantômes : `sub_positions.json`).
+(les fantômes : `sub_positions.json`), `synth_editor`, `synth_editor_display`,
+`synth_editor_implicit`, `synth_editor_import`, `synth_editor_preset_section`,
+`synth_editor_sliders`, `synth_preset_model` (le modèle : `synth_editor.json`).
 
 ### Non portés (fonctionnalité absente)
 
-- Éditeur de synthé : `synth_editor`, `synth_editor_display`,
-  `synth_editor_implicit`, `synth_editor_import`,
-  `synth_editor_preset_section`, `synth_editor_sliders`, `synth_preset_model`.
 - MIDI en direct : `midi_manager`, `midi_out`, `midi_indicator_view`.
 - Thèmes : `color_scheme`, `mcp_color_scheme`.
 - Glisser des notes sur la grille, onglets, outils : `pattern_grid_drag`,

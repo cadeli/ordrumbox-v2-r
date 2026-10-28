@@ -41,6 +41,8 @@ mod session_panel;
 mod session_roll;
 #[path = "session_song.rs"]
 mod session_song;
+#[path = "session_synth.rs"]
+mod session_synth;
 pub use session_panel::{Button, PanelKey};
 
 /// What is shown under the header (the JS view switch; the kit editor
@@ -54,6 +56,8 @@ pub enum Workspace {
     Song,
     /// The output panel (F5): the master bus.
     Output,
+    /// The synth editor (F6): the track editor's track's preset.
+    Synth,
 }
 
 /// Save this long after the last edit.
@@ -179,6 +183,12 @@ pub struct Session {
     master_dirty: Option<Instant>,
     /// The output panel's tab: vol, Comp, Flt.
     output_tab: u8,
+    /// The synth editor: the preset edited, the tab, presets not saved yet.
+    synth: Option<session_synth::SynthEdit>,
+    synth_tab: u8,
+    synths_dirty: Option<Instant>,
+    /// When the session started (the synth editor's LFO clock).
+    started: Instant,
     /// The spectrum's analyser and its last bins.
     analyser: std::cell::RefCell<crate::spectrum::Analyser>,
     spectrum: std::cell::RefCell<Vec<u8>>,
@@ -220,10 +230,10 @@ enum Overlay {
 }
 
 /// Every key, for Help > Keyboard shortcuts.
-const SHORTCUTS: [&str; 48] = [
+const SHORTCUTS: [&str; 50] = [
     "MENUS",
     "  F10 or Alt             open the menus: Arrows move, Enter runs, Esc closes",
-    "  F1 F2 F3 F4 F5         this list, track editor (shown or hidden), song, piano roll, output",
+    "  F1 F2 F3 F4 F5 F6      this list, track editor (shown or hidden), song, piano roll, output, synth",
     "GRID",
     "  Arrows                 move the cursor",
     "  Enter / click          add a note, select it, delete the selected one",
@@ -258,6 +268,8 @@ const SHORTCUTS: [&str; 48] = [
     "  click / drag / right-click a cell: add, select, delete; velocity (up/down) or pitch; menu",
     "  Arrows, Shift+Arrows   the cursor; the selected note's velocity / pitch    Enter, Delete",
     "  a key: hear it, right-click: clear, chord progression     wheel (Shift: pages)",
+    "SYNTH EDITOR (F6)",
+    "  OSC, FLT, MOD, ENV     the track's preset: knobs, waves, lists, power buttons (saved)",
     "OUTPUT PANEL (F5)",
     "  vol, Comp, Flt         the master volume and spectrum, the compressor, the filters (saved)",
     "SONG PANEL (F3)",
@@ -287,7 +299,7 @@ impl Session {
                 ],
             );
         };
-        let assets = match assets::load(&dir) {
+        let mut assets = match assets::load(&dir) {
             Ok(assets) => assets,
             Err(e) => return Self::new(Library::default(), KitSet::empty(), vec![e]),
         };
@@ -327,6 +339,8 @@ impl Session {
         let kits_file = if assets.kits_error.is_none() { store::kits_path() } else { None };
         let kits =
             KitSet::new(assets.kits, &assets.bank, Some(assets.sources.clone()), kits_file, store::samples_dir());
+        // The synth presets edited, over the assets' ones.
+        Self::load_user_synths(&mut assets.synths, &mut status);
         let mut session = Self::new(library, kits, status);
         session.assets_dir = Some(dir.clone());
         session.scales = assets.scales.clone();
@@ -417,6 +431,10 @@ impl Session {
             master: ordrumbox_engine::MasterSettings::default(),
             master_dirty: None,
             output_tab: 0,
+            synth: None,
+            synth_tab: 0,
+            synths_dirty: None,
+            started: Instant::now(),
             analyser: std::cell::RefCell::default(),
             spectrum: std::cell::RefCell::default(),
             hover: None,
@@ -646,6 +664,7 @@ impl Session {
             song_view: self.workspace == Workspace::Song,
             piano_roll: self.workspace == Workspace::PianoRoll,
             output: self.workspace == Workspace::Output,
+            synth: self.workspace == Workspace::Synth,
             can_save_song: store::songs_dir().is_some(),
             saved_songs: store::songs_dir().is_some_and(|d| !store::list_songs(&d).is_empty()),
             kit_sample: self.kit_list().is_some_and(|(s, n)| s < n),
@@ -732,6 +751,7 @@ impl Session {
             C::SongView => self.toggle_song_view(),
             C::PianoRoll => self.toggle_piano_roll(),
             C::Output => self.toggle_output(),
+            C::SynthEditor => self.toggle_synth(),
             C::NewSong => self.song_button("new"),
             C::RemoveSong => self.song_button("delete"),
             C::RenameSong => self.song_text_entry(Id::SongName),
@@ -823,6 +843,7 @@ impl Session {
         match picker.purpose {
             Purpose::ImportMidi => self.import_midi(&path),
             Purpose::ImportSong => self.import_song(&path),
+            Purpose::ImportSynth => self.import_synths(&path),
             Purpose::ReplaceTrackSample => self.replace_track_sample(&path),
             Purpose::ReplaceSample => self.drop_path(&path, true),
             Purpose::AddSample | Purpose::LoadMapping | Purpose::ImportFolder => self.drop_path(&path, false),
@@ -1456,7 +1477,7 @@ impl Session {
     /// Save once the edits have settled; when to call again, if a save is pending.
     /// Save what is due (the library, kit knob edits); when the next save is.
     pub fn autosave(&mut self) -> Option<Instant> {
-        let due = [self.flush_kits(), self.flush_master(), self.autosave_library()];
+        let due = [self.flush_kits(), self.flush_master(), self.flush_synths(), self.autosave_library()];
         due.into_iter().flatten().min()
     }
 
@@ -1508,6 +1529,7 @@ impl Session {
             arrangement: self.song_view_open().then(|| self.song_view_data(&rows, &song_layout)),
             piano_roll: roll,
             output: self.output_view(),
+            synth: self.synth_open(),
             genre: pattern.and_then(|p| p.extra.get("_autoGenGenre")?.as_str()),
             pattern_index: self.pattern_index,
             pattern_count: library.patterns.len(),
@@ -1523,6 +1545,7 @@ impl Session {
             status: &self.status,
         };
         view::draw(canvas, &view, scale);
+        self.draw_synth(canvas, scale);
         crate::panel::draw(canvas, &layout.items, self.focus, scale);
         self.draw_tooltip(canvas, scale, layout.right);
         menu::draw(canvas, &self.menus(), self.menu, scale);
