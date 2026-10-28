@@ -162,17 +162,14 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
     let (auto, mute, solo) = s.focus_track.unwrap_or_default();
     let undo = s.undo.as_ref().map_or_else(|| "Undo".to_owned(), |d| format!("Undo: {d}"));
     let redo = s.redo.as_ref().map_or_else(|| "Redo".to_owned(), |d| format!("Redo: {d}"));
-    let mut kits: Vec<Item> =
-        s.kits.iter().enumerate().map(|(i, name)| check(name, "", C::Kit(i), true, i == s.kit_index)).collect();
-    kits.extend([
-        Item::Separator,
+    let kits: Vec<Item> = vec![
         command("Previous kit", ",", C::PreviousKit, s.kits.len() > 1),
         command("Next kit", ".", C::NextKit, s.kits.len() > 1),
         Item::Separator,
         check("Kit editor", "Ctrl+K", C::KitEditor, true, s.kit_editor),
         command("Normalize kit", "", C::NormalizeKit, !s.kits.is_empty()),
         command("Assign sounds again", "", C::Reassign, !s.kits.is_empty()),
-    ]);
+    ];
     vec![
         Menu {
             title: "File",
