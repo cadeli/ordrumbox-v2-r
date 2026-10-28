@@ -39,6 +39,9 @@ mod session_output;
 mod session_panel;
 #[path = "session_roll.rs"]
 mod session_roll;
+#[cfg(test)]
+#[path = "session_scenarios.rs"]
+mod session_scenarios;
 #[path = "session_song.rs"]
 mod session_song;
 #[path = "session_synth.rs"]
