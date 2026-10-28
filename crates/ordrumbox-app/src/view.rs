@@ -136,6 +136,8 @@ pub struct KitLayout {
     list_width: i32,
     row: i32,
     detail_x: i32,
+    detail_y: i32,
+    list_rows: i32,
     width: i32,
 }
 
@@ -144,20 +146,23 @@ impl KitLayout {
         let margin = margin(scale);
         let top = body_top(scale);
         let bottom = footer_top(height, scale, status_lines) - margin / 2;
-        let list_width = ((width - 2 * margin) / 3).max(40 * scale);
+        // The sample list takes the full width (long file names), on the top
+        // rows; the selected sample's details go below it.
+        let list_width = (width - 2 * margin).max(40 * scale);
         let row = 12 * scale;
-        let detail_x = margin + list_width + 16 * scale;
-        Self { scale, top, bottom, left: margin, list_width, row, detail_x, width }
+        let list_rows = ((bottom - top) / (row * 4)).clamp(4, 12);
+        let detail_y = top + list_rows * row + 8 * scale;
+        Self { scale, top, bottom, left: margin, list_width, row, detail_x: margin, detail_y, width, list_rows }
     }
 
     /// Where the selected sample's selects and knobs go.
     pub fn controls_area(&self) -> Rect {
         let s = self.scale;
-        Rect::new(self.detail_x, self.top + 16 * s, (self.width - self.detail_x - 16 * s).clamp(0, 420 * s), 0)
+        Rect::new(self.detail_x, self.detail_y, (self.width - 2 * self.detail_x).clamp(0, 420 * s), 0)
     }
 
     fn shown(&self) -> usize {
-        usize::try_from((self.bottom - self.top) / self.row).unwrap_or(0)
+        self.list_rows as usize
     }
 
     /// First list row shown, so that `selected` is visible.
@@ -167,7 +172,8 @@ impl KitLayout {
 
     /// The sample of the list under `(x, y)`.
     pub fn hit(&self, view_selected: usize, count: usize, x: i32, y: i32) -> Option<usize> {
-        if y < self.top || y >= self.bottom || !(self.left..self.left + self.list_width).contains(&x) {
+        let list_bottom = self.top + self.shown() as i32 * self.row;
+        if y < self.top || y >= list_bottom || !(self.left..self.left + self.list_width).contains(&x) {
             return None;
         }
         let i = self.first(view_selected) + usize::try_from((y - self.top) / self.row).ok()?;
@@ -941,7 +947,7 @@ mod tests {
         let layout = KitLayout::new(1024, 640, 1, 0);
         assert_eq!(layout.hit(0, 40, layout.left + 2, layout.top + 1), Some(0));
         assert_eq!(layout.hit(0, 1, layout.left + 2, layout.top + layout.row + 1), None);
-        assert_eq!(layout.hit(0, 40, layout.detail_x + 2, layout.top + 1), None);
+        assert_eq!(layout.hit(0, 40, layout.left + 2, layout.detail_y), None);
     }
 
     #[test]
