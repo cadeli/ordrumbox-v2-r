@@ -70,6 +70,23 @@ fn pattern_name(pattern: &Pattern) -> &str {
     pattern.name.as_deref().unwrap_or_default()
 }
 
+/// Set track settings by JSON key: only track settings, numbers clamped to
+/// their range, non-finite numbers and wrong types ignored.
+fn apply_updates(track: &mut Track, updates: &[(&str, Value)]) {
+    for (key, value) in updates {
+        if !Track::is_setting(key) {
+            continue;
+        }
+        let value = match (value, Track::value_range(key)) {
+            (Value::Number(n), _) if !n.is_finite() => continue,
+            (Value::Number(n), Some((min, max))) => Value::Number(n.max(min).min(max)),
+            _ => value.clone(),
+        };
+        // A value of the wrong type leaves the setting as it is.
+        let _: SetField = track.set_field(key, &value);
+    }
+}
+
 /// The library and its undo history.
 #[derive(Debug)]
 pub struct Editor {
@@ -368,18 +385,27 @@ impl Editor {
             t,
             |track| desc.map_or_else(|| format!("Update {}", track.name), str::to_owned),
             coalesce,
-            |track| {
-                for (key, value) in updates {
-                    if !Track::is_setting(key) {
-                        continue;
-                    }
-                    let value = match (value, Track::value_range(key)) {
-                        (Value::Number(n), _) if !n.is_finite() => continue,
-                        (Value::Number(n), Some((min, max))) => Value::Number(n.max(min).min(max)),
-                        _ => value.clone(),
-                    };
-                    // A value of the wrong type leaves the setting as it is.
-                    let _: SetField = track.set_field(key, &value);
+            |track| apply_updates(track, updates),
+        )
+        .is_some()
+    }
+
+    /// [`Self::update_track`] on every track of pattern `p`, `updates(t, track)`
+    /// for each, as one undo step (the JS `recordTransaction`).
+    pub fn update_tracks(
+        &mut self,
+        p: usize,
+        desc: &str,
+        mut updates: impl FnMut(usize, &Track) -> Vec<(&'static str, Value)>,
+    ) -> bool {
+        self.edit(
+            p,
+            |_| desc.to_owned(),
+            None,
+            |pattern| {
+                for (t, track) in pattern.tracks.iter_mut().enumerate() {
+                    let updates = updates(t, track);
+                    apply_updates(track, &updates);
                 }
             },
         )

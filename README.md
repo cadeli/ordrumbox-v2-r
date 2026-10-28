@@ -247,10 +247,15 @@ pitch, MIDI number and the settings that differ from the defaults (the JS
 | **- =** | tempo −1 / +1 (**Shift** ×10) |
 | **, .** | previous / next kit |
 | **B** | generate a new pattern |
+| **F**, **G** | a random pattern, a random kit |
+| **H** | every track on a synth patch (by its type: KICK → BASS0, SNARE → SN…; random for the others) |
+| **J** | every track back on auto-assign |
+| **K** | a random sample (of any kit) on every track |
+| **V** | VU meters on the track stripes (on / off) |
 | **D**, **S**, **A** | drums, bass, chords: generate in auto mode / auto mode off |
 | **Z**, **X** | auto mode of the focused track, random notes on it |
-| **1–9** | mute track 1–9 (**Shift**: solo) |
-| **Q–P** | play track 1–10 |
+| **1–9** | mute track 1–9 (**Shift**: solo), in every view |
+| **Q–P** | play track 1–10, in every view (the kit editor keeps N, R, E) |
 | **arrows** | move the grid cursor |
 | **Enter** | like a click at the cursor |
 | **Shift + ↑↓ / ←→** | velocity ±0.05 / pitch ±1 of the selected note |
@@ -262,7 +267,7 @@ pitch, MIDI number and the settings that differ from the defaults (the JS
 | **Ctrl G**, **Ctrl L** | next grid (steps per beat), loop point one step back |
 | **Ctrl - =** | pattern length −1 / +1 beat |
 | **Ctrl N**, **Ctrl D** | new pattern, duplicate pattern |
-| **Ctrl S** | save now |
+| **Ctrl S** | export the pattern as JSON (`exports/ordrumbox-<name>.json`, as the JS); the library is saved on its own, **File › Save** saves now |
 | **Ctrl E** | export the pattern to WAV (**Shift**: the song) |
 | **Ctrl M** | export the pattern to a MIDI file |
 | **Ctrl K** | kit editor (open / close) |

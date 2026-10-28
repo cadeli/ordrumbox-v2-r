@@ -239,7 +239,7 @@ enum Overlay {
 }
 
 /// Every key, for Help > Keyboard shortcuts.
-const SHORTCUTS: [&str; 51] = [
+const SHORTCUTS: [&str; 52] = [
     "MENUS",
     "  F10 or Alt             open the menus: Arrows move, Enter runs, Esc closes",
     "  F1 F2 F3 F4 F5 F6      this list, track editor, song, piano roll, grid, synth (Ctrl+K: kit editor)",
@@ -248,15 +248,16 @@ const SHORTCUTS: [&str; 51] = [
     "  Enter / click          add a note, select it, delete the selected one",
     "  Shift+Arrows           velocity (up/down), pitch (left/right) of the selected note",
     "  Delete                 clear the cursor step        Esc  deselect",
-    "  1-9 / Shift+1-9        mute / solo track 1-9        Q-P  hear track 1-10",
-    "  F, G, V               random pattern, random drumkit, VU meters on/off",
+    "  F, G, V                random pattern, random drumkit, VU meters on/off",
+    "  H, J, K                every track: synth sounds, auto-assigned, random samples",
     "PLAY",
+    "  1-9 / Shift+1-9        mute / solo track 1-9        Q-P  hear track 1-10 (any view)",
     "  Space / Shift+Space    play or stop the pattern / the song",
     "  [ ] / Shift+[ ]        previous / next pattern / song (also PageUp PageDown)",
     "  - = (Shift: x10)       tempo",
     "  , .                    previous / next kit",
     "FILE AND EDIT",
-    "  Ctrl+S, Ctrl+O, Ctrl+Q save, import a MIDI file, quit",
+    "  Ctrl+S, Ctrl+O, Ctrl+Q export the pattern as JSON, import a MIDI file, quit",
     "  Ctrl+E, Ctrl+M         export WAV (Shift: the song), export MIDI",
     "  Ctrl+Z, Ctrl+Y         undo, redo (also Ctrl+Shift+Z)",
     "  Ctrl+C, Ctrl+V         copy, paste the step (Shift: the track)",
@@ -595,6 +596,27 @@ impl Session {
         };
     }
 
+    /// Ctrl+S (`saveCurrentPattern`): the pattern as `Exporter.export()`
+    /// writes it, to `ordrumbox-<name>.json` in the exports folder.
+    pub fn export_pattern_json(&mut self) {
+        let Some(dir) = store::exports_dir() else {
+            self.message = "no user data folder to export to".into();
+            return;
+        };
+        let Some(pattern) = self.pattern() else {
+            self.message = "No pattern selected".into();
+            return;
+        };
+        let name = pattern.name.as_deref().unwrap_or("pattern");
+        let path = dir.join(format!("ordrumbox-{}.json", store::safe_name(name)));
+        let text = pattern.to_json().to_json_pretty(2) + "\n";
+        let result = std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(&path, text));
+        self.message = match result {
+            Ok(()) => format!("Pattern \"{name}\" exported to {}", path.display()),
+            Err(e) => format!("not exported: {}: {e}", path.display()),
+        };
+    }
+
     /// A MIDI file dropped on the window (or given on the command line):
     /// new patterns from it, the last one selected.
     pub fn import_midi(&mut self, path: &Path) {
@@ -774,6 +796,7 @@ impl Session {
             kit_editor: self.kit_editor.is_some(),
             track_editor: self.show_track_editor,
             grid: self.workspace == Workspace::Grid && self.kit_editor.is_none(),
+            show_vus: self.show_vus,
             song_view: self.song_view_open(),
             piano_roll: self.piano_roll_open(),
             synth: self.synth_open(),
@@ -882,6 +905,15 @@ impl Session {
             C::SelectRandomPattern => self.select_random_pattern(),
             C::SelectRandomDrumkit => self.select_random_drumkit(),
             C::ToggleVus => self.toggle_vus(),
+            C::ExportPatternJson => self.export_pattern_json(),
+            C::ConvertToSynth => self.convert_to_generated_sounds(),
+            C::AutoAssignAll => self.auto_assign_all_tracks(),
+            C::RandomSamples => self.assign_random_samples(),
+            C::PreviewTrack => {
+                if let Some(t) = self.focus_track() {
+                    self.audition_row(t);
+                }
+            }
             C::Shortcuts => self.overlay = Some(Overlay::Shortcuts),
             C::About => self.overlay = Some(Overlay::About),
             C::FactoryReset => self.overlay = Some(Overlay::FactoryReset),

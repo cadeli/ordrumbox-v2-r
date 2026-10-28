@@ -5,6 +5,7 @@
 //! the JS handlers of `track_editor/*.js`, `note_editor/sync_section.js`,
 //! `drumkit_manager.js` and the pattern panel's volume sliders.
 
+use ordrumbox_core::drum_taxonomy::{TrackType, detect_track_type};
 use ordrumbox_core::instruments::catalog;
 use ordrumbox_core::js;
 use ordrumbox_core::json::{Object, Value};
@@ -77,6 +78,20 @@ enum NoteTarget {
 /// Width of the track editor on a `width`-wide window.
 fn panel_width(width: i32, scale: i32) -> i32 {
     (360 * scale).min(width / 2)
+}
+
+/// H's synth patch for a track type (`SYNTH_SOUND_MAP`; the JS OHH and TOM
+/// types are not detected here).
+fn synth_patch_for(kind: TrackType) -> Option<&'static str> {
+    match kind {
+        TrackType::Kick => Some("BASS0"),
+        TrackType::Snare => Some("SN"),
+        TrackType::Hat => Some("CHH_SYNTH"),
+        TrackType::Bass => Some("BASS2"),
+        TrackType::Perc => Some("SYNTH2"),
+        TrackType::Piano => Some("PIANO"),
+        TrackType::Clap | TrackType::Cowbell | TrackType::Organ => None,
+    }
 }
 
 fn num(v: f64) -> Value {
@@ -577,7 +592,9 @@ impl Session {
         let scale = size.2;
         let hover = match self.pattern() {
             Some(pattern) if self.kit_editor.is_none() && self.workspace == Workspace::Grid && self.drag.is_none() => {
-                match Layout::new(body.main_w, body.editor_h, scale, pattern, self.status.len(), self.current_page).hit(pattern, x, y) {
+                match Layout::new(body.main_w, body.editor_h, scale, pattern, self.status.len(), self.current_page)
+                    .hit(pattern, x, y)
+                {
                     Some(view::Hit::Cell { track, beat, step }) => Some((track, beat, step)),
                     _ => None,
                 }
@@ -786,6 +803,94 @@ impl Session {
         self.show_track_editor = !self.show_track_editor;
         self.focus = None;
         self.dropdown = None;
+    }
+
+    /// H (`convertToGeneratedSounds`): every track on the synth patch of its
+    /// type (`SYNTH_SOUND_MAP`), a random patch for a type without one.
+    pub fn convert_to_generated_sounds(&mut self) {
+        if self.pattern().is_none() {
+            self.message = "No pattern selected".into();
+            return;
+        }
+        let keys: Vec<String> = self.synths.keys().into_iter().map(str::to_owned).collect();
+        if keys.is_empty() {
+            self.message = "No synth patches loaded".into();
+            return;
+        }
+        let rng = &mut self.rng;
+        let mut random = Vec::new();
+        let changed =
+            self.editor.update_tracks(self.pattern_index, "Convert tracks to generated sounds", |_, track| {
+                let kind = detect_track_type(&track.name);
+                let mapped = synth_patch_for(kind).filter(|k| keys.iter().any(|key| key == k));
+                let key = mapped.map_or_else(
+                    || {
+                        let key = keys[rng.below(keys.len() as u64) as usize].clone();
+                        random.push(format!("{}→{key}", kind.name()));
+                        key
+                    },
+                    str::to_owned,
+                );
+                vec![
+                    ("useSoftSynth", Value::Bool(true)),
+                    ("useAutoAssignSound", Value::Bool(false)),
+                    ("synthSoundKey", Value::String(key)),
+                ]
+            });
+        if changed {
+            self.edited();
+        }
+        random.dedup();
+        self.message = if random.is_empty() {
+            "All tracks converted to generated sounds".into()
+        } else {
+            format!("No synth patch for: {} (random)", random.join(", "))
+        };
+    }
+
+    /// J (`autoAssignAllTracks`): every track back on auto-assign (the kit's
+    /// sound for its name).
+    pub fn auto_assign_all_tracks(&mut self) {
+        if self.pattern().is_none() {
+            self.message = "No pattern selected".into();
+            return;
+        }
+        let changed = self.editor.update_tracks(self.pattern_index, "Auto-assign all tracks", |_, _| {
+            vec![("useAutoAssignSound", Value::Bool(true)), ("useSoftSynth", Value::Bool(false))]
+        });
+        if changed {
+            self.edited();
+        }
+        self.message = "All tracks auto-assigned".into();
+    }
+
+    /// K (`assignRandomSampleAllTracks`): a random sample, of any kit, on every track.
+    pub fn assign_random_samples(&mut self) {
+        if self.pattern().is_none() {
+            self.message = "No pattern selected".into();
+            return;
+        }
+        let mut urls: Vec<String> =
+            self.kits.kits.iter().flat_map(|k| k.instruments.iter().map(|i| i.url.clone())).collect();
+        urls.sort_unstable();
+        urls.dedup();
+        if urls.is_empty() {
+            self.message = "No samples loaded".into();
+            return;
+        }
+        let rng = &mut self.rng;
+        let changed = self.editor.update_tracks(self.pattern_index, "Random samples on all tracks", |_, _| {
+            let url = urls[rng.below(urls.len() as u64) as usize].clone();
+            vec![
+                ("useAutoAssignSound", Value::Bool(false)),
+                ("useSoftSynth", Value::Bool(false)),
+                ("sampleId", Value::String(url)),
+            ]
+        });
+        if changed {
+            self.edited();
+        }
+        self.message = "Random samples assigned".into();
     }
 
     // ─── Number entry ────────────────────────────────────────────────────────
@@ -1277,6 +1382,34 @@ mod tests {
 
     fn center(r: Rect) -> (i32, i32) {
         (r.x + r.w / 2, r.y + r.h / 2)
+    }
+
+    #[test]
+    fn h_j_k_change_every_track_in_one_undo_step() {
+        let mut s = session();
+        // No synth patches, no samples: nothing changes.
+        s.run(Command::ConvertToSynth);
+        assert_eq!(s.message, "No synth patches loaded");
+        s.run(Command::RandomSamples);
+        assert_eq!(s.message, "No samples loaded");
+        assert!(s.editor.history().next_undo().is_none());
+
+        let presets = ordrumbox_core::json::parse(r#"{"BASS0":{},"SN":{},"PIANO":{}}"#).unwrap();
+        s.synths = SynthPresets::from_json(&presets);
+        s.run(Command::ConvertToSynth);
+        let tracks = &s.pattern().unwrap().tracks;
+        assert!(tracks.iter().all(|t| t.use_soft_synth && !t.use_auto_assign_sound));
+        let keys: Vec<_> = tracks.iter().map(|t| t.synth_sound_key.as_deref()).collect();
+        assert_eq!(keys, [Some("BASS0"), Some("SN")]);
+        assert_eq!(s.message, "All tracks converted to generated sounds");
+        assert_eq!(s.editor.history().next_undo(), Some("Convert tracks to generated sounds"));
+
+        s.run(Command::AutoAssignAll);
+        let tracks = &s.pattern().unwrap().tracks;
+        assert!(tracks.iter().all(|t| !t.use_soft_synth && t.use_auto_assign_sound));
+        // One undo brings both tracks back to their synth.
+        s.run(Command::Undo);
+        assert!(s.pattern().unwrap().tracks.iter().all(|t| t.use_soft_synth));
     }
 
     #[test]
