@@ -34,8 +34,10 @@ pub struct Song {
     pub description: String,
     /// One tempo for the whole song.
     pub bpm: f64,
-    /// Explicit loop length in measures; `None` loops at the end of the last clip.
-    pub loop_measure_count: Option<u32>,
+    /// Explicit loop length in measures; `None` loops at the end of the last
+    /// clip. Whole on load; an arrangement edit sets it to the end of the
+    /// last clip, which may be fractional (as in the JS).
+    pub loop_measure_count: Option<f64>,
     pub clips: Vec<SongClip>,
 }
 
@@ -59,12 +61,25 @@ impl Song {
         self.clips.iter().map(|clip| f64::from(clip.start_measure) + clip.measure_count).fold(0.0, f64::max)
     }
 
-    /// Loop length: `loop_measure_count` when set, else [`Song::content_measures`].
+    /// Loop length (`songLengthMeasures`): `loop_measure_count` floored (at
+    /// least 1) when set, else [`Song::content_measures`].
     pub fn length_measures(&self) -> f64 {
         match self.loop_measure_count {
-            Some(count) if count > 0 => f64::from(count),
+            Some(count) if count > 0.0 => count.floor().max(1.0),
             _ => self.content_measures(),
         }
+    }
+
+    /// Where transport `tick` is in the arrangement, in measures, fractional
+    /// (`songMeasureAtTick`): wrapped on `loop_measure_count` as it is (not
+    /// floored), else on [`Song::length_measures`]; 0 before the start.
+    pub fn measure_at_tick(&self, tick: f64, ticks_per_beat: f64) -> f64 {
+        let measure = tick / (ticks_per_beat * BEATS_PER_MEASURE);
+        let total = self.loop_measure_count.unwrap_or_else(|| self.length_measures());
+        if total <= 0.0 || measure <= 0.0 {
+            return measure.max(0.0);
+        }
+        measure.rem_euclid(total)
     }
 
     /// Load one song as `normalizeSong()`: numbers coerced the JS way
@@ -122,7 +137,7 @@ impl Song {
             name: text("name"),
             description: text("description"),
             bpm: if (SONG_MIN_BPM..=SONG_MAX_BPM).contains(&bpm) { bpm } else { DEFAULT_BPM },
-            loop_measure_count: (loop_count > 0.0).then(|| loop_count.floor().min(f64::from(u32::MAX)) as u32),
+            loop_measure_count: (loop_count > 0.0).then(|| loop_count.floor()),
             clips,
         };
         Ok((song, dropped))
@@ -237,7 +252,7 @@ mod tests {
         let (song, dropped) = Song::from_json(&raw, &ids(&["a"])).unwrap();
         assert_eq!(song.id, "ebauche");
         assert_eq!(song.bpm, 140.0);
-        assert_eq!(song.loop_measure_count, Some(7));
+        assert_eq!(song.loop_measure_count, Some(7.0));
         assert_eq!(song.clips, [SongClip { pattern: "a".into(), start_measure: 2, measure_count: 1.0 }]);
         assert_eq!(
             dropped,
@@ -255,8 +270,10 @@ mod tests {
         assert_eq!(song.length_measures(), 0.0);
         song.clips = vec![clip(8, 4.0), clip(2, 0.75)];
         assert_eq!(song.content_measures(), 12.0);
-        song.loop_measure_count = Some(16);
+        song.loop_measure_count = Some(16.0);
         assert_eq!(song.length_measures(), 16.0);
+        song.loop_measure_count = Some(0.75);
+        assert_eq!(song.length_measures(), 1.0);
         assert_eq!(measures_for_pattern(3), 0.75);
     }
 

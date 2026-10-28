@@ -24,7 +24,7 @@ use crate::view::{KitLayout, Layout};
 /// Kit knob edits reach the player and the disk this long after the last one.
 const KITS_DELAY: Duration = Duration::from_millis(200);
 /// Two clicks on a widget this close are a double-click.
-const DOUBLE_CLICK: Duration = Duration::from_millis(400);
+pub(super) const DOUBLE_CLICK: Duration = Duration::from_millis(400);
 
 /// The editors' widgets on screen.
 #[derive(Debug, Default)]
@@ -130,6 +130,10 @@ impl Session {
             }
             return layout;
         }
+        if self.song_view {
+            self.song_items(&mut layout, width, height, scale);
+            return layout;
+        }
         let top = view::content_top(scale);
         let bottom = view::footer_top(height, scale, self.status.len()) - 8 * s;
         layout.right = self.track_editor_width(width, scale);
@@ -164,7 +168,7 @@ impl Session {
 
     /// Width the track editor takes on the right of a `width`-wide window (0: none).
     pub fn track_editor_width(&self, width: i32, scale: i32) -> i32 {
-        if self.show_track_editor && self.kit_editor.is_none() && width >= 480 * scale {
+        if self.show_track_editor && self.kit_editor.is_none() && !self.song_view && width >= 480 * scale {
             panel_width(width, scale)
         } else {
             0
@@ -390,6 +394,7 @@ impl Session {
 
     /// A press at `(x, y)`; whether the widgets took it.
     pub fn mouse_down(&mut self, size: (i32, i32, i32), x: i32, y: i32, button: Button, shift: bool) -> bool {
+        self.panel_size = size;
         let (width, height, scale) = size;
         if let Some(dropdown) = &self.dropdown {
             let picked = (button == Button::Left).then(|| dropdown.hit(width, height, scale, x, y)).flatten();
@@ -491,7 +496,7 @@ impl Session {
         let (width, height, scale) = size;
         let right = self.track_editor_width(width, scale);
         let hover = match self.pattern() {
-            Some(pattern) if self.kit_editor.is_none() && self.drag.is_none() => {
+            Some(pattern) if self.kit_editor.is_none() && !self.song_view && self.drag.is_none() => {
                 match Layout::new(width - right, height, scale, pattern, self.status.len()).hit(pattern, x, y) {
                     Some(view::Hit::Cell { track, beat, step }) => Some((track, beat, step)),
                     _ => None,
@@ -507,6 +512,9 @@ impl Session {
     /// The tooltip of the note under the mouse (the first of its step), as
     /// `PointerSection.onMouseOver` shows it.
     pub(super) fn draw_tooltip(&self, canvas: &mut Canvas, scale: i32, right: i32) {
+        if self.song_view {
+            return self.draw_song_tooltip(canvas, scale);
+        }
         let Some((t, beat, step)) = self.hover else { return };
         if self.menu.is_some() || self.popup_open() || self.overlay.is_some() || self.kit_editor.is_some() {
             return;
@@ -572,6 +580,7 @@ impl Session {
     /// A key for the widgets (the focused one, the open list or entry);
     /// whether it was theirs.
     pub fn panel_key(&mut self, size: (i32, i32, i32), key: PanelKey, shift: bool, ctrl: bool) -> bool {
+        self.panel_size = size;
         if let Some(entry) = &mut self.entry {
             match key {
                 PanelKey::Enter => self.commit_entry(),
@@ -579,6 +588,7 @@ impl Session {
                 PanelKey::Backspace => {
                     entry.text.pop();
                 }
+                PanelKey::Space if entry.spec.is_none() => entry.text.push(' '),
                 _ => {}
             }
             return true;
@@ -668,7 +678,11 @@ impl Session {
     /// A typed character (the number entry, the open list's letter jump).
     pub fn panel_text(&mut self, c: char) -> bool {
         if let Some(entry) = &mut self.entry {
-            if c.is_ascii_digit() || matches!(c, '.' | '-' | '+' | 'e' | 'E') {
+            let accepted = match entry.spec {
+                Some(_) => c.is_ascii_digit() || matches!(c, '.' | '-' | '+' | 'e' | 'E'),
+                None => !c.is_control(),
+            };
+            if accepted {
                 entry.text.push(c);
             }
             return true;
@@ -700,11 +714,12 @@ impl Session {
             js::number_to_string(spec.min),
             js::number_to_string(spec.max)
         );
-        self.entry = Some(Entry { id, spec, title, text: js::number_to_string(value) });
+        self.entry = Some(Entry { id, spec: Some(spec), title, text: js::number_to_string(value) });
     }
 
     fn commit_entry(&mut self) {
         let Some(entry) = self.entry.take() else { return };
+        let Some(spec) = entry.spec else { return self.commit_text(entry.id, &entry.text) };
         if entry.text.trim().is_empty() {
             return;
         }
@@ -712,7 +727,7 @@ impl Session {
         if number.is_nan() {
             return;
         }
-        self.set_value(entry.id, entry.spec.typed(number));
+        self.set_value(entry.id, spec.typed(number));
     }
 
     // ─── What the widgets do ─────────────────────────────────────────────────
@@ -900,6 +915,13 @@ impl Session {
                 }
                 return;
             }
+            Id::SongList => {
+                if let Ok(index) = value.parse::<usize>() {
+                    self.select_song(index);
+                }
+                return;
+            }
+            Id::SongMenu => return self.song_menu_pick(value),
             Id::KitKit => {
                 let target = self.kits.kits.iter().position(|k| k.name == value);
                 if let (Some(sample), Some(target)) = (self.kit_editor, target)
@@ -984,6 +1006,8 @@ impl Session {
             Id::NoteTab(i) => self.editors.note_tab = i,
             Id::Row(_) => self.select_row(id),
             Id::LoadSample => self.open_picker(Purpose::ReplaceTrackSample),
+            Id::SongButton(button) => self.song_button(button),
+            Id::SongName | Id::SongDescription => self.song_text_entry(id),
             _ => {
                 let Some(t) = self.editor_track() else { return };
                 self.activate_on_track(t, id);

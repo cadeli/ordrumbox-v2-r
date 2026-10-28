@@ -2,6 +2,8 @@
 //! generators, MIDI files, the grid cursor and selection, the clipboard, saving. Edits go through the
 //! [`Editor`] (each one an undo step); the playing pass is rebuilt after each.
 //!
+//! The song panel (F3) takes the grid's place: `session_song.rs`.
+//!
 //! The grid follows the JS pattern panel (`pointer_section.js`,
 //! `keyboard_section.js`, `clipboard_section.js`): a click on an empty step
 //! adds a note, on a note selects it, on the selected note deletes it.
@@ -32,6 +34,8 @@ use crate::view::{self, Cursor, Hit, KitView, View};
 
 #[path = "session_panel.rs"]
 mod session_panel;
+#[path = "session_song.rs"]
+mod session_song;
 pub use session_panel::{Button, PanelKey};
 
 /// Save this long after the last edit.
@@ -81,7 +85,16 @@ pub struct Session {
     analysis: Option<(String, Analysis)>,
     synths: SynthPresets,
     pattern_index: usize,
-    song_index: usize,
+    /// The song panel is shown (in the place of the grid; Space plays the song).
+    song_view: bool,
+    /// The measure the song plays from (`songCursorMeasure`).
+    song_cursor: u32,
+    /// First measure and first row of the arrangement shown.
+    song_scroll: (u32, usize),
+    /// The clip under the mouse (its tooltip).
+    hovered_clip: Option<usize>,
+    /// Window size and scale of the last mouse or key event on the widgets.
+    panel_size: (i32, i32, i32),
     /// What offline renders (WAV exports) use; `None` without samples.
     render: Option<RenderSetup>,
     /// `None` when no audio device could be opened.
@@ -172,10 +185,10 @@ enum Overlay {
 }
 
 /// Every key, for Help > Keyboard shortcuts.
-const SHORTCUTS: [&str; 38] = [
+const SHORTCUTS: [&str; 42] = [
     "MENUS",
     "  F10 or Alt             open the menus: Arrows move, Enter runs, Esc closes",
-    "  F1, F2                 this list, the track editor (shown or hidden)",
+    "  F1, F2, F3             this list, the track editor (shown or hidden), the song panel",
     "GRID",
     "  Arrows                 move the cursor",
     "  Enter / click          add a note, select it, delete the selected one",
@@ -206,6 +219,10 @@ const SHORTCUTS: [&str; 38] = [
     "  drag                   a knob up / down, a slider along (Shift: finely)",
     "  double-click           default value     right-click or Enter: type a value",
     "  Enter or Space         open a list, press a button",
+    "SONG PANEL (F3)",
+    "  click / right-click    the ruler: aim the cursor; a pattern, row, clip, the grid: menu",
+    "  Left Right, Up Down    the cursor a measure back / on, previous / next pattern",
+    "  Space, wheel           play the song from the cursor; scroll (Shift: the rows)",
     "KIT EDITOR (Ctrl+K)",
     "  Up Down                sample      Enter  hear      Delete  remove",
     "  N, R, E                normalize, assign the sounds again, export the mapping",
@@ -315,7 +332,11 @@ impl Session {
             analysis: None,
             synths: SynthPresets::default(),
             pattern_index: 0,
-            song_index: 0,
+            song_view: false,
+            song_cursor: 0,
+            song_scroll: (0, 0),
+            hovered_clip: None,
+            panel_size: (0, 0, 1),
             render: None,
             controller: None,
             _output: None,
@@ -368,21 +389,26 @@ impl Session {
 
     // ─── Transport ───────────────────────────────────────────────────────────
 
-    /// Space: play or stop the selected pattern.
+    /// Space: play or stop the selected pattern (in the song panel: the song).
     pub fn toggle_play(&mut self) {
-        self.toggle(Mode::Pattern(self.pattern_index));
+        if self.song_view {
+            return self.toggle_play_song();
+        }
+        self.toggle(Mode::Pattern(self.pattern_index), 0);
     }
 
-    /// Shift+Space: play or stop the selected song (its arrangement).
+    /// Shift+Space: play or stop the selected song (its arrangement), from the cursor.
     pub fn toggle_play_song(&mut self) {
         if self.editor.library().songs.is_empty() {
             self.message = "no song in the library".into();
             return;
         }
-        self.toggle(Mode::Song(self.song_index));
+        let start = self.song_start();
+        self.toggle(Mode::Song(self.editor.selected_song()), start);
     }
 
-    fn toggle(&mut self, mode: Mode) {
+    /// Stop, or play `mode` from pass `first`.
+    fn toggle(&mut self, mode: Mode, first: u64) {
         let Some(controller) = &mut self.controller else { return };
         if controller.is_playing() {
             controller.stop();
@@ -391,7 +417,7 @@ impl Session {
                 let rng = &mut self.rng;
                 self.editor.auto_loop(p, 0, &self.scales, &mut || rng.next_f64());
             }
-            controller.play(self.editor.library(), mode);
+            controller.play_from(self.editor.library(), mode, first);
             self.played_revision = self.editor.revision();
         }
     }
@@ -403,9 +429,8 @@ impl Session {
             self.message = "no song in the library".into();
             return;
         }
-        self.song_index = (self.song_index as isize + delta).rem_euclid(count as isize) as usize;
-        let song = &self.editor.library().songs[self.song_index];
-        self.message = format!("song {} ({} measures)", song.name, song.length_measures());
+        let index = (self.editor.selected_song() as isize + delta).rem_euclid(count as isize) as usize;
+        self.select_song(index);
     }
 
     /// Ctrl+E: the selected pattern (with Shift: the selected song) to a WAV
@@ -422,11 +447,12 @@ impl Session {
         let library = self.editor.library();
         let started = Instant::now();
         let (rendered, name) = if song {
-            let Some(s) = library.songs.get(self.song_index) else {
+            let index = self.editor.selected_song();
+            let Some(s) = library.songs.get(index) else {
                 self.message = "no song in the library".into();
                 return;
             };
-            (offline::render_song(library, self.song_index, setup), format!("song-{}", s.id))
+            (offline::render_song(library, index, setup), format!("song-{}", s.id))
         } else {
             let Some(p) = library.patterns.get(self.pattern_index) else { return };
             // Tracks in auto mode get their new lines loop after loop, on the render's copy.
@@ -563,6 +589,9 @@ impl Session {
             kit_index: self.kit_index,
             kit_editor: self.kit_editor.is_some(),
             track_editor: self.show_track_editor,
+            song_view: self.song_view,
+            can_save_song: store::songs_dir().is_some(),
+            saved_songs: store::songs_dir().is_some_and(|d| !store::list_songs(&d).is_empty()),
             kit_sample: self.kit_list().is_some_and(|(s, n)| s < n),
         }
     }
@@ -641,6 +670,15 @@ impl Session {
             C::NextKit => self.step_kit(1),
             C::KitEditor => self.toggle_kit_editor(),
             C::TrackEditor => self.toggle_track_editor(),
+            C::SongView => self.toggle_song_view(),
+            C::NewSong => self.song_button("new"),
+            C::RemoveSong => self.song_button("delete"),
+            C::RenameSong => self.song_text_entry(Id::SongName),
+            C::SongDescription => self.song_text_entry(Id::SongDescription),
+            C::SaveSong => self.song_button("save"),
+            C::LoadSong => self.song_button("load"),
+            C::ExportSong => self.song_button("export"),
+            C::ImportSong => self.song_button("import"),
             C::NormalizeKit => self.kit_normalize(),
             C::ExportMapping => self.kit_export(),
             C::LoadMapping => self.open_picker(Purpose::LoadMapping),
@@ -723,6 +761,7 @@ impl Session {
         self.last_dir = picker.dir.clone();
         match picker.purpose {
             Purpose::ImportMidi => self.import_midi(&path),
+            Purpose::ImportSong => self.import_song(&path),
             Purpose::ReplaceTrackSample => self.replace_track_sample(&path),
             Purpose::ReplaceSample => self.drop_path(&path, true),
             Purpose::AddSample | Purpose::LoadMapping | Purpose::ImportFolder => self.drop_path(&path, false),
@@ -882,6 +921,7 @@ impl Session {
         } else {
             match ext.as_str() {
                 "mid" | "midi" => return self.import_midi(path),
+                "odbox" => return self.import_song(path),
                 "json" => self.kits.load_mapping(path).map(|(kit, message)| (kit, 0, message)),
                 "wav" => match self.kit_editor {
                     Some(sample) if shift => self
@@ -893,7 +933,7 @@ impl Session {
                         .add_sample(self.kit_index, path)
                         .map(|(sample, message)| (self.kit_index, sample, message)),
                 },
-                _ => Err(format!("{}: not a MIDI, WAV or kit file", path.display())),
+                _ => Err(format!("{}: not a MIDI, WAV, song or kit file", path.display())),
             }
         };
         match result {
@@ -1355,6 +1395,11 @@ impl Session {
 
     // ─── Drawing ─────────────────────────────────────────────────────────────
 
+    /// The window's size and scale (where the lists opened from the menus go).
+    pub fn set_size(&mut self, size: (i32, i32, i32)) {
+        self.panel_size = size;
+    }
+
     pub fn draw(&self, canvas: &mut Canvas, scale: i32) {
         let layout = self.panel_layout(canvas.width(), canvas.height(), scale);
         let position = self.controller.as_ref().and_then(Controller::position);
@@ -1370,7 +1415,7 @@ impl Session {
                 let measure = (p.pass as f64 + p.frame as f64 / p.frames.max(1) as f64) % total;
                 Some(format!("SONG {}  measure {}/{}", song.name, measure.floor() + 1.0, total.ceil()))
             }
-            _ => library.songs.get(self.song_index).map(|s| format!("song {}", s.name)),
+            _ => library.songs.get(self.editor.selected_song()).map(|s| format!("song {}", s.name)),
         };
         let pattern = self.pattern();
         let generating = |kind: fn(TrackType) -> bool| {
@@ -1382,8 +1427,11 @@ impl Session {
             generating(|k| k == TrackType::Bass),
             generating(|k| k == TrackType::Piano),
         ];
+        let song_layout = crate::song_view::SongLayout::new(canvas.width(), canvas.height(), scale, self.status.len());
+        let rows = if self.song_view { self.song_rows() } else { Vec::new() };
         let view = View {
             pattern,
+            arrangement: self.song_view.then(|| self.song_view_data(&rows, &song_layout)),
             generation,
             genre: pattern.and_then(|p| p.extra.get("_autoGenGenre")?.as_str()),
             pattern_index: self.pattern_index,

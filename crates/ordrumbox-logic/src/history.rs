@@ -1,11 +1,20 @@
 //! Undo/redo (`src/logic/history_manager.js`): a bounded list of steps, each
-//! holding the patterns as they were before and after it.
+//! holding what it changed as it was before and after it.
 //!
 //! The JS steps are closures that redo or undo one change in place; here a
-//! step keeps copies of what changed (one pattern, or the pattern list), which
-//! needs no per-command inverse and cannot drift from the state.
+//! step keeps copies of what changed (one pattern, the pattern list, the
+//! arrangements, or the whole library), which needs no per-command inverse
+//! and cannot drift from the state.
 
-use ordrumbox_core::Pattern;
+use ordrumbox_core::{Library, Pattern, Song};
+
+/// What undo and redo act on.
+#[derive(Debug)]
+pub struct Target<'a> {
+    pub library: &'a mut Library,
+    /// The selected arrangement.
+    pub selected_song: &'a mut usize,
+}
 
 /// Steps kept (`new HistoryManager(50)`).
 pub const MAX_STEPS: usize = 50;
@@ -20,17 +29,33 @@ pub enum Change {
     Pattern { index: usize, before: Box<Pattern>, after: Box<Pattern> },
     /// The whole pattern list (patterns added or removed).
     Patterns { before: Vec<Pattern>, after: Vec<Pattern> },
+    /// The arrangements; `select` is the arrangement undo and redo select
+    /// (adding or removing one), `None` when they leave the selection.
+    Songs { before: Vec<Song>, after: Vec<Song>, select: Option<(usize, usize)> },
+    /// The whole library (a song loaded or imported), and the arrangement
+    /// undo and redo select.
+    Library { before: Box<Library>, after: Box<Library>, select: (usize, usize) },
 }
 
 impl Change {
-    fn apply(&self, patterns: &mut Vec<Pattern>, undo: bool) {
+    fn apply(&self, target: Target<'_>, undo: bool) {
         match self {
             Self::Pattern { index, before, after } => {
-                if let Some(slot) = patterns.get_mut(*index) {
+                if let Some(slot) = target.library.patterns.get_mut(*index) {
                     *slot = if undo { before } else { after }.as_ref().clone();
                 }
             }
-            Self::Patterns { before, after } => *patterns = if undo { before } else { after }.clone(),
+            Self::Patterns { before, after } => target.library.patterns = if undo { before } else { after }.clone(),
+            Self::Songs { before, after, select } => {
+                target.library.songs = if undo { before } else { after }.clone();
+                if let Some((on_undo, on_redo)) = select {
+                    *target.selected_song = if undo { *on_undo } else { *on_redo };
+                }
+            }
+            Self::Library { before, after, select: (on_undo, on_redo) } => {
+                *target.library = if undo { before } else { after }.as_ref().clone();
+                *target.selected_song = if undo { *on_undo } else { *on_redo };
+            }
         }
     }
 
@@ -39,6 +64,7 @@ impl Change {
         match (self, other) {
             (Self::Pattern { index: a, .. }, Self::Pattern { index: b, .. }) => a == b,
             (Self::Patterns { .. }, Self::Patterns { .. }) => true,
+            (Self::Songs { .. }, Self::Songs { .. }) | (Self::Library { .. }, Self::Library { .. }) => true,
             _ => false,
         }
     }
@@ -48,6 +74,8 @@ impl Change {
         match (self, next) {
             (Self::Pattern { after, .. }, Self::Pattern { after: next_after, .. }) => *after = next_after,
             (Self::Patterns { after, .. }, Self::Patterns { after: next_after, .. }) => *after = next_after,
+            (Self::Songs { after, .. }, Self::Songs { after: next_after, .. }) => *after = next_after,
+            (Self::Library { after, .. }, Self::Library { after: next_after, .. }) => *after = next_after,
             _ => {}
         }
     }
@@ -120,19 +148,19 @@ impl History {
         self.future.clear();
     }
 
-    /// Revert the last step on `patterns`; its description.
-    pub fn undo(&mut self, patterns: &mut Vec<Pattern>) -> Option<String> {
+    /// Revert the last step on `target`; its description.
+    pub fn undo(&mut self, target: Target<'_>) -> Option<String> {
         let step = self.past.pop()?;
-        step.change.apply(patterns, true);
+        step.change.apply(target, true);
         let desc = step.desc.clone();
         self.future.push(step);
         Some(desc)
     }
 
-    /// Apply the last undone step again on `patterns`; its description.
-    pub fn redo(&mut self, patterns: &mut Vec<Pattern>) -> Option<String> {
+    /// Apply the last undone step again on `target`; its description.
+    pub fn redo(&mut self, target: Target<'_>) -> Option<String> {
         let mut step = self.future.pop()?;
-        step.change.apply(patterns, false);
+        step.change.apply(target, false);
         let desc = step.desc.clone();
         step.coalesce_key = None; // a redone step never absorbs the next edit
         self.past.push(step);
@@ -153,6 +181,23 @@ mod tests {
         Pattern { bpm, ..Pattern::default() }
     }
 
+    /// What the tests undo and redo on.
+    #[derive(Default)]
+    struct State {
+        library: Library,
+        selected_song: usize,
+    }
+
+    impl State {
+        fn new(patterns: Vec<Pattern>) -> Self {
+            Self { library: Library { patterns, ..Library::default() }, selected_song: 0 }
+        }
+
+        fn target(&mut self) -> Target<'_> {
+            Target { library: &mut self.library, selected_song: &mut self.selected_song }
+        }
+    }
+
     fn change(before: f64, after: f64) -> Change {
         Change::Pattern { index: 0, before: Box::new(pattern(before)), after: Box::new(pattern(after)) }
     }
@@ -160,16 +205,16 @@ mod tests {
     #[test]
     fn undo_redo_and_limit() {
         let mut history = History::default();
-        let mut patterns = vec![pattern(1.0)];
+        let mut state = State::new(vec![pattern(1.0)]);
         for i in 1..=60 {
             history.record(format!("bpm {i}"), change(f64::from(i), f64::from(i + 1)), None, f64::from(i) * 1000.0);
         }
         assert_eq!(history.undo_len(), MAX_STEPS);
-        assert_eq!(history.undo(&mut patterns).as_deref(), Some("bpm 60"));
-        assert_eq!(patterns[0].bpm, 60.0);
-        assert_eq!(history.redo(&mut patterns).as_deref(), Some("bpm 60"));
-        assert_eq!(patterns[0].bpm, 61.0);
-        history.undo(&mut patterns);
+        assert_eq!(history.undo(state.target()).as_deref(), Some("bpm 60"));
+        assert_eq!(state.library.patterns[0].bpm, 60.0);
+        assert_eq!(history.redo(state.target()).as_deref(), Some("bpm 60"));
+        assert_eq!(state.library.patterns[0].bpm, 61.0);
+        history.undo(state.target());
         history.record("new".into(), change(60.0, 3.0), None, 1e9);
         assert!(!history.can_redo());
     }
@@ -183,10 +228,10 @@ mod tests {
         history.record("c".into(), change(3.0, 4.0), key.clone(), 600.0); // 300 ms after the last
         history.record("d".into(), change(4.0, 5.0), key, 1100.0); // too late: a new step
         assert_eq!(history.undo_len(), 2);
-        let mut patterns = vec![pattern(5.0)];
-        history.undo(&mut patterns);
-        assert_eq!(patterns[0].bpm, 4.0);
-        assert_eq!(history.undo(&mut patterns).as_deref(), Some("c"));
-        assert_eq!(patterns[0].bpm, 1.0);
+        let mut state = State::new(vec![pattern(5.0)]);
+        history.undo(state.target());
+        assert_eq!(state.library.patterns[0].bpm, 4.0);
+        assert_eq!(history.undo(state.target()).as_deref(), Some("c"));
+        assert_eq!(state.library.patterns[0].bpm, 1.0);
     }
 }

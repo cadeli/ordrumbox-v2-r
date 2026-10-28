@@ -1,5 +1,5 @@
 //! The screen: header (pattern, generation, tempo, length, kit, transport,
-//! undo), one row per track (mute and solo boxes, name — green in auto mode —,
+//! undo), then the song panel (`song_view`), the kit editor, or one row per track (mute and solo boxes, name — green in auto mode —,
 //! steps with their notes), the grid cursor, the selected note, the playhead,
 //! the messages and the key help.
 //!
@@ -11,6 +11,7 @@ use ordrumbox_core::{Pattern, Track};
 use crate::canvas::{Canvas, Rgb, text_width};
 use crate::menu;
 use crate::panel::Rect;
+use crate::song_view::{self, SongLayout, SongView};
 
 const BACKGROUND: Rgb = 0x0016_1619;
 const CELL: Rgb = 0x002A_2A33;
@@ -33,6 +34,8 @@ const BOX_OFF: Rgb = 0x0038_3845;
 /// The key help line under the grid (every command is in the menus, with
 /// its shortcut; Help > Keyboard shortcuts lists them all).
 const HELP: &str = "F10 or ALT: menus   ARROWS: cursor   ENTER or click: note   SHIFT+ARROWS: velocity/pitch   TAB: track editor   F1: all keys";
+/// The same in the song panel.
+const SONG_HELP: &str = "SONG   click the ruler: cursor   right-click: add / repeat / remove   SPACE: play from the cursor   F3 or ESC: grid";
 /// The same in the kit editor.
 const KIT_HELP: &str =
     "KIT EDITOR   UP DOWN: sample   TAB: controls   ENTER: hear   DEL: remove   N: normalize   ESC: close";
@@ -76,6 +79,8 @@ pub struct View<'a> {
     pub status: &'a [String],
     /// The kit editor, when open (it takes the place of the grid).
     pub kit_view: Option<KitView<'a>>,
+    /// The song panel, when shown (it takes the place of the grid).
+    pub arrangement: Option<SongView<'a>>,
     /// Width kept on the right (for the track editor).
     pub right: i32,
 }
@@ -115,7 +120,7 @@ pub struct KitLayout {
 impl KitLayout {
     pub fn new(width: i32, height: i32, scale: i32, status_lines: usize) -> Self {
         let margin = margin(scale);
-        let top = content_top(scale) + 3 * header_line(scale) + margin / 2;
+        let top = body_top(scale);
         let bottom = footer_top(height, scale, status_lines) - margin / 2;
         let list_width = ((width - 2 * margin) / 3).max(40 * scale);
         let row = 12 * scale;
@@ -190,10 +195,14 @@ fn margin(scale: i32) -> i32 {
     16 * scale
 }
 
-/// Top of the footer (status lines then help).
 /// Top of the header: under the menu bar.
 pub fn content_top(scale: i32) -> i32 {
     menu::bar_height(scale) + margin(scale) / 2
+}
+
+/// Top of what is under the header (the grid, the kit editor, the song panel).
+pub fn body_top(scale: i32) -> i32 {
+    content_top(scale) + 3 * header_line(scale) + margin(scale) / 2
 }
 
 /// The header's pattern list and kit list (`PatternNav`'s two selects).
@@ -207,6 +216,7 @@ pub fn header_selects(scale: i32) -> (Rect, Rect) {
     )
 }
 
+/// Top of the footer (status lines then help).
 pub fn footer_top(height: i32, scale: i32, status_lines: usize) -> i32 {
     height - margin(scale) - 10 * scale - status_lines as i32 * 10 * scale - 4 * scale
 }
@@ -216,7 +226,7 @@ impl Layout {
     /// `status_lines` message lines in the footer.
     pub fn new(width: i32, height: i32, scale: i32, pattern: &Pattern, status_lines: usize) -> Self {
         let margin = margin(scale);
-        let top = content_top(scale) + 3 * header_line(scale) + margin / 2;
+        let top = body_top(scale);
         let bottom = footer_top(height, scale, status_lines) - margin / 2;
         let tracks = pattern.tracks.len();
         let row = ((bottom - top) / tracks.max(1) as i32).clamp(10 * scale, 32 * scale);
@@ -383,9 +393,19 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
         canvas.text(margin, footer_y, message, scale, WARNING);
         footer_y += 10 * scale;
     }
-    canvas.text(margin, footer_y, if view.kit_view.is_some() { KIT_HELP } else { HELP }, scale, DIM);
+    let help = if view.kit_view.is_some() {
+        KIT_HELP
+    } else if view.arrangement.is_some() {
+        SONG_HELP
+    } else {
+        HELP
+    };
+    canvas.text(margin, footer_y, help, scale, DIM);
 
-    if let Some(kit) = &view.kit_view {
+    if let Some(arrangement) = &view.arrangement {
+        let layout = SongLayout::new(canvas.width(), canvas.height(), scale, view.status.len());
+        song_view::draw(canvas, arrangement, &layout);
+    } else if let Some(kit) = &view.kit_view {
         let layout = KitLayout::new(canvas.width(), canvas.height(), scale, view.status.len());
         draw_kit(canvas, kit, &layout);
     } else if let Some(pattern) = view.pattern {
@@ -613,6 +633,7 @@ mod tests {
                 generation: [true, false, true],
                 genre: Some("house"),
                 kit_view: None,
+                arrangement: None,
                 right: 300,
                 cursor: Some(Cursor { track: 0, beat: 1, step: 2 }),
                 selected: Some((0, 0)),

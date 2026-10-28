@@ -386,11 +386,26 @@ impl Controller {
 
     /// Start `mode` from its beginning; sounds are assigned afresh.
     pub fn play(&mut self, library: &Library, mode: Mode) {
+        self.play_from(library, mode, 0);
+    }
+
+    /// Start `mode` from pass `first` (a song: from measure `first`, as from
+    /// the arrangement cursor); sounds are assigned afresh.
+    pub fn play_from(&mut self, library: &Library, mode: Mode, first: u64) {
         self.mode = mode;
         self.assigned.clear();
+        self.jump(library, first);
+    }
+
+    /// Go on from pass `first` at once (`setSongCursor` while playing: the
+    /// measure clicked sounds right away), with the sounds already assigned.
+    pub fn jump(&mut self, library: &Library, first: u64) {
         self.song_notes.clear();
-        let Some(pass) = self.build(library, 0) else { return };
-        self.link.inbox().command = Some(Command::Play(pass));
+        let Some(pass) = self.build(library, first) else { return };
+        let mut inbox = self.link.inbox();
+        inbox.command = Some(Command::Play(pass));
+        inbox.next = None;
+        drop(inbox);
         self.playing = true;
     }
 
@@ -423,9 +438,11 @@ impl Controller {
     /// The pass [`Self::update`] builds now, if it builds one: the moment for
     /// the loop start of auto-mode tracks (a pass is a loop of the pattern).
     pub fn pending_pass(&self) -> Option<u64> {
-        let wants = self.link.wants.load(Ordering::Acquire);
-        let already_sent = self.sent.back().is_some_and(|p| p.number + 1 == wants);
-        (self.playing && wants > 0 && !already_sent).then(|| wants - 1)
+        let wants = self.link.wants.load(Ordering::Acquire).checked_sub(1)?;
+        // The pass after the last one posted: not one already sent, and not
+        // one the engine asked for before a jump it has not taken yet.
+        let follows = self.sent.back().is_none_or(|p| p.number + 1 == wants);
+        (self.playing && follows).then_some(wants)
     }
 
     /// Call regularly (every UI frame) while playing: posts the next pass
@@ -506,6 +523,48 @@ mod tests {
         controller.stop();
         audio.render(&mut l, &mut r);
         assert_eq!(controller.position(), None);
+    }
+
+    #[test]
+    fn a_song_starts_at_a_measure_and_jumps() {
+        let (library, _) = Library::parse(
+            r#"{"songs":[{"name":"s","bpm":120,"clips":[{"pattern":"p","startMeasure":0,"measureCount":8}]}],
+                "patterns":[{"name":"p","tracks":[{"name":"KICK","notes":[{}]}]}]}"#,
+        )
+        .unwrap();
+        let (mut controller, mut audio) = Controller::new(8000.0, bank(), Scales::default(), SynthPresets::default());
+        controller.play_from(&library, Mode::Song(0), 3);
+        let mut seen = Vec::new();
+        // One callback (with the UI's update first, or not); the passes met.
+        let mut step = |controller: &mut Controller, update: bool, seen: &mut Vec<u64>| {
+            let (mut l, mut r) = (vec![0.0; 256], vec![0.0; 256]);
+            if update {
+                controller.update(&library);
+            }
+            audio.render(&mut l, &mut r);
+            let pass = controller.position().expect("playing").pass;
+            if seen.last() != Some(&pass) {
+                seen.push(pass);
+            }
+        };
+        // A measure at 120 bpm = 2 s = 16000 frames per pass.
+        for _ in 0..20_000 / 256 {
+            step(&mut controller, true, &mut seen);
+        }
+        assert_eq!(seen, [3, 4]);
+        assert_eq!(controller.tick().map(|t| t / (u64::from(ordrumbox_core::steps::TICK) * 4)), Some(4));
+        // Into measure 5 without the UI: the engine now asks for measure 6.
+        while seen.last() == Some(&4) {
+            step(&mut controller, false, &mut seen);
+        }
+        assert_eq!(controller.pending_pass(), Some(6));
+        // Back to measure 1 before that request is served: it must not be.
+        controller.jump(&library, 1);
+        assert_eq!(controller.pending_pass(), None);
+        for _ in 0..34_000 / 256 {
+            step(&mut controller, true, &mut seen);
+        }
+        assert_eq!(seen, [3, 4, 5, 1, 2, 3]);
     }
 
     #[test]
