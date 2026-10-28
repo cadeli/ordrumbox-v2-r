@@ -124,8 +124,8 @@ replaces the library in one undo step. Beyond the JS panel, **New** and
 **Delete** add and remove arrangements — the JS `addSong` / `removeSong`
 commands, which only its MCP tools reach. The **Song** menu has all of these
 too, with or without the panel shown: play the song, new, remove, previous and
-next arrangement, rename the song, its description, save, load, export,
-import.
+next arrangement, rename the song, its description; save, load, export and
+import are in the **File** menu.
 
 Piano roll (**F4**, **View › Piano roll**, the JS piano roll; **Esc**
 clears the selection, then goes back to the grid): in the place of the
@@ -210,7 +210,8 @@ removed, one undo step per track (`compactTrack`, checked against the JS).
 Menus: the menu bar at the top of the window (File, Edit, View, Pattern,
 Generate, Play, Song, Kit, Help) lists every command with its shortcut; commands that cannot
 run are greyed out, on/off ones (auto modes, mute, solo, the current kit, the
-kit editor) show a box. Click a title, or press **F10** or **Alt** alone, then
+kit editor) show a box. Every command that reads or writes a file (songs,
+MIDI, WAV, samples, kit folders and mappings) is in **File**. Click a title, or press **F10** or **Alt** alone, then
 **←→** between menus, **↑↓** between items, **Enter** to run, **Esc** to
 close. **Help › Keyboard shortcuts** (**F1**) lists every key; **Help › About**
 shows the version and the folders in use.

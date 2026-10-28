@@ -169,11 +169,6 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
         command("Next kit", ".", C::NextKit, s.kits.len() > 1),
         Item::Separator,
         check("Kit editor", "Ctrl+K", C::KitEditor, true, s.kit_editor),
-        command("Add sample...", "", C::AddSample, !s.kits.is_empty()),
-        command("Replace sample...", "", C::ReplaceSample, s.kit_sample),
-        command("Import folder as kit...", "", C::ImportFolder, true),
-        command("Load kit mapping...", "", C::LoadMapping, true),
-        command("Export kit mapping", "", C::ExportMapping, !s.kits.is_empty()),
         command("Normalize kit", "", C::NormalizeKit, !s.kits.is_empty()),
         command("Assign sounds again", "", C::Reassign, !s.kits.is_empty()),
     ]);
@@ -183,10 +178,21 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
             items: vec![
                 command("Save", "Ctrl+S", C::Save, s.can_save),
                 Item::Separator,
+                command("Save song", "", C::SaveSong, s.can_save_song),
+                command("Load song...", "", C::LoadSong, s.saved_songs),
+                command("Export song", "", C::ExportSong, true),
+                command("Import song...", "", C::ImportSong, true),
+                Item::Separator,
                 command("Import MIDI file...", "Ctrl+O", C::ImportMidi, true),
                 command("Export pattern as MIDI", "Ctrl+M", C::ExportMidi, p),
                 command("Export pattern as WAV", "Ctrl+E", C::ExportWav, p && s.can_render),
                 command("Export song as WAV", "Ctrl+Shift+E", C::ExportSongWav, s.has_songs && s.can_render),
+                Item::Separator,
+                command("Add sample...", "", C::AddSample, !s.kits.is_empty()),
+                command("Replace sample...", "", C::ReplaceSample, s.kit_sample),
+                command("Import folder as kit...", "", C::ImportFolder, true),
+                command("Load kit mapping...", "", C::LoadMapping, true),
+                command("Export kit mapping", "", C::ExportMapping, !s.kits.is_empty()),
                 Item::Separator,
                 command("Quit", "Ctrl+Q", C::Quit, true),
             ],
@@ -278,11 +284,6 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
                 Item::Separator,
                 command("Rename song...", "", C::RenameSong, true),
                 command("Song description...", "", C::SongDescription, true),
-                Item::Separator,
-                command("Save song", "", C::SaveSong, s.can_save_song),
-                command("Load song...", "", C::LoadSong, s.saved_songs),
-                command("Export song", "", C::ExportSong, true),
-                command("Import song...", "", C::ImportSong, true),
             ],
         },
         Menu { title: "Kit", items: kits },
@@ -524,35 +525,61 @@ mod tests {
         // Redo, copy and paste cannot run: the next is nothing else but Undo again.
         assert_eq!(open.step(&menus, 1).command(&menus), Some(Command::Undo));
         let file = Open::new(&menus, 0, true);
-        // Save is greyed out: the first item highlighted is Import.
-        assert_eq!(file.command(&menus), Some(Command::ImportMidi));
-        assert_eq!(file.step(&menus, 1).command(&menus), Some(Command::ExportMidi));
+        // Save, Save song and Load song are greyed out: the first item highlighted is Export song.
+        assert_eq!(file.command(&menus), Some(Command::ExportSong));
+        assert_eq!(file.step(&menus, 1).command(&menus), Some(Command::ImportSong));
         assert_eq!(file.switch(&menus, -1).menu, menus.len() - 1);
     }
 
     #[test]
-    fn the_song_menu_has_the_song_panel_commands() {
+    fn the_song_and_file_menus_have_the_song_panel_commands() {
         let menus = menus(&MenuState { has_songs: true, can_save_song: true, ..state() });
-        let song = menus.iter().find(|m| m.title == "Song").unwrap();
-        let commands: Vec<Command> = song.items.iter().filter_map(Item::runnable).collect();
+        let runnable = |title: &str| -> Vec<Command> {
+            menus.iter().find(|m| m.title == title).unwrap().items.iter().filter_map(Item::runnable).collect()
+        };
+        let (song, file) = (runnable("Song"), runnable("File"));
         use Command as C;
-        for command in [
-            C::SongView,
-            C::PlaySong,
-            C::NewSong,
-            C::RemoveSong,
-            C::PreviousSong,
-            C::NextSong,
-            C::RenameSong,
-            C::SongDescription,
-            C::SaveSong,
-            C::ExportSong,
-            C::ImportSong,
-        ] {
-            assert!(commands.contains(&command), "{command:?}");
+        for command in [C::SongView, C::PlaySong, C::NewSong, C::RemoveSong, C::PreviousSong, C::NextSong] {
+            assert!(song.contains(&command), "{command:?}");
+        }
+        assert!(song.contains(&C::RenameSong) && song.contains(&C::SongDescription));
+        for command in [C::SaveSong, C::ExportSong, C::ImportSong] {
+            assert!(file.contains(&command), "{command:?}");
         }
         // Load needs saved songs.
-        assert!(!commands.contains(&C::LoadSong));
+        assert!(!file.contains(&C::LoadSong));
+    }
+
+    #[test]
+    fn every_file_command_is_in_the_file_menu() {
+        let menus = menus(&MenuState { can_save_song: true, saved_songs: true, kit_sample: true, ..state() });
+        use Command as C;
+        let file_commands = [
+            C::SaveSong,
+            C::LoadSong,
+            C::ExportSong,
+            C::ImportSong,
+            C::ImportMidi,
+            C::ExportMidi,
+            C::AddSample,
+            C::ReplaceSample,
+            C::ImportFolder,
+            C::LoadMapping,
+            C::ExportMapping,
+        ];
+        for menu in &menus {
+            for item in &menu.items {
+                if let Item::Command { command, .. } = item {
+                    if file_commands.contains(command) {
+                        assert_eq!(menu.title, "File", "{command:?}");
+                    }
+                }
+            }
+        }
+        let file: Vec<Command> = menus[0].items.iter().filter_map(Item::runnable).collect();
+        for command in file_commands {
+            assert!(file.contains(&command), "{command:?}");
+        }
     }
 
     #[test]
