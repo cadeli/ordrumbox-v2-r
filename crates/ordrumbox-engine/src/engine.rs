@@ -548,7 +548,7 @@ mod tests {
     #[test]
     fn synth_notes_play_for_their_length() {
         let mut engine = engine();
-        let patch = SynthPatch { velocity: 0.5, master: 1.0, ..SynthPatch::default() };
+        let patch = SynthPatch { velocity: 0.5, volume: 1.0, ..SynthPatch::default() };
         let event =
             Event { frame: 64, sound: Sound::Synth(SynthStart { track: 0, patch: 0, length: 0.01 }), mono: false };
         let pass = Pass {

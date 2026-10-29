@@ -762,7 +762,7 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
     let mut ghosts: Vec<(i64, ordrumbox_core::note_positions::SubKind, &Note)> = Vec::new();
     for note in &track.notes {
         for sub in ordrumbox_core::note_positions::sub_positions(note, track, track_total, &span, &mut rng) {
-            let local = sub.pos - start;
+            let local = sub.step - start;
             if (0..steps).contains(&local) {
                 ghosts.push((local, sub.kind, note));
             }

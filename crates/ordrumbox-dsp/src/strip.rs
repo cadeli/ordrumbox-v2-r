@@ -27,21 +27,21 @@ audio_params! {
         /// 0 lowpass, 1 highpass, 2 bandpass, 3 notch.
         filter_mode = 0.0, 0.0..=3.0;
         /// 0 tanh, 1 hard clip, 2 atan.
-        sat_type = 0.0, 0.0..=2.0;
-        sat_drive = 1.0, 1.0..=7.0;
-        sat_out = 1.0, 0.0..=1.0;
-        sat_mix = 0.0, 0.0..=1.0;
-        rev_room = 0.5, 0.0..=1.0;
-        rev_damp = 0.5, 0.0..=1.0;
-        rev_width = 1.0, 0.0..=1.0;
-        rev_mix = 0.0, 0.0..=1.0;
+        saturation_type = 0.0, 0.0..=2.0;
+        saturation_drive = 1.0, 1.0..=7.0;
+        saturation_output = 1.0, 0.0..=1.0;
+        saturation_mix = 0.0, 0.0..=1.0;
+        reverb_room = 0.5, 0.0..=1.0;
+        reverb_damping = 0.5, 0.0..=1.0;
+        reverb_width = 1.0, 0.0..=1.0;
+        reverb_mix = 0.0, 0.0..=1.0;
         /// Delay times, seconds.
-        dly_time_l = 0.25, 0.0..=2.0;
-        dly_time_r = 0.25, 0.0..=2.0;
-        dly_fb = 0.4, 0.0..=0.99;
-        dly_mix = 0.0, 0.0..=1.0;
+        delay_time_l = 0.25, 0.0..=2.0;
+        delay_time_r = 0.25, 0.0..=2.0;
+        delay_feedback = 0.4, 0.0..=0.99;
+        delay_mix = 0.0, 0.0..=1.0;
         /// 0 slap, 1 tape, 2 ping-pong.
-        dly_mode = 1.0, 0.0..=2.0;
+        delay_mode = 1.0, 0.0..=2.0;
         volume = 1.0, 0.0..=2.0;
         pan = 0.0, -1.0..=1.0;
     }
@@ -206,23 +206,28 @@ impl Strip {
         let s = settings.clamped();
         let sr = self.sample_rate;
         let (cutoff, q, mode) = (f64::from(s.cutoff), f64::from(s.q), f64::from(s.filter_mode));
-        let (sat_drive, sat_type, sat_mix, sat_out) =
-            (f64::from(s.sat_drive), f64::from(s.sat_type), f64::from(s.sat_mix), f64::from(s.sat_out));
-        let (rev_room, rev_damp, rev_width, rev_mix) =
-            (f64::from(s.rev_room), f64::from(s.rev_damp), f64::from(s.rev_width), f64::from(s.rev_mix));
-        let (dly_mix, dly_fb, dly_mode) = (f64::from(s.dly_mix), f64::from(s.dly_fb), f64::from(s.dly_mode));
-        let (dly_time_l, dly_time_r) = (f64::from(s.dly_time_l), f64::from(s.dly_time_r));
+        let (saturation_drive, saturation_type, saturation_mix, saturation_output) = (
+            f64::from(s.saturation_drive),
+            f64::from(s.saturation_type),
+            f64::from(s.saturation_mix),
+            f64::from(s.saturation_output),
+        );
+        let (reverb_room, reverb_damping, reverb_width, reverb_mix) =
+            (f64::from(s.reverb_room), f64::from(s.reverb_damping), f64::from(s.reverb_width), f64::from(s.reverb_mix));
+        let (delay_mix, delay_feedback, delay_mode) =
+            (f64::from(s.delay_mix), f64::from(s.delay_feedback), f64::from(s.delay_mode));
+        let (delay_time_l, delay_time_r) = (f64::from(s.delay_time_l), f64::from(s.delay_time_r));
         let vol = f64::from(s.volume);
 
-        let rm = rev_room * 0.28 + 0.7;
-        let damp1 = rev_damp * 0.4;
+        let rm = reverb_room * 0.28 + 0.7;
+        let damp1 = reverb_damping * 0.4;
         let damp2 = 1.0 - damp1;
-        let width1 = rev_width * 0.5 + 0.5;
-        let width2 = (1.0 - rev_width) * 0.5;
-        let has_reverb = rev_mix > 0.001;
-        let has_delay = dly_mix > 0.001;
-        let has_sat = sat_mix > 0.0;
-        let ping_pong = dly_mode > 1.5;
+        let width1 = reverb_width * 0.5 + 0.5;
+        let width2 = (1.0 - reverb_width) * 0.5;
+        let has_reverb = reverb_mix > 0.001;
+        let has_delay = delay_mix > 0.001;
+        let has_sat = saturation_mix > 0.0;
+        let ping_pong = delay_mode > 1.5;
 
         let p = f64::from(s.pan);
         let pan_l = ((p + 1.0) * PI / 4.0).cos();
@@ -264,8 +269,16 @@ impl Strip {
             };
 
             // 2. Saturation.
-            let sat_l = if has_sat { shape(dry_l, sat_drive, sat_type, sat_mix, sat_out) } else { dry_l };
-            let sat_r = if has_sat { shape(dry_r, sat_drive, sat_type, sat_mix, sat_out) } else { dry_r };
+            let sat_l = if has_sat {
+                shape(dry_l, saturation_drive, saturation_type, saturation_mix, saturation_output)
+            } else {
+                dry_l
+            };
+            let sat_r = if has_sat {
+                shape(dry_r, saturation_drive, saturation_type, saturation_mix, saturation_output)
+            } else {
+                dry_r
+            };
 
             // 3. Reverb.
             let (mut rev_l, mut rev_r) = (0.0, 0.0);
@@ -280,19 +293,19 @@ impl Strip {
                     comb_l = left.process(comb_l);
                     comb_r = right.process(comb_r);
                 }
-                rev_l = (comb_l * width1 + comb_r * width2) * rev_mix;
-                rev_r = (comb_r * width1 + comb_l * width2) * rev_mix;
+                rev_l = (comb_l * width1 + comb_r * width2) * reverb_mix;
+                rev_r = (comb_r * width1 + comb_l * width2) * reverb_mix;
             }
 
             // 4. Delay.
             let (mut wet_l, mut wet_r) = (0.0, 0.0);
             if has_delay {
-                let delayed_l = self.delay_l.read(dly_time_l * sr);
-                let delayed_r = self.delay_r.read(dly_time_r * sr);
+                let delayed_l = self.delay_l.read(delay_time_l * sr);
+                let delayed_r = self.delay_r.read(delay_time_r * sr);
                 self.delay_filter_l += 0.5 * (delayed_l - self.delay_filter_l);
                 self.delay_filter_r += 0.5 * (delayed_r - self.delay_filter_r);
-                let fb_l = shape(self.delay_filter_l * dly_fb, 1.5, 0.0, 0.5, 1.0);
-                let fb_r = shape(self.delay_filter_r * dly_fb, 1.5, 0.0, 0.5, 1.0);
+                let fb_l = shape(self.delay_filter_l * delay_feedback, 1.5, 0.0, 0.5, 1.0);
+                let fb_r = shape(self.delay_filter_r * delay_feedback, 1.5, 0.0, 0.5, 1.0);
                 if ping_pong {
                     self.delay_l.write(sat_l + fb_r);
                     self.delay_r.write(sat_r + fb_l);
@@ -300,8 +313,8 @@ impl Strip {
                     self.delay_l.write(sat_l + fb_l);
                     self.delay_r.write(sat_r + fb_r);
                 }
-                wet_l = delayed_l * dly_mix;
-                wet_r = delayed_r * dly_mix;
+                wet_l = delayed_l * delay_mix;
+                wet_r = delayed_r * delay_mix;
             } else {
                 self.delay_l.write(sat_l);
                 self.delay_r.write(sat_r);
@@ -352,7 +365,7 @@ mod tests {
     fn reverb_tail_outlasts_the_input() {
         let mut input = vec![0.0; 6000];
         input[0] = 1.0;
-        let settings = StripSettings { rev_mix: 0.5, ..StripSettings::default() };
+        let settings = StripSettings { reverb_mix: 0.5, ..StripSettings::default() };
         let (l, _) = run(&settings, &input);
         assert!(l[3000..].iter().any(|s| s.abs() > 1e-4));
     }
@@ -361,7 +374,8 @@ mod tests {
     fn delay_repeats_after_its_time() {
         let mut input = vec![0.0; 2000];
         input[0] = 1.0;
-        let settings = StripSettings { dly_time_l: 0.01, dly_time_r: 0.01, dly_mix: 1.0, ..StripSettings::default() };
+        let settings =
+            StripSettings { delay_time_l: 0.01, delay_time_r: 0.01, delay_mix: 1.0, ..StripSettings::default() };
         let (l, _) = run(&settings, &input);
         let echo = l[400..600].iter().enumerate().max_by(|a, b| a.1.abs().total_cmp(&b.1.abs())).unwrap().0 + 400;
         assert!((479..=482).contains(&echo), "echo at {echo}");

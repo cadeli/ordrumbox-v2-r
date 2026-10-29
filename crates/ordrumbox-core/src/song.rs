@@ -173,7 +173,7 @@ pub struct ActiveClip {
     /// Repetition of the pattern since the clip started.
     pub loop_index: u64,
     /// Tick within the pattern.
-    pub local_step: u64,
+    pub local_tick: u64,
     pub pattern_ticks: u64,
 }
 
@@ -205,7 +205,7 @@ impl Song {
                 pattern,
                 clip: index,
                 loop_index: (elapsed / pattern_ticks).floor() as u64,
-                local_step: (elapsed % pattern_ticks).floor() as u64,
+                local_tick: (elapsed % pattern_ticks).floor() as u64,
                 pattern_ticks: pattern_ticks as u64,
             });
         }

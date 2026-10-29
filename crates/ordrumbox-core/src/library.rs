@@ -12,7 +12,7 @@ use crate::song::{DroppedClip, Song, songs_from_json};
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Library {
     /// Free-form header (`name`, `description`, `date`…), kept as written.
-    pub infos: Object,
+    pub info: Object,
     pub songs: Vec<Song>,
     pub patterns: Vec<Pattern>,
 }
@@ -50,12 +50,12 @@ impl Library {
         let known_ids = patterns.iter().map(|p| p.id.clone()).collect();
         let (songs, dropped) = songs_from_json(value.get("songs").unwrap_or(&Value::Null), &known_ids);
         report.dropped_clips = dropped;
-        (Self { infos, songs, patterns }, report)
+        (Self { info: infos, songs, patterns }, report)
     }
 
     pub fn to_json(&self) -> Value {
         let mut object = Object::new();
-        object.insert("infos", Value::Object(self.infos.clone()));
+        object.insert("infos", Value::Object(self.info.clone()));
         object.insert("songs", Value::Array(self.songs.iter().map(Song::to_json).collect()));
         object.insert("patterns", Value::Array(self.patterns.iter().map(Pattern::to_json).collect()));
         Value::Object(object)
@@ -75,7 +75,7 @@ impl Library {
     /// the patterns, the arrangements, what is selected, and `stamp` (key
     /// and time in ms: `savedAt` or `exportedAt`).
     pub fn song_record(&self, name: &str, selected_pattern: usize, selected_song: usize, stamp: (&str, f64)) -> Value {
-        let info = |key: &str| self.infos.get(key).cloned().unwrap_or_else(|| Value::from(""));
+        let info = |key: &str| self.info.get(key).cloned().unwrap_or_else(|| Value::from(""));
         let mut object = Object::new();
         object.insert("name", Value::from(name));
         object.insert("description", info("description"));
@@ -90,15 +90,15 @@ impl Library {
 
     /// Read a song file (`parseImportedFile`, then `applyToAppState`):
     /// `None` without a `patterns` array. Its name, description and date
-    /// replace those of `infos`, the header kept otherwise.
-    pub fn from_song_record(value: &Value, infos: &Object) -> Option<SongRecord> {
+    /// replace those of `info`, the header kept otherwise.
+    pub fn from_song_record(value: &Value, info: &Object) -> Option<SongRecord> {
         value.get("patterns").and_then(Value::as_array)?;
         let (mut library, report) = Self::from_json(value);
         let text = |key: &str| value.get(key).filter(|v| !v.is_null()).map(crate::js::to_string);
         let name = text("name");
-        library.infos = infos.clone();
+        library.info = info.clone();
         for (key, v) in [("description", text("description")), ("date", text("date"))] {
-            library.infos.insert(key, Value::from(v.unwrap_or_default().as_str()));
+            library.info.insert(key, Value::from(v.unwrap_or_default().as_str()));
         }
         let index = |key: &str| {
             let v = value.get(key).map_or(0.0, crate::js::to_number);
@@ -165,13 +165,13 @@ mod tests {
             keys,
             ["name", "description", "date", "patterns", "selectedPatternIdx", "songs", "selectedSongIdx", "savedAt"]
         );
-        let read = Library::from_song_record(&record, &library.infos).unwrap();
+        let read = Library::from_song_record(&record, &library.info).unwrap();
         assert_eq!(read.name.as_deref(), Some("My song"));
         assert_eq!((read.selected_pattern, read.selected_song), (1, 0));
         assert_eq!(read.library.songs, library.songs);
         assert_eq!(read.library.patterns, library.patterns);
-        assert_eq!(read.library.infos.get("url").and_then(Value::as_str), Some("u"));
-        assert_eq!(read.library.infos.get("description").and_then(Value::as_str), Some(""));
+        assert_eq!(read.library.info.get("url").and_then(Value::as_str), Some("u"));
+        assert_eq!(read.library.info.get("description").and_then(Value::as_str), Some(""));
         assert!(Library::from_song_record(&json::parse(r#"{"songs":[]}"#).unwrap(), &Object::new()).is_none());
     }
 

@@ -124,7 +124,7 @@ impl RollView<'_> {
         if base >= loop_at {
             return false;
         }
-        step % loop_at == base || self.subs[n].iter().any(|s| s.pos < loop_at && step % loop_at == s.pos)
+        step % loop_at == base || self.subs[n].iter().any(|s| s.step < loop_at && step % loop_at == s.step)
     }
 }
 
@@ -327,10 +327,10 @@ pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &s
         let row = note_row(note, view.track);
         for sub in &view.subs[n] {
             let ghost_row = row + sub.pitch_offset.round() as i32;
-            if sub.pos < start || sub.pos >= end || !layout.shown_row(view, ghost_row) {
+            if sub.step < start || sub.step >= end || !layout.shown_row(view, ghost_row) {
                 continue;
             }
-            let (x, y) = (layout.step_x(view, sub.pos), layout.row_y(view.top_row, ghost_row));
+            let (x, y) = (layout.step_x(view, sub.step), layout.row_y(view.top_row, ghost_row));
             let color = if sub.kind == SubKind::Euclidean { GHOST_EUCLIDEAN } else { GHOST_RETRIGGER };
             stroke(canvas, Rect::new(x + s, y + s, layout.cell - 2 * s, layout.row - 2 * s), s, color);
         }

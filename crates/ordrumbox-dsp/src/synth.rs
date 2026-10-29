@@ -140,7 +140,7 @@ pub struct SynthPatch {
     pub pitch_punch: f64,
     pub sub_gain: f64,
     pub envelope: Adsr,
-    pub master: f64,
+    pub volume: f64,
     pub pan: f64,
     /// Peak level of the note (the `velocity` parameter).
     pub velocity: f64,
@@ -149,7 +149,7 @@ pub struct SynthPatch {
     pub filter_env_amount: f64,
     pub fm_amount: f64,
     /// 0–4.
-    pub fm_algo: f64,
+    pub fm_algorithm: f64,
     pub mod_envelope: Adsr,
     /// 0 off, 1 filter, 2 pitch, 3 FM, 4 shape.
     pub mod_env_target: f64,
@@ -177,14 +177,14 @@ impl Default for SynthPatch {
             pitch_punch: 0.0,
             sub_gain: 0.0,
             envelope: Adsr { attack: 0.01, decay: 0.1, sustain: 0.7, release: 0.1 },
-            master: 0.8,
+            volume: 0.8,
             pan: 0.0,
             velocity: 0.8,
             lfo1: lfo,
             lfo2: lfo,
             filter_env_amount: 0.0,
             fm_amount: 0.0,
-            fm_algo: 0.0,
+            fm_algorithm: 0.0,
             mod_envelope: Adsr { attack: 0.01, decay: 0.1, sustain: 0.0, release: 0.1 },
             mod_env_target: 0.0,
             mod_env_depth: 0.0,
@@ -210,7 +210,7 @@ struct LfoMods {
     noise_freq: f64,
     noise_q: f64,
     fm_amount: f64,
-    fm_algo: f64,
+    fm_algorithm: f64,
     env: [f64; 4],
     mod_env: [f64; 4],
 }
@@ -238,7 +238,7 @@ impl LfoMods {
             22 => m.noise_freq = raw * 10_000.0,
             23 => m.noise_q = raw * 24.0,
             24 => m.fm_amount = raw,
-            25 => m.fm_algo = raw,
+            25 => m.fm_algorithm = raw,
             26 | 29 => m.env[(target - 26) as usize] = raw * 0.25,
             27 | 28 => m.env[(target - 26) as usize] = raw * 0.5,
             30 | 33 => m.mod_env[(target - 30) as usize] = raw * 0.25,
@@ -505,7 +505,7 @@ impl SynthVoice {
         let lfo2_wave = js_round(p.lfo2.wave);
         let lfo2_freq = p.lfo2.freq;
         let lfo2_depth = p.lfo2.depth;
-        let fm_algo = js_round(p.fm_algo);
+        let fm_algorithm = js_round(p.fm_algorithm);
         let m_target = js_round(p.mod_env_target) as i64;
         let m_depth = p.mod_env_depth;
         let bypass = p.bypass;
@@ -567,7 +567,7 @@ impl SynthVoice {
             let pitch_punch = clamp(p.pitch_punch + l1.pitch_punch + l2.pitch_punch, 0.0, 1.0);
             let drive = clamp(p.drive + l1.drive + l2.drive, 0.0, 1.0);
             let fm_amount = clamp(p.fm_amount + l1.fm_amount + l2.fm_amount, 0.0, 1.0);
-            let fm_algo = clamp(js_round(fm_algo + l1.fm_algo + l2.fm_algo), 0.0, 4.0) as i64;
+            let fm_algorithm = clamp(js_round(fm_algorithm + l1.fm_algorithm + l2.fm_algorithm), 0.0, 4.0) as i64;
             let env = Adsr {
                 attack: (a + l1.env[0] + l2.env[0]).max(0.0),
                 decay: (d + l1.env[1] + l2.env[1]).max(0.0),
@@ -624,7 +624,7 @@ impl SynthVoice {
             let (d1m, d2m, d3m) = (detune(d1, 0), detune(d2, 1), detune(d3, 2));
             let gain = |base: f64, i: usize| clamp(base + l1.gain[i] + l2.gain[i], 0.0, 1.0);
             let (mut g1c, mut g2c, mut g3c) = (gain(g1, 0), gain(g2, 1), gain(g3, 2));
-            let master = (p.master + l1.master + l2.master).max(0.0);
+            let master = (p.volume + l1.master + l2.master).max(0.0);
 
             let ratio = |cents: f64| if cents == 0.0 { 1.0 } else { (cents * LN2_OVER_1200).exp() };
             let mut f1d = f1 * ratio(d1m);
@@ -647,7 +647,7 @@ impl SynthVoice {
                 let o2 = raw(w2, 1, f2d);
                 let o3 = raw(w3, 2, f3d);
                 let depth = fm_amount * 1000.0;
-                match fm_algo {
+                match fm_algorithm {
                     0 => f1fm = f1d + o2 * depth,
                     1 => f1fm = f1d + o3 * depth,
                     2 => {
@@ -680,7 +680,7 @@ impl SynthVoice {
                             let o2 = raw(w2, 1, f2d);
                             let o3 = raw(w3, 2, f3d);
                             let depth = amount * 1000.0;
-                            match fm_algo {
+                            match fm_algorithm {
                                 0 => f1fm += o2 * depth,
                                 1 => f1fm += o3 * depth,
                                 2 => {
@@ -837,7 +837,7 @@ mod tests {
     #[test]
     fn note_starts_on_time_and_ends_after_its_release() {
         let mut voice = SynthVoice::default();
-        let patch = SynthPatch { master: 1.0, ..SynthPatch::default() };
+        let patch = SynthPatch { volume: 1.0, ..SynthPatch::default() };
         voice.start(&patch, 3, 100.0 / 48_000.0, 1);
         voice.release_at(0.05);
         assert!(voice.is_active() && voice.track() == 3);

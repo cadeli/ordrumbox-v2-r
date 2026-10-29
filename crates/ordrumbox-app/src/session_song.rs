@@ -85,12 +85,12 @@ impl Session {
 
     /// The library header's name (`songInfos.name`), else "Untitled".
     fn song_name(&self) -> String {
-        let name = self.editor.library().infos.get("name").and_then(Value::as_str).unwrap_or_default();
+        let name = self.editor.library().info.get("name").and_then(Value::as_str).unwrap_or_default();
         if name.is_empty() { UNTITLED.to_owned() } else { name.to_owned() }
     }
 
     fn info(&self, key: &str) -> String {
-        self.editor.library().infos.get(key).map(js::to_string).unwrap_or_default()
+        self.editor.library().info.get(key).map(js::to_string).unwrap_or_default()
     }
 
     pub(super) fn song_rows(&self) -> Vec<Row> {
@@ -606,12 +606,12 @@ impl Session {
     fn read_song_file(&mut self, path: &Path) -> Result<String, String> {
         let text = std::fs::read_to_string(path).map_err(|e| format!("Load failed: {}: {e}", path.display()))?;
         let value = json::parse(&text).map_err(|e| format!("Load failed: {e}"))?;
-        let infos = &self.editor.library().infos;
+        let infos = &self.editor.library().info;
         let record = ordrumbox_core::Library::from_song_record(&value, infos).ok_or("Invalid song file")?;
         let fallback = path.file_stem().unwrap_or_default().to_string_lossy().into_owned();
         let name = record.name.clone().unwrap_or(fallback);
         let mut library = record.library;
-        library.infos.insert("name", Value::from(name.as_str()));
+        library.info.insert("name", Value::from(name.as_str()));
         self.editor.load_library(library, record.selected_song);
         self.pattern_index = record.selected_pattern;
         self.song_scroll = (0, 0);

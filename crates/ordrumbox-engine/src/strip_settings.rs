@@ -60,36 +60,36 @@ pub fn strip_settings(track: &Track, bpm: f64) -> StripSettings {
 
     // Saturation.
     let amount = if track.saturation_on { finite_or(track.saturation_amount, 0.0).clamp(0.0, 1.0) } else { 0.0 };
-    s.sat_type = match track.saturation_type.as_str() {
+    s.saturation_type = match track.saturation_type.as_str() {
         "hard" => 1.0,
         "tape" => 2.0,
         _ => 0.0,
     };
-    s.sat_drive = (1.0 + amount * 6.0) as f32;
-    s.sat_out = (1.0 - amount * 0.15) as f32;
-    s.sat_mix = if amount > 0.0 { 1.0 } else { 0.0 };
+    s.saturation_drive = (1.0 + amount * 6.0) as f32;
+    s.saturation_output = (1.0 - amount * 0.15) as f32;
+    s.saturation_mix = if amount > 0.0 { 1.0 } else { 0.0 };
 
     // Reverb.
     let amount = if track.reverb_on { finite_or(track.reverb_amount, 0.0).clamp(0.0, 1.0) } else { 0.0 };
     let reverb = reverb_preset(&track.reverb_type).map_or("none", |_| track.reverb_type.as_str());
     let (room, damp, width) = reverb_preset(reverb).unwrap_or((0.0, 0.5, 0.0));
-    s.rev_room = room;
-    s.rev_damp = damp;
-    s.rev_width = width;
-    s.rev_mix = if reverb == "none" { 0.0 } else { amount as f32 };
+    s.reverb_room = room;
+    s.reverb_damping = damp;
+    s.reverb_width = width;
+    s.reverb_mix = if reverb == "none" { 0.0 } else { amount as f32 };
 
     // Delay: 'none' or no amount only silences the send.
     let amount = if track.delay_on { finite_or(track.delay_mix, 0.0).clamp(0.0, 1.0) } else { 0.0 };
     if track.delay_type == "none" || amount <= 0.0 {
-        s.dly_mix = 0.0;
+        s.delay_mix = 0.0;
     } else {
         let mode = delay_mode(&track.delay_type).unwrap_or(1.0);
         let beats = if track.delay_beats.is_finite() { track.delay_beats } else { 1.0 };
         let seconds = 60.0 / bpm * beats;
-        s.dly_time_l = (if mode >= 1.5 { seconds * 0.667 } else { seconds }) as f32;
-        s.dly_time_r = seconds as f32;
-        s.dly_mode = mode;
-        s.dly_mix = amount as f32;
+        s.delay_time_l = (if mode >= 1.5 { seconds * 0.667 } else { seconds }) as f32;
+        s.delay_time_r = seconds as f32;
+        s.delay_mode = mode;
+        s.delay_mix = amount as f32;
     }
 
     if track.volume_lfo.is_none() {
@@ -166,7 +166,7 @@ mod tests {
     fn defaults_are_a_clean_strip() {
         let s = strip_settings(&Track::default(), 120.0);
         assert_eq!(s.cutoff, 20_000.0);
-        assert_eq!((s.sat_mix, s.rev_mix, s.dly_mix), (0.0, 0.0, 0.0));
+        assert_eq!((s.saturation_mix, s.reverb_mix, s.delay_mix), (0.0, 0.0, 0.0));
         assert_eq!((s.volume, s.pan), (1.0, 0.0));
     }
 
@@ -174,7 +174,10 @@ mod tests {
     fn delay_follows_the_tempo() {
         let track = Track { delay_type: "pingpong".into(), delay_beats: 0.5, delay_mix: 0.4, ..Track::default() };
         let s = strip_settings(&track, 120.0);
-        assert_eq!((s.dly_time_l, s.dly_time_r, s.dly_mode, s.dly_mix), ((0.25_f64 * 0.667) as f32, 0.25, 2.0, 0.4));
+        assert_eq!(
+            (s.delay_time_l, s.delay_time_r, s.delay_mode, s.delay_mix),
+            ((0.25_f64 * 0.667) as f32, 0.25, 2.0, 0.4)
+        );
     }
 
     #[test]

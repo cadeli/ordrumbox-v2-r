@@ -35,7 +35,7 @@ fn check(track: &Track, expected: &Value, at: &str) {
                 SubKind::Retrigger => "retrigger",
                 SubKind::Euclidean => "euclidean",
             };
-            assert_eq!(g.pos as f64, e.get("pos").and_then(Value::as_f64).unwrap(), "{at} note {n}: pos");
+            assert_eq!(g.step as f64, e.get("pos").and_then(Value::as_f64).unwrap(), "{at} note {n}: pos");
             assert_eq!(kind, e.get("type").and_then(Value::as_str).unwrap(), "{at} note {n}: type");
             if let Some(offset) = e.get("pitchOffset").and_then(Value::as_f64) {
                 assert_eq!(g.pitch_offset, offset, "{at} note {n}: pitch offset");
