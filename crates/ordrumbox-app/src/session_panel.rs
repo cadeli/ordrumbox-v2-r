@@ -972,10 +972,11 @@ impl Session {
                 self.update_track(t, &[(key, num(value))], &format!("{label} on {name}"), true);
             }
             Id::Fx(key) => {
-                let label = FX_KNOBS.iter().find(|p| p.key == key).map_or(key, |p| p.label);
-                self.update_track(t, &[(key, num(value))], &format!("{label} on {name}"), true);
+                self.update_track(t, &[(key, num(value))], &format!("{} on {name}", history_label(id)), true)
             }
-            Id::Generation(key) => self.update_track(t, &[(key, num(value))], &format!("{key} on {name}"), true),
+            Id::Generation(key) => {
+                self.update_track(t, &[(key, num(value))], &format!("{} on {name}", history_label(id)), true)
+            }
             Id::Loop(key) => self.loop_slider(t, key, value),
             Id::Decay => {
                 // The sample's decay (the sound registry's in the JS): not undoable.
@@ -990,9 +991,9 @@ impl Session {
     }
 
     /// `onLoopSlider`.
-    fn loop_slider(&mut self, t: usize, key: &str, value: f64) {
+    fn loop_slider(&mut self, t: usize, key: &'static str, value: f64) {
         let Some(track) = self.track(t) else { return };
-        let name = track.name.clone();
+        let desc = format!("{} on {}", history_label(Id::Loop(key)), track.name);
         let max_steps = f64::from(track.beat_count * track.steps_per_beat);
         match key {
             "stepsPerBeat" => {
@@ -1000,10 +1001,8 @@ impl Session {
                     self.edited();
                 }
             }
-            "loopLength" => {
-                self.update_track(t, &[(key, num(value.min(max_steps)))], &format!("{key} on {name}"), true)
-            }
-            _ => self.update_track(t, &[(key, num(value))], &format!("{key} on {name}"), true),
+            "loopLength" => self.update_track(t, &[(key, num(value.min(max_steps)))], &desc, true),
+            _ => self.update_track(t, &[(key, num(value))], &desc, true),
         }
     }
 
@@ -1035,9 +1034,9 @@ impl Session {
         let Some(note) = self.shown_note(t) else { return };
         let (updates, what) = if key == "arpRange" {
             let range = value.max(0.0) as usize;
-            (vec![("arp", editors::arp_value(&note, &self.scale_list, None, None, Some(range)))], "arp")
+            (vec![("arp", editors::arp_value(&note, &self.scale_list, None, None, Some(range)))], "arp".to_owned())
         } else {
-            (vec![(key, num(value))], key)
+            (vec![(key, num(value))], history_label(Id::NoteSlider(key)))
         };
         let desc = format!("Edit note {what} on {}", self.track_name(t));
         self.update_note(t, &updates, &desc, true);
@@ -1162,7 +1161,7 @@ impl Session {
                 } else {
                     Value::String(value.to_owned())
                 };
-                self.update_track(t, &[(key, v)], &format!("{key} on {name}"), false);
+                self.update_track(t, &[(key, v)], &format!("{} on {name}", history_label(id)), false);
             }
             Id::LfoType => {
                 let (mut object, lfo_key, _) = self.lfo_object(t, value);
@@ -1202,7 +1201,7 @@ impl Session {
                     ("arpDirection", editors::arp_value(&note, &self.scale_list, None, Some(value), None))
                 };
                 let updates = [(field, Value::String(value.to_owned())), ("arp", arp)];
-                self.update_note(t, &updates, &format!("Edit note {key} on {name}"), false);
+                self.update_note(t, &updates, &format!("Edit note {} on {name}", history_label(id)), false);
             }
             _ => {}
         }
@@ -1257,7 +1256,7 @@ impl Session {
                     let on = editors::number(&track, fx.key) > 0.0;
                     vec![(fx.key, num(if on { 0.0 } else { 0.5 }))]
                 };
-                self.update_track(t, &updates, &format!("Toggle {} on {name}", fx.key), false);
+                self.update_track(t, &updates, &format!("Toggle {} on {name}", fx.label), false);
             }
             Id::FilterIcon(i) => {
                 let value = FILTER_TYPES[usize::from(i.min(2))];
@@ -1276,11 +1275,11 @@ impl Session {
                 let target = &LFO_TARGETS[usize::from(i.min(4))];
                 let on = track.field(target.lfo_key).is_some_and(|v| !v.is_null());
                 let value = if on { Value::Null } else { Value::Object(self.lfo_object(t, "sine").0) };
-                self.update_track(t, &[(target.lfo_key, value)], &format!("LFO {} on {name}", target.key), false);
+                self.update_track(t, &[(target.lfo_key, value)], &format!("LFO {} on {name}", target.label), false);
             }
             Id::Toggle(key) => {
                 let on = track.field(key).and_then(|v| v.as_bool()).unwrap_or(false);
-                self.update_track(t, &[(key, Value::Bool(!on))], &format!("{key} on {name}"), false);
+                self.update_track(t, &[(key, Value::Bool(!on))], &format!("{} on {name}", history_label(id)), false);
             }
             Id::AutoAssign => {
                 // `toggleAuto`: back on, the synth goes and the sample is picked by name.
@@ -1359,9 +1358,43 @@ fn control_name(id: Id) -> (&'static str, &'static str) {
         Id::KitKnob(field) => {
             KIT_KNOBS.iter().find(|(f, ..)| *f == field).map_or(("", ""), |(_, p, u, _)| (p.label, *u))
         }
+        Id::TrackSelect("autoVariant") => ("Variant", ""),
+        Id::TrackSelect(key) => (editors::fx_label(key), ""),
+        Id::Toggle("mono") => ("Mono", ""),
+        Id::Toggle("auto") => ("Auto", ""),
+        Id::Toggle(key) => {
+            let mut rows = GENERATION_GROOVE.iter().chain(GENERATION_ENGINE.iter());
+            let label = rows.find_map(|r| match r {
+                GenerationRow::Toggle(k, label) if *k == key => Some(*label),
+                _ => None,
+            });
+            (label.unwrap_or(""), "")
+        }
+        Id::NoteSelect(key) => {
+            let label = NOTE_GROUPS.iter().flat_map(|g| g.iter()).find_map(|r| match r {
+                NoteRow::Select(k, label) if *k == key => Some(*label),
+                _ => None,
+            });
+            (label.unwrap_or(""), "")
+        }
         Id::TrackVolume(_) => ("Volume", ""),
         Id::MasterVolume => ("Master Gain", ""),
         _ => ("", ""),
+    }
+}
+
+/// What an edit of control `id` is called in the undo history: its label,
+/// after its effect's for an effect setting (`Dly Mix`), else its key.
+fn history_label(id: Id) -> String {
+    let key = match id {
+        Id::Fx(key) | Id::TrackSelect(key) | Id::Generation(key) | Id::Loop(key) | Id::Toggle(key) => key,
+        Id::NoteSlider(key) | Id::NoteKnob(key) | Id::NoteSelect(key) => key,
+        _ => "",
+    };
+    let label = Some(control_name(id).0).filter(|l| !l.is_empty()).unwrap_or(key);
+    match FX_DEFS.iter().find(|fx| fx.controls.contains(&key)) {
+        Some(fx) => format!("{} {label}", fx.label),
+        None => label.to_owned(),
     }
 }
 
@@ -1369,6 +1402,20 @@ fn control_name(id: Id) -> (&'static str, &'static str) {
 mod tests {
     use super::*;
     use crate::kits::KitSet;
+
+    #[test]
+    fn history_names_an_edit_by_its_label() {
+        assert_eq!(history_label(Id::Fx("delayMix")), "Dly Mix");
+        assert_eq!(history_label(Id::TrackSelect("delayBeats")), "Dly Beats");
+        assert_eq!(history_label(Id::TrackSelect("autoVariant")), "Variant");
+        assert_eq!(history_label(Id::Generation("probPitch")), "Pitch");
+        assert_eq!(history_label(Id::Generation("hitVariation")), "Var Hits");
+        assert_eq!(history_label(Id::Loop("loopLength")), "Loop Len");
+        assert_eq!(history_label(Id::Toggle("pitchScaleLock")), "Scale Lock");
+        assert_eq!(history_label(Id::NoteSlider("euclideanPulses")), "Pulses");
+        assert_eq!(history_label(Id::NoteSelect("arpDirection")), "Dir");
+        assert_eq!(history_label(Id::NoteKnob("velocity")), "Vel");
+    }
 
     const SIZE: (i32, i32, i32) = (1100, 680, 1);
 
