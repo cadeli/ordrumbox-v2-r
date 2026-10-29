@@ -128,7 +128,9 @@ selected note (else the step under the cursor, else the track's first note)
 — velocity, pitch, pan, and the Trig, Retr, Eucl and Arp tabs. While
 playing, a setting with an LFO shows the LFO's value. The grid has a volume
 slider per track and a master volume (the output panel's volume, saved
-with it).
+with it). Right-click a track's name: rename, copy, paste, duplicate,
+delete, randomize or clear it; right-click a step: copy, paste or delete its
+notes, or add a note at a random pitch.
 
 Knobs and sliders work as in the JS (`OrKnob`, `OrSlider`, checked against
 them): drag a knob up or down (200 px for the whole range), click or drag a
