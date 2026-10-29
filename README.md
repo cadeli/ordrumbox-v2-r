@@ -34,19 +34,39 @@ named by `$ORDRUMBOX_LIBRARY` — and loaded from there next time. Delete that
 file to start again from the demo.
 
 Key names: the files this app writes (`library.json`, `kits.json`, pattern
-exports) name some settings differently from the JS app, all in camelCase
-and after what they hold — on a track `volume` (JS `velocity`), `volumeLfo`,
-`hitVariation`/`noteVariation` (`variation`/`variation2`), `loopLength`
-(`loopAtStep`), `delayBeats`/`delayMix` (`delayTime`/`delayDepth`),
-`saturationOn` (`sat`), `synthPreset` (`synthSoundKey`), `probPitch`… and
-`autoVariant`, `autoDensity`, `autoHitVariation`, `pitchRange`,
-`pitchScaleLock` (`prob_pitch`… `auto_variation`, `pitch_range`…); on a note
-`probability`, `retriggerRate`, `euclideanPulses`, `everyOffset`,
-`arpScale`, `arpDirection` (`prob`, `rate`, `euclideanFill`, `pos`,
-`_arpScale`, `_arpType`); `info` for the library header (`infos`) and
-`displayName` for a kit sample (`display_name`). Both names are read, so the
-JS assets and older saves load as before; the JS app does not know the new
-names and drops those settings from a file written here.
+exports) name their settings after what they hold, in camelCase, and differ
+from the JS app's (old name in brackets):
+
+- track: `volume`/`volumeLfo` (`velocity`/`velocityLfo`), `transpose`/
+  `transposeLfo` (`pitch`/`pitchLfo`), `samplePath` (`sampleId`),
+  `autoAssign` (`useAutoAssignSound`), `useSynth` (`useSoftSynth`),
+  `synthPreset` (`synthSoundKey`), `loopLength` (`loopAtStep`),
+  `filterCutoff`/`filterCutoffLfo` (`filterFreq`…), `reverbMix`,
+  `delayMix`, `saturationMix` (`reverbAmount`, `delayDepth`,
+  `saturationAmount`), `delayBeats` (`delayTime`), `saturationOn` (`sat`),
+  `hitVariation`/`noteVariation` (`variation`/`variation2`); auto mode:
+  `autoMode` (`auto`), its chances (0–100) `autoPitchChance`,
+  `autoVelocityChance`, `autoSilenceChance`, `autoFillChance`,
+  `autoGhostChance`, `autoRetriggerChance`, `autoEuclideanChance`,
+  `autoArpChance`, `autoNoteProbabilityChance`/`autoNoteProbabilityRange`
+  (`prob_pitch`… `prob_note_depth`), `autoVariant`, `autoDensity`,
+  `autoHitVariation`, `autoNoteVariation`, `pitchRange`, `pitchScaleLock`
+  (`auto_variant`…); `fxSelected` (an editor tab) is dropped;
+- note: `step` (`beatStep`), `cycle`/`cycleOffset` (`every`/`pos`),
+  `probability` (`prob`), `retriggerRate` (`rate`), `retriggerProbability`
+  (`arpTriggerProbability`), `euclideanPulses` (`euclideanFill`),
+  `arpScale`, `arpDirection` (`_arpScale`, `_arpType`), and an arpeggio's
+  `direction` (`mode`);
+- pattern: `autoGenre`, `autoKeyOffset`, `autoScale` (`_autoGen…`), no
+  more `application`/`url` header; song: `loopMeasures`
+  (`loopMeasureCount`), a clip's `patternId` (`pattern`); library: `info`
+  (`infos`), `selectedPattern`/`selectedSong` (`…Idx`);
+- kit: `samples` (`instruments`), and for a sample `path`, `displayName`,
+  `transpose` (`url`, `display_name`, `tune`).
+
+The old names are still read, so the JS assets and older saves load as
+before; the JS app does not know the new ones and drops those settings from
+a file written here.
 
 Sounds: a track with auto-assign gets a sample of the selected kit by name,
 then of another kit, then a catalog substitute, then any sample (each a
@@ -83,12 +103,12 @@ output panel as a strip along the bottom, always shown.
 
 Kit editor (**Ctrl K**, the JS drumkit manager): the current kit's samples
 (**↑↓**), and for the selected one its kit and instrument (lists), its gain
-(dB), tune (semitones) and decay (knobs), its note, length, peak and RMS
+(dB), transpose (semitones) and decay (knobs), its note, length, peak and RMS
 levels and envelope with the decay end; **Enter** plays it, **Delete**
 removes it, **N** normalizes the kit to 0 dB, **E** exports the kit mapping
 (`.json`), **R** assigns the tracks' sounds again. Dropped on the window, a
 `.wav` joins the kit (**Shift**: replaces the selected sample), a folder of
-WAV files becomes a kit, a kit mapping is loaded. Gain and tune now play (the
+WAV files becomes a kit, a kit mapping is loaded. Gain and transpose now play (the
 JS sample voice uses them). Unlike the JS app, where these edits are lost on
 reload, the kits are saved to `kits.json` and the audio of added, replaced or
 normalized samples to `samples/` (32-bit float WAV), both in the user data

@@ -476,7 +476,7 @@ impl Session {
             kits,
             instruments,
             gain: instrument.gain_db,
-            tune: instrument.transpose,
+            transpose: instrument.transpose,
             decay: instrument.decay.unwrap_or(0.0),
         })
     }
