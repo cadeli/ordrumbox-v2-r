@@ -315,7 +315,7 @@ pub fn build_song_pass(
             let flat = cache.entry((p, source.loop_index)).or_insert_with(|| {
                 recompute_flat_notes(pattern, u32::try_from(source.loop_index).unwrap_or(u32::MAX), rng, context.scales)
             });
-            let Some(notes) = u32::try_from(source.local_step).ok().and_then(|s| flat.get(&s)) else { continue };
+            let Some(notes) = u32::try_from(source.local_tick).ok().and_then(|s| flat.get(&s)) else { continue };
             let sounds = context.sounds.get(p).map_or(&[][..], Vec::as_slice);
             let pass_context = PassContext {
                 bank: context.bank,

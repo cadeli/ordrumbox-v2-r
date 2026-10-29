@@ -83,8 +83,11 @@ impl NoteOp {
 /// The varied copies of a track's notes, by note index; notes not varied are
 /// absent, and the track itself is never modified (`computeNoteVariation`).
 pub(crate) fn vary_notes(track: &Track, rng: &mut Rng) -> HashMap<usize, Note> {
-    let amount =
-        if track.auto { track.auto_note_variation.unwrap_or(AUTO_NOTE_VARIATION_FALLBACK) } else { track.note_variation };
+    let amount = if track.auto {
+        track.auto_note_variation.unwrap_or(AUTO_NOTE_VARIATION_FALLBACK)
+    } else {
+        track.note_variation
+    };
     let budget = budget_for(amount);
     let mut varied = HashMap::new();
     if budget <= 0 || track.notes.is_empty() {

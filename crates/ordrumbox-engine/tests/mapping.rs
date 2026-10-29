@@ -23,19 +23,19 @@ fn strip_fields(s: &StripSettings) -> [(&'static str, f32); 18] {
         ("cutoff", s.cutoff),
         ("q", s.q),
         ("filterMode", s.filter_mode),
-        ("satType", s.sat_type),
-        ("satDrive", s.sat_drive),
-        ("satOut", s.sat_out),
-        ("satMix", s.sat_mix),
-        ("revRoom", s.rev_room),
-        ("revDamp", s.rev_damp),
-        ("revWidth", s.rev_width),
-        ("revMix", s.rev_mix),
-        ("dlyTimeL", s.dly_time_l),
-        ("dlyTimeR", s.dly_time_r),
-        ("dlyFb", s.dly_fb),
-        ("dlyMix", s.dly_mix),
-        ("dlyMode", s.dly_mode),
+        ("satType", s.saturation_type),
+        ("satDrive", s.saturation_drive),
+        ("satOut", s.saturation_output),
+        ("satMix", s.saturation_mix),
+        ("revRoom", s.reverb_room),
+        ("revDamp", s.reverb_damping),
+        ("revWidth", s.reverb_width),
+        ("revMix", s.reverb_mix),
+        ("dlyTimeL", s.delay_time_l),
+        ("dlyTimeR", s.delay_time_r),
+        ("dlyFb", s.delay_feedback),
+        ("dlyMix", s.delay_mix),
+        ("dlyMode", s.delay_mode),
         ("volume", s.volume),
         ("pan", s.pan),
     ]
@@ -101,7 +101,7 @@ fn patch_fields(p: &SynthPatch) -> Vec<(String, f64)> {
     add("decay", p.envelope.decay);
     add("sustain", p.envelope.sustain);
     add("release", p.envelope.release);
-    add("master", p.master);
+    add("master", p.volume);
     add("pan", p.pan);
     add("velocity", p.velocity);
     for (i, l) in [(1, p.lfo1), (2, p.lfo2)] {
@@ -112,7 +112,7 @@ fn patch_fields(p: &SynthPatch) -> Vec<(String, f64)> {
     }
     add("filterEnvAmt", p.filter_env_amount);
     add("fmAmount", p.fm_amount);
-    add("fmAlgo", p.fm_algo);
+    add("fmAlgo", p.fm_algorithm);
     add("modEnvAttack", p.mod_envelope.attack);
     add("modEnvDecay", p.mod_envelope.decay);
     add("modEnvSustain", p.mod_envelope.sustain);

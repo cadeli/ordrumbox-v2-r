@@ -162,6 +162,6 @@ fn slugify_matches_js() {
 #[test]
 fn infos_are_kept_as_written() {
     let (library, _) = load("song.json");
-    let infos: &Object = &library.infos;
+    let infos: &Object = &library.info;
     assert_eq!(infos.get("name").and_then(Value::as_str), Some("orDrumbox Demo lib"));
 }

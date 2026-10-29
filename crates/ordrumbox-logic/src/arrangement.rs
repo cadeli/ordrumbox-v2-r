@@ -36,10 +36,10 @@ impl Editor {
     /// Set a field of the library header (`songInfos`: `name`,
     /// `description`), as the song panel does: not an undo step.
     pub fn set_library_info(&mut self, key: &str, value: &str) -> bool {
-        if self.library.infos.get(key).and_then(Value::as_str) == Some(value) {
+        if self.library.info.get(key).and_then(Value::as_str) == Some(value) {
             return false;
         }
-        self.library.infos.insert(key, Value::from(value));
+        self.library.info.insert(key, Value::from(value));
         self.revision += 1;
         true
     }

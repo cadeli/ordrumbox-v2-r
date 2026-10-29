@@ -22,7 +22,7 @@ pub enum SubKind {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SubPosition {
     /// Absolute step in the track.
-    pub pos: i64,
+    pub step: i64,
     pub kind: SubKind,
     /// The arpeggio's offset from the note, semitones (0 without one).
     pub pitch_offset: f64,
@@ -52,18 +52,22 @@ pub fn sub_positions(
     let spacing = step_spacing(note.retrigger_rate);
     let mut positions: Vec<SubPosition> = (1..count)
         .map(|i| SubPosition {
-            pos: round(base as f64 + i as f64 * spacing) as i64,
+            step: round(base as f64 + i as f64 * spacing) as i64,
             kind: SubKind::Retrigger,
             pitch_offset: offset(i),
         })
-        .filter(|p| p.pos < total_steps)
+        .filter(|p| p.step < total_steps)
         .collect();
     if note.euclidean_pulses > 0 {
         let fills =
             euclidean::fill_positions(base, span.end(note) - base, note.euclidean_pulses, note.euclidean_rotation);
         for (k, pos) in fills.into_iter().enumerate() {
             if pos < total_steps {
-                positions.push(SubPosition { pos, kind: SubKind::Euclidean, pitch_offset: offset(count + k as i64) });
+                positions.push(SubPosition {
+                    step: pos,
+                    kind: SubKind::Euclidean,
+                    pitch_offset: offset(count + k as i64),
+                });
             }
         }
     }
