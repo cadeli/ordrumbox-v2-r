@@ -117,7 +117,7 @@ fn fx_label(key: &str) -> &'static str {
     }
 }
 
-/// The knob bar (velocity, pan, pitch, decay) and its units.
+/// The knob bar (volume, pan, pitch, decay) and its units.
 pub const KNOB_BAR: [(Prop, &str); 4] = [
     (prop("volume", "Vel", 0.0, 1.0, 0.01, Format::Percent), "%"),
     (prop("pan", "Pan", -1.0, 1.0, 0.01, Format::Fmt), ""),
@@ -129,7 +129,7 @@ pub const KNOB_BAR: [(Prop, &str); 4] = [
 pub const DEFAULT_DECAY: f64 = 500.0;
 
 /// Generation tab, shown while auto is off (`manualOnly`).
-pub const GEN_MANUAL: [Prop; 3] = [
+pub const GENERATION_MANUAL: [Prop; 3] = [
     prop("hitVariation", "Var Pos", 0.0, 100.0, 1.0, Format::Plain),
     prop("noteVariation", "Var Prop", 0.0, 100.0, 1.0, Format::Plain),
     prop("probability", "Prob", 0.0, 1.0, 0.01, Format::Plain),
@@ -137,30 +137,30 @@ pub const GEN_MANUAL: [Prop; 3] = [
 
 /// A row of the Groove / Engine sub-tabs.
 #[derive(Debug, Clone, Copy)]
-pub enum GenRow {
+pub enum GenerationRow {
     Slider(Prop),
     Toggle(&'static str, &'static str),
     Select(&'static str, &'static str),
 }
 
-pub const GEN_GROOVE: [GenRow; 7] = [
-    GenRow::Slider(prop("probPitch", "Pitch", 0.0, 100.0, 1.0, Format::Plain)),
-    GenRow::Slider(prop("probVelocity", "Velocity", 0.0, 100.0, 1.0, Format::Plain)),
-    GenRow::Slider(prop("probSilence", "Silence", 0.0, 100.0, 1.0, Format::Plain)),
-    GenRow::Slider(prop("probFill", "Fill", 0.0, 100.0, 1.0, Format::Plain)),
-    GenRow::Slider(prop("probGhost", "Ghost", 0.0, 100.0, 1.0, Format::Plain)),
-    GenRow::Slider(prop("pitchRange", "Pitch Rng", 1.0, 24.0, 1.0, Format::Plain)),
-    GenRow::Toggle("pitchScaleLock", "Scale Lock"),
+pub const GENERATION_GROOVE: [GenerationRow; 7] = [
+    GenerationRow::Slider(prop("probPitch", "Pitch", 0.0, 100.0, 1.0, Format::Plain)),
+    GenerationRow::Slider(prop("probVelocity", "Velocity", 0.0, 100.0, 1.0, Format::Plain)),
+    GenerationRow::Slider(prop("probSilence", "Silence", 0.0, 100.0, 1.0, Format::Plain)),
+    GenerationRow::Slider(prop("probFill", "Fill", 0.0, 100.0, 1.0, Format::Plain)),
+    GenerationRow::Slider(prop("probGhost", "Ghost", 0.0, 100.0, 1.0, Format::Plain)),
+    GenerationRow::Slider(prop("pitchRange", "Pitch Rng", 1.0, 24.0, 1.0, Format::Plain)),
+    GenerationRow::Toggle("pitchScaleLock", "Scale Lock"),
 ];
 
-pub const GEN_ENGINE: [GenRow; 7] = [
-    GenRow::Slider(prop("probRetrigger", "Retrig", 0.0, 100.0, 1.0, Format::Plain)),
-    GenRow::Slider(prop("probEuclidean", "Euclid", 0.0, 100.0, 1.0, Format::Plain)),
-    GenRow::Slider(prop("probNote", "Note Prob", 0.0, 100.0, 1.0, Format::Plain)),
-    GenRow::Slider(prop("probNoteDepth", "Depth", 0.0, 100.0, 1.0, Format::Plain)),
-    GenRow::Slider(prop("probArp", "Arp", 0.0, 100.0, 1.0, Format::Plain)),
-    GenRow::Select("autoVariant", "Variant"),
-    GenRow::Slider(prop("autoDensity", "Density", -1.0, 1.0, 0.01, Format::Density)),
+pub const GENERATION_ENGINE: [GenerationRow; 7] = [
+    GenerationRow::Slider(prop("probRetrigger", "Retrig", 0.0, 100.0, 1.0, Format::Plain)),
+    GenerationRow::Slider(prop("probEuclidean", "Euclid", 0.0, 100.0, 1.0, Format::Plain)),
+    GenerationRow::Slider(prop("probNote", "Note Prob", 0.0, 100.0, 1.0, Format::Plain)),
+    GenerationRow::Slider(prop("probNoteDepth", "Depth", 0.0, 100.0, 1.0, Format::Plain)),
+    GenerationRow::Slider(prop("probArp", "Arp", 0.0, 100.0, 1.0, Format::Plain)),
+    GenerationRow::Select("autoVariant", "Variant"),
+    GenerationRow::Slider(prop("autoDensity", "Density", -1.0, 1.0, 0.01, Format::Density)),
 ];
 
 /// The loop tab.
@@ -208,12 +208,12 @@ pub const NOTE_GROUPS: [&[NoteRow]; 4] = [
     &[note_slider("euclideanPulses", "Eucl", 0.0, 16.0, 1.0), note_slider("euclideanRotation", "Rot", 0.0, 15.0, 1.0)],
     &[
         NoteRow::Select("arpScale", "Scale"),
-        NoteRow::Select("arpType", "Dir"),
+        NoteRow::Select("arpDirection", "Dir"),
         note_slider("arpRange", "Range", 0.0, 12.0, 1.0),
     ],
 ];
 
-pub const ARP_TYPES: [&str; 4] = ["up", "down", "updown", "random"];
+pub const ARP_DIRECTIONS: [&str; 4] = ["up", "down", "updown", "random"];
 
 /// Kit editor knobs: field, label, range, step, format, unit, default.
 pub const KIT_KNOBS: [(Field, Prop, &str, f64); 3] = [
@@ -230,7 +230,7 @@ pub const KIT_KNOBS: [(Field, Prop, &str, f64); 3] = [
 pub struct EditorState {
     pub tab: u8,
     pub fx_tab: u8,
-    pub gen_tab: u8,
+    pub generation_tab: u8,
     /// Index in [`LFO_TARGETS`].
     pub lfo_target: u8,
     pub note_tab: u8,
@@ -272,7 +272,7 @@ pub fn fx_on(track: &Track, fx: &FxDef) -> bool {
 }
 
 /// `getTrackLoopAtStep`: the loop point, else the track's length in steps.
-pub fn loop_at_step(track: &Track) -> f64 {
+pub fn loop_length(track: &Track) -> f64 {
     if let Some(l) = track.loop_length.filter(|&l| l > 0) {
         return f64::from(l);
     }
@@ -333,16 +333,16 @@ impl ScaleList {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ArpState {
     pub scale: String,
-    pub kind: String,
+    pub direction: String,
     pub range: usize,
 }
 
 pub fn arp_state(note: &Note, scales: &ScaleList) -> ArpState {
     let Some(arp) = note.arp.as_object() else {
-        return ArpState { scale: "major".into(), kind: "up".into(), range: 0 };
+        return ArpState { scale: "major".into(), direction: "up".into(), range: 0 };
     };
     let mode = arp.get("mode").and_then(Value::as_str).map(str::to_lowercase).unwrap_or_else(|| "up".into());
-    let kind = if ARP_TYPES.contains(&mode.as_str()) { mode } else { "up".into() };
+    let direction = if ARP_DIRECTIONS.contains(&mode.as_str()) { mode } else { "up".into() };
     let intervals: Vec<f64> = arp
         .get("intervals")
         .and_then(Value::as_array)
@@ -360,7 +360,7 @@ pub fn arp_state(note: &Note, scales: &ScaleList) -> ArpState {
             break;
         }
     }
-    ArpState { scale, kind, range: intervals.len() }
+    ArpState { scale, direction, range: intervals.len() }
 }
 
 /// `#arpValue`: the note's `arp` with these overrides.
@@ -368,11 +368,11 @@ pub fn arp_value(
     note: &Note,
     scales: &ScaleList,
     scale: Option<&str>,
-    kind: Option<&str>,
+    direction: Option<&str>,
     range: Option<usize>,
 ) -> Value {
     let scale = scale.or(note.arp_scale.as_deref()).unwrap_or("major");
-    let kind = kind.or(note.arp_direction.as_deref()).unwrap_or("up");
+    let direction = direction.or(note.arp_direction.as_deref()).unwrap_or("up");
     let range = range.unwrap_or_else(|| arp_state(note, scales).range);
     if range == 0 {
         return Value::Null;
@@ -380,7 +380,7 @@ pub fn arp_value(
     let mut object = ordrumbox_core::json::Object::new();
     let intervals = scales.intervals(scale, range).into_iter().map(|i| Value::Number(f64::from(i))).collect();
     object.insert("intervals", Value::Array(intervals));
-    object.insert("mode", Value::String(kind.to_owned()));
+    object.insert("mode", Value::String(direction.to_owned()));
     Value::Object(object)
 }
 
@@ -519,7 +519,7 @@ pub struct NoteView {
     /// The note (a default one when the track has none).
     pub note: Option<Note>,
     pub scales: Choice,
-    pub arp_type: Choice,
+    pub arp_direction: Choice,
     pub arp_range: usize,
 }
 
@@ -682,7 +682,7 @@ pub fn track_editor(view: &TrackView, state: &EditorState, area: Rect, scale: i3
         TAB_SOUND => sound_tab(&mut rows, view),
         TAB_MOD => mod_tab(&mut rows, view, state),
         TAB_LOOP => loop_tab(&mut rows, track),
-        _ => gen_tab(&mut rows, track, state),
+        _ => generation_tab(&mut rows, track, state),
     }
     let bottom = rows.y;
     (rows.items, bottom)
@@ -834,7 +834,7 @@ fn loop_tab(rows: &mut Rows, track: &Track) {
             "stepsPerBeat" => (f64::from(spb), Spec::slider(p.min, p.max, p.step, default), p.format),
             // The loop point's slider ends at the track's length.
             "loopLength" => (
-                loop_at_step(track).min(max_steps),
+                loop_length(track).min(max_steps),
                 Spec::slider(p.min, max_steps, p.step, p.min),
                 Format::LoopPoint(spb),
             ),
@@ -844,7 +844,7 @@ fn loop_tab(rows: &mut Rows, track: &Track) {
     }
 }
 
-fn gen_tab(rows: &mut Rows, track: &Track, state: &EditorState) {
+fn generation_tab(rows: &mut Rows, track: &Track, state: &EditorState) {
     let s = rows.scale;
     let selected = |rows: &mut Rows, r: Rect, key: &'static str| {
         if state.selected_prop == Some(key) {
@@ -854,30 +854,30 @@ fn gen_tab(rows: &mut Rows, track: &Track, state: &EditorState) {
     let r = rows.row();
     rows.label(r, "Auto", Some("auto"), state.selected_prop == Some("auto"));
     rows.items.push(Item::new(Some(Id::Toggle("auto")), rows.field(r, 36 * s), Kind::Toggle { on: track.auto }));
-    let gen_slider = |rows: &mut Rows, p: &Prop| {
+    let generation_slider = |rows: &mut Rows, p: &Prop| {
         let value = number(track, p.key);
         let spec = value_spec(p, default_of(p.key, p.min), false);
         let r = rows.row();
         selected(rows, r, p.key);
         let kind =
             Kind::Value { spec, value, label: Some(p.label.to_owned()), text: p.format.value(value, ""), lfo: false };
-        rows.items.push(Item::new(Some(Id::Gen(p.key)), r, kind));
+        rows.items.push(Item::new(Some(Id::Generation(p.key)), r, kind));
     };
     if !track.auto {
-        for p in &GEN_MANUAL {
-            gen_slider(rows, p);
+        for p in &GENERATION_MANUAL {
+            generation_slider(rows, p);
         }
         return;
     }
     let tabs = [
-        (Id::GenTab(0), None, "Groove", state.gen_tab == 0, false),
-        (Id::GenTab(1), None, "Engine", state.gen_tab == 1, false),
+        (Id::GenerationTab(0), None, "Groove", state.generation_tab == 0, false),
+        (Id::GenerationTab(1), None, "Engine", state.generation_tab == 1, false),
     ];
     rows.tabs(&tabs);
-    for row in if state.gen_tab == 0 { &GEN_GROOVE } else { &GEN_ENGINE } {
+    for row in if state.generation_tab == 0 { &GENERATION_GROOVE } else { &GENERATION_ENGINE } {
         match row {
-            GenRow::Slider(p) => gen_slider(rows, p),
-            GenRow::Toggle(key, label) => {
+            GenerationRow::Slider(p) => generation_slider(rows, p),
+            GenerationRow::Toggle(key, label) => {
                 let r = rows.row();
                 rows.label(r, label, Some(key), state.selected_prop == Some(key));
                 rows.items.push(Item::new(
@@ -886,7 +886,7 @@ fn gen_tab(rows: &mut Rows, track: &Track, state: &EditorState) {
                     Kind::Toggle { on: flag(track, key) },
                 ));
             }
-            GenRow::Select(key, label) => {
+            GenerationRow::Select(key, label) => {
                 let r = rows.row();
                 rows.label(r, label, Some(key), state.selected_prop == Some(key));
                 let (values, _) = track_select_options(key);
@@ -940,7 +940,7 @@ pub fn note_editor(view: &NoteView, state: &EditorState, area: Rect, scale: i32)
             NoteRow::Select(key, label) => {
                 let r = rows.row();
                 rows.label(r, label, None, false);
-                let choice = if *key == "arpScale" { &view.scales } else { &view.arp_type };
+                let choice = if *key == "arpScale" { &view.scales } else { &view.arp_direction };
                 rows.items.push(Item::new(Some(Id::NoteSelect(key)), rows.field(r, 140 * s), choice.kind()));
             }
         }
@@ -1000,11 +1000,11 @@ mod tests {
         assert_eq!(scales.intervals("minor", 9), [0, 2, 3, 5, 7, 8, 10, 12, 14]);
         assert_eq!(scales.intervals("odd", 3), [0]);
         let mut note = Note::default();
-        assert_eq!(arp_state(&note, &scales), ArpState { scale: "major".into(), kind: "up".into(), range: 0 });
+        assert_eq!(arp_state(&note, &scales), ArpState { scale: "major".into(), direction: "up".into(), range: 0 });
         note.arp_direction = Some("down".into());
         note.arp = arp_value(&note, &scales, Some("minor"), None, Some(4));
         assert_eq!(note.arp.to_json(), r#"{"intervals":[0,2,3,5],"mode":"down"}"#);
-        assert_eq!(arp_state(&note, &scales), ArpState { scale: "minor".into(), kind: "down".into(), range: 4 });
+        assert_eq!(arp_state(&note, &scales), ArpState { scale: "minor".into(), direction: "down".into(), range: 4 });
         assert_eq!(arp_value(&note, &scales, None, None, Some(0)), Value::Null);
     }
 
@@ -1034,11 +1034,11 @@ mod tests {
     #[test]
     fn loop_point_falls_back_to_the_length() {
         let mut track = Track { beat_count: 4, steps_per_beat: 4, ..Track::default() };
-        assert_eq!(loop_at_step(&track), 16.0);
+        assert_eq!(loop_length(&track), 16.0);
         track.notes.push(Note { beat: 7, beat_step: 1, ..Note::default() });
-        assert_eq!(loop_at_step(&track), 30.0);
+        assert_eq!(loop_length(&track), 30.0);
         track.loop_length = Some(5);
-        assert_eq!(loop_at_step(&track), 5.0);
+        assert_eq!(loop_length(&track), 5.0);
     }
 
     fn view(track: &Track) -> TrackView<'_> {
@@ -1064,7 +1064,7 @@ mod tests {
                     let state = EditorState {
                         tab,
                         fx_tab: sub % 4,
-                        gen_tab: sub % 2,
+                        generation_tab: sub % 2,
                         lfo_target: sub,
                         ..EditorState::default()
                     };
@@ -1075,8 +1075,8 @@ mod tests {
         }
         let state = EditorState { tab: 4, ..EditorState::default() };
         let (items, _) = track_editor(&view(&track), &state, Rect::new(0, 0, 360, 600), 1);
-        assert!(items.iter().any(|i| i.id == Some(Id::Gen("probPitch"))));
-        assert!(!items.iter().any(|i| i.id == Some(Id::Gen("hitVariation"))));
+        assert!(items.iter().any(|i| i.id == Some(Id::Generation("probPitch"))));
+        assert!(!items.iter().any(|i| i.id == Some(Id::Generation("hitVariation"))));
     }
 
     #[test]
@@ -1085,7 +1085,7 @@ mod tests {
             title: "KICK [beat 1 step 1]".into(),
             note: Some(Note::default()),
             scales: Choice::default(),
-            arp_type: Choice::default(),
+            arp_direction: Choice::default(),
             arp_range: 0,
         };
         let state = EditorState { note_tab: 2, ..EditorState::default() };

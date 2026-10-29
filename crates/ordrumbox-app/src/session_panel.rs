@@ -15,8 +15,9 @@ use ordrumbox_engine::assign::assign_track;
 use super::*;
 use crate::control::{Spec, Style};
 use crate::editors::{
-    self, ARP_TYPES, Choice, FILTER_TYPES, FX_DEFS, FX_KNOBS, GEN_ENGINE, GEN_GROOVE, GEN_MANUAL, GenRow, KIT_KNOBS,
-    KNOB_BAR, KitControls, LFO_TARGETS, LOOP_PROPS, NOTE_GROUPS, NOTE_KNOBS, NoteRow, NoteView, SampleBar, TrackView,
+    self, ARP_DIRECTIONS, Choice, FILTER_TYPES, FX_DEFS, FX_KNOBS, GENERATION_ENGINE, GENERATION_GROOVE,
+    GENERATION_MANUAL, GenerationRow, KIT_KNOBS, KNOB_BAR, KitControls, LFO_TARGETS, LOOP_PROPS, NOTE_GROUPS,
+    NOTE_KNOBS, NoteRow, NoteView, SampleBar, TrackView,
 };
 use crate::kits::Field;
 use crate::panel::{self, Item, Kind, LfoParam, Rect};
@@ -450,7 +451,7 @@ impl Session {
                 title,
                 note: None,
                 scales: Choice::default(),
-                arp_type: Choice::default(),
+                arp_direction: Choice::default(),
                 arp_range: 0,
             };
         };
@@ -458,10 +459,11 @@ impl Session {
         let names = self.scale_list.names.clone();
         let scale = n.arp_scale.clone().unwrap_or_else(|| state.scale.clone());
         let scales = Choice { selected: editors::index_of(&names, &scale), values: names, labels: Vec::new() };
-        let types: Vec<String> = ARP_TYPES.iter().map(|t| (*t).to_owned()).collect();
-        let kind = n.arp_direction.clone().unwrap_or_else(|| state.kind.clone());
-        let arp_type = Choice { selected: editors::index_of(&types, &kind), values: types, labels: Vec::new() };
-        NoteView { title, note, scales, arp_type, arp_range: state.range }
+        let directions: Vec<String> = ARP_DIRECTIONS.iter().map(|d| (*d).to_owned()).collect();
+        let direction = n.arp_direction.clone().unwrap_or_else(|| state.direction.clone());
+        let arp_direction =
+            Choice { selected: editors::index_of(&directions, &direction), values: directions, labels: Vec::new() };
+        NoteView { title, note, scales, arp_direction, arp_range: state.range }
     }
 
     fn kit_controls(&self) -> Option<KitControls> {
@@ -935,7 +937,7 @@ impl Session {
 
     /// A row's label clicked (`selectedPropKey`).
     fn select_row(&mut self, id: Id) {
-        if let Id::Gen(key) | Id::Loop(key) | Id::Fx(key) | Id::Row(key) = id {
+        if let Id::Generation(key) | Id::Loop(key) | Id::Fx(key) | Id::Row(key) = id {
             self.editors.selected_prop = Some(key);
         }
     }
@@ -973,7 +975,7 @@ impl Session {
                 let label = FX_KNOBS.iter().find(|p| p.key == key).map_or(key, |p| p.label);
                 self.update_track(t, &[(key, num(value))], &format!("{label} on {name}"), true);
             }
-            Id::Gen(key) => self.update_track(t, &[(key, num(value))], &format!("{key} on {name}"), true),
+            Id::Generation(key) => self.update_track(t, &[(key, num(value))], &format!("{key} on {name}"), true),
             Id::Loop(key) => self.loop_slider(t, key, value),
             Id::Decay => {
                 // The sample's decay (the sound registry's in the JS): not undoable.
@@ -1211,7 +1213,7 @@ impl Session {
         match id {
             Id::Tab(i) => self.editors.tab = i,
             Id::FxTab(i) => self.editors.fx_tab = i,
-            Id::GenTab(i) => self.editors.gen_tab = i,
+            Id::GenerationTab(i) => self.editors.generation_tab = i,
             Id::LfoTab(i) => self.editors.lfo_target = i,
             Id::NoteTab(i) => self.editors.note_tab = i,
             Id::Row(_) => self.select_row(id),
@@ -1321,15 +1323,15 @@ fn control_name(id: Id) -> (&'static str, &'static str) {
         Id::Master(key) => crate::output::find(key).map_or(("", ""), |p| (p.label, p.unit)),
         Id::SynthField(_) => ("value", ""),
         Id::Fx(key) => (prop(&FX_KNOBS, key), ""),
-        Id::Gen(key) => {
-            let rows = GEN_GROOVE.iter().chain(GEN_ENGINE.iter());
+        Id::Generation(key) => {
+            let rows = GENERATION_GROOVE.iter().chain(GENERATION_ENGINE.iter());
             let label = rows
                 .filter_map(|r| match r {
-                    GenRow::Slider(p) if p.key == key => Some(p.label),
+                    GenerationRow::Slider(p) if p.key == key => Some(p.label),
                     _ => None,
                 })
                 .next()
-                .unwrap_or_else(|| prop(&GEN_MANUAL, key));
+                .unwrap_or_else(|| prop(&GENERATION_MANUAL, key));
             (label, "")
         }
         Id::Loop(key) => (prop(&LOOP_PROPS, key), ""),
