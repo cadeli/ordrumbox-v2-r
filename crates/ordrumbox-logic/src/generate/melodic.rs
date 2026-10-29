@@ -324,7 +324,7 @@ fn melody_arpeggio(g: &mut Generator<'_>, track: &mut Track, scale: &[f64], conf
     let jitter = num(config, "spacingJitter").unwrap_or(0.0).max(0.0) as i32;
     let arp = config.get("arp").filter(|a| !a.is_null());
     let count = num(config, "retriggerCount").unwrap_or(1.0);
-    let rate = num(config, "rate").unwrap_or(1.0);
+    let rate = num(config, "retriggerRate").unwrap_or(1.0);
     for beat in 0..track.beat_count {
         let (mut step, mut index) = (0, 0usize);
         while step < spb {

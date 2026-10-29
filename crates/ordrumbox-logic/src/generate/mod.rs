@@ -101,19 +101,19 @@ pub(crate) fn apply_note_properties(note: &mut Note, source: &Value) {
     if let Some(n) = num(source, "retriggerCount") {
         note.retrigger_count = n as i32;
     }
-    if let Some(n) = num(source, "rate") {
+    if let Some(n) = num(source, "retriggerRate") {
         note.retrigger_rate = n;
     }
-    if let Some(n) = num(source, "euclideanFill") {
+    if let Some(n) = num(source, "euclideanPulses") {
         note.euclidean_pulses = n as i32;
     }
     if let Some(arp) = source.get("arp").filter(|a| !a.is_null()) {
         note.arp = arp.clone();
     }
-    if let Some(n) = num(source, "prob") {
+    if let Some(n) = num(source, "probability") {
         note.probability = n;
     }
-    if let Some(n) = num(source, "arpTriggerProbability") {
+    if let Some(n) = num(source, "retriggerProbability") {
         note.retrigger_probability = n;
     }
 }
