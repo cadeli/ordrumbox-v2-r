@@ -1,17 +1,18 @@
-//! The key names of the JS app and of older saves (`prob_pitch`, `velocity`
-//! for the track volume, `infos`…), which loading still reads.
+//! Test support: the golden fixtures, written by the web version, under this
+//! app's key names (`prob_pitch` → `autoPitchChance`, `velocity` → `volume`
+//! for a track, `infos` → `info`…), to compare them with what it saves.
+//! Shared by the tests of `ordrumbox-core` and `ordrumbox-logic` (`#[path]`).
 
-use crate::json::{Object, Value};
-use crate::note::{Note, upgrade_arp};
-use crate::track::Track;
+use ordrumbox_core::json::{Object, Value};
+use ordrumbox_core::note::upgrade_arp;
+use ordrumbox_core::{Note, Pattern, Track};
 
-/// A library, a pattern or a list of either with every legacy key renamed
-/// to its current name and the dropped keys left out, values and key order
-/// kept: the keys a load then a save would write. Compares a JS export with
-/// what this app saves.
-pub fn upgrade_keys(value: &Value) -> Value {
+/// A library, a pattern or a list of either with every web-version key
+/// renamed to its current name and the dropped keys left out, values and key
+/// order kept: the keys a load then a save would write.
+pub fn current_keys(value: &Value) -> Value {
     match value {
-        Value::Array(items) => Value::Array(items.iter().map(upgrade_keys).collect()),
+        Value::Array(items) => Value::Array(items.iter().map(current_keys).collect()),
         Value::Object(object) if object.contains_key("patterns") => {
             let mut upgraded = Object::new();
             for (key, value) in object.iter() {
@@ -39,7 +40,7 @@ fn upgrade_pattern(pattern: &Value) -> Value {
         match key {
             "application" | "url" | "_revision" => {}
             "tracks" => _ = upgraded.insert(key, map_array(value, upgrade_track)),
-            _ => _ = upgraded.insert(crate::pattern::canonical_key(key), value.clone()),
+            _ => _ = upgraded.insert(Pattern::canonical_key(key), value.clone()),
         }
     }
     Value::Object(upgraded)
@@ -118,7 +119,7 @@ fn upgrade_track(track: &Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::json;
+    use ordrumbox_core::json;
 
     #[test]
     fn renames_track_note_and_library_keys_in_place() {
@@ -128,7 +129,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            upgrade_keys(&old).to_json(),
+            current_keys(&old).to_json(),
             r#"{"info":{"name":"l"},"patterns":[{"name":"p","tracks":[{"name":"KICK","volume":0.5,"autoPitchChance":10,"noteKeys":["velocity","beat","probability"],"notes":[[0.4,1,0.5]]}]}]}"#
         );
     }

@@ -94,7 +94,7 @@ pub fn load_master(path: &Path) -> Result<Option<(ordrumbox_engine::MasterSettin
     match fs::read_to_string(path) {
         Ok(text) => {
             let value = json::parse(&text).map_err(|e| format!("{}: {e}", path.display()))?;
-            Ok(value.get("master").map(crate::output::from_json))
+            Ok(value.get("master").map(crate::master::from_json))
         }
         Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
         Err(e) => Err(format!("{}: {e}", path.display())),
@@ -112,7 +112,7 @@ pub fn save_master(path: &Path, master: &ordrumbox_engine::MasterSettings) -> io
         Err(e) if e.kind() == io::ErrorKind::NotFound => json::Object::new(),
         Err(e) => return Err(e),
     };
-    settings.insert("master", crate::output::to_json(master));
+    settings.insert("master", crate::master::to_json(master));
     write_atomic(path, &(json::Value::Object(settings).to_json_pretty(2) + "\n"))
 }
 
@@ -207,12 +207,17 @@ pub fn factory_reset(dir: &Path) -> io::Result<Vec<String>> {
     }
     Ok(removed)
 }
-fn write_atomic(path: &Path, text: &str) -> io::Result<()> {
+
+/// Write `path` through a temporary file next to it (`<name>.tmp`), renamed
+/// over it once complete: a crash never leaves it half written. The folder
+/// is made if needed.
+pub fn write_atomic(path: &Path, contents: impl AsRef<[u8]>) -> io::Result<()> {
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir)?;
     }
-    let temporary = path.with_extension("json.tmp");
-    fs::write(&temporary, text)?;
+    let mut temporary = path.as_os_str().to_owned();
+    temporary.push(".tmp");
+    fs::write(&temporary, contents)?;
     fs::rename(&temporary, path)
 }
 
@@ -231,7 +236,7 @@ pub fn load(path: &Path) -> Result<Option<Library>, String> {
 /// Write `library` to `path` through a temporary file, so a crash never
 /// leaves half a file.
 pub fn save(path: &Path, library: &Library) -> io::Result<()> {
-    write_atomic(path, &library.to_file_text())
+    write_atomic(path, library.to_file_text())
 }
 
 #[cfg(test)]

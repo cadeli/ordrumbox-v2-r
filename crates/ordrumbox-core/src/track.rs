@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use crate::drum_taxonomy::pan_from_track_name;
 use crate::json::{Object, Value};
 use crate::note::{Note, decode_notes, encode_notes};
-use crate::record::{Issue, SetField, json_record, round2};
+use crate::record::{Issue, SetField, check_duplicate, json_record, round2};
 
 json_record! {
     /// One track. Table fields are saved only when they differ from their
@@ -160,7 +160,7 @@ impl Track {
     }
 
     /// Whether `key` is a track setting an edit may change (a key of `TRACK_DEFAULTS`).
-    /// A legacy key (`prob_pitch`, `velocity`…) counts as its current one.
+    /// A web-version key (`prob_pitch`, `velocity`…) counts as its current one.
     pub fn is_setting(key: &str) -> bool {
         Self::canonical_key(key).is_some_and(|key| !NOT_SETTINGS.contains(&key))
     }
@@ -181,7 +181,9 @@ impl Track {
             return None;
         };
         let mut track = Self::default();
+        let mut seen = Vec::new();
         for (key, value) in object.iter() {
+            check_duplicate(&mut seen, Self::canonical_key(key), key, at, issues);
             match key {
                 // `fxSelected`: an editor tab the JS app saved with the track.
                 "notes" | "noteKeys" | "fxSelected" => {}
@@ -369,7 +371,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_the_legacy_key_names() {
+    fn reads_the_web_key_names() {
         let (track, issues) =
             load(r#"{"name":"KICK","velocity":0.5,"delayDepth":0.3,"prob_pitch":10,"sat":false,"synthSoundKey":"B1"}"#);
         assert!(issues.is_empty());
@@ -382,6 +384,13 @@ mod tests {
         assert!(Track::is_setting("prob_pitch") && Track::is_setting("autoPitchChance"));
         assert!(!Track::is_setting("auto_variation"));
         assert_eq!(Track::value_range("delayDepth"), Some((0.0, 1.0)));
+    }
+
+    #[test]
+    fn a_setting_given_twice_is_reported() {
+        let (track, issues) = load(r#"{"name":"KICK","volume":0.5,"velocity":0.8}"#);
+        assert_eq!(track.volume, 0.8);
+        assert_eq!(issues, [Issue::new("t.velocity", "same setting as an earlier key (volume), this value used")]);
     }
 
     #[test]

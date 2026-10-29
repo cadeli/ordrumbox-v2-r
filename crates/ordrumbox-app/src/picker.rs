@@ -7,6 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::canvas::{Canvas, Rgb, text_width};
+use crate::panel::row_at;
 use crate::theme;
 
 /// What the picked file is for.
@@ -297,7 +298,7 @@ impl PickerLayout {
         if x < self.x || x >= self.x + self.width || y < self.list_top {
             return None;
         }
-        let row = usize::try_from((y - self.list_top) / self.row).ok()?;
+        let row = row_at(y, self.list_top, self.row)?;
         let i = self.first(picker.selected) + row;
         (row < self.rows && i < picker.entries.len()).then_some(i)
     }

@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 
 use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::track::MAX_TRACKS;
-use ordrumbox_core::{Library, Note, Pattern, Rng, Scales, Track};
+use ordrumbox_core::{Library, Note, Pattern, Rng, ScaleList, Scales, Track};
 use ordrumbox_engine::analysis::{self, Analysis};
 use ordrumbox_engine::offline::{self, RenderSetup};
 use ordrumbox_engine::{Controller, Mode, SynthPresets, wav};
@@ -26,7 +26,8 @@ use ordrumbox_logic::{Editor, Nudge};
 use crate::assets;
 use crate::audio;
 use crate::canvas::Canvas;
-use crate::editors::{EditorState, ScaleList};
+use crate::editors::EditorState;
+use crate::frame;
 use crate::kits::KitSet;
 use crate::menu::{self, Command, MenuState};
 use crate::panel::{Dropdown, Entry, Id};
@@ -564,7 +565,7 @@ impl Session {
         };
         let path = dir.join(format!("ordrumbox-{name}.wav"));
         let bytes = wav::encode(&left, &right, setup.sample_rate);
-        let result = std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(&path, bytes));
+        let result = store::write_atomic(&path, bytes);
         self.message = match result {
             Ok(()) => format!(
                 "exported {} ({:.1} s of audio in {:.1} s)",
@@ -586,7 +587,7 @@ impl Session {
         let mut rng = Rng::new(1);
         let bytes = midi::export(pattern, 1, &self.roots, &mut rng, &self.scales);
         let path = dir.join(format!("ordrumbox-{}.mid", pattern.id));
-        let result = std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(&path, &bytes));
+        let result = store::write_atomic(&path, &bytes);
         self.message = match result {
             Ok(()) => format!("exported {} ({} bytes)", path.display(), bytes.len()),
             Err(e) => format!("not exported: {}: {e}", path.display()),
@@ -607,7 +608,7 @@ impl Session {
         let name = pattern.name.as_deref().unwrap_or("pattern");
         let path = dir.join(format!("ordrumbox-{}.json", store::safe_name(name)));
         let text = pattern.to_json().to_json_pretty(2) + "\n";
-        let result = std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(&path, text));
+        let result = store::write_atomic(&path, text);
         self.message = match result {
             Ok(()) => format!("Pattern \"{name}\" exported to {}", path.display()),
             Err(e) => format!("not exported: {}: {e}", path.display()),
@@ -643,19 +644,13 @@ impl Session {
             self.pattern_index = (self.pattern_index as isize + delta).rem_euclid(count as isize) as usize;
             self.deselect();
             self.message = format!("pattern {}", self.pattern().and_then(|p| p.name.as_deref()).unwrap_or_default());
-            // While playing in pattern mode, switch to the new pattern on the
-            // current pass instead of waiting for the next loop.
-            let playing = self.playing();
-            let mode_is_pattern =
-                self.controller.as_ref().map(|c| matches!(c.mode(), Mode::Pattern(_))).unwrap_or(false);
-            if playing && mode_is_pattern {
-                if let Some(controller) = &mut self.controller {
-                    controller.select_pattern(self.pattern_index);
-                }
-                let library = self.editor.library();
-                if let Some(controller) = &mut self.controller {
-                    controller.refresh(library);
-                }
+            // In pattern mode, switch to the new pattern on the current pass
+            // (when playing) instead of waiting for the next loop.
+            if let Some(controller) = &mut self.controller
+                && let Mode::Pattern(_) = controller.mode()
+            {
+                controller.select_pattern(self.pattern_index);
+                controller.refresh(self.editor.library());
             }
         }
     }
@@ -673,17 +668,11 @@ impl Session {
     fn select_kit(&mut self, index: usize) {
         let Some(kit) = self.kits.kits.get(index) else { return };
         self.kit_index = index;
-        if let Some(controller) = &mut self.controller {
-            controller.set_kit(&kit.name);
-        }
         // A kit change affects every track's sound: rebuild the pass
         // playing now so it is heard at once (not at the next loop).
-        let playing = self.playing();
-        if playing {
-            let library = self.editor.library();
-            if let Some(controller) = &mut self.controller {
-                controller.refresh(library);
-            }
+        if let Some(controller) = &mut self.controller {
+            controller.set_kit(&kit.name);
+            controller.refresh(self.editor.library());
         }
         if let Some(render) = &mut self.render {
             render.kit.clone_from(&kit.name);

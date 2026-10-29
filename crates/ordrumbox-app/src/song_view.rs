@@ -10,9 +10,9 @@
 use ordrumbox_core::{Pattern, Song};
 
 use crate::canvas::{Canvas, Rgb, text_width};
-use crate::panel::Rect;
+use crate::frame;
+use crate::panel::{Rect, row_at};
 use crate::theme;
-use crate::view;
 
 /// The JS grid geometry (`song_panel/layout.js`), in px per scale unit.
 const LABEL_WIDTH: i32 = 74;
@@ -112,8 +112,8 @@ impl SongLayout {
     pub fn new(width: i32, height: i32, scale: i32, status_lines: usize) -> Self {
         let s = scale;
         let margin = 16 * s;
-        let top = view::body_top(scale);
-        let bottom = view::footer_top(height, scale, status_lines) - margin / 2;
+        let top = frame::body_top(scale);
+        let bottom = frame::footer_top(height, scale, status_lines) - margin / 2;
         let h = (bottom - top).max(0);
         let list = Rect::new(margin, top, LIST_WIDTH * s, h);
         let column_w = (COLUMN_WIDTH * s).min((width - 2 * margin) / 3).max(0);
@@ -199,16 +199,15 @@ impl SongLayout {
     /// What is at `(x, y)`.
     pub fn hit(&self, view: &SongView, x: i32, y: i32) -> Option<SongHit> {
         if self.list.contains(x, y) {
-            let row = self.list_first(view.selected_pattern)
-                + usize::try_from((y - self.list.y) / (LIST_ROW * self.scale)).ok()?;
+            let row = self.list_first(view.selected_pattern) + row_at(y, self.list.y, LIST_ROW * self.scale)?;
             return (row < view.patterns.len()).then_some(SongHit::Pattern(row));
         }
         let song = view.song?;
         if !self.grid.contains(x, y) || y < self.ruler_top() {
             return None;
         }
-        let row = (y >= self.body_top())
-            .then(|| view.scroll.1 + usize::try_from((y - self.body_top()) / self.row_height()).unwrap_or(0))
+        let row = row_at(y, self.body_top(), self.row_height())
+            .map(|row| view.scroll.1 + row)
             .filter(|&row| row < view.rows.len());
         if x < self.body_left() {
             return row.map(SongHit::RowName);

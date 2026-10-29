@@ -120,10 +120,7 @@ impl KitSet {
     fn store_bytes(&self, url: &str, bytes: &[u8]) -> Result<(), String> {
         let Some(dir) = &self.samples_dir else { return Err("no user data folder for samples".into()) };
         let path = store::sample_path(dir, url).ok_or_else(|| format!("{url}: not a sample path"))?;
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
-        }
-        fs::write(&path, bytes).map_err(|e| format!("{}: {e}", path.display()))
+        store::write_atomic(&path, bytes).map_err(|e| format!("{}: {e}", path.display()))
     }
 
     // ─── Sample settings ─────────────────────────────────────────────────────
@@ -319,8 +316,8 @@ impl KitSet {
     pub fn export_mapping(&self, kit: usize, dir: &Path) -> Result<String, String> {
         let kit = self.kits.get(kit).ok_or("No drumkit selected")?;
         let path = dir.join(format!("ordrumbox-drumkit-{}.json", safe_name(&kit.name)));
-        fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-        fs::write(&path, kit.to_mapping_json().to_json_pretty(2)).map_err(|e| format!("{}: {e}", path.display()))?;
+        store::write_atomic(&path, kit.to_mapping_json().to_json_pretty(2))
+            .map_err(|e| format!("{}: {e}", path.display()))?;
         Ok(format!("Saved drumkit \"{}\" to {}", kit.name, path.display()))
     }
 }

@@ -109,6 +109,26 @@ impl Issue {
     }
 }
 
+/// Report `key` when an earlier key of the same object named the same
+/// `field` (a web-version name and its current one): the later value is used.
+pub(crate) fn check_duplicate(
+    seen: &mut Vec<&'static str>,
+    field: Option<&'static str>,
+    key: &str,
+    at: &str,
+    issues: &mut Vec<Issue>,
+) {
+    let Some(field) = field else { return };
+    if seen.contains(&field) {
+        issues.push(Issue::new(
+            format!("{at}.{key}"),
+            format!("same setting as an earlier key ({field}), this value used"),
+        ));
+    } else {
+        seen.push(field);
+    }
+}
+
 /// Round to 2 decimals like the JS exporter: `Math.round(v * 100) / 100`.
 pub(crate) fn round2(value: f64) -> f64 {
     crate::js::round(value * 100.0) / 100.0
@@ -118,7 +138,7 @@ macro_rules! json_record {
     (
         $(#[$meta:meta])*
         pub struct $name:ident {
-            $( $(#[$fmeta:meta])* $field:ident : $ty:ty = $default:expr => $key:literal $(| $legacy:literal)*, )*
+            $( $(#[$fmeta:meta])* $field:ident : $ty:ty = $default:expr => $key:literal $(| $web:literal)*, )*
         }
         other_fields {
             $( $(#[$ometa:meta])* $ofield:ident : $oty:ty = $odefault:expr, )*
@@ -142,10 +162,10 @@ macro_rules! json_record {
             pub const KEYS: &'static [&'static str] = &[$( $key ),*];
 
             /// The key a field is written under, for its key or one of its
-            /// legacy keys; `None` for a key that names no field.
+            /// web-version keys; `None` for a key that names no field.
             pub fn canonical_key(key: &str) -> Option<&'static str> {
                 match key {
-                    $( $key $(| $legacy)* => Some($key), )*
+                    $( $key $(| $web)* => Some($key), )*
                     _ => None,
                 }
             }
@@ -155,7 +175,7 @@ macro_rules! json_record {
             pub fn set_field(&mut self, key: &str, value: &$crate::json::Value) -> $crate::record::SetField {
                 use $crate::record::{JsonField, SetField};
                 match key {
-                    $( $key $(| $legacy)* => match <$ty as JsonField>::from_json(value) {
+                    $( $key $(| $web)* => match <$ty as JsonField>::from_json(value) {
                         Some(v) => { self.$field = v; SetField::Set }
                         None if value.is_null() => { self.$field = $default; SetField::Set }
                         None => SetField::WrongType,
@@ -168,7 +188,7 @@ macro_rules! json_record {
             pub fn field(&self, key: &str) -> Option<$crate::json::Value> {
                 use $crate::record::JsonField;
                 match key {
-                    $( $key $(| $legacy)* => Some(<$ty as JsonField>::to_json(&self.$field)), )*
+                    $( $key $(| $web)* => Some(<$ty as JsonField>::to_json(&self.$field)), )*
                     _ => None,
                 }
             }

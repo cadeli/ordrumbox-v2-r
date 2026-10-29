@@ -155,7 +155,7 @@ impl Session {
         }
         let Some(edit) = &self.synth else {
             let s = scale;
-            canvas.text(16 * s, view::body_top(scale), "No synth presets loaded.", s, crate::panel::DIM);
+            canvas.text(16 * s, frame::body_top(scale), "No synth presets loaded.", s, crate::panel::DIM);
             return;
         };
         let Some((built, layout)) = self.synth_built((canvas.width(), canvas.height(), scale)) else { return };

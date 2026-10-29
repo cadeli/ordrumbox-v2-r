@@ -29,6 +29,15 @@ const SELECTED_ROW: Rgb = theme::SELECTED_ROW;
 const ENVELOPE: Rgb = theme::LIME;
 const MARKER: Rgb = theme::PINK;
 
+/// The row of a list under `y`, rows `row_height` high from `top`; `None`
+/// above the list (a division alone would put the pixels just above in row 0).
+pub fn row_at(y: i32, top: i32, row_height: i32) -> Option<usize> {
+    if y < top || row_height <= 0 {
+        return None;
+    }
+    usize::try_from((y - top) / row_height).ok()
+}
+
 /// A rectangle of the window.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Rect {
@@ -546,7 +555,7 @@ impl Dropdown {
         if !r.contains(x, y) {
             return None;
         }
-        let row = usize::try_from((y - r.y - 2 * scale) / row_height(scale)).ok()?.checked_sub(self.head())?;
+        let row = row_at(y, r.y + 2 * scale, row_height(scale))?.checked_sub(self.head())?;
         let i = self.first + row;
         (i < self.labels.len()).then_some(i)
     }
@@ -620,6 +629,13 @@ impl Entry {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rows_start_at_the_top() {
+        assert_eq!(row_at(9, 10, 16), None);
+        assert_eq!(row_at(10, 10, 16), Some(0));
+        assert_eq!(row_at(26, 10, 16), Some(1));
+    }
 
     #[test]
     fn focus_cycles_over_focusable_items() {

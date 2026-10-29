@@ -154,7 +154,7 @@ impl Session {
         layout.right = right;
         // The track editor, always down the right edge (when shown).
         if right > 0 {
-            let top = view::body_top(scale);
+            let top = frame::body_top(scale);
             let bottom = body.main_bottom;
             let back = Rect::new(width - right, top - 4 * s, right, bottom - top + 8 * s);
             layout.items.push(Item::new(None, back, Kind::Panel));

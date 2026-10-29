@@ -14,10 +14,10 @@ use ordrumbox_core::json::{Object, Value};
 
 use crate::canvas::{Canvas, Rgb, text_width};
 use crate::control::Spec;
+use crate::frame;
 use crate::panel::{Id, Item, Kind, Rect};
 use crate::synth_model::{self as model, FILTER_TYPES, LFO_SYNCS, MOD_ENV_TARGETS, TABS, WAVES};
 use crate::theme;
-use crate::view;
 
 /// The preset bar's buttons: id, label, width (scale units).
 pub const BUTTONS: [(&str, &str, i32); 6] = [
@@ -137,7 +137,7 @@ impl SynthLayout {
     pub fn new(width: i32, height: i32, scale: i32, status_lines: usize) -> Self {
         let s = scale;
         let margin = 16 * s;
-        let top = view::body_top(scale);
+        let top = frame::body_top(scale);
         let preset = Rect::new(margin, top, 180 * s, 14 * s);
         let mut x = preset.x + preset.w + 8 * s;
         let buttons = BUTTONS.map(|(_, _, w)| {
@@ -147,7 +147,7 @@ impl SynthLayout {
         });
         let tabs = [0, 1, 2, 3].map(|i| Rect::new(margin + i * 56 * s, top + 20 * s, 52 * s, 14 * s));
         let area_top = top + 42 * s;
-        let bottom = view::footer_top(height, scale, status_lines) - 20 * s;
+        let bottom = frame::footer_top(height, scale, status_lines) - 20 * s;
         Self {
             scale,
             preset,

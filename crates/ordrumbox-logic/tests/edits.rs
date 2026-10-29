@@ -7,7 +7,10 @@
 use std::path::Path;
 
 use ordrumbox_core::json::{self, Value};
-use ordrumbox_core::{Library, Note, legacy};
+use ordrumbox_core::{Library, Note};
+
+#[path = "../../ordrumbox-core/tests/support/web_keys.rs"]
+mod web_keys;
 use ordrumbox_logic::Editor;
 
 fn read(path: &Path) -> Value {
@@ -146,9 +149,9 @@ fn diff(rust: &Value, js: &Value, at: &str) -> Option<String> {
 }
 
 /// `tags` saved as `{"0": "a"}` by JS (a past bug) are an array in Rust,
-/// and the legacy key names have their current ones.
+/// and the web-version key names have their current ones.
 fn js_pattern(pattern: Value) -> Value {
-    let mut pattern = legacy::upgrade_keys(&pattern);
+    let mut pattern = web_keys::current_keys(&pattern);
     if let Some(object) = pattern.as_object_mut()
         && let Some(Value::Object(tags)) = object.get("tags")
     {

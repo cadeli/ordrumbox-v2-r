@@ -5,7 +5,7 @@
 //! trailing values at their default are left out.
 
 use crate::json::{Object, Value};
-use crate::record::{Issue, SetField, json_record, round2};
+use crate::record::{Issue, SetField, check_duplicate, json_record, round2};
 
 json_record! {
     /// One note. The field order is the compact-format key order
@@ -64,7 +64,9 @@ impl Note {
     /// format the app writes cannot hold them.
     pub(crate) fn from_object(object: &Object, at: &str, issues: &mut Vec<Issue>) -> Self {
         let mut note = Self::default();
+        let mut seen = Vec::new();
         for (key, value) in object.iter() {
+            check_duplicate(&mut seen, Self::canonical_key(key), key, at, issues);
             note.set_or_report(key, value, at, issues);
         }
         note
@@ -97,7 +99,7 @@ impl Note {
 
 /// Decode a track's notes: compact arrays named by `note_keys`, or objects.
 ///
-/// Header rule: distinct known keys (current or legacy), **in any order**. The JS loader also
+/// Header rule: distinct known keys (current or web-version), **in any order**. The JS loader also
 /// requires `NOTE_KEY_ORDER` order and otherwise keeps the raw arrays, which
 /// its exporter then writes back as garbage (`[[null]]`). The positional decode
 /// is unambiguous as long as each key is known and appears once.
@@ -132,7 +134,7 @@ pub(crate) fn decode_notes(notes: &[Value], note_keys: Option<&Value>, at: &str,
 }
 
 /// An arpeggio object's `mode` (the JS key, older saves) is its `direction`.
-pub(crate) fn upgrade_arp(arp: &mut Value) {
+pub fn upgrade_arp(arp: &mut Value) {
     if let Value::Object(object) = arp
         && !object.contains_key("direction")
         && let Some(mode) = object.remove("mode")
@@ -155,7 +157,7 @@ fn parse_header(keys: &Value, at: &str, issues: &mut Vec<Issue>) -> Option<Vec<S
                 issues.push(Issue::new(at, format!("unknown note key {key:?}, compact notes skipped")));
                 return None;
             }
-            // A legacy key and its current one name the same field.
+            // A web-version key and its current one name the same field.
             Some((key, Some(field))) if header.iter().any(|k| k == field) => {
                 issues.push(Issue::new(at, format!("duplicate note key {key:?}, compact notes skipped")));
                 return None;
@@ -265,7 +267,7 @@ mod tests {
         assert_eq!(issues[0].message, "unknown note key \"steppc\", compact notes skipped");
         let (notes, _) = decode("[[1, 2]]", Some(r#"["beat","beat"]"#));
         assert!(notes.is_empty());
-        // A legacy key and its current one name the same field.
+        // A web-version key and its current one name the same field.
         let (notes, _) = decode("[[0.5, 0.2]]", Some(r#"["prob","probability"]"#));
         assert!(notes.is_empty());
     }
@@ -277,7 +279,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_the_legacy_key_names() {
+    fn reads_the_web_key_names() {
         let (notes, issues) = decode(
             r#"[[0.5, 4, 3, 2, "up"], {"rate": 2}]"#,
             Some(r#"["prob","rate","euclideanFill","pos","_arpType"]"#),
