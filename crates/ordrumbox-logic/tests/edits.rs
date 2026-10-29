@@ -66,7 +66,7 @@ fn run(editor: &mut Editor, o: &Value) {
             editor.incr_steps_per_beat(p(), t());
         }
         "decrLoopPoint" => {
-            editor.decr_loop_point(p(), t());
+            editor.shorten_loop(p(), t());
         }
         "updateNote" => {
             let u = updates(o);
@@ -176,7 +176,9 @@ fn edits_undo_and_redo_like_the_js_commander() {
         assert_eq!(history.undo_len(), usize_of(step, "undo"), "{at}: undo steps");
         assert_eq!(history.redo_len(), usize_of(step, "redo"), "{at}: redo steps");
         if let Some(desc) = step.get("desc").and_then(Value::as_str) {
-            assert_eq!(history.next_undo(), Some(desc), "{at}: description");
+            // The JS "Loop point back on X" is "Shorten loop on X" here.
+            let desc = desc.replace("Loop point back on ", "Shorten loop on ");
+            assert_eq!(history.next_undo(), Some(desc.as_str()), "{at}: description");
         }
         let ids: Vec<&str> = editor.library().patterns.iter().map(|p| p.id.as_str()).collect();
         let js_ids: Vec<&str> =

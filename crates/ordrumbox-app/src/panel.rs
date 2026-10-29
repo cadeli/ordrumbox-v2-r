@@ -625,7 +625,7 @@ mod tests {
     fn focus_cycles_over_focusable_items() {
         let r = Rect::new(0, 0, 10, 10);
         let items = vec![
-            Item::new(Some(Id::Tab(0)), r, Kind::Tab { label: "fx".into(), active: true }),
+            Item::new(Some(Id::Tab(0)), r, Kind::Tab { label: "FX".into(), active: true }),
             Item::new(None, r, Kind::Line),
             Item::new(Some(Id::Row("x")), r, Kind::Highlight),
             Item::new(Some(Id::Toggle("mono")), r, Kind::Toggle { on: false }),

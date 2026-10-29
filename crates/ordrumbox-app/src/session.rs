@@ -189,7 +189,7 @@ pub struct Session {
     /// volume is their volume), and when they changed, not saved yet.
     master: ordrumbox_engine::MasterSettings,
     master_dirty: Option<Instant>,
-    /// The output panel's tab: vol, Comp, Flt.
+    /// The output panel's tab: Vol, Comp, Flt.
     output_tab: u8,
     /// The synth editor: the preset edited, the tab, presets not saved yet.
     synth: Option<session_synth::SynthEdit>,
@@ -263,7 +263,7 @@ const SHORTCUTS: [&str; 52] = [
     "  Ctrl+C, Ctrl+V         copy, paste the step (Shift: the track)",
     "  Ctrl+N, Ctrl+D         new pattern, duplicate pattern",
     "  Ctrl+T, Ctrl+Backspace add, remove a track",
-    "  Ctrl+G, Ctrl+L         next grid, loop point one step back",
+    "  Ctrl+G, Ctrl+L         next grid, loop one step shorter",
     "  Ctrl+- Ctrl+=          pattern length",
     "GENERATE",
     "  B                      generate a pattern",
@@ -282,7 +282,7 @@ const SHORTCUTS: [&str; 52] = [
     "SYNTH EDITOR (F6)",
     "  OSC, FLT, MOD, ENV     the track's preset: knobs, waves, lists, power buttons (saved)",
     "OUTPUT PANEL (bottom strip, always shown)",
-    "  vol, Comp, Flt         the master volume and spectrum, the compressor, the filters (saved)",
+    "  Vol, Comp, Flt         the master volume and spectrum, the compressor, the filters (saved)",
     "SONG PANEL (F3)",
     "  click / right-click    the ruler: aim the cursor; a pattern, row, clip, the grid: menu",
     "  Left Right, Up Down    the cursor a measure back / on, previous / next pattern",
@@ -856,7 +856,7 @@ impl Session {
             C::AddTrack => self.add_track(),
             C::RemoveTrack => self.remove_track(),
             C::NextGrid => self.next_grid(),
-            C::LoopBack => self.loop_point_back(),
+            C::ShortenLoop => self.shorten_loop(),
             C::CompactTracks => self.compact_tracks(),
             C::GeneratePattern => self.generate_pattern(),
             C::GenerateDrums => self.toggle_generation(None),
@@ -1498,9 +1498,9 @@ impl Session {
         }
     }
 
-    pub fn loop_point_back(&mut self) {
+    pub fn shorten_loop(&mut self) {
         let Some(t) = self.focus_track() else { return };
-        if self.editor.decr_loop_point(self.pattern_index, t) {
+        if self.editor.shorten_loop(self.pattern_index, t) {
             self.edited();
         }
     }

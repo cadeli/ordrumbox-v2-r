@@ -466,7 +466,7 @@ fn shortcut(code: KeyCode, shift: bool, control: bool) -> Option<Command> {
             KeyCode::KeyT => C::AddTrack,
             KeyCode::Backspace | KeyCode::Delete => C::RemoveTrack,
             KeyCode::KeyG => C::NextGrid,
-            KeyCode::KeyL => C::LoopBack,
+            KeyCode::KeyL => C::ShortenLoop,
             KeyCode::Minus => C::LengthDown,
             KeyCode::Equal => C::LengthUp,
             KeyCode::KeyQ => C::Quit,

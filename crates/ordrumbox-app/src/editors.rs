@@ -16,10 +16,10 @@ use crate::panel::{ACCENT, DIM, Id, Item, Kind, LfoParam, Rect, TEXT, label_widt
 // ─── Tables (track_editor_constants.js, sync_section.js) ─────────────────────
 
 /// Main tabs.
-pub const TABS: [&str; 5] = ["fx", "sound", "mod", "loop", "gen"];
+pub const TABS: [&str; 5] = ["FX", "Sound", "LFO", "Loop", "Gen"];
 pub const TAB_FX: u8 = 0;
 pub const TAB_SOUND: u8 = 1;
-pub const TAB_MOD: u8 = 2;
+pub const TAB_LFO: u8 = 2;
 pub const TAB_LOOP: u8 = 3;
 
 /// An effect: the setting its LED reads and writes, its tab label, its rows.
@@ -34,7 +34,7 @@ pub const FX_DEFS: [FxDef; 4] = [
     FxDef { key: "delayMix", label: "Dly", controls: &["delayMix", "delayBeats", "delayType"] },
     FxDef { key: "saturationAmount", label: "Sat", controls: &["saturationAmount", "saturationType"] },
     // The filter is on when its type is not the allpass bypass.
-    FxDef { key: "filterType", label: "fltr", controls: &["filterType", "filterFreq", "filterQ"] },
+    FxDef { key: "filterType", label: "Flt", controls: &["filterType", "filterFreq", "filterQ"] },
 ];
 
 pub const FILTER_TYPES: [&str; 3] = ["lowpass", "highpass", "bandpass"];
@@ -274,7 +274,7 @@ pub fn fx_on(track: &Track, fx: &FxDef) -> bool {
     number(track, fx.key) > 0.0
 }
 
-/// `getTrackLoopAtStep`: the loop point, else the track's length in steps.
+/// `getTrackLoopAtStep`: the loop length, else the track's length in steps.
 pub fn loop_length(track: &Track) -> f64 {
     if let Some(l) = track.loop_length.filter(|&l| l > 0) {
         return f64::from(l);
@@ -683,7 +683,7 @@ pub fn track_editor(view: &TrackView, state: &EditorState, area: Rect, scale: i3
     match state.tab {
         TAB_FX => fx_tab(&mut rows, view, state),
         TAB_SOUND => sound_tab(&mut rows, view),
-        TAB_MOD => mod_tab(&mut rows, view, state),
+        TAB_LFO => lfo_tab(&mut rows, view, state),
         TAB_LOOP => loop_tab(&mut rows, track),
         _ => generation_tab(&mut rows, track, state),
     }
@@ -753,7 +753,7 @@ fn sound_tab(rows: &mut Rows, view: &TrackView) {
     }
 }
 
-fn mod_tab(rows: &mut Rows, view: &TrackView, state: &EditorState) {
+fn lfo_tab(rows: &mut Rows, view: &TrackView, state: &EditorState) {
     let s = rows.scale;
     let track = view.track;
     let tabs: Vec<_> = LFO_TARGETS
@@ -835,7 +835,7 @@ fn loop_tab(rows: &mut Rows, track: &Track) {
         let default = default_of(p.key, p.min);
         let (value, spec, format) = match p.key {
             "stepsPerBeat" => (f64::from(spb), Spec::slider(p.min, p.max, p.step, default), p.format),
-            // The loop point's slider ends at the track's length.
+            // The loop length's slider ends at the track's length.
             "loopLength" => (
                 loop_length(track).min(max_steps),
                 Spec::slider(p.min, max_steps, p.step, p.min),
