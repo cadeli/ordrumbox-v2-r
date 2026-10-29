@@ -674,7 +674,7 @@ mod tests {
             Item::new(
                 Some(Id::KnobBar("volume")),
                 Rect::new(0, 0, 60, 50),
-                Kind::Value { spec, value: 0.5, label: Some("Vel".into()), text: "50 %".into(), lfo: false },
+                Kind::Value { spec, value: 0.5, label: Some("Vol".into()), text: "50 %".into(), lfo: false },
             ),
             Item::new(
                 Some(Id::Fx("reverbAmount")),
@@ -687,7 +687,7 @@ mod tests {
                 Kind::Value {
                     spec: Spec::slider(0.0, 100.0, 1.0, 0.0),
                     value: 30.0,
-                    label: Some("Var Pos".into()),
+                    label: Some("Var Hits".into()),
                     text: "30".into(),
                     lfo: false,
                 },

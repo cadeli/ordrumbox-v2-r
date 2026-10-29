@@ -144,8 +144,8 @@ pub enum Format {
     Fixed1,
     /// `formatSignedDb`: `+1.0`.
     SignedFixed1,
-    /// The loop point as `beat.step` at this many steps per beat.
-    LoopPoint(i32),
+    /// The loop length as `beat.step` at this many steps per beat.
+    LoopLength(i32),
     /// `parseFloat(v.toFixed(3))`.
     Fmt3,
     /// `Math.round(v)`.
@@ -174,7 +174,7 @@ impl Format {
             Self::Fixed2 => to_fixed_text(v, 2),
             Self::Fixed1 => to_fixed_text(v, 1),
             Self::SignedFixed1 => format!("{}{}", if v >= 0.0 { "+" } else { "" }, to_fixed_text(v, 1)),
-            Self::LoopPoint(spb) => {
+            Self::LoopLength(spb) => {
                 let spb = i64::from(spb.max(1));
                 let step = v as i64 - 1;
                 format!("{}.{}", step.div_euclid(spb) + 1, step % spb + 1)
@@ -289,7 +289,7 @@ mod tests {
         }
         for row in fixture.get("loopPoints").and_then(Value::as_array).unwrap() {
             let r = row.as_array().unwrap();
-            assert_eq!(Format::LoopPoint(num(&r[0]) as i32).value(num(&r[1]), ""), r[2].as_str().unwrap());
+            assert_eq!(Format::LoopLength(num(&r[0]) as i32).value(num(&r[1]), ""), r[2].as_str().unwrap());
         }
     }
 
@@ -299,7 +299,7 @@ mod tests {
         assert_eq!(Format::Fmt.text(1.0), "1");
         assert_eq!(Format::Freq.text(999.4), "999Hz");
         assert_eq!(Format::Freq.text(12_345.0), "12.3k");
-        assert_eq!(Format::LoopPoint(4).text(5.0), "2.1");
+        assert_eq!(Format::LoopLength(4).text(5.0), "2.1");
         assert_eq!(Format::Density.text(-1.0), "Auto");
         assert_eq!(Format::Millis.value(5000.0, ""), "5000 ms");
         assert_eq!(Format::Plain.value(0.333_333, "x"), "0.333333 x");

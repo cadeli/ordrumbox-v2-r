@@ -75,7 +75,7 @@ pub struct LfoTarget {
 pub const LFO_TARGETS: [LfoTarget; 5] = [
     LfoTarget { key: "filterFreq", label: "Freq", lfo_key: "filterFreqLfo", min: 20.0, max: 20_000.0, step: 1.0 },
     LfoTarget { key: "filterQ", label: "Q", lfo_key: "filterQLfo", min: 0.707, max: 18.707, step: 0.01 },
-    LfoTarget { key: "volume", label: "Vel", lfo_key: "volumeLfo", min: 0.0, max: 1.0, step: 0.01 },
+    LfoTarget { key: "volume", label: "Vol", lfo_key: "volumeLfo", min: 0.0, max: 1.0, step: 0.01 },
     LfoTarget { key: "pan", label: "Pan", lfo_key: "panLfo", min: -1.0, max: 1.0, step: 0.01 },
     LfoTarget { key: "pitch", label: "Pitch", lfo_key: "pitchLfo", min: -24.0, max: 24.0, step: 1.0 },
 ];
@@ -102,24 +102,24 @@ const fn prop(key: &'static str, label: &'static str, min: f64, max: f64, step: 
 
 /// The effect knobs.
 pub const FX_KNOBS: [Prop; 5] = [
-    prop("reverbAmount", "Depth", 0.0, 1.0, 0.01, Format::Plain),
-    prop("delayMix", "Depth", 0.0, 1.0, 0.01, Format::Plain),
-    prop("saturationAmount", "Depth", 0.0, 1.0, 0.01, Format::Plain),
+    prop("reverbAmount", "Mix", 0.0, 1.0, 0.01, Format::Plain),
+    prop("delayMix", "Mix", 0.0, 1.0, 0.01, Format::Plain),
+    prop("saturationAmount", "Mix", 0.0, 1.0, 0.01, Format::Plain),
     prop("filterFreq", "Freq", 20.0, 20_000.0, 1.0, Format::Freq),
     prop("filterQ", "Q", 0.707, 18.707, 0.01, Format::Fixed2),
 ];
 
 /// Labels of the effect rows that are not knobs.
-fn fx_label(key: &str) -> &'static str {
+pub fn fx_label(key: &str) -> &'static str {
     match key {
-        "delayBeats" => "Time",
+        "delayBeats" => "Beats",
         _ => "Type",
     }
 }
 
 /// The knob bar (volume, pan, pitch, decay) and its units.
 pub const KNOB_BAR: [(Prop, &str); 4] = [
-    (prop("volume", "Vel", 0.0, 1.0, 0.01, Format::Percent), "%"),
+    (prop("volume", "Vol", 0.0, 1.0, 0.01, Format::Percent), "%"),
     (prop("pan", "Pan", -1.0, 1.0, 0.01, Format::Fmt), ""),
     (prop("pitch", "Pitch", -24.0, 24.0, 1.0, Format::SignedPlain), "st"),
     (prop("decay", "Decay", DECAY_RANGE.0, DECAY_RANGE.1, 10.0, Format::Millis), ""),
@@ -130,8 +130,8 @@ pub const DEFAULT_DECAY: f64 = 500.0;
 
 /// Generation tab, shown while auto is off (`manualOnly`).
 pub const GENERATION_MANUAL: [Prop; 3] = [
-    prop("hitVariation", "Var Pos", 0.0, 100.0, 1.0, Format::Plain),
-    prop("noteVariation", "Var Prop", 0.0, 100.0, 1.0, Format::Plain),
+    prop("hitVariation", "Var Hits", 0.0, 100.0, 1.0, Format::Plain),
+    prop("noteVariation", "Var Notes", 0.0, 100.0, 1.0, Format::Plain),
     prop("probability", "Prob", 0.0, 1.0, 0.01, Format::Plain),
 ];
 
@@ -166,7 +166,7 @@ pub const GENERATION_ENGINE: [GenerationRow; 7] = [
 /// The loop tab.
 pub const LOOP_PROPS: [Prop; 3] = [
     prop("stepsPerBeat", "Steps/Beat", 1.0, 8.0, 1.0, Format::Plain),
-    prop("loopLength", "Loop Point", 1.0, 128.0, 1.0, Format::Plain),
+    prop("loopLength", "Loop Len", 1.0, 128.0, 1.0, Format::Plain),
     prop("swingAmount", "Swing", 0.0, 1.0, 0.01, Format::Plain),
 ];
 
@@ -196,8 +196,8 @@ const fn note_slider(key: &'static str, label: &'static str, min: f64, max: f64,
 /// one key, and the second one takes the first one's place.
 pub const NOTE_GROUPS: [&[NoteRow]; 4] = [
     &[
-        note_slider("every", "Passes", 1.0, 16.0, 1.0),
-        note_slider("everyOffset", "Phase", 0.0, 15.0, 1.0),
+        note_slider("every", "Every", 1.0, 16.0, 1.0),
+        note_slider("everyOffset", "Offset", 0.0, 15.0, 1.0),
         note_slider("probability", "Prob", 0.0, 1.0, 0.01),
     ],
     &[
@@ -205,7 +205,10 @@ pub const NOTE_GROUPS: [&[NoteRow]; 4] = [
         note_slider("retriggerRate", "Rate", 1.0, 16.0, 1.0),
         note_slider("arpTriggerProbability", "Prob", 0.0, 1.0, 0.01),
     ],
-    &[note_slider("euclideanPulses", "Eucl", 0.0, 16.0, 1.0), note_slider("euclideanRotation", "Rot", 0.0, 15.0, 1.0)],
+    &[
+        note_slider("euclideanPulses", "Pulses", 0.0, 16.0, 1.0),
+        note_slider("euclideanRotation", "Rot", 0.0, 15.0, 1.0),
+    ],
     &[
         NoteRow::Select("arpScale", "Scale"),
         NoteRow::Select("arpDirection", "Dir"),
@@ -836,7 +839,7 @@ fn loop_tab(rows: &mut Rows, track: &Track) {
             "loopLength" => (
                 loop_length(track).min(max_steps),
                 Spec::slider(p.min, max_steps, p.step, p.min),
-                Format::LoopPoint(spb),
+                Format::LoopLength(spb),
             ),
             _ => (track.swing_amount, Spec::slider(p.min, p.max, p.step, default), p.format),
         };
