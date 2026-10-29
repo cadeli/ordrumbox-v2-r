@@ -95,16 +95,16 @@ pub(crate) fn apply_note_properties(note: &mut Note, source: &Value) {
         note.retrigger_count = n as i32;
     }
     if let Some(n) = num(source, "rate") {
-        note.rate = n;
+        note.retrigger_rate = n;
     }
     if let Some(n) = num(source, "euclideanFill") {
-        note.euclidean_fill = n as i32;
+        note.euclidean_pulses = n as i32;
     }
     if let Some(arp) = source.get("arp").filter(|a| !a.is_null()) {
         note.arp = arp.clone();
     }
     if let Some(n) = num(source, "prob") {
-        note.prob = n;
+        note.probability = n;
     }
     if let Some(n) = num(source, "arpTriggerProbability") {
         note.arp_trigger_probability = n;
@@ -406,7 +406,7 @@ pub(crate) fn loop_point(track: &Track, config: &Value, default_beats: f64) -> i
 /// `applyLoopPoint`: the track loops after `loopBeats` beats (its length by default).
 pub(crate) fn apply_loop_point(track: &mut Track, config: &Value) {
     let beats = num(config, "loopBeats").unwrap_or(f64::from(track.beat_count));
-    track.loop_at_step = Some((beats * f64::from(track.steps_per_beat)) as i32);
+    track.loop_length = Some((beats * f64::from(track.steps_per_beat)) as i32);
 }
 
 /// `#isRequiredStep`: `step` of a beat matching a `{beatModulo, step}` rule.

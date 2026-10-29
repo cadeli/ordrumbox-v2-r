@@ -113,7 +113,7 @@ impl RollView<'_> {
 
     /// Where the track loops (`getTrackLoopAtStep`): its loop point, else its end.
     fn loop_at(&self) -> i64 {
-        self.track.loop_at_step.map_or(self.total_steps(), i64::from).max(1)
+        self.track.loop_length.map_or(self.total_steps(), i64::from).max(1)
     }
 
     /// Whether note `n` sounds on `step` (`illuminateStep`).
@@ -318,7 +318,7 @@ pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &s
         canvas.fill_rect(layout.step_x(view, step), layout.grid.y, s, grid_h, color);
     }
     // The loop point.
-    if let Some(loop_at) = view.track.loop_at_step.map(i64::from).filter(|&l| l > start && l <= end) {
+    if let Some(loop_at) = view.track.loop_length.map(i64::from).filter(|&l| l > start && l <= end) {
         canvas.fill_rect(layout.step_x(view, loop_at) - s, layout.grid.y, 2 * s, grid_h, LOOP_MARK);
     }
 
@@ -343,7 +343,7 @@ pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &s
             theme::mix(BACKGROUND, if lit { PLAYING } else { view.color }, note_opacity(note.velocity.clamp(0.0, 1.0)));
         canvas.fill_rect(r.x, r.y, r.w, r.h, color);
         // The trigger kind (`noteTriggerKind`): probability wins over the cycle.
-        let trig = if note.prob < 1.0 {
+        let trig = if note.probability < 1.0 {
             Some(TRIG_RAND)
         } else if note.every > 1 {
             Some(TRIG_FIXED)

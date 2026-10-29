@@ -91,7 +91,7 @@ fn flow_3_track_settings_and_their_undo() {
     assert!(editor.change_track_name(p, 3, "BASS2"));
     let tracks = &editor.library().patterns[p].tracks;
     assert!(tracks[0].mute);
-    assert_eq!((tracks[1].velocity, tracks[1].pan), (1.0, -0.4), "the velocity clamped to 1");
+    assert_eq!((tracks[1].volume, tracks[1].pan), (1.0, -0.4), "the velocity clamped to 1");
     assert_eq!((tracks[2].sample_id.as_str(), tracks[2].use_auto_assign_sound), ("kits/chh.wav", false));
     assert_eq!(tracks[3].name, "BASS2");
     // The muted track is left out of what plays (here, its MIDI file).

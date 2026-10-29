@@ -24,10 +24,10 @@ json_record! {
         /// Fires once every `every` passes of the pattern (not every N steps).
         every: i32 = 1 => "every",
         /// Trigger probability, 0–1.
-        prob: f64 = 1.0 => "prob",
+        probability: f64 = 1.0 => "prob",
         /// Ghost/retrigger spacing code: `< 8` is `rate / 8` step, `>= 8` is
         /// `rate - 7` steps. 1 is the tightest, not "normal".
-        rate: f64 = 1.0 => "rate",
+        retrigger_rate: f64 = 1.0 => "rate",
         /// Hits: the note plus its repeats (with an arpeggio, the arp notes).
         retrigger_count: i32 = 1 => "retriggerCount",
         /// Arpeggio as written in the file: interval array, `"0,4,7"`, a mode
@@ -37,15 +37,15 @@ json_record! {
         /// Probability of each arpeggio/retrigger hit, 0–1.
         arp_trigger_probability: f64 = 1.0 => "arpTriggerProbability",
         /// Euclidean pulses over the span to the next note, base note included (0 = off).
-        euclidean_fill: i32 = 0 => "euclideanFill",
+        euclidean_pulses: i32 = 0 => "euclideanFill",
         /// Rotation of the euclidean pattern, in steps.
         euclidean_rotation: i32 = 0 => "euclideanRotation",
         /// Phase in the `every` cycle: fires on the pass where `(pass + pos) % every == 0`.
-        pos: i32 = 0 => "pos",
+        every_offset: i32 = 0 => "pos",
         /// Arpeggio scale picked in the note editor.
         arp_scale: Option<String> = None => "_arpScale",
         /// Arpeggio direction picked in the note editor.
-        arp_type: Option<String> = None => "_arpType",
+        arp_direction: Option<String> = None => "_arpType",
     }
     other_fields {
         /// Position in the beat, percent (`stepPercent`): never saved, kept
@@ -259,14 +259,21 @@ mod tests {
         assert_eq!(notes[0], Note::default());
         assert_eq!(issues.len(), 2);
         assert_eq!(issues[0].at, "t.notes[0].beat");
-        assert_eq!(notes[1], Note { pos: 1, ..Note::default() });
+        assert_eq!(notes[1], Note { every_offset: 1, ..Note::default() });
     }
 
     #[test]
     fn encodes_like_the_js_exporter() {
         let notes = [
             Note { velocity: 0.81234, beat: 1, beat_step: 1, ..Note::default() },
-            Note { beat: 3, beat_step: 1, pitch: -2.5, prob: 0.3333, arp: Value::from("0,4,7"), ..Note::default() },
+            Note {
+                beat: 3,
+                beat_step: 1,
+                pitch: -2.5,
+                probability: 0.3333,
+                arp: Value::from("0,4,7"),
+                ..Note::default()
+            },
             Note::default(),
         ];
         assert_eq!(

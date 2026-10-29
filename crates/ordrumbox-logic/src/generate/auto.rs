@@ -94,11 +94,11 @@ fn apply_genre_swing(g: &mut AutoGen<'_>, track: &mut Track, genre: Option<&str>
 fn apply_variation(g: &mut AutoGen<'_>, track: &mut Track, kind: InstrumentFamily) {
     let (min, max) = if kind.is_melodic() { (50.0, 85.0) } else { (30.0, 60.0) };
     let pick_in = |g: &mut AutoGen<'_>, min: f64, max: f64| min + (g.random() * (max - min + 1.0)).floor();
-    if track.auto_variation.is_none() {
-        track.auto_variation = Some(pick_in(g, min, max));
+    if track.auto_hit_variation.is_none() {
+        track.auto_hit_variation = Some(pick_in(g, min, max));
     }
-    if track.auto_variation2.is_none() {
-        track.auto_variation2 = Some(pick_in(g, js::round(min / 2.0), max));
+    if track.auto_note_variation.is_none() {
+        track.auto_note_variation = Some(pick_in(g, js::round(min / 2.0), max));
     }
 }
 
@@ -230,8 +230,8 @@ pub fn generate_pattern(g: &mut AutoGen<'_>, pattern: &mut Pattern, options: &Op
         let mut bass = Track::new("BASS", pattern.beat_count, 4);
         bass.use_soft_synth = false;
         bass.use_auto_assign_sound = true;
-        bass.synth_sound_key = Some("BASS1".into());
-        bass.velocity = 0.5;
+        bass.synth_preset = Some("BASS1".into());
+        bass.volume = 0.5;
         pattern.tracks.push(bass);
     }
 }
@@ -435,8 +435,8 @@ pub fn toggle_melodic(g: &mut AutoGen<'_>, pattern: &mut Pattern, kind: MelodicK
                     let mut track = Track::new(wanted.name(), pattern.beat_count, 4);
                     track.use_soft_synth = true;
                     track.use_auto_assign_sound = false;
-                    track.synth_sound_key = Some(synth.to_owned());
-                    track.velocity = 0.8;
+                    track.synth_preset = Some(synth.to_owned());
+                    track.volume = 0.8;
                     pattern.tracks.push(track);
                     let t = pattern.tracks.len() - 1;
                     generate_track(g, pattern, t, &variant, 1.0, &Harmony { root, scale: Some(scale) });
@@ -457,7 +457,7 @@ pub fn random_track(track: &mut Track, rnd: &mut dyn FnMut() -> f64) {
     let get = |key: &str| config.get(key).and_then(Value::as_f64).unwrap_or(f64::NAN);
     track.notes.clear();
     let spb = track.steps_per_beat;
-    track.loop_at_step = Some(track.beat_count * spb);
+    track.loop_length = Some(track.beat_count * spb);
     let total = track.beat_count * spb;
     let count = ((f64::from(total) * (get("densityMin") + rnd() * get("densitySpread"))).floor() as i32).max(1);
     let mut used: Vec<i32> = Vec::new();

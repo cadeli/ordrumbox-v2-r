@@ -193,7 +193,7 @@ pub fn assign_track(
     pick: &mut dyn FnMut(usize) -> usize,
 ) -> TrackSound {
     if track.use_soft_synth {
-        let key = track.synth_sound_key.as_deref().filter(|k| synths.get(k).is_some()).map(str::to_owned);
+        let key = track.synth_preset.as_deref().filter(|k| synths.get(k).is_some()).map(str::to_owned);
         return match key {
             Some(key) => TrackSound::Synth(key),
             None if synths.is_empty() => TrackSound::None,

@@ -191,7 +191,7 @@ impl Session {
             let grid = Layout::new(body.main_w, body.editor_h, scale, pattern, self.status.len(), self.current_page);
             let spec = Spec::slider(0.0, 1.0, 0.01, 1.0);
             for (t, track) in pattern.tracks.iter().enumerate().take(grid.tracks()) {
-                let kind = Kind::Value { spec, value: track.velocity, label: None, text: String::new(), lfo: false };
+                let kind = Kind::Value { spec, value: track.volume, label: None, text: String::new(), lfo: false };
                 layout.items.push(Item::new(Some(Id::TrackVolume(t)), grid.volume_rect(t), kind));
             }
             let spec = Spec::slider(0.0, 2.0, 0.01, 1.0);
@@ -272,7 +272,7 @@ impl Session {
         match self.track_sound(t) {
             TrackSound::Sample(i) => bank.and_then(|b| b.get(i).map(|s| s.sample.url.clone())).unwrap_or_default(),
             TrackSound::Synth(key) => format!("synth {key}"),
-            TrackSound::None if track.use_soft_synth => match &track.synth_sound_key {
+            TrackSound::None if track.use_soft_synth => match &track.synth_preset {
                 Some(key) => format!("synth {key}"),
                 None => "synth".to_owned(),
             },
@@ -313,7 +313,7 @@ impl Session {
 
         // `getSoundInfo`.
         let info = if track.use_soft_synth {
-            track.synth_sound_key.clone()
+            track.synth_preset.clone()
         } else {
             instrument.map(|i| {
                 let name = if i.display_name.is_empty() { &i.key } else { &i.display_name };
@@ -359,7 +359,7 @@ impl Session {
         // Synth presets.
         let keys = self.synths.keys();
         let current = if track.use_soft_synth {
-            track.synth_sound_key.clone().unwrap_or_else(|| "BASS1".into())
+            track.synth_preset.clone().unwrap_or_else(|| "BASS1".into())
         } else {
             "none".into()
         };
@@ -459,7 +459,7 @@ impl Session {
         let scale = n.arp_scale.clone().unwrap_or_else(|| state.scale.clone());
         let scales = Choice { selected: editors::index_of(&names, &scale), values: names, labels: Vec::new() };
         let types: Vec<String> = ARP_TYPES.iter().map(|t| (*t).to_owned()).collect();
-        let kind = n.arp_type.clone().unwrap_or_else(|| state.kind.clone());
+        let kind = n.arp_direction.clone().unwrap_or_else(|| state.kind.clone());
         let arp_type = Choice { selected: editors::index_of(&types, &kind), values: types, labels: Vec::new() };
         NoteView { title, note, scales, arp_type, arp_range: state.range }
     }
@@ -1399,7 +1399,7 @@ mod tests {
         s.run(Command::ConvertToSynth);
         let tracks = &s.pattern().unwrap().tracks;
         assert!(tracks.iter().all(|t| t.use_soft_synth && !t.use_auto_assign_sound));
-        let keys: Vec<_> = tracks.iter().map(|t| t.synth_sound_key.as_deref()).collect();
+        let keys: Vec<_> = tracks.iter().map(|t| t.synth_preset.as_deref()).collect();
         assert_eq!(keys, [Some("BASS0"), Some("SN")]);
         assert_eq!(s.message, "All tracks converted to generated sounds");
         assert_eq!(s.editor.history().next_undo(), Some("Convert tracks to generated sounds"));

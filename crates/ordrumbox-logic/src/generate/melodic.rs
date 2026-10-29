@@ -333,7 +333,7 @@ fn melody_arpeggio(g: &mut Gen<'_>, track: &mut Track, scale: &[f64], config: &V
                 if let Some(arp) = arp {
                     note.arp = arp.clone();
                     note.retrigger_count = count as i32;
-                    note.rate = rate;
+                    note.retrigger_rate = rate;
                 }
             }
             index += 1;

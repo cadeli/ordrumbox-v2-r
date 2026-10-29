@@ -149,7 +149,7 @@ fn variation_respects_its_budget() {
     only_chh.tracks.truncate(1);
     only_chh.tracks[0].beat_count = 8; // one loop over the 8-beat pattern: one budget
     let mut plain = only_chh.clone();
-    plain.tracks[0].variation = 0.0;
+    plain.tracks[0].hit_variation = 0.0;
     let reference = compute(&plain, 0, 0);
     let reference_count: usize = reference.values().map(Vec::len).sum();
     for seed in 0..50 {

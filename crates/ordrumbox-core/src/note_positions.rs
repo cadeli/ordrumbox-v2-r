@@ -45,11 +45,11 @@ pub fn sub_positions(
         Some(_) => arp::note_count(note.retrigger_count) as i64,
         None => i64::from(note.retrigger_count),
     };
-    if sequence.is_none() && count <= 1 && note.euclidean_fill <= 0 {
+    if sequence.is_none() && count <= 1 && note.euclidean_pulses <= 0 {
         return Vec::new();
     }
     let offset = |i: i64| sequence.as_ref().map_or(0.0, |s| s[(i as usize) % s.len()]);
-    let spacing = step_spacing(note.rate);
+    let spacing = step_spacing(note.retrigger_rate);
     let mut positions: Vec<SubPosition> = (1..count)
         .map(|i| SubPosition {
             pos: round(base as f64 + i as f64 * spacing) as i64,
@@ -58,9 +58,9 @@ pub fn sub_positions(
         })
         .filter(|p| p.pos < total_steps)
         .collect();
-    if note.euclidean_fill > 0 {
+    if note.euclidean_pulses > 0 {
         let fills =
-            euclidean::fill_positions(base, span.end(note) - base, note.euclidean_fill, note.euclidean_rotation);
+            euclidean::fill_positions(base, span.end(note) - base, note.euclidean_pulses, note.euclidean_rotation);
         for (k, pos) in fills.into_iter().enumerate() {
             if pos < total_steps {
                 positions.push(SubPosition { pos, kind: SubKind::Euclidean, pitch_offset: offset(count + k as i64) });
