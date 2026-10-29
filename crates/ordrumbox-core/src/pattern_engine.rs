@@ -73,7 +73,7 @@ pub fn fires_on_pass(offset: i32, cycle: i32, pass: u32) -> bool {
 pub fn expand_hits(pattern: &Pattern, pass: u32, rng: &mut Rng, scales: &Scales) -> Hits {
     let mut flat = Hits::new();
     let pattern_ticks = pattern_ticks(pattern);
-    for (track_idx, track) in pattern.tracks.iter().enumerate() {
+    for (track_index, track) in pattern.tracks.iter().enumerate() {
         if track.steps_per_beat <= 0 {
             continue; // no grid: JS computes NaN ticks for every note
         }
@@ -83,8 +83,8 @@ pub fn expand_hits(pattern: &Pattern, pass: u32, rng: &mut Rng, scales: &Scales)
         // Probability is a manual-mode control: in auto mode only note.probability gates.
         let track_probability = if track.auto_mode { 1.0 } else { track.probability };
 
-        for (note_idx, source) in track.notes.iter().enumerate() {
-            let note = varied.get(&note_idx).unwrap_or(source);
+        for (note_index, source) in track.notes.iter().enumerate() {
+            let note = varied.get(&note_index).unwrap_or(source);
             if !fires_on_pass(note.cycle_offset, note.cycle, pass) || !rng.chance(track_probability * note.probability)
             {
                 continue;
@@ -93,13 +93,13 @@ pub fn expand_hits(pattern: &Pattern, pass: u32, rng: &mut Rng, scales: &Scales)
             if base >= pattern_ticks {
                 continue;
             }
-            let ctx = NoteContext { track_idx, track, note, note_idx, pattern_ticks };
+            let ctx = NoteContext { track_index, track, note, note_index, pattern_ticks };
             for tick in loop_occurrences(base, loop_ticks, pattern_ticks) {
                 ctx.add_sub_notes(&mut flat, tick, rng);
                 ctx.add_euclidean_fill(&mut flat, tick, &span_end, rng);
             }
         }
-        variation::apply(&mut flat, track_idx, track, loop_ticks, pattern_ticks, rng, scales);
+        variation::apply(&mut flat, track_index, track, loop_ticks, pattern_ticks, rng, scales);
     }
     flat
 }
@@ -147,10 +147,10 @@ impl SpanResolver {
 
 /// One written (or varied) note being expanded.
 struct NoteContext<'a> {
-    track_idx: usize,
+    track_index: usize,
     track: &'a Track,
     note: &'a Note,
-    note_idx: usize,
+    note_index: usize,
     pattern_ticks: i64,
 }
 
@@ -158,8 +158,8 @@ impl NoteContext<'_> {
     fn push(&self, flat: &mut Hits, tick: i64, pitch_offset: f64) {
         let Ok(tick) = u32::try_from(tick) else { return }; // before the pattern start
         flat.entry(tick).or_default().push(Hit {
-            track: self.track_idx,
-            source: Some(self.note_idx),
+            track: self.track_index,
+            source: Some(self.note_index),
             beat: self.note.beat,
             step: self.note.step,
             pitch: self.note.pitch + pitch_offset,

@@ -73,10 +73,10 @@ impl Object {
             return Some(std::mem::replace(slot, value));
         }
         let at = match array_index(&key) {
-            Some(idx) => self
+            Some(index) => self
                 .entries
                 .iter()
-                .position(|(k, _)| array_index(k).is_none_or(|other| other > idx))
+                .position(|(k, _)| array_index(k).is_none_or(|other| other > index))
                 .unwrap_or(self.entries.len()),
             None => self.entries.len(),
         };
@@ -117,7 +117,7 @@ fn array_index(key: &str) -> Option<u32> {
     if !canonical {
         return None;
     }
-    key.parse::<u32>().ok().filter(|&idx| idx != u32::MAX)
+    key.parse::<u32>().ok().filter(|&index| index != u32::MAX)
 }
 
 impl Value {
