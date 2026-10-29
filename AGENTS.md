@@ -25,14 +25,14 @@ ordrumbox-core    data model, JSON codec, pattern engine, RNG       no deps
 ordrumbox-dsp     sample voice, synth voice, channel strip, master  no deps
 ordrumbox-logic   editor with undo/redo, generators, MIDI files     → core
 ordrumbox-engine  kits, WAV, passes, engine, UI ↔ audio link        → core, dsp
-ordrumbox-app     window, UI, audio output                          → core, logic, engine, winit, softbuffer, cpal
+ordrumbox-app     window, UI, audio output                          → core, logic, engine, winit, softbuffer, cpal, fontdue
 assets/           data/*.json and kits/**.wav, read at runtime
 tools/            scripts that regenerate the golden fixtures
 ```
 
 - The four domain crates take **no third-party dependency**. Only
   `ordrumbox-app` talks to the OS (window, screen, sound device), through
-  `winit`, `softbuffer` and `cpal`.
+  `winit`, `softbuffer`, `cpal` and `fontdue` (text in the system's monospace font, read at start: nothing bundled).
 - Dependencies only point down the table. Nothing depends on
   `ordrumbox-app`; `dsp` uses `core` only as a dev-dependency.
 - Workspace lints (`Cargo.toml`): `unsafe_code = "forbid"`,
