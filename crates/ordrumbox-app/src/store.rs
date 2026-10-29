@@ -83,27 +83,27 @@ pub fn save_song(path: &Path, record: &json::Value) -> io::Result<()> {
     write_atomic(path, &(record.to_json_pretty(2) + "\n"))
 }
 
-/// The app settings (`settings.json`: `settings.master`, the master bus).
+/// The app settings (`settings.json`: `master`, the master bus; `updates`,
+/// the update check).
 pub fn settings_path() -> Option<PathBuf> {
     Some(user_dir()?.join("settings.json"))
 }
 
-/// The master bus settings saved, if there are some, with what was not
-/// taken as it is (an unreadable file is an error).
-pub fn load_master(path: &Path) -> Result<Option<(ordrumbox_engine::MasterSettings, Vec<String>)>, String> {
+/// Setting `key` of the settings file, if it has one (an unreadable file is an error).
+pub fn load_setting(path: &Path, key: &str) -> Result<Option<json::Value>, String> {
     match fs::read_to_string(path) {
         Ok(text) => {
             let value = json::parse(&text).map_err(|e| format!("{}: {e}", path.display()))?;
-            Ok(value.get("master").map(crate::master::from_json))
+            Ok(value.get(key).cloned())
         }
         Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
         Err(e) => Err(format!("{}: {e}", path.display())),
     }
 }
 
-/// Write the master bus settings, keeping the file's other settings. A file
-/// that cannot be read or is not a JSON object is an error, never written over.
-pub fn save_master(path: &Path, master: &ordrumbox_engine::MasterSettings) -> io::Result<()> {
+/// Write setting `key`, keeping the file's other settings. A file that
+/// cannot be read or is not a JSON object is an error, never written over.
+pub fn save_setting(path: &Path, key: &str, value: json::Value) -> io::Result<()> {
     let mut settings = match fs::read_to_string(path) {
         Ok(text) => json::parse(&text)
             .ok()
@@ -112,7 +112,7 @@ pub fn save_master(path: &Path, master: &ordrumbox_engine::MasterSettings) -> io
         Err(e) if e.kind() == io::ErrorKind::NotFound => json::Object::new(),
         Err(e) => return Err(e),
     };
-    settings.insert("master", crate::master::to_json(master));
+    settings.insert(key, value);
     write_atomic(path, &(json::Value::Object(settings).to_json_pretty(2) + "\n"))
 }
 
@@ -269,21 +269,18 @@ mod tests {
     }
 
     #[test]
-    fn master_settings_keep_the_other_settings() {
+    fn a_setting_keeps_the_other_settings() {
         let dir = env::temp_dir().join(format!("ordrumbox-settings-{}", std::process::id()));
         let path = dir.join("settings.json");
-        assert_eq!(load_master(&path), Ok(None));
+        assert_eq!(load_setting(&path, "master"), Ok(None));
         fs::create_dir_all(&dir).unwrap();
         fs::write(&path, r#"{"colorScheme":3,"master":{"volume":0.5}}"#).unwrap();
-        let (mut master, issues) = load_master(&path).unwrap().unwrap();
-        assert!(issues.is_empty());
-        assert_eq!((master.master, master.threshold), (0.5, -18.0));
-        master.threshold = -30.0;
-        save_master(&path, &master).unwrap();
-        assert_eq!(load_master(&path).unwrap().unwrap(), (master, Vec::new()));
+        assert_eq!(load_setting(&path, "master").unwrap().unwrap().to_json(), r#"{"volume":0.5}"#);
+        save_setting(&path, "updates", json::Value::from(true)).unwrap();
+        assert_eq!(load_setting(&path, "updates"), Ok(Some(json::Value::from(true))));
         assert!(fs::read_to_string(&path).unwrap().contains("\"colorScheme\": 3"));
         fs::write(&path, "{").unwrap();
-        assert!(save_master(&path, &master).is_err());
+        assert!(save_setting(&path, "updates", json::Value::Null).is_err());
         assert_eq!(fs::read_to_string(&path).unwrap(), "{");
         fs::remove_dir_all(dir).unwrap();
     }

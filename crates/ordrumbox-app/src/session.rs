@@ -33,6 +33,7 @@ use crate::menu::{self, Command, MenuState};
 use crate::panel::{Dropdown, Entry, Id};
 use crate::picker::{self, Outcome, Picker, PickerLayout, Purpose};
 use crate::store;
+use crate::update;
 use crate::view::{self, Cursor, Hit, KitView, View};
 
 #[path = "session_grid.rs"]
@@ -50,6 +51,8 @@ mod session_scenarios;
 mod session_song;
 #[path = "session_synth.rs"]
 mod session_synth;
+#[path = "session_update.rs"]
+mod session_update;
 pub use session_panel::{Button, PanelKey};
 
 /// What the main editor (top-left) shows under the header. The kit editor
@@ -203,6 +206,12 @@ pub struct Session {
     /// volume is their volume), and when they changed, not saved yet.
     master: ordrumbox_engine::MasterSettings,
     master_dirty: Option<Instant>,
+    /// The update check: its settings, the one under way, a newer release
+    /// found, and how a finished check wakes the window.
+    updates: update::Settings,
+    update_check: Option<update::Check>,
+    newer_release: Option<update::Release>,
+    update_waker: Option<update::Waker>,
     /// The output panel's tab: Vol, Comp, Flt.
     output_tab: u8,
     /// The synth editor: the preset edited, the tab, presets not saved yet.
@@ -395,6 +404,7 @@ impl Session {
             Err(e) => session.status.push(format!("no sound: {e}")),
         }
         session.load_master();
+        session.load_update_settings();
         session
     }
 
@@ -455,6 +465,10 @@ impl Session {
             kits_dirty: None,
             master: ordrumbox_engine::MasterSettings::default(),
             master_dirty: None,
+            updates: update::Settings::default(),
+            update_check: None,
+            newer_release: None,
+            update_waker: None,
             output_tab: 0,
             synth: None,
             synth_tab: 0,
@@ -801,6 +815,8 @@ impl Session {
             can_save_song: store::songs_dir().is_some(),
             saved_songs: store::songs_dir().is_some_and(|d| store::list_songs(&d).is_ok_and(|s| !s.is_empty())),
             kit_sample: self.kit_list().is_some_and(|(s, n)| s < n),
+            checking_updates: self.update_check.is_some(),
+            newer_release: self.newer_release.as_ref().map(|r| r.version.clone()),
         }
     }
 
@@ -915,6 +931,8 @@ impl Session {
             C::Shortcuts => self.overlay = Some(Overlay::Shortcuts),
             C::About => self.overlay = Some(Overlay::About),
             C::FactoryReset => self.overlay = Some(Overlay::FactoryReset),
+            C::CheckUpdates => self.check_updates(true),
+            C::DownloadPage => self.open_download_page(),
         }
     }
 
