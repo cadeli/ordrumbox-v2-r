@@ -226,7 +226,7 @@ velocity), its notes in the piano roll, its clips in the song panel. Flat
 colours, no glow. This is a redesign: the JS app looks otherwise. **Pattern › Rename pattern...** and **Pattern
 description...** edit the pattern's name and description; **Pattern ›
 Compact tracks** (the JS tools panel's button) shortens every track whose
-notes repeat to its shortest loop — the loop point set, the notes past it
+notes repeat to its shortest loop — the loop length set, the notes past it
 removed, one undo step per track (`compactTrack`, checked against the JS).
 
 Menus: the menu bar at the top of the window (File, Edit, View, Pattern,
