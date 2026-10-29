@@ -12,10 +12,10 @@ Windows by CI).
 | `ordrumbox-logic` | the library being edited: commands with undo/redo; pattern generators (every instrument's variants, genre templates, auto mode loop by loop); Standard MIDI Files (read, import, export) | core |
 | `ordrumbox-dsp` | sample voice, synth voice, channel strip (filter, saturation, reverb, delay), master bus; no allocation in render paths | none |
 | `ordrumbox-engine` | WAV decoding/encoding, kits and their files, sample analysis, sound auto-assignment, synth presets, passes (pattern and song: events, strip settings, LFO steps), sample-accurate engine, UI ↔ audio link, offline renders | core, dsp |
-| `ordrumbox-app` | window, software-rendered UI, audio output → `ordrumbox.exe` | winit, softbuffer, cpal |
+| `ordrumbox-app` | window, software-rendered UI (text in the system monospace font), audio output → `ordrumbox.exe` | winit, softbuffer, cpal, fontdue |
 
 The four domain crates have no third-party dependency. Only the app talks to
-the OS, through small bridges (`winit`, `softbuffer`, `cpal`; `midir` with MIDI).
+the OS, through small bridges (`winit`, `softbuffer`, `cpal`, `fontdue`; `midir` with MIDI).
 
 ## Running
 

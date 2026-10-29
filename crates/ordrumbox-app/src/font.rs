@@ -1,118 +1,118 @@
-//! 8×8 pixel font: the printable ASCII glyphs of the public-domain
-//! `font8x8` (Daniel Hepper, derived from the IBM VGA 8×8 font).
+//! The text font: the system's monospace font, read at start and drawn with
+//! `fontdue` (Consolas on Windows, Menlo on macOS, DejaVu or Liberation Mono
+//! elsewhere; `$ORDRUMBOX_FONT` names another file). Nothing is bundled.
 //!
-//! Monospace, one byte per row, bit 7 is the leftmost pixel. This table
-//! is distributed under the Public Domain (see the `font8x8` project).
+//! Text sits on a grid of [`SIZE`] × [`SIZE`] font pixels per character, the
+//! layout's unit: glyphs are sized so a capital is 7 font pixels high on an
+//! 8-high line, and centred in their cell.
 
-/// Glyph size in font pixels.
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::{Mutex, OnceLock};
+
+use fontdue::{Font, FontSettings};
+
+/// Cell size in font pixels: one character is `SIZE * scale` wide and high.
 pub const SIZE: i32 = 8;
+/// Font pixels from the top of a cell to the baseline (a capital's height).
+const BASELINE: i32 = 7;
+/// Environment variable naming a font file to use instead.
+pub const ENV_VAR: &str = "ORDRUMBOX_FONT";
 
-const FIRST: u32 = 0x20;
+/// A rasterised glyph: coverage (0–255) rows, and where they go in the cell.
+#[derive(Debug)]
+pub struct Glyph {
+    pub width: usize,
+    pub coverage: Vec<u8>,
+    /// Offset of the bitmap's top-left corner from the cell's top-left corner.
+    pub left: i32,
+    pub top: i32,
+}
 
-#[rustfmt::skip]
-const GLYPHS: [[u8; 8]; 95] = [
-    [0, 0, 0, 0, 0, 0, 0, 0], // ' '
-    [24, 60, 60, 24, 24, 0, 24, 0], // '!'
-    [108, 108, 0, 0, 0, 0, 0, 0], // '"'
-    [108, 108, 254, 108, 254, 108, 108, 0], // '#'
-    [48, 124, 192, 120, 12, 248, 48, 0], // '$'
-    [0, 198, 204, 24, 48, 102, 198, 0], // '%'
-    [56, 108, 56, 118, 220, 204, 118, 0], // '&'
-    [96, 96, 192, 0, 0, 0, 0, 0], // "'"
-    [24, 48, 96, 96, 96, 48, 24, 0], // '('
-    [96, 48, 24, 24, 24, 48, 96, 0], // ')'
-    [0, 102, 60, 255, 60, 102, 0, 0], // '*'
-    [0, 48, 48, 252, 48, 48, 0, 0], // '+'
-    [0, 0, 0, 0, 0, 48, 48, 96], // ','
-    [0, 0, 0, 252, 0, 0, 0, 0], // '-'
-    [0, 0, 0, 0, 0, 48, 48, 0], // '.'
-    [6, 12, 24, 48, 96, 192, 128, 0], // '/'
-    [124, 198, 206, 222, 246, 230, 124, 0], // '0'
-    [48, 112, 48, 48, 48, 48, 252, 0], // '1'
-    [120, 204, 12, 56, 96, 204, 252, 0], // '2'
-    [120, 204, 12, 56, 12, 204, 120, 0], // '3'
-    [28, 60, 108, 204, 254, 12, 30, 0], // '4'
-    [252, 192, 248, 12, 12, 204, 120, 0], // '5'
-    [56, 96, 192, 248, 204, 204, 120, 0], // '6'
-    [252, 204, 12, 24, 48, 48, 48, 0], // '7'
-    [120, 204, 204, 120, 204, 204, 120, 0], // '8'
-    [120, 204, 204, 124, 12, 24, 112, 0], // '9'
-    [0, 48, 48, 0, 0, 48, 48, 0], // ':'
-    [0, 48, 48, 0, 0, 48, 48, 96], // ';'
-    [24, 48, 96, 192, 96, 48, 24, 0], // '<'
-    [0, 0, 252, 0, 0, 252, 0, 0], // '='
-    [96, 48, 24, 12, 24, 48, 96, 0], // '>'
-    [120, 204, 12, 24, 48, 0, 48, 0], // '?'
-    [124, 198, 222, 222, 222, 192, 120, 0], // '@'
-    [48, 120, 204, 204, 252, 204, 204, 0], // 'A'
-    [252, 102, 102, 124, 102, 102, 252, 0], // 'B'
-    [60, 102, 192, 192, 192, 102, 60, 0], // 'C'
-    [248, 108, 102, 102, 102, 108, 248, 0], // 'D'
-    [254, 98, 104, 120, 104, 98, 254, 0], // 'E'
-    [254, 98, 104, 120, 104, 96, 240, 0], // 'F'
-    [60, 102, 192, 192, 206, 102, 62, 0], // 'G'
-    [204, 204, 204, 252, 204, 204, 204, 0], // 'H'
-    [120, 48, 48, 48, 48, 48, 120, 0], // 'I'
-    [30, 12, 12, 12, 204, 204, 120, 0], // 'J'
-    [230, 102, 108, 120, 108, 102, 230, 0], // 'K'
-    [240, 96, 96, 96, 98, 102, 254, 0], // 'L'
-    [198, 238, 254, 254, 214, 198, 198, 0], // 'M'
-    [198, 230, 246, 222, 206, 198, 198, 0], // 'N'
-    [56, 108, 198, 198, 198, 108, 56, 0], // 'O'
-    [252, 102, 102, 124, 96, 96, 240, 0], // 'P'
-    [120, 204, 204, 204, 220, 120, 28, 0], // 'Q'
-    [252, 102, 102, 124, 108, 102, 230, 0], // 'R'
-    [120, 204, 224, 112, 28, 204, 120, 0], // 'S'
-    [252, 180, 48, 48, 48, 48, 120, 0], // 'T'
-    [204, 204, 204, 204, 204, 204, 252, 0], // 'U'
-    [204, 204, 204, 204, 204, 120, 48, 0], // 'V'
-    [198, 198, 198, 214, 254, 238, 198, 0], // 'W'
-    [198, 198, 108, 56, 56, 108, 198, 0], // 'X'
-    [204, 204, 204, 120, 48, 48, 120, 0], // 'Y'
-    [254, 198, 140, 24, 50, 102, 254, 0], // 'Z'
-    [120, 96, 96, 96, 96, 96, 120, 0], // '['
-    [192, 96, 48, 24, 12, 6, 2, 0], // '\\'
-    [120, 24, 24, 24, 24, 24, 120, 0], // ']'
-    [16, 56, 108, 198, 0, 0, 0, 0], // '^'
-    [0, 0, 0, 0, 0, 0, 0, 255], // '_'
-    [48, 48, 24, 0, 0, 0, 0, 0], // '`'
-    [0, 0, 120, 12, 124, 204, 118, 0], // 'a'
-    [224, 96, 96, 124, 102, 102, 220, 0], // 'b'
-    [0, 0, 120, 204, 192, 204, 120, 0], // 'c'
-    [28, 12, 12, 124, 204, 204, 118, 0], // 'd'
-    [0, 0, 120, 204, 252, 192, 120, 0], // 'e'
-    [56, 108, 96, 240, 96, 96, 240, 0], // 'f'
-    [0, 0, 118, 204, 204, 124, 12, 248], // 'g'
-    [224, 96, 108, 118, 102, 102, 230, 0], // 'h'
-    [48, 0, 112, 48, 48, 48, 120, 0], // 'i'
-    [12, 0, 12, 12, 12, 204, 204, 120], // 'j'
-    [224, 96, 102, 108, 120, 108, 230, 0], // 'k'
-    [112, 48, 48, 48, 48, 48, 120, 0], // 'l'
-    [0, 0, 204, 254, 254, 214, 198, 0], // 'm'
-    [0, 0, 248, 204, 204, 204, 204, 0], // 'n'
-    [0, 0, 120, 204, 204, 204, 120, 0], // 'o'
-    [0, 0, 220, 102, 102, 124, 96, 240], // 'p'
-    [0, 0, 118, 204, 204, 124, 12, 30], // 'q'
-    [0, 0, 220, 118, 102, 96, 240, 0], // 'r'
-    [0, 0, 124, 192, 120, 12, 248, 0], // 's'
-    [16, 48, 124, 48, 48, 52, 24, 0], // 't'
-    [0, 0, 204, 204, 204, 204, 118, 0], // 'u'
-    [0, 0, 204, 204, 204, 120, 48, 0], // 'v'
-    [0, 0, 198, 214, 254, 254, 108, 0], // 'w'
-    [0, 0, 198, 108, 56, 108, 198, 0], // 'x'
-    [0, 0, 204, 204, 204, 124, 12, 248], // 'y'
-    [0, 0, 252, 152, 48, 100, 252, 0], // 'z'
-    [28, 48, 48, 224, 48, 48, 28, 0], // '{'
-    [24, 24, 24, 0, 24, 24, 24, 0], // '|'
-    [224, 48, 48, 28, 48, 48, 224, 0], // '}'
-    [118, 220, 0, 0, 0, 0, 0, 0], // '~'
-];
+#[derive(Debug)]
+struct Loaded {
+    font: Font,
+    /// Pixel size per scale unit: a capital `BASELINE` font pixels high.
+    px_per_scale: f32,
+    /// Glyphs drawn so far, by character and scale.
+    glyphs: Mutex<HashMap<(char, i32), &'static Glyph>>,
+}
 
-/// Rows of the glyph for `c`; `?` for characters outside printable ASCII.
-pub fn glyph(c: char) -> &'static [u8; 8] {
-    let index =
-        u32::from(c).checked_sub(FIRST).filter(|&i| (i as usize) < GLYPHS.len()).unwrap_or(u32::from('?') - FIRST);
-    &GLYPHS[index as usize]
+static FONT: OnceLock<Loaded> = OnceLock::new();
+
+/// The font files tried, in order.
+fn candidates() -> Vec<PathBuf> {
+    let mut paths: Vec<PathBuf> = std::env::var_os(ENV_VAR).map(PathBuf::from).into_iter().collect();
+    if let Some(windir) = std::env::var_os("WINDIR") {
+        paths.push(PathBuf::from(windir).join("Fonts").join("consola.ttf"));
+    }
+    paths.extend(
+        [
+            "/System/Library/Fonts/Menlo.ttc",
+            "/System/Library/Fonts/Monaco.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+            "/usr/share/fonts/dejavu/DejaVuSansMono.ttf",
+            "/usr/share/fonts/TTF/DejaVuSansMono.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
+            "/usr/share/fonts/liberation-mono/LiberationMono-Regular.ttf",
+        ]
+        .map(PathBuf::from),
+    );
+    paths
+}
+
+/// Read the first font found; the error lists where it was looked for.
+/// Calling it again keeps the font already loaded.
+pub fn load() -> Result<(), String> {
+    if FONT.get().is_some() {
+        return Ok(());
+    }
+    let mut tried = Vec::new();
+    for path in candidates() {
+        let font = std::fs::read(&path)
+            .map_err(|e| e.to_string())
+            .and_then(|bytes| Font::from_bytes(bytes, FontSettings::default()).map_err(str::to_owned));
+        match font {
+            Ok(font) => {
+                // A capital's height at 1 px, from a large rendering.
+                let cap = font.metrics('H', 100.0).height as f32 / 100.0;
+                if cap <= 0.0 {
+                    tried.push(format!("{}: no capital H", path.display()));
+                    continue;
+                }
+                let px_per_scale = BASELINE as f32 / cap;
+                // Tests load it from several threads at once: the first one stays.
+                FONT.get_or_init(|| Loaded { font, px_per_scale, glyphs: Mutex::default() });
+                return Ok(());
+            }
+            Err(e) => tried.push(format!("{}: {e}", path.display())),
+        }
+    }
+    Err(format!("no monospace font found (set {ENV_VAR} to a .ttf file); tried {}", tried.join("; ")))
+}
+
+/// The font; `main` loads it first and stops when there is none, so a
+/// failure here (a test machine without one) is a broken setup.
+fn loaded() -> &'static Loaded {
+    if FONT.get().is_none() {
+        load().expect("a system monospace font");
+    }
+    FONT.get().expect("loaded above")
+}
+
+/// The glyph of `c` drawn at `scale` (the font's own box for a character it lacks).
+pub fn glyph(c: char, scale: i32) -> &'static Glyph {
+    let font = loaded();
+    let mut glyphs = font.glyphs.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    glyphs.entry((c, scale)).or_insert_with(|| {
+        let (metrics, coverage) = font.font.rasterize(c, font.px_per_scale * scale as f32);
+        let cell = SIZE * scale;
+        // Centred on the advance in the cell, standing on the baseline.
+        let left = (cell - metrics.advance_width.round() as i32) / 2 + metrics.xmin;
+        let top = BASELINE * scale - (metrics.ymin + metrics.height as i32);
+        // Kept for the whole run: one per character and scale shown.
+        Box::leak(Box::new(Glyph { width: metrics.width, coverage, left, top }))
+    })
 }
 
 #[cfg(test)]
@@ -120,10 +120,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn letters_and_fallback() {
-        assert_eq!(glyph('A'), &[48, 120, 204, 204, 252, 204, 204, 0]);
-        assert_eq!(glyph(' '), &[0; 8]);
-        assert_eq!(glyph('é'), glyph('?'));
-        assert_eq!(glyph('\u{7f}'), glyph('?'));
+    fn a_capital_stands_on_the_baseline() {
+        let h = glyph('H', 2);
+        let rows = h.coverage.len() / h.width.max(1);
+        assert!(h.top >= 0 && h.top + rows as i32 <= BASELINE * 2 + 1, "{h:?}");
+        assert!(h.left >= 0 && h.left + h.width as i32 <= SIZE * 2, "{h:?}");
+        assert!(h.coverage.iter().any(|&c| c > 128));
+        assert!(std::ptr::eq(glyph('H', 2), h), "drawn once");
     }
 }

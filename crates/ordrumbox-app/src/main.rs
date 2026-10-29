@@ -656,6 +656,8 @@ fn write_bmp(path: &str, pixels: &[u32], width: usize, height: usize) -> std::io
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // No text without it: stop with where it was looked for.
+    font::load()?;
     let event_loop = EventLoop::new()?;
     let mut session = Session::load();
     // MIDI files given on the command line ("open with"): imported.

@@ -18,6 +18,7 @@ ordrumbox-logic.workspace = true
 winit.workspace = true
 softbuffer.workspace = true
 cpal.workspace = true
+fontdue.workspace = true
 
 [lints]
 workspace = true

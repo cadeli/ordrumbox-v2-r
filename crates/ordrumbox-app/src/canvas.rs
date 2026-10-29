@@ -1,7 +1,7 @@
 //! Software drawing into the window's pixel buffer (`0x00RRGGBB` per pixel).
 //!
-//! The whole UI is drawn here, without a GUI framework: rectangles and the
-//! 8 px pixel font; lines and knob arcs come with the editors.
+//! The whole UI is drawn here, without a GUI framework: rectangles and text
+//! in the system's monospace font; lines and knob arcs come with the editors.
 
 use crate::font;
 
@@ -51,56 +51,46 @@ impl<'a> Canvas<'a> {
         }
     }
 
-    /// Draw `text` with its top-left corner at `(x, y)`, each font pixel a
-    /// `scale × scale` square; returns the x after the last character.
+    /// Draw `text` with its top-left corner at `(x, y)`, one cell of
+    /// `font::SIZE × scale` pixels per character, blended over what is there;
+    /// returns the x after the last character.
     pub fn text(&mut self, x: i32, y: i32, text: &str, scale: i32, color: Rgb) -> i32 {
         let mut pen = x;
-        for c in shown(text) {
-            for (row, bits) in font::glyph(c).iter().enumerate() {
-                for col in 0..8 {
-                    if bits & (0x80 >> col) != 0 {
-                        self.fill_rect(pen + col * scale, y + row as i32 * scale, scale, scale, color);
-                    }
+        for c in text.chars() {
+            let glyph = font::glyph(c, scale);
+            for (row, line) in glyph.coverage.chunks(glyph.width.max(1)).enumerate() {
+                for (col, &coverage) in line.iter().enumerate() {
+                    self.blend(pen + glyph.left + col as i32, y + glyph.top + row as i32, color, coverage);
                 }
             }
             pen += font::SIZE * scale;
         }
         pen
     }
+
+    /// `color` over the pixel at `(x, y)` at `coverage` (0–255), if inside.
+    fn blend(&mut self, x: i32, y: i32, color: Rgb, coverage: u8) {
+        if coverage == 0 || !(0..self.width as i32).contains(&x) || !(0..self.height as i32).contains(&y) {
+            return;
+        }
+        let pixel = &mut self.pixels[y as usize * self.width + x as usize];
+        let a = u32::from(coverage);
+        let mix = |shift: u32| {
+            let (over, under) = ((color >> shift) & 0xff, (*pixel >> shift) & 0xff);
+            ((over * a + under * (255 - a) + 127) / 255) << shift
+        };
+        *pixel = mix(16) | mix(8) | mix(0);
+    }
 }
 
 /// Width of `text` drawn at `scale`.
 pub fn text_width(text: &str, scale: i32) -> i32 {
-    shown(text).count() as i32 * font::SIZE * scale
-}
-
-/// The characters drawn for `text`: the font is ASCII, so the punctuation the
-/// app's messages use is spelled out (`→` as `->`); anything else shows as `?`.
-fn shown(text: &str) -> impl Iterator<Item = char> + '_ {
-    text.chars().flat_map(|c| {
-        let replacement: &[char] = match c {
-            '→' => &['-', '>'],
-            '←' => &['<', '-'],
-            '—' | '–' => &['-'],
-            '…' => &['.', '.', '.'],
-            '×' => &['x'],
-            '·' => &['/'],
-            _ => &[],
-        };
-        let own = replacement.is_empty().then_some(c);
-        replacement.iter().copied().chain(own)
-    })
+    text.chars().count() as i32 * font::SIZE * scale
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn non_ascii_punctuation_is_spelled_out() {
-        assert_eq!(shown("a → b…").collect::<String>(), "a -> b...");
-        assert_eq!(text_width("→", 1), 2 * font::SIZE);
-    }
 
     #[test]
     fn fill_rect_clips_to_bounds() {
@@ -126,12 +116,15 @@ mod tests {
     }
 
     #[test]
-    fn text_draws_glyph_pixels() {
-        let mut pixels = vec![0; 16 * 8];
-        let mut canvas = Canvas::new(&mut pixels, 16, 8);
-        assert_eq!(canvas.text(0, 0, "A", 1, 1), 8);
-        // Top row of 'A' is 0x30: pixels 2, 3.
-        assert_eq!(&pixels[..8], &[0, 0, 1, 1, 0, 0, 0, 0]);
+    fn text_is_blended_inside_its_cells() {
+        let mut pixels = vec![0; 32 * 16];
+        let mut canvas = Canvas::new(&mut pixels, 32, 16);
+        assert_eq!(canvas.text(0, 0, "Hé", 2, 0xff_ff_ff), 32);
+        let lit =
+            |x0: usize, x1: usize| (0..16).any(|y| pixels[y * 32 + x0..y * 32 + x1].iter().any(|&p| p > 0x80_80_80));
+        assert!(lit(0, 16) && lit(16, 32), "both cells drawn");
+        // Coverage blends: some pixels are neither background nor full colour.
+        assert!(pixels.iter().any(|&p| p != 0 && p != 0xff_ff_ff));
         assert_eq!(text_width("abc", 2), 48);
     }
 }
