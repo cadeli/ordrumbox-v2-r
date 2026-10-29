@@ -303,7 +303,7 @@ impl Session {
                 KitSet::empty(),
                 vec![
                     format!(
-                        "assets folder not found: copy ordrumbox-v2/assets next to the program, or set {}",
+                        "assets folder not found: copy this repository's assets folder next to the program, or set {}",
                         assets::ENV_VAR
                     ),
                     format!("searched: {}", searched.join(", ")),
@@ -321,7 +321,7 @@ impl Session {
 
         // The user's library when there is one, else the assets' song.json.
         let mut library = assets.library;
-        let mut message = "demo library (assets/data/song.json)".to_owned();
+        let mut message = "demo library (assets/data/library.json)".to_owned();
         let library_path = match store::path() {
             None => {
                 status.push("no user data folder: edits are not saved".into());
@@ -341,7 +341,7 @@ impl Session {
             },
         };
         if library_path.is_none() && !assets.report.issues.is_empty() {
-            status.push(format!("song.json: {} value(s) repaired", assets.report.issues.len()));
+            status.push(format!("library.json: {} value(s) repaired", assets.report.issues.len()));
         }
 
         if let Some(e) = &assets.kits_error {
@@ -1025,7 +1025,7 @@ impl Session {
             String::new(),
             "The user files are removed (moved out of the way):".into(),
             "  library.json, kits.json, settings.json,".into(),
-            "  generated_sounds.json, samples/, songs/".into(),
+            "  synth_presets.json, samples/, songs/".into(),
             String::new(),
             format!("folder: {}", dir.map_or_else(|| "-".to_owned(), |p| p.display().to_string())),
             String::new(),

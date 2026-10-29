@@ -2,6 +2,7 @@
 # GitHub runners) would otherwise turn the fixtures into CRLF and break the
 # byte-for-byte JSON tests against song.json / song.min.json / flat_notes.
 * text=auto eol=lf
+*.wav binary
 
 # Golden fixtures produced by the JS app (JSON compared byte for byte, binary
 # renders): never rewritten.

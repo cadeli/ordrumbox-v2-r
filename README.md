@@ -8,7 +8,7 @@ Windows by CI).
 
 | Crate | Role | Dependencies |
 |---|---|---|
-| `ordrumbox-core` | data model, `song.json` codec, pattern engine, song clips, instrument catalog, JSON, RNG, the JS sort and number formatting | none |
+| `ordrumbox-core` | data model, `library.json` codec, pattern engine, song clips, instrument catalog, JSON, RNG, the JS sort and number formatting | none |
 | `ordrumbox-logic` | the library being edited: commands with undo/redo; pattern generators (every instrument's variants, genre templates, auto mode loop by loop); Standard MIDI Files (read, import, export) | core |
 | `ordrumbox-dsp` | sample voice, synth voice, channel strip (filter, saturation, reverb, delay), master bus; no allocation in render paths | none |
 | `ordrumbox-engine` | WAV decoding/encoding, kits and their files, sample analysis, sound auto-assignment, synth presets, passes (pattern and song: events, strip settings, LFO steps), sample-accurate engine, UI ↔ audio link, offline renders | core, dsp |
@@ -19,14 +19,14 @@ the OS, through small bridges (`winit`, `softbuffer`, `cpal`; `midir` with MIDI)
 
 ## Running
 
-The app reads the `assets` folder of ordrumbox-v2 (`data/song.json`,
-`data/drumkits.json`, `data/scales.json`, `data/generated_sounds.json`,
-`kits/**.wav`). It looks, in order,
-in `$ORDRUMBOX_ASSETS`, in `assets/` next to the program, in `assets/` in the
-working folder, then in `../ordrumbox-v2/assets` (so `cargo run` works from
-this repository when both checkouts sit side by side).
+The app reads its `assets` folder, part of this repository: `data/library.json`
+(the demo patterns and arrangement), `data/kits.json` (the kits and their
+samples), `data/scales.json`, `data/synth_presets.json` and `kits/**.wav`. It
+looks, in order, in `$ORDRUMBOX_ASSETS`, in `assets/` next to the program, in
+`assets/` in the working folder, then in this repository's `assets/` (so
+`cargo run` works from anywhere in the checkout).
 
-The demo `song.json` is only the starting point: the library being edited is
+The demo `library.json` is only the starting point: the library being edited is
 saved (one second after each edit, and on quit) to `library.json` in the user
 data folder — `%APPDATA%\orDrumbox` on Windows, `~/Library/Application
 Support/orDrumbox` on macOS, `~/.local/share/ordrumbox` elsewhere, or the file
@@ -208,9 +208,10 @@ its knobs, lists and switches, as the JS lays them out. A knob an LFO moves
 is purple and follows it. Touching a control of a group that is off switches
 it on (an oscillator to 0.5, FM to 0.3, the noise to 0.15, an LFO onto the
 filter, the mod envelope onto the filter), as the JS does. Every change
-plays at once and is saved half a second later to `generated_sounds.json`
-in the user data folder (the JS keeps it in IndexedDB), read at start over
-the assets' presets. The pills under the cards show the modules in use.
+plays at once and is saved half a second later to `synth_presets.json`
+in the user data folder (an older `generated_sounds.json` there is read when
+it is missing; the JS keeps them in IndexedDB), read at start over the
+assets' presets. The pills under the cards show the modules in use.
 
 Output panel (a strip along the bottom of the window, always shown — the JS
 output panel): the master bus in three tabs — **Vol**: the master
@@ -333,16 +334,23 @@ cargo clippy --workspace --all-targets
 cargo fmt --all
 cargo build --release -p ordrumbox-app  # target/release/ordrumbox(.exe)
 # a pattern (2 loops) or a song rendered offline to a WAV file, with its speed
-cargo run --release -p ordrumbox-engine --example render -- ../ordrumbox-v2/assets rock 2 rock.wav
-cargo run --release -p ordrumbox-engine --example render -- ../ordrumbox-v2/assets song:demo demo.wav
+cargo run --release -p ordrumbox-engine --example render -- assets rock 2 rock.wav
+cargo run --release -p ordrumbox-engine --example render -- assets song:demo demo.wav
 ```
 
 Windows `.exe`: every push to `main` builds it in CI (artifact
-`ordrumbox-windows-x64`); put the `assets` folder next to it. Locally from
+`ordrumbox-windows-x64`, the program with its `assets` folder next to it);
+a local build needs the `assets` folder copied next to it. Locally from
 macOS: `cargo install cargo-xwin`, then
 `cargo xwin build --release -p ordrumbox-app --target x86_64-pc-windows-msvc`.
 
 ## Golden fixtures
+
+The fixtures are committed: the tests need nothing outside this repository.
+They were produced by the JS app (ordrumbox-v2), the reference of the port,
+with the scripts of `tools/`, which need a checkout of it only to make them
+again. They hold the JS names of the keys; the tests compare after
+`legacy::upgrade_keys`.
 
 The JS app is the reference. `tools/export_fixtures.mjs` runs its own code on
 `assets/data/song.json` and writes `crates/ordrumbox-core/tests/fixtures/`:

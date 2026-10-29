@@ -103,9 +103,21 @@ pub fn save_master(path: &Path, master: &ordrumbox_engine::MasterSettings) -> io
     write_atomic(path, &(json::Value::Object(settings).to_json_pretty(2) + "\n"))
 }
 
-/// The synth presets, once edited (`generated_sounds.json` format).
+/// The synth presets, once edited.
 pub fn synths_path() -> Option<PathBuf> {
-    Some(user_dir()?.join("generated_sounds.json"))
+    Some(user_dir()?.join(SYNTHS_FILE))
+}
+
+const SYNTHS_FILE: &str = "synth_presets.json";
+/// Where older versions saved the synth presets: read when there is no
+/// `synth_presets.json` yet.
+const OLD_SYNTHS_FILE: &str = "generated_sounds.json";
+
+/// The synth presets file to read: the current one, else an older save.
+pub fn saved_synths_path() -> Option<PathBuf> {
+    let current = synths_path()?;
+    let old = current.with_file_name(OLD_SYNTHS_FILE);
+    Some(if !current.exists() && old.is_file() { old } else { current })
 }
 
 /// The synth presets saved, if there are some (an unreadable file is an error).
@@ -160,12 +172,13 @@ pub fn save_kits(path: &Path, kits: &[Kit]) -> io::Result<()> {
 
 /// Move the user's edited files aside so the app starts again from the
 /// assets: `library.json`, `kits.json`, `settings.json`,
-/// `generated_sounds.json`, `samples/` and `songs/`. They are removed from
+/// `synth_presets.json` (and an older `generated_sounds.json`), `samples/`
+/// and `songs/`. They are removed from
 /// `dir` (the user data folder); `exports/` is kept. Returns the names of
 /// what was removed.
 pub fn factory_reset(dir: &Path) -> io::Result<Vec<String>> {
     let mut removed = Vec::new();
-    for name in ["library.json", "kits.json", "settings.json", "generated_sounds.json"] {
+    for name in ["library.json", "kits.json", "settings.json", SYNTHS_FILE, OLD_SYNTHS_FILE] {
         let path = dir.join(name);
         if path.exists() {
             fs::remove_file(&path)?;

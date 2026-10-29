@@ -65,7 +65,7 @@ impl Session {
 
     /// The presets saved, read at start over the assets' ones.
     pub(super) fn load_user_synths(synths: &mut SynthPresets, status: &mut Vec<String>) {
-        let Some(path) = store::synths_path() else { return };
+        let Some(path) = store::saved_synths_path() else { return };
         match store::load_synths(&path) {
             Ok(Some(saved)) => *synths = saved,
             Ok(None) => {}
