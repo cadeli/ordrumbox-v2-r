@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use ordrumbox_core::json;
 use ordrumbox_core::steps::TICK;
-use ordrumbox_core::{Library, Rng, Scales, recompute_flat_notes};
+use ordrumbox_core::{Library, Rng, Scales, expand_hits};
 use ordrumbox_engine::assign::{TrackSound, assign_pattern};
 use ordrumbox_engine::kit::{BankSample, KitSample};
 use ordrumbox_engine::pass::{PassContext, build_pass, frames_per_tick};
@@ -59,7 +59,7 @@ fn every_note_becomes_an_event_on_its_frame() {
             first_tick: 0,
         };
         let pass = build_pass(pattern, 0, &mut Rng::new(1), context);
-        let flat = recompute_flat_notes(pattern, 0, &mut Rng::new(1), &scales);
+        let flat = expand_hits(pattern, 0, &mut Rng::new(1), &scales);
         let per_tick = frames_per_tick(pattern.bpm, RATE);
 
         let any_solo = pattern.tracks.iter().any(|t| t.solo);

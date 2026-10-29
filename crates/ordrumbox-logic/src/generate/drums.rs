@@ -38,7 +38,7 @@ pub(crate) fn kick(
     rnd: &mut dyn FnMut() -> f64,
 ) {
     let mut g = Generator::new("kick", scales, rnd);
-    // A random kick is never the `break` one (`getRndVariantName`).
+    // A random kick is never the `break` one.
     let name = match variant {
         Some(v) if !v.is_empty() && g.configs.contains_key(v) => v.to_owned(),
         _ => g.random_variant(&["break"]),

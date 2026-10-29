@@ -193,7 +193,7 @@ impl Default for SynthPatch {
     }
 }
 
-/// What an LFO adds this sample (`#lfoValue`): detune per oscillator,
+/// What an LFO adds this sample: detune per oscillator,
 /// gain per oscillator, and the other targets.
 #[derive(Debug, Clone, Copy, Default)]
 struct LfoMods {
@@ -362,7 +362,7 @@ impl SynthVoice {
         }
     }
 
-    /// ADSR step (`#envelopeStep`), `peak` the note's peak level.
+    /// ADSR step, `peak` the note's peak level.
     fn envelope_step(&mut self, t: f64, env: Adsr, peak: f64) -> f64 {
         if t < 0.0 || self.env_segment == Segment::Idle {
             return 0.0;
@@ -406,7 +406,7 @@ impl SynthVoice {
         if self.env_level.is_finite() && self.env_level > 0.0 { self.env_level } else { 0.0 }
     }
 
-    /// Modulation envelope step (`#modEnvStep`): linear attack, levels 0–1.
+    /// Modulation envelope step: linear attack, levels 0–1.
     fn mod_env_step(&mut self, t: f64, env: Adsr) -> f64 {
         if t < 0.0 || self.mod_env_segment == Segment::Idle {
             return 0.0;
@@ -448,7 +448,7 @@ impl SynthVoice {
         if self.mod_env_level.is_finite() && self.mod_env_level > 0.0 { self.mod_env_level } else { 0.0 }
     }
 
-    /// Main filter step (`#tptFilt`): (lowpass, highpass, bandpass).
+    /// Main filter step: (lowpass, highpass, bandpass).
     #[inline]
     fn filter_step(&mut self, x: f64, g: f64, k: f64) -> (f64, f64, f64) {
         let f = &mut self.filter;

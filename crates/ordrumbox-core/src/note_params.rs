@@ -1,13 +1,13 @@
-//! What a flat note sounds like once its track is applied
+//! What a hit sounds like once its track is applied
 //! (`src/patterns/note_params.js`): stereo position, playback ratio, swing.
 
-use crate::pattern_engine::FlatNote;
+use crate::pattern_engine::Hit;
 use crate::steps::semitone_ratio;
 use crate::track::Track;
 
-impl FlatNote {
+impl Hit {
     /// Stereo position: the mean of the note and track pans, floored to 0.01
-    /// (`computePan`).
+    ///.
     pub fn playback_pan(&self, track: &Track) -> f64 {
         ((self.pan + track.pan) / 2.0 * 100.0).floor() / 100.0
     }
@@ -21,7 +21,7 @@ impl FlatNote {
         semitone_ratio(self.pitch + track.transpose)
     }
 
-    /// Swing delay, in beats (`computeSwingTime`): with a swing grid of
+    /// Swing delay, in beats: with a swing grid of
     /// `swing_resolution` steps (1 = straight), the note on the second step of
     /// each group is pushed late by `swing_amount` beats (0.33 is a triplet feel).
     pub fn swing_beats(&self, track: &Track) -> f64 {
@@ -34,8 +34,8 @@ impl FlatNote {
 mod tests {
     use super::*;
 
-    fn note(beat_step: i32, pitch: f64, pan: f64) -> FlatNote {
-        FlatNote { track: 0, source: Some(0), beat: 0, step: beat_step, pitch, velocity: 0.8, pan }
+    fn note(beat_step: i32, pitch: f64, pan: f64) -> Hit {
+        Hit { track: 0, source: Some(0), beat: 0, step: beat_step, pitch, velocity: 0.8, pan }
     }
 
     #[test]

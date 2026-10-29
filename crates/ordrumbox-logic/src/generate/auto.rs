@@ -306,7 +306,7 @@ pub fn change_track(g: &mut AutoGenerator<'_>, index: u64, pattern: &mut Pattern
     }
 }
 
-/// The player's loop start (`#handleLoopStart`) for loop `index`: an
+/// The player's loop start for loop `index`: an
 /// `autoGen` pattern regenerates its melodic tracks, and every track on a
 /// section's first or last loop; otherwise the tracks in auto mode are
 /// regenerated. Whether anything was.
@@ -368,7 +368,7 @@ fn toggle(
     }
 }
 
-/// ↻ Drum (`toggleDrums`): new drum lines over the existing tracks (and a new
+/// ↻ Drum: new drum lines over the existing tracks (and a new
 /// bass line if there is a bass track), the drum tracks in auto mode, empty
 /// melodic tracks removed; or, when drums are in auto mode, auto mode off.
 /// Whether generation is now on.
@@ -408,7 +408,7 @@ impl MelodicKind {
     }
 }
 
-/// ↻ Bass / ↻ Chords (`toggleMelodic`): the first BASS (PIANO) track in auto
+/// ↻ Bass / ↻ Chords: the first BASS (PIANO) track in auto
 /// mode — created on the pattern's synth, with a first line from the genre
 /// template, when there is none; or auto mode off. Whether generation is now on.
 pub fn toggle_melodic(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, kind: MelodicKind) -> bool {

@@ -50,7 +50,7 @@ pub struct Row {
 }
 
 /// The patterns `song` uses, in library order, then the missing ones
-/// (`#computeRows`).
+///.
 pub fn rows(song: &Song, patterns: &[Pattern]) -> Vec<Row> {
     let used = |id: &str| song.clips.iter().any(|c| c.pattern_id == id);
     let mut rows: Vec<Row> = patterns

@@ -139,7 +139,7 @@ const ROUND_2D: [&str; 9] =
     ["volume", "pan", "reverbMix", "delayMix", "delayBeats", "saturationMix", "swingAmount", "filterCutoff", "filterQ"];
 
 impl Track {
-    /// A new track (`createTrack()`): `beat_count` beats at `steps_per_beat`
+    /// A new track: `beat_count` beats at `steps_per_beat`
     /// (clamped to 1–8), looping over its whole length, panned from its name.
     pub fn new(name: &str, beat_count: i32, steps_per_beat: i32) -> Self {
         let steps_per_beat = steps_per_beat.clamp(1, 8);
@@ -240,9 +240,9 @@ impl Track {
     }
 }
 
-/// What a note sounds like, wherever it is (`getAudibleNoteSignature`):
+/// What a note sounds like, wherever it is:
 /// every field but its beat and step — its `stepPercent` included, as in
-/// the app every note has one (`addNote`), so only notes on the same step
+/// the app every note has one, so only notes on the same step
 /// of their beat compare equal.
 fn audible_signature(note: &Note, steps_per_beat: i32) -> String {
     let mut signature: Vec<String> = note
@@ -256,7 +256,7 @@ fn audible_signature(note: &Note, steps_per_beat: i32) -> String {
 }
 
 impl Track {
-    /// Steps the track spans (`getTrackStepLength`): its beats, widened to its last note.
+    /// Steps the track spans: its beats, widened to its last note.
     fn step_length(&self) -> i64 {
         let spb = i64::from(self.steps_per_beat);
         let declared = (i64::from(self.beat_count) * spb).max(0);
@@ -265,7 +265,7 @@ impl Track {
     }
 
     /// The signatures of the notes on each step, `map` folding the steps
-    /// (`createStepSignatureMap`).
+    ///.
     fn step_signatures<'a>(
         notes: impl Iterator<Item = &'a Note>,
         spb: i32,

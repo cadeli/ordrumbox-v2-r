@@ -35,7 +35,7 @@ const MIDI_MIN: f64 = 12.0;
 const MIDI_MAX: f64 = 108.0;
 const MIDDLE_C: f64 = 60.0;
 
-/// What a nudge changes (`applyNoteNudge`): ↑/↓ velocity, ←/→ pitch.
+/// What a nudge changes: ↑/↓ velocity, ←/→ pitch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Nudge {
     VelocityUp,
@@ -91,7 +91,7 @@ fn apply_updates(track: &mut Track, updates: &[(&str, Value)]) {
 pub struct Editor {
     library: Library,
     history: History,
-    /// The arrangement the song panel edits (`selectedSongIdx`).
+    /// The arrangement the song panel edits.
     selected_song: usize,
     /// Bumped by every change (edits, undo, redo).
     revision: u64,
@@ -213,7 +213,7 @@ impl Editor {
         )
     }
 
-    /// Delete the last note at `beat`/`beat_step` with that pitch (`deleteNote`).
+    /// Delete the last note at `beat`/`beat_step` with that pitch.
     pub fn delete_note(&mut self, p: usize, t: usize, beat: i32, beat_step: i32, pitch: f64) -> bool {
         let Some(pattern) = self.library.patterns.get(p).map(|p| pattern_name(p).to_owned()) else { return false };
         self.edit_track(
@@ -247,7 +247,7 @@ impl Editor {
         .unwrap_or(false)
     }
 
-    /// Set note fields by JSON key (`updateNote`); values of the wrong type
+    /// Set note fields by JSON key; values of the wrong type
     /// are ignored. With `coalesce`, repeated edits of the same fields of the
     /// same note are one undo step.
     pub fn update_note(
@@ -295,7 +295,7 @@ impl Editor {
         self.update_note(p, t, n, &[(key, Value::Number(value))], Some(&desc), true)
     }
 
-    /// Replace the notes at a step by copies of `notes` (`pasteStepNotes`).
+    /// Replace the notes at a step by copies of `notes`.
     pub fn paste_step_notes(&mut self, p: usize, t: usize, beat: i32, beat_step: i32, notes: &[Note]) -> bool {
         let Some(pattern) = self.library.patterns.get(p).map(|p| pattern_name(p).to_owned()) else { return false };
         self.edit_track(
@@ -319,7 +319,7 @@ impl Editor {
 
     // ─── Tracks ──────────────────────────────────────────────────────────────
 
-    /// Append a new track (`addTrack`); its index.
+    /// Append a new track; its index.
     pub fn add_track(&mut self, p: usize, name: &str, steps_per_beat: i32) -> Option<usize> {
         let desc = format!("Add track {name}");
         self.edit(
@@ -341,7 +341,7 @@ impl Editor {
     }
 
     /// Insert a copy of `source` at `index` (clamped), named "`<name>` copy"
-    /// (then "copy 2"…) (`pasteTrack`); its index.
+    /// (then "copy 2"…); its index.
     pub fn paste_track(&mut self, p: usize, index: usize, source: &Track) -> Option<usize> {
         let taken: HashSet<&str> = self.library.patterns.get(p)?.tracks.iter().map(|t| t.name.as_str()).collect();
         let mut name = format!("{} copy", source.name);
@@ -363,7 +363,7 @@ impl Editor {
         )
     }
 
-    /// Set track settings by JSON key (`updateTrack`): only track settings,
+    /// Set track settings by JSON key: only track settings,
     /// numbers clamped to their range, non-finite numbers and wrong types
     /// ignored. With `coalesce`, repeated edits of the same settings of the
     /// same track are one undo step.
@@ -449,14 +449,14 @@ impl Editor {
         .is_some()
     }
 
-    /// Next grid: 1 → 2 … 8 → 1 (`incrStepsPerBeat`).
+    /// Next grid: 1 → 2 … 8 → 1.
     pub fn incr_steps_per_beat(&mut self, p: usize, t: usize) -> bool {
         let Some(track) = self.library.patterns.get(p).and_then(|p| p.tracks.get(t)) else { return false };
         let next = if track.steps_per_beat >= 8 { 1 } else { track.steps_per_beat + 1 };
         self.set_steps_per_beat(p, t, f64::from(next), false)
     }
 
-    /// The loop one step shorter, wrapping to the track end (`decrLoopPoint`).
+    /// The loop one step shorter, wrapping to the track end.
     pub fn shorten_loop(&mut self, p: usize, t: usize) -> bool {
         self.edit_track(
             p,
@@ -472,9 +472,9 @@ impl Editor {
         .is_some()
     }
 
-    /// No notes, loop over the whole track (`cleanTrack`).
+    /// No notes, loop over the whole track.
     /// Shorten track `t` to its shortest loop, when its notes repeat one
-    /// (`compactTrack`); whether it changed.
+    ///; whether it changed.
     pub fn compact_track(&mut self, p: usize, t: usize) -> bool {
         self.edit_track(p, t, |track| format!("Compact {}", track.name), None, Track::compact_loop).unwrap_or(false)
     }
@@ -501,7 +501,7 @@ impl Editor {
         .is_some()
     }
 
-    /// Play sample `sample_id` (`changeTrackSound`): auto-assign and synth off.
+    /// Play sample `sample_id`: auto-assign and synth off.
     pub fn change_track_sound(&mut self, p: usize, t: usize, sample_id: &str) -> bool {
         self.edit_track(
             p,
@@ -550,7 +550,7 @@ impl Editor {
     }
 
     /// Append a copy of pattern `p` named "`<name>` copy", with an id made
-    /// from that name (`duplicateCurrentPattern`); its index.
+    /// from that name; its index.
     pub fn duplicate_pattern(&mut self, p: usize) -> Option<usize> {
         let source = self.library.patterns.get(p)?;
         let name = format!("{} copy", source.name.as_deref().unwrap_or("Pattern"));
@@ -562,7 +562,7 @@ impl Editor {
         }))
     }
 
-    /// Remove pattern `index`, unless it is the last one (`removePattern`).
+    /// Remove pattern `index`, unless it is the last one.
     pub fn remove_pattern(&mut self, index: usize) -> bool {
         if self.library.patterns.len() <= 1 || index >= self.library.patterns.len() {
             return false;
@@ -588,7 +588,7 @@ impl Editor {
         .is_some()
     }
 
-    /// Tempo; 0 or not a number sets the default 120 (`setPatternBpm`).
+    /// Tempo; 0 or not a number sets the default 120.
     /// With `coalesce`, a run of changes is one step.
     pub fn set_pattern_bpm(&mut self, p: usize, bpm: f64, coalesce: bool) -> bool {
         let bpm = if bpm.is_finite() && bpm != 0.0 { bpm } else { DEFAULT_BPM };
@@ -598,7 +598,7 @@ impl Editor {
     }
 
     /// Length in beats, 1–16 (out of range: 4); every track follows and its
-    /// loop point stays inside (`setPatternBeatCount`).
+    /// loop point stays inside.
     pub fn set_pattern_beat_count(&mut self, p: usize, beats: f64) -> bool {
         let requested = round(beats);
         let applied = if requested.is_finite() && (1.0..=f64::from(MAX_BEATS)).contains(&requested) {
@@ -650,7 +650,7 @@ impl Editor {
         })
     }
 
-    /// ↻ Drum on pattern `p` (`toggleDrums`): whether drum generation is now on.
+    /// ↻ Drum on pattern `p`: whether drum generation is now on.
     pub fn toggle_drums(&mut self, p: usize, scales: &Scales, rnd: &mut dyn FnMut() -> f64) -> Option<bool> {
         let desc = |pattern: &Pattern| {
             let on = pattern.tracks.iter().any(|t| instrument_family(&t.name).is_drum() && t.auto_mode);
@@ -659,7 +659,7 @@ impl Editor {
         self.edit(p, desc, None, |pattern| generate::toggle_drums(&mut AutoGenerator::new(scales, rnd), pattern))
     }
 
-    /// ↻ Bass / ↻ Chords on pattern `p` (`toggleMelodic`): whether that
+    /// ↻ Bass / ↻ Chords on pattern `p`: whether that
     /// generation is now on.
     pub fn toggle_melodic(
         &mut self,
@@ -703,7 +703,7 @@ impl Editor {
         Ok((index, imported.message))
     }
 
-    /// Random notes on track `t` (`randomizeTrack`).
+    /// Random notes on track `t`.
     pub fn randomize_track(&mut self, p: usize, t: usize, rnd: &mut dyn FnMut() -> f64) -> bool {
         self.edit_track(
             p,

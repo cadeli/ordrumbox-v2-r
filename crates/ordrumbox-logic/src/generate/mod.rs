@@ -171,7 +171,7 @@ pub(crate) struct Generator<'a> {
     pub configs: &'static Object,
     pub scales: &'a Scales,
     pub rnd: &'a mut dyn FnMut() -> f64,
-    /// Tones above it are taken an octave down (`getRndTone`).
+    /// Tones above it are taken an octave down.
     pub tone_threshold: i32,
 }
 

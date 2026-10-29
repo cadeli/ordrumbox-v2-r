@@ -32,7 +32,7 @@ mod variation;
 pub use library::{Library, LoadReport, SongRecord};
 pub use note::Note;
 pub use pattern::Pattern;
-pub use pattern_engine::{FlatNote, FlatNotes, recompute_flat_notes};
+pub use pattern_engine::{Hit, Hits, expand_hits};
 pub use record::{Issue, JsonField, SetField};
 pub use rng::Rng;
 pub use scales::Scales;

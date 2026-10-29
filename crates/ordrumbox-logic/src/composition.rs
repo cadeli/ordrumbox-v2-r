@@ -38,14 +38,14 @@ pub const PROGRESSIONS: [Progression; 6] = [
     Progression { id: "ii-V-I", name: "ii-V-I", chords: &[("min", 2), ("maj", 7), ("maj", 0)] },
 ];
 
-/// Progression `index`, wrapping both ways (`getSequence`).
+/// Progression `index`, wrapping both ways.
 pub fn progression(index: i64) -> &'static Progression {
     &PROGRESSIONS[index.rem_euclid(PROGRESSIONS.len() as i64) as usize]
 }
 
 /// The notes of `progression` from `tonic` (a pitch relative to the track)
 /// over `beat_count` beats: each chord's notes on the first step of its
-/// measure, as (beat, pitch) (`buildSequenceNotes`).
+/// measure, as (beat, pitch).
 pub fn progression_notes(progression: &Progression, tonic: f64, beat_count: i32) -> Vec<(i32, f64)> {
     let mut notes = Vec::new();
     for (measure, beat) in (0..beat_count.max(0)).step_by(BEATS_PER_MEASURE as usize).enumerate() {

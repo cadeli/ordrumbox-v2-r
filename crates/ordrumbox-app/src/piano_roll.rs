@@ -66,7 +66,7 @@ pub fn steps_per_beat(track: &Track) -> i32 {
     track.steps_per_beat.max(1)
 }
 
-/// Opacity a note is drawn at (`noteOpacity`): 0.25 to 1.
+/// Opacity a note is drawn at: 0.25 to 1.
 fn note_opacity(velocity: f64) -> f64 {
     0.25 + velocity * 0.75
 }
@@ -94,7 +94,7 @@ pub struct RollView<'a> {
 }
 
 impl RollView<'_> {
-    /// Steps in the track (`totalSteps`).
+    /// Steps in the track.
     pub fn total_steps(&self) -> i64 {
         i64::from(self.beat_count) * i64::from(steps_per_beat(self.track))
     }
@@ -111,12 +111,12 @@ impl RollView<'_> {
         (start, (start + per_page).min(self.total_steps()))
     }
 
-    /// Where the track loops (`getTrackLoopAtStep`): its loop point, else its end.
+    /// Where the track loops: its loop point, else its end.
     fn loop_length(&self) -> i64 {
         self.track.loop_length.map_or(self.total_steps(), i64::from).max(1)
     }
 
-    /// Whether note `n` sounds on `step` (`illuminateStep`).
+    /// Whether note `n` sounds on `step`.
     fn sounding(&self, n: usize, step: i64) -> bool {
         let note = &self.track.notes[n];
         let loop_length = self.loop_length();
@@ -193,7 +193,7 @@ impl RollLayout {
         (self.grid.h / self.row).clamp(1, TOTAL_KEYS)
     }
 
-    /// The highest row shown so that `row` is in the middle (`scrollToTrackCenter`).
+    /// The highest row shown so that `row` is in the middle.
     pub fn centered_top(&self, row: i32) -> i32 {
         self.clamp_top(row + self.visible_rows() / 2)
     }
@@ -342,7 +342,7 @@ pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &s
         let color =
             theme::mix(BACKGROUND, if lit { PLAYING } else { view.color }, note_opacity(note.velocity.clamp(0.0, 1.0)));
         canvas.fill_rect(r.x, r.y, r.w, r.h, color);
-        // The trigger kind (`noteTriggerKind`): probability wins over the cycle.
+        // The trigger kind: probability wins over the cycle.
         let trig = if note.probability < 1.0 {
             Some(TRIG_RAND)
         } else if note.cycle > 1 {

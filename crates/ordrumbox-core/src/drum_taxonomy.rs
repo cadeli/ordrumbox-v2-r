@@ -61,7 +61,7 @@ pub fn pan_from_track_name(name: &str) -> f64 {
 }
 
 /// Coarse type of a track: the canonical names first, then substring rules for
-/// names like `"808 KICK"` or `"SYNTH BASS"` (`detectTrackType()`).
+/// names like `"808 KICK"` or `"SYNTH BASS"`.
 pub fn instrument_family(name: &str) -> InstrumentFamily {
     let name = name.to_uppercase();
     if let Some(&(_, _, kind)) = TRACK_KINDS.iter().find(|(kind, _, _)| *kind == name) {

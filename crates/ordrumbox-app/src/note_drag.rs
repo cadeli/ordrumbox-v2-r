@@ -40,9 +40,9 @@ impl Axis {
 /// What a movement did.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum DragEvent {
-    /// The axis was claimed (`onStart`): the value it starts from.
+    /// The axis was claimed: the value it starts from.
     Start(Axis, f64),
-    /// A new value for the note (`onValue`), and its direction from the start.
+    /// A new value for the note, and its direction from the start.
     Value(Axis, f64, i32),
 }
 
@@ -112,7 +112,7 @@ impl NoteDrag {
     }
 }
 
-/// The name of MIDI note `midi`, C4 = 60 (`midiName`).
+/// The name of MIDI note `midi`, C4 = 60.
 pub fn midi_name(midi: i32) -> String {
     const NAMES: [&str; 12] = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
     format!("{}{}", NAMES[midi.rem_euclid(12) as usize], midi.div_euclid(12) - 1)
@@ -145,7 +145,7 @@ mod tests {
                             format!(r#"{{"start":"{}","value":{}}}"#, axis.key(), Value::from(v).to_json())
                         }
                         DragEvent::Value(axis, v, dir) => {
-                            // The surface writes the value (`applyNoteEdit`).
+                            // The surface writes the value.
                             match axis {
                                 Axis::Pitch => note.pitch = v,
                                 Axis::Velocity => note.velocity = v,

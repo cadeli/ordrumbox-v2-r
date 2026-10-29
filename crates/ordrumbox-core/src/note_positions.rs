@@ -28,7 +28,7 @@ pub struct SubPosition {
     pub pitch_offset: f64,
 }
 
-/// The sub-events of `note` before `total_steps` (`getNoteSubPositions`).
+/// The sub-events of `note` before `total_steps`.
 /// `span` is the track's (built once per pass); a `random` arpeggio draws
 /// its order from `rng`.
 pub fn sub_positions(

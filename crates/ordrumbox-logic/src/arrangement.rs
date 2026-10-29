@@ -5,7 +5,7 @@
 //! Clips reference a pattern by its id; the placement commands take an id or
 //! a name and report what they could not do (the JS `reportUserError`
 //! messages). Every clip edit moves the arrangement's loop onto the end of
-//! its last clip (`#followContent`), so the grid and the playback never show
+//! its last clip, so the grid and the playback never show
 //! or play measures nothing is placed on.
 
 use ordrumbox_core::song::{DEFAULT_BPM, measures_for_pattern};
@@ -14,7 +14,7 @@ use ordrumbox_core::{Song, SongClip};
 use super::*;
 
 /// The loop length after a clip edit: the end of the last clip, none
-/// without clips (`#followContent`).
+/// without clips.
 fn follow_content(song: &mut Song) {
     let measures = song.content_measures();
     song.loop_measures = (measures > 0.0).then_some(measures);
@@ -90,7 +90,7 @@ impl Editor {
     // ─── Clips ───────────────────────────────────────────────────────────────
 
     /// Place `clip` in arrangement `song` (else the selected one): a length
-    /// of 0 or less is 1 (`addSongClip`). Whether there was an arrangement.
+    /// of 0 or less is 1. Whether there was an arrangement.
     pub fn add_song_clip(&mut self, song: Option<usize>, clip: SongClip) -> bool {
         let Some(s) = self.song_index(song) else { return false };
         if clip.pattern_id.is_empty() {
@@ -107,7 +107,7 @@ impl Editor {
     }
 
     /// Remove the clips at `indices` (out of range ones ignored) in one undo
-    /// step (`removeSongClips`); whether one was removed.
+    /// step; whether one was removed.
     pub fn remove_song_clips(&mut self, song: Option<usize>, indices: &[usize]) -> bool {
         let Some(s) = self.song_index(song) else { return false };
         let clips = &self.library.songs[s].clips;
@@ -130,7 +130,7 @@ impl Editor {
 
     /// Place a pattern (an id or a name) at `start` (0-based measure), for
     /// `measure_count` measures, else the pattern's own length
-    /// (`addPatternAtMeasure`); the clip added.
+    ///; the clip added.
     pub fn add_pattern_at_measure(
         &mut self,
         reference: &str,
@@ -152,7 +152,7 @@ impl Editor {
     }
 
     /// Repeat the clip starting at `start` right after itself, as long
-    /// (`repeatPatternAtMeasure`); the clip added.
+    ///; the clip added.
     pub fn repeat_pattern_at_measure(&mut self, start: u32, song: Option<usize>) -> Result<SongClip, String> {
         let s = self.require_song(song)?;
         let Some(clip) = self.library.songs[s].clips.iter().find(|c| c.start_measure == start).cloned() else {
@@ -164,7 +164,7 @@ impl Editor {
     }
 
     /// Remove every clip starting at `start`, in one undo step
-    /// (`removePatternAtMeasure`); the clips removed.
+    ///; the clips removed.
     pub fn remove_pattern_at_measure(&mut self, start: u32, song: Option<usize>) -> Result<Vec<SongClip>, String> {
         let s = self.require_song(song)?;
         let clips = &self.library.songs[s].clips;
@@ -179,7 +179,7 @@ impl Editor {
 
     /// Remove every clip of a pattern (an id or a name; an id the library no
     /// longer knows too, for an orphaned row), in one undo step
-    /// (`removePatternClips`); the clips removed.
+    ///; the clips removed.
     pub fn remove_pattern_clips(&mut self, reference: &str, song: Option<usize>) -> Result<Vec<SongClip>, String> {
         let s = self.require_song(song)?;
         let id = match self.pattern_by_ref(reference) {
@@ -199,7 +199,7 @@ impl Editor {
     // ─── Arrangements ────────────────────────────────────────────────────────
 
     /// Append an empty arrangement named `name` (trimmed; empty: "Untitled")
-    /// with a unique id, and select it (`addSong`); its index.
+    /// with a unique id, and select it; its index.
     pub fn add_song(&mut self, name: &str) -> usize {
         let name = match name.trim() {
             "" => "Untitled",
@@ -237,7 +237,7 @@ impl Editor {
     }
 
     /// Remove arrangement `index` (else the selected one); the selection
-    /// stays where it was, inside the list (`removeSong`). Whether one was removed.
+    /// stays where it was, inside the list. Whether one was removed.
     pub fn remove_song(&mut self, index: Option<usize>) -> bool {
         let index = index.unwrap_or(self.selected_song);
         let Some(song) = self.library.songs.get(index) else { return false };

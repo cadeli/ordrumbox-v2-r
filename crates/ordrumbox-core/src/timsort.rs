@@ -8,7 +8,7 @@
 //! result is whatever this exact algorithm does, and only it reproduces the
 //! JS bytes.
 
-/// Initial threshold of galloping (`kMinGallopWins`).
+/// Initial threshold of galloping.
 const MIN_GALLOP: usize = 7;
 
 struct Sorter<'a, T, F> {

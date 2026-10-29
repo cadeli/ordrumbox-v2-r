@@ -124,7 +124,7 @@ pub fn to_json(master: &MasterSettings) -> Value {
     Value::Object(object)
 }
 
-/// The compressor's gain reduction at `input` dB (`#gainReductionDb`).
+/// The compressor's gain reduction at `input` dB.
 fn gain_reduction(input: f64, threshold: f64, ratio: f64, knee: f64) -> f64 {
     let over = input - threshold;
     if over <= -knee / 2.0 {
@@ -237,7 +237,7 @@ const PHOSPHOR: Rgb = theme::CYAN;
 pub struct OutputView {
     pub tab: u8,
     pub master: MasterSettings,
-    /// The analyser's bytes, one a bin (`getByteFrequencyData`).
+    /// The analyser's bytes, one a bin.
     pub spectrum: Vec<u8>,
 }
 
@@ -276,7 +276,7 @@ fn line(canvas: &mut Canvas, (x0, y0): (i32, i32), (x1, y1): (i32, i32), t: i32,
     }
 }
 
-/// The compressor's transfer curve (`drawCompCurve`): -60 to 0 dB in, -60 to
+/// The compressor's transfer curve: -60 to 0 dB in, -60 to
 /// +12 dB out, the unity line, the threshold, the curve.
 fn draw_curve(canvas: &mut Canvas, master: &MasterSettings, r: Rect, s: i32) {
     canvas.fill_rect(r.x, r.y, r.w, r.h, SURFACE);
@@ -315,7 +315,7 @@ fn draw_curve(canvas: &mut Canvas, master: &MasterSettings, r: Rect, s: i32) {
     }
 }
 
-/// The spectrum (`drawSpectrum`): a grid, then the first bins (one a
+/// The spectrum: a grid, then the first bins (one a
 /// column of the JS canvas, 256) as a line, louder higher.
 fn draw_spectrum(canvas: &mut Canvas, bins: &[u8], r: Rect, s: i32) {
     canvas.fill_rect(r.x, r.y, r.w, r.h, SCOPE_BG);

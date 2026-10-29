@@ -98,7 +98,7 @@ impl KitSample {
         Value::Object(o)
     }
 
-    /// The entry of a kit mapping file (`exportCurrentKit`): every field,
+    /// The entry of a kit mapping file: every field,
     /// unset ones as null or 0.
     fn to_mapping_json(&self) -> Value {
         let mut o = Object::new();
@@ -156,7 +156,7 @@ impl Kit {
         Value::Object(o)
     }
 
-    /// A kit mapping file (`exportCurrentKit`): name and samples, no audio.
+    /// A kit mapping file: name and samples, no audio.
     pub fn to_mapping_json(&self) -> Value {
         let mut o = Object::new();
         o.insert("name", Value::from(self.name.as_str()));
@@ -164,7 +164,7 @@ impl Kit {
         Value::Object(o)
     }
 
-    /// A kit from a mapping file (`restoreDrumkit`): a name and at least one
+    /// A kit from a mapping file: a name and at least one
     /// entry with a string `path` and `key`; the display name defaults to the path.
     pub fn from_mapping_json(value: &Value) -> Result<Self, String> {
         let name = value.get("name").and_then(Value::as_str);

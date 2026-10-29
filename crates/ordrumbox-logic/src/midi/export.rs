@@ -9,7 +9,7 @@
 //! scales the velocity, the pitch LFO adds semitones; notes last a 16th.
 
 use ordrumbox_core::instruments::catalog;
-use ordrumbox_core::pattern_engine::recompute_flat_notes;
+use ordrumbox_core::pattern_engine::expand_hits;
 use ordrumbox_core::steps::TICK;
 use ordrumbox_core::{Pattern, Rng, Scales, js, lfo};
 
@@ -62,7 +62,7 @@ fn text_bytes(text: &str) -> Vec<u8> {
     text.chars().map(|c| c.encode_utf16(&mut [0; 2])[0] as u8).collect()
 }
 
-/// Where a track name plays (`assignChannels`).
+/// Where a track name plays.
 #[derive(Debug, Clone, Copy)]
 struct Target {
     note: f64,
@@ -181,7 +181,7 @@ pub fn export(pattern: &Pattern, loops: u32, roots: &[(String, f64)], rng: &mut 
     }
 
     for pass in 0..loops {
-        let flat = recompute_flat_notes(pattern, pass, rng, scales);
+        let flat = expand_hits(pattern, pass, rng, scales);
         let offset = f64::from(pass) * pattern_ticks * MIDI_RATIO;
         for (&tick, notes) in &flat {
             let midi_tick = f64::from(tick) * MIDI_RATIO + offset;

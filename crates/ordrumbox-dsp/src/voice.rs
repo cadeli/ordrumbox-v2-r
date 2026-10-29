@@ -15,7 +15,7 @@ const ATTACK_SECONDS: f32 = 0.005;
 const RELEASE_SECONDS: f32 = 0.015;
 /// Level the decay ends at (`MIN_GAIN_VALUE`, -60 dB): the voice stops there.
 const MIN_GAIN: f32 = 0.001;
-/// Shortest decay a sample may have (`safeDecay`).
+/// Shortest decay a sample may have.
 const MIN_DECAY_SECONDS: f32 = 0.02;
 
 /// What to play.

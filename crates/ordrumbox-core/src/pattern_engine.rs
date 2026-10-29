@@ -21,7 +21,7 @@ use crate::variation;
 
 /// One note to play, as the player and the exporters read it.
 #[derive(Debug, Clone, PartialEq)]
-pub struct FlatNote {
+pub struct Hit {
     /// Index of the track in `pattern.tracks`.
     pub track: usize,
     /// Index of the written note in `track.notes` that produced it; `None` for
@@ -37,8 +37,8 @@ pub struct FlatNote {
     pub pan: f64,
 }
 
-/// The flat notes of one pass, by tick (a beat is [`TICK`] ticks).
-pub type FlatNotes = BTreeMap<u32, Vec<FlatNote>>;
+/// The hits of one pass (the notes expanded into what plays), by tick (a beat is [`TICK`] ticks).
+pub type Hits = BTreeMap<u32, Vec<Hit>>;
 
 /// Length of one pattern pass, in ticks.
 pub fn pattern_ticks(pattern: &Pattern) -> i64 {
@@ -46,7 +46,7 @@ pub fn pattern_ticks(pattern: &Pattern) -> i64 {
 }
 
 /// Length of one loop of a track, in ticks: `loopAtStep` when set, else the
-/// track's own `beatCount` (`computeTickCountForLoop`).
+/// track's own `beatCount`.
 pub fn track_loop_ticks(track: &Track) -> i64 {
     let spb = f64::from(track.steps_per_beat);
     let loop_steps = match track.loop_length {
@@ -68,10 +68,10 @@ pub fn fires_on_pass(offset: i32, cycle: i32, pass: u32) -> bool {
 }
 
 /// Compute pass `pass` (0-based, it selects the notes by `cycle`/`cycle_offset`) of a
-/// pattern (`recomputeFlatNotes`). Within a tick, notes come in track order,
+/// pattern. Within a tick, notes come in track order,
 /// then note order, then repeats, as in the JS app.
-pub fn recompute_flat_notes(pattern: &Pattern, pass: u32, rng: &mut Rng, scales: &Scales) -> FlatNotes {
-    let mut flat = FlatNotes::new();
+pub fn expand_hits(pattern: &Pattern, pass: u32, rng: &mut Rng, scales: &Scales) -> Hits {
+    let mut flat = Hits::new();
     let pattern_ticks = pattern_ticks(pattern);
     for (track_idx, track) in pattern.tracks.iter().enumerate() {
         if track.steps_per_beat <= 0 {
@@ -105,7 +105,7 @@ pub fn recompute_flat_notes(pattern: &Pattern, pass: u32, rng: &mut Rng, scales:
 }
 
 /// Ticks where a note at `base` sounds: repeated every loop when it sits
-/// inside the loop, once otherwise (`expandLoopOccurrences`).
+/// inside the loop, once otherwise.
 fn loop_occurrences(base: i64, loop_ticks: i64, pattern_ticks: i64) -> Vec<i64> {
     if base >= loop_ticks || loop_ticks <= 0 || loop_ticks >= pattern_ticks {
         return vec![base];
@@ -155,9 +155,9 @@ struct NoteContext<'a> {
 }
 
 impl NoteContext<'_> {
-    fn push(&self, flat: &mut FlatNotes, tick: i64, pitch_offset: f64) {
+    fn push(&self, flat: &mut Hits, tick: i64, pitch_offset: f64) {
         let Ok(tick) = u32::try_from(tick) else { return }; // before the pattern start
-        flat.entry(tick).or_default().push(FlatNote {
+        flat.entry(tick).or_default().push(Hit {
             track: self.track_idx,
             source: Some(self.note_idx),
             beat: self.note.beat,
@@ -174,10 +174,10 @@ impl NoteContext<'_> {
         js::round(ticks_per_step * step_spacing(self.note.retrigger_rate)) as i64
     }
 
-    /// The note and its repeats, or its arpeggio (`generateSubNotes`). Every
+    /// The note and its repeats, or its arpeggio. Every
     /// arpeggio note, the first included, and every repeat after the first
     /// pass `arpTriggerProbability`.
-    fn add_sub_notes(&self, flat: &mut FlatNotes, base: i64, rng: &mut Rng) {
+    fn add_sub_notes(&self, flat: &mut Hits, base: i64, rng: &mut Rng) {
         let note = self.note;
         let spacing = self.repeat_spacing();
         let trigger = note.retrigger_probability;
@@ -203,7 +203,7 @@ impl NoteContext<'_> {
 
     /// Euclidean onsets over the span to the next note; with an arpeggio they
     /// continue its sequence after the arpeggio notes.
-    fn add_euclidean_fill(&self, flat: &mut FlatNotes, base: i64, span_end: &SpanResolver, rng: &mut Rng) {
+    fn add_euclidean_fill(&self, flat: &mut Hits, base: i64, span_end: &SpanResolver, rng: &mut Rng) {
         let note = self.note;
         if note.euclidean_pulses <= 0 {
             return;
@@ -245,7 +245,7 @@ mod tests {
     }
 
     fn ticks(pattern: &Pattern, pass: u32) -> Vec<(u32, f64)> {
-        let flat = recompute_flat_notes(pattern, pass, &mut Rng::new(0), &Scales::default());
+        let flat = expand_hits(pattern, pass, &mut Rng::new(0), &Scales::default());
         flat.iter().flat_map(|(&tick, notes)| notes.iter().map(move |n| (tick, n.pitch))).collect()
     }
 
@@ -295,7 +295,7 @@ mod tests {
         let rock = library.pattern("rock").unwrap();
         let mut rng = Rng::new(9);
         let before = rng.clone().next_u64();
-        recompute_flat_notes(rock, 0, &mut rng, &Scales::default());
+        expand_hits(rock, 0, &mut rng, &Scales::default());
         assert_eq!(rng.next_u64(), before);
     }
 }

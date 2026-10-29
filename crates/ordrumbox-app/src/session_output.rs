@@ -1,6 +1,6 @@
 //! The session's side of the output panel (`output_panel.js`): the master
 //! bus settings sent to the player as they change and saved to
-//! `settings.json` half a second after the last change (`persistMaster`),
+//! `settings.json` half a second after the last change,
 //! the tabs, the spectrum of what plays.
 
 use ordrumbox_engine::{MasterSettings, SCOPE_SIZE};

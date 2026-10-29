@@ -34,12 +34,12 @@ pub(super) struct RollDrag {
 /// Rows a notch of the wheel scrolls.
 const WHEEL_ROWS: i32 = 3;
 
-/// `beat 2.3`: a cursor position (`beatLabel`).
+/// `beat 2.3`: a cursor position.
 fn beat_label(beat: i32, step: i32) -> String {
     format!("beat {}.{}", beat + 1, step + 1)
 }
 
-/// `3 notes` (`notesLabel`).
+/// `3 notes`.
 fn notes_label(count: usize) -> String {
     format!("{count} note{}", if count == 1 { "" } else { "s" })
 }
@@ -153,7 +153,7 @@ impl Session {
         self.roll_gauge = None;
     }
 
-    /// The note of track `t` at `step` on `row` (`findNoteAt`).
+    /// The note of track `t` at `step` on `row`.
     fn roll_note_at(&self, t: usize, step: i64, row: i32) -> Option<usize> {
         let track = self.track(t)?;
         let spb = steps_per_beat(track);
@@ -325,7 +325,7 @@ impl Session {
     }
 
     /// The bubble over a note: the drag's value (the gauge), else the hovered
-    /// note's tooltip (`formatNoteTooltip`).
+    /// note's tooltip.
     pub(super) fn draw_roll_tooltip(&self, canvas: &mut Canvas, scale: i32) {
         if self.menu.is_some() || self.popup_open() || self.overlay.is_some() {
             return;
@@ -359,7 +359,7 @@ impl Session {
         }
     }
 
-    /// A key clicked: play that pitch on the track (`#playKey`).
+    /// A key clicked: play that pitch on the track.
     fn roll_play_key(&mut self, t: usize, midi: i32) {
         let note = Note {
             pitch: f64::from(midi) - MIDDLE_C - self.track(t).map_or(0.0, |track| track.transpose),
@@ -374,7 +374,7 @@ impl Session {
     // ─── The keyboard ────────────────────────────────────────────────────────
 
     /// An arrow: the cursor (wrapping, the page following), or with Shift the
-    /// selected note's velocity and pitch (`#onKeyDown`).
+    /// selected note's velocity and pitch.
     pub fn roll_arrow(&mut self, direction: Move, shift: bool) {
         let Some(t) = self.roll_track() else { return };
         if shift && self.selected.is_some_and(|(st, _)| st == t) {
@@ -458,7 +458,7 @@ impl Session {
     // ─── The menus ───────────────────────────────────────────────────────────
 
     /// The keyboard: clear the track, or write the next progression from
-    /// that key (`#showKeyboardContextMenu`).
+    /// that key.
     fn roll_key_menu(&mut self, t: usize, midi: i32, x: i32, y: i32) {
         let Some(track) = self.track(t) else { return };
         let progression = composition::progression(self.roll_sequence);
@@ -540,7 +540,7 @@ impl Session {
         }
     }
 
-    /// Add the chord's notes the step has not got (`#menuAddChord`), the
+    /// Add the chord's notes the step has not got, the
     /// first selected.
     fn roll_chord(&mut self, t: usize, step: i64, root: f64, intervals: &[f64], quality: &str) {
         let (beat, beat_step) = self.roll_beat(t, step);
@@ -570,7 +570,7 @@ impl Session {
     }
 
     /// Replace the track's notes with the next progression from `tonic`,
-    /// a chord per measure (`#menuAddSequence`).
+    /// a chord per measure.
     fn roll_sequence_from(&mut self, t: usize, tonic: f64) {
         let progression = composition::progression(self.roll_sequence);
         let beat_count = self.pattern().map_or(4, |p| p.beat_count);

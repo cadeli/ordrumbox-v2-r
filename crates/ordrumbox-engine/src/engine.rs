@@ -25,7 +25,7 @@ pub const MAX_TRACKS: usize = 64;
 /// Frames per render quantum (Web Audio's).
 pub const QUANTUM: usize = 128;
 /// Time constants of parameter changes (`setTargetAtTime`), seconds: effect
-/// settings (`RAMP_TIME`), volume and pan (`applyTrackToStrip`), LFO steps
+/// settings (`RAMP_TIME`), volume and pan, LFO steps
 /// (`LFO_SMOOTHING`).
 const RAMP_FX: f32 = 0.02;
 const RAMP_MIX: f32 = 0.01;
