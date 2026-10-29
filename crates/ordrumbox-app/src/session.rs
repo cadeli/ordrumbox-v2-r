@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use ordrumbox_core::drum_taxonomy::{TrackType, detect_track_type};
+use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::{Library, Note, Pattern, Rng, Scales, Track};
 use ordrumbox_engine::analysis::{self, Analysis};
 use ordrumbox_engine::offline::{self, RenderSetup};
@@ -357,12 +357,8 @@ impl Session {
         session.scales = assets.scales.clone();
         session.scale_list = assets.scale_list.clone();
         session.synths = assets.synths.clone();
-        session.roots = assets
-            .bank
-            .samples
-            .iter()
-            .filter_map(|s| Some((s.instrument.key.clone(), s.instrument.root_midi?)))
-            .collect();
+        session.roots =
+            assets.bank.samples.iter().filter_map(|s| Some((s.sample.key.clone(), s.sample.root_midi?))).collect();
         session.library_path = library_path;
         session.message = message;
         let bank = Arc::new(assets.bank);
@@ -692,7 +688,7 @@ impl Session {
             render.kit.clone_from(&kit.name);
         }
         if let Some(sample) = self.kit_editor {
-            self.kit_editor = Some(sample.min(kit.instruments.len().saturating_sub(1)));
+            self.kit_editor = Some(sample.min(kit.samples.len().saturating_sub(1)));
         }
         self.update_analysis();
     }
@@ -764,11 +760,15 @@ impl Session {
 
     /// Generation on (tracks in auto mode): drums, bass, chords.
     fn generation(&self) -> [bool; 3] {
-        let generating = |kind: fn(TrackType) -> bool| {
+        let generating = |kind: fn(InstrumentFamily) -> bool| {
             self.pattern()
-                .is_some_and(|p| p.tracks.iter().any(|t| generate::is_auto_on(t) && kind(detect_track_type(&t.name))))
+                .is_some_and(|p| p.tracks.iter().any(|t| generate::is_auto_on(t) && kind(instrument_family(&t.name))))
         };
-        [generating(TrackType::is_drum), generating(|k| k == TrackType::Bass), generating(|k| k == TrackType::Piano)]
+        [
+            generating(InstrumentFamily::is_drum),
+            generating(|k| k == InstrumentFamily::Bass),
+            generating(|k| k == InstrumentFamily::Piano),
+        ]
     }
 
     /// What the menus show now.
@@ -1067,7 +1067,7 @@ impl Session {
     /// The kit editor's selected sample and the kit's sample count, when open.
     pub fn kit_list(&self) -> Option<(usize, usize)> {
         let sample = self.kit_editor?;
-        Some((sample, self.kits.kits.get(self.kit_index).map_or(0, |k| k.instruments.len())))
+        Some((sample, self.kits.kits.get(self.kit_index).map_or(0, |k| k.samples.len())))
     }
 
     /// Ctrl+K: the kit editor (the drumkit manager), open or closed.
@@ -1099,8 +1099,7 @@ impl Session {
         self.kits_dirty = None;
         self.track_analysis.borrow_mut().clear();
         let (bank, errors) = self.kits.bank();
-        self.roots =
-            bank.samples.iter().filter_map(|s| Some((s.instrument.key.clone(), s.instrument.root_midi?))).collect();
+        self.roots = bank.samples.iter().filter_map(|s| Some((s.sample.key.clone(), s.sample.root_midi?))).collect();
         let bank = Arc::new(bank);
         if let Some(controller) = &mut self.controller {
             controller.set_bank(bank.clone());
@@ -1128,7 +1127,7 @@ impl Session {
     /// ↑↓: the previous / next sample of the kit.
     pub fn kit_select(&mut self, delta: isize) {
         let Some(sample) = self.kit_editor else { return };
-        let count = self.kits.kits.get(self.kit_index).map_or(0, |k| k.instruments.len());
+        let count = self.kits.kits.get(self.kit_index).map_or(0, |k| k.samples.len());
         if count > 0 {
             self.kit_editor = Some((sample as isize + delta).rem_euclid(count as isize) as usize);
             self.update_analysis();
@@ -1819,8 +1818,8 @@ impl Session {
     fn kit_view(&self, details_top: i32) -> Option<KitView<'_>> {
         let sample = self.kit_editor?;
         let kit = self.kits.kits.get(self.kit_index)?;
-        let samples = kit.instruments.iter().map(|i| (i.display_name.as_str(), i.key.as_str())).collect();
-        let selected = kit.instruments.get(sample);
+        let samples = kit.samples.iter().map(|i| (i.display_name.as_str(), i.key.as_str())).collect();
+        let selected = kit.samples.get(sample);
         let analysis =
             self.analysis.as_ref().filter(|(url, _)| selected.is_some_and(|i| i.url == *url)).map(|(_, a)| a);
         let info = analysis.map(|a| {

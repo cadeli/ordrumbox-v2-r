@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use ordrumbox_core::instruments::{NOT_FOUND, catalog};
-use ordrumbox_engine::kit::{Instrument, Kit};
+use ordrumbox_engine::kit::{Kit, KitSample};
 use ordrumbox_engine::{SampleBank, SampleBuffer, analysis, wav};
 
 use crate::assets::SampleSources;
@@ -71,7 +71,7 @@ impl KitSet {
         save_to: Option<PathBuf>,
         samples_dir: Option<PathBuf>,
     ) -> Self {
-        let buffers = bank.samples.iter().map(|s| (s.instrument.url.clone(), s.buffer.clone())).collect();
+        let buffers = bank.samples.iter().map(|s| (s.sample.url.clone(), s.buffer.clone())).collect();
         Self { kits, buffers, sources, save_to, samples_dir }
     }
 
@@ -93,7 +93,7 @@ impl KitSet {
             },
         );
         for sample in &bank.samples {
-            self.buffers.entry(sample.instrument.url.clone()).or_insert_with(|| sample.buffer.clone());
+            self.buffers.entry(sample.sample.url.clone()).or_insert_with(|| sample.buffer.clone());
         }
         (bank, errors)
     }
@@ -108,8 +108,8 @@ impl KitSet {
         self.buffers.get(url)
     }
 
-    pub fn sample(&self, kit: usize, sample: usize) -> Option<&Instrument> {
-        self.kits.get(kit)?.instruments.get(sample)
+    pub fn sample(&self, kit: usize, sample: usize) -> Option<&KitSample> {
+        self.kits.get(kit)?.samples.get(sample)
     }
 
     /// Keep the audio of `url` in the user's samples folder (as 32-bit float).
@@ -130,13 +130,13 @@ impl KitSet {
 
     /// Where the sample of `url` is: kit and index.
     pub fn find_url(&self, url: &str) -> Option<(usize, usize)> {
-        self.kits.iter().enumerate().find_map(|(k, kit)| Some((k, kit.instruments.iter().position(|i| i.url == url)?)))
+        self.kits.iter().enumerate().find_map(|(k, kit)| Some((k, kit.samples.iter().position(|i| i.url == url)?)))
     }
 
     /// Set gain (dB), tune (semitones) or decay (ms) of a sample, from a
     /// knob (`onKnobChange`); the message when it changed.
     pub fn set_value(&mut self, kit: usize, sample: usize, field: Field, value: f64) -> Option<String> {
-        let instrument = self.kits.get_mut(kit)?.instruments.get_mut(sample)?;
+        let instrument = self.kits.get_mut(kit)?.samples.get_mut(sample)?;
         let name = instrument.display_name.clone();
         match field {
             Field::Gain if value != instrument.gain_db => {
@@ -157,7 +157,7 @@ impl KitSet {
 
     /// `setInstrument`: the instrument a sample is.
     pub fn set_instrument(&mut self, kit: usize, sample: usize, id: &str) -> Option<String> {
-        let instrument = self.kits.get_mut(kit)?.instruments.get_mut(sample)?;
+        let instrument = self.kits.get_mut(kit)?.samples.get_mut(sample)?;
         (instrument.key != id).then(|| {
             instrument.key = id.to_owned();
             format!("Set \"{}\" to instrument \"{id}\"", instrument.display_name)
@@ -166,25 +166,25 @@ impl KitSet {
 
     /// `moveToKit`: a sample into kit `target`.
     pub fn move_to_kit(&mut self, kit: usize, sample: usize, target: usize) -> Option<String> {
-        if target == kit || target >= self.kits.len() || sample >= self.kits.get(kit)?.instruments.len() {
+        if target == kit || target >= self.kits.len() || sample >= self.kits.get(kit)?.samples.len() {
             return None;
         }
-        let moved = self.kits[kit].instruments.remove(sample);
+        let moved = self.kits[kit].samples.remove(sample);
         let message = format!("Moved \"{}\" to kit \"{}\"", moved.display_name, self.kits[target].name);
-        self.kits[target].instruments.push(moved);
+        self.kits[target].samples.push(moved);
         Some(message)
     }
 
     /// `removeSample`.
     pub fn remove(&mut self, kit: usize, sample: usize) -> Option<String> {
-        let instruments = &mut self.kits.get_mut(kit)?.instruments;
+        let instruments = &mut self.kits.get_mut(kit)?.samples;
         (sample < instruments.len()).then(|| format!("Removed \"{}\"", instruments.remove(sample).display_name))
     }
 
     /// `normalizeAll`: the samples of kit `kit` scaled to a 0 dB peak; how many.
     pub fn normalize(&mut self, kit: usize) -> Result<usize, String> {
         let urls: Vec<String> =
-            self.kits.get(kit).map(|k| k.instruments.iter().map(|i| i.url.clone()).collect()).unwrap_or_default();
+            self.kits.get(kit).map(|k| k.samples.iter().map(|i| i.url.clone()).collect()).unwrap_or_default();
         let mut count = 0;
         for url in urls {
             let Some(buffer) = self.buffers.get(&url) else { continue };
@@ -216,13 +216,9 @@ impl KitSet {
             self.kits.push(Kit { name: kit_name.clone(), ..Kit::default() });
         }
         let kit = self.kits.iter().position(|k| k.name == kit_name).unwrap_or(0);
-        let instruments = &mut self.kits[kit].instruments;
-        let entry = Instrument {
-            key: detect_key(&name),
-            display_name: name.clone(),
-            url: name.clone(),
-            ..Instrument::default()
-        };
+        let instruments = &mut self.kits[kit].samples;
+        let entry =
+            KitSample { key: detect_key(&name), display_name: name.clone(), url: name.clone(), ..KitSample::default() };
         let index = match instruments.iter().position(|i| i.url == name) {
             Some(i) => {
                 instruments[i] = entry;
@@ -243,7 +239,7 @@ impl KitSet {
         self.store_audio(&url, &buffer)?;
         self.buffers.insert(url, Arc::new(buffer));
         let name = file_name(path);
-        if let Some(instrument) = self.kits[kit].instruments.get_mut(sample) {
+        if let Some(instrument) = self.kits[kit].samples.get_mut(sample) {
             instrument.display_name.clone_from(&name);
         }
         Ok(format!("Replaced with \"{name}\""))
@@ -270,18 +266,18 @@ impl KitSet {
                 Ok((bytes, buffer)) => {
                     self.store_bytes(&name, &bytes)?;
                     self.buffers.insert(name.clone(), Arc::new(buffer));
-                    instruments.push(Instrument {
+                    instruments.push(KitSample {
                         key: detect_key(&name),
                         display_name: name.clone(),
                         url: name,
-                        ..Instrument::default()
+                        ..KitSample::default()
                     });
                 }
                 Err(_) => failed += 1,
             }
         }
         let count = instruments.len();
-        let kit = Kit { name: kit_name.clone(), instruments, ..Kit::default() };
+        let kit = Kit { name: kit_name.clone(), samples: instruments, ..Kit::default() };
         let index = match self.kits.iter().position(|k| k.name == kit_name) {
             Some(i) => {
                 self.kits[i] = kit;
@@ -333,11 +329,11 @@ mod tests {
         let kits = vec![
             Kit {
                 name: "a".into(),
-                instruments: vec![Instrument {
+                samples: vec![KitSample {
                     key: "KICK".into(),
                     display_name: "kick".into(),
                     url: "k.wav".into(),
-                    ..Instrument::default()
+                    ..KitSample::default()
                 }],
                 ..Kit::default()
             },
@@ -346,7 +342,7 @@ mod tests {
         let bank = SampleBank {
             samples: vec![ordrumbox_engine::kit::BankSample {
                 kit: "a".into(),
-                instrument: kits[0].instruments[0].clone(),
+                sample: kits[0].samples[0].clone(),
                 buffer: Arc::new(SampleBuffer::mono(vec![0.25, -0.5, 0.1], 8000)),
             }],
         };
@@ -361,11 +357,11 @@ mod tests {
         assert_eq!(kits.set_value(0, 0, Field::Gain, -3.0).as_deref(), Some("kick: gain -3.0 dB"));
         assert_eq!(kits.set_value(0, 0, Field::Gain, -3.0), None); // no change
         kits.set_value(0, 0, Field::Tune, 0.3);
-        assert_eq!(kits.kits[0].instruments[0].tune, 0.3);
+        assert_eq!(kits.kits[0].samples[0].tune, 0.3);
         kits.set_value(0, 0, Field::Decay, 630.0);
-        assert_eq!(kits.kits[0].instruments[0].decay, Some(630.0));
+        assert_eq!(kits.kits[0].samples[0].decay, Some(630.0));
         assert!(kits.set_instrument(0, 0, "SNARE").is_some());
-        assert_eq!(kits.kits[0].instruments[0].key, "SNARE");
+        assert_eq!(kits.kits[0].samples[0].key, "SNARE");
         assert_eq!(kits.find_url("k.wav"), Some((0, 0)));
 
         assert_eq!(kits.normalize(0), Ok(1));
@@ -378,21 +374,21 @@ mod tests {
         let file = dir.join("SnareDrum.wav");
         fs::write(&file, wav::encode_float(&SampleBuffer::mono(vec![0.3; 10], 8000))).unwrap();
         assert_eq!(kits.add_sample(0, &file).unwrap().0, 1);
-        assert_eq!(kits.kits[0].instruments[1].key, "SNARE");
+        assert_eq!(kits.kits[0].samples[1].key, "SNARE");
         let (bank, errors) = kits.bank();
         assert!(errors.is_empty());
         assert_eq!(bank.samples.len(), 2);
 
         assert_eq!(kits.move_to_kit(0, 1, 1).as_deref(), Some("Moved \"SnareDrum.wav\" to kit \"b\""));
         assert_eq!(kits.move_to_kit(0, 0, 0), None);
-        assert_eq!(kits.kits[1].instruments.len(), 1);
+        assert_eq!(kits.kits[1].samples.len(), 1);
         assert!(kits.remove(1, 0).is_some());
 
         kits.export_mapping(0, &dir).unwrap();
         let mapping = dir.join("ordrumbox-drumkit-a.json");
-        kits.kits[0].instruments.clear();
+        kits.kits[0].samples.clear();
         assert_eq!(kits.load_mapping(&mapping).unwrap().0, 0);
-        assert_eq!(kits.kits[0].instruments.len(), 1);
+        assert_eq!(kits.kits[0].samples.len(), 1);
         kits.save().unwrap();
         assert_eq!(store::load_kits(&dir.join("kits.json")).unwrap().unwrap()[0].name, "a");
         fs::remove_dir_all(dir).unwrap();

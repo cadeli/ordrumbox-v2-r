@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use ordrumbox_core::json::{self, Object, Value};
 use ordrumbox_core::{Library, Rng, Scales};
-use ordrumbox_engine::kit::{BankSample, Instrument};
+use ordrumbox_engine::kit::{BankSample, KitSample};
 use ordrumbox_engine::offline::{self, EXPORT_RATE, RenderSetup};
 use ordrumbox_engine::{Controller, Mode, SampleBank, SynthPresets, TrackSound, wav};
 
@@ -37,7 +37,7 @@ fn bank() -> Arc<SampleBank> {
         for key in KEYS {
             samples.push(BankSample {
                 kit: kit.into(),
-                instrument: Instrument {
+                sample: KitSample {
                     key: key.into(),
                     display_name: key.to_lowercase(),
                     url: format!("{kit}/{key}.wav"),
@@ -242,7 +242,7 @@ fn the_song_export_follows_the_arrangement_loop() {
 /// The sample of `sound`, as (kit, key).
 fn sample_of(bank: &SampleBank, sound: &TrackSound) -> Option<(String, String)> {
     match sound {
-        TrackSound::Sample(i) => bank.get(*i).map(|s| (s.kit.clone(), s.instrument.key.clone())),
+        TrackSound::Sample(i) => bank.get(*i).map(|s| (s.kit.clone(), s.sample.key.clone())),
         _ => None,
     }
 }

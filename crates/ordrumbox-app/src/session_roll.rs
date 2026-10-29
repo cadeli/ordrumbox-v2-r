@@ -462,8 +462,8 @@ impl Session {
     /// that key (`#showKeyboardContextMenu`).
     fn roll_key_menu(&mut self, t: usize, midi: i32, x: i32, y: i32) {
         let Some(track) = self.track(t) else { return };
-        let sequence = composition::sequence(self.roll_sequence);
-        let title = format!("{} - {} {}", track.name, midi_name(midi), sequence.name);
+        let progression = composition::progression(self.roll_sequence);
+        let title = format!("{} - {} {}", track.name, midi_name(midi), progression.name);
         let tonic = self.roll_pitch(t, midi - MIDI_MIN as i32);
         let values = vec!["clear".into(), format!("sequence:{tonic}")];
         let labels = vec!["Clear all".into(), "Add sequence".into()];
@@ -572,9 +572,9 @@ impl Session {
     /// Replace the track's notes with the next progression from `tonic`,
     /// a chord per measure (`#menuAddSequence`).
     fn roll_sequence_from(&mut self, t: usize, tonic: f64) {
-        let sequence = composition::sequence(self.roll_sequence);
+        let progression = composition::progression(self.roll_sequence);
         let beat_count = self.pattern().map_or(4, |p| p.beat_count);
-        let planned = composition::sequence_notes(sequence, tonic, beat_count);
+        let planned = composition::progression_notes(progression, tonic, beat_count);
         if planned.is_empty() {
             return;
         }
@@ -594,7 +594,7 @@ impl Session {
         let name = self.track(t).map(|track| track.name.clone()).unwrap_or_default();
         self.message = format!(
             "Replaced with sequence \"{}\" ({}, 1 chord/measure) - {name}",
-            sequence.name,
+            progression.name,
             notes_label(planned.len())
         );
     }

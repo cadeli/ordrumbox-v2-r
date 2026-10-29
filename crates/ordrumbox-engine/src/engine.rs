@@ -448,7 +448,7 @@ mod tests {
 
     fn bank() -> Arc<SampleBank> {
         let buffer = SampleBuffer::mono(vec![1.0; 100], 48_000);
-        let instrument = crate::kit::Instrument {
+        let instrument = crate::kit::KitSample {
             key: "K".into(),
             display_name: "k".into(),
             url: "k".into(),
@@ -456,7 +456,7 @@ mod tests {
             ..Default::default()
         };
         Arc::new(SampleBank {
-            samples: vec![crate::kit::BankSample { kit: "x".into(), instrument, buffer: buffer.into() }],
+            samples: vec![crate::kit::BankSample { kit: "x".into(), sample: instrument, buffer: buffer.into() }],
         })
     }
 

@@ -200,7 +200,7 @@ fn sound_for(
     };
     let bank_sample = context.bank.get(sample)?;
     // The sample's tune and gain trim (`sample.tune`, `sample.gainDb`).
-    let mut ratio = note.playback_ratio(track) * (bank_sample.instrument.tune / 12.0).exp2();
+    let mut ratio = note.playback_ratio(track) * (bank_sample.sample.tune / 12.0).exp2();
     if let Some(pitch_lfo) = &track.pitch_lfo {
         ratio *= (lfo::value(pitch_lfo, lfo_tick as f64) / 12.0).exp2();
     }
@@ -208,8 +208,8 @@ fn sound_for(
         sample,
         track: strip,
         ratio,
-        peak: (note.velocity * bank_sample.instrument.gain()) as f32,
-        decay: (bank_sample.instrument.decay_ms() / 1000.0) as f32,
+        peak: (note.velocity * bank_sample.sample.gain()) as f32,
+        decay: (bank_sample.sample.decay_ms() / 1000.0) as f32,
         pan: note.playback_pan(track) as f32,
         delay: 0,
     }))
@@ -309,7 +309,7 @@ pub fn build_song_pass(
     let mut patches = Vec::new();
     for t in 0..ticks {
         let tick = first_tick + u64::from(t);
-        for source in song.sources_at(context.patterns, tick, TICK) {
+        for source in song.active_clips_at(context.patterns, tick, TICK) {
             let p = source.pattern;
             let pattern = &context.patterns[p];
             let flat = cache.entry((p, source.loop_index)).or_insert_with(|| {
@@ -343,7 +343,7 @@ pub fn build_song_pass(
     events.sort_by_key(|e| e.frame);
     // Repetitions this pass is past are not needed again.
     cache.retain(|&(p, loop_index), _| {
-        song.sources_at(context.patterns, first_tick + u64::from(ticks), TICK)
+        song.active_clips_at(context.patterns, first_tick + u64::from(ticks), TICK)
             .iter()
             .any(|s| s.pattern == p && s.loop_index <= loop_index)
     });
@@ -375,7 +375,7 @@ pub fn build_song_pass(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::kit::{BankSample, Instrument};
+    use crate::kit::{BankSample, KitSample};
     use ordrumbox_core::Library;
     use ordrumbox_dsp::SampleBuffer;
 
@@ -389,7 +389,7 @@ mod tests {
                 {"pattern":"a","startMeasure":0,"measureCount":2},{"pattern":"b","startMeasure":1,"measureCount":2}]}]}"#,
         )
         .unwrap();
-        let instrument = Instrument {
+        let instrument = KitSample {
             key: "X".into(),
             display_name: "x".into(),
             url: "x".into(),
@@ -399,7 +399,7 @@ mod tests {
         let bank = SampleBank {
             samples: vec![BankSample {
                 kit: "k".into(),
-                instrument,
+                sample: instrument,
                 buffer: SampleBuffer::mono(vec![1.0], 48_000).into(),
             }],
         };

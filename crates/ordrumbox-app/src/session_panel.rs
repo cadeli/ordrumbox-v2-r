@@ -5,7 +5,7 @@
 //! the JS handlers of `track_editor/*.js`, `note_editor/sync_section.js`,
 //! `drumkit_manager.js` and the pattern panel's volume sliders.
 
-use ordrumbox_core::drum_taxonomy::{TrackType, detect_track_type};
+use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::instruments::catalog;
 use ordrumbox_core::js;
 use ordrumbox_core::json::{Object, Value};
@@ -82,15 +82,15 @@ fn panel_width(width: i32, scale: i32) -> i32 {
 
 /// H's synth patch for a track type (`SYNTH_SOUND_MAP`; the JS OHH and TOM
 /// types are not detected here).
-fn synth_patch_for(kind: TrackType) -> Option<&'static str> {
+fn synth_patch_for(kind: InstrumentFamily) -> Option<&'static str> {
     match kind {
-        TrackType::Kick => Some("BASS0"),
-        TrackType::Snare => Some("SN"),
-        TrackType::Hat => Some("CHH_SYNTH"),
-        TrackType::Bass => Some("BASS2"),
-        TrackType::Perc => Some("SYNTH2"),
-        TrackType::Piano => Some("PIANO"),
-        TrackType::Clap | TrackType::Cowbell | TrackType::Organ => None,
+        InstrumentFamily::Kick => Some("BASS0"),
+        InstrumentFamily::Snare => Some("SN"),
+        InstrumentFamily::Hat => Some("CHH_SYNTH"),
+        InstrumentFamily::Bass => Some("BASS2"),
+        InstrumentFamily::Perc => Some("SYNTH2"),
+        InstrumentFamily::Piano => Some("PIANO"),
+        InstrumentFamily::Clap | InstrumentFamily::Cowbell | InstrumentFamily::Organ => None,
     }
 }
 
@@ -270,7 +270,7 @@ impl Session {
         let bank =
             self.controller.as_ref().map(|c| c.bank().clone()).or_else(|| self.render.as_ref().map(|r| r.bank.clone()));
         match self.track_sound(t) {
-            TrackSound::Sample(i) => bank.and_then(|b| b.get(i).map(|s| s.instrument.url.clone())).unwrap_or_default(),
+            TrackSound::Sample(i) => bank.and_then(|b| b.get(i).map(|s| s.sample.url.clone())).unwrap_or_default(),
             TrackSound::Synth(key) => format!("synth {key}"),
             TrackSound::None if track.use_soft_synth => match &track.synth_sound_key {
                 Some(key) => format!("synth {key}"),
@@ -290,7 +290,7 @@ impl Session {
         let bank =
             self.controller.as_ref().map(|c| c.bank().clone()).or_else(|| self.render.as_ref().map(|r| r.bank.clone()));
         match sound {
-            TrackSound::Sample(i) => bank.and_then(|b| b.get(i).map(|s| s.instrument.url.clone())),
+            TrackSound::Sample(i) => bank.and_then(|b| b.get(i).map(|s| s.sample.url.clone())),
             _ => (!track.use_auto_assign_sound).then(|| track.sample_id.clone()),
         }
     }
@@ -334,7 +334,7 @@ impl Session {
 
         // Instruments that have samples, sorted; the current one.
         let keys: std::collections::HashSet<&str> =
-            self.kits.kits.iter().flat_map(|k| k.instruments.iter().map(|i| i.key.as_str())).collect();
+            self.kits.kits.iter().flat_map(|k| k.samples.iter().map(|i| i.key.as_str())).collect();
         let mut ids: Vec<String> =
             catalog().instruments.iter().map(|i| i.id.clone()).filter(|id| keys.contains(id.as_str())).collect();
         ids.sort();
@@ -393,7 +393,7 @@ impl Session {
             .kits
             .iter()
             .flat_map(|kit| {
-                kit.instruments.iter().filter(|i| i.key == id).map(|i| {
+                kit.samples.iter().filter(|i| i.key == id).map(|i| {
                     let name = if i.display_name.is_empty() { i.url.clone() } else { i.display_name.clone() };
                     (kit.name.clone(), i.url.clone(), name)
                 })
@@ -821,7 +821,7 @@ impl Session {
         let mut random = Vec::new();
         let changed =
             self.editor.update_tracks(self.pattern_index, "Convert tracks to generated sounds", |_, track| {
-                let kind = detect_track_type(&track.name);
+                let kind = instrument_family(&track.name);
                 let mapped = synth_patch_for(kind).filter(|k| keys.iter().any(|key| key == k));
                 let key = mapped.map_or_else(
                     || {
@@ -871,7 +871,7 @@ impl Session {
             return;
         }
         let mut urls: Vec<String> =
-            self.kits.kits.iter().flat_map(|k| k.instruments.iter().map(|i| i.url.clone())).collect();
+            self.kits.kits.iter().flat_map(|k| k.samples.iter().map(|i| i.url.clone())).collect();
         urls.sort_unstable();
         urls.dedup();
         if urls.is_empty() {

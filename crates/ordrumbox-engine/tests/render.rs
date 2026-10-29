@@ -8,7 +8,7 @@ use ordrumbox_core::json;
 use ordrumbox_core::steps::TICK;
 use ordrumbox_core::{Library, Rng, Scales, recompute_flat_notes};
 use ordrumbox_engine::assign::{TrackSound, assign_pattern};
-use ordrumbox_engine::kit::{BankSample, Instrument};
+use ordrumbox_engine::kit::{BankSample, KitSample};
 use ordrumbox_engine::pass::{PassContext, build_pass, frames_per_tick};
 use ordrumbox_engine::{Engine, SampleBank, SynthPresets, wav};
 
@@ -29,7 +29,7 @@ fn bank() -> SampleBank {
         .iter()
         .map(|key| BankSample {
             kit: "test".into(),
-            instrument: Instrument {
+            sample: KitSample {
                 key: (*key).into(),
                 display_name: key.to_lowercase(),
                 url: format!("{key}.wav"),

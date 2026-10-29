@@ -6,7 +6,7 @@
 use std::path::Path;
 
 use ordrumbox_core::json::{self, Value};
-use ordrumbox_logic::composition::{sequence, sequence_notes};
+use ordrumbox_logic::composition::{progression, progression_notes};
 
 #[test]
 fn sequences_match_build_sequence_notes() {
@@ -14,10 +14,10 @@ fn sequences_match_build_sequence_notes() {
     let fixture = json::parse(&std::fs::read_to_string(path).unwrap()).unwrap();
     let num = |o: &Value, key: &str| o.get(key).and_then(Value::as_f64).unwrap();
     for case in fixture.get("sequences").and_then(Value::as_array).unwrap() {
-        let s = sequence(num(case, "index") as i64);
+        let s = progression(num(case, "index") as i64);
         assert_eq!(s.id, case.get("id").and_then(Value::as_str).unwrap());
         assert_eq!(s.name, case.get("name").and_then(Value::as_str).unwrap());
-        let got = sequence_notes(s, num(case, "tonic"), num(case, "beatCount") as i32);
+        let got = progression_notes(s, num(case, "tonic"), num(case, "beatCount") as i32);
         let expected: Vec<(i32, f64)> = case
             .get("notes")
             .and_then(Value::as_array)

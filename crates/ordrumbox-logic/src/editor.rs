@@ -9,7 +9,7 @@
 use std::collections::HashSet;
 use std::time::Instant;
 
-use ordrumbox_core::drum_taxonomy::{TrackType, detect_track_type};
+use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::ids::{slugify, unique_id};
 use ordrumbox_core::js::{number_to_string, round};
 use ordrumbox_core::json::Value;
@@ -659,7 +659,7 @@ impl Editor {
     /// ↻ Drum on pattern `p` (`toggleDrums`): whether drum generation is now on.
     pub fn toggle_drums(&mut self, p: usize, scales: &Scales, rnd: &mut dyn FnMut() -> f64) -> Option<bool> {
         let desc = |pattern: &Pattern| {
-            let on = pattern.tracks.iter().any(|t| detect_track_type(&t.name).is_drum() && t.auto);
+            let on = pattern.tracks.iter().any(|t| instrument_family(&t.name).is_drum() && t.auto);
             if on { "Generate drums" } else { "Drums auto off" }.to_owned()
         };
         self.edit(p, desc, None, |pattern| generate::toggle_drums(&mut AutoGen::new(scales, rnd), pattern))
@@ -675,11 +675,11 @@ impl Editor {
         rnd: &mut dyn FnMut() -> f64,
     ) -> Option<bool> {
         let (part, wanted) = match kind {
-            MelodicKind::Bass => ("bass", TrackType::Bass),
-            MelodicKind::Chords => ("chords", TrackType::Piano),
+            MelodicKind::Bass => ("bass", InstrumentFamily::Bass),
+            MelodicKind::Chords => ("chords", InstrumentFamily::Piano),
         };
         let desc = |pattern: &Pattern| {
-            let on = pattern.tracks.iter().any(|t| detect_track_type(&t.name) == wanted && t.auto);
+            let on = pattern.tracks.iter().any(|t| instrument_family(&t.name) == wanted && t.auto);
             if on { format!("Generate {part}") } else { format!("{part} auto off") }
         };
         self.edit(p, desc, None, |pattern| generate::toggle_melodic(&mut AutoGen::new(scales, rnd), pattern, kind))

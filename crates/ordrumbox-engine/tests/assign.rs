@@ -21,9 +21,9 @@ fn bank() -> (SampleBank, Vec<String>) {
     let samples = kits
         .iter()
         .flat_map(|kit| {
-            kit.instruments.iter().map(|instrument| BankSample {
+            kit.samples.iter().map(|instrument| BankSample {
                 kit: kit.name.clone(),
-                instrument: instrument.clone(),
+                sample: instrument.clone(),
                 buffer: SampleBuffer::mono(vec![0.0], 44_100).into(),
             })
         })
@@ -45,7 +45,7 @@ fn auto_assign_picks_what_the_js_picks() {
         for (label, pick) in [("first", 0usize), ("last", usize::MAX)] {
             let mut choose = |n: usize| pick.min(n - 1);
             let got = match assign_track(&track, &bank, kit, &synths, &mut choose) {
-                TrackSound::Sample(i) => bank.samples[i].instrument.url.clone(),
+                TrackSound::Sample(i) => bank.samples[i].sample.url.clone(),
                 TrackSound::None => "NOT_DEFINED".to_owned(),
                 TrackSound::Synth(key) => panic!("synth {key}"),
             };

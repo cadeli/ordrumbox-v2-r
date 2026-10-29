@@ -109,11 +109,11 @@ pub fn render_song(library: &Library, index: usize, setup: &RenderSetup) -> Opti
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::kit::{BankSample, Instrument};
+    use crate::kit::{BankSample, KitSample};
     use ordrumbox_dsp::SampleBuffer;
 
     fn setup() -> RenderSetup {
-        let instrument = Instrument {
+        let instrument = KitSample {
             key: "KICK".into(),
             display_name: "k".into(),
             url: "k".into(),
@@ -123,7 +123,7 @@ mod tests {
         let buffer = SampleBuffer::mono(vec![0.5; 2000], 44_100);
         RenderSetup {
             bank: Arc::new(SampleBank {
-                samples: vec![BankSample { kit: "x".into(), instrument, buffer: buffer.into() }],
+                samples: vec![BankSample { kit: "x".into(), sample: instrument, buffer: buffer.into() }],
             }),
             scales: Scales::default(),
             synths: SynthPresets::default(),

@@ -7,7 +7,7 @@
 //! JS choices can be reproduced. A synth track without a valid preset gets a
 //! random one.
 
-use ordrumbox_core::drum_taxonomy::detect_track_type;
+use ordrumbox_core::drum_taxonomy::instrument_family;
 use ordrumbox_core::instruments::{self, Catalog};
 use ordrumbox_core::{Pattern, Track};
 
@@ -67,10 +67,7 @@ impl<'a> AutoAssign<'a> {
 
     /// Samples whose key is one of `names` (normalized).
     fn exact(&self, names: &[String], kit: Option<&str>, exclude: Option<&str>) -> Vec<usize> {
-        self.in_scope(kit, exclude)
-            .filter(|(_, s)| names.contains(&normalize(&s.instrument.key)))
-            .map(|(i, _)| i)
-            .collect()
+        self.in_scope(kit, exclude).filter(|(_, s)| names.contains(&normalize(&s.sample.key))).map(|(i, _)| i).collect()
     }
 
     /// `#resolveInstrumentId`: a catalog id for the track name, else the name.
@@ -147,7 +144,7 @@ impl<'a> AutoAssign<'a> {
         }
         let ids: Vec<usize> = self
             .in_scope(kit, None)
-            .filter(|(_, s)| s.instrument.key.to_uppercase().contains(&search))
+            .filter(|(_, s)| s.sample.key.to_uppercase().contains(&search))
             .map(|(i, _)| i)
             .collect();
         self.pick_from(&ids)
@@ -156,16 +153,16 @@ impl<'a> AutoAssign<'a> {
     /// `getSampleIdFromTrackname`: exact key, else a sample of the same
     /// coarse type (only drum sounds for a drum instrument).
     fn by_track_name(&mut self, name: &str, kit: Option<&str>) -> Option<usize> {
-        let kind = detect_track_type(name);
+        let kind = instrument_family(name);
         let wanted = normalize(name);
         let drums_only = self.catalog.by_id(name).is_some_and(|i| i.drum);
         let is_drum_sound = |key: &str| self.catalog.by_id(key).is_none_or(|i| i.drum);
         let (mut exact, mut same_type) = (Vec::new(), Vec::new());
         for (i, sample) in self.in_scope(kit, None) {
-            let key = &sample.instrument.key;
+            let key = &sample.sample.key;
             if normalize(key) == wanted {
                 exact.push(i);
-            } else if detect_track_type(key) == kind && (!drums_only || is_drum_sound(key)) {
+            } else if instrument_family(key) == kind && (!drums_only || is_drum_sound(key)) {
                 same_type.push(i);
             }
         }
