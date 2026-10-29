@@ -218,7 +218,6 @@ pub struct Layout {
     left: i32,
     box_size: i32,
     name_x: i32,
-    label_scale: i32,
     /// The volume slider after the name.
     volume_x: i32,
     grid_left: i32,
@@ -329,11 +328,10 @@ impl Layout {
         let bottom = footer_top(height, scale, status_lines) - margin / 2;
         let tracks = pattern.tracks.len();
         let row = ((bottom - top) / tracks.max(1) as i32).clamp(10 * scale, 32 * scale);
-        let label_scale = if row >= 24 * scale { 2 * scale } else { scale };
         let box_size = (row - 4 * scale).clamp(6 * scale, 14 * scale);
         let left = margin;
         let name_x = left + 2 * (box_size + 3 * scale) + 4 * scale;
-        let volume_x = name_x + text_width(&"W".repeat(LABEL_CHARS), label_scale) + 6 * scale;
+        let volume_x = name_x + text_width(&"W".repeat(LABEL_CHARS), scale) + 6 * scale;
         let grid_left = volume_x + VOLUME_WIDTH * scale + 8 * scale;
         // Pagination: BEATS_PER_PAGE beats per page (JS BEATS_PER_PAGE).
         let total_beats = pattern.beat_count.max(1);
@@ -349,7 +347,6 @@ impl Layout {
             left,
             box_size,
             name_x,
-            label_scale,
             volume_x,
             grid_left,
             grid_width: (width - margin - grid_left).max(1),
@@ -395,7 +392,7 @@ impl Layout {
 
     /// Where the master volume's label goes.
     fn master_label(&self) -> (i32, i32) {
-        (self.name_x, self.row_top(self.tracks) + (self.row - 8 * self.label_scale) / 2)
+        (self.name_x, self.row_top(self.tracks) + (self.row - 8 * self.scale) / 2)
     }
 
     fn beat_width(&self) -> f64 {
@@ -578,14 +575,14 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
         }
         let label: String = track.name.chars().take(LABEL_CHARS).collect();
         // The name, and under it what the track plays when there is room.
-        let sound = view.sounds.get(i).filter(|s| !s.is_empty() && layout.row >= 8 * layout.label_scale + 10 * scale);
-        let block = 8 * layout.label_scale + if sound.is_some() { 10 * scale } else { 0 };
+        let sound = view.sounds.get(i).filter(|s| !s.is_empty() && layout.row >= 8 * layout.scale + 10 * scale);
+        let block = 8 * layout.scale + if sound.is_some() { 10 * scale } else { 0 };
         let label_y = y + (layout.row - block) / 2;
         if let Some(sound) = sound {
             let width = layout.volume_x - layout.name_x - 4 * scale;
             let chars = usize::try_from(width / (8 * scale)).unwrap_or(0);
             let shown: String = sound.chars().take(chars).collect();
-            canvas.text(layout.name_x, label_y + 8 * layout.label_scale + 2 * scale, &shown, scale, DIM);
+            canvas.text(layout.name_x, label_y + 8 * layout.scale + 2 * scale, &shown, scale, DIM);
         }
         let color = if track.mute {
             DIM
@@ -596,12 +593,12 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
         } else {
             TEXT
         };
-        canvas.text(layout.name_x, label_y, &label, layout.label_scale, color);
+        canvas.text(layout.name_x, label_y, &label, layout.scale, color);
         draw_track_steps(canvas, track, i, view, layout);
     }
 
     let (x, y) = layout.master_label();
-    canvas.text(x, y, "Master", layout.label_scale, DIM);
+    canvas.text(x, y, "Master", layout.scale, DIM);
 
     if let Some(fraction) = view.playhead {
         let x = layout.grid_left + (fraction.clamp(0.0, 1.0) * f64::from(layout.grid_width)) as i32;
