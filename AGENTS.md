@@ -99,8 +99,10 @@ tools/            scripts that regenerate the golden fixtures
 - English only, in code, comments and names.
 - Rust naming: `snake_case` functions, fields and modules; `PascalCase`
   types; `SCREAMING_SNAKE_CASE` constants.
-- A quantity ends in `_count` (`beat_count`, `measure_count`,
-  `retrigger_count`), never `nb_` or `num_`. An index ends in `_index`
+- A number of things ends in `_count` (`beat_count`, `track_count`,
+  `retrigger_count`), never `nb_` or `num_`. A length or a duration ends in
+  its unit (`pattern_ticks`, `decay_frames`, `delay_beats`,
+  `length_measures`); a clip's `measure_count` is both. An index ends in `_index`
   (`pattern_index`, `kit_index`), not `_idx`; in a short scope, `p` (pattern),
   `t` (track) and `n` (note) are fine.
 - Music vocabulary: a measure is a **measure**, never a bar (`bar` is UI

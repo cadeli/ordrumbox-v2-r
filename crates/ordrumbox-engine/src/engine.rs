@@ -146,11 +146,6 @@ impl Engine {
         self.master_target
     }
 
-    /// Master volume, 0–2.
-    pub fn set_volume(&mut self, volume: f32) {
-        self.master_target.master = volume;
-    }
-
     /// Start playing `pass` from its first frame; its strip settings apply at once.
     pub fn play(&mut self, pass: Arc<Pass>) {
         self.pass_number = pass.number;

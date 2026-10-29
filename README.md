@@ -350,7 +350,7 @@ The fixtures are committed: the tests need nothing outside this repository.
 They were produced by the JS app (ordrumbox-v2), the reference of the port,
 with the scripts of `tools/`, which need a checkout of it only to make them
 again. They hold the JS names of the keys; the tests compare after
-`legacy::upgrade_keys`.
+`web_keys::current_keys` (`crates/ordrumbox-core/tests/support/`).
 
 The JS app is the reference. `tools/export_fixtures.mjs` runs its own code on
 `assets/data/song.json` and writes `crates/ordrumbox-core/tests/fixtures/`:
@@ -362,7 +362,7 @@ node tools/export_fixtures.mjs ../ordrumbox-v2
 - `song.json` / `song.min.json`: the JSON writer must reproduce both byte for byte.
 - `library.export.json`: `song.json` loaded by the app (`fixPatterns`, `fixSongs`)
   and saved by its exporter; `Library` must hold the same values (compared
-  after `legacy::upgrade_keys`, the JS key names being the legacy ones).
+  after `web_keys::current_keys` (`crates/ordrumbox-core/tests/support/`), the JS key names being the web version's).
 - `edge_library.json` (hand-written, kept by the script) and
   `edge_library.export.json`: the same check on cases `song.json` does not reach.
 - `slugify.json`: pattern/song id slugs.

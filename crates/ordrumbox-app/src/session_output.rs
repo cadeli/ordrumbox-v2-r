@@ -6,6 +6,7 @@
 use ordrumbox_engine::{MasterSettings, SCOPE_SIZE};
 
 use super::*;
+use crate::master;
 use crate::output::{self, OutputLayout, OutputView};
 use crate::panel::{Item, Kind, Rect};
 
@@ -39,7 +40,7 @@ impl Session {
 
     /// Setting `key` of the master bus at `value`.
     pub(super) fn set_master_value(&mut self, key: &str, value: f64) {
-        self.set_master(output::set(self.master, key, value), true);
+        self.set_master(master::set(self.master, key, value), true);
     }
 
     /// Write the master settings when they have settled; when to call again.
@@ -66,7 +67,7 @@ impl Session {
             layout.items.push(Item::new(Some(Id::OutTab(i as u8)), *rect, kind));
         }
         let mut control = |param: &output::Param, rect: Rect| {
-            let value = output::get(&self.master, param.key);
+            let value = master::get(&self.master, param.key);
             let text = param.format.value(value, param.unit);
             let kind = Kind::Value { spec: param.spec, value, label: Some(param.label.into()), text, lfo: false };
             layout.items.push(Item::new(Some(Id::Master(param.key)), rect, kind));

@@ -8,9 +8,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use ordrumbox_core::json;
-use ordrumbox_core::{Library, LoadReport, Scales};
-
-use crate::editors::ScaleList;
+use ordrumbox_core::{Library, LoadReport, ScaleList, Scales};
 use ordrumbox_engine::{Kit, SampleBank, SynthPresets, kits_from_json};
 
 use crate::store;

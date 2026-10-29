@@ -9,9 +9,10 @@ use ordrumbox_core::steps::absolute_step;
 use ordrumbox_core::{Note, Pattern, Track};
 
 use crate::canvas::{Canvas, Rgb, text_width};
+use crate::frame::{body_top, content_top, footer_top, margin, status_line};
 use crate::menu;
 use crate::output::{self, OutputLayout, OutputView};
-use crate::panel::Rect;
+use crate::panel::{Rect, row_at};
 
 /// Beats shown per page of the pattern grid (JS `BEATS_PER_PAGE`).
 pub const BEATS_PER_PAGE: i32 = 4;
@@ -192,7 +193,7 @@ impl KitLayout {
         if y < self.list_top || y >= list_bottom || !(self.left..self.left + self.list_width).contains(&x) {
             return None;
         }
-        let i = self.first(view_selected) + usize::try_from((y - self.list_top) / self.row).ok()?;
+        let i = self.first(view_selected) + row_at(y, self.list_top, self.row)?;
         (i < count).then_some(i)
     }
 }
@@ -231,30 +232,6 @@ pub struct Layout {
 /// Text scale of the header (the 8 px font at 16 px per scale unit).
 fn header_text(scale: i32) -> i32 {
     2 * scale
-}
-
-fn margin(scale: i32) -> i32 {
-    16 * scale
-}
-
-/// Top of the header: under the menu bar.
-pub fn content_top(scale: i32) -> i32 {
-    menu::bar_height(scale) + margin(scale) / 2
-}
-
-/// Height of the header's row of controls: a label, then the widget.
-fn controls_height(scale: i32) -> i32 {
-    28 * scale
-}
-
-/// Top of the header's second line (the last action, undo, the song).
-fn status_line(scale: i32) -> i32 {
-    content_top(scale) + controls_height(scale) + 4 * scale
-}
-
-/// Top of what is under the header (the grid, the kit editor, the song panel).
-pub fn body_top(scale: i32) -> i32 {
-    status_line(scale) + 10 * scale + margin(scale) / 2
 }
 
 /// The header's pattern list and kit list (`PatternNav`'s two selects).
@@ -300,11 +277,6 @@ pub fn header_controls(scale: i32) -> HeaderControls {
     let generation = [next(48, 4), next(48, 4), next(64, 14)];
     let views = [next(40, 3), next(40, 3), next(40, 3), next(48, 3), next(40, 0)];
     HeaderControls { play, bpm, pattern, beats, kit, generation, views }
-}
-
-/// Top of the footer (status lines then help).
-pub fn footer_top(height: i32, scale: i32, status_lines: usize) -> i32 {
-    height - margin(scale) - 10 * scale - status_lines as i32 * 10 * scale - 4 * scale
 }
 
 /// Height of the output strip always shown along the bottom of the window.
@@ -444,7 +416,7 @@ impl Layout {
         if y < self.top || x < self.left {
             return None;
         }
-        let track = usize::try_from((y - self.top) / self.row).ok().filter(|&t| t < self.tracks)?;
+        let track = row_at(y, self.top, self.row).filter(|&t| t < self.tracks)?;
         let in_box = |solo: bool| {
             let bx = self.box_x(solo);
             let by = self.row_top(track) + (self.row - self.box_size) / 2;

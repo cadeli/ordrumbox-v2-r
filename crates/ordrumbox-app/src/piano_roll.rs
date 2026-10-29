@@ -12,10 +12,10 @@ use ordrumbox_core::steps::absolute_step;
 use ordrumbox_core::{Note, Track};
 
 use crate::canvas::{Canvas, Rgb, text_width};
+use crate::frame;
 use crate::note_drag::{MIDDLE_C, MIDI_MIN, midi_name};
 use crate::panel::Rect;
 use crate::theme;
-use crate::view;
 
 /// Height of a key row, px per scale unit (`NOTE_HEIGHT`).
 const NOTE_HEIGHT: i32 = 14;
@@ -164,8 +164,8 @@ impl RollLayout {
     pub fn new(width: i32, height: i32, scale: i32, status_lines: usize, spb: i32) -> Self {
         let s = scale;
         let margin = 16 * s;
-        let top = view::body_top(scale);
-        let bottom = view::footer_top(height, scale, status_lines) - margin / 2;
+        let top = frame::body_top(scale);
+        let bottom = frame::footer_top(height, scale, status_lines) - margin / 2;
         let title = Rect::new(margin, top, (width - 2 * margin).max(0), 12 * s);
         let button = 14 * s;
         let next = Rect::new(title.x + title.w - button, top - 2 * s, button, button);

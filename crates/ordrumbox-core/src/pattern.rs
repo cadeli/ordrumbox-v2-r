@@ -10,14 +10,9 @@ use crate::track::{MAX_TRACKS, Track};
 /// `url`, the web app's name and address, were written in every pattern.
 const DROPPED_KEYS: [&str; 3] = ["_revision", "application", "url"];
 
-/// The generator's keys under their JS names (older saves).
-const LEGACY_KEYS: [(&str, &str); 3] =
+/// The generator's keys under their web-version names.
+const WEB_KEYS: [(&str, &str); 3] =
     [("_autoGenGenre", "autoGenre"), ("_autoGenKeyOffset", "autoKeyOffset"), ("_autoGenScale", "autoScale")];
-
-/// The current name of a pattern key.
-pub(crate) fn canonical_key(key: &str) -> &str {
-    LEGACY_KEYS.iter().find(|(old, _)| *old == key).map_or(key, |(_, new)| new)
-}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Pattern {
@@ -51,6 +46,11 @@ impl Default for Pattern {
 }
 
 impl Pattern {
+    /// The current name of a pattern key (a web-version name read as its current one).
+    pub fn canonical_key(key: &str) -> &str {
+        WEB_KEYS.iter().find(|(web, _)| *web == key).map_or(key, |(_, current)| current)
+    }
+
     /// Load one pattern; the id is left empty when the file has none (the
     /// library assigns ids across all its patterns).
     pub(crate) fn from_json(value: &Value, at: &str, issues: &mut Vec<Issue>) -> Option<Self> {
@@ -91,7 +91,7 @@ impl Pattern {
                 "tracks" => {}
                 key if DROPPED_KEYS.contains(&key) => {}
                 _ => {
-                    pattern.extra.insert(canonical_key(key), value.clone());
+                    pattern.extra.insert(Self::canonical_key(key), value.clone());
                 }
             }
         }
@@ -202,7 +202,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_legacy_object_tags() {
+    fn reads_web_object_tags() {
         assert_eq!(load(r#"{"tags":{"0":"a","1":"b"}}"#).0.tags, ["a", "b"]);
         assert_eq!(load(r#"{"tags":["c"]}"#).0.tags, ["c"]);
         let (pattern, issues) = load(r#"{"tags":[1]}"#);

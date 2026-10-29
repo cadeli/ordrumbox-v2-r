@@ -7,7 +7,6 @@
 //! [`OutputLayout`] places everything; the controls are panel items, the
 //! curve and the spectrum are drawn here.
 
-use ordrumbox_core::json::{Object, Value};
 use ordrumbox_engine::MasterSettings;
 
 use crate::canvas::{Canvas, Rgb, text_width};
@@ -58,87 +57,6 @@ pub fn params() -> impl Iterator<Item = &'static Param> {
 
 pub fn find(key: &str) -> Option<&'static Param> {
     params().find(|p| p.key == key)
-}
-
-/// Setting `key` of `master`, as `settings.master` holds it.
-pub fn get(master: &MasterSettings, key: &str) -> f64 {
-    f64::from(match key {
-        "volume" => master.master,
-        "preGain" => master.pre_gain,
-        "threshold" => master.threshold,
-        "ratio" => master.ratio,
-        "attack" => master.attack,
-        "release" => master.release,
-        "knee" => master.knee,
-        "makeup" => master.makeup,
-        "lowcut" => master.lowcut,
-        "hicut" => master.hicut,
-        "compBypass" => master.bypass,
-        _ => 0.0,
-    })
-}
-
-/// `master` with setting `key` at `value`.
-pub fn set(master: MasterSettings, key: &str, value: f64) -> MasterSettings {
-    let mut m = master;
-    let v = value as f32;
-    match key {
-        "volume" => m.master = v,
-        "preGain" => m.pre_gain = v,
-        "threshold" => m.threshold = v,
-        "ratio" => m.ratio = v,
-        "attack" => m.attack = v,
-        "release" => m.release = v,
-        "knee" => m.knee = v,
-        "makeup" => m.makeup = v,
-        "lowcut" => m.lowcut = v,
-        "hicut" => m.hicut = v,
-        "compBypass" => m.bypass = v,
-        _ => {}
-    }
-    m
-}
-
-/// `settings.master` read over the defaults, with what was not taken as it
-/// is: a value of the wrong type (default kept), out of range (clamped), an
-/// unknown key (ignored).
-pub fn from_json(value: &Value) -> (MasterSettings, Vec<String>) {
-    let mut master = MasterSettings::default();
-    let mut issues = Vec::new();
-    let Some(object) = value.as_object() else {
-        return (master, vec![format!("master: not an object ({value}), defaults used")]);
-    };
-    for (key, v) in object.iter() {
-        match (key, find(key)) {
-            ("compBypass", _) => match v.as_bool() {
-                Some(bypass) => master.bypass = if bypass { 1.0 } else { 0.0 },
-                None => issues.push(format!("master.compBypass: not a boolean ({v}), default kept")),
-            },
-            (_, Some(param)) => match v.as_f64() {
-                Some(number) => master = set(master, param.key, number),
-                None => issues.push(format!("master.{key}: not a number ({v}), default kept")),
-            },
-            _ => issues.push(format!("master.{key}: unknown setting, ignored")),
-        }
-    }
-    let clamped = master.clamped();
-    for param in params() {
-        let (asked, used) = (get(&master, param.key), get(&clamped, param.key));
-        if asked != used {
-            issues.push(format!("master.{}: {asked} out of range, {used} used", param.key));
-        }
-    }
-    (clamped, issues)
-}
-
-/// `settings.master`.
-pub fn to_json(master: &MasterSettings) -> Value {
-    let mut object = Object::new();
-    for key in params().map(|p| p.key) {
-        object.insert(key, Value::from(get(master, key)));
-    }
-    object.insert("compBypass", Value::Bool(master.bypass >= 0.5));
-    Value::Object(object)
 }
 
 /// The compressor's gain reduction at `input` dB.
@@ -359,23 +277,11 @@ fn draw_spectrum(canvas: &mut Canvas, bins: &[u8], r: Rect, s: i32) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ordrumbox_core::json;
 
     #[test]
-    fn settings_round_trip_over_the_defaults() {
-        let (master, issues) =
-            from_json(&json::parse(r#"{"volume":1.5,"compBypass":true,"hicut":99999,"ratio":"x","gain":1}"#).unwrap());
-        assert_eq!((master.master, master.bypass, master.hicut, master.ratio), (1.5, 1.0, 22_000.0, 8.0));
-        assert_eq!(
-            issues,
-            [
-                "master.ratio: not a number (\"x\"), default kept",
-                "master.gain: unknown setting, ignored",
-                "master.hicut: 99999 out of range, 22000 used",
-            ]
-        );
-        assert_eq!(from_json(&to_json(&master)), (master, Vec::new()));
-        assert_eq!(to_json(&MasterSettings::default()).get("compBypass"), Some(&Value::Bool(false)));
+    fn every_control_is_a_saved_setting() {
+        let keys: Vec<_> = params().map(|p| p.key).collect();
+        assert_eq!(keys, crate::master::KEYS);
     }
 
     #[test]

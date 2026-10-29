@@ -41,6 +41,40 @@ impl Scales {
     }
 }
 
+/// Scale names (`scales.json` keys, in file order) and their degrees.
+#[derive(Debug, Clone, Default)]
+pub struct ScaleList {
+    pub names: Vec<String>,
+    pub steps: Vec<Option<Vec<i32>>>,
+}
+
+impl ScaleList {
+    pub fn from_json(value: &Value) -> Self {
+        let mut list = Self::default();
+        for (name, scale) in value.as_object().into_iter().flat_map(|o| o.iter()) {
+            list.names.push(name.to_owned());
+            let steps = scale
+                .get("scaleSteps")
+                .and_then(Value::as_array)
+                .map(|a| a.iter().map(|v| v.as_f64().unwrap_or(0.0) as i32).collect::<Vec<_>>());
+            list.steps.push(steps.filter(|s| !s.is_empty()));
+        }
+        list
+    }
+
+    fn steps_of(&self, name: &str) -> Option<&[i32]> {
+        let i = self.names.iter().position(|n| n == name)?;
+        self.steps[i].as_deref()
+    }
+
+    /// `getScaleIntervals`: `range` notes up the scale.
+    pub fn intervals(&self, name: &str, range: usize) -> Vec<i32> {
+        let Some(steps) = self.steps_of(name) else { return vec![0] };
+        let n = steps.len();
+        (0..range).map(|i| steps[i % n] + (i / n) as i32 * 12).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

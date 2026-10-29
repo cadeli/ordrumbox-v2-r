@@ -9,7 +9,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use ordrumbox_core::json::{self, Object, Value};
-use ordrumbox_core::{DroppedClip, Library, LoadReport, ids, legacy};
+use ordrumbox_core::{DroppedClip, Library, LoadReport, ids};
+
+#[path = "support/web_keys.rs"]
+mod web_keys;
 
 fn fixtures() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("fixtures")
@@ -75,8 +78,8 @@ fn js_reference(name: &str) -> (Value, Vec<DroppedClip>) {
             pattern.insert("id", Value::from(id));
         }
     }
-    // The JS app writes the legacy key names.
-    (legacy::upgrade_keys(&reference), dropped)
+    // The web version writes its own key names.
+    (web_keys::current_keys(&reference), dropped)
 }
 
 /// Remove the tracks named `name` from every pattern.

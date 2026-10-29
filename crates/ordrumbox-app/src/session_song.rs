@@ -578,7 +578,7 @@ impl Session {
         let (width, height, scale) = self.panel_size;
         let layout = self.panel_layout(width, height, scale);
         panel::find(&layout.items, Id::SongButton(id))
-            .map_or_else(|| Rect::new(width / 2 - 100 * scale, view::body_top(scale), 200 * scale, 0), |i| i.rect)
+            .map_or_else(|| Rect::new(width / 2 - 100 * scale, frame::body_top(scale), 200 * scale, 0), |i| i.rect)
     }
 
     /// Export: the song to `exports/<name>.odbox`.

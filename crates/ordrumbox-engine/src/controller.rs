@@ -14,7 +14,7 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering, fence};
 use std::sync::{Arc, Mutex, MutexGuard, TryLockError};
 
-use ordrumbox_core::{Library, Rng, Scales};
+use ordrumbox_core::{Library, Rng, Scales, Track};
 use ordrumbox_dsp::MasterSettings;
 
 use crate::assign::{TrackSound, assign_track};
@@ -225,9 +225,9 @@ pub struct Controller {
     kit: String,
     rng: Rng,
     mode: Mode,
-    /// Sound of each track, by (pattern id, track index), with what it was
+    /// Sound of each track, by pattern id then track index, with what it was
     /// decided from: auto-assignment picks at random, once per play.
-    assigned: HashMap<(String, usize), (String, TrackSound)>,
+    assigned: HashMap<String, Vec<Option<(SoundKey, TrackSound)>>>,
     /// Pattern repetitions drawn for the song passes.
     song_notes: HitsCache,
     /// Passes posted, oldest first, kept while the engine or the inbox may
@@ -239,8 +239,34 @@ pub struct Controller {
 }
 
 /// What a track's sound depends on.
-fn sound_key(track: &ordrumbox_core::Track) -> String {
-    format!("{}|{}|{}|{}|{:?}", track.name, track.auto_assign, track.sample_path, track.use_synth, track.synth_preset)
+#[derive(Debug, Clone, PartialEq)]
+struct SoundKey {
+    name: String,
+    auto_assign: bool,
+    sample_path: String,
+    use_synth: bool,
+    synth_preset: Option<String>,
+}
+
+impl SoundKey {
+    fn of(track: &Track) -> Self {
+        Self {
+            name: track.name.clone(),
+            auto_assign: track.auto_assign,
+            sample_path: track.sample_path.clone(),
+            use_synth: track.use_synth,
+            synth_preset: track.synth_preset.clone(),
+        }
+    }
+
+    /// Whether `track` still has these settings (compared in place, no copy).
+    fn matches(&self, track: &Track) -> bool {
+        self.name == track.name
+            && self.auto_assign == track.auto_assign
+            && self.sample_path == track.sample_path
+            && self.use_synth == track.use_synth
+            && self.synth_preset == track.synth_preset
+    }
 }
 
 impl Controller {
@@ -335,30 +361,25 @@ impl Controller {
         out[older.len()..].copy_from_slice(newer);
     }
 
-    /// Master volume, 0–2.
-    pub fn set_volume(&mut self, volume: f32) {
-        self.set_master(MasterSettings { master: volume.clamp(0.0, 2.0), ..self.master });
-    }
-
     /// What each track of pattern `p` plays (assigned once, then kept).
     fn sounds(&mut self, library: &Library, p: usize) -> Vec<TrackSound> {
         let Some(pattern) = library.patterns.get(p) else { return Vec::new() };
         let rng = &mut self.rng;
         let mut pick = |n: usize| rng.below(n as u64) as usize;
+        let slots = self.assigned.entry(pattern.id.clone()).or_default();
+        if slots.len() < pattern.tracks.len() {
+            slots.resize(pattern.tracks.len(), None);
+        }
         pattern
             .tracks
             .iter()
-            .enumerate()
-            .map(|(t, track)| {
-                let key = sound_key(track);
-                let slot = (pattern.id.clone(), t);
-                match self.assigned.get(&slot) {
-                    Some((known, sound)) if *known == key => sound.clone(),
-                    _ => {
-                        let sound = assign_track(track, &self.bank, &self.kit, &self.synths, &mut pick);
-                        self.assigned.insert(slot, (key, sound.clone()));
-                        sound
-                    }
+            .zip(slots.iter_mut())
+            .map(|(track, slot)| match slot {
+                Some((key, sound)) if key.matches(track) => sound.clone(),
+                _ => {
+                    let sound = assign_track(track, &self.bank, &self.kit, &self.synths, &mut pick);
+                    *slot = Some((SoundKey::of(track), sound.clone()));
+                    sound
                 }
             })
             .collect()
@@ -369,8 +390,8 @@ impl Controller {
     pub fn track_sound(&self, library: &Library, p: usize, t: usize) -> TrackSound {
         let Some(pattern) = library.patterns.get(p) else { return TrackSound::None };
         let Some(track) = pattern.tracks.get(t) else { return TrackSound::None };
-        match self.assigned.get(&(pattern.id.clone(), t)) {
-            Some((key, sound)) if *key == sound_key(track) => sound.clone(),
+        match self.assigned.get(&pattern.id).and_then(|slots| slots.get(t)?.as_ref()) {
+            Some((key, sound)) if key.matches(track) => sound.clone(),
             _ => assign_track(track, &self.bank, &self.kit, &self.synths, &mut |_| 0),
         }
     }
@@ -531,14 +552,16 @@ impl Controller {
             return;
         }
         let Some(Position { pass: number, .. }) = self.position() else { return };
+        // A Play still waiting must not be replaced by a rebuild: none is
+        // built. Only this thread posts a Play, so none appears meanwhile.
+        if matches!(lock(&self.link.inbox).command, Some(Command::Play(_))) {
+            return;
+        }
         self.song_notes.clear();
         let Some(pass) = self.build(library, number) else { return };
         let mut inbox = lock(&self.link.inbox);
-        // A Play still waiting must not be replaced by a rebuild.
-        if !matches!(inbox.command, Some(Command::Play(_))) {
-            inbox.command = Some(Command::Replace(pass));
-            inbox.next = None;
-        }
+        inbox.command = Some(Command::Replace(pass));
+        inbox.next = None;
     }
 
     pub fn stop(&mut self) {
