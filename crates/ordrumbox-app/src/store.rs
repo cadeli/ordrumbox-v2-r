@@ -334,3 +334,7 @@ mod tests {
         fs::remove_dir_all(dir).unwrap();
     }
 }
+
+#[cfg(test)]
+#[path = "store_files.rs"]
+mod store_files;
