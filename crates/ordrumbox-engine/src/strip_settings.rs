@@ -50,8 +50,8 @@ pub fn strip_settings(track: &Track, bpm: f64) -> StripSettings {
         s.cutoff = 20_000.0;
     } else {
         s.filter_mode = filter_mode(&track.filter_type).unwrap_or(0.0);
-        if track.filter_freq_lfo.is_none() {
-            s.cutoff = finite_or(track.filter_freq, 20.0) as f32;
+        if track.filter_cutoff_lfo.is_none() {
+            s.cutoff = finite_or(track.filter_cutoff, 20.0) as f32;
         }
         if track.filter_q_lfo.is_none() {
             s.q = finite_or(track.filter_q, 0.707) as f32;
@@ -59,7 +59,7 @@ pub fn strip_settings(track: &Track, bpm: f64) -> StripSettings {
     }
 
     // Saturation.
-    let amount = if track.saturation_on { finite_or(track.saturation_amount, 0.0).clamp(0.0, 1.0) } else { 0.0 };
+    let amount = if track.saturation_on { finite_or(track.saturation_mix, 0.0).clamp(0.0, 1.0) } else { 0.0 };
     s.saturation_type = match track.saturation_type.as_str() {
         "hard" => 1.0,
         "tape" => 2.0,
@@ -70,7 +70,7 @@ pub fn strip_settings(track: &Track, bpm: f64) -> StripSettings {
     s.saturation_mix = if amount > 0.0 { 1.0 } else { 0.0 };
 
     // Reverb.
-    let amount = if track.reverb_on { finite_or(track.reverb_amount, 0.0).clamp(0.0, 1.0) } else { 0.0 };
+    let amount = if track.reverb_on { finite_or(track.reverb_mix, 0.0).clamp(0.0, 1.0) } else { 0.0 };
     let reverb = reverb_preset(&track.reverb_type).map_or("none", |_| track.reverb_type.as_str());
     let (room, damp, width) = reverb_preset(reverb).unwrap_or((0.0, 0.5, 0.0));
     s.reverb_room = room;
@@ -151,7 +151,7 @@ pub fn strip_lfo(index: usize, track: &Track, silent: bool, first_tick: u64, tic
         track: index,
         volume: if silent { Vec::new() } else { values(&track.volume_lfo, &|v| v.clamp(0.0, 2.0)) },
         pan: values(&track.pan_lfo, &|v| (track.pan + v).clamp(-1.0, 1.0)),
-        cutoff: values(&track.filter_freq_lfo, &|v| (track.filter_freq + v).clamp(20.0, 20_000.0)),
+        cutoff: values(&track.filter_cutoff_lfo, &|v| (track.filter_cutoff + v).clamp(20.0, 20_000.0)),
         q: values(&track.filter_q_lfo, &|v| (track.filter_q + v).clamp(0.707, 18.707)),
     };
     let any = !(result.volume.is_empty() && result.pan.is_empty() && result.cutoff.is_empty() && result.q.is_empty());

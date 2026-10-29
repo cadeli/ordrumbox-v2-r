@@ -58,7 +58,7 @@ pub fn row_midi(row: i32) -> i32 {
 
 /// The row a note of `track` is on (may be off the keyboard).
 pub fn note_row(note: &Note, track: &Track) -> i32 {
-    (MIDDLE_C + track.pitch + note.pitch - MIDI_MIN).round() as i32
+    (MIDDLE_C + track.transpose + note.pitch - MIDI_MIN).round() as i32
 }
 
 /// Steps per beat of `track`, as the roll counts them.
@@ -120,7 +120,7 @@ impl RollView<'_> {
     fn sounding(&self, n: usize, step: i64) -> bool {
         let note = &self.track.notes[n];
         let loop_length = self.loop_length();
-        let base = absolute_step(note.beat, note.beat_step, steps_per_beat(self.track));
+        let base = absolute_step(note.beat, note.step, steps_per_beat(self.track));
         if base >= loop_length {
             return false;
         }
@@ -218,7 +218,7 @@ impl RollLayout {
     /// Where note `n` of the view's track is drawn, if it is on the page.
     pub fn note_rect(&self, view: &RollView, n: usize) -> Option<Rect> {
         let note = view.track.notes.get(n)?;
-        let step = absolute_step(note.beat, note.beat_step, steps_per_beat(view.track));
+        let step = absolute_step(note.beat, note.step, steps_per_beat(view.track));
         let (start, end) = view.page_steps();
         let row = note_row(note, view.track);
         if step < start || step >= end || !self.shown_row(view, row) {
@@ -345,7 +345,7 @@ pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &s
         // The trigger kind (`noteTriggerKind`): probability wins over the cycle.
         let trig = if note.probability < 1.0 {
             Some(TRIG_RAND)
-        } else if note.every > 1 {
+        } else if note.cycle > 1 {
             Some(TRIG_FIXED)
         } else {
             None
@@ -391,7 +391,7 @@ mod tests {
     fn library() -> Library {
         Library::parse(
             r#"{"patterns":[{"beatCount":6,"tracks":[{"name":"BASS","pitch":-12,"beatCount":6,"loopLength":20,
-                "notes":[{"beat":0,"pitch":0},{"beat":1,"beatStep":2,"pitch":7,"velocity":0.3,"prob":0.5},
+                "notes":[{"beat":0,"pitch":0},{"beat":1,"step":2,"pitch":7,"velocity":0.3,"prob":0.5},
                          {"beat":4,"pitch":0,"retriggerCount":3,"rate":4}]}]}]}"#,
         )
         .unwrap()

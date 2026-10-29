@@ -194,8 +194,8 @@ pub fn export(pattern: &Pattern, loops: u32, roots: &[(String, f64)], rng: &mut 
                 if let Some(l) = &track.volume_lfo {
                     velocity = clamp(velocity * lfo::value(l, f64::from(tick)), 0.0, 1.0);
                 }
-                let mut pitch = note.pitch + track.pitch;
-                if let Some(l) = &track.pitch_lfo {
+                let mut pitch = note.pitch + track.transpose;
+                if let Some(l) = &track.transpose_lfo {
                     pitch += lfo::value(l, f64::from(tick));
                 }
                 let key = clamp(target.note + pitch, 0.0, 127.0);

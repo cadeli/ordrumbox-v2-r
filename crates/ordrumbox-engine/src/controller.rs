@@ -183,10 +183,7 @@ pub struct Controller {
 
 /// What a track's sound depends on.
 fn sound_key(track: &ordrumbox_core::Track) -> String {
-    format!(
-        "{}|{}|{}|{}|{:?}",
-        track.name, track.use_auto_assign_sound, track.sample_id, track.use_soft_synth, track.synth_preset
-    )
+    format!("{}|{}|{}|{}|{:?}", track.name, track.auto_assign, track.sample_path, track.use_synth, track.synth_preset)
 }
 
 impl Controller {

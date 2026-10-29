@@ -273,18 +273,18 @@ impl Session {
         match self.track_sound(t) {
             TrackSound::Sample(i) => bank.and_then(|b| b.get(i).map(|s| s.sample.url.clone())).unwrap_or_default(),
             TrackSound::Synth(key) => format!("synth {key}"),
-            TrackSound::None if track.use_soft_synth => match &track.synth_preset {
+            TrackSound::None if track.use_synth => match &track.synth_preset {
                 Some(key) => format!("synth {key}"),
                 None => "synth".to_owned(),
             },
-            TrackSound::None if !track.use_auto_assign_sound && !track.sample_id.is_empty() => track.sample_id.clone(),
+            TrackSound::None if !track.auto_assign && !track.sample_path.is_empty() => track.sample_path.clone(),
             TrackSound::None => "no sound".to_owned(),
         }
     }
 
     fn track_sample_url(&self, t: usize) -> Option<String> {
         let track = self.track(t)?;
-        if track.use_soft_synth {
+        if track.use_synth {
             return None;
         }
         let sound = self.track_sound(t);
@@ -292,7 +292,7 @@ impl Session {
             self.controller.as_ref().map(|c| c.bank().clone()).or_else(|| self.render.as_ref().map(|r| r.bank.clone()));
         match sound {
             TrackSound::Sample(i) => bank.and_then(|b| b.get(i).map(|s| s.sample.url.clone())),
-            _ => (!track.use_auto_assign_sound).then(|| track.sample_id.clone()),
+            _ => (!track.auto_assign).then(|| track.sample_path.clone()),
         }
     }
 
@@ -313,7 +313,7 @@ impl Session {
         let kit_name = place.and_then(|(k, _)| self.kits.kits.get(k)).map(|k| k.name.as_str());
 
         // `getSoundInfo`.
-        let info = if track.use_soft_synth {
+        let info = if track.use_synth {
             track.synth_preset.clone()
         } else {
             instrument.map(|i| {
@@ -325,7 +325,7 @@ impl Session {
 
         // Sample bar: analysis text, envelope, decay end (`sound.decay ?? 0`).
         let decay = instrument.and_then(|i| i.decay).unwrap_or(0.0);
-        let sample = url.as_deref().filter(|_| !track.use_soft_synth).and_then(|u| self.analysis_of(u)).map(|a| {
+        let sample = url.as_deref().filter(|_| !track.use_synth).and_then(|u| self.analysis_of(u)).map(|a| {
             let pitch = a.note.map_or_else(|| "—".to_owned(), |n| format!("{}{}", n.name, n.octave));
             let duration = format!("{} ms", crate::control::to_fixed_text(a.duration_sec * 1000.0, 0));
             let peak = format!("{} dB", crate::control::to_fixed_text(a.peak_db, 1));
@@ -347,7 +347,7 @@ impl Session {
         let instruments = Choice { selected: editors::index_of(&ids, &current_id), values: ids, labels: Vec::new() };
 
         // Samples of that instrument: the current kit's first.
-        let current_url = url.clone().unwrap_or_else(|| track.sample_id.clone());
+        let current_url = url.clone().unwrap_or_else(|| track.sample_path.clone());
         let found = self.samples_for(&current_id);
         let samples = if found.is_empty() {
             Choice { values: vec![String::new()], labels: vec!["— no samples —".into()], selected: 0 }
@@ -359,13 +359,10 @@ impl Session {
 
         // Synth presets.
         let keys = self.synths.keys();
-        let current = if track.use_soft_synth {
-            track.synth_preset.clone().unwrap_or_else(|| "BASS1".into())
-        } else {
-            "none".into()
-        };
+        let current =
+            if track.use_synth { track.synth_preset.clone().unwrap_or_else(|| "BASS1".into()) } else { "none".into() };
         let mut values: Vec<String> = std::iter::once("none").chain(keys.iter().copied()).map(str::to_owned).collect();
-        if track.use_soft_synth && !keys.contains(&current.as_str()) {
+        if track.use_synth && !keys.contains(&current.as_str()) {
             values.push(current.clone());
         }
         let synths = Choice { selected: editors::index_of(&values, &current), values, labels: Vec::new() };
@@ -417,7 +414,7 @@ impl Session {
         }
         match self.note_focus {
             Some(NoteFocus::Step { track: ft, beat, step }) if ft == t => {
-                match track.notes.iter().position(|n| n.beat == beat && n.beat_step == step) {
+                match track.notes.iter().position(|n| n.beat == beat && n.step == step) {
                     Some(n) => NoteTarget::Note(n),
                     None => NoteTarget::Empty { beat, step },
                 }
@@ -443,7 +440,7 @@ impl Session {
         let note = self.shown_note(t);
         let title = match (self.note_target(t), &note) {
             (NoteTarget::Empty { beat, step }, _) => format!("{name} [beat {} step {}] — no note", beat + 1, step + 1),
-            (_, Some(n)) => format!("{name} [beat {} step {}]", n.beat + 1, n.beat_step + 1),
+            (_, Some(n)) => format!("{name} [beat {} step {}]", n.beat + 1, n.step + 1),
             _ => name.to_owned(),
         };
         let Some(n) = &note else {
@@ -623,11 +620,11 @@ impl Session {
         }
         let Some(pattern) = self.pattern() else { return };
         let Some(track) = pattern.tracks.get(t) else { return };
-        let Some(note) = track.notes.iter().find(|n| n.beat == beat && n.beat_step == step) else { return };
+        let Some(note) = track.notes.iter().find(|n| n.beat == beat && n.step == step) else { return };
         let body = view::Body::new(canvas.width(), canvas.height(), scale, right, self.status.len());
         let layout = Layout::new(body.main_w, body.editor_h, scale, pattern, self.status.len(), self.current_page);
         let cell = layout.cell_rect(t, beat, step, track.steps_per_beat);
-        view::draw_tooltip(canvas, &editors::note_tooltip(note, track.pitch), cell, scale);
+        view::draw_tooltip(canvas, &editors::note_tooltip(note, track.transpose), cell, scale);
     }
 
     pub fn mouse_up(&mut self) {
@@ -834,8 +831,8 @@ impl Session {
                     str::to_owned,
                 );
                 vec![
-                    ("useSoftSynth", Value::Bool(true)),
-                    ("useAutoAssignSound", Value::Bool(false)),
+                    ("useSynth", Value::Bool(true)),
+                    ("autoAssign", Value::Bool(false)),
                     ("synthPreset", Value::String(key)),
                 ]
             });
@@ -858,7 +855,7 @@ impl Session {
             return;
         }
         let changed = self.editor.update_tracks(self.pattern_index, "Auto-assign all tracks", |_, _| {
-            vec![("useAutoAssignSound", Value::Bool(true)), ("useSoftSynth", Value::Bool(false))]
+            vec![("autoAssign", Value::Bool(true)), ("useSynth", Value::Bool(false))]
         });
         if changed {
             self.edited();
@@ -884,9 +881,9 @@ impl Session {
         let changed = self.editor.update_tracks(self.pattern_index, "Random samples on all tracks", |_, _| {
             let url = urls[rng.below(urls.len() as u64) as usize].clone();
             vec![
-                ("useAutoAssignSound", Value::Bool(false)),
-                ("useSoftSynth", Value::Bool(false)),
-                ("sampleId", Value::String(url)),
+                ("autoAssign", Value::Bool(false)),
+                ("useSynth", Value::Bool(false)),
+                ("samplePath", Value::String(url)),
             ]
         });
         if changed {
@@ -1183,11 +1180,11 @@ impl Session {
             }
             Id::Synth => {
                 let updates: Vec<(&str, Value)> = if value == "none" {
-                    vec![("useSoftSynth", Value::Bool(false))]
+                    vec![("useSynth", Value::Bool(false))]
                 } else {
                     vec![
-                        ("useSoftSynth", Value::Bool(true)),
-                        ("useAutoAssignSound", Value::Bool(false)),
+                        ("useSynth", Value::Bool(true)),
+                        ("autoAssign", Value::Bool(false)),
                         ("synthPreset", Value::String(value.to_owned())),
                     ]
                 };
@@ -1283,10 +1280,10 @@ impl Session {
             }
             Id::AutoAssign => {
                 // `toggleAuto`: back on, the synth goes and the sample is picked by name.
-                let on = !track.use_auto_assign_sound;
-                let mut updates = vec![("useAutoAssignSound", Value::Bool(on))];
+                let on = !track.auto_assign;
+                let mut updates = vec![("autoAssign", Value::Bool(on))];
                 if on {
-                    updates.push(("useSoftSynth", Value::Bool(false)));
+                    updates.push(("useSynth", Value::Bool(false)));
                     updates.push(("synthPreset", Value::Null));
                 }
                 self.update_track(t, &updates, &format!("Auto-assign on {name}"), false);
@@ -1361,7 +1358,7 @@ fn control_name(id: Id) -> (&'static str, &'static str) {
         Id::TrackSelect("autoVariant") => ("Variant", ""),
         Id::TrackSelect(key) => (editors::fx_label(key), ""),
         Id::Toggle("mono") => ("Mono", ""),
-        Id::Toggle("auto") => ("Auto", ""),
+        Id::Toggle("autoMode") => ("Auto", ""),
         Id::Toggle(key) => {
             let mut rows = GENERATION_GROOVE.iter().chain(GENERATION_ENGINE.iter());
             let label = rows.find_map(|r| match r {
@@ -1408,7 +1405,7 @@ mod tests {
         assert_eq!(history_label(Id::Fx("delayMix")), "Dly Mix");
         assert_eq!(history_label(Id::TrackSelect("delayBeats")), "Dly Beats");
         assert_eq!(history_label(Id::TrackSelect("autoVariant")), "Variant");
-        assert_eq!(history_label(Id::Generation("probPitch")), "Pitch");
+        assert_eq!(history_label(Id::Generation("autoPitchChance")), "Pitch");
         assert_eq!(history_label(Id::Generation("hitVariation")), "Var Hits");
         assert_eq!(history_label(Id::Loop("loopLength")), "Loop Len");
         assert_eq!(history_label(Id::Toggle("pitchScaleLock")), "Scale Lock");
@@ -1447,7 +1444,7 @@ mod tests {
         s.synths = SynthPresets::from_json(&presets);
         s.run(Command::ConvertToSynth);
         let tracks = &s.pattern().unwrap().tracks;
-        assert!(tracks.iter().all(|t| t.use_soft_synth && !t.use_auto_assign_sound));
+        assert!(tracks.iter().all(|t| t.use_synth && !t.auto_assign));
         let keys: Vec<_> = tracks.iter().map(|t| t.synth_preset.as_deref()).collect();
         assert_eq!(keys, [Some("BASS0"), Some("SN")]);
         assert_eq!(s.message, "All tracks converted to generated sounds");
@@ -1455,10 +1452,10 @@ mod tests {
 
         s.run(Command::AutoAssignAll);
         let tracks = &s.pattern().unwrap().tracks;
-        assert!(tracks.iter().all(|t| !t.use_soft_synth && t.use_auto_assign_sound));
+        assert!(tracks.iter().all(|t| !t.use_synth && t.auto_assign));
         // One undo brings both tracks back to their synth.
         s.run(Command::Undo);
-        assert!(s.pattern().unwrap().tracks.iter().all(|t| t.use_soft_synth));
+        assert!(s.pattern().unwrap().tracks.iter().all(|t| t.use_synth));
     }
 
     #[test]
@@ -1492,8 +1489,8 @@ mod tests {
     #[test]
     fn the_grid_names_what_each_track_plays() {
         let (library, _) = Library::parse(
-            r#"{"patterns":[{"tracks":[{"name":"KICK"},{"name":"BASS","useSoftSynth":true,"synthPreset":"BASS5"},
-                {"name":"X","useAutoAssignSound":false,"sampleId":"real/x.wav"}]}]}"#,
+            r#"{"patterns":[{"tracks":[{"name":"KICK"},{"name":"BASS","useSynth":true,"synthPreset":"BASS5"},
+                {"name":"X","autoAssign":false,"samplePath":"real/x.wav"}]}]}"#,
         )
         .unwrap();
         let s = Session::new(library, KitSet::empty(), Vec::new());

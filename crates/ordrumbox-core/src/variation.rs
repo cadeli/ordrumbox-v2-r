@@ -68,14 +68,14 @@ impl NoteOp {
     }
 
     fn chance(&self, track: &Track) -> f64 {
-        if !track.auto {
+        if !track.auto_mode {
             return DEFAULT_CHANCE;
         }
         match self {
-            Self::RetrigRate { .. } => track.prob_retrig,
-            Self::EuclideanFill(_) => track.prob_euclidean,
-            Self::Prob(_) => track.prob_note,
-            Self::ArpSpan(_) => track.prob_arp,
+            Self::RetrigRate { .. } => track.auto_retrigger_chance,
+            Self::EuclideanFill(_) => track.auto_euclidean_chance,
+            Self::Prob(_) => track.auto_note_probability_chance,
+            Self::ArpSpan(_) => track.auto_arp_chance,
         }
     }
 }
@@ -83,7 +83,7 @@ impl NoteOp {
 /// The varied copies of a track's notes, by note index; notes not varied are
 /// absent, and the track itself is never modified (`computeNoteVariation`).
 pub(crate) fn vary_notes(track: &Track, rng: &mut Rng) -> HashMap<usize, Note> {
-    let amount = if track.auto {
+    let amount = if track.auto_mode {
         track.auto_note_variation.unwrap_or(AUTO_NOTE_VARIATION_FALLBACK)
     } else {
         track.note_variation
@@ -93,7 +93,7 @@ pub(crate) fn vary_notes(track: &Track, rng: &mut Rng) -> HashMap<usize, Note> {
     if budget <= 0 || track.notes.is_empty() {
         return varied;
     }
-    let depth = track.prob_note_depth;
+    let depth = track.auto_note_probability_range;
     let mut candidates = Vec::new();
     for (idx, note) in track.notes.iter().enumerate() {
         let retrigger_count = rng.below(4) as i32 + 1;
@@ -172,15 +172,15 @@ impl FlatOp {
     }
 
     fn chance(&self, track: &Track) -> f64 {
-        if !track.auto {
+        if !track.auto_mode {
             return DEFAULT_CHANCE;
         }
         match self {
-            Self::Silence(_) => track.prob_silence,
-            Self::Velocity(_) => track.prob_velocity,
-            Self::Pitch(_) => track.prob_pitch,
-            Self::Anticipation(..) | Self::Double(..) => track.prob_fill,
-            Self::Ghost(..) => track.prob_ghost,
+            Self::Silence(_) => track.auto_silence_chance,
+            Self::Velocity(_) => track.auto_velocity_chance,
+            Self::Pitch(_) => track.auto_pitch_chance,
+            Self::Anticipation(..) | Self::Double(..) => track.auto_fill_chance,
+            Self::Ghost(..) => track.auto_ghost_chance,
         }
     }
 }
@@ -195,8 +195,11 @@ pub(crate) fn apply(
     rng: &mut Rng,
     scales: &Scales,
 ) {
-    let amount =
-        if track.auto { track.auto_hit_variation.unwrap_or(AUTO_HIT_VARIATION_FALLBACK) } else { track.hit_variation };
+    let amount = if track.auto_mode {
+        track.auto_hit_variation.unwrap_or(AUTO_HIT_VARIATION_FALLBACK)
+    } else {
+        track.hit_variation
+    };
     let budget = budget_for(amount);
     if budget <= 0 || loop_ticks <= 0 {
         return;
@@ -314,7 +317,7 @@ fn add(flat: &mut FlatNotes, track_idx: usize, from: &FlatNote, target: Target, 
         track: track_idx,
         source: None,
         beat: target.beat,
-        beat_step: target.beat_step,
+        step: target.beat_step,
         pitch: from.pitch,
         velocity,
         pan: from.pan,
@@ -324,9 +327,9 @@ fn add(flat: &mut FlatNotes, track_idx: usize, from: &FlatNote, target: Target, 
 /// A random transposition within ±`pitch_range` (±12 outside auto mode),
 /// snapped to the track scale when `pitch_scale_lock` is on in auto mode.
 fn pick_pitch(track: &Track, rng: &mut Rng, scales: &Scales) -> f64 {
-    let range = if track.auto { track.pitch_range } else { 12.0 };
+    let range = if track.auto_mode { track.pitch_range } else { 12.0 };
     let raw = (rng.next_f64() * (2.0 * range + 1.0)).floor() - range;
-    if !track.auto || !track.pitch_scale_lock {
+    if !track.auto_mode || !track.pitch_scale_lock {
         return raw;
     }
     let degrees = scales.steps_or_major(track.scale_name.as_deref());
@@ -354,7 +357,7 @@ mod tests {
     #[test]
     fn locked_pitch_stays_in_the_scale() {
         let track = Track {
-            auto: true,
+            auto_mode: true,
             pitch_scale_lock: true,
             pitch_range: 24.0,
             scale_name: Some("dorian".into()),
@@ -372,12 +375,12 @@ mod tests {
     #[test]
     fn note_probability_never_falls_below_the_floor() {
         let track = Track {
-            auto: true,
+            auto_mode: true,
             auto_note_variation: Some(100.0),
-            prob_retrig: 0.0,
-            prob_euclidean: 0.0,
-            prob_note: 100.0,
-            prob_note_depth: 100.0,
+            auto_retrigger_chance: 0.0,
+            auto_euclidean_chance: 0.0,
+            auto_note_probability_chance: 100.0,
+            auto_note_probability_range: 100.0,
             notes: vec![Note::default(); 4],
             ..Track::default()
         };

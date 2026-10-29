@@ -84,7 +84,14 @@ pub(crate) fn pick<'a, T>(rnd: &mut dyn FnMut() -> f64, items: &'a [T]) -> Optio
 /// `beat`/`beat_step` with its `stepPercent` on the track's current grid.
 pub(crate) fn add_note(track: &mut Track, beat: i32, beat_step: i32, pitch: f64, velocity: f64) -> &mut Note {
     let step_percent = js::round(f64::from(beat_step) * 100.0 / f64::from(track.steps_per_beat));
-    track.notes.push(Note { velocity, beat, beat_step, pitch, step_percent: Some(step_percent), ..Note::default() });
+    track.notes.push(Note {
+        velocity,
+        beat,
+        step: beat_step,
+        pitch,
+        step_percent: Some(step_percent),
+        ..Note::default()
+    });
     let last = track.notes.len() - 1;
     &mut track.notes[last]
 }
@@ -107,7 +114,7 @@ pub(crate) fn apply_note_properties(note: &mut Note, source: &Value) {
         note.probability = n;
     }
     if let Some(n) = num(source, "arpTriggerProbability") {
-        note.arp_trigger_probability = n;
+        note.retrigger_probability = n;
     }
 }
 

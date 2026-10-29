@@ -228,8 +228,8 @@ pub fn generate_pattern(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, option
 
     if !pattern.tracks.iter().any(|t| instrument_family(&t.name) == InstrumentFamily::Bass) {
         let mut bass = Track::new("BASS", pattern.beat_count, 4);
-        bass.use_soft_synth = false;
-        bass.use_auto_assign_sound = true;
+        bass.use_synth = false;
+        bass.auto_assign = true;
         bass.synth_preset = Some("BASS1".into());
         bass.volume = 0.5;
         pattern.tracks.push(bass);
@@ -294,9 +294,9 @@ pub fn change_track(g: &mut AutoGenerator<'_>, index: u64, pattern: &mut Pattern
         let variant = section_end_variant(track, kind).map_or(config, str::to_owned);
         let mut notes: Vec<Note> = pattern.tracks[t].notes.clone();
         generate_track(g, pattern, t, &variant, density, &harmony);
-        let seen: Vec<(i32, i32)> = notes.iter().map(|n| (n.beat, n.beat_step)).collect();
+        let seen: Vec<(i32, i32)> = notes.iter().map(|n| (n.beat, n.step)).collect();
         let track = &mut pattern.tracks[t];
-        notes.extend(track.notes.iter().filter(|n| !seen.contains(&(n.beat, n.beat_step))).cloned());
+        notes.extend(track.notes.iter().filter(|n| !seen.contains(&(n.beat, n.step))).cloned());
         track.notes = notes;
     } else {
         pattern.tracks[t].notes.clear();
@@ -321,7 +321,7 @@ pub fn run_loop(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, index: u64) ->
         }
     } else {
         for t in 0..pattern.tracks.len() {
-            if pattern.tracks[t].auto {
+            if pattern.tracks[t].auto_mode {
                 change_track(g, index, pattern, t);
                 changed = true;
             }
@@ -332,18 +332,18 @@ pub fn run_loop(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, index: u64) ->
 
 /// Whether a pattern's tracks regenerate as it plays.
 pub fn plays_auto(pattern: &Pattern) -> bool {
-    pattern.extra.get("autoGen").is_some_and(js::truthy) || pattern.tracks.iter().any(|t| t.auto)
+    pattern.extra.get("autoGen").is_some_and(js::truthy) || pattern.tracks.iter().any(|t| t.auto_mode)
 }
 
 // ─── The ↻ buttons ───────────────────────────────────────────────────────────
 
 /// Auto mode as the toolbar shows it (`auto || _toolbarAuto`).
 pub fn is_auto_on(track: &Track) -> bool {
-    track.auto || track.extra.get(TOOLBAR_AUTO).is_some_and(js::truthy)
+    track.auto_mode || track.extra.get(TOOLBAR_AUTO).is_some_and(js::truthy)
 }
 
 fn set_auto(track: &mut Track, on: bool) {
-    track.auto = on;
+    track.auto_mode = on;
     track.extra.insert(TOOLBAR_AUTO, Value::Bool(on));
 }
 
@@ -433,8 +433,8 @@ pub fn toggle_melodic(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, kind: Me
                         .find(|(name, _)| name == wanted.name())
                         .map_or(fallback.to_owned(), |(_, v)| v.clone());
                     let mut track = Track::new(wanted.name(), pattern.beat_count, 4);
-                    track.use_soft_synth = true;
-                    track.use_auto_assign_sound = false;
+                    track.use_synth = true;
+                    track.auto_assign = false;
                     track.synth_preset = Some(synth.to_owned());
                     track.volume = 0.8;
                     pattern.tracks.push(track);
@@ -471,6 +471,6 @@ pub fn random_track(track: &mut Track, rnd: &mut dyn FnMut() -> f64) {
         used.push(step);
         let pitch = (rnd() * get("pitchRange")).floor() + get("pitchMin");
         let velocity = get("velocityMin") + rnd() * get("velocitySpread");
-        track.notes.push(Note { beat: step / spb, beat_step: step % spb, pitch, velocity, ..Note::default() });
+        track.notes.push(Note { beat: step / spb, step: step % spb, pitch, velocity, ..Note::default() });
     }
 }

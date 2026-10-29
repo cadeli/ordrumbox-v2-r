@@ -677,7 +677,7 @@ mod tests {
                 Kind::Value { spec, value: 0.5, label: Some("Vol".into()), text: "50 %".into(), lfo: false },
             ),
             Item::new(
-                Some(Id::Fx("reverbAmount")),
+                Some(Id::Fx("reverbMix")),
                 Rect::new(0, 60, 160, 16),
                 Kind::Value { spec, value: 0.2, label: None, text: "0.2".into(), lfo: true },
             ),

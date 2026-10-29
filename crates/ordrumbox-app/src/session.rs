@@ -775,7 +775,7 @@ impl Session {
     fn menu_state(&self) -> MenuState {
         let history = self.editor.history();
         let pattern = self.pattern();
-        let focus = self.focus_track().and_then(|t| self.track(t)).map(|t| (t.auto, t.mute, t.solo));
+        let focus = self.focus_track().and_then(|t| self.track(t)).map(|t| (t.auto_mode, t.mute, t.solo));
         MenuState {
             can_save: self.library_path.is_some(),
             can_render: self.render.is_some(),
@@ -1320,7 +1320,7 @@ impl Session {
     fn toggle_note(&mut self, t: usize, beat: i32, step: i32) {
         let p = self.pattern_index;
         let Some(track) = self.track(t) else { return };
-        let at_step = track.notes.iter().position(|n| n.beat == beat && n.beat_step == step);
+        let at_step = track.notes.iter().position(|n| n.beat == beat && n.step == step);
         match at_step {
             Some(n) if self.selected == Some((t, n)) => {
                 let pitch = track.notes[n].pitch;
@@ -1386,7 +1386,7 @@ impl Session {
         c.step = c.step.min(spb - 1);
         self.cursor = Some(c);
         self.note_focus = Some(NoteFocus::Step { track: c.track, beat: c.beat, step: c.step });
-        let note = pattern.tracks[c.track].notes.iter().position(|n| n.beat == c.beat && n.beat_step == c.step);
+        let note = pattern.tracks[c.track].notes.iter().position(|n| n.beat == c.beat && n.step == c.step);
         self.selected = note.map(|n| (c.track, n));
         if let Some(n) = note {
             self.audition(c.track, Some(n));
@@ -1571,7 +1571,7 @@ impl Session {
             self.message = "select a track first".into();
             return;
         };
-        if self.editor.toggle_track(self.pattern_index, t, "auto") {
+        if self.editor.toggle_track(self.pattern_index, t, "autoMode") {
             self.edited();
         }
     }
@@ -1615,7 +1615,7 @@ impl Session {
             self.clipboard = Some(Clipboard::Track(Box::new(source)));
         } else if let Some(c) = self.cursor {
             let notes: Vec<Note> =
-                source.notes.iter().filter(|n| n.beat == c.beat && n.beat_step == c.step).cloned().collect();
+                source.notes.iter().filter(|n| n.beat == c.beat && n.step == c.step).cloned().collect();
             self.message = format!("copied {} note(s) — {name} @ {}.{}", notes.len(), c.beat + 1, c.step + 1);
             self.clipboard = Some(Clipboard::Step(notes));
         }

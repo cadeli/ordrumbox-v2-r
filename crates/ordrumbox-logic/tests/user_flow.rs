@@ -92,7 +92,7 @@ fn flow_3_track_settings_and_their_undo() {
     let tracks = &editor.library().patterns[p].tracks;
     assert!(tracks[0].mute);
     assert_eq!((tracks[1].volume, tracks[1].pan), (1.0, -0.4), "the velocity clamped to 1");
-    assert_eq!((tracks[2].sample_id.as_str(), tracks[2].use_auto_assign_sound), ("kits/chh.wav", false));
+    assert_eq!((tracks[2].sample_path.as_str(), tracks[2].auto_assign), ("kits/chh.wav", false));
     assert_eq!(tracks[3].name, "BASS2");
     // The muted track is left out of what plays (here, its MIDI file).
     let bytes = midi::export(&editor.library().patterns[p], 1, &[], &mut Rng::new(1), &Scales::default());
@@ -180,7 +180,7 @@ fn a_pattern_exported_to_midi_and_imported_back_plays_the_same_notes() {
             .notes
             .iter()
             .map(|n| {
-                let tick = step_to_tick(absolute_step(n.beat, n.beat_step, twin.steps_per_beat), twin.steps_per_beat);
+                let tick = step_to_tick(absolute_step(n.beat, n.step, twin.steps_per_beat), twin.steps_per_beat);
                 (tick * MIDI_RATIO, (n.velocity * 100.0).round() as i64)
             })
             .collect();

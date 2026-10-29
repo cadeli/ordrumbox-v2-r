@@ -246,7 +246,7 @@ fn importer() {
                             .map(|n| {
                                 let pitch = if n.pitch.is_nan() { Value::Null } else { num(n.pitch) };
                                 let percent = n.step_percent.map_or(Value::Null, num);
-                                Value::Array(vec![num(n.velocity), num(n.beat), num(n.beat_step), pitch, percent])
+                                Value::Array(vec![num(n.velocity), num(n.beat), num(n.step), pitch, percent])
                             })
                             .collect();
                         assert_eq!(notes, items(expected, "notes"), "{at}: notes");

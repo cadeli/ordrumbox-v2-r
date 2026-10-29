@@ -76,7 +76,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             upgrade_keys(&old).to_json(),
-            r#"{"info":{"name":"l"},"patterns":[{"name":"p","tracks":[{"name":"KICK","volume":0.5,"probPitch":10,"noteKeys":["velocity","beat","probability"],"notes":[[0.4,1,0.5]]}]}]}"#
+            r#"{"info":{"name":"l"},"patterns":[{"name":"p","tracks":[{"name":"KICK","volume":0.5,"autoPitchChance":10,"noteKeys":["velocity","beat","probability"],"notes":[[0.4,1,0.5]]}]}]}"#
         );
     }
 }

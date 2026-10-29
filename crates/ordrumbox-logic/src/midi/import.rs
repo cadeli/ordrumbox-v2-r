@@ -194,7 +194,7 @@ fn patterns_from(defs: &[TrackDef], base_name: &str, division: f64) -> Vec<Patte
                         track.notes.push(Note {
                             velocity: smf::velocity_to_unit(note.velocity),
                             beat,
-                            beat_step,
+                            step: beat_step,
                             pitch,
                             step_percent: Some(step_percent),
                             ..Note::default()

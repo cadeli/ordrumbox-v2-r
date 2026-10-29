@@ -38,7 +38,7 @@ pub fn sub_positions(
     span: &SpanResolver,
     rng: &mut Rng,
 ) -> Vec<SubPosition> {
-    let base = absolute_step(note.beat, note.beat_step, track.steps_per_beat);
+    let base = absolute_step(note.beat, note.step, track.steps_per_beat);
     let sequence = arp::sequence(&note.arp, rng);
     // The engine clamps the arpeggio's note count: the ghosts stay on the same steps.
     let count = match &sequence {
