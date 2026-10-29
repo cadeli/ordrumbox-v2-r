@@ -47,7 +47,7 @@ use winit::window::{Window, WindowId};
 use canvas::Canvas;
 use menu::Command;
 use session::{Button, Move, OverlayKey, PanelKey, Session};
-use view::{KitLayout, Layout};
+use view::KitLayout;
 
 const TITLE: &str = "orDrumbox";
 const INITIAL_SIZE: LogicalSize<f64> = LogicalSize::new(1100.0, 680.0);
@@ -154,6 +154,7 @@ impl App {
             if s.mouse_down(size, x, y, button, shift)
                 || (button == Button::Right && !menus_open && s.song_view_open() && s.song_click(size, x, y, button))
                 || (button == Button::Right && !menus_open && s.piano_roll_open() && s.roll_click(size, x, y, button))
+                || (button == Button::Right && !menus_open && s.grid_menu(size, x, y))
             {
                 self.request_redraw();
             }
@@ -205,16 +206,7 @@ impl App {
             }
             return;
         }
-        let Some(pattern) = self.session.pattern() else { return };
-        let layout = Layout::new(
-            body.main_w,
-            body.editor_h,
-            scale,
-            pattern,
-            self.session.status_lines(),
-            self.session.current_page(),
-        );
-        if let Some(hit) = layout.hit(pattern, x, y) {
+        if let Some(hit) = self.session.grid_hit((width, height, scale), x, y) {
             self.session.click(hit);
             self.request_redraw();
         }

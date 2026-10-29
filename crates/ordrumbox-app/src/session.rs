@@ -35,6 +35,8 @@ use crate::picker::{self, Outcome, Picker, PickerLayout, Purpose};
 use crate::store;
 use crate::view::{self, Cursor, Hit, KitView, View};
 
+#[path = "session_grid.rs"]
+mod session_grid;
 #[path = "session_output.rs"]
 mod session_output;
 #[path = "session_panel.rs"]
@@ -66,6 +68,16 @@ pub enum Workspace {
 
 /// Save this long after the last edit.
 const SAVE_DELAY: Duration = Duration::from_secs(1);
+
+/// `beat 2.3`: a cursor position.
+fn beat_label(beat: i32, step: i32) -> String {
+    format!("beat {}.{}", beat + 1, step + 1)
+}
+
+/// `3 notes`.
+fn notes_label(count: usize) -> String {
+    format!("{count} note{}", if count == 1 { "" } else { "s" })
+}
 
 /// A direction (arrow key).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -241,7 +253,7 @@ enum Overlay {
 }
 
 /// Every key, for Help > Keyboard shortcuts.
-const SHORTCUTS: [&str; 52] = [
+const SHORTCUTS: [&str; 53] = [
     "MENUS",
     "  F10 or Alt             open the menus: Arrows move, Enter runs, Esc closes",
     "  F1 F2 F3 F4 F5 F6      this list, track editor, song, piano roll, grid, synth (Ctrl+K: kit editor)",
@@ -250,6 +262,7 @@ const SHORTCUTS: [&str; 52] = [
     "  Enter / click          add a note, select it, delete the selected one",
     "  Shift+Arrows           velocity (up/down), pitch (left/right) of the selected note",
     "  Delete                 clear the cursor step        Esc  deselect",
+    "  right-click            a track's name: track menu   a step: notes menu",
     "  F, G, V                random pattern, random drumkit, VU meters on/off",
     "  H, J, K                every track: synth sounds, auto-assigned, random samples",
     "PLAY",
@@ -464,11 +477,6 @@ impl Session {
 
     pub fn status_lines(&self) -> usize {
         self.status.len()
-    }
-
-    /// Current page of the pattern grid.
-    pub fn current_page(&self) -> usize {
-        self.current_page
     }
 
     /// The window split for `size` (a real window size): the main editor
@@ -835,8 +843,8 @@ impl Session {
             C::Deselect => self.deselect(),
             C::NewPattern => self.new_pattern(),
             C::DuplicatePattern => self.duplicate_pattern(),
-            C::RenamePattern => self.song_text_entry(Id::SongPattern(self.pattern_index)),
-            C::PatternDescription => self.song_text_entry(Id::PatternDescription),
+            C::RenamePattern => self.text_entry(Id::SongPattern(self.pattern_index)),
+            C::PatternDescription => self.text_entry(Id::PatternDescription),
             C::PreviousPattern => self.step_pattern(-1),
             C::NextPattern => self.step_pattern(1),
             C::TempoDown => self.step_tempo(-1.0),
@@ -879,8 +887,8 @@ impl Session {
             C::SynthEditor => self.toggle_synth(),
             C::NewSong => self.song_button("new"),
             C::RemoveSong => self.song_button("delete"),
-            C::RenameSong => self.song_text_entry(Id::SongName),
-            C::SongDescription => self.song_text_entry(Id::SongDescription),
+            C::RenameSong => self.text_entry(Id::SongName),
+            C::SongDescription => self.text_entry(Id::SongDescription),
             C::SaveSong => self.song_button("save"),
             C::LoadSong => self.song_button("load"),
             C::ExportSong => self.song_button("export"),
@@ -1513,10 +1521,25 @@ impl Session {
     /// Remove the focused track, never the last one.
     pub fn remove_track(&mut self) {
         let Some(t) = self.focus_track() else { return };
-        if self.pattern().is_some_and(|p| p.tracks.len() > 1) && self.editor.remove_track(self.pattern_index, t) {
+        if self.pattern().is_some_and(|p| p.tracks.len() <= 1) {
+            self.message = "Cannot delete the last track".into();
+        } else if self.editor.remove_track(self.pattern_index, t) {
             self.selected = None;
             self.edited();
             self.clamp_selection();
+            self.message = "Track deleted".into();
+        }
+    }
+
+    /// Remove every note of track `t`.
+    pub(super) fn clear_track(&mut self, t: usize) {
+        let Some(name) = self.track(t).map(|track| track.name.clone()) else { return };
+        if self.track(t).is_some_and(|track| track.notes.is_empty()) {
+            self.message = "No notes to clear".into();
+        } else if self.editor.clean_track(self.pattern_index, t) {
+            self.selected = None;
+            self.edited();
+            self.message = format!("Cleared notes on \"{name}\"");
         }
     }
 
@@ -1581,6 +1604,8 @@ impl Session {
         if self.editor.randomize_track(self.pattern_index, t, &mut || rng.next_f64()) {
             self.selected = None;
             self.edited();
+            let name = self.track(t).map(|track| track.name.clone()).unwrap_or_default();
+            self.message = format!("Randomized \"{name}\"");
         }
     }
 

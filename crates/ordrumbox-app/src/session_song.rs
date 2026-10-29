@@ -235,8 +235,8 @@ impl Session {
         }
     }
 
-    /// A click on the song's name or description: its entry.
-    pub(super) fn song_text_entry(&mut self, id: Id) {
+    /// The text entry of `id` (a song, pattern or track name, a description).
+    pub(super) fn text_entry(&mut self, id: Id) {
         let (title, text) = match id {
             Id::SongName => ("Song name:", self.song_name()),
             Id::SongDescription => ("Song description:", self.info("description")),
@@ -247,6 +247,10 @@ impl Session {
             Id::PatternDescription => {
                 let Some(pattern) = self.pattern() else { return };
                 ("Pattern description:", pattern.description.clone())
+            }
+            Id::TrackName(t) => {
+                let Some(track) = self.track(t) else { return };
+                ("Rename track:", track.name.clone())
             }
             _ => return,
         };
@@ -278,6 +282,14 @@ impl Session {
                 let changed = self.pattern().is_some_and(|p| p.description != text);
                 if changed && self.editor.set_pattern_description(self.pattern_index, text) {
                     self.edited();
+                }
+            }
+            // An empty or unchanged name would only add an undo step.
+            Id::TrackName(t) => {
+                let changed = self.track(t).is_some_and(|track| !text.is_empty() && track.name != text);
+                if changed && self.editor.change_track_name(self.pattern_index, t, text) {
+                    self.edited();
+                    self.message = format!("Renamed track to \"{text}\"");
                 }
             }
             Id::SongButton("new") => self.add_song(text),
@@ -361,7 +373,7 @@ impl Session {
                 let double = self.last_click.is_some_and(|(last, at)| last == id && now - at < DOUBLE_CLICK);
                 self.last_click = if double { None } else { Some((id, now)) };
                 if double {
-                    self.song_text_entry(id);
+                    self.text_entry(id);
                 } else {
                     self.step_pattern(p as isize - self.pattern_index as isize);
                 }

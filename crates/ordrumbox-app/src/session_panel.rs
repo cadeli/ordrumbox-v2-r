@@ -1133,6 +1133,7 @@ impl Session {
                 return;
             }
             Id::RollMenu => return self.roll_menu_pick(value),
+            Id::GridMenu => return self.grid_menu_pick(value),
             Id::SynthPreset | Id::SynthField(_) => return self.synth_select(id, value),
             Id::KitKit => {
                 let target = self.kits.kits.iter().position(|k| k.name == value);
@@ -1230,7 +1231,7 @@ impl Session {
                     [Command::GenerateDrums, Command::GenerateBass, Command::GenerateChords][usize::from(i.min(2))],
                 );
             }
-            Id::SongName | Id::SongDescription => self.song_text_entry(id),
+            Id::SongName | Id::SongDescription => self.text_entry(id),
             _ => {
                 let Some(t) = self.editor_track() else { return };
                 self.activate_on_track(t, id);

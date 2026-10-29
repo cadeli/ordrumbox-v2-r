@@ -173,6 +173,10 @@ pub enum Id {
     RollMenu,
     // Grid.
     TrackVolume(usize),
+    /// A track's rename entry.
+    TrackName(usize),
+    /// The grid's right-click menus.
+    GridMenu,
     MasterVolume,
 }
 

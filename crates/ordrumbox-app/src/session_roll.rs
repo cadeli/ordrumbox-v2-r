@@ -34,16 +34,6 @@ pub(super) struct RollDrag {
 /// Rows a notch of the wheel scrolls.
 const WHEEL_ROWS: i32 = 3;
 
-/// `beat 2.3`: a cursor position.
-fn beat_label(beat: i32, step: i32) -> String {
-    format!("beat {}.{}", beat + 1, step + 1)
-}
-
-/// `3 notes`.
-fn notes_label(count: usize) -> String {
-    format!("{count} note{}", if count == 1 { "" } else { "s" })
-}
-
 impl Session {
     // ─── State ───────────────────────────────────────────────────────────────
 
@@ -526,15 +516,7 @@ impl Session {
                 let intervals: [f64; 3] = if quality == "minor" { [0.0, 3.0, 7.0] } else { [0.0, 4.0, 7.0] };
                 self.roll_chord(t, step, root, &intervals, quality);
             }
-            "clear" => {
-                if self.track(t).is_some_and(|track| track.notes.is_empty()) {
-                    self.message = "No notes to clear".into();
-                } else if self.editor.clean_track(self.pattern_index, t) {
-                    self.selected = None;
-                    self.edited();
-                    self.message = format!("Cleared notes on \"{name}\"");
-                }
-            }
+            "clear" => self.clear_track(t),
             "sequence" => self.roll_sequence_from(t, number(1)),
             _ => {}
         }
