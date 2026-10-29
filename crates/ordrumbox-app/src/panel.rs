@@ -672,7 +672,7 @@ mod tests {
         let spec = Spec::knob(0.0, 1.0, 0.01, 0.0);
         let items = vec![
             Item::new(
-                Some(Id::KnobBar("velocity")),
+                Some(Id::KnobBar("volume")),
                 Rect::new(0, 0, 60, 50),
                 Kind::Value { spec, value: 0.5, label: Some("Vel".into()), text: "50 %".into(), lfo: false },
             ),
@@ -682,7 +682,7 @@ mod tests {
                 Kind::Value { spec, value: 0.2, label: None, text: "0.2".into(), lfo: true },
             ),
             Item::new(
-                Some(Id::Gen("variation")),
+                Some(Id::Gen("hitVariation")),
                 Rect::new(0, 80, 300, 16),
                 Kind::Value {
                     spec: Spec::slider(0.0, 100.0, 1.0, 0.0),

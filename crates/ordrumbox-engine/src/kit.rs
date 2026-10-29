@@ -59,7 +59,7 @@ impl KitSample {
         }
         Some(Self {
             key: text("key").unwrap_or_default(),
-            display_name: text("display_name").unwrap_or_default(),
+            display_name: text("displayName").or_else(|| text("display_name")).unwrap_or_default(),
             url,
             decay: number("decay"),
             root_midi: number("rootMidi"),
@@ -73,7 +73,7 @@ impl KitSample {
     /// The entry as drumkits.json holds it (`gainDb`/`tune` only when set).
     pub fn to_json(&self) -> Value {
         let mut o = Object::new();
-        o.insert("display_name", Value::from(self.display_name.as_str()));
+        o.insert("displayName", Value::from(self.display_name.as_str()));
         o.insert("key", Value::from(self.key.as_str()));
         o.insert("url", Value::from(self.url.as_str()));
         if let Some(peak) = self.peak_db {
@@ -103,7 +103,7 @@ impl KitSample {
         let mut o = Object::new();
         let opt = |v: Option<f64>| v.map_or(Value::Null, Value::Number);
         o.insert("url", Value::from(self.url.as_str()));
-        o.insert("display_name", Value::from(self.display_name.as_str()));
+        o.insert("displayName", Value::from(self.display_name.as_str()));
         o.insert("key", Value::from(self.key.as_str()));
         o.insert("rootMidi", opt(self.root_midi));
         o.insert("peakDb", opt(self.peak_db));
@@ -114,7 +114,9 @@ impl KitSample {
     }
 }
 
-const KNOWN_KEYS: [&str; 8] = ["key", "display_name", "url", "decay", "rootMidi", "peakDb", "gainDb", "tune"];
+/// `display_name`: the key in the JS app's drumkits.json and older saves.
+const KNOWN_KEYS: [&str; 9] =
+    ["key", "displayName", "display_name", "url", "decay", "rootMidi", "peakDb", "gainDb", "tune"];
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Kit {
@@ -177,7 +179,7 @@ impl Kit {
             })
             .filter_map(|e| {
                 let mut instrument = KitSample::from_json(e)?;
-                if e.get("display_name").is_none_or(Value::is_null) {
+                if ["displayName", "display_name"].iter().all(|key| e.get(key).is_none_or(Value::is_null)) {
                     instrument.display_name.clone_from(&instrument.url);
                 }
                 instrument.extra = Object::new();
@@ -312,10 +314,12 @@ mod tests {
     fn kit_files_round_trip() {
         let text = r#"[{"name":"real","infos":" kit","instruments":[{"display_name":"kick","key":"KICK","url":"real/kick.wav","peakDb":-3,"rootMidi":72,"decay":5000,"x":1},{"display_name":"s","key":"SNARE","url":"s.wav","gainDb":-2.5,"tune":1}]}]"#;
         let kits = kits_from_json(&json::parse(text).unwrap());
-        assert_eq!(kits_to_json(&kits).to_json(), text);
+        // Read under the JS key, written under the current one.
+        assert_eq!(kits_to_json(&kits).to_json(), text.replace("display_name", "displayName"));
+        assert_eq!(kits_from_json(&kits_to_json(&kits)), kits);
         assert_eq!(
             kits[0].to_mapping_json().to_json(),
-            r#"{"name":"real","instruments":[{"url":"real/kick.wav","display_name":"kick","key":"KICK","rootMidi":72,"peakDb":-3,"decay":5000,"gainDb":0,"tune":0},{"url":"s.wav","display_name":"s","key":"SNARE","rootMidi":null,"peakDb":null,"decay":null,"gainDb":-2.5,"tune":1}]}"#
+            r#"{"name":"real","instruments":[{"url":"real/kick.wav","displayName":"kick","key":"KICK","rootMidi":72,"peakDb":-3,"decay":5000,"gainDb":0,"tune":0},{"url":"s.wav","displayName":"s","key":"SNARE","rootMidi":null,"peakDb":null,"decay":null,"gainDb":-2.5,"tune":1}]}"#
         );
         let restored = Kit::from_mapping_json(&kits[0].to_mapping_json()).unwrap();
         assert_eq!(restored.samples[0].decay, Some(5000.0));

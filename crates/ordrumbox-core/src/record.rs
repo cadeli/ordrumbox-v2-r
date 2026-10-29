@@ -4,6 +4,9 @@
 //! into the struct, its `Default`, the ordered key list and a by-key setter, so
 //! a key, its type and its default are written in one place only (the JS
 //! equivalents are `NOTE_DEFAULTS` / `NOTE_KEY_ORDER` / `TRACK_DEFAULTS`).
+//!
+//! A row may add the keys older files (and the JS app) use for the field:
+//! `=> "newKey" | "oldKey"`. Both are read; only the first is written.
 
 use crate::json::{Object, Value};
 
@@ -115,7 +118,7 @@ macro_rules! json_record {
     (
         $(#[$meta:meta])*
         pub struct $name:ident {
-            $( $(#[$fmeta:meta])* $field:ident : $ty:ty = $default:expr => $key:literal, )*
+            $( $(#[$fmeta:meta])* $field:ident : $ty:ty = $default:expr => $key:literal $(| $legacy:literal)*, )*
         }
         other_fields {
             $( $(#[$ometa:meta])* $ofield:ident : $oty:ty = $odefault:expr, )*
@@ -138,12 +141,21 @@ macro_rules! json_record {
             /// JSON keys of the table fields, in declaration order.
             pub const KEYS: &'static [&'static str] = &[$( $key ),*];
 
+            /// The key a field is written under, for its key or one of its
+            /// legacy keys; `None` for a key that names no field.
+            pub fn canonical_key(key: &str) -> Option<&'static str> {
+                match key {
+                    $( $key $(| $legacy)* => Some($key), )*
+                    _ => None,
+                }
+            }
+
             /// Set the field named `key`. `null` resets it to its default
             /// (what `?? default` does on the JS side).
             pub fn set_field(&mut self, key: &str, value: &$crate::json::Value) -> $crate::record::SetField {
                 use $crate::record::{JsonField, SetField};
                 match key {
-                    $( $key => match <$ty as JsonField>::from_json(value) {
+                    $( $key $(| $legacy)* => match <$ty as JsonField>::from_json(value) {
                         Some(v) => { self.$field = v; SetField::Set }
                         None if value.is_null() => { self.$field = $default; SetField::Set }
                         None => SetField::WrongType,
@@ -156,7 +168,7 @@ macro_rules! json_record {
             pub fn field(&self, key: &str) -> Option<$crate::json::Value> {
                 use $crate::record::JsonField;
                 match key {
-                    $( $key => Some(<$ty as JsonField>::to_json(&self.$field)), )*
+                    $( $key $(| $legacy)* => Some(<$ty as JsonField>::to_json(&self.$field)), )*
                     _ => None,
                 }
             }

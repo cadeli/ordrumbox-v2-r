@@ -33,6 +33,21 @@ Support/orDrumbox` on macOS, `~/.local/share/ordrumbox` elsewhere, or the file
 named by `$ORDRUMBOX_LIBRARY` — and loaded from there next time. Delete that
 file to start again from the demo.
 
+Key names: the files this app writes (`library.json`, `kits.json`, pattern
+exports) name some settings differently from the JS app, all in camelCase
+and after what they hold — on a track `volume` (JS `velocity`), `volumeLfo`,
+`hitVariation`/`noteVariation` (`variation`/`variation2`), `loopLength`
+(`loopAtStep`), `delayBeats`/`delayMix` (`delayTime`/`delayDepth`),
+`saturationOn` (`sat`), `synthPreset` (`synthSoundKey`), `probPitch`… and
+`autoVariant`, `autoDensity`, `autoHitVariation`, `pitchRange`,
+`pitchScaleLock` (`prob_pitch`… `auto_variation`, `pitch_range`…); on a note
+`probability`, `retriggerRate`, `euclideanPulses`, `everyOffset`,
+`arpScale`, `arpDirection` (`prob`, `rate`, `euclideanFill`, `pos`,
+`_arpScale`, `_arpType`); `info` for the library header (`infos`) and
+`displayName` for a kit sample (`display_name`). Both names are read, so the
+JS assets and older saves load as before; the JS app does not know the new
+names and drops those settings from a file written here.
+
 Sounds: a track with auto-assign gets a sample of the selected kit by name,
 then of another kit, then a catalog substitute, then any sample (each a
 random pick among the candidates, made at play and on a kit change); a synth
@@ -318,7 +333,8 @@ node tools/export_fixtures.mjs ../ordrumbox-v2
 
 - `song.json` / `song.min.json`: the JSON writer must reproduce both byte for byte.
 - `library.export.json`: `song.json` loaded by the app (`fixPatterns`, `fixSongs`)
-  and saved by its exporter; `Library` must hold the same values.
+  and saved by its exporter; `Library` must hold the same values (compared
+  after `legacy::upgrade_keys`, the JS key names being the legacy ones).
 - `edge_library.json` (hand-written, kept by the script) and
   `edge_library.export.json`: the same check on cases `song.json` does not reach.
 - `slugify.json`: pattern/song id slugs.

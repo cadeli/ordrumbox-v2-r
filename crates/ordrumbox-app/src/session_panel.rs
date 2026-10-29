@@ -834,7 +834,7 @@ impl Session {
                 vec![
                     ("useSoftSynth", Value::Bool(true)),
                     ("useAutoAssignSound", Value::Bool(false)),
-                    ("synthSoundKey", Value::String(key)),
+                    ("synthPreset", Value::String(key)),
                 ]
             });
         if changed {
@@ -960,7 +960,7 @@ impl Session {
         }
         if let Id::TrackVolume(t) = id {
             let desc = format!("Volume on {}", self.track_name(t));
-            return self.update_track(t, &[("velocity", num(value))], &desc, true);
+            return self.update_track(t, &[("volume", num(value))], &desc, true);
         }
         let Some(t) = self.editor_track() else { return };
         let name = self.track_name(t);
@@ -998,7 +998,7 @@ impl Session {
                     self.edited();
                 }
             }
-            "loopAtStep" => {
+            "loopLength" => {
                 self.update_track(t, &[(key, num(value.min(max_steps)))], &format!("{key} on {name}"), true)
             }
             _ => self.update_track(t, &[(key, num(value))], &format!("{key} on {name}"), true),
@@ -1155,7 +1155,7 @@ impl Session {
         let name = self.track_name(t);
         match id {
             Id::TrackSelect(key) => {
-                let v = if key == "delayTime" {
+                let v = if key == "delayBeats" {
                     num(js::parse_float(&Value::String(value.to_owned())))
                 } else {
                     Value::String(value.to_owned())
@@ -1187,7 +1187,7 @@ impl Session {
                     vec![
                         ("useSoftSynth", Value::Bool(true)),
                         ("useAutoAssignSound", Value::Bool(false)),
-                        ("synthSoundKey", Value::String(value.to_owned())),
+                        ("synthPreset", Value::String(value.to_owned())),
                     ]
                 };
                 self.update_track(t, &updates, &format!("Synth on {name}"), false);
@@ -1195,9 +1195,9 @@ impl Session {
             Id::NoteSelect(key) => {
                 let Some(note) = self.shown_note(t) else { return };
                 let (field, arp) = if key == "arpScale" {
-                    ("_arpScale", editors::arp_value(&note, &self.scale_list, Some(value), None, None))
+                    ("arpScale", editors::arp_value(&note, &self.scale_list, Some(value), None, None))
                 } else {
-                    ("_arpType", editors::arp_value(&note, &self.scale_list, None, Some(value), None))
+                    ("arpDirection", editors::arp_value(&note, &self.scale_list, None, Some(value), None))
                 };
                 let updates = [(field, Value::String(value.to_owned())), ("arp", arp)];
                 self.update_note(t, &updates, &format!("Edit note {key} on {name}"), false);
@@ -1286,7 +1286,7 @@ impl Session {
                 let mut updates = vec![("useAutoAssignSound", Value::Bool(on))];
                 if on {
                     updates.push(("useSoftSynth", Value::Bool(false)));
-                    updates.push(("synthSoundKey", Value::Null));
+                    updates.push(("synthPreset", Value::Null));
                 }
                 self.update_track(t, &updates, &format!("Auto-assign on {name}"), false);
             }
@@ -1443,7 +1443,7 @@ mod tests {
     #[test]
     fn the_grid_names_what_each_track_plays() {
         let (library, _) = Library::parse(
-            r#"{"patterns":[{"tracks":[{"name":"KICK"},{"name":"BASS","useSoftSynth":true,"synthSoundKey":"BASS5"},
+            r#"{"patterns":[{"tracks":[{"name":"KICK"},{"name":"BASS","useSoftSynth":true,"synthPreset":"BASS5"},
                 {"name":"X","useAutoAssignSound":false,"sampleId":"real/x.wav"}]}]}"#,
         )
         .unwrap();

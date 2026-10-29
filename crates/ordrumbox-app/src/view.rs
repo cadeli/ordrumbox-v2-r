@@ -884,7 +884,7 @@ mod tests {
 
     fn library() -> Library {
         Library::parse(
-            r#"{"patterns":[{"name":"p","tracks":[{"name":"KICK","loopAtStep":3,"notes":[{},{"beat":9}]},{"name":"X","stepsPerBeat":0},{"name":"H","stepsPerBeat":2}]}]}"#,
+            r#"{"patterns":[{"name":"p","tracks":[{"name":"KICK","loopLength":3,"notes":[{},{"beat":9}]},{"name":"X","stepsPerBeat":0},{"name":"H","stepsPerBeat":2}]}]}"#,
         )
         .unwrap()
         .0

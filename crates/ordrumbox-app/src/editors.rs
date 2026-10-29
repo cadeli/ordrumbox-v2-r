@@ -31,7 +31,7 @@ pub struct FxDef {
 
 pub const FX_DEFS: [FxDef; 4] = [
     FxDef { key: "reverbAmount", label: "Rev", controls: &["reverbAmount", "reverbType"] },
-    FxDef { key: "delayDepth", label: "Dly", controls: &["delayDepth", "delayTime", "delayType"] },
+    FxDef { key: "delayMix", label: "Dly", controls: &["delayMix", "delayBeats", "delayType"] },
     FxDef { key: "saturationAmount", label: "Sat", controls: &["saturationAmount", "saturationType"] },
     // The filter is on when its type is not the allpass bypass.
     FxDef { key: "filterType", label: "fltr", controls: &["filterType", "filterFreq", "filterQ"] },
@@ -52,10 +52,10 @@ pub fn track_select_options(key: &str) -> (Vec<String>, Vec<String>) {
     let list = |v: &[&str]| v.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
     match key {
         "reverbType" => (list(&["none", "room", "hall", "plate", "spring", "gated"]), Vec::new()),
-        "delayTime" => (list(&DELAY_TIME_VALUES), list(&DELAY_TIME_LABELS)),
+        "delayBeats" => (list(&DELAY_TIME_VALUES), list(&DELAY_TIME_LABELS)),
         "delayType" => (list(&["none", "slap", "tape", "pingpong"]), Vec::new()),
         "saturationType" => (list(&["soft", "hard", "tape"]), Vec::new()),
-        "auto_variant" => (list(&["", "basic", "fill", "roll", "sparse", "dense"]), Vec::new()),
+        "autoVariant" => (list(&["", "basic", "fill", "roll", "sparse", "dense"]), Vec::new()),
         _ => (Vec::new(), Vec::new()),
     }
 }
@@ -75,7 +75,7 @@ pub struct LfoTarget {
 pub const LFO_TARGETS: [LfoTarget; 5] = [
     LfoTarget { key: "filterFreq", label: "Freq", lfo_key: "filterFreqLfo", min: 20.0, max: 20_000.0, step: 1.0 },
     LfoTarget { key: "filterQ", label: "Q", lfo_key: "filterQLfo", min: 0.707, max: 18.707, step: 0.01 },
-    LfoTarget { key: "velocity", label: "Vel", lfo_key: "velocityLfo", min: 0.0, max: 1.0, step: 0.01 },
+    LfoTarget { key: "volume", label: "Vel", lfo_key: "volumeLfo", min: 0.0, max: 1.0, step: 0.01 },
     LfoTarget { key: "pan", label: "Pan", lfo_key: "panLfo", min: -1.0, max: 1.0, step: 0.01 },
     LfoTarget { key: "pitch", label: "Pitch", lfo_key: "pitchLfo", min: -24.0, max: 24.0, step: 1.0 },
 ];
@@ -103,7 +103,7 @@ const fn prop(key: &'static str, label: &'static str, min: f64, max: f64, step: 
 /// The effect knobs.
 pub const FX_KNOBS: [Prop; 5] = [
     prop("reverbAmount", "Depth", 0.0, 1.0, 0.01, Format::Plain),
-    prop("delayDepth", "Depth", 0.0, 1.0, 0.01, Format::Plain),
+    prop("delayMix", "Depth", 0.0, 1.0, 0.01, Format::Plain),
     prop("saturationAmount", "Depth", 0.0, 1.0, 0.01, Format::Plain),
     prop("filterFreq", "Freq", 20.0, 20_000.0, 1.0, Format::Freq),
     prop("filterQ", "Q", 0.707, 18.707, 0.01, Format::Fixed2),
@@ -112,14 +112,14 @@ pub const FX_KNOBS: [Prop; 5] = [
 /// Labels of the effect rows that are not knobs.
 fn fx_label(key: &str) -> &'static str {
     match key {
-        "delayTime" => "Time",
+        "delayBeats" => "Time",
         _ => "Type",
     }
 }
 
 /// The knob bar (velocity, pan, pitch, decay) and its units.
 pub const KNOB_BAR: [(Prop, &str); 4] = [
-    (prop("velocity", "Vel", 0.0, 1.0, 0.01, Format::Percent), "%"),
+    (prop("volume", "Vel", 0.0, 1.0, 0.01, Format::Percent), "%"),
     (prop("pan", "Pan", -1.0, 1.0, 0.01, Format::Fmt), ""),
     (prop("pitch", "Pitch", -24.0, 24.0, 1.0, Format::SignedPlain), "st"),
     (prop("decay", "Decay", DECAY_RANGE.0, DECAY_RANGE.1, 10.0, Format::Millis), ""),
@@ -130,8 +130,8 @@ pub const DEFAULT_DECAY: f64 = 500.0;
 
 /// Generation tab, shown while auto is off (`manualOnly`).
 pub const GEN_MANUAL: [Prop; 3] = [
-    prop("variation", "Var Pos", 0.0, 100.0, 1.0, Format::Plain),
-    prop("variation2", "Var Prop", 0.0, 100.0, 1.0, Format::Plain),
+    prop("hitVariation", "Var Pos", 0.0, 100.0, 1.0, Format::Plain),
+    prop("noteVariation", "Var Prop", 0.0, 100.0, 1.0, Format::Plain),
     prop("probability", "Prob", 0.0, 1.0, 0.01, Format::Plain),
 ];
 
@@ -144,29 +144,29 @@ pub enum GenRow {
 }
 
 pub const GEN_GROOVE: [GenRow; 7] = [
-    GenRow::Slider(prop("prob_pitch", "Pitch", 0.0, 100.0, 1.0, Format::Plain)),
-    GenRow::Slider(prop("prob_velocity", "Velocity", 0.0, 100.0, 1.0, Format::Plain)),
-    GenRow::Slider(prop("prob_silence", "Silence", 0.0, 100.0, 1.0, Format::Plain)),
-    GenRow::Slider(prop("prob_fill", "Fill", 0.0, 100.0, 1.0, Format::Plain)),
-    GenRow::Slider(prop("prob_ghost", "Ghost", 0.0, 100.0, 1.0, Format::Plain)),
-    GenRow::Slider(prop("pitch_range", "Pitch Rng", 1.0, 24.0, 1.0, Format::Plain)),
-    GenRow::Toggle("pitch_scale_lock", "Scale Lock"),
+    GenRow::Slider(prop("probPitch", "Pitch", 0.0, 100.0, 1.0, Format::Plain)),
+    GenRow::Slider(prop("probVelocity", "Velocity", 0.0, 100.0, 1.0, Format::Plain)),
+    GenRow::Slider(prop("probSilence", "Silence", 0.0, 100.0, 1.0, Format::Plain)),
+    GenRow::Slider(prop("probFill", "Fill", 0.0, 100.0, 1.0, Format::Plain)),
+    GenRow::Slider(prop("probGhost", "Ghost", 0.0, 100.0, 1.0, Format::Plain)),
+    GenRow::Slider(prop("pitchRange", "Pitch Rng", 1.0, 24.0, 1.0, Format::Plain)),
+    GenRow::Toggle("pitchScaleLock", "Scale Lock"),
 ];
 
 pub const GEN_ENGINE: [GenRow; 7] = [
-    GenRow::Slider(prop("prob_retrig", "Retrig", 0.0, 100.0, 1.0, Format::Plain)),
-    GenRow::Slider(prop("prob_euclid", "Euclid", 0.0, 100.0, 1.0, Format::Plain)),
-    GenRow::Slider(prop("prob_note", "Note Prob", 0.0, 100.0, 1.0, Format::Plain)),
-    GenRow::Slider(prop("prob_note_depth", "Depth", 0.0, 100.0, 1.0, Format::Plain)),
-    GenRow::Slider(prop("prob_arp", "Arp", 0.0, 100.0, 1.0, Format::Plain)),
-    GenRow::Select("auto_variant", "Variant"),
-    GenRow::Slider(prop("auto_density", "Density", -1.0, 1.0, 0.01, Format::Density)),
+    GenRow::Slider(prop("probRetrigger", "Retrig", 0.0, 100.0, 1.0, Format::Plain)),
+    GenRow::Slider(prop("probEuclidean", "Euclid", 0.0, 100.0, 1.0, Format::Plain)),
+    GenRow::Slider(prop("probNote", "Note Prob", 0.0, 100.0, 1.0, Format::Plain)),
+    GenRow::Slider(prop("probNoteDepth", "Depth", 0.0, 100.0, 1.0, Format::Plain)),
+    GenRow::Slider(prop("probArp", "Arp", 0.0, 100.0, 1.0, Format::Plain)),
+    GenRow::Select("autoVariant", "Variant"),
+    GenRow::Slider(prop("autoDensity", "Density", -1.0, 1.0, 0.01, Format::Density)),
 ];
 
 /// The loop tab.
 pub const LOOP_PROPS: [Prop; 3] = [
     prop("stepsPerBeat", "Steps/Beat", 1.0, 8.0, 1.0, Format::Plain),
-    prop("loopAtStep", "Loop Point", 1.0, 128.0, 1.0, Format::Plain),
+    prop("loopLength", "Loop Point", 1.0, 128.0, 1.0, Format::Plain),
     prop("swingAmount", "Swing", 0.0, 1.0, 0.01, Format::Plain),
 ];
 
@@ -197,15 +197,15 @@ const fn note_slider(key: &'static str, label: &'static str, min: f64, max: f64,
 pub const NOTE_GROUPS: [&[NoteRow]; 4] = [
     &[
         note_slider("every", "Passes", 1.0, 16.0, 1.0),
-        note_slider("pos", "Phase", 0.0, 15.0, 1.0),
-        note_slider("prob", "Prob", 0.0, 1.0, 0.01),
+        note_slider("everyOffset", "Phase", 0.0, 15.0, 1.0),
+        note_slider("probability", "Prob", 0.0, 1.0, 0.01),
     ],
     &[
         note_slider("retriggerCount", "Retrig", 1.0, 16.0, 1.0),
-        note_slider("rate", "Rate", 1.0, 16.0, 1.0),
+        note_slider("retriggerRate", "Rate", 1.0, 16.0, 1.0),
         note_slider("arpTriggerProbability", "Prob", 0.0, 1.0, 0.01),
     ],
-    &[note_slider("euclideanFill", "Eucl", 0.0, 16.0, 1.0), note_slider("euclideanRotation", "Rot", 0.0, 15.0, 1.0)],
+    &[note_slider("euclideanPulses", "Eucl", 0.0, 16.0, 1.0), note_slider("euclideanRotation", "Rot", 0.0, 15.0, 1.0)],
     &[
         NoteRow::Select("arpScale", "Scale"),
         NoteRow::Select("arpType", "Dir"),
@@ -833,7 +833,7 @@ fn loop_tab(rows: &mut Rows, track: &Track) {
         let (value, spec, format) = match p.key {
             "stepsPerBeat" => (f64::from(spb), Spec::slider(p.min, p.max, p.step, default), p.format),
             // The loop point's slider ends at the track's length.
-            "loopAtStep" => (
+            "loopLength" => (
                 loop_at_step(track).min(max_steps),
                 Spec::slider(p.min, max_steps, p.step, p.min),
                 Format::LoopPoint(spb),
@@ -1075,8 +1075,8 @@ mod tests {
         }
         let state = EditorState { tab: 4, ..EditorState::default() };
         let (items, _) = track_editor(&view(&track), &state, Rect::new(0, 0, 360, 600), 1);
-        assert!(items.iter().any(|i| i.id == Some(Id::Gen("prob_pitch"))));
-        assert!(!items.iter().any(|i| i.id == Some(Id::Gen("variation"))));
+        assert!(items.iter().any(|i| i.id == Some(Id::Gen("probPitch"))));
+        assert!(!items.iter().any(|i| i.id == Some(Id::Gen("hitVariation"))));
     }
 
     #[test]
@@ -1097,6 +1097,6 @@ mod tests {
                 _ => None,
             })
             .collect();
-        assert_eq!(sliders, ["euclideanFill", "euclideanRotation"]);
+        assert_eq!(sliders, ["euclideanPulses", "euclideanRotation"]);
     }
 }

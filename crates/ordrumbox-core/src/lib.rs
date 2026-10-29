@@ -12,6 +12,7 @@ pub mod ids;
 pub mod instruments;
 pub mod js;
 pub mod json;
+pub mod legacy;
 pub mod lfo;
 pub mod library;
 pub mod note;

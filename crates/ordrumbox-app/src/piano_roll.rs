@@ -390,7 +390,7 @@ mod tests {
 
     fn library() -> Library {
         Library::parse(
-            r#"{"patterns":[{"beatCount":6,"tracks":[{"name":"BASS","pitch":-12,"beatCount":6,"loopAtStep":20,
+            r#"{"patterns":[{"beatCount":6,"tracks":[{"name":"BASS","pitch":-12,"beatCount":6,"loopLength":20,
                 "notes":[{"beat":0,"pitch":0},{"beat":1,"beatStep":2,"pitch":7,"velocity":0.3,"prob":0.5},
                          {"beat":4,"pitch":0,"retriggerCount":3,"rate":4}]}]}]}"#,
         )
