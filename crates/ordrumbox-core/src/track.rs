@@ -138,11 +138,17 @@ const NOT_SETTINGS: [&str; 3] = ["autoHitVariation", "autoNoteVariation", "scale
 const ROUND_2D: [&str; 9] =
     ["volume", "pan", "reverbMix", "delayMix", "delayBeats", "saturationMix", "swingAmount", "filterCutoff", "filterQ"];
 
+/// Tracks a pattern plays, each through its own strip: an edit adds no
+/// track past them, a load reports the tracks beyond.
+pub const MAX_TRACKS: usize = 64;
+/// Steps a beat can be divided into.
+pub const MAX_STEPS_PER_BEAT: i32 = 8;
+
 impl Track {
-    /// A new track: `beat_count` beats at `steps_per_beat`
-    /// (clamped to 1–8), looping over its whole length, panned from its name.
+    /// A new track: `beat_count` beats at `steps_per_beat` (1 to
+    /// [`MAX_STEPS_PER_BEAT`]), looping over its whole length, panned from its name.
     pub fn new(name: &str, beat_count: i32, steps_per_beat: i32) -> Self {
-        let steps_per_beat = steps_per_beat.clamp(1, 8);
+        assert!((1..=MAX_STEPS_PER_BEAT).contains(&steps_per_beat), "steps per beat {steps_per_beat}");
         Self {
             name: name.to_owned(),
             beat_count,

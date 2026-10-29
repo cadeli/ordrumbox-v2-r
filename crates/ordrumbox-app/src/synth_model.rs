@@ -43,7 +43,7 @@ const DEFAULTS: &str = r#"{"masterVolume":0.8,"subGain":0,"pitchPunch":0,
     "modEnvelope":{"attack":0,"decay":0.12,"sustain":0,"release":0.1,"target":"off"}}"#;
 
 pub fn defaults() -> Object {
-    json::parse(DEFAULTS).ok().and_then(|v| v.as_object().cloned()).unwrap_or_default()
+    json::parse(DEFAULTS).ok().and_then(|v| v.as_object().cloned()).expect("DEFAULTS is a JSON object")
 }
 
 /// A numeric control (`SYNTH_PARAM_META`): its path, range, step, unit, label.

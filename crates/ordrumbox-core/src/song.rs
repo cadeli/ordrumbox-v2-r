@@ -8,13 +8,20 @@ use std::collections::HashSet;
 use crate::ids::{slugify, unique_id};
 use crate::js;
 use crate::json::{Object, Value};
+use crate::record::Issue;
 
 /// Beats in one 4/4 measure.
 pub const BEATS_PER_MEASURE: f64 = 4.0;
-/// Tempo bounds accepted in a song file.
-pub const SONG_MIN_BPM: f64 = 20.0;
-pub const SONG_MAX_BPM: f64 = 300.0;
+/// Tempo bounds of a pattern or a song: a file or an edit outside them is
+/// brought inside, and the load or the edit says so.
+pub const MIN_BPM: f64 = 20.0;
+pub const MAX_BPM: f64 = 300.0;
 pub const DEFAULT_BPM: f64 = 120.0;
+
+/// `bpm` inside [`MIN_BPM`]–[`MAX_BPM`].
+pub fn clamp_bpm(bpm: f64) -> f64 {
+    bpm.clamp(MIN_BPM, MAX_BPM)
+}
 
 /// One placement of a pattern on the timeline.
 #[derive(Debug, Clone, PartialEq)]
@@ -84,9 +91,15 @@ impl Song {
 
     /// Load one song as `normalizeSong()`: numbers coerced the JS way
     /// (`"bpm": "140"` is 140), positions floored at 0, clips referencing an
-    /// unknown pattern id dropped and reported. `Err` when the song itself is
-    /// unusable.
-    pub fn from_json(raw: &Value, known_ids: &HashSet<String>) -> Result<(Self, Vec<DroppedClip>), &'static str> {
+    /// unknown pattern id dropped and reported, a tempo outside the bounds
+    /// replaced by the default and reported in `issues` (at `at`). `Err` when
+    /// the song itself is unusable.
+    pub fn from_json(
+        raw: &Value,
+        known_ids: &HashSet<String>,
+        at: &str,
+        issues: &mut Vec<Issue>,
+    ) -> Result<(Self, Vec<DroppedClip>), &'static str> {
         let Some(object) = raw.as_object() else {
             return Err("Each song must be a JSON object");
         };
@@ -131,7 +144,17 @@ impl Song {
         }
 
         let text = |key: &str| field(key).map(js::to_string).unwrap_or_default();
-        let bpm = field("bpm").map_or(f64::NAN, js::to_number);
+        let bpm = match field("bpm") {
+            None => DEFAULT_BPM,
+            Some(raw) => match js::to_number(raw) {
+                bpm if (MIN_BPM..=MAX_BPM).contains(&bpm) => bpm,
+                bpm => {
+                    let message = format!("{bpm} outside {MIN_BPM}–{MAX_BPM}, {DEFAULT_BPM} used");
+                    issues.push(Issue::new(format!("{at}.bpm"), message));
+                    DEFAULT_BPM
+                }
+            },
+        };
         let loop_count =
             ["loopMeasures", "loopMeasureCount"].iter().find_map(|key| object.get(key)).map_or(f64::NAN, js::to_number);
         let id = match text("id").trim() {
@@ -142,7 +165,7 @@ impl Song {
             id,
             name: text("name"),
             description: text("description"),
-            bpm: if (SONG_MIN_BPM..=SONG_MAX_BPM).contains(&bpm) { bpm } else { DEFAULT_BPM },
+            bpm,
             loop_measures: (loop_count > 0.0).then(|| loop_count.floor()),
             clips,
         };
@@ -221,13 +244,31 @@ impl Song {
 
 /// Load a `songs` array as `normalizeSongs()`: unusable songs skipped, a
 /// repeated id renamed `<id>-alt` (then `-alt-2`…).
-pub fn songs_from_json(raw: &Value, known_ids: &HashSet<String>) -> (Vec<Song>, Vec<DroppedClip>) {
-    let Some(items) = raw.as_array() else { return (Vec::new(), Vec::new()) };
+pub fn songs_from_json(
+    raw: &Value,
+    known_ids: &HashSet<String>,
+    issues: &mut Vec<Issue>,
+) -> (Vec<Song>, Vec<DroppedClip>) {
+    let items = match raw {
+        Value::Array(items) => items.as_slice(),
+        Value::Null => &[],
+        other => {
+            issues.push(Issue::new("songs", format!("not an array ({other}), no songs loaded")));
+            &[]
+        }
+    };
     let mut taken = HashSet::new();
     let mut songs = Vec::new();
     let mut dropped = Vec::new();
-    for item in items {
-        let Ok((mut song, song_dropped)) = Song::from_json(item, known_ids) else { continue };
+    for (i, item) in items.iter().enumerate() {
+        let at = format!("songs[{i}]");
+        let (mut song, song_dropped) = match Song::from_json(item, known_ids, &at, issues) {
+            Ok(loaded) => loaded,
+            Err(e) => {
+                issues.push(Issue::new(at, format!("{e}, skipped")));
+                continue;
+            }
+        };
         if taken.contains(&song.id) {
             song.id = unique_id(&format!("{}-alt", song.id), &mut taken);
         } else {
@@ -255,7 +296,7 @@ mod tests {
                 "clips":[{"pattern":" a ","startMeasure":"2.7","measureCount":"0"},{"pattern":"b"},{}]}"#,
         )
         .unwrap();
-        let (song, dropped) = Song::from_json(&raw, &ids(&["a"])).unwrap();
+        let (song, dropped) = Song::from_json(&raw, &ids(&["a"]), "s", &mut Vec::new()).unwrap();
         assert_eq!(song.id, "ebauche");
         assert_eq!(song.bpm, 140.0);
         assert_eq!(song.loop_measures, Some(7.0));
@@ -272,7 +313,7 @@ mod tests {
     #[test]
     fn lengths() {
         let clip = |start, count| SongClip { pattern_id: "a".into(), start_measure: start, measure_count: count };
-        let mut song = Song::from_json(&json::parse("{}").unwrap(), &HashSet::new()).unwrap().0;
+        let mut song = Song::from_json(&json::parse("{}").unwrap(), &HashSet::new(), "s", &mut Vec::new()).unwrap().0;
         assert_eq!(song.length_measures(), 0.0);
         song.clips = vec![clip(8, 4.0), clip(2, 0.75)];
         assert_eq!(song.content_measures(), 12.0);
@@ -286,8 +327,19 @@ mod tests {
     #[test]
     fn renames_duplicate_ids() {
         let raw = json::parse(r#"[{"id":"x"},{"id":"x"},{"id":"x"},"bad",{"clips":1}]"#).unwrap();
-        let (songs, _) = songs_from_json(&raw, &HashSet::new());
+        let mut issues = Vec::new();
+        let (songs, _) = songs_from_json(&raw, &HashSet::new(), &mut issues);
         let ids: Vec<_> = songs.iter().map(|s| s.id.as_str()).collect();
         assert_eq!(ids, ["x", "x-alt", "x-alt-2"]);
+        let at: Vec<_> = issues.iter().map(|i| i.at.as_str()).collect();
+        assert_eq!(at, ["songs[3]", "songs[4]"]);
+    }
+
+    #[test]
+    fn a_tempo_outside_the_bounds_is_reported() {
+        let mut issues = Vec::new();
+        let song = Song::from_json(&json::parse(r#"{"bpm":400}"#).unwrap(), &HashSet::new(), "s", &mut issues);
+        assert_eq!(song.unwrap().0.bpm, DEFAULT_BPM);
+        assert_eq!(issues, [Issue::new("s.bpm", "400 outside 20–300, 120 used")]);
     }
 }

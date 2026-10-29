@@ -129,6 +129,10 @@ fn edge_cases_repair_and_report() {
             "patterns[0].tracks[4].pan: not a number (\"left\"), pan taken from the track name",
             "patterns[0].tracks[4].mono: wrong type (\"yes\"), default kept",
             "patterns[0].tracks[4].notes[0]: more values than noteKeys, extra values ignored",
+            "songs[1].bpm: 10 outside 20–300, 120 used",
+            "songs[2].bpm: 301 outside 20–300, 120 used",
+            "songs[3]: \"clips\" must be an array, skipped",
+            "songs[4]: Each song must be a JSON object, skipped",
         ]
     );
     assert_eq!(library.patterns[3].id, "spaced");

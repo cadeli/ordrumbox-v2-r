@@ -59,15 +59,23 @@ pub fn safe_name(name: &str) -> String {
     name.chars().map(|c| if c.is_ascii_alphanumeric() || c == '_' || c == '-' { c } else { '_' }).collect()
 }
 
-/// The song files of `dir` (`.odbox`), by name.
-pub fn list_songs(dir: &Path) -> Vec<PathBuf> {
-    let Ok(entries) = fs::read_dir(dir) else { return Vec::new() };
-    let mut songs: Vec<PathBuf> = entries
-        .filter_map(|e| Some(e.ok()?.path()))
-        .filter(|p| p.extension().is_some_and(|e| e.eq_ignore_ascii_case("odbox")))
-        .collect();
+/// The song files of `dir` (`.odbox`), by name; none when `dir` does not
+/// exist yet.
+pub fn list_songs(dir: &Path) -> io::Result<Vec<PathBuf>> {
+    let entries = match fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(e) => return Err(e),
+    };
+    let mut songs = Vec::new();
+    for entry in entries {
+        let path = entry?.path();
+        if path.extension().is_some_and(|e| e.eq_ignore_ascii_case("odbox")) {
+            songs.push(path);
+        }
+    }
     songs.sort();
-    songs
+    Ok(songs)
 }
 
 /// Write a song file (through a temporary file).
@@ -80,8 +88,9 @@ pub fn settings_path() -> Option<PathBuf> {
     Some(user_dir()?.join("settings.json"))
 }
 
-/// The master bus settings saved, if there are some (an unreadable file is an error).
-pub fn load_master(path: &Path) -> Result<Option<ordrumbox_engine::MasterSettings>, String> {
+/// The master bus settings saved, if there are some, with what was not
+/// taken as it is (an unreadable file is an error).
+pub fn load_master(path: &Path) -> Result<Option<(ordrumbox_engine::MasterSettings, Vec<String>)>, String> {
     match fs::read_to_string(path) {
         Ok(text) => {
             let value = json::parse(&text).map_err(|e| format!("{}: {e}", path.display()))?;
@@ -92,13 +101,17 @@ pub fn load_master(path: &Path) -> Result<Option<ordrumbox_engine::MasterSetting
     }
 }
 
-/// Write the master bus settings, keeping the file's other settings.
+/// Write the master bus settings, keeping the file's other settings. A file
+/// that cannot be read or is not a JSON object is an error, never written over.
 pub fn save_master(path: &Path, master: &ordrumbox_engine::MasterSettings) -> io::Result<()> {
-    let mut settings = fs::read_to_string(path)
-        .ok()
-        .and_then(|text| json::parse(&text).ok())
-        .and_then(|v| v.as_object().cloned())
-        .unwrap_or_default();
+    let mut settings = match fs::read_to_string(path) {
+        Ok(text) => json::parse(&text)
+            .ok()
+            .and_then(|v| v.as_object().cloned())
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "not a JSON object, not written over"))?,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => json::Object::new(),
+        Err(e) => return Err(e),
+    };
     settings.insert("master", crate::output::to_json(master));
     write_atomic(path, &(json::Value::Object(settings).to_json_pretty(2) + "\n"))
 }
@@ -242,11 +255,11 @@ mod tests {
     fn song_files() {
         assert_eq!(safe_name("My song #1 é"), "My_song__1__");
         let dir = env::temp_dir().join(format!("ordrumbox-songs-{}", std::process::id()));
-        assert!(list_songs(&dir).is_empty());
+        assert!(list_songs(&dir).unwrap().is_empty());
         save_song(&dir.join("b.odbox"), &json::parse(r#"{"name":"b"}"#).unwrap()).unwrap();
         save_song(&dir.join("a.odbox"), &json::parse(r#"{"name":"a"}"#).unwrap()).unwrap();
         fs::write(dir.join("c.json"), "{}").unwrap();
-        assert_eq!(list_songs(&dir), [dir.join("a.odbox"), dir.join("b.odbox")]);
+        assert_eq!(list_songs(&dir).unwrap(), [dir.join("a.odbox"), dir.join("b.odbox")]);
         fs::remove_dir_all(dir).unwrap();
     }
 
@@ -257,12 +270,16 @@ mod tests {
         assert_eq!(load_master(&path), Ok(None));
         fs::create_dir_all(&dir).unwrap();
         fs::write(&path, r#"{"colorScheme":3,"master":{"volume":0.5}}"#).unwrap();
-        let mut master = load_master(&path).unwrap().unwrap();
+        let (mut master, issues) = load_master(&path).unwrap().unwrap();
+        assert!(issues.is_empty());
         assert_eq!((master.master, master.threshold), (0.5, -18.0));
         master.threshold = -30.0;
         save_master(&path, &master).unwrap();
-        assert_eq!(load_master(&path).unwrap().unwrap(), master);
+        assert_eq!(load_master(&path).unwrap().unwrap(), (master, Vec::new()));
         assert!(fs::read_to_string(&path).unwrap().contains("\"colorScheme\": 3"));
+        fs::write(&path, "{").unwrap();
+        assert!(save_master(&path, &master).is_err());
+        assert_eq!(fs::read_to_string(&path).unwrap(), "{");
         fs::remove_dir_all(dir).unwrap();
     }
 

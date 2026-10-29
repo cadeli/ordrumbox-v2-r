@@ -4,16 +4,15 @@
 //!   them ahead of time.
 //! - [`AudioSide`], in the audio callback: picks up what was posted with a
 //!   `try_lock` that never waits (if the UI holds the lock, it tries again on
-//!   the next callback), renders, and publishes its position through atomics.
+//!   the next callback), renders, and publishes its position as one snapshot
+//!   (a seqlock: the UI never reads a pass number with another pass's frame).
 //!
-//! The controller keeps a reference to every pass and bank it posted until the
-//! engine is past them, so the audio thread never drops a last reference.
+//! The controller keeps a reference to every pass and bank it posted until it
+//! holds the only one left, so the audio thread never drops a last reference.
 
-use std::collections::VecDeque;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard};
-
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering, fence};
+use std::sync::{Arc, Mutex, MutexGuard, TryLockError};
 
 use ordrumbox_core::{Library, Rng, Scales};
 use ordrumbox_dsp::MasterSettings;
@@ -23,10 +22,6 @@ use crate::engine::{Engine, MAX_TRACKS, Position};
 use crate::kit::SampleBank;
 use crate::pass::{HitsCache, Pass, PassContext, SongContext, build_pass, build_preview, build_song_pass};
 use crate::synth_preset::SynthPresets;
-
-/// Passes kept alive. The engine holds at most its current pass and the
-/// queued one, and the inbox one more, all among the last three posted.
-const KEPT_PASSES: usize = 4;
 
 #[derive(Debug)]
 enum Command {
@@ -62,13 +57,12 @@ impl Default for Scope {
     }
 }
 
-/// State shared by both sides.
+/// What the engine publishes after each callback, read as one snapshot: a
+/// seqlock, odd `seq` while the audio side writes. The audio side never waits;
+/// the UI reads again when a write was under way.
 #[derive(Debug, Default)]
-struct Link {
-    inbox: Mutex<Inbox>,
-    /// Written by the audio side when it can take it, never waited for.
-    scope: Mutex<Scope>,
-    levels: Mutex<Vec<f32>>,
+struct Published {
+    seq: AtomicU64,
     playing: AtomicBool,
     pass: AtomicU64,
     frame: AtomicU64,
@@ -77,10 +71,79 @@ struct Link {
     wants: AtomicU64,
 }
 
-impl Link {
-    fn inbox(&self) -> MutexGuard<'_, Inbox> {
-        self.inbox.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+impl Published {
+    /// Audio side, the only writer.
+    fn write(&self, position: Option<Position>, wants: u64) {
+        let seq = self.seq.load(Ordering::Relaxed);
+        self.seq.store(seq + 1, Ordering::Relaxed);
+        fence(Ordering::Release);
+        self.playing.store(position.is_some(), Ordering::Relaxed);
+        if let Some(Position { pass, frame, frames }) = position {
+            self.pass.store(pass, Ordering::Relaxed);
+            self.frame.store(frame, Ordering::Relaxed);
+            self.frames.store(frames, Ordering::Relaxed);
+        }
+        self.wants.store(wants, Ordering::Relaxed);
+        self.seq.store(seq + 2, Ordering::Release);
     }
+
+    /// The position (`None` when stopped) and `wants`, from one callback.
+    fn read(&self) -> (Option<Position>, u64) {
+        loop {
+            let before = self.seq.load(Ordering::Acquire);
+            if before % 2 == 0 {
+                let playing = self.playing.load(Ordering::Relaxed);
+                let position = Position {
+                    pass: self.pass.load(Ordering::Relaxed),
+                    frame: self.frame.load(Ordering::Relaxed),
+                    frames: self.frames.load(Ordering::Relaxed),
+                };
+                let wants = self.wants.load(Ordering::Relaxed);
+                fence(Ordering::Acquire);
+                if self.seq.load(Ordering::Relaxed) == before {
+                    return (playing.then_some(position), wants);
+                }
+            }
+            std::hint::spin_loop();
+        }
+    }
+}
+
+/// State shared by both sides.
+#[derive(Debug, Default)]
+struct Link {
+    inbox: Mutex<Inbox>,
+    /// Copied from the audio side's own ring when it can take the lock.
+    scope: Mutex<Scope>,
+    levels: Mutex<Vec<f32>>,
+    published: Published,
+}
+
+/// The lock, whether or not a thread panicked holding it: the values it
+/// guards are plain data, valid at any time.
+fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// The lock if it is free (the audio side never waits), poisoned or not.
+fn try_lock<T>(mutex: &Mutex<T>) -> Option<MutexGuard<'_, T>> {
+    match mutex.try_lock() {
+        Ok(guard) => Some(guard),
+        Err(TryLockError::Poisoned(poisoned)) => Some(poisoned.into_inner()),
+        Err(TryLockError::WouldBlock) => None,
+    }
+}
+
+/// Drop the references only `list` still holds; the newest is kept when
+/// `keep_last` (the next pass follows it).
+fn release(list: &mut VecDeque<Arc<Pass>>, keep_last: bool) {
+    let last = list.len().saturating_sub(1);
+    let mut i = 0;
+    list.retain(|pass| {
+        let keep = (keep_last && i == last) || Arc::strong_count(pass) > 1;
+        i += 1;
+        keep
+    });
 }
 
 /// The audio-callback side: owns the [`Engine`].
@@ -88,6 +151,8 @@ impl Link {
 pub struct AudioSide {
     engine: Engine,
     link: Arc<Link>,
+    /// The scope ring, written every callback whatever the UI holds.
+    scope: Scope,
 }
 
 impl AudioSide {
@@ -97,7 +162,7 @@ impl AudioSide {
 
     /// Render one callback's worth of stereo frames.
     pub fn render(&mut self, left: &mut [f32], right: &mut [f32]) {
-        if let Ok(mut inbox) = self.link.inbox.try_lock() {
+        if let Some(mut inbox) = try_lock(&self.link.inbox) {
             if let Some(bank) = inbox.bank.take() {
                 self.engine.set_bank(bank);
             }
@@ -118,31 +183,22 @@ impl AudioSide {
             }
         }
         self.engine.render(left, right);
-        if let Ok(mut levels) = self.link.levels.try_lock() {
-            let peaks = self.engine.peaks();
-            if levels.len() < peaks.len() {
-                levels.resize(peaks.len(), 0.0);
-            }
-            for (l, p) in levels.iter_mut().zip(peaks) {
-                *l = *p;
+        // Both hold MAX_TRACKS values from the start: nothing to allocate.
+        if let Some(mut levels) = try_lock(&self.link.levels) {
+            for (level, peak) in levels.iter_mut().zip(self.engine.peaks()) {
+                *level = *peak;
             }
         }
-        if let Ok(mut scope) = self.link.scope.try_lock() {
-            for (l, r) in left.iter().zip(right.iter()) {
-                let at = scope.at;
-                scope.samples[at] = (l + r) * 0.5;
-                scope.at = (at + 1) % SCOPE_SIZE;
-            }
+        for (l, r) in left.iter().zip(right.iter()) {
+            self.scope.samples[self.scope.at] = (l + r) * 0.5;
+            self.scope.at = (self.scope.at + 1) % SCOPE_SIZE;
         }
-
-        let position = self.engine.position();
-        self.link.playing.store(position.is_some(), Ordering::Release);
-        if let Some(Position { pass, frame, frames }) = position {
-            self.link.pass.store(pass, Ordering::Release);
-            self.link.frame.store(frame, Ordering::Release);
-            self.link.frames.store(frames, Ordering::Release);
+        if let Some(mut scope) = try_lock(&self.link.scope) {
+            scope.samples.copy_from_slice(&self.scope.samples);
+            scope.at = self.scope.at;
         }
-        self.link.wants.store(self.engine.wants_pass().map_or(0, |n| n + 1), Ordering::Release);
+        let wants = self.engine.wants_pass().map_or(0, |n| n + 1);
+        self.link.published.write(self.engine.position(), wants);
     }
 }
 
@@ -161,7 +217,7 @@ pub struct Controller {
     link: Arc<Link>,
     sample_rate: f64,
     bank: Arc<SampleBank>,
-    /// Banks posted to the engine, kept until it has surely switched.
+    /// Banks replaced, kept while the engine may still hold them.
     old_banks: Vec<Arc<SampleBank>>,
     scales: Scales,
     synths: SynthPresets,
@@ -174,9 +230,10 @@ pub struct Controller {
     assigned: HashMap<(String, usize), (String, TrackSound)>,
     /// Pattern repetitions drawn for the song passes.
     song_notes: HitsCache,
-    /// Passes posted, oldest first.
+    /// Passes posted, oldest first, kept while the engine or the inbox may
+    /// hold them (and the newest: the next pass follows it).
     sent: VecDeque<Arc<Pass>>,
-    /// Previews posted, oldest first.
+    /// Previews posted, oldest first, kept while the engine or the inbox may hold them.
     previews: VecDeque<Arc<Pass>>,
     playing: bool,
 }
@@ -204,14 +261,11 @@ impl Controller {
             inbox: Mutex::new(Inbox::default()),
             scope: Mutex::new(Scope::default()),
             levels: Mutex::new(vec![0.0; MAX_TRACKS]),
-            playing: AtomicBool::new(false),
-            pass: AtomicU64::new(0),
-            frame: AtomicU64::new(0),
-            frames: AtomicU64::new(0),
-            wants: AtomicU64::new(0),
+            published: Published::default(),
         });
         let kit = bank.samples.first().map(|s| s.kit.clone()).unwrap_or_default();
-        let audio = AudioSide { engine: Engine::new(sample_rate, bank.clone()), link: link.clone() };
+        let audio =
+            AudioSide { engine: Engine::new(sample_rate, bank.clone()), link: link.clone(), scope: Scope::default() };
         let controller = Self {
             link,
             sample_rate: f64::from(sample_rate),
@@ -264,18 +318,18 @@ impl Controller {
 
     pub fn set_master(&mut self, master: MasterSettings) {
         self.master = master;
-        self.link.inbox().master = Some(master);
+        lock(&self.link.inbox).master = Some(master);
     }
 
     /// Per-track peak of the last rendered quantum (0–1), for VU meters.
     pub fn levels(&self) -> Vec<f32> {
-        self.link.levels.lock().map(|g| g.clone()).unwrap_or_default()
+        lock(&self.link.levels).clone()
     }
 
     /// The last [`SCOPE_SIZE`] samples played, oldest first, mono (silence
     /// before anything played).
     pub fn scope(&self, out: &mut [f32; SCOPE_SIZE]) {
-        let scope = self.link.scope.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let scope = lock(&self.link.scope);
         let (newer, older) = scope.samples.split_at(scope.at);
         out[..older.len()].copy_from_slice(older);
         out[older.len()..].copy_from_slice(newer);
@@ -324,7 +378,8 @@ impl Controller {
     /// The transport tick playing now (what the track LFOs are at); `None` when stopped.
     pub fn tick(&self) -> Option<u64> {
         let position = self.position()?;
-        let pass = self.sent.iter().find(|p| p.number == position.pass)?;
+        // The latest build of that pass: a rebuild replaced the earlier ones.
+        let pass = self.sent.iter().rev().find(|p| p.number == position.pass)?;
         Some(pass.first_tick + position.frame * u64::from(pass.ticks) / position.frames.max(1))
     }
 
@@ -406,15 +461,18 @@ impl Controller {
             sample_rate: self.sample_rate,
             first_tick: 0,
         };
-        let pass = Arc::new(build_preview(pattern, t, note, context));
-        if pass.events.is_empty() {
-            return;
+        let pass = build_preview(pattern, t, note, context);
+        if !pass.events.is_empty() {
+            self.post_preview(pass);
         }
+    }
+
+    /// Post `pass` to sound at once, kept here until the engine is done with it.
+    fn post_preview(&mut self, pass: Pass) {
+        let pass = Arc::new(pass);
+        release(&mut self.previews, false);
         self.previews.push_back(pass.clone());
-        while self.previews.len() > KEPT_PASSES {
-            self.previews.pop_front();
-        }
-        self.link.inbox().preview = Some(pass);
+        lock(&self.link.inbox).preview = Some(pass);
     }
 
     /// Audition sample `index` of the bank as it is (`DrumkitManager.audition`):
@@ -432,18 +490,13 @@ impl Controller {
             pan: 0.0,
             delay: 0,
         };
-        let pass = Arc::new(Pass {
+        self.post_preview(Pass {
             frames: 1,
             ticks: 1,
             events: vec![crate::pass::Event { frame: 0, sound: crate::pass::Sound::Sample(voice), mono: false }],
             strips: vec![ordrumbox_dsp::StripSettings::default()],
             ..Pass::default()
         });
-        self.previews.push_back(pass.clone());
-        while self.previews.len() > KEPT_PASSES {
-            self.previews.pop_front();
-        }
-        self.link.inbox().preview = Some(pass);
     }
 
     /// Start `mode` from its beginning; sounds are assigned afresh.
@@ -464,7 +517,7 @@ impl Controller {
     pub fn jump(&mut self, library: &Library, first: u64) {
         self.song_notes.clear();
         let Some(pass) = self.build(library, first) else { return };
-        let mut inbox = self.link.inbox();
+        let mut inbox = lock(&self.link.inbox);
         inbox.command = Some(Command::Play(pass));
         inbox.next = None;
         drop(inbox);
@@ -474,13 +527,13 @@ impl Controller {
     /// The library was edited: rebuild the pass playing now (it goes on from
     /// the same place), and the next ones follow the edit.
     pub fn refresh(&mut self, library: &Library) {
-        if !self.playing || !self.link.playing.load(Ordering::Acquire) {
+        if !self.playing {
             return;
         }
-        let number = self.link.pass.load(Ordering::Acquire);
+        let Some(Position { pass: number, .. }) = self.position() else { return };
         self.song_notes.clear();
         let Some(pass) = self.build(library, number) else { return };
-        let mut inbox = self.link.inbox();
+        let mut inbox = lock(&self.link.inbox);
         // A Play still waiting must not be replaced by a rebuild.
         if !matches!(inbox.command, Some(Command::Play(_))) {
             inbox.command = Some(Command::Replace(pass));
@@ -489,7 +542,7 @@ impl Controller {
     }
 
     pub fn stop(&mut self) {
-        self.link.inbox().command = Some(Command::Stop);
+        lock(&self.link.inbox).command = Some(Command::Stop);
         self.playing = false;
     }
 
@@ -500,7 +553,7 @@ impl Controller {
     /// The pass [`Self::update`] builds now, if it builds one: the moment for
     /// the loop start of auto-mode tracks (a pass is a loop of the pattern).
     pub fn pending_pass(&self) -> Option<u64> {
-        let wants = self.link.wants.load(Ordering::Acquire).checked_sub(1)?;
+        let wants = self.link.published.read().1.checked_sub(1)?;
         // The pass after the last one posted: not one already sent, and not
         // one the engine asked for before a jump it has not taken yet.
         let follows = self.sent.back().is_none_or(|p| p.number + 1 == wants);
@@ -514,14 +567,11 @@ impl Controller {
         if let Some(number) = self.pending_pass()
             && let Some(pass) = self.build(library, number)
         {
-            self.link.inbox().next = Some(pass);
+            lock(&self.link.inbox).next = Some(pass);
         }
-        while self.sent.len() > KEPT_PASSES {
-            self.sent.pop_front();
-        }
-        if self.link.inbox().bank.is_none() {
-            self.old_banks.clear(); // the engine took the last bank posted
-        }
+        release(&mut self.sent, true);
+        release(&mut self.previews, false);
+        self.old_banks.retain(|bank| Arc::strong_count(bank) > 1);
     }
 
     /// Replace the synth presets (an edit in the synth editor): the pass
@@ -534,17 +584,13 @@ impl Controller {
     /// Replace the samples (after a reload); the engine switches on its next callback.
     pub fn set_bank(&mut self, bank: Arc<SampleBank>) {
         self.old_banks.push(std::mem::replace(&mut self.bank, bank.clone()));
-        self.link.inbox().bank = Some(bank);
+        lock(&self.link.inbox).bank = Some(bank);
         self.assigned.clear();
     }
 
     /// Playback position, `None` when stopped.
     pub fn position(&self) -> Option<Position> {
-        self.link.playing.load(Ordering::Acquire).then(|| Position {
-            pass: self.link.pass.load(Ordering::Acquire),
-            frame: self.link.frame.load(Ordering::Acquire),
-            frames: self.link.frames.load(Ordering::Acquire),
-        })
+        self.link.published.read().0
     }
 }
 
@@ -588,7 +634,8 @@ mod tests {
             }
         }
         assert_eq!(seen_passes, [0, 1, 2]);
-        assert!(controller.sent.len() <= KEPT_PASSES);
+        // The engine's pass and the queued one, at most, plus the newest.
+        assert!(controller.sent.len() <= 3);
         controller.stop();
         audio.render(&mut l, &mut r);
         assert_eq!(controller.position(), None);
@@ -647,13 +694,35 @@ mod tests {
         audio.render(&mut l, &mut r);
         audio.render(&mut l, &mut r);
         {
-            let mut scope = controller.link.scope.lock().unwrap();
+            let mut scope = lock(&controller.link.scope);
             let at = scope.at;
             scope.samples[at] = 7.0; // the oldest
             scope.samples[(at + SCOPE_SIZE - 1) % SCOPE_SIZE] = 9.0; // the newest
         }
         controller.scope(&mut out);
         assert_eq!((out[0], out[SCOPE_SIZE - 1]), (7.0, 9.0));
+    }
+
+    #[test]
+    fn passes_are_released_only_from_their_last_holder() {
+        let held = Arc::new(Pass::default()); // the engine's
+        let mut sent: VecDeque<Arc<Pass>> = [held.clone(), Arc::new(Pass::default()), Arc::new(Pass::default())].into();
+        release(&mut sent, true);
+        assert_eq!(sent.len(), 2);
+        assert!(Arc::ptr_eq(&sent[0], &held));
+        drop(held);
+        release(&mut sent, false);
+        assert!(sent.is_empty());
+    }
+
+    #[test]
+    fn the_position_is_read_as_written() {
+        let published = Published::default();
+        assert_eq!(published.read(), (None, 0));
+        published.write(Some(Position { pass: 3, frame: 10, frames: 100 }), 4);
+        assert_eq!(published.read(), (Some(Position { pass: 3, frame: 10, frames: 100 }), 4));
+        published.write(None, 0);
+        assert_eq!(published.read(), (None, 0));
     }
 
     #[test]

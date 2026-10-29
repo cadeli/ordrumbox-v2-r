@@ -1,7 +1,7 @@
 //! The audio output: the default device through cpal (WASAPI on Windows,
 //! CoreAudio on macOS), fed by the engine's [`AudioSide`].
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{FromSample, SampleFormat, SizedSample, StreamConfig};
@@ -16,6 +16,15 @@ pub struct Output {
     _stream: cpal::Stream,
     pub device: String,
     pub sample_rate: u32,
+    /// The last stream error (a device unplugged…), until the UI takes it.
+    error: Arc<Mutex<Option<String>>>,
+}
+
+impl Output {
+    /// The stream error reported since the last call, if any.
+    pub fn take_error(&self) -> Option<String> {
+        self.error.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).take()
+    }
 }
 
 impl std::fmt::Debug for Output {
@@ -33,19 +42,25 @@ pub fn start(bank: Arc<SampleBank>, scales: Scales, synths: SynthPresets) -> Res
     let config: StreamConfig = supported.config();
     let (controller, audio) = Controller::new(config.sample_rate as f32, bank, scales, synths);
 
+    let error = Arc::new(Mutex::new(None));
     let stream = match supported.sample_format() {
-        SampleFormat::F32 => build::<f32>(&device, &config, audio),
-        SampleFormat::I16 => build::<i16>(&device, &config, audio),
-        SampleFormat::I32 => build::<i32>(&device, &config, audio),
-        SampleFormat::U16 => build::<u16>(&device, &config, audio),
+        SampleFormat::F32 => build::<f32>(&device, &config, audio, error.clone()),
+        SampleFormat::I16 => build::<i16>(&device, &config, audio, error.clone()),
+        SampleFormat::I32 => build::<i32>(&device, &config, audio, error.clone()),
+        SampleFormat::U16 => build::<u16>(&device, &config, audio, error.clone()),
         other => return Err(format!("{name}: unsupported sample format {other}")),
     }
     .map_err(|e| format!("{name}: {e}"))?;
     stream.play().map_err(|e| format!("{name}: {e}"))?;
-    Ok((Output { _stream: stream, device: name, sample_rate: config.sample_rate }, controller))
+    Ok((Output { _stream: stream, device: name, sample_rate: config.sample_rate, error }, controller))
 }
 
-fn build<T>(device: &cpal::Device, config: &StreamConfig, mut audio: AudioSide) -> Result<cpal::Stream, cpal::Error>
+fn build<T>(
+    device: &cpal::Device,
+    config: &StreamConfig,
+    mut audio: AudioSide,
+    error: Arc<Mutex<Option<String>>>,
+) -> Result<cpal::Stream, cpal::Error>
 where
     T: SizedSample + FromSample<f32>,
 {
@@ -72,7 +87,8 @@ where
                 }
             }
         },
-        |err| eprintln!("audio stream: {err}"),
+        // Called outside the audio callback: it may lock and allocate.
+        move |err| *error.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(err.to_string()),
         None,
     )
 }

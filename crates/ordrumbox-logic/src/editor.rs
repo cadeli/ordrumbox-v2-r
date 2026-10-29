@@ -13,6 +13,7 @@ use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::ids::{slugify, unique_id};
 use ordrumbox_core::js::{number_to_string, round};
 use ordrumbox_core::json::Value;
+use ordrumbox_core::track::MAX_TRACKS;
 use ordrumbox_core::{Library, Note, Pattern, Scales, SetField, Track};
 
 use crate::generate::{self, AutoGenerator, MelodicKind, Options};
@@ -319,8 +320,16 @@ impl Editor {
 
     // ─── Tracks ──────────────────────────────────────────────────────────────
 
-    /// Append a new track; its index.
+    /// Whether pattern `p` can take one more track ([`MAX_TRACKS`]).
+    pub fn has_track_room(&self, p: usize) -> bool {
+        self.library.patterns.get(p).is_some_and(|pattern| pattern.tracks.len() < MAX_TRACKS)
+    }
+
+    /// Append a new track; its index. `None` when the pattern is full.
     pub fn add_track(&mut self, p: usize, name: &str, steps_per_beat: i32) -> Option<usize> {
+        if !self.has_track_room(p) {
+            return None;
+        }
         let desc = format!("Add track {name}");
         self.edit(
             p,
@@ -341,8 +350,11 @@ impl Editor {
     }
 
     /// Insert a copy of `source` at `index` (clamped), named "`<name>` copy"
-    /// (then "copy 2"…); its index.
+    /// (then "copy 2"…); its index. `None` when the pattern is full.
     pub fn paste_track(&mut self, p: usize, index: usize, source: &Track) -> Option<usize> {
+        if !self.has_track_room(p) {
+            return None;
+        }
         let taken: HashSet<&str> = self.library.patterns.get(p)?.tracks.iter().map(|t| t.name.as_str()).collect();
         let mut name = format!("{} copy", source.name);
         let mut n = 2;
@@ -837,6 +849,18 @@ mod tests {
         assert!(e.clean_pattern(0));
         assert!(pattern(&e).tracks.iter().all(|t| t.notes.is_empty()));
         assert_eq!(e.history().next_undo(), Some("Clean \"rock\""));
+    }
+
+    #[test]
+    fn a_full_pattern_takes_no_more_tracks() {
+        let mut e = editor();
+        while e.has_track_room(0) {
+            e.add_track(0, "T", 4).expect("room");
+        }
+        assert_eq!(pattern(&e).tracks.len(), MAX_TRACKS);
+        let kick = pattern(&e).tracks[0].clone();
+        assert_eq!(e.add_track(0, "T", 4), None);
+        assert_eq!(e.paste_track(0, 0, &kick), None);
     }
 
     #[test]

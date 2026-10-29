@@ -57,7 +57,8 @@ fn song_sources_match_resolve_song_sources() {
     let cases = cases.as_array().expect("cases");
     assert_eq!(cases.len(), 2);
     for case in cases {
-        let (songs, _) = song::songs_from_json(&Value::Array(vec![case.get("song").unwrap().clone()]), &known);
+        let (songs, _) =
+            song::songs_from_json(&Value::Array(vec![case.get("song").unwrap().clone()]), &known, &mut Vec::new());
         let song: &Song = &songs[0];
         for t in case.get("ticks").and_then(Value::as_array).expect("ticks") {
             let tick = num(t, "tick") as u64;

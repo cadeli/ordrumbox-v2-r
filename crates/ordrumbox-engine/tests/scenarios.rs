@@ -113,7 +113,8 @@ fn with_song(bpm: f64, loop_measures: u32, clips: &[(&str, u32, f64)]) -> Librar
         clips.join(",")
     );
     let known = library.patterns.iter().map(|p| p.id.clone()).collect();
-    library.songs = vec![ordrumbox_core::Song::from_json(&json::parse(&song).unwrap(), &known).unwrap().0];
+    library.songs =
+        vec![ordrumbox_core::Song::from_json(&json::parse(&song).unwrap(), &known, "song", &mut Vec::new()).unwrap().0];
     library
 }
 

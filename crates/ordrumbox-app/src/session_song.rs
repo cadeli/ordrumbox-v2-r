@@ -548,7 +548,17 @@ impl Session {
 
     /// Load: the songs saved, to choose from.
     fn load_song_menu(&mut self) {
-        let files = store::songs_dir().map(|d| store::list_songs(&d)).unwrap_or_default();
+        let Some(dir) = store::songs_dir() else {
+            self.message = "No user data folder: no saved songs".into();
+            return;
+        };
+        let files = match store::list_songs(&dir) {
+            Ok(files) => files,
+            Err(e) => {
+                self.message = format!("Songs not listed: {}: {e}", dir.display());
+                return;
+            }
+        };
         if files.is_empty() {
             self.message = "No saved songs found".into();
             return;
