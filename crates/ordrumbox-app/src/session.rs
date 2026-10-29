@@ -38,6 +38,9 @@ use crate::view::{self, Cursor, Hit, KitView, View};
 
 #[path = "session_grid.rs"]
 mod session_grid;
+#[cfg(test)]
+#[path = "session_library_file.rs"]
+mod session_library_file;
 #[path = "session_output.rs"]
 mod session_output;
 #[path = "session_panel.rs"]
@@ -343,27 +346,7 @@ impl Session {
             status.push(format!("{} sample(s) not loaded, first: {first}", assets.sample_errors.len()));
         }
 
-        // The user's library when there is one, else the assets' song.json.
-        let mut library = assets.library;
-        let mut message = "demo library (assets/data/library.json)".to_owned();
-        let library_path = match store::path() {
-            None => {
-                status.push("no user data folder: edits are not saved".into());
-                None
-            }
-            Some(path) => match store::load(&path) {
-                Ok(Some(saved)) => {
-                    library = saved;
-                    message = format!("library {}", path.display());
-                    Some(path)
-                }
-                Ok(None) => Some(path),
-                Err(e) => {
-                    status.push(format!("library not loaded, not saved over: {e}"));
-                    None
-                }
-            },
-        };
+        let (library, library_path, message) = Self::open_library(store::path(), assets.library, &mut status);
         if library_path.is_none() && !assets.report.issues.is_empty() {
             status.push(format!("library.json: {} value(s) repaired", assets.report.issues.len()));
         }
@@ -406,6 +389,34 @@ impl Session {
         session.load_master();
         session.load_update_settings();
         session
+    }
+
+    /// The library to start with: the user's file at `path` when there is
+    /// one, else `demo`; the file edits are saved to (`None`: not saved, the
+    /// reason pushed on `status`); the message to show.
+    fn open_library(
+        path: Option<PathBuf>,
+        demo: Library,
+        status: &mut Vec<String>,
+    ) -> (Library, Option<PathBuf>, String) {
+        let demo_message = "demo library (assets/data/library.json)".to_owned();
+        match path {
+            None => {
+                status.push("no user data folder: edits are not saved".into());
+                (demo, None, demo_message)
+            }
+            Some(path) => match store::load(&path) {
+                Ok(Some(saved)) => {
+                    let message = format!("library {}", path.display());
+                    (saved, Some(path), message)
+                }
+                Ok(None) => (demo, Some(path), demo_message),
+                Err(e) => {
+                    status.push(format!("library not loaded, not saved over: {e}"));
+                    (demo, None, demo_message)
+                }
+            },
+        }
     }
 
     fn new(library: Library, kits: KitSet, status: Vec<String>) -> Self {
