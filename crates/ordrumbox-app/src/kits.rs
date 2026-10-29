@@ -22,14 +22,14 @@ use crate::store;
 
 /// Knob ranges of the JS kit editor (`SOUND_KNOB_DEFS`).
 pub const GAIN_RANGE: (f64, f64) = (-24.0, 6.0);
-pub const TUNE_RANGE: (f64, f64) = (-12.0, 12.0);
+pub const TRANSPOSE_RANGE: (f64, f64) = (-12.0, 12.0);
 pub const DECAY_RANGE: (f64, f64) = (20.0, 5000.0);
 
 /// What a kit knob changes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Field {
     Gain,
-    Tune,
+    Transpose,
     Decay,
 }
 
@@ -143,7 +143,7 @@ impl KitSet {
                 instrument.gain_db = value;
                 Some(format!("{name}: gain {value:+.1} dB"))
             }
-            Field::Tune if value != instrument.transpose => {
+            Field::Transpose if value != instrument.transpose => {
                 instrument.transpose = value;
                 Some(format!("{name}: tune {value:+.1} st"))
             }
@@ -360,7 +360,7 @@ mod tests {
         let mut kits = set(&dir);
         assert_eq!(kits.set_value(0, 0, Field::Gain, -3.0).as_deref(), Some("kick: gain -3.0 dB"));
         assert_eq!(kits.set_value(0, 0, Field::Gain, -3.0), None); // no change
-        kits.set_value(0, 0, Field::Tune, 0.3);
+        kits.set_value(0, 0, Field::Transpose, 0.3);
         assert_eq!(kits.kits[0].samples[0].transpose, 0.3);
         kits.set_value(0, 0, Field::Decay, 630.0);
         assert_eq!(kits.kits[0].samples[0].decay, Some(630.0));

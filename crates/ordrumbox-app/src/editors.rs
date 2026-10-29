@@ -10,7 +10,7 @@ use ordrumbox_core::{Note, Track};
 
 use crate::canvas::text_width;
 use crate::control::{Format, Spec};
-use crate::kits::{DECAY_RANGE, Field, GAIN_RANGE, TUNE_RANGE};
+use crate::kits::{DECAY_RANGE, Field, GAIN_RANGE, TRANSPOSE_RANGE};
 use crate::panel::{ACCENT, DIM, Id, Item, Kind, LfoParam, Rect, TEXT, label_width};
 
 // ─── Tables (track_editor_constants.js, sync_section.js) ─────────────────────
@@ -77,7 +77,7 @@ pub const LFO_TARGETS: [LfoTarget; 5] = [
     LfoTarget { key: "filterQ", label: "Q", lfo_key: "filterQLfo", min: 0.707, max: 18.707, step: 0.01 },
     LfoTarget { key: "volume", label: "Vol", lfo_key: "volumeLfo", min: 0.0, max: 1.0, step: 0.01 },
     LfoTarget { key: "pan", label: "Pan", lfo_key: "panLfo", min: -1.0, max: 1.0, step: 0.01 },
-    LfoTarget { key: "transpose", label: "Pitch", lfo_key: "transposeLfo", min: -24.0, max: 24.0, step: 1.0 },
+    LfoTarget { key: "transpose", label: "Transp", lfo_key: "transposeLfo", min: -24.0, max: 24.0, step: 1.0 },
 ];
 
 /// The LFO key of a setting, if it takes one.
@@ -121,7 +121,7 @@ pub fn fx_label(key: &str) -> &'static str {
 pub const KNOB_BAR: [(Prop, &str); 4] = [
     (prop("volume", "Vol", 0.0, 1.0, 0.01, Format::Percent), "%"),
     (prop("pan", "Pan", -1.0, 1.0, 0.01, Format::Fmt), ""),
-    (prop("transpose", "Pitch", -24.0, 24.0, 1.0, Format::SignedPlain), "st"),
+    (prop("transpose", "Transp", -24.0, 24.0, 1.0, Format::SignedPlain), "st"),
     (prop("decay", "Decay", DECAY_RANGE.0, DECAY_RANGE.1, 10.0, Format::Millis), ""),
 ];
 
@@ -221,7 +221,12 @@ pub const ARP_DIRECTIONS: [&str; 4] = ["up", "down", "updown", "random"];
 /// Kit editor knobs: field, label, range, step, format, unit, default.
 pub const KIT_KNOBS: [(Field, Prop, &str, f64); 3] = [
     (Field::Gain, prop("gain", "Gain", GAIN_RANGE.0, GAIN_RANGE.1, 0.1, Format::Fixed1), "dB", 0.0),
-    (Field::Tune, prop("tune", "Tune", TUNE_RANGE.0, TUNE_RANGE.1, 0.1, Format::SignedFixed1), "st", 0.0),
+    (
+        Field::Transpose,
+        prop("transpose", "Transp", TRANSPOSE_RANGE.0, TRANSPOSE_RANGE.1, 0.1, Format::SignedFixed1),
+        "st",
+        0.0,
+    ),
     (Field::Decay, prop("decay", "Decay", DECAY_RANGE.0, DECAY_RANGE.1, 10.0, Format::Millis), "", DEFAULT_DECAY),
 ];
 
@@ -532,7 +537,7 @@ pub struct KitControls {
     pub kits: Choice,
     pub instruments: Choice,
     pub gain: f64,
-    pub tune: f64,
+    pub transpose: f64,
     pub decay: f64,
 }
 
@@ -971,7 +976,7 @@ pub fn kit_controls(view: &KitControls, area: Rect, scale: i32) -> (Vec<Item>, i
         .map(|(field, p, unit, default)| {
             let value = match field {
                 Field::Gain => view.gain,
-                Field::Tune => view.tune,
+                Field::Transpose => view.transpose,
                 _ => view.decay,
             };
             let mut spec = value_spec(p, *default, true);
