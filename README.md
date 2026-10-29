@@ -118,7 +118,7 @@ again from the assets' kits.
 Track editor (on the right, **F2** or **View › Track editor** shows or hides
 it), for the track of the cursor or of the selected note: the sample bar
 (note, length, peak, envelope with the decay end, **Load** replaces the
-sample), the knob bar (volume, pan, pitch, the sample's decay) and the JS
+sample), the knob bar (volume, pan, transpose, the sample's decay) and the JS
 tabs — **FX** (reverb, delay, saturation, filter, each with its on/off LED),
 **Sound** (mono, auto-assign, instrument, sample, synth preset), **LFO** (an
 LFO per setting: LED, wave, frequency, range, phase), **Loop** (steps per
