@@ -1083,7 +1083,7 @@ impl Session {
 
     /// The analysis of the sample shown, computed when it changes.
     fn update_analysis(&mut self) {
-        let url = self.kit_editor.and_then(|s| self.kits.sample(self.kit_index, s)).map(|i| i.url.clone());
+        let url = self.kit_editor.and_then(|s| self.kits.sample(self.kit_index, s)).map(|i| i.path.clone());
         match url {
             Some(url) if self.analysis.as_ref().is_some_and(|(u, _)| *u == url) => {}
             Some(url) => {
@@ -1147,9 +1147,9 @@ impl Session {
     /// Enter: the selected sample, as it is.
     pub fn kit_audition(&mut self) {
         let Some(sample) = self.kit_editor else { return };
-        let Some(url) = self.kits.sample(self.kit_index, sample).map(|i| i.url.clone()) else { return };
+        let Some(url) = self.kits.sample(self.kit_index, sample).map(|i| i.path.clone()) else { return };
         if let Some(controller) = &mut self.controller
-            && let Some(index) = controller.bank().find_url(&url)
+            && let Some(index) = controller.bank().find_path(&url)
         {
             controller.audition_sample(index);
         }
@@ -1821,14 +1821,14 @@ impl Session {
         let samples = kit.samples.iter().map(|i| (i.display_name.as_str(), i.key.as_str())).collect();
         let selected = kit.samples.get(sample);
         let analysis =
-            self.analysis.as_ref().filter(|(url, _)| selected.is_some_and(|i| i.url == *url)).map(|(_, a)| a);
+            self.analysis.as_ref().filter(|(url, _)| selected.is_some_and(|i| i.path == *url)).map(|(_, a)| a);
         let info = analysis.map(|a| {
             let db = |v: f64| if v.is_finite() { format!("{v:.1}") } else { "-".into() };
             let note = a.note.map_or_else(|| "-".to_owned(), |n| n.to_string());
             format!("{note}  {:.0} ms  {} dB peak  {} dB RMS", a.duration_sec * 1000.0, db(a.peak_db), db(a.rms_db))
         });
         let detected = selected.map(|i| {
-            let name = if i.display_name.is_empty() { &i.url } else { &i.display_name };
+            let name = if i.display_name.is_empty() { &i.path } else { &i.display_name };
             ordrumbox_core::instruments::catalog()
                 .from_file_name(name)
                 .map_or_else(|| "No instrument detected".to_owned(), |d| format!("Detected: {}", d.id))

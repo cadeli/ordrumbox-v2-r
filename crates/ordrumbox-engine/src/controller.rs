@@ -425,7 +425,7 @@ impl Controller {
         let voice = ordrumbox_dsp::VoiceStart {
             sample: index,
             track: 0,
-            ratio: (sample.sample.tune / 12.0).exp2(),
+            ratio: (sample.sample.transpose / 12.0).exp2(),
             peak: sample.sample.gain() as f32,
             // No decay envelope: one that outlasts any sample.
             decay: 600.0,
@@ -558,7 +558,7 @@ mod tests {
         let instrument = crate::kit::KitSample {
             key: "KICK".into(),
             display_name: "k".into(),
-            url: "k".into(),
+            path: "k".into(),
             decay: Some(100.0),
             ..Default::default()
         };

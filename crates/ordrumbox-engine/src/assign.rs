@@ -204,7 +204,7 @@ pub fn assign_track(
         };
     }
     if !track.auto_assign {
-        return bank.find_url(&track.sample_path).map_or(TrackSound::None, TrackSound::Sample);
+        return bank.find_path(&track.sample_path).map_or(TrackSound::None, TrackSound::Sample);
     }
     if bank.samples.is_empty() {
         return TrackSound::None;

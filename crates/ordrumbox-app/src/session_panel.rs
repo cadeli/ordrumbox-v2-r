@@ -271,7 +271,7 @@ impl Session {
         let bank =
             self.controller.as_ref().map(|c| c.bank().clone()).or_else(|| self.render.as_ref().map(|r| r.bank.clone()));
         match self.track_sound(t) {
-            TrackSound::Sample(i) => bank.and_then(|b| b.get(i).map(|s| s.sample.url.clone())).unwrap_or_default(),
+            TrackSound::Sample(i) => bank.and_then(|b| b.get(i).map(|s| s.sample.path.clone())).unwrap_or_default(),
             TrackSound::Synth(key) => format!("synth {key}"),
             TrackSound::None if track.use_synth => match &track.synth_preset {
                 Some(key) => format!("synth {key}"),
@@ -282,7 +282,7 @@ impl Session {
         }
     }
 
-    fn track_sample_url(&self, t: usize) -> Option<String> {
+    fn track_sample_path(&self, t: usize) -> Option<String> {
         let track = self.track(t)?;
         if track.use_synth {
             return None;
@@ -291,7 +291,7 @@ impl Session {
         let bank =
             self.controller.as_ref().map(|c| c.bank().clone()).or_else(|| self.render.as_ref().map(|r| r.bank.clone()));
         match sound {
-            TrackSound::Sample(i) => bank.and_then(|b| b.get(i).map(|s| s.sample.url.clone())),
+            TrackSound::Sample(i) => bank.and_then(|b| b.get(i).map(|s| s.sample.path.clone())),
             _ => (!track.auto_assign).then(|| track.sample_path.clone()),
         }
     }
@@ -307,8 +307,8 @@ impl Session {
 
     fn track_view(&self, t: usize) -> Option<TrackView<'_>> {
         let track = self.track(t)?;
-        let url = self.track_sample_url(t);
-        let place = url.as_deref().and_then(|u| self.kits.find_url(u));
+        let url = self.track_sample_path(t);
+        let place = url.as_deref().and_then(|u| self.kits.find_path(u));
         let instrument = place.and_then(|(k, i)| self.kits.sample(k, i));
         let kit_name = place.and_then(|(k, _)| self.kits.kits.get(k)).map(|k| k.name.as_str());
 
@@ -392,8 +392,8 @@ impl Session {
             .iter()
             .flat_map(|kit| {
                 kit.samples.iter().filter(|i| i.key == id).map(|i| {
-                    let name = if i.display_name.is_empty() { i.url.clone() } else { i.display_name.clone() };
-                    (kit.name.clone(), i.url.clone(), name)
+                    let name = if i.display_name.is_empty() { i.path.clone() } else { i.display_name.clone() };
+                    (kit.name.clone(), i.path.clone(), name)
                 })
             })
             .collect();
@@ -476,7 +476,7 @@ impl Session {
             kits,
             instruments,
             gain: instrument.gain_db,
-            tune: instrument.tune,
+            tune: instrument.transpose,
             decay: instrument.decay.unwrap_or(0.0),
         })
     }
@@ -870,7 +870,7 @@ impl Session {
             return;
         }
         let mut urls: Vec<String> =
-            self.kits.kits.iter().flat_map(|k| k.samples.iter().map(|i| i.url.clone())).collect();
+            self.kits.kits.iter().flat_map(|k| k.samples.iter().map(|i| i.path.clone())).collect();
         urls.sort_unstable();
         urls.dedup();
         if urls.is_empty() {
@@ -977,7 +977,7 @@ impl Session {
             Id::Loop(key) => self.loop_slider(t, key, value),
             Id::Decay => {
                 // The sample's decay (the sound registry's in the JS): not undoable.
-                if let Some((kit, sample)) = self.track_sample_url(t).and_then(|u| self.kits.find_url(&u)) {
+                if let Some((kit, sample)) = self.track_sample_path(t).and_then(|u| self.kits.find_path(&u)) {
                     self.set_kit_sample_value(kit, sample, Field::Decay, value);
                 }
             }
@@ -1295,7 +1295,7 @@ impl Session {
     /// The load button's file: the track's sample replaced.
     pub(super) fn replace_track_sample(&mut self, path: &Path) {
         let Some(t) = self.editor_track() else { return };
-        let Some((kit, sample)) = self.track_sample_url(t).and_then(|u| self.kits.find_url(&u)) else {
+        let Some((kit, sample)) = self.track_sample_path(t).and_then(|u| self.kits.find_path(&u)) else {
             self.message = "this track plays no sample of the kits".into();
             return;
         };

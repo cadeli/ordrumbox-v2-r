@@ -45,7 +45,7 @@ fn auto_assign_picks_what_the_js_picks() {
         for (label, pick) in [("first", 0usize), ("last", usize::MAX)] {
             let mut choose = |n: usize| pick.min(n - 1);
             let got = match assign_track(&track, &bank, kit, &synths, &mut choose) {
-                TrackSound::Sample(i) => bank.samples[i].sample.url.clone(),
+                TrackSound::Sample(i) => bank.samples[i].sample.path.clone(),
                 TrackSound::None => "NOT_DEFINED".to_owned(),
                 TrackSound::Synth(key) => panic!("synth {key}"),
             };
@@ -66,7 +66,7 @@ fn synth_tracks_get_a_preset() {
     assert_eq!(assign_track(&synth(None), &bank, "real", &SynthPresets::default(), &mut last), TrackSound::None);
     let explicit = Track { auto_assign: false, sample_path: "matt/RIMSHOT.wav".into(), ..Track::default() };
     let found = assign_track(&explicit, &bank, "real", &synths, &mut last);
-    assert_eq!(found, TrackSound::Sample(bank.find_url("matt/RIMSHOT.wav").unwrap()));
+    assert_eq!(found, TrackSound::Sample(bank.find_path("matt/RIMSHOT.wav").unwrap()));
 }
 
 #[test]
