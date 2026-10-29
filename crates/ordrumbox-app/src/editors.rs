@@ -30,11 +30,11 @@ pub struct FxDef {
 }
 
 pub const FX_DEFS: [FxDef; 4] = [
-    FxDef { key: "reverbAmount", label: "Rev", controls: &["reverbAmount", "reverbType"] },
+    FxDef { key: "reverbMix", label: "Rev", controls: &["reverbMix", "reverbType"] },
     FxDef { key: "delayMix", label: "Dly", controls: &["delayMix", "delayBeats", "delayType"] },
-    FxDef { key: "saturationAmount", label: "Sat", controls: &["saturationAmount", "saturationType"] },
+    FxDef { key: "saturationMix", label: "Sat", controls: &["saturationMix", "saturationType"] },
     // The filter is on when its type is not the allpass bypass.
-    FxDef { key: "filterType", label: "Flt", controls: &["filterType", "filterFreq", "filterQ"] },
+    FxDef { key: "filterType", label: "Flt", controls: &["filterType", "filterCutoff", "filterQ"] },
 ];
 
 pub const FILTER_TYPES: [&str; 3] = ["lowpass", "highpass", "bandpass"];
@@ -73,11 +73,11 @@ pub struct LfoTarget {
 
 /// The settings that take an LFO, in the JS order (track props, then the knob bar's).
 pub const LFO_TARGETS: [LfoTarget; 5] = [
-    LfoTarget { key: "filterFreq", label: "Freq", lfo_key: "filterFreqLfo", min: 20.0, max: 20_000.0, step: 1.0 },
+    LfoTarget { key: "filterCutoff", label: "Freq", lfo_key: "filterCutoffLfo", min: 20.0, max: 20_000.0, step: 1.0 },
     LfoTarget { key: "filterQ", label: "Q", lfo_key: "filterQLfo", min: 0.707, max: 18.707, step: 0.01 },
     LfoTarget { key: "volume", label: "Vol", lfo_key: "volumeLfo", min: 0.0, max: 1.0, step: 0.01 },
     LfoTarget { key: "pan", label: "Pan", lfo_key: "panLfo", min: -1.0, max: 1.0, step: 0.01 },
-    LfoTarget { key: "pitch", label: "Pitch", lfo_key: "pitchLfo", min: -24.0, max: 24.0, step: 1.0 },
+    LfoTarget { key: "transpose", label: "Pitch", lfo_key: "transposeLfo", min: -24.0, max: 24.0, step: 1.0 },
 ];
 
 /// The LFO key of a setting, if it takes one.
@@ -102,10 +102,10 @@ const fn prop(key: &'static str, label: &'static str, min: f64, max: f64, step: 
 
 /// The effect knobs.
 pub const FX_KNOBS: [Prop; 5] = [
-    prop("reverbAmount", "Mix", 0.0, 1.0, 0.01, Format::Plain),
+    prop("reverbMix", "Mix", 0.0, 1.0, 0.01, Format::Plain),
     prop("delayMix", "Mix", 0.0, 1.0, 0.01, Format::Plain),
-    prop("saturationAmount", "Mix", 0.0, 1.0, 0.01, Format::Plain),
-    prop("filterFreq", "Freq", 20.0, 20_000.0, 1.0, Format::Freq),
+    prop("saturationMix", "Mix", 0.0, 1.0, 0.01, Format::Plain),
+    prop("filterCutoff", "Freq", 20.0, 20_000.0, 1.0, Format::Freq),
     prop("filterQ", "Q", 0.707, 18.707, 0.01, Format::Fixed2),
 ];
 
@@ -121,7 +121,7 @@ pub fn fx_label(key: &str) -> &'static str {
 pub const KNOB_BAR: [(Prop, &str); 4] = [
     (prop("volume", "Vol", 0.0, 1.0, 0.01, Format::Percent), "%"),
     (prop("pan", "Pan", -1.0, 1.0, 0.01, Format::Fmt), ""),
-    (prop("pitch", "Pitch", -24.0, 24.0, 1.0, Format::SignedPlain), "st"),
+    (prop("transpose", "Pitch", -24.0, 24.0, 1.0, Format::SignedPlain), "st"),
     (prop("decay", "Decay", DECAY_RANGE.0, DECAY_RANGE.1, 10.0, Format::Millis), ""),
 ];
 
@@ -144,21 +144,21 @@ pub enum GenerationRow {
 }
 
 pub const GENERATION_GROOVE: [GenerationRow; 7] = [
-    GenerationRow::Slider(prop("probPitch", "Pitch", 0.0, 100.0, 1.0, Format::Plain)),
-    GenerationRow::Slider(prop("probVelocity", "Velocity", 0.0, 100.0, 1.0, Format::Plain)),
-    GenerationRow::Slider(prop("probSilence", "Silence", 0.0, 100.0, 1.0, Format::Plain)),
-    GenerationRow::Slider(prop("probFill", "Fill", 0.0, 100.0, 1.0, Format::Plain)),
-    GenerationRow::Slider(prop("probGhost", "Ghost", 0.0, 100.0, 1.0, Format::Plain)),
+    GenerationRow::Slider(prop("autoPitchChance", "Pitch", 0.0, 100.0, 1.0, Format::Plain)),
+    GenerationRow::Slider(prop("autoVelocityChance", "Velocity", 0.0, 100.0, 1.0, Format::Plain)),
+    GenerationRow::Slider(prop("autoSilenceChance", "Silence", 0.0, 100.0, 1.0, Format::Plain)),
+    GenerationRow::Slider(prop("autoFillChance", "Fill", 0.0, 100.0, 1.0, Format::Plain)),
+    GenerationRow::Slider(prop("autoGhostChance", "Ghost", 0.0, 100.0, 1.0, Format::Plain)),
     GenerationRow::Slider(prop("pitchRange", "Pitch Rng", 1.0, 24.0, 1.0, Format::Plain)),
     GenerationRow::Toggle("pitchScaleLock", "Scale Lock"),
 ];
 
 pub const GENERATION_ENGINE: [GenerationRow; 7] = [
-    GenerationRow::Slider(prop("probRetrigger", "Retrig", 0.0, 100.0, 1.0, Format::Plain)),
-    GenerationRow::Slider(prop("probEuclidean", "Euclid", 0.0, 100.0, 1.0, Format::Plain)),
-    GenerationRow::Slider(prop("probNote", "Note Prob", 0.0, 100.0, 1.0, Format::Plain)),
-    GenerationRow::Slider(prop("probNoteDepth", "Depth", 0.0, 100.0, 1.0, Format::Plain)),
-    GenerationRow::Slider(prop("probArp", "Arp", 0.0, 100.0, 1.0, Format::Plain)),
+    GenerationRow::Slider(prop("autoRetriggerChance", "Retrig", 0.0, 100.0, 1.0, Format::Plain)),
+    GenerationRow::Slider(prop("autoEuclideanChance", "Euclid", 0.0, 100.0, 1.0, Format::Plain)),
+    GenerationRow::Slider(prop("autoNoteProbabilityChance", "Note Prob", 0.0, 100.0, 1.0, Format::Plain)),
+    GenerationRow::Slider(prop("autoNoteProbabilityRange", "Depth", 0.0, 100.0, 1.0, Format::Plain)),
+    GenerationRow::Slider(prop("autoArpChance", "Arp", 0.0, 100.0, 1.0, Format::Plain)),
     GenerationRow::Select("autoVariant", "Variant"),
     GenerationRow::Slider(prop("autoDensity", "Density", -1.0, 1.0, 0.01, Format::Density)),
 ];
@@ -196,14 +196,14 @@ const fn note_slider(key: &'static str, label: &'static str, min: f64, max: f64,
 /// one key, and the second one takes the first one's place.
 pub const NOTE_GROUPS: [&[NoteRow]; 4] = [
     &[
-        note_slider("every", "Every", 1.0, 16.0, 1.0),
-        note_slider("everyOffset", "Offset", 0.0, 15.0, 1.0),
+        note_slider("cycle", "Cycle", 1.0, 16.0, 1.0),
+        note_slider("cycleOffset", "Offset", 0.0, 15.0, 1.0),
         note_slider("probability", "Prob", 0.0, 1.0, 0.01),
     ],
     &[
         note_slider("retriggerCount", "Retrig", 1.0, 16.0, 1.0),
         note_slider("retriggerRate", "Rate", 1.0, 16.0, 1.0),
-        note_slider("arpTriggerProbability", "Prob", 0.0, 1.0, 0.01),
+        note_slider("retriggerProbability", "Prob", 0.0, 1.0, 0.01),
     ],
     &[
         note_slider("euclideanPulses", "Pulses", 0.0, 16.0, 1.0),
@@ -284,7 +284,7 @@ pub fn loop_length(track: &Track) -> f64 {
     let last = track
         .notes
         .iter()
-        .map(|n| ordrumbox_core::steps::absolute_step(n.beat, n.beat_step, spb) + 1)
+        .map(|n| ordrumbox_core::steps::absolute_step(n.beat, n.step, spb) + 1)
         .max()
         .unwrap_or(0)
         .max(0);
@@ -412,8 +412,8 @@ pub fn note_tooltip(note: &Note, track_pitch: f64) -> String {
     if note.probability != 1.0 {
         parts.push(format!("prob:{}", fmt(note.probability)));
     }
-    if note.every != 1 {
-        parts.push(format!("every:{}", note.every));
+    if note.cycle != 1 {
+        parts.push(format!("every:{}", note.cycle));
     }
     if note.retrigger_count != 1 {
         parts.push(format!("retrig:{}", note.retrigger_count));
@@ -429,8 +429,8 @@ pub fn note_tooltip(note: &Note, track_pitch: f64) -> String {
     if let Some(a) = intervals.filter(|a| a.len() >= 2) {
         parts.push(format!("arp:[{}]", js::to_string(&Value::Array(a.clone()))));
     }
-    if note.arp_trigger_probability != 1.0 {
-        parts.push(format!("arpProb:{}", fmt(note.arp_trigger_probability)));
+    if note.retrigger_probability != 1.0 {
+        parts.push(format!("arpProb:{}", fmt(note.retrigger_probability)));
     }
     if note.euclidean_pulses > 0 {
         parts.push(if note.euclidean_rotation != 0 {
@@ -739,7 +739,7 @@ fn sound_tab(rows: &mut Rows, view: &TrackView) {
     rows.items.push(Item::new(
         Some(Id::AutoAssign),
         Rect::new(r.x, r.y, 12 * s, r.h),
-        Kind::Led { on: track.use_auto_assign_sound },
+        Kind::Led { on: track.auto_assign },
     ));
     rows.items.push(Item::text(r.x + 14 * s, r.y + (r.h - 8 * s) / 2, "auto", DIM, s));
     for (id, label, choice) in [
@@ -855,8 +855,12 @@ fn generation_tab(rows: &mut Rows, track: &Track, state: &EditorState) {
         }
     };
     let r = rows.row();
-    rows.label(r, "Auto", Some("auto"), state.selected_prop == Some("auto"));
-    rows.items.push(Item::new(Some(Id::Toggle("auto")), rows.field(r, 36 * s), Kind::Toggle { on: track.auto }));
+    rows.label(r, "Auto", Some("autoMode"), state.selected_prop == Some("autoMode"));
+    rows.items.push(Item::new(
+        Some(Id::Toggle("autoMode")),
+        rows.field(r, 36 * s),
+        Kind::Toggle { on: track.auto_mode },
+    ));
     let generation_slider = |rows: &mut Rows, p: &Prop| {
         let value = number(track, p.key);
         let spec = value_spec(p, default_of(p.key, p.min), false);
@@ -866,7 +870,7 @@ fn generation_tab(rows: &mut Rows, track: &Track, state: &EditorState) {
             Kind::Value { spec, value, label: Some(p.label.to_owned()), text: p.format.value(value, ""), lfo: false };
         rows.items.push(Item::new(Some(Id::Generation(p.key)), r, kind));
     };
-    if !track.auto {
+    if !track.auto_mode {
         for p in &GENERATION_MANUAL {
             generation_slider(rows, p);
         }
@@ -1038,7 +1042,7 @@ mod tests {
     fn loop_point_falls_back_to_the_length() {
         let mut track = Track { beat_count: 4, steps_per_beat: 4, ..Track::default() };
         assert_eq!(loop_length(&track), 16.0);
-        track.notes.push(Note { beat: 7, beat_step: 1, ..Note::default() });
+        track.notes.push(Note { beat: 7, step: 1, ..Note::default() });
         assert_eq!(loop_length(&track), 30.0);
         track.loop_length = Some(5);
         assert_eq!(loop_length(&track), 5.0);
@@ -1061,7 +1065,7 @@ mod tests {
     fn every_tab_builds() {
         let mut track = Track { name: "KICK".into(), ..Track::default() };
         for auto in [false, true] {
-            track.auto = auto;
+            track.auto_mode = auto;
             for tab in 0..5 {
                 for sub in 0..5 {
                     let state = EditorState {
@@ -1078,7 +1082,7 @@ mod tests {
         }
         let state = EditorState { tab: 4, ..EditorState::default() };
         let (items, _) = track_editor(&view(&track), &state, Rect::new(0, 0, 360, 600), 1);
-        assert!(items.iter().any(|i| i.id == Some(Id::Generation("probPitch"))));
+        assert!(items.iter().any(|i| i.id == Some(Id::Generation("autoPitchChance"))));
         assert!(!items.iter().any(|i| i.id == Some(Id::Generation("hitVariation"))));
     }
 

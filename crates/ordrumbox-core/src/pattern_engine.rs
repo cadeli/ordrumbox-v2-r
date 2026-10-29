@@ -30,7 +30,7 @@ pub struct FlatNote {
     /// Grid position of that note (a repeat or an arpeggio note keeps the
     /// position of its source note: swing is decided by it).
     pub beat: i32,
-    pub beat_step: i32,
+    pub step: i32,
     /// Semitones, arpeggio offset included (track pitch not included).
     pub pitch: f64,
     pub velocity: f64,
@@ -56,17 +56,18 @@ pub fn track_loop_ticks(track: &Track) -> i64 {
     (loop_steps / spb * f64::from(TICK)).floor() as i64
 }
 
-/// Does a note with this `every`/`pos` fire on pass `pass`? It fires once every
-/// `every` passes, on the pass where `(pass + pos) % every == 0`. `every` 0 never fires.
-pub fn fires_on_pass(pos: i32, every: i32, pass: u32) -> bool {
-    if every == 0 {
+/// Does a note with this `cycle`/`cycle_offset` fire on pass `pass`? It fires
+/// once every `cycle` passes, on the pass where `(pass + offset) % cycle == 0`.
+/// A `cycle` of 0 never fires.
+pub fn fires_on_pass(offset: i32, cycle: i32, pass: u32) -> bool {
+    if cycle == 0 {
         return false;
     }
-    let every = i64::from(every);
-    (i64::from(pass) + i64::from(pos) % every) % every == 0
+    let cycle = i64::from(cycle);
+    (i64::from(pass) + i64::from(offset) % cycle) % cycle == 0
 }
 
-/// Compute pass `pass` (0-based, it selects the `every`/`pos` notes) of a
+/// Compute pass `pass` (0-based, it selects the notes by `cycle`/`cycle_offset`) of a
 /// pattern (`recomputeFlatNotes`). Within a tick, notes come in track order,
 /// then note order, then repeats, as in the JS app.
 pub fn recompute_flat_notes(pattern: &Pattern, pass: u32, rng: &mut Rng, scales: &Scales) -> FlatNotes {
@@ -80,16 +81,15 @@ pub fn recompute_flat_notes(pattern: &Pattern, pass: u32, rng: &mut Rng, scales:
         let varied = variation::vary_notes(track, rng);
         let span_end = SpanResolver::new(track);
         // Probability is a manual-mode control: in auto mode only note.probability gates.
-        let track_probability = if track.auto { 1.0 } else { track.probability };
+        let track_probability = if track.auto_mode { 1.0 } else { track.probability };
 
         for (note_idx, source) in track.notes.iter().enumerate() {
             let note = varied.get(&note_idx).unwrap_or(source);
-            if !fires_on_pass(note.every_offset, note.every, pass) || !rng.chance(track_probability * note.probability)
+            if !fires_on_pass(note.cycle_offset, note.cycle, pass) || !rng.chance(track_probability * note.probability)
             {
                 continue;
             }
-            let base =
-                step_to_tick(absolute_step(note.beat, note.beat_step, track.steps_per_beat), track.steps_per_beat);
+            let base = step_to_tick(absolute_step(note.beat, note.step, track.steps_per_beat), track.steps_per_beat);
             if base >= pattern_ticks {
                 continue;
             }
@@ -128,7 +128,7 @@ impl SpanResolver {
     pub fn new(track: &Track) -> Self {
         let spb = track.steps_per_beat;
         Self {
-            occupied: track.notes.iter().map(|n| absolute_step(n.beat, n.beat_step, spb)).collect(),
+            occupied: track.notes.iter().map(|n| absolute_step(n.beat, n.step, spb)).collect(),
             last: i64::from(spb) * i64::from(track.beat_count),
             loop_at: track.loop_length.map(i64::from),
             steps_per_beat: spb,
@@ -136,7 +136,7 @@ impl SpanResolver {
     }
 
     pub fn end(&self, note: &Note) -> i64 {
-        let first = absolute_step(note.beat, note.beat_step, self.steps_per_beat);
+        let first = absolute_step(note.beat, note.step, self.steps_per_beat);
         let end = (first + 1..self.last).find(|step| self.occupied.contains(step)).unwrap_or(self.last);
         match self.loop_at {
             Some(loop_at) if loop_at > first && loop_at < end => loop_at,
@@ -161,7 +161,7 @@ impl NoteContext<'_> {
             track: self.track_idx,
             source: Some(self.note_idx),
             beat: self.note.beat,
-            beat_step: self.note.beat_step,
+            step: self.note.step,
             pitch: self.note.pitch + pitch_offset,
             velocity: self.note.velocity,
             pan: self.note.pan,
@@ -180,7 +180,7 @@ impl NoteContext<'_> {
     fn add_sub_notes(&self, flat: &mut FlatNotes, base: i64, rng: &mut Rng) {
         let note = self.note;
         let spacing = self.repeat_spacing();
-        let trigger = note.arp_trigger_probability;
+        let trigger = note.retrigger_probability;
         if let Some(sequence) = arp::sequence(&note.arp, rng) {
             for i in 0..arp::note_count(note.retrigger_count) {
                 if rng.chance(trigger) {
@@ -210,7 +210,7 @@ impl NoteContext<'_> {
         }
         let sequence = arp::sequence(&note.arp, rng);
         let spb = self.track.steps_per_beat;
-        let start = absolute_step(note.beat, note.beat_step, spb);
+        let start = absolute_step(note.beat, note.step, spb);
         let ticks_per_step = f64::from(TICK) / f64::from(spb);
         let positions = euclidean::fill_positions(
             start,
@@ -220,7 +220,7 @@ impl NoteContext<'_> {
         );
         for (i, step) in positions.into_iter().enumerate() {
             let tick = base + js::round((step - start) as f64 * ticks_per_step) as i64;
-            if tick >= self.pattern_ticks || !rng.chance(note.arp_trigger_probability) {
+            if tick >= self.pattern_ticks || !rng.chance(note.retrigger_probability) {
                 continue;
             }
             let offset = sequence.as_ref().map_or(0.0, |seq| {

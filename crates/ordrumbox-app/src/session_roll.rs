@@ -99,7 +99,7 @@ impl Session {
             beat_count: pattern.beat_count.max(1),
             page: 0,
             top_row: self.roll_top.map_or_else(
-                || layout.centered_top((MIDDLE_C + track.pitch - MIDI_MIN).round() as i32),
+                || layout.centered_top((MIDDLE_C + track.transpose - MIDI_MIN).round() as i32),
                 |top| layout.clamp_top(top),
             ),
             selected: self.selected.filter(|&(st, _)| st == t).map(|(_, n)| n),
@@ -161,12 +161,12 @@ impl Session {
         track
             .notes
             .iter()
-            .position(|n| absolute_step(n.beat, n.beat_step, spb) == step && MIDDLE_C + track.pitch + n.pitch == midi)
+            .position(|n| absolute_step(n.beat, n.step, spb) == step && MIDDLE_C + track.transpose + n.pitch == midi)
     }
 
     /// The pitch a row has on track `t`, relative to the track.
     fn roll_pitch(&self, t: usize, row: i32) -> f64 {
-        f64::from(piano_roll::row_midi(row)) - MIDDLE_C - self.track(t).map_or(0.0, |track| track.pitch)
+        f64::from(piano_roll::row_midi(row)) - MIDDLE_C - self.track(t).map_or(0.0, |track| track.transpose)
     }
 
     fn roll_beat(&self, t: usize, step: i64) -> (i32, i32) {
@@ -185,8 +185,7 @@ impl Session {
         let Some((t, n)) = self.selected else { return };
         let Some(track) = self.track(t) else { return };
         let Some(note) = track.notes.get(n) else { return };
-        self.roll_cursor =
-            Some((absolute_step(note.beat, note.beat_step, steps_per_beat(track)), note_row(note, track)));
+        self.roll_cursor = Some((absolute_step(note.beat, note.step, steps_per_beat(track)), note_row(note, track)));
     }
 
     /// Add a note at `step`, `row` and select it.
@@ -202,7 +201,7 @@ impl Session {
     /// Delete note `n` of track `t`.
     fn roll_delete_note(&mut self, t: usize, n: usize) -> bool {
         let Some(note) = self.track(t).and_then(|track| track.notes.get(n)).cloned() else { return false };
-        let deleted = self.editor.delete_note(self.pattern_index, t, note.beat, note.beat_step, note.pitch);
+        let deleted = self.editor.delete_note(self.pattern_index, t, note.beat, note.step, note.pitch);
         if deleted {
             if self.selected == Some((t, n)) {
                 self.selected = None;
@@ -235,7 +234,7 @@ impl Session {
             (RollHit::Cell { step, row }, Button::Left) => match self.roll_note_at(t, step, row) {
                 // A press on a note: a drag, or a click when it does not move.
                 Some(n) => {
-                    let pitch = self.track(t).map_or(0.0, |track| track.pitch);
+                    let pitch = self.track(t).map_or(0.0, |track| track.transpose);
                     self.roll_drag = Some(RollDrag { track: t, note: n, drag: NoteDrag::new(x, y, pitch) });
                 }
                 None => {
@@ -337,7 +336,7 @@ impl Session {
         let (n, text) = match (&self.roll_gauge, self.selected, self.roll_hover) {
             (Some(gauge), Some((_, n)), _) => (n, gauge.clone()),
             (None, _, Some(n)) => match view.track.notes.get(n) {
-                Some(note) => (n, editors::note_tooltip(note, view.track.pitch)),
+                Some(note) => (n, editors::note_tooltip(note, view.track.transpose)),
                 None => return,
             },
             _ => return,
@@ -354,7 +353,7 @@ impl Session {
         match axis {
             Axis::Velocity => format!("velocity {}", js::number_to_string(note.velocity)),
             Axis::Pitch => {
-                let midi = (MIDDLE_C + track.pitch + note.pitch).round() as i32;
+                let midi = (MIDDLE_C + track.transpose + note.pitch).round() as i32;
                 format!("pitch {}", midi_name(midi))
             }
         }
@@ -363,7 +362,7 @@ impl Session {
     /// A key clicked: play that pitch on the track (`#playKey`).
     fn roll_play_key(&mut self, t: usize, midi: i32) {
         let note = Note {
-            pitch: f64::from(midi) - MIDDLE_C - self.track(t).map_or(0.0, |track| track.pitch),
+            pitch: f64::from(midi) - MIDDLE_C - self.track(t).map_or(0.0, |track| track.transpose),
             ..Note::default()
         };
         if let Some(controller) = &mut self.controller {
@@ -503,7 +502,8 @@ impl Session {
         match parts[0] {
             "add" => {
                 let (step, pitch) = (number(1) as i64, number(2));
-                let row = (MIDDLE_C + self.track(t).map_or(0.0, |track| track.pitch) + pitch - MIDI_MIN).round() as i32;
+                let row =
+                    (MIDDLE_C + self.track(t).map_or(0.0, |track| track.transpose) + pitch - MIDI_MIN).round() as i32;
                 if let Some(n) = self.roll_add(t, step, row) {
                     self.audition(t, Some(n));
                     let (beat, beat_step) = self.roll_beat(t, step);
@@ -518,7 +518,7 @@ impl Session {
                 let n = number(1) as usize;
                 let Some(note) = self.track(t).and_then(|track| track.notes.get(n)).cloned() else { return };
                 if self.roll_delete_note(t, n) {
-                    self.message = format!("Deleted note - {name} @ {}", beat_label(note.beat, note.beat_step));
+                    self.message = format!("Deleted note - {name} @ {}", beat_label(note.beat, note.step));
                 }
             }
             quality @ ("minor" | "major") => {
@@ -547,7 +547,7 @@ impl Session {
         let Some(track) = self.track(t) else { return };
         let name = track.name.clone();
         let existing: Vec<f64> =
-            track.notes.iter().filter(|n| n.beat == beat && n.beat_step == beat_step).map(|n| n.pitch).collect();
+            track.notes.iter().filter(|n| n.beat == beat && n.step == beat_step).map(|n| n.pitch).collect();
         let mut added = Vec::new();
         for interval in intervals {
             let pitch = root + interval;
@@ -563,7 +563,7 @@ impl Session {
         };
         self.edited();
         self.selected = Some((t, first));
-        let row = (MIDDLE_C + self.track(t).map_or(0.0, |track| track.pitch) + root - MIDI_MIN).round() as i32;
+        let row = (MIDDLE_C + self.track(t).map_or(0.0, |track| track.transpose) + root - MIDI_MIN).round() as i32;
         self.roll_cursor = Some((step, row));
         self.message =
             format!("Added {quality} chord ({}) - {name} @ {}", notes_label(added.len()), beat_label(beat, beat_step));
@@ -589,7 +589,7 @@ impl Session {
         self.roll_sequence += 1;
         self.edited();
         self.selected = first.map(|n| (t, n));
-        let row = (MIDDLE_C + self.track(t).map_or(0.0, |track| track.pitch) + tonic - MIDI_MIN).round() as i32;
+        let row = (MIDDLE_C + self.track(t).map_or(0.0, |track| track.transpose) + tonic - MIDI_MIN).round() as i32;
         self.roll_cursor = Some((0, row));
         let name = self.track(t).map(|track| track.name.clone()).unwrap_or_default();
         self.message = format!(
@@ -631,7 +631,7 @@ mod tests {
     }
 
     fn notes(s: &Session) -> Vec<(i32, i32, f64, f64)> {
-        s.track(1).unwrap().notes.iter().map(|n| (n.beat, n.beat_step, n.pitch, n.velocity)).collect()
+        s.track(1).unwrap().notes.iter().map(|n| (n.beat, n.step, n.pitch, n.velocity)).collect()
     }
 
     /// Option `i` of the open menu.

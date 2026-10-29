@@ -281,7 +281,7 @@ fn a_kit_change_while_playing_reassigns_every_auto_track() {
     assert!(controller.is_playing());
     assert!(controller.position().expect("playing").pass > before.pass);
     for (t, track) in pattern.tracks.iter().enumerate() {
-        assert!(track.use_auto_assign_sound);
+        assert!(track.auto_assign);
         let (kit, key) = sample_of(&bank, &controller.track_sound(&library, p, t)).expect("a sample");
         assert_eq!(kit, "b", "track {} plays {key} of kit {kit}", track.name);
     }

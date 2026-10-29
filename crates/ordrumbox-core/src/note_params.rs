@@ -18,7 +18,7 @@ impl FlatNote {
     /// every interval flat (+1 semitone: 1.0595 → 1.05, −15.5 cents; +7:
     /// 1.4983 → 1.49, −9.8 cents; octaves stay exact).
     pub fn playback_ratio(&self, track: &Track) -> f64 {
-        semitone_ratio(self.pitch + track.pitch)
+        semitone_ratio(self.pitch + track.transpose)
     }
 
     /// Swing delay, in beats (`computeSwingTime`): with a swing grid of
@@ -26,7 +26,7 @@ impl FlatNote {
     /// each group is pushed late by `swing_amount` beats (0.33 is a triplet feel).
     pub fn swing_beats(&self, track: &Track) -> f64 {
         let grid = track.swing_resolution.max(1);
-        if grid == 1 || self.beat_step % grid != 1 { 0.0 } else { track.swing_amount }
+        if grid == 1 || self.step % grid != 1 { 0.0 } else { track.swing_amount }
     }
 }
 
@@ -35,7 +35,7 @@ mod tests {
     use super::*;
 
     fn note(beat_step: i32, pitch: f64, pan: f64) -> FlatNote {
-        FlatNote { track: 0, source: Some(0), beat: 0, beat_step, pitch, velocity: 0.8, pan }
+        FlatNote { track: 0, source: Some(0), beat: 0, step: beat_step, pitch, velocity: 0.8, pan }
     }
 
     #[test]
@@ -47,7 +47,7 @@ mod tests {
 
     #[test]
     fn ratio_is_exact() {
-        let track = Track { pitch: -12.0, ..Track::default() };
+        let track = Track { transpose: -12.0, ..Track::default() };
         assert_eq!(note(0, 0.0, 0.0).playback_ratio(&track), 0.5);
         let ratio = note(0, 13.0, 0.0).playback_ratio(&track);
         assert!((ratio - 2f64.powf(1.0 / 12.0)).abs() < 1e-12);

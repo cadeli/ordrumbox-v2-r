@@ -16,13 +16,13 @@ json_record! {
         /// Beat index within the track, 0-based (a measure is 4 beats).
         beat: i32 = 0 => "beat",
         /// Step within the beat, `0..stepsPerBeat`.
-        beat_step: i32 = 0 => "beatStep",
+        step: i32 = 0 => "step" | "beatStep",
         /// Transposition in semitones (may be fractional).
         pitch: f64 = 0.0 => "pitch",
         /// Stereo position, -1 (left) to 1 (right).
         pan: f64 = 0.0 => "pan",
-        /// Fires once every `every` passes of the pattern (not every N steps).
-        every: i32 = 1 => "every",
+        /// Fires once every `cycle` passes of the pattern (not every N steps).
+        cycle: i32 = 1 => "cycle" | "every",
         /// Trigger probability, 0–1.
         probability: f64 = 1.0 => "probability" | "prob",
         /// Ghost/retrigger spacing code: `< 8` is `rate / 8` step, `>= 8` is
@@ -35,13 +35,13 @@ json_record! {
         /// pattern engine, kept verbatim here.
         arp: Value = Value::Null => "arp",
         /// Probability of each arpeggio/retrigger hit, 0–1.
-        arp_trigger_probability: f64 = 1.0 => "arpTriggerProbability",
+        retrigger_probability: f64 = 1.0 => "retriggerProbability" | "arpTriggerProbability",
         /// Euclidean pulses over the span to the next note, base note included (0 = off).
         euclidean_pulses: i32 = 0 => "euclideanPulses" | "euclideanFill",
         /// Rotation of the euclidean pattern, in steps.
         euclidean_rotation: i32 = 0 => "euclideanRotation",
-        /// Phase in the `every` cycle: fires on the pass where `(pass + pos) % every == 0`.
-        every_offset: i32 = 0 => "everyOffset" | "pos",
+        /// Phase in the cycle: fires on the pass where `(pass + cycle_offset) % cycle == 0`.
+        cycle_offset: i32 = 0 => "cycleOffset" | "everyOffset" | "pos",
         /// Arpeggio scale picked in the note editor.
         arp_scale: Option<String> = None => "arpScale" | "_arpScale",
         /// Arpeggio direction picked in the note editor.
@@ -50,7 +50,7 @@ json_record! {
     other_fields {
         /// Position in the beat, percent (`stepPercent`): never saved, kept
         /// while editing so a change of steps per beat and back restores the
-        /// step. `None`: derived from `beat_step`.
+        /// step. `None`: derived from `step`.
         step_percent: Option<f64> = None,
     }
 }
@@ -80,7 +80,7 @@ impl Note {
     pub fn step_percent(&self, steps_per_beat: i32) -> f64 {
         self.step_percent.filter(|p| p.is_finite()).unwrap_or_else(|| {
             crate::js::round(
-                f64::from(self.beat_step) * 100.0 / f64::from(if steps_per_beat == 0 { 4 } else { steps_per_beat }),
+                f64::from(self.step) * 100.0 / f64::from(if steps_per_beat == 0 { 4 } else { steps_per_beat }),
             )
         })
     }
@@ -88,9 +88,9 @@ impl Note {
     /// Fold a `beatStep` past the end of its beat into the following beats:
     /// beat 1 step 6 at 4 steps per beat is beat 2 step 2 (`normalizeNoteGridPosition`).
     pub(crate) fn wrap_grid_position(&mut self, steps_per_beat: i32) {
-        if steps_per_beat > 0 && self.beat_step >= steps_per_beat {
-            self.beat += self.beat_step / steps_per_beat;
-            self.beat_step %= steps_per_beat;
+        if steps_per_beat > 0 && self.step >= steps_per_beat {
+            self.beat += self.step / steps_per_beat;
+            self.step %= steps_per_beat;
         }
     }
 }
@@ -211,18 +211,18 @@ mod tests {
             [
                 "velocity",
                 "beat",
-                "beatStep",
+                "step",
                 "pitch",
                 "pan",
-                "every",
+                "cycle",
                 "probability",
                 "retriggerRate",
                 "retriggerCount",
                 "arp",
-                "arpTriggerProbability",
+                "retriggerProbability",
                 "euclideanPulses",
                 "euclideanRotation",
-                "everyOffset",
+                "cycleOffset",
                 "arpScale",
                 "arpDirection",
             ]
@@ -235,7 +235,7 @@ mod tests {
             decode("[[0.4], [0.9, 1], [0.35, 2, 2, -3]]", Some(r#"["velocity","beat","beatStep","pitch"]"#));
         assert!(issues.is_empty());
         assert_eq!(notes[0], Note { velocity: 0.4, ..Note::default() });
-        assert_eq!(notes[2], Note { velocity: 0.35, beat: 2, beat_step: 2, pitch: -3.0, ..Note::default() });
+        assert_eq!(notes[2], Note { velocity: 0.35, beat: 2, step: 2, pitch: -3.0, ..Note::default() });
     }
 
     #[test]
@@ -268,7 +268,7 @@ mod tests {
             probability: 0.5,
             retrigger_rate: 4.0,
             euclidean_pulses: 3,
-            every_offset: 2,
+            cycle_offset: 2,
             arp_direction: Some("up".into()),
             ..Note::default()
         };
@@ -276,7 +276,7 @@ mod tests {
         assert_eq!(notes[1].retrigger_rate, 2.0);
         assert_eq!(
             encode(&notes[..1]),
-            r#"["probability","retriggerRate","euclideanPulses","everyOffset","arpDirection"] [[0.5,4,3,2,"up"]]"#
+            r#"["probability","retriggerRate","euclideanPulses","cycleOffset","arpDirection"] [[0.5,4,3,2,"up"]]"#
         );
     }
 
@@ -286,26 +286,19 @@ mod tests {
         assert_eq!(notes[0], Note::default());
         assert_eq!(issues.len(), 2);
         assert_eq!(issues[0].at, "t.notes[0].beat");
-        assert_eq!(notes[1], Note { every_offset: 1, ..Note::default() });
+        assert_eq!(notes[1], Note { cycle_offset: 1, ..Note::default() });
     }
 
     #[test]
     fn encodes_like_the_js_exporter() {
         let notes = [
-            Note { velocity: 0.81234, beat: 1, beat_step: 1, ..Note::default() },
-            Note {
-                beat: 3,
-                beat_step: 1,
-                pitch: -2.5,
-                probability: 0.3333,
-                arp: Value::from("0,4,7"),
-                ..Note::default()
-            },
+            Note { velocity: 0.81234, beat: 1, step: 1, ..Note::default() },
+            Note { beat: 3, step: 1, pitch: -2.5, probability: 0.3333, arp: Value::from("0,4,7"), ..Note::default() },
             Note::default(),
         ];
         assert_eq!(
             encode(&notes),
-            r#"["velocity","beat","beatStep","pitch","probability","arp"] [[0.81,1,1],[0.8,3,1,-2.5,0.33,"0,4,7"],[]]"#
+            r#"["velocity","beat","step","pitch","probability","arp"] [[0.81,1,1],[0.8,3,1,-2.5,0.33,"0,4,7"],[]]"#
         );
     }
 
@@ -316,10 +309,10 @@ mod tests {
 
     #[test]
     fn grid_wrap_adds_whole_beats() {
-        let mut note = Note { beat: 1, beat_step: 6, ..Note::default() };
+        let mut note = Note { beat: 1, step: 6, ..Note::default() };
         note.wrap_grid_position(4);
-        assert_eq!((note.beat, note.beat_step), (2, 2));
+        assert_eq!((note.beat, note.step), (2, 2));
         note.wrap_grid_position(0);
-        assert_eq!((note.beat, note.beat_step), (2, 2));
+        assert_eq!((note.beat, note.step), (2, 2));
     }
 }

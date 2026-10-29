@@ -71,12 +71,8 @@ fn note_out(note: &Note) -> Value {
     if let Some(percent) = note.step_percent {
         extra.insert("stepPercent", Value::Number(percent));
     }
-    let mut out = vec![
-        Value::Number(note.velocity),
-        Value::from(note.beat),
-        Value::from(note.beat_step),
-        Value::Number(note.pitch),
-    ];
+    let mut out =
+        vec![Value::Number(note.velocity), Value::from(note.beat), Value::from(note.step), Value::Number(note.pitch)];
     if !extra.is_empty() {
         out.push(Value::Object(extra));
     }
@@ -88,7 +84,7 @@ fn note_in(value: &Value) -> Note {
     let mut note = Note {
         velocity: v[0].as_f64().unwrap(),
         beat: v[1].as_f64().unwrap() as i32,
-        beat_step: v[2].as_f64().unwrap() as i32,
+        step: v[2].as_f64().unwrap() as i32,
         pitch: v[3].as_f64().unwrap(),
         ..Note::default()
     };

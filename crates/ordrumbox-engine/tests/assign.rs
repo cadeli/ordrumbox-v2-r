@@ -59,13 +59,12 @@ fn auto_assign_picks_what_the_js_picks() {
 fn synth_tracks_get_a_preset() {
     let (bank, _) = bank();
     let synths = SynthPresets::from_json(&json::parse(r#"{"A":{},"B":{}}"#).unwrap());
-    let synth =
-        |key: Option<&str>| Track { use_soft_synth: true, synth_preset: key.map(str::to_owned), ..Track::default() };
+    let synth = |key: Option<&str>| Track { use_synth: true, synth_preset: key.map(str::to_owned), ..Track::default() };
     let mut last = |n: usize| n - 1;
     assert_eq!(assign_track(&synth(Some("A")), &bank, "real", &synths, &mut last), TrackSound::Synth("A".into()));
     assert_eq!(assign_track(&synth(Some("gone")), &bank, "real", &synths, &mut last), TrackSound::Synth("B".into()));
     assert_eq!(assign_track(&synth(None), &bank, "real", &SynthPresets::default(), &mut last), TrackSound::None);
-    let explicit = Track { use_auto_assign_sound: false, sample_id: "matt/RIMSHOT.wav".into(), ..Track::default() };
+    let explicit = Track { auto_assign: false, sample_path: "matt/RIMSHOT.wav".into(), ..Track::default() };
     let found = assign_track(&explicit, &bank, "real", &synths, &mut last);
     assert_eq!(found, TrackSound::Sample(bank.find_url("matt/RIMSHOT.wav").unwrap()));
 }

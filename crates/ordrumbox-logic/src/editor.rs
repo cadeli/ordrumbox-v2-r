@@ -208,7 +208,7 @@ impl Editor {
             None,
             |track| {
                 let percent = step_percent(beat_step, track.steps_per_beat);
-                track.notes.push(Note { beat, beat_step, pitch, step_percent: Some(percent), ..Note::default() });
+                track.notes.push(Note { beat, step: beat_step, pitch, step_percent: Some(percent), ..Note::default() });
                 track.notes.len() - 1
             },
         )
@@ -223,8 +223,7 @@ impl Editor {
             |track| format!("Delete note on {} in \"{pattern}\"", track.name),
             None,
             |track| {
-                let found =
-                    track.notes.iter().rposition(|n| n.beat == beat && n.beat_step == beat_step && n.pitch == pitch);
+                let found = track.notes.iter().rposition(|n| n.beat == beat && n.step == beat_step && n.pitch == pitch);
                 found.map(|i| track.notes.remove(i)).is_some()
             },
         )
@@ -242,7 +241,7 @@ impl Editor {
             None,
             |track| {
                 let count = track.notes.len();
-                track.notes.retain(|n| !(n.beat == beat && n.beat_step == beat_step));
+                track.notes.retain(|n| !(n.beat == beat && n.step == beat_step));
                 track.notes.len() != count
             },
         )
@@ -290,7 +289,7 @@ impl Editor {
                 ("velocity", nudge_velocity(note.velocity, nudge == Nudge::VelocityUp))
             }
             Nudge::PitchUp | Nudge::PitchDown => {
-                ("pitch", nudge_pitch(note.pitch, nudge == Nudge::PitchUp, track.pitch))
+                ("pitch", nudge_pitch(note.pitch, nudge == Nudge::PitchUp, track.transpose))
             }
         };
         let desc = format!("Edit note {key} on {}", track.name);
@@ -306,11 +305,11 @@ impl Editor {
             |track| format!("Paste step on {} in \"{pattern}\"", track.name),
             None,
             |track| {
-                track.notes.retain(|n| !(n.beat == beat && n.beat_step == beat_step));
+                track.notes.retain(|n| !(n.beat == beat && n.step == beat_step));
                 let percent = step_percent(beat_step, track.steps_per_beat);
                 track.notes.extend(notes.iter().map(|n| Note {
                     beat,
-                    beat_step,
+                    step: beat_step,
                     step_percent: Some(percent),
                     ..n.clone()
                 }));
@@ -440,7 +439,7 @@ impl Editor {
                 for note in &mut track.notes {
                     let percent = note.step_percent(old);
                     note.step_percent = Some(percent);
-                    note.beat_step = (round(percent / 100.0 * f64::from(target)) as i32).min(target - 1);
+                    note.step = (round(percent / 100.0 * f64::from(target)) as i32).min(target - 1);
                 }
                 let max_steps = track.beat_count * target;
                 if track.loop_length.is_some_and(|l| l > max_steps) {
@@ -511,9 +510,9 @@ impl Editor {
             |track| format!("Sound on {}", track.name),
             None,
             |track| {
-                track.sample_id = sample_id.to_owned();
-                track.use_auto_assign_sound = false;
-                track.use_soft_synth = false;
+                track.sample_path = sample_id.to_owned();
+                track.auto_assign = false;
+                track.use_synth = false;
             },
         )
         .is_some()
@@ -659,7 +658,7 @@ impl Editor {
     /// ↻ Drum on pattern `p` (`toggleDrums`): whether drum generation is now on.
     pub fn toggle_drums(&mut self, p: usize, scales: &Scales, rnd: &mut dyn FnMut() -> f64) -> Option<bool> {
         let desc = |pattern: &Pattern| {
-            let on = pattern.tracks.iter().any(|t| instrument_family(&t.name).is_drum() && t.auto);
+            let on = pattern.tracks.iter().any(|t| instrument_family(&t.name).is_drum() && t.auto_mode);
             if on { "Generate drums" } else { "Drums auto off" }.to_owned()
         };
         self.edit(p, desc, None, |pattern| generate::toggle_drums(&mut AutoGenerator::new(scales, rnd), pattern))
@@ -679,7 +678,7 @@ impl Editor {
             MelodicKind::Chords => ("chords", InstrumentFamily::Piano),
         };
         let desc = |pattern: &Pattern| {
-            let on = pattern.tracks.iter().any(|t| instrument_family(&t.name) == wanted && t.auto);
+            let on = pattern.tracks.iter().any(|t| instrument_family(&t.name) == wanted && t.auto_mode);
             if on { format!("Generate {part}") } else { format!("{part} auto off") }
         };
         self.edit(p, desc, None, |pattern| {
@@ -753,7 +752,7 @@ mod tests {
         let (library, _) = Library::parse(
             r#"{"patterns":[{"name":"rock","bpm":100,"tracks":[
                 {"name":"KICK","notes":[{"beat":0},{"beat":2}]},
-                {"name":"SNARE","stepsPerBeat":8,"loopAtStep":32,"notes":[{"beat":1,"beatStep":7}]}]}]}"#,
+                {"name":"SNARE","stepsPerBeat":8,"loopAtStep":32,"notes":[{"beat":1,"step":7}]}]}]}"#,
         )
         .unwrap();
         let mut editor = Editor::new(library);
@@ -790,12 +789,12 @@ mod tests {
             ("velocity", Value::Number(-3.0)),
             ("scaleName", Value::from("major")),
             ("mute", Value::from("yes")),
-            ("filterFreq", Value::Number(50_000.0)),
+            ("filterCutoff", Value::Number(50_000.0)),
         ];
         assert!(e.update_track(0, 0, &updates, None, false));
         let track = &pattern(&e).tracks[0];
         assert_eq!(
-            (track.volume, track.filter_freq, track.mute, track.scale_name.as_deref()),
+            (track.volume, track.filter_cutoff, track.mute, track.scale_name.as_deref()),
             (0.0, 20_000.0, false, None)
         );
         assert_eq!(e.history().next_undo(), Some("Update KICK"));
@@ -824,9 +823,9 @@ mod tests {
         // SNARE: beat 1 step 7 of 8 (88 %), loop at 32 > 4 beats × 3.
         assert!(e.set_steps_per_beat(0, 1, 3.0, false));
         let track = &pattern(&e).tracks[1];
-        assert_eq!((track.notes[0].beat_step, track.loop_length), (2, Some(12)));
+        assert_eq!((track.notes[0].step, track.loop_length), (2, Some(12)));
         assert!(e.set_steps_per_beat(0, 1, 8.0, false));
-        assert_eq!(pattern(&e).tracks[1].notes[0].beat_step, 7, "back to its step, as stepPercent is kept");
+        assert_eq!(pattern(&e).tracks[1].notes[0].step, 7, "back to its step, as stepPercent is kept");
         assert!(!e.set_steps_per_beat(0, 1, 8.0, false));
         assert!(e.incr_steps_per_beat(0, 1));
         assert_eq!(pattern(&e).tracks[1].steps_per_beat, 1);
@@ -920,7 +919,7 @@ mod tests {
         let notes = pattern(&e).tracks[0].notes[..1].to_vec();
         assert!(e.paste_step_notes(0, 1, 3, 1, &notes));
         let pasted = pattern(&e).tracks[1].notes.last().unwrap().clone();
-        assert_eq!((pasted.beat, pasted.beat_step, pasted.velocity), (3, 1, 0.9));
+        assert_eq!((pasted.beat, pasted.step, pasted.velocity), (3, 1, 0.9));
         assert!(e.delete_step(0, 1, 3, 1));
     }
 
@@ -943,7 +942,7 @@ mod tests {
 
         // ↻ Drum on: KICK and SNARE in auto mode.
         assert_eq!(e.toggle_drums(0, &scales, &mut rnd), Some(true));
-        assert!(pattern(&e).tracks.iter().all(|t| t.auto));
+        assert!(pattern(&e).tracks.iter().all(|t| t.auto_mode));
         assert_eq!(e.history().next_undo(), Some("Generate drums"));
         // A loop start: new lines, no undo step.
         let (undo, before) = (e.history().undo_len(), pattern(&e).clone());
@@ -952,13 +951,13 @@ mod tests {
         assert_ne!(*pattern(&e), before);
         // ↻ Drum again: auto off.
         assert_eq!(e.toggle_drums(0, &scales, &mut rnd), Some(false));
-        assert!(pattern(&e).tracks.iter().all(|t| !t.auto));
+        assert!(pattern(&e).tracks.iter().all(|t| !t.auto_mode));
         assert!(!e.auto_loop(0, 2, &scales, &mut rnd));
 
         // ↻ Bass: a synth BASS track with a line, in auto mode.
         assert_eq!(e.toggle_melodic(0, MelodicKind::Bass, &scales, &mut rnd), Some(true));
         let bass = pattern(&e).tracks.last().unwrap();
-        assert!(bass.name == "BASS" && bass.use_soft_synth && bass.auto && !bass.notes.is_empty());
+        assert!(bass.name == "BASS" && bass.use_synth && bass.auto_mode && !bass.notes.is_empty());
         assert_eq!(e.history().next_undo(), Some("Generate bass"));
         e.undo();
         assert!(pattern(&e).tracks.iter().all(|t| t.name != "BASS"));
@@ -983,7 +982,7 @@ mod tests {
         assert_eq!((pattern.id.as_str(), pattern.name.as_deref(), pattern.beat_count), ("groove", Some("groove"), 32));
         let kick = &pattern.tracks[0];
         assert_eq!(kick.name, "KICK");
-        let notes: Vec<_> = kick.notes.iter().map(|n| (n.beat, n.beat_step, n.velocity)).collect();
+        let notes: Vec<_> = kick.notes.iter().map(|n| (n.beat, n.step, n.velocity)).collect();
         assert_eq!(notes, [(0, 0, 0.79), (2, 0, 0.5)]);
         assert_eq!(e.history().next_undo(), Some("Import MIDI file"));
         e.undo();

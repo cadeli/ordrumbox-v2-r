@@ -27,7 +27,7 @@ fn sparse_grid() -> Vec<Note> {
 
 /// One note every step: every inner note has a neighbour on both sides (silence).
 fn dense_grid() -> Vec<Note> {
-    (0..4).flat_map(|beat| (0..4).map(move |beat_step| Note { beat, beat_step, ..Note::default() })).collect()
+    (0..4).flat_map(|beat| (0..4).map(move |beat_step| Note { beat, step: beat_step, ..Note::default() })).collect()
 }
 
 /// A 4-beat pattern with one BASS track in auto mode playing `notes`, every
@@ -50,16 +50,16 @@ fn pattern(notes: Vec<Note>, keep: &str) -> Pattern {
 /// A slider moved (a track setting, 0–100 or a range).
 fn set(track: &mut Track, key: &str, value: f64) {
     let field = match key {
-        "prob_pitch" => &mut track.prob_pitch,
-        "prob_velocity" => &mut track.prob_velocity,
-        "prob_silence" => &mut track.prob_silence,
-        "prob_fill" => &mut track.prob_fill,
-        "prob_ghost" => &mut track.prob_ghost,
-        "prob_retrig" => &mut track.prob_retrig,
-        "prob_euclid" => &mut track.prob_euclidean,
-        "prob_note" => &mut track.prob_note,
-        "prob_note_depth" => &mut track.prob_note_depth,
-        "prob_arp" => &mut track.prob_arp,
+        "prob_pitch" => &mut track.auto_pitch_chance,
+        "prob_velocity" => &mut track.auto_velocity_chance,
+        "prob_silence" => &mut track.auto_silence_chance,
+        "prob_fill" => &mut track.auto_fill_chance,
+        "prob_ghost" => &mut track.auto_ghost_chance,
+        "prob_retrig" => &mut track.auto_retrigger_chance,
+        "prob_euclid" => &mut track.auto_euclidean_chance,
+        "prob_note" => &mut track.auto_note_probability_chance,
+        "prob_note_depth" => &mut track.auto_note_probability_range,
+        "prob_arp" => &mut track.auto_arp_chance,
         "pitch_range" => &mut track.pitch_range,
         _ => panic!("no slider {key}"),
     };

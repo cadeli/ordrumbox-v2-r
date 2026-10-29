@@ -52,7 +52,7 @@ pub struct Event {
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Pass {
-    /// Pass index since play started (selects the `every`/`pos` notes).
+    /// Pass index since play started (selects the notes by `cycle`/`cycle_offset`).
     pub number: u64,
     /// Transport tick of the first tick (LFOs run on the transport tick).
     pub first_tick: u64,
@@ -201,7 +201,7 @@ fn sound_for(
     let bank_sample = context.bank.get(sample)?;
     // The sample's tune and gain trim (`sample.tune`, `sample.gainDb`).
     let mut ratio = note.playback_ratio(track) * (bank_sample.sample.tune / 12.0).exp2();
-    if let Some(pitch_lfo) = &track.pitch_lfo {
+    if let Some(pitch_lfo) = &track.transpose_lfo {
         ratio *= (lfo::value(pitch_lfo, lfo_tick as f64) / 12.0).exp2();
     }
     Some(Sound::Sample(VoiceStart {
@@ -225,7 +225,7 @@ pub fn build_preview(pattern: &Pattern, t: usize, note: Option<&Note>, context: 
         track: t,
         source: None,
         beat: 0,
-        beat_step: 0,
+        step: 0,
         pitch: note.map_or(0.0, |n| n.pitch),
         velocity: note.map_or(track.volume, |n| n.velocity),
         pan: note.map_or(track.pan, |n| n.pan),

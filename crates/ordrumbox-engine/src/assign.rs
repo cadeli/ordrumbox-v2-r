@@ -192,7 +192,7 @@ pub fn assign_track(
     synths: &SynthPresets,
     pick: &mut dyn FnMut(usize) -> usize,
 ) -> TrackSound {
-    if track.use_soft_synth {
+    if track.use_synth {
         let key = track.synth_preset.as_deref().filter(|k| synths.get(k).is_some()).map(str::to_owned);
         return match key {
             Some(key) => TrackSound::Synth(key),
@@ -203,8 +203,8 @@ pub fn assign_track(
             }
         };
     }
-    if !track.use_auto_assign_sound {
-        return bank.find_url(&track.sample_id).map_or(TrackSound::None, TrackSound::Sample);
+    if !track.auto_assign {
+        return bank.find_url(&track.sample_path).map_or(TrackSound::None, TrackSound::Sample);
     }
     if bank.samples.is_empty() {
         return TrackSound::None;

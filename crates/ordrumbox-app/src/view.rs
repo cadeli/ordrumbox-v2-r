@@ -617,7 +617,7 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
         }
         let color = if track.mute {
             DIM
-        } else if track.auto {
+        } else if track.auto_mode {
             PLAYING // a new line every loop
         } else if focused {
             theme::track(i)
@@ -724,7 +724,7 @@ fn note_color(note: &Note) -> Rgb {
         theme::ORANGE
     } else if note.probability < 1.0 {
         theme::CYAN
-    } else if note.every > 1 {
+    } else if note.cycle > 1 {
         theme::VIOLET
     } else {
         theme::LIME
@@ -746,7 +746,7 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
 
     let mut note_at: Vec<Option<&Note>> = vec![None; steps as usize];
     for note in &track.notes {
-        let gstep = absolute_step(note.beat, note.beat_step, spb);
+        let gstep = absolute_step(note.beat, note.step, spb);
         let local = gstep - start;
         if let Some(slot) = usize::try_from(local).ok().and_then(|s| note_at.get_mut(s)) {
             if slot.is_none_or(|existing| note.velocity > existing.velocity) {
@@ -772,7 +772,7 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
     let mut loop_ghosts: Vec<(i64, &Note)> = Vec::new();
     if let Some(loop_length) = track.loop_length.map(i64::from).filter(|&l| l > 0) {
         for note in &track.notes {
-            let base = absolute_step(note.beat, note.beat_step, spb);
+            let base = absolute_step(note.beat, note.step, spb);
             if base >= loop_length {
                 continue;
             }
@@ -864,7 +864,7 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
         outline(canvas, s, CURSOR);
     }
     if let Some(note) = view.selected.filter(|(t, _)| *t == index).and_then(|(_, n)| track.notes.get(n)) {
-        let s = absolute_step(note.beat, note.beat_step, spb) - start;
+        let s = absolute_step(note.beat, note.step, spb) - start;
         outline(canvas, s, SELECTED);
     }
 }

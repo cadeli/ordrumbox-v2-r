@@ -234,7 +234,7 @@ fn compact_tracks_like_the_js_commander() {
                     format!(
                         "[{},{},{},{}]",
                         n.beat,
-                        n.beat_step,
+                        n.step,
                         Value::from(n.pitch).to_json(),
                         Value::from(n.velocity).to_json()
                     )
