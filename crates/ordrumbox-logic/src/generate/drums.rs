@@ -132,7 +132,7 @@ fn snare_roll(g: &mut Generator<'_>, track: &mut Track, config: &Value) {
     let last_beat = (track.beat_count - 1).max(0);
     let last_step = (spb - 1).max(0);
     let count = num(config, "retriggerCount").unwrap_or(4.0);
-    let rate = num(config, "rate").unwrap_or(1.0);
+    let rate = num(config, "retriggerRate").unwrap_or(1.0);
     let (min, max) = (num(config, "minVelocity").unwrap_or(0.3), num(config, "maxVelocity").unwrap_or(1.0));
     for step in 0..spb {
         if last_beat * spb + step >= loop_point {
@@ -182,7 +182,7 @@ fn break_crescendo(g: &mut Generator<'_>, track: &mut Track, config: &Value) {
     let steps_back = num(config, "stepsBack").unwrap_or(16.0);
     let start = (f64::from(length) - steps_back).max(0.0) as i32;
     let count_max = num(config, "retriggerCountMax").unwrap_or(0.0);
-    let rate = num(config, "rate").unwrap_or(1.0);
+    let rate = num(config, "retriggerRate").unwrap_or(1.0);
     for abs in start..length {
         let (beat, beat_step) = (abs / spb, abs % spb);
         let prob = f64::from(abs - start + 1) / steps_back;
@@ -312,7 +312,7 @@ fn hat_transition(g: &mut Generator<'_>, track: &mut Track, config: &Value, kind
             let note = add_note(track, last_beat, step, 0.0, velocity);
             if last && let Some(count) = num(config, "retriggerCount") {
                 note.retrigger_count = count as i32;
-                note.retrigger_rate = num(config, "rate").unwrap_or(1.0);
+                note.retrigger_rate = num(config, "retriggerRate").unwrap_or(1.0);
             }
         }
         step += interval;
@@ -325,7 +325,7 @@ fn hat_roll(g: &mut Generator<'_>, track: &mut Track, config: &Value) {
     let spb = track.steps_per_beat;
     let roll_beat = num(config, "rollBeat").map_or((track.beat_count - 1).max(0), |b| b as i32);
     let count = num(config, "retriggerCount").unwrap_or(4.0);
-    let rate = num(config, "rate").unwrap_or(1.0);
+    let rate = num(config, "retriggerRate").unwrap_or(1.0);
     for step in 0..spb {
         if roll_beat * spb + step >= loop_point {
             continue;
@@ -484,10 +484,10 @@ fn perc_fill(g: &mut Generator<'_>, track: &mut Track, tones: &[f64], bias: f64,
         let context = VelocitySpec { variation: index > 0, ..VelocitySpec::accent(step == 0, false) };
         let velocity = g.velocity(config.get("velocity"), context);
         let note = add_note(track, start, step, pitch, velocity);
-        if let Some(prob) = config.get("prob").filter(|p| !p.is_null()) {
+        if let Some(prob) = config.get("probability").filter(|p| !p.is_null()) {
             note.probability = prob.as_f64().unwrap_or(f64::NAN);
         }
-        if let Some(fill) = num(config, "euclideanFill") {
+        if let Some(fill) = num(config, "euclideanPulses") {
             note.euclidean_pulses = fill as i32;
         }
     }

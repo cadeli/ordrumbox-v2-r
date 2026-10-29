@@ -63,7 +63,13 @@ fn note_out(note: &Note) -> Value {
         "euclideanRotation",
         "pos",
     ] {
-        let value = note.field(key).unwrap_or(Value::Null);
+        let mut value = note.field(key).unwrap_or(Value::Null);
+        // The script writes an arpeggio's direction under its JS key, `mode`.
+        if let Value::Object(arp) = &mut value
+            && let Some(direction) = arp.remove("direction")
+        {
+            arp.insert("mode", direction);
+        }
         if Some(&value) != defaults.field(key).as_ref() {
             extra.insert(key, value);
         }
