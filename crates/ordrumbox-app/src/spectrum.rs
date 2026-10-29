@@ -8,7 +8,7 @@ use std::f64::consts::PI;
 
 /// Samples per analysis (`analyser.fftSize`).
 pub const FFT_SIZE: usize = ordrumbox_engine::SCOPE_SIZE;
-/// Bins (`frequencyBinCount`).
+/// Bins.
 pub const BINS: usize = FFT_SIZE / 2;
 const SMOOTHING: f64 = 0.8;
 const MIN_DB: f64 = -100.0;

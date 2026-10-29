@@ -21,7 +21,7 @@ use ordrumbox_dsp::MasterSettings;
 use crate::assign::{TrackSound, assign_track};
 use crate::engine::{Engine, MAX_TRACKS, Position};
 use crate::kit::SampleBank;
-use crate::pass::{FlatNotesCache, Pass, PassContext, SongContext, build_pass, build_preview, build_song_pass};
+use crate::pass::{HitsCache, Pass, PassContext, SongContext, build_pass, build_preview, build_song_pass};
 use crate::synth_preset::SynthPresets;
 
 /// Passes kept alive. The engine holds at most its current pass and the
@@ -173,7 +173,7 @@ pub struct Controller {
     /// decided from: auto-assignment picks at random, once per play.
     assigned: HashMap<(String, usize), (String, TrackSound)>,
     /// Pattern repetitions drawn for the song passes.
-    song_notes: FlatNotesCache,
+    song_notes: HitsCache,
     /// Passes posted, oldest first.
     sent: VecDeque<Arc<Pass>>,
     /// Previews posted, oldest first.
@@ -224,7 +224,7 @@ impl Controller {
             rng,
             mode: Mode::Pattern(0),
             assigned: HashMap::new(),
-            song_notes: FlatNotesCache::new(),
+            song_notes: HitsCache::new(),
             sent: VecDeque::new(),
             previews: VecDeque::new(),
             playing: false,
@@ -386,7 +386,7 @@ impl Controller {
         Some(pass)
     }
 
-    /// Audition track `t` of pattern `p` (`simpleBeep`): `note` (an index in
+    /// Audition track `t` of pattern `p`: `note` (an index in
     /// its notes) or a default note, through the track's strip.
     pub fn preview(&mut self, library: &Library, p: usize, t: usize, note: Option<usize>) {
         let note = note.and_then(|n| library.patterns.get(p)?.tracks.get(t)?.notes.get(n)).cloned();

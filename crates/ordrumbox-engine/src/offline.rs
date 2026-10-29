@@ -40,7 +40,7 @@ fn frames(ticks: f64, bpm: f64, rate: u32, round_up: bool) -> usize {
 }
 
 /// Called before each pass of a pattern render is built, with its number:
-/// where the tracks in auto mode get their new lines (`#handleLoopStart`). It
+/// where the tracks in auto mode get their new lines. It
 /// changes the render's own copy of the library, never the caller's.
 pub type BeforePass<'a> = &'a mut dyn FnMut(&mut Library, usize, u64);
 
@@ -79,7 +79,7 @@ fn render(
     (left, right)
 }
 
-/// Pattern `index` played `loops` times (`exportPatternToWav`); `before_pass`
+/// Pattern `index` played `loops` times; `before_pass`
 /// regenerates its auto-mode tracks loop after loop.
 pub fn render_pattern(
     library: &Library,
@@ -94,7 +94,7 @@ pub fn render_pattern(
     Some(render(library, Mode::Pattern(index), length, setup, before_pass))
 }
 
-/// Song `index`, its whole arrangement once (`exportSongToWav`).
+/// Song `index`, its whole arrangement once.
 pub fn render_song(library: &Library, index: usize, setup: &RenderSetup) -> Option<(Vec<f32>, Vec<f32>)> {
     let song = library.songs.get(index)?;
     if !song.clips.iter().any(|c| library.patterns.iter().any(|p| p.id == c.pattern_id)) {

@@ -128,7 +128,7 @@ pub const KNOB_BAR: [(Prop, &str); 4] = [
 /// Decay a double-click restores (the knob bar's default).
 pub const DEFAULT_DECAY: f64 = 500.0;
 
-/// Generation tab, shown while auto is off (`manualOnly`).
+/// Generation tab, shown while auto is off.
 pub const GENERATION_MANUAL: [Prop; 3] = [
     prop("hitVariation", "Var Hits", 0.0, 100.0, 1.0, Format::Plain),
     prop("noteVariation", "Var Notes", 0.0, 100.0, 1.0, Format::Plain),
@@ -237,9 +237,9 @@ pub struct EditorState {
     /// Index in [`LFO_TARGETS`].
     pub lfo_target: u8,
     pub note_tab: u8,
-    /// The row last clicked (`selectedPropKey`).
+    /// The row last clicked.
     pub selected_prop: Option<&'static str>,
-    /// The filter type the fx LED turns back on (`prevFilterType`).
+    /// The filter type the fx LED turns back on.
     pub prev_filter_type: Option<String>,
 }
 
@@ -332,7 +332,7 @@ impl ScaleList {
     }
 }
 
-/// What a note's arpeggio is (`getArpState`): scale, direction, notes.
+/// What a note's arpeggio is: scale, direction, notes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ArpState {
     pub scale: String,

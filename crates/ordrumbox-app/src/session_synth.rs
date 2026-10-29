@@ -48,14 +48,14 @@ impl Session {
         }
     }
 
-    /// The presets' keys, sorted (`soundKeys`).
+    /// The presets' keys, sorted.
     fn synth_keys(&self) -> Vec<String> {
         let mut keys: Vec<String> = self.synths.keys().into_iter().map(str::to_owned).collect();
         keys.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()).then_with(|| a.cmp(b)));
         keys
     }
 
-    /// Edit preset `key` (`loadPreset`).
+    /// Edit preset `key`.
     fn load_synth(&mut self, key: &str) {
         let Some(preset) = self.synths.get(key).cloned() else { return };
         let mut draft = preset.as_object().cloned().unwrap_or_default();
@@ -294,7 +294,7 @@ impl Session {
         }
     }
 
-    /// Export: every preset to `exports/ordrumbox-synth-sounds.json` (`#exportSynth`).
+    /// Export: every preset to `exports/ordrumbox-synth-sounds.json`.
     fn export_synths(&mut self) {
         if self.synths.is_empty() {
             self.message = "No synth sounds loaded".into();
@@ -311,7 +311,7 @@ impl Session {
         };
     }
 
-    /// Import: the presets of a JSON object join (or replace) the presets (`#importSynth`).
+    /// Import: the presets of a JSON object join (or replace) the presets.
     pub(super) fn import_synths(&mut self, path: &Path) {
         let value = match std::fs::read_to_string(path)
             .map_err(|e| e.to_string())

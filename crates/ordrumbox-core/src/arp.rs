@@ -59,7 +59,7 @@ pub fn sequence(arp: &Value, rng: &mut Rng) -> Option<Vec<f64>> {
     Some(steps)
 }
 
-/// Notes an arpeggio plays: the note's `retriggerCount`, 1–16 (`getArpNoteCount`).
+/// Notes an arpeggio plays: the note's `retriggerCount`, 1–16.
 pub fn note_count(retrigger_count: i32) -> usize {
     retrigger_count.clamp(1, 16) as usize
 }

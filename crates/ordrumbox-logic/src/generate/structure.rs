@@ -140,7 +140,7 @@ pub(crate) fn section_harmony(genre: &str, section: &str, loop_in_element: u64) 
     (root + offset, scale)
 }
 
-/// Where a loop sits in the song form (`getElement`).
+/// Where a loop sits in the song form.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SectionElement {
     /// `intro`, `chorus`, `verse`, `break`, `bridge`, `outro`.

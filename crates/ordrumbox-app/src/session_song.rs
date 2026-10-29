@@ -31,7 +31,7 @@ const BUTTONS: [(&str, &str); 6] = [
     ("delete", "Delete"),
 ];
 
-/// What is shown for a song without a name (`#songName`).
+/// What is shown for a song without a name.
 const UNTITLED: &str = "Untitled";
 
 fn now_ms() -> f64 {
@@ -53,7 +53,7 @@ impl Session {
 
     /// Show `workspace`. While playing, a switch to or from the song panel
     /// switches the playback to the view's mode, from its start
-    /// (`syncPlaybackMode`); the grid and the piano roll share one mode.
+    ///; the grid and the piano roll share one mode.
     pub(super) fn set_workspace(&mut self, workspace: Workspace) {
         let was_song = self.workspace == Workspace::Song;
         self.workspace = workspace;
@@ -83,7 +83,7 @@ impl Session {
         self.editor.library().songs.get(self.editor.selected_song())
     }
 
-    /// The library header's name (`songInfos.name`), else "Untitled".
+    /// The library header's name, else "Untitled".
     fn song_name(&self) -> String {
         let name = self.editor.library().info.get("name").and_then(Value::as_str).unwrap_or_default();
         if name.is_empty() { UNTITLED.to_owned() } else { name.to_owned() }
@@ -102,7 +102,7 @@ impl Session {
         self.playing() && self.controller.as_ref().is_some_and(|c| c.mode() == Mode::Song(self.editor.selected_song()))
     }
 
-    /// Where the cursor is, in measures (`#cursorMeasure`): where the song
+    /// Where the cursor is, in measures: where the song
     /// plays, else the measure play starts from; kept on the grid.
     fn song_cursor_measure(&self) -> f64 {
         let Some(song) = self.song() else { return 0.0 };
@@ -113,7 +113,7 @@ impl Session {
         measure.min((song.length_measures() - 1.0).max(0.0))
     }
 
-    /// The measure the playhead is on (`#playheadMeasure`): where the song
+    /// The measure the playhead is on: where the song
     /// plays, else the cursor. What a pattern is added at from the lists.
     fn playhead_measure(&self) -> u32 {
         self.song_cursor_measure().floor() as u32
@@ -285,7 +285,7 @@ impl Session {
         }
     }
 
-    /// The arrangement select: arrangement `index` (`onArrangementChange`).
+    /// The arrangement select: arrangement `index`.
     /// A song playing switches to it, from the cursor.
     pub(super) fn select_song(&mut self, index: usize) {
         let playing = self.song_playing();
@@ -322,7 +322,7 @@ impl Session {
 
     // ─── The cursor ──────────────────────────────────────────────────────────
 
-    /// Aim the cursor at `measure` (`setSongCursor`): play starts there, and
+    /// Aim the cursor at `measure`: play starts there, and
     /// a song playing goes there at once.
     fn set_song_cursor(&mut self, measure: u32) {
         self.song_cursor = measure;
@@ -440,7 +440,7 @@ impl Session {
 
     // ─── The menus ───────────────────────────────────────────────────────────
 
-    /// A pattern of the list: add it at the playhead (`onListContextMenu`).
+    /// A pattern of the list: add it at the playhead.
     fn list_menu(&mut self, p: usize, x: i32, y: i32) {
         if self.song().is_none() {
             self.message = "No song to add to".into();
@@ -454,7 +454,7 @@ impl Session {
         self.dropdown = Some(Dropdown::menu(Id::SongMenu, x, y, label, values, labels));
     }
 
-    /// A clip: repeat it after itself, or remove it (`#showClipMenu`).
+    /// A clip: repeat it after itself, or remove it.
     fn clip_menu(&mut self, c: usize, x: i32, y: i32) {
         let Some(clip) = self.song().and_then(|s| s.clips.get(c)).cloned() else { return };
         let title = clip_label(&self.pattern_label(&clip.pattern_id), &clip);
@@ -463,7 +463,7 @@ impl Session {
     }
 
     /// A row's name: add its pattern at the playhead, or remove every clip
-    /// of it (`#showRowMenu`).
+    /// of it.
     fn row_menu(&mut self, row: &Row, x: i32, y: i32) {
         let count = self.song().map_or(0, |s| s.clips.iter().filter(|c| c.pattern_id == row.id).count());
         let measure = self.playhead_measure();
@@ -546,7 +546,7 @@ impl Session {
         };
     }
 
-    /// Load: the songs saved, to choose from (`loadSong`).
+    /// Load: the songs saved, to choose from.
     fn load_song_menu(&mut self) {
         let files = store::songs_dir().map(|d| store::list_songs(&d)).unwrap_or_default();
         if files.is_empty() {
@@ -571,7 +571,7 @@ impl Session {
             .map_or_else(|| Rect::new(width / 2 - 100 * scale, view::body_top(scale), 200 * scale, 0), |i| i.rect)
     }
 
-    /// Export: the song to `exports/<name>.odbox` (`exportToFile`).
+    /// Export: the song to `exports/<name>.odbox`.
     fn export_song(&mut self) {
         let Some(dir) = store::exports_dir() else {
             self.message = "no user data folder to export to".into();

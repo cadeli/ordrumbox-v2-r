@@ -1,8 +1,8 @@
 //! The two variation layers of a track (`src/patterns/track_variation.js`).
 //!
-//! - **Notes** (`variation2`): before expansion, some written notes get new
+//! - **Notes** (`note_variation`): before expansion, some written notes get new
 //!   repeats, euclidean fill, probability or arpeggio span ([`vary_notes`]).
-//! - **Flat notes** (`variation`): after expansion, notes are silenced,
+//! - **Hits** (`hit_variation`): after expansion, notes are silenced,
 //!   re-velocitied, re-pitched, or anticipations, doubles and ghosts are added
 //!   ([`apply`]).
 //!
@@ -15,7 +15,7 @@ use std::collections::HashMap;
 use crate::js;
 use crate::json::Value;
 use crate::note::Note;
-use crate::pattern_engine::{FlatNote, FlatNotes};
+use crate::pattern_engine::{Hit, Hits};
 use crate::rng::Rng;
 use crate::scales::Scales;
 use crate::steps::{step_to_beat, step_to_tick};
@@ -81,7 +81,7 @@ impl NoteOp {
 }
 
 /// The varied copies of a track's notes, by note index; notes not varied are
-/// absent, and the track itself is never modified (`computeNoteVariation`).
+/// absent, and the track itself is never modified.
 pub(crate) fn vary_notes(track: &Track, rng: &mut Rng) -> HashMap<usize, Note> {
     let amount = if track.auto_mode {
         track.auto_note_variation.unwrap_or(AUTO_NOTE_VARIATION_FALLBACK)
@@ -138,7 +138,7 @@ pub(crate) fn vary_notes(track: &Track, rng: &mut Rng) -> HashMap<usize, Note> {
 
 // ── Flat-notes layer (variation) ────────────────────────────────────────
 
-/// A flat note found by the scan: its tick and its index in that tick's list.
+/// A hit found by the scan: its tick and its index in that tick's list.
 /// Removals are deferred to the end of the loop, and additions are appended,
 /// so these stay valid while operations apply.
 type Slot = (u32, usize);
@@ -151,7 +151,7 @@ struct Target {
     beat_step: i32,
 }
 
-enum FlatOp {
+enum HitOp {
     Silence(Slot),
     Velocity(Slot),
     Pitch(Slot),
@@ -163,7 +163,7 @@ enum FlatOp {
     Ghost(Slot, Target),
 }
 
-impl FlatOp {
+impl HitOp {
     fn cost(&self) -> i32 {
         match self {
             Self::Velocity(_) | Self::Pitch(_) => 1,
@@ -187,7 +187,7 @@ impl FlatOp {
 
 /// Apply the flat-notes layer of one track, loop by loop (`TrackVariation.apply`).
 pub(crate) fn apply(
-    flat: &mut FlatNotes,
+    flat: &mut Hits,
     track_idx: usize,
     track: &Track,
     loop_ticks: i64,
@@ -242,17 +242,17 @@ pub(crate) fn apply(
             let next_free = next.filter(|&n| !is_played(n));
             if let (false, Some(next)) = (has_prev, next_free) {
                 if let Some(target) = target(next) {
-                    ops.push(FlatOp::Anticipation(slot, target));
+                    ops.push(HitOp::Anticipation(slot, target));
                 }
             }
             if has_prev && next.is_some_and(is_played) {
-                ops.push(FlatOp::Silence(slot));
+                ops.push(HitOp::Silence(slot));
             }
-            ops.push(FlatOp::Velocity(slot));
-            ops.push(FlatOp::Pitch(slot));
+            ops.push(HitOp::Velocity(slot));
+            ops.push(HitOp::Pitch(slot));
             if let Some(next) = next_free {
                 if let Some(target) = target(next) {
-                    ops.push(FlatOp::Double(slot, target));
+                    ops.push(HitOp::Double(slot, target));
                 }
             }
         }
@@ -261,7 +261,7 @@ pub(crate) fn apply(
             let gap = next_step - step;
             if gap >= 3 {
                 if let Some(target) = target(step + gap / 2) {
-                    ops.push(FlatOp::Ghost(slot, target));
+                    ops.push(HitOp::Ghost(slot, target));
                 }
             }
         }
@@ -273,26 +273,26 @@ pub(crate) fn apply(
                 continue;
             }
             remaining -= op.cost();
-            let note_at = |flat: &FlatNotes, (tick, idx): Slot| flat[&tick][idx].clone();
+            let note_at = |flat: &Hits, (tick, idx): Slot| flat[&tick][idx].clone();
             match op {
-                FlatOp::Silence(slot) => silenced.push(slot),
-                FlatOp::Velocity((tick, idx)) => {
+                HitOp::Silence(slot) => silenced.push(slot),
+                HitOp::Velocity((tick, idx)) => {
                     let velocity = round2(rng.next_f64());
                     flat.get_mut(&tick).expect("scanned tick")[idx].velocity = velocity;
                 }
-                FlatOp::Pitch((tick, idx)) => {
+                HitOp::Pitch((tick, idx)) => {
                     let pitch = pick_pitch(track, rng, scales);
                     flat.get_mut(&tick).expect("scanned tick")[idx].pitch = pitch;
                 }
-                FlatOp::Anticipation(slot, target) => {
+                HitOp::Anticipation(slot, target) => {
                     let from = note_at(flat, slot);
                     add(flat, track_idx, &from, target, round2((from.velocity * 0.7).max(0.2)));
                 }
-                FlatOp::Double(slot, target) => {
+                HitOp::Double(slot, target) => {
                     let from = note_at(flat, slot);
                     add(flat, track_idx, &from, target, round2(from.velocity * 0.8));
                 }
-                FlatOp::Ghost(slot, target) => {
+                HitOp::Ghost(slot, target) => {
                     let from = note_at(flat, slot);
                     add(flat, track_idx, &from, target, round2(from.velocity * 0.5));
                 }
@@ -312,8 +312,8 @@ pub(crate) fn apply(
 }
 
 /// A note added by the variation: pitch and pan of `from`, default everything else.
-fn add(flat: &mut FlatNotes, track_idx: usize, from: &FlatNote, target: Target, velocity: f64) {
-    flat.entry(target.tick).or_default().push(FlatNote {
+fn add(flat: &mut Hits, track_idx: usize, from: &Hit, target: Target, velocity: f64) {
+    flat.entry(target.tick).or_default().push(Hit {
         track: track_idx,
         source: None,
         beat: target.beat,
@@ -397,7 +397,7 @@ mod tests {
         let mut rng = Rng::new(1);
         let before = rng.clone().next_u64();
         assert!(vary_notes(&track, &mut rng).is_empty());
-        let mut flat = FlatNotes::new();
+        let mut flat = Hits::new();
         apply(&mut flat, 0, &track, 128, 128, &mut rng, &Scales::default());
         assert_eq!(rng.next_u64(), before);
     }

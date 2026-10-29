@@ -6,7 +6,7 @@
 //! rolled many times, and a one-sided invariant is checked against the
 //! written notes: at 0 the effect never appears, at 100 it appears at least once.
 
-use ordrumbox_core::{FlatNote, Library, Note, Pattern, Rng, Scales, Track, recompute_flat_notes};
+use ordrumbox_core::{Hit, Library, Note, Pattern, Rng, Scales, Track, expand_hits};
 
 const GATES: [&str; 9] = [
     "prob_pitch",
@@ -67,14 +67,12 @@ fn set(track: &mut Track, key: &str, value: f64) {
 }
 
 /// The notes of `rolls` projections, pooled.
-fn roll(pattern: &Pattern, rolls: u32, rng: &mut Rng) -> Vec<FlatNote> {
-    (0..rolls)
-        .flat_map(|pass| recompute_flat_notes(pattern, pass, rng, &Scales::default()).into_values().flatten())
-        .collect()
+fn roll(pattern: &Pattern, rolls: u32, rng: &mut Rng) -> Vec<Hit> {
+    (0..rolls).flat_map(|pass| expand_hits(pattern, pass, rng, &Scales::default()).into_values().flatten()).collect()
 }
 
 /// `slider` at 0, then at 100: the notes of each.
-fn at_0_and_100(mut pattern: Pattern, slider: &str, rolls: u32) -> (Vec<FlatNote>, Vec<FlatNote>) {
+fn at_0_and_100(mut pattern: Pattern, slider: &str, rolls: u32) -> (Vec<Hit>, Vec<Hit>) {
     let mut rng = Rng::new(11);
     set(&mut pattern.tracks[0], slider, 0.0);
     let base = roll(&pattern, rolls, &mut rng);

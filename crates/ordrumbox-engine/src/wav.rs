@@ -109,7 +109,7 @@ fn decode_samples(format: &Format, data: &[u8]) -> Result<SampleBuffer, WavError
     })
 }
 
-/// A stereo 16-bit PCM WAV file (`bufferToWav`): samples clamped to ±1,
+/// A stereo 16-bit PCM WAV file: samples clamped to ±1,
 /// negative ones scaled by 32768 and positive ones by 32767, truncated.
 pub fn encode(left: &[f32], right: &[f32], sample_rate: u32) -> Vec<u8> {
     let frames = left.len().min(right.len());

@@ -86,7 +86,7 @@ impl Note {
     }
 
     /// Fold a `beatStep` past the end of its beat into the following beats:
-    /// beat 1 step 6 at 4 steps per beat is beat 2 step 2 (`normalizeNoteGridPosition`).
+    /// beat 1 step 6 at 4 steps per beat is beat 2 step 2.
     pub(crate) fn wrap_grid_position(&mut self, steps_per_beat: i32) {
         if steps_per_beat > 0 && self.step >= steps_per_beat {
             self.beat += self.step / steps_per_beat;

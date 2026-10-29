@@ -28,7 +28,7 @@ pub fn step_to_tick(step: i64, steps_per_beat: i32) -> i64 {
 }
 
 /// Spacing, in steps, of a `rate` code: below 8 it is `rate / 8` of a step,
-/// from 8 up `rate - 7` steps (`getStepSpacing`).
+/// from 8 up `rate - 7` steps.
 pub fn step_spacing(rate: f64) -> f64 {
     if rate < 8.0 { rate / 8.0 } else { rate - 7.0 }
 }

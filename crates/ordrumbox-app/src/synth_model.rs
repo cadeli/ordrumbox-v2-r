@@ -275,7 +275,7 @@ pub fn hydrate(draft: &mut Object) {
     }
 }
 
-/// Which cards show bypassed (`hydrateCardBypassed`): an oscillator at gain
+/// Which cards show bypassed: an oscillator at gain
 /// 0, a card whose bypass flag is set.
 pub fn bypassed(draft: &Object, group: &str) -> bool {
     if matches!(group, "vco1" | "vco2" | "vco3") {
@@ -289,7 +289,7 @@ pub fn has_power(group: &str) -> bool {
     matches!(group, "vco1" | "vco2" | "vco3") || BYPASS_FLAGS.iter().any(|(g, _)| *g == group)
 }
 
-/// The cards of `draft`, in order (`getOrderedGroupNames`): the known ones,
+/// The cards of `draft`, in order: the known ones,
 /// then any other group it has (not a bypass flag), by name.
 pub fn groups(draft: &Object) -> Vec<String> {
     let mut groups: Vec<String> = GROUP_ORDER.iter().map(|g| (*g).to_owned()).collect();
@@ -308,7 +308,7 @@ pub fn groups(draft: &Object) -> Vec<String> {
     groups
 }
 
-/// A card's fields (`#buildGroupContent`): the master keys, a group's own
+/// A card's fields: the master keys, a group's own
 /// keys known to its defaults, or the value itself.
 pub fn fields(draft: &Object, group: &str) -> Vec<String> {
     if group == "master" {
@@ -328,7 +328,7 @@ pub fn fields(draft: &Object, group: &str) -> Vec<String> {
     }
 }
 
-/// A card turned on or off by its power button (`#handlePowerBtn`): an
+/// A card turned on or off by its power button: an
 /// oscillator keeps its gain aside and goes to 0 (and gets it back), a
 /// flagged card sets its flag (the envelope, turned on, is reset).
 pub fn toggle_card(draft: &mut Object, group: &str) {
@@ -352,7 +352,7 @@ pub fn toggle_card(draft: &mut Object, group: &str) {
 }
 
 /// A group off by default switched on when one of its controls is touched
-/// (`#implicitEnable`): an oscillator at gain 0 to 0.5, FM to 0.3, the noise
+///: an oscillator at gain 0 to 0.5, FM to 0.3, the noise
 /// to 0.15, an LFO onto the filter (depth 0.5 unless that is the depth
 /// being set), the mod envelope onto the filter. The paths it changed.
 pub fn implicit_enable(draft: &mut Object, path: &str) -> Vec<String> {
@@ -402,7 +402,7 @@ fn lfos(draft: &Object) -> [Option<&Object>; 2] {
 }
 
 /// The modulation an LFO adds to its target at `time` seconds, in the
-/// target's units (`computeLfoMod`): tempo sync wins over the frequency.
+/// target's units: tempo sync wins over the frequency.
 pub fn lfo_mod(lfo: &Object, time: f64, bpm: f64) -> f64 {
     let target = lfo.get("target").and_then(Value::as_str).unwrap_or_default();
     let scale = lfo_scale(target);
@@ -430,7 +430,7 @@ pub fn lfo_mod_on(draft: &Object, path: &str, time: f64, bpm: f64) -> f64 {
         .sum()
 }
 
-/// The controls an LFO is on (`#updateLfoIndicators`): its target, when it
+/// The controls an LFO is on: its target, when it
 /// has depth and is not bypassed.
 pub fn lfo_targeted(draft: &Object, path: &str) -> bool {
     lfos(draft).into_iter().flatten().any(|l| {
@@ -442,7 +442,7 @@ pub fn lfo_targeted(draft: &Object, path: &str) -> bool {
 
 // ─── What the canvases plot ──────────────────────────────────────────────────
 
-/// A wave's value at phase `p` (0–1) of cycle `cycle` (`#waveAtPhase`).
+/// A wave's value at phase `p` (0–1) of cycle `cycle`.
 fn wave_at(wave: &str, p: f64, cycle: f64) -> f64 {
     use std::f64::consts::PI;
     match wave {
@@ -460,7 +460,7 @@ fn wave_at(wave: &str, p: f64, cycle: f64) -> f64 {
     }
 }
 
-/// Points of the scope (`#drawOscillators`): four cycles of the three
+/// Points of the scope: four cycles of the three
 /// oscillators with their gains, octaves, detunes, FM and sub, the drive's
 /// saturation, scaled to the master volume. `time`: when (the LFOs).
 pub fn scope(draft: &Object, time: f64, bpm: f64) -> Vec<f64> {
@@ -535,7 +535,7 @@ pub fn scope(draft: &Object, time: f64, bpm: f64) -> Vec<f64> {
 }
 
 /// The envelope's corners as (time, level), over its plotted length
-/// (`#drawAdsrEnvelope`).
+///.
 pub fn envelope(draft: &Object) -> (Vec<(f64, f64)>, f64) {
     let v = |key: &str, default: f64| number(draft, &format!("envelope.{key}")).unwrap_or(default);
     let (a, d, s, r) = (v("attack", 0.0), v("decay", 0.12), v("sustain", 1.0), v("release", 0.05));
@@ -562,7 +562,7 @@ pub fn filter_response(kind: &str, fc: f64, q: f64, points: usize) -> Vec<f64> {
 }
 
 /// The filter curve's centre and Q with the LFOs at `time`, and the band an
-/// LFO on the frequency sweeps (`#drawFilterResponse`).
+/// LFO on the frequency sweeps.
 pub fn filter_now(draft: &Object, time: f64, bpm: f64) -> (String, f64, f64, Option<(f64, f64)>) {
     let kind = text(draft, "filter.type").unwrap_or("lowpass").to_owned();
     let fc = number(draft, "filter.freq").unwrap_or(400.0).clamp(20.0, 20_000.0);
@@ -579,7 +579,7 @@ pub fn filter_now(draft: &Object, time: f64, bpm: f64) -> (String, f64, f64, Opt
     (kind, fc, q, band)
 }
 
-/// The module pills under the cards (`#getActiveModules`): label, active.
+/// The module pills under the cards: label, active.
 pub fn modules(draft: &Object) -> Vec<(&'static str, bool)> {
     let n = |path: &str| number(draft, path).unwrap_or(0.0);
     let flag = |key: &str| truthy(draft.get(key));
@@ -603,7 +603,7 @@ pub fn modules(draft: &Object) -> Vec<(&'static str, bool)> {
     ]
 }
 
-/// The name of the first free `new_preset`, `new_preset_1`… (`newPreset`).
+/// The name of the first free `new_preset`, `new_preset_1`….
 pub fn new_preset_name(keys: &[&str]) -> String {
     let mut name = "new_preset".to_owned();
     let mut n = 1;

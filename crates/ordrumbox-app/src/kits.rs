@@ -134,7 +134,7 @@ impl KitSet {
     }
 
     /// Set gain (dB), tune (semitones) or decay (ms) of a sample, from a
-    /// knob (`onKnobChange`); the message when it changed.
+    /// knob; the message when it changed.
     pub fn set_value(&mut self, kit: usize, sample: usize, field: Field, value: f64) -> Option<String> {
         let instrument = self.kits.get_mut(kit)?.samples.get_mut(sample)?;
         let name = instrument.display_name.clone();

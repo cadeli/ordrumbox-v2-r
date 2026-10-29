@@ -111,7 +111,7 @@ impl Spec {
         self.clamp_step(start + dfraction * (self.max - self.min) * 0.1, self.step * 0.1)
     }
 
-    /// A number typed in (`sanitizePromptInput`): a knob on its step grid, a
+    /// A number typed in: a knob on its step grid, a
     /// slider in range.
     pub fn typed(&self, number: f64) -> f64 {
         match self.style {
@@ -130,7 +130,7 @@ pub enum Format {
     Fmt,
     /// `String(v)`.
     Plain,
-    /// Knob bar velocity: a percentage (`knobFormat`).
+    /// Knob bar velocity: a percentage.
     Percent,
     /// Knob bar pitch: `+3`.
     SignedPlain,

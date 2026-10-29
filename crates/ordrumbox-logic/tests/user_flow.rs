@@ -6,19 +6,19 @@
 
 use ordrumbox_core::json::Value;
 use ordrumbox_core::steps::{TICK, absolute_step, step_to_tick};
-use ordrumbox_core::{FlatNotes, Library, Pattern, Rng, Scales, recompute_flat_notes};
+use ordrumbox_core::{Hits, Library, Pattern, Rng, Scales, expand_hits};
 use ordrumbox_logic::Editor;
 use ordrumbox_logic::midi::{self, PPQN, smf};
 
 /// MIDI ticks per engine tick (96 PPQN, 32 ticks a beat).
 const MIDI_RATIO: i64 = PPQN as i64 / TICK as i64;
 
-fn flat(pattern: &Pattern, pass: u32) -> FlatNotes {
-    recompute_flat_notes(pattern, pass, &mut Rng::new(1), &Scales::default())
+fn flat(pattern: &Pattern, pass: u32) -> Hits {
+    expand_hits(pattern, pass, &mut Rng::new(1), &Scales::default())
 }
 
 /// Ticks of every flat note of track `t`.
-fn ticks_of(flat: &FlatNotes, t: usize) -> Vec<u32> {
+fn ticks_of(flat: &Hits, t: usize) -> Vec<u32> {
     flat.iter().flat_map(|(&tick, notes)| notes.iter().filter(|n| n.track == t).map(move |_| tick)).collect()
 }
 

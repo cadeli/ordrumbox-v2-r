@@ -10,7 +10,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use ordrumbox_core::json::{self, Value};
-use ordrumbox_core::{FlatNotes, Library, Pattern, Rng, Scales, arp, recompute_flat_notes};
+use ordrumbox_core::{Hits, Library, Pattern, Rng, Scales, arp, expand_hits};
 
 fn fixtures() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("fixtures")
@@ -50,12 +50,12 @@ fn fixture_passes() -> Vec<(String, u32, bool, Value)> {
     passes
 }
 
-fn compute(pattern: &Pattern, pass: u32, seed: u64) -> FlatNotes {
-    recompute_flat_notes(pattern, pass, &mut Rng::new(seed), &Scales::default())
+fn compute(pattern: &Pattern, pass: u32, seed: u64) -> Hits {
+    expand_hits(pattern, pass, &mut Rng::new(seed), &Scales::default())
 }
 
 /// First difference between the Rust notes and the JS ones, if any.
-fn diff(pattern: &Pattern, rust: &FlatNotes, js: &Value) -> Option<String> {
+fn diff(pattern: &Pattern, rust: &Hits, js: &Value) -> Option<String> {
     let js = js.as_array().expect("ticks");
     let rust_ticks: Vec<u32> = rust.keys().copied().collect();
     let js_ticks: Vec<u32> = js.iter().map(|t| t.as_array().unwrap()[0].as_f64().unwrap() as u32).collect();
@@ -107,7 +107,7 @@ fn deterministic_passes_match_the_js_engine() {
         let pattern = patterns.iter().find(|p| p.id == id).unwrap_or_else(|| panic!("no pattern {id}"));
         let mut rng = Rng::new(7);
         let before = rng.clone().next_u64();
-        let rust = recompute_flat_notes(pattern, pass, &mut rng, &Scales::default());
+        let rust = expand_hits(pattern, pass, &mut rng, &Scales::default());
         if let Some(difference) = diff(pattern, &rust, &ticks) {
             failures.push(format!("{id} pass {pass}: {difference}"));
         }
@@ -127,7 +127,7 @@ fn random_passes_are_reproducible_and_well_formed() {
     assert_eq!(random.len(), 8);
     for (id, pass, _, _) in random {
         let pattern = patterns.iter().find(|p| p.id == id).expect("pattern");
-        let runs: Vec<FlatNotes> = (0..20).map(|seed| compute(pattern, pass, seed)).collect();
+        let runs: Vec<Hits> = (0..20).map(|seed| compute(pattern, pass, seed)).collect();
         assert_eq!(compute(pattern, pass, 3), runs[3], "{id}: same seed, same pass");
         assert!(runs.iter().any(|run| *run != runs[0]), "{id} pass {pass}: no seed changes anything");
         for run in &runs {

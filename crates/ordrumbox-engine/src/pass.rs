@@ -7,7 +7,7 @@
 use ordrumbox_core::steps::TICK;
 use std::collections::HashMap;
 
-use ordrumbox_core::{FlatNote, FlatNotes, Note, Pattern, Rng, Scales, Song, lfo, recompute_flat_notes};
+use ordrumbox_core::{Hit, Hits, Note, Pattern, Rng, Scales, Song, expand_hits, lfo};
 use ordrumbox_dsp::{StripSettings, SynthPatch, VoiceStart};
 
 use crate::assign::TrackSound;
@@ -108,7 +108,7 @@ pub fn build_pass(pattern: &Pattern, number: u64, rng: &mut Rng, context: PassCo
     let ticks = u32::try_from(ordrumbox_core::pattern_engine::pattern_ticks(pattern).max(1)).unwrap_or(u32::MAX);
     let frames = (f64::from(ticks) * per_tick).round().max(1.0) as u64;
     let pass_index = u32::try_from(number).unwrap_or(u32::MAX);
-    let flat = recompute_flat_notes(pattern, pass_index, rng, context.scales);
+    let flat = expand_hits(pattern, pass_index, rng, context.scales);
     let any_solo = pattern.tracks.iter().any(|t| t.solo);
     let silent = |i: usize| {
         let t = &pattern.tracks[i];
@@ -171,7 +171,7 @@ struct Voice {
 /// synth patch pushed to `patches`.
 fn sound_for(
     pattern: &Pattern,
-    note: &FlatNote,
+    note: &Hit,
     assigned: &TrackSound,
     voice: Voice,
     context: &PassContext<'_>,
@@ -215,13 +215,13 @@ fn sound_for(
     }))
 }
 
-/// A one-note pass to audition track `t` (`simpleBeep()`): `note` as written,
+/// A one-note pass to audition track `t`: `note` as written,
 /// or, without one, a note at the track's velocity and pan. Its strips are
 /// the pattern's.
 pub fn build_preview(pattern: &Pattern, t: usize, note: Option<&Note>, context: PassContext<'_>) -> Pass {
     let Some(track) = pattern.tracks.get(t) else { return Pass::default() };
     let bpm = pattern.bpm.clamp(20.0, 300.0);
-    let flat = FlatNote {
+    let flat = Hit {
         track: t,
         source: None,
         beat: 0,
@@ -243,9 +243,9 @@ pub fn build_preview(pattern: &Pattern, t: usize, note: Option<&Note>, context: 
     Pass { frames: 1, ticks: 1, events, strips, patches, ..Pass::default() }
 }
 
-/// Flat notes of a pattern repetition, kept between song passes so a
+/// Hits of a pattern repetition, kept between song passes so a
 /// pattern longer than a measure is drawn once per repetition.
-pub type FlatNotesCache = HashMap<(usize, u64), FlatNotes>;
+pub type HitsCache = HashMap<(usize, u64), Hits>;
 
 /// What a song pass is built from.
 #[derive(Debug, Clone, Copy)]
@@ -282,12 +282,12 @@ pub fn song_strips(song: &Song, patterns: &[Pattern]) -> Vec<(usize, usize)> {
 }
 
 /// Pass `measure` (measures since play started) of `song`: every clip
-/// sounding during that measure at the song's tempo (`#playSongNotes`).
+/// sounding during that measure at the song's tempo.
 pub fn build_song_pass(
     song: &Song,
     measure: u64,
     rng: &mut Rng,
-    cache: &mut FlatNotesCache,
+    cache: &mut HitsCache,
     context: SongContext<'_>,
 ) -> Pass {
     let bpm = song.bpm.clamp(20.0, 300.0);
@@ -313,7 +313,7 @@ pub fn build_song_pass(
             let p = source.pattern;
             let pattern = &context.patterns[p];
             let flat = cache.entry((p, source.loop_index)).or_insert_with(|| {
-                recompute_flat_notes(pattern, u32::try_from(source.loop_index).unwrap_or(u32::MAX), rng, context.scales)
+                expand_hits(pattern, u32::try_from(source.loop_index).unwrap_or(u32::MAX), rng, context.scales)
             });
             let Some(notes) = u32::try_from(source.local_tick).ok().and_then(|s| flat.get(&s)) else { continue };
             let sounds = context.sounds.get(p).map_or(&[][..], Vec::as_slice);
@@ -417,9 +417,9 @@ mod tests {
         let strips = song_strips(song, &library.patterns);
         assert_eq!(strips, [(0, 0), (0, 1), (1, 1)], "KICK, HAT, SNARE: one strip per name");
 
-        let mut cache = FlatNotesCache::new();
+        let mut cache = HitsCache::new();
         let beat = 24_000; // frames per beat at 120 bpm
-        let events = |measure: u64, cache: &mut FlatNotesCache| -> Vec<(u64, usize)> {
+        let events = |measure: u64, cache: &mut HitsCache| -> Vec<(u64, usize)> {
             let pass = build_song_pass(song, measure, &mut Rng::new(1), cache, context);
             assert_eq!((pass.frames, pass.first_tick, pass.strips.len()), (4 * beat, measure * 128, 3));
             pass.events.iter().map(|e| (e.frame / beat, e.sound.track())).collect()

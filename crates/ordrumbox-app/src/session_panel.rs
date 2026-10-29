@@ -383,7 +383,7 @@ impl Session {
     }
 
     /// Every sample of instrument `id`: (kit, url, name), the current kit's
-    /// first, then by kit and name (`getSamplesForInstrument`).
+    /// first, then by kit and name.
     fn samples_for(&self, id: &str) -> Vec<(String, String, String)> {
         let current = self.kits.kits.get(self.kit_index).map_or("", |k| k.name.as_str());
         let mut found: Vec<(String, String, String)> = self
@@ -804,7 +804,7 @@ impl Session {
         self.dropdown = None;
     }
 
-    /// H (`convertToGeneratedSounds`): every track on the synth patch of its
+    /// H: every track on the synth patch of its
     /// type (`SYNTH_SOUND_MAP`), a random patch for a type without one.
     pub fn convert_to_generated_sounds(&mut self) {
         if self.pattern().is_none() {
@@ -847,7 +847,7 @@ impl Session {
         };
     }
 
-    /// J (`autoAssignAllTracks`): every track back on auto-assign (the kit's
+    /// J: every track back on auto-assign (the kit's
     /// sound for its name).
     pub fn auto_assign_all_tracks(&mut self) {
         if self.pattern().is_none() {
@@ -863,7 +863,7 @@ impl Session {
         self.message = "All tracks auto-assigned".into();
     }
 
-    /// K (`assignRandomSampleAllTracks`): a random sample, of any kit, on every track.
+    /// K: a random sample, of any kit, on every track.
     pub fn assign_random_samples(&mut self) {
         if self.pattern().is_none() {
             self.message = "No pattern selected".into();
@@ -932,7 +932,7 @@ impl Session {
         }
     }
 
-    /// A row's label clicked (`selectedPropKey`).
+    /// A row's label clicked.
     fn select_row(&mut self, id: Id) {
         if let Id::Generation(key) | Id::Loop(key) | Id::Fx(key) | Id::Row(key) = id {
             self.editors.selected_prop = Some(key);

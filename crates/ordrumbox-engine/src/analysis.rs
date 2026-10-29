@@ -6,16 +6,16 @@
 use ordrumbox_core::js;
 use ordrumbox_dsp::SampleBuffer;
 
-/// Points of the envelope (`envelopePoints`).
+/// Points of the envelope.
 const ENVELOPE_POINTS: usize = 128;
-/// Samples of the frame the pitch is estimated on (`pitchFrameSize`).
+/// Samples of the frame the pitch is estimated on.
 const PITCH_FRAME: usize = 4096;
 const MIN_FUNDAMENTAL_HZ: f64 = 40.0;
 const MAX_FUNDAMENTAL_HZ: f64 = 2000.0;
 
 const NOTE_NAMES: [&str; 12] = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
-/// The nearest note of a frequency (`hzToNote`).
+/// The nearest note of a frequency.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NoteInfo {
     pub name: &'static str,
@@ -44,7 +44,7 @@ pub fn hz_to_note(hz: f64) -> Option<NoteInfo> {
     Some(NoteInfo { name: NOTE_NAMES[midi.rem_euclid(12) as usize], octave: midi.div_euclid(12) - 1, cents, midi })
 }
 
-/// A sample's analysis (`analyzeSample`).
+/// A sample's analysis.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Analysis {
     /// Peak of each of 128 slices, 6 decimals.
@@ -152,7 +152,7 @@ fn fundamental(frame: &[f32], sample_rate: f64) -> (Option<f64>, f64) {
     (Some(js::to_fixed(sample_rate / best_lag as f64, 3)), js::to_fixed(best.clamp(0.0, 1.0), 4))
 }
 
-/// Analyse `buffer` (`analyzeAudioBuffer`).
+/// Analyse `buffer`.
 pub fn analyze(buffer: &SampleBuffer) -> Analysis {
     let samples = mono(buffer);
     let rate = f64::from(buffer.sample_rate);

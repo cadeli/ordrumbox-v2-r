@@ -2,7 +2,7 @@
 //!
 //! A track with auto-assign on gets a sample by name, in tiers: an exact key
 //! in the selected kit, then in another kit, then the catalog's substitutes
-//! (`findSoundEquivalence`), then any sample. Each tier picks at random among
+//!, then any sample. Each tier picks at random among
 //! its candidates; `pick(n)` makes that choice (an index below `n`), so the
 //! JS choices can be reproduced. A synth track without a valid preset gets a
 //! random one.
@@ -171,7 +171,7 @@ impl<'a> AutoAssign<'a> {
     }
 }
 
-/// What every track of `pattern` plays (`autoAssignSounds`): synth tracks
+/// What every track of `pattern` plays: synth tracks
 /// their preset (a random one when missing or unknown), tracks with
 /// auto-assign their sample by name in kit `kit`, the others the sample
 /// their `sampleId` names.

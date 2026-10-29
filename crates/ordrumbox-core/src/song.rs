@@ -61,7 +61,7 @@ impl Song {
         self.clips.iter().map(|clip| f64::from(clip.start_measure) + clip.measure_count).fold(0.0, f64::max)
     }
 
-    /// Loop length (`songLengthMeasures`): `loop_measure_count` floored (at
+    /// Loop length: `loop_measure_count` floored (at
     /// least 1) when set, else [`Song::content_measures`].
     pub fn length_measures(&self) -> f64 {
         match self.loop_measures {
@@ -71,7 +71,7 @@ impl Song {
     }
 
     /// Where transport `tick` is in the arrangement, in measures, fractional
-    /// (`songMeasureAtTick`): wrapped on `loop_measure_count` as it is (not
+    ///: wrapped on `loop_measure_count` as it is (not
     /// floored), else on [`Song::length_measures`]; 0 before the start.
     pub fn measure_at_tick(&self, tick: f64, ticks_per_beat: f64) -> f64 {
         let measure = tick / (ticks_per_beat * BEATS_PER_MEASURE);
@@ -170,7 +170,7 @@ impl Song {
     }
 }
 
-/// A clip sounding at a transport tick (`resolveSongSources`).
+/// A clip sounding at a transport tick.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActiveClip {
     /// Index of the clip's pattern in the pattern list.

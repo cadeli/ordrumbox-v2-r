@@ -69,7 +69,7 @@ fn words(s: &str) -> Vec<String> {
     s.to_uppercase().split(|c: char| !c.is_ascii_alphanumeric()).filter(|w| !w.is_empty()).map(str::to_owned).collect()
 }
 
-/// Words two strings share (`countCommonWords`).
+/// Words two strings share.
 pub fn count_common_words(a: &str, b: &str) -> usize {
     if a.is_empty() || b.is_empty() {
         return 0;
@@ -163,7 +163,7 @@ impl Catalog {
         self.instruments.iter().find(|i| i.id == id)
     }
 
-    /// The first instrument with a pattern matching the whole `name` (`findByName`).
+    /// The first instrument with a pattern matching the whole `name`.
     pub fn by_name(&self, name: &str) -> Option<&Instrument> {
         self.instruments.iter().find(|i| i.synonyms.iter().any(|s| pattern_matches(s, name)))
     }
@@ -184,12 +184,12 @@ impl Catalog {
             .or_else(|| words(file_name).iter().find_map(|w| self.by_name(w)))
     }
 
-    /// The instrument mapped to `key` on MIDI `channel` (`findInstrumentFromMidi`).
+    /// The instrument mapped to `key` on MIDI `channel`.
     pub fn from_midi(&self, channel: i64, key: i64) -> Option<&Instrument> {
         self.instruments.iter().find(|i| i.midi.iter().any(|m| m.channel == channel && m.key == Some(key)))
     }
 
-    /// The instrument for GM `program` (`findInstrumentFromMidiProgram`): a
+    /// The instrument for GM `program`: a
     /// direct mapping, else the program's GM name matched by pattern or by
     /// mapping name.
     pub fn from_midi_program(&self, program: i64) -> Option<&Instrument> {
@@ -202,7 +202,7 @@ impl Catalog {
         })
     }
 
-    /// The instrument's id then its substitutes (`getTrackCandidatesFromInstrument`).
+    /// The instrument's id then its substitutes.
     pub fn track_candidates(instrument: &Instrument) -> Vec<&str> {
         let mut candidates = vec![instrument.id.as_str()];
         for s in &instrument.subst {

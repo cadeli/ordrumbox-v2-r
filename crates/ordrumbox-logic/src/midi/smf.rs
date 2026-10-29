@@ -43,7 +43,7 @@ pub struct Midi {
     pub track_names: Vec<String>,
 }
 
-/// A note-on with a velocity (`findAllNotes`).
+/// A note-on with a velocity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NoteOn {
     pub tick: i64,

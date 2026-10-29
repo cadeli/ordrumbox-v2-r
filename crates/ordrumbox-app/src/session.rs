@@ -111,7 +111,7 @@ pub struct Session {
     pattern_index: usize,
     /// What is shown under the header.
     workspace: Workspace,
-    /// The measure the song plays from (`songCursorMeasure`).
+    /// The measure the song plays from.
     song_cursor: u32,
     /// First measure and first row of the arrangement shown.
     song_scroll: (u32, usize),
@@ -592,7 +592,7 @@ impl Session {
         };
     }
 
-    /// Ctrl+S (`saveCurrentPattern`): the pattern as `Exporter.export()`
+    /// Ctrl+S: the pattern as `Exporter.export()`
     /// writes it, to `ordrumbox-<name>.json` in the exports folder.
     pub fn export_pattern_json(&mut self) {
         let Some(dir) = store::exports_dir() else {
@@ -1172,7 +1172,7 @@ impl Session {
         }
     }
 
-    /// R: the sounds of the tracks assigned again (`autoDetectAll`).
+    /// R: the sounds of the tracks assigned again.
     pub fn kit_reassign(&mut self) {
         self.select_kit(self.kit_index);
         self.message = "Auto-detect complete".into();
