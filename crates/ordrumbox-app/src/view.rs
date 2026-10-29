@@ -768,21 +768,21 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
             }
         }
     }
-    // Loop ghosts: notes that re-trigger when the track loops at loop_at_step.
+    // Loop ghosts: notes that re-trigger when the track loops at loop_length.
     let mut loop_ghosts: Vec<(i64, &Note)> = Vec::new();
-    if let Some(loop_at) = track.loop_length.map(i64::from).filter(|&l| l > 0) {
+    if let Some(loop_length) = track.loop_length.map(i64::from).filter(|&l| l > 0) {
         for note in &track.notes {
             let base = absolute_step(note.beat, note.beat_step, spb);
-            if base >= loop_at {
+            if base >= loop_length {
                 continue;
             }
-            let mut pos = base + loop_at;
+            let mut pos = base + loop_length;
             while pos < track_total {
                 let local = pos - start;
                 if (0..steps).contains(&local) {
                     loop_ghosts.push((local, note));
                 }
-                pos += loop_at;
+                pos += loop_length;
             }
         }
     }
@@ -841,12 +841,12 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
             }
         }
     }
-    if let Some(loop_at) = track
+    if let Some(loop_length) = track
         .loop_length
         .map(i64::from)
         .filter(|&l| l > 0 && l < i64::from(track.steps_per_beat) * i64::from(track.beat_count))
     {
-        let local = loop_at - start;
+        let local = loop_length - start;
         if (0..steps).contains(&local) {
             let (x, _) = cell(local);
             canvas.fill_rect(x - gap, y, gap * 2, height, LOOP_MARK);

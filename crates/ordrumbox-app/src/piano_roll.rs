@@ -112,19 +112,19 @@ impl RollView<'_> {
     }
 
     /// Where the track loops (`getTrackLoopAtStep`): its loop point, else its end.
-    fn loop_at(&self) -> i64 {
+    fn loop_length(&self) -> i64 {
         self.track.loop_length.map_or(self.total_steps(), i64::from).max(1)
     }
 
     /// Whether note `n` sounds on `step` (`illuminateStep`).
     fn sounding(&self, n: usize, step: i64) -> bool {
         let note = &self.track.notes[n];
-        let loop_at = self.loop_at();
+        let loop_length = self.loop_length();
         let base = absolute_step(note.beat, note.beat_step, steps_per_beat(self.track));
-        if base >= loop_at {
+        if base >= loop_length {
             return false;
         }
-        step % loop_at == base || self.subs[n].iter().any(|s| s.step < loop_at && step % loop_at == s.step)
+        step % loop_length == base || self.subs[n].iter().any(|s| s.step < loop_length && step % loop_length == s.step)
     }
 }
 
@@ -318,8 +318,8 @@ pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &s
         canvas.fill_rect(layout.step_x(view, step), layout.grid.y, s, grid_h, color);
     }
     // The loop point.
-    if let Some(loop_at) = view.track.loop_length.map(i64::from).filter(|&l| l > start && l <= end) {
-        canvas.fill_rect(layout.step_x(view, loop_at) - s, layout.grid.y, 2 * s, grid_h, LOOP_MARK);
+    if let Some(loop_length) = view.track.loop_length.map(i64::from).filter(|&l| l > start && l <= end) {
+        canvas.fill_rect(layout.step_x(view, loop_length) - s, layout.grid.y, 2 * s, grid_h, LOOP_MARK);
     }
 
     // Ghosts, then notes.

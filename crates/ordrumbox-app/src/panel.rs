@@ -78,18 +78,18 @@ pub enum Id {
     FxTab(u8),
     FxLed(u8),
     /// Groove / Engine sub-tab.
-    GenTab(u8),
+    GenerationTab(u8),
     /// LFO target sub-tab, and its on/off LED.
     LfoTab(u8),
     LfoLed(u8),
-    /// The knob bar (velocity, pan, pitch).
+    /// The knob bar (volume, pan, pitch).
     KnobBar(&'static str),
     /// The knob bar's decay (the sample's, not the track's).
     Decay,
     /// An effect knob.
     Fx(&'static str),
     /// A generation slider.
-    Gen(&'static str),
+    Generation(&'static str),
     /// A loop slider.
     Loop(&'static str),
     Lfo(LfoParam),
@@ -682,7 +682,7 @@ mod tests {
                 Kind::Value { spec, value: 0.2, label: None, text: "0.2".into(), lfo: true },
             ),
             Item::new(
-                Some(Id::Gen("hitVariation")),
+                Some(Id::Generation("hitVariation")),
                 Rect::new(0, 80, 300, 16),
                 Kind::Value {
                     spec: Spec::slider(0.0, 100.0, 1.0, 0.0),
