@@ -699,8 +699,8 @@ impl Session {
         if count == 0 {
             return;
         }
-        let idx = self.rng.below(count as u64) as usize;
-        self.pattern_index = idx;
+        let index = self.rng.below(count as u64) as usize;
+        self.pattern_index = index;
         self.deselect();
         self.edited();
         self.current_page = 0;
@@ -713,8 +713,8 @@ impl Session {
         if count == 0 {
             return;
         }
-        let idx = self.rng.below(count as u64) as usize;
-        self.select_kit(idx);
+        let index = self.rng.below(count as u64) as usize;
+        self.select_kit(index);
         self.message = format!("kit {}", self.kits.kits[self.kit_index].name);
     }
 

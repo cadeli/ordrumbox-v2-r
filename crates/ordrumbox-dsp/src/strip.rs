@@ -50,23 +50,23 @@ audio_params! {
 #[derive(Debug, Clone)]
 struct Comb {
     buf: Vec<f32>,
-    idx: usize,
+    index: usize,
     store: f64,
 }
 
 impl Comb {
     fn new(len: usize) -> Self {
-        Self { buf: vec![0.0; len], idx: 0, store: 0.0 }
+        Self { buf: vec![0.0; len], index: 0, store: 0.0 }
     }
 
     #[inline]
     fn process(&mut self, input: f64, d1: f64, d2: f64, feedback: f64) -> f64 {
-        let out = f64::from(self.buf[self.idx]);
+        let out = f64::from(self.buf[self.index]);
         self.store = out * d2 + self.store * d1;
-        self.buf[self.idx] = (input + self.store * feedback) as f32;
-        self.idx += 1;
-        if self.idx >= self.buf.len() {
-            self.idx = 0;
+        self.buf[self.index] = (input + self.store * feedback) as f32;
+        self.index += 1;
+        if self.index >= self.buf.len() {
+            self.index = 0;
         }
         out
     }
@@ -75,22 +75,22 @@ impl Comb {
 #[derive(Debug, Clone)]
 struct Allpass {
     buf: Vec<f32>,
-    idx: usize,
+    index: usize,
 }
 
 impl Allpass {
     fn new(len: usize) -> Self {
-        Self { buf: vec![0.0; len], idx: 0 }
+        Self { buf: vec![0.0; len], index: 0 }
     }
 
     #[inline]
     fn process(&mut self, input: f64) -> f64 {
-        let bout = f64::from(self.buf[self.idx]);
+        let bout = f64::from(self.buf[self.index]);
         let out = -input + bout;
-        self.buf[self.idx] = (input + bout * 0.5) as f32;
-        self.idx += 1;
-        if self.idx >= self.buf.len() {
-            self.idx = 0;
+        self.buf[self.index] = (input + bout * 0.5) as f32;
+        self.index += 1;
+        if self.index >= self.buf.len() {
+            self.index = 0;
         }
         out
     }
@@ -99,19 +99,19 @@ impl Allpass {
 #[derive(Debug, Clone)]
 struct DelayLine {
     buf: Vec<f32>,
-    idx: usize,
+    index: usize,
 }
 
 impl DelayLine {
     fn new(len: usize) -> Self {
-        Self { buf: vec![0.0; len], idx: 0 }
+        Self { buf: vec![0.0; len], index: 0 }
     }
 
     /// The sample `delay` frames ago, linearly interpolated.
     #[inline]
     fn read(&self, delay: f64) -> f64 {
         let len = self.buf.len() as f64;
-        let mut position = self.idx as f64 - delay;
+        let mut position = self.index as f64 - delay;
         position = ((position % len) + len) % len;
         let i = position as usize;
         let fraction = position - i as f64;
@@ -121,10 +121,10 @@ impl DelayLine {
 
     #[inline]
     fn write(&mut self, value: f64) {
-        self.buf[self.idx] = value as f32;
-        self.idx += 1;
-        if self.idx >= self.buf.len() {
-            self.idx = 0;
+        self.buf[self.index] = value as f32;
+        self.index += 1;
+        if self.index >= self.buf.len() {
+            self.index = 0;
         }
     }
 }

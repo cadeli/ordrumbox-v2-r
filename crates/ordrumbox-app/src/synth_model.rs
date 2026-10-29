@@ -617,9 +617,9 @@ pub fn new_preset_name(keys: &[&str]) -> String {
 /// The preset to show after deleting `deleted` from `keys` (sorted, before
 /// the deletion: `deletePreset`): the next one, else the previous.
 pub fn after_delete<'a>(keys: &[&'a str], deleted: &str) -> Option<&'a str> {
-    let idx = keys.iter().position(|k| *k == deleted)?;
-    let next = if idx + 1 < keys.len() { idx } else { idx.checked_sub(1)? };
-    if keys[next] == deleted { keys.get((idx + 1) % keys.len()).copied() } else { Some(keys[next]) }
+    let index = keys.iter().position(|k| *k == deleted)?;
+    let next = if index + 1 < keys.len() { index } else { index.checked_sub(1)? };
+    if keys[next] == deleted { keys.get((index + 1) % keys.len()).copied() } else { Some(keys[next]) }
 }
 
 #[cfg(test)]

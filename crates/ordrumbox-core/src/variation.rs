@@ -95,30 +95,30 @@ pub(crate) fn vary_notes(track: &Track, rng: &mut Rng) -> HashMap<usize, Note> {
     }
     let depth = track.auto_note_probability_range;
     let mut candidates = Vec::new();
-    for (idx, note) in track.notes.iter().enumerate() {
+    for (index, note) in track.notes.iter().enumerate() {
         let retrigger_count = rng.below(4) as i32 + 1;
         let max_rate = (4 - retrigger_count).max(1);
         let rate = (rng.below(max_rate as u64) + 1) as f64;
-        candidates.push((idx, NoteOp::RetrigRate { retrigger_count, rate }));
-        candidates.push((idx, NoteOp::EuclideanFill(rng.below(2) as i32 + 1)));
+        candidates.push((index, NoteOp::RetrigRate { retrigger_count, rate }));
+        candidates.push((index, NoteOp::EuclideanFill(rng.below(2) as i32 + 1)));
         // Depth 0 cannot move the probability: not offered, its cost stays free.
         if depth > 0.0 {
             let floor = 1.0 - (1.0 - NOTE_PROB_FLOOR) * depth / 100.0;
-            candidates.push((idx, NoteOp::Prob(round2(floor + rng.next_f64() * (1.0 - floor)))));
+            candidates.push((index, NoteOp::Prob(round2(floor + rng.next_f64() * (1.0 - floor)))));
         }
         if note.arp.as_array().is_some_and(|intervals| intervals.len() >= 2) {
-            candidates.push((idx, NoteOp::ArpSpan((rng.below(7) + 6) as f64)));
+            candidates.push((index, NoteOp::ArpSpan((rng.below(7) + 6) as f64)));
         }
     }
 
     let mut remaining = budget;
-    for (idx, op) in select(candidates, |(_, op)| op.chance(track), rng) {
+    for (index, op) in select(candidates, |(_, op)| op.chance(track), rng) {
         let cost = op.cost(budget);
         if cost > remaining {
             continue;
         }
         remaining -= cost;
-        let note = varied.entry(idx).or_insert_with(|| track.notes[idx].clone());
+        let note = varied.entry(index).or_insert_with(|| track.notes[index].clone());
         match op {
             NoteOp::RetrigRate { retrigger_count, rate } => {
                 note.retrigger_count = retrigger_count;
@@ -188,7 +188,7 @@ impl HitOp {
 /// Apply the flat-notes layer of one track, loop by loop (`TrackVariation.apply`).
 pub(crate) fn apply(
     flat: &mut Hits,
-    track_idx: usize,
+    track_index: usize,
     track: &Track,
     loop_ticks: i64,
     pattern_ticks: i64,
@@ -226,8 +226,8 @@ pub(crate) fn apply(
             if i64::from(tick) >= pattern_ticks {
                 continue;
             }
-            if let Some(idx) = flat.get(&tick).and_then(|notes| notes.iter().position(|n| n.track == track_idx)) {
-                played.push((step, (tick, idx)));
+            if let Some(index) = flat.get(&tick).and_then(|notes| notes.iter().position(|n| n.track == track_index)) {
+                played.push((step, (tick, index)));
             }
         }
         if played.is_empty() {
@@ -273,36 +273,36 @@ pub(crate) fn apply(
                 continue;
             }
             remaining -= op.cost();
-            let note_at = |flat: &Hits, (tick, idx): Slot| flat[&tick][idx].clone();
+            let note_at = |flat: &Hits, (tick, index): Slot| flat[&tick][index].clone();
             match op {
                 HitOp::Silence(slot) => silenced.push(slot),
-                HitOp::Velocity((tick, idx)) => {
+                HitOp::Velocity((tick, index)) => {
                     let velocity = round2(rng.next_f64());
-                    flat.get_mut(&tick).expect("scanned tick")[idx].velocity = velocity;
+                    flat.get_mut(&tick).expect("scanned tick")[index].velocity = velocity;
                 }
-                HitOp::Pitch((tick, idx)) => {
+                HitOp::Pitch((tick, index)) => {
                     let pitch = pick_pitch(track, rng, scales);
-                    flat.get_mut(&tick).expect("scanned tick")[idx].pitch = pitch;
+                    flat.get_mut(&tick).expect("scanned tick")[index].pitch = pitch;
                 }
                 HitOp::Anticipation(slot, target) => {
                     let from = note_at(flat, slot);
-                    add(flat, track_idx, &from, target, round2((from.velocity * 0.7).max(0.2)));
+                    add(flat, track_index, &from, target, round2((from.velocity * 0.7).max(0.2)));
                 }
                 HitOp::Double(slot, target) => {
                     let from = note_at(flat, slot);
-                    add(flat, track_idx, &from, target, round2(from.velocity * 0.8));
+                    add(flat, track_index, &from, target, round2(from.velocity * 0.8));
                 }
                 HitOp::Ghost(slot, target) => {
                     let from = note_at(flat, slot);
-                    add(flat, track_idx, &from, target, round2(from.velocity * 0.5));
+                    add(flat, track_index, &from, target, round2(from.velocity * 0.5));
                 }
             }
         }
 
         silenced.sort_unstable_by(|a, b| b.cmp(a)); // highest index first in each tick
-        for (tick, idx) in silenced {
+        for (tick, index) in silenced {
             if let Some(notes) = flat.get_mut(&tick) {
-                notes.remove(idx);
+                notes.remove(index);
                 if notes.is_empty() {
                     flat.remove(&tick);
                 }
@@ -312,9 +312,9 @@ pub(crate) fn apply(
 }
 
 /// A note added by the variation: pitch and pan of `from`, default everything else.
-fn add(flat: &mut Hits, track_idx: usize, from: &Hit, target: Target, velocity: f64) {
+fn add(flat: &mut Hits, track_index: usize, from: &Hit, target: Target, velocity: f64) {
     flat.entry(target.tick).or_default().push(Hit {
-        track: track_idx,
+        track: track_index,
         source: None,
         beat: target.beat,
         step: target.beat_step,
