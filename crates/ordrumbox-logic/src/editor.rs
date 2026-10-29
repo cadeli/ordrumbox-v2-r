@@ -16,7 +16,7 @@ use ordrumbox_core::json::Value;
 use ordrumbox_core::pattern::{APPLICATION, URL};
 use ordrumbox_core::{Library, Note, Pattern, Scales, SetField, Track};
 
-use crate::generate::{self, AutoGen, MelodicKind, Options};
+use crate::generate::{self, AutoGenerator, MelodicKind, Options};
 use crate::history::{Change, History, Target};
 use crate::midi;
 
@@ -648,7 +648,7 @@ impl Editor {
     /// tracks and lines, one undo step; its index.
     pub fn generate_pattern(&mut self, scales: &Scales, rnd: &mut dyn FnMut() -> f64) -> usize {
         let mut pattern = self.blank_pattern(None);
-        generate::generate_pattern(&mut AutoGen::new(scales, rnd), &mut pattern, &Options::default());
+        generate::generate_pattern(&mut AutoGenerator::new(scales, rnd), &mut pattern, &Options::default());
         let desc = format!("Generate pattern \"{}\"", pattern_name(&pattern));
         self.edit_patterns(desc, |patterns| {
             patterns.push(pattern);
@@ -662,7 +662,7 @@ impl Editor {
             let on = pattern.tracks.iter().any(|t| instrument_family(&t.name).is_drum() && t.auto);
             if on { "Generate drums" } else { "Drums auto off" }.to_owned()
         };
-        self.edit(p, desc, None, |pattern| generate::toggle_drums(&mut AutoGen::new(scales, rnd), pattern))
+        self.edit(p, desc, None, |pattern| generate::toggle_drums(&mut AutoGenerator::new(scales, rnd), pattern))
     }
 
     /// ↻ Bass / ↻ Chords on pattern `p` (`toggleMelodic`): whether that
@@ -682,7 +682,9 @@ impl Editor {
             let on = pattern.tracks.iter().any(|t| instrument_family(&t.name) == wanted && t.auto);
             if on { format!("Generate {part}") } else { format!("{part} auto off") }
         };
-        self.edit(p, desc, None, |pattern| generate::toggle_melodic(&mut AutoGen::new(scales, rnd), pattern, kind))
+        self.edit(p, desc, None, |pattern| {
+            generate::toggle_melodic(&mut AutoGenerator::new(scales, rnd), pattern, kind)
+        })
     }
 
     /// Patterns from the MIDI file `bytes` named `file_name`
@@ -729,7 +731,7 @@ impl Editor {
         if !generate::plays_auto(pattern) {
             return false;
         }
-        let changed = generate::run_loop(&mut AutoGen::new(scales, rnd), pattern, index);
+        let changed = generate::run_loop(&mut AutoGenerator::new(scales, rnd), pattern, index);
         if changed {
             self.revision += 1;
         }

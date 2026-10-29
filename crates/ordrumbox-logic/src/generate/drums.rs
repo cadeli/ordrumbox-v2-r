@@ -6,7 +6,7 @@ use ordrumbox_core::json::Value;
 use ordrumbox_core::{Scales, Track, js};
 
 use super::{
-    Accent, Gen, Grid, Phrases, Vel, add_note, apply_loop_point, cycle, loop_point, num, nums, text,
+    Accent, Generator, Grid, Phrases, VelocitySpec, add_note, apply_loop_point, cycle, loop_point, num, nums, text,
     with_steps_per_beat,
 };
 
@@ -15,10 +15,10 @@ fn is_true(value: &Value, key: &str) -> bool {
 }
 
 /// The phrases of a drum variant: accents and ghosts as the phrase says.
-fn drum_phrases(g: &mut Gen<'_>, track: &mut Track, config: &Value, density: f64) {
+fn drum_phrases(g: &mut Generator<'_>, track: &mut Track, config: &Value, density: f64) {
     let accent = |p: &Value, _: i32| is_true(p, "accent");
     let ghost = |p: &Value, _: i32| is_true(p, "ghost");
-    let mut zero = |_: &mut Gen<'_>, _: &Value, _: &[f64]| 0.0;
+    let mut zero = |_: &mut Generator<'_>, _: &Value, _: &[f64]| 0.0;
     let opts = Phrases {
         default_loop_beats: 2.0,
         pitch: Some(&mut zero),
@@ -37,7 +37,7 @@ pub(crate) fn kick(
     scales: &Scales,
     rnd: &mut dyn FnMut() -> f64,
 ) {
-    let mut g = Gen::new("kick", scales, rnd);
+    let mut g = Generator::new("kick", scales, rnd);
     // A random kick is never the `break` one (`getRndVariantName`).
     let name = match variant {
         Some(v) if !v.is_empty() && g.configs.contains_key(v) => v.to_owned(),
@@ -64,7 +64,7 @@ pub(crate) fn clap(
     scales: &Scales,
     rnd: &mut dyn FnMut() -> f64,
 ) {
-    let mut g = Gen::new("clap", scales, rnd);
+    let mut g = Generator::new("clap", scales, rnd);
     let name = g.resolve_variant(variant);
     let Some(config) = g.config(&name).or_else(|| g.config("sparse")) else { return };
     track.notes.clear();
@@ -84,7 +84,7 @@ pub(crate) fn cowbell(
     scales: &Scales,
     rnd: &mut dyn FnMut() -> f64,
 ) {
-    let mut g = Gen::new("cowbell", scales, rnd);
+    let mut g = Generator::new("cowbell", scales, rnd);
     let name = g.resolve_variant(variant);
     let Some(config) = g.config(&name).or_else(|| g.config("basic")) else { return };
     track.notes.clear();
@@ -106,7 +106,7 @@ pub(crate) fn snare(
     scales: &Scales,
     rnd: &mut dyn FnMut() -> f64,
 ) {
-    let mut g = Gen::new("snare", scales, rnd);
+    let mut g = Generator::new("snare", scales, rnd);
     let name = g.resolve_variant(variant);
     let Some(config) = g.config(&name).or_else(|| g.config("basic")) else { return };
     track.notes.clear();
@@ -126,7 +126,7 @@ fn ratchet(count: f64, progress: f64) -> i32 {
 }
 
 /// `generateSnareRollVariant`: the last beat, louder and with more hits step after step.
-fn snare_roll(g: &mut Gen<'_>, track: &mut Track, config: &Value) {
+fn snare_roll(g: &mut Generator<'_>, track: &mut Track, config: &Value) {
     let loop_point = loop_point(track, config, 1.0);
     let spb = track.steps_per_beat;
     let last_beat = (track.beat_count - 1).max(0);
@@ -141,7 +141,7 @@ fn snare_roll(g: &mut Gen<'_>, track: &mut Track, config: &Value) {
         let progress = if last_step == 0 { 1.0 } else { f64::from(step) / f64::from(last_step) };
         let base = min + (max - min) * progress;
         let hits = ratchet(count, progress);
-        let context = Vel { base: Some(base), ..Vel::accent(step == last_step, step != last_step) };
+        let context = VelocitySpec { base: Some(base), ..VelocitySpec::accent(step == last_step, step != last_step) };
         let velocity = g.velocity(config.get("velocity"), context);
         let note = add_note(track, last_beat, step, 0.0, velocity);
         if hits > 1 {
@@ -152,7 +152,7 @@ fn snare_roll(g: &mut Gen<'_>, track: &mut Track, config: &Value) {
 }
 
 /// `generateSnareFillVariant`: the last beats, step by step with a chance.
-fn snare_fill(g: &mut Gen<'_>, track: &mut Track, config: &Value, density: f64) {
+fn snare_fill(g: &mut Generator<'_>, track: &mut Track, config: &Value, density: f64) {
     let loop_point = loop_point(track, config, 2.0);
     let spb = track.steps_per_beat;
     let start = (track.beat_count - num(config, "startBeatOffset").unwrap_or(1.0) as i32).max(0);
@@ -167,7 +167,7 @@ fn snare_fill(g: &mut Gen<'_>, track: &mut Track, config: &Value, density: f64) 
             if beat * spb + step >= loop_point {
                 continue;
             }
-            let context = Vel::accent(step == 0 || step == spb - 1, step != 0);
+            let context = VelocitySpec::accent(step == 0 || step == spb - 1, step != 0);
             let velocity = g.velocity(config.get("velocity"), context);
             add_note(track, beat, step, 0.0, velocity);
         }
@@ -176,7 +176,7 @@ fn snare_fill(g: &mut Gen<'_>, track: &mut Track, config: &Value, density: f64) 
 
 /// `generateBreakCrescendo`: every step of the last `stepsBack`, more and
 /// more likely and with more and more hits.
-fn break_crescendo(g: &mut Gen<'_>, track: &mut Track, config: &Value) {
+fn break_crescendo(g: &mut Generator<'_>, track: &mut Track, config: &Value) {
     let spb = track.steps_per_beat;
     let length = track.beat_count * spb;
     let steps_back = num(config, "stepsBack").unwrap_or(16.0);
@@ -186,7 +186,7 @@ fn break_crescendo(g: &mut Gen<'_>, track: &mut Track, config: &Value) {
     for abs in start..length {
         let (beat, beat_step) = (abs / spb, abs % spb);
         let prob = f64::from(abs - start + 1) / steps_back;
-        let velocity = g.velocity(config.get("velocity"), Vel::accent(beat_step == 0, false));
+        let velocity = g.velocity(config.get("velocity"), VelocitySpec::accent(beat_step == 0, false));
         let note = add_note(track, beat, beat_step, 0.0, velocity);
         note.probability = js::to_fixed(prob, 2);
         if count_max > 1.0 {
@@ -215,7 +215,7 @@ pub(crate) fn hat(
     scales: &Scales,
     rnd: &mut dyn FnMut() -> f64,
 ) {
-    let mut g = Gen::new("hat", scales, rnd);
+    let mut g = Generator::new("hat", scales, rnd);
     let kind = hat_type(track);
     // `resolveHatVariantName`: a random variant is one of the hat's own kind.
     let name = match variant {
@@ -248,7 +248,7 @@ pub(crate) fn hat(
 
 /// `generateHatLockedVariant`: a velocity pattern over 16 steps a beat —
 /// on a grid clamped to 8 (`withTemporaryStepsPerBeat(16)`), as the JS does.
-fn hat_locked(g: &mut Gen<'_>, track: &mut Track, config: &Value) {
+fn hat_locked(g: &mut Generator<'_>, track: &mut Track, config: &Value) {
     with_steps_per_beat(track, 16, |track| {
         let loop_point = loop_point(track, config, 1.0);
         let pattern = nums(config, "velocityPattern").unwrap_or_default();
@@ -260,7 +260,7 @@ fn hat_locked(g: &mut Gen<'_>, track: &mut Track, config: &Value) {
                 }
                 let base = cycle(&pattern, step as usize).unwrap_or(0.6);
                 let accent = f64::from(step) % accent_every == 0.0;
-                let context = Vel { base: Some(base), ..Vel::accent(accent, !accent) };
+                let context = VelocitySpec { base: Some(base), ..VelocitySpec::accent(accent, !accent) };
                 let velocity = g.velocity(config.get("velocity"), context);
                 add_note(track, beat, step, 0.0, velocity);
             }
@@ -270,7 +270,7 @@ fn hat_locked(g: &mut Gen<'_>, track: &mut Track, config: &Value) {
 
 /// `#generateHatVelocityVariant` (shaker, ride): a velocity pattern, each
 /// step kept with `density`; the ride's bell step accented.
-fn hat_velocity(g: &mut Gen<'_>, track: &mut Track, config: &Value, density: f64, default_base: f64, bell: bool) {
+fn hat_velocity(g: &mut Generator<'_>, track: &mut Track, config: &Value, density: f64, default_base: f64, bell: bool) {
     let loop_point = loop_point(track, config, 2.0);
     let spb = track.steps_per_beat;
     let pattern = nums(config, "velocityPattern").unwrap_or_default();
@@ -290,7 +290,8 @@ fn hat_velocity(g: &mut Gen<'_>, track: &mut Track, config: &Value, density: f64
                 continue;
             }
             let base = if is_bell { bell_config.and_then(|b| num(b, "velocity")).unwrap_or(0.75) } else { base };
-            let context = Vel { base: Some(base), ..Vel::accent(accent || is_bell, !accent && !is_bell) };
+            let context =
+                VelocitySpec { base: Some(base), ..VelocitySpec::accent(accent || is_bell, !accent && !is_bell) };
             let velocity = g.velocity(config.get("velocity"), context);
             add_note(track, beat, step, 0.0, velocity);
         }
@@ -298,7 +299,7 @@ fn hat_velocity(g: &mut Gen<'_>, track: &mut Track, config: &Value, density: f64
 }
 
 /// `generateHatTransitionVariant`: the last beat, the last hit a ratchet.
-fn hat_transition(g: &mut Gen<'_>, track: &mut Track, config: &Value, kind: &str) {
+fn hat_transition(g: &mut Generator<'_>, track: &mut Track, config: &Value, kind: &str) {
     let last_beat = (track.beat_count - num(config, "startBeatOffset").unwrap_or(1.0) as i32).max(0);
     let spb = track.steps_per_beat;
     let interval = if kind == "OHH" { 2 } else { 1 };
@@ -307,7 +308,7 @@ fn hat_transition(g: &mut Gen<'_>, track: &mut Track, config: &Value, kind: &str
     while step < spb {
         if last_beat * spb + step < loop_point {
             let last = step == spb - interval;
-            let velocity = g.velocity(config.get("velocity"), Vel::accent(last, !last));
+            let velocity = g.velocity(config.get("velocity"), VelocitySpec::accent(last, !last));
             let note = add_note(track, last_beat, step, 0.0, velocity);
             if last && let Some(count) = num(config, "retriggerCount") {
                 note.retrigger_count = count as i32;
@@ -319,7 +320,7 @@ fn hat_transition(g: &mut Gen<'_>, track: &mut Track, config: &Value, kind: &str
 }
 
 /// `generateHatRollVariant`: one beat with more and more hits per step.
-fn hat_roll(g: &mut Gen<'_>, track: &mut Track, config: &Value) {
+fn hat_roll(g: &mut Generator<'_>, track: &mut Track, config: &Value) {
     let loop_point = loop_point(track, config, 4.0);
     let spb = track.steps_per_beat;
     let roll_beat = num(config, "rollBeat").map_or((track.beat_count - 1).max(0), |b| b as i32);
@@ -331,7 +332,7 @@ fn hat_roll(g: &mut Gen<'_>, track: &mut Track, config: &Value) {
         }
         let progress = if spb > 1 { f64::from(step) / f64::from(spb - 1) } else { 1.0 };
         let hits = ratchet(count, progress);
-        let velocity = g.velocity(config.get("velocity"), Vel::accent(step == 0, step != 0));
+        let velocity = g.velocity(config.get("velocity"), VelocitySpec::accent(step == 0, step != 0));
         let note = add_note(track, roll_beat, step, 0.0, velocity);
         if hits > 1 {
             note.retrigger_count = hits;
@@ -358,7 +359,7 @@ fn pitch_bias(track: &Track) -> f64 {
 }
 
 /// `PercGenerator.getScaleSteps`: the scale, else pentatonic minor, else major.
-fn perc_scale(g: &Gen<'_>, name: Option<&str>) -> Vec<f64> {
+fn perc_scale(g: &Generator<'_>, name: Option<&str>) -> Vec<f64> {
     let steps = name
         .and_then(|n| g.scales.get(n))
         .or_else(|| g.scales.get("pentatonic minor"))
@@ -375,7 +376,7 @@ pub(crate) fn perc(
     scales: &Scales,
     rnd: &mut dyn FnMut() -> f64,
 ) {
-    let mut g = Gen::new("perc", scales, rnd);
+    let mut g = Generator::new("perc", scales, rnd);
     let name = g.resolve_variant(variant);
     let Some(config) = g.config(&name).or_else(|| g.config("basic")) else { return };
     let tones = perc_scale(&g, text(config, "scaleName"));
@@ -385,15 +386,16 @@ pub(crate) fn perc(
         Some("lockedPerc") => perc_locked(&mut g, track, &tones, bias, config, density),
         Some("crash") => crash(&mut g, track, config),
         Some("grid") => {
-            let mut pitch = |g: &mut Gen<'_>| g.random_tone(&tones) + bias;
+            let mut pitch = |g: &mut Generator<'_>| g.random_tone(&tones) + bias;
             let opts = Grid { default_loop_beats: 2.0, pitch: Some(&mut pitch), ..Grid::default() };
             g.grid(track, config, density, opts);
         }
         Some("callResponse") => call_response(&mut g, track, &tones, bias, config, density),
         Some("fill") => perc_fill(&mut g, track, &tones, bias, config),
         _ => {
-            let mut pitch =
-                |g: &mut Gen<'_>, phrase: &Value, cached: &[f64]| g.phrase_pitch(phrase, &tones, cached, bias, None);
+            let mut pitch = |g: &mut Generator<'_>, phrase: &Value, cached: &[f64]| {
+                g.phrase_pitch(phrase, &tones, cached, bias, None)
+            };
             let accent = |_: &Value, step: i32| step == 0;
             let ghost = |phrase: &Value, _: i32| text(phrase, "source") != Some("root");
             let opts = Phrases {
@@ -411,7 +413,7 @@ pub(crate) fn perc(
 
 /// `generateLockedPercVariant`: velocity and pitch patterns over 16 steps a
 /// beat (on a grid clamped to 8, as for the hats); silent steps skipped.
-fn perc_locked(g: &mut Gen<'_>, track: &mut Track, tones: &[f64], bias: f64, config: &Value, density: f64) {
+fn perc_locked(g: &mut Generator<'_>, track: &mut Track, tones: &[f64], bias: f64, config: &Value, density: f64) {
     with_steps_per_beat(track, 16, |track| {
         let loop_point = loop_point(track, config, 1.0);
         let velocities = nums(config, "velocityPattern").unwrap_or_default();
@@ -433,7 +435,7 @@ fn perc_locked(g: &mut Gen<'_>, track: &mut Track, tones: &[f64], bias: f64, con
                 if g.random() >= density {
                     continue;
                 }
-                let context = Vel { base: Some(base), ..Vel::accent(accent, !accent) };
+                let context = VelocitySpec { base: Some(base), ..VelocitySpec::accent(accent, !accent) };
                 let velocity = g.velocity(config.get("velocity"), context);
                 add_note(track, beat, step, pitch, velocity);
             }
@@ -443,7 +445,7 @@ fn perc_locked(g: &mut Gen<'_>, track: &mut Track, tones: &[f64], bias: f64, con
 
 /// `generatePercCallResponseVariant`: call steps on even beats, response
 /// steps on odd ones, each with a chance, at random tones.
-fn call_response(g: &mut Gen<'_>, track: &mut Track, tones: &[f64], bias: f64, config: &Value, density: f64) {
+fn call_response(g: &mut Generator<'_>, track: &mut Track, tones: &[f64], bias: f64, config: &Value, density: f64) {
     let loop_point = loop_point(track, config, 2.0);
     let spb = track.steps_per_beat;
     let call = nums(config, "callSteps").unwrap_or_default();
@@ -460,7 +462,7 @@ fn call_response(g: &mut Gen<'_>, track: &mut Track, tones: &[f64], bias: f64, c
                 continue;
             }
             let pitch = g.random_tone(tones) + bias;
-            let context = Vel { variation: true, ..Vel::accent(step == 0, false) };
+            let context = VelocitySpec { variation: true, ..VelocitySpec::accent(step == 0, false) };
             let velocity = g.velocity(config.get("velocity"), context);
             add_note(track, beat, step, pitch, velocity);
         }
@@ -468,7 +470,7 @@ fn call_response(g: &mut Gen<'_>, track: &mut Track, tones: &[f64], bias: f64, c
 }
 
 /// `generatePercFillVariant`: a few steps of one beat walking up the scale.
-fn perc_fill(g: &mut Gen<'_>, track: &mut Track, tones: &[f64], bias: f64, config: &Value) {
+fn perc_fill(g: &mut Generator<'_>, track: &mut Track, tones: &[f64], bias: f64, config: &Value) {
     let loop_point = loop_point(track, config, 2.0);
     let spb = track.steps_per_beat;
     let start = (track.beat_count - num(config, "startBeatOffset").unwrap_or(1.0) as i32).max(0);
@@ -479,7 +481,7 @@ fn perc_fill(g: &mut Gen<'_>, track: &mut Track, tones: &[f64], bias: f64, confi
             continue;
         }
         let pitch = cycle(tones, index).unwrap_or(0.0) + bias;
-        let context = Vel { variation: index > 0, ..Vel::accent(step == 0, false) };
+        let context = VelocitySpec { variation: index > 0, ..VelocitySpec::accent(step == 0, false) };
         let velocity = g.velocity(config.get("velocity"), context);
         let note = add_note(track, start, step, pitch, velocity);
         if let Some(prob) = config.get("prob").filter(|p| !p.is_null()) {
@@ -492,7 +494,7 @@ fn perc_fill(g: &mut Gen<'_>, track: &mut Track, tones: &[f64], bias: f64, confi
 }
 
 /// `generateCrashVariant`: rare hits anywhere, any pitch, anywhere in the stereo field.
-fn crash(g: &mut Gen<'_>, track: &mut Track, config: &Value) {
+fn crash(g: &mut Generator<'_>, track: &mut Track, config: &Value) {
     let loop_point = loop_point(track, config, 1.0);
     let spb = track.steps_per_beat;
     let probability = num(config, "probability").unwrap_or(0.1);
@@ -502,7 +504,7 @@ fn crash(g: &mut Gen<'_>, track: &mut Track, config: &Value) {
                 continue;
             }
             let pitch = (g.random() * 24.0).floor() - 12.0;
-            let velocity = g.velocity(config.get("velocity"), Vel::accent(Accent::Off, false));
+            let velocity = g.velocity(config.get("velocity"), VelocitySpec::accent(Accent::Off, false));
             let note = add_note(track, beat, step, pitch, velocity);
             note.pan = g.random() * 2.0 - 1.0;
         }

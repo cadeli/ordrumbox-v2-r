@@ -6,8 +6,8 @@ use ordrumbox_core::drum_taxonomy::InstrumentFamily;
 use ordrumbox_core::json::{self, Object, Value};
 use ordrumbox_core::{Note, Pattern, Scales, Track};
 use ordrumbox_logic::generate::{
-    AutoGen, Harmony, MelodicKind, Options, generate_pattern, instrument_line, random_track, run_loop, toggle_drums,
-    toggle_melodic,
+    AutoGenerator, Harmony, MelodicKind, Options, generate_pattern, instrument_line, random_track, run_loop,
+    toggle_drums, toggle_melodic,
 };
 
 /// mulberry32, the stream the fixture script gives `Math.random`.
@@ -230,7 +230,7 @@ fn every_variant_of_every_generator() {
         );
         let mut stream = Stream::new(f(case, "seed"));
         let mut rnd = || stream.next();
-        let mut g = AutoGen::new(&scales, &mut rnd);
+        let mut g = AutoGenerator::new(&scales, &mut rnd);
         instrument_line(&mut g, &mut pattern, t, kind, variant, f(case, "density"), &harmony_in(case.get("harmony")));
         drop(g);
         check_track(&pattern.tracks[t], case.get("track").unwrap(), &at);
@@ -268,7 +268,7 @@ fn whole_patterns() {
         let at = format!("pattern seed {}", f(case, "seed"));
         let mut stream = Stream::new(f(case, "seed"));
         let mut rnd = || stream.next();
-        generate_pattern(&mut AutoGen::new(&scales, &mut rnd), &mut pattern, &options);
+        generate_pattern(&mut AutoGenerator::new(&scales, &mut rnd), &mut pattern, &options);
         check_pattern(&pattern, case.get("after").unwrap(), &at);
         assert_eq!(stream.draws as f64, f(case, "draws"), "{at}: draws");
     }
@@ -285,7 +285,7 @@ fn loop_after_loop() {
             let at = format!("loops seed {} loop {index}", f(case, "seed"));
             let start = stream.draws;
             let mut rnd = || stream.next();
-            run_loop(&mut AutoGen::new(&scales, &mut rnd), &mut pattern, index as u64);
+            run_loop(&mut AutoGenerator::new(&scales, &mut rnd), &mut pattern, index as u64);
             check_pattern(&pattern, expected.get("pattern").unwrap(), &at);
             assert_eq!((stream.draws - start) as f64, f(expected, "draws"), "{at}: draws");
         }
@@ -304,7 +304,7 @@ fn toolbar_toggles() {
             let at = format!("toggles seed {} step {i} {step}", f(case, "seed"));
             let start = stream.draws;
             let mut rnd = || stream.next();
-            let mut g = AutoGen::new(&scales, &mut rnd);
+            let mut g = AutoGenerator::new(&scales, &mut rnd);
             match step {
                 "drums" => toggle_drums(&mut g, &mut pattern),
                 "bass" => toggle_melodic(&mut g, &mut pattern, MelodicKind::Bass),

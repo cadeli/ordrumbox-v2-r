@@ -21,7 +21,7 @@ use ordrumbox_core::json::{self, Object, Value};
 use ordrumbox_core::{Note, Scales, Track};
 
 pub use auto::{
-    AutoGen, Harmony, MelodicKind, Options, change_track, generate_pattern, generate_track, instrument_line,
+    AutoGenerator, Harmony, MelodicKind, Options, change_track, generate_pattern, generate_track, instrument_line,
     is_auto_on, plays_auto, random_track, run_loop, toggle_drums, toggle_melodic,
 };
 pub use structure::{SectionElement, Structure};
@@ -132,7 +132,7 @@ impl From<bool> for Accent {
 
 /// `computeVelocity`'s context.
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct Vel {
+pub(crate) struct VelocitySpec {
     pub accent: Accent,
     pub ghost: bool,
     pub variation: bool,
@@ -144,13 +144,13 @@ pub(crate) struct Vel {
     pub scale: f64,
 }
 
-impl Default for Vel {
+impl Default for VelocitySpec {
     fn default() -> Self {
         Self { accent: Accent::Off, ghost: false, variation: false, base: None, fixed: true, scale: 1.0 }
     }
 }
 
-impl Vel {
+impl VelocitySpec {
     pub fn accent(accent: impl Into<Accent>, ghost: bool) -> Self {
         Self { accent: accent.into(), ghost, ..Self::default() }
     }
@@ -160,7 +160,7 @@ impl Vel {
 
 /// `BaseGenerator`: what every instrument generator shares — its variant
 /// table, the scales, the random source.
-pub(crate) struct Gen<'a> {
+pub(crate) struct Generator<'a> {
     pub configs: &'static Object,
     pub scales: &'a Scales,
     pub rnd: &'a mut dyn FnMut() -> f64,
@@ -168,7 +168,7 @@ pub(crate) struct Gen<'a> {
     pub tone_threshold: i32,
 }
 
-impl<'a> Gen<'a> {
+impl<'a> Generator<'a> {
     pub fn new(table_name: &str, scales: &'a Scales, rnd: &'a mut dyn FnMut() -> f64) -> Self {
         Self { configs: table(table_name), scales, rnd, tone_threshold: 6 }
     }
@@ -202,7 +202,7 @@ impl<'a> Gen<'a> {
 
     /// `computeVelocity`: base + accent + ghost + variation boost + a random
     /// spread (always drawn), scaled, clamped, rounded to 2 decimals.
-    pub fn velocity(&mut self, config: Option<&Value>, context: Vel) -> f64 {
+    pub fn velocity(&mut self, config: Option<&Value>, context: VelocitySpec) -> f64 {
         let empty = Value::Object(Object::new());
         let vc = config.unwrap_or(&empty);
         let base = context.base.or_else(|| num(vc, "base")).unwrap_or(0.75);
@@ -309,7 +309,7 @@ impl<'a> Gen<'a> {
                     Some(pitch) => pitch(self),
                     None => num(config, "pitch").unwrap_or(0.0),
                 };
-                let velocity = self.velocity(config.get("velocity"), Vel::accent(accent, ghost));
+                let velocity = self.velocity(config.get("velocity"), VelocitySpec::accent(accent, ghost));
                 apply_note_properties(add_note(track, beat, step, pitch, velocity), config);
             }
         }
@@ -358,7 +358,7 @@ impl<'a> Gen<'a> {
             };
             let accent = opts.accent.map_or(phrase.get("accent") == Some(&Value::Bool(true)), |f| f(phrase, step));
             let ghost = opts.ghost.map_or(phrase.get("ghost") == Some(&Value::Bool(true)), |f| f(phrase, step));
-            let velocity = self.velocity(config.get("velocity"), Vel::accent(accent, ghost));
+            let velocity = self.velocity(config.get("velocity"), VelocitySpec::accent(accent, ghost));
             apply_note_properties(add_note(track, beat, step, pitch, velocity), phrase);
             cached.push(pitch);
             if !opts.stacking {
@@ -426,11 +426,11 @@ pub(crate) type StepTest<'f> = &'f dyn Fn(i32, i32) -> bool;
 /// A test on a phrase and the step it lands on.
 pub(crate) type PhraseTest<'f> = &'f dyn Fn(&Value, i32) -> bool;
 /// The pitch of a grid step.
-pub(crate) type StepPitch<'f> = &'f mut dyn FnMut(&mut Gen<'_>) -> f64;
+pub(crate) type StepPitch<'f> = &'f mut dyn FnMut(&mut Generator<'_>) -> f64;
 /// The pitch of a phrase, given the pitches so far.
-pub(crate) type PhrasePitch<'f> = &'f mut dyn FnMut(&mut Gen<'_>, &Value, &[f64]) -> f64;
+pub(crate) type PhrasePitch<'f> = &'f mut dyn FnMut(&mut Generator<'_>, &Value, &[f64]) -> f64;
 
-/// Options of [`Gen::grid`].
+/// Options of [`Generator::grid`].
 #[derive(Default)]
 pub(crate) struct Grid<'f> {
     pub default_loop_beats: f64,
@@ -439,7 +439,7 @@ pub(crate) struct Grid<'f> {
     pub pitch: Option<StepPitch<'f>>,
 }
 
-/// Options of [`Gen::phrases`].
+/// Options of [`Generator::phrases`].
 #[derive(Default)]
 pub(crate) struct Phrases<'f> {
     pub default_loop_beats: f64,

@@ -5,7 +5,9 @@ use ordrumbox_core::json::Value;
 use ordrumbox_core::{Pattern, Scales, Track};
 
 use super::auto::Harmony;
-use super::{Accent, Gen, Phrases, Vel, add_note, apply_loop_point, clamp, cycle, loop_point, num, nums, text};
+use super::{
+    Accent, Generator, Phrases, VelocitySpec, add_note, apply_loop_point, clamp, cycle, loop_point, num, nums, text,
+};
 
 fn is_true(value: &Value, key: &str) -> bool {
     value.get(key) == Some(&Value::Bool(true))
@@ -23,7 +25,7 @@ pub(crate) fn bass(
     scales: &Scales,
     rnd: &mut dyn FnMut() -> f64,
 ) {
-    let mut g = Gen::new("bass", scales, rnd);
+    let mut g = Generator::new("bass", scales, rnd);
     g.tone_threshold = 5;
     let name = g.resolve_variant(variant);
     let Some(config) = g.config(&name).or_else(|| g.config("basic")) else { return };
@@ -37,7 +39,7 @@ pub(crate) fn bass(
         Some("arpeggio") => bass_arpeggio(&mut g, track, &tones, config, density, root),
         _ => {
             let approach = nums(config, "approachNotes");
-            let mut pitch = |g: &mut Gen<'_>, phrase: &Value, cached: &[f64]| {
+            let mut pitch = |g: &mut Generator<'_>, phrase: &Value, cached: &[f64]| {
                 g.phrase_pitch(phrase, &tones, cached, root, approach.as_deref())
             };
             let accent = |_: &Value, step: i32| step % 4 == 0;
@@ -55,7 +57,7 @@ pub(crate) fn bass(
 
 /// `generateBassStepGridVariant`: one beat, the root then random tones, each
 /// step with its probability (one row of `probabilitySets`).
-fn bass_step_grid(g: &mut Gen<'_>, track: &mut Track, tones: &[f64], config: &Value, density: f64, root: f64) {
+fn bass_step_grid(g: &mut Generator<'_>, track: &mut Track, tones: &[f64], config: &Value, density: f64, root: f64) {
     let loop_point = loop_point(track, config, 2.0);
     let spb = track.steps_per_beat;
     let beat = num(config, "beat").unwrap_or(0.0) as i32;
@@ -80,7 +82,7 @@ fn bass_step_grid(g: &mut Gen<'_>, track: &mut Track, tones: &[f64], config: &Va
         let probability = cycle(&probabilities, step as usize).unwrap_or(f64::NAN);
         if g.random() < probability * density {
             let accent = accents.as_deref().and_then(|a| cycle(a, step as usize)).unwrap_or(0.0);
-            let context = Vel { accent: Accent::By(accent), fixed: false, ..Vel::default() };
+            let context = VelocitySpec { accent: Accent::By(accent), fixed: false, ..VelocitySpec::default() };
             let velocity = g.velocity(config.get("velocity"), context);
             add_note(track, beat, step, pitches[step as usize], velocity);
         }
@@ -89,7 +91,7 @@ fn bass_step_grid(g: &mut Gen<'_>, track: &mut Track, tones: &[f64], config: &Va
 
 /// `generateBassGrooveVariant`: each beat on its root (`rootPattern`), the
 /// other steps by chance, mostly strong intervals, sometimes a scale degree.
-fn bass_groove(g: &mut Gen<'_>, track: &mut Track, scale: &[f64], config: &Value, density: f64, root: f64) {
+fn bass_groove(g: &mut Generator<'_>, track: &mut Track, scale: &[f64], config: &Value, density: f64, root: f64) {
     let loop_point = loop_point(track, config, 2.0);
     let spb = track.steps_per_beat;
     let roots = nums(config, "rootPattern").unwrap_or_default();
@@ -130,7 +132,7 @@ fn bass_groove(g: &mut Gen<'_>, track: &mut Track, scale: &[f64], config: &Value
                 }
             };
             last = pitch;
-            let context = Vel { variation: is_variation, ..Vel::accent(strong, false) };
+            let context = VelocitySpec { variation: is_variation, ..VelocitySpec::accent(strong, false) };
             let velocity = g.velocity(config.get("velocity"), context);
             add_note(track, beat, step, pitch, velocity);
         }
@@ -139,14 +141,14 @@ fn bass_groove(g: &mut Gen<'_>, track: &mut Track, scale: &[f64], config: &Value
 
 /// `generateBassArpeggioVariant`: a contour over the scale from each beat's
 /// root; off-beat notes may rest and fade across the beat.
-fn bass_arpeggio(g: &mut Gen<'_>, track: &mut Track, scale: &[f64], config: &Value, density: f64, root: f64) {
+fn bass_arpeggio(g: &mut Generator<'_>, track: &mut Track, scale: &[f64], config: &Value, density: f64, root: f64) {
     let loop_point = loop_point(track, config, 2.0);
     let spb = track.steps_per_beat;
     let roots = nums(config, "rootPattern").unwrap_or_else(|| vec![0.0]);
     let length = num(config, "phraseLength").unwrap_or(scale.len() as f64).max(2.0) as usize;
     let contour = text(config, "contour").unwrap_or("updown");
     let start = num(config, "startDegree").unwrap_or(0.0);
-    let sequence = Gen::contour(scale, length, contour, start, &[0.0]);
+    let sequence = Generator::contour(scale, length, contour, start, &[0.0]);
     let average = num(config, "noteSpacing").unwrap_or(2.0).max(1.0) as i32;
     let jitter = num(config, "spacingJitter").unwrap_or(0.0).max(0.0) as i32;
     let rest_chance = clamp(num(config, "restChance").unwrap_or(0.15), 0.0, 1.0);
@@ -163,8 +165,11 @@ fn bass_arpeggio(g: &mut Gen<'_>, track: &mut Track, scale: &[f64], config: &Val
             if !rests && g.random() < density {
                 let degree = cycle(&sequence, index).unwrap_or(0.0);
                 let fade = if downbeat { 1.0 } else { 1.0 - decay * (f64::from(step) / f64::from(spb)) };
-                let context =
-                    Vel { variation: index % sequence.len() != 0, scale: fade, ..Vel::accent(downbeat, false) };
+                let context = VelocitySpec {
+                    variation: index % sequence.len() != 0,
+                    scale: fade,
+                    ..VelocitySpec::accent(downbeat, false)
+                };
                 let velocity = g.velocity(config.get("velocity"), context);
                 add_note(track, beat, step, root_pitch + degree, velocity);
             }
@@ -214,14 +219,15 @@ pub(crate) fn melody(
 ) {
     let bass_root = bass_root(pattern);
     let Some(track) = pattern.tracks.get_mut(t) else { return };
-    let mut g = Gen::new("melody", scales, rnd);
+    let mut g = Generator::new("melody", scales, rnd);
     let root = harmony.root;
     if variant == Some("break") {
         let Some(config) = g.config("break") else { return };
         track.notes.clear();
         let tones = g.scale_steps(harmony.scale.as_deref().or_else(|| text(config, "scaleName")));
         let bias = root + num(config, "octaveShift").unwrap_or(1.0) * 12.0;
-        let mut pitch = |g: &mut Gen<'_>, phrase: &Value, _: &[f64]| g.phrase_pitch(phrase, &tones, &[], bias, None);
+        let mut pitch =
+            |g: &mut Generator<'_>, phrase: &Value, _: &[f64]| g.phrase_pitch(phrase, &tones, &[], bias, None);
         let accent = |p: &Value, _: i32| is_true(p, "accent");
         let ghost = |p: &Value, _: i32| is_true(p, "ghost");
         let opts = Phrases {
@@ -248,7 +254,7 @@ pub(crate) fn melody(
         Some("arpeggio") => melody_arpeggio(&mut g, track, &tones, config, density, bias),
         _ => {
             // `#resolveChordPitch`: a chord note on the bass root's pitch class goes an octave up.
-            let mut pitch = |g: &mut Gen<'_>, phrase: &Value, cached: &[f64]| {
+            let mut pitch = |g: &mut Generator<'_>, phrase: &Value, cached: &[f64]| {
                 let base = g.phrase_pitch(phrase, &tones, cached, 0.0, None);
                 match bass_root {
                     Some(bass) if base.rem_euclid(12.0) == bass.rem_euclid(12.0) => base + 12.0 + bias,
@@ -271,7 +277,7 @@ pub(crate) fn melody(
 
 /// `generateMelodyGrooveVariant`: strong steps on chord intervals, the
 /// others by chance, sometimes a scale degree within `maxLeap`.
-fn melody_groove(g: &mut Gen<'_>, track: &mut Track, scale: &[f64], config: &Value, density: f64, bias: f64) {
+fn melody_groove(g: &mut Generator<'_>, track: &mut Track, scale: &[f64], config: &Value, density: f64, bias: f64) {
     let loop_point = loop_point(track, config, 2.0);
     let spb = track.steps_per_beat;
     let intervals = nums(config, "strongBeatIntervals").unwrap_or_else(|| vec![0.0, 4.0, 7.0]);
@@ -299,7 +305,7 @@ fn melody_groove(g: &mut Gen<'_>, track: &mut Track, scale: &[f64], config: &Val
                 if (pitch - last).abs() > max_leap { bias } else { pitch }
             };
             last = pitch;
-            let context = Vel { variation: !strong, ..Vel::accent(strong, false) };
+            let context = VelocitySpec { variation: !strong, ..VelocitySpec::accent(strong, false) };
             let velocity = g.velocity(config.get("velocity"), context);
             add_note(track, beat, step, pitch, velocity);
         }
@@ -308,12 +314,12 @@ fn melody_groove(g: &mut Gen<'_>, track: &mut Track, scale: &[f64], config: &Val
 
 /// `generateMelodyArpeggioVariant`: a contour over the scale, every
 /// `noteSpacing` steps, each note an arpeggio when the variant has one.
-fn melody_arpeggio(g: &mut Gen<'_>, track: &mut Track, scale: &[f64], config: &Value, density: f64, bias: f64) {
+fn melody_arpeggio(g: &mut Generator<'_>, track: &mut Track, scale: &[f64], config: &Value, density: f64, bias: f64) {
     let loop_point = loop_point(track, config, 2.0);
     let spb = track.steps_per_beat;
     let length = num(config, "phraseLength").unwrap_or(scale.len() as f64).max(2.0) as usize;
     let contour = text(config, "contour").unwrap_or("updown");
-    let sequence = Gen::contour(scale, length, contour, 0.0, &[0.0, 3.0, 5.0, 7.0]);
+    let sequence = Generator::contour(scale, length, contour, 0.0, &[0.0, 3.0, 5.0, 7.0]);
     let average = num(config, "noteSpacing").unwrap_or(2.0).max(1.0) as i32;
     let jitter = num(config, "spacingJitter").unwrap_or(0.0).max(0.0) as i32;
     let arp = config.get("arp").filter(|a| !a.is_null());
@@ -327,7 +333,10 @@ fn melody_arpeggio(g: &mut Gen<'_>, track: &mut Track, scale: &[f64], config: &V
             }
             if g.random() < density {
                 let degree = cycle(&sequence, index).unwrap_or(0.0);
-                let context = Vel { variation: index % sequence.len() != 0, ..Vel::accent(step % 4 == 0, false) };
+                let context = VelocitySpec {
+                    variation: index % sequence.len() != 0,
+                    ..VelocitySpec::accent(step % 4 == 0, false)
+                };
                 let velocity = g.velocity(config.get("velocity"), context);
                 let note = add_note(track, beat, step, bias + degree, velocity);
                 if let Some(arp) = arp {

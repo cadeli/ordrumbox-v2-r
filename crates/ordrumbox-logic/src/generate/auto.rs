@@ -35,13 +35,13 @@ pub struct Harmony {
 
 /// What generates: the scales and the random source.
 #[allow(missing_debug_implementations)]
-pub struct AutoGen<'a> {
+pub struct AutoGenerator<'a> {
     pub scales: &'a Scales,
     pub rnd: &'a mut dyn FnMut() -> f64,
     structure: Structure,
 }
 
-impl<'a> AutoGen<'a> {
+impl<'a> AutoGenerator<'a> {
     pub fn new(scales: &'a Scales, rnd: &'a mut dyn FnMut() -> f64) -> Self {
         Self { scales, rnd, structure: Structure::default() }
     }
@@ -69,7 +69,7 @@ fn pattern_harmony(pattern: &Pattern, genre: &str, section: &str, loop_in_elemen
 }
 
 /// `#randomDensity`: kick, snare and bass near full, the others vary more.
-fn random_density(g: &mut AutoGen<'_>, track: &Track) -> f64 {
+fn random_density(g: &mut AutoGenerator<'_>, track: &Track) -> f64 {
     let core = matches!(
         instrument_family(&track.name),
         InstrumentFamily::Kick | InstrumentFamily::Snare | InstrumentFamily::Bass
@@ -79,7 +79,7 @@ fn random_density(g: &mut AutoGen<'_>, track: &Track) -> f64 {
 }
 
 /// `#applyGenreSwing`: the genre's swing, ±0.08.
-fn apply_genre_swing(g: &mut AutoGen<'_>, track: &mut Track, genre: Option<&str>) {
+fn apply_genre_swing(g: &mut AutoGenerator<'_>, track: &mut Track, genre: Option<&str>) {
     let genre = match genre {
         Some(genre) => genre.to_owned(),
         None => random_genre(g.rnd),
@@ -91,9 +91,9 @@ fn apply_genre_swing(g: &mut AutoGen<'_>, track: &mut Track, genre: Option<&str>
 }
 
 /// `#applyVariation`: the variation budget of a generated track, when it has none yet.
-fn apply_variation(g: &mut AutoGen<'_>, track: &mut Track, kind: InstrumentFamily) {
+fn apply_variation(g: &mut AutoGenerator<'_>, track: &mut Track, kind: InstrumentFamily) {
     let (min, max) = if kind.is_melodic() { (50.0, 85.0) } else { (30.0, 60.0) };
-    let pick_in = |g: &mut AutoGen<'_>, min: f64, max: f64| min + (g.random() * (max - min + 1.0)).floor();
+    let pick_in = |g: &mut AutoGenerator<'_>, min: f64, max: f64| min + (g.random() * (max - min + 1.0)).floor();
     if track.auto_hit_variation.is_none() {
         track.auto_hit_variation = Some(pick_in(g, min, max));
     }
@@ -106,7 +106,7 @@ fn apply_variation(g: &mut AutoGen<'_>, track: &mut Track, kind: InstrumentFamil
 /// `variant` (a bass track keeps its own `auto_variant`, else draws one of
 /// its genre's), after its swing and variation are picked.
 pub fn generate_track(
-    g: &mut AutoGen<'_>,
+    g: &mut AutoGenerator<'_>,
     pattern: &mut Pattern,
     t: usize,
     variant: &str,
@@ -134,7 +134,7 @@ pub fn generate_track(
 /// PIANO and ORGAN `generateNewMelody`) for track `t` of `pattern`, variant
 /// `variant` (random when `None` or unknown).
 pub fn instrument_line(
-    g: &mut AutoGen<'_>,
+    g: &mut AutoGenerator<'_>,
     pattern: &mut Pattern,
     t: usize,
     kind: InstrumentFamily,
@@ -189,7 +189,7 @@ pub struct Options {
 /// and scale (kept when the pattern has them); an empty pattern gets the
 /// template's tracks, an existing one new lines for the tracks the template
 /// covers; a BASS track (empty) is added when there is none.
-pub fn generate_pattern(g: &mut AutoGen<'_>, pattern: &mut Pattern, options: &Options) {
+pub fn generate_pattern(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, options: &Options) {
     // `resolveGenreFromTags` never finds a genre in a tag list.
     let genre = match &options.genre {
         Some(genre) => genre.clone(),
@@ -264,7 +264,7 @@ fn section_end_variant(track: &Track, kind: InstrumentFamily) -> Option<&'static
 /// `changeTrack`: the line of track `t` for loop `index` of the song form —
 /// a snare crescendo on breaks, a fill merged into the old line on the last
 /// loop of a section, a new line otherwise, at the section's density.
-pub fn change_track(g: &mut AutoGen<'_>, index: u64, pattern: &mut Pattern, t: usize) {
+pub fn change_track(g: &mut AutoGenerator<'_>, index: u64, pattern: &mut Pattern, t: usize) {
     let Some(track) = pattern.tracks.get(t) else { return };
     let genre = match genre_of(pattern) {
         Some(genre) => genre,
@@ -308,7 +308,7 @@ pub fn change_track(g: &mut AutoGen<'_>, index: u64, pattern: &mut Pattern, t: u
 /// `autoGen` pattern regenerates its melodic tracks, and every track on a
 /// section's first or last loop; otherwise the tracks in auto mode are
 /// regenerated. Whether anything was.
-pub fn run_loop(g: &mut AutoGen<'_>, pattern: &mut Pattern, index: u64) -> bool {
+pub fn run_loop(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, index: u64) -> bool {
     let mut changed = false;
     if pattern.extra.get("autoGen").is_some_and(js::truthy) {
         let element = g.structure.element(index);
@@ -370,7 +370,7 @@ fn toggle(
 /// bass line if there is a bass track), the drum tracks in auto mode, empty
 /// melodic tracks removed; or, when drums are in auto mode, auto mode off.
 /// Whether generation is now on.
-pub fn toggle_drums(g: &mut AutoGen<'_>, pattern: &mut Pattern) -> bool {
+pub fn toggle_drums(g: &mut AutoGenerator<'_>, pattern: &mut Pattern) -> bool {
     toggle(pattern, InstrumentFamily::is_drum, |pattern| {
         generate_pattern(g, pattern, &Options::default());
         pattern.tracks.retain(|t| !instrument_family(&t.name).is_melodic() || !t.notes.is_empty());
@@ -409,7 +409,7 @@ impl MelodicKind {
 /// ↻ Bass / ↻ Chords (`toggleMelodic`): the first BASS (PIANO) track in auto
 /// mode — created on the pattern's synth, with a first line from the genre
 /// template, when there is none; or auto mode off. Whether generation is now on.
-pub fn toggle_melodic(g: &mut AutoGen<'_>, pattern: &mut Pattern, kind: MelodicKind) -> bool {
+pub fn toggle_melodic(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, kind: MelodicKind) -> bool {
     let wanted = kind.track_type();
     toggle(
         pattern,
