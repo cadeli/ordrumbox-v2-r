@@ -5,10 +5,11 @@
 //! the JS handlers of `track_editor/*.js`, `note_editor/sync_section.js`,
 //! `drumkit_manager.js` and the pattern panel's volume sliders.
 
+use ordrumbox_core::SetField;
 use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::instruments::catalog;
-use ordrumbox_core::js;
 use ordrumbox_core::json::{Object, Value};
+use ordrumbox_core::{js, song};
 use ordrumbox_engine::TrackSound;
 use ordrumbox_engine::assign::assign_track;
 
@@ -214,8 +215,7 @@ impl Session {
             controls.play,
             Kind::Button { label: label.into(), on: playing },
         ));
-        // The JS slider's range (`BPM_MIN`, `BPM_MAX`).
-        let spec = Spec::knob(20.0, 250.0, 1.0, 120.0);
+        let spec = Spec::knob(song::MIN_BPM, song::MAX_BPM, 1.0, song::DEFAULT_BPM);
         let text = js::number_to_string(pattern.bpm);
         let kind = Kind::Value { spec, value: pattern.bpm, label: None, text, lfo: false };
         layout.items.push(Item::new(Some(Id::Bpm), controls.bpm, kind));
@@ -1051,7 +1051,11 @@ impl Session {
             NoteTarget::Detached => {
                 let mut note = self.shown_note(t).unwrap_or_default();
                 for (key, value) in updates {
-                    let _ = note.set_field(key, value);
+                    match note.set_field(key, value) {
+                        SetField::Set => {}
+                        SetField::WrongType => self.message = format!("note {key}: wrong type ({value}), not set"),
+                        SetField::Unknown => self.message = format!("note {key}: no such setting, not set"),
+                    }
                 }
                 self.detached = Some((t, note));
             }

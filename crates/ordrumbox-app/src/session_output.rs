@@ -17,7 +17,10 @@ impl Session {
     pub(super) fn load_master(&mut self) {
         let Some(path) = store::settings_path() else { return };
         match store::load_master(&path) {
-            Ok(Some(master)) => self.set_master(master, false),
+            Ok(Some((master, issues))) => {
+                self.status.extend(issues.into_iter().map(|issue| format!("settings.json: {issue}")));
+                self.set_master(master, false);
+            }
             Ok(None) => {}
             Err(e) => self.status.push(format!("settings.json not loaded: {e}")),
         }

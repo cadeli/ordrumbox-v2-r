@@ -7,7 +7,7 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use ordrumbox_core::steps::TICK;
-use ordrumbox_core::{Library, Rng, Scales, song::BEATS_PER_MEASURE};
+use ordrumbox_core::{Library, Rng, Scales, song::BEATS_PER_MEASURE, song::clamp_bpm};
 
 use crate::controller::{Controller, Mode};
 use crate::kit::SampleBank;
@@ -90,7 +90,7 @@ pub fn render_pattern(
 ) -> Option<(Vec<f32>, Vec<f32>)> {
     let pattern = library.patterns.get(index)?;
     let ticks = f64::from(pattern.beat_count.max(1)) * f64::from(TICK) * f64::from(loops.max(1));
-    let length = frames(ticks, pattern.bpm.clamp(20.0, 300.0), setup.sample_rate, false);
+    let length = frames(ticks, clamp_bpm(pattern.bpm), setup.sample_rate, false);
     Some(render(library, Mode::Pattern(index), length, setup, before_pass))
 }
 
@@ -102,7 +102,7 @@ pub fn render_song(library: &Library, index: usize, setup: &RenderSetup) -> Opti
     }
     let measures = song.length_measures().max(1.0);
     let ticks = (measures * BEATS_PER_MEASURE * f64::from(TICK)).ceil();
-    let length = frames(ticks, song.bpm.clamp(20.0, 300.0), setup.sample_rate, true);
+    let length = frames(ticks, clamp_bpm(song.bpm), setup.sample_rate, true);
     Some(render(library, Mode::Song(index), length, setup, None))
 }
 

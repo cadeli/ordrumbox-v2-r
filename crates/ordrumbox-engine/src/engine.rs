@@ -20,8 +20,7 @@ use crate::pass::{Event, Pass, Sound};
 pub const MAX_VOICES: usize = 64;
 /// Synth voices playing at once (the JS synth voice pool size).
 pub const MAX_SYNTH_VOICES: usize = 16;
-/// Tracks with their own strip; notes of tracks beyond are dropped.
-pub const MAX_TRACKS: usize = 64;
+pub use ordrumbox_core::track::MAX_TRACKS;
 /// Frames per render quantum (Web Audio's).
 pub const QUANTUM: usize = 128;
 /// Time constants of parameter changes (`setTargetAtTime`), seconds: effect

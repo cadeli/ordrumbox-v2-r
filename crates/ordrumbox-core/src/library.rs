@@ -53,7 +53,8 @@ impl Library {
         assign_pattern_ids(&mut patterns);
 
         let known_ids = patterns.iter().map(|p| p.id.clone()).collect();
-        let (songs, dropped) = songs_from_json(value.get("songs").unwrap_or(&Value::Null), &known_ids);
+        let (songs, dropped) =
+            songs_from_json(value.get("songs").unwrap_or(&Value::Null), &known_ids, &mut report.issues);
         report.dropped_clips = dropped;
         (Self { info, songs, patterns }, report)
     }

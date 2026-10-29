@@ -4,6 +4,7 @@
 //!
 //! Built on the UI side (it allocates); the audio thread only reads it.
 
+use ordrumbox_core::song::clamp_bpm;
 use ordrumbox_core::steps::TICK;
 use std::collections::HashMap;
 
@@ -103,7 +104,7 @@ pub fn frames_per_tick(bpm: f64, sample_rate: f64) -> f64 {
 /// muted tracks (or of tracks another track's solo silences) are left out,
 /// as `shouldTrackPlay()` does.
 pub fn build_pass(pattern: &Pattern, number: u64, rng: &mut Rng, context: PassContext<'_>) -> Pass {
-    let bpm = pattern.bpm.clamp(20.0, 300.0);
+    let bpm = clamp_bpm(pattern.bpm);
     let per_tick = frames_per_tick(bpm, context.sample_rate);
     let ticks = u32::try_from(ordrumbox_core::pattern_engine::pattern_ticks(pattern).max(1)).unwrap_or(u32::MAX);
     let frames = (f64::from(ticks) * per_tick).round().max(1.0) as u64;
@@ -220,7 +221,7 @@ fn sound_for(
 /// the pattern's.
 pub fn build_preview(pattern: &Pattern, t: usize, note: Option<&Note>, context: PassContext<'_>) -> Pass {
     let Some(track) = pattern.tracks.get(t) else { return Pass::default() };
-    let bpm = pattern.bpm.clamp(20.0, 300.0);
+    let bpm = clamp_bpm(pattern.bpm);
     let flat = Hit {
         track: t,
         source: None,
@@ -290,7 +291,7 @@ pub fn build_song_pass(
     cache: &mut HitsCache,
     context: SongContext<'_>,
 ) -> Pass {
-    let bpm = song.bpm.clamp(20.0, 300.0);
+    let bpm = clamp_bpm(song.bpm);
     let per_tick = frames_per_tick(bpm, context.sample_rate);
     let ticks = TICK * 4;
     let frames = (f64::from(ticks) * per_tick).round().max(1.0) as u64;

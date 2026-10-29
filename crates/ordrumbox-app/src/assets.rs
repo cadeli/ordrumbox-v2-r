@@ -36,6 +36,9 @@ pub struct Assets {
     /// The user's `kits.json` could not be read: the assets' kits are used
     /// and kit edits are not saved (so as not to overwrite it).
     pub kits_error: Option<String>,
+    /// Asset files that could not be read (`kits.json`, `scales.json`,
+    /// `synth_presets.json`): what they hold is missing.
+    pub errors: Vec<String>,
 }
 
 /// Where a sample url is read: the user's samples folder first, then the
@@ -95,18 +98,21 @@ pub const LIBRARY: &str = "library.json";
 pub fn load(dir: &Path) -> Result<Assets, String> {
     let data = dir.join("data");
     let (library, report) = Library::from_json(&read_json(&data.join(LIBRARY))?);
+    let mut errors = Vec::new();
+    // An asset file that cannot be read: its error reported, `None` used.
+    let mut read = |name: &str| read_json(&data.join(name)).map_err(|e| errors.push(e)).ok();
     let saved = store::kits_path().map(|p| store::load_kits(&p));
-    let assets_kits = || read_json(&data.join("kits.json")).map(|v| kits_from_json(&v)).unwrap_or_default();
     let (kits, kits_error) = match saved {
-        Some(Ok(Some(kits))) => (kits, None),
-        Some(Err(e)) => (assets_kits(), Some(e)),
-        _ => (assets_kits(), None),
+        Some(Ok(Some(kits))) => (Some(kits), None),
+        Some(Err(e)) => (None, Some(e)),
+        _ => (None, None),
     };
-    let scales_json = read_json(&data.join("scales.json")).ok();
+    let kits = kits.or_else(|| read("kits.json").map(|v| kits_from_json(&v))).unwrap_or_default();
+    let scales_json = read("scales.json");
+    let synths = read("synth_presets.json").map(|v| SynthPresets::from_json(&v)).unwrap_or_default();
     let scales = scales_json.as_ref().map(Scales::from_json).unwrap_or_default();
     let scale_list = scales_json.as_ref().map(ScaleList::from_json).unwrap_or_default();
-    let synths = read_json(&data.join("synth_presets.json")).map(|v| SynthPresets::from_json(&v)).unwrap_or_default();
     let sources = SampleSources { assets: dir.join("kits"), user: store::samples_dir() };
     let (bank, sample_errors) = SampleBank::load(&kits, |url| sources.read(url));
-    Ok(Assets { library, report, kits, scales, scale_list, synths, bank, sample_errors, sources, kits_error })
+    Ok(Assets { library, report, kits, scales, scale_list, synths, bank, sample_errors, sources, kits_error, errors })
 }

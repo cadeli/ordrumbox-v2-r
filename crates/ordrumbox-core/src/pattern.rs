@@ -3,7 +3,8 @@
 
 use crate::json::{Object, Value};
 use crate::record::Issue;
-use crate::track::Track;
+use crate::song::{MAX_BPM, MIN_BPM, clamp_bpm};
+use crate::track::{MAX_TRACKS, Track};
 
 /// Keys read and dropped: `_revision` is runtime state; `application` and
 /// `url`, the web app's name and address, were written in every pattern.
@@ -94,6 +95,11 @@ impl Pattern {
                 }
             }
         }
+        if clamp_bpm(pattern.bpm) != pattern.bpm {
+            let message = format!("{} outside {MIN_BPM}–{MAX_BPM}, {} used", pattern.bpm, clamp_bpm(pattern.bpm));
+            issues.push(Issue::new(format!("{at}.bpm"), message));
+            pattern.bpm = clamp_bpm(pattern.bpm);
+        }
         match object.get("tracks") {
             Some(Value::Array(tracks)) => {
                 pattern.tracks = tracks
@@ -104,6 +110,10 @@ impl Pattern {
             }
             Some(Value::Null) | None => {}
             Some(_) => issues.push(Issue::new(format!("{at}.tracks"), "tracks is not an array, skipped")),
+        }
+        if pattern.tracks.len() > MAX_TRACKS {
+            let message = format!("{} tracks, only the first {MAX_TRACKS} play", pattern.tracks.len());
+            issues.push(Issue::new(format!("{at}.tracks"), message));
         }
         Some(pattern)
     }
@@ -174,6 +184,21 @@ mod tests {
     fn drops_the_web_header_and_renames_the_generator_keys() {
         let (pattern, _) = load(r#"{"application":"other","url":"u","_autoGenGenre":"house","x":1,"bpm":97.5}"#);
         assert_eq!(pattern.to_json().to_json(), r#"{"bpm":97.5,"autoGenre":"house","x":1}"#);
+    }
+
+    #[test]
+    fn a_tempo_outside_the_bounds_is_clamped_and_reported() {
+        let (pattern, issues) = load(r#"{"bpm":400}"#);
+        assert_eq!(pattern.bpm, 300.0);
+        assert_eq!(issues, [Issue::new("p.bpm", "400 outside 20–300, 300 used")]);
+    }
+
+    #[test]
+    fn tracks_past_the_limit_are_kept_and_reported() {
+        let tracks = vec![r#"{"name":"T"}"#; MAX_TRACKS + 1].join(",");
+        let (pattern, issues) = load(&format!(r#"{{"tracks":[{tracks}]}}"#));
+        assert_eq!(pattern.tracks.len(), MAX_TRACKS + 1);
+        assert_eq!(issues, [Issue::new("p.tracks", "65 tracks, only the first 64 play")]);
     }
 
     #[test]

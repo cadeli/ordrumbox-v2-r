@@ -151,7 +151,7 @@ fn measure_at_tick_matches_song_measure_at_tick() {
                     .filter_map(|c| c.get("pattern").and_then(Value::as_str).map(str::to_owned)),
             )
             .collect();
-        let mut song = Song::from_json(&raw, &ids).expect("song").0;
+        let mut song = Song::from_json(&raw, &ids, "song", &mut Vec::new()).expect("song").0;
         song.loop_measures = f64_of(case, "loopMeasureCount");
         for at in case.get("at").and_then(Value::as_array).expect("at") {
             let tick = f64_of(at, "tick").unwrap_or(0.0);

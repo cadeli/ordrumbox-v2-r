@@ -122,8 +122,12 @@ impl App {
         self.session.draw(&mut Canvas::new(&mut buffer, width.get() as usize, height.get() as usize), scale);
         // `ORDRUMBOX_SCREENSHOT=path`: keep the first frame as a BMP there and
         // quit — to check the layout without a screen capture.
+        // A failed write exits with an error: whoever asked for the file reads it next.
         if let Ok(path) = std::env::var("ORDRUMBOX_SCREENSHOT") {
-            let _ = write_bmp(&path, &buffer, width.get() as usize, height.get() as usize);
+            if let Err(e) = write_bmp(&path, &buffer, width.get() as usize, height.get() as usize) {
+                eprintln!("{path}: {e}");
+                std::process::exit(1);
+            }
             std::process::exit(0);
         }
         buffer.present().map_err(|e| format!("present frame: {e}"))
@@ -598,6 +602,9 @@ impl ApplicationHandler for App {
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         let save_at = self.session.autosave();
+        if self.session.check_audio() {
+            self.request_redraw();
+        }
         let playing = self.session.playing();
         if playing {
             self.session.update();

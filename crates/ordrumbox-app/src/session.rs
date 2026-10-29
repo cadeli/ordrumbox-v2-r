@@ -14,6 +14,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
+use ordrumbox_core::track::MAX_TRACKS;
 use ordrumbox_core::{Library, Note, Pattern, Rng, Scales, Track};
 use ordrumbox_engine::analysis::{self, Analysis};
 use ordrumbox_engine::offline::{self, RenderSetup};
@@ -133,7 +134,7 @@ pub struct Session {
     render: Option<RenderSetup>,
     /// `None` when no audio device could be opened.
     controller: Option<Controller>,
-    _output: Option<audio::Output>,
+    output: Option<audio::Output>,
     /// Startup problems, shown until quit.
     status: Vec<String>,
     /// Outcome of the last action.
@@ -314,7 +315,7 @@ impl Session {
             Ok(assets) => assets,
             Err(e) => return Self::new(Library::default(), KitSet::empty(), vec![e]),
         };
-        let mut status = Vec::new();
+        let mut status: Vec<String> = assets.errors.iter().map(|e| format!("not loaded: {e}")).collect();
         if let Some(first) = assets.sample_errors.first() {
             status.push(format!("{} sample(s) not loaded, first: {first}", assets.sample_errors.len()));
         }
@@ -375,7 +376,7 @@ impl Session {
         match audio::start(bank, assets.scales, assets.synths) {
             Ok((output, controller)) => {
                 session.controller = Some(controller);
-                session._output = Some(output);
+                session.output = Some(output);
             }
             Err(e) => session.status.push(format!("no sound: {e}")),
         }
@@ -409,7 +410,7 @@ impl Session {
             panel_size: (0, 0, 1),
             render: None,
             controller: None,
-            _output: None,
+            output: None,
             status,
             message: String::new(),
             cursor: None,
@@ -801,7 +802,7 @@ impl Session {
             piano_roll: self.piano_roll_open(),
             synth: self.synth_open(),
             can_save_song: store::songs_dir().is_some(),
-            saved_songs: store::songs_dir().is_some_and(|d| !store::list_songs(&d).is_empty()),
+            saved_songs: store::songs_dir().is_some_and(|d| store::list_songs(&d).is_ok_and(|s| !s.is_empty())),
             kit_sample: self.kit_list().is_some_and(|(s, n)| s < n),
         }
     }
@@ -1457,9 +1458,10 @@ impl Session {
         self.set_tempo(bpm + delta);
     }
 
-    /// The pattern at `bpm` (20–300, whole), a run of changes one undo step.
+    /// The pattern at `bpm` (whole, inside the tempo bounds), a run of
+    /// changes one undo step.
     pub(super) fn set_tempo(&mut self, bpm: f64) {
-        let bpm = bpm.round().clamp(20.0, 300.0);
+        let bpm = ordrumbox_core::song::clamp_bpm(bpm.round());
         if self.editor.set_pattern_bpm(self.pattern_index, bpm, true) {
             self.edited();
         }
@@ -1508,6 +1510,10 @@ impl Session {
     /// A new track `T<n>` (the JS "add track" button).
     pub fn add_track(&mut self) {
         let Some(count) = self.pattern().map(|p| p.tracks.len()) else { return };
+        if !self.editor.has_track_room(self.pattern_index) {
+            self.message = format!("a pattern holds at most {MAX_TRACKS} tracks");
+            return;
+        }
         if let Some(t) = self.editor.add_track(self.pattern_index, &format!("T{}", count + 1), 4) {
             self.cursor = Some(Cursor { track: t, beat: 0, step: 0 });
             self.selected = None;
@@ -1627,6 +1633,9 @@ impl Session {
         let p = self.pattern_index;
         match self.clipboard.clone() {
             None => self.message = "clipboard is empty".into(),
+            Some(Clipboard::Track(_)) if !self.editor.has_track_room(p) => {
+                self.message = format!("a pattern holds at most {MAX_TRACKS} tracks");
+            }
             Some(Clipboard::Track(track)) => {
                 let after = self.focus_track().map_or_else(|| self.pattern().map_or(0, |p| p.tracks.len()), |t| t + 1);
                 if let Some(t) = self.editor.paste_track(p, after, &track) {
@@ -1670,7 +1679,13 @@ impl Session {
         }
     }
 
-    /// Save once the edits have settled; when to call again, if a save is pending.
+    /// Show an audio output error reported since the last call; whether there was one.
+    pub fn check_audio(&mut self) -> bool {
+        let Some(error) = self.output.as_ref().and_then(audio::Output::take_error) else { return false };
+        self.message = format!("audio output: {error}");
+        true
+    }
+
     /// Save what is due (the library, kit knob edits); when the next save is.
     pub fn autosave(&mut self) -> Option<Instant> {
         let due = [self.flush_kits(), self.flush_master(), self.flush_synths(), self.autosave_library()];

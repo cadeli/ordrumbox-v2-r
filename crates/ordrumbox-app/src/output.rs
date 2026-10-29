@@ -99,19 +99,36 @@ pub fn set(master: MasterSettings, key: &str, value: f64) -> MasterSettings {
     m
 }
 
-/// `settings.master` read over the defaults; values out of range clamped.
-pub fn from_json(value: &Value) -> MasterSettings {
+/// `settings.master` read over the defaults, with what was not taken as it
+/// is: a value of the wrong type (default kept), out of range (clamped), an
+/// unknown key (ignored).
+pub fn from_json(value: &Value) -> (MasterSettings, Vec<String>) {
     let mut master = MasterSettings::default();
-    let Some(object) = value.as_object() else { return master };
-    for key in params().map(|p| p.key) {
-        if let Some(v) = object.get(key).and_then(Value::as_f64) {
-            master = set(master, key, v);
+    let mut issues = Vec::new();
+    let Some(object) = value.as_object() else {
+        return (master, vec![format!("master: not an object ({value}), defaults used")]);
+    };
+    for (key, v) in object.iter() {
+        match (key, find(key)) {
+            ("compBypass", _) => match v.as_bool() {
+                Some(bypass) => master.bypass = if bypass { 1.0 } else { 0.0 },
+                None => issues.push(format!("master.compBypass: not a boolean ({v}), default kept")),
+            },
+            (_, Some(param)) => match v.as_f64() {
+                Some(number) => master = set(master, param.key, number),
+                None => issues.push(format!("master.{key}: not a number ({v}), default kept")),
+            },
+            _ => issues.push(format!("master.{key}: unknown setting, ignored")),
         }
     }
-    if let Some(bypass) = object.get("compBypass").and_then(Value::as_bool) {
-        master.bypass = if bypass { 1.0 } else { 0.0 };
+    let clamped = master.clamped();
+    for param in params() {
+        let (asked, used) = (get(&master, param.key), get(&clamped, param.key));
+        if asked != used {
+            issues.push(format!("master.{}: {asked} out of range, {used} used", param.key));
+        }
     }
-    master.clamped()
+    (clamped, issues)
 }
 
 /// `settings.master`.
@@ -346,10 +363,18 @@ mod tests {
 
     #[test]
     fn settings_round_trip_over_the_defaults() {
-        let master = from_json(&json::parse(r#"{"volume":1.5,"compBypass":true,"hicut":99999,"ratio":"x"}"#).unwrap());
+        let (master, issues) =
+            from_json(&json::parse(r#"{"volume":1.5,"compBypass":true,"hicut":99999,"ratio":"x","gain":1}"#).unwrap());
         assert_eq!((master.master, master.bypass, master.hicut, master.ratio), (1.5, 1.0, 22_000.0, 8.0));
-        let back = from_json(&to_json(&master));
-        assert_eq!(back, master);
+        assert_eq!(
+            issues,
+            [
+                "master.ratio: not a number (\"x\"), default kept",
+                "master.gain: unknown setting, ignored",
+                "master.hicut: 99999 out of range, 22000 used",
+            ]
+        );
+        assert_eq!(from_json(&to_json(&master)), (master, Vec::new()));
         assert_eq!(to_json(&MasterSettings::default()).get("compBypass"), Some(&Value::Bool(false)));
     }
 
