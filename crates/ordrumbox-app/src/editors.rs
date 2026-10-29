@@ -344,7 +344,7 @@ pub fn arp_state(note: &Note, scales: &ScaleList) -> ArpState {
     let Some(arp) = note.arp.as_object() else {
         return ArpState { scale: "major".into(), direction: "up".into(), range: 0 };
     };
-    let mode = arp.get("mode").and_then(Value::as_str).map(str::to_lowercase).unwrap_or_else(|| "up".into());
+    let mode = arp.get("direction").and_then(Value::as_str).map(str::to_lowercase).unwrap_or_else(|| "up".into());
     let direction = if ARP_DIRECTIONS.contains(&mode.as_str()) { mode } else { "up".into() };
     let intervals: Vec<f64> = arp
         .get("intervals")
@@ -383,7 +383,7 @@ pub fn arp_value(
     let mut object = ordrumbox_core::json::Object::new();
     let intervals = scales.intervals(scale, range).into_iter().map(|i| Value::Number(f64::from(i))).collect();
     object.insert("intervals", Value::Array(intervals));
-    object.insert("mode", Value::String(direction.to_owned()));
+    object.insert("direction", Value::String(direction.to_owned()));
     Value::Object(object)
 }
 
@@ -1010,7 +1010,7 @@ mod tests {
         assert_eq!(arp_state(&note, &scales), ArpState { scale: "major".into(), direction: "up".into(), range: 0 });
         note.arp_direction = Some("down".into());
         note.arp = arp_value(&note, &scales, Some("minor"), None, Some(4));
-        assert_eq!(note.arp.to_json(), r#"{"intervals":[0,2,3,5],"mode":"down"}"#);
+        assert_eq!(note.arp.to_json(), r#"{"intervals":[0,2,3,5],"direction":"down"}"#);
         assert_eq!(arp_state(&note, &scales), ArpState { scale: "minor".into(), direction: "down".into(), range: 4 });
         assert_eq!(arp_value(&note, &scales, None, None, Some(0)), Value::Null);
     }

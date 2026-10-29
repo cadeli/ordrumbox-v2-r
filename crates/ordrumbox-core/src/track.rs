@@ -75,7 +75,6 @@ json_record! {
         delay_type: String = "tape".to_owned() => "delayType",
         delay_beats: f64 = 1.0 => "delayBeats" | "delayTime",
         delay_mix: f64 = 0.0 => "delayMix" | "delayDepth",
-        fx_selected: String = "reverb".to_owned() => "fxSelected",
         saturation_type: String = "soft".to_owned() => "saturationType",
         saturation_mix: f64 = 0.0 => "saturationMix" | "saturationAmount",
         saturation_on: bool = true => "saturationOn" | "sat",
@@ -178,7 +177,8 @@ impl Track {
         let mut track = Self::default();
         for (key, value) in object.iter() {
             match key {
-                "notes" | "noteKeys" => {}
+                // `fxSelected`: an editor tab the JS app saved with the track.
+                "notes" | "noteKeys" | "fxSelected" => {}
                 _ => match track.set_field(key, value) {
                     SetField::Set => {}
                     SetField::WrongType if key == "pan" => {
