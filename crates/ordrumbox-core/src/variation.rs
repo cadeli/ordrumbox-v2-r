@@ -186,6 +186,7 @@ impl HitOp {
 }
 
 /// Apply the flat-notes layer of one track, loop by loop (`TrackVariation.apply`).
+#[expect(clippy::expect_used, reason = "the slots it changes were scanned from `flat`")]
 pub(crate) fn apply(
     flat: &mut Hits,
     track_index: usize,

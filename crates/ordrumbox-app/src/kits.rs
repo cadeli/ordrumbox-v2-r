@@ -353,7 +353,9 @@ mod tests {
     #[test]
     fn edits_and_files() {
         let dir = std::env::temp_dir().join(format!("ordrumbox-kitset-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&dir);
+        if dir.exists() {
+            fs::remove_dir_all(&dir).unwrap();
+        }
         let mut kits = set(&dir);
         assert_eq!(kits.set_value(0, 0, Field::Gain, -3.0).as_deref(), Some("kick: gain -3.0 dB"));
         assert_eq!(kits.set_value(0, 0, Field::Gain, -3.0), None); // no change

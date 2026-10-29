@@ -3,6 +3,8 @@
 //! bytes, the patterns an import creates, and the sort order the exporter
 //! relies on.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
+
 use ordrumbox_core::json::{self, Object, Value};
 use ordrumbox_core::{Library, Rng, Scales, js};
 use ordrumbox_logic::midi::{self, smf};

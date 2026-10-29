@@ -1,6 +1,8 @@
 //! Track and preset settings against what the JS app sends to its audio
 //! processors (fixtures from `tools/export_dsp_fixtures.mjs`).
 
+#![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
+
 use std::path::Path;
 
 use ordrumbox_core::json::{self, Value};

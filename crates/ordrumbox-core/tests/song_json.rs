@@ -1,5 +1,7 @@
 //! The JSON layer against files produced by the JS app (tools/export_fixtures.mjs).
 
+#![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
+
 use std::fs;
 use std::path::{Path, PathBuf};
 

@@ -4,6 +4,8 @@
 //! `tests/wav_midi_roundtrip.test.js` (a pattern exported to MIDI and imported
 //! back plays the same notes).
 
+#![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
+
 use ordrumbox_core::json::Value;
 use ordrumbox_core::steps::{TICK, absolute_step, step_to_tick};
 use ordrumbox_core::{Hits, Library, Pattern, Rng, Scales, expand_hits};

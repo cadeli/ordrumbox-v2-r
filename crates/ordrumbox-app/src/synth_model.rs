@@ -42,6 +42,7 @@ const DEFAULTS: &str = r#"{"masterVolume":0.8,"subGain":0,"pitchPunch":0,
     "envelope":{"attack":0,"decay":0.12,"sustain":1,"release":0.05},
     "modEnvelope":{"attack":0,"decay":0.12,"sustain":0,"release":0.1,"target":"off"}}"#;
 
+#[expect(clippy::expect_used, reason = "a constant, read by the tests")]
 pub fn defaults() -> Object {
     json::parse(DEFAULTS).ok().and_then(|v| v.as_object().cloned()).expect("DEFAULTS is a JSON object")
 }

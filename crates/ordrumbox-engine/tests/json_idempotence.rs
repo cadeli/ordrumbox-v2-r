@@ -3,6 +3,8 @@
 //! first one's text and every value is the one written. The first save may
 //! normalize (the JS app's keys); the saves after it never change the file.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
+
 use std::path::Path;
 
 use ordrumbox_core::json::{self, Value};

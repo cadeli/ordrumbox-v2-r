@@ -3,6 +3,8 @@
 //! tools/export_piano_fixtures.mjs): every progression, indices past both
 //! ends, several tonics and pattern lengths.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
+
 use std::path::Path;
 
 use ordrumbox_core::json::{self, Value};

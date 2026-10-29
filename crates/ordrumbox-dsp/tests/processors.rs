@@ -1,6 +1,8 @@
 //! The processors against the JS AudioWorklet processors, run in Node by
 //! `tools/export_dsp_fixtures.mjs` on the same inputs, quantum by quantum.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
+
 use std::path::Path;
 
 use ordrumbox_core::json::{self, Object, Value};

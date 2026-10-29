@@ -1,6 +1,8 @@
 //! Catalog lookups and song clip resolution against the JS app
 //! (`instruments.json`, `song_sources.json`, from tools/export_assign_fixtures.mjs).
 
+#![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
+
 use std::collections::HashSet;
 use std::path::Path;
 

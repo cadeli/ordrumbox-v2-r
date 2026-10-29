@@ -1,6 +1,8 @@
 //! Sound assignment and WAV encoding against the JS app (`assign.json`,
 //! `wav.json`, from tools/export_assign_fixtures.mjs).
 
+#![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
+
 use std::path::Path;
 
 use ordrumbox_core::Track;

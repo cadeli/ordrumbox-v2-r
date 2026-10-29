@@ -4,6 +4,8 @@
 //! sizes, the newest step's description, the pattern ids and the saved
 //! patterns must match.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
+
 use std::path::Path;
 
 use ordrumbox_core::json::{self, Value};

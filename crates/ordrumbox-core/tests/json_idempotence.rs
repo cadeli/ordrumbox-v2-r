@@ -5,6 +5,8 @@
 //! one written. The first save may normalize (web-version keys, an old
 //! arpeggio `mode`); the saves after it never change the file.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
+
 use std::path::Path;
 
 use ordrumbox_core::json::{self, Object, Value};

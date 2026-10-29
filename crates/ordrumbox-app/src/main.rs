@@ -112,6 +112,7 @@ impl App {
         }
     }
 
+    #[expect(clippy::print_stderr, reason = "the screenshot mode is run from a terminal, which reads it")]
     fn redraw(&mut self) -> Result<(), String> {
         let scale = self.scale();
         let Some(gfx) = &mut self.gfx else { return Ok(()) };
@@ -703,7 +704,7 @@ mod tests {
         // One row, two pixels: red then green, the row padded to four bytes.
         write_bmp(path.to_str().unwrap(), &[0xff0000, 0x00ff00], 2, 1).unwrap();
         let bytes = std::fs::read(&path).unwrap();
-        let _ = std::fs::remove_file(&path);
+        std::fs::remove_file(&path).unwrap();
         assert_eq!(&bytes[..2], b"BM");
         assert_eq!(u32::from_le_bytes(bytes[2..6].try_into().unwrap()), 54 + 8);
         assert_eq!(&bytes[54..], &[0, 0, 255, 0, 255, 0, 0, 0]); // BGR, BGR, pad

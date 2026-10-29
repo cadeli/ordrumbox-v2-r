@@ -51,6 +51,7 @@ pub struct Catalog {
 }
 
 /// The catalog of the app (parsed once).
+#[expect(clippy::expect_used, reason = "a file built in, read by the tests")]
 pub fn catalog() -> &'static Catalog {
     static CATALOG: OnceLock<Catalog> = OnceLock::new();
     CATALOG.get_or_init(|| {
