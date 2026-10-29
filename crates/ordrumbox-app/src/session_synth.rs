@@ -40,7 +40,7 @@ impl Session {
             return self.set_workspace(Workspace::Grid);
         }
         self.set_workspace(Workspace::Synth);
-        let track_key = self.editor_track().and_then(|t| self.track(t)).and_then(|t| t.synth_sound_key.clone());
+        let track_key = self.editor_track().and_then(|t| self.track(t)).and_then(|t| t.synth_preset.clone());
         let key = track_key.filter(|k| self.synths.get(k).is_some()).or_else(|| self.synth_keys().into_iter().next());
         match key {
             Some(key) => self.load_synth(&key),

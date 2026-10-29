@@ -227,7 +227,7 @@ pub fn build_preview(pattern: &Pattern, t: usize, note: Option<&Note>, context: 
         beat: 0,
         beat_step: 0,
         pitch: note.map_or(0.0, |n| n.pitch),
-        velocity: note.map_or(track.velocity, |n| n.velocity),
+        velocity: note.map_or(track.volume, |n| n.velocity),
         pan: note.map_or(track.pan, |n| n.pan),
     };
     let mut patches = Vec::new();

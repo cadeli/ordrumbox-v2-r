@@ -718,11 +718,11 @@ fn draw_kit(canvas: &mut Canvas, kit: &KitView, layout: &KitLayout) {
 /// track: a plain note is lime, a probabilistic one cyan, a fixed-trigger
 /// one violet, a retriggered one orange, an euclidean one yellow.
 fn note_color(note: &Note) -> Rgb {
-    if note.euclidean_fill > 0 {
+    if note.euclidean_pulses > 0 {
         theme::YELLOW
-    } else if note.retrigger_count > 1 || (note.rate - 1.0).abs() > 1e-9 {
+    } else if note.retrigger_count > 1 || (note.retrigger_rate - 1.0).abs() > 1e-9 {
         theme::ORANGE
-    } else if note.prob < 1.0 {
+    } else if note.probability < 1.0 {
         theme::CYAN
     } else if note.every > 1 {
         theme::VIOLET
@@ -770,7 +770,7 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
     }
     // Loop ghosts: notes that re-trigger when the track loops at loop_at_step.
     let mut loop_ghosts: Vec<(i64, &Note)> = Vec::new();
-    if let Some(loop_at) = track.loop_at_step.map(i64::from).filter(|&l| l > 0) {
+    if let Some(loop_at) = track.loop_length.map(i64::from).filter(|&l| l > 0) {
         for note in &track.notes {
             let base = absolute_step(note.beat, note.beat_step, spb);
             if base >= loop_at {
@@ -842,7 +842,7 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
         }
     }
     if let Some(loop_at) = track
-        .loop_at_step
+        .loop_length
         .map(i64::from)
         .filter(|&l| l > 0 && l < i64::from(track.steps_per_beat) * i64::from(track.beat_count))
     {

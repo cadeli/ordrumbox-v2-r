@@ -39,8 +39,8 @@ fn pattern(notes: Vec<Note>, keep: &str) -> Pattern {
     let mut pattern = library.patterns.remove(0);
     let track = &mut pattern.tracks[0];
     track.notes = notes;
-    track.auto_variation = Some(100.0);
-    track.auto_variation2 = Some(100.0);
+    track.auto_hit_variation = Some(100.0);
+    track.auto_note_variation = Some(100.0);
     for gate in GATES {
         set(track, gate, if gate == keep { 100.0 } else { 0.0 });
     }
@@ -56,7 +56,7 @@ fn set(track: &mut Track, key: &str, value: f64) {
         "prob_fill" => &mut track.prob_fill,
         "prob_ghost" => &mut track.prob_ghost,
         "prob_retrig" => &mut track.prob_retrig,
-        "prob_euclid" => &mut track.prob_euclid,
+        "prob_euclid" => &mut track.prob_euclidean,
         "prob_note" => &mut track.prob_note,
         "prob_note_depth" => &mut track.prob_note_depth,
         "prob_arp" => &mut track.prob_arp,

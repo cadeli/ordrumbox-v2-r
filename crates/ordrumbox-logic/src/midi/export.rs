@@ -191,7 +191,7 @@ pub fn export(pattern: &Pattern, loops: u32, roots: &[(String, f64)], rng: &mut 
                     continue;
                 };
                 let mut velocity = note.velocity;
-                if let Some(l) = &track.velocity_lfo {
+                if let Some(l) = &track.volume_lfo {
                     velocity = clamp(velocity * lfo::value(l, f64::from(tick)), 0.0, 1.0);
                 }
                 let mut pitch = note.pitch + track.pitch;

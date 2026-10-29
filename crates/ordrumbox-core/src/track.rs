@@ -24,13 +24,13 @@ json_record! {
         /// Grid subdivision: steps per beat, 1–8.
         steps_per_beat: i32 = 4 => "stepsPerBeat",
         /// Loop point in steps; `None` loops over the track length.
-        loop_at_step: Option<i32> = None => "loopAtStep",
+        loop_length: Option<i32> = None => "loopAtStep",
         swing_resolution: i32 = 1 => "swingResolution",
         swing_amount: f64 = 0.0 => "swingAmount",
-        velocity: f64 = 1.0 => "velocity",
+        volume: f64 = 1.0 => "velocity",
         /// LFO objects (`{freq, min, max, phase, type}`) are kept as written
         /// and read leniently when played (see [`crate::lfo`]).
-        velocity_lfo: Option<Object> = None => "velocityLfo",
+        volume_lfo: Option<Object> = None => "velocityLfo",
         /// Transposition in semitones.
         pitch: f64 = 0.0 => "pitch",
         pitch_lfo: Option<Object> = None => "pitchLfo",
@@ -43,8 +43,8 @@ json_record! {
         use_soft_synth: bool = false => "useSoftSynth",
         mono: bool = false => "mono",
         /// Variation amounts, 0–100.
-        variation: f64 = 0.0 => "variation",
-        variation2: f64 = 0.0 => "variation2",
+        hit_variation: f64 = 0.0 => "variation",
+        note_variation: f64 = 0.0 => "variation2",
         /// Base probability of every note, 0–1.
         probability: f64 = 1.0 => "probability",
         /// Per-note chances of the auto engine, 0–100.
@@ -54,7 +54,7 @@ json_record! {
         prob_fill: f64 = 50.0 => "prob_fill",
         prob_ghost: f64 = 50.0 => "prob_ghost",
         prob_retrig: f64 = 50.0 => "prob_retrig",
-        prob_euclid: f64 = 50.0 => "prob_euclid",
+        prob_euclidean: f64 = 50.0 => "prob_euclid",
         prob_note: f64 = 50.0 => "prob_note",
         prob_note_depth: f64 = 100.0 => "prob_note_depth",
         prob_arp: f64 = 50.0 => "prob_arp",
@@ -73,22 +73,22 @@ json_record! {
         reverb_type: String = "none".to_owned() => "reverbType",
         reverb_amount: f64 = 0.0 => "reverbAmount",
         delay_type: String = "tape".to_owned() => "delayType",
-        delay_time: f64 = 1.0 => "delayTime",
-        delay_depth: f64 = 0.0 => "delayDepth",
+        delay_beats: f64 = 1.0 => "delayTime",
+        delay_mix: f64 = 0.0 => "delayDepth",
         fx_selected: String = "reverb".to_owned() => "fxSelected",
         saturation_type: String = "soft".to_owned() => "saturationType",
         saturation_amount: f64 = 0.0 => "saturationAmount",
-        sat: bool = true => "sat",
+        saturation_on: bool = true => "sat",
         reverb_on: bool = true => "reverbOn",
         delay_on: bool = true => "delayOn",
         /// Synth preset played when `use_soft_synth` is on.
-        synth_sound_key: Option<String> = None => "synthSoundKey",
+        synth_preset: Option<String> = None => "synthSoundKey",
         // Not in TRACK_DEFAULTS: written by the auto generator / scale picker,
         // saved only when set.
         /// Variation amount the auto generator picked (auto mode); `None` until it ran.
-        auto_variation: Option<f64> = None => "auto_variation",
+        auto_hit_variation: Option<f64> = None => "auto_variation",
         /// Per-note variation amount the auto generator picked (auto mode).
-        auto_variation2: Option<f64> = None => "auto_variation2",
+        auto_note_variation: Option<f64> = None => "auto_variation2",
         /// Scale (a key of scales.json) the pitch variation snaps to when `pitch_scale_lock` is on.
         scale_name: Option<String> = None => "scaleName",
     }
@@ -157,7 +157,7 @@ impl Track {
             name: name.to_owned(),
             beat_count,
             steps_per_beat,
-            loop_at_step: Some(beat_count * steps_per_beat),
+            loop_length: Some(beat_count * steps_per_beat),
             pan: pan_from_track_name(name),
             ..Self::default()
         }
@@ -304,7 +304,7 @@ impl Track {
         if spb <= 0 || total <= 1 || self.notes.is_empty() {
             return false;
         }
-        let current = self.loop_at_step.map(i64::from).filter(|&l| l > 0).unwrap_or(total);
+        let current = self.loop_length.map(i64::from).filter(|&l| l > 0).unwrap_or(total);
         let step_of = |n: &Note| i64::from(n.beat) * i64::from(spb) + i64::from(n.beat_step);
         let original = Self::step_signatures(self.notes.iter(), spb, |s| s);
         let Some(loop_at) = (1..current).find(|&loop_at| {
@@ -316,7 +316,7 @@ impl Track {
         };
         self.notes.retain(|n| step_of(n) < loop_at);
         self.notes.sort_by_key(step_of);
-        self.loop_at_step = Some(loop_at as i32);
+        self.loop_length = Some(loop_at as i32);
         true
     }
 }
@@ -358,7 +358,7 @@ mod tests {
         let (track, issues) = load(r#"{"name":"X","custom":[1],"mono":"yes","loopAtStep":null}"#);
         assert_eq!(track.extra.get("custom"), Some(&json::parse("[1]").unwrap()));
         assert!(!track.mono);
-        assert_eq!(track.loop_at_step, None);
+        assert_eq!(track.loop_length, None);
         assert_eq!(issues, [Issue::new("t.mono", "wrong type (\"yes\"), default kept")]);
         assert_eq!(track.to_json().to_json(), r#"{"name":"X","custom":[1]}"#);
     }

@@ -222,7 +222,7 @@ fn compact_tracks_like_the_js_commander() {
             let name = js.get("name").and_then(Value::as_str).unwrap();
             assert_eq!(track.name, name, "{at}");
             let loop_at = js.get("loopAtStep").and_then(Value::as_f64).map(|l| l as i32);
-            assert_eq!(track.loop_at_step, loop_at, "{at} {name}: loop point");
+            assert_eq!(track.loop_length, loop_at, "{at} {name}: loop point");
             let notes: Vec<String> = track
                 .notes
                 .iter()

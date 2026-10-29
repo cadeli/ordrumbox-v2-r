@@ -146,7 +146,7 @@ fn snare_roll(g: &mut Gen<'_>, track: &mut Track, config: &Value) {
         let note = add_note(track, last_beat, step, 0.0, velocity);
         if hits > 1 {
             note.retrigger_count = hits;
-            note.rate = rate;
+            note.retrigger_rate = rate;
         }
     }
 }
@@ -188,12 +188,12 @@ fn break_crescendo(g: &mut Gen<'_>, track: &mut Track, config: &Value) {
         let prob = f64::from(abs - start + 1) / steps_back;
         let velocity = g.velocity(config.get("velocity"), Vel::accent(beat_step == 0, false));
         let note = add_note(track, beat, beat_step, 0.0, velocity);
-        note.prob = js::to_fixed(prob, 2);
+        note.probability = js::to_fixed(prob, 2);
         if count_max > 1.0 {
             let hits = ratchet(count_max, prob);
             if hits > 1 {
                 note.retrigger_count = hits;
-                note.rate = rate;
+                note.retrigger_rate = rate;
             }
         }
     }
@@ -311,7 +311,7 @@ fn hat_transition(g: &mut Gen<'_>, track: &mut Track, config: &Value, kind: &str
             let note = add_note(track, last_beat, step, 0.0, velocity);
             if last && let Some(count) = num(config, "retriggerCount") {
                 note.retrigger_count = count as i32;
-                note.rate = num(config, "rate").unwrap_or(1.0);
+                note.retrigger_rate = num(config, "rate").unwrap_or(1.0);
             }
         }
         step += interval;
@@ -335,7 +335,7 @@ fn hat_roll(g: &mut Gen<'_>, track: &mut Track, config: &Value) {
         let note = add_note(track, roll_beat, step, 0.0, velocity);
         if hits > 1 {
             note.retrigger_count = hits;
-            note.rate = rate;
+            note.retrigger_rate = rate;
         }
     }
 }
@@ -483,10 +483,10 @@ fn perc_fill(g: &mut Gen<'_>, track: &mut Track, tones: &[f64], bias: f64, confi
         let velocity = g.velocity(config.get("velocity"), context);
         let note = add_note(track, start, step, pitch, velocity);
         if let Some(prob) = config.get("prob").filter(|p| !p.is_null()) {
-            note.prob = prob.as_f64().unwrap_or(f64::NAN);
+            note.probability = prob.as_f64().unwrap_or(f64::NAN);
         }
         if let Some(fill) = num(config, "euclideanFill") {
-            note.euclidean_fill = fill as i32;
+            note.euclidean_pulses = fill as i32;
         }
     }
 }

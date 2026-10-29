@@ -60,7 +60,7 @@ fn synth_tracks_get_a_preset() {
     let (bank, _) = bank();
     let synths = SynthPresets::from_json(&json::parse(r#"{"A":{},"B":{}}"#).unwrap());
     let synth =
-        |key: Option<&str>| Track { use_soft_synth: true, synth_sound_key: key.map(str::to_owned), ..Track::default() };
+        |key: Option<&str>| Track { use_soft_synth: true, synth_preset: key.map(str::to_owned), ..Track::default() };
     let mut last = |n: usize| n - 1;
     assert_eq!(assign_track(&synth(Some("A")), &bank, "real", &synths, &mut last), TrackSound::Synth("A".into()));
     assert_eq!(assign_track(&synth(Some("gone")), &bank, "real", &synths, &mut last), TrackSound::Synth("B".into()));

@@ -59,7 +59,7 @@ pub fn strip_settings(track: &Track, bpm: f64) -> StripSettings {
     }
 
     // Saturation.
-    let amount = if track.sat { finite_or(track.saturation_amount, 0.0).clamp(0.0, 1.0) } else { 0.0 };
+    let amount = if track.saturation_on { finite_or(track.saturation_amount, 0.0).clamp(0.0, 1.0) } else { 0.0 };
     s.sat_type = match track.saturation_type.as_str() {
         "hard" => 1.0,
         "tape" => 2.0,
@@ -79,12 +79,12 @@ pub fn strip_settings(track: &Track, bpm: f64) -> StripSettings {
     s.rev_mix = if reverb == "none" { 0.0 } else { amount as f32 };
 
     // Delay: 'none' or no amount only silences the send.
-    let amount = if track.delay_on { finite_or(track.delay_depth, 0.0).clamp(0.0, 1.0) } else { 0.0 };
+    let amount = if track.delay_on { finite_or(track.delay_mix, 0.0).clamp(0.0, 1.0) } else { 0.0 };
     if track.delay_type == "none" || amount <= 0.0 {
         s.dly_mix = 0.0;
     } else {
         let mode = delay_mode(&track.delay_type).unwrap_or(1.0);
-        let beats = if track.delay_time.is_finite() { track.delay_time } else { 1.0 };
+        let beats = if track.delay_beats.is_finite() { track.delay_beats } else { 1.0 };
         let seconds = 60.0 / bpm * beats;
         s.dly_time_l = (if mode >= 1.5 { seconds * 0.667 } else { seconds }) as f32;
         s.dly_time_r = seconds as f32;
@@ -92,8 +92,8 @@ pub fn strip_settings(track: &Track, bpm: f64) -> StripSettings {
         s.dly_mix = amount as f32;
     }
 
-    if track.velocity_lfo.is_none() {
-        s.volume = track.velocity as f32;
+    if track.volume_lfo.is_none() {
+        s.volume = track.volume as f32;
     }
     if track.pan_lfo.is_none() {
         s.pan = track.pan as f32;
@@ -149,7 +149,7 @@ pub fn strip_lfo(index: usize, track: &Track, silent: bool, first_tick: u64, tic
     };
     let result = StripLfo {
         track: index,
-        volume: if silent { Vec::new() } else { values(&track.velocity_lfo, &|v| v.clamp(0.0, 2.0)) },
+        volume: if silent { Vec::new() } else { values(&track.volume_lfo, &|v| v.clamp(0.0, 2.0)) },
         pan: values(&track.pan_lfo, &|v| (track.pan + v).clamp(-1.0, 1.0)),
         cutoff: values(&track.filter_freq_lfo, &|v| (track.filter_freq + v).clamp(20.0, 20_000.0)),
         q: values(&track.filter_q_lfo, &|v| (track.filter_q + v).clamp(0.707, 18.707)),
@@ -172,7 +172,7 @@ mod tests {
 
     #[test]
     fn delay_follows_the_tempo() {
-        let track = Track { delay_type: "pingpong".into(), delay_time: 0.5, delay_depth: 0.4, ..Track::default() };
+        let track = Track { delay_type: "pingpong".into(), delay_beats: 0.5, delay_mix: 0.4, ..Track::default() };
         let s = strip_settings(&track, 120.0);
         assert_eq!((s.dly_time_l, s.dly_time_r, s.dly_mode, s.dly_mix), ((0.25_f64 * 0.667) as f32, 0.25, 2.0, 0.4));
     }

@@ -236,7 +236,7 @@ fn importer() {
                         for (key, value) in [
                             ("beatCount", num(track.beat_count)),
                             ("stepsPerBeat", num(track.steps_per_beat)),
-                            ("loopAtStep", track.loop_at_step.map_or(Value::Null, num)),
+                            ("loopAtStep", track.loop_length.map_or(Value::Null, num)),
                         ] {
                             assert_eq!(value, *expected.get(key).unwrap(), "{at}: {key}");
                         }

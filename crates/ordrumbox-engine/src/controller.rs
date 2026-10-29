@@ -185,7 +185,7 @@ pub struct Controller {
 fn sound_key(track: &ordrumbox_core::Track) -> String {
     format!(
         "{}|{}|{}|{}|{:?}",
-        track.name, track.use_auto_assign_sound, track.sample_id, track.use_soft_synth, track.synth_sound_key
+        track.name, track.use_auto_assign_sound, track.sample_id, track.use_soft_synth, track.synth_preset
     )
 }
 

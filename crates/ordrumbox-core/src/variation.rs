@@ -22,8 +22,8 @@ use crate::steps::{step_to_beat, step_to_tick};
 use crate::track::Track;
 
 /// Amounts an auto track uses until the generator has picked its own.
-const AUTO_VARIATION_FALLBACK: f64 = 60.0;
-const AUTO_VARIATION2_FALLBACK: f64 = 40.0;
+const AUTO_HIT_VARIATION_FALLBACK: f64 = 60.0;
+const AUTO_NOTE_VARIATION_FALLBACK: f64 = 40.0;
 
 /// Chance (0–100) every operation gets outside auto mode, where the per-kind
 /// sliders are hidden.
@@ -73,7 +73,7 @@ impl NoteOp {
         }
         match self {
             Self::RetrigRate { .. } => track.prob_retrig,
-            Self::EuclideanFill(_) => track.prob_euclid,
+            Self::EuclideanFill(_) => track.prob_euclidean,
             Self::Prob(_) => track.prob_note,
             Self::ArpSpan(_) => track.prob_arp,
         }
@@ -83,7 +83,8 @@ impl NoteOp {
 /// The varied copies of a track's notes, by note index; notes not varied are
 /// absent, and the track itself is never modified (`computeNoteVariation`).
 pub(crate) fn vary_notes(track: &Track, rng: &mut Rng) -> HashMap<usize, Note> {
-    let amount = if track.auto { track.auto_variation2.unwrap_or(AUTO_VARIATION2_FALLBACK) } else { track.variation2 };
+    let amount =
+        if track.auto { track.auto_note_variation.unwrap_or(AUTO_NOTE_VARIATION_FALLBACK) } else { track.note_variation };
     let budget = budget_for(amount);
     let mut varied = HashMap::new();
     if budget <= 0 || track.notes.is_empty() {
@@ -118,10 +119,10 @@ pub(crate) fn vary_notes(track: &Track, rng: &mut Rng) -> HashMap<usize, Note> {
         match op {
             NoteOp::RetrigRate { retrigger_count, rate } => {
                 note.retrigger_count = retrigger_count;
-                note.rate = rate;
+                note.retrigger_rate = rate;
             }
-            NoteOp::EuclideanFill(fill) => note.euclidean_fill = fill,
-            NoteOp::Prob(prob) => note.prob = prob,
+            NoteOp::EuclideanFill(fill) => note.euclidean_pulses = fill,
+            NoteOp::Prob(prob) => note.probability = prob,
             NoteOp::ArpSpan(span) => {
                 if let Value::Array(intervals) = &mut note.arp {
                     intervals[0] = Value::Number(span);
@@ -191,7 +192,8 @@ pub(crate) fn apply(
     rng: &mut Rng,
     scales: &Scales,
 ) {
-    let amount = if track.auto { track.auto_variation.unwrap_or(AUTO_VARIATION_FALLBACK) } else { track.variation };
+    let amount =
+        if track.auto { track.auto_hit_variation.unwrap_or(AUTO_HIT_VARIATION_FALLBACK) } else { track.hit_variation };
     let budget = budget_for(amount);
     if budget <= 0 || loop_ticks <= 0 {
         return;
@@ -368,9 +370,9 @@ mod tests {
     fn note_probability_never_falls_below_the_floor() {
         let track = Track {
             auto: true,
-            auto_variation2: Some(100.0),
+            auto_note_variation: Some(100.0),
             prob_retrig: 0.0,
-            prob_euclid: 0.0,
+            prob_euclidean: 0.0,
             prob_note: 100.0,
             prob_note_depth: 100.0,
             notes: vec![Note::default(); 4],
@@ -378,7 +380,7 @@ mod tests {
         };
         let mut rng = Rng::new(2);
         let probs: Vec<f64> =
-            (0..50).flat_map(|_| vary_notes(&track, &mut rng).into_values().map(|n| n.prob)).collect();
+            (0..50).flat_map(|_| vary_notes(&track, &mut rng).into_values().map(|n| n.probability)).collect();
         assert!(probs.iter().any(|&p| p < 0.5));
         assert!(probs.iter().all(|&p| (NOTE_PROB_FLOOR..=1.0).contains(&p)), "{probs:?}");
     }

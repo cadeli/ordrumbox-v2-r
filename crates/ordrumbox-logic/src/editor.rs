@@ -443,8 +443,8 @@ impl Editor {
                     note.beat_step = (round(percent / 100.0 * f64::from(target)) as i32).min(target - 1);
                 }
                 let max_steps = track.beat_count * target;
-                if track.loop_at_step.is_some_and(|l| l > max_steps) {
-                    track.loop_at_step = Some(max_steps);
+                if track.loop_length.is_some_and(|l| l > max_steps) {
+                    track.loop_length = Some(max_steps);
                 }
             },
         )
@@ -467,8 +467,8 @@ impl Editor {
             None,
             |track| {
                 let full = track.steps_per_beat * track.beat_count;
-                let next = track.loop_at_step.unwrap_or(full) - 1;
-                track.loop_at_step = Some(if next < 1 { full } else { next });
+                let next = track.loop_length.unwrap_or(full) - 1;
+                track.loop_length = Some(if next < 1 { full } else { next });
             },
         )
         .is_some()
@@ -619,8 +619,8 @@ impl Editor {
             |pattern| {
                 for track in &mut pattern.tracks {
                     let max_steps = applied * track.steps_per_beat;
-                    if track.loop_at_step.is_some_and(|l| l > max_steps) {
-                        track.loop_at_step = Some(max_steps);
+                    if track.loop_length.is_some_and(|l| l > max_steps) {
+                        track.loop_length = Some(max_steps);
                     }
                     track.beat_count = applied;
                 }
@@ -740,7 +740,7 @@ impl Editor {
 /// `cleanTrack`'s change.
 fn clean(track: &mut Track) {
     track.notes.clear();
-    track.loop_at_step = Some(track.beat_count * track.steps_per_beat);
+    track.loop_length = Some(track.beat_count * track.steps_per_beat);
 }
 
 #[cfg(test)]
@@ -793,7 +793,7 @@ mod tests {
         assert!(e.update_track(0, 0, &updates, None, false));
         let track = &pattern(&e).tracks[0];
         assert_eq!(
-            (track.velocity, track.filter_freq, track.mute, track.scale_name.as_deref()),
+            (track.volume, track.filter_freq, track.mute, track.scale_name.as_deref()),
             (0.0, 20_000.0, false, None)
         );
         assert_eq!(e.history().next_undo(), Some("Update KICK"));
@@ -813,7 +813,7 @@ mod tests {
         }
         assert_eq!(e.history().undo_len(), 1);
         e.undo();
-        assert_eq!(pattern(&e).tracks[0].velocity, 1.0);
+        assert_eq!(pattern(&e).tracks[0].volume, 1.0);
     }
 
     #[test]
@@ -822,7 +822,7 @@ mod tests {
         // SNARE: beat 1 step 7 of 8 (88 %), loop at 32 > 4 beats × 3.
         assert!(e.set_steps_per_beat(0, 1, 3.0, false));
         let track = &pattern(&e).tracks[1];
-        assert_eq!((track.notes[0].beat_step, track.loop_at_step), (2, Some(12)));
+        assert_eq!((track.notes[0].beat_step, track.loop_length), (2, Some(12)));
         assert!(e.set_steps_per_beat(0, 1, 8.0, false));
         assert_eq!(pattern(&e).tracks[1].notes[0].beat_step, 7, "back to its step, as stepPercent is kept");
         assert!(!e.set_steps_per_beat(0, 1, 8.0, false));
@@ -834,12 +834,12 @@ mod tests {
     fn loop_point_and_clean() {
         let mut e = editor();
         assert!(e.decr_loop_point(0, 0));
-        assert_eq!(pattern(&e).tracks[0].loop_at_step, Some(15));
+        assert_eq!(pattern(&e).tracks[0].loop_length, Some(15));
         e.set_steps_per_beat(0, 0, 1.0, false); // 4 steps
         for _ in 0..4 {
             e.decr_loop_point(0, 0);
         }
-        assert_eq!(pattern(&e).tracks[0].loop_at_step, Some(4), "wrapped from 1 to the track end");
+        assert_eq!(pattern(&e).tracks[0].loop_length, Some(4), "wrapped from 1 to the track end");
         assert!(e.clean_pattern(0));
         assert!(pattern(&e).tracks.iter().all(|t| t.notes.is_empty()));
         assert_eq!(e.history().next_undo(), Some("Clean \"rock\""));
@@ -857,7 +857,7 @@ mod tests {
         assert_eq!(e.add_track(0, "CHH", 4), Some(3));
         let chh = &pattern(&e).tracks[3];
         assert_eq!(
-            (chh.beat_count, chh.loop_at_step, chh.pan),
+            (chh.beat_count, chh.loop_length, chh.pan),
             (4, Some(16), ordrumbox_core::drum_taxonomy::pan_from_track_name("CHH"))
         );
     }
@@ -872,7 +872,7 @@ mod tests {
         assert_eq!(ids, ["rock", "newpat-1", "rock-2"]);
         assert!(e.set_pattern_beat_count(0, 2.0));
         assert!(pattern(&e).tracks.iter().all(|t| t.beat_count == 2));
-        assert_eq!(pattern(&e).tracks[1].loop_at_step, Some(16));
+        assert_eq!(pattern(&e).tracks[1].loop_length, Some(16));
         assert!(e.set_pattern_beat_count(0, 40.0));
         assert_eq!(pattern(&e).beat_count, 4);
         assert!(e.set_pattern_bpm(0, f64::NAN, false));

@@ -49,7 +49,7 @@ pub fn pattern_ticks(pattern: &Pattern) -> i64 {
 /// track's own `beatCount` (`computeTickCountForLoop`).
 pub fn track_loop_ticks(track: &Track) -> i64 {
     let spb = f64::from(track.steps_per_beat);
-    let loop_steps = match track.loop_at_step {
+    let loop_steps = match track.loop_length {
         Some(steps) if steps > 0 => f64::from(steps),
         _ => f64::from(track.beat_count) * spb,
     };
@@ -79,12 +79,13 @@ pub fn recompute_flat_notes(pattern: &Pattern, pass: u32, rng: &mut Rng, scales:
         let loop_ticks = track_loop_ticks(track);
         let varied = variation::vary_notes(track, rng);
         let span_end = SpanResolver::new(track);
-        // Probability is a manual-mode control: in auto mode only note.prob gates.
+        // Probability is a manual-mode control: in auto mode only note.probability gates.
         let track_probability = if track.auto { 1.0 } else { track.probability };
 
         for (note_idx, source) in track.notes.iter().enumerate() {
             let note = varied.get(&note_idx).unwrap_or(source);
-            if !fires_on_pass(note.pos, note.every, pass) || !rng.chance(track_probability * note.prob) {
+            if !fires_on_pass(note.every_offset, note.every, pass) || !rng.chance(track_probability * note.probability)
+            {
                 continue;
             }
             let base =
@@ -129,7 +130,7 @@ impl SpanResolver {
         Self {
             occupied: track.notes.iter().map(|n| absolute_step(n.beat, n.beat_step, spb)).collect(),
             last: i64::from(spb) * i64::from(track.beat_count),
-            loop_at: track.loop_at_step.map(i64::from),
+            loop_at: track.loop_length.map(i64::from),
             steps_per_beat: spb,
         }
     }
@@ -170,7 +171,7 @@ impl NoteContext<'_> {
     /// Ticks between repeats / arpeggio notes for the note's `rate`.
     fn repeat_spacing(&self) -> i64 {
         let ticks_per_step = f64::from(TICK) / f64::from(self.track.steps_per_beat);
-        js::round(ticks_per_step * step_spacing(self.note.rate)) as i64
+        js::round(ticks_per_step * step_spacing(self.note.retrigger_rate)) as i64
     }
 
     /// The note and its repeats, or its arpeggio (`generateSubNotes`). Every
@@ -204,15 +205,19 @@ impl NoteContext<'_> {
     /// continue its sequence after the arpeggio notes.
     fn add_euclidean_fill(&self, flat: &mut FlatNotes, base: i64, span_end: &SpanResolver, rng: &mut Rng) {
         let note = self.note;
-        if note.euclidean_fill <= 0 {
+        if note.euclidean_pulses <= 0 {
             return;
         }
         let sequence = arp::sequence(&note.arp, rng);
         let spb = self.track.steps_per_beat;
         let start = absolute_step(note.beat, note.beat_step, spb);
         let ticks_per_step = f64::from(TICK) / f64::from(spb);
-        let positions =
-            euclidean::fill_positions(start, span_end.end(note) - start, note.euclidean_fill, note.euclidean_rotation);
+        let positions = euclidean::fill_positions(
+            start,
+            span_end.end(note) - start,
+            note.euclidean_pulses,
+            note.euclidean_rotation,
+        );
         for (i, step) in positions.into_iter().enumerate() {
             let tick = base + js::round((step - start) as f64 * ticks_per_step) as i64;
             if tick >= self.pattern_ticks || !rng.chance(note.arp_trigger_probability) {

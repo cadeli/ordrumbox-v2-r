@@ -273,7 +273,7 @@ pub fn fx_on(track: &Track, fx: &FxDef) -> bool {
 
 /// `getTrackLoopAtStep`: the loop point, else the track's length in steps.
 pub fn loop_at_step(track: &Track) -> f64 {
-    if let Some(l) = track.loop_at_step.filter(|&l| l > 0) {
+    if let Some(l) = track.loop_length.filter(|&l| l > 0) {
         return f64::from(l);
     }
     let spb = track.steps_per_beat;
@@ -372,7 +372,7 @@ pub fn arp_value(
     range: Option<usize>,
 ) -> Value {
     let scale = scale.or(note.arp_scale.as_deref()).unwrap_or("major");
-    let kind = kind.or(note.arp_type.as_deref()).unwrap_or("up");
+    let kind = kind.or(note.arp_direction.as_deref()).unwrap_or("up");
     let range = range.unwrap_or_else(|| arp_state(note, scales).range);
     if range == 0 {
         return Value::Null;
@@ -406,8 +406,8 @@ pub fn note_tooltip(note: &Note, track_pitch: f64) -> String {
     if note.velocity != 0.8 {
         parts.push(format!("vel:{}", fmt(note.velocity)));
     }
-    if note.prob != 1.0 {
-        parts.push(format!("prob:{}", fmt(note.prob)));
+    if note.probability != 1.0 {
+        parts.push(format!("prob:{}", fmt(note.probability)));
     }
     if note.every != 1 {
         parts.push(format!("every:{}", note.every));
@@ -429,15 +429,15 @@ pub fn note_tooltip(note: &Note, track_pitch: f64) -> String {
     if note.arp_trigger_probability != 1.0 {
         parts.push(format!("arpProb:{}", fmt(note.arp_trigger_probability)));
     }
-    if note.euclidean_fill > 0 {
+    if note.euclidean_pulses > 0 {
         parts.push(if note.euclidean_rotation != 0 {
-            format!("eucl:{}@{}", note.euclidean_fill, note.euclidean_rotation)
+            format!("eucl:{}@{}", note.euclidean_pulses, note.euclidean_rotation)
         } else {
-            format!("eucl:{}", note.euclidean_fill)
+            format!("eucl:{}", note.euclidean_pulses)
         });
     }
-    if note.rate != 1.0 {
-        parts.push(format!("rate:{}", fmt(note.rate)));
+    if note.retrigger_rate != 1.0 {
+        parts.push(format!("rate:{}", fmt(note.retrigger_rate)));
     }
     if note.pan != 0.0 {
         parts.push(format!("pan:{}", fmt(note.pan)));
@@ -1001,7 +1001,7 @@ mod tests {
         assert_eq!(scales.intervals("odd", 3), [0]);
         let mut note = Note::default();
         assert_eq!(arp_state(&note, &scales), ArpState { scale: "major".into(), kind: "up".into(), range: 0 });
-        note.arp_type = Some("down".into());
+        note.arp_direction = Some("down".into());
         note.arp = arp_value(&note, &scales, Some("minor"), None, Some(4));
         assert_eq!(note.arp.to_json(), r#"{"intervals":[0,2,3,5],"mode":"down"}"#);
         assert_eq!(arp_state(&note, &scales), ArpState { scale: "minor".into(), kind: "down".into(), range: 4 });
@@ -1037,7 +1037,7 @@ mod tests {
         assert_eq!(loop_at_step(&track), 16.0);
         track.notes.push(Note { beat: 7, beat_step: 1, ..Note::default() });
         assert_eq!(loop_at_step(&track), 30.0);
-        track.loop_at_step = Some(5);
+        track.loop_length = Some(5);
         assert_eq!(loop_at_step(&track), 5.0);
     }
 
