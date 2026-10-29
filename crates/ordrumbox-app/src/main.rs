@@ -18,6 +18,8 @@ mod font;
 mod frame;
 mod kits;
 mod master;
+mod mcp;
+mod mcp_link;
 mod menu;
 mod note_drag;
 mod output;
@@ -597,8 +599,10 @@ impl ApplicationHandler for App {
     }
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        // MCP calls first: the autosave below counts their edits.
+        let called = self.session.poll_mcp();
         let save_at = self.session.autosave();
-        if self.session.check_audio() || self.session.poll_updates() {
+        if called || self.session.check_audio() || self.session.poll_updates() {
             self.request_redraw();
         }
         let playing = self.session.playing();
@@ -650,15 +654,21 @@ fn write_bmp(path: &str, pixels: &[u32], width: usize, height: usize) -> std::io
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // `ordrumbox --mcp`, started by an MCP client: the bridge to the window.
+    if std::env::args_os().nth(1).is_some_and(|arg| arg == "--mcp") {
+        return Ok(mcp_link::run_bridge()?);
+    }
     // No text without it: stop with where it was looked for.
     font::load()?;
     let event_loop = EventLoop::new()?;
     let mut session = Session::load();
     let proxy = event_loop.create_proxy();
-    session.start_updates(update::Waker::new(move || match proxy.send_event(()) {
+    let waker = update::Waker::new(move || match proxy.send_event(()) {
         // Closed: the app is quitting, there is nothing to wake.
         Ok(()) | Err(EventLoopClosed(())) => {}
-    }));
+    });
+    session.start_updates(waker.clone());
+    session.start_mcp(waker);
     // MIDI files given on the command line ("open with"): imported.
     for arg in std::env::args_os().skip(1) {
         let path = std::path::PathBuf::from(arg);

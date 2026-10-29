@@ -201,13 +201,18 @@ fn fetch() -> Result<Answer, String> {
     }
 }
 
-/// Called from the check's thread once its outcome is sent, to wake the UI.
+/// Called from another thread (the update check, the MCP link) once it has
+/// sent something, to wake the UI.
 #[derive(Clone)]
 pub struct Waker(Arc<dyn Fn() + Send + Sync>);
 
 impl Waker {
     pub fn new(wake: impl Fn() + Send + Sync + 'static) -> Self {
         Self(Arc::new(wake))
+    }
+
+    pub fn wake(&self) {
+        (self.0)();
     }
 }
 
@@ -233,7 +238,7 @@ impl Check {
         thread::spawn(move || {
             // Unsent means the session is gone: no one left to tell.
             if sender.send(outcome(fetch())).is_ok() {
-                (waker.0)();
+                waker.wake();
             }
         });
         Self { receiver, manual }

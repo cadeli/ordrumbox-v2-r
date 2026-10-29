@@ -116,6 +116,12 @@ pub fn save_setting(path: &Path, key: &str, value: json::Value) -> io::Result<()
     write_atomic(path, &(json::Value::Object(settings).to_json_pretty(2) + "\n"))
 }
 
+/// Where the running app tells `ordrumbox --mcp` how to reach it
+/// (`mcp_link.rs`): its port and the token a connection must give.
+pub fn mcp_endpoint_path() -> Option<PathBuf> {
+    Some(user_dir()?.join("mcp.json"))
+}
+
 /// The synth presets, once edited.
 pub fn synths_path() -> Option<PathBuf> {
     Some(user_dir()?.join(SYNTHS_FILE))
