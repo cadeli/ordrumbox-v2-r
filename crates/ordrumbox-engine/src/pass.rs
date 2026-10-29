@@ -200,7 +200,7 @@ fn sound_for(
     };
     let bank_sample = context.bank.get(sample)?;
     // The sample's tune and gain trim (`sample.tune`, `sample.gainDb`).
-    let mut ratio = note.playback_ratio(track) * (bank_sample.sample.tune / 12.0).exp2();
+    let mut ratio = note.playback_ratio(track) * (bank_sample.sample.transpose / 12.0).exp2();
     if let Some(pitch_lfo) = &track.transpose_lfo {
         ratio *= (lfo::value(pitch_lfo, lfo_tick as f64) / 12.0).exp2();
     }
@@ -392,7 +392,7 @@ mod tests {
         let instrument = KitSample {
             key: "X".into(),
             display_name: "x".into(),
-            url: "x".into(),
+            path: "x".into(),
             decay: Some(100.0),
             ..Default::default()
         };

@@ -71,7 +71,7 @@ impl KitSet {
         save_to: Option<PathBuf>,
         samples_dir: Option<PathBuf>,
     ) -> Self {
-        let buffers = bank.samples.iter().map(|s| (s.sample.url.clone(), s.buffer.clone())).collect();
+        let buffers = bank.samples.iter().map(|s| (s.sample.path.clone(), s.buffer.clone())).collect();
         Self { kits, buffers, sources, save_to, samples_dir }
     }
 
@@ -93,7 +93,7 @@ impl KitSet {
             },
         );
         for sample in &bank.samples {
-            self.buffers.entry(sample.sample.url.clone()).or_insert_with(|| sample.buffer.clone());
+            self.buffers.entry(sample.sample.path.clone()).or_insert_with(|| sample.buffer.clone());
         }
         (bank, errors)
     }
@@ -129,8 +129,8 @@ impl KitSet {
     // ─── Sample settings ─────────────────────────────────────────────────────
 
     /// Where the sample of `url` is: kit and index.
-    pub fn find_url(&self, url: &str) -> Option<(usize, usize)> {
-        self.kits.iter().enumerate().find_map(|(k, kit)| Some((k, kit.samples.iter().position(|i| i.url == url)?)))
+    pub fn find_path(&self, url: &str) -> Option<(usize, usize)> {
+        self.kits.iter().enumerate().find_map(|(k, kit)| Some((k, kit.samples.iter().position(|i| i.path == url)?)))
     }
 
     /// Set gain (dB), tune (semitones) or decay (ms) of a sample, from a
@@ -143,8 +143,8 @@ impl KitSet {
                 instrument.gain_db = value;
                 Some(format!("{name}: gain {value:+.1} dB"))
             }
-            Field::Tune if value != instrument.tune => {
-                instrument.tune = value;
+            Field::Tune if value != instrument.transpose => {
+                instrument.transpose = value;
                 Some(format!("{name}: tune {value:+.1} st"))
             }
             Field::Decay if Some(value) != instrument.decay => {
@@ -184,7 +184,7 @@ impl KitSet {
     /// `normalizeAll`: the samples of kit `kit` scaled to a 0 dB peak; how many.
     pub fn normalize(&mut self, kit: usize) -> Result<usize, String> {
         let urls: Vec<String> =
-            self.kits.get(kit).map(|k| k.samples.iter().map(|i| i.url.clone()).collect()).unwrap_or_default();
+            self.kits.get(kit).map(|k| k.samples.iter().map(|i| i.path.clone()).collect()).unwrap_or_default();
         let mut count = 0;
         for url in urls {
             let Some(buffer) = self.buffers.get(&url) else { continue };
@@ -217,9 +217,13 @@ impl KitSet {
         }
         let kit = self.kits.iter().position(|k| k.name == kit_name).unwrap_or(0);
         let instruments = &mut self.kits[kit].samples;
-        let entry =
-            KitSample { key: detect_key(&name), display_name: name.clone(), url: name.clone(), ..KitSample::default() };
-        let index = match instruments.iter().position(|i| i.url == name) {
+        let entry = KitSample {
+            key: detect_key(&name),
+            display_name: name.clone(),
+            path: name.clone(),
+            ..KitSample::default()
+        };
+        let index = match instruments.iter().position(|i| i.path == name) {
             Some(i) => {
                 instruments[i] = entry;
                 i
@@ -234,7 +238,7 @@ impl KitSet {
 
     /// `replaceSampleBuffer`: new audio for sample `sample`, same url.
     pub fn replace_sample(&mut self, kit: usize, sample: usize, path: &Path) -> Result<String, String> {
-        let url = self.sample(kit, sample).ok_or("no sample selected")?.url.clone();
+        let url = self.sample(kit, sample).ok_or("no sample selected")?.path.clone();
         let (_, buffer) = Self::decode(path)?;
         self.store_audio(&url, &buffer)?;
         self.buffers.insert(url, Arc::new(buffer));
@@ -269,7 +273,7 @@ impl KitSet {
                     instruments.push(KitSample {
                         key: detect_key(&name),
                         display_name: name.clone(),
-                        url: name,
+                        path: name,
                         ..KitSample::default()
                     });
                 }
@@ -332,7 +336,7 @@ mod tests {
                 samples: vec![KitSample {
                     key: "KICK".into(),
                     display_name: "kick".into(),
-                    url: "k.wav".into(),
+                    path: "k.wav".into(),
                     ..KitSample::default()
                 }],
                 ..Kit::default()
@@ -357,12 +361,12 @@ mod tests {
         assert_eq!(kits.set_value(0, 0, Field::Gain, -3.0).as_deref(), Some("kick: gain -3.0 dB"));
         assert_eq!(kits.set_value(0, 0, Field::Gain, -3.0), None); // no change
         kits.set_value(0, 0, Field::Tune, 0.3);
-        assert_eq!(kits.kits[0].samples[0].tune, 0.3);
+        assert_eq!(kits.kits[0].samples[0].transpose, 0.3);
         kits.set_value(0, 0, Field::Decay, 630.0);
         assert_eq!(kits.kits[0].samples[0].decay, Some(630.0));
         assert!(kits.set_instrument(0, 0, "SNARE").is_some());
         assert_eq!(kits.kits[0].samples[0].key, "SNARE");
-        assert_eq!(kits.find_url("k.wav"), Some((0, 0)));
+        assert_eq!(kits.find_path("k.wav"), Some((0, 0)));
 
         assert_eq!(kits.normalize(0), Ok(1));
         // The gain comes from the peak in dB to 3 decimals, as in the JS: about 0 dB.

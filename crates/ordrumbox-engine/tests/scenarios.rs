@@ -40,7 +40,7 @@ fn bank() -> Arc<SampleBank> {
                 sample: KitSample {
                     key: key.into(),
                     display_name: key.to_lowercase(),
-                    url: format!("{kit}/{key}.wav"),
+                    path: format!("{kit}/{key}.wav"),
                     decay: Some(5000.0),
                     ..Default::default()
                 },

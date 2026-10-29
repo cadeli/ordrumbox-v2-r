@@ -27,7 +27,7 @@ fn bank(rate: u32) -> Arc<SampleBank> {
     let instrument = KitSample {
         key: "KICK".into(),
         display_name: "k".into(),
-        url: "k".into(),
+        path: "k".into(),
         decay: Some(100.0),
         ..Default::default()
     };

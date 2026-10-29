@@ -451,7 +451,7 @@ mod tests {
         let instrument = crate::kit::KitSample {
             key: "K".into(),
             display_name: "k".into(),
-            url: "k".into(),
+            path: "k".into(),
             decay: Some(10_000.0),
             ..Default::default()
         };

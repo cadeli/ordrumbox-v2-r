@@ -116,7 +116,7 @@ mod tests {
         let instrument = KitSample {
             key: "KICK".into(),
             display_name: "k".into(),
-            url: "k".into(),
+            path: "k".into(),
             decay: Some(200.0),
             ..Default::default()
         };

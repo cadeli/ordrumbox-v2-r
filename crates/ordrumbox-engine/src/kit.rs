@@ -19,7 +19,7 @@ pub struct KitSample {
     pub display_name: String,
     /// Path under `assets/kits/` (or the user's samples folder), also the
     /// sample id tracks refer to.
-    pub url: String,
+    pub path: String,
     /// Decay to -60 dB, ms, when the kit sets one (see [`KitSample::decay_ms`]).
     pub decay: Option<f64>,
     /// MIDI note the sample sounds at unpitched (`rootMidi`), when known:
@@ -29,8 +29,8 @@ pub struct KitSample {
     pub peak_db: Option<f64>,
     /// Gain trim, dB (`gainDb`).
     pub gain_db: f64,
-    /// Transposition, semitones (`tune`).
-    pub tune: f64,
+    /// Transposition, semitones.
+    pub transpose: f64,
     /// Other keys of the entry, written back as they came.
     pub extra: Object,
 }
@@ -48,9 +48,10 @@ impl KitSample {
 
     fn from_json(value: &Value) -> Option<Self> {
         let object = value.as_object()?;
-        let url = object.get("url")?.as_str()?.to_owned();
-        let text = |key: &str| object.get(key).and_then(Value::as_str).map(str::to_owned);
-        let number = |key: &str| object.get(key).and_then(Value::as_f64);
+        let text =
+            |keys: &[&str]| keys.iter().find_map(|key| object.get(key).and_then(Value::as_str)).map(str::to_owned);
+        let number = |keys: &[&str]| keys.iter().find_map(|key| object.get(key).and_then(Value::as_f64));
+        let path = text(&["path", "url"])?;
         let mut extra = Object::new();
         for (key, value) in object.iter() {
             if !KNOWN_KEYS.contains(&key) {
@@ -58,24 +59,24 @@ impl KitSample {
             }
         }
         Some(Self {
-            key: text("key").unwrap_or_default(),
-            display_name: text("displayName").or_else(|| text("display_name")).unwrap_or_default(),
-            url,
-            decay: number("decay"),
-            root_midi: number("rootMidi"),
-            peak_db: number("peakDb"),
-            gain_db: number("gainDb").unwrap_or(0.0),
-            tune: number("tune").unwrap_or(0.0),
+            key: text(&["key"]).unwrap_or_default(),
+            display_name: text(&["displayName", "display_name"]).unwrap_or_default(),
+            path,
+            decay: number(&["decay"]),
+            root_midi: number(&["rootMidi"]),
+            peak_db: number(&["peakDb"]),
+            gain_db: number(&["gainDb"]).unwrap_or(0.0),
+            transpose: number(&["transpose", "tune"]).unwrap_or(0.0),
             extra,
         })
     }
 
-    /// The entry as drumkits.json holds it (`gainDb`/`tune` only when set).
+    /// The entry as kits.json holds it (`gainDb`/`transpose` only when set).
     pub fn to_json(&self) -> Value {
         let mut o = Object::new();
         o.insert("displayName", Value::from(self.display_name.as_str()));
         o.insert("key", Value::from(self.key.as_str()));
-        o.insert("url", Value::from(self.url.as_str()));
+        o.insert("path", Value::from(self.path.as_str()));
         if let Some(peak) = self.peak_db {
             o.insert("peakDb", Value::Number(peak));
         }
@@ -88,8 +89,8 @@ impl KitSample {
         if self.gain_db != 0.0 {
             o.insert("gainDb", Value::Number(self.gain_db));
         }
-        if self.tune != 0.0 {
-            o.insert("tune", Value::Number(self.tune));
+        if self.transpose != 0.0 {
+            o.insert("transpose", Value::Number(self.transpose));
         }
         for (key, value) in self.extra.iter() {
             o.insert(key, value.clone());
@@ -102,21 +103,26 @@ impl KitSample {
     fn to_mapping_json(&self) -> Value {
         let mut o = Object::new();
         let opt = |v: Option<f64>| v.map_or(Value::Null, Value::Number);
-        o.insert("url", Value::from(self.url.as_str()));
+        o.insert("path", Value::from(self.path.as_str()));
         o.insert("displayName", Value::from(self.display_name.as_str()));
         o.insert("key", Value::from(self.key.as_str()));
         o.insert("rootMidi", opt(self.root_midi));
         o.insert("peakDb", opt(self.peak_db));
         o.insert("decay", opt(self.decay));
         o.insert("gainDb", Value::Number(self.gain_db));
-        o.insert("tune", Value::Number(self.tune));
+        o.insert("transpose", Value::Number(self.transpose));
         Value::Object(o)
     }
 }
 
-/// `display_name`: the key in the JS app's drumkits.json and older saves.
-const KNOWN_KEYS: [&str; 9] =
-    ["key", "displayName", "display_name", "url", "decay", "rootMidi", "peakDb", "gainDb", "tune"];
+/// `display_name`, `url`, `tune`: the keys of the JS app's drumkits.json and older saves.
+const KNOWN_KEYS: [&str; 11] =
+    ["key", "displayName", "display_name", "path", "url", "decay", "rootMidi", "peakDb", "gainDb", "transpose", "tune"];
+
+/// A kit's samples: `instruments` in the JS app's drumkits.json and older saves.
+fn sample_entries(value: &Value) -> Option<&[Value]> {
+    ["samples", "instruments"].iter().find_map(|key| value.get(key).and_then(Value::as_array))
+}
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Kit {
@@ -130,20 +136,14 @@ impl Kit {
     fn from_json(value: &Value) -> Option<Self> {
         let object = value.as_object()?;
         let name = object.get("name")?.as_str()?.to_owned();
-        let instruments = object
-            .get("instruments")
-            .and_then(Value::as_array)
-            .unwrap_or_default()
-            .iter()
-            .filter_map(KitSample::from_json)
-            .collect();
+        let samples = sample_entries(value).unwrap_or_default().iter().filter_map(KitSample::from_json).collect();
         let mut extra = Object::new();
         for (key, value) in object.iter() {
-            if key != "name" && key != "instruments" {
+            if !matches!(key, "name" | "samples" | "instruments") {
                 extra.insert(key, value.clone());
             }
         }
-        Some(Self { name, samples: instruments, extra })
+        Some(Self { name, samples, extra })
     }
 
     pub fn to_json(&self) -> Value {
@@ -152,7 +152,7 @@ impl Kit {
         for (key, value) in self.extra.iter() {
             o.insert(key, value.clone());
         }
-        o.insert("instruments", Value::Array(self.samples.iter().map(KitSample::to_json).collect()));
+        o.insert("samples", Value::Array(self.samples.iter().map(KitSample::to_json).collect()));
         Value::Object(o)
     }
 
@@ -160,36 +160,33 @@ impl Kit {
     pub fn to_mapping_json(&self) -> Value {
         let mut o = Object::new();
         o.insert("name", Value::from(self.name.as_str()));
-        o.insert("instruments", Value::Array(self.samples.iter().map(KitSample::to_mapping_json).collect()));
+        o.insert("samples", Value::Array(self.samples.iter().map(KitSample::to_mapping_json).collect()));
         Value::Object(o)
     }
 
     /// A kit from a mapping file (`restoreDrumkit`): a name and at least one
-    /// entry with a string `url` and `key`; the display name defaults to the url.
+    /// entry with a string `path` and `key`; the display name defaults to the path.
     pub fn from_mapping_json(value: &Value) -> Result<Self, String> {
         let name = value.get("name").and_then(Value::as_str);
-        let entries = value.get("instruments").and_then(Value::as_array);
-        let (Some(name), Some(entries)) = (name, entries) else {
-            return Err("Missing drumkit name or instruments".into());
+        let (Some(name), Some(entries)) = (name, sample_entries(value)) else {
+            return Err("Missing kit name or samples".into());
         };
-        let instruments: Vec<KitSample> = entries
+        let samples: Vec<KitSample> = entries
             .iter()
-            .filter(|e| {
-                e.get("url").and_then(Value::as_str).is_some() && e.get("key").and_then(Value::as_str).is_some()
-            })
+            .filter(|e| e.get("key").and_then(Value::as_str).is_some())
             .filter_map(|e| {
-                let mut instrument = KitSample::from_json(e)?;
+                let mut sample = KitSample::from_json(e)?;
                 if ["displayName", "display_name"].iter().all(|key| e.get(key).is_none_or(Value::is_null)) {
-                    instrument.display_name.clone_from(&instrument.url);
+                    sample.display_name.clone_from(&sample.path);
                 }
-                instrument.extra = Object::new();
-                Some(instrument)
+                sample.extra = Object::new();
+                Some(sample)
             })
             .collect();
-        if instruments.is_empty() {
-            return Err("No valid instruments".into());
+        if samples.is_empty() {
+            return Err("No valid samples".into());
         }
-        Ok(Self { name: name.to_owned(), samples: instruments, extra: Object::new() })
+        Ok(Self { name: name.to_owned(), samples, extra: Object::new() })
     }
 }
 
@@ -236,9 +233,9 @@ impl SampleBank {
         let mut errors = Vec::new();
         for kit in kits {
             for instrument in &kit.samples {
-                let buffer = match known(&instrument.url) {
+                let buffer = match known(&instrument.path) {
                     Some(buffer) => Ok(buffer),
-                    None => read(&instrument.url)
+                    None => read(&instrument.path)
                         .map_err(|e| e.to_string())
                         .and_then(|b| wav::decode(&b).map_err(|e| e.to_string()))
                         .map(Arc::new),
@@ -247,7 +244,7 @@ impl SampleBank {
                     Ok(buffer) => {
                         samples.push(BankSample { kit: kit.name.clone(), sample: instrument.clone(), buffer })
                     }
-                    Err(e) => errors.push(format!("{}: {e}", instrument.url)),
+                    Err(e) => errors.push(format!("{}: {e}", instrument.path)),
                 }
             }
         }
@@ -258,8 +255,8 @@ impl SampleBank {
         Arc::new(self)
     }
 
-    pub fn find_url(&self, url: &str) -> Option<usize> {
-        self.samples.iter().position(|s| s.sample.url == url)
+    pub fn find_path(&self, url: &str) -> Option<usize> {
+        self.samples.iter().position(|s| s.sample.path == url)
     }
 
     pub fn get(&self, index: usize) -> Option<&BankSample> {
@@ -288,7 +285,7 @@ mod tests {
         let silence = crate::wav::tests::wav(1, 1, 8_000, 16, &[0, 0]);
         let (bank, errors) = SampleBank::load(&kits, |_| Ok(silence.clone()));
         assert!(errors.is_empty());
-        assert_eq!(bank.find_url("b/h.wav"), Some(3));
+        assert_eq!(bank.find_path("b/h.wav"), Some(3));
         assert_eq!(bank.samples[3].kit, "b");
     }
 
@@ -299,7 +296,7 @@ mod tests {
             samples: vec![KitSample {
                 key: "K".into(),
                 display_name: "k".into(),
-                url: "x.wav".into(),
+                path: "x.wav".into(),
                 decay: Some(1.0),
                 ..Default::default()
             }],
@@ -315,19 +312,24 @@ mod tests {
         let text = r#"[{"name":"real","infos":" kit","instruments":[{"display_name":"kick","key":"KICK","url":"real/kick.wav","peakDb":-3,"rootMidi":72,"decay":5000,"x":1},{"display_name":"s","key":"SNARE","url":"s.wav","gainDb":-2.5,"tune":1}]}]"#;
         let kits = kits_from_json(&json::parse(text).unwrap());
         // Read under the JS key, written under the current one.
-        assert_eq!(kits_to_json(&kits).to_json(), text.replace("display_name", "displayName"));
+        // Read under the JS keys, written under the current ones.
+        let current =
+            [("display_name", "displayName"), ("instruments", "samples"), ("url", "path"), ("tune", "transpose")]
+                .iter()
+                .fold(text.to_owned(), |text, (old, new)| text.replace(&format!("\"{old}\""), &format!("\"{new}\"")));
+        assert_eq!(kits_to_json(&kits).to_json(), current);
         assert_eq!(kits_from_json(&kits_to_json(&kits)), kits);
         assert_eq!(
             kits[0].to_mapping_json().to_json(),
-            r#"{"name":"real","instruments":[{"url":"real/kick.wav","displayName":"kick","key":"KICK","rootMidi":72,"peakDb":-3,"decay":5000,"gainDb":0,"tune":0},{"url":"s.wav","displayName":"s","key":"SNARE","rootMidi":null,"peakDb":null,"decay":null,"gainDb":-2.5,"tune":1}]}"#
+            r#"{"name":"real","samples":[{"path":"real/kick.wav","displayName":"kick","key":"KICK","rootMidi":72,"peakDb":-3,"decay":5000,"gainDb":0,"transpose":0},{"path":"s.wav","displayName":"s","key":"SNARE","rootMidi":null,"peakDb":null,"decay":null,"gainDb":-2.5,"transpose":1}]}"#
         );
         let restored = Kit::from_mapping_json(&kits[0].to_mapping_json()).unwrap();
         assert_eq!(restored.samples[0].decay, Some(5000.0));
         assert_eq!(restored.samples[1].gain_db, -2.5);
         let missing = json::parse(r#"{"name":"n","instruments":[{"url":"a.wav"}]}"#).unwrap();
-        assert_eq!(Kit::from_mapping_json(&missing), Err("No valid instruments".into()));
+        assert_eq!(Kit::from_mapping_json(&missing), Err("No valid samples".into()));
         let unnamed = json::parse(r#"{"instruments":[{"url":"a.wav","key":"K"}]}"#).unwrap();
-        assert_eq!(Kit::from_mapping_json(&unnamed), Err("Missing drumkit name or instruments".into()));
+        assert_eq!(Kit::from_mapping_json(&unnamed), Err("Missing kit name or samples".into()));
         let defaults = json::parse(r#"{"name":"n","instruments":[{"url":"a.wav","key":"K"}]}"#).unwrap();
         assert_eq!(Kit::from_mapping_json(&defaults).unwrap().samples[0].display_name, "a.wav");
     }
