@@ -2,8 +2,8 @@
 //! `audio/player.js`, the ↻ Drum / Bass / Chords buttons of
 //! `pattern_auto_gen.js`, and `random_generator.js`).
 //!
-//! A pattern remembers its generation in three saved keys: `_autoGenGenre`,
-//! `_autoGenKeyOffset` (semitones) and `_autoGenScale`. A track in auto mode
+//! A pattern remembers its generation in three saved keys: `autoGenre`,
+//! `autoKeyOffset` (semitones) and `autoScale`. A track in auto mode
 //! (`auto`) gets a new line at every loop start; a pattern with `autoGen`
 //! regenerates its melodic tracks every loop and all of them at section
 //! boundaries.
@@ -18,10 +18,12 @@ use super::structure::{
 };
 use super::{clamp, drums, melodic, table};
 
-const GENRE: &str = "_autoGenGenre";
-const KEY_OFFSET: &str = "_autoGenKeyOffset";
-const SCALE: &str = "_autoGenScale";
-/// Legacy auto flag of the toolbar, read alongside `auto` and written with it.
+/// The pattern's genre key (in `Pattern::extra`).
+pub const GENRE: &str = "autoGenre";
+const KEY_OFFSET: &str = "autoKeyOffset";
+const SCALE: &str = "autoScale";
+/// The ↻ buttons' own auto flag: it can stay on while `auto_mode` is off
+/// (the button lit, the track not regenerating).
 const TOOLBAR_AUTO: &str = "_toolbarAuto";
 
 /// Tonal centre and scale a melodic line plays in.
@@ -337,7 +339,7 @@ pub fn plays_auto(pattern: &Pattern) -> bool {
 
 // ─── The ↻ buttons ───────────────────────────────────────────────────────────
 
-/// Auto mode as the toolbar shows it (`auto || _toolbarAuto`).
+/// Auto mode as the ↻ buttons show it (`auto_mode` or their own flag).
 pub fn is_auto_on(track: &Track) -> bool {
     track.auto_mode || track.extra.get(TOOLBAR_AUTO).is_some_and(js::truthy)
 }

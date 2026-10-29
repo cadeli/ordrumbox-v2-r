@@ -86,9 +86,9 @@ impl Library {
         object.insert("description", info("description"));
         object.insert("date", info("date"));
         object.insert("patterns", Value::Array(self.patterns.iter().map(Pattern::to_json).collect()));
-        object.insert("selectedPatternIdx", Value::from(selected_pattern as f64));
+        object.insert("selectedPattern", Value::from(selected_pattern as f64));
         object.insert("songs", Value::Array(self.songs.iter().map(Song::to_json).collect()));
-        object.insert("selectedSongIdx", Value::from(selected_song as f64));
+        object.insert("selectedSong", Value::from(selected_song as f64));
         object.insert(stamp.0, Value::from(stamp.1));
         Value::Object(object)
     }
@@ -105,16 +105,17 @@ impl Library {
         for (key, v) in [("description", text("description")), ("date", text("date"))] {
             library.info.insert(key, Value::from(v.unwrap_or_default().as_str()));
         }
-        let index = |key: &str| {
-            let v = value.get(key).map_or(0.0, crate::js::to_number);
+        // `selectedPatternIdx`, `selectedSongIdx`: the JS keys, older saves.
+        let index = |keys: [&str; 2]| {
+            let v = keys.iter().find_map(|key| value.get(key)).map_or(0.0, crate::js::to_number);
             if v > 0.0 { v as usize } else { 0 }
         };
         Some(SongRecord {
             name,
             library,
             report,
-            selected_pattern: index("selectedPatternIdx"),
-            selected_song: index("selectedSongIdx"),
+            selected_pattern: index(["selectedPattern", "selectedPatternIdx"]),
+            selected_song: index(["selectedSong", "selectedSongIdx"]),
         })
     }
 }
@@ -168,7 +169,7 @@ mod tests {
         let keys: Vec<_> = record.as_object().unwrap().iter().map(|(k, _)| k.to_owned()).collect();
         assert_eq!(
             keys,
-            ["name", "description", "date", "patterns", "selectedPatternIdx", "songs", "selectedSongIdx", "savedAt"]
+            ["name", "description", "date", "patterns", "selectedPattern", "songs", "selectedSong", "savedAt"]
         );
         let read = Library::from_song_record(&record, &library.info).unwrap();
         assert_eq!(read.name.as_deref(), Some("My song"));

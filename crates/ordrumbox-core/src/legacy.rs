@@ -6,25 +6,64 @@ use crate::note::{Note, upgrade_arp};
 use crate::track::Track;
 
 /// A library, a pattern or a list of either with every legacy key renamed
-/// to its current name, values and key order kept: the keys a load then a
-/// save would write. Compares a JS export with what this app saves.
+/// to its current name and the dropped keys left out, values and key order
+/// kept: the keys a load then a save would write. Compares a JS export with
+/// what this app saves.
 pub fn upgrade_keys(value: &Value) -> Value {
     match value {
         Value::Array(items) => Value::Array(items.iter().map(upgrade_keys).collect()),
-        Value::Object(object) if object.contains_key("patterns") || object.contains_key("tracks") => {
+        Value::Object(object) if object.contains_key("patterns") => {
             let mut upgraded = Object::new();
             for (key, value) in object.iter() {
-                let value = match key {
-                    "patterns" => upgrade_keys(value),
-                    "tracks" => map_array(value, upgrade_track),
-                    _ => value.clone(),
+                let (key, value) = match key {
+                    "patterns" => (key, map_array(value, upgrade_pattern)),
+                    "songs" => (key, map_array(value, upgrade_song)),
+                    "infos" => ("info", value.clone()),
+                    "selectedPatternIdx" => ("selectedPattern", value.clone()),
+                    "selectedSongIdx" => ("selectedSong", value.clone()),
+                    _ => (key, value.clone()),
                 };
-                upgraded.insert(if key == "infos" { "info" } else { key }, value);
+                upgraded.insert(key, value);
             }
             Value::Object(upgraded)
         }
+        Value::Object(_) => upgrade_pattern(value),
         other => other.clone(),
     }
+}
+
+fn upgrade_pattern(pattern: &Value) -> Value {
+    let Some(object) = pattern.as_object() else { return pattern.clone() };
+    let mut upgraded = Object::new();
+    for (key, value) in object.iter() {
+        match key {
+            "application" | "url" | "_revision" => {}
+            "tracks" => _ = upgraded.insert(key, map_array(value, upgrade_track)),
+            _ => _ = upgraded.insert(crate::pattern::canonical_key(key), value.clone()),
+        }
+    }
+    Value::Object(upgraded)
+}
+
+fn upgrade_song(song: &Value) -> Value {
+    let Some(object) = song.as_object() else { return song.clone() };
+    let mut upgraded = Object::new();
+    for (key, value) in object.iter() {
+        match key {
+            "loopMeasureCount" => _ = upgraded.insert("loopMeasures", value.clone()),
+            "clips" => {
+                _ = upgraded.insert(
+                    key,
+                    map_array(value, |clip| match clip.as_object() {
+                        Some(clip) => Value::Object(rename_keys(clip, |key| (key == "pattern").then_some("patternId"))),
+                        None => clip.clone(),
+                    }),
+                )
+            }
+            _ => _ = upgraded.insert(key, value.clone()),
+        }
+    }
+    Value::Object(upgraded)
 }
 
 fn map_array(value: &Value, f: impl Fn(&Value) -> Value) -> Value {

@@ -52,15 +52,15 @@ pub struct Row {
 /// The patterns `song` uses, in library order, then the missing ones
 /// (`#computeRows`).
 pub fn rows(song: &Song, patterns: &[Pattern]) -> Vec<Row> {
-    let used = |id: &str| song.clips.iter().any(|c| c.pattern == id);
+    let used = |id: &str| song.clips.iter().any(|c| c.pattern_id == id);
     let mut rows: Vec<Row> = patterns
         .iter()
         .filter(|p| !p.id.is_empty() && used(&p.id))
         .map(|p| Row { id: p.id.clone(), name: p.name.clone().unwrap_or_else(|| p.id.clone()), orphan: false })
         .collect();
     for clip in &song.clips {
-        if !rows.iter().any(|r| r.id == clip.pattern) {
-            rows.push(Row { id: clip.pattern.clone(), name: clip.pattern.clone(), orphan: true });
+        if !rows.iter().any(|r| r.id == clip.pattern_id) {
+            rows.push(Row { id: clip.pattern_id.clone(), name: clip.pattern_id.clone(), orphan: true });
         }
     }
     rows
@@ -182,7 +182,7 @@ impl SongLayout {
     /// the grid); `None` when its row is not shown.
     pub fn clip_rect(&self, view: &SongView, index: usize) -> Option<Rect> {
         let clip = view.song?.clips.get(index)?;
-        let row = view.rows.iter().position(|r| r.id == clip.pattern)?;
+        let row = view.rows.iter().position(|r| r.id == clip.pattern_id)?;
         if row < view.scroll.1 || row >= view.scroll.1 + self.visible_rows() {
             return None;
         }
@@ -321,7 +321,7 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     // A clip takes its row's colour.
     for (i, clip) in song.clips.iter().enumerate() {
         if let Some(r) = layout.clip_rect(view, i) {
-            let row = view.rows.iter().position(|row| row.id == clip.pattern).unwrap_or(0);
+            let row = view.rows.iter().position(|row| row.id == clip.pattern_id).unwrap_or(0);
             canvas.fill_rect(r.x, r.y, r.w, r.h, theme::track(row));
         }
     }

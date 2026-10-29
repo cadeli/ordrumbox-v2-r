@@ -35,7 +35,7 @@ fn reference(o: &Value) -> &str {
 fn clip_json(clip: &SongClip) -> Value {
     json::parse(&format!(
         r#"{{"pattern":{},"startMeasure":{},"measureCount":{}}}"#,
-        Value::from(clip.pattern.as_str()).to_json(),
+        Value::from(clip.pattern_id.as_str()).to_json(),
         clip.start_measure,
         Value::from(clip.measure_count).to_json()
     ))
@@ -96,7 +96,7 @@ fn song_json(song: &Song) -> Value {
         Value::from(song.name.as_str()).to_json(),
         Value::from(song.description.as_str()).to_json(),
         Value::from(song.bpm).to_json(),
-        song.loop_measure_count.map_or(Value::Null, Value::from).to_json(),
+        song.loop_measures.map_or(Value::Null, Value::from).to_json(),
         Value::from(song.length_measures()).to_json(),
         clips.join(",")
     ))
@@ -152,7 +152,7 @@ fn measure_at_tick_matches_song_measure_at_tick() {
             )
             .collect();
         let mut song = Song::from_json(&raw, &ids).expect("song").0;
-        song.loop_measure_count = f64_of(case, "loopMeasureCount");
+        song.loop_measures = f64_of(case, "loopMeasureCount");
         for at in case.get("at").and_then(Value::as_array).expect("at") {
             let tick = f64_of(at, "tick").unwrap_or(0.0);
             let expected = f64_of(at, "measure").expect("measure");

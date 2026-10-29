@@ -267,7 +267,7 @@ pub fn song_strips(song: &Song, patterns: &[Pattern]) -> Vec<(usize, usize)> {
     let mut strips: Vec<(usize, usize)> = Vec::new();
     let mut seen = Vec::new();
     for clip in &song.clips {
-        let Some(p) = patterns.iter().rposition(|p| p.id == clip.pattern) else { continue };
+        let Some(p) = patterns.iter().rposition(|p| p.id == clip.pattern_id) else { continue };
         if seen.contains(&p) {
             continue;
         }
