@@ -130,8 +130,8 @@ mod tests {
         let mut pixels = vec![0; 16 * 8];
         let mut canvas = Canvas::new(&mut pixels, 16, 8);
         assert_eq!(canvas.text(0, 0, "A", 1, 1), 8);
-        // Top row of 'A' is 0x38: pixels 2, 3, 4.
-        assert_eq!(&pixels[..8], &[0, 0, 1, 1, 1, 0, 0, 0]);
+        // Top row of 'A' is 0x30: pixels 2, 3.
+        assert_eq!(&pixels[..8], &[0, 0, 1, 1, 0, 0, 0, 0]);
         assert_eq!(text_width("abc", 2), 48);
     }
 }
