@@ -13,7 +13,7 @@ const MAJOR_SCALE: [f64; 8] = [0.0, 2.0, 4.0, 5.0, 7.0, 9.0, 11.0, 12.0];
 /// - `[0, 4, 7]`: intervals, ascending;
 /// - `"0,4,7"`: the same as a string;
 /// - `"up"`, `"down"`, `"updown"`, `"random"`: the major scale in that order;
-/// - `{"intervals": [0, 3, 7], "mode": "updown"}`.
+/// - `{"intervals": [0, 3, 7], "direction": "updown"}`.
 ///
 /// Intervals are coerced like JS `Number()` (`"4"` is 4), non-numbers dropped,
 /// and a root (0) is added when missing. `updown` goes up then back down
@@ -32,7 +32,7 @@ pub fn sequence(arp: &Value, rng: &mut Rng) -> Option<Vec<f64>> {
         }
         Value::Object(object) => {
             let intervals = object.get("intervals").and_then(Value::as_array).unwrap_or_default();
-            let mode = object.get("mode").filter(|m| !m.is_null()).map_or_else(|| "up".to_owned(), js::to_string);
+            let mode = object.get("direction").filter(|m| !m.is_null()).map_or_else(|| "up".to_owned(), js::to_string);
             (intervals.iter().map(js::to_number).collect(), mode.to_lowercase())
         }
         _ => return None,
@@ -78,14 +78,14 @@ mod tests {
         assert_eq!(seq("[7, 4]"), Some(vec![0.0, 4.0, 7.0]));
         assert_eq!(seq(r#""0, 5,9""#), Some(vec![0.0, 5.0, 9.0]));
         assert_eq!(seq(r#""down""#), Some(vec![12.0, 11.0, 9.0, 7.0, 5.0, 4.0, 2.0, 0.0]));
-        assert_eq!(seq(r#"{"intervals":[0,4,7,12],"mode":"updown"}"#), Some(vec![0.0, 4.0, 7.0, 12.0, 7.0, 4.0]));
+        assert_eq!(seq(r#"{"intervals":[0,4,7,12],"direction":"updown"}"#), Some(vec![0.0, 4.0, 7.0, 12.0, 7.0, 4.0]));
         assert_eq!(seq(r#"{"intervals":["4","7","x"]}"#), Some(vec![0.0, 4.0, 7.0]));
-        assert_eq!(seq(r#"{"intervals":[3],"mode":"UP"}"#), Some(vec![0.0, 3.0]));
+        assert_eq!(seq(r#"{"intervals":[3],"direction":"UP"}"#), Some(vec![0.0, 3.0]));
     }
 
     #[test]
     fn not_an_arpeggio() {
-        for text in ["null", "5", "true", "[]", r#""nothing""#, r#"{"mode":"up"}"#, r#"["x"]"#] {
+        for text in ["null", "5", "true", "[]", r#""nothing""#, r#"{"direction":"up"}"#, r#"["x"]"#] {
             assert_eq!(seq(text), None, "{text}");
         }
     }

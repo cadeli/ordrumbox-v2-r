@@ -30,8 +30,8 @@ json_record! {
         retrigger_rate: f64 = 1.0 => "retriggerRate" | "rate",
         /// Hits: the note plus its repeats (with an arpeggio, the arp notes).
         retrigger_count: i32 = 1 => "retriggerCount",
-        /// Arpeggio as written in the file: interval array, `"0,4,7"`, a mode
-        /// keyword, or `{intervals, mode}`. `null` = none. Interpreted by the
+        /// Arpeggio as written in the file: interval array, `"0,4,7"`, a
+        /// direction keyword, or `{intervals, direction}`. `null` = none. Interpreted by the
         /// pattern engine, kept verbatim here.
         arp: Value = Value::Null => "arp",
         /// Probability of each arpeggio/retrigger hit, 0–1.
@@ -125,7 +125,20 @@ pub(crate) fn decode_notes(notes: &[Value], note_keys: Option<&Value>, at: &str,
             _ => issues.push(Issue::new(note_at, "note is neither an object nor an array, skipped")),
         }
     }
+    for note in &mut decoded {
+        upgrade_arp(&mut note.arp);
+    }
     decoded
+}
+
+/// An arpeggio object's `mode` (the JS key, older saves) is its `direction`.
+pub(crate) fn upgrade_arp(arp: &mut Value) {
+    if let Value::Object(object) = arp
+        && !object.contains_key("direction")
+        && let Some(mode) = object.remove("mode")
+    {
+        object.insert("direction", mode);
+    }
 }
 
 /// The header keys, or `None` (reported) when they cannot name note fields.
@@ -255,6 +268,12 @@ mod tests {
         // A legacy key and its current one name the same field.
         let (notes, _) = decode("[[0.5, 0.2]]", Some(r#"["prob","probability"]"#));
         assert!(notes.is_empty());
+    }
+
+    #[test]
+    fn an_arpeggio_mode_becomes_its_direction() {
+        let (notes, _) = decode(r#"[{"arp":{"intervals":[0,4],"mode":"down"}}]"#, None);
+        assert_eq!(notes[0].arp.to_json(), r#"{"intervals":[0,4],"direction":"down"}"#);
     }
 
     #[test]

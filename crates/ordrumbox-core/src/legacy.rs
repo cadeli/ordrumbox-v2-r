@@ -2,7 +2,7 @@
 //! for the track volume, `infos`…), which loading still reads.
 
 use crate::json::{Object, Value};
-use crate::note::Note;
+use crate::note::{Note, upgrade_arp};
 use crate::track::Track;
 
 /// A library, a pattern or a list of either with every legacy key renamed
@@ -45,17 +45,31 @@ fn rename_keys(object: &Object, canonical: impl Fn(&str) -> Option<&'static str>
 fn upgrade_track(track: &Value) -> Value {
     let Some(object) = track.as_object() else { return track.clone() };
     let mut upgraded = rename_keys(object, Track::canonical_key);
+    upgraded.remove("fxSelected"); // an editor tab, not a track setting
+    let mut arp_column = None;
     if let Some(header) = upgraded.get_mut("noteKeys").and_then(Value::as_array_mut) {
         for key in header.iter_mut() {
             if let Some(name) = key.as_str().and_then(Note::canonical_key) {
                 *key = Value::from(name);
             }
         }
+        arp_column = header.iter().position(|key| key.as_str() == Some("arp"));
     }
     if let Some(notes) = upgraded.get_mut("notes").and_then(Value::as_array_mut) {
         for note in notes.iter_mut() {
-            if let Value::Object(object) = note {
-                *object = rename_keys(object, Note::canonical_key);
+            match note {
+                Value::Object(object) => {
+                    *object = rename_keys(object, Note::canonical_key);
+                    if let Some(arp) = object.get_mut("arp") {
+                        upgrade_arp(arp);
+                    }
+                }
+                Value::Array(values) => {
+                    if let Some(arp) = arp_column.and_then(|i| values.get_mut(i)) {
+                        upgrade_arp(arp);
+                    }
+                }
+                _ => {}
             }
         }
     }
