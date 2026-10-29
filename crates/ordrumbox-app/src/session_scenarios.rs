@@ -9,7 +9,7 @@
 use std::sync::Arc;
 
 use ordrumbox_core::{Library, Rng, Scales};
-use ordrumbox_engine::kit::{BankSample, Instrument};
+use ordrumbox_engine::kit::{BankSample, KitSample};
 use ordrumbox_engine::offline::{self, EXPORT_RATE, RenderSetup};
 use ordrumbox_engine::{AudioSide, Controller, Mode, Position, SampleBank, SampleBuffer, SynthPresets};
 use ordrumbox_logic::midi::{self, PPQN, smf};
@@ -24,7 +24,7 @@ const RATE: f32 = 8000.0;
 const CALLBACK: usize = 256;
 
 fn bank(rate: u32) -> Arc<SampleBank> {
-    let instrument = Instrument {
+    let instrument = KitSample {
         key: "KICK".into(),
         display_name: "k".into(),
         url: "k".into(),
@@ -32,7 +32,7 @@ fn bank(rate: u32) -> Arc<SampleBank> {
         ..Default::default()
     };
     let buffer = SampleBuffer::mono(vec![0.5; 400], rate);
-    Arc::new(SampleBank { samples: vec![BankSample { kit: "x".into(), instrument, buffer: buffer.into() }] })
+    Arc::new(SampleBank { samples: vec![BankSample { kit: "x".into(), sample: instrument, buffer: buffer.into() }] })
 }
 
 /// A session on `json` with sound.

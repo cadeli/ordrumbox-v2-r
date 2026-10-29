@@ -3,7 +3,7 @@
 
 /// Coarse instrument type of a track.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TrackType {
+pub enum InstrumentFamily {
     Kick,
     Snare,
     Hat,
@@ -15,7 +15,7 @@ pub enum TrackType {
     Organ,
 }
 
-impl TrackType {
+impl InstrumentFamily {
     /// BASS, PIANO and ORGAN tracks are melodic (auto-generation, empty-track pruning).
     pub fn is_melodic(self) -> bool {
         matches!(self, Self::Bass | Self::Piano | Self::Organ)
@@ -43,15 +43,15 @@ impl TrackType {
 }
 
 /// Canonical names: `(name, default pan, type)` (`TRACK_KINDS` + `PAN_MAP`).
-const TRACK_KINDS: [(&str, f64, TrackType); 8] = [
-    ("KICK", 0.0, TrackType::Kick),
-    ("SNARE", 0.3, TrackType::Snare),
-    ("TOM", 0.5, TrackType::Perc),
-    ("CLAP", -0.4, TrackType::Clap),
-    ("COWBELL", 0.4, TrackType::Cowbell),
-    ("CHH", -0.3, TrackType::Hat),
-    ("OHH", -0.2, TrackType::Hat),
-    ("CRASH", 1.0, TrackType::Perc),
+const TRACK_KINDS: [(&str, f64, InstrumentFamily); 8] = [
+    ("KICK", 0.0, InstrumentFamily::Kick),
+    ("SNARE", 0.3, InstrumentFamily::Snare),
+    ("TOM", 0.5, InstrumentFamily::Perc),
+    ("CLAP", -0.4, InstrumentFamily::Clap),
+    ("COWBELL", 0.4, InstrumentFamily::Cowbell),
+    ("CHH", -0.3, InstrumentFamily::Hat),
+    ("OHH", -0.2, InstrumentFamily::Hat),
+    ("CRASH", 1.0, InstrumentFamily::Perc),
 ];
 
 /// Default pan of a track from its exact name (`"KICK"`, `"OHH"`…), 0 for any
@@ -62,32 +62,32 @@ pub fn pan_from_track_name(name: &str) -> f64 {
 
 /// Coarse type of a track: the canonical names first, then substring rules for
 /// names like `"808 KICK"` or `"SYNTH BASS"` (`detectTrackType()`).
-pub fn detect_track_type(name: &str) -> TrackType {
+pub fn instrument_family(name: &str) -> InstrumentFamily {
     let name = name.to_uppercase();
     if let Some(&(_, _, kind)) = TRACK_KINDS.iter().find(|(kind, _, _)| *kind == name) {
         return kind;
     }
     let has = |parts: &[&str]| parts.iter().any(|part| name.contains(part));
     if has(&["KICK", "BD"]) {
-        TrackType::Kick
+        InstrumentFamily::Kick
     } else if has(&["SNARE", "SD"]) {
-        TrackType::Snare
+        InstrumentFamily::Snare
     } else if has(&["OHH", "HAT", "CHH"]) {
-        TrackType::Hat
+        InstrumentFamily::Hat
     } else if has(&["CLAP", "CLP", "CP"]) {
-        TrackType::Clap
+        InstrumentFamily::Clap
     } else if has(&["BASS"]) {
-        TrackType::Bass
+        InstrumentFamily::Bass
     } else if has(&["PIANO"]) {
-        TrackType::Piano
+        InstrumentFamily::Piano
     } else if has(&["COWBELL", "COW"]) {
-        TrackType::Cowbell
+        InstrumentFamily::Cowbell
     } else if has(&["ORGAN"]) {
-        TrackType::Organ
+        InstrumentFamily::Organ
     } else if has(&["SYNTH"]) {
-        TrackType::Bass
+        InstrumentFamily::Bass
     } else {
-        TrackType::Perc
+        InstrumentFamily::Perc
     }
 }
 
@@ -105,14 +105,14 @@ mod tests {
 
     #[test]
     fn type_from_name() {
-        assert_eq!(detect_track_type("tom"), TrackType::Perc);
-        assert_eq!(detect_track_type("808 KICK"), TrackType::Kick);
-        assert_eq!(detect_track_type("Synth Bass"), TrackType::Bass);
-        assert_eq!(detect_track_type("SYNTH LEAD"), TrackType::Bass);
-        assert_eq!(detect_track_type("RIDE"), TrackType::Perc);
-        assert!(detect_track_type("PIANO").is_melodic());
-        assert!(!detect_track_type("CHH").is_melodic());
-        assert!(detect_track_type("COWBELL").is_drum());
-        assert_eq!(detect_track_type("OPEN HAT").name(), "HAT");
+        assert_eq!(instrument_family("tom"), InstrumentFamily::Perc);
+        assert_eq!(instrument_family("808 KICK"), InstrumentFamily::Kick);
+        assert_eq!(instrument_family("Synth Bass"), InstrumentFamily::Bass);
+        assert_eq!(instrument_family("SYNTH LEAD"), InstrumentFamily::Bass);
+        assert_eq!(instrument_family("RIDE"), InstrumentFamily::Perc);
+        assert!(instrument_family("PIANO").is_melodic());
+        assert!(!instrument_family("CHH").is_melodic());
+        assert!(instrument_family("COWBELL").is_drum());
+        assert_eq!(instrument_family("OPEN HAT").name(), "HAT");
     }
 }

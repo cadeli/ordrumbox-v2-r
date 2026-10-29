@@ -13,14 +13,14 @@ pub const DEFAULT_DECAY_MS: f64 = 500.0;
 
 /// One sample of a kit, as listed in drumkits.json.
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct Instrument {
+pub struct KitSample {
     /// Matching key: `KICK`, `SNARE`, `CHH`…
     pub key: String,
     pub display_name: String,
     /// Path under `assets/kits/` (or the user's samples folder), also the
     /// sample id tracks refer to.
     pub url: String,
-    /// Decay to -60 dB, ms, when the kit sets one (see [`Instrument::decay_ms`]).
+    /// Decay to -60 dB, ms, when the kit sets one (see [`KitSample::decay_ms`]).
     pub decay: Option<f64>,
     /// MIDI note the sample sounds at unpitched (`rootMidi`), when known:
     /// the note MIDI files map pitch 0 to.
@@ -35,7 +35,7 @@ pub struct Instrument {
     pub extra: Object,
 }
 
-impl Instrument {
+impl KitSample {
     /// Decay to -60 dB, ms (500 when the kit sets none).
     pub fn decay_ms(&self) -> f64 {
         self.decay.unwrap_or(DEFAULT_DECAY_MS)
@@ -119,7 +119,7 @@ const KNOWN_KEYS: [&str; 8] = ["key", "display_name", "url", "decay", "rootMidi"
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Kit {
     pub name: String,
-    pub instruments: Vec<Instrument>,
+    pub samples: Vec<KitSample>,
     /// Other keys (`infos`, `desc`…), written back as they came.
     pub extra: Object,
 }
@@ -133,7 +133,7 @@ impl Kit {
             .and_then(Value::as_array)
             .unwrap_or_default()
             .iter()
-            .filter_map(Instrument::from_json)
+            .filter_map(KitSample::from_json)
             .collect();
         let mut extra = Object::new();
         for (key, value) in object.iter() {
@@ -141,7 +141,7 @@ impl Kit {
                 extra.insert(key, value.clone());
             }
         }
-        Some(Self { name, instruments, extra })
+        Some(Self { name, samples: instruments, extra })
     }
 
     pub fn to_json(&self) -> Value {
@@ -150,7 +150,7 @@ impl Kit {
         for (key, value) in self.extra.iter() {
             o.insert(key, value.clone());
         }
-        o.insert("instruments", Value::Array(self.instruments.iter().map(Instrument::to_json).collect()));
+        o.insert("instruments", Value::Array(self.samples.iter().map(KitSample::to_json).collect()));
         Value::Object(o)
     }
 
@@ -158,7 +158,7 @@ impl Kit {
     pub fn to_mapping_json(&self) -> Value {
         let mut o = Object::new();
         o.insert("name", Value::from(self.name.as_str()));
-        o.insert("instruments", Value::Array(self.instruments.iter().map(Instrument::to_mapping_json).collect()));
+        o.insert("instruments", Value::Array(self.samples.iter().map(KitSample::to_mapping_json).collect()));
         Value::Object(o)
     }
 
@@ -170,13 +170,13 @@ impl Kit {
         let (Some(name), Some(entries)) = (name, entries) else {
             return Err("Missing drumkit name or instruments".into());
         };
-        let instruments: Vec<Instrument> = entries
+        let instruments: Vec<KitSample> = entries
             .iter()
             .filter(|e| {
                 e.get("url").and_then(Value::as_str).is_some() && e.get("key").and_then(Value::as_str).is_some()
             })
             .filter_map(|e| {
-                let mut instrument = Instrument::from_json(e)?;
+                let mut instrument = KitSample::from_json(e)?;
                 if e.get("display_name").is_none_or(Value::is_null) {
                     instrument.display_name.clone_from(&instrument.url);
                 }
@@ -187,7 +187,7 @@ impl Kit {
         if instruments.is_empty() {
             return Err("No valid instruments".into());
         }
-        Ok(Self { name: name.to_owned(), instruments, extra: Object::new() })
+        Ok(Self { name: name.to_owned(), samples: instruments, extra: Object::new() })
     }
 }
 
@@ -205,7 +205,7 @@ pub fn kits_to_json(kits: &[Kit]) -> Value {
 #[derive(Debug, Clone, PartialEq)]
 pub struct BankSample {
     pub kit: String,
-    pub instrument: Instrument,
+    pub sample: KitSample,
     /// Shared: a bank rebuilt after a kit edit keeps the decoded audio.
     pub buffer: Arc<SampleBuffer>,
 }
@@ -233,7 +233,7 @@ impl SampleBank {
         let mut samples = Vec::new();
         let mut errors = Vec::new();
         for kit in kits {
-            for instrument in &kit.instruments {
+            for instrument in &kit.samples {
                 let buffer = match known(&instrument.url) {
                     Some(buffer) => Ok(buffer),
                     None => read(&instrument.url)
@@ -243,7 +243,7 @@ impl SampleBank {
                 };
                 match buffer {
                     Ok(buffer) => {
-                        samples.push(BankSample { kit: kit.name.clone(), instrument: instrument.clone(), buffer })
+                        samples.push(BankSample { kit: kit.name.clone(), sample: instrument.clone(), buffer })
                     }
                     Err(e) => errors.push(format!("{}: {e}", instrument.url)),
                 }
@@ -257,7 +257,7 @@ impl SampleBank {
     }
 
     pub fn find_url(&self, url: &str) -> Option<usize> {
-        self.samples.iter().position(|s| s.instrument.url == url)
+        self.samples.iter().position(|s| s.sample.url == url)
     }
 
     pub fn get(&self, index: usize) -> Option<&BankSample> {
@@ -281,8 +281,8 @@ mod tests {
             .unwrap(),
         );
         assert_eq!(kits.len(), 2);
-        assert_eq!(kits[0].instruments[1].decay_ms(), DEFAULT_DECAY_MS);
-        assert_eq!(kits[0].instruments[0].decay, Some(5000.0));
+        assert_eq!(kits[0].samples[1].decay_ms(), DEFAULT_DECAY_MS);
+        assert_eq!(kits[0].samples[0].decay, Some(5000.0));
         let silence = crate::wav::tests::wav(1, 1, 8_000, 16, &[0, 0]);
         let (bank, errors) = SampleBank::load(&kits, |_| Ok(silence.clone()));
         assert!(errors.is_empty());
@@ -294,7 +294,7 @@ mod tests {
     fn load_reports_unreadable_files() {
         let kits = vec![Kit {
             name: "x".into(),
-            instruments: vec![Instrument {
+            samples: vec![KitSample {
                 key: "K".into(),
                 display_name: "k".into(),
                 url: "x.wav".into(),
@@ -318,13 +318,13 @@ mod tests {
             r#"{"name":"real","instruments":[{"url":"real/kick.wav","display_name":"kick","key":"KICK","rootMidi":72,"peakDb":-3,"decay":5000,"gainDb":0,"tune":0},{"url":"s.wav","display_name":"s","key":"SNARE","rootMidi":null,"peakDb":null,"decay":null,"gainDb":-2.5,"tune":1}]}"#
         );
         let restored = Kit::from_mapping_json(&kits[0].to_mapping_json()).unwrap();
-        assert_eq!(restored.instruments[0].decay, Some(5000.0));
-        assert_eq!(restored.instruments[1].gain_db, -2.5);
+        assert_eq!(restored.samples[0].decay, Some(5000.0));
+        assert_eq!(restored.samples[1].gain_db, -2.5);
         let missing = json::parse(r#"{"name":"n","instruments":[{"url":"a.wav"}]}"#).unwrap();
         assert_eq!(Kit::from_mapping_json(&missing), Err("No valid instruments".into()));
         let unnamed = json::parse(r#"{"instruments":[{"url":"a.wav","key":"K"}]}"#).unwrap();
         assert_eq!(Kit::from_mapping_json(&unnamed), Err("Missing drumkit name or instruments".into()));
         let defaults = json::parse(r#"{"name":"n","instruments":[{"url":"a.wav","key":"K"}]}"#).unwrap();
-        assert_eq!(Kit::from_mapping_json(&defaults).unwrap().instruments[0].display_name, "a.wav");
+        assert_eq!(Kit::from_mapping_json(&defaults).unwrap().samples[0].display_name, "a.wav");
     }
 }

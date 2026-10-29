@@ -35,5 +35,5 @@ pub use pattern_engine::{FlatNote, FlatNotes, recompute_flat_notes};
 pub use record::{Issue, JsonField, SetField};
 pub use rng::Rng;
 pub use scales::Scales;
-pub use song::{DroppedClip, Song, SongClip, SongSource};
+pub use song::{ActiveClip, DroppedClip, Song, SongClip};
 pub use track::Track;

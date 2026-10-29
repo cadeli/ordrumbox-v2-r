@@ -62,7 +62,7 @@ fn song_sources_match_resolve_song_sources() {
         for t in case.get("ticks").and_then(Value::as_array).expect("ticks") {
             let tick = num(t, "tick") as u64;
             let got: Vec<(String, usize, u64, u64, u64)> = song
-                .sources_at(&library.patterns, tick, 32)
+                .active_clips_at(&library.patterns, tick, 32)
                 .iter()
                 .map(|s| (library.patterns[s.pattern].id.clone(), s.clip, s.loop_index, s.local_step, s.pattern_ticks))
                 .collect();

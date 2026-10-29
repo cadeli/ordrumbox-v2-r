@@ -2,7 +2,7 @@
 //! a genre's track template, its bass variants, swing and chord progression,
 //! and the section (intro, chorus, verse, break…) a loop falls in.
 
-use ordrumbox_core::drum_taxonomy::detect_track_type;
+use ordrumbox_core::drum_taxonomy::instrument_family;
 use ordrumbox_core::json::Value;
 
 use super::{num, pick, table, text};
@@ -64,7 +64,7 @@ pub(crate) fn generate_structure(genre: &str) -> Vec<(String, String)> {
 /// `poolFor`: the variants a track may swap to (by name, else by type).
 fn pool_for(name: &str) -> Option<&'static [Value]> {
     let by_name = structure_table("variantPools").and_then(|p| p.get(&name.to_uppercase()));
-    let by_type = || structure_table("variantPoolsByType").and_then(|p| p.get(detect_track_type(name).name()));
+    let by_type = || structure_table("variantPoolsByType").and_then(|p| p.get(instrument_family(name).name()));
     by_name.or_else(by_type).and_then(Value::as_array)
 }
 

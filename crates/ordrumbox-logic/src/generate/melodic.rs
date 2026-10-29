@@ -1,6 +1,6 @@
 //! Bass lines and chords/melodies (`bass_generator.js`, `melody_generator.js`).
 
-use ordrumbox_core::drum_taxonomy::{TrackType, detect_track_type};
+use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::json::Value;
 use ordrumbox_core::{Pattern, Scales, Track};
 
@@ -179,7 +179,7 @@ fn bass_arpeggio(g: &mut Gen<'_>, track: &mut Track, scale: &[f64], config: &Val
 /// `#extractBassRootPitch`: the most frequent pitch of the pattern's bass
 /// track (the first to reach the top count), `None` without bass notes.
 fn bass_root(pattern: &Pattern) -> Option<f64> {
-    let bass = pattern.tracks.iter().find(|t| detect_track_type(&t.name) == TrackType::Bass)?;
+    let bass = pattern.tracks.iter().find(|t| instrument_family(&t.name) == InstrumentFamily::Bass)?;
     let mut counts: Vec<(f64, usize)> = Vec::new();
     let (mut best, mut best_count) = (bass.notes.first()?.pitch, 0);
     for note in &bass.notes {

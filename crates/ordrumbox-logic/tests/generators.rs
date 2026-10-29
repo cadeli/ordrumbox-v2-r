@@ -2,7 +2,7 @@
 //! written by `tools/export_gen_fixtures.mjs`): with the same random stream,
 //! the same notes, the same track settings and the same number of draws.
 
-use ordrumbox_core::drum_taxonomy::TrackType;
+use ordrumbox_core::drum_taxonomy::InstrumentFamily;
 use ordrumbox_core::json::{self, Object, Value};
 use ordrumbox_core::{Note, Pattern, Scales, Track};
 use ordrumbox_logic::generate::{
@@ -196,14 +196,14 @@ fn every_variant_of_every_generator() {
     assert!(cases.len() > 500);
     for case in cases {
         let kind = match case.get("kind").and_then(Value::as_str).unwrap() {
-            "kick" => TrackType::Kick,
-            "snare" => TrackType::Snare,
-            "hat" => TrackType::Hat,
-            "clap" => TrackType::Clap,
-            "cowbell" => TrackType::Cowbell,
-            "perc" => TrackType::Perc,
-            "melody" => TrackType::Piano,
-            "bass" => TrackType::Bass,
+            "kick" => InstrumentFamily::Kick,
+            "snare" => InstrumentFamily::Snare,
+            "hat" => InstrumentFamily::Hat,
+            "clap" => InstrumentFamily::Clap,
+            "cowbell" => InstrumentFamily::Cowbell,
+            "perc" => InstrumentFamily::Perc,
+            "melody" => InstrumentFamily::Piano,
+            "bass" => InstrumentFamily::Bass,
             other => panic!("unknown kind {other}"),
         };
         let variant = case.get("variant").and_then(Value::as_str);

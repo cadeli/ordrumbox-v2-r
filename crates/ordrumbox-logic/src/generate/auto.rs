@@ -8,7 +8,7 @@
 //! regenerates its melodic tracks every loop and all of them at section
 //! boundaries.
 
-use ordrumbox_core::drum_taxonomy::{TrackType, detect_track_type};
+use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::json::Value;
 use ordrumbox_core::{Note, Pattern, Scales, Track, js};
 
@@ -70,7 +70,10 @@ fn pattern_harmony(pattern: &Pattern, genre: &str, section: &str, loop_in_elemen
 
 /// `#randomDensity`: kick, snare and bass near full, the others vary more.
 fn random_density(g: &mut AutoGen<'_>, track: &Track) -> f64 {
-    let core = matches!(detect_track_type(&track.name), TrackType::Kick | TrackType::Snare | TrackType::Bass);
+    let core = matches!(
+        instrument_family(&track.name),
+        InstrumentFamily::Kick | InstrumentFamily::Snare | InstrumentFamily::Bass
+    );
     let (min, max) = if core { (0.85, 1.05) } else { (0.6, 1.2) };
     js::to_fixed(min + g.random() * (max - min), 2)
 }
@@ -88,7 +91,7 @@ fn apply_genre_swing(g: &mut AutoGen<'_>, track: &mut Track, genre: Option<&str>
 }
 
 /// `#applyVariation`: the variation budget of a generated track, when it has none yet.
-fn apply_variation(g: &mut AutoGen<'_>, track: &mut Track, kind: TrackType) {
+fn apply_variation(g: &mut AutoGen<'_>, track: &mut Track, kind: InstrumentFamily) {
     let (min, max) = if kind.is_melodic() { (50.0, 85.0) } else { (30.0, 60.0) };
     let pick_in = |g: &mut AutoGen<'_>, min: f64, max: f64| min + (g.random() * (max - min + 1.0)).floor();
     if track.auto_variation.is_none() {
@@ -112,10 +115,10 @@ pub fn generate_track(
 ) {
     let genre = genre_of(pattern);
     let Some(track) = pattern.tracks.get_mut(t) else { return };
-    let kind = detect_track_type(&track.name);
+    let kind = instrument_family(&track.name);
     apply_genre_swing(g, track, genre.as_deref());
     apply_variation(g, track, kind);
-    let variant = if kind == TrackType::Bass {
+    let variant = if kind == InstrumentFamily::Bass {
         if track.auto_variant.is_empty() {
             random_bass_variant(genre.as_deref(), g.rnd)
         } else {
@@ -134,37 +137,37 @@ pub fn instrument_line(
     g: &mut AutoGen<'_>,
     pattern: &mut Pattern,
     t: usize,
-    kind: TrackType,
+    kind: InstrumentFamily,
     variant: Option<&str>,
     density: f64,
     harmony: &Harmony,
 ) {
     let scales = g.scales;
-    if matches!(kind, TrackType::Piano | TrackType::Organ) {
+    if matches!(kind, InstrumentFamily::Piano | InstrumentFamily::Organ) {
         melodic::melody(pattern, t, variant, density, harmony, scales, g.rnd);
         return;
     }
     let Some(track) = pattern.tracks.get_mut(t) else { return };
     match kind {
-        TrackType::Kick => drums::kick(track, variant, density, scales, g.rnd),
-        TrackType::Snare => drums::snare(track, variant, density, scales, g.rnd),
-        TrackType::Hat => drums::hat(track, variant, density, scales, g.rnd),
-        TrackType::Clap => drums::clap(track, variant, density, scales, g.rnd),
-        TrackType::Perc => drums::perc(track, variant, density, scales, g.rnd),
-        TrackType::Cowbell => drums::cowbell(track, variant, density, scales, g.rnd),
-        TrackType::Bass => melodic::bass(track, variant, density, harmony, scales, g.rnd),
-        TrackType::Piano | TrackType::Organ => {}
+        InstrumentFamily::Kick => drums::kick(track, variant, density, scales, g.rnd),
+        InstrumentFamily::Snare => drums::snare(track, variant, density, scales, g.rnd),
+        InstrumentFamily::Hat => drums::hat(track, variant, density, scales, g.rnd),
+        InstrumentFamily::Clap => drums::clap(track, variant, density, scales, g.rnd),
+        InstrumentFamily::Perc => drums::perc(track, variant, density, scales, g.rnd),
+        InstrumentFamily::Cowbell => drums::cowbell(track, variant, density, scales, g.rnd),
+        InstrumentFamily::Bass => melodic::bass(track, variant, density, harmony, scales, g.rnd),
+        InstrumentFamily::Piano | InstrumentFamily::Organ => {}
     }
 }
 
 /// `#findTrackConfig`: the variant of the template entry of the track's
 /// type — the one whose name the track name contains, else the last.
 fn find_track_config(structure: &[(String, String)], track: &Track) -> Option<String> {
-    let kind = detect_track_type(&track.name);
+    let kind = instrument_family(&track.name);
     let upper = track.name.to_uppercase();
     let mut config = None;
     for (name, variant) in structure {
-        if detect_track_type(name) == kind {
+        if instrument_family(name) == kind {
             config = Some(variant.clone()).filter(|v| !v.is_empty());
             if upper.contains(&name.to_uppercase()) {
                 break;
@@ -223,7 +226,7 @@ pub fn generate_pattern(g: &mut AutoGen<'_>, pattern: &mut Pattern, options: &Op
         }
     }
 
-    if !pattern.tracks.iter().any(|t| detect_track_type(&t.name) == TrackType::Bass) {
+    if !pattern.tracks.iter().any(|t| instrument_family(&t.name) == InstrumentFamily::Bass) {
         let mut bass = Track::new("BASS", pattern.beat_count, 4);
         bass.use_soft_synth = false;
         bass.use_auto_assign_sound = true;
@@ -247,13 +250,13 @@ fn section_density(section: &str) -> f64 {
 }
 
 /// `#resolveSectionEndVariant`: hats roll and percussion fills into the next section.
-fn section_end_variant(track: &Track, kind: TrackType) -> Option<&'static str> {
+fn section_end_variant(track: &Track, kind: InstrumentFamily) -> Option<&'static str> {
     match kind {
-        TrackType::Hat => {
+        InstrumentFamily::Hat => {
             let name = track.name.to_uppercase();
             Some(if name.contains("OHH") || name.contains("OPEN") { "ohhRoll" } else { "chhRoll" })
         }
-        TrackType::Perc => Some("fill"),
+        InstrumentFamily::Perc => Some("fill"),
         _ => None,
     }
 }
@@ -277,7 +280,7 @@ pub fn change_track(g: &mut AutoGen<'_>, index: u64, pattern: &mut Pattern, t: u
         section_density(&element.name)
     };
     let harmony = pattern_harmony(pattern, &genre, &element.name, element.loop_in_element);
-    let kind = detect_track_type(&track.name);
+    let kind = instrument_family(&track.name);
     let config = if track.auto_variant.is_empty() {
         find_track_config(&generate_structure(&genre), track)
     } else {
@@ -285,7 +288,7 @@ pub fn change_track(g: &mut AutoGen<'_>, index: u64, pattern: &mut Pattern, t: u
     };
     let Some(config) = config else { return };
 
-    if element.name == "break" && kind == TrackType::Snare {
+    if element.name == "break" && kind == InstrumentFamily::Snare {
         drums::snare(&mut pattern.tracks[t], Some("breakCrescendo"), density, g.scales, g.rnd);
     } else if section_end {
         let variant = section_end_variant(track, kind).map_or(config, str::to_owned);
@@ -311,7 +314,7 @@ pub fn run_loop(g: &mut AutoGen<'_>, pattern: &mut Pattern, index: u64) -> bool 
         let element = g.structure.element(index);
         let boundary = element.loop_in_element == 0 || element.is_last_loop_before_change;
         for t in 0..pattern.tracks.len() {
-            if boundary || detect_track_type(&pattern.tracks[t].name).is_melodic() {
+            if boundary || instrument_family(&pattern.tracks[t].name).is_melodic() {
                 change_track(g, index, pattern, t);
                 changed = true;
             }
@@ -346,8 +349,12 @@ fn set_auto(track: &mut Track, on: bool) {
 
 /// `toggleAutoGeneration`: when a track of `kinds` is in auto mode, all of
 /// them leave it (`false`); otherwise `generate` runs (`true`).
-fn toggle(pattern: &mut Pattern, kinds: impl Fn(TrackType) -> bool, generate: impl FnOnce(&mut Pattern)) -> bool {
-    let of_kind = |t: &Track| kinds(detect_track_type(&t.name));
+fn toggle(
+    pattern: &mut Pattern,
+    kinds: impl Fn(InstrumentFamily) -> bool,
+    generate: impl FnOnce(&mut Pattern),
+) -> bool {
+    let of_kind = |t: &Track| kinds(instrument_family(&t.name));
     if pattern.tracks.iter().any(|t| is_auto_on(t) && of_kind(t)) {
         for track in pattern.tracks.iter_mut().filter(|t| of_kind(t)) {
             set_auto(track, false);
@@ -364,10 +371,10 @@ fn toggle(pattern: &mut Pattern, kinds: impl Fn(TrackType) -> bool, generate: im
 /// melodic tracks removed; or, when drums are in auto mode, auto mode off.
 /// Whether generation is now on.
 pub fn toggle_drums(g: &mut AutoGen<'_>, pattern: &mut Pattern) -> bool {
-    toggle(pattern, TrackType::is_drum, |pattern| {
+    toggle(pattern, InstrumentFamily::is_drum, |pattern| {
         generate_pattern(g, pattern, &Options::default());
-        pattern.tracks.retain(|t| !detect_track_type(&t.name).is_melodic() || !t.notes.is_empty());
-        for track in pattern.tracks.iter_mut().filter(|t| detect_track_type(&t.name).is_drum()) {
+        pattern.tracks.retain(|t| !instrument_family(&t.name).is_melodic() || !t.notes.is_empty());
+        for track in pattern.tracks.iter_mut().filter(|t| instrument_family(&t.name).is_drum()) {
             set_auto(track, true);
         }
     })
@@ -383,10 +390,10 @@ pub enum MelodicKind {
 }
 
 impl MelodicKind {
-    fn track_type(self) -> TrackType {
+    fn track_type(self) -> InstrumentFamily {
         match self {
-            Self::Bass => TrackType::Bass,
-            Self::Chords => TrackType::Piano,
+            Self::Bass => InstrumentFamily::Bass,
+            Self::Chords => InstrumentFamily::Piano,
         }
     }
 
@@ -408,7 +415,7 @@ pub fn toggle_melodic(g: &mut AutoGen<'_>, pattern: &mut Pattern, kind: MelodicK
         pattern,
         |k| k == wanted,
         |pattern| {
-            let found = pattern.tracks.iter().position(|t| detect_track_type(&t.name) == wanted);
+            let found = pattern.tracks.iter().position(|t| instrument_family(&t.name) == wanted);
             let t = match found {
                 Some(t) => t,
                 None => {

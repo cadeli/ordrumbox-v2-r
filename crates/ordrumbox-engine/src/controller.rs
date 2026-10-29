@@ -428,8 +428,8 @@ impl Controller {
         let voice = ordrumbox_dsp::VoiceStart {
             sample: index,
             track: 0,
-            ratio: (sample.instrument.tune / 12.0).exp2(),
-            peak: sample.instrument.gain() as f32,
+            ratio: (sample.sample.tune / 12.0).exp2(),
+            peak: sample.sample.gain() as f32,
             // No decay envelope: one that outlasts any sample.
             decay: 600.0,
             pan: 0.0,
@@ -558,7 +558,7 @@ mod tests {
     use ordrumbox_dsp::SampleBuffer;
 
     fn bank() -> Arc<SampleBank> {
-        let instrument = crate::kit::Instrument {
+        let instrument = crate::kit::KitSample {
             key: "KICK".into(),
             display_name: "k".into(),
             url: "k".into(),
@@ -567,7 +567,7 @@ mod tests {
         };
         let buffer = SampleBuffer::mono(vec![0.5; 400], 8000);
         Arc::new(SampleBank {
-            samples: vec![crate::kit::BankSample { kit: "x".into(), instrument, buffer: buffer.into() }],
+            samples: vec![crate::kit::BankSample { kit: "x".into(), sample: instrument, buffer: buffer.into() }],
         })
     }
 
