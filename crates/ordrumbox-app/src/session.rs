@@ -18,7 +18,7 @@ use ordrumbox_core::{Library, Note, Pattern, Rng, Scales, Track};
 use ordrumbox_engine::analysis::{self, Analysis};
 use ordrumbox_engine::offline::{self, RenderSetup};
 use ordrumbox_engine::{Controller, Mode, SynthPresets, wav};
-use ordrumbox_logic::generate::{self, AutoGen, MelodicKind};
+use ordrumbox_logic::generate::{self, AutoGenerator, MelodicKind};
 use ordrumbox_logic::midi;
 use ordrumbox_logic::{Editor, Nudge};
 
@@ -552,7 +552,7 @@ impl Session {
             let (scales, mut rng) = (&self.scales, Rng::new(setup.seed));
             let mut loop_start = |library: &mut Library, p: usize, number: u64| {
                 if let Some(pattern) = library.patterns.get_mut(p).filter(|p| generate::plays_auto(p)) {
-                    generate::run_loop(&mut AutoGen::new(scales, &mut || rng.next_f64()), pattern, number);
+                    generate::run_loop(&mut AutoGenerator::new(scales, &mut || rng.next_f64()), pattern, number);
                 }
             };
             (offline::render_pattern(library, self.pattern_index, 1, setup, Some(&mut loop_start)), p.id.clone())
