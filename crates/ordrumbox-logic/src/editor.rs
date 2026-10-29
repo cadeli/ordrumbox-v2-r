@@ -13,7 +13,6 @@ use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::ids::{slugify, unique_id};
 use ordrumbox_core::js::{number_to_string, round};
 use ordrumbox_core::json::Value;
-use ordrumbox_core::pattern::{APPLICATION, URL};
 use ordrumbox_core::{Library, Note, Pattern, Scales, SetField, Track};
 
 use crate::generate::{self, AutoGenerator, MelodicKind, Options};
@@ -530,17 +529,13 @@ impl Editor {
     fn blank_pattern(&self, name: Option<&str>) -> Pattern {
         let name = name.map_or_else(|| format!("NewPat_{}", self.library.patterns.len()), str::to_owned);
         let mut taken: HashSet<String> = self.library.patterns.iter().map(|p| p.id.clone()).collect();
-        let mut pattern = Pattern {
+        Pattern {
             id: unique_id(&slugify(&name), &mut taken),
             name: Some(name),
             bpm: DEFAULT_BPM,
             beat_count: DEFAULT_BEAT_COUNT,
             ..Pattern::default()
-        };
-        // What every loaded pattern carries and the exporter writes first.
-        pattern.extra.insert("application", Value::from(APPLICATION));
-        pattern.extra.insert("url", Value::from(URL));
-        pattern
+        }
     }
 
     /// Append an empty pattern (`addPattern`; default name `NewPat_<count>`)
@@ -701,8 +696,6 @@ impl Editor {
             let mut taken: HashSet<String> = patterns.iter().map(|p| p.id.clone()).collect();
             for mut pattern in imported.patterns {
                 pattern.id = unique_id(&slugify(pattern_name(&pattern)), &mut taken);
-                pattern.extra.insert("application", Value::from(APPLICATION));
-                pattern.extra.insert("url", Value::from(URL));
                 patterns.push(pattern);
             }
             patterns.len() - 1
@@ -936,7 +929,7 @@ mod tests {
         assert_eq!(p, 1);
         let generated = &e.library().patterns[p];
         assert!(generated.tracks.iter().any(|t| t.name == "KICK" && !t.notes.is_empty()));
-        assert!(generated.extra.get("_autoGenGenre").is_some_and(|g| g.as_str().is_some()));
+        assert!(generated.extra.get("autoGenre").is_some_and(|g| g.as_str().is_some()));
         assert_eq!(e.history().undo_len(), undo + 1);
         assert_eq!(e.history().next_undo(), Some("Generate pattern \"NewPat_1\""));
 

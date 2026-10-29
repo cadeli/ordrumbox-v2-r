@@ -21,8 +21,8 @@ use ordrumbox_core::json::{self, Object, Value};
 use ordrumbox_core::{Note, Scales, Track};
 
 pub use auto::{
-    AutoGenerator, Harmony, MelodicKind, Options, change_track, generate_pattern, generate_track, instrument_line,
-    is_auto_on, plays_auto, random_track, run_loop, toggle_drums, toggle_melodic,
+    AutoGenerator, GENRE, Harmony, MelodicKind, Options, change_track, generate_pattern, generate_track,
+    instrument_line, is_auto_on, plays_auto, random_track, run_loop, toggle_drums, toggle_melodic,
 };
 pub use structure::{SectionElement, Structure};
 

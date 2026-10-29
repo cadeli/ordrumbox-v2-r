@@ -1535,7 +1535,7 @@ impl Session {
         self.edited();
         self.current_page = 0;
         if let Some(pattern) = self.pattern() {
-            let genre = pattern.extra.get("_autoGenGenre").and_then(|g| g.as_str()).unwrap_or_default();
+            let genre = pattern.extra.get(generate::GENRE).and_then(|g| g.as_str()).unwrap_or_default();
             self.message = format!("generated {} ({genre})", pattern.name.as_deref().unwrap_or_default());
         }
     }
@@ -1558,7 +1558,7 @@ impl Session {
             Some(MelodicKind::Chords) => "chords",
         };
         self.message = if on {
-            let genre = self.pattern().and_then(|p| p.extra.get("_autoGenGenre")?.as_str()).unwrap_or_default();
+            let genre = self.pattern().and_then(|p| p.extra.get(generate::GENRE)?.as_str()).unwrap_or_default();
             format!("{name}: generated, new lines every loop ({genre})")
         } else {
             format!("{name}: auto off")
@@ -1760,7 +1760,7 @@ impl Session {
             piano_roll: roll,
             output: self.output_view(),
             synth: self.synth_open(),
-            genre: pattern.and_then(|p| p.extra.get("_autoGenGenre")?.as_str()),
+            genre: pattern.and_then(|p| p.extra.get(generate::GENRE)?.as_str()),
             kit_view: self.kit_view(layout.details_top),
             right: layout.right,
             current_page: self.current_page,

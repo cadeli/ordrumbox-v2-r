@@ -435,7 +435,7 @@ impl Session {
         let layout = self.song_layout((canvas.width(), canvas.height(), scale));
         let rows = self.song_rows();
         let Some(rect) = layout.clip_rect(&self.song_view_data(&rows, &layout), c) else { return };
-        view::draw_tooltip(canvas, &clip_label(&clip.pattern, clip), rect, scale);
+        view::draw_tooltip(canvas, &clip_label(&clip.pattern_id, clip), rect, scale);
     }
 
     // ─── The menus ───────────────────────────────────────────────────────────
@@ -457,7 +457,7 @@ impl Session {
     /// A clip: repeat it after itself, or remove it (`#showClipMenu`).
     fn clip_menu(&mut self, c: usize, x: i32, y: i32) {
         let Some(clip) = self.song().and_then(|s| s.clips.get(c)).cloned() else { return };
-        let title = clip_label(&self.pattern_label(&clip.pattern), &clip);
+        let title = clip_label(&self.pattern_label(&clip.pattern_id), &clip);
         let values = vec![format!("next:{c}"), format!("delete:{c}")];
         self.dropdown = Some(Dropdown::menu(Id::SongMenu, x, y, title, values, vec!["Next".into(), "Delete".into()]));
     }
@@ -465,7 +465,7 @@ impl Session {
     /// A row's name: add its pattern at the playhead, or remove every clip
     /// of it (`#showRowMenu`).
     fn row_menu(&mut self, row: &Row, x: i32, y: i32) {
-        let count = self.song().map_or(0, |s| s.clips.iter().filter(|c| c.pattern == row.id).count());
+        let count = self.song().map_or(0, |s| s.clips.iter().filter(|c| c.pattern_id == row.id).count());
         let measure = self.playhead_measure();
         let title = format!("{} - {count} clip(s)", row.name);
         let values = vec![format!("add:{measure}:{}", row.id), format!("row:{}", row.id)];
@@ -492,7 +492,7 @@ impl Session {
             }
             ("next", None) => {
                 let Some(clip) = a.parse().ok().and_then(|c: usize| self.song()?.clips.get(c).cloned()) else { return };
-                let label = self.pattern_label(&clip.pattern);
+                let label = self.pattern_label(&clip.pattern_id);
                 self.editor.repeat_pattern_at_measure(clip.start_measure, None).map(|_| {
                     let at = f64::from(clip.start_measure) + clip.measure_count + 1.0;
                     format!("\"{label}\" repeated at measure {}", js::number_to_string(at))
@@ -504,7 +504,7 @@ impl Session {
                 else {
                     return;
                 };
-                let label = self.pattern_label(&clip.pattern);
+                let label = self.pattern_label(&clip.pattern_id);
                 self.editor.remove_song_clips(None, &[c]);
                 Ok(format!("Removed \"{label}\" at measure {}", clip.start_measure + 1))
             }
@@ -678,12 +678,12 @@ mod tests {
 
     fn clips(session: &Session) -> Vec<(String, u32, f64)> {
         let song = session.song().unwrap();
-        song.clips.iter().map(|c| (c.pattern.clone(), c.start_measure, c.measure_count)).collect()
+        song.clips.iter().map(|c| (c.pattern_id.clone(), c.start_measure, c.measure_count)).collect()
     }
 
     #[test]
     fn clip_labels() {
-        let clip = SongClip { pattern: "rock".into(), start_measure: 2, measure_count: 0.75 };
+        let clip = SongClip { pattern_id: "rock".into(), start_measure: 2, measure_count: 0.75 };
         assert_eq!(clip_label("Rock", &clip), "Rock - measure 3, 0.75 measure(s)");
     }
 

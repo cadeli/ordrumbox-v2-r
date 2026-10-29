@@ -17,7 +17,7 @@ use super::*;
 /// without clips (`#followContent`).
 fn follow_content(song: &mut Song) {
     let measures = song.content_measures();
-    song.loop_measure_count = (measures > 0.0).then_some(measures);
+    song.loop_measures = (measures > 0.0).then_some(measures);
 }
 
 impl Editor {
@@ -93,12 +93,12 @@ impl Editor {
     /// of 0 or less is 1 (`addSongClip`). Whether there was an arrangement.
     pub fn add_song_clip(&mut self, song: Option<usize>, clip: SongClip) -> bool {
         let Some(s) = self.song_index(song) else { return false };
-        if clip.pattern.is_empty() {
+        if clip.pattern_id.is_empty() {
             return false;
         }
         let measure_count = if clip.measure_count > 0.0 { clip.measure_count } else { 1.0 };
         let clip = SongClip { measure_count, ..clip };
-        let desc = format!("Add \"{}\" at measure {}", clip.pattern, u64::from(clip.start_measure) + 1);
+        let desc = format!("Add \"{}\" at measure {}", clip.pattern_id, u64::from(clip.start_measure) + 1);
         self.edit_songs(desc, None, |songs| {
             songs[s].clips.push(clip);
             follow_content(&mut songs[s]);
@@ -116,7 +116,7 @@ impl Editor {
         targets.dedup();
         let desc = match targets.as_slice() {
             [] => return false,
-            [one] => format!("Remove clip \"{}\"", clips[*one].pattern),
+            [one] => format!("Remove clip \"{}\"", clips[*one].pattern_id),
             many => format!("Remove {} clips", many.len()),
         };
         self.edit_songs(desc, None, |songs| {
@@ -146,7 +146,7 @@ impl Editor {
             Some(count) if count.is_finite() && count > 0.0 => count,
             _ => measures_for_pattern(pattern.beat_count),
         };
-        let clip = SongClip { pattern: pattern.id.clone(), start_measure: start, measure_count: duration };
+        let clip = SongClip { pattern_id: pattern.id.clone(), start_measure: start, measure_count: duration };
         self.add_song_clip(Some(s), clip.clone());
         Ok(clip)
     }
@@ -160,7 +160,7 @@ impl Editor {
         };
         // `startMeasure + measureCount`, floored by `addSongClip`.
         let next = (f64::from(clip.start_measure) + clip.measure_count).floor().min(f64::from(u32::MAX)) as u32;
-        self.add_pattern_at_measure(&clip.pattern, next, Some(clip.measure_count), Some(s))
+        self.add_pattern_at_measure(&clip.pattern_id, next, Some(clip.measure_count), Some(s))
     }
 
     /// Remove every clip starting at `start`, in one undo step
@@ -190,7 +190,7 @@ impl Editor {
             return Err("No pattern given to remove".to_owned());
         }
         let clips = &self.library.songs[s].clips;
-        let indices: Vec<usize> = (0..clips.len()).filter(|&i| clips[i].pattern == id).collect();
+        let indices: Vec<usize> = (0..clips.len()).filter(|&i| clips[i].pattern_id == id).collect();
         let removed = indices.iter().map(|&i| clips[i].clone()).collect();
         self.remove_song_clips(Some(s), &indices);
         Ok(removed)
@@ -212,7 +212,7 @@ impl Editor {
             name: name.to_owned(),
             description: String::new(),
             bpm: DEFAULT_BPM,
-            loop_measure_count: None,
+            loop_measures: None,
             clips: Vec::new(),
         };
         let index = self.library.songs.len();

@@ -362,7 +362,7 @@ impl Controller {
                 let used: Vec<usize> = song
                     .clips
                     .iter()
-                    .filter_map(|c| library.patterns.iter().rposition(|p| p.id == c.pattern))
+                    .filter_map(|c| library.patterns.iter().rposition(|p| p.id == c.pattern_id))
                     .collect();
                 let mut sounds = vec![Vec::new(); library.patterns.len()];
                 for &p in &used {

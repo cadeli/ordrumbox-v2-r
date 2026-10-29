@@ -119,10 +119,18 @@ fn pattern_in(value: &Value) -> Pattern {
         match key {
             "tracks" => pattern.tracks = value.as_array().unwrap().iter().map(track_in).collect(),
             "beatCount" => pattern.beat_count = value.as_f64().unwrap() as i32,
-            _ => _ = pattern.extra.insert(key, value.clone()),
+            _ => _ = pattern.extra.insert(current_pattern_key(key), value.clone()),
         }
     }
     pattern
+}
+
+/// The generator's pattern keys: the script writes their JS names.
+const PATTERN_KEYS: [(&str, &str); 3] =
+    [("_autoGenGenre", "autoGenre"), ("_autoGenKeyOffset", "autoKeyOffset"), ("_autoGenScale", "autoScale")];
+
+fn current_pattern_key(key: &str) -> &str {
+    PATTERN_KEYS.iter().find(|(js, _)| *js == key).map_or(key, |(_, current)| current)
 }
 
 /// Compare a track with the script's `trackOut`: every key it wrote, and the
@@ -150,19 +158,19 @@ fn check_track(track: &Track, expected: &Value, at: &str) {
             panic!("{at}: {key} is {actual}, JS {value}");
         }
     }
+    if !object.contains_key("_toolbarAuto") {
+        assert_eq!(track.extra.get("_toolbarAuto"), None, "{at}: _toolbarAuto set, JS left it unset");
+    }
     for key in ["auto_variation", "auto_variation2"] {
         if !object.contains_key(key) {
             assert_eq!(track.field(key), Some(Value::Null), "{at}: {key} set, JS left it unset");
         }
     }
-    if !object.contains_key("_toolbarAuto") {
-        assert_eq!(track.extra.get("_toolbarAuto"), None, "{at}: _toolbarAuto set, JS left it unset");
-    }
 }
 
 fn check_pattern(pattern: &Pattern, expected: &Value, at: &str) {
     for key in ["autoGen", "_autoGenGenre", "_autoGenKeyOffset", "_autoGenScale"] {
-        assert_eq!(pattern.extra.get(key), expected.get(key), "{at}: {key}");
+        assert_eq!(pattern.extra.get(current_pattern_key(key)), expected.get(key), "{at}: {key}");
     }
     let tracks = items(expected, "tracks");
     let names: Vec<&str> = pattern.tracks.iter().map(|t| t.name.as_str()).collect();

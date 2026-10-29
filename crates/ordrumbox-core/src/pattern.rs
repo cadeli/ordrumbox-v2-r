@@ -5,12 +5,18 @@ use crate::json::{Object, Value};
 use crate::record::Issue;
 use crate::track::Track;
 
-/// Written in front of every saved pattern (and filled in on load when missing).
-pub const APPLICATION: &str = "online-ordrumbox";
-pub const URL: &str = "https://www.ordrumbox.com";
+/// Keys read and dropped: `_revision` is runtime state; `application` and
+/// `url`, the web app's name and address, were written in every pattern.
+const DROPPED_KEYS: [&str; 3] = ["_revision", "application", "url"];
 
-/// Runtime-only keys, never saved (`PATTERN_RUNTIME_KEYS`).
-const RUNTIME_KEYS: [&str; 1] = ["_revision"];
+/// The generator's keys under their JS names (older saves).
+const LEGACY_KEYS: [(&str, &str); 3] =
+    [("_autoGenGenre", "autoGenre"), ("_autoGenKeyOffset", "autoKeyOffset"), ("_autoGenScale", "autoScale")];
+
+/// The current name of a pattern key.
+pub(crate) fn canonical_key(key: &str) -> &str {
+    LEGACY_KEYS.iter().find(|(old, _)| *old == key).map_or(key, |(_, new)| new)
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Pattern {
@@ -24,7 +30,7 @@ pub struct Pattern {
     pub description: String,
     pub tags: Vec<String>,
     pub tracks: Vec<Track>,
-    /// Other keys (`application`, `url`, `_autoGen*`…), kept and written back.
+    /// Other keys (`autoGenre`, `autoKeyOffset`, `autoScale`…), kept and written back.
     pub extra: Object,
 }
 
@@ -52,8 +58,6 @@ impl Pattern {
             return None;
         };
         let mut pattern = Self::default();
-        pattern.extra.insert("application", Value::from(APPLICATION));
-        pattern.extra.insert("url", Value::from(URL));
         let mut wrong_type = |key: &str, value: &Value| {
             issues.push(Issue::new(format!("{at}.{key}"), format!("wrong type ({value}), default kept")));
         };
@@ -84,9 +88,9 @@ impl Pattern {
                     None => wrong_type(key, value),
                 },
                 "tracks" => {}
-                key if RUNTIME_KEYS.contains(&key) => {}
+                key if DROPPED_KEYS.contains(&key) => {}
                 _ => {
-                    pattern.extra.insert(key, value.clone());
+                    pattern.extra.insert(canonical_key(key), value.clone());
                 }
             }
         }
@@ -104,15 +108,9 @@ impl Pattern {
         Some(pattern)
     }
 
-    /// Save as `Exporter.export()`: `application` and `url` first, then the
-    /// non-default fields, unknown keys, and the tracks last.
+    /// Save the non-default fields, the other keys, and the tracks last.
     pub fn to_json(&self) -> Value {
         let mut object = Object::new();
-        for key in ["application", "url"] {
-            if let Some(value) = self.extra.get(key) {
-                object.insert(key, value.clone());
-            }
-        }
         if !self.id.is_empty() {
             object.insert("id", Value::from(self.id.as_str()));
         }
@@ -133,7 +131,7 @@ impl Pattern {
             object.insert("tags", Value::Array(self.tags.iter().map(|t| Value::from(t.as_str())).collect()));
         }
         for (key, value) in self.extra.iter() {
-            object.insert(key, value.clone()); // application/url: same slot, same value
+            object.insert(key, value.clone());
         }
         if !self.tracks.is_empty() {
             object.insert("tracks", Value::Array(self.tracks.iter().map(Track::to_json).collect()));
@@ -169,19 +167,13 @@ mod tests {
     fn saves_only_what_differs_from_the_defaults() {
         let (pattern, issues) = load(r#"{"id":" rock ","name":"Rock","beatCount":4,"bpm":120,"_revision":3}"#);
         assert!(issues.is_empty());
-        assert_eq!(
-            pattern.to_json().to_json(),
-            r#"{"application":"online-ordrumbox","url":"https://www.ordrumbox.com","id":"rock","name":"Rock"}"#
-        );
+        assert_eq!(pattern.to_json().to_json(), r#"{"id":"rock","name":"Rock"}"#);
     }
 
     #[test]
-    fn keeps_a_foreign_application_and_unknown_keys() {
-        let (pattern, _) = load(r#"{"application":"other","_autoGenGenre":"house","bpm":97.5}"#);
-        assert_eq!(
-            pattern.to_json().to_json(),
-            r#"{"application":"other","url":"https://www.ordrumbox.com","bpm":97.5,"_autoGenGenre":"house"}"#
-        );
+    fn drops_the_web_header_and_renames_the_generator_keys() {
+        let (pattern, _) = load(r#"{"application":"other","url":"u","_autoGenGenre":"house","x":1,"bpm":97.5}"#);
+        assert_eq!(pattern.to_json().to_json(), r#"{"bpm":97.5,"autoGenre":"house","x":1}"#);
     }
 
     #[test]

@@ -232,7 +232,7 @@ fn a_song_without_a_playable_clip_is_refused() {
 fn the_song_export_follows_the_arrangement_loop() {
     // The demo arrangement is 66 measures; its loop shortened to 2.
     let mut library = library();
-    library.songs[0].loop_measure_count = Some(2.0);
+    library.songs[0].loop_measures = Some(2.0);
     let (left, _) = offline::render_song(&library, 0, &setup(1)).expect("renders");
     assert_eq!(left.len(), 4 * EXPORT_RATE as usize);
 }
@@ -310,10 +310,10 @@ fn starting_a_song_makes_every_pattern_it_plays_audible() {
     assert!(controller.position().expect("playing").pass >= 1, "the arrangement advances");
     // Every pattern of the arrangement, not only the selected one, has its sounds.
     for clip in &library.songs[0].clips {
-        let p = library.patterns.iter().position(|p| p.id == clip.pattern).expect("known pattern");
+        let p = library.patterns.iter().position(|p| p.id == clip.pattern_id).expect("known pattern");
         for (t, track) in library.patterns[p].tracks.iter().enumerate() {
             let sound = controller.track_sound(&library, p, t);
-            assert_ne!(sound, TrackSound::None, "{} track {} is silent", clip.pattern, track.name);
+            assert_ne!(sound, TrackSound::None, "{} track {} is silent", clip.pattern_id, track.name);
         }
     }
 }

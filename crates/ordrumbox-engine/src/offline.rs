@@ -97,7 +97,7 @@ pub fn render_pattern(
 /// Song `index`, its whole arrangement once (`exportSongToWav`).
 pub fn render_song(library: &Library, index: usize, setup: &RenderSetup) -> Option<(Vec<f32>, Vec<f32>)> {
     let song = library.songs.get(index)?;
-    if !song.clips.iter().any(|c| library.patterns.iter().any(|p| p.id == c.pattern)) {
+    if !song.clips.iter().any(|c| library.patterns.iter().any(|p| p.id == c.pattern_id)) {
         return None; // no playable clip
     }
     let measures = song.length_measures().max(1.0);
