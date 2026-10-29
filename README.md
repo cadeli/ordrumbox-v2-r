@@ -261,6 +261,15 @@ MIDI, WAV, samples, kit folders and mappings) is in **File**. Click a title, or 
 close. **Help › Keyboard shortcuts** (**F1**) lists every key; **Help › About**
 shows the version and the folders in use.
 
+Updates: at start, at most once a day, the app asks GitHub for the latest
+release of this repository (with the system's `curl`, in Windows 10 and
+later and in macOS; the request carries only `User-Agent:
+orDrumbox/<version>`). A newer one is shown in the status lines, and **Help ›
+Download orDrumbox …** opens its page; nothing is downloaded or installed by
+the app. **Help › Check for updates** checks now. `settings.json` keeps it
+under `updates`: `"check": false` stops the check at start, `lastCheck` is
+when it last ran (seconds since 1970).
+
 Commands ending in "..." (import a MIDI file or a song, add or replace a
 sample, import a folder as a kit, load a kit mapping) open the built-in file picker: **↑↓**,
 **PageUp/PageDown**, **Home/End** or the mouse wheel to move, a letter to jump,
@@ -342,7 +351,15 @@ cargo run --release -p ordrumbox-engine --example render -- assets song:demo dem
 
 Windows `.exe`: every push to `main` builds it in CI (artifact
 `ordrumbox-windows-x64`, the program with its `assets` folder next to it);
-a local build needs the `assets` folder copied next to it. Locally from
+a local build needs the `assets` folder copied next to it.
+
+A release: set `version` in the root `Cargo.toml` (`0.2.0`), commit, then
+`git tag v0.2.0 && git push origin v0.2.0`. CI checks that the tag is the
+version, then publishes a GitHub release with
+`ordrumbox-v0.2.0-windows-x64.zip`; the apps already installed find it
+through their update check.
+
+Locally from
 macOS: `cargo install cargo-xwin`, then
 `cargo xwin build --release -p ordrumbox-app --target x86_64-pc-windows-msvc`.
 

@@ -33,6 +33,10 @@ tools/            scripts that regenerate the golden fixtures
 - The four domain crates take **no third-party dependency**. Only
   `ordrumbox-app` talks to the OS (window, screen, sound device), through
   `winit`, `softbuffer`, `cpal` and `fontdue` (text in the system's monospace font, read at start: nothing bundled).
+- The update check (`ordrumbox-app/src/update.rs`) runs the system's `curl`
+  on a thread of its own, never on the UI or audio thread; it only tells,
+  never downloads. A release is a `v<version>` tag matching `Cargo.toml`
+  (`README.md`, "Commands").
 - Dependencies only point down the table. Nothing depends on
   `ordrumbox-app`; `dsp` uses `core` only as a dev-dependency.
 - Workspace lints (`Cargo.toml`): `unsafe_code = "forbid"`,

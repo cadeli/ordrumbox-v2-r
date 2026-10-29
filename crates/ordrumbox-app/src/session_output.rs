@@ -17,8 +17,9 @@ impl Session {
     /// The master bus settings from `settings.json`, if it has some.
     pub(super) fn load_master(&mut self) {
         let Some(path) = store::settings_path() else { return };
-        match store::load_master(&path) {
-            Ok(Some((master, issues))) => {
+        match store::load_setting(&path, "master") {
+            Ok(Some(value)) => {
+                let (master, issues) = master::from_json(&value);
                 self.status.extend(issues.into_iter().map(|issue| format!("settings.json: {issue}")));
                 self.set_master(master, false);
             }
@@ -52,7 +53,7 @@ impl Session {
         }
         self.master_dirty = None;
         if let Some(path) = store::settings_path()
-            && let Err(e) = store::save_master(&path, &self.master)
+            && let Err(e) = store::save_setting(&path, "master", master::to_json(&self.master))
         {
             self.message = format!("settings not saved: {}: {e}", path.display());
         }

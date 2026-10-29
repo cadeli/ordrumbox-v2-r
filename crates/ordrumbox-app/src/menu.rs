@@ -88,6 +88,8 @@ pub enum Command {
     Shortcuts,
     About,
     FactoryReset,
+    CheckUpdates,
+    DownloadPage,
 }
 
 /// One line of a menu.
@@ -154,6 +156,10 @@ pub struct MenuState {
     pub saved_songs: bool,
     /// The kit editor has a sample selected.
     pub kit_sample: bool,
+    /// An update check under way.
+    pub checking_updates: bool,
+    /// The version of a newer release found.
+    pub newer_release: Option<String>,
 }
 
 fn command(label: impl Into<String>, shortcut: &'static str, command: Command, enabled: bool) -> Item {
@@ -311,6 +317,11 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
             items: vec![
                 command("Keyboard shortcuts", "F1", C::Shortcuts, true),
                 command("About orDrumbox", "", C::About, true),
+                command("Check for updates", "", C::CheckUpdates, !s.checking_updates),
+                match &s.newer_release {
+                    Some(version) => command(format!("Download orDrumbox {version}..."), "", C::DownloadPage, true),
+                    None => command("Download page...", "", C::DownloadPage, false),
+                },
                 Item::Separator,
                 command("Factory reset...", "", C::FactoryReset, true),
             ],

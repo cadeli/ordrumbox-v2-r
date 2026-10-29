@@ -3,6 +3,9 @@ name: CI
 on:
   push:
     branches: [main]
+    # A version tag (`v0.2.0`) also publishes a GitHub release, which the
+    # app's update check (Help > Check for updates) reads.
+    tags: ["v*"]
   pull_request:
 
 env:
@@ -43,3 +46,29 @@ jobs:
         with:
           name: ordrumbox-windows-x64
           path: dist
+
+  release:
+    name: GitHub release
+    needs: windows-exe
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      # The app compares the tag with its own version: they must be the same.
+      - name: Tag matches the version
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "tag $GITHUB_REF_NAME, but Cargo.toml has version $version"
+            exit 1
+          fi
+      - uses: actions/download-artifact@v4
+        with:
+          name: ordrumbox-windows-x64
+          path: ordrumbox
+      - run: zip -r "ordrumbox-$GITHUB_REF_NAME-windows-x64.zip" ordrumbox
+      - run: gh release create "$GITHUB_REF_NAME" --title "orDrumbox $GITHUB_REF_NAME" --generate-notes ./*.zip
+        env:
+          GH_TOKEN: ${{ github.token }}

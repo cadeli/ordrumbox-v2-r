@@ -31,6 +31,7 @@ mod store;
 mod synth_model;
 mod synth_view;
 mod theme;
+mod update;
 mod view;
 
 use std::num::NonZeroU32;
@@ -40,7 +41,7 @@ use std::time::{Duration, Instant};
 use winit::application::ApplicationHandler;
 use winit::dpi::{LogicalSize, PhysicalPosition};
 use winit::event::{ElementState, KeyEvent, MouseButton, MouseScrollDelta, WindowEvent};
-use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopClosed};
 use winit::keyboard::{KeyCode, ModifiersState, PhysicalKey};
 use winit::window::{Window, WindowId};
 
@@ -596,7 +597,7 @@ impl ApplicationHandler for App {
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         let save_at = self.session.autosave();
-        if self.session.check_audio() {
+        if self.session.check_audio() || self.session.poll_updates() {
             self.request_redraw();
         }
         let playing = self.session.playing();
@@ -652,6 +653,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     font::load()?;
     let event_loop = EventLoop::new()?;
     let mut session = Session::load();
+    let proxy = event_loop.create_proxy();
+    session.start_updates(update::Waker::new(move || match proxy.send_event(()) {
+        // Closed: the app is quitting, there is nothing to wake.
+        Ok(()) | Err(EventLoopClosed(())) => {}
+    }));
     // MIDI files given on the command line ("open with"): imported.
     for arg in std::env::args_os().skip(1) {
         let path = std::path::PathBuf::from(arg);
