@@ -458,12 +458,12 @@ impl Editor {
         self.set_steps_per_beat(p, t, f64::from(next), false)
     }
 
-    /// Loop point one step back, wrapping to the track end (`decrLoopPoint`).
-    pub fn decr_loop_point(&mut self, p: usize, t: usize) -> bool {
+    /// The loop one step shorter, wrapping to the track end (`decrLoopPoint`).
+    pub fn shorten_loop(&mut self, p: usize, t: usize) -> bool {
         self.edit_track(
             p,
             t,
-            |track| format!("Loop point back on {}", track.name),
+            |track| format!("Shorten loop on {}", track.name),
             None,
             |track| {
                 let full = track.steps_per_beat * track.beat_count;
@@ -835,11 +835,11 @@ mod tests {
     #[test]
     fn loop_point_and_clean() {
         let mut e = editor();
-        assert!(e.decr_loop_point(0, 0));
+        assert!(e.shorten_loop(0, 0));
         assert_eq!(pattern(&e).tracks[0].loop_length, Some(15));
         e.set_steps_per_beat(0, 0, 1.0, false); // 4 steps
         for _ in 0..4 {
-            e.decr_loop_point(0, 0);
+            e.shorten_loop(0, 0);
         }
         assert_eq!(pattern(&e).tracks[0].loop_length, Some(4), "wrapped from 1 to the track end");
         assert!(e.clean_pattern(0));

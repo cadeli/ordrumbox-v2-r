@@ -98,11 +98,11 @@ again from the assets' kits.
 Track editor (on the right, **F2** or **View › Track editor** shows or hides
 it), for the track of the cursor or of the selected note: the sample bar
 (note, length, peak, envelope with the decay end, **Load** replaces the
-sample), the knob bar (velocity, pan, pitch, the sample's decay) and the JS
-tabs — **fx** (reverb, delay, saturation, filter, each with its on/off LED),
-**sound** (mono, auto-assign, instrument, sample, synth preset), **mod** (an
-LFO per setting: LED, wave, frequency, range, phase), **loop** (steps per
-beat, loop point, swing), **gen** (auto mode; the manual variation settings,
+sample), the knob bar (volume, pan, pitch, the sample's decay) and the JS
+tabs — **FX** (reverb, delay, saturation, filter, each with its on/off LED),
+**Sound** (mono, auto-assign, instrument, sample, synth preset), **LFO** (an
+LFO per setting: LED, wave, frequency, range, phase), **Loop** (steps per
+beat, loop length, swing), **Gen** (auto mode; the manual variation settings,
 or the Groove / Engine settings in auto mode). Under it, the note editor: the
 selected note (else the step under the cursor, else the track's first note)
 — velocity, pitch, pan, and the Trig, Retr, Eucl and Arp tabs. While
@@ -193,7 +193,7 @@ in the user data folder (the JS keeps it in IndexedDB), read at start over
 the assets' presets. The pills under the cards show the modules in use.
 
 Output panel (a strip along the bottom of the window, always shown — the JS
-output panel): the master bus in three tabs — **vol**: the master
+output panel): the master bus in three tabs — **Vol**: the master
 volume and the spectrum of what plays (the JS analyser's
 `getByteFrequencyData`, computed as the Web Audio specification describes
 it: 4096 samples, Blackman window, smoothing 0.8, -100 to -30 dB, the first
@@ -279,7 +279,7 @@ pitch, MIDI number and the settings that differ from the defaults (the JS
 | **Ctrl Z**, **Ctrl Y** (or **Ctrl Shift Z**) | undo, redo (50 steps) |
 | **Ctrl C / V** | copy / paste the cursor step (**Shift**: the track) |
 | **Ctrl T**, **Ctrl Backspace** | add a track, remove the focused track |
-| **Ctrl G**, **Ctrl L** | next grid (steps per beat), loop point one step back |
+| **Ctrl G**, **Ctrl L** | next grid (steps per beat), loop one step shorter |
 | **Ctrl - =** | pattern length −1 / +1 beat |
 | **Ctrl N**, **Ctrl D** | new pattern, duplicate pattern |
 | **Ctrl S** | export the pattern as JSON (`exports/ordrumbox-<name>.json`, as the JS); the library is saved on its own, **File › Save** saves now |

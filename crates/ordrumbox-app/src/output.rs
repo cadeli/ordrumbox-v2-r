@@ -1,5 +1,5 @@
 //! The output panel (`output_panel.js` and its sections), in the place of
-//! the grid: the master bus settings in three tabs — **vol** (the master
+//! the grid: the master bus settings in three tabs — **Vol** (the master
 //! volume, the spectrum), **Comp** (pre-gain, the compressor's transfer curve,
 //! its on/off button and six knobs), **Flt** (low cut, high cut) — kept in
 //! `settings.json` (`settings.master`, `MASTER_BUS_DEFAULTS` for what it lacks).
@@ -30,7 +30,7 @@ const fn param(key: &'static str, label: &'static str, spec: Spec, format: Forma
     Param { key, label, spec, format, unit }
 }
 
-/// The volume knob (vol tab).
+/// The volume knob (Vol tab).
 pub const VOLUME: Param = param("volume", "Volume", Spec::knob(0.0, 2.0, 0.01, 1.0), Format::Fixed2, "");
 /// The pre-gain knob (Comp tab).
 pub const PRE_GAIN: Param = param("preGain", "Pre-Gain", Spec::knob(-20.0, 20.0, 0.5, 0.0), Format::SignedFixed1, "dB");
@@ -49,7 +49,7 @@ pub const FILTERS: [Param; 2] = [
     param("hicut", "High Cut", Spec::slider(1000.0, 20_000.0, 100.0, 18_500.0), Format::Round, "Hz"),
 ];
 /// The tabs.
-pub const TABS: [&str; 3] = ["vol", "Comp", "Flt"];
+pub const TABS: [&str; 3] = ["Vol", "Comp", "Flt"];
 
 /// Every knob and slider.
 pub fn params() -> impl Iterator<Item = &'static Param> {
@@ -159,7 +159,7 @@ pub struct OutputLayout {
     pub band: Rect,
     pub title: (i32, i32),
     pub tabs: [Rect; 3],
-    /// vol: the volume knob, the spectrum.
+    /// Vol: the volume knob, the spectrum.
     pub volume: Rect,
     pub spectrum: Rect,
     /// Comp: the pre-gain knob, the curve, the on/off button, the six knobs.
@@ -192,7 +192,7 @@ impl OutputLayout {
         let knob_y = band.y + (band.h - knob_h) / 2;
         let knob = |x: i32, w: i32| Rect::new(x, knob_y, w, knob_h);
         let after_knobs = |n: i32| cx + n * (knob_w + 4 * s);
-        // vol: the volume knob, then the spectrum filling the rest.
+        // Vol: the volume knob, then the spectrum filling the rest.
         let volume = knob(cx, knob_w);
         let spectrum = Rect::new(cx + knob_w + 12 * s, top, (right - (cx + knob_w + 12 * s)).max(0), inner_h);
         // Comp: pre-gain + six knobs + the on/off button, the curve on the right.

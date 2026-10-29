@@ -101,7 +101,7 @@ impl Session {
         }
     }
 
-    /// What the output strip draws: on the vol tab, the spectrum of the
+    /// What the output strip draws: on the Vol tab, the spectrum of the
     /// last samples played (the analyser keeps its smoothing between frames).
     /// The strip is always shown.
     pub(super) fn output_view(&self) -> Option<OutputView> {
@@ -132,7 +132,7 @@ mod tests {
             let band = s.body(SIZE).output;
             OutputLayout::strip(SIZE.0, band, 1)
         };
-        // vol: the wheel on the volume knob.
+        // Vol: the wheel on the volume knob.
         let (x, y) = (out.volume.x + out.volume.w / 2, out.volume.y + 10);
         assert!(s.wheel(SIZE, x, y, -10, false, false));
         assert!((s.master.master - 0.9).abs() < 1e-6);
