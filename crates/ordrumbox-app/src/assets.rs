@@ -1,6 +1,7 @@
-//! The `assets` folder of ordrumbox-v2 (`data/song.json`, `data/drumkits.json`,
-//! `data/scales.json`, `data/generated_sounds.json`, `kits/**.wav`), found
-//! next to the program or given by `ORDRUMBOX_ASSETS`, and loaded into the model.
+//! The `assets` folder (`data/library.json`, `data/kits.json`,
+//! `data/scales.json`, `data/synth_presets.json`, `kits/**.wav`), found next
+//! to the program, in this repository or given by `ORDRUMBOX_ASSETS`, and
+//! loaded into the model.
 
 use std::env;
 use std::fs;
@@ -25,7 +26,7 @@ pub struct Assets {
     pub scales: Scales,
     /// The scale names in file order (the note editor's arpeggio scales).
     pub scale_list: ScaleList,
-    /// Synth presets (`generated_sounds.json`).
+    /// Synth presets (`synth_presets.json`).
     pub synths: SynthPresets,
     pub bank: SampleBank,
     /// Samples that could not be read or decoded.
@@ -60,8 +61,8 @@ impl SampleSources {
 }
 
 /// Folders searched, in order: `$ORDRUMBOX_ASSETS`, `assets/` next to the
-/// program, `assets/` in the working folder, and a sibling ordrumbox-v2
-/// checkout (`../ordrumbox-v2/assets`, for `cargo run` from this repository).
+/// program, `assets/` in the working folder, and this repository's
+/// `assets/` (for `cargo run` from anywhere in the checkout).
 pub fn candidates() -> Vec<PathBuf> {
     let mut dirs = Vec::new();
     if let Some(dir) = env::var_os(ENV_VAR) {
@@ -72,14 +73,14 @@ pub fn candidates() -> Vec<PathBuf> {
     }
     if let Ok(cwd) = env::current_dir() {
         dirs.push(cwd.join("assets"));
-        dirs.push(cwd.join("..").join("ordrumbox-v2").join("assets"));
     }
+    dirs.push(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets"));
     dirs
 }
 
-/// The first candidate holding `data/song.json`.
+/// The first candidate holding `data/library.json`.
 pub fn find() -> Option<PathBuf> {
-    candidates().into_iter().find(|dir| dir.join("data").join("song.json").is_file())
+    candidates().into_iter().find(|dir| dir.join("data").join(LIBRARY).is_file())
 }
 
 fn read_json(path: &Path) -> Result<json::Value, String> {
@@ -87,12 +88,15 @@ fn read_json(path: &Path) -> Result<json::Value, String> {
     json::parse(&text).map_err(|e| format!("{}: {e}", path.display()))
 }
 
-/// Load everything; only an unreadable `song.json` is fatal.
+/// The demo library, the starting point of the user's.
+pub const LIBRARY: &str = "library.json";
+
+/// Load everything; only an unreadable `library.json` is fatal.
 pub fn load(dir: &Path) -> Result<Assets, String> {
     let data = dir.join("data");
-    let (library, report) = Library::from_json(&read_json(&data.join("song.json"))?);
+    let (library, report) = Library::from_json(&read_json(&data.join(LIBRARY))?);
     let saved = store::kits_path().map(|p| store::load_kits(&p));
-    let assets_kits = || read_json(&data.join("drumkits.json")).map(|v| kits_from_json(&v)).unwrap_or_default();
+    let assets_kits = || read_json(&data.join("kits.json")).map(|v| kits_from_json(&v)).unwrap_or_default();
     let (kits, kits_error) = match saved {
         Some(Ok(Some(kits))) => (kits, None),
         Some(Err(e)) => (assets_kits(), Some(e)),
@@ -101,8 +105,7 @@ pub fn load(dir: &Path) -> Result<Assets, String> {
     let scales_json = read_json(&data.join("scales.json")).ok();
     let scales = scales_json.as_ref().map(Scales::from_json).unwrap_or_default();
     let scale_list = scales_json.as_ref().map(ScaleList::from_json).unwrap_or_default();
-    let synths =
-        read_json(&data.join("generated_sounds.json")).map(|v| SynthPresets::from_json(&v)).unwrap_or_default();
+    let synths = read_json(&data.join("synth_presets.json")).map(|v| SynthPresets::from_json(&v)).unwrap_or_default();
     let sources = SampleSources { assets: dir.join("kits"), user: store::samples_dir() };
     let (bank, sample_errors) = SampleBank::load(&kits, |url| sources.read(url));
     Ok(Assets { library, report, kits, scales, scale_list, synths, bank, sample_errors, sources, kits_error })

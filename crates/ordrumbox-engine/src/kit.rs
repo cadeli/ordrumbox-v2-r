@@ -128,7 +128,7 @@ fn sample_entries(value: &Value) -> Option<&[Value]> {
 pub struct Kit {
     pub name: String,
     pub samples: Vec<KitSample>,
-    /// Other keys (`infos`, `desc`…), written back as they came.
+    /// Other keys (`info`, `desc`…), written back as they came.
     pub extra: Object,
 }
 
@@ -139,8 +139,10 @@ impl Kit {
         let samples = sample_entries(value).unwrap_or_default().iter().filter_map(KitSample::from_json).collect();
         let mut extra = Object::new();
         for (key, value) in object.iter() {
-            if !matches!(key, "name" | "samples" | "instruments") {
-                extra.insert(key, value.clone());
+            match key {
+                "name" | "samples" | "instruments" => {}
+                "infos" => _ = extra.insert("info", value.clone()), // the JS key
+                _ => _ = extra.insert(key, value.clone()),
             }
         }
         Some(Self { name, samples, extra })
@@ -313,10 +315,15 @@ mod tests {
         let kits = kits_from_json(&json::parse(text).unwrap());
         // Read under the JS key, written under the current one.
         // Read under the JS keys, written under the current ones.
-        let current =
-            [("display_name", "displayName"), ("instruments", "samples"), ("url", "path"), ("tune", "transpose")]
-                .iter()
-                .fold(text.to_owned(), |text, (old, new)| text.replace(&format!("\"{old}\""), &format!("\"{new}\"")));
+        let current = [
+            ("display_name", "displayName"),
+            ("infos", "info"),
+            ("instruments", "samples"),
+            ("url", "path"),
+            ("tune", "transpose"),
+        ]
+        .iter()
+        .fold(text.to_owned(), |text, (old, new)| text.replace(&format!("\"{old}\""), &format!("\"{new}\"")));
         assert_eq!(kits_to_json(&kits).to_json(), current);
         assert_eq!(kits_from_json(&kits_to_json(&kits)), kits);
         assert_eq!(
