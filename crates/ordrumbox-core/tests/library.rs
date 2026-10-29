@@ -9,7 +9,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use ordrumbox_core::json::{self, Object, Value};
-use ordrumbox_core::{DroppedClip, Library, LoadReport, ids};
+use ordrumbox_core::{DroppedClip, Library, LoadReport, ids, legacy};
 
 fn fixtures() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("fixtures")
@@ -75,7 +75,8 @@ fn js_reference(name: &str) -> (Value, Vec<DroppedClip>) {
             pattern.insert("id", Value::from(id));
         }
     }
-    (reference, dropped)
+    // The JS app writes the legacy key names.
+    (legacy::upgrade_keys(&reference), dropped)
 }
 
 /// Remove the tracks named `name` from every pattern.

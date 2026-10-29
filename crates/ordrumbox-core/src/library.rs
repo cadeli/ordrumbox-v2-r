@@ -1,4 +1,4 @@
-//! A library file (`assets/data/song.json`): `{infos, songs, patterns}`, the
+//! A library file (`assets/data/song.json`): `{info, songs, patterns}`, the
 //! patterns being shared by every song of the file.
 
 use std::collections::HashSet;
@@ -37,7 +37,12 @@ impl Library {
     /// checked against those ids.
     pub fn from_json(value: &Value) -> (Self, LoadReport) {
         let mut report = LoadReport::default();
-        let infos = value.get("infos").and_then(Value::as_object).cloned().unwrap_or_default();
+        // `infos` in files from the JS app and older saves.
+        let info = ["info", "infos"]
+            .into_iter()
+            .find_map(|key| value.get(key).and_then(Value::as_object))
+            .cloned()
+            .unwrap_or_default();
 
         let raw_patterns = value.get("patterns").and_then(Value::as_array).unwrap_or_default();
         let mut patterns: Vec<Pattern> = raw_patterns
@@ -50,12 +55,12 @@ impl Library {
         let known_ids = patterns.iter().map(|p| p.id.clone()).collect();
         let (songs, dropped) = songs_from_json(value.get("songs").unwrap_or(&Value::Null), &known_ids);
         report.dropped_clips = dropped;
-        (Self { info: infos, songs, patterns }, report)
+        (Self { info, songs, patterns }, report)
     }
 
     pub fn to_json(&self) -> Value {
         let mut object = Object::new();
-        object.insert("infos", Value::Object(self.info.clone()));
+        object.insert("info", Value::Object(self.info.clone()));
         object.insert("songs", Value::Array(self.songs.iter().map(Song::to_json).collect()));
         object.insert("patterns", Value::Array(self.patterns.iter().map(Pattern::to_json).collect()));
         Value::Object(object)

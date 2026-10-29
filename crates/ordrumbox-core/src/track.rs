@@ -24,13 +24,13 @@ json_record! {
         /// Grid subdivision: steps per beat, 1–8.
         steps_per_beat: i32 = 4 => "stepsPerBeat",
         /// Loop point in steps; `None` loops over the track length.
-        loop_length: Option<i32> = None => "loopAtStep",
+        loop_length: Option<i32> = None => "loopLength" | "loopAtStep",
         swing_resolution: i32 = 1 => "swingResolution",
         swing_amount: f64 = 0.0 => "swingAmount",
-        volume: f64 = 1.0 => "velocity",
+        volume: f64 = 1.0 => "volume" | "velocity",
         /// LFO objects (`{freq, min, max, phase, type}`) are kept as written
         /// and read leniently when played (see [`crate::lfo`]).
-        volume_lfo: Option<Object> = None => "velocityLfo",
+        volume_lfo: Option<Object> = None => "volumeLfo" | "velocityLfo",
         /// Transposition in semitones.
         pitch: f64 = 0.0 => "pitch",
         pitch_lfo: Option<Object> = None => "pitchLfo",
@@ -43,27 +43,27 @@ json_record! {
         use_soft_synth: bool = false => "useSoftSynth",
         mono: bool = false => "mono",
         /// Variation amounts, 0–100.
-        hit_variation: f64 = 0.0 => "variation",
-        note_variation: f64 = 0.0 => "variation2",
+        hit_variation: f64 = 0.0 => "hitVariation" | "variation",
+        note_variation: f64 = 0.0 => "noteVariation" | "variation2",
         /// Base probability of every note, 0–1.
         probability: f64 = 1.0 => "probability",
         /// Per-note chances of the auto engine, 0–100.
-        prob_pitch: f64 = 50.0 => "prob_pitch",
-        prob_velocity: f64 = 50.0 => "prob_velocity",
-        prob_silence: f64 = 50.0 => "prob_silence",
-        prob_fill: f64 = 50.0 => "prob_fill",
-        prob_ghost: f64 = 50.0 => "prob_ghost",
-        prob_retrig: f64 = 50.0 => "prob_retrig",
-        prob_euclidean: f64 = 50.0 => "prob_euclid",
-        prob_note: f64 = 50.0 => "prob_note",
-        prob_note_depth: f64 = 100.0 => "prob_note_depth",
-        prob_arp: f64 = 50.0 => "prob_arp",
+        prob_pitch: f64 = 50.0 => "probPitch" | "prob_pitch",
+        prob_velocity: f64 = 50.0 => "probVelocity" | "prob_velocity",
+        prob_silence: f64 = 50.0 => "probSilence" | "prob_silence",
+        prob_fill: f64 = 50.0 => "probFill" | "prob_fill",
+        prob_ghost: f64 = 50.0 => "probGhost" | "prob_ghost",
+        prob_retrig: f64 = 50.0 => "probRetrigger" | "prob_retrig",
+        prob_euclidean: f64 = 50.0 => "probEuclidean" | "prob_euclid",
+        prob_note: f64 = 50.0 => "probNote" | "prob_note",
+        prob_note_depth: f64 = 100.0 => "probNoteDepth" | "prob_note_depth",
+        prob_arp: f64 = 50.0 => "probArp" | "prob_arp",
         /// Semitone span of pitch randomization, 1–24.
-        pitch_range: f64 = 12.0 => "pitch_range",
-        pitch_scale_lock: bool = false => "pitch_scale_lock",
-        auto_variant: String = String::new() => "auto_variant",
+        pitch_range: f64 = 12.0 => "pitchRange" | "pitch_range",
+        pitch_scale_lock: bool = false => "pitchScaleLock" | "pitch_scale_lock",
+        auto_variant: String = String::new() => "autoVariant" | "auto_variant",
         /// Per-loop density offset, -1–1 (-1 = auto).
-        auto_density: f64 = -1.0 => "auto_density",
+        auto_density: f64 = -1.0 => "autoDensity" | "auto_density",
         filter_type: String = "allpass".to_owned() => "filterType",
         filter_freq_lfo: Option<Object> = None => "filterFreqLfo",
         /// Hz.
@@ -73,22 +73,22 @@ json_record! {
         reverb_type: String = "none".to_owned() => "reverbType",
         reverb_amount: f64 = 0.0 => "reverbAmount",
         delay_type: String = "tape".to_owned() => "delayType",
-        delay_beats: f64 = 1.0 => "delayTime",
-        delay_mix: f64 = 0.0 => "delayDepth",
+        delay_beats: f64 = 1.0 => "delayBeats" | "delayTime",
+        delay_mix: f64 = 0.0 => "delayMix" | "delayDepth",
         fx_selected: String = "reverb".to_owned() => "fxSelected",
         saturation_type: String = "soft".to_owned() => "saturationType",
         saturation_amount: f64 = 0.0 => "saturationAmount",
-        saturation_on: bool = true => "sat",
+        saturation_on: bool = true => "saturationOn" | "sat",
         reverb_on: bool = true => "reverbOn",
         delay_on: bool = true => "delayOn",
         /// Synth preset played when `use_soft_synth` is on.
-        synth_preset: Option<String> = None => "synthSoundKey",
+        synth_preset: Option<String> = None => "synthPreset" | "synthSoundKey",
         // Not in TRACK_DEFAULTS: written by the auto generator / scale picker,
         // saved only when set.
         /// Variation amount the auto generator picked (auto mode); `None` until it ran.
-        auto_hit_variation: Option<f64> = None => "auto_variation",
+        auto_hit_variation: Option<f64> = None => "autoHitVariation" | "auto_variation",
         /// Per-note variation amount the auto generator picked (auto mode).
-        auto_note_variation: Option<f64> = None => "auto_variation2",
+        auto_note_variation: Option<f64> = None => "autoNoteVariation" | "auto_variation2",
         /// Scale (a key of scales.json) the pitch variation snaps to when `pitch_scale_lock` is on.
         scale_name: Option<String> = None => "scaleName",
     }
@@ -101,47 +101,47 @@ json_record! {
 
 /// `TRACK_VALUE_RANGES`: bounds of the numeric settings an edit clamps to.
 const VALUE_RANGES: [(&str, f64, f64); 28] = [
-    ("velocity", 0.0, 1.0),
+    ("volume", 0.0, 1.0),
     ("pan", -1.0, 1.0),
     ("pitch", -24.0, 24.0),
     ("beatCount", 1.0, 16.0),
     ("stepsPerBeat", 1.0, 8.0),
-    ("loopAtStep", 0.0, 1024.0),
+    ("loopLength", 0.0, 1024.0),
     ("swingResolution", 1.0, 8.0),
     ("swingAmount", 0.0, 1.0),
     ("filterFreq", 20.0, 20_000.0),
     ("filterQ", 0.707, 18.707),
     ("reverbAmount", 0.0, 1.0),
-    ("delayTime", 0.0, 4.0),
-    ("delayDepth", 0.0, 1.0),
+    ("delayBeats", 0.0, 4.0),
+    ("delayMix", 0.0, 1.0),
     ("saturationAmount", 0.0, 1.0),
-    ("variation", 0.0, 100.0),
-    ("variation2", 0.0, 100.0),
-    ("prob_pitch", 0.0, 100.0),
-    ("prob_velocity", 0.0, 100.0),
-    ("prob_silence", 0.0, 100.0),
-    ("prob_fill", 0.0, 100.0),
-    ("prob_ghost", 0.0, 100.0),
-    ("prob_retrig", 0.0, 100.0),
-    ("prob_euclid", 0.0, 100.0),
-    ("prob_note", 0.0, 100.0),
-    ("prob_note_depth", 0.0, 100.0),
-    ("prob_arp", 0.0, 100.0),
-    ("pitch_range", 1.0, 24.0),
-    ("auto_density", -1.0, 1.0),
+    ("hitVariation", 0.0, 100.0),
+    ("noteVariation", 0.0, 100.0),
+    ("probPitch", 0.0, 100.0),
+    ("probVelocity", 0.0, 100.0),
+    ("probSilence", 0.0, 100.0),
+    ("probFill", 0.0, 100.0),
+    ("probGhost", 0.0, 100.0),
+    ("probRetrigger", 0.0, 100.0),
+    ("probEuclidean", 0.0, 100.0),
+    ("probNote", 0.0, 100.0),
+    ("probNoteDepth", 0.0, 100.0),
+    ("probArp", 0.0, 100.0),
+    ("pitchRange", 1.0, 24.0),
+    ("autoDensity", -1.0, 1.0),
 ];
 
 /// Table keys that are not track settings (`TRACK_DEFAULTS` lacks them):
 /// an edit never sets them.
-const NOT_SETTINGS: [&str; 3] = ["auto_variation", "auto_variation2", "scaleName"];
+const NOT_SETTINGS: [&str; 3] = ["autoHitVariation", "autoNoteVariation", "scaleName"];
 
 /// Keys written rounded to 2 decimals (`ROUND_2D` in exporter.js).
 const ROUND_2D: [&str; 9] = [
-    "velocity",
+    "volume",
     "pan",
     "reverbAmount",
-    "delayDepth",
-    "delayTime",
+    "delayMix",
+    "delayBeats",
     "saturationAmount",
     "swingAmount",
     "filterFreq",
@@ -164,12 +164,14 @@ impl Track {
     }
 
     /// Whether `key` is a track setting an edit may change (a key of `TRACK_DEFAULTS`).
+    /// A legacy key (`prob_pitch`, `velocity`…) counts as its current one.
     pub fn is_setting(key: &str) -> bool {
-        Self::KEYS.contains(&key) && !NOT_SETTINGS.contains(&key)
+        Self::canonical_key(key).is_some_and(|key| !NOT_SETTINGS.contains(&key))
     }
 
     /// Bounds an edit clamps the numeric setting `key` to (`TRACK_VALUE_RANGES`).
     pub fn value_range(key: &str) -> Option<(f64, f64)> {
+        let key = Self::canonical_key(key)?;
         VALUE_RANGES.iter().find(|(k, _, _)| *k == key).map(|&(_, min, max)| (min, max))
     }
 
@@ -370,8 +372,24 @@ mod tests {
     }
 
     #[test]
+    fn reads_the_legacy_key_names() {
+        let (track, issues) =
+            load(r#"{"name":"KICK","velocity":0.5,"delayDepth":0.3,"prob_pitch":10,"sat":false,"synthSoundKey":"B1"}"#);
+        assert!(issues.is_empty());
+        assert_eq!((track.volume, track.delay_mix, track.prob_pitch), (0.5, 0.3, 10.0));
+        assert!(!track.saturation_on);
+        assert_eq!(
+            track.to_json().to_json(),
+            r#"{"name":"KICK","volume":0.5,"probPitch":10,"delayMix":0.3,"saturationOn":false,"synthPreset":"B1"}"#
+        );
+        assert!(Track::is_setting("prob_pitch") && Track::is_setting("probPitch"));
+        assert!(!Track::is_setting("auto_variation"));
+        assert_eq!(Track::value_range("delayDepth"), Some((0.0, 1.0)));
+    }
+
+    #[test]
     fn rounds_mix_parameters() {
         let (track, _) = load(r#"{"name":"KICK","velocity":0.876,"filterFreq":1234.567,"filterQ":0.707}"#);
-        assert_eq!(track.to_json().to_json(), r#"{"name":"KICK","velocity":0.88,"filterFreq":1234.57}"#);
+        assert_eq!(track.to_json().to_json(), r#"{"name":"KICK","volume":0.88,"filterFreq":1234.57}"#);
     }
 }

@@ -352,7 +352,7 @@ mod tests {
 
     fn session() -> Session {
         let (library, _) = Library::parse(
-            r#"{"patterns":[{"name":"p","tracks":[{"name":"BASS","useSoftSynth":true,"synthSoundKey":"b"}]}]}"#,
+            r#"{"patterns":[{"name":"p","tracks":[{"name":"BASS","useSoftSynth":true,"synthPreset":"b"}]}]}"#,
         )
         .unwrap();
         let mut s = Session::new(library, KitSet::empty(), Vec::new());

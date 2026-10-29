@@ -24,10 +24,10 @@ json_record! {
         /// Fires once every `every` passes of the pattern (not every N steps).
         every: i32 = 1 => "every",
         /// Trigger probability, 0–1.
-        probability: f64 = 1.0 => "prob",
+        probability: f64 = 1.0 => "probability" | "prob",
         /// Ghost/retrigger spacing code: `< 8` is `rate / 8` step, `>= 8` is
         /// `rate - 7` steps. 1 is the tightest, not "normal".
-        retrigger_rate: f64 = 1.0 => "rate",
+        retrigger_rate: f64 = 1.0 => "retriggerRate" | "rate",
         /// Hits: the note plus its repeats (with an arpeggio, the arp notes).
         retrigger_count: i32 = 1 => "retriggerCount",
         /// Arpeggio as written in the file: interval array, `"0,4,7"`, a mode
@@ -37,15 +37,15 @@ json_record! {
         /// Probability of each arpeggio/retrigger hit, 0–1.
         arp_trigger_probability: f64 = 1.0 => "arpTriggerProbability",
         /// Euclidean pulses over the span to the next note, base note included (0 = off).
-        euclidean_pulses: i32 = 0 => "euclideanFill",
+        euclidean_pulses: i32 = 0 => "euclideanPulses" | "euclideanFill",
         /// Rotation of the euclidean pattern, in steps.
         euclidean_rotation: i32 = 0 => "euclideanRotation",
         /// Phase in the `every` cycle: fires on the pass where `(pass + pos) % every == 0`.
-        every_offset: i32 = 0 => "pos",
+        every_offset: i32 = 0 => "everyOffset" | "pos",
         /// Arpeggio scale picked in the note editor.
-        arp_scale: Option<String> = None => "_arpScale",
+        arp_scale: Option<String> = None => "arpScale" | "_arpScale",
         /// Arpeggio direction picked in the note editor.
-        arp_direction: Option<String> = None => "_arpType",
+        arp_direction: Option<String> = None => "arpDirection" | "_arpType",
     }
     other_fields {
         /// Position in the beat, percent (`stepPercent`): never saved, kept
@@ -56,7 +56,7 @@ json_record! {
 }
 
 /// Keys written rounded to 2 decimals (`NOTE_ROUND_2D`).
-const ROUND_2D: [&str; 4] = ["velocity", "pan", "prob", "rate"];
+const ROUND_2D: [&str; 4] = ["velocity", "pan", "probability", "retriggerRate"];
 
 impl Note {
     /// A note from its object form (`{"beat": 1, "velocity": 0.5}`). Unknown
@@ -97,7 +97,7 @@ impl Note {
 
 /// Decode a track's notes: compact arrays named by `note_keys`, or objects.
 ///
-/// Header rule: distinct known keys, **in any order**. The JS loader also
+/// Header rule: distinct known keys (current or legacy), **in any order**. The JS loader also
 /// requires `NOTE_KEY_ORDER` order and otherwise keeps the raw arrays, which
 /// its exporter then writes back as garbage (`[[null]]`). The positional decode
 /// is unambiguous as long as each key is known and appears once.
@@ -137,16 +137,17 @@ fn parse_header(keys: &Value, at: &str, issues: &mut Vec<Issue>) -> Option<Vec<S
     };
     let mut header: Vec<String> = Vec::with_capacity(items.len());
     for item in items {
-        match item.as_str() {
-            Some(key) if !Note::KEYS.contains(&key) => {
+        match item.as_str().map(|key| (key, Note::canonical_key(key))) {
+            Some((key, None)) => {
                 issues.push(Issue::new(at, format!("unknown note key {key:?}, compact notes skipped")));
                 return None;
             }
-            Some(key) if header.iter().any(|k| k == key) => {
+            // A legacy key and its current one name the same field.
+            Some((key, Some(field))) if header.iter().any(|k| k == field) => {
                 issues.push(Issue::new(at, format!("duplicate note key {key:?}, compact notes skipped")));
                 return None;
             }
-            Some(key) => header.push(key.to_owned()),
+            Some((_, Some(field))) => header.push(field.to_owned()),
             None => {
                 issues.push(Issue::new(at, "noteKeys holds a non-string, compact notes skipped"));
                 return None;
@@ -214,16 +215,16 @@ mod tests {
                 "pitch",
                 "pan",
                 "every",
-                "prob",
-                "rate",
+                "probability",
+                "retriggerRate",
                 "retriggerCount",
                 "arp",
                 "arpTriggerProbability",
-                "euclideanFill",
+                "euclideanPulses",
                 "euclideanRotation",
-                "pos",
-                "_arpScale",
-                "_arpType",
+                "everyOffset",
+                "arpScale",
+                "arpDirection",
             ]
         );
     }
@@ -251,6 +252,32 @@ mod tests {
         assert_eq!(issues[0].message, "unknown note key \"steppc\", compact notes skipped");
         let (notes, _) = decode("[[1, 2]]", Some(r#"["beat","beat"]"#));
         assert!(notes.is_empty());
+        // A legacy key and its current one name the same field.
+        let (notes, _) = decode("[[0.5, 0.2]]", Some(r#"["prob","probability"]"#));
+        assert!(notes.is_empty());
+    }
+
+    #[test]
+    fn reads_the_legacy_key_names() {
+        let (notes, issues) = decode(
+            r#"[[0.5, 4, 3, 2, "up"], {"rate": 2}]"#,
+            Some(r#"["prob","rate","euclideanFill","pos","_arpType"]"#),
+        );
+        assert!(issues.is_empty());
+        let expected = Note {
+            probability: 0.5,
+            retrigger_rate: 4.0,
+            euclidean_pulses: 3,
+            every_offset: 2,
+            arp_direction: Some("up".into()),
+            ..Note::default()
+        };
+        assert_eq!(notes[0], expected);
+        assert_eq!(notes[1].retrigger_rate, 2.0);
+        assert_eq!(
+            encode(&notes[..1]),
+            r#"["probability","retriggerRate","euclideanPulses","everyOffset","arpDirection"] [[0.5,4,3,2,"up"]]"#
+        );
     }
 
     #[test]
@@ -278,7 +305,7 @@ mod tests {
         ];
         assert_eq!(
             encode(&notes),
-            r#"["velocity","beat","beatStep","pitch","prob","arp"] [[0.81,1,1],[0.8,3,1,-2.5,0.33,"0,4,7"],[]]"#
+            r#"["velocity","beat","beatStep","pitch","probability","arp"] [[0.81,1,1],[0.8,3,1,-2.5,0.33,"0,4,7"],[]]"#
         );
     }
 
