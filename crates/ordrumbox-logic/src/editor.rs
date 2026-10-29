@@ -99,6 +99,8 @@ pub struct Editor {
     started: Instant,
     /// Fixed time for tests, ms.
     clock: Option<f64>,
+    /// Inside [`Editor::batch`]: edits are not recorded one by one.
+    batching: bool,
 }
 
 impl Editor {
@@ -110,6 +112,7 @@ impl Editor {
             revision: 0,
             started: Instant::now(),
             clock: None,
+            batching: false,
         }
     }
 
@@ -133,6 +136,37 @@ impl Editor {
 
     fn now(&self) -> f64 {
         self.clock.unwrap_or_else(|| self.started.elapsed().as_secs_f64() * 1000.0)
+    }
+
+    /// Record `change` as an undo step, unless a batch is under way (it
+    /// records one step for all its edits at its end).
+    fn record(&mut self, desc: String, change: Change, coalesce: Option<String>) {
+        if !self.batching {
+            let now = self.now();
+            self.history.record(desc, change, coalesce, now);
+        }
+    }
+
+    /// Run `edits` as one undo step named `desc`, whatever edits it makes;
+    /// none when they changed nothing. A batch inside a batch is part of it.
+    pub fn batch<R>(&mut self, desc: &str, edits: impl FnOnce(&mut Self) -> R) -> R {
+        if self.batching {
+            return edits(self);
+        }
+        let before = Box::new(self.library.clone());
+        let selected_before = self.selected_song;
+        self.batching = true;
+        let result = edits(self);
+        self.batching = false;
+        if *before != self.library {
+            let change = Change::Library {
+                before,
+                after: Box::new(self.library.clone()),
+                select: (selected_before, self.selected_song),
+            };
+            self.record(desc.to_owned(), change, None);
+        }
+        result
     }
 
     /// Undo the last step; what it did.
@@ -163,8 +197,8 @@ impl Editor {
         let after = &self.library.patterns[p];
         if *after != before {
             let change = Change::Pattern { index: p, before: Box::new(before), after: Box::new(after.clone()) };
-            let now = self.now();
-            self.history.record(desc(after), change, coalesce, now);
+            let desc = desc(after);
+            self.record(desc, change, coalesce);
             self.revision += 1;
         }
         Some(result)
@@ -189,8 +223,7 @@ impl Editor {
         let result = edit(&mut self.library.patterns);
         if self.library.patterns != before {
             let change = Change::Patterns { before, after: self.library.patterns.clone() };
-            let now = self.now();
-            self.history.record(desc, change, None, now);
+            self.record(desc, change, None);
             self.revision += 1;
         }
         result
@@ -636,6 +669,18 @@ impl Editor {
         .is_some()
     }
 
+    /// Tags (trimmed, empty ones left out).
+    pub fn set_pattern_tags(&mut self, p: usize, tags: &[String]) -> bool {
+        let tags: Vec<String> = tags.iter().map(|t| t.trim().to_owned()).filter(|t| !t.is_empty()).collect();
+        self.edit(
+            p,
+            |pattern| format!("Set tags on \"{}\"", pattern_name(pattern)),
+            None,
+            |pattern| pattern.tags = tags,
+        )
+        .is_some()
+    }
+
     pub fn set_pattern_description(&mut self, p: usize, description: &str) -> bool {
         self.edit(
             p,
@@ -1005,5 +1050,46 @@ mod tests {
         e.undo();
         assert_eq!(e.library().patterns.len(), 1);
         assert_eq!(e.import_midi("x.mid", b"nothing", &[]), Err("No MIDI notes found in file".into()));
+    }
+
+    #[test]
+    fn a_batch_is_one_undo_step() {
+        let mut e = editor();
+        e.add_note(0, 0, 3, 0, 0.0);
+        let before = e.library().clone();
+        let added = e.batch("Remote edit", |e| {
+            let t = e.add_track(0, "HH", 4).unwrap();
+            e.add_note(0, t, 0, 1, 0.0);
+            e.set_pattern_bpm(0, 140.0, false);
+            e.add_song("verse");
+            e.batch("inner", |e| e.set_pattern_tags(0, &[" rock ".into(), " ".into()]));
+            t
+        });
+        assert_eq!(added, 2);
+        assert_eq!(e.history().undo_len(), 2);
+        assert_eq!(e.history().next_undo(), Some("Remote edit"));
+        assert_eq!(pattern(&e).tags, ["rock"]);
+        assert_eq!(e.selected_song(), 0);
+        let after = e.library().clone();
+        e.undo();
+        assert_eq!(e.library(), &before);
+        e.redo();
+        assert_eq!(e.library(), &after);
+        // A batch that changes nothing records nothing.
+        e.batch("nothing", |e| e.set_pattern_bpm(0, 140.0, false));
+        assert_eq!(e.history().undo_len(), 2);
+    }
+
+    #[test]
+    fn song_settings() {
+        let mut e = editor();
+        assert!(e.set_song_settings(None, Some(90.0), None, None).is_err());
+        e.add_song("verse");
+        e.set_song_settings(None, Some(500.0), Some("intro"), Some(8.0)).unwrap();
+        let song = &e.library().songs[0];
+        assert_eq!((song.bpm, song.description.as_str(), song.loop_measures), (300.0, "intro", Some(8.0)));
+        e.set_song_settings(Some(0), None, None, Some(0.0)).unwrap();
+        assert_eq!(e.library().songs[0].loop_measures, None);
+        assert_eq!(e.library().songs[0].bpm, 300.0);
     }
 }

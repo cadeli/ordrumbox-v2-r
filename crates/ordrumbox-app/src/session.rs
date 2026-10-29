@@ -29,6 +29,7 @@ use crate::canvas::Canvas;
 use crate::editors::EditorState;
 use crate::frame;
 use crate::kits::KitSet;
+use crate::mcp_link;
 use crate::menu::{self, Command, MenuState};
 use crate::panel::{Dropdown, Entry, Id};
 use crate::picker::{self, Outcome, Picker, PickerLayout, Purpose};
@@ -41,6 +42,8 @@ mod session_grid;
 #[cfg(test)]
 #[path = "session_library_file.rs"]
 mod session_library_file;
+#[path = "session_mcp.rs"]
+mod session_mcp;
 #[path = "session_output.rs"]
 mod session_output;
 #[path = "session_panel.rs"]
@@ -215,6 +218,8 @@ pub struct Session {
     update_check: Option<update::Check>,
     newer_release: Option<update::Release>,
     update_waker: Option<update::Waker>,
+    /// The MCP link (`mcp_link.rs`): the calls of `ordrumbox --mcp`.
+    mcp: Option<mcp_link::Server>,
     /// The output panel's tab: Vol, Comp, Flt.
     output_tab: u8,
     /// The synth editor: the preset edited, the tab, presets not saved yet.
@@ -480,6 +485,7 @@ impl Session {
             update_check: None,
             newer_release: None,
             update_waker: None,
+            mcp: None,
             output_tab: 0,
             synth: None,
             synth_tab: 0,
@@ -630,22 +636,25 @@ impl Session {
     /// Ctrl+S: the pattern as `Exporter.export()`
     /// writes it, to `ordrumbox-<name>.json` in the exports folder.
     pub fn export_pattern_json(&mut self) {
-        let Some(dir) = store::exports_dir() else {
-            self.message = "no user data folder to export to".into();
-            return;
+        self.message = match self.write_pattern_json(self.pattern_index) {
+            Ok(path) => format!(
+                "Pattern \"{}\" exported to {}",
+                self.pattern().and_then(|p| p.name.as_deref()).unwrap_or("pattern"),
+                path.display()
+            ),
+            Err(e) => e,
         };
-        let Some(pattern) = self.pattern() else {
-            self.message = "No pattern selected".into();
-            return;
-        };
+    }
+
+    /// Pattern `p` as JSON in the exports folder (`ordrumbox-<name>.json`); the file.
+    pub(super) fn write_pattern_json(&self, p: usize) -> Result<PathBuf, String> {
+        let dir = store::exports_dir().ok_or("no user data folder to export to")?;
+        let pattern = self.editor.library().patterns.get(p).ok_or("No pattern selected")?;
         let name = pattern.name.as_deref().unwrap_or("pattern");
         let path = dir.join(format!("ordrumbox-{}.json", store::safe_name(name)));
         let text = pattern.to_json().to_json_pretty(2) + "\n";
-        let result = store::write_atomic(&path, text);
-        self.message = match result {
-            Ok(()) => format!("Pattern \"{name}\" exported to {}", path.display()),
-            Err(e) => format!("not exported: {}: {e}", path.display()),
-        };
+        store::write_atomic(&path, text).map_err(|e| format!("not exported: {}: {e}", path.display()))?;
+        Ok(path)
     }
 
     /// A MIDI file dropped on the window (or given on the command line):
@@ -674,17 +683,23 @@ impl Session {
     pub fn step_pattern(&mut self, delta: isize) {
         let count = self.editor.library().patterns.len();
         if count > 0 {
-            self.pattern_index = (self.pattern_index as isize + delta).rem_euclid(count as isize) as usize;
-            self.deselect();
-            self.message = format!("pattern {}", self.pattern().and_then(|p| p.name.as_deref()).unwrap_or_default());
-            // In pattern mode, switch to the new pattern on the current pass
-            // (when playing) instead of waiting for the next loop.
-            if let Some(controller) = &mut self.controller
-                && let Mode::Pattern(_) = controller.mode()
-            {
-                controller.select_pattern(self.pattern_index);
-                controller.refresh(self.editor.library());
-            }
+            self.show_pattern((self.pattern_index as isize + delta).rem_euclid(count as isize) as usize);
+        }
+    }
+
+    /// Show pattern `index` (it must exist), and play it if a pattern plays.
+    pub(super) fn show_pattern(&mut self, index: usize) {
+        self.pattern_index = index;
+        self.deselect();
+        self.current_page = 0;
+        self.message = format!("pattern {}", self.pattern().and_then(|p| p.name.as_deref()).unwrap_or_default());
+        // In pattern mode, switch to the new pattern on the current pass
+        // (when playing) instead of waiting for the next loop.
+        if let Some(controller) = &mut self.controller
+            && let Mode::Pattern(_) = controller.mode()
+        {
+            controller.select_pattern(self.pattern_index);
+            controller.refresh(self.editor.library());
         }
     }
 

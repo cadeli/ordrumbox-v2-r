@@ -37,6 +37,10 @@ tools/            scripts that regenerate the golden fixtures
   on a thread of its own, never on the UI or audio thread; it only tells,
   never downloads. A release is a `v<version>` tag matching `Cargo.toml`
   (`README.md`, "Commands").
+- The MCP link (`ordrumbox-app/src/mcp_link.rs`) listens on `127.0.0.1`
+  only, on threads of its own; the tool calls run on the UI thread between
+  frames (`session_mcp.rs`), each one undo step. `ordrumbox --mcp` is the
+  stdio bridge an MCP client starts (`README.md`, "AI clients").
 - Dependencies only point down the table. Nothing depends on
   `ordrumbox-app`; `dsp` uses `core` only as a dev-dependency.
 - Workspace lints (`Cargo.toml`): `unsafe_code = "forbid"`,

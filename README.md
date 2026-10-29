@@ -270,6 +270,34 @@ the app. **Help › Check for updates** checks now. `settings.json` keeps it
 under `updates`: `"check": false` stops the check at start, `lastCheck` is
 when it last ran (seconds since 1970).
 
+AI clients (MCP): an MCP client (Claude Desktop, Claude Code, Cursor…) can
+drive the running app, as the JS app's `ordrumboxMcpserver.mjs` did its
+files. The client starts `ordrumbox --mcp`, which speaks the Model Context
+Protocol on its standard input and output and passes each tool call to the
+window: the edit is shown at once, is one step of **Edit › Undo**, and is
+saved with the library. The window listens on `127.0.0.1` only, on a port
+it picks at start and writes to `mcp.json` in the user data folder with a
+token a connection must give; with the window closed, a call answers that
+orDrumbox is not running. In the client's settings (the path is the
+program's, `ordrumbox.exe` on Windows):
+
+```json
+{ "mcpServers": { "ordrumbox": { "command": "/path/to/ordrumbox", "args": ["--mcp"] } } }
+```
+
+The tools keep the JS names: `listPatterns`, `loadPattern`,
+`createNewPattern`, `selectPattern` (shows it in the window),
+`addNotesToPattern`, `updateTrack`, `setPatternBpm`, `setPatternBeatCount`,
+`setPatternTags`, `setPatternDescription`, `savePatternToJson` (to
+`exports/`), `listAllInstrumentsNames`, `listKitSamples`, `analyzeSamples`,
+`listArrangements`, `createArrangement`, `addPatternToArrangement`,
+`removePatternFromArrangement`; and for the live app `selectKit`, `play`,
+`stop`, `undo`. `setColorScheme` is gone: this app has one theme. Track and
+note settings take the key names of the files (`volume`, `transpose`,
+`cycle`, `probability`…; the JS names are read too), and a value outside its
+range is refused (notes) or brought inside it, the answer saying the value
+used (tracks, tempo).
+
 Commands ending in "..." (import a MIDI file or a song, add or replace a
 sample, import a folder as a kit, load a kit mapping) open the built-in file picker: **↑↓**,
 **PageUp/PageDown**, **Home/End** or the mouse wheel to move, a letter to jump,

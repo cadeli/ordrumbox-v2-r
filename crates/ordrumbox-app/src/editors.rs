@@ -216,6 +216,18 @@ pub const NOTE_GROUPS: [&[NoteRow]; 4] = [
     ],
 ];
 
+/// The range of a note setting in the note editor. Not the pitch: the knob
+/// spans two octaves, the piano roll more.
+pub fn note_range(key: &str) -> Option<(f64, f64)> {
+    let knobs = NOTE_KNOBS.iter().map(|(prop, _)| prop);
+    let sliders = NOTE_GROUPS.iter().flat_map(|rows| rows.iter()).filter_map(|row| match row {
+        NoteRow::Slider(prop) => Some(prop),
+        NoteRow::Select(..) => None,
+    });
+    let prop = knobs.chain(sliders).find(|prop| prop.key == key && key != "pitch")?;
+    Some((prop.min, prop.max))
+}
+
 pub const ARP_DIRECTIONS: [&str; 4] = ["up", "down", "updown", "random"];
 
 /// Kit editor knobs: field, label, range, step, format, unit, default.

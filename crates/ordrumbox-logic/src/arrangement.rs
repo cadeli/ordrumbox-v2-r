@@ -8,7 +8,7 @@
 //! its last clip, so the grid and the playback never show
 //! or play measures nothing is placed on.
 
-use ordrumbox_core::song::{DEFAULT_BPM, measures_for_pattern};
+use ordrumbox_core::song::{DEFAULT_BPM, clamp_bpm, measures_for_pattern};
 use ordrumbox_core::{Song, SongClip};
 
 use super::*;
@@ -80,8 +80,7 @@ impl Editor {
         let result = edit(&mut self.library.songs);
         if self.library.songs != before {
             let change = Change::Songs { before, after: self.library.songs.clone(), select };
-            let now = self.now();
-            self.history.record(desc, change, None, now);
+            self.record(desc, change, None);
             self.revision += 1;
         }
         result
@@ -223,6 +222,33 @@ impl Editor {
         index
     }
 
+    /// Set the tempo (brought inside the tempo bounds), the description and the
+    /// loop length (0: the arrangement loops at the end of its last clip) of
+    /// arrangement `song`, else the selected one; what is `None` stays.
+    pub fn set_song_settings(
+        &mut self,
+        song: Option<usize>,
+        bpm: Option<f64>,
+        description: Option<&str>,
+        loop_measures: Option<f64>,
+    ) -> Result<(), String> {
+        let s = self.require_song(song)?;
+        let desc = format!("Set \"{}\"", self.library.songs[s].name);
+        self.edit_songs(desc, None, |songs| {
+            let song = &mut songs[s];
+            if let Some(bpm) = bpm.filter(|b| b.is_finite()) {
+                song.bpm = clamp_bpm(bpm);
+            }
+            if let Some(description) = description {
+                description.clone_into(&mut song.description);
+            }
+            if let Some(count) = loop_measures.filter(|c| c.is_finite()) {
+                song.loop_measures = (count > 0.0).then_some(count);
+            }
+        });
+        Ok(())
+    }
+
     /// Replace the whole library (`applyToAppState`: a song loaded or
     /// imported), arrangement `selected_song` selected (clamped); one undo step.
     pub fn load_library(&mut self, library: Library, selected_song: usize) {
@@ -231,8 +257,7 @@ impl Editor {
         self.set_selected_song(selected_song);
         let change =
             Change::Library { before, after: Box::new(self.library.clone()), select: (previous, self.selected_song) };
-        let now = self.now();
-        self.history.record("Load song".to_owned(), change, None, now);
+        self.record("Load song".to_owned(), change, None);
         self.revision += 1;
     }
 
