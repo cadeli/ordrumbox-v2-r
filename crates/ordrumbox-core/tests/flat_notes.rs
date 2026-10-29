@@ -6,6 +6,8 @@
 //! streams: Rust must give exactly those notes, in the same order. The other
 //! passes depend on chance; they are checked by properties.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
+
 use std::fs;
 use std::path::{Path, PathBuf};
 

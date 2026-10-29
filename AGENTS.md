@@ -75,6 +75,11 @@ tools/            scripts that regenerate the golden fixtures
   input is refused with a message.
 - `expect`/`unwrap` only for invariants (a built-in constant that must parse,
   covered by a test), never on files or user input.
+- Clippy checks these rules (`unwrap_used`, `expect_used`, `print_stderr`,
+  `let_underscore_must_use` in `Cargo.toml`). An invariant is marked where it
+  is, `#[expect(clippy::expect_used, reason = "…")]` on its function. Tests are
+  exempt: `clippy.toml` for `#[test]` and `#[cfg(test)]` code, a
+  `#![allow(…)]` at the top of each file in `tests/`.
 
 ## Files
 

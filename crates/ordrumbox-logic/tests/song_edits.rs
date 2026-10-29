@@ -5,6 +5,8 @@
 //! command returned, the selected arrangement and every arrangement must
 //! match. Also `songMeasureAtTick()`.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
+
 use std::collections::HashSet;
 use std::path::Path;
 

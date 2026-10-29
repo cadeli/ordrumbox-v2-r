@@ -2,6 +2,8 @@
 //! written by `tools/export_gen_fixtures.mjs`): with the same random stream,
 //! the same notes, the same track settings and the same number of draws.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
+
 use ordrumbox_core::drum_taxonomy::InstrumentFamily;
 use ordrumbox_core::json::{self, Object, Value};
 use ordrumbox_core::{Note, Pattern, Scales, Track};

@@ -30,6 +30,7 @@ pub use structure::{SectionElement, Structure};
 pub type Random<'a> = &'a mut dyn FnMut() -> f64;
 
 /// The tables of `data/generators.json` (parsed once).
+#[expect(clippy::expect_used, reason = "a file built in, read by the tests")]
 pub(crate) fn tables() -> &'static Value {
     static TABLES: OnceLock<Value> = OnceLock::new();
     TABLES.get_or_init(|| json::parse(include_str!("../../data/generators.json")).expect("data/generators.json parses"))

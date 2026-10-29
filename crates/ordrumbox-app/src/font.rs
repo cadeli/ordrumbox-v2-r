@@ -93,6 +93,7 @@ pub fn load() -> Result<(), String> {
 
 /// The font; `main` loads it first and stops when there is none, so a
 /// failure here (a test machine without one) is a broken setup.
+#[expect(clippy::expect_used, reason = "`main` stops before drawing when there is no font")]
 fn loaded() -> &'static Loaded {
     if FONT.get().is_none() {
         load().expect("a system monospace font");

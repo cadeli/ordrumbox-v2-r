@@ -353,7 +353,9 @@ mod tests {
     #[test]
     fn browses_and_picks() {
         let dir = std::env::temp_dir().join(format!("ordrumbox-picker-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&dir);
+        if dir.exists() {
+            fs::remove_dir_all(&dir).unwrap();
+        }
         fs::create_dir_all(dir.join("Beats")).unwrap();
         fs::create_dir_all(dir.join("alpha")).unwrap();
         for name in ["b.mid", "A.MID", "notes.txt", ".hidden.mid"] {

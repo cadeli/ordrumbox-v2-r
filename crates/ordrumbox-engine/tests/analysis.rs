@@ -1,6 +1,8 @@
 //! The kit editor's sample analysis against the JS Analyzer
 //! (`tests/fixtures/analysis.json`, written by `tools/export_kit_fixtures.mjs`).
 
+#![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
+
 use ordrumbox_core::json::{self, Value};
 use ordrumbox_engine::analysis::analyze;
 use ordrumbox_engine::wav;

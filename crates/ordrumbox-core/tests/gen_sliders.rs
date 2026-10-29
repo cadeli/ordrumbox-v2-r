@@ -6,6 +6,8 @@
 //! rolled many times, and a one-sided invariant is checked against the
 //! written notes: at 0 the effect never appears, at 100 it appears at least once.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
+
 use ordrumbox_core::{Hit, Library, Note, Pattern, Rng, Scales, Track, expand_hits};
 
 const GATES: [&str; 9] = [

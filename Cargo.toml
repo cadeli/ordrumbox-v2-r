@@ -30,6 +30,14 @@ missing_debug_implementations = "warn"
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
 float_cmp = "allow"
+# AGENTS.md, "Errors": `expect` and `unwrap` only for invariants (allowed
+# where they are, with the reason; tests are free: clippy.toml); no report
+# on stderr, which the Windows build has no console for; no `let _ =` on a
+# value that must be used.
+unwrap_used = "warn"
+expect_used = "warn"
+print_stderr = "warn"
+let_underscore_must_use = "warn"
 
 [profile.dev]
 opt-level = 1

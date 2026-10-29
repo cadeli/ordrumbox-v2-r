@@ -5,6 +5,8 @@
 //! Compared as JSON values with key order ignored: the JS exporter follows the
 //! accidental key order of each object, Rust writes a fixed order.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
+
 use std::fs;
 use std::path::{Path, PathBuf};
 

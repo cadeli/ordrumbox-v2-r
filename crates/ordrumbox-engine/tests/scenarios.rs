@@ -6,6 +6,8 @@
 //! The JS tests judge the audio of a headless browser with tolerances; here
 //! the renders are deterministic, so most comparisons are exact.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
+
 use std::path::Path;
 use std::sync::Arc;
 

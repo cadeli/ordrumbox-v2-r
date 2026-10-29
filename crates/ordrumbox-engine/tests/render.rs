@@ -1,6 +1,8 @@
 //! The demo library through the whole chain: a real kit sample (kick.wav,
 //! 24-bit mono 44.1 kHz from ordrumbox-v2), passes at 48 kHz, offline render.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
+
 use std::path::Path;
 use std::sync::Arc;
 
