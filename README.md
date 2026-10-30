@@ -147,17 +147,20 @@ A list opens on a click (or **Enter**): arrows, a letter to jump, the wheel,
 
 Song panel (**F3**, **View › Song** or **Song › Song view**, the JS song
 view; **Esc** goes back to the grid): in the place of the grid, the
-library's patterns on the left, the selected arrangement in the middle — a
-ruler of measures, one row per pattern it uses (named on the left; a pattern
-gone from the library keeps its row, in red), each clip a bar over its
-measures — and on the right the song's name and description (a click edits
-them), its date, the arrangement list, and **Save**, **Load**, **Save as**,
-**Export**, **Import**. A click on the ruler aims the cursor, where the song plays from
+selected arrangement across the whole width — a ruler of measures, one row
+per pattern it uses (named on the left; a pattern gone from the library keeps
+its row, in red), each clip a bar over its measures — and under it the
+library's patterns on the left and on the right the song's name and
+description (a click edits them), its date, the arrangement list, and
+**Save**, **Load**, **Save as**, **Export**, **Import**. A click on the ruler aims the cursor, where the song plays from
 (**←→** move it a measure; while playing, it jumps there at once); while the
 panel is shown **Space** plays the song. Right-click a pattern of the list
 or a row's name: add it at the playhead (stopped: the cursor), or remove its
 row; a clip: **Next** (the same clip right after it) or **Delete**; the bare
-grid: add the row's pattern there. A click on a pattern selects it, a
+grid: add the row's pattern there. Drag a pattern of the list onto the
+arrangement to add it at that measure, on its own row; drag a clip sideways to
+move it, whole measures at a time (the wheel scrolls during the drag; the grid
+shows a page past the end to drop on). A click on a pattern selects it, a
 double-click renames it (**↑↓** step through them). The wheel scrolls the
 measures (**Shift**: the rows); while the song plays the grid follows it page
 by page. Every edit is an undo step, and moves the loop onto the end of the
@@ -262,7 +265,9 @@ kit editor) show a box. Every command that reads or writes a file (songs,
 MIDI, WAV, samples, kit folders and mappings) is in **File**. Click a title, or press **F10** or **Alt** alone, then
 **←→** between menus, **↑↓** between items, **Enter** to run, **Esc** to
 close. **Help › Keyboard shortcuts** (**F1**) lists every key; **Help › About**
-shows the version and the folders in use.
+shows the version and the folders in use. A click on the status line (under
+the controls) lists what was done since the app started, newest first; the
+wheel, the arrows, **Page Up/Down** and **Home/End** scroll it.
 
 Updates: at start, at most once a day, the app asks GitHub for the latest
 release of this repository (with the system's `curl`, in Windows 10 and

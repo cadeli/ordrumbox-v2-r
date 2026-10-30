@@ -23,6 +23,11 @@ pub fn status_line(scale: i32) -> i32 {
     content_top(scale) + controls_height(scale) + 4 * scale
 }
 
+/// `y` is on the header's second line.
+pub fn on_status_line(y: i32, scale: i32) -> bool {
+    (status_line(scale)..status_line(scale) + 10 * scale).contains(&y)
+}
+
 /// Top of what is under the header (the grid, the kit editor, the song panel).
 pub fn body_top(scale: i32) -> i32 {
     status_line(scale) + 10 * scale + margin(scale) / 2

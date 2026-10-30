@@ -127,6 +127,21 @@ impl Editor {
         true
     }
 
+    /// Move clip `index` to start at measure `start`; whether it moved.
+    pub fn move_song_clip(&mut self, song: Option<usize>, index: usize, start: u32) -> bool {
+        let Some(s) = self.song_index(song) else { return false };
+        let Some(clip) = self.library.songs[s].clips.get(index) else { return false };
+        if clip.start_measure == start {
+            return false;
+        }
+        let desc = format!("Move \"{}\" to measure {}", clip.pattern_id, u64::from(start) + 1);
+        self.edit_songs(desc, None, |songs| {
+            songs[s].clips[index].start_measure = start;
+            follow_content(&mut songs[s]);
+        });
+        true
+    }
+
     /// Place a pattern (an id or a name) at `start` (0-based measure), for
     /// `measure_count` measures, else the pattern's own length
     ///; the clip added.
