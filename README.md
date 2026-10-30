@@ -79,6 +79,12 @@ one picked, at first `exports/` next to `library.json` if it exists, else the
 home folder; **Enter** on `[ Use this folder ]` writes there. A file of the same
 name is replaced only once confirmed.
 
+What removes or replaces work asks first (**Enter** goes on, **Esc** or a click
+cancels): deleting a track, a clip, a row, an arrangement, a kit's sample or a
+synth preset; clearing a track or a step of several notes; random notes over a
+track's notes; compacting tracks; loading or importing a song. A single note goes
+at once. While a question is open, the MCP tools are refused.
+
 Generation (the JS generators, same variants and same choices): **B** makes a
 new pattern from a random genre's template (tracks, lines, key, scale);
 **D**, **S**, **A** are the ↻ Drum, ↻ Bass and ↻ Chords buttons — new lines

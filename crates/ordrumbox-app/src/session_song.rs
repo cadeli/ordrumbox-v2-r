@@ -111,7 +111,7 @@ impl Session {
         }
     }
 
-    fn song(&self) -> Option<&Song> {
+    pub(super) fn song(&self) -> Option<&Song> {
         self.editor.library().songs.get(self.editor.selected_song())
     }
 
@@ -266,7 +266,13 @@ impl Session {
                     text: String::new(),
                 });
             }
-            "delete" => self.remove_song(),
+            "delete" => {
+                if self.song().is_some() {
+                    self.ask(Pending::RemoveSong);
+                } else {
+                    self.message = "no arrangement to remove".into();
+                }
+            }
             _ => {}
         }
     }
@@ -354,7 +360,7 @@ impl Session {
         self.edited();
     }
 
-    fn remove_song(&mut self) {
+    pub(super) fn remove_song(&mut self) {
         if self.song_playing()
             && let Some(controller) = &mut self.controller
         {
@@ -629,7 +635,7 @@ impl Session {
     }
 
     /// The name a clip's pattern is shown by (its id when it is gone).
-    fn pattern_label(&self, id: &str) -> String {
+    pub(super) fn pattern_label(&self, id: &str) -> String {
         self.editor.library().pattern(id).and_then(|p| p.name.clone()).unwrap_or_else(|| id.to_owned())
     }
 
@@ -654,22 +660,36 @@ impl Session {
                 })
             }
             ("delete", None) => {
-                let Some((c, clip)) =
-                    a.parse().ok().and_then(|c: usize| Some((c, self.song()?.clips.get(c).cloned()?)))
-                else {
-                    return;
-                };
-                let label = self.pattern_label(&clip.pattern_id);
-                self.editor.remove_song_clips(None, &[c]);
-                Ok(format!("Removed \"{label}\" at measure {}", clip.start_measure + 1))
+                if let Some(c) = a.parse().ok().filter(|&c: &usize| self.song().is_some_and(|s| c < s.clips.len())) {
+                    self.ask(Pending::RemoveClip(c));
+                }
+                return;
             }
-            ("row", None) => {
-                let label = self.pattern_label(a);
-                self.editor.remove_pattern_clips(a, None).map(|_| format!("Removed \"{label}\" from the arrangement"))
-            }
-            ("load", None) => return self.load_song_file(Path::new(a)),
+            ("row", None) => return self.ask(Pending::RemoveRow(a.to_owned())),
+            ("load", None) => return self.ask(Pending::LoadSong(PathBuf::from(a))),
             _ => return,
         };
+        self.song_edit_result(result);
+    }
+
+    /// Remove clip `c` of the arrangement.
+    pub(super) fn remove_clip(&mut self, c: usize) {
+        let Some(clip) = self.song().and_then(|song| song.clips.get(c).cloned()) else { return };
+        let label = self.pattern_label(&clip.pattern_id);
+        self.editor.remove_song_clips(None, &[c]);
+        self.song_edit_result(Ok(format!("Removed \"{label}\" at measure {}", clip.start_measure + 1)));
+    }
+
+    /// Remove every clip of pattern `id` from the arrangement.
+    pub(super) fn remove_row(&mut self, id: &str) {
+        let label = self.pattern_label(id);
+        let result =
+            self.editor.remove_pattern_clips(id, None).map(|_| format!("Removed \"{label}\" from the arrangement"));
+        self.song_edit_result(result);
+    }
+
+    /// What an arrangement edit gave: its message, and the edit taken into account.
+    fn song_edit_result(&mut self, result: Result<String, String>) {
         match result {
             Ok(message) => {
                 self.edited();
@@ -760,7 +780,7 @@ impl Session {
     }
 
     /// A saved song chosen in the Load list.
-    fn load_song_file(&mut self, path: &Path) {
+    pub(super) fn load_song_file(&mut self, path: &Path) {
         match self.read_song_file(path) {
             Ok(name) => self.message = format!("Song \"{name}\" loaded"),
             Err(e) => self.message = e,
@@ -769,6 +789,10 @@ impl Session {
 
     /// Import (the file picker), or a `.odbox` dropped on the window.
     pub(super) fn import_song(&mut self, path: &Path) {
+        self.ask(Pending::ImportSong(path.to_path_buf()));
+    }
+
+    pub(super) fn import_song_now(&mut self, path: &Path) {
         match self.read_song_file(path) {
             Ok(name) => self.message = format!("Song \"{name}\" imported"),
             Err(e) => self.message = e,
@@ -889,6 +913,7 @@ mod tests {
         assert!(s.song_click(SIZE, l.grid.x + 2, row_y(0), Button::Right));
         assert_eq!(menu(&s), ["add:1:a", "row:a"]);
         choose(&mut s, 1);
+        s.overlay_key(OverlayKey::Enter);
         assert_eq!(s.message, "Removed \"a\" from the arrangement");
         assert_eq!(clips(&s), [("b".into(), 0, 2.0)]);
         s.undo();
@@ -974,6 +999,7 @@ mod tests {
         assert_eq!((s.editor.selected_song(), s.song().unwrap().name.as_str()), (1, "Second"));
         s.select_song(0);
         s.song_button("delete");
+        s.overlay_key(OverlayKey::Enter);
         assert_eq!(s.editor.library().songs.len(), 1);
         assert_eq!(s.song().unwrap().name, "Second");
         s.undo();
@@ -1072,6 +1098,7 @@ mod tests {
         assert_eq!(s.song_name(), "changed");
         std::fs::write(&path, r#"{"songs":[]}"#).unwrap();
         s.import_song(&path);
+        s.overlay_key(OverlayKey::Enter);
         assert_eq!(s.message, "Invalid song file");
         std::fs::remove_dir_all(dir).unwrap();
     }

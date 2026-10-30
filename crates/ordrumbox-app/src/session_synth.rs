@@ -244,6 +244,19 @@ impl Session {
         }
     }
 
+    /// Delete preset `key`; the next one is shown.
+    pub(super) fn remove_synth(&mut self, key: &str) {
+        let keys = self.synth_keys();
+        let list: Vec<&str> = keys.iter().map(String::as_str).collect();
+        let next = model::after_delete(&list, key).map(str::to_owned);
+        self.synths.remove(key);
+        self.synths_changed();
+        if let Some(next) = next {
+            self.load_synth(&next);
+        }
+        self.message = format!("Deleted \"{key}\"");
+    }
+
     /// The preset bar's buttons (`preset_section.js`).
     pub(super) fn synth_button(&mut self, button: &str) {
         match button {
@@ -254,14 +267,7 @@ impl Session {
                     self.message = "Cannot delete the last preset".into();
                     return;
                 }
-                let list: Vec<&str> = keys.iter().map(String::as_str).collect();
-                let next = model::after_delete(&list, &key).map(str::to_owned);
-                self.synths.remove(&key);
-                self.synths_changed();
-                if let Some(next) = next {
-                    self.load_synth(&next);
-                }
-                self.message = format!("Deleted \"{key}\"");
+                self.ask(Pending::RemoveSynth(key));
             }
             "new" => {
                 let keys = self.synth_keys();
@@ -403,6 +409,7 @@ mod tests {
         s.synth_button("duplicate");
         assert_eq!(s.synth_keys(), ["a", "b", "new_preset", "new_preset_copy"]);
         s.synth_button("delete");
+        s.overlay_key(OverlayKey::Enter);
         assert_eq!(s.synth.as_ref().unwrap().key, "new_preset");
         // The power button of the envelope (ENV tab).
         s.synth_activate(Id::SynthTab(3));

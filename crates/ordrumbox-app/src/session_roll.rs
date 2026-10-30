@@ -709,6 +709,7 @@ mod tests {
         s.roll_click(SIZE, layout.keys.x + 4, y, Button::Right);
         assert!(s.dropdown.as_ref().unwrap().title.as_deref().unwrap().ends_with("I-vi-IV-V"));
         choose(&mut s, 0); // Clear all
+        s.overlay_key(OverlayKey::Enter);
         assert!(notes(&s).is_empty());
     }
 }
