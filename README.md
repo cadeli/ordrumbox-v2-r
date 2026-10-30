@@ -572,4 +572,4 @@ node tools/export_song_fixtures.mjs ../ordrumbox-v2
 
 ## License
 
-GPL-3.0-only, like ordrumbox-v2.
+MIT: see `LICENSE`.
