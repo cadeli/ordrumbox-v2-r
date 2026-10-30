@@ -312,11 +312,15 @@ impl KitSet {
         Ok((index, format!("Loaded drumkit \"{name}\"")))
     }
 
-    /// `exportCurrentKit`: kit `kit`'s mapping (no audio) to `dir`.
-    pub fn export_mapping(&self, kit: usize, dir: &Path) -> Result<String, String> {
+    /// The file kit `kit`'s mapping is exported to.
+    pub fn mapping_file_name(&self, kit: usize) -> Option<String> {
+        Some(format!("ordrumbox-drumkit-{}.json", safe_name(&self.kits.get(kit)?.name)))
+    }
+
+    /// `exportCurrentKit`: kit `kit`'s mapping (no audio) to `path`.
+    pub fn export_mapping(&self, kit: usize, path: &Path) -> Result<String, String> {
         let kit = self.kits.get(kit).ok_or("No drumkit selected")?;
-        let path = dir.join(format!("ordrumbox-drumkit-{}.json", safe_name(&kit.name)));
-        store::write_atomic(&path, kit.to_mapping_json().to_json_pretty(2))
+        store::write_atomic(path, kit.to_mapping_json().to_json_pretty(2))
             .map_err(|e| format!("{}: {e}", path.display()))?;
         Ok(format!("Saved drumkit \"{}\" to {}", kit.name, path.display()))
     }
@@ -387,8 +391,9 @@ mod tests {
         assert_eq!(kits.kits[1].samples.len(), 1);
         assert!(kits.remove(1, 0).is_some());
 
-        kits.export_mapping(0, &dir).unwrap();
-        let mapping = dir.join("ordrumbox-drumkit-a.json");
+        let mapping = dir.join(kits.mapping_file_name(0).unwrap());
+        assert!(mapping.ends_with("ordrumbox-drumkit-a.json"));
+        kits.export_mapping(0, &mapping).unwrap();
         kits.kits[0].samples.clear();
         assert_eq!(kits.load_mapping(&mapping).unwrap().0, 0);
         assert_eq!(kits.kits[0].samples.len(), 1);

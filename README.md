@@ -76,8 +76,8 @@ track without a known preset gets a random one.
 WAV exports (16-bit, 44.1 kHz, the pattern once or the whole song, no tail) go
 to the folder picked when exporting. Every export asks for its folder: the last
 one picked, at first `exports/` next to `library.json` if it exists, else the
-home folder; **Enter** on `[ Use this folder ]` writes there, over a file of the
-same name.
+home folder; **Enter** on `[ Use this folder ]` writes there. A file of the same
+name is replaced only once confirmed.
 
 Generation (the JS generators, same variants and same choices): **B** makes a
 new pattern from a random genre's template (tracks, lines, key, scale);

@@ -294,14 +294,13 @@ impl Session {
         }
     }
 
-    /// Export: every preset to `ordrumbox-synth-sounds.json` in `dir`.
-    pub(super) fn export_synths(&mut self, dir: &Path) {
+    /// Export: every preset to `path`.
+    pub(super) fn export_synths(&mut self, path: &Path) {
         if self.synths.is_empty() {
             self.message = NO_SYNTHS.into();
             return;
         }
-        let path = dir.join("ordrumbox-synth-sounds.json");
-        self.message = match store::save_synths(&path, &self.synths) {
+        self.message = match store::save_synths(path, &self.synths) {
             Ok(()) => format!("Synth sounds exported to {}", path.display()),
             Err(e) => format!("Export failed: {}: {e}", path.display()),
         };

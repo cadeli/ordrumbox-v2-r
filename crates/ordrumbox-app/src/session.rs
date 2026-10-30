@@ -81,6 +81,13 @@ const SAVE_DELAY: Duration = Duration::from_secs(1);
 const NOTHING_TO_RENDER: &str = "nothing to render with (no samples loaded)";
 /// Why the synth sounds cannot be exported.
 const NO_SYNTHS: &str = "No synth sounds loaded";
+/// The file the synth sounds are exported to.
+const SYNTHS_FILE_NAME: &str = "ordrumbox-synth-sounds.json";
+
+/// The file a pattern is exported to as JSON (`ordrumbox-<name>.json`).
+fn pattern_json_file_name(pattern: &Pattern) -> String {
+    format!("ordrumbox-{}.json", store::safe_name(pattern.name.as_deref().unwrap_or("pattern")))
+}
 
 /// `beat 2.3`: a cursor position.
 fn beat_label(beat: i32, step: i32) -> String {
@@ -271,6 +278,11 @@ enum Overlay {
     Shortcuts,
     About,
     FactoryReset,
+    /// The file an export would replace, until the user says so.
+    ConfirmOverwrite {
+        export: Export,
+        path: PathBuf,
+    },
 }
 
 /// Every key, for Help > Keyboard shortcuts.
@@ -572,23 +584,22 @@ impl Session {
     }
 
     /// Ctrl+E: the selected pattern (with Shift: the selected song) to a WAV
-    /// file in `dir`.
-    fn export_wav(&mut self, song: bool, dir: &Path) {
+    /// file at `path`.
+    fn export_wav(&mut self, song: bool, path: &Path) {
         let Some(setup) = &self.render else {
             self.message = NOTHING_TO_RENDER.into();
             return;
         };
         let library = self.editor.library();
         let started = Instant::now();
-        let (rendered, name) = if song {
+        let rendered = if song {
             let index = self.editor.selected_song();
-            let Some(s) = library.songs.get(index) else {
+            if library.songs.get(index).is_none() {
                 self.message = "no song in the library".into();
                 return;
-            };
-            (offline::render_song(library, index, setup), format!("song-{}", s.id))
+            }
+            offline::render_song(library, index, setup)
         } else {
-            let Some(p) = library.patterns.get(self.pattern_index) else { return };
             // Tracks in auto mode get their new lines loop after loop, on the render's copy.
             let (scales, mut rng) = (&self.scales, Rng::new(setup.seed));
             let mut loop_start = |library: &mut Library, p: usize, number: u64| {
@@ -596,15 +607,14 @@ impl Session {
                     generate::run_loop(&mut AutoGenerator::new(scales, &mut || rng.next_f64()), pattern, number);
                 }
             };
-            (offline::render_pattern(library, self.pattern_index, 1, setup, Some(&mut loop_start)), p.id.clone())
+            offline::render_pattern(library, self.pattern_index, 1, setup, Some(&mut loop_start))
         };
         let Some((left, right)) = rendered else {
             self.message = "nothing to export (no playable clip)".into();
             return;
         };
-        let path = dir.join(format!("ordrumbox-{name}.wav"));
         let bytes = wav::encode(&left, &right, setup.sample_rate);
-        let result = store::write_atomic(&path, bytes);
+        let result = store::write_atomic(path, bytes);
         self.message = match result {
             Ok(()) => format!(
                 "exported {} ({:.1} s of audio in {:.1} s)",
@@ -616,13 +626,12 @@ impl Session {
         };
     }
 
-    /// Ctrl+M: the selected pattern to a MIDI file in `dir`.
-    fn export_midi(&mut self, dir: &Path) {
+    /// Ctrl+M: the selected pattern to a MIDI file at `path`.
+    fn export_midi(&mut self, path: &Path) {
         let Some(pattern) = self.pattern() else { return };
         let mut rng = Rng::new(1);
         let bytes = midi::export(pattern, 1, &self.roots, &mut rng, &self.scales);
-        let path = dir.join(format!("ordrumbox-{}.mid", pattern.id));
-        let result = store::write_atomic(&path, &bytes);
+        let result = store::write_atomic(path, &bytes);
         self.message = match result {
             Ok(()) => format!("exported {} ({} bytes)", path.display(), bytes.len()),
             Err(e) => format!("not exported: {}: {e}", path.display()),
@@ -630,10 +639,10 @@ impl Session {
     }
 
     /// Ctrl+S: the pattern as `Exporter.export()`
-    /// writes it, to `ordrumbox-<name>.json` in `dir`.
-    fn export_pattern_json(&mut self, dir: &Path) {
-        self.message = match self.write_pattern_json(self.pattern_index, dir) {
-            Ok(path) => format!(
+    /// writes it, to `path`.
+    fn export_pattern_json(&mut self, path: &Path) {
+        self.message = match self.write_pattern_json(self.pattern_index, path) {
+            Ok(()) => format!(
                 "Pattern \"{}\" exported to {}",
                 self.pattern().and_then(|p| p.name.as_deref()).unwrap_or("pattern"),
                 path.display()
@@ -642,14 +651,11 @@ impl Session {
         };
     }
 
-    /// Pattern `p` as JSON in `dir` (`ordrumbox-<name>.json`); the file.
-    pub(super) fn write_pattern_json(&self, p: usize, dir: &Path) -> Result<PathBuf, String> {
+    /// Pattern `p` as JSON at `path`.
+    pub(super) fn write_pattern_json(&self, p: usize, path: &Path) -> Result<(), String> {
         let pattern = self.editor.library().patterns.get(p).ok_or("No pattern selected")?;
-        let name = pattern.name.as_deref().unwrap_or("pattern");
-        let path = dir.join(format!("ordrumbox-{}.json", store::safe_name(name)));
         let text = pattern.to_json().to_json_pretty(2) + "\n";
-        store::write_atomic(&path, text).map_err(|e| format!("not exported: {}: {e}", path.display()))?;
-        Ok(path)
+        store::write_atomic(path, text).map_err(|e| format!("not exported: {}: {e}", path.display()))
     }
 
     /// A MIDI file dropped on the window (or given on the command line):
@@ -978,17 +984,46 @@ impl Session {
         self.overlay = Some(Overlay::Picker(Picker::new(Purpose::Export(export), start.as_deref())));
     }
 
-    /// `export` written to the folder picked.
+    /// The name of the file `export` writes; `None` when what it writes is gone.
+    fn export_file_name(&self, export: Export) -> Option<String> {
+        let library = self.editor.library();
+        let pattern = library.patterns.get(self.pattern_index);
+        Some(match export {
+            Export::PatternWav => format!("ordrumbox-{}.wav", pattern?.id),
+            Export::SongWav => format!("ordrumbox-song-{}.wav", library.songs.get(self.editor.selected_song())?.id),
+            Export::PatternMidi => format!("ordrumbox-{}.mid", pattern?.id),
+            Export::PatternJson => pattern_json_file_name(pattern?),
+            Export::Song | Export::SongSaveAs => self.song_file_name(),
+            Export::Synths => SYNTHS_FILE_NAME.to_owned(),
+            Export::KitMapping => self.kits.mapping_file_name(self.kit_index)?,
+        })
+    }
+
+    /// The folder is picked: write `export` there, once confirmed if that
+    /// replaces a file.
     fn export_to(&mut self, export: Export, dir: &Path) {
+        let Some(name) = self.export_file_name(export) else {
+            self.message = "nothing to export".into();
+            return;
+        };
+        let path = dir.join(name);
+        if path.exists() {
+            self.overlay = Some(Overlay::ConfirmOverwrite { export, path });
+        } else {
+            self.write_export(export, &path);
+        }
+    }
+
+    fn write_export(&mut self, export: Export, path: &Path) {
         match export {
-            Export::PatternWav => self.export_wav(false, dir),
-            Export::SongWav => self.export_wav(true, dir),
-            Export::PatternMidi => self.export_midi(dir),
-            Export::PatternJson => self.export_pattern_json(dir),
-            Export::Song => self.export_song(dir),
-            Export::SongSaveAs => self.save_song_as(dir),
-            Export::Synths => self.export_synths(dir),
-            Export::KitMapping => self.kit_export(dir),
+            Export::PatternWav => self.export_wav(false, path),
+            Export::SongWav => self.export_wav(true, path),
+            Export::PatternMidi => self.export_midi(path),
+            Export::PatternJson => self.export_pattern_json(path),
+            Export::Song => self.export_song(path),
+            Export::SongSaveAs => self.save_song_as(path),
+            Export::Synths => self.export_synths(path),
+            Export::KitMapping => self.kit_export(path),
         }
     }
 
@@ -1009,7 +1044,13 @@ impl Session {
                 self.factory_reset();
                 return;
             }
-            if matches!(key, OverlayKey::Escape | OverlayKey::Enter) {
+            if matches!(key, OverlayKey::Enter) {
+                if let Some(Overlay::ConfirmOverwrite { export, path }) = self.overlay.take() {
+                    self.write_export(export, &path);
+                }
+                return;
+            }
+            if matches!(key, OverlayKey::Escape) {
                 self.overlay = None;
             }
             return;
@@ -1247,9 +1288,9 @@ impl Session {
         self.message = "Auto-detect complete".into();
     }
 
-    /// E: the kit's mapping to a JSON file in `dir`.
-    fn kit_export(&mut self, dir: &Path) {
-        self.message = self.kits.export_mapping(self.kit_index, dir).unwrap_or_else(|e| e);
+    /// E: the kit's mapping to a JSON file at `path`.
+    fn kit_export(&mut self, path: &Path) {
+        self.message = self.kits.export_mapping(self.kit_index, path).unwrap_or_else(|e| e);
     }
 
     /// A file or folder dropped on the window (Shift: a WAV replaces the
@@ -1905,6 +1946,16 @@ impl Session {
             Some(Overlay::About) => view::draw_notice(canvas, "About orDrumbox", &self.about(), scale),
             Some(Overlay::FactoryReset) => {
                 view::draw_notice(canvas, "Factory reset", &self.factory_reset_lines(), scale)
+            }
+            Some(Overlay::ConfirmOverwrite { path, .. }) => {
+                // The name alone: the folder was just picked, and a long path would not fit.
+                let name = path.file_name().unwrap_or(path.as_os_str()).to_string_lossy();
+                let lines = [
+                    format!("{name} already exists in this folder."),
+                    String::new(),
+                    "ENTER: replace it   ESC: keep it".to_owned(),
+                ];
+                view::draw_notice(canvas, "Replace the file?", &lines, scale)
             }
             None => {}
         }
