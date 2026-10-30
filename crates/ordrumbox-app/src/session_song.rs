@@ -1,8 +1,9 @@
 //! The session's side of the song panel (`song_panel.js` and its sections):
 //! the pattern list (a click selects, a double-click renames, a right-click
-//! adds the pattern at the playhead), the arrangement (a click on the ruler
-//! aims the cursor, where play starts; the right-click menus of clips, row
-//! names and the bare grid), the song's column (name, date, description,
+//! adds the pattern at the playhead, a drag drops it on the arrangement), the
+//! arrangement (a click on the ruler aims the cursor, where play starts; a
+//! clip dragged sideways moves; the right-click menus of clips, row names and
+//! the bare grid), the song's column (name, date, description,
 //! the arrangement select, Save, Load, Export, Import, and New and Delete
 //! for arrangements) — and Space plays the song while the panel is shown.
 //!
@@ -13,13 +14,14 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use ordrumbox_core::js;
 use ordrumbox_core::json::{self, Value};
+use ordrumbox_core::song::measures_for_pattern;
 use ordrumbox_core::steps::TICK;
 use ordrumbox_core::{Song, SongClip};
 
 use super::session_panel::{DOUBLE_CLICK, PanelLayout};
 use super::*;
 use crate::panel::{self, Item, Kind, Rect};
-use crate::song_view::{self, Row, SongHit, SongLayout, SongView};
+use crate::song_view::{self, Row, SongGhost, SongHit, SongLayout, SongView};
 
 /// The column's buttons: id and label.
 const BUTTONS: [(&str, &str); 7] = [
@@ -31,6 +33,34 @@ const BUTTONS: [(&str, &str); 7] = [
     ("new", "New"),
     ("delete", "Delete"),
 ];
+
+/// Movement before a press becomes a drag, px.
+const DRAG_START_PX: i32 = 3;
+
+/// What a drag on the song panel carries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DragSource {
+    /// A pattern of the list.
+    Pattern(usize),
+    /// A clip, held `grab` measures after its start.
+    Clip { clip: usize, grab: u32 },
+}
+
+/// A press on the song panel that may become a drag. Nothing is edited before
+/// the release, so a drag is one undo step and playback hears only the result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct SongDrag {
+    source: DragSource,
+    press: (i32, i32),
+    /// Where the pointer is.
+    x: i32,
+    y: i32,
+    /// The pointer has really moved: this is no longer a click.
+    started: bool,
+    /// What it was pressed on; another edit or arrangement cancels the drag.
+    revision: u64,
+    song: usize,
+}
 
 /// What is shown for a song without a name.
 const UNTITLED: &str = "Untitled";
@@ -62,6 +92,7 @@ impl Session {
         self.focus = None;
         self.dropdown = None;
         self.hovered_clip = None;
+        self.song_drag = None;
         self.roll_drag = None;
         if self.playing() && was_song != (workspace == Workspace::Song) {
             let mode = self.play_mode();
@@ -124,8 +155,8 @@ impl Session {
     /// the cursor is on; else where the wheel left them.
     fn song_scroll(&self, layout: &SongLayout, rows: usize) -> (u32, usize) {
         let Some(song) = self.song() else { return (0, 0) };
-        let total = song.length_measures().max(1.0).ceil() as u32;
         let visible = layout.visible_measures();
+        let total = song.length_measures().max(1.0).ceil() as u32 + self.song_room(layout);
         let last = total.saturating_sub(visible);
         let x = if self.song_playing() {
             (self.song_cursor_measure() as u32 / visible * visible).min(last)
@@ -156,6 +187,9 @@ impl Session {
             cursor: self.song_cursor_measure(),
             playing: self.song_playing(),
             scroll: self.song_scroll(layout, rows.len()),
+            dragged_clip: self.song_dragged_clip(layout, rows.len()),
+            ghost: self.song_ghost(layout, rows),
+            room: self.song_room(layout),
         }
     }
 
@@ -378,7 +412,14 @@ impl Session {
                     self.text_entry(id);
                 } else {
                     self.step_pattern(p as isize - self.pattern_index as isize);
+                    self.press_song_drag(DragSource::Pattern(p), x, y);
                 }
+            }
+            (SongHit::Clip(clip), Button::Left) => {
+                let first = self.song_scroll(&layout, rows.len()).0;
+                let start = self.song().and_then(|s| s.clips.get(clip)).map_or(0, |c| c.start_measure);
+                let grab = layout.measure_at(x, first).saturating_sub(start);
+                self.press_song_drag(DragSource::Clip { clip, grab }, x, y);
             }
             (SongHit::Pattern(p), Button::Right) => self.list_menu(p, x, y),
             (SongHit::Ruler(m), Button::Left) => self.set_song_cursor(m),
@@ -401,6 +442,105 @@ impl Session {
         true
     }
 
+    // ─── Dragging ────────────────────────────────────────────────────────────
+
+    fn press_song_drag(&mut self, source: DragSource, x: i32, y: i32) {
+        self.song_drag = Some(SongDrag {
+            source,
+            press: (x, y),
+            x,
+            y,
+            started: false,
+            revision: self.editor.revision(),
+            song: self.editor.selected_song(),
+        });
+    }
+
+    /// The drag under way, unless what it holds may have changed under it.
+    fn live_song_drag(&self) -> Option<SongDrag> {
+        self.song_drag.filter(|d| {
+            d.started
+                && self.song_view_open()
+                && d.revision == self.editor.revision()
+                && d.song == self.editor.selected_song()
+        })
+    }
+
+    /// Measures shown past the end while dragging: a page to drop on.
+    fn song_room(&self, layout: &SongLayout) -> u32 {
+        self.live_song_drag().map_or(0, |_| layout.visible_measures())
+    }
+
+    /// The measure the pointer is on, and the drag.
+    fn song_drag_at(&self, layout: &SongLayout, rows: usize) -> Option<(SongDrag, u32)> {
+        let drag = self.live_song_drag()?;
+        Some((drag, layout.measure_at(drag.x, self.song_scroll(layout, rows).0)))
+    }
+
+    /// The clip being dragged and where it would start.
+    fn song_dragged_clip(&self, layout: &SongLayout, rows: usize) -> Option<(usize, u32)> {
+        match self.song_drag_at(layout, rows)? {
+            (SongDrag { source: DragSource::Clip { clip, grab }, .. }, at) => Some((clip, at.saturating_sub(grab))),
+            _ => None,
+        }
+    }
+
+    /// Where the pattern being dragged would land, the pointer over the arrangement.
+    fn song_ghost(&self, layout: &SongLayout, rows: &[Row]) -> Option<SongGhost> {
+        let (drag, measure) = self.song_drag_at(layout, rows.len())?;
+        let DragSource::Pattern(p) = drag.source else { return None };
+        if self.song().is_none() || !layout.grid.contains(drag.x, drag.y) {
+            return None;
+        }
+        let pattern = self.editor.library().patterns.get(p)?;
+        Some(SongGhost {
+            name: pattern.name.clone().unwrap_or_else(|| pattern.id.clone()),
+            row: rows.iter().position(|r| r.id == pattern.id).unwrap_or(rows.len()),
+            measure,
+            measure_count: measures_for_pattern(pattern.beat_count),
+        })
+    }
+
+    /// The mouse moved with a press held; whether to redraw.
+    pub(super) fn song_drag_move(&mut self, x: i32, y: i32) -> bool {
+        let Some(drag) = &mut self.song_drag else { return false };
+        (drag.x, drag.y) = (x, y);
+        let (dx, dy) = (x - drag.press.0, y - drag.press.1);
+        drag.started |= dx.abs() >= DRAG_START_PX || dy.abs() >= DRAG_START_PX;
+        drag.started
+    }
+
+    /// The press released: a drag places or moves its clip; whether it was one.
+    pub fn song_release(&mut self, size: (i32, i32, i32)) -> bool {
+        let layout = self.song_layout(size);
+        let rows = self.song_rows();
+        let at = self.song_drag_at(&layout, rows.len());
+        let ghost = self.song_ghost(&layout, &rows);
+        let over_grid = at.is_some_and(|(drag, _)| layout.grid.contains(drag.x, drag.y));
+        self.song_drag = None;
+        let Some((drag, measure)) = at else { return false };
+        match drag.source {
+            DragSource::Pattern(p) => {
+                if self.song().is_none() && over_grid {
+                    self.message = "No song to add to".into();
+                } else if let (Some(ghost), Some(pattern)) = (ghost, self.editor.library().patterns.get(p)) {
+                    let value = format!("add:{}:{}", ghost.measure, pattern.id);
+                    self.song_menu_pick(&value);
+                }
+            }
+            DragSource::Clip { clip, grab } => {
+                let start = measure.saturating_sub(grab);
+                if self.editor.move_song_clip(None, clip, start) {
+                    self.edited();
+                    let id = self.song().and_then(|s| s.clips.get(clip)).map(|c| c.pattern_id.clone());
+                    let label = self.pattern_label(&id.unwrap_or_default());
+                    self.message = format!("\"{label}\" moved to measure {}", start + 1);
+                }
+            }
+        }
+        true
+    }
+
     /// The wheel over the arrangement: measures (Shift: rows); whether it was its.
     pub fn song_wheel(&mut self, size: (i32, i32, i32), x: i32, y: i32, lines: isize, shift: bool) -> bool {
         let layout = self.song_layout(size);
@@ -414,7 +554,8 @@ impl Session {
             let last = rows.saturating_sub(layout.visible_rows());
             sy = (sy as isize - lines).clamp(0, last as isize) as usize;
         } else {
-            let last = (song.length_measures().max(1.0).ceil() as u32).saturating_sub(layout.visible_measures());
+            let total = song.length_measures().max(1.0).ceil() as u32 + self.song_room(&layout);
+            let last = total.saturating_sub(layout.visible_measures());
             sx = (i64::from(sx) - 4 * lines as i64).clamp(0, i64::from(last)) as u32;
         }
         self.song_scroll = (sx, sy);
@@ -424,7 +565,7 @@ impl Session {
     /// The mouse over the arrangement: the clip it is on, for its tooltip;
     /// whether it changed.
     pub fn song_hover(&mut self, size: (i32, i32, i32), x: i32, y: i32) -> bool {
-        let hover = if self.workspace == Workspace::Song && self.drag.is_none() {
+        let hover = if self.workspace == Workspace::Song && self.drag.is_none() && self.song_drag.is_none() {
             let layout = self.song_layout(size);
             let rows = self.song_rows();
             match layout.hit(&self.song_view_data(&rows, &layout), x, y) {
@@ -686,10 +827,6 @@ mod tests {
         session
     }
 
-    fn layout() -> SongLayout {
-        SongLayout::new(SIZE.0, SIZE.1, SIZE.2, 0)
-    }
-
     /// The menu open: its values.
     fn menu(session: &Session) -> Vec<String> {
         session.dropdown.as_ref().map(|d| d.values.clone()).unwrap_or_default()
@@ -723,7 +860,7 @@ mod tests {
     #[test]
     fn the_mouse_places_repeats_and_removes_clips() {
         let mut s = session();
-        let l = layout();
+        let l = s.song_layout(SIZE);
         // The ruler aims the cursor; a pattern of the list is added there.
         let ruler_y = l.grid.y + 14 + 4;
         let measure_x = |m: i32| l.grid.x + 74 + m * 24 + 12;
@@ -759,6 +896,61 @@ mod tests {
     }
 
     #[test]
+    fn a_drag_adds_a_pattern_and_moves_a_clip() {
+        let mut s = session();
+        let l = s.song_layout(SIZE);
+        let measure_x = |m: i32| l.grid.x + 74 + m * 24 + 12;
+        let row_y = |r: i32| l.grid.y + 14 + 18 + r * 22 + 11;
+        let list = (l.list.x + 2, l.list.y + 2);
+
+        // A press and release that hardly moves is a click.
+        assert!(s.song_click(SIZE, list.0, list.1, Button::Left));
+        s.mouse_move(SIZE, list.0 + 1, list.1, false);
+        assert!(!s.song_release(SIZE));
+        assert_eq!(clips(&s).len(), 1);
+
+        // Pattern a, not in the arrangement yet, dropped past its end.
+        s.last_click = None;
+        s.song_click(SIZE, list.0, list.1, Button::Left);
+        s.mouse_move(SIZE, measure_x(4), row_y(1), false);
+        let rows = s.song_rows();
+        let ghost = s.song_view_data(&rows, &l).ghost.unwrap();
+        assert_eq!((ghost.row, ghost.measure), (1, 4));
+        assert!(s.song_release(SIZE));
+        assert_eq!(s.message, "\"a\" added at measure 5");
+        assert_eq!(clips(&s), [("b".into(), 0, 2.0), ("a".into(), 4, 0.75)]);
+        s.undo();
+        assert_eq!(clips(&s).len(), 1);
+
+        // Dropped outside the arrangement: nothing.
+        s.last_click = None;
+        s.song_click(SIZE, list.0, list.1, Button::Left);
+        s.mouse_move(SIZE, l.column.x + 2, l.column.y + 2, false);
+        assert!(s.song_release(SIZE));
+        assert_eq!(clips(&s).len(), 1);
+
+        // The clip of b, held in its second measure: it keeps its row and its grip.
+        assert!(s.song_click(SIZE, measure_x(1), row_y(0), Button::Left));
+        s.mouse_move(SIZE, measure_x(4), row_y(0) + 40, false);
+        let rows = s.song_rows();
+        assert_eq!(s.song_view_data(&rows, &l).dragged_clip, Some((0, 3)));
+        assert_eq!(clips(&s)[0].1, 0, "nothing is edited before the release");
+        assert!(s.song_release(SIZE));
+        assert_eq!(s.message, "\"b\" moved to measure 4");
+        assert_eq!(clips(&s), [("b".into(), 3, 2.0)]);
+        assert_eq!(s.song().unwrap().loop_measures, Some(5.0));
+        s.undo();
+        assert_eq!(clips(&s), [("b".into(), 0, 2.0)]);
+
+        // An edit during the drag cancels it.
+        s.song_click(SIZE, measure_x(0), row_y(0), Button::Left);
+        s.mouse_move(SIZE, measure_x(4), row_y(0), false);
+        s.commit_text(Id::SongPattern(1), "renamed");
+        assert!(!s.song_release(SIZE));
+        assert_eq!(clips(&s), [("b".into(), 0, 2.0)]);
+    }
+
+    #[test]
     fn names_descriptions_and_arrangements() {
         let mut s = session();
         assert_eq!(s.song_name(), "lib");
@@ -768,7 +960,7 @@ mod tests {
         s.commit_text(Id::SongDescription, " about ");
         assert_eq!((s.song_name().as_str(), s.info("description").as_str()), ("My song", "about"));
         // A double-click on a pattern of the list renames it.
-        let l = layout();
+        let l = s.song_layout(SIZE);
         let row = (l.list.x + 2, l.list.y + 12 + 2);
         s.song_click(SIZE, row.0, row.1, Button::Left);
         assert_eq!(s.pattern_index, 1);

@@ -1,9 +1,10 @@
-//! The song panel (`song_panel.js`), in the place of the grid: the pattern
-//! list on the left, the arrangement in the middle — laid out like a DAW
-//! arrangement view (`arrangement_section.js`): a ruler of measures along X,
-//! one row per pattern the arrangement uses (named in a frozen first
-//! column), each clip a rectangle over its measures, the cursor —, and the
-//! song's column on the right (its widgets are panel items).
+//! The song panel (`song_panel.js`), in the place of the grid: the arrangement
+//! across the whole width — laid out like a DAW arrangement view
+//! (`arrangement_section.js`): a ruler of measures along X, one row per
+//! pattern the arrangement uses (named in a frozen first column), each clip a
+//! rectangle over its measures, the cursor —, and under it the pattern list
+//! on the left and the song's column on the right (its widgets are panel
+//! items).
 //!
 //! [`SongLayout`] places everything; drawing and mouse hit-testing both use it.
 
@@ -21,10 +22,13 @@ const ROW_HEIGHT: i32 = 22;
 const HEADER_HEIGHT: i32 = 18;
 /// Gap a clip leaves to its neighbours (1 px on each side).
 const CLIP_INSET: i32 = 2;
-/// The pattern list's rows and width, the song column's width.
+/// The pattern list's rows, the song column's width.
 const LIST_ROW: i32 = 12;
-const LIST_WIDTH: i32 = 150;
 const COLUMN_WIDTH: i32 = 210;
+/// Height of what is under the arrangement: all the song column's widgets.
+const LOWER_HEIGHT: i32 = 138;
+/// Gap between the arrangement and what is under it, and between the list and the column.
+const GAP: i32 = 12;
 
 const BACKGROUND: Rgb = theme::BG;
 const CELL: Rgb = theme::PANEL_2;
@@ -79,6 +83,22 @@ pub struct SongView<'a> {
     pub playing: bool,
     /// First measure and first row shown.
     pub scroll: (u32, usize),
+    /// A clip being dragged, and the measure it would start at.
+    pub dragged_clip: Option<(usize, u32)>,
+    /// A pattern being dragged over the arrangement.
+    pub ghost: Option<SongGhost>,
+    /// Measures shown past the end of the arrangement, to drop on.
+    pub room: u32,
+}
+
+/// Where a pattern dragged from the list would land.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SongGhost {
+    pub name: String,
+    /// Its row; past the last one for a pattern the arrangement does not use yet.
+    pub row: usize,
+    pub measure: u32,
+    pub measure_count: f64,
 }
 
 /// What is under the mouse.
@@ -115,11 +135,14 @@ impl SongLayout {
         let top = frame::body_top(scale);
         let bottom = frame::footer_top(height, scale, status_lines) - margin / 2;
         let h = (bottom - top).max(0);
-        let list = Rect::new(margin, top, LIST_WIDTH * s, h);
-        let column_w = (COLUMN_WIDTH * s).min((width - 2 * margin) / 3).max(0);
-        let column = Rect::new(width - margin - column_w, top, column_w, h);
-        let grid_x = list.x + list.w + 12 * s;
-        let grid = Rect::new(grid_x, top, (column.x - 12 * s - grid_x).max(0), h);
+        let full_w = (width - 2 * margin).max(0);
+        // A short window keeps half its height for the arrangement.
+        let lower_h = (LOWER_HEIGHT * s).min(h / 2);
+        let lower_y = bottom.max(top) - lower_h;
+        let grid = Rect::new(margin, top, full_w, (lower_y - GAP * s - top).max(0));
+        let column_w = (COLUMN_WIDTH * s).min(full_w / 3);
+        let column = Rect::new(width - margin - column_w, lower_y, column_w, lower_h);
+        let list = Rect::new(margin, lower_y, (column.x - GAP * s - margin).max(0), lower_h);
         Self { scale, list, grid, column }
     }
 
@@ -183,17 +206,29 @@ impl SongLayout {
     pub fn clip_rect(&self, view: &SongView, index: usize) -> Option<Rect> {
         let clip = view.song?.clips.get(index)?;
         let row = view.rows.iter().position(|r| r.id == clip.pattern_id)?;
-        if row < view.scroll.1 || row >= view.scroll.1 + self.visible_rows() {
+        let start = view.dragged_clip.filter(|&(c, _)| c == index).map_or(clip.start_measure, |(_, m)| m);
+        self.span_rect(row, start, clip.measure_count, view.scroll)
+    }
+
+    /// Where `measure_count` measures from `start` on `row` are drawn.
+    fn span_rect(&self, row: usize, start: u32, measure_count: f64, scroll: (u32, usize)) -> Option<Rect> {
+        if row < scroll.1 || row >= scroll.1 + self.visible_rows() {
             return None;
         }
         let s = self.scale;
-        let x = self.measure_x(f64::from(clip.start_measure), view.scroll.0);
+        let x = self.measure_x(f64::from(start), scroll.0);
         // A clip may last a fraction of a measure: its width is not rounded to a cell.
-        let w = ((clip.measure_count * f64::from(self.measure_width())) as i32 - CLIP_INSET * s).max(4 * s);
+        let w = ((measure_count * f64::from(self.measure_width())) as i32 - CLIP_INSET * s).max(4 * s);
         let end = self.body_left() + self.visible_measures() as i32 * self.measure_width();
         let (left, right) = (x.max(self.body_left()), (x + w).min(end));
-        let y = self.row_y(row, view.scroll.1) + CLIP_INSET * s / 2;
+        let y = self.row_y(row, scroll.1) + CLIP_INSET * s / 2;
         (right > left).then(|| Rect::new(left, y, right - left, self.row_height() - 2 * CLIP_INSET * s))
+    }
+
+    /// The measure shown at `x`, kept on the page; `first` is the first one shown.
+    pub fn measure_at(&self, x: i32, first: u32) -> u32 {
+        let across = u32::try_from((x - self.body_left()).max(0) / self.measure_width()).unwrap_or(0);
+        first + across.min(self.visible_measures() - 1)
     }
 
     /// What is at `(x, y)`.
@@ -268,13 +303,14 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     let total = song.length_measures().max(1.0).ceil() as u32;
     let meta = format!("{}  {} measures  {} BPM", song.name, total, ordrumbox_core::js::number_to_string(song.bpm));
     canvas.text(title, g.y, &fit(&meta, g.x + g.w - title, s), s, TEXT);
-    if song.clips.is_empty() {
+    if song.clips.is_empty() && view.ghost.is_none() {
         canvas.text(g.x, layout.ruler_top(), "No clips yet: right-click a pattern of the list to add it.", s, DIM);
         return;
     }
 
     let (first_measure, first_row) = view.scroll;
-    let shown_measures = layout.visible_measures().min(total.saturating_sub(first_measure));
+    let grid_total = total + view.room;
+    let shown_measures = layout.visible_measures().min(grid_total.saturating_sub(first_measure));
     let shown_rows = layout.visible_rows().min(view.rows.len().saturating_sub(first_row));
     let body_w = shown_measures as i32 * layout.measure_width();
     let body_h = shown_rows as i32 * layout.row_height();
@@ -317,11 +353,24 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
         canvas.fill_rect(x - s, layout.body_top(), s, body_h, if m % 4 == 0 { MAJOR } else { CELL });
     }
 
-    // A clip takes its row's colour.
-    for (i, clip) in song.clips.iter().enumerate() {
+    // A clip takes its row's colour; the one dragged is over the others.
+    let dragged = view.dragged_clip.map(|(c, _)| c);
+    for i in (0..song.clips.len()).filter(|&i| Some(i) != dragged).chain(dragged) {
         if let Some(r) = layout.clip_rect(view, i) {
-            let row = view.rows.iter().position(|row| row.id == clip.pattern_id).unwrap_or(0);
+            let row = view.rows.iter().position(|row| row.id == song.clips[i].pattern_id).unwrap_or(0);
             canvas.fill_rect(r.x, r.y, r.w, r.h, theme::track(row));
+        }
+    }
+
+    // A pattern dragged from the list: on its row, kept on the rows shown.
+    if let Some(ghost) = &view.ghost {
+        let row = ghost.row.clamp(first_row, first_row + layout.visible_rows() - 1);
+        if let Some(r) = layout.span_rect(row, ghost.measure, ghost.measure_count, view.scroll) {
+            canvas.fill_rect(r.x, r.y, r.w, r.h, ACCENT);
+        }
+        if ghost.row >= view.rows.len() {
+            let name = fit(&ghost.name, layout.label_width() - 6 * s, s);
+            canvas.text(g.x, layout.row_y(row, first_row) + (layout.row_height() - 8 * s) / 2, &name, s, ACCENT);
         }
     }
 
@@ -338,7 +387,7 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     if first_measure > 0 {
         more(canvas, "<", layout.body_left() - 10 * s, layout.ruler_top() + 5 * s);
     }
-    if first_measure + shown_measures < total {
+    if first_measure + shown_measures < grid_total {
         more(canvas, ">", layout.body_left() + body_w + 2 * s, layout.ruler_top() + 5 * s);
     }
     if first_row + shown_rows < view.rows.len() {
@@ -390,6 +439,9 @@ mod tests {
             cursor: 1.5,
             playing: false,
             scroll: (0, 0),
+            dragged_clip: None,
+            ghost: None,
+            room: 0,
         };
         let layout = SongLayout::new(1100, 680, 1, 0);
         let (mw, rh) = (layout.measure_width(), layout.row_height());
@@ -413,6 +465,10 @@ mod tests {
         let scrolled = SongView { scroll: (2, 1), ..view };
         assert_eq!(layout.hit(&scrolled, at_measure(2), in_row(0)), Some(SongHit::Clip(2)));
         assert_eq!(layout.hit(&scrolled, at_measure(0), layout.ruler_top() + 2), Some(SongHit::Ruler(2)));
+        // The measure under the pointer stays on the page.
+        assert_eq!(layout.measure_at(at_measure(3), 2), 5);
+        assert_eq!(layout.measure_at(0, 2), 2);
+        assert_eq!(layout.measure_at(i32::MAX / 2, 0), layout.visible_measures() - 1);
     }
 
     #[test]
@@ -433,6 +489,9 @@ mod tests {
                     cursor: 3.2,
                     playing,
                     scroll: (1, 0),
+                    dragged_clip: song.filter(|s| !s.clips.is_empty()).map(|_| (0, 3)),
+                    ghost: Some(SongGhost { name: "c".into(), row: 2, measure: 2, measure_count: 1.0 }),
+                    room: 8,
                 };
                 draw(&mut canvas, &view, &layout);
             }

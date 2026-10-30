@@ -1092,4 +1092,20 @@ mod tests {
         assert_eq!(e.library().songs[0].loop_measures, None);
         assert_eq!(e.library().songs[0].bpm, 300.0);
     }
+
+    #[test]
+    fn a_moved_clip_takes_the_loop_along_in_one_step() {
+        let mut e = editor();
+        e.add_song("verse");
+        let clip = ordrumbox_core::SongClip { pattern_id: "a".into(), start_measure: 0, measure_count: 2.0 };
+        assert!(e.add_song_clip(None, clip));
+        assert!(!e.move_song_clip(None, 0, 0));
+        assert!(!e.move_song_clip(None, 1, 3));
+        assert!(e.move_song_clip(None, 0, 3));
+        let song = &e.library().songs[0];
+        assert_eq!((song.clips[0].start_measure, song.loop_measures), (3, Some(5.0)));
+        e.undo();
+        let song = &e.library().songs[0];
+        assert_eq!((song.clips[0].start_measure, song.loop_measures), (0, Some(2.0)));
+    }
 }

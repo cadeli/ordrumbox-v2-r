@@ -148,6 +148,47 @@ mod tests {
         session
     }
 
+    #[test]
+    fn the_history_panel_scrolls_and_closes() {
+        let mut s = session();
+        for i in 0..200 {
+            s.message = format!("action {i}");
+            s.note_actions();
+        }
+        s.open_history();
+        let scroll = |s: &Session| match s.overlay {
+            Some(Overlay::History { scroll }) => scroll,
+            _ => panic!("the history panel is open"),
+        };
+        s.overlay_key(OverlayKey::Move(-3));
+        assert_eq!(scroll(&s), 0);
+        s.overlay_key(OverlayKey::Move(3));
+        assert_eq!(scroll(&s), 3);
+        s.overlay_key(OverlayKey::Edge(true));
+        let last = scroll(&s);
+        assert!(last > 0);
+        s.overlay_key(OverlayKey::Move(1));
+        assert_eq!(scroll(&s), last);
+        s.overlay_click(SIZE.0, SIZE.1, SIZE.2, SIZE.0 / 2, SIZE.1 / 2);
+        assert!(s.overlay_open(), "a click inside keeps it open");
+        s.overlay_click(SIZE.0, SIZE.1, SIZE.2, 1, 1);
+        assert!(!s.overlay_open());
+    }
+
+    #[test]
+    fn no_control_is_on_the_status_line() {
+        let s = session();
+        let (width, height, scale) = SIZE;
+        let layout = s.panel_layout(width, height, scale);
+        let y = crate::frame::status_line(scale);
+        for y in y..y + 10 * scale {
+            assert!(crate::frame::on_status_line(y, scale));
+            for x in 0..width {
+                assert!(crate::panel::hit(&layout.items, x, y).is_none(), "a control at {x}, {y}");
+            }
+        }
+    }
+
     /// The menu open, its labels.
     fn labels(s: &Session) -> Vec<String> {
         s.dropdown.as_ref().map(|d| d.labels.clone()).unwrap_or_default()

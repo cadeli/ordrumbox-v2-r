@@ -23,6 +23,7 @@ use ordrumbox_logic::generate::{self, AutoGenerator, MelodicKind};
 use ordrumbox_logic::midi;
 use ordrumbox_logic::{Editor, Nudge};
 
+use crate::action_log::{self, ActionLog, LogLayout, Seen};
 use crate::assets;
 use crate::audio;
 use crate::canvas::Canvas;
@@ -151,6 +152,7 @@ pub struct Session {
     song_scroll: (u32, usize),
     /// The clip under the mouse (its tooltip).
     hovered_clip: Option<usize>,
+    song_drag: Option<session_song::SongDrag>,
     /// The piano roll's page, highest row shown (`None`: centered on the
     /// track's pitch), cursor (step, row), note pressed, the edited value
     /// shown over the note, next progression, note under the mouse.
@@ -172,6 +174,8 @@ pub struct Session {
     status: Vec<String>,
     /// Outcome of the last action.
     message: String,
+    /// What was done so far, shown by a click on the status line.
+    action_log: ActionLog,
     cursor: Option<Cursor>,
     /// Selected note: track and index in its notes.
     selected: Option<(usize, usize)>,
@@ -278,6 +282,10 @@ enum Overlay {
     Shortcuts,
     About,
     FactoryReset,
+    /// What was done; the first row shown.
+    History {
+        scroll: usize,
+    },
     /// The file an export would replace, until the user says so.
     ConfirmOverwrite {
         export: Export,
@@ -456,6 +464,7 @@ impl Session {
             song_cursor: 0,
             song_scroll: (0, 0),
             hovered_clip: None,
+            song_drag: None,
             roll_page: 0,
             roll_top: None,
             roll_cursor: None,
@@ -469,6 +478,7 @@ impl Session {
             output: None,
             status,
             message: String::new(),
+            action_log: ActionLog::default(),
             cursor: None,
             selected: None,
             clipboard: None,
@@ -1036,8 +1046,43 @@ impl Session {
         self.overlay = None;
     }
 
+    /// A click on the status line: what was done so far.
+    pub fn open_history(&mut self) {
+        self.note_actions();
+        self.overlay = Some(Overlay::History { scroll: 0 });
+    }
+
+    /// Add what the last events did to the log.
+    fn note_actions(&mut self) {
+        let history = self.editor.history();
+        self.action_log.note(Seen {
+            message: &self.message,
+            revision: self.editor.revision(),
+            steps: history.undo_len(),
+            undo: history.next_undo(),
+            dragging: self.drag.is_some(),
+        });
+    }
+
+    /// Scroll the history panel, if open, for `key`; whether it was.
+    fn history_key(&mut self, key: &OverlayKey) -> bool {
+        let Some(Overlay::History { scroll }) = &mut self.overlay else { return false };
+        let (width, height, scale) = self.panel_size;
+        let max = LogLayout::new(width, height, scale).max_scroll(&self.action_log);
+        match key {
+            OverlayKey::Move(delta) => *scroll = (*scroll).min(max).saturating_add_signed(*delta).min(max),
+            OverlayKey::Edge(end) => *scroll = if *end { max } else { 0 },
+            OverlayKey::Escape => self.overlay = None,
+            OverlayKey::Enter | OverlayKey::Back | OverlayKey::Letter(_) => {}
+        }
+        true
+    }
+
     /// A key while a panel is open: the file picker's keys, or any key closes it.
     pub fn overlay_key(&mut self, key: OverlayKey) {
+        if self.history_key(&key) {
+            return;
+        }
         let is_factory = matches!(self.overlay, Some(Overlay::FactoryReset));
         let Some(Overlay::Picker(picker)) = &mut self.overlay else {
             if is_factory && matches!(key, OverlayKey::Enter) {
@@ -1083,6 +1128,12 @@ impl Session {
 
     /// A click while a panel is open.
     pub fn overlay_click(&mut self, width: i32, height: i32, scale: i32, x: i32, y: i32) {
+        if matches!(self.overlay, Some(Overlay::History { .. })) {
+            if !LogLayout::new(width, height, scale).contains(x, y) {
+                self.overlay = None;
+            }
+            return;
+        }
         let Some(Overlay::Picker(picker)) = &mut self.overlay else {
             self.overlay = None;
             return;
@@ -1157,7 +1208,9 @@ impl Session {
         };
         match store::factory_reset(&dir) {
             Ok(removed) => {
+                let action_log = std::mem::take(&mut self.action_log);
                 *self = Self::load();
+                self.action_log = action_log;
                 self.message = if removed.is_empty() {
                     "factory settings restored (no user files found)".into()
                 } else {
@@ -1836,6 +1889,7 @@ impl Session {
     }
 
     pub fn draw(&mut self, canvas: &mut Canvas, scale: i32) {
+        self.note_actions();
         let layout = self.panel_layout(canvas.width(), canvas.height(), scale);
         let position = self.controller.as_ref().and_then(Controller::position);
         let history = self.editor.history();
@@ -1944,6 +1998,10 @@ impl Session {
                 view::draw_notice(canvas, "Keyboard shortcuts", &lines, scale);
             }
             Some(Overlay::About) => view::draw_notice(canvas, "About orDrumbox", &self.about(), scale),
+            Some(Overlay::History { scroll }) => {
+                let layout = LogLayout::new(canvas.width(), canvas.height(), scale);
+                action_log::draw(canvas, &self.action_log, *scroll, &layout);
+            }
             Some(Overlay::FactoryReset) => {
                 view::draw_notice(canvas, "Factory reset", &self.factory_reset_lines(), scale)
             }

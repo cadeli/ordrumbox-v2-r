@@ -560,6 +560,9 @@ impl Session {
         if self.roll_drag.is_some() {
             return self.roll_drag_move(x, y);
         }
+        if self.song_drag.is_some() {
+            return self.song_drag_move(x, y);
+        }
         let (width, height, scale) = size;
         if let Some(dropdown) = &mut self.dropdown {
             if let Some(i) = dropdown.hit(width, height, scale, x, y).filter(|&i| i != dropdown.at) {

@@ -9,6 +9,7 @@
 // No console window in a release build on Windows.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod action_log;
 mod assets;
 mod audio;
 mod canvas;
@@ -181,6 +182,8 @@ impl App {
             Some(menu::Hit::Bar) => s.set_menu(None),
             None if s.open_menu().is_some() => s.set_menu(None),
             None if s.overlay_open() => s.overlay_click(width, height, scale, x, y),
+            // Before the panel's: with the track editor open, its side claims the whole column.
+            None if frame::on_status_line(y, scale) => s.open_history(),
             None if s.mouse_down((width, height, scale), x, y, Button::Left, shift) => {}
             None => return self.click_content(width, height, scale, x, y),
         }
@@ -589,6 +592,9 @@ impl ApplicationHandler for App {
                 self.click(Button::Right);
             }
             WindowEvent::MouseInput { state: ElementState::Released, button: MouseButton::Left, .. } => {
+                if self.session.song_release((self.size().0, self.size().1, self.scale())) {
+                    self.request_redraw();
+                }
                 self.session.mouse_up();
             }
             _ => {}
