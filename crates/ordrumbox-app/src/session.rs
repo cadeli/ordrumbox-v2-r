@@ -1050,7 +1050,7 @@ impl Session {
         let shown = |p: Option<PathBuf>| p.map_or_else(|| "-".to_owned(), |p| p.display().to_string());
         vec![
             format!("orDrumbox {} - native port of ordrumbox-v2", env!("CARGO_PKG_VERSION")),
-            "GPL-3.0-only - https://www.ordrumbox.com".into(),
+            "MIT - https://www.ordrumbox.com".into(),
             String::new(),
             format!("library   {}", shown(self.library_path.clone())),
             format!("user data {}", shown(store::user_dir())),

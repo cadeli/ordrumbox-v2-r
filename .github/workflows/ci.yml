@@ -39,9 +39,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --release -p ordrumbox-app
-      # The program and the assets it reads from the folder next to it.
+      # The program, the assets it reads from the folder next to it, its license.
       - shell: bash
-        run: mkdir dist && cp target/release/ordrumbox.exe dist/ && cp -r assets dist/
+        run: mkdir dist && cp target/release/ordrumbox.exe LICENSE dist/ && cp -r assets dist/
       - uses: actions/upload-artifact@v4
         with:
           name: ordrumbox-windows-x64
