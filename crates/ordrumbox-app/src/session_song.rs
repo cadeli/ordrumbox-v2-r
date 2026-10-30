@@ -7,7 +7,7 @@
 //! for arrangements) — and Space plays the song while the panel is shown.
 //!
 //! Songs are saved to `songs/` in the user data folder (the JS IndexedDB
-//! store) and exported to `exports/`, as `.odbox` files.
+//! store) and, with Save as and Export, to a folder picked, as `.odbox` files.
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -22,8 +22,9 @@ use crate::panel::{self, Item, Kind, Rect};
 use crate::song_view::{self, Row, SongHit, SongLayout, SongView};
 
 /// The column's buttons: id and label.
-const BUTTONS: [(&str, &str); 6] = [
+const BUTTONS: [(&str, &str); 7] = [
     ("save", "Save"),
+    ("saveas", "Save as"),
     ("load", "Load"),
     ("export", "Export"),
     ("import", "Import"),
@@ -220,7 +221,8 @@ impl Session {
         match id {
             "save" => self.save_song(),
             "load" => self.load_song_menu(),
-            "export" => self.export_song(),
+            "saveas" => self.open_export(Export::SongSaveAs),
+            "export" => self.open_export(Export::Song),
             "import" => self.open_picker(Purpose::ImportSong),
             "new" => {
                 self.entry = Some(Entry {
@@ -593,12 +595,18 @@ impl Session {
             .map_or_else(|| Rect::new(width / 2 - 100 * scale, frame::body_top(scale), 200 * scale, 0), |i| i.rect)
     }
 
-    /// Export: the song to `exports/<name>.odbox`.
-    fn export_song(&mut self) {
-        let Some(dir) = store::exports_dir() else {
-            self.message = "no user data folder to export to".into();
-            return;
+    /// Save as: the song to `<name>.odbox` in `dir`.
+    pub(super) fn save_song_as(&mut self, dir: &Path) {
+        let name = self.song_name();
+        let path = dir.join(format!("{}.odbox", store::safe_name(&name)));
+        self.message = match store::save_song(&path, &self.song_record("savedAt")) {
+            Ok(()) => format!("Song \"{name}\" saved to {}", path.display()),
+            Err(e) => format!("Save failed: {}: {e}", path.display()),
         };
+    }
+
+    /// Export: the song to `<name>.odbox` in `dir`.
+    pub(super) fn export_song(&mut self, dir: &Path) {
         let name = self.song_name();
         let path = dir.join(format!("{}.odbox", store::safe_name(&name)));
         self.message = match store::save_song(&path, &self.song_record("exportedAt")) {
@@ -798,6 +806,32 @@ mod tests {
         type_entry(&mut s, "Third");
         s.run(Command::PreviousSong);
         assert_eq!(s.editor.selected_song(), 0);
+    }
+
+    #[test]
+    fn save_as_and_export_write_to_the_folder_picked() {
+        let mut s = session();
+        let dir = std::env::temp_dir().join(format!("ordrumbox-song-destination-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        s.last_dir = Some(dir.clone());
+        let name = store::safe_name(&s.song_name());
+        let path = dir.join(format!("{name}.odbox"));
+
+        // Escape writes nothing.
+        s.song_button("saveas");
+        assert!(s.overlay_open());
+        s.overlay_key(OverlayKey::Escape);
+        assert!(!path.exists());
+
+        for (id, stamp) in [("saveas", "savedAt"), ("export", "exportedAt")] {
+            s.song_button(id);
+            s.overlay_key(OverlayKey::Enter);
+            assert!(!s.overlay_open());
+            assert!(s.message.contains(&path.display().to_string()), "{}", s.message);
+            assert!(std::fs::read_to_string(&path).unwrap().contains(stamp), "{id}");
+            std::fs::remove_file(&path).unwrap();
+        }
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

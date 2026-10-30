@@ -307,7 +307,7 @@ impl App {
                 KeyCode::Delete | KeyCode::Backspace => s.kit_remove(),
                 KeyCode::KeyN => s.kit_normalize(),
                 KeyCode::KeyR => s.kit_reassign(),
-                KeyCode::KeyE => s.kit_export(),
+                KeyCode::KeyE => s.run(Command::ExportMapping),
                 _ => return,
             }
         } else if s.synth_open() {

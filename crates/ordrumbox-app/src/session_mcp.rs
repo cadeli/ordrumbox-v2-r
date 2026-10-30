@@ -202,7 +202,8 @@ impl Session {
             }
             "savePatternToJson" => {
                 let p = self.mcp_pattern(text(args, "patternName")?)?;
-                let path = self.write_pattern_json(p)?;
+                let dir = store::exports_dir().ok_or("no user data folder to export to")?;
+                let path = self.write_pattern_json(p, &dir)?;
                 Ok(object([("filePath", Value::from(path.display().to_string()))]))
             }
             "listAllInstrumentsNames" => Ok(Self::mcp_instruments()),

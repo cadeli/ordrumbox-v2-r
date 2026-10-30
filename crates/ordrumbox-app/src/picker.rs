@@ -25,6 +25,22 @@ pub enum Purpose {
     ImportSong,
     /// Synth presets (`.json`), the synth editor's Import.
     ImportSynth,
+    /// A folder to write a file to.
+    Export(Export),
+}
+
+/// What is written to the folder picked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Export {
+    PatternWav,
+    SongWav,
+    PatternMidi,
+    PatternJson,
+    Song,
+    /// The song, as a save rather than an export (`savedAt`).
+    SongSaveAs,
+    Synths,
+    KitMapping,
 }
 
 impl Purpose {
@@ -38,7 +54,20 @@ impl Purpose {
             Self::ImportFolder => "Import folder as kit",
             Self::ImportSong => "Import song",
             Self::ImportSynth => "Import synth sounds",
+            Self::Export(Export::PatternWav) => "Export pattern as WAV to folder",
+            Self::Export(Export::SongWav) => "Export song as WAV to folder",
+            Self::Export(Export::PatternMidi) => "Export pattern as MIDI to folder",
+            Self::Export(Export::PatternJson) => "Export pattern as JSON to folder",
+            Self::Export(Export::Song) => "Export song to folder",
+            Self::Export(Export::SongSaveAs) => "Save song to folder",
+            Self::Export(Export::Synths) => "Export synth sounds to folder",
+            Self::Export(Export::KitMapping) => "Export kit mapping to folder",
         }
+    }
+
+    /// The pick is a folder, not a file.
+    fn picks_folder(self) -> bool {
+        matches!(self, Self::ImportFolder | Self::Export(_))
     }
 
     /// File extensions shown (lowercase); none for a folder.
@@ -47,7 +76,7 @@ impl Purpose {
             Self::ImportMidi => &["mid", "midi"],
             Self::AddSample | Self::ReplaceSample | Self::ReplaceTrackSample => &["wav"],
             Self::LoadMapping => &["json"],
-            Self::ImportFolder => &[],
+            Self::ImportFolder | Self::Export(_) => &[],
             Self::ImportSong => &["odbox", "json"],
             Self::ImportSynth => &["json"],
         }
@@ -136,7 +165,7 @@ impl Picker {
             return;
         };
         let mut entries = Vec::new();
-        if self.purpose == Purpose::ImportFolder {
+        if self.purpose.picks_folder() {
             entries.push(Entry::ThisFolder);
         }
         if dir.parent().is_some() || cfg!(windows) {
@@ -378,6 +407,11 @@ mod tests {
         assert_eq!(folders.entries[0], Entry::ThisFolder);
         assert!(folders.entries.iter().all(|e| !matches!(e, Entry::File(_))));
         assert_eq!(folders.activate(), Outcome::Picked(dir.clone()));
+
+        let mut destination = Picker::new(Purpose::Export(Export::SongSaveAs), Some(&dir));
+        assert_eq!(destination.entries[0], Entry::ThisFolder);
+        assert!(destination.entries.iter().all(|e| !matches!(e, Entry::File(_))));
+        assert_eq!(destination.activate(), Outcome::Picked(dir.clone()));
 
         let layout = PickerLayout::new(800, 600, 1);
         let mut pixels = vec![0; 800 * 600];

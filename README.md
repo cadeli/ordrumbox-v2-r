@@ -74,7 +74,10 @@ random pick among the candidates, made at play and on a kit change); a synth
 track without a known preset gets a random one.
 
 WAV exports (16-bit, 44.1 kHz, the pattern once or the whole song, no tail) go
-to `exports/` next to `library.json`.
+to the folder picked when exporting. Every export asks for its folder: the last
+one picked, at first `exports/` next to `library.json` if it exists, else the
+home folder; **Enter** on `[ Use this folder ]` writes there, over a file of the
+same name.
 
 Generation (the JS generators, same variants and same choices): **B** makes a
 new pattern from a random genre's template (tracks, lines, key, scale);
@@ -89,8 +92,8 @@ on the focused track.
 
 MIDI files (the JS exporter and import, byte for byte): **Ctrl M** writes the
 pattern as a type 1 file (96 PPQN; drums on channel 10 at their GM keys,
-melodic instruments on their own channels at the sample's root note) to
-`exports/`. A `.mid` dropped on the window becomes new 32-beat patterns (up to
+melodic instruments on their own channels at the sample's root note) to a
+folder picked. A `.mid` dropped on the window becomes new 32-beat patterns (up to
 16), one track per instrument found (by GM program, drum key, then track
 name), in one undo step. As in the JS app, the file's tempo is not read
 (120 BPM).
@@ -148,8 +151,8 @@ library's patterns on the left, the selected arrangement in the middle — a
 ruler of measures, one row per pattern it uses (named on the left; a pattern
 gone from the library keeps its row, in red), each clip a bar over its
 measures — and on the right the song's name and description (a click edits
-them), its date, the arrangement list, and **Save**, **Load**, **Export**,
-**Import**. A click on the ruler aims the cursor, where the song plays from
+them), its date, the arrangement list, and **Save**, **Load**, **Save as**,
+**Export**, **Import**. A click on the ruler aims the cursor, where the song plays from
 (**←→** move it a measure; while playing, it jumps there at once); while the
 panel is shown **Space** plays the song. Right-click a pattern of the list
 or a row's name: add it at the playhead (stopped: the cursor), or remove its
@@ -161,8 +164,8 @@ by page. Every edit is an undo step, and moves the loop onto the end of the
 last clip, as in the JS (`song_commands.js`, checked against it). **Save**
 writes the song (patterns, arrangements, what is selected) to
 `songs/<name>.odbox` in the user data folder, where the JS app uses
-IndexedDB; **Load** lists them; **Export** writes the same file to
-`exports/`; **Import** (or a `.odbox` dropped on the window) reads one; loading
+IndexedDB; **Load** lists them; **Save as** and **Export** write the same file
+to a folder picked; **Import** (or a `.odbox` dropped on the window) reads one; loading
 replaces the library in one undo step. Beyond the JS panel, **New** and
 **Delete** add and remove arrangements — the JS `addSong` / `removeSong`
 commands, which only its MCP tools reach. The **Song** menu has all of these
@@ -200,8 +203,8 @@ Synth editor (**F6**, **View › Synth**, the JS soft-synth editor; **Esc**
 goes back to the grid): the preset of the track editor's track (else the
 first one), in the place of the grid, the track editor beside it. The preset
 bar picks another preset and deletes, creates, duplicates, reverts (to the
-preset as it was when opened), exports (`exports/ordrumbox-synth-sounds.json`)
-and imports presets. Four tabs of cards — **OSC** (the scope: four cycles of
+preset as it was when opened), exports (`ordrumbox-synth-sounds.json`, to a
+folder picked) and imports presets. Four tabs of cards — **OSC** (the scope: four cycles of
 the oscillators, with their FM, sub and drive; VCO1–3; FM), **FLT** (the
 filter and its response curve, the filter envelope, the mod envelope),
 **MOD** (LFO1, LFO2, noise), **ENV** (master, the envelope and its shape) —
@@ -342,7 +345,7 @@ pitch, MIDI number and the settings that differ from the defaults (the JS
 | **Ctrl G**, **Ctrl L** | next grid (steps per beat), loop one step shorter |
 | **Ctrl - =** | pattern length −1 / +1 beat |
 | **Ctrl N**, **Ctrl D** | new pattern, duplicate pattern |
-| **Ctrl S** | export the pattern as JSON (`exports/ordrumbox-<name>.json`, as the JS); the library is saved on its own, **File › Save** saves now |
+| **Ctrl S** | export the pattern as JSON (`ordrumbox-<name>.json` in a folder picked, as the JS); the library is saved on its own, **File › Save** saves now |
 | **Ctrl E** | export the pattern to WAV (**Shift**: the song) |
 | **Ctrl M** | export the pattern to a MIDI file |
 | **Ctrl K** | kit editor (open / close) |
