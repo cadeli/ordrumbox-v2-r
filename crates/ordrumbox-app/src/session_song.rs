@@ -595,21 +595,24 @@ impl Session {
             .map_or_else(|| Rect::new(width / 2 - 100 * scale, frame::body_top(scale), 200 * scale, 0), |i| i.rect)
     }
 
-    /// Save as: the song to `<name>.odbox` in `dir`.
-    pub(super) fn save_song_as(&mut self, dir: &Path) {
+    /// The file a song is written to (`<name>.odbox`).
+    pub(super) fn song_file_name(&self) -> String {
+        format!("{}.odbox", store::safe_name(&self.song_name()))
+    }
+
+    /// Save as: the song to `path`.
+    pub(super) fn save_song_as(&mut self, path: &Path) {
         let name = self.song_name();
-        let path = dir.join(format!("{}.odbox", store::safe_name(&name)));
-        self.message = match store::save_song(&path, &self.song_record("savedAt")) {
+        self.message = match store::save_song(path, &self.song_record("savedAt")) {
             Ok(()) => format!("Song \"{name}\" saved to {}", path.display()),
             Err(e) => format!("Save failed: {}: {e}", path.display()),
         };
     }
 
-    /// Export: the song to `<name>.odbox` in `dir`.
-    pub(super) fn export_song(&mut self, dir: &Path) {
+    /// Export: the song to `path`.
+    pub(super) fn export_song(&mut self, path: &Path) {
         let name = self.song_name();
-        let path = dir.join(format!("{}.odbox", store::safe_name(&name)));
-        self.message = match store::save_song(&path, &self.song_record("exportedAt")) {
+        self.message = match store::save_song(path, &self.song_record("exportedAt")) {
             Ok(()) => format!("Song \"{name}\" exported to {}", path.display()),
             Err(e) => format!("not exported: {}: {e}", path.display()),
         };
@@ -831,6 +834,32 @@ mod tests {
             assert!(std::fs::read_to_string(&path).unwrap().contains(stamp), "{id}");
             std::fs::remove_file(&path).unwrap();
         }
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn replacing_a_file_is_confirmed() {
+        let mut s = session();
+        let dir = std::env::temp_dir().join(format!("ordrumbox-song-replace-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        s.last_dir = Some(dir.clone());
+        let path = dir.join(s.song_file_name());
+        std::fs::write(&path, "old").unwrap();
+
+        // Escape keeps the file.
+        s.song_button("export");
+        s.overlay_key(OverlayKey::Enter);
+        assert!(s.overlay_open());
+        s.overlay_key(OverlayKey::Escape);
+        assert!(!s.overlay_open());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "old");
+
+        // Enter replaces it.
+        s.song_button("export");
+        s.overlay_key(OverlayKey::Enter);
+        s.overlay_key(OverlayKey::Enter);
+        assert!(!s.overlay_open());
+        assert!(std::fs::read_to_string(&path).unwrap().contains("exportedAt"));
         std::fs::remove_dir_all(dir).unwrap();
     }
 
