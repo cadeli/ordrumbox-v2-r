@@ -32,7 +32,7 @@ use crate::kits::KitSet;
 use crate::mcp_link;
 use crate::menu::{self, Command, MenuState};
 use crate::panel::{Dropdown, Entry, Id};
-use crate::picker::{self, Outcome, Picker, PickerLayout, Purpose};
+use crate::picker::{self, Export, Outcome, Picker, PickerLayout, Purpose};
 use crate::store;
 use crate::update;
 use crate::view::{self, Cursor, Hit, KitView, View};
@@ -77,6 +77,10 @@ pub enum Workspace {
 
 /// Save this long after the last edit.
 const SAVE_DELAY: Duration = Duration::from_secs(1);
+/// Why a WAV export is refused.
+const NOTHING_TO_RENDER: &str = "nothing to render with (no samples loaded)";
+/// Why the synth sounds cannot be exported.
+const NO_SYNTHS: &str = "No synth sounds loaded";
 
 /// `beat 2.3`: a cursor position.
 fn beat_label(beat: i32, step: i32) -> String {
@@ -568,14 +572,10 @@ impl Session {
     }
 
     /// Ctrl+E: the selected pattern (with Shift: the selected song) to a WAV
-    /// file in the exports folder.
-    pub fn export_wav(&mut self, song: bool) {
-        let Some(dir) = store::exports_dir() else {
-            self.message = "no user data folder to export to".into();
-            return;
-        };
+    /// file in `dir`.
+    fn export_wav(&mut self, song: bool, dir: &Path) {
         let Some(setup) = &self.render else {
-            self.message = "nothing to render with (no samples loaded)".into();
+            self.message = NOTHING_TO_RENDER.into();
             return;
         };
         let library = self.editor.library();
@@ -616,12 +616,8 @@ impl Session {
         };
     }
 
-    /// Ctrl+M: the selected pattern to a MIDI file in the exports folder.
-    pub fn export_midi(&mut self) {
-        let Some(dir) = store::exports_dir() else {
-            self.message = "no user data folder to export to".into();
-            return;
-        };
+    /// Ctrl+M: the selected pattern to a MIDI file in `dir`.
+    fn export_midi(&mut self, dir: &Path) {
         let Some(pattern) = self.pattern() else { return };
         let mut rng = Rng::new(1);
         let bytes = midi::export(pattern, 1, &self.roots, &mut rng, &self.scales);
@@ -634,9 +630,9 @@ impl Session {
     }
 
     /// Ctrl+S: the pattern as `Exporter.export()`
-    /// writes it, to `ordrumbox-<name>.json` in the exports folder.
-    pub fn export_pattern_json(&mut self) {
-        self.message = match self.write_pattern_json(self.pattern_index) {
+    /// writes it, to `ordrumbox-<name>.json` in `dir`.
+    fn export_pattern_json(&mut self, dir: &Path) {
+        self.message = match self.write_pattern_json(self.pattern_index, dir) {
             Ok(path) => format!(
                 "Pattern \"{}\" exported to {}",
                 self.pattern().and_then(|p| p.name.as_deref()).unwrap_or("pattern"),
@@ -646,9 +642,8 @@ impl Session {
         };
     }
 
-    /// Pattern `p` as JSON in the exports folder (`ordrumbox-<name>.json`); the file.
-    pub(super) fn write_pattern_json(&self, p: usize) -> Result<PathBuf, String> {
-        let dir = store::exports_dir().ok_or("no user data folder to export to")?;
+    /// Pattern `p` as JSON in `dir` (`ordrumbox-<name>.json`); the file.
+    pub(super) fn write_pattern_json(&self, p: usize, dir: &Path) -> Result<PathBuf, String> {
         let pattern = self.editor.library().patterns.get(p).ok_or("No pattern selected")?;
         let name = pattern.name.as_deref().unwrap_or("pattern");
         let path = dir.join(format!("ordrumbox-{}.json", store::safe_name(name)));
@@ -871,9 +866,9 @@ impl Session {
         match command {
             C::Save => self.save(),
             C::ImportMidi => self.open_picker(Purpose::ImportMidi),
-            C::ExportWav => self.export_wav(false),
-            C::ExportSongWav => self.export_wav(true),
-            C::ExportMidi => self.export_midi(),
+            C::ExportWav => self.open_export(Export::PatternWav),
+            C::ExportSongWav => self.open_export(Export::SongWav),
+            C::ExportMidi => self.open_export(Export::PatternMidi),
             C::Quit => self.quit = true,
             C::Undo => self.undo(),
             C::Redo => self.redo(),
@@ -932,11 +927,12 @@ impl Session {
             C::RenameSong => self.text_entry(Id::SongName),
             C::SongDescription => self.text_entry(Id::SongDescription),
             C::SaveSong => self.song_button("save"),
+            C::SaveSongAs => self.song_button("saveas"),
             C::LoadSong => self.song_button("load"),
             C::ExportSong => self.song_button("export"),
             C::ImportSong => self.song_button("import"),
             C::NormalizeKit => self.kit_normalize(),
-            C::ExportMapping => self.kit_export(),
+            C::ExportMapping => self.open_export(Export::KitMapping),
             C::LoadMapping => self.open_picker(Purpose::LoadMapping),
             C::AddSample => self.open_picker(Purpose::AddSample),
             C::ReplaceSample => self.open_picker(Purpose::ReplaceSample),
@@ -945,7 +941,7 @@ impl Session {
             C::SelectRandomPattern => self.select_random_pattern(),
             C::SelectRandomDrumkit => self.select_random_drumkit(),
             C::ToggleVus => self.toggle_vus(),
-            C::ExportPatternJson => self.export_pattern_json(),
+            C::ExportPatternJson => self.open_export(Export::PatternJson),
             C::ConvertToSynth => self.convert_to_generated_sounds(),
             C::AutoAssignAll => self.auto_assign_all_tracks(),
             C::RandomSamples => self.assign_random_samples(),
@@ -964,6 +960,36 @@ impl Session {
 
     fn open_picker(&mut self, purpose: Purpose) {
         self.overlay = Some(Overlay::Picker(Picker::new(purpose, self.last_dir.as_deref())));
+    }
+
+    /// Ask for the folder to write `export` to: the last one picked, at first
+    /// the exports folder. What cannot be exported is said at once.
+    pub(super) fn open_export(&mut self, export: Export) {
+        let refusal = match export {
+            Export::PatternWav | Export::SongWav if self.render.is_none() => Some(NOTHING_TO_RENDER),
+            Export::Synths if self.synths.is_empty() => Some(NO_SYNTHS),
+            _ => None,
+        };
+        if let Some(refusal) = refusal {
+            self.message = refusal.into();
+            return;
+        }
+        let start = self.last_dir.clone().filter(|d| d.is_dir()).or_else(store::exports_dir);
+        self.overlay = Some(Overlay::Picker(Picker::new(Purpose::Export(export), start.as_deref())));
+    }
+
+    /// `export` written to the folder picked.
+    fn export_to(&mut self, export: Export, dir: &Path) {
+        match export {
+            Export::PatternWav => self.export_wav(false, dir),
+            Export::SongWav => self.export_wav(true, dir),
+            Export::PatternMidi => self.export_midi(dir),
+            Export::PatternJson => self.export_pattern_json(dir),
+            Export::Song => self.export_song(dir),
+            Export::SongSaveAs => self.save_song_as(dir),
+            Export::Synths => self.export_synths(dir),
+            Export::KitMapping => self.kit_export(dir),
+        }
     }
 
     /// A panel (file picker, key list, about) is over the window.
@@ -1042,6 +1068,7 @@ impl Session {
             Purpose::ReplaceTrackSample => self.replace_track_sample(&path),
             Purpose::ReplaceSample => self.drop_path(&path, true),
             Purpose::AddSample | Purpose::LoadMapping | Purpose::ImportFolder => self.drop_path(&path, false),
+            Purpose::Export(export) => self.export_to(export, &path),
         }
     }
 
@@ -1220,13 +1247,9 @@ impl Session {
         self.message = "Auto-detect complete".into();
     }
 
-    /// E: the kit's mapping to a JSON file in the exports folder.
-    pub fn kit_export(&mut self) {
-        let Some(dir) = store::exports_dir() else {
-            self.message = "no user data folder to export to".into();
-            return;
-        };
-        self.message = self.kits.export_mapping(self.kit_index, &dir).unwrap_or_else(|e| e);
+    /// E: the kit's mapping to a JSON file in `dir`.
+    fn kit_export(&mut self, dir: &Path) {
+        self.message = self.kits.export_mapping(self.kit_index, dir).unwrap_or_else(|e| e);
     }
 
     /// A file or folder dropped on the window (Shift: a WAV replaces the

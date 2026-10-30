@@ -288,22 +288,18 @@ impl Session {
                 self.synths_changed();
                 self.message = format!("\"{key}\" reverted");
             }
-            "export" => self.export_synths(),
+            "export" => self.open_export(Export::Synths),
             "import" => self.open_picker(Purpose::ImportSynth),
             _ => {}
         }
     }
 
-    /// Export: every preset to `exports/ordrumbox-synth-sounds.json`.
-    fn export_synths(&mut self) {
+    /// Export: every preset to `ordrumbox-synth-sounds.json` in `dir`.
+    pub(super) fn export_synths(&mut self, dir: &Path) {
         if self.synths.is_empty() {
-            self.message = "No synth sounds loaded".into();
+            self.message = NO_SYNTHS.into();
             return;
         }
-        let Some(dir) = store::exports_dir() else {
-            self.message = "no user data folder to export to".into();
-            return;
-        };
         let path = dir.join("ordrumbox-synth-sounds.json");
         self.message = match store::save_synths(&path, &self.synths) {
             Ok(()) => format!("Synth sounds exported to {}", path.display()),

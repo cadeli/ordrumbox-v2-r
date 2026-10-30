@@ -22,6 +22,7 @@ pub enum Command {
     RenameSong,
     SongDescription,
     SaveSong,
+    SaveSongAs,
     LoadSong,
     ExportSong,
     ImportSong,
@@ -198,21 +199,22 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
                 command("Save", "", C::Save, s.can_save),
                 Item::Separator,
                 command("Save song", "", C::SaveSong, s.can_save_song),
+                command("Save song as...", "", C::SaveSongAs, true),
                 command("Load song...", "", C::LoadSong, s.saved_songs),
-                command("Export song", "", C::ExportSong, true),
+                command("Export song...", "", C::ExportSong, true),
                 command("Import song...", "", C::ImportSong, true),
                 Item::Separator,
                 command("Import MIDI file...", "Ctrl+O", C::ImportMidi, true),
-                command("Export pattern as JSON", "Ctrl+S", C::ExportPatternJson, p),
-                command("Export pattern as MIDI", "Ctrl+M", C::ExportMidi, p),
-                command("Export pattern as WAV", "Ctrl+E", C::ExportWav, p && s.can_render),
-                command("Export song as WAV", "Ctrl+Shift+E", C::ExportSongWav, s.has_songs && s.can_render),
+                command("Export pattern as JSON...", "Ctrl+S", C::ExportPatternJson, p),
+                command("Export pattern as MIDI...", "Ctrl+M", C::ExportMidi, p),
+                command("Export pattern as WAV...", "Ctrl+E", C::ExportWav, p && s.can_render),
+                command("Export song as WAV...", "Ctrl+Shift+E", C::ExportSongWav, s.has_songs && s.can_render),
                 Item::Separator,
                 command("Add sample...", "", C::AddSample, !s.kits.is_empty()),
                 command("Replace sample...", "", C::ReplaceSample, s.kit_sample),
                 command("Import folder as kit...", "", C::ImportFolder, true),
                 command("Load kit mapping...", "", C::LoadMapping, true),
-                command("Export kit mapping", "", C::ExportMapping, !s.kits.is_empty()),
+                command("Export kit mapping...", "", C::ExportMapping, !s.kits.is_empty()),
                 Item::Separator,
                 command("Quit", "Ctrl+Q", C::Quit, true),
             ],
@@ -557,9 +559,9 @@ mod tests {
         // Redo, copy and paste cannot run: the next is nothing else but Undo again.
         assert_eq!(open.step(&menus, 1).command(&menus), Some(Command::Undo));
         let file = Open::new(&menus, 0, true);
-        // Save, Save song and Load song are greyed out: the first item highlighted is Export song.
-        assert_eq!(file.command(&menus), Some(Command::ExportSong));
-        assert_eq!(file.step(&menus, 1).command(&menus), Some(Command::ImportSong));
+        // Save, Save song and Load song are greyed out: the first item highlighted is Save song as.
+        assert_eq!(file.command(&menus), Some(Command::SaveSongAs));
+        assert_eq!(file.step(&menus, 1).command(&menus), Some(Command::ExportSong));
         assert_eq!(file.switch(&menus, -1).menu, menus.len() - 1);
     }
 
@@ -575,7 +577,7 @@ mod tests {
             assert!(song.contains(&command), "{command:?}");
         }
         assert!(song.contains(&C::RenameSong) && song.contains(&C::SongDescription));
-        for command in [C::SaveSong, C::ExportSong, C::ImportSong] {
+        for command in [C::SaveSong, C::SaveSongAs, C::ExportSong, C::ImportSong] {
             assert!(file.contains(&command), "{command:?}");
         }
         // Load needs saved songs.
@@ -588,6 +590,7 @@ mod tests {
         use Command as C;
         let file_commands = [
             C::SaveSong,
+            C::SaveSongAs,
             C::LoadSong,
             C::ExportSong,
             C::ImportSong,
