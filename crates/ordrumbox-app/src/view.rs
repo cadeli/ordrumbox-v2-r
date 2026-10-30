@@ -620,8 +620,10 @@ pub fn draw_tooltip(canvas: &mut Canvas, text: &str, cell: Rect, scale: i32) {
 /// A panel over the window: a title and lines of text (the key list, about).
 pub fn draw_notice(canvas: &mut Canvas, title: &str, lines: &[String], scale: i32) {
     let line_h = 11 * scale;
-    let width =
-        lines.iter().map(|l| text_width(l, scale)).chain([text_width(title, scale)]).max().unwrap_or(0) + 32 * scale;
+    let close = "ESC or click: close";
+    // The title shares its line with `close`.
+    let title_width = text_width(title, scale) + 16 * scale + text_width(close, scale);
+    let width = lines.iter().map(|l| text_width(l, scale)).chain([title_width]).max().unwrap_or(0) + 32 * scale;
     let height = (lines.len() as i32 + 3) * line_h + 16 * scale;
     let x = ((canvas.width() - width) / 2).max(0);
     let y = ((canvas.height() - height) / 2).max(menu::bar_height(scale));
@@ -632,7 +634,6 @@ pub fn draw_notice(canvas: &mut Canvas, title: &str, lines: &[String], scale: i3
     for (i, line) in lines.iter().enumerate() {
         canvas.text(x + 16 * scale, y + 10 * scale + (i as i32 + 2) * line_h, line, scale, TEXT);
     }
-    let close = "ESC or click: close";
     canvas.text(x + width - 16 * scale - text_width(close, scale), y + 10 * scale, close, scale, DIM);
 }
 

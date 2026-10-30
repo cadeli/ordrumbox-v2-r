@@ -76,7 +76,9 @@ impl Session {
         let action = parts.next().unwrap_or_default();
         let mut number = || parts.next().and_then(|v| v.parse::<i32>().ok());
         let Some(t) = number().and_then(|t| usize::try_from(t).ok()) else { return };
-        let Some(name) = self.track(t).map(|track| track.name.clone()) else { return };
+        if self.track(t).is_none() {
+            return;
+        }
         let (beat, step) = (number().unwrap_or(0), number().unwrap_or(0));
         self.cursor = Some(Cursor { track: t, beat, step });
         match action {
@@ -89,13 +91,7 @@ impl Session {
             "clear" => self.clear_track(t),
             "copy-notes" => self.copy(false),
             "paste-notes" => self.paste(false),
-            "delete-notes" => {
-                let count = self
-                    .track(t)
-                    .map_or(0, |track| track.notes.iter().filter(|n| n.beat == beat && n.step == step).count());
-                self.delete_step();
-                self.message = format!("Deleted {} - {name} @ {}", notes_label(count), beat_label(beat, step));
-            }
+            "delete-notes" => self.delete_step(),
             "random-note" => self.add_random_note(t, beat, step),
             _ => {}
         }
@@ -217,6 +213,7 @@ mod tests {
         assert_eq!(s.pattern().unwrap().tracks.len(), count + 2);
         s.track_menu(1, 10, 10);
         pick(&mut s, "Delete track");
+        s.overlay_key(OverlayKey::Enter);
         assert_eq!(s.pattern().unwrap().tracks.len(), count + 1);
     }
 

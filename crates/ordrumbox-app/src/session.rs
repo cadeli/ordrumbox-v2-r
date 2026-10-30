@@ -37,7 +37,10 @@ use crate::picker::{self, Export, Outcome, Picker, PickerLayout, Purpose};
 use crate::store;
 use crate::update;
 use crate::view::{self, Cursor, Hit, KitView, View};
+use session_confirm::Pending;
 
+#[path = "session_confirm.rs"]
+mod session_confirm;
 #[path = "session_grid.rs"]
 mod session_grid;
 #[cfg(test)]
@@ -291,6 +294,8 @@ enum Overlay {
         export: Export,
         path: PathBuf,
     },
+    /// What removes or replaces the user's work, until the user says so.
+    Confirm(Pending),
 }
 
 /// Every key, for Help > Keyboard shortcuts.
@@ -1090,8 +1095,10 @@ impl Session {
                 return;
             }
             if matches!(key, OverlayKey::Enter) {
-                if let Some(Overlay::ConfirmOverwrite { export, path }) = self.overlay.take() {
-                    self.write_export(export, &path);
+                match self.overlay.take() {
+                    Some(Overlay::ConfirmOverwrite { export, path }) => self.write_export(export, &path),
+                    Some(Overlay::Confirm(pending)) => self.run_pending(pending),
+                    _ => {}
                 }
                 return;
             }
@@ -1321,7 +1328,14 @@ impl Session {
     /// Delete: the selected sample out of the kit.
     pub fn kit_remove(&mut self) {
         let Some(sample) = self.kit_editor else { return };
-        if let Some(message) = self.kits.remove(self.kit_index, sample) {
+        let kit = self.kit_index;
+        if self.kits.kits.get(kit).is_some_and(|k| sample < k.samples.len()) {
+            self.ask(Pending::RemoveSample { kit, sample });
+        }
+    }
+
+    fn kit_remove_now(&mut self, kit: usize, sample: usize) {
+        if let Some(message) = self.kits.remove(kit, sample) {
             self.kits_changed(message);
         }
     }
@@ -1576,6 +1590,15 @@ impl Session {
     /// Pattern > Compact tracks (the tools panel's button): every track
     /// shortened to its shortest loop, when its notes repeat one.
     pub fn compact_tracks(&mut self) {
+        let can_compact = |track: &Track| track.clone().compact_loop();
+        if self.pattern().is_some_and(|p| p.tracks.iter().any(can_compact)) {
+            self.ask(Pending::CompactTracks);
+        } else {
+            self.compact_tracks_now();
+        }
+    }
+
+    fn compact_tracks_now(&mut self) {
         let count = self.editor.compact_pattern(self.pattern_index);
         if count == 0 {
             self.message = "no track repeats a shorter loop".into();
@@ -1587,10 +1610,29 @@ impl Session {
         self.message = format!("compacted {count} track{}", if count == 1 { "" } else { "s" });
     }
 
+    /// Clear the cursor step: at once for a single note, else once confirmed.
     pub fn delete_step(&mut self) {
         let Some(c) = self.cursor else { return };
+        if self.step_note_count(c) > 1 {
+            self.ask(Pending::ClearStep(c));
+        } else {
+            self.delete_step_now();
+        }
+    }
+
+    /// How many notes step `c` holds.
+    fn step_note_count(&self, c: Cursor) -> usize {
+        self.track(c.track)
+            .map_or(0, |track| track.notes.iter().filter(|n| n.beat == c.beat && n.step == c.step).count())
+    }
+
+    fn delete_step_now(&mut self) {
+        let Some(c) = self.cursor else { return };
+        let count = self.step_note_count(c);
+        let name = self.track(c.track).map(|track| track.name.clone()).unwrap_or_default();
         if self.editor.delete_step(self.pattern_index, c.track, c.beat, c.step) {
             self.edited();
+            self.message = format!("Deleted {} - {name} @ {}", notes_label(count), beat_label(c.beat, c.step));
         }
         self.selected = None;
     }
@@ -1684,7 +1726,13 @@ impl Session {
         let Some(t) = self.focus_track() else { return };
         if self.pattern().is_some_and(|p| p.tracks.len() <= 1) {
             self.message = "Cannot delete the last track".into();
-        } else if self.editor.remove_track(self.pattern_index, t) {
+        } else {
+            self.ask(Pending::RemoveTrack(t));
+        }
+    }
+
+    fn remove_track_now(&mut self, t: usize) {
+        if self.editor.remove_track(self.pattern_index, t) {
             self.selected = None;
             self.edited();
             self.clamp_selection();
@@ -1694,10 +1742,17 @@ impl Session {
 
     /// Remove every note of track `t`.
     pub(super) fn clear_track(&mut self, t: usize) {
-        let Some(name) = self.track(t).map(|track| track.name.clone()) else { return };
-        if self.track(t).is_some_and(|track| track.notes.is_empty()) {
+        let Some(track) = self.track(t) else { return };
+        if track.notes.is_empty() {
             self.message = "No notes to clear".into();
-        } else if self.editor.clean_track(self.pattern_index, t) {
+        } else {
+            self.ask(Pending::ClearTrack(t));
+        }
+    }
+
+    fn clear_track_now(&mut self, t: usize) {
+        let Some(name) = self.track(t).map(|track| track.name.clone()) else { return };
+        if self.editor.clean_track(self.pattern_index, t) {
             self.selected = None;
             self.edited();
             self.message = format!("Cleared notes on \"{name}\"");
@@ -1761,6 +1816,14 @@ impl Session {
             self.message = "select a track first".into();
             return;
         };
+        if self.track(t).is_some_and(|track| !track.notes.is_empty()) {
+            self.ask(Pending::RandomTrack(t));
+        } else {
+            self.randomize_track_now(t);
+        }
+    }
+
+    fn randomize_track_now(&mut self, t: usize) {
         let rng = &mut self.rng;
         if self.editor.randomize_track(self.pattern_index, t, &mut || rng.next_f64()) {
             self.selected = None;
@@ -2014,6 +2077,10 @@ impl Session {
                     "ENTER: replace it   ESC: keep it".to_owned(),
                 ];
                 view::draw_notice(canvas, "Replace the file?", &lines, scale)
+            }
+            Some(Overlay::Confirm(pending)) => {
+                let (title, lines) = self.confirm_text(pending);
+                view::draw_notice(canvas, title, &lines, scale)
             }
             None => {}
         }

@@ -175,6 +175,10 @@ impl Session {
 
     /// Run tool `name` on `args` (an object); what it answers.
     pub(super) fn mcp_call(&mut self, name: &str, args: &Value) -> Result<Value, String> {
+        // What waits for the user holds indexes that an edit would shift.
+        if self.confirm_open() {
+            return Err("A confirmation is open in the app: the user must answer it first".into());
+        }
         let revision = self.editor.revision();
         let outcome = match name {
             "listPatterns" => Ok(self.mcp_list_patterns()),
