@@ -5,7 +5,8 @@
 //!, then any sample. Each tier picks at random among
 //! its candidates; `pick(n)` makes that choice (an index below `n`), so the
 //! JS choices can be reproduced. A synth track without a valid preset gets a
-//! random one.
+//! random one. The same matching picks a synth preset for a track name
+//! ([`synth_for`]), the presets standing as one kit.
 
 use ordrumbox_core::drum_taxonomy::instrument_family;
 use ordrumbox_core::instruments::{self, Catalog};
@@ -30,9 +31,25 @@ fn normalize(name: &str) -> String {
     name.trim().to_uppercase()
 }
 
-/// The auto-assignment over a bank, with kit `kit` selected.
+/// What the matching sees of a sound: the kit it belongs to and its key.
+#[derive(Debug, Clone, Copy)]
+struct Candidate<'a> {
+    kit: &'a str,
+    key: &'a str,
+}
+
+/// Kit name the synth presets are matched under.
+const SYNTH_KIT: &str = "synth";
+
+/// The key a preset is matched by: `KICK_SYNTH` plays a `KICK` track, `BASS0`
+/// to `BASS5` a `BASS` track.
+fn preset_match_key(key: &str) -> &str {
+    key.strip_suffix("_SYNTH").unwrap_or(key).trim_end_matches(|c: char| c.is_ascii_digit())
+}
+
+/// The auto-assignment over a list of sounds, with kit `kit` selected.
 pub struct AutoAssign<'a> {
-    bank: &'a SampleBank,
+    candidates: Vec<Candidate<'a>>,
     kit: &'a str,
     catalog: &'a Catalog,
     pick: &'a mut dyn FnMut(usize) -> usize,
@@ -40,13 +57,20 @@ pub struct AutoAssign<'a> {
 
 impl std::fmt::Debug for AutoAssign<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("AutoAssign").field("kit", &self.kit).field("samples", &self.bank.samples.len()).finish()
+        f.debug_struct("AutoAssign").field("kit", &self.kit).field("candidates", &self.candidates.len()).finish()
     }
 }
 
 impl<'a> AutoAssign<'a> {
     pub fn new(bank: &'a SampleBank, kit: &'a str, pick: &'a mut dyn FnMut(usize) -> usize) -> Self {
-        Self { bank, kit, catalog: instruments::catalog(), pick }
+        let candidates = bank.samples.iter().map(|s: &'a BankSample| Candidate { kit: &s.kit, key: &s.sample.key });
+        Self { candidates: candidates.collect(), kit, catalog: instruments::catalog(), pick }
+    }
+
+    /// The matching over the synth presets, all in one kit.
+    fn over_synths(synths: &'a SynthPresets, pick: &'a mut dyn FnMut(usize) -> usize) -> Self {
+        let candidates = synths.keys().into_iter().map(|key| Candidate { kit: SYNTH_KIT, key: preset_match_key(key) });
+        Self { candidates: candidates.collect(), kit: SYNTH_KIT, catalog: instruments::catalog(), pick }
     }
 
     fn pick_from(&mut self, candidates: &[usize]) -> Option<usize> {
@@ -57,17 +81,15 @@ impl<'a> AutoAssign<'a> {
         candidates.get(i.min(candidates.len() - 1)).copied()
     }
 
-    /// Samples of `kit` (`Some`), of every kit but `exclude` (`exclude`), or all.
-    fn in_scope(&self, kit: Option<&str>, exclude: Option<&str>) -> impl Iterator<Item = (usize, &'a BankSample)> + 'a {
-        let (kit, exclude) = (kit.map(str::to_owned), exclude.map(str::to_owned));
-        self.bank.samples.iter().enumerate().filter(move |(_, s)| {
-            kit.as_deref().is_none_or(|k| s.kit == k) && exclude.as_deref().is_none_or(|k| s.kit != k)
-        })
+    /// Candidates of `kit` (`Some`), of every kit but `exclude` (`exclude`), or all.
+    fn in_scope(&self, kit: Option<&str>, exclude: Option<&str>) -> Vec<(usize, Candidate<'a>)> {
+        let in_it = |c: &Candidate<'a>| kit.is_none_or(|k| c.kit == k) && exclude.is_none_or(|k| c.kit != k);
+        self.candidates.iter().copied().enumerate().filter(|(_, c)| in_it(c)).collect()
     }
 
-    /// Samples whose key is one of `names` (normalized).
+    /// Candidates whose key is one of `names` (normalized).
     fn exact(&self, names: &[String], kit: Option<&str>, exclude: Option<&str>) -> Vec<usize> {
-        self.in_scope(kit, exclude).filter(|(_, s)| names.contains(&normalize(&s.sample.key))).map(|(i, _)| i).collect()
+        self.in_scope(kit, exclude).iter().filter(|(_, c)| names.contains(&normalize(c.key))).map(|(i, _)| *i).collect()
     }
 
     /// `#resolveInstrumentId`: a catalog id for the track name, else the name.
@@ -81,12 +103,22 @@ impl<'a> AutoAssign<'a> {
         }
     }
 
-    /// `autoAssignTrackSounds`: the sample for a track named `name`; `None`
-    /// when the bank is empty or the selected kit does not exist.
+    /// `autoAssignTrackSounds`: the candidate for a track named `name`; `None`
+    /// when there is no candidate or the selected kit does not exist.
     pub fn sample_for(&mut self, name: &str) -> Option<usize> {
         if self.kit.is_empty() {
             return None; // no kit selected: the track keeps no sample
         }
+        if let Some(found) = self.matching(name) {
+            return Some(found);
+        }
+        let all: Vec<usize> = (0..self.candidates.len()).collect();
+        self.pick_from(&all)
+    }
+
+    /// The candidate that matches the track name `name`: by key, then by the
+    /// catalog's substitutes.
+    fn matching(&mut self, name: &str) -> Option<usize> {
         let match_name = self.resolve_instrument_id(name);
         let mut names = vec![normalize(name)];
         if normalize(&match_name) != names[0] {
@@ -101,11 +133,7 @@ impl<'a> AutoAssign<'a> {
         if let Some(found) = self.pick_from(&tier2) {
             return Some(found);
         }
-        if let Some(found) = self.equivalence(&match_name) {
-            return Some(found);
-        }
-        let all: Vec<usize> = (0..self.bank.samples.len()).collect();
-        self.pick_from(&all)
+        self.equivalence(&match_name)
     }
 
     /// `findSoundEquivalence`: the catalog substitutes of `track_name`.
@@ -144,13 +172,14 @@ impl<'a> AutoAssign<'a> {
         }
         let ids: Vec<usize> = self
             .in_scope(kit, None)
-            .filter(|(_, s)| s.sample.key.to_uppercase().contains(&search))
-            .map(|(i, _)| i)
+            .iter()
+            .filter(|(_, c)| c.key.to_uppercase().contains(&search))
+            .map(|(i, _)| *i)
             .collect();
         self.pick_from(&ids)
     }
 
-    /// `getSampleIdFromTrackname`: exact key, else a sample of the same
+    /// `getSampleIdFromTrackname`: exact key, else a candidate of the same
     /// coarse type (only drum sounds for a drum instrument).
     fn by_track_name(&mut self, name: &str, kit: Option<&str>) -> Option<usize> {
         let kind = instrument_family(name);
@@ -158,8 +187,8 @@ impl<'a> AutoAssign<'a> {
         let drums_only = self.catalog.by_id(name).is_some_and(|i| i.drum);
         let is_drum_sound = |key: &str| self.catalog.by_id(key).is_none_or(|i| i.drum);
         let (mut exact, mut same_type) = (Vec::new(), Vec::new());
-        for (i, sample) in self.in_scope(kit, None) {
-            let key = &sample.sample.key;
+        for (i, candidate) in self.in_scope(kit, None) {
+            let key = candidate.key;
             if normalize(key) == wanted {
                 exact.push(i);
             } else if instrument_family(key) == kind && (!drums_only || is_drum_sound(key)) {
@@ -169,6 +198,13 @@ impl<'a> AutoAssign<'a> {
         let candidates = if exact.is_empty() { same_type } else { exact };
         self.pick_from(&candidates)
     }
+}
+
+/// The synth preset whose name matches a track named `name`, by the rules of
+/// the auto-assignment; `None` when none does.
+pub fn synth_for(name: &str, synths: &SynthPresets, pick: &mut dyn FnMut(usize) -> usize) -> Option<String> {
+    let found = AutoAssign::over_synths(synths, pick).matching(name)?;
+    synths.keys().get(found).map(|key| (*key).to_owned())
 }
 
 /// What every track of `pattern` plays: synth tracks
@@ -210,4 +246,42 @@ pub fn assign_track(
         return TrackSound::None;
     }
     AutoAssign::new(bank, kit, pick).sample_for(&track.name).map_or(TrackSound::None, TrackSound::Sample)
+}
+
+#[cfg(test)]
+mod tests {
+    use ordrumbox_core::json;
+
+    use super::*;
+
+    fn synths(keys: &[&str]) -> SynthPresets {
+        let entries: Vec<String> = keys.iter().map(|key| format!("\"{key}\":{{}}")).collect();
+        SynthPresets::from_json(&json::parse(&format!("{{{}}}", entries.join(","))).unwrap())
+    }
+
+    #[test]
+    fn a_track_gets_the_preset_of_its_name() {
+        let presets = synths(&["BASS0", "SN", "TOM", "KICK_SYNTH", "SNARE_SYNTH", "CLAP_SYNTH", "CHH_SYNTH"]);
+        let mut first = |_: usize| 0;
+        for (name, want) in
+            [("KICK", "KICK_SYNTH"), ("SNARE", "SNARE_SYNTH"), ("CLAP", "CLAP_SYNTH"), ("CHH", "CHH_SYNTH")]
+        {
+            assert_eq!(synth_for(name, &presets, &mut first).as_deref(), Some(want));
+        }
+    }
+
+    #[test]
+    fn a_numbered_preset_plays_the_track_of_its_name() {
+        let presets = synths(&["TOM", "BELL1", "BASS0", "BASS1"]);
+        let (mut first, mut last) = (|_: usize| 0, |n: usize| n - 1);
+        assert_eq!(synth_for("BASS", &presets, &mut first).as_deref(), Some("BASS0"));
+        assert_eq!(synth_for("BASS", &presets, &mut last).as_deref(), Some("BASS1"));
+    }
+
+    #[test]
+    fn a_name_nothing_matches_gets_no_preset() {
+        let mut first = |_: usize| 0;
+        assert_eq!(synth_for("KICK", &synths(&[]), &mut first), None);
+        assert_eq!(synth_for("ZZZ", &synths(&["PIANO"]), &mut first), None);
+    }
 }
