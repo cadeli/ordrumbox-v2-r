@@ -474,11 +474,15 @@ const currentKeys = (value, key) => {
 await write('crates/ordrumbox-logic/data/generators.json', currentKeys(portTables))
 await write('crates/ordrumbox-logic/tests/fixtures/generators.json', {
     scales: soundRegistry.scales,
-    tracks,
+    // What departs from the JS keeps its inputs and seeds only: its results
+    // are in `generators_rust.txt`.
+    tracks: tracks.map(({ track, draws, ...input }) =>
+        ['kick', 'snare', 'hat', 'clap', 'cowbell'].includes(input.kind) ? input : { ...input, track, draws },
+    ),
     random,
-    patterns,
-    loops,
-    toggles,
+    patterns: patterns.map(({ after, draws, ...input }) => input),
+    loops: loops.map(({ after, autoGen, ...input }) => ({ ...input, loopCount: after.length })),
+    toggles: toggles.map(({ after, ...input }) => ({ ...input, steps: after.map((a) => a.step) })),
 })
 process.stdout.write(
     `${tracks.length} track cases, ${random.length} random, ${patterns.length} patterns, ` +

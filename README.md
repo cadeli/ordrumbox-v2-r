@@ -577,11 +577,12 @@ node tools/export_gen_fixtures.mjs ../ordrumbox-v2
 - `ordrumbox-logic/tests/fixtures/generators.json`, with `Math.random`
   replaced by a seeded stream (mulberry32, also in the Rust test): every
   variant of every generator on several track setups, densities and seeds;
-  `generateRandom`; `generatePattern` on new and existing patterns; the
-  player's loop-start regeneration over 30–46 loops (auto tracks, `autoGen`
-  patterns); the ↻ Drum / Bass / Chords toggles. Rust must give the same
-  notes, track settings and number of draws, except where it generates fewer
-  notes on purpose (below).
+  `generateRandom`. Rust must give the same notes, track settings and number of
+  draws for the percussion and melodic lines and `generateRandom`. For what
+  departs on purpose (below) the file holds the inputs and seeds only: the drum
+  lines, `generatePattern` on new and existing patterns, the player's loop start
+  over 30–46 loops (auto tracks, `autoGen` patterns), the ↻ Drum / Bass / Chords
+  toggles.
 - `ordrumbox-logic/tests/fixtures/generators_rust.txt`: what departs from the
   JS, from the same inputs and seeds, as the Rust generators make it: whole
   patterns, loops, toggles, and the track cases of the changed variants. The

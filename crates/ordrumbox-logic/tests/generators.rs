@@ -314,7 +314,7 @@ fn rust_snapshot() -> Vec<String> {
     for (n, case) in items(&fixtures, "loops").iter().enumerate() {
         let mut pattern = pattern_in(case.get("before").unwrap());
         let mut stream = Stream::new(f(case, "seed"));
-        for index in 0..items(case, "after").len() {
+        for index in 0..f(case, "loopCount") as usize {
             let start = stream.draws;
             let mut rnd = || stream.next();
             run_loop(&mut AutoGenerator::new(&scales, &mut rnd), &mut pattern, index as u64);
@@ -325,8 +325,8 @@ fn rust_snapshot() -> Vec<String> {
     for (n, case) in items(&fixtures, "toggles").iter().enumerate() {
         let mut pattern = pattern_in(case.get("before").unwrap());
         let mut stream = Stream::new(f(case, "seed"));
-        for (i, expected) in items(case, "after").iter().enumerate() {
-            let step = expected.get("step").and_then(Value::as_str).unwrap();
+        for (i, step) in items(case, "steps").iter().enumerate() {
+            let step = step.as_str().unwrap();
             let start = stream.draws;
             let mut rnd = || stream.next();
             let mut g = AutoGenerator::new(&scales, &mut rnd);
