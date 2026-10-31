@@ -28,6 +28,27 @@ fn every_preset_sounds_and_ends() {
 }
 
 #[test]
+fn every_kit_sound_has_a_preset_and_no_preset_clips() {
+    let presets = presets();
+    for key in [
+        "KICK_SYNTH",
+        "SNARE_SYNTH",
+        "TOM_SYNTH",
+        "CLAP_SYNTH",
+        "COWBELL_SYNTH",
+        "CHH_SYNTH",
+        "OHH_SYNTH",
+        "CRASH_SYNTH",
+    ] {
+        assert!(presets.get(key).is_some(), "{key}");
+    }
+    for key in presets.keys() {
+        let m = measure(&render_note(presets.get(key).unwrap(), &NoteSettings::default()).unwrap());
+        assert!(m.peak < 1.0, "{key}: {}", m.peak);
+    }
+}
+
+#[test]
 fn the_gate_sets_the_length_and_the_note_the_pitch() {
     let preset =
         json::parse(r#"{"vco1":{"gain":1,"wave":"sine"},"bypassFilter":true,"envelope":{"sustain":1,"release":0.01}}"#)

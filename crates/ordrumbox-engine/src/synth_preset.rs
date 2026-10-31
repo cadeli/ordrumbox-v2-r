@@ -104,6 +104,17 @@ impl SynthPresets {
         self.0.remove(key)
     }
 
+    /// Add the presets of `other` this one does not hold, leaving its own as they are.
+    pub fn add_missing(&mut self, other: &Self) {
+        for key in other.keys() {
+            if self.get(key).is_none()
+                && let Some(preset) = other.get(key)
+            {
+                self.set(key, preset.clone());
+            }
+        }
+    }
+
     /// The presets as `generated_sounds.json` holds them.
     pub fn to_json(&self) -> Value {
         Value::Object(self.0.clone())
@@ -280,6 +291,14 @@ mod tests {
         // 0.8 / 0.5 = 1.6, accented (×1.25), master volume 0.8.
         assert!((patch.velocity - 1.6 * 0.8 * 1.25).abs() < 1e-12);
         assert_eq!(patch.envelope, Adsr { attack: 0.01, decay: 0.1, sustain: 0.7, release: 0.1 });
+    }
+
+    #[test]
+    fn add_missing_keeps_what_is_there() {
+        let presets = |text: &str| SynthPresets::from_json(&json::parse(text).unwrap());
+        let mut saved = presets(r#"{"A":{"masterVolume":0.1}}"#);
+        saved.add_missing(&presets(r#"{"A":{"masterVolume":0.9},"B":{"masterVolume":0.5}}"#));
+        assert_eq!(saved, presets(r#"{"A":{"masterVolume":0.1},"B":{"masterVolume":0.5}}"#));
     }
 
     #[test]
