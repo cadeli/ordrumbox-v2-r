@@ -13,6 +13,8 @@ const QUANTUM: usize = 128;
 /// Largest difference allowed with the JS output (math functions of V8 and of
 /// the platform may differ in their last bit).
 const TOLERANCE: f32 = 2e-5;
+/// One frame kept out of this many in `synth_renders.bin`.
+const SNAPSHOT_STRIDE: usize = 16;
 
 struct Fixtures {
     full_frames: usize,
@@ -211,6 +213,68 @@ fn render_effect(case: &Value, frames: usize) -> (Vec<f32>, Vec<f32>) {
     (out_l, out_r)
 }
 
+/// Whether a synth case uses what the voice does differently from the JS
+/// processor on purpose (`synth.rs`): the sub, the pitch punch or FM, set or
+/// reached by an LFO. Such a case is checked against `synth_renders.bin`.
+fn departs_from_js(case: &Value) -> bool {
+    /// LFO targets: sub gain, pitch punch, FM amount, FM algorithm.
+    const DEPARTING_TARGETS: [f64; 4] = [19.0, 20.0, 24.0, 25.0];
+    let messages = case.get("messages").and_then(Value::as_array).expect("messages");
+    let update = messages.iter().find(|m| m.get("type").and_then(Value::as_str) == Some("update")).expect("update");
+    let patch = patch_from_update(update);
+    patch.sub_gain > 0.0
+        || patch.pitch_punch > 0.0
+        || patch.fm_amount > 0.0
+        || [patch.lfo1.target, patch.lfo2.target].iter().any(|t| DEPARTING_TARGETS.contains(t))
+}
+
+fn synth_snapshot_path() -> std::path::PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/synth_renders.bin")
+}
+
+/// The stored frames of every case that departs from JS, left then right.
+fn synth_snapshot(fx: &Fixtures) -> Vec<(String, Vec<f32>)> {
+    let synth_case = |case: &&Value| case.get("processor").and_then(Value::as_str) == Some("synth-voice");
+    fx.cases
+        .iter()
+        .filter(synth_case)
+        .filter(|case| departs_from_js(case))
+        .map(|case| {
+            let (l, r) = render_synth(case, num(case, "frames") as usize);
+            let thin = |s: Vec<f32>| s.into_iter().step_by(SNAPSHOT_STRIDE);
+            let name = case.get("name").and_then(Value::as_str).expect("name").to_owned();
+            (name, thin(l).chain(thin(r)).collect())
+        })
+        .collect()
+}
+
+/// Writes `synth_renders.bin` from the voice as it is: `cargo test -p
+/// ordrumbox-dsp --test processors -- --ignored`, when its sound changes on
+/// purpose (`README.md`, "Golden fixtures").
+#[test]
+#[ignore = "writes the snapshot"]
+fn write_the_synth_snapshot() {
+    let bytes: Vec<u8> =
+        synth_snapshot(&fixtures()).iter().flat_map(|(_, s)| s).flat_map(|x| x.to_le_bytes()).collect();
+    std::fs::write(synth_snapshot_path(), bytes).expect("written");
+}
+
+#[test]
+fn the_synth_voice_matches_its_snapshot() {
+    let bytes = std::fs::read(synth_snapshot_path()).expect("synth_renders.bin");
+    let stored: Vec<f32> = bytes.chunks_exact(4).map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]])).collect();
+    let cases = synth_snapshot(&fixtures());
+    assert_eq!(stored.len(), cases.iter().map(|(_, s)| s.len()).sum::<usize>());
+    let mut rest = stored.as_slice();
+    for (name, samples) in &cases {
+        let (expected, after) = rest.split_at(samples.len());
+        rest = after;
+        for (got, want) in samples.iter().zip(expected) {
+            assert!((got - want).abs() <= TOLERANCE, "{name}: {got} instead of {want}");
+        }
+    }
+}
+
 /// The messages WorkletSynthVoice posts (update, trigger, update with the
 /// same values, release) as one start and one release.
 fn render_synth(case: &Value, frames: usize) -> (Vec<f32>, Vec<f32>) {
@@ -243,6 +307,9 @@ fn processors_match_the_js_worklets() {
     for case in &fx.cases {
         let name = case.get("name").and_then(Value::as_str).expect("name");
         let processor = case.get("processor").and_then(Value::as_str).expect("processor");
+        if processor == "synth-voice" && departs_from_js(case) {
+            continue;
+        }
         let frames = num(case, "frames") as usize;
         let stored = num(case, "stored") as usize;
         let offset = num(case, "offset") as usize;

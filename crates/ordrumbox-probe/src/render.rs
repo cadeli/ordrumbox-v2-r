@@ -54,7 +54,8 @@ fn render_from(preset: &Value, settings: &NoteSettings, start_frame: u64) -> Res
     let rate = f64::from(settings.sample_rate);
     let start = start_frame as f64 / rate;
     let mut voice = SynthVoice::default();
-    voice.start(&synth_patch(preset, note), 0, start, 1);
+    // Numbered as the engine numbers its notes: each has its own noise.
+    voice.start(&synth_patch(preset, note), 0, start, 1 + u64::from(start_frame > 0));
     voice.release_at(start + settings.gate());
 
     let max_frames = ((settings.gate() + MAX_TAIL_SECONDS) * rate) as usize;

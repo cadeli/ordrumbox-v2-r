@@ -8,6 +8,7 @@
 use ordrumbox_core::js;
 use ordrumbox_core::json::{self, Object, Value};
 use ordrumbox_core::lfo;
+use ordrumbox_engine::synth_preset::FM_DEVIATION;
 
 use crate::control::Spec;
 
@@ -466,7 +467,6 @@ fn wave_at(wave: &str, p: f64, cycle: f64) -> f64 {
 /// saturation, scaled to the master volume. `time`: when (the LFOs).
 pub fn scope(draft: &Object, time: f64, bpm: f64) -> Vec<f64> {
     const SAMPLES: usize = 1024;
-    const FM_DEPTH_SCALE: f64 = 0.08;
     let vco = |n: usize, key: &str, default: f64| number(draft, &format!("vco{n}.{key}")).unwrap_or(default);
     let waves: Vec<String> =
         (1..=3).map(|n| text(draft, &format!("vco{n}.wave")).unwrap_or("sine").to_owned()).collect();
@@ -487,7 +487,7 @@ pub fn scope(draft: &Object, time: f64, bpm: f64) -> Vec<f64> {
     let drive = number(draft, "filter.drive").or_else(|| number(draft, "drive")).unwrap_or(0.0);
     let base = 4.0 / SAMPLES as f64;
     let inc: Vec<f64> = ratio.iter().map(|r| base * r).collect();
-    let depth = fm_amount * FM_DEPTH_SCALE;
+    let (depth1, depth2) = (fm_amount * FM_DEVIATION * inc[0], fm_amount * FM_DEVIATION * inc[1]);
     let (mut phase, mut cycle) = ([0.0f64; 3], [0.0f64; 3]);
     let mut out = Vec::with_capacity(SAMPLES);
     for _ in 0..SAMPLES {
@@ -496,17 +496,17 @@ pub fn scope(draft: &Object, time: f64, bpm: f64) -> Vec<f64> {
         let (mut f1, mut f2, f3) = (inc[0], inc[1], inc[2]);
         if fm_amount > 0.001 {
             match fm_algo as i64 {
-                0 => f1 += o2 * depth,
-                1 => f1 += o3 * depth,
+                0 => f1 += o2 * depth1,
+                1 => f1 += o3 * depth1,
                 2 => {
-                    f1 += o2 * depth;
-                    f2 += o3 * depth;
+                    f1 += o2 * depth1;
+                    f2 += o3 * depth2;
                 }
-                3 => f1 += (o2 + o3) * depth,
+                3 => f1 += (o2 + o3) * depth1,
                 4 => {
                     let o1 = wave_at(&waves[0], phase[0], cycle[0]);
-                    f1 += o2 * depth;
-                    f2 += o1 * depth;
+                    f1 += o2 * depth1;
+                    f2 += o1 * depth2;
                 }
                 _ => {}
             }
@@ -517,7 +517,11 @@ pub fn scope(draft: &Object, time: f64, bpm: f64) -> Vec<f64> {
             cycle[i] += whole;
             phase[i] -= whole;
         }
-        let sub = if sub_gain > 0.0 { wave_at("sine", (phase[0] * 0.5) % 1.0, 0.0) * sub_gain } else { 0.0 };
+        let sub = if sub_gain > 0.0 {
+            wave_at("sine", (cycle[0].rem_euclid(2.0) + phase[0]) * 0.5, 0.0) * sub_gain
+        } else {
+            0.0
+        };
         let mut sample = (0..3).map(|i| wave_at(&waves[i], phase[i], cycle[i]) * gain[i]).sum::<f64>() + sub;
         if drive > 0.0 {
             let driven = sample * (1.0 + drive * 3.0);

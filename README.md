@@ -507,7 +507,16 @@ node tools/export_dsp_fixtures.mjs ../ordrumbox-v2
 - `ordrumbox-dsp/tests/fixtures/renders.{json,bin}`: strip, master bus and
   synth voice outputs (every preset of `generated_sounds.json`, every LFO
   target, FM algorithm and modulation target) for inputs both sides compute
-  bit for bit. The Rust processors must match within 2e-5.
+  bit for bit. The Rust processors must match within 2e-5, except the synth
+  cases that use what the voice does differently on purpose (below).
+- `ordrumbox-dsp/tests/fixtures/synth_renders.bin`: those synth cases as the
+  Rust voice renders them, one frame in 16. The voice departs from the JS
+  processor on its sub (an octave below oscillator 1, no DC), its pitch punch
+  (two octaves, not 24 cents), its FM (following the note, through zero) and
+  its noise (each note its own); the patch's level also counts the noise in
+  the mix. This file is the one fixture the JS app does not produce:
+  `cargo test -p ordrumbox-dsp --test processors -- --ignored` writes it, only
+  when the voice's sound changes on purpose.
 - `ordrumbox-engine/tests/fixtures/strip_settings.json`: the strip parameters
   `applyTrackToStrip()` sets for every track setup of `song.json`.
 - `ordrumbox-engine/tests/fixtures/lfo_values.json`: `computeLfoValue()` over
