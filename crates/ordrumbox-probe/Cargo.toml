@@ -1,0 +1,16 @@
+[package]
+name = "ordrumbox-probe"
+description = "orDrumbox sound measurements: levels, envelope, spectrum and pitch of synth presets and WAV files"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+ordrumbox-core.workspace = true
+ordrumbox-dsp.workspace = true
+ordrumbox-engine.workspace = true
+
+[lints]
+workspace = true
