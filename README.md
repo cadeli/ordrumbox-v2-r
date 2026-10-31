@@ -342,7 +342,7 @@ pitch, MIDI number and the settings that differ from the defaults (the JS
 | **, .** | previous / next kit |
 | **B** | generate a new pattern |
 | **F**, **G** | a random pattern, a random kit |
-| **H** | every track on a synth patch (by its type: KICK → BASS0, SNARE → SN…; random for the others) |
+| **H** | every track on the synth patch that matches its name, like auto-assign (KICK → KICK_SYNTH, SNARE → SNARE_SYNTH…; random when none does) |
 | **J** | every track back on auto-assign |
 | **K** | a random sample (of any kit) on every track |
 | **V** | VU meters on the track stripes (on / off) |

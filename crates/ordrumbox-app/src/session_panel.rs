@@ -6,12 +6,11 @@
 //! `drumkit_manager.js` and the pattern panel's volume sliders.
 
 use ordrumbox_core::SetField;
-use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::instruments::catalog;
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_core::{js, song};
 use ordrumbox_engine::TrackSound;
-use ordrumbox_engine::assign::assign_track;
+use ordrumbox_engine::assign::{assign_track, synth_for};
 
 use super::*;
 use crate::control::{Spec, Style};
@@ -80,20 +79,6 @@ enum NoteTarget {
 /// Width of the track editor on a `width`-wide window.
 fn panel_width(width: i32, scale: i32) -> i32 {
     (360 * scale).min(width / 2)
-}
-
-/// H's synth patch for a track type (`SYNTH_SOUND_MAP`; the JS OHH and TOM
-/// types are not detected here).
-fn synth_patch_for(kind: InstrumentFamily) -> Option<&'static str> {
-    match kind {
-        InstrumentFamily::Kick => Some("BASS0"),
-        InstrumentFamily::Snare => Some("SN"),
-        InstrumentFamily::Hat => Some("CHH_SYNTH"),
-        InstrumentFamily::Bass => Some("BASS2"),
-        InstrumentFamily::Perc => Some("SYNTH2"),
-        InstrumentFamily::Piano => Some("PIANO"),
-        InstrumentFamily::Clap | InstrumentFamily::Cowbell | InstrumentFamily::Organ => None,
-    }
 }
 
 fn num(v: f64) -> Value {
@@ -807,8 +792,8 @@ impl Session {
         self.dropdown = None;
     }
 
-    /// H: every track on the synth patch of its
-    /// type (`SYNTH_SOUND_MAP`), a random patch for a type without one.
+    /// H: every track on the synth patch that matches its name, written to the
+    /// track; a random patch for a name nothing matches.
     pub fn convert_to_generated_sounds(&mut self) {
         if self.pattern().is_none() {
             self.message = "No pattern selected".into();
@@ -819,20 +804,17 @@ impl Session {
             self.message = "No synth patches loaded".into();
             return;
         }
-        let rng = &mut self.rng;
+        let (rng, synths) = (&mut self.rng, &self.synths);
         let mut random = Vec::new();
         let changed =
             self.editor.update_tracks(self.pattern_index, "Convert tracks to generated sounds", |_, track| {
-                let kind = instrument_family(&track.name);
-                let mapped = synth_patch_for(kind).filter(|k| keys.iter().any(|key| key == k));
-                let key = mapped.map_or_else(
-                    || {
-                        let key = keys[rng.below(keys.len() as u64) as usize].clone();
-                        random.push(format!("{}→{key}", kind.name()));
-                        key
-                    },
-                    str::to_owned,
-                );
+                let mut pick = |n: usize| rng.below(n as u64) as usize;
+                let matched = synth_for(&track.name, synths, &mut pick);
+                let key = matched.unwrap_or_else(|| {
+                    let key = keys[pick(keys.len())].clone();
+                    random.push(format!("{}→{key}", track.name));
+                    key
+                });
                 vec![
                     ("useSynth", Value::Bool(true)),
                     ("autoAssign", Value::Bool(false)),
@@ -1448,13 +1430,13 @@ mod tests {
         assert_eq!(s.message, "No samples loaded");
         assert!(s.editor.history().next_undo().is_none());
 
-        let presets = ordrumbox_core::json::parse(r#"{"BASS0":{},"SN":{},"PIANO":{}}"#).unwrap();
+        let presets = ordrumbox_core::json::parse(r#"{"BASS0":{},"KICK_SYNTH":{},"SNARE_SYNTH":{}}"#).unwrap();
         s.synths = SynthPresets::from_json(&presets);
         s.run(Command::ConvertToSynth);
         let tracks = &s.pattern().unwrap().tracks;
         assert!(tracks.iter().all(|t| t.use_synth && !t.auto_assign));
         let keys: Vec<_> = tracks.iter().map(|t| t.synth_preset.as_deref()).collect();
-        assert_eq!(keys, [Some("BASS0"), Some("SN")]);
+        assert_eq!(keys, [Some("KICK_SYNTH"), Some("SNARE_SYNTH")]);
         assert_eq!(s.message, "All tracks converted to generated sounds");
         assert_eq!(s.editor.history().next_undo(), Some("Convert tracks to generated sounds"));
 
