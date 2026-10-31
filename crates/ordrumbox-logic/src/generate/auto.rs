@@ -4,17 +4,17 @@
 //!
 //! A pattern remembers its generation in three saved keys: `autoGenre`,
 //! `autoKeyOffset` (semitones) and `autoScale`. A track in auto mode
-//! (`auto`) gets a new line at every loop start; a pattern with `autoGen`
-//! regenerates its melodic tracks every loop and all of them at section
-//! boundaries.
+//! (`auto`), or any track of a pattern with `autoGen`, holds its line through
+//! a section of the song form: a new one at its start, a fill on the drums at
+//! its end.
 
 use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::json::Value;
 use ordrumbox_core::{Note, Pattern, Scales, Track, js};
 
 use super::structure::{
-    Structure, drum_track_limit, generate_structure, genre_swing, limit_drum_tracks, random_bass_variant, random_genre,
-    random_key_offset, random_scale, randomize_structure, section_harmony,
+    SectionElement, Structure, drum_track_limit, generate_structure, genre_swing, limit_drum_tracks,
+    random_bass_variant, random_genre, random_key_offset, random_scale, randomize_structure, section_harmony,
 };
 use super::{clamp, drums, melodic, table};
 
@@ -92,15 +92,16 @@ fn apply_genre_swing(g: &mut AutoGenerator<'_>, track: &mut Track, genre: Option
     track.swing_resolution = resolution as i32;
 }
 
-/// `#applyVariation`: the variation budget of a generated track, when it has none yet.
+/// `#applyVariation`: the variation budget of a generated track, when it has
+/// none yet. A drum line is a written rhythm, its variation an ornament; a
+/// bass or chord line plays as written until its section ends.
 fn apply_variation(g: &mut AutoGenerator<'_>, track: &mut Track, kind: InstrumentFamily) {
-    let (min, max) = if kind.is_melodic() { (50.0, 85.0) } else { (30.0, 60.0) };
-    let pick_in = |g: &mut AutoGenerator<'_>, min: f64, max: f64| min + (g.random() * (max - min + 1.0)).floor();
     if track.auto_hit_variation.is_none() {
-        track.auto_hit_variation = Some(pick_in(g, min, max));
+        let amount = if kind.is_melodic() { 0.0 } else { 12.0 + (g.random() * 14.0).floor() };
+        track.auto_hit_variation = Some(amount);
     }
     if track.auto_note_variation.is_none() {
-        track.auto_note_variation = Some(pick_in(g, js::round(min / 2.0), max));
+        track.auto_note_variation = Some(0.0);
     }
 }
 
@@ -233,6 +234,9 @@ pub fn generate_pattern(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, option
     } else {
         for t in 0..pattern.tracks.len() {
             if let Some(variant) = find_track_config(&structure, &pattern.tracks[t]) {
+                // Asked for anew: the track also gets a new variation budget.
+                pattern.tracks[t].auto_hit_variation = None;
+                pattern.tracks[t].auto_note_variation = None;
                 let density = random_density(g, &pattern.tracks[t]);
                 generate_track(g, pattern, t, &variant, density, &harmony);
             }
@@ -287,7 +291,8 @@ pub fn change_track(g: &mut AutoGenerator<'_>, index: u64, pattern: &mut Pattern
         None => random_genre(g.rnd),
     };
     let element = g.structure.element(index);
-    let section_end = element.is_last_loop_before_change;
+    // Only a drum line plays a fill: a bass or chord line stays in its harmony.
+    let section_end = element.is_last_loop_before_change && instrument_family(&track.name).is_drum();
     let density = if track.auto_density >= 0.0 {
         track.auto_density
     } else if section_end {
@@ -320,27 +325,26 @@ pub fn change_track(g: &mut AutoGenerator<'_>, index: u64, pattern: &mut Pattern
     }
 }
 
-/// The player's loop start for loop `index`: an
-/// `autoGen` pattern regenerates its melodic tracks, and every track on a
-/// section's first or last loop; otherwise the tracks in auto mode are
-/// regenerated. Whether anything was.
+/// Whether a track gets a new line on this loop: a line holds through its
+/// section. Bass and chords change at its start, the drums also add a fill at
+/// its end; a track without a line gets one.
+fn line_moves(track: &Track, element: &SectionElement) -> bool {
+    let fill = instrument_family(&track.name).is_drum() && element.is_last_loop_before_change;
+    element.loop_in_element == 0 || fill || track.notes.is_empty()
+}
+
+/// The player's loop start for loop `index`: the tracks in auto mode, or all
+/// those of an `autoGen` pattern, whose line moves on this loop get a new one.
+/// Whether any did.
 pub fn run_loop(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, index: u64) -> bool {
+    let all = pattern.extra.get("autoGen").is_some_and(js::truthy);
+    let element = g.structure.element(index);
     let mut changed = false;
-    if pattern.extra.get("autoGen").is_some_and(js::truthy) {
-        let element = g.structure.element(index);
-        let boundary = element.loop_in_element == 0 || element.is_last_loop_before_change;
-        for t in 0..pattern.tracks.len() {
-            if boundary || instrument_family(&pattern.tracks[t].name).is_melodic() {
-                change_track(g, index, pattern, t);
-                changed = true;
-            }
-        }
-    } else {
-        for t in 0..pattern.tracks.len() {
-            if pattern.tracks[t].auto_mode {
-                change_track(g, index, pattern, t);
-                changed = true;
-            }
+    for t in 0..pattern.tracks.len() {
+        let track = &pattern.tracks[t];
+        if (all || track.auto_mode) && line_moves(track, &element) {
+            change_track(g, index, pattern, t);
+            changed = true;
         }
     }
     changed
@@ -462,7 +466,11 @@ pub fn toggle_melodic(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, kind: Me
                     t
                 }
             };
-            set_auto(&mut pattern.tracks[t], true);
+            let track = &mut pattern.tracks[t];
+            set_auto(track, true);
+            // A track generated before holding its line may keep a variation budget.
+            track.auto_hit_variation = Some(0.0);
+            track.auto_note_variation = Some(0.0);
         },
     )
 }

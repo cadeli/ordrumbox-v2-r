@@ -25,6 +25,7 @@ fn drum_phrases(g: &mut Generator<'_>, track: &mut Track, config: &Value, densit
         accent: Some(&accent),
         ghost: Some(&ghost),
         stacking: false,
+        keep_accents: true,
     };
     g.phrases(track, config, density, opts);
 }
@@ -246,30 +247,27 @@ pub(crate) fn hat(
     apply_loop_point(track, config);
 }
 
-/// `generateHatLockedVariant`: a velocity pattern over 16 steps a beat —
-/// on a grid clamped to 8 (`withTemporaryStepsPerBeat(16)`), as the JS does;
-/// each step kept with `density`, which the JS does not do.
+/// `generateHatLockedVariant`: a velocity pattern on the track's steps; the
+/// beats and offbeats always play, the steps between are kept with `density`.
 fn hat_locked(g: &mut Generator<'_>, track: &mut Track, config: &Value, density: f64) {
-    with_steps_per_beat(track, 16, |track| {
-        let loop_point = loop_point(track, config, 1.0);
-        let pattern = nums(config, "velocityPattern").unwrap_or_default();
-        let accent_every = num(config, "accentEvery").unwrap_or(4.0);
-        for beat in 0..track.beat_count {
-            for step in 0..16 {
-                if beat * 16 + step >= loop_point {
-                    continue;
-                }
-                if g.random() >= density {
-                    continue;
-                }
-                let base = cycle(&pattern, step as usize).unwrap_or(0.6);
-                let accent = f64::from(step) % accent_every == 0.0;
-                let context = VelocitySpec { base: Some(base), ..VelocitySpec::accent(accent, !accent) };
-                let velocity = g.velocity(config.get("velocity"), context);
-                add_note(track, beat, step, 0.0, velocity);
+    let loop_point = loop_point(track, config, 1.0);
+    let spb = track.steps_per_beat;
+    let pattern = nums(config, "velocityPattern").unwrap_or_default();
+    for beat in 0..track.beat_count {
+        for step in 0..spb {
+            if beat * spb + step >= loop_point {
+                continue;
             }
+            let holds = step * 2 % spb == 0;
+            if !holds && g.random() >= density {
+                continue;
+            }
+            let base = cycle(&pattern, step as usize).unwrap_or(0.6);
+            let context = VelocitySpec { base: Some(base), ..VelocitySpec::accent(step == 0, step != 0) };
+            let velocity = g.velocity(config.get("velocity"), context);
+            add_note(track, beat, step, 0.0, velocity);
         }
-    });
+    }
 }
 
 /// `#generateHatVelocityVariant` (shaker, ride): a velocity pattern, each
@@ -408,6 +406,7 @@ pub(crate) fn perc(
                 accent: Some(&accent),
                 ghost: Some(&ghost),
                 stacking: false,
+                keep_accents: false,
             };
             g.phrases(track, config, density, opts);
         }

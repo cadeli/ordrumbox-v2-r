@@ -1015,9 +1015,10 @@ mod tests {
         assert_eq!(e.toggle_drums(0, &scales, &mut rnd), Some(true));
         assert!(pattern(&e).tracks.iter().all(|t| t.auto_mode));
         assert_eq!(e.history().next_undo(), Some("Generate drums"));
-        // A loop start: new lines, no undo step.
+        // A section's last loop: new lines, no undo step; its other loops hold the drums.
         let (undo, before) = (e.history().undo_len(), pattern(&e).clone());
-        assert!(e.auto_loop(0, 1, &scales, &mut rnd));
+        assert!(!e.auto_loop(0, 1, &scales, &mut rnd));
+        assert!(e.auto_loop(0, 3, &scales, &mut rnd));
         assert_eq!(e.history().undo_len(), undo);
         assert_ne!(*pattern(&e), before);
         // ↻ Drum again: auto off.
