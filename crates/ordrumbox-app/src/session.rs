@@ -125,6 +125,16 @@ pub enum OverlayKey {
     Letter(char),
 }
 
+/// The next loop of a pattern in auto mode, posted ahead to the engine. Its
+/// lines enter the library when that loop starts: what the grid shows and what
+/// an edit changes is the loop playing.
+#[derive(Debug)]
+struct UpcomingLoop {
+    pattern_index: usize,
+    pass: u64,
+    tracks: Vec<Track>,
+}
+
 #[derive(Debug, Clone)]
 enum Clipboard {
     Step(Vec<Note>),
@@ -188,6 +198,7 @@ pub struct Session {
     saved_revision: u64,
     /// Editor revision the playing pass was built from.
     played_revision: u64,
+    upcoming_loop: Option<UpcomingLoop>,
     changed_at: Option<Instant>,
     /// The open menu, if any.
     menu: Option<menu::Open>,
@@ -490,6 +501,7 @@ impl Session {
             library_path: None,
             saved_revision: 0,
             played_revision: 0,
+            upcoming_loop: None,
             changed_at: None,
             menu: None,
             overlay: None,
@@ -575,6 +587,7 @@ impl Session {
     /// Stop, or play `mode` from pass `first`.
     fn toggle(&mut self, mode: Mode, first: u64) {
         let Some(controller) = &mut self.controller else { return };
+        self.upcoming_loop = None;
         if controller.is_playing() {
             controller.stop();
         } else {
@@ -1395,20 +1408,42 @@ impl Session {
     }
 
     /// Keep the engine fed and the playing pass current; call every frame
-    /// while playing. Before the next pass of a pattern is built, its tracks
-    /// in auto mode get their new lines (the JS loop start).
+    /// while playing. The next pass of a pattern is built with the new lines
+    /// of its tracks in auto mode (the JS loop start); they replace the library's
+    /// when that pass starts.
     pub fn update(&mut self) {
         let Some(controller) = &mut self.controller else { return };
         controller.select_pattern(self.pattern_index);
         if self.editor.revision() != self.played_revision {
+            // The loop ahead was generated before the edit: it is generated again.
+            self.upcoming_loop = None;
             controller.refresh(self.editor.library());
         }
-        if let (Some(number), Mode::Pattern(p)) = (controller.pending_pass(), controller.mode()) {
+        if !matches!(controller.mode(), Mode::Pattern(_)) {
+            self.upcoming_loop = None;
+        }
+        // Read before the position: asking for the pass after the upcoming
+        // one means that one has started, and the position then says so.
+        let pending = controller.pending_pass();
+        let position = controller.position();
+        if let Some(mut started) = self.upcoming_loop.take_if(|u| position.is_some_and(|at| at.pass >= u.pass)) {
+            self.editor.swap_tracks(started.pattern_index, &mut started.tracks);
+        }
+        let mut upcoming = None;
+        if let (Some(pass), Mode::Pattern(p)) = (pending, controller.mode())
+            && let Some(playing) = self.editor.library().patterns.get(p).map(|pattern| pattern.tracks.clone())
+        {
             let rng = &mut self.rng;
-            self.editor.auto_loop(p, number, &self.scales, &mut || rng.next_f64());
+            if self.editor.auto_loop(p, pass, &self.scales, &mut || rng.next_f64()) {
+                upcoming = Some(UpcomingLoop { pattern_index: p, pass, tracks: playing });
+            }
+        }
+        controller.update(self.editor.library());
+        if let Some(mut next) = upcoming {
+            self.editor.swap_tracks(next.pattern_index, &mut next.tracks);
+            self.upcoming_loop = Some(next);
         }
         self.played_revision = self.editor.revision();
-        controller.update(self.editor.library());
     }
 
     fn audition(&mut self, t: usize, note: Option<usize>) {

@@ -786,6 +786,15 @@ impl Editor {
         }
         changed
     }
+
+    /// Exchange the tracks of pattern `p` with `tracks`: the lines of a loop
+    /// generated ahead going in or out. Not an undo step, like [`Self::auto_loop`].
+    pub fn swap_tracks(&mut self, p: usize, tracks: &mut Vec<Track>) {
+        if let Some(pattern) = self.library.patterns.get_mut(p) {
+            std::mem::swap(&mut pattern.tracks, tracks);
+            self.revision += 1;
+        }
+    }
 }
 
 /// `cleanTrack`'s change.
