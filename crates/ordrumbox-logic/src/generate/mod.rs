@@ -26,6 +26,11 @@ pub use auto::{
 };
 pub use structure::{SectionElement, Structure};
 
+/// The variant names of generator `kind` (`kick`, `hat`…).
+pub fn variant_names(kind: &str) -> Vec<&'static str> {
+    table(kind).iter().map(|(name, _)| name).collect()
+}
+
 /// A random source with the `Math.random()` contract: uniform in `[0, 1)`.
 pub type Random<'a> = &'a mut dyn FnMut() -> f64;
 

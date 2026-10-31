@@ -38,6 +38,12 @@ fn budget_for(amount: f64) -> i32 {
     if amount <= 0.0 { 0 } else { (js::round(amount * 16.0 / 100.0) as i32).max(1) }
 }
 
+/// The share of `budget` one loop of the track spends: a short loop repeats
+/// over the pattern, and the amount slider buys variation for the whole pattern.
+fn loop_budget(budget: i32, loop_count: i64) -> i32 {
+    if budget <= 0 { 0 } else { (js::round(f64::from(budget) / loop_count.max(1) as f64) as i32).max(1) }
+}
+
 /// Keep each candidate with its chance (0–100), then shuffle the survivors.
 fn select<T>(candidates: Vec<T>, chance: impl Fn(&T) -> f64, rng: &mut Rng) -> Vec<T> {
     let mut kept: Vec<T> = candidates.into_iter().filter(|c| rng.next_f64() * 100.0 < chance(c)).collect();
@@ -208,6 +214,7 @@ pub(crate) fn apply(
     let spb = track.steps_per_beat;
     let steps_in_loop = js::round(loop_ticks as f64 * f64::from(spb) / f64::from(crate::steps::TICK)) as i64;
     let loop_count = ((pattern_ticks as f64 / loop_ticks as f64).ceil() as i64).max(1);
+    let budget = loop_budget(budget, loop_count);
 
     for lp in 0..loop_count {
         let tick_of = |step: i64| lp * loop_ticks + step_to_tick(step, spb);
@@ -353,6 +360,14 @@ mod tests {
         assert_eq!(budget_for(1.0), 1);
         assert_eq!(budget_for(50.0), 8);
         assert_eq!(budget_for(100.0), 16);
+    }
+
+    #[test]
+    fn the_budget_is_shared_between_the_loops_of_a_pattern() {
+        assert_eq!(loop_budget(8, 1), 8);
+        assert_eq!(loop_budget(8, 4), 2);
+        assert_eq!(loop_budget(5, 16), 1);
+        assert_eq!(loop_budget(0, 4), 0);
     }
 
     #[test]

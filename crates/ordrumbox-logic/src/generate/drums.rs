@@ -229,7 +229,7 @@ pub(crate) fn hat(
     let Some(config) = g.config(&name).or_else(|| g.config("chhBasic")) else { return };
     track.notes.clear();
     match text(config, "mode") {
-        Some("locked") => hat_locked(&mut g, track, config),
+        Some("locked") => hat_locked(&mut g, track, config, density),
         Some("shaker") => hat_velocity(&mut g, track, config, density, 0.5, false),
         Some("ride") => hat_velocity(&mut g, track, config, density, 0.55, true),
         Some("grid") => {
@@ -247,8 +247,9 @@ pub(crate) fn hat(
 }
 
 /// `generateHatLockedVariant`: a velocity pattern over 16 steps a beat —
-/// on a grid clamped to 8 (`withTemporaryStepsPerBeat(16)`), as the JS does.
-fn hat_locked(g: &mut Generator<'_>, track: &mut Track, config: &Value) {
+/// on a grid clamped to 8 (`withTemporaryStepsPerBeat(16)`), as the JS does;
+/// each step kept with `density`, which the JS does not do.
+fn hat_locked(g: &mut Generator<'_>, track: &mut Track, config: &Value, density: f64) {
     with_steps_per_beat(track, 16, |track| {
         let loop_point = loop_point(track, config, 1.0);
         let pattern = nums(config, "velocityPattern").unwrap_or_default();
@@ -256,6 +257,9 @@ fn hat_locked(g: &mut Generator<'_>, track: &mut Track, config: &Value) {
         for beat in 0..track.beat_count {
             for step in 0..16 {
                 if beat * 16 + step >= loop_point {
+                    continue;
+                }
+                if g.random() >= density {
                     continue;
                 }
                 let base = cycle(&pattern, step as usize).unwrap_or(0.6);

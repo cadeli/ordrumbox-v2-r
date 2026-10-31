@@ -109,6 +109,29 @@ pub(crate) fn randomize_structure(base: &[(String, String)], rnd: &mut dyn FnMut
     result
 }
 
+/// How many drum tracks a generated pattern of `genre` plays at most: the
+/// genres that leave room between their hits have fewer.
+pub(crate) fn drum_track_limit(genre: &str) -> usize {
+    match genre {
+        "hiphop" | "reggae" | "rock" | "funk" => 5,
+        _ => 6,
+    }
+}
+
+/// The template without the drum tracks past the genre's limit, the last ones
+/// first (an extra instrument, then the template's end).
+pub(crate) fn limit_drum_tracks(structure: &mut Vec<(String, String)>, genre: &str) {
+    let mut left = drum_track_limit(genre);
+    structure.retain(|(name, _)| {
+        if !instrument_family(name).is_drum() {
+            return true;
+        }
+        let keep = left > 0;
+        left = left.saturating_sub(1);
+        keep
+    });
+}
+
 /// `getGenreSwing`: swing amount and resolution of a genre.
 pub(crate) fn genre_swing(genre: &str) -> (f64, f64) {
     let swing = structure_table("swingByGenre").and_then(|s| s.get(genre));
