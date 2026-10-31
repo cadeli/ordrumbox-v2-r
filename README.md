@@ -472,12 +472,17 @@ of 1200 cents can be the detector jumping between octaves: check the curve.
 ## Golden fixtures
 
 The fixtures are committed: the tests need nothing outside this repository.
-They were produced by the JS app (ordrumbox-v2), the reference of the port,
+They were produced by the JS app (ordrumbox-v2), from which this one was ported,
 with the scripts of `tools/`, which need a checkout of it only to make them
 again. They hold the JS names of the keys; the tests compare after
 `web_keys::current_keys` (`crates/ordrumbox-core/tests/support/`).
 
-The JS app is the reference. `tools/export_fixtures.mjs` runs its own code on
+The fixtures guard against regressions: a test that fails signals a change of
+behaviour, and by default the code is wrong. A change meant on purpose moves the
+cases concerned to a Rust snapshot or a property test, and is noted here, as the
+synth voice's departures are below.
+
+`tools/export_fixtures.mjs` runs the JS app's code on
 `assets/data/song.json` and writes `crates/ordrumbox-core/tests/fixtures/`:
 
 ```sh
@@ -498,7 +503,8 @@ node tools/export_fixtures.mjs ../ordrumbox-v2
   `Math.random` streams give the same notes: Rust must give exactly those notes
   and draw no randomness. The other passes are checked by properties.
 
-Re-run the script whenever the JS engine or `song.json` changes.
+Re-run the script when `song.json` changes, or when this app is to follow a
+change of the JS engine.
 
 The audio processors have their own script, which runs the JS AudioWorklet
 processors in Node (a minimal worklet scope, 128-frame quanta):
