@@ -86,11 +86,12 @@ synth preset; clearing a track or a step of several notes; random notes over a
 track's notes; compacting tracks; loading or importing a song. A single note goes
 at once. While a question is open, the MCP tools are refused.
 
-Generation (the JS generators, same variants and same choices): **B** makes a
+Generation (the JS generators, with fewer drum notes: "Golden fixtures"): **B** makes a
 new pattern from a random genre's template (tracks, lines, key, scale);
 **D**, **S**, **A** are the ↻ Drum, ↻ Bass and ↻ Chords buttons — new lines
-for the drum tracks (the bass and chord tracks, created on the synth when
-missing) and auto mode for them, or auto mode off. A track in auto mode (name
+for the drum tracks, at most 5 or 6 by genre, the others left empty (the bass
+and chord tracks, created on the synth when missing) and auto mode for them, or
+auto mode off. A track in auto mode (name
 in green, **Z** toggles it) gets a new line at every loop of playback,
 following the song form (intro, chorus, verse, break…: fills on the last loop
 of a section, a snare crescendo on breaks); those lines are saved but are not
@@ -579,7 +580,19 @@ node tools/export_gen_fixtures.mjs ../ordrumbox-v2
   `generateRandom`; `generatePattern` on new and existing patterns; the
   player's loop-start regeneration over 30–46 loops (auto tracks, `autoGen`
   patterns); the ↻ Drum / Bass / Chords toggles. Rust must give the same
-  notes, track settings and number of draws.
+  notes, track settings and number of draws, except where it generates fewer
+  notes on purpose (below).
+- `ordrumbox-logic/tests/fixtures/generators_rust.txt`: what departs from the
+  JS, from the same inputs and seeds, as the Rust generators make it: whole
+  patterns, loops, toggles, and the track cases of the changed variants. The
+  JS filled every pattern: here a genre plays at most 5 or 6 drum tracks (the
+  tracks past that are left empty, out of auto mode), the kick's `fourOnFloor`
+  is one kick a beat, `offbeat` on the clap and cowbell is one hit between the
+  beats (`data/generators.json`, patched by the script), and `chh16thLocked`
+  follows the density. A track's variation budget is for the whole pattern,
+  not for each of its loops (`ordrumbox-core/src/variation.rs`).
+  `cargo test -p ordrumbox-logic --test generators -- --ignored` writes this
+  file, only when what the generators make changes on purpose.
 
 MIDI files have a sixth script:
 

@@ -13,8 +13,8 @@ use ordrumbox_core::json::Value;
 use ordrumbox_core::{Note, Pattern, Scales, Track, js};
 
 use super::structure::{
-    Structure, generate_structure, genre_swing, random_bass_variant, random_genre, random_key_offset, random_scale,
-    randomize_structure, section_harmony,
+    Structure, drum_track_limit, generate_structure, genre_swing, limit_drum_tracks, random_bass_variant, random_genre,
+    random_key_offset, random_scale, randomize_structure, section_harmony,
 };
 use super::{clamp, drums, melodic, table};
 
@@ -179,6 +179,15 @@ fn find_track_config(structure: &[(String, String)], track: &Track) -> Option<St
     config
 }
 
+/// The drum tracks of `pattern` past the limit of `genre`: kick and snare
+/// count first, then the others in track order.
+fn drums_over_limit(pattern: &Pattern, genre: &str) -> Vec<usize> {
+    let family = |t: usize| instrument_family(&pattern.tracks[t].name);
+    let mut drums: Vec<usize> = (0..pattern.tracks.len()).filter(|&t| family(t).is_drum()).collect();
+    drums.sort_by_key(|&t| !matches!(family(t), InstrumentFamily::Kick | InstrumentFamily::Snare));
+    drums.split_off(drum_track_limit(genre).min(drums.len()))
+}
+
 /// Choices `generate_pattern` may be given instead of drawing them.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Options {
@@ -190,14 +199,16 @@ pub struct Options {
 /// `generatePattern`: a genre (drawn), a variation of its template, a key
 /// and scale (kept when the pattern has them); an empty pattern gets the
 /// template's tracks, an existing one new lines for the tracks the template
-/// covers; a BASS track (empty) is added when there is none.
+/// covers, the drum tracks past the genre's limit left empty; a BASS track
+/// (empty) is added when there is none.
 pub fn generate_pattern(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, options: &Options) {
     // `resolveGenreFromTags` never finds a genre in a tag list.
     let genre = match &options.genre {
         Some(genre) => genre.clone(),
         None => random_genre(g.rnd),
     };
-    let structure = randomize_structure(&generate_structure(&genre), g.rnd);
+    let mut structure = randomize_structure(&generate_structure(&genre), g.rnd);
+    limit_drum_tracks(&mut structure, &genre);
     pattern.extra.insert(GENRE, Value::from(genre.as_str()));
     match options.key_offset {
         Some(offset) => _ = pattern.extra.insert(KEY_OFFSET, Value::Number(offset)),
@@ -225,6 +236,9 @@ pub fn generate_pattern(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, option
                 let density = random_density(g, &pattern.tracks[t]);
                 generate_track(g, pattern, t, &variant, density, &harmony);
             }
+        }
+        for t in drums_over_limit(pattern, &genre) {
+            pattern.tracks[t].notes.clear();
         }
     }
 
@@ -369,15 +383,18 @@ fn toggle(
 }
 
 /// ↻ Drum: new drum lines over the existing tracks (and a new
-/// bass line if there is a bass track), the drum tracks in auto mode, empty
-/// melodic tracks removed; or, when drums are in auto mode, auto mode off.
+/// bass line if there is a bass track), the drum tracks within the genre's
+/// limit in auto mode, empty melodic tracks removed; or, when drums are in auto mode, auto mode off.
 /// Whether generation is now on.
 pub fn toggle_drums(g: &mut AutoGenerator<'_>, pattern: &mut Pattern) -> bool {
     toggle(pattern, InstrumentFamily::is_drum, |pattern| {
         generate_pattern(g, pattern, &Options::default());
         pattern.tracks.retain(|t| !instrument_family(&t.name).is_melodic() || !t.notes.is_empty());
-        for track in pattern.tracks.iter_mut().filter(|t| instrument_family(&t.name).is_drum()) {
-            set_auto(track, true);
+        let over = drums_over_limit(pattern, &genre_of(pattern).unwrap_or_default());
+        for (t, track) in pattern.tracks.iter_mut().enumerate() {
+            if instrument_family(&track.name).is_drum() {
+                set_auto(track, !over.contains(&t));
+            }
         }
     })
 }

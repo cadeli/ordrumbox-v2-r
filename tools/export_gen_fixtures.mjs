@@ -414,7 +414,14 @@ const write = async (rel, value) => {
     await writeFile(path, JSON.stringify(value) + '\n')
     process.stdout.write(`${rel}\n`)
 }
-await write('crates/ordrumbox-logic/data/generators.json', tables)
+// The tables the port reads depart from the JS on purpose (`README.md`, "Golden
+// fixtures"); the fixture below still records the JS with its own tables.
+const OFFBEAT = [0.02, 0.05, 0.85, 0.05]
+const portTables = structuredClone(tables)
+portTables.kick.fourOnFloor.probabilities = [1, 0.02, 0.06, 0.04]
+portTables.clap.offbeat.probabilities = OFFBEAT
+portTables.cowbell.offbeat.probabilities = OFFBEAT
+await write('crates/ordrumbox-logic/data/generators.json', portTables)
 await write('crates/ordrumbox-logic/tests/fixtures/generators.json', {
     scales: soundRegistry.scales,
     tracks,
