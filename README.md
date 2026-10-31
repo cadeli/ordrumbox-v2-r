@@ -12,9 +12,10 @@ Windows by CI).
 | `ordrumbox-logic` | the library being edited: commands with undo/redo; pattern generators (every instrument's variants, genre templates, auto mode loop by loop); Standard MIDI Files (read, import, export) | core |
 | `ordrumbox-dsp` | sample voice, synth voice, channel strip (filter, saturation, reverb, delay), master bus; no allocation in render paths | none |
 | `ordrumbox-engine` | WAV decoding/encoding, kits and their files, sample analysis, sound auto-assignment, synth presets, passes (pattern and song: events, strip settings, LFO steps), sample-accurate engine, UI ↔ audio link, offline renders | core, dsp |
+| `ordrumbox-probe` | sound measurements of synth presets and WAV files, a command-line tool that does not ship with the app | core, dsp, engine |
 | `ordrumbox-app` | window, software-rendered UI (text in the system monospace font), audio output → `ordrumbox.exe` | winit, softbuffer, cpal, fontdue |
 
-The four domain crates have no third-party dependency. Only the app talks to
+The domain crates and the probe have no third-party dependency. Only the app talks to
 the OS, through small bridges (`winit`, `softbuffer`, `cpal`, `fontdue`; `midir` with MIDI).
 
 ## Running
@@ -404,6 +405,66 @@ through their update check.
 Locally from
 macOS: `cargo install cargo-xwin`, then
 `cargo xwin build --release -p ordrumbox-app --target x86_64-pc-windows-msvc`.
+
+## Sound measurements
+
+`ordrumbox-probe` measures a sound: a preset rendered by the real synth voice
+(before the channel strip and the master bus), a WAV file as it is, a whole kit,
+or an exported mix.
+
+```sh
+cargo run --release -p ordrumbox-probe -- preset BASS0 --note C2 --gate 1
+cargo run --release -p ordrumbox-probe -- preset --all --json before.json --svg pictures
+cargo run --release -p ordrumbox-probe -- wav assets/kits/electro/acid-synth-c4.wav
+cargo run --release -p ordrumbox-probe -- kit electro real --json kits.json
+cargo run --release -p ordrumbox-probe -- mix rock.wav --bpm 120 --svg pictures
+cargo run --release -p ordrumbox-probe -- compare before.json after.json
+```
+
+A preset note is held for one step (120 BPM, 4 steps per beat), as the app
+plays it, unless `--gate` gives its length. `--help` lists the options.
+
+- **Levels:** peak, RMS, DC, crest factor, frames at or over full scale, stereo
+  balance.
+- **Envelope:** attack (10% to 90% of the peak), time of the peak, decay to
+  -20 dB, end at -60 dB, from a 10 ms RMS.
+- **Spectrum:** energy centroid, 85% rolloff, flatness (tone near 0, noise
+  higher), strongest peaks.
+- **Pitch:** fundamental (YIN, 25 to 4000 Hz), its note, the level of its
+  harmonics and of its lower octave.
+- **Over time:** how far pitch and centroid move; the report holds their curves,
+  the picture a spectrogram.
+- **Bands:** share of the energy and level in sub, low, lowMid, mid, highMid and
+  high (20, 60, 250, 500, 2000, 6000 Hz); a full-scale sine reads 0 dB.
+- **Repeat (presets):** how much a later note differs from the first: `identical`
+  means the same noise and LFO position on every hit.
+
+`kit` reviews each folder of `assets/kits` (or `--kits`): a summary of its levels,
+then the samples worth a look, with what is measured: frames at full scale, DC
+over 0.02, last 5 ms louder than -40 dB from the peak, over 5 ms before the sound
+starts, peak over 6 dB from the kit's median, over 25 cents from the note in its
+name (`piano-c4`; another octave of that note does not count). A flag is not a
+fault: a sample may be cut on purpose. Samples are named `kit/sample`.
+
+`mix` measures an export without what only a single note has (attack, pitch):
+
+- **Loudness:** integrated, momentary and short-term LUFS and loudness range
+  (ITU-R BS.1770, EBU R128, EBU Tech 3342).
+- **True peak:** with the points between samples, 4× oversampled; a sample peak
+  at 1.000 with frames at full scale means the signal was clipped there.
+- **Hits:** peaks of the spectral flux, each with its time, peak and main band;
+  per band, their number and level spread. Notes that start together are one
+  hit; a delay's echoes and a sample's own second burst count as hits, and a hit
+  is timed where its sound starts, after any silence at the head of its sample.
+- **Grid (`--bpm`):** how far hits sit from the steps. The median offset is the
+  samples' own lead-in; swing, delays and retriggers leave the grid on purpose.
+
+It cannot tell which sound masks which: that takes each track's own render.
+
+`--json` writes the report and `compare` lists what changed between two reports,
+sound by sound. Limits: a pitch frame lasts 85 ms, so a shorter pitch move is
+blurred and a sound under 85 ms has no pitch curve. A pitch range near a multiple
+of 1200 cents can be the detector jumping between octaves: check the curve.
 
 ## Golden fixtures
 

@@ -25,6 +25,7 @@ ordrumbox-core    data model, JSON codec, pattern engine, RNG       no deps
 ordrumbox-dsp     sample voice, synth voice, channel strip, master  no deps
 ordrumbox-logic   editor with undo/redo, generators, MIDI files     → core
 ordrumbox-engine  kits, WAV, passes, engine, UI ↔ audio link        → core, dsp
+ordrumbox-probe   sound measurements (command line, not shipped)    → core, dsp, engine
 ordrumbox-app     window, UI, audio output                          → core, logic, engine, winit, softbuffer, cpal, fontdue
 assets/           data/*.json and kits/**.wav, read at runtime
 tools/            scripts that regenerate the golden fixtures
