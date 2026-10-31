@@ -226,7 +226,11 @@ filter, the mod envelope onto the filter), as the JS does. Every change
 plays at once and is saved half a second later to `synth_presets.json`
 in the user data folder (an older `generated_sounds.json` there is read when
 it is missing; the JS keeps them in IndexedDB), read at start over the
-assets' presets. The pills under the cards show the modules in use.
+assets' presets: a saved preset wins over the asset of the same name, and an
+asset the save does not hold is added (so a deleted asset preset comes back at
+the next start). The assets hold one preset per base sound of the kits:
+`KICK_SYNTH`, `SNARE_SYNTH`, `TOM_SYNTH`, `CLAP_SYNTH`, `COWBELL_SYNTH`,
+`CHH_SYNTH`, `OHH_SYNTH`, `CRASH_SYNTH`. The pills under the cards show the modules in use.
 
 Output panel (a strip along the bottom of the window, always shown — the JS
 output panel): the master bus in three tabs — **Vol**: the master

@@ -173,3 +173,31 @@ fn the_shipped_files_are_written_again_unchanged() {
 
     fs::remove_dir_all(dir).unwrap();
 }
+
+/// After a factory reset no saved preset is left to read over the assets, and
+/// the assets hold a preset for each base sound of the kits.
+#[test]
+fn a_factory_reset_leaves_the_shipped_presets() {
+    let dir = folder("reset-presets");
+    fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("synth_presets.json");
+    fs::write(&path, r#"{"OLD":{"masterVolume":0.5}}"#).unwrap();
+
+    assert!(store::factory_reset(&dir).unwrap().contains(&"synth_presets.json".to_owned()));
+    assert_eq!(store::load_synths(&path).unwrap(), None);
+
+    let shipped = SynthPresets::from_json(&json::parse(&asset("synth_presets.json")).unwrap());
+    for key in [
+        "KICK_SYNTH",
+        "SNARE_SYNTH",
+        "TOM_SYNTH",
+        "CLAP_SYNTH",
+        "COWBELL_SYNTH",
+        "CHH_SYNTH",
+        "OHH_SYNTH",
+        "CRASH_SYNTH",
+    ] {
+        assert!(shipped.get(key).is_some(), "{key}");
+    }
+    fs::remove_dir_all(dir).unwrap();
+}

@@ -63,11 +63,15 @@ impl Session {
         self.synth = Some(SynthEdit { key: key.to_owned(), original: preset, draft });
     }
 
-    /// The presets saved, read at start over the assets' ones.
+    /// The presets saved, read at start over the assets' ones. An asset's
+    /// preset the save does not hold is kept: a new version's presets appear.
     pub(super) fn load_user_synths(synths: &mut SynthPresets, status: &mut Vec<String>) {
         let Some(path) = store::saved_synths_path() else { return };
         match store::load_synths(&path) {
-            Ok(Some(saved)) => *synths = saved,
+            Ok(Some(mut saved)) => {
+                saved.add_missing(synths);
+                *synths = saved;
+            }
             Ok(None) => {}
             Err(e) => status.push(format!("synth presets not loaded: {e}")),
         }
