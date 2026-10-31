@@ -253,3 +253,56 @@ fn a_pattern_built_in_the_grid_is_saved_reloaded_and_exported() {
     assert_eq!(left.len(), (f64::from(EXPORT_RATE) * 8.0 * 60.0 / 100.0).floor() as usize);
     assert!(left.iter().any(|s| s.abs() > 0.01));
 }
+
+// ─── Auto mode ──────────────────────────────────────────────────────────────
+
+#[test]
+fn the_grid_shows_the_loop_being_heard_in_auto_mode() {
+    const LOOP_COUNT: usize = 8;
+    // 4 beats at 120 bpm: 16000 frames a loop, 1000 a step.
+    const LOOP_FRAMES: usize = 16_000;
+    const STEP_FRAMES: usize = 1000;
+    // No variation: the passes play the lines as they are.
+    let (mut s, mut audio) = session(
+        r#"{"patterns":[{"name":"p","bpm":120,"tracks":[
+            {"name":"KICK","autoMode":true,"autoHitVariation":0,"autoNoteVariation":0}]}]}"#,
+    );
+    s.rng = Rng::new(7);
+    s.toggle_play();
+    let (mut left, mut right) = (vec![0.0; CALLBACK], vec![0.0; CALLBACK]);
+    let mut heard = Vec::new();
+    let mut shown = Vec::new();
+    while heard.len() < LOOP_COUNT * LOOP_FRAMES {
+        s.update();
+        audio.render(&mut left, &mut right);
+        heard.extend_from_slice(&left);
+        // In the middle of each loop.
+        if heard.len() / LOOP_FRAMES == shown.len() && heard.len() % LOOP_FRAMES >= LOOP_FRAMES / 2 {
+            shown.push(s.pattern().unwrap().tracks[0].notes.clone());
+        }
+    }
+    assert!(shown.windows(2).any(|w| w[0] != w[1]), "the lines change");
+    for (index, notes) in shown.iter().enumerate() {
+        for note in notes {
+            let at = index * LOOP_FRAMES + (note.beat * 4 + note.step) as usize * STEP_FRAMES;
+            let sounds = heard[at..at + STEP_FRAMES / 4].iter().any(|s| s.abs() > 1e-3);
+            assert!(sounds, "loop {index}: beat {} step {} is shown, not heard", note.beat, note.step);
+        }
+    }
+}
+
+#[test]
+fn an_edit_in_auto_mode_goes_on_the_loop_being_heard_and_stays() {
+    let (mut s, mut audio) =
+        session(r#"{"patterns":[{"name":"p","bpm":120,"tracks":[{"name":"KICK","autoMode":true},{"name":"SNARE"}]}]}"#);
+    s.toggle_play();
+    run(&mut s, &mut audio, 1000);
+    let lines = s.pattern().unwrap().tracks[0].notes.clone();
+    // On a track not in auto mode, before the next loop starts.
+    s.click(Hit::Cell { track: 1, beat: 1, step: 0 });
+    run(&mut s, &mut audio, 1000);
+    assert_eq!(s.pattern().unwrap().tracks[0].notes, lines, "the lines of this loop stay");
+    run(&mut s, &mut audio, 16_000);
+    assert_eq!(position(&s).expect("playing").pass, 1);
+    assert_eq!(s.pattern().unwrap().tracks[1].notes.len(), 1, "the edit survives the next loop");
+}
