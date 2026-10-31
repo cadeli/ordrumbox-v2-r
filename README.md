@@ -137,8 +137,7 @@ or the Groove / Engine settings in auto mode). Under it, the note editor: the
 selected note (else the step under the cursor, else the track's first note)
 — velocity, pitch, pan, and the Trig, Retr, Eucl and Arp tabs. While
 playing, a setting with an LFO shows the LFO's value. The grid has a volume
-slider per track and a master volume (the output panel's volume, saved
-with it). Right-click a track's name: rename, copy, paste, duplicate,
+slider per track. Right-click a track's name: rename, copy, paste, duplicate,
 delete, randomize or clear it; right-click a step: copy, paste or delete its
 notes, or add a note at a random pitch.
 
@@ -243,7 +242,7 @@ threshold, ratio, attack, release, knee and make-up; **Flt**: the low cut
 and the high cut. They play at once and are saved half a second after the
 last change to `settings.json` in the user data folder (`settings.master`,
 as the JS keeps them; the file's other settings are kept), and loaded at
-start. The grid's master volume is this volume.
+start.
 
 The header, under the menu bar, is a row of labelled groups after the logo
 (the JS toolbar and its pattern settings panel): **PLAY** / **STOP**, **BPM**

@@ -698,7 +698,10 @@ fn fx_tab(rows: &mut Rows, view: &TrackView, state: &EditorState) {
         } else if let Some(p) = FX_KNOBS.iter().find(|p| p.key == key) {
             rows.label(r, p.label, Some(key), state.selected_prop == Some(key));
             let value = view.lfo.iter().find(|(k, _)| *k == key).map_or_else(|| number(track, key), |&(_, v)| v);
-            let spec = value_spec(p, default_of(key, p.min), true);
+            let mut spec = value_spec(p, default_of(key, p.min), true);
+            if p.format == Format::Freq {
+                spec = spec.log_full_travel();
+            }
             let kind =
                 Kind::Value { spec, value, label: None, text: p.format.value(value, ""), lfo: has_lfo(track, key) };
             rows.items.push(Item::new(Some(Id::Fx(key)), rows.field(r, 120 * s), kind));
@@ -780,7 +783,10 @@ fn lfo_tab(rows: &mut Rows, view: &TrackView, state: &EditorState) {
     // Range: two sliders side by side, one value.
     let (min, max) = (get("min", target.min), get("max", target.max));
     let r = rows.row();
-    let spec = Spec::slider(target.min, target.max, target.step, target.min);
+    let mut spec = Spec::slider(target.min, target.max, target.step, target.min);
+    if target.key == "filterCutoff" {
+        spec = spec.log();
+    }
     let field = rows.field(r, r.w);
     let text = format!("{}..{}", crate::control::fmt(min), crate::control::fmt(max));
     let text_w = text_width(&text, s) + 4 * s;

@@ -181,10 +181,6 @@ impl Session {
                 let kind = Kind::Value { spec, value: track.volume, label: None, text: String::new(), lfo: false };
                 layout.items.push(Item::new(Some(Id::TrackVolume(t)), grid.volume_rect(t), kind));
             }
-            let spec = Spec::slider(0.0, 2.0, 0.01, 1.0);
-            let volume = f64::from(self.master.master);
-            let kind = Kind::Value { spec, value: volume, label: None, text: String::new(), lfo: false };
-            layout.items.push(Item::new(Some(Id::MasterVolume), grid.master_rect(), kind));
         }
         layout
     }
@@ -701,7 +697,7 @@ impl Session {
         }
         let layout = self.panel_layout(size.0, size.1, size.2);
         let focusable: Vec<Item> =
-            layout.items.into_iter().filter(|i| !matches!(i.id, Some(Id::TrackVolume(_) | Id::MasterVolume))).collect();
+            layout.items.into_iter().filter(|i| !matches!(i.id, Some(Id::TrackVolume(_)))).collect();
         if key == PanelKey::Tab {
             let next = panel::next_focus(&focusable, self.focus, if shift { -1 } else { 1 });
             if next.is_none() {
@@ -934,10 +930,6 @@ impl Session {
         }
         if let Id::SynthField(fi) = id {
             return self.synth_value(fi, value);
-        }
-        if let Id::MasterVolume = id {
-            // The output panel's volume: saved with it.
-            return self.set_master_value("volume", value);
         }
         if let Id::KitKnob(field) = id {
             return self.set_kit_value(field, value);
@@ -1365,7 +1357,6 @@ fn control_name(id: Id) -> (&'static str, &'static str) {
             (label.unwrap_or(""), "")
         }
         Id::TrackVolume(_) => ("Volume", ""),
-        Id::MasterVolume => ("Master Gain", ""),
         _ => ("", ""),
     }
 }
@@ -1525,7 +1516,7 @@ mod tests {
         // The grid: its volume sliders, the strip and the track editor together.
         let layout = s.panel_layout(SIZE.0, SIZE.1, SIZE.2);
         strip(s.body(SIZE).output, &layout);
-        assert!(layout.items.iter().any(|i| matches!(i.id, Some(Id::MasterVolume))));
+        assert!(layout.items.iter().any(|i| matches!(i.id, Some(Id::TrackVolume(_)))));
         assert!(layout.right > 0);
         // The song panel keeps both.
         s.toggle_song_view();

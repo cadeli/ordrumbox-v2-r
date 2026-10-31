@@ -177,7 +177,6 @@ pub enum Id {
     TrackName(usize),
     /// The grid's right-click menus.
     GridMenu,
-    MasterVolume,
 }
 
 /// What a widget shows.

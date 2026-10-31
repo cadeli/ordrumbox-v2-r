@@ -337,8 +337,7 @@ impl Layout {
         let total_beats = pattern.beat_count.max(1);
         let start_beat = (page as i32 * BEATS_PER_PAGE).min(total_beats - 1).max(0);
         let beats = (total_beats - start_beat).clamp(1, BEATS_PER_PAGE);
-        // One row under the tracks for the master volume.
-        let shown = usize::try_from((bottom - top - row).max(0) / row.max(1)).unwrap_or(0).min(tracks);
+        let shown = usize::try_from((bottom - top).max(0) / row.max(1)).unwrap_or(0).min(tracks);
         Self {
             scale,
             top,
@@ -381,18 +380,6 @@ impl Layout {
     pub fn volume_rect(&self, track: usize) -> Rect {
         let h = self.row.min(14 * self.scale);
         Rect::new(self.volume_x, self.row_top(track) + (self.row - h) / 2, VOLUME_WIDTH * self.scale, h)
-    }
-
-    /// The master volume slider, under the last row.
-    pub fn master_rect(&self) -> Rect {
-        let h = self.row.min(14 * self.scale);
-        let y = self.row_top(self.tracks) + (self.row - h) / 2;
-        Rect::new(self.volume_x, y, VOLUME_WIDTH * self.scale, h)
-    }
-
-    /// Where the master volume's label goes.
-    fn master_label(&self) -> (i32, i32) {
-        (self.name_x, self.row_top(self.tracks) + (self.row - 8 * self.scale) / 2)
     }
 
     fn beat_width(&self) -> f64 {
@@ -596,9 +583,6 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
         canvas.text(layout.name_x, label_y, &label, layout.scale, color);
         draw_track_steps(canvas, track, i, view, layout);
     }
-
-    let (x, y) = layout.master_label();
-    canvas.text(x, y, "Master", layout.scale, DIM);
 
     if let Some(fraction) = view.playhead {
         let x = layout.grid_left + (fraction.clamp(0.0, 1.0) * f64::from(layout.grid_width)) as i32;
