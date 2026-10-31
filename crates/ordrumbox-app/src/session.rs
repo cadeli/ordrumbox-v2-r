@@ -226,8 +226,8 @@ pub struct Session {
     detached: Option<(usize, Note)>,
     /// Kit knob edits not yet applied to the bank and saved.
     kits_dirty: Option<Instant>,
-    /// The master bus settings (the output panel's; the grid's master
-    /// volume is their volume), and when they changed, not saved yet.
+    /// The master bus settings (the output panel's), and when they changed,
+    /// not saved yet.
     master: ordrumbox_engine::MasterSettings,
     master_dirty: Option<Instant>,
     /// The update check: its settings, the one under way, a newer release

@@ -78,7 +78,7 @@ pub const METAS: [Meta; 32] = [
     meta("vco3.gain", 0.0, 1.0, 0.01, ""),
     meta("vco3.octave", -4.0, 4.0, 1.0, "oct"),
     meta("vco3.detune", -100.0, 100.0, 1.0, "ct"),
-    meta("filter.freq", 20.0, 20000.0, 1.0, "Hz"),
+    Meta { log: true, ..meta("filter.freq", 20.0, 20000.0, 1.0, "Hz") },
     meta("filter.Q", 0.1, 24.0, 0.1, ""),
     meta("filter.drive", 0.0, 1.0, 0.01, ""),
     Meta { label: Some("Env"), ..meta("filterEnv.filterEnvelopeAmount", 0.0, 1.0, 0.01, "") },
@@ -87,7 +87,7 @@ pub const METAS: [Meta; 32] = [
     Meta { log: true, ..meta("lfo2.freq", 0.01, 5.0, 0.01, "Hz") },
     meta("lfo2.depth", 0.0, 1.0, 0.01, ""),
     meta("noise.mix", 0.0, 1.0, 0.01, ""),
-    meta("noise.filterFreq", 20.0, 20000.0, 1.0, "Hz"),
+    Meta { log: true, ..meta("noise.filterFreq", 20.0, 20000.0, 1.0, "Hz") },
     meta("noise.filterQ", 0.1, 24.0, 0.1, ""),
     Meta { label: Some("FM"), ..meta("fm.amount", 0.0, 1.0, 0.01, "") },
     Meta { label: Some("Algo"), ..meta("fm.algo", 0.0, 4.0, 1.0, "") },
@@ -115,7 +115,7 @@ impl Meta {
     /// The knob of this control.
     pub fn spec(&self) -> Spec {
         let spec = Spec::knob(self.min, self.max, self.step, self.min);
-        if self.log { spec.log() } else { spec }
+        if self.log { spec.log_full_travel() } else { spec }
     }
 }
 
@@ -703,6 +703,15 @@ mod tests {
         assert!(bypassed(&d, "envelope"));
         toggle_card(&mut d, "envelope");
         assert_eq!(d.get("_resetEnv"), Some(&Value::Bool(true)));
+    }
+
+    #[test]
+    fn filter_freq_knob_is_logarithmic() {
+        let spec = find_meta("filter.freq").unwrap().spec();
+        // Half of the knob's travel is the middle of the three decades, not 10 kHz.
+        assert_eq!(spec.drag(20.0, 100.0, false), 632.0);
+        assert_eq!(spec.drag(20.0, 200.0, false), 20_000.0);
+        assert!((spec.fraction(632.456) - 0.5).abs() < 1e-5);
     }
 
     #[test]

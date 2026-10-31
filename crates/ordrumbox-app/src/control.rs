@@ -4,9 +4,9 @@
 //! value — and the display formats of the track editor, the note editor and
 //! the kit editor, all computed as the JS computes them.
 //!
-//! Two additions: the mouse wheel steps any control like an arrow key, and
+//! Three additions: the mouse wheel steps any control like an arrow key,
 //! Shift drags a slider finely, as it already does a knob (the JS range
-//! input has no fine drag).
+//! input has no fine drag), and a slider can be logarithmic.
 
 use ordrumbox_core::js;
 
@@ -21,7 +21,7 @@ pub enum Style {
 }
 
 /// A control's range: `min`–`max` by `step`, `default` restored by a
-/// double-click, logarithmic when asked and possible (`OrKnob` only).
+/// double-click, logarithmic when asked and possible.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Spec {
     pub style: Style,
@@ -30,20 +30,28 @@ pub struct Spec {
     pub step: f64,
     pub default: f64,
     log: bool,
+    full_travel: bool,
 }
 
 impl Spec {
     pub const fn knob(min: f64, max: f64, step: f64, default: f64) -> Self {
-        Self { style: Style::Knob, min, max, step, default, log: false }
+        Self { style: Style::Knob, min, max, step, default, log: false, full_travel: false }
     }
 
     pub const fn slider(min: f64, max: f64, step: f64, default: f64) -> Self {
-        Self { style: Style::Slider, min, max, step, default, log: false }
+        Self { style: Style::Slider, min, max, step, default, log: false, full_travel: false }
     }
 
     /// `scale: 'log'`; ignored (linear) unless `0 < min < max`, as in the JS.
-    pub fn log(self) -> Self {
+    pub const fn log(self) -> Self {
         Self { log: self.min > 0.0 && self.max > self.min, ..self }
+    }
+
+    /// A logarithmic knob whose whole range takes `DRAG_RANGE_PX` of drag.
+    /// `OrKnob` crosses it that many pixels divided by its decades, too fast
+    /// for a three-decade frequency.
+    pub const fn log_full_travel(self) -> Self {
+        Self { full_travel: true, ..self.log() }
     }
 
     fn clamp(&self, value: f64) -> f64 {
@@ -60,6 +68,12 @@ impl Spec {
         if f.is_nan() { 0.0 } else { f.clamp(0.0, 1.0) }
     }
 
+    /// The value at `position` (0–1) of a logarithmic range.
+    fn log_value(&self, position: f64) -> f64 {
+        let log_min = self.min.log10();
+        10f64.powf(log_min + position * (self.max.log10() - log_min))
+    }
+
     /// `#clampStep`: `raw` rounded to a multiple of `step`, inside the range.
     fn clamp_step(&self, raw: f64, step: f64) -> f64 {
         self.clamp(js::round(raw / step) * step)
@@ -68,14 +82,16 @@ impl Spec {
     /// A knob dragged `dy` pixels up (negative: down) from `start` (Shift: finely).
     pub fn drag(&self, start: f64, dy: f64, fine: bool) -> f64 {
         let step = if fine { self.step * 0.1 } else { self.step };
-        let log_min = self.min.log10();
-        let log_range = self.max.log10() - log_min;
-        let base = if self.log { log_range / DRAG_RANGE_PX } else { (self.max - self.min) / DRAG_RANGE_PX };
+        let log_range = self.max.log10() - self.min.log10();
+        let base = match (self.log, self.full_travel) {
+            (true, true) => 1.0 / DRAG_RANGE_PX,
+            (true, false) => log_range / DRAG_RANGE_PX,
+            (false, _) => (self.max - self.min) / DRAG_RANGE_PX,
+        };
         let sensitivity = if fine { base * 0.1 } else { base };
         if self.log {
-            let start_pos = (start.max(self.min).log10() - log_min) / log_range;
-            let pos = (start_pos + dy * sensitivity).clamp(0.0, 1.0);
-            self.clamp_step(10f64.powf(log_min + pos * log_range), step)
+            let pos = (self.fraction(start) + dy * sensitivity).clamp(0.0, 1.0);
+            self.clamp_step(self.log_value(pos), step)
         } else {
             self.clamp_step(start + dy * sensitivity, step)
         }
@@ -102,13 +118,19 @@ impl Spec {
     /// A slider pressed or dragged at `fraction` of its width: the range
     /// input's value there, on the step grid.
     pub fn slider_at(&self, fraction: f64) -> f64 {
-        let raw = self.min + fraction.clamp(0.0, 1.0) * (self.max - self.min);
+        let fraction = fraction.clamp(0.0, 1.0);
+        let raw = if self.log { self.log_value(fraction) } else { self.min + fraction * (self.max - self.min) };
         self.clamp(self.min + js::round((raw - self.min) / self.step) * self.step)
     }
 
     /// A slider dragged finely (Shift) by `dfraction` of its width from `start`.
     pub fn slider_fine(&self, start: f64, dfraction: f64) -> f64 {
-        self.clamp_step(start + dfraction * (self.max - self.min) * 0.1, self.step * 0.1)
+        let raw = if self.log {
+            self.log_value((self.fraction(start) + dfraction * 0.1).clamp(0.0, 1.0))
+        } else {
+            start + dfraction * (self.max - self.min) * 0.1
+        };
+        self.clamp_step(raw, self.step * 0.1)
     }
 
     /// A number typed in: a knob on its step grid, a
@@ -330,5 +352,15 @@ mod tests {
         assert_eq!(s.nudge(4.0, true, true, false), 4.1);
         assert_eq!(s.typed(99.0), 8.0);
         assert_eq!(s.slider_fine(4.0, 0.6), 4.4);
+    }
+
+    #[test]
+    fn log_slider() {
+        let s = Spec::slider(10.0, 1000.0, 1.0, 10.0).log();
+        assert_eq!(s.slider_at(0.0), 10.0);
+        assert_eq!(s.slider_at(0.5), 100.0);
+        assert_eq!(s.slider_at(1.0), 1000.0);
+        assert!((s.fraction(100.0) - 0.5).abs() < 1e-12);
+        assert_eq!(s.slider_fine(100.0, 1.0), 158.5);
     }
 }

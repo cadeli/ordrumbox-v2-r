@@ -44,8 +44,8 @@ pub const COMPRESSOR: [Param; 6] = [
 ];
 /// The filter sliders (Flt tab).
 pub const FILTERS: [Param; 2] = [
-    param("lowcut", "Low Cut", Spec::slider(10.0, 500.0, 1.0, 35.0), Format::Round, "Hz"),
-    param("hicut", "High Cut", Spec::slider(1000.0, 20_000.0, 100.0, 18_500.0), Format::Round, "Hz"),
+    param("lowcut", "Low Cut", Spec::slider(10.0, 500.0, 1.0, 35.0).log(), Format::Round, "Hz"),
+    param("hicut", "High Cut", Spec::slider(1000.0, 20_000.0, 100.0, 18_500.0).log(), Format::Round, "Hz"),
 ];
 /// The tabs.
 pub const TABS: [&str; 3] = ["Vol", "Comp", "Flt"];
