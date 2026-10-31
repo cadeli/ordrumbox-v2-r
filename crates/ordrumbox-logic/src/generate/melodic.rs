@@ -236,6 +236,7 @@ pub(crate) fn melody(
             accent: Some(&accent),
             ghost: Some(&ghost),
             stacking: false,
+            keep_accents: false,
         };
         g.phrases(track, config, density, opts);
         apply_loop_point(track, config);
@@ -268,6 +269,7 @@ pub(crate) fn melody(
                 accent: Some(&accent),
                 ghost: None,
                 stacking: true,
+                keep_accents: false,
             };
             g.phrases(track, config, density, opts);
         }

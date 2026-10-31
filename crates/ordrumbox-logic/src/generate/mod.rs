@@ -342,7 +342,8 @@ impl<'a> Generator<'a> {
         let mut cached: Vec<f64> = Vec::new();
         let mut pitch_of = opts.pitch;
         for phrase in phrases {
-            if density < 1.0 && self.random() >= density {
+            let holds = opts.keep_accents && phrase.get("accent") == Some(&Value::Bool(true));
+            if density < 1.0 && !holds && self.random() >= density {
                 continue;
             }
             if let Some(chance) = num(phrase, "chance")
@@ -461,6 +462,8 @@ pub(crate) struct Phrases<'f> {
     pub ghost: Option<PhraseTest<'f>>,
     /// Notes may share a step and pass the loop point (chords).
     pub stacking: bool,
+    /// The accented notes hold the groove: the density never drops them.
+    pub keep_accents: bool,
 }
 
 impl Grid<'_> {

@@ -12,6 +12,7 @@
 
 use std::collections::HashMap;
 
+use crate::drum_taxonomy::instrument_family;
 use crate::js;
 use crate::json::Value;
 use crate::note::Note;
@@ -28,6 +29,9 @@ const AUTO_NOTE_VARIATION_FALLBACK: f64 = 40.0;
 /// Chance (0–100) every operation gets outside auto mode, where the per-kind
 /// sliders are hidden.
 const DEFAULT_CHANCE: f64 = 50.0;
+
+/// Share of its velocity a generated drum note keeps at least when varied.
+const DRUM_VELOCITY_FLOOR: f64 = 0.75;
 
 /// Lowest play probability the note-probability operation can draw (at depth 100).
 const NOTE_PROB_FLOOR: f64 = 0.2;
@@ -215,6 +219,8 @@ pub(crate) fn apply(
     let steps_in_loop = js::round(loop_ticks as f64 * f64::from(spb) / f64::from(crate::steps::TICK)) as i64;
     let loop_count = ((pattern_ticks as f64 / loop_ticks as f64).ceil() as i64).max(1);
     let budget = loop_budget(budget, loop_count);
+    // A generated drum line keeps its sound and its accents.
+    let drum_line = track.auto_mode && instrument_family(&track.name).is_drum();
 
     for lp in 0..loop_count {
         let tick_of = |step: i64| lp * loop_ticks + step_to_tick(step, spb);
@@ -257,7 +263,9 @@ pub(crate) fn apply(
                 ops.push(HitOp::Silence(slot));
             }
             ops.push(HitOp::Velocity(slot));
-            ops.push(HitOp::Pitch(slot));
+            if !drum_line {
+                ops.push(HitOp::Pitch(slot));
+            }
             if let Some(next) = next_free {
                 if let Some(target) = target(next) {
                     ops.push(HitOp::Double(slot, target));
@@ -285,8 +293,12 @@ pub(crate) fn apply(
             match op {
                 HitOp::Silence(slot) => silenced.push(slot),
                 HitOp::Velocity((tick, index)) => {
-                    let velocity = round2(rng.next_f64());
-                    flat.get_mut(&tick).expect("scanned tick")[index].velocity = velocity;
+                    let note = &mut flat.get_mut(&tick).expect("scanned tick")[index];
+                    note.velocity = if drum_line {
+                        round2(note.velocity * (DRUM_VELOCITY_FLOOR + rng.next_f64() * (1.0 - DRUM_VELOCITY_FLOOR)))
+                    } else {
+                        round2(rng.next_f64())
+                    };
                 }
                 HitOp::Pitch((tick, index)) => {
                     let pitch = pick_pitch(track, rng, scales);

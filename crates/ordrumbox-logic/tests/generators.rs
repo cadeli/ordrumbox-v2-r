@@ -262,21 +262,9 @@ fn random_tracks() {
 // ─── What departs from the JS ────────────────────────────────────────────────
 
 /// Whether a track case departs from the JS on purpose (`README.md`, "Golden
-/// fixtures"): the corrected tables, the locked hats and density, and a variant
-/// drawn at random, which may be one of them.
+/// fixtures"): the drum lines are standard rhythms here.
 fn departs(case: &Value) -> bool {
-    let kind = case.get("kind").and_then(Value::as_str).unwrap();
-    let variant = case.get("variant").and_then(Value::as_str).unwrap_or("");
-    let departed = matches!(
-        (kind, variant),
-        ("kick", "fourOnFloor") | ("clap", "offbeat") | ("cowbell", "offbeat") | ("hat", "chh16thLocked")
-    );
-    let known = tables_have(kind, variant);
-    departed || (!known && matches!(kind, "kick" | "clap" | "cowbell" | "hat"))
-}
-
-fn tables_have(kind: &str, variant: &str) -> bool {
-    ordrumbox_logic::generate::variant_names(kind).contains(&variant)
+    matches!(case.get("kind").and_then(Value::as_str).unwrap(), "kick" | "snare" | "hat" | "clap" | "cowbell")
 }
 
 /// One line of the snapshot: what a case made, and its draws.
@@ -467,7 +455,84 @@ fn locked_hats_follow_the_density() {
         }
         notes
     };
-    assert_eq!(count(1.0), 800);
+    assert_eq!(count(1.0), 400);
     let thin = count(0.4);
-    assert!((240..=400).contains(&thin), "{thin} notes over 100 lines");
+    assert!((240..=320).contains(&thin), "{thin} notes over 100 lines");
+}
+
+// ─── Standard rhythms ────────────────────────────────────────────────────────
+
+/// The line of `kind`, variant `variant`, as steps of 16 in the measure.
+fn line_steps(stream: &mut Stream, name: &str, kind: InstrumentFamily, variant: &str, density: f64) -> Vec<i32> {
+    let scales = scales();
+    let mut pattern = Pattern { tracks: vec![Track::new(name, 4, 4)], beat_count: 4, ..Pattern::default() };
+    let mut rnd = || stream.next();
+    let mut g = AutoGenerator::new(&scales, &mut rnd);
+    instrument_line(&mut g, &mut pattern, 0, kind, Some(variant), density, &Harmony::default());
+    drop(g);
+    pattern.tracks[0].notes.iter().map(|n| n.beat * 4 + n.step).collect()
+}
+
+#[test]
+fn the_downbeat_and_backbeat_hold_at_any_density() {
+    let mut stream = Stream::new(11.0);
+    for density in [0.2, 0.4, 0.7, 1.0] {
+        for _ in 0..50 {
+            for variant in ["basic", "syncopated", "fourOnFloor"] {
+                let kick = line_steps(&mut stream, "KICK", InstrumentFamily::Kick, variant, density);
+                assert!(kick.contains(&0), "{variant} at {density}: {kick:?}");
+            }
+            for variant in ["basic", "syncopated", "ghost"] {
+                let snare = line_steps(&mut stream, "SNARE", InstrumentFamily::Snare, variant, density);
+                assert!(snare.contains(&4) && snare.contains(&12), "{variant} at {density}: {snare:?}");
+            }
+            let hats = line_steps(&mut stream, "CHH", InstrumentFamily::Hat, "chhBasic", density);
+            assert!(hats.contains(&0) && hats.contains(&2), "{hats:?}");
+        }
+    }
+}
+
+#[test]
+fn a_drum_groove_holds_through_its_section() {
+    let scales = scales();
+    let mut stream = Stream::new(13.0);
+    let mut track = Track::new("KICK", 4, 4);
+    track.auto_mode = true;
+    let mut pattern = Pattern { tracks: vec![track], beat_count: 4, ..Pattern::default() };
+    pattern.extra.insert(ordrumbox_logic::generate::GENRE, Value::from("funk"));
+    let mut rnd = || stream.next();
+    let mut g = AutoGenerator::new(&scales, &mut rnd);
+    // The song form starts with 4 loops of intro: new, held, held, fill.
+    assert!(run_loop(&mut g, &mut pattern, 0));
+    let groove = pattern.tracks[0].notes.clone();
+    assert!(!run_loop(&mut g, &mut pattern, 1));
+    assert!(!run_loop(&mut g, &mut pattern, 2));
+    assert_eq!(pattern.tracks[0].notes, groove);
+    assert!(run_loop(&mut g, &mut pattern, 3));
+}
+
+#[test]
+fn bass_and_chords_hold_through_their_section_with_no_variation() {
+    let scales = scales();
+    let mut stream = Stream::new(17.0);
+    let mut tracks = vec![Track::new("BASS", 4, 4), Track::new("PIANO", 4, 4)];
+    tracks.iter_mut().for_each(|t| t.auto_mode = true);
+    let mut pattern = Pattern { tracks, beat_count: 4, ..Pattern::default() };
+    pattern.extra.insert(ordrumbox_logic::generate::GENRE, Value::from("house"));
+    let mut rnd = || stream.next();
+    let mut g = AutoGenerator::new(&scales, &mut rnd);
+    // 4 loops of intro, then the chorus: only its first loop is new.
+    assert!(run_loop(&mut g, &mut pattern, 0));
+    let lines = pattern.tracks.clone();
+    assert!(lines.iter().all(|t| !t.notes.is_empty()));
+    for index in 1..4 {
+        assert!(!run_loop(&mut g, &mut pattern, index), "loop {index}");
+    }
+    assert_eq!(pattern.tracks[0].notes, lines[0].notes);
+    assert_eq!(pattern.tracks[1].notes, lines[1].notes);
+    assert!(run_loop(&mut g, &mut pattern, 4));
+    assert!(!run_loop(&mut g, &mut pattern, 5));
+    for track in &pattern.tracks {
+        assert_eq!((track.auto_hit_variation, track.auto_note_variation), (Some(0.0), Some(0.0)));
+    }
 }

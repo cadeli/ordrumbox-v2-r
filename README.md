@@ -92,9 +92,9 @@ new pattern from a random genre's template (tracks, lines, key, scale);
 for the drum tracks, at most 5 or 6 by genre, the others left empty (the bass
 and chord tracks, created on the synth when missing) and auto mode for them, or
 auto mode off. A track in auto mode (name
-in green, **Z** toggles it) gets a new line at every loop of playback,
-following the song form (intro, chorus, verse, break…: fills on the last loop
-of a section, a snare crescendo on breaks); those lines are saved but are not
+in green, **Z** toggles it) follows the song form as it plays (intro, chorus, verse,
+break…): a line holds through its section, new at the start, the drums with a
+fill on its last loop and a snare crescendo on breaks; those lines are saved but are not
 undo steps. Exports regenerate them on their own copy. **X** puts random notes
 on the focused track.
 
@@ -589,7 +589,12 @@ node tools/export_gen_fixtures.mjs ../ordrumbox-v2
   tracks past that are left empty, out of auto mode), the kick's `fourOnFloor`
   is one kick a beat, `offbeat` on the clap and cowbell is one hit between the
   beats (`data/generators.json`, patched by the script), and `chh16thLocked`
-  follows the density. A track's variation budget is for the whole pattern,
+  follows the density. Beyond that the drum lines are standard rhythms: written
+  kick and snare lines per genre, hats on a fixed grid (16ths are 4 a beat), the
+  clap on the backbeat, accented hits never dropped by the density, and in auto
+  mode a groove held through its section, with little variation at play and no
+  pitch change. Bass and chord lines hold through their section too, with no
+  variation and no chord progression within it. A track's variation budget is for the whole pattern,
   not for each of its loops (`ordrumbox-core/src/variation.rs`).
   `cargo test -p ordrumbox-logic --test generators -- --ignored` writes this
   file, only when what the generators make changes on purpose.
