@@ -7,6 +7,11 @@
 //! here [`SynthVoice::start`] is the trigger with the update's values (a
 //! [`SynthPatch`]) and [`SynthVoice::release_at`] the release. Starting,
 //! releasing and rendering never allocate.
+//!
+//! It departs from the JS processor on purpose where that one did not do what
+//! its controls say: the sub-oscillator sounds an octave below oscillator 1,
+//! the pitch punch reaches two octaves, FM follows the note and goes through
+//! zero, and each note has its own noise.
 
 use std::f64::consts::{PI, TAU};
 use std::sync::OnceLock;
@@ -19,6 +24,33 @@ const SINE_TABLE_SIZE: usize = 4096;
 /// Initial state of the noise generator.
 const NOISE_SEED: i32 = 54_321;
 const FLUSH: f64 = 1e-15;
+/// Pitch rise of a full pitch punch at the start of a note, cents.
+const PITCH_PUNCH_CENTS: f64 = 2400.0;
+/// Frequency deviation of a full FM amount, as a multiple of the carrier's
+/// frequency: the timbre stays the same over the keyboard.
+pub const FM_DEVIATION: f64 = 2.0;
+
+/// Initial noise state of the note numbered `serial`: every note has its own,
+/// the same from one render to the next. A xorshift never leaves a state of 0.
+fn noise_seed(serial: u64) -> i32 {
+    let seed = NOISE_SEED ^ serial.wrapping_sub(1).wrapping_mul(0x9E37_79B1) as i32;
+    if seed == 0 { NOISE_SEED } else { seed }
+}
+
+/// Frequencies of oscillators 1 and 2 under FM of `amount`, routed by
+/// `algorithm` from the raw `o1`, `o2` and `o3`.
+#[inline]
+fn fm_frequencies(amount: f64, algorithm: i64, (f1, f2): (f64, f64), [o1, o2, o3]: [f64; 3]) -> (f64, f64) {
+    let (d1, d2) = (f1 * amount * FM_DEVIATION, f2 * amount * FM_DEVIATION);
+    match algorithm {
+        0 => (f1 + o2 * d1, f2),
+        1 => (f1 + o3 * d1, f2),
+        2 => (f1 + o2 * d1, f2 + o3 * d2),
+        3 => (f1 + (o2 + o3) * d1, f2),
+        4 => (f1 + o2 * d1, f2 + o1 * d2),
+        _ => (f1, f2),
+    }
+}
 
 fn sine_table() -> &'static [f32; SINE_TABLE_SIZE] {
     static TABLE: OnceLock<[f32; SINE_TABLE_SIZE]> = OnceLock::new();
@@ -348,7 +380,8 @@ impl SynthVoice {
     /// Start a note at `start_time` (seconds on the clock [`Self::render`]
     /// is given), on a fresh voice (a pooled JS node is reset before reuse).
     pub fn start(&mut self, patch: &SynthPatch, track: usize, start_time: f64, serial: u64) {
-        *self = Self { active: true, track, serial, patch: *patch, start_time, ..Self::default() };
+        *self =
+            Self { active: true, track, serial, patch: *patch, start_time, rng: noise_seed(serial), ..Self::default() };
         self.env_segment = Segment::Attack;
         self.filter_env_segment = 1;
         self.mod_env_segment = Segment::Attack;
@@ -632,7 +665,7 @@ impl SynthVoice {
             let mut f3d = f3 * ratio(d3m);
 
             if pitch_punch > 0.001 && t < 0.06 {
-                let punch = (((1.0 - t / 0.06) * pitch_punch * 24.0) * LN2_OVER_1200).exp();
+                let punch = (((1.0 - t / 0.06) * pitch_punch * PITCH_PUNCH_CENTS) * LN2_OVER_1200).exp();
                 f1d *= punch;
                 f2d *= punch;
                 f3d *= punch;
@@ -642,28 +675,10 @@ impl SynthVoice {
             let (phase, cycle) = (self.phase, self.osc_cycle);
             let raw =
                 |shape: f64, n: usize, freq: f64| oscillator(table, shape, phase[n], (freq / sr).min(0.49), cycle[n]);
+            let raw_oscillators = || [raw(w1, 0, f1d), raw(w2, 1, f2d), raw(w3, 2, f3d)];
             let (mut f1fm, mut f2fm) = (f1d, f2d);
             if !bypass.fm && fm_amount > 0.001 {
-                let o2 = raw(w2, 1, f2d);
-                let o3 = raw(w3, 2, f3d);
-                let depth = fm_amount * 1000.0;
-                match fm_algorithm {
-                    0 => f1fm = f1d + o2 * depth,
-                    1 => f1fm = f1d + o3 * depth,
-                    2 => {
-                        f1fm = f1d + o2 * depth;
-                        f2fm = f2d + o3 * depth;
-                    }
-                    3 => f1fm = f1d + (o2 + o3) * depth,
-                    4 => {
-                        let o1 = raw(w1, 0, f1d);
-                        f1fm = f1d + o2 * depth;
-                        f2fm = f2d + o1 * depth;
-                    }
-                    _ => {}
-                }
-                f1fm = f1fm.max(0.0);
-                f2fm = f2fm.max(0.0);
+                (f1fm, f2fm) = fm_frequencies(fm_amount, fm_algorithm, (f1d, f2d), raw_oscillators());
             }
 
             if m_target > 0 && m_env > 0.001 {
@@ -677,24 +692,9 @@ impl SynthVoice {
                     3 if !bypass.fm => {
                         let amount = fm_amount * m_depth * m_env;
                         if amount > 0.001 {
-                            let o2 = raw(w2, 1, f2d);
-                            let o3 = raw(w3, 2, f3d);
-                            let depth = amount * 1000.0;
-                            match fm_algorithm {
-                                0 => f1fm += o2 * depth,
-                                1 => f1fm += o3 * depth,
-                                2 => {
-                                    f1fm += o2 * depth;
-                                    f2fm += o3 * depth;
-                                }
-                                3 => f1fm += (o2 + o3) * depth,
-                                4 => {
-                                    let o1 = raw(w1, 0, f1d);
-                                    f1fm += o2 * depth;
-                                    f2fm += o1 * depth;
-                                }
-                                _ => {}
-                            }
+                            let (a, b) = fm_frequencies(amount, fm_algorithm, (f1d, f2d), raw_oscillators());
+                            f1fm += a - f1d;
+                            f2fm += b - f2d;
                         }
                     }
                     4 => {
@@ -708,18 +708,23 @@ impl SynthVoice {
             }
 
             // Oscillators.
-            let dts = [clamp(f1fm / sr, 0.0, 0.49), clamp(f2fm / sr, 0.0, 0.49), clamp(f3d / sr, 0.0, 0.49)];
+            // A negative frequency runs the phase backwards: through-zero FM
+            // keeps the note's pitch, where stopping at zero would raise it.
+            let dts = [clamp(f1fm / sr, -0.49, 0.49), clamp(f2fm / sr, -0.49, 0.49), clamp(f3d / sr, -0.49, 0.49)];
             for (n, dt) in dts.iter().enumerate() {
                 let advanced = self.phase[n] + dt;
-                if advanced >= 1.0 {
-                    self.osc_cycle[n] += 1.0;
-                }
-                self.phase[n] = advanced % 1.0;
+                self.osc_cycle[n] += advanced.floor();
+                self.phase[n] = advanced.rem_euclid(1.0);
             }
-            let o1 = oscillator(table, w1, self.phase[0], dts[0], self.osc_cycle[0]) * g1c;
-            let o2 = oscillator(table, w2, self.phase[1], dts[1], self.osc_cycle[1]) * g2c;
-            let o3 = oscillator(table, w3, self.phase[2], dts[2], self.osc_cycle[2]) * g3c;
-            let sub = if sub_gain > 0.001 { sin_lookup(table, (self.phase[0] * 0.5) % 1.0) * sub_gain } else { 0.0 };
+            let o1 = oscillator(table, w1, self.phase[0], dts[0].abs(), self.osc_cycle[0]) * g1c;
+            let o2 = oscillator(table, w2, self.phase[1], dts[1].abs(), self.osc_cycle[1]) * g2c;
+            let o3 = oscillator(table, w3, self.phase[2], dts[2].abs(), self.osc_cycle[2]) * g3c;
+            // One cycle over two of oscillator 1: an octave below it.
+            let sub = if sub_gain > 0.001 {
+                sin_lookup(table, (self.osc_cycle[0].rem_euclid(2.0) + self.phase[0]) * 0.5) * sub_gain
+            } else {
+                0.0
+            };
             let osc_sum = (o1 + o2 + o3 + sub) * osc_mix;
 
             // Noise.
@@ -847,5 +852,85 @@ mod tests {
         // Release 0.1 s from 0.05 s: silent from 0.15 s.
         assert!(out[7300..].iter().all(|&s| s == 0.0));
         assert!(!voice.is_active());
+    }
+
+    /// A held note of `patch` at 100 Hz, with no filter and no envelope, from
+    /// its start. Oscillators not set are silent.
+    fn held(patch: SynthPatch, frames: usize) -> Vec<f32> {
+        let mut voice = SynthVoice::default();
+        let bypass = SynthBypass { filter: true, env: true, ..SynthBypass::default() };
+        let base = SynthPatch { osc_freq: [100.0; 3], volume: 1.0, bypass, ..patch };
+        voice.start(&base, 0, 0.0, 1);
+        render(&mut voice, frames)
+    }
+
+    /// Strength of `freq` in `signal` at 48 kHz.
+    fn tone_level(signal: &[f32], freq: f64) -> f64 {
+        let (mut re, mut im) = (0.0, 0.0);
+        for (i, &x) in signal.iter().enumerate() {
+            let phase = TAU * freq * i as f64 / 48_000.0;
+            re += f64::from(x) * phase.cos();
+            im += f64::from(x) * phase.sin();
+        }
+        (re * re + im * im).sqrt() / signal.len() as f64
+    }
+
+    #[test]
+    fn the_sub_sounds_an_octave_below_with_no_dc() {
+        let out = held(SynthPatch { osc_gain: [0.0; 3], sub_gain: 1.0, ..SynthPatch::default() }, 48_000);
+        let dc = out.iter().map(|&x| f64::from(x)).sum::<f64>() / out.len() as f64;
+        assert!(dc.abs() < 1e-3, "{dc}");
+        assert!(tone_level(&out, 50.0) > 100.0 * tone_level(&out, 100.0));
+    }
+
+    #[test]
+    fn a_full_punch_starts_two_octaves_up_and_ends_on_the_note() {
+        let crossings = |s: &[f32]| s.windows(2).filter(|w| w[0] < 0.0 && w[1] >= 0.0).count();
+        let patch =
+            SynthPatch { osc_gain: [1.0, 0.0, 0.0], pitch_punch: 1.0, osc_freq: [1000.0; 3], ..SynthPatch::default() };
+        let mut voice = SynthVoice::default();
+        let bypass = SynthBypass { filter: true, env: true, ..SynthBypass::default() };
+        voice.start(&SynthPatch { bypass, ..patch }, 0, 0.0, 1);
+        let out = render(&mut voice, 7680);
+        // 2 ms at nearly 4 kHz, then 20 ms at 1 kHz once the punch is over.
+        assert!(crossings(&out[..96]) >= 6, "{}", crossings(&out[..96]));
+        assert_eq!(crossings(&out[2880..3840]), 20);
+    }
+
+    #[test]
+    fn fm_keeps_the_pitch_and_follows_the_note() {
+        // The carrier goes well below zero on every cycle of its modulator.
+        let spectrum = |freq: f64| {
+            let mut voice = SynthVoice::default();
+            let bypass = SynthBypass { filter: true, env: true, ..SynthBypass::default() };
+            let patch = SynthPatch {
+                osc_freq: [freq, freq * 2.0, freq],
+                osc_gain: [1.0, 0.0, 0.0],
+                fm_amount: 1.0,
+                bypass,
+                ..SynthPatch::default()
+            };
+            voice.start(&patch, 0, 0.0, 1);
+            let out = render(&mut voice, 48_000);
+            [1.0, 1.5, 3.0, 5.0].map(|k| tone_level(&out, freq * k))
+        };
+        let (low, high) = (spectrum(200.0), spectrum(400.0));
+        // Only odd multiples of the note: sidebands at the carrier ± 2n × the note.
+        assert!(low[0] > 50.0 * low[1], "{low:?}");
+        for (a, b) in low.iter().zip(&high) {
+            assert!((a - b).abs() < 0.03, "{low:?} {high:?}");
+        }
+    }
+
+    #[test]
+    fn each_note_has_its_own_noise_and_replays_it() {
+        let note = |serial: u64| {
+            let mut voice = SynthVoice::default();
+            let patch = SynthPatch { noise_mix: 1.0, ..SynthPatch::default() };
+            voice.start(&patch, 0, 0.0, serial);
+            render(&mut voice, 2048)
+        };
+        assert_eq!(note(3), note(3));
+        assert_ne!(note(3), note(4));
     }
 }

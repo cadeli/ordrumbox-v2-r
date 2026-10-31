@@ -159,7 +159,13 @@ fn synth_patches_match_worklet_synth_voice() {
         let expected_keys =
             update.as_object().expect("object").iter().filter(|(k, _)| *k != "type" && *k != "fmAlgo").count();
         assert_eq!(fields.len(), expected_keys + 1, "{name}: field count");
+        // Unlike the JS voice, the level counts the noise in the mix
+        // (`synth_preset::tests`).
+        let counts_noise = patch.noise_mix != 0.0 && !patch.bypass.noise;
         for (key, got) in fields {
+            if key == "velocity" && counts_noise {
+                continue;
+            }
             let want = match update.get(&key) {
                 Some(Value::Bool(b)) => f64::from(u8::from(*b)),
                 Some(v) => v.as_f64().unwrap_or_else(|| panic!("{name}.{key}")),

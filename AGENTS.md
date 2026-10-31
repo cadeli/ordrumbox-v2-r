@@ -107,6 +107,10 @@ tools/            scripts that regenerate the golden fixtures
   named in the README.
 - When a test against a fixture fails, the code is wrong, not the fixture.
   DSP outputs must match within 2e-5; everything else matches exactly.
+- One exception: the synth voice departs from the JS processor on purpose
+  (`README.md`, "Golden fixtures"), and the cases concerned are checked against
+  `synth_renders.bin`, written from the Rust voice. Rewrite it only for a
+  change of sound you mean to make.
 
 ## Code conventions
 

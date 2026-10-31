@@ -8,6 +8,7 @@
 use ordrumbox_core::js::{round, to_number, truthy};
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_dsp::SynthPatch;
+pub use ordrumbox_dsp::synth::FM_DEVIATION;
 use ordrumbox_dsp::synth::{Adsr, SynthBypass, SynthLfo};
 
 /// `C3_FREQ`, Hz: the pitch of ratio 1.
@@ -169,8 +170,12 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
     let vcos = [at("vco1"), at("vco2"), at("vco3")];
     let gains = vcos.map(|vco| finite(get(vco, "gain"), 0.0));
     let total_gain = gains[0] + gains[1] + gains[2];
-    let vco_norm = if total_gain > 0.001 { 1.0 / total_gain } else { 1.0 };
-    let note_velo = note.velocity * vco_norm;
+    // The voice mixes oscillators and noise by `noise.mix`: both count, or a
+    // sound mostly made of noise would be raised by its quiet oscillators.
+    let noise_mix = if at("bypassNoise").is_some_and(truthy) { 0.0 } else { finite(get(at("noise"), "mix"), 0.0) };
+    let mix_gain = total_gain * (1.0 - noise_mix) + noise_mix;
+    let mix_norm = if mix_gain > 0.001 { 1.0 / mix_gain } else { 1.0 };
+    let note_velo = note.velocity * mix_norm;
     let accent = if note_velo > 0.5 { 1.0 + 0.5 * 0.5 } else { 1.0 };
     let master_volume = finite(at("masterVolume"), 0.8);
     let peak = note_velo * master_volume * accent * 1.0;
@@ -275,6 +280,20 @@ mod tests {
         // 0.8 / 0.5 = 1.6, accented (×1.25), master volume 0.8.
         assert!((patch.velocity - 1.6 * 0.8 * 1.25).abs() < 1e-12);
         assert_eq!(patch.envelope, Adsr { attack: 0.01, decay: 0.1, sustain: 0.7, release: 0.1 });
+    }
+
+    #[test]
+    fn the_level_counts_the_noise_in_the_mix() {
+        let velocity = |preset: &str| {
+            synth_patch(&json::parse(preset).unwrap(), SynthNote { ratio: 1.0, velocity: 0.8, pan: 0.0, bpm: 120.0 })
+                .velocity
+        };
+        // Oscillators at 0.4 for 20% of the mix, noise for 80%: 0.88 in all.
+        let noisy = velocity(r#"{"masterVolume":1,"vco1":{"gain":0.4},"noise":{"mix":0.8}}"#);
+        assert!((noisy - 0.8 / 0.88 * 1.25).abs() < 1e-12, "{noisy}");
+        // Bypassed, the noise is not in the mix.
+        let bypassed = velocity(r#"{"masterVolume":1,"vco1":{"gain":0.4},"noise":{"mix":0.8},"bypassNoise":true}"#);
+        assert!((bypassed - 0.8 / 0.4 * 1.25).abs() < 1e-12, "{bypassed}");
     }
 
     #[test]
