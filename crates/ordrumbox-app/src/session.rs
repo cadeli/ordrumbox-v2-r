@@ -163,6 +163,8 @@ pub struct Session {
     song_cursor: u32,
     /// First measure and first row of the arrangement shown.
     song_scroll: (u32, usize),
+    /// The pattern whose description is scrolled, and its first line shown.
+    description_scroll: (usize, usize),
     /// The clip under the mouse (its tooltip).
     hovered_clip: Option<usize>,
     song_drag: Option<session_song::SongDrag>,
@@ -479,6 +481,7 @@ impl Session {
             workspace: Workspace::Grid,
             song_cursor: 0,
             song_scroll: (0, 0),
+            description_scroll: (0, 0),
             hovered_clip: None,
             song_drag: None,
             roll_page: 0,

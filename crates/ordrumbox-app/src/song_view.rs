@@ -3,8 +3,8 @@
 //! (`arrangement_section.js`): a ruler of measures along X, one row per
 //! pattern the arrangement uses (named in a frozen first column), each clip a
 //! rectangle over its measures, the cursor —, and under it the pattern list
-//! on the left and the song's column on the right (its widgets are panel
-//! items).
+//! on the left, the selected pattern's description (wrapped, scrolled by the
+//! wheel) and the song's column on the right (its widgets are panel items).
 //!
 //! [`SongLayout`] places everything; drawing and mouse hit-testing both use it.
 
@@ -27,6 +27,15 @@ const CLIP_INSET: i32 = 2;
 /// The pattern list's rows, the song column's width.
 const LIST_ROW: i32 = 12;
 const COLUMN_WIDTH: i32 = 210;
+/// Characters of a pattern name in the list, and of its number ("99.").
+const LIST_NAME_CHARS: i32 = 16;
+const LIST_NUMBER_CHARS: i32 = 3;
+/// The pattern list's width: its number, a 4 px gap, its name.
+const LIST_WIDTH: i32 = (LIST_NUMBER_CHARS + LIST_NAME_CHARS) * 8 + 4;
+/// Space between the description's frame and its text.
+const DESCRIPTION_PAD: i32 = 4;
+/// Width of the description's scroll bar.
+const SCROLL_BAR: i32 = 3;
 /// Height of what is under the arrangement: all the song column's widgets.
 const LOWER_HEIGHT: i32 = 138;
 /// Gap between the arrangement and what is under it, and between the list and the column.
@@ -91,6 +100,10 @@ pub struct SongView<'a> {
     pub ghost: Option<SongGhost>,
     /// Measures shown past the end of the arrangement, to drop on.
     pub room: u32,
+    /// The selected pattern's description (`None` without a pattern), and
+    /// its first line shown.
+    pub description: Option<&'a str>,
+    pub description_scroll: usize,
 }
 
 /// Where a pattern dragged from the list would land.
@@ -108,6 +121,8 @@ pub struct SongGhost {
 pub enum SongHit {
     /// A pattern of the list.
     Pattern(usize),
+    /// The selected pattern's description.
+    Description,
     /// A measure of the ruler.
     Ruler(u32),
     /// A clip (its index in the arrangement).
@@ -124,6 +139,8 @@ pub struct SongLayout {
     scale: i32,
     /// The pattern list.
     pub list: Rect,
+    /// The selected pattern's description: its title line, then its frame.
+    pub description: Rect,
     /// The arrangement: its title line, then the ruler and the rows.
     pub grid: Rect,
     /// The song's column (its widgets).
@@ -144,8 +161,30 @@ impl SongLayout {
         let grid = Rect::new(margin, top, full_w, (lower_y - GAP * s - top).max(0));
         let column_w = (COLUMN_WIDTH * s).min(full_w / 3);
         let column = Rect::new(width - margin - column_w, lower_y, column_w, lower_h);
-        let list = Rect::new(margin, lower_y, (column.x - GAP * s - margin).max(0), lower_h);
-        Self { scale, list, grid, column }
+        let list = Rect::new(margin, lower_y, (LIST_WIDTH * s).min(full_w / 4), lower_h);
+        let description_x = list.x + list.w + GAP * s;
+        let description = Rect::new(description_x, lower_y, (column.x - GAP * s - description_x).max(0), lower_h);
+        Self { scale, list, description, grid, column }
+    }
+
+    /// The description's frame, under its title line.
+    fn description_frame(&self) -> Rect {
+        let d = self.description;
+        let title = 12 * self.scale;
+        Rect::new(d.x, d.y + title, d.w, (d.h - title).max(0))
+    }
+
+    /// `text` in the lines the description's frame shows.
+    pub fn description_lines(&self, text: &str) -> Vec<String> {
+        let s = self.scale;
+        let w = self.description_frame().w - 2 * DESCRIPTION_PAD * s - SCROLL_BAR * s;
+        wrap(text, usize::try_from(w / (8 * s)).unwrap_or(0))
+    }
+
+    /// Lines of the description that fit in its frame.
+    pub fn description_rows(&self) -> usize {
+        let h = self.description_frame().h - 2 * DESCRIPTION_PAD * self.scale;
+        usize::try_from(h / (LIST_ROW * self.scale)).unwrap_or(0).max(1)
     }
 
     fn label_width(&self) -> i32 {
@@ -239,6 +278,9 @@ impl SongLayout {
             let row = self.list_first(view.selected_pattern) + row_at(y, self.list.y, LIST_ROW * self.scale)?;
             return (row < view.patterns.len()).then_some(SongHit::Pattern(row));
         }
+        if self.description.contains(x, y) {
+            return view.description.map(|_| SongHit::Description);
+        }
         let song = view.song?;
         if !self.grid.contains(x, y) || y < self.ruler_top() {
             return None;
@@ -272,6 +314,7 @@ impl SongLayout {
 /// Draw the list and the arrangement (the column is panel items).
 pub fn draw(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     draw_list(canvas, view, layout);
+    draw_description(canvas, view, layout);
     draw_arrangement(canvas, view, layout);
 }
 
@@ -289,8 +332,47 @@ fn draw_list(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
         if selected {
             canvas.fill_rect(r.x - 2 * s, y - 2 * s, r.w, LIST_ROW * s, SELECTED);
         }
-        let x = canvas.text(r.x, y, &format!("{}.", i + 1), s, DIM) + 4 * s;
+        let number = format!("{}.", i + 1);
+        let x = r.x + (LIST_NUMBER_CHARS * 8 * s - text_width(&number, s)).max(0);
+        let x = canvas.text(x, y, &number, s, DIM) + 4 * s;
         canvas.text(x, y, &fit(name, r.x + r.w - x, s), s, if selected { ACCENT } else { TEXT });
+    }
+}
+
+/// The selected pattern's description: wrapped in its frame, from the first
+/// line shown, with a scroll bar when it is longer than the frame.
+fn draw_description(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
+    let s = layout.scale;
+    let Some(text) = view.description else { return };
+    let d = layout.description;
+    if d.w <= 0 {
+        return;
+    }
+    canvas.text(d.x, d.y, &fit("Pattern description", d.w, s), s, DIM);
+    let f = layout.description_frame();
+    for (x, y, w, h) in
+        [(f.x, f.y, f.w, s), (f.x, f.y + f.h - s, f.w, s), (f.x, f.y, s, f.h), (f.x + f.w - s, f.y, s, f.h)]
+    {
+        canvas.fill_rect(x, y, w, h, LINE);
+    }
+    let (x, top) = (f.x + DESCRIPTION_PAD * s, f.y + DESCRIPTION_PAD * s);
+    if text.is_empty() {
+        canvas.text(x, top, &fit("(click to write one)", f.w - 2 * DESCRIPTION_PAD * s, s), s, DIM);
+        return;
+    }
+    let lines = layout.description_lines(text);
+    let rows = layout.description_rows();
+    for (k, line) in lines.iter().skip(view.description_scroll).take(rows).enumerate() {
+        canvas.text(x, top + k as i32 * LIST_ROW * s, line, s, TEXT);
+    }
+    if lines.len() > rows {
+        // The thumb: the lines shown, over the whole text.
+        let track_h = f.h - 2 * DESCRIPTION_PAD * s;
+        let bar_x = f.x + f.w - DESCRIPTION_PAD * s / 2 - SCROLL_BAR * s;
+        let thumb_y = top + track_h * view.description_scroll as i32 / lines.len() as i32;
+        let thumb_h = (track_h * rows as i32 / lines.len() as i32).max(4 * s);
+        canvas.fill_rect(bar_x, top, SCROLL_BAR * s, track_h, CELL);
+        canvas.fill_rect(bar_x, thumb_y.min(top + track_h - thumb_h), SCROLL_BAR * s, thumb_h, DIM);
     }
 }
 
@@ -398,6 +480,37 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     }
 }
 
+/// `text` in lines of at most `chars` characters, cut at spaces (a word longer
+/// than a line is cut in it) and at line breaks.
+fn wrap(text: &str, chars: usize) -> Vec<String> {
+    let mut lines = Vec::new();
+    if chars == 0 {
+        return lines;
+    }
+    for paragraph in text.split('\n') {
+        let mut line: Vec<char> = Vec::new();
+        for word in paragraph.split_whitespace() {
+            let word: Vec<char> = word.chars().collect();
+            if !line.is_empty() && line.len() + 1 + word.len() <= chars {
+                line.push(' ');
+                line.extend(&word);
+                continue;
+            }
+            if !line.is_empty() {
+                lines.push(line.drain(..).collect());
+            }
+            let mut rest = &word[..];
+            while rest.len() > chars {
+                lines.push(rest[..chars].iter().collect());
+                rest = &rest[chars..];
+            }
+            line.extend(rest);
+        }
+        lines.push(line.into_iter().collect());
+    }
+    lines
+}
+
 /// Text cut to `width` pixels.
 fn fit(text: &str, width: i32, scale: i32) -> String {
     let chars = usize::try_from(width / (8 * scale).max(1)).unwrap_or(0);
@@ -444,6 +557,8 @@ mod tests {
             dragged_clip: None,
             ghost: None,
             room: 0,
+            description: Some("x"),
+            description_scroll: 0,
         };
         let layout = SongLayout::new(1100, 680, 1, 0);
         let (mw, rh) = (layout.measure_width(), layout.row_height());
@@ -451,6 +566,9 @@ mod tests {
         let at_measure = |m: i32| layout.body_left() + m * mw + mw / 2;
         assert_eq!(layout.hit(&view, layout.list.x + 2, layout.list.y + 13), Some(SongHit::Pattern(1)));
         assert_eq!(layout.hit(&view, layout.list.x + 2, layout.list.y + 40), None);
+        assert!(layout.list.w < layout.description.w);
+        let d = layout.description;
+        assert_eq!(layout.hit(&view, d.x + 2, d.y + d.h - 2), Some(SongHit::Description));
         assert_eq!(layout.hit(&view, at_measure(3), layout.ruler_top() + 2), Some(SongHit::Ruler(3)));
         assert_eq!(layout.hit(&view, at_measure(5), layout.ruler_top() + 2), None); // past the end
         assert_eq!(layout.hit(&view, layout.grid.x + 2, in_row(1)), Some(SongHit::RowName(1)));
@@ -474,10 +592,19 @@ mod tests {
     }
 
     #[test]
+    fn wrap_cuts_at_spaces_and_inside_long_words() {
+        assert_eq!(wrap("one two three", 7), ["one two", "three"]);
+        assert_eq!(wrap("abcdefghij k", 4), ["abcd", "efgh", "ij k"]);
+        assert_eq!(wrap("a\n\nb", 4), ["a", "", "b"]);
+        assert!(wrap("a", 0).is_empty());
+    }
+
+    #[test]
     fn draws_without_panicking_at_any_size() {
         let library = library();
         let rows = rows(&library.songs[0], &library.patterns);
         let empty = Library::parse(r#"{"songs":[{"name":"e"}]}"#).unwrap().0;
+        let long = "a long description of the pattern ".repeat(20);
         for (w, h) in [(1, 1), (40, 30), (1100, 680)] {
             let mut pixels = vec![0; w * h];
             let mut canvas = Canvas::new(&mut pixels, w, h);
@@ -494,6 +621,8 @@ mod tests {
                     dragged_clip: song.filter(|s| !s.clips.is_empty()).map(|_| (0, 3)),
                     ghost: Some(SongGhost { name: "c".into(), row: 2, measure: 2, measure_count: 1.0 }),
                     room: 8,
+                    description: song.map(|_| long.as_str()),
+                    description_scroll: 3,
                 };
                 draw(&mut canvas, &view, &layout);
             }

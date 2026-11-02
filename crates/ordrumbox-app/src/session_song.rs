@@ -3,9 +3,10 @@
 //! adds the pattern at the playhead, a drag drops it on the arrangement), the
 //! arrangement (a click on the ruler aims the cursor, where play starts; a
 //! clip dragged sideways moves; the right-click menus of clips, row names and
-//! the bare grid), the song's column (name, date, description,
-//! the arrangement select, Save, Load, Export, Import, and New and Delete
-//! for arrangements) — and Space plays the song while the panel is shown.
+//! the bare grid), the selected pattern's description (a click edits it, the
+//! wheel scrolls it), the song's column (name, date, description, the
+//! arrangement select, Save, Load, Export, Import, and New and Delete for
+//! arrangements) — and Space plays the song while the panel is shown.
 //!
 //! Songs are saved to `songs/` in the user data folder (the JS IndexedDB
 //! store) and, with Save as and Export, to a folder picked, as `.odbox` files.
@@ -166,6 +167,14 @@ impl Session {
         (x, self.song_scroll.1.min(rows.saturating_sub(layout.visible_rows())))
     }
 
+    /// The first line of the selected pattern's description shown, kept so
+    /// that the frame is full; another pattern shows from its first line.
+    fn description_scroll(&self, layout: &SongLayout) -> usize {
+        let (p, first) = self.description_scroll;
+        let Some(pattern) = self.pattern().filter(|_| p == self.pattern_index) else { return 0 };
+        first.min(layout.description_lines(&pattern.description).len().saturating_sub(layout.description_rows()))
+    }
+
     pub(super) fn song_layout(&self, size: (i32, i32, i32)) -> SongLayout {
         let body = self.body(size);
         SongLayout::new(body.main_w, body.editor_h, size.2, self.status.len())
@@ -190,6 +199,8 @@ impl Session {
             dragged_clip: self.song_dragged_clip(layout, rows.len()),
             ghost: self.song_ghost(layout, rows),
             room: self.song_room(layout),
+            description: self.pattern().map(|p| p.description.as_str()),
+            description_scroll: self.description_scroll(layout),
         }
     }
 
@@ -428,6 +439,7 @@ impl Session {
                 self.press_song_drag(DragSource::Clip { clip, grab }, x, y);
             }
             (SongHit::Pattern(p), Button::Right) => self.list_menu(p, x, y),
+            (SongHit::Description, Button::Left) => self.text_entry(Id::PatternDescription),
             (SongHit::Ruler(m), Button::Left) => self.set_song_cursor(m),
             (SongHit::Clip(c), Button::Right) => self.clip_menu(c, x, y),
             (SongHit::RowName(r), Button::Right) => self.row_menu(&rows[r], x, y),
@@ -547,9 +559,16 @@ impl Session {
         true
     }
 
-    /// The wheel over the arrangement: measures (Shift: rows); whether it was its.
+    /// The wheel over the arrangement: measures (Shift: rows); over the
+    /// pattern's description: its lines; whether it was theirs.
     pub fn song_wheel(&mut self, size: (i32, i32, i32), x: i32, y: i32, lines: isize, shift: bool) -> bool {
         let layout = self.song_layout(size);
+        if self.workspace == Workspace::Song && lines != 0 && layout.description.contains(x, y) {
+            let first = (self.description_scroll(&layout) as isize - lines).max(0) as usize;
+            self.description_scroll = (self.pattern_index, first);
+            self.description_scroll.1 = self.description_scroll(&layout);
+            return true;
+        }
         let Some(song) = self.song() else { return false };
         if self.workspace != Workspace::Song || lines == 0 || !layout.grid.contains(x, y) {
             return false;
@@ -984,6 +1003,22 @@ mod tests {
         s.commit_text(Id::SongName, "  My song ");
         s.commit_text(Id::SongDescription, " about ");
         assert_eq!((s.song_name().as_str(), s.info("description").as_str()), ("My song", "about"));
+        // A click on the pattern's description edits the selected pattern's.
+        let d = s.song_layout(SIZE).description;
+        let inside = (d.x + d.w / 2, d.y + d.h / 2);
+        assert!(s.song_click(SIZE, inside.0, inside.1, Button::Left));
+        type_entry(&mut s, " a groove ");
+        assert_eq!(s.editor.library().patterns[s.pattern_index].description, "a groove");
+        // The wheel scrolls a long one, no further than its last line.
+        s.commit_text(Id::PatternDescription, &"a groove to dance on ".repeat(40));
+        assert!(s.song_wheel(SIZE, inside.0, inside.1, -2, false));
+        let l = s.song_layout(SIZE);
+        assert_eq!(s.song_view_data(&[], &l).description_scroll, 2);
+        assert!(s.song_wheel(SIZE, inside.0, inside.1, -1000, false));
+        let last = l.description_lines(&s.pattern().unwrap().description).len() - l.description_rows();
+        assert_eq!(s.song_view_data(&[], &l).description_scroll, last);
+        assert!(s.song_wheel(SIZE, inside.0, inside.1, 1000, false));
+        assert_eq!(s.song_view_data(&[], &l).description_scroll, 0);
         // A double-click on a pattern of the list renames it.
         let l = s.song_layout(SIZE);
         let row = (l.list.x + 2, l.list.y + 12 + 2);
