@@ -77,7 +77,6 @@ pub enum Command {
     AddSample,
     ReplaceSample,
     ImportFolder,
-    Reassign,
     SelectRandomPattern,
     SelectRandomDrumkit,
     ToggleVus,
@@ -184,13 +183,14 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
         command("Next kit", ".", C::NextKit, s.kits.len() > 1),
         command("Random kit", "G", C::SelectRandomDrumkit, s.kits.len() > 1),
         Item::Separator,
-        command("Synth sounds on all tracks", "H", C::ConvertToSynth, p),
         command("Auto-assign all tracks", "J", C::AutoAssignAll, p),
+        command("Use synth kit", "H", C::ConvertToSynth, p),
         command("Random samples on all tracks", "K", C::RandomSamples, p && !s.kits.is_empty()),
         Item::Separator,
         check("Kit editor", "Ctrl+K", C::KitEditor, true, s.kit_editor),
         command("Normalize kit", "", C::NormalizeKit, !s.kits.is_empty()),
-        command("Assign sounds again", "", C::Reassign, !s.kits.is_empty()),
+        Item::Separator,
+        command("Import folder as kit...", "", C::ImportFolder, true),
     ];
     vec![
         Menu {
@@ -212,7 +212,6 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
                 Item::Separator,
                 command("Add sample...", "", C::AddSample, !s.kits.is_empty()),
                 command("Replace sample...", "", C::ReplaceSample, s.kit_sample),
-                command("Import folder as kit...", "", C::ImportFolder, true),
                 command("Load kit mapping...", "", C::LoadMapping, true),
                 command("Export kit mapping...", "", C::ExportMapping, !s.kits.is_empty()),
                 Item::Separator,
@@ -598,7 +597,6 @@ mod tests {
             C::ExportMidi,
             C::AddSample,
             C::ReplaceSample,
-            C::ImportFolder,
             C::LoadMapping,
             C::ExportMapping,
         ];
@@ -614,6 +612,17 @@ mod tests {
         let file: Vec<Command> = menus[0].items.iter().filter_map(Item::runnable).collect();
         for command in file_commands {
             assert!(file.contains(&command), "{command:?}");
+        }
+    }
+
+    #[test]
+    fn the_kit_menu_has_the_track_sound_commands() {
+        let menus = menus(&state());
+        let kit = menus.iter().find(|m| m.title == "Kit").unwrap();
+        let commands: Vec<Command> = kit.items.iter().filter_map(Item::runnable).collect();
+        use Command as C;
+        for command in [C::AutoAssignAll, C::ConvertToSynth, C::ImportFolder] {
+            assert!(commands.contains(&command), "{command:?}");
         }
     }
 
