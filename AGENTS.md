@@ -111,9 +111,10 @@ tools/            scripts that regenerate the golden fixtures
 - A change meant on purpose moves the cases concerned to a Rust snapshot or a
   property test, and the README notes the departure. Never loosen a tolerance
   or regenerate a JS fixture to make a test pass.
-- The synth voice is such a departure (`README.md`, "Golden fixtures"): its
-  cases are checked against `synth_renders.bin`, written from the Rust voice.
-  Rewrite it only for a change of sound you mean to make.
+- The synth voice and some effects are such departures (`README.md`,
+  "Golden fixtures", "Effects"): their cases are checked against
+  `synth_renders.bin` and `effect_renders.bin`, written from the Rust
+  processors. Rewrite them only for a change of sound you mean to make.
 
 ## Code conventions
 

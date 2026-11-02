@@ -77,6 +77,8 @@ json_record! {
         delay_type: String = "tape".to_owned() => "delayType",
         delay_beats: f64 = 1.0 => "delayBeats" | "delayTime",
         delay_mix: f64 = 0.0 => "delayMix" | "delayDepth",
+        /// Share of each repeat fed back, 0–0.95 (not for `slap`: one echo).
+        delay_feedback: f64 = 0.4 => "delayFeedback",
         saturation_type: String = "soft".to_owned() => "saturationType",
         saturation_mix: f64 = 0.0 => "saturationMix" | "saturationAmount",
         saturation_on: bool = true => "saturationOn" | "sat",
@@ -101,7 +103,7 @@ json_record! {
 }
 
 /// `TRACK_VALUE_RANGES`: bounds of the numeric settings an edit clamps to.
-const VALUE_RANGES: [(&str, f64, f64); 29] = [
+const VALUE_RANGES: [(&str, f64, f64); 30] = [
     ("volume", 0.0, 1.0),
     ("pan", -1.0, 1.0),
     ("transpose", -24.0, 24.0),
@@ -116,6 +118,7 @@ const VALUE_RANGES: [(&str, f64, f64); 29] = [
     ("reverbMix", 0.0, 1.0),
     ("delayBeats", 0.0, 4.0),
     ("delayMix", 0.0, 1.0),
+    ("delayFeedback", 0.0, 0.95),
     ("saturationMix", 0.0, 1.0),
     ("hitVariation", 0.0, 100.0),
     ("noteVariation", 0.0, 100.0),
@@ -138,8 +141,18 @@ const VALUE_RANGES: [(&str, f64, f64); 29] = [
 const NOT_SETTINGS: [&str; 3] = ["autoHitVariation", "autoNoteVariation", "scaleName"];
 
 /// Keys written rounded to 2 decimals (`ROUND_2D` in exporter.js).
-const ROUND_2D: [&str; 9] =
-    ["volume", "pan", "reverbMix", "delayMix", "delayBeats", "saturationMix", "swingAmount", "filterCutoff", "filterQ"];
+const ROUND_2D: [&str; 10] = [
+    "volume",
+    "pan",
+    "reverbMix",
+    "delayMix",
+    "delayFeedback",
+    "delayBeats",
+    "saturationMix",
+    "swingAmount",
+    "filterCutoff",
+    "filterQ",
+];
 
 /// Tracks a pattern plays, each through its own strip: an edit adds no
 /// track past them, a load reports the tracks beyond.

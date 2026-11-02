@@ -1,12 +1,27 @@
 //! The master bus (`worklets/processors/master_bus_source.js`): pre-gain, a
 //! peak compressor with soft knee and make-up gain, a one-pole low cut and
-//! high cut, the master gain, then a safety clip to ±1.
+//! high cut, the master gain, then a soft limit to ±1 (a hard clip in JS):
+//! untouched under 0.9, rounded above.
 
 use std::f64::consts::{LN_10, PI};
 
 /// `Math.LN10 / 20`.
 const LOG10_OVER_20: f64 = 0.115_129_254_649_702_29;
 const FLUSH: f64 = 1e-15;
+/// Level from which the output limit bends toward ±1.
+const LIMIT_KNEE: f64 = 0.9;
+
+/// `x` unchanged within ±[`LIMIT_KNEE`], then bent smoothly (same slope at
+/// the knee) toward ±1, never reached.
+#[inline]
+fn soft_limit(x: f64) -> f64 {
+    let level = x.abs();
+    if level <= LIMIT_KNEE {
+        return x;
+    }
+    let room = 1.0 - LIMIT_KNEE;
+    (LIMIT_KNEE + room * ((level - LIMIT_KNEE) / room).tanh()).copysign(x)
+}
 
 audio_params! {
     /// The master bus parameters; the defaults are `MASTER_BUS_DEFAULTS`
@@ -130,8 +145,8 @@ impl MasterBus {
                 self.hp_y_r = 0.0;
                 self.lp_y_r = 0.0;
             }
-            *l = (x_l * master).clamp(-1.0, 1.0) as f32;
-            *r = (x_r * master).clamp(-1.0, 1.0) as f32;
+            *l = soft_limit(x_l * master) as f32;
+            *r = soft_limit(x_r * master) as f32;
         }
     }
 }
@@ -155,6 +170,17 @@ mod tests {
         let mut r = l.clone();
         bus.process(&MasterSettings::default(), &mut l, &mut r);
         assert!(l.iter().all(|s| s.abs() <= 1.0));
+    }
+
+    #[test]
+    fn the_limit_bends_only_above_its_knee() {
+        assert_eq!(soft_limit(0.5), 0.5);
+        assert_eq!(soft_limit(-0.9), -0.9);
+        assert!((0.99..1.0).contains(&soft_limit(1.5)));
+        assert!((-1.0..-0.99).contains(&soft_limit(-3.0)));
+        // Continuous slope at the knee: no edge.
+        let slope = (soft_limit(0.9 + 1e-6) - 0.9) / 1e-6;
+        assert!((slope - 1.0).abs() < 1e-3);
     }
 
     #[test]

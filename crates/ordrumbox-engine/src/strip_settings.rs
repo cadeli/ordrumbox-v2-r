@@ -1,22 +1,65 @@
 //! A track's settings as strip parameters (`strip_sync.js` and `strip.js`),
 //! and its LFOs as per-tick parameter values (`step_lfo.js`).
+//!
+//! It departs from the JS where the names did not hold: `slap` is one clean
+//! echo (the JS played it as `tape`), `tape` has wow and a darker feedback,
+//! `pingpong` starts on the left and alternates at one time (the JS crossed
+//! two times, 2/3 apart), `spring` disperses, `gated` is gated, `hall` and
+//! `plate` have a pre-delay, and `allpass` skips the filter. A delay longer
+//! than the line plays at the longest halving of its beats that fits.
 
 use ordrumbox_core::Track;
 use ordrumbox_core::json::Object;
 use ordrumbox_core::lfo;
 use ordrumbox_dsp::StripSettings;
 
-/// `REVERB_PRESETS`: room, damp, width.
-fn reverb_preset(name: &str) -> Option<(f32, f32, f32)> {
+/// A reverb type's settings: room, damp and width (`REVERB_PRESETS`), then
+/// pre-delay (seconds), dispersion and gate (seconds), which the JS lacks.
+#[derive(Debug, Clone, Copy)]
+struct ReverbPreset {
+    room: f32,
+    damping: f32,
+    width: f32,
+    predelay: f32,
+    dispersion: f32,
+    gate: f32,
+}
+
+fn reverb_preset(name: &str) -> Option<ReverbPreset> {
+    let preset = |room, damping, width, predelay, dispersion, gate| ReverbPreset {
+        room,
+        damping,
+        width,
+        predelay,
+        dispersion,
+        gate,
+    };
     Some(match name {
-        "none" => (0.0, 0.5, 0.0),
-        "room" => (0.5, 0.5, 0.8),
-        "hall" => (0.85, 0.3, 1.0),
-        "plate" => (0.7, 0.4, 0.9),
-        "spring" => (0.45, 0.6, 0.5),
-        "gated" => (0.4, 0.7, 0.4),
+        "none" => preset(0.0, 0.5, 0.0, 0.0, 0.0, 0.0),
+        "room" => preset(0.5, 0.5, 0.8, 0.0, 0.0, 0.0),
+        "hall" => preset(0.85, 0.3, 1.0, 0.03, 0.0, 0.0),
+        "plate" => preset(0.7, 0.4, 0.9, 0.01, 0.0, 0.0),
+        "spring" => preset(0.45, 0.6, 0.5, 0.0, 0.6, 0.0),
+        // A large bright room cut short: the drum sound of the 1980s.
+        "gated" => preset(0.9, 0.2, 1.0, 0.0, 0.0, 0.25),
         _ => return None,
     })
+}
+
+/// Longest delay the strip holds, seconds (its `delay_time_*` range).
+const MAX_DELAY_SECONDS: f64 = 2.0;
+/// Wow depth (seconds) and feedback tone of the `tape` delay.
+const TAPE_WOW_SECONDS: f32 = 0.0015;
+const TAPE_TONE: f32 = 0.3;
+
+/// The beats a delay of `beats` plays at `bpm`: halved until it fits the
+/// delay line (the editor shows the value used).
+pub fn delay_beats_used(beats: f64, bpm: f64) -> f64 {
+    let mut used = beats;
+    while used > 0.0 && 60.0 / bpm * used > MAX_DELAY_SECONDS {
+        used /= 2.0;
+    }
+    used
 }
 
 fn filter_mode(name: &str) -> Option<f32> {
@@ -51,9 +94,10 @@ fn delay_mode(name: &str) -> Option<f32> {
 pub fn strip_settings(track: &Track, bpm: f64) -> StripSettings {
     let mut s = StripSettings::default();
 
-    // Filter: `allpass` only opens the cutoff (the mode stays lowpass).
+    // Filter: `allpass` skips it (the cutoff opens as in JS).
     if track.filter_type == "allpass" {
         s.cutoff = 20_000.0;
+        s.filter_on = 0.0;
     } else {
         s.filter_mode = filter_mode(&track.filter_type).unwrap_or(0.0);
         if track.filter_cutoff_lfo.is_none() {
@@ -79,10 +123,14 @@ pub fn strip_settings(track: &Track, bpm: f64) -> StripSettings {
     // Reverb.
     let amount = if track.reverb_on { finite_or(track.reverb_mix, 0.0).clamp(0.0, 1.0) } else { 0.0 };
     let reverb = reverb_preset(&track.reverb_type).map_or("none", |_| track.reverb_type.as_str());
-    let (room, damp, width) = reverb_preset(reverb).unwrap_or((0.0, 0.5, 0.0));
-    s.reverb_room = room;
-    s.reverb_damping = damp;
-    s.reverb_width = width;
+    if let Some(p) = reverb_preset(reverb) {
+        s.reverb_room = p.room;
+        s.reverb_damping = p.damping;
+        s.reverb_width = p.width;
+        s.reverb_predelay = p.predelay;
+        s.reverb_dispersion = p.dispersion;
+        s.reverb_gate = p.gate;
+    }
     s.reverb_mix = if reverb == "none" { 0.0 } else { amount as f32 };
 
     // Delay: 'none' or no amount only silences the send.
@@ -92,11 +140,21 @@ pub fn strip_settings(track: &Track, bpm: f64) -> StripSettings {
     } else {
         let mode = delay_mode(&track.delay_type).unwrap_or(1.0);
         let beats = if track.delay_beats.is_finite() { track.delay_beats } else { 1.0 };
-        let seconds = 60.0 / bpm * beats;
-        s.delay_time_l = (if mode >= 1.5 { seconds * 0.667 } else { seconds }) as f32;
+        let seconds = 60.0 / bpm * delay_beats_used(beats, bpm);
+        s.delay_time_l = seconds as f32;
         s.delay_time_r = seconds as f32;
         s.delay_mode = mode;
         s.delay_mix = amount as f32;
+        s.delay_feedback = finite_or(track.delay_feedback, 0.4).clamp(0.0, 0.95) as f32;
+        if mode < 0.5 {
+            // Slap: one echo.
+            s.delay_feedback = 0.0;
+        } else if mode < 1.5 {
+            s.delay_wow = TAPE_WOW_SECONDS;
+            s.delay_tone = TAPE_TONE;
+        } else {
+            s.delay_mono_in = 1.0;
+        }
     }
 
     if track.volume_lfo.is_none() {
@@ -181,10 +239,40 @@ mod tests {
     fn delay_follows_the_tempo() {
         let track = Track { delay_type: "pingpong".into(), delay_beats: 0.5, delay_mix: 0.4, ..Track::default() };
         let s = strip_settings(&track, 120.0);
-        assert_eq!(
-            (s.delay_time_l, s.delay_time_r, s.delay_mode, s.delay_mix),
-            ((0.25_f64 * 0.667) as f32, 0.25, 2.0, 0.4)
-        );
+        assert_eq!((s.delay_time_l, s.delay_time_r, s.delay_mode, s.delay_mix), (0.25, 0.25, 2.0, 0.4));
+        assert_eq!((s.delay_mono_in, s.delay_feedback), (1.0, 0.4));
+    }
+
+    #[test]
+    fn each_delay_type_sounds_its_own() {
+        let delay = |kind: &str| {
+            let track = Track { delay_type: kind.into(), delay_mix: 0.5, delay_feedback: 0.7, ..Track::default() };
+            strip_settings(&track, 120.0)
+        };
+        let (slap, tape, ping_pong) = (delay("slap"), delay("tape"), delay("pingpong"));
+        assert_eq!((slap.delay_feedback, slap.delay_wow), (0.0, 0.0));
+        assert_eq!((tape.delay_feedback, tape.delay_wow, tape.delay_tone), (0.7, TAPE_WOW_SECONDS, TAPE_TONE));
+        assert_eq!((ping_pong.delay_feedback, ping_pong.delay_mono_in), (0.7, 1.0));
+    }
+
+    #[test]
+    fn a_delay_too_long_halves_its_beats() {
+        assert_eq!(delay_beats_used(4.0, 120.0), 4.0);
+        assert_eq!(delay_beats_used(4.0, 90.0), 2.0);
+        assert_eq!(delay_beats_used(4.0, 20.0), 0.5);
+        let track = Track { delay_beats: 4.0, delay_mix: 0.5, ..Track::default() };
+        assert_eq!(strip_settings(&track, 60.0).delay_time_l, 2.0);
+    }
+
+    #[test]
+    fn each_reverb_type_sounds_its_own() {
+        let reverb = |kind: &str| {
+            strip_settings(&Track { reverb_type: kind.into(), reverb_mix: 0.5, ..Track::default() }, 120.0)
+        };
+        assert!(reverb("gated").reverb_gate > 0.0 && reverb("hall").reverb_gate == 0.0);
+        assert!(reverb("spring").reverb_dispersion > 0.0 && reverb("plate").reverb_dispersion == 0.0);
+        assert!(reverb("hall").reverb_predelay > reverb("plate").reverb_predelay);
+        assert_eq!(strip_settings(&Track::default(), 120.0).filter_on, 0.0);
     }
 
     #[test]

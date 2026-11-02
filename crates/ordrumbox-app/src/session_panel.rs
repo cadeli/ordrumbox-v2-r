@@ -360,7 +360,8 @@ impl Session {
                 .collect(),
             None => Vec::new(),
         };
-        Some(TrackView { track, title, sample, decay, instruments, samples, synths, lfo })
+        let bpm = self.pattern().map_or(song::DEFAULT_BPM, |p| p.bpm);
+        Some(TrackView { track, title, sample, decay, instruments, samples, synths, lfo, bpm })
     }
 
     /// Every sample of instrument `id`: (kit, url, name), the current kit's
@@ -1233,7 +1234,7 @@ impl Session {
                         vec![("filterType", Value::String("allpass".into()))]
                     } else {
                         let back = self.editors.prev_filter_type.clone().unwrap_or_else(|| "lowpass".into());
-                        vec![("filterType", Value::String(back))]
+                        filter_on(&track, back)
                     }
                 } else {
                     let on = editors::number(&track, fx.key) > 0.0;
@@ -1242,16 +1243,15 @@ impl Session {
                 self.update_track(t, &updates, &format!("Toggle {} on {name}", fx.label), false);
             }
             Id::FilterIcon(i) => {
-                let value = FILTER_TYPES[usize::from(i.min(2))];
+                let value = FILTER_TYPES[usize::from(i).min(FILTER_TYPES.len() - 1)];
                 let current = track.filter_type.clone();
-                let next = if current == value { "allpass" } else { value };
+                let updates = if current == value {
+                    vec![("filterType", Value::String("allpass".into()))]
+                } else {
+                    filter_on(&track, value.to_owned())
+                };
                 self.editors.prev_filter_type = (current != value).then_some(current);
-                self.update_track(
-                    t,
-                    &[("filterType", Value::String(next.into()))],
-                    &format!("Filter type on {name}"),
-                    false,
-                );
+                self.update_track(t, &updates, &format!("Filter type on {name}"), false);
             }
             Id::LfoLed(i) => {
                 self.editors.lfo_target = i;
@@ -1363,6 +1363,16 @@ fn control_name(id: Id) -> (&'static str, &'static str) {
         Id::TrackVolume(_) => ("Volume", ""),
         _ => ("", ""),
     }
+}
+
+/// The edits that set the filter of `track` to `filter_type`: from the bypass,
+/// a cutoff at its 20 Hz default moves to [`editors::FILTER_ON_CUTOFF`].
+fn filter_on(track: &Track, filter_type: String) -> Vec<(&'static str, Value)> {
+    let mut updates = vec![("filterType", Value::String(filter_type))];
+    if track.filter_type == "allpass" && track.filter_cutoff <= Track::default().filter_cutoff {
+        updates.push(("filterCutoff", num(editors::FILTER_ON_CUTOFF)));
+    }
+    updates
 }
 
 /// What an edit of control `id` is called in the undo history: its label,

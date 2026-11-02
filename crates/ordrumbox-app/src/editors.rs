@@ -7,6 +7,7 @@
 use ordrumbox_core::js;
 use ordrumbox_core::json::Value;
 use ordrumbox_core::{Note, ScaleList, Track};
+use ordrumbox_engine::strip_settings::delay_beats_used;
 
 use crate::canvas::text_width;
 use crate::control::{Format, Spec};
@@ -31,14 +32,17 @@ pub struct FxDef {
 
 pub const FX_DEFS: [FxDef; 4] = [
     FxDef { key: "reverbMix", label: "Rev", controls: &["reverbMix", "reverbType"] },
-    FxDef { key: "delayMix", label: "Dly", controls: &["delayMix", "delayBeats", "delayType"] },
+    FxDef { key: "delayMix", label: "Dly", controls: &["delayMix", "delayBeats", "delayFeedback", "delayType"] },
     FxDef { key: "saturationMix", label: "Sat", controls: &["saturationMix", "saturationType"] },
     // The filter is on when its type is not the allpass bypass.
     FxDef { key: "filterType", label: "Flt", controls: &["filterType", "filterSlope", "filterCutoff", "filterQ"] },
 ];
 
-pub const FILTER_TYPES: [&str; 3] = ["lowpass", "highpass", "bandpass"];
-const FILTER_ICONS: [&str; 3] = ["LP", "HP", "BP"];
+pub const FILTER_TYPES: [&str; 4] = ["lowpass", "highpass", "bandpass", "notch"];
+const FILTER_ICONS: [&str; 4] = ["LP", "HP", "BP", "NT"];
+/// Cutoff a filter gets when switched on from its 20 Hz default, Hz (a
+/// lowpass at 20 Hz is silence).
+pub const FILTER_ON_CUTOFF: f64 = 1_000.0;
 
 /// Delay time multipliers, in beats, and their labels (`fx_values.js`).
 const DELAY_TIME_VALUES: [&str; 7] = ["0.0625", "0.125", "0.25", "0.5", "1", "2", "4"];
@@ -109,9 +113,10 @@ const fn prop(key: &'static str, label: &'static str, min: f64, max: f64, step: 
 }
 
 /// The effect knobs.
-pub const FX_KNOBS: [Prop; 5] = [
+pub const FX_KNOBS: [Prop; 6] = [
     prop("reverbMix", "Mix", 0.0, 1.0, 0.01, Format::Plain),
     prop("delayMix", "Mix", 0.0, 1.0, 0.01, Format::Plain),
+    prop("delayFeedback", "Fdbk", 0.0, 0.95, 0.01, Format::Plain),
     prop("saturationMix", "Mix", 0.0, 1.0, 0.01, Format::Plain),
     prop("filterCutoff", "Freq", 20.0, 20_000.0, 1.0, Format::Freq),
     prop("filterQ", "Q", 0.707, 18.707, 0.01, Format::Fixed2),
@@ -504,6 +509,8 @@ pub struct TrackView<'a> {
     pub synths: Choice,
     /// LFO values while playing, by setting.
     pub lfo: Vec<(&'static str, f64)>,
+    /// Tempo the track plays at (the delay's beats may not fit at it).
+    pub bpm: f64,
 }
 
 /// What the note editor shows.
@@ -696,6 +703,10 @@ fn fx_tab(rows: &mut Rows, view: &TrackView, state: &EditorState) {
     rows.tabs(&tabs);
     let fx = &FX_DEFS[usize::from(state.fx_tab.min(3))];
     for &key in fx.controls {
+        // A slap is one echo: no feedback to set.
+        if key == "delayFeedback" && track.delay_type == "slap" {
+            continue;
+        }
         let r = rows.row();
         if key == "filterType" {
             rows.label(r, "Type", Some(key), state.selected_prop == Some(key));
@@ -716,8 +727,17 @@ fn fx_tab(rows: &mut Rows, view: &TrackView, state: &EditorState) {
             rows.items.push(Item::new(Some(Id::Fx(key)), rows.field(r, 120 * s), kind));
         } else {
             rows.label(r, fx_label(key), Some(key), state.selected_prop == Some(key));
-            let (values, labels) = track_select_options(key);
+            let (values, mut labels) = track_select_options(key);
             let selected = index_of(&values, &text_of(track, key));
+            if key == "delayBeats" {
+                // Too long a delay plays at fewer beats: shown on the choice.
+                let used = delay_beats_used(track.delay_beats, view.bpm);
+                if used != track.delay_beats
+                    && let Some(label) = labels.get_mut(selected)
+                {
+                    *label = format!("{label} ({} used)", js::number_to_string(used));
+                }
+            }
             let choice = Choice { values, labels, selected };
             rows.items.push(Item::new(Some(Id::TrackSelect(key)), rows.field(r, 120 * s), choice.kind()));
         }
@@ -1056,6 +1076,7 @@ mod tests {
             samples: Choice::default(),
             synths: Choice { values: vec!["none".into()], labels: Vec::new(), selected: 0 },
             lfo: Vec::new(),
+            bpm: 120.0,
         }
     }
 

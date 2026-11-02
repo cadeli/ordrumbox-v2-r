@@ -6,7 +6,7 @@
 use std::path::Path;
 
 use ordrumbox_core::json::{self, Value};
-use ordrumbox_core::{Library, lfo};
+use ordrumbox_core::{Library, Track, lfo};
 use ordrumbox_dsp::{StripSettings, SynthPatch};
 use ordrumbox_engine::strip_settings::strip_settings;
 use ordrumbox_engine::synth_preset::{SynthNote, synth_patch};
@@ -48,18 +48,35 @@ fn strip_settings_match_applytracktostrip() {
     let cases = fixture("strip_settings.json");
     let cases = cases.as_array().expect("array");
     assert!(cases.len() > 100);
+    let mut departing = 0;
     for case in cases {
         let track_json = case.get("track").expect("track");
         let library = format!(r#"{{"patterns":[{{"name":"p","tracks":[{}]}}]}}"#, track_json.to_json());
         let (library, _) = Library::parse(&library).expect("library");
         let track = &library.patterns[0].tracks[0];
-        let settings = strip_settings(track, num(case, "bpm"));
+        let bpm = num(case, "bpm");
+        if departs_from_js(track, bpm) {
+            departing += 1;
+            continue;
+        }
+        let settings = strip_settings(track, bpm);
         let expected = case.get("settings").expect("settings");
         for (key, got) in strip_fields(&settings) {
             let want = num(expected, key) as f32;
             assert_eq!(got, want, "{key} of {}", track_json.to_json());
         }
     }
+    // The edge cases of the export script reach each departure.
+    assert!((4..cases.len() / 4).contains(&departing), "{departing}");
+}
+
+/// Whether the strip settings of `track` depart from the JS on purpose
+/// (`strip_settings.rs`): a `gated` reverb's room, and a sounding `slap`,
+/// `pingpong` or too long delay. Unit tests of `strip_settings.rs` cover them.
+fn departs_from_js(track: &Track, bpm: f64) -> bool {
+    let delay = track.delay_on && track.delay_mix > 0.0 && track.delay_type != "none";
+    let too_long = 60.0 / bpm * track.delay_beats > 2.0;
+    track.reverb_type == "gated" || (delay && (matches!(track.delay_type.as_str(), "slap" | "pingpong") || too_long))
 }
 
 #[test]

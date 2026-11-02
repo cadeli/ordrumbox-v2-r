@@ -11,7 +11,8 @@
 //! It departs from the JS processor on purpose where that one did not do what
 //! its controls say: the sub-oscillator sounds an octave below oscillator 1,
 //! the pitch punch reaches two octaves, FM follows the note and goes through
-//! zero, and each note has its own noise.
+//! zero, each note has its own noise, and the filter opens up to 0.45 × the
+//! sample rate (a quarter in JS).
 
 use std::f64::consts::{PI, TAU};
 use std::sync::OnceLock;
@@ -26,6 +27,9 @@ const NOISE_SEED: i32 = 54_321;
 const FLUSH: f64 = 1e-15;
 /// Pitch rise of a full pitch punch at the start of a note, cents.
 const PITCH_PUNCH_CENTS: f64 = 2400.0;
+/// Highest filter cutoff, as a fraction of the sample rate (the JS stops at a
+/// quarter: 12 kHz at 48 kHz, too dark for hats and noise).
+const MAX_CUTOFF_RATIO: f64 = 0.45;
 /// Frequency deviation of a full FM amount, as a multiple of the carrier's
 /// frequency: the timbre stays the same over the keyboard.
 pub const FM_DEVIATION: f64 = 2.0;
@@ -569,7 +573,7 @@ impl SynthVoice {
 
         let f_freq_mod = clamp(f_freq, 20.0, 20_000.0);
         let f_q_val = clamp(f_q, 0.1, 20.0);
-        let g_coeff = (PI * f_freq_mod.min(sr * 0.25) / sr).tan();
+        let g_coeff = (PI * f_freq_mod.min(sr * MAX_CUTOFF_RATIO) / sr).tan();
         let k_coeff = 1.0 / f_q_val;
         let steep = slope::is_steep(p.filter_slope);
         let select = |(lp, hp, bp): (f64, f64, f64)| match filter_mode {
@@ -585,7 +589,7 @@ impl SynthVoice {
         let lfo2_on = !bypass.lfo2 && lfo2_freq > 0.0;
 
         let nf_mode = mode(nf_type);
-        let nf_g = (PI * clamp(nf_freq, 20.0, 20_000.0).min(sr * 0.25) / sr).tan();
+        let nf_g = (PI * clamp(nf_freq, 20.0, 20_000.0).min(sr * MAX_CUTOFF_RATIO) / sr).tan();
         let nf_k = 1.0 / clamp(nf_q, 0.1, 20.0);
 
         let frames = left.len().min(right.len());
@@ -749,7 +753,7 @@ impl SynthVoice {
                 let freq = nf_freq + l1.noise_freq + l2.noise_freq;
                 let q = clamp(nf_q + l1.noise_q + l2.noise_q, 0.1, 20.0);
                 if freq != nf_freq || q != nf_q {
-                    g = (PI * clamp(freq, 20.0, 20_000.0).min(sr * 0.25) / sr).tan();
+                    g = (PI * clamp(freq, 20.0, 20_000.0).min(sr * MAX_CUTOFF_RATIO) / sr).tan();
                     k = 1.0 / q;
                 }
                 let a1 = 1.0 / (1.0 + g * (g + k));
@@ -796,8 +800,8 @@ impl SynthVoice {
                 let (g, k) = if recompute {
                     let f = if f_freq_sample < 20.0 {
                         20.0
-                    } else if f_freq_sample > sr * 0.25 {
-                        sr * 0.25
+                    } else if f_freq_sample > sr * MAX_CUTOFF_RATIO {
+                        sr * MAX_CUTOFF_RATIO
                     } else {
                         f_freq_sample
                     };
