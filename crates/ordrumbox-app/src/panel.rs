@@ -86,8 +86,14 @@ pub enum Id {
     /// Effect sub-tab (Rev, Dly, Sat, fltr), and its on/off LED.
     FxTab(u8),
     FxLed(u8),
-    /// Groove / Engine sub-tab.
+    /// Groove / Engine / Compose sub-tab.
     GenerationTab(u8),
+    /// A compose setting of a drum track (its style's value when unset).
+    Compose(&'static str),
+    /// ↻: a new line on the edited track.
+    Regenerate,
+    /// The Gen tab's Advanced settings, shown or folded.
+    GenerationAdvanced,
     /// LFO target list, and the on/off LED of a target.
     LfoTarget,
     LfoLed(u8),
@@ -136,7 +142,12 @@ pub enum Id {
     Transport,
     Bpm,
     Beats,
-    Generate(u8),
+    /// The style list, ⟳ (the pattern made again in it), AUTO (every track in
+    /// auto mode), and a generation macro of the pattern.
+    StyleList,
+    GeneratePattern,
+    AutoAll,
+    Macro(&'static str),
     /// A view button: grid, piano roll, song, synth, output.
     View(u8),
     // Song panel.

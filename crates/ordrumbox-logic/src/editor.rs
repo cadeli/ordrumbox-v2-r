@@ -13,8 +13,9 @@ use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::ids::{slugify, unique_id};
 use ordrumbox_core::js::{number_to_string, round};
 use ordrumbox_core::json::Value;
+use ordrumbox_core::style::{COMPLEXITY, ENERGY, MACRO_NEUTRAL};
 use ordrumbox_core::track::MAX_TRACKS;
-use ordrumbox_core::{Library, Note, Pattern, Scales, SetField, Track};
+use ordrumbox_core::{Library, Note, Pattern, Scales, SetField, Styles, Track};
 
 use crate::generate::{self, AutoGenerator, MelodicKind, Options};
 use crate::history::{Change, History, Target};
@@ -695,11 +696,18 @@ impl Editor {
 // ─── Generation ──────────────────────────────────────────────────────────────
 
 impl Editor {
-    /// B (`generatePattern` on a new pattern): a new pattern with a genre's
-    /// tracks and lines, one undo step; its index.
-    pub fn generate_pattern(&mut self, scales: &Scales, rnd: &mut dyn FnMut() -> f64) -> usize {
+    /// Shift+B: a new pattern made in a style (style `style`, else a drawn
+    /// one): its tracks, meter, tempo and lines, one undo step; its index.
+    pub fn generate_pattern(
+        &mut self,
+        scales: &Scales,
+        styles: &Styles,
+        style: Option<&str>,
+        rnd: &mut dyn FnMut() -> f64,
+    ) -> usize {
         let mut pattern = self.blank_pattern(None);
-        generate::generate_pattern(&mut AutoGenerator::new(scales, rnd), &mut pattern, &Options::default());
+        let options = Options { genre: style.map(str::to_owned), ..Options::default() };
+        generate::restyle_pattern(&mut AutoGenerator::new(scales, styles, rnd), &mut pattern, &options);
         let desc = format!("Generate pattern \"{}\"", pattern_name(&pattern));
         self.edit_patterns(desc, |patterns| {
             patterns.push(pattern);
@@ -707,13 +715,105 @@ impl Editor {
         })
     }
 
-    /// ↻ Drum on pattern `p`: whether drum generation is now on.
-    pub fn toggle_drums(&mut self, p: usize, scales: &Scales, rnd: &mut dyn FnMut() -> f64) -> Option<bool> {
+    /// ⟳ (B): pattern `p` made again in style `style` (else its own, else a
+    /// drawn one), locked tracks kept; one undo step.
+    pub fn regenerate_pattern(
+        &mut self,
+        p: usize,
+        scales: &Scales,
+        styles: &Styles,
+        style: Option<&str>,
+        rnd: &mut dyn FnMut() -> f64,
+    ) -> bool {
+        let options = Options { genre: style.map(str::to_owned), ..Options::default() };
+        self.edit(
+            p,
+            |pattern| format!("Generate \"{}\"", pattern_name(pattern)),
+            None,
+            |pattern| generate::restyle_pattern(&mut AutoGenerator::new(scales, styles, rnd), pattern, &options),
+        )
+        .is_some()
+    }
+
+    /// A generation macro of pattern `p` (`composeEnergy`…, 0–100) set to
+    /// `value`, its lines made again from its seed; a drag is one undo step.
+    pub fn set_pattern_macro(
+        &mut self,
+        p: usize,
+        key: &'static str,
+        value: f64,
+        (scales, styles): (&Scales, &Styles),
+        rnd: &mut dyn FnMut() -> f64,
+    ) -> bool {
+        let value = if value.is_finite() { value.clamp(0.0, 100.0).round() } else { MACRO_NEUTRAL };
+        let coalesce = Some(format!("pattern:{p}:{key}"));
+        let label = match key {
+            ENERGY => "energy",
+            COMPLEXITY => "complexity",
+            _ => "variation",
+        };
+        self.edit(
+            p,
+            |_| format!("Set {label} → {}", number_to_string(value)),
+            coalesce,
+            |pattern| {
+                pattern.extra.insert(key, Value::Number(value));
+                generate::recompose(&mut AutoGenerator::new(scales, styles, rnd), pattern);
+            },
+        )
+        .is_some()
+    }
+
+    /// AUTO: every unlocked track of pattern `p` in auto mode, or all out of
+    /// it; whether auto mode is now on.
+    pub fn toggle_pattern_auto(&mut self, p: usize) -> Option<bool> {
+        let desc = |pattern: &Pattern| {
+            let on = pattern.tracks.iter().any(|t| t.auto_mode);
+            if on { "Auto on" } else { "Auto off" }.to_owned()
+        };
+        self.edit(p, desc, None, generate::toggle_auto)
+    }
+
+    /// ↻ Drum on pattern `p` (in style `style`, else the pattern's): whether
+    /// drum generation is now on.
+    pub fn toggle_drums(
+        &mut self,
+        p: usize,
+        scales: &Scales,
+        styles: &Styles,
+        style: Option<&str>,
+        rnd: &mut dyn FnMut() -> f64,
+    ) -> Option<bool> {
         let desc = |pattern: &Pattern| {
             let on = pattern.tracks.iter().any(|t| instrument_family(&t.name).is_drum() && t.auto_mode);
             if on { "Generate drums" } else { "Drums auto off" }.to_owned()
         };
-        self.edit(p, desc, None, |pattern| generate::toggle_drums(&mut AutoGenerator::new(scales, rnd), pattern))
+        let options = Options { genre: style.map(str::to_owned), ..Options::default() };
+        self.edit(p, desc, None, |pattern| {
+            generate::toggle_drums(&mut AutoGenerator::new(scales, styles, rnd), pattern, &options)
+        })
+    }
+
+    /// ↻ on track `t` of pattern `p`: a new line in the pattern's style, one undo step.
+    pub fn regenerate_track(
+        &mut self,
+        p: usize,
+        t: usize,
+        scales: &Scales,
+        styles: &Styles,
+        rnd: &mut dyn FnMut() -> f64,
+    ) -> bool {
+        let name = match self.library.patterns.get(p).and_then(|pattern| pattern.tracks.get(t)) {
+            Some(track) => track.name.clone(),
+            None => return false,
+        };
+        self.edit(
+            p,
+            |_| format!("Generate {name}"),
+            None,
+            |pattern| generate::regenerate_track(&mut AutoGenerator::new(scales, styles, rnd), pattern, t),
+        )
+        .is_some()
     }
 
     /// ↻ Bass / ↻ Chords on pattern `p`: whether that
@@ -723,6 +823,7 @@ impl Editor {
         p: usize,
         kind: MelodicKind,
         scales: &Scales,
+        styles: &Styles,
         rnd: &mut dyn FnMut() -> f64,
     ) -> Option<bool> {
         let (part, wanted) = match kind {
@@ -734,7 +835,7 @@ impl Editor {
             if on { format!("Generate {part}") } else { format!("{part} auto off") }
         };
         self.edit(p, desc, None, |pattern| {
-            generate::toggle_melodic(&mut AutoGenerator::new(scales, rnd), pattern, kind)
+            generate::toggle_melodic(&mut AutoGenerator::new(scales, styles, rnd), pattern, kind)
         })
     }
 
@@ -775,12 +876,19 @@ impl Editor {
     /// The loop start of pattern `p` (loop `index` of the playback): its
     /// tracks in auto mode get new lines. Not an undo step — the lines change
     /// every loop, as in the JS app — but a change to save.
-    pub fn auto_loop(&mut self, p: usize, index: u64, scales: &Scales, rnd: &mut dyn FnMut() -> f64) -> bool {
+    pub fn auto_loop(
+        &mut self,
+        p: usize,
+        index: u64,
+        scales: &Scales,
+        styles: &Styles,
+        rnd: &mut dyn FnMut() -> f64,
+    ) -> bool {
         let Some(pattern) = self.library.patterns.get_mut(p) else { return false };
         if !generate::plays_auto(pattern) {
             return false;
         }
-        let changed = generate::run_loop(&mut AutoGenerator::new(scales, rnd), pattern, index);
+        let changed = generate::run_loop(&mut AutoGenerator::new(scales, styles, rnd), pattern, index);
         if changed {
             self.revision += 1;
         }
@@ -994,40 +1102,48 @@ mod tests {
         assert!(e.delete_step(0, 1, 3, 1));
     }
 
+    fn styles() -> Styles {
+        let text = include_str!("../../../assets/data/styles.json");
+        Styles::from_json(&ordrumbox_core::json::parse(text).unwrap()).0
+    }
+
     #[test]
     fn generation_commands() {
         let mut e = editor();
-        let scales = Scales::default();
+        let (scales, styles) = (Scales::default(), styles());
         let mut rng = ordrumbox_core::Rng::new(5);
         let mut rnd = || rng.next_f64();
 
-        // B: a new generated pattern, one undo step.
+        // B: a new generated pattern in the asked style, one undo step.
         let undo = e.history().undo_len();
-        let p = e.generate_pattern(&scales, &mut rnd);
+        let p = e.generate_pattern(&scales, &styles, Some("rap"), &mut rnd);
         assert_eq!(p, 1);
         let generated = &e.library().patterns[p];
         assert!(generated.tracks.iter().any(|t| t.name == "KICK" && !t.notes.is_empty()));
-        assert!(generated.extra.get("autoGenre").is_some_and(|g| g.as_str().is_some()));
+        assert_eq!(generated.extra.get("autoGenre").and_then(|g| g.as_str()), Some("hiphop"));
         assert_eq!(e.history().undo_len(), undo + 1);
         assert_eq!(e.history().next_undo(), Some("Generate pattern \"NewPat_1\""));
 
         // ↻ Drum on: KICK and SNARE in auto mode.
-        assert_eq!(e.toggle_drums(0, &scales, &mut rnd), Some(true));
+        assert_eq!(e.toggle_drums(0, &scales, &styles, Some("funk"), &mut rnd), Some(true));
         assert!(pattern(&e).tracks.iter().all(|t| t.auto_mode));
         assert_eq!(e.history().next_undo(), Some("Generate drums"));
-        // A section's last loop: new lines, no undo step; its other loops hold the drums.
+        // Funk lines vary loop after loop, with no undo step.
         let (undo, before) = (e.history().undo_len(), pattern(&e).clone());
-        assert!(!e.auto_loop(0, 1, &scales, &mut rnd));
-        assert!(e.auto_loop(0, 3, &scales, &mut rnd));
+        assert!(e.auto_loop(0, 1, &scales, &styles, &mut rnd));
         assert_eq!(e.history().undo_len(), undo);
         assert_ne!(*pattern(&e), before);
         // ↻ Drum again: auto off.
-        assert_eq!(e.toggle_drums(0, &scales, &mut rnd), Some(false));
+        assert_eq!(e.toggle_drums(0, &scales, &styles, None, &mut rnd), Some(false));
         assert!(pattern(&e).tracks.iter().all(|t| !t.auto_mode));
-        assert!(!e.auto_loop(0, 2, &scales, &mut rnd));
+        assert!(!e.auto_loop(0, 2, &scales, &styles, &mut rnd));
+
+        // ↻ on one track: a new line, one undo step.
+        assert!(e.regenerate_track(0, 1, &scales, &styles, &mut rnd));
+        assert_eq!(e.history().next_undo(), Some("Generate SNARE"));
 
         // ↻ Bass: a synth BASS track with a line, in auto mode.
-        assert_eq!(e.toggle_melodic(0, MelodicKind::Bass, &scales, &mut rnd), Some(true));
+        assert_eq!(e.toggle_melodic(0, MelodicKind::Bass, &scales, &styles, &mut rnd), Some(true));
         let bass = pattern(&e).tracks.last().unwrap();
         assert!(bass.name == "BASS" && bass.use_synth && bass.auto_mode && !bass.notes.is_empty());
         assert_eq!(e.history().next_undo(), Some("Generate bass"));

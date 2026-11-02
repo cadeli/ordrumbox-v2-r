@@ -490,6 +490,7 @@ fn shortcut(code: KeyCode, shift: bool, control: bool) -> Option<Command> {
             KeyCode::BracketRight | KeyCode::PageDown => C::NextPattern,
             KeyCode::Comma => C::PreviousKit,
             KeyCode::Period => C::NextKit,
+            KeyCode::KeyB if shift => C::NewGeneratedPattern,
             KeyCode::KeyB => C::GeneratePattern,
             KeyCode::KeyF => C::SelectRandomPattern,
             KeyCode::KeyG => C::SelectRandomDrumkit,
@@ -682,7 +683,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             session.import_midi(&path);
         }
     }
-    // `ORDRUMBOX_VIEW=roll|song|synth|kit|comp|flt`: which view the window
+    // `ORDRUMBOX_VIEW=roll|song|synth|kit|comp|flt|gen`: which view the window
     // starts on (with `ORDRUMBOX_SCREENSHOT`, to capture that layout).
     match std::env::var("ORDRUMBOX_VIEW").as_deref() {
         Ok("roll") => session.toggle_piano_roll(),
@@ -691,6 +692,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok("kit") => session.toggle_kit_editor(),
         Ok("comp") => session.output_activate(panel::Id::OutTab(1)),
         Ok("flt") => session.output_activate(panel::Id::OutTab(2)),
+        Ok("gen") => session.show_generation_tab(),
         Ok("reset") => session.run(Command::FactoryReset),
         _ => {}
     }

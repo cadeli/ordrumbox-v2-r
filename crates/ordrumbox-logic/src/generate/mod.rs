@@ -1,16 +1,16 @@
-//! Pattern generators (`src/logic/generators/`): a line for a track from a
-//! variant of its instrument's table (kick, snare, hats, clap, cowbell,
-//! percussion, bass, chords/melody), whole patterns from a genre template,
-//! and the loop-by-loop regeneration of tracks in auto mode.
+//! Pattern generators (`src/logic/generators/`): whole patterns in a style,
+//! the bass and chord/melody lines from a variant of their table, the drum
+//! lines from the style (`crate::compose`), and the loop-by-loop regeneration
+//! of tracks in auto mode.
 //!
-//! The variant tables are the JS ones (`data/generators.json`, exported by
-//! `tools/export_gen_fixtures.mjs`) and are read the way the JS reads them,
-//! key by key with its defaults. Every random draw is one `Math.random()` of
-//! the JS, in the same order, through the `rnd` source the caller gives: with
-//! the same stream the notes are the JS notes (`tests/generators.rs`).
+//! The melodic variant tables are the JS ones (`data/generators.json`,
+//! exported by `tools/export_gen_fixtures.mjs`) and are read the way the JS
+//! reads them, key by key with its defaults. Every random draw of a melodic
+//! line is one `Math.random()` of the JS, in the same order, through the
+//! `rnd` source the caller gives: with the same stream the notes are the JS
+//! notes (`tests/generators.rs`).
 
 mod auto;
-mod drums;
 mod melodic;
 mod structure;
 
@@ -22,7 +22,8 @@ use ordrumbox_core::{Note, Scales, Track};
 
 pub use auto::{
     AutoGenerator, GENRE, Harmony, MelodicKind, Options, change_track, generate_pattern, generate_track,
-    instrument_line, is_auto_on, plays_auto, random_track, run_loop, toggle_drums, toggle_melodic,
+    instrument_line, is_auto_on, plays_auto, random_track, recompose, regenerate_track, restyle_pattern, run_loop,
+    toggle_auto, toggle_drums, toggle_melodic,
 };
 pub use structure::{SectionElement, Structure};
 
@@ -299,35 +300,6 @@ impl<'a> Generator<'a> {
         self.pick(&choices).copied().unwrap_or(average)
     }
 
-    /// `generateGridVariant`: each step of the loop sounds with its column's
-    /// probability (required steps always).
-    pub fn grid(&mut self, track: &mut Track, config: &Value, density: f64, mut opts: Grid<'_>) {
-        let loop_point = loop_point(track, config, opts.default_loop_beats);
-        let spb = track.steps_per_beat;
-        let required = list(config, "requiredSteps");
-        let probabilities = nums(config, "probabilities");
-        for beat in 0..track.beat_count {
-            for step in 0..spb {
-                if beat * spb + step >= loop_point {
-                    continue;
-                }
-                let is_required = required.is_some_and(|r| is_required_step(beat, step, r));
-                let probability = probabilities.as_deref().and_then(|p| cycle(p, step as usize)).unwrap_or(0.0);
-                if !is_required && self.random() >= probability * density {
-                    continue;
-                }
-                let accent = opts.accent.map_or(is_required || step == 0, |f| f(beat, step));
-                let ghost = opts.ghost.map_or(!is_required && step != 0, |f| f(beat, step));
-                let pitch = match opts.pitch.as_mut() {
-                    Some(pitch) => pitch(self),
-                    None => num(config, "pitch").unwrap_or(0.0),
-                };
-                let velocity = self.velocity(config.get("velocity"), VelocitySpec::accent(accent, ghost));
-                apply_note_properties(add_note(track, beat, step, pitch, velocity), config);
-            }
-        }
-    }
-
     /// `generatePhraseVariant`: the notes of a phrase skeleton (one of
     /// `phraseSets`, or `phrases`), each kept with `density` and its own
     /// `chance`; `step: "random"` takes a free step of its beat.
@@ -423,35 +395,10 @@ pub(crate) fn apply_loop_point(track: &mut Track, config: &Value) {
     track.loop_length = Some((beats * f64::from(track.steps_per_beat)) as i32);
 }
 
-/// `#isRequiredStep`: `step` of a beat matching a `{beatModulo, step}` rule.
-fn is_required_step(beat: i32, step: i32, rules: &[Value]) -> bool {
-    rules.iter().any(|rule| {
-        // `beatModulo === undefined || beat % beatModulo === beatModulo - 1`
-        let beat_matches = match rule.get("beatModulo") {
-            None => true,
-            Some(m) => m.as_f64().is_some_and(|m| f64::from(beat) % m == m - 1.0),
-        };
-        beat_matches && num(rule, "step") == Some(f64::from(step))
-    })
-}
-
-/// A test on a step (`beat`, `step`).
-pub(crate) type StepTest<'f> = &'f dyn Fn(i32, i32) -> bool;
 /// A test on a phrase and the step it lands on.
 pub(crate) type PhraseTest<'f> = &'f dyn Fn(&Value, i32) -> bool;
-/// The pitch of a grid step.
-pub(crate) type StepPitch<'f> = &'f mut dyn FnMut(&mut Generator<'_>) -> f64;
 /// The pitch of a phrase, given the pitches so far.
 pub(crate) type PhrasePitch<'f> = &'f mut dyn FnMut(&mut Generator<'_>, &Value, &[f64]) -> f64;
-
-/// Options of [`Generator::grid`].
-#[derive(Default)]
-pub(crate) struct Grid<'f> {
-    pub default_loop_beats: f64,
-    pub accent: Option<StepTest<'f>>,
-    pub ghost: Option<StepTest<'f>>,
-    pub pitch: Option<StepPitch<'f>>,
-}
 
 /// Options of [`Generator::phrases`].
 #[derive(Default)]
@@ -464,20 +411,4 @@ pub(crate) struct Phrases<'f> {
     pub stacking: bool,
     /// The accented notes hold the groove: the density never drops them.
     pub keep_accents: bool,
-}
-
-impl Grid<'_> {
-    pub fn beats(default_loop_beats: f64) -> Self {
-        Self { default_loop_beats, ..Self::default() }
-    }
-}
-
-/// `withTemporaryStepsPerBeat`: run `f` with the track's grid at `steps`
-/// clamped to 1–8 (so 16 is 8), then put the grid back.
-pub(crate) fn with_steps_per_beat<R>(track: &mut Track, steps: i32, f: impl FnOnce(&mut Track) -> R) -> R {
-    let saved = track.steps_per_beat;
-    track.steps_per_beat = steps.clamp(1, 8);
-    let result = f(track);
-    track.steps_per_beat = saved;
-    result
 }

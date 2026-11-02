@@ -9,7 +9,7 @@ Windows by CI).
 | Crate | Role | Dependencies |
 |---|---|---|
 | `ordrumbox-core` | data model, `library.json` codec, pattern engine, song clips, instrument catalog, JSON, RNG, the JS sort and number formatting | none |
-| `ordrumbox-logic` | the library being edited: commands with undo/redo; pattern generators (every instrument's variants, genre templates, auto mode loop by loop); Standard MIDI Files (read, import, export) | core |
+| `ordrumbox-logic` | the library being edited: commands with undo/redo; pattern generators (drum lines from a style, styles learned from the library's tags, bass and chord variants, auto mode loop by loop); Standard MIDI Files (read, import, export) | core |
 | `ordrumbox-dsp` | sample voice, synth voice, channel strip (filter, saturation, reverb, delay), master bus; no allocation in render paths | none |
 | `ordrumbox-engine` | WAV decoding/encoding, kits and their files, sample analysis, sound auto-assignment, synth presets, passes (pattern and song: events, strip settings, LFO steps), sample-accurate engine, UI ↔ audio link, offline renders | core, dsp |
 | `ordrumbox-probe` | sound measurements of synth presets and WAV files, a command-line tool that does not ship with the app | core, dsp, engine |
@@ -22,7 +22,8 @@ the OS, through small bridges (`winit`, `softbuffer`, `cpal`, `fontdue`; `midir`
 
 The app reads its `assets` folder, part of this repository: `data/library.json`
 (the demo patterns and arrangement), `data/kits.json` (the kits and their
-samples), `data/scales.json`, `data/synth_presets.json` and `kits/**.wav`. It
+samples), `data/scales.json`, `data/synth_presets.json`, `data/styles.json`
+(the styles the drum generation follows, below) and `kits/**.wav`. It
 looks, in order, in `$ORDRUMBOX_ASSETS`, in `assets/` next to the program, in
 `assets/` in the working folder, then in this repository's `assets/` (so
 `cargo run` works from anywhere in the checkout).
@@ -54,7 +55,10 @@ from the JS app's (old name in brackets):
   `autoArpChance`, `autoNoteProbabilityChance`/`autoNoteProbabilityRange`
   (`prob_pitch`… `prob_note_depth`), `autoVariant`, `autoDensity`,
   `autoHitVariation`, `autoNoteVariation`, `pitchRange`, `pitchScaleLock`
-  (`auto_variant`…); `fxSelected` (an editor tab) is dropped;
+  (`auto_variant`…); the drum generation (new, saved only when set):
+  `composeHitsPerMeasure`, `composeComplexity`, `composeSyncopation`,
+  `composeCoupling`, `composeVariation` (unset: the style's),
+  `composeStyleWeight`, `composeSeed`; `fxSelected` (an editor tab) is dropped;
 - note: `step` (`beatStep`), `cycle`/`cycleOffset` (`every`/`pos`),
   `probability` (`prob`), `retriggerRate` (`rate`), `retriggerProbability`
   (`arpTriggerProbability`), `euclideanPulses` (`euclideanFill`),
@@ -88,17 +92,59 @@ synth preset; clearing a track or a step of several notes; random notes over a
 track's notes; compacting tracks; loading or importing a song. A single note goes
 at once. While a question is open, the MCP tools are refused.
 
-Generation (the JS generators, with fewer drum notes: "Golden fixtures"): **B** makes a
-new pattern from a random genre's template (tracks, lines, key, scale);
-**D**, **S**, **A** are the ↻ Drum, ↻ Bass and ↻ Chords buttons — new lines
-for the drum tracks, at most 5 or 6 by genre, the others left empty (the bass
-and chord tracks, created on the synth when missing) and auto mode for them, or
-auto mode off. A track in auto mode (name
-in green, **Z** toggles it) follows the song form as it plays (intro, chorus, verse,
-break…): a line holds through its section, new at the start, the drums with a
-fill on its last loop and a snare crescendo on breaks; those lines are saved but are not
-undo steps. Exports regenerate them on their own copy. **X** puts random notes
-on the focused track.
+Generation, in three levels. **The header**: **STYLE** (the 14 styles, the
+learned ones, or random — picking one makes the pattern again in it), **↻**
+(**B**: the pattern made again in its style — its tracks, meter, tempo and
+lines; a track the style names keeps its sound and settings, the others go),
+**AUTO** (every track in auto mode, or out of it), and three knobs over the
+whole pattern, 50 changing nothing: **ENERGY** (the hits and densities, ×0.5
+to ×1.5), **COMPLEX** (the complexity and syncopation of every drum part, −100
+to +100) and **VARY** (the variation of the lines and of the play, none to
+twice). The knobs make the lines again at once from the pattern's seed
+(`composeSeed`, drawn by ↻): the same values make the same lines.
+**Shift+B** makes a new pattern in the chosen style. **The Gen tab** of a
+track: Auto, **Lock** (↻, the knobs and auto mode leave the track as it is),
+↻ for this track alone, and Hits, Complexity and Variation for a drum track
+(Variant and Density for a bass or chord track). **Advanced**, folded: the
+manual, Groove, Engine and full Compose settings. **D**, **S**, **A** (the
+Generate menu) still make the drum, bass or chord lines alone, in auto mode.
+
+A track in auto mode (name in green, **Z** toggles it) follows the song form
+as it plays (intro, chorus, verse, break…): a line is new at the start of a
+section (the drums thinner in quiet sections), a drum line then moves a few
+hits from loop to loop (its variation) and the style's fill part fills its
+last loop; bass and chord lines hold through the section. Those lines are
+saved but are not undo steps. Exports regenerate them on their own copy.
+**X** puts random notes on the focused track.
+
+Styles: `assets/data/styles.json` holds 14 (techno, house, drum & bass,
+hip-hop, rock, funk, disco, reggae, swing jazz, bossa nova, samba, salsa,
+afrobeat, trap) and their aliases (`rap`, `dnb`, `ragga`…). A style gives its
+meter (`stepsPerBeat`, `beatCount`: jazz and afrobeat are ternary, bossa and
+salsa run over two measures for their clave), `tempo`, `swing`, `tracks`, the
+`melodic` variants and chord `progression`, a `fill`, and for each drum part
+`weights` (one per step of the measure: how typical a hit there is),
+`required`, `forbidden` and `accents` steps, `hitsPerMeasure`, `complexity`,
+`syncopation`, `coupling`/`couplingTo`, `variation`, `ghost`, `rolls` and
+`chance` (that a new pattern has the track). A value that cannot be read is
+reported on the status line with its path, and takes its default.
+
+A drum line: each step of the measure weighs the style's weight against the
+plain meter (`composeStyleWeight`), flattened toward the weak steps by the
+complexity, tilted by the syncopation, raised or lowered where the coupled
+part plays; exactly the asked hits are drawn in each measure, required steps
+first, for 16 candidate lines, and the one whose syncopation (Longuet-Higgins
+and Lee) sits where asked among them is kept. In the Gen tab a drum track's
+settings show the track's value, else the style's (ending in `*`; a
+double-click gives a value back to the style), and `4→6` when the header's
+knobs make it play 6; a seed above 0 (Advanced) makes the same line every time.
+
+Learned styles: the patterns tagged with a style's name (or alias) move it
+toward what they play — each part's weights and hits, the required steps, the
+swing — in proportion to the measures seen (8 count as much as the written
+profile); a tag that names no style becomes a style of its own, its forbidden
+steps those its patterns never play. Fewer than 4 measures teach nothing. The
+Generate menu lists them with the patterns and measures they rest on.
 
 MIDI files (the JS exporter and import, byte for byte): **Ctrl M** writes the
 pattern as a type 1 file (96 PPQN; drums on channel 10 at their GM keys,
@@ -136,8 +182,15 @@ tabs — **FX** (reverb, delay, saturation, filter, each with its on/off LED;
 see "Effects" below),
 **Sound** (mono, auto-assign, instrument, sample, synth preset), **LFO** (an
 LFO per setting: the target list and its LED, wave, frequency, range, phase), **Loop** (steps per
-beat, loop length, swing), **Gen** (auto mode; the manual variation settings,
-or the Groove / Engine settings in auto mode). Under it, the note editor: the
+beat, loop length, swing), **Gen** (auto, lock, ↻ and three settings;
+Advanced: the manual variation settings, or the Groove / Engine settings in
+auto mode, and Compose on a drum track).
+In auto mode, **Var Hits** (Groove) and **Var Notes** (Engine) are the
+variation amounts the other sliders' chances draw on (16 units at 100: a
+velocity or pitch change costs 1, a silence, fill or ghost 3); the generator
+picks them while a track has none (a drum line 12–25 and 0, a bass or chord
+line 0 and 0) and keeps them after; the header's VARY knob scales them. Variant
+lists the bass variants on a bass track, the chord and melody ones on the others. Under it, the note editor: the
 selected note (else the step under the cursor, else the track's first note)
 — velocity, pitch, pan, and the Trig, Retr, Eucl and Arp tabs. While
 playing, a setting with an LFO shows the LFO's value. The grid has a volume
@@ -253,8 +306,8 @@ The header, under the menu bar, is a row of labelled groups after the logo
 (the JS toolbar and its pattern settings panel): **PLAY** / **STOP**, **BPM**
 (the tempo knob, 20–250 as the JS slider), **PATTERN** (the pattern list,
 and where it is in the library), **BEATS** (1–16), **KIT** (the kit list),
-**GENERATE** (**DRUM**, **BASS**, **CHORDS**, lit while their tracks are in
-auto mode: the D, S, A keys; then the genre) and **VIEW** (**GRID**,
+**STYLE**, **↻**, **AUTO** and the **ENERGY**, **COMPLEX**, **VARY** knobs
+(above) and **VIEW** (**GRID**,
 **ROLL**, **SONG**, **SYNTH**, **KIT**: the main editor shown is lit, as
 F3–F6 do; **KIT** toggles the kit editor, as Ctrl+K does).
 A list opens on a click; the wheel or the arrows move, **Enter** picks. The
@@ -344,7 +397,8 @@ pitch, MIDI number and the settings that differ from the defaults (the JS
 | **[ ]** | previous / next pattern (**Shift**: song) |
 | **- =** | tempo −1 / +1 (**Shift** ×10) |
 | **, .** | previous / next kit |
-| **B** | generate a new pattern |
+| **B** | make the pattern again in its style |
+| **Shift B** | a new pattern in the chosen style |
 | **F**, **G** | a random pattern, a random kit |
 | **H** | every track on the synth patch that matches its name, like auto-assign (KICK → KICK_SYNTH, SNARE → SNARE_SYNTH…; random when none does) |
 | **J** | every track back on auto-assign |
@@ -617,27 +671,27 @@ node tools/export_gen_fixtures.mjs ../ordrumbox-v2
   replaced by a seeded stream (mulberry32, also in the Rust test): every
   variant of every generator on several track setups, densities and seeds;
   `generateRandom`. Rust must give the same notes, track settings and number of
-  draws for the percussion and melodic lines and `generateRandom`. For what
-  departs on purpose (below) the file holds the inputs and seeds only: the drum
-  lines, `generatePattern` on new and existing patterns, the player's loop start
-  over 30–46 loops (auto tracks, `autoGen` patterns), the ↻ Drum / Bass / Chords
+  draws for the melodic lines and `generateRandom`. For what departs on purpose
+  (below) the file holds the inputs and seeds only: the drum lines,
+  `generatePattern` on new and existing patterns, the player's loop start over
+  30–46 loops (auto tracks, `autoGen` patterns), the ↻ Drum / Bass / Chords
   toggles.
 - `ordrumbox-logic/tests/fixtures/generators_rust.txt`: what departs from the
   JS, from the same inputs and seeds, as the Rust generators make it: whole
-  patterns, loops, toggles, and the track cases of the changed variants. The
-  JS filled every pattern: here a genre plays at most 5 or 6 drum tracks (the
-  tracks past that are left empty, out of auto mode), the kick's `fourOnFloor`
-  is one kick a beat, `offbeat` on the clap and cowbell is one hit between the
-  beats (`data/generators.json`, patched by the script), and `chh16thLocked`
-  follows the density. Beyond that the drum lines are standard rhythms: written
-  kick and snare lines per genre, hats on a fixed grid (16ths are 4 a beat), the
-  clap on the backbeat, accented hits never dropped by the density, and in auto
-  mode a groove held through its section, with little variation at play and no
-  pitch change. Bass and chord lines hold through their section too, with no
+  patterns, loops and toggles. The drum lines no longer come from the JS
+  variant tables but from the styles (`assets/data/styles.json`, above): the
+  script no longer writes the drum and genre tables into
+  `data/generators.json`. Bass and chord lines hold through their section, with no
   variation and no chord progression within it. A track's variation budget is for the whole pattern,
   not for each of its loops (`ordrumbox-core/src/variation.rs`).
   `cargo test -p ordrumbox-logic --test generators -- --ignored` writes this
   file, only when what the generators make changes on purpose.
+- `ordrumbox-logic/tests/fixtures/compose_rust.txt`: one pattern per style
+  (two seeds), its drum tracks, as `crate::compose` makes them; the properties
+  of every style (exact hits, required and forbidden steps, the signature
+  figures, closeness to the weights, coupling) are in `tests/compose.rs`.
+  `cargo test -p ordrumbox-logic --test compose -- --ignored` writes it, only
+  when the drum lines change on purpose.
 
 MIDI files have a sixth script:
 

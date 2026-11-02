@@ -174,6 +174,8 @@ pub enum Format {
     Round,
     /// Auto density: `Auto` below 0.
     Density,
+    /// A seed: `new` below 1 (a new line each time).
+    Seed,
 }
 
 impl Format {
@@ -203,6 +205,13 @@ impl Format {
             }
             Self::Fmt3 => js::number_to_string(js::to_fixed(v, 3)),
             Self::Round => js::number_to_string(js::round(v)),
+            Self::Seed => {
+                if v < 1.0 {
+                    "new".to_owned()
+                } else {
+                    js::number_to_string(v)
+                }
+            }
             Self::Density => {
                 if v < 0.0 {
                     "Auto".to_owned()

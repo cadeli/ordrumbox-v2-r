@@ -22,10 +22,6 @@ use crate::scales::Scales;
 use crate::steps::{step_to_beat, step_to_tick};
 use crate::track::Track;
 
-/// Amounts an auto track uses until the generator has picked its own.
-const AUTO_HIT_VARIATION_FALLBACK: f64 = 60.0;
-const AUTO_NOTE_VARIATION_FALLBACK: f64 = 40.0;
-
 /// Chance (0–100) every operation gets outside auto mode, where the per-kind
 /// sliders are hidden.
 const DEFAULT_CHANCE: f64 = 50.0;
@@ -92,12 +88,10 @@ impl NoteOp {
 
 /// The varied copies of a track's notes, by note index; notes not varied are
 /// absent, and the track itself is never modified.
-pub(crate) fn vary_notes(track: &Track, rng: &mut Rng) -> HashMap<usize, Note> {
-    let amount = if track.auto_mode {
-        track.auto_note_variation.unwrap_or(AUTO_NOTE_VARIATION_FALLBACK)
-    } else {
-        track.note_variation
-    };
+pub(crate) fn vary_notes(track: &Track, macro_factor: f64, rng: &mut Rng) -> HashMap<usize, Note> {
+    // The pattern's variation macro moves the auto amounts only.
+    let amount =
+        if track.auto_mode { (track.auto_note_amount() * macro_factor).min(100.0) } else { track.note_variation };
     let budget = budget_for(amount);
     let mut varied = HashMap::new();
     if budget <= 0 || track.notes.is_empty() {
@@ -201,16 +195,14 @@ pub(crate) fn apply(
     flat: &mut Hits,
     track_index: usize,
     track: &Track,
-    loop_ticks: i64,
-    pattern_ticks: i64,
+    (loop_ticks, pattern_ticks): (i64, i64),
+    macro_factor: f64,
     rng: &mut Rng,
     scales: &Scales,
 ) {
-    let amount = if track.auto_mode {
-        track.auto_hit_variation.unwrap_or(AUTO_HIT_VARIATION_FALLBACK)
-    } else {
-        track.hit_variation
-    };
+    // The pattern's variation macro moves the auto amounts only.
+    let amount =
+        if track.auto_mode { (track.auto_hit_amount() * macro_factor).min(100.0) } else { track.hit_variation };
     let budget = budget_for(amount);
     if budget <= 0 || loop_ticks <= 0 {
         return;
@@ -414,7 +406,7 @@ mod tests {
         };
         let mut rng = Rng::new(2);
         let probs: Vec<f64> =
-            (0..50).flat_map(|_| vary_notes(&track, &mut rng).into_values().map(|n| n.probability)).collect();
+            (0..50).flat_map(|_| vary_notes(&track, 1.0, &mut rng).into_values().map(|n| n.probability)).collect();
         assert!(probs.iter().any(|&p| p < 0.5));
         assert!(probs.iter().all(|&p| (NOTE_PROB_FLOOR..=1.0).contains(&p)), "{probs:?}");
     }
@@ -424,9 +416,9 @@ mod tests {
         let track = Track { notes: vec![Note::default()], ..Track::default() };
         let mut rng = Rng::new(1);
         let before = rng.clone().next_u64();
-        assert!(vary_notes(&track, &mut rng).is_empty());
+        assert!(vary_notes(&track, 1.0, &mut rng).is_empty());
         let mut flat = Hits::new();
-        apply(&mut flat, 0, &track, 128, 128, &mut rng, &Scales::default());
+        apply(&mut flat, 0, &track, (128, 128), 1.0, &mut rng, &Scales::default());
         assert_eq!(rng.next_u64(), before);
     }
 }

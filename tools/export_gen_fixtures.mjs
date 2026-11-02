@@ -414,51 +414,15 @@ const write = async (rel, value) => {
     await writeFile(path, JSON.stringify(value) + '\n')
     process.stdout.write(`${rel}\n`)
 }
-// The tables the port reads depart from the JS on purpose (`README.md`, "Golden
-// fixtures"); the fixture below still records the JS with its own tables.
-const OFFBEAT = [0.02, 0.05, 0.85, 0.05]
+// The port's drum lines come from the styles (`assets/data/styles.json`,
+// `README.md`, "Golden fixtures"): it reads the melodic, random and song-form
+// tables only.
 const portTables = structuredClone(tables)
-portTables.kick.fourOnFloor.probabilities = [1, 0.02, 0.06, 0.04]
-portTables.clap.offbeat.probabilities = OFFBEAT
-portTables.cowbell.offbeat.probabilities = OFFBEAT
-// Standard drum rhythms: a set of written lines (steps of 16 in the measure),
-// the steps that hold the groove always played.
-const line = (steps, ghosts = []) =>
-    [...steps.map(s => ({ beat: s >> 2, step: s & 3, accent: s % 8 === 0 || s % 8 === 4 })),
-        ...ghosts.map(s => ({ beat: s >> 2, step: s & 3, ghost: true }))].sort(
-        (a, b) => a.beat - b.beat || a.step - b.step,
-    )
-const written = (config, sets) => {
-    delete config.probabilities
-    delete config.phrases
-    config.mode = 'phrases'
-    config.loopBeats = 4
-    config.phraseSets = sets
+for (const kind of ['kick', 'snare', 'hat', 'clap', 'cowbell', 'perc']) delete portTables[kind]
+for (const key of ['genres', 'bassVariantsByGenre', 'styleToGenre', 'chordProgressions', 'swingByGenre',
+    'structures', 'variantPools', 'variantPoolsByType', 'coreTracks', 'dropChance', 'optionalExtras']) {
+    delete portTables.structure[key]
 }
-const always = (config, steps, others = [0, 0, 0, 0]) => {
-    config.requiredSteps = steps.map(step => ({ step }))
-    config.probabilities = others
-}
-written(portTables.kick.basic, [[0, 8], [0, 8, 10], [0, 7, 8], [0, 7, 10], [0, 3, 8, 11]].map(s => line(s)))
-written(portTables.kick.syncopated, [[0, 10], [0, 2, 10, 11], [0, 3, 6, 10], [0, 7, 10]].map(s => line(s)))
-always(portTables.kick.fourOnFloor, [0])
-written(portTables.snare.syncopated, [line([4, 12]), line([4, 12], [7, 9]), line([4, 12], [15]), line([4, 12], [6, 14])])
-always(portTables.hat.chhBasic, [0, 2])
-always(portTables.hat.chhDense, [0, 1, 2, 3])
-always(portTables.hat.chhSparse, [0, 2], [0, 0.1, 0, 0.1])
-always(portTables.hat.ohhOffbeat, [2])
-always(portTables.clap.offbeat, [2])
-always(portTables.cowbell.offbeat, [2])
-portTables.clap.sparse.phrases = line([12])
-const genres = portTables.structure.structures
-for (const genre of Object.keys(genres)) genres[genre].CLAP = 'backbeat'
-genres.house.COWBELL = 'offbeat'
-genres.disco.COWBELL = 'offbeat'
-const pools = portTables.structure.variantPools
-pools.CLAP = ['backbeat', 'sparse']
-pools.COWBELL = ['basic', 'offbeat', 'sparse']
-portTables.structure.variantPoolsByType.CLAP = pools.CLAP
-portTables.structure.variantPoolsByType.COWBELL = pools.COWBELL
 // The port's note keys under their current names (`README.md`, "Files").
 const TABLE_KEYS = { rate: 'retriggerRate', euclideanFill: 'euclideanPulses', prob: 'probability' }
 const currentKeys = (value, key) => {

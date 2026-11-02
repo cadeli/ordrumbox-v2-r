@@ -140,6 +140,14 @@ fn setting_schema(key: &str, default: &Value, range: Option<(f64, f64)>) -> Valu
                 schema.insert("enum", Value::Array(choices.into_iter().map(Value::from).collect()));
             }
         }
+        // Unset by default, a number when set: the compose settings, the variation amounts.
+        _ if range.is_some() => {
+            schema.insert("type", types(&["number", "null"]));
+            if let Some((min, max)) = range {
+                schema.insert("minimum", Value::from(min));
+                schema.insert("maximum", Value::from(max));
+            }
+        }
         // Unset by default: an LFO (`{type, freq, min, max, phase}`), a synth
         // preset key, an arpeggio (intervals, "0,4,7", a direction); null unsets.
         _ if key.ends_with("Lfo") => _ = schema.insert("type", types(&["object", "null"])),

@@ -8,7 +8,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use ordrumbox_core::json;
-use ordrumbox_core::{Library, LoadReport, ScaleList, Scales};
+use ordrumbox_core::{Issue, Library, LoadReport, ScaleList, Scales, Styles};
 use ordrumbox_engine::{Kit, SampleBank, SynthPresets, kits_from_json};
 
 use crate::store;
@@ -26,6 +26,10 @@ pub struct Assets {
     pub scale_list: ScaleList,
     /// Synth presets (`synth_presets.json`).
     pub synths: SynthPresets,
+    /// The styles the drum generation follows (`styles.json`).
+    pub styles: Styles,
+    /// Values of `styles.json` that could not be read (their defaults used).
+    pub style_issues: Vec<Issue>,
     pub bank: SampleBank,
     /// Samples that could not be read or decoded.
     pub sample_errors: Vec<String>,
@@ -35,7 +39,7 @@ pub struct Assets {
     /// and kit edits are not saved (so as not to overwrite it).
     pub kits_error: Option<String>,
     /// Asset files that could not be read (`kits.json`, `scales.json`,
-    /// `synth_presets.json`): what they hold is missing.
+    /// `synth_presets.json`, `styles.json`): what they hold is missing.
     pub errors: Vec<String>,
 }
 
@@ -110,7 +114,22 @@ pub fn load(dir: &Path) -> Result<Assets, String> {
     let synths = read("synth_presets.json").map(|v| SynthPresets::from_json(&v)).unwrap_or_default();
     let scales = scales_json.as_ref().map(Scales::from_json).unwrap_or_default();
     let scale_list = scales_json.as_ref().map(ScaleList::from_json).unwrap_or_default();
+    let (styles, style_issues) = read("styles.json").map(|v| Styles::from_json(&v)).unwrap_or_default();
     let sources = SampleSources { assets: dir.join("kits"), user: store::samples_dir() };
     let (bank, sample_errors) = SampleBank::load(&kits, |url| sources.read(url));
-    Ok(Assets { library, report, kits, scales, scale_list, synths, bank, sample_errors, sources, kits_error, errors })
+    Ok(Assets {
+        library,
+        report,
+        kits,
+        scales,
+        scale_list,
+        synths,
+        styles,
+        style_issues,
+        bank,
+        sample_errors,
+        sources,
+        kits_error,
+        errors,
+    })
 }

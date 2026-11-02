@@ -4,10 +4,12 @@
 //! what each shows, in the JS order, with the JS ranges, defaults and
 //! formats. What the widgets do is in the session.
 
+use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::js;
 use ordrumbox_core::json::Value;
 use ordrumbox_core::{Note, ScaleList, Track};
 use ordrumbox_engine::strip_settings::delay_beats_used;
+use ordrumbox_logic::generate;
 
 use crate::canvas::text_width;
 use crate::control::{Format, Spec};
@@ -18,6 +20,8 @@ use crate::panel::{ACCENT, DIM, Id, Item, Kind, LfoParam, Rect, TEXT, label_widt
 
 /// Main tabs.
 pub const TABS: [&str; 5] = ["FX", "Sound", "LFO", "Loop", "Gen"];
+/// The index of the Gen tab in [`TABS`].
+pub const GEN_TAB: u8 = 4;
 pub const TAB_FX: u8 = 0;
 pub const TAB_SOUND: u8 = 1;
 pub const TAB_LFO: u8 = 2;
@@ -67,7 +71,16 @@ pub fn track_select_options(key: &str) -> (Vec<String>, Vec<String>) {
         "filterSlope" => (list(&FILTER_SLOPE_VALUES), list(&FILTER_SLOPE_LABELS)),
         "delayType" => (list(&["none", "slap", "tape", "pingpong"]), Vec::new()),
         "saturationType" => (list(&["soft", "hard", "tape"]), Vec::new()),
-        "autoVariant" => (list(&["", "basic", "fill", "roll", "sparse", "dense"]), Vec::new()),
+        "autoVariant" => {
+            // Every melodic variant (a bass track plays the bass ones, a chord track the others).
+            let mut names = vec![String::new()];
+            for name in ["bass", "melody"].into_iter().flat_map(generate::variant_names) {
+                if !names.iter().any(|n| n == name) {
+                    names.push(name.to_owned());
+                }
+            }
+            (names, Vec::new())
+        }
         _ => (Vec::new(), Vec::new()),
     }
 }
@@ -182,7 +195,8 @@ pub enum GenerationRow {
     Select(&'static str, &'static str),
 }
 
-pub const GENERATION_GROOVE: [GenerationRow; 7] = [
+pub const GENERATION_GROOVE: [GenerationRow; 8] = [
+    GenerationRow::Slider(prop("autoHitVariation", "Var Hits", 0.0, 100.0, 1.0, Format::Plain)),
     GenerationRow::Slider(prop("autoPitchChance", "Pitch", 0.0, 100.0, 1.0, Format::Plain)),
     GenerationRow::Slider(prop("autoVelocityChance", "Velocity", 0.0, 100.0, 1.0, Format::Plain)),
     GenerationRow::Slider(prop("autoSilenceChance", "Silence", 0.0, 100.0, 1.0, Format::Plain)),
@@ -192,7 +206,8 @@ pub const GENERATION_GROOVE: [GenerationRow; 7] = [
     GenerationRow::Toggle("pitchScaleLock", "Scale Lock"),
 ];
 
-pub const GENERATION_ENGINE: [GenerationRow; 7] = [
+pub const GENERATION_ENGINE: [GenerationRow; 8] = [
+    GenerationRow::Slider(prop("autoNoteVariation", "Var Notes", 0.0, 100.0, 1.0, Format::Plain)),
     GenerationRow::Slider(prop("autoRetriggerChance", "Retrig", 0.0, 100.0, 1.0, Format::Plain)),
     GenerationRow::Slider(prop("autoEuclideanChance", "Euclid", 0.0, 100.0, 1.0, Format::Plain)),
     GenerationRow::Slider(prop("autoNoteProbabilityChance", "Note Prob", 0.0, 100.0, 1.0, Format::Plain)),
@@ -201,6 +216,24 @@ pub const GENERATION_ENGINE: [GenerationRow; 7] = [
     GenerationRow::Select("autoVariant", "Variant"),
     GenerationRow::Slider(prop("autoDensity", "Density", -1.0, 1.0, 0.01, Format::Density)),
 ];
+
+/// The Compose sub-tab: how a drum track plays its style's part.
+pub const GENERATION_COMPOSE: [Prop; 7] = [
+    prop("composeHitsPerMeasure", "Hits/Meas", 0.0, 32.0, 1.0, Format::Plain),
+    prop("composeComplexity", "Complexity", 0.0, 100.0, 1.0, Format::Plain),
+    prop("composeSyncopation", "Syncopation", 0.0, 100.0, 1.0, Format::Plain),
+    prop("composeCoupling", "Coupling", -100.0, 100.0, 1.0, Format::Plain),
+    prop("composeVariation", "Variation", 0.0, 100.0, 1.0, Format::Plain),
+    prop("composeStyleWeight", "Style", 0.0, 100.0, 1.0, Format::Plain),
+    prop("composeSeed", "Seed", 0.0, 9999.0, 1.0, Format::Seed),
+];
+
+/// What a double-click on a compose slider sets: the setting given back to
+/// the style (`None`). Below every range.
+pub const STYLE_DEFAULT: f64 = -1.0e9;
+
+/// The sub-tab index of Compose.
+pub const COMPOSE_TAB: u8 = 2;
 
 /// The loop tab.
 pub const LOOP_PROPS: [Prop; 3] = [
@@ -293,6 +326,8 @@ pub struct EditorState {
     /// Index in [`LFO_TARGETS`].
     pub lfo_target: u8,
     pub note_tab: u8,
+    /// The Gen tab shows its Advanced settings.
+    pub generation_advanced: bool,
     /// The row last clicked.
     pub selected_prop: Option<&'static str>,
     /// The filter type the fx LED turns back on.
@@ -536,6 +571,18 @@ pub struct TrackView<'a> {
     pub lfo: Vec<(&'static str, f64)>,
     /// Tempo the track plays at (the delay's beats may not fit at it).
     pub bpm: f64,
+    /// A drum track: how it plays its pattern's style.
+    pub compose: Option<ComposeView>,
+}
+
+/// What the Compose sub-tab shows of a drum track.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ComposeView {
+    /// The pattern's style.
+    pub style: String,
+    /// The part the track plays in it, its settings with and without the
+    /// pattern's macros, the hits a measure can hold.
+    pub shown: ordrumbox_logic::compose::TrackCompose,
 }
 
 /// What the note editor shows.
@@ -709,7 +756,7 @@ pub fn track_editor(view: &TrackView, state: &EditorState, area: Rect, scale: i3
         TAB_SOUND => sound_tab(&mut rows, view),
         TAB_LFO => lfo_tab(&mut rows, view, state),
         TAB_LOOP => loop_tab(&mut rows, track),
-        _ => generation_tab(&mut rows, track, state),
+        _ => generation_tab(&mut rows, track, view.compose.as_ref(), state),
     }
     let bottom = rows.y;
     (rows.items, bottom)
@@ -896,62 +943,168 @@ fn loop_tab(rows: &mut Rows, track: &Track) {
     }
 }
 
-fn generation_tab(rows: &mut Rows, track: &Track, state: &EditorState) {
+fn generation_tab(rows: &mut Rows, track: &Track, compose: Option<&ComposeView>, state: &EditorState) {
     let s = rows.scale;
-    let selected = |rows: &mut Rows, r: Rect, key: &'static str| {
-        if state.selected_prop == Some(key) {
-            rows.items.push(Item::new(None, Rect::new(r.x - 2 * s, r.y, r.w + 4 * s, r.h), Kind::Highlight));
-        }
-    };
-    let r = rows.row();
-    rows.label(r, "Auto", Some("autoMode"), state.selected_prop == Some("autoMode"));
-    rows.items.push(Item::new(
-        Some(Id::Toggle("autoMode")),
-        rows.field(r, 36 * s),
-        Kind::Toggle { on: track.auto_mode },
-    ));
-    let generation_slider = |rows: &mut Rows, p: &Prop| {
-        let value = number(track, p.key);
-        let spec = value_spec(p, default_of(p.key, p.min), false);
+    // The simple view: auto, lock, a new line, three settings.
+    let toggle = |rows: &mut Rows, key: &'static str, label: &str, on: bool| {
         let r = rows.row();
-        selected(rows, r, p.key);
-        let kind =
-            Kind::Value { spec, value, label: Some(p.label.to_owned()), text: p.format.value(value, ""), lfo: false };
-        rows.items.push(Item::new(Some(Id::Generation(p.key)), r, kind));
+        rows.label(r, label, Some(key), state.selected_prop == Some(key));
+        rows.items.push(Item::new(Some(Id::Toggle(key)), rows.field(r, 36 * s), Kind::Toggle { on }));
     };
-    if !track.auto_mode {
-        for p in &GENERATION_MANUAL {
-            generation_slider(rows, p);
+    toggle(rows, "autoMode", "Auto", track.auto_mode);
+    toggle(rows, "composeLock", "Lock", track.compose_lock);
+    let r = rows.row();
+    rows.label(r, "New line", None, false);
+    let button = Kind::Button { label: "\u{21bb}".into(), on: false };
+    rows.items.push(Item::new(Some(Id::Regenerate), rows.field(r, 36 * s), button));
+    let melodic = instrument_family(&track.name).is_melodic();
+    match compose {
+        Some(view) => {
+            rows.text(&format!("{} / {}  (* = style)", view.style, view.shown.part), DIM);
+            for p in GENERATION_COMPOSE.iter().filter(|p| SIMPLE_COMPOSE.contains(&p.key)) {
+                compose_slider(rows, track, view, p, state);
+            }
+        }
+        None if melodic => {
+            variant_select(rows, track, state);
+            generation_slider(rows, track, &GENERATION_DENSITY, state);
+        }
+        None => rows.text("no part for this track in the pattern's style", DIM),
+    }
+    // Everything else, folded.
+    let r = rows.row();
+    let label = if state.generation_advanced { "Advanced \u{25be}" } else { "Advanced \u{25b8}" };
+    let button = Kind::Button { label: label.into(), on: state.generation_advanced };
+    rows.items.push(Item::new(Some(Id::GenerationAdvanced), Rect::new(r.x, r.y + 2 * s, 120 * s, r.h - 4 * s), button));
+    if !state.generation_advanced {
+        return;
+    }
+    let compose_tab = compose.is_some() && state.generation_tab == COMPOSE_TAB;
+    let mut tabs = if track.auto_mode {
+        vec![
+            (Id::GenerationTab(0), None, "Groove", !compose_tab && state.generation_tab == 0, false),
+            (Id::GenerationTab(1), None, "Engine", !compose_tab && state.generation_tab == 1, false),
+        ]
+    } else {
+        vec![(Id::GenerationTab(0), None, "Manual", !compose_tab, false)]
+    };
+    if compose.is_some() {
+        tabs.push((Id::GenerationTab(COMPOSE_TAB), None, "Compose", compose_tab, false));
+    }
+    rows.tabs(&tabs);
+    if let (true, Some(view)) = (compose_tab, compose) {
+        for p in &GENERATION_COMPOSE {
+            compose_slider(rows, track, view, p, state);
         }
         return;
     }
-    let tabs = [
-        (Id::GenerationTab(0), None, "Groove", state.generation_tab == 0, false),
-        (Id::GenerationTab(1), None, "Engine", state.generation_tab == 1, false),
-    ];
-    rows.tabs(&tabs);
+    if !track.auto_mode {
+        for p in &GENERATION_MANUAL {
+            generation_slider(rows, track, p, state);
+        }
+        return;
+    }
     for row in if state.generation_tab == 0 { &GENERATION_GROOVE } else { &GENERATION_ENGINE } {
         match row {
-            GenerationRow::Slider(p) => generation_slider(rows, p),
-            GenerationRow::Toggle(key, label) => {
-                let r = rows.row();
-                rows.label(r, label, Some(key), state.selected_prop == Some(key));
-                rows.items.push(Item::new(
-                    Some(Id::Toggle(key)),
-                    rows.field(r, 36 * s),
-                    Kind::Toggle { on: flag(track, key) },
-                ));
-            }
+            // A drum line comes from its style (Compose); a melodic one has them above.
+            GenerationRow::Select("autoVariant", _) | GenerationRow::Slider(Prop { key: "autoDensity", .. }) => {}
+            GenerationRow::Slider(p) => generation_slider(rows, track, p, state),
+            GenerationRow::Toggle(key, label) => toggle(rows, key, label, flag(track, key)),
             GenerationRow::Select(key, label) => {
                 let r = rows.row();
                 rows.label(r, label, Some(key), state.selected_prop == Some(key));
-                let (values, _) = track_select_options(key);
+                let values = track_select_options(key).0;
                 let selected = index_of(&values, &text_of(track, key));
                 let choice = Choice { values, labels: Vec::new(), selected };
                 rows.items.push(Item::new(Some(Id::TrackSelect(key)), rows.field(r, 120 * s), choice.kind()));
             }
         }
     }
+}
+
+/// The compose settings of the simple view.
+const SIMPLE_COMPOSE: [&str; 3] = ["composeHitsPerMeasure", "composeComplexity", "composeVariation"];
+
+/// A melodic track's density (the simple view).
+const GENERATION_DENSITY: Prop = prop("autoDensity", "Density", -1.0, 1.0, 0.01, Format::Density);
+
+fn generation_slider(rows: &mut Rows, track: &Track, p: &Prop, state: &EditorState) {
+    let s = rows.scale;
+    let value = match p.key {
+        // Unset until the generator picks them: the amounts used meanwhile.
+        "autoHitVariation" => track.auto_hit_amount(),
+        "autoNoteVariation" => track.auto_note_amount(),
+        key => number(track, key),
+    };
+    let spec = value_spec(p, default_of(p.key, p.min), false);
+    let r = rows.row();
+    if state.selected_prop == Some(p.key) {
+        rows.items.push(Item::new(None, Rect::new(r.x - 2 * s, r.y, r.w + 4 * s, r.h), Kind::Highlight));
+    }
+    let kind =
+        Kind::Value { spec, value, label: Some(p.label.to_owned()), text: p.format.value(value, ""), lfo: false };
+    rows.items.push(Item::new(Some(Id::Generation(p.key)), r, kind));
+}
+
+/// The variant a melodic track plays (`""`: its style's).
+fn variant_select(rows: &mut Rows, track: &Track, state: &EditorState) {
+    let key = "autoVariant";
+    let r = rows.row();
+    rows.label(r, "Variant", Some(key), state.selected_prop == Some(key));
+    let values = variant_options(track);
+    let selected = index_of(&values, &text_of(track, key));
+    let choice = Choice { values, labels: Vec::new(), selected };
+    rows.items.push(Item::new(Some(Id::TrackSelect(key)), rows.field(r, 120 * rows.scale), choice.kind()));
+}
+
+/// The variants a melodic track can play (`""`: its style's).
+pub fn variant_options(track: &Track) -> Vec<String> {
+    let kind = if instrument_family(&track.name) == InstrumentFamily::Bass { "bass" } else { "melody" };
+    std::iter::once(String::new()).chain(generate::variant_names(kind).into_iter().map(str::to_owned)).collect()
+}
+
+/// A setting of `settings` by its key.
+fn compose_value(key: &str, settings: &ordrumbox_logic::compose::Settings) -> f64 {
+    match key {
+        "composeHitsPerMeasure" => settings.hits_per_measure,
+        "composeComplexity" => settings.complexity,
+        "composeSyncopation" => settings.syncopation,
+        "composeCoupling" => settings.coupling,
+        "composeVariation" => settings.variation,
+        "composeStyleWeight" => settings.style_weight,
+        _ => 0.0,
+    }
+}
+
+/// One compose slider: the track's value, else the style's (its text ends
+/// in `*`; a double-click gives a value back to the style); `a→b` when the
+/// pattern's macros make it play `b`; the hits show the most a measure holds
+/// when asked for more.
+fn compose_slider(rows: &mut Rows, track: &Track, view: &ComposeView, p: &Prop, state: &EditorState) {
+    let s = rows.scale;
+    let own_key = matches!(p.key, "composeStyleWeight" | "composeSeed");
+    let own = track.field(p.key).and_then(|v| v.as_f64());
+    let value =
+        if own_key { number(track, p.key) } else { own.unwrap_or_else(|| compose_value(p.key, &view.shown.base)) };
+    let mut text = p.format.value(value, "");
+    if !own_key {
+        let used = compose_value(p.key, &view.shown.used);
+        let used = if p.key == "composeHitsPerMeasure" { used.min(view.shown.open_hits as f64) } else { used };
+        if (used - value).abs() >= 0.5 {
+            text = format!("{text}\u{2192}{}", js::number_to_string(used.round()));
+        }
+        if own.is_none() {
+            text.push('*');
+        }
+    }
+    let default = if own_key { default_of(p.key, p.min) } else { STYLE_DEFAULT };
+    let r = rows.row();
+    if state.selected_prop == Some(p.key) {
+        rows.items.push(Item::new(None, Rect::new(r.x - 2 * s, r.y, r.w + 4 * s, r.h), Kind::Highlight));
+    }
+    let spec = Spec::slider(p.min, p.max, p.step, default);
+    let kind = Kind::Value { spec, value, label: Some(p.label.to_owned()), text, lfo: false };
+    rows.items.push(Item::new(Some(Id::Compose(p.key)), r, kind));
 }
 
 /// `NOTE_DEFAULTS[key]`, what a double-click restores.
@@ -1097,6 +1250,18 @@ mod tests {
         assert_eq!(loop_length(&track), 5.0);
     }
 
+    fn settings(hits: f64) -> ordrumbox_logic::compose::Settings {
+        ordrumbox_logic::compose::Settings {
+            hits_per_measure: hits,
+            complexity: 5.0,
+            // As the test track sets it.
+            syncopation: 70.0,
+            coupling: 0.0,
+            variation: 5.0,
+            style_weight: 100.0,
+        }
+    }
+
     fn view(track: &Track) -> TrackView<'_> {
         TrackView {
             track,
@@ -1108,6 +1273,15 @@ mod tests {
             synths: Choice { values: vec!["none".into()], labels: Vec::new(), selected: 0 },
             lfo: Vec::new(),
             bpm: 120.0,
+            compose: Some(ComposeView {
+                style: "house".into(),
+                shown: ordrumbox_logic::compose::TrackCompose {
+                    part: "KICK".into(),
+                    used: settings(6.0),
+                    base: settings(4.0),
+                    open_hits: 16,
+                },
+            }),
         }
     }
 
@@ -1117,11 +1291,12 @@ mod tests {
         for auto in [false, true] {
             track.auto_mode = auto;
             for tab in 0..5 {
-                for sub in 0..5 {
+                for sub in 0..6 {
                     let state = EditorState {
                         tab,
                         fx_tab: sub % 4,
-                        generation_tab: sub % 2,
+                        generation_tab: sub % 3,
+                        generation_advanced: sub >= 3,
                         lfo_target: sub,
                         ..EditorState::default()
                     };
@@ -1130,10 +1305,71 @@ mod tests {
                 }
             }
         }
+        // Folded: the simple view only.
         let state = EditorState { tab: 4, ..EditorState::default() };
+        let (items, _) = track_editor(&view(&track), &state, Rect::new(0, 0, 360, 600), 1);
+        assert!(items.iter().any(|i| i.id == Some(Id::Toggle("composeLock"))));
+        assert!(items.iter().any(|i| i.id == Some(Id::GenerationAdvanced)));
+        assert!(!items.iter().any(|i| i.id == Some(Id::Generation("autoPitchChance"))));
+        let state = EditorState { generation_advanced: true, ..state };
         let (items, _) = track_editor(&view(&track), &state, Rect::new(0, 0, 360, 600), 1);
         assert!(items.iter().any(|i| i.id == Some(Id::Generation("autoPitchChance"))));
         assert!(!items.iter().any(|i| i.id == Some(Id::Generation("hitVariation"))));
+    }
+
+    #[test]
+    fn the_engine_tab_shows_the_amounts_and_the_variants_a_track_can_use() {
+        let ids = |track: &Track, tab: u8| {
+            let state =
+                EditorState { tab: 4, generation_tab: tab, generation_advanced: true, ..EditorState::default() };
+            let mut view = view(track);
+            if instrument_family(&track.name).is_melodic() {
+                view.compose = None;
+            }
+            track_editor(&view, &state, Rect::new(0, 0, 360, 600), 1).0
+        };
+        let kick = Track { name: "KICK".into(), auto_mode: true, auto_hit_variation: Some(20.0), ..Track::default() };
+        let groove = ids(&kick, 0);
+        let hits = groove.iter().find(|i| i.id == Some(Id::Generation("autoHitVariation"))).unwrap();
+        assert!(matches!(&hits.kind, Kind::Value { value, .. } if *value == 20.0));
+        // A drum line: no variant, no density; the note amount unset shows the one used.
+        let engine = ids(&kick, 1);
+        assert!(!engine.iter().any(|i| i.id == Some(Id::TrackSelect("autoVariant"))));
+        assert!(!engine.iter().any(|i| i.id == Some(Id::Generation("autoDensity"))));
+        let notes = engine.iter().find(|i| i.id == Some(Id::Generation("autoNoteVariation"))).unwrap();
+        assert!(matches!(&notes.kind, Kind::Value { value, .. } if *value == kick.auto_note_amount()));
+        // A bass line: its own variants, in the simple view.
+        let bass = Track { name: "BASS".into(), auto_mode: true, ..Track::default() };
+        assert!(ids(&bass, 1).iter().any(|i| i.id == Some(Id::TrackSelect("autoVariant"))));
+        assert!(ids(&bass, 1).iter().any(|i| i.id == Some(Id::Generation("autoDensity"))));
+        let variants = variant_options(&bass);
+        assert!(variants.contains(&"groove".to_owned()) && !variants.contains(&"chordStab".to_owned()));
+        assert!(variant_options(&Track { name: "PIANO".into(), ..Track::default() }).contains(&"chordStab".to_owned()));
+    }
+
+    #[test]
+    fn the_compose_tab_shows_the_style_values_until_set() {
+        let mut track = Track { name: "KICK".into(), ..Track::default() };
+        track.compose_syncopation = Some(70.0);
+        let state =
+            EditorState { tab: 4, generation_tab: COMPOSE_TAB, generation_advanced: true, ..EditorState::default() };
+        let (items, _) = track_editor(&view(&track), &state, Rect::new(0, 0, 360, 600), 1);
+        let shown = |key: &'static str| {
+            items.iter().find(|i| i.id == Some(Id::Compose(key))).and_then(|i| match &i.kind {
+                Kind::Value { value, text, spec, .. } => Some((*value, text.clone(), spec.default)),
+                _ => None,
+            })
+        };
+        // The pattern's energy makes the 4 hits of the style 6.
+        assert_eq!(shown("composeHitsPerMeasure"), Some((4.0, "4\u{2192}6*".to_owned(), STYLE_DEFAULT)));
+        assert_eq!(shown("composeSyncopation"), Some((70.0, "70".to_owned(), STYLE_DEFAULT)));
+        assert_eq!(shown("composeSeed"), Some((0.0, "new".to_owned(), 0.0)));
+        assert!(items.iter().any(|i| i.id == Some(Id::Regenerate)));
+        // A melodic track has no Compose tab: the manual sliders show.
+        let mut bass = view(&track);
+        bass.compose = None;
+        let (items, _) = track_editor(&bass, &state, Rect::new(0, 0, 360, 600), 1);
+        assert!(items.iter().any(|i| i.id == Some(Id::Generation("hitVariation"))));
     }
 
     #[test]

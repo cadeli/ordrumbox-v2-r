@@ -1,8 +1,7 @@
-//! Genres and the song form the generation follows (`song_structure.js`):
-//! a genre's track template, its bass variants, swing and chord progression,
-//! and the section (intro, chorus, verse, break…) a loop falls in.
+//! The song form the generation follows (`song_structure.js`): the section
+//! (intro, chorus, verse, break…) a loop falls in and its harmony, the keys
+//! and scales a pattern draws. Styles are in `assets/data/styles.json`.
 
-use ordrumbox_core::drum_taxonomy::instrument_family;
 use ordrumbox_core::json::Value;
 
 use super::{num, pick, table, text};
@@ -14,11 +13,6 @@ fn structure_table(name: &str) -> Option<&'static Value> {
 /// The string items of a structure list (`GENRES`, `SCALES`…).
 fn names(name: &str) -> Vec<&'static str> {
     structure_table(name).and_then(Value::as_array).unwrap_or_default().iter().filter_map(Value::as_str).collect()
-}
-
-/// `getRandomGenre`.
-pub(crate) fn random_genre(rnd: &mut dyn FnMut() -> f64) -> String {
-    pick(rnd, &names("genres")).map_or_else(String::new, |g| (*g).to_owned())
 }
 
 /// `randomKeyOffset`: a tonal centre, 0 more often than the others.
@@ -37,126 +31,14 @@ pub(crate) fn random_scale(rnd: &mut dyn FnMut() -> f64) -> String {
     pick(rnd, &names("scales")).map_or_else(String::new, |s| (*s).to_owned())
 }
 
-/// `randomBassVariant`: one of the genre's bass variants (`basic` for an
-/// unknown genre, still one draw).
-pub(crate) fn random_bass_variant(genre: Option<&str>, rnd: &mut dyn FnMut() -> f64) -> String {
-    let variants: Vec<&str> = genre
-        .and_then(|g| structure_table("bassVariantsByGenre")?.get(g))
-        .and_then(Value::as_array)
-        .unwrap_or_default()
-        .iter()
-        .filter_map(Value::as_str)
-        .collect();
-    let variants = if variants.is_empty() { vec!["basic"] } else { variants };
-    pick(rnd, &variants).map_or_else(|| "basic".to_owned(), |v| (*v).to_owned())
-}
-
-/// `generateStructure`: the genre's template, track name → variant (techno
-/// for an unknown genre), in table order.
-pub(crate) fn generate_structure(genre: &str) -> Vec<(String, String)> {
-    let structures = structure_table("structures").and_then(Value::as_object);
-    let template = structures.and_then(|s| s.get(genre).or_else(|| s.get("techno"))).and_then(Value::as_object);
-    template
-        .map(|t| t.iter().map(|(k, v)| (k.to_owned(), v.as_str().unwrap_or_default().to_owned())).collect())
-        .unwrap_or_default()
-}
-
-/// `poolFor`: the variants a track may swap to (by name, else by type).
-fn pool_for(name: &str) -> Option<&'static [Value]> {
-    let by_name = structure_table("variantPools").and_then(|p| p.get(&name.to_uppercase()));
-    let by_type = || structure_table("variantPoolsByType").and_then(|p| p.get(instrument_family(name).name()));
-    by_name.or_else(by_type).and_then(Value::as_array)
-}
-
-fn pick_name(rnd: &mut dyn FnMut() -> f64, pool: &[Value]) -> String {
-    pick(rnd, pool).map(ordrumbox_core::js::to_string).unwrap_or_default()
-}
-
-/// `randomizeStructure`: drop some optional tracks, swap variants within
-/// their pools, maybe add an extra instrument. KICK, SNARE and BASS stay.
-pub(crate) fn randomize_structure(base: &[(String, String)], rnd: &mut dyn FnMut() -> f64) -> Vec<(String, String)> {
-    let mut result = base.to_vec();
-    let core = names("coreTracks");
-    let drop = structure_table("dropChance");
-    for (name, _) in base {
-        if core.contains(&name.as_str()) {
-            continue;
-        }
-        let chance = drop.and_then(|d| num(d, name).or_else(|| num(d, "default"))).unwrap_or(f64::NAN);
-        if rnd() < chance {
-            result.retain(|(n, _)| n != name);
-            continue;
-        }
-        if rnd() < 0.55
-            && let Some(pool) = pool_for(name)
-        {
-            let variant = pick_name(rnd, pool);
-            if let Some(slot) = result.iter_mut().find(|(n, _)| n == name) {
-                slot.1 = variant;
-            }
-        }
-    }
-    if rnd() < 0.3 {
-        let missing: Vec<&str> =
-            names("optionalExtras").into_iter().filter(|n| !result.iter().any(|(r, _)| r == n)).collect();
-        if let Some(name) = pick(rnd, &missing).map(|n| (*n).to_owned())
-            && let Some(pool) = pool_for(&name)
-        {
-            let variant = pick_name(rnd, pool);
-            result.push((name, variant));
-        }
-    }
-    result
-}
-
-/// How many drum tracks a generated pattern of `genre` plays at most: the
-/// genres that leave room between their hits have fewer.
-pub(crate) fn drum_track_limit(genre: &str) -> usize {
-    match genre {
-        "hiphop" | "reggae" | "rock" | "funk" => 5,
-        _ => 6,
-    }
-}
-
-/// The template without the drum tracks past the genre's limit, the last ones
-/// first (an extra instrument, then the template's end).
-pub(crate) fn limit_drum_tracks(structure: &mut Vec<(String, String)>, genre: &str) {
-    let mut left = drum_track_limit(genre);
-    structure.retain(|(name, _)| {
-        if !instrument_family(name).is_drum() {
-            return true;
-        }
-        let keep = left > 0;
-        left = left.saturating_sub(1);
-        keep
-    });
-}
-
-/// `getGenreSwing`: swing amount and resolution of a genre.
-pub(crate) fn genre_swing(genre: &str) -> (f64, f64) {
-    let swing = structure_table("swingByGenre").and_then(|s| s.get(genre));
-    match swing {
-        Some(s) => (num(s, "swingAmount").unwrap_or(0.0), num(s, "swingResolution").unwrap_or(4.0)),
-        None => (0.0, 4.0),
-    }
-}
-
-/// `SongStructure#resolveHarmony`: the section's root plus the genre's chord
+/// `SongStructure#resolveHarmony`: the section's root plus the style's chord
 /// progression step (none on breaks and outros), and its scale.
-pub(crate) fn section_harmony(genre: &str, section: &str, loop_in_element: u64) -> (f64, String) {
+pub(crate) fn section_harmony(progression: &[f64], section: &str, loop_in_element: u64) -> (f64, String) {
     let table = structure_table("harmonicTable").and_then(|t| t.get(section));
     let root = table.and_then(|t| num(t, "root")).unwrap_or(0.0);
     let scale = table.and_then(|t| text(t, "scale")).unwrap_or("natural minor").to_owned();
-    let progression: Vec<f64> = structure_table("chordProgressions")
-        .and_then(|p| p.get(genre))
-        .and_then(Value::as_array)
-        .unwrap_or_default()
-        .iter()
-        .map(|v| v.as_f64().unwrap_or(f64::NAN))
-        .collect();
     let offset = if !progression.is_empty() && section != "break" && section != "outro" {
-        let step = progression[(loop_in_element % progression.len() as u64) as usize];
-        if step.is_nan() { 0.0 } else { step }
+        progression[(loop_in_element % progression.len() as u64) as usize]
     } else {
         0.0
     };
