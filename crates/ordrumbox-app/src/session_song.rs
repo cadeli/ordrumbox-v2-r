@@ -22,7 +22,7 @@ use ordrumbox_core::{Song, SongClip};
 use super::session_panel::{DOUBLE_CLICK, PanelLayout};
 use super::*;
 use crate::panel::{self, Item, Kind, Rect};
-use crate::song_view::{self, Row, SongGhost, SongHit, SongLayout, SongView};
+use crate::song_view::{self, Axis, Row, SongGhost, SongHit, SongLayout, SongView};
 
 /// The column's buttons: id and label.
 const BUTTONS: [(&str, &str); 7] = [
@@ -94,6 +94,7 @@ impl Session {
         self.dropdown = None;
         self.hovered_clip = None;
         self.song_drag = None;
+        self.song_bar_drag = None;
         self.roll_drag = None;
         if self.playing() && was_song != (workspace == Workspace::Song) {
             let mode = self.play_mode();
@@ -155,16 +156,22 @@ impl Session {
     /// First measure and first row shown: while the song plays, the page
     /// the cursor is on; else where the wheel left them.
     fn song_scroll(&self, layout: &SongLayout, rows: usize) -> (u32, usize) {
-        let Some(song) = self.song() else { return (0, 0) };
+        if self.song().is_none() {
+            return (0, 0);
+        }
         let visible = layout.visible_measures();
-        let total = song.length_measures().max(1.0).ceil() as u32 + self.song_room(layout);
-        let last = total.saturating_sub(visible);
+        let last = self.song_measure_total(layout).saturating_sub(visible);
         let x = if self.song_playing() {
             (self.song_cursor_measure() as u32 / visible * visible).min(last)
         } else {
             self.song_scroll.0.min(last)
         };
         (x, self.song_scroll.1.min(rows.saturating_sub(layout.visible_rows())))
+    }
+
+    /// Measures the arrangement's grid spans: the song, and the room to drop on.
+    fn song_measure_total(&self, layout: &SongLayout) -> u32 {
+        self.song().map_or(0, |song| song.length_measures().max(1.0).ceil() as u32 + self.song_room(layout))
     }
 
     /// The first line of the selected pattern's description shown, kept so
@@ -438,6 +445,10 @@ impl Session {
                 let grab = layout.measure_at(x, first).saturating_sub(start);
                 self.press_song_drag(DragSource::Clip { clip, grab }, x, y);
             }
+            (SongHit::ScrollBar(axis), Button::Left) => {
+                self.song_bar_drag = Some(axis);
+                self.song_bar_to(size, axis, x, y);
+            }
             (SongHit::Pattern(p), Button::Right) => self.list_menu(p, x, y),
             (SongHit::Description, Button::Left) => self.text_entry(Id::PatternDescription),
             (SongHit::Ruler(m), Button::Left) => self.set_song_cursor(m),
@@ -559,9 +570,29 @@ impl Session {
         true
     }
 
-    /// The wheel over the arrangement: measures (Shift: rows); over the
-    /// pattern's description: its lines; whether it was theirs.
-    pub fn song_wheel(&mut self, size: (i32, i32, i32), x: i32, y: i32, lines: isize, shift: bool) -> bool {
+    /// The scroll bar `axis` held at `(x, y)`: its thumb centred there; whether to redraw.
+    pub(super) fn song_bar_to(&mut self, size: (i32, i32, i32), axis: Axis, x: i32, y: i32) -> bool {
+        let layout = self.song_layout(size);
+        let rows = self.song_rows().len();
+        let (mut sx, mut sy) = self.song_scroll(&layout, rows);
+        match axis {
+            Axis::Measures => {
+                let (shown, total) = (layout.visible_measures() as usize, self.song_measure_total(&layout) as usize);
+                sx = layout.scroll_at(axis, x, y, shown, total) as u32;
+            }
+            Axis::Rows => sy = layout.scroll_at(axis, x, y, layout.visible_rows(), rows),
+        }
+        let changed = (sx, sy) != self.song_scroll;
+        self.song_scroll = (sx, sy);
+        changed
+    }
+
+    /// The wheel over the arrangement: measures, sideways ones too (Shift:
+    /// rows, which macOS turns into sideways notches); over the pattern's
+    /// description: its lines; whether it was theirs.
+    pub fn song_wheel(&mut self, size: (i32, i32, i32), x: i32, y: i32, wheel: (isize, isize), shift: bool) -> bool {
+        // Content moves right and down for positive notches: both show what is before.
+        let lines = wheel.0 + wheel.1;
         let layout = self.song_layout(size);
         if self.workspace == Workspace::Song && lines != 0 && layout.description.contains(x, y) {
             let first = (self.description_scroll(&layout) as isize - lines).max(0) as usize;
@@ -569,8 +600,7 @@ impl Session {
             self.description_scroll.1 = self.description_scroll(&layout);
             return true;
         }
-        let Some(song) = self.song() else { return false };
-        if self.workspace != Workspace::Song || lines == 0 || !layout.grid.contains(x, y) {
+        if self.song().is_none() || self.workspace != Workspace::Song || lines == 0 || !layout.grid.contains(x, y) {
             return false;
         }
         let rows = self.song_rows().len();
@@ -579,8 +609,7 @@ impl Session {
             let last = rows.saturating_sub(layout.visible_rows());
             sy = (sy as isize - lines).clamp(0, last as isize) as usize;
         } else {
-            let total = song.length_measures().max(1.0).ceil() as u32 + self.song_room(&layout);
-            let last = total.saturating_sub(layout.visible_measures());
+            let last = self.song_measure_total(&layout).saturating_sub(layout.visible_measures());
             sx = (i64::from(sx) - 4 * lines as i64).clamp(0, i64::from(last)) as u32;
         }
         self.song_scroll = (sx, sy);
@@ -940,6 +969,50 @@ mod tests {
     }
 
     #[test]
+    fn the_scroll_bars_and_the_wheel_reach_every_measure_and_row() {
+        // 30 patterns, each on a row of its own, the last clip at measure 200.
+        let patterns: Vec<String> = (0..30).map(|i| format!(r#"{{"name":"p{i}"}}"#)).collect();
+        let clips: Vec<String> = (0..30)
+            .map(|i| format!(r#"{{"pattern":"p{i}","startMeasure":{},"measureCount":1}}"#, i * 200 / 29))
+            .collect();
+        let json = format!(
+            r#"{{"songs":[{{"name":"s","clips":[{}]}}],"patterns":[{}]}}"#,
+            clips.join(","),
+            patterns.join(",")
+        );
+        let mut s = Session::new(Library::parse(&json).unwrap().0, KitSet::empty(), Vec::new());
+        s.toggle_song_view();
+        let l = s.song_layout(SIZE);
+        let rows = s.song_rows();
+        assert!(rows.len() > l.visible_rows());
+        let scroll = |s: &Session| s.song_view_data(&rows, &l).scroll;
+        let (last_measure, last_row) = (201 - l.visible_measures(), rows.len() - l.visible_rows());
+
+        // The measures' bar, dragged to its right end and back.
+        let bar = l.scroll_bar(Axis::Measures);
+        assert!(s.song_click(SIZE, bar.x + 1, bar.y + 1, Button::Left));
+        assert!(s.mouse_move(SIZE, bar.x + bar.w + 50, bar.y, false));
+        assert_eq!(scroll(&s), (last_measure, 0));
+        s.mouse_move(SIZE, bar.x - 50, bar.y, false);
+        assert_eq!(scroll(&s).0, 0);
+        s.mouse_up();
+        assert!(!s.mouse_move(SIZE, bar.x + bar.w, bar.y, false));
+
+        // The rows' bar: a click on its end.
+        let bar = l.scroll_bar(Axis::Rows);
+        assert!(s.song_click(SIZE, bar.x + 1, bar.y + bar.h - 1, Button::Left));
+        s.mouse_up();
+        assert_eq!(scroll(&s), (0, last_row));
+
+        // The wheel: sideways notches scroll the measures, Shift the rows.
+        let inside = (l.grid.x + l.grid.w / 2, l.grid.y + l.grid.h / 2);
+        assert!(s.song_wheel(SIZE, inside.0, inside.1, (-1000, 0), false));
+        assert_eq!(scroll(&s), (last_measure, last_row));
+        assert!(s.song_wheel(SIZE, inside.0, inside.1, (1000, 0), true));
+        assert_eq!(scroll(&s), (last_measure, 0));
+    }
+
+    #[test]
     fn a_drag_adds_a_pattern_and_moves_a_clip() {
         let mut s = session();
         let l = s.song_layout(SIZE);
@@ -1011,13 +1084,13 @@ mod tests {
         assert_eq!(s.editor.library().patterns[s.pattern_index].description, "a groove");
         // The wheel scrolls a long one, no further than its last line.
         s.commit_text(Id::PatternDescription, &"a groove to dance on ".repeat(40));
-        assert!(s.song_wheel(SIZE, inside.0, inside.1, -2, false));
+        assert!(s.song_wheel(SIZE, inside.0, inside.1, (0, -2), false));
         let l = s.song_layout(SIZE);
         assert_eq!(s.song_view_data(&[], &l).description_scroll, 2);
-        assert!(s.song_wheel(SIZE, inside.0, inside.1, -1000, false));
+        assert!(s.song_wheel(SIZE, inside.0, inside.1, (0, -1000), false));
         let last = l.description_lines(&s.pattern().unwrap().description).len() - l.description_rows();
         assert_eq!(s.song_view_data(&[], &l).description_scroll, last);
-        assert!(s.song_wheel(SIZE, inside.0, inside.1, 1000, false));
+        assert!(s.song_wheel(SIZE, inside.0, inside.1, (0, 1000), false));
         assert_eq!(s.song_view_data(&[], &l).description_scroll, 0);
         // A double-click on a pattern of the list renames it.
         let l = s.song_layout(SIZE);

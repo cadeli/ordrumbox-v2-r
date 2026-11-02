@@ -563,9 +563,9 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::MouseWheel { delta, .. } => {
-                let lines = match delta {
-                    MouseScrollDelta::LineDelta(_, y) => y.round() as isize,
-                    MouseScrollDelta::PixelDelta(p) => (p.y / 20.0).round() as isize,
+                let (columns, lines) = match delta {
+                    MouseScrollDelta::LineDelta(x, y) => (x.round() as isize, y.round() as isize),
+                    MouseScrollDelta::PixelDelta(p) => ((p.x / 20.0).round() as isize, (p.y / 20.0).round() as isize),
                 };
                 let size = (self.size().0, self.size().1, self.scale());
                 let (x, y) = (self.mouse.x as i32, self.mouse.y as i32);
@@ -573,7 +573,7 @@ impl ApplicationHandler for App {
                 let coarse = self.modifiers.control_key() || self.modifiers.super_key();
                 let shift = self.modifiers.shift_key();
                 if self.session.wheel(size, x, y, lines, fine, coarse)
-                    || self.session.song_wheel(size, x, y, lines, shift)
+                    || self.session.song_wheel(size, x, y, (columns, lines), shift)
                     || self.session.roll_wheel(size, x, y, lines, shift)
                 {
                     self.request_redraw();
