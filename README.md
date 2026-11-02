@@ -368,7 +368,9 @@ The tools keep the JS names: `listPatterns`, `loadPattern`,
 `exports/`), `listAllInstrumentsNames`, `listKitSamples`, `analyzeSamples`,
 `listArrangements`, `createArrangement`, `addPatternToArrangement`,
 `removePatternFromArrangement`; and for the live app `selectKit`, `play`,
-`stop`, `undo`. `setColorScheme` is gone: this app has one theme. Track and
+`stop`, `undo`. Beyond the JS server: `deleteNotes`, `removeTrack`,
+`renamePattern`, `duplicatePattern`, `removePattern` (with its clips),
+`updateArrangement`, `removeArrangement`, `redo`. `setColorScheme` is gone: this app has one theme. Track and
 note settings take the key names of the files (`volume`, `transpose`,
 `cycle`, `probability`…; the JS names are read too), and a value outside its
 range is refused (notes) or brought inside it, the answer saying the value
