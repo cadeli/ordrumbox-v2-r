@@ -13,7 +13,7 @@ const QUANTUM: usize = 128;
 /// Largest difference allowed with the JS output (math functions of V8 and of
 /// the platform may differ in their last bit).
 const TOLERANCE: f32 = 2e-5;
-/// One frame kept out of this many in `synth_renders.bin`.
+/// One frame kept out of this many in the Rust snapshots.
 const SNAPSHOT_STRIDE: usize = 16;
 
 struct Fixtures {
@@ -215,10 +215,40 @@ fn render_effect(case: &Value, frames: usize) -> (Vec<f32>, Vec<f32>) {
     (out_l, out_r)
 }
 
-/// Whether a synth case uses what the voice does differently from the JS
-/// processor on purpose (`synth.rs`): the sub, the pitch punch or FM, set or
-/// reached by an LFO. Such a case is checked against `synth_renders.bin`.
-fn departs_from_js(case: &Value) -> bool {
+/// Whether a case uses what a processor does differently from the JS one on
+/// purpose. Such a case is checked against a Rust snapshot.
+fn departs_from_js(case: &Value, fx: &Fixtures) -> bool {
+    match case.get("processor").and_then(Value::as_str) {
+        Some("synth-voice") => synth_departs(case),
+        _ => effect_departs(case, fx),
+    }
+}
+
+/// Whether a strip or master bus case uses what they do on purpose
+/// (`strip.rs`, `master_bus.rs`): the reverb at another rate than 44.1 kHz
+/// (its tunings follow the rate), the tape saturation, or a master output
+/// the JS clips above the limit's knee.
+fn effect_departs(case: &Value, fx: &Fixtures) -> bool {
+    /// `LIMIT_KNEE` of the master bus.
+    const LIMIT_KNEE: f32 = 0.9;
+    let params: Vec<Object> = changes(case).into_iter().map(|(_, p)| p).collect();
+    let set = |key: &str| params.iter().filter_map(|p| p.get(key).and_then(Value::as_f64)).collect::<Vec<_>>();
+    match case.get("processor").and_then(Value::as_str) {
+        Some("strip") => {
+            let reverb = set("revMix").iter().any(|&m| m > 0.0) && num(case, "sampleRate") != 44_100.0;
+            let tape = set("satType").contains(&2.0) && set("satMix").iter().any(|&m| m > 0.0);
+            reverb || tape
+        }
+        _ => {
+            let (offset, stored) = (num(case, "offset") as usize, num(case, "stored") as usize);
+            fx.data[offset..offset + 2 * stored].iter().any(|x| x.abs() > LIMIT_KNEE)
+        }
+    }
+}
+
+/// Whether a synth case uses what the voice does differently on purpose
+/// (`synth.rs`): the sub, the pitch punch or FM, set or reached by an LFO.
+fn synth_departs(case: &Value) -> bool {
     /// LFO targets: sub gain, pitch punch, FM amount, FM algorithm.
     const DEPARTING_TARGETS: [f64; 4] = [19.0, 20.0, 24.0, 25.0];
     let messages = case.get("messages").and_then(Value::as_array).expect("messages");
@@ -230,19 +260,25 @@ fn departs_from_js(case: &Value) -> bool {
         || [patch.lfo1.target, patch.lfo2.target].iter().any(|t| DEPARTING_TARGETS.contains(t))
 }
 
-fn synth_snapshot_path() -> std::path::PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/synth_renders.bin")
+/// The Rust snapshots: the synth voice's departing cases, and the strip's and
+/// master bus's.
+const SNAPSHOTS: [(&str, bool); 2] = [("synth_renders.bin", true), ("effect_renders.bin", false)];
+
+fn snapshot_path(file: &str) -> std::path::PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures").join(file)
 }
 
-/// The stored frames of every case that departs from JS, left then right.
-fn synth_snapshot(fx: &Fixtures) -> Vec<(String, Vec<f32>)> {
-    let synth_case = |case: &&Value| case.get("processor").and_then(Value::as_str) == Some("synth-voice");
+/// The stored frames of every synth case (else effect case) that departs
+/// from JS, left then right.
+fn snapshot(fx: &Fixtures, synth: bool) -> Vec<(String, Vec<f32>)> {
+    let of_kind = |case: &&Value| (case.get("processor").and_then(Value::as_str) == Some("synth-voice")) == synth;
     fx.cases
         .iter()
-        .filter(synth_case)
-        .filter(|case| departs_from_js(case))
+        .filter(of_kind)
+        .filter(|case| departs_from_js(case, fx))
         .map(|case| {
-            let (l, r) = render_synth(case, num(case, "frames") as usize);
+            let frames = num(case, "frames") as usize;
+            let (l, r) = if synth { render_synth(case, frames) } else { render_effect(case, frames) };
             let thin = |s: Vec<f32>| s.into_iter().step_by(SNAPSHOT_STRIDE);
             let name = case.get("name").and_then(Value::as_str).expect("name").to_owned();
             (name, thin(l).chain(thin(r)).collect())
@@ -250,25 +286,33 @@ fn synth_snapshot(fx: &Fixtures) -> Vec<(String, Vec<f32>)> {
         .collect()
 }
 
-/// Writes `synth_renders.bin` from the voice as it is: `cargo test -p
-/// ordrumbox-dsp --test processors -- --ignored`, when its sound changes on
+/// Writes the snapshots from the processors as they are: `cargo test -p
+/// ordrumbox-dsp --test processors -- --ignored`, when their sound changes on
 /// purpose (`README.md`, "Golden fixtures").
 #[test]
-#[ignore = "writes the snapshot"]
-fn write_the_synth_snapshot() {
-    let bytes: Vec<u8> =
-        synth_snapshot(&fixtures()).iter().flat_map(|(_, s)| s).flat_map(|x| x.to_le_bytes()).collect();
-    std::fs::write(synth_snapshot_path(), bytes).expect("written");
+#[ignore = "writes the snapshots"]
+fn write_the_snapshots() {
+    let fx = fixtures();
+    for (file, synth) in SNAPSHOTS {
+        let bytes: Vec<u8> = snapshot(&fx, synth).iter().flat_map(|(_, s)| s).flat_map(|x| x.to_le_bytes()).collect();
+        std::fs::write(snapshot_path(file), bytes).expect("written");
+    }
 }
 
 #[test]
-fn the_synth_voice_matches_its_snapshot() {
-    let bytes = std::fs::read(synth_snapshot_path()).expect("synth_renders.bin");
+fn departing_cases_match_their_snapshots() {
+    let fx = fixtures();
+    for (file, synth) in SNAPSHOTS {
+        check_snapshot(file, &snapshot(&fx, synth));
+    }
+}
+
+fn check_snapshot(file: &str, cases: &[(String, Vec<f32>)]) {
+    let bytes = std::fs::read(snapshot_path(file)).expect(file);
     let stored: Vec<f32> = bytes.chunks_exact(4).map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]])).collect();
-    let cases = synth_snapshot(&fixtures());
     assert_eq!(stored.len(), cases.iter().map(|(_, s)| s.len()).sum::<usize>());
     let mut rest = stored.as_slice();
-    for (name, samples) in &cases {
+    for (name, samples) in cases {
         let (expected, after) = rest.split_at(samples.len());
         rest = after;
         for (got, want) in samples.iter().zip(expected) {
@@ -309,7 +353,7 @@ fn processors_match_the_js_worklets() {
     for case in &fx.cases {
         let name = case.get("name").and_then(Value::as_str).expect("name");
         let processor = case.get("processor").and_then(Value::as_str).expect("processor");
-        if processor == "synth-voice" && departs_from_js(case) {
+        if departs_from_js(case, &fx) {
             continue;
         }
         let frames = num(case, "frames") as usize;

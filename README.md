@@ -43,7 +43,8 @@ from the JS app's (old name in brackets):
   `autoAssign` (`useAutoAssignSound`), `useSynth` (`useSoftSynth`),
   `synthPreset` (`synthSoundKey`), `loopLength` (`loopAtStep`),
   `filterCutoff`/`filterCutoffLfo` (`filterFreq`…), `filterSlope` (12 or
-  24 dB/oct; new, the JS filter has 12 only), `reverbMix`,
+  24 dB/oct; new, the JS filter has 12 only), `delayFeedback` (new, 0.4 in
+  the JS), `reverbMix`,
   `delayMix`, `saturationMix` (`reverbAmount`, `delayDepth`,
   `saturationAmount`), `delayBeats` (`delayTime`), `saturationOn` (`sat`),
   `hitVariation`/`noteVariation` (`variation`/`variation2`); auto mode:
@@ -131,8 +132,8 @@ Track editor (on the right, **F2** or **View › Track editor** shows or hides
 it), for the track of the cursor or of the selected note: the sample bar
 (note, length, peak, envelope with the decay end, **Load** replaces the
 sample), the knob bar (volume, pan, transpose, the sample's decay) and the JS
-tabs — **FX** (reverb, delay, saturation, filter — LP/HP/BP, 12 or
-24 dB/oct —, each with its on/off LED),
+tabs — **FX** (reverb, delay, saturation, filter, each with its on/off LED;
+see "Effects" below),
 **Sound** (mono, auto-assign, instrument, sample, synth preset), **LFO** (an
 LFO per setting: LED, wave, frequency, range, phase), **Loop** (steps per
 beat, loop length, swing), **Gen** (auto mode; the manual variation settings,
@@ -473,6 +474,29 @@ sound by sound. Limits: a pitch frame lasts 85 ms, so a shorter pitch move is
 blurred and a sound under 85 ms has no pitch curve. A pitch range near a multiple
 of 1200 cents can be the detector jumping between octaves: check the curve.
 
+## Effects
+
+Each track plays through its strip: filter, saturation, reverb, delay, then
+volume and pan; the master bus follows. They follow the JS processors, except
+where a name did not hold what it said:
+
+- **Filter**: LP, HP, BP, notch, 12 or 24 dB/oct (`filterSlope`; two stages,
+  a Butterworth pair whose resonance peaks as high as one stage's). Off
+  (`allpass`) skips it (the JS left a 20 kHz lowpass). Switched on from its
+  20 Hz default, the cutoff goes to 1 kHz.
+- **Saturation**: soft (tanh), hard (clip), tape (an asymmetric tanh: even
+  harmonics; an `atan` in JS).
+- **Reverb**: a Freeverb whose times follow the sample rate (the JS keeps the
+  44.1 kHz lengths). `hall` and `plate` have a pre-delay, `spring` a
+  dispersion, `gated` a large room cut 250 ms after the hit.
+- **Delay**, in beats: `slap` is one clean echo, `tape` repeats darker with
+  wow, `pingpong` starts on the left and alternates (the JS crossed two
+  times); `delayFeedback` sets the repeats. Longer than 2 s at the tempo, it
+  plays at the longest halving of its beats that fits, shown on the Beats
+  choice.
+- **Master bus**: a compressor, low and high cut, then a soft limit (unchanged
+  under 0.9, rounded toward ±1; a hard clip in JS).
+
 ## Golden fixtures
 
 The fixtures are committed: the tests need nothing outside this repository.
@@ -530,10 +554,18 @@ node tools/export_dsp_fixtures.mjs ../ordrumbox-v2
   the mix. This file is the one fixture the JS app does not produce:
   `cargo test -p ordrumbox-dsp --test processors -- --ignored` writes it, only
   when the voice's sound changes on purpose.
-- The 24 dB/oct filter of the strip and of the synth voice (two stages in
-  series, `ordrumbox-dsp/src/slope.rs`) has no JS counterpart: the fixtures
-  play the 12 dB/oct one, and unit tests (`strip.rs`, `synth.rs`) measure the
-  slopes and the resonance peak.
+- `ordrumbox-dsp/tests/fixtures/effect_renders.bin`: the same for the strip
+  and master bus cases that use what they do differently on purpose (see
+  "Effects"): the reverb at 48 kHz (its tunings follow the rate), the `tape`
+  saturation, a master output above the limit's knee. The synth snapshot also
+  covers its filter opening to 0.45 × the rate (a quarter in JS). The same
+  command writes both files.
+- The strip settings the JS lacks (24 dB/oct filter, pre-delay, dispersion,
+  gate, wow, feedback tone, ping-pong input) default to what the JS does, so
+  the fixtures play them unset; unit tests (`strip.rs`, `synth.rs`) measure
+  them. `strip_settings.json` is checked on every track but those whose
+  settings depart on purpose (a `gated` reverb, a sounding `slap`, `pingpong`
+  or too long delay), which the unit tests of `strip_settings.rs` cover.
 - `ordrumbox-engine/tests/fixtures/strip_settings.json`: the strip parameters
   `applyTrackToStrip()` sets for every track setup of `song.json`.
 - `ordrumbox-engine/tests/fixtures/lfo_values.json`: `computeLfoValue()` over
