@@ -51,6 +51,16 @@ const TOOLS: &str = r#"[
        "step": {"type": "integer", "minimum": 0, "description": "Absolute step, 0-based: beat * stepsPerBeat + step in the beat"}},
        "required": ["trackName", "step"]}}},
      "required": ["patternName", "notes"]}},
+  {"name": "deleteNotes", "description": "Deletes every note at the given steps of the given tracks.",
+   "inputSchema": {"type": "object", "properties": {
+     "patternName": {"type": "string"},
+     "notes": {"type": "array", "items": {"type": "object", "properties": {
+       "trackName": {"type": "string", "description": "Instrument name (KICK, SNARE...)"},
+       "step": {"type": "integer", "minimum": 0, "description": "Absolute step, 0-based: beat * stepsPerBeat + step in the beat"}},
+       "required": ["trackName", "step"]}}},
+     "required": ["patternName", "notes"]}},
+  {"name": "removeTrack", "description": "Removes a track and its notes from a pattern; the last track stays.",
+   "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}, "trackName": {"type": "string"}}, "required": ["patternName", "trackName"]}},
   {"name": "updateTrack", "description": "Changes the settings of a track (added when the pattern has none of that name) and, with noteUpdates, of all its notes. Numbers outside a setting's range are brought inside it: the answer gives the values used.",
    "inputSchema": {"type": "object", "properties": {
      "patternName": {"type": "string"},
@@ -66,6 +76,12 @@ const TOOLS: &str = r#"[
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}, "tags": {"type": "array", "items": {"type": "string"}}}, "required": ["patternName", "tags"]}},
   {"name": "setPatternDescription", "description": "The description of a pattern.",
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}, "description": {"type": "string"}}, "required": ["patternName", "description"]}},
+  {"name": "renamePattern", "description": "Renames a pattern; its id, which arrangements refer to, stays.",
+   "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}, "newName": {"type": "string", "minLength": 1}}, "required": ["patternName", "newName"]}},
+  {"name": "duplicatePattern", "description": "Adds a copy of a pattern at the end of the library, named newName (default: \"<name> copy\").",
+   "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}, "newName": {"type": "string"}}, "required": ["patternName"]}},
+  {"name": "removePattern", "description": "Removes a pattern and its clips in every arrangement; the last pattern stays.",
+   "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}}, "required": ["patternName"]}},
   {"name": "savePatternToJson", "description": "Exports a pattern as JSON to the exports folder of the user data folder (as File > Export pattern).",
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}}, "required": ["patternName"]}},
   {"name": "listAllInstrumentsNames", "description": "The instruments a track can be named after, with whether each is a drum and its default pan.",
@@ -102,11 +118,22 @@ const TOOLS: &str = r#"[
      "startMeasure": {"type": "integer", "minimum": 0},
      "patternName": {"type": "string", "description": "Pattern name or id"},
      "arrangement": {"type": ["string", "integer"], "description": "Arrangement name or index (default: the selected one)"}}}},
+  {"name": "updateArrangement", "description": "Changes the tempo, description or loop length of an arrangement; what is not given stays.",
+   "inputSchema": {"type": "object", "properties": {
+     "arrangement": {"type": ["string", "integer"], "description": "Arrangement name or index (default: the selected one)"},
+     "description": {"type": "string"},
+     "bpm": {"type": "number", "minimum": 20, "maximum": 300, "description": "Tempo of the whole arrangement"},
+     "loopMeasures": {"type": "number", "minimum": 0, "description": "Loop length in measures (0: up to the end of the last clip)"}}}},
+  {"name": "removeArrangement", "description": "Removes an arrangement and its clips (its patterns stay).",
+   "inputSchema": {"type": "object", "properties": {
+     "arrangement": {"type": ["string", "integer"], "description": "Arrangement name or index (default: the selected one)"}}}},
   {"name": "play", "description": "Plays the pattern shown, or with song true the selected arrangement from its start.",
    "inputSchema": {"type": "object", "properties": {"song": {"type": "boolean"}}}},
   {"name": "stop", "description": "Stops playing.",
    "inputSchema": {"type": "object", "properties": {}}},
   {"name": "undo", "description": "Undoes the last edit, made in the window or by a tool.",
+   "inputSchema": {"type": "object", "properties": {}}},
+  {"name": "redo", "description": "Redoes the last edit undone.",
    "inputSchema": {"type": "object", "properties": {}}}
 ]"#;
 
@@ -302,7 +329,7 @@ mod tests {
     fn the_tool_list_parses_with_the_settings() {
         let tools = tools();
         let tools = tools.as_array().unwrap();
-        assert_eq!(tools.len(), 22);
+        assert_eq!(tools.len(), 30);
         let update = tools.iter().find(|t| t.get("name").and_then(Value::as_str) == Some("updateTrack")).unwrap();
         let updates = &update.get("inputSchema").unwrap().get("properties").unwrap().get("updates").unwrap();
         let properties = updates.get("properties").unwrap();

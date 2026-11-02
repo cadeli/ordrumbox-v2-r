@@ -194,6 +194,8 @@ impl Session {
             "createNewPattern" => self.mcp_create_pattern(args),
             "selectPattern" => self.mcp_select_pattern(args),
             "addNotesToPattern" => self.mcp_add_notes(args),
+            "deleteNotes" => self.mcp_delete_notes(args),
+            "removeTrack" => self.mcp_remove_track(args),
             "updateTrack" => self.mcp_update_track(args),
             "setPatternBpm" => self.mcp_set_bpm(args),
             "setPatternBeatCount" => self.mcp_set_beat_count(args),
@@ -204,6 +206,9 @@ impl Session {
                 self.editor.set_pattern_description(p, description);
                 Ok(object([("description", Value::from(description))]))
             }
+            "renamePattern" => self.mcp_rename_pattern(args),
+            "duplicatePattern" => self.mcp_duplicate_pattern(args),
+            "removePattern" => self.mcp_remove_pattern(args),
             "savePatternToJson" => {
                 let p = self.mcp_pattern(text(args, "patternName")?)?;
                 let dir = store::exports_dir().ok_or("no user data folder to export to")?;
@@ -227,6 +232,8 @@ impl Session {
             "createArrangement" => self.mcp_create_arrangement(args),
             "addPatternToArrangement" => self.mcp_add_clip(args),
             "removePatternFromArrangement" => self.mcp_remove_clips(args),
+            "updateArrangement" => self.mcp_update_arrangement(args),
+            "removeArrangement" => self.mcp_remove_arrangement(args),
             "play" => self.mcp_play(args),
             "stop" => {
                 if let Some(controller) = &mut self.controller {
@@ -237,6 +244,10 @@ impl Session {
             }
             "undo" => {
                 self.undo();
+                return Ok(object([("message", Value::from(self.message.as_str()))]));
+            }
+            "redo" => {
+                self.redo();
                 return Ok(object([("message", Value::from(self.message.as_str()))]));
             }
             _ => Err(format!("Unknown tool: {name}")),
@@ -282,16 +293,82 @@ impl Session {
         ])
     }
 
-    fn mcp_create_pattern(&mut self, args: &Value) -> Result<Value, String> {
-        let name = text(args, "patternName")?.trim();
+    /// Argument `key`, trimmed, as the name of pattern `p` (else of a new
+    /// one): not empty, no other pattern's.
+    fn mcp_new_name<'a>(&self, args: &'a Value, key: &str, p: Option<usize>) -> Result<&'a str, String> {
+        let name = text(args, key)?.trim();
         if name.is_empty() {
-            return Err("patternName is empty".into());
+            return Err(format!("{key} is empty"));
         }
-        if self.mcp_pattern(name).is_ok() {
-            return Err(format!("The library has a pattern named \"{name}\" already"));
+        match self.mcp_pattern(name) {
+            Ok(other) if Some(other) != p => Err(format!("The library has a pattern named \"{name}\" already")),
+            _ => Ok(name),
         }
+    }
+
+    fn mcp_create_pattern(&mut self, args: &Value) -> Result<Value, String> {
+        let name = self.mcp_new_name(args, "patternName", None)?;
         let p = self.editor.add_pattern(Some(name));
         Ok(pattern_summary(p, &self.editor.library().patterns[p]))
+    }
+
+    fn mcp_rename_pattern(&mut self, args: &Value) -> Result<Value, String> {
+        let p = self.mcp_pattern(text(args, "patternName")?)?;
+        let name = self.mcp_new_name(args, "newName", Some(p))?;
+        self.editor.rename_pattern(p, name);
+        Ok(pattern_summary(p, &self.editor.library().patterns[p]))
+    }
+
+    fn mcp_duplicate_pattern(&mut self, args: &Value) -> Result<Value, String> {
+        let p = self.mcp_pattern(text(args, "patternName")?)?;
+        let name = match optional_text(args, "newName")? {
+            Some(_) => Some(self.mcp_new_name(args, "newName", None)?),
+            None => None,
+        };
+        let desc = format!("Duplicate pattern \"{}\"", pattern_name(&self.editor.library().patterns[p]));
+        let copy = self.editor.batch(&desc, |editor| {
+            let copy = editor.duplicate_pattern(p).ok_or("the pattern was not copied")?;
+            if let Some(name) = name {
+                editor.rename_pattern(copy, name);
+            }
+            Ok::<_, String>(copy)
+        })?;
+        Ok(pattern_summary(copy, &self.editor.library().patterns[copy]))
+    }
+
+    /// Remove a pattern with its clips; the pattern shown or playing stays
+    /// the same one when it is another.
+    fn mcp_remove_pattern(&mut self, args: &Value) -> Result<Value, String> {
+        let p = self.mcp_pattern(text(args, "patternName")?)?;
+        let library = self.editor.library();
+        if library.patterns.len() <= 1 {
+            return Err("The last pattern of the library stays".into());
+        }
+        let (id, name) = (library.patterns[p].id.clone(), pattern_name(&library.patterns[p]));
+        let songs = library.songs.len();
+        let clips = self.editor.batch(&format!("Remove pattern \"{name}\""), |editor| {
+            let mut clips = 0;
+            for s in 0..songs {
+                clips += editor.remove_pattern_clips(&id, Some(s))?.len();
+            }
+            if !editor.remove_pattern(p) {
+                return Err("the pattern was not removed".to_owned());
+            }
+            Ok(clips)
+        })?;
+        if self.pattern_index > p {
+            self.pattern_index -= 1;
+        }
+        if let Some(controller) = &mut self.controller
+            && let Mode::Pattern(playing) = controller.mode()
+        {
+            match playing.cmp(&p) {
+                std::cmp::Ordering::Equal => controller.stop(),
+                std::cmp::Ordering::Greater => controller.select_pattern(playing - 1),
+                std::cmp::Ordering::Less => {}
+            }
+        }
+        Ok(object([("removed", Value::from(name)), ("clipsRemoved", count(clips))]))
     }
 
     fn mcp_select_pattern(&mut self, args: &Value) -> Result<Value, String> {
@@ -345,8 +422,7 @@ impl Session {
                     Some(t) => t,
                     None => editor.add_track(p, track, DEFAULT_STEPS_PER_BEAT).ok_or("no room for a track")?,
                 };
-                let steps_per_beat = editor.library().patterns[p].tracks[t].steps_per_beat.max(1);
-                let (beat, beat_step) = ((*step as i32) / steps_per_beat, (*step as i32) % steps_per_beat);
+                let (beat, beat_step) = beat_and_step(*step, editor.library().patterns[p].tracks[t].steps_per_beat);
                 grow_pattern(editor, p, beat + 1);
                 let notes = &editor.library().patterns[p].tracks[t].notes;
                 let n = match notes.iter().position(|n| n.beat == beat && n.step == beat_step) {
@@ -372,6 +448,53 @@ impl Session {
         ]))
     }
 
+    fn mcp_delete_notes(&mut self, args: &Value) -> Result<Value, String> {
+        let p = self.mcp_pattern(text(args, "patternName")?)?;
+        let pattern = &self.editor.library().patterns[p];
+        let mut planned: Vec<(usize, i32, i32)> = Vec::new();
+        for (i, item) in list(args, "notes")?.iter().enumerate() {
+            let at = format!("notes[{i}]");
+            let track = text(item, "trackName").map_err(|e| format!("{at}.{e}"))?;
+            let t = track_index(pattern, track)
+                .ok_or_else(|| format!("{at}.trackName: the pattern has no track \"{}\"", track.trim()))?;
+            let step = optional_whole(item, "step").map_err(|e| format!("{at}.{e}"))?;
+            let step = step.ok_or_else(|| format!("{at}.step is required"))?;
+            let (beat, beat_step) = beat_and_step(step, pattern.tracks[t].steps_per_beat);
+            if !planned.contains(&(t, beat, beat_step)) {
+                planned.push((t, beat, beat_step));
+            }
+        }
+        let at_step = |&(t, beat, beat_step): &(usize, i32, i32)| {
+            pattern.tracks[t].notes.iter().filter(|n| n.beat == beat && n.step == beat_step).count()
+        };
+        let deleted: usize = planned.iter().map(at_step).sum();
+        if deleted == 0 {
+            return Err("No note at those steps".into());
+        }
+        let desc = format!("Delete {deleted} notes in \"{}\"", pattern_name(pattern));
+        self.editor.batch(&desc, |editor| {
+            for &(t, beat, beat_step) in &planned {
+                editor.delete_step(p, t, beat, beat_step);
+            }
+        });
+        Ok(object([("deleted", count(deleted))]))
+    }
+
+    fn mcp_remove_track(&mut self, args: &Value) -> Result<Value, String> {
+        let p = self.mcp_pattern(text(args, "patternName")?)?;
+        let pattern = &self.editor.library().patterns[p];
+        let name = text(args, "trackName")?;
+        let t = track_index(pattern, name).ok_or_else(|| format!("The pattern has no track \"{}\"", name.trim()))?;
+        // As the window: a pattern keeps a track.
+        if pattern.tracks.len() <= 1 {
+            return Err("The last track of a pattern stays".into());
+        }
+        let name = pattern.tracks[t].name.clone();
+        self.editor.remove_track(p, t);
+        let tracks = self.editor.library().patterns[p].tracks.iter().map(|t| t.name.clone()).collect::<Vec<_>>();
+        Ok(object([("removed", Value::from(name)), ("tracks", strings(&tracks))]))
+    }
+
     fn mcp_update_track(&mut self, args: &Value) -> Result<Value, String> {
         let p = self.mcp_pattern(text(args, "patternName")?)?;
         let name = text(args, "trackName")?.trim().to_uppercase();
@@ -383,7 +506,7 @@ impl Session {
             Some(other) => return Err(format!("noteUpdates: not an object ({other})")),
         };
         let pattern = &self.editor.library().patterns[p];
-        let existing = pattern.tracks.iter().position(|t| same_name(&t.name, &name));
+        let existing = track_index(pattern, &name);
         if existing.is_none() && !self.editor.has_track_room(p) {
             return Err(format!("a pattern holds at most {MAX_TRACKS} tracks"));
         }
@@ -544,12 +667,7 @@ impl Session {
         if name.is_empty() {
             return Err("name is empty".into());
         }
-        let description = optional_text(args, "description")?;
-        let bpm = optional_number(args, "bpm")?;
-        let loop_measures = optional_number(args, "loopMeasures")?;
-        if loop_measures.is_some_and(|l| l < 0.0) {
-            return Err("loopMeasures: below 0".into());
-        }
+        let (description, bpm, loop_measures) = song_settings(args)?;
         let clips = match args.get("clips") {
             None | Some(Value::Null) => Vec::new(),
             Some(_) => {
@@ -566,12 +684,17 @@ impl Session {
             Ok::<_, String>(s)
         })?;
         self.song_scroll = (0, 0);
+        Ok(self.song_json_with_bpm(s, bpm))
+    }
+
+    /// `song_json`, with a note when the tempo used is not `asked`.
+    fn song_json_with_bpm(&self, s: usize, asked: Option<f64>) -> Value {
         let mut answer = self.song_json(s);
         let used = self.editor.library().songs[s].bpm;
-        if let (Some(asked), Some(object)) = (bpm.filter(|&b| b != used), answer.as_object_mut()) {
+        if let (Some(asked), Some(object)) = (asked.filter(|&b| b != used), answer.as_object_mut()) {
             object.insert("note", Value::from(format!("bpm {asked} asked, {used} used (20 to 300)")));
         }
-        Ok(answer)
+        answer
     }
 
     fn mcp_add_clip(&mut self, args: &Value) -> Result<Value, String> {
@@ -610,6 +733,30 @@ impl Session {
             return Err("No matching clip to remove".into());
         }
         Ok(object([("removed", count(removed)), ("arrangement", self.song_json(s))]))
+    }
+
+    fn mcp_update_arrangement(&mut self, args: &Value) -> Result<Value, String> {
+        let s = self.mcp_song(args)?;
+        let (description, bpm, loop_measures) = song_settings(args)?;
+        if description.is_none() && bpm.is_none() && loop_measures.is_none() {
+            return Err("Give description, bpm, loopMeasures, or several".into());
+        }
+        self.editor.set_song_settings(Some(s), bpm, description, loop_measures)?;
+        Ok(self.song_json_with_bpm(s, bpm))
+    }
+
+    fn mcp_remove_arrangement(&mut self, args: &Value) -> Result<Value, String> {
+        let s = self.mcp_song(args)?;
+        if let Some(controller) = &mut self.controller
+            && controller.is_playing()
+            && controller.mode() == Mode::Song(s)
+        {
+            controller.stop();
+        }
+        let name = self.editor.library().songs[s].name.clone();
+        self.editor.remove_song(Some(s));
+        self.song_scroll = (0, 0);
+        Ok(object([("removed", Value::from(name)), ("arrangements", count(self.editor.library().songs.len()))]))
     }
 
     fn mcp_play(&mut self, args: &Value) -> Result<Value, String> {
@@ -659,6 +806,29 @@ fn grow_pattern(editor: &mut Editor, p: usize, beats: i32) {
         let length = beats * editor.library().patterns[p].tracks[t].steps_per_beat;
         editor.update_track(p, t, &[("loopLength", Value::from(length))], None, false);
     }
+}
+
+/// Absolute step `step` of a track as its beat and its step in the beat.
+fn beat_and_step(step: u32, steps_per_beat: i32) -> (i32, i32) {
+    let steps_per_beat = steps_per_beat.max(1);
+    (step as i32 / steps_per_beat, step as i32 % steps_per_beat)
+}
+
+/// The track of `pattern` named `name` (trimmed, any case).
+fn track_index(pattern: &Pattern, name: &str) -> Option<usize> {
+    pattern.tracks.iter().position(|t| same_name(&t.name, name))
+}
+
+/// An arrangement's description, tempo and loop length, each when given.
+type SongSettings<'a> = (Option<&'a str>, Option<f64>, Option<f64>);
+
+/// The arrangement settings of `args`.
+fn song_settings(args: &Value) -> Result<SongSettings<'_>, String> {
+    let loop_measures = optional_number(args, "loopMeasures")?;
+    if loop_measures.is_some_and(|l| l < 0.0) {
+        return Err("loopMeasures: below 0".into());
+    }
+    Ok((optional_text(args, "description")?, optional_number(args, "bpm")?, loop_measures))
 }
 
 /// A pattern's name, its id when it has none.
@@ -807,5 +977,58 @@ mod tests {
         let listed = call(&mut s, "listArrangements", "{}").unwrap();
         let clips = get(&get(&listed, &["arrangements"]).as_array().unwrap()[0], &["clips"]).to_json();
         assert_eq!(clips, r#"[{"patternId":"jazz","patternName":"jazz","startMeasure":1,"measureCount":2}]"#);
+        let updated = call(&mut s, "updateArrangement", r#"{"bpm":90,"loopMeasures":2}"#).unwrap();
+        assert_eq!(get(&updated, &["bpm"]).as_f64(), Some(90.0));
+        assert_eq!(s.editor.library().songs[0].loop_measures, Some(2.0));
+        assert!(call(&mut s, "updateArrangement", "{}").is_err());
+        let removed = call(&mut s, "removeArrangement", r#"{"arrangement":"SONG"}"#).unwrap();
+        assert_eq!(removed.to_json(), r#"{"removed":"Song","arrangements":0}"#);
+        assert!(call(&mut s, "removeArrangement", "{}").is_err());
+    }
+
+    #[test]
+    fn notes_and_tracks_are_deleted() {
+        let mut s = session();
+        call(&mut s, "addNotesToPattern", r#"{"patternName":"rock","notes":[{"trackName":"SNARE","step":4}]}"#)
+            .unwrap();
+        let args = r#"{"patternName":"rock","notes":[{"trackName":"kick","step":8},{"trackName":"KICK","step":8},
+            {"trackName":"KICK","step":1}]}"#;
+        assert_eq!(call(&mut s, "deleteNotes", args).unwrap().to_json(), r#"{"deleted":1}"#);
+        assert_eq!(s.editor.library().patterns[0].tracks[0].notes.len(), 1);
+        assert!(call(&mut s, "deleteNotes", args).is_err(), "nothing left at those steps");
+        let unknown = r#"{"patternName":"rock","notes":[{"trackName":"CHH","step":0}]}"#;
+        assert!(call(&mut s, "deleteNotes", unknown).is_err());
+        let removed = call(&mut s, "removeTrack", r#"{"patternName":"rock","trackName":"kick"}"#).unwrap();
+        assert_eq!(removed.to_json(), r#"{"removed":"KICK","tracks":["SNARE"]}"#);
+        assert!(call(&mut s, "removeTrack", r#"{"patternName":"rock","trackName":"SNARE"}"#).is_err());
+        assert_eq!(s.editor.history().undo_len(), 3);
+        call(&mut s, "undo", "{}").unwrap();
+        assert_eq!(s.editor.library().patterns[0].tracks.len(), 2);
+        let redone = call(&mut s, "redo", "{}").unwrap();
+        assert_eq!(get(&redone, &["message"]).as_str(), Some("redone: Remove track KICK"));
+        assert_eq!(s.editor.library().patterns[0].tracks.len(), 1);
+    }
+
+    #[test]
+    fn patterns_are_renamed_copied_and_removed() {
+        let mut s = session();
+        assert!(call(&mut s, "renamePattern", r#"{"patternName":"rock","newName":"JAZZ"}"#).is_err());
+        let renamed = call(&mut s, "renamePattern", r#"{"patternName":"rock","newName":" Rock "}"#).unwrap();
+        assert_eq!((get(&renamed, &["id"]).as_str(), get(&renamed, &["name"]).as_str()), (Some("rock"), Some("Rock")));
+        let copy = call(&mut s, "duplicatePattern", r#"{"patternName":"rock","newName":"rock 2"}"#).unwrap();
+        assert_eq!((get(&copy, &["index"]).as_f64(), get(&copy, &["trackCount"]).as_f64()), (Some(2.0), Some(1.0)));
+        assert_eq!(get(&copy, &["name"]).as_str(), Some("rock 2"));
+        assert_eq!(s.editor.history().undo_len(), 2);
+        call(&mut s, "createArrangement", r#"{"name":"song","clips":[{"patternName":"jazz"},{"patternName":"rock"}]}"#)
+            .unwrap();
+        call(&mut s, "selectPattern", r#"{"patternName":"rock 2"}"#).unwrap();
+        let removed = call(&mut s, "removePattern", r#"{"patternName":"jazz"}"#).unwrap();
+        assert_eq!(removed.to_json(), r#"{"removed":"jazz","clipsRemoved":1}"#);
+        // The pattern shown stays the same one.
+        assert_eq!(s.pattern().and_then(|p| p.name.as_deref()), Some("rock 2"));
+        assert_eq!(s.editor.library().songs[0].clips.len(), 1);
+        assert_eq!(s.editor.history().undo_len(), 4);
+        call(&mut s, "removePattern", r#"{"patternName":"rock"}"#).unwrap();
+        assert!(call(&mut s, "removePattern", r#"{"patternName":"rock 2"}"#).is_err(), "the last pattern stays");
     }
 }
