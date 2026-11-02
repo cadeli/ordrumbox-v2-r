@@ -12,6 +12,7 @@ use ordrumbox_core::song::clamp_bpm;
 use super::*;
 use crate::editors::note_range;
 use crate::mcp::object;
+use crate::{master, output, synth_model as model};
 
 /// Track settings a tool does not set (`mcp.rs` does not offer them).
 const NOT_EDITED: [&str; 1] = ["name"];
@@ -196,6 +197,7 @@ impl Session {
             "addNotesToPattern" => self.mcp_add_notes(args),
             "deleteNotes" => self.mcp_delete_notes(args),
             "removeTrack" => self.mcp_remove_track(args),
+            "copyTrack" => self.mcp_copy_track(args),
             "updateTrack" => self.mcp_update_track(args),
             "setPatternBpm" => self.mcp_set_bpm(args),
             "setPatternBeatCount" => self.mcp_set_beat_count(args),
@@ -211,11 +213,45 @@ impl Session {
             "removePattern" => self.mcp_remove_pattern(args),
             "savePatternToJson" => {
                 let p = self.mcp_pattern(text(args, "patternName")?)?;
-                let dir = store::exports_dir().ok_or("no user data folder to export to")?;
-                let pattern = self.editor.library().patterns.get(p).ok_or("No pattern selected")?;
-                let path = dir.join(pattern_json_file_name(pattern));
+                let path = self.mcp_export_path(Export::PatternJson, p, 0)?;
                 self.write_pattern_json(p, &path)?;
                 Ok(object([("filePath", Value::from(path.display().to_string()))]))
+            }
+            "exportPatternWav" => {
+                let p = self.mcp_pattern(text(args, "patternName")?)?;
+                let path = self.mcp_export_path(Export::PatternWav, p, 0)?;
+                exported(&path, self.write_wav(Mode::Pattern(p), &path)?)
+            }
+            "exportPatternMidi" => {
+                let p = self.mcp_pattern(text(args, "patternName")?)?;
+                let path = self.mcp_export_path(Export::PatternMidi, p, 0)?;
+                exported(&path, self.write_midi(p, &path)?)
+            }
+            "exportArrangementWav" => {
+                let s = self.mcp_song(args)?;
+                let path = self.mcp_export_path(Export::SongWav, 0, s)?;
+                exported(&path, self.write_wav(Mode::Song(s), &path)?)
+            }
+            "importMidi" => self.mcp_import_midi(args),
+            "listStyles" => Ok(self.mcp_styles()),
+            "listScales" => Ok(self.mcp_scales()),
+            "getSynthPreset" => {
+                let key = self.mcp_synth(text(args, "preset")?)?;
+                let mut draft = self.synths.get(&key).and_then(Value::as_object).cloned().unwrap_or_default();
+                model::hydrate(&mut draft);
+                Ok(object([("preset", Value::from(key)), ("settings", Value::Object(draft))]))
+            }
+            "createSynthPreset" => self.mcp_create_synth(args),
+            "updateSynthPreset" => {
+                let key = self.mcp_synth(text(args, "preset")?)?;
+                let settings = synth_settings(args, true)?;
+                let draft = self.synths.get(&key).and_then(Value::as_object).cloned().unwrap_or_default();
+                Ok(self.mcp_write_synth(&key, draft, &settings))
+            }
+            "removeSynthPreset" => self.mcp_remove_synth(args),
+            "listSynthPresets" => {
+                let keys = self.synths.keys().into_iter().map(Value::from).collect::<Vec<_>>();
+                Ok(object([("count", count(keys.len())), ("presets", Value::Array(keys))]))
             }
             "listAllInstrumentsNames" => Ok(Self::mcp_instruments()),
             "listKitSamples" => Ok(self.mcp_kits()),
@@ -234,6 +270,10 @@ impl Session {
             "removePatternFromArrangement" => self.mcp_remove_clips(args),
             "updateArrangement" => self.mcp_update_arrangement(args),
             "removeArrangement" => self.mcp_remove_arrangement(args),
+            "renameArrangement" => self.mcp_rename_arrangement(args),
+            "moveClip" => self.mcp_move_clip(args),
+            "getMaster" => Ok(master::to_json(&self.master)),
+            "setMaster" => self.mcp_set_master(args),
             "play" => self.mcp_play(args),
             "stop" => {
                 if let Some(controller) = &mut self.controller {
@@ -495,11 +535,49 @@ impl Session {
         Ok(object([("removed", Value::from(name)), ("tracks", strings(&tracks))]))
     }
 
+    fn mcp_copy_track(&mut self, args: &Value) -> Result<Value, String> {
+        let p = self.mcp_pattern(text(args, "patternName")?)?;
+        let to = match optional_text(args, "toPatternName")?.filter(|n| !n.trim().is_empty()) {
+            Some(name) => self.mcp_pattern(name)?,
+            None => p,
+        };
+        let library = self.editor.library();
+        let name = text(args, "trackName")?;
+        let t = track_index(&library.patterns[p], name)
+            .ok_or_else(|| format!("The pattern has no track \"{}\"", name.trim()))?;
+        let source = library.patterns[p].tracks[t].clone();
+        let new_name = optional_text(args, "newName")?.map(str::trim).filter(|n| !n.is_empty());
+        let new_name = new_name.map_or_else(|| source.name.clone(), str::to_uppercase);
+        let destination = pattern_name(&library.patterns[to]);
+        if track_index(&library.patterns[to], &new_name).is_some() {
+            return Err(format!("\"{destination}\" has a track named {new_name} already: give newName"));
+        }
+        if !self.editor.has_track_room(to) {
+            return Err(format!("a pattern holds at most {MAX_TRACKS} tracks"));
+        }
+        let desc = format!("Copy track {} to \"{destination}\"", source.name);
+        let copy = self.editor.batch(&desc, |editor| {
+            let copy = editor.paste_track(to, usize::MAX, &source).ok_or("no room for a track")?;
+            editor.change_track_name(to, copy, &new_name);
+            Ok::<_, String>(copy)
+        })?;
+        let track = &self.editor.library().patterns[to].tracks[copy];
+        Ok(object([
+            ("patternName", Value::from(destination)),
+            ("trackName", Value::from(track.name.as_str())),
+            ("noteCount", count(track.notes.len())),
+        ]))
+    }
+
     fn mcp_update_track(&mut self, args: &Value) -> Result<Value, String> {
         let p = self.mcp_pattern(text(args, "patternName")?)?;
         let name = text(args, "trackName")?.trim().to_uppercase();
         let updates = args.get("updates").and_then(Value::as_object).ok_or("updates: not an object")?;
         let updates = track_fields(updates, "updates")?;
+        let preset = updates.iter().find(|(key, _)| *key == "synthPreset").and_then(|(_, v)| v.as_str());
+        if let Some(preset) = preset.filter(|p| self.synths.get(p).is_none()) {
+            return Err(format!("updates.synthPreset: no preset \"{preset}\" (listSynthPresets gives them)"));
+        }
         let note_updates = match args.get("noteUpdates") {
             None | Some(Value::Null) => Vec::new(),
             Some(Value::Object(fields)) => note_fields(fields, &[], "noteUpdates")?,
@@ -567,6 +645,142 @@ impl Session {
         let tags = tags.collect::<Result<Vec<_>, _>>()?;
         self.editor.set_pattern_tags(p, &tags);
         Ok(object([("tags", strings(&self.editor.library().patterns[p].tags))]))
+    }
+
+    /// Where a tool writes `export` of pattern `p` or arrangement `s`: the
+    /// exports folder, under the name the window would give.
+    fn mcp_export_path(&self, export: Export, p: usize, s: usize) -> Result<PathBuf, String> {
+        let dir = store::exports_dir().ok_or("no user data folder to export to")?;
+        let name = self.export_file_name_of(export, p, s).ok_or("nothing to export")?;
+        Ok(dir.join(name))
+    }
+
+    fn mcp_import_midi(&mut self, args: &Value) -> Result<Value, String> {
+        let path = text(args, "filePath")?.trim();
+        let before = self.editor.library().patterns.len();
+        let message = self.import_midi_file(Path::new(path))?;
+        let patterns = self.editor.library().patterns.iter().enumerate().skip(before);
+        Ok(object([
+            ("message", Value::from(message)),
+            ("patterns", Value::Array(patterns.map(|(i, p)| pattern_summary(i, p)).collect())),
+        ]))
+    }
+
+    fn mcp_styles(&mut self) -> Value {
+        let styles = learned_styles(&mut self.learned_styles, &self.styles, &self.editor);
+        let styles = styles.list.iter().map(|style| {
+            object([
+                ("name", Value::from(style.name.as_str())),
+                ("learnedFromPatterns", style.learned.map_or(Value::Null, |(patterns, _)| count(patterns))),
+                ("beatCount", Value::from(style.beat_count)),
+                ("stepsPerBeat", Value::from(style.steps_per_beat)),
+                ("swingAmount", Value::from(style.swing_amount)),
+                ("bpmMin", Value::from(style.tempo.0)),
+                ("bpmMax", Value::from(style.tempo.1)),
+                ("tracks", strings(&style.tracks)),
+            ])
+        });
+        object([("styles", Value::Array(styles.collect()))])
+    }
+
+    fn mcp_scales(&self) -> Value {
+        let list = &self.scale_list;
+        let scales = list.names.iter().zip(&list.steps).filter_map(|(name, steps)| {
+            let steps = steps.as_ref()?.iter().map(|&s| Value::from(s)).collect();
+            Some(object([("name", Value::from(name.as_str())), ("degrees", Value::Array(steps))]))
+        });
+        object([("scales", Value::Array(scales.collect()))])
+    }
+
+    /// Master settings by key, each inside its knob's range.
+    fn mcp_set_master(&mut self, args: &Value) -> Result<Value, String> {
+        let settings = args.get("settings").and_then(Value::as_object).ok_or("settings: not an object")?;
+        let mut changed = self.master;
+        for (key, value) in settings.iter() {
+            let at = format!("settings.{key}");
+            if key == "compBypass" {
+                let bypass = value.as_bool().ok_or_else(|| format!("{at}: not true or false ({value})"))?;
+                changed = master::set(changed, key, if bypass { 1.0 } else { 0.0 });
+                continue;
+            }
+            let param = output::find(key).ok_or_else(|| format!("{at}: not a master setting"))?;
+            let number = value.as_f64().ok_or_else(|| format!("{at}: not a number ({value})"))?;
+            let (min, max) = (param.spec.min, param.spec.max);
+            if !(min..=max).contains(&number) {
+                return Err(format!("{at}: {number} is outside {min} to {max}"));
+            }
+            changed = master::set(changed, key, number);
+        }
+        self.set_master(changed, true);
+        self.message = "master settings changed".into();
+        Ok(master::to_json(&self.master))
+    }
+
+    /// A synth preset's key, by key (else in any case).
+    fn mcp_synth(&self, name: &str) -> Result<String, String> {
+        let keys = self.synths.keys();
+        let found = keys.iter().find(|k| **k == name.trim()).or_else(|| keys.iter().find(|k| same_name(k, name)));
+        found
+            .map(|k| (*k).to_owned())
+            .ok_or_else(|| format!("No synth preset \"{}\" (listSynthPresets gives them)", name.trim()))
+    }
+
+    fn mcp_create_synth(&mut self, args: &Value) -> Result<Value, String> {
+        let key = text(args, "preset")?.trim();
+        if key.is_empty() {
+            return Err("preset is empty".into());
+        }
+        if self.mcp_synth(key).is_ok() {
+            return Err(format!("There is a synth preset \"{key}\" already"));
+        }
+        let draft = match optional_text(args, "from")?.filter(|f| !f.trim().is_empty()) {
+            Some(from) => {
+                let from = self.mcp_synth(from)?;
+                self.synths.get(&from).and_then(Value::as_object).cloned().unwrap_or_default()
+            }
+            None => model::defaults(),
+        };
+        let settings = synth_settings(args, false)?;
+        Ok(self.mcp_write_synth(key, draft, &settings))
+    }
+
+    /// Preset `key` as `draft` with `settings` set as the synth editor sets
+    /// them, to the player and to the disk; what it is now.
+    fn mcp_write_synth(&mut self, key: &str, mut draft: Object, settings: &[(String, Value)]) -> Value {
+        model::hydrate(&mut draft);
+        for (path, value) in settings {
+            model::implicit_enable(&mut draft, path);
+            model::set(&mut draft, path, value.clone());
+        }
+        self.synths.set(key, Value::Object(draft.clone()));
+        self.synths_changed();
+        if self.synth.as_ref().is_some_and(|edit| edit.key == key) {
+            self.load_synth(key);
+        }
+        self.message = format!("synth preset \"{key}\" set");
+        object([("preset", Value::from(key)), ("settings", Value::Object(draft))])
+    }
+
+    fn mcp_remove_synth(&mut self, args: &Value) -> Result<Value, String> {
+        let key = self.mcp_synth(text(args, "preset")?)?;
+        if self.synths.len() <= 1 {
+            return Err("The last synth preset stays".into());
+        }
+        let library = self.editor.library();
+        let using = library.patterns.iter().flat_map(|p| {
+            let playing = p.tracks.iter().filter(|t| t.use_synth && t.synth_preset.as_deref() == Some(key.as_str()));
+            playing.map(move |t| format!("{}/{}", pattern_name(p), t.name))
+        });
+        let using: Vec<String> = using.collect();
+        if self.synth.as_ref().is_some_and(|edit| edit.key == key) {
+            // The editor shows the next preset, as its Delete button does.
+            self.remove_synth(&key);
+        } else {
+            self.synths.remove(&key);
+            self.synths_changed();
+            self.message = format!("Deleted \"{key}\"");
+        }
+        Ok(object([("removed", Value::from(key)), ("tracksUsing", strings(&using))]))
     }
 
     fn mcp_instruments() -> Value {
@@ -759,6 +973,40 @@ impl Session {
         Ok(object([("removed", Value::from(name)), ("arrangements", count(self.editor.library().songs.len()))]))
     }
 
+    fn mcp_rename_arrangement(&mut self, args: &Value) -> Result<Value, String> {
+        let s = self.mcp_song(args)?;
+        let name = text(args, "newName")?.trim();
+        if name.is_empty() {
+            return Err("newName is empty".into());
+        }
+        let songs = &self.editor.library().songs;
+        if songs.iter().enumerate().any(|(other, song)| other != s && same_name(&song.name, name)) {
+            return Err(format!("The library has an arrangement named \"{name}\" already"));
+        }
+        self.editor.rename_song(Some(s), name)?;
+        Ok(self.song_json(s))
+    }
+
+    fn mcp_move_clip(&mut self, args: &Value) -> Result<Value, String> {
+        let s = self.mcp_song(args)?;
+        let start = optional_whole(args, "startMeasure")?.ok_or("startMeasure is required")?;
+        let to = optional_whole(args, "toMeasure")?.ok_or("toMeasure is required")?;
+        let pattern = optional_text(args, "patternName")?.filter(|n| !n.trim().is_empty());
+        let id = pattern.map(|name| self.mcp_pattern(name)).transpose()?;
+        let id = id.map(|p| self.editor.library().patterns[p].id.clone());
+        let clips = &self.editor.library().songs[s].clips;
+        let found: Vec<usize> = (0..clips.len())
+            .filter(|&i| clips[i].start_measure == start && id.as_ref().is_none_or(|id| clips[i].pattern_id == *id))
+            .collect();
+        let index = match found.as_slice() {
+            [] => return Err(format!("No clip at measure {start}")),
+            [index] => *index,
+            _ => return Err(format!("Several clips start at measure {start}: give patternName")),
+        };
+        self.editor.move_song_clip(Some(s), index, to);
+        Ok(self.song_json(s))
+    }
+
     fn mcp_play(&mut self, args: &Value) -> Result<Value, String> {
         let song = optional_bool(args, "song")?.unwrap_or(false);
         let Some(controller) = &mut self.controller else {
@@ -806,6 +1054,48 @@ fn grow_pattern(editor: &mut Editor, p: usize, beats: i32) {
         let length = beats * editor.library().patterns[p].tracks[t].steps_per_beat;
         editor.update_track(p, t, &[("loopLength", Value::from(length))], None, false);
     }
+}
+
+/// Argument `settings` (`required`, else it may be absent): synth preset
+/// settings by path, checked against the synth editor's controls.
+fn synth_settings(args: &Value, required: bool) -> Result<Vec<(String, Value)>, String> {
+    let fields = match args.get("settings") {
+        None | Some(Value::Null) if !required => return Ok(Vec::new()),
+        Some(Value::Object(fields)) if !(required && fields.is_empty()) => fields,
+        Some(Value::Object(_)) => return Err("settings is empty".into()),
+        _ => return Err("settings: not an object".into()),
+    };
+    let mut checked = Vec::new();
+    for (path, value) in fields.iter() {
+        let at = format!("settings.{path}");
+        let value = if let Some(meta) = model::find_meta(path) {
+            let n = value.as_f64().filter(|n| n.is_finite()).ok_or_else(|| format!("{at}: not a number ({value})"))?;
+            if !(meta.min..=meta.max).contains(&n) {
+                return Err(format!("{at}: {n} is outside {} to {}", meta.min, meta.max));
+            }
+            if meta.step >= 1.0 && n.fract() != 0.0 {
+                return Err(format!("{at}: {n} is not a whole number"));
+            }
+            Value::from(n)
+        } else if let Some(values) = model::choices(path) {
+            let allowed = values.iter().map(|v| model::choice_value(path, v));
+            if !allowed.clone().any(|v| v == *value) {
+                return Err(format!("{at}: {value} is not one of {}", Value::Array(allowed.collect())));
+            }
+            value.clone()
+        } else if model::BYPASS_FLAGS.iter().any(|(_, flag)| *flag == path) {
+            Value::Bool(value.as_bool().ok_or_else(|| format!("{at}: not true or false ({value})"))?)
+        } else {
+            return Err(format!("{at}: not a synth setting"));
+        };
+        checked.push((path.to_owned(), value));
+    }
+    Ok(checked)
+}
+
+/// The answer of a tool that wrote a file.
+fn exported(path: &Path, message: String) -> Result<Value, String> {
+    Ok(object([("filePath", Value::from(path.display().to_string())), ("message", Value::from(message))]))
 }
 
 /// Absolute step `step` of a track as its beat and its step in the beat.
@@ -1030,5 +1320,109 @@ mod tests {
         assert_eq!(s.editor.history().undo_len(), 4);
         call(&mut s, "removePattern", r#"{"patternName":"rock"}"#).unwrap();
         assert!(call(&mut s, "removePattern", r#"{"patternName":"rock 2"}"#).is_err(), "the last pattern stays");
+    }
+
+    #[test]
+    fn tracks_are_copied_and_clips_moved() {
+        let mut s = session();
+        let args = r#"{"patternName":"rock","trackName":"kick","toPatternName":"jazz"}"#;
+        let copied = call(&mut s, "copyTrack", args).unwrap();
+        assert_eq!(copied.to_json(), r#"{"patternName":"jazz","trackName":"KICK","noteCount":2}"#);
+        assert!(call(&mut s, "copyTrack", args).is_err(), "jazz has a KICK now");
+        let renamed = call(&mut s, "copyTrack", r#"{"patternName":"rock","trackName":"KICK","newName":"kick 2"}"#);
+        assert_eq!(get(&renamed.unwrap(), &["trackName"]).as_str(), Some("KICK 2"));
+        assert_eq!(s.editor.library().patterns[0].tracks.len(), 2);
+        let args = r#"{"name":"Song","clips":[{"patternName":"rock"},{"patternName":"jazz","startMeasure":0}]}"#;
+        call(&mut s, "createArrangement", args).unwrap();
+        assert!(call(&mut s, "moveClip", r#"{"startMeasure":0,"toMeasure":4}"#).is_err(), "two clips start there");
+        let moved = call(&mut s, "moveClip", r#"{"startMeasure":0,"toMeasure":4,"patternName":"jazz"}"#).unwrap();
+        let clips = get(&moved, &["clips"]).as_array().unwrap();
+        assert!(
+            clips.iter().any(
+                |c| c.to_json() == r#"{"patternId":"jazz","patternName":"jazz","startMeasure":4,"measureCount":1}"#
+            )
+        );
+        assert!(call(&mut s, "moveClip", r#"{"startMeasure":2,"toMeasure":4}"#).is_err());
+        call(&mut s, "createArrangement", r#"{"name":"Other"}"#).unwrap();
+        assert!(call(&mut s, "renameArrangement", r#"{"arrangement":"other","newName":"song"}"#).is_err());
+        let renamed = call(&mut s, "renameArrangement", r#"{"arrangement":0,"newName":"Verse"}"#).unwrap();
+        assert_eq!((get(&renamed, &["name"]).as_str(), get(&renamed, &["id"]).as_str()), (Some("Verse"), Some("song")));
+        assert_eq!(s.editor.history().undo_len(), 6);
+    }
+
+    #[test]
+    fn the_master_is_read_and_set() {
+        let mut s = session();
+        let master = call(&mut s, "setMaster", r#"{"settings":{"volume":0.5,"compBypass":true}}"#).unwrap();
+        assert_eq!(
+            (get(&master, &["volume"]).as_f64(), get(&master, &["compBypass"])),
+            (Some(0.5), &Value::Bool(true))
+        );
+        for refused in
+            [r#"{"settings":{"volume":3}}"#, r#"{"settings":{"loudness":1}}"#, r#"{"settings":{"compBypass":1}}"#]
+        {
+            assert!(call(&mut s, "setMaster", refused).is_err(), "{refused}");
+        }
+        assert_eq!(call(&mut s, "getMaster", "{}").unwrap(), master);
+        assert_eq!(s.editor.history().undo_len(), 0);
+    }
+
+    #[test]
+    fn lists_exports_and_imports() {
+        let mut s = session();
+        assert_eq!(call(&mut s, "listSynthPresets", "{}").unwrap().to_json(), r#"{"count":0,"presets":[]}"#);
+        let preset = r#"{"patternName":"rock","trackName":"KICK","updates":{"useSynth":true,"synthPreset":"B1"}}"#;
+        assert!(call(&mut s, "updateTrack", preset).is_err(), "no such preset");
+        assert!(get(&call(&mut s, "listScales", "{}").unwrap(), &["scales"]).as_array().is_some());
+        assert!(get(&call(&mut s, "listStyles", "{}").unwrap(), &["styles"]).as_array().is_some());
+        assert_eq!(call(&mut s, "exportPatternWav", r#"{"patternName":"rock"}"#), Err(NOTHING_TO_RENDER.into()));
+        let path = std::env::temp_dir().join(format!("ordrumbox_mcp_{}.mid", std::process::id()));
+        s.write_midi(0, &path).unwrap();
+        let args = object([("filePath", Value::from(path.display().to_string()))]);
+        let imported = s.mcp_call("importMidi", &args).unwrap();
+        std::fs::remove_file(&path).unwrap();
+        let patterns = get(&imported, &["patterns"]).as_array().unwrap();
+        assert_eq!(get(&patterns[0], &["index"]).as_f64(), Some(2.0));
+        assert_eq!(s.pattern_index, s.editor.library().patterns.len() - 1);
+        assert!(call(&mut s, "importMidi", r#"{"filePath":"/no/such/file.mid"}"#).is_err());
+    }
+
+    #[test]
+    fn synth_presets_are_designed() {
+        let mut s = session();
+        let args = r#"{"preset":"acid","settings":{"vco1.wave":"sawtooth","filter.freq":800,"filter.slope":24,
+            "lfo.depth":0.3,"bypassFilter":false}}"#;
+        let made = call(&mut s, "createSynthPreset", args).unwrap();
+        assert_eq!(get(&made, &["settings", "vco1", "wave"]).as_str(), Some("sawtooth"));
+        assert_eq!(get(&made, &["settings", "filter", "slope"]).as_f64(), Some(24.0));
+        // Setting the LFO's depth aims it at the filter, as the editor does.
+        assert_eq!(get(&made, &["settings", "lfo", "target"]).as_str(), Some("filter.freq"));
+        assert!(call(&mut s, "createSynthPreset", r#"{"preset":"ACID"}"#).is_err(), "the key is taken");
+        let refused = [
+            r#"{"preset":"acid","settings":{"filter.freq":5}}"#,
+            r#"{"preset":"acid","settings":{"vco1.octave":1.5}}"#,
+            r#"{"preset":"acid","settings":{"vco1.wave":"saw"}}"#,
+            r#"{"preset":"acid","settings":{"filter.slope":"24"}}"#,
+            r#"{"preset":"acid","settings":{"vco9.gain":1}}"#,
+            r#"{"preset":"acid","settings":{}}"#,
+            r#"{"preset":"bass","settings":{"vco1.gain":1}}"#,
+        ];
+        for args in refused {
+            assert!(call(&mut s, "updateSynthPreset", args).is_err(), "{args}");
+        }
+        let copy =
+            call(&mut s, "createSynthPreset", r#"{"preset":"acid 2","from":"Acid","settings":{"vco2.wave":"square"}}"#);
+        let copy = copy.unwrap();
+        assert_eq!(get(&copy, &["settings", "filter", "freq"]).as_f64(), Some(800.0));
+        assert_eq!(get(&copy, &["settings", "vco2", "gain"]).as_f64(), Some(0.5), "vco2 switched on");
+        call(&mut s, "updateSynthPreset", r#"{"preset":"acid","settings":{"envelope.decay":0.2}}"#).unwrap();
+        let read = call(&mut s, "getSynthPreset", r#"{"preset":"acid"}"#).unwrap();
+        assert_eq!(get(&read, &["settings", "envelope", "decay"]).as_f64(), Some(0.2));
+        let preset = r#"{"patternName":"rock","trackName":"KICK","updates":{"useSynth":true,"synthPreset":"acid"}}"#;
+        call(&mut s, "updateTrack", preset).unwrap();
+        let removed = call(&mut s, "removeSynthPreset", r#"{"preset":"acid"}"#).unwrap();
+        assert_eq!(removed.to_json(), r#"{"removed":"acid","tracksUsing":["rock/KICK"]}"#);
+        assert!(call(&mut s, "removeSynthPreset", r#"{"preset":"acid 2"}"#).is_err(), "the last preset stays");
+        assert_eq!(s.synths.keys(), ["acid 2"]);
     }
 }

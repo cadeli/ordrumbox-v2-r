@@ -237,6 +237,19 @@ impl Editor {
         index
     }
 
+    /// Rename arrangement `song`, else the selected one (trimmed; an empty
+    /// name keeps the old one). Its id stays. Whether the name changed.
+    pub fn rename_song(&mut self, song: Option<usize>, name: &str) -> Result<bool, String> {
+        let s = self.require_song(song)?;
+        let name = name.trim();
+        if name.is_empty() || self.library.songs[s].name == name {
+            return Ok(false);
+        }
+        let desc = format!("Rename arrangement → \"{name}\"");
+        self.edit_songs(desc, None, |songs| name.clone_into(&mut songs[s].name));
+        Ok(true)
+    }
+
     /// Set the tempo (brought inside the tempo bounds), the description and the
     /// loop length (0: the arrangement loops at the end of its last clip) of
     /// arrangement `song`, else the selected one; what is `None` stays.

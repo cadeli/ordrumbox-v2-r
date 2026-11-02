@@ -134,6 +134,43 @@ pub fn lfo_targets() -> Vec<&'static str> {
         .collect()
 }
 
+/// The controls set from a list (`filter.slope` holds numbers).
+pub const CHOICE_PATHS: [&str; 13] = [
+    "vco1.wave",
+    "vco2.wave",
+    "vco3.wave",
+    "lfo.wave",
+    "lfo2.wave",
+    "filter.type",
+    "noise.filterType",
+    "filter.slope",
+    "modEnvelope.target",
+    "lfo.target",
+    "lfo2.target",
+    "lfo.sync",
+    "lfo2.sync",
+];
+
+/// The values control `path` takes from a list, if it is one of [`CHOICE_PATHS`].
+pub fn choices(path: &str) -> Option<Vec<&'static str>> {
+    let values = |list: &[(&'static str, &'static str)]| list.iter().map(|(value, _)| *value).collect();
+    Some(match path {
+        "vco1.wave" | "vco2.wave" | "vco3.wave" | "lfo.wave" | "lfo2.wave" => WAVES.to_vec(),
+        "filter.type" | "noise.filterType" => FILTER_TYPES.to_vec(),
+        "filter.slope" => values(&FILTER_SLOPES),
+        "modEnvelope.target" => values(&MOD_ENV_TARGETS),
+        "lfo.target" | "lfo2.target" => lfo_targets(),
+        "lfo.sync" | "lfo2.sync" => values(&LFO_SYNCS),
+        _ => return None,
+    })
+}
+
+/// Value `value` of list control `path` as a preset holds it: the slope
+/// list holds numbers.
+pub fn choice_value(path: &str, value: &str) -> Value {
+    if path == "filter.slope" { Value::from(js::parse_float(&Value::from(value))) } else { Value::from(value) }
+}
+
 /// What one unit of an LFO's wave is worth on a target (`LFO_TARGET_SCALE`).
 pub fn lfo_scale(target: &str) -> f64 {
     match target {

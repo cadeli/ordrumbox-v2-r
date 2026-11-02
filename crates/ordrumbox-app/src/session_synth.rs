@@ -8,7 +8,6 @@
 
 use std::time::Instant;
 
-use ordrumbox_core::js;
 use ordrumbox_core::json::{Object, Value};
 
 use super::*;
@@ -21,7 +20,7 @@ const SYNTHS_DELAY: Duration = Duration::from_millis(500);
 /// The preset being edited.
 #[derive(Debug, Clone)]
 pub(super) struct SynthEdit {
-    key: String,
+    pub(super) key: String,
     /// As it was when opened (Revert).
     original: Value,
     draft: Object,
@@ -50,14 +49,14 @@ impl Session {
     }
 
     /// The presets' keys, sorted.
-    fn synth_keys(&self) -> Vec<String> {
+    pub(super) fn synth_keys(&self) -> Vec<String> {
         let mut keys: Vec<String> = self.synths.keys().into_iter().map(str::to_owned).collect();
         keys.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()).then_with(|| a.cmp(b)));
         keys
     }
 
     /// Edit preset `key`.
-    fn load_synth(&mut self, key: &str) {
+    pub(super) fn load_synth(&mut self, key: &str) {
         let Some(preset) = self.synths.get(key).cloned() else { return };
         let mut draft = preset.as_object().cloned().unwrap_or_default();
         model::hydrate(&mut draft);
@@ -79,7 +78,7 @@ impl Session {
     }
 
     /// The presets changed: to the player, to exports, to the disk soon.
-    fn synths_changed(&mut self) {
+    pub(super) fn synths_changed(&mut self) {
         if let Some(controller) = &mut self.controller {
             controller.set_synths(self.editor.library(), self.synths.clone());
         }
@@ -205,13 +204,7 @@ impl Session {
             }
             Id::SynthField(fi) => {
                 if let Some(path) = self.synth_field(fi) {
-                    // The slope list holds numbers, written as numbers.
-                    let value = if path == "filter.slope" {
-                        Value::from(js::parse_float(&Value::from(value)))
-                    } else {
-                        Value::from(value)
-                    };
-                    self.edit_synth(&path, value);
+                    self.edit_synth(&path, model::choice_value(&path, value));
                 }
             }
             _ => {}

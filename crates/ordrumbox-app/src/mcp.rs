@@ -12,6 +12,7 @@ use ordrumbox_core::json::{self, Object, Value};
 use ordrumbox_core::{Note, Track};
 
 use crate::editors::track_select_options;
+use crate::synth_model;
 use crate::update;
 
 /// Protocol versions this server speaks, newest first.
@@ -61,6 +62,13 @@ const TOOLS: &str = r#"[
      "required": ["patternName", "notes"]}},
   {"name": "removeTrack", "description": "Removes a track and its notes from a pattern; the last track stays.",
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}, "trackName": {"type": "string"}}, "required": ["patternName", "trackName"]}},
+  {"name": "copyTrack", "description": "Copies a track (settings and notes) to the end of a pattern, the same one or another.",
+   "inputSchema": {"type": "object", "properties": {
+     "patternName": {"type": "string"},
+     "trackName": {"type": "string"},
+     "toPatternName": {"type": "string", "description": "Destination pattern (default: patternName)"},
+     "newName": {"type": "string", "description": "Name of the copy (default: the track's; required when the destination has a track of that name)"}},
+     "required": ["patternName", "trackName"]}},
   {"name": "updateTrack", "description": "Changes the settings of a track (added when the pattern has none of that name) and, with noteUpdates, of all its notes. Numbers outside a setting's range are brought inside it: the answer gives the values used.",
    "inputSchema": {"type": "object", "properties": {
      "patternName": {"type": "string"},
@@ -84,12 +92,39 @@ const TOOLS: &str = r#"[
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}}, "required": ["patternName"]}},
   {"name": "savePatternToJson", "description": "Exports a pattern as JSON to the exports folder of the user data folder (as File > Export pattern).",
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}}, "required": ["patternName"]}},
+  {"name": "exportPatternWav", "description": "Renders a pattern once to a WAV file in the exports folder of the user data folder (as File > Export pattern as WAV).",
+   "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}}, "required": ["patternName"]}},
+  {"name": "exportPatternMidi", "description": "Exports a pattern as a MIDI file to the exports folder of the user data folder (as File > Export pattern as MIDI).",
+   "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}}, "required": ["patternName"]}},
+  {"name": "importMidi", "description": "New patterns from a MIDI file (as File > Import MIDI file); the last one is shown.",
+   "inputSchema": {"type": "object", "properties": {"filePath": {"type": "string", "minLength": 1, "description": "Absolute path of a .mid file"}}, "required": ["filePath"]}},
+  {"name": "listStyles", "description": "The styles of styles.json and those learned from the library's tags: meter, tempo range, swing, tracks.",
+   "inputSchema": {"type": "object", "properties": {}}},
+  {"name": "listScales", "description": "The scales: name and degrees (semitones from the root), as a note's arp or pitch can use them.",
+   "inputSchema": {"type": "object", "properties": {}}},
+  {"name": "listSynthPresets", "description": "The synth presets a track plays with updateTrack {useSynth: true, synthPreset: <key>}.",
+   "inputSchema": {"type": "object", "properties": {}}},
   {"name": "listAllInstrumentsNames", "description": "The instruments a track can be named after, with whether each is a drum and its default pan.",
    "inputSchema": {"type": "object", "properties": {}}},
   {"name": "listKitSamples", "description": "The kits and their samples (instrument key and path), and the kit in use.",
    "inputSchema": {"type": "object", "properties": {}}},
   {"name": "selectKit", "description": "Plays the library with a kit (by name, any case): every track's sound is assigned again.",
    "inputSchema": {"type": "object", "properties": {"kit": {"type": "string", "minLength": 1}}, "required": ["kit"]}},
+  {"name": "getSynthPreset", "description": "Every setting of a synth preset, by group (vco1, filter, envelope...).",
+   "inputSchema": {"type": "object", "properties": {"preset": {"type": "string", "minLength": 1}}, "required": ["preset"]}},
+  {"name": "createSynthPreset", "description": "A new synth preset: the default one (a sine) or a copy of another, then settings by path (\"filter.freq\"). Not an undo step.",
+   "inputSchema": {"type": "object", "properties": {
+     "preset": {"type": "string", "minLength": 1, "description": "Key of the new preset"},
+     "from": {"type": "string", "description": "Preset to copy (default: the default preset)"},
+     "settings": {"type": "object", "properties": {}, "additionalProperties": false}},
+     "required": ["preset"]}},
+  {"name": "updateSynthPreset", "description": "Changes settings of a synth preset by path (\"filter.freq\", \"vco2.wave\"); every track playing it hears it. A group off is switched on when one of its controls is set, as in the synth editor. Not an undo step.",
+   "inputSchema": {"type": "object", "properties": {
+     "preset": {"type": "string", "minLength": 1},
+     "settings": {"type": "object", "properties": {}, "additionalProperties": false}},
+     "required": ["preset", "settings"]}},
+  {"name": "removeSynthPreset", "description": "Removes a synth preset; the last one stays. Not an undo step.",
+   "inputSchema": {"type": "object", "properties": {"preset": {"type": "string", "minLength": 1}}, "required": ["preset"]}},
   {"name": "analyzeSamples", "description": "Length, peak and RMS levels and pitch of samples, by their path in listKitSamples.",
    "inputSchema": {"type": "object", "properties": {"samples": {"type": "array", "items": {"type": "string"}}}, "required": ["samples"]}},
   {"name": "listArrangements", "description": "The arrangements (songs) with their clips, and the one selected. Measures are 0-based.",
@@ -127,6 +162,27 @@ const TOOLS: &str = r#"[
   {"name": "removeArrangement", "description": "Removes an arrangement and its clips (its patterns stay).",
    "inputSchema": {"type": "object", "properties": {
      "arrangement": {"type": ["string", "integer"], "description": "Arrangement name or index (default: the selected one)"}}}},
+  {"name": "renameArrangement", "description": "Renames an arrangement; its id stays.",
+   "inputSchema": {"type": "object", "properties": {
+     "arrangement": {"type": ["string", "integer"], "description": "Arrangement name or index (default: the selected one)"},
+     "newName": {"type": "string", "minLength": 1}},
+     "required": ["newName"]}},
+  {"name": "moveClip", "description": "Moves the clip starting at startMeasure to start at toMeasure.",
+   "inputSchema": {"type": "object", "properties": {
+     "startMeasure": {"type": "integer", "minimum": 0},
+     "toMeasure": {"type": "integer", "minimum": 0},
+     "patternName": {"type": "string", "description": "Pattern name or id, when several clips start at startMeasure"},
+     "arrangement": {"type": ["string", "integer"], "description": "Arrangement name or index (default: the selected one)"}},
+     "required": ["startMeasure", "toMeasure"]}},
+  {"name": "exportArrangementWav", "description": "Renders an arrangement whole to a WAV file in the exports folder of the user data folder (as File > Export song as WAV).",
+   "inputSchema": {"type": "object", "properties": {
+     "arrangement": {"type": ["string", "integer"], "description": "Arrangement name or index (default: the selected one)"}}}},
+  {"name": "getMaster", "description": "The master bus settings: volume, pre-gain, compressor, low and high cut.",
+   "inputSchema": {"type": "object", "properties": {}}},
+  {"name": "setMaster", "description": "Changes master bus settings; what is not given stays. Saved with the settings, not an undo step.",
+   "inputSchema": {"type": "object", "properties": {
+     "settings": {"type": "object", "properties": {"compBypass": {"type": "boolean", "description": "Skips pre-gain, compressor and filters"}}, "additionalProperties": false}},
+     "required": ["settings"]}},
   {"name": "play", "description": "Plays the pattern shown, or with song true the selected arrangement from its start.",
    "inputSchema": {"type": "object", "properties": {"song": {"type": "boolean"}}}},
   {"name": "stop", "description": "Stops playing.",
@@ -205,6 +261,40 @@ fn note_properties() -> Value {
     }))
 }
 
+/// The master bus settings a tool may set (but `compBypass`), with the
+/// ranges of their knobs.
+fn master_properties() -> Value {
+    object(crate::output::params().map(|param| {
+        let schema = object([
+            ("type", Value::from("number")),
+            ("minimum", Value::from(param.spec.min)),
+            ("maximum", Value::from(param.spec.max)),
+        ]);
+        (param.key, schema)
+    }))
+}
+
+/// The synth preset settings a tool may set, by path: the knobs with their
+/// ranges, the lists with their values, the bypass flags.
+fn synth_properties() -> Value {
+    let knobs = synth_model::metas().map(|meta| {
+        let kind = if meta.step >= 1.0 { "integer" } else { "number" };
+        let schema = object([
+            ("type", Value::from(kind)),
+            ("minimum", Value::from(meta.min)),
+            ("maximum", Value::from(meta.max)),
+        ]);
+        (meta.path, schema)
+    });
+    let lists = synth_model::CHOICE_PATHS.iter().map(|&path| {
+        let values = synth_model::choices(path).into_iter().flatten();
+        let values = values.map(|value| synth_model::choice_value(path, value)).collect();
+        (path, object([("enum", Value::Array(values))]))
+    });
+    let flags = synth_model::BYPASS_FLAGS.iter().map(|(_, flag)| (*flag, object([("type", Value::from("boolean"))])));
+    object(knobs.chain(lists).chain(flags))
+}
+
 /// Merge `properties` into the object at `path` of `value`.
 fn add_properties(value: &mut Value, path: &[&str], properties: &Value) {
     let mut at = value;
@@ -232,6 +322,12 @@ pub fn tools() -> Value {
                 add_properties(tool, &[schema[0], schema[1], "noteUpdates", "properties"], &note);
             }
             "addNotesToPattern" => add_properties(tool, &[schema[0], schema[1], "notes", "items", "properties"], &note),
+            "createSynthPreset" | "updateSynthPreset" => {
+                add_properties(tool, &[schema[0], schema[1], "settings", "properties"], &synth_properties());
+            }
+            "setMaster" => {
+                add_properties(tool, &[schema[0], schema[1], "settings", "properties"], &master_properties())
+            }
             _ => {}
         }
     }
@@ -329,7 +425,7 @@ mod tests {
     fn the_tool_list_parses_with_the_settings() {
         let tools = tools();
         let tools = tools.as_array().unwrap();
-        assert_eq!(tools.len(), 30);
+        assert_eq!(tools.len(), 46);
         let update = tools.iter().find(|t| t.get("name").and_then(Value::as_str) == Some("updateTrack")).unwrap();
         let updates = &update.get("inputSchema").unwrap().get("properties").unwrap().get("updates").unwrap();
         let properties = updates.get("properties").unwrap();
