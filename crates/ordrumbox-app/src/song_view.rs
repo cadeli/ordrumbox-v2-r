@@ -15,8 +15,10 @@ use crate::frame;
 use crate::panel::{Rect, row_at};
 use crate::theme;
 
-/// The JS grid geometry (`song_panel/layout.js`), in px per scale unit.
-const LABEL_WIDTH: i32 = 74;
+/// The JS grid geometry (`song_panel/layout.js`), in px per scale unit, but
+/// for the frozen column: wide enough for a 16-character pattern name (8 px
+/// a glyph) and its 6 px margin, where the JS one holds 8.
+pub const LABEL_WIDTH: i32 = 134;
 const MEASURE_WIDTH: i32 = 24;
 const ROW_HEIGHT: i32 = 22;
 const HEADER_HEIGHT: i32 = 18;

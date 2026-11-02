@@ -887,7 +887,7 @@ mod tests {
         let l = s.song_layout(SIZE);
         // The ruler aims the cursor; a pattern of the list is added there.
         let ruler_y = l.grid.y + 14 + 4;
-        let measure_x = |m: i32| l.grid.x + 74 + m * 24 + 12;
+        let measure_x = |m: i32| l.grid.x + song_view::LABEL_WIDTH + m * 24 + 12;
         assert!(s.song_click(SIZE, measure_x(1), ruler_y, Button::Left));
         assert_eq!(s.song_cursor, 1);
         assert!(s.song_click(SIZE, l.list.x + 2, l.list.y + 2, Button::Right));
@@ -924,7 +924,7 @@ mod tests {
     fn a_drag_adds_a_pattern_and_moves_a_clip() {
         let mut s = session();
         let l = s.song_layout(SIZE);
-        let measure_x = |m: i32| l.grid.x + 74 + m * 24 + 12;
+        let measure_x = |m: i32| l.grid.x + song_view::LABEL_WIDTH + m * 24 + 12;
         let row_y = |r: i32| l.grid.y + 14 + 18 + r * 22 + 11;
         let list = (l.list.x + 2, l.list.y + 2);
 
