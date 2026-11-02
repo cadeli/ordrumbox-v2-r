@@ -42,7 +42,8 @@ from the JS app's (old name in brackets):
   `transposeLfo` (`pitch`/`pitchLfo`), `samplePath` (`sampleId`),
   `autoAssign` (`useAutoAssignSound`), `useSynth` (`useSoftSynth`),
   `synthPreset` (`synthSoundKey`), `loopLength` (`loopAtStep`),
-  `filterCutoff`/`filterCutoffLfo` (`filterFreq`…), `reverbMix`,
+  `filterCutoff`/`filterCutoffLfo` (`filterFreq`…), `filterSlope` (12 or
+  24 dB/oct; new, the JS filter has 12 only), `reverbMix`,
   `delayMix`, `saturationMix` (`reverbAmount`, `delayDepth`,
   `saturationAmount`), `delayBeats` (`delayTime`), `saturationOn` (`sat`),
   `hitVariation`/`noteVariation` (`variation`/`variation2`); auto mode:
@@ -130,7 +131,8 @@ Track editor (on the right, **F2** or **View › Track editor** shows or hides
 it), for the track of the cursor or of the selected note: the sample bar
 (note, length, peak, envelope with the decay end, **Load** replaces the
 sample), the knob bar (volume, pan, transpose, the sample's decay) and the JS
-tabs — **FX** (reverb, delay, saturation, filter, each with its on/off LED),
+tabs — **FX** (reverb, delay, saturation, filter — LP/HP/BP, 12 or
+24 dB/oct —, each with its on/off LED),
 **Sound** (mono, auto-assign, instrument, sample, synth preset), **LFO** (an
 LFO per setting: LED, wave, frequency, range, phase), **Loop** (steps per
 beat, loop length, swing), **Gen** (auto mode; the manual variation settings,
@@ -217,7 +219,7 @@ bar picks another preset and deletes, creates, duplicates, reverts (to the
 preset as it was when opened), exports (`ordrumbox-synth-sounds.json`, to a
 folder picked) and imports presets. Four tabs of cards — **OSC** (the scope: four cycles of
 the oscillators, with their FM, sub and drive; VCO1–3; FM), **FLT** (the
-filter and its response curve, the filter envelope, the mod envelope),
+filter, 12 or 24 dB/oct (`filter.slope`, not in the JS editor), and its response curve, the filter envelope, the mod envelope),
 **MOD** (LFO1, LFO2, noise), **ENV** (master, the envelope and its shape) —
 each with its wave, filter type or FM algorithm choices, its power button,
 its knobs, lists and switches, as the JS lays them out. A knob an LFO moves
@@ -528,6 +530,10 @@ node tools/export_dsp_fixtures.mjs ../ordrumbox-v2
   the mix. This file is the one fixture the JS app does not produce:
   `cargo test -p ordrumbox-dsp --test processors -- --ignored` writes it, only
   when the voice's sound changes on purpose.
+- The 24 dB/oct filter of the strip and of the synth voice (two stages in
+  series, `ordrumbox-dsp/src/slope.rs`) has no JS counterpart: the fixtures
+  play the 12 dB/oct one, and unit tests (`strip.rs`, `synth.rs`) measure the
+  slopes and the resonance peak.
 - `ordrumbox-engine/tests/fixtures/strip_settings.json`: the strip parameters
   `applyTrackToStrip()` sets for every track setup of `song.json`.
 - `ordrumbox-engine/tests/fixtures/lfo_values.json`: `computeLfoValue()` over

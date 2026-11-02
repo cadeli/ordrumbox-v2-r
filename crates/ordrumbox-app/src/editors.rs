@@ -34,7 +34,7 @@ pub const FX_DEFS: [FxDef; 4] = [
     FxDef { key: "delayMix", label: "Dly", controls: &["delayMix", "delayBeats", "delayType"] },
     FxDef { key: "saturationMix", label: "Sat", controls: &["saturationMix", "saturationType"] },
     // The filter is on when its type is not the allpass bypass.
-    FxDef { key: "filterType", label: "Flt", controls: &["filterType", "filterCutoff", "filterQ"] },
+    FxDef { key: "filterType", label: "Flt", controls: &["filterType", "filterSlope", "filterCutoff", "filterQ"] },
 ];
 
 pub const FILTER_TYPES: [&str; 3] = ["lowpass", "highpass", "bandpass"];
@@ -43,6 +43,13 @@ const FILTER_ICONS: [&str; 3] = ["LP", "HP", "BP"];
 /// Delay time multipliers, in beats, and their labels (`fx_values.js`).
 const DELAY_TIME_VALUES: [&str; 7] = ["0.0625", "0.125", "0.25", "0.5", "1", "2", "4"];
 const DELAY_TIME_LABELS: [&str; 7] = ["1/16", "1/8", "1/4", "1/2", "1", "2", "4"];
+
+/// Filter slopes, dB per octave, and their labels.
+const FILTER_SLOPE_VALUES: [&str; 2] = ["12", "24"];
+const FILTER_SLOPE_LABELS: [&str; 2] = ["12 dB", "24 dB"];
+
+/// Selects of a track setting whose values are numbers (written as numbers).
+pub const NUMERIC_SELECTS: [&str; 2] = ["delayBeats", "filterSlope"];
 
 /// LFO waveforms (`WAVE_TYPES`).
 pub const WAVE_TYPES: [&str; 5] = ["sine", "triangle", "sawtooth", "square", "random"];
@@ -53,6 +60,7 @@ pub fn track_select_options(key: &str) -> (Vec<String>, Vec<String>) {
     match key {
         "reverbType" => (list(&["none", "room", "hall", "plate", "spring", "gated"]), Vec::new()),
         "delayBeats" => (list(&DELAY_TIME_VALUES), list(&DELAY_TIME_LABELS)),
+        "filterSlope" => (list(&FILTER_SLOPE_VALUES), list(&FILTER_SLOPE_LABELS)),
         "delayType" => (list(&["none", "slap", "tape", "pingpong"]), Vec::new()),
         "saturationType" => (list(&["soft", "hard", "tape"]), Vec::new()),
         "autoVariant" => (list(&["", "basic", "fill", "roll", "sparse", "dense"]), Vec::new()),
@@ -113,6 +121,7 @@ pub const FX_KNOBS: [Prop; 5] = [
 pub fn fx_label(key: &str) -> &'static str {
     match key {
         "delayBeats" => "Beats",
+        "filterSlope" => "Slope",
         _ => "Type",
     }
 }

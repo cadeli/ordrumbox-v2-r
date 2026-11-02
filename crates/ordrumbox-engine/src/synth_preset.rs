@@ -228,6 +228,7 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
         filter_type: enum_code(get(filter, "type"), &FILTERS),
         filter_freq: finite(get(filter, "freq"), 1000.0),
         filter_q: finite(get(filter, "Q"), 0.7),
+        filter_slope: finite(get(filter, "slope"), 12.0),
         drive: finite(get(filter, "drive"), 0.0),
         pitch_punch: finite(at("pitchPunch"), 0.0),
         sub_gain: finite(at("subGain"), 0.0),

@@ -8,6 +8,7 @@
 use ordrumbox_core::js;
 use ordrumbox_core::json::{self, Object, Value};
 use ordrumbox_core::lfo;
+use ordrumbox_engine::slope;
 use ordrumbox_engine::synth_preset::FM_DEVIATION;
 
 use crate::control::Spec;
@@ -18,6 +19,8 @@ pub const FILTER_TYPES: [&str; 3] = ["lowpass", "highpass", "bandpass"];
 /// The mod envelope's targets and the LFO syncs (value, label).
 pub const MOD_ENV_TARGETS: [(&str, &str); 5] =
     [("off", "Off"), ("filter", "Filter"), ("pitch", "Pitch"), ("fm", "FM"), ("shape", "Shape")];
+/// Filter slopes, dB per octave, and their labels.
+pub const FILTER_SLOPES: [(&str, &str); 2] = [("12", "12 dB"), ("24", "24 dB")];
 pub const LFO_SYNCS: [(&str, &str); 8] = [
     ("off", "free"),
     ("1/1", "1/1"),
@@ -42,6 +45,11 @@ const DEFAULTS: &str = r#"{"masterVolume":0.8,"subGain":0,"pitchPunch":0,
     "noise":{"mix":0,"filterType":"highpass","filterFreq":1000,"filterQ":1},
     "envelope":{"attack":0,"decay":0.12,"sustain":1,"release":0.05},
     "modEnvelope":{"attack":0,"decay":0.12,"sustain":0,"release":0.1,"target":"off"}}"#;
+
+/// Fields the JS editor lacks, shown last in their card and written only once
+/// set (absent, the engine's default applies): kept out of [`DEFAULTS`] so a
+/// hydrated preset stays the JS one.
+const EXTRA_FIELDS: [(&str, &str); 1] = [("filter", "slope")];
 
 #[expect(clippy::expect_used, reason = "a constant, read by the tests")]
 pub fn defaults() -> Object {
@@ -325,6 +333,7 @@ pub fn fields(draft: &Object, group: &str) -> Vec<String> {
                 _ => true,
             })
             .map(|(key, _)| format!("{group}.{key}"))
+            .chain(EXTRA_FIELDS.iter().filter(|(g, _)| *g == group).map(|(g, key)| format!("{g}.{key}")))
             .collect(),
         _ => vec![group.to_owned()],
     }
@@ -549,27 +558,43 @@ pub fn envelope(draft: &Object) -> (Vec<(f64, f64)>, f64) {
 }
 
 /// The filter's response, dB at `points + 1` frequencies from 20 Hz to
-/// 20 kHz (log), centred on `fc` (`#drawFilterResponse`'s `drawCurve`).
-pub fn filter_response(kind: &str, fc: f64, q: f64, points: usize) -> Vec<f64> {
+/// 20 kHz (log), centred on `fc` (`#drawFilterResponse`'s `drawCurve`); a
+/// slope of 24 dB/oct is the product of its two stages.
+pub fn filter_response(kind: &str, fc: f64, q: f64, slope_db: f64, points: usize) -> Vec<f64> {
+    let magnitude = |f: f64, q: f64| {
+        let d = fc * fc - f * f;
+        let denom = (d * d + (fc * f / q) * (fc * f / q)).sqrt();
+        match kind {
+            "highpass" => f * f / denom,
+            "bandpass" => fc * f / q / denom,
+            _ => fc * fc / denom,
+        }
+    };
+    let mode = match kind {
+        "highpass" => 1.0,
+        "bandpass" => 2.0,
+        _ => 0.0,
+    };
+    let (k1, k2, _) = slope::stages(1.0 / q, mode);
     (0..=points)
         .map(|i| {
             let f = 20.0 * 1000f64.powf(i as f64 / points as f64);
-            let d = fc * fc - f * f;
-            let denom = (d * d + (fc * f / q) * (fc * f / q)).sqrt();
-            let mag = match kind {
-                "highpass" => f * f / denom,
-                "bandpass" => fc * f / q / denom,
-                _ => fc * fc / denom,
+            // The bandpass curve is drawn normalized: both stages peak at 1.
+            let mag = if slope::is_steep(slope_db) {
+                magnitude(f, 1.0 / k1) * magnitude(f, 1.0 / k2)
+            } else {
+                magnitude(f, q)
             };
             (20.0 * mag.max(1e-10).log10()).clamp(-30.0, 12.0)
         })
         .collect()
 }
 
-/// The filter curve's centre and Q with the LFOs at `time`, and the band an
-/// LFO on the frequency sweeps.
-pub fn filter_now(draft: &Object, time: f64, bpm: f64) -> (String, f64, f64, Option<(f64, f64)>) {
+/// The filter curve's type, centre, Q with the LFOs at `time` and slope, and
+/// the band an LFO on the frequency sweeps.
+pub fn filter_now(draft: &Object, time: f64, bpm: f64) -> (String, f64, f64, f64, Option<(f64, f64)>) {
     let kind = text(draft, "filter.type").unwrap_or("lowpass").to_owned();
+    let slope_db = number(draft, "filter.slope").unwrap_or(12.0);
     let fc = number(draft, "filter.freq").unwrap_or(400.0).clamp(20.0, 20_000.0);
     let q = number(draft, "filter.Q").unwrap_or(1.0).clamp(0.1, 24.0);
     let fc = (fc + lfo_mod_on(draft, "filter.freq", time, bpm)).clamp(20.0, 20_000.0);
@@ -581,7 +606,7 @@ pub fn filter_now(draft: &Object, time: f64, bpm: f64) -> (String, f64, f64, Opt
         .map(|l| l.get("depth").and_then(Value::as_f64).unwrap_or(0.0))
         .fold(0.0f64, f64::max);
     let band = (depth > 0.0).then(|| ((fc - depth * 1000.0).max(20.0), (fc + depth * 1000.0).min(20_000.0)));
-    (kind, fc, q, band)
+    (kind, fc, q, slope_db, band)
 }
 
 /// The module pills under the cards: label, active.
@@ -735,10 +760,14 @@ mod tests {
         assert_ne!(scope(&d, 0.0, 120.0), wave);
         let (points, total) = envelope(&d);
         assert_eq!((points.len(), total), (5, 0.5));
-        let low = filter_response("lowpass", 1000.0, 1.0, 200);
+        let low = filter_response("lowpass", 1000.0, 1.0, 12.0, 200);
         assert!(low[0] > -1.0 && low[200] == -30.0);
-        let high = filter_response("highpass", 1000.0, 1.0, 200);
+        let high = filter_response("highpass", 1000.0, 1.0, 12.0, 200);
         assert!(high[0] == -30.0 && high[200] > -1.0);
+        // The point of frequency `f`: 200 points span 3 decades from 20 Hz.
+        let at = |f: f64| (200.0 * (f / 20.0f64).log10() / 3.0).round() as usize;
+        let steep = filter_response("lowpass", 1000.0, std::f64::consts::FRAC_1_SQRT_2, 24.0, 200);
+        assert!((steep[at(1000.0)] + 3.0).abs() < 0.5 && steep[at(2000.0)] < -23.0, "{}", steep[at(2000.0)]);
         assert_eq!(
             modules(&defaults()).iter().filter(|(_, on)| *on).map(|(l, _)| *l).collect::<Vec<_>>(),
             ["VCO1", "Flt", "Env"]

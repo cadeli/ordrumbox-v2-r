@@ -16,7 +16,7 @@ use crate::canvas::{Canvas, Rgb, text_width};
 use crate::control::Spec;
 use crate::frame;
 use crate::panel::{Id, Item, Kind, Rect};
-use crate::synth_model::{self as model, FILTER_TYPES, LFO_SYNCS, MOD_ENV_TARGETS, TABS, WAVES};
+use crate::synth_model::{self as model, FILTER_SLOPES, FILTER_TYPES, LFO_SYNCS, MOD_ENV_TARGETS, TABS, WAVES};
 use crate::theme;
 
 /// The preset bar's buttons: id, label, width (scale units).
@@ -73,6 +73,9 @@ fn field_kind(path: &str, value: Option<&Value>) -> Field {
     }
     if path == "modEnvelope.target" {
         return list(&MOD_ENV_TARGETS);
+    }
+    if path == "filter.slope" {
+        return list(&FILTER_SLOPES);
     }
     if is_lfo && key == "target" {
         let targets = model::lfo_targets();
@@ -401,9 +404,9 @@ fn draw_filter(canvas: &mut Canvas, draft: &Object, r: Rect, s: i32, time: f64, 
         canvas.fill_rect(r.x, to_y(db), r.w, s.max(1), GRID);
     }
     const N: usize = 200;
-    let (kind, fc, q, band) = model::filter_now(draft, time, bpm);
+    let (kind, fc, q, slope_db, band) = model::filter_now(draft, time, bpm);
     let curve = |canvas: &mut Canvas, fc: f64, color: Rgb, t: i32| {
-        let response = model::filter_response(&kind, fc, q, N);
+        let response = model::filter_response(&kind, fc, q, slope_db, N);
         polyline(
             canvas,
             response.iter().enumerate().map(|(i, db)| (r.x + (i as i32 * (r.w - 1)) / N as i32, to_y(*db))),

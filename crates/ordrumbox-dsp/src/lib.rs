@@ -50,6 +50,7 @@ macro_rules! audio_params {
 pub mod lfo;
 pub mod master_bus;
 pub mod sample;
+pub mod slope;
 pub mod strip;
 pub mod synth;
 pub mod voice;

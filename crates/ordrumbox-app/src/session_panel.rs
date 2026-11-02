@@ -1139,7 +1139,7 @@ impl Session {
         let name = self.track_name(t);
         match id {
             Id::TrackSelect(key) => {
-                let v = if key == "delayBeats" {
+                let v = if editors::NUMERIC_SELECTS.contains(&key) {
                     num(js::parse_float(&Value::String(value.to_owned())))
                 } else {
                     Value::String(value.to_owned())

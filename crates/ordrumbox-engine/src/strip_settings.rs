@@ -29,6 +29,12 @@ fn filter_mode(name: &str) -> Option<f32> {
     })
 }
 
+/// The strip's `filter_slope` for a track's `filterSlope`: 24 from 18 dB/oct
+/// up, else 12 (the editor offers only these two).
+fn filter_slope(db_per_octave: f64) -> f32 {
+    if db_per_octave >= 18.0 { 24.0 } else { 12.0 }
+}
+
 fn delay_mode(name: &str) -> Option<f32> {
     Some(match name {
         "slap" => 0.0,
@@ -56,6 +62,7 @@ pub fn strip_settings(track: &Track, bpm: f64) -> StripSettings {
         if track.filter_q_lfo.is_none() {
             s.q = finite_or(track.filter_q, 0.707) as f32;
         }
+        s.filter_slope = filter_slope(track.filter_slope);
     }
 
     // Saturation.

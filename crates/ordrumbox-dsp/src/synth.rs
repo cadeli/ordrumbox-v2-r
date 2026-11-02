@@ -16,7 +16,7 @@
 use std::f64::consts::{PI, TAU};
 use std::sync::OnceLock;
 
-use crate::{js_round, lfo};
+use crate::{js_round, lfo, slope};
 
 /// `Math.LN2 / 1200`: cents to a natural-log ratio.
 const LN2_OVER_1200: f64 = 0.000_577_622_650_466_621_1;
@@ -168,6 +168,8 @@ pub struct SynthPatch {
     pub filter_type: f64,
     pub filter_freq: f64,
     pub filter_q: f64,
+    /// dB per octave: 12, or 24 (two filter stages).
+    pub filter_slope: f64,
     pub drive: f64,
     pub pitch_punch: f64,
     pub sub_gain: f64,
@@ -205,6 +207,7 @@ impl Default for SynthPatch {
             filter_type: 0.0,
             filter_freq: 1000.0,
             filter_q: 0.7,
+            filter_slope: 12.0,
             drive: 0.0,
             pitch_punch: 0.0,
             sub_gain: 0.0,
@@ -314,6 +317,8 @@ pub struct SynthVoice {
     lfo_phase: [f64; 2],
     lfo_seeded: bool,
     filter: Tpt,
+    /// Second filter stage (24 dB/oct only).
+    filter_2: Tpt,
     noise_filter: Tpt,
     env_level: f64,
     env_segment: Segment,
@@ -344,6 +349,7 @@ impl Default for SynthVoice {
             lfo_phase: [0.0; 2],
             lfo_seeded: false,
             filter: Tpt::default(),
+            filter_2: Tpt::default(),
             noise_filter: Tpt::default(),
             env_level: 0.0,
             env_segment: Segment::Idle,
@@ -481,10 +487,9 @@ impl SynthVoice {
         if self.mod_env_level.is_finite() && self.mod_env_level > 0.0 { self.mod_env_level } else { 0.0 }
     }
 
-    /// Main filter step: (lowpass, highpass, bandpass).
+    /// Main filter step of stage `f`: (lowpass, highpass, bandpass).
     #[inline]
-    fn filter_step(&mut self, x: f64, g: f64, k: f64) -> (f64, f64, f64) {
-        let f = &mut self.filter;
+    fn filter_step(f: &mut Tpt, x: f64, g: f64, k: f64) -> (f64, f64, f64) {
         if !f.z1.is_finite() {
             f.z1 = 0.0;
         }
@@ -566,6 +571,13 @@ impl SynthVoice {
         let f_q_val = clamp(f_q, 0.1, 20.0);
         let g_coeff = (PI * f_freq_mod.min(sr * 0.25) / sr).tan();
         let k_coeff = 1.0 / f_q_val;
+        let steep = slope::is_steep(p.filter_slope);
+        let select = |(lp, hp, bp): (f64, f64, f64)| match filter_mode {
+            0 => lp,
+            1 => hp,
+            2 => bp,
+            _ => lp + hp,
+        };
 
         let lfo1_inc = lfo1_freq / sr;
         let lfo2_inc = lfo2_freq / sr;
@@ -781,7 +793,7 @@ impl SynthVoice {
             let mut y = if bypass.filter {
                 dry
             } else {
-                let (lp, hp, bp) = if recompute {
+                let (g, k) = if recompute {
                     let f = if f_freq_sample < 20.0 {
                         20.0
                     } else if f_freq_sample > sr * 0.25 {
@@ -789,15 +801,16 @@ impl SynthVoice {
                     } else {
                         f_freq_sample
                     };
-                    self.filter_step(dry, (PI * f / sr).tan(), k_mod)
+                    ((PI * f / sr).tan(), k_mod)
                 } else {
-                    self.filter_step(dry, g_coeff, k_coeff)
+                    (g_coeff, k_coeff)
                 };
-                match filter_mode {
-                    0 => lp,
-                    1 => hp,
-                    2 => bp,
-                    _ => lp + hp,
+                if steep {
+                    let (k1, k2, gain_2) = slope::stages(k, f64::from(filter_mode));
+                    let y = select(Self::filter_step(&mut self.filter, dry, g, k1));
+                    select(Self::filter_step(&mut self.filter_2, y, g, k2)) * gain_2
+                } else {
+                    select(Self::filter_step(&mut self.filter, dry, g, k))
                 }
             };
 
@@ -873,6 +886,29 @@ mod tests {
             im += f64::from(x) * phase.sin();
         }
         (re * re + im * im).sqrt() / signal.len() as f64
+    }
+
+    #[test]
+    fn a_24_db_lowpass_falls_12_db_per_octave_faster() {
+        let saw = |filter_slope: f64| {
+            let mut voice = SynthVoice::default();
+            let patch = SynthPatch {
+                osc_freq: [100.0; 3],
+                osc_gain: [1.0, 0.0, 0.0],
+                osc_wave: [2.0; 3],
+                filter_freq: 1_000.0,
+                filter_slope,
+                volume: 1.0,
+                bypass: SynthBypass { env: true, ..SynthBypass::default() },
+                ..SynthPatch::default()
+            };
+            voice.start(&patch, 0, 0.0, 1);
+            let out = render(&mut voice, 48_000);
+            [2_000.0, 4_000.0].map(|f| 20.0 * tone_level(&out[24_000..], f).log10())
+        };
+        let (one, two) = (saw(12.0), saw(24.0));
+        let extra = (one[1] - two[1]) - (one[0] - two[0]);
+        assert!((extra - 12.0).abs() < 2.0, "{one:?} {two:?}");
     }
 
     #[test]

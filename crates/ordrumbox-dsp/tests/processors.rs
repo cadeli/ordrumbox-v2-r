@@ -127,6 +127,8 @@ fn patch_from_update(m: &Value) -> SynthPatch {
         filter_type: n("filterType"),
         filter_freq: n("filterFreq"),
         filter_q: n("filterQ"),
+        // The JS voice has one filter stage.
+        filter_slope: 12.0,
         drive: n("drive"),
         pitch_punch: n("pitchPunch"),
         sub_gain: n("subGain"),
