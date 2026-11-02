@@ -10422,6 +10422,468 @@
           ]
         }
       ]
+    },
+    {
+      "id": "break-roller",
+      "name": "Break Roller",
+      "beatCount": 8,
+      "bpm": 136,
+      "description": "Breakbeat, 2 measures: syncopated kick, snare on 2 and 4 with probability ghosts, 16th hats looping every 3 steps against the beat, open hat every 6 steps, flammed snare on 4 of measure 2; 32nd snare roll every 2 passes, descending tom arpeggio every 4, swept high-pass on the hats.",
+      "tags": [
+        "breakbeat",
+        "default"
+      ],
+      "tracks": [
+        {
+          "name": "KICK",
+          "beatCount": 8,
+          "loopLength": 32,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "cycle",
+            "probability",
+            "cycleOffset"
+          ],
+          "notes": [
+            [
+              1
+            ],
+            [
+              0.8,
+              0,
+              2
+            ],
+            [
+              0.9,
+              2,
+              2
+            ],
+            [
+              1,
+              4
+            ],
+            [
+              0.7,
+              4,
+              2,
+              2,
+              1,
+              1
+            ],
+            [
+              0.7,
+              5,
+              3
+            ],
+            [
+              0.9,
+              6,
+              2
+            ],
+            [
+              0.6,
+              7,
+              3,
+              1,
+              0.5
+            ]
+          ]
+        },
+        {
+          "name": "SNARE",
+          "beatCount": 8,
+          "loopLength": 32,
+          "reverbType": "room",
+          "reverbMix": 0.2,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "cycle",
+            "probability",
+            "retriggerRate",
+            "retriggerCount"
+          ],
+          "notes": [
+            [
+              1,
+              1
+            ],
+            [
+              0.3,
+              1,
+              3,
+              1,
+              0.7
+            ],
+            [
+              0.35,
+              2,
+              1
+            ],
+            [
+              1,
+              3
+            ],
+            [
+              0.3,
+              3,
+              3,
+              1,
+              0.6
+            ],
+            [
+              1,
+              5
+            ],
+            [
+              0.3,
+              5,
+              3,
+              1,
+              0.7
+            ],
+            [
+              0.35,
+              6,
+              1
+            ],
+            [
+              1,
+              7,
+              0,
+              1,
+              1,
+              2,
+              2
+            ],
+            [
+              0.55,
+              7,
+              2,
+              2,
+              1,
+              4,
+              4
+            ]
+          ]
+        },
+        {
+          "name": "CHH",
+          "beatCount": 8,
+          "loopLength": 3,
+          "volume": 0.6,
+          "pan": -0.3,
+          "filterType": "highpass",
+          "filterCutoffLfo": {
+            "freq": 0.5,
+            "min": 0,
+            "max": 6000,
+            "phase": 0,
+            "type": "sine"
+          },
+          "filterCutoff": 800,
+          "noteKeys": [
+            "velocity",
+            "step"
+          ],
+          "notes": [
+            [
+              0.7
+            ],
+            [
+              0.35,
+              1
+            ],
+            [
+              0.5,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "OHH",
+          "beatCount": 8,
+          "loopLength": 6,
+          "volume": 0.45,
+          "pan": -0.2,
+          "noteKeys": [
+            "velocity"
+          ],
+          "notes": [
+            [
+              0.5
+            ]
+          ]
+        },
+        {
+          "name": "TOM",
+          "beatCount": 8,
+          "loopLength": 32,
+          "pan": 0.4,
+          "reverbType": "room",
+          "reverbMix": 0.2,
+          "noteKeys": [
+            "beat",
+            "cycle",
+            "retriggerRate",
+            "retriggerCount",
+            "arp",
+            "cycleOffset"
+          ],
+          "notes": [
+            [
+              7,
+              4,
+              8,
+              4,
+              {
+                "intervals": [
+                  0,
+                  -3,
+                  -5,
+                  -7
+                ],
+                "direction": "down"
+              },
+              3
+            ]
+          ]
+        },
+        {
+          "name": "CRASH",
+          "beatCount": 8,
+          "loopLength": 32,
+          "volume": 0.6,
+          "pan": 0.6,
+          "noteKeys": [
+            "velocity",
+            "cycle"
+          ],
+          "notes": [
+            [
+              0.7,
+              4
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "break-euclid",
+      "name": "Break Euclid",
+      "bpm": 132,
+      "description": "Breakbeat, 1 measure: euclidean kick (3 pulses over 1, 1a and 2&) then 3&, snare on 2 and 4 with a 64th stutter on 4a every 2 passes, 16th hats gated by probability, rimshot every 5 steps and open hat every 7 across the measure, pitched euclidean toms (5 of 16), 16th clap burst on 2 every 4 passes.",
+      "tags": [
+        "breakbeat",
+        "default"
+      ],
+      "tracks": [
+        {
+          "name": "KICK",
+          "loopLength": 16,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "euclideanPulses"
+          ],
+          "notes": [
+            [
+              1,
+              0,
+              0,
+              3
+            ],
+            [
+              0.9,
+              2,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "SNARE",
+          "loopLength": 16,
+          "reverbType": "room",
+          "reverbMix": 0.2,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "cycle",
+            "retriggerRate",
+            "retriggerCount",
+            "retriggerProbability"
+          ],
+          "notes": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              3
+            ],
+            [
+              0.6,
+              3,
+              3,
+              2,
+              2,
+              4,
+              0.7
+            ]
+          ]
+        },
+        {
+          "name": "CHH",
+          "loopLength": 4,
+          "volume": 0.6,
+          "volumeLfo": {
+            "freq": 1,
+            "min": 0.4,
+            "max": 0.7,
+            "phase": 0,
+            "type": "triangle"
+          },
+          "pan": -0.3,
+          "noteKeys": [
+            "velocity",
+            "step",
+            "probability"
+          ],
+          "notes": [
+            [
+              0.7
+            ],
+            [
+              0.35,
+              1,
+              0.6
+            ],
+            [
+              0.55,
+              2
+            ],
+            [
+              0.35,
+              3,
+              0.6
+            ]
+          ]
+        },
+        {
+          "name": "RIMSHOT",
+          "loopLength": 5,
+          "volume": 0.6,
+          "panLfo": {
+            "freq": 1,
+            "min": -0.6,
+            "max": 0.6,
+            "phase": 0,
+            "type": "sine"
+          },
+          "noteKeys": [
+            "velocity"
+          ],
+          "notes": [
+            [
+              0.6
+            ]
+          ]
+        },
+        {
+          "name": "OHH",
+          "loopLength": 7,
+          "volume": 0.45,
+          "pan": -0.2,
+          "noteKeys": [
+            "velocity",
+            "step"
+          ],
+          "notes": [
+            [
+              0.5,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "TOM",
+          "loopLength": 16,
+          "volume": 0.7,
+          "pan": 0.4,
+          "reverbType": "room",
+          "reverbMix": 0.2,
+          "noteKeys": [
+            "velocity",
+            "arp",
+            "euclideanPulses",
+            "euclideanRotation"
+          ],
+          "notes": [
+            [
+              0.6,
+              {
+                "intervals": [
+                  0,
+                  3,
+                  5,
+                  7,
+                  10
+                ],
+                "direction": "up"
+              },
+              5,
+              1
+            ]
+          ]
+        },
+        {
+          "name": "CLAP",
+          "loopLength": 16,
+          "pan": 0.2,
+          "reverbType": "room",
+          "reverbMix": 0.2,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "cycle",
+            "retriggerRate",
+            "retriggerCount",
+            "cycleOffset"
+          ],
+          "notes": [
+            [
+              0.7,
+              1,
+              4,
+              8,
+              4,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "CRASH",
+          "loopLength": 16,
+          "volume": 0.6,
+          "pan": 0.6,
+          "noteKeys": [
+            "velocity",
+            "cycle"
+          ],
+          "notes": [
+            [
+              0.6,
+              8
+            ]
+          ]
+        }
+      ]
     }
   ]
 }
