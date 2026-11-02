@@ -653,58 +653,62 @@ impl Session {
     /// Ctrl+E: the selected pattern (with Shift: the selected song) to a WAV
     /// file at `path`.
     fn export_wav(&mut self, song: bool, path: &Path) {
-        let Some(setup) = &self.render else {
-            self.message = NOTHING_TO_RENDER.into();
-            return;
-        };
+        let mode = if song { Mode::Song(self.editor.selected_song()) } else { Mode::Pattern(self.pattern_index) };
+        self.message = self.write_wav(mode, path).unwrap_or_else(|e| e);
+    }
+
+    /// What `mode` plays (a pattern once, a song whole) as a WAV file at
+    /// `path`; what was written.
+    pub(super) fn write_wav(&self, mode: Mode, path: &Path) -> Result<String, String> {
+        let setup = self.render.as_ref().ok_or(NOTHING_TO_RENDER)?;
         let library = self.editor.library();
         let started = Instant::now();
-        let rendered = if song {
-            let index = self.editor.selected_song();
-            if library.songs.get(index).is_none() {
-                self.message = "no song in the library".into();
-                return;
-            }
-            offline::render_song(library, index, setup)
-        } else {
-            // Tracks in auto mode get their new lines loop after loop, on the render's copy.
-            let (scales, mut rng) = (&self.scales, Rng::new(setup.seed));
-            let styles = compose::learn(&self.styles, &library.patterns);
-            let mut loop_start = |library: &mut Library, p: usize, number: u64| {
-                if let Some(pattern) = library.patterns.get_mut(p).filter(|p| generate::plays_auto(p)) {
-                    let mut rnd = || rng.next_f64();
-                    generate::run_loop(&mut AutoGenerator::new(scales, &styles, &mut rnd), pattern, number);
+        let rendered = match mode {
+            Mode::Song(index) => {
+                if library.songs.get(index).is_none() {
+                    return Err("no song in the library".into());
                 }
-            };
-            offline::render_pattern(library, self.pattern_index, 1, setup, Some(&mut loop_start))
+                offline::render_song(library, index, setup)
+            }
+            Mode::Pattern(p) => {
+                // Tracks in auto mode get their new lines loop after loop, on the render's copy.
+                let (scales, mut rng) = (&self.scales, Rng::new(setup.seed));
+                let styles = compose::learn(&self.styles, &library.patterns);
+                let mut loop_start = |library: &mut Library, p: usize, number: u64| {
+                    if let Some(pattern) = library.patterns.get_mut(p).filter(|p| generate::plays_auto(p)) {
+                        let mut rnd = || rng.next_f64();
+                        generate::run_loop(&mut AutoGenerator::new(scales, &styles, &mut rnd), pattern, number);
+                    }
+                };
+                offline::render_pattern(library, p, 1, setup, Some(&mut loop_start))
+            }
         };
-        let Some((left, right)) = rendered else {
-            self.message = "nothing to export (no playable clip)".into();
-            return;
-        };
+        let (left, right) = rendered.ok_or("nothing to export (no playable clip)")?;
         let bytes = wav::encode(&left, &right, setup.sample_rate);
-        let result = store::write_atomic(path, bytes);
-        self.message = match result {
-            Ok(()) => format!(
-                "exported {} ({:.1} s of audio in {:.1} s)",
-                path.display(),
-                left.len() as f64 / f64::from(setup.sample_rate),
-                started.elapsed().as_secs_f64()
-            ),
-            Err(e) => format!("not exported: {}: {e}", path.display()),
-        };
+        store::write_atomic(path, bytes).map_err(|e| format!("not exported: {}: {e}", path.display()))?;
+        Ok(format!(
+            "exported {} ({:.1} s of audio in {:.1} s)",
+            path.display(),
+            left.len() as f64 / f64::from(setup.sample_rate),
+            started.elapsed().as_secs_f64()
+        ))
     }
 
     /// Ctrl+M: the selected pattern to a MIDI file at `path`.
     fn export_midi(&mut self, path: &Path) {
-        let Some(pattern) = self.pattern() else { return };
+        if self.pattern().is_none() {
+            return;
+        }
+        self.message = self.write_midi(self.pattern_index, path).unwrap_or_else(|e| e);
+    }
+
+    /// Pattern `p` as a MIDI file at `path`; what was written.
+    pub(super) fn write_midi(&self, p: usize, path: &Path) -> Result<String, String> {
+        let pattern = self.editor.library().patterns.get(p).ok_or("No pattern selected")?;
         let mut rng = Rng::new(1);
         let bytes = midi::export(pattern, 1, &self.roots, &mut rng, &self.scales);
-        let result = store::write_atomic(path, &bytes);
-        self.message = match result {
-            Ok(()) => format!("exported {} ({} bytes)", path.display(), bytes.len()),
-            Err(e) => format!("not exported: {}: {e}", path.display()),
-        };
+        store::write_atomic(path, &bytes).map_err(|e| format!("not exported: {}: {e}", path.display()))?;
+        Ok(format!("exported {} ({} bytes)", path.display(), bytes.len()))
     }
 
     /// Ctrl+S: the pattern as `Exporter.export()`
@@ -730,24 +734,24 @@ impl Session {
     /// A MIDI file dropped on the window (or given on the command line):
     /// new patterns from it, the last one selected.
     pub fn import_midi(&mut self, path: &Path) {
-        let name = path.file_name().map_or_else(|| "midi".into(), |n| n.to_string_lossy().into_owned());
-        let bytes = match std::fs::read(path) {
-            Ok(bytes) => bytes,
-            Err(e) => {
-                self.message = format!("not imported: {}: {e}", path.display());
-                return;
-            }
-        };
-        match self.editor.import_midi(&name, &bytes, &self.roots) {
-            Ok((index, message)) => {
-                self.pattern_index = index;
-                self.deselect();
-                self.edited();
-                self.message = message;
-                self.current_page = 0;
-            }
-            Err(reason) => self.message = format!("{name}: {reason}"),
+        if let Err(e) = self.import_midi_file(path) {
+            self.message = e;
         }
+    }
+
+    /// New patterns from the MIDI file at `path`, the last one shown; what
+    /// the import says.
+    pub(super) fn import_midi_file(&mut self, path: &Path) -> Result<String, String> {
+        let name = path.file_name().map_or_else(|| "midi".into(), |n| n.to_string_lossy().into_owned());
+        let bytes = std::fs::read(path).map_err(|e| format!("not imported: {}: {e}", path.display()))?;
+        let (index, message) =
+            self.editor.import_midi(&name, &bytes, &self.roots).map_err(|reason| format!("{name}: {reason}"))?;
+        self.pattern_index = index;
+        self.deselect();
+        self.edited();
+        self.message.clone_from(&message);
+        self.current_page = 0;
+        Ok(message)
     }
 
     pub fn step_pattern(&mut self, delta: isize) {
@@ -1059,11 +1063,16 @@ impl Session {
 
     /// The name of the file `export` writes; `None` when what it writes is gone.
     fn export_file_name(&self, export: Export) -> Option<String> {
+        self.export_file_name_of(export, self.pattern_index, self.editor.selected_song())
+    }
+
+    /// The name of the file `export` writes for pattern `p` or song `s`.
+    pub(super) fn export_file_name_of(&self, export: Export, p: usize, s: usize) -> Option<String> {
         let library = self.editor.library();
-        let pattern = library.patterns.get(self.pattern_index);
+        let pattern = library.patterns.get(p);
         Some(match export {
             Export::PatternWav => format!("ordrumbox-{}.wav", pattern?.id),
-            Export::SongWav => format!("ordrumbox-song-{}.wav", library.songs.get(self.editor.selected_song())?.id),
+            Export::SongWav => format!("ordrumbox-song-{}.wav", library.songs.get(s)?.id),
             Export::PatternMidi => format!("ordrumbox-{}.mid", pattern?.id),
             Export::PatternJson => pattern_json_file_name(pattern?),
             Export::Song | Export::SongSaveAs => self.song_file_name(),

@@ -1220,6 +1220,21 @@ mod tests {
     }
 
     #[test]
+    fn a_song_is_renamed_in_one_step() {
+        let mut e = editor();
+        assert!(e.rename_song(None, "chorus").is_err());
+        e.add_song("verse");
+        assert_eq!(e.rename_song(None, "   "), Ok(false));
+        assert_eq!(e.rename_song(Some(0), " chorus "), Ok(true));
+        assert_eq!(e.rename_song(None, "chorus"), Ok(false));
+        let song = &e.library().songs[0];
+        assert_eq!((song.name.as_str(), song.id.as_str()), ("chorus", "verse"));
+        assert_eq!(e.history().next_undo(), Some("Rename arrangement → \"chorus\""));
+        e.undo();
+        assert_eq!(e.library().songs[0].name, "verse");
+    }
+
+    #[test]
     fn a_moved_clip_takes_the_loop_along_in_one_step() {
         let mut e = editor();
         e.add_song("verse");

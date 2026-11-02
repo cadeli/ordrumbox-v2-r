@@ -370,7 +370,14 @@ The tools keep the JS names: `listPatterns`, `loadPattern`,
 `removePatternFromArrangement`; and for the live app `selectKit`, `play`,
 `stop`, `undo`. Beyond the JS server: `deleteNotes`, `removeTrack`,
 `renamePattern`, `duplicatePattern`, `removePattern` (with its clips),
-`updateArrangement`, `removeArrangement`, `redo`. `setColorScheme` is gone: this app has one theme. Track and
+`updateArrangement`, `removeArrangement`, `redo`, `copyTrack`, `moveClip`,
+`renameArrangement`, `exportPatternWav`, `exportPatternMidi`,
+`exportArrangementWav` (to `exports/`), `importMidi`, `listStyles`,
+`listScales`, `listSynthPresets`, `getMaster`, `setMaster` (saved with the
+settings, not an undo step), `getSynthPreset`, `createSynthPreset`,
+`updateSynthPreset`, `removeSynthPreset` (settings by path, `filter.freq`,
+checked against the synth editor's controls; saved with the presets, not an
+undo step). `setColorScheme` is gone: this app has one theme. Track and
 note settings take the key names of the files (`volume`, `transpose`,
 `cycle`, `probability`…; the JS names are read too), and a value outside its
 range is refused (notes) or brought inside it, the answer saying the value
