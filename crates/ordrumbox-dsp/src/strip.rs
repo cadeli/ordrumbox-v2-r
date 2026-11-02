@@ -1,11 +1,14 @@
 //! A track's channel strip (`worklets/processors/strip_source.js`): a stereo
-//! TPT state-variable filter, saturation, a Freeverb reverb, a delay, then
+//! TPT state-variable filter (12 dB/oct, or two in series for 24 dB/oct),
+//! saturation, a Freeverb reverb, a delay, then
 //! volume and compensated equal-power pan.
 //!
 //! The reverb and delay memories are allocated by [`Strip::new`];
 //! [`Strip::process`] never allocates.
 
 use std::f64::consts::PI;
+
+use crate::slope;
 
 const COMB_TUNINGS_L: [usize; 8] = [1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617];
 const COMB_TUNINGS_R: [usize; 8] = [1139, 1211, 1300, 1379, 1445, 1514, 1580, 1640];
@@ -26,6 +29,8 @@ audio_params! {
         q = 0.707, 0.707..=18.707;
         /// 0 lowpass, 1 highpass, 2 bandpass, 3 notch.
         filter_mode = 0.0, 0.0..=3.0;
+        /// dB per octave: 12 (one stage) or 24 (two stages).
+        filter_slope = 12.0, 12.0..=24.0;
         /// 0 tanh, 1 hard clip, 2 atan.
         saturation_type = 0.0, 0.0..=2.0;
         saturation_drive = 1.0, 1.0..=7.0;
@@ -129,6 +134,54 @@ impl DelayLine {
     }
 }
 
+/// TPT state-variable filter state (one channel, one stage).
+#[derive(Debug, Clone, Copy, Default)]
+struct Svf {
+    z1: f64,
+    z2: f64,
+}
+
+/// Coefficients of one [`Svf`] stage at a cutoff and damping.
+#[derive(Debug, Clone, Copy)]
+struct SvfCoeffs {
+    k: f64,
+    a1: f64,
+    a2: f64,
+    a3: f64,
+}
+
+impl SvfCoeffs {
+    /// `g` is `tan(pi * cutoff / sample_rate)`, `k` is `1 / q`.
+    fn new(g: f64, k: f64) -> Self {
+        let a1 = 1.0 / (1.0 + g * (g + k));
+        let a2 = g * a1;
+        Self { k, a1, a2, a3: g * a2 }
+    }
+}
+
+impl Svf {
+    /// Filter `x` and return the output of `mode` (as `filter_mode`).
+    #[inline]
+    fn process(&mut self, x: f64, c: &SvfCoeffs, mode: f64) -> f64 {
+        let v3 = x - self.z2;
+        let v1 = c.a1 * self.z1 + c.a2 * v3;
+        let v2 = self.z2 + c.a2 * self.z1 + c.a3 * v3;
+        self.z1 = 2.0 * v1 - self.z1;
+        self.z2 = 2.0 * v2 - self.z2;
+        flush(&mut self.z1);
+        flush(&mut self.z2);
+        if mode < 0.5 {
+            v2
+        } else if mode < 1.5 {
+            v3 - v1 * c.k
+        } else if mode < 2.5 {
+            v1
+        } else {
+            v3 - v1 * c.k + v2
+        }
+    }
+}
+
 /// `#shape()`: drive, waveshape, dry/wet, output gain.
 #[inline]
 fn shape(x: f64, drive: f64, kind: f64, mix: f64, out: f64) -> f64 {
@@ -157,10 +210,10 @@ fn flush(x: &mut f64) {
 #[derive(Debug, Clone)]
 pub struct Strip {
     sample_rate: f64,
-    z1l: f64,
-    z2l: f64,
-    z1r: f64,
-    z2r: f64,
+    /// Filter stages: [left, right] of the first, then of the second
+    /// (24 dB/oct only).
+    filter: [Svf; 2],
+    filter_2: [Svf; 2],
     combs_l: [Comb; 8],
     combs_r: [Comb; 8],
     allpass_l: [Allpass; 4],
@@ -178,10 +231,8 @@ impl Strip {
         let delay_len = (DELAY_SECONDS * sample_rate.max(DELAY_MIN_RATE)).ceil() as usize;
         Self {
             sample_rate,
-            z1l: 0.0,
-            z2l: 0.0,
-            z1r: 0.0,
-            z2r: 0.0,
+            filter: [Svf::default(); 2],
+            filter_2: [Svf::default(); 2],
             combs_l: COMB_TUNINGS_L.map(Comb::new),
             combs_r: COMB_TUNINGS_R.map(Comb::new),
             allpass_l: ALLPASS_TUNINGS_L.map(Allpass::new),
@@ -236,37 +287,26 @@ impl Strip {
         let pan_comp = if pan_max > 0.001 { 1.0 / pan_max } else { 1.0 };
 
         let g = (PI * cutoff / sr).tan();
-        let k = 1.0 / q;
-        let a1 = 1.0 / (1.0 + g * (g + k));
-        let a2 = g * a1;
-        let a3 = g * a2;
+        let (stage_1, stage_2, gain_2) = if slope::is_steep(f64::from(s.filter_slope)) {
+            let (k1, k2, gain_2) = slope::stages(1.0 / q, mode);
+            (SvfCoeffs::new(g, k1), Some(SvfCoeffs::new(g, k2)), gain_2)
+        } else {
+            (SvfCoeffs::new(g, 1.0 / q), None, 1.0)
+        };
+        if stage_2.is_none() {
+            // A later switch to 24 dB/oct starts the second stage from silence.
+            self.filter_2 = [Svf::default(); 2];
+        }
 
         let frames = in_l.len().min(in_r.len()).min(out_l.len()).min(out_r.len());
         for i in 0..frames {
             // 1. Filter.
-            let v3l = f64::from(in_l[i]) - self.z2l;
-            let v1l = a1 * self.z1l + a2 * v3l;
-            let v2l = self.z2l + a2 * self.z1l + a3 * v3l;
-            self.z1l = 2.0 * v1l - self.z1l;
-            self.z2l = 2.0 * v2l - self.z2l;
-            let v3r = f64::from(in_r[i]) - self.z2r;
-            let v1r = a1 * self.z1r + a2 * v3r;
-            let v2r = self.z2r + a2 * self.z1r + a3 * v3r;
-            self.z1r = 2.0 * v1r - self.z1r;
-            self.z2r = 2.0 * v2r - self.z2r;
-            flush(&mut self.z1l);
-            flush(&mut self.z2l);
-            flush(&mut self.z1r);
-            flush(&mut self.z2r);
-            let (dry_l, dry_r) = if mode < 0.5 {
-                (v2l, v2r)
-            } else if mode < 1.5 {
-                (v3l - v1l * k, v3r - v1r * k)
-            } else if mode < 2.5 {
-                (v1l, v1r)
-            } else {
-                (v3l - v1l * k + v2l, v3r - v1r * k + v2r)
-            };
+            let mut dry_l = self.filter[0].process(f64::from(in_l[i]), &stage_1, mode);
+            let mut dry_r = self.filter[1].process(f64::from(in_r[i]), &stage_1, mode);
+            if let Some(stage_2) = &stage_2 {
+                dry_l = self.filter_2[0].process(dry_l, stage_2, mode) * gain_2;
+                dry_r = self.filter_2[1].process(dry_r, stage_2, mode) * gain_2;
+            }
 
             // 2. Saturation.
             let sat_l = if has_sat {
@@ -333,6 +373,8 @@ impl Strip {
 
 #[cfg(test)]
 mod tests {
+    use std::f64::consts::TAU;
+
     use super::*;
 
     fn run(settings: &StripSettings, input: &[f32]) -> (Vec<f32>, Vec<f32>) {
@@ -350,6 +392,36 @@ mod tests {
         // 20 kHz lowpass at 48 kHz: the energy stays.
         let energy = |s: &[f32]| s.iter().map(|x| x * x).sum::<f32>();
         assert!((energy(&l) / energy(&input) - 1.0).abs() < 0.2);
+    }
+
+    /// Gain in dB of the strip on a sine of `freq` Hz, measured once settled.
+    fn gain_db(settings: &StripSettings, freq: f64) -> f64 {
+        let input: Vec<f32> = (0..24_000).map(|i| (TAU * freq * f64::from(i) / 48_000.0).sin() as f32).collect();
+        let (l, _) = run(settings, &input);
+        let energy = |s: &[f32]| s[12_000..].iter().map(|x| f64::from(*x).powi(2)).sum::<f64>();
+        10.0 * (energy(&l) / energy(&input)).log10()
+    }
+
+    #[test]
+    fn slopes_of_12_and_24_db() {
+        for (mode, (near, far)) in [(0.0, (2_000.0, 4_000.0)), (1.0, (500.0, 250.0))] {
+            let one = StripSettings { cutoff: 1_000.0, filter_mode: mode, ..StripSettings::default() };
+            let two = StripSettings { filter_slope: 24.0, ..one };
+            for (settings, slope) in [(one, 12.0), (two, 24.0)] {
+                assert!((gain_db(&settings, 1_000.0) + 3.0).abs() < 0.3, "mode {mode}: -3 dB at the cutoff");
+                let octave = gain_db(&settings, near) - gain_db(&settings, far);
+                assert!((octave - slope).abs() < 1.5, "mode {mode}, {slope} dB/oct: {octave}");
+            }
+        }
+    }
+
+    #[test]
+    fn resonance_peaks_as_high_at_24_db() {
+        let one = StripSettings { cutoff: 1_000.0, q: 4.0, ..StripSettings::default() };
+        let two = StripSettings { filter_slope: 24.0, ..one };
+        assert!((gain_db(&one, 1_000.0) - gain_db(&two, 1_000.0)).abs() < 0.5);
+        let bandpass = StripSettings { filter_mode: 2.0, ..two };
+        assert!((gain_db(&bandpass, 1_000.0) - gain_db(&one, 1_000.0)).abs() < 0.5);
     }
 
     #[test]

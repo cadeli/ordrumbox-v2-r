@@ -8,6 +8,7 @@
 
 use std::time::Instant;
 
+use ordrumbox_core::js;
 use ordrumbox_core::json::{Object, Value};
 
 use super::*;
@@ -204,7 +205,13 @@ impl Session {
             }
             Id::SynthField(fi) => {
                 if let Some(path) = self.synth_field(fi) {
-                    self.edit_synth(&path, Value::from(value));
+                    // The slope list holds numbers, written as numbers.
+                    let value = if path == "filter.slope" {
+                        Value::from(js::parse_float(&Value::from(value)))
+                    } else {
+                        Value::from(value)
+                    };
+                    self.edit_synth(&path, value);
                 }
             }
             _ => {}

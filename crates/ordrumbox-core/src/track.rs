@@ -70,6 +70,8 @@ json_record! {
         filter_cutoff: f64 = 20.0 => "filterCutoff" | "filterFreq",
         filter_q_lfo: Option<Object> = None => "filterQLfo",
         filter_q: f64 = 0.707 => "filterQ",
+        /// Filter slope, dB per octave: 12 or 24.
+        filter_slope: f64 = 12.0 => "filterSlope",
         reverb_type: String = "none".to_owned() => "reverbType",
         reverb_mix: f64 = 0.0 => "reverbMix" | "reverbAmount",
         delay_type: String = "tape".to_owned() => "delayType",
@@ -99,7 +101,7 @@ json_record! {
 }
 
 /// `TRACK_VALUE_RANGES`: bounds of the numeric settings an edit clamps to.
-const VALUE_RANGES: [(&str, f64, f64); 28] = [
+const VALUE_RANGES: [(&str, f64, f64); 29] = [
     ("volume", 0.0, 1.0),
     ("pan", -1.0, 1.0),
     ("transpose", -24.0, 24.0),
@@ -110,6 +112,7 @@ const VALUE_RANGES: [(&str, f64, f64); 28] = [
     ("swingAmount", 0.0, 1.0),
     ("filterCutoff", 20.0, 20_000.0),
     ("filterQ", 0.707, 18.707),
+    ("filterSlope", 12.0, 24.0),
     ("reverbMix", 0.0, 1.0),
     ("delayBeats", 0.0, 4.0),
     ("delayMix", 0.0, 1.0),
