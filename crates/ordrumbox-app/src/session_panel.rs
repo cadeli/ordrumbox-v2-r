@@ -1147,6 +1147,11 @@ impl Session {
                 };
                 self.update_track(t, &[(key, v)], &format!("{} on {name}", history_label(id)), false);
             }
+            Id::LfoTarget => {
+                if let Some(i) = LFO_TARGETS.iter().position(|target| target.key == value) {
+                    self.editors.lfo_target = i as u8;
+                }
+            }
             Id::LfoType => {
                 let (mut object, lfo_key, _) = self.lfo_object(t, value);
                 object.insert("type", Value::String(value.to_owned()));
@@ -1197,7 +1202,6 @@ impl Session {
             Id::Tab(i) => self.editors.tab = i,
             Id::FxTab(i) => self.editors.fx_tab = i,
             Id::GenerationTab(i) => self.editors.generation_tab = i,
-            Id::LfoTab(i) => self.editors.lfo_target = i,
             Id::NoteTab(i) => self.editors.note_tab = i,
             Id::Row(_) => self.select_row(id),
             Id::LoadSample => self.open_picker(Purpose::ReplaceTrackSample),

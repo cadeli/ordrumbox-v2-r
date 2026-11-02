@@ -135,7 +135,7 @@ sample), the knob bar (volume, pan, transpose, the sample's decay) and the JS
 tabs — **FX** (reverb, delay, saturation, filter, each with its on/off LED;
 see "Effects" below),
 **Sound** (mono, auto-assign, instrument, sample, synth preset), **LFO** (an
-LFO per setting: LED, wave, frequency, range, phase), **Loop** (steps per
+LFO per setting: the target list and its LED, wave, frequency, range, phase), **Loop** (steps per
 beat, loop length, swing), **Gen** (auto mode; the manual variation settings,
 or the Groove / Engine settings in auto mode). Under it, the note editor: the
 selected note (else the step under the cursor, else the track's first note)
