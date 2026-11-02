@@ -11394,6 +11394,229 @@
           ]
         }
       ]
+    },
+    {
+      "id": "poly-3-against-2",
+      "name": "Poly 3 Against 2",
+      "bpm": 100,
+      "description": "Polyrhythm 3 against 2 (hemiola), 1 measure: kick on every beat for the 2, cowbell on quarter-note triplets for the 3, both meeting on 1 and 3, soft 8th-note triplet hats as the shared grid, snare on 2 and 4; crash on 1 every 4 passes.",
+      "tags": [
+        "polyrhythm",
+        "default"
+      ],
+      "tracks": [
+        {
+          "name": "KICK",
+          "loopLength": 4,
+          "noteKeys": [
+            "velocity"
+          ],
+          "notes": [
+            [
+              1
+            ]
+          ]
+        },
+        {
+          "name": "COWBELL",
+          "stepsPerBeat": 3,
+          "loopLength": 6,
+          "volume": 0.6,
+          "pan": 0.4,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.9
+            ],
+            [
+              0.7,
+              0,
+              2
+            ],
+            [
+              0.7,
+              1,
+              1
+            ]
+          ]
+        },
+        {
+          "name": "CHH",
+          "stepsPerBeat": 3,
+          "loopLength": 3,
+          "volume": 0.5,
+          "pan": -0.3,
+          "noteKeys": [
+            "velocity",
+            "step"
+          ],
+          "notes": [
+            [
+              0.4
+            ],
+            [
+              0.2,
+              1
+            ],
+            [
+              0.25,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "SNARE",
+          "loopLength": 16,
+          "reverbType": "room",
+          "reverbMix": 0.2,
+          "noteKeys": [
+            "velocity",
+            "beat"
+          ],
+          "notes": [
+            [
+              0.7,
+              1
+            ],
+            [
+              0.7,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "CRASH",
+          "loopLength": 16,
+          "volume": 0.6,
+          "pan": 0.6,
+          "noteKeys": [
+            "velocity",
+            "cycle"
+          ],
+          "notes": [
+            [
+              0.6,
+              4
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "poly-3-against-4",
+      "name": "Poly 3 Against 4",
+      "bpm": 100,
+      "description": "Polyrhythm 3 against 4, 1 measure: kick on every beat for the 4, rimshot on 1, the second triplet of 2 and the third triplet of 3 for the 3, meeting only on 1, soft 8th-note triplet hats as the shared grid, clap on 2 and 4; crash on 1 every 4 passes.",
+      "tags": [
+        "polyrhythm",
+        "default"
+      ],
+      "tracks": [
+        {
+          "name": "KICK",
+          "loopLength": 4,
+          "noteKeys": [
+            "velocity"
+          ],
+          "notes": [
+            [
+              1
+            ]
+          ]
+        },
+        {
+          "name": "RIMSHOT",
+          "stepsPerBeat": 3,
+          "loopLength": 12,
+          "volume": 0.7,
+          "pan": 0.4,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.9
+            ],
+            [
+              0.75,
+              1,
+              1
+            ],
+            [
+              0.75,
+              2,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "CHH",
+          "stepsPerBeat": 3,
+          "loopLength": 3,
+          "volume": 0.5,
+          "pan": -0.3,
+          "noteKeys": [
+            "velocity",
+            "step"
+          ],
+          "notes": [
+            [
+              0.4
+            ],
+            [
+              0.2,
+              1
+            ],
+            [
+              0.25,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "CLAP",
+          "loopLength": 16,
+          "pan": 0.2,
+          "reverbType": "room",
+          "reverbMix": 0.2,
+          "noteKeys": [
+            "velocity",
+            "beat"
+          ],
+          "notes": [
+            [
+              0.7,
+              1
+            ],
+            [
+              0.7,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "CRASH",
+          "loopLength": 16,
+          "volume": 0.6,
+          "pan": 0.6,
+          "noteKeys": [
+            "velocity",
+            "cycle"
+          ],
+          "notes": [
+            [
+              0.6,
+              4
+            ]
+          ]
+        }
+      ]
     }
   ]
 }
