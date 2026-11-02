@@ -544,6 +544,9 @@ impl Session {
         if self.song_drag.is_some() {
             return self.song_drag_move(x, y);
         }
+        if let Some(axis) = self.song_bar_drag {
+            return self.song_bar_to(size, axis, x, y);
+        }
         let (width, height, scale) = size;
         if let Some(dropdown) = &mut self.dropdown {
             if let Some(i) = dropdown.hit(width, height, scale, x, y).filter(|&i| i != dropdown.at) {
@@ -613,6 +616,7 @@ impl Session {
 
     pub fn mouse_up(&mut self) {
         self.drag = None;
+        self.song_bar_drag = None;
         self.roll_release();
     }
 

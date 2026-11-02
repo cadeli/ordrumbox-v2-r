@@ -168,6 +168,8 @@ pub struct Session {
     /// The clip under the mouse (its tooltip).
     hovered_clip: Option<usize>,
     song_drag: Option<session_song::SongDrag>,
+    /// The arrangement's scroll bar held by the mouse.
+    song_bar_drag: Option<crate::song_view::Axis>,
     /// The piano roll's page, highest row shown (`None`: centered on the
     /// track's pitch), cursor (step, row), note pressed, the edited value
     /// shown over the note, next progression, note under the mouse.
@@ -360,7 +362,7 @@ const SHORTCUTS: [&str; 53] = [
     "SONG PANEL (F3)",
     "  click / right-click    the ruler: aim the cursor; a pattern, row, clip, the grid: menu",
     "  Left Right, Up Down    the cursor a measure back / on, previous / next pattern",
-    "  Space, wheel           play the song from the cursor; scroll (Shift: the rows)",
+    "  Space, wheel           play the song from the cursor; scroll (Shift: the rows), or drag the bars",
     "KIT EDITOR (Ctrl+K)",
     "  Up Down                sample      Enter  hear      Delete  remove",
     "  N, E                   normalize, export the mapping",
@@ -484,6 +486,7 @@ impl Session {
             description_scroll: (0, 0),
             hovered_clip: None,
             song_drag: None,
+            song_bar_drag: None,
             roll_page: 0,
             roll_top: None,
             roll_cursor: None,

@@ -169,8 +169,9 @@ arrangement to add it at that measure, on its own row; drag a clip sideways to
 move it, whole measures at a time (the wheel scrolls during the drag; the grid
 shows a page past the end to drop on). A click on a pattern selects it, a
 double-click renames it (**↑↓** step through them). The wheel scrolls the
-measures (**Shift**: the rows); while the song plays the grid follows it page
-by page. Every edit is an undo step, and moves the loop onto the end of the
+measures, sideways too (**Shift**: the rows); the scroll bars under and right
+of the grid, clicked or dragged, reach every measure and row; while the song
+plays the grid follows it page by page. Every edit is an undo step, and moves the loop onto the end of the
 last clip, as in the JS (`song_commands.js`, checked against it). **Save**
 writes the song (patterns, arrangements, what is selected) to
 `songs/<name>.odbox` in the user data folder, where the JS app uses

@@ -36,6 +36,10 @@ const LIST_WIDTH: i32 = (LIST_NUMBER_CHARS + LIST_NAME_CHARS) * 8 + 4;
 const DESCRIPTION_PAD: i32 = 4;
 /// Width of the description's scroll bar.
 const SCROLL_BAR: i32 = 3;
+/// Thickness of the arrangement's scroll bars.
+const GRID_BAR: i32 = 8;
+/// Shortest thumb of a scroll bar.
+const MIN_THUMB: i32 = 12;
 /// Height of what is under the arrangement: all the song column's widgets.
 const LOWER_HEIGHT: i32 = 138;
 /// Gap between the arrangement and what is under it, and between the list and the column.
@@ -116,6 +120,13 @@ pub struct SongGhost {
     pub measure_count: f64,
 }
 
+/// A scroll bar of the arrangement: across the measures, or down the rows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Axis {
+    Measures,
+    Rows,
+}
+
 /// What is under the mouse.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SongHit {
@@ -131,6 +142,8 @@ pub enum SongHit {
     RowName(usize),
     /// The bare grid: a row, a measure.
     Cell { row: usize, measure: u32 },
+    /// A scroll bar of the arrangement.
+    ScrollBar(Axis),
 }
 
 /// Where the song panel's parts are.
@@ -214,14 +227,63 @@ impl SongLayout {
         self.grid.x + self.label_width()
     }
 
-    /// Measures that fit across.
-    pub fn visible_measures(&self) -> u32 {
-        u32::try_from((self.grid.w - self.label_width()).max(0) / self.measure_width()).unwrap_or(0).max(1)
+    fn grid_bar(&self) -> i32 {
+        GRID_BAR * self.scale
     }
 
-    /// Rows that fit down.
+    /// Measures that fit across, left of the rows' scroll bar.
+    pub fn visible_measures(&self) -> u32 {
+        let w = self.grid.w - self.label_width() - self.grid_bar();
+        u32::try_from(w.max(0) / self.measure_width()).unwrap_or(0).max(1)
+    }
+
+    /// Rows that fit down, over the measures' scroll bar.
     pub fn visible_rows(&self) -> usize {
-        usize::try_from((self.grid.y + self.grid.h - self.body_top()).max(0) / self.row_height()).unwrap_or(0).max(1)
+        let h = self.grid.y + self.grid.h - self.grid_bar() - self.body_top();
+        usize::try_from(h.max(0) / self.row_height()).unwrap_or(0).max(1)
+    }
+
+    /// The scroll bar along `axis`: under the measures, or right of the rows.
+    pub fn scroll_bar(&self, axis: Axis) -> Rect {
+        let (g, bar) = (self.grid, self.grid_bar());
+        let bottom = g.y + g.h - bar;
+        match axis {
+            Axis::Measures => Rect::new(self.body_left(), bottom, (g.x + g.w - bar - self.body_left()).max(0), bar),
+            Axis::Rows => Rect::new(g.x + g.w - bar, self.body_top(), bar, (bottom - self.body_top()).max(0)),
+        }
+    }
+
+    /// Start and length of `axis`'s track, along it.
+    fn track(&self, axis: Axis) -> (i32, i32) {
+        let r = self.scroll_bar(axis);
+        match axis {
+            Axis::Measures => (r.x, r.w),
+            Axis::Rows => (r.y, r.h),
+        }
+    }
+
+    /// Start and length of `axis`'s thumb: `shown` of `total` from `first`.
+    fn thumb(&self, axis: Axis, first: usize, shown: usize, total: usize) -> (i32, i32) {
+        let (start, len) = self.track(axis);
+        let total = total.max(shown).max(1) as i64;
+        let thumb = ((i64::from(len) * shown as i64 / total) as i32).max(MIN_THUMB * self.scale).min(len);
+        let free = i64::from(len - thumb);
+        let room = (total - shown as i64).max(1);
+        (start + (free * first as i64 / room) as i32, thumb)
+    }
+
+    /// The first measure or row that puts `axis`'s thumb centred on `(x, y)`.
+    pub fn scroll_at(&self, axis: Axis, x: i32, y: i32, shown: usize, total: usize) -> usize {
+        let last = total.saturating_sub(shown);
+        let (start, len) = self.track(axis);
+        let (_, thumb) = self.thumb(axis, 0, shown, total);
+        let pos = match axis {
+            Axis::Measures => x,
+            Axis::Rows => y,
+        };
+        let free = i64::from((len - thumb).max(1));
+        let along = i64::from((pos - start - thumb / 2).clamp(0, len - thumb));
+        ((along * last as i64 + free / 2) / free) as usize
     }
 
     fn list_rows(&self) -> usize {
@@ -284,6 +346,9 @@ impl SongLayout {
         let song = view.song?;
         if !self.grid.contains(x, y) || y < self.ruler_top() {
             return None;
+        }
+        if let Some(axis) = [Axis::Measures, Axis::Rows].into_iter().find(|&a| self.scroll_bar(a).contains(x, y)) {
+            return Some(SongHit::ScrollBar(axis));
         }
         let row = row_at(y, self.body_top(), self.row_height())
             .map(|row| view.scroll.1 + row)
@@ -464,19 +529,20 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
         canvas.fill_rect(x - s, layout.body_top(), 2 * s, body_h, if view.playing { CURSOR } else { CURSOR_IDLE });
     }
 
-    // Scroll hints.
-    let more = |canvas: &mut Canvas, text: &str, x: i32, y: i32| {
-        canvas.text(x, y, text, s, DIM);
-    };
-    if first_measure > 0 {
-        more(canvas, "<", layout.body_left() - 10 * s, layout.ruler_top() + 5 * s);
-    }
-    if first_measure + shown_measures < grid_total {
-        more(canvas, ">", layout.body_left() + body_w + 2 * s, layout.ruler_top() + 5 * s);
-    }
-    if first_row + shown_rows < view.rows.len() {
-        let hidden = view.rows.len() - first_row - shown_rows;
-        more(canvas, &format!("+{hidden} rows"), g.x, layout.body_top() + body_h + 4 * s);
+    // The scroll bars: what is shown, over the whole arrangement.
+    let bars = [
+        (Axis::Measures, first_measure as usize, layout.visible_measures() as usize, grid_total as usize),
+        (Axis::Rows, first_row, layout.visible_rows(), view.rows.len()),
+    ];
+    for (axis, first, shown, total) in bars {
+        let r = layout.scroll_bar(axis);
+        canvas.fill_rect(r.x, r.y, r.w, r.h, CELL);
+        let (start, len) = layout.thumb(axis, first, shown, total);
+        let color = if total > shown { DIM } else { LINE };
+        match axis {
+            Axis::Measures => canvas.fill_rect(start, r.y + s, len, r.h - 2 * s, color),
+            Axis::Rows => canvas.fill_rect(r.x + s, start, r.w - 2 * s, len, color),
+        }
     }
 }
 
