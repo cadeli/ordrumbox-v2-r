@@ -1208,7 +1208,7 @@ impl Session {
                     [Command::GenerateDrums, Command::GenerateBass, Command::GenerateChords][usize::from(i.min(2))],
                 );
             }
-            Id::SongName | Id::SongDescription => self.text_entry(id),
+            Id::SongName | Id::SongDescription | Id::PatternDescription => self.text_entry(id),
             _ => {
                 let Some(t) = self.editor_track() else { return };
                 self.activate_on_track(t, id);
