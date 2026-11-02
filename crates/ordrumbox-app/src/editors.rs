@@ -72,11 +72,12 @@ pub fn track_select_options(key: &str) -> (Vec<String>, Vec<String>) {
     }
 }
 
-/// A target of the modulation tab: the setting, its label, its LFO's key,
-/// its range and step.
+/// A target of the modulation tab: the setting, its short label, its name,
+/// its LFO's key, its range and step.
 pub struct LfoTarget {
     pub key: &'static str,
     pub label: &'static str,
+    pub name: &'static str,
     pub lfo_key: &'static str,
     pub min: f64,
     pub max: f64,
@@ -85,11 +86,35 @@ pub struct LfoTarget {
 
 /// The settings that take an LFO, in the JS order (track props, then the knob bar's).
 pub const LFO_TARGETS: [LfoTarget; 5] = [
-    LfoTarget { key: "filterCutoff", label: "Freq", lfo_key: "filterCutoffLfo", min: 20.0, max: 20_000.0, step: 1.0 },
-    LfoTarget { key: "filterQ", label: "Q", lfo_key: "filterQLfo", min: 0.707, max: 18.707, step: 0.01 },
-    LfoTarget { key: "volume", label: "Vol", lfo_key: "volumeLfo", min: 0.0, max: 1.0, step: 0.01 },
-    LfoTarget { key: "pan", label: "Pan", lfo_key: "panLfo", min: -1.0, max: 1.0, step: 0.01 },
-    LfoTarget { key: "transpose", label: "Transp", lfo_key: "transposeLfo", min: -24.0, max: 24.0, step: 1.0 },
+    LfoTarget {
+        key: "filterCutoff",
+        label: "Cutoff",
+        name: "filter cutoff, Hz",
+        lfo_key: "filterCutoffLfo",
+        min: 20.0,
+        max: 20_000.0,
+        step: 1.0,
+    },
+    LfoTarget {
+        key: "filterQ",
+        label: "Q",
+        name: "filter Q",
+        lfo_key: "filterQLfo",
+        min: 0.707,
+        max: 18.707,
+        step: 0.01,
+    },
+    LfoTarget { key: "volume", label: "Vol", name: "volume", lfo_key: "volumeLfo", min: 0.0, max: 1.0, step: 0.01 },
+    LfoTarget { key: "pan", label: "Pan", name: "pan", lfo_key: "panLfo", min: -1.0, max: 1.0, step: 0.01 },
+    LfoTarget {
+        key: "transpose",
+        label: "Transp",
+        name: "transpose, semitones",
+        lfo_key: "transposeLfo",
+        min: -24.0,
+        max: 24.0,
+        step: 1.0,
+    },
 ];
 
 /// The LFO key of a setting, if it takes one.
@@ -669,7 +694,7 @@ pub fn track_editor(view: &TrackView, state: &EditorState, area: Rect, scale: i3
             } else {
                 let value = lfo_now(p.key).unwrap_or_else(|| number(track, p.key));
                 let spec = value_spec(p, default_of(p.key, p.min), true);
-                (Id::KnobBar(p.key), spec, value, p.label, p.format.value(value, unit), false)
+                (Id::KnobBar(p.key), spec, value, p.label, p.format.value(value, unit), has_lfo(track, p.key))
             }
         })
         .collect();
@@ -771,15 +796,6 @@ fn sound_tab(rows: &mut Rows, view: &TrackView) {
 fn lfo_tab(rows: &mut Rows, view: &TrackView, state: &EditorState) {
     let s = rows.scale;
     let track = view.track;
-    let tabs: Vec<_> = LFO_TARGETS
-        .iter()
-        .enumerate()
-        .map(|(i, t)| {
-            let on = track.field(t.lfo_key).is_some_and(|v| !v.is_null());
-            (Id::LfoTab(i as u8), Some(Id::LfoLed(i as u8)), t.label, state.lfo_target == i as u8, on)
-        })
-        .collect();
-    rows.tabs(&tabs);
     let target = &LFO_TARGETS[usize::from(state.lfo_target.min(4))];
     let lfo = track.field(target.lfo_key).and_then(|v| v.as_object().cloned());
     let get = |key: &str, fallback: f64| {
@@ -788,6 +804,21 @@ fn lfo_tab(rows: &mut Rows, view: &TrackView, state: &EditorState) {
     let kind_now = lfo
         .as_ref()
         .map_or_else(|| "sine".to_owned(), |o| o.get("type").and_then(Value::as_str).unwrap_or("sine").to_owned());
+
+    // Target: its on/off LED, then the list (a target with an LFO on says so).
+    let r = rows.row();
+    rows.label(r, "Target", None, false);
+    let field = rows.field(r, r.w);
+    let led_w = 10 * s;
+    let on = |t: &LfoTarget| track.field(t.lfo_key).is_some_and(|v| !v.is_null());
+    let led = Id::LfoLed(state.lfo_target.min(4));
+    rows.items.push(Item::new(Some(led), Rect::new(field.x, field.y, led_w, field.h), Kind::Led { on: on(target) }));
+    let values = LFO_TARGETS.iter().map(|t| t.key.to_owned()).collect();
+    let labels =
+        LFO_TARGETS.iter().map(|t| if on(t) { format!("{} (on)", t.name) } else { t.name.to_owned() }).collect();
+    let choice = Choice { values, labels, selected: usize::from(state.lfo_target.min(4)) };
+    let select = Rect::new(field.x + led_w + 2 * s, field.y, (200 * s).min(field.w - led_w - 2 * s), field.h);
+    rows.items.push(Item::new(Some(Id::LfoTarget), select, choice.kind()));
 
     let r = rows.row();
     rows.label(r, "Type", None, false);

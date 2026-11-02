@@ -88,8 +88,8 @@ pub enum Id {
     FxLed(u8),
     /// Groove / Engine sub-tab.
     GenerationTab(u8),
-    /// LFO target sub-tab, and its on/off LED.
-    LfoTab(u8),
+    /// LFO target list, and the on/off LED of a target.
+    LfoTarget,
     LfoLed(u8),
     /// The knob bar (volume, pan, pitch).
     KnobBar(&'static str),
