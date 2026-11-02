@@ -16,6 +16,7 @@ use crate::pattern::Pattern;
 use crate::rng::Rng;
 use crate::scales::Scales;
 use crate::steps::{TICK, absolute_step, step_spacing, step_to_tick};
+use crate::style::Macros;
 use crate::track::Track;
 use crate::variation;
 
@@ -73,12 +74,13 @@ pub fn fires_on_pass(offset: i32, cycle: i32, pass: u32) -> bool {
 pub fn expand_hits(pattern: &Pattern, pass: u32, rng: &mut Rng, scales: &Scales) -> Hits {
     let mut flat = Hits::new();
     let pattern_ticks = pattern_ticks(pattern);
+    let macro_factor = Macros::of(pattern).variation_factor();
     for (track_index, track) in pattern.tracks.iter().enumerate() {
         if track.steps_per_beat <= 0 {
             continue; // no grid: JS computes NaN ticks for every note
         }
         let loop_ticks = track_loop_ticks(track);
-        let varied = variation::vary_notes(track, rng);
+        let varied = variation::vary_notes(track, macro_factor, rng);
         let span_end = SpanResolver::new(track);
         // Probability is a manual-mode control: in auto mode only note.probability gates.
         let track_probability = if track.auto_mode { 1.0 } else { track.probability };
@@ -99,7 +101,7 @@ pub fn expand_hits(pattern: &Pattern, pass: u32, rng: &mut Rng, scales: &Scales)
                 ctx.add_euclidean_fill(&mut flat, tick, &span_end, rng);
             }
         }
-        variation::apply(&mut flat, track_index, track, loop_ticks, pattern_ticks, rng, scales);
+        variation::apply(&mut flat, track_index, track, (loop_ticks, pattern_ticks), macro_factor, rng, scales);
     }
     flat
 }

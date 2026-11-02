@@ -15,11 +15,15 @@ use ordrumbox_engine::assign::{assign_track, synth_for};
 use super::*;
 use crate::control::{Spec, Style};
 use crate::editors::{
-    self, ARP_DIRECTIONS, Choice, FILTER_TYPES, FX_DEFS, FX_KNOBS, GENERATION_ENGINE, GENERATION_GROOVE,
-    GENERATION_MANUAL, GenerationRow, KIT_KNOBS, KNOB_BAR, KitControls, LFO_TARGETS, LOOP_PROPS, NOTE_GROUPS,
-    NOTE_KNOBS, NoteRow, NoteView, SampleBar, TrackView,
+    self, ARP_DIRECTIONS, Choice, ComposeView, FILTER_TYPES, FX_DEFS, FX_KNOBS, GENERATION_COMPOSE, GENERATION_ENGINE,
+    GENERATION_GROOVE, GENERATION_MANUAL, GenerationRow, KIT_KNOBS, KNOB_BAR, KitControls, LFO_TARGETS, LOOP_PROPS,
+    NOTE_GROUPS, NOTE_KNOBS, NoteRow, NoteView, STYLE_DEFAULT, SampleBar, TrackView,
 };
 use crate::kits::Field;
+use ordrumbox_core::style::{self, Macros};
+
+/// The ⟳ button's label: the pattern made again.
+const GENERATE_LABEL: &str = "\u{21bb}";
 use crate::panel::{self, Item, Kind, LfoParam, Rect};
 use crate::view::{KitLayout, Layout};
 
@@ -204,11 +208,29 @@ impl Session {
         let selected = usize::try_from(pattern.beat_count - 1).unwrap_or(0).min(beats.len() - 1);
         let kind = Kind::Select { values: beats.clone(), labels: beats, selected };
         layout.items.push(Item::new(Some(Id::Beats), controls.beats, kind));
-        for (i, ((rect, label), on)) in
-            controls.generation.iter().zip(["DRUM", "BASS", "CHORDS"]).zip(self.generation()).enumerate()
-        {
-            let kind = Kind::Button { label: label.into(), on };
-            layout.items.push(Item::new(Some(Id::Generate(i as u8)), *rect, kind));
+        // The generation: the pattern's style, ⟳, AUTO, the macros.
+        let styles = self.shown_styles();
+        let genre = pattern.extra.get(generate::GENRE).and_then(|g| g.as_str()).unwrap_or_default();
+        let values: Vec<String> =
+            std::iter::once(String::new()).chain(styles.list.iter().map(|s| s.name.clone())).collect();
+        let labels: Vec<String> =
+            std::iter::once("random".to_owned()).chain(styles.list.iter().map(style_label)).collect();
+        let selected = styles.get(genre).and_then(|st| values.iter().position(|v| *v == st.name)).unwrap_or(0);
+        layout.items.push(Item::new(Some(Id::StyleList), controls.style, Kind::Select { values, labels, selected }));
+        let button = Kind::Button { label: GENERATE_LABEL.into(), on: false };
+        layout.items.push(Item::new(Some(Id::GeneratePattern), controls.generate, button));
+        let button = Kind::Button { label: "AUTO".into(), on: self.pattern_auto() };
+        layout.items.push(Item::new(Some(Id::AutoAll), controls.auto, button));
+        let macros = Macros::of(pattern);
+        for (rect, (key, _)) in controls.macros.iter().zip(view::MACROS) {
+            let value = match key {
+                style::ENERGY => macros.energy,
+                style::COMPLEXITY => macros.complexity,
+                _ => macros.variation,
+            };
+            let spec = Spec::knob(0.0, 100.0, 1.0, style::MACRO_NEUTRAL);
+            let kind = Kind::Value { spec, value, label: None, text: js::number_to_string(value), lfo: false };
+            layout.items.push(Item::new(Some(Id::Macro(key)), *rect, kind));
         }
     }
 
@@ -361,7 +383,33 @@ impl Session {
             None => Vec::new(),
         };
         let bpm = self.pattern().map_or(song::DEFAULT_BPM, |p| p.bpm);
-        Some(TrackView { track, title, sample, decay, instruments, samples, synths, lfo, bpm })
+        let compose = self.compose_view(track);
+        Some(TrackView { track, title, sample, decay, instruments, samples, synths, lfo, bpm, compose })
+    }
+
+    /// The track editor on its Gen tab.
+    pub fn show_generation_tab(&mut self) {
+        self.show_track_editor = true;
+        self.editors.tab = editors::GEN_TAB;
+    }
+
+    /// The styles the header and the Gen tab show: what the library taught,
+    /// else (before the first frame learned it) the written ones.
+    fn shown_styles(&self) -> &Styles {
+        if self.learned_styles.1.is_some() { &self.learned_styles.0 } else { &self.styles }
+    }
+
+    /// How a drum track plays its pattern's style (the style the
+    /// generation last learned, else the written one).
+    fn compose_view(&self, track: &Track) -> Option<ComposeView> {
+        if !instrument_family(&track.name).is_drum() {
+            return None;
+        }
+        let genre = self.pattern()?.extra.get(generate::GENRE)?.as_str()?;
+        let style = self.shown_styles().get(genre)?;
+        let macros = Macros::of(self.pattern()?);
+        let shown = compose::track_settings(track, style, macros)?;
+        Some(ComposeView { style: style.name.clone(), shown })
     }
 
     /// Every sample of instrument `id`: (kit, url, name), the current kit's
@@ -920,7 +968,7 @@ impl Session {
 
     /// A row's label clicked.
     fn select_row(&mut self, id: Id) {
-        if let Id::Generation(key) | Id::Loop(key) | Id::Fx(key) | Id::Row(key) = id {
+        if let Id::Generation(key) | Id::Compose(key) | Id::Loop(key) | Id::Fx(key) | Id::Row(key) = id {
             self.editors.selected_prop = Some(key);
         }
     }
@@ -929,6 +977,9 @@ impl Session {
     fn set_value(&mut self, id: Id, value: f64) {
         if let Id::Bpm = id {
             return self.set_tempo(value);
+        }
+        if let Id::Macro(key) = id {
+            return self.set_macro(key, value);
         }
         if let Id::Master(key) = id {
             return self.set_master_value(key, value);
@@ -955,6 +1006,11 @@ impl Session {
             }
             Id::Generation(key) => {
                 self.update_track(t, &[(key, num(value))], &format!("{} on {name}", history_label(id)), true)
+            }
+            Id::Compose(key) => {
+                // A double-click gives the setting back to the style.
+                let value = if value <= STYLE_DEFAULT { Value::Null } else { num(value) };
+                self.update_track(t, &[(key, value)], &format!("{} on {name}", history_label(id)), true)
             }
             Id::Loop(key) => self.loop_slider(t, key, value),
             Id::Decay => {
@@ -1102,6 +1158,7 @@ impl Session {
                 return;
             }
             Id::SongMenu => return self.song_menu_pick(value),
+            Id::StyleList => return self.choose_style(value),
             Id::Beats => {
                 if let Ok(beats) = value.parse::<i32>() {
                     self.set_length(beats);
@@ -1202,6 +1259,7 @@ impl Session {
             Id::Tab(i) => self.editors.tab = i,
             Id::FxTab(i) => self.editors.fx_tab = i,
             Id::GenerationTab(i) => self.editors.generation_tab = i,
+            Id::GenerationAdvanced => self.editors.generation_advanced = !self.editors.generation_advanced,
             Id::NoteTab(i) => self.editors.note_tab = i,
             Id::Row(_) => self.select_row(id),
             Id::LoadSample => self.open_picker(Purpose::ReplaceTrackSample),
@@ -1212,11 +1270,8 @@ impl Session {
             Id::SynthTab(_) | Id::SynthButton(_) | Id::SynthPower(_) | Id::SynthIcon(..) | Id::SynthField(_) => {
                 self.synth_activate(id);
             }
-            Id::Generate(i) => {
-                self.run(
-                    [Command::GenerateDrums, Command::GenerateBass, Command::GenerateChords][usize::from(i.min(2))],
-                );
-            }
+            Id::GeneratePattern => self.run(Command::GeneratePattern),
+            Id::AutoAll => self.run(Command::AutoAll),
             Id::SongName | Id::SongDescription | Id::PatternDescription => self.text_entry(id),
             _ => {
                 let Some(t) = self.editor_track() else { return };
@@ -1229,6 +1284,7 @@ impl Session {
         let Some(track) = self.track(t).cloned() else { return };
         let name = &track.name;
         match id {
+            Id::Regenerate => self.regenerate_track(t),
             Id::FxLed(i) => {
                 // `toggleFxByKey`.
                 let fx = &FX_DEFS[usize::from(i.min(3))];
@@ -1320,6 +1376,7 @@ fn control_name(id: Id) -> (&'static str, &'static str) {
                 .unwrap_or_else(|| prop(&GENERATION_MANUAL, key));
             (label, "")
         }
+        Id::Compose(key) => (prop(&GENERATION_COMPOSE, key), ""),
         Id::Loop(key) => (prop(&LOOP_PROPS, key), ""),
         Id::Lfo(param) => (
             match param {
@@ -1349,6 +1406,7 @@ fn control_name(id: Id) -> (&'static str, &'static str) {
         Id::TrackSelect(key) => (editors::fx_label(key), ""),
         Id::Toggle("mono") => ("Mono", ""),
         Id::Toggle("autoMode") => ("Auto", ""),
+        Id::Toggle("composeLock") => ("Lock", ""),
         Id::Toggle(key) => {
             let mut rows = GENERATION_GROOVE.iter().chain(GENERATION_ENGINE.iter());
             let label = rows.find_map(|r| match r {
@@ -1383,7 +1441,12 @@ fn filter_on(track: &Track, filter_type: String) -> Vec<(&'static str, Value)> {
 /// after its effect's for an effect setting (`Dly Mix`), else its key.
 fn history_label(id: Id) -> String {
     let key = match id {
-        Id::Fx(key) | Id::TrackSelect(key) | Id::Generation(key) | Id::Loop(key) | Id::Toggle(key) => key,
+        Id::Fx(key)
+        | Id::TrackSelect(key)
+        | Id::Generation(key)
+        | Id::Compose(key)
+        | Id::Loop(key)
+        | Id::Toggle(key) => key,
         Id::NoteSlider(key) | Id::NoteKnob(key) | Id::NoteSelect(key) => key,
         _ => "",
     };
@@ -1406,6 +1469,7 @@ mod tests {
         assert_eq!(history_label(Id::TrackSelect("autoVariant")), "Variant");
         assert_eq!(history_label(Id::Generation("autoPitchChance")), "Pitch");
         assert_eq!(history_label(Id::Generation("hitVariation")), "Var Hits");
+        assert_eq!(history_label(Id::Compose("composeSyncopation")), "Syncopation");
         assert_eq!(history_label(Id::Loop("loopLength")), "Loop Len");
         assert_eq!(history_label(Id::Toggle("pitchScaleLock")), "Scale Lock");
         assert_eq!(history_label(Id::NoteSlider("euclideanPulses")), "Pulses");
@@ -1477,12 +1541,72 @@ mod tests {
         }
         s.panel_key(SIZE, PanelKey::Enter, false, false);
         assert_eq!(s.pattern().unwrap().beat_count, 8);
-        // Drum: the drum tracks in auto mode, the button lit.
-        let (x, y) = center(c.generation[0]);
+        // AUTO: every track in auto mode, the button lit.
+        let (x, y) = center(c.auto);
         s.mouse_down(SIZE, x, y, Button::Left, false);
-        assert_eq!(s.generation(), [true, false, false]);
+        assert!(s.pattern().unwrap().tracks.iter().all(|t| t.auto_mode));
         let layout = s.panel_layout(SIZE.0, SIZE.1, 1);
-        assert!(matches!(panel::find(&layout.items, Id::Generate(0)).unwrap().kind, Kind::Button { on: true, .. }));
+        assert!(matches!(panel::find(&layout.items, Id::AutoAll).unwrap().kind, Kind::Button { on: true, .. }));
+    }
+
+    #[test]
+    fn a_pattern_in_the_chosen_style_and_its_drum_track_composed_from_the_gen_tab() {
+        let mut s = session();
+        let text = include_str!("../../../assets/data/styles.json");
+        s.styles = Styles::from_json(&ordrumbox_core::json::parse(text).unwrap()).0;
+        s.update();
+        // The header's style list: the pattern made again in reggae.
+        s.select(Id::StyleList, "reggae");
+        assert_eq!(s.message, "generated in reggae");
+        let pattern = s.pattern().unwrap();
+        assert_eq!(pattern.extra.get(generate::GENRE).and_then(|g| g.as_str()), Some("reggae"));
+        assert_eq!(pattern.tracks[0].name, "KICK");
+        assert_eq!(pattern.tracks[0].notes.iter().map(|n| (n.beat, n.step)).collect::<Vec<_>>(), [(2, 0)]);
+        assert!(pattern.tracks.iter().all(|t| t.name != "TOM"));
+
+        // The Gen tab of the KICK: the style's hits, then the track's own.
+        s.editors.tab = editors::GEN_TAB;
+        let layout = s.panel_layout(SIZE.0, SIZE.1, 1);
+        let hits = panel::find(&layout.items, Id::Compose("composeHitsPerMeasure")).unwrap();
+        assert!(matches!(&hits.kind, Kind::Value { value, text, .. } if *value == 1.0 && text == "1*"));
+        s.set_value(Id::Compose("composeHitsPerMeasure"), 3.0);
+        assert_eq!(s.track(0).unwrap().compose_hits_per_measure, Some(3.0));
+        assert_eq!(s.editor.history().next_undo(), Some("Hits/Meas on KICK"));
+        // ↻: a new line with three kicks, the third beat among them.
+        let regenerate = panel::find(&s.panel_layout(SIZE.0, SIZE.1, 1).items, Id::Regenerate).unwrap().rect;
+        let (x, y) = center(regenerate);
+        s.mouse_down(SIZE, x, y, Button::Left, false);
+        let kick = s.track(0).unwrap();
+        assert_eq!(kick.notes.len(), 3);
+        assert!(kick.notes.iter().any(|n| (n.beat, n.step) == (2, 0)));
+        assert!(kick.notes.iter().all(|n| (n.beat, n.step) != (0, 0)), "one drop: never the downbeat");
+        // A double-click gives the setting back to the style.
+        s.set_value(Id::Compose("composeHitsPerMeasure"), STYLE_DEFAULT);
+        assert_eq!(s.track(0).unwrap().compose_hits_per_measure, None);
+
+        // The ENERGY knob: the one-drop's single kick played twice, its third beat kept.
+        s.set_value(Id::Macro(style::ENERGY), 100.0);
+        assert_eq!(s.editor.history().next_undo(), Some("Set energy → 100"));
+        let kick = s.track(0).unwrap();
+        assert_eq!(kick.notes.len(), 2);
+        assert!(kick.notes.iter().any(|n| (n.beat, n.step) == (2, 0)));
+        let layout = s.panel_layout(SIZE.0, SIZE.1, 1);
+        let hits = panel::find(&layout.items, Id::Compose("composeHitsPerMeasure")).unwrap();
+        assert!(matches!(&hits.kind, Kind::Value { text, .. } if text == "1\u{2192}2*"), "{:?}", hits.kind);
+        // The same knob value makes the same lines.
+        let lines = s.pattern().unwrap().tracks.clone();
+        s.set_value(Id::Macro(style::ENERGY), 60.0);
+        s.set_value(Id::Macro(style::ENERGY), 100.0);
+        assert_eq!(s.pattern().unwrap().tracks, lines);
+
+        // A locked KICK stays through ⟳; the other tracks get new lines.
+        s.run(Command::LockTrack);
+        assert!(s.track(0).unwrap().compose_lock);
+        let kick = s.track(0).unwrap().clone();
+        let (x, y) = center(panel::find(&s.panel_layout(SIZE.0, SIZE.1, 1).items, Id::GeneratePattern).unwrap().rect);
+        s.mouse_down(SIZE, x, y, Button::Left, false);
+        assert_eq!(s.pattern().unwrap().tracks.iter().find(|t| t.name == "KICK"), Some(&kick));
+        assert_eq!(s.editor.history().next_undo(), Some("Generate \"p\""));
     }
 
     #[test]

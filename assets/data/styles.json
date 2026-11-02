@@ -1,0 +1,967 @@
+{
+  "aliases": {
+    "electro": "techno",
+    "dnb": "drumandbass",
+    "jungle": "drumandbass",
+    "hip": "hiphop",
+    "rap": "hiphop",
+    "boombap": "hiphop",
+    "metal": "rock",
+    "pop": "rock",
+    "ragga": "reggae",
+    "dub": "reggae",
+    "swing": "jazz",
+    "bossanova": "bossa",
+    "mambo": "salsa",
+    "afro": "afrobeat",
+    "drill": "trap"
+  },
+  "styles": {
+    "techno": {
+      "meter": {
+        "stepsPerBeat": 4,
+        "beatCount": 4
+      },
+      "swing": {
+        "amount": 0,
+        "resolution": 4
+      },
+      "tempo": [124, 134],
+      "tracks": ["KICK", "CLAP", "CHH", "OHH", "PERC", "BASS"],
+      "parts": {
+        "KICK": {
+          "weights": [1, 0.03, 0.03, 0.15, 1, 0.03, 0.03, 0.15, 1, 0.03, 0.03, 0.15, 1, 0.03, 0.03, 0.15],
+          "hitsPerMeasure": 4,
+          "required": [0, 4, 8, 12],
+          "accents": [0, 4, 8, 12],
+          "complexity": 5,
+          "syncopation": 5,
+          "variation": 5
+        },
+        "CLAP": {
+          "weights": [0.03, 0.03, 0.03, 0.03, 1, 0.03, 0.03, 0.15, 0.03, 0.03, 0.03, 0.03, 1, 0.03, 0.03, 0.15],
+          "hitsPerMeasure": 2,
+          "required": [4, 12],
+          "complexity": 10,
+          "syncopation": 10,
+          "variation": 10
+        },
+        "CHH": {
+          "weights": [0.2, 0.5, 1, 0.5, 0.2, 0.5, 1, 0.5, 0.2, 0.5, 1, 0.5, 0.2, 0.5, 1, 0.5],
+          "hitsPerMeasure": 8,
+          "accents": [2, 6, 10, 14],
+          "couplingTo": "KICK",
+          "coupling": -40,
+          "complexity": 30,
+          "syncopation": 40,
+          "variation": 20,
+          "ghost": 0.3
+        },
+        "OHH": {
+          "weights": [0.02, 0.02, 1, 0.02, 0.02, 0.02, 1, 0.02, 0.02, 0.02, 1, 0.02, 0.02, 0.02, 1, 0.02],
+          "hitsPerMeasure": 4,
+          "required": [2, 6, 10, 14],
+          "couplingTo": "KICK",
+          "coupling": -100,
+          "chance": 0.7,
+          "complexity": 0,
+          "syncopation": 0,
+          "variation": 0
+        },
+        "PERC": {
+          "weights": [0.2, 0.2, 0.2, 0.8, 0.2, 0.2, 0.8, 0.2, 0.2, 0.5, 0.2, 0.8, 0.2, 0.2, 0.8, 0.2],
+          "hitsPerMeasure": 3,
+          "chance": 0.6,
+          "complexity": 50,
+          "syncopation": 60,
+          "variation": 35
+        }
+      },
+      "melodic": {
+        "BASS": ["acid", "hypnotic", "stepping"]
+      },
+      "progression": [0, 7, 5, 7],
+      "fill": {
+        "part": "CHH",
+        "beats": 1,
+        "boost": 2
+      }
+    },
+    "house": {
+      "meter": {
+        "stepsPerBeat": 4,
+        "beatCount": 4
+      },
+      "swing": {
+        "amount": 0.18,
+        "resolution": 4
+      },
+      "tempo": [120, 128],
+      "tracks": ["KICK", "CLAP", "CHH", "OHH", "TAMB", "BASS", "PIANO"],
+      "parts": {
+        "KICK": {
+          "weights": [1, 0.03, 0.03, 0.03, 1, 0.03, 0.03, 0.03, 1, 0.03, 0.03, 0.03, 1, 0.03, 0.03, 0.2],
+          "hitsPerMeasure": 4,
+          "required": [0, 4, 8, 12],
+          "accents": [0, 4, 8, 12],
+          "complexity": 5,
+          "syncopation": 5,
+          "variation": 5
+        },
+        "CLAP": {
+          "weights": [0.03, 0.03, 0.03, 0.03, 1, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 1, 0.03, 0.03, 0.2],
+          "hitsPerMeasure": 2,
+          "required": [4, 12],
+          "complexity": 10,
+          "syncopation": 10,
+          "variation": 10
+        },
+        "CHH": {
+          "weights": [0.1, 0.45, 1, 0.45, 0.1, 0.45, 1, 0.45, 0.1, 0.45, 1, 0.45, 0.1, 0.45, 1, 0.45],
+          "hitsPerMeasure": 6,
+          "accents": [2, 6, 10, 14],
+          "couplingTo": "KICK",
+          "coupling": -50,
+          "complexity": 30,
+          "syncopation": 50,
+          "variation": 20,
+          "ghost": 0.4
+        },
+        "OHH": {
+          "weights": [0.02, 0.02, 1, 0.02, 0.02, 0.02, 1, 0.02, 0.02, 0.02, 1, 0.02, 0.02, 0.02, 1, 0.02],
+          "hitsPerMeasure": 4,
+          "required": [2, 6, 10, 14],
+          "couplingTo": "CHH",
+          "coupling": -100,
+          "chance": 0.7,
+          "complexity": 0,
+          "syncopation": 0,
+          "variation": 0
+        },
+        "TAMB": {
+          "weights": [0.3, 0.6, 0.3, 0.6, 1, 0.6, 0.3, 0.6, 0.3, 0.6, 0.3, 0.6, 1, 0.6, 0.3, 0.6],
+          "hitsPerMeasure": 6,
+          "chance": 0.6,
+          "complexity": 40,
+          "syncopation": 40,
+          "variation": 25,
+          "ghost": 0.5
+        }
+      },
+      "melodic": {
+        "BASS": ["groove", "stepping", "basic", "melodic"],
+        "PIANO": ["chordStab"]
+      },
+      "progression": [0, 7, 9, 5],
+      "fill": {
+        "part": "TAMB",
+        "beats": 1,
+        "boost": 2
+      }
+    },
+    "drumandbass": {
+      "meter": {
+        "stepsPerBeat": 4,
+        "beatCount": 4
+      },
+      "swing": {
+        "amount": 0.05,
+        "resolution": 4
+      },
+      "tempo": [168, 176],
+      "tracks": ["KICK", "SNARE", "CHH", "OHH", "PERC", "BASS", "PIANO"],
+      "parts": {
+        "KICK": {
+          "weights": [1, 0.03, 0.03, 0.15, 0.03, 0.03, 0.2, 0.03, 0.03, 0.03, 0.9, 0.4, 0.03, 0.03, 0.2, 0.03],
+          "hitsPerMeasure": 2,
+          "required": [0],
+          "accents": [0],
+          "complexity": 20,
+          "syncopation": 50,
+          "variation": 20
+        },
+        "SNARE": {
+          "weights": [0.05, 0.05, 0.05, 0.05, 1, 0.05, 0.05, 0.3, 0.05, 0.3, 0.05, 0.05, 1, 0.05, 0.2, 0.3],
+          "hitsPerMeasure": 3,
+          "required": [4, 12],
+          "accents": [4, 12],
+          "couplingTo": "KICK",
+          "coupling": -80,
+          "complexity": 30,
+          "syncopation": 50,
+          "variation": 25,
+          "ghost": 0.7
+        },
+        "CHH": {
+          "weights": [1, 0.5, 1, 0.5, 1, 0.5, 1, 0.5, 1, 0.5, 1, 0.5, 1, 0.5, 1, 0.5],
+          "hitsPerMeasure": 10,
+          "accents": [2, 6, 10, 14],
+          "complexity": 50,
+          "syncopation": 40,
+          "variation": 30,
+          "ghost": 0.4
+        },
+        "OHH": {
+          "weights": [0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.5, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.8, 0.02],
+          "hitsPerMeasure": 1,
+          "chance": 0.5,
+          "complexity": 20,
+          "syncopation": 30,
+          "variation": 30
+        },
+        "PERC": {
+          "weights": [0.2, 0.2, 0.2, 0.7, 0.2, 0.2, 0.7, 0.2, 0.2, 0.7, 0.2, 0.2, 0.2, 0.7, 0.2, 0.2],
+          "hitsPerMeasure": 3,
+          "chance": 0.5,
+          "complexity": 50,
+          "syncopation": 70,
+          "variation": 40
+        }
+      },
+      "melodic": {
+        "BASS": ["stepping", "arpege", "melodic"],
+        "PIANO": ["arpeggio"]
+      },
+      "progression": [0, 10, 8, 7],
+      "fill": {
+        "part": "SNARE",
+        "beats": 1,
+        "boost": 2.5
+      }
+    },
+    "hiphop": {
+      "meter": {
+        "stepsPerBeat": 4,
+        "beatCount": 4
+      },
+      "swing": {
+        "amount": 0.12,
+        "resolution": 4
+      },
+      "tempo": [85, 95],
+      "tracks": ["KICK", "SNARE", "CHH", "OHH", "BASS", "PIANO"],
+      "parts": {
+        "KICK": {
+          "weights": [1, 0.03, 0.03, 0.3, 0.03, 0.03, 0.03, 0.3, 0.3, 0.03, 0.8, 0.5, 0.03, 0.03, 0.2, 0.03],
+          "hitsPerMeasure": 3,
+          "required": [0],
+          "accents": [0],
+          "complexity": 25,
+          "syncopation": 50,
+          "variation": 20
+        },
+        "SNARE": {
+          "weights": [0.03, 0.03, 0.03, 0.03, 1, 0.03, 0.03, 0.2, 0.03, 0.03, 0.03, 0.03, 1, 0.03, 0.03, 0.2],
+          "hitsPerMeasure": 2,
+          "required": [4, 12],
+          "accents": [4, 12],
+          "couplingTo": "KICK",
+          "coupling": -80,
+          "complexity": 15,
+          "syncopation": 20,
+          "variation": 15,
+          "ghost": 0.6
+        },
+        "CHH": {
+          "weights": [1, 0.3, 1, 0.3, 1, 0.3, 1, 0.3, 1, 0.3, 1, 0.3, 1, 0.3, 1, 0.3],
+          "hitsPerMeasure": 8,
+          "accents": [0, 4, 8, 12],
+          "complexity": 20,
+          "syncopation": 20,
+          "variation": 20,
+          "ghost": 0.4
+        },
+        "OHH": {
+          "weights": [0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.3, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.6, 0.02],
+          "hitsPerMeasure": 1,
+          "chance": 0.4,
+          "complexity": 10,
+          "syncopation": 30,
+          "variation": 20
+        }
+      },
+      "melodic": {
+        "BASS": ["groove", "basic", "melodic"],
+        "PIANO": ["sparse"]
+      },
+      "progression": [0, 5, 7, 10],
+      "fill": {
+        "part": "SNARE",
+        "beats": 1,
+        "boost": 2
+      }
+    },
+    "rock": {
+      "meter": {
+        "stepsPerBeat": 4,
+        "beatCount": 4
+      },
+      "swing": {
+        "amount": 0,
+        "resolution": 4
+      },
+      "tempo": [100, 140],
+      "tracks": ["KICK", "SNARE", "CHH", "CRASH", "TOM", "BASS", "PIANO", "ORGAN"],
+      "parts": {
+        "KICK": {
+          "weights": [1, 0.03, 0.2, 0.03, 0.03, 0.03, 0.3, 0.03, 1, 0.03, 0.6, 0.03, 0.03, 0.03, 0.3, 0.03],
+          "hitsPerMeasure": 3,
+          "required": [0, 8],
+          "accents": [0, 8],
+          "complexity": 15,
+          "syncopation": 25,
+          "variation": 15
+        },
+        "SNARE": {
+          "weights": [0.04, 0.04, 0.04, 0.04, 1, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 1, 0.04, 0.04, 0.1],
+          "hitsPerMeasure": 2,
+          "required": [4, 12],
+          "accents": [4, 12],
+          "couplingTo": "KICK",
+          "coupling": -80,
+          "complexity": 10,
+          "syncopation": 10,
+          "variation": 10
+        },
+        "CHH": {
+          "weights": [1, 0.1, 1, 0.1, 1, 0.1, 1, 0.1, 1, 0.1, 1, 0.1, 1, 0.1, 1, 0.1],
+          "hitsPerMeasure": 8,
+          "accents": [0, 4, 8, 12],
+          "complexity": 10,
+          "syncopation": 0,
+          "variation": 5
+        },
+        "CRASH": {
+          "weights": [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          "hitsPerMeasure": 1,
+          "required": [0],
+          "chance": 0.3,
+          "complexity": 0,
+          "syncopation": 0,
+          "variation": 0
+        },
+        "TOM": {
+          "weights": [0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.6, 0.6, 0.6, 0.6],
+          "hitsPerMeasure": 0,
+          "chance": 0.6,
+          "complexity": 20,
+          "syncopation": 20,
+          "variation": 0
+        }
+      },
+      "melodic": {
+        "BASS": ["basic", "groove", "melodic"],
+        "PIANO": ["chordStab"],
+        "ORGAN": ["walking"]
+      },
+      "progression": [0, 5, 7, 0],
+      "fill": {
+        "part": "TOM",
+        "beats": 1,
+        "boost": 4
+      }
+    },
+    "funk": {
+      "meter": {
+        "stepsPerBeat": 4,
+        "beatCount": 4
+      },
+      "swing": {
+        "amount": 0.22,
+        "resolution": 4
+      },
+      "tempo": [95, 115],
+      "tracks": ["KICK", "SNARE", "CHH", "OHH", "CONGAS", "BASS", "PIANO", "ORGAN"],
+      "parts": {
+        "KICK": {
+          "weights": [1, 0.05, 0.05, 0.5, 0.05, 0.05, 0.4, 0.5, 0.05, 0.05, 0.7, 0.4, 0.05, 0.05, 0.3, 0.05],
+          "hitsPerMeasure": 4,
+          "required": [0],
+          "accents": [0],
+          "complexity": 35,
+          "syncopation": 60,
+          "variation": 25
+        },
+        "SNARE": {
+          "weights": [0.15, 0.3, 0.15, 0.3, 1, 0.3, 0.15, 0.3, 0.15, 0.3, 0.15, 0.3, 1, 0.3, 0.15, 0.3],
+          "hitsPerMeasure": 6,
+          "required": [4, 12],
+          "accents": [4, 12],
+          "couplingTo": "KICK",
+          "coupling": -60,
+          "complexity": 40,
+          "syncopation": 50,
+          "variation": 30,
+          "ghost": 0.85
+        },
+        "CHH": {
+          "weights": [1, 0.8, 1, 0.8, 1, 0.8, 1, 0.8, 1, 0.8, 1, 0.8, 1, 0.8, 1, 0.8],
+          "hitsPerMeasure": 12,
+          "accents": [2, 6, 10, 14],
+          "complexity": 50,
+          "syncopation": 40,
+          "variation": 25,
+          "ghost": 0.5
+        },
+        "OHH": {
+          "weights": [0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.4, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.8, 0.02],
+          "hitsPerMeasure": 1,
+          "chance": 0.6,
+          "complexity": 10,
+          "syncopation": 30,
+          "variation": 20
+        },
+        "CONGAS": {
+          "weights": [0.15, 0.15, 0.15, 0.7, 0.15, 0.15, 0.7, 0.15, 0.15, 0.15, 0.7, 0.15, 0.15, 0.7, 0.5, 0.15],
+          "hitsPerMeasure": 4,
+          "chance": 0.5,
+          "complexity": 40,
+          "syncopation": 60,
+          "variation": 35
+        }
+      },
+      "melodic": {
+        "BASS": ["groove", "melodic", "basic"],
+        "PIANO": ["chordStab"],
+        "ORGAN": ["walking"]
+      },
+      "progression": [0, 5, 7, 10],
+      "fill": {
+        "part": "SNARE",
+        "beats": 1,
+        "boost": 2
+      }
+    },
+    "disco": {
+      "meter": {
+        "stepsPerBeat": 4,
+        "beatCount": 4
+      },
+      "swing": {
+        "amount": 0.1,
+        "resolution": 4
+      },
+      "tempo": [115, 125],
+      "tracks": ["KICK", "SNARE", "CHH", "OHH", "TAMB", "COWBELL", "BASS", "PIANO", "ORGAN"],
+      "parts": {
+        "KICK": {
+          "weights": [1, 0.03, 0.03, 0.03, 1, 0.03, 0.03, 0.03, 1, 0.03, 0.03, 0.03, 1, 0.03, 0.03, 0.03],
+          "hitsPerMeasure": 4,
+          "required": [0, 4, 8, 12],
+          "accents": [0, 4, 8, 12],
+          "complexity": 0,
+          "syncopation": 0,
+          "variation": 0
+        },
+        "SNARE": {
+          "weights": [0.03, 0.03, 0.03, 0.03, 1, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 1, 0.03, 0.03, 0.15],
+          "hitsPerMeasure": 2,
+          "required": [4, 12],
+          "accents": [4, 12],
+          "complexity": 10,
+          "syncopation": 10,
+          "variation": 10
+        },
+        "OHH": {
+          "weights": [0.02, 0.02, 1, 0.02, 0.02, 0.02, 1, 0.02, 0.02, 0.02, 1, 0.02, 0.02, 0.02, 1, 0.02],
+          "hitsPerMeasure": 4,
+          "required": [2, 6, 10, 14],
+          "complexity": 0,
+          "syncopation": 0,
+          "variation": 0
+        },
+        "CHH": {
+          "weights": [0.6, 0.8, 0.3, 0.8, 0.6, 0.8, 0.3, 0.8, 0.6, 0.8, 0.3, 0.8, 0.6, 0.8, 0.3, 0.8],
+          "hitsPerMeasure": 6,
+          "couplingTo": "OHH",
+          "coupling": -100,
+          "complexity": 30,
+          "syncopation": 40,
+          "variation": 20,
+          "ghost": 0.4
+        },
+        "TAMB": {
+          "weights": [0.4, 0.4, 0.4, 0.4, 1, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 1, 0.4, 0.4, 0.4],
+          "hitsPerMeasure": 6,
+          "chance": 0.5,
+          "complexity": 30,
+          "syncopation": 30,
+          "variation": 20,
+          "ghost": 0.4
+        },
+        "COWBELL": {
+          "weights": [0.05, 0.05, 0.9, 0.05, 0.05, 0.05, 0.9, 0.05, 0.05, 0.05, 0.9, 0.05, 0.05, 0.05, 0.9, 0.05],
+          "hitsPerMeasure": 2,
+          "chance": 0.3,
+          "complexity": 10,
+          "syncopation": 20,
+          "variation": 20
+        }
+      },
+      "melodic": {
+        "BASS": ["stepping", "groove", "basic"],
+        "PIANO": ["arpeggio"],
+        "ORGAN": ["chordStab"]
+      },
+      "progression": [0, 7, 9, 7],
+      "fill": {
+        "part": "SNARE",
+        "beats": 1,
+        "boost": 3
+      }
+    },
+    "reggae": {
+      "meter": {
+        "stepsPerBeat": 4,
+        "beatCount": 4
+      },
+      "swing": {
+        "amount": 0.15,
+        "resolution": 4
+      },
+      "tempo": [70, 90],
+      "tracks": ["KICK", "SNARE", "CHH", "PERC", "BASS", "ORGAN"],
+      "parts": {
+        "KICK": {
+          "weights": [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+          "hitsPerMeasure": 1,
+          "required": [8],
+          "forbidden": [0],
+          "accents": [8],
+          "complexity": 0,
+          "syncopation": 0,
+          "variation": 0
+        },
+        "SNARE": {
+          "weights": [0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.15, 1, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.2],
+          "hitsPerMeasure": 1,
+          "required": [8],
+          "forbidden": [0],
+          "accents": [8],
+          "couplingTo": "KICK",
+          "coupling": 100,
+          "complexity": 10,
+          "syncopation": 10,
+          "variation": 15,
+          "ghost": 0.6
+        },
+        "CHH": {
+          "weights": [1, 0.05, 1, 0.3, 1, 0.05, 1, 0.05, 1, 0.05, 1, 0.3, 1, 0.05, 1, 0.05],
+          "hitsPerMeasure": 6,
+          "accents": [2, 6, 10, 14],
+          "complexity": 20,
+          "syncopation": 20,
+          "variation": 20,
+          "ghost": 0.3
+        },
+        "PERC": {
+          "weights": [0.05, 0.05, 0.7, 0.05, 0.05, 0.05, 0.7, 0.05, 0.05, 0.05, 0.7, 0.05, 0.05, 0.05, 0.7, 0.05],
+          "hitsPerMeasure": 2,
+          "chance": 0.5,
+          "complexity": 20,
+          "syncopation": 30,
+          "variation": 25
+        }
+      },
+      "melodic": {
+        "BASS": ["hypnotic", "groove", "basic"],
+        "ORGAN": ["reggae"]
+      },
+      "progression": [0, 5, 7, 5],
+      "fill": {
+        "part": "SNARE",
+        "beats": 1,
+        "boost": 3
+      }
+    },
+    "jazz": {
+      "meter": {
+        "stepsPerBeat": 3,
+        "beatCount": 4
+      },
+      "swing": {
+        "amount": 0,
+        "resolution": 3
+      },
+      "tempo": [110, 180],
+      "tracks": ["RIDE", "CHH", "SNARE", "KICK", "BASS", "PIANO"],
+      "parts": {
+        "RIDE": {
+          "weights": [1, 0.05, 0.3, 1, 0.05, 1, 1, 0.05, 0.3, 1, 0.05, 1],
+          "hitsPerMeasure": 6,
+          "required": [0, 3, 5, 6, 9, 11],
+          "accents": [3, 9],
+          "complexity": 20,
+          "syncopation": 10,
+          "variation": 10
+        },
+        "CHH": {
+          "weights": [0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0],
+          "hitsPerMeasure": 2,
+          "required": [3, 9],
+          "forbidden": [0, 6],
+          "complexity": 0,
+          "syncopation": 0,
+          "variation": 0
+        },
+        "SNARE": {
+          "weights": [0.15, 0.1, 0.45, 0.15, 0.1, 0.45, 0.15, 0.1, 0.45, 0.15, 0.1, 0.45],
+          "hitsPerMeasure": 2,
+          "complexity": 50,
+          "syncopation": 70,
+          "variation": 45,
+          "ghost": 0.7
+        },
+        "KICK": {
+          "weights": [0.5, 0.05, 0.3, 0.05, 0.05, 0.3, 0.05, 0.05, 0.3, 0.05, 0.05, 0.3],
+          "hitsPerMeasure": 1,
+          "complexity": 40,
+          "syncopation": 60,
+          "variation": 50,
+          "couplingTo": "SNARE",
+          "coupling": -60,
+          "ghost": 0.8
+        }
+      },
+      "melodic": {
+        "BASS": ["basic", "melodic"],
+        "PIANO": ["walking", "sparse"]
+      },
+      "progression": [2, 7, 0, 9],
+      "fill": {
+        "part": "SNARE",
+        "beats": 1,
+        "boost": 2.5
+      }
+    },
+    "bossa": {
+      "meter": {
+        "stepsPerBeat": 4,
+        "beatCount": 8
+      },
+      "swing": {
+        "amount": 0,
+        "resolution": 4
+      },
+      "tempo": [120, 140],
+      "tracks": ["KICK", "SNARE", "CHH", "SHAKER", "BASS", "PIANO"],
+      "parts": {
+        "KICK": {
+          "weights": [1, 0.02, 0.02, 0.02, 0.02, 0.02, 1, 0.02, 1, 0.02, 0.02, 0.02, 0.02, 0.02, 1, 0.02, 1, 0.02, 0.02, 0.02, 0.02, 0.02, 1, 0.02, 1, 0.02, 0.02, 0.02, 0.02, 0.02, 1, 0.02],
+          "hitsPerMeasure": 8,
+          "required": [0, 6, 8, 14, 16, 22, 24, 30],
+          "accents": [0, 16],
+          "complexity": 0,
+          "syncopation": 0,
+          "variation": 0,
+          "ghost": 0.3
+        },
+        "SNARE": {
+          "weights": [1, 0.03, 0.03, 0.2, 0.03, 0.03, 1, 0.03, 0.03, 0.03, 0.2, 0.03, 1, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.2, 1, 0.03, 0.03, 0.03, 0.03, 0.03, 1, 0.03, 0.2, 0.03, 0.03, 0.03],
+          "hitsPerMeasure": 5,
+          "required": [0, 6, 12, 20, 26],
+          "complexity": 10,
+          "syncopation": 20,
+          "variation": 10
+        },
+        "CHH": {
+          "weights": [1, 0.2, 1, 0.2, 1, 0.2, 1, 0.2, 1, 0.2, 1, 0.2, 1, 0.2, 1, 0.2, 1, 0.2, 1, 0.2, 1, 0.2, 1, 0.2, 1, 0.2, 1, 0.2, 1, 0.2, 1, 0.2],
+          "hitsPerMeasure": 16,
+          "accents": [0, 4, 8, 12, 16, 20, 24, 28],
+          "complexity": 10,
+          "syncopation": 0,
+          "variation": 5,
+          "ghost": 0.5
+        },
+        "SHAKER": {
+          "weights": [1, 0.8, 0.8, 0.8, 1, 0.8, 0.8, 0.8, 1, 0.8, 0.8, 0.8, 1, 0.8, 0.8, 0.8, 1, 0.8, 0.8, 0.8, 1, 0.8, 0.8, 0.8, 1, 0.8, 0.8, 0.8, 1, 0.8, 0.8, 0.8],
+          "hitsPerMeasure": 16,
+          "chance": 0.5,
+          "complexity": 30,
+          "syncopation": 20,
+          "variation": 10,
+          "ghost": 0.6
+        }
+      },
+      "melodic": {
+        "BASS": ["basic", "melodic"],
+        "PIANO": ["chordStab", "sparse"]
+      },
+      "progression": [0, 0, 2, 7],
+      "fill": {
+        "part": "SNARE",
+        "beats": 1,
+        "boost": 2
+      }
+    },
+    "samba": {
+      "meter": {
+        "stepsPerBeat": 4,
+        "beatCount": 4
+      },
+      "swing": {
+        "amount": 0.08,
+        "resolution": 4
+      },
+      "tempo": [96, 106],
+      "tracks": ["KICK", "SNARE", "SHAKER", "TAMB", "COWBELL", "BASS", "PIANO"],
+      "parts": {
+        "KICK": {
+          "weights": [0.6, 0.03, 0.03, 0.03, 1, 0.03, 0.03, 0.2, 0.6, 0.03, 0.03, 0.03, 1, 0.03, 0.03, 0.3],
+          "hitsPerMeasure": 4,
+          "required": [4, 12],
+          "accents": [4, 12],
+          "complexity": 15,
+          "syncopation": 20,
+          "variation": 10
+        },
+        "SNARE": {
+          "weights": [0.7, 0.9, 0.7, 1, 0.7, 0.9, 0.7, 1, 0.7, 0.9, 0.7, 1, 0.7, 0.9, 0.7, 1],
+          "hitsPerMeasure": 12,
+          "accents": [3, 7, 11, 15],
+          "complexity": 30,
+          "syncopation": 50,
+          "variation": 20,
+          "ghost": 0.6
+        },
+        "SHAKER": {
+          "weights": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+          "hitsPerMeasure": 16,
+          "accents": [2, 6, 10, 14],
+          "complexity": 0,
+          "syncopation": 0,
+          "variation": 0,
+          "ghost": 0.5
+        },
+        "TAMB": {
+          "weights": [1, 0.05, 1, 0.05, 0.05, 1, 0.05, 1, 0.05, 0.05, 1, 0.05, 1, 0.05, 0.4, 0.05],
+          "hitsPerMeasure": 6,
+          "required": [0, 2, 5, 7, 10, 12],
+          "chance": 0.8,
+          "complexity": 10,
+          "syncopation": 30,
+          "variation": 15
+        },
+        "COWBELL": {
+          "weights": [0.9, 0.05, 0.05, 0.9, 0.05, 0.05, 0.9, 0.05, 0.9, 0.05, 0.05, 0.9, 0.05, 0.05, 0.9, 0.05],
+          "hitsPerMeasure": 5,
+          "chance": 0.5,
+          "complexity": 20,
+          "syncopation": 40,
+          "variation": 20
+        }
+      },
+      "melodic": {
+        "BASS": ["basic", "groove"],
+        "PIANO": ["chordStab"]
+      },
+      "progression": [0, 5, 7, 0],
+      "fill": {
+        "part": "SNARE",
+        "beats": 1,
+        "boost": 1.5
+      }
+    },
+    "salsa": {
+      "meter": {
+        "stepsPerBeat": 4,
+        "beatCount": 8
+      },
+      "swing": {
+        "amount": 0,
+        "resolution": 4
+      },
+      "tempo": [160, 200],
+      "tracks": ["CLAVES", "COWBELL", "CONGAS", "KICK", "BASS", "PIANO"],
+      "parts": {
+        "CLAVES": {
+          "weights": [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+          "hitsPerMeasure": 5,
+          "required": [0, 6, 12, 20, 24],
+          "accents": [0, 6, 12, 20, 24],
+          "complexity": 0,
+          "syncopation": 0,
+          "variation": 0
+        },
+        "COWBELL": {
+          "weights": [1, 0.05, 0.6, 0.05, 1, 0.05, 0.6, 0.05, 1, 0.05, 0.6, 0.05, 1, 0.05, 0.6, 0.05, 1, 0.05, 0.6, 0.05, 1, 0.05, 0.6, 0.05, 1, 0.05, 0.6, 0.05, 1, 0.05, 0.6, 0.05],
+          "hitsPerMeasure": 10,
+          "accents": [0, 4, 8, 12, 16, 20, 24, 28],
+          "complexity": 20,
+          "syncopation": 30,
+          "variation": 15
+        },
+        "CONGAS": {
+          "weights": [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.6, 0.2, 0.2, 0.2, 0.2, 0.2, 1, 0.2, 1, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.6, 0.2, 0.2, 0.2, 0.2, 0.2, 1, 0.2, 1, 0.2],
+          "hitsPerMeasure": 8,
+          "required": [14, 30],
+          "accents": [14, 30],
+          "complexity": 30,
+          "syncopation": 50,
+          "variation": 20,
+          "ghost": 0.5
+        },
+        "KICK": {
+          "weights": [0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 1, 0.03, 0.03, 0.03, 0.03, 0.03, 1, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 1, 0.03, 0.03, 0.03, 0.03, 0.03, 1, 0.03, 0.03, 0.03],
+          "hitsPerMeasure": 2,
+          "complexity": 20,
+          "syncopation": 50,
+          "variation": 30
+        }
+      },
+      "melodic": {
+        "BASS": ["groove", "melodic"],
+        "PIANO": ["arpeggio", "chordStab"]
+      },
+      "progression": [0, 7, 0, 7],
+      "fill": {
+        "part": "CONGAS",
+        "beats": 1,
+        "boost": 2
+      }
+    },
+    "afrobeat": {
+      "meter": {
+        "stepsPerBeat": 3,
+        "beatCount": 4
+      },
+      "swing": {
+        "amount": 0,
+        "resolution": 3
+      },
+      "tempo": [100, 120],
+      "tracks": ["COWBELL", "KICK", "SNARE", "CHH", "SHAKER", "BASS", "ORGAN"],
+      "parts": {
+        "COWBELL": {
+          "weights": [1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1],
+          "hitsPerMeasure": 7,
+          "required": [0, 2, 4, 5, 7, 9, 11],
+          "accents": [0],
+          "complexity": 0,
+          "syncopation": 0,
+          "variation": 0
+        },
+        "KICK": {
+          "weights": [1, 0.05, 0.3, 0.05, 0.05, 0.05, 0.7, 0.05, 0.4, 0.05, 0.05, 0.05],
+          "hitsPerMeasure": 3,
+          "required": [0],
+          "accents": [0],
+          "complexity": 20,
+          "syncopation": 40,
+          "variation": 20
+        },
+        "SNARE": {
+          "weights": [0.2, 0.2, 0.2, 1, 0.2, 0.4, 0.2, 0.2, 0.2, 1, 0.2, 0.4],
+          "hitsPerMeasure": 3,
+          "accents": [3, 9],
+          "couplingTo": "KICK",
+          "coupling": -60,
+          "complexity": 40,
+          "syncopation": 50,
+          "variation": 30,
+          "ghost": 0.6
+        },
+        "CHH": {
+          "weights": [1, 0.9, 0.9, 1, 0.9, 0.9, 1, 0.9, 0.9, 1, 0.9, 0.9],
+          "hitsPerMeasure": 10,
+          "accents": [0, 3, 6, 9],
+          "complexity": 30,
+          "syncopation": 20,
+          "variation": 20,
+          "ghost": 0.5
+        },
+        "SHAKER": {
+          "weights": [0.3, 0.8, 0.3, 0.3, 0.8, 0.3, 0.3, 0.8, 0.3, 0.3, 0.8, 0.3],
+          "hitsPerMeasure": 4,
+          "chance": 0.7,
+          "complexity": 40,
+          "syncopation": 40,
+          "variation": 25
+        }
+      },
+      "melodic": {
+        "BASS": ["groove", "melodic"],
+        "ORGAN": ["chordStab"]
+      },
+      "progression": [0, 0, 0, 5],
+      "fill": {
+        "part": "SNARE",
+        "beats": 1,
+        "boost": 2
+      }
+    },
+    "trap": {
+      "meter": {
+        "stepsPerBeat": 4,
+        "beatCount": 4
+      },
+      "swing": {
+        "amount": 0,
+        "resolution": 4
+      },
+      "tempo": [130, 150],
+      "tracks": ["KICK", "SNARE", "CLAP", "CHH", "OHH", "BASS", "PIANO"],
+      "parts": {
+        "KICK": {
+          "weights": [1, 0.04, 0.04, 0.3, 0.04, 0.04, 0.04, 0.2, 0.04, 0.04, 0.6, 0.4, 0.04, 0.04, 0.3, 0.04],
+          "hitsPerMeasure": 3,
+          "required": [0],
+          "accents": [0],
+          "complexity": 30,
+          "syncopation": 60,
+          "variation": 25
+        },
+        "SNARE": {
+          "weights": [0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 1, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.1],
+          "hitsPerMeasure": 1,
+          "required": [8],
+          "accents": [8],
+          "complexity": 5,
+          "syncopation": 5,
+          "variation": 5
+        },
+        "CLAP": {
+          "weights": [0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 1, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02],
+          "hitsPerMeasure": 1,
+          "required": [8],
+          "couplingTo": "SNARE",
+          "coupling": 100,
+          "chance": 0.6,
+          "complexity": 0,
+          "syncopation": 0,
+          "variation": 0
+        },
+        "CHH": {
+          "weights": [1, 0.8, 1, 0.8, 1, 0.8, 1, 0.8, 1, 0.8, 1, 0.8, 1, 0.8, 1, 0.8],
+          "hitsPerMeasure": 12,
+          "accents": [0, 4, 8, 12],
+          "complexity": 40,
+          "syncopation": 30,
+          "variation": 30,
+          "rolls": 0.25,
+          "ghost": 0.3
+        },
+        "OHH": {
+          "weights": [0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.4, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.7, 0.02],
+          "hitsPerMeasure": 1,
+          "chance": 0.5,
+          "couplingTo": "CHH",
+          "coupling": -100,
+          "complexity": 10,
+          "syncopation": 30,
+          "variation": 20
+        }
+      },
+      "melodic": {
+        "BASS": ["basic", "hypnotic"],
+        "PIANO": ["sparse", "arpeggio"]
+      },
+      "progression": [0, 8, 5, 7],
+      "fill": {
+        "part": "CHH",
+        "beats": 1,
+        "boost": 1.5
+      }
+    }
+  }
+}

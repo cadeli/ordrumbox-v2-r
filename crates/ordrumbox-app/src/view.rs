@@ -77,8 +77,6 @@ pub struct View<'a> {
     pub playhead: Option<f64>,
     /// The selected song, or the song playing and where.
     pub song: Option<&'a str>,
-    /// The genre the pattern was generated in.
-    pub genre: Option<&'a str>,
     pub cursor: Option<Cursor>,
     /// Selected note: track and index in its notes.
     pub selected: Option<(usize, usize)>,
@@ -250,9 +248,21 @@ pub struct HeaderControls {
     pub pattern: Rect,
     pub beats: Rect,
     pub kit: Rect,
-    pub generation: [Rect; 3],
+    /// The generation: the style list, ⟳, AUTO, and the energy, complexity
+    /// and variation macros.
+    pub style: Rect,
+    pub generate: Rect,
+    pub auto: Rect,
+    pub macros: [Rect; 3],
     pub views: [Rect; 5],
 }
+
+/// The header's macro knobs: their pattern key and label.
+pub const MACROS: [(&str, &str); 3] = [
+    (ordrumbox_core::style::ENERGY, "ENERGY"),
+    (ordrumbox_core::style::COMPLEXITY, "COMPLEX"),
+    (ordrumbox_core::style::VARIATION, "VARY"),
+];
 
 /// The view buttons' labels: the main editor (grid, piano roll, song, synth)
 /// and the kit editor.
@@ -268,14 +278,17 @@ pub fn header_controls(scale: i32) -> HeaderControls {
         x += (w + gap) * s;
         rect
     };
-    let play = next(36, 10);
-    let bpm = next(56, 10);
-    let pattern = next(150, 10);
-    let beats = next(40, 10);
-    let kit = next(110, 14);
-    let generation = [next(48, 4), next(48, 4), next(64, 14)];
-    let views = [next(40, 3), next(40, 3), next(40, 3), next(48, 3), next(40, 0)];
-    HeaderControls { play, bpm, pattern, beats, kit, generation, views }
+    let play = next(36, 8);
+    let bpm = next(52, 8);
+    let pattern = next(104, 8);
+    let beats = next(36, 8);
+    let kit = next(84, 10);
+    let style = next(90, 4);
+    let generate = next(22, 4);
+    let auto = next(38, 10);
+    let macros = [next(52, 4), next(60, 4), next(42, 10)];
+    let views = [next(40, 2), next(40, 2), next(40, 2), next(48, 2), next(40, 0)];
+    HeaderControls { play, bpm, pattern, beats, kit, style, generate, auto, macros, views }
 }
 
 /// Height of the output strip always shown along the bottom of the window.
@@ -451,11 +464,10 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
         }
         label(canvas, c.beats, "BEATS");
         label(canvas, c.kit, "KIT");
-        let generate = match view.genre {
-            Some(genre) => format!("GENERATE {genre}"),
-            None => "GENERATE".to_owned(),
-        };
-        label(canvas, c.generation[0], &generate);
+        label(canvas, c.style, "STYLE");
+        for (rect, (_, text)) in c.macros.iter().zip(MACROS) {
+            label(canvas, *rect, text);
+        }
     } else {
         canvas.text(c.play.x, c.play.y + 4 * scale, "no pattern", scale, DIM);
     }
@@ -854,7 +866,6 @@ mod tests {
                 pattern: library.patterns.first(),
                 playhead: Some(0.5),
                 song: Some("SONG demo  measure 3/66"),
-                genre: Some("house"),
                 kit_view: None,
                 sounds: vec!["real/kick.wav".into(), "synth BASS5".into()],
                 arrangement: None,

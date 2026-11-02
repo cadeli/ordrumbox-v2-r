@@ -68,6 +68,12 @@ pub enum Command {
     Mute,
     Solo,
     Kit(usize),
+    /// Shift+B: a new pattern in the chosen style.
+    NewGeneratedPattern,
+    /// AUTO: every track of the pattern in auto mode, or out of it.
+    AutoAll,
+    /// The focused track locked against the generation, or unlocked.
+    LockTrack,
     PreviousKit,
     NextKit,
     KitEditor,
@@ -140,6 +146,10 @@ pub struct MenuState {
     pub has_songs: bool,
     /// Generation on: drums, bass, chords.
     pub generation: [bool; 3],
+    /// AUTO lit: the pattern's tracks play in auto mode.
+    pub auto_all: bool,
+    /// The focused track is locked against the generation.
+    pub locked: bool,
     pub kits: Vec<String>,
     pub kit_index: usize,
     pub kit_editor: bool,
@@ -275,13 +285,16 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
         Menu {
             title: "Generate",
             items: vec![
-                command("Generate a pattern", "B", C::GeneratePattern, true),
+                command("Generate the pattern again", "B", C::GeneratePattern, true),
+                command("New pattern in the style", "Shift+B", C::NewGeneratedPattern, true),
+                check("Auto (every track)", "", C::AutoAll, p, s.auto_all),
                 Item::Separator,
                 check("Drums (auto)", "D", C::GenerateDrums, p, s.generation[0]),
                 check("Bass (auto)", "S", C::GenerateBass, p, s.generation[1]),
                 check("Chords (auto)", "A", C::GenerateChords, p, s.generation[2]),
                 Item::Separator,
                 check("Track in auto mode", "Z", C::TrackAuto, track, auto),
+                check("Lock the track", "", C::LockTrack, track, s.locked),
                 command("Random notes on the track", "X", C::RandomTrack, track),
             ],
         },

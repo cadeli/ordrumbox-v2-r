@@ -1,17 +1,18 @@
-//! The generators against the JS ones (`tests/fixtures/generators.json`,
+//! The melodic generators against the JS ones (`tests/fixtures/generators.json`,
 //! written by `tools/export_gen_fixtures.mjs`): with the same random stream,
-//! the same notes, the same track settings and the same number of draws. What
-//! departs from them on purpose is checked against `generators_rust.txt`, and
-//! by properties.
+//! the same notes, the same track settings and the same number of draws. The
+//! drum lines come from the styles (`tests/compose.rs`): the whole patterns,
+//! auto mode loops and ↻ buttons are checked against `generators_rust.txt`
+//! from the fixture's inputs, and by properties.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
 
 use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::json::{self, Object, Value};
-use ordrumbox_core::{Note, Pattern, Scales, Track};
+use ordrumbox_core::{Note, Pattern, Scales, Styles, Track};
 use ordrumbox_logic::generate::{
-    AutoGenerator, Harmony, MelodicKind, Options, generate_pattern, instrument_line, random_track, run_loop,
-    toggle_drums, toggle_melodic,
+    AutoGenerator, Harmony, MelodicKind, Options, generate_pattern, instrument_line, random_track, recompose,
+    restyle_pattern, run_loop, toggle_auto, toggle_drums, toggle_melodic,
 };
 
 /// mulberry32, the stream the fixture script gives `Math.random`.
@@ -178,6 +179,14 @@ fn check_track(track: &Track, expected: &Value, at: &str) {
     }
 }
 
+fn styles() -> Styles {
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/data/styles.json");
+    let text = std::fs::read_to_string(path).expect("assets/data/styles.json");
+    let (styles, issues) = Styles::from_json(&json::parse(&text).expect("styles.json parses"));
+    assert_eq!(issues, [], "styles.json");
+    styles
+}
+
 fn harmony_in(value: Option<&Value>) -> Harmony {
     match value {
         Some(h) if !h.is_null() => {
@@ -222,9 +231,10 @@ fn track_case(case: &Value) -> (Pattern, usize, InstrumentFamily) {
 fn every_variant_of_every_generator() {
     let fixtures = fixtures();
     let scales = Scales::from_json(fixtures.get("scales").unwrap());
+    let styles = Styles::default();
     let cases = items(&fixtures, "tracks");
     assert!(cases.len() > 500);
-    for case in cases.iter().filter(|c| !departs(c)) {
+    for case in cases.iter().filter(|c| is_melodic(c)) {
         let name = case.get("name").and_then(Value::as_str).unwrap();
         let variant = case.get("variant").and_then(Value::as_str);
         let (beats, spb) = (f(case, "beatCount") as i32, f(case, "stepsPerBeat") as i32);
@@ -238,7 +248,7 @@ fn every_variant_of_every_generator() {
         );
         let mut stream = Stream::new(f(case, "seed"));
         let mut rnd = || stream.next();
-        let mut g = AutoGenerator::new(&scales, &mut rnd);
+        let mut g = AutoGenerator::new(&scales, &styles, &mut rnd);
         instrument_line(&mut g, &mut pattern, t, kind, variant, f(case, "density"), &harmony_in(case.get("harmony")));
         drop(g);
         check_track(&pattern.tracks[t], case.get("track").unwrap(), &at);
@@ -261,10 +271,10 @@ fn random_tracks() {
 
 // ─── What departs from the JS ────────────────────────────────────────────────
 
-/// Whether a track case departs from the JS on purpose (`README.md`, "Golden
-/// fixtures"): the drum lines are standard rhythms here.
-fn departs(case: &Value) -> bool {
-    matches!(case.get("kind").and_then(Value::as_str).unwrap(), "kick" | "snare" | "hat" | "clap" | "cowbell")
+/// Whether a track case is a melodic line, still the JS one (`README.md`,
+/// "Golden fixtures"): the drum lines come from the styles.
+fn is_melodic(case: &Value) -> bool {
+    matches!(case.get("kind").and_then(Value::as_str).unwrap(), "melody" | "bass")
 }
 
 /// One line of the snapshot: what a case made, and its draws.
@@ -272,30 +282,13 @@ fn snapshot_line(at: &str, value: &Value, draws: u64) -> String {
     format!("{at} draws {draws} {}", value.to_json())
 }
 
-/// The cases that depart from the JS, as this code generates them. They start
-/// from the fixture's inputs and seeds.
+/// The whole patterns, loops and toggles as this code generates them, from
+/// the fixture's inputs and seeds.
 fn rust_snapshot() -> Vec<String> {
     let fixtures = fixtures();
     let scales = Scales::from_json(fixtures.get("scales").unwrap());
+    let styles = styles();
     let mut lines = Vec::new();
-    for (n, case) in items(&fixtures, "tracks").iter().enumerate().filter(|(_, c)| departs(c)) {
-        let (mut pattern, t, kind) = track_case(case);
-        let mut stream = Stream::new(f(case, "seed"));
-        let mut rnd = || stream.next();
-        let harmony = harmony_in(case.get("harmony"));
-        let mut g = AutoGenerator::new(&scales, &mut rnd);
-        instrument_line(
-            &mut g,
-            &mut pattern,
-            t,
-            kind,
-            case.get("variant").and_then(Value::as_str),
-            f(case, "density"),
-            &harmony,
-        );
-        drop(g);
-        lines.push(snapshot_line(&format!("track {n}"), &pattern.to_json(), stream.draws));
-    }
     for (n, case) in items(&fixtures, "patterns").iter().enumerate() {
         let mut pattern = pattern_in(case.get("before").unwrap());
         let options = match case.get("options").filter(|o| !o.is_null()) {
@@ -308,7 +301,7 @@ fn rust_snapshot() -> Vec<String> {
         };
         let mut stream = Stream::new(f(case, "seed"));
         let mut rnd = || stream.next();
-        generate_pattern(&mut AutoGenerator::new(&scales, &mut rnd), &mut pattern, &options);
+        generate_pattern(&mut AutoGenerator::new(&scales, &styles, &mut rnd), &mut pattern, &options);
         lines.push(snapshot_line(&format!("pattern {n}"), &pattern.to_json(), stream.draws));
     }
     for (n, case) in items(&fixtures, "loops").iter().enumerate() {
@@ -317,7 +310,7 @@ fn rust_snapshot() -> Vec<String> {
         for index in 0..f(case, "loopCount") as usize {
             let start = stream.draws;
             let mut rnd = || stream.next();
-            run_loop(&mut AutoGenerator::new(&scales, &mut rnd), &mut pattern, index as u64);
+            run_loop(&mut AutoGenerator::new(&scales, &styles, &mut rnd), &mut pattern, index as u64);
             let at = format!("loops {n} loop {index}");
             lines.push(snapshot_line(&at, &pattern.to_json(), stream.draws - start));
         }
@@ -329,9 +322,9 @@ fn rust_snapshot() -> Vec<String> {
             let step = step.as_str().unwrap();
             let start = stream.draws;
             let mut rnd = || stream.next();
-            let mut g = AutoGenerator::new(&scales, &mut rnd);
+            let mut g = AutoGenerator::new(&scales, &styles, &mut rnd);
             match step {
-                "drums" => toggle_drums(&mut g, &mut pattern),
+                "drums" => toggle_drums(&mut g, &mut pattern, &Options::default()),
                 "bass" => toggle_melodic(&mut g, &mut pattern, MelodicKind::Bass),
                 _ => toggle_melodic(&mut g, &mut pattern, MelodicKind::Chords),
             };
@@ -367,160 +360,106 @@ fn what_departs_from_the_js_matches_its_snapshot() {
     }
 }
 
-// ─── The density the departure is for ────────────────────────────────────────
-
-const GENRES: [&str; 8] = ["techno", "house", "drumandbass", "hiphop", "rock", "funk", "disco", "reggae"];
+// ─── Patterns in a style ─────────────────────────────────────────────────────
 
 fn scales() -> Scales {
     Scales::from_json(fixtures().get("scales").unwrap())
 }
 
-fn generated(genre: &str, scales: &Scales, stream: &mut Stream) -> Pattern {
+fn generated(genre: &str, scales: &Scales, styles: &Styles, stream: &mut Stream) -> Pattern {
     let mut pattern = Pattern { beat_count: 4, ..Pattern::default() };
     let options = Options { genre: Some(genre.to_owned()), ..Options::default() };
     let mut rnd = || stream.next();
-    generate_pattern(&mut AutoGenerator::new(scales, &mut rnd), &mut pattern, &options);
+    generate_pattern(&mut AutoGenerator::new(scales, styles, &mut rnd), &mut pattern, &options);
     pattern
 }
 
-fn drums(pattern: &Pattern) -> impl Iterator<Item = (usize, &Track)> {
-    pattern.tracks.iter().enumerate().filter(|(_, t)| instrument_family(&t.name).is_drum())
-}
-
 #[test]
-fn a_new_pattern_stays_within_its_drum_track_limit_with_kick_and_snare() {
-    let scales = scales();
+fn a_new_pattern_has_its_style_tracks_meter_and_tempo() {
+    let (scales, styles) = (scales(), styles());
     let mut stream = Stream::new(11.0);
-    for genre in GENRES {
-        for _ in 0..100 {
-            let pattern = generated(genre, &scales, &mut stream);
-            let limit = if matches!(genre, "hiphop" | "reggae" | "rock" | "funk") { 5 } else { 6 };
-            assert!(drums(&pattern).count() <= limit, "{genre}");
-            for name in ["KICK", "SNARE"] {
-                assert!(pattern.tracks.iter().any(|t| t.name == name), "{genre}: no {name}");
+    for style in &styles.list {
+        for _ in 0..30 {
+            let pattern = generated(&style.name, &scales, &styles, &mut stream);
+            assert_eq!(pattern.beat_count, style.beat_count, "{}", style.name);
+            assert!((style.tempo.0..=style.tempo.1).contains(&pattern.bpm), "{}: {}", style.name, pattern.bpm);
+            for track in &pattern.tracks {
+                assert!(style.tracks.contains(&track.name), "{}: {}", style.name, track.name);
+                if instrument_family(&track.name).is_drum() {
+                    assert_eq!(track.steps_per_beat, style.steps_per_beat, "{}: {}", style.name, track.name);
+                    assert_eq!(track.swing_amount, style.swing_amount);
+                }
+            }
+            // The parts every pattern of the style has.
+            for (name, part) in &style.parts {
+                if part.chance >= 1.0 && part.hits_per_measure > 0.0 {
+                    let track = pattern.tracks.iter().find(|t| t.name == *name).unwrap();
+                    assert!(!track.notes.is_empty(), "{}: {name}", style.name);
+                }
             }
         }
     }
 }
 
 #[test]
-fn drums_on_a_full_pattern_leaves_the_tracks_past_the_limit_empty_and_out_of_auto() {
-    let scales = scales();
+fn drums_on_a_full_pattern_play_the_style_parts_and_leave_the_others_empty_out_of_auto() {
+    let (scales, styles) = (scales(), styles());
     let names = ["CHH", "OHH", "CLAP", "PERC", "COWBELL", "CRASH", "KICK", "SNARE"];
-    for seed in 0..50 {
+    for seed in 0..20 {
         let mut tracks: Vec<Track> = names.iter().map(|n| Track::new(n, 4, 4)).collect();
         tracks.iter_mut().for_each(|t| t.notes.push(Note::default()));
         let mut pattern = Pattern { beat_count: 4, tracks, ..Pattern::default() };
         let mut stream = Stream::new(f64::from(seed));
         let mut rnd = || stream.next();
-        assert!(toggle_drums(&mut AutoGenerator::new(&scales, &mut rnd), &mut pattern));
-        let auto: Vec<&Track> = drums(&pattern).map(|(_, t)| t).filter(|t| t.auto_mode).collect();
-        assert!(auto.len() <= 6);
-        assert!(auto.iter().any(|t| t.name == "KICK") && auto.iter().any(|t| t.name == "SNARE"));
-        assert!(drums(&pattern).all(|(_, t)| t.auto_mode || t.notes.is_empty()));
-    }
-}
-
-#[test]
-fn four_on_the_floor_is_about_one_kick_a_beat() {
-    let scales = scales();
-    let mut stream = Stream::new(5.0);
-    let mut notes = 0;
-    for _ in 0..200 {
-        let mut pattern = Pattern { tracks: vec![Track::new("KICK", 4, 4)], beat_count: 4, ..Pattern::default() };
-        let mut rnd = || stream.next();
-        let mut g = AutoGenerator::new(&scales, &mut rnd);
-        instrument_line(&mut g, &mut pattern, 0, InstrumentFamily::Kick, Some("fourOnFloor"), 1.0, &Harmony::default());
-        drop(g);
-        notes += pattern.tracks[0].notes.len();
-    }
-    // One beat loops: the first step, and rarely another.
-    assert!((200..=240).contains(&notes), "{notes} notes over 200 lines");
-}
-
-#[test]
-fn locked_hats_follow_the_density() {
-    let scales = scales();
-    let mut stream = Stream::new(3.0);
-    let mut count = |density: f64| {
-        let mut notes = 0;
-        for _ in 0..100 {
-            let mut pattern = Pattern { tracks: vec![Track::new("CHH", 4, 4)], beat_count: 4, ..Pattern::default() };
-            let mut rnd = || stream.next();
-            let mut g = AutoGenerator::new(&scales, &mut rnd);
-            let variant = Some("chh16thLocked");
-            instrument_line(&mut g, &mut pattern, 0, InstrumentFamily::Hat, variant, density, &Harmony::default());
-            drop(g);
-            notes += pattern.tracks[0].notes.len();
-        }
-        notes
-    };
-    assert_eq!(count(1.0), 400);
-    let thin = count(0.4);
-    assert!((240..=320).contains(&thin), "{thin} notes over 100 lines");
-}
-
-// ─── Standard rhythms ────────────────────────────────────────────────────────
-
-/// The line of `kind`, variant `variant`, as steps of 16 in the measure.
-fn line_steps(stream: &mut Stream, name: &str, kind: InstrumentFamily, variant: &str, density: f64) -> Vec<i32> {
-    let scales = scales();
-    let mut pattern = Pattern { tracks: vec![Track::new(name, 4, 4)], beat_count: 4, ..Pattern::default() };
-    let mut rnd = || stream.next();
-    let mut g = AutoGenerator::new(&scales, &mut rnd);
-    instrument_line(&mut g, &mut pattern, 0, kind, Some(variant), density, &Harmony::default());
-    drop(g);
-    pattern.tracks[0].notes.iter().map(|n| n.beat * 4 + n.step).collect()
-}
-
-#[test]
-fn the_downbeat_and_backbeat_hold_at_any_density() {
-    let mut stream = Stream::new(11.0);
-    for density in [0.2, 0.4, 0.7, 1.0] {
-        for _ in 0..50 {
-            for variant in ["basic", "syncopated", "fourOnFloor"] {
-                let kick = line_steps(&mut stream, "KICK", InstrumentFamily::Kick, variant, density);
-                assert!(kick.contains(&0), "{variant} at {density}: {kick:?}");
+        let options = Options { genre: Some("reggae".into()), ..Options::default() };
+        assert!(toggle_drums(&mut AutoGenerator::new(&scales, &styles, &mut rnd), &mut pattern, &options));
+        let reggae = styles.get("reggae").unwrap();
+        for track in pattern.tracks.iter().filter(|t| instrument_family(&t.name).is_drum()) {
+            let plays = reggae.part_for(&track.name).is_some();
+            assert_eq!(track.auto_mode, plays, "{}", track.name);
+            if !plays {
+                assert!(track.notes.is_empty(), "{}", track.name);
             }
-            for variant in ["basic", "syncopated", "ghost"] {
-                let snare = line_steps(&mut stream, "SNARE", InstrumentFamily::Snare, variant, density);
-                assert!(snare.contains(&4) && snare.contains(&12), "{variant} at {density}: {snare:?}");
-            }
-            let hats = line_steps(&mut stream, "CHH", InstrumentFamily::Hat, "chhBasic", density);
-            assert!(hats.contains(&0) && hats.contains(&2), "{hats:?}");
         }
+        let kick = pattern.tracks.iter().find(|t| t.name == "KICK").unwrap();
+        assert_eq!(kick.notes.iter().map(|n| (n.beat, n.step)).collect::<Vec<_>>(), [(2, 0)], "one drop");
     }
 }
 
 #[test]
-fn a_drum_groove_holds_through_its_section() {
-    let scales = scales();
+fn a_drum_line_varies_through_its_section_and_holds_with_no_variation() {
+    let (scales, styles) = (scales(), styles());
     let mut stream = Stream::new(13.0);
     let mut track = Track::new("KICK", 4, 4);
     track.auto_mode = true;
     let mut pattern = Pattern { tracks: vec![track], beat_count: 4, ..Pattern::default() };
     pattern.extra.insert(ordrumbox_logic::generate::GENRE, Value::from("funk"));
     let mut rnd = || stream.next();
-    let mut g = AutoGenerator::new(&scales, &mut rnd);
-    // The song form starts with 4 loops of intro: new, held, held, fill.
+    let mut g = AutoGenerator::new(&scales, &styles, &mut rnd);
     assert!(run_loop(&mut g, &mut pattern, 0));
     let groove = pattern.tracks[0].notes.clone();
-    assert!(!run_loop(&mut g, &mut pattern, 1));
+    assert!(run_loop(&mut g, &mut pattern, 1));
+    assert_ne!(pattern.tracks[0].notes, groove);
+    assert_eq!(pattern.tracks[0].notes.len(), groove.len());
+    // No variation: the line holds until the next section.
+    pattern.tracks[0].compose_variation = Some(0.0);
+    let held = pattern.tracks[0].notes.clone();
     assert!(!run_loop(&mut g, &mut pattern, 2));
-    assert_eq!(pattern.tracks[0].notes, groove);
-    assert!(run_loop(&mut g, &mut pattern, 3));
+    assert!(!run_loop(&mut g, &mut pattern, 3));
+    assert_eq!(pattern.tracks[0].notes, held);
+    assert!(run_loop(&mut g, &mut pattern, 4));
 }
 
 #[test]
 fn bass_and_chords_hold_through_their_section_with_no_variation() {
-    let scales = scales();
+    let (scales, styles) = (scales(), styles());
     let mut stream = Stream::new(17.0);
     let mut tracks = vec![Track::new("BASS", 4, 4), Track::new("PIANO", 4, 4)];
     tracks.iter_mut().for_each(|t| t.auto_mode = true);
     let mut pattern = Pattern { tracks, beat_count: 4, ..Pattern::default() };
     pattern.extra.insert(ordrumbox_logic::generate::GENRE, Value::from("house"));
     let mut rnd = || stream.next();
-    let mut g = AutoGenerator::new(&scales, &mut rnd);
+    let mut g = AutoGenerator::new(&scales, &styles, &mut rnd);
     // 4 loops of intro, then the chorus: only its first loop is new.
     assert!(run_loop(&mut g, &mut pattern, 0));
     let lines = pattern.tracks.clone();
@@ -535,4 +474,77 @@ fn bass_and_chords_hold_through_their_section_with_no_variation() {
     for track in &pattern.tracks {
         assert_eq!((track.auto_hit_variation, track.auto_note_variation), (Some(0.0), Some(0.0)));
     }
+}
+
+// ─── ⟳, the macros, the lock, AUTO ───────────────────────────────────────────
+
+#[test]
+fn a_pattern_made_again_in_a_style_takes_its_tracks_and_keeps_the_locked_one() {
+    let (scales, styles) = (scales(), styles());
+    let mut stream = Stream::new(23.0);
+    let mut pattern = generated("rock", &scales, &styles, &mut stream);
+    let t = pattern.tracks.iter().position(|t| t.name == "SNARE").unwrap();
+    pattern.tracks[t].compose_lock = true;
+    pattern.tracks[t].volume = 0.3;
+    let locked = pattern.tracks[t].clone();
+    let kick_volume = 0.6;
+    pattern.tracks[0].volume = kick_volume;
+    let mut rnd = || stream.next();
+    let options = Options { genre: Some("salsa".into()), ..Options::default() };
+    restyle_pattern(&mut AutoGenerator::new(&scales, &styles, &mut rnd), &mut pattern, &options);
+    let salsa = styles.get("salsa").unwrap();
+    assert_eq!(pattern.beat_count, salsa.beat_count);
+    assert!(pattern.tracks.iter().any(|t| t.name == "CLAVES" && !t.notes.is_empty()));
+    assert!(pattern.tracks.iter().all(|t| t.name != "CHH"), "a track the style does not name goes");
+    assert_eq!(pattern.tracks.iter().find(|t| t.name == "SNARE"), Some(&locked));
+    // A track the style names keeps its sound settings.
+    assert_eq!(pattern.tracks.iter().find(|t| t.name == "KICK").unwrap().volume, kick_volume);
+}
+
+#[test]
+fn the_macros_move_every_line_and_the_same_values_make_the_same_lines() {
+    let (scales, styles) = (scales(), styles());
+    let mut stream = Stream::new(29.0);
+    let mut pattern = Pattern { beat_count: 4, ..Pattern::default() };
+    let mut rnd = || stream.next();
+    let options = Options { genre: Some("funk".into()), ..Options::default() };
+    restyle_pattern(&mut AutoGenerator::new(&scales, &styles, &mut rnd), &mut pattern, &options);
+    let hits = |p: &Pattern| {
+        p.tracks.iter().filter(|t| instrument_family(&t.name).is_drum()).map(|t| t.notes.len()).sum::<usize>()
+    };
+    let before = pattern.clone();
+    let mut set = |pattern: &mut Pattern, energy: f64| {
+        pattern.extra.insert(ordrumbox_core::style::ENERGY, Value::Number(energy));
+        let mut rnd = || stream.next();
+        recompose(&mut AutoGenerator::new(&scales, &styles, &mut rnd), pattern);
+    };
+    set(&mut pattern, 100.0);
+    assert!(hits(&pattern) > hits(&before));
+    set(&mut pattern, 0.0);
+    assert!(hits(&pattern) < hits(&before));
+    set(&mut pattern, 50.0);
+    pattern.extra.remove(ordrumbox_core::style::ENERGY);
+    let mut expected = before.clone();
+    expected.extra.remove(ordrumbox_core::style::ENERGY);
+    assert_eq!(pattern.tracks, expected.tracks, "back to neutral: the lines of the seed");
+}
+
+#[test]
+fn a_locked_track_holds_through_auto_mode_and_auto_leaves_it() {
+    let (scales, styles) = (scales(), styles());
+    let mut stream = Stream::new(31.0);
+    let mut pattern = generated("funk", &scales, &styles, &mut stream);
+    pattern.tracks[0].compose_lock = true;
+    assert!(toggle_auto(&mut pattern));
+    assert!(!pattern.tracks[0].auto_mode && pattern.tracks[1..].iter().all(|t| t.auto_mode));
+    let kick = pattern.tracks[0].clone();
+    pattern.tracks[0].auto_mode = true;
+    let mut rnd = || stream.next();
+    let mut g = AutoGenerator::new(&scales, &styles, &mut rnd);
+    for index in 0..6 {
+        run_loop(&mut g, &mut pattern, index);
+    }
+    assert_eq!(pattern.tracks[0].notes, kick.notes);
+    assert!(!toggle_auto(&mut pattern));
+    assert!(pattern.tracks[1..].iter().all(|t| !t.auto_mode));
 }

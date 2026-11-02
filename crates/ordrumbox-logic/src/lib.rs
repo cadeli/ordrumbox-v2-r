@@ -1,8 +1,10 @@
 //! Editing layer of orDrumbox: the library being edited, every edit as an
-//! undo step, the pattern generators, and Standard MIDI Files.
+//! undo step, the pattern generators (drum lines from a style), and Standard
+//! MIDI Files.
 //!
 //! Ported from `src/logic/` of ordrumbox-v2 (`commands/`, `history_manager.js`).
 
+pub mod compose;
 pub mod composition;
 pub mod editor;
 pub mod generate;

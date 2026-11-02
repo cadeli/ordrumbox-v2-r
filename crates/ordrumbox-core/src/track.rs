@@ -64,6 +64,22 @@ json_record! {
         auto_variant: String = String::new() => "autoVariant" | "auto_variant",
         /// Per-loop density offset, -1–1 (-1 = auto).
         auto_density: f64 = -1.0 => "autoDensity" | "auto_density",
+        /// Drum generation (`compose`): hits in a measure; `None` = the style's.
+        compose_hits_per_measure: Option<f64> = None => "composeHitsPerMeasure",
+        /// 0–100: weights flattened toward the weak steps; `None` = the style's.
+        compose_complexity: Option<f64> = None => "composeComplexity",
+        /// 0–100: how syncopated the line is; `None` = the style's.
+        compose_syncopation: Option<f64> = None => "composeSyncopation",
+        /// -100–100: avoids (−) or follows (+) the style's coupled part; `None` = the style's.
+        compose_coupling: Option<f64> = None => "composeCoupling",
+        /// 0–100: hits moved from one loop to the next in auto mode; `None` = the style's.
+        compose_variation: Option<f64> = None => "composeVariation",
+        /// 0–100: how much the style's weights count against the plain meter.
+        compose_style_weight: f64 = 100.0 => "composeStyleWeight",
+        /// Seed of the line, 1–9999; 0 = a new line each time.
+        compose_seed: f64 = 0.0 => "composeSeed",
+        /// The generation leaves the track as it is (its line, its settings).
+        compose_lock: bool = false => "composeLock",
         filter_type: String = "allpass".to_owned() => "filterType",
         filter_cutoff_lfo: Option<Object> = None => "filterCutoffLfo" | "filterFreqLfo",
         /// Hz.
@@ -88,9 +104,11 @@ json_record! {
         synth_preset: Option<String> = None => "synthPreset" | "synthSoundKey",
         // Not in TRACK_DEFAULTS: written by the auto generator / scale picker,
         // saved only when set.
-        /// Variation amount the auto generator picked (auto mode); `None` until it ran.
+        /// Hit variation amount in auto mode, 0–100 (Groove's Var Hits); the
+        /// generator picks one while it is `None`.
         auto_hit_variation: Option<f64> = None => "autoHitVariation" | "auto_variation",
-        /// Per-note variation amount the auto generator picked (auto mode).
+        /// Note variation amount in auto mode, 0–100 (Engine's Var Notes); the
+        /// generator picks one while it is `None`.
         auto_note_variation: Option<f64> = None => "autoNoteVariation" | "auto_variation2",
         /// Scale (a key of scales.json) the pitch variation snaps to when `pitch_scale_lock` is on.
         scale_name: Option<String> = None => "scaleName",
@@ -103,7 +121,7 @@ json_record! {
 }
 
 /// `TRACK_VALUE_RANGES`: bounds of the numeric settings an edit clamps to.
-const VALUE_RANGES: [(&str, f64, f64); 30] = [
+const VALUE_RANGES: [(&str, f64, f64); 39] = [
     ("volume", 0.0, 1.0),
     ("pan", -1.0, 1.0),
     ("transpose", -24.0, 24.0),
@@ -134,11 +152,24 @@ const VALUE_RANGES: [(&str, f64, f64); 30] = [
     ("autoArpChance", 0.0, 100.0),
     ("pitchRange", 1.0, 24.0),
     ("autoDensity", -1.0, 1.0),
+    ("autoHitVariation", 0.0, 100.0),
+    ("autoNoteVariation", 0.0, 100.0),
+    ("composeHitsPerMeasure", 0.0, 64.0),
+    ("composeComplexity", 0.0, 100.0),
+    ("composeSyncopation", 0.0, 100.0),
+    ("composeCoupling", -100.0, 100.0),
+    ("composeVariation", 0.0, 100.0),
+    ("composeStyleWeight", 0.0, 100.0),
+    ("composeSeed", 0.0, 9999.0),
 ];
 
 /// Table keys that are not track settings (`TRACK_DEFAULTS` lacks them):
 /// an edit never sets them.
-const NOT_SETTINGS: [&str; 3] = ["autoHitVariation", "autoNoteVariation", "scaleName"];
+const NOT_SETTINGS: [&str; 1] = ["scaleName"];
+
+/// Variation amounts an auto track uses until the generator has picked its own.
+const AUTO_HIT_VARIATION_FALLBACK: f64 = 60.0;
+const AUTO_NOTE_VARIATION_FALLBACK: f64 = 40.0;
 
 /// Keys written rounded to 2 decimals (`ROUND_2D` in exporter.js).
 const ROUND_2D: [&str; 10] = [
@@ -177,6 +208,16 @@ impl Track {
 
     /// Whether `key` is a track setting an edit may change (a key of `TRACK_DEFAULTS`).
     /// A web-version key (`prob_pitch`, `velocity`…) counts as its current one.
+    /// The hit variation amount (0–100) of a track in auto mode: its own, else the fallback.
+    pub fn auto_hit_amount(&self) -> f64 {
+        self.auto_hit_variation.unwrap_or(AUTO_HIT_VARIATION_FALLBACK)
+    }
+
+    /// The note variation amount (0–100) of a track in auto mode: its own, else the fallback.
+    pub fn auto_note_amount(&self) -> f64 {
+        self.auto_note_variation.unwrap_or(AUTO_NOTE_VARIATION_FALLBACK)
+    }
+
     pub fn is_setting(key: &str) -> bool {
         Self::canonical_key(key).is_some_and(|key| !NOT_SETTINGS.contains(&key))
     }
@@ -398,7 +439,7 @@ mod tests {
             r#"{"name":"KICK","volume":0.5,"autoPitchChance":10,"delayMix":0.3,"saturationOn":false,"synthPreset":"B1"}"#
         );
         assert!(Track::is_setting("prob_pitch") && Track::is_setting("autoPitchChance"));
-        assert!(!Track::is_setting("auto_variation"));
+        assert!(Track::is_setting("auto_variation") && !Track::is_setting("scaleName"));
         assert_eq!(Track::value_range("delayDepth"), Some((0.0, 1.0)));
     }
 
