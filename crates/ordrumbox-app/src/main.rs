@@ -309,7 +309,6 @@ impl App {
                 KeyCode::Enter | KeyCode::NumpadEnter => s.kit_audition(),
                 KeyCode::Delete | KeyCode::Backspace => s.kit_remove(),
                 KeyCode::KeyN => s.kit_normalize(),
-                KeyCode::KeyR => s.kit_reassign(),
                 KeyCode::KeyE => s.run(Command::ExportMapping),
                 _ => return,
             }

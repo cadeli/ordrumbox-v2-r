@@ -117,7 +117,7 @@ Kit editor (**Ctrl K**, the JS drumkit manager): the current kit's samples
 (dB), transpose (semitones) and decay (knobs), its note, length, peak and RMS
 levels and envelope with the decay end; **Enter** plays it, **Delete**
 removes it, **N** normalizes the kit to 0 dB, **E** exports the kit mapping
-(`.json`), **R** assigns the tracks' sounds again. Dropped on the window, a
+(`.json`). Dropped on the window, a
 `.wav` joins the kit (**Shift**: replaces the selected sample), a folder of
 WAV files becomes a kit, a kit mapping is loaded. Gain and transpose now play (the
 JS sample voice uses them). Unlike the JS app, where these edits are lost on

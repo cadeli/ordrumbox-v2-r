@@ -363,7 +363,7 @@ const SHORTCUTS: [&str; 53] = [
     "  Space, wheel           play the song from the cursor; scroll (Shift: the rows)",
     "KIT EDITOR (Ctrl+K)",
     "  Up Down                sample      Enter  hear      Delete  remove",
-    "  N, R, E                normalize, assign the sounds again, export the mapping",
+    "  N, E                   normalize, export the mapping",
     "  drop files             a .wav joins the kit (Shift: replaces the sample), a folder",
     "                         becomes a kit, a .json mapping loads, a .mid imports",
 ];
@@ -974,7 +974,6 @@ impl Session {
             C::AddSample => self.open_picker(Purpose::AddSample),
             C::ReplaceSample => self.open_picker(Purpose::ReplaceSample),
             C::ImportFolder => self.open_picker(Purpose::ImportFolder),
-            C::Reassign => self.kit_reassign(),
             C::SelectRandomPattern => self.select_random_pattern(),
             C::SelectRandomDrumkit => self.select_random_drumkit(),
             C::ToggleVus => self.toggle_vus(),
@@ -1363,12 +1362,6 @@ impl Session {
             Ok(n) => self.kits_changed(format!("Normalized {n} sample(s)")),
             Err(e) => self.message = e,
         }
-    }
-
-    /// R: the sounds of the tracks assigned again.
-    pub fn kit_reassign(&mut self) {
-        self.select_kit(self.kit_index);
-        self.message = "Auto-detect complete".into();
     }
 
     /// E: the kit's mapping to a JSON file at `path`.
