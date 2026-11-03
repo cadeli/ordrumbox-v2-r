@@ -10,9 +10,9 @@
 
 use ordrumbox_core::json::{self, Object, Value};
 use ordrumbox_core::{Note, Track};
+use ordrumbox_engine::synth_model;
 
 use crate::editors::track_select_options;
-use crate::synth_model;
 use crate::update;
 
 /// Protocol versions this server speaks, newest first.

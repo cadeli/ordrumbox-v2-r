@@ -7,16 +7,18 @@
 //! the module pills under them.
 //!
 //! [`SynthLayout`] and [`build`] place everything as panel items (the ids
-//! name groups and fields by their index in [`synth_model::groups`] and
+//! name groups and fields by their index in [`model::groups`] and
 //! [`all_fields`]); [`draw`] paints the cards and the plots under them.
 
 use ordrumbox_core::json::{Object, Value};
+use ordrumbox_engine::synth_model::{
+    self as model, FILTER_SLOPES, FILTER_TYPES, LFO_SYNCS, MOD_ENV_TARGETS, TABS, WAVES,
+};
 
 use crate::canvas::{Canvas, Rgb, text_width};
 use crate::control::Spec;
 use crate::frame;
 use crate::panel::{Id, Item, Kind, Rect};
-use crate::synth_model::{self as model, FILTER_SLOPES, FILTER_TYPES, LFO_SYNCS, MOD_ENV_TARGETS, TABS, WAVES};
 use crate::theme;
 
 /// The preset bar's buttons: id, label, width (scale units).
@@ -60,6 +62,12 @@ enum Field {
     List(Vec<(String, String)>),
     Switch,
     None,
+}
+
+/// The knob of a numeric control.
+fn knob_spec(meta: &model::Meta) -> Spec {
+    let spec = Spec::knob(meta.min, meta.max, meta.step, meta.min);
+    if meta.log { spec.log_full_travel() } else { spec }
 }
 
 fn field_kind(path: &str, value: Option<&Value>) -> Field {
@@ -274,7 +282,7 @@ pub fn build(
                 Field::Knob => {
                     let base = model::number(draft, &path).unwrap_or(0.0);
                     let moved = lfo(&path);
-                    let spec = meta.map_or_else(|| Spec::knob(0.0, 1.0, 0.01, 0.0), |m| m.spec());
+                    let spec = meta.map_or_else(|| Spec::knob(0.0, 1.0, 0.01, 0.0), knob_spec);
                     let value = moved.map_or(base, |m| m.clamp(spec.min, spec.max));
                     let unit = meta.map_or("", |m| m.unit);
                     let text = crate::control::Format::Fmt.value(value, unit);
@@ -424,6 +432,15 @@ fn draw_filter(canvas: &mut Canvas, draft: &Object, r: Rect, s: i32, time: f64, 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn filter_freq_knob_is_logarithmic() {
+        let spec = knob_spec(model::find_meta("filter.freq").unwrap());
+        // Half of the knob's travel is the middle of the three decades, not 10 kHz.
+        assert_eq!(spec.drag(20.0, 100.0, false), 632.0);
+        assert_eq!(spec.drag(20.0, 200.0, false), 20_000.0);
+        assert!((spec.fraction(632.456) - 0.5).abs() < 1e-5);
+    }
 
     fn draft() -> Object {
         let mut d = model::defaults();

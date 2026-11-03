@@ -14,6 +14,7 @@ pub mod kit;
 pub mod offline;
 pub mod pass;
 pub mod strip_settings;
+pub mod synth_model;
 pub mod synth_preset;
 pub mod wav;
 
