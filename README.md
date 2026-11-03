@@ -221,12 +221,14 @@ description (a click edits them), its date, the arrangement list, and
 **Save**, **Load**, **Save as**, **Export**, **Import**. A click on the ruler aims the cursor, where the song plays from
 (**←→** move it a measure; while playing, it jumps there at once); while the
 panel is shown **Space** plays the song. Right-click a pattern of the list
-or a row's name: add it at the playhead (stopped: the cursor), or remove its
-row; a clip: **Next** (the same clip right after it) or **Delete**; the bare
+or a row's name: add it at the playhead (stopped: the cursor), move the row
+up or down, or remove its row; a clip: **Next** (the same clip right after it) or **Delete**; the bare
 grid: add the row's pattern there. Drag a pattern of the list onto the
 arrangement to add it at that measure, on its own row; drag a clip sideways to
 move it, whole measures at a time (the wheel scrolls during the drag; the grid
-shows a page past the end to drop on). A click on a pattern selects it, a
+shows a page past the end to drop on); drag a row by its name up or down to
+move it. Rows follow the order of the pattern list, so a row moved moves its
+pattern in the list too. A click on a pattern selects it, a
 double-click renames it (**↑↓** step through them). The wheel scrolls the
 measures, sideways too (**Shift**: the rows); the scroll bars under and right
 of the grid, clicked or dragged, reach every measure and row; while the song

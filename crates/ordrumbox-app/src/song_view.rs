@@ -102,6 +102,8 @@ pub struct SongView<'a> {
     pub dragged_clip: Option<(usize, u32)>,
     /// A pattern being dragged over the arrangement.
     pub ghost: Option<SongGhost>,
+    /// A row being dragged by its name, and the row it would take.
+    pub row_drop: Option<(usize, usize)>,
     /// Measures shown past the end of the arrangement, to drop on.
     pub room: u32,
     /// The selected pattern's description (`None` without a pattern), and
@@ -334,6 +336,12 @@ impl SongLayout {
         first + across.min(self.visible_measures() - 1)
     }
 
+    /// The row shown at `y`, kept on the page; `first` is the first one shown.
+    pub fn drop_row(&self, y: i32, first: usize) -> usize {
+        let down = usize::try_from((y - self.body_top()).max(0) / self.row_height()).unwrap_or(0);
+        first + down.min(self.visible_rows().saturating_sub(1))
+    }
+
     /// What is at `(x, y)`.
     pub fn hit(&self, view: &SongView, x: i32, y: i32) -> Option<SongHit> {
         if self.list.contains(x, y) {
@@ -523,6 +531,15 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
         }
     }
 
+    // A row dragged by its name: a line where it would go, above or below the row it takes.
+    if let Some((from, to)) = view.row_drop.filter(|&(from, to)| from != to) {
+        let edge = if to > from { to + 1 } else { to };
+        if (first_row..=first_row + shown_rows).contains(&edge) {
+            let y = layout.row_y(edge, first_row) - s;
+            canvas.fill_rect(g.x, y, layout.label_width() + body_w, 2 * s, ACCENT);
+        }
+    }
+
     // The cursor: where the song plays, else (dimmer) where play starts.
     if (f64::from(first_measure)..f64::from(first_measure + shown_measures)).contains(&cursor_measure) {
         let x = layout.measure_x(cursor_measure, first_measure);
@@ -622,6 +639,7 @@ mod tests {
             scroll: (0, 0),
             dragged_clip: None,
             ghost: None,
+            row_drop: None,
             room: 0,
             description: Some("x"),
             description_scroll: 0,
@@ -686,6 +704,7 @@ mod tests {
                     scroll: (1, 0),
                     dragged_clip: song.filter(|s| !s.clips.is_empty()).map(|_| (0, 3)),
                     ghost: Some(SongGhost { name: "c".into(), row: 2, measure: 2, measure_count: 1.0 }),
+                    row_drop: Some((0, 2)),
                     room: 8,
                     description: song.map(|_| long.as_str()),
                     description_scroll: 3,
