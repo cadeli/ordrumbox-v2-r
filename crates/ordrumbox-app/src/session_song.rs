@@ -36,7 +36,7 @@ const BUTTONS: [(&str, &str); 7] = [
 ];
 
 /// Movement before a press becomes a drag, px.
-const DRAG_START_PX: i32 = 3;
+pub(super) const DRAG_START_PX: i32 = 3;
 
 /// What a drag on the song panel carries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -106,6 +106,8 @@ pub struct View<'a> {
     pub levels: Vec<f32>,
     /// Whether the VU meter stripe is shown.
     pub show_vus: bool,
+    /// A track being dragged by its name: from which row to which.
+    pub track_drop: Option<(usize, usize)>,
 }
 
 /// What the kit editor shows.
@@ -389,6 +391,13 @@ impl Layout {
         self.tracks
     }
 
+    /// The row a track dragged to `y` takes: the one under it, else the
+    /// first or the last shown.
+    pub fn drop_row(&self, y: i32) -> usize {
+        let row = (y - self.top).max(0) / self.row.max(1);
+        usize::try_from(row).unwrap_or(0).min(self.tracks.saturating_sub(1))
+    }
+
     /// The volume slider of row `track`.
     pub fn volume_rect(&self, track: usize) -> Rect {
         let h = self.row.min(14 * self.scale);
@@ -594,6 +603,13 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
         };
         canvas.text(layout.name_x, label_y, &label, layout.scale, color);
         draw_track_steps(canvas, track, i, view, layout);
+    }
+
+    if let Some((from, to)) = view.track_drop.filter(|(from, to)| from != to) {
+        // Where the track lands: above the row it takes moving up, below it moving down.
+        let y = layout.row_top(if to > from { to + 1 } else { to });
+        let right = layout.grid_left + layout.grid_width;
+        canvas.fill_rect(layout.left - 4 * scale, y - scale, right - layout.left + 4 * scale, 2 * scale, ACCENT);
     }
 
     if let Some(fraction) = view.playhead {
@@ -876,6 +892,7 @@ mod tests {
                 current_page: 0,
                 levels: vec![0.0; 2],
                 show_vus: true,
+                track_drop: None,
                 cursor: Some(Cursor { track: 0, beat: 1, step: 2 }),
                 selected: Some((0, 0)),
                 undo: Some("Add note"),

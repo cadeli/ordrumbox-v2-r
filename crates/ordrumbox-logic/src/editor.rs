@@ -383,6 +383,27 @@ impl Editor {
         self.edit(p, |_| format!("Remove track {name}"), None, |pattern| pattern.tracks.remove(t)).is_some()
     }
 
+    /// Move track `from` so that it ends at index `to` (clamped), the others
+    /// keeping their order; whether it moved.
+    pub fn move_track(&mut self, p: usize, from: usize, to: usize) -> bool {
+        let Some(pattern) = self.library.patterns.get(p) else { return false };
+        let Some(name) = pattern.tracks.get(from).map(|t| t.name.clone()) else { return false };
+        let to = to.min(pattern.tracks.len() - 1);
+        if to == from {
+            return false;
+        }
+        self.edit(
+            p,
+            |_| format!("Move track {name}"),
+            None,
+            |pattern| {
+                let track = pattern.tracks.remove(from);
+                pattern.tracks.insert(to, track);
+            },
+        )
+        .is_some()
+    }
+
     /// Insert a copy of `source` at `index` (clamped), named "`<name>` copy"
     /// (then "copy 2"…); its index. `None` when the pattern is full.
     pub fn paste_track(&mut self, p: usize, index: usize, source: &Track) -> Option<usize> {
@@ -1040,6 +1061,21 @@ mod tests {
             (chh.beat_count, chh.loop_length, chh.pan),
             (4, Some(16), ordrumbox_core::drum_taxonomy::pan_from_track_name("CHH"))
         );
+    }
+
+    #[test]
+    fn tracks_move_as_one_step() {
+        let mut e = editor();
+        let names = |e: &Editor| pattern(e).tracks.iter().map(|t| t.name.clone()).collect::<Vec<_>>();
+        e.add_track(0, "CHH", 4).expect("room");
+        assert!(!e.move_track(0, 1, 1));
+        assert!(!e.move_track(0, 5, 0));
+        assert!(e.move_track(0, 0, 99));
+        assert_eq!(names(&e), ["SNARE", "CHH", "KICK"]);
+        assert!(e.move_track(0, 1, 0));
+        assert_eq!(names(&e), ["CHH", "SNARE", "KICK"]);
+        assert_eq!(e.undo().as_deref(), Some("Move track CHH"));
+        assert_eq!(names(&e), ["SNARE", "CHH", "KICK"]);
     }
 
     #[test]

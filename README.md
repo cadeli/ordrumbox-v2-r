@@ -196,9 +196,10 @@ lists the bass variants on a bass track, the chord and melody ones on the others
 selected note (else the step under the cursor, else the track's first note)
 — velocity, pitch, pan, and the Trig, Retr, Eucl and Arp tabs. While
 playing, a setting with an LFO shows the LFO's value. The grid has a volume
-slider per track. Right-click a track's name: rename, copy, paste, duplicate,
-delete, randomize or clear it; right-click a step: copy, paste or delete its
-notes, or add a note at a random pitch.
+slider per track. Right-click a track's name: rename, copy, paste, move up or
+down, duplicate, delete, randomize or clear it; drag a track's name up or down
+to move the track to another row (one undo step). Right-click a step: copy,
+paste or delete its notes, or add a note at a random pitch.
 
 Knobs and sliders work as in the JS (`OrKnob`, `OrSlider`, checked against
 them): drag a knob up or down (200 px for the whole range), click or drag a
