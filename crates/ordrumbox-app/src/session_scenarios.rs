@@ -833,7 +833,7 @@ fn a_song_saved_comes_back_from_the_load_menu() {
     s.run(Command::NewGeneratedPattern);
     assert_eq!(s.editor.library().patterns.len(), count + 2);
     s.run(Command::LoadSong);
-    let menu = s.dropdown.as_ref().expect("the Load list");
+    let menu = s.widgets.dropdown.as_ref().expect("the Load list");
     assert_eq!(menu.values.len(), 1);
     let value = menu.values[0].clone();
     draw(&mut s);
