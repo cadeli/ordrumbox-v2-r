@@ -22,6 +22,7 @@ use ordrumbox_engine::{Controller, Mode, SynthPresets, wav};
 use ordrumbox_logic::compose;
 use ordrumbox_logic::generate::{self, AutoGenerator, MelodicKind};
 use ordrumbox_logic::midi;
+use ordrumbox_logic::tools::learned_styles;
 use ordrumbox_logic::{Editor, Nudge};
 
 use crate::action_log::{self, ActionLog, LogLayout, Seen};
@@ -44,16 +45,6 @@ use session_confirm::Pending;
 mod session_confirm;
 #[path = "session_grid.rs"]
 mod session_grid;
-
-/// The styles with what the library's tags teach, learned again when the
-/// library changed since.
-fn learned_styles<'s>(learned: &'s mut (Styles, Option<u64>), written: &Styles, editor: &Editor) -> &'s Styles {
-    let revision = editor.revision();
-    if learned.1 != Some(revision) {
-        *learned = (compose::learn(written, &editor.library().patterns), Some(revision));
-    }
-    &learned.0
-}
 
 /// A style's name in the menus: a learned one says from how many patterns.
 pub fn style_label(style: &ordrumbox_core::Style) -> String {
