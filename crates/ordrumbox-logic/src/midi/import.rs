@@ -11,6 +11,10 @@
 //! The JS rules are kept as they are: an instrument already made a track
 //! drops the later notes that resolve to it; the tempo meta event is never
 //! read (120 BPM); every pattern is 32 beats long, up to 16 patterns.
+//!
+//! Two departures from the JS: a file timed in SMPTE frames or with a 0
+//! division is refused (the JS makes 16 patterns of misplaced notes), and the
+//! message says when notes past the 16th pattern are left out.
 
 use ordrumbox_core::instruments::{Catalog, Instrument, catalog};
 use ordrumbox_core::js;
@@ -85,6 +89,11 @@ pub fn import(file_name: &str, bytes: &[u8], roots: &[(String, f64)]) -> Result<
     if notes.is_empty() {
         return Err("No MIDI notes found in file".into());
     }
+    // A set top bit means SMPTE frames, which this import does not convert.
+    let division = midi.header.division;
+    if division == 0 || division & 0x8000 != 0 {
+        return Err(format!("MIDI timing not supported (division {division:#06x}): only ticks per beat are read"));
+    }
     let programs = midi.program_changes();
     let c = catalog();
 
@@ -142,12 +151,15 @@ pub fn import(file_name: &str, bytes: &[u8], roots: &[(String, f64)]) -> Result<
     }
 
     let base_name = strip_midi_extension(file_name);
-    let patterns = patterns_from(&defs, base_name, f64::from(midi.header.division));
-    let message = if patterns.len() > 1 {
+    let (patterns, cut) = patterns_from(&defs, base_name, f64::from(division));
+    let mut message = if patterns.len() > 1 {
         format!("MIDI imported: {} track(s) into {} patterns", defs.len(), patterns.len())
     } else {
         format!("MIDI imported: {} track(s)", defs.len())
     };
+    if cut {
+        message.push_str(&format!(", notes past beat {} left out", MAX_PATTERNS * f64::from(PATTERN_BEATS)));
+    }
     Ok(Imported { patterns, track_count: defs.len(), message })
 }
 
@@ -163,16 +175,17 @@ fn strip_midi_extension(name: &str) -> &str {
 }
 
 /// `#createPatternsFromTrackDefs`: 32-beat patterns covering the notes, every
-/// track in each of them.
-fn patterns_from(defs: &[TrackDef], base_name: &str, division: f64) -> Vec<Pattern> {
+/// track in each of them, and whether notes fall past the last one.
+fn patterns_from(defs: &[TrackDef], base_name: &str, division: f64) -> (Vec<Pattern>, bool) {
     let ratio = division / TICK;
     let max_tick = defs.iter().flat_map(|d| &d.notes).map(|n| n.tick).fold(0, i64::max);
     let total_ticks = js::round(max_tick as f64 / ratio);
-    // `Math.max`/`Math.min` keep a NaN (a 0 division): then no pattern.
     let total_beats = (total_ticks / TICK).ceil();
     let wanted = (total_beats.max(1.0) / f64::from(PATTERN_BEATS)).ceil();
-    let count = if total_beats.is_nan() { 0 } else { MAX_PATTERNS.min(wanted) as usize };
-    (0..count)
+    let count = MAX_PATTERNS.min(wanted) as usize;
+    // The last pattern ends before this tick, so a note on it is left out.
+    let cut = total_ticks >= MAX_PATTERNS * f64::from(PATTERN_BEATS) * TICK;
+    let patterns = (0..count)
         .map(|p| {
             let start_beat = (p as i32) * PATTERN_BEATS;
             let (start_tick, end_tick) = (f64::from(start_beat) * TICK, f64::from(start_beat + PATTERN_BEATS) * TICK);
@@ -211,5 +224,6 @@ fn patterns_from(defs: &[TrackDef], base_name: &str, division: f64) -> Vec<Patte
                 ..Pattern::default()
             }
         })
-        .collect()
+        .collect();
+    (patterns, cut)
 }

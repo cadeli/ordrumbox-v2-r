@@ -15,7 +15,7 @@ use crate::synth_model as model;
 use crate::synth_view::{self, Built, SynthLayout};
 
 /// Preset edits reach the disk this long after the last one.
-const SYNTHS_DELAY: Duration = Duration::from_millis(500);
+pub(super) const SYNTHS_DELAY: Duration = Duration::from_millis(500);
 
 /// The preset being edited.
 #[derive(Debug, Clone)]
@@ -65,15 +65,26 @@ impl Session {
 
     /// The presets saved at `path`, read at start over the assets' ones. An
     /// asset's preset the save does not hold is kept: a new version's presets appear.
-    pub(super) fn load_user_synths(path: Option<PathBuf>, synths: &mut SynthPresets, status: &mut Vec<String>) {
-        let Some(path) = path else { return };
+    /// Returns where edits are saved: `save_to`, or none when the saved presets
+    /// cannot be read (never written over).
+    pub(super) fn load_user_synths(
+        path: Option<PathBuf>,
+        save_to: Option<PathBuf>,
+        synths: &mut SynthPresets,
+        status: &mut Vec<String>,
+    ) -> Option<PathBuf> {
+        let Some(path) = path else { return save_to };
         match store::load_synths(&path) {
             Ok(Some(mut saved)) => {
                 saved.add_missing(synths);
                 *synths = saved;
+                save_to
             }
-            Ok(None) => {}
-            Err(e) => status.push(format!("synth presets not loaded: {e}")),
+            Ok(None) => save_to,
+            Err(e) => {
+                status.push(format!("synth presets not loaded, not saved over: {e}"));
+                None
+            }
         }
     }
 
@@ -103,10 +114,16 @@ impl Session {
             return Some(due);
         }
         self.synths_dirty = None;
-        if let Some(path) = store::synths_path()
-            && let Err(e) = store::save_synths(&path, &self.synths)
-        {
-            self.message = format!("Synth preset changes are not being saved: {}: {e}", path.display());
+        match &self.synths_file {
+            Some(path) => {
+                if let Err(e) = store::save_synths(path, &self.synths) {
+                    self.message = format!("Synth preset changes are not being saved: {}: {e}", path.display());
+                }
+            }
+            None => {
+                self.message =
+                    "Synth preset changes are not being saved: no synth presets file (see the messages below)".into();
+            }
         }
         None
     }

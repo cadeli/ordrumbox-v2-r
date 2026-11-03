@@ -742,7 +742,8 @@ fn synth_presets_exported_are_imported_and_saved_ones_read_at_start() {
     // the save does not hold kept.
     let mut assets = presets(r#"{"bass":{},"new":{"vco1":{"gain":1}}}"#);
     let mut status = Vec::new();
-    Session::load_user_synths(Some(file.clone()), &mut assets, &mut status);
+    let save_to = Some(dir.join("saved.json"));
+    assert_eq!(Session::load_user_synths(Some(file.clone()), save_to.clone(), &mut assets, &mut status), save_to);
     assert!(status.is_empty(), "{status:?}");
     let mut keys = assets.keys();
     keys.sort_unstable();
@@ -750,15 +751,54 @@ fn synth_presets_exported_are_imported_and_saved_ones_read_at_start() {
     assert_eq!(assets.get("bass"), s.synths.get("bass"));
     // No save yet: the assets' presets as they are.
     let mut assets = presets(r#"{"bass":{}}"#);
-    Session::load_user_synths(Some(dir.join("none.json")), &mut assets, &mut status);
-    Session::load_user_synths(None, &mut assets, &mut status);
+    assert_eq!(
+        Session::load_user_synths(Some(dir.join("none.json")), save_to.clone(), &mut assets, &mut status),
+        save_to
+    );
+    assert_eq!(Session::load_user_synths(None, save_to.clone(), &mut assets, &mut status), save_to);
     assert!(status.is_empty(), "{status:?}");
     assert_eq!(assets.to_json().to_json(), r#"{"bass":{}}"#);
     // A save that cannot be read: said, the assets' presets kept.
-    Session::load_user_synths(Some(dir.join("cut.json")), &mut assets, &mut status);
+    assert_eq!(Session::load_user_synths(Some(dir.join("cut.json")), save_to, &mut assets, &mut status), None);
     assert_eq!(status.len(), 1);
-    assert!(status[0].starts_with("synth presets not loaded: "), "{}", status[0]);
+    assert!(status[0].starts_with("synth presets not loaded, not saved over: "), "{}", status[0]);
     assert_eq!(assets.to_json().to_json(), r#"{"bass":{}}"#);
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn a_synth_presets_file_that_cannot_be_read_is_never_written_over() {
+    let dir = scratch_dir("synth-unreadable");
+    let file = dir.join("synth_presets.json");
+    let (mut s, _audio) = demo_session(&dir.join("samples"));
+    let edit = |s: &mut Session, gain: f64| {
+        s.synths.set("bass", json::parse(&format!(r#"{{"vco1":{{"gain":{gain}}}}}"#)).unwrap());
+        s.synths_changed();
+        s.synths_dirty = s.synths_dirty.map(|at| at - super::session_synth::SYNTHS_DELAY);
+        assert_eq!(s.flush_synths(), None);
+        assert_eq!(s.synths_dirty, None);
+    };
+
+    // A file that reads: an edit is saved to it.
+    std::fs::write(&file, r#"{"lead":{}}"#).unwrap();
+    let mut status = Vec::new();
+    s.synths_file = Session::load_user_synths(Some(file.clone()), Some(file.clone()), &mut s.synths, &mut status);
+    assert!(status.is_empty(), "{status:?}");
+    edit(&mut s, 0.5);
+    let saved = store::load_synths(&file).unwrap().unwrap();
+    assert_eq!(saved.get("bass").unwrap().to_json(), r#"{"vco1":{"gain":0.5}}"#);
+    assert!(saved.get("lead").is_some());
+
+    // A file that does not: said at start, and every edit after says it is not saved.
+    let broken = r#"{"lead":{"vco1":"#;
+    std::fs::write(&file, broken).unwrap();
+    s.synths_file = Session::load_user_synths(Some(file.clone()), Some(file.clone()), &mut s.synths, &mut status);
+    assert_eq!(s.synths_file, None);
+    assert!(status[0].starts_with("synth presets not loaded, not saved over: "), "{status:?}");
+    edit(&mut s, 0.25);
+    assert!(s.message.starts_with("Synth preset changes are not being saved"), "{}", s.message);
+    s.autosave();
+    assert_eq!(std::fs::read_to_string(&file).unwrap(), broken);
     std::fs::remove_dir_all(&dir).unwrap();
 }
 

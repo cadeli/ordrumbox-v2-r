@@ -152,7 +152,9 @@ melodic instruments on their own channels at the sample's root note) to a
 folder picked. A `.mid` dropped on the window becomes new 32-beat patterns (up to
 16), one track per instrument found (by GM program, drum key, then track
 name), in one undo step. As in the JS app, the file's tempo is not read
-(120 BPM).
+(120 BPM). Two departures from the JS: a file timed in SMPTE frames or with a
+0 division is refused, and the message says when notes past beat 512 (the
+16th pattern) are left out.
 
 The window keeps the same three parts whatever is edited: one main editor in
 the top-left (the grid, the piano roll, the song panel, the synth editor, or
@@ -285,7 +287,8 @@ in the user data folder (an older `generated_sounds.json` there is read when
 it is missing; the JS keeps them in IndexedDB), read at start over the
 assets' presets: a saved preset wins over the asset of the same name, and an
 asset the save does not hold is added (so a deleted asset preset comes back at
-the next start). The assets hold one preset per base sound of the kits:
+the next start). A save that cannot be read is reported and never written
+over: preset edits then say they are not saved. The assets hold one preset per base sound of the kits:
 `KICK_SYNTH`, `SNARE_SYNTH`, `TOM_SYNTH`, `CLAP_SYNTH`, `COWBELL_SYNTH`,
 `CHH_SYNTH`, `OHH_SYNTH`, `CRASH_SYNTH`. The pills under the cards show the modules in use.
 
@@ -715,7 +718,10 @@ node tools/export_midi_fixtures.mjs ../ordrumbox-v2
   random stream, 1 and 3 loops; the patterns the import makes of each file;
   and `Array.prototype.sort` permutations — the exporter sorts with a
   comparator that contradicts itself, so the bytes depend on V8's TimSort,
-  which `ordrumbox_core::js::sort_by` reproduces step by step.
+  which `ordrumbox_core::js::sort_by` reproduces step by step. The import
+  message of `long-format2.mid` departs (it says the notes past the 16th
+  pattern are left out; `CUT_FILES` in `tests/midi.rs`), and the refused
+  timings are checked in Rust only.
 
 The kit editor's sample analysis has a seventh script:
 

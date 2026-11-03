@@ -207,6 +207,11 @@ fn exporter() {
     }
 }
 
+/// Files the import cuts after 16 patterns: their message departs from the JS
+/// one, which does not say so.
+const CUT_FILES: &[&str] = &["long-format2.mid"];
+const CUT_NOTE: &str = ", notes past beat 512 left out";
+
 #[test]
 fn importer() {
     let fixtures = fixtures();
@@ -222,7 +227,9 @@ fn importer() {
                 assert!(items(case, "patterns").is_empty());
             }
             Ok(imported) => {
-                assert_eq!(Some(imported.message.as_str()), result.get("message").and_then(Value::as_str), "{name}");
+                let js_message = result.get("message").and_then(Value::as_str).unwrap();
+                let message = imported.message.strip_suffix(CUT_NOTE).filter(|_| CUT_FILES.contains(&name));
+                assert_eq!(message.unwrap_or(&imported.message), js_message, "{name}");
                 let patterns = items(case, "patterns");
                 assert_eq!(imported.patterns.len(), patterns.len(), "{name}: patterns");
                 for (pattern, expected) in imported.patterns.iter().zip(patterns) {
@@ -256,5 +263,77 @@ fn importer() {
                 }
             }
         }
+    }
+}
+
+/// A type 0 file of `division` holding a kick on beat 0 and one at `last_tick`.
+fn two_kicks(division: u16, last_tick: u32) -> Vec<u8> {
+    let mut bytes = b"MThd\0\0\0\x06\0\0\0\x01".to_vec();
+    bytes.extend(division.to_be_bytes());
+    let mut events = vec![0x00, 0x99, 36, 100];
+    events.extend(smf::encode_vlq(last_tick));
+    events.extend([0x99, 36, 100, 0x00, 0xff, 0x2f, 0x00]);
+    bytes.extend(b"MTrk");
+    bytes.extend(u32::try_from(events.len()).unwrap().to_be_bytes());
+    bytes.extend(events);
+    bytes
+}
+
+#[test]
+fn a_file_not_timed_in_ticks_per_beat_is_refused() {
+    for division in [0u16, 0xe728, 0xe250] {
+        let refused = midi::import("smpte.mid", &two_kicks(division, 96), &[]).unwrap_err();
+        assert!(refused.starts_with("MIDI timing not supported"), "{division:#x}: {refused}");
+    }
+    assert!(midi::import("ppqn.mid", &two_kicks(96, 96), &[]).is_ok());
+}
+
+#[test]
+fn notes_past_the_last_pattern_are_announced() {
+    const PPQN: u32 = 96;
+    let last_beat = |imported: &midi::Imported| {
+        let kicks = imported.patterns.iter().enumerate().flat_map(|(p, pattern)| {
+            pattern.tracks[0].notes.iter().map(move |n| p as i32 * pattern.beat_count + n.beat)
+        });
+        kicks.max().unwrap()
+    };
+    let fits = midi::import("fits.mid", &two_kicks(PPQN as u16, 511 * PPQN), &[]).unwrap();
+    assert_eq!(fits.patterns.len(), 16);
+    assert_eq!(last_beat(&fits), 511);
+    assert!(!fits.message.ends_with(CUT_NOTE), "{}", fits.message);
+
+    let cut = midi::import("cut.mid", &two_kicks(PPQN as u16, 512 * PPQN), &[]).unwrap();
+    assert_eq!(cut.patterns.len(), 16);
+    assert_eq!(last_beat(&cut), 0, "the kick on beat 512 has no pattern");
+    assert_eq!(cut.message, format!("MIDI imported: 1 track(s) into 16 patterns{CUT_NOTE}"));
+}
+
+#[test]
+fn a_damaged_file_is_imported_or_refused_never_a_panic() {
+    // A drum channel, melodic programs and running status: most of the parser's paths.
+    let fixtures = fixtures();
+    let files = items(&fixtures, "files");
+    let band = files.iter().find(|f| f.get("name").and_then(Value::as_str) == Some("band-format1.mid")).unwrap();
+    let bytes = bytes(band.get("bytes").unwrap());
+    let mut damaged: Vec<Vec<u8>> = (0..bytes.len()).map(|n| bytes[..n].to_vec()).collect();
+    for at in 0..bytes.len() {
+        for value in [0x00, 0x7f, 0x80, 0xff] {
+            let mut copy = bytes.clone();
+            copy[at] = value;
+            damaged.push(copy);
+        }
+    }
+    let mut rng = Rng::new(7);
+    for _ in 0..2000 {
+        let mut copy = bytes.clone();
+        for _ in 0..4 {
+            let at = (rng.next_u64() % copy.len() as u64) as usize;
+            copy[at] = rng.next_u64() as u8;
+        }
+        damaged.push(copy);
+    }
+    for (case, file) in damaged.iter().enumerate() {
+        let outcome = std::panic::catch_unwind(|| midi::import("damaged.mid", file, &[]));
+        assert!(outcome.is_ok(), "case {case} panics: {file:?}");
     }
 }
