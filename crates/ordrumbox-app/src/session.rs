@@ -288,6 +288,8 @@ pub struct Session {
     synth: Option<session_synth::SynthEdit>,
     synth_tab: u8,
     synths_dirty: Option<Instant>,
+    /// Where the synth presets are saved; none when the saved ones could not be read.
+    synths_file: Option<PathBuf>,
     /// When the session started (the synth editor's LFO clock).
     started: Instant,
     /// The spectrum's analyser and its last bins.
@@ -437,7 +439,8 @@ impl Session {
         let kits =
             KitSet::new(assets.kits, &assets.bank, Some(assets.sources.clone()), kits_file, store::samples_dir());
         // The synth presets edited, over the assets' ones.
-        Self::load_user_synths(store::saved_synths_path(), &mut assets.synths, &mut status);
+        let synths_file =
+            Self::load_user_synths(store::saved_synths_path(), store::synths_path(), &mut assets.synths, &mut status);
         let mut session = Self::new(library, kits, status);
         session.assets_dir = Some(dir.clone());
         session.songs_dir = store::songs_dir();
@@ -448,6 +451,7 @@ impl Session {
         session.roots =
             assets.bank.samples.iter().filter_map(|s| Some((s.sample.key.clone(), s.sample.root_midi?))).collect();
         session.library_path = library_path;
+        session.synths_file = synths_file;
         session.message = message;
         let bank = Arc::new(assets.bank);
         if !bank.samples.is_empty() {
@@ -575,6 +579,7 @@ impl Session {
             synth: None,
             synth_tab: 0,
             synths_dirty: None,
+            synths_file: None,
             started: Instant::now(),
             analyser: std::cell::RefCell::default(),
             spectrum: std::cell::RefCell::default(),
