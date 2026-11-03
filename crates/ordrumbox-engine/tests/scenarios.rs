@@ -1,7 +1,8 @@
 //! The Playwright scenarios of ordrumbox-v2 that only need the engine
 //! (`e2e/live-vs-export`, `song-wav-export`, `kit-change`, `cold-start`,
 //! `song-playback`): playback driven like an audio callback, and the offline
-//! renders, on the demo library (song.json) with a real sample (kick.wav).
+//! renders, on the demo library (song.json) with a real sample (kick.wav);
+//! then a whole live session through the controller, from an audition to the stop.
 //!
 //! The JS tests judge the audio of a headless browser with tolerances; here
 //! the renders are deterministic, so most comparisons are exact.
@@ -15,7 +16,9 @@ use ordrumbox_core::json::{self, Object, Value};
 use ordrumbox_core::{Library, Rng, Scales};
 use ordrumbox_engine::kit::{BankSample, KitSample};
 use ordrumbox_engine::offline::{self, EXPORT_RATE, RenderSetup};
-use ordrumbox_engine::{Controller, Mode, SampleBank, SynthPresets, TrackSound, wav};
+use ordrumbox_engine::{
+    AudioSide, Controller, MasterSettings, Mode, SampleBank, SampleBuffer, SynthPresets, TrackSound, wav,
+};
 
 const KEYS: [&str; 8] = ["KICK", "SNARE", "TOM", "CLAP", "COWBELL", "CHH", "OHH", "CRASH"];
 
@@ -319,4 +322,109 @@ fn starting_a_song_makes_every_pattern_it_plays_audible() {
             assert_ne!(sound, TrackSound::None, "{} track {} is silent", clip.pattern_id, track.name);
         }
     }
+}
+
+// ─── a live session ─────────────────────────────────────────────────────────
+
+/// `frames` frames of playback in callbacks of 256, the UI's update before
+/// each; the left channel.
+fn run(controller: &mut Controller, audio: &mut AudioSide, library: &Library, frames: usize) -> Vec<f32> {
+    let mut left = vec![0.0; frames];
+    let mut right = vec![0.0; frames];
+    for from in (0..frames).step_by(256) {
+        let to = (from + 256).min(frames);
+        controller.update(library);
+        audio.render(&mut left[from..to], &mut right[from..to]);
+    }
+    left
+}
+
+/// Every key of kit `a`, silent.
+fn silent_bank() -> Arc<SampleBank> {
+    let samples = KEYS
+        .iter()
+        .map(|key| BankSample {
+            kit: "a".into(),
+            sample: KitSample { key: (*key).into(), path: format!("silent/{key}.wav"), ..Default::default() },
+            buffer: SampleBuffer::mono(vec![0.0; 400], 8000).into(),
+        })
+        .collect();
+    Arc::new(SampleBank { samples })
+}
+
+#[test]
+fn a_live_session_from_audition_to_stop() {
+    let library = library();
+    let rock = library.patterns.iter().position(|p| p.id == "rock").expect("rock");
+    let slrock = library.patterns.iter().position(|p| p.id == "slrock").expect("slrock");
+    let loud = bank();
+    let first_bank = Arc::downgrade(&loud);
+    let (mut controller, mut audio) = Controller::with_rng(8000.0, loud, Scales::default(), synths(), Rng::new(7));
+    assert_eq!(audio.sample_rate(), 8000.0);
+    // The first kit of the bank until another is chosen.
+    assert_eq!(controller.kit(), "a");
+    assert_eq!(controller.bank().samples.len(), 2 * KEYS.len());
+
+    // Stopped: a sample of the kit browser sounds, the transport does not move.
+    controller.audition_sample(0);
+    controller.audition_sample(999); // no such sample: nothing
+    assert!(peak(&run(&mut controller, &mut audio, &library, 2048)) > 0.05);
+    assert_eq!(controller.position(), None);
+    assert_eq!(controller.tick(), None);
+
+    // Playing: the meters and the scope follow the sound.
+    controller.play(&library, Mode::Pattern(rock));
+    assert!(controller.is_playing());
+    let playing = run(&mut controller, &mut audio, &library, 8000);
+    assert!(rms(&playing) > 0.001);
+    assert!(controller.levels().iter().any(|&level| level > 0.0));
+    let mut scope = [0.0; ordrumbox_engine::SCOPE_SIZE];
+    controller.scope(&mut scope);
+    assert!(scope.iter().any(|&s| s != 0.0));
+
+    // The master gain at 0 fades the bus out (an exponential ramp: 60 dB down within
+    // a second); back to 1, it sounds again.
+    controller.set_master(MasterSettings { master: 0.0, ..MasterSettings::default() });
+    assert_eq!(controller.master().master, 0.0);
+    run(&mut controller, &mut audio, &library, 8000);
+    assert!(peak(&run(&mut controller, &mut audio, &library, 8000)) < peak(&playing) * 1e-3);
+    controller.set_master(MasterSettings::default());
+    assert!(rms(&run(&mut controller, &mut audio, &library, 16_000)) > 0.001);
+
+    // A synth edit rebuilds the pass playing: it goes on from where it was.
+    let before = controller.position().expect("playing");
+    controller.set_synths(&library, synths());
+    run(&mut controller, &mut audio, &library, 256);
+    let after = controller.position().expect("playing");
+    assert_eq!(after.pass, before.pass);
+    assert_eq!(after.frame, before.frame + 256);
+
+    // Another pattern takes over at the next pass.
+    controller.select_pattern(slrock);
+    assert_eq!(controller.mode(), Mode::Pattern(slrock));
+    let pass = after.pass;
+    while controller.position().expect("playing").pass == pass {
+        run(&mut controller, &mut audio, &library, 256);
+    }
+    let tick = controller.tick().expect("playing");
+    run(&mut controller, &mut audio, &library, 2048);
+    assert!(controller.tick().expect("playing") > tick, "the transport moves on");
+
+    // A reload of the samples: the engine switches on its next callback, and the
+    // UI lets the bank it played go at the update after.
+    controller.set_bank(silent_bank());
+    run(&mut controller, &mut audio, &library, 256);
+    assert!(first_bank.upgrade().is_some(), "dropped before the engine switched");
+    run(&mut controller, &mut audio, &library, 256);
+    assert!(first_bank.upgrade().is_none(), "the replaced bank is still held");
+    // Only the tails of the strips are left, and they die out.
+    run(&mut controller, &mut audio, &library, 8000);
+    assert!(peak(&run(&mut controller, &mut audio, &library, 8000)) < peak(&playing) * 1e-3);
+
+    // Stopped: nothing is posted any more.
+    controller.stop();
+    run(&mut controller, &mut audio, &library, 256);
+    assert!(!controller.is_playing());
+    assert_eq!(controller.position(), None);
+    assert_eq!(controller.pending_pass(), None);
 }
