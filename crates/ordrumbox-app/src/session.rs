@@ -1548,22 +1548,29 @@ impl Session {
     }
 
     pub fn undo(&mut self) {
+        let shown = self.pattern().map(|p| p.id.clone());
         self.message = match self.editor.undo() {
             Some(desc) => format!("undone: {desc}"),
             None => "nothing to undo".into(),
         };
-        self.after_history();
+        self.after_history(shown);
     }
 
     pub fn redo(&mut self) {
+        let shown = self.pattern().map(|p| p.id.clone());
         self.message = match self.editor.redo() {
             Some(desc) => format!("redone: {desc}"),
             None => "nothing to redo".into(),
         };
-        self.after_history();
+        self.after_history(shown);
     }
 
-    fn after_history(&mut self) {
+    /// After an undo or a redo: the pattern `shown` before stays shown where
+    /// it moved to (a pattern moved, added or removed).
+    fn after_history(&mut self, shown: Option<String>) {
+        if let Some(index) = shown.and_then(|id| self.editor.library().patterns.iter().position(|p| p.id == id)) {
+            self.pattern_index = index;
+        }
         self.selected = None;
         self.clamp_selection();
         self.changed_at = Some(Instant::now());

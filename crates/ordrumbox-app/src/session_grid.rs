@@ -21,8 +21,8 @@ pub(super) struct TrackDrag {
     revision: u64,
 }
 
-/// Where track `t` is once the track `from` moved to `to`.
-fn moved_index(t: usize, from: usize, to: usize) -> usize {
+/// Where item `t` of a list is once the item `from` moved to `to`.
+pub(super) fn moved_index(t: usize, from: usize, to: usize) -> usize {
     if t == from {
         to
     } else if from < t && t <= to {

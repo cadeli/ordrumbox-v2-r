@@ -639,6 +639,23 @@ impl Editor {
         true
     }
 
+    /// Move pattern `from` so that it ends at index `to` (clamped), the others
+    /// keeping their order; whether it moved. Songs name patterns by id, so
+    /// only the order of the list and of the arrangement rows changes.
+    pub fn move_pattern(&mut self, from: usize, to: usize) -> bool {
+        let Some(pattern) = self.library.patterns.get(from) else { return false };
+        let to = to.min(self.library.patterns.len() - 1);
+        if to == from {
+            return false;
+        }
+        let desc = format!("Move pattern \"{}\"", pattern_name(pattern));
+        self.edit_patterns(desc, |patterns| {
+            let pattern = patterns.remove(from);
+            patterns.insert(to, pattern);
+        });
+        true
+    }
+
     /// Rename (trimmed; an empty name keeps the old one). The id stays.
     pub fn rename_pattern(&mut self, p: usize, name: &str) -> bool {
         let name = name.trim();
@@ -1076,6 +1093,22 @@ mod tests {
         assert_eq!(names(&e), ["CHH", "SNARE", "KICK"]);
         assert_eq!(e.undo().as_deref(), Some("Move track CHH"));
         assert_eq!(names(&e), ["SNARE", "CHH", "KICK"]);
+    }
+
+    #[test]
+    fn patterns_move_as_one_step() {
+        let mut e = editor();
+        e.add_pattern(Some("verse"));
+        e.add_pattern(Some("chorus"));
+        let ids = |e: &Editor| e.library().patterns.iter().map(|p| p.id.clone()).collect::<Vec<_>>();
+        assert!(!e.move_pattern(1, 1));
+        assert!(!e.move_pattern(5, 0));
+        assert!(e.move_pattern(0, 99));
+        assert_eq!(ids(&e), ["verse", "chorus", "rock"]);
+        assert!(e.move_pattern(1, 0));
+        assert_eq!(ids(&e), ["chorus", "verse", "rock"]);
+        assert_eq!(e.undo().as_deref(), Some("Move pattern \"chorus\""));
+        assert_eq!(ids(&e), ["verse", "chorus", "rock"]);
     }
 
     #[test]
