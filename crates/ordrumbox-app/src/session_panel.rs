@@ -243,13 +243,13 @@ impl Session {
 
     /// A drop-down list or a number entry is open (it takes every key and click).
     pub fn popup_open(&self) -> bool {
-        self.dropdown.is_some() || self.entry.is_some()
+        self.widgets.dropdown.is_some() || self.widgets.entry.is_some()
     }
 
     /// A number or text entry is open. It is the one place that keeps Space:
     /// a text entry types a space in it.
     pub fn entry_open(&self) -> bool {
-        self.entry.is_some()
+        self.widgets.entry.is_some()
     }
 
     /// The url of the sample track `t` plays (none for a synth track).
@@ -517,43 +517,43 @@ impl Session {
     pub fn mouse_down(&mut self, size: (i32, i32, i32), x: i32, y: i32, button: Button, shift: bool) -> bool {
         self.panel_size = size;
         let (width, height, scale) = size;
-        if let Some(dropdown) = &self.dropdown {
+        if let Some(dropdown) = &self.widgets.dropdown {
             let picked = (button == Button::Left).then(|| dropdown.hit(width, height, scale, x, y)).flatten();
             match picked {
                 Some(i) => self.pick(i),
-                None => self.dropdown = None,
+                None => self.widgets.dropdown = None,
             }
             return true;
         }
-        if let Some(entry) = &self.entry {
+        if let Some(entry) = &self.widgets.entry {
             if !entry.rect(width, height, scale).contains(x, y) {
-                self.entry = None;
+                self.widgets.entry = None;
             }
             return true;
         }
         let layout = self.panel_layout(width, height, scale);
         let Some(item) = panel::hit(&layout.items, x, y).cloned() else {
-            self.focus = None;
+            self.widgets.focus = None;
             // A click on the track editor's background is its own.
             return layout.right > 0 && x >= width - layout.right;
         };
         let Some(id) = item.id else { return false };
         if button == Button::Right {
             if let Kind::Value { spec, value, .. } = item.kind {
-                self.focus = Some(id);
+                self.widgets.focus = Some(id);
                 self.open_entry(id, spec, value);
             }
             return true;
         }
         let now = Instant::now();
-        let double = self.last_click.is_some_and(|(last, at)| last == id && now - at < DOUBLE_CLICK);
-        self.last_click = Some((id, now));
+        let double = self.widgets.last_click.is_some_and(|(last, at)| last == id && now - at < DOUBLE_CLICK);
+        self.widgets.last_click = Some((id, now));
         match item.kind {
             Kind::Value { spec, value, label, text, .. } => {
-                self.focus = Some(id);
+                self.widgets.focus = Some(id);
                 if double {
                     // Double-click: the default value.
-                    self.last_click = None;
+                    self.widgets.last_click = None;
                     self.set_value(id, spec.default);
                     return true;
                 }
@@ -574,11 +574,11 @@ impl Session {
                         self.set_value(id, v);
                     }
                 }
-                self.drag = Some(drag);
+                self.widgets.drag = Some(drag);
             }
             Kind::Select { values, labels, selected } => {
-                self.focus = Some(id);
-                self.dropdown = Some(Dropdown::new(id, item.rect, values, labels, selected));
+                self.widgets.focus = Some(id);
+                self.widgets.dropdown = Some(Dropdown::new(id, item.rect, values, labels, selected));
             }
             _ => self.activate(id),
         }
@@ -587,27 +587,27 @@ impl Session {
 
     /// The mouse moved; whether to redraw.
     pub fn mouse_move(&mut self, size: (i32, i32, i32), x: i32, y: i32, shift: bool) -> bool {
-        if self.roll_drag.is_some() {
+        if self.roll.dragging() {
             return self.roll_drag_move(x, y);
         }
-        if self.song_drag.is_some() {
+        if self.song_panel.dragging() {
             return self.song_drag_move(x, y);
         }
         if self.track_drag.is_some() {
             return self.track_drag_move(x, y);
         }
-        if let Some(axis) = self.song_bar_drag {
+        if let Some(axis) = self.song_panel.held_bar() {
             return self.song_bar_to(size, axis, x, y);
         }
         let (width, height, scale) = size;
-        if let Some(dropdown) = &mut self.dropdown {
+        if let Some(dropdown) = &mut self.widgets.dropdown {
             if let Some(i) = dropdown.hit(width, height, scale, x, y).filter(|&i| i != dropdown.at) {
                 dropdown.at = i;
                 return true;
             }
             return false;
         }
-        let Some(drag) = self.drag else { return false };
+        let Some(drag) = self.widgets.drag else { return false };
         let value = match (drag.spec.style, drag.bar) {
             (Style::Knob, _) => drag.spec.drag(drag.start, f64::from(drag.y - y), shift),
             (Style::Slider, Some((left, w))) => drag.spec.slider_at(f64::from(x - left) / f64::from(w.max(1))),
@@ -629,7 +629,9 @@ impl Session {
         let body = self.body(size);
         let scale = size.2;
         let hover = match self.pattern() {
-            Some(pattern) if self.kit_editor.is_none() && self.workspace == Workspace::Grid && self.drag.is_none() => {
+            Some(pattern)
+                if self.kit_editor.is_none() && self.workspace == Workspace::Grid && self.widgets.drag.is_none() =>
+            {
                 match Layout::new(body.main_w, body.editor_h, scale, pattern, self.status.len(), self.current_page)
                     .hit(pattern, x, y)
                 {
@@ -667,19 +669,19 @@ impl Session {
     }
 
     pub fn mouse_up(&mut self) {
-        self.drag = None;
-        self.song_bar_drag = None;
+        self.widgets.drag = None;
+        self.song_panel.release_bar();
         self.track_drag = None;
         self.roll_release();
     }
 
     /// The wheel over the widgets (one notch: one step); whether it was theirs.
     pub fn wheel(&mut self, size: (i32, i32, i32), x: i32, y: i32, lines: isize, shift: bool, ctrl: bool) -> bool {
-        if let Some(dropdown) = &mut self.dropdown {
+        if let Some(dropdown) = &mut self.widgets.dropdown {
             dropdown.scroll(-lines);
             return true;
         }
-        if lines == 0 || self.entry.is_some() {
+        if lines == 0 || self.widgets.entry.is_some() {
             return false;
         }
         let (width, height, scale) = size;
@@ -723,10 +725,10 @@ impl Session {
     /// whether it was theirs.
     pub fn panel_key(&mut self, size: (i32, i32, i32), key: PanelKey, shift: bool, ctrl: bool) -> bool {
         self.panel_size = size;
-        if let Some(entry) = &mut self.entry {
+        if let Some(entry) = &mut self.widgets.entry {
             match key {
                 PanelKey::Enter => self.commit_entry(),
-                PanelKey::Escape => self.entry = None,
+                PanelKey::Escape => self.widgets.entry = None,
                 PanelKey::Backspace => {
                     entry.text.pop();
                 }
@@ -735,7 +737,7 @@ impl Session {
             }
             return true;
         }
-        if let Some(dropdown) = &mut self.dropdown {
+        if let Some(dropdown) = &mut self.widgets.dropdown {
             match key {
                 PanelKey::Up => dropdown.step(-1),
                 PanelKey::Down => dropdown.step(1),
@@ -747,7 +749,7 @@ impl Session {
                     let at = dropdown.at;
                     self.pick(at);
                 }
-                PanelKey::Escape => self.dropdown = None,
+                PanelKey::Escape => self.widgets.dropdown = None,
                 _ => {}
             }
             return true;
@@ -756,20 +758,20 @@ impl Session {
         let focusable: Vec<Item> =
             layout.items.into_iter().filter(|i| !matches!(i.id, Some(Id::TrackVolume(_)))).collect();
         if key == PanelKey::Tab {
-            let next = panel::next_focus(&focusable, self.focus, if shift { -1 } else { 1 });
+            let next = panel::next_focus(&focusable, self.widgets.focus, if shift { -1 } else { 1 });
             if next.is_none() {
                 return false;
             }
-            self.focus = next;
+            self.widgets.focus = next;
             return true;
         }
-        let Some(id) = self.focus else { return false };
+        let Some(id) = self.widgets.focus else { return false };
         let Some(item) = panel::find(&focusable, id).cloned() else {
-            self.focus = None;
+            self.widgets.focus = None;
             return false;
         };
         if key == PanelKey::Escape {
-            self.focus = None;
+            self.widgets.focus = None;
             return true;
         }
         match item.kind {
@@ -794,7 +796,7 @@ impl Session {
                     PanelKey::Up | PanelKey::Left | PanelKey::Minus => -1,
                     PanelKey::Down | PanelKey::Right | PanelKey::Plus => 1,
                     PanelKey::Enter | PanelKey::Space => {
-                        self.dropdown = Some(Dropdown::new(id, item.rect, values, labels, selected));
+                        self.widgets.dropdown = Some(Dropdown::new(id, item.rect, values, labels, selected));
                         return true;
                     }
                     _ => return false,
@@ -819,7 +821,7 @@ impl Session {
 
     /// A typed character (the number entry, the open list's letter jump).
     pub fn panel_text(&mut self, c: char) -> bool {
-        if let Some(entry) = &mut self.entry {
+        if let Some(entry) = &mut self.widgets.entry {
             let accepted = match entry.spec {
                 Some(_) => c.is_ascii_digit() || matches!(c, '.' | '-' | '+' | 'e' | 'E'),
                 None => !c.is_control(),
@@ -829,7 +831,7 @@ impl Session {
             }
             return true;
         }
-        if let Some(dropdown) = &mut self.dropdown {
+        if let Some(dropdown) = &mut self.widgets.dropdown {
             if c.is_alphanumeric() {
                 dropdown.jump(c);
             }
@@ -841,8 +843,8 @@ impl Session {
     /// View > Track editor.
     pub fn toggle_track_editor(&mut self) {
         self.show_track_editor = !self.show_track_editor;
-        self.focus = None;
-        self.dropdown = None;
+        self.widgets.focus = None;
+        self.widgets.dropdown = None;
     }
 
     /// H: every track of pattern `p` on the synth patch that matches its name, written to the
@@ -940,11 +942,11 @@ impl Session {
             js::number_to_string(spec.min),
             js::number_to_string(spec.max)
         );
-        self.entry = Some(Entry { id, spec: Some(spec), title, text: js::number_to_string(value) });
+        self.widgets.entry = Some(Entry { id, spec: Some(spec), title, text: js::number_to_string(value) });
     }
 
     fn commit_entry(&mut self) {
-        let Some(entry) = self.entry.take() else { return };
+        let Some(entry) = self.widgets.entry.take() else { return };
         let Some(spec) = entry.spec else { return self.commit_text(entry.id, &entry.text) };
         if entry.text.trim().is_empty() {
             return;
@@ -1132,7 +1134,7 @@ impl Session {
 
     /// An option picked in the open list.
     fn pick(&mut self, index: usize) {
-        let Some(dropdown) = self.dropdown.take() else { return };
+        let Some(dropdown) = self.widgets.dropdown.take() else { return };
         if let Some(value) = dropdown.values.get(index) {
             self.select(dropdown.id, value);
         }
@@ -1533,7 +1535,7 @@ mod tests {
         assert!(s.wheel(SIZE, x, y, 3, false, false));
         assert_eq!(s.pattern().unwrap().bpm, 103.0);
         s.mouse_down(SIZE, x, y, Button::Right, false);
-        s.entry.as_mut().unwrap().text = "140".into();
+        s.widgets.entry.as_mut().unwrap().text = "140".into();
         s.panel_key(SIZE, PanelKey::Enter, false, false);
         assert_eq!(s.pattern().unwrap().bpm, 140.0);
         // The beats list: 8.
@@ -1629,11 +1631,11 @@ mod tests {
     fn the_pattern_menu_renames_and_describes() {
         let mut s = session();
         s.run(Command::RenamePattern);
-        s.entry.as_mut().unwrap().text = " Verse ".into();
+        s.widgets.entry.as_mut().unwrap().text = " Verse ".into();
         s.panel_key(SIZE, PanelKey::Enter, false, false);
         assert_eq!(s.pattern().unwrap().name.as_deref(), Some("Verse"));
         s.run(Command::PatternDescription);
-        assert_eq!(s.entry.as_ref().map(|e| e.text.as_str()), Some(""));
+        assert_eq!(s.widgets.entry.as_ref().map(|e| e.text.as_str()), Some(""));
         s.panel_text('x');
         s.panel_key(SIZE, PanelKey::Space, false, false);
         s.panel_text('y');

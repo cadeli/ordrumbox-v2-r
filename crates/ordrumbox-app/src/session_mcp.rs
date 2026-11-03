@@ -57,7 +57,7 @@ impl Session {
             }),
             "createArrangement" => {
                 let answer = self.mcp_library_tool(name, args)?;
-                self.song_scroll = (0, 0);
+                self.song_panel.scroll_to_start();
                 Ok(answer)
             }
             "selectPattern" => self.mcp_select_pattern(args),
@@ -113,7 +113,7 @@ impl Session {
             }
             "analyzeSamples" => self.mcp_analyze(args),
             "removeArrangement" => self.mcp_remove_arrangement(args),
-            "getMaster" => Ok(master::to_json(&self.master)),
+            "getMaster" => Ok(master::to_json(&self.output_panel.master())),
             "setMaster" => self.mcp_set_master(args),
             "play" => self.mcp_play(args),
             "stop" => {
@@ -277,7 +277,7 @@ impl Session {
     /// Master settings by key, each inside its knob's range.
     fn mcp_set_master(&mut self, args: &Value) -> Result<Value, String> {
         let settings = args.get("settings").and_then(Value::as_object).ok_or("settings: not an object")?;
-        let mut changed = self.master;
+        let mut changed = self.output_panel.master();
         for (key, value) in settings.iter() {
             let at = format!("settings.{key}");
             if key == "compBypass" {
@@ -295,7 +295,7 @@ impl Session {
         }
         self.set_master(changed, true);
         self.message = "master settings changed".into();
-        Ok(master::to_json(&self.master))
+        Ok(master::to_json(&self.output_panel.master()))
     }
 
     /// A synth preset's key, by key (else in any case).
@@ -336,7 +336,7 @@ impl Session {
         }
         self.synths.set(key, Value::Object(draft.clone()));
         self.synths_changed();
-        if self.synth.as_ref().is_some_and(|edit| edit.key == key) {
+        if self.synth_editor.edits(key) {
             self.load_synth(key);
         }
         self.message = format!("synth preset \"{key}\" set");
@@ -354,7 +354,7 @@ impl Session {
             playing.map(move |t| format!("{}/{}", pattern_name(p), t.name))
         });
         let using: Vec<String> = using.collect();
-        if self.synth.as_ref().is_some_and(|edit| edit.key == key) {
+        if self.synth_editor.edits(&key) {
             // The editor shows the next preset, as its Delete button does.
             self.remove_synth(&key);
         } else {
@@ -417,7 +417,7 @@ impl Session {
         }
         let name = self.editor.library().songs[s].name.clone();
         self.editor.remove_song(Some(s));
-        self.song_scroll = (0, 0);
+        self.song_panel.scroll_to_start();
         Ok(object([("removed", Value::from(name)), ("arrangements", count(self.editor.library().songs.len()))]))
     }
 

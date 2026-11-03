@@ -179,29 +179,12 @@ pub struct Session {
     workspace: Workspace,
     /// The measure the song plays from.
     song_cursor: u32,
-    /// First measure and first row of the arrangement shown.
-    song_scroll: (u32, usize),
-    /// The pattern whose description is scrolled, and its first line shown.
-    description_scroll: (usize, usize),
-    /// The pattern selected when the pattern list was scrolled, and its first row shown.
-    list_scroll: (usize, usize),
-    /// The clip under the mouse (its tooltip).
-    hovered_clip: Option<usize>,
-    song_drag: Option<session_song::SongDrag>,
+    /// The song panel's scrolls and what the mouse holds in it.
+    song_panel: session_song::SongPanel,
     /// A track pressed by its name, that may be dragged to another row.
     track_drag: Option<session_grid::TrackDrag>,
-    /// The arrangement's scroll bar held by the mouse.
-    song_bar_drag: Option<crate::song_view::Axis>,
-    /// The piano roll's page, highest row shown (`None`: centered on the
-    /// track's pitch), cursor (step, row), note pressed, the edited value
-    /// shown over the note, next progression, note under the mouse.
-    roll_page: i32,
-    roll_top: Option<i32>,
-    roll_cursor: Option<(i64, i32)>,
-    roll_drag: Option<session_roll::RollDrag>,
-    roll_gauge: Option<String>,
-    roll_sequence: i64,
-    roll_hover: Option<usize>,
+    /// The piano roll's view and what the mouse holds in it.
+    roll: session_roll::RollState,
     /// Window size and scale of the last mouse or key event on the widgets.
     panel_size: (i32, i32, i32),
     /// What offline renders (WAV exports) use; `None` without samples.
@@ -250,14 +233,8 @@ pub struct Session {
     show_vus: bool,
     /// Current page of the pattern grid (BEATS_PER_PAGE beats).
     current_page: usize,
-    /// The widget with the keyboard focus.
-    focus: Option<Id>,
-    /// A knob or slider being dragged.
-    drag: Option<Drag>,
-    dropdown: Option<Dropdown>,
-    entry: Option<Entry>,
-    /// Last click on a widget, for double-clicks.
-    last_click: Option<(Id, Instant)>,
+    /// What the mouse and the keyboard hold among the widgets.
+    widgets: Widgets,
     /// What the note editor follows when no note is selected.
     note_focus: Option<NoteFocus>,
     /// The default note the note editor shows for a track without notes
@@ -265,31 +242,17 @@ pub struct Session {
     detached: Option<(usize, Note)>,
     /// Kit knob edits not yet applied to the bank and saved.
     kits_dirty: Option<Instant>,
-    /// The master bus settings (the output panel's), and when they changed,
-    /// not saved yet.
-    master: ordrumbox_engine::MasterSettings,
-    master_dirty: Option<Instant>,
-    /// The update check: its settings, the one under way, a newer release
-    /// found, and how a finished check wakes the window.
-    updates: update::Settings,
-    update_check: Option<update::Check>,
-    newer_release: Option<update::Release>,
-    update_waker: Option<update::Waker>,
+    /// The output panel: the master bus, its tab, the spectrum.
+    output_panel: session_output::OutputPanel,
+    /// The update check (`session_update.rs`).
+    updates: session_update::Updates,
     /// The MCP link (`mcp_link.rs`): the calls of `ordrumbox --mcp`.
     mcp: Option<mcp_link::Server>,
-    /// The output panel's tab: Vol, Comp, Flt.
-    output_tab: u8,
-    /// The synth editor: the preset edited, the tab, presets not saved yet.
-    synth: Option<session_synth::SynthEdit>,
-    synth_tab: u8,
+    /// The synth editor (`session_synth.rs`).
+    synth_editor: session_synth::SynthEditor,
     synths_dirty: Option<Instant>,
     /// Where the synth presets are saved; none when the saved ones could not be read.
     synths_file: Option<PathBuf>,
-    /// When the session started (the synth editor's LFO clock).
-    started: Instant,
-    /// The spectrum's analyser and its last bins.
-    analyser: std::cell::RefCell<crate::spectrum::Analyser>,
-    spectrum: std::cell::RefCell<Vec<u8>>,
     /// The grid step under the mouse: track, beat, step (its note's tooltip).
     hover: Option<(usize, i32, i32)>,
     /// Sample analyses of the track editor, by url.
@@ -308,6 +271,19 @@ struct Drag {
     bar: Option<(i32, i32)>,
     /// A slider dragged finely: from where.
     fine: bool,
+}
+
+/// What the mouse and the keyboard hold among the widgets of every panel.
+#[derive(Debug, Default)]
+struct Widgets {
+    /// The widget with the keyboard focus.
+    focus: Option<Id>,
+    /// A knob or slider being dragged.
+    drag: Option<Drag>,
+    dropdown: Option<Dropdown>,
+    entry: Option<Entry>,
+    /// Last click on a widget, for double-clicks.
+    last_click: Option<(Id, Instant)>,
 }
 
 /// What the note editor shows when no note is selected.
@@ -516,19 +492,8 @@ impl Session {
             pattern_index: 0,
             workspace: Workspace::Grid,
             song_cursor: 0,
-            song_scroll: (0, 0),
-            description_scroll: (0, 0),
-            list_scroll: (0, 0),
-            hovered_clip: None,
-            song_drag: None,
-            song_bar_drag: None,
-            roll_page: 0,
-            roll_top: None,
-            roll_cursor: None,
-            roll_drag: None,
-            roll_gauge: None,
-            roll_sequence: 0,
-            roll_hover: None,
+            song_panel: session_song::SongPanel::default(),
+            roll: session_roll::RollState::default(),
             panel_size: (0, 0, 1),
             render: None,
             controller: None,
@@ -556,29 +521,16 @@ impl Session {
             track_levels: Vec::new(),
             show_vus: true,
             current_page: 0,
-            focus: None,
-            drag: None,
-            dropdown: None,
-            entry: None,
-            last_click: None,
+            widgets: Widgets::default(),
             note_focus: None,
             detached: None,
             kits_dirty: None,
-            master: ordrumbox_engine::MasterSettings::default(),
-            master_dirty: None,
-            updates: update::Settings::default(),
-            update_check: None,
-            newer_release: None,
-            update_waker: None,
+            output_panel: session_output::OutputPanel::default(),
+            updates: session_update::Updates::default(),
             mcp: None,
-            output_tab: 0,
-            synth: None,
-            synth_tab: 0,
+            synth_editor: session_synth::SynthEditor::new(),
             synths_dirty: None,
             synths_file: None,
-            started: Instant::now(),
-            analyser: std::cell::RefCell::default(),
-            spectrum: std::cell::RefCell::default(),
             hover: None,
             track_drag: None,
             track_analysis: std::cell::RefCell::default(),
@@ -860,7 +812,7 @@ impl Session {
         if self.workspace != target {
             match target {
                 Workspace::Grid => {
-                    self.synth = None;
+                    self.synth_editor.close();
                     self.set_workspace(Workspace::Grid);
                 }
                 Workspace::PianoRoll => self.toggle_piano_roll(),
@@ -872,7 +824,7 @@ impl Session {
 
     /// Show the grid (View > Grid, F5).
     pub(super) fn show_grid(&mut self) {
-        self.synth = None;
+        self.synth_editor.close();
         self.set_workspace(Workspace::Grid);
     }
 
@@ -923,8 +875,8 @@ impl Session {
             can_save_song: self.songs_dir.is_some(),
             saved_songs: self.songs_dir.as_ref().is_some_and(|d| store::list_songs(d).is_ok_and(|s| !s.is_empty())),
             kit_sample: self.kit_list().is_some_and(|(s, n)| s < n),
-            checking_updates: self.update_check.is_some(),
-            newer_release: self.newer_release.as_ref().map(|r| r.version.clone()),
+            checking_updates: self.updates.checking(),
+            newer_release: self.updates.newer_release().map(|r| r.version.clone()),
         }
     }
 
@@ -1138,7 +1090,7 @@ impl Session {
             revision: self.editor.revision(),
             steps: history.undo_len(),
             undo: history.next_undo(),
-            dragging: self.drag.is_some(),
+            dragging: self.widgets.drag.is_some(),
         });
     }
 
@@ -1279,8 +1231,8 @@ impl Session {
     pub fn factory_reset(&mut self) {
         self.overlay = None;
         self.menu = None;
-        self.dropdown = None;
-        self.entry = None;
+        self.widgets.dropdown = None;
+        self.widgets.entry = None;
         let dir = self.library_path.as_ref().and_then(|p| p.parent().map(Path::to_path_buf)).or_else(store::user_dir);
         let Some(dir) = dir else {
             self.message = "factory reset: no user data folder".into();
@@ -1319,8 +1271,8 @@ impl Session {
             Some(_) => None,
             None => Some(0),
         };
-        self.focus = None;
-        self.dropdown = None;
+        self.widgets.focus = None;
+        self.widgets.dropdown = None;
         self.update_analysis();
     }
 
@@ -2242,13 +2194,13 @@ impl Session {
         };
         view::draw(canvas, &view, scale);
         self.draw_synth(canvas, scale);
-        crate::panel::draw(canvas, &layout.items, self.focus, scale);
+        crate::panel::draw(canvas, &layout.items, self.widgets.focus, scale);
         self.draw_tooltip(canvas, scale, layout.right);
         menu::draw(canvas, &self.menus(), self.menu, scale);
-        if let Some(dropdown) = &self.dropdown {
+        if let Some(dropdown) = &self.widgets.dropdown {
             dropdown.draw(canvas, scale);
         }
-        if let Some(entry) = &self.entry {
+        if let Some(entry) = &self.widgets.entry {
             entry.draw(canvas, scale);
         }
         match &self.overlay {

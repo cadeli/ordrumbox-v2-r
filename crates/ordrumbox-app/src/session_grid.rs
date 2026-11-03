@@ -84,7 +84,7 @@ impl Session {
         ]);
         let values = items.iter().map(|(action, _)| format!("{action}:{t}")).collect();
         let labels = items.iter().map(|(_, label)| (*label).to_owned()).collect();
-        self.dropdown = Some(Dropdown::menu(Id::GridMenu, x, y, title, values, labels));
+        self.widgets.dropdown = Some(Dropdown::menu(Id::GridMenu, x, y, title, values, labels));
     }
 
     /// A step: copy its notes, paste on it, delete them, add a random note.
@@ -102,7 +102,7 @@ impl Session {
         items.push(("random-note", "Add rnd note"));
         let values = items.iter().map(|(action, _)| format!("{action}:{t}:{beat}:{step}")).collect();
         let labels = items.iter().map(|(_, label)| (*label).to_owned()).collect();
-        self.dropdown = Some(Dropdown::menu(Id::GridMenu, x, y, title, values, labels));
+        self.widgets.dropdown = Some(Dropdown::menu(Id::GridMenu, x, y, title, values, labels));
     }
 
     /// An action of a grid menu: the cursor goes to its track or step, and
@@ -285,12 +285,12 @@ mod tests {
 
     /// The menu open, its labels.
     fn labels(s: &Session) -> Vec<String> {
-        s.dropdown.as_ref().map(|d| d.labels.clone()).unwrap_or_default()
+        s.widgets.dropdown.as_ref().map(|d| d.labels.clone()).unwrap_or_default()
     }
 
     /// Run the menu's action labelled `label`.
     fn pick(s: &mut Session, label: &str) {
-        let d = s.dropdown.take().expect("a menu");
+        let d = s.widgets.dropdown.take().expect("a menu");
         let i = d.labels.iter().position(|l| l == label).unwrap_or_else(|| panic!("{label} in {:?}", d.labels));
         s.grid_menu_pick(&d.values[i]);
     }
@@ -398,7 +398,7 @@ mod tests {
         }
         let (x, y) = name.expect("a track name");
         assert!(s.grid_menu(SIZE, x, y));
-        assert_eq!(s.dropdown.as_ref().and_then(|d| d.title.clone()), Some(pattern.tracks[0].name.clone()));
+        assert_eq!(s.widgets.dropdown.as_ref().and_then(|d| d.title.clone()), Some(pattern.tracks[0].name.clone()));
         let (x, y) = cell.expect("a step");
         assert!(s.grid_menu(SIZE, x, y));
         assert!(labels(&s).contains(&"Add rnd note".to_owned()));

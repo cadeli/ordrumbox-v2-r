@@ -26,6 +26,31 @@ pub(super) struct SynthEdit {
     draft: Object,
 }
 
+/// The synth editor: the preset edited, the tab, and when the session
+/// started (the LFO clock).
+#[derive(Debug)]
+pub(super) struct SynthEditor {
+    edit: Option<SynthEdit>,
+    tab: u8,
+    started: Instant,
+}
+
+impl SynthEditor {
+    pub(super) fn new() -> Self {
+        Self { edit: None, tab: 0, started: Instant::now() }
+    }
+
+    /// Preset `key` is the one edited.
+    pub(super) fn edits(&self, key: &str) -> bool {
+        self.edit.as_ref().is_some_and(|edit| edit.key == key)
+    }
+
+    /// No preset edited any more.
+    pub(super) fn close(&mut self) {
+        self.edit = None;
+    }
+}
+
 impl Session {
     /// The synth editor is shown (the kit editor opens over it).
     pub fn synth_open(&self) -> bool {
@@ -36,7 +61,7 @@ impl Session {
     /// track's preset, else the first), or back (`showPanel`, `closePanelAndCommit`).
     pub fn toggle_synth(&mut self) {
         if self.workspace == Workspace::Synth {
-            self.synth = None;
+            self.synth_editor.edit = None;
             return self.set_workspace(Workspace::Grid);
         }
         self.set_workspace(Workspace::Synth);
@@ -60,7 +85,7 @@ impl Session {
         let Some(preset) = self.synths.get(key).cloned() else { return };
         let mut draft = preset.as_object().cloned().unwrap_or_default();
         model::hydrate(&mut draft);
-        self.synth = Some(SynthEdit { key: key.to_owned(), original: preset, draft });
+        self.synth_editor.edit = Some(SynthEdit { key: key.to_owned(), original: preset, draft });
     }
 
     /// The presets saved at `path`, read at start over the assets' ones. An
@@ -101,7 +126,7 @@ impl Session {
 
     /// The draft into its preset (`commit`).
     fn commit_synth(&mut self) {
-        let Some(edit) = &self.synth else { return };
+        let Some(edit) = &self.synth_editor.edit else { return };
         self.synths.set(&edit.key, Value::Object(edit.draft.clone()));
         self.synths_changed();
     }
@@ -131,7 +156,7 @@ impl Session {
     /// Set `path` of the draft (a group off by default is switched on when
     /// one of its controls is touched: `#setValue`, `#implicitEnable`).
     fn edit_synth(&mut self, path: &str, value: Value) {
-        let Some(edit) = &mut self.synth else { return };
+        let Some(edit) = &mut self.synth_editor.edit else { return };
         model::implicit_enable(&mut edit.draft, path);
         if model::set(&mut edit.draft, path, value) {
             self.commit_synth();
@@ -147,19 +172,19 @@ impl Session {
 
     /// Seconds the LFOs are at, and the tempo they sync to.
     fn synth_clock(&self) -> (f64, f64) {
-        (self.started.elapsed().as_secs_f64(), self.pattern().map_or(120.0, |p| p.bpm))
+        (self.synth_editor.started.elapsed().as_secs_f64(), self.pattern().map_or(120.0, |p| p.bpm))
     }
 
     /// The editor as built for a `size` window, if it shows a preset.
     pub(super) fn synth_built(&self, size: (i32, i32, i32)) -> Option<(Built, SynthLayout)> {
-        let edit = self.synth.as_ref()?;
+        let edit = self.synth_editor.edit.as_ref()?;
         let layout = self.synth_layout(size);
         let (time, bpm) = self.synth_clock();
         let lfo = |path: &str| {
             let modulation = model::lfo_mod_on(&edit.draft, path, time, bpm);
             (modulation != 0.0).then(|| model::number(&edit.draft, path).unwrap_or(0.0) + modulation)
         };
-        let built = synth_view::build(&edit.draft, &self.synth_keys(), &edit.key, self.synth_tab, &layout, &lfo);
+        let built = synth_view::build(&edit.draft, &self.synth_keys(), &edit.key, self.synth_editor.tab, &layout, &lfo);
         Some((built, layout))
     }
 
@@ -174,7 +199,7 @@ impl Session {
         if !self.synth_open() {
             return;
         }
-        let Some(edit) = &self.synth else {
+        let Some(edit) = &self.synth_editor.edit else {
             let s = scale;
             canvas.text(16 * s, frame::body_top(scale), "No synth presets loaded.", s, crate::panel::DIM);
             return;
@@ -187,7 +212,7 @@ impl Session {
     /// An LFO moves a knob or the plots: keep redrawing.
     pub fn synth_animating(&self) -> bool {
         self.synth_open()
-            && self.synth.as_ref().is_some_and(|e| {
+            && self.synth_editor.edit.as_ref().is_some_and(|e| {
                 ["lfo", "lfo2"].iter().any(|g| {
                     let target = model::get(&e.draft, &format!("{g}.target")).and_then(Value::as_str).unwrap_or("NOT");
                     target != "NOT"
@@ -201,7 +226,7 @@ impl Session {
 
     /// The path of field `fi` of the draft.
     fn synth_field(&self, fi: u16) -> Option<String> {
-        synth_view::all_fields(&self.synth.as_ref()?.draft).into_iter().nth(usize::from(fi))
+        synth_view::all_fields(&self.synth_editor.edit.as_ref()?.draft).into_iter().nth(usize::from(fi))
     }
 
     /// A knob of the editor turned.
@@ -215,7 +240,7 @@ impl Session {
     pub(super) fn synth_select(&mut self, id: Id, value: &str) {
         match id {
             Id::SynthPreset => {
-                if self.synth.as_ref().is_none_or(|e| e.key != value) {
+                if self.synth_editor.edit.as_ref().is_none_or(|e| e.key != value) {
                     self.load_synth(value);
                 }
             }
@@ -231,16 +256,16 @@ impl Session {
     /// A tab, a power button, a choice, a switch or a preset button pressed.
     pub(super) fn synth_activate(&mut self, id: Id) {
         match id {
-            Id::SynthTab(i) => self.synth_tab = i.min(3),
+            Id::SynthTab(i) => self.synth_editor.tab = i.min(3),
             Id::SynthButton(button) => self.synth_button(button),
             Id::SynthPower(gi) => {
-                let Some(edit) = &mut self.synth else { return };
+                let Some(edit) = &mut self.synth_editor.edit else { return };
                 let Some(group) = model::groups(&edit.draft).into_iter().nth(usize::from(gi)) else { return };
                 model::toggle_card(&mut edit.draft, &group);
                 self.commit_synth();
             }
             Id::SynthIcon(gi, oi) => {
-                let Some(edit) = &self.synth else { return };
+                let Some(edit) = &self.synth_editor.edit else { return };
                 let Some(group) = model::groups(&edit.draft).into_iter().nth(usize::from(gi)) else { return };
                 let (path, value) = if group.starts_with("vco") || group.starts_with("lfo") {
                     (format!("{group}.wave"), model::WAVES.get(usize::from(oi)).map(|w| Value::from(*w)))
@@ -256,7 +281,8 @@ impl Session {
             }
             Id::SynthField(fi) => {
                 let Some(path) = self.synth_field(fi) else { return };
-                let on = self.synth.as_ref().and_then(|e| model::get(&e.draft, &path)).and_then(Value::as_bool);
+                let on =
+                    self.synth_editor.edit.as_ref().and_then(|e| model::get(&e.draft, &path)).and_then(Value::as_bool);
                 if let Some(on) = on {
                     self.edit_synth(&path, Value::Bool(!on));
                 }
@@ -282,7 +308,7 @@ impl Session {
     pub(super) fn synth_button(&mut self, button: &str) {
         match button {
             "delete" => {
-                let Some(key) = self.synth.as_ref().map(|e| e.key.clone()) else { return };
+                let Some(key) = self.synth_editor.edit.as_ref().map(|e| e.key.clone()) else { return };
                 let keys = self.synth_keys();
                 if keys.len() <= 1 {
                     self.message = "Cannot delete the last preset".into();
@@ -299,7 +325,7 @@ impl Session {
                 self.message = format!("Preset \"{name}\" created");
             }
             "duplicate" => {
-                let Some(edit) = &mut self.synth else { return };
+                let Some(edit) = &mut self.synth_editor.edit else { return };
                 let key = format!("{}_copy", edit.key);
                 edit.key = key.clone();
                 edit.original = Value::Object(edit.draft.clone());
@@ -307,7 +333,7 @@ impl Session {
                 self.message = format!("Preset \"{key}\" created");
             }
             "revert" => {
-                let Some(edit) = &mut self.synth else { return };
+                let Some(edit) = &mut self.synth_editor.edit else { return };
                 edit.draft = edit.original.as_object().cloned().unwrap_or_default();
                 model::hydrate(&mut edit.draft);
                 let (key, original) = (edit.key.clone(), edit.original.clone());
@@ -357,7 +383,7 @@ impl Session {
             }
         }
         self.synths_changed();
-        if let Some(key) = self.synth.as_ref().map(|e| e.key.clone()) {
+        if let Some(key) = self.synth_editor.edit.as_ref().map(|e| e.key.clone()) {
             self.load_synth(&key);
         }
         self.message = format!("Imported {count} synth sound(s)");
@@ -397,10 +423,10 @@ mod tests {
     fn opens_on_the_track_preset_and_edits_it() {
         let mut s = session();
         s.toggle_synth();
-        assert_eq!(s.synth.as_ref().map(|e| e.key.as_str()), Some("b"));
+        assert_eq!(s.synth_editor.edit.as_ref().map(|e| e.key.as_str()), Some("b"));
         // VCO2's wave: VCO2 switches on (gain 0.5), the preset follows.
-        let fields = synth_view::all_fields(&s.synth.as_ref().unwrap().draft);
-        let groups = model::groups(&s.synth.as_ref().unwrap().draft);
+        let fields = synth_view::all_fields(&s.synth_editor.edit.as_ref().unwrap().draft);
+        let groups = model::groups(&s.synth_editor.edit.as_ref().unwrap().draft);
         let vco2 = groups.iter().position(|g| g == "vco2").unwrap() as u8;
         let icon = item(&s, |i| i.id == Some(Id::SynthIcon(vco2, 2)));
         let (x, y) = center(icon.rect);
@@ -418,7 +444,7 @@ mod tests {
         // Revert: as it was.
         s.synth_button("revert");
         assert_eq!(s.synths.get("b").unwrap().to_json(), r#"{"vco1":{"gain":0.5}}"#);
-        assert_eq!(model::number(&s.synth.as_ref().unwrap().draft, "vco2.gain"), Some(0.0));
+        assert_eq!(model::number(&s.synth_editor.edit.as_ref().unwrap().draft, "vco2.gain"), Some(0.0));
     }
 
     #[test]
@@ -426,19 +452,19 @@ mod tests {
         let mut s = session();
         s.toggle_synth();
         s.synth_button("new");
-        assert_eq!(s.synth.as_ref().unwrap().key, "new_preset");
+        assert_eq!(s.synth_editor.edit.as_ref().unwrap().key, "new_preset");
         s.synth_button("duplicate");
         assert_eq!(s.synth_keys(), ["a", "b", "new_preset", "new_preset_copy"]);
         s.synth_button("delete");
         s.overlay_key(OverlayKey::Enter);
-        assert_eq!(s.synth.as_ref().unwrap().key, "new_preset");
+        assert_eq!(s.synth_editor.edit.as_ref().unwrap().key, "new_preset");
         // The power button of the envelope (ENV tab).
         s.synth_activate(Id::SynthTab(3));
-        let groups = model::groups(&s.synth.as_ref().unwrap().draft);
+        let groups = model::groups(&s.synth_editor.edit.as_ref().unwrap().draft);
         let env = groups.iter().position(|g| g == "envelope").unwrap() as u8;
         s.synth_activate(Id::SynthPower(env));
-        assert!(model::bypassed(&s.synth.as_ref().unwrap().draft, "envelope"));
+        assert!(model::bypassed(&s.synth_editor.edit.as_ref().unwrap().draft, "envelope"));
         s.toggle_synth();
-        assert!(s.synth.is_none() && s.workspace == Workspace::Grid);
+        assert!(s.synth_editor.edit.is_none() && s.workspace == Workspace::Grid);
     }
 }

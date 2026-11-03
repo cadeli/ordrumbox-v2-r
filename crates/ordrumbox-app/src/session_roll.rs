@@ -31,6 +31,37 @@ pub(super) struct RollDrag {
     drag: NoteDrag,
 }
 
+/// The piano roll's view and what the mouse holds in it.
+#[derive(Debug, Default)]
+pub(super) struct RollState {
+    /// The page shown.
+    page: i32,
+    /// Highest row shown; `None`: centered on the track's pitch.
+    top: Option<i32>,
+    /// The keyboard cursor: step, row.
+    cursor: Option<(i64, i32)>,
+    /// The note pressed.
+    drag: Option<RollDrag>,
+    /// The edited value shown over the note.
+    gauge: Option<String>,
+    /// The next chord progression.
+    sequence: i64,
+    /// The note under the mouse.
+    hover: Option<usize>,
+}
+
+impl RollState {
+    /// A note is held by the mouse.
+    pub(super) fn dragging(&self) -> bool {
+        self.drag.is_some()
+    }
+
+    /// Let go of the note held, if any.
+    pub(super) fn release(&mut self) {
+        self.drag = None;
+    }
+}
+
 /// Rows a notch of the wheel scrolls.
 const WHEEL_ROWS: i32 = 3;
 
@@ -47,9 +78,9 @@ impl Session {
     pub fn toggle_piano_roll(&mut self) {
         let open = self.workspace == Workspace::PianoRoll;
         self.set_workspace(if open { Workspace::Grid } else { Workspace::PianoRoll });
-        self.roll_top = None;
-        self.roll_cursor = None;
-        self.roll_gauge = None;
+        self.roll.top = None;
+        self.roll.cursor = None;
+        self.roll.gauge = None;
         self.selected = None;
     }
 
@@ -88,19 +119,19 @@ impl Session {
             color: crate::theme::track(t),
             beat_count: pattern.beat_count.max(1),
             page: 0,
-            top_row: self.roll_top.map_or_else(
+            top_row: self.roll.top.map_or_else(
                 || layout.centered_top((MIDDLE_C + track.transpose - MIDI_MIN).round() as i32),
                 |top| layout.clamp_top(top),
             ),
             selected: self.selected.filter(|&(st, _)| st == t).map(|(_, n)| n),
-            cursor: self.roll_cursor,
+            cursor: self.roll.cursor,
             playhead,
             subs: Vec::new(),
         };
         let per_page = i64::from(BEATS_PER_PAGE * steps_per_beat(track));
         view.page = match playhead {
             Some(step) => (step / per_page) as i32,
-            None => self.roll_page,
+            None => self.roll.page,
         }
         .clamp(0, view.pages() - 1);
         let span = SpanResolver::new(track);
@@ -138,9 +169,9 @@ impl Session {
         self.cursor = Some(Cursor { track: t, beat: 0, step: 0 });
         self.selected = None;
         self.note_focus = Some(NoteFocus::Track(t));
-        self.roll_cursor = None;
-        self.roll_top = None;
-        self.roll_gauge = None;
+        self.roll.cursor = None;
+        self.roll.top = None;
+        self.roll.gauge = None;
     }
 
     /// The note of track `t` at `step` on `row`.
@@ -175,7 +206,7 @@ impl Session {
         let Some((t, n)) = self.selected else { return };
         let Some(track) = self.track(t) else { return };
         let Some(note) = track.notes.get(n) else { return };
-        self.roll_cursor = Some((absolute_step(note.beat, note.step, steps_per_beat(track)), note_row(note, track)));
+        self.roll.cursor = Some((absolute_step(note.beat, note.step, steps_per_beat(track)), note_row(note, track)));
     }
 
     /// Add a note at `step`, `row` and select it.
@@ -183,7 +214,7 @@ impl Session {
         let (beat, beat_step) = self.roll_beat(t, step);
         let n = self.editor.add_note(self.pattern_index, t, beat, beat_step, self.roll_pitch(t, row))?;
         self.selected = Some((t, n));
-        self.roll_cursor = Some((step, row));
+        self.roll.cursor = Some((step, row));
         self.edited();
         Some(n)
     }
@@ -215,17 +246,17 @@ impl Session {
         let (page, pages) = (view.page, view.pages());
         let Some(hit) = layout.hit(&view, x, y) else { return false };
         let Some(t) = self.roll_track() else { return false };
-        self.roll_gauge = None;
+        self.roll.gauge = None;
         match (hit, button) {
-            (RollHit::PreviousPage, Button::Left) => self.roll_page = (page - 1).max(0),
-            (RollHit::NextPage, Button::Left) => self.roll_page = (page + 1).min(pages - 1),
+            (RollHit::PreviousPage, Button::Left) => self.roll.page = (page - 1).max(0),
+            (RollHit::NextPage, Button::Left) => self.roll.page = (page + 1).min(pages - 1),
             (RollHit::Key(midi), Button::Left) => self.roll_play_key(t, midi),
             (RollHit::Key(midi), Button::Right) => self.roll_key_menu(t, midi, x, y),
             (RollHit::Cell { step, row }, Button::Left) => match self.roll_note_at(t, step, row) {
                 // A press on a note: a drag, or a click when it does not move.
                 Some(n) => {
                     let pitch = self.track(t).map_or(0.0, |track| track.transpose);
-                    self.roll_drag = Some(RollDrag { track: t, note: n, drag: NoteDrag::new(x, y, pitch) });
+                    self.roll.drag = Some(RollDrag { track: t, note: n, drag: NoteDrag::new(x, y, pitch) });
                 }
                 None => {
                     if let Some(n) = self.roll_add(t, step, row) {
@@ -241,10 +272,10 @@ impl Session {
 
     /// The mouse moved while a note is pressed; whether to redraw.
     pub fn roll_drag_move(&mut self, x: i32, y: i32) -> bool {
-        let Some(RollDrag { track: t, note: n, mut drag }) = self.roll_drag else { return false };
+        let Some(RollDrag { track: t, note: n, mut drag }) = self.roll.drag else { return false };
         let Some(note) = self.track(t).and_then(|track| track.notes.get(n)).cloned() else { return false };
         let events = drag.moved(x, y, &note);
-        self.roll_drag = Some(RollDrag { track: t, note: n, drag });
+        self.roll.drag = Some(RollDrag { track: t, note: n, drag });
         for event in &events {
             match *event {
                 // A drag makes no click: the note is selected here.
@@ -258,7 +289,7 @@ impl Session {
                         self.audition(t, Some(n));
                     }
                     self.roll_follow();
-                    self.roll_gauge = Some(self.gauge_text(t, n, axis));
+                    self.roll.gauge = Some(self.gauge_text(t, n, axis));
                 }
             }
         }
@@ -268,8 +299,8 @@ impl Session {
     /// The press ended: a press that did not drag is a click on its note —
     /// it selects it, or deletes it when it was selected.
     pub(super) fn roll_release(&mut self) {
-        let Some(RollDrag { track: t, note: n, drag }) = self.roll_drag.take() else { return };
-        self.roll_gauge = None;
+        let Some(RollDrag { track: t, note: n, drag }) = self.roll.drag.take() else { return };
+        self.roll.gauge = None;
         if drag.axis().is_some() {
             return;
         }
@@ -293,24 +324,24 @@ impl Session {
         }
         let Some(view) = self.roll_view(&layout) else { return false };
         if shift {
-            self.roll_page = (view.page - lines.signum() as i32).clamp(0, view.pages() - 1);
+            self.roll.page = (view.page - lines.signum() as i32).clamp(0, view.pages() - 1);
         } else {
-            self.roll_top = Some(layout.clamp_top(view.top_row + lines as i32 * WHEEL_ROWS));
+            self.roll.top = Some(layout.clamp_top(view.top_row + lines as i32 * WHEEL_ROWS));
         }
         true
     }
 
     /// The note under the mouse, for its tooltip; whether it changed.
     pub fn roll_hover(&mut self, size: (i32, i32, i32), x: i32, y: i32) -> bool {
-        let hover = (self.workspace == Workspace::PianoRoll && self.roll_drag.is_none())
+        let hover = (self.workspace == Workspace::PianoRoll && self.roll.drag.is_none())
             .then(|| {
                 let layout = self.roll_layout(size);
                 let view = self.roll_view(&layout)?;
                 (0..view.track.notes.len()).find(|&n| layout.note_rect(&view, n).is_some_and(|r| r.contains(x, y)))
             })
             .flatten();
-        let changed = hover != self.roll_hover;
-        self.roll_hover = hover;
+        let changed = hover != self.roll.hover;
+        self.roll.hover = hover;
         changed
     }
 
@@ -323,7 +354,7 @@ impl Session {
         let size = (canvas.width(), canvas.height(), scale);
         let layout = self.roll_layout(size);
         let Some(view) = self.roll_view(&layout) else { return };
-        let (n, text) = match (&self.roll_gauge, self.selected, self.roll_hover) {
+        let (n, text) = match (&self.roll.gauge, self.selected, self.roll.hover) {
             (Some(gauge), Some((_, n)), _) => (n, gauge.clone()),
             (None, _, Some(n)) => match view.track.notes.get(n) {
                 Some(note) => (n, editors::note_tooltip(note, view.track.transpose)),
@@ -372,16 +403,16 @@ impl Session {
             self.roll_follow();
             let axis = if matches!(direction, Move::Up | Move::Down) { Axis::Velocity } else { Axis::Pitch };
             if let Some((_, n)) = self.selected {
-                self.roll_gauge = Some(self.gauge_text(t, n, axis));
+                self.roll.gauge = Some(self.gauge_text(t, n, axis));
             }
             return;
         }
-        self.roll_gauge = None;
+        self.roll.gauge = None;
         let Some(spb) = self.track(t).map(steps_per_beat) else { return };
         let total = i64::from(self.pattern().map_or(4, |p| p.beat_count.max(1))) * i64::from(spb);
-        let page_start = i64::from(self.roll_page * BEATS_PER_PAGE * spb);
+        let page_start = i64::from(self.roll.page * BEATS_PER_PAGE * spb);
         let middle = TOTAL_KEYS - 1 - TOTAL_KEYS / 2;
-        let (step, row) = match (direction, self.roll_cursor) {
+        let (step, row) = match (direction, self.roll.cursor) {
             (Move::Left, None) => ((page_start - 1).rem_euclid(total), middle),
             (Move::Right, None) => ((page_start + 1).rem_euclid(total), middle),
             (Move::Up, None) => (page_start, 0),
@@ -391,9 +422,9 @@ impl Session {
             (Move::Up, Some((s, r))) => (s, (r + 1).rem_euclid(TOTAL_KEYS)),
             (Move::Down, Some((s, r))) => (s, (r - 1).rem_euclid(TOTAL_KEYS)),
         };
-        self.roll_cursor = Some((step, row));
+        self.roll.cursor = Some((step, row));
         // `#syncCursor`: the page follows, the note there is selected.
-        self.roll_page = (step / i64::from(BEATS_PER_PAGE * spb)) as i32;
+        self.roll.page = (step / i64::from(BEATS_PER_PAGE * spb)) as i32;
         self.selected = self.roll_note_at(t, step, row).map(|n| (t, n));
         self.roll_show_row(row);
         let (beat, beat_step) = self.roll_beat(t, step);
@@ -406,16 +437,16 @@ impl Session {
         let Some(top) = self.roll_view(&layout).map(|v| v.top_row) else { return };
         let rows = layout.visible_rows();
         if row > top {
-            self.roll_top = Some(layout.clamp_top(row));
+            self.roll.top = Some(layout.clamp_top(row));
         } else if row <= top - rows {
-            self.roll_top = Some(layout.clamp_top(row + rows - 1));
+            self.roll.top = Some(layout.clamp_top(row + rows - 1));
         }
     }
 
     /// Enter: at the cursor, add a note, select the one there, or delete it
     /// when it is selected.
     pub fn roll_enter(&mut self) {
-        let (Some(t), Some((step, row))) = (self.roll_track(), self.roll_cursor) else { return };
+        let (Some(t), Some((step, row))) = (self.roll_track(), self.roll.cursor) else { return };
         match self.roll_note_at(t, step, row) {
             Some(n) if self.selected == Some((t, n)) => {
                 self.roll_delete_note(t, n);
@@ -429,10 +460,10 @@ impl Session {
 
     /// Esc: no selection and no cursor, else back to the grid.
     pub fn roll_escape(&mut self) {
-        if self.selected.is_some() || self.roll_cursor.is_some() {
+        if self.selected.is_some() || self.roll.cursor.is_some() {
             self.selected = None;
-            self.roll_cursor = None;
-            self.roll_gauge = None;
+            self.roll.cursor = None;
+            self.roll.gauge = None;
         } else {
             self.toggle_piano_roll();
         }
@@ -451,12 +482,12 @@ impl Session {
     /// that key.
     fn roll_key_menu(&mut self, t: usize, midi: i32, x: i32, y: i32) {
         let Some(track) = self.track(t) else { return };
-        let progression = composition::progression(self.roll_sequence);
+        let progression = composition::progression(self.roll.sequence);
         let title = format!("{} - {} {}", track.name, midi_name(midi), progression.name);
         let tonic = self.roll_pitch(t, midi - MIDI_MIN as i32);
         let values = vec!["clear".into(), format!("sequence:{tonic}")];
         let labels = vec!["Clear all".into(), "Add sequence".into()];
-        self.dropdown = Some(Dropdown::menu(Id::RollMenu, x, y, title, values, labels));
+        self.widgets.dropdown = Some(Dropdown::menu(Id::RollMenu, x, y, title, values, labels));
     }
 
     /// A cell: add or delete its note, add a chord on it
@@ -480,7 +511,7 @@ impl Session {
         }
         values.extend([format!("minor:{at}"), format!("major:{at}")]);
         labels.extend(["Add minor chord".to_owned(), "Add major chord".to_owned()]);
-        self.dropdown = Some(Dropdown::menu(Id::RollMenu, x, y, title, values, labels));
+        self.widgets.dropdown = Some(Dropdown::menu(Id::RollMenu, x, y, title, values, labels));
     }
 
     /// An action of a piano roll menu.
@@ -546,7 +577,7 @@ impl Session {
         self.edited();
         self.selected = Some((t, first));
         let row = (MIDDLE_C + self.track(t).map_or(0.0, |track| track.transpose) + root - MIDI_MIN).round() as i32;
-        self.roll_cursor = Some((step, row));
+        self.roll.cursor = Some((step, row));
         self.message =
             format!("Added {quality} chord ({}) - {name} @ {}", notes_label(added.len()), beat_label(beat, beat_step));
     }
@@ -554,7 +585,7 @@ impl Session {
     /// Replace the track's notes with the next progression from `tonic`,
     /// a chord per measure.
     fn roll_sequence_from(&mut self, t: usize, tonic: f64) {
-        let progression = composition::progression(self.roll_sequence);
+        let progression = composition::progression(self.roll.sequence);
         let beat_count = self.pattern().map_or(4, |p| p.beat_count);
         let planned = composition::progression_notes(progression, tonic, beat_count);
         if planned.is_empty() {
@@ -568,11 +599,11 @@ impl Session {
             let n = self.editor.add_note(self.pattern_index, t, beat, 0, pitch);
             first = first.or(n);
         }
-        self.roll_sequence += 1;
+        self.roll.sequence += 1;
         self.edited();
         self.selected = first.map(|n| (t, n));
         let row = (MIDDLE_C + self.track(t).map_or(0.0, |track| track.transpose) + tonic - MIDI_MIN).round() as i32;
-        self.roll_cursor = Some((0, row));
+        self.roll.cursor = Some((0, row));
         let name = self.track(t).map(|track| track.name.clone()).unwrap_or_default();
         self.message = format!(
             "Replaced with sequence \"{}\" ({}, 1 chord/measure) - {name}",
@@ -673,19 +704,19 @@ mod tests {
     fn keys_move_the_cursor_and_edit() {
         let mut s = session();
         s.roll_arrow(Move::Right, false);
-        assert_eq!(s.roll_cursor, Some((1, TOTAL_KEYS - 1 - TOTAL_KEYS / 2)));
+        assert_eq!(s.roll.cursor, Some((1, TOTAL_KEYS - 1 - TOTAL_KEYS / 2)));
         s.roll_enter();
         assert_eq!(notes(&s).len(), 2);
         s.roll_arrow(Move::Up, true);
         assert_eq!(notes(&s)[1].3, 0.85);
         s.roll_arrow(Move::Right, true);
-        assert_eq!(s.roll_cursor.map(|c| c.1), Some(TOTAL_KEYS - 1 - TOTAL_KEYS / 2 + 1));
+        assert_eq!(s.roll.cursor.map(|c| c.1), Some(TOTAL_KEYS - 1 - TOTAL_KEYS / 2 + 1));
         s.roll_delete();
         assert_eq!(notes(&s).len(), 1);
         // Left from step 0 wraps to the last step, on page 2.
-        s.roll_cursor = Some((0, 40));
+        s.roll.cursor = Some((0, 40));
         s.roll_arrow(Move::Left, false);
-        assert_eq!((s.roll_cursor, s.roll_page), (Some((31, 40)), 1));
+        assert_eq!((s.roll.cursor, s.roll.page), (Some((31, 40)), 1));
     }
 
     #[test]
@@ -707,7 +738,7 @@ mod tests {
         assert_eq!(pitches, [(0, 0.0), (0, 4.0), (0, 7.0), (4, 7.0), (4, 11.0), (4, 14.0)]);
         // The next one is the next progression.
         s.roll_click(SIZE, layout.keys.x + 4, y, Button::Right);
-        assert!(s.dropdown.as_ref().unwrap().title.as_deref().unwrap().ends_with("I-vi-IV-V"));
+        assert!(s.widgets.dropdown.as_ref().unwrap().title.as_deref().unwrap().ends_with("I-vi-IV-V"));
         choose(&mut s, 0); // Clear all
         s.overlay_key(OverlayKey::Enter);
         assert!(notes(&s).is_empty());
