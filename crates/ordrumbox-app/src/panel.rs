@@ -172,7 +172,7 @@ pub enum Id {
     SynthButton(&'static str),
     SynthTab(u8),
     /// A card's power button, its icon choices: by the card's index in
-    /// `synth_model::groups`.
+    /// `ordrumbox_engine::synth_model::groups`.
     SynthPower(u8),
     SynthIcon(u8, u8),
     /// A control, by its index in `synth_view::all_fields`.

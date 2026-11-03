@@ -9,11 +9,11 @@ use std::path::{Path, PathBuf};
 
 use ordrumbox_core::Library;
 use ordrumbox_core::json::{self, Object, Value};
+use ordrumbox_engine::synth_model as model;
 use ordrumbox_engine::{MasterSettings, SynthPresets, kits_from_json};
 
 use crate::master;
 use crate::store;
-use crate::synth_model as model;
 use crate::update;
 
 /// A folder of its own for test `name`, empty.

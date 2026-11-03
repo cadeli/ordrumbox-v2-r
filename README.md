@@ -787,7 +787,7 @@ The synth editor has an eleventh:
 node tools/export_synth_fixtures.mjs ../ordrumbox-v2
 ```
 
-- `ordrumbox-app/tests/fixtures/synth_editor.json`: `SynthPresetModel`
+- `ordrumbox-engine/tests/fixtures/synth_editor.json`: `SynthPresetModel`
   on every preset of `generated_sounds.json` and hand-made ones (the defaults
   filled in, the cards bypassed), `getOrderedGroupNames()`, the LFO targets
   and their scales, and `computeLfoMod()` for every target, wave and sync at

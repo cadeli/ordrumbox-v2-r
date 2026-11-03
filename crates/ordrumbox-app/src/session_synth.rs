@@ -9,9 +9,9 @@
 use std::time::Instant;
 
 use ordrumbox_core::json::{Object, Value};
+use ordrumbox_engine::synth_model as model;
 
 use super::*;
-use crate::synth_model as model;
 use crate::synth_view::{self, Built, SynthLayout};
 
 /// Preset edits reach the disk this long after the last one.

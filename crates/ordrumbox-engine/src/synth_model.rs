@@ -8,10 +8,9 @@
 use ordrumbox_core::js;
 use ordrumbox_core::json::{self, Object, Value};
 use ordrumbox_core::lfo;
-use ordrumbox_engine::slope;
-use ordrumbox_engine::synth_preset::FM_DEVIATION;
 
-use crate::control::Spec;
+use crate::slope;
+use crate::synth_preset::FM_DEVIATION;
 
 /// The oscillator waves (`WAVE_TYPES`) and filter types (`FILTER_TYPES`).
 pub const WAVES: [&str; 5] = ["sine", "triangle", "sawtooth", "square", "random"];
@@ -117,14 +116,6 @@ pub fn metas() -> impl Iterator<Item = &'static Meta> {
 
 pub fn find_meta(path: &str) -> Option<&'static Meta> {
     metas().find(|m| m.path == path)
-}
-
-impl Meta {
-    /// The knob of this control.
-    pub fn spec(&self) -> Spec {
-        let spec = Spec::knob(self.min, self.max, self.step, self.min);
-        if self.log { spec.log_full_travel() } else { spec }
-    }
 }
 
 /// What an LFO can modulate (`SYNTH_LFO_TARGETS`): off, then every control but the LFOs'.
@@ -457,7 +448,7 @@ pub fn lfo_mod(lfo: &Object, time: f64, bpm: f64) -> f64 {
     if scale == 0.0 {
         return 0.0;
     }
-    let freq = ordrumbox_engine::synth_preset::sync_to_hz(lfo.get("sync"), bpm)
+    let freq = crate::synth_preset::sync_to_hz(lfo.get("sync"), bpm)
         .unwrap_or_else(|| lfo.get("freq").filter(|v| !v.is_null()).map_or(0.0, js::to_number));
     let depth = lfo.get("depth").filter(|v| !v.is_null()).map_or(0.0, js::to_number);
     if freq <= 0.0 || depth <= 0.0 {
@@ -765,15 +756,6 @@ mod tests {
         assert!(bypassed(&d, "envelope"));
         toggle_card(&mut d, "envelope");
         assert_eq!(d.get("_resetEnv"), Some(&Value::Bool(true)));
-    }
-
-    #[test]
-    fn filter_freq_knob_is_logarithmic() {
-        let spec = find_meta("filter.freq").unwrap().spec();
-        // Half of the knob's travel is the middle of the three decades, not 10 kHz.
-        assert_eq!(spec.drag(20.0, 100.0, false), 632.0);
-        assert_eq!(spec.drag(20.0, 200.0, false), 20_000.0);
-        assert!((spec.fraction(632.456) - 0.5).abs() < 1e-5);
     }
 
     #[test]

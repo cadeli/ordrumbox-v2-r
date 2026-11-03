@@ -12,7 +12,7 @@
 //
 //   node tools/export_synth_fixtures.mjs <path-to-ordrumbox-v2>
 //
-// Writes crates/ordrumbox-app/tests/fixtures/synth_editor.json.
+// Writes crates/ordrumbox-engine/tests/fixtures/synth_editor.json.
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { join, resolve, dirname } from 'node:path'
@@ -26,7 +26,7 @@ if (!jsRepo) {
 for (const level of ['warn', 'error', 'info', 'debug', 'log']) console[level] = () => {}
 
 const here = dirname(fileURLToPath(import.meta.url))
-const outDir = join(here, '..', 'crates', 'ordrumbox-app', 'tests', 'fixtures')
+const outDir = join(here, '..', 'crates', 'ordrumbox-engine', 'tests', 'fixtures')
 const srcUrl = (rel) => pathToFileURL(resolve(jsRepo, 'src', rel)).href
 
 const { default: SynthPresetModel } = await import(srcUrl('ui/synth_editor/synth_preset_model.js'))

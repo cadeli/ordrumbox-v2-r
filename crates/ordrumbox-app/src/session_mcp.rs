@@ -9,11 +9,12 @@ use ordrumbox_core::instruments::catalog;
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_core::song::{SongClip, clamp_bpm};
 use ordrumbox_core::style;
+use ordrumbox_engine::synth_model as model;
 
 use super::*;
 use crate::editors::note_range;
 use crate::mcp::object;
-use crate::{master, output, synth_model as model};
+use crate::{master, output};
 
 /// Track settings a tool does not set (`mcp.rs` does not offer them).
 const NOT_EDITED: [&str; 1] = ["name"];

@@ -31,7 +31,6 @@ mod session;
 mod song_view;
 mod spectrum;
 mod store;
-mod synth_model;
 mod synth_view;
 mod theme;
 mod update;
