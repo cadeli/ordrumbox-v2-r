@@ -96,14 +96,21 @@ fn read_json(path: &Path) -> Result<json::Value, String> {
 /// The demo library, the starting point of the user's.
 pub const LIBRARY: &str = "library.json";
 
-/// Load everything; only an unreadable `library.json` is fatal.
+/// Load everything, the user's kits and samples first; only an unreadable
+/// `library.json` is fatal.
 pub fn load(dir: &Path) -> Result<Assets, String> {
+    load_with(dir, store::kits_path(), store::samples_dir())
+}
+
+/// [`load`] with the user's `kits.json` and samples folder given (`None`:
+/// the assets' only).
+fn load_with(dir: &Path, user_kits: Option<PathBuf>, user_samples: Option<PathBuf>) -> Result<Assets, String> {
     let data = dir.join("data");
     let (library, report) = Library::from_json(&read_json(&data.join(LIBRARY))?);
     let mut errors = Vec::new();
     // An asset file that cannot be read: its error reported, `None` used.
     let mut read = |name: &str| read_json(&data.join(name)).map_err(|e| errors.push(e)).ok();
-    let saved = store::kits_path().map(|p| store::load_kits(&p));
+    let saved = user_kits.map(|p| store::load_kits(&p));
     let (kits, kits_error) = match saved {
         Some(Ok(Some(kits))) => (Some(kits), None),
         Some(Err(e)) => (None, Some(e)),
@@ -115,7 +122,7 @@ pub fn load(dir: &Path) -> Result<Assets, String> {
     let scales = scales_json.as_ref().map(Scales::from_json).unwrap_or_default();
     let scale_list = scales_json.as_ref().map(ScaleList::from_json).unwrap_or_default();
     let (styles, style_issues) = read("styles.json").map(|v| Styles::from_json(&v)).unwrap_or_default();
-    let sources = SampleSources { assets: dir.join("kits"), user: store::samples_dir() };
+    let sources = SampleSources { assets: dir.join("kits"), user: user_samples };
     let (bank, sample_errors) = SampleBank::load(&kits, |url| sources.read(url));
     Ok(Assets {
         library,
@@ -132,4 +139,56 @@ pub fn load(dir: &Path) -> Result<Assets, String> {
         kits_error,
         errors,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use ordrumbox_engine::TrackSound;
+    use ordrumbox_engine::assign::assign_track;
+
+    use super::*;
+
+    /// This repository's `assets/`, without the user's kits and samples.
+    fn repository_assets() -> Assets {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
+        load_with(&dir, None, None).unwrap()
+    }
+
+    #[test]
+    fn the_assets_load_without_an_error() {
+        let assets = repository_assets();
+        assert_eq!(assets.errors, Vec::<String>::new());
+        assert_eq!(assets.kits_error, None);
+        assert_eq!(assets.report.issues, Vec::new());
+        assert_eq!(assets.report.dropped_clips, Vec::new());
+        assert_eq!(assets.style_issues, Vec::new());
+        assert!(!assets.library.patterns.is_empty());
+        assert!(!assets.kits.is_empty());
+        assert!(!assets.synths.is_empty());
+        assert!(!assets.scale_list.names.is_empty());
+    }
+
+    #[test]
+    fn every_sample_of_the_kits_decodes() {
+        let assets = repository_assets();
+        assert_eq!(assets.sample_errors, Vec::<String>::new());
+        let sample_count: usize = assets.kits.iter().map(|k| k.samples.len()).sum();
+        assert_eq!(assets.bank.samples.len(), sample_count);
+        for s in &assets.bank.samples {
+            assert!(s.buffer.frames() > 0 && s.buffer.sample_rate > 0, "{} is empty", s.sample.path);
+        }
+    }
+
+    #[test]
+    fn every_demo_track_has_a_sound() {
+        let assets = repository_assets();
+        // The kit the app starts with.
+        let kit = &assets.kits[0].name;
+        for pattern in &assets.library.patterns {
+            for track in &pattern.tracks {
+                let sound = assign_track(track, &assets.bank, kit, &assets.synths, &mut |_| 0);
+                assert_ne!(sound, TrackSound::None, "pattern {:?}, track {}", pattern.name, track.name);
+            }
+        }
+    }
 }
