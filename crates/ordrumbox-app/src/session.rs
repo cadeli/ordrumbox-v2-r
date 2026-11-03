@@ -239,6 +239,8 @@ pub struct Session {
     last_dir: Option<PathBuf>,
     /// The assets folder in use.
     assets_dir: Option<PathBuf>,
+    /// Where the song panel saves songs; `None`: no user data folder.
+    songs_dir: Option<PathBuf>,
     /// File > Quit was chosen.
     quit: bool,
     /// The scale names, in file order (arpeggios).
@@ -435,9 +437,10 @@ impl Session {
         let kits =
             KitSet::new(assets.kits, &assets.bank, Some(assets.sources.clone()), kits_file, store::samples_dir());
         // The synth presets edited, over the assets' ones.
-        Self::load_user_synths(&mut assets.synths, &mut status);
+        Self::load_user_synths(store::saved_synths_path(), &mut assets.synths, &mut status);
         let mut session = Self::new(library, kits, status);
         session.assets_dir = Some(dir.clone());
+        session.songs_dir = store::songs_dir();
         session.scales = assets.scales.clone();
         session.styles = assets.styles.clone();
         session.scale_list = assets.scale_list.clone();
@@ -545,6 +548,7 @@ impl Session {
             overlay: None,
             last_dir: None,
             assets_dir: None,
+            songs_dir: None,
             quit: false,
             scale_list: ScaleList::default(),
             editors: EditorState::default(),
@@ -914,8 +918,8 @@ impl Session {
             song_view: self.song_view_open(),
             piano_roll: self.piano_roll_open(),
             synth: self.synth_open(),
-            can_save_song: store::songs_dir().is_some(),
-            saved_songs: store::songs_dir().is_some_and(|d| store::list_songs(&d).is_ok_and(|s| !s.is_empty())),
+            can_save_song: self.songs_dir.is_some(),
+            saved_songs: self.songs_dir.as_ref().is_some_and(|d| store::list_songs(d).is_ok_and(|s| !s.is_empty())),
             kit_sample: self.kit_list().is_some_and(|(s, n)| s < n),
             checking_updates: self.update_check.is_some(),
             newer_release: self.newer_release.as_ref().map(|r| r.version.clone()),
