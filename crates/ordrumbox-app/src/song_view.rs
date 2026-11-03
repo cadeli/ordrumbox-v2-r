@@ -91,6 +91,8 @@ pub struct SongView<'a> {
     /// The library's patterns (their names) and the selected one.
     pub patterns: Vec<String>,
     pub selected_pattern: usize,
+    /// The list's first row shown.
+    pub list_scroll: usize,
     pub song: Option<&'a Song>,
     pub rows: &'a [Row],
     /// The cursor, in measures: where the song plays, else where it starts.
@@ -104,6 +106,8 @@ pub struct SongView<'a> {
     pub ghost: Option<SongGhost>,
     /// A row being dragged by its name, and the row it would take.
     pub row_drop: Option<(usize, usize)>,
+    /// A pattern being dragged along the list, and the place it would take.
+    pub list_drop: Option<(usize, usize)>,
     /// Measures shown past the end of the arrangement, to drop on.
     pub room: u32,
     /// The selected pattern's description (`None` without a pattern), and
@@ -122,11 +126,13 @@ pub struct SongGhost {
     pub measure_count: f64,
 }
 
-/// A scroll bar of the arrangement: across the measures, or down the rows.
+/// A scroll bar: across the arrangement's measures, down its rows, or down
+/// the pattern list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Axis {
     Measures,
     Rows,
+    List,
 }
 
 /// What is under the mouse.
@@ -144,7 +150,7 @@ pub enum SongHit {
     RowName(usize),
     /// The bare grid: a row, a measure.
     Cell { row: usize, measure: u32 },
-    /// A scroll bar of the arrangement.
+    /// A scroll bar.
     ScrollBar(Axis),
 }
 
@@ -245,13 +251,15 @@ impl SongLayout {
         usize::try_from(h.max(0) / self.row_height()).unwrap_or(0).max(1)
     }
 
-    /// The scroll bar along `axis`: under the measures, or right of the rows.
+    /// The scroll bar along `axis`: under the measures, right of the rows,
+    /// or right of the list.
     pub fn scroll_bar(&self, axis: Axis) -> Rect {
-        let (g, bar) = (self.grid, self.grid_bar());
+        let (g, l, bar) = (self.grid, self.list, self.grid_bar());
         let bottom = g.y + g.h - bar;
         match axis {
             Axis::Measures => Rect::new(self.body_left(), bottom, (g.x + g.w - bar - self.body_left()).max(0), bar),
             Axis::Rows => Rect::new(g.x + g.w - bar, self.body_top(), bar, (bottom - self.body_top()).max(0)),
+            Axis::List => Rect::new(l.x + l.w - bar, l.y, bar, l.h),
         }
     }
 
@@ -260,7 +268,7 @@ impl SongLayout {
         let r = self.scroll_bar(axis);
         match axis {
             Axis::Measures => (r.x, r.w),
-            Axis::Rows => (r.y, r.h),
+            Axis::Rows | Axis::List => (r.y, r.h),
         }
     }
 
@@ -281,20 +289,28 @@ impl SongLayout {
         let (_, thumb) = self.thumb(axis, 0, shown, total);
         let pos = match axis {
             Axis::Measures => x,
-            Axis::Rows => y,
+            Axis::Rows | Axis::List => y,
         };
         let free = i64::from((len - thumb).max(1));
         let along = i64::from((pos - start - thumb / 2).clamp(0, len - thumb));
         ((along * last as i64 + free / 2) / free) as usize
     }
 
-    fn list_rows(&self) -> usize {
-        usize::try_from(self.list.h / (LIST_ROW * self.scale)).unwrap_or(0)
+    /// Patterns that fit down the list.
+    pub fn list_rows(&self) -> usize {
+        usize::try_from(self.list.h / (LIST_ROW * self.scale)).unwrap_or(0).max(1)
     }
 
-    /// First list row shown, so that `selected` is visible.
-    fn list_first(&self, selected: usize) -> usize {
-        selected.saturating_sub(self.list_rows().saturating_sub(1))
+    /// The place in a list of `count` patterns at `y`, kept on the rows shown;
+    /// `first` is the first one shown.
+    pub fn list_drop_row(&self, y: i32, first: usize, count: usize) -> usize {
+        let down = usize::try_from((y - self.list.y).max(0) / (LIST_ROW * self.scale)).unwrap_or(0);
+        (first + down.min(self.list_rows() - 1)).min(count.saturating_sub(1))
+    }
+
+    /// The largest first row of a list of `count` patterns: the last ones at the bottom.
+    pub fn list_last_scroll(&self, count: usize) -> usize {
+        count.saturating_sub(self.list_rows())
     }
 
     /// X of measure `m` (fractional), with `first` the first measure shown.
@@ -345,7 +361,10 @@ impl SongLayout {
     /// What is at `(x, y)`.
     pub fn hit(&self, view: &SongView, x: i32, y: i32) -> Option<SongHit> {
         if self.list.contains(x, y) {
-            let row = self.list_first(view.selected_pattern) + row_at(y, self.list.y, LIST_ROW * self.scale)?;
+            if view.patterns.len() > self.list_rows() && self.scroll_bar(Axis::List).contains(x, y) {
+                return Some(SongHit::ScrollBar(Axis::List));
+            }
+            let row = view.list_scroll + row_at(y, self.list.y, LIST_ROW * self.scale)?;
             return (row < view.patterns.len()).then_some(SongHit::Pattern(row));
         }
         if self.description.contains(x, y) {
@@ -398,8 +417,10 @@ fn draw_list(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
         canvas.text(r.x, r.y, "No patterns", s, DIM);
         return;
     }
-    let first = layout.list_first(view.selected_pattern);
-    for (i, name) in view.patterns.iter().enumerate().skip(first).take(layout.list_rows()) {
+    let (first, shown, total) = (view.list_scroll, layout.list_rows(), view.patterns.len());
+    // The names stop short of the scroll bar, when there is one.
+    let names_right = if total > shown { layout.scroll_bar(Axis::List).x - 2 * s } else { r.x + r.w };
+    for (i, name) in view.patterns.iter().enumerate().skip(first).take(shown) {
         let y = r.y + (i - first) as i32 * LIST_ROW * s;
         let selected = i == view.selected_pattern;
         if selected {
@@ -408,7 +429,21 @@ fn draw_list(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
         let number = format!("{}.", i + 1);
         let x = r.x + (LIST_NUMBER_CHARS * 8 * s - text_width(&number, s)).max(0);
         let x = canvas.text(x, y, &number, s, DIM) + 4 * s;
-        canvas.text(x, y, &fit(name, r.x + r.w - x, s), s, if selected { ACCENT } else { TEXT });
+        canvas.text(x, y, &fit(name, names_right - x, s), s, if selected { ACCENT } else { TEXT });
+    }
+    // A pattern dragged along the list: a line where it would go, above or below the one it takes.
+    if let Some((from, to)) = view.list_drop.filter(|&(from, to)| from != to) {
+        let edge = if to > from { to + 1 } else { to };
+        if (first..=first + shown).contains(&edge) {
+            let y = r.y + (edge - first) as i32 * LIST_ROW * s - 2 * s;
+            canvas.fill_rect(r.x - 2 * s, y - s, names_right - r.x + 2 * s, 2 * s, ACCENT);
+        }
+    }
+    if total > shown {
+        let bar = layout.scroll_bar(Axis::List);
+        canvas.fill_rect(bar.x, bar.y, bar.w, bar.h, CELL);
+        let (start, len) = layout.thumb(Axis::List, first, shown, total);
+        canvas.fill_rect(bar.x + s, start, bar.w - 2 * s, len, DIM);
     }
 }
 
@@ -558,7 +593,7 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
         let color = if total > shown { DIM } else { LINE };
         match axis {
             Axis::Measures => canvas.fill_rect(start, r.y + s, len, r.h - 2 * s, color),
-            Axis::Rows => canvas.fill_rect(r.x + s, start, r.w - 2 * s, len, color),
+            Axis::Rows | Axis::List => canvas.fill_rect(r.x + s, start, r.w - 2 * s, len, color),
         }
     }
 }
@@ -632,6 +667,7 @@ mod tests {
         let view = SongView {
             patterns: vec!["a".into(), "b".into(), "c".into()],
             selected_pattern: 0,
+            list_scroll: 0,
             song: library.songs.first(),
             rows: &rows,
             cursor: 1.5,
@@ -640,6 +676,7 @@ mod tests {
             dragged_clip: None,
             ghost: None,
             row_drop: None,
+            list_drop: None,
             room: 0,
             description: Some("x"),
             description_scroll: 0,
@@ -697,6 +734,7 @@ mod tests {
                 let view = SongView {
                     patterns: vec!["a".into(); 40],
                     selected_pattern: 39,
+                    list_scroll: 30,
                     song,
                     rows: &rows,
                     cursor: 3.2,
@@ -705,6 +743,7 @@ mod tests {
                     dragged_clip: song.filter(|s| !s.clips.is_empty()).map(|_| (0, 3)),
                     ghost: Some(SongGhost { name: "c".into(), row: 2, measure: 2, measure_count: 1.0 }),
                     row_drop: Some((0, 2)),
+                    list_drop: Some((39, 31)),
                     room: 8,
                     description: song.map(|_| long.as_str()),
                     description_scroll: 3,
