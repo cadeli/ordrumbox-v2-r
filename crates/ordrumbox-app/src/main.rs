@@ -215,6 +215,9 @@ impl App {
         }
         if let Some(hit) = self.session.grid_hit((width, height, scale), x, y) {
             self.session.click(hit);
+            if let view::Hit::Name(t) = hit {
+                self.session.press_track_drag(t, x, y);
+            }
             self.request_redraw();
         }
     }
@@ -592,7 +595,8 @@ impl ApplicationHandler for App {
                 self.click(Button::Right);
             }
             WindowEvent::MouseInput { state: ElementState::Released, button: MouseButton::Left, .. } => {
-                if self.session.song_release((self.size().0, self.size().1, self.scale())) {
+                let size = (self.size().0, self.size().1, self.scale());
+                if self.session.song_release(size) | self.session.track_release(size) {
                     self.request_redraw();
                 }
                 self.session.mouse_up();

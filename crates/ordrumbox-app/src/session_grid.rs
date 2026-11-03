@@ -1,10 +1,38 @@
 //! The pattern grid's right-click menus (`context_menu_section.js`): a
 //! track's name or buttons open the track menu, a step the notes menu. What
 //! cannot run (paste with nothing copied, delete on an empty step) is left out.
+//! A track's name dragged up or down moves the track to another row.
 
 use ordrumbox_core::js;
 
+use super::session_song::DRAG_START_PX;
 use super::*;
+
+/// A press on a track's name that may become a drag. Nothing is edited before
+/// the release, so the move is one undo step.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct TrackDrag {
+    track: usize,
+    press: (i32, i32),
+    y: i32,
+    /// The pointer has really moved: this is no longer a click.
+    started: bool,
+    /// What it was pressed on; another edit cancels the drag.
+    revision: u64,
+}
+
+/// Where track `t` is once the track `from` moved to `to`.
+fn moved_index(t: usize, from: usize, to: usize) -> usize {
+    if t == from {
+        to
+    } else if from < t && t <= to {
+        t - 1
+    } else if to <= t && t < from {
+        t + 1
+    } else {
+        t
+    }
+}
 
 impl Session {
     /// The grid's layout, when the grid is shown.
@@ -32,13 +60,21 @@ impl Session {
         true
     }
 
-    /// A track: rename, copy, paste after it, duplicate, delete, randomize, clear.
+    /// A track: rename, copy, paste after it, move up or down, duplicate,
+    /// delete, randomize, clear.
     fn track_menu(&mut self, t: usize, x: i32, y: i32) {
         let Some(track) = self.track(t) else { return };
         let title = track.name.clone();
+        let count = self.pattern().map_or(0, |p| p.tracks.len());
         let mut items = vec![("rename", "Rename track"), ("copy", "Copy track")];
         if matches!(self.clipboard, Some(Clipboard::Track(_))) {
             items.push(("paste", "Paste track"));
+        }
+        if t > 0 {
+            items.push(("up", "Move up"));
+        }
+        if t + 1 < count {
+            items.push(("down", "Move down"));
         }
         items.extend([
             ("duplicate", "Duplicate track"),
@@ -85,6 +121,8 @@ impl Session {
             "rename" => self.text_entry(Id::TrackName(t)),
             "copy" => self.copy(true),
             "paste" => self.paste(true),
+            "up" => self.move_track(t, t.saturating_sub(1)),
+            "down" => self.move_track(t, t + 1),
             "duplicate" => self.duplicate_track(t),
             "delete" => self.remove_track(),
             "randomize" => self.randomize_track(),
@@ -95,6 +133,66 @@ impl Session {
             "random-note" => self.add_random_note(t, beat, step),
             _ => {}
         }
+    }
+
+    /// Move track `from` to row `to`; the cursor and the selection follow
+    /// the tracks they were on.
+    pub(super) fn move_track(&mut self, from: usize, to: usize) {
+        if !self.editor.move_track(self.pattern_index, from, to) {
+            return;
+        }
+        let Some(to) = self.pattern().map(|p| to.min(p.tracks.len() - 1)) else { return };
+        let moved = |t: usize| moved_index(t, from, to);
+        if let Some(cursor) = &mut self.cursor {
+            cursor.track = moved(cursor.track);
+        }
+        self.selected = self.selected.map(|(t, n)| (moved(t), n));
+        self.note_focus = self.note_focus.map(|focus| match focus {
+            NoteFocus::Track(t) => NoteFocus::Track(moved(t)),
+            NoteFocus::Step { track, beat, step } => NoteFocus::Step { track: moved(track), beat, step },
+        });
+        if let Some((t, _)) = &mut self.detached {
+            *t = moved(*t);
+        }
+        self.hover = None;
+        self.edited();
+    }
+
+    // ─── Dragging a track ────────────────────────────────────────────────────
+
+    /// A press on the name of track `t`.
+    pub fn press_track_drag(&mut self, t: usize, x: i32, y: i32) {
+        self.track_drag =
+            Some(TrackDrag { track: t, press: (x, y), y, started: false, revision: self.editor.revision() });
+    }
+
+    /// The drag under way, unless the pattern may have changed under it.
+    fn live_track_drag(&self) -> Option<TrackDrag> {
+        self.track_drag.filter(|d| d.started && d.revision == self.editor.revision())
+    }
+
+    /// The track dragged and the row it would take.
+    pub(super) fn track_drop(&self, size: (i32, i32, i32)) -> Option<(usize, usize)> {
+        let drag = self.live_track_drag()?;
+        Some((drag.track, self.grid_layout(size)?.drop_row(drag.y)))
+    }
+
+    /// The mouse moved with a name pressed; whether to redraw.
+    pub(super) fn track_drag_move(&mut self, x: i32, y: i32) -> bool {
+        let Some(drag) = &mut self.track_drag else { return false };
+        drag.y = y;
+        let (dx, dy) = (x - drag.press.0, y - drag.press.1);
+        drag.started |= dx.abs() >= DRAG_START_PX || dy.abs() >= DRAG_START_PX;
+        drag.started
+    }
+
+    /// The press released: a drag moves its track; whether it was one.
+    pub fn track_release(&mut self, size: (i32, i32, i32)) -> bool {
+        let drop = self.track_drop(size);
+        self.track_drag = None;
+        let Some((from, to)) = drop else { return false };
+        self.move_track(from, to);
+        true
     }
 
     /// A copy of track `t` right after it.
@@ -215,6 +313,50 @@ mod tests {
         pick(&mut s, "Delete track");
         s.overlay_key(OverlayKey::Enter);
         assert_eq!(s.pattern().unwrap().tracks.len(), count + 1);
+    }
+
+    #[test]
+    fn the_track_menu_moves_up_and_down() {
+        let mut s = session();
+        let names = |s: &Session| s.pattern().unwrap().tracks.iter().map(|t| t.name.clone()).collect::<Vec<_>>();
+        s.track_menu(0, 10, 10);
+        assert!(!labels(&s).contains(&"Move up".to_owned()), "the first track goes no higher");
+        s.cursor = Some(Cursor { track: 0, beat: 1, step: 0 });
+        pick(&mut s, "Move down");
+        assert_eq!(names(&s), ["SNARE", "KICK"]);
+        assert_eq!(s.cursor.map(|c| c.track), Some(1), "the cursor follows the track");
+        assert_eq!(s.message, "Move track KICK");
+        s.track_menu(1, 10, 10);
+        assert!(!labels(&s).contains(&"Move down".to_owned()), "the last track goes no lower");
+        pick(&mut s, "Move up");
+        assert_eq!(names(&s), ["KICK", "SNARE"]);
+    }
+
+    #[test]
+    fn a_track_dragged_by_its_name_moves() {
+        let mut s = session();
+        let layout = s.grid_layout(SIZE).expect("the grid is shown");
+        let pattern = s.pattern().unwrap().clone();
+        let at = |t: usize| {
+            (0..SIZE.1)
+                .flat_map(|y| (0..SIZE.0).map(move |x| (x, y)))
+                .find(|&(x, y)| layout.hit(&pattern, x, y) == Some(Hit::Name(t)))
+                .expect("a track name")
+        };
+        let ((x0, y0), (x1, y1)) = (at(0), at(1));
+        s.click(Hit::Name(0));
+        s.press_track_drag(0, x0, y0);
+        assert!(!s.track_drag_move(x0, y0 + 1), "a small move is still a click");
+        assert!(s.track_drag_move(x1, y1));
+        assert_eq!(s.track_drop(SIZE), Some((0, 1)));
+        assert!(s.track_release(SIZE));
+        let names: Vec<_> = s.pattern().unwrap().tracks.iter().map(|t| t.name.as_str()).collect();
+        assert_eq!(names, ["SNARE", "KICK"]);
+        assert_eq!(s.cursor.map(|c| c.track), Some(1));
+        s.press_track_drag(1, x1, y1);
+        assert!(!s.track_release(SIZE), "a click moves nothing");
+        s.undo();
+        assert_eq!(s.pattern().unwrap().tracks[0].name, "KICK");
     }
 
     #[test]

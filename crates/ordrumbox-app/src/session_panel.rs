@@ -593,6 +593,9 @@ impl Session {
         if self.song_drag.is_some() {
             return self.song_drag_move(x, y);
         }
+        if self.track_drag.is_some() {
+            return self.track_drag_move(x, y);
+        }
         if let Some(axis) = self.song_bar_drag {
             return self.song_bar_to(size, axis, x, y);
         }
@@ -666,6 +669,7 @@ impl Session {
     pub fn mouse_up(&mut self) {
         self.drag = None;
         self.song_bar_drag = None;
+        self.track_drag = None;
         self.roll_release();
     }
 

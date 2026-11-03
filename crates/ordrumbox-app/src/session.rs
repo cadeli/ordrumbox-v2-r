@@ -195,6 +195,8 @@ pub struct Session {
     /// The clip under the mouse (its tooltip).
     hovered_clip: Option<usize>,
     song_drag: Option<session_song::SongDrag>,
+    /// A track pressed by its name, that may be dragged to another row.
+    track_drag: Option<session_grid::TrackDrag>,
     /// The arrangement's scroll bar held by the mouse.
     song_bar_drag: Option<crate::song_view::Axis>,
     /// The piano roll's page, highest row shown (`None`: centered on the
@@ -584,6 +586,7 @@ impl Session {
             analyser: std::cell::RefCell::default(),
             spectrum: std::cell::RefCell::default(),
             hover: None,
+            track_drag: None,
             track_analysis: std::cell::RefCell::default(),
         }
     }
@@ -2215,6 +2218,7 @@ impl Session {
             current_page: self.current_page,
             levels: self.track_levels.clone(),
             show_vus: self.show_vus,
+            track_drop: self.track_drop((canvas.width(), canvas.height(), scale)),
             playhead: if song_mode.is_some() {
                 None
             } else {
