@@ -478,38 +478,9 @@ impl Session {
         Ok(pattern_summary(copy, &self.editor.library().patterns[copy]))
     }
 
-    /// Remove a pattern with its clips; the pattern shown or playing stays
-    /// the same one when it is another.
     fn mcp_remove_pattern(&mut self, args: &Value) -> Result<Value, String> {
         let p = self.mcp_pattern(text(args, "patternName")?)?;
-        let library = self.editor.library();
-        if library.patterns.len() <= 1 {
-            return Err("The last pattern of the library stays".into());
-        }
-        let (id, name) = (library.patterns[p].id.clone(), pattern_name(&library.patterns[p]));
-        let songs = library.songs.len();
-        let clips = self.editor.batch(&format!("Remove pattern \"{name}\""), |editor| {
-            let mut clips = 0;
-            for s in 0..songs {
-                clips += editor.remove_pattern_clips(&id, Some(s))?.len();
-            }
-            if !editor.remove_pattern(p) {
-                return Err("the pattern was not removed".to_owned());
-            }
-            Ok(clips)
-        })?;
-        if self.pattern_index > p {
-            self.pattern_index -= 1;
-        }
-        if let Some(controller) = &mut self.controller
-            && let Mode::Pattern(playing) = controller.mode()
-        {
-            match playing.cmp(&p) {
-                std::cmp::Ordering::Equal => controller.stop(),
-                std::cmp::Ordering::Greater => controller.select_pattern(playing - 1),
-                std::cmp::Ordering::Less => {}
-            }
-        }
+        let (name, clips) = self.remove_pattern_with_clips(p)?;
         Ok(object([("removed", Value::from(name)), ("clipsRemoved", count(clips))]))
     }
 

@@ -192,6 +192,8 @@ pub struct Session {
     song_scroll: (u32, usize),
     /// The pattern whose description is scrolled, and its first line shown.
     description_scroll: (usize, usize),
+    /// The pattern selected when the pattern list was scrolled, and its first row shown.
+    list_scroll: (usize, usize),
     /// The clip under the mouse (its tooltip).
     hovered_clip: Option<usize>,
     song_drag: Option<session_song::SongDrag>,
@@ -525,6 +527,7 @@ impl Session {
             song_cursor: 0,
             song_scroll: (0, 0),
             description_scroll: (0, 0),
+            list_scroll: (0, 0),
             hovered_clip: None,
             song_drag: None,
             song_bar_drag: None,

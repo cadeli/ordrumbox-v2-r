@@ -220,16 +220,19 @@ library's patterns on the left and on the right the song's name and
 description (a click edits them), its date, the arrangement list, and
 **Save**, **Load**, **Save as**, **Export**, **Import**. A click on the ruler aims the cursor, where the song plays from
 (**←→** move it a measure; while playing, it jumps there at once); while the
-panel is shown **Space** plays the song. Right-click a pattern of the list
-or a row's name: add it at the playhead (stopped: the cursor), move the row
-up or down, or remove its row; a clip: **Next** (the same clip right after it) or **Delete**; the bare
-grid: add the row's pattern there. Drag a pattern of the list onto the
-arrangement to add it at that measure, on its own row; drag a clip sideways to
+panel is shown **Space** plays the song. Right-click a pattern of the list:
+add it at the playhead (stopped: the cursor), move it up or down the list,
+rename it, or delete it with its clips (confirmed); a row's name: add its
+pattern at the playhead, move the row up or down, or remove its row; a clip: **Next** (the same clip right after it) or **Delete**; the bare
+grid: add the row's pattern there. Drag a pattern along the list to move it
+there; drag it onto the arrangement to add it at that measure, on its own row
+(a tooltip shows the measure); drag a clip sideways to
 move it, whole measures at a time (the wheel scrolls during the drag; the grid
 shows a page past the end to drop on); drag a row by its name up or down to
 move it. Rows follow the order of the pattern list, so a row moved moves its
 pattern in the list too. A click on a pattern selects it, a
-double-click renames it (**↑↓** step through them). The wheel scrolls the
+double-click adds it at the playhead (**↑↓** step through them). The wheel
+scrolls the list, the pattern's description, and the arrangement's
 measures, sideways too (**Shift**: the rows); the scroll bars under and right
 of the grid, clicked or dragged, reach every measure and row; while the song
 plays the grid follows it page by page. Every edit is an undo step, and moves the loop onto the end of the

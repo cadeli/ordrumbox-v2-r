@@ -1,6 +1,9 @@
 //! The session's side of the song panel (`song_panel.js` and its sections):
-//! the pattern list (a click selects, a double-click renames, a right-click
-//! adds the pattern at the playhead, a drag drops it on the arrangement), the
+//! the pattern list (a click selects, a double-click adds the pattern at the
+//! playhead, a right-click opens its menu: add at the playhead, move up or
+//! down, rename, delete; a drag drops it on the arrangement, the wheel or its
+//! scroll bar scrolls it; a drag moves it along the list, or drops it on the
+//! arrangement at the measure under the pointer), the
 //! arrangement (a click on the ruler aims the cursor, where play starts; a
 //! clip dragged sideways moves; a row dragged by its name moves up or down;
 //! the right-click menus of clips, row names and the bare grid), the selected pattern's description (a click edits it, the
@@ -185,6 +188,17 @@ impl Session {
         first.min(layout.description_lines(&pattern.description).len().saturating_sub(layout.description_rows()))
     }
 
+    /// The pattern list's first row shown: where the wheel or the bar left
+    /// it, moved just enough to show a pattern selected since.
+    fn list_scroll(&self, layout: &SongLayout) -> usize {
+        let (p, mut first) = self.list_scroll;
+        if p != self.pattern_index {
+            let selected = self.pattern_index;
+            first = first.clamp(selected.saturating_sub(layout.list_rows() - 1), selected);
+        }
+        first.min(layout.list_last_scroll(self.editor.library().patterns.len()))
+    }
+
     pub(super) fn song_layout(&self, size: (i32, i32, i32)) -> SongLayout {
         let body = self.body(size);
         SongLayout::new(body.main_w, body.editor_h, size.2, self.status.len())
@@ -201,6 +215,7 @@ impl Session {
                 .map(|(i, p)| p.name.clone().unwrap_or_else(|| format!("Pattern {i}")))
                 .collect(),
             selected_pattern: self.pattern_index,
+            list_scroll: self.list_scroll(layout),
             song: self.song(),
             rows,
             cursor: self.song_cursor_measure(),
@@ -209,6 +224,7 @@ impl Session {
             dragged_clip: self.song_dragged_clip(layout, rows.len()),
             ghost: self.song_ghost(layout, rows),
             row_drop: self.song_row_drop(layout, rows),
+            list_drop: self.song_list_drop(layout),
             room: self.song_room(layout),
             description: self.pattern().map(|p| p.description.as_str()),
             description_scroll: self.description_scroll(layout),
@@ -437,7 +453,7 @@ impl Session {
                 let double = self.last_click.is_some_and(|(last, at)| last == id && now - at < DOUBLE_CLICK);
                 self.last_click = if double { None } else { Some((id, now)) };
                 if double {
-                    self.text_entry(id);
+                    self.add_at_playhead(p);
                 } else {
                     self.step_pattern(p as isize - self.pattern_index as isize);
                     self.press_song_drag(DragSource::Pattern(p), x, y);
@@ -532,6 +548,17 @@ impl Session {
         Some((from, layout.drop_row(drag.y, first).min(movable.saturating_sub(1))))
     }
 
+    /// The pattern being dragged along the list and the place it would take.
+    fn song_list_drop(&self, layout: &SongLayout) -> Option<(usize, usize)> {
+        let drag = self.live_song_drag()?;
+        let DragSource::Pattern(from) = drag.source else { return None };
+        if !layout.list.contains(drag.x, drag.y) {
+            return None;
+        }
+        let count = self.editor.library().patterns.len();
+        Some((from, layout.list_drop_row(drag.y, self.list_scroll(layout), count)))
+    }
+
     /// Where the pattern being dragged would land, the pointer over the arrangement.
     fn song_ghost(&self, layout: &SongLayout, rows: &[Row]) -> Option<SongGhost> {
         let (drag, measure) = self.song_drag_at(layout, rows.len())?;
@@ -564,12 +591,15 @@ impl Session {
         let at = self.song_drag_at(&layout, rows.len());
         let ghost = self.song_ghost(&layout, &rows);
         let row_drop = self.song_row_drop(&layout, &rows);
+        let list_drop = self.song_list_drop(&layout);
         let over_grid = at.is_some_and(|(drag, _)| layout.grid.contains(drag.x, drag.y));
         self.song_drag = None;
         let Some((drag, measure)) = at else { return false };
         match drag.source {
             DragSource::Pattern(p) => {
-                if self.song().is_none() && over_grid {
+                if let Some((from, to)) = list_drop {
+                    self.move_pattern(from, to);
+                } else if self.song().is_none() && over_grid {
                     self.message = "No song to add to".into();
                 } else if let (Some(ghost), Some(pattern)) = (ghost, self.editor.library().patterns.get(p)) {
                     let value = format!("add:{}:{}", ghost.measure, pattern.id);
@@ -597,6 +627,13 @@ impl Session {
     /// The scroll bar `axis` held at `(x, y)`: its thumb centred there; whether to redraw.
     pub(super) fn song_bar_to(&mut self, size: (i32, i32, i32), axis: Axis, x: i32, y: i32) -> bool {
         let layout = self.song_layout(size);
+        if axis == Axis::List {
+            let count = self.editor.library().patterns.len();
+            let first = layout.scroll_at(axis, x, y, layout.list_rows(), count);
+            let changed = first != self.list_scroll(&layout);
+            self.list_scroll = (self.pattern_index, first);
+            return changed;
+        }
         let rows = self.song_rows().len();
         let (mut sx, mut sy) = self.song_scroll(&layout, rows);
         match axis {
@@ -604,7 +641,7 @@ impl Session {
                 let (shown, total) = (layout.visible_measures() as usize, self.song_measure_total(&layout) as usize);
                 sx = layout.scroll_at(axis, x, y, shown, total) as u32;
             }
-            Axis::Rows => sy = layout.scroll_at(axis, x, y, layout.visible_rows(), rows),
+            Axis::Rows | Axis::List => sy = layout.scroll_at(axis, x, y, layout.visible_rows(), rows),
         }
         let changed = (sx, sy) != self.song_scroll;
         self.song_scroll = (sx, sy);
@@ -613,7 +650,8 @@ impl Session {
 
     /// The wheel over the arrangement: measures, sideways ones too (Shift:
     /// rows, which macOS turns into sideways notches); over the pattern's
-    /// description: its lines; whether it was theirs.
+    /// description: its lines; over the pattern list: its rows; whether it
+    /// was theirs.
     pub fn song_wheel(&mut self, size: (i32, i32, i32), x: i32, y: i32, wheel: (isize, isize), shift: bool) -> bool {
         // Content moves right and down for positive notches: both show what is before.
         let lines = wheel.0 + wheel.1;
@@ -622,6 +660,12 @@ impl Session {
             let first = (self.description_scroll(&layout) as isize - lines).max(0) as usize;
             self.description_scroll = (self.pattern_index, first);
             self.description_scroll.1 = self.description_scroll(&layout);
+            return true;
+        }
+        if self.workspace == Workspace::Song && lines != 0 && layout.list.contains(x, y) {
+            let last = layout.list_last_scroll(self.editor.library().patterns.len());
+            let first = (self.list_scroll(&layout) as isize - lines).clamp(0, last as isize) as usize;
+            self.list_scroll = (self.pattern_index, first);
             return true;
         }
         if self.song().is_none() || self.workspace != Workspace::Song || lines == 0 || !layout.grid.contains(x, y) {
@@ -659,32 +703,59 @@ impl Session {
     }
 
     /// The tooltip of the clip under the mouse (the clip's `title`).
+    /// The tooltip of the clip under the mouse, or, while a pattern is
+    /// dragged over the arrangement, the measure it would be added at.
     pub(super) fn draw_song_tooltip(&self, canvas: &mut Canvas, scale: i32) {
-        let Some(c) = self.hovered_clip else { return };
         if self.menu.is_some() || self.popup_open() || self.overlay.is_some() {
             return;
         }
-        let Some(clip) = self.song().and_then(|s| s.clips.get(c)) else { return };
         let layout = self.song_layout((canvas.width(), canvas.height(), scale));
         let rows = self.song_rows();
+        if let (Some(ghost), Some(drag)) = (self.song_ghost(&layout, &rows), self.live_song_drag()) {
+            let at = Rect::new(drag.x, drag.y, 0, 0);
+            return view::draw_tooltip(canvas, &format!("Add at measure {}", ghost.measure + 1), at, scale);
+        }
+        let Some(c) = self.hovered_clip else { return };
+        let Some(clip) = self.song().and_then(|s| s.clips.get(c)) else { return };
         let Some(rect) = layout.clip_rect(&self.song_view_data(&rows, &layout), c) else { return };
         view::draw_tooltip(canvas, &clip_label(&clip.pattern_id, clip), rect, scale);
     }
 
     // ─── The menus ───────────────────────────────────────────────────────────
 
-    /// A pattern of the list: add it at the playhead.
+    /// A pattern of the list: add it at the playhead (when there is a song),
+    /// move it up or down the list, rename it, or delete it.
     fn list_menu(&mut self, p: usize, x: i32, y: i32) {
+        let patterns = &self.editor.library().patterns;
+        let Some(pattern) = patterns.get(p) else { return };
+        let (title, id, count) = (self.pattern_label(&pattern.id), pattern.id.clone(), patterns.len());
+        let (mut values, mut labels) = (Vec::new(), Vec::new());
+        if self.song().is_some() {
+            let measure = self.playhead_measure();
+            values.push(format!("add:{measure}:{id}"));
+            labels.push(format!("Add at measure {}", measure + 1));
+        }
+        if p > 0 {
+            values.push(format!("pattern-up:{p}"));
+            labels.push("Move up".into());
+        }
+        if p + 1 < count {
+            values.push(format!("pattern-down:{p}"));
+            labels.push("Move down".into());
+        }
+        values.extend([format!("rename:{p}"), format!("pattern-delete:{p}")]);
+        labels.extend(["Rename".into(), "Delete".into()]);
+        self.dropdown = Some(Dropdown::menu(Id::SongMenu, x, y, title, values, labels));
+    }
+
+    /// Pattern `p` of the list added to the arrangement at the playhead.
+    fn add_at_playhead(&mut self, p: usize) {
         if self.song().is_none() {
             self.message = "No song to add to".into();
             return;
         }
-        let Some(pattern) = self.editor.library().patterns.get(p) else { return };
-        let label = pattern.name.clone().unwrap_or_else(|| pattern.id.clone());
-        let measure = self.playhead_measure();
-        let values = vec![format!("add:{measure}:{}", pattern.id)];
-        let labels = vec![format!("Add at measure {}", measure + 1)];
-        self.dropdown = Some(Dropdown::menu(Id::SongMenu, x, y, label, values, labels));
+        let Some(id) = self.editor.library().patterns.get(p).map(|pattern| pattern.id.clone()) else { return };
+        self.song_menu_pick(&format!("add:{}:{id}", self.playhead_measure()));
     }
 
     /// A clip: repeat it after itself, or remove it.
@@ -765,6 +836,18 @@ impl Session {
                 return;
             }
             ("row", None) => return self.ask(Pending::RemoveRow(a.to_owned())),
+            ("pattern-up" | "pattern-down" | "rename" | "pattern-delete", None) => {
+                let Some(p) = a.parse().ok().filter(|&p: &usize| p < self.editor.library().patterns.len()) else {
+                    return;
+                };
+                match action {
+                    "pattern-up" => self.move_pattern(p, p.saturating_sub(1)),
+                    "pattern-down" => self.move_pattern(p, p + 1),
+                    "rename" => self.text_entry(Id::SongPattern(p)),
+                    _ => self.ask(Pending::RemovePattern(p)),
+                }
+                return;
+            }
             _ => return,
         };
         self.song_edit_result(result);
@@ -780,11 +863,64 @@ impl Session {
             rows.get(r).filter(|row| !row.orphan).and_then(|row| patterns.iter().position(|p| p.id == row.id))
         };
         let (Some(from), Some(to)) = (index(from), index(to)) else { return };
+        self.move_pattern(from, to);
+    }
+
+    /// Move pattern `from` of the library to index `to`, in one undo step;
+    /// the pattern shown stays the same one.
+    fn move_pattern(&mut self, from: usize, to: usize) {
         if self.editor.move_pattern(from, to) {
             self.pattern_index = moved_index(self.pattern_index, from, to);
             self.description_scroll.0 = moved_index(self.description_scroll.0, from, to);
+            self.list_scroll.0 = moved_index(self.list_scroll.0, from, to);
             self.edited();
         }
+    }
+
+    /// Remove pattern `p` and its clips of every arrangement, in one undo
+    /// step; the pattern shown or playing stays the same one when it is
+    /// another. Its name and the clips removed.
+    pub(super) fn remove_pattern_with_clips(&mut self, p: usize) -> Result<(String, usize), String> {
+        let library = self.editor.library();
+        if library.patterns.len() <= 1 {
+            return Err("The last pattern of the library stays".into());
+        }
+        let Some(id) = library.patterns.get(p).map(|pattern| pattern.id.clone()) else {
+            return Err(format!("No pattern {}", p + 1));
+        };
+        let (name, songs) = (self.pattern_label(&id), library.songs.len());
+        let clips = self.editor.batch(&format!("Remove pattern \"{name}\""), |editor| {
+            let mut clips = 0;
+            for s in 0..songs {
+                clips += editor.remove_pattern_clips(&id, Some(s))?.len();
+            }
+            if !editor.remove_pattern(p) {
+                return Err("the pattern was not removed".to_owned());
+            }
+            Ok(clips)
+        })?;
+        if self.pattern_index > p {
+            self.pattern_index -= 1;
+        }
+        if let Some(controller) = &mut self.controller
+            && let Mode::Pattern(playing) = controller.mode()
+        {
+            match playing.cmp(&p) {
+                std::cmp::Ordering::Equal => controller.stop(),
+                std::cmp::Ordering::Greater => controller.select_pattern(playing - 1),
+                std::cmp::Ordering::Less => {}
+            }
+        }
+        self.clamp_selection();
+        Ok((name, clips))
+    }
+
+    /// Pattern `p` deleted, once confirmed.
+    pub(super) fn remove_pattern_now(&mut self, p: usize) {
+        let result = self
+            .remove_pattern_with_clips(p)
+            .map(|(name, clips)| format!("Removed pattern \"{name}\" and {clips} clip(s)"));
+        self.song_edit_result(result);
     }
 
     /// Remove clip `c` of the arrangement.
@@ -1006,7 +1142,7 @@ mod tests {
         assert!(s.song_click(SIZE, measure_x(1), ruler_y, Button::Left));
         assert_eq!(s.song_cursor, 1);
         assert!(s.song_click(SIZE, l.list.x + 2, l.list.y + 2, Button::Right));
-        assert_eq!(menu(&s), ["add:1:a"]);
+        assert_eq!(menu(&s), ["add:1:a", "pattern-down:0", "rename:0", "pattern-delete:0"]);
         choose(&mut s, 0);
         assert_eq!(s.message, "\"a\" added at measure 2");
         assert_eq!(clips(&s), [("b".into(), 0, 2.0), ("a".into(), 1, 0.75)]);
@@ -1033,6 +1169,48 @@ mod tests {
         assert_eq!(clips(&s), [("b".into(), 0, 2.0)]);
         s.undo();
         assert_eq!(clips(&s).len(), 4);
+    }
+
+    #[test]
+    fn the_pattern_list_adds_moves_and_deletes_patterns() {
+        let mut s = session();
+        let l = s.song_layout(SIZE);
+        let row = |r: i32| (l.list.x + 2, l.list.y + r * 12 + 2);
+        // A double-click adds the pattern at the playhead.
+        let (x, y) = row(0);
+        s.song_click(SIZE, x, y, Button::Left);
+        s.mouse_up();
+        s.song_click(SIZE, x, y, Button::Left);
+        s.mouse_up();
+        assert_eq!(s.message, "\"a\" added at measure 1");
+        assert_eq!(clips(&s), [("b".into(), 0, 2.0), ("a".into(), 0, 0.75)]);
+        // Move down, then up: the pattern shown follows.
+        s.song_click(SIZE, x, y, Button::Right);
+        choose(&mut s, 1);
+        assert_eq!(s.editor.library().patterns[1].name.as_deref(), Some("a"));
+        assert_eq!(s.pattern_index, 1);
+        let (x, y) = row(1);
+        s.song_click(SIZE, x, y, Button::Right);
+        assert_eq!(menu(&s), ["add:0:a", "pattern-up:1", "rename:1", "pattern-delete:1"]);
+        choose(&mut s, 1);
+        assert_eq!(s.editor.library().patterns[0].name.as_deref(), Some("a"));
+        // Delete waits for Enter, takes the clips along, and is one undo step.
+        let (x, y) = row(1);
+        s.song_click(SIZE, x, y, Button::Right);
+        choose(&mut s, 3);
+        assert!(s.confirm_open());
+        assert_eq!(s.confirm_text(&Pending::RemovePattern(1)).1[0], "\"b\" and its 1 clip(s)");
+        s.overlay_key(OverlayKey::Enter);
+        assert_eq!(s.message, "Removed pattern \"b\" and 1 clip(s)");
+        assert_eq!(s.editor.library().patterns.len(), 1);
+        assert_eq!(clips(&s), [("a".into(), 0, 0.75)]);
+        // The last pattern stays.
+        s.song_menu_pick("pattern-delete:0");
+        s.overlay_key(OverlayKey::Enter);
+        assert_eq!(s.message, "The last pattern of the library stays");
+        s.undo();
+        assert_eq!(s.editor.library().patterns.len(), 2);
+        assert_eq!(clips(&s).len(), 2);
     }
 
     #[test]
@@ -1077,6 +1255,24 @@ mod tests {
         assert_eq!(scroll(&s), (last_measure, last_row));
         assert!(s.song_wheel(SIZE, inside.0, inside.1, (1000, 0), true));
         assert_eq!(scroll(&s), (last_measure, 0));
+
+        // The pattern list: the wheel, its bar, and a pattern selected out of view.
+        let list_scroll = |s: &Session| s.song_view_data(&rows, &l).list_scroll;
+        let last = 30 - l.list_rows();
+        let in_list = (l.list.x + 2, l.list.y + 2);
+        assert!(s.song_wheel(SIZE, in_list.0, in_list.1, (0, -2), false));
+        assert_eq!(list_scroll(&s), 2);
+        assert!(s.song_wheel(SIZE, in_list.0, in_list.1, (0, -1000), false));
+        assert_eq!(list_scroll(&s), last);
+        assert!(s.song_click(SIZE, in_list.0, in_list.1, Button::Left));
+        s.mouse_up();
+        assert_eq!(s.pattern_index, last);
+        let bar = l.scroll_bar(Axis::List);
+        assert!(s.song_click(SIZE, bar.x + 1, bar.y + 1, Button::Left));
+        s.mouse_up();
+        assert_eq!(list_scroll(&s), 0);
+        s.step_pattern(1);
+        assert_eq!(list_scroll(&s), last + 1 - (l.list_rows() - 1));
     }
 
     #[test]
@@ -1105,6 +1301,18 @@ mod tests {
         assert_eq!(clips(&s), [("b".into(), 0, 2.0), ("a".into(), 4, 0.75)]);
         s.undo();
         assert_eq!(clips(&s).len(), 1);
+
+        // Dragged along the list: a line where it goes, and the pattern moves there.
+        s.last_click = None;
+        s.song_click(SIZE, list.0, list.1, Button::Left);
+        s.mouse_move(SIZE, list.0, list.1 + 12, false);
+        assert_eq!(s.song_view_data(&rows, &l).list_drop, Some((0, 1)));
+        assert!(s.song_release(SIZE));
+        let names: Vec<_> = s.editor.library().patterns.iter().map(|p| p.name.clone().unwrap()).collect();
+        assert_eq!((names, s.pattern_index), (vec!["b".to_owned(), "a".to_owned()], 1));
+        assert_eq!(clips(&s).len(), 1);
+        s.undo();
+        assert_eq!(s.editor.library().patterns[0].name.as_deref(), Some("a"));
 
         // Dropped outside the arrangement: nothing.
         s.last_click = None;
@@ -1202,12 +1410,12 @@ mod tests {
         assert_eq!(s.song_view_data(&[], &l).description_scroll, last);
         assert!(s.song_wheel(SIZE, inside.0, inside.1, (0, 1000), false));
         assert_eq!(s.song_view_data(&[], &l).description_scroll, 0);
-        // A double-click on a pattern of the list renames it.
+        // Rename, in the menu of a pattern of the list.
         let l = s.song_layout(SIZE);
         let row = (l.list.x + 2, l.list.y + 12 + 2);
-        s.song_click(SIZE, row.0, row.1, Button::Left);
-        assert_eq!(s.pattern_index, 1);
-        s.song_click(SIZE, row.0, row.1, Button::Left);
+        s.song_click(SIZE, row.0, row.1, Button::Right);
+        let rename = menu(&s).iter().position(|v| v == "rename:1").unwrap();
+        choose(&mut s, rename);
         assert_eq!(s.entry.as_ref().map(|e| (e.id, e.text.as_str())), Some((Id::SongPattern(1), "b")));
         type_entry(&mut s, "B two");
         assert_eq!(s.editor.library().patterns[1].name.as_deref(), Some("B two"));

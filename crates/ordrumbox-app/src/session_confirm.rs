@@ -12,6 +12,8 @@ pub(super) enum Pending {
     RemoveClip(usize),
     /// Every clip of a pattern (its id) in the arrangement.
     RemoveRow(String),
+    /// A pattern of the library, with its clips.
+    RemovePattern(usize),
     RemoveSong,
     RemoveSample {
         kit: usize,
@@ -46,6 +48,7 @@ impl Session {
             }
             Pending::RemoveClip(c) => self.remove_clip(c),
             Pending::RemoveRow(id) => self.remove_row(&id),
+            Pending::RemovePattern(p) => self.remove_pattern_now(p),
             Pending::RemoveSong => self.remove_song(),
             Pending::RemoveSample { kit, sample } => self.kit_remove_now(kit, sample),
             Pending::RemoveSynth(key) => self.remove_synth(&key),
@@ -84,6 +87,14 @@ impl Session {
             Pending::RemoveRow(id) => {
                 let count = self.song().map_or(0, |song| song.clips.iter().filter(|c| c.pattern_id == *id).count());
                 ("Delete the row?", format!("\"{}\": {count} clip(s)", self.pattern_label(id)), "delete")
+            }
+            Pending::RemovePattern(p) => {
+                let library = self.editor.library();
+                let what = library.patterns.get(*p).map_or_else(String::new, |pattern| {
+                    let clips = library.songs.iter().flat_map(|s| &s.clips).filter(|c| c.pattern_id == pattern.id);
+                    format!("\"{}\" and its {} clip(s)", self.pattern_label(&pattern.id), clips.count())
+                });
+                ("Delete the pattern?", what, "delete")
             }
             Pending::RemoveSong => {
                 let what = self
