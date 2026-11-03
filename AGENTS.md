@@ -40,7 +40,10 @@ tools/            scripts that regenerate the golden fixtures
   (`README.md`, "Commands").
 - The MCP link (`ordrumbox-app/src/mcp_link.rs`) listens on `127.0.0.1`
   only, on threads of its own; the tool calls run on the UI thread between
-  frames (`session_mcp.rs`), each one undo step. `ordrumbox --mcp` is the
+  frames (`session_mcp.rs`), each one undo step. The tools that only edit
+  the library are `ordrumbox-logic/src/tools.rs`, tested without the app;
+  `session_mcp.rs` keeps those that play, touch files, kits, synth presets
+  or the master, or change what the window shows. `ordrumbox --mcp` is the
   stdio bridge an MCP client starts (`README.md`, "AI clients").
 - Dependencies only point down the table. Nothing depends on
   `ordrumbox-app`; `dsp` uses `core` only as a dev-dependency.

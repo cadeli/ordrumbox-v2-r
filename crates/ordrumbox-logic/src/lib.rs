@@ -10,6 +10,7 @@ pub mod editor;
 pub mod generate;
 pub mod history;
 pub mod midi;
+pub mod tools;
 
 pub use editor::{Editor, Nudge};
 pub use history::History;

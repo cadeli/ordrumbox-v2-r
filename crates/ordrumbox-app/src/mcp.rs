@@ -11,6 +11,7 @@
 use ordrumbox_core::json::{self, Object, Value};
 use ordrumbox_core::{Note, Track};
 use ordrumbox_engine::synth_model;
+use ordrumbox_logic::tools::object;
 
 use crate::editors::track_select_options;
 use crate::update;
@@ -264,15 +265,6 @@ const TOOLS: &str = r#"[
   {"name": "exportKitMapping", "description": "Exports a kit's mapping (no audio) as JSON to the exports folder of the user data folder.",
    "inputSchema": {"type": "object", "properties": {"kit": {"type": "string", "description": "Kit name (default: the kit in use)"}}}}
 ]"#;
-
-/// `{key: value, ...}`.
-pub fn object(entries: impl IntoIterator<Item = (&'static str, Value)>) -> Value {
-    let mut object = Object::new();
-    for (key, value) in entries {
-        object.insert(key, value);
-    }
-    Value::Object(object)
-}
 
 /// The schema of a setting whose default is `default`: its type, its range,
 /// its choices.

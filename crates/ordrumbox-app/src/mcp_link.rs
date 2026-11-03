@@ -17,8 +17,9 @@ use std::thread;
 use std::time::Duration;
 
 use ordrumbox_core::json::{self, Value};
+use ordrumbox_logic::tools::object;
 
-use crate::mcp::{self, object};
+use crate::mcp;
 use crate::store;
 use crate::update::Waker;
 
