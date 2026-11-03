@@ -118,12 +118,12 @@ impl Session {
     }
 
     /// The library header's name, else "Untitled".
-    fn song_name(&self) -> String {
+    pub(super) fn song_name(&self) -> String {
         let name = self.editor.library().info.get("name").and_then(Value::as_str).unwrap_or_default();
         if name.is_empty() { UNTITLED.to_owned() } else { name.to_owned() }
     }
 
-    fn info(&self, key: &str) -> String {
+    pub(super) fn info(&self, key: &str) -> String {
         self.editor.library().info.get(key).map(js::to_string).unwrap_or_default()
     }
 
@@ -138,7 +138,7 @@ impl Session {
 
     /// Where the cursor is, in measures: where the song
     /// plays, else the measure play starts from; kept on the grid.
-    fn song_cursor_measure(&self) -> f64 {
+    pub(super) fn song_cursor_measure(&self) -> f64 {
         let Some(song) = self.song() else { return 0.0 };
         let measure = match self.controller.as_ref().and_then(Controller::tick) {
             Some(tick) if self.song_playing() => song.measure_at_tick(tick as f64, f64::from(TICK)),
@@ -753,7 +753,7 @@ impl Session {
     // ─── Song files ──────────────────────────────────────────────────────────
 
     /// The song file of the library: its patterns, its arrangements, what is selected.
-    fn song_record(&self, stamp: &str) -> Value {
+    pub(super) fn song_record(&self, stamp: &str) -> Value {
         let library = self.editor.library();
         library.song_record(&self.song_name(), self.pattern_index, self.editor.selected_song(), (stamp, now_ms()))
     }
@@ -852,7 +852,7 @@ impl Session {
 
     /// Read a song file and put it in the place of the library
     /// (`parseImportedFile`, `applyToAppState`: one undo step); its name.
-    fn read_song_file(&mut self, path: &Path) -> Result<String, String> {
+    pub(super) fn read_song_file(&mut self, path: &Path) -> Result<String, String> {
         let text = std::fs::read_to_string(path).map_err(|e| format!("Load failed: {}: {e}", path.display()))?;
         let value = json::parse(&text).map_err(|e| format!("Load failed: {e}"))?;
         let infos = &self.editor.library().info;
@@ -1195,7 +1195,7 @@ mod tests {
     #[test]
     fn song_files_load_as_one_undo_step() {
         let mut s = session();
-        let dir = std::env::temp_dir().join(format!("ordrumbox-song-files-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("ordrumbox-song-load-{}", std::process::id()));
         let path = dir.join("lib.odbox");
         store::save_song(&path, &s.song_record("savedAt")).unwrap();
         s.editor.add_pattern_at_measure("a", 5, None, None).unwrap();

@@ -841,10 +841,10 @@ impl Session {
         self.dropdown = None;
     }
 
-    /// H: every track on the synth patch that matches its name, written to the
+    /// H: every track of pattern `p` on the synth patch that matches its name, written to the
     /// track; a random patch for a name nothing matches.
-    pub fn convert_to_generated_sounds(&mut self) {
-        if self.pattern().is_none() {
+    pub fn convert_to_generated_sounds(&mut self, p: usize) {
+        if self.editor.library().patterns.get(p).is_none() {
             self.message = "No pattern selected".into();
             return;
         }
@@ -855,21 +855,20 @@ impl Session {
         }
         let (rng, synths) = (&mut self.rng, &self.synths);
         let mut random = Vec::new();
-        let changed =
-            self.editor.update_tracks(self.pattern_index, "Convert tracks to generated sounds", |_, track| {
-                let mut pick = |n: usize| rng.below(n as u64) as usize;
-                let matched = synth_for(&track.name, synths, &mut pick);
-                let key = matched.unwrap_or_else(|| {
-                    let key = keys[pick(keys.len())].clone();
-                    random.push(format!("{}→{key}", track.name));
-                    key
-                });
-                vec![
-                    ("useSynth", Value::Bool(true)),
-                    ("autoAssign", Value::Bool(false)),
-                    ("synthPreset", Value::String(key)),
-                ]
+        let changed = self.editor.update_tracks(p, "Convert tracks to generated sounds", |_, track| {
+            let mut pick = |n: usize| rng.below(n as u64) as usize;
+            let matched = synth_for(&track.name, synths, &mut pick);
+            let key = matched.unwrap_or_else(|| {
+                let key = keys[pick(keys.len())].clone();
+                random.push(format!("{}→{key}", track.name));
+                key
             });
+            vec![
+                ("useSynth", Value::Bool(true)),
+                ("autoAssign", Value::Bool(false)),
+                ("synthPreset", Value::String(key)),
+            ]
+        });
         if changed {
             self.edited();
         }
@@ -881,14 +880,14 @@ impl Session {
         };
     }
 
-    /// J: every track back on auto-assign (the kit's
+    /// J: every track of pattern `p` back on auto-assign (the kit's
     /// sound for its name).
-    pub fn auto_assign_all_tracks(&mut self) {
-        if self.pattern().is_none() {
+    pub fn auto_assign_all_tracks(&mut self, p: usize) {
+        if self.editor.library().patterns.get(p).is_none() {
             self.message = "No pattern selected".into();
             return;
         }
-        let changed = self.editor.update_tracks(self.pattern_index, "Auto-assign all tracks", |_, _| {
+        let changed = self.editor.update_tracks(p, "Auto-assign all tracks", |_, _| {
             vec![("autoAssign", Value::Bool(true)), ("useSynth", Value::Bool(false))]
         });
         if changed {
@@ -897,9 +896,9 @@ impl Session {
         self.message = "All tracks auto-assigned".into();
     }
 
-    /// K: a random sample, of any kit, on every track.
-    pub fn assign_random_samples(&mut self) {
-        if self.pattern().is_none() {
+    /// K: a random sample, of any kit, on every track of pattern `p`.
+    pub fn assign_random_samples(&mut self, p: usize) {
+        if self.editor.library().patterns.get(p).is_none() {
             self.message = "No pattern selected".into();
             return;
         }
@@ -912,7 +911,7 @@ impl Session {
             return;
         }
         let rng = &mut self.rng;
-        let changed = self.editor.update_tracks(self.pattern_index, "Random samples on all tracks", |_, _| {
+        let changed = self.editor.update_tracks(p, "Random samples on all tracks", |_, _| {
             let url = urls[rng.below(urls.len() as u64) as usize].clone();
             vec![
                 ("autoAssign", Value::Bool(false)),

@@ -1034,9 +1034,9 @@ impl Session {
             C::SelectRandomDrumkit => self.select_random_drumkit(),
             C::ToggleVus => self.toggle_vus(),
             C::ExportPatternJson => self.open_export(Export::PatternJson),
-            C::ConvertToSynth => self.convert_to_generated_sounds(),
-            C::AutoAssignAll => self.auto_assign_all_tracks(),
-            C::RandomSamples => self.assign_random_samples(),
+            C::ConvertToSynth => self.convert_to_generated_sounds(self.pattern_index),
+            C::AutoAssignAll => self.auto_assign_all_tracks(self.pattern_index),
+            C::RandomSamples => self.assign_random_samples(self.pattern_index),
             C::PreviewTrack => {
                 if let Some(t) = self.focus_track() {
                     self.audition_row(t);

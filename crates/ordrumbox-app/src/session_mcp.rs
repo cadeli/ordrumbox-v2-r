@@ -7,7 +7,8 @@
 use ordrumbox_core::SetField;
 use ordrumbox_core::instruments::catalog;
 use ordrumbox_core::json::{Object, Value};
-use ordrumbox_core::song::clamp_bpm;
+use ordrumbox_core::song::{SongClip, clamp_bpm};
+use ordrumbox_core::style;
 
 use super::*;
 use crate::editors::note_range;
@@ -289,6 +290,107 @@ impl Session {
             "redo" => {
                 self.redo();
                 return Ok(object([("message", Value::from(self.message.as_str()))]));
+            }
+            "renameTrack" => self.mcp_rename_track(args),
+            "compactPattern" => {
+                let p = self.mcp_pattern(text(args, "patternName")?)?;
+                let desc = format!("Compact the tracks of \"{}\"", pattern_name(&self.editor.library().patterns[p]));
+                let compacted = self.editor.batch(&desc, |editor| editor.compact_pattern(p));
+                Ok(object([("tracksCompacted", count(compacted))]))
+            }
+            "generatePattern" => self.mcp_generate_pattern(args),
+            "regeneratePattern" => self.mcp_regenerate_pattern(args),
+            "toggleGeneration" => self.mcp_toggle_generation(args),
+            "togglePatternAuto" => {
+                let p = self.mcp_pattern(text(args, "patternName")?)?;
+                let on = self.editor.toggle_pattern_auto(p).ok_or("The pattern has no track to put in auto mode")?;
+                Ok(object([("auto", Value::Bool(on))]))
+            }
+            "setPatternMacro" => self.mcp_set_macro(args),
+            "regenerateTrack" => self.mcp_regenerate_track(args),
+            "randomizeTrack" => {
+                let (p, t) = self.mcp_track(args)?;
+                let rng = &mut self.rng;
+                self.editor.randomize_track(p, t, &mut || rng.next_f64());
+                Ok(self.mcp_track_notes(p, t))
+            }
+            "assignSounds" => self.mcp_assign_sounds(args),
+            "auditionTrack" => {
+                let (p, t) = self.mcp_track(args)?;
+                let controller = self.controller.as_mut().ok_or(NO_AUDIO)?;
+                controller.preview(self.editor.library(), p, t, None);
+                Ok(object([("trackName", Value::from(self.editor.library().patterns[p].tracks[t].name.as_str()))]))
+            }
+            "getPlaybackState" => Ok(self.mcp_playback_state()),
+            "selectArrangement" => {
+                if args.get("arrangement").is_none_or(|a| *a == Value::Null) {
+                    return Err("arrangement is required".into());
+                }
+                let s = self.mcp_song(args)?;
+                self.select_song(s);
+                Ok(self.song_json(s))
+            }
+            "repeatClip" => {
+                let s = self.mcp_song(args)?;
+                let start = optional_whole(args, "startMeasure")?.ok_or("startMeasure is required")?;
+                let clip = self.editor.repeat_pattern_at_measure(start, Some(s))?;
+                Ok(object([("clip", clip_json(&clip)), ("arrangement", self.song_json(s))]))
+            }
+            "setSongInfo" => self.mcp_set_song_info(args),
+            "saveSong" => {
+                let dir = self.songs_dir.as_ref().ok_or("no user data folder to save to")?;
+                let path = dir.join(self.song_file_name());
+                self.mcp_write_song(&path, "savedAt")
+            }
+            "exportSong" => {
+                let path = store::exports_dir().ok_or("no user data folder to export to")?.join(self.song_file_name());
+                self.mcp_write_song(&path, "exportedAt")
+            }
+            "listSavedSongs" => {
+                let names = self.mcp_saved_songs()?.into_iter().map(|(name, _)| Value::from(name)).collect();
+                Ok(object([("songs", Value::Array(names))]))
+            }
+            "loadSong" => self.mcp_load_song(args),
+            "normalizeKit" => {
+                let k = self.mcp_kit(args)?;
+                let n = self.kits.normalize(k)?;
+                self.kits_changed(format!("Normalized {n} sample(s)"));
+                Ok(object([("kit", Value::from(self.kits.kits[k].name.as_str())), ("normalized", count(n))]))
+            }
+            "addSampleToKit" => {
+                let k = self.mcp_kit(args)?;
+                let (sample, message) = self.kits.add_sample(k, Path::new(text(args, "filePath")?.trim()))?;
+                self.kits_changed(message);
+                let added = &self.kits.kits[k].samples[sample];
+                Ok(object([
+                    ("kit", Value::from(self.kits.kits[k].name.as_str())),
+                    ("key", Value::from(added.key.as_str())),
+                    ("path", Value::from(added.path.as_str())),
+                ]))
+            }
+            "replaceKitSample" => {
+                let k = self.mcp_kit(args)?;
+                let path = text(args, "samplePath")?.trim();
+                let sample = self.kits.kits[k].samples.iter().position(|s| s.path == path);
+                let sample =
+                    sample.ok_or_else(|| format!("No sample \"{path}\" in that kit (listKitSamples gives them)"))?;
+                let message = self.kits.replace_sample(k, sample, Path::new(text(args, "filePath")?.trim()))?;
+                self.kits_changed(message);
+                Ok(object([("message", Value::from(self.message.as_str()))]))
+            }
+            "importKitFolder" => {
+                let (k, message) = self.kits.import_folder(Path::new(text(args, "folderPath")?.trim()))?;
+                self.mcp_kit_added(k, message)
+            }
+            "loadKitMapping" => {
+                let (k, message) = self.kits.load_mapping(Path::new(text(args, "filePath")?.trim()))?;
+                self.mcp_kit_added(k, message)
+            }
+            "exportKitMapping" => {
+                let k = self.mcp_kit(args)?;
+                let name = self.kits.mapping_file_name(k).ok_or("nothing to export")?;
+                let path = store::exports_dir().ok_or("no user data folder to export to")?.join(name);
+                exported(&path, self.kits.export_mapping(k, &path)?)
             }
             _ => Err(format!("Unknown tool: {name}")),
         };
@@ -915,12 +1017,7 @@ impl Session {
         let s = self.mcp_song(args)?;
         let (id, start, length) = self.mcp_clip(args, "arguments")?;
         let clip = self.editor.add_pattern_at_measure(&id, start, length, Some(s))?;
-        let clip = object([
-            ("patternId", Value::from(clip.pattern_id.as_str())),
-            ("startMeasure", Value::from(clip.start_measure)),
-            ("measureCount", Value::from(clip.measure_count)),
-        ]);
-        Ok(object([("clip", clip), ("arrangement", self.song_json(s))]))
+        Ok(object([("clip", clip_json(&clip)), ("arrangement", self.song_json(s))]))
     }
 
     fn mcp_remove_clips(&mut self, args: &Value) -> Result<Value, String> {
@@ -1010,7 +1107,7 @@ impl Session {
     fn mcp_play(&mut self, args: &Value) -> Result<Value, String> {
         let song = optional_bool(args, "song")?.unwrap_or(false);
         let Some(controller) = &mut self.controller else {
-            return Err("no audio device: orDrumbox plays nothing".into());
+            return Err(NO_AUDIO.into());
         };
         controller.stop();
         if song {
@@ -1030,6 +1127,278 @@ impl Session {
         self.message = format!("playing {}", playing.as_deref().unwrap_or_default());
         Ok(object([("playing", playing.map_or(Value::Null, Value::from))]))
     }
+    /// The pattern and track of arguments `patternName` and `trackName`.
+    fn mcp_track(&self, args: &Value) -> Result<(usize, usize), String> {
+        let p = self.mcp_pattern(text(args, "patternName")?)?;
+        let name = text(args, "trackName")?;
+        let t = track_index(&self.editor.library().patterns[p], name)
+            .ok_or_else(|| format!("The pattern has no track \"{}\"", name.trim()))?;
+        Ok((p, t))
+    }
+
+    /// Track `t` of pattern `p`: its name and how many notes it has.
+    fn mcp_track_notes(&self, p: usize, t: usize) -> Value {
+        let track = &self.editor.library().patterns[p].tracks[t];
+        object([("trackName", Value::from(track.name.as_str())), ("noteCount", count(track.notes.len()))])
+    }
+
+    fn mcp_rename_track(&mut self, args: &Value) -> Result<Value, String> {
+        let (p, t) = self.mcp_track(args)?;
+        let name = text(args, "newName")?.trim().to_uppercase();
+        if name.is_empty() {
+            return Err("newName is empty".into());
+        }
+        let pattern = &self.editor.library().patterns[p];
+        if track_index(pattern, &name).is_some_and(|other| other != t) {
+            return Err(format!("\"{}\" has a track named {name} already", pattern_name(pattern)));
+        }
+        self.editor.change_track_name(p, t, &name);
+        let tracks = self.editor.library().patterns[p].tracks.iter().map(|t| t.name.clone()).collect::<Vec<_>>();
+        Ok(object([("trackName", Value::from(name)), ("tracks", strings(&tracks))]))
+    }
+
+    /// The styles the generation follows, and argument `style` among them
+    /// (by its name, any case) when given.
+    fn mcp_style(&mut self, args: &Value) -> Result<(Styles, Option<String>), String> {
+        let styles = self.generation_styles();
+        let style = match optional_text(args, "style")?.filter(|s| !s.trim().is_empty()) {
+            Some(wanted) => {
+                let found = styles.names().into_iter().find(|name| same_name(name, wanted)).map(str::to_owned);
+                Some(found.ok_or_else(|| format!("No style \"{}\" (listStyles gives them)", wanted.trim()))?)
+            }
+            None => None,
+        };
+        Ok((styles, style))
+    }
+
+    /// A generated pattern as a tool shows it: its summary and its style.
+    fn generated_json(&self, p: usize) -> Value {
+        let pattern = &self.editor.library().patterns[p];
+        let mut json = pattern_summary(p, pattern);
+        let style = pattern.extra.get(generate::GENRE).and_then(Value::as_str);
+        if let Some(object) = json.as_object_mut() {
+            object.insert("style", style.map_or(Value::Null, Value::from));
+        }
+        json
+    }
+
+    fn mcp_generate_pattern(&mut self, args: &Value) -> Result<Value, String> {
+        let (styles, style) = self.mcp_style(args)?;
+        let rng = &mut self.rng;
+        let p = self.editor.generate_pattern(&self.scales, &styles, style.as_deref(), &mut || rng.next_f64());
+        Ok(self.generated_json(p))
+    }
+
+    fn mcp_regenerate_pattern(&mut self, args: &Value) -> Result<Value, String> {
+        let p = self.mcp_pattern(text(args, "patternName")?)?;
+        let (styles, style) = self.mcp_style(args)?;
+        let rng = &mut self.rng;
+        self.editor.regenerate_pattern(p, &self.scales, &styles, style.as_deref(), &mut || rng.next_f64());
+        Ok(self.generated_json(p))
+    }
+
+    fn mcp_toggle_generation(&mut self, args: &Value) -> Result<Value, String> {
+        let p = self.mcp_pattern(text(args, "patternName")?)?;
+        let part = text(args, "part")?;
+        let (styles, style) = self.mcp_style(args)?;
+        let rng = &mut self.rng;
+        let rnd = &mut || rng.next_f64();
+        let on = match part {
+            "drums" => self.editor.toggle_drums(p, &self.scales, &styles, style.as_deref(), rnd),
+            "bass" => self.editor.toggle_melodic(p, MelodicKind::Bass, &self.scales, &styles, rnd),
+            "chords" => self.editor.toggle_melodic(p, MelodicKind::Chords, &self.scales, &styles, rnd),
+            _ => return Err(format!("part: \"{part}\" is not drums, bass or chords")),
+        };
+        let on = on.ok_or_else(|| format!("No {part} generated for this pattern"))?;
+        let mut answer = self.generated_json(p);
+        if let Some(object) = answer.as_object_mut() {
+            object.insert("part", Value::from(part));
+            object.insert("auto", Value::Bool(on));
+        }
+        Ok(answer)
+    }
+
+    fn mcp_set_macro(&mut self, args: &Value) -> Result<Value, String> {
+        let p = self.mcp_pattern(text(args, "patternName")?)?;
+        let name = text(args, "macro")?;
+        let key = match name {
+            "energy" => style::ENERGY,
+            "complexity" => style::COMPLEXITY,
+            "variation" => style::VARIATION,
+            _ => return Err(format!("macro: \"{name}\" is not energy, complexity or variation")),
+        };
+        let value = optional_number(args, "value")?.ok_or("value is required")?;
+        if !(0.0..=100.0).contains(&value) {
+            return Err(format!("value: {value} is outside 0 to 100"));
+        }
+        let styles = self.generation_styles();
+        let rng = &mut self.rng;
+        let sources = (&self.scales, &styles);
+        self.editor.set_pattern_macro(p, key, value, sources, &mut || rng.next_f64());
+        let used = self.editor.library().patterns[p].extra.get(key).and_then(Value::as_f64).unwrap_or(value);
+        Ok(object([("macro", Value::from(name)), ("value", Value::from(used))]))
+    }
+
+    fn mcp_regenerate_track(&mut self, args: &Value) -> Result<Value, String> {
+        let (p, t) = self.mcp_track(args)?;
+        let track = &self.editor.library().patterns[p].tracks[t];
+        if track.compose_lock {
+            return Err(format!("{} is locked: set composeLock false with updateTrack first", track.name));
+        }
+        let styles = self.generation_styles();
+        let rng = &mut self.rng;
+        if !self.editor.regenerate_track(p, t, &self.scales, &styles, &mut || rng.next_f64()) {
+            return Err("No new line for this track".into());
+        }
+        Ok(self.mcp_track_notes(p, t))
+    }
+
+    fn mcp_assign_sounds(&mut self, args: &Value) -> Result<Value, String> {
+        let p = self.mcp_pattern(text(args, "patternName")?)?;
+        // What the window says in its message is refused here.
+        match text(args, "sounds")? {
+            "kit" => self.auto_assign_all_tracks(p),
+            "synth" if self.synths.is_empty() => return Err("No synth preset (createSynthPreset)".into()),
+            "synth" => self.convert_to_generated_sounds(p),
+            "random" if self.kits.kits.iter().all(|k| k.samples.is_empty()) => {
+                return Err("No sample in the kits".into());
+            }
+            "random" => self.assign_random_samples(p),
+            other => return Err(format!("sounds: \"{other}\" is not kit, synth or random")),
+        }
+        let message = self.message.clone();
+        let tracks = self.editor.library().patterns[p].tracks.iter().map(|track| {
+            let sound = match (track.use_synth, track.auto_assign) {
+                (true, _) => track.synth_preset.as_deref().map_or(Value::Null, |k| Value::from(format!("synth:{k}"))),
+                (false, true) => Value::from("kit"),
+                (false, false) => Value::from(track.sample_path.as_str()),
+            };
+            object([("trackName", Value::from(track.name.as_str())), ("sound", sound)])
+        });
+        Ok(object([("message", Value::from(message)), ("tracks", Value::Array(tracks.collect()))]))
+    }
+
+    fn mcp_playback_state(&self) -> Value {
+        let library = self.editor.library();
+        let Some(controller) = self.controller.as_ref().filter(|c| c.is_playing()) else {
+            return object([("playing", Value::Bool(false))]);
+        };
+        let position = controller.position();
+        match controller.mode() {
+            Mode::Pattern(p) => {
+                let pattern = library.patterns.get(p);
+                let beat = position
+                    .zip(pattern)
+                    .map(|(at, pattern)| (at.frame * pattern.beat_count.max(1) as u64 / at.frames.max(1)) as f64);
+                object([
+                    ("playing", Value::Bool(true)),
+                    ("patternName", pattern.map_or(Value::Null, |p| Value::from(pattern_name(p)))),
+                    ("loop", position.map_or(Value::Null, |at| Value::from(at.pass as f64))),
+                    ("beat", beat.map_or(Value::Null, Value::from)),
+                ])
+            }
+            Mode::Song(s) => {
+                let measure =
+                    if s == self.editor.selected_song() { Some(self.song_cursor_measure().floor()) } else { None };
+                object([
+                    ("playing", Value::Bool(true)),
+                    ("arrangement", library.songs.get(s).map_or(Value::Null, |song| Value::from(song.name.as_str()))),
+                    ("measure", measure.map_or(Value::Null, Value::from)),
+                ])
+            }
+        }
+    }
+
+    fn mcp_set_song_info(&mut self, args: &Value) -> Result<Value, String> {
+        let name = optional_text(args, "name")?.map(str::trim);
+        let description = optional_text(args, "description")?.map(str::trim);
+        if name.is_some_and(str::is_empty) {
+            return Err("name is empty".into());
+        }
+        if name.is_none() && description.is_none() {
+            return Err("Give name, description, or both".into());
+        }
+        if let Some(name) = name {
+            self.editor.set_library_info("name", name);
+        }
+        if let Some(description) = description {
+            self.editor.set_library_info("description", description);
+        }
+        Ok(object([("name", Value::from(self.song_name())), ("description", Value::from(self.info("description")))]))
+    }
+
+    /// The song written to `path`, stamped `stamp`.
+    fn mcp_write_song(&mut self, path: &Path, stamp: &str) -> Result<Value, String> {
+        store::save_song(path, &self.song_record(stamp)).map_err(|e| format!("{}: {e}", path.display()))?;
+        self.message = format!("Song \"{}\" written to {}", self.song_name(), path.display());
+        exported(path, self.message.clone())
+    }
+
+    /// The songs of the songs folder: name and file.
+    fn mcp_saved_songs(&self) -> Result<Vec<(String, PathBuf)>, String> {
+        let dir = self.songs_dir.as_ref().ok_or("no user data folder: no saved songs")?;
+        let files = store::list_songs(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+        Ok(files.into_iter().map(|f| (f.file_stem().unwrap_or_default().to_string_lossy().into_owned(), f)).collect())
+    }
+
+    fn mcp_load_song(&mut self, args: &Value) -> Result<Value, String> {
+        let path = match (optional_text(args, "name")?, optional_text(args, "filePath")?) {
+            (Some(name), None) => {
+                let songs = self.mcp_saved_songs()?;
+                let found = songs.into_iter().find(|(saved, _)| same_name(saved, name)).map(|(_, path)| path);
+                found.ok_or_else(|| format!("No saved song \"{}\" (listSavedSongs gives them)", name.trim()))?
+            }
+            (None, Some(path)) => PathBuf::from(path.trim()),
+            _ => return Err("Give name or filePath".into()),
+        };
+        let name = self.read_song_file(&path)?;
+        let library = self.editor.library();
+        Ok(object([
+            ("name", Value::from(name)),
+            ("patterns", count(library.patterns.len())),
+            ("arrangements", count(library.songs.len())),
+        ]))
+    }
+
+    /// Argument `kit` (a kit name, any case), else the kit in use.
+    fn mcp_kit(&self, args: &Value) -> Result<usize, String> {
+        match optional_text(args, "kit")?.filter(|k| !k.trim().is_empty()) {
+            Some(wanted) => self
+                .kits
+                .kits
+                .iter()
+                .position(|k| same_name(&k.name, wanted))
+                .ok_or_else(|| format!("No kit named \"{}\" (listKitSamples gives them)", wanted.trim())),
+            None => Some(self.kit_index).filter(|&k| k < self.kits.kits.len()).ok_or_else(|| "No kit loaded".into()),
+        }
+    }
+
+    /// Kit `k`, read from a folder or a mapping: the kits saved, its samples told.
+    fn mcp_kit_added(&mut self, k: usize, message: String) -> Result<Value, String> {
+        self.kits_changed(message);
+        let kit = &self.kits.kits[k];
+        let samples = kit
+            .samples
+            .iter()
+            .map(|s| object([("key", Value::from(s.key.as_str())), ("path", Value::from(s.path.as_str()))]));
+        Ok(object([
+            ("kit", Value::from(kit.name.as_str())),
+            ("samples", Value::Array(samples.collect())),
+            ("message", Value::from(self.message.as_str())),
+        ]))
+    }
+}
+
+/// What a tool that plays answers without a sound device.
+const NO_AUDIO: &str = "no audio device: orDrumbox plays nothing";
+
+/// A clip as a tool shows it.
+fn clip_json(clip: &SongClip) -> Value {
+    object([
+        ("patternId", Value::from(clip.pattern_id.as_str())),
+        ("startMeasure", Value::from(clip.start_measure)),
+        ("measureCount", Value::from(clip.measure_count)),
+    ])
 }
 
 /// Steps a beat of a track added by a tool (as the grid's).
@@ -1424,5 +1793,92 @@ mod tests {
         assert_eq!(removed.to_json(), r#"{"removed":"acid","tracksUsing":["rock/KICK"]}"#);
         assert!(call(&mut s, "removeSynthPreset", r#"{"preset":"acid 2"}"#).is_err(), "the last preset stays");
         assert_eq!(s.synths.keys(), ["acid 2"]);
+    }
+    #[test]
+    fn tracks_are_renamed_and_patterns_compacted() {
+        let mut s = session();
+        call(&mut s, "addNotesToPattern", r#"{"patternName":"rock","notes":[{"trackName":"SNARE","step":4}]}"#)
+            .unwrap();
+        assert!(call(&mut s, "renameTrack", r#"{"patternName":"rock","trackName":"kick","newName":"snare"}"#).is_err());
+        let renamed = call(&mut s, "renameTrack", r#"{"patternName":"rock","trackName":"kick","newName":"bd"}"#);
+        assert_eq!(renamed.unwrap().to_json(), r#"{"trackName":"BD","tracks":["BD","SNARE"]}"#);
+        // Both repeat a shorter loop: BD's notes on beats 0 and 2, SNARE's one note.
+        let compacted = call(&mut s, "compactPattern", r#"{"patternName":"rock"}"#).unwrap();
+        assert_eq!(get(&compacted, &["tracksCompacted"]).as_f64(), Some(2.0));
+        assert_eq!(s.editor.history().undo_len(), 3);
+    }
+
+    #[test]
+    fn patterns_are_generated() {
+        let mut s = session();
+        assert!(call(&mut s, "generatePattern", r#"{"style":"no such style"}"#).is_err());
+        let made = call(&mut s, "generatePattern", "{}").unwrap();
+        assert_eq!(get(&made, &["index"]).as_f64(), Some(2.0));
+        assert!(get(&made, &["trackCount"]).as_f64().is_some_and(|n| n > 0.0));
+        assert_eq!(s.editor.history().undo_len(), 1);
+        let bass = r#"{"patternName":"rock","part":"bass"}"#;
+        assert_eq!(get(&call(&mut s, "toggleGeneration", bass).unwrap(), &["auto"]), &Value::Bool(true));
+        assert_eq!(get(&call(&mut s, "toggleGeneration", bass).unwrap(), &["auto"]), &Value::Bool(false));
+        assert!(call(&mut s, "toggleGeneration", r#"{"patternName":"rock","part":"lead"}"#).is_err());
+        let set = call(&mut s, "setPatternMacro", r#"{"patternName":"rock","macro":"energy","value":80}"#).unwrap();
+        assert_eq!(set.to_json(), r#"{"macro":"energy","value":80}"#);
+        assert!(call(&mut s, "setPatternMacro", r#"{"patternName":"rock","macro":"energy","value":120}"#).is_err());
+        let random = call(&mut s, "randomizeTrack", r#"{"patternName":"rock","trackName":"KICK"}"#).unwrap();
+        assert_eq!(get(&random, &["trackName"]).as_str(), Some("KICK"));
+        call(&mut s, "updateTrack", r#"{"patternName":"rock","trackName":"KICK","updates":{"composeLock":true}}"#)
+            .unwrap();
+        assert!(call(&mut s, "regenerateTrack", r#"{"patternName":"rock","trackName":"KICK"}"#).is_err(), "locked");
+        let auto = call(&mut s, "togglePatternAuto", r#"{"patternName":"rock"}"#);
+        assert!(get(&auto.unwrap(), &["auto"]).as_bool().is_some());
+    }
+
+    #[test]
+    fn arrangements_are_selected_and_clips_repeated() {
+        let mut s = session();
+        call(&mut s, "createArrangement", r#"{"name":"A","clips":[{"patternName":"rock","measureCount":2}]}"#).unwrap();
+        call(&mut s, "createArrangement", r#"{"name":"B"}"#).unwrap();
+        assert_eq!(s.editor.selected_song(), 1);
+        assert!(call(&mut s, "selectArrangement", "{}").is_err());
+        let selected = call(&mut s, "selectArrangement", r#"{"arrangement":"a"}"#).unwrap();
+        assert_eq!((s.editor.selected_song(), get(&selected, &["name"]).as_str()), (0, Some("A")));
+        let repeated = call(&mut s, "repeatClip", r#"{"startMeasure":0}"#).unwrap();
+        assert_eq!(get(&repeated, &["clip"]).to_json(), r#"{"patternId":"rock","startMeasure":2,"measureCount":2}"#);
+        assert!(call(&mut s, "repeatClip", r#"{"startMeasure":1}"#).is_err());
+        let info = call(&mut s, "setSongInfo", r#"{"name":" Live set ","description":"two parts"}"#).unwrap();
+        assert_eq!(info.to_json(), r#"{"name":"Live set","description":"two parts"}"#);
+        assert!(call(&mut s, "setSongInfo", r#"{"name":""}"#).is_err());
+    }
+
+    #[test]
+    fn songs_kits_and_playback_without_files_or_sound() {
+        let mut s = session();
+        assert_eq!(call(&mut s, "getPlaybackState", "{}").unwrap().to_json(), r#"{"playing":false}"#);
+        assert_eq!(call(&mut s, "auditionTrack", r#"{"patternName":"rock","trackName":"KICK"}"#), Err(NO_AUDIO.into()));
+        // A session of the tests has no user data folder and no kit.
+        assert!(call(&mut s, "saveSong", "{}").is_err());
+        assert!(call(&mut s, "listSavedSongs", "{}").is_err());
+        assert!(call(&mut s, "loadSong", "{}").is_err());
+        assert!(call(&mut s, "loadSong", r#"{"filePath":"/no/such/song.odbox"}"#).is_err());
+        assert!(call(&mut s, "normalizeKit", "{}").is_err());
+        assert!(call(&mut s, "exportKitMapping", r#"{"kit":"808"}"#).is_err());
+        assert!(call(&mut s, "importKitFolder", r#"{"folderPath":"/no/such/folder"}"#).is_err());
+        assert!(call(&mut s, "assignSounds", r#"{"patternName":"rock","sounds":"random"}"#).is_err());
+        assert!(call(&mut s, "assignSounds", r#"{"patternName":"rock","sounds":"synth"}"#).is_err());
+        let kit = call(&mut s, "assignSounds", r#"{"patternName":"rock","sounds":"kit"}"#).unwrap();
+        assert_eq!(get(&kit, &["tracks"]).to_json(), r#"[{"trackName":"KICK","sound":"kit"}]"#);
+        assert_eq!(s.editor.history().undo_len(), 0);
+    }
+
+    #[test]
+    fn a_song_file_is_loaded_by_path() {
+        let mut s = session();
+        let path = std::env::temp_dir().join(format!("ordrumbox_mcp_{}.odbox", std::process::id()));
+        store::save_song(&path, &s.song_record("savedAt")).unwrap();
+        call(&mut s, "removePattern", r#"{"patternName":"jazz"}"#).unwrap();
+        let args = object([("filePath", Value::from(path.display().to_string()))]);
+        let loaded = s.mcp_call("loadSong", &args).unwrap();
+        std::fs::remove_file(&path).unwrap();
+        assert_eq!(get(&loaded, &["patterns"]).as_f64(), Some(2.0));
+        assert_eq!(s.editor.library().patterns.len(), 2);
     }
 }

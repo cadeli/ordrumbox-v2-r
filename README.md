@@ -380,7 +380,18 @@ The tools keep the JS names: `listPatterns`, `loadPattern`,
 settings, not an undo step), `getSynthPreset`, `createSynthPreset`,
 `updateSynthPreset`, `removeSynthPreset` (settings by path, `filter.freq`,
 checked against the synth editor's controls; saved with the presets, not an
-undo step). `setColorScheme` is gone: this app has one theme. Track and
+undo step). Pattern and track: `renameTrack`, `compactPattern`,
+`auditionTrack`, `assignSounds` (kit, synth or random, every track).
+Generation: `generatePattern`, `regeneratePattern` (in a style of
+`listStyles`), `toggleGeneration` (drums, bass, chords), `togglePatternAuto`,
+`setPatternMacro` (energy, complexity, variation), `regenerateTrack`,
+`randomizeTrack`. Arrangements: `selectArrangement`, `repeatClip`. The song
+file: `setSongInfo` (not an undo step), `saveSong` (to `songs/`),
+`exportSong` (to `exports/`), `listSavedSongs`, `loadSong` (one undo step).
+Kits, saved with them, not undo steps: `normalizeKit`, `addSampleToKit`,
+`replaceKitSample`, `importKitFolder`, `loadKitMapping`,
+`exportKitMapping` (to `exports/`). `getPlaybackState` tells what plays and
+where. `setColorScheme` is gone: this app has one theme. Track and
 note settings take the key names of the files (`volume`, `transpose`,
 `cycle`, `probability`…; the JS names are read too), and a value outside its
 range is refused (notes) or brought inside it, the answer saying the value
