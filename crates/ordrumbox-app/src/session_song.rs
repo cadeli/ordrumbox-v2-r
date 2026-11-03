@@ -689,6 +689,10 @@ impl Session {
 
     /// An action of a song panel menu (see the menus above, and Load).
     pub(super) fn song_menu_pick(&mut self, value: &str) {
+        // A path may hold a `:` (`C:\…`): not split.
+        if let Some(path) = value.strip_prefix("load:") {
+            return self.ask(Pending::LoadSong(PathBuf::from(path)));
+        }
         let mut parts = value.splitn(3, ':');
         let (action, a, b) = (parts.next().unwrap_or_default(), parts.next().unwrap_or_default(), parts.next());
         let result = match (action, b) {
@@ -714,7 +718,6 @@ impl Session {
                 return;
             }
             ("row", None) => return self.ask(Pending::RemoveRow(a.to_owned())),
-            ("load", None) => return self.ask(Pending::LoadSong(PathBuf::from(a))),
             _ => return,
         };
         self.song_edit_result(result);
@@ -757,7 +760,7 @@ impl Session {
 
     /// Save: the song to `songs/<name>.odbox` (`SongService.save`).
     fn save_song(&mut self) {
-        let Some(dir) = store::songs_dir() else {
+        let Some(dir) = &self.songs_dir else {
             self.message = "Save failed: no user data folder".into();
             return;
         };
@@ -771,11 +774,11 @@ impl Session {
 
     /// Load: the songs saved, to choose from.
     fn load_song_menu(&mut self) {
-        let Some(dir) = store::songs_dir() else {
+        let Some(dir) = &self.songs_dir else {
             self.message = "No user data folder: no saved songs".into();
             return;
         };
-        let files = match store::list_songs(&dir) {
+        let files = match store::list_songs(dir) {
             Ok(files) => files,
             Err(e) => {
                 self.message = format!("Songs not listed: {}: {e}", dir.display());
