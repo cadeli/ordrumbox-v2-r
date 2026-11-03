@@ -190,7 +190,79 @@ const TOOLS: &str = r#"[
   {"name": "undo", "description": "Undoes the last edit, made in the window or by a tool.",
    "inputSchema": {"type": "object", "properties": {}}},
   {"name": "redo", "description": "Redoes the last edit undone.",
-   "inputSchema": {"type": "object", "properties": {}}}
+   "inputSchema": {"type": "object", "properties": {}}},
+  {"name": "renameTrack", "description": "Renames a track (an instrument name: KICK, SNARE...); its sound follows the name when it is auto-assigned.",
+   "inputSchema": {"type": "object", "properties": {
+     "patternName": {"type": "string"}, "trackName": {"type": "string"}, "newName": {"type": "string", "minLength": 1}},
+     "required": ["patternName", "trackName", "newName"]}},
+  {"name": "compactPattern", "description": "Shortens every track of a pattern to its shortest loop, when its notes repeat one (as Pattern > Compact tracks).",
+   "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}}, "required": ["patternName"]}},
+  {"name": "generatePattern", "description": "Adds a pattern made in a style (listStyles; default: a drawn one): its tracks, meter, tempo and lines (as Pattern > New pattern in the style).",
+   "inputSchema": {"type": "object", "properties": {"style": {"type": "string"}}}},
+  {"name": "regeneratePattern", "description": "Makes a pattern again in a style (default: its own, else a drawn one); locked tracks (composeLock) stay as they are.",
+   "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}, "style": {"type": "string"}}, "required": ["patternName"]}},
+  {"name": "toggleGeneration", "description": "Drums, bass or chords of a pattern generated, their tracks in auto mode (a new line every loop), or that auto mode off; the answer tells which.",
+   "inputSchema": {"type": "object", "properties": {
+     "patternName": {"type": "string"},
+     "part": {"type": "string", "enum": ["drums", "bass", "chords"]},
+     "style": {"type": "string", "description": "For drums: the style (default: the pattern's)"}},
+     "required": ["patternName", "part"]}},
+  {"name": "togglePatternAuto", "description": "Every unlocked track of a pattern in auto mode (a new line every loop), or all out of it; the answer tells which.",
+   "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}}, "required": ["patternName"]}},
+  {"name": "setPatternMacro", "description": "A generation macro of a pattern (0 to 100, 50 changes nothing); its lines are made again from its seed.",
+   "inputSchema": {"type": "object", "properties": {
+     "patternName": {"type": "string"},
+     "macro": {"type": "string", "enum": ["energy", "complexity", "variation"]},
+     "value": {"type": "number", "minimum": 0, "maximum": 100}},
+     "required": ["patternName", "macro", "value"]}},
+  {"name": "regenerateTrack", "description": "A new line on a track, in the pattern's style; a locked track (composeLock) is refused.",
+   "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}, "trackName": {"type": "string"}}, "required": ["patternName", "trackName"]}},
+  {"name": "randomizeTrack", "description": "Random notes on a track, in place of its notes.",
+   "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}, "trackName": {"type": "string"}}, "required": ["patternName", "trackName"]}},
+  {"name": "assignSounds", "description": "The sound of every track of a pattern: kit (the kit's sample for its name), synth (the synth preset matching its name, else a random one) or random (a random sample of any kit).",
+   "inputSchema": {"type": "object", "properties": {
+     "patternName": {"type": "string"}, "sounds": {"type": "string", "enum": ["kit", "synth", "random"]}},
+     "required": ["patternName", "sounds"]}},
+  {"name": "auditionTrack", "description": "Plays a track's sound once, as Q-P in the window.",
+   "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}, "trackName": {"type": "string"}}, "required": ["patternName", "trackName"]}},
+  {"name": "getPlaybackState", "description": "Whether the app plays, what (a pattern or an arrangement) and where: the loop of a pattern and its beat, the measure of an arrangement.",
+   "inputSchema": {"type": "object", "properties": {}}},
+  {"name": "selectArrangement", "description": "Selects an arrangement (by name or index): the one play song plays and the arrangement tools edit by default. A song playing switches to it.",
+   "inputSchema": {"type": "object", "properties": {
+     "arrangement": {"type": ["string", "integer"], "description": "Arrangement name or index"}},
+     "required": ["arrangement"]}},
+  {"name": "repeatClip", "description": "Repeats the clip starting at startMeasure right after itself, as long.",
+   "inputSchema": {"type": "object", "properties": {
+     "startMeasure": {"type": "integer", "minimum": 0},
+     "arrangement": {"type": ["string", "integer"], "description": "Arrangement name or index (default: the selected one)"}},
+     "required": ["startMeasure"]}},
+  {"name": "setSongInfo", "description": "The name and description of the song: the library as saveSong writes it. Not an undo step.",
+   "inputSchema": {"type": "object", "properties": {"name": {"type": "string", "minLength": 1}, "description": {"type": "string"}}}},
+  {"name": "saveSong", "description": "Saves the song (patterns, arrangements) to the songs folder of the user data folder as <name>.odbox (as Song > Save).",
+   "inputSchema": {"type": "object", "properties": {}}},
+  {"name": "exportSong", "description": "Exports the song as <name>.odbox to the exports folder of the user data folder (as Song > Export song).",
+   "inputSchema": {"type": "object", "properties": {}}},
+  {"name": "listSavedSongs", "description": "The songs saved in the songs folder, by name.",
+   "inputSchema": {"type": "object", "properties": {}}},
+  {"name": "loadSong", "description": "Puts a song file in the place of the library, one undo step: a saved song by name (listSavedSongs), or an .odbox file by path.",
+   "inputSchema": {"type": "object", "properties": {"name": {"type": "string"}, "filePath": {"type": "string"}}}},
+  {"name": "normalizeKit", "description": "Brings every sample of a kit to a 0 dB peak, on disk. Not an undo step.",
+   "inputSchema": {"type": "object", "properties": {"kit": {"type": "string", "description": "Kit name (default: the kit in use)"}}}},
+  {"name": "addSampleToKit", "description": "Adds a WAV file to a kit, its instrument guessed from its file name. Not an undo step.",
+   "inputSchema": {"type": "object", "properties": {
+     "filePath": {"type": "string"}, "kit": {"type": "string", "description": "Kit name (default: the kit in use)"}},
+     "required": ["filePath"]}},
+  {"name": "replaceKitSample", "description": "New audio, from a WAV file, for a sample of a kit (by its path in listKitSamples). Not an undo step.",
+   "inputSchema": {"type": "object", "properties": {
+     "samplePath": {"type": "string"}, "filePath": {"type": "string"},
+     "kit": {"type": "string", "description": "Kit name (default: the kit in use)"}},
+     "required": ["samplePath", "filePath"]}},
+  {"name": "importKitFolder", "description": "The WAV files of a folder as a kit named after it, replacing a kit of that name. Not an undo step.",
+   "inputSchema": {"type": "object", "properties": {"folderPath": {"type": "string"}}, "required": ["folderPath"]}},
+  {"name": "loadKitMapping", "description": "A kit mapping file (JSON, as exportKitMapping writes), replacing the kit of its name. Not an undo step.",
+   "inputSchema": {"type": "object", "properties": {"filePath": {"type": "string"}}, "required": ["filePath"]}},
+  {"name": "exportKitMapping", "description": "Exports a kit's mapping (no audio) as JSON to the exports folder of the user data folder.",
+   "inputSchema": {"type": "object", "properties": {"kit": {"type": "string", "description": "Kit name (default: the kit in use)"}}}}
 ]"#;
 
 /// `{key: value, ...}`.
@@ -425,7 +497,7 @@ mod tests {
     fn the_tool_list_parses_with_the_settings() {
         let tools = tools();
         let tools = tools.as_array().unwrap();
-        assert_eq!(tools.len(), 46);
+        assert_eq!(tools.len(), 71);
         let update = tools.iter().find(|t| t.get("name").and_then(Value::as_str) == Some("updateTrack")).unwrap();
         let updates = &update.get("inputSchema").unwrap().get("properties").unwrap().get("updates").unwrap();
         let properties = updates.get("properties").unwrap();
