@@ -1,0 +1,50 @@
+[package]
+name = "ordrumbox-plugin"
+description = "orDrumbox as a CLAP and VST3 instrument, synchronized to the host's transport"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+# MIT for the CLAP build; a build with the `vst3` feature links the GPLv3
+# VST3 bindings and is GPLv3 as a whole (README.md, "Plugin").
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+# `cdylib` is the plugin; `lib` lets the tests use it.
+crate-type = ["cdylib", "lib"]
+
+[features]
+default = []
+vst3 = ["nih_plug/vst3"]
+
+[dependencies]
+ordrumbox-core.workspace = true
+ordrumbox-engine.workspace = true
+# Pinned: nih-plug has no release, and this is the baseview revision its
+# softbuffer example is built against.
+nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", rev = "de421011f41a6d10fc8c7a6084e4f4dee0143683", default-features = false, features = ["assert_process_allocs"] }
+baseview = { git = "https://github.com/RustAudio/baseview.git", rev = "9a0b42c09d712777b2edb4c5e0cb6baf21e988f0" }
+softbuffer.workspace = true
+# baseview speaks raw-window-handle 0.5, softbuffer 0.6.
+raw-window-handle = "0.5"
+raw-window-handle-06 = { package = "raw-window-handle", version = "0.6" }
+# The project's state is serialized by nih-plug through serde.
+serde = { version = "1", features = ["derive"] }
+# Where the plugin binary is, to find the assets in its bundle.
+process_path = "0.1"
+
+# The workspace's lints, but `unsafe_code` is `deny` rather than `forbid`:
+# the export macros and the window handle adapters need it, each allowed
+# where it is with the reason.
+[lints.rust]
+unsafe_code = "deny"
+missing_debug_implementations = "warn"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+float_cmp = "allow"
+unwrap_used = "warn"
+expect_used = "warn"
+print_stderr = "warn"
+let_underscore_must_use = "warn"

@@ -14,6 +14,8 @@ Windows by CI).
 | `ordrumbox-engine` | WAV decoding/encoding, kits and their files, sample analysis, sound auto-assignment, synth presets, passes (pattern and song: events, strip settings, LFO steps), sample-accurate engine, UI ↔ audio link, offline renders | core, dsp |
 | `ordrumbox-probe` | sound measurements of synth presets and WAV files, a command-line tool that does not ship with the app | core, dsp, engine |
 | `ordrumbox-app` | window, software-rendered UI (text in the system monospace font), audio output → `ordrumbox.exe` | winit, softbuffer, cpal, fontdue |
+| `ordrumbox-plugin` | the CLAP and VST3 instrument (below, "Plugin") | core, engine, nih-plug, baseview, softbuffer |
+| `xtask` | `cargo xtask bundle`: the plugin bundles | nih-plug's bundler |
 
 The domain crates and the probe have no third-party dependency. Only the app talks to
 the OS, through small bridges (`winit`, `softbuffer`, `cpal`, `fontdue`; `midir` with MIDI).
@@ -507,6 +509,36 @@ Locally from
 macOS: `cargo install cargo-xwin`, then
 `cargo xwin build --release -p ordrumbox-app --target x86_64-pc-windows-msvc`.
 
+## Plugin
+
+orDrumbox also builds as an instrument plugin, CLAP and VST3: no input, a
+stereo output. It follows the host's transport: it plays and stops with it,
+plays the pass the host's position falls in (a loop of the pattern, or a
+measure of the song) and plays at the host's tempo, not the pattern's. The
+library is saved in the host's project; a new instance starts from the demo
+library. The update check and the MCP link are off in the plugin.
+
+```sh
+cargo xtask bundle ordrumbox-plugin --release                 # target/bundled/orDrumbox.clap
+cargo xtask bundle ordrumbox-plugin --release --features vst3 # and orDrumbox.vst3
+```
+
+Each bundle holds `assets/` in `Contents/Resources/`; on Windows, the
+`.clap` is one file and `assets/` is written next to it. Install:
+
+- macOS: `orDrumbox.clap` into `~/Library/Audio/Plug-Ins/CLAP/`,
+  `orDrumbox.vst3` into `~/Library/Audio/Plug-Ins/VST3/`;
+- Windows: a folder `orDrumbox` holding `orDrumbox.clap` and `assets` into
+  `C:\Program Files\Common Files\CLAP\`, `orDrumbox.vst3` into
+  `C:\Program Files\Common Files\VST3\`.
+
+The plugin looks for its assets in `$ORDRUMBOX_ASSETS`, in its bundle, next
+to its binary, then in this repository. CI builds both bundles on Windows and
+macOS (artifact `ordrumbox-plugin-<os>`) and runs `clap-validator` on the CLAP.
+
+Work in progress: the editor window is empty until the app's UI is moved into
+a library the plugin can draw.
+
 ## Sound measurements
 
 `ordrumbox-probe` measures a sound: a preset rendered by the real synth voice
@@ -819,4 +851,6 @@ node tools/export_song_fixtures.mjs ../ordrumbox-v2
 
 ## License
 
-MIT: see `LICENSE`.
+MIT: see `LICENSE`. A plugin built with the `vst3` feature links the VST3
+bindings (`vst3-sys`), which are GPLv3: that `orDrumbox.vst3` is GPLv3 as a
+whole. The CLAP build stays MIT.
