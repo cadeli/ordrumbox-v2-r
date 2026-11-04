@@ -52,7 +52,6 @@ use menu::Command;
 use session::{Button, Move, OverlayKey, PanelKey, Session};
 use view::KitLayout;
 
-const TITLE: &str = "orDrumbox";
 const INITIAL_SIZE: LogicalSize<f64> = LogicalSize::new(1100.0, 680.0);
 /// Redraw interval while playing (the playhead moves).
 const FRAME: Duration = Duration::from_millis(16);
@@ -516,7 +515,9 @@ impl ApplicationHandler for App {
         if self.gfx.is_some() {
             return;
         }
-        let attributes = Window::default_attributes().with_title(TITLE).with_inner_size(INITIAL_SIZE);
+        let attributes = Window::default_attributes()
+            .with_title(format!("orDrumbox {}", update::BUILD))
+            .with_inner_size(INITIAL_SIZE);
         let window = match event_loop.create_window(attributes) {
             Ok(window) => Rc::new(window),
             Err(e) => return self.fail(event_loop, "create window", e),
@@ -667,6 +668,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // `ordrumbox --mcp`, started by an MCP client: the bridge to the window.
     if std::env::args_os().nth(1).is_some_and(|arg| arg == "--mcp") {
         return Ok(mcp_link::run_bridge()?);
+    }
+    // `ordrumbox --version`: which build this is.
+    if std::env::args_os().nth(1).is_some_and(|arg| arg == "--version") {
+        println!("orDrumbox {}", update::BUILD);
+        return Ok(());
     }
     // No text without it: stop with where it was looked for.
     font::load()?;

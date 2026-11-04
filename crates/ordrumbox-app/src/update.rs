@@ -18,6 +18,10 @@ use ordrumbox_core::json::{self, Object, Value};
 
 /// This program's version.
 pub const CURRENT: &str = env!("CARGO_PKG_VERSION");
+/// This build, as the user is shown it: the version alone for a release, else
+/// followed by `dev`, the commit (`+dirty` with local changes) and its date
+/// (`build.rs`).
+pub const BUILD: &str = concat!(env!("CARGO_PKG_VERSION"), env!("ORDRUMBOX_BUILD"));
 /// The latest release, as JSON (`tag_name`, `html_url`).
 const API_URL: &str = "https://api.github.com/repos/cadeli/ordrumbox-v2-r/releases/latest";
 /// Seconds between two checks at start.
@@ -270,6 +274,11 @@ pub fn open_page(url: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn build_starts_with_the_version() {
+        assert!(BUILD.starts_with(CURRENT));
+    }
 
     #[test]
     fn versions_compare_as_numbers() {

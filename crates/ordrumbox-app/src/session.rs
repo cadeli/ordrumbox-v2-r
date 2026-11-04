@@ -1210,7 +1210,7 @@ impl Session {
     fn about(&self) -> Vec<String> {
         let shown = |p: Option<PathBuf>| p.map_or_else(|| "-".to_owned(), |p| p.display().to_string());
         vec![
-            format!("orDrumbox {} - native port of ordrumbox-v2", env!("CARGO_PKG_VERSION")),
+            format!("orDrumbox {} - native port of ordrumbox-v2", update::BUILD),
             "MIT - https://www.ordrumbox.com".into(),
             String::new(),
             format!("library   {}", shown(self.library_path.clone())),

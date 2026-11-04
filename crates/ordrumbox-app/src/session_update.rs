@@ -76,11 +76,8 @@ impl Session {
         self.updates.check = None;
         match outcome {
             update::Outcome::Newer(release) => {
-                let line = format!(
-                    "orDrumbox {} is available (this is {}): Help > Download",
-                    release.version,
-                    update::CURRENT
-                );
+                let line =
+                    format!("orDrumbox {} is available (this is {}): Help > Download", release.version, update::BUILD);
                 if !self.status.contains(&line) {
                     self.status.push(line.clone());
                 }
@@ -90,10 +87,10 @@ impl Session {
                 self.updates.newer_release = Some(release);
             }
             update::Outcome::UpToDate if manual => {
-                self.message = format!("orDrumbox {} is up to date", update::CURRENT);
+                self.message = format!("orDrumbox {} is up to date", update::BUILD);
             }
             update::Outcome::NoRelease if manual => {
-                self.message = format!("no release published yet (this is {})", update::CURRENT);
+                self.message = format!("no release published yet (this is {})", update::BUILD);
             }
             update::Outcome::UpToDate | update::Outcome::NoRelease => return false,
             update::Outcome::Failed(e) if manual => self.message = format!("update check failed: {e}"),
