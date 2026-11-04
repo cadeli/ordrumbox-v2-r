@@ -100,13 +100,25 @@ pub fn frames_per_tick(bpm: f64, sample_rate: f64) -> f64 {
     sample_rate * 60.0 / (bpm * f64::from(TICK))
 }
 
+/// Ticks in one song pass: a measure of four beats.
+pub const SONG_PASS_TICKS: u32 = TICK * 4;
+
+/// Ticks in one pass of `pattern`: the whole pattern, at least one.
+pub fn pattern_pass_ticks(pattern: &Pattern) -> u32 {
+    u32::try_from(ordrumbox_core::pattern_engine::pattern_ticks(pattern).max(1)).unwrap_or(u32::MAX)
+}
+
 /// Build pass `number` of `pattern` at the pattern's own tempo. Notes of
 /// muted tracks (or of tracks another track's solo silences) are left out,
 /// as `shouldTrackPlay()` does.
 pub fn build_pass(pattern: &Pattern, number: u64, rng: &mut Rng, context: PassContext<'_>) -> Pass {
-    let bpm = clamp_bpm(pattern.bpm);
+    build_pass_at(pattern, number, rng, context, clamp_bpm(pattern.bpm))
+}
+
+/// [`build_pass`] at tempo `bpm` instead of the pattern's (a plugin host's tempo).
+pub fn build_pass_at(pattern: &Pattern, number: u64, rng: &mut Rng, context: PassContext<'_>, bpm: f64) -> Pass {
     let per_tick = frames_per_tick(bpm, context.sample_rate);
-    let ticks = u32::try_from(ordrumbox_core::pattern_engine::pattern_ticks(pattern).max(1)).unwrap_or(u32::MAX);
+    let ticks = pattern_pass_ticks(pattern);
     let frames = (f64::from(ticks) * per_tick).round().max(1.0) as u64;
     let pass_index = u32::try_from(number).unwrap_or(u32::MAX);
     let flat = expand_hits(pattern, pass_index, rng, context.scales);
@@ -291,9 +303,20 @@ pub fn build_song_pass(
     cache: &mut HitsCache,
     context: SongContext<'_>,
 ) -> Pass {
-    let bpm = clamp_bpm(song.bpm);
+    build_song_pass_at(song, measure, rng, cache, context, clamp_bpm(song.bpm))
+}
+
+/// [`build_song_pass`] at tempo `bpm` instead of the song's (a plugin host's tempo).
+pub fn build_song_pass_at(
+    song: &Song,
+    measure: u64,
+    rng: &mut Rng,
+    cache: &mut HitsCache,
+    context: SongContext<'_>,
+    bpm: f64,
+) -> Pass {
     let per_tick = frames_per_tick(bpm, context.sample_rate);
-    let ticks = TICK * 4;
+    let ticks = SONG_PASS_TICKS;
     let frames = (f64::from(ticks) * per_tick).round().max(1.0) as u64;
     let first_tick = measure * u64::from(ticks);
     let strips = song_strips(song, context.patterns);

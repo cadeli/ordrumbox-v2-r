@@ -20,7 +20,7 @@ pub mod wav;
 
 pub use assign::TrackSound;
 pub use controller::{AudioSide, Controller, Mode, SCOPE_SIZE};
-pub use engine::{Engine, Position};
+pub use engine::{Engine, HostTransport, Position, host_pass};
 pub use kit::{Kit, KitSample, SampleBank, kits_from_json, kits_to_json};
 pub use ordrumbox_dsp::{MasterSettings, SampleBuffer, slope};
 pub use pass::Pass;
