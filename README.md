@@ -342,9 +342,17 @@ kit editor) show a box. Every command that reads or writes a file (songs,
 MIDI, WAV, samples, kit folders and mappings) is in **File**. Click a title, or press **F10** or **Alt** alone, then
 **←→** between menus, **↑↓** between items, **Enter** to run, **Esc** to
 close. **Help › Keyboard shortcuts** (**F1**) lists every key; **Help › About**
-shows the version and the folders in use. A click on the status line (under
+shows the build and the folders in use. A click on the status line (under
 the controls) lists what was done since the app started, newest first; the
 wheel, the arrows, **Page Up/Down** and **Home/End** scroll it.
+
+Build: the window title, **Help › About**, the update messages and
+`ordrumbox --version` name the build. A release, built from the commit tagged
+`v<version>` with no local change, is its version alone (`0.1.0`); any other
+build follows it with `dev`, the commit (`+dirty` with uncommitted changes)
+and the commit's date (`0.1.1 dev f7b7e1b 2026-11-04`).
+`crates/ordrumbox-app/build.rs` reads them from git; built without git, it
+is `dev unknown build`.
 
 Updates: at start, at most once a day, the app asks GitHub for the latest
 release of this repository (with the system's `curl`, in Windows 10 and
@@ -490,7 +498,8 @@ a local build needs the `assets` folder copied next to it.
 
 A release: set `version` in the root `Cargo.toml` (`0.2.0`), commit, then
 `git tag v0.2.0 && git push origin v0.2.0`. CI checks that the tag is the
-version, then publishes a GitHub release with
+version and that the program built names itself by that version alone (not
+as a dev build), then publishes a GitHub release with
 `ordrumbox-v0.2.0-windows-x64.zip`; the apps already installed find it
 through their update check.
 

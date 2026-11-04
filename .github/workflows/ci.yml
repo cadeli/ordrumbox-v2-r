@@ -36,9 +36,23 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
+        # The whole history and its tags: the program names its build from
+        # them (`crates/ordrumbox-app/build.rs`).
+        with:
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --release -p ordrumbox-app
+      # A release names itself by its version alone, not as a dev build.
+      - name: Release build is named by its version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          build=$(target/release/ordrumbox.exe --version)
+          if [ "$build" != "orDrumbox ${GITHUB_REF_NAME#v}" ]; then
+            echo "tag $GITHUB_REF_NAME, but the program is $build"
+            exit 1
+          fi
       # The program, the assets it reads from the folder next to it, its license.
       - shell: bash
         run: mkdir dist && cp target/release/ordrumbox.exe LICENSE dist/ && cp -r assets dist/
