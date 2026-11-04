@@ -30,6 +30,28 @@ jobs:
       - run: cargo clippy --workspace --all-targets
       - run: cargo test --workspace
 
+  # The plugin bundles (CLAP and VST3, `assets/` inside), checked by the
+  # CLAP project's validator.
+  plugin:
+    name: plugin (${{ matrix.os }})
+    needs: check
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo xtask bundle ordrumbox-plugin --release --features vst3
+      - run: cargo install --locked --git https://github.com/free-audio/clap-validator --tag 0.3.2 clap-validator
+      - run: clap-validator validate target/bundled/orDrumbox.clap
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ordrumbox-plugin-${{ runner.os }}
+          path: target/bundled
+
   windows-exe:
     name: ordrumbox.exe
     needs: check
