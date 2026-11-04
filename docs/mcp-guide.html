@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>orDrumbox AI Guide</title>
+<meta name="description" content="A beginner's guide to driving orDrumbox from an AI assistant (MCP): setup in Claude Desktop or Claude Code, the few ideas to know, and worked examples.">
+<style>
+:root {
+  --bg: #f7f6fb; --fg: #1d1b2e; --muted: #5b5873; --line: #d9d6e8;
+  --panel: #ffffff; --accent: #c2187a; --accent2: #007c91; --code: #efedf7;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #14122a; --fg: #e8e6f5; --muted: #a29fc0; --line: #34305a;
+          --panel: #1c1938; --accent: #ff5fb4; --accent2: #3fd8ef; --code: #262249; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+       font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
+h1 { font-size: 2rem; margin: .2em 0 .1em; color: var(--accent); }
+h2 { margin-top: 2.4em; padding-top: .4em; border-top: 2px solid var(--line); color: var(--accent); }
+h3 { margin-top: 1.6em; color: var(--accent2); }
+a { color: var(--accent2); }
+code, kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .9em;
+            background: var(--code); padding: 1px 5px; border-radius: 4px; }
+kbd { border: 1px solid var(--line); border-bottom-width: 2px; white-space: nowrap; }
+pre { background: var(--code); padding: 12px; border-radius: 6px; overflow-x: auto; }
+pre code { padding: 0; background: none; }
+table { width: 100%; border-collapse: collapse; margin: .8em 0 1.2em; background: var(--panel);
+        display: block; overflow-x: auto; }
+th, td { border: 1px solid var(--line); padding: 6px 9px; text-align: left; vertical-align: top; }
+th { background: var(--code); }
+.toc { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 20px; }
+.note { border-left: 4px solid var(--accent2); background: var(--panel); padding: 8px 14px; margin: 1em 0; }
+.warn { border-left: 4px solid var(--accent); background: var(--panel); padding: 8px 14px; margin: 1em 0; }
+.subtitle { color: var(--muted); margin-top: 0; }
+.example { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 4px 16px 10px; margin: 1.2em 0; }
+.say { font-size: 1.05em; border-left: 4px solid var(--accent); padding: 6px 12px; margin: .8em 0; background: var(--code); border-radius: 0 6px 6px 0; }
+.say::before { content: "You: "; font-weight: 600; color: var(--accent); }
+.grid td { text-align: center; font-family: ui-monospace, Menlo, Consolas, monospace; }
+.grid td.on { background: var(--accent); color: #fff; font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Making beats with an AI assistant</h1>
+<p class="subtitle">A beginner's guide to the orDrumbox MCP link — see also the <a href="user-manual.html#mcp">user manual, section 19</a></p>
+
+<div class="note">
+<strong>In one sentence:</strong> you connect an AI assistant (such as Claude) to orDrumbox, then you ask it in plain
+words — "make me a hip-hop beat at 90 BPM" — and it edits the patterns in the orDrumbox window while you watch and listen.
+You do not need to know any programming.
+</div>
+
+<div class="toc">
+<h2 style="border:0;margin:0;padding:0">Contents</h2>
+<ol>
+  <li><a href="#what">What is MCP?</a></li>
+  <li><a href="#setup">Setting it up (once)</a></li>
+  <li><a href="#check">Checking that it works</a></li>
+  <li><a href="#ideas">Five ideas to know</a></li>
+  <li><a href="#examples">Examples, step by step</a></li>
+  <li><a href="#prompts">Writing good requests</a></li>
+  <li><a href="#trouble">When something goes wrong</a></li>
+  <li><a href="#tools">What the assistant can do</a></li>
+</ol>
+</div>
+
+<!-- ───────────────────────────────────────────────────────────── -->
+<h2 id="what">1. What is MCP?</h2>
+<p><strong>MCP</strong> (Model Context Protocol) is a standard way for an AI assistant to use a program on your computer.
+orDrumbox offers a set of <em>tools</em> — "list the patterns", "add notes", "change the tempo", "play"… — and the assistant
+chooses which ones to call to do what you asked.</p>
+<ul>
+  <li>Every change appears <strong>at once</strong> in the orDrumbox window.</li>
+  <li>Every change is <strong>one step of Edit › Undo</strong> (<kbd>Ctrl</kbd>+<kbd>Z</kbd>): nothing the assistant does is final.</li>
+  <li>Every change is <strong>saved</strong> with your library, like your own edits.</li>
+  <li>The link stays <strong>on your computer</strong>: orDrumbox only accepts connections from the same machine
+      (<code>127.0.0.1</code>), with a secret token.</li>
+</ul>
+
+<!-- ───────────────────────────────────────────────────────────── -->
+<h2 id="setup">2. Setting it up (once)</h2>
+
+<h3>Step 1 — Find the path of the orDrumbox program</h3>
+<p>The assistant needs to know where the program is. It is the full path of the file you start:</p>
+<table>
+<tr><th>System</th><th>Example of path</th></tr>
+<tr><td>Windows</td><td><code>C:\Programs\ordrumbox\ordrumbox.exe</code> (where you unpacked the zip)</td></tr>
+<tr><td>macOS</td><td><code>/Users/you/ordrumbox/ordrumbox</code></td></tr>
+</table>
+<p>Tip: on Windows, hold <kbd>Shift</kbd>, right-click <code>ordrumbox.exe</code> and choose <strong>Copy as path</strong>.
+On macOS, select the file in the Finder and press <kbd>⌥ Option</kbd>+<kbd>⌘ Cmd</kbd>+<kbd>C</kbd>.</p>
+
+<h3>Step 2a — With Claude Desktop</h3>
+<ol>
+  <li>Open Claude Desktop, then <strong>Settings › Developer › Edit Config</strong>. This opens the file
+      <code>claude_desktop_config.json</code>.</li>
+  <li>Put this in it (replace the path with yours). If the file already has an <code>"mcpServers"</code> section,
+      add only the <code>"ordrumbox"</code> entry inside it.
+<pre><code>{
+  "mcpServers": {
+    "ordrumbox": {
+      "command": "C:\\Programs\\ordrumbox\\ordrumbox.exe",
+      "args": ["--mcp"]
+    }
+  }
+}</code></pre>
+  </li>
+  <li>Save the file, then <strong>quit Claude Desktop completely and start it again</strong>.</li>
+</ol>
+<div class="warn">
+<strong>Windows:</strong> in this file every backslash is written twice: <code>C:\\Programs\\ordrumbox\\ordrumbox.exe</code>,
+not <code>C:\Programs\ordrumbox\ordrumbox.exe</code>. Forward slashes also work: <code>C:/Programs/ordrumbox/ordrumbox.exe</code>.
+</div>
+
+<h3>Step 2b — Or with Claude Code (in a terminal)</h3>
+<pre><code>claude mcp add ordrumbox -- /path/to/ordrumbox --mcp</code></pre>
+<p>Other MCP clients (Cursor, …) take the same two things: the <em>command</em> (the program's path) and the
+<em>argument</em> <code>--mcp</code>.</p>
+
+<h3>Step 3 — Start orDrumbox</h3>
+<p>The assistant drives the <strong>open window</strong>. Start orDrumbox as usual, before you ask anything, and keep it open.</p>
+
+<!-- ───────────────────────────────────────────────────────────── -->
+<h2 id="check">3. Checking that it works</h2>
+<p>With orDrumbox open, ask the assistant:</p>
+<p class="say">What patterns do I have in orDrumbox?</p>
+<p>The assistant calls the tool <code>listPatterns</code> (the client may ask you to allow it the first time: accept) and
+answers with the names of your patterns, for example those of the demo library. If it says that orDrumbox is not running,
+start the program and ask again.</p>
+
+<!-- ───────────────────────────────────────────────────────────── -->
+<h2 id="ideas">4. Five ideas to know</h2>
+<p>You can talk naturally, but knowing these words helps you ask precisely and understand the answers.</p>
+
+<h3>A pattern</h3>
+<p>A short loop, usually one measure of 4 beats, with its own tempo (BPM). Patterns have a <strong>name</strong>; you
+refer to them by it ("the pattern <em>Funky</em>"), in any case.</p>
+
+<h3>A track</h3>
+<p>One line of the pattern, one sound. A track is named after its instrument: <code>KICK</code>, <code>SNARE</code>,
+<code>CLAP</code>, <code>CHH</code> (closed hi-hat), <code>OHH</code> (open hi-hat), <code>TOM</code>, <code>COWBELL</code>,
+<code>CRASH</code>, <code>BASS</code>… Ask "which instrument names can I use?" for the full list.</p>
+
+<h3>A step</h3>
+<p>Each beat is cut into steps, 4 by default (sixteenth notes). Steps are counted <strong>from 0</strong>, across the whole
+pattern: a 4-beat pattern has steps 0 to 15. You rarely need the numbers — "on every beat" is enough — but they are what
+the assistant sends, and what it may tell you back.</p>
+<table class="grid">
+<tr><th>Beat</th><td colspan="4">1</td><td colspan="4">2</td><td colspan="4">3</td><td colspan="4">4</td></tr>
+<tr><th>Step</th><td>0</td><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>7</td><td>8</td><td>9</td><td>10</td><td>11</td><td>12</td><td>13</td><td>14</td><td>15</td></tr>
+<tr><th>Kick on every beat</th><td class="on">●</td><td></td><td></td><td></td><td class="on">●</td><td></td><td></td><td></td><td class="on">●</td><td></td><td></td><td></td><td class="on">●</td><td></td><td></td><td></td></tr>
+<tr><th>Snare on 2 and 4</th><td></td><td></td><td></td><td></td><td class="on">●</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="on">●</td><td></td><td></td><td></td></tr>
+<tr><th>Hi-hat on eighths</th><td class="on">●</td><td></td><td class="on">●</td><td></td><td class="on">●</td><td></td><td class="on">●</td><td></td><td class="on">●</td><td></td><td class="on">●</td><td></td><td class="on">●</td><td></td><td class="on">●</td><td></td></tr>
+</table>
+<p>The formula, if you like it: <code>step = (beat − 1) × 4 + position in the beat</code>.</p>
+
+<h3>A kit and a synth</h3>
+<p>A <strong>kit</strong> is a set of samples (<code>electro</code>, <code>real</code>, <code>8bits</code>…): changing the kit
+changes the sound of every drum track. A <strong>synth</strong> preset (<code>BASS5</code>, <code>SYNTH1</code>, <code>PIANO</code>…)
+is a sound made by the built-in synthesizer, handy for bass lines and chords.</p>
+
+<h3>An arrangement (song)</h3>
+<p>Patterns placed one after the other on a timeline, measure by measure. Measures are also counted from 0: the first
+measure is measure 0.</p>
+
+<!-- ───────────────────────────────────────────────────────────── -->
+<h2 id="examples">5. Examples, step by step</h2>
+<p>Each example shows what you can say, what the assistant does behind the scenes (the tool it calls, with its
+settings, so you can follow along), and what you will see in the window. You never have to type the tool calls yourself.</p>
+
+<div class="example">
+<h3>Example 1 — Your first beat from scratch</h3>
+<p class="say">Create a pattern called "First Beat" at 95 BPM: kick on every beat, snare on beats 2 and 4, closed
+hi-hat on every eighth note. Then show it and play it.</p>
+<p>The assistant calls, in order:</p>
+<pre><code>createNewPattern   { "patternName": "First Beat" }
+setPatternBpm      { "patternName": "First Beat", "bpm": 95 }
+addNotesToPattern  { "patternName": "First Beat", "notes": [
+  { "trackName": "KICK",  "step": 0 }, { "trackName": "KICK",  "step": 4 },
+  { "trackName": "KICK",  "step": 8 }, { "trackName": "KICK",  "step": 12 },
+  { "trackName": "SNARE", "step": 4 }, { "trackName": "SNARE", "step": 12 },
+  { "trackName": "CHH", "step": 0 },  { "trackName": "CHH", "step": 2 },
+  { "trackName": "CHH", "step": 4 },  { "trackName": "CHH", "step": 6 },
+  { "trackName": "CHH", "step": 8 },  { "trackName": "CHH", "step": 10 },
+  { "trackName": "CHH", "step": 12 }, { "trackName": "CHH", "step": 14 } ] }
+selectPattern      { "patternName": "First Beat" }
+play               { }</code></pre>
+<p>You see a new pattern at the end of the list, with three tracks filled exactly like the grid of section 4, and you
+hear it loop. The tracks did not have to exist: adding notes to <code>KICK</code> creates the <code>KICK</code> track.</p>
+</div>
+
+<div class="example">
+<h3>Example 2 — Let orDrumbox generate a pattern in a style</h3>
+<p class="say">Which styles do you know? … OK, make me a new house pattern.</p>
+<pre><code>listStyles       { }
+generatePattern  { "style": "house" }</code></pre>
+<p>orDrumbox writes a whole pattern itself — tracks, tempo, swing, lines — as <strong>Pattern › New pattern in the style</strong>
+does. Not happy with it?</p>
+<p class="say">Make it again, with more energy.</p>
+<pre><code>regeneratePattern { "patternName": "…", "style": "house" }
+setPatternMacro   { "patternName": "…", "macro": "energy", "value": 80 }</code></pre>
+<p>The three macros, <code>energy</code>, <code>complexity</code> and <code>variation</code>, go from 0 to 100; 50 changes nothing.</p>
+</div>
+
+<div class="example">
+<h3>Example 3 — Mixing: volume and stereo position</h3>
+<p class="say">In "First Beat", make the hi-hat quieter and put it a bit to the left.</p>
+<pre><code>updateTrack { "patternName": "First Beat", "trackName": "CHH",
+              "updates": { "volume": 0.6, "pan": -0.4 } }</code></pre>
+<p><code>volume</code> 1 is the normal level; <code>pan</code> goes from −1 (left) to 1 (right). If a value is out of range,
+orDrumbox brings it inside and the assistant tells you the value used.</p>
+</div>
+
+<div class="example">
+<h3>Example 4 — Groove: accents, ghost notes and chance</h3>
+<p class="say">Add soft snare ghost notes just before beats 2 and 4, and make every hi-hat play only 80 % of the time.</p>
+<pre><code>addNotesToPattern { "patternName": "First Beat", "notes": [
+  { "trackName": "SNARE", "step": 3,  "velocity": 0.3 },
+  { "trackName": "SNARE", "step": 11, "velocity": 0.3 } ] }
+updateTrack { "patternName": "First Beat", "trackName": "CHH",
+              "updates": {}, "noteUpdates": { "probability": 0.8 } }</code></pre>
+<p>A note's <code>velocity</code> (how hard it is hit) and <code>probability</code> (its chance to play) go from 0 to 1.
+With a probability below 1, the hi-hat changes a little at every loop: the beat feels more alive.</p>
+</div>
+
+<div class="example">
+<h3>Example 5 — A synth bass line</h3>
+<p class="say">Add a bass playing on the synth preset BASS5: a note on step 0, then a fifth higher on step 6, then back on step 10.</p>
+<pre><code>updateTrack       { "patternName": "First Beat", "trackName": "BASS",
+                    "updates": { "useSynth": true, "synthPreset": "BASS5" } }
+addNotesToPattern { "patternName": "First Beat", "notes": [
+  { "trackName": "BASS", "step": 0 },
+  { "trackName": "BASS", "step": 6, "pitch": 7 },
+  { "trackName": "BASS", "step": 10 } ] }</code></pre>
+<p>A note's <code>pitch</code> is in semitones from the track's note (7 = a fifth, 12 = an octave). Ask "which synth presets
+are there?" to hear other sounds.</p>
+</div>
+
+<div class="example">
+<h3>Example 6 — Change the whole drum sound</h3>
+<p class="say">Which kits do I have? Switch to the electro kit.</p>
+<pre><code>listKitSamples { }
+selectKit      { "kit": "electro" }</code></pre>
+<p>Every track whose sound follows its name takes the sample of the new kit. Changing back is as easy:
+"switch to the real kit".</p>
+</div>
+
+<div class="example">
+<h3>Example 7 — Build a short song</h3>
+<p class="say">Make a song called "Demo song": 4 measures of "Intro", then 8 measures of "First Beat", then 4 measures of "Intro" again. Play it.</p>
+<pre><code>createArrangement { "name": "Demo song", "clips": [
+  { "patternName": "Intro",      "startMeasure": 0,  "measureCount": 4 },
+  { "patternName": "First Beat", "startMeasure": 4,  "measureCount": 8 },
+  { "patternName": "Intro",      "startMeasure": 12, "measureCount": 4 } ] }
+play { "song": true }</code></pre>
+<p>The song panel shows the three clips. Without <code>measureCount</code>, a clip lasts as long as its pattern;
+"repeat the clip at measure 4" doubles it (<code>repeatClip</code>).</p>
+</div>
+
+<div class="example">
+<h3>Example 8 — Export to share</h3>
+<p class="say">Export "First Beat" as a WAV file and as MIDI, and the song "Demo song" as WAV.</p>
+<pre><code>exportPatternWav     { "patternName": "First Beat" }
+exportPatternMidi    { "patternName": "First Beat" }
+exportArrangementWav { "arrangement": "Demo song" }</code></pre>
+<p>The files go to the <code>exports</code> folder of your user data folder (see the
+<a href="user-manual.html#getting-started">user manual, section 1</a>); the assistant tells you their full path.</p>
+</div>
+
+<div class="example">
+<h3>Example 9 — Oops: undo</h3>
+<p class="say">No, I preferred it before. Undo the last two changes.</p>
+<pre><code>undo { }
+undo { }</code></pre>
+<p>You can also simply press <kbd>Ctrl</kbd>+<kbd>Z</kbd> in the window: the assistant's edits and yours share the same
+undo history. <code>redo</code> brings a change back.</p>
+</div>
+
+<!-- ───────────────────────────────────────────────────────────── -->
+<h2 id="prompts">6. Writing good requests</h2>
+<ul>
+  <li><strong>Name the pattern</strong> you mean: "in <em>First Beat</em>, …". Otherwise the assistant has to guess or ask.</li>
+  <li><strong>Use musical words</strong>: "on every beat", "on the off-beats", "on beats 2 and 4", "every sixteenth note",
+      "a fifth higher". The assistant turns them into step numbers.</li>
+  <li><strong>One idea at a time</strong> when you start: you hear each change and can undo just that one.</li>
+  <li><strong>Ask it to look first</strong>: "describe the pattern Funky" (it calls <code>loadPattern</code>) before
+      "make it groovier". It then knows what is there.</li>
+  <li><strong>Ask for explanations</strong>: "why does the hi-hat sometimes skip?" — it can read the settings and tell you.</li>
+  <li><strong>Be bold</strong>: everything is undoable, and you can always ask for a copy first ("duplicate Funky as Funky 2,
+      then work on the copy").</li>
+</ul>
+
+<!-- ───────────────────────────────────────────────────────────── -->
+<h2 id="trouble">7. When something goes wrong</h2>
+<table>
+<tr><th>What you see</th><th>What to do</th></tr>
+<tr><td>"orDrumbox is not running"</td><td>Start orDrumbox, keep its window open, and ask again.</td></tr>
+<tr><td>The assistant does not know about orDrumbox, or has no orDrumbox tools</td>
+    <td>Check the path in the client's settings (on Windows, double backslashes), then quit and restart the client completely.</td></tr>
+<tr><td>A tool is refused while a question is open in the window</td>
+    <td>orDrumbox is waiting for you to answer a confirmation (for example "Factory reset?"). Answer it in the window, then ask again.</td></tr>
+<tr><td>"No pattern named …"</td><td>Ask "what patterns do I have?" and use one of the names it gives.</td></tr>
+<tr><td>A value is not the one you asked for</td>
+    <td>It was out of range (tempo 20 to 300, at most 16 beats…): orDrumbox used the nearest allowed value and the answer says which.</td></tr>
+<tr><td>Undo does not bring back a synth preset, the master or a kit</td>
+    <td>Changes to synth presets, the master bus and kits are saved with the settings, not in the undo history. Ask the assistant
+        to set the old values back.</td></tr>
+</table>
+
+<!-- ───────────────────────────────────────────────────────────── -->
+<h2 id="tools">8. What the assistant can do</h2>
+<p>You never call these yourself; this list only shows what you can ask for.</p>
+<table>
+<tr><th>Area</th><th>You can ask to…</th><th>Tools</th></tr>
+<tr><td>Patterns</td><td>list, show, create, rename, copy, delete, change the tempo, length, tags, description</td>
+    <td><code>listPatterns</code>, <code>loadPattern</code>, <code>selectPattern</code>, <code>createNewPattern</code>,
+        <code>renamePattern</code>, <code>duplicatePattern</code>, <code>removePattern</code>, <code>setPatternBpm</code>,
+        <code>setPatternBeatCount</code>, <code>setPatternTags</code>, <code>setPatternDescription</code></td></tr>
+<tr><td>Notes and tracks</td><td>add or delete notes, change track settings, rename, copy, remove, listen to a track</td>
+    <td><code>addNotesToPattern</code>, <code>deleteNotes</code>, <code>updateTrack</code>, <code>renameTrack</code>,
+        <code>copyTrack</code>, <code>removeTrack</code>, <code>auditionTrack</code>, <code>compactPattern</code></td></tr>
+<tr><td>Generation</td><td>make a pattern in a style, remake it or one track, auto mode, macros, random notes</td>
+    <td><code>listStyles</code>, <code>generatePattern</code>, <code>regeneratePattern</code>, <code>regenerateTrack</code>,
+        <code>randomizeTrack</code>, <code>toggleGeneration</code>, <code>togglePatternAuto</code>, <code>setPatternMacro</code></td></tr>
+<tr><td>Sounds</td><td>choose a kit, give tracks kit, synth or random sounds, edit synth presets, analyse samples</td>
+    <td><code>listKitSamples</code>, <code>selectKit</code>, <code>assignSounds</code>, <code>listSynthPresets</code>,
+        <code>getSynthPreset</code>, <code>createSynthPreset</code>, <code>updateSynthPreset</code>, <code>analyzeSamples</code></td></tr>
+<tr><td>Songs</td><td>build and edit arrangements, move and repeat clips, save and load song files</td>
+    <td><code>listArrangements</code>, <code>createArrangement</code>, <code>addPatternToArrangement</code>,
+        <code>removePatternFromArrangement</code>, <code>moveClip</code>, <code>repeatClip</code>, <code>saveSong</code>,
+        <code>loadSong</code></td></tr>
+<tr><td>Playback</td><td>play, stop, tell what is playing</td>
+    <td><code>play</code>, <code>stop</code>, <code>getPlaybackState</code></td></tr>
+<tr><td>Files</td><td>export WAV, MIDI or JSON, import a MIDI file</td>
+    <td><code>exportPatternWav</code>, <code>exportPatternMidi</code>, <code>savePatternToJson</code>,
+        <code>exportArrangementWav</code>, <code>importMidi</code></td></tr>
+<tr><td>Master and history</td><td>adjust the master bus, undo, redo</td>
+    <td><code>getMaster</code>, <code>setMaster</code>, <code>undo</code>, <code>redo</code></td></tr>
+</table>
+<p>The complete list, with every detail, is in <code>README.md</code>, section "AI clients".</p>
+
+</main>
+</body>
+</html>
