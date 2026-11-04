@@ -1180,7 +1180,7 @@ dependencies = [
 
 [[package]]
 name = "ordrumbox-app"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "cpal",
  "fontdue",
@@ -1193,18 +1193,18 @@ dependencies = [
 
 [[package]]
 name = "ordrumbox-core"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "ordrumbox-dsp"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "ordrumbox-core",
 ]
 
 [[package]]
 name = "ordrumbox-engine"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "ordrumbox-core",
  "ordrumbox-dsp",
@@ -1212,14 +1212,14 @@ dependencies = [
 
 [[package]]
 name = "ordrumbox-logic"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "ordrumbox-core",
 ]
 
 [[package]]
 name = "ordrumbox-probe"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "ordrumbox-core",
  "ordrumbox-dsp",
