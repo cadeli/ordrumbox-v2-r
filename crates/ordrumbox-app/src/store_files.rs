@@ -115,7 +115,7 @@ fn full_master() -> MasterSettings {
 fn every_setting_survives_saving() {
     let dir = folder("settings");
     let path = dir.join("settings.json");
-    // A key of another version of the app, kept.
+    // A key the master and update settings do not own, kept.
     fs::create_dir_all(&dir).unwrap();
     fs::write(&path, r#"{"colorScheme":3}"#).unwrap();
     let master = full_master();

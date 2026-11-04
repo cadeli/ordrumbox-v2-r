@@ -433,6 +433,7 @@ pitch, MIDI number and the settings that differ from the defaults (the JS
 | **J** | every track back on auto-assign |
 | **K** | a random sample (of any kit) on every track |
 | **V** | VU meters on the track stripes (on / off) |
+| **C** | the next colour scheme (Indigo, Amber, Deep sea, Crimson, Toxic; also **View › Next colour scheme**), kept in `settings.json` under `colorScheme` (1 to 5; the web version knows 1 to 3 and takes 1 for the others) |
 | **D**, **S**, **A** | drums, bass, chords: generate in auto mode / auto mode off |
 | **Z**, **X** | auto mode of the focused track, random notes on it |
 | **1–9** | mute track 1–9 (**Shift**: solo), in every view |

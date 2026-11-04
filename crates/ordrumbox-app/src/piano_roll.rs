@@ -29,17 +29,39 @@ pub const TOTAL_KEYS: i32 = 97;
 /// The black keys, by pitch class.
 const BLACK_KEYS: [i32; 5] = [1, 3, 6, 8, 10];
 
-const BACKGROUND: Rgb = theme::BG;
-const ROW_WHITE: Rgb = theme::CELL;
-const ROW_BLACK: Rgb = theme::PANEL_2;
-const COLUMN_BEAT: Rgb = theme::LINE;
-const COLUMN_HALF: Rgb = theme::CELL_BEAT;
-const COLUMN_STEP: Rgb = theme::PANEL_2;
-const OCTAVE: Rgb = theme::LINE;
-const KEY_WHITE: Rgb = theme::TEXT;
-const KEY_BLACK: Rgb = theme::PANEL;
-const TEXT: Rgb = theme::TEXT;
-const DIM: Rgb = theme::MUTED;
+fn background_color() -> Rgb {
+    theme::bg()
+}
+fn row_white_color() -> Rgb {
+    theme::cell()
+}
+fn row_black_color() -> Rgb {
+    theme::panel_2()
+}
+fn column_beat_color() -> Rgb {
+    theme::line()
+}
+fn column_half_color() -> Rgb {
+    theme::cell_beat()
+}
+fn column_step_color() -> Rgb {
+    theme::panel_2()
+}
+fn octave_color() -> Rgb {
+    theme::line()
+}
+fn key_white_color() -> Rgb {
+    theme::text()
+}
+fn key_black_color() -> Rgb {
+    theme::panel()
+}
+fn text_color() -> Rgb {
+    theme::text()
+}
+fn dim_color() -> Rgb {
+    theme::muted()
+}
 
 const PLAYING: Rgb = theme::LIME;
 const SELECTED: Rgb = theme::WHITE;
@@ -261,19 +283,31 @@ impl RollLayout {
 /// Draw the piano roll; `title` names the track.
 pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &str) {
     let s = layout.scale;
-    canvas.text(layout.title.x, layout.title.y, title, s, TEXT);
+    canvas.text(layout.title.x, layout.title.y, title, s, text_color());
     if view.pages() > 1 {
         for (rect, label, enabled) in
             [(layout.previous, "<", view.page > 0), (layout.next, ">", view.page < view.pages() - 1)]
         {
-            canvas.fill_rect(rect.x, rect.y, rect.w, rect.h, if enabled { COLUMN_HALF } else { ROW_BLACK });
-            canvas.text(rect.x + (rect.w - 8 * s) / 2, rect.y + 3 * s, label, s, if enabled { TEXT } else { DIM });
+            canvas.fill_rect(
+                rect.x,
+                rect.y,
+                rect.w,
+                rect.h,
+                if enabled { column_half_color() } else { row_black_color() },
+            );
+            canvas.text(
+                rect.x + (rect.w - 8 * s) / 2,
+                rect.y + 3 * s,
+                label,
+                s,
+                if enabled { text_color() } else { dim_color() },
+            );
         }
         let info = format!("{}/{}", view.page + 1, view.pages());
         let x = layout.previous.x
             + layout.previous.w
             + (layout.next.x - layout.previous.x - layout.previous.w - text_width(&info, s)) / 2;
-        canvas.text(x, layout.title.y, &info, s, TEXT);
+        canvas.text(x, layout.title.y, &info, s, text_color());
     }
 
     let spb = steps_per_beat(view.track);
@@ -289,19 +323,25 @@ pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &s
         let black = BLACK_KEYS.contains(&midi.rem_euclid(12));
         let c = midi.rem_euclid(12) == 0;
         let k = layout.keys;
-        canvas.fill_rect(k.x, y, k.w - s, layout.row - s, if black { KEY_BLACK } else { KEY_WHITE });
+        canvas.fill_rect(k.x, y, k.w - s, layout.row - s, if black { key_black_color() } else { key_white_color() });
         if c {
             canvas.text(
                 k.x + k.w - 8 * s - text_width(&midi_name(midi), s),
                 y + (layout.row - 8 * s) / 2,
                 &midi_name(midi),
                 s,
-                BACKGROUND,
+                background_color(),
             );
         }
-        canvas.fill_rect(layout.grid.x, y, width, layout.row, if black { ROW_BLACK } else { ROW_WHITE });
+        canvas.fill_rect(
+            layout.grid.x,
+            y,
+            width,
+            layout.row,
+            if black { row_black_color() } else { row_white_color() },
+        );
         if c {
-            canvas.fill_rect(layout.grid.x, y + layout.row - s, width, s, OCTAVE);
+            canvas.fill_rect(layout.grid.x, y + layout.row - s, width, s, octave_color());
         }
     }
     let grid_h = (view.top_row - first_row + 1) * layout.row;
@@ -309,11 +349,11 @@ pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &s
     for step in start..end {
         let in_beat = (step % i64::from(spb)) as i32;
         let color = if in_beat == 0 {
-            COLUMN_BEAT
+            column_beat_color()
         } else if spb >= 4 && in_beat * 2 == spb {
-            COLUMN_HALF
+            column_half_color()
         } else {
-            COLUMN_STEP
+            column_step_color()
         };
         canvas.fill_rect(layout.step_x(view, step), layout.grid.y, s, grid_h, color);
     }
@@ -339,8 +379,11 @@ pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &s
         let Some(r) = layout.note_rect(view, n) else { continue };
         let note = &view.track.notes[n];
         let lit = view.playhead.is_some_and(|step| view.sounding(n, step));
-        let color =
-            theme::mix(BACKGROUND, if lit { PLAYING } else { view.color }, note_opacity(note.velocity.clamp(0.0, 1.0)));
+        let color = theme::mix(
+            background_color(),
+            if lit { PLAYING } else { view.color },
+            note_opacity(note.velocity.clamp(0.0, 1.0)),
+        );
         canvas.fill_rect(r.x, r.y, r.w, r.h, color);
         // The trigger kind: probability wins over the cycle.
         let trig = if note.probability < 1.0 {
@@ -371,7 +414,7 @@ pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &s
     }
     if first_row > 0 || view.top_row < TOTAL_KEYS - 1 {
         let hint = format!("{} - {}", midi_name(row_midi(view.top_row)), midi_name(row_midi(first_row)));
-        canvas.text(layout.keys.x, layout.grid.y + grid_h + 4 * s, &hint, s, DIM);
+        canvas.text(layout.keys.x, layout.grid.y + grid_h + 4 * s, &hint, s, dim_color());
     }
 }
 

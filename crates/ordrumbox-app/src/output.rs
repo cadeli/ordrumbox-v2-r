@@ -158,13 +158,23 @@ impl OutputLayout {
     }
 }
 
-const SURFACE: Rgb = theme::PANEL_2;
-const GRID: Rgb = theme::LINE;
-const MUTED: Rgb = theme::MUTED;
+fn surface_color() -> Rgb {
+    theme::panel_2()
+}
+fn grid_color() -> Rgb {
+    theme::line()
+}
+fn muted_color() -> Rgb {
+    theme::muted()
+}
 const ACCENT: Rgb = theme::PINK;
 const WARNING: Rgb = theme::YELLOW;
-const SCOPE_BG: Rgb = theme::SCREEN;
-const SCOPE_GRID: Rgb = theme::PANEL_2;
+fn scope_bg_color() -> Rgb {
+    theme::screen()
+}
+fn scope_grid_color() -> Rgb {
+    theme::panel_2()
+}
 const PHOSPHOR: Rgb = theme::CYAN;
 
 /// What the output panel draws besides its controls.
@@ -180,8 +190,8 @@ pub fn draw(canvas: &mut Canvas, view: &OutputView, layout: &OutputLayout) {
     let s = layout.scale;
     if layout.band.h > 0 {
         // The strip: a panel along the bottom, edged on top.
-        canvas.fill_rect(layout.band.x, layout.band.y, layout.band.w, layout.band.h, theme::PANEL);
-        canvas.fill_rect(layout.band.x, layout.band.y, layout.band.w, s.max(1), theme::LINE);
+        canvas.fill_rect(layout.band.x, layout.band.y, layout.band.w, layout.band.h, theme::panel());
+        canvas.fill_rect(layout.band.x, layout.band.y, layout.band.w, s.max(1), theme::line());
     }
     canvas.text(layout.title.0, layout.title.1, "Master", s, ACCENT);
     match view.tab {
@@ -190,7 +200,7 @@ pub fn draw(canvas: &mut Canvas, view: &OutputView, layout: &OutputLayout) {
         }
         1 if layout.curve.w > 8 * s && layout.curve.h > 8 * s => {
             draw_curve(canvas, &view.master, layout.curve, s);
-            canvas.text(layout.compressor_title.0, layout.compressor_title.1, "COMPRESSOR", s, MUTED);
+            canvas.text(layout.compressor_title.0, layout.compressor_title.1, "COMPRESSOR", s, muted_color());
         }
         _ => {}
     }
@@ -214,23 +224,23 @@ fn line(canvas: &mut Canvas, (x0, y0): (i32, i32), (x1, y1): (i32, i32), t: i32,
 /// The compressor's transfer curve: -60 to 0 dB in, -60 to
 /// +12 dB out, the unity line, the threshold, the curve.
 fn draw_curve(canvas: &mut Canvas, master: &MasterSettings, r: Rect, s: i32) {
-    canvas.fill_rect(r.x, r.y, r.w, r.h, SURFACE);
+    canvas.fill_rect(r.x, r.y, r.w, r.h, surface_color());
     let x_px = |db: f64| r.x + ((db - CURVE_X.0) / (CURVE_X.1 - CURVE_X.0) * f64::from(r.w)) as i32;
     let y_px = |db: f64| r.y + r.h - ((db - CURVE_Y.0) / (CURVE_Y.1 - CURVE_Y.0) * f64::from(r.h)) as i32;
     for db in [-60.0, -40.0, -20.0, 0.0] {
         let (x, y) = (x_px(db).min(r.x + r.w - 1), y_px(db));
-        canvas.fill_rect(x, r.y, s.max(1), r.h, GRID);
-        canvas.fill_rect(r.x, y, r.w, s.max(1), GRID);
+        canvas.fill_rect(x, r.y, s.max(1), r.h, grid_color());
+        canvas.fill_rect(r.x, y, r.w, s.max(1), grid_color());
     }
     let (from, to) = (CURVE_X.0.max(CURVE_Y.0), CURVE_X.1.min(CURVE_Y.1));
-    line(canvas, (x_px(from), y_px(from)), (x_px(to), y_px(to)), s.max(1), MUTED, Some((6 * s, 6 * s)));
+    line(canvas, (x_px(from), y_px(from)), (x_px(to), y_px(to)), s.max(1), muted_color(), Some((6 * s, 6 * s)));
     let bypass = master.bypass >= 0.5;
     let threshold = f64::from(master.threshold);
     if !bypass && (CURVE_X.0..=CURVE_X.1).contains(&threshold) {
         let x = x_px(threshold).min(r.x + r.w - 1);
         line(canvas, (x, r.y), (x, r.y + r.h - 1), s.max(1), WARNING, Some((4 * s, 4 * s)));
     }
-    let color = if bypass { MUTED } else { ACCENT };
+    let color = if bypass { muted_color() } else { ACCENT };
     let mut previous = None;
     for px in 0..=r.w {
         let db = CURVE_X.0 + f64::from(px) / f64::from(r.w) * (CURVE_X.1 - CURVE_X.0);
@@ -241,24 +251,24 @@ fn draw_curve(canvas: &mut Canvas, master: &MasterSettings, r: Rect, s: i32) {
         }
         previous = Some(point);
     }
-    canvas.text(r.x + 4 * s, r.y + 4 * s, "12 dB", s, MUTED);
-    canvas.text(r.x + 4 * s, r.y + r.h - 12 * s, "-60 dB", s, MUTED);
-    canvas.text(r.x + r.w - 4 * s - text_width("0 dB", s), r.y + r.h - 12 * s, "0 dB", s, MUTED);
+    canvas.text(r.x + 4 * s, r.y + 4 * s, "12 dB", s, muted_color());
+    canvas.text(r.x + 4 * s, r.y + r.h - 12 * s, "-60 dB", s, muted_color());
+    canvas.text(r.x + r.w - 4 * s - text_width("0 dB", s), r.y + r.h - 12 * s, "0 dB", s, muted_color());
     if bypass {
         let label = "BYPASSED";
-        canvas.text(r.x + (r.w - text_width(label, s)) / 2, r.y + r.h / 2 - 4 * s, label, s, MUTED);
+        canvas.text(r.x + (r.w - text_width(label, s)) / 2, r.y + r.h / 2 - 4 * s, label, s, muted_color());
     }
 }
 
 /// The spectrum: a grid, then the first bins (one a
 /// column of the JS canvas, 256) as a line, louder higher.
 fn draw_spectrum(canvas: &mut Canvas, bins: &[u8], r: Rect, s: i32) {
-    canvas.fill_rect(r.x, r.y, r.w, r.h, SCOPE_BG);
+    canvas.fill_rect(r.x, r.y, r.w, r.h, scope_bg_color());
     for i in 1..8 {
-        canvas.fill_rect(r.x + r.w * i / 8, r.y, s.max(1), r.h, SCOPE_GRID);
+        canvas.fill_rect(r.x + r.w * i / 8, r.y, s.max(1), r.h, scope_grid_color());
     }
     for i in 1..4 {
-        canvas.fill_rect(r.x, r.y + r.h * i / 4, r.w, s.max(1), SCOPE_GRID);
+        canvas.fill_rect(r.x, r.y + r.h * i / 4, r.w, s.max(1), scope_grid_color());
     }
     let count = bins.len().min(256);
     let mut previous = None;

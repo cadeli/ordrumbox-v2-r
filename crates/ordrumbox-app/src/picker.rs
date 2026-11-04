@@ -284,12 +284,24 @@ impl Picker {
 
 // ─── Drawing ─────────────────────────────────────────────────────────────────
 
-const SHADE: Rgb = theme::SHADE;
-const PANEL: Rgb = theme::PANEL;
-const BORDER: Rgb = theme::LINE;
-const HIGHLIGHT: Rgb = theme::HIGHLIGHT;
-const TEXT: Rgb = theme::TEXT;
-const DIM: Rgb = theme::MUTED;
+fn shade_color() -> Rgb {
+    theme::shade()
+}
+fn panel_color() -> Rgb {
+    theme::panel()
+}
+fn border_color() -> Rgb {
+    theme::line()
+}
+fn highlight_color() -> Rgb {
+    theme::highlight()
+}
+fn text_color() -> Rgb {
+    theme::text()
+}
+fn dim_color() -> Rgb {
+    theme::muted()
+}
 const ACCENT: Rgb = theme::PINK;
 const WARNING: Rgb = theme::RED;
 
@@ -340,9 +352,9 @@ impl PickerLayout {
 
 pub fn draw(canvas: &mut Canvas, picker: &Picker, layout: &PickerLayout) {
     let s = layout.scale;
-    canvas.fill_rect(layout.x - 4 * s, layout.y - 4 * s, layout.width + 8 * s, layout.height + 8 * s, SHADE);
-    canvas.fill_rect(layout.x, layout.y, layout.width, layout.height, BORDER);
-    canvas.fill_rect(layout.x + s, layout.y + s, layout.width - 2 * s, layout.height - 2 * s, PANEL);
+    canvas.fill_rect(layout.x - 4 * s, layout.y - 4 * s, layout.width + 8 * s, layout.height + 8 * s, shade_color());
+    canvas.fill_rect(layout.x, layout.y, layout.width, layout.height, border_color());
+    canvas.fill_rect(layout.x + s, layout.y + s, layout.width - 2 * s, layout.height - 2 * s, panel_color());
     let x = layout.x + 10 * s;
     canvas.text(x, layout.y + 8 * s, picker.purpose.title(), s, ACCENT);
     let place = picker.dir.as_ref().map_or_else(|| "Drives".to_owned(), |d| d.display().to_string());
@@ -351,28 +363,28 @@ pub fn draw(canvas: &mut Canvas, picker: &Picker, layout: &PickerLayout) {
     let count = place.chars().count();
     let place =
         if count > room { format!("...{}", place.chars().skip(count - room + 3).collect::<String>()) } else { place };
-    canvas.text(x, layout.y + 20 * s, &place, s, DIM);
+    canvas.text(x, layout.y + 20 * s, &place, s, dim_color());
     if let Some(error) = &picker.error {
         canvas.text(x, layout.list_top, error, s, WARNING);
     } else if picker.entries.is_empty() {
-        canvas.text(x, layout.list_top, "(nothing to open here)", s, DIM);
+        canvas.text(x, layout.list_top, "(nothing to open here)", s, dim_color());
     }
     let first = layout.first(picker.selected);
     for (row, (i, entry)) in picker.entries.iter().enumerate().skip(first).take(layout.rows).enumerate() {
         let y = layout.list_top + row as i32 * layout.row;
         let selected = i == picker.selected;
         if selected {
-            canvas.fill_rect(layout.x + 4 * s, y - 2 * s, layout.width - 8 * s, layout.row, HIGHLIGHT);
+            canvas.fill_rect(layout.x + 4 * s, y - 2 * s, layout.width - 8 * s, layout.row, highlight_color());
         }
         let color = match entry {
             _ if selected => ACCENT,
-            Entry::File(_) => TEXT,
-            _ => DIM,
+            Entry::File(_) => text_color(),
+            _ => dim_color(),
         };
         canvas.text(x, y, &entry.label(), s, color);
     }
     let hint = "ENTER or click again: open / choose   BACKSPACE: up   a letter: jump   ESC: cancel";
-    canvas.text(x, layout.y + layout.height - 14 * s, hint, s, DIM);
+    canvas.text(x, layout.y + layout.height - 14 * s, hint, s, dim_color());
 }
 
 #[cfg(test)]

@@ -45,15 +45,29 @@ const LOWER_HEIGHT: i32 = 138;
 /// Gap between the arrangement and what is under it, and between the list and the column.
 const GAP: i32 = 12;
 
-const BACKGROUND: Rgb = theme::BG;
-const CELL: Rgb = theme::PANEL_2;
-const MAJOR: Rgb = theme::CELL_BEAT;
-const LINE: Rgb = theme::LINE;
-const TEXT: Rgb = theme::TEXT;
-const DIM: Rgb = theme::MUTED;
+fn background_color() -> Rgb {
+    theme::bg()
+}
+fn cell_color() -> Rgb {
+    theme::panel_2()
+}
+fn major_color() -> Rgb {
+    theme::cell_beat()
+}
+fn line_color() -> Rgb {
+    theme::line()
+}
+fn text_color() -> Rgb {
+    theme::text()
+}
+fn dim_color() -> Rgb {
+    theme::muted()
+}
 const ACCENT: Rgb = theme::PINK;
 const ORPHAN: Rgb = theme::RED;
-const SELECTED: Rgb = theme::SELECTED_ROW;
+fn selected_color() -> Rgb {
+    theme::selected_row()
+}
 const CURSOR: Rgb = theme::LIME;
 const CURSOR_IDLE: Rgb = theme::CYAN;
 const CURRENT: Rgb = theme::LIME;
@@ -414,7 +428,7 @@ fn draw_list(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     let s = layout.scale;
     let r = layout.list;
     if view.patterns.is_empty() {
-        canvas.text(r.x, r.y, "No patterns", s, DIM);
+        canvas.text(r.x, r.y, "No patterns", s, dim_color());
         return;
     }
     let (first, shown, total) = (view.list_scroll, layout.list_rows(), view.patterns.len());
@@ -424,12 +438,12 @@ fn draw_list(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
         let y = r.y + (i - first) as i32 * LIST_ROW * s;
         let selected = i == view.selected_pattern;
         if selected {
-            canvas.fill_rect(r.x - 2 * s, y - 2 * s, r.w, LIST_ROW * s, SELECTED);
+            canvas.fill_rect(r.x - 2 * s, y - 2 * s, r.w, LIST_ROW * s, selected_color());
         }
         let number = format!("{}.", i + 1);
         let x = r.x + (LIST_NUMBER_CHARS * 8 * s - text_width(&number, s)).max(0);
-        let x = canvas.text(x, y, &number, s, DIM) + 4 * s;
-        canvas.text(x, y, &fit(name, names_right - x, s), s, if selected { ACCENT } else { TEXT });
+        let x = canvas.text(x, y, &number, s, dim_color()) + 4 * s;
+        canvas.text(x, y, &fit(name, names_right - x, s), s, if selected { ACCENT } else { text_color() });
     }
     // A pattern dragged along the list: a line where it would go, above or below the one it takes.
     if let Some((from, to)) = view.list_drop.filter(|&(from, to)| from != to) {
@@ -441,9 +455,9 @@ fn draw_list(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     }
     if total > shown {
         let bar = layout.scroll_bar(Axis::List);
-        canvas.fill_rect(bar.x, bar.y, bar.w, bar.h, CELL);
+        canvas.fill_rect(bar.x, bar.y, bar.w, bar.h, cell_color());
         let (start, len) = layout.thumb(Axis::List, first, shown, total);
-        canvas.fill_rect(bar.x + s, start, bar.w - 2 * s, len, DIM);
+        canvas.fill_rect(bar.x + s, start, bar.w - 2 * s, len, dim_color());
     }
 }
 
@@ -456,22 +470,22 @@ fn draw_description(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     if d.w <= 0 {
         return;
     }
-    canvas.text(d.x, d.y, &fit("Pattern description", d.w, s), s, DIM);
+    canvas.text(d.x, d.y, &fit("Pattern description", d.w, s), s, dim_color());
     let f = layout.description_frame();
     for (x, y, w, h) in
         [(f.x, f.y, f.w, s), (f.x, f.y + f.h - s, f.w, s), (f.x, f.y, s, f.h), (f.x + f.w - s, f.y, s, f.h)]
     {
-        canvas.fill_rect(x, y, w, h, LINE);
+        canvas.fill_rect(x, y, w, h, line_color());
     }
     let (x, top) = (f.x + DESCRIPTION_PAD * s, f.y + DESCRIPTION_PAD * s);
     if text.is_empty() {
-        canvas.text(x, top, &fit("(click to write one)", f.w - 2 * DESCRIPTION_PAD * s, s), s, DIM);
+        canvas.text(x, top, &fit("(click to write one)", f.w - 2 * DESCRIPTION_PAD * s, s), s, dim_color());
         return;
     }
     let lines = layout.description_lines(text);
     let rows = layout.description_rows();
     for (k, line) in lines.iter().skip(view.description_scroll).take(rows).enumerate() {
-        canvas.text(x, top + k as i32 * LIST_ROW * s, line, s, TEXT);
+        canvas.text(x, top + k as i32 * LIST_ROW * s, line, s, text_color());
     }
     if lines.len() > rows {
         // The thumb: the lines shown, over the whole text.
@@ -479,8 +493,8 @@ fn draw_description(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
         let bar_x = f.x + f.w - DESCRIPTION_PAD * s / 2 - SCROLL_BAR * s;
         let thumb_y = top + track_h * view.description_scroll as i32 / lines.len() as i32;
         let thumb_h = (track_h * rows as i32 / lines.len() as i32).max(4 * s);
-        canvas.fill_rect(bar_x, top, SCROLL_BAR * s, track_h, CELL);
-        canvas.fill_rect(bar_x, thumb_y.min(top + track_h - thumb_h), SCROLL_BAR * s, thumb_h, DIM);
+        canvas.fill_rect(bar_x, top, SCROLL_BAR * s, track_h, cell_color());
+        canvas.fill_rect(bar_x, thumb_y.min(top + track_h - thumb_h), SCROLL_BAR * s, thumb_h, dim_color());
     }
 }
 
@@ -488,15 +502,21 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     let s = layout.scale;
     let g = layout.grid;
     let Some(song) = view.song else {
-        canvas.text(g.x, g.y, "No arrangement - Song > New arrangement makes one.", s, DIM);
+        canvas.text(g.x, g.y, "No arrangement - Song > New arrangement makes one.", s, dim_color());
         return;
     };
-    let title = canvas.text(g.x, g.y, "Arrangement", s, DIM) + 8 * s;
+    let title = canvas.text(g.x, g.y, "Arrangement", s, dim_color()) + 8 * s;
     let total = song.length_measures().max(1.0).ceil() as u32;
     let meta = format!("{}  {} measures  {} BPM", song.name, total, ordrumbox_core::js::number_to_string(song.bpm));
-    canvas.text(title, g.y, &fit(&meta, g.x + g.w - title, s), s, TEXT);
+    canvas.text(title, g.y, &fit(&meta, g.x + g.w - title, s), s, text_color());
     if song.clips.is_empty() && view.ghost.is_none() {
-        canvas.text(g.x, layout.ruler_top(), "No clips yet: right-click a pattern of the list to add it.", s, DIM);
+        canvas.text(
+            g.x,
+            layout.ruler_top(),
+            "No clips yet: right-click a pattern of the list to add it.",
+            s,
+            dim_color(),
+        );
         return;
     }
 
@@ -515,19 +535,19 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
         let color = if m == current {
             CURRENT
         } else if m % 4 == 0 {
-            MAJOR
+            major_color()
         } else {
-            CELL
+            cell_color()
         };
         canvas.fill_rect(x, layout.ruler_top(), layout.measure_width() - s, HEADER_HEIGHT * s - s, color);
         let label = (m + 1).to_string();
         let tx = x + (layout.measure_width() - text_width(&label, s)) / 2;
         let text = if m == current {
-            BACKGROUND
+            background_color()
         } else if m % 4 == 0 {
-            TEXT
+            text_color()
         } else {
-            DIM
+            dim_color()
         };
         canvas.text(tx, layout.ruler_top() + (HEADER_HEIGHT * s - 8 * s) / 2, &label, s, text);
     }
@@ -535,14 +555,20 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     // Rows: the name in the frozen column, a line under each.
     for (k, row) in view.rows.iter().enumerate().skip(first_row).take(shown_rows) {
         let y = layout.row_y(k, first_row);
-        canvas.fill_rect(g.x, y + layout.row_height() - s, layout.label_width() + body_w, s, LINE);
+        canvas.fill_rect(g.x, y + layout.row_height() - s, layout.label_width() + body_w, s, line_color());
         let name = fit(&row.name, layout.label_width() - 6 * s, s);
-        canvas.text(g.x, y + (layout.row_height() - 8 * s) / 2, &name, s, if row.orphan { ORPHAN } else { TEXT });
+        canvas.text(
+            g.x,
+            y + (layout.row_height() - 8 * s) / 2,
+            &name,
+            s,
+            if row.orphan { ORPHAN } else { text_color() },
+        );
     }
     // Measure lines, every fourth brighter.
     for m in first_measure..=first_measure + shown_measures {
         let x = layout.measure_x(f64::from(m), first_measure);
-        canvas.fill_rect(x - s, layout.body_top(), s, body_h, if m % 4 == 0 { MAJOR } else { CELL });
+        canvas.fill_rect(x - s, layout.body_top(), s, body_h, if m % 4 == 0 { major_color() } else { cell_color() });
     }
 
     // A clip takes its row's colour; the one dragged is over the others.
@@ -588,9 +614,9 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     ];
     for (axis, first, shown, total) in bars {
         let r = layout.scroll_bar(axis);
-        canvas.fill_rect(r.x, r.y, r.w, r.h, CELL);
+        canvas.fill_rect(r.x, r.y, r.w, r.h, cell_color());
         let (start, len) = layout.thumb(axis, first, shown, total);
-        let color = if total > shown { DIM } else { LINE };
+        let color = if total > shown { dim_color() } else { line_color() };
         match axis {
             Axis::Measures => canvas.fill_rect(start, r.y + s, len, r.h - 2 * s, color),
             Axis::Rows | Axis::List => canvas.fill_rect(r.x + s, start, r.w - 2 * s, len, color),

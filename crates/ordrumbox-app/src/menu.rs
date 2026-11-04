@@ -86,6 +86,7 @@ pub enum Command {
     SelectRandomPattern,
     SelectRandomDrumkit,
     ToggleVus,
+    NextColorScheme,
     ExportPatternJson,
     ConvertToSynth,
     AutoAssignAll,
@@ -255,6 +256,7 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
                 check("Kit editor", "Ctrl+K", C::KitEditor, true, s.kit_editor),
                 Item::Separator,
                 check("VU meters", "V", C::ToggleVus, true, s.show_vus),
+                command("Next colour scheme", "C", C::NextColorScheme, true),
             ],
         },
         Menu {
@@ -391,13 +393,25 @@ fn first_runnable(menu: &Menu) -> Option<usize> {
 
 // ─── Geometry ────────────────────────────────────────────────────────────────
 
-const BAR_BACKGROUND: Rgb = theme::PANEL;
-const PANEL: Rgb = theme::PANEL_2;
-const BORDER: Rgb = theme::LINE;
-const HIGHLIGHT: Rgb = theme::HIGHLIGHT;
-const TEXT: Rgb = theme::TEXT;
+fn bar_background_color() -> Rgb {
+    theme::panel()
+}
+fn panel_color() -> Rgb {
+    theme::panel_2()
+}
+fn border_color() -> Rgb {
+    theme::line()
+}
+fn highlight_color() -> Rgb {
+    theme::highlight()
+}
+fn text_color() -> Rgb {
+    theme::text()
+}
 const DIM: Rgb = theme::CYAN;
-const DISABLED: Rgb = theme::DISABLED;
+fn disabled_color() -> Rgb {
+    theme::disabled()
+}
 const ACCENT: Rgb = theme::PINK;
 
 /// Height of the menu bar.
@@ -488,22 +502,22 @@ pub fn hit(menus: &[Menu], open: Option<Open>, scale: i32, x: i32, y: i32) -> Op
 /// The bar, and the open menu over everything.
 pub fn draw(canvas: &mut Canvas, menus: &[Menu], open: Option<Open>, scale: i32) {
     let bar = bar_height(scale);
-    canvas.fill_rect(0, 0, canvas.width(), bar, BAR_BACKGROUND);
-    canvas.fill_rect(0, bar - scale.max(1), canvas.width(), scale.max(1), BORDER);
+    canvas.fill_rect(0, 0, canvas.width(), bar, bar_background_color());
+    canvas.fill_rect(0, bar - scale.max(1), canvas.width(), scale.max(1), border_color());
     let text_y = (bar - 8 * scale) / 2;
     for (i, (menu, (x, w))) in menus.iter().zip(titles(menus, scale)).enumerate() {
         let is_open = open.is_some_and(|o| o.menu == i);
         if is_open {
-            canvas.fill_rect(x, 0, w, bar - scale.max(1), HIGHLIGHT);
+            canvas.fill_rect(x, 0, w, bar - scale.max(1), highlight_color());
         }
-        canvas.text(x + 8 * scale, text_y, menu.title, scale, if is_open { ACCENT } else { TEXT });
+        canvas.text(x + 8 * scale, text_y, menu.title, scale, if is_open { ACCENT } else { text_color() });
     }
     let Some(open) = open else { return };
     let (px, py, width, tops) = panel(menus, open, scale);
     let items = &menus[open.menu].items;
     let bottom = tops.last().map_or(py, |&t| t + item_height(scale)) + 2 * scale;
-    canvas.fill_rect(px, py, width, bottom - py, BORDER);
-    canvas.fill_rect(px + scale, py, width - 2 * scale, bottom - py - scale, PANEL);
+    canvas.fill_rect(px, py, width, bottom - py, border_color());
+    canvas.fill_rect(px + scale, py, width - 2 * scale, bottom - py - scale, panel_color());
     for (i, (item, &top)) in items.iter().zip(&tops).enumerate() {
         match item {
             Item::Separator => {
@@ -512,22 +526,22 @@ pub fn draw(canvas: &mut Canvas, menus: &[Menu], open: Option<Open>, scale: i32)
                     top + separator_height(scale) / 2,
                     width - 12 * scale,
                     scale.max(1),
-                    BORDER,
+                    border_color(),
                 );
             }
             Item::Command { label, shortcut, enabled, checked, .. } => {
                 let h = item_height(scale);
                 if open.item == Some(i) && *enabled {
-                    canvas.fill_rect(px + scale, top, width - 2 * scale, h, HIGHLIGHT);
+                    canvas.fill_rect(px + scale, top, width - 2 * scale, h, highlight_color());
                 }
                 let ty = top + (h - 8 * scale) / 2;
                 if let Some(on) = checked {
                     let (bx, by, b) = (px + 5 * scale, ty + scale, 6 * scale);
                     if *on {
-                        canvas.fill_rect(bx, by, b, b, if *enabled { ACCENT } else { DISABLED });
+                        canvas.fill_rect(bx, by, b, b, if *enabled { ACCENT } else { disabled_color() });
                     } else {
                         let line = scale.max(1);
-                        let c = if *enabled { DIM } else { DISABLED };
+                        let c = if *enabled { DIM } else { disabled_color() };
                         canvas.fill_rect(bx, by, b, line, c);
                         canvas.fill_rect(bx, by + b - line, b, line, c);
                         canvas.fill_rect(bx, by, line, b, c);
@@ -535,15 +549,21 @@ pub fn draw(canvas: &mut Canvas, menus: &[Menu], open: Option<Open>, scale: i32)
                     }
                 }
                 let color = if !enabled {
-                    DISABLED
+                    disabled_color()
                 } else if open.item == Some(i) {
                     ACCENT
                 } else {
-                    TEXT
+                    text_color()
                 };
                 canvas.text(px + 18 * scale, ty, label, scale, color);
                 let sw = text_width(shortcut, scale);
-                canvas.text(px + width - 8 * scale - sw, ty, shortcut, scale, if *enabled { DIM } else { DISABLED });
+                canvas.text(
+                    px + width - 8 * scale - sw,
+                    ty,
+                    shortcut,
+                    scale,
+                    if *enabled { DIM } else { disabled_color() },
+                );
             }
         }
     }

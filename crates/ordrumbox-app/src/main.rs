@@ -497,6 +497,7 @@ fn shortcut(code: KeyCode, shift: bool, control: bool) -> Option<Command> {
             KeyCode::KeyF => C::SelectRandomPattern,
             KeyCode::KeyG => C::SelectRandomDrumkit,
             KeyCode::KeyV => C::ToggleVus,
+            KeyCode::KeyC => C::NextColorScheme,
             KeyCode::KeyH => C::ConvertToSynth,
             KeyCode::KeyJ => C::AutoAssignAll,
             KeyCode::KeyK => C::RandomSamples,

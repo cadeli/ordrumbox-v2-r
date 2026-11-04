@@ -20,12 +20,22 @@ use crate::piano_roll::{self, RollLayout, RollView};
 use crate::song_view::{self, SongLayout, SongView};
 use crate::theme;
 
-const BACKGROUND: Rgb = theme::BG;
-const CELL: Rgb = theme::CELL;
-const CELL_BEAT: Rgb = theme::CELL_BEAT;
+fn background_color() -> Rgb {
+    theme::bg()
+}
+fn cell_color() -> Rgb {
+    theme::cell()
+}
+fn cell_beat_color() -> Rgb {
+    theme::cell_beat()
+}
 const NOTE: Rgb = theme::PINK;
-const TEXT: Rgb = theme::TEXT;
-const DIM: Rgb = theme::MUTED;
+fn text_color() -> Rgb {
+    theme::text()
+}
+fn dim_color() -> Rgb {
+    theme::muted()
+}
 const ACCENT: Rgb = theme::PINK;
 const PLAYING: Rgb = theme::LIME;
 const WARNING: Rgb = theme::RED;
@@ -33,14 +43,18 @@ const PLAYHEAD: Rgb = theme::LIME;
 const LOOP_MARK: Rgb = theme::YELLOW;
 const CURSOR: Rgb = theme::CYAN;
 const SELECTED: Rgb = theme::WHITE;
-const FOCUS_ROW: Rgb = theme::SELECTED_ROW;
+fn focus_row_color() -> Rgb {
+    theme::selected_row()
+}
 const MUTE_ON: Rgb = theme::RED;
 /// The logo, the header's labels, values.
 const LOGO: Rgb = theme::LIME;
 const LABEL: Rgb = theme::CYAN;
 const VALUE: Rgb = theme::YELLOW;
 const SOLO_ON: Rgb = theme::YELLOW;
-const BOX_OFF: Rgb = theme::LINE;
+fn box_off_color() -> Rgb {
+    theme::line()
+}
 
 /// The key help line under the grid (every command is in the menus, with
 /// its shortcut; Help > Keyboard shortcuts lists them all).
@@ -454,7 +468,7 @@ fn steps_per_beat(track: &Track) -> i32 {
 
 /// Draw `view`; `scale` is the integer UI scale (1 on a standard display, 2 on HiDPI).
 pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
-    canvas.clear(BACKGROUND);
+    canvas.clear(background_color());
     let text = header_text(scale);
     let margin = margin(scale);
 
@@ -478,7 +492,7 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
             label(canvas, *rect, text);
         }
     } else {
-        canvas.text(c.play.x, c.play.y + 4 * scale, "no pattern", scale, DIM);
+        canvas.text(c.play.x, c.play.y + 4 * scale, "no pattern", scale, dim_color());
     }
     label(canvas, c.views[0], "VIEW");
 
@@ -491,9 +505,9 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
         (None, None) => String::new(),
     };
     let x = canvas.text(margin, y, view.message, scale, VALUE) + 24 * scale;
-    let x = canvas.text(x.max(margin + canvas.width() / 3), y, &history, scale, DIM) + 24 * scale;
+    let x = canvas.text(x.max(margin + canvas.width() / 3), y, &history, scale, dim_color()) + 24 * scale;
     if let Some(song) = view.song {
-        let color = if song.starts_with("SONG") { PLAYING } else { DIM };
+        let color = if song.starts_with("SONG") { PLAYING } else { dim_color() };
         canvas.text(x.max(margin + canvas.width() * 2 / 3), y, song, scale, color);
     }
     // The header's lower edge.
@@ -516,7 +530,7 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
     } else {
         HELP
     };
-    canvas.text(margin, footer_y, help, scale, DIM);
+    canvas.text(margin, footer_y, help, scale, dim_color());
 
     // The window split: one main editor top-left, the track editor down the
     // right, the output strip along the bottom.
@@ -556,7 +570,13 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
         if focused {
             // The whole row, its steps included.
             let right = layout.grid_left + layout.grid_width;
-            canvas.fill_rect(layout.left - 4 * scale, y, right - layout.left + 4 * scale, layout.row - gap, FOCUS_ROW);
+            canvas.fill_rect(
+                layout.left - 4 * scale,
+                y,
+                right - layout.left + 4 * scale,
+                layout.row - gap,
+                focus_row_color(),
+            );
         }
         // The track's VU meter stripe (level from the audio engine).
         let stripe_x = layout.left - 8 * scale;
@@ -565,7 +585,7 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
         let stripe_h = layout.row - 3 * gap;
         let level = view.levels.get(i).copied().unwrap_or(0.0).clamp(0.0, 1.0);
         if view.show_vus {
-            canvas.fill_rect(stripe_x, stripe_top, stripe_w, stripe_h, theme::mix(theme::track(i), theme::BG, 0.75));
+            canvas.fill_rect(stripe_x, stripe_top, stripe_w, stripe_h, theme::mix(theme::track(i), theme::bg(), 0.75));
             let fill_h = (f64::from(stripe_h) * f64::from(level)).round() as i32;
             if fill_h > 0 {
                 canvas.fill_rect(stripe_x, stripe_top + stripe_h - fill_h, stripe_w, fill_h, theme::track(i));
@@ -576,10 +596,16 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
         let box_y = y + (layout.row - layout.box_size) / 2;
         for (solo, on, color, letter) in [(false, track.mute, MUTE_ON, "M"), (true, track.solo, SOLO_ON, "S")] {
             let x = layout.box_x(solo);
-            canvas.fill_rect(x, box_y, layout.box_size, layout.box_size, if on { color } else { BOX_OFF });
+            canvas.fill_rect(x, box_y, layout.box_size, layout.box_size, if on { color } else { box_off_color() });
             let letter_scale = (layout.box_size / 10).max(1);
             let inset = (layout.box_size - 8 * letter_scale) / 2;
-            canvas.text(x + inset, box_y + inset, letter, letter_scale, if on { BACKGROUND } else { DIM });
+            canvas.text(
+                x + inset,
+                box_y + inset,
+                letter,
+                letter_scale,
+                if on { background_color() } else { dim_color() },
+            );
         }
         let label: String = track.name.chars().take(LABEL_CHARS).collect();
         // The name, and under it what the track plays when there is room.
@@ -590,16 +616,16 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
             let width = layout.volume_x - layout.name_x - 4 * scale;
             let chars = usize::try_from(width / (8 * scale)).unwrap_or(0);
             let shown: String = sound.chars().take(chars).collect();
-            canvas.text(layout.name_x, label_y + 8 * layout.scale + 2 * scale, &shown, scale, DIM);
+            canvas.text(layout.name_x, label_y + 8 * layout.scale + 2 * scale, &shown, scale, dim_color());
         }
         let color = if track.mute {
-            DIM
+            dim_color()
         } else if track.auto_mode {
             PLAYING // a new line every loop
         } else if focused {
             theme::track(i)
         } else {
-            TEXT
+            text_color()
         };
         canvas.text(layout.name_x, label_y, &label, layout.scale, color);
         draw_track_steps(canvas, track, i, view, layout);
@@ -624,9 +650,9 @@ pub fn draw_tooltip(canvas: &mut Canvas, text: &str, cell: Rect, scale: i32) {
     let (w, h) = (text_width(text, scale) + 12 * scale, 14 * scale);
     let x = (cell.x + cell.w / 2 - w / 2).clamp(0, (canvas.width() - w).max(0));
     let y = (cell.y - h - 4 * scale).max(0);
-    canvas.fill_rect(x, y, w, h, theme::LINE);
-    canvas.fill_rect(x + scale, y + scale, w - 2 * scale, h - 2 * scale, theme::SHADE);
-    canvas.text(x + 6 * scale, y + 3 * scale, text, scale, TEXT);
+    canvas.fill_rect(x, y, w, h, theme::line());
+    canvas.fill_rect(x + scale, y + scale, w - 2 * scale, h - 2 * scale, theme::shade());
+    canvas.text(x + 6 * scale, y + 3 * scale, text, scale, text_color());
 }
 
 /// A panel over the window: a title and lines of text (the key list, about).
@@ -639,14 +665,14 @@ pub fn draw_notice(canvas: &mut Canvas, title: &str, lines: &[String], scale: i3
     let height = (lines.len() as i32 + 3) * line_h + 16 * scale;
     let x = ((canvas.width() - width) / 2).max(0);
     let y = ((canvas.height() - height) / 2).max(menu::bar_height(scale));
-    canvas.fill_rect(x - 4 * scale, y - 4 * scale, width + 8 * scale, height + 8 * scale, theme::SHADE);
-    canvas.fill_rect(x, y, width, height, theme::LINE);
-    canvas.fill_rect(x + scale, y + scale, width - 2 * scale, height - 2 * scale, theme::PANEL);
+    canvas.fill_rect(x - 4 * scale, y - 4 * scale, width + 8 * scale, height + 8 * scale, theme::shade());
+    canvas.fill_rect(x, y, width, height, theme::line());
+    canvas.fill_rect(x + scale, y + scale, width - 2 * scale, height - 2 * scale, theme::panel());
     canvas.text(x + 16 * scale, y + 10 * scale, title, scale, ACCENT);
     for (i, line) in lines.iter().enumerate() {
-        canvas.text(x + 16 * scale, y + 10 * scale + (i as i32 + 2) * line_h, line, scale, TEXT);
+        canvas.text(x + 16 * scale, y + 10 * scale + (i as i32 + 2) * line_h, line, scale, text_color());
     }
-    canvas.text(x + width - 16 * scale - text_width(close, scale), y + 10 * scale, close, scale, DIM);
+    canvas.text(x + width - 16 * scale - text_width(close, scale), y + 10 * scale, close, scale, dim_color());
 }
 
 /// The kit editor: the kit's samples on the left, the selected one on the
@@ -654,25 +680,25 @@ pub fn draw_notice(canvas: &mut Canvas, title: &str, lines: &[String], scale: i3
 fn draw_kit(canvas: &mut Canvas, kit: &KitView, layout: &KitLayout) {
     let scale = layout.scale;
     // Title line above the list.
-    canvas.text(layout.left, layout.top + 2 * scale, &format!("kit {}", kit.kit), scale, DIM);
+    canvas.text(layout.left, layout.top + 2 * scale, &format!("kit {}", kit.kit), scale, dim_color());
     let first = layout.first(kit.selected);
     if kit.samples.is_empty() {
-        canvas.text(layout.left, layout.list_top, "No samples in this kit", scale, DIM);
+        canvas.text(layout.left, layout.list_top, "No samples in this kit", scale, dim_color());
     }
     for (row, (i, (name, key))) in kit.samples.iter().enumerate().skip(first).take(layout.shown()).enumerate() {
         let y = layout.list_top + row as i32 * layout.row;
         if i == kit.selected {
-            canvas.fill_rect(layout.left - 2 * scale, y - 2 * scale, layout.list_width, layout.row, FOCUS_ROW);
+            canvas.fill_rect(layout.left - 2 * scale, y - 2 * scale, layout.list_width, layout.row, focus_row_color());
         }
-        let color = if i == kit.selected { ACCENT } else { TEXT };
+        let color = if i == kit.selected { ACCENT } else { text_color() };
         let x = canvas.text(layout.left, y, name, scale, color);
-        canvas.text(x + 8 * scale, y, key, scale, DIM);
+        canvas.text(x + 8 * scale, y, key, scale, dim_color());
     }
 
     let x = layout.detail_x;
     let mut y = kit.details_top + 4 * scale;
     for line in [kit.info.as_deref(), kit.detected.as_deref()].into_iter().flatten() {
-        canvas.text(x, y, line, scale, DIM);
+        canvas.text(x, y, line, scale, dim_color());
         y += 12 * scale;
     }
 
@@ -681,7 +707,7 @@ fn draw_kit(canvas: &mut Canvas, kit: &KitView, layout: &KitLayout) {
     if kit.envelope.is_empty() || width <= 0 || height <= 4 * scale {
         return;
     }
-    canvas.fill_rect(x, y, width, height, CELL);
+    canvas.fill_rect(x, y, width, height, cell_color());
     let n = kit.envelope.len() as i32;
     for (i, v) in kit.envelope.iter().enumerate() {
         let bar_x = x + i as i32 * width / n;
@@ -772,7 +798,7 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
         let step = step as i64;
         let (x, width) = cell(step);
         let is_beat = step % i64::from(spb) == 0;
-        let bg = if is_beat { CELL_BEAT } else { CELL };
+        let bg = if is_beat { cell_beat_color() } else { cell_color() };
         canvas.fill_rect(x, y, width, height, bg);
         if let Some(n) = note {
             let color = theme::note(note_color(n), n.velocity);
@@ -785,7 +811,7 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
             }
             let gcolor = match gkind {
                 ordrumbox_core::note_positions::SubKind::Euclidean => theme::YELLOW,
-                ordrumbox_core::note_positions::SubKind::Retrigger => theme::MUTED,
+                ordrumbox_core::note_positions::SubKind::Retrigger => theme::muted(),
             };
             let color = theme::note(gcolor, gnote.velocity);
             let iw = ((f64::from(width) * 0.5).round() as i32).max(1);
@@ -796,7 +822,7 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
             if *gpos != step {
                 continue;
             }
-            let color = theme::note(theme::mix(theme::track(index), theme::BG, 0.3), gnote.velocity);
+            let color = theme::note(theme::mix(theme::track(index), theme::bg(), 0.3), gnote.velocity);
             let iw = ((f64::from(width) * 0.5).round() as i32).max(1);
             let ih = ((f64::from(height) * 0.5).round() as i32).max(1);
             canvas.fill_rect(x + (width - iw) / 2, y + (height - ih) / 2, iw, ih, color);
@@ -815,9 +841,9 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
                     .copied()
                     .flatten()
                     .map(|n| theme::note(note_color(n), n.velocity))
-                    .unwrap_or(CELL);
+                    .unwrap_or(cell_color());
                 let flash = theme::mix(base_color, theme::WHITE, 0.6);
-                let glow = theme::mix(flash, theme::BG, 0.5);
+                let glow = theme::mix(flash, theme::bg(), 0.5);
                 canvas.fill_rect(x - 2 * gap, y - 2 * gap, width + 4 * gap, height + 4 * gap, glow);
                 canvas.fill_rect(x, y, width, height, flash);
             }
