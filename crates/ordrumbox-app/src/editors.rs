@@ -14,7 +14,7 @@ use ordrumbox_logic::generate;
 use crate::canvas::text_width;
 use crate::control::{Format, Spec};
 use crate::kits::{DECAY_RANGE, Field, GAIN_RANGE, TRANSPOSE_RANGE};
-use crate::panel::{ACCENT, DIM, Id, Item, Kind, LfoParam, Rect, TEXT, label_width};
+use crate::panel::{ACCENT, DIM, Id, Item, Kind, LfoParam, Rect, label_width, text_color};
 
 // ─── Tables (track_editor_constants.js, sync_section.js) ─────────────────────
 
@@ -717,7 +717,7 @@ pub fn track_editor(view: &TrackView, state: &EditorState, area: Rect, scale: i3
     if let Some(bar) = &view.sample {
         let load_w = 40 * s;
         let info: String = bar.info.chars().take(usize::try_from((area.w - load_w) / (8 * s)).unwrap_or(0)).collect();
-        rows.items.push(Item::text(area.x, rows.y + 2 * s, info, TEXT, s));
+        rows.items.push(Item::text(area.x, rows.y + 2 * s, info, text_color(), s));
         let button = Kind::Button { label: "Load".into(), on: false };
         rows.items.push(Item::new(
             Some(Id::LoadSample),
@@ -911,7 +911,7 @@ fn lfo_tab(rows: &mut Rows, view: &TrackView, state: &EditorState) {
         Rect::new(field.x - 4 * s + half, r.y, half, r.h),
         value_kind(max),
     ));
-    rows.items.push(Item::text(field.x - 4 * s + 2 * half + 2 * s, r.y + (r.h - 8 * s) / 2, text, TEXT, s));
+    rows.items.push(Item::text(field.x - 4 * s + 2 * half + 2 * s, r.y + (r.h - 8 * s) / 2, text, text_color(), s));
 
     let phase = get("phase", 0.0);
     rows.slider(

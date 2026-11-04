@@ -127,29 +127,29 @@ impl LogLayout {
 pub fn draw(canvas: &mut Canvas, log: &ActionLog, scroll: usize, layout: &LogLayout) {
     let s = layout.scale;
     let Rect { x, y, w, h } = layout.panel;
-    canvas.fill_rect(x - 4 * s, y - 4 * s, w + 8 * s, h + 8 * s, theme::SHADE);
-    canvas.fill_rect(x, y, w, h, theme::LINE);
-    canvas.fill_rect(x + s, y + s, w - 2 * s, h - 2 * s, theme::PANEL);
+    canvas.fill_rect(x - 4 * s, y - 4 * s, w + 8 * s, h + 8 * s, theme::shade());
+    canvas.fill_rect(x, y, w, h, theme::line());
+    canvas.fill_rect(x + s, y + s, w - 2 * s, h - 2 * s, theme::panel());
     let text_x = x + 10 * s;
     canvas.text(text_x, y + 8 * s, "History", s, theme::PINK);
     let rows = log.rows(layout.chars_per_row);
     if rows.is_empty() {
-        canvas.text(text_x, layout.list_top, "(nothing done yet)", s, theme::MUTED);
+        canvas.text(text_x, layout.list_top, "(nothing done yet)", s, theme::muted());
     }
     let scroll = scroll.min(layout.max_scroll(log));
     for (i, row) in rows.iter().skip(scroll).take(layout.rows).enumerate() {
-        canvas.text(text_x, layout.list_top + i as i32 * layout.row, row, s, theme::TEXT);
+        canvas.text(text_x, layout.list_top + i as i32 * layout.row, row, s, theme::text());
     }
     if rows.len() > layout.rows {
         let track = layout.rows as i32 * layout.row;
         let thumb = (track * layout.rows as i32 / rows.len() as i32).max(8 * s);
         let top = (track - thumb) * scroll as i32 / layout.max_scroll(log).max(1) as i32;
         let bar_x = x + w - 8 * s;
-        canvas.fill_rect(bar_x, layout.list_top, 3 * s, track, theme::LINE);
+        canvas.fill_rect(bar_x, layout.list_top, 3 * s, track, theme::line());
         canvas.fill_rect(bar_x, layout.list_top + top, 3 * s, thumb, theme::PINK);
     }
     let hint = "wheel, arrows, PAGE UP/DOWN, HOME/END: scroll   ESC or click outside: close";
-    canvas.text(text_x, y + h - 14 * s, hint, s, theme::MUTED);
+    canvas.text(text_x, y + h - 14 * s, hint, s, theme::muted());
 }
 
 #[cfg(test)]

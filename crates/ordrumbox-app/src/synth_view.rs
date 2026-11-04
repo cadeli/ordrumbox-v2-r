@@ -39,15 +39,29 @@ const KNOB_W: i32 = 64;
 const KNOB_H: i32 = 56;
 const ROW_H: i32 = 16;
 
-const CARD: Rgb = theme::PANEL;
-const CARD_OFF: Rgb = theme::BG;
-const BORDER: Rgb = theme::LINE;
-const SURFACE: Rgb = theme::SCREEN;
-const GRID: Rgb = theme::PANEL_2;
+fn card_color() -> Rgb {
+    theme::panel()
+}
+fn card_off_color() -> Rgb {
+    theme::bg()
+}
+fn border_color() -> Rgb {
+    theme::line()
+}
+fn surface_color() -> Rgb {
+    theme::screen()
+}
+fn grid_color() -> Rgb {
+    theme::panel_2()
+}
 const ACCENT: Rgb = theme::LIME;
 const ACCENT_DIM: Rgb = theme::VIOLET;
-const TEXT: Rgb = theme::TEXT;
-const DIM: Rgb = theme::MUTED;
+fn text_color() -> Rgb {
+    theme::text()
+}
+fn dim_color() -> Rgb {
+    theme::muted()
+}
 
 /// Every field of the draft's cards, card after card: the index a
 /// [`Id::SynthField`] names.
@@ -235,7 +249,7 @@ pub fn build(
         let mut y = inner.y;
         // Title: the label, the choices, the power button.
         let label = model::group_label(group);
-        items.push(Item::text(inner.x, y + 3 * s, label, TEXT, s));
+        items.push(Item::text(inner.x, y + 3 * s, label, text_color(), s));
         if let Some((path, options)) = icon_choices(group) {
             let current = model::get(draft, &path);
             for (k, (value, label)) in options.iter().enumerate() {
@@ -305,7 +319,7 @@ pub fn build(
             y += ((knobs + per_row - 1) / per_row) * (KNOB_H + 4) * s;
         }
         for (id, label, options, path) in rows {
-            items.push(Item::text(inner.x, y + 3 * s, label, DIM, s));
+            items.push(Item::text(inner.x, y + 3 * s, label, dim_color(), s));
             let rect = Rect::new(inner.x + 80 * s, y, (inner.w - 80 * s).min(200 * s), 13 * s);
             let kind = match options {
                 Some(options) => {
@@ -337,10 +351,16 @@ pub fn draw(canvas: &mut Canvas, draft: &Object, built: &Built, layout: &SynthLa
     let s = layout.scale;
     for card in &built.cards {
         let r = card.rect;
-        canvas.fill_rect(r.x, r.y, r.w, r.h, BORDER);
-        canvas.fill_rect(r.x + s, r.y + s, r.w - 2 * s, r.h - 2 * s, if card.bypassed { CARD_OFF } else { CARD });
+        canvas.fill_rect(r.x, r.y, r.w, r.h, border_color());
+        canvas.fill_rect(
+            r.x + s,
+            r.y + s,
+            r.w - 2 * s,
+            r.h - 2 * s,
+            if card.bypassed { card_off_color() } else { card_color() },
+        );
         if let Some((plot, rect)) = card.plot {
-            canvas.fill_rect(rect.x, rect.y, rect.w, rect.h, SURFACE);
+            canvas.fill_rect(rect.x, rect.y, rect.w, rect.h, surface_color());
             match plot {
                 Plot::Scope => draw_scope(canvas, &model::scope(draft, time, bpm), rect, s),
                 Plot::Envelope => draw_envelope(canvas, draft, rect, s),
@@ -353,8 +373,8 @@ pub fn draw(canvas: &mut Canvas, draft: &Object, built: &Built, layout: &SynthLa
     let y = layout.area.y + layout.area.h + 4 * s;
     for (label, on) in model::modules(draft) {
         let w = text_width(label, s) + 8 * s;
-        canvas.fill_rect(x, y, w, 12 * s, if on { ACCENT_DIM } else { CARD_OFF });
-        canvas.text(x + 4 * s, y + 2 * s, label, s, if on { ACCENT } else { DIM });
+        canvas.fill_rect(x, y, w, 12 * s, if on { ACCENT_DIM } else { card_off_color() });
+        canvas.text(x + 4 * s, y + 2 * s, label, s, if on { ACCENT } else { dim_color() });
         x += w + 4 * s;
     }
 }
@@ -380,7 +400,7 @@ fn polyline(canvas: &mut Canvas, points: impl Iterator<Item = (i32, i32)>, t: i3
 /// The scope: the samples across, -1 to 1 around the middle.
 fn draw_scope(canvas: &mut Canvas, samples: &[f64], r: Rect, s: i32) {
     let mid = r.y + r.h / 2;
-    canvas.fill_rect(r.x, mid, r.w, s.max(1), GRID);
+    canvas.fill_rect(r.x, mid, r.w, s.max(1), grid_color());
     let n = samples.len().max(1);
     let points = samples
         .iter()
@@ -392,7 +412,7 @@ fn draw_scope(canvas: &mut Canvas, samples: &[f64], r: Rect, s: i32) {
 /// The envelope: attack, decay, sustain, release.
 fn draw_envelope(canvas: &mut Canvas, draft: &Object, r: Rect, s: i32) {
     let mid = r.y + r.h / 2;
-    canvas.fill_rect(r.x, mid, r.w, s.max(1), GRID);
+    canvas.fill_rect(r.x, mid, r.w, s.max(1), grid_color());
     let (points, total) = model::envelope(draft);
     let point = |(t, v): (f64, f64)| {
         (r.x + ((t / total) * f64::from(r.w - 1)) as i32, mid - (v * f64::from(r.h / 2 - 4 * s)) as i32)
@@ -406,10 +426,10 @@ fn draw_filter(canvas: &mut Canvas, draft: &Object, r: Rect, s: i32, time: f64, 
     let to_x = |f: f64| r.x + (((f.log10() - 20f64.log10()) / 3.0) * f64::from(r.w)) as i32;
     let to_y = |db: f64| r.y + r.h - 1 - (((db + 30.0) / 42.0) * f64::from(r.h - 1)) as i32;
     for f in [100.0, 1000.0, 10_000.0] {
-        canvas.fill_rect(to_x(f), r.y, s.max(1), r.h, GRID);
+        canvas.fill_rect(to_x(f), r.y, s.max(1), r.h, grid_color());
     }
     for db in [0.0, -20.0] {
-        canvas.fill_rect(r.x, to_y(db), r.w, s.max(1), GRID);
+        canvas.fill_rect(r.x, to_y(db), r.w, s.max(1), grid_color());
     }
     const N: usize = 200;
     let (kind, fc, q, slope_db, band) = model::filter_now(draft, time, bpm);

@@ -41,6 +41,8 @@ use crate::update;
 use crate::view::{self, Cursor, Hit, KitView, View};
 use session_confirm::Pending;
 
+#[path = "session_color.rs"]
+mod session_color;
 #[path = "session_confirm.rs"]
 mod session_confirm;
 #[path = "session_grid.rs"]
@@ -231,6 +233,8 @@ pub struct Session {
     track_levels: Vec<f32>,
     /// Whether the VU meter stripe is shown.
     show_vus: bool,
+    /// The settings file the colour scheme is saved to (`None`: not saved).
+    color_scheme_file: Option<PathBuf>,
     /// Current page of the pattern grid (BEATS_PER_PAGE beats).
     current_page: usize,
     /// What the mouse and the keyboard hold among the widgets.
@@ -316,7 +320,7 @@ enum Overlay {
 }
 
 /// Every key, for Help > Keyboard shortcuts.
-const SHORTCUTS: [&str; 53] = [
+const SHORTCUTS: [&str; 54] = [
     "MENUS",
     "  F10 or Alt             open the menus: Arrows move, Enter runs, Esc closes",
     "  F1 F2 F3 F4 F5 F6      this list, track editor, song, piano roll, grid, synth (Ctrl+K: kit editor)",
@@ -327,6 +331,7 @@ const SHORTCUTS: [&str; 53] = [
     "  Delete                 clear the cursor step        Esc  deselect",
     "  right-click            a track's name: track menu   a step: notes menu",
     "  F, G, V                random pattern, random drumkit, VU meters on/off",
+    "  C                      next colour scheme",
     "  H, J, K                every track: synth sounds, auto-assigned, random samples",
     "PLAY",
     "  1-9 / Shift+1-9        mute / solo track 1-9        Q-P  hear track 1-10 (any view)",
@@ -444,6 +449,7 @@ impl Session {
         }
         session.load_master();
         session.load_update_settings();
+        session.load_color_scheme(store::settings_path());
         session
     }
 
@@ -520,6 +526,7 @@ impl Session {
             show_track_editor: true,
             track_levels: Vec::new(),
             show_vus: true,
+            color_scheme_file: None,
             current_page: 0,
             widgets: Widgets::default(),
             note_focus: None,
@@ -982,6 +989,7 @@ impl Session {
             C::SelectRandomPattern => self.select_random_pattern(),
             C::SelectRandomDrumkit => self.select_random_drumkit(),
             C::ToggleVus => self.toggle_vus(),
+            C::NextColorScheme => self.next_color_scheme(),
             C::ExportPatternJson => self.open_export(Export::PatternJson),
             C::ConvertToSynth => self.convert_to_generated_sounds(self.pattern_index),
             C::AutoAssignAll => self.auto_assign_all_tracks(self.pattern_index),

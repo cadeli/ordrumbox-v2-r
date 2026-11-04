@@ -281,17 +281,21 @@ impl Session {
         let line = 16 * s;
         let field = |y: i32| Rect::new(x + label_w, y, area.w - label_w, 12 * s);
         // The name (a click renames it), the date.
-        for (label, id, text, color) in
-            [("Song", Some(Id::SongName), self.song_name(), panel::TEXT), ("Date", None, self.info("date"), panel::DIM)]
-        {
+        for (label, id, text, color) in [
+            ("Song", Some(Id::SongName), self.song_name(), panel::text_color()),
+            ("Date", None, self.info("date"), panel::DIM),
+        ] {
             layout.items.push(Item::text(x, y + 2 * s, label, panel::DIM, s));
             layout.items.push(Item::new(id, field(y), Kind::Text { text, color }));
             y += line;
         }
         // The description, a click edits it.
         let description = self.info("description");
-        let (text, color) =
-            if description.is_empty() { ("(description)".to_owned(), panel::DIM) } else { (description, panel::TEXT) };
+        let (text, color) = if description.is_empty() {
+            ("(description)".to_owned(), panel::DIM)
+        } else {
+            (description, panel::text_color())
+        };
         let rect = Rect::new(x, y, area.w, 12 * s);
         layout.items.push(Item::new(Some(Id::SongDescription), rect, Kind::Text { text, color }));
         y += line + 4 * s;
