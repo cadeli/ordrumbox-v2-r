@@ -1036,10 +1036,12 @@ impl Session {
     pub(super) fn export_file_name_of(&self, export: Export, p: usize, s: usize) -> Option<String> {
         let library = self.editor.library();
         let pattern = library.patterns.get(p);
+        // Ids come as they are from the files loaded: one with `/` or `..`
+        // must not lead the write out of the folder picked.
         Some(match export {
-            Export::PatternWav => format!("ordrumbox-{}.wav", pattern?.id),
-            Export::SongWav => format!("ordrumbox-song-{}.wav", library.songs.get(s)?.id),
-            Export::PatternMidi => format!("ordrumbox-{}.mid", pattern?.id),
+            Export::PatternWav => format!("ordrumbox-{}.wav", store::safe_name(&pattern?.id)),
+            Export::SongWav => format!("ordrumbox-song-{}.wav", store::safe_name(&library.songs.get(s)?.id)),
+            Export::PatternMidi => format!("ordrumbox-{}.mid", store::safe_name(&pattern?.id)),
             Export::PatternJson => pattern_json_file_name(pattern?),
             Export::Song | Export::SongSaveAs => self.song_file_name(),
             Export::Synths => SYNTHS_FILE_NAME.to_owned(),
