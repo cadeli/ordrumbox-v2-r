@@ -667,6 +667,18 @@ mod tests {
     }
 
     #[test]
+    fn export_file_names_stay_in_their_folder() {
+        let (library, _) = Library::parse(
+            r#"{"patterns":[{"id":"/../../x","name":"a"}],"songs":[{"id":"..\\..\\y","name":"b","clips":[]}]}"#,
+        )
+        .unwrap();
+        let s = Session::new(library, KitSet::empty(), Vec::new());
+        assert_eq!(s.export_file_name_of(Export::PatternWav, 0, 0).as_deref(), Some("ordrumbox-_______x.wav"));
+        assert_eq!(s.export_file_name_of(Export::PatternMidi, 0, 0).as_deref(), Some("ordrumbox-_______x.mid"));
+        assert_eq!(s.export_file_name_of(Export::SongWav, 0, 0).as_deref(), Some("ordrumbox-song-______y.wav"));
+    }
+
+    #[test]
     fn patterns_are_shown_and_removed() {
         let mut s = session();
         call(&mut s, "createNewPattern", r#"{"patternName":"house"}"#).unwrap();
