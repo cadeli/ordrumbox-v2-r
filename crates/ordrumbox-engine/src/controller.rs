@@ -14,13 +14,17 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering, fence};
 use std::sync::{Arc, Mutex, MutexGuard, TryLockError};
 
+use ordrumbox_core::song::clamp_bpm;
 use ordrumbox_core::{Library, Rng, Scales, Track};
 use ordrumbox_dsp::MasterSettings;
 
 use crate::assign::{TrackSound, assign_track};
-use crate::engine::{Engine, MAX_TRACKS, Position};
+use crate::engine::{Engine, HostTransport, MAX_TRACKS, Position, host_pass};
 use crate::kit::SampleBank;
-use crate::pass::{HitsCache, Pass, PassContext, SongContext, build_pass, build_preview, build_song_pass};
+use crate::pass::{
+    HitsCache, Pass, PassContext, SONG_PASS_TICKS, SongContext, build_pass_at, build_preview, build_song_pass_at,
+    pattern_pass_ticks,
+};
 use crate::synth_preset::SynthPresets;
 
 #[derive(Debug)]
@@ -39,6 +43,9 @@ struct Inbox {
     master: Option<MasterSettings>,
     preview: Option<Arc<Pass>>,
 }
+
+/// A host tempo change smaller than this is not one (passes are not rebuilt).
+const TEMPO_EPSILON: f64 = 1e-6;
 
 /// Samples the scope keeps (the JS analyser's `fftSize`).
 pub const SCOPE_SIZE: usize = 4096;
@@ -69,11 +76,32 @@ struct Published {
     frames: AtomicU64,
     /// Pass index the engine needs, plus one (0: none).
     wants: AtomicU64,
+    /// Whether the last callback followed a plugin host's transport, and that transport.
+    synced: AtomicBool,
+    host_playing: AtomicBool,
+    host_bpm: AtomicU64,
+    host_beat: AtomicU64,
+    /// The host was in a pass the engine does not play.
+    lost: AtomicBool,
+}
+
+/// One callback's published state.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Snapshot {
+    /// `None` when stopped.
+    position: Option<Position>,
+    /// Pass index the engine needs, plus one (0: none).
+    wants: u64,
+    /// The host's transport, when the callback followed one.
+    host: Option<HostTransport>,
+    /// The host was in a pass the engine does not play.
+    lost: bool,
 }
 
 impl Published {
     /// Audio side, the only writer.
-    fn write(&self, position: Option<Position>, wants: u64) {
+    fn write(&self, snapshot: Snapshot) {
+        let Snapshot { position, wants, host, lost } = snapshot;
         let seq = self.seq.load(Ordering::Relaxed);
         self.seq.store(seq + 1, Ordering::Relaxed);
         fence(Ordering::Release);
@@ -84,11 +112,18 @@ impl Published {
             self.frames.store(frames, Ordering::Relaxed);
         }
         self.wants.store(wants, Ordering::Relaxed);
+        self.synced.store(host.is_some(), Ordering::Relaxed);
+        if let Some(HostTransport { playing, bpm, beat }) = host {
+            self.host_playing.store(playing, Ordering::Relaxed);
+            self.host_bpm.store(bpm.to_bits(), Ordering::Relaxed);
+            self.host_beat.store(beat.to_bits(), Ordering::Relaxed);
+        }
+        self.lost.store(lost, Ordering::Relaxed);
         self.seq.store(seq + 2, Ordering::Release);
     }
 
-    /// The position (`None` when stopped) and `wants`, from one callback.
-    fn read(&self) -> (Option<Position>, u64) {
+    /// What one callback published.
+    fn read(&self) -> Snapshot {
         loop {
             let before = self.seq.load(Ordering::Acquire);
             if before % 2 == 0 {
@@ -99,9 +134,15 @@ impl Published {
                     frames: self.frames.load(Ordering::Relaxed),
                 };
                 let wants = self.wants.load(Ordering::Relaxed);
+                let host = self.synced.load(Ordering::Relaxed).then(|| HostTransport {
+                    playing: self.host_playing.load(Ordering::Relaxed),
+                    bpm: f64::from_bits(self.host_bpm.load(Ordering::Relaxed)),
+                    beat: f64::from_bits(self.host_beat.load(Ordering::Relaxed)),
+                });
+                let lost = self.lost.load(Ordering::Relaxed);
                 fence(Ordering::Acquire);
                 if self.seq.load(Ordering::Relaxed) == before {
-                    return (playing.then_some(position), wants);
+                    return Snapshot { position: playing.then_some(position), wants, host, lost };
                 }
             }
             std::hint::spin_loop();
@@ -162,6 +203,31 @@ impl AudioSide {
 
     /// Render one callback's worth of stereo frames.
     pub fn render(&mut self, left: &mut [f32], right: &mut [f32]) {
+        self.take_inbox();
+        self.engine.render(left, right);
+        self.publish(left, right, None, false);
+    }
+
+    /// Render one block of a plugin host, following its transport: the
+    /// engine stops when the host stops, and keeps to the host's position
+    /// inside the pass it plays. When the host is in another pass, it says
+    /// so, and the controller posts that pass ([`Controller::update`]).
+    pub fn render_synced(&mut self, left: &mut [f32], right: &mut [f32], host: HostTransport) {
+        self.take_inbox();
+        let lost = if host.rolling() {
+            !self.engine.follow(host.beat)
+        } else {
+            if self.engine.is_playing() {
+                self.engine.stop();
+            }
+            false
+        };
+        self.engine.render(left, right);
+        self.publish(left, right, Some(host), lost);
+    }
+
+    /// Take what the controller posted, if the lock is free.
+    fn take_inbox(&mut self) {
         if let Some(mut inbox) = try_lock(&self.link.inbox) {
             if let Some(bank) = inbox.bank.take() {
                 self.engine.set_bank(bank);
@@ -182,7 +248,10 @@ impl AudioSide {
                 self.engine.preview(preview);
             }
         }
-        self.engine.render(left, right);
+    }
+
+    /// Publish levels, scope and position after rendering `left` and `right`.
+    fn publish(&mut self, left: &[f32], right: &[f32], host: Option<HostTransport>, lost: bool) {
         // Both hold MAX_TRACKS values from the start: nothing to allocate.
         if let Some(mut levels) = try_lock(&self.link.levels) {
             for (level, peak) in levels.iter_mut().zip(self.engine.peaks()) {
@@ -198,7 +267,7 @@ impl AudioSide {
             scope.at = self.scope.at;
         }
         let wants = self.engine.wants_pass().map_or(0, |n| n + 1);
-        self.link.published.write(self.engine.position(), wants);
+        self.link.published.write(Snapshot { position: self.engine.position(), wants, host, lost });
     }
 }
 
@@ -236,6 +305,8 @@ pub struct Controller {
     /// Previews posted, oldest first, kept while the engine or the inbox may hold them.
     previews: VecDeque<Arc<Pass>>,
     playing: bool,
+    /// The plugin host's tempo the passes are built at, once a host transport was seen.
+    tempo: Option<f64>,
 }
 
 /// What a track's sound depends on.
@@ -308,6 +379,7 @@ impl Controller {
             sent: VecDeque::new(),
             previews: VecDeque::new(),
             playing: false,
+            tempo: None,
         };
         (controller, audio)
     }
@@ -431,7 +503,8 @@ impl Controller {
                     sample_rate: self.sample_rate,
                     first_tick: self.first_tick(number),
                 };
-                build_pass(pattern, number, &mut self.rng, context)
+                let bpm = self.tempo.unwrap_or_else(|| clamp_bpm(pattern.bpm));
+                build_pass_at(pattern, number, &mut self.rng, context, bpm)
             }
             Mode::Song(s) => {
                 let song = library.songs.get(s)?;
@@ -454,7 +527,8 @@ impl Controller {
                     synths: &self.synths,
                     sample_rate: self.sample_rate,
                 };
-                build_song_pass(song, number, &mut self.rng, &mut self.song_notes, context)
+                let bpm = self.tempo.unwrap_or_else(|| clamp_bpm(song.bpm));
+                build_song_pass_at(song, number, &mut self.rng, &mut self.song_notes, context, bpm)
             }
         };
         let pass = Arc::new(pass);
@@ -576,7 +650,7 @@ impl Controller {
     /// The pass [`Self::update`] builds now, if it builds one: the moment for
     /// the loop start of auto-mode tracks (a pass is a loop of the pattern).
     pub fn pending_pass(&self) -> Option<u64> {
-        let wants = self.link.published.read().1.checked_sub(1)?;
+        let wants = self.link.published.read().wants.checked_sub(1)?;
         // The pass after the last one posted: not one already sent, and not
         // one the engine asked for before a jump it has not taken yet.
         let follows = self.sent.back().is_none_or(|p| p.number + 1 == wants);
@@ -585,8 +659,14 @@ impl Controller {
 
     /// Call regularly (every UI frame) while playing: posts the next pass
     /// when the engine needs it, so tempo, kit and pattern changes take
-    /// effect at the next pass boundary.
+    /// effect at the next pass boundary. Under a plugin host
+    /// ([`AudioSide::render_synced`]), call it even while stopped: it starts,
+    /// stops and moves playback with the host.
     pub fn update(&mut self, library: &Library) {
+        let snapshot = self.link.published.read();
+        if let Some(host) = snapshot.host {
+            self.follow_host(library, host, snapshot.lost);
+        }
         if let Some(number) = self.pending_pass()
             && let Some(pass) = self.build(library, number)
         {
@@ -613,7 +693,52 @@ impl Controller {
 
     /// Playback position, `None` when stopped.
     pub fn position(&self) -> Option<Position> {
-        self.link.published.read().0
+        self.link.published.read().position
+    }
+
+    /// The plugin host's transport seen by the last callback, if it followed one.
+    pub fn host(&self) -> Option<HostTransport> {
+        self.link.published.read().host
+    }
+
+    /// Ticks in one pass of what plays.
+    fn pass_ticks(&self, library: &Library) -> Option<u32> {
+        match self.mode {
+            Mode::Pattern(p) => library.patterns.get(p).map(pattern_pass_ticks),
+            Mode::Song(s) => library.songs.get(s).map(|_| SONG_PASS_TICKS),
+        }
+    }
+
+    /// Follow the plugin host's transport: its tempo for every pass, start
+    /// and stop with it, and the pass it is in when it jumps (a loop, a
+    /// click on its timeline).
+    fn follow_host(&mut self, library: &Library, host: HostTransport, lost: bool) {
+        let bpm = clamp_bpm(host.bpm);
+        let new_tempo = self.tempo.is_none_or(|tempo| (tempo - bpm).abs() > TEMPO_EPSILON);
+        if new_tempo {
+            self.tempo = Some(bpm);
+        }
+        if !host.rolling() {
+            if self.playing {
+                self.stop();
+            }
+            return;
+        }
+        // A Play still waiting is the host's pass already.
+        if matches!(lock(&self.link.inbox).command, Some(Command::Play(_))) {
+            return;
+        }
+        if !self.playing || lost {
+            let Some((number, _)) = self.pass_ticks(library).and_then(|ticks| host_pass(host.beat, ticks)) else {
+                return;
+            };
+            if !self.playing {
+                self.assigned.clear();
+            }
+            self.jump(library, number);
+        } else if new_tempo {
+            self.refresh(library);
+        }
     }
 }
 
@@ -741,11 +866,19 @@ mod tests {
     #[test]
     fn the_position_is_read_as_written() {
         let published = Published::default();
-        assert_eq!(published.read(), (None, 0));
-        published.write(Some(Position { pass: 3, frame: 10, frames: 100 }), 4);
-        assert_eq!(published.read(), (Some(Position { pass: 3, frame: 10, frames: 100 }), 4));
-        published.write(None, 0);
-        assert_eq!(published.read(), (None, 0));
+        let stopped = Snapshot { position: None, wants: 0, host: None, lost: false };
+        assert_eq!(published.read(), stopped);
+        let host = HostTransport { playing: true, bpm: 97.5, beat: 12.25 };
+        let playing = Snapshot {
+            position: Some(Position { pass: 3, frame: 10, frames: 100 }),
+            wants: 4,
+            host: Some(host),
+            lost: true,
+        };
+        published.write(playing);
+        assert_eq!(published.read(), playing);
+        published.write(stopped);
+        assert_eq!(published.read(), stopped);
     }
 
     #[test]

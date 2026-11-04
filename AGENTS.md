@@ -58,6 +58,10 @@ tools/            scripts that regenerate the golden fixtures
     them ahead of time;
   - `AudioSide`, in the cpal callback, takes them with `try_lock`, renders,
     and publishes its position.
+- Under a plugin host, `AudioSide::render_synced` follows the host's
+  transport (`HostTransport`): it stops with the host, and seeks inside the pass it
+  plays. `Controller::update`, called even while stopped, starts playback,
+  moves it to the host's pass and rebuilds passes at the host's tempo.
 - **Nothing reached from the audio callback allocates, frees, takes a
   blocking lock, or does I/O.** This covers `Engine::render` and every
   render path of `ordrumbox-dsp`. Buffers are sized before the stream starts.

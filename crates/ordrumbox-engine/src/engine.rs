@@ -11,6 +11,7 @@
 
 use std::sync::Arc;
 
+use ordrumbox_core::steps::TICK;
 use ordrumbox_dsp::{MasterBus, MasterSettings, SampleVoice, Strip, StripSettings, SynthVoice};
 
 use crate::kit::SampleBank;
@@ -34,6 +35,36 @@ const IDLE_LEVEL: f32 = 1e-6;
 /// ...for this long (longer than the longest delay) is not processed until
 /// its input comes back.
 const IDLE_SECONDS: f32 = 2.5;
+
+/// Frames the transport may drift from the host's position before it seeks.
+pub const SEEK_TOLERANCE_FRAMES: u64 = 32;
+
+/// A plugin host's transport at the start of a block.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct HostTransport {
+    pub playing: bool,
+    pub bpm: f64,
+    /// Beats since the start of the host's timeline.
+    pub beat: f64,
+}
+
+impl HostTransport {
+    /// Playing at a place the transport can follow (not in a pre-roll before beat 0).
+    pub fn rolling(&self) -> bool {
+        self.playing && self.beat.is_finite() && self.beat >= 0.0
+    }
+}
+
+/// The pass host beat `beat` falls in, passes of `ticks` ticks each, and how
+/// far into it (0 to 1); `None` before beat 0 or for an empty pass.
+pub fn host_pass(beat: f64, ticks: u32) -> Option<(u64, f64)> {
+    if !beat.is_finite() || beat < 0.0 || ticks == 0 {
+        return None;
+    }
+    let pass_beats = f64::from(ticks) / f64::from(TICK);
+    let pass = (beat / pass_beats).floor();
+    Some((pass as u64, (beat / pass_beats - pass).clamp(0.0, 1.0)))
+}
 
 /// Where playback is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -212,6 +243,30 @@ impl Engine {
 
     pub fn is_playing(&self) -> bool {
         self.current.is_some()
+    }
+
+    /// Keep the transport on host beat `beat`: a drift of more than
+    /// [`SEEK_TOLERANCE_FRAMES`] inside the playing pass moves playback
+    /// there. False when stopped or when the host is in another pass (the
+    /// controller posts that one).
+    pub fn follow(&mut self, beat: f64) -> bool {
+        let Some(pass) = &self.current else { return false };
+        let Some((mut number, fraction)) = host_pass(beat, pass.ticks) else { return false };
+        let mut frame = (fraction * pass.frames as f64).round() as u64;
+        if frame >= pass.frames {
+            number += 1;
+            frame = 0;
+        }
+        let at = |n: u64, f: u64| u128::from(n) * u128::from(pass.frames) + u128::from(f);
+        if at(self.pass_number, self.frame).abs_diff(at(number, frame)) <= u128::from(SEEK_TOLERANCE_FRAMES) {
+            return true;
+        }
+        if number != self.pass_number {
+            return false;
+        }
+        self.cursor = pass.events.partition_point(|e| e.frame < frame);
+        self.frame = frame;
+        true
     }
 
     pub fn position(&self) -> Option<Position> {
@@ -568,6 +623,40 @@ mod tests {
         loud.strips[0].volume = 2.0;
         engine.play(Arc::new(loud));
         assert!(render(&mut engine, 1000).iter().all(|s| s.abs() <= 1.0));
+    }
+
+    #[test]
+    fn host_beats_fall_in_passes() {
+        let four_beats = 4 * TICK;
+        assert_eq!(host_pass(0.0, four_beats), Some((0, 0.0)));
+        assert_eq!(host_pass(5.0, four_beats), Some((1, 0.25)));
+        assert_eq!(host_pass(8.0, four_beats), Some((2, 0.0)));
+        assert_eq!(host_pass(-0.5, four_beats), None, "a pre-roll");
+        assert_eq!(host_pass(f64::NAN, four_beats), None);
+        assert_eq!(host_pass(1.0, 0), None);
+        let pre_roll = HostTransport { playing: true, bpm: 120.0, beat: -1.0 };
+        assert!(!pre_roll.rolling() && HostTransport { beat: 0.0, ..pre_roll }.rolling());
+    }
+
+    #[test]
+    fn follow_seeks_inside_the_pass_and_tells_another_pass() {
+        // `pass` lasts one beat (32 ticks) in 1000 frames.
+        let mut engine = engine();
+        assert!(!engine.follow(0.0), "stopped");
+        engine.play(pass(0, &[0, 600], 1000));
+        assert!(engine.follow(0.01), "10 frames off: within the tolerance");
+        assert_eq!(engine.position().map(|p| p.frame), Some(0));
+        assert!(engine.follow(0.5));
+        assert_eq!(engine.position().map(|p| p.frame), Some(500));
+        let signal = render(&mut engine, 200);
+        assert_eq!(onsets(&signal), [100], "frame 600 of the pass, frame 0 skipped");
+        assert!(engine.follow(0.7), "where it is");
+        assert!(!engine.follow(3.2), "pass 3: the controller posts it");
+        assert_eq!(engine.position().map(|p| p.frame), Some(700));
+        // Across the end of a pass, the frames are compared, not the pass numbers.
+        render(&mut engine, 290);
+        assert!(engine.follow(0.999_999));
+        assert_eq!(engine.position().map(|p| (p.pass, p.frame)), Some((0, 990)));
     }
 
     #[test]
