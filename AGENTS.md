@@ -13,10 +13,12 @@ cargo run -p ordrumbox-app              # the app; finds assets/ from anywhere i
 cargo test --workspace                  # all tests, golden fixtures included
 cargo clippy --workspace --all-targets  # must be clean: CI sets RUSTFLAGS=-D warnings
 cargo fmt --all                         # rustfmt.toml: max_width 120; CI checks it
+cargo xtask bundle ordrumbox-plugin --release --features vst3   # target/bundled/orDrumbox.{clap,vst3}
 ```
 
 CI (`.github/workflows/ci.yml`) runs fmt, clippy and tests on Windows and
-macOS, then builds the release `ordrumbox.exe` with `assets/` next to it.
+macOS, then builds the release `ordrumbox.exe` with `assets/` next to it,
+and the plugin bundles, checked by `clap-validator`.
 
 ## Layout
 
@@ -27,6 +29,8 @@ ordrumbox-logic   editor with undo/redo, generators, MIDI files     → core
 ordrumbox-engine  kits, WAV, passes, engine, UI ↔ audio link        → core, dsp
 ordrumbox-probe   sound measurements (command line, not shipped)    → core, dsp, engine
 ordrumbox-app     window, UI, audio output                          → core, logic, engine, winit, softbuffer, cpal, fontdue
+ordrumbox-plugin  CLAP/VST3 instrument following the host           → core, engine, nih-plug, baseview, softbuffer
+xtask             `cargo xtask bundle`: plugin bundles, assets in   → nih_plug_xtask
 assets/           data/*.json and kits/**.wav, read at runtime
 tools/            scripts that regenerate the golden fixtures
 ```
@@ -34,6 +38,9 @@ tools/            scripts that regenerate the golden fixtures
 - The four domain crates take **no third-party dependency**. Only
   `ordrumbox-app` talks to the OS (window, screen, sound device), through
   `winit`, `softbuffer`, `cpal` and `fontdue` (text in the system's monospace font, read at start: nothing bundled).
+  `ordrumbox-plugin` talks to a plugin host instead, through `nih-plug`
+  (pinned git revision) and `baseview`; the `vst3` feature links GPLv3
+  bindings (`README.md`, "License"), so it stays off by default.
 - The update check (`ordrumbox-app/src/update.rs`) runs the system's `curl`
   on a thread of its own, never on the UI or audio thread; it only tells,
   never downloads. A release is a `v<version>` tag matching `Cargo.toml`
@@ -48,7 +55,9 @@ tools/            scripts that regenerate the golden fixtures
 - Dependencies only point down the table. Nothing depends on
   `ordrumbox-app`; `dsp` uses `core` only as a dev-dependency.
 - Workspace lints (`Cargo.toml`): `unsafe_code = "forbid"`,
-  `missing_debug_implementations = "warn"`, clippy `all`.
+  `missing_debug_implementations = "warn"`, clippy `all`. `ordrumbox-plugin`
+  repeats them with `unsafe_code = "deny"`: only the export macros and the
+  window handle adapters (`editor.rs`) allow it, each with a `SAFETY` comment.
 
 ## Audio thread
 
@@ -62,6 +71,10 @@ tools/            scripts that regenerate the golden fixtures
   transport (`HostTransport`): it stops with the host, and seeks inside the pass it
   plays. `Controller::update`, called even while stopped, starts playback,
   moves it to the host's pass and rebuilds passes at the host's tempo.
+  In the plugin, a thread of its own (`player.rs`, `Ticker`) calls it every
+  10 ms, editor open or not; `process()` only calls `render_synced` and
+  never takes the player's lock. Engines are made and dropped in
+  `initialize()`, on the host's main thread.
 - **Nothing reached from the audio callback allocates, frees, takes a
   blocking lock, or does I/O.** This covers `Engine::render` and every
   render path of `ordrumbox-dsp`. Buffers are sized before the stream starts.
