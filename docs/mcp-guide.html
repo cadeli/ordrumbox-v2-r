@@ -160,7 +160,7 @@ the assistant sends, and what it may tell you back.</p>
 
 <h3>A kit and a synth</h3>
 <p>A <strong>kit</strong> is a set of samples (<code>electro</code>, <code>real</code>, <code>8bits</code>…): changing the kit
-changes the sound of every drum track. A <strong>synth</strong> preset (<code>BASS5</code>, <code>SYNTH1</code>, <code>PIANO</code>…)
+changes the sound of every drum track. A <strong>synth</strong> preset (<code>BASS_ACID</code>, <code>SYNTHLEAD_SAW</code>, <code>PIANO_EPIANO</code>…)
 is a sound made by the built-in synthesizer, handy for bass lines and chords.</p>
 
 <h3>An arrangement (song)</h3>
@@ -229,9 +229,9 @@ With a probability below 1, the hi-hat changes a little at every loop: the beat 
 
 <div class="example">
 <h3>Example 5 — A synth bass line</h3>
-<p class="say">Add a bass playing on the synth preset BASS5: a note on step 0, then a fifth higher on step 6, then back on step 10.</p>
+<p class="say">Add a bass playing on the synth preset BASS_ACID: a note on step 0, then a fifth higher on step 6, then back on step 10.</p>
 <pre><code>updateTrack       { "patternName": "First Beat", "trackName": "BASS",
-                    "updates": { "useSynth": true, "synthPreset": "BASS5" } }
+                    "updates": { "useSynth": true, "synthPreset": "BASS_ACID" } }
 addNotesToPattern { "patternName": "First Beat", "notes": [
   { "trackName": "BASS", "step": 0 },
   { "trackName": "BASS", "step": 6, "pitch": 7 },

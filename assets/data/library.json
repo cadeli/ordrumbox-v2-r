@@ -3562,7 +3562,7 @@
           "hitVariation": 85,
           "reverbType": "hall",
           "reverbMix": 0.05,
-          "synthPreset": "PIANO",
+          "synthPreset": "PIANO_EPIANO",
           "noteKeys": [
             "beat"
           ],
