@@ -258,8 +258,9 @@ impl Check {
     }
 }
 
-/// Open `url` in the default browser.
-pub fn open_page(url: &str) -> Result<(), String> {
+/// Open `url` with the system: a web page in the default browser, a folder
+/// in the Finder or the Explorer.
+pub fn open_with_system(url: &str) -> Result<(), String> {
     let mut command = if cfg!(windows) {
         command("rundll32", &["url.dll,FileProtocolHandler", url])
     } else if cfg!(target_os = "macos") {

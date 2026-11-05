@@ -19,6 +19,16 @@ impl Updates {
         self.check.is_some()
     }
 
+    /// The waker of the checks, taken (to keep it across a reload).
+    pub(super) fn take_waker(&mut self) -> Option<update::Waker> {
+        self.waker.take()
+    }
+
+    /// Keep `waker` for the checks, without checking now.
+    pub(super) fn keep_waker(&mut self, waker: update::Waker) {
+        self.waker = Some(waker);
+    }
+
     /// The newer release found, if any.
     pub(super) fn newer_release(&self) -> Option<&update::Release> {
         self.newer_release.as_ref()
@@ -105,7 +115,7 @@ impl Session {
             self.message = "no newer version found: Help > Check for updates".into();
             return;
         };
-        self.message = match update::open_page(&release.url) {
+        self.message = match update::open_with_system(&release.url) {
             Ok(()) => format!("opened {}", release.url),
             Err(e) => e,
         };

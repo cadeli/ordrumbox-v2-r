@@ -183,7 +183,8 @@ fn a_factory_reset_leaves_the_shipped_presets() {
     let path = dir.join("synth_presets.json");
     fs::write(&path, r#"{"OLD":{"masterVolume":0.5}}"#).unwrap();
 
-    assert!(store::factory_reset(&dir).unwrap().contains(&"synth_presets.json".to_owned()));
+    let aside = crate::user_data::move_aside(&dir, "20261105-131505", "reset").unwrap().unwrap();
+    assert!(aside.names.contains(&"synth_presets.json".to_owned()));
     assert_eq!(store::load_synths(&path).unwrap(), None);
 
     let shipped = SynthPresets::from_json(&json::parse(&asset("synth_presets.json")).unwrap());

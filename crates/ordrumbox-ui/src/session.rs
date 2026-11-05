@@ -89,6 +89,8 @@ mod session_song;
 mod session_synth;
 #[path = "session_update.rs"]
 mod session_update;
+#[path = "session_user_data.rs"]
+mod session_user_data;
 pub use session_panel::{Button, PanelKey};
 
 /// What the main editor (top-left) shows under the header. The kit editor
@@ -456,7 +458,12 @@ impl Session {
 
         let hosted = matches!(source, LibrarySource::Host(_));
         let (library, library_path, message) = match source {
-            LibrarySource::UserFile => Self::open_library(store::path(), assets.library, &mut status),
+            LibrarySource::UserFile => {
+                if let Some(problem) = store::location_problem() {
+                    status.push(format!("{problem}: File > Change user data folder"));
+                }
+                Self::open_library(store::path(), assets.library, &mut status)
+            }
             LibrarySource::Host(text) => Self::open_host_library(text, assets.library, &mut status),
         };
         if library_path.is_none() && !assets.report.issues.is_empty() {
@@ -1041,6 +1048,8 @@ impl Session {
             checking_updates: self.updates.checking(),
             newer_release: self.updates.newer_release().map(|r| r.version.clone()),
             hosted: self.hosted,
+            has_demo: self.has_demo(),
+            user_folder: self.user_folder().is_some(),
         }
     }
 
@@ -1172,6 +1181,14 @@ impl Session {
             C::Shortcuts => self.chrome.overlay = Some(Overlay::Shortcuts),
             C::About => self.chrome.overlay = Some(Overlay::About),
             C::FactoryReset => self.chrome.overlay = Some(Overlay::FactoryReset),
+            C::ExportLibrary => self.open_export(Export::Library),
+            C::ImportLibrary => self.open_picker(Purpose::ImportLibrary),
+            C::DemoLibrary => self.ask(Pending::DemoLibrary),
+            C::BackUpUserData => self.open_export(Export::UserData),
+            C::RestoreUserData => self.open_restore(),
+            C::ChangeUserFolder => self.open_user_folder_picker(),
+            C::DefaultUserFolder => self.use_default_user_folder(),
+            C::OpenUserFolder => self.open_user_folder(),
             C::CheckUpdates => self.check_updates(true),
             C::DownloadPage => self.open_download_page(),
         }
@@ -1216,6 +1233,8 @@ impl Session {
             Export::Song | Export::SongSaveAs => self.song_file_name(),
             Export::Synths => SYNTHS_FILE_NAME.to_owned(),
             Export::KitMapping => self.kits.mapping_file_name(self.kit_index)?,
+            Export::Library => session_user_data::LIBRARY_FILE_NAME.to_owned(),
+            Export::UserData => crate::user_data::backup_name(&crate::user_data::now_stamp()),
         })
     }
 
@@ -1244,6 +1263,8 @@ impl Session {
             Export::SongSaveAs => self.save_song_as(path),
             Export::Synths => self.export_synths(path),
             Export::KitMapping => self.kit_export(path),
+            Export::Library => self.export_library(path),
+            Export::UserData => self.back_up_user_data(path),
         }
     }
 
@@ -1365,7 +1386,12 @@ impl Session {
         let Outcome::Picked(path) = outcome else { return };
         let Some(Overlay::Picker(picker)) = self.chrome.overlay.take() else { return };
         self.chrome.last_dir = picker.dir.clone();
-        match picker.purpose {
+        self.picked(picker.purpose, path);
+    }
+
+    /// `path` is picked for `purpose`.
+    fn picked(&mut self, purpose: Purpose, path: PathBuf) {
+        match purpose {
             Purpose::ImportMidi => self.import_midi(&path),
             Purpose::ImportSong => self.import_song(&path),
             Purpose::ImportSynth => self.import_synths(&path),
@@ -1373,6 +1399,9 @@ impl Session {
             Purpose::ReplaceSample => self.drop_path(&path, true),
             Purpose::AddSample | Purpose::LoadMapping | Purpose::ImportFolder => self.drop_path(&path, false),
             Purpose::Export(export) => self.export_to(export, &path),
+            Purpose::ImportLibrary => self.ask(Pending::ImportLibrary(path)),
+            Purpose::RestoreUserData => self.ask_restore(path),
+            Purpose::UserFolder => self.ask_user_folder(path),
         }
     }
 
@@ -1384,57 +1413,37 @@ impl Session {
             "MIT - https://www.ordrumbox.com".into(),
             String::new(),
             format!("library   {}", shown(self.saving.library_path.clone())),
-            format!("user data {}", shown(store::user_dir())),
+            format!("user data {}{}", shown(self.user_folder()), self.user_folder_origin()),
             format!("exports   {}", shown(store::exports_dir())),
             format!("assets    {}", shown(self.assets_dir.clone())),
         ]
     }
 
+    /// Where the user data folder comes from, after its path in Help > About.
+    fn user_folder_origin(&self) -> &'static str {
+        if store::env_library().is_some() {
+            " (ORDRUMBOX_LIBRARY)"
+        } else if self.user_folder().zip(store::default_dir()).is_some_and(|(d, default)| d != default) {
+            " (chosen in the app)"
+        } else {
+            ""
+        }
+    }
+
     /// Lines of Help > Factory reset.
     fn factory_reset_lines(&self) -> Vec<String> {
-        let dir =
-            self.saving.library_path.as_ref().and_then(|p| p.parent().map(Path::to_path_buf)).or_else(store::user_dir);
         vec![
             "Restore the factory settings?".into(),
             String::new(),
-            "The user files are removed (moved out of the way):".into(),
+            "The user files are moved to backups/ in the user data folder:".into(),
             "  library.json, kits.json, settings.json,".into(),
             "  synth_presets.json, samples/, songs/".into(),
+            "File > Restore user data brings them back.".into(),
             String::new(),
-            format!("folder: {}", dir.map_or_else(|| "-".to_owned(), |p| p.display().to_string())),
+            format!("folder: {}", self.user_folder().map_or_else(|| "-".to_owned(), |p| p.display().to_string())),
             String::new(),
             "ENTER: restore     ESC or click: cancel".into(),
         ]
-    }
-
-    /// Help > Factory reset: move the user's edited files aside and reload
-    /// from the assets, as at first start.
-    pub fn factory_reset(&mut self) {
-        if let Some(refusal) = Command::FactoryReset.hosted_refusal().filter(|_| self.hosted) {
-            self.message = refusal.into();
-            return;
-        }
-        self.chrome.close_popups();
-        let dir =
-            self.saving.library_path.as_ref().and_then(|p| p.parent().map(Path::to_path_buf)).or_else(store::user_dir);
-        let Some(dir) = dir else {
-            self.message = "factory reset: no user data folder".into();
-            return;
-        };
-        match store::factory_reset(&dir) {
-            Ok(removed) => {
-                let action_log = std::mem::take(&mut self.action_log);
-                let start_output = self.playback.take_start_output().unwrap_or_else(|| Box::new(no_output));
-                *self = Self::load(start_output);
-                self.action_log = action_log;
-                self.message = if removed.is_empty() {
-                    "factory settings restored (no user files found)".into()
-                } else {
-                    format!("factory settings restored (removed: {})", removed.join(", "))
-                };
-            }
-            Err(e) => self.message = format!("factory reset failed: {e}"),
-        }
     }
 
     // ─── Kit editor ──────────────────────────────────────────────────────────

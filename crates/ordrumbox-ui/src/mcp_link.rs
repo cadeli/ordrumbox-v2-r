@@ -50,6 +50,8 @@ impl Request {
 #[derive(Debug)]
 pub struct Server {
     requests: Receiver<Request>,
+    /// What the endpoint file holds: the port and the token.
+    endpoint_text: String,
 }
 
 impl Server {
@@ -60,11 +62,17 @@ impl Server {
         let port = listener.local_addr().map_err(|e| format!("listen: {e}"))?.port();
         let token = new_token();
         let text = object([("port", Value::from(u32::from(port))), ("token", Value::from(token.as_str()))]);
-        store::write_atomic(endpoint, text.to_json_pretty(2) + "\n")
-            .map_err(|e| format!("{}: {e}", endpoint.display()))?;
         let (sender, requests) = mpsc::channel();
+        let server = Self { requests, endpoint_text: text.to_json_pretty(2) + "\n" };
+        server.announce(endpoint)?;
         thread::spawn(move || accept(&listener, &token, &sender, &waker));
-        Ok(Self { requests })
+        Ok(server)
+    }
+
+    /// Write the port and the token to `endpoint` (again, when the user
+    /// data folder changed: `ordrumbox --mcp` reads them there).
+    pub fn announce(&self, endpoint: &Path) -> Result<(), String> {
+        store::write_atomic(endpoint, &self.endpoint_text).map_err(|e| format!("{}: {e}", endpoint.display()))
     }
 
     /// The next call waiting, if any.

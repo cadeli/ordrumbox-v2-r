@@ -55,6 +55,17 @@ fn detect_key(file_name: &str) -> String {
     catalog().from_file_name(file_name).map_or_else(|| NOT_FOUND.to_owned(), |i| i.id.clone())
 }
 
+/// The url of a file copied into kit `kit_name`: `imported/<kit>/<file>`.
+/// Kept apart per kit, so that two kits' files of the same name do not
+/// overwrite each other, and apart from the assets' folders, which the
+/// user's `samples/` would otherwise shadow.
+fn imported_url(kit_name: &str, file_name: &str) -> String {
+    format!("{IMPORTED_DIR}/{}/{file_name}", safe_name(kit_name))
+}
+
+/// The folder of `samples/` that the imported files are copied to.
+const IMPORTED_DIR: &str = "imported";
+
 fn file_name(path: &Path) -> String {
     path.file_name().map_or_else(String::new, |n| n.to_string_lossy().into_owned())
 }
@@ -206,21 +217,18 @@ impl KitSet {
     pub fn add_sample(&mut self, kit: usize, path: &Path) -> Result<(usize, String), String> {
         let (bytes, buffer) = Self::decode(path)?;
         let name = file_name(path);
-        self.store_bytes(&name, &bytes)?;
-        self.buffers.insert(name.clone(), Arc::new(buffer));
         let kit_name = self.kits.get(kit).map_or_else(|| "imported".to_owned(), |k| k.name.clone());
+        let url = imported_url(&kit_name, &name);
+        self.store_bytes(&url, &bytes)?;
+        self.buffers.insert(url.clone(), Arc::new(buffer));
         if self.kits.get(kit).is_none() {
             self.kits.push(Kit { name: kit_name.clone(), ..Kit::default() });
         }
         let kit = self.kits.iter().position(|k| k.name == kit_name).unwrap_or(0);
         let instruments = &mut self.kits[kit].samples;
-        let entry = KitSample {
-            key: detect_key(&name),
-            display_name: name.clone(),
-            path: name.clone(),
-            ..KitSample::default()
-        };
-        let index = match instruments.iter().position(|i| i.path == name) {
+        let entry =
+            KitSample { key: detect_key(&name), display_name: name.clone(), path: url.clone(), ..KitSample::default() };
+        let index = match instruments.iter().position(|i| i.path == url) {
             Some(i) => {
                 instruments[i] = entry;
                 i
@@ -265,12 +273,13 @@ impl KitSet {
             let name = file_name(path);
             match Self::decode(path) {
                 Ok((bytes, buffer)) => {
-                    self.store_bytes(&name, &bytes)?;
-                    self.buffers.insert(name.clone(), Arc::new(buffer));
+                    let url = imported_url(&kit_name, &name);
+                    self.store_bytes(&url, &bytes)?;
+                    self.buffers.insert(url.clone(), Arc::new(buffer));
                     instruments.push(KitSample {
                         key: detect_key(&name),
-                        display_name: name.clone(),
-                        path: name,
+                        display_name: name,
+                        path: url,
                         ..KitSample::default()
                     });
                 }
@@ -399,6 +408,32 @@ mod tests {
         assert_eq!(kits.kits[0].samples.len(), 1);
         kits.save().unwrap();
         assert_eq!(store::load_kits(&dir.join("kits.json")).unwrap().unwrap()[0].name, "a");
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn imported_files_of_the_same_name_stay_apart() {
+        let dir = std::env::temp_dir().join(format!("ordrumbox-kitset-import-{}", std::process::id()));
+        if dir.exists() {
+            fs::remove_dir_all(&dir).unwrap();
+        }
+        let mut kits = set(&dir);
+        for (folder, level) in [("808", 0.25), ("909", -0.5)] {
+            let source = dir.join("sources").join(folder);
+            fs::create_dir_all(&source).unwrap();
+            fs::write(source.join("kick.wav"), wav::encode_float(&SampleBuffer::mono(vec![level; 4], 8000))).unwrap();
+            kits.import_folder(&source).unwrap();
+        }
+        let file = dir.join("sources").join("808").join("kick.wav");
+        kits.add_sample(0, &file).unwrap();
+
+        let urls: Vec<&str> = kits.kits.iter().flat_map(|k| k.samples.iter().map(|s| s.path.as_str())).collect();
+        assert_eq!(urls, ["k.wav", "imported/a/kick.wav", "imported/808/kick.wav", "imported/909/kick.wav"]);
+        for (url, level) in [("imported/808/kick.wav", 0.25), ("imported/909/kick.wav", -0.5)] {
+            assert_eq!(kits.buffer(url).unwrap().left[0], level, "{url}");
+            let saved = wav::decode(&fs::read(dir.join("samples").join(url)).unwrap()).unwrap();
+            assert_eq!(saved.left[0], level, "{url}");
+        }
         fs::remove_dir_all(dir).unwrap();
     }
 

@@ -32,9 +32,93 @@ fn data_dir() -> Option<PathBuf> {
     }
 }
 
-/// Where the library is saved.
+/// The library file `$ORDRUMBOX_LIBRARY` names, if it is set.
+pub fn env_library() -> Option<PathBuf> {
+    env::var_os(ENV_VAR).filter(|v| !v.is_empty()).map(PathBuf::from)
+}
+
+/// Where the library is saved: the file `$ORDRUMBOX_LIBRARY` names, else
+/// `library.json` in the folder chosen in the app, else in the default
+/// folder. `None` when the folder chosen cannot be used ([`location_problem`]).
 pub fn path() -> Option<PathBuf> {
-    env::var_os(ENV_VAR).filter(|v| !v.is_empty()).map(PathBuf::from).or_else(|| Some(data_dir()?.join(FILE_NAME)))
+    if let Some(file) = env_library() {
+        return Some(file);
+    }
+    let default = data_dir()?;
+    match chosen_dir_in(&default) {
+        Ok(Some(dir)) => Some(dir.join(FILE_NAME)),
+        Ok(None) => Some(default.join(FILE_NAME)),
+        // Reported by `location_problem`, at start.
+        Err(_) => None,
+    }
+}
+
+/// The default user data folder (where the folder chosen in the app is noted).
+pub fn default_dir() -> Option<PathBuf> {
+    data_dir()
+}
+
+/// In the default folder: the user data folder chosen in the app, when it
+/// is another one (`{"userFolder": "<path>"}`).
+const LOCATION_FILE: &str = "location.json";
+const LOCATION_KEY: &str = "userFolder";
+
+/// Why the user data folder chosen in the app cannot be used, if it cannot.
+pub fn location_problem() -> Option<String> {
+    if env_library().is_some() {
+        return None;
+    }
+    chosen_dir_in(&data_dir()?).err()
+}
+
+/// The folder chosen in the app, noted in `default`; `None` when none is.
+/// One that is not there any more (a drive not plugged in) is an error:
+/// files are never written to a folder made in its place.
+fn chosen_dir_in(default: &Path) -> Result<Option<PathBuf>, String> {
+    let path = default.join(LOCATION_FILE);
+    let text = match fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(format!("{}: {e}", path.display())),
+    };
+    let value = json::parse(&text).map_err(|e| format!("{}: {e}", path.display()))?;
+    let dir = value
+        .get(LOCATION_KEY)
+        .and_then(json::Value::as_str)
+        .filter(|d| !d.is_empty())
+        .ok_or_else(|| format!("{}: no \"{LOCATION_KEY}\"", path.display()))?;
+    let dir = PathBuf::from(dir);
+    if !dir.is_dir() {
+        return Err(format!(
+            "user data folder {} not found (chosen in the app, noted in {})",
+            dir.display(),
+            path.display()
+        ));
+    }
+    Ok(Some(dir))
+}
+
+/// Use `dir` as the user data folder from now on (at the next load): noted
+/// in the default folder, or the note removed when `dir` is the default.
+pub fn choose_dir(dir: &Path) -> Result<(), String> {
+    let default = data_dir().ok_or("no default user data folder to note the choice in")?;
+    choose_dir_in(&default, dir)
+}
+
+fn choose_dir_in(default: &Path, dir: &Path) -> Result<(), String> {
+    let path = default.join(LOCATION_FILE);
+    if crate::user_data::same_folder(dir, default) {
+        return match fs::remove_file(&path) {
+            Ok(()) => Ok(()),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(format!("{}: {e}", path.display())),
+        };
+    }
+    let text = dir.to_str().ok_or_else(|| format!("{}: not a UTF-8 path, cannot be noted", dir.display()))?;
+    let mut record = json::Object::new();
+    record.insert(LOCATION_KEY, json::Value::from(text));
+    write_atomic(&path, json::Value::Object(record).to_json_pretty(2) + "\n")
+        .map_err(|e| format!("{}: {e}", path.display()))
 }
 
 /// Where WAV exports go: `exports` in the user data folder (next to the
@@ -127,10 +211,10 @@ pub fn synths_path() -> Option<PathBuf> {
     Some(user_dir()?.join(SYNTHS_FILE))
 }
 
-const SYNTHS_FILE: &str = "synth_presets.json";
+pub const SYNTHS_FILE: &str = "synth_presets.json";
 /// Where older versions saved the synth presets: read when there is no
 /// `synth_presets.json` yet.
-const OLD_SYNTHS_FILE: &str = "generated_sounds.json";
+pub const OLD_SYNTHS_FILE: &str = "generated_sounds.json";
 
 /// The synth presets file to read: the current one, else an older save.
 pub fn saved_synths_path() -> Option<PathBuf> {
@@ -187,31 +271,6 @@ pub fn load_kits(path: &Path) -> Result<Option<Vec<Kit>>, String> {
 /// Write the kits (through a temporary file).
 pub fn save_kits(path: &Path, kits: &[Kit]) -> io::Result<()> {
     write_atomic(path, &(kits_to_json(kits).to_json_pretty(2) + "\n"))
-}
-
-/// Move the user's edited files aside so the app starts again from the
-/// assets: `library.json`, `kits.json`, `settings.json`,
-/// `synth_presets.json` (and an older `generated_sounds.json`), `samples/`
-/// and `songs/`. They are removed from
-/// `dir` (the user data folder); `exports/` is kept. Returns the names of
-/// what was removed.
-pub fn factory_reset(dir: &Path) -> io::Result<Vec<String>> {
-    let mut removed = Vec::new();
-    for name in ["library.json", "kits.json", "settings.json", SYNTHS_FILE, OLD_SYNTHS_FILE] {
-        let path = dir.join(name);
-        if path.exists() {
-            fs::remove_file(&path)?;
-            removed.push(name.to_owned());
-        }
-    }
-    for name in ["samples", "songs"] {
-        let path = dir.join(name);
-        if path.exists() {
-            fs::remove_dir_all(&path)?;
-            removed.push(format!("{name}/"));
-        }
-    }
-    Ok(removed)
 }
 
 /// Write `path` through a temporary file next to it (`<name>.tmp`), renamed
@@ -301,43 +360,23 @@ mod tests {
     }
 
     #[test]
-    fn factory_reset_removes_the_user_files() {
-        let dir = env::temp_dir().join(format!("ordrumbox-reset-{}", std::process::id()));
-        fs::create_dir_all(dir.join("samples")).unwrap();
-        fs::create_dir_all(dir.join("songs")).unwrap();
-        fs::create_dir_all(dir.join("exports")).unwrap();
-        fs::write(dir.join("library.json"), "{}").unwrap();
-        fs::write(dir.join("kits.json"), "[]").unwrap();
-        fs::write(dir.join("settings.json"), "{}").unwrap();
-        fs::write(dir.join("generated_sounds.json"), "{}").unwrap();
-        fs::write(dir.join("samples").join("x.wav"), "x").unwrap();
-        fs::write(dir.join("songs").join("a.odbox"), "{}").unwrap();
-        fs::write(dir.join("exports").join("e.wav"), "e").unwrap();
-        let removed = factory_reset(&dir).unwrap();
-        assert!(removed.contains(&"library.json".to_owned()));
-        assert!(removed.contains(&"kits.json".to_owned()));
-        assert!(removed.contains(&"settings.json".to_owned()));
-        assert!(removed.contains(&"generated_sounds.json".to_owned()));
-        assert!(removed.contains(&"samples/".to_owned()));
-        assert!(removed.contains(&"songs/".to_owned()));
-        assert!(!dir.join("library.json").exists());
-        assert!(!dir.join("kits.json").exists());
-        assert!(!dir.join("settings.json").exists());
-        assert!(!dir.join("generated_sounds.json").exists());
-        assert!(!dir.join("samples").exists());
-        assert!(!dir.join("songs").exists());
-        // exports are kept.
-        assert!(dir.join("exports").join("e.wav").exists());
-        fs::remove_dir_all(dir).unwrap();
-    }
-
-    #[test]
-    fn factory_reset_on_an_empty_folder_removes_nothing() {
-        let dir = env::temp_dir().join(format!("ordrumbox-reset-empty-{}", std::process::id()));
-        fs::create_dir_all(&dir).unwrap();
-        let removed = factory_reset(&dir).unwrap();
-        assert!(removed.is_empty());
-        fs::remove_dir_all(dir).unwrap();
+    fn the_folder_chosen_is_noted_in_the_default_one() {
+        let default = env::temp_dir().join(format!("ordrumbox-location-{}", std::process::id()));
+        let chosen = default.join("elsewhere");
+        fs::create_dir_all(&chosen).unwrap();
+        assert_eq!(chosen_dir_in(&default), Ok(None));
+        choose_dir_in(&default, &chosen).unwrap();
+        assert_eq!(chosen_dir_in(&default), Ok(Some(chosen.clone())));
+        // A folder gone (a drive unplugged) is not made again: an error.
+        fs::remove_dir(&chosen).unwrap();
+        assert!(chosen_dir_in(&default).unwrap_err().contains("not found"));
+        // Back to the default: the note goes.
+        choose_dir_in(&default, &default).unwrap();
+        assert!(!default.join(LOCATION_FILE).exists());
+        assert_eq!(chosen_dir_in(&default), Ok(None));
+        fs::write(default.join(LOCATION_FILE), "{").unwrap();
+        assert!(chosen_dir_in(&default).is_err());
+        fs::remove_dir_all(default).unwrap();
     }
 }
 
