@@ -99,6 +99,38 @@ pub enum Command {
     DownloadPage,
 }
 
+/// Why a plugin has no song commands.
+pub const SONGS_IN_THE_APP: &str = "songs: in the app only, a plugin plays patterns";
+
+impl Command {
+    /// Why a plugin does not run this command (the host does it, or it is
+    /// the app's), `None` when it does.
+    pub fn hosted_refusal(self) -> Option<&'static str> {
+        match self {
+            Self::Save => Some("the host saves the library with its project"),
+            Self::Quit => Some("the host closes the plugin's window"),
+            Self::TempoDown | Self::TempoUp => Some("the tempo is the host's"),
+            Self::CheckUpdates | Self::DownloadPage => Some("update check: in the app only, not in a plugin"),
+            Self::FactoryReset => Some("factory reset: in the app only, not in a plugin"),
+            Self::SongView
+            | Self::PlaySong
+            | Self::PreviousSong
+            | Self::NextSong
+            | Self::NewSong
+            | Self::RemoveSong
+            | Self::RenameSong
+            | Self::SongDescription
+            | Self::SaveSong
+            | Self::SaveSongAs
+            | Self::LoadSong
+            | Self::ExportSong
+            | Self::ImportSong
+            | Self::ExportSongWav => Some(SONGS_IN_THE_APP),
+            _ => None,
+        }
+    }
+}
+
 /// One line of a menu.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Item {
@@ -171,6 +203,8 @@ pub struct MenuState {
     pub checking_updates: bool,
     /// The version of a newer release found.
     pub newer_release: Option<String>,
+    /// Shown by a plugin: the commands the host does are left out.
+    pub hosted: bool,
 }
 
 fn command(label: impl Into<String>, shortcut: &'static str, command: Command, enabled: bool) -> Item {
@@ -203,7 +237,7 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
         Item::Separator,
         command("Import folder as kit...", "", C::ImportFolder, true),
     ];
-    vec![
+    let mut menus = vec![
         Menu {
             title: "File",
             items: vec![
@@ -342,7 +376,43 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
                 command("Factory reset...", "", C::FactoryReset, true),
             ],
         },
-    ]
+    ];
+    if s.hosted {
+        for menu in &mut menus {
+            menu.items = without_host_commands(std::mem::take(&mut menu.items));
+        }
+        // The Song menu: nothing left.
+        menus.retain(|menu| !menu.items.is_empty());
+    }
+    menus
+}
+
+/// A shortcut whose key a plugin leaves to the host (`Ui::key`): every
+/// Ctrl/Cmd key, and Space, its transport.
+fn host_key(shortcut: &str) -> bool {
+    shortcut.starts_with("Ctrl+") || shortcut.contains("Space")
+}
+
+/// `items` without the commands a plugin does not run, the keys it leaves to
+/// the host, and the separators left at an end or next to another.
+fn without_host_commands(items: Vec<Item>) -> Vec<Item> {
+    let mut kept: Vec<Item> = Vec::with_capacity(items.len());
+    for mut item in items {
+        if let Item::Command { shortcut, .. } = &mut item
+            && host_key(shortcut)
+        {
+            *shortcut = "";
+        }
+        match &item {
+            Item::Command { command, .. } if command.hosted_refusal().is_some() => {}
+            Item::Separator if kept.last().is_none_or(|last| *last == Item::Separator) => {}
+            _ => kept.push(item),
+        }
+    }
+    if kept.last() == Some(&Item::Separator) {
+        kept.pop();
+    }
+    kept
 }
 
 // ─── Open menu ───────────────────────────────────────────────────────────────
@@ -657,6 +727,38 @@ mod tests {
         for command in [C::AutoAssignAll, C::ConvertToSynth, C::ImportFolder] {
             assert!(commands.contains(&command), "{command:?}");
         }
+    }
+
+    #[test]
+    fn a_plugin_menu_leaves_out_what_the_host_does() {
+        let state = MenuState { can_save: true, hosted: true, ..state() };
+        let menus = menus(&state);
+        for menu in &menus {
+            for item in &menu.items {
+                if let Item::Command { command, .. } = item {
+                    assert_eq!(command.hosted_refusal(), None, "{command:?} in {}", menu.title);
+                }
+            }
+            assert_ne!(menu.items.first(), Some(&Item::Separator), "{}", menu.title);
+            assert_ne!(menu.items.last(), Some(&Item::Separator), "{}", menu.title);
+            assert!(!menu.items.windows(2).any(|w| w[0] == Item::Separator && w[1] == Item::Separator));
+        }
+        assert!(!menus.iter().any(|m| m.title == "Song"));
+        // The keys the host keeps are not shown.
+        let shortcuts = || {
+            menus.iter().flat_map(|m| &m.items).filter_map(|i| match i {
+                Item::Command { shortcut, .. } => Some(*shortcut),
+                Item::Separator => None,
+            })
+        };
+        assert!(shortcuts().all(|s| !host_key(s)));
+        assert!(shortcuts().any(|s| s == "F1"));
+        // The rest is the app's menus.
+        let app = super::menus(&MenuState { hosted: false, ..state });
+        let file = |menus: &[Menu]| menus[0].items.iter().filter_map(Item::runnable).collect::<Vec<_>>();
+        let mut expected = file(&app);
+        expected.retain(|c| c.hosted_refusal().is_none());
+        assert_eq!(file(&menus), expected);
     }
 
     #[test]

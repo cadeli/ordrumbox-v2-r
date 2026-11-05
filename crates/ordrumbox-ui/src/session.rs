@@ -396,6 +396,51 @@ const SHORTCUTS: [&str; 54] = [
     "                         becomes a kit, a .json mapping loads, a .mid imports",
 ];
 
+/// Every key of a plugin, which leaves Space, the Ctrl/Cmd keys and the songs
+/// to the host (`Ui::key`).
+const PLUGIN_SHORTCUTS: &[&str] = &[
+    "THE HOST'S KEYS",
+    "  Space, every Ctrl/Cmd key   the host's: its transport, its save, undo, zoom...",
+    "                              (the menus run orDrumbox's undo, copy, paste, exports)",
+    "MENUS",
+    "  F10 or Alt             open the menus: Arrows move, Enter runs, Esc closes",
+    "  F1 F2 F4 F5 F6         this list, track editor, piano roll, grid, synth",
+    "GRID",
+    "  Arrows                 move the cursor",
+    "  Enter / click          add a note, select it, delete the selected one",
+    "  Shift+Arrows           velocity (up/down), pitch (left/right) of the selected note",
+    "  Delete                 clear the cursor step        Esc  deselect",
+    "  right-click            a track's name: track menu   a step: notes menu",
+    "  F, G, V                random pattern, random drumkit, VU meters on/off",
+    "  C                      next colour scheme",
+    "  H, J, K                every track: synth sounds, auto-assigned, random samples",
+    "PLAY",
+    "  1-9 / Shift+1-9        mute / solo track 1-9        Q-P  hear track 1-10 (any view)",
+    "  [ ]                    previous / next pattern (also PageUp PageDown)",
+    "  , .                    previous / next kit",
+    "GENERATE",
+    "  B, Shift+B             the pattern again in its style, a new pattern in the style",
+    "  D, S, A                drums, bass, chords in auto mode (again: off)",
+    "  Z, X                   track in auto mode, random notes on the track",
+    "KNOBS, SLIDERS, LISTS (track editor, note editor, kit editor, volumes)",
+    "  Tab / Shift+Tab        focus the next / previous control      Esc  back to the grid",
+    "  Arrows, - =, wheel     change (Shift or Alt: finely); a list: next option",
+    "  drag                   a knob up / down, a slider along (Shift: finely)",
+    "  double-click           default value     right-click or Enter: type a value",
+    "  Enter                  open a list, press a button",
+    "PIANO ROLL (F4)",
+    "  click / drag / right-click a cell: add, select, delete; velocity (up/down) or pitch; menu",
+    "  Arrows, Shift+Arrows   the cursor; the selected note's velocity / pitch    Enter, Delete",
+    "  a key: hear it, right-click: clear, chord progression     wheel (Shift: pages)",
+    "SYNTH EDITOR (F6)",
+    "  OSC, FLT, MOD, ENV     the track's preset: knobs, waves, lists, power buttons (saved)",
+    "KIT EDITOR (from the menus)",
+    "  Up Down                sample      Enter  hear      Delete  remove",
+    "  N, E                   normalize, export the mapping",
+    "  drop files             a .wav joins the kit (Shift: replaces the sample), a folder",
+    "                         becomes a kit, a .json mapping loads, a .mid imports",
+];
+
 /// The output of a session that had none: none again.
 fn no_output(_: Arc<ordrumbox_engine::SampleBank>, _: Scales, _: SynthPresets) -> crate::audio_output::StartedOutput {
     Err("no audio output given".into())
@@ -502,7 +547,10 @@ impl Session {
             Err(e) => session.status.push(format!("no sound: {e}")),
         }
         session.start_output = Some(start_output);
-        session.load_master();
+        // A plugin shows no master panel: the host mixes, the default master applies.
+        if !hosted {
+            session.load_master();
+        }
         session.load_update_settings();
         session.load_color_scheme(store::settings_path());
         session
@@ -658,7 +706,7 @@ impl Session {
     /// region (top-left) and the output strip (bottom).
     pub(super) fn body(&self, size: (i32, i32, i32)) -> view::Body {
         let (width, height, scale) = size;
-        view::Body::new(width, height, scale, self.track_editor_width(width, scale), self.status.len())
+        view::Body::new(width, height, scale, self.track_editor_width(width, scale), self.status.len(), !self.hosted)
     }
 
     pub fn playing(&self) -> bool {
@@ -677,6 +725,10 @@ impl Session {
 
     /// Shift+Space: play or stop the selected song (its arrangement), from the cursor.
     pub fn toggle_play_song(&mut self) {
+        if self.hosted {
+            self.message = menu::SONGS_IN_THE_APP.into();
+            return;
+        }
         if self.editor.library().songs.is_empty() {
             self.message = "no song in the library".into();
             return;
@@ -982,7 +1034,22 @@ impl Session {
             kit_sample: self.kit_list().is_some_and(|(s, n)| s < n),
             checking_updates: self.updates.checking(),
             newer_release: self.updates.newer_release().map(|r| r.version.clone()),
+            hosted: self.hosted,
         }
+    }
+
+    /// The session is a plugin's: the host plays, saves and has the keys it
+    /// leaves out of the menus.
+    pub fn hosted(&self) -> bool {
+        self.hosted
+    }
+
+    /// A session of `library` with no kit, a plugin's when `hosted`.
+    #[cfg(test)]
+    pub(crate) fn for_tests(library: Library, hosted: bool) -> Self {
+        let mut session = Self::new(library, KitSet::empty(), Vec::new());
+        session.hosted = hosted;
+        session
     }
 
     pub fn menus(&self) -> Vec<menu::Menu> {
@@ -1007,6 +1074,10 @@ impl Session {
     pub fn run(&mut self, command: Command) {
         use Command as C;
         self.menu = None;
+        if let Some(refusal) = command.hosted_refusal().filter(|_| self.hosted) {
+            self.message = refusal.into();
+            return;
+        }
         match command {
             C::Save => self.save(),
             C::ImportMidi => self.open_picker(Purpose::ImportMidi),
@@ -1337,8 +1408,8 @@ impl Session {
     /// Help > Factory reset: move the user's edited files aside and reload
     /// from the assets, as at first start.
     pub fn factory_reset(&mut self) {
-        if self.hosted {
-            self.message = "factory reset: in the app only, not in a plugin".into();
+        if let Some(refusal) = Command::FactoryReset.hosted_refusal().filter(|_| self.hosted) {
+            self.message = refusal.into();
             return;
         }
         self.overlay = None;
@@ -1817,6 +1888,13 @@ impl Session {
         }
     }
 
+    /// The tempo a plugin plays at: the host's, inside the tempo bounds
+    /// (`None` before the host's transport was seen).
+    pub(super) fn host_bpm(&self) -> Option<f64> {
+        let host = self.controller.as_ref().and_then(Controller::host)?;
+        Some(ordrumbox_core::song::clamp_bpm(host.bpm.round()))
+    }
+
     pub fn step_tempo(&mut self, delta: f64) {
         let Some(bpm) = self.pattern().map(|p| p.bpm) else { return };
         self.set_tempo(bpm + delta);
@@ -2163,8 +2241,8 @@ impl Session {
 
     pub fn save(&mut self) {
         let Some(path) = &self.library_path else {
-            self.message = if self.hosted {
-                "the host saves the library with its project".into()
+            self.message = if let Some(refusal) = Command::Save.hosted_refusal().filter(|_| self.hosted) {
+                refusal.into()
             } else {
                 "not saved: no library file (see the messages below)".into()
             };
@@ -2290,6 +2368,7 @@ impl Session {
             current_page: self.current_page,
             levels: self.track_levels.clone(),
             show_vus: self.show_vus,
+            tempo_label: if self.hosted { "HOST" } else { "BPM" },
             track_drop: self.track_drop((canvas.width(), canvas.height(), scale)),
             playhead: if song_mode.is_some() {
                 None
@@ -2303,7 +2382,7 @@ impl Session {
                     ((global_beat - start_beat) / page_beats).clamp(0.0, 1.0)
                 })
             },
-            song: song.as_deref(),
+            song: song.as_deref().filter(|_| !self.hosted),
             cursor: self.cursor,
             selected: self.selected,
             undo: history.next_undo(),
@@ -2328,7 +2407,8 @@ impl Session {
                 picker::draw(canvas, p, &layout);
             }
             Some(Overlay::Shortcuts) => {
-                let lines: Vec<String> = SHORTCUTS.iter().map(|l| (*l).to_owned()).collect();
+                let keys: &[&str] = if self.hosted { PLUGIN_SHORTCUTS } else { &SHORTCUTS };
+                let lines: Vec<String> = keys.iter().map(|l| (*l).to_owned()).collect();
                 view::draw_notice(canvas, "Keyboard shortcuts", &lines, scale);
             }
             Some(Overlay::About) => view::draw_notice(canvas, "About orDrumbox", &self.about(), scale),

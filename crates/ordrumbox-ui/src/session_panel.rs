@@ -133,13 +133,17 @@ impl Session {
         let views = view::header_controls(scale).views;
         let kit_open = self.kit_editor.is_some();
         for (i, (rect, label)) in views.iter().zip(view::VIEWS).enumerate() {
+            // A plugin has no song view.
+            if self.hosted && shown.get(i) == Some(&Workspace::Song) {
+                continue;
+            }
             let on = if i == 4 { kit_open } else { !kit_open && self.workspace == shown[i] };
             layout.items.push(Item::new(Some(Id::View(i as u8)), *rect, Kind::Button { label: label.into(), on }));
         }
         // The window split: the main editor top-left, the track editor down the
         // right, the output strip along the bottom (always shown).
         let right = self.track_editor_width(width, scale);
-        let body = view::Body::new(width, height, scale, right, self.status.len());
+        let body = view::Body::new(width, height, scale, right, self.status.len(), !self.hosted);
         layout.right = right;
         // The track editor, always down the right edge (when shown).
         if right > 0 {
@@ -159,8 +163,10 @@ impl Session {
                 None => layout.items.push(Item::text(area.x, area.y, "No track", panel::DIM, s)),
             }
         }
-        // The output strip, always along the bottom.
-        self.output_items(&mut layout, width, body.output, scale);
+        // The output strip along the bottom, in the app only.
+        if !self.hosted {
+            self.output_items(&mut layout, width, body.output, scale);
+        }
         // The main editor (top-left): exactly one of the kit editor, the song
         // panel, the piano roll, the synth editor, or the grid.
         if kit_open {
@@ -201,9 +207,17 @@ impl Session {
             Kind::Button { label: label.into(), on: playing },
         ));
         let spec = Spec::knob(song::MIN_BPM, song::MAX_BPM, 1.0, song::DEFAULT_BPM);
-        let text = js::number_to_string(pattern.bpm);
-        let kind = Kind::Value { spec, value: pattern.bpm, label: None, text, lfo: false };
-        layout.items.push(Item::new(Some(Id::Bpm), controls.bpm, kind));
+        if self.hosted {
+            // The host's tempo plays, not the pattern's: shown, not turned.
+            let bpm = self.host_bpm();
+            let text = bpm.map_or_else(|| "-".to_owned(), js::number_to_string);
+            let kind = Kind::Value { spec, value: bpm.unwrap_or(pattern.bpm), label: None, text, lfo: false };
+            layout.items.push(Item::new(None, controls.bpm, kind));
+        } else {
+            let text = js::number_to_string(pattern.bpm);
+            let kind = Kind::Value { spec, value: pattern.bpm, label: None, text, lfo: false };
+            layout.items.push(Item::new(Some(Id::Bpm), controls.bpm, kind));
+        }
         let beats: Vec<String> = (1..=ordrumbox_logic::editor::MAX_BEATS).map(|b| b.to_string()).collect();
         let selected = usize::try_from(pattern.beat_count - 1).unwrap_or(0).min(beats.len() - 1);
         let kind = Kind::Select { values: beats.clone(), labels: beats, selected };
@@ -662,7 +676,7 @@ impl Session {
         let Some(pattern) = self.pattern() else { return };
         let Some(track) = pattern.tracks.get(t) else { return };
         let Some(note) = track.notes.iter().find(|n| n.beat == beat && n.step == step) else { return };
-        let body = view::Body::new(canvas.width(), canvas.height(), scale, right, self.status.len());
+        let body = view::Body::new(canvas.width(), canvas.height(), scale, right, self.status.len(), !self.hosted);
         let layout = Layout::new(body.main_w, body.editor_h, scale, pattern, self.status.len(), self.current_page);
         let cell = layout.cell_rect(t, beat, step, track.steps_per_beat);
         view::draw_tooltip(canvas, &editors::note_tooltip(note, track.transpose), cell, scale);

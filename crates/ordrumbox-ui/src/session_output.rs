@@ -127,8 +127,11 @@ impl Session {
 
     /// What the output strip draws: on the Vol tab, the spectrum of the
     /// last samples played (the analyser keeps its smoothing between frames).
-    /// The strip is always shown.
+    /// `None` in a plugin: it has no output strip.
     pub(super) fn output_view(&self) -> Option<OutputView> {
+        if self.hosted {
+            return None;
+        }
         if self.output_panel.tab == 0
             && let Some(controller) = &self.controller
         {

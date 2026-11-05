@@ -120,6 +120,8 @@ pub struct View<'a> {
     pub levels: Vec<f32>,
     /// Whether the VU meter stripe is shown.
     pub show_vus: bool,
+    /// The tempo's label: the pattern's in the app, the host's in a plugin.
+    pub tempo_label: &'a str,
     /// A track being dragged by its name: from which row to which.
     pub track_drop: Option<(usize, usize)>,
 }
@@ -314,8 +316,8 @@ pub fn output_height(scale: i32) -> i32 {
 
 /// How the window is split: one main editor (grid, piano roll, song, synth or
 /// the kit editor) in the top-left, the track editor down the right edge (shown
-/// or hidden), and the output panel as a full-width strip along the bottom,
-/// always shown.
+/// or hidden), and the output panel as a full-width strip along the bottom
+/// (in the app; a plugin has none).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Body {
     /// The main editor's width (the window minus the track editor).
@@ -333,10 +335,11 @@ pub struct Body {
 
 impl Body {
     /// The split of a `width` × `height` window at `scale`, `right` pixels
-    /// wide on the right for the track editor, with `status_lines` footer lines.
-    pub fn new(width: i32, height: i32, scale: i32, right: i32, status_lines: usize) -> Self {
+    /// wide on the right for the track editor, with `status_lines` footer
+    /// lines; `output`: with the output strip (else it is 0 high).
+    pub fn new(width: i32, height: i32, scale: i32, right: i32, status_lines: usize, output: bool) -> Self {
         let margin = margin(scale);
-        let output_h = output_height(scale);
+        let output_h = if output { output_height(scale) } else { 0 };
         let output_bottom = footer_top(height, scale, status_lines) - margin / 2;
         let output_top = output_bottom - output_h;
         Self {
@@ -480,7 +483,7 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
         canvas.text(r.x, top, text, scale, LABEL);
     };
     if view.pattern.is_some() {
-        label(canvas, c.bpm, "BPM");
+        label(canvas, c.bpm, view.tempo_label);
         if let Some(pattern) = view.pattern {
             let pages = (pattern.beat_count.max(1) as usize).div_ceil(BEATS_PER_PAGE as usize).max(1);
             label(canvas, c.pattern, &format!("Page {}/{}", view.current_page + 1, pages));
@@ -534,7 +537,7 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
 
     // The window split: one main editor top-left, the track editor down the
     // right, the output strip along the bottom.
-    let body = Body::new(canvas.width(), canvas.height(), scale, view.right, view.status.len());
+    let body = Body::new(canvas.width(), canvas.height(), scale, view.right, view.status.len(), view.output.is_some());
 
     // The main editor (top-left): exactly one of the song panel, the kit
     // editor, the synth editor (painted by the session), the piano roll, the grid.
@@ -918,6 +921,7 @@ mod tests {
                 current_page: 0,
                 levels: vec![0.0; 2],
                 show_vus: true,
+                tempo_label: "BPM",
                 track_drop: None,
                 cursor: Some(Cursor { track: 0, beat: 1, step: 2 }),
                 selected: Some((0, 0)),
@@ -938,7 +942,7 @@ mod tests {
             for (w, h) in [(1100, 680), (1280, 800)] {
                 for status in [0, 1, 3] {
                     for right in [0, 300 * scale] {
-                        let body = Body::new(w, h, scale, right, status);
+                        let body = Body::new(w, h, scale, right, status, true);
                         assert_eq!(body.main_w, w - right);
                         // The strip's bottom edge is the footer's top, less a margin.
                         assert_eq!(body.output.y + body.output.h, footer_top(h, scale, status) - margin(scale) / 2);
@@ -948,6 +952,11 @@ mod tests {
                         // (and the real status count) ends exactly at main_bottom.
                         let grid = Layout::new(body.main_w, body.editor_h, scale, pattern, status, 0);
                         assert_eq!(grid.bottom, body.main_bottom);
+                        // Without the strip (a plugin), the same down to where it was.
+                        let bare = Body::new(w, h, scale, right, status, false);
+                        assert_eq!((bare.output.h, bare.main_bottom), (0, body.main_bottom + body.output.h));
+                        let grid = Layout::new(bare.main_w, bare.editor_h, scale, pattern, status, 0);
+                        assert_eq!(grid.bottom, bare.main_bottom);
                     }
                 }
             }
