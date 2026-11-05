@@ -254,6 +254,8 @@ pub struct Session {
     color_scheme: usize,
     /// The library lives in a plugin host's project, not in a file.
     hosted: bool,
+    /// The tracks a plugin host mutes, bit `t` for track `t`.
+    host_muted: u64,
     /// Current page of the pattern grid (BEATS_PER_PAGE beats).
     current_page: usize,
     /// What the mouse and the keyboard hold among the widgets.
@@ -673,6 +675,7 @@ impl Session {
             color_scheme_file: None,
             color_scheme: 1,
             hosted: false,
+            host_muted: 0,
             current_page: 0,
             widgets: Widgets::default(),
             note_focus: None,
@@ -902,31 +905,60 @@ impl Session {
         if count == 0 {
             return;
         }
-        self.select_kit((self.kit_index as isize + delta).rem_euclid(count as isize) as usize);
-        self.message = format!("kit {}", self.kits.kits[self.kit_index].name);
+        self.use_kit((self.kit_index as isize + delta).rem_euclid(count as isize) as usize);
     }
 
-    /// Pattern `index` (from 0) shown and played, as a plugin host's
-    /// parameter asks; refused with a message when the library has no such pattern.
-    pub fn host_select_pattern(&mut self, index: usize) {
+    /// The pattern shown, from 0.
+    pub fn pattern_index(&self) -> usize {
+        self.pattern_index
+    }
+
+    /// The kit used, from 0.
+    pub fn kit_index(&self) -> usize {
+        self.kit_index
+    }
+
+    /// Pattern `index` (from 0) shown, and played in pattern mode, as a
+    /// plugin host's parameter asks. False, with a message, when the library
+    /// has no such pattern. In song mode the song plays on, and the message says so.
+    pub fn host_select_pattern(&mut self, index: usize) -> bool {
         let count = self.editor.library().patterns.len();
         if index >= count {
             self.message = format!("host: no pattern {} (the library has {count})", index + 1);
-        } else if index != self.pattern_index {
-            self.show_pattern(index);
+            return false;
         }
+        if index != self.pattern_index {
+            self.show_pattern(index);
+            if self.controller.as_ref().is_some_and(|c| matches!(c.mode(), Mode::Song(_))) {
+                self.message = format!("host: {}, shown only: a song plays", self.message);
+            }
+        }
+        true
     }
 
-    /// Kit `index` (from 0) used, as a plugin host's parameter asks; refused
-    /// with a message when there is no such kit.
-    pub fn host_select_kit(&mut self, index: usize) {
+    /// Kit `index` (from 0) used, as a plugin host's parameter asks. False,
+    /// with a message, when there is no such kit.
+    pub fn host_select_kit(&mut self, index: usize) -> bool {
         let count = self.kits.kits.len();
         if index >= count {
-            self.message = format!("host: no kit {} ({count} kits)", index + 1);
-        } else if index != self.kit_index {
-            self.select_kit(index);
-            self.message = format!("kit {}", self.kits.kits[index].name);
+            self.message = format!("host: no kit {} (there are {count})", index + 1);
+            return false;
         }
+        if index != self.kit_index {
+            self.use_kit(index);
+        }
+        true
+    }
+
+    /// The tracks a plugin host mutes, bit `t` for track `t`, shown on their
+    /// mute boxes; true when they changed.
+    pub fn set_host_muted(&mut self, muted: u64) -> bool {
+        std::mem::replace(&mut self.host_muted, muted) != muted
+    }
+
+    /// Show `message` as the outcome of the last action.
+    pub fn tell(&mut self, message: String) {
+        self.message = message;
     }
 
     /// The names of the library's patterns, in order (`None`: no name).
@@ -937,6 +969,14 @@ impl Session {
     /// The names of the kits, in order.
     pub fn kit_names(&self) -> impl Iterator<Item = &str> + Clone {
         self.kits.kits.iter().map(|k| k.name.as_str())
+    }
+
+    /// Use kit `index` and say so.
+    fn use_kit(&mut self, index: usize) {
+        self.select_kit(index);
+        if let Some(kit) = self.kits.kits.get(index) {
+            self.message = format!("kit {}", kit.name);
+        }
     }
 
     /// Use kit `index` (its sounds are assigned again).
@@ -979,8 +1019,7 @@ impl Session {
             return;
         }
         let index = self.rng.below(count as u64) as usize;
-        self.select_kit(index);
-        self.message = format!("kit {}", self.kits.kits[self.kit_index].name);
+        self.use_kit(index);
     }
 
     /// V: show/hide the VU meters on the track stripes.
@@ -1164,12 +1203,7 @@ impl Session {
             C::NewGeneratedPattern => self.generate_pattern(),
             C::AutoAll => self.toggle_pattern_auto(),
             C::LockTrack => self.toggle_lock(),
-            C::Kit(i) => {
-                self.select_kit(i);
-                if let Some(kit) = self.kits.kits.get(i) {
-                    self.message = format!("kit {}", kit.name);
-                }
-            }
+            C::Kit(i) => self.use_kit(i),
             C::PreviousKit => self.step_kit(-1),
             C::NextKit => self.step_kit(1),
             C::KitEditor => self.toggle_kit_editor(),
@@ -2407,6 +2441,7 @@ impl Session {
             levels: self.track_levels.clone(),
             show_vus: self.show_vus,
             tempo_label: if self.hosted { "HOST" } else { "BPM" },
+            host_muted: self.host_muted,
             track_drop: self.track_drop((canvas.width(), canvas.height(), scale)),
             playhead: if song_mode.is_some() {
                 None

@@ -69,9 +69,14 @@ pub fn host_pass(beat: f64, ticks: u32) -> Option<(u64, f64)> {
 // One bit per track in the host's mute mask.
 const _: () = assert!(MAX_TRACKS <= u64::BITS as usize);
 
-/// The volume strip `track` goes to: its own, or none when `muted` has its bit.
-fn gated_volume(target: &StripSettings, muted: u64, track: usize) -> f32 {
-    if muted >> track & 1 == 1 { 0.0 } else { target.volume }
+/// Whether a plugin host's mute mask `muted` (bit `t` for track `t`) mutes `track`.
+pub fn host_muted(muted: u64, track: usize) -> bool {
+    u32::try_from(track).ok().and_then(|t| muted.checked_shr(t)).is_some_and(|m| m & 1 == 1)
+}
+
+/// The volume a strip of `volume` goes to: its own, or none when the host mutes `track`.
+fn gated_volume(volume: f32, muted: u64, track: usize) -> f32 {
+    if host_muted(muted, track) { 0.0 } else { volume }
 }
 
 /// Where playback is.
@@ -204,14 +209,14 @@ impl Engine {
         self.pass_number = pass.number;
         self.load(pass);
         self.next = None;
-        self.settle_strips();
+        self.settle_strips(self.strip_count);
     }
 
-    /// The strips at their targets at once, the muted ones silent.
-    fn settle_strips(&mut self) {
-        for (track, channel) in self.channels[..self.strip_count].iter_mut().enumerate() {
+    /// The first `count` strips at their targets at once, the muted ones silent.
+    fn settle_strips(&mut self, count: usize) {
+        for (track, channel) in self.channels[..count].iter_mut().enumerate() {
             channel.current = channel.target;
-            channel.current.volume = gated_volume(&channel.target, self.host_muted, track);
+            channel.current.volume = gated_volume(channel.target.volume, self.host_muted, track);
         }
     }
 
@@ -225,7 +230,7 @@ impl Engine {
                 channel.target = *settings;
                 channel.lfo = [false; 4];
             }
-            self.settle_strips();
+            self.settle_strips(pass.strips.len().min(MAX_TRACKS));
         }
         for event in &pass.events {
             self.start(event, &pass, self.clock);
@@ -372,7 +377,7 @@ impl Engine {
             let ramp = |from: f32, to: f32, keep: f32| to + (from - to) * keep;
             let [lfo_volume, lfo_pan, lfo_cutoff, lfo_q] = channel.lfo;
             let mix_or_lfo = |lfo: bool| if lfo { keep_lfo } else { keep_mix };
-            let volume = gated_volume(&target, muted, track);
+            let volume = gated_volume(target.volume, muted, track);
             channel.current.volume = ramp(before.volume, volume, mix_or_lfo(lfo_volume));
             channel.current.pan = ramp(before.pan, target.pan, mix_or_lfo(lfo_pan));
             if lfo_cutoff {

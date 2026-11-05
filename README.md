@@ -570,13 +570,23 @@ host saves automation under the ids, which never change):
 | `mute_1` … `mute_16` | track 1–16 of the pattern muted | off by default |
 
 The pattern and the kit are applied by the player thread (within 10 ms) when
-their value changes, and when a project is opened: a pattern or kit chosen in
-the window stays until the host's value moves. A number past the library's
-patterns or the kits is refused with a message. The volume and the mutes are
-read every block on the audio thread and go through the engine's volume ramps
-(no click); a muted track is silenced, its notes still play, its effect tails
-are cut. They add to the track's own mute, solo and volume, which stay in the
-library.
+their value changes, and when a project is opened. A pattern or kit chosen in
+the window is given back to the host as a change of the parameter (one past
+128 patterns or 64 kits cannot be, and the window says so). A number past the
+library's patterns or the kits is refused with a message, and applied once the
+library has it, unless a choice is made in the window first. In song mode the
+pattern is shown, the song plays on, and the window says so.
+
+The volume and the mutes are read every block on the audio thread and go
+through the engine's volume ramps (no click); a muted track is silenced, its
+notes still play, its effect tails are cut. They add to the track's own mute,
+solo and volume, which stay in the library. A track the host mutes has its
+`M` box lit in orange (red: its own mute). The plugin's window has no master
+strip, so the host's volume shows only in the host.
+
+The names next to the pattern and kit numbers follow the library, but nih-plug
+cannot tell the host that they changed: a host that keeps the texts it read
+shows the old names until it reads them again.
 
 ## Sound measurements
 

@@ -107,8 +107,7 @@ impl Session {
                 let wanted = text(args, "kit")?;
                 let found = self.kits.kits.iter().position(|k| same_name(&k.name, wanted));
                 let index = found.ok_or_else(|| format!("No kit named \"{wanted}\" (listKitSamples gives them)"))?;
-                self.select_kit(index);
-                self.message = format!("kit {}", self.kits.kits[index].name);
+                self.use_kit(index);
                 Ok(object([("kit", Value::from(self.kits.kits[index].name.as_str()))]))
             }
             "analyzeSamples" => self.mcp_analyze(args),

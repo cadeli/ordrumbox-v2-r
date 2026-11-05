@@ -11,7 +11,7 @@ use std::time::Duration;
 use ordrumbox_engine::AudioSide;
 use ordrumbox_ui::{LibrarySource, Session, Ui};
 
-use crate::params::{HostChoice, Names, OrdrumboxParams};
+use crate::params::{HostControls, KIT_CHOICES, Names, OrdrumboxParams, PATTERN_CHOICES, choice_value};
 use crate::state::LibraryState;
 
 /// How often the controller posts passes and follows the host.
@@ -35,10 +35,54 @@ pub struct Player {
     sample_rate: f32,
     /// The revision whose text the project holds; `None`: not saved from this session.
     published: Option<u64>,
-    /// The host's pattern and kit last applied to this session; `None`: none yet.
-    applied: Option<HostChoice>,
+    /// The host's pattern parameter, followed.
+    pattern: Follow,
+    /// The host's kit parameter, followed.
+    kit: Follow,
+    /// The library revision whose pattern names the host has; `None`: none yet.
+    named: Option<u64>,
     /// The host changed what the window shows since it was last drawn.
     redraw: bool,
+}
+
+/// A host's choice parameter (the pattern or the kit) followed by the
+/// session, and the choices made in the window given back to it.
+#[derive(Debug, Default)]
+struct Follow {
+    /// The host's value last seen; `None`: none since the session started.
+    seen: Option<usize>,
+    /// That value was refused: it is applied once the session has it,
+    /// unless a choice is made in the window first.
+    refused: bool,
+    /// The session's choice as of the last look; `None`: none yet.
+    known: Option<usize>,
+    /// A choice made in the window since, not yet given to the host.
+    moved: Option<usize>,
+}
+
+impl Follow {
+    /// The session's choice is `index`: a change since the last look was made in the window.
+    fn look(&mut self, index: usize) {
+        if self.known.is_some_and(|known| known != index) {
+            self.moved = Some(index);
+            self.refused = false;
+        }
+        self.known = Some(index);
+    }
+
+    /// Whether the host's `value` is to be applied: it moved, or it was
+    /// refused and the session's `count` choices now have it.
+    fn due(&mut self, value: usize, count: usize) -> bool {
+        self.seen.replace(value) != Some(value) || (self.refused && value < count)
+    }
+}
+
+/// The values (from 1) for a host's pattern and kit parameters: the
+/// choices made in the window.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct WindowChoices {
+    pub pattern: Option<i32>,
+    pub kit: Option<i32>,
 }
 
 impl Player {
@@ -57,31 +101,62 @@ impl Player {
         // until the library is edited; a new instance saves what it plays.
         self.published = if state.is_empty() { None } else { Some(session.library_revision()) };
         self.ui = Some(Ui::new(session));
-        self.applied = None;
+        (self.pattern, self.kit, self.named) = (Follow::default(), Follow::default(), None);
         self.sample_rate = sample_rate;
         self.publish(state);
         Started::New(sides.try_recv().ok().map(Box::new))
     }
 
     /// One step of the UI side: the host's pattern and kit applied when
-    /// they changed, the controller fed, the names the host shows updated,
-    /// the library saved into the project when it changed.
-    pub fn tick(&mut self, state: &LibraryState, choice: HostChoice, names: &Names) {
-        if let Some(ui) = &mut self.ui {
-            let last = self.applied.replace(choice);
-            if last.is_none_or(|last| last.kit != choice.kit) {
-                ui.session.host_select_kit(choice.kit);
-                self.redraw = true;
-            }
-            if last.is_none_or(|last| last.pattern != choice.pattern) {
-                ui.session.host_select_pattern(choice.pattern);
-                self.redraw = true;
-            }
-            ui.session.update();
-            names.set_patterns(ui.session.pattern_names());
-            names.set_kits(ui.session.kit_names());
+    /// they changed (or when a refused one can be), its mutes shown, the
+    /// controller fed, the names the host shows updated, the library saved
+    /// into the project when it changed.
+    pub fn tick(&mut self, state: &LibraryState, host: HostControls, names: &Names) {
+        let Some(ui) = &mut self.ui else { return };
+        let session = &mut ui.session;
+        self.pattern.look(session.pattern_index());
+        self.kit.look(session.kit_index());
+        if self.kit.due(host.kit, session.kit_names().count()) {
+            self.kit.refused = !session.host_select_kit(host.kit);
+            self.redraw = true;
         }
+        if self.pattern.due(host.pattern, session.pattern_names().count()) {
+            self.pattern.refused = !session.host_select_pattern(host.pattern);
+            self.redraw = true;
+        }
+        self.redraw |= session.set_host_muted(host.muted);
+        session.update();
+        // What the host or the playback chose is not given back to the host.
+        self.pattern.known = Some(session.pattern_index());
+        self.kit.known = Some(session.kit_index());
+        let revision = session.library_revision();
+        if self.named != Some(revision) {
+            names.set_patterns(session.pattern_names());
+            self.named = Some(revision);
+        }
+        names.set_kits(session.kit_names());
         self.publish(state);
+    }
+
+    /// The choices made in the window since the last call, for the host's
+    /// parameters; one past a parameter's range is refused with a message.
+    pub fn take_window_choices(&mut self) -> WindowChoices {
+        let Some(ui) = &mut self.ui else { return WindowChoices::default() };
+        let session = &mut ui.session;
+        self.pattern.look(session.pattern_index());
+        self.kit.look(session.kit_index());
+        let mut value = |follow: &mut Follow, max: i32, what: &str| {
+            let index = follow.moved.take()?;
+            let value = choice_value(index, max);
+            if value.is_none() {
+                session.tell(format!("host: {what} {} has no value in the host (1-{max})", index + 1));
+            }
+            value
+        };
+        WindowChoices {
+            pattern: value(&mut self.pattern, PATTERN_CHOICES, "pattern"),
+            kit: value(&mut self.kit, KIT_CHOICES, "kit"),
+        }
     }
 
     /// Whether the host changed what the window shows since the last call.
@@ -138,7 +213,7 @@ impl Ticker {
         let stopped = stop.clone();
         let thread = std::thread::Builder::new().name("ordrumbox-player".into()).spawn(move || {
             while !stopped.load(Ordering::Acquire) {
-                lock(&player).tick(&params.library, params.choice(), &params.names);
+                lock(&player).tick(&params.library, params.controls(), &params.names);
                 std::thread::sleep(TICK_INTERVAL);
             }
         })?;
@@ -165,7 +240,7 @@ mod tests {
     use super::*;
     use crate::state::LibraryText;
 
-    const FIRST: HostChoice = HostChoice { pattern: 0, kit: 0 };
+    const FIRST: HostControls = HostControls { pattern: 0, kit: 0, muted: 0 };
 
     fn audio(started: Started) -> Box<AudioSide> {
         match started {
@@ -217,24 +292,48 @@ mod tests {
         let state = Arc::new(LibraryState::default());
         let names = Names::default();
         let mut player = Player::default();
-        let _audio = player.start(48_000.0, &state);
         let text = r#"{"patterns":[{"name":"a","tracks":[]},{"name":"b","tracks":[]}]}"#;
         state.set(LibraryText(text.into()));
         let _audio = audio(player.start(48_000.0, &state));
         let shown = |player: &mut Player| player.ui().and_then(|ui| ui.session.pattern()?.name.clone());
 
-        player.tick(&state, HostChoice { pattern: 1, ..FIRST }, &names);
+        let b = HostControls { pattern: 1, ..FIRST };
+        player.tick(&state, b, &names);
         assert_eq!(shown(&mut player).as_deref(), Some("b"));
         assert!(player.take_redraw() && !player.take_redraw());
+        assert_eq!(player.take_window_choices(), WindowChoices::default(), "the host's own choice");
 
-        // Unchanged, the parameter leaves the window's own choice alone.
+        // Unchanged, the parameter leaves the window's own choice alone,
+        // and the host is given it.
         player.ui().unwrap().session.step_pattern(1);
-        player.tick(&state, HostChoice { pattern: 1, ..FIRST }, &names);
+        player.tick(&state, b, &names);
         assert_eq!(shown(&mut player).as_deref(), Some("a"));
+        assert_eq!(player.take_window_choices(), WindowChoices { pattern: Some(1), kit: None });
+        assert_eq!(player.take_window_choices(), WindowChoices::default());
 
-        player.tick(&state, HostChoice { pattern: 4, ..FIRST }, &names);
+        // Refused, then applied once the library has it.
+        let third = HostControls { pattern: 2, ..FIRST };
+        player.tick(&state, third, &names);
         assert_eq!(shown(&mut player).as_deref(), Some("a"));
-        assert_eq!(player.ui().unwrap().session.message(), "host: no pattern 5 (the library has 2)");
+        assert_eq!(player.ui().unwrap().session.message(), "host: no pattern 3 (the library has 2)");
+        let session = &mut player.ui().unwrap().session;
+        session.new_pattern();
+        session.step_pattern(-2);
+        player.tick(&state, third, &names);
+        assert_eq!(player.ui().unwrap().session.pattern_index(), 2);
+    }
+
+    #[test]
+    fn host_mutes_are_shown() {
+        let state = Arc::new(LibraryState::default());
+        let mut player = Player::default();
+        let _audio = audio(player.start(48_000.0, &state));
+        player.tick(&state, FIRST, &Names::default());
+        player.take_redraw();
+        player.tick(&state, HostControls { muted: 0b1, ..FIRST }, &Names::default());
+        assert!(player.take_redraw());
+        player.tick(&state, HostControls { muted: 0b1, ..FIRST }, &Names::default());
+        assert!(!player.take_redraw());
     }
 
     #[test]
