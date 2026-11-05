@@ -123,6 +123,10 @@ impl Session {
 
     /// F3, View > Song: the song panel in the place of the grid, or back.
     pub fn toggle_song_view(&mut self) {
+        if self.hosted {
+            self.message = crate::menu::SONGS_IN_THE_APP.into();
+            return;
+        }
         self.set_workspace(if self.workspace == Workspace::Song { Workspace::Grid } else { Workspace::Song });
     }
 

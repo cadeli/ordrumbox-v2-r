@@ -14,6 +14,8 @@ use ordrumbox_core::Library;
 
 use super::{SAVE_DELAY, Session};
 use crate::kits::KitSet;
+use crate::menu::{Command, Item};
+use crate::panel::Id;
 use crate::view::Hit;
 
 const DEMO: &str = r#"{"patterns":[{"name":"demo","tracks":[{"name":"KICK","notes":[{}]}]}]}"#;
@@ -169,4 +171,48 @@ fn a_host_library_comes_back_as_text_and_is_never_saved() {
     let (library, path, _) = Session::open_host_library(Some("{".to_owned()), demo, &mut status);
     assert_eq!((library.patterns[0].name.as_deref(), path), (Some("demo"), None));
     assert!(status[0].starts_with("library of the host project not loaded: "), "{status:?}");
+}
+
+#[test]
+fn a_plugin_leaves_to_the_host_what_the_host_does() {
+    let library = Library::parse(DEMO).unwrap().0;
+    let mut s = Session::new(library, KitSet::empty(), Vec::new());
+    s.hosted = true;
+    let bpm = s.pattern().unwrap().bpm;
+    let refused = [
+        Command::Save,
+        Command::Quit,
+        Command::TempoUp,
+        Command::CheckUpdates,
+        Command::FactoryReset,
+        Command::SongView,
+        Command::PlaySong,
+        Command::NewSong,
+    ];
+    for command in refused {
+        s.run(command);
+        assert_eq!(Some(s.message.as_str()), command.hosted_refusal(), "{command:?}");
+    }
+    assert!(!s.quit_requested());
+    assert_eq!(s.pattern().unwrap().bpm, bpm);
+    assert_eq!(s.editor.history().next_undo(), None);
+    assert!(!s.song_view_open() && !s.playing());
+    s.toggle_play_song();
+    assert_eq!(s.message, crate::menu::SONGS_IN_THE_APP);
+    // Not in the menus, and the tempo shown is not the pattern's knob.
+    let commands = s.menus().into_iter().flat_map(|m| m.items).filter_map(|i| match i {
+        Item::Command { command, .. } => Some(command),
+        Item::Separator => None,
+    });
+    assert!(commands.into_iter().all(|c| c.hosted_refusal().is_none()));
+    let layout = s.panel_layout(1100, 680, 1);
+    assert!(!layout.items.iter().any(|i| i.id == Some(Id::Bpm)));
+    // No SONG view button, no master strip: the editors reach down to where it was.
+    assert!(!layout.items.iter().any(|i| i.id == Some(Id::View(2))));
+    assert!(!layout.items.iter().any(|i| matches!(i.id, Some(Id::OutTab(_) | Id::Master(_)))));
+    assert!(s.output_view().is_none());
+    let body = s.body((1100, 680, 1));
+    assert_eq!(body.output.h, 0);
+    s.hosted = false;
+    assert!(s.body((1100, 680, 1)).main_bottom < body.main_bottom);
 }

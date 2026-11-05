@@ -216,7 +216,10 @@ impl View {
         EventStatus::Captured
     }
 
-    fn key(&mut self, event: &KeyboardEvent) {
+    /// A key for the UI. A key it does not take, and every release, go on to
+    /// the host (its shortcuts, its transport, its computer keyboard): a
+    /// release kept from it would leave its key held.
+    fn key(&mut self, event: &KeyboardEvent) -> EventStatus {
         let key = KeyEvent {
             key: Key::from_code(&event.code.to_string()),
             pressed: event.state == KeyState::Down,
@@ -226,10 +229,14 @@ impl View {
                 _ => None,
             },
         };
+        let pressed = key.pressed;
+        let mut taken = false;
         self.with_ui(|ui| {
             ui.set_modifiers(ui_modifiers(event.modifiers));
-            ui.key(&key)
+            taken = ui.key(&key);
+            taken
         });
+        if taken && pressed { EventStatus::Captured } else { EventStatus::Ignored }
     }
 }
 
@@ -267,10 +274,7 @@ impl baseview::WindowHandler for View {
             }
             Event::Window(_) => EventStatus::Ignored,
             Event::Mouse(event) => self.mouse(event),
-            Event::Keyboard(event) => {
-                self.key(&event);
-                EventStatus::Captured
-            }
+            Event::Keyboard(event) => self.key(&event),
         }
     }
 }

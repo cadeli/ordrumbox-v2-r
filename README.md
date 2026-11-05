@@ -540,8 +540,24 @@ macOS (artifact `ordrumbox-plugin-<os>`) and runs `clap-validator` on the CLAP.
 
 The plugin's window is the app's UI (`ordrumbox-ui`). It edits the project's
 library; kits, synth presets and settings are the user's files, shared with
-the app. File > Save and Help > Factory reset do not apply: the host saves
-the library with the project.
+the app. What the host does is left out of its menus (File > Save and Quit,
+Tempo -1/+1, Help > Check for updates and Factory reset), and its shortcuts
+are refused with a message: the host saves the library with the project and
+sets the tempo. The header shows the host's tempo, under HOST, in place of
+the pattern's BPM knob. A plugin plays patterns only: no song view, no Song
+menu, no song files (the songs of the library stay in it, for the app). It
+has no master strip either: the host mixes, and the master bus keeps its
+default settings, not those of `settings.json`.
+
+The plugin's keys leave the host's alone. Space (the host's transport) and
+every Ctrl/Cmd key (its save, undo, zoom...) go on to the host, even with a menu
+or the file picker open; only a text entry keeps Space. The keys of the
+commands it leaves out (F3, Shift+[ ], - and = for the tempo) go to the host
+too, as does any key the plugin does not use and every key release. Undo,
+copy, paste and the exports stay in the menus, which show no Ctrl shortcut;
+Help > Keyboard shortcuts lists the plugin's keys. A key passed on reaches the
+host on macOS; on Windows, baseview does not pass it on, and what the host gets
+depends on the host.
 
 ## Sound measurements
 

@@ -59,7 +59,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         # The whole history and its tags: the program names its build from
-        # them (`crates/ordrumbox-app/build.rs`).
+        # them (`crates/ordrumbox-ui/build.rs`).
         with:
           fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable

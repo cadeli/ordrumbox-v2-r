@@ -262,15 +262,24 @@ impl Ui {
         if code == Key::F(10) {
             return self.toggle_menu();
         }
+        let shift = self.modifiers.shift;
+        let control = self.modifiers.command();
+        let alt = self.modifiers.alt;
+        // In a plugin, Ctrl/Cmd keys are the host's (save, undo, zoom…),
+        // whatever is open: the key is left to the host.
+        if self.session.hosted() && control {
+            return false;
+        }
         if let Some(open) = self.session.open_menu() {
             return self.menu_key(open, code);
         }
         if self.session.overlay_open() {
             return self.overlay_key(event);
         }
-        let shift = self.modifiers.shift;
-        let control = self.modifiers.command();
-        let alt = self.modifiers.alt;
+        // Space too, its transport, unless an entry types it.
+        if self.session.hosted() && code == Key::Space && !self.session.entry_open() {
+            return false;
+        }
         // Space plays or stops wherever the focus is (a button, a knob, an open
         // list…), except while writing text: an open entry keeps it (it types a
         // space). Menus and the file picker are modal and take it first.
@@ -286,6 +295,10 @@ impl Ui {
             return true;
         }
         if let Some(command) = shortcut(code, shift, control) {
+            // A command a plugin leaves to the host leaves it its key too.
+            if self.session.hosted() && command.hosted_refusal().is_some() {
+                return false;
+            }
             self.session.run(command);
             return true;
         }
@@ -338,9 +351,10 @@ impl Ui {
             }
         } else {
             let tempo = if shift { 10.0 } else { 1.0 };
+            let tempo_keys = !s.hosted();
             match code {
-                Key::Minus | Key::NumpadSubtract => s.step_tempo(-tempo),
-                Key::Equal | Key::NumpadAdd => s.step_tempo(tempo),
+                Key::Minus | Key::NumpadSubtract if tempo_keys => s.step_tempo(-tempo),
+                Key::Equal | Key::NumpadAdd if tempo_keys => s.step_tempo(tempo),
                 Key::ArrowLeft if shift => s.nudge(Move::Left),
                 Key::ArrowRight if shift => s.nudge(Move::Right),
                 Key::ArrowUp if shift => s.nudge(Move::Up),
@@ -514,5 +528,40 @@ mod tests {
         // Only the main row's minus changes the length; the keypad's is the tempo.
         assert_eq!(shortcut(Key::NumpadSubtract, false, true), None);
         assert_eq!(shortcut(Key::F(3), false, false), Some(Command::SongView));
+    }
+
+    #[test]
+    fn a_plugin_leaves_the_host_its_keys() {
+        let library =
+            ordrumbox_core::Library::parse(r#"{"patterns":[{"name":"demo","tracks":[{"name":"KICK"}]}]}"#).unwrap().0;
+        let session = |hosted| Session::for_tests(library.clone(), hosted);
+        let press = |key| KeyEvent { key, pressed: true, repeat: false, text: None };
+        let command = Modifiers { logo: true, ..Modifiers::default() };
+
+        let mut app = Ui::new(session(false));
+        assert!(app.key(&press(Key::Space)));
+        app.set_modifiers(command);
+        assert!(app.key(&press(Key::Letter('Z'))));
+
+        let mut plugin = Ui::new(session(true));
+        let bpm = plugin.session.pattern().unwrap().bpm;
+        // The host's: its transport, Ctrl/Cmd keys, what a plugin leaves out.
+        for key in [Key::Space, Key::F(3), Key::Minus, Key::Equal, Key::BracketLeft] {
+            let shift = key == Key::BracketLeft;
+            plugin.set_modifiers(Modifiers { shift, ..Modifiers::default() });
+            assert!(!plugin.key(&press(key)), "{key:?}");
+        }
+        plugin.set_modifiers(command);
+        for key in [Key::Letter('S'), Key::Letter('Z'), Key::Letter('N'), Key::Minus] {
+            assert!(!plugin.key(&press(key)), "Cmd+{key:?}");
+        }
+        assert!(!plugin.session.playing() && !plugin.session.song_view_open());
+        assert_eq!(plugin.session.pattern().unwrap().bpm, bpm);
+        assert_eq!(plugin.session.pattern().unwrap().beat_count, session(false).pattern().unwrap().beat_count);
+        // The plugin's own keys stay its own.
+        plugin.set_modifiers(Modifiers::default());
+        assert!(plugin.key(&press(Key::Digit(1))));
+        assert!(plugin.key(&press(Key::ArrowRight)));
+        assert!(plugin.key(&press(Key::F(4))));
     }
 }
