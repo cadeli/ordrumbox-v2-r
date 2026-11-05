@@ -3,7 +3,10 @@
 //! cannot run (paste with nothing copied, delete on an empty step) is left out.
 //! A track's name dragged up or down moves the track to another row.
 
+use ordrumbox_core::instruments::CATEGORIES;
 use ordrumbox_core::js;
+
+use crate::panel::SUBMENU_MARK;
 
 use super::session_song::DRAG_START_PX;
 use super::*;
@@ -20,6 +23,13 @@ pub(super) struct TrackDrag {
     /// What it was pressed on; another edit cancels the drag.
     revision: u64,
 }
+
+/// Value prefix of a category in the "add track" menus (its index follows).
+const CATEGORY_VALUE: &str = "category:";
+/// Value prefix of an instrument in the "add track" menus (its id follows).
+const INSTRUMENT_VALUE: &str = "instrument:";
+/// Value of the line of the rename menus that asks for any name.
+const FREE_NAME_VALUE: &str = "free-name";
 
 /// Where item `t` of a list is once the item `from` moved to `to`.
 pub(super) fn moved_index(t: usize, from: usize, to: usize) -> usize {
@@ -62,18 +72,89 @@ impl Session {
         match self.grid_hit(size, x, y) {
             Some(Hit::Mute(t) | Hit::Solo(t) | Hit::Name(t)) => self.track_menu(t, x, y),
             Some(Hit::Cell { track, beat, step }) => self.step_menu(track, beat, step, x, y),
-            Some(Hit::AddTrack) | None => return false,
+            Some(Hit::AddTrack) => self.add_track_menu(x, y),
+            None => return false,
         }
         true
     }
 
+    // ─── Naming a track ──────────────────────────────────────────────────────
+
+    /// The "add track" menus at `(x, y)`: first the instrument categories.
+    pub(super) fn add_track_menu(&mut self, x: i32, y: i32) {
+        self.track_name_menu(None, |id, title, values, labels| Dropdown::menu(id, x, y, title, values, labels));
+    }
+
+    /// The "add track" menus under the button that adds a track (a click on
+    /// it, Pattern > Add track), or under the menu bar when the grid is not shown.
+    pub(super) fn add_track_menu_at_button(&mut self) {
+        let size = self.chrome.panel_size;
+        let scale = size.2;
+        let (x, y) = self.grid_layout(size).map_or((8 * scale, menu::bar_height(scale) + 2 * scale), |layout| {
+            let button = layout.add_track_rect();
+            (button.x, button.y + button.h)
+        });
+        self.add_track_menu(x, y);
+    }
+
+    /// The instrument categories that name a new track (`target` `None`) or
+    /// rename track `t` (`Some(t)`, with a line to type any name), as `open`
+    /// makes the menu of them.
+    fn track_name_menu(
+        &mut self,
+        target: Option<usize>,
+        open: impl FnOnce(Id, String, Vec<String>, Vec<String>) -> Dropdown,
+    ) {
+        if self.pattern().is_none() {
+            return;
+        }
+        if target.is_none() && !self.editor.has_track_room(self.pattern_index) {
+            self.message = format!("a pattern holds at most {MAX_TRACKS} tracks");
+            return;
+        }
+        let mut values: Vec<String> = (0..CATEGORIES.len()).map(|i| format!("{CATEGORY_VALUE}{i}")).collect();
+        let mut labels: Vec<String> =
+            CATEGORIES.iter().map(|(category, _)| format!("{category}{SUBMENU_MARK}")).collect();
+        let title = match target {
+            Some(t) => {
+                let Some(track) = self.track(t) else { return };
+                values.push(FREE_NAME_VALUE.to_owned());
+                labels.push("Free name...".to_owned());
+                format!("Rename {}", track.name)
+            }
+            None => "Add track".to_owned(),
+        };
+        self.chrome.widgets.dropdown = Some(open(Id::TrackNameMenu(target), title, values, labels));
+    }
+
+    /// A line of the instrument menus, picked in `menu`: a category opens the
+    /// list of its instruments beside it, an instrument names the track,
+    /// "Free name" asks for the name.
+    pub(super) fn track_name_menu_pick(&mut self, target: Option<usize>, value: &str, menu: Dropdown) {
+        if let Some(index) = value.strip_prefix(CATEGORY_VALUE).and_then(|i| i.parse::<usize>().ok()) {
+            let Some((category, ids)) = CATEGORIES.get(index) else { return };
+            let values = ids.iter().map(|id| format!("{INSTRUMENT_VALUE}{id}")).collect();
+            let labels = ids.iter().map(|id| (*id).to_owned()).collect();
+            let id = Id::TrackNameMenu(target);
+            let submenu = Dropdown::submenu(menu, self.chrome.panel_size, id, (*category).to_owned(), values, labels);
+            self.chrome.widgets.dropdown = Some(submenu);
+            return;
+        }
+        match (target, value.strip_prefix(INSTRUMENT_VALUE)) {
+            (None, Some(name)) => self.add_track_named(name),
+            (Some(t), Some(name)) => self.commit_text(Id::TrackName(t), name),
+            (Some(t), None) if value == FREE_NAME_VALUE => self.text_entry(Id::TrackName(t)),
+            _ => {}
+        }
+    }
+
     /// A track: rename, copy, paste after it, move up or down, duplicate,
-    /// delete, randomize, clear.
+    /// delete, randomize, clear; add a track.
     fn track_menu(&mut self, t: usize, x: i32, y: i32) {
         let Some(track) = self.track(t) else { return };
         let title = track.name.clone();
         let count = self.pattern().map_or(0, |p| p.tracks.len());
-        let mut items = vec![("rename", "Rename track"), ("copy", "Copy track")];
+        let mut items = vec![("rename", "Rename track >"), ("copy", "Copy track")];
         if matches!(self.selection.clipboard, Some(Clipboard::Track(_))) {
             items.push(("paste", "Paste track"));
         }
@@ -88,6 +169,7 @@ impl Session {
             ("delete", "Delete track"),
             ("randomize", "Randomize"),
             ("clear", "Clear notes"),
+            ("add-track", "Add track >"),
         ]);
         let values = items.iter().map(|(action, _)| format!("{action}:{t}")).collect();
         let labels = items.iter().map(|(_, label)| (*label).to_owned()).collect();
@@ -113,8 +195,8 @@ impl Session {
     }
 
     /// An action of a grid menu: the cursor goes to its track or step, and
-    /// the action runs as its key would there.
-    pub(super) fn grid_menu_pick(&mut self, value: &str) {
+    /// the action runs as its key would there. A menu it opens opens beside `menu`.
+    pub(super) fn grid_menu_pick(&mut self, value: &str, menu: Dropdown) {
         let mut parts = value.split(':');
         let action = parts.next().unwrap_or_default();
         let mut number = || parts.next().and_then(|v| v.parse::<i32>().ok());
@@ -125,7 +207,7 @@ impl Session {
         let (beat, step) = (number().unwrap_or(0), number().unwrap_or(0));
         self.selection.cursor = Some(Cursor { track: t, beat, step });
         match action {
-            "rename" => self.text_entry(Id::TrackName(t)),
+            "rename" => self.track_name_submenu(Some(t), menu),
             "copy" => self.copy(true),
             "paste" => self.paste(true),
             "up" => self.move_track(t, t.saturating_sub(1)),
@@ -138,8 +220,17 @@ impl Session {
             "paste-notes" => self.paste(false),
             "delete-notes" => self.delete_step(),
             "random-note" => self.add_random_note(t, beat, step),
+            "add-track" => self.track_name_submenu(None, menu),
             _ => {}
         }
+    }
+
+    /// The instrument menus beside the grid menu `menu`.
+    fn track_name_submenu(&mut self, target: Option<usize>, menu: Dropdown) {
+        let size = self.chrome.panel_size;
+        self.track_name_menu(target, |id, title, values, labels| {
+            Dropdown::submenu(menu, size, id, title, values, labels)
+        });
     }
 
     /// Move track `from` to row `to`; the cursor and the selection follow
@@ -283,11 +374,110 @@ mod tests {
         s.chrome.widgets.dropdown.as_ref().map(|d| d.labels.clone()).unwrap_or_default()
     }
 
-    /// Run the menu's action labelled `label`.
+    /// Pick the line labelled `label` of the open menu, as a click does.
     fn pick(s: &mut Session, label: &str) {
-        let d = s.chrome.widgets.dropdown.take().expect("a menu");
+        let d = s.chrome.widgets.dropdown.as_ref().expect("a menu");
         let i = d.labels.iter().position(|l| l == label).unwrap_or_else(|| panic!("{label} in {:?}", d.labels));
-        s.grid_menu_pick(&d.values[i]);
+        s.pick(i);
+    }
+
+    /// The titles of the menus shown, the top one last.
+    fn menu_titles(s: &Session) -> Vec<String> {
+        let mut titles = Vec::new();
+        let mut menu = s.chrome.widgets.dropdown.as_ref();
+        while let Some(m) = menu {
+            titles.insert(0, m.title.clone().unwrap_or_default());
+            menu = m.parent.as_deref();
+        }
+        titles
+    }
+
+    fn track_names(s: &Session) -> Vec<String> {
+        s.pattern().unwrap().tracks.iter().map(|t| t.name.clone()).collect()
+    }
+
+    #[test]
+    fn the_add_track_menus_name_the_track_after_the_instrument() {
+        let mut s = session();
+        let before = s.pattern().unwrap().tracks.len();
+        s.add_track_menu(30, 40);
+        assert_eq!(labels(&s).len(), CATEGORIES.len());
+        pick(&mut s, "Hats & cymbals >");
+        assert_eq!(labels(&s), ["CHH", "CHHK", "OHH", "CYM", "CRASH", "RIDE"]);
+        assert_eq!(menu_titles(&s), ["Add track", "Hats & cymbals"], "the categories stay shown");
+        pick(&mut s, "OHH");
+        assert!(s.chrome.widgets.dropdown.is_none(), "every menu closes");
+        assert_eq!(track_names(&s).len(), before + 1);
+        assert_eq!(track_names(&s)[before], "OHH");
+        assert_eq!(s.selection.cursor.map(|c| c.track), Some(before));
+    }
+
+    #[test]
+    fn a_submenu_opens_beside_its_menu_and_goes_back_to_it() {
+        let mut s = session();
+        let (width, height, scale) = SIZE;
+        s.add_track_menu(30, 40);
+        pick(&mut s, "Toms >");
+        let d = s.chrome.widgets.dropdown.as_ref().unwrap();
+        let (parent, child) = (d.parent.as_ref().unwrap().rect(width, height, scale), d.rect(width, height, scale));
+        assert_eq!(child.x, parent.x + parent.w, "on the right of the categories");
+        // A click on another category of the menu above: its instruments instead.
+        let hats = CATEGORIES.iter().position(|(c, _)| *c == "Hats & cymbals").unwrap();
+        let y = parent.y + 2 * scale + (hats as i32 + 1) * 12 * scale + scale;
+        assert!(s.mouse_down(SIZE, parent.x + 4, y, Button::Left, false));
+        assert_eq!(menu_titles(&s), ["Add track", "Hats & cymbals"]);
+        // Left (or Escape) goes back a menu, Right opens the highlighted category again.
+        s.panel_key(SIZE, PanelKey::Left, false, false);
+        assert_eq!(menu_titles(&s), ["Add track"]);
+        s.panel_key(SIZE, PanelKey::Right, false, false);
+        assert_eq!(menu_titles(&s), ["Add track", "Hats & cymbals"]);
+        s.panel_key(SIZE, PanelKey::Escape, false, false);
+        s.panel_key(SIZE, PanelKey::Escape, false, false);
+        assert!(s.chrome.widgets.dropdown.is_none());
+        // Near the right edge, it opens on the left.
+        s.add_track_menu(width, 40);
+        pick(&mut s, "Toms >");
+        let d = s.chrome.widgets.dropdown.as_ref().unwrap();
+        let (parent, child) = (d.parent.as_ref().unwrap().rect(width, height, scale), d.rect(width, height, scale));
+        assert_eq!(child.x + child.w, parent.x);
+    }
+
+    #[test]
+    fn the_track_menu_pattern_menu_and_shortcut_add_tracks() {
+        let mut s = session();
+        let before = s.pattern().unwrap().tracks.len();
+        s.track_menu(0, 10, 10);
+        pick(&mut s, "Add track >");
+        pick(&mut s, "Toms >");
+        assert_eq!(menu_titles(&s), ["KICK", "Add track", "Toms"]);
+        pick(&mut s, "LO_TOM");
+        s.run(Command::ChooseTrack);
+        pick(&mut s, "Bass & keys >");
+        pick(&mut s, "PIANO");
+        s.run(Command::AddTrack);
+        assert!(s.chrome.widgets.dropdown.is_none(), "the shortcut asks nothing");
+        assert_eq!(track_names(&s)[before..], ["LO_TOM", "PIANO", "KICK"]);
+    }
+
+    #[test]
+    fn rename_track_offers_the_instruments_or_a_free_name() {
+        let mut s = session();
+        let before = s.pattern().unwrap().tracks.len();
+        s.track_menu(1, 10, 10);
+        pick(&mut s, "Rename track >");
+        assert_eq!(labels(&s).last().map(String::as_str), Some("Free name..."));
+        pick(&mut s, "Percussion >");
+        pick(&mut s, "COWBELL");
+        assert_eq!(track_names(&s)[1], "COWBELL");
+        assert_eq!(track_names(&s).len(), before, "renamed, not added");
+        s.track_menu(1, 10, 10);
+        pick(&mut s, "Rename track >");
+        pick(&mut s, "Free name...");
+        assert!(s.chrome.widgets.dropdown.is_none());
+        assert_eq!(
+            s.chrome.widgets.entry.as_ref().map(|e| (e.id, e.text.as_str())),
+            Some((Id::TrackName(1), "COWBELL"))
+        );
     }
 
     #[test]
@@ -362,6 +552,9 @@ mod tests {
         let hit = s.grid_hit(SIZE, rect.x + rect.w / 2, rect.y + rect.h / 2);
         assert_eq!(hit, Some(Hit::AddTrack));
         s.click(Hit::AddTrack);
+        assert_eq!(s.pattern().unwrap().tracks.len(), before, "it asks for the instrument first");
+        pick(&mut s, "Kick & snare >");
+        pick(&mut s, "SNARE");
         assert_eq!(s.pattern().unwrap().tracks.len(), before + 1);
         assert_eq!(s.selection.cursor.map(|c| c.track), Some(before), "the cursor goes to the new track");
         let rect = s.grid_layout(SIZE).unwrap().add_track_rect();

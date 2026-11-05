@@ -200,6 +200,9 @@ pub enum Id {
     TrackName(usize),
     /// The grid's right-click menus.
     GridMenu,
+    /// The instrument menus that name a track: the categories, then a
+    /// category's instruments. `None`: a new track; `Some(t)`: track `t` renamed.
+    TrackNameMenu(Option<usize>),
 }
 
 /// What a widget shows.
@@ -517,11 +520,17 @@ pub struct Dropdown {
     pub at: usize,
     /// First option shown.
     pub first: usize,
+    /// The menu this one is a submenu of, still shown, its line that opened
+    /// this one highlighted.
+    pub parent: Option<Box<Dropdown>>,
 }
+
+/// The label end of a line that opens a submenu.
+pub const SUBMENU_MARK: &str = " >";
 
 impl Dropdown {
     pub fn new(id: Id, anchor: Rect, values: Vec<String>, labels: Vec<String>, selected: usize) -> Self {
-        let mut d = Self { id, title: None, anchor, values, labels, at: selected, first: 0 };
+        let mut d = Self { id, title: None, anchor, values, labels, at: selected, first: 0, parent: None };
         d.show_at();
         d
     }
@@ -529,6 +538,53 @@ impl Dropdown {
     /// A menu of actions at `(x, y)`, under `title`.
     pub fn menu(id: Id, x: i32, y: i32, title: String, values: Vec<String>, labels: Vec<String>) -> Self {
         Self { title: Some(title), ..Self::new(id, Rect::new(x, y, 0, 0), values, labels, 0) }
+    }
+
+    /// A menu opened by the highlighted line of `parent`, beside it (on its
+    /// right, or on its left where the `width` × `height` window ends).
+    pub fn submenu(
+        parent: Dropdown,
+        size: (i32, i32, i32),
+        id: Id,
+        title: String,
+        values: Vec<String>,
+        labels: Vec<String>,
+    ) -> Self {
+        let (width, height, scale) = size;
+        let mut menu = Self::menu(id, 0, 0, title, values, labels);
+        let beside = parent.rect(width, height, scale);
+        let w = menu.rect(width, height, scale).w;
+        let row = parent.at.saturating_sub(parent.first) + parent.head();
+        let y = beside.y + 2 * scale + row as i32 * row_height(scale) - 2 * scale;
+        let right = beside.x + beside.w;
+        let x = if right + w <= width { right } else { (beside.x - w).max(0) };
+        menu.anchor = Rect::new(x, y, 0, 0);
+        menu.parent = Some(Box::new(parent));
+        menu
+    }
+
+    /// Whether the highlighted line opens a submenu.
+    pub fn opens_submenu(&self) -> bool {
+        self.labels.get(self.at).is_some_and(|l| l.ends_with(SUBMENU_MARK))
+    }
+
+    /// Back to the menu above, `None` when there is none.
+    pub fn back(self) -> Option<Dropdown> {
+        self.parent.map(|p| *p)
+    }
+
+    /// The menu above whose list is at `(x, y)` (the nearest first), and the
+    /// option there: a click on it goes back to it.
+    pub fn parent_at(self, width: i32, height: i32, scale: i32, x: i32, y: i32) -> Option<(Dropdown, Option<usize>)> {
+        let mut menu = self.back();
+        while let Some(m) = menu {
+            if m.rect(width, height, scale).contains(x, y) {
+                let i = m.hit(width, height, scale, x, y);
+                return Some((m, i));
+            }
+            menu = m.back();
+        }
+        None
     }
 
     /// Rows over the options (the title).
@@ -599,7 +655,11 @@ impl Dropdown {
         (i < self.labels.len()).then_some(i)
     }
 
+    /// The menus above first, then this one over them.
     pub fn draw(&self, canvas: &mut Canvas, scale: i32) {
+        if let Some(parent) = &self.parent {
+            parent.draw(canvas, scale);
+        }
         let r = self.rect(canvas.width(), canvas.height(), scale);
         canvas.fill_rect(r.x, r.y, r.w, r.h, border_color());
         canvas.fill_rect(r.x + scale, r.y + scale, r.w - 2 * scale, r.h - 2 * scale, background_color());

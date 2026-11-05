@@ -236,14 +236,19 @@ selected note (else the step under the cursor, else the track's first note)
 — velocity, pitch, pan, and the Trigger, Retrigger, Euclidean and Arpeggio tabs. Settings are named in whole words (Transpose, Feedback, Hit Variation…), the text at the font's own letter spacing leaving room for them. While
 playing, a setting with an LFO shows the LFO's value. The grid has a volume
 slider per track, the same setting as the track editor's Volume knob (their tooltips say so). Right-click a track's name: rename, copy, paste, move up or
-down, duplicate, delete, randomize or clear it; drag a track's name up or down
+down, duplicate, delete, randomize or clear it, or add a track; Rename track
+offers the instrument menus below, plus **Free name...**, which asks for any name; drag a track's name up or down
 to move the track to another row (one undo step). Right-click a step: copy,
 paste or delete its notes, or add a note at a random pitch. A note fills its cell as high as it is loud;
 from velocity 0.9 it is an accent, topped with a bright bar. **L** accents
 the notes of the cursor step (velocity 1), or, when they all are, sets them
 back to 0.8 (one undo step). A ruler above the rows numbers the beats, the one
 playing lit, with a dot per step of the focused track; **+ NEW TRACK** under
-the rows adds a track (**Ctrl+T**), and a track's name shows in a tooltip its
+the rows adds a track: like **Pattern > Add track...** and **Add track** in a track's
+right-click menu, it opens a menu of instrument categories, then one of the
+category's instruments, which names the track. A submenu opens beside its menu,
+which stays shown: a click on another line of it, **Left**, **Backspace** or
+**Escape** goes back to it (**Right** or **Enter** opens a submenu). **Ctrl+T** adds a KICK track at once, and a track's name shows in a tooltip its
 whole sound, mix and length. Above the track names, the ruler says which page of beats is shown when the pattern has more than one; the header's list is labelled PATTERN. In the kit editor, each sample names the pattern's tracks that play it. Problems found at start (a sample not loaded, a file that cannot be read) stay on a red band above the help line until quit.
 
 The mouse over a tab, a knob, a slider or a setting's label of the track,

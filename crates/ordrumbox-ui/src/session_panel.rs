@@ -543,11 +543,19 @@ impl Session {
     pub fn mouse_down(&mut self, size: (i32, i32, i32), x: i32, y: i32, button: Button, shift: bool) -> bool {
         self.chrome.panel_size = size;
         let (width, height, scale) = size;
-        if let Some(dropdown) = &self.chrome.widgets.dropdown {
-            let picked = (button == Button::Left).then(|| dropdown.hit(width, height, scale, x, y)).flatten();
-            match picked {
-                Some(i) => self.pick(i),
-                None => self.chrome.widgets.dropdown = None,
+        if let Some(dropdown) = self.chrome.widgets.dropdown.take() {
+            let left = button == Button::Left;
+            if let Some(i) = dropdown.hit(width, height, scale, x, y) {
+                self.chrome.widgets.dropdown = Some(dropdown);
+                if left {
+                    self.pick(i);
+                }
+            } else if let Some((menu, i)) = dropdown.parent_at(width, height, scale, x, y) {
+                // Back to a menu above: its submenus close, a line of it is picked.
+                self.chrome.widgets.dropdown = Some(menu);
+                if let (true, Some(i)) = (left, i) {
+                    self.pick(i);
+                }
             }
             return true;
         }
@@ -839,7 +847,17 @@ impl Session {
                     let at = dropdown.at;
                     self.pick(at);
                 }
-                PanelKey::Escape => self.chrome.widgets.dropdown = None,
+                PanelKey::Right if dropdown.opens_submenu() => {
+                    let at = dropdown.at;
+                    self.pick(at);
+                }
+                // Back to the menu above (Escape closes the last one).
+                PanelKey::Left | PanelKey::Backspace if dropdown.parent.is_some() => {
+                    self.chrome.widgets.dropdown = self.chrome.widgets.dropdown.take().and_then(Dropdown::back);
+                }
+                PanelKey::Escape => {
+                    self.chrome.widgets.dropdown = self.chrome.widgets.dropdown.take().and_then(Dropdown::back);
+                }
                 _ => {}
             }
             return true;
@@ -1235,10 +1253,15 @@ impl Session {
     }
 
     /// An option picked in the open list.
-    fn pick(&mut self, index: usize) {
-        let Some(dropdown) = self.chrome.widgets.dropdown.take() else { return };
-        if let Some(value) = dropdown.values.get(index) {
-            self.select(dropdown.id, value);
+    pub(super) fn pick(&mut self, index: usize) {
+        let Some(mut dropdown) = self.chrome.widgets.dropdown.take() else { return };
+        let Some(value) = dropdown.values.get(index).cloned() else { return };
+        // A menu that opens another stays shown beside it, this line highlighted.
+        dropdown.at = index;
+        match dropdown.id {
+            Id::GridMenu => self.grid_menu_pick(&value, dropdown),
+            Id::TrackNameMenu(target) => self.track_name_menu_pick(target, &value, dropdown),
+            id => self.select(id, &value),
         }
     }
 
@@ -1279,7 +1302,8 @@ impl Session {
                 return;
             }
             Id::RollMenu => return self.roll_menu_pick(value),
-            Id::GridMenu => return self.grid_menu_pick(value),
+            // Picked with where they are (`pick`).
+            Id::GridMenu | Id::TrackNameMenu(_) => return,
             Id::SynthPreset | Id::SynthField(_) => return self.synth_select(id, value),
             Id::KitKit => {
                 let target = self.kits.kits.iter().position(|k| k.name == value);

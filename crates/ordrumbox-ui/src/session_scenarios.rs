@@ -221,8 +221,8 @@ fn a_pattern_built_in_the_grid_is_saved_reloaded_and_exported() {
     // (The length first: a track keeps the loop point it was made with.)
     s.set_length(8);
     s.set_tempo(100.0);
-    for _ in 0..4 {
-        s.add_track();
+    for t in 1..=4 {
+        s.add_track_named(&format!("T{t}"));
     }
     let notes: [(usize, &[i32]); 3] = [(0, &[0, 2, 4, 6]), (1, &[1, 5]), (2, &[3])];
     for (track, beats) in notes {

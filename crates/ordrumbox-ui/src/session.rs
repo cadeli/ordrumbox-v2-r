@@ -116,6 +116,9 @@ const NO_SYNTHS: &str = "No synth sounds loaded";
 /// The file the synth sounds are exported to.
 const SYNTHS_FILE_NAME: &str = "ordrumbox-synth-sounds.json";
 
+/// The name of the track Ctrl+T adds.
+const DEFAULT_TRACK_NAME: &str = "KICK";
+
 /// The file a pattern is exported to as JSON (`ordrumbox-<name>.json`).
 fn pattern_json_file_name(pattern: &Pattern) -> String {
     format!("ordrumbox-{}.json", store::safe_name(pattern.name.as_deref().unwrap_or("pattern")))
@@ -317,7 +320,7 @@ const SHORTCUTS: [&str; 59] = [
     "  Ctrl+Z, Ctrl+Y         undo, redo (also Ctrl+Shift+Z)",
     "  Ctrl+C, Ctrl+V         copy, paste the step (Shift: the track)",
     "  Ctrl+N, Ctrl+D         new pattern, duplicate pattern",
-    "  Ctrl+T, Ctrl+Backspace add, remove a track",
+    "  Ctrl+T, Ctrl+Backspace add a KICK track, remove a track",
     "  Ctrl+G, Ctrl+L         next grid, loop one step shorter",
     "  Ctrl+- Ctrl+=          pattern length",
     "  Ctrl++ Ctrl+_ Ctrl+0   zoom in, out, back to the display's size (also Ctrl and keypad + -)",
@@ -1160,6 +1163,7 @@ impl Session {
             C::LengthDown => self.change_length(-1),
             C::LengthUp => self.change_length(1),
             C::AddTrack => self.add_track(),
+            C::ChooseTrack => self.add_track_menu_at_button(),
             C::RemoveTrack => self.remove_track(),
             C::NextGrid => self.next_grid(),
             C::ShortenLoop => self.shorten_loop(),
@@ -1757,7 +1761,7 @@ impl Session {
                 self.selection.cursor = Some(Cursor { track, beat, step });
                 self.toggle_note(track, beat, step);
             }
-            Hit::AddTrack => self.add_track(),
+            Hit::AddTrack => self.add_track_menu_at_button(),
         }
     }
 
@@ -2006,14 +2010,22 @@ impl Session {
         }
     }
 
-    /// A new track `T<n>` (the JS "add track" button).
+    /// Ctrl+T: a new track named [`DEFAULT_TRACK_NAME`] (the menus and the
+    /// button let the user choose the instrument: `session_grid.rs`).
     pub fn add_track(&mut self) {
-        let Some(count) = self.pattern().map(|p| p.tracks.len()) else { return };
+        self.add_track_named(DEFAULT_TRACK_NAME);
+    }
+
+    /// A new track named `name`, the cursor on it.
+    pub fn add_track_named(&mut self, name: &str) {
+        if self.pattern().is_none() {
+            return;
+        }
         if !self.editor.has_track_room(self.pattern_index) {
             self.message = format!("a pattern holds at most {MAX_TRACKS} tracks");
             return;
         }
-        if let Some(t) = self.editor.add_track(self.pattern_index, &format!("T{}", count + 1), 4) {
+        if let Some(t) = self.editor.add_track(self.pattern_index, name, 4) {
             self.selection.put_cursor(Cursor { track: t, beat: 0, step: 0 });
             self.edited();
         }

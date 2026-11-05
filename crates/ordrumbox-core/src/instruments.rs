@@ -13,6 +13,57 @@ use crate::json::{self, Value};
 /// Id of "no instrument" (`NOT_FOUND`).
 pub const NOT_FOUND: &str = "NOT_FOUND";
 
+/// The catalog's instrument ids by category, in the order the "add track"
+/// menus list them. Every id of `data/instruments.json` is in one category.
+pub const CATEGORIES: [(&str, &[&str]); 9] = [
+    ("Kick & snare", &["KICK", "SNARE", "RIMSHOT", "CLAP"]),
+    ("Hats & cymbals", &["CHH", "CHHK", "OHH", "CYM", "CRASH", "RIDE"]),
+    ("Toms", &["TOM", "HI_TOM", "MTOM", "LO_TOM"]),
+    (
+        "Latin",
+        &[
+            "BONGOS",
+            "HI_BONGOS",
+            "LO_BONGOS",
+            "CONGAS",
+            "HI_CONGAS",
+            "LO_CONGAS",
+            "OHI_CONGAS",
+            "CHI_CONGAS",
+            "TIMBAL",
+            "HI_TIMBAL",
+            "LO_TIMBAL",
+            "CUICA",
+            "GUIRO",
+        ],
+    ),
+    (
+        "Percussion",
+        &[
+            "COWBELL",
+            "TAMB",
+            "TAMBOURINE",
+            "SHAKER",
+            "MARACAS",
+            "CABA",
+            "CLAVES",
+            "CASTENET",
+            "TRIANGLE",
+            "HI_WOODBLOCK",
+            "LO_WOODBLOCK",
+            "WHISTLE",
+            "VIBRA",
+            "PERC",
+            "PERCUSSIVE",
+            "CROMAPERC",
+        ],
+    ),
+    ("Bass & keys", &["BASS", "PIANO", "ORGAN", "GUITAR", "MELO"]),
+    ("Strings & winds", &["STRINGS", "ENSEMBLE", "BRASS", "LONGBRASS", "SHORTBRASS", "SAX", "REED", "PIPE", "ETHNIC"]),
+    ("Synth", &["SYNTH", "SYNTHLEAD", "SYNTHPAD", "SYNTHEFFECT"]),
+    ("FX & loops", &["HIT", "RAZOR", "SCRATCH", "SOUNDEFFECT", "LOOP"]),
+];
+
 /// One MIDI mapping of an instrument.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MidiMapping {
@@ -237,5 +288,15 @@ mod tests {
         assert_eq!(c.by_id("ohh").map(|i| i.id.as_str()), Some("OHH"));
         assert_eq!(c.program_names.len(), 128);
         assert_eq!(count_common_words("HI_TOM", "tom hi"), 2);
+    }
+
+    #[test]
+    fn every_instrument_is_in_one_category() {
+        let listed: Vec<&str> = CATEGORIES.iter().flat_map(|(_, ids)| ids.iter().copied()).collect();
+        for instrument in &catalog().instruments {
+            let count = listed.iter().filter(|id| **id == instrument.id).count();
+            assert_eq!(count, 1, "{}", instrument.id);
+        }
+        assert_eq!(listed.len(), catalog().instruments.len(), "no id outside the catalog");
     }
 }
