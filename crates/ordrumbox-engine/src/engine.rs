@@ -66,6 +66,14 @@ pub fn host_pass(beat: f64, ticks: u32) -> Option<(u64, f64)> {
     Some((pass as u64, (beat / pass_beats - pass).clamp(0.0, 1.0)))
 }
 
+// One bit per track in the host's mute mask.
+const _: () = assert!(MAX_TRACKS <= u64::BITS as usize);
+
+/// The volume strip `track` goes to: its own, or none when `muted` has its bit.
+fn gated_volume(target: &StripSettings, muted: u64, track: usize) -> f32 {
+    if muted >> track & 1 == 1 { 0.0 } else { target.volume }
+}
+
 /// Where playback is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Position {
@@ -116,6 +124,10 @@ pub struct Engine {
     master: MasterBus,
     master_current: MasterSettings,
     master_target: MasterSettings,
+    /// A plugin host's gain on the master volume (linear).
+    host_gain: f32,
+    /// The tracks a plugin host mutes: bit `t` for track `t`.
+    host_muted: u64,
     /// `exp(-quantum / τ)` for each ramp.
     keep: [f32; 3],
     idle_quanta: u32,
@@ -152,6 +164,8 @@ impl Engine {
             master: MasterBus::new(sample_rate),
             master_current: MasterSettings::default(),
             master_target: MasterSettings::default(),
+            host_gain: 1.0,
+            host_muted: 0,
             keep: [RAMP_FX, RAMP_MIX, RAMP_LFO].map(|tau| (-quantum_seconds / tau).exp()),
             idle_quanta: (IDLE_SECONDS / quantum_seconds).ceil() as u32,
         }
@@ -177,13 +191,27 @@ impl Engine {
         self.master_target
     }
 
+    /// A plugin host's controls: `gain` multiplies the master volume, and
+    /// the tracks of `muted` (bit `t` for track `t`) are silenced, both
+    /// through the volume ramps.
+    pub fn set_host_controls(&mut self, gain: f32, muted: u64) {
+        self.host_gain = gain;
+        self.host_muted = muted;
+    }
+
     /// Start playing `pass` from its first frame; its strip settings apply at once.
     pub fn play(&mut self, pass: Arc<Pass>) {
         self.pass_number = pass.number;
         self.load(pass);
         self.next = None;
-        for channel in &mut self.channels[..self.strip_count] {
+        self.settle_strips();
+    }
+
+    /// The strips at their targets at once, the muted ones silent.
+    fn settle_strips(&mut self) {
+        for (track, channel) in self.channels[..self.strip_count].iter_mut().enumerate() {
             channel.current = channel.target;
+            channel.current.volume = gated_volume(&channel.target, self.host_muted, track);
         }
     }
 
@@ -195,9 +223,9 @@ impl Engine {
             self.strip_count = self.strip_count.max(pass.strips.len()).min(MAX_TRACKS);
             for (channel, settings) in self.channels.iter_mut().zip(&pass.strips) {
                 channel.target = *settings;
-                channel.current = *settings;
                 channel.lfo = [false; 4];
             }
+            self.settle_strips();
         }
         for event in &pass.events {
             self.start(event, &pass, self.clock);
@@ -336,6 +364,7 @@ impl Engine {
         out_left.fill(0.0);
         out_right.fill(0.0);
         let [keep_fx, keep_mix, keep_lfo] = self.keep;
+        let muted = self.host_muted;
         for (track, channel) in self.channels[..strips].iter_mut().enumerate() {
             let target = channel.target;
             let before = channel.current;
@@ -343,7 +372,8 @@ impl Engine {
             let ramp = |from: f32, to: f32, keep: f32| to + (from - to) * keep;
             let [lfo_volume, lfo_pan, lfo_cutoff, lfo_q] = channel.lfo;
             let mix_or_lfo = |lfo: bool| if lfo { keep_lfo } else { keep_mix };
-            channel.current.volume = ramp(before.volume, target.volume, mix_or_lfo(lfo_volume));
+            let volume = gated_volume(&target, muted, track);
+            channel.current.volume = ramp(before.volume, volume, mix_or_lfo(lfo_volume));
             channel.current.pan = ramp(before.pan, target.pan, mix_or_lfo(lfo_pan));
             if lfo_cutoff {
                 channel.current.cutoff = ramp(before.cutoff, target.cutoff, keep_lfo);
@@ -372,7 +402,8 @@ impl Engine {
         }
 
         // Master bus.
-        self.master_current.approach(&self.master_target, keep_fx);
+        let target = MasterSettings { master: self.master_target.master * self.host_gain, ..self.master_target };
+        self.master_current.approach(&target, keep_fx);
         self.master.process(&self.master_current, out_left, out_right);
         self.clock += n as u64;
     }
@@ -592,6 +623,27 @@ mod tests {
         muted.strips[0].volume = 0.0;
         engine.play(Arc::new(muted));
         assert!(render(&mut engine, 500).iter().all(|&s| s == 0.0));
+    }
+
+    #[test]
+    fn host_controls_mute_tracks_and_scale_the_master() {
+        let long = || SampleBuffer::mono(vec![1.0; 48_000], 48_000);
+        let level = |gain: f32, muted: u64, settle: usize| {
+            let mut engine = engine();
+            engine.bank = Arc::new(SampleBank {
+                samples: vec![crate::kit::BankSample { buffer: long().into(), ..engine.bank.samples[0].clone() }],
+            });
+            engine.set_host_controls(gain, muted);
+            engine.play(pass(0, &[0], 48_000));
+            let signal = render(&mut engine, settle + 128);
+            signal[settle..].iter().fold(0.0_f32, |peak, s| peak.max(s.abs()))
+        };
+        let full = level(1.0, 0, 2000);
+        assert!(full > 0.1);
+        assert_eq!(level(1.0, 0b1, 0), 0.0, "a muted track is silent from the start");
+        assert_eq!(level(1.0, 0b10, 2000), full, "another track's mute changes nothing");
+        // The master's 20 ms ramp has settled after 0.25 s.
+        assert!((level(0.5, 0, 12_000) / level(1.0, 0, 12_000) - 0.5).abs() < 1e-3);
     }
 
     #[test]

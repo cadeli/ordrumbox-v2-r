@@ -11,6 +11,7 @@ use std::time::Duration;
 use ordrumbox_engine::AudioSide;
 use ordrumbox_ui::{LibrarySource, Session, Ui};
 
+use crate::params::{HostChoice, Names, OrdrumboxParams};
 use crate::state::LibraryState;
 
 /// How often the controller posts passes and follows the host.
@@ -34,6 +35,10 @@ pub struct Player {
     sample_rate: f32,
     /// The revision whose text the project holds; `None`: not saved from this session.
     published: Option<u64>,
+    /// The host's pattern and kit last applied to this session; `None`: none yet.
+    applied: Option<HostChoice>,
+    /// The host changed what the window shows since it was last drawn.
+    redraw: bool,
 }
 
 impl Player {
@@ -52,18 +57,36 @@ impl Player {
         // until the library is edited; a new instance saves what it plays.
         self.published = if state.is_empty() { None } else { Some(session.library_revision()) };
         self.ui = Some(Ui::new(session));
+        self.applied = None;
         self.sample_rate = sample_rate;
         self.publish(state);
         Started::New(sides.try_recv().ok().map(Box::new))
     }
 
-    /// One step of the UI side: the controller fed, the library saved into
-    /// the project when it changed.
-    pub fn tick(&mut self, state: &LibraryState) {
+    /// One step of the UI side: the host's pattern and kit applied when
+    /// they changed, the controller fed, the names the host shows updated,
+    /// the library saved into the project when it changed.
+    pub fn tick(&mut self, state: &LibraryState, choice: HostChoice, names: &Names) {
         if let Some(ui) = &mut self.ui {
+            let last = self.applied.replace(choice);
+            if last.is_none_or(|last| last.kit != choice.kit) {
+                ui.session.host_select_kit(choice.kit);
+                self.redraw = true;
+            }
+            if last.is_none_or(|last| last.pattern != choice.pattern) {
+                ui.session.host_select_pattern(choice.pattern);
+                self.redraw = true;
+            }
             ui.session.update();
+            names.set_patterns(ui.session.pattern_names());
+            names.set_kits(ui.session.kit_names());
         }
         self.publish(state);
+    }
+
+    /// Whether the host changed what the window shows since the last call.
+    pub fn take_redraw(&mut self) -> bool {
+        std::mem::take(&mut self.redraw)
     }
 
     fn publish(&mut self, state: &LibraryState) {
@@ -110,12 +133,12 @@ pub struct Ticker {
 }
 
 impl Ticker {
-    pub fn spawn(player: SharedPlayer, state: Arc<LibraryState>) -> std::io::Result<Self> {
+    pub fn spawn(player: SharedPlayer, params: Arc<OrdrumboxParams>) -> std::io::Result<Self> {
         let stop = Arc::new(AtomicBool::new(false));
         let stopped = stop.clone();
         let thread = std::thread::Builder::new().name("ordrumbox-player".into()).spawn(move || {
             while !stopped.load(Ordering::Acquire) {
-                lock(&player).tick(&state);
+                lock(&player).tick(&params.library, params.choice(), &params.names);
                 std::thread::sleep(TICK_INTERVAL);
             }
         })?;
@@ -142,6 +165,8 @@ mod tests {
     use super::*;
     use crate::state::LibraryText;
 
+    const FIRST: HostChoice = HostChoice { pattern: 0, kit: 0 };
+
     fn audio(started: Started) -> Box<AudioSide> {
         match started {
             Started::New(Some(audio)) => audio,
@@ -159,7 +184,7 @@ mod tests {
         let host = HostTransport { playing: true, bpm: 100.0, beat: 0.0 };
         let (mut left, mut right) = (vec![0.0; 512], vec![0.0; 512]);
         for _ in 0..4 {
-            player.tick(&state);
+            player.tick(&state, FIRST, &Names::default());
             audio.render_synced(&mut left, &mut right, host);
         }
         assert!(player.ui().is_some_and(|ui| ui.session.playing()));
@@ -177,14 +202,39 @@ mod tests {
         // A text the session cannot read: the project keeps it.
         state.set(LibraryText("{".into()));
         let _audio = audio(player.start(48_000.0, &state));
-        player.tick(&state);
+        player.tick(&state, FIRST, &Names::default());
         assert_eq!(state.map(|t| t.0.clone()), "{");
 
         let text = r#"{"patterns":[{"name":"mine","tracks":[]}]}"#;
         state.set(LibraryText(text.into()));
         let _audio = audio(player.start(48_000.0, &state));
-        player.tick(&state);
+        player.tick(&state, FIRST, &Names::default());
         assert!(player.ui().is_some_and(|ui| ui.session.library_text().contains("mine")));
+    }
+
+    #[test]
+    fn the_host_chooses_the_pattern_when_its_parameter_changes() {
+        let state = Arc::new(LibraryState::default());
+        let names = Names::default();
+        let mut player = Player::default();
+        let _audio = player.start(48_000.0, &state);
+        let text = r#"{"patterns":[{"name":"a","tracks":[]},{"name":"b","tracks":[]}]}"#;
+        state.set(LibraryText(text.into()));
+        let _audio = audio(player.start(48_000.0, &state));
+        let shown = |player: &mut Player| player.ui().and_then(|ui| ui.session.pattern()?.name.clone());
+
+        player.tick(&state, HostChoice { pattern: 1, ..FIRST }, &names);
+        assert_eq!(shown(&mut player).as_deref(), Some("b"));
+        assert!(player.take_redraw() && !player.take_redraw());
+
+        // Unchanged, the parameter leaves the window's own choice alone.
+        player.ui().unwrap().session.step_pattern(1);
+        player.tick(&state, HostChoice { pattern: 1, ..FIRST }, &names);
+        assert_eq!(shown(&mut player).as_deref(), Some("a"));
+
+        player.tick(&state, HostChoice { pattern: 4, ..FIRST }, &names);
+        assert_eq!(shown(&mut player).as_deref(), Some("a"));
+        assert_eq!(player.ui().unwrap().session.message(), "host: no pattern 5 (the library has 2)");
     }
 
     #[test]

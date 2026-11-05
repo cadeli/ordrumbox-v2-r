@@ -1,6 +1,7 @@
 //! orDrumbox as a CLAP (and, with the `vst3` feature, VST3) instrument: no
 //! input, a stereo output, playback that follows the host's transport (play
-//! and stop, position, tempo), the library saved in the host's project.
+//! and stop, position, tempo), the library saved in the host's project, and
+//! parameters a host automates (`params.rs`).
 //!
 //! Threads: the host's audio thread runs [`AudioSide::render_synced`]; the
 //! player thread ([`player::Ticker`]) builds and posts passes; the host's GUI
@@ -13,11 +14,12 @@ use nih_plug::prelude::*;
 use ordrumbox_engine::{AudioSide, HostTransport};
 
 mod editor;
+pub mod params;
 pub mod player;
 pub mod state;
 
+use params::OrdrumboxParams;
 use player::{SharedPlayer, Started, Ticker, lock};
-use state::LibraryState;
 
 /// The tempo used until the host gives one.
 const DEFAULT_BPM: f64 = 120.0;
@@ -34,17 +36,10 @@ pub struct Ordrumbox {
     bpm: f64,
 }
 
-/// No parameter for now; what the project saves.
-#[derive(Debug, Params)]
-pub struct OrdrumboxParams {
-    #[persist = "library"]
-    library: Arc<LibraryState>,
-}
-
 impl Default for Ordrumbox {
     fn default() -> Self {
         Self {
-            params: Arc::new(OrdrumboxParams { library: Arc::default() }),
+            params: Arc::new(OrdrumboxParams::default()),
             player: SharedPlayer::default(),
             audio: None,
             ticker: None,
@@ -102,7 +97,7 @@ impl Plugin for Ordrumbox {
             self.audio = audio;
         }
         if self.ticker.is_none() {
-            match Ticker::spawn(self.player.clone(), self.params.library.clone()) {
+            match Ticker::spawn(self.player.clone(), self.params.clone()) {
                 Ok(ticker) => self.ticker = Some(ticker),
                 Err(e) => {
                     nih_log!("orDrumbox: cannot start the player thread: {e}");
@@ -123,7 +118,10 @@ impl Plugin for Ordrumbox {
         let host = host_transport(transport.playing, transport.tempo, transport.pos_beats(), self.bpm);
         self.bpm = host.bpm;
         match (&mut self.audio, buffer.as_slice()) {
-            (Some(audio), [left, right, ..]) => audio.render_synced(left, right, host),
+            (Some(audio), [left, right, ..]) => {
+                audio.set_host_controls(self.params.volume.value(), self.params.muted_tracks());
+                audio.render_synced(left, right, host);
+            }
             (_, channels) => channels.iter_mut().for_each(|c| c.fill(0.0)),
         }
         // A sequencer sounds with no input: the host must keep calling.

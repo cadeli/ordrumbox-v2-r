@@ -201,6 +201,13 @@ impl AudioSide {
         self.engine.sample_rate()
     }
 
+    /// A plugin host's controls for the blocks to come: a gain on the master
+    /// volume and the tracks it mutes, bit `t` for track `t`
+    /// ([`Engine::set_host_controls`]).
+    pub fn set_host_controls(&mut self, gain: f32, muted: u64) {
+        self.engine.set_host_controls(gain, muted);
+    }
+
     /// Render one callback's worth of stereo frames.
     pub fn render(&mut self, left: &mut [f32], right: &mut [f32]) {
         self.take_inbox();

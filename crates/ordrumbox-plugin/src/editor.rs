@@ -140,9 +140,10 @@ impl View {
             return Ok(());
         }
         let mut player = lock(&self.player);
+        let host_changed = player.take_redraw();
         let ui = player.ui().filter(|_| self.font);
         let redraw = match ui {
-            Some(ui) => ui.idle().redraw,
+            Some(ui) => ui.idle().redraw || host_changed,
             None => false,
         };
         if !(redraw || self.dirty) {
