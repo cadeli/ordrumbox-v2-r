@@ -80,7 +80,7 @@ impl Plugin for Ordrumbox {
     }
 
     fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
-        Some(Box::new(editor::OrdrumboxEditor { player: self.player.clone() }))
+        Some(Box::new(editor::OrdrumboxEditor { player: self.player.clone(), params: self.params.clone() }))
     }
 
     fn initialize(

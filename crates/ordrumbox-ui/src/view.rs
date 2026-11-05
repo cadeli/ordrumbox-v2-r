@@ -47,6 +47,8 @@ fn focus_row_color() -> Rgb {
     theme::selected_row()
 }
 const MUTE_ON: Rgb = theme::RED;
+/// A track a plugin host mutes.
+const MUTE_HOST: Rgb = theme::ORANGE;
 /// The logo, the header's labels, values.
 const LOGO: Rgb = theme::LIME;
 const LABEL: Rgb = theme::CYAN;
@@ -124,6 +126,8 @@ pub struct View<'a> {
     pub tempo_label: &'a str,
     /// A track being dragged by its name: from which row to which.
     pub track_drop: Option<(usize, usize)>,
+    /// The tracks a plugin host mutes, bit `t` for track `t`.
+    pub host_muted: u64,
 }
 
 /// What the kit editor shows.
@@ -597,7 +601,10 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
             canvas.fill_rect(stripe_x, stripe_top, stripe_w, stripe_h, theme::track(i));
         }
         let box_y = y + (layout.row - layout.box_size) / 2;
-        for (solo, on, color, letter) in [(false, track.mute, MUTE_ON, "M"), (true, track.solo, SOLO_ON, "S")] {
+        // A mute from the host is lit in its own colour: the track's own stays off.
+        let host_mute = ordrumbox_engine::host_muted(view.host_muted, i);
+        let (mute, mute_color) = if track.mute { (true, MUTE_ON) } else { (host_mute, MUTE_HOST) };
+        for (solo, on, color, letter) in [(false, mute, mute_color, "M"), (true, track.solo, SOLO_ON, "S")] {
             let x = layout.box_x(solo);
             canvas.fill_rect(x, box_y, layout.box_size, layout.box_size, if on { color } else { box_off_color() });
             let letter_scale = (layout.box_size / 10).max(1);
@@ -621,7 +628,7 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
             let shown: String = sound.chars().take(chars).collect();
             canvas.text(layout.name_x, label_y + 8 * layout.scale + 2 * scale, &shown, scale, dim_color());
         }
-        let color = if track.mute {
+        let color = if mute {
             dim_color()
         } else if track.auto_mode {
             PLAYING // a new line every loop
@@ -923,6 +930,7 @@ mod tests {
                 show_vus: true,
                 tempo_label: "BPM",
                 track_drop: None,
+                host_muted: 0b10,
                 cursor: Some(Cursor { track: 0, beat: 1, step: 2 }),
                 selected: Some((0, 0)),
                 undo: Some("Add note"),

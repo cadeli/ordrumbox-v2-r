@@ -1,6 +1,7 @@
 //! The plugin's window: a baseview child of the host's window showing the
 //! app's UI, drawn in software and shown through softbuffer, its input
-//! translated into the UI's.
+//! translated into the UI's. A pattern or kit chosen in it is given to the
+//! host's parameters.
 
 use std::num::{NonZeroIsize, NonZeroU32};
 use std::ptr::NonNull;
@@ -12,11 +13,12 @@ use baseview::{
 };
 use keyboard_types::{KeyState, KeyboardEvent};
 use nih_plug::nih_log;
-use nih_plug::prelude::{Editor, GuiContext, ParentWindowHandle};
+use nih_plug::prelude::{Editor, GuiContext, IntParam, ParamSetter, ParentWindowHandle};
 use ordrumbox_ui::ui_input::{self, Button, Key, KeyEvent, Modifiers};
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle, RawDisplayHandle, RawWindowHandle};
 use raw_window_handle_06 as rwh06;
 
+use crate::params::OrdrumboxParams;
 use crate::player::{SharedPlayer, lock};
 
 /// The window's size in logical pixels (the app's first window size).
@@ -29,10 +31,12 @@ const BACKGROUND: u32 = 0x0018_1820;
 #[derive(Debug)]
 pub struct OrdrumboxEditor {
     pub player: SharedPlayer,
+    pub params: Arc<OrdrumboxParams>,
 }
 
 impl Editor for OrdrumboxEditor {
-    fn spawn(&self, parent: ParentWindowHandle, _context: Arc<dyn GuiContext>) -> Box<dyn std::any::Any + Send> {
+    fn spawn(&self, parent: ParentWindowHandle, context: Arc<dyn GuiContext>) -> Box<dyn std::any::Any + Send> {
+        let host = Host { context, params: self.params.clone() };
         let player = self.player.clone();
         let window = baseview::Window::open_parented(
             &HostWindow(parent),
@@ -41,7 +45,7 @@ impl Editor for OrdrumboxEditor {
                 size: baseview::Size::new(f64::from(SIZE.0), f64::from(SIZE.1)),
                 scale: WindowScalePolicy::SystemScaleFactor,
             },
-            move |window: &mut baseview::Window<'_>| View::new(window, player),
+            move |window: &mut baseview::Window<'_>| View::new(window, player, host),
         );
         Box::new(Open { window })
     }
@@ -79,9 +83,27 @@ impl Drop for Open {
     }
 }
 
+/// The host's parameters, set from the window.
+struct Host {
+    context: Arc<dyn GuiContext>,
+    params: Arc<OrdrumboxParams>,
+}
+
+impl Host {
+    /// `param` set to `value` (from 1), as one gesture; nothing when `None`.
+    fn set(&self, param: &IntParam, value: Option<i32>) {
+        let Some(value) = value else { return };
+        let setter = ParamSetter::new(self.context.as_ref());
+        setter.begin_set_parameter(param);
+        setter.set_parameter(param, value);
+        setter.end_set_parameter(param);
+    }
+}
+
 /// What the window shows: the player's UI, drawn into a softbuffer surface.
 struct View {
     player: SharedPlayer,
+    host: Host,
     /// `None` when the surface could not be made or used: nothing is drawn.
     surface: Option<Surface>,
     /// The system's monospace font is loaded: the UI can draw text.
@@ -102,7 +124,7 @@ struct Surface {
 }
 
 impl View {
-    fn new(window: &mut baseview::Window<'_>, player: SharedPlayer) -> Self {
+    fn new(window: &mut baseview::Window<'_>, player: SharedPlayer, host: Host) -> Self {
         let font = match ordrumbox_ui::load_font() {
             Ok(()) => true,
             Err(e) => {
@@ -114,7 +136,7 @@ impl View {
         let surface = softbuffer::Context::new(target.clone()).and_then(|context| {
             softbuffer::Surface::new(&context, target).map(|surface| Surface { _context: context, surface })
         });
-        let mut view = Self { player, surface: None, font, width: 0, height: 0, scale: 1.0, dirty: true };
+        let mut view = Self { player, host, surface: None, font, width: 0, height: 0, scale: 1.0, dirty: true };
         match surface {
             Ok(surface) => view.surface = Some(surface),
             Err(e) => view.fail(&e),
@@ -133,8 +155,13 @@ impl View {
         }
     }
 
-    /// One frame: the UI's idle pass, then a redraw if anything changed.
+    /// One frame: the choices made in the window given to the host, the
+    /// UI's idle pass, then a redraw if anything changed.
     fn frame(&mut self) -> Result<(), softbuffer::SoftBufferError> {
+        // Taken under the lock, given with it released: the host is called.
+        let choices = lock(&self.player).take_window_choices();
+        self.host.set(&self.host.params.pattern, choices.pattern);
+        self.host.set(&self.host.params.kit, choices.kit);
         let Some(surface) = &mut self.surface else { return Ok(()) };
         if self.width == 0 {
             return Ok(());

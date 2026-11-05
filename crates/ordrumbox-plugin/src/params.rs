@@ -1,7 +1,9 @@
 //! The parameters a host shows and automates: the pattern and the kit
 //! played, the master volume, a mute per track. The pattern and the kit are
-//! applied by the player thread; the volume and the mutes by the audio
-//! thread, every block.
+//! applied by the player thread, which also shows the mutes in the window;
+//! the volume and the mutes are applied by the audio thread, every block.
+//! A pattern or kit chosen in the window is given back to the host
+//! (`editor.rs`).
 
 use std::sync::{Arc, RwLock};
 
@@ -80,10 +82,10 @@ impl Default for OrdrumboxParams {
 }
 
 impl OrdrumboxParams {
-    /// The pattern and the kit the host asks for, from 0.
-    pub fn choice(&self) -> HostChoice {
-        let index = |param: &IntParam| usize::try_from(param.value() - 1).unwrap_or(0);
-        HostChoice { pattern: index(&self.pattern), kit: index(&self.kit) }
+    /// What the player thread follows: the pattern and the kit the host asks
+    /// for, and the tracks it mutes.
+    pub fn controls(&self) -> HostControls {
+        HostControls { pattern: choice_index(&self.pattern), kit: choice_index(&self.kit), muted: self.muted_tracks() }
     }
 
     /// The tracks muted, bit `t` for track `t`.
@@ -92,15 +94,33 @@ impl OrdrumboxParams {
     }
 }
 
-/// The pattern and the kit a host's parameters ask for, from 0.
+/// What a host's parameters ask of the player thread.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct HostChoice {
+pub struct HostControls {
+    /// The pattern, from 0.
     pub pattern: usize,
+    /// The kit, from 0.
     pub kit: usize,
+    /// The tracks muted, bit `t` for track `t`.
+    pub muted: u64,
+}
+
+/// Choice parameter `param` (from 1) as an index from 0.
+fn choice_index(param: &IntParam) -> usize {
+    // The parameter's range starts at 1: `value() - 1` is never negative.
+    param.value().max(1).unsigned_abs() as usize - 1
+}
+
+/// Index `index` (from 0) as the value of a choice parameter of `max`
+/// choices; `None` past them.
+pub fn choice_value(index: usize, max: i32) -> Option<i32> {
+    i32::try_from(index + 1).ok().filter(|&v| v <= max)
 }
 
 /// The names of the patterns and the kits, kept up to date by the player
-/// thread, for the host to show next to the parameters' numbers.
+/// thread, for the host to show next to the parameters' numbers. nih-plug
+/// cannot tell the host that these texts changed: a host that keeps the
+/// texts it read shows the old names until it asks again.
 #[derive(Debug, Default)]
 pub struct Names {
     patterns: RwLock<Vec<String>>,
@@ -160,12 +180,15 @@ mod tests {
         assert_eq!(choice_number(" 12 funk", PATTERN_CHOICES), Some(12));
         assert_eq!(choice_number("0", PATTERN_CHOICES), None);
         assert_eq!(choice_number("funk", PATTERN_CHOICES), None);
+        assert_eq!(choice_value(0, PATTERN_CHOICES), Some(1));
+        assert_eq!(choice_value(127, PATTERN_CHOICES), Some(128));
+        assert_eq!(choice_value(128, PATTERN_CHOICES), None);
     }
 
     #[test]
     fn the_defaults_choose_the_first_pattern_and_kit_and_mute_nothing() {
         let params = OrdrumboxParams::default();
-        assert_eq!(params.choice(), HostChoice { pattern: 0, kit: 0 });
+        assert_eq!(params.controls(), HostControls { pattern: 0, kit: 0, muted: 0 });
         assert_eq!(params.muted_tracks(), 0);
         assert_eq!(params.volume.value(), 1.0);
         let ids: Vec<String> = params.param_map().into_iter().map(|(id, _, _)| id).collect();
