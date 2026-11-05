@@ -346,9 +346,10 @@ pub fn output_height(scale: i32) -> i32 {
 }
 
 /// The height the track editor and its note editor take at most, at scale 1:
-/// the Gen tab's Advanced settings on a track in auto mode. A test checks
+/// the Gen tab's Advanced settings on a track in auto mode, under the
+/// sample bar (kept even without a sample). A test checks
 /// that every tab fits in it.
-pub const TRACK_EDITOR_HEIGHT: i32 = 472;
+pub const TRACK_EDITOR_HEIGHT: i32 = 523;
 
 /// The footer status lines the smallest window leaves room for.
 const MIN_STATUS_LINES: usize = 1;

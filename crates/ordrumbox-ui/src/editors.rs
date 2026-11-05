@@ -759,22 +759,24 @@ pub fn track_editor(view: &TrackView, state: &EditorState, area: Rect, scale: i3
     let mut rows = Rows { x: area.x, w: area.w, y: area.y, scale: s, items: Vec::new() };
     rows.text(&view.title, ACCENT);
 
-    // Sample bar: analysis, load button, envelope with the decay end.
+    // Sample bar: analysis, load button, envelope with the decay end. Its
+    // place is kept without a sample (a synth track), so the rows under it
+    // stay put when the sound changes.
+    let load_w = 40 * s;
     if let Some(bar) = &view.sample {
-        let load_w = 40 * s;
         let info: String = bar.info.chars().take(crate::canvas::chars_in(area.w - load_w, s)).collect();
         rows.items.push(Item::text(area.x, rows.y + 2 * s, info, text_color(), s));
-        let button = Kind::Button { label: "Load".into(), on: false };
-        rows.items.push(Item::new(
-            Some(Id::LoadSample),
-            Rect::new(area.x + area.w - load_w, rows.y, load_w, 12 * s),
-            button,
-        ));
-        rows.y += 15 * s;
-        let kind = Kind::Envelope { points: bar.envelope.clone(), marker: bar.marker };
-        rows.items.push(Item::new(None, Rect::new(area.x, rows.y, area.w, 32 * s), kind));
-        rows.y += 36 * s;
     }
+    let button = Kind::Button { label: "Load".into(), on: false };
+    rows.items.push(Item::new(
+        Some(Id::LoadSample),
+        Rect::new(area.x + area.w - load_w, rows.y, load_w, 12 * s),
+        button,
+    ));
+    rows.y += 15 * s;
+    let (points, marker) = view.sample.as_ref().map_or((Vec::new(), None), |bar| (bar.envelope.clone(), bar.marker));
+    rows.items.push(Item::new(None, Rect::new(area.x, rows.y, area.w, 32 * s), Kind::Envelope { points, marker }));
+    rows.y += 36 * s;
 
     // Knob bar: while playing, a setting with an LFO shows the LFO's value.
     let lfo_now = |key: &str| view.lfo.iter().find(|(k, _)| *k == key).map(|&(_, v)| v);
@@ -1350,6 +1352,20 @@ mod tests {
                 },
             }),
         }
+    }
+
+    #[test]
+    fn the_rows_stay_put_without_a_sample() {
+        let track = Track { name: "BASS".into(), ..Track::default() };
+        let tab_rect = |sample: bool| {
+            let mut view = view(&track);
+            if !sample {
+                view.sample = None;
+            }
+            let (items, bottom) = track_editor(&view, &EditorState::default(), Rect::new(0, 0, 360, 600), 1);
+            (items.into_iter().find(|i| i.id == Some(Id::Tab(0))).map(|i| i.rect), bottom)
+        };
+        assert_eq!(tab_rect(true), tab_rect(false));
     }
 
     #[test]
