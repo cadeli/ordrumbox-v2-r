@@ -42,7 +42,14 @@ impl Session {
         }
         let body = self.body(size);
         let pattern = self.pattern()?;
-        Some(view::Layout::new(body.main_w, body.editor_h, size.2, pattern, self.status.len(), self.current_page))
+        Some(view::Layout::new(
+            body.main_w,
+            body.editor_h,
+            size.2,
+            pattern,
+            self.status.len(),
+            self.chrome.current_page,
+        ))
     }
 
     /// What of the grid is at `(x, y)`.
@@ -67,7 +74,7 @@ impl Session {
         let title = track.name.clone();
         let count = self.pattern().map_or(0, |p| p.tracks.len());
         let mut items = vec![("rename", "Rename track"), ("copy", "Copy track")];
-        if matches!(self.clipboard, Some(Clipboard::Track(_))) {
+        if matches!(self.selection.clipboard, Some(Clipboard::Track(_))) {
             items.push(("paste", "Paste track"));
         }
         if t > 0 {
@@ -84,7 +91,7 @@ impl Session {
         ]);
         let values = items.iter().map(|(action, _)| format!("{action}:{t}")).collect();
         let labels = items.iter().map(|(_, label)| (*label).to_owned()).collect();
-        self.widgets.dropdown = Some(Dropdown::menu(Id::GridMenu, x, y, title, values, labels));
+        self.chrome.widgets.dropdown = Some(Dropdown::menu(Id::GridMenu, x, y, title, values, labels));
     }
 
     /// A step: copy its notes, paste on it, delete them, add a random note.
@@ -93,7 +100,7 @@ impl Session {
         let title = format!("{} @ {}.{}", track.name, beat + 1, step + 1);
         let has_notes = track.notes.iter().any(|n| n.beat == beat && n.step == step);
         let mut items = vec![("copy-notes", "Copy notes")];
-        if matches!(&self.clipboard, Some(Clipboard::Step(notes)) if !notes.is_empty()) {
+        if matches!(&self.selection.clipboard, Some(Clipboard::Step(notes)) if !notes.is_empty()) {
             items.push(("paste-notes", "Paste notes"));
         }
         if has_notes {
@@ -102,7 +109,7 @@ impl Session {
         items.push(("random-note", "Add rnd note"));
         let values = items.iter().map(|(action, _)| format!("{action}:{t}:{beat}:{step}")).collect();
         let labels = items.iter().map(|(_, label)| (*label).to_owned()).collect();
-        self.widgets.dropdown = Some(Dropdown::menu(Id::GridMenu, x, y, title, values, labels));
+        self.chrome.widgets.dropdown = Some(Dropdown::menu(Id::GridMenu, x, y, title, values, labels));
     }
 
     /// An action of a grid menu: the cursor goes to its track or step, and
@@ -116,7 +123,7 @@ impl Session {
             return;
         }
         let (beat, step) = (number().unwrap_or(0), number().unwrap_or(0));
-        self.cursor = Some(Cursor { track: t, beat, step });
+        self.selection.cursor = Some(Cursor { track: t, beat, step });
         match action {
             "rename" => self.text_entry(Id::TrackName(t)),
             "copy" => self.copy(true),
@@ -142,19 +149,8 @@ impl Session {
             return;
         }
         let Some(to) = self.pattern().map(|p| to.min(p.tracks.len() - 1)) else { return };
-        let moved = |t: usize| moved_index(t, from, to);
-        if let Some(cursor) = &mut self.cursor {
-            cursor.track = moved(cursor.track);
-        }
-        self.selected = self.selected.map(|(t, n)| (moved(t), n));
-        self.note_focus = self.note_focus.map(|focus| match focus {
-            NoteFocus::Track(t) => NoteFocus::Track(moved(t)),
-            NoteFocus::Step { track, beat, step } => NoteFocus::Step { track: moved(track), beat, step },
-        });
-        if let Some((t, _)) = &mut self.detached {
-            *t = moved(*t);
-        }
-        self.hover = None;
+        self.selection.follow_tracks(|t| moved_index(t, from, to));
+        self.chrome.hover = None;
         self.edited();
     }
 
@@ -162,13 +158,13 @@ impl Session {
 
     /// A press on the name of track `t`.
     pub fn press_track_drag(&mut self, t: usize, x: i32, y: i32) {
-        self.track_drag =
+        self.chrome.track_drag =
             Some(TrackDrag { track: t, press: (x, y), y, started: false, revision: self.editor.revision() });
     }
 
     /// The drag under way, unless the pattern may have changed under it.
     fn live_track_drag(&self) -> Option<TrackDrag> {
-        self.track_drag.filter(|d| d.started && d.revision == self.editor.revision())
+        self.chrome.track_drag.filter(|d| d.started && d.revision == self.editor.revision())
     }
 
     /// The track dragged and the row it would take.
@@ -179,7 +175,7 @@ impl Session {
 
     /// The mouse moved with a name pressed; whether to redraw.
     pub(super) fn track_drag_move(&mut self, x: i32, y: i32) -> bool {
-        let Some(drag) = &mut self.track_drag else { return false };
+        let Some(drag) = &mut self.chrome.track_drag else { return false };
         drag.y = y;
         let (dx, dy) = (x - drag.press.0, y - drag.press.1);
         drag.started |= dx.abs() >= DRAG_START_PX || dy.abs() >= DRAG_START_PX;
@@ -189,7 +185,7 @@ impl Session {
     /// The press released: a drag moves its track; whether it was one.
     pub fn track_release(&mut self, size: (i32, i32, i32)) -> bool {
         let drop = self.track_drop(size);
-        self.track_drag = None;
+        self.chrome.track_drag = None;
         let Some((from, to)) = drop else { return false };
         self.move_track(from, to);
         true
@@ -204,8 +200,7 @@ impl Session {
         }
         let Some(source) = self.track(t).cloned() else { return };
         if let Some(copy) = self.editor.paste_track(p, t + 1, &source) {
-            self.cursor = Some(Cursor { track: copy, beat: 0, step: 0 });
-            self.selected = None;
+            self.selection.put_cursor(Cursor { track: copy, beat: 0, step: 0 });
             self.edited();
             let name = self.track(copy).map(|track| track.name.clone()).unwrap_or_default();
             self.message = format!("Duplicated track as \"{name}\"");
@@ -218,7 +213,7 @@ impl Session {
         let (name, range) = (track.name.clone(), track.pitch_range.max(1.0));
         let pitch = (self.rng.next_f64() * (range * 2.0 + 1.0)).floor() - range;
         let Some(n) = self.editor.add_note(self.pattern_index, t, beat, step, pitch) else { return };
-        self.selected = Some((t, n));
+        self.selection.selected = Some((t, n));
         self.edited();
         self.audition(t, Some(n));
         self.message =
@@ -250,7 +245,7 @@ mod tests {
             s.note_actions();
         }
         s.open_history();
-        let scroll = |s: &Session| match s.overlay {
+        let scroll = |s: &Session| match s.chrome.overlay {
             Some(Overlay::History { scroll }) => scroll,
             _ => panic!("the history panel is open"),
         };
@@ -285,12 +280,12 @@ mod tests {
 
     /// The menu open, its labels.
     fn labels(s: &Session) -> Vec<String> {
-        s.widgets.dropdown.as_ref().map(|d| d.labels.clone()).unwrap_or_default()
+        s.chrome.widgets.dropdown.as_ref().map(|d| d.labels.clone()).unwrap_or_default()
     }
 
     /// Run the menu's action labelled `label`.
     fn pick(s: &mut Session, label: &str) {
-        let d = s.widgets.dropdown.take().expect("a menu");
+        let d = s.chrome.widgets.dropdown.take().expect("a menu");
         let i = d.labels.iter().position(|l| l == label).unwrap_or_else(|| panic!("{label} in {:?}", d.labels));
         s.grid_menu_pick(&d.values[i]);
     }
@@ -321,10 +316,10 @@ mod tests {
         let names = |s: &Session| s.pattern().unwrap().tracks.iter().map(|t| t.name.clone()).collect::<Vec<_>>();
         s.track_menu(0, 10, 10);
         assert!(!labels(&s).contains(&"Move up".to_owned()), "the first track goes no higher");
-        s.cursor = Some(Cursor { track: 0, beat: 1, step: 0 });
+        s.selection.cursor = Some(Cursor { track: 0, beat: 1, step: 0 });
         pick(&mut s, "Move down");
         assert_eq!(names(&s), ["SNARE", "KICK"]);
-        assert_eq!(s.cursor.map(|c| c.track), Some(1), "the cursor follows the track");
+        assert_eq!(s.selection.cursor.map(|c| c.track), Some(1), "the cursor follows the track");
         assert_eq!(s.message, "Move track KICK");
         s.track_menu(1, 10, 10);
         assert!(!labels(&s).contains(&"Move down".to_owned()), "the last track goes no lower");
@@ -352,7 +347,7 @@ mod tests {
         assert!(s.track_release(SIZE));
         let names: Vec<_> = s.pattern().unwrap().tracks.iter().map(|t| t.name.as_str()).collect();
         assert_eq!(names, ["SNARE", "KICK"]);
-        assert_eq!(s.cursor.map(|c| c.track), Some(1));
+        assert_eq!(s.selection.cursor.map(|c| c.track), Some(1));
         s.press_track_drag(1, x1, y1);
         assert!(!s.track_release(SIZE), "a click moves nothing");
         s.undo();
@@ -398,7 +393,10 @@ mod tests {
         }
         let (x, y) = name.expect("a track name");
         assert!(s.grid_menu(SIZE, x, y));
-        assert_eq!(s.widgets.dropdown.as_ref().and_then(|d| d.title.clone()), Some(pattern.tracks[0].name.clone()));
+        assert_eq!(
+            s.chrome.widgets.dropdown.as_ref().and_then(|d| d.title.clone()),
+            Some(pattern.tracks[0].name.clone())
+        );
         let (x, y) = cell.expect("a step");
         assert!(s.grid_menu(SIZE, x, y));
         assert!(labels(&s).contains(&"Add rnd note".to_owned()));

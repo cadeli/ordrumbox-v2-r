@@ -18,7 +18,7 @@ use ordrumbox_core::track::MAX_TRACKS;
 use ordrumbox_core::{Library, Note, Pattern, Rng, ScaleList, Scales, Styles, Track};
 use ordrumbox_engine::analysis::{self, Analysis};
 use ordrumbox_engine::offline::{self, RenderSetup};
-use ordrumbox_engine::{Controller, Mode, SynthPresets, wav};
+use ordrumbox_engine::{Mode, SynthPresets, wav};
 use ordrumbox_logic::compose;
 use ordrumbox_logic::generate::{self, AutoGenerator, MelodicKind};
 use ordrumbox_logic::midi;
@@ -27,7 +27,7 @@ use ordrumbox_logic::{Editor, Nudge};
 
 use crate::action_log::{self, ActionLog, LogLayout, Seen};
 use crate::assets;
-use crate::audio_output::{AudioOutput, StartOutput};
+use crate::audio_output::StartOutput;
 use crate::canvas::Canvas;
 use crate::editors::EditorState;
 use crate::frame;
@@ -40,8 +40,14 @@ use crate::store;
 use crate::theme;
 use crate::update;
 use crate::view::{self, Cursor, Hit, KitView, View};
+use session_chrome::Chrome;
 use session_confirm::Pending;
+use session_playback::Playback;
+use session_saving::Saving;
+use session_selection::{Clipboard, NoteFocus, Selection};
 
+#[path = "session_chrome.rs"]
+mod session_chrome;
 #[path = "session_color.rs"]
 mod session_color;
 #[path = "session_confirm.rs"]
@@ -66,11 +72,17 @@ mod session_mcp;
 mod session_output;
 #[path = "session_panel.rs"]
 mod session_panel;
+#[path = "session_playback.rs"]
+mod session_playback;
 #[path = "session_roll.rs"]
 mod session_roll;
+#[path = "session_saving.rs"]
+mod session_saving;
 #[cfg(test)]
 #[path = "session_scenarios.rs"]
 mod session_scenarios;
+#[path = "session_selection.rs"]
+mod session_selection;
 #[path = "session_song.rs"]
 mod session_song;
 #[path = "session_synth.rs"]
@@ -93,8 +105,6 @@ pub enum Workspace {
     Synth,
 }
 
-/// Save this long after the last edit.
-const SAVE_DELAY: Duration = Duration::from_secs(1);
 /// Why a WAV export is refused.
 const NOTHING_TO_RENDER: &str = "nothing to render with (no samples loaded)";
 /// Why the synth sounds cannot be exported.
@@ -139,22 +149,6 @@ pub enum OverlayKey {
     Letter(char),
 }
 
-/// The next loop of a pattern in auto mode, posted ahead to the engine. Its
-/// lines enter the library when that loop starts: what the grid shows and what
-/// an edit changes is the loop playing.
-#[derive(Debug)]
-struct UpcomingLoop {
-    pattern_index: usize,
-    pass: u64,
-    tracks: Vec<Track>,
-}
-
-#[derive(Debug, Clone)]
-enum Clipboard {
-    Step(Vec<Note>),
-    Track(Box<Track>),
-}
-
 /// Where a session's library comes from, and where its edits go.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LibrarySource {
@@ -167,6 +161,12 @@ pub enum LibrarySource {
 }
 
 pub struct Session {
+    /// What the window shows around the library (`session_chrome.rs`).
+    chrome: Chrome,
+    /// The cursor, the selected note, the clipboard (`session_selection.rs`).
+    selection: Selection,
+    /// Where the files go and when (`session_saving.rs`).
+    saving: Saving,
     editor: Editor,
     /// What the generators read (`scales.json`).
     scales: Scales,
@@ -195,78 +195,32 @@ pub struct Session {
     song_cursor: u32,
     /// The song panel's scrolls and what the mouse holds in it.
     song_panel: session_song::SongPanel,
-    /// A track pressed by its name, that may be dragged to another row.
-    track_drag: Option<session_grid::TrackDrag>,
     /// The piano roll's view and what the mouse holds in it.
     roll: session_roll::RollState,
-    /// Window size and scale of the last mouse or key event on the widgets.
-    panel_size: (i32, i32, i32),
     /// What offline renders (WAV exports) use; `None` without samples.
     render: Option<RenderSetup>,
-    /// `None` when no audio device could be opened.
-    controller: Option<Controller>,
-    output: Option<Box<dyn AudioOutput>>,
-    /// What started `output`, to start it again when the session reloads
-    /// (`None`: a session built without assets or by a test).
-    start_output: Option<StartOutput>,
+    /// The engine and the sound output (`session_playback.rs`).
+    playback: Playback,
     /// Startup problems, shown until quit.
     status: Vec<String>,
     /// Outcome of the last action.
     message: String,
     /// What was done so far, shown by a click on the status line.
     action_log: ActionLog,
-    cursor: Option<Cursor>,
-    /// Selected note: track and index in its notes.
-    selected: Option<(usize, usize)>,
-    clipboard: Option<Clipboard>,
-    /// Where the library is saved; `None`: not saved.
-    library_path: Option<PathBuf>,
-    saved_revision: u64,
-    /// Editor revision the playing pass was built from.
-    played_revision: u64,
-    upcoming_loop: Option<UpcomingLoop>,
-    changed_at: Option<Instant>,
-    /// The open menu, if any.
-    menu: Option<menu::Open>,
-    /// A panel over everything: the file picker, the key list, about.
-    overlay: Option<Overlay>,
-    /// Folder the file picker last picked in.
-    last_dir: Option<PathBuf>,
     /// The assets folder in use.
     assets_dir: Option<PathBuf>,
-    /// Where the song panel saves songs; `None`: no user data folder.
-    songs_dir: Option<PathBuf>,
     /// File > Quit was chosen.
     quit: bool,
     /// The scale names, in file order (arpeggios).
     scale_list: ScaleList,
     /// Tabs and selection of the track and note editors.
     editors: EditorState,
-    /// The track editor (and its note editor) shown on the right.
-    show_track_editor: bool,
-    /// Smoothed per-track levels for the VU meter stripe.
-    track_levels: Vec<f32>,
-    /// Whether the VU meter stripe is shown.
-    show_vus: bool,
-    /// The settings file the colour scheme is saved to (`None`: not saved).
-    color_scheme_file: Option<PathBuf>,
     /// The scheme in use, from 1, set again on the thread that draws.
     color_scheme: usize,
     /// The library lives in a plugin host's project, not in a file.
     hosted: bool,
     /// The tracks a plugin host mutes, bit `t` for track `t`.
     host_muted: u64,
-    /// Current page of the pattern grid (BEATS_PER_PAGE beats).
-    current_page: usize,
-    /// What the mouse and the keyboard hold among the widgets.
-    widgets: Widgets,
-    /// What the note editor follows when no note is selected.
-    note_focus: Option<NoteFocus>,
-    /// The default note the note editor shows for a track without notes
-    /// (edits stay in it, as in the JS): its track and the note.
-    detached: Option<(usize, Note)>,
-    /// Kit knob edits not yet applied to the bank and saved.
-    kits_dirty: Option<Instant>,
     /// The output panel: the master bus, its tab, the spectrum.
     output_panel: session_output::OutputPanel,
     /// The update check (`session_update.rs`).
@@ -275,11 +229,6 @@ pub struct Session {
     mcp: Option<mcp_link::Server>,
     /// The synth editor (`session_synth.rs`).
     synth_editor: session_synth::SynthEditor,
-    synths_dirty: Option<Instant>,
-    /// Where the synth presets are saved; none when the saved ones could not be read.
-    synths_file: Option<PathBuf>,
-    /// The grid step under the mouse: track, beat, step (its note's tooltip).
-    hover: Option<(usize, i32, i32)>,
     /// Sample analyses of the track editor, by url.
     track_analysis: std::cell::RefCell<std::collections::HashMap<String, Analysis>>,
 }
@@ -309,15 +258,6 @@ struct Widgets {
     entry: Option<Entry>,
     /// Last click on a widget, for double-clicks.
     last_click: Option<(Id, Instant)>,
-}
-
-/// What the note editor shows when no note is selected.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum NoteFocus {
-    /// A track was picked: its first note.
-    Track(usize),
-    /// The grid cursor moved to a step: its note, or none.
-    Step { track: usize, beat: i32, step: i32 },
 }
 
 /// What is shown over the window.
@@ -443,6 +383,21 @@ const PLUGIN_SHORTCUTS: &[&str] = &[
     "                         becomes a kit, a .json mapping loads, a .mid imports",
 ];
 
+/// The loop start of pattern `p` (loop `pass` of the playback): new lines for
+/// its tracks in auto mode, in the styles the library teaches; whether any changed.
+fn auto_loop(
+    editor: &mut Editor,
+    learned: &mut (Styles, Option<u64>),
+    styles: &Styles,
+    scales: &Scales,
+    rng: &mut Rng,
+    p: usize,
+    pass: u64,
+) -> bool {
+    let styles = learned_styles(learned, styles, editor).clone();
+    editor.auto_loop(p, pass, scales, &styles, &mut || rng.next_f64())
+}
+
 /// The output of a session that had none: none again.
 fn no_output(_: Arc<ordrumbox_engine::SampleBank>, _: Scales, _: SynthPresets) -> crate::audio_output::StartedOutput {
     Err("no audio output given".into())
@@ -520,15 +475,15 @@ impl Session {
         let mut session = Self::new(library, kits, status);
         session.hosted = hosted;
         session.assets_dir = Some(dir.clone());
-        session.songs_dir = store::songs_dir();
+        session.saving.songs_dir = store::songs_dir();
         session.scales = assets.scales.clone();
         session.styles = assets.styles.clone();
         session.scale_list = assets.scale_list.clone();
         session.synths = assets.synths.clone();
         session.roots =
             assets.bank.samples.iter().filter_map(|s| Some((s.sample.key.clone(), s.sample.root_midi?))).collect();
-        session.library_path = library_path;
-        session.synths_file = synths_file;
+        session.saving.library_path = library_path;
+        session.saving.synths_file = synths_file;
         session.message = message;
         let bank = Arc::new(assets.bank);
         if !bank.samples.is_empty() {
@@ -542,13 +497,10 @@ impl Session {
             });
         }
         match start_output(bank, assets.scales, assets.synths) {
-            Ok((output, controller)) => {
-                session.controller = Some(controller);
-                session.output = Some(output);
-            }
+            Ok((output, controller)) => session.playback = Playback::new(output, controller),
             Err(e) => session.status.push(format!("no sound: {e}")),
         }
-        session.start_output = Some(start_output);
+        session.playback.keep_start_output(start_output);
         // A plugin shows no master panel: the host mixes, the default master applies.
         if !hosted {
             session.load_master();
@@ -645,50 +597,25 @@ impl Session {
             song_cursor: 0,
             song_panel: session_song::SongPanel::default(),
             roll: session_roll::RollState::default(),
-            panel_size: (0, 0, 1),
             render: None,
-            controller: None,
-            output: None,
-            start_output: None,
+            playback: Playback::default(),
+            selection: Selection::default(),
+            saving: Saving::default(),
+            chrome: Chrome::default(),
             status,
             message: String::new(),
             action_log: ActionLog::default(),
-            cursor: None,
-            selected: None,
-            clipboard: None,
-            library_path: None,
-            saved_revision: 0,
-            played_revision: 0,
-            upcoming_loop: None,
-            changed_at: None,
-            menu: None,
-            overlay: None,
-            last_dir: None,
             assets_dir: None,
-            songs_dir: None,
             quit: false,
             scale_list: ScaleList::default(),
             editors: EditorState::default(),
-            show_track_editor: true,
-            track_levels: Vec::new(),
-            show_vus: true,
-            color_scheme_file: None,
             color_scheme: 1,
             hosted: false,
             host_muted: 0,
-            current_page: 0,
-            widgets: Widgets::default(),
-            note_focus: None,
-            detached: None,
-            kits_dirty: None,
             output_panel: session_output::OutputPanel::default(),
             updates: session_update::Updates::default(),
             mcp: None,
             synth_editor: session_synth::SynthEditor::new(),
-            synths_dirty: None,
-            synths_file: None,
-            hover: None,
-            track_drag: None,
             track_analysis: std::cell::RefCell::default(),
         }
     }
@@ -718,7 +645,7 @@ impl Session {
     }
 
     pub fn playing(&self) -> bool {
-        self.controller.as_ref().is_some_and(Controller::is_playing)
+        self.playback.is_playing()
     }
 
     // ─── Transport ───────────────────────────────────────────────────────────
@@ -747,18 +674,16 @@ impl Session {
 
     /// Stop, or play `mode` from pass `first`.
     fn toggle(&mut self, mode: Mode, first: u64) {
-        let Some(controller) = &mut self.controller else { return };
-        self.upcoming_loop = None;
-        if controller.is_playing() {
-            controller.stop();
+        if self.playback.controller().is_none() {
+            return;
+        }
+        if self.playback.is_playing() {
+            self.playback.stop();
         } else {
             if let Mode::Pattern(p) = mode {
-                let styles = learned_styles(&mut self.learned_styles, &self.styles, &self.editor).clone();
-                let rng = &mut self.rng;
-                self.editor.auto_loop(p, 0, &self.scales, &styles, &mut || rng.next_f64());
+                auto_loop(&mut self.editor, &mut self.learned_styles, &self.styles, &self.scales, &mut self.rng, p, 0);
             }
-            controller.play_from(self.editor.library(), mode, first);
-            self.played_revision = self.editor.revision();
+            self.playback.play_from(&self.editor, mode, first);
         }
     }
 
@@ -873,7 +798,7 @@ impl Session {
         self.deselect();
         self.edited();
         self.message.clone_from(&message);
-        self.current_page = 0;
+        self.chrome.current_page = 0;
         Ok(message)
     }
 
@@ -888,11 +813,11 @@ impl Session {
     pub(super) fn show_pattern(&mut self, index: usize) {
         self.pattern_index = index;
         self.deselect();
-        self.current_page = 0;
+        self.chrome.current_page = 0;
         self.message = format!("pattern {}", self.pattern().and_then(|p| p.name.as_deref()).unwrap_or_default());
         // In pattern mode, switch to the new pattern on the current pass
         // (when playing) instead of waiting for the next loop.
-        if let Some(controller) = &mut self.controller
+        if let Some(controller) = self.playback.controller_mut()
             && let Mode::Pattern(_) = controller.mode()
         {
             controller.select_pattern(self.pattern_index);
@@ -929,7 +854,7 @@ impl Session {
         }
         if index != self.pattern_index {
             self.show_pattern(index);
-            if self.controller.as_ref().is_some_and(|c| matches!(c.mode(), Mode::Song(_))) {
+            if matches!(self.playback.mode(), Some(Mode::Song(_))) {
                 self.message = format!("host: {}, shown only: a song plays", self.message);
             }
         }
@@ -985,7 +910,7 @@ impl Session {
         self.kit_index = index;
         // A kit change affects every track's sound: rebuild the pass
         // playing now so it is heard at once (not at the next loop).
-        if let Some(controller) = &mut self.controller {
+        if let Some(controller) = self.playback.controller_mut() {
             controller.set_kit(&kit.name);
             controller.refresh(self.editor.library());
         }
@@ -1008,7 +933,7 @@ impl Session {
         self.pattern_index = index;
         self.deselect();
         self.edited();
-        self.current_page = 0;
+        self.chrome.current_page = 0;
         self.message = format!("pattern {}", self.pattern().and_then(|p| p.name.as_deref()).unwrap_or_default());
     }
 
@@ -1024,8 +949,8 @@ impl Session {
 
     /// V: show/hide the VU meters on the track stripes.
     pub fn toggle_vus(&mut self) {
-        self.show_vus = !self.show_vus;
-        self.message = if self.show_vus { "VU meters on".into() } else { "VU meters off".into() };
+        self.chrome.show_vus = !self.chrome.show_vus;
+        self.message = if self.chrome.show_vus { "VU meters on".into() } else { "VU meters off".into() };
     }
 
     // ─── Menus and commands ──────────────────────────────────────────────────
@@ -1081,17 +1006,17 @@ impl Session {
         let pattern = self.pattern();
         let focus = self.focus_track().and_then(|t| self.track(t)).map(|t| (t.auto_mode, t.mute, t.solo));
         MenuState {
-            can_save: self.library_path.is_some(),
+            can_save: self.saving.library_path.is_some(),
             can_render: self.render.is_some(),
             has_pattern: pattern.is_some(),
             undo: history.next_undo().map(str::to_owned),
             redo: history.next_redo().map(str::to_owned),
-            has_cursor: self.cursor.is_some(),
+            has_cursor: self.selection.cursor.is_some(),
             focus_track: focus,
             can_remove_track: focus.is_some() && pattern.is_some_and(|p| p.tracks.len() > 1),
-            clipboard_step: matches!(self.clipboard, Some(Clipboard::Step(_))),
-            clipboard_track: matches!(self.clipboard, Some(Clipboard::Track(_))),
-            has_selection: self.selected.is_some(),
+            clipboard_step: matches!(self.selection.clipboard, Some(Clipboard::Step(_))),
+            clipboard_track: matches!(self.selection.clipboard, Some(Clipboard::Track(_))),
+            has_selection: self.selection.selected.is_some(),
             playing: self.playing(),
             has_songs: !self.editor.library().songs.is_empty(),
             generation: self.generation(),
@@ -1100,14 +1025,18 @@ impl Session {
             kits: self.kits.kits.iter().map(|k| k.name.clone()).collect(),
             kit_index: self.kit_index,
             kit_editor: self.kit_editor.is_some(),
-            track_editor: self.show_track_editor,
+            track_editor: self.chrome.show_track_editor,
             grid: self.workspace == Workspace::Grid && self.kit_editor.is_none(),
-            show_vus: self.show_vus,
+            show_vus: self.chrome.show_vus,
             song_view: self.song_view_open(),
             piano_roll: self.piano_roll_open(),
             synth: self.synth_open(),
-            can_save_song: self.songs_dir.is_some(),
-            saved_songs: self.songs_dir.as_ref().is_some_and(|d| store::list_songs(d).is_ok_and(|s| !s.is_empty())),
+            can_save_song: self.saving.songs_dir.is_some(),
+            saved_songs: self
+                .saving
+                .songs_dir
+                .as_ref()
+                .is_some_and(|d| store::list_songs(d).is_ok_and(|s| !s.is_empty())),
             kit_sample: self.kit_list().is_some_and(|(s, n)| s < n),
             checking_updates: self.updates.checking(),
             newer_release: self.updates.newer_release().map(|r| r.version.clone()),
@@ -1135,11 +1064,11 @@ impl Session {
 
     /// The open menu, if any.
     pub fn open_menu(&self) -> Option<menu::Open> {
-        self.menu
+        self.chrome.menu
     }
 
     pub fn set_menu(&mut self, open: Option<menu::Open>) {
-        self.menu = open;
+        self.chrome.menu = open;
     }
 
     /// File > Quit was chosen.
@@ -1150,7 +1079,7 @@ impl Session {
     /// Run a menu command (or its shortcut).
     pub fn run(&mut self, command: Command) {
         use Command as C;
-        self.menu = None;
+        self.chrome.menu = None;
         if let Some(refusal) = command.hosted_refusal().filter(|_| self.hosted) {
             self.message = refusal.into();
             return;
@@ -1240,16 +1169,16 @@ impl Session {
                     self.audition_row(t);
                 }
             }
-            C::Shortcuts => self.overlay = Some(Overlay::Shortcuts),
-            C::About => self.overlay = Some(Overlay::About),
-            C::FactoryReset => self.overlay = Some(Overlay::FactoryReset),
+            C::Shortcuts => self.chrome.overlay = Some(Overlay::Shortcuts),
+            C::About => self.chrome.overlay = Some(Overlay::About),
+            C::FactoryReset => self.chrome.overlay = Some(Overlay::FactoryReset),
             C::CheckUpdates => self.check_updates(true),
             C::DownloadPage => self.open_download_page(),
         }
     }
 
     fn open_picker(&mut self, purpose: Purpose) {
-        self.overlay = Some(Overlay::Picker(Picker::new(purpose, self.last_dir.as_deref())));
+        self.chrome.overlay = Some(Overlay::Picker(Picker::new(purpose, self.chrome.last_dir.as_deref())));
     }
 
     /// Ask for the folder to write `export` to: the last one picked, at first
@@ -1264,8 +1193,8 @@ impl Session {
             self.message = refusal.into();
             return;
         }
-        let start = self.last_dir.clone().filter(|d| d.is_dir()).or_else(store::exports_dir);
-        self.overlay = Some(Overlay::Picker(Picker::new(Purpose::Export(export), start.as_deref())));
+        let start = self.chrome.last_dir.clone().filter(|d| d.is_dir()).or_else(store::exports_dir);
+        self.chrome.overlay = Some(Overlay::Picker(Picker::new(Purpose::Export(export), start.as_deref())));
     }
 
     /// The name of the file `export` writes; `None` when what it writes is gone.
@@ -1299,7 +1228,7 @@ impl Session {
         };
         let path = dir.join(name);
         if path.exists() {
-            self.overlay = Some(Overlay::ConfirmOverwrite { export, path });
+            self.chrome.overlay = Some(Overlay::ConfirmOverwrite { export, path });
         } else {
             self.write_export(export, &path);
         }
@@ -1320,17 +1249,17 @@ impl Session {
 
     /// A panel (file picker, key list, about) is over the window.
     pub fn overlay_open(&self) -> bool {
-        self.overlay.is_some()
+        self.chrome.overlay.is_some()
     }
 
     pub fn close_overlay(&mut self) {
-        self.overlay = None;
+        self.chrome.overlay = None;
     }
 
     /// A click on the status line: what was done so far.
     pub fn open_history(&mut self) {
         self.note_actions();
-        self.overlay = Some(Overlay::History { scroll: 0 });
+        self.chrome.overlay = Some(Overlay::History { scroll: 0 });
     }
 
     /// Add what the last events did to the log.
@@ -1341,19 +1270,19 @@ impl Session {
             revision: self.editor.revision(),
             steps: history.undo_len(),
             undo: history.next_undo(),
-            dragging: self.widgets.drag.is_some(),
+            dragging: self.chrome.widgets.drag.is_some(),
         });
     }
 
     /// Scroll the history panel, if open, for `key`; whether it was.
     fn history_key(&mut self, key: &OverlayKey) -> bool {
-        let Some(Overlay::History { scroll }) = &mut self.overlay else { return false };
-        let (width, height, scale) = self.panel_size;
+        let Some(Overlay::History { scroll }) = &mut self.chrome.overlay else { return false };
+        let (width, height, scale) = self.chrome.panel_size;
         let max = LogLayout::new(width, height, scale).max_scroll(&self.action_log);
         match key {
             OverlayKey::Move(delta) => *scroll = (*scroll).min(max).saturating_add_signed(*delta).min(max),
             OverlayKey::Edge(end) => *scroll = if *end { max } else { 0 },
-            OverlayKey::Escape => self.overlay = None,
+            OverlayKey::Escape => self.chrome.overlay = None,
             OverlayKey::Enter | OverlayKey::Back | OverlayKey::Letter(_) => {}
         }
         true
@@ -1364,14 +1293,14 @@ impl Session {
         if self.history_key(&key) {
             return;
         }
-        let is_factory = matches!(self.overlay, Some(Overlay::FactoryReset));
-        let Some(Overlay::Picker(picker)) = &mut self.overlay else {
+        let is_factory = matches!(self.chrome.overlay, Some(Overlay::FactoryReset));
+        let Some(Overlay::Picker(picker)) = &mut self.chrome.overlay else {
             if is_factory && matches!(key, OverlayKey::Enter) {
                 self.factory_reset();
                 return;
             }
             if matches!(key, OverlayKey::Enter) {
-                match self.overlay.take() {
+                match self.chrome.overlay.take() {
                     Some(Overlay::ConfirmOverwrite { export, path }) => self.write_export(export, &path),
                     Some(Overlay::Confirm(pending)) => self.run_pending(pending),
                     _ => {}
@@ -1379,13 +1308,13 @@ impl Session {
                 return;
             }
             if matches!(key, OverlayKey::Escape) {
-                self.overlay = None;
+                self.chrome.overlay = None;
             }
             return;
         };
         let outcome = match key {
             OverlayKey::Escape => {
-                self.overlay = None;
+                self.chrome.overlay = None;
                 return;
             }
             OverlayKey::Enter => picker.activate(),
@@ -1411,19 +1340,19 @@ impl Session {
 
     /// A click while a panel is open.
     pub fn overlay_click(&mut self, width: i32, height: i32, scale: i32, x: i32, y: i32) {
-        if matches!(self.overlay, Some(Overlay::History { .. })) {
+        if matches!(self.chrome.overlay, Some(Overlay::History { .. })) {
             if !LogLayout::new(width, height, scale).contains(x, y) {
-                self.overlay = None;
+                self.chrome.overlay = None;
             }
             return;
         }
-        let Some(Overlay::Picker(picker)) = &mut self.overlay else {
-            self.overlay = None;
+        let Some(Overlay::Picker(picker)) = &mut self.chrome.overlay else {
+            self.chrome.overlay = None;
             return;
         };
         let layout = PickerLayout::new(width, height, scale);
         if !layout.contains(x, y) {
-            self.overlay = None;
+            self.chrome.overlay = None;
             return;
         }
         if let Some(i) = layout.hit(picker, x, y) {
@@ -1434,8 +1363,8 @@ impl Session {
 
     fn picker_outcome(&mut self, outcome: Outcome) {
         let Outcome::Picked(path) = outcome else { return };
-        let Some(Overlay::Picker(picker)) = self.overlay.take() else { return };
-        self.last_dir = picker.dir.clone();
+        let Some(Overlay::Picker(picker)) = self.chrome.overlay.take() else { return };
+        self.chrome.last_dir = picker.dir.clone();
         match picker.purpose {
             Purpose::ImportMidi => self.import_midi(&path),
             Purpose::ImportSong => self.import_song(&path),
@@ -1454,7 +1383,7 @@ impl Session {
             format!("orDrumbox {} - native port of ordrumbox-v2", update::BUILD),
             "MIT - https://www.ordrumbox.com".into(),
             String::new(),
-            format!("library   {}", shown(self.library_path.clone())),
+            format!("library   {}", shown(self.saving.library_path.clone())),
             format!("user data {}", shown(store::user_dir())),
             format!("exports   {}", shown(store::exports_dir())),
             format!("assets    {}", shown(self.assets_dir.clone())),
@@ -1463,7 +1392,8 @@ impl Session {
 
     /// Lines of Help > Factory reset.
     fn factory_reset_lines(&self) -> Vec<String> {
-        let dir = self.library_path.as_ref().and_then(|p| p.parent().map(Path::to_path_buf)).or_else(store::user_dir);
+        let dir =
+            self.saving.library_path.as_ref().and_then(|p| p.parent().map(Path::to_path_buf)).or_else(store::user_dir);
         vec![
             "Restore the factory settings?".into(),
             String::new(),
@@ -1484,11 +1414,9 @@ impl Session {
             self.message = refusal.into();
             return;
         }
-        self.overlay = None;
-        self.menu = None;
-        self.widgets.dropdown = None;
-        self.widgets.entry = None;
-        let dir = self.library_path.as_ref().and_then(|p| p.parent().map(Path::to_path_buf)).or_else(store::user_dir);
+        self.chrome.close_popups();
+        let dir =
+            self.saving.library_path.as_ref().and_then(|p| p.parent().map(Path::to_path_buf)).or_else(store::user_dir);
         let Some(dir) = dir else {
             self.message = "factory reset: no user data folder".into();
             return;
@@ -1496,7 +1424,7 @@ impl Session {
         match store::factory_reset(&dir) {
             Ok(removed) => {
                 let action_log = std::mem::take(&mut self.action_log);
-                let start_output = self.start_output.take().unwrap_or_else(|| Box::new(no_output));
+                let start_output = self.playback.take_start_output().unwrap_or_else(|| Box::new(no_output));
                 *self = Self::load(start_output);
                 self.action_log = action_log;
                 self.message = if removed.is_empty() {
@@ -1527,8 +1455,8 @@ impl Session {
             Some(_) => None,
             None => Some(0),
         };
-        self.widgets.focus = None;
-        self.widgets.dropdown = None;
+        self.chrome.widgets.focus = None;
+        self.chrome.widgets.dropdown = None;
         self.update_analysis();
     }
 
@@ -1547,12 +1475,12 @@ impl Session {
     /// The kits changed: a new bank for playback and exports, the root
     /// notes, the kits saved, the selection kept inside.
     fn kits_changed(&mut self, message: String) {
-        self.kits_dirty = None;
+        self.saving.kits.clear();
         self.track_analysis.borrow_mut().clear();
         let (bank, errors) = self.kits.bank();
         self.roots = bank.samples.iter().filter_map(|s| Some((s.sample.key.clone(), s.sample.root_midi?))).collect();
         let bank = Arc::new(bank);
-        if let Some(controller) = &mut self.controller {
+        if let Some(controller) = self.playback.controller_mut() {
             controller.set_bank(bank.clone());
             controller.refresh(self.editor.library());
         }
@@ -1599,7 +1527,7 @@ impl Session {
     pub fn kit_audition(&mut self) {
         let Some(sample) = self.kit_editor else { return };
         let Some(url) = self.kits.sample(self.kit_index, sample).map(|i| i.path.clone()) else { return };
-        if let Some(controller) = &mut self.controller
+        if let Some(controller) = self.playback.controller_mut()
             && let Some(index) = controller.bank().find_path(&url)
         {
             controller.audition_sample(index);
@@ -1676,43 +1604,13 @@ impl Session {
     pub fn update(&mut self) {
         // What the library's tags teach, learned again after an edit (the header and menus read it).
         learned_styles(&mut self.learned_styles, &self.styles, &self.editor);
-        let Some(controller) = &mut self.controller else { return };
-        controller.select_pattern(self.pattern_index);
-        if self.editor.revision() != self.played_revision {
-            // The loop ahead was generated before the edit: it is generated again.
-            self.upcoming_loop = None;
-            controller.refresh(self.editor.library());
-        }
-        if !matches!(controller.mode(), Mode::Pattern(_)) {
-            self.upcoming_loop = None;
-        }
-        // Read before the position: asking for the pass after the upcoming
-        // one means that one has started, and the position then says so.
-        let pending = controller.pending_pass();
-        let position = controller.position();
-        if let Some(mut started) = self.upcoming_loop.take_if(|u| position.is_some_and(|at| at.pass >= u.pass)) {
-            self.editor.swap_tracks(started.pattern_index, &mut started.tracks);
-        }
-        let mut upcoming = None;
-        if let (Some(pass), Mode::Pattern(p)) = (pending, controller.mode())
-            && let Some(playing) = self.editor.library().patterns.get(p).map(|pattern| pattern.tracks.clone())
-        {
-            let styles = learned_styles(&mut self.learned_styles, &self.styles, &self.editor).clone();
-            let rng = &mut self.rng;
-            if self.editor.auto_loop(p, pass, &self.scales, &styles, &mut || rng.next_f64()) {
-                upcoming = Some(UpcomingLoop { pattern_index: p, pass, tracks: playing });
-            }
-        }
-        controller.update(self.editor.library());
-        if let Some(mut next) = upcoming {
-            self.editor.swap_tracks(next.pattern_index, &mut next.tracks);
-            self.upcoming_loop = Some(next);
-        }
-        self.played_revision = self.editor.revision();
+        self.playback.update(&mut self.editor, self.pattern_index, |editor, p, pass| {
+            auto_loop(editor, &mut self.learned_styles, &self.styles, &self.scales, &mut self.rng, p, pass)
+        });
     }
 
     fn audition(&mut self, t: usize, note: Option<usize>) {
-        if let Some(controller) = &mut self.controller {
+        if let Some(controller) = self.playback.controller_mut() {
             controller.preview(self.editor.library(), self.pattern_index, t, note);
         }
     }
@@ -1727,7 +1625,7 @@ impl Session {
 
     /// After an edit: remember to save, show what happened.
     fn edited(&mut self) {
-        self.changed_at = Some(Instant::now());
+        self.saving.library.touch();
         if let Some(desc) = self.editor.history().next_undo() {
             self.message = desc.to_owned();
         }
@@ -1737,16 +1635,8 @@ impl Session {
     fn clamp_selection(&mut self) {
         let count = self.editor.library().patterns.len();
         self.pattern_index = self.pattern_index.min(count.saturating_sub(1));
-        let tracks = self.pattern().map_or(0, |p| p.tracks.len());
-        if let Some(cursor) = &mut self.cursor {
-            if tracks == 0 {
-                self.cursor = None;
-            } else {
-                cursor.track = cursor.track.min(tracks - 1);
-            }
-        }
-        let valid = |&(t, n): &(usize, usize)| self.track(t).is_some_and(|t| n < t.notes.len());
-        self.selected = self.selected.filter(valid);
+        let pattern = self.editor.library().patterns.get(self.pattern_index);
+        self.selection.clamp(pattern);
     }
 
     pub fn undo(&mut self) {
@@ -1773,9 +1663,9 @@ impl Session {
         if let Some(index) = shown.and_then(|id| self.editor.library().patterns.iter().position(|p| p.id == id)) {
             self.pattern_index = index;
         }
-        self.selected = None;
+        self.selection.selected = None;
         self.clamp_selection();
-        self.changed_at = Some(Instant::now());
+        self.saving.library.touch();
     }
 
     pub fn click(&mut self, hit: Hit) {
@@ -1783,13 +1673,16 @@ impl Session {
             Hit::Mute(t) => self.toggle_row(t, "mute"),
             Hit::Solo(t) => self.toggle_row(t, "solo"),
             Hit::Name(t) => {
-                self.cursor = Some(Cursor { track: t, beat: self.cursor.map_or(0, |c| c.beat), step: 0 });
-                self.selected = None;
-                self.note_focus = Some(NoteFocus::Track(t));
+                self.selection.put_cursor(Cursor {
+                    track: t,
+                    beat: self.selection.cursor.map_or(0, |c| c.beat),
+                    step: 0,
+                });
+                self.selection.note_focus = Some(NoteFocus::Track(t));
                 self.audition(t, None);
             }
             Hit::Cell { track, beat, step } => {
-                self.cursor = Some(Cursor { track, beat, step });
+                self.selection.cursor = Some(Cursor { track, beat, step });
                 self.toggle_note(track, beat, step);
             }
         }
@@ -1802,33 +1695,34 @@ impl Session {
         let Some(track) = self.track(t) else { return };
         let at_step = track.notes.iter().position(|n| n.beat == beat && n.step == step);
         match at_step {
-            Some(n) if self.selected == Some((t, n)) => {
+            Some(n) if self.selection.selected == Some((t, n)) => {
                 let pitch = track.notes[n].pitch;
                 self.editor.delete_note(p, t, beat, step, pitch);
-                self.selected = None;
-                self.note_focus = Some(NoteFocus::Step { track: t, beat, step });
+                self.selection.selected = None;
+                self.selection.note_focus = Some(NoteFocus::Step { track: t, beat, step });
                 self.edited();
             }
             Some(n) => {
-                self.selected = Some((t, n));
+                self.selection.selected = Some((t, n));
                 self.audition(t, Some(n));
             }
             None => {
-                self.selected = self.editor.add_note(p, t, beat, step, 0.0).map(|n| (t, n));
+                self.selection.selected = self.editor.add_note(p, t, beat, step, 0.0).map(|n| (t, n));
                 self.edited();
-                self.audition(t, self.selected.map(|(_, n)| n));
+                self.audition(t, self.selection.selected.map(|(_, n)| n));
             }
         }
     }
 
     pub fn enter(&mut self) {
         let Some(c) = self
+            .selection
             .cursor
             .or_else(|| self.pattern().filter(|p| !p.tracks.is_empty()).map(|_| Cursor { track: 0, beat: 0, step: 0 }))
         else {
             return;
         };
-        self.cursor = Some(c);
+        self.selection.cursor = Some(c);
         self.toggle_note(c.track, c.beat, c.step);
     }
 
@@ -1839,8 +1733,8 @@ impl Session {
             return;
         }
         let beats = pattern.beat_count.max(1);
-        let Some(mut c) = self.cursor else {
-            self.cursor = Some(Cursor { track: 0, beat: 0, step: 0 });
+        let Some(mut c) = self.selection.cursor else {
+            self.selection.cursor = Some(Cursor { track: 0, beat: 0, step: 0 });
             return;
         };
         let spb = pattern.tracks[c.track.min(tracks - 1)].steps_per_beat.max(1);
@@ -1864,10 +1758,10 @@ impl Session {
         }
         let spb = pattern.tracks[c.track].steps_per_beat.max(1);
         c.step = c.step.min(spb - 1);
-        self.cursor = Some(c);
-        self.note_focus = Some(NoteFocus::Step { track: c.track, beat: c.beat, step: c.step });
+        self.selection.cursor = Some(c);
+        self.selection.note_focus = Some(NoteFocus::Step { track: c.track, beat: c.beat, step: c.step });
         let note = pattern.tracks[c.track].notes.iter().position(|n| n.beat == c.beat && n.step == c.step);
-        self.selected = note.map(|n| (c.track, n));
+        self.selection.selected = note.map(|n| (c.track, n));
         if let Some(n) = note {
             self.audition(c.track, Some(n));
         }
@@ -1875,7 +1769,7 @@ impl Session {
 
     /// Shift+arrows on the selected note: ↑↓ velocity, ←→ pitch.
     pub fn nudge(&mut self, direction: Move) {
-        let Some((t, n)) = self.selected else {
+        let Some((t, n)) = self.selection.selected else {
             self.message = "select a note first".into();
             return;
         };
@@ -1911,7 +1805,7 @@ impl Session {
             self.message = "no track repeats a shorter loop".into();
             return;
         }
-        self.selected = None;
+        self.selection.selected = None;
         self.clamp_selection();
         self.edited();
         self.message = format!("compacted {count} track{}", if count == 1 { "" } else { "s" });
@@ -1919,7 +1813,7 @@ impl Session {
 
     /// Clear the cursor step: at once for a single note, else once confirmed.
     pub fn delete_step(&mut self) {
-        let Some(c) = self.cursor else { return };
+        let Some(c) = self.selection.cursor else { return };
         if self.step_note_count(c) > 1 {
             self.ask(Pending::ClearStep(c));
         } else {
@@ -1934,24 +1828,23 @@ impl Session {
     }
 
     fn delete_step_now(&mut self) {
-        let Some(c) = self.cursor else { return };
+        let Some(c) = self.selection.cursor else { return };
         let count = self.step_note_count(c);
         let name = self.track(c.track).map(|track| track.name.clone()).unwrap_or_default();
         if self.editor.delete_step(self.pattern_index, c.track, c.beat, c.step) {
             self.edited();
             self.message = format!("Deleted {} - {name} @ {}", notes_label(count), beat_label(c.beat, c.step));
         }
-        self.selected = None;
+        self.selection.selected = None;
     }
 
     pub fn deselect(&mut self) {
-        self.cursor = None;
-        self.selected = None;
+        self.selection.clear();
     }
 
     /// The track the cursor is on, else the selected note's.
     fn focus_track(&self) -> Option<usize> {
-        self.cursor.map(|c| c.track).or(self.selected.map(|(t, _)| t)).filter(|&t| self.track(t).is_some())
+        self.selection.focus_track().filter(|&t| self.track(t).is_some())
     }
 
     pub fn toggle_row(&mut self, t: usize, key: &str) {
@@ -1963,7 +1856,7 @@ impl Session {
     /// The tempo a plugin plays at: the host's, inside the tempo bounds
     /// (`None` before the host's transport was seen).
     pub(super) fn host_bpm(&self) -> Option<f64> {
-        let host = self.controller.as_ref().and_then(Controller::host)?;
+        let host = self.playback.host()?;
         Some(ordrumbox_core::song::clamp_bpm(host.bpm.round()))
     }
 
@@ -1998,7 +1891,7 @@ impl Session {
     fn clamp_cursor_to_grid(&mut self) {
         let Some(pattern) = self.editor.library().patterns.get(self.pattern_index) else { return };
         let beats = pattern.beat_count.max(1);
-        if let Some(c) = &mut self.cursor {
+        if let Some(c) = &mut self.selection.cursor {
             c.beat = c.beat.min(beats - 1);
             let spb = pattern.tracks.get(c.track).map_or(1, |t| t.steps_per_beat.max(1));
             c.step = c.step.min(spb - 1);
@@ -2029,8 +1922,7 @@ impl Session {
             return;
         }
         if let Some(t) = self.editor.add_track(self.pattern_index, &format!("T{}", count + 1), 4) {
-            self.cursor = Some(Cursor { track: t, beat: 0, step: 0 });
-            self.selected = None;
+            self.selection.put_cursor(Cursor { track: t, beat: 0, step: 0 });
             self.edited();
         }
     }
@@ -2047,7 +1939,7 @@ impl Session {
 
     fn remove_track_now(&mut self, t: usize) {
         if self.editor.remove_track(self.pattern_index, t) {
-            self.selected = None;
+            self.selection.selected = None;
             self.edited();
             self.clamp_selection();
             self.message = "Track deleted".into();
@@ -2067,7 +1959,7 @@ impl Session {
     fn clear_track_now(&mut self, t: usize) {
         let Some(name) = self.track(t).map(|track| track.name.clone()) else { return };
         if self.editor.clean_track(self.pattern_index, t) {
-            self.selected = None;
+            self.selection.selected = None;
             self.edited();
             self.message = format!("Cleared notes on \"{name}\"");
         }
@@ -2164,7 +2056,7 @@ impl Session {
         self.pattern_index = self.editor.generate_pattern(&self.scales, &styles, style, &mut || rng.next_f64());
         self.deselect();
         self.edited();
-        self.current_page = 0;
+        self.chrome.current_page = 0;
         if let Some(pattern) = self.pattern() {
             let genre = pattern.extra.get(generate::GENRE).and_then(|g| g.as_str()).unwrap_or_default();
             let label = styles.get(genre).map_or_else(|| genre.to_owned(), style_label);
@@ -2241,7 +2133,7 @@ impl Session {
     fn randomize_track_now(&mut self, t: usize) {
         let rng = &mut self.rng;
         if self.editor.randomize_track(self.pattern_index, t, &mut || rng.next_f64()) {
-            self.selected = None;
+            self.selection.selected = None;
             self.edited();
             let name = self.track(t).map(|track| track.name.clone()).unwrap_or_default();
             self.message = format!("Randomized \"{name}\"");
@@ -2252,7 +2144,7 @@ impl Session {
         self.pattern_index = self.editor.add_pattern(None);
         self.deselect();
         self.edited();
-        self.current_page = 0;
+        self.chrome.current_page = 0;
     }
 
     pub fn duplicate_pattern(&mut self) {
@@ -2260,7 +2152,7 @@ impl Session {
             self.pattern_index = index;
             self.deselect();
             self.edited();
-            self.current_page = 0;
+            self.chrome.current_page = 0;
         }
     }
 
@@ -2269,14 +2161,14 @@ impl Session {
         let Some(t) = self.focus_track() else { return };
         let Some(source) = self.track(t).cloned() else { return };
         let name = source.name.clone();
-        if track || self.cursor.is_none() {
+        if track || self.selection.cursor.is_none() {
             self.message = format!("copied track \"{name}\" ({} notes)", source.notes.len());
-            self.clipboard = Some(Clipboard::Track(Box::new(source)));
-        } else if let Some(c) = self.cursor {
+            self.selection.clipboard = Some(Clipboard::Track(Box::new(source)));
+        } else if let Some(c) = self.selection.cursor {
             let notes: Vec<Note> =
                 source.notes.iter().filter(|n| n.beat == c.beat && n.step == c.step).cloned().collect();
             self.message = format!("copied {} note(s) — {name} @ {}.{}", notes.len(), c.beat + 1, c.step + 1);
-            self.clipboard = Some(Clipboard::Step(notes));
+            self.selection.clipboard = Some(Clipboard::Step(notes));
         }
     }
 
@@ -2284,7 +2176,7 @@ impl Session {
     /// focused one (with Shift, only a track).
     pub fn paste(&mut self, track_only: bool) {
         let p = self.pattern_index;
-        match self.clipboard.clone() {
+        match self.selection.clipboard.clone() {
             None => self.message = "clipboard is empty".into(),
             Some(Clipboard::Track(_)) if !self.editor.has_track_room(p) => {
                 self.message = format!("a pattern holds at most {MAX_TRACKS} tracks");
@@ -2292,17 +2184,15 @@ impl Session {
             Some(Clipboard::Track(track)) => {
                 let after = self.focus_track().map_or_else(|| self.pattern().map_or(0, |p| p.tracks.len()), |t| t + 1);
                 if let Some(t) = self.editor.paste_track(p, after, &track) {
-                    self.cursor = Some(Cursor { track: t, beat: 0, step: 0 });
-                    self.selected = None;
+                    self.selection.put_cursor(Cursor { track: t, beat: 0, step: 0 });
                     self.edited();
                 }
             }
             Some(Clipboard::Step(_)) if track_only => self.message = "no track copied".into(),
             Some(Clipboard::Step(notes)) => {
-                let c = self.cursor.unwrap_or(Cursor { track: 0, beat: 0, step: 0 });
+                let c = self.selection.cursor.unwrap_or(Cursor { track: 0, beat: 0, step: 0 });
                 if self.editor.paste_step_notes(p, c.track, c.beat, c.step, &notes) {
-                    self.cursor = Some(c);
-                    self.selected = None;
+                    self.selection.put_cursor(c);
                     self.edited();
                 }
             }
@@ -2312,7 +2202,7 @@ impl Session {
     // ─── Saving ──────────────────────────────────────────────────────────────
 
     pub fn save(&mut self) {
-        let Some(path) = &self.library_path else {
+        let Some(path) = self.saving.library_path.clone() else {
             self.message = if let Some(refusal) = Command::Save.hosted_refusal().filter(|_| self.hosted) {
                 refusal.into()
             } else {
@@ -2320,10 +2210,9 @@ impl Session {
             };
             return;
         };
-        match store::save(path, self.editor.library()) {
+        match store::save(&path, self.editor.library()) {
             Ok(()) => {
-                self.saved_revision = self.editor.revision();
-                self.changed_at = None;
+                self.saving.library_saved(self.editor.revision());
                 self.message = format!("saved {}", path.display());
             }
             Err(e) => self.message = format!("not saved: {}: {e}", path.display()),
@@ -2331,14 +2220,14 @@ impl Session {
     }
 
     pub fn save_if_changed(&mut self) {
-        if self.library_path.is_some() && self.editor.revision() != self.saved_revision {
+        if self.saving.library_unsaved(self.editor.revision()) {
             self.save();
         }
     }
 
     /// Show an audio output error reported since the last call; whether there was one.
     pub fn check_audio(&mut self) -> bool {
-        let Some(error) = self.output.as_ref().and_then(|output| output.take_error()) else { return false };
+        let Some(error) = self.playback.take_output_error() else { return false };
         self.message = format!("audio output: {error}");
         true
     }
@@ -2350,24 +2239,18 @@ impl Session {
     }
 
     fn autosave_library(&mut self) -> Option<Instant> {
-        let changed = self.changed_at?;
-        if self.library_path.is_none() || self.editor.revision() == self.saved_revision {
-            self.changed_at = None;
-            return None;
+        if let Err(next) = self.saving.library_ready(self.editor.revision()) {
+            return next;
         }
-        let due = changed + SAVE_DELAY;
-        if Instant::now() >= due {
-            self.save();
-            return None;
-        }
-        Some(due)
+        self.save();
+        None
     }
 
     // ─── Drawing ─────────────────────────────────────────────────────────────
 
     /// The window's size and scale (where the lists opened from the menus go).
     pub fn set_size(&mut self, size: (i32, i32, i32)) {
-        self.panel_size = size;
+        self.chrome.panel_size = size;
     }
 
     pub fn draw(&mut self, canvas: &mut Canvas, scale: i32) {
@@ -2375,13 +2258,13 @@ impl Session {
         theme::set_scheme(self.color_scheme);
         self.note_actions();
         let layout = self.panel_layout(canvas.width(), canvas.height(), scale);
-        let position = self.controller.as_ref().and_then(Controller::position);
+        let position = self.playback.position();
         let history = self.editor.history();
         let library = self.editor.library();
-        let song_mode = self.controller.as_ref().and_then(|c| match c.mode() {
-            Mode::Song(s) => library.songs.get(s),
-            Mode::Pattern(_) => None,
-        });
+        let song_mode = match self.playback.mode() {
+            Some(Mode::Song(s)) => library.songs.get(s),
+            _ => None,
+        };
         let song = match (song_mode, position) {
             (Some(song), Some(p)) => {
                 let total = song.length_measures().max(1.0);
@@ -2393,9 +2276,9 @@ impl Session {
         // Auto-page: keep the cursor / playhead on the current page.
         let beat_count = self.pattern().map(|p| p.beat_count.max(1)).unwrap_or(1);
         let page_count = (beat_count as usize).div_ceil(view::BEATS_PER_PAGE as usize).max(1);
-        let cursor_page = self.cursor.map(|c| (c.beat.max(0) as usize) / view::BEATS_PER_PAGE as usize);
+        let cursor_page = self.selection.cursor.map(|c| (c.beat.max(0) as usize) / view::BEATS_PER_PAGE as usize);
         let playhead_page = if self.playing() {
-            self.controller.as_ref().and_then(Controller::position).map(|p| {
+            position.map(|p| {
                 let frac = p.frame as f64 / p.frames.max(1) as f64;
                 let global_beat = (frac * beat_count as f64).floor() as usize;
                 global_beat / view::BEATS_PER_PAGE as usize
@@ -2403,26 +2286,11 @@ impl Session {
         } else {
             None
         };
-        let new_page = playhead_page.or(cursor_page).unwrap_or(self.current_page);
-        self.current_page = new_page.min(page_count.saturating_sub(1));
+        let new_page = playhead_page.or(cursor_page).unwrap_or(self.chrome.current_page);
+        self.chrome.current_page = new_page.min(page_count.saturating_sub(1));
 
         // Smoothed per-track levels for the VU meter stripe (peak-hold + decay).
-        let raw_levels = self.controller.as_ref().map(|c| c.levels()).unwrap_or_default();
-        if self.track_levels.len() < raw_levels.len() {
-            self.track_levels.resize(raw_levels.len(), 0.0);
-        }
-        for level in &mut self.track_levels {
-            *level *= 0.88;
-            if *level < 0.001 {
-                *level = 0.0;
-            }
-        }
-        for (i, level) in self.track_levels.iter_mut().enumerate() {
-            let r = raw_levels.get(i).copied().unwrap_or(0.0).abs();
-            if r > *level {
-                *level = r;
-            }
-        }
+        let levels = self.chrome.smooth_levels(&self.playback.levels()).to_vec();
         let pattern = self.pattern();
         let song_layout = self.song_layout((canvas.width(), canvas.height(), scale));
         let rows = if self.workspace == Workspace::Song { self.song_rows() } else { Vec::new() };
@@ -2437,9 +2305,9 @@ impl Session {
             synth: self.synth_open(),
             kit_view: self.kit_view(layout.details_top),
             right: layout.right,
-            current_page: self.current_page,
-            levels: self.track_levels.clone(),
-            show_vus: self.show_vus,
+            current_page: self.chrome.current_page,
+            levels,
+            show_vus: self.chrome.show_vus,
             tempo_label: if self.hosted { "HOST" } else { "BPM" },
             host_muted: self.host_muted,
             track_drop: self.track_drop((canvas.width(), canvas.height(), scale)),
@@ -2450,14 +2318,14 @@ impl Session {
                     let global_frac = p.frame as f64 / p.frames.max(1) as f64;
                     let total_beats = self.pattern().map(|pat| pat.beat_count.max(1)).unwrap_or(1) as f64;
                     let global_beat = global_frac * total_beats;
-                    let start_beat = self.current_page as f64 * view::BEATS_PER_PAGE as f64;
+                    let start_beat = self.chrome.current_page as f64 * view::BEATS_PER_PAGE as f64;
                     let page_beats = view::BEATS_PER_PAGE as f64;
                     ((global_beat - start_beat) / page_beats).clamp(0.0, 1.0)
                 })
             },
             song: song.as_deref().filter(|_| !self.hosted),
-            cursor: self.cursor,
-            selected: self.selected,
+            cursor: self.selection.cursor,
+            selected: self.selection.selected,
             undo: history.next_undo(),
             redo: history.next_redo(),
             message: &self.message,
@@ -2465,16 +2333,16 @@ impl Session {
         };
         view::draw(canvas, &view, scale);
         self.draw_synth(canvas, scale);
-        crate::panel::draw(canvas, &layout.items, self.widgets.focus, scale);
+        crate::panel::draw(canvas, &layout.items, self.chrome.widgets.focus, scale);
         self.draw_tooltip(canvas, scale, layout.right);
-        menu::draw(canvas, &self.menus(), self.menu, scale);
-        if let Some(dropdown) = &self.widgets.dropdown {
+        menu::draw(canvas, &self.menus(), self.chrome.menu, scale);
+        if let Some(dropdown) = &self.chrome.widgets.dropdown {
             dropdown.draw(canvas, scale);
         }
-        if let Some(entry) = &self.widgets.entry {
+        if let Some(entry) = &self.chrome.widgets.entry {
             entry.draw(canvas, scale);
         }
-        match &self.overlay {
+        match &self.chrome.overlay {
             Some(Overlay::Picker(p)) => {
                 let layout = PickerLayout::new(canvas.width(), canvas.height(), scale);
                 picker::draw(canvas, p, &layout);

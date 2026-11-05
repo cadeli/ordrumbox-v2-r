@@ -14,9 +14,6 @@ use ordrumbox_engine::synth_model as model;
 use super::*;
 use crate::synth_view::{self, Built, SynthLayout};
 
-/// Preset edits reach the disk this long after the last one.
-pub(super) const SYNTHS_DELAY: Duration = Duration::from_millis(500);
-
 /// The preset being edited.
 #[derive(Debug, Clone)]
 pub(super) struct SynthEdit {
@@ -115,13 +112,13 @@ impl Session {
 
     /// The presets changed: to the player, to exports, to the disk soon.
     pub(super) fn synths_changed(&mut self) {
-        if let Some(controller) = &mut self.controller {
+        if let Some(controller) = self.playback.controller_mut() {
             controller.set_synths(self.editor.library(), self.synths.clone());
         }
         if let Some(render) = &mut self.render {
             render.synths = self.synths.clone();
         }
-        self.synths_dirty = Some(Instant::now());
+        self.saving.synths.touch();
     }
 
     /// The draft into its preset (`commit`).
@@ -133,13 +130,10 @@ impl Session {
 
     /// Write the presets when the edits have settled; when to call again.
     pub(super) fn flush_synths(&mut self) -> Option<Instant> {
-        let since = self.synths_dirty?;
-        let due = since + SYNTHS_DELAY;
-        if Instant::now() < due {
-            return Some(due);
+        if let Err(next) = self.saving.synths.ready() {
+            return next;
         }
-        self.synths_dirty = None;
-        match &self.synths_file {
+        match &self.saving.synths_file {
             Some(path) => {
                 if let Err(e) = store::save_synths(path, &self.synths) {
                     self.message = format!("Synth preset changes are not being saved: {}: {e}", path.display());
@@ -434,7 +428,7 @@ mod tests {
         let preset = s.synths.get("b").unwrap();
         assert_eq!(model::get(preset.as_object().unwrap(), "vco2.wave"), Some(&Value::from("sawtooth")));
         assert_eq!(model::number(preset.as_object().unwrap(), "vco2.gain"), Some(0.5));
-        assert!(s.synths_dirty.is_some());
+        assert!(s.saving.synths.pending());
         // A knob: VCO1's gain, with the wheel.
         let fi = fields.iter().position(|f| f == "vco1.gain").unwrap() as u16;
         let knob = item(&s, |i| i.id == Some(Id::SynthField(fi)));

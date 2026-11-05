@@ -29,12 +29,12 @@ pub(super) enum Pending {
 impl Session {
     /// Show the notice of `pending`.
     pub(super) fn ask(&mut self, pending: Pending) {
-        self.overlay = Some(Overlay::Confirm(pending));
+        self.chrome.overlay = Some(Overlay::Confirm(pending));
     }
 
     /// Whether a confirmation is waiting for the user.
     pub(super) fn confirm_open(&self) -> bool {
-        matches!(self.overlay, Some(Overlay::Confirm(_)))
+        matches!(self.chrome.overlay, Some(Overlay::Confirm(_)))
     }
 
     /// The user said yes.
@@ -43,7 +43,7 @@ impl Session {
             Pending::RemoveTrack(t) => self.remove_track_now(t),
             Pending::ClearTrack(t) => self.clear_track_now(t),
             Pending::ClearStep(cursor) => {
-                self.cursor = Some(cursor);
+                self.selection.cursor = Some(cursor);
                 self.delete_step_now();
             }
             Pending::RemoveClip(c) => self.remove_clip(c),
@@ -141,7 +141,7 @@ mod tests {
     fn a_track_goes_only_once_confirmed() {
         let mut s = session();
         let tracks = s.pattern().unwrap().tracks.len();
-        s.cursor = Some(Cursor { track: 0, beat: 0, step: 0 });
+        s.selection.cursor = Some(Cursor { track: 0, beat: 0, step: 0 });
         s.remove_track();
         assert!(s.confirm_open());
         assert_eq!(s.pattern().unwrap().tracks.len(), tracks);
@@ -158,7 +158,7 @@ mod tests {
     fn a_click_cancels() {
         let mut s = session();
         let tracks = s.pattern().unwrap().tracks.len();
-        s.cursor = Some(Cursor { track: 0, beat: 0, step: 0 });
+        s.selection.cursor = Some(Cursor { track: 0, beat: 0, step: 0 });
         s.remove_track();
         s.overlay_click(800, 600, 1, 10, 10);
         assert!(!s.confirm_open());
@@ -169,8 +169,8 @@ mod tests {
     fn one_note_goes_at_once_and_several_are_confirmed() {
         let mut s = session();
         let p = s.pattern_index;
-        s.cursor = Some(Cursor { track: 0, beat: 0, step: 0 });
-        let c = s.cursor.unwrap();
+        s.selection.cursor = Some(Cursor { track: 0, beat: 0, step: 0 });
+        let c = s.selection.cursor.unwrap();
         // The step starts empty, whatever the library holds.
         s.delete_step_now();
         assert!(s.editor.add_note(p, 0, 0, 0, 60.0).is_some());
@@ -191,7 +191,7 @@ mod tests {
     fn nothing_to_lose_asks_nothing() {
         let mut s = session();
         let p = s.pattern_index;
-        s.cursor = Some(Cursor { track: 0, beat: 0, step: 0 });
+        s.selection.cursor = Some(Cursor { track: 0, beat: 0, step: 0 });
         assert!(s.editor.clean_track(p, 0));
         s.clear_track(0);
         assert!(!s.confirm_open());
@@ -207,7 +207,7 @@ mod tests {
     #[test]
     fn the_mcp_tools_wait_for_the_answer() {
         let mut s = session();
-        s.cursor = Some(Cursor { track: 0, beat: 0, step: 0 });
+        s.selection.cursor = Some(Cursor { track: 0, beat: 0, step: 0 });
         s.remove_track();
         assert!(s.mcp_call("listPatterns", &Value::Null).is_err());
         s.overlay_key(OverlayKey::Escape);

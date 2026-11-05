@@ -18,6 +18,7 @@ use ordrumbox_logic::history::MAX_STEPS;
 use ordrumbox_logic::midi::{self, PPQN, smf};
 
 use super::session_panel::Button;
+use super::session_playback::Playback;
 use super::{Move, OverlayKey, SYNTHS_FILE_NAME, Session, Workspace};
 use crate::canvas::Canvas;
 use crate::editors;
@@ -50,7 +51,7 @@ fn session(json: &str) -> (Session, AudioSide) {
     let mut session = Session::new(library, KitSet::empty(), Vec::new());
     let (controller, audio) =
         Controller::with_rng(RATE, bank(RATE as u32), Scales::default(), SynthPresets::default(), Rng::new(1));
-    session.controller = Some(controller);
+    session.playback = Playback::without_output(controller);
     (session, audio)
 }
 
@@ -67,11 +68,11 @@ fn run(session: &mut Session, audio: &mut AudioSide, frames: usize) -> f64 {
 }
 
 fn position(session: &Session) -> Option<Position> {
-    session.controller.as_ref()?.position()
+    session.playback.position()
 }
 
 fn mode(session: &Session) -> Mode {
-    session.controller.as_ref().unwrap().mode()
+    session.playback.mode().unwrap()
 }
 
 /// Frames of `beats` beats at `bpm` (a pass: the pattern, or a song measure).
@@ -118,7 +119,7 @@ fn a_click_on_a_grid_cell_sounds_the_note() {
     // A note: selected and heard.
     run(&mut s, &mut audio, 4000);
     s.click(Hit::Cell { track: 0, beat: 0, step: 0 });
-    assert_eq!(s.selected, Some((0, 0)));
+    assert_eq!(s.selection.selected, Some((0, 0)));
     assert!(run(&mut s, &mut audio, 512) > 0.0);
     // The track name: heard too.
     run(&mut s, &mut audio, 4000);
@@ -364,7 +365,7 @@ fn demo_session(samples_dir: &Path) -> (Session, AudioSide) {
     session.rng = Rng::new(1);
     let (controller, audio) =
         Controller::with_rng(RATE, Arc::new(bank), Scales::default(), SynthPresets::default(), Rng::new(1));
-    session.controller = Some(controller);
+    session.playback = Playback::without_output(controller);
     // As after loading the assets: the bank, the exports, the kit in use.
     session.kits_changed("kits loaded".into());
     (session, audio)
@@ -416,10 +417,10 @@ fn a_session_through_the_menus_draws_every_step() {
     s.move_cursor(Move::Right);
     s.move_cursor(Move::Left);
     s.move_cursor(Move::Down);
-    let c = s.cursor.unwrap();
+    let c = s.selection.cursor.unwrap();
     let notes = |s: &Session| s.pattern().unwrap().tracks[c.track].notes.len();
     let before = notes(&s);
-    if s.selected.is_some() {
+    if s.selection.selected.is_some() {
         s.enter(); // a note there: selected, entered again it goes
     }
     s.enter();
@@ -457,7 +458,7 @@ fn a_session_through_the_menus_draws_every_step() {
     }
     s.run(Command::TrackEditor);
     s.show_generation_tab();
-    assert!(s.show_track_editor);
+    assert!(s.chrome.show_track_editor);
     draw(&mut s);
 
     // The kit editor, stopped (what is heard is the sample): a sample chosen
@@ -547,7 +548,7 @@ fn every_knob_of_the_editors_is_undone() {
     s.run(Command::PlayPattern);
     // A note selected: the note editor's knobs are shown too.
     s.click(Hit::Cell { track: 0, beat: 0, step: 0 });
-    if s.selected.is_none() {
+    if s.selection.selected.is_none() {
         s.click(Hit::Cell { track: 0, beat: 0, step: 0 });
     }
     let start = s.editor.library().to_file_text();
@@ -600,7 +601,7 @@ fn every_knob_of_the_editors_is_undone() {
     for rect in kit_knobs {
         assert!(s.wheel(WINDOW, rect.x + rect.w / 2, rect.y + rect.h / 2, 1, false, false));
     }
-    assert!(s.kits_dirty.is_some(), "the kit edits wait to be saved");
+    assert!(s.saving.kits.pending(), "the kit edits wait to be saved");
     assert_eq!(s.editor.library().to_file_text(), start);
     draw(&mut s);
     std::fs::remove_dir_all(&dir).unwrap();
@@ -716,7 +717,7 @@ fn synth_presets_exported_are_imported_and_saved_ones_read_at_start() {
     assert_eq!(other.message, "Imported 2 synth sound(s)");
     assert_eq!(other.synth_keys(), ["bass", "lead", "pad"]);
     assert_eq!(other.synths.get("lead"), s.synths.get("lead"));
-    assert!(other.synths_dirty.is_some(), "the imported presets wait to be saved");
+    assert!(other.saving.synths.pending(), "the imported presets wait to be saved");
     draw(&mut other);
     // Revert goes back to the imported preset, not the one it replaced.
     other.synth_button("revert");
@@ -774,15 +775,16 @@ fn a_synth_presets_file_that_cannot_be_read_is_never_written_over() {
     let edit = |s: &mut Session, gain: f64| {
         s.synths.set("bass", json::parse(&format!(r#"{{"vco1":{{"gain":{gain}}}}}"#)).unwrap());
         s.synths_changed();
-        s.synths_dirty = s.synths_dirty.map(|at| at - super::session_synth::SYNTHS_DELAY);
+        s.saving.synths.expire();
         assert_eq!(s.flush_synths(), None);
-        assert_eq!(s.synths_dirty, None);
+        assert!(!s.saving.synths.pending());
     };
 
     // A file that reads: an edit is saved to it.
     std::fs::write(&file, r#"{"lead":{}}"#).unwrap();
     let mut status = Vec::new();
-    s.synths_file = Session::load_user_synths(Some(file.clone()), Some(file.clone()), &mut s.synths, &mut status);
+    s.saving.synths_file =
+        Session::load_user_synths(Some(file.clone()), Some(file.clone()), &mut s.synths, &mut status);
     assert!(status.is_empty(), "{status:?}");
     edit(&mut s, 0.5);
     let saved = store::load_synths(&file).unwrap().unwrap();
@@ -792,8 +794,9 @@ fn a_synth_presets_file_that_cannot_be_read_is_never_written_over() {
     // A file that does not: said at start, and every edit after says it is not saved.
     let broken = r#"{"lead":{"vco1":"#;
     std::fs::write(&file, broken).unwrap();
-    s.synths_file = Session::load_user_synths(Some(file.clone()), Some(file.clone()), &mut s.synths, &mut status);
-    assert_eq!(s.synths_file, None);
+    s.saving.synths_file =
+        Session::load_user_synths(Some(file.clone()), Some(file.clone()), &mut s.synths, &mut status);
+    assert_eq!(s.saving.synths_file, None);
     assert!(status[0].starts_with("synth presets not loaded, not saved over: "), "{status:?}");
     edit(&mut s, 0.25);
     assert!(s.message.starts_with("Synth preset changes are not being saved"), "{}", s.message);
@@ -814,7 +817,7 @@ fn a_song_saved_comes_back_from_the_load_menu() {
     s.run(Command::LoadSong);
     assert_eq!(s.message, "No user data folder: no saved songs");
 
-    s.songs_dir = Some(songs.clone());
+    s.saving.songs_dir = Some(songs.clone());
     assert!(s.menu_state().can_save_song && !s.menu_state().saved_songs);
     s.run(Command::LoadSong);
     assert_eq!(s.message, "No saved songs found");
@@ -833,7 +836,7 @@ fn a_song_saved_comes_back_from_the_load_menu() {
     s.run(Command::NewGeneratedPattern);
     assert_eq!(s.editor.library().patterns.len(), count + 2);
     s.run(Command::LoadSong);
-    let menu = s.widgets.dropdown.as_ref().expect("the Load list");
+    let menu = s.chrome.widgets.dropdown.as_ref().expect("the Load list");
     assert_eq!(menu.values.len(), 1);
     let value = menu.values[0].clone();
     draw(&mut s);
@@ -855,7 +858,7 @@ fn a_song_saved_comes_back_from_the_load_menu() {
     // A songs folder that is a file: said, not listed nor written.
     let blocked = dir.join("blocked");
     std::fs::write(&blocked, b"").unwrap();
-    s.songs_dir = Some(blocked.clone());
+    s.saving.songs_dir = Some(blocked.clone());
     s.run(Command::SaveSong);
     assert!(s.message.starts_with("Save failed: "), "{}", s.message);
     s.run(Command::LoadSong);

@@ -137,18 +137,15 @@ impl Session {
         let was_song = self.workspace == Workspace::Song;
         self.workspace = workspace;
         self.kit_editor = None;
-        self.widgets.focus = None;
-        self.widgets.dropdown = None;
+        self.chrome.widgets.focus = None;
+        self.chrome.widgets.dropdown = None;
         self.song_panel.hovered_clip = None;
         self.song_panel.drag = None;
         self.song_panel.bar_drag = None;
         self.roll.release();
         if self.playing() && was_song != (workspace == Workspace::Song) {
             let mode = self.play_mode();
-            if let Some(controller) = &mut self.controller {
-                controller.play(self.editor.library(), mode);
-                self.played_revision = self.editor.revision();
-            }
+            self.playback.play(&self.editor, mode);
         }
     }
 
@@ -180,14 +177,14 @@ impl Session {
 
     /// The song playing now, if the selected one plays.
     fn song_playing(&self) -> bool {
-        self.playing() && self.controller.as_ref().is_some_and(|c| c.mode() == Mode::Song(self.editor.selected_song()))
+        self.playback.plays(Mode::Song(self.editor.selected_song()))
     }
 
     /// Where the cursor is, in measures: where the song
     /// plays, else the measure play starts from; kept on the grid.
     pub(super) fn song_cursor_measure(&self) -> f64 {
         let Some(song) = self.song() else { return 0.0 };
-        let measure = match self.controller.as_ref().and_then(Controller::tick) {
+        let measure = match self.playback.tick() {
             Some(tick) if self.song_playing() => song.measure_at_tick(tick as f64, f64::from(TICK)),
             _ => f64::from(self.song_cursor),
         };
@@ -342,7 +339,7 @@ impl Session {
             "export" => self.open_export(Export::Song),
             "import" => self.open_picker(Purpose::ImportSong),
             "new" => {
-                self.widgets.entry = Some(Entry {
+                self.chrome.widgets.entry = Some(Entry {
                     id: Id::SongButton("new"),
                     spec: None,
                     title: "New arrangement name:".into(),
@@ -379,7 +376,7 @@ impl Session {
             }
             _ => return,
         };
-        self.widgets.entry = Some(Entry { id, spec: None, title: title.into(), text });
+        self.chrome.widgets.entry = Some(Entry { id, spec: None, title: title.into(), text });
     }
 
     /// A text entry confirmed.
@@ -389,12 +386,12 @@ impl Session {
             // `renameSong`: an empty name keeps the old one.
             Id::SongName if !text.is_empty() => {
                 if self.editor.set_library_info("name", text) {
-                    self.changed_at = Some(Instant::now());
+                    self.saving.library.touch();
                 }
             }
             Id::SongDescription => {
                 if self.editor.set_library_info("description", text) {
-                    self.changed_at = Some(Instant::now());
+                    self.saving.library.touch();
                 }
             }
             Id::SongPattern(p) => {
@@ -428,9 +425,8 @@ impl Session {
         let playing = self.song_playing();
         let selected = self.editor.set_selected_song(index);
         self.song_panel.scroll = (0, 0);
-        if playing && let Some(controller) = &mut self.controller {
-            controller.play_from(self.editor.library(), Mode::Song(selected), u64::from(self.song_cursor));
-            self.played_revision = self.editor.revision();
+        if playing {
+            self.playback.play_from(&self.editor, Mode::Song(selected), u64::from(self.song_cursor));
         }
         if let Some(song) = self.song() {
             self.message = format!("song {} ({} measures)", song.name, song.length_measures());
@@ -444,10 +440,8 @@ impl Session {
     }
 
     pub(super) fn remove_song(&mut self) {
-        if self.song_playing()
-            && let Some(controller) = &mut self.controller
-        {
-            controller.stop();
+        if self.song_playing() {
+            self.playback.stop();
         }
         if self.editor.remove_song(None) {
             self.song_panel.scroll = (0, 0);
@@ -464,7 +458,7 @@ impl Session {
     fn set_song_cursor(&mut self, measure: u32) {
         self.song_cursor = measure;
         if self.song_playing()
-            && let Some(controller) = &mut self.controller
+            && let Some(controller) = self.playback.controller_mut()
         {
             controller.jump(self.editor.library(), u64::from(measure));
         }
@@ -495,8 +489,9 @@ impl Session {
             (SongHit::Pattern(p), Button::Left) => {
                 let id = Id::SongPattern(p);
                 let now = Instant::now();
-                let double = self.widgets.last_click.is_some_and(|(last, at)| last == id && now - at < DOUBLE_CLICK);
-                self.widgets.last_click = if double { None } else { Some((id, now)) };
+                let double =
+                    self.chrome.widgets.last_click.is_some_and(|(last, at)| last == id && now - at < DOUBLE_CLICK);
+                self.chrome.widgets.last_click = if double { None } else { Some((id, now)) };
                 if double {
                     self.add_at_playhead(p);
                 } else {
@@ -525,7 +520,7 @@ impl Session {
             (SongHit::Cell { row, measure }, Button::Right) => {
                 let row = &rows[row];
                 let title = format!("Add \"{}\" at measure {}", row.name, measure + 1);
-                self.widgets.dropdown = Some(Dropdown::menu(
+                self.chrome.widgets.dropdown = Some(Dropdown::menu(
                     Id::SongMenu,
                     x,
                     y,
@@ -732,17 +727,19 @@ impl Session {
     /// The mouse over the arrangement: the clip it is on, for its tooltip;
     /// whether it changed.
     pub fn song_hover(&mut self, size: (i32, i32, i32), x: i32, y: i32) -> bool {
-        let hover =
-            if self.workspace == Workspace::Song && self.widgets.drag.is_none() && self.song_panel.drag.is_none() {
-                let layout = self.song_layout(size);
-                let rows = self.song_rows();
-                match layout.hit(&self.song_view_data(&rows, &layout), x, y) {
-                    Some(SongHit::Clip(c)) => Some(c),
-                    _ => None,
-                }
-            } else {
-                None
-            };
+        let hover = if self.workspace == Workspace::Song
+            && self.chrome.widgets.drag.is_none()
+            && self.song_panel.drag.is_none()
+        {
+            let layout = self.song_layout(size);
+            let rows = self.song_rows();
+            match layout.hit(&self.song_view_data(&rows, &layout), x, y) {
+                Some(SongHit::Clip(c)) => Some(c),
+                _ => None,
+            }
+        } else {
+            None
+        };
         let changed = hover != self.song_panel.hovered_clip;
         self.song_panel.hovered_clip = hover;
         changed
@@ -752,7 +749,7 @@ impl Session {
     /// The tooltip of the clip under the mouse, or, while a pattern is
     /// dragged over the arrangement, the measure it would be added at.
     pub(super) fn draw_song_tooltip(&self, canvas: &mut Canvas, scale: i32) {
-        if self.menu.is_some() || self.popup_open() || self.overlay.is_some() {
+        if self.chrome.covered() {
             return;
         }
         let layout = self.song_layout((canvas.width(), canvas.height(), scale));
@@ -791,7 +788,7 @@ impl Session {
         }
         values.extend([format!("rename:{p}"), format!("pattern-delete:{p}")]);
         labels.extend(["Rename".into(), "Delete".into()]);
-        self.widgets.dropdown = Some(Dropdown::menu(Id::SongMenu, x, y, title, values, labels));
+        self.chrome.widgets.dropdown = Some(Dropdown::menu(Id::SongMenu, x, y, title, values, labels));
     }
 
     /// Pattern `p` of the list added to the arrangement at the playhead.
@@ -809,7 +806,7 @@ impl Session {
         let Some(clip) = self.song().and_then(|s| s.clips.get(c)).cloned() else { return };
         let title = clip_label(&self.pattern_label(&clip.pattern_id), &clip);
         let values = vec![format!("next:{c}"), format!("delete:{c}")];
-        self.widgets.dropdown =
+        self.chrome.widgets.dropdown =
             Some(Dropdown::menu(Id::SongMenu, x, y, title, values, vec!["Next".into(), "Delete".into()]));
     }
 
@@ -832,7 +829,7 @@ impl Session {
         }
         values.push(format!("row:{}", row.id));
         labels.push("Delete row".into());
-        self.widgets.dropdown = Some(Dropdown::menu(Id::SongMenu, x, y, title, values, labels));
+        self.chrome.widgets.dropdown = Some(Dropdown::menu(Id::SongMenu, x, y, title, values, labels));
     }
 
     /// The name a clip's pattern is shown by (its id when it is gone).
@@ -949,7 +946,7 @@ impl Session {
         if self.pattern_index > p {
             self.pattern_index -= 1;
         }
-        if let Some(controller) = &mut self.controller
+        if let Some(controller) = self.playback.controller_mut()
             && let Mode::Pattern(playing) = controller.mode()
         {
             match playing.cmp(&p) {
@@ -1007,7 +1004,7 @@ impl Session {
 
     /// Save: the song to `songs/<name>.odbox` (`SongService.save`).
     fn save_song(&mut self) {
-        let Some(dir) = &self.songs_dir else {
+        let Some(dir) = &self.saving.songs_dir else {
             self.message = "Save failed: no user data folder".into();
             return;
         };
@@ -1021,7 +1018,7 @@ impl Session {
 
     /// Load: the songs saved, to choose from.
     fn load_song_menu(&mut self) {
-        let Some(dir) = &self.songs_dir else {
+        let Some(dir) = &self.saving.songs_dir else {
             self.message = "No user data folder: no saved songs".into();
             return;
         };
@@ -1039,7 +1036,7 @@ impl Session {
         let labels = files.iter().map(|f| f.file_stem().unwrap_or_default().to_string_lossy().into_owned()).collect();
         let values = files.iter().map(|f| format!("load:{}", f.display())).collect();
         let anchor = self.song_button_rect("load");
-        self.widgets.dropdown = Some(Dropdown {
+        self.chrome.widgets.dropdown = Some(Dropdown {
             title: Some("Load Song".into()),
             ..Dropdown::new(Id::SongMenu, anchor, values, labels, 0)
         });
@@ -1048,7 +1045,7 @@ impl Session {
     /// Where a column button is (the Load list opens under it); without the
     /// song panel (the Song menu), the middle of the window under the header.
     fn song_button_rect(&self, id: &'static str) -> Rect {
-        let (width, height, scale) = self.panel_size;
+        let (width, height, scale) = self.chrome.panel_size;
         let layout = self.panel_layout(width, height, scale);
         panel::find(&layout.items, Id::SongButton(id))
             .map_or_else(|| Rect::new(width / 2 - 100 * scale, frame::body_top(scale), 200 * scale, 0), |i| i.rect)
@@ -1151,7 +1148,7 @@ mod tests {
 
     /// The menu open: its values.
     fn menu(session: &Session) -> Vec<String> {
-        session.widgets.dropdown.as_ref().map(|d| d.values.clone()).unwrap_or_default()
+        session.chrome.widgets.dropdown.as_ref().map(|d| d.values.clone()).unwrap_or_default()
     }
 
     /// Option `i` of the open menu chosen with the keys.
@@ -1164,7 +1161,7 @@ mod tests {
 
     /// `text` typed in the open entry, then Enter.
     fn type_entry(session: &mut Session, text: &str) {
-        session.widgets.entry.as_mut().expect("an entry").text = text.into();
+        session.chrome.widgets.entry.as_mut().expect("an entry").text = text.into();
         session.panel_key(SIZE, PanelKey::Enter, false, false);
     }
 
@@ -1337,7 +1334,7 @@ mod tests {
         assert_eq!(clips(&s).len(), 1);
 
         // Pattern a, not in the arrangement yet, dropped past its end.
-        s.widgets.last_click = None;
+        s.chrome.widgets.last_click = None;
         s.song_click(SIZE, list.0, list.1, Button::Left);
         s.mouse_move(SIZE, measure_x(4), row_y(1), false);
         let rows = s.song_rows();
@@ -1350,7 +1347,7 @@ mod tests {
         assert_eq!(clips(&s).len(), 1);
 
         // Dragged along the list: a line where it goes, and the pattern moves there.
-        s.widgets.last_click = None;
+        s.chrome.widgets.last_click = None;
         s.song_click(SIZE, list.0, list.1, Button::Left);
         s.mouse_move(SIZE, list.0, list.1 + 12, false);
         assert_eq!(s.song_view_data(&rows, &l).list_drop, Some((0, 1)));
@@ -1362,7 +1359,7 @@ mod tests {
         assert_eq!(s.editor.library().patterns[0].name.as_deref(), Some("a"));
 
         // Dropped outside the arrangement: nothing.
-        s.widgets.last_click = None;
+        s.chrome.widgets.last_click = None;
         s.song_click(SIZE, list.0, list.1, Button::Left);
         s.mouse_move(SIZE, l.column.x + 2, l.column.y + 2, false);
         assert!(s.song_release(SIZE));
@@ -1402,10 +1399,10 @@ mod tests {
         // The first row moves down only, the last one up only.
         assert!(s.song_click(SIZE, name_x, row_y(0), Button::Right));
         assert!(menu(&s).contains(&"down:0".to_owned()) && !menu(&s).iter().any(|v| v.starts_with("up:")));
-        s.widgets.dropdown = None;
+        s.chrome.widgets.dropdown = None;
         assert!(s.song_click(SIZE, name_x, row_y(1), Button::Right));
         assert!(menu(&s).contains(&"up:1".to_owned()) && !menu(&s).iter().any(|v| v.starts_with("down:")));
-        s.widgets.dropdown = None;
+        s.chrome.widgets.dropdown = None;
 
         // The pattern shown follows its row, through the undo too.
         s.song_menu_pick("down:0");
@@ -1463,7 +1460,7 @@ mod tests {
         s.song_click(SIZE, row.0, row.1, Button::Right);
         let rename = menu(&s).iter().position(|v| v == "rename:1").unwrap();
         choose(&mut s, rename);
-        assert_eq!(s.widgets.entry.as_ref().map(|e| (e.id, e.text.as_str())), Some((Id::SongPattern(1), "b")));
+        assert_eq!(s.chrome.widgets.entry.as_ref().map(|e| (e.id, e.text.as_str())), Some((Id::SongPattern(1), "b")));
         type_entry(&mut s, "B two");
         assert_eq!(s.editor.library().patterns[1].name.as_deref(), Some("B two"));
         // New and Delete.
@@ -1493,7 +1490,7 @@ mod tests {
             panel::find(&s.panel_layout(SIZE.0, SIZE.1, 1).items, Id::SongButton("load")).unwrap().rect
         );
         s.run(Command::RenameSong);
-        assert_eq!(s.widgets.entry.as_ref().map(|e| e.id), Some(Id::SongName));
+        assert_eq!(s.chrome.widgets.entry.as_ref().map(|e| e.id), Some(Id::SongName));
         type_entry(&mut s, "From the menu");
         assert_eq!(s.song_name(), "From the menu");
         s.run(Command::NewSong);
@@ -1507,7 +1504,7 @@ mod tests {
         let mut s = session();
         let dir = std::env::temp_dir().join(format!("ordrumbox-song-destination-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        s.last_dir = Some(dir.clone());
+        s.chrome.last_dir = Some(dir.clone());
         let name = store::safe_name(&s.song_name());
         let path = dir.join(format!("{name}.odbox"));
 
@@ -1533,7 +1530,7 @@ mod tests {
         let mut s = session();
         let dir = std::env::temp_dir().join(format!("ordrumbox-song-replace-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        s.last_dir = Some(dir.clone());
+        s.chrome.last_dir = Some(dir.clone());
         let path = dir.join(s.song_file_name());
         std::fs::write(&path, "old").unwrap();
 
