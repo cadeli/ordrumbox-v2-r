@@ -46,8 +46,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo xtask bundle ordrumbox-plugin --release --features vst3
       # 0.3.2 no longer builds: its lockfile pins `time` 0.3.20, which recent
-      # rustc rejects.
+      # rustc rejects. The workflow's `-D warnings` is for this repository's
+      # code: a warning in the validator's own code must not fail its build.
       - run: cargo install --locked --git https://github.com/free-audio/clap-validator --tag 0.4.1 clap-validator
+        env:
+          RUSTFLAGS: ""
       # The excluded tests fail in nih-plug's CLAP wrapper, not in this plugin:
       # its state load reserves the length read from the stream unchecked
       # (random bytes abort on the allocation), and does not ask the host to
