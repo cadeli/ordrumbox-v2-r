@@ -25,6 +25,12 @@ pub enum Purpose {
     ImportSong,
     /// Synth presets (`.json`), the synth editor's Import.
     ImportSynth,
+    /// A library file (`.json`), File > Import library.
+    ImportLibrary,
+    /// A backup's folder, File > Restore user data.
+    RestoreUserData,
+    /// The folder to use as the user data folder.
+    UserFolder,
     /// A folder to write a file to.
     Export(Export),
 }
@@ -41,6 +47,9 @@ pub enum Export {
     SongSaveAs,
     Synths,
     KitMapping,
+    Library,
+    /// The user's files, in a folder of their own made in the folder picked.
+    UserData,
 }
 
 impl Purpose {
@@ -54,6 +63,9 @@ impl Purpose {
             Self::ImportFolder => "Import folder as kit",
             Self::ImportSong => "Import song",
             Self::ImportSynth => "Import synth sounds",
+            Self::ImportLibrary => "Import library",
+            Self::RestoreUserData => "Restore user data from a backup folder",
+            Self::UserFolder => "Use as the user data folder",
             Self::Export(Export::PatternWav) => "Export pattern as WAV to folder",
             Self::Export(Export::SongWav) => "Export song as WAV to folder",
             Self::Export(Export::PatternMidi) => "Export pattern as MIDI to folder",
@@ -62,12 +74,14 @@ impl Purpose {
             Self::Export(Export::SongSaveAs) => "Save song to folder",
             Self::Export(Export::Synths) => "Export synth sounds to folder",
             Self::Export(Export::KitMapping) => "Export kit mapping to folder",
+            Self::Export(Export::Library) => "Export library to folder",
+            Self::Export(Export::UserData) => "Back up user data to folder",
         }
     }
 
     /// The pick is a folder, not a file.
     fn picks_folder(self) -> bool {
-        matches!(self, Self::ImportFolder | Self::Export(_))
+        matches!(self, Self::ImportFolder | Self::RestoreUserData | Self::UserFolder | Self::Export(_))
     }
 
     /// File extensions shown (lowercase); none for a folder.
@@ -76,9 +90,9 @@ impl Purpose {
             Self::ImportMidi => &["mid", "midi"],
             Self::AddSample | Self::ReplaceSample | Self::ReplaceTrackSample => &["wav"],
             Self::LoadMapping => &["json"],
-            Self::ImportFolder | Self::Export(_) => &[],
+            Self::ImportFolder | Self::RestoreUserData | Self::UserFolder | Self::Export(_) => &[],
             Self::ImportSong => &["odbox", "json"],
-            Self::ImportSynth => &["json"],
+            Self::ImportSynth | Self::ImportLibrary => &["json"],
         }
     }
 }

@@ -280,12 +280,17 @@ impl Editor {
     /// Replace the whole library (`applyToAppState`: a song loaded or
     /// imported), arrangement `selected_song` selected (clamped); one undo step.
     pub fn load_library(&mut self, library: Library, selected_song: usize) {
+        self.replace_library(library, selected_song, "Load song");
+    }
+
+    /// The same, the undo step described as `description`.
+    pub fn replace_library(&mut self, library: Library, selected_song: usize, description: &str) {
         let previous = self.selected_song;
         let before = Box::new(std::mem::replace(&mut self.library, library));
         self.set_selected_song(selected_song);
         let change =
             Change::Library { before, after: Box::new(self.library.clone()), select: (previous, self.selected_song) };
-        self.record("Load song".to_owned(), change, None);
+        self.record(description.to_owned(), change, None);
         self.revision += 1;
     }
 

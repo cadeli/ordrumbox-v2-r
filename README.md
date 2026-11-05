@@ -36,8 +36,36 @@ The demo `library.json` is only the starting point: the library being edited is
 saved (one second after each edit, and on quit) to `library.json` in the user
 data folder — `%APPDATA%\orDrumbox` on Windows, `~/Library/Application
 Support/orDrumbox` on macOS, `~/.local/share/ordrumbox` elsewhere, or the file
-named by `$ORDRUMBOX_LIBRARY` — and loaded from there next time. Delete that
-file to start again from the demo.
+named by `$ORDRUMBOX_LIBRARY` — and loaded from there next time.
+
+The user data folder from the File menu:
+
+- **Export library...** writes the library to `ordrumbox-library.json` in the
+  folder picked, as the app saves it; **Import library...** reads such a file
+  (or any `library.json`) in the place of the library, and **Load the demo
+  library...** the assets' one: each is one step of Edit > Undo.
+- **Back up user data...** copies the user's files — `library.json`,
+  `kits.json`, `settings.json`, `synth_presets.json` (and an older
+  `generated_sounds.json`), `samples/` and `songs/` — to a new folder
+  `orDrumbox-backup-<YYYYMMDD-HHMMSS>` (UTC) in the folder picked. `exports/`,
+  `backups/` and `mcp.json` are not the user's work and are left out.
+  **Restore user data...** picks such a folder: the user's files there are
+  moved to `backups/<date>-before-restore/` first, then the backup's take
+  their place and the app loads them, as at start. Help > **Factory reset...**
+  moves them to `backups/<date>-reset/` the same way, and starts again from
+  the assets: Restore user data brings them back.
+- **Change user data folder...** uses another folder from now on: the user's
+  files are copied there when it holds none (the current folder is left as it
+  is), else the ones it holds are used. The choice is noted in
+  `location.json` in the default folder; **Use the default user data
+  folder...** removes it. A folder chosen that is not there any more (a drive
+  unplugged) is said at start, and nothing is saved until it is back or
+  another is chosen. `$ORDRUMBOX_LIBRARY`, when set, decides instead, and the
+  folder cannot be changed from the app.
+- **Open user data folder** shows it in the Finder or the Explorer. Help >
+  About says which folder is used and where that comes from.
+
+A plugin has none of the user data folder commands but the library ones.
 
 Key names: the files this app writes (`library.json`, `kits.json`, pattern
 exports) name their settings after what they hold, in camelCase, and differ
@@ -177,7 +205,10 @@ WAV files becomes a kit, a kit mapping is loaded. Gain and transpose now play (t
 JS sample voice uses them). Unlike the JS app, where these edits are lost on
 reload, the kits are saved to `kits.json` and the audio of added, replaced or
 normalized samples to `samples/` (32-bit float WAV), both in the user data
-folder; `samples/` wins over the assets' `kits/`. Delete `kits.json` to start
+folder; `samples/` wins over the assets' `kits/`. A file added or imported is
+copied, as it came, to `samples/imported/<kit>/` (the kit's name with
+characters other than letters, digits, `_` and `-` as `_`), so two kits'
+files of the same name stay apart; the folder it came from is not read again. Delete `kits.json` to start
 again from the assets' kits.
 
 Track editor (on the right, **F2** or **View › Track editor** shows or hides
@@ -541,7 +572,8 @@ macOS (artifact `ordrumbox-plugin-<os>`) and runs `clap-validator` on the CLAP.
 The plugin's window is the app's UI (`ordrumbox-ui`). It edits the project's
 library; kits, synth presets and settings are the user's files, shared with
 the app. What the host does is left out of its menus (File > Save and Quit,
-Tempo -1/+1, Help > Check for updates and Factory reset), and its shortcuts
+Tempo -1/+1, Help > Check for updates and Factory reset, the user data folder
+commands), and its shortcuts
 are refused with a message: the host saves the library with the project and
 sets the tempo. The header shows the host's tempo, under HOST, in place of
 the pattern's BPM knob. A plugin plays patterns only: no song view, no Song

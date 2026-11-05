@@ -57,7 +57,6 @@ impl Settle {
     }
 
     /// As if the delay had passed since the last change.
-    #[cfg(test)]
     pub(super) fn expire(&mut self) {
         self.since = self.since.map(|_| Instant::now() - self.delay);
     }
@@ -103,6 +102,13 @@ impl Default for Saving {
 }
 
 impl Saving {
+    /// Every write waiting is due now (before the files are moved or copied).
+    pub(super) fn expire_all(&mut self) {
+        for settle in [&mut self.library, &mut self.kits, &mut self.synths, &mut self.master] {
+            settle.expire();
+        }
+    }
+
     /// The library has a file, and editor revision `revision` is not in it.
     pub(super) fn library_unsaved(&self, revision: u64) -> bool {
         self.library_path.is_some() && revision != self.saved_revision

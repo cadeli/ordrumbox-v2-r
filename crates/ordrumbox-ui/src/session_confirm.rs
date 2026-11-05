@@ -24,6 +24,12 @@ pub(super) enum Pending {
     ImportSong(PathBuf),
     RandomTrack(usize),
     CompactTracks,
+    ImportLibrary(PathBuf),
+    DemoLibrary,
+    /// A backup's folder.
+    RestoreUserData(PathBuf),
+    /// The folder to use as the user data folder.
+    UserFolder(PathBuf),
 }
 
 impl Session {
@@ -56,6 +62,10 @@ impl Session {
             Pending::ImportSong(path) => self.import_song_now(&path),
             Pending::RandomTrack(t) => self.randomize_track_now(t),
             Pending::CompactTracks => self.compact_tracks_now(),
+            Pending::ImportLibrary(path) => self.import_library_now(&path),
+            Pending::DemoLibrary => self.load_demo_library_now(),
+            Pending::RestoreUserData(path) => self.restore_user_data_now(&path),
+            Pending::UserFolder(path) => self.change_user_folder_now(&path),
         }
     }
 
@@ -109,7 +119,7 @@ impl Session {
                 ("Remove the sample?", what, "remove")
             }
             Pending::RemoveSynth(key) => ("Delete the preset?", format!("\"{key}\". {NO_UNDO}"), "delete"),
-            Pending::LoadSong(path) | Pending::ImportSong(path) => {
+            Pending::LoadSong(path) | Pending::ImportSong(path) | Pending::ImportLibrary(path) => {
                 let name = path.file_name().unwrap_or(path.as_os_str()).to_string_lossy();
                 ("Replace the library?", format!("{name} takes the place of every pattern and arrangement."), "replace")
             }
@@ -119,6 +129,16 @@ impl Session {
             Pending::CompactTracks => {
                 ("Compact the tracks?", "Tracks whose notes repeat get a shorter loop.".to_owned(), "compact")
             }
+            Pending::DemoLibrary => (
+                "Load the demo library?",
+                "The demo takes the place of every pattern and arrangement.".to_owned(),
+                "load",
+            ),
+            Pending::RestoreUserData(path) => {
+                let what = format!("{} takes the place of the user files; they go to backups/ first.", path.display());
+                ("Restore the backup?", what, "restore")
+            }
+            Pending::UserFolder(path) => ("Change the user data folder?", Self::user_folder_text(path), "change"),
         };
         (title, vec![what, String::new(), format!("ENTER: {verb}   ESC: cancel")])
     }

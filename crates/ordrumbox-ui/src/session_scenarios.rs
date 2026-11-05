@@ -644,9 +644,9 @@ fn a_folder_dropped_becomes_a_kit_and_a_wav_dropped_with_shift_replaces_a_sample
     let keys: Vec<&str> = s.kits.kits[kit_count].samples.iter().map(|i| i.key.as_str()).collect();
     assert_eq!(keys, ["KICK", "SNARE"]);
     assert_eq!(s.kit_list(), Some((0, 2)), "the kit editor is on its first sample");
-    // The audio is kept in the user's samples folder, as it came.
-    assert_eq!(std::fs::read(samples.join("Kick01.wav")).unwrap(), kick);
-    assert_eq!(std::fs::read(samples.join("Snare.wav")).unwrap(), snare);
+    // The audio is kept in the user's samples folder, as it came, in a folder of the kit's.
+    assert_eq!(std::fs::read(samples.join("imported/my_kit/Kick01.wav")).unwrap(), kick);
+    assert_eq!(std::fs::read(samples.join("imported/my_kit/Snare.wav")).unwrap(), snare);
     let loud = heard(&mut s, &mut audio, 0);
     assert!(loud > 0.0, "the imported sample is heard");
     draw(&mut s);
@@ -659,9 +659,9 @@ fn a_folder_dropped_becomes_a_kit_and_a_wav_dropped_with_shift_replaces_a_sample
     let sample = &s.kits.kits[kit_count].samples[0];
     assert_eq!(
         (sample.path.as_str(), sample.display_name.as_str(), sample.key.as_str()),
-        ("Kick01.wav", "quiet.wav", "KICK")
+        ("imported/my_kit/Kick01.wav", "quiet.wav", "KICK")
     );
-    let saved = wav::decode(&std::fs::read(samples.join("Kick01.wav")).unwrap()).unwrap();
+    let saved = wav::decode(&std::fs::read(samples.join("imported/my_kit/Kick01.wav")).unwrap()).unwrap();
     assert_eq!(saved.left, wav::decode(&std::fs::read(&quiet).unwrap()).unwrap().left);
     let replaced = heard(&mut s, &mut audio, 0);
     assert!(replaced > 0.0 && replaced * 10.0 < loud, "the new audio is heard: {replaced} vs {loud}");

@@ -1094,6 +1094,14 @@ impl Session {
         }
     }
 
+    /// `library` in the place of the library: one undo step, `description`.
+    pub(super) fn put_library(&mut self, library: Library, description: &str) {
+        self.editor.replace_library(library, 0, description);
+        self.pattern_index = 0;
+        self.song_panel.scroll = (0, 0);
+        self.after_history(None);
+    }
+
     /// Read a song file and put it in the place of the library
     /// (`parseImportedFile`, `applyToAppState`: one undo step); its name.
     pub(super) fn read_song_file(&mut self, path: &Path) -> Result<String, String> {

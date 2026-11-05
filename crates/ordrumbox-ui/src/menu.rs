@@ -95,9 +95,28 @@ pub enum Command {
     Shortcuts,
     About,
     FactoryReset,
+    /// The library written to a file of its own (`library.json` format).
+    ExportLibrary,
+    /// A library file in the place of the library (one undo step).
+    ImportLibrary,
+    /// The assets' library in the place of the library (one undo step).
+    DemoLibrary,
+    /// The user's files copied to a folder of their own.
+    BackUpUserData,
+    /// A backup's files in the place of the user's (those moved aside).
+    RestoreUserData,
+    /// Another user data folder, from the next load on.
+    ChangeUserFolder,
+    /// Back to the default user data folder.
+    DefaultUserFolder,
+    /// The user data folder in the Finder or the Explorer.
+    OpenUserFolder,
     CheckUpdates,
     DownloadPage,
 }
+
+/// Why a plugin leaves the user data folder alone.
+pub const USER_DATA_IN_THE_APP: &str = "user data folder: in the app only, not in a plugin";
 
 /// Why a plugin has no song commands.
 pub const SONGS_IN_THE_APP: &str = "songs: in the app only, a plugin plays patterns";
@@ -112,6 +131,11 @@ impl Command {
             Self::TempoDown | Self::TempoUp => Some("the tempo is the host's"),
             Self::CheckUpdates | Self::DownloadPage => Some("update check: in the app only, not in a plugin"),
             Self::FactoryReset => Some("factory reset: in the app only, not in a plugin"),
+            Self::BackUpUserData
+            | Self::RestoreUserData
+            | Self::ChangeUserFolder
+            | Self::DefaultUserFolder
+            | Self::OpenUserFolder => Some(USER_DATA_IN_THE_APP),
             Self::SongView
             | Self::PlaySong
             | Self::PreviousSong
@@ -205,6 +229,10 @@ pub struct MenuState {
     pub newer_release: Option<String>,
     /// Shown by a plugin: the commands the host does are left out.
     pub hosted: bool,
+    /// The assets' library can be loaded (Load the demo library).
+    pub has_demo: bool,
+    /// A user data folder to back up, restore, change or open.
+    pub user_folder: bool,
 }
 
 fn command(label: impl Into<String>, shortcut: &'static str, command: Command, enabled: bool) -> Item {
@@ -249,6 +277,10 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
                 command("Export song...", "", C::ExportSong, true),
                 command("Import song...", "", C::ImportSong, true),
                 Item::Separator,
+                command("Export library...", "", C::ExportLibrary, true),
+                command("Import library...", "", C::ImportLibrary, true),
+                command("Load the demo library...", "", C::DemoLibrary, s.has_demo),
+                Item::Separator,
                 command("Import MIDI file...", "Ctrl+O", C::ImportMidi, true),
                 command("Export pattern as JSON...", "Ctrl+S", C::ExportPatternJson, p),
                 command("Export pattern as MIDI...", "Ctrl+M", C::ExportMidi, p),
@@ -259,6 +291,12 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
                 command("Replace sample...", "", C::ReplaceSample, s.kit_sample),
                 command("Load kit mapping...", "", C::LoadMapping, true),
                 command("Export kit mapping...", "", C::ExportMapping, !s.kits.is_empty()),
+                Item::Separator,
+                command("Back up user data...", "", C::BackUpUserData, s.user_folder),
+                command("Restore user data...", "", C::RestoreUserData, s.user_folder),
+                command("Change user data folder...", "", C::ChangeUserFolder, s.user_folder),
+                command("Use the default user data folder...", "", C::DefaultUserFolder, s.user_folder),
+                command("Open user data folder", "", C::OpenUserFolder, s.user_folder),
                 Item::Separator,
                 command("Quit", "Ctrl+Q", C::Quit, true),
             ],
@@ -688,7 +726,8 @@ mod tests {
 
     #[test]
     fn every_file_command_is_in_the_file_menu() {
-        let menus = menus(&MenuState { can_save_song: true, saved_songs: true, kit_sample: true, ..state() });
+        let all = MenuState { can_save_song: true, saved_songs: true, kit_sample: true, ..state() };
+        let menus = menus(&MenuState { has_demo: true, user_folder: true, ..all });
         use Command as C;
         let file_commands = [
             C::SaveSong,
@@ -702,6 +741,14 @@ mod tests {
             C::ReplaceSample,
             C::LoadMapping,
             C::ExportMapping,
+            C::ExportLibrary,
+            C::ImportLibrary,
+            C::DemoLibrary,
+            C::BackUpUserData,
+            C::RestoreUserData,
+            C::ChangeUserFolder,
+            C::DefaultUserFolder,
+            C::OpenUserFolder,
         ];
         for menu in &menus {
             for item in &menu.items {

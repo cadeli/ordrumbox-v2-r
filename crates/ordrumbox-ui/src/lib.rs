@@ -33,6 +33,7 @@ mod theme;
 mod ui;
 pub mod ui_input;
 mod update;
+mod user_data;
 mod view;
 
 pub use audio_output::{AudioOutput, HostOutput, StartOutput, StartedOutput, host_output};
