@@ -251,7 +251,11 @@ fn every_variant_of_every_generator() {
         let mut g = AutoGenerator::new(&scales, &styles, &mut rnd);
         instrument_line(&mut g, &mut pattern, t, kind, variant, f(case, "density"), &harmony_in(case.get("harmony")));
         drop(g);
-        check_track(&pattern.tracks[t], case.get("track").unwrap(), &at);
+        let mut expected = case.get("track").unwrap().clone();
+        if kind == InstrumentFamily::Bass {
+            raise_pitches(&mut expected, BASS_DEPARTURE);
+        }
+        check_track(&pattern.tracks[t], &expected, &at);
         assert_eq!(stream.draws as f64, f(case, "draws"), "{at}: draws");
     }
 }
@@ -270,6 +274,20 @@ fn random_tracks() {
 }
 
 // ─── What departs from the JS ────────────────────────────────────────────────
+
+/// Semitones the bass lines sound above the JS ones (`README.md`, "Golden
+/// fixtures"): the JS variants sat an octave too low.
+const BASS_DEPARTURE: f64 = 12.0;
+
+/// Raise every note of a `trackOut` by `semitones`.
+fn raise_pitches(track: &mut Value, semitones: f64) {
+    let Some(Value::Array(notes)) = track.as_object_mut().unwrap().get_mut("notes") else { return };
+    for note in notes {
+        let Value::Array(fields) = note else { panic!("note {note}") };
+        let pitch = fields[3].as_f64().unwrap();
+        fields[3] = Value::Number(pitch + semitones);
+    }
+}
 
 /// Whether a track case is a melodic line, still the JS one (`README.md`,
 /// "Golden fixtures"): the drum lines come from the styles.

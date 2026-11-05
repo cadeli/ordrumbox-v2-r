@@ -862,7 +862,10 @@ node tools/export_gen_fixtures.mjs ../ordrumbox-v2
   (below) the file holds the inputs and seeds only: the drum lines,
   `generatePattern` on new and existing patterns, the player's loop start over
   30–46 loops (auto tracks, `autoGen` patterns), the ↻ Drum / Bass / Chords
-  toggles.
+  toggles. The bass lines sound an octave above the JS ones, whose variants sat
+  an octave too low: each bass variant's `rootNote` in `data/generators.json` is
+  12 above the JS table (re-apply it after running the script), and the test
+  compares the bass cases with the JS notes raised by 12.
 - `ordrumbox-logic/tests/fixtures/generators_rust.txt`: what departs from the
   JS, from the same inputs and seeds, as the Rust generators make it: whole
   patterns, loops and toggles. The drum lines no longer come from the JS
