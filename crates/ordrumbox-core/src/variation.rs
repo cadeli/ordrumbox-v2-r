@@ -246,10 +246,10 @@ pub(crate) fn apply(
             let next = (step < steps_in_loop - 1).then_some(step + 1);
             let has_prev = step > 0 && is_played(step - 1);
             let next_free = next.filter(|&n| !is_played(n));
-            if let (false, Some(next)) = (has_prev, next_free) {
-                if let Some(target) = target(next) {
-                    ops.push(HitOp::Anticipation(slot, target));
-                }
+            if let (false, Some(next)) = (has_prev, next_free)
+                && let Some(target) = target(next)
+            {
+                ops.push(HitOp::Anticipation(slot, target));
             }
             if has_prev && next.is_some_and(is_played) {
                 ops.push(HitOp::Silence(slot));
@@ -258,19 +258,19 @@ pub(crate) fn apply(
             if !drum_line {
                 ops.push(HitOp::Pitch(slot));
             }
-            if let Some(next) = next_free {
-                if let Some(target) = target(next) {
-                    ops.push(HitOp::Double(slot, target));
-                }
+            if let Some(next) = next_free
+                && let Some(target) = target(next)
+            {
+                ops.push(HitOp::Double(slot, target));
             }
         }
         for pair in played.windows(2) {
             let ((step, slot), (next_step, _)) = (pair[0], pair[1]);
             let gap = next_step - step;
-            if gap >= 3 {
-                if let Some(target) = target(step + gap / 2) {
-                    ops.push(HitOp::Ghost(slot, target));
-                }
+            if gap >= 3
+                && let Some(target) = target(step + gap / 2)
+            {
+                ops.push(HitOp::Ghost(slot, target));
             }
         }
 

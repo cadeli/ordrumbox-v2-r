@@ -21,7 +21,7 @@ jobs:
       matrix:
         os: [windows-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -41,7 +41,7 @@ jobs:
       matrix:
         os: [windows-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo xtask bundle ordrumbox-plugin --release --features vst3
@@ -53,7 +53,7 @@ jobs:
       # (random bytes abort on the allocation), and does not ask the host to
       # rescan the parameter values afterwards.
       - run: clap-validator validate --exclude 'state-invalid-random|state-reproducibility' target/bundled/orDrumbox.clap
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ordrumbox-plugin-${{ runner.os }}
           path: target/bundled
@@ -63,7 +63,7 @@ jobs:
     needs: check
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         # The whole history and its tags: the program names its build from
         # them (`crates/ordrumbox-ui/build.rs`).
         with:
@@ -84,7 +84,7 @@ jobs:
       # The program, the assets it reads from the folder next to it, its license.
       - shell: bash
         run: mkdir dist && cp target/release/ordrumbox.exe LICENSE dist/ && cp -r assets dist/
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ordrumbox-windows-x64
           path: dist
@@ -97,7 +97,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       # The app compares the tag with its own version: they must be the same.
       - name: Tag matches the version
         run: |
@@ -106,7 +106,7 @@ jobs:
             echo "tag $GITHUB_REF_NAME, but Cargo.toml has version $version"
             exit 1
           fi
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: ordrumbox-windows-x64
           path: ordrumbox

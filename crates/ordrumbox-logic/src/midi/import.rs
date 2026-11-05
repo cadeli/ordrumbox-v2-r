@@ -115,14 +115,14 @@ pub fn import(file_name: &str, bytes: &[u8], roots: &[(String, f64)]) -> Result<
     let mut skipped: Vec<u8> = Vec::new();
     for (channel, list, track_name) in &channels {
         let program = programs.iter().find(|(ch, _)| ch == channel).and_then(|(_, p)| *p).unwrap_or(0);
-        if *channel != 9 {
-            if let Some(instrument) = found(c.from_midi_program(i64::from(program))).filter(|i| !i.drum) {
-                if !defs.iter().any(|d| d.name == instrument.id) {
-                    let base_note = root_or_c3(&instrument.id);
-                    defs.push(TrackDef { name: instrument.id.clone(), notes: list.clone(), base_note });
-                }
-                continue;
+        if *channel != 9
+            && let Some(instrument) = found(c.from_midi_program(i64::from(program))).filter(|i| !i.drum)
+        {
+            if !defs.iter().any(|d| d.name == instrument.id) {
+                let base_note = root_or_c3(&instrument.id);
+                defs.push(TrackDef { name: instrument.id.clone(), notes: list.clone(), base_note });
             }
+            continue;
         }
         if let Some(drums) = drum_tracks(c, list, *channel) {
             defs.extend(drums);

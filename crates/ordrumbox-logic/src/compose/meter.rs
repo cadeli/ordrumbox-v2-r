@@ -10,7 +10,7 @@ pub fn metric_weight(step: usize, steps_per_beat: usize, beat_count: usize) -> f
     if within == 0 {
         return if beat == 0 {
             1.0
-        } else if beat_count % 2 == 0 && beat * 2 == beat_count {
+        } else if beat_count.is_multiple_of(2) && beat * 2 == beat_count {
             0.85
         } else {
             0.7
