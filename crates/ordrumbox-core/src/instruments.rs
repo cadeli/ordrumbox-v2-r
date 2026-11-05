@@ -1,10 +1,11 @@
-//! The instrument catalog (`logic/services/instruments_manager/`): canonical
-//! instrument ids (`KICK`, `OHH`, `CONGAS`…) with their name patterns,
-//! substitutes, GM MIDI mapping and default pan, and the lookups the app makes
-//! with them (sound auto-assignment, MIDI files).
+//! The instrument catalog: canonical instrument ids (`KICK`, `OHH`, `CONGAS`…)
+//! with their name patterns, words, substitutes, GM MIDI mapping and default
+//! pan, and the lookups the app makes with them (sound auto-assignment, MIDI
+//! files, kit import).
 //!
-//! The data is `data/instruments.json`, exported from the JS catalog by
-//! `tools/export_assign_fixtures.mjs` (GM keys and programs already filled in).
+//! Everything the detection knows is data, in `data/instruments.json`, which is
+//! edited by hand (`README.md`, "Instrument catalog"); this module only reads it
+//! and applies its rules.
 
 use std::sync::OnceLock;
 
@@ -12,57 +13,6 @@ use crate::json::{self, Value};
 
 /// Id of "no instrument" (`NOT_FOUND`).
 pub const NOT_FOUND: &str = "NOT_FOUND";
-
-/// The catalog's instrument ids by category, in the order the "add track"
-/// menus list them. Every id of `data/instruments.json` is in one category.
-pub const CATEGORIES: [(&str, &[&str]); 9] = [
-    ("Kick & snare", &["KICK", "SNARE", "RIMSHOT", "CLAP"]),
-    ("Hats & cymbals", &["CHH", "CHHK", "OHH", "CYM", "CRASH", "RIDE"]),
-    ("Toms", &["TOM", "HI_TOM", "MTOM", "LO_TOM"]),
-    (
-        "Latin",
-        &[
-            "BONGOS",
-            "HI_BONGOS",
-            "LO_BONGOS",
-            "CONGAS",
-            "HI_CONGAS",
-            "LO_CONGAS",
-            "OHI_CONGAS",
-            "CHI_CONGAS",
-            "TIMBAL",
-            "HI_TIMBAL",
-            "LO_TIMBAL",
-            "CUICA",
-            "GUIRO",
-        ],
-    ),
-    (
-        "Percussion",
-        &[
-            "COWBELL",
-            "TAMB",
-            "TAMBOURINE",
-            "SHAKER",
-            "MARACAS",
-            "CABA",
-            "CLAVES",
-            "CASTENET",
-            "TRIANGLE",
-            "HI_WOODBLOCK",
-            "LO_WOODBLOCK",
-            "WHISTLE",
-            "VIBRA",
-            "PERC",
-            "PERCUSSIVE",
-            "CROMAPERC",
-        ],
-    ),
-    ("Bass & keys", &["BASS", "PIANO", "ORGAN", "GUITAR", "MELO"]),
-    ("Strings & winds", &["STRINGS", "ENSEMBLE", "BRASS", "LONGBRASS", "SHORTBRASS", "SAX", "REED", "PIPE", "ETHNIC"]),
-    ("Synth", &["SYNTH", "SYNTHLEAD", "SYNTHPAD", "SYNTHEFFECT"]),
-    ("FX & loops", &["HIT", "RAZOR", "SCRATCH", "SOUNDEFFECT", "LOOP"]),
-];
 
 /// One MIDI mapping of an instrument.
 #[derive(Debug, Clone, PartialEq)]
@@ -77,24 +27,72 @@ pub struct MidiMapping {
     pub key_based: Option<bool>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Instrument {
     pub id: String,
     pub drum: bool,
+    /// Plays notes (a bass, a lead, a pitched bell): with no sample of its own, a synth preset.
+    pub melodic: bool,
     /// As written in the catalog ("-4", "0"…).
     pub pan: String,
+    /// The instrument this one is a variant of (`TOM` for `HI_TOM`), and the
+    /// qualifier that picks it (`HI`).
+    pub variant_of: Option<String>,
+    pub qualifier: Option<String>,
     /// Name patterns (a small regex dialect: `.`, `*`, `?`), whole name, any case.
     pub synonyms: Vec<String>,
+    /// Words that name it like its id: other names ("Rhodes"), short spellings
+    /// ("shkr"), phrases ("BASS DRUM").
+    pub words: Vec<String>,
+    /// Words that name it only when no other word of the name names anything ("Stab").
+    pub weak_words: Vec<String>,
+    /// Ways of playing another instrument that name this one ("Snare Rim" is a rimshot).
+    pub articulations: Vec<String>,
+    /// Category prefixes of synth patch names ("LD Supersaw").
+    pub patch_prefixes: Vec<String>,
     /// Ids to fall back on, in order.
     pub subst: Vec<String>,
     pub midi: Vec<MidiMapping>,
 }
 
-/// The catalog.
+/// Instruments with an open and a closed sound.
 #[derive(Debug, Clone, PartialEq)]
+pub struct OpenClosed {
+    pub members: Vec<String>,
+    pub open: String,
+    pub closed: String,
+    /// What a GM name that states neither plays (a hi-hat is closed).
+    pub neutral: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Openness {
+    Open,
+    Closed,
+}
+
+/// A kit's file named `word` alone is `id` when another file of the kit is `beside`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct KitContext {
+    pub word: String,
+    pub beside: String,
+    pub id: String,
+}
+
+/// The catalog.
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Catalog {
-    /// In catalog order (the JS `Map` order).
+    /// In catalog order: the first one that fits wins.
     pub instruments: Vec<Instrument>,
+    /// Category names and their ids, in the order the "add track" menus list them.
+    pub categories: Vec<(String, Vec<String>)>,
+    /// Words that pick a variant (`LOW` is `LO`).
+    pub qualifiers: Vec<(String, String)>,
+    pub openness: Vec<(String, Openness)>,
+    pub open_closed: Vec<OpenClosed>,
+    /// Words that count last, and the id one of them names then (`BELL` is `CROMAPERC`).
+    pub generic_words: Vec<(String, Option<String>)>,
+    pub kit_context: Vec<KitContext>,
     /// GM program names, by program number.
     pub program_names: Vec<(i64, String)>,
     /// GM drum names, by note.
@@ -111,9 +109,21 @@ pub fn catalog() -> &'static Catalog {
     })
 }
 
+fn str_of(v: &Value, key: &str) -> Option<String> {
+    v.get(key).and_then(Value::as_str).map(str::to_owned)
+}
+
+fn strings(v: Option<&Value>) -> Vec<String> {
+    v.and_then(Value::as_array).unwrap_or_default().iter().filter_map(Value::as_str).map(str::to_owned).collect()
+}
+
+fn entries(v: Option<&Value>) -> Vec<(String, &Value)> {
+    let Some(object) = v.and_then(Value::as_object) else { return Vec::new() };
+    object.iter().map(|(k, v)| (k.to_owned(), v)).collect()
+}
+
 fn names(value: Option<&Value>) -> Vec<(i64, String)> {
-    let Some(object) = value.and_then(Value::as_object) else { return Vec::new() };
-    object.iter().filter_map(|(k, v)| Some((k.parse().ok()?, v.as_str()?.to_owned()))).collect()
+    entries(value).into_iter().filter_map(|(k, v)| Some((k.parse().ok()?, v.as_str()?.to_owned()))).collect()
 }
 
 /// Upper-case alphanumeric words of `s`, CamelCase cut ("OpenHat" is OPEN HAT).
@@ -135,229 +145,25 @@ fn words(s: &str) -> Vec<String> {
         .collect()
 }
 
-/// Words two strings share.
-pub fn count_common_words(a: &str, b: &str) -> usize {
-    if a.is_empty() || b.is_empty() {
-        return 0;
-    }
-    let mut first = words(a);
-    first.sort();
-    first.dedup();
-    let second = words(b);
-    first.iter().filter(|w| second.contains(w)).count()
-}
-
-/// Words that pick a variant of an instrument: a tom's pitch, a sound's length.
-const QUALIFIER_WORDS: [(&str, &str); 11] = [
-    ("FLOOR", "LO"),
-    ("HI", "HI"),
-    ("HIGH", "HI"),
-    ("LO", "LO"),
-    ("LOW", "LO"),
-    ("MID", "MID"),
-    ("MED", "MID"),
-    ("MIDDLE", "MID"),
-    ("SHORT", "SHORT"),
-    ("LONG", "LONG"),
-    ("LNG", "LONG"),
-];
-
-/// Words read as another one, an id: the agogo plays where a cowbell does, a Rhodes is a piano.
-/// They name an instrument, so they count like the id itself.
-const WORD_ALIASES: [(&str, &str); 15] = [
-    ("AGOGO", "COWBELL"),
-    ("PEDAL", "CHHK"),
-    ("RHODES", "PIANO"),
-    ("WURLY", "PIANO"),
-    ("WURLITZER", "PIANO"),
-    ("KEYS", "PIANO"),
-    ("CLAV", "PIANO"),
-    ("EPIANO", "PIANO"),
-    ("SUPERSAW", "SYNTHLEAD"),
-    ("HOOVER", "SYNTHLEAD"),
-    ("REESE", "BASS"),
-    ("CHOIR", "ENSEMBLE"),
-    ("VOX", "ENSEMBLE"),
-    ("VOCAL", "ENSEMBLE"),
-    ("VOICE", "ENSEMBLE"),
-];
-
-/// Words that say how a sound is played more than what plays it ("Organ Stab" is an organ):
-/// they give their id only when no other word of the name finds an instrument.
-const WEAK_WORDS: [(&str, &str); 17] = [
-    ("SUB", "BASS"),
-    ("ACID", "BASS"),
-    ("TB", "BASS"),
-    ("WOBBLE", "BASS"),
-    ("PLUCK", "SYNTHLEAD"),
-    ("STAB", "SYNTHLEAD"),
-    ("ARP", "SYNTHLEAD"),
-    ("SYNC", "SYNTHLEAD"),
-    ("SCREAMER", "SYNTHLEAD"),
-    ("CHORD", "SYNTHPAD"),
-    ("ATMOS", "SYNTHPAD"),
-    ("DRONE", "SYNTHPAD"),
-    ("SWEEP", "SOUNDEFFECT"),
-    ("RISER", "SOUNDEFFECT"),
-    ("NOISE", "SOUNDEFFECT"),
-    ("IMPACT", "SOUNDEFFECT"),
-    ("DOWNLIFTER", "SOUNDEFFECT"),
-];
-
-/// Category prefixes of synth patch names ("LD Supersaw", "BA Acid"), and the id they mean.
-/// One that is also a catalog word or pattern (`CH`, `FX`, `BELL`) is not a prefix.
-const PATCH_PREFIXES: [(&str, &str); 22] = [
-    ("BA", "BASS"),
-    ("BS", "BASS"),
-    ("BAS", "BASS"),
-    ("LD", "SYNTHLEAD"),
-    ("PL", "SYNTHLEAD"),
-    ("PLK", "SYNTHLEAD"),
-    ("ARP", "SYNTHLEAD"),
-    ("SQ", "SYNTHLEAD"),
-    ("SEQ", "SYNTHLEAD"),
-    ("CHD", "SYNTHLEAD"),
-    ("PD", "SYNTHPAD"),
-    ("SY", "SYNTH"),
-    ("SYN", "SYNTH"),
-    ("KY", "PIANO"),
-    ("KEY", "PIANO"),
-    ("KB", "PIANO"),
-    ("EP", "PIANO"),
-    ("PN", "PIANO"),
-    ("PNO", "PIANO"),
-    ("ORG", "ORGAN"),
-    ("STR", "STRINGS"),
-    ("GT", "GUITAR"),
-];
-
-/// Other spellings of an instrument word: vowels dropped ("shkr"), plurals, names the
-/// catalog's patterns miss. None is an id word of another instrument or a word of its patterns
-/// (`abbreviations_do_not_collide`): CL stays the rimshot's, though a 808's CL is its claves.
-const ABBREVIATIONS: [(&str, &str); 22] = [
-    ("BASSDRUM", "KICK"),
-    ("CRSH", "CRASH"),
-    ("CRS", "CRASH"),
-    ("SPLASH", "CRASH"),
-    ("CHINESE", "CRASH"),
-    ("RD", "RIDE"),
-    ("RDE", "RIDE"),
-    ("SHKR", "SHAKER"),
-    ("SHK", "SHAKER"),
-    ("TMB", "TAMB"),
-    ("TMBR", "TAMB"),
-    ("CWB", "COWBELL"),
-    ("CWBL", "COWBELL"),
-    ("PRC", "PERC"),
-    ("TMBL", "TIMBAL"),
-    ("TRNGL", "TRIANGLE"),
-    ("WSTL", "WHISTLE"),
-    ("MRCS", "MARACAS"),
-    ("CASTANET", "CASTENET"),
-    ("CASTANETS", "CASTENET"),
-    ("VIBRASLAP", "VIBRA"),
-    ("WDBLK", "LO_WOODBLOCK"),
-];
-
-/// Words that name a kind of sound more than an instrument ("Perc Bongo" is a bongo,
-/// "Tamb_Loop" a tambourine): they count only when no other word of the name finds one.
-const GENERIC_WORDS: [&str; 6] = ["PERC", "HIT", "LOOP", "DRUM", "CYMBAL", "SYNTH"];
-
-/// The word that names a 808 bass when nothing else in the name does.
-const BASS_808: &str = "808";
-
-/// The words of a name, digits removed ("sn01" is SN), aliases and abbreviations
-/// applied, and BASS DRUM read as KICK.
-fn name_words(s: &str) -> Vec<String> {
-    let mut found: Vec<String> = Vec::new();
-    for w in words(s) {
-        let w: String = w.chars().filter(|c| !c.is_ascii_digit()).collect();
-        if w.is_empty() {
-            continue;
+/// A name without what it says in parentheses, and what it says there:
+/// "Lead 8 (bass + lead)" is a lead, its parentheses only a detail.
+fn split_parentheses(s: &str) -> (String, String) {
+    let (mut outside, mut inside) = (String::new(), String::new());
+    let mut depth = 0usize;
+    for c in s.chars() {
+        match c {
+            '(' | '[' => depth += 1,
+            ')' | ']' => depth = depth.saturating_sub(1),
+            _ if depth > 0 => inside.push(c),
+            _ => outside.push(c),
         }
-        let w = WORD_ALIASES
-            .iter()
-            .chain(ABBREVIATIONS.iter())
-            .find(|(word, _)| *word == w)
-            .map_or(w, |(_, alias)| (*alias).to_owned());
-        // A bass drum is a kick, not a bass.
-        match found.last_mut() {
-            Some(last) if w == "DRUM" && last == "BASS" => *last = "KICK".to_owned(),
-            _ => found.push(w),
+        if matches!(c, '(' | ')' | '[' | ']') {
+            // Keep the words apart: "Pad(choir)" is PAD, CHOIR.
+            outside.push(' ');
+            inside.push(' ');
         }
     }
-    found
-}
-
-/// Ids with the qualifier glued to the name: id, its core word, its qualifier.
-const GLUED_IDS: [(&str, &str, &str); 3] =
-    [("MTOM", "TOM", "MID"), ("LONGBRASS", "BRASS", "LONG"), ("SHORTBRASS", "BRASS", "SHORT")];
-
-/// The qualifier a name states: MID if any ("Low-Mid Tom" is the mid tom), else its first one.
-fn qualifier(s: &str) -> Option<&'static str> {
-    let found: Vec<&'static str> = name_words(s)
-        .iter()
-        .filter_map(|w| QUALIFIER_WORDS.iter().find(|(word, _)| word == w).map(|(_, q)| *q))
-        .collect();
-    if found.contains(&"MID") { Some("MID") } else { found.first().copied() }
-}
-
-/// An id's core words and qualifier (`HI_TOM` is TOM, HI; `MTOM` is TOM, MID).
-fn id_parts(id: &str) -> (Vec<String>, Option<&'static str>) {
-    match GLUED_IDS.iter().find(|(glued, ..)| *glued == id) {
-        Some(&(_, core, q)) => (vec![core.to_owned()], Some(q)),
-        None => (core_words(id), qualifier(id)),
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Openness {
-    Open,
-    Closed,
-}
-
-/// Words that say whether a sound is open or closed (a hi-hat, a conga).
-const OPENNESS_WORDS: [(&str, Openness); 4] =
-    [("OPEN", Openness::Open), ("OPENED", Openness::Open), ("CLOSE", Openness::Closed), ("CLOSED", Openness::Closed)];
-
-/// Instruments with an open and a closed sound: the ids found, the open one,
-/// the closed one, and the one a name that states neither plays.
-const OPEN_CLOSED: [(&[&str], &str, &str, Option<&str>); 2] = [
-    (&["OHH", "CHH", "CHHK"], "OHH", "CHH", Some("CHH")),
-    (&["HI_CONGAS", "OHI_CONGAS", "CHI_CONGAS"], "OHI_CONGAS", "CHI_CONGAS", None),
-];
-
-/// The openness a name states, from its first openness word.
-fn openness(s: &str) -> Option<Openness> {
-    name_words(s).iter().find_map(|w| OPENNESS_WORDS.iter().find(|(word, _)| word == w).map(|(_, o)| *o))
-}
-
-/// The words of `s` but the qualifier and openness words.
-fn core_words(s: &str) -> Vec<String> {
-    name_words(s)
-        .into_iter()
-        .filter(|w| {
-            !QUALIFIER_WORDS.iter().any(|(word, _)| word == w) && !OPENNESS_WORDS.iter().any(|(word, _)| word == w)
-        })
-        .collect()
-}
-
-/// Whether `text` has one of `words`, qualifier and openness words left out.
-fn shares_word(text: &str, words: &[String]) -> bool {
-    core_words(text).iter().any(|w| words.contains(w))
-}
-
-/// The literal parts of a pattern of two words or more (`.*TUBULAR.*BELL.*` is
-/// TUBULAR, BELL); none for a pattern with a part of one letter or a qualifier
-/// (`.*TOM.*HI.*`), which the qualifier pass handles.
-fn compound_parts(pattern: &str) -> Option<Vec<&str>> {
-    let parts: Vec<&str> = pattern.split(['.', '*', '?', ' ']).filter(|p| !p.is_empty()).collect();
-    let is_qualifier = |p: &str| {
-        let p = p.to_uppercase();
-        QUALIFIER_WORDS.iter().any(|(w, _)| *w == p) || OPENNESS_WORDS.iter().any(|(w, _)| *w == p)
-    };
-    let usable = parts.len() >= 2 && parts.iter().all(|p| p.len() >= 2 && !is_qualifier(p));
-    usable.then_some(parts)
+    (outside, inside)
 }
 
 /// How the words of a name found an instrument.
@@ -395,26 +201,30 @@ pub fn pattern_matches(pattern: &str, text: &str) -> bool {
     matches(&p, &t)
 }
 
+/// The literal parts of a pattern (`.*TUBULAR.*BELL.*` is TUBULAR, BELL).
+fn pattern_parts(pattern: &str) -> impl Iterator<Item = &str> {
+    pattern.split(['.', '*', '?', ' ']).filter(|p| !p.is_empty())
+}
+
 impl Catalog {
     pub fn from_json(value: &Value) -> Self {
-        let strings = |v: Option<&Value>| -> Vec<String> {
-            v.and_then(Value::as_array)
-                .unwrap_or_default()
-                .iter()
-                .filter_map(Value::as_str)
-                .map(str::to_owned)
-                .collect()
-        };
         let instruments = value
             .get("instruments")
             .and_then(Value::as_array)
             .unwrap_or_default()
             .iter()
             .map(|i| Instrument {
-                id: i.get("id").and_then(Value::as_str).unwrap_or(NOT_FOUND).to_owned(),
+                id: str_of(i, "id").unwrap_or_else(|| NOT_FOUND.to_owned()),
                 drum: i.get("drum").and_then(Value::as_bool) == Some(true),
-                pan: i.get("pan").and_then(Value::as_str).unwrap_or("0").to_owned(),
+                melodic: i.get("melodic").and_then(Value::as_bool) == Some(true),
+                pan: str_of(i, "pan").unwrap_or_else(|| "0".to_owned()),
+                variant_of: str_of(i, "variantOf"),
+                qualifier: str_of(i, "qualifier"),
                 synonyms: strings(i.get("synonyms")),
+                words: strings(i.get("words")),
+                weak_words: strings(i.get("weakWords")),
+                articulations: strings(i.get("articulations")),
+                patch_prefixes: strings(i.get("patchPrefixes")),
                 subst: strings(i.get("subst")),
                 midi: i
                     .get("midi")
@@ -423,7 +233,7 @@ impl Catalog {
                     .iter()
                     .map(|m| MidiMapping {
                         channel: m.get("channel").and_then(Value::as_f64).map_or(9, |c| c as i64),
-                        name: m.get("name").and_then(Value::as_str).unwrap_or_default().to_owned(),
+                        name: str_of(m, "name").unwrap_or_default(),
                         key: m.get("key").and_then(Value::as_f64).map(|k| k as i64),
                         program: m.get("program").and_then(Value::as_f64).map(|p| p as i64),
                         key_based: m.get("keyBased").and_then(Value::as_bool),
@@ -431,8 +241,46 @@ impl Catalog {
                     .collect(),
             })
             .collect();
+        let list = |key: &str| value.get(key).and_then(Value::as_array).unwrap_or_default();
         Self {
             instruments,
+            categories: list("categories")
+                .iter()
+                .map(|c| (str_of(c, "name").unwrap_or_default(), strings(c.get("ids"))))
+                .collect(),
+            qualifiers: entries(value.get("qualifiers"))
+                .into_iter()
+                .filter_map(|(w, q)| Some((w, q.as_str()?.to_owned())))
+                .collect(),
+            openness: entries(value.get("openness"))
+                .into_iter()
+                .filter_map(|(w, o)| match o.as_str()? {
+                    "open" => Some((w, Openness::Open)),
+                    "closed" => Some((w, Openness::Closed)),
+                    _ => None,
+                })
+                .collect(),
+            open_closed: list("openClosed")
+                .iter()
+                .map(|o| OpenClosed {
+                    members: strings(o.get("members")),
+                    open: str_of(o, "open").unwrap_or_default(),
+                    closed: str_of(o, "closed").unwrap_or_default(),
+                    neutral: str_of(o, "neutral"),
+                })
+                .collect(),
+            generic_words: entries(value.get("genericWords"))
+                .into_iter()
+                .map(|(w, id)| (w, id.as_str().map(str::to_owned)))
+                .collect(),
+            kit_context: list("kitContext")
+                .iter()
+                .map(|k| KitContext {
+                    word: str_of(k, "word").unwrap_or_default(),
+                    beside: str_of(k, "beside").unwrap_or_default(),
+                    id: str_of(k, "is").unwrap_or_default(),
+                })
+                .collect(),
             program_names: names(value.get("gmProgramNames")),
             drum_names: names(value.get("gmDrumNames")),
         }
@@ -444,8 +292,7 @@ impl Catalog {
         self.instruments.iter().find(|i| i.id.to_uppercase() == id)
     }
 
-    /// The instrument with exactly this id (case-sensitive), as the
-    /// auto-assignment checks `DATA.instruments`.
+    /// The instrument with exactly this id (case-sensitive).
     pub fn by_exact_id(&self, id: &str) -> Option<&Instrument> {
         self.instruments.iter().find(|i| i.id == id)
     }
@@ -455,13 +302,88 @@ impl Catalog {
         self.instruments.iter().find(|i| i.synonyms.iter().any(|s| pattern_matches(s, name)))
     }
 
+    /// The category an id is in.
+    pub fn category_of(&self, id: &str) -> Option<&str> {
+        self.categories.iter().find(|(_, ids)| ids.iter().any(|i| i == id)).map(|(name, _)| name.as_str())
+    }
+
+    fn is_qualifier(&self, word: &str) -> bool {
+        self.qualifiers.iter().any(|(w, _)| w == word)
+    }
+
+    fn is_generic(&self, word: &str) -> bool {
+        self.generic_words.iter().any(|(w, _)| w == word)
+    }
+
+    /// The words of a name, digits removed ("sn01" is SN) but in a word the
+    /// catalog lists ("808"), and the instruments' words read as their id
+    /// ("Rhodes" is PIANO, "Bass Drum" KICK).
+    fn name_words(&self, s: &str) -> Vec<String> {
+        let listed = |w: &str| self.is_generic(w) || self.instruments.iter().any(|i| i.words.iter().any(|x| x == w));
+        let raw: Vec<String> = words(s)
+            .into_iter()
+            .map(|w| if listed(&w) { w } else { w.chars().filter(|c| !c.is_ascii_digit()).collect() })
+            .filter(|w| !w.is_empty())
+            .collect();
+        let mut found = Vec::new();
+        let mut rest = raw.as_slice();
+        while let Some(first) = rest.first() {
+            // The longest word or phrase of an instrument that starts here.
+            let phrase = self
+                .instruments
+                .iter()
+                .flat_map(|i| i.words.iter().map(move |w| (w.split(' ').collect::<Vec<_>>(), &i.id)))
+                .filter(|(parts, _)| rest.len() >= parts.len() && parts.iter().zip(rest).all(|(p, w)| p == w))
+                .max_by_key(|(parts, _)| parts.len());
+            match phrase {
+                Some((parts, id)) => {
+                    found.push(id.clone());
+                    rest = &rest[parts.len()..];
+                }
+                None => {
+                    found.push(first.clone());
+                    rest = &rest[1..];
+                }
+            }
+        }
+        found
+    }
+
+    /// The qualifier a name states: MID if any ("Low-Mid Tom" is the mid tom), else its first one.
+    fn qualifier(&self, s: &str) -> Option<&str> {
+        let found: Vec<&str> = self
+            .name_words(s)
+            .iter()
+            .filter_map(|w| self.qualifiers.iter().find(|(word, _)| word == w).map(|(_, q)| q.as_str()))
+            .collect();
+        if found.contains(&"MID") { Some("MID") } else { found.first().copied() }
+    }
+
+    /// The openness a name states, from its first openness word.
+    fn name_openness(&self, s: &str) -> Option<Openness> {
+        self.name_words(s).iter().find_map(|w| self.openness.iter().find(|(word, _)| word == w).map(|(_, o)| *o))
+    }
+
+    /// The words of `s` but the qualifier and openness words.
+    fn core_words(&self, s: &str) -> Vec<String> {
+        self.name_words(s)
+            .into_iter()
+            .filter(|w| !self.is_qualifier(w) && !self.openness.iter().any(|(word, _)| word == w))
+            .collect()
+    }
+
+    /// Whether `text` has one of `words`, qualifier and openness words left out.
+    fn shares_word(&self, text: &str, words: &[String]) -> bool {
+        self.core_words(text).iter().any(|w| words.contains(w))
+    }
+
     /// The instrument a file or patch name means. In order: the id itself; a patch
-    /// category prefix ("LD Supersaw"); an instrument whose id or GM name shares a
-    /// word with the name, then a weak word ("Stab"), then the most specific pattern;
-    /// and a lone 808 is a bass. Digits do not count, CamelCase is cut, and the
-    /// qualifiers (HI, LOW, MID, LONG...) and OPEN/CLOSED only pick the variant
-    /// of what the other words found. This departs from the JS app (`README.md`,
-    /// "Golden fixtures").
+    /// category prefix ("LD Supersaw"); a pattern of two words ("Tubular Bells");
+    /// the words of the name but the generic ones, outside the parentheses then
+    /// inside: an articulation, an id or instrument word, a GM name, a weak word,
+    /// the most specific pattern; then the generic words (PERC, LOOP, BELL…).
+    /// Digits do not count and CamelCase is cut; the qualifiers (HI, LOW, MID…) and
+    /// OPEN/CLOSED only pick the variant of what the other words found.
     pub fn from_file_name(&self, file_name: &str) -> Option<&Instrument> {
         if let Some(found) = self.by_id(file_name.trim()) {
             return Some(found);
@@ -470,17 +392,36 @@ impl Catalog {
             return Some(found);
         }
         self.by_words(file_name)
-            .or_else(|| words(file_name).iter().any(|w| w == BASS_808).then(|| self.by_exact_id("BASS")).flatten())
+    }
+
+    /// The instruments the files of one kit mean, each read with the names of the
+    /// others (`kitContext`): in a kit with an `RS.wav`, `CL.wav` is the claves.
+    pub fn from_kit_file_names(&self, names: &[&str]) -> Vec<Option<&Instrument>> {
+        let found: Vec<Option<&Instrument>> = names.iter().map(|n| self.from_file_name(n)).collect();
+        let stem = |name: &str| -> Vec<String> {
+            let stem =
+                name.rsplit_once('.').filter(|(_, ext)| ext.eq_ignore_ascii_case("wav")).map_or(name, |(s, _)| s);
+            self.name_words(stem)
+        };
+        names
+            .iter()
+            .enumerate()
+            .map(|(k, name)| {
+                let words = stem(name);
+                let beside = |id: &str| found.iter().enumerate().any(|(j, f)| j != k && f.is_some_and(|f| f.id == id));
+                let rule = self.kit_context.iter().find(|c| words == [c.word.as_str()] && beside(&c.beside));
+                rule.map_or(found[k], |c| self.by_exact_id(&c.id))
+            })
+            .collect()
     }
 
     /// The id a patch name's category prefix means, when the prefix is no catalog word.
     fn by_patch_prefix(&self, file_name: &str) -> Option<&Instrument> {
         let all = words(file_name);
         let [first, _, ..] = all.as_slice() else { return None };
-        let &(prefix, id) = PATCH_PREFIXES.iter().find(|(prefix, _)| prefix == first)?;
-        let collides =
-            self.by_name(prefix).is_some() || self.instruments.iter().any(|i| words(&i.id).iter().any(|w| w == prefix));
-        if collides { None } else { self.by_exact_id(id) }
+        let found = self.instruments.iter().find(|i| i.patch_prefixes.contains(first))?;
+        let collides = self.by_name(first).is_some() || self.instruments.iter().any(|i| words(&i.id).contains(first));
+        if collides { None } else { Some(found) }
     }
 
     /// The instrument whose most specific pattern matches `word`: `.*CLAVINET.*` wins over `.*CLAV.*`.
@@ -499,15 +440,24 @@ impl Catalog {
     }
 
     /// The instrument whose pattern of two words or more matches the whole name
-    /// (`.*ORCH.*HIT.*` for "Orchestra Hit"), the one with the most letters.
+    /// (`.*ORCH.*HIT.*` for "Orchestra Hit"), the one with the most letters. A
+    /// pattern with a part of one letter or a qualifier (`.*TOM.*HI.*`) is left
+    /// to the qualifier pass.
     fn by_compound_pattern(&self, file_name: &str) -> Option<&Instrument> {
-        let text = name_words(file_name).join(" ");
+        let text = self.name_words(file_name).join(" ");
+        let usable = |parts: &[&str]| {
+            let qualifier = |p: &str| {
+                let p = p.to_uppercase();
+                self.is_qualifier(&p) || self.openness.iter().any(|(w, _)| *w == p)
+            };
+            parts.len() >= 2 && parts.iter().all(|p| p.len() >= 2 && !qualifier(p))
+        };
         let mut best: Option<(&Instrument, usize)> = None;
         for i in &self.instruments {
             for pattern in &i.synonyms {
-                let Some(parts) = compound_parts(pattern) else { continue };
+                let parts: Vec<&str> = pattern_parts(pattern).collect();
                 let count = parts.iter().map(|p| p.len()).sum();
-                if pattern_matches(pattern, &text) && best.is_none_or(|(_, b)| count > b) {
+                if usable(&parts) && pattern_matches(pattern, &text) && best.is_none_or(|(_, b)| count > b) {
                     best = Some((i, count));
                 }
             }
@@ -515,36 +465,71 @@ impl Catalog {
         best.map(|(i, _)| i)
     }
 
-    /// What `words` find, in order: an id word, a GM name word, a weak word, a pattern.
+    /// What `words` find, in order: an articulation, an id word, the GM name with
+    /// the fewest other words ("Low Conga" for "conga low", not "Mute Hi Conga"),
+    /// a weak word, a pattern.
     fn by_word_list(&self, words: &[String]) -> Option<Base<'_>> {
         if words.is_empty() {
             return None;
         }
-        if let Some(found) = self.instruments.iter().find(|i| shares_word(&i.id, words)) {
+        let names_it = |list: &[String]| list.iter().any(|w| words.contains(w));
+        if let Some(found) = self.instruments.iter().find(|i| names_it(&i.articulations)) {
             return Some(Base::IdWord(found));
         }
-        if let Some(found) = self.instruments.iter().find(|i| i.midi.iter().any(|m| shares_word(&m.name, words))) {
+        if let Some(found) = self.instruments.iter().find(|i| self.shares_word(&i.id, words)) {
+            return Some(Base::IdWord(found));
+        }
+        let extra_words = |name: &str| self.core_words(name).iter().filter(|w| !words.contains(w)).count();
+        let by_gm_name = self
+            .instruments
+            .iter()
+            .filter_map(|i| {
+                let names = i.midi.iter().filter(|m| self.shares_word(&m.name, words));
+                Some((i, names.map(|m| extra_words(&m.name)).min()?))
+            })
+            .min_by_key(|&(_, extra)| extra);
+        if let Some((found, _)) = by_gm_name {
             return Some(Base::GmWord(found));
         }
-        if let Some(&(_, id)) = words.iter().find_map(|w| WEAK_WORDS.iter().find(|(weak, _)| weak == w)) {
-            return self.by_exact_id(id).map(Base::Weak);
+        if let Some(found) = self.instruments.iter().find(|i| names_it(&i.weak_words)) {
+            return Some(Base::Weak(found));
         }
         words.iter().find_map(|w| self.by_specific_name(w)).map(Base::Pattern)
     }
 
-    /// The instrument a name's words point to: a pattern of two words, then the
-    /// words but the generic ones, then the generic ones; the qualifiers and the
-    /// openness pick the variant after.
+    /// What the generic words of a name find: an id ("Perc"), else the id one of
+    /// them names ("Bell"), else what they share with the rest.
+    fn by_generic_words(&self, words: &[String]) -> Option<Base<'_>> {
+        if let Some(found) = self.instruments.iter().find(|i| self.shares_word(&i.id, words)) {
+            return Some(Base::IdWord(found));
+        }
+        let named = words.iter().find_map(|w| self.generic_words.iter().find(|(g, _)| g == w)?.1.as_deref());
+        match named.and_then(|id| self.by_exact_id(id)) {
+            Some(found) => Some(Base::IdWord(found)),
+            None => self.by_word_list(words),
+        }
+    }
+
+    /// The instrument a variant group holds for `qualifier` (`TOM`, `HI`: `HI_TOM`).
+    fn variant(&self, group: &str, qualifier: Option<&str>) -> Option<&Instrument> {
+        self.instruments
+            .iter()
+            .find(|i| i.variant_of.as_deref().unwrap_or(&i.id) == group && i.qualifier.as_deref() == qualifier)
+    }
+
+    /// The instrument a name's words point to, then its variant and its openness.
     fn by_words(&self, file_name: &str) -> Option<&Instrument> {
         // First pass: the qualifiers (HI, LOW, MID...) do not count.
-        let wanted = qualifier(file_name);
-        let (specific, generic): (Vec<String>, Vec<String>) =
-            core_words(file_name).into_iter().partition(|w| !GENERIC_WORDS.contains(&w.as_str()));
+        let wanted = self.qualifier(file_name);
+        let (outside, inside) = split_parentheses(file_name);
+        let specific = |s: &str| self.core_words(s).into_iter().filter(|w| !self.is_generic(w)).collect::<Vec<_>>();
+        let generic: Vec<String> = self.core_words(file_name).into_iter().filter(|w| self.is_generic(w)).collect();
         let base = self
             .by_compound_pattern(file_name)
             .map(Base::Pattern)
-            .or_else(|| self.by_word_list(&specific))
-            .or_else(|| self.by_word_list(&generic))?;
+            .or_else(|| self.by_word_list(&specific(&outside)))
+            .or_else(|| self.by_word_list(&specific(&inside)))
+            .or_else(|| self.by_generic_words(&generic))?;
         // Found by a GM name ("Open Hi-Hat"), the instrument says nothing of the name's openness.
         // A pattern can state the qualifier itself (`LT.*` is LO_TOM).
         let (base, level_known, from_gm_name) = match base {
@@ -553,23 +538,15 @@ impl Catalog {
             Base::GmWord(found) => (found, true, true),
             Base::Pattern(found) => (found, wanted.is_some(), false),
         };
-        let found = if level_known {
-            // Second pass: the qualifier picks the variant of the instrument found.
-            let (core, _) = id_parts(&base.id);
-            self.instruments.iter().find(|i| id_parts(&i.id) == (core.clone(), wanted)).unwrap_or(base)
-        } else {
-            base
-        };
+        // Second pass: the qualifier picks the variant of the instrument found.
+        let group = base.variant_of.as_deref().unwrap_or(&base.id);
+        let found = if level_known { self.variant(group, wanted).unwrap_or(base) } else { base };
         // Then the openness, for the instruments that have an open and a closed sound.
-        let Some(&(_, open, closed, neutral)) =
-            OPEN_CLOSED.iter().find(|(members, ..)| members.contains(&found.id.as_str()))
-        else {
-            return Some(found);
-        };
-        let id = match openness(file_name) {
-            Some(Openness::Open) => Some(open),
-            Some(Openness::Closed) => Some(closed),
-            None if from_gm_name => neutral,
+        let Some(pair) = self.open_closed.iter().find(|o| o.members.contains(&found.id)) else { return Some(found) };
+        let id = match self.name_openness(file_name) {
+            Some(Openness::Open) => Some(&pair.open),
+            Some(Openness::Closed) => Some(&pair.closed),
+            None if from_gm_name => pair.neutral.as_ref(),
             None => None,
         };
         Some(id.and_then(|id| self.by_exact_id(id)).unwrap_or(found))
@@ -580,9 +557,8 @@ impl Catalog {
         self.instruments.iter().find(|i| i.midi.iter().any(|m| m.channel == channel && m.key == Some(key)))
     }
 
-    /// The instrument for GM `program`: a
-    /// direct mapping, else the program's GM name matched by pattern or by
-    /// mapping name.
+    /// The instrument for GM `program`: a direct mapping, else the program's GM
+    /// name matched by pattern or by mapping name.
     pub fn from_midi_program(&self, program: i64) -> Option<&Instrument> {
         if let Some(found) = self.instruments.iter().find(|i| i.midi.iter().any(|m| m.program == Some(program))) {
             return Some(found);
@@ -591,17 +567,6 @@ impl Catalog {
         self.by_name(gm).or_else(|| {
             self.instruments.iter().find(|i| i.midi.iter().any(|m| m.name.to_lowercase() == gm.to_lowercase()))
         })
-    }
-
-    /// The instrument's id then its substitutes.
-    pub fn track_candidates(instrument: &Instrument) -> Vec<&str> {
-        let mut candidates = vec![instrument.id.as_str()];
-        for s in &instrument.subst {
-            if !s.is_empty() && !candidates.contains(&s.as_str()) {
-                candidates.push(s);
-            }
-        }
-        candidates
     }
 }
 
@@ -635,6 +600,7 @@ mod tests {
         assert_eq!(detected("ltom"), "LO_TOM");
         assert_eq!(detected("HT"), "HI_TOM");
         assert_eq!(detected("Tom_Rack_01.wav"), "TOM");
+        assert_eq!(detected("conga low"), "LO_CONGAS");
     }
 
     #[test]
@@ -689,14 +655,16 @@ mod tests {
     }
 
     #[test]
-    fn abbreviations_do_not_collide() {
+    fn words_name_one_instrument() {
         let c = catalog();
-        for (abbreviation, id) in ABBREVIATIONS {
-            assert!(c.by_exact_id(id).is_some(), "{id}");
-            for i in c.instruments.iter().filter(|i| i.id != id) {
-                let named = words(&i.id).iter().any(|w| w == abbreviation)
-                    || i.synonyms.iter().any(|p| p.split(['.', '*', '?', ' ']).any(|part| part == abbreviation));
-                assert!(!named, "{abbreviation} names {}", i.id);
+        for i in &c.instruments {
+            for word in i.words.iter().chain(&i.weak_words).chain(&i.articulations).chain(&i.patch_prefixes) {
+                for other in c.instruments.iter().filter(|o| o.id != i.id) {
+                    let named = words(&other.id).contains(word)
+                        || other.words.contains(word)
+                        || other.synonyms.iter().any(|p| p.eq_ignore_ascii_case(word));
+                    assert!(!named, "{word} of {} names {}", i.id, other.id);
+                }
             }
         }
     }
@@ -722,17 +690,68 @@ mod tests {
     }
 
     #[test]
+    fn parentheses_articulations_and_bells() {
+        assert_eq!(detected("Lead 8 (bass + lead)"), "SYNTHLEAD");
+        assert_eq!(detected("Pad 4 (choir)"), "SYNTHPAD");
+        assert_eq!(detected("Kick (soft)"), "KICK");
+        assert_eq!(detected("Snare Rim.wav"), "RIMSHOT");
+        assert_eq!(detected("Snare Side Stick"), "RIMSHOT");
+        assert_eq!(detected("Snare Brush.wav"), "SNARE");
+        assert_eq!(detected("Bell_C5.wav"), "CROMAPERC");
+        assert_eq!(detected("Bell Glass"), "CROMAPERC");
+        assert_eq!(detected("Ride_Bell.wav"), "RIDE");
+        assert_eq!(detected("Agogo Bell"), "COWBELL");
+        assert_eq!(detected("Cowbell"), "COWBELL");
+    }
+
+    #[test]
+    fn a_kit_reads_cl_beside_rs_as_the_claves() {
+        let ids = |names: &[&str]| -> Vec<String> {
+            catalog()
+                .from_kit_file_names(names)
+                .iter()
+                .map(|i| i.map_or(NOT_FOUND, |i| i.id.as_str()).to_owned())
+                .collect()
+        };
+        assert_eq!(ids(&["RS.wav", "CL.wav", "BD.wav"]), ["RIMSHOT", "CLAVES", "KICK"]);
+        assert_eq!(ids(&["CL.wav", "BD.wav"]), ["RIMSHOT", "KICK"]);
+        assert_eq!(ids(&["CL 2.wav", "Rim.wav"]), ["CLAVES", "RIMSHOT"]);
+    }
+
+    #[test]
+    fn every_id_the_catalog_names_exists() {
+        let c = catalog();
+        let exists = |id: &str| assert!(c.by_exact_id(id).is_some(), "{id}");
+        for i in &c.instruments {
+            i.subst.iter().for_each(|s| exists(s));
+            if let Some(q) = &i.qualifier {
+                assert!(c.qualifiers.iter().any(|(_, v)| v == q), "{}: {q}", i.id);
+            }
+        }
+        for pair in &c.open_closed {
+            pair.members.iter().chain([&pair.open, &pair.closed]).chain(&pair.neutral).for_each(|s| exists(s));
+        }
+        c.generic_words.iter().filter_map(|(_, id)| id.as_deref()).for_each(exists);
+        for k in &c.kit_context {
+            exists(&k.beside);
+            exists(&k.id);
+        }
+        assert_eq!(c.category_of("HI_TOM"), Some("Toms"));
+    }
+
+    #[test]
     fn catalog_loads() {
         let c = catalog();
         assert_eq!(c.instruments.len(), 66);
         assert_eq!(c.by_id("ohh").map(|i| i.id.as_str()), Some("OHH"));
         assert_eq!(c.program_names.len(), 128);
-        assert_eq!(count_common_words("HI_TOM", "tom hi"), 2);
+        assert_eq!(c.variant("TOM", Some("HI")).map(|i| i.id.as_str()), Some("HI_TOM"));
     }
 
     #[test]
     fn every_instrument_is_in_one_category() {
-        let listed: Vec<&str> = CATEGORIES.iter().flat_map(|(_, ids)| ids.iter().copied()).collect();
+        let listed: Vec<&str> =
+            catalog().categories.iter().flat_map(|(_, ids)| ids.iter().map(String::as_str)).collect();
         for instrument in &catalog().instruments {
             let count = listed.iter().filter(|id| **id == instrument.id).count();
             assert_eq!(count, 1, "{}", instrument.id);

@@ -740,6 +740,59 @@ where a name did not hold what it said:
 - **Master bus**: a compressor, low and high cut, then a soft limit (unchanged
   under 0.9, rounded toward ±1; a hard clip in JS).
 
+## Instrument catalog
+
+`crates/ordrumbox-core/data/instruments.json` is the instrument catalog, built
+into the program and edited by hand: everything the app knows of instrument
+names is there, and `ordrumbox-core/src/instruments.rs` only applies it. It
+started as an export of the JS catalog; it is this app's own now, and no
+script writes it.
+
+Each of `instruments`, in order (the first that fits wins):
+
+| Key | What |
+|---|---|
+| `id` | `KICK`, `HI_TOM`… |
+| `drum`, `melodic` | a drum sound (channel 10 in a MIDI file); a melodic one (with no sample of its own, a synth preset plays it) |
+| `pan` | default pan, as written |
+| `variantOf`, `qualifier` | the instrument it is a variant of and the qualifier that picks it (`TOM`, `HI`) |
+| `synonyms` | name patterns, whole name, any case (`.` any character, `*` and `?` after an atom) |
+| `words` | words read as its id: other names, short spellings, phrases (`RHODES`, `SHKR`, `BASS DRUM`) |
+| `weakWords` | words that name it only when nothing else does (`STAB`) |
+| `articulations` | ways of playing another instrument that name this one (`RIM`: "Snare Rim" is a rimshot) |
+| `patchPrefixes` | synth patch name prefixes (`LD Supersaw`) |
+| `subst` | what the auto-assignment takes when the kit lacks it, in order |
+| `midi` | GM mappings: channel, name, key or program |
+
+And at the top: `categories` (the "add track" menus, every id in one),
+`qualifiers` (`LOW` is `LO`; MID wins, so "Low-Mid Tom" is the mid tom),
+`openness` and `openClosed` (OPEN/CLOSED pick the hat; a GM name that says
+neither is the closed one), `genericWords` (they count last, and some name an
+id then: `BELL` a pitched bell, `808` a bass), `kitContext` (a kit's `CL.wav`
+is the claves beside an `RS.wav`), `gmDrumNames`, `gmProgramNames`.
+
+A name is read in this order: the id itself; a patch prefix, unless it is
+also an id word or a pattern; a pattern of two words on the whole name
+("Tubular Bells"); then the words but the generic ones, outside parentheses
+and then inside ("Lead 8 (bass + lead)" is a lead): an articulation, an id or
+an instrument's word, the GM name with the fewest other words ("conga low"
+is the low conga), a weak word, the pattern with the most letters; then the
+generic words. Digits do not count but in a word the catalog lists ("808"),
+CamelCase is cut, and the qualifiers and OPEN/CLOSED only pick the variant of
+what the other words found. In the auto-assignment, a substitute keeps to the
+category of the instrument (a conga does not take a ride), and the grid shows
+when a sample stands in (`for CONGAS: real/tom.wav`). The unit tests of
+`instruments.rs` check that no word names two instruments and that every id
+the catalog names exists.
+
+One test follows the whole chain, `ordrumbox-ui/src/kit_import_tests.rs`:
+five folders of WAV files named as drum machines and sample packs name them
+(Roland's `BD`/`CL`/`RS`, short spellings, NI, Splice, Ableton) are imported as
+kits, and 18 canonical tracks are played in each with the app's synth presets.
+Its table of what each track gets, first and last candidate, and whether the
+sample stands in, is written by hand: a change in it is a change of what a user
+hears, to check by ear before the table is updated.
+
 ## Golden fixtures
 
 The fixtures are committed: the tests need nothing outside this repository.
@@ -833,8 +886,8 @@ node tools/export_edit_fixtures.mjs ../ordrumbox-v2
   `stepPercent`, which the comparison of notes includes): the steps recorded,
   then each track's loop point and notes.
 
-Sound assignment, song playback and WAV encoding have a fourth script; it
-also writes the instrument catalog the port reads (`ordrumbox-core/data/instruments.json`):
+Sound assignment, song playback and WAV encoding have a fourth script (the
+instrument catalog is not generated: "Instrument catalog", above):
 
 ```sh
 node tools/export_assign_fixtures.mjs ../ordrumbox-v2
@@ -849,26 +902,20 @@ node tools/export_assign_fixtures.mjs ../ordrumbox-v2
   candidate.
 - `ordrumbox-engine/tests/fixtures/wav.json`: `bufferToWav()` bytes.
 
-The detection of an instrument from a file or patch name
-(`Catalog::from_file_name`) departs from `findInstrumentFromFileName`:
-digits do not count and CamelCase is cut; the qualifiers (HI, LOW, MID,
-FLOOR, SHORT, LONG…) and OPEN/CLOSED only pick the variant of what the other
-words found; a patch category prefix (`LD`, `PD`, `BA`, `KY`…) names the
-category unless it is a catalog word or pattern; synth and keys words are read
-as an instrument (Rhodes, Supersaw, Reese, Choir, Agogo as a cowbell, Pedal as
-the pedal hat), or only when nothing else is found (Stab, Pluck, Sub, Chord,
-Sweep, a lone 808 as a bass); short spellings count as the word (`crsh`,
-`shkr`, `rd`, `Splash`, `Castanets`: `ABBREVIATIONS`, none a word of another
-instrument); a bass drum is a kick; a pattern of two words (`.*TUBULAR.*BELL.*`)
-is tried on the whole name first, and the generic words (PERC, HIT, LOOP, DRUM,
-CYMBAL, SYNTH) last; and the most specific pattern wins. The names
-the JS read otherwise are listed with what this app reads:
+The detection and the auto-assignment depart from `findInstrumentFromFileName`
+and `autoAssignTrackSounds`: their rules are this app's, written in the catalog
+("Instrument catalog", above).
+
+The names the JS read otherwise are listed with what this app reads:
 `FILE_NAME_DEPARTURES` in `ordrumbox-core/tests/instruments.rs`, `DEPARTURES`
 in `ordrumbox-engine/tests/assign.rs` (kit `real`; those names are left out of
 the JS comparison), and `TRACK_NAME_DEPARTURES` in
 `ordrumbox-logic/tests/midi.rs` (GM key 44, "Pedal Hi-Hat", is a CHHK track,
-not a high bongo; key 35, "Acoustic Bass Drum", is `KICK 2`, not a bass). The rules themselves are unit tests in
-`ordrumbox-core/src/instruments.rs`.
+not a high bongo; key 35, "Acoustic Bass Drum", is `KICK 2`, not a bass). The
+JS fixtures hold no synth preset, so the synth fallback is checked by unit
+tests, like the rules themselves (`ordrumbox-core/src/instruments.rs`,
+`ordrumbox-engine/src/assign.rs`). The fixture script reads the JS catalog
+for the JS side of these comparisons; the app reads its own.
 
 The generators have a fifth script; it also writes the variant tables the
 port reads (`ordrumbox-logic/data/generators.json`):

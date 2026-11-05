@@ -15,6 +15,8 @@ mod control_help;
 mod editors;
 mod font;
 mod frame;
+#[cfg(test)]
+mod kit_import_tests;
 mod kits;
 mod master;
 mod mcp;

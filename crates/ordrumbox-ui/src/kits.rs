@@ -286,6 +286,16 @@ impl KitSet {
                 Err(_) => failed += 1,
             }
         }
+        // Each file is read beside the others: a Roland CL is the claves next to its RS.
+        let names: Vec<&str> = instruments.iter().map(|i: &KitSample| i.display_name.as_str()).collect();
+        let keys: Vec<String> = catalog()
+            .from_kit_file_names(&names)
+            .iter()
+            .map(|i| i.map_or_else(|| NOT_FOUND.to_owned(), |i| i.id.clone()))
+            .collect();
+        for (instrument, key) in instruments.iter_mut().zip(keys) {
+            instrument.key = key;
+        }
         let count = instruments.len();
         let kit = Kit { name: kit_name.clone(), samples: instruments, ..Kit::default() };
         let index = match self.kits.iter().position(|k| k.name == kit_name) {

@@ -3,7 +3,7 @@
 //! cannot run (paste with nothing copied, delete on an empty step) is left out.
 //! A track's name dragged up or down moves the track to another row.
 
-use ordrumbox_core::instruments::CATEGORIES;
+use ordrumbox_core::instruments::catalog;
 use ordrumbox_core::js;
 
 use crate::panel::SUBMENU_MARK;
@@ -112,9 +112,10 @@ impl Session {
             self.message = format!("a pattern holds at most {MAX_TRACKS} tracks");
             return;
         }
-        let mut values: Vec<String> = (0..CATEGORIES.len()).map(|i| format!("{CATEGORY_VALUE}{i}")).collect();
+        let categories = &catalog().categories;
+        let mut values: Vec<String> = (0..categories.len()).map(|i| format!("{CATEGORY_VALUE}{i}")).collect();
         let mut labels: Vec<String> =
-            CATEGORIES.iter().map(|(category, _)| format!("{category}{SUBMENU_MARK}")).collect();
+            categories.iter().map(|(category, _)| format!("{category}{SUBMENU_MARK}")).collect();
         let title = match target {
             Some(t) => {
                 let Some(track) = self.track(t) else { return };
@@ -132,9 +133,9 @@ impl Session {
     /// "Free name" asks for the name.
     pub(super) fn track_name_menu_pick(&mut self, target: Option<usize>, value: &str, menu: Dropdown) {
         if let Some(index) = value.strip_prefix(CATEGORY_VALUE).and_then(|i| i.parse::<usize>().ok()) {
-            let Some((category, ids)) = CATEGORIES.get(index) else { return };
+            let Some((category, ids)) = catalog().categories.get(index) else { return };
             let values = ids.iter().map(|id| format!("{INSTRUMENT_VALUE}{id}")).collect();
-            let labels = ids.iter().map(|id| (*id).to_owned()).collect();
+            let labels = ids.clone();
             let id = Id::TrackNameMenu(target);
             let submenu = Dropdown::submenu(menu, self.chrome.panel_size, id, (*category).to_owned(), values, labels);
             self.chrome.widgets.dropdown = Some(submenu);
@@ -401,7 +402,7 @@ mod tests {
         let mut s = session();
         let before = s.pattern().unwrap().tracks.len();
         s.add_track_menu(30, 40);
-        assert_eq!(labels(&s).len(), CATEGORIES.len());
+        assert_eq!(labels(&s).len(), catalog().categories.len());
         pick(&mut s, "Hats & cymbals >");
         assert_eq!(labels(&s), ["CHH", "CHHK", "OHH", "CYM", "CRASH", "RIDE"]);
         assert_eq!(menu_titles(&s), ["Add track", "Hats & cymbals"], "the categories stay shown");
@@ -422,7 +423,7 @@ mod tests {
         let (parent, child) = (d.parent.as_ref().unwrap().rect(width, height, scale), d.rect(width, height, scale));
         assert_eq!(child.x, parent.x + parent.w, "on the right of the categories");
         // A click on another category of the menu above: its instruments instead.
-        let hats = CATEGORIES.iter().position(|(c, _)| *c == "Hats & cymbals").unwrap();
+        let hats = catalog().categories.iter().position(|(c, _)| c == "Hats & cymbals").unwrap();
         let y = parent.y + 2 * scale + (hats as i32 + 1) * 12 * scale + scale;
         assert!(s.mouse_down(SIZE, parent.x + 4, y, Button::Left, false));
         assert_eq!(menu_titles(&s), ["Add track", "Hats & cymbals"]);

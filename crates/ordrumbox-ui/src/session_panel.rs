@@ -10,7 +10,7 @@ use ordrumbox_core::instruments::catalog;
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_core::{js, song};
 use ordrumbox_engine::TrackSound;
-use ordrumbox_engine::assign::{assign_track, synth_for};
+use ordrumbox_engine::assign::{assign_track, substitute_for, synth_for};
 
 use super::*;
 use crate::control::{Spec, Style};
@@ -283,8 +283,9 @@ impl Session {
         }
     }
 
-    /// What the grid shows under track `t`'s name: its sample (`kit/file`),
-    /// its synth preset, or that it has none.
+    /// What the grid shows under track `t`'s name: its sample (`kit/file`, after
+    /// `for CONGAS:` when it stands in for the track's instrument), its synth
+    /// preset, or that it has none.
     pub(super) fn track_sound_label(&self, t: usize) -> String {
         let Some(track) = self.track(t) else { return String::new() };
         let bank = self
@@ -293,7 +294,14 @@ impl Session {
             .map(|c| c.bank().clone())
             .or_else(|| self.render.as_ref().map(|r| r.bank.clone()));
         match self.track_sound(t) {
-            TrackSound::Sample(i) => bank.and_then(|b| b.get(i).map(|s| s.sample.path.clone())).unwrap_or_default(),
+            TrackSound::Sample(i) => {
+                let Some(sample) = bank.as_ref().and_then(|b| b.get(i)) else { return String::new() };
+                // A sample picked for want of the track's own instrument says so.
+                match substitute_for(&track.name, &sample.sample.key).filter(|_| track.auto_assign) {
+                    Some(wanted) => format!("for {wanted}: {}", sample.sample.path),
+                    None => sample.sample.path.clone(),
+                }
+            }
             TrackSound::Synth(key) => format!("synth {key}"),
             TrackSound::None if track.use_synth => match &track.synth_preset {
                 Some(key) => format!("synth {key}"),
