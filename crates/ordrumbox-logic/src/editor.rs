@@ -9,7 +9,7 @@
 use std::collections::HashSet;
 use std::time::Instant;
 
-use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
+use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family, mono_from_track_name};
 use ordrumbox_core::ids::{slugify, unique_id};
 use ordrumbox_core::js::{number_to_string, round};
 use ordrumbox_core::json::Value;
@@ -605,9 +605,19 @@ impl Editor {
         .is_some()
     }
 
+    /// Rename track `t`; a track renamed to a bass becomes mono.
     pub fn change_track_name(&mut self, p: usize, t: usize, name: &str) -> bool {
-        self.edit_track(p, t, |_| format!("Rename track → {name}"), None, |track| track.name = name.to_owned())
-            .is_some()
+        self.edit_track(
+            p,
+            t,
+            |_| format!("Rename track → {name}"),
+            None,
+            |track| {
+                track.name = name.to_owned();
+                track.mono |= mono_from_track_name(name);
+            },
+        )
+        .is_some()
     }
 
     // ─── Patterns ────────────────────────────────────────────────────────────
@@ -986,6 +996,21 @@ mod tests {
         assert_eq!(e.toggle_accent(0, 0, 0, 0), Some(true));
         assert_eq!(e.undo().as_deref(), Some("Accent on KICK"));
         assert_eq!(velocity(&e), Note::default().velocity);
+    }
+
+    #[test]
+    fn a_track_added_or_renamed_as_a_bass_is_mono() {
+        let mut e = editor();
+        let t = e.add_track(0, "BASS", 4).unwrap();
+        assert!(pattern(&e).tracks[t].mono);
+        assert!(!pattern(&e).tracks[1].mono);
+        assert!(e.change_track_name(0, 1, "SUB BASS"));
+        assert!(pattern(&e).tracks[1].mono);
+        assert!(e.change_track_name(0, 1, "SNARE"));
+        assert!(pattern(&e).tracks[1].mono, "renaming away from a bass keeps mono");
+        e.undo();
+        e.undo();
+        assert!(!pattern(&e).tracks[1].mono);
     }
 
     fn editor() -> Editor {

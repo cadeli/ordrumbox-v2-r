@@ -42,9 +42,17 @@ struct Candidate<'a> {
 const SYNTH_KIT: &str = "synth";
 
 /// The key a preset is matched by: `KICK_SYNTH` plays a `KICK` track, `BASS0`
-/// to `BASS5` a `BASS` track.
+/// and `BASS_ACID` a `BASS` track. A `_STYLE` suffix is dropped only when what
+/// is left is an instrument, so `HI_TOM` stays `HI_TOM`.
 fn preset_match_key(key: &str) -> &str {
-    key.strip_suffix("_SYNTH").unwrap_or(key).trim_end_matches(|c: char| c.is_ascii_digit())
+    let key = key.strip_suffix("_SYNTH").unwrap_or(key).trim_end_matches(|c: char| c.is_ascii_digit());
+    if instruments::catalog().by_exact_id(key).is_some() {
+        return key;
+    }
+    match key.rsplit_once('_') {
+        Some((instrument, _)) if instruments::catalog().by_exact_id(instrument).is_some() => instrument,
+        _ => key,
+    }
 }
 
 /// The auto-assignment over a list of sounds, with kit `kit` selected.
@@ -276,6 +284,17 @@ mod tests {
         let (mut first, mut last) = (|_: usize| 0, |n: usize| n - 1);
         assert_eq!(synth_for("BASS", &presets, &mut first).as_deref(), Some("BASS0"));
         assert_eq!(synth_for("BASS", &presets, &mut last).as_deref(), Some("BASS1"));
+    }
+
+    #[test]
+    fn a_style_named_preset_plays_the_track_of_its_instrument() {
+        let presets = synths(&["BASS_ACID", "BASS_FM", "HI_TOM", "PIANO"]);
+        let (mut first, mut last) = (|_: usize| 0, |n: usize| n - 1);
+        assert_eq!(synth_for("BASS", &presets, &mut first).as_deref(), Some("BASS_ACID"));
+        assert_eq!(synth_for("BASS", &presets, &mut last).as_deref(), Some("BASS_FM"));
+        assert_eq!(preset_match_key("HI_TOM"), "HI_TOM");
+        assert_eq!(preset_match_key("HI_TOM_SYNTH"), "HI_TOM");
+        assert_eq!(preset_match_key("SOME_THING"), "SOME_THING");
     }
 
     #[test]

@@ -221,7 +221,8 @@ it), for the track of the cursor or of the selected note: the sample bar
 sample), the knob bar (volume, pan, transpose, the sample's decay) and the JS
 tabs — **FX** (reverb, delay, saturation, filter, each with its on/off LED;
 see "Effects" below),
-**Sound** (mono, auto-assign, instrument, sample, synth preset), **LFO** (an
+**Sound** (mono, auto-assign, instrument, sample, synth preset; a track made or
+renamed as a bass, such as `BASS` or `SYNTH BASS`, is set mono), **LFO** (an
 LFO per setting: the target list and its LED, wave, frequency, range, phase), **Loop** (steps per
 beat, loop length, swing), **Gen** (auto, lock, ↻ and three settings;
 Advanced: the manual variation settings, or the Groove / Engine settings in
@@ -332,7 +333,7 @@ Synth editor (**F6**, **View › Synth**, the JS soft-synth editor; **Esc**
 goes back to the grid): the preset of the track editor's track (else the
 first one), in the place of the grid, the track editor beside it. Right of
 the tabs, a line says what that track plays: "KICK plays this preset", or
-"KICK plays a sample" / "plays synth "BASS1"" with a **USE ON KICK** button
+"KICK plays a sample" / "plays synth "BASS_SQUARE"" with a **USE ON KICK** button
 that puts the track on the preset shown (one undo step). The preset
 bar picks another preset and deletes, creates, duplicates, reverts (to the
 preset as it was when opened), exports (`ordrumbox-synth-sounds.json`, to a
@@ -481,7 +482,7 @@ on Windows the drives are listed above a drive's root. It starts in the home
 folder, then where it last chose.
 
 Under each track's name, the grid shows what it plays: its sample (`kit/file`,
-as assigned, perhaps from another kit) or its synth preset (`synth BASS5`).
+as assigned, perhaps from another kit) or its synth preset (`synth BASS_FM`).
 
 Mouse: a click switches a step on or off: an empty step gets a note (selected,
 and played), a step with notes loses them all, in one undo step and without a
@@ -661,7 +662,7 @@ shows the old names until it reads them again.
 or an exported mix.
 
 ```sh
-cargo run --release -p ordrumbox-probe -- preset BASS0 --note C2 --gate 1
+cargo run --release -p ordrumbox-probe -- preset BASS_ACID --note C2 --gate 1
 cargo run --release -p ordrumbox-probe -- preset --all --json before.json --svg pictures
 cargo run --release -p ordrumbox-probe -- wav assets/kits/electro/acid-synth-c4.wav
 cargo run --release -p ordrumbox-probe -- kit electro real --json kits.json

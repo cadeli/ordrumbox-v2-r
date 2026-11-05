@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use crate::drum_taxonomy::pan_from_track_name;
+use crate::drum_taxonomy::{mono_from_track_name, pan_from_track_name};
 use crate::json::{Object, Value};
 use crate::note::{Note, decode_notes, encode_notes};
 use crate::record::{Issue, SetField, check_duplicate, json_record, round2};
@@ -193,7 +193,8 @@ pub const MAX_STEPS_PER_BEAT: i32 = 8;
 
 impl Track {
     /// A new track: `beat_count` beats at `steps_per_beat` (1 to
-    /// [`MAX_STEPS_PER_BEAT`]), looping over its whole length, panned from its name.
+    /// [`MAX_STEPS_PER_BEAT`]), looping over its whole length, panned from its name, mono when it
+    /// is a bass.
     pub fn new(name: &str, beat_count: i32, steps_per_beat: i32) -> Self {
         assert!((1..=MAX_STEPS_PER_BEAT).contains(&steps_per_beat), "steps per beat {steps_per_beat}");
         Self {
@@ -202,6 +203,7 @@ impl Track {
             steps_per_beat,
             loop_length: Some(beat_count * steps_per_beat),
             pan: pan_from_track_name(name),
+            mono: mono_from_track_name(name),
             ..Self::default()
         }
     }
@@ -388,6 +390,14 @@ mod tests {
         let mut issues = Vec::new();
         let track = Track::from_json(&json::parse(text).unwrap(), "t", &mut issues).unwrap();
         (track, issues)
+    }
+
+    #[test]
+    fn a_new_bass_track_is_mono() {
+        assert!(Track::new("BASS", 4, 4).mono);
+        assert!(Track::new("Synth Bass", 4, 4).mono);
+        assert!(!Track::new("KICK", 4, 4).mono);
+        assert!(!load(r#"{"name":"BASS"}"#).0.mono, "a loaded track keeps its own setting");
     }
 
     #[test]

@@ -60,6 +60,11 @@ pub fn pan_from_track_name(name: &str) -> f64 {
     TRACK_KINDS.iter().find(|(kind, _, _)| *kind == name).map_or(0.0, |&(_, pan, _)| pan)
 }
 
+/// Whether a track named `name` starts mono: a bass line plays one note at a time.
+pub fn mono_from_track_name(name: &str) -> bool {
+    instrument_family(name) == InstrumentFamily::Bass
+}
+
 /// Coarse type of a track: the canonical names first, then substring rules for
 /// names like `"808 KICK"` or `"SYNTH BASS"`.
 pub fn instrument_family(name: &str) -> InstrumentFamily {
