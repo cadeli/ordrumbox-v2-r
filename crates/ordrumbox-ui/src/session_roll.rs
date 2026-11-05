@@ -81,7 +81,7 @@ impl Session {
         self.roll.top = None;
         self.roll.cursor = None;
         self.roll.gauge = None;
-        self.selected = None;
+        self.selection.selected = None;
     }
 
     /// The track the piano roll shows (the track editor's).
@@ -97,13 +97,12 @@ impl Session {
 
     /// The step playing on the roll's track, while the pattern plays.
     fn roll_playhead(&self) -> Option<i64> {
-        let controller = self.controller.as_ref()?;
-        if !self.playing() || controller.mode() != Mode::Pattern(self.pattern_index) {
+        if !self.playback.plays(Mode::Pattern(self.pattern_index)) {
             return None;
         }
         let (pattern, track) = (self.pattern()?, self.track(self.roll_track()?)?);
         let ticks = u64::from(TICK) * u64::try_from(pattern.beat_count.max(1)).ok()?;
-        let tick = controller.tick()? % ticks;
+        let tick = self.playback.tick()? % ticks;
         let spb = steps_per_beat(track);
         let in_beat = (tick % u64::from(TICK)) as f64 / (f64::from(TICK) / f64::from(spb));
         Some((tick / u64::from(TICK)) as i64 * i64::from(spb) + in_beat.floor() as i64)
@@ -123,7 +122,7 @@ impl Session {
                 || layout.centered_top((MIDDLE_C + track.transpose - MIDI_MIN).round() as i32),
                 |top| layout.clamp_top(top),
             ),
-            selected: self.selected.filter(|&(st, _)| st == t).map(|(_, n)| n),
+            selected: self.selection.selected.filter(|&(st, _)| st == t).map(|(_, n)| n),
             cursor: self.roll.cursor,
             playhead,
             subs: Vec::new(),
@@ -166,9 +165,9 @@ impl Session {
         if self.track(t).is_none() {
             return;
         }
-        self.cursor = Some(Cursor { track: t, beat: 0, step: 0 });
-        self.selected = None;
-        self.note_focus = Some(NoteFocus::Track(t));
+        self.selection.cursor = Some(Cursor { track: t, beat: 0, step: 0 });
+        self.selection.selected = None;
+        self.selection.note_focus = Some(NoteFocus::Track(t));
         self.roll.cursor = None;
         self.roll.top = None;
         self.roll.gauge = None;
@@ -197,13 +196,13 @@ impl Session {
 
     /// Select note `n` of track `t`, the cursor on it.
     fn roll_select(&mut self, t: usize, n: usize) {
-        self.selected = Some((t, n));
+        self.selection.selected = Some((t, n));
         self.roll_follow();
     }
 
     /// The cursor on the selected note (it follows a transposition).
     fn roll_follow(&mut self) {
-        let Some((t, n)) = self.selected else { return };
+        let Some((t, n)) = self.selection.selected else { return };
         let Some(track) = self.track(t) else { return };
         let Some(note) = track.notes.get(n) else { return };
         self.roll.cursor = Some((absolute_step(note.beat, note.step, steps_per_beat(track)), note_row(note, track)));
@@ -213,7 +212,7 @@ impl Session {
     fn roll_add(&mut self, t: usize, step: i64, row: i32) -> Option<usize> {
         let (beat, beat_step) = self.roll_beat(t, step);
         let n = self.editor.add_note(self.pattern_index, t, beat, beat_step, self.roll_pitch(t, row))?;
-        self.selected = Some((t, n));
+        self.selection.selected = Some((t, n));
         self.roll.cursor = Some((step, row));
         self.edited();
         Some(n)
@@ -224,13 +223,13 @@ impl Session {
         let Some(note) = self.track(t).and_then(|track| track.notes.get(n)).cloned() else { return false };
         let deleted = self.editor.delete_note(self.pattern_index, t, note.beat, note.step, note.pitch);
         if deleted {
-            if self.selected == Some((t, n)) {
-                self.selected = None;
-            } else if let Some((st, sn)) = self.selected
+            if self.selection.selected == Some((t, n)) {
+                self.selection.selected = None;
+            } else if let Some((st, sn)) = self.selection.selected
                 && st == t
                 && sn > n
             {
-                self.selected = Some((st, sn - 1));
+                self.selection.selected = Some((st, sn - 1));
             }
             self.edited();
         }
@@ -304,7 +303,7 @@ impl Session {
         if drag.axis().is_some() {
             return;
         }
-        if self.selected == Some((t, n)) {
+        if self.selection.selected == Some((t, n)) {
             self.roll_delete_note(t, n);
         } else if self.track(t).is_some_and(|track| n < track.notes.len()) {
             self.roll_select(t, n);
@@ -348,13 +347,13 @@ impl Session {
     /// The bubble over a note: the drag's value (the gauge), else the hovered
     /// note's tooltip.
     pub(super) fn draw_roll_tooltip(&self, canvas: &mut Canvas, scale: i32) {
-        if self.menu.is_some() || self.popup_open() || self.overlay.is_some() {
+        if self.chrome.covered() {
             return;
         }
         let size = (canvas.width(), canvas.height(), scale);
         let layout = self.roll_layout(size);
         let Some(view) = self.roll_view(&layout) else { return };
-        let (n, text) = match (&self.roll.gauge, self.selected, self.roll.hover) {
+        let (n, text) = match (&self.roll.gauge, self.selection.selected, self.roll.hover) {
             (Some(gauge), Some((_, n)), _) => (n, gauge.clone()),
             (None, _, Some(n)) => match view.track.notes.get(n) {
                 Some(note) => (n, editors::note_tooltip(note, view.track.transpose)),
@@ -386,7 +385,7 @@ impl Session {
             pitch: f64::from(midi) - MIDDLE_C - self.track(t).map_or(0.0, |track| track.transpose),
             ..Note::default()
         };
-        if let Some(controller) = &mut self.controller {
+        if let Some(controller) = self.playback.controller_mut() {
             controller.preview_note(self.editor.library(), self.pattern_index, t, Some(&note));
         }
         self.message = midi_name(midi);
@@ -398,11 +397,11 @@ impl Session {
     /// selected note's velocity and pitch.
     pub fn roll_arrow(&mut self, direction: Move, shift: bool) {
         let Some(t) = self.roll_track() else { return };
-        if shift && self.selected.is_some_and(|(st, _)| st == t) {
+        if shift && self.selection.selected.is_some_and(|(st, _)| st == t) {
             self.nudge(direction);
             self.roll_follow();
             let axis = if matches!(direction, Move::Up | Move::Down) { Axis::Velocity } else { Axis::Pitch };
-            if let Some((_, n)) = self.selected {
+            if let Some((_, n)) = self.selection.selected {
                 self.roll.gauge = Some(self.gauge_text(t, n, axis));
             }
             return;
@@ -425,7 +424,7 @@ impl Session {
         self.roll.cursor = Some((step, row));
         // `#syncCursor`: the page follows, the note there is selected.
         self.roll.page = (step / i64::from(BEATS_PER_PAGE * spb)) as i32;
-        self.selected = self.roll_note_at(t, step, row).map(|n| (t, n));
+        self.selection.selected = self.roll_note_at(t, step, row).map(|n| (t, n));
         self.roll_show_row(row);
         let (beat, beat_step) = self.roll_beat(t, step);
         self.message = format!("{} {}", beat_label(beat, beat_step), midi_name(piano_roll::row_midi(row)));
@@ -433,7 +432,7 @@ impl Session {
 
     /// Scroll so that `row` is on screen.
     fn roll_show_row(&mut self, row: i32) {
-        let layout = self.roll_layout(self.panel_size);
+        let layout = self.roll_layout(self.chrome.panel_size);
         let Some(top) = self.roll_view(&layout).map(|v| v.top_row) else { return };
         let rows = layout.visible_rows();
         if row > top {
@@ -448,10 +447,10 @@ impl Session {
     pub fn roll_enter(&mut self) {
         let (Some(t), Some((step, row))) = (self.roll_track(), self.roll.cursor) else { return };
         match self.roll_note_at(t, step, row) {
-            Some(n) if self.selected == Some((t, n)) => {
+            Some(n) if self.selection.selected == Some((t, n)) => {
                 self.roll_delete_note(t, n);
             }
-            Some(n) => self.selected = Some((t, n)),
+            Some(n) => self.selection.selected = Some((t, n)),
             None => {
                 self.roll_add(t, step, row);
             }
@@ -460,8 +459,8 @@ impl Session {
 
     /// Esc: no selection and no cursor, else back to the grid.
     pub fn roll_escape(&mut self) {
-        if self.selected.is_some() || self.roll.cursor.is_some() {
-            self.selected = None;
+        if self.selection.selected.is_some() || self.roll.cursor.is_some() {
+            self.selection.selected = None;
             self.roll.cursor = None;
             self.roll.gauge = None;
         } else {
@@ -471,7 +470,7 @@ impl Session {
 
     /// Delete: the selected note.
     pub fn roll_delete(&mut self) {
-        if let Some((t, n)) = self.selected {
+        if let Some((t, n)) = self.selection.selected {
             self.roll_delete_note(t, n);
         }
     }
@@ -487,7 +486,7 @@ impl Session {
         let tonic = self.roll_pitch(t, midi - MIDI_MIN as i32);
         let values = vec!["clear".into(), format!("sequence:{tonic}")];
         let labels = vec!["Clear all".into(), "Add sequence".into()];
-        self.widgets.dropdown = Some(Dropdown::menu(Id::RollMenu, x, y, title, values, labels));
+        self.chrome.widgets.dropdown = Some(Dropdown::menu(Id::RollMenu, x, y, title, values, labels));
     }
 
     /// A cell: add or delete its note, add a chord on it
@@ -511,7 +510,7 @@ impl Session {
         }
         values.extend([format!("minor:{at}"), format!("major:{at}")]);
         labels.extend(["Add minor chord".to_owned(), "Add major chord".to_owned()]);
-        self.widgets.dropdown = Some(Dropdown::menu(Id::RollMenu, x, y, title, values, labels));
+        self.chrome.widgets.dropdown = Some(Dropdown::menu(Id::RollMenu, x, y, title, values, labels));
     }
 
     /// An action of a piano roll menu.
@@ -575,7 +574,7 @@ impl Session {
             return;
         };
         self.edited();
-        self.selected = Some((t, first));
+        self.selection.selected = Some((t, first));
         let row = (MIDDLE_C + self.track(t).map_or(0.0, |track| track.transpose) + root - MIDI_MIN).round() as i32;
         self.roll.cursor = Some((step, row));
         self.message =
@@ -601,7 +600,7 @@ impl Session {
         }
         self.roll.sequence += 1;
         self.edited();
-        self.selected = first.map(|n| (t, n));
+        self.selection.selected = first.map(|n| (t, n));
         let row = (MIDDLE_C + self.track(t).map_or(0.0, |track| track.transpose) + tonic - MIDI_MIN).round() as i32;
         self.roll.cursor = Some((0, row));
         let name = self.track(t).map(|track| track.name.clone()).unwrap_or_default();
@@ -663,17 +662,17 @@ mod tests {
         let (x, y) = cell(&s, 4, 39);
         assert!(s.roll_click(SIZE, x, y, Button::Left));
         s.mouse_up();
-        assert_eq!(s.selected, Some((1, 0)));
+        assert_eq!(s.selection.selected, Some((1, 0)));
         // An empty cell: a note there, selected.
         let (x, y) = cell(&s, 6, 41);
         s.roll_click(SIZE, x, y, Button::Left);
         assert_eq!(notes(&s)[1], (1, 2, 5.0, 0.8));
-        assert_eq!(s.selected, Some((1, 1)));
+        assert_eq!(s.selection.selected, Some((1, 1)));
         // A click on the selected note deletes it.
         s.roll_click(SIZE, x, y, Button::Left);
         s.mouse_up();
         assert_eq!(notes(&s).len(), 1);
-        assert_eq!(s.selected, None);
+        assert_eq!(s.selection.selected, None);
     }
 
     #[test]
@@ -688,7 +687,7 @@ mod tests {
         s.mouse_up();
         assert_eq!(notes(&s), [(1, 0, 3.0, 1.0)]);
         // Dragged, not clicked: still there and selected.
-        assert_eq!(s.selected, Some((1, 0)));
+        assert_eq!(s.selection.selected, Some((1, 0)));
         let (x, y) = cell(&s, 4, 39);
         s.roll_click(SIZE, x, y, Button::Left);
         s.roll_drag_move(x + 30, y);
@@ -738,7 +737,7 @@ mod tests {
         assert_eq!(pitches, [(0, 0.0), (0, 4.0), (0, 7.0), (4, 7.0), (4, 11.0), (4, 14.0)]);
         // The next one is the next progression.
         s.roll_click(SIZE, layout.keys.x + 4, y, Button::Right);
-        assert!(s.widgets.dropdown.as_ref().unwrap().title.as_deref().unwrap().ends_with("I-vi-IV-V"));
+        assert!(s.chrome.widgets.dropdown.as_ref().unwrap().title.as_deref().unwrap().ends_with("I-vi-IV-V"));
         choose(&mut s, 0); // Clear all
         s.overlay_key(OverlayKey::Enter);
         assert!(notes(&s).is_empty());

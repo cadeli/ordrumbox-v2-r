@@ -27,8 +27,6 @@ const GENERATE_LABEL: &str = "\u{21bb}";
 use crate::panel::{self, Item, Kind, LfoParam, Rect};
 use crate::view::{KitLayout, Layout};
 
-/// Kit knob edits reach the player and the disk this long after the last one.
-const KITS_DELAY: Duration = Duration::from_millis(200);
 /// Two clicks on a widget this close are a double-click.
 pub(super) const DOUBLE_CLICK: Duration = Duration::from_millis(400);
 
@@ -185,7 +183,8 @@ impl Session {
         } else if self.workspace == Workspace::Synth {
             self.synth_items(&mut layout, (width, height, scale));
         } else if let Some(pattern) = self.pattern() {
-            let grid = Layout::new(body.main_w, body.editor_h, scale, pattern, self.status.len(), self.current_page);
+            let grid =
+                Layout::new(body.main_w, body.editor_h, scale, pattern, self.status.len(), self.chrome.current_page);
             let spec = Spec::slider(0.0, 1.0, 0.01, 1.0);
             for (t, track) in pattern.tracks.iter().enumerate().take(grid.tracks()) {
                 let kind = Kind::Value { spec, value: track.volume, label: None, text: String::new(), lfo: false };
@@ -252,18 +251,18 @@ impl Session {
     /// none). It is shown for every main editor (grid, piano roll, song, synth,
     /// the kit editor) whenever it is toggled on and the window is wide enough.
     pub fn track_editor_width(&self, width: i32, scale: i32) -> i32 {
-        if self.show_track_editor && width >= 480 * scale { panel_width(width, scale) } else { 0 }
+        if self.chrome.show_track_editor && width >= 480 * scale { panel_width(width, scale) } else { 0 }
     }
 
     /// A drop-down list or a number entry is open (it takes every key and click).
     pub fn popup_open(&self) -> bool {
-        self.widgets.dropdown.is_some() || self.widgets.entry.is_some()
+        self.chrome.popup_open()
     }
 
     /// A number or text entry is open. It is the one place that keeps Space:
     /// a text entry types a space in it.
     pub fn entry_open(&self) -> bool {
-        self.widgets.entry.is_some()
+        self.chrome.widgets.entry.is_some()
     }
 
     /// The url of the sample track `t` plays (none for a synth track).
@@ -271,7 +270,7 @@ impl Session {
     fn track_sound(&self, t: usize) -> TrackSound {
         let Some(track) = self.track(t) else { return TrackSound::None };
         let library = self.editor.library();
-        match (&self.controller, &self.render) {
+        match (self.playback.controller(), &self.render) {
             (Some(c), _) => c.track_sound(library, self.pattern_index, t),
             (None, Some(render)) => {
                 let kit = self.kits.kits.get(self.kit_index).map_or("", |k| k.name.as_str());
@@ -285,8 +284,11 @@ impl Session {
     /// its synth preset, or that it has none.
     pub(super) fn track_sound_label(&self, t: usize) -> String {
         let Some(track) = self.track(t) else { return String::new() };
-        let bank =
-            self.controller.as_ref().map(|c| c.bank().clone()).or_else(|| self.render.as_ref().map(|r| r.bank.clone()));
+        let bank = self
+            .playback
+            .controller()
+            .map(|c| c.bank().clone())
+            .or_else(|| self.render.as_ref().map(|r| r.bank.clone()));
         match self.track_sound(t) {
             TrackSound::Sample(i) => bank.and_then(|b| b.get(i).map(|s| s.sample.path.clone())).unwrap_or_default(),
             TrackSound::Synth(key) => format!("synth {key}"),
@@ -305,8 +307,11 @@ impl Session {
             return None;
         }
         let sound = self.track_sound(t);
-        let bank =
-            self.controller.as_ref().map(|c| c.bank().clone()).or_else(|| self.render.as_ref().map(|r| r.bank.clone()));
+        let bank = self
+            .playback
+            .controller()
+            .map(|c| c.bank().clone())
+            .or_else(|| self.render.as_ref().map(|r| r.bank.clone()));
         match sound {
             TrackSound::Sample(i) => bank.and_then(|b| b.get(i).map(|s| s.sample.path.clone())),
             _ => (!track.auto_assign).then(|| track.sample_path.clone()),
@@ -385,7 +390,7 @@ impl Session {
         let synths = Choice { selected: editors::index_of(&values, &current), values, labels: Vec::new() };
 
         // LFO values while playing (the LFO step watch).
-        let tick = self.controller.as_ref().and_then(Controller::tick);
+        let tick = self.playback.tick();
         let lfo = match tick {
             Some(tick) => LFO_TARGETS
                 .iter()
@@ -403,7 +408,7 @@ impl Session {
 
     /// The track editor on its Gen tab.
     pub fn show_generation_tab(&mut self) {
-        self.show_track_editor = true;
+        self.chrome.show_track_editor = true;
         self.editors.tab = editors::GEN_TAB;
     }
 
@@ -452,11 +457,11 @@ impl Session {
 
     fn note_target(&self, t: usize) -> NoteTarget {
         let Some(track) = self.track(t) else { return NoteTarget::Detached };
-        if let Some((st, n)) = self.selected.filter(|&(st, n)| st == t && n < track.notes.len()) {
+        if let Some((st, n)) = self.selection.selected.filter(|&(st, n)| st == t && n < track.notes.len()) {
             debug_assert_eq!(st, t);
             return NoteTarget::Note(n);
         }
-        match self.note_focus {
+        match self.selection.note_focus {
             Some(NoteFocus::Step { track: ft, beat, step }) if ft == t => {
                 match track.notes.iter().position(|n| n.beat == beat && n.step == step) {
                     Some(n) => NoteTarget::Note(n),
@@ -473,9 +478,13 @@ impl Session {
         match self.note_target(t) {
             NoteTarget::Note(n) => self.track(t)?.notes.get(n).cloned(),
             NoteTarget::Empty { .. } => None,
-            NoteTarget::Detached => {
-                Some(self.detached.as_ref().filter(|(dt, _)| *dt == t).map_or_else(Note::default, |(_, n)| n.clone()))
-            }
+            NoteTarget::Detached => Some(
+                self.selection
+                    .detached
+                    .as_ref()
+                    .filter(|(dt, _)| *dt == t)
+                    .map_or_else(Note::default, |(_, n)| n.clone()),
+            ),
         }
     }
 
@@ -529,45 +538,45 @@ impl Session {
 
     /// A press at `(x, y)`; whether the widgets took it.
     pub fn mouse_down(&mut self, size: (i32, i32, i32), x: i32, y: i32, button: Button, shift: bool) -> bool {
-        self.panel_size = size;
+        self.chrome.panel_size = size;
         let (width, height, scale) = size;
-        if let Some(dropdown) = &self.widgets.dropdown {
+        if let Some(dropdown) = &self.chrome.widgets.dropdown {
             let picked = (button == Button::Left).then(|| dropdown.hit(width, height, scale, x, y)).flatten();
             match picked {
                 Some(i) => self.pick(i),
-                None => self.widgets.dropdown = None,
+                None => self.chrome.widgets.dropdown = None,
             }
             return true;
         }
-        if let Some(entry) = &self.widgets.entry {
+        if let Some(entry) = &self.chrome.widgets.entry {
             if !entry.rect(width, height, scale).contains(x, y) {
-                self.widgets.entry = None;
+                self.chrome.widgets.entry = None;
             }
             return true;
         }
         let layout = self.panel_layout(width, height, scale);
         let Some(item) = panel::hit(&layout.items, x, y).cloned() else {
-            self.widgets.focus = None;
+            self.chrome.widgets.focus = None;
             // A click on the track editor's background is its own.
             return layout.right > 0 && x >= width - layout.right;
         };
         let Some(id) = item.id else { return false };
         if button == Button::Right {
             if let Kind::Value { spec, value, .. } = item.kind {
-                self.widgets.focus = Some(id);
+                self.chrome.widgets.focus = Some(id);
                 self.open_entry(id, spec, value);
             }
             return true;
         }
         let now = Instant::now();
-        let double = self.widgets.last_click.is_some_and(|(last, at)| last == id && now - at < DOUBLE_CLICK);
-        self.widgets.last_click = Some((id, now));
+        let double = self.chrome.widgets.last_click.is_some_and(|(last, at)| last == id && now - at < DOUBLE_CLICK);
+        self.chrome.widgets.last_click = Some((id, now));
         match item.kind {
             Kind::Value { spec, value, label, text, .. } => {
-                self.widgets.focus = Some(id);
+                self.chrome.widgets.focus = Some(id);
                 if double {
                     // Double-click: the default value.
-                    self.widgets.last_click = None;
+                    self.chrome.widgets.last_click = None;
                     self.set_value(id, spec.default);
                     return true;
                 }
@@ -588,11 +597,11 @@ impl Session {
                         self.set_value(id, v);
                     }
                 }
-                self.widgets.drag = Some(drag);
+                self.chrome.widgets.drag = Some(drag);
             }
             Kind::Select { values, labels, selected } => {
-                self.widgets.focus = Some(id);
-                self.widgets.dropdown = Some(Dropdown::new(id, item.rect, values, labels, selected));
+                self.chrome.widgets.focus = Some(id);
+                self.chrome.widgets.dropdown = Some(Dropdown::new(id, item.rect, values, labels, selected));
             }
             _ => self.activate(id),
         }
@@ -607,21 +616,21 @@ impl Session {
         if self.song_panel.dragging() {
             return self.song_drag_move(x, y);
         }
-        if self.track_drag.is_some() {
+        if self.chrome.track_drag.is_some() {
             return self.track_drag_move(x, y);
         }
         if let Some(axis) = self.song_panel.held_bar() {
             return self.song_bar_to(size, axis, x, y);
         }
         let (width, height, scale) = size;
-        if let Some(dropdown) = &mut self.widgets.dropdown {
+        if let Some(dropdown) = &mut self.chrome.widgets.dropdown {
             if let Some(i) = dropdown.hit(width, height, scale, x, y).filter(|&i| i != dropdown.at) {
                 dropdown.at = i;
                 return true;
             }
             return false;
         }
-        let Some(drag) = self.widgets.drag else { return false };
+        let Some(drag) = self.chrome.widgets.drag else { return false };
         let value = match (drag.spec.style, drag.bar) {
             (Style::Knob, _) => drag.spec.drag(drag.start, f64::from(drag.y - y), shift),
             (Style::Slider, Some((left, w))) => drag.spec.slider_at(f64::from(x - left) / f64::from(w.max(1))),
@@ -644,10 +653,19 @@ impl Session {
         let scale = size.2;
         let hover = match self.pattern() {
             Some(pattern)
-                if self.kit_editor.is_none() && self.workspace == Workspace::Grid && self.widgets.drag.is_none() =>
+                if self.kit_editor.is_none()
+                    && self.workspace == Workspace::Grid
+                    && self.chrome.widgets.drag.is_none() =>
             {
-                match Layout::new(body.main_w, body.editor_h, scale, pattern, self.status.len(), self.current_page)
-                    .hit(pattern, x, y)
+                match Layout::new(
+                    body.main_w,
+                    body.editor_h,
+                    scale,
+                    pattern,
+                    self.status.len(),
+                    self.chrome.current_page,
+                )
+                .hit(pattern, x, y)
                 {
                     Some(view::Hit::Cell { track, beat, step }) => Some((track, beat, step)),
                     _ => None,
@@ -655,8 +673,8 @@ impl Session {
             }
             _ => None,
         };
-        let changed = hover != self.hover;
-        self.hover = hover;
+        let changed = hover != self.chrome.hover;
+        self.chrome.hover = hover;
         changed
     }
 
@@ -669,33 +687,34 @@ impl Session {
         if self.piano_roll_open() {
             return self.draw_roll_tooltip(canvas, scale);
         }
-        let Some((t, beat, step)) = self.hover else { return };
-        if self.menu.is_some() || self.popup_open() || self.overlay.is_some() || self.kit_editor.is_some() {
+        let Some((t, beat, step)) = self.chrome.hover else { return };
+        if self.chrome.covered() || self.kit_editor.is_some() {
             return;
         }
         let Some(pattern) = self.pattern() else { return };
         let Some(track) = pattern.tracks.get(t) else { return };
         let Some(note) = track.notes.iter().find(|n| n.beat == beat && n.step == step) else { return };
         let body = view::Body::new(canvas.width(), canvas.height(), scale, right, self.status.len(), !self.hosted);
-        let layout = Layout::new(body.main_w, body.editor_h, scale, pattern, self.status.len(), self.current_page);
+        let layout =
+            Layout::new(body.main_w, body.editor_h, scale, pattern, self.status.len(), self.chrome.current_page);
         let cell = layout.cell_rect(t, beat, step, track.steps_per_beat);
         view::draw_tooltip(canvas, &editors::note_tooltip(note, track.transpose), cell, scale);
     }
 
     pub fn mouse_up(&mut self) {
-        self.widgets.drag = None;
+        self.chrome.widgets.drag = None;
         self.song_panel.release_bar();
-        self.track_drag = None;
+        self.chrome.track_drag = None;
         self.roll_release();
     }
 
     /// The wheel over the widgets (one notch: one step); whether it was theirs.
     pub fn wheel(&mut self, size: (i32, i32, i32), x: i32, y: i32, lines: isize, shift: bool, ctrl: bool) -> bool {
-        if let Some(dropdown) = &mut self.widgets.dropdown {
+        if let Some(dropdown) = &mut self.chrome.widgets.dropdown {
             dropdown.scroll(-lines);
             return true;
         }
-        if lines == 0 || self.widgets.entry.is_some() {
+        if lines == 0 || self.chrome.widgets.entry.is_some() {
             return false;
         }
         let (width, height, scale) = size;
@@ -738,11 +757,11 @@ impl Session {
     /// A key for the widgets (the focused one, the open list or entry);
     /// whether it was theirs.
     pub fn panel_key(&mut self, size: (i32, i32, i32), key: PanelKey, shift: bool, ctrl: bool) -> bool {
-        self.panel_size = size;
-        if let Some(entry) = &mut self.widgets.entry {
+        self.chrome.panel_size = size;
+        if let Some(entry) = &mut self.chrome.widgets.entry {
             match key {
                 PanelKey::Enter => self.commit_entry(),
-                PanelKey::Escape => self.widgets.entry = None,
+                PanelKey::Escape => self.chrome.widgets.entry = None,
                 PanelKey::Backspace => {
                     entry.text.pop();
                 }
@@ -751,7 +770,7 @@ impl Session {
             }
             return true;
         }
-        if let Some(dropdown) = &mut self.widgets.dropdown {
+        if let Some(dropdown) = &mut self.chrome.widgets.dropdown {
             match key {
                 PanelKey::Up => dropdown.step(-1),
                 PanelKey::Down => dropdown.step(1),
@@ -763,7 +782,7 @@ impl Session {
                     let at = dropdown.at;
                     self.pick(at);
                 }
-                PanelKey::Escape => self.widgets.dropdown = None,
+                PanelKey::Escape => self.chrome.widgets.dropdown = None,
                 _ => {}
             }
             return true;
@@ -772,20 +791,20 @@ impl Session {
         let focusable: Vec<Item> =
             layout.items.into_iter().filter(|i| !matches!(i.id, Some(Id::TrackVolume(_)))).collect();
         if key == PanelKey::Tab {
-            let next = panel::next_focus(&focusable, self.widgets.focus, if shift { -1 } else { 1 });
+            let next = panel::next_focus(&focusable, self.chrome.widgets.focus, if shift { -1 } else { 1 });
             if next.is_none() {
                 return false;
             }
-            self.widgets.focus = next;
+            self.chrome.widgets.focus = next;
             return true;
         }
-        let Some(id) = self.widgets.focus else { return false };
+        let Some(id) = self.chrome.widgets.focus else { return false };
         let Some(item) = panel::find(&focusable, id).cloned() else {
-            self.widgets.focus = None;
+            self.chrome.widgets.focus = None;
             return false;
         };
         if key == PanelKey::Escape {
-            self.widgets.focus = None;
+            self.chrome.widgets.focus = None;
             return true;
         }
         match item.kind {
@@ -810,7 +829,7 @@ impl Session {
                     PanelKey::Up | PanelKey::Left | PanelKey::Minus => -1,
                     PanelKey::Down | PanelKey::Right | PanelKey::Plus => 1,
                     PanelKey::Enter | PanelKey::Space => {
-                        self.widgets.dropdown = Some(Dropdown::new(id, item.rect, values, labels, selected));
+                        self.chrome.widgets.dropdown = Some(Dropdown::new(id, item.rect, values, labels, selected));
                         return true;
                     }
                     _ => return false,
@@ -835,7 +854,7 @@ impl Session {
 
     /// A typed character (the number entry, the open list's letter jump).
     pub fn panel_text(&mut self, c: char) -> bool {
-        if let Some(entry) = &mut self.widgets.entry {
+        if let Some(entry) = &mut self.chrome.widgets.entry {
             let accepted = match entry.spec {
                 Some(_) => c.is_ascii_digit() || matches!(c, '.' | '-' | '+' | 'e' | 'E'),
                 None => !c.is_control(),
@@ -845,7 +864,7 @@ impl Session {
             }
             return true;
         }
-        if let Some(dropdown) = &mut self.widgets.dropdown {
+        if let Some(dropdown) = &mut self.chrome.widgets.dropdown {
             if c.is_alphanumeric() {
                 dropdown.jump(c);
             }
@@ -856,9 +875,9 @@ impl Session {
 
     /// View > Track editor.
     pub fn toggle_track_editor(&mut self) {
-        self.show_track_editor = !self.show_track_editor;
-        self.widgets.focus = None;
-        self.widgets.dropdown = None;
+        self.chrome.show_track_editor = !self.chrome.show_track_editor;
+        self.chrome.widgets.focus = None;
+        self.chrome.widgets.dropdown = None;
     }
 
     /// H: every track of pattern `p` on the synth patch that matches its name, written to the
@@ -956,11 +975,11 @@ impl Session {
             js::number_to_string(spec.min),
             js::number_to_string(spec.max)
         );
-        self.widgets.entry = Some(Entry { id, spec: Some(spec), title, text: js::number_to_string(value) });
+        self.chrome.widgets.entry = Some(Entry { id, spec: Some(spec), title, text: js::number_to_string(value) });
     }
 
     fn commit_entry(&mut self) {
-        let Some(entry) = self.widgets.entry.take() else { return };
+        let Some(entry) = self.chrome.widgets.entry.take() else { return };
         let Some(spec) = entry.spec else { return self.commit_text(entry.id, &entry.text) };
         if entry.text.trim().is_empty() {
             return;
@@ -1114,7 +1133,7 @@ impl Session {
                         SetField::Unknown => self.message = format!("note {key}: no such setting, not set"),
                     }
                 }
-                self.detached = Some((t, note));
+                self.selection.detached = Some((t, note));
             }
             NoteTarget::Empty { .. } => {}
         }
@@ -1129,18 +1148,15 @@ impl Session {
     fn set_kit_sample_value(&mut self, kit: usize, sample: usize, field: Field, value: f64) {
         if let Some(message) = self.kits.set_value(kit, sample, field, value) {
             self.message = message;
-            self.kits_dirty = Some(Instant::now());
+            self.saving.kits.touch();
         }
     }
 
     /// Apply waiting kit knob edits when due; when they will be.
     pub(super) fn flush_kits(&mut self) -> Option<Instant> {
-        let since = self.kits_dirty?;
-        let due = since + KITS_DELAY;
-        if Instant::now() < due {
-            return Some(due);
+        if let Err(next) = self.saving.kits.ready() {
+            return next;
         }
-        self.kits_dirty = None;
         let message = self.message.clone();
         self.kits_changed(message);
         None
@@ -1148,7 +1164,7 @@ impl Session {
 
     /// An option picked in the open list.
     fn pick(&mut self, index: usize) {
-        let Some(dropdown) = self.widgets.dropdown.take() else { return };
+        let Some(dropdown) = self.chrome.widgets.dropdown.take() else { return };
         if let Some(value) = dropdown.values.get(index) {
             self.select(dropdown.id, value);
         }
@@ -1549,7 +1565,7 @@ mod tests {
         assert!(s.wheel(SIZE, x, y, 3, false, false));
         assert_eq!(s.pattern().unwrap().bpm, 103.0);
         s.mouse_down(SIZE, x, y, Button::Right, false);
-        s.widgets.entry.as_mut().unwrap().text = "140".into();
+        s.chrome.widgets.entry.as_mut().unwrap().text = "140".into();
         s.panel_key(SIZE, PanelKey::Enter, false, false);
         assert_eq!(s.pattern().unwrap().bpm, 140.0);
         // The beats list: 8.
@@ -1645,11 +1661,11 @@ mod tests {
     fn the_pattern_menu_renames_and_describes() {
         let mut s = session();
         s.run(Command::RenamePattern);
-        s.widgets.entry.as_mut().unwrap().text = " Verse ".into();
+        s.chrome.widgets.entry.as_mut().unwrap().text = " Verse ".into();
         s.panel_key(SIZE, PanelKey::Enter, false, false);
         assert_eq!(s.pattern().unwrap().name.as_deref(), Some("Verse"));
         s.run(Command::PatternDescription);
-        assert_eq!(s.widgets.entry.as_ref().map(|e| e.text.as_str()), Some(""));
+        assert_eq!(s.chrome.widgets.entry.as_ref().map(|e| e.text.as_str()), Some(""));
         s.panel_text('x');
         s.panel_key(SIZE, PanelKey::Space, false, false);
         s.panel_text('y');

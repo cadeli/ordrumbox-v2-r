@@ -10,16 +10,11 @@ use crate::master;
 use crate::output::{self, OutputLayout, OutputView};
 use crate::panel::{Item, Kind, Rect};
 
-/// Master changes reach `settings.json` this long after the last one.
-const MASTER_DELAY: Duration = Duration::from_millis(500);
-
-/// The output panel's state: the master bus settings and when they changed,
-/// not saved yet; the tab (Vol, Comp, Flt); the spectrum's analyser and its
+/// The output panel's state: the master bus settings; the tab (Vol, Comp, Flt); the spectrum's analyser and its
 /// last bins.
 #[derive(Debug, Default)]
 pub(super) struct OutputPanel {
     master: MasterSettings,
-    master_dirty: Option<Instant>,
     tab: u8,
     analyser: std::cell::RefCell<crate::spectrum::Analyser>,
     spectrum: std::cell::RefCell<Vec<u8>>,
@@ -50,11 +45,11 @@ impl Session {
     /// Use `master` (clamped); `save`: write it to `settings.json` soon.
     pub(super) fn set_master(&mut self, master: MasterSettings, save: bool) {
         self.output_panel.master = master.clamped();
-        if let Some(controller) = &mut self.controller {
+        if let Some(controller) = self.playback.controller_mut() {
             controller.set_master(self.output_panel.master);
         }
         if save {
-            self.output_panel.master_dirty = Some(Instant::now());
+            self.saving.master.touch();
         }
     }
 
@@ -65,12 +60,9 @@ impl Session {
 
     /// Write the master settings when they have settled; when to call again.
     pub(super) fn flush_master(&mut self) -> Option<Instant> {
-        let since = self.output_panel.master_dirty?;
-        let due = since + MASTER_DELAY;
-        if Instant::now() < due {
-            return Some(due);
+        if let Err(next) = self.saving.master.ready() {
+            return next;
         }
-        self.output_panel.master_dirty = None;
         if let Some(path) = store::settings_path()
             && let Err(e) = store::save_setting(&path, "master", master::to_json(&self.output_panel.master))
         {
@@ -133,7 +125,7 @@ impl Session {
             return None;
         }
         if self.output_panel.tab == 0
-            && let Some(controller) = &self.controller
+            && let Some(controller) = self.playback.controller()
         {
             let mut samples = [0.0f32; SCOPE_SIZE];
             controller.scope(&mut samples);
@@ -167,7 +159,7 @@ mod tests {
         let (x, y) = (out.volume.x + out.volume.w / 2, out.volume.y + 10);
         assert!(s.wheel(SIZE, x, y, -10, false, false));
         assert!((s.output_panel.master.master - 0.9).abs() < 1e-6);
-        assert!(s.output_panel.master_dirty.is_some());
+        assert!(s.saving.master.pending());
         // Comp: the button bypasses the compressor.
         s.mouse_down(SIZE, out.tabs[1].x + 4, out.tabs[1].y + 4, Button::Left, false);
         assert_eq!(s.output_panel.tab, 1);
@@ -176,7 +168,7 @@ mod tests {
         // A typed threshold.
         let t = out.compressor[0];
         s.mouse_down(SIZE, t.x + t.w / 2, t.y + 10, Button::Right, false);
-        s.widgets.entry.as_mut().unwrap().text = "-30".into();
+        s.chrome.widgets.entry.as_mut().unwrap().text = "-30".into();
         s.panel_key(SIZE, PanelKey::Enter, false, false);
         assert_eq!(s.output_panel.master.threshold, -30.0);
         // Flt: a click on the low cut slider's bar.

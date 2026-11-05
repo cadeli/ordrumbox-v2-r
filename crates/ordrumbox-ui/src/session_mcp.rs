@@ -116,9 +116,7 @@ impl Session {
             "setMaster" => self.mcp_set_master(args),
             "play" => self.mcp_play(args),
             "stop" => {
-                if let Some(controller) = &mut self.controller {
-                    controller.stop();
-                }
+                self.playback.stop();
                 self.message = "stopped".into();
                 Ok(object([("playing", Value::Bool(false))]))
             }
@@ -133,7 +131,7 @@ impl Session {
             "assignSounds" => self.mcp_assign_sounds(args),
             "auditionTrack" => {
                 let (p, t) = find_track(self.editor.library(), args)?;
-                let controller = self.controller.as_mut().ok_or(NO_AUDIO)?;
+                let controller = self.playback.controller_mut().ok_or(NO_AUDIO)?;
                 controller.preview(self.editor.library(), p, t, None);
                 Ok(object([("trackName", Value::from(self.editor.library().patterns[p].tracks[t].name.as_str()))]))
             }
@@ -148,7 +146,7 @@ impl Session {
             }
             "setSongInfo" => self.mcp_set_song_info(args),
             "saveSong" => {
-                let dir = self.songs_dir.as_ref().ok_or("no user data folder to save to")?;
+                let dir = self.saving.songs_dir.as_ref().ok_or("no user data folder to save to")?;
                 let path = dir.join(self.song_file_name());
                 self.mcp_write_song(&path, "savedAt")
             }
@@ -408,11 +406,8 @@ impl Session {
 
     fn mcp_remove_arrangement(&mut self, args: &Value) -> Result<Value, String> {
         let s = find_song(&self.editor, args)?;
-        if let Some(controller) = &mut self.controller
-            && controller.is_playing()
-            && controller.mode() == Mode::Song(s)
-        {
-            controller.stop();
+        if self.playback.plays(Mode::Song(s)) {
+            self.playback.stop();
         }
         let name = self.editor.library().songs[s].name.clone();
         self.editor.remove_song(Some(s));
@@ -422,10 +417,10 @@ impl Session {
 
     fn mcp_play(&mut self, args: &Value) -> Result<Value, String> {
         let song = optional_bool(args, "song")?.unwrap_or(false);
-        let Some(controller) = &mut self.controller else {
+        if self.playback.controller().is_none() {
             return Err(NO_AUDIO.into());
-        };
-        controller.stop();
+        }
+        self.playback.stop();
         if song {
             if self.editor.library().songs.is_empty() {
                 return Err("No arrangement to play: createArrangement".into());
@@ -470,7 +465,7 @@ impl Session {
 
     fn mcp_playback_state(&self) -> Value {
         let library = self.editor.library();
-        let Some(controller) = self.controller.as_ref().filter(|c| c.is_playing()) else {
+        let Some(controller) = self.playback.controller().filter(|c| c.is_playing()) else {
             return object([("playing", Value::Bool(false))]);
         };
         let position = controller.position();
@@ -526,7 +521,7 @@ impl Session {
 
     /// The songs of the songs folder: name and file.
     fn mcp_saved_songs(&self) -> Result<Vec<(String, PathBuf)>, String> {
-        let dir = self.songs_dir.as_ref().ok_or("no user data folder: no saved songs")?;
+        let dir = self.saving.songs_dir.as_ref().ok_or("no user data folder: no saved songs")?;
         let files = store::list_songs(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         Ok(files.into_iter().map(|f| (f.file_stem().unwrap_or_default().to_string_lossy().into_owned(), f)).collect())
     }

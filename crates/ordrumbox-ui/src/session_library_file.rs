@@ -12,7 +12,7 @@ use std::time::Instant;
 
 use ordrumbox_core::Library;
 
-use super::{SAVE_DELAY, Session};
+use super::Session;
 use crate::kits::KitSet;
 use crate::menu::{Command, Item};
 use crate::panel::Id;
@@ -36,7 +36,7 @@ fn start(path: &Path) -> Session {
     let demo = Library::parse(DEMO).unwrap().0;
     let (library, library_path, message) = Session::open_library(Some(path.to_owned()), demo, &mut status);
     let mut session = Session::new(library, KitSet::empty(), status);
-    session.library_path = library_path;
+    session.saving.library_path = library_path;
     session.message = message;
     session
 }
@@ -50,7 +50,7 @@ fn add_note(session: &mut Session, beat: i32) {
 
 /// As if the save delay had passed since the last edit.
 fn wait_save_delay(session: &mut Session) {
-    session.changed_at = session.changed_at.map(|_| Instant::now() - SAVE_DELAY);
+    session.saving.library.expire();
 }
 
 fn temporary(path: &Path) -> PathBuf {
@@ -68,7 +68,7 @@ fn a_library_file_that_cannot_be_read_is_never_written_over() {
     let mut s = start(&path);
     assert!(s.status.iter().any(|line| line.starts_with("library not loaded, not saved over")), "{:?}", s.status);
     assert_eq!(s.pattern().unwrap().name.as_deref(), Some("demo"), "the demo library instead");
-    assert_eq!(s.library_path, None);
+    assert_eq!(s.saving.library_path, None);
 
     // Edits, the save a moment later, an explicit save, the save on quit.
     add_note(&mut s, 1);
@@ -89,7 +89,7 @@ fn an_edit_is_saved_a_moment_later_and_read_at_the_next_start() {
     // First start: no file yet, the demo library, saved to that file.
     let mut s = start(&path);
     assert!(s.status.is_empty(), "{:?}", s.status);
-    assert_eq!(s.library_path.as_deref(), Some(path.as_path()));
+    assert_eq!(s.saving.library_path.as_deref(), Some(path.as_path()));
     assert!(!path.exists());
 
     // An edit: saved once the delay has passed, not before.

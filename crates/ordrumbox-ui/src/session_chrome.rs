@@ -1,0 +1,93 @@
+//! What the window shows around the library, and nothing else reads: the
+//! open menu and overlay, the widgets the mouse and keyboard hold, the grid
+//! page, the panels shown, the VU levels. Undo, saving and playback never
+//! touch it.
+
+use std::path::PathBuf;
+
+use super::{Overlay, Widgets, menu, session_grid};
+
+/// How fast a VU level falls, per frame drawn.
+const LEVEL_DECAY: f32 = 0.88;
+/// A VU level below this is silence.
+const LEVEL_FLOOR: f32 = 0.001;
+
+/// The session's presentation state.
+#[derive(Debug)]
+pub(super) struct Chrome {
+    /// The open menu, if any.
+    pub(super) menu: Option<menu::Open>,
+    /// A panel over everything: the file picker, the key list, about.
+    pub(super) overlay: Option<Overlay>,
+    /// Folder the file picker last picked in.
+    pub(super) last_dir: Option<PathBuf>,
+    /// What the mouse and the keyboard hold among the widgets.
+    pub(super) widgets: Widgets,
+    /// The grid step under the mouse: track, beat, step (its note's tooltip).
+    pub(super) hover: Option<(usize, i32, i32)>,
+    /// A track pressed by its name, that may be dragged to another row.
+    pub(super) track_drag: Option<session_grid::TrackDrag>,
+    /// Window size and scale of the last mouse or key event on the widgets.
+    pub(super) panel_size: (i32, i32, i32),
+    /// Current page of the pattern grid (BEATS_PER_PAGE beats).
+    pub(super) current_page: usize,
+    /// The track editor (and its note editor) shown on the right.
+    pub(super) show_track_editor: bool,
+    /// Whether the VU meter stripe is shown.
+    pub(super) show_vus: bool,
+    /// Smoothed per-track levels for the VU meter stripe.
+    track_levels: Vec<f32>,
+}
+
+impl Default for Chrome {
+    fn default() -> Self {
+        Self {
+            menu: None,
+            overlay: None,
+            last_dir: None,
+            widgets: Widgets::default(),
+            hover: None,
+            track_drag: None,
+            panel_size: (0, 0, 1),
+            current_page: 0,
+            show_track_editor: true,
+            show_vus: true,
+            track_levels: Vec::new(),
+        }
+    }
+}
+
+impl Chrome {
+    /// A dropdown or an entry is open.
+    pub(super) fn popup_open(&self) -> bool {
+        self.widgets.dropdown.is_some() || self.widgets.entry.is_some()
+    }
+
+    /// A menu, a popup or an overlay takes the pointer from the panels under it.
+    pub(super) fn covered(&self) -> bool {
+        self.menu.is_some() || self.popup_open() || self.overlay.is_some()
+    }
+
+    /// No menu, overlay, dropdown or entry open.
+    pub(super) fn close_popups(&mut self) {
+        self.overlay = None;
+        self.menu = None;
+        self.widgets.dropdown = None;
+        self.widgets.entry = None;
+    }
+
+    /// The VU levels after a frame that heard `raw`: each holds its peak and falls.
+    pub(super) fn smooth_levels(&mut self, raw: &[f32]) -> &[f32] {
+        if self.track_levels.len() < raw.len() {
+            self.track_levels.resize(raw.len(), 0.0);
+        }
+        for (i, level) in self.track_levels.iter_mut().enumerate() {
+            *level *= LEVEL_DECAY;
+            if *level < LEVEL_FLOOR {
+                *level = 0.0;
+            }
+            *level = level.max(raw.get(i).copied().unwrap_or(0.0).abs());
+        }
+        &self.track_levels
+    }
+}
