@@ -702,6 +702,11 @@ impl Session {
         self.status.len()
     }
 
+    /// What the last action said.
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+
     /// The window split for `size` (a real window size): the main editor
     /// region (top-left) and the output strip (bottom).
     pub(super) fn body(&self, size: (i32, i32, i32)) -> view::Body {
@@ -899,6 +904,39 @@ impl Session {
         }
         self.select_kit((self.kit_index as isize + delta).rem_euclid(count as isize) as usize);
         self.message = format!("kit {}", self.kits.kits[self.kit_index].name);
+    }
+
+    /// Pattern `index` (from 0) shown and played, as a plugin host's
+    /// parameter asks; refused with a message when the library has no such pattern.
+    pub fn host_select_pattern(&mut self, index: usize) {
+        let count = self.editor.library().patterns.len();
+        if index >= count {
+            self.message = format!("host: no pattern {} (the library has {count})", index + 1);
+        } else if index != self.pattern_index {
+            self.show_pattern(index);
+        }
+    }
+
+    /// Kit `index` (from 0) used, as a plugin host's parameter asks; refused
+    /// with a message when there is no such kit.
+    pub fn host_select_kit(&mut self, index: usize) {
+        let count = self.kits.kits.len();
+        if index >= count {
+            self.message = format!("host: no kit {} ({count} kits)", index + 1);
+        } else if index != self.kit_index {
+            self.select_kit(index);
+            self.message = format!("kit {}", self.kits.kits[index].name);
+        }
+    }
+
+    /// The names of the library's patterns, in order (`None`: no name).
+    pub fn pattern_names(&self) -> impl Iterator<Item = Option<&str>> + Clone {
+        self.editor.library().patterns.iter().map(|p| p.name.as_deref())
+    }
+
+    /// The names of the kits, in order.
+    pub fn kit_names(&self) -> impl Iterator<Item = &str> + Clone {
+        self.kits.kits.iter().map(|k| k.name.as_str())
     }
 
     /// Use kit `index` (its sounds are assigned again).
