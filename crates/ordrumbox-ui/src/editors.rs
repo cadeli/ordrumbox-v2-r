@@ -35,11 +35,11 @@ pub struct FxDef {
 }
 
 pub const FX_DEFS: [FxDef; 4] = [
-    FxDef { key: "reverbMix", label: "Rev", controls: &["reverbMix", "reverbType"] },
-    FxDef { key: "delayMix", label: "Dly", controls: &["delayMix", "delayBeats", "delayFeedback", "delayType"] },
-    FxDef { key: "saturationMix", label: "Sat", controls: &["saturationMix", "saturationType"] },
+    FxDef { key: "reverbMix", label: "Reverb", controls: &["reverbMix", "reverbType"] },
+    FxDef { key: "delayMix", label: "Delay", controls: &["delayMix", "delayBeats", "delayFeedback", "delayType"] },
+    FxDef { key: "saturationMix", label: "Saturation", controls: &["saturationMix", "saturationType"] },
     // The filter is on when its type is not the allpass bypass.
-    FxDef { key: "filterType", label: "Flt", controls: &["filterType", "filterSlope", "filterCutoff", "filterQ"] },
+    FxDef { key: "filterType", label: "Filter", controls: &["filterType", "filterSlope", "filterCutoff", "filterQ"] },
 ];
 
 pub const FILTER_TYPES: [&str; 4] = ["lowpass", "highpass", "bandpass", "notch"];
@@ -121,7 +121,7 @@ pub const LFO_TARGETS: [LfoTarget; 5] = [
     LfoTarget { key: "pan", label: "Pan", name: "pan", lfo_key: "panLfo", min: -1.0, max: 1.0, step: 0.01 },
     LfoTarget {
         key: "transpose",
-        label: "Transp",
+        label: "Transpose",
         name: "transpose, semitones",
         lfo_key: "transposeLfo",
         min: -24.0,
@@ -154,9 +154,9 @@ const fn prop(key: &'static str, label: &'static str, min: f64, max: f64, step: 
 pub const FX_KNOBS: [Prop; 6] = [
     prop("reverbMix", "Mix", 0.0, 1.0, 0.01, Format::Plain),
     prop("delayMix", "Mix", 0.0, 1.0, 0.01, Format::Plain),
-    prop("delayFeedback", "Fdbk", 0.0, 0.95, 0.01, Format::Plain),
+    prop("delayFeedback", "Feedback", 0.0, 0.95, 0.01, Format::Plain),
     prop("saturationMix", "Mix", 0.0, 1.0, 0.01, Format::Plain),
-    prop("filterCutoff", "Freq", 20.0, 20_000.0, 1.0, Format::Freq),
+    prop("filterCutoff", "Cutoff", 20.0, 20_000.0, 1.0, Format::Freq),
     prop("filterQ", "Q", 0.707, 18.707, 0.01, Format::Fixed2),
 ];
 
@@ -171,9 +171,9 @@ pub fn fx_label(key: &str) -> &'static str {
 
 /// The knob bar (volume, pan, pitch, decay) and its units.
 pub const KNOB_BAR: [(Prop, &str); 4] = [
-    (prop("volume", "Vol", 0.0, 1.0, 0.01, Format::Percent), "%"),
+    (prop("volume", "Volume", 0.0, 1.0, 0.01, Format::Percent), "%"),
     (prop("pan", "Pan", -1.0, 1.0, 0.01, Format::Fmt), ""),
-    (prop("transpose", "Transp", -24.0, 24.0, 1.0, Format::SignedPlain), "st"),
+    (prop("transpose", "Transpose", -24.0, 24.0, 1.0, Format::SignedPlain), "st"),
     (prop("decay", "Decay", DECAY_RANGE.0, DECAY_RANGE.1, 10.0, Format::Millis), ""),
 ];
 
@@ -182,9 +182,9 @@ pub const DEFAULT_DECAY: f64 = 500.0;
 
 /// Generation tab, shown while auto is off.
 pub const GENERATION_MANUAL: [Prop; 3] = [
-    prop("hitVariation", "Var Hits", 0.0, 100.0, 1.0, Format::Plain),
-    prop("noteVariation", "Var Notes", 0.0, 100.0, 1.0, Format::Plain),
-    prop("probability", "Prob", 0.0, 1.0, 0.01, Format::Plain),
+    prop("hitVariation", "Hit Variation", 0.0, 100.0, 1.0, Format::Plain),
+    prop("noteVariation", "Note Variation", 0.0, 100.0, 1.0, Format::Plain),
+    prop("probability", "Probability", 0.0, 1.0, 0.01, Format::Plain),
 ];
 
 /// A row of the Groove / Engine sub-tabs.
@@ -196,35 +196,35 @@ pub enum GenerationRow {
 }
 
 pub const GENERATION_GROOVE: [GenerationRow; 8] = [
-    GenerationRow::Slider(prop("autoHitVariation", "Var Hits", 0.0, 100.0, 1.0, Format::Plain)),
+    GenerationRow::Slider(prop("autoHitVariation", "Hit Variation", 0.0, 100.0, 1.0, Format::Plain)),
     GenerationRow::Slider(prop("autoPitchChance", "Pitch", 0.0, 100.0, 1.0, Format::Plain)),
     GenerationRow::Slider(prop("autoVelocityChance", "Velocity", 0.0, 100.0, 1.0, Format::Plain)),
     GenerationRow::Slider(prop("autoSilenceChance", "Silence", 0.0, 100.0, 1.0, Format::Plain)),
     GenerationRow::Slider(prop("autoFillChance", "Fill", 0.0, 100.0, 1.0, Format::Plain)),
     GenerationRow::Slider(prop("autoGhostChance", "Ghost", 0.0, 100.0, 1.0, Format::Plain)),
-    GenerationRow::Slider(prop("pitchRange", "Pitch Rng", 1.0, 24.0, 1.0, Format::Plain)),
+    GenerationRow::Slider(prop("pitchRange", "Pitch Range", 1.0, 24.0, 1.0, Format::Plain)),
     GenerationRow::Toggle("pitchScaleLock", "Scale Lock"),
 ];
 
 pub const GENERATION_ENGINE: [GenerationRow; 8] = [
-    GenerationRow::Slider(prop("autoNoteVariation", "Var Notes", 0.0, 100.0, 1.0, Format::Plain)),
-    GenerationRow::Slider(prop("autoRetriggerChance", "Retrig", 0.0, 100.0, 1.0, Format::Plain)),
-    GenerationRow::Slider(prop("autoEuclideanChance", "Euclid", 0.0, 100.0, 1.0, Format::Plain)),
+    GenerationRow::Slider(prop("autoNoteVariation", "Note Variation", 0.0, 100.0, 1.0, Format::Plain)),
+    GenerationRow::Slider(prop("autoRetriggerChance", "Retrigger", 0.0, 100.0, 1.0, Format::Plain)),
+    GenerationRow::Slider(prop("autoEuclideanChance", "Euclidean", 0.0, 100.0, 1.0, Format::Plain)),
     GenerationRow::Slider(prop("autoNoteProbabilityChance", "Note Prob", 0.0, 100.0, 1.0, Format::Plain)),
     GenerationRow::Slider(prop("autoNoteProbabilityRange", "Depth", 0.0, 100.0, 1.0, Format::Plain)),
-    GenerationRow::Slider(prop("autoArpChance", "Arp", 0.0, 100.0, 1.0, Format::Plain)),
+    GenerationRow::Slider(prop("autoArpChance", "Arpeggio", 0.0, 100.0, 1.0, Format::Plain)),
     GenerationRow::Select("autoVariant", "Variant"),
     GenerationRow::Slider(prop("autoDensity", "Density", -1.0, 1.0, 0.01, Format::Density)),
 ];
 
 /// The Compose sub-tab: how a drum track plays its style's part.
 pub const GENERATION_COMPOSE: [Prop; 7] = [
-    prop("composeHitsPerMeasure", "Hits/Meas", 0.0, 32.0, 1.0, Format::Plain),
+    prop("composeHitsPerMeasure", "Hits/Measure", 0.0, 32.0, 1.0, Format::Plain),
     prop("composeComplexity", "Complexity", 0.0, 100.0, 1.0, Format::Plain),
     prop("composeSyncopation", "Syncopation", 0.0, 100.0, 1.0, Format::Plain),
     prop("composeCoupling", "Coupling", -100.0, 100.0, 1.0, Format::Plain),
     prop("composeVariation", "Variation", 0.0, 100.0, 1.0, Format::Plain),
-    prop("composeStyleWeight", "Style", 0.0, 100.0, 1.0, Format::Plain),
+    prop("composeStyleWeight", "Style Weight", 0.0, 100.0, 1.0, Format::Plain),
     prop("composeSeed", "Seed", 0.0, 9999.0, 1.0, Format::Seed),
 ];
 
@@ -238,16 +238,16 @@ pub const COMPOSE_TAB: u8 = 2;
 /// The loop tab.
 pub const LOOP_PROPS: [Prop; 3] = [
     prop("stepsPerBeat", "Steps/Beat", 1.0, 8.0, 1.0, Format::Plain),
-    prop("loopLength", "Loop Len", 1.0, 128.0, 1.0, Format::Plain),
+    prop("loopLength", "Loop Length", 1.0, 128.0, 1.0, Format::Plain),
     prop("swingAmount", "Swing", 0.0, 1.0, 0.01, Format::Plain),
 ];
 
 /// Note editor tabs.
-pub const NOTE_TABS: [&str; 4] = ["Trig", "Retr", "Eucl", "Arp"];
+pub const NOTE_TABS: [&str; 4] = ["Trigger", "Retrigger", "Euclidean", "Arpeggio"];
 
 /// The note editor's knobs and their units.
 pub const NOTE_KNOBS: [(Prop, &str); 3] = [
-    (prop("velocity", "Vel", 0.0, 1.0, 0.01, Format::Percent), "%"),
+    (prop("velocity", "Velocity", 0.0, 1.0, 0.01, Format::Percent), "%"),
     (prop("pitch", "Pitch", -24.0, 24.0, 1.0, Format::SignedPlain), "st"),
     (prop("pan", "Pan", -1.0, 1.0, 0.01, Format::Fmt), ""),
 ];
@@ -270,20 +270,20 @@ pub const NOTE_GROUPS: [&[NoteRow]; 4] = [
     &[
         note_slider("cycle", "Cycle", 1.0, 16.0, 1.0),
         note_slider("cycleOffset", "Offset", 0.0, 15.0, 1.0),
-        note_slider("probability", "Prob", 0.0, 1.0, 0.01),
+        note_slider("probability", "Probability", 0.0, 1.0, 0.01),
     ],
     &[
-        note_slider("retriggerCount", "Retrig", 1.0, 16.0, 1.0),
+        note_slider("retriggerCount", "Retrigger", 1.0, 16.0, 1.0),
         note_slider("retriggerRate", "Rate", 1.0, 16.0, 1.0),
-        note_slider("retriggerProbability", "Prob", 0.0, 1.0, 0.01),
+        note_slider("retriggerProbability", "Probability", 0.0, 1.0, 0.01),
     ],
     &[
         note_slider("euclideanPulses", "Pulses", 0.0, 16.0, 1.0),
-        note_slider("euclideanRotation", "Rot", 0.0, 15.0, 1.0),
+        note_slider("euclideanRotation", "Rotation", 0.0, 15.0, 1.0),
     ],
     &[
         NoteRow::Select("arpScale", "Scale"),
-        NoteRow::Select("arpDirection", "Dir"),
+        NoteRow::Select("arpDirection", "Direction"),
         note_slider("arpRange", "Range", 0.0, 12.0, 1.0),
     ],
 ];
@@ -307,7 +307,7 @@ pub const KIT_KNOBS: [(Field, Prop, &str, f64); 3] = [
     (Field::Gain, prop("gain", "Gain", GAIN_RANGE.0, GAIN_RANGE.1, 0.1, Format::Fixed1), "dB", 0.0),
     (
         Field::Transpose,
-        prop("transpose", "Transp", TRANSPOSE_RANGE.0, TRANSPOSE_RANGE.1, 0.1, Format::SignedFixed1),
+        prop("transpose", "Transpose", TRANSPOSE_RANGE.0, TRANSPOSE_RANGE.1, 0.1, Format::SignedFixed1),
         "st",
         0.0,
     ),
@@ -737,7 +737,7 @@ impl Rows {
 
     fn text(&mut self, text: &str, color: u32) {
         let s = self.scale;
-        let fitted: String = text.chars().take(usize::try_from(self.w / (8 * s)).unwrap_or(0)).collect();
+        let fitted: String = text.chars().take(crate::canvas::chars_in(self.w, s)).collect();
         self.items.push(Item::text(self.x, self.y, fitted, color, s));
         self.y += 12 * s;
     }
@@ -762,7 +762,7 @@ pub fn track_editor(view: &TrackView, state: &EditorState, area: Rect, scale: i3
     // Sample bar: analysis, load button, envelope with the decay end.
     if let Some(bar) = &view.sample {
         let load_w = 40 * s;
-        let info: String = bar.info.chars().take(usize::try_from((area.w - load_w) / (8 * s)).unwrap_or(0)).collect();
+        let info: String = bar.info.chars().take(crate::canvas::chars_in(area.w - load_w, s)).collect();
         rows.items.push(Item::text(area.x, rows.y + 2 * s, info, text_color(), s));
         let button = Kind::Button { label: "Load".into(), on: false };
         rows.items.push(Item::new(

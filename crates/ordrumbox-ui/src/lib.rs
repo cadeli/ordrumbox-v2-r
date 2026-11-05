@@ -11,6 +11,7 @@ mod assets;
 mod audio_output;
 mod canvas;
 mod control;
+mod control_help;
 mod editors;
 mod font;
 mod frame;

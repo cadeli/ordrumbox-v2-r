@@ -13,6 +13,7 @@ use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::ids::{slugify, unique_id};
 use ordrumbox_core::js::{number_to_string, round};
 use ordrumbox_core::json::Value;
+use ordrumbox_core::note::{ACCENT_VELOCITY, ACCENTED_VELOCITY};
 use ordrumbox_core::style::{COMPLEXITY, ENERGY, MACRO_NEUTRAL};
 use ordrumbox_core::track::MAX_TRACKS;
 use ordrumbox_core::{Library, Note, Pattern, Scales, SetField, Styles, Track};
@@ -312,6 +313,26 @@ impl Editor {
             },
         )
         .unwrap_or(false)
+    }
+
+    /// Accent the notes at a step, or, when they all are, take the accent
+    /// off (back to the default velocity), as one undo step. The new state:
+    /// `Some(true)` accented, `None` when the step has no note.
+    pub fn toggle_accent(&mut self, p: usize, t: usize, beat: i32, beat_step: i32) -> Option<bool> {
+        let track = self.library.patterns.get(p)?.tracks.get(t)?;
+        let at = |n: &Note| n.beat == beat && n.step == beat_step;
+        let notes: Vec<&Note> = track.notes.iter().filter(|n| at(n)).collect();
+        if notes.is_empty() {
+            return None;
+        }
+        let accent = notes.iter().any(|n| n.velocity < ACCENT_VELOCITY);
+        let velocity = if accent { ACCENTED_VELOCITY } else { Note::default().velocity };
+        let desc = |track: &Track| format!("{} on {}", if accent { "Accent" } else { "Remove accent" }, track.name);
+        self.edit_track(p, t, desc, None, |track| {
+            track.notes.iter_mut().filter(|n| at(n)).for_each(|n| n.velocity = velocity);
+            true
+        })?;
+        Some(accent)
     }
 
     /// Nudge note `n` (`applyNoteNudge`: velocity ±0.05, pitch ±1).
@@ -952,6 +973,20 @@ fn clean(track: &mut Track) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_accent_toggles_on_the_notes_of_a_step_in_one_undo_step() {
+        let mut e = editor();
+        let velocity = |e: &Editor| e.library().patterns[0].tracks[0].notes[0].velocity;
+        assert_eq!(e.toggle_accent(0, 0, 0, 0), Some(true));
+        assert_eq!(velocity(&e), ACCENTED_VELOCITY);
+        assert_eq!(e.toggle_accent(0, 0, 0, 0), Some(false));
+        assert_eq!(velocity(&e), Note::default().velocity);
+        assert_eq!(e.toggle_accent(0, 0, 1, 0), None, "no note on that step");
+        assert_eq!(e.toggle_accent(0, 0, 0, 0), Some(true));
+        assert_eq!(e.undo().as_deref(), Some("Accent on KICK"));
+        assert_eq!(velocity(&e), Note::default().velocity);
+    }
 
     fn editor() -> Editor {
         let (library, _) = Library::parse(

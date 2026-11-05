@@ -48,7 +48,7 @@ pub const FILTERS: [Param; 2] = [
     param("hicut", "High Cut", Spec::slider(1000.0, 20_000.0, 100.0, 18_500.0).log(), Format::Round, "Hz"),
 ];
 /// The tabs.
-pub const TABS: [&str; 3] = ["Vol", "Comp", "Flt"];
+pub const TABS: [&str; 3] = ["Volume", "Comp", "Filter"];
 
 /// Every knob and slider.
 pub fn params() -> impl Iterator<Item = &'static Param> {

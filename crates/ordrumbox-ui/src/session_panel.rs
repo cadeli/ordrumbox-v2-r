@@ -14,6 +14,7 @@ use ordrumbox_engine::assign::{assign_track, synth_for};
 
 use super::*;
 use crate::control::{Spec, Style};
+use crate::control_help;
 use crate::editors::{
     self, ARP_DIRECTIONS, Choice, ComposeView, FILTER_TYPES, FX_DEFS, FX_KNOBS, GENERATION_COMPOSE, GENERATION_ENGINE,
     GENERATION_GROOVE, GENERATION_MANUAL, GenerationRow, KIT_KNOBS, KNOB_BAR, KitControls, LFO_TARGETS, LOOP_PROPS,
@@ -131,8 +132,10 @@ impl Session {
         let views = view::header_controls(scale).views;
         let kit_open = self.kit_editor.is_some();
         for (i, (rect, label)) in views.iter().zip(view::VIEWS).enumerate() {
-            // A plugin has no song view.
+            // A plugin has no song view: its button only says so.
             if self.hosted && shown.get(i) == Some(&Workspace::Song) {
+                let kind = Kind::Disabled { label: label.into() };
+                layout.items.push(Item::new(Some(Id::View(i as u8)), *rect, kind));
                 continue;
             }
             let on = if i == 4 { kit_open } else { !kit_open && self.workspace == shown[i] };
@@ -301,7 +304,7 @@ impl Session {
         }
     }
 
-    fn track_sample_path(&self, t: usize) -> Option<String> {
+    pub(super) fn track_sample_path(&self, t: usize) -> Option<String> {
         let track = self.track(t)?;
         if track.use_synth {
             return None;
@@ -679,9 +682,52 @@ impl Session {
         changed
     }
 
+    /// The mouse over the panels: the control under it that has a tooltip
+    /// (none while a control is dragged); whether it changed.
+    pub fn control_hover(&mut self, size: (i32, i32, i32), x: i32, y: i32) -> bool {
+        let (width, height, scale) = size;
+        let hover = if self.chrome.widgets.drag.is_some() || self.chrome.covered() {
+            None
+        } else {
+            let layout = self.panel_layout(width, height, scale);
+            // A plugin's tempo is shown, not turned: no id, but a tooltip.
+            let host_tempo = Some(view::header_controls(scale).bpm)
+                .filter(|rect| self.hosted && self.pattern().is_some() && rect.contains(x, y))
+                .map(|rect| (Id::Bpm, rect));
+            panel::hit(&layout.items, x, y)
+                .and_then(|item| Some((item.id?, item.rect)))
+                .or(host_tempo)
+                .filter(|(id, _)| self.control_tip(*id).is_some())
+        };
+        let changed = hover != self.chrome.control_hover;
+        self.chrome.control_hover = hover;
+        changed
+    }
+
+    /// What a control is, said in its tooltip; a plugin's tells where the
+    /// host or the app does the thing instead.
+    pub(super) fn control_tip(&self, id: Id) -> Option<control_help::Help> {
+        if self.hosted {
+            match id {
+                Id::Bpm => return Some(["Tempo (HOST)", "the host's: a plugin plays at the host's tempo"]),
+                Id::View(2) => {
+                    return Some(["Song: in the app only", "a plugin plays patterns, the host arranges them"]);
+                }
+                Id::View(4) => return Some(["Kit editor (Alt+K)", "the kit's samples and their settings"]),
+                _ => {}
+            }
+        }
+        control_help::help(id)
+    }
+
     /// The tooltip of the note under the mouse (the first of its step), as
-    /// `PointerSection.onMouseOver` shows it.
+    /// `PointerSection.onMouseOver` shows it; over a control, what it is.
     pub(super) fn draw_tooltip(&self, canvas: &mut Canvas, scale: i32, right: i32) {
+        if let Some((id, rect)) = self.chrome.control_hover.filter(|_| !self.chrome.covered())
+            && let Some(lines) = self.control_tip(id)
+        {
+            return view::draw_tooltip_lines(canvas, &lines, rect, scale);
+        }
         if self.song_view_open() {
             return self.draw_song_tooltip(canvas, scale);
         }
@@ -1004,7 +1050,7 @@ impl Session {
 
     // ─── What the widgets do ─────────────────────────────────────────────────
 
-    fn track_name(&self, t: usize) -> String {
+    pub(super) fn track_name(&self, t: usize) -> String {
         self.track(t).map_or_else(String::new, |tr| tr.name.clone())
     }
 
@@ -1072,6 +1118,21 @@ impl Session {
             Id::NoteKnob(key) | Id::NoteSlider(key) => self.note_value(t, key, value),
             _ => {}
         }
+    }
+
+    /// Track `t` on synth preset `key` ("none": back on its sample), one undo step.
+    pub(super) fn assign_synth(&mut self, t: usize, key: &str) {
+        let updates: Vec<(&str, Value)> = if key == "none" {
+            vec![("useSynth", Value::Bool(false))]
+        } else {
+            vec![
+                ("useSynth", Value::Bool(true)),
+                ("autoAssign", Value::Bool(false)),
+                ("synthPreset", Value::String(key.to_owned())),
+            ]
+        };
+        let name = self.track_name(t);
+        self.update_track(t, &updates, &format!("Synth on {name}"), false);
     }
 
     /// `onLoopSlider`.
@@ -1158,7 +1219,7 @@ impl Session {
     /// A kit knob: the kit changes now, the player and the disk shortly after.
     fn set_kit_sample_value(&mut self, kit: usize, sample: usize, field: Field, value: f64) {
         if let Some(message) = self.kits.set_value(kit, sample, field, value) {
-            self.message = message;
+            self.not_undoable(message);
             self.saving.kits.touch();
         }
     }
@@ -1273,18 +1334,7 @@ impl Session {
                     self.edited();
                 }
             }
-            Id::Synth => {
-                let updates: Vec<(&str, Value)> = if value == "none" {
-                    vec![("useSynth", Value::Bool(false))]
-                } else {
-                    vec![
-                        ("useSynth", Value::Bool(true)),
-                        ("autoAssign", Value::Bool(false)),
-                        ("synthPreset", Value::String(value.to_owned())),
-                    ]
-                };
-                self.update_track(t, &updates, &format!("Synth on {name}"), false);
-            }
+            Id::Synth => self.assign_synth(t, value),
             Id::NoteSelect(key) => {
                 let Some(note) = self.shown_note(t) else { return };
                 let (field, arp) = if key == "arpScale" {
@@ -1510,20 +1560,41 @@ mod tests {
 
     #[test]
     fn history_names_an_edit_by_its_label() {
-        assert_eq!(history_label(Id::Fx("delayMix")), "Dly Mix");
-        assert_eq!(history_label(Id::TrackSelect("delayBeats")), "Dly Beats");
+        assert_eq!(history_label(Id::Fx("delayMix")), "Delay Mix");
+        assert_eq!(history_label(Id::TrackSelect("delayBeats")), "Delay Beats");
         assert_eq!(history_label(Id::TrackSelect("autoVariant")), "Variant");
         assert_eq!(history_label(Id::Generation("autoPitchChance")), "Pitch");
-        assert_eq!(history_label(Id::Generation("hitVariation")), "Var Hits");
+        assert_eq!(history_label(Id::Generation("hitVariation")), "Hit Variation");
         assert_eq!(history_label(Id::Compose("composeSyncopation")), "Syncopation");
-        assert_eq!(history_label(Id::Loop("loopLength")), "Loop Len");
+        assert_eq!(history_label(Id::Loop("loopLength")), "Loop Length");
         assert_eq!(history_label(Id::Toggle("pitchScaleLock")), "Scale Lock");
         assert_eq!(history_label(Id::NoteSlider("euclideanPulses")), "Pulses");
-        assert_eq!(history_label(Id::NoteSelect("arpDirection")), "Dir");
-        assert_eq!(history_label(Id::NoteKnob("velocity")), "Vel");
+        assert_eq!(history_label(Id::NoteSelect("arpDirection")), "Direction");
+        assert_eq!(history_label(Id::NoteKnob("velocity")), "Velocity");
     }
 
     const SIZE: (i32, i32, i32) = (1100, 680, 1);
+
+    #[test]
+    fn the_mouse_over_a_tab_or_a_knob_shows_what_it_is() {
+        let mut s = session();
+        let (width, height, scale) = SIZE;
+        let center = |s: &Session, id: Id| {
+            let item = panel::find(&s.panel_layout(width, height, scale).items, id).cloned().expect("shown");
+            (item.rect.x + item.rect.w / 2, item.rect.y + item.rect.h / 2)
+        };
+        let (x, y) = center(&s, Id::Tab(editors::TAB_LOOP));
+        assert!(s.control_hover(SIZE, x, y));
+        assert_eq!(s.chrome.control_hover.map(|(id, _)| id), Some(Id::Tab(editors::TAB_LOOP)));
+        assert!(!s.control_hover(SIZE, x, y), "unchanged");
+        let (x, y) = center(&s, Id::KnobBar("transpose"));
+        assert!(s.control_hover(SIZE, x, y));
+        let mut pixels = vec![0; (width * height) as usize];
+        s.draw(&mut Canvas::new(&mut pixels, width as usize, height as usize), scale);
+        // Off every control: no tooltip.
+        assert!(s.control_hover(SIZE, 1, height - 1));
+        assert_eq!(s.chrome.control_hover, None);
+    }
 
     fn session() -> Session {
         let (library, _) = Library::parse(
@@ -1657,7 +1728,7 @@ mod tests {
         assert!(matches!(&hits.kind, Kind::Value { value, text, .. } if *value == 1.0 && text == "1*"));
         s.set_value(Id::Compose("composeHitsPerMeasure"), 3.0);
         assert_eq!(s.track(0).unwrap().compose_hits_per_measure, Some(3.0));
-        assert_eq!(s.editor.history().next_undo(), Some("Hits/Meas on KICK"));
+        assert_eq!(s.editor.history().next_undo(), Some("Hits/Measure on KICK"));
         // ↻: a new line with three kicks, the third beat among them.
         let regenerate = panel::find(&s.panel_layout(SIZE.0, SIZE.1, 1).items, Id::Regenerate).unwrap().rect;
         let (x, y) = center(regenerate);

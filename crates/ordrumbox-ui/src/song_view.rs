@@ -31,7 +31,7 @@ const COLUMN_WIDTH: i32 = 210;
 const LIST_NAME_CHARS: i32 = 16;
 const LIST_NUMBER_CHARS: i32 = 3;
 /// The pattern list's width: its number, a 4 px gap, its name.
-const LIST_WIDTH: i32 = (LIST_NUMBER_CHARS + LIST_NAME_CHARS) * 8 + 4;
+const LIST_WIDTH: i32 = (LIST_NUMBER_CHARS + LIST_NAME_CHARS) * crate::font::WIDTH + 4;
 /// Space between the description's frame and its text.
 const DESCRIPTION_PAD: i32 = 4;
 /// Width of the description's scroll bar.
@@ -213,7 +213,7 @@ impl SongLayout {
     pub fn description_lines(&self, text: &str) -> Vec<String> {
         let s = self.scale;
         let w = self.description_frame().w - 2 * DESCRIPTION_PAD * s - SCROLL_BAR * s;
-        wrap(text, usize::try_from(w / (8 * s)).unwrap_or(0))
+        wrap(text, crate::canvas::chars_in(w, s))
     }
 
     /// Lines of the description that fit in its frame.
@@ -441,7 +441,7 @@ fn draw_list(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
             canvas.fill_rect(r.x - 2 * s, y - 2 * s, r.w, LIST_ROW * s, selected_color());
         }
         let number = format!("{}.", i + 1);
-        let x = r.x + (LIST_NUMBER_CHARS * 8 * s - text_width(&number, s)).max(0);
+        let x = r.x + (LIST_NUMBER_CHARS * crate::font::WIDTH * s - text_width(&number, s)).max(0);
         let x = canvas.text(x, y, &number, s, dim_color()) + 4 * s;
         canvas.text(x, y, &fit(name, names_right - x, s), s, if selected { ACCENT } else { text_color() });
     }
@@ -507,7 +507,9 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     };
     let title = canvas.text(g.x, g.y, "Arrangement", s, dim_color()) + 8 * s;
     let total = song.length_measures().max(1.0).ceil() as u32;
-    let meta = format!("{}  {} measures  {} BPM", song.name, total, ordrumbox_core::js::number_to_string(song.bpm));
+    // The arrangement's own tempo, which it plays at: not the header's (the pattern's).
+    let bpm = ordrumbox_core::js::number_to_string(song.bpm);
+    let meta = format!("{}  {} measures  plays at {bpm} BPM (the header: the pattern's)", song.name, total);
     canvas.text(title, g.y, &fit(&meta, g.x + g.w - title, s), s, text_color());
     if song.clips.is_empty() && view.ghost.is_none() {
         canvas.text(
@@ -657,7 +659,7 @@ fn wrap(text: &str, chars: usize) -> Vec<String> {
 
 /// Text cut to `width` pixels.
 fn fit(text: &str, width: i32, scale: i32) -> String {
-    let chars = usize::try_from(width / (8 * scale).max(1)).unwrap_or(0);
+    let chars = crate::canvas::chars_in(width, scale);
     text.chars().take(chars).collect()
 }
 

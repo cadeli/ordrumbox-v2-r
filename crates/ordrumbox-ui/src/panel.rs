@@ -235,6 +235,10 @@ pub enum Kind {
         label: String,
         on: bool,
     },
+    /// A button greyed out: a click only says why (a plugin's SONG).
+    Disabled {
+        label: String,
+    },
     Text {
         text: String,
         color: Rgb,
@@ -274,7 +278,12 @@ impl Item {
         self.id.is_some()
             && !matches!(
                 self.kind,
-                Kind::Text { .. } | Kind::Envelope { .. } | Kind::Highlight | Kind::Panel | Kind::Line
+                Kind::Text { .. }
+                    | Kind::Disabled { .. }
+                    | Kind::Envelope { .. }
+                    | Kind::Highlight
+                    | Kind::Panel
+                    | Kind::Line
             )
             && !matches!(self.id, Some(Id::Row(_)))
     }
@@ -342,8 +351,7 @@ fn fill_circle(canvas: &mut Canvas, cx: i32, cy: i32, r: i32, color: Rgb) {
 
 /// Text cut to `width` pixels.
 fn fit(text: &str, width: i32, scale: i32) -> String {
-    let chars = usize::try_from(width / (8 * scale).max(1)).unwrap_or(0);
-    text.chars().take(chars).collect()
+    text.chars().take(crate::canvas::chars_in(width, scale)).collect()
 }
 
 /// A knob: a 270° arc from bottom left, lit up to `fraction`, a disc and its pointer.
@@ -458,6 +466,11 @@ pub fn draw(canvas: &mut Canvas, items: &[Item], focus: Option<Id>, scale: i32) 
                 let color = if *on { background_color() } else { text_color() };
                 let x = r.x + (r.w - text_width(label, scale)) / 2;
                 canvas.text(x, r.y + (r.h - 8 * scale) / 2, label, scale, color);
+            }
+            Kind::Disabled { label } => {
+                canvas.fill_rect(r.x, r.y, r.w, r.h, field_color());
+                let x = r.x + (r.w - text_width(label, scale)) / 2;
+                canvas.text(x, r.y + (r.h - 8 * scale) / 2, label, scale, theme::disabled());
             }
             Kind::Envelope { points, marker } => {
                 canvas.fill_rect(r.x, r.y, r.w, r.h, field_color());
@@ -729,7 +742,7 @@ mod tests {
                 Kind::Value {
                     spec: Spec::slider(0.0, 100.0, 1.0, 0.0),
                     value: 30.0,
-                    label: Some("Var Hits".into()),
+                    label: Some("Hit Variation".into()),
                     text: "30".into(),
                     lfo: false,
                 },

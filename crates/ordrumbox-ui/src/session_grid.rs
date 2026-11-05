@@ -306,7 +306,6 @@ mod tests {
         assert_eq!(s.pattern().unwrap().tracks.len(), count + 2);
         s.track_menu(1, 10, 10);
         pick(&mut s, "Delete track");
-        s.overlay_key(OverlayKey::Enter);
         assert_eq!(s.pattern().unwrap().tracks.len(), count + 1);
     }
 
@@ -325,6 +324,32 @@ mod tests {
         assert!(!labels(&s).contains(&"Move down".to_owned()), "the last track goes no lower");
         pick(&mut s, "Move up");
         assert_eq!(names(&s), ["KICK", "SNARE"]);
+    }
+
+    #[test]
+    fn a_click_switches_a_step_on_and_off_and_shift_click_selects() {
+        let mut s = session();
+        let count = |s: &Session| s.pattern().unwrap().tracks[0].notes.iter().filter(|n| n.beat == 3).count();
+        let cell = Hit::Cell { track: 0, beat: 3, step: 0 };
+        s.click(cell);
+        assert_eq!(count(&s), 1, "on");
+        s.click(cell);
+        assert_eq!(count(&s), 0, "off at the second click");
+        assert_eq!(s.selection.selected, None);
+        // A step holding two notes goes off at once, without a question, in one undo step.
+        s.click(cell);
+        s.editor.add_note(0, 0, 3, 0, 7.0);
+        assert_eq!(count(&s), 2);
+        s.click(cell);
+        assert_eq!(count(&s), 0);
+        assert!(s.chrome.overlay.is_none(), "no confirmation");
+        s.run(Command::Undo);
+        assert_eq!(count(&s), 2);
+        // Shift+click: selected for the note editor, nothing removed.
+        s.select_step_note(0, 3, 0);
+        assert!(s.selection.selected.is_some_and(|(t, _)| t == 0));
+        assert_eq!(count(&s), 2);
+        assert_eq!(s.selection.cursor, Some(Cursor { track: 0, beat: 3, step: 0 }));
     }
 
     #[test]
@@ -389,7 +414,7 @@ mod tests {
         s.step_menu(0, 1, 0, 10, 10);
         pick(&mut s, "Delete notes");
         assert_eq!(s.track(0).unwrap().notes.len(), 1);
-        assert_eq!(s.message, "Deleted 1 note - KICK @ beat 2.1");
+        assert_eq!(s.message, "Deleted 1 note - KICK @ beat 2.1 (Ctrl+Z: undo)");
     }
 
     #[test]

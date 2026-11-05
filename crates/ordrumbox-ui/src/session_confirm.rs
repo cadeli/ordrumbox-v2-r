@@ -1,20 +1,15 @@
-//! Confirmations: what removes or replaces the user's work waits for Enter
-//! in a notice; Esc or a click cancels it. A single note is removed at once.
+//! Confirmations: what removes or replaces the user's work for good waits
+//! for Enter in a notice; Esc or a click cancels it. An edit that Ctrl+Z
+//! undoes is done at once, and its message says how to undo it.
 
 use super::*;
+
+/// What the message of a change outside the library's history ends with.
+pub(super) const NOT_UNDOABLE: &str = "not undoable";
 
 /// What waits for the user's yes.
 #[derive(Debug, Clone)]
 pub(super) enum Pending {
-    RemoveTrack(usize),
-    ClearTrack(usize),
-    ClearStep(Cursor),
-    RemoveClip(usize),
-    /// Every clip of a pattern (its id) in the arrangement.
-    RemoveRow(String),
-    /// A pattern of the library, with its clips.
-    RemovePattern(usize),
-    RemoveSong,
     RemoveSample {
         kit: usize,
         sample: usize,
@@ -22,8 +17,6 @@ pub(super) enum Pending {
     RemoveSynth(String),
     LoadSong(PathBuf),
     ImportSong(PathBuf),
-    RandomTrack(usize),
-    CompactTracks,
     ImportLibrary(PathBuf),
     DemoLibrary,
     /// A backup's folder.
@@ -46,22 +39,10 @@ impl Session {
     /// The user said yes.
     pub(super) fn run_pending(&mut self, pending: Pending) {
         match pending {
-            Pending::RemoveTrack(t) => self.remove_track_now(t),
-            Pending::ClearTrack(t) => self.clear_track_now(t),
-            Pending::ClearStep(cursor) => {
-                self.selection.cursor = Some(cursor);
-                self.delete_step_now();
-            }
-            Pending::RemoveClip(c) => self.remove_clip(c),
-            Pending::RemoveRow(id) => self.remove_row(&id),
-            Pending::RemovePattern(p) => self.remove_pattern_now(p),
-            Pending::RemoveSong => self.remove_song(),
             Pending::RemoveSample { kit, sample } => self.kit_remove_now(kit, sample),
             Pending::RemoveSynth(key) => self.remove_synth(&key),
             Pending::LoadSong(path) => self.load_song_file(&path),
             Pending::ImportSong(path) => self.import_song_now(&path),
-            Pending::RandomTrack(t) => self.randomize_track_now(t),
-            Pending::CompactTracks => self.compact_tracks_now(),
             Pending::ImportLibrary(path) => self.import_library_now(&path),
             Pending::DemoLibrary => self.load_demo_library_now(),
             Pending::RestoreUserData(path) => self.restore_user_data_now(&path),
@@ -69,49 +50,27 @@ impl Session {
         }
     }
 
-    /// The name of track `t`, between quotes, and its notes.
-    fn track_summary(&self, t: usize) -> String {
-        self.track(t)
-            .map_or_else(String::new, |track| format!("\"{}\": {}", track.name, notes_label(track.notes.len())))
+    /// Say that a change was made outside the library's history (the master,
+    /// a synth preset, a kit), which Ctrl+Z leaves as it is.
+    pub(super) fn not_undoable(&mut self, what: String) {
+        self.message = format!("{what} ({NOT_UNDOABLE})");
+    }
+
+    /// Run `action`, an edit that Ctrl+Z undoes, at once instead of asking
+    /// first; its message, when it edited, says how to undo it.
+    pub(super) fn undoable(&mut self, action: impl FnOnce(&mut Self)) {
+        let revision = self.editor.revision();
+        action(self);
+        if self.editor.revision() != revision {
+            let key = if self.hosted { "Alt+Z" } else { "Ctrl+Z" };
+            self.message = format!("{} ({key}: undo)", self.message);
+        }
     }
 
     /// The title and the lines of the notice of `pending`.
     pub(super) fn confirm_text(&self, pending: &Pending) -> (&'static str, Vec<String>) {
         const NO_UNDO: &str = "This cannot be undone.";
         let (title, what, verb) = match pending {
-            Pending::RemoveTrack(t) => ("Delete the track?", self.track_summary(*t), "delete"),
-            Pending::ClearTrack(t) => ("Clear the track?", self.track_summary(*t), "clear"),
-            Pending::ClearStep(c) => {
-                let name = self.track(c.track).map_or("", |track| track.name.as_str());
-                let count = self.step_note_count(*c);
-                let what = format!("{} - {name} @ {}", notes_label(count), beat_label(c.beat, c.step));
-                ("Delete the notes?", what, "delete")
-            }
-            Pending::RemoveClip(c) => {
-                let clip = self.song().and_then(|song| song.clips.get(*c));
-                let what = clip.map_or_else(String::new, |clip| {
-                    format!("\"{}\" at measure {}", self.pattern_label(&clip.pattern_id), clip.start_measure + 1)
-                });
-                ("Delete the clip?", what, "delete")
-            }
-            Pending::RemoveRow(id) => {
-                let count = self.song().map_or(0, |song| song.clips.iter().filter(|c| c.pattern_id == *id).count());
-                ("Delete the row?", format!("\"{}\": {count} clip(s)", self.pattern_label(id)), "delete")
-            }
-            Pending::RemovePattern(p) => {
-                let library = self.editor.library();
-                let what = library.patterns.get(*p).map_or_else(String::new, |pattern| {
-                    let clips = library.songs.iter().flat_map(|s| &s.clips).filter(|c| c.pattern_id == pattern.id);
-                    format!("\"{}\" and its {} clip(s)", self.pattern_label(&pattern.id), clips.count())
-                });
-                ("Delete the pattern?", what, "delete")
-            }
-            Pending::RemoveSong => {
-                let what = self
-                    .song()
-                    .map_or_else(String::new, |song| format!("\"{}\": {} clip(s)", song.name, song.clips.len()));
-                ("Delete the arrangement?", what, "delete")
-            }
             Pending::RemoveSample { kit, sample } => {
                 let kit = self.kits.kits.get(*kit);
                 let name = kit.and_then(|k| k.samples.get(*sample)).map_or("", |s| s.display_name.as_str());
@@ -122,12 +81,6 @@ impl Session {
             Pending::LoadSong(path) | Pending::ImportSong(path) | Pending::ImportLibrary(path) => {
                 let name = path.file_name().unwrap_or(path.as_os_str()).to_string_lossy();
                 ("Replace the library?", format!("{name} takes the place of every pattern and arrangement."), "replace")
-            }
-            Pending::RandomTrack(t) => {
-                ("Replace the notes?", format!("{} replaced by random ones", self.track_summary(*t)), "replace")
-            }
-            Pending::CompactTracks => {
-                ("Compact the tracks?", "Tracks whose notes repeat get a shorter loop.".to_owned(), "compact")
             }
             Pending::DemoLibrary => (
                 "Load the demo library?",
@@ -158,77 +111,63 @@ mod tests {
     }
 
     #[test]
-    fn a_track_goes_only_once_confirmed() {
+    fn an_edit_ctrl_z_undoes_is_done_at_once_and_says_so() {
         let mut s = session();
+        let p = s.pattern_index;
         let tracks = s.pattern().unwrap().tracks.len();
         s.selection.cursor = Some(Cursor { track: 0, beat: 0, step: 0 });
         s.remove_track();
-        assert!(s.confirm_open());
-        assert_eq!(s.pattern().unwrap().tracks.len(), tracks);
-        s.overlay_key(OverlayKey::Escape);
-        assert!(!s.confirm_open());
-        assert_eq!(s.pattern().unwrap().tracks.len(), tracks);
-        s.remove_track();
-        s.overlay_key(OverlayKey::Enter);
         assert!(!s.confirm_open());
         assert_eq!(s.pattern().unwrap().tracks.len(), tracks - 1);
-    }
-
-    #[test]
-    fn a_click_cancels() {
-        let mut s = session();
-        let tracks = s.pattern().unwrap().tracks.len();
-        s.selection.cursor = Some(Cursor { track: 0, beat: 0, step: 0 });
-        s.remove_track();
-        s.overlay_click(800, 600, 1, 10, 10);
-        assert!(!s.confirm_open());
+        assert_eq!(s.message, "Track deleted (Ctrl+Z: undo)");
+        s.undo();
         assert_eq!(s.pattern().unwrap().tracks.len(), tracks);
-    }
 
-    #[test]
-    fn one_note_goes_at_once_and_several_are_confirmed() {
-        let mut s = session();
-        let p = s.pattern_index;
-        s.selection.cursor = Some(Cursor { track: 0, beat: 0, step: 0 });
-        let c = s.selection.cursor.unwrap();
-        // The step starts empty, whatever the library holds.
-        s.delete_step_now();
-        assert!(s.editor.add_note(p, 0, 0, 0, 60.0).is_some());
-        s.delete_step();
-        assert!(!s.confirm_open());
-        assert_eq!(s.step_note_count(c), 0);
-
-        assert!(s.editor.add_note(p, 0, 0, 0, 60.0).is_some());
+        let c = Cursor { track: 0, beat: 0, step: 0 };
+        s.selection.cursor = Some(c);
         assert!(s.editor.add_note(p, 0, 0, 0, 64.0).is_some());
         s.delete_step();
-        assert!(s.confirm_open());
-        assert_eq!(s.step_note_count(c), 2);
-        s.overlay_key(OverlayKey::Enter);
+        assert!(!s.confirm_open());
         assert_eq!(s.step_note_count(c), 0);
+        assert!(s.message.ends_with("(Ctrl+Z: undo)"), "{}", s.message);
+
+        s.randomize_track();
+        assert!(!s.confirm_open() && !s.track(0).unwrap().notes.is_empty());
+        s.clear_track(0);
+        assert!(!s.confirm_open() && s.track(0).unwrap().notes.is_empty());
+        assert_eq!(s.message, "Cleared notes on \"KICK\" (Ctrl+Z: undo)");
+        // Nothing done, nothing to undo.
+        s.clear_track(0);
+        assert_eq!(s.message, "No notes to clear");
+        // A plugin's undo key is Alt+Z.
+        s.hosted = true;
+        s.randomize_track();
+        assert!(s.message.ends_with("(Alt+Z: undo)"), "{}", s.message);
     }
 
     #[test]
-    fn nothing_to_lose_asks_nothing() {
+    fn what_cannot_be_undone_waits_for_enter_and_a_click_cancels() {
         let mut s = session();
-        let p = s.pattern_index;
-        s.selection.cursor = Some(Cursor { track: 0, beat: 0, step: 0 });
-        assert!(s.editor.clean_track(p, 0));
-        s.clear_track(0);
-        assert!(!s.confirm_open());
-        assert_eq!(s.message, "No notes to clear");
-        s.randomize_track();
-        assert!(!s.confirm_open());
-        assert!(!s.track(0).unwrap().notes.is_empty());
-        // Now it has notes to lose.
-        s.randomize_track();
+        s.run(Command::DemoLibrary);
         assert!(s.confirm_open());
+        s.overlay_click(800, 600, 1, 10, 10);
+        assert!(!s.confirm_open());
+        assert_eq!(s.pattern().unwrap().name.as_deref(), Some("p"));
+    }
+
+    #[test]
+    fn a_master_change_says_ctrl_z_leaves_it() {
+        let mut s = session();
+        s.set_master_value("volume", 0.5);
+        assert_eq!(s.message, "master: volume 0.5 (not undoable)");
+        s.undo();
+        assert_eq!(crate::master::get(&s.output_panel.master(), "volume"), 0.5);
     }
 
     #[test]
     fn the_mcp_tools_wait_for_the_answer() {
         let mut s = session();
-        s.selection.cursor = Some(Cursor { track: 0, beat: 0, step: 0 });
-        s.remove_track();
+        s.ask(Pending::DemoLibrary);
         assert!(s.mcp_call("listPatterns", &Value::Null).is_err());
         s.overlay_key(OverlayKey::Escape);
         assert!(s.mcp_call("listPatterns", &Value::Null).is_ok());

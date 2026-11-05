@@ -72,7 +72,7 @@ impl<'a> Canvas<'a> {
                     self.blend(pen + glyph.left + col as i32, y + glyph.top + row as i32, color, coverage);
                 }
             }
-            pen += font::SIZE * quarters / 4;
+            pen += font::advance(quarters);
         }
         pen
     }
@@ -94,12 +94,27 @@ impl<'a> Canvas<'a> {
 
 /// Width of `text` drawn at `scale`.
 pub fn text_width(text: &str, scale: i32) -> i32 {
-    text.chars().count() as i32 * font::SIZE * scale
+    text.chars().count() as i32 * char_width(scale)
 }
 
-/// Width and height of one character of the small font at `scale`.
+/// Width of one character at `scale`.
+pub fn char_width(scale: i32) -> i32 {
+    font::WIDTH * scale
+}
+
+/// How many characters fit in `width` pixels at `scale`.
+pub fn chars_in(width: i32, scale: i32) -> usize {
+    usize::try_from(width / char_width(scale).max(1)).unwrap_or(0)
+}
+
+/// Height of a line of the small font at `scale`.
 pub fn small_cell(scale: i32) -> i32 {
     font::SIZE * font::SMALL_QUARTERS * scale / 4
+}
+
+/// Width of one character of the small font at `scale`.
+pub fn small_char_width(scale: i32) -> i32 {
+    font::advance(font::SMALL_QUARTERS * scale)
 }
 
 #[cfg(test)]
@@ -133,12 +148,13 @@ mod tests {
     fn text_is_blended_inside_its_cells() {
         let mut pixels = vec![0; 32 * 16];
         let mut canvas = Canvas::new(&mut pixels, 32, 16);
-        assert_eq!(canvas.text(0, 0, "Hé", 2, 0xff_ff_ff), 32);
+        assert_eq!(canvas.text(0, 0, "Hé", 2, 0xff_ff_ff), 24);
         let lit =
             |x0: usize, x1: usize| (0..16).any(|y| pixels[y * 32 + x0..y * 32 + x1].iter().any(|&p| p > 0x80_80_80));
-        assert!(lit(0, 16) && lit(16, 32), "both cells drawn");
+        assert!(lit(0, 12) && lit(12, 24), "both cells drawn");
+        assert!(!lit(24, 32), "nothing past them");
         // Coverage blends: some pixels are neither background nor full colour.
         assert!(pixels.iter().any(|&p| p != 0 && p != 0xff_ff_ff));
-        assert_eq!(text_width("abc", 2), 48);
+        assert_eq!(text_width("abc", 2), 36);
     }
 }

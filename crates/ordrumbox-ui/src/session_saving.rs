@@ -79,8 +79,8 @@ pub(super) struct Saving {
     pub(super) master: Settle,
     /// Where the synth presets are saved; none when the saved ones could not be read.
     pub(super) synths_file: Option<PathBuf>,
-    /// The settings file the colour scheme is saved to (`None`: not saved).
-    pub(super) color_scheme_file: Option<PathBuf>,
+    /// The settings file the colour scheme and the zoom are saved to (`None`: not saved).
+    pub(super) settings_file: Option<PathBuf>,
     /// Where the song panel saves songs; `None`: no user data folder.
     pub(super) songs_dir: Option<PathBuf>,
 }
@@ -95,7 +95,7 @@ impl Default for Saving {
             synths: Settle::new(SYNTHS_DELAY),
             master: Settle::new(MASTER_DELAY),
             synths_file: None,
-            color_scheme_file: None,
+            settings_file: None,
             songs_dir: None,
         }
     }

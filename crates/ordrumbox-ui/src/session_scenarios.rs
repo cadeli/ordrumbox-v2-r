@@ -116,10 +116,11 @@ fn a_click_on_a_grid_cell_sounds_the_note() {
     assert_eq!(s.pattern().unwrap().tracks[0].notes.len(), 3);
     assert!(run(&mut s, &mut audio, 512) > 0.0);
     assert!(!s.playing());
-    // A note: selected and heard.
+    // A note, Shift+clicked: selected and heard, kept.
     run(&mut s, &mut audio, 4000);
-    s.click(Hit::Cell { track: 0, beat: 0, step: 0 });
+    s.select_step_note(0, 0, 0);
     assert_eq!(s.selection.selected, Some((0, 0)));
+    assert_eq!(s.pattern().unwrap().tracks[0].notes.len(), 3);
     assert!(run(&mut s, &mut audio, 512) > 0.0);
     // The track name: heard too.
     run(&mut s, &mut audio, 4000);
@@ -171,6 +172,30 @@ fn the_tempo_and_what_plays_follow_the_view() {
     run(&mut s, &mut audio, CALLBACK);
     assert_eq!(mode(&s), Mode::Pattern(0));
     assert_pass_frames(&s, 4.0, 100.0);
+    s.toggle_play();
+}
+
+#[test]
+fn a_pattern_chosen_while_playing_waits_for_the_loop_to_end_and_says_so() {
+    let (mut s, mut audio) = session(
+        r#"{"patterns":[{"name":"a","bpm":120,"tracks":[{"name":"KICK","notes":[{}]}]},
+                        {"name":"b","bpm":120,"tracks":[{"name":"KICK","notes":[{"beat":1}]}]}]}"#,
+    );
+    let pass = pass_frames(4.0, 120.0) as usize;
+    s.toggle_play();
+    run(&mut s, &mut audio, pass / 4);
+    assert_eq!(s.waiting_blink(), None, "nothing waits");
+    s.step_pattern(1);
+    assert_eq!(s.pattern_index(), 1);
+    assert_eq!(s.message, "pattern b - next, after a");
+    run(&mut s, &mut audio, CALLBACK);
+    let at = position(&s).expect("playing");
+    assert_eq!((at.pass, s.playback.controller().and_then(|c| c.playing_pattern())), (0, Some(0)));
+    assert!(s.waiting_blink().is_some(), "b waits for a to end its loop");
+    run(&mut s, &mut audio, pass);
+    let at = position(&s).expect("playing");
+    assert_eq!((at.pass, s.playback.controller().and_then(|c| c.playing_pattern())), (1, Some(1)));
+    assert_eq!(s.waiting_blink(), None);
     s.toggle_play();
 }
 
@@ -432,10 +457,7 @@ fn a_session_through_the_menus_draws_every_step() {
     s.run(Command::PreviewTrack);
     draw(&mut s);
     s.run(Command::CompactTracks);
-    if s.confirm_open() {
-        draw(&mut s);
-        s.overlay_key(OverlayKey::Enter);
-    }
+    assert!(!s.confirm_open(), "Ctrl+Z undoes it: not asked");
     assert!(!s.overlay_open());
 
     // Patterns made, generated and put in auto mode, while it plays.
@@ -486,6 +508,27 @@ fn a_session_through_the_menus_draws_every_step() {
     assert_eq!(s.message, "notes.txt: not a MIDI, WAV, song or kit file");
     s.run(Command::KitEditor);
     assert!(!s.kit_editor_open());
+
+    // The kit editor names the tracks that play each sample.
+    s.run(Command::KitEditor);
+    let users = s.kit_view(0).map(|k| k.users).unwrap_or_default();
+    assert!(users.iter().any(|u| !u.is_empty()), "{users:?}");
+    s.run(Command::KitEditor);
+
+    // The shortcuts, longer than the window, scroll.
+    s.run(Command::Shortcuts);
+    let rows = crate::view::notice_rows(WINDOW.1, WINDOW.2);
+    assert!(rows < s.shortcut_lines().len());
+    s.overlay_key(OverlayKey::Edge(true));
+    assert!(
+        matches!(s.chrome.overlay, Some(super::Overlay::Shortcuts { scroll }) if scroll == s.shortcut_lines().len() - rows)
+    );
+    s.overlay_key(OverlayKey::Move(-2));
+    assert!(
+        matches!(s.chrome.overlay, Some(super::Overlay::Shortcuts { scroll }) if scroll == s.shortcut_lines().len() - rows - 2)
+    );
+    draw(&mut s);
+    s.overlay_key(OverlayKey::Escape);
 
     // The panels over the window; the factory reset is shown, never run.
     for command in [Command::Shortcuts, Command::About, Command::FactoryReset] {
@@ -547,7 +590,7 @@ fn every_knob_of_the_editors_is_undone() {
     let (mut s, mut audio) = demo_session(&dir);
     s.run(Command::PlayPattern);
     // A note selected: the note editor's knobs are shown too.
-    s.click(Hit::Cell { track: 0, beat: 0, step: 0 });
+    s.select_step_note(0, 0, 0);
     if s.selection.selected.is_none() {
         s.click(Hit::Cell { track: 0, beat: 0, step: 0 });
     }

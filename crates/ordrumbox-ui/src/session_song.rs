@@ -348,7 +348,7 @@ impl Session {
             }
             "delete" => {
                 if self.song().is_some() {
-                    self.ask(Pending::RemoveSong);
+                    self.undoable(Self::remove_song);
                 } else {
                     self.message = "no arrangement to remove".into();
                 }
@@ -443,9 +443,11 @@ impl Session {
         if self.song_playing() {
             self.playback.stop();
         }
+        let name = self.song().map(|song| song.name.clone()).unwrap_or_default();
         if self.editor.remove_song(None) {
             self.song_panel.scroll = (0, 0);
             self.edited();
+            self.message = format!("Removed the arrangement \"{name}\"");
         } else {
             self.message = "no arrangement to remove".into();
         }
@@ -863,7 +865,7 @@ impl Session {
             }
             ("delete", None) => {
                 if let Some(c) = a.parse().ok().filter(|&c: &usize| self.song().is_some_and(|s| c < s.clips.len())) {
-                    self.ask(Pending::RemoveClip(c));
+                    self.undoable(|s| s.remove_clip(c));
                 }
                 return;
             }
@@ -879,7 +881,7 @@ impl Session {
                 }
                 return;
             }
-            ("row", None) => return self.ask(Pending::RemoveRow(a.to_owned())),
+            ("row", None) => return self.undoable(|s| s.remove_row(a)),
             ("pattern-up" | "pattern-down" | "rename" | "pattern-delete", None) => {
                 let Some(p) = a.parse().ok().filter(|&p: &usize| p < self.editor.library().patterns.len()) else {
                     return;
@@ -888,7 +890,7 @@ impl Session {
                     "pattern-up" => self.move_pattern(p, p.saturating_sub(1)),
                     "pattern-down" => self.move_pattern(p, p + 1),
                     "rename" => self.text_entry(Id::SongPattern(p)),
-                    _ => self.ask(Pending::RemovePattern(p)),
+                    _ => self.undoable(|s| s.remove_pattern_now(p)),
                 }
                 return;
             }
@@ -946,20 +948,14 @@ impl Session {
         if self.pattern_index > p {
             self.pattern_index -= 1;
         }
-        if let Some(controller) = self.playback.controller_mut()
-            && let Mode::Pattern(playing) = controller.mode()
-        {
-            match playing.cmp(&p) {
-                std::cmp::Ordering::Equal => controller.stop(),
-                std::cmp::Ordering::Greater => controller.select_pattern(playing - 1),
-                std::cmp::Ordering::Less => {}
-            }
+        if let Some(controller) = self.playback.controller_mut() {
+            controller.remove_pattern(p);
         }
         self.clamp_selection();
         Ok((name, clips))
     }
 
-    /// Pattern `p` deleted, once confirmed.
+    /// Pattern `p` deleted with its clips.
     pub(super) fn remove_pattern_now(&mut self, p: usize) {
         let result = self
             .remove_pattern_with_clips(p)
@@ -1216,8 +1212,7 @@ mod tests {
         assert!(s.song_click(SIZE, l.grid.x + 2, row_y(0), Button::Right));
         assert_eq!(menu(&s), ["add:1:a", "down:0", "row:a"]);
         choose(&mut s, 2);
-        s.overlay_key(OverlayKey::Enter);
-        assert_eq!(s.message, "Removed \"a\" from the arrangement");
+        assert_eq!(s.message, "Removed \"a\" from the arrangement (Ctrl+Z: undo)");
         assert_eq!(clips(&s), [("b".into(), 0, 2.0)]);
         s.undo();
         assert_eq!(clips(&s).len(), 4);
@@ -1246,19 +1241,16 @@ mod tests {
         assert_eq!(menu(&s), ["add:0:a", "pattern-up:1", "rename:1", "pattern-delete:1"]);
         choose(&mut s, 1);
         assert_eq!(s.editor.library().patterns[0].name.as_deref(), Some("a"));
-        // Delete waits for Enter, takes the clips along, and is one undo step.
+        // Delete is done at once, takes the clips along, and is one undo step.
         let (x, y) = row(1);
         s.song_click(SIZE, x, y, Button::Right);
         choose(&mut s, 3);
-        assert!(s.confirm_open());
-        assert_eq!(s.confirm_text(&Pending::RemovePattern(1)).1[0], "\"b\" and its 1 clip(s)");
-        s.overlay_key(OverlayKey::Enter);
-        assert_eq!(s.message, "Removed pattern \"b\" and 1 clip(s)");
+        assert!(!s.confirm_open());
+        assert_eq!(s.message, "Removed pattern \"b\" and 1 clip(s) (Ctrl+Z: undo)");
         assert_eq!(s.editor.library().patterns.len(), 1);
         assert_eq!(clips(&s), [("a".into(), 0, 0.75)]);
         // The last pattern stays.
         s.song_menu_pick("pattern-delete:0");
-        s.overlay_key(OverlayKey::Enter);
         assert_eq!(s.message, "The last pattern of the library stays");
         s.undo();
         assert_eq!(s.editor.library().patterns.len(), 2);
@@ -1477,7 +1469,7 @@ mod tests {
         assert_eq!((s.editor.selected_song(), s.song().unwrap().name.as_str()), (1, "Second"));
         s.select_song(0);
         s.song_button("delete");
-        s.overlay_key(OverlayKey::Enter);
+        assert_eq!(s.message, "Removed the arrangement \"s\" (Ctrl+Z: undo)");
         assert_eq!(s.editor.library().songs.len(), 1);
         assert_eq!(s.song().unwrap().name, "Second");
         s.undo();

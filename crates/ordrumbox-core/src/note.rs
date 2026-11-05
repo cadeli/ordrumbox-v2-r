@@ -7,6 +7,12 @@
 use crate::json::{Object, Value};
 use crate::record::{Issue, SetField, check_duplicate, json_record, round2};
 
+/// The velocity from which a note is an accent: the generators accent at
+/// 0.95 give or take 0.05.
+pub const ACCENT_VELOCITY: f64 = 0.9;
+/// The velocity an accent is given by hand.
+pub const ACCENTED_VELOCITY: f64 = 1.0;
+
 json_record! {
     /// One note. The field order is the compact-format key order
     /// (`NOTE_KEY_ORDER`): a `noteKeys` header lists its keys in this order.

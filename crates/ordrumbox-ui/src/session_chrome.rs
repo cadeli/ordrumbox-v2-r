@@ -26,6 +26,8 @@ pub(super) struct Chrome {
     /// What of the grid is under the mouse, for its tooltip: a step (its
     /// note's) or a track's name (the track's).
     pub(super) hover: Option<crate::view::Hit>,
+    /// The control of a panel under the mouse that has a tooltip, and where it is.
+    pub(super) control_hover: Option<(crate::panel::Id, crate::panel::Rect)>,
     /// A track pressed by its name, that may be dragged to another row.
     pub(super) track_drag: Option<session_grid::TrackDrag>,
     /// Window size and scale of the last mouse or key event on the widgets.
@@ -36,6 +38,10 @@ pub(super) struct Chrome {
     pub(super) show_track_editor: bool,
     /// Whether the VU meter stripe is shown.
     pub(super) show_vus: bool,
+    /// The display's scale factor (≥ 1).
+    pub(super) display_scale: i32,
+    /// Whole scales added to the display's (Ctrl++, Ctrl+-; `session_zoom.rs`).
+    pub(super) zoom: i32,
     /// Smoothed per-track levels for the VU meter stripe.
     track_levels: Vec<f32>,
 }
@@ -48,11 +54,14 @@ impl Default for Chrome {
             last_dir: None,
             widgets: Widgets::default(),
             hover: None,
+            control_hover: None,
             track_drag: None,
             panel_size: (0, 0, 1),
             current_page: 0,
             show_track_editor: true,
             show_vus: true,
+            display_scale: 1,
+            zoom: 0,
             track_levels: Vec::new(),
         }
     }

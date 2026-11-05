@@ -6,6 +6,8 @@
 //! click runs a command. Keyboard: F10 or Alt opens the first menu, arrows
 //! move, Enter runs, Escape closes.
 
+use std::borrow::Cow;
+
 use crate::canvas::{Canvas, Rgb, text_width};
 use crate::theme;
 
@@ -39,6 +41,7 @@ pub enum Command {
     Paste,
     PasteTrack,
     ClearStep,
+    ToggleAccent,
     Deselect,
     NewPattern,
     DuplicatePattern,
@@ -87,6 +90,9 @@ pub enum Command {
     SelectRandomDrumkit,
     ToggleVus,
     NextColorScheme,
+    ZoomIn,
+    ZoomOut,
+    ZoomReset,
     ExportPatternJson,
     ConvertToSynth,
     AutoAssignAll,
@@ -153,14 +159,29 @@ impl Command {
             _ => None,
         }
     }
+
+    /// What a plugin's menu shows in place of the shortcut of a command it
+    /// does not run: whose it is.
+    fn hosted_tag(self) -> Option<&'static str> {
+        match self {
+            Self::Save | Self::Quit | Self::TempoDown | Self::TempoUp => Some(HOST_TAG),
+            _ => self.hosted_refusal().map(|_| APP_TAG),
+        }
+    }
 }
+
+/// A plugin's tag for a command the host does.
+const HOST_TAG: &str = "host's";
+
+/// A plugin's tag for a command of the app alone.
+const APP_TAG: &str = "app only";
 
 /// One line of a menu.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Item {
     Command {
         label: String,
-        shortcut: &'static str,
+        shortcut: Cow<'static, str>,
         command: Command,
         enabled: bool,
         /// `Some` for an on/off command.
@@ -170,7 +191,7 @@ pub enum Item {
 }
 
 impl Item {
-    fn runnable(&self) -> Option<Command> {
+    pub fn runnable(&self) -> Option<Command> {
         match self {
             Self::Command { command, enabled: true, .. } => Some(*command),
             _ => None,
@@ -236,11 +257,11 @@ pub struct MenuState {
 }
 
 fn command(label: impl Into<String>, shortcut: &'static str, command: Command, enabled: bool) -> Item {
-    Item::Command { label: label.into(), shortcut, command, enabled, checked: None }
+    Item::Command { label: label.into(), shortcut: shortcut.into(), command, enabled, checked: None }
 }
 
 fn check(label: &str, shortcut: &'static str, command: Command, enabled: bool, on: bool) -> Item {
-    Item::Command { label: label.into(), shortcut, command, enabled, checked: Some(on) }
+    Item::Command { label: label.into(), shortcut: shortcut.into(), command, enabled, checked: Some(on) }
 }
 
 /// The menus, as they stand.
@@ -254,11 +275,11 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
     let kits: Vec<Item> = vec![
         command("Previous kit", ",", C::PreviousKit, s.kits.len() > 1),
         command("Next kit", ".", C::NextKit, s.kits.len() > 1),
-        command("Random kit", "G", C::SelectRandomDrumkit, s.kits.len() > 1),
+        command("Random kit", "Shift+G", C::SelectRandomDrumkit, s.kits.len() > 1),
         Item::Separator,
-        command("Auto-assign all tracks", "J", C::AutoAssignAll, p),
-        command("Use synth kit", "H", C::ConvertToSynth, p),
-        command("Random samples on all tracks", "K", C::RandomSamples, p && !s.kits.is_empty()),
+        command("Auto-assign all tracks", "Shift+J", C::AutoAssignAll, p),
+        command("Use synth kit", "Shift+H", C::ConvertToSynth, p),
+        command("Random samples on all tracks", "Shift+K", C::RandomSamples, p && !s.kits.is_empty()),
         Item::Separator,
         check("Kit editor", "Ctrl+K", C::KitEditor, true, s.kit_editor),
         command("Normalize kit", "", C::NormalizeKit, !s.kits.is_empty()),
@@ -269,7 +290,7 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
         Menu {
             title: "File",
             items: vec![
-                command("Save", "", C::Save, s.can_save),
+                command("Save", "Ctrl+S", C::Save, s.can_save),
                 Item::Separator,
                 command("Save song", "", C::SaveSong, s.can_save_song),
                 command("Save song as...", "", C::SaveSongAs, true),
@@ -282,7 +303,7 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
                 command("Load the demo library...", "", C::DemoLibrary, s.has_demo),
                 Item::Separator,
                 command("Import MIDI file...", "Ctrl+O", C::ImportMidi, true),
-                command("Export pattern as JSON...", "Ctrl+S", C::ExportPatternJson, p),
+                command("Export pattern as JSON...", "Ctrl+Shift+S", C::ExportPatternJson, p),
                 command("Export pattern as MIDI...", "Ctrl+M", C::ExportMidi, p),
                 command("Export pattern as WAV...", "Ctrl+E", C::ExportWav, p && s.can_render),
                 command("Export song as WAV...", "Ctrl+Shift+E", C::ExportSongWav, s.has_songs && s.can_render),
@@ -313,6 +334,7 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
                 command("Paste track", "Ctrl+Shift+V", C::PasteTrack, p && s.clipboard_track),
                 Item::Separator,
                 command("Clear step", "Delete", C::ClearStep, s.has_cursor),
+                command("Accent on / off", "L", C::ToggleAccent, s.has_cursor),
                 command("Deselect", "Esc", C::Deselect, s.has_cursor || s.has_selection),
             ],
         },
@@ -329,6 +351,10 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
                 Item::Separator,
                 check("VU meters", "V", C::ToggleVus, true, s.show_vus),
                 command("Next colour scheme", "C", C::NextColorScheme, true),
+                Item::Separator,
+                command("Zoom in", "Ctrl++", C::ZoomIn, true),
+                command("Zoom out", "Ctrl+Shift+-", C::ZoomOut, true),
+                command("Actual size", "Ctrl+0", C::ZoomReset, true),
             ],
         },
         Menu {
@@ -416,41 +442,30 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
         },
     ];
     if s.hosted {
-        for menu in &mut menus {
-            menu.items = without_host_commands(std::mem::take(&mut menu.items));
+        for item in menus.iter_mut().flat_map(|menu| &mut menu.items) {
+            host_item(item);
         }
-        // The Song menu: nothing left.
-        menus.retain(|menu| !menu.items.is_empty());
     }
     menus
 }
 
-/// A shortcut whose key a plugin leaves to the host (`Ui::key`): every
-/// Ctrl/Cmd key, and Space, its transport.
-fn host_key(shortcut: &str) -> bool {
-    shortcut.starts_with("Ctrl+") || shortcut.contains("Space")
-}
+/// The prefix of a shortcut whose key a plugin leaves to the host: every
+/// Ctrl/Cmd key, which Alt replaces there (`Ui::key`).
+const CONTROL_PREFIX: &str = "Ctrl+";
 
-/// `items` without the commands a plugin does not run, the keys it leaves to
-/// the host, and the separators left at an end or next to another.
-fn without_host_commands(items: Vec<Item>) -> Vec<Item> {
-    let mut kept: Vec<Item> = Vec::with_capacity(items.len());
-    for mut item in items {
-        if let Item::Command { shortcut, .. } = &mut item
-            && host_key(shortcut)
-        {
-            *shortcut = "";
-        }
-        match &item {
-            Item::Command { command, .. } if command.hosted_refusal().is_some() => {}
-            Item::Separator if kept.last().is_none_or(|last| *last == Item::Separator) => {}
-            _ => kept.push(item),
-        }
+/// What a plugin shows of `item`: a command it does not run greyed out,
+/// with whose it is (the host's, the app's) in place of its shortcut; Alt in
+/// place of Ctrl; no Space, the host's transport.
+fn host_item(item: &mut Item) {
+    let Item::Command { shortcut, command, enabled, .. } = item else { return };
+    if let Some(tag) = command.hosted_tag() {
+        *enabled = false;
+        *shortcut = tag.into();
+    } else if let Some(key) = shortcut.strip_prefix(CONTROL_PREFIX) {
+        *shortcut = format!("Alt+{key}").into();
+    } else if shortcut.contains("Space") {
+        *shortcut = "".into();
     }
-    if kept.last() == Some(&Item::Separator) {
-        kept.pop();
-    }
-    kept
 }
 
 // ─── Open menu ───────────────────────────────────────────────────────────────
@@ -777,35 +792,37 @@ mod tests {
     }
 
     #[test]
-    fn a_plugin_menu_leaves_out_what_the_host_does() {
-        let state = MenuState { can_save: true, hosted: true, ..state() };
+    fn a_plugin_menu_greys_out_what_it_leaves_and_says_whose_it_is() {
+        let state = MenuState { can_save: true, has_songs: true, hosted: true, ..state() };
         let menus = menus(&state);
-        for menu in &menus {
+        let app = super::menus(&MenuState { hosted: false, ..state.clone() });
+        assert_eq!(menus.len(), app.len(), "the Song menu too");
+        for (menu, app_menu) in menus.iter().zip(&app) {
+            assert_eq!(menu.items.len(), app_menu.items.len(), "{}", menu.title);
             for item in &menu.items {
-                if let Item::Command { command, .. } = item {
-                    assert_eq!(command.hosted_refusal(), None, "{command:?} in {}", menu.title);
+                let Item::Command { shortcut, command, enabled, .. } = item else { continue };
+                match command.hosted_refusal() {
+                    Some(_) => {
+                        assert!(!enabled, "{command:?}");
+                        assert!([HOST_TAG, APP_TAG].contains(&shortcut.as_ref()), "{command:?}: {shortcut}");
+                    }
+                    None => assert!(!shortcut.starts_with(CONTROL_PREFIX) && !shortcut.contains("Space")),
                 }
             }
-            assert_ne!(menu.items.first(), Some(&Item::Separator), "{}", menu.title);
-            assert_ne!(menu.items.last(), Some(&Item::Separator), "{}", menu.title);
-            assert!(!menu.items.windows(2).any(|w| w[0] == Item::Separator && w[1] == Item::Separator));
         }
-        assert!(!menus.iter().any(|m| m.title == "Song"));
-        // The keys the host keeps are not shown.
-        let shortcuts = || {
-            menus.iter().flat_map(|m| &m.items).filter_map(|i| match i {
-                Item::Command { shortcut, .. } => Some(*shortcut),
-                Item::Separator => None,
+        let item = |command| {
+            menus.iter().flat_map(|m| &m.items).find_map(|i| match i {
+                Item::Command { shortcut, command: c, enabled, .. } if *c == command => {
+                    Some((shortcut.as_ref(), *enabled))
+                }
+                _ => None,
             })
         };
-        assert!(shortcuts().all(|s| !host_key(s)));
-        assert!(shortcuts().any(|s| s == "F1"));
-        // The rest is the app's menus.
-        let app = super::menus(&MenuState { hosted: false, ..state });
-        let file = |menus: &[Menu]| menus[0].items.iter().filter_map(Item::runnable).collect::<Vec<_>>();
-        let mut expected = file(&app);
-        expected.retain(|c| c.hosted_refusal().is_none());
-        assert_eq!(file(&menus), expected);
+        assert_eq!(item(Command::Save), Some((HOST_TAG, false)));
+        assert_eq!(item(Command::SongView), Some((APP_TAG, false)));
+        assert_eq!(item(Command::KitEditor), Some(("Alt+K", true)));
+        assert_eq!(item(Command::Undo), Some(("Alt+Z", true)));
+        assert_eq!(item(Command::Shortcuts), Some(("F1", true)));
     }
 
     #[test]

@@ -309,6 +309,9 @@ pub struct Controller {
     /// Passes posted, oldest first, kept while the engine or the inbox may
     /// hold them (and the newest: the next pass follows it).
     sent: VecDeque<Arc<Pass>>,
+    /// The pattern of each pass built in pattern mode, by pass number, oldest
+    /// first (a rebuild comes after the build it replaces).
+    pass_patterns: VecDeque<(u64, usize)>,
     /// Previews posted, oldest first, kept while the engine or the inbox may hold them.
     previews: VecDeque<Arc<Pass>>,
     playing: bool,
@@ -384,6 +387,7 @@ impl Controller {
             assigned: HashMap::new(),
             song_notes: HitsCache::new(),
             sent: VecDeque::new(),
+            pass_patterns: VecDeque::new(),
             previews: VecDeque::new(),
             playing: false,
             tempo: None,
@@ -409,10 +413,41 @@ impl Controller {
         self.mode
     }
 
-    /// Play pattern `index` from the next pass on (pattern mode).
+    /// Play pattern `index` from the next pass on (pattern mode): the pass
+    /// playing ends first, and a next pass already posted is built again.
     pub fn select_pattern(&mut self, index: usize) {
         if let Mode::Pattern(_) = self.mode {
             self.mode = Mode::Pattern(index);
+        }
+    }
+
+    /// The pattern of the pass playing now (pattern mode); `None` when
+    /// stopped, in song mode, or before the first pass has started.
+    pub fn playing_pattern(&self) -> Option<usize> {
+        if !self.playing || !matches!(self.mode, Mode::Pattern(_)) {
+            return None;
+        }
+        self.pattern_of(self.position()?.pass)
+    }
+
+    /// The pattern pass `number` was last built from.
+    fn pattern_of(&self, number: u64) -> Option<usize> {
+        self.pass_patterns.iter().rev().find(|(n, _)| *n == number).map(|(_, p)| *p)
+    }
+
+    /// Pattern `p` left the library: the later ones move down one. Playback
+    /// stops when `p` plays or is the one to play next.
+    pub fn remove_pattern(&mut self, p: usize) {
+        let Mode::Pattern(selected) = self.mode else { return };
+        if selected == p || self.pass_patterns.iter().any(|(_, q)| *q == p) {
+            self.stop();
+            self.pass_patterns.clear();
+            return;
+        }
+        let shift = |q: usize| if q > p { q - 1 } else { q };
+        self.mode = Mode::Pattern(shift(selected));
+        for (_, q) in &mut self.pass_patterns {
+            *q = shift(*q);
         }
     }
 
@@ -498,8 +533,14 @@ impl Controller {
 
     /// Pass `number` of what plays; `None` when there is nothing to play.
     fn build(&mut self, library: &Library, number: u64) -> Option<Arc<Pass>> {
-        let pass = match self.mode {
+        self.build_of(library, number, self.mode)
+    }
+
+    /// Pass `number` of `mode`.
+    fn build_of(&mut self, library: &Library, number: u64, mode: Mode) -> Option<Arc<Pass>> {
+        let pass = match mode {
             Mode::Pattern(p) => {
+                self.pass_patterns.push_back((number, p));
                 let pattern = library.patterns.get(p)?;
                 let sounds = self.sounds(library, p);
                 let context = PassContext {
@@ -618,6 +659,7 @@ impl Controller {
     /// measure clicked sounds right away), with the sounds already assigned.
     pub fn jump(&mut self, library: &Library, first: u64) {
         self.song_notes.clear();
+        self.pass_patterns.clear();
         let Some(pass) = self.build(library, first) else { return };
         let mut inbox = lock(&self.link.inbox);
         inbox.command = Some(Command::Play(pass));
@@ -639,7 +681,12 @@ impl Controller {
             return;
         }
         self.song_notes.clear();
-        let Some(pass) = self.build(library, number) else { return };
+        // The pass playing keeps its pattern: a pattern selected meanwhile waits for the next.
+        let mode = match self.mode {
+            Mode::Pattern(p) => Mode::Pattern(self.pattern_of(number).unwrap_or(p)),
+            song => song,
+        };
+        let Some(pass) = self.build_of(library, number, mode) else { return };
         let mut inbox = lock(&self.link.inbox);
         inbox.command = Some(Command::Replace(pass));
         inbox.next = None;
@@ -664,6 +711,16 @@ impl Controller {
         (self.playing && follows).then_some(wants)
     }
 
+    /// The next pass, already posted, when it was built from another
+    /// pattern than the one selected since: it is built again.
+    fn stale_next_pass(&self) -> Option<u64> {
+        let Mode::Pattern(selected) = self.mode else { return None };
+        let next = self.sent.back()?.number;
+        let playing = self.position()?.pass;
+        let waiting_play = matches!(lock(&self.link.inbox).command, Some(Command::Play(_)));
+        (self.playing && next > playing && !waiting_play && self.pattern_of(next) != Some(selected)).then_some(next)
+    }
+
     /// Call regularly (every UI frame) while playing: posts the next pass
     /// when the engine needs it, so tempo, kit and pattern changes take
     /// effect at the next pass boundary. Under a plugin host
@@ -674,12 +731,16 @@ impl Controller {
         if let Some(host) = snapshot.host {
             self.follow_host(library, host, snapshot.lost);
         }
-        if let Some(number) = self.pending_pass()
+        if let Some(number) = self.pending_pass().or_else(|| self.stale_next_pass())
             && let Some(pass) = self.build(library, number)
         {
             lock(&self.link.inbox).next = Some(pass);
         }
         release(&mut self.sent, true);
+        // The lowest number held, not the first: a jump starts the numbers again.
+        if let Some(oldest) = self.sent.iter().map(|p| p.number).min() {
+            self.pass_patterns.retain(|(n, _)| *n >= oldest);
+        }
         release(&mut self.previews, false);
         self.old_banks.retain(|bank| Arc::strong_count(bank) > 1);
     }
@@ -794,6 +855,55 @@ mod tests {
         controller.stop();
         audio.render(&mut l, &mut r);
         assert_eq!(controller.position(), None);
+    }
+
+    #[test]
+    fn a_pattern_selected_while_playing_waits_for_the_end_of_the_pass() {
+        let (library, _) = Library::parse(
+            r#"{"patterns":[{"name":"a","bpm":120,"tracks":[{"name":"KICK","notes":[{}]}]},
+                            {"name":"b","bpm":120,"tracks":[{"name":"KICK","notes":[{"beat":1}]}]}]}"#,
+        )
+        .unwrap();
+        let (mut controller, mut audio) = Controller::new(8000.0, bank(), Scales::default(), SynthPresets::default());
+        controller.play(&library, Mode::Pattern(0));
+        let (mut l, mut r) = (vec![0.0; 256], vec![0.0; 256]);
+        let mut callback = |controller: &mut Controller| {
+            controller.update(&library);
+            audio.render(&mut l, &mut r);
+            let at = controller.position().expect("playing").pass;
+            (at, controller.playing_pattern())
+        };
+        // A quarter of the first pass (16000 frames): the next one is posted by then.
+        for _ in 0..16 {
+            callback(&mut controller);
+        }
+        assert!(controller.sent.iter().any(|p| p.number == 1), "the next pass is posted ahead");
+        controller.select_pattern(1);
+        // An edit meanwhile rebuilds the pass playing from its own pattern.
+        controller.refresh(&library);
+        let mut seen = Vec::new();
+        for _ in 0..(2 * 16_000 / 256) {
+            let met = callback(&mut controller);
+            if seen.last() != Some(&met) {
+                seen.push(met);
+            }
+        }
+        assert_eq!(seen, [(0, Some(0)), (1, Some(1)), (2, Some(1))]);
+    }
+
+    #[test]
+    fn removing_a_pattern_moves_the_later_ones_down_and_stops_on_the_one_playing() {
+        let (library, _) = Library::parse(
+            r#"{"patterns":[{"name":"a","tracks":[]},{"name":"b","tracks":[]},{"name":"c","tracks":[]}]}"#,
+        )
+        .unwrap();
+        let (mut controller, _audio) = Controller::new(8000.0, bank(), Scales::default(), SynthPresets::default());
+        controller.play(&library, Mode::Pattern(2));
+        controller.remove_pattern(0);
+        assert_eq!(controller.mode(), Mode::Pattern(1));
+        assert_eq!(controller.pattern_of(0), Some(1));
+        controller.remove_pattern(1);
+        assert!(!controller.is_playing());
     }
 
     #[test]
