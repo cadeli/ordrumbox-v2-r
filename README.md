@@ -801,10 +801,11 @@ with the scripts of `tools/`, which need a checkout of it only to make them
 again. They hold the JS names of the keys; the tests compare after
 `web_keys::current_keys` (`crates/ordrumbox-core/tests/support/`).
 
-The fixtures guard against regressions: a test that fails signals a change of
-behaviour, and by default the code is wrong. A change meant on purpose moves the
-cases concerned to a Rust snapshot or a property test, and is noted here, as the
-synth voice's departures are below.
+The JS app is no longer the reference: the fixtures only guard against
+regressions, and are to be replaced over time by pure Rust tests. A test that
+fails signals a change of behaviour; if it is not meant, the code is wrong. A
+change meant on purpose moves the cases concerned to a Rust snapshot or a
+property test, and is noted here, as the synth voice's departures are below.
 
 `tools/export_fixtures.mjs` runs the JS app's code on
 `assets/data/song.json` and writes `crates/ordrumbox-core/tests/fixtures/`:
@@ -827,8 +828,8 @@ node tools/export_fixtures.mjs ../ordrumbox-v2
   `Math.random` streams give the same notes: Rust must give exactly those notes
   and draw no randomness. The other passes are checked by properties.
 
-Re-run the script when `song.json` changes, or when this app is to follow a
-change of the JS engine.
+Re-run the script only when `song.json` changes; this app no longer follows
+changes of the JS engine.
 
 The audio processors have their own script, which runs the JS AudioWorklet
 processors in Node (a minimal worklet scope, 128-frame quanta):
