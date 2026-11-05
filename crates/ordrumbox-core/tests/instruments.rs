@@ -29,7 +29,7 @@ fn num(v: &Value, key: &str) -> i64 {
 
 /// Names `from_file_name` reads unlike the JS app, on purpose (`README.md`, "Golden fixtures"):
 /// the name, what the JS found, what this app finds.
-const FILE_NAME_DEPARTURES: [(&str, &str, &str); 4] = [
+const FILE_NAME_DEPARTURES: [(&str, &str, &str); 7] = [
     // A hat that says nothing of its openness is a closed one.
     ("hat", "OHH", "CHH"),
     // HI and LOW pick the variant, they do not find the instrument.
@@ -37,6 +37,12 @@ const FILE_NAME_DEPARTURES: [(&str, &str, &str); 4] = [
     ("tom_hi", "HI_BONGOS", "HI_TOM"),
     // VOX is read as ENSEMBLE.
     ("vox", NOT_FOUND, "ENSEMBLE"),
+    // A snare's rim is a rimshot.
+    ("Snare Rim", "SNARE", "RIMSHOT"),
+    // BELL counts last: the GM "Ride Bell" no longer makes it a percussion.
+    ("COW BELL", "PERC", "COWBELL"),
+    // The closest GM name: "Low Conga", not "Mute Hi Conga".
+    ("conga low", "CHI_CONGAS", "LO_CONGAS"),
 ];
 
 #[test]

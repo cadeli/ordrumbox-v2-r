@@ -1,14 +1,12 @@
 #!/usr/bin/env node
-// Instrument catalog and golden fixtures for sound assignment, song playback
-// and WAV encoding, produced by the JS app's own modules.
+// Golden fixtures for sound assignment, song playback and WAV encoding,
+// produced by the JS app's own modules. The instrument catalog the port reads,
+// crates/ordrumbox-core/data/instruments.json, is the port's own (edited by
+// hand): this script no longer writes it.
 //
 //   node tools/export_assign_fixtures.mjs <path-to-ordrumbox-v2>
 //
 // Writes:
-//   crates/ordrumbox-core/data/instruments.json   the instrument catalog as
-//       InstrumentsManager holds it once loaded (GM keys/programs filled in),
-//       plus the GM drum and program names. This is source data for the port,
-//       not a fixture: regenerate it when instruments_data.js changes.
 //   crates/ordrumbox-core/tests/fixtures/instruments.json   lookups
 //       (findById, findByName, findInstrumentFromFileName, MIDI) for many names.
 //   crates/ordrumbox-core/tests/fixtures/song_sources.json   resolveSongSources()
@@ -36,34 +34,13 @@ const root = join(here, '..')
 const srcUrl = (rel) => pathToFileURL(resolve(jsRepo, 'src', rel)).href
 const readJson = async (rel) => JSON.parse(await readFile(resolve(jsRepo, rel), 'utf8'))
 
-const { instrumentsManager, GM_DRUM_NAMES, GM_PROGRAM_NAMES } = await import(
+const { instrumentsManager } = await import(
     srcUrl('logic/services/instruments_manager/index.js')
 )
 const { default: AutoAssign } = await import(srcUrl('logic/services/auto_assign.js'))
 const { resolveSongSources } = await import(srcUrl('logic/song_playback.js'))
 const { bufferToWav } = await import(srcUrl('audio/export/wav_encoder.js'))
 const { fixSongs, fixPatterns } = await import(srcUrl('patterns/fixer.js'))
-
-// ─── Catalog ─────────────────────────────────────────────────────────────────
-
-const catalog = {
-    instruments: [...instrumentsManager.instrumentById.values()].map((inst) => ({
-        id: inst.id,
-        drum: inst.drum,
-        pan: String(inst.pan),
-        synonyms: inst.synonyms,
-        subst: Object.values(inst.subst ?? {}),
-        midi: inst.midi.map((m) => ({
-            channel: m.channel,
-            name: m.name,
-            key: m.key,
-            program: m.program,
-            keyBased: m.keyBased,
-        })),
-    })),
-    gmDrumNames: GM_DRUM_NAMES,
-    gmProgramNames: GM_PROGRAM_NAMES,
-}
 
 // ─── Lookups ─────────────────────────────────────────────────────────────────
 
@@ -173,7 +150,6 @@ const write = async (rel, value) => {
     await mkdir(dirname(path), { recursive: true })
     await writeFile(path, JSON.stringify(value) + '\n')
 }
-await write('crates/ordrumbox-core/data/instruments.json', catalog)
 await write('crates/ordrumbox-core/tests/fixtures/instruments.json', { lookups, midi, programs })
 await write('crates/ordrumbox-core/tests/fixtures/song_sources.json', sourceCases)
 await write('crates/ordrumbox-engine/tests/fixtures/assign.json', assignCases)
@@ -185,6 +161,6 @@ await write('crates/ordrumbox-engine/tests/fixtures/wav.json', {
     bytes: wavBytes.toString('base64'),
 })
 print(
-    `instruments: ${catalog.instruments.length}, lookups: ${lookups.length}, song ticks: ` +
+    `lookups: ${lookups.length}, song ticks: ` +
         `${sourceCases.map((c) => c.ticks.length).join('+')}, assign cases: ${assignCases.length}`,
 )

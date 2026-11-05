@@ -35,12 +35,17 @@ fn bank() -> (SampleBank, Vec<String>) {
 
 /// Track names whose detection departs from the JS app (`README.md`, "Golden fixtures"),
 /// with the samples this app picks in kit `real`: first candidate, last candidate.
-const DEPARTURES: [(&str, &str, &str); 4] = [
+const DEPARTURES: [(&str, &str, &str); 7] = [
     ("hat", "real/chh.wav", "real/chh.wav"),
     ("LOW TOM", "matt/LOW_TOM.wav", "human/LowTom.wav"),
     ("tom_hi", "human/HiTom.wav", "human/HiTom.wav"),
     // No ENSEMBLE sample: its first substitute, BRASS.
     ("vox", "real/brass-c4.wav", "real/brass-c4.wav"),
+    // A snare's rim is a rimshot; BELL counts last.
+    ("Snare Rim", "matt/RIMSHOT.wav", "open/RIMSHOT.wav"),
+    ("COW BELL", "real/cow.wav", "real/cow.wav"),
+    // The closest GM name makes it the low conga, which kit real has.
+    ("conga low", "real/low_congas.wav", "real/low_congas.wav"),
 ];
 
 fn sample_picked(track_name: &str, bank: &SampleBank, kit: &str, pick: usize) -> String {
