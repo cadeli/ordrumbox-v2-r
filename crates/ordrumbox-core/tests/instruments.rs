@@ -27,6 +27,18 @@ fn num(v: &Value, key: &str) -> i64 {
     v.get(key).and_then(Value::as_f64).unwrap_or_else(|| panic!("{key}")) as i64
 }
 
+/// Names `from_file_name` reads unlike the JS app, on purpose (`README.md`, "Golden fixtures"):
+/// the name, what the JS found, what this app finds.
+const FILE_NAME_DEPARTURES: [(&str, &str, &str); 4] = [
+    // A hat that says nothing of its openness is a closed one.
+    ("hat", "OHH", "CHH"),
+    // HI and LOW pick the variant, they do not find the instrument.
+    ("LOW TOM", "HI_TOM", "LO_TOM"),
+    ("tom_hi", "HI_BONGOS", "HI_TOM"),
+    // VOX is read as ENSEMBLE.
+    ("vox", NOT_FOUND, "ENSEMBLE"),
+];
+
 #[test]
 fn lookups_match_the_js_instruments_manager() {
     let fx = fixture("instruments.json");
@@ -38,7 +50,14 @@ fn lookups_match_the_js_instruments_manager() {
         assert_eq!(id(c.by_id(name)), str_of(l, "byId"), "findById({name:?})");
         assert_eq!(c.by_id(name).is_some_and(|i| i.drum), l.get("byIdDrum").and_then(Value::as_bool) == Some(true));
         assert_eq!(id(c.by_name(name)), str_of(l, "byName"), "findByName({name:?})");
-        assert_eq!(id(c.from_file_name(name)), str_of(l, "fromFileName"), "findInstrumentFromFileName({name:?})");
+        let want = match FILE_NAME_DEPARTURES.iter().find(|(n, ..)| *n == name) {
+            Some(&(_, js, rust)) => {
+                assert_eq!(str_of(l, "fromFileName"), js, "departure {name:?}: the fixture changed");
+                rust
+            }
+            None => str_of(l, "fromFileName"),
+        };
+        assert_eq!(id(c.from_file_name(name)), want, "from_file_name({name:?})");
     }
     for m in fx.get("midi").and_then(Value::as_array).expect("midi") {
         let (channel, key) = (num(m, "channel"), num(m, "key"));

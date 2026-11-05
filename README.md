@@ -184,9 +184,11 @@ melodic instruments on their own channels at the sample's root note) to a
 folder picked. A `.mid` dropped on the window becomes new 32-beat patterns (up to
 16), one track per instrument found (by GM program, drum key, then track
 name), in one undo step. As in the JS app, the file's tempo is not read
-(120 BPM). Two departures from the JS: a file timed in SMPTE frames or with a
-0 division is refused, and the message says when notes past beat 512 (the
-16th pattern) are left out.
+(120 BPM). Three departures from the JS: a file timed in SMPTE frames or with a
+0 division is refused, the message says when notes past beat 512 (the
+16th pattern) are left out, and a drum key named by its GM name after an
+instrument another key plays keeps its notes on a numbered track ("Acoustic
+Bass Drum" beside "Bass Drum 1" is `KICK 2`).
 
 The window keeps the same three parts whatever is edited: one main editor in
 the top-left (the grid, the piano roll, the song panel, the synth editor, or
@@ -847,6 +849,27 @@ node tools/export_assign_fixtures.mjs ../ordrumbox-v2
   candidate.
 - `ordrumbox-engine/tests/fixtures/wav.json`: `bufferToWav()` bytes.
 
+The detection of an instrument from a file or patch name
+(`Catalog::from_file_name`) departs from `findInstrumentFromFileName`:
+digits do not count and CamelCase is cut; the qualifiers (HI, LOW, MID,
+FLOOR, SHORT, LONG…) and OPEN/CLOSED only pick the variant of what the other
+words found; a patch category prefix (`LD`, `PD`, `BA`, `KY`…) names the
+category unless it is a catalog word or pattern; synth and keys words are read
+as an instrument (Rhodes, Supersaw, Reese, Choir, Agogo as a cowbell, Pedal as
+the pedal hat), or only when nothing else is found (Stab, Pluck, Sub, Chord,
+Sweep, a lone 808 as a bass); short spellings count as the word (`crsh`,
+`shkr`, `rd`, `Splash`, `Castanets`: `ABBREVIATIONS`, none a word of another
+instrument); a bass drum is a kick; a pattern of two words (`.*TUBULAR.*BELL.*`)
+is tried on the whole name first, and the generic words (PERC, HIT, LOOP, DRUM,
+CYMBAL, SYNTH) last; and the most specific pattern wins. The names
+the JS read otherwise are listed with what this app reads:
+`FILE_NAME_DEPARTURES` in `ordrumbox-core/tests/instruments.rs`, `DEPARTURES`
+in `ordrumbox-engine/tests/assign.rs` (kit `real`; those names are left out of
+the JS comparison), and `TRACK_NAME_DEPARTURES` in
+`ordrumbox-logic/tests/midi.rs` (GM key 44, "Pedal Hi-Hat", is a CHHK track,
+not a high bongo; key 35, "Acoustic Bass Drum", is `KICK 2`, not a bass). The rules themselves are unit tests in
+`ordrumbox-core/src/instruments.rs`.
+
 The generators have a fifth script; it also writes the variant tables the
 port reads (`ordrumbox-logic/data/generators.json`):
 
@@ -898,7 +921,8 @@ node tools/export_midi_fixtures.mjs ../ordrumbox-v2
   comparator that contradicts itself, so the bytes depend on V8's TimSort,
   which `ordrumbox_core::js::sort_by` reproduces step by step. The import
   message of `long-format2.mid` departs (it says the notes past the 16th
-  pattern are left out; `CUT_FILES` in `tests/midi.rs`), and the refused
+  pattern are left out; `CUT_FILES` in `tests/midi.rs`), so do the drum tracks
+  named from GM keys 44 and 35 (`TRACK_NAME_DEPARTURES`, above), and the refused
   timings are checked in Rust only.
 
 The kit editor's sample analysis has a seventh script:
