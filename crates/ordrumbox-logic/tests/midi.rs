@@ -212,6 +212,15 @@ fn exporter() {
 const CUT_FILES: &[&str] = &["long-format2.mid"];
 const CUT_NOTE: &str = ", notes past beat 512 left out";
 
+/// Drum tracks the import names unlike the JS app (`README.md`, "Golden fixtures"),
+/// which read GM key 44 ("Pedal Hi-Hat") as a high bongo and key 35 ("Acoustic
+/// Bass Drum") as a bass: file, track index, JS name, name here.
+const TRACK_NAME_DEPARTURES: &[(&str, usize, &str, &str)] = &[
+    ("band-format1.mid", 2, "BASS", "KICK 2"),
+    ("band-format1.mid", 5, "HI_BONGOS", "CHHK"),
+    ("export-salsa.mid", 3, "HI_BONGOS", "CHHK"),
+];
+
 #[test]
 fn importer() {
     let fixtures = fixtures();
@@ -239,9 +248,15 @@ fn importer() {
                     assert_eq!(num(pattern.beat_count), *expected.get("beatCount").unwrap(), "{at}: beats");
                     let tracks = items(expected, "tracks");
                     assert_eq!(pattern.tracks.len(), tracks.len(), "{at}: tracks");
-                    for (track, expected) in pattern.tracks.iter().zip(tracks) {
+                    for (t, (track, expected)) in pattern.tracks.iter().zip(tracks).enumerate() {
                         let at = format!("{at} {}", track.name);
-                        assert_eq!(Some(track.name.as_str()), expected.get("name").and_then(Value::as_str), "{at}");
+                        let js_name = expected.get("name").and_then(Value::as_str).unwrap();
+                        let departure = TRACK_NAME_DEPARTURES.iter().find(|d| d.0 == name && d.1 == t);
+                        let want = departure.map_or(js_name, |d| {
+                            assert_eq!(d.2, js_name, "{at}: the fixture still holds the JS name");
+                            d.3
+                        });
+                        assert_eq!(track.name, want, "{at}");
                         for (key, value) in [
                             ("beatCount", num(track.beat_count)),
                             ("stepsPerBeat", num(track.steps_per_beat)),

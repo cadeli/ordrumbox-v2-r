@@ -33,24 +33,49 @@ fn bank() -> (SampleBank, Vec<String>) {
     (SampleBank { samples }, kits.iter().map(|k| k.name.clone()).collect())
 }
 
+/// Track names whose detection departs from the JS app (`README.md`, "Golden fixtures"),
+/// with the samples this app picks in kit `real`: first candidate, last candidate.
+const DEPARTURES: [(&str, &str, &str); 4] = [
+    ("hat", "real/chh.wav", "real/chh.wav"),
+    ("LOW TOM", "matt/LOW_TOM.wav", "human/LowTom.wav"),
+    ("tom_hi", "human/HiTom.wav", "human/HiTom.wav"),
+    // No ENSEMBLE sample: its first substitute, BRASS.
+    ("vox", "real/brass-c4.wav", "real/brass-c4.wav"),
+];
+
+fn sample_picked(track_name: &str, bank: &SampleBank, kit: &str, pick: usize) -> String {
+    let track = Track { name: track_name.to_owned(), ..Track::default() };
+    let mut choose = |n: usize| pick.min(n - 1);
+    match assign_track(&track, bank, kit, &SynthPresets::default(), &mut choose) {
+        TrackSound::Sample(i) => bank.samples[i].sample.path.clone(),
+        TrackSound::None => "NOT_DEFINED".to_owned(),
+        TrackSound::Synth(key) => panic!("synth {key}"),
+    }
+}
+
+#[test]
+fn departures_from_the_js_pick_the_named_variant() {
+    let (bank, _) = bank();
+    for (name, first, last) in DEPARTURES {
+        assert_eq!(sample_picked(name, &bank, "real", 0), first, "{name:?}, first candidate");
+        assert_eq!(sample_picked(name, &bank, "real", usize::MAX), last, "{name:?}, last candidate");
+    }
+}
+
 #[test]
 fn auto_assign_picks_what_the_js_picks() {
     let (bank, kits) = bank();
     let cases = fixture("assign.json");
     let cases = cases.as_array().expect("cases");
     assert!(cases.len() > 500);
-    let synths = SynthPresets::default();
     for case in cases {
         let name = case.get("name").and_then(Value::as_str).expect("name");
+        if DEPARTURES.iter().any(|(departure, ..)| *departure == name) {
+            continue;
+        }
         let kit = &kits[case.get("kit").and_then(Value::as_f64).expect("kit") as usize];
-        let track = Track { name: name.to_owned(), ..Track::default() };
         for (label, pick) in [("first", 0usize), ("last", usize::MAX)] {
-            let mut choose = |n: usize| pick.min(n - 1);
-            let got = match assign_track(&track, &bank, kit, &synths, &mut choose) {
-                TrackSound::Sample(i) => bank.samples[i].sample.path.clone(),
-                TrackSound::None => "NOT_DEFINED".to_owned(),
-                TrackSound::Synth(key) => panic!("synth {key}"),
-            };
+            let got = sample_picked(name, &bank, kit, pick);
             let want = case.get(label).and_then(Value::as_str).expect(label);
             assert_eq!(got, want, "{name:?} in kit {kit}, {label} candidate");
         }

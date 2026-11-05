@@ -9,12 +9,14 @@
 //! 4. otherwise the first catalog instrument not used yet.
 //!
 //! The JS rules are kept as they are: an instrument already made a track
-//! drops the later notes that resolve to it; the tempo meta event is never
+//! drops the later notes the catalog's mapping resolves to it; the tempo meta event is never
 //! read (120 BPM); every pattern is 32 beats long, up to 16 patterns.
 //!
-//! Two departures from the JS: a file timed in SMPTE frames or with a 0
-//! division is refused (the JS makes 16 patterns of misplaced notes), and the
-//! message says when notes past the 16th pattern are left out.
+//! Three departures from the JS: a file timed in SMPTE frames or with a 0
+//! division is refused (the JS makes 16 patterns of misplaced notes), the
+//! message says when notes past the 16th pattern are left out, and a drum key
+//! found by its GM name, whose instrument another key plays, gets a numbered
+//! track (`KICK 2`) instead of losing its notes.
 
 use ordrumbox_core::instruments::{Catalog, Instrument, catalog};
 use ordrumbox_core::js;
@@ -65,17 +67,33 @@ fn drum_tracks(c: &Catalog, notes: &[NoteOn], channel: u8) -> Option<Vec<TrackDe
             None => groups.push((note.note, vec![*note])),
         }
     }
-    let mut defs: Vec<TrackDef> = Vec::new();
-    for (key, group) in groups {
-        let Some(key) = key else { continue };
-        let by_mapping = found(c.from_midi(i64::from(channel), i64::from(key)));
-        let instrument = by_mapping.or_else(|| {
+    // The catalog's mapping first: a key it maps claims its instrument's name.
+    let resolved: Vec<(u8, Vec<NoteOn>, &Instrument, bool)> = groups
+        .into_iter()
+        .filter_map(|(key, group)| {
+            let key = key?;
+            if let Some(mapped) = found(c.from_midi(i64::from(channel), i64::from(key))) {
+                return Some((key, group, mapped, true));
+            }
             let (_, gm) = c.drum_names.iter().find(|(k, _)| *k == i64::from(key))?;
-            found(c.from_file_name(gm))
-        });
-        let Some(instrument) = instrument else { continue };
-        if !defs.iter().any(|d| d.name == instrument.id) {
-            defs.push(TrackDef { name: instrument.id.clone(), notes: group, base_note: f64::from(key) });
+            Some((key, group, found(c.from_file_name(gm))?, false))
+        })
+        .collect();
+    let mut defs: Vec<TrackDef> = Vec::new();
+    for (key, group, instrument, mapped) in &resolved {
+        let name = if *mapped {
+            instrument.id.clone()
+        } else {
+            // A key named after an instrument another key plays ("Acoustic Bass Drum"
+            // beside "Bass Drum 1") is another sound of it: a track of its own, numbered.
+            let taken = |name: &str| {
+                defs.iter().any(|d| d.name == name) || resolved.iter().any(|(_, _, i, m)| *m && i.id == name)
+            };
+            let numbered = (2..).map(|n| format!("{} {n}", instrument.id));
+            std::iter::once(instrument.id.clone()).chain(numbered).find(|name| !taken(name)).unwrap_or_default()
+        };
+        if !defs.iter().any(|d| d.name == name) {
+            defs.push(TrackDef { name, notes: group.clone(), base_note: f64::from(*key) });
         }
     }
     (!defs.is_empty()).then_some(defs)
