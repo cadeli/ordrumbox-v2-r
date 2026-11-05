@@ -14,8 +14,10 @@ use ordrumbox_core::Library;
 
 use super::Session;
 use crate::kits::KitSet;
-use crate::menu::{Command, Item};
-use crate::panel::Id;
+use crate::menu::Command;
+use crate::panel::{self, Id, Kind};
+use crate::ui_input::Button;
+use crate::view;
 use crate::view::Hit;
 
 const DEMO: &str = r#"{"patterns":[{"name":"demo","tracks":[{"name":"KICK","notes":[{}]}]}]}"#;
@@ -199,16 +201,28 @@ fn a_plugin_leaves_to_the_host_what_the_host_does() {
     assert!(!s.song_view_open() && !s.playing());
     s.toggle_play_song();
     assert_eq!(s.message, crate::menu::SONGS_IN_THE_APP);
-    // Not in the menus, and the tempo shown is not the pattern's knob.
-    let commands = s.menus().into_iter().flat_map(|m| m.items).filter_map(|i| match i {
-        Item::Command { command, .. } => Some(command),
-        Item::Separator => None,
-    });
-    assert!(commands.into_iter().all(|c| c.hosted_refusal().is_none()));
-    let layout = s.panel_layout(1100, 680, 1);
+    // Greyed out in the menus (`menu.rs` tests), and the tempo shown is not the pattern's knob.
+    let runnable = s.menus().into_iter().flat_map(|m| m.items).filter_map(|i| i.runnable());
+    assert!(runnable.into_iter().all(|c| c.hosted_refusal().is_none()));
+    let size = (1100, 680, 1);
+    let layout = s.panel_layout(size.0, size.1, size.2);
     assert!(!layout.items.iter().any(|i| i.id == Some(Id::Bpm)));
-    // No SONG view button, no master strip: the editors reach down to where it was.
-    assert!(!layout.items.iter().any(|i| i.id == Some(Id::View(2))));
+    // The SONG view button greyed out: a click says why.
+    let song = panel::find(&layout.items, Id::View(2)).unwrap();
+    assert!(matches!(song.kind, Kind::Disabled { .. }));
+    let (x, y) = (song.rect.x + 2, song.rect.y + 2);
+    s.message.clear();
+    s.mouse_down(size, x, y, Button::Left, false);
+    s.mouse_up();
+    assert_eq!(s.message, crate::menu::SONGS_IN_THE_APP);
+    assert!(!s.song_view_open());
+    // Tooltips say whose the tempo and the songs are.
+    s.control_hover(size, x, y);
+    assert_eq!(s.chrome.control_hover.map(|(id, _)| s.control_tip(id).unwrap()[0]), Some("Song: in the app only"));
+    let bpm = view::header_controls(1).bpm;
+    s.control_hover(size, bpm.x + 2, bpm.y + 2);
+    assert_eq!(s.chrome.control_hover.map(|(id, _)| s.control_tip(id).unwrap()[0]), Some("Tempo (HOST)"));
+    // No master strip: the editors reach down to where it was.
     assert!(!layout.items.iter().any(|i| matches!(i.id, Some(Id::OutTab(_) | Id::Master(_)))));
     assert!(s.output_view().is_none());
     let body = s.body((1100, 680, 1));

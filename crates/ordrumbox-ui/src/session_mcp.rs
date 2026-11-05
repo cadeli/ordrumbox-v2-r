@@ -985,7 +985,7 @@ mod tests {
     #[test]
     fn arguments_and_states_that_refuse_a_call() {
         let mut s = session();
-        s.ask(Pending::CompactTracks);
+        s.ask(Pending::DemoLibrary);
         assert!(call(&mut s, "listPatterns", "{}").unwrap_err().contains("confirmation"));
         s.chrome.overlay = None;
 

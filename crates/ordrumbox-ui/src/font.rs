@@ -2,9 +2,10 @@
 //! `fontdue` (Consolas on Windows, Menlo on macOS, DejaVu or Liberation Mono
 //! elsewhere; `$ORDRUMBOX_FONT` names another file). Nothing is bundled.
 //!
-//! Text sits on a grid of [`SIZE`] × [`SIZE`] font pixels per character, the
+//! Text sits on a grid of [`WIDTH`] × [`SIZE`] font pixels per character, the
 //! layout's unit: glyphs are sized so a capital is 7 font pixels high on an
-//! 8-high line, and centred in their cell.
+//! 8-high line, and centred in their cell, about as wide as the font's own
+//! advance (0.6 of its size): letters keep their natural spacing.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -12,8 +13,10 @@ use std::sync::{Mutex, OnceLock};
 
 use fontdue::{Font, FontSettings};
 
-/// Cell size in font pixels: one character is `SIZE * scale` wide and high.
+/// Cell height in font pixels: a line is `SIZE * scale` high.
 pub const SIZE: i32 = 8;
+/// Cell width in font pixels: one character is `WIDTH * scale` wide.
+pub const WIDTH: i32 = 6;
 /// Font pixels from the top of a cell to the baseline (a capital's height).
 const BASELINE: i32 = 7;
 /// Environment variable naming a font file to use instead.
@@ -101,9 +104,15 @@ fn loaded() -> &'static Loaded {
     FONT.get().expect("loaded above")
 }
 
-/// Quarters of a scale unit in the small font: its cells are 6 × 6 font
-/// pixels instead of 8 × 8.
+/// Quarters of a scale unit in the small font: its cells are three quarters
+/// of the regular ones.
 pub const SMALL_QUARTERS: i32 = 3;
+
+/// The width of a character in cells of `quarters` quarters of a scale unit,
+/// in pixels, rounded.
+pub fn advance(quarters: i32) -> i32 {
+    (WIDTH * quarters + 2) / 4
+}
 
 /// The glyph of `c` (the font's own box for a character it lacks) in cells
 /// of `SIZE × quarters / 4` pixels: `4 * scale` is the regular font,
@@ -113,7 +122,7 @@ pub fn glyph_quarters(c: char, quarters: i32) -> &'static Glyph {
     let mut glyphs = font.glyphs.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     glyphs.entry((c, quarters)).or_insert_with(|| {
         let (metrics, coverage) = font.font.rasterize(c, font.px_per_scale * quarters as f32 / 4.0);
-        let cell = SIZE * quarters / 4;
+        let cell = advance(quarters);
         // Centred on the advance in the cell, standing on the baseline.
         let left = (cell - metrics.advance_width.round() as i32) / 2 + metrics.xmin;
         let top = BASELINE * quarters / 4 - (metrics.ymin + metrics.height as i32);
@@ -131,7 +140,7 @@ mod tests {
         let h = glyph_quarters('H', 8);
         let rows = h.coverage.len() / h.width.max(1);
         assert!(h.top >= 0 && h.top + rows as i32 <= BASELINE * 2 + 1, "{h:?}");
-        assert!(h.left >= 0 && h.left + h.width as i32 <= SIZE * 2, "{h:?}");
+        assert!(h.left >= 0 && h.left + h.width as i32 <= WIDTH * 2, "{h:?}");
         assert!(h.coverage.iter().any(|&c| c > 128));
         assert!(std::ptr::eq(glyph_quarters('H', 8), h), "drawn once");
     }

@@ -60,23 +60,30 @@ pub struct Ui {
     modifiers: Modifiers,
     /// The pointer, in physical pixels.
     pointer: (f64, f64),
-    /// The window's size in physical pixels and its scale factor.
-    size: (i32, i32, i32),
+    /// The window's size in physical pixels.
+    window: (i32, i32),
     /// Alt is down and no other key was pressed since.
     alt_alone: bool,
 }
 
 impl Ui {
     pub fn new(session: Session) -> Self {
-        Self { session, modifiers: Modifiers::default(), pointer: (0.0, 0.0), size: (0, 0, 1), alt_alone: false }
+        Self { session, modifiers: Modifiers::default(), pointer: (0.0, 0.0), window: (0, 0), alt_alone: false }
     }
 
     /// The window's size in physical pixels and the display's scale factor
-    /// (≥ 1); the UI takes a smaller one when the window cannot hold the
-    /// layout at that one ([`view::fit_scale`]).
+    /// (≥ 1), which the zoom starts from (`session_zoom.rs`).
     pub fn set_size(&mut self, width: i32, height: i32, scale: i32) {
-        let scale = view::fit_scale(width, height, scale, !self.session.hosted());
-        self.size = (width, height, scale);
+        self.window = (width, height);
+        self.session.set_display_scale(scale);
+    }
+
+    /// The window's size in physical pixels and the scale the UI shows at:
+    /// the zoomed one, or a smaller one when the window cannot hold the
+    /// layout at it ([`view::fit_scale`]).
+    fn size(&self) -> (i32, i32, i32) {
+        let (width, height) = self.window;
+        (width, height, self.session.fit_scale(width, height))
     }
 
     pub fn set_modifiers(&mut self, modifiers: Modifiers) {
@@ -85,7 +92,7 @@ impl Ui {
 
     /// Draw the window, `pixels` holding `width × height` `0x00RRGGBB` pixels.
     pub fn draw(&mut self, pixels: &mut [u32], width: usize, height: usize) {
-        let scale = self.size.2;
+        let scale = self.size().2;
         self.session.set_size((width as i32, height as i32, scale));
         self.session.draw(&mut Canvas::new(pixels, width, height), scale);
     }
@@ -110,13 +117,13 @@ impl Ui {
 
     /// A button pressed at the pointer.
     pub fn pointer_pressed(&mut self, button: Button) -> bool {
-        let (width, height, scale) = self.size;
+        let size = self.size();
+        let (width, height, scale) = size;
         let (x, y) = (self.pointer.0 as i32, self.pointer.1 as i32);
         let shift = self.modifiers.shift;
         let s = &mut self.session;
         // An open list or number entry takes the click; the right button is the widgets'.
         if s.popup_open() || button == Button::Right {
-            let size = self.size;
             let menus_open = s.open_menu().is_some() || s.overlay_open();
             return s.mouse_down(size, x, y, button, shift)
                 || (button == Button::Right && !menus_open && s.song_view_open() && s.song_click(size, x, y, button))
@@ -142,15 +149,16 @@ impl Ui {
             None if s.overlay_open() => s.overlay_click(width, height, scale, x, y),
             // Before the panel's: with the track editor open, its side claims the whole column.
             None if frame::on_status_line(y, scale) => s.open_history(),
-            None if s.mouse_down(self.size, x, y, Button::Left, shift) => {}
-            None => return self.click_content(x, y),
+            None if s.mouse_down(size, x, y, Button::Left, shift) => {}
+            None => return self.click_content(x, y, shift),
         }
         true
     }
 
-    /// A click on the grid, the song panel or the kit editor.
-    fn click_content(&mut self, x: i32, y: i32) -> bool {
-        let size = self.size;
+    /// A click on the grid, the song panel or the kit editor (Shift on a
+    /// grid cell: select its note rather than switch the step).
+    fn click_content(&mut self, x: i32, y: i32, shift: bool) -> bool {
+        let size = self.size();
         let s = &mut self.session;
         if s.song_view_open() {
             return s.song_click(size, x, y, Button::Left);
@@ -166,7 +174,10 @@ impl Ui {
             return true;
         }
         let Some(hit) = s.grid_hit(size, x, y) else { return false };
-        s.click(hit);
+        match hit {
+            view::Hit::Cell { track, beat, step } if shift => s.select_step_note(track, beat, step),
+            _ => s.click(hit),
+        }
         if let view::Hit::Name(t) = hit {
             s.press_track_drag(t, x, y);
         }
@@ -178,7 +189,7 @@ impl Ui {
         if button != Button::Left {
             return false;
         }
-        let redraw = self.session.song_release(self.size) | self.session.track_release(self.size);
+        let redraw = self.session.song_release(self.size()) | self.session.track_release(self.size());
         self.session.mouse_up();
         redraw
     }
@@ -187,10 +198,11 @@ impl Ui {
     pub fn pointer_moved(&mut self, x: f64, y: f64) -> bool {
         self.pointer = (x, y);
         let hovered_menu = self.hover();
-        let size = self.size;
+        let size = self.size();
         let (x, y) = (x as i32, y as i32);
         let moved = self.session.mouse_move(size, x, y, self.modifiers.shift);
         let hovered = self.session.grid_hover(size, x, y)
+            | self.session.control_hover(size, x, y)
             | self.session.song_hover(size, x, y)
             | self.session.roll_hover(size, x, y);
         hovered_menu || hovered || moved
@@ -198,7 +210,7 @@ impl Ui {
 
     /// The pointer moved: an open menu follows it.
     fn hover(&mut self) -> bool {
-        let scale = self.size.2;
+        let scale = self.size().2;
         let s = &mut self.session;
         let Some(open) = s.open_menu() else { return false };
         let menus = s.menus();
@@ -225,7 +237,7 @@ impl Ui {
             self.session.overlay_key(OverlayKey::Move(-lines * WHEEL_ROWS));
             return true;
         }
-        let size = self.size;
+        let size = self.size();
         let (x, y) = (self.pointer.0 as i32, self.pointer.1 as i32);
         let m = self.modifiers;
         let (fine, coarse) = (m.shift || m.alt, m.command());
@@ -297,7 +309,9 @@ impl Ui {
         if self.widget_key(event, shift || alt, control) {
             return true;
         }
-        if let Some(command) = shortcut(code, shift, control) {
+        // A plugin's Alt stands for the Ctrl/Cmd the host keeps (the menus say Alt+…).
+        let command_key = control || (alt && self.session.hosted());
+        if let Some(command) = shortcut(code, shift, command_key) {
             // A command a plugin leaves to the host leaves it its key too.
             if self.session.hosted() && command.hosted_refusal().is_some() {
                 return false;
@@ -306,8 +320,12 @@ impl Ui {
             return true;
         }
         let s = &mut self.session;
-        if control {
+        if command_key {
             return false;
+        }
+        if let Some(hint) = shift_hint(code).filter(|_| !shift && !s.kit_editor_open()) {
+            s.say(hint);
+            return true;
         }
         // Mute (1-9) and hear (Q-P) a track in every view, as in the JS; the
         // kit editor keeps its own letters (N, R, E).
@@ -379,7 +397,7 @@ impl Ui {
     /// them all; a focused knob, slider, select or button its own; Tab moves
     /// the focus. Whether the key was theirs.
     fn widget_key(&mut self, event: &KeyEvent, fine: bool, control: bool) -> bool {
-        let size = self.size;
+        let size = self.size();
         let key = match event.key {
             Key::ArrowUp => Some(PanelKey::Up),
             Key::ArrowDown => Some(PanelKey::Down),
@@ -457,6 +475,17 @@ impl Ui {
     }
 }
 
+/// What a letter that changes every track says when pressed without Shift.
+fn shift_hint(code: Key) -> Option<&'static str> {
+    Some(match code {
+        Key::Letter('G') => "Shift+G: a random kit",
+        Key::Letter('H') => "Shift+H: every track on a synth sound",
+        Key::Letter('J') => "Shift+J: every track back on auto-assign",
+        Key::Letter('K') => "Shift+K: a random sample on every track",
+        _ => return None,
+    })
+}
+
 /// The command a key runs, when the menus list it (`view::HELP`).
 fn shortcut(code: Key, shift: bool, control: bool) -> Option<Command> {
     use Command as C;
@@ -469,7 +498,8 @@ fn shortcut(code: Key, shift: bool, control: bool) -> Option<Command> {
             Key::Letter('C') => C::CopyStep,
             Key::Letter('V') if shift => C::PasteTrack,
             Key::Letter('V') => C::Paste,
-            Key::Letter('S') => C::ExportPatternJson,
+            Key::Letter('S') if shift => C::ExportPatternJson,
+            Key::Letter('S') => C::Save,
             Key::Letter('O') => C::ImportMidi,
             Key::Letter('E') if shift => C::ExportSongWav,
             Key::Letter('E') => C::ExportWav,
@@ -481,6 +511,12 @@ fn shortcut(code: Key, shift: bool, control: bool) -> Option<Command> {
             Key::Backspace | Key::Delete => C::RemoveTrack,
             Key::Letter('G') => C::NextGrid,
             Key::Letter('L') => C::ShortenLoop,
+            // Ctrl++ is Ctrl+Shift+= on most layouts; the keypad needs no Shift.
+            Key::Equal if shift => C::ZoomIn,
+            Key::Minus if shift => C::ZoomOut,
+            Key::NumpadAdd => C::ZoomIn,
+            Key::NumpadSubtract => C::ZoomOut,
+            Key::Digit(0) => C::ZoomReset,
             Key::Minus => C::LengthDown,
             Key::Equal => C::LengthUp,
             Key::Letter('Q') => C::Quit,
@@ -503,17 +539,19 @@ fn shortcut(code: Key, shift: bool, control: bool) -> Option<Command> {
             Key::Letter('B') if shift => C::NewGeneratedPattern,
             Key::Letter('B') => C::GeneratePattern,
             Key::Letter('F') => C::SelectRandomPattern,
-            Key::Letter('G') => C::SelectRandomDrumkit,
+            // What changes every track wants Shift: a slip off the play keys (Q-P, 1-9) does nothing.
+            Key::Letter('G') if shift => C::SelectRandomDrumkit,
             Key::Letter('V') => C::ToggleVus,
             Key::Letter('C') => C::NextColorScheme,
-            Key::Letter('H') => C::ConvertToSynth,
-            Key::Letter('J') => C::AutoAssignAll,
-            Key::Letter('K') => C::RandomSamples,
+            Key::Letter('H') if shift => C::ConvertToSynth,
+            Key::Letter('J') if shift => C::AutoAssignAll,
+            Key::Letter('K') if shift => C::RandomSamples,
             Key::Letter('D') => C::GenerateDrums,
             Key::Letter('S') => C::GenerateBass,
             Key::Letter('A') => C::GenerateChords,
             Key::Letter('Z') => C::TrackAuto,
             Key::Letter('X') => C::RandomTrack,
+            Key::Letter('L') => C::ToggleAccent,
             _ => return None,
         }
     })
@@ -528,9 +566,24 @@ mod tests {
         assert_eq!(shortcut(Key::Letter('Z'), false, true), Some(Command::Undo));
         assert_eq!(shortcut(Key::Letter('Z'), true, true), Some(Command::Redo));
         assert_eq!(shortcut(Key::Letter('Z'), false, false), Some(Command::TrackAuto));
-        // Only the main row's minus changes the length; the keypad's is the tempo.
-        assert_eq!(shortcut(Key::NumpadSubtract, false, true), None);
+        // Only the main row's minus changes the length; the keypad's zooms.
+        assert_eq!(shortcut(Key::Minus, false, true), Some(Command::LengthDown));
+        assert_eq!(shortcut(Key::NumpadSubtract, false, true), Some(Command::ZoomOut));
+        assert_eq!(shortcut(Key::Minus, true, true), Some(Command::ZoomOut));
+        assert_eq!(shortcut(Key::Equal, true, true), Some(Command::ZoomIn));
+        assert_eq!(shortcut(Key::NumpadAdd, false, true), Some(Command::ZoomIn));
+        assert_eq!(shortcut(Key::Digit(0), false, true), Some(Command::ZoomReset));
         assert_eq!(shortcut(Key::F(3), false, false), Some(Command::SongView));
+        assert_eq!(shortcut(Key::Letter('L'), false, false), Some(Command::ToggleAccent));
+        assert_eq!(shortcut(Key::Letter('S'), false, true), Some(Command::Save));
+        assert_eq!(shortcut(Key::Letter('S'), true, true), Some(Command::ExportPatternJson));
+        for (letter, command) in
+            [('G', Command::SelectRandomDrumkit), ('H', Command::ConvertToSynth), ('K', Command::RandomSamples)]
+        {
+            assert_eq!(shortcut(Key::Letter(letter), true, false), Some(command), "Shift+{letter}");
+            assert_eq!(shortcut(Key::Letter(letter), false, false), None, "{letter} alone");
+            assert!(shift_hint(Key::Letter(letter)).is_some(), "{letter} says to hold Shift");
+        }
     }
 
     #[test]
@@ -566,5 +619,14 @@ mod tests {
         assert!(plugin.key(&press(Key::Digit(1))));
         assert!(plugin.key(&press(Key::ArrowRight)));
         assert!(plugin.key(&press(Key::F(4))));
+        // Alt stands for the Ctrl the host keeps, but not for what the host does.
+        plugin.set_modifiers(Modifiers { alt: true, ..Modifiers::default() });
+        let revision = plugin.session.library_revision();
+        assert!(plugin.key(&press(Key::Letter('N'))));
+        assert_ne!(plugin.session.library_revision(), revision, "a new pattern");
+        assert!(plugin.key(&press(Key::Letter('K'))));
+        assert!(plugin.session.kit_editor_open());
+        assert!(!plugin.key(&press(Key::Letter('S'))), "the host saves");
+        assert!(!plugin.key(&press(Key::Letter('Q'))), "the host closes");
     }
 }

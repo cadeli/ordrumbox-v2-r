@@ -54,6 +54,8 @@ mod session_color;
 mod session_confirm;
 #[path = "session_grid.rs"]
 mod session_grid;
+#[path = "session_zoom.rs"]
+mod session_zoom;
 
 /// A style's name in the menus: a learned one says from how many patterns.
 pub fn style_label(style: &ordrumbox_core::Style) -> String {
@@ -266,7 +268,10 @@ struct Widgets {
 #[derive(Debug)]
 enum Overlay {
     Picker(Picker),
-    Shortcuts,
+    /// The keyboard shortcuts, from line `scroll` on.
+    Shortcuts {
+        scroll: usize,
+    },
     About,
     FactoryReset,
     /// What was done; the first row shown.
@@ -283,19 +288,21 @@ enum Overlay {
 }
 
 /// Every key, for Help > Keyboard shortcuts.
-const SHORTCUTS: [&str; 54] = [
+const SHORTCUTS: [&str; 59] = [
     "MENUS",
     "  F10 or Alt             open the menus: Arrows move, Enter runs, Esc closes",
     "  F1 F2 F3 F4 F5 F6      this list, track editor, song, piano roll, grid, synth (Ctrl+K: kit editor)",
     "GRID",
     "  Arrows                 move the cursor",
-    "  Enter / click          add a note, select it, delete the selected one",
+    "  Enter / click          switch the step on (a note) or off (all its notes)",
+    "  Shift+click            select the step's note for the note editor, and hear it",
     "  Shift+Arrows           velocity (up/down), pitch (left/right) of the selected note",
     "  Delete                 clear the cursor step        Esc  deselect",
+    "  L                      accent the cursor step's notes, or take the accent off",
     "  right-click            a track's name: track menu   a step: notes menu",
-    "  F, G, V                random pattern, random drumkit, VU meters on/off",
+    "  F, Shift+G, V          random pattern, random drumkit, VU meters on/off",
     "  C                      next colour scheme",
-    "  H, J, K                every track: synth sounds, auto-assigned, random samples",
+    "  Shift+H, J, K          every track: synth sounds, auto-assigned, random samples",
     "PLAY",
     "  1-9 / Shift+1-9        mute / solo track 1-9        Q-P  hear track 1-10 (any view)",
     "  Space / Shift+Space    play or stop the pattern / the song",
@@ -303,7 +310,9 @@ const SHORTCUTS: [&str; 54] = [
     "  - = (Shift: x10)       tempo",
     "  , .                    previous / next kit",
     "FILE AND EDIT",
-    "  Ctrl+S, Ctrl+O, Ctrl+Q export the pattern as JSON, import a MIDI file, quit",
+    "  Ctrl+S                 save the library now (it is also saved on its own)",
+    "  Ctrl+Shift+S           export the pattern as JSON",
+    "  Ctrl+O, Ctrl+Q         import a MIDI file, quit",
     "  Ctrl+E, Ctrl+M         export WAV (Shift: the song), export MIDI",
     "  Ctrl+Z, Ctrl+Y         undo, redo (also Ctrl+Shift+Z)",
     "  Ctrl+C, Ctrl+V         copy, paste the step (Shift: the track)",
@@ -311,6 +320,7 @@ const SHORTCUTS: [&str; 54] = [
     "  Ctrl+T, Ctrl+Backspace add, remove a track",
     "  Ctrl+G, Ctrl+L         next grid, loop one step shorter",
     "  Ctrl+- Ctrl+=          pattern length",
+    "  Ctrl++ Ctrl+_ Ctrl+0   zoom in, out, back to the display's size (also Ctrl and keypad + -)",
     "GENERATE",
     "  B, Shift+B             the pattern again in its style, a new pattern in the style",
     "  D, S, A                drums, bass, chords in auto mode (again: off)",
@@ -328,7 +338,7 @@ const SHORTCUTS: [&str; 54] = [
     "SYNTH EDITOR (F6)",
     "  OSC, FLT, MOD, ENV     the track's preset: knobs, waves, lists, power buttons (saved)",
     "OUTPUT PANEL (bottom strip, always shown)",
-    "  Vol, Comp, Flt         the master volume and spectrum, the compressor, the filters (saved)",
+    "  Volume, Comp, Filter   the master volume and spectrum, the compressor, the filters (saved)",
     "SONG PANEL (F3)",
     "  click / right-click    the ruler: aim the cursor; a pattern, row, clip, the grid: menu",
     "  Left Right, Up Down    the cursor a measure back / on, previous / next pattern",
@@ -345,19 +355,23 @@ const SHORTCUTS: [&str; 54] = [
 const PLUGIN_SHORTCUTS: &[&str] = &[
     "THE HOST'S KEYS",
     "  Space, every Ctrl/Cmd key   the host's: its transport, its save, undo, zoom...",
-    "                              (the menus run orDrumbox's undo, copy, paste, exports)",
+    "  Alt + the app's Ctrl key    orDrumbox's: Alt+Z undo, Alt+C copy, Alt+K kit editor...",
+    "                              (the menus show them; greyed out: the host's or the app's)",
     "MENUS",
     "  F10 or Alt             open the menus: Arrows move, Enter runs, Esc closes",
     "  F1 F2 F4 F5 F6         this list, track editor, piano roll, grid, synth",
+    "  songs, tempo, saving   the app's or the host's: no F3, no - = (the tempo is HOST's)",
     "GRID",
     "  Arrows                 move the cursor",
-    "  Enter / click          add a note, select it, delete the selected one",
+    "  Enter / click          switch the step on (a note) or off (all its notes)",
+    "  Shift+click            select the step's note for the note editor, and hear it",
     "  Shift+Arrows           velocity (up/down), pitch (left/right) of the selected note",
     "  Delete                 clear the cursor step        Esc  deselect",
+    "  L                      accent the cursor step's notes, or take the accent off",
     "  right-click            a track's name: track menu   a step: notes menu",
-    "  F, G, V                random pattern, random drumkit, VU meters on/off",
+    "  F, Shift+G, V          random pattern, random drumkit, VU meters on/off",
     "  C                      next colour scheme",
-    "  H, J, K                every track: synth sounds, auto-assigned, random samples",
+    "  Shift+H, J, K          every track: synth sounds, auto-assigned, random samples",
     "PLAY",
     "  1-9 / Shift+1-9        mute / solo track 1-9        Q-P  hear track 1-10 (any view)",
     "  [ ]                    previous / next pattern (also PageUp PageDown)",
@@ -378,7 +392,7 @@ const PLUGIN_SHORTCUTS: &[&str] = &[
     "  a key: hear it, right-click: clear, chord progression     wheel (Shift: pages)",
     "SYNTH EDITOR (F6)",
     "  OSC, FLT, MOD, ENV     the track's preset: knobs, waves, lists, power buttons (saved)",
-    "KIT EDITOR (from the menus)",
+    "KIT EDITOR (Alt+K)",
     "  Up Down                sample      Enter  hear      Delete  remove",
     "  N, E                   normalize, export the mapping",
     "  drop files             a .wav joins the kit (Shift: replaces the sample), a folder",
@@ -514,6 +528,7 @@ impl Session {
         }
         session.load_update_settings();
         session.load_color_scheme(store::settings_path());
+        session.load_zoom(store::settings_path());
         session
     }
 
@@ -640,6 +655,11 @@ impl Session {
     }
 
     /// What the last action said.
+    /// Show `text` on the status line.
+    pub fn say(&mut self, text: &str) {
+        self.message = text.into();
+    }
+
     pub fn message(&self) -> &str {
         &self.message
     }
@@ -653,6 +673,19 @@ impl Session {
 
     pub fn playing(&self) -> bool {
         self.playback.is_playing()
+    }
+
+    /// While the pattern shown waits for the one playing to end its loop:
+    /// the blink of its marker, on in the first half of each beat.
+    pub(super) fn waiting_blink(&self) -> Option<bool> {
+        let playing = self.playback.controller()?.playing_pattern()?;
+        if playing == self.pattern_index {
+            return None;
+        }
+        let at = self.playback.position()?;
+        let beat_count = self.editor.library().patterns.get(playing).map_or(1, |p| p.beat_count.max(1));
+        let beat = at.frame as f64 / at.frames.max(1) as f64 * beat_count as f64;
+        Some(beat.fract() < 0.5)
     }
 
     // ─── Transport ───────────────────────────────────────────────────────────
@@ -766,7 +799,7 @@ impl Session {
         Ok(format!("exported {} ({} bytes)", path.display(), bytes.len()))
     }
 
-    /// Ctrl+S: the pattern as `Exporter.export()`
+    /// Ctrl+Shift+S: the pattern as `Exporter.export()`
     /// writes it, to `path`.
     fn export_pattern_json(&mut self, path: &Path) {
         self.message = match self.write_pattern_json(self.pattern_index, path) {
@@ -822,13 +855,20 @@ impl Session {
         self.deselect();
         self.chrome.current_page = 0;
         self.message = format!("pattern {}", self.pattern().and_then(|p| p.name.as_deref()).unwrap_or_default());
-        // In pattern mode, switch to the new pattern on the current pass
-        // (when playing) instead of waiting for the next loop.
+        // In pattern mode the new pattern plays once the one playing ends its loop.
         if let Some(controller) = self.playback.controller_mut()
             && let Mode::Pattern(_) = controller.mode()
         {
             controller.select_pattern(self.pattern_index);
-            controller.refresh(self.editor.library());
+            let library = self.editor.library();
+            if let Some(name) = controller
+                .playing_pattern()
+                .filter(|&p| p != index)
+                .and_then(|p| library.patterns.get(p))
+                .map(|p| p.name.as_deref().unwrap_or_default())
+            {
+                self.message = format!("{} - next, after {name}", self.message);
+            }
         }
     }
 
@@ -1107,6 +1147,7 @@ impl Session {
             C::Paste => self.paste(false),
             C::PasteTrack => self.paste(true),
             C::ClearStep => self.delete_step(),
+            C::ToggleAccent => self.toggle_accent(),
             C::Deselect => self.deselect(),
             C::NewPattern => self.new_pattern(),
             C::DuplicatePattern => self.duplicate_pattern(),
@@ -1169,6 +1210,9 @@ impl Session {
             C::SelectRandomDrumkit => self.select_random_drumkit(),
             C::ToggleVus => self.toggle_vus(),
             C::NextColorScheme => self.next_color_scheme(),
+            C::ZoomIn => self.zoom(1),
+            C::ZoomOut => self.zoom(-1),
+            C::ZoomReset => self.zoom(0),
             C::ExportPatternJson => self.open_export(Export::PatternJson),
             C::ConvertToSynth => self.convert_to_generated_sounds(self.pattern_index),
             C::AutoAssignAll => self.auto_assign_all_tracks(self.pattern_index),
@@ -1178,7 +1222,7 @@ impl Session {
                     self.audition_row(t);
                 }
             }
-            C::Shortcuts => self.chrome.overlay = Some(Overlay::Shortcuts),
+            C::Shortcuts => self.chrome.overlay = Some(Overlay::Shortcuts { scroll: 0 }),
             C::About => self.chrome.overlay = Some(Overlay::About),
             C::FactoryReset => self.chrome.overlay = Some(Overlay::FactoryReset),
             C::ExportLibrary => self.open_export(Export::Library),
@@ -1295,6 +1339,25 @@ impl Session {
         });
     }
 
+    /// The lines of the keyboard shortcuts panel.
+    fn shortcut_lines(&self) -> &'static [&'static str] {
+        if self.hosted { PLUGIN_SHORTCUTS } else { &SHORTCUTS }
+    }
+
+    /// Scroll the shortcuts panel, if open, for `key`; whether it was.
+    fn shortcuts_key(&mut self, key: &OverlayKey) -> bool {
+        let count = self.shortcut_lines().len();
+        let Some(Overlay::Shortcuts { scroll }) = &mut self.chrome.overlay else { return false };
+        let (_, height, scale) = self.chrome.panel_size;
+        let max = count.saturating_sub(view::notice_rows(height, scale));
+        match key {
+            OverlayKey::Move(delta) => *scroll = (*scroll).min(max).saturating_add_signed(*delta).min(max),
+            OverlayKey::Edge(end) => *scroll = if *end { max } else { 0 },
+            _ => self.chrome.overlay = None,
+        }
+        true
+    }
+
     /// Scroll the history panel, if open, for `key`; whether it was.
     fn history_key(&mut self, key: &OverlayKey) -> bool {
         let Some(Overlay::History { scroll }) = &mut self.chrome.overlay else { return false };
@@ -1311,7 +1374,7 @@ impl Session {
 
     /// A key while a panel is open: the file picker's keys, or any key closes it.
     pub fn overlay_key(&mut self, key: OverlayKey) {
-        if self.history_key(&key) {
+        if self.history_key(&key) || self.shortcuts_key(&key) {
             return;
         }
         let is_factory = matches!(self.chrome.overlay, Some(Overlay::FactoryReset));
@@ -1698,29 +1761,37 @@ impl Session {
         }
     }
 
-    /// The JS grid click / Enter: add a note on an empty step, select the
-    /// note of a step, delete the selected note.
+    /// A grid click / Enter: a step is on or off. An empty step gets a note
+    /// (selected); a step with notes loses them all, in one undo step and
+    /// without asking. Shift+click selects a note instead ([`Self::select_step_note`]).
     fn toggle_note(&mut self, t: usize, beat: i32, step: i32) {
         let p = self.pattern_index;
         let Some(track) = self.track(t) else { return };
         let at_step = track.notes.iter().position(|n| n.beat == beat && n.step == step);
         match at_step {
-            Some(n) if self.selection.selected == Some((t, n)) => {
-                let pitch = track.notes[n].pitch;
-                self.editor.delete_note(p, t, beat, step, pitch);
-                self.selection.selected = None;
+            Some(_) => {
+                self.selection.cursor = Some(Cursor { track: t, beat, step });
+                self.delete_step_now();
                 self.selection.note_focus = Some(NoteFocus::Step { track: t, beat, step });
-                self.edited();
-            }
-            Some(n) => {
-                self.selection.selected = Some((t, n));
-                self.audition(t, Some(n));
             }
             None => {
                 self.selection.selected = self.editor.add_note(p, t, beat, step, 0.0).map(|n| (t, n));
                 self.edited();
                 self.audition(t, self.selection.selected.map(|(_, n)| n));
             }
+        }
+    }
+
+    /// Shift+click on a grid cell: the cursor goes there and the step's note
+    /// is selected for the note editor, and heard; nothing is added or deleted.
+    pub fn select_step_note(&mut self, t: usize, beat: i32, step: i32) {
+        let Some(track) = self.track(t) else { return };
+        let at_step = track.notes.iter().position(|n| n.beat == beat && n.step == step);
+        self.selection.cursor = Some(Cursor { track: t, beat, step });
+        self.selection.note_focus = Some(NoteFocus::Step { track: t, beat, step });
+        self.selection.selected = at_step.map(|n| (t, n));
+        if let Some(n) = at_step {
+            self.audition(t, Some(n));
         }
     }
 
@@ -1803,7 +1874,7 @@ impl Session {
     pub fn compact_tracks(&mut self) {
         let can_compact = |track: &Track| track.clone().compact_loop();
         if self.pattern().is_some_and(|p| p.tracks.iter().any(can_compact)) {
-            self.ask(Pending::CompactTracks);
+            self.undoable(Self::compact_tracks_now);
         } else {
             self.compact_tracks_now();
         }
@@ -1821,13 +1892,24 @@ impl Session {
         self.message = format!("compacted {count} track{}", if count == 1 { "" } else { "s" });
     }
 
-    /// Clear the cursor step: at once for a single note, else once confirmed.
+    /// Clear the cursor step (Ctrl+Z undoes it).
     pub fn delete_step(&mut self) {
+        if self.selection.cursor.is_some() {
+            self.undoable(Self::delete_step_now);
+        }
+    }
+
+    /// L: accent the notes of the cursor step, or take their accent off.
+    pub fn toggle_accent(&mut self) {
         let Some(c) = self.selection.cursor else { return };
-        if self.step_note_count(c) > 1 {
-            self.ask(Pending::ClearStep(c));
-        } else {
-            self.delete_step_now();
+        let name = self.track(c.track).map(|track| track.name.clone()).unwrap_or_default();
+        let at = beat_label(c.beat, c.step);
+        match self.editor.toggle_accent(self.pattern_index, c.track, c.beat, c.step) {
+            Some(accent) => {
+                self.edited();
+                self.message = format!("{} - {name} @ {at}", if accent { "Accent" } else { "No accent" });
+            }
+            None => self.message = format!("no note to accent - {name} @ {at}"),
         }
     }
 
@@ -1943,7 +2025,7 @@ impl Session {
         if self.pattern().is_some_and(|p| p.tracks.len() <= 1) {
             self.message = "Cannot delete the last track".into();
         } else {
-            self.ask(Pending::RemoveTrack(t));
+            self.undoable(|s| s.remove_track_now(t));
         }
     }
 
@@ -1962,7 +2044,7 @@ impl Session {
         if track.notes.is_empty() {
             self.message = "No notes to clear".into();
         } else {
-            self.ask(Pending::ClearTrack(t));
+            self.undoable(|s| s.clear_track_now(t));
         }
     }
 
@@ -2133,11 +2215,7 @@ impl Session {
             self.message = "select a track first".into();
             return;
         };
-        if self.track(t).is_some_and(|track| !track.notes.is_empty()) {
-            self.ask(Pending::RandomTrack(t));
-        } else {
-            self.randomize_track_now(t);
-        }
+        self.undoable(|s| s.randomize_track_now(t));
     }
 
     fn randomize_track_now(&mut self, t: usize) {
@@ -2287,7 +2365,9 @@ impl Session {
         let beat_count = self.pattern().map(|p| p.beat_count.max(1)).unwrap_or(1);
         let page_count = (beat_count as usize).div_ceil(view::BEATS_PER_PAGE as usize).max(1);
         let cursor_page = self.selection.cursor.map(|c| (c.beat.max(0) as usize) / view::BEATS_PER_PAGE as usize);
-        let playhead_page = if self.playing() {
+        // The pass playing is another pattern's while the one shown waits.
+        let waiting = self.waiting_blink();
+        let playhead_page = if self.playing() && waiting.is_none() {
             position.map(|p| {
                 let frac = p.frame as f64 / p.frames.max(1) as f64;
                 let global_beat = (frac * beat_count as f64).floor() as usize;
@@ -2321,7 +2401,8 @@ impl Session {
             tempo_label: if self.hosted { "HOST" } else { "BPM" },
             host_muted: self.host_muted,
             track_drop: self.track_drop((canvas.width(), canvas.height(), scale)),
-            playhead: if song_mode.is_some() {
+            waiting,
+            playhead: if song_mode.is_some() || waiting.is_some() {
                 None
             } else {
                 position.map(|p| {
@@ -2357,10 +2438,9 @@ impl Session {
                 let layout = PickerLayout::new(canvas.width(), canvas.height(), scale);
                 picker::draw(canvas, p, &layout);
             }
-            Some(Overlay::Shortcuts) => {
-                let keys: &[&str] = if self.hosted { PLUGIN_SHORTCUTS } else { &SHORTCUTS };
-                let lines: Vec<String> = keys.iter().map(|l| (*l).to_owned()).collect();
-                view::draw_notice(canvas, "Keyboard shortcuts", &lines, scale);
+            Some(Overlay::Shortcuts { scroll }) => {
+                let lines: Vec<String> = self.shortcut_lines().iter().map(|l| (*l).to_owned()).collect();
+                view::draw_notice_scrolled(canvas, "Keyboard shortcuts", &lines, *scroll, scale);
             }
             Some(Overlay::About) => view::draw_notice(canvas, "About orDrumbox", &self.about(), scale),
             Some(Overlay::History { scroll }) => {
@@ -2411,9 +2491,19 @@ impl Session {
             (Some(i), Some(a)) if a.duration_sec > 0.0 => Some((i.decay_ms() / 1000.0 / a.duration_sec).min(1.0)),
             _ => None,
         };
+        // Which tracks of the pattern play each sample.
+        let paths: Vec<(String, String)> = (0..self.pattern().map_or(0, |p| p.tracks.len()))
+            .filter_map(|t| Some((self.track_sample_path(t)?, self.track(t)?.name.clone())))
+            .collect();
+        let users = kit
+            .samples
+            .iter()
+            .map(|s| paths.iter().filter(|(path, _)| *path == s.path).map(|(_, name)| name.clone()).collect())
+            .collect();
         Some(KitView {
             kit: &kit.name,
             samples,
+            users,
             selected: sample,
             details_top,
             info,

@@ -1,6 +1,8 @@
 //! The session's side of the synth editor (`synth_editor.js`,
 //! `synth_preset_model.js`, `preset_section.js`): it opens on the track
-//! editor's track's preset (else the first one) and every change goes to
+//! editor's track's preset (else the first one, and a line above the cards
+//! says what the track plays, with a button to put it on the preset shown)
+//! and every change goes to
 //! that preset at once — the player rebuilds what plays with it — and to
 //! `generated_sounds.json` in the user data folder half a second later (the
 //! JS caches them in IndexedDB), read at start over the assets' presets.
@@ -12,7 +14,12 @@ use ordrumbox_core::json::{Object, Value};
 use ordrumbox_engine::synth_model as model;
 
 use super::*;
+use crate::canvas::text_width;
+use crate::panel::{DIM, Item, Kind, Rect};
 use crate::synth_view::{self, Built, SynthLayout};
+
+/// The button that puts the track editor's track on the preset shown.
+const USE_BUTTON: &str = "use";
 
 /// The preset being edited.
 #[derive(Debug, Clone)]
@@ -65,9 +72,48 @@ impl Session {
         let track_key = self.editor_track().and_then(|t| self.track(t)).and_then(|t| t.synth_preset.clone());
         let key = track_key.filter(|k| self.synths.get(k).is_some()).or_else(|| self.synth_keys().into_iter().next());
         match key {
-            Some(key) => self.load_synth(&key),
+            Some(key) => {
+                self.load_synth(&key);
+                if let Some((name, plays)) = self.track_plays().filter(|(_, plays)| plays.is_some()) {
+                    self.message =
+                        format!("{name} {}: \"{key}\" shown, USE ON {name} to play it", plays.unwrap_or_default());
+                }
+            }
             None => self.message = "No synth presets loaded.".into(),
         }
+    }
+
+    /// The track editor's track's name, and what it plays when it is not
+    /// the preset shown (`None`: it plays it).
+    fn track_plays(&self) -> Option<(String, Option<String>)> {
+        let track = self.track(self.editor_track()?)?;
+        let key = self.synth_editor.edit.as_ref().map(|e| e.key.as_str());
+        let plays = match &track.synth_preset {
+            Some(preset) if track.use_synth && Some(preset.as_str()) == key => None,
+            Some(preset) if track.use_synth => Some(format!("plays synth \"{preset}\"")),
+            _ => Some("plays a sample".to_owned()),
+        };
+        Some((track.name.clone(), plays))
+    }
+
+    /// The line under the preset bar, right of the tabs: what the track
+    /// plays, and when it is not the preset shown, a button that puts it on it.
+    fn track_line(&self, layout: &SynthLayout, scale: i32, items: &mut Vec<Item>) {
+        let Some((name, plays)) = self.track_plays() else { return };
+        let tab = layout.tabs[layout.tabs.len() - 1];
+        let mut x = tab.x + tab.w + 16 * scale;
+        let text = match plays {
+            None => format!("{name} plays this preset"),
+            Some(plays) => {
+                let label = format!("USE ON {name}");
+                let w = text_width(&label, scale) + 12 * scale;
+                let rect = Rect::new(x, tab.y, w, tab.h);
+                items.push(Item::new(Some(Id::SynthButton(USE_BUTTON)), rect, Kind::Button { label, on: false }));
+                x += w + 8 * scale;
+                format!("{name} {plays}")
+            }
+        };
+        items.push(Item::text(x, tab.y + 3 * scale, text, DIM, scale));
     }
 
     /// The presets' keys, sorted.
@@ -124,8 +170,10 @@ impl Session {
     /// The draft into its preset (`commit`).
     fn commit_synth(&mut self) {
         let Some(edit) = &self.synth_editor.edit else { return };
-        self.synths.set(&edit.key, Value::Object(edit.draft.clone()));
+        let key = edit.key.clone();
+        self.synths.set(&key, Value::Object(edit.draft.clone()));
         self.synths_changed();
+        self.not_undoable(format!("synth preset \"{key}\" changed"));
     }
 
     /// Write the presets when the edits have settled; when to call again.
@@ -183,8 +231,9 @@ impl Session {
     }
 
     pub(super) fn synth_items(&self, layout: &mut session_panel::PanelLayout, size: (i32, i32, i32)) {
-        if let Some((built, _)) = self.synth_built(size) {
+        if let Some((built, synth_layout)) = self.synth_built(size) {
             layout.items.extend(built.items);
+            self.track_line(&synth_layout, size.2, &mut layout.items);
         }
     }
 
@@ -335,6 +384,12 @@ impl Session {
                 self.synths_changed();
                 self.message = format!("\"{key}\" reverted");
             }
+            USE_BUTTON => {
+                let Some(key) = self.synth_editor.edit.as_ref().map(|e| e.key.clone()) else { return };
+                let Some(t) = self.editor_track() else { return };
+                self.assign_synth(t, &key);
+                self.message = format!("{} plays \"{key}\"", self.track_name(t));
+            }
             "export" => self.open_export(Export::Synths),
             "import" => self.open_picker(Purpose::ImportSynth),
             _ => {}
@@ -388,7 +443,6 @@ impl Session {
 mod tests {
     use super::*;
     use crate::kits::KitSet;
-    use crate::panel::{Item, Rect};
 
     const SIZE: (i32, i32, i32) = (1100, 680, 1);
 
@@ -439,6 +493,43 @@ mod tests {
         s.synth_button("revert");
         assert_eq!(s.synths.get("b").unwrap().to_json(), r#"{"vco1":{"gain":0.5}}"#);
         assert_eq!(model::number(&s.synth_editor.edit.as_ref().unwrap().draft, "vco2.gain"), Some(0.0));
+    }
+
+    #[test]
+    fn a_sample_track_is_told_so_and_put_on_the_preset_shown() {
+        let (library, _) = Library::parse(
+            r#"{"patterns":[{"name":"p","tracks":[{"name":"KICK"},{"name":"BASS","useSynth":true,"synthPreset":"b"}]}]}"#,
+        )
+        .unwrap();
+        let mut s = session();
+        s.editor = ordrumbox_logic::editor::Editor::new(library);
+        s.selection.cursor = Some(Cursor { track: 0, beat: 0, step: 0 });
+        s.toggle_synth();
+        assert_eq!(s.synth_editor.edit.as_ref().map(|e| e.key.as_str()), Some("a"), "the first preset");
+        assert_eq!(s.message, "KICK plays a sample: \"a\" shown, USE ON KICK to play it");
+        let text = |s: &Session| {
+            let layout = s.panel_layout(SIZE.0, SIZE.1, 1);
+            layout.items.iter().find_map(|i| match &i.kind {
+                Kind::Text { text, .. } if text.starts_with("KICK plays") => Some(text.clone()),
+                _ => None,
+            })
+        };
+        assert_eq!(text(&s).as_deref(), Some("KICK plays a sample"));
+        let button = item(&s, |i| i.id == Some(Id::SynthButton(USE_BUTTON)));
+        let (x, y) = center(button.rect);
+        s.mouse_down(SIZE, x, y, Button::Left, false);
+        let track = s.track(0).unwrap();
+        assert!(track.use_synth && track.synth_preset.as_deref() == Some("a"));
+        assert_eq!(s.message, "KICK plays \"a\"");
+        assert_eq!(text(&s).as_deref(), Some("KICK plays this preset"));
+        let layout = s.panel_layout(SIZE.0, SIZE.1, 1);
+        assert!(!layout.items.iter().any(|i| i.id == Some(Id::SynthButton(USE_BUTTON))));
+        // Another preset picked: the track still plays its own.
+        s.synth_select(Id::SynthPreset, "b");
+        assert_eq!(text(&s).as_deref(), Some("KICK plays synth \"a\""));
+        // One undo step: back on its sample.
+        s.undo();
+        assert!(!s.track(0).unwrap().use_synth);
     }
 
     #[test]

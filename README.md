@@ -13,13 +13,13 @@ Windows by CI).
 | `ordrumbox-dsp` | sample voice, synth voice, channel strip (filter, saturation, reverb, delay), master bus; no allocation in render paths | none |
 | `ordrumbox-engine` | WAV decoding/encoding, kits and their files, sample analysis, sound auto-assignment, synth presets, passes (pattern and song: events, strip settings, LFO steps), sample-accurate engine, UI ↔ audio link, offline renders | core, dsp |
 | `ordrumbox-probe` | sound measurements of synth presets and WAV files, a command-line tool that does not ship with the app | core, dsp, engine |
-| `ordrumbox-ui` | the UI without a window or a sound device: session, software-rendered views (text in the system monospace font), input, MCP link, update check | core, logic, engine, fontdue |
+| `ordrumbox-ui` | the UI without a window or a sound device: session, software-rendered views (text in the system monospace font, at its natural letter spacing: 6 × 8 pixel cells per character at scale 1), input, MCP link, update check | core, logic, engine, fontdue |
 | `ordrumbox-app` | window, input translation, audio output → `ordrumbox.exe` | core, engine, ui, winit, softbuffer, cpal |
 | `ordrumbox-plugin` | the CLAP and VST3 instrument (below, "Plugin") | engine, ui, nih-plug, baseview, softbuffer |
 | `xtask` | `cargo xtask bundle`: the plugin bundles | nih-plug's bundler |
 
 The domain crates and the probe have no third-party dependency. Only the app talks to
-the OS, through small bridges (`winit`, `softbuffer`, `cpal`; `midir` with MIDI); the UI
+the OS, through small bridges (`winit`, `softbuffer`, `cpal`; no MIDI device yet); the UI
 rasterises text with `fontdue`.
 
 ## Running
@@ -233,12 +233,22 @@ picks them while a track has none (a drum line 12–25 and 0, a bass or chord
 line 0 and 0) and keeps them after; the header's VARY knob scales them. Variant
 lists the bass variants on a bass track, the chord and melody ones on the others. Under it, the note editor: the
 selected note (else the step under the cursor, else the track's first note)
-— velocity, pitch, pan, and the Trig, Retr, Eucl and Arp tabs. While
+— velocity, pitch, pan, and the Trigger, Retrigger, Euclidean and Arpeggio tabs. Settings are named in whole words (Transpose, Feedback, Hit Variation…), the text at the font's own letter spacing leaving room for them. While
 playing, a setting with an LFO shows the LFO's value. The grid has a volume
-slider per track. Right-click a track's name: rename, copy, paste, move up or
+slider per track, the same setting as the track editor's Volume knob (their tooltips say so). Right-click a track's name: rename, copy, paste, move up or
 down, duplicate, delete, randomize or clear it; drag a track's name up or down
 to move the track to another row (one undo step). Right-click a step: copy,
-paste or delete its notes, or add a note at a random pitch.
+paste or delete its notes, or add a note at a random pitch. A note fills its cell as high as it is loud;
+from velocity 0.9 it is an accent, topped with a bright bar. **L** accents
+the notes of the cursor step (velocity 1), or, when they all are, sets them
+back to 0.8 (one undo step). A ruler above the rows numbers the beats, the one
+playing lit, with a dot per step of the focused track; **+ NEW TRACK** under
+the rows adds a track (**Ctrl+T**), and a track's name shows in a tooltip its
+whole sound, mix and length. Above the track names, the ruler says which page of beats is shown when the pattern has more than one; the header's list is labelled PATTERN. In the kit editor, each sample names the pattern's tracks that play it. Problems found at start (a sample not loaded, a file that cannot be read) stay on a red band above the help line until quit.
+
+The mouse over a tab, a knob, a slider or a setting's label of the track,
+note and kit editors, or over a header control, shows its whole name and what
+it does (Retrigger: repeats of the note, how fast, their chance…).
 
 Knobs and sliders work as in the JS (`OrKnob`, `OrSlider`, checked against
 them): drag a knob up or down (200 px for the whole range), click or drag a
@@ -261,7 +271,7 @@ description (a click edits them), its date, the arrangement list, and
 (**←→** move it a measure; while playing, it jumps there at once); while the
 panel is shown **Space** plays the song. Right-click a pattern of the list:
 add it at the playhead (stopped: the cursor), move it up or down the list,
-rename it, or delete it with its clips (confirmed); a row's name: add its
+rename it, or delete it with its clips (one undo step); a row's name: add its
 pattern at the playhead, move the row up or down, or remove its row; a clip: **Next** (the same clip right after it) or **Delete**; the bare
 grid: add the row's pattern there. Drag a pattern along the list to move it
 there; drag it onto the arrangement to add it at that measure, on its own row
@@ -315,7 +325,10 @@ the drag before the click arrives, so `consumeClick()` never sees it.
 
 Synth editor (**F6**, **View › Synth**, the JS soft-synth editor; **Esc**
 goes back to the grid): the preset of the track editor's track (else the
-first one), in the place of the grid, the track editor beside it. The preset
+first one), in the place of the grid, the track editor beside it. Right of
+the tabs, a line says what that track plays: "KICK plays this preset", or
+"KICK plays a sample" / "plays synth "BASS1"" with a **USE ON KICK** button
+that puts the track on the preset shown (one undo step). The preset
 bar picks another preset and deletes, creates, duplicates, reverts (to the
 preset as it was when opened), exports (`ordrumbox-synth-sounds.json`, to a
 folder picked) and imports presets. Four tabs of cards — **OSC** (the scope: four cycles of
@@ -338,13 +351,13 @@ over: preset edits then say they are not saved. The assets hold one preset per b
 `CHH_SYNTH`, `OHH_SYNTH`, `CRASH_SYNTH`. The pills under the cards show the modules in use.
 
 Output panel (a strip along the bottom of the window, always shown — the JS
-output panel): the master bus in three tabs — **Vol**: the master
+output panel): the master bus in three tabs — **Volume**: the master
 volume and the spectrum of what plays (the JS analyser's
 `getByteFrequencyData`, computed as the Web Audio specification describes
 it: 4096 samples, Blackman window, smoothing 0.8, -100 to -30 dB, the first
 256 bins); **Comp**: the pre-gain, the compressor's transfer curve
 (-60 to 0 dB in, the unity line, the threshold), its on/off button and its
-threshold, ratio, attack, release, knee and make-up; **Flt**: the low cut
+threshold, ratio, attack, release, knee and make-up; **Filter**: the low cut
 and the high cut. They play at once and are saved half a second after the
 last change to `settings.json` in the user data folder (`settings.master`,
 as the JS keeps them; the file's other settings are kept), and loaded at
@@ -360,6 +373,10 @@ and where it is in the library), **BEATS** (1–16), **KIT** (the kit list),
 F3–F6 do; **KIT** toggles the kit editor, as Ctrl+K does).
 A list opens on a click; the wheel or the arrows move, **Enter** picks. The
 line under it shows the last action, undo and redo, and the song.
+A pattern chosen while a pattern plays (in the list, with **[ ]**, or by a
+plugin host) waits for the one playing to end its loop: until then **NEXT**
+blinks on the beat above the list, the grid shows the new pattern without a
+playhead, and the line under the header names the one finishing.
 
 The look (`theme.rs`, every colour of the app): a deep indigo ground,
 panels a step lighter, and neon accents with one role each — pink for
@@ -444,7 +461,7 @@ file: `setSongInfo` (not an undo step), `saveSong` (to `songs/`),
 Kits, saved with them, not undo steps: `normalizeKit`, `addSampleToKit`,
 `replaceKitSample`, `importKitFolder`, `loadKitMapping`,
 `exportKitMapping` (to `exports/`). `getPlaybackState` tells what plays and
-where. `setColorScheme` is gone: this app has one theme. Track and
+where. `setColorScheme` is not a tool: the colour scheme is the user's choice (**C**, `settings.json`). Track and
 note settings take the key names of the files (`volume`, `transpose`,
 `cycle`, `probability`…; the JS names are read too), and a value outside its
 range is refused (notes) or brought inside it, the answer saying the value
@@ -461,8 +478,10 @@ folder, then where it last chose.
 Under each track's name, the grid shows what it plays: its sample (`kit/file`,
 as assigned, perhaps from another kit) or its synth preset (`synth BASS5`).
 
-Mouse: a click on an empty step adds a note, on a note selects it (and plays
-it), on the selected note deletes it; **M**/**S** boxes mute/solo; a click on
+Mouse: a click switches a step on or off: an empty step gets a note (selected,
+and played), a step with notes loses them all, in one undo step and without a
+question; **Shift**+click selects the step's note for the note editor (and
+plays it) without changing it; **M**/**S** boxes mute/solo; a click on
 a name selects the track (and plays it). Over a note, a bubble shows its
 pitch, MIDI number and the settings that differ from the defaults (the JS
 `formatNoteTooltip`, checked against it).
@@ -475,10 +494,11 @@ pitch, MIDI number and the settings that differ from the defaults (the JS
 | **, .** | previous / next kit |
 | **B** | make the pattern again in its style |
 | **Shift B** | a new pattern in the chosen style |
-| **F**, **G** | a random pattern, a random kit |
-| **H** | every track on the synth patch that matches its name, like auto-assign (KICK → KICK_SYNTH, SNARE → SNARE_SYNTH…; random when none does) |
-| **J** | every track back on auto-assign |
-| **K** | a random sample (of any kit) on every track |
+| **F**, **Shift G** | a random pattern, a random kit |
+| **Shift H** | every track on the synth patch that matches its name, like auto-assign (KICK → KICK_SYNTH, SNARE → SNARE_SYNTH…; random when none does) |
+| **Shift J** | every track back on auto-assign |
+| **Shift K** | a random sample (of any kit) on every track |
+| **G**, **H**, **J**, **K** alone | nothing but a reminder to hold **Shift**: these change every track, and sit next to the play keys (**Q**–**P**, **1**–**9**) |
 | **V** | VU meters on the track stripes (on / off) |
 | **C** | the next colour scheme (Indigo, Amber, Deep sea, Crimson, Toxic; also **View › Next colour scheme**), kept in `settings.json` under `colorScheme` (1 to 5; the web version knows 1 to 3 and takes 1 for the others) |
 | **D**, **S**, **A** | drums, bass, chords: generate in auto mode / auto mode off |
@@ -490,20 +510,22 @@ pitch, MIDI number and the settings that differ from the defaults (the JS
 | **Shift + ↑↓ / ←→** | velocity ±0.05 / pitch ±1 of the selected note |
 | **Delete** | clear the cursor step |
 | **Esc** | deselect |
-| **Ctrl Z**, **Ctrl Y** (or **Ctrl Shift Z**) | undo, redo (50 steps) |
+| **Ctrl Z**, **Ctrl Y** (or **Ctrl Shift Z**) | undo, redo (50 steps) of the library's edits. What Ctrl Z undoes is done at once, without a question, and its message ends with *(Ctrl+Z: undo)*: removing a track, a pattern, an arrangement, a clip or a row, clearing a step or a track, random notes, compacting. Only what cannot be undone asks first: replacing the library (import, demo, song files), removing a kit's sample or a synth preset, restoring a backup, changing the user data folder. The master, the synth presets and the kits are saved as they change, outside the history: their messages end with *(not undoable)* |
 | **Ctrl C / V** | copy / paste the cursor step (**Shift**: the track) |
 | **Ctrl T**, **Ctrl Backspace** | add a track, remove the focused track |
 | **Ctrl G**, **Ctrl L** | next grid (steps per beat), loop one step shorter |
 | **Ctrl - =** | pattern length −1 / +1 beat |
+| **Ctrl +** (**Ctrl Shift =**), **Ctrl Shift -**, **Ctrl 0** | zoom the UI in, out by a whole scale (×1 to ×4), back to the display's scale; also **Ctrl** with the keypad's **+ -** (**View › Zoom in**…). A window too small for the scale asked shows the largest that fits and says so. Kept in `settings.json` (`uiZoom`, steps from the display's scale) |
 | **Ctrl N**, **Ctrl D** | new pattern, duplicate pattern |
-| **Ctrl S** | export the pattern as JSON (`ordrumbox-<name>.json` in a folder picked, as the JS); the library is saved on its own, **File › Save** saves now |
+| **Ctrl S** | save the library now, the line under the header saying where (**File › Save**); it is also saved on its own a moment after each edit |
+| **Ctrl Shift S** | export the pattern as JSON (`ordrumbox-<name>.json` in a folder picked; the JS app's **Ctrl S**) |
 | **Ctrl E** | export the pattern to WAV (**Shift**: the song) |
 | **Ctrl M** | export the pattern to a MIDI file |
 | **Ctrl K** | kit editor (open / close) |
 | **Ctrl O** | import a MIDI file (file picker) |
 | **Ctrl Q** | save and quit |
 | **F10**, **Alt** | open the menus |
-| **F1** | the list of keys |
+| **F1** | the list of keys (the wheel, the arrows, Page Up/Down, Home/End scroll it when it is longer than the window) |
 | **F2** | track editor (shown / hidden) |
 | **F3** | song panel (shown / hidden) |
 | **F4** | piano roll (shown / hidden) |
@@ -575,22 +597,25 @@ macOS (artifact `ordrumbox-plugin-<os>`) and runs `clap-validator` on the CLAP.
 
 The plugin's window is the app's UI (`ordrumbox-ui`). It edits the project's
 library; kits, synth presets and settings are the user's files, shared with
-the app. What the host does is left out of its menus (File > Save and Quit,
-Tempo -1/+1, Help > Check for updates and Factory reset, the user data folder
-commands), and its shortcuts
-are refused with a message: the host saves the library with the project and
-sets the tempo. The header shows the host's tempo, under HOST, in place of
-the pattern's BPM knob. A plugin plays patterns only: no song view, no Song
-menu, no song files (the songs of the library stay in it, for the app). It
+the app. What the host does is greyed out in its menus, tagged *host's*
+(File > Save and Quit, Tempo -1/+1) or *app only* (Help > Check for updates
+and Factory reset, the user data folder commands, the Song menu), and its
+shortcuts are refused with a message: the host saves the library with the
+project and sets the tempo. The header shows the host's tempo, under HOST, in
+place of the pattern's BPM knob; its tooltip says so. A plugin plays patterns
+only: the SONG view button is greyed out (a click says why), and there are no
+song files (the songs of the library stay in it, for the app). It
 has no master strip either: the host mixes, and the master bus keeps its
 default settings, not those of `settings.json`.
 
 The plugin's keys leave the host's alone. Space (the host's transport) and
 every Ctrl/Cmd key (its save, undo, zoom...) go on to the host, even with a menu
-or the file picker open; only a text entry keeps Space. The keys of the
-commands it leaves out (F3, Shift+[ ], - and = for the tempo) go to the host
-too, as does any key the plugin does not use and every key release. Undo,
-copy, paste and the exports stay in the menus, which show no Ctrl shortcut;
+or the file picker open; only a text entry keeps Space. **Alt** takes the
+place of Ctrl for the plugin's own commands: Alt+Z undo, Alt+C and Alt+V copy
+and paste, Alt+K the kit editor, Alt+N a new pattern, and so on; the menus show
+these Alt shortcuts. The keys of the commands it leaves out (F3, Shift+[ ], -
+and = for the tempo, Alt+S, Alt+Q) go to the host too, as does any key the
+plugin does not use and every key release.
 Help > Keyboard shortcuts lists the plugin's keys. A key passed on reaches the
 host on macOS; on Windows, baseview does not pass it on, and what the host gets
 depends on the host.

@@ -224,12 +224,12 @@ pub fn group_label(group: &str) -> String {
     match group {
         "scope" => "Scope".into(),
         "master" => "Master".into(),
-        "filter" => "Flt".into(),
-        "filterEnv" => "FltEnv".into(),
+        "filter" => "Filter".into(),
+        "filterEnv" => "Filter Env".into(),
         "fm" => "FM".into(),
         "lfo" => "LFO1".into(),
-        "envelope" => "Env".into(),
-        "modEnvelope" => "ModEnv".into(),
+        "envelope" => "Envelope".into(),
+        "modEnvelope" => "Mod Env".into(),
         g if g.len() > 3 && g[..3].eq_ignore_ascii_case("vco") && g[3..].chars().all(|c| c.is_ascii_digit()) => {
             g.to_uppercase()
         }
@@ -650,14 +650,14 @@ pub fn modules(draft: &Object) -> Vec<(&'static str, bool)> {
         ("VCO1", gain(1) > 0.01),
         ("VCO2", gain(2) > 0.01),
         ("VCO3", gain(3) > 0.01),
-        ("Flt", !flag("bypassFilter")),
-        ("Env", !flag("bypassEnv")),
+        ("Filter", !flag("bypassFilter")),
+        ("Envelope", !flag("bypassEnv")),
         ("LFO1", !flag("bypassLfo1") && target("lfo.target", "NOT") && n("lfo.depth") > 0.0),
         ("LFO2", !flag("bypassLfo2") && target("lfo2.target", "NOT") && n("lfo2.depth") > 0.0),
         ("FM", !flag("bypassFm") && n("fm.amount") > 0.001),
         ("Mod", !flag("bypassModEnv") && target("modEnvelope.target", "off")),
-        ("Ns", !flag("bypassNoise") && n("noise.mix") > 0.001),
-        ("FltEnv", !flag("bypassFilterEnv") && env_amount > 0.001),
+        ("Noise", !flag("bypassNoise") && n("noise.mix") > 0.001),
+        ("Filter Env", !flag("bypassFilterEnv") && env_amount > 0.001),
     ]
 }
 
@@ -789,7 +789,7 @@ mod tests {
         assert!((steep[at(1000.0)] + 3.0).abs() < 0.5 && steep[at(2000.0)] < -23.0, "{}", steep[at(2000.0)]);
         assert_eq!(
             modules(&defaults()).iter().filter(|(_, on)| *on).map(|(l, _)| *l).collect::<Vec<_>>(),
-            ["VCO1", "Flt", "Env"]
+            ["VCO1", "Filter", "Envelope"]
         );
     }
 }
