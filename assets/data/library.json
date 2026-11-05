@@ -2592,7 +2592,7 @@
           "useSynth": true,
           "reverbType": "gated",
           "reverbMix": 0.7,
-          "synthPreset": "BASS1",
+          "synthPreset": "BASS_SQUARE",
           "noteKeys": [
             "beat",
             "step",
@@ -11391,7 +11391,7 @@
           "filterQ": 12,
           "delayBeats": 0.75,
           "delayMix": 0.15,
-          "synthPreset": "BASS0",
+          "synthPreset": "BASS_ANALOG",
           "noteKeys": [
             "velocity",
             "arp",

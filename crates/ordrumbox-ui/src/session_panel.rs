@@ -384,8 +384,11 @@ impl Session {
 
         // Synth presets.
         let keys = self.synths.keys();
-        let current =
-            if track.use_synth { track.synth_preset.clone().unwrap_or_else(|| "BASS1".into()) } else { "none".into() };
+        let current = if track.use_synth {
+            track.synth_preset.clone().unwrap_or_else(|| ordrumbox_logic::generate::BASS_PRESET.into())
+        } else {
+            "none".into()
+        };
         let mut values: Vec<String> = std::iter::once("none").chain(keys.iter().copied()).map(str::to_owned).collect();
         if track.use_synth && !keys.contains(&current.as_str()) {
             values.push(current.clone());

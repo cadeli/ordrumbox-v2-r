@@ -20,6 +20,8 @@ use crate::compose;
 
 /// The pattern's style key (in `Pattern::extra`).
 pub const GENRE: &str = "autoGenre";
+/// The synth preset a generated bass track plays.
+pub const BASS_PRESET: &str = "BASS_SQUARE";
 const KEY_OFFSET: &str = "autoKeyOffset";
 const SCALE: &str = "autoScale";
 /// The seed a pattern's lines are drawn from (⟳ draws a new one, the macros keep it).
@@ -338,7 +340,7 @@ pub fn generate_pattern(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, option
         let mut bass = Track::new("BASS", pattern.beat_count, 4);
         bass.use_synth = false;
         bass.auto_assign = true;
-        bass.synth_preset = Some("BASS1".into());
+        bass.synth_preset = Some(BASS_PRESET.into());
         bass.volume = 0.5;
         pattern.tracks.push(bass);
     }
@@ -608,7 +610,7 @@ impl MelodicKind {
     /// `MELODIC_GEN_PRESETS`: the synth preset.
     fn preset(self) -> &'static str {
         match self {
-            Self::Bass => "BASS1",
+            Self::Bass => BASS_PRESET,
             Self::Chords => "PIANO",
         }
     }
