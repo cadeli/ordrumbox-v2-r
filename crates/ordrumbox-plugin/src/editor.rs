@@ -1,12 +1,19 @@
-//! The plugin's window: a baseview child of the host's window, its pixels
-//! drawn in software and shown through softbuffer.
+//! The plugin's window: a baseview child of the host's window showing the
+//! app's UI, drawn in software and shown through softbuffer, its input
+//! translated into the UI's.
 
 use std::num::{NonZeroIsize, NonZeroU32};
 use std::ptr::NonNull;
 use std::sync::Arc;
 
-use baseview::{Event, EventStatus, WindowEvent, WindowHandle, WindowOpenOptions, WindowScalePolicy};
+use baseview::{
+    DropData, DropEffect, Event, EventStatus, MouseButton, MouseEvent, ScrollDelta, WindowEvent, WindowHandle,
+    WindowOpenOptions, WindowScalePolicy,
+};
+use keyboard_types::{KeyState, KeyboardEvent};
+use nih_plug::nih_log;
 use nih_plug::prelude::{Editor, GuiContext, ParentWindowHandle};
+use ordrumbox_ui::ui_input::{self, Button, Key, KeyEvent, Modifiers};
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle, RawDisplayHandle, RawWindowHandle};
 use raw_window_handle_06 as rwh06;
 
@@ -15,7 +22,7 @@ use crate::player::{SharedPlayer, lock};
 /// The window's size in logical pixels (the app's first window size).
 pub const SIZE: (u32, u32) = (1100, 680);
 
-/// The window's background until the UI is drawn here.
+/// The window's colour where the UI cannot draw (no font, no session).
 const BACKGROUND: u32 = 0x0018_1820;
 
 /// Opens the window when the host asks.
@@ -72,14 +79,20 @@ impl Drop for Open {
     }
 }
 
-/// What the window shows: the player's state, drawn into a softbuffer surface.
+/// What the window shows: the player's UI, drawn into a softbuffer surface.
 struct View {
     player: SharedPlayer,
-    /// `None` when the surface could not be made or used: nothing is drawn
-    /// (the reason is in the player's status).
+    /// `None` when the surface could not be made or used: nothing is drawn.
     surface: Option<Surface>,
+    /// The system's monospace font is loaded: the UI can draw text.
+    font: bool,
+    /// Physical pixels.
     width: u32,
     height: u32,
+    /// Physical pixels per logical one.
+    scale: f64,
+    /// Something changed since the last frame drawn.
+    dirty: bool,
 }
 
 /// A softbuffer surface and the context it needs alive.
@@ -90,59 +103,175 @@ struct Surface {
 
 impl View {
     fn new(window: &mut baseview::Window<'_>, player: SharedPlayer) -> Self {
+        let font = match ordrumbox_ui::load_font() {
+            Ok(()) => true,
+            Err(e) => {
+                nih_log!("orDrumbox: no font, the window stays empty: {e}");
+                false
+            }
+        };
         let target = Target::of(window);
         let surface = softbuffer::Context::new(target.clone()).and_then(|context| {
             softbuffer::Surface::new(&context, target).map(|surface| Surface { _context: context, surface })
         });
-        let mut view = Self { player, surface: None, width: 0, height: 0 };
+        let mut view = Self { player, surface: None, font, width: 0, height: 0, scale: 1.0, dirty: true };
         match surface {
             Ok(surface) => view.surface = Some(surface),
-            Err(e) => view.fail(format!("editor: {e}")),
+            Err(e) => view.fail(&e),
         }
         view
     }
 
-    fn resize(&mut self, width: u32, height: u32) {
+    fn resize(&mut self, width: u32, height: u32, scale: f64) {
         let (Some(w), Some(h), Some(surface)) = (NonZeroU32::new(width), NonZeroU32::new(height), &mut self.surface)
         else {
             return;
         };
         match surface.surface.resize(w, h) {
-            Ok(()) => (self.width, self.height) = (width, height),
-            Err(e) => self.fail(format!("editor: resize: {e}")),
+            Ok(()) => (self.width, self.height, self.scale, self.dirty) = (width, height, scale, true),
+            Err(e) => self.fail(&e),
         }
     }
 
-    fn draw(&mut self) -> Result<(), softbuffer::SoftBufferError> {
+    /// One frame: the UI's idle pass, then a redraw if anything changed.
+    fn frame(&mut self) -> Result<(), softbuffer::SoftBufferError> {
         let Some(surface) = &mut self.surface else { return Ok(()) };
         if self.width == 0 {
             return Ok(());
         }
+        let mut player = lock(&self.player);
+        let ui = player.ui().filter(|_| self.font);
+        let redraw = match ui {
+            Some(ui) => ui.idle().redraw,
+            None => false,
+        };
+        if !(redraw || self.dirty) {
+            return Ok(());
+        }
+        let (width, height) = (self.width as usize, self.height as usize);
         let mut buffer = surface.surface.buffer_mut()?;
-        buffer.fill(BACKGROUND);
+        match player.ui().filter(|_| self.font) {
+            Some(ui) => {
+                ui.set_size(width as i32, height as i32, self.scale.round().max(1.0) as i32);
+                ui.draw(&mut buffer, width, height);
+            }
+            None => buffer.fill(BACKGROUND),
+        }
+        self.dirty = false;
         buffer.present()
     }
 
     /// The surface is given up; the window stays empty.
-    fn fail(&mut self, message: String) {
-        lock(&self.player).status.push(message);
+    fn fail(&mut self, error: &softbuffer::SoftBufferError) {
+        nih_log!("orDrumbox: the window cannot be drawn: {error}");
         self.surface = None;
+    }
+
+    /// `f` on the UI, if there is one; its answer marks the window to redraw.
+    fn with_ui(&mut self, f: impl FnOnce(&mut ordrumbox_ui::Ui) -> bool) {
+        if let Some(ui) = lock(&self.player).ui() {
+            self.dirty |= f(ui);
+        }
+    }
+
+    fn mouse(&mut self, event: MouseEvent) -> EventStatus {
+        let scale = self.scale;
+        match event {
+            MouseEvent::CursorMoved { position, modifiers } => self.with_ui(|ui| {
+                ui.set_modifiers(ui_modifiers(modifiers));
+                ui.pointer_moved(position.x * scale, position.y * scale)
+            }),
+            MouseEvent::ButtonPressed { button, modifiers } => {
+                let Some(button) = ui_button(button) else { return EventStatus::Ignored };
+                self.with_ui(|ui| {
+                    ui.set_modifiers(ui_modifiers(modifiers));
+                    ui.pointer_pressed(button)
+                });
+            }
+            MouseEvent::ButtonReleased { button, modifiers } => {
+                let Some(button) = ui_button(button) else { return EventStatus::Ignored };
+                self.with_ui(|ui| {
+                    ui.set_modifiers(ui_modifiers(modifiers));
+                    ui.pointer_released(button)
+                });
+            }
+            MouseEvent::WheelScrolled { delta, modifiers } => self.with_ui(|ui| {
+                ui.set_modifiers(ui_modifiers(modifiers));
+                ui.wheel(match delta {
+                    ScrollDelta::Lines { x, y } => ui_input::ScrollDelta::Lines(x, y),
+                    ScrollDelta::Pixels { x, y } => {
+                        ui_input::ScrollDelta::Pixels(f64::from(x) * scale, f64::from(y) * scale)
+                    }
+                })
+            }),
+            MouseEvent::DragEntered { data: DropData::Files(_), .. }
+            | MouseEvent::DragMoved { data: DropData::Files(_), .. } => {
+                return EventStatus::AcceptDrop(DropEffect::Copy);
+            }
+            MouseEvent::DragDropped { data: DropData::Files(paths), .. } => {
+                self.with_ui(|ui| paths.iter().fold(false, |redraw, path| ui.drop_path(path) | redraw));
+            }
+            _ => return EventStatus::Ignored,
+        }
+        EventStatus::Captured
+    }
+
+    fn key(&mut self, event: &KeyboardEvent) {
+        let key = KeyEvent {
+            key: Key::from_code(&event.code.to_string()),
+            pressed: event.state == KeyState::Down,
+            repeat: event.repeat,
+            text: match &event.key {
+                keyboard_types::Key::Character(text) => Some(text.clone()),
+                _ => None,
+            },
+        };
+        self.with_ui(|ui| {
+            ui.set_modifiers(ui_modifiers(event.modifiers));
+            ui.key(&key)
+        });
+    }
+}
+
+fn ui_modifiers(modifiers: keyboard_types::Modifiers) -> Modifiers {
+    use keyboard_types::Modifiers as M;
+    Modifiers {
+        shift: modifiers.contains(M::SHIFT),
+        control: modifiers.contains(M::CONTROL),
+        alt: modifiers.contains(M::ALT),
+        logo: modifiers.contains(M::META),
+    }
+}
+
+fn ui_button(button: MouseButton) -> Option<Button> {
+    match button {
+        MouseButton::Left => Some(Button::Left),
+        MouseButton::Right => Some(Button::Right),
+        _ => None,
     }
 }
 
 impl baseview::WindowHandler for View {
     fn on_frame(&mut self, _window: &mut baseview::Window<'_>) {
-        if let Err(e) = self.draw() {
-            self.fail(format!("editor: {e}"));
+        if let Err(e) = self.frame() {
+            self.fail(&e);
         }
     }
 
     fn on_event(&mut self, _window: &mut baseview::Window<'_>, event: Event) -> EventStatus {
-        if let Event::Window(WindowEvent::Resized(info)) = event {
-            let size = info.physical_size();
-            self.resize(size.width, size.height);
+        match event {
+            Event::Window(WindowEvent::Resized(info)) => {
+                let size = info.physical_size();
+                self.resize(size.width, size.height, info.scale());
+                EventStatus::Captured
+            }
+            Event::Window(_) => EventStatus::Ignored,
+            Event::Mouse(event) => self.mouse(event),
+            Event::Keyboard(event) => {
+                self.key(&event);
+                EventStatus::Captured
+            }
         }
-        EventStatus::Captured
     }
 }
 

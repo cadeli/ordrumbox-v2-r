@@ -3,84 +3,27 @@
 //! Loads the ordrumbox-v2 assets (patterns, kits, samples, synth presets) and
 //! the user's library, plays the selected pattern through the default audio
 //! device (per-track strips, synth tracks, master bus), and edits it with the
-//! menu bar, the mouse and the keyboard (see `menu` and `view::HELP`), every
+//! menu bar, the mouse and the keyboard (`ordrumbox-ui`: `menu`, `view::HELP`), every
 //! edit undoable and saved a moment later.
 
 // No console window in a release build on Windows.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod action_log;
-mod assets;
 mod audio;
-mod canvas;
-mod control;
-mod editors;
-mod font;
-mod frame;
-mod kits;
-mod master;
-mod mcp;
-mod mcp_link;
-mod menu;
-mod note_drag;
-mod output;
-mod panel;
-mod piano_roll;
-mod picker;
-mod session;
-mod song_view;
-mod spectrum;
-mod store;
-mod synth_view;
-mod theme;
-mod update;
-mod view;
 
 use std::num::NonZeroU32;
 use std::rc::Rc;
-use std::time::{Duration, Instant};
 
+use ordrumbox_ui::ui_input::{Button, Key, KeyEvent, Modifiers, ScrollDelta};
+use ordrumbox_ui::{Command, PanelId, Session, Ui};
 use winit::application::ApplicationHandler;
-use winit::dpi::{LogicalSize, PhysicalPosition};
-use winit::event::{ElementState, KeyEvent, MouseButton, MouseScrollDelta, WindowEvent};
+use winit::dpi::LogicalSize;
+use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopClosed};
 use winit::keyboard::{KeyCode, ModifiersState, PhysicalKey};
 use winit::window::{Window, WindowId};
 
-use canvas::Canvas;
-use menu::Command;
-use session::{Button, Move, OverlayKey, PanelKey, Session};
-use view::KitLayout;
-
 const INITIAL_SIZE: LogicalSize<f64> = LogicalSize::new(1100.0, 680.0);
-/// Redraw interval while playing (the playhead moves).
-const FRAME: Duration = Duration::from_millis(16);
-/// Keys of the track rows, in order: 1–9 mute (shift: solo), Q–P audition.
-const ROW_DIGITS: [KeyCode; 9] = [
-    KeyCode::Digit1,
-    KeyCode::Digit2,
-    KeyCode::Digit3,
-    KeyCode::Digit4,
-    KeyCode::Digit5,
-    KeyCode::Digit6,
-    KeyCode::Digit7,
-    KeyCode::Digit8,
-    KeyCode::Digit9,
-];
-/// Rows Page Up / Page Down move in the file picker.
-const PAGE: isize = 10;
-const ROW_LETTERS: [KeyCode; 10] = [
-    KeyCode::KeyQ,
-    KeyCode::KeyW,
-    KeyCode::KeyE,
-    KeyCode::KeyR,
-    KeyCode::KeyT,
-    KeyCode::KeyY,
-    KeyCode::KeyU,
-    KeyCode::KeyI,
-    KeyCode::KeyO,
-    KeyCode::KeyP,
-];
 
 struct Gfx {
     window: Rc<Window>,
@@ -89,12 +32,8 @@ struct Gfx {
 
 struct App {
     gfx: Option<Gfx>,
-    session: Session,
-    modifiers: ModifiersState,
-    mouse: PhysicalPosition<f64>,
+    ui: Ui,
     error: Option<String>,
-    /// Alt is down and no other key was pressed since.
-    alt_alone: bool,
 }
 
 impl App {
@@ -103,19 +42,24 @@ impl App {
         event_loop.exit();
     }
 
-    fn scale(&self) -> i32 {
-        self.gfx.as_ref().map_or(1, |g| g.window.scale_factor().round().max(1.0) as i32)
-    }
-
     fn request_redraw(&self) {
         if let Some(gfx) = &self.gfx {
             gfx.window.request_redraw();
         }
     }
 
+    /// Tell the UI the window's current size and scale factor.
+    fn sync_size(&mut self) {
+        if let Some(gfx) = &self.gfx {
+            let size = gfx.window.inner_size();
+            let scale = gfx.window.scale_factor().round().max(1.0) as i32;
+            self.ui.set_size(size.width as i32, size.height as i32, scale);
+        }
+    }
+
     #[expect(clippy::print_stderr, reason = "the screenshot mode is run from a terminal, which reads it")]
     fn redraw(&mut self) -> Result<(), String> {
-        let scale = self.scale();
+        self.sync_size();
         let Some(gfx) = &mut self.gfx else { return Ok(()) };
         let size = gfx.window.inner_size();
         let (Some(width), Some(height)) = (NonZeroU32::new(size.width), NonZeroU32::new(size.height)) else {
@@ -123,8 +67,7 @@ impl App {
         };
         gfx.surface.resize(width, height).map_err(|e| format!("resize surface: {e}"))?;
         let mut buffer = gfx.surface.buffer_mut().map_err(|e| format!("get frame buffer: {e}"))?;
-        self.session.set_size((width.get() as i32, height.get() as i32, scale));
-        self.session.draw(&mut Canvas::new(&mut buffer, width.get() as usize, height.get() as usize), scale);
+        self.ui.draw(&mut buffer, width.get() as usize, height.get() as usize);
         // `ORDRUMBOX_SCREENSHOT=path`: keep the first frame as a BMP there and
         // quit — to check the layout without a screen capture.
         // A failed write exits with an error: whoever asked for the file reads it next.
@@ -138,376 +81,95 @@ impl App {
         buffer.present().map_err(|e| format!("present frame: {e}"))
     }
 
-    fn size(&self) -> (i32, i32) {
-        self.gfx.as_ref().map_or((0, 0), |g| {
-            let size = g.window.inner_size();
-            (size.width as i32, size.height as i32)
-        })
-    }
-
-    fn click(&mut self, button: Button) {
-        let (width, height) = self.size();
-        let (scale, x, y) = (self.scale(), self.mouse.x as i32, self.mouse.y as i32);
-        let shift = self.modifiers.shift_key();
-        let s = &mut self.session;
-        // An open list or number entry takes the click; the right button is the widgets'.
-        if s.popup_open() || button == Button::Right {
-            let size = (width, height, scale);
-            let menus_open = s.open_menu().is_some() || s.overlay_open();
-            if s.mouse_down(size, x, y, button, shift)
-                || (button == Button::Right && !menus_open && s.song_view_open() && s.song_click(size, x, y, button))
-                || (button == Button::Right && !menus_open && s.piano_roll_open() && s.roll_click(size, x, y, button))
-                || (button == Button::Right && !menus_open && s.grid_menu(size, x, y))
-            {
-                self.request_redraw();
-            }
-            return;
-        }
-        let menus = s.menus();
-        // The menu bar first: it is over everything.
-        match menu::hit(&menus, s.open_menu(), scale, x, y) {
-            Some(menu::Hit::Title(i)) => {
-                let same = s.open_menu().is_some_and(|o| o.menu == i);
-                s.close_overlay();
-                s.set_menu((!same).then(|| menu::Open::new(&menus, i, false)));
-            }
-            Some(menu::Hit::Item(i)) => {
-                if let Some(command) = s.open_menu().and_then(|o| menu::Open { item: Some(i), ..o }.command(&menus)) {
-                    s.run(command);
-                }
-            }
-            Some(menu::Hit::Panel) => {}
-            Some(menu::Hit::Bar) => s.set_menu(None),
-            None if s.open_menu().is_some() => s.set_menu(None),
-            None if s.overlay_open() => s.overlay_click(width, height, scale, x, y),
-            // Before the panel's: with the track editor open, its side claims the whole column.
-            None if frame::on_status_line(y, scale) => s.open_history(),
-            None if s.mouse_down((width, height, scale), x, y, Button::Left, shift) => {}
-            None => return self.click_content(width, height, scale, x, y),
-        }
-        self.request_redraw();
-    }
-
-    /// A click on the grid, the song panel or the kit editor.
-    fn click_content(&mut self, width: i32, height: i32, scale: i32, x: i32, y: i32) {
-        if self.session.song_view_open() {
-            if self.session.song_click((width, height, scale), x, y, Button::Left) {
-                self.request_redraw();
-            }
-            return;
-        }
-        if self.session.piano_roll_open() {
-            if self.session.roll_click((width, height, scale), x, y, Button::Left) {
-                self.request_redraw();
-            }
-            return;
-        }
-        let body = self.session.body((width, height, scale));
-        if let Some((selected, count)) = self.session.kit_list() {
-            let layout = KitLayout::new(body.main_w, body.editor_h, scale, self.session.status_lines());
-            if let Some(hit) = layout.hit(selected, count, x, y) {
-                self.session.kit_click(hit);
-                self.request_redraw();
-            }
-            return;
-        }
-        if let Some(hit) = self.session.grid_hit((width, height, scale), x, y) {
-            self.session.click(hit);
-            if let view::Hit::Name(t) = hit {
-                self.session.press_track_drag(t, x, y);
-            }
-            self.request_redraw();
-        }
-    }
-
-    /// The mouse moved: an open menu follows it.
-    fn hover(&mut self) {
-        let scale = self.scale();
-        let s = &mut self.session;
-        let Some(open) = s.open_menu() else { return };
-        let menus = s.menus();
-        let next = match menu::hit(&menus, Some(open), scale, self.mouse.x as i32, self.mouse.y as i32) {
-            Some(menu::Hit::Title(i)) if i != open.menu => menu::Open::new(&menus, i, false),
-            Some(menu::Hit::Item(i)) => menu::Open { item: Some(i), ..open },
-            Some(menu::Hit::Title(_)) => open,
-            _ => menu::Open { item: None, ..open },
-        };
-        if next != open {
-            s.set_menu(Some(next));
-            self.request_redraw();
-        }
-    }
-
-    /// Open the first menu from the keyboard, or close the open one.
-    fn toggle_menu(&mut self) {
-        let s = &mut self.session;
-        let open = s.open_menu();
-        s.close_overlay();
-        s.set_menu(if open.is_some() { None } else { Some(menu::Open::new(&s.menus(), 0, true)) });
-        self.request_redraw();
-    }
-
-    fn key(&mut self, event: &KeyEvent) {
-        let PhysicalKey::Code(code) = event.physical_key else { return };
-        let is_alt = matches!(code, KeyCode::AltLeft | KeyCode::AltRight);
-        if event.state != ElementState::Pressed {
-            // Alt pressed and released alone opens the menus, as on Windows.
-            if is_alt && std::mem::take(&mut self.alt_alone) {
-                self.toggle_menu();
-            }
-            return;
-        }
-        self.alt_alone = is_alt && !event.repeat;
-        if is_alt {
-            return;
-        }
-        if code == KeyCode::F10 {
-            return self.toggle_menu();
-        }
-        if let Some(open) = self.session.open_menu() {
-            return self.menu_key(open, code);
-        }
-        if self.session.overlay_open() {
-            return self.overlay_key(event, code);
-        }
-        let shift = self.modifiers.shift_key();
-        let control = self.modifiers.control_key() || self.modifiers.super_key();
-        let alt = self.modifiers.alt_key();
-        // Space plays or stops wherever the focus is (a button, a knob, an open
-        // list…), except while writing text: an open entry keeps it (it types a
-        // space). Menus and the file picker are modal and take it first.
-        if code == KeyCode::Space && !event.repeat && !control && !self.session.entry_open() {
-            if shift {
-                self.session.toggle_play_song();
-            } else {
-                self.session.toggle_play();
-            }
-            return self.request_redraw();
-        }
-        if self.widget_key(event, code, shift || alt, control) {
-            return self.request_redraw();
-        }
-        if let Some(command) = shortcut(code, shift, control) {
-            self.session.run(command);
-            return self.request_redraw();
-        }
-        let s = &mut self.session;
-        if control {
-            return;
-        }
-        // Mute (1-9) and hear (Q-P) a track in every view, as in the JS; the
-        // kit editor keeps its own letters (N, R, E).
-        let kit_letter = s.kit_editor_open() && matches!(code, KeyCode::KeyN | KeyCode::KeyR | KeyCode::KeyE);
-        if let Some(row) = ROW_DIGITS.iter().position(|&k| k == code) {
-            s.toggle_row(row, if shift { "solo" } else { "mute" });
-        } else if let Some(row) = ROW_LETTERS.iter().position(|&k| k == code).filter(|_| !kit_letter) {
-            s.audition_row(row);
-        } else if s.kit_editor_open() {
-            match code {
-                KeyCode::Escape => s.toggle_kit_editor(),
-                KeyCode::ArrowUp => s.kit_select(-1),
-                KeyCode::ArrowDown => s.kit_select(1),
-                KeyCode::Enter | KeyCode::NumpadEnter => s.kit_audition(),
-                KeyCode::Delete | KeyCode::Backspace => s.kit_remove(),
-                KeyCode::KeyN => s.kit_normalize(),
-                KeyCode::KeyE => s.run(Command::ExportMapping),
-                _ => return,
-            }
-        } else if s.synth_open() {
-            match code {
-                KeyCode::Escape => s.toggle_synth(),
-                _ => return,
-            }
-        } else if s.piano_roll_open() {
-            match code {
-                KeyCode::Escape => s.roll_escape(),
-                KeyCode::ArrowLeft => s.roll_arrow(Move::Left, shift),
-                KeyCode::ArrowRight => s.roll_arrow(Move::Right, shift),
-                KeyCode::ArrowUp => s.roll_arrow(Move::Up, shift),
-                KeyCode::ArrowDown => s.roll_arrow(Move::Down, shift),
-                KeyCode::Enter | KeyCode::NumpadEnter => s.roll_enter(),
-                KeyCode::Delete | KeyCode::Backspace => s.roll_delete(),
-                _ => return,
-            }
-        } else if s.song_view_open() {
-            match code {
-                KeyCode::Escape => s.toggle_song_view(),
-                KeyCode::ArrowLeft => s.move_song_cursor(-1),
-                KeyCode::ArrowRight => s.move_song_cursor(1),
-                KeyCode::ArrowUp => s.step_pattern(-1),
-                KeyCode::ArrowDown => s.step_pattern(1),
-                _ => return,
-            }
-        } else {
-            let tempo = if shift { 10.0 } else { 1.0 };
-            match code {
-                KeyCode::Minus | KeyCode::NumpadSubtract => s.step_tempo(-tempo),
-                KeyCode::Equal | KeyCode::NumpadAdd => s.step_tempo(tempo),
-                KeyCode::ArrowLeft if shift => s.nudge(Move::Left),
-                KeyCode::ArrowRight if shift => s.nudge(Move::Right),
-                KeyCode::ArrowUp if shift => s.nudge(Move::Up),
-                KeyCode::ArrowDown if shift => s.nudge(Move::Down),
-                KeyCode::ArrowLeft => s.move_cursor(Move::Left),
-                KeyCode::ArrowRight => s.move_cursor(Move::Right),
-                KeyCode::ArrowUp => s.move_cursor(Move::Up),
-                KeyCode::ArrowDown => s.move_cursor(Move::Down),
-                KeyCode::Enter | KeyCode::NumpadEnter => s.enter(),
-                KeyCode::Delete | KeyCode::Backspace => s.delete_step(),
-                KeyCode::Escape => s.deselect(),
-                _ => return,
-            }
-        }
-        self.request_redraw();
-    }
-
-    /// Keys for the editors' widgets: an open list or number entry takes
-    /// them all; a focused knob, slider, select or button its own; Tab moves
-    /// the focus. Whether the key was theirs.
-    fn widget_key(&mut self, event: &KeyEvent, code: KeyCode, fine: bool, control: bool) -> bool {
-        let size = (self.size().0, self.size().1, self.scale());
-        let key = match code {
-            KeyCode::ArrowUp => Some(PanelKey::Up),
-            KeyCode::ArrowDown => Some(PanelKey::Down),
-            KeyCode::ArrowLeft => Some(PanelKey::Left),
-            KeyCode::ArrowRight => Some(PanelKey::Right),
-            // Ctrl+- and Ctrl+= stay the pattern length.
-            KeyCode::Minus | KeyCode::NumpadSubtract if !control => Some(PanelKey::Minus),
-            KeyCode::Equal | KeyCode::NumpadAdd if !control => Some(PanelKey::Plus),
-            KeyCode::Enter | KeyCode::NumpadEnter => Some(PanelKey::Enter),
-            KeyCode::Space => Some(PanelKey::Space),
-            KeyCode::Escape => Some(PanelKey::Escape),
-            KeyCode::Tab => Some(PanelKey::Tab),
-            KeyCode::PageUp => Some(PanelKey::PageUp),
-            KeyCode::PageDown => Some(PanelKey::PageDown),
-            KeyCode::Home => Some(PanelKey::Home),
-            KeyCode::End => Some(PanelKey::End),
-            KeyCode::Backspace => Some(PanelKey::Backspace),
-            _ => None,
-        };
-        let s = &mut self.session;
-        if s.popup_open() {
-            match key {
-                Some(key) if !(key == PanelKey::Minus || key == PanelKey::Plus) => {
-                    s.panel_key(size, key, fine, control);
-                }
-                _ => {
-                    for c in event.text.as_deref().unwrap_or("").chars() {
-                        s.panel_text(c);
-                    }
-                }
-            }
-            return true;
-        }
-        key.is_some_and(|key| s.panel_key(size, key, fine, control))
-    }
-
-    /// Keys while a menu is open.
-    fn menu_key(&mut self, open: menu::Open, code: KeyCode) {
-        let s = &mut self.session;
-        let menus = s.menus();
-        match code {
-            KeyCode::Escape => s.set_menu(None),
-            KeyCode::ArrowLeft => s.set_menu(Some(open.switch(&menus, -1))),
-            KeyCode::ArrowRight => s.set_menu(Some(open.switch(&menus, 1))),
-            KeyCode::ArrowUp => s.set_menu(Some(open.step(&menus, -1))),
-            KeyCode::ArrowDown => s.set_menu(Some(open.step(&menus, 1))),
-            KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space => match open.command(&menus) {
-                Some(command) => s.run(command),
-                None => return,
-            },
-            _ => return,
-        }
-        self.request_redraw();
-    }
-
-    /// Keys while the file picker (or another panel) is open.
-    fn overlay_key(&mut self, event: &KeyEvent, code: KeyCode) {
-        let key = match code {
-            KeyCode::Escape => OverlayKey::Escape,
-            KeyCode::Enter | KeyCode::NumpadEnter => OverlayKey::Enter,
-            KeyCode::Backspace => OverlayKey::Back,
-            KeyCode::ArrowUp => OverlayKey::Move(-1),
-            KeyCode::ArrowDown => OverlayKey::Move(1),
-            KeyCode::PageUp => OverlayKey::Move(-PAGE),
-            KeyCode::PageDown => OverlayKey::Move(PAGE),
-            KeyCode::Home => OverlayKey::Edge(false),
-            KeyCode::End => OverlayKey::Edge(true),
-            _ => match event.text.as_ref().and_then(|t| t.chars().next()).filter(|c| c.is_alphanumeric()) {
-                Some(c) => OverlayKey::Letter(c),
-                None => return,
-            },
-        };
-        self.session.overlay_key(key);
-        self.request_redraw();
-    }
-
     /// Finish: save, then leave.
     fn quit(&mut self, event_loop: &ActiveEventLoop) {
-        self.session.save_if_changed();
+        self.ui.session.save_if_changed();
         event_loop.exit();
     }
 }
 
-/// The command a key runs, when the menus list it (`view::HELP`).
-fn shortcut(code: KeyCode, shift: bool, control: bool) -> Option<Command> {
-    use Command as C;
-    Some(if control {
-        match code {
-            KeyCode::KeyZ if shift => C::Redo,
-            KeyCode::KeyZ => C::Undo,
-            KeyCode::KeyY => C::Redo,
-            KeyCode::KeyC if shift => C::CopyTrack,
-            KeyCode::KeyC => C::CopyStep,
-            KeyCode::KeyV if shift => C::PasteTrack,
-            KeyCode::KeyV => C::Paste,
-            KeyCode::KeyS => C::ExportPatternJson,
-            KeyCode::KeyO => C::ImportMidi,
-            KeyCode::KeyE if shift => C::ExportSongWav,
-            KeyCode::KeyE => C::ExportWav,
-            KeyCode::KeyM => C::ExportMidi,
-            KeyCode::KeyK => C::KitEditor,
-            KeyCode::KeyN => C::NewPattern,
-            KeyCode::KeyD => C::DuplicatePattern,
-            KeyCode::KeyT => C::AddTrack,
-            KeyCode::Backspace | KeyCode::Delete => C::RemoveTrack,
-            KeyCode::KeyG => C::NextGrid,
-            KeyCode::KeyL => C::ShortenLoop,
-            KeyCode::Minus => C::LengthDown,
-            KeyCode::Equal => C::LengthUp,
-            KeyCode::KeyQ => C::Quit,
-            _ => return None,
-        }
-    } else {
-        match code {
-            KeyCode::F1 => C::Shortcuts,
-            KeyCode::F2 => C::TrackEditor,
-            KeyCode::F3 => C::SongView,
-            KeyCode::F4 => C::PianoRoll,
-            KeyCode::F5 => C::Grid,
-            KeyCode::F6 => C::SynthEditor,
-            KeyCode::BracketLeft if shift => C::PreviousSong,
-            KeyCode::BracketRight if shift => C::NextSong,
-            KeyCode::BracketLeft | KeyCode::PageUp => C::PreviousPattern,
-            KeyCode::BracketRight | KeyCode::PageDown => C::NextPattern,
-            KeyCode::Comma => C::PreviousKit,
-            KeyCode::Period => C::NextKit,
-            KeyCode::KeyB if shift => C::NewGeneratedPattern,
-            KeyCode::KeyB => C::GeneratePattern,
-            KeyCode::KeyF => C::SelectRandomPattern,
-            KeyCode::KeyG => C::SelectRandomDrumkit,
-            KeyCode::KeyV => C::ToggleVus,
-            KeyCode::KeyC => C::NextColorScheme,
-            KeyCode::KeyH => C::ConvertToSynth,
-            KeyCode::KeyJ => C::AutoAssignAll,
-            KeyCode::KeyK => C::RandomSamples,
-            KeyCode::KeyD => C::GenerateDrums,
-            KeyCode::KeyS => C::GenerateBass,
-            KeyCode::KeyA => C::GenerateChords,
-            KeyCode::KeyZ => C::TrackAuto,
-            KeyCode::KeyX => C::RandomTrack,
-            _ => return None,
-        }
-    })
+/// The UI's name for a physical key.
+fn key(code: KeyCode) -> Key {
+    use KeyCode as K;
+    match code {
+        K::KeyA => Key::Letter('A'),
+        K::KeyB => Key::Letter('B'),
+        K::KeyC => Key::Letter('C'),
+        K::KeyD => Key::Letter('D'),
+        K::KeyE => Key::Letter('E'),
+        K::KeyF => Key::Letter('F'),
+        K::KeyG => Key::Letter('G'),
+        K::KeyH => Key::Letter('H'),
+        K::KeyI => Key::Letter('I'),
+        K::KeyJ => Key::Letter('J'),
+        K::KeyK => Key::Letter('K'),
+        K::KeyL => Key::Letter('L'),
+        K::KeyM => Key::Letter('M'),
+        K::KeyN => Key::Letter('N'),
+        K::KeyO => Key::Letter('O'),
+        K::KeyP => Key::Letter('P'),
+        K::KeyQ => Key::Letter('Q'),
+        K::KeyR => Key::Letter('R'),
+        K::KeyS => Key::Letter('S'),
+        K::KeyT => Key::Letter('T'),
+        K::KeyU => Key::Letter('U'),
+        K::KeyV => Key::Letter('V'),
+        K::KeyW => Key::Letter('W'),
+        K::KeyX => Key::Letter('X'),
+        K::KeyY => Key::Letter('Y'),
+        K::KeyZ => Key::Letter('Z'),
+        K::Digit0 => Key::Digit(0),
+        K::Digit1 => Key::Digit(1),
+        K::Digit2 => Key::Digit(2),
+        K::Digit3 => Key::Digit(3),
+        K::Digit4 => Key::Digit(4),
+        K::Digit5 => Key::Digit(5),
+        K::Digit6 => Key::Digit(6),
+        K::Digit7 => Key::Digit(7),
+        K::Digit8 => Key::Digit(8),
+        K::Digit9 => Key::Digit(9),
+        K::F1 => Key::F(1),
+        K::F2 => Key::F(2),
+        K::F3 => Key::F(3),
+        K::F4 => Key::F(4),
+        K::F5 => Key::F(5),
+        K::F6 => Key::F(6),
+        K::F7 => Key::F(7),
+        K::F8 => Key::F(8),
+        K::F9 => Key::F(9),
+        K::F10 => Key::F(10),
+        K::F11 => Key::F(11),
+        K::F12 => Key::F(12),
+        K::AltLeft | K::AltRight => Key::Alt,
+        K::Escape => Key::Escape,
+        K::Enter => Key::Enter,
+        K::NumpadEnter => Key::NumpadEnter,
+        K::Space => Key::Space,
+        K::Tab => Key::Tab,
+        K::Backspace => Key::Backspace,
+        K::Delete => Key::Delete,
+        K::ArrowUp => Key::ArrowUp,
+        K::ArrowDown => Key::ArrowDown,
+        K::ArrowLeft => Key::ArrowLeft,
+        K::ArrowRight => Key::ArrowRight,
+        K::PageUp => Key::PageUp,
+        K::PageDown => Key::PageDown,
+        K::Home => Key::Home,
+        K::End => Key::End,
+        K::Minus => Key::Minus,
+        K::Equal => Key::Equal,
+        K::NumpadSubtract => Key::NumpadSubtract,
+        K::NumpadAdd => Key::NumpadAdd,
+        K::BracketLeft => Key::BracketLeft,
+        K::BracketRight => Key::BracketRight,
+        K::Comma => Key::Comma,
+        K::Period => Key::Period,
+        _ => Key::Other,
+    }
+}
+
+fn modifiers(state: ModifiersState) -> Modifiers {
+    Modifiers { shift: state.shift_key(), control: state.control_key(), alt: state.alt_key(), logo: state.super_key() }
 }
 
 impl ApplicationHandler for App {
@@ -516,7 +178,7 @@ impl ApplicationHandler for App {
             return;
         }
         let attributes = Window::default_attributes()
-            .with_title(format!("orDrumbox {}", update::BUILD))
+            .with_title(format!("orDrumbox {}", ordrumbox_ui::BUILD))
             .with_inner_size(INITIAL_SIZE);
         let window = match event_loop.create_window(attributes) {
             Ok(window) => Rc::new(window),
@@ -533,104 +195,72 @@ impl ApplicationHandler for App {
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
-        match event {
-            WindowEvent::CloseRequested => self.quit(event_loop),
+        self.sync_size();
+        let redraw = match event {
+            WindowEvent::CloseRequested => {
+                self.quit(event_loop);
+                false
+            }
             WindowEvent::RedrawRequested => {
                 if let Err(e) = self.redraw() {
                     self.fail(event_loop, "redraw", e);
                 }
+                false
             }
-            WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. } => self.request_redraw(),
-            WindowEvent::ModifiersChanged(modifiers) => self.modifiers = modifiers.state(),
-            WindowEvent::KeyboardInput { event, .. } => self.key(&event),
-            WindowEvent::CursorMoved { position, .. } => {
-                self.mouse = position;
-                self.hover();
-                let size = (self.size().0, self.size().1, self.scale());
-                let shift = self.modifiers.shift_key();
-                let (x, y) = (position.x as i32, position.y as i32);
-                let moved = self.session.mouse_move(size, x, y, shift);
-                let hovered = self.session.grid_hover(size, x, y)
-                    | self.session.song_hover(size, x, y)
-                    | self.session.roll_hover(size, x, y);
-                if hovered || moved {
-                    self.request_redraw();
-                }
+            WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. } => true,
+            WindowEvent::ModifiersChanged(state) => {
+                self.ui.set_modifiers(modifiers(state.state()));
+                false
             }
-            WindowEvent::MouseWheel { delta, .. } if self.session.overlay_open() => {
-                let lines = match delta {
-                    MouseScrollDelta::LineDelta(_, y) => y.round() as isize,
-                    MouseScrollDelta::PixelDelta(p) => (p.y / 20.0).round() as isize,
+            WindowEvent::KeyboardInput { event, .. } => match event.physical_key {
+                PhysicalKey::Code(code) => self.ui.key(&KeyEvent {
+                    key: key(code),
+                    pressed: event.state == ElementState::Pressed,
+                    repeat: event.repeat,
+                    text: event.text.map(|t| t.to_string()),
+                }),
+                PhysicalKey::Unidentified(_) => false,
+            },
+            WindowEvent::CursorMoved { position, .. } => self.ui.pointer_moved(position.x, position.y),
+            WindowEvent::MouseWheel { delta, .. } => self.ui.wheel(match delta {
+                MouseScrollDelta::LineDelta(x, y) => ScrollDelta::Lines(x, y),
+                MouseScrollDelta::PixelDelta(p) => ScrollDelta::Pixels(p.x, p.y),
+            }),
+            WindowEvent::DroppedFile(path) => self.ui.drop_path(&path),
+            WindowEvent::MouseInput { state, button, .. } => {
+                let button = match button {
+                    MouseButton::Left => Button::Left,
+                    MouseButton::Right => Button::Right,
+                    _ => return self.after_event(event_loop),
                 };
-                if lines != 0 {
-                    self.session.overlay_key(OverlayKey::Move(-lines * 3));
-                    self.request_redraw();
+                match state {
+                    ElementState::Pressed => self.ui.pointer_pressed(button),
+                    ElementState::Released => self.ui.pointer_released(button),
                 }
             }
-            WindowEvent::MouseWheel { delta, .. } => {
-                let (columns, lines) = match delta {
-                    MouseScrollDelta::LineDelta(x, y) => (x.round() as isize, y.round() as isize),
-                    MouseScrollDelta::PixelDelta(p) => ((p.x / 20.0).round() as isize, (p.y / 20.0).round() as isize),
-                };
-                let size = (self.size().0, self.size().1, self.scale());
-                let (x, y) = (self.mouse.x as i32, self.mouse.y as i32);
-                let fine = self.modifiers.shift_key() || self.modifiers.alt_key();
-                let coarse = self.modifiers.control_key() || self.modifiers.super_key();
-                let shift = self.modifiers.shift_key();
-                if self.session.wheel(size, x, y, lines, fine, coarse)
-                    || self.session.song_wheel(size, x, y, (columns, lines), shift)
-                    || self.session.roll_wheel(size, x, y, lines, shift)
-                {
-                    self.request_redraw();
-                }
-            }
-            WindowEvent::DroppedFile(path) => {
-                self.session.close_overlay();
-                self.session.drop_path(&path, self.modifiers.shift_key());
-                self.request_redraw();
-            }
-            WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } => {
-                self.click(Button::Left);
-            }
-            WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Right, .. } => {
-                self.click(Button::Right);
-            }
-            WindowEvent::MouseInput { state: ElementState::Released, button: MouseButton::Left, .. } => {
-                let size = (self.size().0, self.size().1, self.scale());
-                if self.session.song_release(size) | self.session.track_release(size) {
-                    self.request_redraw();
-                }
-                self.session.mouse_up();
-            }
-            _ => {}
+            _ => false,
+        };
+        if redraw {
+            self.request_redraw();
         }
-        if self.session.quit_requested() {
-            self.quit(event_loop);
-        }
+        self.after_event(event_loop);
     }
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-        // MCP calls first: the autosave below counts their edits.
-        let called = self.session.poll_mcp();
-        let save_at = self.session.autosave();
-        if called || self.session.check_audio() || self.session.poll_updates() {
+        let idle = self.ui.idle();
+        if idle.redraw {
             self.request_redraw();
         }
-        let playing = self.session.playing();
-        if playing {
-            self.session.update();
+        event_loop.set_control_flow(idle.wake_at.map_or(ControlFlow::Wait, ControlFlow::WaitUntil));
+    }
+}
+
+impl App {
+    /// After each window event: a quit asked from the menus or the keyboard.
+    fn after_event(&mut self, event_loop: &ActiveEventLoop) {
+        if self.ui.session.quit_requested() {
+            self.quit(event_loop);
         }
-        // While playing (the playhead) or while an LFO moves the synth editor.
-        let animating = playing || self.session.synth_animating();
-        if animating {
-            self.request_redraw();
-        }
-        let wake = match (animating, save_at) {
-            (true, _) => Some(Instant::now() + FRAME),
-            (false, Some(at)) => Some(at),
-            (false, None) => None,
-        };
-        event_loop.set_control_flow(wake.map_or(ControlFlow::Wait, ControlFlow::WaitUntil));
     }
 }
 
@@ -667,19 +297,19 @@ fn write_bmp(path: &str, pixels: &[u32], width: usize, height: usize) -> std::io
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // `ordrumbox --mcp`, started by an MCP client: the bridge to the window.
     if std::env::args_os().nth(1).is_some_and(|arg| arg == "--mcp") {
-        return Ok(mcp_link::run_bridge()?);
+        return Ok(ordrumbox_ui::run_mcp_bridge()?);
     }
     // `ordrumbox --version`: which build this is.
     if std::env::args_os().nth(1).is_some_and(|arg| arg == "--version") {
-        println!("orDrumbox {}", update::BUILD);
+        println!("orDrumbox {}", ordrumbox_ui::BUILD);
         return Ok(());
     }
     // No text without it: stop with where it was looked for.
-    font::load()?;
+    ordrumbox_ui::load_font()?;
     let event_loop = EventLoop::new()?;
-    let mut session = Session::load();
+    let mut session = Session::load(Box::new(audio::start));
     let proxy = event_loop.create_proxy();
-    let waker = update::Waker::new(move || match proxy.send_event(()) {
+    let waker = ordrumbox_ui::Waker::new(move || match proxy.send_event(()) {
         // Closed: the app is quitting, there is nothing to wake.
         Ok(()) | Err(EventLoopClosed(())) => {}
     });
@@ -700,20 +330,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok("song") => session.toggle_song_view(),
         Ok("synth") => session.toggle_synth(),
         Ok("kit") => session.toggle_kit_editor(),
-        Ok("comp") => session.output_activate(panel::Id::OutTab(1)),
-        Ok("flt") => session.output_activate(panel::Id::OutTab(2)),
+        Ok("comp") => session.output_activate(PanelId::OutTab(1)),
+        Ok("flt") => session.output_activate(PanelId::OutTab(2)),
         Ok("gen") => session.show_generation_tab(),
         Ok("reset") => session.run(Command::FactoryReset),
         _ => {}
     }
-    let mut app = App {
-        gfx: None,
-        session,
-        modifiers: ModifiersState::default(),
-        mouse: PhysicalPosition::new(0.0, 0.0),
-        error: None,
-        alt_alone: false,
-    };
+    let mut app = App { gfx: None, ui: Ui::new(session), error: None };
     event_loop.run_app(&mut app)?;
     match app.error {
         Some(error) => Err(error.into()),

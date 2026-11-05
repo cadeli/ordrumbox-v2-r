@@ -1,87 +1,97 @@
-//! The UI side of the plugin's playback: the library and the engine's
-//! [`Controller`], updated by a thread of its own whether the editor is open
-//! or not.
+//! The UI side of the plugin: the app's [`Ui`] and its session (the library,
+//! the engine's controller), updated by a thread of its own whether the
+//! editor is open or not.
 
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-use ordrumbox_core::{Library, json};
-use ordrumbox_engine::{AudioSide, Controller};
+use ordrumbox_engine::AudioSide;
+use ordrumbox_ui::{LibrarySource, Session, Ui};
 
-use crate::assets::{self, Assets};
 use crate::state::LibraryState;
 
 /// How often the controller posts passes and follows the host.
 const TICK_INTERVAL: Duration = Duration::from_millis(10);
 
-/// The library, the controller of the running engine, and what went wrong.
+/// What [`Player::start`] did with the engine.
+#[derive(Debug)]
+pub enum Started {
+    /// The session and its engine are the same as before.
+    Kept,
+    /// A new session and engine: its audio side, `None` when there is no
+    /// sound (the session's status says why).
+    New(Option<Box<AudioSide>>),
+}
+
+/// The UI and the library revision last saved into the project.
 #[derive(Debug, Default)]
 pub struct Player {
-    /// Loaded on the first [`start`](Self::start), not when a host scans plugins.
-    assets: Option<Assets>,
-    library: Library,
-    controller: Option<Controller>,
-    /// Errors to show: assets that could not be read, a project's library that could not.
-    pub status: Vec<String>,
+    ui: Option<Ui>,
+    /// The sample rate of the running engine.
+    sample_rate: f32,
+    /// The revision whose text the project holds; `None`: not saved from this session.
+    published: Option<u64>,
 }
 
 impl Player {
-    /// A new engine at `sample_rate`; the audio side is the caller's, for its
-    /// process callback. The assets are loaded on the first call.
-    pub fn start(&mut self, sample_rate: f32, state: &LibraryState) -> AudioSide {
-        let assets = self.assets.get_or_insert_with(|| {
-            let assets = assets::find_and_load();
-            self.status.extend(assets.errors.iter().cloned());
-            assets
-        });
-        if self.controller.is_none() {
-            self.library = assets.library.clone();
-            if state.is_empty() {
-                state.publish(self.library.to_json().to_json());
-            }
+    /// Called by `initialize()`: a session for a project the host restored or
+    /// for a new sample rate (the library carried over), else the running
+    /// one kept.
+    pub fn start(&mut self, sample_rate: f32, state: &LibraryState) -> Started {
+        let restored = state.take_restored();
+        if self.ui.is_some() && restored.is_none() && self.sample_rate == sample_rate {
+            return Started::Kept;
         }
-        let bank = Arc::new(assets.bank.clone());
-        let (mut controller, audio) = Controller::new(sample_rate, bank, assets.scales.clone(), assets.synths.clone());
-        controller.select_pattern(0);
-        self.controller = Some(controller);
-        audio
+        let carried = self.ui.as_ref().map(|ui| ui.session.library_text());
+        let (start, sides) = ordrumbox_ui::host_output(sample_rate);
+        let session = Session::load_with_assets(start, LibrarySource::Host(restored.or(carried)), &bundle_assets());
+        // The project keeps its own text (even one that could not be read)
+        // until the library is edited; a new instance saves what it plays.
+        self.published = if state.is_empty() { None } else { Some(session.library_revision()) };
+        self.ui = Some(Ui::new(session));
+        self.sample_rate = sample_rate;
+        self.publish(state);
+        Started::New(sides.try_recv().ok().map(Box::new))
     }
 
-    /// One step of the UI side: a library the host restored, then the controller.
+    /// One step of the UI side: the controller fed, the library saved into
+    /// the project when it changed.
     pub fn tick(&mut self, state: &LibraryState) {
-        if let Some(text) = state.take_restored() {
-            self.restore(&text);
+        if let Some(ui) = &mut self.ui {
+            ui.session.update();
         }
-        if let Some(controller) = &mut self.controller {
-            controller.update(&self.library);
-        }
+        self.publish(state);
     }
 
-    fn restore(&mut self, text: &str) {
-        match json::parse(text) {
-            Ok(value) => {
-                let (library, report) = Library::from_json(&value);
-                self.status.extend(report.issues.iter().map(|issue| format!("project library: {issue:?}")));
-                self.library = library;
-                if let Some(controller) = &mut self.controller {
-                    controller.select_pattern(0);
-                    controller.refresh(&self.library);
-                }
-            }
-            // The library played until now stays; the project keeps its text.
-            Err(e) => self.status.push(format!("project library: {e}")),
+    fn publish(&mut self, state: &LibraryState) {
+        let Some(ui) = &self.ui else { return };
+        let revision = ui.session.library_revision();
+        if self.published != Some(revision) {
+            state.publish(ui.session.library_text());
+            self.published = Some(revision);
         }
     }
 
-    pub fn library(&self) -> &Library {
-        &self.library
+    pub fn ui(&mut self) -> Option<&mut Ui> {
+        self.ui.as_mut()
     }
+}
 
-    pub fn controller(&self) -> Option<&Controller> {
-        self.controller.as_ref()
+/// `Contents/Resources/assets` of the bundle the plugin binary is in, and
+/// `assets/` next to it: `X.clap/Contents/MacOS/X`,
+/// `X.vst3/Contents/x86_64-win/X.vst3`, a single `X.clap` on Windows.
+fn bundle_assets() -> Vec<PathBuf> {
+    let Some(binary) = process_path::get_dylib_path() else { return Vec::new() };
+    let Some(dir) = binary.parent() else { return Vec::new() };
+    let mut dirs = Vec::new();
+    if let Some(contents) = dir.parent() {
+        dirs.push(contents.join("Resources").join("assets"));
     }
+    dirs.push(dir.join("assets"));
+    dirs
 }
 
 /// A [`Player`] shared by the tick thread, the editor and the plugin.
@@ -126,17 +136,25 @@ impl Drop for Ticker {
 
 #[cfg(test)]
 mod tests {
+    use nih_plug::params::persist::PersistentField;
     use ordrumbox_engine::HostTransport;
 
     use super::*;
+    use crate::state::LibraryText;
+
+    fn audio(started: Started) -> Box<AudioSide> {
+        match started {
+            Started::New(Some(audio)) => audio,
+            other => panic!("expected a new engine, got {other:?}"),
+        }
+    }
 
     #[test]
-    fn a_new_player_plays_the_demo_library_with_the_host() {
-        let state = LibraryState::default();
+    fn a_new_player_plays_with_the_host_and_saves_its_library() {
+        let state = Arc::new(LibraryState::default());
         let mut player = Player::default();
-        let mut audio = player.start(48_000.0, &state);
-        assert_eq!(player.status, Vec::<String>::new());
-        assert!(!state.is_empty(), "the demo library is saved with the project");
+        let mut audio = audio(player.start(48_000.0, &state));
+        assert!(!state.is_empty(), "the library is saved with the project");
 
         let host = HostTransport { playing: true, bpm: 100.0, beat: 0.0 };
         let (mut left, mut right) = (vec![0.0; 512], vec![0.0; 512]);
@@ -144,28 +162,29 @@ mod tests {
             player.tick(&state);
             audio.render_synced(&mut left, &mut right, host);
         }
-        assert!(player.controller().is_some_and(Controller::is_playing));
-        assert_eq!(player.controller().and_then(Controller::host).map(|h| h.bpm), Some(100.0));
+        assert!(player.ui().is_some_and(|ui| ui.session.playing()));
+
+        assert!(matches!(player.start(48_000.0, &state), Started::Kept));
+        assert!(matches!(player.start(44_100.0, &state), Started::New(Some(_))));
     }
 
     #[test]
-    fn a_restored_library_replaces_the_demo_and_a_bad_one_is_reported() {
-        use nih_plug::params::persist::PersistentField;
-
-        use crate::state::LibraryText;
-
+    fn a_restored_project_is_loaded_and_its_text_kept_until_an_edit() {
         let state = Arc::new(LibraryState::default());
         let mut player = Player::default();
         let _audio = player.start(48_000.0, &state);
-        state.set(LibraryText(r#"{"patterns":[{"name":"mine","tracks":[]}]}"#.into()));
-        player.tick(&state);
-        assert_eq!(player.library().patterns.len(), 1);
-        assert_eq!(player.library().patterns[0].name.as_deref(), Some("mine"));
 
+        // A text the session cannot read: the project keeps it.
         state.set(LibraryText("{".into()));
+        let _audio = audio(player.start(48_000.0, &state));
         player.tick(&state);
-        assert_eq!(player.library().patterns[0].name.as_deref(), Some("mine"));
-        assert_eq!(player.status.len(), 1);
+        assert_eq!(state.map(|t| t.0.clone()), "{");
+
+        let text = r#"{"patterns":[{"name":"mine","tracks":[]}]}"#;
+        state.set(LibraryText(text.into()));
+        let _audio = audio(player.start(48_000.0, &state));
+        player.tick(&state);
+        assert!(player.ui().is_some_and(|ui| ui.session.library_text().contains("mine")));
     }
 
     #[test]

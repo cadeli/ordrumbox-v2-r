@@ -27,6 +27,7 @@ impl Session {
                 ));
             }
         }
+        self.color_scheme = theme::scheme_number();
         self.color_scheme_file = Some(path);
     }
 
@@ -34,6 +35,7 @@ impl Session {
     pub(super) fn next_color_scheme(&mut self) {
         let number = theme::next_scheme(theme::scheme_number());
         theme::set_scheme(number);
+        self.color_scheme = number;
         self.message = format!("colour scheme {number}: {}", theme::scheme().name);
         if let Some(path) = &self.color_scheme_file
             && let Err(e) = store::save_setting(path, KEY, json::Value::from(number as u32))

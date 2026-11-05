@@ -10,14 +10,15 @@ license = "MIT"
 repository = "https://github.com/cadeli/ordrumbox-v2-r"
 
 # The four domain crates have no third-party dependency. Only the platform
-# bridges used by ordrumbox-app live here: window, pixel buffer, audio output,
-# font rasteriser (the font itself is the system's, read at start)
-# (MIDI comes with the MIDI phase).
+# bridges live here: window, pixel buffer, audio output (ordrumbox-app) and
+# font rasteriser (ordrumbox-ui; the font itself is the system's, read at
+# start) (MIDI comes with the MIDI phase).
 [workspace.dependencies]
 ordrumbox-core = { path = "crates/ordrumbox-core" }
 ordrumbox-logic = { path = "crates/ordrumbox-logic" }
 ordrumbox-dsp = { path = "crates/ordrumbox-dsp" }
 ordrumbox-engine = { path = "crates/ordrumbox-engine" }
+ordrumbox-ui = { path = "crates/ordrumbox-ui" }
 winit = "0.30.13"
 softbuffer = "0.4.8"
 cpal = "0.18.2"

@@ -149,3 +149,24 @@ fn a_save_that_fails_is_reported_and_done_later() {
     assert_eq!(start(&path).pattern().unwrap().tracks[0].notes.len(), 2);
     fs::remove_dir_all(path.parent().unwrap()).unwrap();
 }
+
+#[test]
+fn a_host_library_comes_back_as_text_and_is_never_saved() {
+    let demo = Library::parse(DEMO).unwrap().0;
+    let saved = r#"{"patterns":[{"name":"kept","tracks":[{"name":"SNARE","notes":[{},{}]}]}]}"#;
+    let mut status = Vec::new();
+    let (library, path, message) = Session::open_host_library(Some(saved.to_owned()), demo.clone(), &mut status);
+    assert_eq!((path, message.as_str(), status.len()), (None, "library from the host project", 0));
+    let mut s = Session::new(library, KitSet::empty(), status);
+    s.hosted = true;
+    assert_eq!(s.pattern().unwrap().name.as_deref(), Some("kept"));
+    s.save();
+    assert_eq!(s.message, "the host saves the library with its project");
+    let (again, _, _) = Session::open_host_library(Some(s.library_text()), demo.clone(), &mut Vec::new());
+    assert_eq!(again.to_file_text(), s.library_text());
+
+    let mut status = Vec::new();
+    let (library, path, _) = Session::open_host_library(Some("{".to_owned()), demo, &mut status);
+    assert_eq!((library.patterns[0].name.as_deref(), path), (Some("demo"), None));
+    assert!(status[0].starts_with("library of the host project not loaded: "), "{status:?}");
+}

@@ -12,12 +12,11 @@ use std::sync::Arc;
 use nih_plug::prelude::*;
 use ordrumbox_engine::{AudioSide, HostTransport};
 
-pub mod assets;
 mod editor;
 pub mod player;
 pub mod state;
 
-use player::{SharedPlayer, Ticker, lock};
+use player::{SharedPlayer, Started, Ticker, lock};
 use state::LibraryState;
 
 /// The tempo used until the host gives one.
@@ -29,7 +28,7 @@ pub struct Ordrumbox {
     params: Arc<OrdrumboxParams>,
     player: SharedPlayer,
     /// Made in `initialize`, at the host's sample rate.
-    audio: Option<AudioSide>,
+    audio: Option<Box<AudioSide>>,
     ticker: Option<Ticker>,
     /// The host's last tempo (a host may leave it out of a block).
     bpm: f64,
@@ -97,7 +96,11 @@ impl Plugin for Ordrumbox {
     ) -> bool {
         // On the host's main thread: the engine made here, and the one it
         // replaces dropped here, allocate and free off the audio thread.
-        self.audio = Some(lock(&self.player).start(buffer_config.sample_rate, &self.params.library));
+        // nih-plug initializes again after the host restores a project: the
+        // session is then loaded from it.
+        if let Started::New(audio) = lock(&self.player).start(buffer_config.sample_rate, &self.params.library) {
+            self.audio = audio;
+        }
         if self.ticker.is_none() {
             match Ticker::spawn(self.player.clone(), self.params.library.clone()) {
                 Ok(ticker) => self.ticker = Some(ticker),
