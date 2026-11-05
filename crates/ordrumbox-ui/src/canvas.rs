@@ -55,15 +55,24 @@ impl<'a> Canvas<'a> {
     /// `font::SIZE × scale` pixels per character, blended over what is there;
     /// returns the x after the last character.
     pub fn text(&mut self, x: i32, y: i32, text: &str, scale: i32, color: Rgb) -> i32 {
+        self.text_quarters(x, y, text, 4 * scale, color)
+    }
+
+    /// The same in the small font: cells three quarters the size.
+    pub fn small_text(&mut self, x: i32, y: i32, text: &str, scale: i32, color: Rgb) -> i32 {
+        self.text_quarters(x, y, text, font::SMALL_QUARTERS * scale, color)
+    }
+
+    fn text_quarters(&mut self, x: i32, y: i32, text: &str, quarters: i32, color: Rgb) -> i32 {
         let mut pen = x;
         for c in text.chars() {
-            let glyph = font::glyph(c, scale);
+            let glyph = font::glyph_quarters(c, quarters);
             for (row, line) in glyph.coverage.chunks(glyph.width.max(1)).enumerate() {
                 for (col, &coverage) in line.iter().enumerate() {
                     self.blend(pen + glyph.left + col as i32, y + glyph.top + row as i32, color, coverage);
                 }
             }
-            pen += font::SIZE * scale;
+            pen += font::SIZE * quarters / 4;
         }
         pen
     }
@@ -86,6 +95,11 @@ impl<'a> Canvas<'a> {
 /// Width of `text` drawn at `scale`.
 pub fn text_width(text: &str, scale: i32) -> i32 {
     text.chars().count() as i32 * font::SIZE * scale
+}
+
+/// Width and height of one character of the small font at `scale`.
+pub fn small_cell(scale: i32) -> i32 {
+    font::SIZE * font::SMALL_QUARTERS * scale / 4
 }
 
 #[cfg(test)]

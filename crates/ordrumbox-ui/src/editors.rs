@@ -505,6 +505,52 @@ pub fn note_tooltip(note: &Note, track_pitch: f64) -> String {
     parts.join("  ")
 }
 
+// ─── Track tooltip ───────────────────────────────────────────────────────────
+
+/// The lines of the bubble over a track's name: the name and its states, the
+/// sound it plays (`sound`, whole), then its mix and length, and the generator
+/// settings that differ from the defaults.
+pub fn track_tooltip(track: &Track, sound: &str) -> Vec<String> {
+    let fmt = crate::control::fmt;
+    let states = [
+        (track.mute, "mute"),
+        (track.solo, "solo"),
+        (track.auto_mode, "auto"),
+        (track.mono, "mono"),
+        (track.auto_assign && !track.use_synth, "auto-assigned"),
+    ];
+    let mut title = track.name.clone();
+    for (_, state) in states.iter().filter(|(on, _)| *on) {
+        title.push_str("  ");
+        title.push_str(state);
+    }
+    let mut mix = vec![format!("vol:{}", fmt(track.volume)), format!("pan:{}", fmt(track.pan))];
+    if track.transpose != 0.0 {
+        mix.push(format!("transpose:{}", fmt(track.transpose)));
+    }
+    if track.probability != 1.0 {
+        mix.push(format!("prob:{}", fmt(track.probability)));
+    }
+    let mut length = vec![
+        format!("notes:{}", track.notes.len()),
+        format!("beats:{}", track.beat_count),
+        format!("steps/beat:{}", track.steps_per_beat),
+    ];
+    if let Some(steps) = track.loop_length {
+        length.push(format!("loop:{steps}"));
+    }
+    if track.swing_amount != 0.0 {
+        length.push(format!("swing:{}", fmt(track.swing_amount)));
+    }
+    let mut lines = vec![title];
+    if !sound.is_empty() {
+        lines.push(sound.to_owned());
+    }
+    lines.push(mix.join("  "));
+    lines.push(length.join("  "));
+    lines
+}
+
 // ─── localeCompare ───────────────────────────────────────────────────────────
 
 /// `a.localeCompare(b)`, approximated for names: punctuation, then digits,
@@ -1215,6 +1261,27 @@ mod tests {
         assert_eq!(note.arp.to_json(), r#"{"intervals":[0,2,3,5],"direction":"down"}"#);
         assert_eq!(arp_state(&note, &scales), ArpState { scale: "minor".into(), direction: "down".into(), range: 4 });
         assert_eq!(arp_value(&note, &scales, None, None, Some(0)), Value::Null);
+    }
+
+    #[test]
+    fn a_track_tooltip_names_its_whole_sound_and_its_settings() {
+        let track = Track {
+            name: "KICK".into(),
+            mute: true,
+            transpose: 2.0,
+            notes: vec![Note::default(), Note::default()],
+            ..Track::default()
+        };
+        assert_eq!(
+            track_tooltip(&track, "kits/real/a very long kick name.wav"),
+            [
+                "KICK  mute  auto-assigned",
+                "kits/real/a very long kick name.wav",
+                "vol:1  pan:0  transpose:2",
+                "notes:2  beats:4  steps/beat:4",
+            ]
+        );
+        assert_eq!(track_tooltip(&Track { auto_assign: false, ..Track::default() }, "").len(), 3);
     }
 
     /// `formatNoteTooltip` (tools/export_control_fixtures.mjs).

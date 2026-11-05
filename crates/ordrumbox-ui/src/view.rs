@@ -8,7 +8,7 @@
 use ordrumbox_core::steps::absolute_step;
 use ordrumbox_core::{Note, Pattern, Track};
 
-use crate::canvas::{Canvas, Rgb, text_width};
+use crate::canvas::{Canvas, Rgb, small_cell, text_width};
 use crate::frame::{body_top, content_top, footer_top, margin, status_line};
 use crate::menu;
 use crate::output::{self, OutputLayout, OutputView};
@@ -224,8 +224,23 @@ pub enum Hit {
     Mute(usize),
     Solo(usize),
     Name(usize),
-    Cell { track: usize, beat: i32, step: i32 },
+    Cell {
+        track: usize,
+        beat: i32,
+        step: i32,
+    },
+    /// The button under the track list that adds a track.
+    AddTrack,
 }
+
+/// The tallest a track row gets, at scale 1: rows share the grid's height up
+/// to this, so a tall window gives bigger cells rather than an empty area.
+const MAX_ROW: i32 = 56;
+/// Height of the add-track button under the rows, and the gap above it, per scale unit.
+const ADD_TRACK_HEIGHT: i32 = 14;
+const ADD_TRACK_GAP: i32 = 4;
+/// The add-track button's label.
+const ADD_TRACK_LABEL: &str = "+ NEW TRACK";
 
 /// Where the track rows are.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -318,6 +333,41 @@ pub fn output_height(scale: i32) -> i32 {
     88 * scale
 }
 
+/// The height the track editor and its note editor take at most, at scale 1:
+/// the Gen tab's Advanced settings on a track in auto mode. A test checks
+/// that every tab fits in it.
+pub const TRACK_EDITOR_HEIGHT: i32 = 472;
+
+/// The footer status lines the smallest window leaves room for.
+const MIN_STATUS_LINES: usize = 1;
+
+/// The smallest window, in physical pixels, that the layout fits at `scale`:
+/// the header's controls across; down, the header, the tallest track editor,
+/// the output strip (`output`: the app's, a plugin has none) and a footer of
+/// one status line.
+pub fn min_window_size(scale: i32, output: bool) -> (i32, i32) {
+    let views = header_controls(scale).views;
+    let width = views[4].x + views[4].w + margin(scale);
+    // `Body::new` places the editors' bottom at a fixed distance above the
+    // window's bottom edge: at a height of 0 it is minus that distance.
+    let below = -Body::new(0, 0, scale, 0, MIN_STATUS_LINES, output).main_bottom;
+    (width, body_top(scale) + TRACK_EDITOR_HEIGHT * scale + below)
+}
+
+/// The scale the window shows at: `scale` (the display's), else the largest
+/// smaller one whose layout fits the window's `width` × `height`, at least 1.
+/// A display at 150 % rounds to 2, which a window under twice the smallest
+/// size cannot hold.
+pub fn fit_scale(width: i32, height: i32, scale: i32, output: bool) -> i32 {
+    (1..=scale.max(1))
+        .rev()
+        .find(|&s| {
+            let (w, h) = min_window_size(s, output);
+            width >= w && height >= h
+        })
+        .unwrap_or(1)
+}
+
 /// How the window is split: one main editor (grid, piano roll, song, synth or
 /// the kit editor) in the top-left, the track editor down the right edge (shown
 /// or hidden), and the output panel as a full-width strip along the bottom
@@ -363,7 +413,9 @@ impl Layout {
         let top = body_top(scale);
         let bottom = footer_top(height, scale, status_lines) - margin / 2;
         let tracks = pattern.tracks.len();
-        let row = ((bottom - top) / tracks.max(1) as i32).clamp(10 * scale, 32 * scale);
+        // The rows share the height left above the add-track button.
+        let rows_h = bottom - top - (ADD_TRACK_HEIGHT + ADD_TRACK_GAP) * scale;
+        let row = (rows_h / tracks.max(1) as i32).clamp(10 * scale, MAX_ROW * scale);
         let box_size = (row - 4 * scale).clamp(6 * scale, 14 * scale);
         let left = margin;
         let name_x = left + 2 * (box_size + 3 * scale) + 4 * scale;
@@ -373,7 +425,7 @@ impl Layout {
         let total_beats = pattern.beat_count.max(1);
         let start_beat = (page as i32 * BEATS_PER_PAGE).min(total_beats - 1).max(0);
         let beats = (total_beats - start_beat).clamp(1, BEATS_PER_PAGE);
-        let shown = usize::try_from((bottom - top).max(0) / row.max(1)).unwrap_or(0).min(tracks);
+        let shown = usize::try_from(rows_h.max(0) / row.max(1)).unwrap_or(0).min(tracks);
         Self {
             scale,
             top,
@@ -391,7 +443,7 @@ impl Layout {
         }
     }
 
-    fn row_top(&self, track: usize) -> i32 {
+    pub(crate) fn row_top(&self, track: usize) -> i32 {
         self.top + track as i32 * self.row
     }
 
@@ -419,6 +471,19 @@ impl Layout {
         usize::try_from(row).unwrap_or(0).min(self.tracks.saturating_sub(1))
     }
 
+    /// The add-track button, under the last row shown, as wide as the
+    /// columns before the steps.
+    pub fn add_track_rect(&self) -> Rect {
+        let y = self.row_top(self.tracks) + ADD_TRACK_GAP * self.scale;
+        let w = self.volume_x + VOLUME_WIDTH * self.scale - self.left;
+        Rect::new(self.left, y, w, ADD_TRACK_HEIGHT * self.scale)
+    }
+
+    /// The name (and sound) of row `track`.
+    pub fn name_rect(&self, track: usize) -> Rect {
+        Rect::new(self.name_x, self.row_top(track), self.volume_x - self.name_x, self.row)
+    }
+
     /// The volume slider of row `track`.
     pub fn volume_rect(&self, track: usize) -> Rect {
         let h = self.row.min(14 * self.scale);
@@ -442,6 +507,9 @@ impl Layout {
     pub fn hit(&self, pattern: &Pattern, x: i32, y: i32) -> Option<Hit> {
         if y < self.top || x < self.left {
             return None;
+        }
+        if self.add_track_rect().contains(x, y) {
+            return Some(Hit::AddTrack);
         }
         let track = row_at(y, self.top, self.row).filter(|&t| t < self.tracks)?;
         let in_box = |solo: bool| {
@@ -618,15 +686,17 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
             );
         }
         let label: String = track.name.chars().take(LABEL_CHARS).collect();
-        // The name, and under it what the track plays when there is room.
-        let sound = view.sounds.get(i).filter(|s| !s.is_empty() && layout.row >= 8 * layout.scale + 10 * scale);
-        let block = 8 * layout.scale + if sound.is_some() { 10 * scale } else { 0 };
+        // The name, and under it, in the small font, what the track plays
+        // when there is room (all of it in the name's tooltip).
+        let sound_h = small_cell(scale) + 2 * scale;
+        let sound = view.sounds.get(i).filter(|s| !s.is_empty() && layout.row >= 8 * layout.scale + sound_h);
+        let block = 8 * layout.scale + if sound.is_some() { sound_h } else { 0 };
         let label_y = y + (layout.row - block) / 2;
         if let Some(sound) = sound {
             let width = layout.volume_x - layout.name_x - 4 * scale;
-            let chars = usize::try_from(width / (8 * scale)).unwrap_or(0);
+            let chars = usize::try_from(width / small_cell(scale).max(1)).unwrap_or(0);
             let shown: String = sound.chars().take(chars).collect();
-            canvas.text(layout.name_x, label_y + 8 * layout.scale + 2 * scale, &shown, scale, dim_color());
+            canvas.small_text(layout.name_x, label_y + 8 * layout.scale + 2 * scale, &shown, scale, dim_color());
         }
         let color = if mute {
             dim_color()
@@ -640,6 +710,11 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
         canvas.text(layout.name_x, label_y, &label, layout.scale, color);
         draw_track_steps(canvas, track, i, view, layout);
     }
+
+    let add = layout.add_track_rect();
+    canvas.fill_rect(add.x, add.y, add.w, add.h, box_off_color());
+    let label_x = add.x + (add.w - text_width(ADD_TRACK_LABEL, scale)) / 2;
+    canvas.text(label_x, add.y + (add.h - 8 * scale) / 2, ADD_TRACK_LABEL, scale, text_color());
 
     if let Some((from, to)) = view.track_drop.filter(|(from, to)| from != to) {
         // Where the track lands: above the row it takes moving up, below it moving down.
@@ -657,12 +732,23 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
 
 /// The hover bubble over a note (`pp-tooltip`): centered above `cell`, kept in the window.
 pub fn draw_tooltip(canvas: &mut Canvas, text: &str, cell: Rect, scale: i32) {
-    let (w, h) = (text_width(text, scale) + 12 * scale, 14 * scale);
+    draw_tooltip_lines(canvas, &[text], cell, scale);
+}
+
+/// A bubble of several lines over `cell`: above it, or below it when there
+/// is no room above, kept in the window.
+pub fn draw_tooltip_lines<S: AsRef<str>>(canvas: &mut Canvas, lines: &[S], cell: Rect, scale: i32) {
+    let line_h = 10 * scale;
+    let widest = lines.iter().map(|l| text_width(l.as_ref(), scale)).max().unwrap_or(0);
+    let (w, h) = (widest + 12 * scale, lines.len() as i32 * line_h + 4 * scale);
     let x = (cell.x + cell.w / 2 - w / 2).clamp(0, (canvas.width() - w).max(0));
-    let y = (cell.y - h - 4 * scale).max(0);
+    let above = cell.y - h - 4 * scale;
+    let y = if above >= 0 { above } else { (cell.y + cell.h + 4 * scale).min((canvas.height() - h).max(0)) };
     canvas.fill_rect(x, y, w, h, theme::line());
     canvas.fill_rect(x + scale, y + scale, w - 2 * scale, h - 2 * scale, theme::shade());
-    canvas.text(x + 6 * scale, y + 3 * scale, text, scale, text_color());
+    for (i, line) in lines.iter().enumerate() {
+        canvas.text(x + 6 * scale, y + 3 * scale + i as i32 * line_h, line.as_ref(), scale, text_color());
+    }
 }
 
 /// A panel over the window: a title and lines of text (the key list, about).
@@ -898,6 +984,20 @@ fn stroke(canvas: &mut Canvas, x: i32, y: i32, width: i32, height: i32, thicknes
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_scale_drops_to_the_largest_whose_layout_fits() {
+        let (w, h) = min_window_size(1, true);
+        assert_eq!(min_window_size(2, true), (2 * w, 2 * h));
+        // A display at 150 % rounds to 2: a window 1.5 times the smallest shows at 1.
+        assert_eq!(fit_scale(w * 3 / 2, h * 3 / 2, 2, true), 1);
+        assert_eq!(fit_scale(2 * w, 2 * h, 2, true), 2);
+        assert_eq!(fit_scale(2 * w, 2 * h - 1, 2, true), 1);
+        // Smaller than the smallest window: 1 all the same.
+        assert_eq!(fit_scale(w / 2, h / 2, 1, true), 1);
+        // Without the output strip (a plugin) the layout needs less height.
+        assert!(min_window_size(1, false).1 < h);
+    }
     use ordrumbox_core::Library;
 
     fn library() -> Library {

@@ -62,7 +62,7 @@ impl Session {
         match self.grid_hit(size, x, y) {
             Some(Hit::Mute(t) | Hit::Solo(t) | Hit::Name(t)) => self.track_menu(t, x, y),
             Some(Hit::Cell { track, beat, step }) => self.step_menu(track, beat, step, x, y),
-            None => return false,
+            Some(Hit::AddTrack) | None => return false,
         }
         true
     }
@@ -325,6 +325,22 @@ mod tests {
         assert!(!labels(&s).contains(&"Move down".to_owned()), "the last track goes no lower");
         pick(&mut s, "Move up");
         assert_eq!(names(&s), ["KICK", "SNARE"]);
+    }
+
+    #[test]
+    fn the_button_under_the_rows_adds_a_track() {
+        let mut s = session();
+        let before = s.pattern().unwrap().tracks.len();
+        let rect = s.grid_layout(SIZE).expect("the grid is shown").add_track_rect();
+        let last = s.grid_layout(SIZE).unwrap().row_top(before - 1);
+        assert!(rect.y > last, "under the last row");
+        let hit = s.grid_hit(SIZE, rect.x + rect.w / 2, rect.y + rect.h / 2);
+        assert_eq!(hit, Some(Hit::AddTrack));
+        s.click(Hit::AddTrack);
+        assert_eq!(s.pattern().unwrap().tracks.len(), before + 1);
+        assert_eq!(s.selection.cursor.map(|c| c.track), Some(before), "the cursor goes to the new track");
+        let rect = s.grid_layout(SIZE).unwrap().add_track_rect();
+        assert_eq!(s.grid_hit(SIZE, rect.x + 1, rect.y + 1), Some(Hit::AddTrack), "it moves down with the rows");
     }
 
     #[test]

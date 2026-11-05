@@ -1694,6 +1694,7 @@ impl Session {
                 self.selection.cursor = Some(Cursor { track, beat, step });
                 self.toggle_note(track, beat, step);
             }
+            Hit::AddTrack => self.add_track(),
         }
     }
 

@@ -44,3 +44,4 @@ pub use panel::Id as PanelId;
 pub use session::{LibrarySource, Session};
 pub use ui::{Idle, Ui};
 pub use update::{BUILD, Waker};
+pub use view::min_window_size;

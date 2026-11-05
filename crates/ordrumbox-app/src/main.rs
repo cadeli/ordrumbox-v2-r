@@ -177,9 +177,16 @@ impl ApplicationHandler for App {
         if self.gfx.is_some() {
             return;
         }
+        // The smallest window the layout fits at scale 1, in logical pixels:
+        // on a HiDPI display the UI's scale and the window grow together.
+        let (min_width, min_height) = ordrumbox_ui::min_window_size(1, true);
+        let min_size = LogicalSize::new(f64::from(min_width), f64::from(min_height));
+        let initial =
+            LogicalSize::new(INITIAL_SIZE.width.max(min_size.width), INITIAL_SIZE.height.max(min_size.height));
         let attributes = Window::default_attributes()
             .with_title(format!("orDrumbox {}", ordrumbox_ui::BUILD))
-            .with_inner_size(INITIAL_SIZE);
+            .with_min_inner_size(min_size)
+            .with_inner_size(initial);
         let window = match event_loop.create_window(attributes) {
             Ok(window) => Rc::new(window),
             Err(e) => return self.fail(event_loop, "create window", e),

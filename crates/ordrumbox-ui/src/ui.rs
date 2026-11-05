@@ -71,8 +71,11 @@ impl Ui {
         Self { session, modifiers: Modifiers::default(), pointer: (0.0, 0.0), size: (0, 0, 1), alt_alone: false }
     }
 
-    /// The window's size in physical pixels and its scale factor (≥ 1).
+    /// The window's size in physical pixels and the display's scale factor
+    /// (≥ 1); the UI takes a smaller one when the window cannot hold the
+    /// layout at that one ([`view::fit_scale`]).
     pub fn set_size(&mut self, width: i32, height: i32, scale: i32) {
+        let scale = view::fit_scale(width, height, scale, !self.session.hosted());
         self.size = (width, height, scale);
     }
 
