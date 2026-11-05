@@ -766,10 +766,10 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
     for note in &track.notes {
         let gstep = absolute_step(note.beat, note.step, spb);
         let local = gstep - start;
-        if let Some(slot) = usize::try_from(local).ok().and_then(|s| note_at.get_mut(s)) {
-            if slot.is_none_or(|existing| note.velocity > existing.velocity) {
-                *slot = Some(note);
-            }
+        if let Some(slot) = usize::try_from(local).ok().and_then(|s| note_at.get_mut(s))
+            && slot.is_none_or(|existing| note.velocity > existing.velocity)
+        {
+            *slot = Some(note);
         }
     }
     // Ghosts: the sub-events (retriggers, arpeggio steps, euclidean fills)

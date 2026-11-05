@@ -138,7 +138,7 @@ pub(crate) fn steps(style: &Style, part: &StylePart, settings: Settings, steps_p
 fn partner_plays(partner: &Track, a: usize, steps_per_beat: usize) -> bool {
     let pspb = partner.steps_per_beat.max(1) as usize;
     let numerator = a * pspb;
-    if numerator % steps_per_beat != 0 {
+    if !numerator.is_multiple_of(steps_per_beat) {
         return false;
     }
     let total = (partner.beat_count.max(1) as usize) * pspb;

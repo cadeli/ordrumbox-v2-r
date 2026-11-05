@@ -27,7 +27,7 @@ fn fixtures() -> Fixtures {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
     let index = json::parse(&std::fs::read_to_string(dir.join("renders.json")).expect("renders.json")).expect("parses");
     let bytes = std::fs::read(dir.join("renders.bin")).expect("renders.bin");
-    let data = bytes.chunks_exact(4).map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]])).collect();
+    let data = bytes.as_chunks::<4>().0.iter().map(|b| f32::from_le_bytes(*b)).collect();
     let number = |key: &str| index.get(key).and_then(Value::as_f64).expect(key) as usize;
     Fixtures {
         full_frames: number("fullFrames"),
@@ -309,7 +309,7 @@ fn departing_cases_match_their_snapshots() {
 
 fn check_snapshot(file: &str, cases: &[(String, Vec<f32>)]) {
     let bytes = std::fs::read(snapshot_path(file)).expect(file);
-    let stored: Vec<f32> = bytes.chunks_exact(4).map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]])).collect();
+    let stored: Vec<f32> = bytes.as_chunks::<4>().0.iter().map(|b| f32::from_le_bytes(*b)).collect();
     assert_eq!(stored.len(), cases.iter().map(|(_, s)| s.len()).sum::<usize>());
     let mut rest = stored.as_slice();
     for (name, samples) in cases {

@@ -752,10 +752,10 @@ mod tests {
         ];
         for menu in &menus {
             for item in &menu.items {
-                if let Item::Command { command, .. } = item {
-                    if file_commands.contains(command) {
-                        assert_eq!(menu.title, "File", "{command:?}");
-                    }
+                if let Item::Command { command, .. } = item
+                    && file_commands.contains(command)
+                {
+                    assert_eq!(menu.title, "File", "{command:?}");
                 }
             }
         }

@@ -460,7 +460,7 @@ impl StylePart {
     /// `grid` steps; `None` when it falls between two steps of that grid.
     pub fn read(&self, step: usize, steps: usize, grid: usize) -> Option<StepRead> {
         let numerator = step * grid;
-        if steps == 0 || numerator % steps != 0 {
+        if steps == 0 || !numerator.is_multiple_of(steps) {
             return None;
         }
         let index = numerator / steps;

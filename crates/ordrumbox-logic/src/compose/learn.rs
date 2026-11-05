@@ -90,7 +90,7 @@ fn stats(patterns: &[&Pattern], steps_per_beat: usize, beat_count: usize) -> Vec
         for note in &track.notes {
             let at = note.beat.max(0) as usize * tspb + note.step.max(0) as usize;
             // On the learning grid, or not counted (a ternary hit on a binary grid).
-            if (at * steps_per_beat) % tspb != 0 {
+            if !(at * steps_per_beat).is_multiple_of(tspb) {
                 continue;
             }
             let reference = at * steps_per_beat / tspb;

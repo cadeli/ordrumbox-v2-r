@@ -126,7 +126,7 @@ impl Published {
     fn read(&self) -> Snapshot {
         loop {
             let before = self.seq.load(Ordering::Acquire);
-            if before % 2 == 0 {
+            if before.is_multiple_of(2) {
                 let playing = self.playing.load(Ordering::Relaxed);
                 let position = Position {
                     pass: self.pass.load(Ordering::Relaxed),
