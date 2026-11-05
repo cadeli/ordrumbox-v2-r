@@ -23,8 +23,9 @@ pub(super) struct Chrome {
     pub(super) last_dir: Option<PathBuf>,
     /// What the mouse and the keyboard hold among the widgets.
     pub(super) widgets: Widgets,
-    /// The grid step under the mouse: track, beat, step (its note's tooltip).
-    pub(super) hover: Option<(usize, i32, i32)>,
+    /// What of the grid is under the mouse, for its tooltip: a step (its
+    /// note's) or a track's name (the track's).
+    pub(super) hover: Option<crate::view::Hit>,
     /// A track pressed by its name, that may be dragged to another row.
     pub(super) track_drag: Option<session_grid::TrackDrag>,
     /// Window size and scale of the last mouse or key event on the widgets.

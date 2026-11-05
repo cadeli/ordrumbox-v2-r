@@ -647,7 +647,7 @@ impl Session {
         false
     }
 
-    /// The mouse over the grid: the step it is on, for the note tooltip; whether it changed.
+    /// The mouse over the grid: the step or the track name it is on, for its tooltip; whether it changed.
     pub fn grid_hover(&mut self, size: (i32, i32, i32), x: i32, y: i32) -> bool {
         let body = self.body(size);
         let scale = size.2;
@@ -655,7 +655,8 @@ impl Session {
             Some(pattern)
                 if self.kit_editor.is_none()
                     && self.workspace == Workspace::Grid
-                    && self.chrome.widgets.drag.is_none() =>
+                    && self.chrome.widgets.drag.is_none()
+                    && self.chrome.track_drag.is_none() =>
             {
                 match Layout::new(
                     body.main_w,
@@ -667,7 +668,7 @@ impl Session {
                 )
                 .hit(pattern, x, y)
                 {
-                    Some(view::Hit::Cell { track, beat, step }) => Some((track, beat, step)),
+                    hit @ Some(view::Hit::Cell { .. } | view::Hit::Name(_)) => hit,
                     _ => None,
                 }
             }
@@ -687,18 +688,28 @@ impl Session {
         if self.piano_roll_open() {
             return self.draw_roll_tooltip(canvas, scale);
         }
-        let Some((t, beat, step)) = self.chrome.hover else { return };
+        let Some(hover) = self.chrome.hover else { return };
         if self.chrome.covered() || self.kit_editor.is_some() {
             return;
         }
         let Some(pattern) = self.pattern() else { return };
-        let Some(track) = pattern.tracks.get(t) else { return };
-        let Some(note) = track.notes.iter().find(|n| n.beat == beat && n.step == step) else { return };
         let body = view::Body::new(canvas.width(), canvas.height(), scale, right, self.status.len(), !self.hosted);
         let layout =
             Layout::new(body.main_w, body.editor_h, scale, pattern, self.status.len(), self.chrome.current_page);
-        let cell = layout.cell_rect(t, beat, step, track.steps_per_beat);
-        view::draw_tooltip(canvas, &editors::note_tooltip(note, track.transpose), cell, scale);
+        match hover {
+            view::Hit::Cell { track: t, beat, step } => {
+                let Some(track) = pattern.tracks.get(t) else { return };
+                let Some(note) = track.notes.iter().find(|n| n.beat == beat && n.step == step) else { return };
+                let cell = layout.cell_rect(t, beat, step, track.steps_per_beat);
+                view::draw_tooltip(canvas, &editors::note_tooltip(note, track.transpose), cell, scale);
+            }
+            view::Hit::Name(t) => {
+                let Some(track) = pattern.tracks.get(t) else { return };
+                let lines = editors::track_tooltip(track, &self.track_sound_label(t));
+                view::draw_tooltip_lines(canvas, &lines, layout.name_rect(t), scale);
+            }
+            view::Hit::Mute(_) | view::Hit::Solo(_) | view::Hit::AddTrack => {}
+        }
     }
 
     pub fn mouse_up(&mut self) {
@@ -1554,6 +1565,46 @@ mod tests {
         // One undo brings both tracks back to their synth.
         s.run(Command::Undo);
         assert!(s.pattern().unwrap().tracks.iter().all(|t| t.use_synth));
+    }
+
+    #[test]
+    fn every_track_editor_tab_fits_the_smallest_window() {
+        let (library, _) = Library::parse(
+            r#"{"patterns":[{"name":"p","beatCount":4,"tracks":[{"name":"KICK","notes":[{}]},{"name":"SNARE","autoMode":true}]}]}"#,
+        )
+        .unwrap();
+        let mut s = Session::new(library, KitSet::empty(), Vec::new());
+        s.status = vec!["a status line".into()];
+        let mut tallest = 0;
+        for scale in [1, 2] {
+            let (width, height) = view::min_window_size(scale, true);
+            let body = view::Body::new(width, height, scale, s.track_editor_width(width, scale), 1, true);
+            for (track, tab, sub, note_tab, advanced) in (0..2).flat_map(|t| {
+                (0..6u8).flat_map(move |tab| {
+                    (0..5u8).flat_map(move |sub| (0..5u8).flat_map(move |n| [false, true].map(|a| (t, tab, sub, n, a))))
+                })
+            }) {
+                s.editors.tab = tab;
+                s.editors.fx_tab = sub;
+                s.editors.generation_tab = sub;
+                s.editors.note_tab = note_tab;
+                s.editors.generation_advanced = advanced;
+                s.selection.cursor = Some(view::Cursor { track, beat: 0, step: 0 });
+                let layout = s.panel_layout(width, height, scale);
+                let bottom = (layout.items.iter())
+                    .filter(|i| i.rect.x >= width - layout.right && i.rect.y < body.output.y)
+                    .filter(|i| !matches!(i.kind, Kind::Panel))
+                    .map(|i| i.rect.y + i.rect.h)
+                    .max()
+                    .unwrap();
+                assert!(bottom <= body.main_bottom, "scale {scale} tab {tab}/{sub} note tab {note_tab}: {bottom}");
+                tallest = tallest.max((bottom - frame::body_top(scale)) / scale);
+            }
+            let views = view::header_controls(scale).views;
+            assert!(views[4].x + views[4].w <= width);
+        }
+        // The constant is the tallest tab, not more: the window is no taller than it needs.
+        assert_eq!(tallest, view::TRACK_EDITOR_HEIGHT);
     }
 
     #[test]

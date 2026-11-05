@@ -192,7 +192,11 @@ The window keeps the same three parts whatever is edited: one main editor in
 the top-left (the grid, the piano roll, the song panel, the synth editor, or
 the kit editor over any of them — the **VIEW** buttons and the View menu pick
 one), the track editor down the right edge (**F2** shows or hides it), and the
-output panel as a strip along the bottom, always shown.
+output panel as a strip along the bottom, always shown. The window cannot be made
+smaller than the layout needs (about 1100 × 690 at 100 %); the track rows
+share the grid's height, so a taller window gives bigger cells. The UI scales
+by whole steps: on a display at 150 %, which rounds to 2, a window too small
+to hold the layout at 2 shows it at 1.
 
 Kit editor (**Ctrl K**, the JS drumkit manager): the current kit's samples
 (**↑↓**), and for the selected one its kit and instrument (lists), its gain

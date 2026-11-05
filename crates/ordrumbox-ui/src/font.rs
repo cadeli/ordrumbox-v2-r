@@ -34,7 +34,7 @@ struct Loaded {
     font: Font,
     /// Pixel size per scale unit: a capital `BASELINE` font pixels high.
     px_per_scale: f32,
-    /// Glyphs drawn so far, by character and scale.
+    /// Glyphs drawn so far, by character and size in quarters of a scale unit.
     glyphs: Mutex<HashMap<(char, i32), &'static Glyph>>,
 }
 
@@ -101,17 +101,23 @@ fn loaded() -> &'static Loaded {
     FONT.get().expect("loaded above")
 }
 
-/// The glyph of `c` drawn at `scale` (the font's own box for a character it lacks).
-pub fn glyph(c: char, scale: i32) -> &'static Glyph {
+/// Quarters of a scale unit in the small font: its cells are 6 × 6 font
+/// pixels instead of 8 × 8.
+pub const SMALL_QUARTERS: i32 = 3;
+
+/// The glyph of `c` (the font's own box for a character it lacks) in cells
+/// of `SIZE × quarters / 4` pixels: `4 * scale` is the regular font,
+/// `SMALL_QUARTERS * scale` the small one.
+pub fn glyph_quarters(c: char, quarters: i32) -> &'static Glyph {
     let font = loaded();
     let mut glyphs = font.glyphs.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-    glyphs.entry((c, scale)).or_insert_with(|| {
-        let (metrics, coverage) = font.font.rasterize(c, font.px_per_scale * scale as f32);
-        let cell = SIZE * scale;
+    glyphs.entry((c, quarters)).or_insert_with(|| {
+        let (metrics, coverage) = font.font.rasterize(c, font.px_per_scale * quarters as f32 / 4.0);
+        let cell = SIZE * quarters / 4;
         // Centred on the advance in the cell, standing on the baseline.
         let left = (cell - metrics.advance_width.round() as i32) / 2 + metrics.xmin;
-        let top = BASELINE * scale - (metrics.ymin + metrics.height as i32);
-        // Kept for the whole run: one per character and scale shown.
+        let top = BASELINE * quarters / 4 - (metrics.ymin + metrics.height as i32);
+        // Kept for the whole run: one per character and size shown.
         Box::leak(Box::new(Glyph { width: metrics.width, coverage, left, top }))
     })
 }
@@ -122,11 +128,11 @@ mod tests {
 
     #[test]
     fn a_capital_stands_on_the_baseline() {
-        let h = glyph('H', 2);
+        let h = glyph_quarters('H', 8);
         let rows = h.coverage.len() / h.width.max(1);
         assert!(h.top >= 0 && h.top + rows as i32 <= BASELINE * 2 + 1, "{h:?}");
         assert!(h.left >= 0 && h.left + h.width as i32 <= SIZE * 2, "{h:?}");
         assert!(h.coverage.iter().any(|&c| c > 128));
-        assert!(std::ptr::eq(glyph('H', 2), h), "drawn once");
+        assert!(std::ptr::eq(glyph_quarters('H', 8), h), "drawn once");
     }
 }
