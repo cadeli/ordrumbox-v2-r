@@ -53,7 +53,10 @@ pub enum Command {
     TempoUp,
     LengthDown,
     LengthUp,
+    /// A new track named KICK (Ctrl+T).
     AddTrack,
+    /// The "add track" menus: an instrument category, then the instrument.
+    ChooseTrack,
     RemoveTrack,
     NextGrid,
     ShortenLoop,
@@ -374,7 +377,8 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
                 command("Length -1 beat", "Ctrl+-", C::LengthDown, p),
                 command("Length +1 beat", "Ctrl+=", C::LengthUp, p),
                 Item::Separator,
-                command("Add track", "Ctrl+T", C::AddTrack, p),
+                command("Add track...", "", C::ChooseTrack, p),
+                command("Add KICK track", "Ctrl+T", C::AddTrack, p),
                 command("Remove track", "Ctrl+Backspace", C::RemoveTrack, s.can_remove_track),
                 command("Next grid", "Ctrl+G", C::NextGrid, track),
                 command("Loop one step shorter", "Ctrl+L", C::ShortenLoop, track),
