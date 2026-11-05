@@ -1,5 +1,6 @@
 //! The audio output: the default device through cpal (WASAPI on Windows,
-//! CoreAudio on macOS), fed by the engine's [`AudioSide`].
+//! CoreAudio on macOS), fed by the engine's [`AudioSide`]. The session gets it
+//! as an [`AudioOutput`].
 
 use std::sync::{Arc, Mutex};
 
@@ -7,22 +8,30 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{FromSample, SampleFormat, SizedSample, StreamConfig};
 use ordrumbox_core::Scales;
 use ordrumbox_engine::{AudioSide, Controller, SampleBank, SynthPresets};
+use ordrumbox_ui::{AudioOutput, StartedOutput};
 
 /// Frames rendered per engine call inside a callback (scratch size).
 const SCRATCH_FRAMES: usize = 4096;
 
 /// A running output stream; dropping it stops the sound.
-pub struct Output {
+struct Output {
     _stream: cpal::Stream,
-    pub device: String,
-    pub sample_rate: u32,
+    device: String,
+    sample_rate: u32,
     /// The last stream error (a device unplugged…), until the UI takes it.
     error: Arc<Mutex<Option<String>>>,
 }
 
-impl Output {
-    /// The stream error reported since the last call, if any.
-    pub fn take_error(&self) -> Option<String> {
+impl AudioOutput for Output {
+    fn device(&self) -> &str {
+        &self.device
+    }
+
+    fn sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
+
+    fn take_error(&self) -> Option<String> {
         self.error.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).take()
     }
 }
@@ -34,7 +43,7 @@ impl std::fmt::Debug for Output {
 }
 
 /// Open the default output device and start rendering.
-pub fn start(bank: Arc<SampleBank>, scales: Scales, synths: SynthPresets) -> Result<(Output, Controller), String> {
+pub fn start(bank: Arc<SampleBank>, scales: Scales, synths: SynthPresets) -> StartedOutput {
     let host = cpal::default_host();
     let device = host.default_output_device().ok_or("no audio output device")?;
     let name = device.description().map(|d| d.name().to_owned()).unwrap_or_else(|_| "default".into());
@@ -52,7 +61,7 @@ pub fn start(bank: Arc<SampleBank>, scales: Scales, synths: SynthPresets) -> Res
     }
     .map_err(|e| format!("{name}: {e}"))?;
     stream.play().map_err(|e| format!("{name}: {e}"))?;
-    Ok((Output { _stream: stream, device: name, sample_rate: config.sample_rate, error }, controller))
+    Ok((Box::new(Output { _stream: stream, device: name, sample_rate: config.sample_rate, error }), controller))
 }
 
 fn build<T>(

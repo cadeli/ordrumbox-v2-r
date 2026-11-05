@@ -16,7 +16,7 @@
 //
 // Writes crates/ordrumbox-core/tests/fixtures/sub_positions.json,
 // crates/ordrumbox-logic/tests/fixtures/composition.json and
-// crates/ordrumbox-app/tests/fixtures/piano_roll.json.
+// crates/ordrumbox-ui/tests/fixtures/piano_roll.json.
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { join, resolve, dirname } from 'node:path'
@@ -151,7 +151,7 @@ const drags = [
 const midiNames = []
 for (let midi = 0; midi <= 127; midi++) midiNames.push(midiName(midi))
 
-await write('ordrumbox-app', 'piano_roll.json', { drags, midiNames })
+await write('ordrumbox-ui', 'piano_roll.json', { drags, midiNames })
 process.stdout.write(
     `piano roll: ${libraryCases.length} library tracks, ${handCases.length} hand tracks, ` +
         `${sequences.length} sequences, ${drags.length} drags\n`,

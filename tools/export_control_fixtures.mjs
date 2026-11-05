@@ -7,7 +7,7 @@
 //
 //   node tools/export_control_fixtures.mjs <path-to-ordrumbox-v2>
 //
-// Writes crates/ordrumbox-app/tests/fixtures/controls.json.
+// Writes crates/ordrumbox-ui/tests/fixtures/controls.json.
 
 import { writeFile, mkdir } from 'node:fs/promises'
 import { join, resolve, dirname } from 'node:path'
@@ -248,7 +248,7 @@ for (const trackPitch of [0, -2, 7]) {
 }
 
 const here = dirname(fileURLToPath(import.meta.url))
-const dir = join(here, '..', 'crates/ordrumbox-app/tests/fixtures')
+const dir = join(here, '..', 'crates/ordrumbox-ui/tests/fixtures')
 await mkdir(dir, { recursive: true })
 await writeFile(join(dir, 'controls.json'), JSON.stringify({ cases, formats, loopPoints, tooltips }) + '\n')
 process.stdout.write(`${cases.length} control specs, ${formats.length} formats\n`)

@@ -1,0 +1,17 @@
+[package]
+name = "ordrumbox-ui"
+description = "orDrumbox user interface: session, software-rendered views and input, independent of the window and the sound device"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+ordrumbox-core.workspace = true
+ordrumbox-engine.workspace = true
+ordrumbox-logic.workspace = true
+fontdue.workspace = true
+
+[lints]
+workspace = true

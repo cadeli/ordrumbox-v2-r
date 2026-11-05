@@ -1642,10 +1642,9 @@ name = "ordrumbox-app"
 version = "0.1.1"
 dependencies = [
  "cpal",
- "fontdue",
  "ordrumbox-core",
  "ordrumbox-engine",
- "ordrumbox-logic",
+ "ordrumbox-ui",
  "softbuffer",
  "winit",
 ]
@@ -1681,9 +1680,10 @@ name = "ordrumbox-plugin"
 version = "0.1.1"
 dependencies = [
  "baseview",
+ "keyboard-types",
  "nih_plug",
- "ordrumbox-core",
  "ordrumbox-engine",
+ "ordrumbox-ui",
  "process_path",
  "raw-window-handle 0.5.2",
  "raw-window-handle 0.6.2",
@@ -1698,6 +1698,16 @@ dependencies = [
  "ordrumbox-core",
  "ordrumbox-dsp",
  "ordrumbox-engine",
+]
+
+[[package]]
+name = "ordrumbox-ui"
+version = "0.1.1"
+dependencies = [
+ "fontdue",
+ "ordrumbox-core",
+ "ordrumbox-engine",
+ "ordrumbox-logic",
 ]
 
 [[package]]

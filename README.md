@@ -13,12 +13,14 @@ Windows by CI).
 | `ordrumbox-dsp` | sample voice, synth voice, channel strip (filter, saturation, reverb, delay), master bus; no allocation in render paths | none |
 | `ordrumbox-engine` | WAV decoding/encoding, kits and their files, sample analysis, sound auto-assignment, synth presets, passes (pattern and song: events, strip settings, LFO steps), sample-accurate engine, UI ↔ audio link, offline renders | core, dsp |
 | `ordrumbox-probe` | sound measurements of synth presets and WAV files, a command-line tool that does not ship with the app | core, dsp, engine |
-| `ordrumbox-app` | window, software-rendered UI (text in the system monospace font), audio output → `ordrumbox.exe` | winit, softbuffer, cpal, fontdue |
-| `ordrumbox-plugin` | the CLAP and VST3 instrument (below, "Plugin") | core, engine, nih-plug, baseview, softbuffer |
+| `ordrumbox-ui` | the UI without a window or a sound device: session, software-rendered views (text in the system monospace font), input, MCP link, update check | core, logic, engine, fontdue |
+| `ordrumbox-app` | window, input translation, audio output → `ordrumbox.exe` | core, engine, ui, winit, softbuffer, cpal |
+| `ordrumbox-plugin` | the CLAP and VST3 instrument (below, "Plugin") | engine, ui, nih-plug, baseview, softbuffer |
 | `xtask` | `cargo xtask bundle`: the plugin bundles | nih-plug's bundler |
 
 The domain crates and the probe have no third-party dependency. Only the app talks to
-the OS, through small bridges (`winit`, `softbuffer`, `cpal`, `fontdue`; `midir` with MIDI).
+the OS, through small bridges (`winit`, `softbuffer`, `cpal`; `midir` with MIDI); the UI
+rasterises text with `fontdue`.
 
 ## Running
 
@@ -353,7 +355,7 @@ Build: the window title, **Help › About**, the update messages and
 `v<version>` with no local change, is its version alone (`0.1.0`); any other
 build follows it with `dev`, the commit (`+dirty` with uncommitted changes)
 and the commit's date (`0.1.1 dev f7b7e1b 2026-11-04`).
-`crates/ordrumbox-app/build.rs` reads them from git; built without git, it
+`crates/ordrumbox-ui/build.rs` reads them from git; built without git, it
 is `dev unknown build`.
 
 Updates: at start, at most once a day, the app asks GitHub for the latest
@@ -536,8 +538,10 @@ The plugin looks for its assets in `$ORDRUMBOX_ASSETS`, in its bundle, next
 to its binary, then in this repository. CI builds both bundles on Windows and
 macOS (artifact `ordrumbox-plugin-<os>`) and runs `clap-validator` on the CLAP.
 
-Work in progress: the editor window is empty until the app's UI is moved into
-a library the plugin can draw.
+The plugin's window is the app's UI (`ordrumbox-ui`). It edits the project's
+library; kits, synth presets and settings are the user's files, shared with
+the app. File > Save and Help > Factory reset do not apply: the host saves
+the library with the project.
 
 ## Sound measurements
 
@@ -800,7 +804,7 @@ The knobs and sliders have an eighth:
 node tools/export_control_fixtures.mjs ../ordrumbox-v2
 ```
 
-- `ordrumbox-app/tests/fixtures/controls.json`: the JS `OrKnob` and `OrSlider`
+- `ordrumbox-ui/tests/fixtures/controls.json`: the JS `OrKnob` and `OrSlider`
   driven through a minimal fake DOM — drags (normal and fine, linear and
   logarithmic), arrow keys with every modifier, typed numbers, the knob's arc
   — and the value texts of every formatter (`fmt`, `knobFormat`, `fmtVal`,
@@ -820,7 +824,7 @@ node tools/export_piano_fixtures.mjs ../ordrumbox-v2
   steps are compared).
 - `ordrumbox-logic/tests/fixtures/composition.json`: `getSequence()` and
   `buildSequenceNotes()` for every progression, tonic and length.
-- `ordrumbox-app/tests/fixtures/piano_roll.json`: `NoteDrag` driven through a
+- `ordrumbox-ui/tests/fixtures/piano_roll.json`: `NoteDrag` driven through a
   fake window (velocity, pitch, the axis lock, the bounds), and `midiName()`.
 
 The synth editor has an eleventh:

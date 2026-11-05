@@ -27,7 +27,7 @@ use ordrumbox_logic::{Editor, Nudge};
 
 use crate::action_log::{self, ActionLog, LogLayout, Seen};
 use crate::assets;
-use crate::audio;
+use crate::audio_output::{AudioOutput, StartOutput};
 use crate::canvas::Canvas;
 use crate::editors::EditorState;
 use crate::frame;
@@ -37,6 +37,7 @@ use crate::menu::{self, Command, MenuState};
 use crate::panel::{Dropdown, Entry, Id};
 use crate::picker::{self, Export, Outcome, Picker, PickerLayout, Purpose};
 use crate::store;
+use crate::theme;
 use crate::update;
 use crate::view::{self, Cursor, Hit, KitView, View};
 use session_confirm::Pending;
@@ -154,6 +155,17 @@ enum Clipboard {
     Track(Box<Track>),
 }
 
+/// Where a session's library comes from, and where its edits go.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LibrarySource {
+    /// The user's `library.json` (else the demo), saved a moment after each edit.
+    UserFile,
+    /// A plugin's: the text its host kept in the project (`None`: a new
+    /// instance, which starts from the user's library, else the demo). It is
+    /// never saved to a file: the host asks [`Session::library_text`].
+    Host(Option<String>),
+}
+
 pub struct Session {
     editor: Editor,
     /// What the generators read (`scales.json`).
@@ -193,7 +205,10 @@ pub struct Session {
     render: Option<RenderSetup>,
     /// `None` when no audio device could be opened.
     controller: Option<Controller>,
-    output: Option<audio::Output>,
+    output: Option<Box<dyn AudioOutput>>,
+    /// What started `output`, to start it again when the session reloads
+    /// (`None`: a session built without assets or by a test).
+    start_output: Option<StartOutput>,
     /// Startup problems, shown until quit.
     status: Vec<String>,
     /// Outcome of the last action.
@@ -235,6 +250,10 @@ pub struct Session {
     show_vus: bool,
     /// The settings file the colour scheme is saved to (`None`: not saved).
     color_scheme_file: Option<PathBuf>,
+    /// The scheme in use, from 1, set again on the thread that draws.
+    color_scheme: usize,
+    /// The library lives in a plugin host's project, not in a file.
+    hosted: bool,
     /// Current page of the pattern grid (BEATS_PER_PAGE beats).
     current_page: usize,
     /// What the mouse and the keyboard hold among the widgets.
@@ -377,10 +396,40 @@ const SHORTCUTS: [&str; 54] = [
     "                         becomes a kit, a .json mapping loads, a .mid imports",
 ];
 
+/// The output of a session that had none: none again.
+fn no_output(_: Arc<ordrumbox_engine::SampleBank>, _: Scales, _: SynthPresets) -> crate::audio_output::StartedOutput {
+    Err("no audio output given".into())
+}
+
+// A plugin shares its session between the editor and a timer thread.
+const _: fn() = || {
+    fn send<T: Send>() {}
+    send::<Session>();
+};
+
+impl std::fmt::Debug for Session {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Session").field("pattern_index", &self.pattern_index).finish_non_exhaustive()
+    }
+}
+
 impl Session {
-    pub fn load() -> Self {
-        let Some(dir) = assets::find() else {
-            let searched: Vec<String> = assets::candidates().iter().map(|d| d.display().to_string()).collect();
+    /// The session for the assets found and the user's files, its sound
+    /// started by `start_output`.
+    pub fn load(start_output: StartOutput) -> Self {
+        Self::load_from(start_output, LibrarySource::UserFile)
+    }
+
+    /// The same with its library from `source`.
+    pub fn load_from(start_output: StartOutput, source: LibrarySource) -> Self {
+        Self::load_with_assets(start_output, source, &[])
+    }
+
+    /// The same, the assets searched in `first` before the usual folders (a
+    /// plugin's bundle).
+    pub fn load_with_assets(mut start_output: StartOutput, source: LibrarySource, first: &[PathBuf]) -> Self {
+        let Some(dir) = assets::find(first) else {
+            let searched: Vec<String> = assets::candidates(first).iter().map(|d| d.display().to_string()).collect();
             return Self::new(
                 Library::default(),
                 KitSet::empty(),
@@ -403,7 +452,11 @@ impl Session {
             status.push(format!("{} sample(s) not loaded, first: {first}", assets.sample_errors.len()));
         }
 
-        let (library, library_path, message) = Self::open_library(store::path(), assets.library, &mut status);
+        let hosted = matches!(source, LibrarySource::Host(_));
+        let (library, library_path, message) = match source {
+            LibrarySource::UserFile => Self::open_library(store::path(), assets.library, &mut status),
+            LibrarySource::Host(text) => Self::open_host_library(text, assets.library, &mut status),
+        };
         if library_path.is_none() && !assets.report.issues.is_empty() {
             status.push(format!("library.json: {} value(s) repaired", assets.report.issues.len()));
         }
@@ -418,6 +471,7 @@ impl Session {
         let synths_file =
             Self::load_user_synths(store::saved_synths_path(), store::synths_path(), &mut assets.synths, &mut status);
         let mut session = Self::new(library, kits, status);
+        session.hosted = hosted;
         session.assets_dir = Some(dir.clone());
         session.songs_dir = store::songs_dir();
         session.scales = assets.scales.clone();
@@ -440,13 +494,14 @@ impl Session {
                 seed: 1,
             });
         }
-        match audio::start(bank, assets.scales, assets.synths) {
+        match start_output(bank, assets.scales, assets.synths) {
             Ok((output, controller)) => {
                 session.controller = Some(controller);
                 session.output = Some(output);
             }
             Err(e) => session.status.push(format!("no sound: {e}")),
         }
+        session.start_output = Some(start_output);
         session.load_master();
         session.load_update_settings();
         session.load_color_scheme(store::settings_path());
@@ -481,6 +536,46 @@ impl Session {
         }
     }
 
+    /// The library of a plugin: the host's `text` when it kept one, else the
+    /// user's file (read, never written), else `demo`; no file to save to; the
+    /// message to show.
+    fn open_host_library(
+        text: Option<String>,
+        demo: Library,
+        status: &mut Vec<String>,
+    ) -> (Library, Option<PathBuf>, String) {
+        if let Some(text) = text {
+            return match Library::parse(&text) {
+                Ok((library, _)) => (library, None, "library from the host project".to_owned()),
+                Err(e) => {
+                    status.push(format!("library of the host project not loaded: {e}"));
+                    (demo, None, "demo library (assets/data/library.json)".to_owned())
+                }
+            };
+        }
+        match store::path().map(|path| (store::load(&path), path)) {
+            Some((Ok(Some(saved)), path)) => {
+                (saved, None, format!("library {} (copied into the host project)", path.display()))
+            }
+            Some((Err(e), _)) => {
+                status.push(format!("library not loaded: {e}"));
+                (demo, None, "demo library (assets/data/library.json)".to_owned())
+            }
+            Some((Ok(None), _)) | None => (demo, None, "demo library (assets/data/library.json)".to_owned()),
+        }
+    }
+
+    /// The library as its file holds it, for a plugin host to keep in its project.
+    /// Changes made to the library so far: compare to know when to ask
+    /// [`library_text`](Self::library_text) again.
+    pub fn library_revision(&self) -> u64 {
+        self.editor.revision()
+    }
+
+    pub fn library_text(&self) -> String {
+        self.editor.library().to_file_text()
+    }
+
     fn new(library: Library, kits: KitSet, status: Vec<String>) -> Self {
         Self {
             editor: Editor::new(library),
@@ -504,6 +599,7 @@ impl Session {
             render: None,
             controller: None,
             output: None,
+            start_output: None,
             status,
             message: String::new(),
             action_log: ActionLog::default(),
@@ -527,6 +623,8 @@ impl Session {
             track_levels: Vec::new(),
             show_vus: true,
             color_scheme_file: None,
+            color_scheme: 1,
+            hosted: false,
             current_page: 0,
             widgets: Widgets::default(),
             note_focus: None,
@@ -1239,6 +1337,10 @@ impl Session {
     /// Help > Factory reset: move the user's edited files aside and reload
     /// from the assets, as at first start.
     pub fn factory_reset(&mut self) {
+        if self.hosted {
+            self.message = "factory reset: in the app only, not in a plugin".into();
+            return;
+        }
         self.overlay = None;
         self.menu = None;
         self.widgets.dropdown = None;
@@ -1251,7 +1353,8 @@ impl Session {
         match store::factory_reset(&dir) {
             Ok(removed) => {
                 let action_log = std::mem::take(&mut self.action_log);
-                *self = Self::load();
+                let start_output = self.start_output.take().unwrap_or_else(|| Box::new(no_output));
+                *self = Self::load(start_output);
                 self.action_log = action_log;
                 self.message = if removed.is_empty() {
                     "factory settings restored (no user files found)".into()
@@ -2060,7 +2163,11 @@ impl Session {
 
     pub fn save(&mut self) {
         let Some(path) = &self.library_path else {
-            self.message = "not saved: no library file (see the messages below)".into();
+            self.message = if self.hosted {
+                "the host saves the library with its project".into()
+            } else {
+                "not saved: no library file (see the messages below)".into()
+            };
             return;
         };
         match store::save(path, self.editor.library()) {
@@ -2081,7 +2188,7 @@ impl Session {
 
     /// Show an audio output error reported since the last call; whether there was one.
     pub fn check_audio(&mut self) -> bool {
-        let Some(error) = self.output.as_ref().and_then(audio::Output::take_error) else { return false };
+        let Some(error) = self.output.as_ref().and_then(|output| output.take_error()) else { return false };
         self.message = format!("audio output: {error}");
         true
     }
@@ -2114,6 +2221,8 @@ impl Session {
     }
 
     pub fn draw(&mut self, canvas: &mut Canvas, scale: i32) {
+        // The scheme is per thread: a plugin draws on another than it loads on.
+        theme::set_scheme(self.color_scheme);
         self.note_actions();
         let layout = self.panel_layout(canvas.width(), canvas.height(), scale);
         let position = self.controller.as_ref().and_then(Controller::position);

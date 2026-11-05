@@ -28,8 +28,9 @@ ordrumbox-dsp     sample voice, synth voice, channel strip, master  no deps
 ordrumbox-logic   editor with undo/redo, generators, MIDI files     → core
 ordrumbox-engine  kits, WAV, passes, engine, UI ↔ audio link        → core, dsp
 ordrumbox-probe   sound measurements (command line, not shipped)    → core, dsp, engine
-ordrumbox-app     window, UI, audio output                          → core, logic, engine, winit, softbuffer, cpal, fontdue
-ordrumbox-plugin  CLAP/VST3 instrument following the host           → core, engine, nih-plug, baseview, softbuffer
+ordrumbox-ui      session, views, input, MCP link, update check     → core, logic, engine, fontdue
+ordrumbox-app     window, input translation, audio output           → core, engine, ui, winit, softbuffer, cpal
+ordrumbox-plugin  CLAP/VST3 instrument following the host           → engine, ui, nih-plug, baseview, softbuffer
 xtask             `cargo xtask bundle`: plugin bundles, assets in   → nih_plug_xtask
 assets/           data/*.json and kits/**.wav, read at runtime
 tools/            scripts that regenerate the golden fixtures
@@ -37,15 +38,22 @@ tools/            scripts that regenerate the golden fixtures
 
 - The four domain crates take **no third-party dependency**. Only
   `ordrumbox-app` talks to the OS (window, screen, sound device), through
-  `winit`, `softbuffer`, `cpal` and `fontdue` (text in the system's monospace font, read at start: nothing bundled).
+  `winit`, `softbuffer` and `cpal`.
   `ordrumbox-plugin` talks to a plugin host instead, through `nih-plug`
   (pinned git revision) and `baseview`; the `vst3` feature links GPLv3
   bindings (`README.md`, "License"), so it stays off by default.
-- The update check (`ordrumbox-app/src/update.rs`) runs the system's `curl`
+- `ordrumbox-ui` is the whole UI without a window or a sound device:
+  `Session`, the views drawn into a pixel buffer, and `Ui`, which takes the
+  neutral input of `ui_input.rs` (keys, modifiers, pointer, wheel). Its only
+  third-party dependency is `fontdue` (text in the system's monospace font,
+  read at start: nothing bundled). The program gives it its sound output
+  (`AudioOutput`, started by a `StartOutput`) and translates its window
+  events; `main.rs` does nothing else.
+- The update check (`ordrumbox-ui/src/update.rs`) runs the system's `curl`
   on a thread of its own, never on the UI or audio thread; it only tells,
   never downloads. A release is a `v<version>` tag matching `Cargo.toml`
   (`README.md`, "Commands").
-- The MCP link (`ordrumbox-app/src/mcp_link.rs`) listens on `127.0.0.1`
+- The MCP link (`ordrumbox-ui/src/mcp_link.rs`) listens on `127.0.0.1`
   only, on threads of its own; the tool calls run on the UI thread between
   frames (`session_mcp.rs`), each one undo step. The tools that only edit
   the library are `ordrumbox-logic/src/tools.rs`, tested without the app;
@@ -71,7 +79,7 @@ tools/            scripts that regenerate the golden fixtures
   transport (`HostTransport`): it stops with the host, and seeks inside the pass it
   plays. `Controller::update`, called even while stopped, starts playback,
   moves it to the host's pass and rebuilds passes at the host's tempo.
-  In the plugin, a thread of its own (`player.rs`, `Ticker`) calls it every
+  In the plugin, a thread of its own (`player.rs`, `Ticker`) calls it, through `Session::update`, every
   10 ms, editor open or not; `process()` only calls `render_synced` and
   never takes the player's lock. Engines are made and dropped in
   `initialize()`, on the host's main thread.
