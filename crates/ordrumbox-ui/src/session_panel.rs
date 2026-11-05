@@ -374,12 +374,20 @@ impl Session {
         // Samples of that instrument: the current kit's first.
         let current_url = url.clone().unwrap_or_else(|| track.sample_path.clone());
         let found = self.samples_for(&current_id);
-        let samples = if found.is_empty() {
+        let samples = if found.is_empty() && !track.use_synth {
             Choice { values: vec![String::new()], labels: vec!["— no samples —".into()], selected: 0 }
         } else {
-            let values: Vec<String> = found.iter().map(|(_, url, _)| url.clone()).collect();
-            let labels = found.iter().map(|(kit, _, name)| format!("{kit}/{name}")).collect();
-            Choice { selected: editors::index_of(&values, &current_url), values, labels }
+            let mut values: Vec<String> = found.iter().map(|(_, url, _)| url.clone()).collect();
+            let mut labels: Vec<String> = found.iter().map(|(kit, _, name)| format!("{kit}/{name}")).collect();
+            if track.use_synth {
+                // A synth track plays no sample: `none` first, shown (its empty
+                // value is ignored when picked; a sample turns the synth off).
+                values.insert(0, String::new());
+                labels.insert(0, "none".into());
+                Choice { selected: 0, values, labels }
+            } else {
+                Choice { selected: editors::index_of(&values, &current_url), values, labels }
+            }
         };
 
         // Synth presets.
@@ -1663,6 +1671,18 @@ mod tests {
         // One undo brings both tracks back to their synth.
         s.run(Command::Undo);
         assert!(s.pattern().unwrap().tracks.iter().all(|t| t.use_synth));
+    }
+
+    #[test]
+    fn a_synth_track_shows_none_as_its_sample() {
+        let (library, _) = Library::parse(
+            r#"{"patterns":[{"name":"p","tracks":[{"name":"BASS","useSynth":true,"synthPreset":"b"},{"name":"KICK"}]}]}"#,
+        )
+        .unwrap();
+        let s = Session::new(library, KitSet::empty(), Vec::new());
+        let shown = |t| s.track_view(t).map(|v| v.samples.labels[v.samples.selected].clone());
+        assert_eq!(shown(0).as_deref(), Some("none"));
+        assert_eq!(shown(1).as_deref(), Some("— no samples —"));
     }
 
     #[test]
