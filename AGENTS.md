@@ -114,6 +114,18 @@ tools/            scripts that regenerate the golden fixtures
   exempt: `clippy.toml` for `#[test]` and `#[cfg(test)]` code, a
   `#![allow(…)]` at the top of each file in `tests/`.
 
+## UI layout
+
+- No layout shift, anywhere. A control or a row never moves because of a
+  state change: a sample replaced by a synth, a value that
+  appears or goes, an analysis still running, a playing or stopped transport.
+  A block that can be empty keeps its place (drawn empty or greyed out); a
+  text that varies in length gets a fixed width and is fitted to it.
+- The window's minimum size (`view::min_window_size`,
+  `TRACK_EDITOR_HEIGHT`) covers the tallest state, not the most common one.
+  A test that changes the state checks that the rects under it stay put
+  (`editors.rs`, `the_rows_stay_put_without_a_sample`).
+
 ## Files
 
 - The library, kits, synth presets and settings are JSON, written with the
