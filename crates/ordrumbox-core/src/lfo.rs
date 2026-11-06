@@ -84,19 +84,20 @@ mod tests {
         // The JS "triangle" rises from -2 to 0 over the first half cycle, jumps
         // to 2 and falls back to 0: the value leaves [min, max] by half the range.
         let l = lfo(r#"{"freq":1,"min":0,"max":1,"type":"triangle"}"#);
-        assert_eq!(value(&l, 0.0), -0.5);
-        assert_eq!(value(&l, 32.0), 0.0);
-        assert_eq!(value(&l, 64.0), 1.5);
-        assert_eq!(value(&l, 96.0), 1.0);
-        assert_eq!(value(&l, 128.0), -0.5);
+        let beats = |b: f64| b * f64::from(TICK);
+        assert_eq!(value(&l, beats(0.0)), -0.5);
+        assert_eq!(value(&l, beats(1.0)), 0.0);
+        assert_eq!(value(&l, beats(2.0)), 1.5);
+        assert_eq!(value(&l, beats(3.0)), 1.0);
+        assert_eq!(value(&l, beats(4.0)), -0.5);
     }
 
     #[test]
     fn lenient_fields() {
         let l = lfo(r#"{"freq":"0.5","min":"-1","max":2,"waveform":"square"}"#);
         assert_eq!(value(&l, 0.0), -1.0);
-        assert_eq!(value(&l, 128.0), 2.0); // half a cycle at freq 0.5
+        assert_eq!(value(&l, 4.0 * f64::from(TICK)), 2.0); // half a cycle at freq 0.5
         assert_eq!(value(&lfo("{}"), 0.0), 0.0);
-        assert_eq!(value(&lfo(r#"{"type":"2"}"#), 64.0), 0.25); // sawtooth by code
+        assert_eq!(value(&lfo(r#"{"type":"2"}"#), 2.0 * f64::from(TICK)), 0.25); // sawtooth by code
     }
 }

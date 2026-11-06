@@ -279,10 +279,11 @@ mod tests {
     fn lfo_values_per_tick() {
         let lfo = ordrumbox_core::json::parse(r#"{"freq":1,"min":-0.5,"max":0.5,"type":"sine"}"#).unwrap();
         let track = Track { pan: 0.8, pan_lfo: lfo.as_object().cloned(), ..Track::default() };
-        let l = strip_lfo(2, &track, false, 0, 128).unwrap();
-        assert_eq!((l.track, l.pan.len(), l.volume.len()), (2, 128, 0));
+        let four_beats = 4 * ordrumbox_core::steps::TICK;
+        let l = strip_lfo(2, &track, false, 0, four_beats).unwrap();
+        assert_eq!((l.track, l.pan.len(), l.volume.len()), (2, four_beats as usize, 0));
         assert_eq!(l.pan[0], 0.3); // sine starts at its minimum
-        assert_eq!(l.pan[64], 1.0); // 0.8 + 0.5, clamped
-        assert!(strip_lfo(0, &Track::default(), false, 0, 128).is_none());
+        assert_eq!(l.pan[four_beats as usize / 2], 1.0); // 0.8 + 0.5, clamped
+        assert!(strip_lfo(0, &Track::default(), false, 0, four_beats).is_none());
     }
 }

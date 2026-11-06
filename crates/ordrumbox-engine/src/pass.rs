@@ -445,7 +445,10 @@ mod tests {
         let beat = 24_000; // frames per beat at 120 bpm
         let events = |measure: u64, cache: &mut HitsCache| -> Vec<(u64, usize)> {
             let pass = build_song_pass(song, measure, &mut Rng::new(1), cache, context);
-            assert_eq!((pass.frames, pass.first_tick, pass.strips.len()), (4 * beat, measure * 128, 3));
+            assert_eq!(
+                (pass.frames, pass.first_tick, pass.strips.len()),
+                (4 * beat, measure * u64::from(SONG_PASS_TICKS), 3)
+            );
             pass.events.iter().map(|e| (e.frame / beat, e.sound.track())).collect()
         };
         assert_eq!(events(0, &mut cache), [(0, 0), (1, 1), (2, 0)]);

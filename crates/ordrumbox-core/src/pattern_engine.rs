@@ -105,8 +105,8 @@ pub fn expand_hits(pattern: &Pattern, pass: u32, rng: &mut Rng, scales: &Scales)
 
 /// Absolute steps where a note at `step` sounds: repeated every loop when it
 /// sits inside the loop, once otherwise. Each one is turned into a tick from
-/// its own step, so a loop of a fractional tick length (4 steps at 3 a beat,
-/// 42.67 ticks) does not drift.
+/// its own step, so a loop of a fractional tick length (4 steps at 5 a beat,
+/// 76.8 ticks) does not drift.
 fn loop_occurrences(step: i64, loop_steps: i64, steps_per_beat: i32, pattern_ticks: i64) -> Vec<i64> {
     let tick = |step: i64| step_to_tick(step, steps_per_beat);
     if step >= loop_steps || loop_steps <= 0 || tick(loop_steps) >= pattern_ticks {
@@ -265,45 +265,54 @@ mod tests {
     #[test]
     fn retriggers_follow_the_rate_code() {
         let p = pattern(r#"{"tracks":[{"notes":[{"retriggerCount":4,"rate":8}]}]}"#);
-        assert_eq!(ticks(&p, 0), [(0, 0.0), (8, 0.0), (16, 0.0), (24, 0.0)]);
+        assert_eq!(ticks(&p, 0), [(0, 0.0), (24, 0.0), (48, 0.0), (72, 0.0)]);
         let p = pattern(r#"{"tracks":[{"notes":[{"retriggerCount":3,"rate":4}]}]}"#);
-        assert_eq!(ticks(&p, 0), [(0, 0.0), (4, 0.0), (8, 0.0)]);
+        assert_eq!(ticks(&p, 0), [(0, 0.0), (12, 0.0), (24, 0.0)]);
     }
 
     #[test]
     fn notes_inside_the_loop_repeat() {
         let p = pattern(r#"{"tracks":[{"loopAtStep":4,"notes":[{"beatStep":1},{"beat":2}]}]}"#);
-        assert_eq!(ticks(&p, 0), [(8, 0.0), (40, 0.0), (64, 0.0), (72, 0.0), (104, 0.0)]);
+        assert_eq!(ticks(&p, 0), [(24, 0.0), (120, 0.0), (192, 0.0), (216, 0.0), (312, 0.0)]);
+    }
+
+    #[test]
+    fn triplets_fall_on_whole_ticks() {
+        let p = pattern(r#"{"tracks":[{"stepsPerBeat":3,"notes":[{"retriggerCount":4,"rate":8}]}]}"#);
+        assert_eq!(ticks(&p, 0), [(0, 0.0), (32, 0.0), (64, 0.0), (96, 0.0)]);
+        let p = pattern(r#"{"tracks":[{"stepsPerBeat":6,"notes":[{"step":5},{"beat":1,"step":1}]}]}"#);
+        assert_eq!(ticks(&p, 0), [(80, 0.0), (112, 0.0)]);
     }
 
     #[test]
     fn a_loop_of_a_fractional_tick_length_does_not_drift() {
-        // 4 steps at 3 a beat last 42.67 ticks: each repeat is rounded from
-        // its own step (0, 43, 85), not from a floored loop (0, 42, 84).
-        let p = pattern(r#"{"tracks":[{"beatCount":4,"stepsPerBeat":3,"loopAtStep":4,"notes":[{}]}]}"#);
-        assert_eq!(ticks(&p, 0), [(0, 0.0), (43, 0.0), (85, 0.0)]);
+        // 4 steps at 5 a beat last 76.8 ticks: each repeat is rounded from
+        // its own step (0, 77, 154, 230, 307), not from a floored loop
+        // (0, 76, 152, 228, 304).
+        let p = pattern(r#"{"tracks":[{"beatCount":4,"stepsPerBeat":5,"loopAtStep":4,"notes":[{}]}]}"#);
+        assert_eq!(ticks(&p, 0), [(0, 0.0), (77, 0.0), (154, 0.0), (230, 0.0), (307, 0.0)]);
     }
 
     #[test]
     fn repeats_of_a_fractional_tick_spacing_do_not_drift() {
-        // A step at 3 a beat is 10.67 ticks: each repeat is rounded from its
-        // own place (0, 11, 21, 32), not from a rounded spacing (0, 11, 22, 33).
-        let p = pattern(r#"{"tracks":[{"stepsPerBeat":3,"notes":[{"retriggerCount":4,"rate":8}]}]}"#);
-        assert_eq!(ticks(&p, 0), [(0, 0.0), (11, 0.0), (21, 0.0), (32, 0.0)]);
+        // A step at 5 a beat is 19.2 ticks: each repeat is rounded from its
+        // own place (0, 19, 38, 58), not from a rounded spacing (0, 19, 38, 57).
+        let p = pattern(r#"{"tracks":[{"stepsPerBeat":5,"notes":[{"retriggerCount":4,"rate":8}]}]}"#);
+        assert_eq!(ticks(&p, 0), [(0, 0.0), (19, 0.0), (38, 0.0), (58, 0.0)]);
     }
 
     #[test]
     fn a_euclidean_onset_lands_where_a_written_note_would() {
-        // 2 pulses over the 2 steps to the next note: the onset at step 2 is
-        // tick 21, as a note written there, not 11 + 11.
-        let p = pattern(r#"{"tracks":[{"stepsPerBeat":3,"notes":[{"step":1,"euclideanPulses":2},{"beat":1}]}]}"#);
-        assert_eq!(ticks(&p, 0), [(11, 0.0), (21, 0.0), (32, 0.0)]);
+        // 2 pulses over the 2 steps to the next note, at 5 a beat: the onset
+        // at step 3 is tick 58, as a note written there, not 38 + 19.
+        let p = pattern(r#"{"tracks":[{"stepsPerBeat":5,"notes":[{"step":2,"euclideanPulses":2},{"step":4}]}]}"#);
+        assert_eq!(ticks(&p, 0), [(38, 0.0), (58, 0.0), (77, 0.0)]);
     }
 
     #[test]
     fn arpeggio_offsets_pitch() {
         let p = pattern(r#"{"tracks":[{"notes":[{"pitch":-12,"arp":[0,4,7],"retriggerCount":4,"rate":8}]}]}"#);
-        assert_eq!(ticks(&p, 0), [(0, -12.0), (8, -8.0), (16, -5.0), (24, -12.0)]);
+        assert_eq!(ticks(&p, 0), [(0, -12.0), (24, -8.0), (48, -5.0), (72, -12.0)]);
     }
 
     #[test]
@@ -313,7 +322,7 @@ mod tests {
         let auto = pattern(
             r#"{"tracks":[{"probability":0,"auto":true,"auto_variation":0,"auto_variation2":0,"notes":[{"beat":1}]}]}"#,
         );
-        assert_eq!(ticks(&auto, 0), [(32, 0.0)]);
+        assert_eq!(ticks(&auto, 0), [(TICK, 0.0)]);
     }
 
     #[test]

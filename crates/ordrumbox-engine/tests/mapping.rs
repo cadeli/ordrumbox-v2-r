@@ -6,6 +6,7 @@
 use std::path::Path;
 
 use ordrumbox_core::json::{self, Value};
+use ordrumbox_core::steps::TICK;
 use ordrumbox_core::{Library, Track, lfo};
 use ordrumbox_dsp::{StripSettings, SynthPatch};
 use ordrumbox_engine::strip_settings::strip_settings;
@@ -91,7 +92,9 @@ fn lfo_values_match_computelfovalue() {
         let values = case.get("values").and_then(Value::as_array).expect("values");
         for (tick, want) in ticks.iter().zip(values) {
             let want = want.as_f64().expect("number");
-            assert_eq!(lfo::value(object, *tick), want, "{} at tick {tick}", case.get("lfo").unwrap().to_json());
+            // The fixture counts 32 ticks a beat, as the JS app did.
+            let at = tick * f64::from(TICK) / 32.0;
+            assert_eq!(lfo::value(object, at), want, "{} at JS tick {tick}", case.get("lfo").unwrap().to_json());
         }
     }
 }

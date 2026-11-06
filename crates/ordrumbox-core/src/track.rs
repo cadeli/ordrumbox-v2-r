@@ -480,10 +480,10 @@ mod tests {
 
     #[test]
     fn a_loop_may_last_a_fractional_number_of_ticks() {
-        // Every 4 steps at 3 a beat repeats (one `stepPercent` for all, so
-        // swing does not tell them apart). 4 steps are 42.67 ticks: the
+        // Every 4 steps at 5 a beat repeats (one `stepPercent` for all, so
+        // swing does not tell them apart). 4 steps are 76.8 ticks: the
         // engine rounds each repeat from its own step, so the loop is exact.
-        let mut track = with_notes(8, 3, (0..24).step_by(4));
+        let mut track = with_notes(8, 5, (0..40).step_by(4));
         track.notes.iter_mut().for_each(|n| n.step_percent = Some(0.0));
         assert!(track.compact_loop());
         assert_eq!(track.loop_length, Some(4));

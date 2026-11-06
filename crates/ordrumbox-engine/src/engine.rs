@@ -555,7 +555,7 @@ mod tests {
         Arc::new(Pass {
             number,
             frames: length,
-            ticks: 32,
+            ticks: TICK,
             events,
             strips: vec![StripSettings::default()],
             ..Pass::default()
@@ -697,7 +697,7 @@ mod tests {
 
     #[test]
     fn follow_seeks_inside_the_pass_and_tells_another_pass() {
-        // `pass` lasts one beat (32 ticks) in 1000 frames.
+        // `pass` lasts one beat (`TICK` ticks) in 1000 frames.
         let mut engine = engine();
         assert!(!engine.follow(0.0), "stopped");
         engine.play(pass(0, &[0, 600], 1000));

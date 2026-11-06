@@ -12,7 +12,7 @@ use ordrumbox_core::{Hits, Library, Pattern, Rng, Scales, expand_hits};
 use ordrumbox_logic::Editor;
 use ordrumbox_logic::midi::{self, PPQN, smf};
 
-/// MIDI ticks per engine tick (96 PPQN, 32 ticks a beat).
+/// MIDI ticks per engine tick (96 PPQN, `TICK` ticks a beat).
 const MIDI_RATIO: i64 = PPQN as i64 / TICK as i64;
 
 fn flat(pattern: &Pattern, pass: u32) -> Hits {

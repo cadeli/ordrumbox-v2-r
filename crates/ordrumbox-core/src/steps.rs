@@ -2,12 +2,14 @@
 //!
 //! A beat is [`TICK`] ticks whatever the grid; a track divides its beat into
 //! `stepsPerBeat` steps, so a step is `TICK / stepsPerBeat` ticks, rounded per
-//! step position.
+//! step position. 96 is divided by every usual grid, triplets included (1, 2,
+//! 3, 4, 6, 8, 12, 16, 24, 32): only odd grids such as 5 or 7 round.
 
 use crate::js;
 
-/// Ticks per **beat** (not per step).
-pub const TICK: u32 = 32;
+/// Ticks per **beat** (not per step). The JS app counted 32, which rounded
+/// triplets; MIDI files are written at the same 96 PPQN.
+pub const TICK: u32 = 96;
 
 /// Absolute step of a note in its track: `beat * stepsPerBeat + beatStep`.
 pub fn absolute_step(beat: i32, beat_step: i32, steps_per_beat: i32) -> i64 {
@@ -52,10 +54,19 @@ mod tests {
     #[test]
     fn step_to_tick_rounds_per_step() {
         assert_eq!(step_to_tick(0, 4), 0);
-        assert_eq!(step_to_tick(5, 4), 40);
-        assert_eq!(step_to_tick(1, 3), 11); // 10.67
-        assert_eq!(step_to_tick(2, 3), 21); // 21.33
-        assert_eq!(step_to_tick(4, 3), 43);
+        assert_eq!(step_to_tick(5, 4), 120);
+        assert_eq!(step_to_tick(1, 5), 19); // 19.2
+        assert_eq!(step_to_tick(3, 5), 58); // 57.6
+        assert_eq!(step_to_tick(7, 5), 134); // 96 + 38.4
+    }
+
+    #[test]
+    fn the_usual_grids_fall_on_whole_ticks() {
+        for steps_per_beat in [1, 2, 3, 4, 6, 8, 12, 16, 24, 32] {
+            assert_eq!(TICK % steps_per_beat, 0, "{steps_per_beat} steps a beat");
+        }
+        assert_eq!(step_to_tick(1, 3), 32);
+        assert_eq!(step_to_tick(4, 6), 64);
     }
 
     #[test]

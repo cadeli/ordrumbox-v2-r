@@ -845,17 +845,22 @@ node tools/export_fixtures.mjs ../ordrumbox-v2
   `importPatternFromJson`). A pass is deterministic when three different
   `Math.random` streams give the same notes: Rust must give exactly those notes
   and draw no randomness. The other passes are checked by properties.
+- The JS app counted 32 ticks a beat; the engine counts 96 (`TICK`), so
+  that triplets (3, 6, 12, 24 steps a beat) fall on whole ticks instead of
+  being rounded. `flat_notes.rs` scales the fixture's ticks by 3; the
+  patterns on a 3-a-beat grid, `shuffle` and `case-grid3`, differ from their
+  fixture for this, and `flat_notes.rs` holds their new ticks
+  (`DEPARTURES`). The LFO fixture is read at the same beat positions.
 - Unlike the JS app, which floors a loop's length in ticks and adds it again
   each loop, the engine rounds each repeat of a looped note from its own step:
-  a loop of 4 steps at 3 a beat (42.67 ticks) repeats at ticks 0, 43, 85, as
-  the steps 0, 4, 8 of the full track, not 0, 42, 84. No fixture has such a
-  loop; `pattern_engine.rs` tests it.
+  a loop of 4 steps at 5 a beat (76.8 ticks) repeats at ticks 0, 77, 154,
+  230, 307, as the steps 0, 4, 8, 12, 16 of the full track, not 0, 76, 152,
+  228, 304. No fixture has such a loop; `pattern_engine.rs` tests it.
 - In the same way, repeats and arpeggio notes are rounded from their exact
-  place, not spaced by a rounded spacing: at 3 a beat, repeats a step apart
-  (10.67 ticks) fall at 0, 11, 21, 32, not 0, 11, 22, 33. A euclidean onset
-  lands on the tick of its own step, as a note written there. `case-grid3`
-  differs from its fixture for this; `flat_notes.rs` holds its new ticks
-  (`DEPARTURES`), `pattern_engine.rs` tests both.
+  place, not spaced by a rounded spacing: at 5 a beat, repeats a step apart
+  (19.2 ticks) fall at 0, 19, 38, 58, not 0, 19, 38, 57. A euclidean onset
+  lands on the tick of its own step, as a note written there.
+  `pattern_engine.rs` tests both.
 
 Re-run the script only when `song.json` changes; this app no longer follows
 changes of the JS engine.
@@ -1015,7 +1020,8 @@ MIDI files no longer have a script; their tests are Rust only
   where its key is struck again on its track, before its 16th is out, and
   the notes of one key at one tick are one note at the loudest velocity, so
   no key is struck while it sounds; the tempo track carries the text event
-  "Made with orDrumbox". Two tests check every export without the
+  "Made with orDrumbox"; at 96 ticks a beat, the triplets of `shuffle` and
+  `case-grid3` are written on their exact MIDI tick. Two tests check every export without the
   snapshot: the notes of one tick come note-offs first, then by key; and the
   file, accepted by a strict Standard MIDI File validator
   (`ordrumbox-logic/tests/strict_smf/`, written from the spec apart from the
