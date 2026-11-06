@@ -16,7 +16,7 @@ use ordrumbox_core::json::Value;
 use ordrumbox_core::note::{ACCENT_VELOCITY, ACCENTED_VELOCITY};
 use ordrumbox_core::song::{DEFAULT_BPM, clamp_bpm};
 use ordrumbox_core::style::{COMPLEXITY, ENERGY, MACRO_NEUTRAL};
-use ordrumbox_core::track::MAX_TRACKS;
+use ordrumbox_core::track::{MAX_STEPS_PER_BEAT, MAX_TRACKS};
 use ordrumbox_core::{Library, Note, Pattern, Scales, SetField, Styles, Track};
 
 use crate::generate::{self, AutoGenerator, MelodicKind, Options};
@@ -513,7 +513,7 @@ impl Editor {
     /// `setStepsPerBeat`: clamped to 1–8; notes keep their position in the
     /// beat (by percent), the loop point stays inside the track.
     pub fn set_steps_per_beat(&mut self, p: usize, t: usize, value: f64, coalesce: bool) -> bool {
-        let target = round(value.clamp(1.0, 8.0)) as i32;
+        let target = round(value.clamp(1.0, MAX_STEPS_PER_BEAT as f64)) as i32;
         let Some(track) = self.library.patterns.get(p).and_then(|p| p.tracks.get(t)) else { return false };
         if !value.is_finite() || target == track.steps_per_beat {
             return false;

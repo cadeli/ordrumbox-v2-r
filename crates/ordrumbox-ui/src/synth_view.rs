@@ -56,12 +56,6 @@ fn grid_color() -> Rgb {
 }
 const ACCENT: Rgb = theme::LIME;
 const ACCENT_DIM: Rgb = theme::VIOLET;
-fn text_color() -> Rgb {
-    theme::text()
-}
-fn dim_color() -> Rgb {
-    theme::muted()
-}
 
 /// Every field of the draft's cards, card after card: the index a
 /// [`Id::SynthField`] names.
@@ -249,7 +243,7 @@ pub fn build(
         let mut y = inner.y;
         // Title: the label, the choices, the power button.
         let label = model::group_label(group);
-        items.push(Item::text(inner.x, y + 3 * s, label, text_color(), s));
+        items.push(Item::text(inner.x, y + 3 * s, label, theme::text(), s));
         if let Some((path, options)) = icon_choices(group) {
             let current = model::get(draft, &path);
             for (k, (value, label)) in options.iter().enumerate() {
@@ -319,7 +313,7 @@ pub fn build(
             y += ((knobs + per_row - 1) / per_row) * (KNOB_H + 4) * s;
         }
         for (id, label, options, path) in rows {
-            items.push(Item::text(inner.x, y + 3 * s, label, dim_color(), s));
+            items.push(Item::text(inner.x, y + 3 * s, label, theme::muted(), s));
             let rect = Rect::new(inner.x + 80 * s, y, (inner.w - 80 * s).min(200 * s), 13 * s);
             let kind = match options {
                 Some(options) => {
@@ -374,7 +368,7 @@ pub fn draw(canvas: &mut Canvas, draft: &Object, built: &Built, layout: &SynthLa
     for (label, on) in model::modules(draft) {
         let w = text_width(label, s) + 8 * s;
         canvas.fill_rect(x, y, w, 12 * s, if on { ACCENT_DIM } else { card_off_color() });
-        canvas.text(x + 4 * s, y + 2 * s, label, s, if on { ACCENT } else { dim_color() });
+        canvas.text(x + 4 * s, y + 2 * s, label, s, if on { ACCENT } else { theme::muted() });
         x += w + 4 * s;
     }
 }

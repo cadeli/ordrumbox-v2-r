@@ -96,12 +96,12 @@ pub fn strip_settings(track: &Track, bpm: f64) -> StripSettings {
 
     // Filter: `allpass` skips it (the cutoff opens as in JS).
     if track.filter_type == "allpass" {
-        s.cutoff = 20_000.0;
+        s.cutoff = ordrumbox_dsp::MAX_FILTER_FREQ as f32;
         s.filter_on = 0.0;
     } else {
         s.filter_mode = filter_mode(&track.filter_type).unwrap_or(0.0);
         if track.filter_cutoff_lfo.is_none() {
-            s.cutoff = finite_or(track.filter_cutoff, 20.0) as f32;
+            s.cutoff = finite_or(track.filter_cutoff, ordrumbox_dsp::MIN_FILTER_FREQ) as f32;
         }
         if track.filter_q_lfo.is_none() {
             s.q = finite_or(track.filter_q, 0.707) as f32;
@@ -216,7 +216,9 @@ pub fn strip_lfo(index: usize, track: &Track, silent: bool, first_tick: u64, tic
         track: index,
         volume: if silent { Vec::new() } else { values(&track.volume_lfo, &|v| v.clamp(0.0, 2.0)) },
         pan: values(&track.pan_lfo, &|v| (track.pan + v).clamp(-1.0, 1.0)),
-        cutoff: values(&track.filter_cutoff_lfo, &|v| (track.filter_cutoff + v).clamp(20.0, 20_000.0)),
+        cutoff: values(&track.filter_cutoff_lfo, &|v| {
+            (track.filter_cutoff + v).clamp(ordrumbox_dsp::MIN_FILTER_FREQ, ordrumbox_dsp::MAX_FILTER_FREQ)
+        }),
         q: values(&track.filter_q_lfo, &|v| (track.filter_q + v).clamp(0.707, 18.707)),
     };
     let any = !(result.volume.is_empty() && result.pan.is_empty() && result.cutoff.is_empty() && result.q.is_empty());

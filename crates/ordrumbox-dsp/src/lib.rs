@@ -16,7 +16,7 @@ macro_rules! audio_params {
     (
         $(#[$meta:meta])*
         pub struct $name:ident {
-            $( $(#[$fmeta:meta])* $field:ident = $default:expr, $min:literal ..= $max:literal; )*
+            $( $(#[$fmeta:meta])* $field:ident = $default:expr, $min:expr, $max:expr; )*
         }
     ) => {
         $(#[$meta])*
@@ -60,6 +60,20 @@ pub use sample::SampleBuffer;
 pub use strip::{Strip, StripSettings};
 pub use synth::{SynthPatch, SynthVoice};
 pub use voice::{SampleVoice, VoiceStart};
+
+/// Lowest frequency a filter cutoff can take, in Hz.
+pub const MIN_FILTER_FREQ: f64 = 20.0;
+/// Highest frequency a filter cutoff can take, in Hz.
+pub const MAX_FILTER_FREQ: f64 = 20_000.0;
+/// Aliases for the filter cutoff bounds.
+pub const MIN_FILTER_CUTOFF: f64 = MIN_FILTER_FREQ;
+pub const MAX_FILTER_CUTOFF: f64 = MAX_FILTER_FREQ;
+pub const MIN_FILTER_FREQUENCY: f64 = MIN_FILTER_FREQ;
+pub const MAX_FILTER_FREQUENCY: f64 = MAX_FILTER_FREQ;
+pub const FILTER_FREQ_MIN: f64 = MIN_FILTER_FREQ;
+pub const FILTER_FREQ_MAX: f64 = MAX_FILTER_FREQ;
+pub const FILTER_CUTOFF_MIN: f64 = MIN_FILTER_FREQ;
+pub const FILTER_CUTOFF_MAX: f64 = MAX_FILTER_FREQ;
 
 /// `Math.round`: halves round up (toward +∞).
 #[inline]

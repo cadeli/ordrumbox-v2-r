@@ -310,12 +310,6 @@ fn border_color() -> Rgb {
 fn highlight_color() -> Rgb {
     theme::highlight()
 }
-fn text_color() -> Rgb {
-    theme::text()
-}
-fn dim_color() -> Rgb {
-    theme::muted()
-}
 const ACCENT: Rgb = theme::PINK;
 const WARNING: Rgb = theme::RED;
 
@@ -377,11 +371,11 @@ pub fn draw(canvas: &mut Canvas, picker: &Picker, layout: &PickerLayout) {
     let count = place.chars().count();
     let place =
         if count > room { format!("...{}", place.chars().skip(count - room + 3).collect::<String>()) } else { place };
-    canvas.text(x, layout.y + 20 * s, &place, s, dim_color());
+    canvas.text(x, layout.y + 20 * s, &place, s, theme::muted());
     if let Some(error) = &picker.error {
         canvas.text(x, layout.list_top, error, s, WARNING);
     } else if picker.entries.is_empty() {
-        canvas.text(x, layout.list_top, "(nothing to open here)", s, dim_color());
+        canvas.text(x, layout.list_top, "(nothing to open here)", s, theme::muted());
     }
     let first = layout.first(picker.selected);
     for (row, (i, entry)) in picker.entries.iter().enumerate().skip(first).take(layout.rows).enumerate() {
@@ -392,13 +386,13 @@ pub fn draw(canvas: &mut Canvas, picker: &Picker, layout: &PickerLayout) {
         }
         let color = match entry {
             _ if selected => ACCENT,
-            Entry::File(_) => text_color(),
-            _ => dim_color(),
+            Entry::File(_) => theme::text(),
+            _ => theme::muted(),
         };
         canvas.text(x, y, &entry.label(), s, color);
     }
     let hint = "ENTER or click again: open / choose   BACKSPACE: up   a letter: jump   ESC: cancel";
-    canvas.text(x, layout.y + layout.height - 14 * s, hint, s, dim_color());
+    canvas.text(x, layout.y + layout.height - 14 * s, hint, s, theme::muted());
 }
 
 #[cfg(test)]

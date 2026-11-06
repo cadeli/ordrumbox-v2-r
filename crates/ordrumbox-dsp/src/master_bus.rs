@@ -28,26 +28,26 @@ audio_params! {
     /// (`core/constants.js`), which the app applies at start.
     pub struct MasterSettings {
         /// dB.
-        threshold = -18.0, -60.0..=0.0;
-        ratio = 8.0, 1.0..=20.0;
+        threshold = -18.0, -60.0, 0.0;
+        ratio = 8.0, 1.0, 20.0;
         /// dB.
-        knee = 3.0, 0.0..=40.0;
+        knee = 3.0, 0.0, 40.0;
         /// Seconds.
-        attack = 0.002, 0.001..=1.0;
+        attack = 0.002, 0.001, 1.0;
         /// Seconds.
-        release = 0.08, 0.01..=1.0;
+        release = 0.08, 0.01, 1.0;
         /// dB.
-        makeup = 8.0, 0.0..=24.0;
+        makeup = 8.0, 0.0, 24.0;
         /// Hz.
-        lowcut = 35.0, 10.0..=500.0;
+        lowcut = 35.0, 10.0, 500.0;
         /// Hz.
-        hicut = 18_500.0, 1_000.0..=22_000.0;
+        hicut = 18_500.0, 1_000.0, 22_000.0;
         /// Linear.
-        master = 1.0, 0.0..=2.0;
+        master = 1.0, 0.0, 2.0;
         /// 1 skips pre-gain, compressor and filters (not the master gain).
-        bypass = 0.0, 0.0..=1.0;
+        bypass = 0.0, 0.0, 1.0;
         /// dB.
-        pre_gain = 0.0, -20.0..=20.0;
+        pre_gain = 0.0, -20.0, 20.0;
     }
 }
 

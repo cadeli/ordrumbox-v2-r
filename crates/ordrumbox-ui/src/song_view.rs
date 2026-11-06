@@ -57,12 +57,6 @@ fn major_color() -> Rgb {
 fn line_color() -> Rgb {
     theme::line()
 }
-fn text_color() -> Rgb {
-    theme::text()
-}
-fn dim_color() -> Rgb {
-    theme::muted()
-}
 const ACCENT: Rgb = theme::PINK;
 const ORPHAN: Rgb = theme::RED;
 fn selected_color() -> Rgb {
@@ -428,7 +422,7 @@ fn draw_list(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     let s = layout.scale;
     let r = layout.list;
     if view.patterns.is_empty() {
-        canvas.text(r.x, r.y, "No patterns", s, dim_color());
+        canvas.text(r.x, r.y, "No patterns", s, theme::muted());
         return;
     }
     let (first, shown, total) = (view.list_scroll, layout.list_rows(), view.patterns.len());
@@ -442,8 +436,8 @@ fn draw_list(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
         }
         let number = format!("{}.", i + 1);
         let x = r.x + (LIST_NUMBER_CHARS * crate::font::WIDTH * s - text_width(&number, s)).max(0);
-        let x = canvas.text(x, y, &number, s, dim_color()) + 4 * s;
-        canvas.text(x, y, &fit(name, names_right - x, s), s, if selected { ACCENT } else { text_color() });
+        let x = canvas.text(x, y, &number, s, theme::muted()) + 4 * s;
+        canvas.text(x, y, &fit(name, names_right - x, s), s, if selected { ACCENT } else { theme::text() });
     }
     // A pattern dragged along the list: a line where it would go, above or below the one it takes.
     if let Some((from, to)) = view.list_drop.filter(|&(from, to)| from != to) {
@@ -457,7 +451,7 @@ fn draw_list(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
         let bar = layout.scroll_bar(Axis::List);
         canvas.fill_rect(bar.x, bar.y, bar.w, bar.h, cell_color());
         let (start, len) = layout.thumb(Axis::List, first, shown, total);
-        canvas.fill_rect(bar.x + s, start, bar.w - 2 * s, len, dim_color());
+        canvas.fill_rect(bar.x + s, start, bar.w - 2 * s, len, theme::muted());
     }
 }
 
@@ -470,7 +464,7 @@ fn draw_description(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     if d.w <= 0 {
         return;
     }
-    canvas.text(d.x, d.y, &fit("Pattern description", d.w, s), s, dim_color());
+    canvas.text(d.x, d.y, &fit("Pattern description", d.w, s), s, theme::muted());
     let f = layout.description_frame();
     for (x, y, w, h) in
         [(f.x, f.y, f.w, s), (f.x, f.y + f.h - s, f.w, s), (f.x, f.y, s, f.h), (f.x + f.w - s, f.y, s, f.h)]
@@ -479,13 +473,13 @@ fn draw_description(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     }
     let (x, top) = (f.x + DESCRIPTION_PAD * s, f.y + DESCRIPTION_PAD * s);
     if text.is_empty() {
-        canvas.text(x, top, &fit("(click to write one)", f.w - 2 * DESCRIPTION_PAD * s, s), s, dim_color());
+        canvas.text(x, top, &fit("(click to write one)", f.w - 2 * DESCRIPTION_PAD * s, s), s, theme::muted());
         return;
     }
     let lines = layout.description_lines(text);
     let rows = layout.description_rows();
     for (k, line) in lines.iter().skip(view.description_scroll).take(rows).enumerate() {
-        canvas.text(x, top + k as i32 * LIST_ROW * s, line, s, text_color());
+        canvas.text(x, top + k as i32 * LIST_ROW * s, line, s, theme::text());
     }
     if lines.len() > rows {
         // The thumb: the lines shown, over the whole text.
@@ -494,7 +488,7 @@ fn draw_description(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
         let thumb_y = top + track_h * view.description_scroll as i32 / lines.len() as i32;
         let thumb_h = (track_h * rows as i32 / lines.len() as i32).max(4 * s);
         canvas.fill_rect(bar_x, top, SCROLL_BAR * s, track_h, cell_color());
-        canvas.fill_rect(bar_x, thumb_y.min(top + track_h - thumb_h), SCROLL_BAR * s, thumb_h, dim_color());
+        canvas.fill_rect(bar_x, thumb_y.min(top + track_h - thumb_h), SCROLL_BAR * s, thumb_h, theme::muted());
     }
 }
 
@@ -502,22 +496,22 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     let s = layout.scale;
     let g = layout.grid;
     let Some(song) = view.song else {
-        canvas.text(g.x, g.y, "No arrangement - Song > New arrangement makes one.", s, dim_color());
+        canvas.text(g.x, g.y, "No arrangement - Song > New arrangement makes one.", s, theme::muted());
         return;
     };
-    let title = canvas.text(g.x, g.y, "Arrangement", s, dim_color()) + 8 * s;
+    let title = canvas.text(g.x, g.y, "Arrangement", s, theme::muted()) + 8 * s;
     let total = song.length_measures().max(1.0).ceil() as u32;
     // The arrangement's own tempo, which it plays at (the header's knob in this panel).
     let bpm = ordrumbox_core::js::number_to_string(song.bpm);
     let meta = format!("{}  {} measures  plays at {bpm} BPM", song.name, total);
-    canvas.text(title, g.y, &fit(&meta, g.x + g.w - title, s), s, text_color());
+    canvas.text(title, g.y, &fit(&meta, g.x + g.w - title, s), s, theme::text());
     if song.clips.is_empty() && view.ghost.is_none() {
         canvas.text(
             g.x,
             layout.ruler_top(),
             "No clips yet: right-click a pattern of the list to add it.",
             s,
-            dim_color(),
+            theme::muted(),
         );
         return;
     }
@@ -547,9 +541,9 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
         let text = if m == current {
             background_color()
         } else if m % 4 == 0 {
-            text_color()
+            theme::text()
         } else {
-            dim_color()
+            theme::muted()
         };
         canvas.text(tx, layout.ruler_top() + (HEADER_HEIGHT * s - 8 * s) / 2, &label, s, text);
     }
@@ -564,7 +558,7 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
             y + (layout.row_height() - 8 * s) / 2,
             &name,
             s,
-            if row.orphan { ORPHAN } else { text_color() },
+            if row.orphan { ORPHAN } else { theme::text() },
         );
     }
     // Measure lines, every fourth brighter.
@@ -618,7 +612,7 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
         let r = layout.scroll_bar(axis);
         canvas.fill_rect(r.x, r.y, r.w, r.h, cell_color());
         let (start, len) = layout.thumb(axis, first, shown, total);
-        let color = if total > shown { dim_color() } else { line_color() };
+        let color = if total > shown { theme::muted() } else { line_color() };
         match axis {
             Axis::Measures => canvas.fill_rect(start, r.y + s, len, r.h - 2 * s, color),
             Axis::Rows | Axis::List => canvas.fill_rect(r.x + s, start, r.w - 2 * s, len, color),

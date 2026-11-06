@@ -9,6 +9,7 @@
 
 use ordrumbox_core::note_positions::{SubKind, SubPosition};
 use ordrumbox_core::steps::absolute_step;
+use ordrumbox_core::track::MAX_STEPS_PER_BEAT;
 use ordrumbox_core::{Note, Track};
 
 use crate::canvas::{Canvas, Rgb, text_width};
@@ -56,12 +57,6 @@ fn key_white_color() -> Rgb {
 fn key_black_color() -> Rgb {
     theme::panel()
 }
-fn text_color() -> Rgb {
-    theme::text()
-}
-fn dim_color() -> Rgb {
-    theme::muted()
-}
 
 const PLAYING: Rgb = theme::LIME;
 const SELECTED: Rgb = theme::WHITE;
@@ -85,7 +80,7 @@ pub fn note_row(note: &Note, track: &Track) -> i32 {
 
 /// Steps per beat of `track`, as the roll counts them.
 pub fn steps_per_beat(track: &Track) -> i32 {
-    track.steps_per_beat.max(1)
+    track.steps_per_beat.clamp(1, MAX_STEPS_PER_BEAT)
 }
 
 /// Opacity a note is drawn at: 0.25 to 1.
@@ -283,7 +278,7 @@ impl RollLayout {
 /// Draw the piano roll; `title` names the track.
 pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &str) {
     let s = layout.scale;
-    canvas.text(layout.title.x, layout.title.y, title, s, text_color());
+    canvas.text(layout.title.x, layout.title.y, title, s, theme::text());
     if view.pages() > 1 {
         for (rect, label, enabled) in
             [(layout.previous, "<", view.page > 0), (layout.next, ">", view.page < view.pages() - 1)]
@@ -300,14 +295,14 @@ pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &s
                 rect.y + 3 * s,
                 label,
                 s,
-                if enabled { text_color() } else { dim_color() },
+                if enabled { theme::text() } else { theme::muted() },
             );
         }
         let info = format!("{}/{}", view.page + 1, view.pages());
         let x = layout.previous.x
             + layout.previous.w
             + (layout.next.x - layout.previous.x - layout.previous.w - text_width(&info, s)) / 2;
-        canvas.text(x, layout.title.y, &info, s, text_color());
+        canvas.text(x, layout.title.y, &info, s, theme::text());
     }
 
     let spb = steps_per_beat(view.track);
@@ -414,7 +409,7 @@ pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &s
     }
     if first_row > 0 || view.top_row < TOTAL_KEYS - 1 {
         let hint = format!("{} - {}", midi_name(row_midi(view.top_row)), midi_name(row_midi(first_row)));
-        canvas.text(layout.keys.x, layout.grid.y + grid_h + 4 * s, &hint, s, dim_color());
+        canvas.text(layout.keys.x, layout.grid.y + grid_h + 4 * s, &hint, s, theme::muted());
     }
 }
 
