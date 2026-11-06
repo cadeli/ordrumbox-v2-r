@@ -1,8 +1,7 @@
 //! Track LFOs (`computeLfoValue()` in `src/audio/math.js`): an object
-//! `{freq, min, max, phase, type}` read leniently (`parseFloat`, defaults),
-//! evaluated on the transport tick. The engine samples it once per tick.
+//! `{freq, min, max, phase, type}` read leniently (numbers or numeric strings,
+//! defaults), evaluated on the transport tick. The engine samples it once per tick.
 
-use crate::js::parse_float;
 use crate::json::{Object, Value};
 use crate::steps::TICK;
 
@@ -13,10 +12,9 @@ const MAX_FREQ: f64 = 2.0;
 /// Waveform names, by code.
 pub const WAVE_TYPES: [&str; 5] = ["sine", "triangle", "sawtooth", "square", "random"];
 
-/// `toFiniteNumber(parseFloat(v), fallback)`.
+/// The number `value` holds (a number or a numeric string), `fallback` without one.
 fn lenient(value: Option<&Value>, fallback: f64) -> f64 {
-    let n = value.map_or(f64::NAN, parse_float);
-    if n.is_finite() { n } else { fallback }
+    value.and_then(Value::to_number).unwrap_or(fallback)
 }
 
 /// Value of `lfo` at transport tick `tick`, rounded to 2 decimals, between
@@ -36,7 +34,7 @@ pub fn value(lfo: &Object, tick: f64) -> f64 {
     };
     let current = tick / (f64::from(TICK) * BEATS_PER_CYCLE) * freq.min(MAX_FREQ) + phase;
     let unit = (waveform(current, wave) + 1.0) / 2.0;
-    crate::js::round(100.0 * (min + unit * (max - min))) / 100.0
+    crate::num::round2(min + unit * (max - min))
 }
 
 /// `getLfoWaveformValue()`: value at `phase` cycles for waveform code `wave`
@@ -60,7 +58,7 @@ pub fn waveform(phase: f64, wave: f64) -> f64 {
     } else if wave < 3.5 {
         if p < 0.5 { 1.0 } else { -1.0 }
     } else {
-        // Sample and hold: integer hash of the cycle index, in int32 like JS.
+        // Sample and hold: integer hash of the cycle index, wrapping in i32.
         let cycle = phase.floor() * 1_234_567.0 + 890_123.0;
         let mut rng = if cycle.is_finite() { cycle.trunc().rem_euclid(4_294_967_296.0) as u32 as i32 } else { 0 };
         rng ^= rng << 13;

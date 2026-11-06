@@ -11,9 +11,9 @@ use std::time::Instant;
 
 use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family, mono_from_track_name};
 use ordrumbox_core::ids::{slugify, unique_id};
-use ordrumbox_core::js::{number_to_string, round};
 use ordrumbox_core::json::Value;
 use ordrumbox_core::note::{ACCENT_VELOCITY, ACCENTED_VELOCITY};
+use ordrumbox_core::num::round2;
 use ordrumbox_core::song::{DEFAULT_BPM, clamp_bpm};
 use ordrumbox_core::style::{COMPLEXITY, ENERGY, MACRO_NEUTRAL};
 use ordrumbox_core::track::{MAX_STEPS_PER_BEAT, MAX_TRACKS};
@@ -50,14 +50,14 @@ pub enum Nudge {
 /// `nudgeVelocity()`: ±0.05, rounded to 2 decimals, unchanged past 0–1.
 pub fn nudge_velocity(velocity: f64, up: bool) -> f64 {
     let current = if velocity.is_finite() { velocity } else { 0.8 };
-    let next = round((current + if up { VELOCITY_STEP } else { -VELOCITY_STEP }) * 100.0) / 100.0;
+    let next = round2(current + if up { VELOCITY_STEP } else { -VELOCITY_STEP });
     if (0.0..=1.0).contains(&next) { next } else { current }
 }
 
 /// `nudgePitch()`: ±1 semitone (rounded first), unchanged past the piano
 /// roll's range once the track transposition is added.
 pub fn nudge_pitch(pitch: f64, up: bool, track_pitch: f64) -> f64 {
-    let current = round(if pitch.is_finite() { pitch } else { 0.0 });
+    let current = if pitch.is_finite() { pitch.round() } else { 0.0 };
     let next = current + if up { 1.0 } else { -1.0 };
     let (min, max) = (MIDI_MIN - MIDDLE_C - track_pitch, MIDI_MAX - MIDDLE_C - track_pitch);
     if next < min || next > max { current } else { next }
@@ -65,7 +65,7 @@ pub fn nudge_pitch(pitch: f64, up: bool, track_pitch: f64) -> f64 {
 
 /// Step position in percent of the beat.
 fn step_percent(beat_step: i32, steps_per_beat: i32) -> f64 {
-    round(f64::from(beat_step) * 100.0 / f64::from(steps_per_beat.max(1)))
+    (f64::from(beat_step) * 100.0 / f64::from(steps_per_beat.max(1))).round()
 }
 
 fn pattern_name(pattern: &Pattern) -> &str {
@@ -513,7 +513,7 @@ impl Editor {
     /// `setStepsPerBeat`: clamped to 1–8; notes keep their position in the
     /// beat (by percent), the loop point stays inside the track.
     pub fn set_steps_per_beat(&mut self, p: usize, t: usize, value: f64, coalesce: bool) -> bool {
-        let target = round(value.clamp(1.0, MAX_STEPS_PER_BEAT as f64)) as i32;
+        let target = value.clamp(1.0, MAX_STEPS_PER_BEAT as f64).round() as i32;
         let Some(track) = self.library.patterns.get(p).and_then(|p| p.tracks.get(t)) else { return false };
         if !value.is_finite() || target == track.steps_per_beat {
             return false;
@@ -530,7 +530,7 @@ impl Editor {
                 for note in &mut track.notes {
                     let percent = note.step_percent(old);
                     note.step_percent = Some(percent);
-                    note.step = (round(percent / 100.0 * f64::from(target)) as i32).min(target - 1);
+                    note.step = ((percent / 100.0 * f64::from(target)).round() as i32).min(target - 1);
                 }
                 let max_steps = track.beat_count * target;
                 if track.loop_length.is_some_and(|l| l > max_steps) {
@@ -717,7 +717,7 @@ impl Editor {
         }
         self.library.bpm = bpm;
         let coalesce = coalesce.then(|| "bpm".to_owned());
-        self.record(format!("Set BPM → {}", number_to_string(bpm)), Change::Tempo { before, after: bpm }, coalesce);
+        self.record(format!("Set BPM → {bpm}"), Change::Tempo { before, after: bpm }, coalesce);
         self.revision += 1;
         true
     }
@@ -725,7 +725,7 @@ impl Editor {
     /// Length in beats, 1–16 (out of range: 4); every track follows and its
     /// loop point stays inside.
     pub fn set_pattern_beat_count(&mut self, p: usize, beats: f64) -> bool {
-        let requested = round(beats);
+        let requested = beats.round();
         let applied = if requested.is_finite() && (1.0..=f64::from(MAX_BEATS)).contains(&requested) {
             requested as i32
         } else {
@@ -856,7 +856,7 @@ impl Editor {
         };
         self.edit(
             p,
-            |_| format!("Set {label} → {}", number_to_string(value)),
+            |_| format!("Set {label} → {value}"),
             coalesce,
             |pattern| {
                 pattern.extra.insert(key, Value::Number(value));

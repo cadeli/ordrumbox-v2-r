@@ -19,7 +19,6 @@
 //! track (`KICK 2`) instead of losing its notes.
 
 use ordrumbox_core::instruments::{Catalog, Instrument, catalog};
-use ordrumbox_core::js;
 use ordrumbox_core::{Note, Pattern, Track};
 
 use super::smf::{self, NoteOn};
@@ -199,7 +198,7 @@ fn patterns_from(defs: &[TrackDef], base_name: &str, division: f64) -> (Vec<Patt
     // Each note goes to the step nearest its MIDI tick, rounded once: a note
     // just before a beat rounds to that beat's first step, never to a step
     // past the last one of the beat before.
-    let step_of = |tick: i64| js::round(tick as f64 * f64::from(STEPS_PER_BEAT) / division) as i64;
+    let step_of = |tick: i64| (tick as f64 * f64::from(STEPS_PER_BEAT) / division).round() as i64;
     let pattern_steps = i64::from(PATTERN_BEATS * STEPS_PER_BEAT);
     let last_step = defs.iter().flat_map(|d| &d.notes).map(|n| step_of(n.tick)).fold(0, i64::max);
     let wanted = last_step / pattern_steps + 1;
@@ -221,7 +220,7 @@ fn patterns_from(defs: &[TrackDef], base_name: &str, division: f64) -> (Vec<Patt
                         let spb = i64::from(STEPS_PER_BEAT);
                         let (beat, beat_step) = ((step / spb) as i32, (step % spb) as i32);
                         let pitch = note.note.map_or(f64::NAN, f64::from) - def.base_note;
-                        let step_percent = js::round(f64::from(beat_step) * 100.0 / f64::from(STEPS_PER_BEAT));
+                        let step_percent = (f64::from(beat_step) * 100.0 / f64::from(STEPS_PER_BEAT)).round();
                         track.notes.push(Note {
                             velocity: smf::velocity_to_unit(note.velocity),
                             beat,

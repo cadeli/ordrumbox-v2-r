@@ -5,7 +5,7 @@
 //! only. A press that claims no axis is a click.
 
 use ordrumbox_core::Note;
-use ordrumbox_core::js::round;
+use ordrumbox_core::num::round2;
 
 /// Movement before the gesture claims an axis, px.
 const AXIS_LOCK_PX: f64 = 3.0;
@@ -81,7 +81,13 @@ impl NoteDrag {
                 }
                 let axis = if dx.abs() >= dy.abs() { Axis::Pitch } else { Axis::Velocity };
                 self.start = match axis {
-                    Axis::Pitch => round(if note.pitch.is_finite() { note.pitch } else { 0.0 }),
+                    Axis::Pitch => {
+                        if note.pitch.is_finite() {
+                            note.pitch.round()
+                        } else {
+                            0.0
+                        }
+                    }
                     Axis::Velocity => {
                         if note.velocity.is_finite() {
                             note.velocity
@@ -96,9 +102,9 @@ impl NoteDrag {
             }
         };
         let value = match axis {
-            Axis::Pitch => (self.start + round(dx / PITCH_PX_PER_SEMITONE))
+            Axis::Pitch => (self.start + (dx / PITCH_PX_PER_SEMITONE).round())
                 .clamp(MIDI_MIN - MIDDLE_C - self.track_pitch, MIDI_MAX - MIDDLE_C - self.track_pitch),
-            Axis::Velocity => round((self.start + dy * VELOCITY_PER_PX).clamp(0.0, 1.0) * 100.0) / 100.0,
+            Axis::Velocity => round2((self.start + dy * VELOCITY_PER_PX).clamp(0.0, 1.0)),
         };
         let current = match axis {
             Axis::Pitch => note.pitch,

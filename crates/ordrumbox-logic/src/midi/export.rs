@@ -13,7 +13,7 @@
 use ordrumbox_core::instruments::catalog;
 use ordrumbox_core::pattern_engine::expand_hits;
 use ordrumbox_core::steps::TICK;
-use ordrumbox_core::{Pattern, Rng, Scales, js, lfo};
+use ordrumbox_core::{Pattern, Rng, Scales, lfo};
 
 use super::import::C3_MIDI_NOTE;
 use super::smf::encode_vlq;
@@ -201,7 +201,7 @@ pub fn export(
                     pitch += lfo::value(l, f64::from(tick));
                 }
                 let key = crate::generate::clamp(target.note + pitch, 0.0, 127.0);
-                let velocity = js::round(velocity * 127.0);
+                let velocity = (velocity * 127.0).round();
                 // A note-on at velocity 0 is a note-off: a silent note is left out.
                 if velocity.is_nan() || velocity < 1.0 {
                     continue;
@@ -222,7 +222,7 @@ pub fn export(
     header.extend(((1 + chunks.len()) as u16).to_be_bytes());
     header.extend((PPQN as u16).to_be_bytes());
     let mut bytes = chunk(b"MThd", &header);
-    let us = js::round(60_000_000.0 / bpm);
+    let us = (60_000_000.0 / bpm).round();
     let us = if us.is_finite() { us as i64 as u32 } else { 0 };
     let mut tempo = meta(0, 0x58, &[0x04, 0x02, 0x18, 0x08]);
     tempo.extend(meta(0, 0x51, &[(us >> 16) as u8, (us >> 8) as u8, us as u8]));

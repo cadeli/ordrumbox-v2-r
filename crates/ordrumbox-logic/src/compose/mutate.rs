@@ -2,7 +2,8 @@
 //! move to steps of comparable weight, so the line changes and stays in its
 //! style; on the last loop of a section the fill part plays a fill.
 
-use ordrumbox_core::{Macros, Rng, Style, Track, js};
+use ordrumbox_core::num::round2;
+use ordrumbox_core::{Macros, Rng, Style, Track};
 
 use super::{Settings, add_hit, sample, steps, track_steps, velocity};
 
@@ -53,7 +54,7 @@ pub fn vary_line(track: &mut Track, style: &Style, macros: Macros, partner: Opti
         let note = &mut track.notes[i];
         note.beat = (to / spb) as i32;
         note.step = (to % spb) as i32;
-        note.step_percent = Some(js::round(note.step as f64 * 100.0 / spb as f64));
+        note.step_percent = Some((note.step as f64 * 100.0 / spb as f64).round());
         note.velocity = velocity(&steps[to % n], &part, rng);
         moved = true;
     }
@@ -88,7 +89,7 @@ pub fn fill(track: &mut Track, style: &Style, macros: Macros, rng: &mut Rng) -> 
         add_hit(track, a, &steps[a % n], &part, rng);
         if let Some(note) = track.notes.last_mut() {
             // A crescendo over the fill.
-            note.velocity = js::to_fixed(0.6 + 0.4 * (i + 1) as f64 / len as f64, 2);
+            note.velocity = round2(0.6 + 0.4 * (i + 1) as f64 / len as f64);
         }
     }
     !added.is_empty()

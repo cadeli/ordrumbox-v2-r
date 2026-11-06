@@ -12,7 +12,8 @@
 
 use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::json::Value;
-use ordrumbox_core::{Macros, Note, Pattern, Scales, Style, Styles, Track, js};
+use ordrumbox_core::num::round2;
+use ordrumbox_core::{Macros, Note, Pattern, Scales, Style, Styles, Track};
 
 use super::structure::{SectionElement, Structure, random_key_offset, random_scale, section_harmony};
 use super::{clamp, melodic, table};
@@ -89,13 +90,13 @@ impl<'a> AutoGenerator<'a> {
     }
 }
 
-/// A pattern-level key, as the JS `??` sees it (null counts as missing).
+/// A pattern-level key; null counts as missing.
 fn pattern_value<'p>(pattern: &'p Pattern, key: &str) -> Option<&'p Value> {
     pattern.extra.get(key).filter(|v| !v.is_null())
 }
 
 fn genre_of(pattern: &Pattern) -> Option<String> {
-    pattern_value(pattern, GENRE).map(js::to_string).filter(|g| !g.is_empty())
+    pattern_value(pattern, GENRE).and_then(Value::to_text).filter(|g| !g.is_empty())
 }
 
 /// The style of `pattern`: its own, else a drawn one (written to it).
@@ -114,8 +115,8 @@ fn pattern_style(g: &mut AutoGenerator<'_>, pattern: &mut Pattern) -> Style {
 /// `#resolveHarmony`: the section harmony moved to the pattern's key, in its scale.
 fn pattern_harmony(pattern: &Pattern, style: &Style, section: &str, loop_in_element: u64) -> Harmony {
     let (root, scale) = section_harmony(&style.progression, section, loop_in_element);
-    let offset = pattern_value(pattern, KEY_OFFSET).map_or(0.0, js::to_number);
-    let scale = pattern_value(pattern, SCALE).map_or(scale, js::to_string);
+    let offset = pattern_value(pattern, KEY_OFFSET).and_then(Value::to_number).unwrap_or(0.0);
+    let scale = pattern_value(pattern, SCALE).and_then(Value::to_text).unwrap_or(scale);
     Harmony { root: ((root + offset) % 12.0 + 12.0) % 12.0, scale: Some(scale) }
 }
 
@@ -123,14 +124,14 @@ fn pattern_harmony(pattern: &Pattern, style: &Style, section: &str, loop_in_elem
 fn random_density(g: &mut AutoGenerator<'_>, track: &Track) -> f64 {
     let core = instrument_family(&track.name) == InstrumentFamily::Bass;
     let (min, max) = if core { (0.85, 1.05) } else { (0.6, 1.2) };
-    js::to_fixed(min + g.random() * (max - min), 2)
+    round2(min + g.random() * (max - min))
 }
 
 /// The style's swing on a melodic track, ±0.08 when it swings at all.
 fn apply_style_swing(g: &mut AutoGenerator<'_>, track: &mut Track, style: &Style) {
     let jitter = (g.random() * 2.0 - 1.0) * 0.08;
     let amount = if style.swing_amount > 0.0 { style.swing_amount + jitter } else { 0.0 };
-    track.swing_amount = js::to_fixed(clamp(amount, 0.0, 0.45), 2);
+    track.swing_amount = round2(clamp(amount, 0.0, 0.45));
     track.swing_resolution = style.swing_resolution;
 }
 
@@ -430,7 +431,7 @@ fn line_moves(track: &Track, style: &Style, macros: Macros, element: &SectionEle
 /// those of an `autoGen` pattern, whose line moves on this loop get a new one.
 /// Whether any did.
 pub fn run_loop(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, index: u64) -> bool {
-    let all = pattern.extra.get("autoGen").is_some_and(js::truthy);
+    let all = pattern.extra.get("autoGen").is_some_and(Value::is_true);
     let style = g.style(&genre_of(pattern).unwrap_or_default());
     let element = g.structure.element(index);
     let macros = Macros::of(pattern);
@@ -448,7 +449,7 @@ pub fn run_loop(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, index: u64) ->
 
 /// Whether a pattern's tracks regenerate as it plays.
 pub fn plays_auto(pattern: &Pattern) -> bool {
-    pattern.extra.get("autoGen").is_some_and(js::truthy) || pattern.tracks.iter().any(|t| t.auto_mode)
+    pattern.extra.get("autoGen").is_some_and(Value::is_true) || pattern.tracks.iter().any(|t| t.auto_mode)
 }
 
 /// ⟳: the pattern made again in a style (given, the pattern's, or drawn) —
@@ -555,7 +556,7 @@ pub fn regenerate_track(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, t: usi
 
 /// Auto mode as the ↻ buttons show it (`auto_mode` or their own flag).
 pub fn is_auto_on(track: &Track) -> bool {
-    track.auto_mode || track.extra.get(TOOLBAR_AUTO).is_some_and(js::truthy)
+    track.auto_mode || track.extra.get(TOOLBAR_AUTO).is_some_and(Value::is_true)
 }
 
 fn set_auto(track: &mut Track, on: bool) {

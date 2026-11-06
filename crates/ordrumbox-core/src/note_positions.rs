@@ -3,7 +3,6 @@
 //! roll draws as ghosts and lights while playing.
 
 use crate::euclidean;
-use crate::js::round;
 use crate::pattern_engine::SpanResolver;
 use crate::rng::Rng;
 use crate::steps::{absolute_step, step_spacing};
@@ -52,7 +51,7 @@ pub fn sub_positions(
     let spacing = step_spacing(note.retrigger_rate);
     let mut positions: Vec<SubPosition> = (1..count)
         .map(|i| SubPosition {
-            step: round(base as f64 + i as f64 * spacing) as i64,
+            step: (base as f64 + i as f64 * spacing).round() as i64,
             kind: SubKind::Retrigger,
             pitch_offset: offset(i),
         })

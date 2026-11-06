@@ -108,7 +108,7 @@ fn bass_groove(g: &mut Generator<'_>, track: &mut Track, scale: &[f64], config: 
                 continue;
             }
             let strong = step == 0;
-            // `strong || Math.random() < density`: a NaN density keeps nothing.
+            // A strong step always plays; a NaN density keeps nothing else.
             if !strong {
                 let plays = g.random() < note_density * density;
                 if !plays {
@@ -120,7 +120,7 @@ fn bass_groove(g: &mut Generator<'_>, track: &mut Track, scale: &[f64], config: 
                 let interval = if g.random() < weight { intervals.first() } else { intervals.get(1) };
                 root_pitch + interval.copied().unwrap_or(f64::NAN)
             } else {
-                // `rootPitch + null` is the root in JS.
+                // A scale with no degree gives the root.
                 let degree = g.pick(scale).copied().unwrap_or(0.0);
                 let pitch = root_pitch + degree;
                 is_variation = true;
@@ -293,7 +293,7 @@ fn melody_groove(g: &mut Generator<'_>, track: &mut Track, scale: &[f64], config
                 continue;
             }
             let strong = step == 0 || step == spb / 2;
-            // `strong || Math.random() < density`: a NaN density keeps nothing.
+            // A strong step always plays; a NaN density keeps nothing else.
             if !strong {
                 let plays = g.random() < note_density * density;
                 if !plays {

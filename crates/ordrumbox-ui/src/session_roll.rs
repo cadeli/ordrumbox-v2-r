@@ -10,9 +10,9 @@
 //! Enter adds, selects or deletes at the cursor, Delete deletes the selected
 //! note. The wheel scrolls the keyboard (Shift: the pages).
 
-use ordrumbox_core::js;
 use ordrumbox_core::json::Value;
 use ordrumbox_core::note_positions::sub_positions;
+use ordrumbox_core::num;
 use ordrumbox_core::pattern_engine::SpanResolver;
 use ordrumbox_core::steps::{TICK, absolute_step};
 use ordrumbox_logic::composition;
@@ -371,7 +371,7 @@ impl Session {
         let Some(track) = self.track(t) else { return String::new() };
         let Some(note) = track.notes.get(n) else { return String::new() };
         match axis {
-            Axis::Velocity => format!("velocity {}", js::number_to_string(note.velocity)),
+            Axis::Velocity => format!("velocity {}", num::text(note.velocity)),
             Axis::Pitch => {
                 let midi = (MIDDLE_C + track.transpose + note.pitch).round() as i32;
                 format!("pitch {}", midi_name(midi))
@@ -527,11 +527,8 @@ impl Session {
                 if let Some(n) = self.roll_add(t, step, row) {
                     self.audition(t, Some(n));
                     let (beat, beat_step) = self.roll_beat(t, step);
-                    self.message = format!(
-                        "Added note (pitch {}) - {name} @ {}",
-                        js::number_to_string(pitch),
-                        beat_label(beat, beat_step)
-                    );
+                    self.message =
+                        format!("Added note (pitch {}) - {name} @ {}", num::text(pitch), beat_label(beat, beat_step));
                 }
             }
             "delete" => {

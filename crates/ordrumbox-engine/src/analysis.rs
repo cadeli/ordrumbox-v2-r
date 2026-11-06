@@ -3,7 +3,7 @@
 //! peak and RMS levels, and the note it sounds (autocorrelation over its
 //! loudest frame), computed as the JS computes them.
 
-use ordrumbox_core::js;
+use ordrumbox_core::num::round_to;
 use ordrumbox_dsp::SampleBuffer;
 
 /// Points of the envelope.
@@ -38,8 +38,8 @@ pub fn hz_to_note(hz: f64) -> Option<NoteInfo> {
         return None;
     }
     let midi_float = 69.0 + 12.0 * (hz / 440.0).log2();
-    let midi = js::round(midi_float);
-    let cents = js::round((midi_float - midi) * 100.0) as i32;
+    let midi = midi_float.round();
+    let cents = ((midi_float - midi) * 100.0).round() as i32;
     let midi = midi as i32;
     Some(NoteInfo { name: NOTE_NAMES[midi.rem_euclid(12) as usize], octave: midi.div_euclid(12) - 1, cents, midi })
 }
@@ -73,7 +73,7 @@ fn mono(buffer: &SampleBuffer) -> Vec<f32> {
 
 /// `linearToDb`.
 fn to_db(value: f64) -> f64 {
-    if !value.is_finite() || value <= 0.0 { f64::NEG_INFINITY } else { js::to_fixed(20.0 * value.log10(), 3) }
+    if !value.is_finite() || value <= 0.0 { f64::NEG_INFINITY } else { round_to(20.0 * value.log10(), 3) }
 }
 
 /// `nextPowerOfTwo`.
@@ -138,7 +138,7 @@ fn fundamental(frame: &[f32], sample_rate: f64) -> (Option<f64>, f64) {
         }
     }
     if best_lag == 0 || best < 0.1 {
-        return (None, js::to_fixed(best.max(0.0), 4));
+        return (None, round_to(best.max(0.0), 4));
     }
     let threshold = (best * 0.9).max(0.6);
     for lag in min_lag + 1..max_lag {
@@ -149,7 +149,7 @@ fn fundamental(frame: &[f32], sample_rate: f64) -> (Option<f64>, f64) {
             break;
         }
     }
-    (Some(js::to_fixed(sample_rate / best_lag as f64, 3)), js::to_fixed(best.clamp(0.0, 1.0), 4))
+    (Some(round_to(sample_rate / best_lag as f64, 3)), round_to(best.clamp(0.0, 1.0), 4))
 }
 
 /// Analyse `buffer`.
@@ -175,7 +175,7 @@ pub fn analyze(buffer: &SampleBuffer) -> Analysis {
         .map(|p| {
             let (start, end) = (p * len / points, ((p + 1) * len / points).min(len));
             let peak = samples[start..end].iter().fold(0.0f32, |m, s| m.max(s.abs()));
-            js::to_fixed(f64::from(peak), 6)
+            round_to(f64::from(peak), 6)
         })
         .collect();
     let peak_linear = samples.iter().fold(0.0f64, |m, &s| m.max(f64::from(s.abs())));

@@ -19,7 +19,8 @@ pub use meter::metric_weight;
 pub use mutate::{fill, vary_line};
 pub use score::syncopation;
 
-use ordrumbox_core::{Macros, Rng, Style, StylePart, Track, js};
+use ordrumbox_core::num::round2;
+use ordrumbox_core::{Macros, Rng, Style, StylePart, Track};
 
 use crate::generate::add_note;
 
@@ -223,7 +224,7 @@ pub(crate) fn velocity(step: &Step, part: &StylePart, rng: &mut Rng) -> f64 {
     } else {
         0.78
     };
-    js::to_fixed((base + (rng.next_f64() * 2.0 - 1.0) * 0.05).clamp(0.25, 1.0), 2)
+    round2((base + (rng.next_f64() * 2.0 - 1.0) * 0.05).clamp(0.25, 1.0))
 }
 
 /// Add a hit at step `a` of `track`, a roll at the part's roll rate.

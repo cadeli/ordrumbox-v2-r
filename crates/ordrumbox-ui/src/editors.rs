@@ -5,8 +5,8 @@
 //! formats. What the widgets do is in the session.
 
 use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
-use ordrumbox_core::js;
 use ordrumbox_core::json::Value;
+use ordrumbox_core::num;
 use ordrumbox_core::track::MAX_STEPS_PER_BEAT;
 use ordrumbox_core::{Note, ScaleList, Track};
 use ordrumbox_engine::strip_settings::delay_beats_used;
@@ -346,11 +346,11 @@ fn flag(track: &Track, key: &str) -> bool {
     track.field(key).and_then(|v| v.as_bool()).unwrap_or(false)
 }
 
-/// `String(track[key] ?? '')`, as a select compares it.
+/// The text of setting `key`, as a select compares it (empty without one).
 fn text_of(track: &Track, key: &str) -> String {
     match track.field(key) {
         Some(Value::String(s)) => s,
-        Some(Value::Number(n)) => ordrumbox_core::js::number_to_string(n),
+        Some(Value::Number(n)) => ordrumbox_core::num::text(n),
         _ => String::new(),
     }
 }
@@ -454,17 +454,16 @@ const NOTE_NAMES: [&str; 12] = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#",
 fn pitch_to_note_name(pitch: f64, track_pitch: f64) -> String {
     let midi = 60.0 + track_pitch + pitch;
     let index = (midi % 12.0 + 12.0) % 12.0;
-    // A fractional pitch has no name: the JS shows `undefined`.
-    let name = if index.fract() == 0.0 { NOTE_NAMES[index as usize] } else { "undefined" };
-    format!("{name}{}", js::number_to_string((midi / 12.0).floor() - 1.0))
+    // A fractional pitch has no name.
+    let name = if index.fract() == 0.0 { NOTE_NAMES[index as usize] } else { "?" };
+    format!("{name}{}", num::text((midi / 12.0).floor() - 1.0))
 }
 
 /// `formatNoteTooltip`: a note's pitch and MIDI number, then what differs from the defaults.
 pub fn note_tooltip(note: &Note, track_pitch: f64) -> String {
     let fmt = crate::control::fmt;
     let midi = 60.0 + track_pitch + note.pitch;
-    let mut parts =
-        vec![format!("{}  MIDI {}", pitch_to_note_name(note.pitch, track_pitch), js::number_to_string(midi))];
+    let mut parts = vec![format!("{}  MIDI {}", pitch_to_note_name(note.pitch, track_pitch), num::text(midi))];
     if note.velocity != 0.8 {
         parts.push(format!("vel:{}", fmt(note.velocity)));
     }
@@ -486,7 +485,10 @@ pub fn note_tooltip(note: &Note, track_pitch: f64) -> String {
         _ => None,
     };
     if let Some(a) = intervals.filter(|a| a.len() >= 2) {
-        parts.push(format!("arp:[{}]", js::to_string(&Value::Array(a.clone()))));
+        parts.push(format!(
+            "arp:[{}]",
+            a.iter().map(|v| v.to_text().unwrap_or_else(|| v.to_json())).collect::<Vec<_>>().join(",")
+        ));
     }
     if note.retrigger_probability != 1.0 {
         parts.push(format!("arpProb:{}", fmt(note.retrigger_probability)));
@@ -610,7 +612,7 @@ pub struct TrackView<'a> {
     /// `Track: NAME - kit/sample`.
     pub title: String,
     pub sample: Option<SampleBar>,
-    /// The sample's decay (`sound.decay ?? 0`).
+    /// The sample's decay (0 without one).
     pub decay: f64,
     pub instruments: Choice,
     pub samples: Choice,
@@ -749,7 +751,7 @@ fn value_spec(p: &Prop, default: f64, knob: bool) -> Spec {
     if knob { Spec::knob(p.min, p.max, p.step, default) } else { Spec::slider(p.min, p.max, p.step, default) }
 }
 
-/// Default of a setting (`TRACK_DEFAULTS[key] ?? min`).
+/// Default of a setting, else its minimum.
 fn default_of(key: &str, min: f64) -> f64 {
     Track::default().field(key).and_then(|v| v.as_f64()).unwrap_or(min)
 }
@@ -857,7 +859,7 @@ fn fx_tab(rows: &mut Rows, view: &TrackView, state: &EditorState) {
                 if used != track.delay_beats
                     && let Some(label) = labels.get_mut(selected)
                 {
-                    *label = format!("{label} ({} used)", js::number_to_string(used));
+                    *label = format!("{label} ({} used)", num::text(used));
                 }
             }
             let choice = Choice { values, labels, selected };
@@ -1141,7 +1143,7 @@ fn compose_slider(rows: &mut Rows, track: &Track, view: &ComposeView, p: &Prop, 
         let used = compose_value(p.key, &view.shown.used);
         let used = if p.key == "composeHitsPerMeasure" { used.min(view.shown.open_hits as f64) } else { used };
         if (used - value).abs() >= 0.5 {
-            text = format!("{text}\u{2192}{}", js::number_to_string(used.round()));
+            text = format!("{text}\u{2192}{}", num::text(used.round()));
         }
         if own.is_none() {
             text.push('*');
@@ -1339,10 +1341,7 @@ mod tests {
                 ["C-1  MIDI 0  vel:0.12", "A#-2  MIDI -2  vel:0.12", "G-1  MIDI 7  vel:0.12"],
             ),
             // A fractional pitch has no name.
-            (
-                Note { pitch: 0.5, ..Note::default() },
-                ["undefined4  MIDI 60.5", "undefined3  MIDI 58.5", "undefined4  MIDI 67.5"],
-            ),
+            (Note { pitch: 0.5, ..Note::default() }, ["?4  MIDI 60.5", "?3  MIDI 58.5", "?4  MIDI 67.5"]),
         ];
         for (note, texts) in &rows {
             for (track_pitch, text) in [0.0, -2.0, 7.0].into_iter().zip(texts) {

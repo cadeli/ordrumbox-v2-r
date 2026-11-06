@@ -1,9 +1,7 @@
 //! Seedable random source (xoshiro256++, seeded through SplitMix64).
 //!
-//! The JS app calls `Math.random()` directly (13 call sites in `src/`), so a
-//! generated pattern can never be reproduced. Here every random draw goes
-//! through an `Rng` handed in by the caller: same seed, same pattern, and tests
-//! can pin the outcome.
+//! Every random draw goes through an `Rng` handed in by the caller: same
+//! seed, same pattern, and tests can pin the outcome.
 
 /// A small, fast, non-cryptographic generator.
 #[derive(Debug, Clone)]
@@ -39,7 +37,7 @@ impl Rng {
         result
     }
 
-    /// Uniform in `[0, 1)`, the `Math.random()` contract.
+    /// Uniform in `[0, 1)`.
     pub fn next_f64(&mut self) -> f64 {
         (self.next_u64() >> 11) as f64 * (1.0 / (1u64 << 53) as f64)
     }
@@ -69,7 +67,7 @@ impl Rng {
         self.next_f64() < p
     }
 
-    /// One item of `items`, uniformly (`pickRandom()` in core/random.js).
+    /// One item of `items`, uniformly; `None` for an empty slice.
     pub fn pick<'a, T>(&mut self, items: &'a [T]) -> Option<&'a T> {
         if items.is_empty() {
             return None;
@@ -77,8 +75,7 @@ impl Rng {
         items.get(self.below(items.len() as u64) as usize)
     }
 
-    /// Unbiased in-place shuffle (Fisher-Yates). Replaces the biased
-    /// `sort(() => Math.random() - 0.5)` of the JS arpeggiator.
+    /// Unbiased in-place shuffle (Fisher-Yates).
     pub fn shuffle<T>(&mut self, items: &mut [T]) {
         for i in (1..items.len()).rev() {
             let j = self.below(i as u64 + 1) as usize;

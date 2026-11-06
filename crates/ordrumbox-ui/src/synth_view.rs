@@ -317,7 +317,7 @@ pub fn build(
             let rect = Rect::new(inner.x + 80 * s, y, (inner.w - 80 * s).min(200 * s), 13 * s);
             let kind = match options {
                 Some(options) => {
-                    let current = model::get(draft, &path).map(ordrumbox_core::js::to_string).unwrap_or_default();
+                    let current = model::get(draft, &path).and_then(Value::to_text).unwrap_or_default();
                     let selected = options.iter().position(|(v, _)| *v == current).unwrap_or(0);
                     let (values, labels) = options.into_iter().unzip();
                     Kind::Select { values, labels, selected }

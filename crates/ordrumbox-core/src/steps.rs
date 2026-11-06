@@ -5,8 +5,6 @@
 //! step position. 96 is divided by every usual grid, triplets included (1, 2,
 //! 3, 4, 6, 8, 12, 16, 24, 32): only odd grids such as 5 or 7 round.
 
-use crate::js;
-
 /// Ticks per **beat** (not per step). The JS app counted 32, which rounded
 /// triplets; MIDI files are written at the same 96 PPQN.
 pub const TICK: u32 = 96;
@@ -17,7 +15,7 @@ pub fn absolute_step(beat: i32, beat_step: i32, steps_per_beat: i32) -> i64 {
 }
 
 /// `(beat, beatStep)` of an absolute step, as `stepToBeat()`: the beat is
-/// floored, the step is JS `%` (it keeps the sign of `step`). `steps_per_beat > 0`.
+/// floored, the step is `%` (it keeps the sign of `step`). `steps_per_beat > 0`.
 pub fn step_to_beat(step: i64, steps_per_beat: i32) -> (i64, i64) {
     let spb = i64::from(steps_per_beat);
     (step.div_euclid(spb), step % spb)
@@ -26,14 +24,14 @@ pub fn step_to_beat(step: i64, steps_per_beat: i32) -> (i64, i64) {
 /// Tick of an absolute step: `beat * TICK + round(beatStep * TICK / stepsPerBeat)`.
 pub fn step_to_tick(step: i64, steps_per_beat: i32) -> i64 {
     let (beat, beat_step) = step_to_beat(step, steps_per_beat);
-    beat * i64::from(TICK) + js::round(beat_step as f64 * f64::from(TICK) / f64::from(steps_per_beat)) as i64
+    beat * i64::from(TICK) + (beat_step as f64 * f64::from(TICK) / f64::from(steps_per_beat)).round() as i64
 }
 
 /// Tick nearest a position counted in steps, which may fall between steps (a
 /// repeat at a fraction of a step). For a whole step `>= 0` it is
 /// [`step_to_tick`].
 pub fn position_to_tick(steps: f64, steps_per_beat: i32) -> i64 {
-    js::round(steps * f64::from(TICK) / f64::from(steps_per_beat)) as i64
+    (steps * f64::from(TICK) / f64::from(steps_per_beat)).round() as i64
 }
 
 /// Spacing, in steps, of a `rate` code: below 8 it is `rate / 8` of a step,

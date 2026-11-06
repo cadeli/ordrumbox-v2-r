@@ -13,9 +13,9 @@
 use std::collections::HashMap;
 
 use crate::drum_taxonomy::instrument_family;
-use crate::js;
 use crate::json::Value;
 use crate::note::Note;
+use crate::num::round2;
 use crate::pattern_engine::{Hit, Hits};
 use crate::rng::Rng;
 use crate::scales::Scales;
@@ -35,13 +35,13 @@ const NOTE_PROB_FLOOR: f64 = 0.2;
 /// Budget (cost units, 16 at 100) bought by an amount slider (0–100). Any
 /// non-zero amount buys at least one unit.
 fn budget_for(amount: f64) -> i32 {
-    if amount <= 0.0 { 0 } else { (js::round(amount * 16.0 / 100.0) as i32).max(1) }
+    if amount <= 0.0 { 0 } else { ((amount * 16.0 / 100.0).round() as i32).max(1) }
 }
 
 /// The share of `budget` one loop of the track spends: a short loop repeats
 /// over the pattern, and the amount slider buys variation for the whole pattern.
 fn loop_budget(budget: i32, loop_count: i64) -> i32 {
-    if budget <= 0 { 0 } else { (js::round(f64::from(budget) / loop_count.max(1) as f64) as i32).max(1) }
+    if budget <= 0 { 0 } else { ((f64::from(budget) / loop_count.max(1) as f64).round() as i32).max(1) }
 }
 
 /// Keep each candidate with its chance (0–100), then shuffle the survivors.
@@ -49,10 +49,6 @@ fn select<T>(candidates: Vec<T>, chance: impl Fn(&T) -> f64, rng: &mut Rng) -> V
     let mut kept: Vec<T> = candidates.into_iter().filter(|c| rng.next_f64() * 100.0 < chance(c)).collect();
     rng.shuffle(&mut kept);
     kept
-}
-
-fn round2(value: f64) -> f64 {
-    js::round(value * 100.0) / 100.0
 }
 
 // ── Notes layer (variation2) ────────────────────────────────────────────

@@ -8,7 +8,7 @@
 use ordrumbox_core::SetField;
 use ordrumbox_core::instruments::catalog;
 use ordrumbox_core::json::{Object, Value};
-use ordrumbox_core::{js, song};
+use ordrumbox_core::{num, song};
 use ordrumbox_engine::TrackSound;
 use ordrumbox_engine::assign::{assign_track, substitute_for, synth_for};
 
@@ -212,12 +212,12 @@ impl Session {
         if self.hosted {
             // The host's tempo plays, not the session's: shown, not turned.
             let bpm = self.host_bpm();
-            let text = bpm.map_or_else(|| "-".to_owned(), js::number_to_string);
+            let text = bpm.map_or_else(|| "-".to_owned(), num::text);
             let kind = Kind::Value { spec, value: bpm.unwrap_or_else(|| self.tempo()), label: None, text, lfo: false };
             layout.items.push(Item::new(None, controls.bpm, kind));
         } else {
             let bpm = self.tempo();
-            let text = js::number_to_string(bpm);
+            let text = num::text(bpm);
             let kind = Kind::Value { spec, value: bpm, label: None, text, lfo: false };
             layout.items.push(Item::new(Some(Id::Bpm), controls.bpm, kind));
         }
@@ -246,7 +246,7 @@ impl Session {
                 _ => macros.variation,
             };
             let spec = Spec::knob(0.0, 100.0, 1.0, style::MACRO_NEUTRAL);
-            let kind = Kind::Value { spec, value, label: None, text: js::number_to_string(value), lfo: false };
+            let kind = Kind::Value { spec, value, label: None, text: num::text(value), lfo: false };
             layout.items.push(Item::new(Some(Id::Macro(key)), *rect, kind));
         }
     }
@@ -357,7 +357,7 @@ impl Session {
         };
         let title = format!("Track: {}{}", track.name, info.map(|i| format!(" - {i}")).unwrap_or_default());
 
-        // Sample bar: analysis text, envelope, decay end (`sound.decay ?? 0`).
+        // Sample bar: analysis text, envelope, decay end (0 without a decay).
         let decay = instrument.and_then(|i| i.decay).unwrap_or(0.0);
         let sample = url.as_deref().filter(|_| !track.use_synth).and_then(|u| self.analysis_of(u)).map(|a| {
             let pitch = a.note.map_or_else(|| "—".to_owned(), |n| format!("{}{}", n.name, n.octave));
@@ -1065,12 +1065,8 @@ impl Session {
     fn open_entry(&mut self, id: Id, spec: Spec, value: f64) {
         let (label, unit) = control_name(id);
         let unit = if unit.is_empty() { String::new() } else { format!(" {unit}") };
-        let title = format!(
-            "Enter value for {label} ({}–{}{unit}):",
-            js::number_to_string(spec.min),
-            js::number_to_string(spec.max)
-        );
-        self.chrome.widgets.entry = Some(Entry { id, spec: Some(spec), title, text: js::number_to_string(value) });
+        let title = format!("Enter value for {label} ({}–{}{unit}):", num::text(spec.min), num::text(spec.max));
+        self.chrome.widgets.entry = Some(Entry { id, spec: Some(spec), title, text: num::text(value) });
     }
 
     fn commit_entry(&mut self) {
@@ -1079,11 +1075,10 @@ impl Session {
         if entry.text.trim().is_empty() {
             return;
         }
-        let number = js::parse_float(&Value::String(entry.text));
-        if number.is_nan() {
-            return;
+        match Value::from(entry.text.as_str()).to_number() {
+            Some(number) => self.set_value(entry.id, spec.typed(number)),
+            None => self.tell(format!("\"{}\" is not a number", entry.text.trim())),
         }
-        self.set_value(entry.id, spec.typed(number));
     }
 
     // ─── What the widgets do ─────────────────────────────────────────────────
@@ -1349,7 +1344,7 @@ impl Session {
         match id {
             Id::TrackSelect(key) => {
                 let v = if editors::NUMERIC_SELECTS.contains(&key) {
-                    num(js::parse_float(&Value::String(value.to_owned())))
+                    Value::from(value).to_number().map_or_else(|| Value::from(value), num)
                 } else {
                     Value::String(value.to_owned())
                 };
