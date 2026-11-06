@@ -280,15 +280,16 @@ fn strict_tracks(bytes: &[u8]) -> Result<Vec<Vec<RawEvent>>, String> {
 
 /// Where the notes of track name `name` go, by the rules of `README.md`
 /// ("Files"): a drum on channel 10 at its GM key; a melodic instrument on
-/// the next channel at the sample's root note, else its mapping's key, else
-/// C3; an unknown name a bass drum. Channel (0-based), base note.
-fn target(name: &str, roots: &[(String, f64)], next_melodic: &mut u8) -> (u8, f64) {
+/// the next channel but 10 (the 16th melodic one shares channel 1 again) at
+/// the sample's root note, else its mapping's key, else C3; an unknown name a
+/// bass drum. Channel (0-based), base note.
+fn target(name: &str, roots: &[(String, f64)], melodic_count: &mut u8) -> (u8, f64) {
     let upper = name.trim().to_uppercase();
     match catalog().by_name(&upper).filter(|i| !i.midi.is_empty()) {
         Some(instrument) if instrument.drum => (9, instrument.midi[0].key.map_or(C3_MIDI_NOTE, |k| k as f64)),
         Some(instrument) => {
-            let channel = *next_melodic;
-            *next_melodic += 1;
+            let channel = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15][usize::from(*melodic_count) % 15];
+            *melodic_count += 1;
             let root = roots.iter().find(|(key, _)| upper.contains(&key.to_uppercase())).map(|r| r.1);
             (channel, root.or(instrument.midi[0].key.map(|k| k as f64)).unwrap_or(C3_MIDI_NOTE))
         }
@@ -307,14 +308,13 @@ type FileNote = (u64, u8, u8);
 fn expected_tracks(pattern: &Pattern, loops: u32, roots: &[(String, f64)]) -> Vec<(String, u8, Vec<FileNote>)> {
     let any_solo = pattern.tracks.iter().any(|t| t.solo);
     let plays: Vec<bool> = pattern.tracks.iter().map(|t| if any_solo { t.solo } else { !t.mute }).collect();
-    let mut next_melodic = 0;
+    let mut melodic_count = 0;
     let mut by_name: Vec<(String, u8, f64, Vec<FileNote>)> = Vec::new();
     for track in pattern.tracks.iter().zip(&plays).filter(|(_, plays)| **plays).map(|(t, _)| t) {
-        let (channel, base) = target(&track.name, roots, &mut next_melodic);
-        match by_name.iter_mut().find(|(n, ..)| *n == track.name) {
-            // A repeated melodic name takes a channel each time and keeps the last.
-            Some(entry) => (entry.1, entry.2) = (channel, base),
-            None => by_name.push((track.name.clone(), channel, base, Vec::new())),
+        // A repeated name keeps the channel it was given first.
+        if !by_name.iter().any(|(n, ..)| *n == track.name) {
+            let (channel, base) = target(&track.name, roots, &mut melodic_count);
+            by_name.push((track.name.clone(), channel, base, Vec::new()));
         }
     }
     let mut rng = Rng::new(1);

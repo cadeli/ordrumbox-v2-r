@@ -154,8 +154,7 @@ impl DelayLine {
     #[inline]
     fn read(&self, delay: f64) -> f64 {
         let len = self.buf.len() as f64;
-        let mut position = self.index as f64 - delay;
-        position = ((position % len) + len) % len;
+        let position = crate::wrap(self.index as f64 - delay, len);
         let i = position as usize;
         let fraction = position - i as f64;
         let next = if i + 1 >= self.buf.len() { 0 } else { i + 1 };

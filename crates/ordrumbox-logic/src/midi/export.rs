@@ -4,8 +4,9 @@
 //! arpeggios, euclidean fills), loop after loop.
 //!
 //! Drums go on channel 10 at their GM key, melodic instruments each on the
-//! next channel at the sample's root note (else their mapping's key, else
-//! C3); a name the catalog does not know is a bass drum. The velocity LFO
+//! next free channel at the sample's root note (else their mapping's key,
+//! else C3), past the 15th sharing them again from the first; a name the
+//! catalog does not know is a bass drum. The velocity LFO
 //! scales the velocity, the pitch LFO adds semitones; notes last a 16th, or
 //! end where their key is struck again on their track, so that no key is
 //! struck while it sounds. The tempo track carries a signature, a text event.
@@ -22,16 +23,20 @@ use super::smf::encode_vlq;
 pub const PPQN: u32 = 96;
 const MIDI_RATIO: f64 = PPQN as f64 / TICK as f64;
 const DRUM_CHANNEL: u8 = 9;
+/// The channels left to melodic instruments: all 16 but the drums'.
+const MELODIC_CHANNELS: [u8; 15] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15];
 /// A 16th at 96 PPQN.
 const NOTE_LENGTH: f64 = 24.0;
 /// Bass Drum 1.
 const DEFAULT_NOTE: f64 = 36.0;
+/// The largest tempo event value, microseconds per beat (24 bits).
+const MAX_TEMPO_US: f64 = 16_777_215.0;
 /// The text event of the tempo track that tells which program wrote the file.
 pub const SIGNATURE: &str = "Made with orDrumbox";
 
-/// `new Uint8Array([x])[0]`: truncated, modulo 256 (NaN is 0).
-fn uint8(x: f64) -> u8 {
-    if x.is_finite() { x.trunc().rem_euclid(256.0) as u8 } else { 0 }
+/// `x` as a MIDI data byte: truncated into 0–127 (NaN is 0).
+fn data_byte(x: f64) -> u8 {
+    x.clamp(0.0, 127.0) as u8
 }
 
 fn meta(delta: u32, kind: u8, data: &[u8]) -> Vec<u8> {
@@ -69,13 +74,21 @@ fn root_note(roots: &[(String, f64)], name: &str) -> Option<f64> {
     roots.iter().find(|(key, _)| upper.contains(&key.to_uppercase())).map(|(_, root)| *root)
 }
 
-/// `assignChannels`: by name, in track order (a repeated melodic name takes
-/// a channel each time and keeps the last).
+/// The channel of the `index`th melodic instrument (0-based): the melodic
+/// channels in order, then again from the first.
+fn melodic_channel(index: usize) -> u8 {
+    MELODIC_CHANNELS[index % MELODIC_CHANNELS.len()]
+}
+
+/// `assignChannels`: each name once, in the order the names first come.
 fn assign(names: &[&str], roots: &[(String, f64)]) -> Vec<(String, Target)> {
     let c = catalog();
     let mut targets: Vec<(String, Target)> = Vec::new();
-    let mut next_melodic = 0u8;
+    let mut melodic_count = 0;
     for &name in names {
+        if targets.iter().any(|(n, _)| n == name) {
+            continue;
+        }
         let instrument = c.by_name(&name.trim().to_uppercase()).filter(|i| !i.midi.is_empty());
         let target = match instrument {
             Some(instrument) => {
@@ -83,9 +96,8 @@ fn assign(names: &[&str], roots: &[(String, f64)]) -> Vec<(String, Target)> {
                 let channel = if instrument.drum {
                     DRUM_CHANNEL
                 } else {
-                    let channel = next_melodic;
-                    next_melodic = next_melodic.wrapping_add(1);
-                    channel
+                    melodic_count += 1;
+                    melodic_channel(melodic_count - 1)
                 };
                 let mut note = mapping.key.map_or(C3_MIDI_NOTE, |k| k as f64);
                 if !instrument.drum
@@ -97,10 +109,7 @@ fn assign(names: &[&str], roots: &[(String, f64)]) -> Vec<(String, Target)> {
             }
             None => Target { note: DEFAULT_NOTE, channel: DRUM_CHANNEL, program: None },
         };
-        match targets.iter_mut().find(|(n, _)| n == name) {
-            Some(slot) => slot.1 = target,
-            None => targets.push((name.to_owned(), target)),
-        }
+        targets.push((name.to_owned(), target));
     }
     targets
 }
@@ -206,7 +215,7 @@ pub fn export(
                 if velocity.is_nan() || velocity < 1.0 {
                     continue;
                 }
-                events.push(NoteEvent { tick: midi_tick, key: uint8(key), velocity: uint8(velocity) });
+                events.push(NoteEvent { tick: midi_tick, key: data_byte(key), velocity: data_byte(velocity) });
             }
         }
     }
@@ -222,8 +231,8 @@ pub fn export(
     header.extend(((1 + chunks.len()) as u16).to_be_bytes());
     header.extend((PPQN as u16).to_be_bytes());
     let mut bytes = chunk(b"MThd", &header);
-    let us = (60_000_000.0 / bpm).round();
-    let us = if us.is_finite() { us as i64 as u32 } else { 0 };
+    // Microseconds per beat, on the 24 bits of the tempo event (NaN is 0).
+    let us = (60_000_000.0 / bpm).round().clamp(0.0, MAX_TEMPO_US) as u32;
     let mut tempo = meta(0, 0x58, &[0x04, 0x02, 0x18, 0x08]);
     tempo.extend(meta(0, 0x51, &[(us >> 16) as u8, (us >> 8) as u8, us as u8]));
     tempo.extend(meta(0, 0x03, b"orDrumbox Pattern"));
@@ -233,4 +242,35 @@ pub fn export(
         bytes.extend(chunk);
     }
     bytes
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn melodic_channels_skip_the_drums_and_stay_in_range() {
+        let channels: Vec<u8> = (0..40).map(melodic_channel).collect();
+        assert!(channels.iter().all(|&c| c < 16 && c != DRUM_CHANNEL));
+        assert_eq!(&channels[..15], &MELODIC_CHANNELS);
+        assert_eq!(channels[15], 0);
+        assert_eq!(channels[9], 10);
+    }
+
+    #[test]
+    fn a_repeated_name_keeps_its_channel() {
+        let c = catalog();
+        let melodic: Vec<&str> = c
+            .instruments
+            .iter()
+            .map(|i| i.id.as_str())
+            .filter(|id| c.by_name(id).is_some_and(|i| !i.drum && !i.midi.is_empty()))
+            .take(2)
+            .collect();
+        assert_eq!(melodic.len(), 2);
+        let names = [melodic[0], melodic[1], melodic[0]];
+        let targets = assign(&names, &[]);
+        let channels: Vec<u8> = targets.iter().map(|(_, t)| t.channel).collect();
+        assert_eq!(channels, [0, 1]);
+    }
 }

@@ -453,7 +453,7 @@ const NOTE_NAMES: [&str; 12] = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#",
 /// `pitchToNoteName`: the note at `pitch` semitones from C4 (plus the track's pitch).
 fn pitch_to_note_name(pitch: f64, track_pitch: f64) -> String {
     let midi = 60.0 + track_pitch + pitch;
-    let index = (midi % 12.0 + 12.0) % 12.0;
+    let index = num::wrap(midi, 12.0);
     // A fractional pitch has no name.
     let name = if index.fract() == 0.0 { NOTE_NAMES[index as usize] } else { "?" };
     format!("{name}{}", num::text((midi / 12.0).floor() - 1.0))

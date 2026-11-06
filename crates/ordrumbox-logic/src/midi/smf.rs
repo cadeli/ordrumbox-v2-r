@@ -58,11 +58,12 @@ fn byte(bytes: &[u8], at: usize) -> Option<u8> {
 }
 
 /// `decodeVLQ`: value and bytes read (a missing byte reads as 0 and ends it).
-pub fn decode_vlq(bytes: &[u8], offset: usize) -> (i32, usize) {
-    let (mut value, mut read) = (0i32, 0usize);
+pub fn decode_vlq(bytes: &[u8], offset: usize) -> (u32, usize) {
+    let (mut value, mut read) = (0u32, 0usize);
     loop {
         let b = byte(bytes, offset + read).unwrap_or(0);
-        value = value.wrapping_shl(7) | i32::from(b & 0x7f);
+        // Past 4 bytes (28 bits, the most a file may use) the high bits drop out.
+        value = (value << 7) | u32::from(b & 0x7f);
         read += 1;
         if b & 0x80 == 0 {
             return (value, read);
@@ -110,13 +111,10 @@ fn parse_track(bytes: &[u8], start: usize, length: usize) -> Vec<Event> {
             let meta_type = byte(bytes, pos);
             let (len, read) = decode_vlq(bytes, pos + 1);
             let from = pos + 1 + read;
-            // `bytes.slice(from, from + len)` (a negative length takes nothing)
-            let to = if len < 0 { from } else { from + len as usize };
+            let to = from.saturating_add(len as usize);
             let data = bytes.get(from.min(bytes.len())..to.min(bytes.len())).unwrap_or_default().to_vec();
             events.push(Event { tick, kind: EventKind::Meta { meta_type, data } });
-            // A negative length would step back (the JS can loop forever there): always move on.
-            let next = pos as i64 + 1 + read as i64 + i64::from(len);
-            pos = usize::try_from(next).unwrap_or(0).max(pos + 1);
+            pos = to;
             running = 0;
         } else {
             let (hi, channel) = (status & 0xf0, status & 0x0f);
@@ -227,7 +225,7 @@ mod tests {
     fn vlq_round_trip() {
         for v in [0, 1, 127, 128, 0x3fff, 0x4000, 0x0fff_ffff] {
             let bytes = encode_vlq(v);
-            assert_eq!(decode_vlq(&bytes, 0), (v as i32, bytes.len()));
+            assert_eq!(decode_vlq(&bytes, 0), (v, bytes.len()));
         }
         assert_eq!(encode_vlq(0x80), [0x81, 0x00]);
         assert_eq!(decode_vlq(&[0x81], 0), (0x80, 2)); // the missing byte reads as 0

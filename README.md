@@ -196,7 +196,8 @@ Generate menu lists them with the patterns and measures they rest on.
 
 MIDI files (ported from the JS exporter and import): **Ctrl M** writes the
 pattern as a type 1 file (96 PPQN; drums on channel 10 at their GM keys,
-melodic instruments on their own channels at the sample's root note) to a
+melodic instruments on their own channels at the sample's root note, never
+channel 10; past 15 of them, they share channels again from channel 1) to a
 folder picked. A `.mid` dropped on the window becomes new 32-beat patterns (up to
 16), one track per instrument found (by GM program, drum key, then track
 name), in one undo step. As in the JS app, the file's tempo is not read
@@ -920,7 +921,10 @@ and bypasses (`tests/processors.rs`):
   above the limit's knee (see "Effects"). `synth_renders.bin` was rewritten
   when the random LFO wave stopped hashing its cycle through a JS-style
   int32 xorshift: each cycle's value now comes from the splitmix64 finalizer,
-  so the busy patches with a random LFO play other values.
+  so the busy patches with a random LFO play other values. Rewritten again
+  when the noise generator became a plain xorshift32 on `u32` (logical
+  shifts, not the JS sign-propagating `>>`): every patch with noise plays
+  another noise.
 - The strip settings the JS lacked (24 dB/oct filter, pre-delay, dispersion,
   gate, wow, feedback tone, ping-pong input) default to what the JS did, so
   the cases play them unset; unit tests (`strip.rs`, `synth.rs`) measure
@@ -950,6 +954,9 @@ against Rust snapshots, from inputs the tests build (`ordrumbox-engine/tests/`):
   Rewritten when the JS number helpers went: a value at a negative half
   rounds away from zero (`f64::round`), so a track LFO at -0.125 is -0.13,
   no longer -0.12.
+  Rewritten when the track LFO's `random` wave stopped wrapping its cycle
+  into a JS int32 for a xorshift: it takes the splitmix64 finalizer of the
+  cycle, as the synth's random LFO does, so it holds other values.
 - `ordrumbox-engine/tests/fixtures/synth_editor_rust.txt` (`synth_editor.rs`):
   the synth editor's draft of every web preset and of hand-made ones (empty,
   partial and broken, bypassed), filled with the group defaults, their cards
@@ -962,6 +969,8 @@ against Rust snapshots, from inputs the tests build (`ordrumbox-engine/tests/`):
   it.
   Rewritten when the JS coercions went: a flag is on only when it is
   `true`, so the partial preset's `"bypassFm": 1` no longer bypasses FM.
+  Rewritten when the track LFO's `random` wave took the splitmix64
+  finalizer (see `mapping_rust.txt`): the random LFO lines hold other values.
 
 The editing commands are checked by properties:
 
@@ -1087,7 +1096,12 @@ MIDI files (`ordrumbox-logic/tests/midi.rs`):
   the notes of one key at one tick are one note at the loudest velocity, so
   no key is struck while it sounds; the tempo track carries the text event
   "Made with orDrumbox"; at 96 ticks a beat, the triplets of `shuffle` and
-  `case-grid3` are written on their exact MIDI tick. Two tests check every export without the
+  `case-grid3` are written on their exact MIDI tick. Since a fix of the
+  channels, the melodic channels skip channel 10, the drums' (the 10th
+  melodic instrument went there), and come around again past the 15th
+  instead of running past 16; a repeated melodic name keeps its first
+  channel instead of taking a new one each time (`midi-edge` changed).
+  Two tests check every export without the
   snapshot: the notes of one tick come note-offs first, then by key; and the
   file, accepted by a strict Standard MIDI File validator
   (`ordrumbox-logic/tests/strict_smf/`, written from the spec apart from the

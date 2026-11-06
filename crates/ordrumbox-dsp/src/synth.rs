@@ -19,11 +19,11 @@ use std::sync::OnceLock;
 
 use crate::{lfo, slope};
 
-/// `Math.LN2 / 1200`: cents to a natural-log ratio.
-const LN2_OVER_1200: f64 = 0.000_577_622_650_466_621_1;
+/// Cents to a natural-log ratio.
+const LN2_OVER_1200: f64 = std::f64::consts::LN_2 / 1200.0;
 const SINE_TABLE_SIZE: usize = 4096;
 /// Initial state of the noise generator.
-const NOISE_SEED: i32 = 54_321;
+const NOISE_SEED: u32 = 54_321;
 const FLUSH: f64 = 1e-15;
 /// Pitch rise of a full pitch punch at the start of a note, cents.
 const PITCH_PUNCH_CENTS: f64 = 2400.0;
@@ -36,8 +36,9 @@ pub const FM_DEVIATION: f64 = 2.0;
 
 /// Initial noise state of the note numbered `serial`: every note has its own,
 /// the same from one render to the next. A xorshift never leaves a state of 0.
-fn noise_seed(serial: u64) -> i32 {
-    let seed = NOISE_SEED ^ serial.wrapping_sub(1).wrapping_mul(0x9E37_79B1) as i32;
+fn noise_seed(serial: u64) -> u32 {
+    // The low 32 bits of the product.
+    let seed = NOISE_SEED ^ serial.wrapping_sub(1).wrapping_mul(0x9E37_79B1) as u32;
     if seed == 0 { NOISE_SEED } else { seed }
 }
 
@@ -64,7 +65,7 @@ fn sine_table() -> &'static [f32; SINE_TABLE_SIZE] {
 /// Sine of `phase` cycles from the 4096-entry table, linearly interpolated.
 #[inline]
 fn sin_lookup(table: &[f32; SINE_TABLE_SIZE], phase: f64) -> f64 {
-    let p = ((phase % 1.0) + 1.0) % 1.0;
+    let p = crate::wrap(phase, 1.0);
     let index = p * SINE_TABLE_SIZE as f64;
     let i = index as usize;
     let fraction = index - i as f64;
@@ -89,8 +90,9 @@ fn poly_blep(t: f64, dt: f64) -> f64 {
     0.0
 }
 
+/// Marsaglia's xorshift32: the next state of the noise generator.
 #[inline]
-fn xorshift32(mut state: i32) -> i32 {
+fn xorshift32(mut state: u32) -> u32 {
     state ^= state << 13;
     state ^= state >> 17;
     state ^= state << 5;
@@ -317,7 +319,7 @@ pub struct SynthVoice {
     release_start_level: f64,
     phase: [f64; 3],
     osc_cycle: [f64; 3],
-    rng: i32,
+    rng: u32,
     lfo_phase: [f64; 2],
     lfo_seeded: bool,
     filter: Tpt,
@@ -749,7 +751,7 @@ impl SynthVoice {
             let mut noise = 0.0;
             if !bypass.noise {
                 let level = clamp(noise_mix + l1.noise + l2.noise, 0.0, 1.0);
-                let noise_raw = (f64::from(self.rng) / 2_147_483_648.0) * level;
+                let noise_raw = (f64::from(self.rng) / 2_147_483_648.0 - 1.0) * level;
                 let (mut g, mut k) = (nf_g, nf_k);
                 let freq = nf_freq + l1.noise_freq + l2.noise_freq;
                 let q = clamp(nf_q + l1.noise_q + l2.noise_q, 0.1, 20.0);
