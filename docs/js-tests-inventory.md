@@ -42,7 +42,7 @@ Statuts :
 | `playback.spec.js` | 5 | Couvert | `session_scenarios.rs` : Espace lance, la tête de lecture avance, Espace arrête ; un clic sur une case (vide, note, nom de piste) fait entendre la note à l'arrêt. Écran d'accueil et 404 : sans objet. |
 | `playback_tempo.spec.js` | 3 | Couvert | `session_scenarios.rs` : tempo du pattern en grille (et changé en pleine lecture), inchangé et sans redémarrage en passant par synthé et piano roll, tempo de la song dans la vue song, retour au pattern. |
 | `select_dropdown.spec.js` | 2 | Couvert | `Dropdown` : tests du panel (clavier, molette, clic, fermeture). |
-| `song-arrangement.spec.js` | 34 | Partiel (élevé) | Commandes : `song_edits.json` ; menus, clics, Next/Delete/Add here/Delete row, annuler : tests `session_song` ; lignes, rectangles, règle, hit-test : tests `song_view`. Non vérifiés tels quels : curseur qui revient dans la grille en boucle, boucle d'animation arrêtée en quittant la vue. |
+| `song-arrangement.spec.js` | 34 | Partiel (élevé) | Commandes : `edit_properties.rs` et tests unitaires de `editor.rs` ; menus, clics, Next/Delete/Add here/Delete row, annuler : tests `session_song` ; lignes, rectangles, règle, hit-test : tests `song_view`. Non vérifiés tels quels : curseur qui revient dans la grille en boucle, boucle d'animation arrêtée en quittant la vue. |
 | `song-playback.spec.js` | 6 | Couvert | Clips superposés : `song_sources.json` et le rendu (`scenarios.rs`) ; mode suivant la vue, avance mesure après mesure : `session_scenarios.rs` ; chaque pattern de l'arrangement a ses sons : `scenarios.rs`. |
 | `song-view.spec.js` | 4 | Partiel | Vue, liste d'arrangements, liste de patterns qui défile : portés. Différence : en Rust le track editor est masqué dans la vue song. |
 | `song-wav-export.spec.js` | 5 | Couvert | `scenarios.rs` (moteur) : longueur au tempo de la song (120 et 240 bpm), en-tête 16 bits stéréo, son présent, un second clip change plus de la moitié des samples, refus sans clip jouable, boucle de l'arrangement raccourcie. Le bouton : Ctrl+Shift+E. |
@@ -50,10 +50,10 @@ Statuts :
 | `synth-params.spec.js` | 4 | Couvert (DSP) | Presets, formes d'onde, algorithmes FM, filtres : `renders.bin`, `synth_patches.json`. |
 | `synth_group_titles.spec.js` | 1 | Sans objet | Position du titre dans le DOM. |
 | `synth_implicit_enable.spec.js` | 1 | Couvert | `implicit_enable_and_cards` (`synth_model.rs`) et le test de session de l'éditeur. |
-| `tools-import-export.spec.js` | 8 | Partiel | Import/export MIDI et export WAV (menus, fixtures d'octets), notes aléatoires (X) : portés. « Compact Tracks » : Pattern › Compact tracks, `compact.json`. « Exporting... » : sans objet. |
-| `track-editor-loop.spec.js` | 3 | Couvert | Steps/beat et point de boucle, bornage du point de boucle : `edits.json`, `controls.json`. |
+| `tools-import-export.spec.js` | 8 | Partiel | Import/export MIDI et export WAV (menus, fixtures d'octets), notes aléatoires (X) : portés. « Compact Tracks » : Pattern › Compact tracks, `edit_properties.rs` (ce qui joue ne change pas). « Exporting... » : sans objet. |
+| `track-editor-loop.spec.js` | 3 | Couvert | Steps/beat et point de boucle, bornage du point de boucle : `edit_properties.rs`, tests de `editor.rs`, `controls.json`. |
 | `track-editor.mobile.spec.js` | 4 | Sans objet | Mobile. |
-| `undo_redo.spec.js` | 3 | Couvert | `edits.json`, `song_edits.json` (tout annuler, tout refaire). |
+| `undo_redo.spec.js` | 3 | Couvert | `edit_properties.rs` (séquences aléatoires : chaque annulation, tout annuler, tout refaire). |
 | `viewport-fit.mobile.spec.js` | 1 | Sans objet | Mobile. |
 | `waiting-screen.spec.js` | 9 | Sans objet | Écran d'accueil du navigateur. |
 
@@ -65,8 +65,8 @@ Statuts :
 |---|---|---|
 | Format JSON, chargement, export | `exporter`, `pattern_fixer`, `defaults`, `model_schemas`, `serialize_roundtrip`, `roundtrip_integration`, `pattern_import_validation`, `multi_note_step` | `song.json`, `song.min.json`, `library.export.json`, `edge_library*.json`, `slugify.json` |
 | Moteur de patterns | `pattern_engine`, `pattern_manager`, `euclidean`, `notes`, `variation2` | `flat_notes/` |
-| Songs | `song_schema`, `song_playback`, `player_song_mode`, `song_roundtrip` | `song_sources.json`, `song_edits.json` |
-| Commandes, historique | `cmd`, `cmd_update`, `cmd_transaction`, `history_manager`, `undo_roundtrip`, `arrangement_section` (partie commandes) | `edits.json`, `song_edits.json` |
+| Songs | `song_schema`, `song_playback`, `player_song_mode`, `song_roundtrip` | `song_sources.json` ; `measure_at_tick` : tests de `song.rs` |
+| Commandes, historique | `cmd`, `cmd_update`, `cmd_transaction`, `history_manager`, `undo_roundtrip`, `arrangement_section` (partie commandes) | Rust seul : `edit_properties.rs`, tests de `editor.rs` |
 | Générateurs | `generators`, `base_generator`, `pattern_auto_gen`, `song_structure`, `composition` | `generators.json`, `composition.json` |
 | MIDI | `midi_exporter`, `midi_exporter_functional`, `midi_json_roundtrip`, `midi_import_service` | `midi/*.mid`, `midi_exports.json` ; attentes en snapshot Rust (`midi_rust.txt`) |
 | Instruments, assignation | `instrument_manager`, `auto_assign`, `tracks`, `drumkits_validation` | `instruments.json`, `assign.json` |

@@ -95,7 +95,12 @@ from the JS app's (old name in brackets):
   `probability` (`prob`), `retriggerRate` (`rate`), `retriggerProbability`
   (`arpTriggerProbability`), `euclideanPulses` (`euclideanFill`),
   `arpScale`, `arpDirection` (`_arpScale`, `_arpType`), and an arpeggio's
-  `direction` (`mode`);
+  `direction` (`mode`); `stepPercent` (new, last in `noteKeys`), the place
+  in its beat, 0 to 100, of a note on a track brought down to fewer steps
+  per beat, written only when its `step` cannot give it back: a track saved
+  at 1 step per beat and opened again finds its notes when brought back up.
+  It is read, and checked, in a note object too, where the JS app ignored
+  it. A note moved by hand forgets it;
 - pattern: `autoGenre`, `autoKeyOffset`, `autoScale` (`_autoGen…`), no
   more `application`/`url` header; song: `loopMeasures`
   (`loopMeasureCount`), a clip's `patternId` (`pattern`); library: `info`
@@ -188,7 +193,10 @@ name), in one undo step. As in the JS app, the file's tempo is not read
 0 division is refused, the message says when notes past beat 512 (the
 16th pattern) are left out, and a drum key named by its GM name after an
 instrument another key plays keeps its notes on a numbered track ("Acoustic
-Bass Drum" beside "Bass Drum 1" is `KICK 2`). The export writes the notes of
+Bass Drum" beside "Bass Drum 1" is `KICK 2`). A note goes to the 16th nearest
+its MIDI tick, rounded once: one just before a beat lands on that beat, where
+the JS wrote a fifth step in the beat before (lost at the end of a pattern),
+and one rounded past the last 16th of a pattern opens the next pattern. The export writes the notes of
 one tick note-offs first, then by key (the JS order of simultaneous note-offs
 was whatever its sort left); it leaves out a note whose velocity rounds to 0
 (the JS wrote a note-on at velocity 0, which MIDI reads as a note-off: the
@@ -403,7 +411,9 @@ colours, no glow. This is a redesign: the JS app looks otherwise. **Pattern › 
 description...** edit the pattern's name and description; **Pattern ›
 Compact tracks** (the JS tools panel's button) shortens every track whose
 notes repeat to its shortest loop — the loop length set, the notes past it
-removed, one undo step per track (`compactTrack`, checked against the JS).
+removed, one undo step per track (`compactTrack`). Unlike the JS app, it
+leaves a track alone when the loop would remove no note (notes gathered at
+the track end: only the loop point would move).
 
 Menus: the menu bar at the top of the window (File, Edit, View, Pattern,
 Generate, Play, Song, Kit, Help) lists every command with its shortcut; commands that cannot
@@ -835,6 +845,17 @@ node tools/export_fixtures.mjs ../ordrumbox-v2
   `importPatternFromJson`). A pass is deterministic when three different
   `Math.random` streams give the same notes: Rust must give exactly those notes
   and draw no randomness. The other passes are checked by properties.
+- Unlike the JS app, which floors a loop's length in ticks and adds it again
+  each loop, the engine rounds each repeat of a looped note from its own step:
+  a loop of 4 steps at 3 a beat (42.67 ticks) repeats at ticks 0, 43, 85, as
+  the steps 0, 4, 8 of the full track, not 0, 42, 84. No fixture has such a
+  loop; `pattern_engine.rs` tests it.
+- In the same way, repeats and arpeggio notes are rounded from their exact
+  place, not spaced by a rounded spacing: at 3 a beat, repeats a step apart
+  (10.67 ticks) fall at 0, 11, 21, 32, not 0, 11, 22, 33. A euclidean onset
+  lands on the tick of its own step, as a note written there. `case-grid3`
+  differs from its fixture for this; `flat_notes.rs` holds its new ticks
+  (`DEPARTURES`), `pattern_engine.rs` tests both.
 
 Re-run the script only when `song.json` changes; this app no longer follows
 changes of the JS engine.
@@ -878,24 +899,36 @@ node tools/export_dsp_fixtures.mjs ../ordrumbox-v2
 - `ordrumbox-engine/tests/fixtures/synth_patches.json`: the message
   `WorkletSynthVoice` sends to its processor for each preset.
 
-The editing commands have a third script, which drives the JS `Commander`
-and `HistoryManager`:
+The editing commands no longer have a script; their tests are Rust only:
 
-```sh
-node tools/export_edit_fixtures.mjs ../ordrumbox-v2
-```
+- `ordrumbox-logic/tests/edit_properties.rs`: seeded random sequences of
+  every editing command of `Editor` (notes, tracks, patterns, generators,
+  arrangements, batches, a library loaded, drags whose edits coalesce), with
+  arguments out of range, on `song.json`. After each command: an edit that
+  changes nothing records no step and keeps what can be redone; one that
+  changes something is one step, or joins the previous one when it
+  coalesces, and drops what could be redone; a refused one (an error)
+  changes nothing; each undo gives back the library as it was before its
+  step, each redo as it was after. Undoing everything gives back `song.json`,
+  redoing everything the end. The test fails if a command never changed
+  anything over all the sequences. The selected arrangement, the library
+  header and the lines auto mode makes each loop are not undo steps.
+- The same file compacts random repeating patterns: what the pattern engine
+  plays stays the same, each track compacted is one step, and compacting
+  again changes nothing, on every grid from 1 to 8 steps a beat, some
+  tracks with one `stepPercent` for all their notes (their loop may last a
+  fractional number of ticks). Each compacted track loses a note.
+- The step descriptions, return values and refusals are unit tests of
+  `ordrumbox-logic/src/editor.rs`, and `songMeasureAtTick()` is one of
+  `ordrumbox-core/src/song.rs`.
 
-- `ordrumbox-logic/tests/fixtures/edits.json`: 29 edits on `song.json`
-  (notes, tracks, patterns), then undo all, then redo all; after each, the
-  undo/redo sizes, the step description, the pattern ids and the saved
-  patterns.
-- `ordrumbox-logic/tests/fixtures/compact.json`: `compactTrack` on every
-  track of every pattern of `song.json` and of hand-made patterns that
-  repeat, loaded as the app boots (`importPatternFromJson`: every note has a
-  `stepPercent`, which the comparison of notes includes): the steps recorded,
-  then each track's loop point and notes.
+Until then, `edits.json`, `compact.json` and `song_edits.json` checked the
+edits against the JS `Commander`, `HistoryManager` and `SongCommands` step by
+step: stack sizes, descriptions, return values, patterns and arrangements.
+They matched, apart from one description: shortening a loop is "Shorten loop
+on" a track (the JS said "Loop point back on").
 
-Sound assignment, song playback and WAV encoding have a fourth script (the
+Sound assignment, song playback and WAV encoding have a third script (the
 instrument catalog is not generated: "Instrument catalog", above):
 
 ```sh
@@ -926,7 +959,7 @@ tests, like the rules themselves (`ordrumbox-core/src/instruments.rs`,
 `ordrumbox-engine/src/assign.rs`). The fixture script reads the JS catalog
 for the JS side of these comparisons; the app reads its own.
 
-The generators have a fifth script; it also writes the variant tables the
+The generators have a fourth script; it also writes the variant tables the
 port reads (`ordrumbox-logic/data/generators.json`):
 
 ```sh
@@ -995,7 +1028,7 @@ MIDI files no longer have a script; their tests are Rust only
   `cargo test -p ordrumbox-logic --test midi -- --ignored` writes this file,
   only when the parser, the import or the export changes on purpose.
 
-The kit editor's sample analysis has a sixth script:
+The kit editor's sample analysis has a fifth script:
 
 ```sh
 node tools/export_kit_fixtures.mjs ../ordrumbox-v2
@@ -1007,7 +1040,7 @@ node tools/export_kit_fixtures.mjs ../ordrumbox-v2
   silence, very short files, stereo, the kick.wav fixture). Rust decodes the
   same bytes and must report the same values exactly.
 
-The knobs and sliders have a seventh:
+The knobs and sliders have a sixth:
 
 ```sh
 node tools/export_control_fixtures.mjs ../ordrumbox-v2
@@ -1020,7 +1053,7 @@ node tools/export_control_fixtures.mjs ../ordrumbox-v2
   `formatSignedDb`, the loop point label), and `formatNoteTooltip` for a set of
   notes and track pitches.
 
-The piano roll has a ninth:
+The piano roll has a seventh:
 
 ```sh
 node tools/export_piano_fixtures.mjs ../ordrumbox-v2
@@ -1036,7 +1069,7 @@ node tools/export_piano_fixtures.mjs ../ordrumbox-v2
 - `ordrumbox-ui/tests/fixtures/piano_roll.json`: `NoteDrag` driven through a
   fake window (velocity, pitch, the axis lock, the bounds), and `midiName()`.
 
-The synth editor has a tenth:
+The synth editor has an eighth:
 
 ```sh
 node tools/export_synth_fixtures.mjs ../ordrumbox-v2
@@ -1047,20 +1080,6 @@ node tools/export_synth_fixtures.mjs ../ordrumbox-v2
   filled in, the cards bypassed), `getOrderedGroupNames()`, the LFO targets
   and their scales, and `computeLfoMod()` for every target, wave and sync at
   several times.
-
-The song panel's commands have an eighth:
-
-```sh
-node tools/export_song_fixtures.mjs ../ordrumbox-v2
-```
-
-- `ordrumbox-logic/tests/fixtures/song_edits.json`: the JS `SongCommands`
-  (clips added by id or name, repeated, removed one by one, by measure or by
-  row; arrangements added, removed and selected; what each one refuses) on
-  `song.json`'s arrangements, then undo all, then redo all; after each, the
-  undo/redo sizes, the step's description, what the command returned, the
-  selected arrangement and every arrangement (with its loop length, which an
-  edit may leave fractional). Also `songMeasureAtTick()`.
 
 ## License
 

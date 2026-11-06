@@ -52,15 +52,26 @@ fn fixture_passes() -> Vec<(String, u32, bool, Value)> {
     passes
 }
 
+/// Patterns where the engine leaves the JS on purpose (`README.md`, "Golden
+/// fixtures"): the ticks the fixture holds, and the ticks Rust gives instead.
+/// `case-grid3` repeats notes at a fraction of a 3-a-beat step: each repeat
+/// is rounded from its exact place, where the JS rounded the spacing once.
+const DEPARTURES: &[(&str, &[u32], &[u32])] =
+    &[("case-grid3", &[11, 32, 53, 54, 55, 56, 64, 71, 78, 85, 92], &[11, 32, 53, 55, 56, 57, 64, 71, 77, 84, 91, 92])];
+
+fn tick_list(js: &Value) -> Vec<u32> {
+    js.as_array().expect("ticks").iter().map(|t| t.as_array().unwrap()[0].as_f64().unwrap() as u32).collect()
+}
+
 fn compute(pattern: &Pattern, pass: u32, seed: u64) -> Hits {
     expand_hits(pattern, pass, &mut Rng::new(seed), &Scales::default())
 }
 
 /// First difference between the Rust notes and the JS ones, if any.
 fn diff(pattern: &Pattern, rust: &Hits, js: &Value) -> Option<String> {
-    let js = js.as_array().expect("ticks");
     let rust_ticks: Vec<u32> = rust.keys().copied().collect();
-    let js_ticks: Vec<u32> = js.iter().map(|t| t.as_array().unwrap()[0].as_f64().unwrap() as u32).collect();
+    let js_ticks = tick_list(js);
+    let js = js.as_array().expect("ticks");
     if rust_ticks != js_ticks {
         return Some(format!("ticks {rust_ticks:?}\n   JS {js_ticks:?}"));
     }
@@ -110,7 +121,10 @@ fn deterministic_passes_match_the_js_engine() {
         let mut rng = Rng::new(7);
         let before = rng.clone().next_u64();
         let rust = expand_hits(pattern, pass, &mut rng, &Scales::default());
-        if let Some(difference) = diff(pattern, &rust, &ticks) {
+        if let Some(&(_, js, own)) = DEPARTURES.iter().find(|(d, ..)| *d == id) {
+            assert_eq!(tick_list(&ticks), js, "departure {id}: the fixture changed");
+            assert_eq!(rust.keys().copied().collect::<Vec<_>>(), own, "departure {id} pass {pass}");
+        } else if let Some(difference) = diff(pattern, &rust, &ticks) {
             failures.push(format!("{id} pass {pass}: {difference}"));
         }
         if rng.next_u64() != before {

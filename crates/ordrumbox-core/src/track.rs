@@ -299,7 +299,7 @@ impl Track {
             object.insert(key, value.clone());
         }
         if !self.notes.is_empty() {
-            let (header, notes) = encode_notes(&self.notes);
+            let (header, notes) = encode_notes(&self.notes, self.steps_per_beat);
             object.insert("noteKeys", Value::Array(header));
             object.insert("notes", Value::Array(notes));
         }
@@ -357,7 +357,7 @@ impl Track {
     /// Shorten the track to its shortest loop, when its notes repeat one
     /// (`addLoopToTrackIfPossible`, the tools panel's Compact Tracks): the
     /// loop point set, the notes past it removed, the rest sorted by step.
-    /// Whether it changed.
+    /// The loop is taken only when it removes a note. Whether it changed.
     pub fn compact_loop(&mut self) -> bool {
         let spb = self.steps_per_beat;
         let total = self.step_length();
@@ -374,6 +374,11 @@ impl Track {
         }) else {
             return false;
         };
+        // A loop past every note (notes gathered at the track end) would
+        // only move the loop point: nothing to compact.
+        if self.notes.iter().all(|n| step_of(n) < loop_at) {
+            return false;
+        }
         self.notes.retain(|n| step_of(n) < loop_at);
         self.notes.sort_by_key(step_of);
         self.loop_length = Some(loop_at as i32);
@@ -464,5 +469,34 @@ mod tests {
     fn rounds_mix_parameters() {
         let (track, _) = load(r#"{"name":"KICK","velocity":0.876,"filterFreq":1234.567,"filterQ":0.707}"#);
         assert_eq!(track.to_json().to_json(), r#"{"name":"KICK","volume":0.88,"filterCutoff":1234.57}"#);
+    }
+
+    /// A track of `beat_count` beats on a grid of `spb`, a note on each of `steps`.
+    fn with_notes(beat_count: i32, spb: i32, steps: impl IntoIterator<Item = i32>) -> Track {
+        let mut track = Track::new("KICK", beat_count, spb);
+        track.notes = steps.into_iter().map(|s| Note { beat: s / spb, step: s % spb, ..Note::default() }).collect();
+        track
+    }
+
+    #[test]
+    fn a_loop_may_last_a_fractional_number_of_ticks() {
+        // Every 4 steps at 3 a beat repeats (one `stepPercent` for all, so
+        // swing does not tell them apart). 4 steps are 42.67 ticks: the
+        // engine rounds each repeat from its own step, so the loop is exact.
+        let mut track = with_notes(8, 3, (0..24).step_by(4));
+        track.notes.iter_mut().for_each(|n| n.step_percent = Some(0.0));
+        assert!(track.compact_loop());
+        assert_eq!(track.loop_length, Some(4));
+        assert_eq!(track.notes.len(), 1);
+    }
+
+    #[test]
+    fn a_loop_that_removes_no_note_is_not_set() {
+        // Notes gathered at the end: a loop just past them would repeat
+        // nothing, only move the loop point.
+        let mut track = with_notes(4, 4, [12, 13]);
+        let before = track.clone();
+        assert!(!track.compact_loop());
+        assert_eq!(track, before);
     }
 }

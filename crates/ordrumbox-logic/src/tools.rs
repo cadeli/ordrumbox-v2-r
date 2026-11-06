@@ -1158,9 +1158,10 @@ mod tests {
         assert!(call(&mut b, "renameTrack", r#"{"patternName":"rock","trackName":"kick","newName":"snare"}"#).is_err());
         let renamed = call(&mut b, "renameTrack", r#"{"patternName":"rock","trackName":"kick","newName":"bd"}"#);
         assert_eq!(renamed.unwrap().to_json(), r#"{"trackName":"BD","tracks":["BD","SNARE"]}"#);
-        // Both repeat a shorter loop: BD's notes on beats 0 and 2, SNARE's one note.
+        // BD repeats its note of beat 0 on beat 2; SNARE's one note would
+        // only move its loop point, so it is left alone.
         let compacted = call(&mut b, "compactPattern", r#"{"patternName":"rock"}"#).unwrap();
-        assert_eq!(get(&compacted, &["tracksCompacted"]).as_f64(), Some(2.0));
+        assert_eq!(get(&compacted, &["tracksCompacted"]).as_f64(), Some(1.0));
         assert_eq!(undo_len(&b), 6);
     }
 
