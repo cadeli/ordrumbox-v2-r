@@ -56,10 +56,10 @@ fn bank() -> Arc<SampleBank> {
     Arc::new(SampleBank { samples })
 }
 
-/// The first preset of synth_patches.json, as `BASS0`.
+/// The web version's `BASS0` (`generated_sounds.json`).
 fn synths() -> SynthPresets {
-    let cases = json::parse(&fixture("tests/fixtures/synth_patches.json")).expect("parses");
-    let preset = cases.as_array().and_then(|c| c.first()).and_then(|c| c.get("preset")).cloned().expect("a preset");
+    let presets = json::parse(&fixture("tests/fixtures/generated_sounds.json")).expect("parses");
+    let preset = presets.get("BASS0").cloned().expect("a preset");
     let mut presets = Object::new();
     presets.insert("BASS0", preset);
     SynthPresets::from_json(&Value::Object(presets))

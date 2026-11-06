@@ -684,55 +684,6 @@ pub fn after_delete<'a>(keys: &[&'a str], deleted: &str) -> Option<&'a str> {
 mod tests {
     use super::*;
 
-    fn fixture() -> Value {
-        json::parse(include_str!("../tests/fixtures/synth_editor.json")).unwrap()
-    }
-
-    /// The JS model on every preset (tools/export_synth_fixtures.mjs).
-    #[test]
-    fn golden_presets() {
-        let fixture = fixture();
-        let presets = fixture.get("presets").and_then(Value::as_array).unwrap();
-        assert!(presets.len() > 15);
-        for case in presets {
-            let key = case.get("key").and_then(Value::as_str).unwrap();
-            let mut draft = case.get("source").and_then(Value::as_object).cloned().unwrap();
-            hydrate(&mut draft);
-            assert_eq!(Value::Object(draft.clone()).to_json(), case.get("draft").unwrap().to_json(), "{key}: draft");
-            for (group, on) in case.get("bypassed").and_then(Value::as_object).unwrap().iter() {
-                assert_eq!(bypassed(&draft, group), on.as_bool().unwrap(), "{key}: {group} bypassed");
-            }
-            let order: Vec<String> = case
-                .get("groups")
-                .and_then(Value::as_array)
-                .unwrap()
-                .iter()
-                .map(|g| g.as_str().unwrap().to_owned())
-                .collect();
-            assert_eq!(groups(&draft), order, "{key}: groups");
-        }
-        let targets: Vec<&str> =
-            fixture.get("lfoTargets").and_then(Value::as_array).unwrap().iter().filter_map(Value::as_str).collect();
-        assert_eq!(lfo_targets(), targets);
-        for (target, scale) in fixture.get("lfoScale").and_then(Value::as_object).unwrap().iter() {
-            assert_eq!(lfo_scale(target), scale.as_f64().unwrap(), "{target}");
-        }
-    }
-
-    #[test]
-    fn golden_lfo_modulation() {
-        let fixture = fixture();
-        for case in fixture.get("lfoMods").and_then(Value::as_array).unwrap() {
-            let lfo = case.get("lfo").and_then(Value::as_object).unwrap();
-            let times = [0.0, 0.1, 0.37, 1.5, 7.77];
-            for (t, expected) in times.iter().zip(case.get("at").and_then(Value::as_array).unwrap()) {
-                let got = lfo_mod(lfo, *t, 120.0);
-                let expected = expected.as_f64().unwrap();
-                assert!((got - expected).abs() < 1e-9, "{} at {t}: {got} vs {expected}", case.to_json());
-            }
-        }
-    }
-
     #[test]
     fn implicit_enable_and_cards() {
         let mut d = defaults();

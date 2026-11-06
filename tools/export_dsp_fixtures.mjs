@@ -16,14 +16,6 @@
 //                 thinned out to keep the file small: every frame below
 //                 FULL_FRAMES, then one frame in STRIDE (see `kept`)
 //
-// crates/ordrumbox-engine/tests/fixtures/
-//   strip_settings.json  the strip parameters strip_sync.js/strip.js set for
-//                        every distinct track setup of song.json (+ edge cases)
-//   lfo_values.json      computeLfoValue() for the track LFOs of song.json
-//                        (+ edge cases) over a range of ticks
-//   synth_patches.json   the `update` message WorkletSynthVoice sends for every
-//                        preset of generated_sounds.json (+ note variants)
-//
 // Inputs are built from integer arithmetic only (an LCG and exact products),
 // so the Rust tests regenerate them bit for bit.
 
@@ -41,7 +33,6 @@ console.error = () => {}
 
 const here = dirname(fileURLToPath(import.meta.url))
 const dspOut = join(here, '..', 'crates', 'ordrumbox-dsp', 'tests', 'fixtures')
-const engineOut = join(here, '..', 'crates', 'ordrumbox-engine', 'tests', 'fixtures')
 const srcUrl = (rel) => pathToFileURL(resolve(jsRepo, 'src', rel)).href
 const QUANTUM = 128
 
@@ -260,13 +251,10 @@ synthCases.push(['bypassed', busy({ target: 'FLT', wave: 'sine', freq: 2, depth:
 }), busyNote])
 synthCases.push(['no_env', busy(null, null, null, 'off', { bypassEnv: true, filter: { type: 'notch', freq: 9000, Q: 0.5 } }), busyNote])
 
-const synthPatches = []
 for (const [name, presetOrKey, note] of synthCases) {
     const preset = typeof presetOrKey === 'string' ? generatedSounds[presetOrKey] : presetOrKey
     const startTime = START_FRAME / SYNTH_RATE
     const messages = await synthMessages(preset, { ...note, startTime })
-    const update = messages.find((m) => m.type === 'update')
-    synthPatches.push({ name, preset, note, update })
 
     globalThis.sampleRate = SYNTH_RATE
     const proc = new processors['synth-voice']()
@@ -292,107 +280,9 @@ for (const [name, presetOrKey, note] of synthCases) {
     )
 }
 
-// ─── Strip settings, LFO values (engine mapping) ─────────────────────────────
-
-const { applyTrackToStrip } = await import(srcUrl('audio/strip_sync.js'))
-const { default: Strip } = await import(srcUrl('audio/strip.js'))
-const { computeLfoValue } = await import(srcUrl('audio/math.js'))
-const { fixPatterns } = await import(srcUrl('patterns/fixer.js'))
-const { normalizeTrack } = await import(srcUrl('model/track_schema.js'))
-
-function stripSettingsOf(track, bpm) {
-    const values = defaultsOf('strip')
-    const param = (name) => ({
-        setTargetAtTime: (v) => (values[name] = Math.fround(v)),
-        setValueAtTime: (v) => (values[name] = Math.fround(v)),
-    })
-    const node = { parameters: { get: param }, connect() {}, disconnect() {} }
-    WorkletLoader.createNode = () => node
-    const fake = () => ({ connect() {}, disconnect() {}, fftSize: 0, frequencyBinCount: 128 })
-    const ctx = { currentTime: 0, createGain: fake, createAnalyser: fake }
-    const strip = new Strip(track.name, ctx, null)
-    // #initNode is private: rebuild what it exposes.
-    strip.stripNode = node
-    strip.output = { gain: param('volume') }
-    strip.pan = { pan: param('pan') }
-    strip.setBpm(bpm)
-    applyTrackToStrip(strip, track, 0)
-    delete values.transportTime
-    delete values.bpm
-    return values
-}
-
-const song = JSON.parse(await readFile(resolve(jsRepo, 'assets', 'data', 'song.json'), 'utf8'))
-const patterns = fixPatterns(structuredClone(song.patterns))
-const STRIP_KEYS = ['filterType', 'filterFreq', 'filterFreqLfo', 'filterQ', 'filterQLfo', 'saturationType', 'sat', 'saturationAmount',
-    'reverbType', 'reverbOn', 'reverbAmount', 'delayType', 'delayOn', 'delayTime', 'delayDepth', 'velocity', 'velocityLfo', 'pan', 'panLfo', 'mute']
-const seen = new Set()
-const stripSettings = []
-const addStripCase = (track, bpm) => {
-    const picked = Object.fromEntries(STRIP_KEYS.filter((k) => track[k] !== undefined).map((k) => [k, track[k]]))
-    picked.name = track.name
-    const key = JSON.stringify([picked, bpm])
-    if (seen.has(key)) return
-    seen.add(key)
-    stripSettings.push({ track: picked, bpm, settings: stripSettingsOf(picked, bpm) })
-}
-// A pattern without bpm plays at the default tempo (importPatternFromJson).
-for (const p of patterns) for (const t of p.tracks) addStripCase(t, p.bpm ?? 120)
-const edgeTracks = [
-    { name: 'A', filterType: 'notch', filterFreq: 1200, filterQ: 3 },
-    { name: 'B', filterType: 'bandpass', filterFreq: 600, filterQ: 9, filterFreqLfo: { freq: 1 }, filterQLfo: { freq: 1 } },
-    { name: 'C', saturationType: 'hard', saturationAmount: 0.6, sat: true },
-    { name: 'D', saturationType: 'tape', saturationAmount: 1.4, sat: false },
-    { name: 'E', reverbType: 'gated', reverbAmount: 0.7, reverbOn: true },
-    { name: 'F', reverbType: 'spring', reverbAmount: 0.5, reverbOn: false },
-    { name: 'G', reverbType: 'plate', reverbAmount: 0.3 },
-    { name: 'H', delayType: 'pingpong', delayTime: 0.75, delayDepth: 0.6, delayOn: true },
-    { name: 'I', delayType: 'slap', delayTime: 0.25, delayDepth: 0.3 },
-    { name: 'J', delayType: 'none', delayTime: 1, delayDepth: 0.9 },
-    { name: 'K', delayType: 'tape', delayTime: 2, delayDepth: 0.5, delayOn: false },
-    { name: 'L', velocity: 1.7, pan: -0.4, mute: true },
-    { name: 'M', velocity: 0.6, velocityLfo: { freq: 2 }, panLfo: { freq: 1 }, pan: 0.5 },
-    { name: 'N', filterType: 'weird', reverbType: 'cathedral', delayType: 'warp', saturationType: 'fuzz', saturationAmount: 0.2 },
-    { name: 'O', mute: false, velocity: 0.3 },
-]
-// Completed with the track defaults, as every loaded track is.
-for (const t of edgeTracks) addStripCase(normalizeTrack(t), 97)
-
-const lfoSeen = new Set()
-const lfos = []
-for (const p of patterns)
-    for (const t of p.tracks)
-        for (const key of ['velocityLfo', 'panLfo', 'pitchLfo', 'filterFreqLfo', 'filterQLfo']) {
-            const lfo = t[key]
-            if (!lfo || lfoSeen.has(JSON.stringify(lfo))) continue
-            lfoSeen.add(JSON.stringify(lfo))
-            lfos.push(lfo)
-        }
-lfos.push(
-    { freq: '0.5', min: '-1', max: 2, phase: 0.25, type: 'sawtooth' },
-    { freq: 3, min: 0, max: 1, phase: 0, type: 'square' },
-    { freq: 1.5, min: -3, max: 3, phase: 0.1, type: 'random' },
-    { freq: 1, min: 0, max: 1, waveform: 'triangle' },
-    { freq: 1, min: 0, max: 1, type: '2' },
-    { freq: 1, min: 0, max: 1, type: 'bogus' },
-    { freq: -1, min: 0, max: 10, phase: -0.3, type: 'sine' },
-    { min: 0.2 },
-    {},
-)
-const TICKS = []
-for (let tick = 0; tick < 1200; tick += 7) TICKS.push(tick)
-const lfoValues = lfos.map((lfo) => ({ lfo, values: TICKS.map((tick) => computeLfoValue(lfo, tick, 128, 'x')) }))
-
 // ─── Write ───────────────────────────────────────────────────────────────────
 
 await mkdir(dspOut, { recursive: true })
-await mkdir(engineOut, { recursive: true })
 await writeFile(join(dspOut, 'renders.json'), JSON.stringify({ fullFrames: FULL_FRAMES, stride: STRIDE, cases: index }, null, 1) + '\n')
 await writeFile(join(dspOut, 'renders.bin'), Buffer.concat(chunks))
-await writeFile(join(engineOut, 'strip_settings.json'), JSON.stringify(stripSettings, null, 1) + '\n')
-await writeFile(join(engineOut, 'lfo_values.json'), JSON.stringify({ ticks: TICKS, lfos: lfoValues }) + '\n')
-await writeFile(join(engineOut, 'synth_patches.json'), JSON.stringify(synthPatches, null, 1) + '\n')
-process.stdout.write(
-    `renders: ${index.length} (${(offset * 4) / 1e6} MB), strip settings: ${stripSettings.length}, ` +
-        `lfos: ${lfos.length}, synth patches: ${synthPatches.length}\n`,
-)
+process.stdout.write(`renders: ${index.length} (${(offset * 4) / 1e6} MB)\n`)

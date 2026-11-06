@@ -47,7 +47,7 @@ Statuts :
 | `song-view.spec.js` | 4 | Partiel | Vue, liste d'arrangements, liste de patterns qui défile : portés. Différence : en Rust le track editor est masqué dans la vue song. |
 | `song-wav-export.spec.js` | 5 | Couvert | `scenarios.rs` (moteur) : longueur au tempo de la song (120 et 240 bpm), en-tête 16 bits stéréo, son présent, un second clip change plus de la moitié des samples, refus sans clip jouable, boucle de l'arrangement raccourcie. Le bouton : Ctrl+Shift+E. |
 | `synth-modulators.spec.js` | 3 | Couvert (DSP) | Chaque cible de LFO : `renders.bin` (processeurs DSP). L'éditeur de synthé n'est pas porté. |
-| `synth-params.spec.js` | 4 | Couvert (DSP) | Presets, formes d'onde, algorithmes FM, filtres : `renders.bin`, `synth_patches.json`. |
+| `synth-params.spec.js` | 4 | Couvert (DSP) | Presets, formes d'onde, algorithmes FM, filtres : `renders.bin` ; patches : snapshot Rust `mapping_rust.txt`. |
 | `synth_group_titles.spec.js` | 1 | Sans objet | Position du titre dans le DOM. |
 | `synth_implicit_enable.spec.js` | 1 | Couvert | `implicit_enable_and_cards` (`synth_model.rs`) et le test de session de l'éditeur. |
 | `tools-import-export.spec.js` | 8 | Partiel | Import/export MIDI et export WAV (menus, fixtures d'octets), notes aléatoires (X) : portés. « Compact Tracks » : Pattern › Compact tracks, `edit_properties.rs` (ce qui joue ne change pas). « Exporting... » : sans objet. |
@@ -70,8 +70,8 @@ Statuts :
 | Générateurs | `generators`, `base_generator`, `pattern_auto_gen`, `song_structure`, `composition` | `generators.json` ; progressions : snapshot Rust `composition_rust.txt` |
 | MIDI | `midi_exporter`, `midi_exporter_functional`, `midi_json_roundtrip`, `midi_import_service` | `midi/*.mid`, `midi_exports.json` ; attentes en snapshot Rust (`midi_rust.txt`) |
 | Instruments, assignation | `instrument_manager`, `auto_assign`, `tracks`, `drumkits_validation` | Rust seul : tables de recherche, notes et programmes GM (`instruments.rs`), assignation par kit, kits livrés et kits importés (`assign_tests.rs`, ui) |
-| DSP | `worklet_synth_voice`, `worklet_master_bus`, `strip_sync`, `fx_values`, `lfo_engine`, `math` | `renders.{json,bin}`, `strip_settings.json`, `lfo_values.json`, `synth_patches.json` |
-| WAV, analyse | `wav_encoder`, `sample_analyzer`, `hz_to_note` | WAV : tests de `wav.rs` (en-tête, aller-retour) ; `analysis.json` |
+| DSP | `worklet_synth_voice`, `worklet_master_bus`, `strip_sync`, `fx_values`, `lfo_engine`, `math` | `renders.{json,bin}` ; réglages de strip, LFO et patches de synthé : snapshot Rust `mapping_rust.txt` (`mapping.rs`) |
+| WAV, analyse | `wav_encoder`, `sample_analyzer`, `hz_to_note` | WAV : tests de `wav.rs` (en-tête, aller-retour) ; analyse : Rust seul, sinusoïdes de fréquence et d'amplitude connues et snapshot `analysis_rust.txt` des cas limites (`analysis.rs`) |
 | Contrôles | `base_control`, `or_knob_log`, `ui_utils` (formatage) | `controls.json` |
 | Scénarios | `e2e_user_flow`, `wav_midi_roundtrip` (aller-retour MIDI), `e2e_audio_comparison` | `user_flow.rs`, `scenarios.rs`, tests de `wav.rs` |
 
@@ -93,7 +93,7 @@ Statuts :
 comme en JS), `pattern_settings_panel` (ses contrôles sont dans l'en-tête), `piano_roll`, `ghost_sync`
 (les fantômes : snapshot Rust `sub_positions_rust.txt`), `synth_editor`, `synth_editor_display`,
 `synth_editor_implicit`, `synth_editor_import`, `synth_editor_preset_section`,
-`synth_editor_sliders`, `synth_preset_model` (le modèle : `synth_editor.json`).
+`synth_editor_sliders`, `synth_preset_model` (le modèle : snapshot Rust `synth_editor_rust.txt`).
 
 ### Non portés (fonctionnalité absente)
 
