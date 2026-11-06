@@ -5,5 +5,5 @@ mod export;
 mod import;
 pub mod smf;
 
-pub use export::{PPQN, export};
+pub use export::{PPQN, SIGNATURE, export};
 pub use import::{C3_MIDI_NOTE, Imported, import};

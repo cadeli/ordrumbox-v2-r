@@ -6,7 +6,9 @@
 //! Drums go on channel 10 at their GM key, melodic instruments each on the
 //! next channel at the sample's root note (else their mapping's key, else
 //! C3); a name the catalog does not know is a bass drum. The velocity LFO
-//! scales the velocity, the pitch LFO adds semitones; notes last a 16th.
+//! scales the velocity, the pitch LFO adds semitones; notes last a 16th, or
+//! end where their key is struck again on their track, so that no key is
+//! struck while it sounds. The tempo track carries a signature, a text event.
 
 use ordrumbox_core::instruments::catalog;
 use ordrumbox_core::pattern_engine::expand_hits;
@@ -24,6 +26,8 @@ const DRUM_CHANNEL: u8 = 9;
 const NOTE_LENGTH: f64 = 24.0;
 /// Bass Drum 1.
 const DEFAULT_NOTE: f64 = 36.0;
+/// The text event of the tempo track that tells which program wrote the file.
+pub const SIGNATURE: &str = "Made with orDrumbox";
 
 /// `new Uint8Array([x])[0]`: truncated, modulo 256 (NaN is 0).
 fn uint8(x: f64) -> u8 {
@@ -54,12 +58,6 @@ fn chunk(tag: &[u8; 4], body: &[u8]) -> Vec<u8> {
 fn track_chunk(mut events: Vec<u8>) -> Vec<u8> {
     events.extend([0x00, 0xff, 0x2f, 0x00]);
     chunk(b"MTrk", &events)
-}
-
-/// The bytes JS writes for a string: one per code point (its first UTF-16
-/// unit, truncated to a byte).
-fn text_bytes(text: &str) -> Vec<u8> {
-    text.chars().map(|c| c.encode_utf16(&mut [0; 2])[0] as u8).collect()
 }
 
 /// Where a track name plays.
@@ -112,38 +110,43 @@ fn assign(names: &[&str], roots: &[(String, f64)]) -> Vec<(String, Target)> {
     targets
 }
 
+/// A note as written: its tick, key and velocity bytes.
 #[derive(Debug, Clone, Copy)]
 struct NoteEvent {
     tick: f64,
-    key: f64,
-    velocity: f64,
+    key: u8,
+    velocity: u8,
 }
 
 /// `buildInstrumentTrackFromEvents`: name, program, then note on/off pairs.
 fn instrument_track(name: &str, target: Target, mut events: Vec<NoteEvent>) -> Vec<u8> {
-    js::sort_by(&mut events, |a, b| {
-        let by_tick = a.tick - b.tick;
-        if by_tick != 0.0 && !by_tick.is_nan() { by_tick } else { a.key - b.key }
-    });
-    // (tick, on, key, velocity)
-    let mut raw: Vec<(f64, bool, f64, f64)> = Vec::with_capacity(events.len() * 2);
-    for e in &events {
-        raw.push((e.tick, true, e.key, e.velocity));
-        raw.push((e.tick + NOTE_LENGTH, false, e.key, 0.0));
-    }
-    // The JS order: by tick, a note-off before anything (inconsistent for two
-    // ons or two offs: the order is TimSort's own, see `js::sort_by`).
-    js::sort_by(&mut raw, |a, b| {
-        let by_tick = a.0 - b.0;
-        if by_tick != 0.0 && !by_tick.is_nan() {
-            by_tick
-        } else if a.1 {
-            1.0
-        } else {
-            -1.0
+    events.sort_by(|a, b| a.tick.total_cmp(&b.tick).then(a.key.cmp(&b.key)));
+    // Notes of one key at one tick are one note, at the loudest velocity.
+    events.dedup_by(|later, kept| {
+        let same = later.tick == kept.tick && later.key == kept.key;
+        if same {
+            kept.velocity = kept.velocity.max(later.velocity);
         }
+        same
     });
-    let mut bytes = meta(0, 0x03, &text_bytes(name));
+    // A note ends a 16th later, or where its key is struck again.
+    let mut next_strike = [f64::INFINITY; 128];
+    let mut ends = vec![0.0; events.len()];
+    for (end, e) in ends.iter_mut().zip(&events).rev() {
+        let key = usize::from(e.key & 0x7f);
+        *end = (e.tick + NOTE_LENGTH).min(next_strike[key]);
+        next_strike[key] = e.tick;
+    }
+    // (tick, on, key, velocity)
+    let mut raw: Vec<(f64, bool, u8, u8)> = Vec::with_capacity(events.len() * 2);
+    for (e, &end) in events.iter().zip(&ends) {
+        raw.push((e.tick, true, e.key, e.velocity));
+        raw.push((end, false, e.key, 0));
+    }
+    // By tick, the note-offs before the note-ons; the sort is stable, so the
+    // ons, and the offs, of one tick keep the notes' order (by key).
+    raw.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+    let mut bytes = meta(0, 0x03, name.as_bytes());
     if let Some(program) = target.program.filter(|p| (0..=127).contains(p)) {
         bytes.extend([0x00, 0xc0 | (target.channel & 0x0f), program as u8]);
     }
@@ -152,11 +155,7 @@ fn instrument_track(name: &str, target: Target, mut events: Vec<NoteEvent>) -> V
     for (tick, is_on, key, velocity) in raw {
         bytes.extend(encode_vlq((tick - cursor) as u32));
         cursor = tick;
-        if is_on {
-            bytes.extend([on, uint8(key), uint8(velocity)]);
-        } else {
-            bytes.extend([off, uint8(key), 0]);
-        }
+        bytes.extend([if is_on { on } else { off }, key, velocity]);
     }
     track_chunk(bytes)
 }
@@ -199,7 +198,12 @@ pub fn export(pattern: &Pattern, loops: u32, roots: &[(String, f64)], rng: &mut 
                     pitch += lfo::value(l, f64::from(tick));
                 }
                 let key = clamp(target.note + pitch, 0.0, 127.0);
-                events.push(NoteEvent { tick: midi_tick, key, velocity: js::round(velocity * 127.0) });
+                let velocity = js::round(velocity * 127.0);
+                // A note-on at velocity 0 is a note-off: a silent note is left out.
+                if velocity.is_nan() || velocity < 1.0 {
+                    continue;
+                }
+                events.push(NoteEvent { tick: midi_tick, key: uint8(key), velocity: uint8(velocity) });
             }
         }
     }
@@ -220,6 +224,7 @@ pub fn export(pattern: &Pattern, loops: u32, roots: &[(String, f64)], rng: &mut 
     let mut tempo = meta(0, 0x58, &[0x04, 0x02, 0x18, 0x08]);
     tempo.extend(meta(0, 0x51, &[(us >> 16) as u8, (us >> 8) as u8, us as u8]));
     tempo.extend(meta(0, 0x03, b"orDrumbox Pattern"));
+    tempo.extend(meta(0, 0x01, SIGNATURE.as_bytes()));
     bytes.extend(track_chunk(tempo));
     for chunk in chunks {
         bytes.extend(chunk);

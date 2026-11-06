@@ -8,7 +8,7 @@ Windows by CI).
 
 | Crate | Role | Dependencies |
 |---|---|---|
-| `ordrumbox-core` | data model, `library.json` codec, pattern engine, song clips, instrument catalog, JSON, RNG, the JS sort and number formatting | none |
+| `ordrumbox-core` | data model, `library.json` codec, pattern engine, song clips, instrument catalog, JSON, RNG, JS number formatting | none |
 | `ordrumbox-logic` | the library being edited: commands with undo/redo; pattern generators (drum lines from a style, styles learned from the library's tags, bass and chord variants, auto mode loop by loop); Standard MIDI Files (read, import, export) | core |
 | `ordrumbox-dsp` | sample voice, synth voice, channel strip (filter, saturation, reverb, delay), master bus; no allocation in render paths | none |
 | `ordrumbox-engine` | WAV decoding/encoding, kits and their files, sample analysis, sound auto-assignment, synth presets, passes (pattern and song: events, strip settings, LFO steps), sample-accurate engine, UI ↔ audio link, offline renders | core, dsp |
@@ -178,17 +178,23 @@ profile); a tag that names no style becomes a style of its own, its forbidden
 steps those its patterns never play. Fewer than 4 measures teach nothing. The
 Generate menu lists them with the patterns and measures they rest on.
 
-MIDI files (the JS exporter and import, byte for byte): **Ctrl M** writes the
+MIDI files (ported from the JS exporter and import): **Ctrl M** writes the
 pattern as a type 1 file (96 PPQN; drums on channel 10 at their GM keys,
 melodic instruments on their own channels at the sample's root note) to a
 folder picked. A `.mid` dropped on the window becomes new 32-beat patterns (up to
 16), one track per instrument found (by GM program, drum key, then track
 name), in one undo step. As in the JS app, the file's tempo is not read
-(120 BPM). Three departures from the JS: a file timed in SMPTE frames or with a
+(120 BPM). Departures from the JS: a file timed in SMPTE frames or with a
 0 division is refused, the message says when notes past beat 512 (the
 16th pattern) are left out, and a drum key named by its GM name after an
 instrument another key plays keeps its notes on a numbered track ("Acoustic
-Bass Drum" beside "Bass Drum 1" is `KICK 2`).
+Bass Drum" beside "Bass Drum 1" is `KICK 2`). The export writes the notes of
+one tick note-offs first, then by key (the JS order of simultaneous note-offs
+was whatever its sort left); it leaves out a note whose velocity rounds to 0
+(the JS wrote a note-on at velocity 0, which MIDI reads as a note-off: the
+triangle velocity LFO, which goes below its `min`, makes such notes); and it
+writes track names in UTF-8 (the JS kept one byte per character), which the
+import reads, or Latin-1 when a name is not UTF-8.
 
 The window keeps the same three parts whatever is edited: one main editor in
 the top-left (the grid, the piano roll, the song panel, the synth editor, or
@@ -912,9 +918,9 @@ and `autoAssignTrackSounds`: their rules are this app's, written in the catalog
 The names the JS read otherwise are listed with what this app reads:
 `FILE_NAME_DEPARTURES` in `ordrumbox-core/tests/instruments.rs`, `DEPARTURES`
 in `ordrumbox-engine/tests/assign.rs` (kit `real`; those names are left out of
-the JS comparison), and `TRACK_NAME_DEPARTURES` in
-`ordrumbox-logic/tests/midi.rs` (GM key 44, "Pedal Hi-Hat", is a CHHK track,
-not a high bongo; key 35, "Acoustic Bass Drum", is `KICK 2`, not a bass). The
+the JS comparison). The MIDI import names GM key 44, "Pedal Hi-Hat", a CHHK
+track, not a high bongo, and key 35, "Acoustic Bass Drum", `KICK 2`, not a
+bass; its Rust snapshot holds these names (below). The
 JS fixtures hold no synth preset, so the synth fallback is checked by unit
 tests, like the rules themselves (`ordrumbox-core/src/instruments.rs`,
 `ordrumbox-engine/src/assign.rs`). The fixture script reads the JS catalog
@@ -956,26 +962,40 @@ node tools/export_gen_fixtures.mjs ../ordrumbox-v2
   `cargo test -p ordrumbox-logic --test compose -- --ignored` writes it, only
   when the drum lines change on purpose.
 
-MIDI files have a sixth script:
+MIDI files no longer have a script; their tests are Rust only
+(`ordrumbox-logic/tests/midi.rs`):
 
-```sh
-node tools/export_midi_fixtures.mjs ../ordrumbox-v2
-```
+- `ordrumbox-logic/tests/fixtures/midi/`: the MIDI files read, hand-made ones
+  covering the parser's paths (running status, sysex, truncation, garbage) and
+  exports of song.json patterns, first written by the JS app.
+- `ordrumbox-logic/tests/fixtures/midi_exports.json`: the patterns exported
+  (every song.json pattern the engine plays the same with any random stream,
+  and edge cases) with their loop counts (1 and 3), and the samples' root
+  notes; inputs only.
+- `ordrumbox-logic/tests/fixtures/midi_rust.txt`: what the parser reads of
+  each file (events, names, note-ons, program changes), the patterns the
+  import makes of it or its warning, and the exporter's bytes of each pattern.
+  Until it was written, all three matched the JS app, apart from the import
+  departures above; the export then left the JS where the departures above
+  say (the order of simultaneous note-offs, which depended on V8's TimSort;
+  silent notes; names in UTF-8). It also departs on its own: a note ends
+  where its key is struck again on its track, before its 16th is out, and
+  the notes of one key at one tick are one note at the loudest velocity, so
+  no key is struck while it sounds; the tempo track carries the text event
+  "Made with orDrumbox". Two tests check every export without the
+  snapshot: the notes of one tick come note-offs first, then by key; and the
+  file, accepted by a strict Standard MIDI File validator
+  (`ordrumbox-logic/tests/strict_smf/`, written from the spec apart from the
+  parser: header, chunks, deltas, running status, data bytes, sysex, the
+  meta events and their ranges, the tempo map on the first track, one end of
+  track, every note released), and signed by orDrumbox, holds on each track
+  exactly the notes the pattern engine plays, pass after pass (tick, channel,
+  key, velocity), no key struck while it sounds, each note ending a 16th
+  later or where its key is struck again.
+  `cargo test -p ordrumbox-logic --test midi -- --ignored` writes this file,
+  only when the parser, the import or the export changes on purpose.
 
-- `ordrumbox-logic/tests/fixtures/midi.json`: `parseMidi()` (events, names,
-  note-ons, program changes) of hand-made files covering the parser's paths
-  (running status, sysex, truncation, garbage) and of exports; the
-  exporter's bytes for every song.json pattern it plays the same with any
-  random stream, 1 and 3 loops; the patterns the import makes of each file;
-  and `Array.prototype.sort` permutations — the exporter sorts with a
-  comparator that contradicts itself, so the bytes depend on V8's TimSort,
-  which `ordrumbox_core::js::sort_by` reproduces step by step. The import
-  message of `long-format2.mid` departs (it says the notes past the 16th
-  pattern are left out; `CUT_FILES` in `tests/midi.rs`), so do the drum tracks
-  named from GM keys 44 and 35 (`TRACK_NAME_DEPARTURES`, above), and the refused
-  timings are checked in Rust only.
-
-The kit editor's sample analysis has a seventh script:
+The kit editor's sample analysis has a sixth script:
 
 ```sh
 node tools/export_kit_fixtures.mjs ../ordrumbox-v2
@@ -987,7 +1007,7 @@ node tools/export_kit_fixtures.mjs ../ordrumbox-v2
   silence, very short files, stereo, the kick.wav fixture). Rust decodes the
   same bytes and must report the same values exactly.
 
-The knobs and sliders have an eighth:
+The knobs and sliders have a seventh:
 
 ```sh
 node tools/export_control_fixtures.mjs ../ordrumbox-v2
@@ -1000,7 +1020,7 @@ node tools/export_control_fixtures.mjs ../ordrumbox-v2
   `formatSignedDb`, the loop point label), and `formatNoteTooltip` for a set of
   notes and track pitches.
 
-The piano roll has a tenth:
+The piano roll has a ninth:
 
 ```sh
 node tools/export_piano_fixtures.mjs ../ordrumbox-v2
@@ -1016,7 +1036,7 @@ node tools/export_piano_fixtures.mjs ../ordrumbox-v2
 - `ordrumbox-ui/tests/fixtures/piano_roll.json`: `NoteDrag` driven through a
   fake window (velocity, pitch, the axis lock, the bounds), and `midiName()`.
 
-The synth editor has an eleventh:
+The synth editor has a tenth:
 
 ```sh
 node tools/export_synth_fixtures.mjs ../ordrumbox-v2
@@ -1028,7 +1048,7 @@ node tools/export_synth_fixtures.mjs ../ordrumbox-v2
   and their scales, and `computeLfoMod()` for every target, wave and sync at
   several times.
 
-The song panel's commands have a ninth:
+The song panel's commands have an eighth:
 
 ```sh
 node tools/export_song_fixtures.mjs ../ordrumbox-v2
