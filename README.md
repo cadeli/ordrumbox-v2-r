@@ -1,12 +1,10 @@
-# orDrumbox (Rust)
-
-Native port of [ordrumbox-v2](https://github.com/cadeli/ordrumbox-v2), the web
-drum machine. Target: a single Windows `.exe` (developed on macOS, built for
-Windows by CI).
+# orDrumbox v2 (Rust)
 
 Note: the legacy orDrumbox V1, the old Java drum machine, has been largely
 improved upon and superseded; it is no longer current. This Rust port is the
 active version.
+
+The JavaScript/web v(ersion https://github.com/cadeli/ordrumbox-v2), is a web demo of this Rust version: it is less complete than the downloadable (native) version.
 
 ## Download
 
