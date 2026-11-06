@@ -1,4 +1,5 @@
-//! The JSON layer against files produced by the JS app (tools/export_fixtures.mjs).
+//! The JSON layer on the library files: reading then writing gives the input
+//! back, and writing what was read from a write gives the same text.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
 
@@ -57,10 +58,20 @@ fn song_json_pretty_round_trip_is_byte_identical() {
     assert_same_text(&(value.to_json_pretty(2) + "\n"), &raw, "song.json");
 }
 
+/// Writing is idempotent, compact and pretty: the text of a value read back
+/// from its own text is that text, and the value is the same.
 #[test]
-fn song_json_compact_matches_json_stringify() {
-    let value = json::parse(&read("song.json")).expect("song.json parses");
-    assert_same_text(&value.to_json(), &read("song.min.json"), "song.min.json");
+fn writing_is_idempotent() {
+    for name in ["song.json", "edge_library.json"] {
+        let value = json::parse(&read(name)).unwrap_or_else(|e| panic!("{name}: {e}"));
+        for (form, write) in [("compact", Value::to_json as fn(&Value) -> String), ("pretty", |v| v.to_json_pretty(2))]
+        {
+            let first = write(&value);
+            let reread = json::parse(&first).unwrap_or_else(|e| panic!("{name}, {form}: {e}"));
+            assert_eq!(reread, value, "{name}, {form}: the text does not hold the value");
+            assert_same_text(&write(&reread), &first, &format!("{name}, {form}"));
+        }
+    }
 }
 
 #[test]
@@ -72,18 +83,4 @@ fn song_json_has_the_expected_shape() {
         assert!(pattern.get("id").and_then(Value::as_str).is_some_and(|id| !id.is_empty()));
     }
     assert!(value.get("songs").and_then(Value::as_array).is_some());
-}
-
-#[test]
-fn flat_note_fixtures_round_trip() {
-    let dir = fixtures().join("flat_notes");
-    let mut count = 0;
-    for entry in fs::read_dir(&dir).expect("flat_notes dir") {
-        let path = entry.expect("dir entry").path();
-        let raw = fs::read_to_string(&path).expect("fixture readable");
-        let value = json::parse(&raw).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
-        assert_same_text(&(value.to_json() + "\n"), &raw, &path.display().to_string());
-        count += 1;
-    }
-    assert!(count > 0, "no fixture in {}", dir.display());
 }

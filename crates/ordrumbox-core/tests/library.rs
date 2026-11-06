@@ -1,9 +1,9 @@
-//! The model against the JS app: a library loaded then saved by Rust must hold
-//! what `fixPatterns` + `fixSongs` + `Exporter.export` produce in JS
-//! (`library.export.json`, `edge_library.export.json`, from tools/export_fixtures.mjs).
-//!
-//! Compared as JSON values with key order ignored: the JS exporter follows the
-//! accidental key order of each object, Rust writes a fixed order.
+//! A library loaded then saved, against its Rust snapshot: `song.json` (the
+//! demo library of the web version) and `edge_library.json` (hand-written:
+//! repairs, dropped clips, badly typed values). The snapshots,
+//! `library_rust.json` and `edge_library_rust.json`, are what the code saves
+//! of them; `write_the_snapshots` rewrites them when a load or a save changes
+//! on purpose.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
 
@@ -11,114 +11,90 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use ordrumbox_core::json::{self, Object, Value};
-use ordrumbox_core::{DroppedClip, Library, LoadReport, ids};
+use ordrumbox_core::{DroppedClip, Library, LoadReport};
 
-#[path = "support/web_keys.rs"]
-mod web_keys;
+/// Each input and the snapshot of its save.
+const SNAPSHOTS: [(&str, &str); 2] =
+    [("song.json", "library_rust.json"), ("edge_library.json", "edge_library_rust.json")];
 
 fn fixtures() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("fixtures")
 }
 
+fn read(name: &str) -> String {
+    fs::read_to_string(fixtures().join(name)).unwrap_or_else(|e| panic!("{name}: {e}"))
+}
+
 fn read_json(name: &str) -> Value {
-    let text = fs::read_to_string(fixtures().join(name)).unwrap_or_else(|e| panic!("{name}: {e}"));
-    json::parse(&text).unwrap_or_else(|e| panic!("{name}: {e}"))
+    json::parse(&read(name)).unwrap_or_else(|e| panic!("{name}: {e}"))
 }
 
 fn load(name: &str) -> (Library, LoadReport) {
     Library::from_json(&read_json(name))
 }
 
-/// First difference between two values, key order ignored.
-fn diff(rust: &Value, js: &Value, at: &str) -> Option<String> {
-    match (rust, js) {
-        (Value::Object(r), Value::Object(j)) => {
-            let missing =
-                j.iter().find(|(k, _)| !r.contains_key(k)).map(|(k, v)| format!("{at}.{k}: missing, JS has {v}"));
-            let extra = r.iter().find(|(k, _)| !j.contains_key(k)).map(|(k, v)| format!("{at}.{k}: {v}, JS has none"));
-            missing
-                .or(extra)
-                .or_else(|| r.iter().find_map(|(k, v)| j.get(k).and_then(|jv| diff(v, jv, &format!("{at}.{k}")))))
+/// First difference between two values, key order included.
+fn diff(actual: &Value, expected: &Value, at: &str) -> Option<String> {
+    match (actual, expected) {
+        (Value::Object(a), Value::Object(e)) => {
+            let keys = |o: &Object| o.iter().map(|(k, _)| k.to_owned()).collect::<Vec<_>>();
+            if keys(a) != keys(e) {
+                return Some(format!("{at}: keys {:?} vs {:?}", keys(a), keys(e)));
+            }
+            a.iter().find_map(|(k, v)| e.get(k).and_then(|ev| diff(v, ev, &format!("{at}.{k}"))))
         }
-        (Value::Array(r), Value::Array(j)) if r.len() == j.len() => {
-            r.iter().zip(j).enumerate().find_map(|(i, (rv, jv))| diff(rv, jv, &format!("{at}[{i}]")))
+        (Value::Array(a), Value::Array(e)) if a.len() == e.len() => {
+            a.iter().zip(e).enumerate().find_map(|(i, (av, ev))| diff(av, ev, &format!("{at}[{i}]")))
         }
-        _ if rust == js => None,
-        _ => Some(format!("{at}: {rust} vs JS {js}")),
+        _ if actual == expected => None,
+        _ => Some(format!("{at}: {actual} vs snapshot {expected}")),
     }
 }
 
-/// The JS output, minus the behaviours the port fixes on purpose:
-/// - `tags` saved as `{"0": "a"}` (a past bug) are written back as an array;
-/// - a pattern id with spaces is trimmed (JS trims it for the song lookup only,
-///   so clips can never match it).
-fn js_reference(name: &str) -> (Value, Vec<DroppedClip>) {
-    let mut reference = read_json(name);
-    let object = reference.as_object_mut().expect("object");
-    let dropped = object
-        .remove("dropped")
-        .and_then(|d| d.as_array().map(<[Value]>::to_vec))
-        .unwrap_or_default()
-        .iter()
-        .map(|d| DroppedClip {
-            pattern: d.get("pattern").and_then(Value::as_str).unwrap_or_default().to_owned(),
-            reason: match d.get("reason").and_then(Value::as_str) {
-                Some("unknown pattern id") => "unknown pattern id",
-                Some("clip has no pattern") => "clip has no pattern",
-                Some("clip is not an object") => "clip is not an object",
-                other => panic!("unexpected reason {other:?}"),
-            },
-        })
-        .collect();
-    for pattern in object.get_mut("patterns").and_then(Value::as_array_mut).expect("patterns") {
-        let pattern = pattern.as_object_mut().expect("pattern");
-        if let Some(Value::Object(tags)) = pattern.get("tags") {
-            let list = tags.iter().map(|(_, tag)| tag.clone()).collect();
-            pattern.insert("tags", Value::Array(list));
-        }
-        if let Some(id) = pattern.get("id").and_then(Value::as_str).map(str::trim).map(str::to_owned) {
-            pattern.insert("id", Value::from(id));
-        }
+/// Writes the snapshots from the code as it is: `cargo test -p ordrumbox-core
+/// --test library -- --ignored`, when a load or a save changes on purpose
+/// (`README.md`, "Golden fixtures").
+#[test]
+#[ignore = "writes the snapshots"]
+fn write_the_snapshots() {
+    for (input, snapshot) in SNAPSHOTS {
+        fs::write(fixtures().join(snapshot), load(input).0.to_file_text()).expect("written");
     }
-    // The web version writes its own key names.
-    (web_keys::current_keys(&reference), dropped)
-}
-
-/// Remove the tracks named `name` from every pattern.
-fn without_track(mut library: Value, name: &str) -> Value {
-    let patterns = library.as_object_mut().and_then(|o| o.get_mut("patterns")).and_then(Value::as_array_mut);
-    for pattern in patterns.expect("patterns") {
-        if let Some(tracks) = pattern.as_object_mut().and_then(|p| p.get_mut("tracks")).and_then(Value::as_array_mut) {
-            tracks.retain(|t| t.get("name").and_then(Value::as_str) != Some(name));
-        }
-    }
-    library
 }
 
 #[test]
-fn song_json_saves_what_the_js_exporter_saves() {
+fn a_loaded_library_saves_its_snapshot() {
+    for (input, snapshot) in SNAPSHOTS {
+        let saved = load(input).0.to_file_text();
+        let expected = read(snapshot);
+        if saved != expected {
+            let difference = diff(&json::parse(&saved).expect("saved text parses"), &read_json(snapshot), "");
+            panic!("{input} against {snapshot}: {}", difference.as_deref().unwrap_or("same values, other text"));
+        }
+    }
+}
+
+#[test]
+fn song_json_loads_without_issue() {
     let (library, report) = load("song.json");
-    let (reference, js_dropped) = js_reference("library.export.json");
     assert!(report.issues.is_empty(), "{:#?}", report.issues);
-    assert_eq!(report.dropped_clips, js_dropped);
+    assert!(report.dropped_clips.is_empty(), "{:#?}", report.dropped_clips);
     assert_eq!(library.patterns.len(), 42);
-    if let Some(difference) = diff(&library.to_json(), &reference, "") {
-        panic!("{difference}");
-    }
 }
 
 #[test]
-fn edge_cases_save_what_the_js_exporter_saves() {
-    let (library, report) = load("edge_library.json");
-    let (reference, js_dropped) = js_reference("edge_library.export.json");
-    assert_eq!(report.dropped_clips, js_dropped);
-    // Track ODD has a reordered noteKeys header and badly typed values: JS
-    // keeps them raw and writes garbage back; it is checked on its own below.
-    let rust = without_track(library.to_json(), "ODD");
-    let reference = without_track(reference, "ODD");
-    if let Some(difference) = diff(&rust, &reference, "") {
-        panic!("{difference}");
-    }
+fn edge_cases_drop_the_clips_they_cannot_play() {
+    let (_, report) = load("edge_library.json");
+    let dropped = |pattern: &str, reason| DroppedClip { pattern: pattern.to_owned(), reason };
+    assert_eq!(
+        report.dropped_clips,
+        [
+            dropped("ghost", "unknown pattern id"),
+            dropped("#3", "clip has no pattern"),
+            dropped("#4", "clip is not an object"),
+            dropped("#5", "clip is not an object"),
+        ]
+    );
 }
 
 #[test]
@@ -141,7 +117,10 @@ fn edge_cases_repair_and_report() {
             "songs[4]: Each song must be a JSON object, skipped",
         ]
     );
+    // An id with spaces is trimmed, so that clips can name it; tags saved as
+    // an object (`{"0": "a"}`, a past bug) are read as a list.
     assert_eq!(library.patterns[3].id, "spaced");
+    assert_eq!(library.patterns[1].tags, ["legacy", "object"]);
 }
 
 /// Saving rounds some values to 2 decimals (as the JS exporter does), so the
@@ -161,16 +140,6 @@ fn saving_is_stable() {
 }
 
 #[test]
-fn slugify_matches_js() {
-    let cases = read_json("slugify.json");
-    for case in cases.as_array().expect("array") {
-        let [input, expected] = case.as_array().expect("pair") else { panic!("pair expected") };
-        let (input, expected) = (input.as_str().unwrap(), expected.as_str().unwrap());
-        assert_eq!(ids::slugify(input), expected, "slugify({input:?})");
-    }
-}
-
-#[test]
 fn infos_are_kept_as_written() {
     let (library, _) = load("song.json");
     let infos: &Object = &library.info;
@@ -179,8 +148,9 @@ fn infos_are_kept_as_written() {
 
 #[test]
 fn a_saved_library_loads_back_to_the_same_file() {
-    // song.json has the JS key names; the save writes the current ones. The
-    // file, not the model, is compared: a save rounds some values (0.792 -> 0.79).
+    // song.json has the web version's key names; the save writes the current
+    // ones. The file, not the model, is compared: a save rounds some values
+    // (0.792 -> 0.79).
     for name in ["song.json", "edge_library.json"] {
         let (library, _) = load(name);
         let saved = library.to_json();

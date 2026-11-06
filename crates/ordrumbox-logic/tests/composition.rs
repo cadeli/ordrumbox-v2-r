@@ -1,35 +1,59 @@
-//! The chord progressions against the JS `getSequence()` and
-//! `buildSequenceNotes()` (`composition.json`, from
-//! tools/export_piano_fixtures.mjs): every progression, indices past both
-//! ends, several tonics and pattern lengths.
+//! The chord progressions of the keyboard menu's "Add sequence" against their
+//! Rust snapshot, `composition_rust.txt`: every progression, indices past
+//! both ends, several tonics and pattern lengths. `write_the_snapshot`
+//! rewrites it when a progression changes on purpose.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
 
-use std::path::Path;
+use std::fmt::Write as _;
+use std::fs;
+use std::path::PathBuf;
 
-use ordrumbox_core::json::{self, Value};
-use ordrumbox_logic::composition::{progression, progression_notes};
+use ordrumbox_logic::composition::{PROGRESSIONS, progression, progression_notes};
+
+const TONICS: [f64; 3] = [0.0, -5.0, 7.0];
+const BEAT_COUNTS: [i32; 7] = [0, 1, 3, 4, 7, 8, 16];
+
+/// One line a case: `<index> <id> <name> tonic <t> beats <b>:` then each
+/// note, `beat:pitch`.
+fn rust_snapshot() -> Vec<String> {
+    let len = PROGRESSIONS.len() as i64;
+    let mut lines = Vec::new();
+    for index in -2..len + 2 {
+        let s = progression(index);
+        for tonic in TONICS {
+            for beat_count in BEAT_COUNTS {
+                let mut line = format!("{index} {} {} tonic {tonic} beats {beat_count}:", s.id, s.name);
+                for (beat, pitch) in progression_notes(s, tonic, beat_count) {
+                    write!(line, " {beat}:{pitch}").unwrap();
+                }
+                lines.push(line);
+            }
+        }
+    }
+    lines
+}
+
+fn snapshot_path() -> PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/composition_rust.txt")
+}
+
+/// Writes `composition_rust.txt` from the progressions as they are: `cargo
+/// test -p ordrumbox-logic --test composition -- --ignored`, when a
+/// progression changes on purpose (`README.md`, "Golden fixtures").
+#[test]
+#[ignore = "writes the snapshot"]
+fn write_the_snapshot() {
+    fs::write(snapshot_path(), rust_snapshot().join("\n") + "\n").expect("written");
+}
 
 #[test]
-fn sequences_match_build_sequence_notes() {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/composition.json");
-    let fixture = json::parse(&std::fs::read_to_string(path).unwrap()).unwrap();
-    let num = |o: &Value, key: &str| o.get(key).and_then(Value::as_f64).unwrap();
-    for case in fixture.get("sequences").and_then(Value::as_array).unwrap() {
-        let s = progression(num(case, "index") as i64);
-        assert_eq!(s.id, case.get("id").and_then(Value::as_str).unwrap());
-        assert_eq!(s.name, case.get("name").and_then(Value::as_str).unwrap());
-        let got = progression_notes(s, num(case, "tonic"), num(case, "beatCount") as i32);
-        let expected: Vec<(i32, f64)> = case
-            .get("notes")
-            .and_then(Value::as_array)
-            .unwrap()
-            .iter()
-            .map(|n| {
-                assert_eq!(num(n, "beatStep"), 0.0);
-                (num(n, "beat") as i32, num(n, "pitch"))
-            })
-            .collect();
-        assert_eq!(got, expected, "{}", case.to_json());
+fn progressions_match_their_snapshot() {
+    let text = fs::read_to_string(snapshot_path()).expect("tests/fixtures/composition_rust.txt");
+    let expected: Vec<&str> = text.lines().collect();
+    let actual = rust_snapshot();
+    assert_eq!(actual.len(), expected.len(), "snapshot lines");
+    for (actual, expected) in actual.iter().zip(expected) {
+        assert_eq!(actual, expected);
     }
 }

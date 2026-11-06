@@ -1,18 +1,17 @@
-//! Stable identifiers (`src/core/ids.js`): pattern and song ids are slugs of
+//! Stable identifiers: pattern and song ids are slugs of
 //! their names, made unique within a library, and never rewritten afterwards.
 
 use std::collections::HashSet;
 
-/// Maximum slug length, like `slice(0, 48)` in ids.js.
+/// Maximum slug length.
 const MAX_SLUG_LEN: usize = 48;
 
 /// Lowercase alphanumerics and single dashes, no dash at either end, at most 48
 /// characters. Accented Latin letters lose their accent (`Ébauche` → `ebauche`);
 /// any other character separates words. `""` when nothing is sluggable.
 ///
-/// Same output as `slugify()` in ids.js (`normalize('NFD')`, strip
-/// U+0300–U+036F, lowercase, `[^a-z0-9]+` → `-`), without a Unicode table
-/// dependency: see `fold_char`.
+/// The fold is Unicode's canonical decomposition with the combining accents
+/// (U+0300–U+036F) left out, lowercased, as a table: see `fold_char`.
 pub fn slugify(value: &str) -> String {
     let mut slug = String::new();
     let mut pending_dash = false;
@@ -105,6 +104,49 @@ const FOLD_RANGES: [(u32, &str); 3] = [
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Names and their slugs: ASCII, every accented Latin letter folded,
+    /// letters with no ASCII form, combining accents, look-alike signs, other
+    /// scripts and emoji, separators only, the 48-character cut.
+    const SLUGS: [(&str, &str); 18] = [
+        ("Rock 8a", "rock-8a"),
+        ("  Bossa Nova  ", "bossa-nova"),
+        ("Ébauche n°1", "ebauche-n-1"),
+        ("Ça déménage à Noël", "ca-demenage-a-noel"),
+        ("ÀÁÂÃÄÅàáâãäåÇçÈÉÊËèéêëÌÍÎÏìíîïÑñÒÓÔÕÖòóôõöÙÚÛÜùúûüÝýÿ", "aaaaaaaaaaaacceeeeeeeeiiiiiiiinnoooooooooouuuuuu"),
+        (
+            "ĀāĂăĄąĆćĈĉĊċČčĎďĒēĔĕĖėĘęĚěĜĝĞğĠġĢģĤĥĨĩĪīĬĭĮįİĴĵĶķĹĺĻļĽľŃńŅņŇňŌōŎŏŐőŔŕŖŗŘřŚśŜŝŞşŠšŢţŤťŨũŪūŬŭŮůŰűŲųŴŵŶŷŸŹźŻżŽž",
+            "aaaaaaccccccccddeeeeeeeeeegggggggghhiiiiiiiiijjk",
+        ),
+        ("Ǎǎǐǒǔǖǘǚǜǧǩǫǭǰǵǹȁȃȅȇȉȋȍȏȑȓȕȗșțȟȧȩȫȭȯȱȳ", "aaiouuuuugkoojgnaaeeiioorruusthaeooooy"),
+        (
+            "ḀḁḂḃḄḅḆḇẠạẢảẤấẦầẪẫẬậẮắẰằẲẳẴẵẶặẸẹẺẻẼẽẾếỀềỂểỄễỆệỈỉỊịỌọỎỏỐốỒồỔổỖỗỘộỚớỜờỞởỠỡỢợỤụỦủỨứỪừỬửỮữỰựỲỳỴỵỶỷỸỹ",
+            "aabbbbbbaaaaaaaaaaaaaaaaaaaaaaeeeeeeeeeeeeeeeeii",
+        ),
+        ("Straße Œuvre Æsir Øresund Łódź Đà Nẵng ıi", "stra-e-uvre-sir-resund-odz-a-nang-i"),
+        ("e\u{0301}te\u{0300} combining", "ete-combining"),
+        ("Kelvin \u{212A} Ångström \u{212B}", "kelvin-k-angstrom-a"),
+        ("Ωmega Δelta 漢字 🥁 drums", "mega-elta-drums"),
+        ("***", ""),
+        ("", ""),
+        ("---a---b---", "a-b"),
+        (
+            "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        ),
+        (
+            "ÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉ",
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        ),
+        ("TR-808 / TR-909 (2026)", "tr-808-tr-909-2026"),
+    ];
+
+    #[test]
+    fn slugify_folds_accents_and_separates_words() {
+        for (name, slug) in SLUGS {
+            assert_eq!(slugify(name), slug, "slugify({name:?})");
+        }
+    }
 
     #[test]
     fn fold_table_covers_490_characters() {

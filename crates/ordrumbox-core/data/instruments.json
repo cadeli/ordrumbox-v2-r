@@ -34,7 +34,6 @@
       "name": "Percussion",
       "ids": [
         "COWBELL",
-        "TAMB",
         "TAMBOURINE",
         "SHAKER",
         "MARACAS",
@@ -891,22 +890,12 @@
       ]
     },
     {
-      "id": "TAMB",
-      "drum": true,
-      "pan": "0",
-      "synonyms": [".*TAMB.*"],
-      "words": ["TMB", "TMBR"],
-      "subst": ["SHAKER", "MARACAS", "TAMBOURINE", "CHH"],
-      "midi": [
-        {"channel": 9, "name": "Tambourine", "key": 54, "program": null, "keyBased": true}
-      ]
-    },
-    {
       "id": "TAMBOURINE",
       "drum": true,
       "pan": "-2",
       "synonyms": [".*TAMB.*"],
-      "subst": ["TAMB", "SHAKER", "MARACAS", "OHH"],
+      "words": ["TAMB", "TMB", "TMBR"],
+      "subst": ["SHAKER", "MARACAS", "OHH", "CHH"],
       "midi": [
         {"channel": 9, "name": "Tambourine", "key": 54, "program": null, "keyBased": true}
       ]

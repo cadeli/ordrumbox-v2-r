@@ -803,21 +803,26 @@ when a sample stands in (`for CONGAS: real/tom.wav`). The unit tests of
 `instruments.rs` check that no word names two instruments and that every id
 the catalog names exists.
 
-One test follows the whole chain, `ordrumbox-ui/src/kit_import_tests.rs`:
-five folders of WAV files named as drum machines and sample packs name them
-(Roland's `BD`/`CL`/`RS`, short spellings, NI, Splice, Ableton) are imported as
-kits, and 18 canonical tracks are played in each with the app's synth presets.
-Its table of what each track gets, first and last candidate, and whether the
-sample stands in, is written by hand: a change in it is a change of what a user
-hears, to check by ear before the table is updated.
+One test follows the whole chain, `ordrumbox-ui/src/assign_tests.rs`: 62
+track names are played, with the app's synth presets, in each kit the app
+ships with (`assets/data/kits.json`, all in one bank, so a kit lacking an
+instrument borrows it) and in five folders of WAV files named as drum machines
+and sample packs name them (Roland's `BD`/`CL`/`RS`, short spellings, NI,
+Splice, Ableton), each imported as a kit. The names are the canonical tracks,
+then names as songs and files spell them (`bd808`, `Kick 2`, `open-hat`,
+`Électro kick`, `LOW TOM`), melodic instruments, and names that find nothing
+(`xyz`, the empty name). Its table of what each track gets, first and last
+candidate, and whether the sample stands in, is written by hand: a change in
+it is a change of what a user hears, to check by ear before the table is
+updated.
 
 ## Golden fixtures
 
 The fixtures are committed: the tests need nothing outside this repository.
 They were produced by the JS app (ordrumbox-v2), from which this one was ported,
 with the scripts of `tools/`, which need a checkout of it only to make them
-again. They hold the JS names of the keys; the tests compare after
-`web_keys::current_keys` (`crates/ordrumbox-core/tests/support/`).
+again. They hold the JS names of the keys, which the load reads as
+alternative spellings.
 
 The JS app is no longer the reference: the fixtures only guard against
 regressions, and are to be replaced over time by pure Rust tests. A test that
@@ -825,45 +830,58 @@ fails signals a change of behaviour; if it is not meant, the code is wrong. A
 change meant on purpose moves the cases concerned to a Rust snapshot or a
 property test, and is noted here, as the synth voice's departures are below.
 
-`tools/export_fixtures.mjs` runs the JS app's code on
-`assets/data/song.json` and writes `crates/ordrumbox-core/tests/fixtures/`:
+The fixtures of `crates/ordrumbox-core/tests/fixtures/` need no script:
 
-```sh
-node tools/export_fixtures.mjs ../ordrumbox-v2
-```
-
-- `song.json` / `song.min.json`: the JSON writer must reproduce both byte for byte.
-- `library.export.json`: `song.json` loaded by the app (`fixPatterns`, `fixSongs`)
-  and saved by its exporter; `Library` must hold the same values (compared
-  after `web_keys::current_keys` (`crates/ordrumbox-core/tests/support/`), the JS key names being the web version's).
-- `edge_library.json` (hand-written, kept by the script) and
-  `edge_library.export.json`: the same check on cases `song.json` does not reach.
-- `slugify.json`: pattern/song id slugs.
-- `flat_notes/<id>.json`: `recomputeFlatNotes()` for passes 0–3 of every
-  pattern of `song.json` and of `engine_cases.json` (hand-written, kept by the
-  script), loaded the way the app boots (`fixPatterns` then
-  `importPatternFromJson`). A pass is deterministic when three different
-  `Math.random` streams give the same notes: Rust must give exactly those notes
-  and draw no randomness. The other passes are checked by properties.
+- `song.json`: the web version's demo library (its `assets/data/song.json`),
+  copied verbatim; an input of the tests of every crate, not a JS output.
+  Read then written (pretty, two spaces) it gives back its own text byte for
+  byte, and writing is idempotent, compact and pretty (`song_json.rs`).
+- `edge_library.json` (hand-written): what `song.json` does not reach
+  (repairs, dropped clips, badly typed values, legacy tags).
+- `engine_cases.json` (hand-written): pattern-engine paths `song.json` does
+  not reach (arpeggios, euclidean fills, variation, a 3-a-beat grid…).
+- `library_rust.json` / `edge_library_rust.json`: Rust snapshots of what the
+  library saves of these two files once loaded (`library.rs`; `cargo test -p
+  ordrumbox-core --test library -- --ignored` rewrites them, for a load or a
+  save changed on purpose). They replace the JS exporter's output
+  (`library.export.json`, `edge_library.export.json`); when they were written,
+  `song.json` saved the same values as the JS app, and so did
+  `edge_library.json` apart from three fixes: its track `ODD`, which the JS
+  app wrote back unrepaired, tags saved as an object (`{"0": "a"}`), written
+  back as a list, and a pattern id with spaces, trimmed.
+- The id slugs are a table in the unit tests of `ids.rs` (they were
+  `slugify.json`, from the JS app's `slugify()`).
+- `flat_notes_rust.txt`: the Rust snapshot of what the pattern engine plays
+  in passes 0–3 of every pattern of `song.json` and `engine_cases.json`, with
+  seed 7, one line a pass (`flat_notes.rs`; `cargo test -p ordrumbox-core
+  --test flat_notes -- --ignored` rewrites it). A pass is `fixed` when it
+  draws no randomness, and must then give the same notes for every seed; the
+  other passes are also checked by properties (reproducible, sources and
+  velocities in range, the variation budget). It replaces `flat_notes/<id>.json`,
+  the JS `recomputeFlatNotes()`; when it was written, every pass gave the
+  JS notes, ticks scaled by 3 (below), and the same passes drew randomness,
+  except the patterns on a 3-a-beat grid, `shuffle` and `case-grid3`, whose
+  ticks the JS rounded.
 - The JS app counted 32 ticks a beat; the engine counts 96 (`TICK`), so
   that triplets (3, 6, 12, 24 steps a beat) fall on whole ticks instead of
-  being rounded. `flat_notes.rs` scales the fixture's ticks by 3; the
-  patterns on a 3-a-beat grid, `shuffle` and `case-grid3`, differ from their
-  fixture for this, and `flat_notes.rs` holds their new ticks
-  (`DEPARTURES`). The LFO fixture is read at the same beat positions.
+  being rounded. The LFO fixture is read at the same beat positions.
 - Unlike the JS app, which floors a loop's length in ticks and adds it again
   each loop, the engine rounds each repeat of a looped note from its own step:
   a loop of 4 steps at 5 a beat (76.8 ticks) repeats at ticks 0, 77, 154,
   230, 307, as the steps 0, 4, 8, 12, 16 of the full track, not 0, 76, 152,
-  228, 304. No fixture has such a loop; `pattern_engine.rs` tests it.
+  228, 304. `pattern_engine.rs` tests it.
 - In the same way, repeats and arpeggio notes are rounded from their exact
   place, not spaced by a rounded spacing: at 5 a beat, repeats a step apart
   (19.2 ticks) fall at 0, 19, 38, 58, not 0, 19, 38, 57. A euclidean onset
   lands on the tick of its own step, as a note written there.
   `pattern_engine.rs` tests both.
-
-Re-run the script only when `song.json` changes; this app no longer follows
-changes of the JS engine.
+- `sub_positions_rust.txt`: the Rust snapshot of a note's sub-positions (the
+  piano roll's ghosts: retriggers, arpeggio steps, euclidean fills) on every
+  track of `song.json` and on hand-made tracks (`sub_positions.rs`; `cargo
+  test -p ordrumbox-core --test sub_positions -- --ignored` rewrites it). It
+  replaces `sub_positions.json`, the JS `getNoteSubPositions()`, which it
+  matched when written (a random arpeggio's pitches apart: the JS drew them,
+  the snapshot holds seed 1's).
 
 The audio processors have their own script, which runs the JS AudioWorklet
 processors in Node (a minimal worklet scope, 128-frame quanta):
@@ -933,38 +951,42 @@ step: stack sizes, descriptions, return values, patterns and arrangements.
 They matched, apart from one description: shortening a loop is "Shorten loop
 on" a track (the JS said "Loop point back on").
 
-Sound assignment, song playback and WAV encoding have a third script (the
-instrument catalog is not generated: "Instrument catalog", above):
+Sound assignment, song playback and WAV encoding no longer have a script;
+their tests are Rust only (the instrument catalog is not generated:
+"Instrument catalog", above):
 
-```sh
-node tools/export_assign_fixtures.mjs ../ordrumbox-v2
-```
+- `ordrumbox-core/tests/instruments.rs`: tables of what `by_id`, `by_name`
+  and `from_file_name` find for a list of names (the demo library's track
+  names, its kits' sample names, hand-picked spellings), and of the instrument
+  of every GM drum key and program. They replace `instruments.json`, the JS
+  `findById`, `findByName`, `findInstrumentFromFileName` and MIDI lookups.
+- The same file: tables of the clips a song plays, tick by tick, for the demo
+  song and a hand-made one (overlapping and fractional clips, a clip of an
+  unknown pattern, the loop wrapping). They replace `song_sources.json`, the
+  JS `resolveSongSources()`.
+- `ordrumbox-ui/src/assign_tests.rs` ("Instrument catalog", above): the
+  auto-assignment in the shipped kits. It replaces `assign.json`, the JS
+  `AutoAssign` for a list of track names in the web version's kits, which the
+  Rust code matched when the fixture was dropped (the names the detection
+  reads otherwise apart, below); its 58 names are all in the table.
+- The unit tests of `ordrumbox-engine/src/wav.rs`: the header and samples of
+  the 16-bit WAV export, and a write then read that gives back the samples
+  quantized. They replace `wav.json`, the JS `bufferToWav()` bytes, which
+  `encode` matched byte for byte.
 
-- `ordrumbox-core/tests/fixtures/instruments.json`: catalog lookups
-  (`findById`, `findByName`, `findInstrumentFromFileName`, MIDI note and program).
-- `ordrumbox-core/tests/fixtures/song_sources.json`: `resolveSongSources()`
-  tick by tick for the demo song and a hand-made one.
-- `ordrumbox-engine/tests/fixtures/assign.json`: `AutoAssign` for every track
-  name in every kit, with `Math.random` pinned to the first and to the last
-  candidate.
-- `ordrumbox-engine/tests/fixtures/wav.json`: `bufferToWav()` bytes.
+When they were written, these tests matched the JS app but for the names the
+detection reads otherwise on purpose, its rules being this app's, written in
+the catalog ("Instrument catalog", above): "hat" is a closed hi-hat, "LOW TOM"
+the low tom, "tom_hi" the high tom, "vox" an ensemble, "Snare Rim" a rimshot,
+"COW BELL" a cowbell and "conga low" the low conga (the JS found an open
+hi-hat, a high tom, a high bongo, nothing, a snare, a percussion and a muted
+high conga). The MIDI import names GM key 44, "Pedal Hi-Hat", a CHHK track,
+not a high bongo, and key 35, "Acoustic Bass Drum", `KICK 2`, not a bass; its
+Rust snapshot holds these names (below). The synth fallback is checked by
+unit tests, like the rules themselves (`ordrumbox-core/src/instruments.rs`,
+`ordrumbox-engine/src/assign.rs`).
 
-The detection and the auto-assignment depart from `findInstrumentFromFileName`
-and `autoAssignTrackSounds`: their rules are this app's, written in the catalog
-("Instrument catalog", above).
-
-The names the JS read otherwise are listed with what this app reads:
-`FILE_NAME_DEPARTURES` in `ordrumbox-core/tests/instruments.rs`, `DEPARTURES`
-in `ordrumbox-engine/tests/assign.rs` (kit `real`; those names are left out of
-the JS comparison). The MIDI import names GM key 44, "Pedal Hi-Hat", a CHHK
-track, not a high bongo, and key 35, "Acoustic Bass Drum", `KICK 2`, not a
-bass; its Rust snapshot holds these names (below). The
-JS fixtures hold no synth preset, so the synth fallback is checked by unit
-tests, like the rules themselves (`ordrumbox-core/src/instruments.rs`,
-`ordrumbox-engine/src/assign.rs`). The fixture script reads the JS catalog
-for the JS side of these comparisons; the app reads its own.
-
-The generators have a fourth script; it also writes the variant tables the
+The generators have a second script; it also writes the variant tables the
 port reads (`ordrumbox-logic/data/generators.json`):
 
 ```sh
@@ -999,6 +1021,12 @@ node tools/export_gen_fixtures.mjs ../ordrumbox-v2
   figures, closeness to the weights, coupling) are in `tests/compose.rs`.
   `cargo test -p ordrumbox-logic --test compose -- --ignored` writes it, only
   when the drum lines change on purpose.
+- `ordrumbox-logic/tests/fixtures/composition_rust.txt`: the notes of the
+  chord progressions of "Add sequence", for every progression (indices past
+  both ends too), three tonics and seven pattern lengths (`tests/composition.rs`;
+  `cargo test -p ordrumbox-logic --test composition -- --ignored` writes it).
+  It replaces `composition.json`, the JS `buildSequenceNotes()`, which it
+  matched when written.
 
 MIDI files no longer have a script; their tests are Rust only
 (`ordrumbox-logic/tests/midi.rs`):
@@ -1034,7 +1062,7 @@ MIDI files no longer have a script; their tests are Rust only
   `cargo test -p ordrumbox-logic --test midi -- --ignored` writes this file,
   only when the parser, the import or the export changes on purpose.
 
-The kit editor's sample analysis has a fifth script:
+The kit editor's sample analysis has a third script:
 
 ```sh
 node tools/export_kit_fixtures.mjs ../ordrumbox-v2
@@ -1046,7 +1074,7 @@ node tools/export_kit_fixtures.mjs ../ordrumbox-v2
   silence, very short files, stereo, the kick.wav fixture). Rust decodes the
   same bytes and must report the same values exactly.
 
-The knobs and sliders have a sixth:
+The knobs and sliders have a fourth:
 
 ```sh
 node tools/export_control_fixtures.mjs ../ordrumbox-v2
@@ -1059,23 +1087,16 @@ node tools/export_control_fixtures.mjs ../ordrumbox-v2
   `formatSignedDb`, the loop point label), and `formatNoteTooltip` for a set of
   notes and track pitches.
 
-The piano roll has a seventh:
+The piano roll has a fifth:
 
 ```sh
 node tools/export_piano_fixtures.mjs ../ordrumbox-v2
 ```
 
-- `ordrumbox-core/tests/fixtures/sub_positions.json`: `getNoteSubPositions()`
-  (the ghosts) on every track of `song.json` and on hand-made notes
-  (retriggers at every rate, euclidean fills and rotations, loop points,
-  every arpeggio form; a random arpeggio's pitches are drawn, so only its
-  steps are compared).
-- `ordrumbox-logic/tests/fixtures/composition.json`: `getSequence()` and
-  `buildSequenceNotes()` for every progression, tonic and length.
 - `ordrumbox-ui/tests/fixtures/piano_roll.json`: `NoteDrag` driven through a
   fake window (velocity, pitch, the axis lock, the bounds), and `midiName()`.
 
-The synth editor has an eighth:
+The synth editor has a sixth:
 
 ```sh
 node tools/export_synth_fixtures.mjs ../ordrumbox-v2
