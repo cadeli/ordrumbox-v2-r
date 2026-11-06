@@ -11,7 +11,7 @@
 //! widgets).
 //!
 //! The song panel (F3) and the piano roll (F4) take the grid's place:
-//! `session_song.rs`, `session_roll.rs`.
+//! `session_song*.rs`, `session_roll.rs`.
 //!
 //! The grid follows the JS pattern panel (`pointer_section.js`,
 //! `keyboard_section.js`, `clipboard_section.js`): a click on an empty step
@@ -113,6 +113,12 @@ mod session_scenarios;
 mod session_selection;
 #[path = "session_song.rs"]
 mod session_song;
+#[path = "session_song_files.rs"]
+mod session_song_files;
+#[path = "session_song_menu.rs"]
+mod session_song_menu;
+#[path = "session_song_mouse.rs"]
+mod session_song_mouse;
 #[path = "session_synth.rs"]
 mod session_synth;
 #[path = "session_transport.rs"]

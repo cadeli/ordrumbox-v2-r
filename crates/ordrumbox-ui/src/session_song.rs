@@ -13,20 +13,18 @@
 //!
 //! Songs are saved to `songs/` in the user data folder (the JS IndexedDB
 //! store) and, with Save as and Export, to a folder picked, as `.odbox` files.
+//!
+//! The mouse is in `session_song_mouse.rs`, the menus and the edits they
+//! lead to in `session_song_menu.rs`, song files in `session_song_files.rs`.
 
-use std::time::{SystemTime, UNIX_EPOCH};
-
-use ordrumbox_core::json::{self, Value};
-use ordrumbox_core::num;
-use ordrumbox_core::song::measures_for_pattern;
+use ordrumbox_core::Song;
+use ordrumbox_core::json::Value;
 use ordrumbox_core::steps::TICK;
-use ordrumbox_core::{Song, SongClip};
 
-use super::session_grid::moved_index;
-use super::session_panel::{DOUBLE_CLICK, PanelLayout};
+use super::session_panel::PanelLayout;
 use super::*;
 use crate::panel::{self, Item, Kind, Rect};
-use crate::song_view::{self, Axis, Row, SongGhost, SongHit, SongLayout, SongView};
+use crate::song_view::{self, Row, SongLayout, SongView};
 use crate::theme;
 
 /// The column's buttons: id and label.
@@ -45,7 +43,7 @@ pub(super) const DRAG_START_PX: i32 = 3;
 
 /// What a drag on the song panel carries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum DragSource {
+pub(super) enum DragSource {
     /// A pattern of the list.
     Pattern(usize),
     /// A clip, held `grab` measures after its start.
@@ -58,32 +56,32 @@ enum DragSource {
 /// the release, so a drag is one undo step and playback hears only the result.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct SongDrag {
-    source: DragSource,
-    press: (i32, i32),
+    pub(super) source: DragSource,
+    pub(super) press: (i32, i32),
     /// Where the pointer is.
-    x: i32,
-    y: i32,
+    pub(super) x: i32,
+    pub(super) y: i32,
     /// The pointer has really moved: this is no longer a click.
-    started: bool,
+    pub(super) started: bool,
     /// What it was pressed on; another edit or arrangement cancels the drag.
-    revision: u64,
-    song: usize,
+    pub(super) revision: u64,
+    pub(super) song: usize,
 }
 
 /// The song panel's scrolls and what the mouse holds in it.
 #[derive(Debug, Default)]
 pub(super) struct SongPanel {
     /// First measure and first row of the arrangement shown.
-    scroll: (u32, usize),
+    pub(super) scroll: (u32, usize),
     /// The pattern whose description is scrolled, and its first line shown.
-    description_scroll: (usize, usize),
+    pub(super) description_scroll: (usize, usize),
     /// The pattern selected when the pattern list was scrolled, and its first row shown.
-    list_scroll: (usize, usize),
+    pub(super) list_scroll: (usize, usize),
     /// The clip under the mouse (its tooltip).
-    hovered_clip: Option<usize>,
-    drag: Option<SongDrag>,
+    pub(super) hovered_clip: Option<usize>,
+    pub(super) drag: Option<SongDrag>,
     /// The arrangement's scroll bar held by the mouse.
-    bar_drag: Option<crate::song_view::Axis>,
+    pub(super) bar_drag: Option<crate::song_view::Axis>,
 }
 
 impl SongPanel {
@@ -109,10 +107,6 @@ impl SongPanel {
 
 /// What is shown for a song without a name.
 const UNTITLED: &str = "Untitled";
-
-fn now_ms() -> f64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map_or(0.0, |d| d.as_millis() as f64)
-}
 
 impl Session {
     // ─── State ───────────────────────────────────────────────────────────────
@@ -194,13 +188,13 @@ impl Session {
 
     /// The measure the playhead is on: where the song
     /// plays, else the cursor. What a pattern is added at from the lists.
-    fn playhead_measure(&self) -> u32 {
+    pub(super) fn playhead_measure(&self) -> u32 {
         self.song_cursor_measure().floor() as u32
     }
 
     /// First measure and first row shown: while the song plays, the page
     /// the cursor is on; else where the wheel left them.
-    fn song_scroll(&self, layout: &SongLayout, rows: usize) -> (u32, usize) {
+    pub(super) fn song_scroll(&self, layout: &SongLayout, rows: usize) -> (u32, usize) {
         if self.song().is_none() {
             return (0, 0);
         }
@@ -215,13 +209,13 @@ impl Session {
     }
 
     /// Measures the arrangement's grid spans: the song, and the room to drop on.
-    fn song_measure_total(&self, layout: &SongLayout) -> u32 {
+    pub(super) fn song_measure_total(&self, layout: &SongLayout) -> u32 {
         self.song().map_or(0, |song| song.length_measures().max(1.0).ceil() as u32 + self.song_room(layout))
     }
 
     /// The first line of the selected pattern's description shown, kept so
     /// that the frame is full; another pattern shows from its first line.
-    fn description_scroll(&self, layout: &SongLayout) -> usize {
+    pub(super) fn description_scroll(&self, layout: &SongLayout) -> usize {
         let (p, first) = self.song_panel.description_scroll;
         let Some(pattern) = self.pattern().filter(|_| p == self.pattern_index) else { return 0 };
         first.min(layout.description_lines(&pattern.description).len().saturating_sub(layout.description_rows()))
@@ -229,7 +223,7 @@ impl Session {
 
     /// The pattern list's first row shown: where the wheel or the bar left
     /// it, moved just enough to show a pattern selected since.
-    fn list_scroll(&self, layout: &SongLayout) -> usize {
+    pub(super) fn list_scroll(&self, layout: &SongLayout) -> usize {
         let (p, mut first) = self.song_panel.list_scroll;
         if p != self.pattern_index {
             let selected = self.pattern_index;
@@ -458,7 +452,7 @@ impl Session {
 
     /// Aim the cursor at `measure`: play starts there, and
     /// a song playing goes there at once.
-    fn set_song_cursor(&mut self, measure: u32) {
+    pub(super) fn set_song_cursor(&mut self, measure: u32) {
         self.song_cursor = measure;
         if self.song_playing()
             && let Some(controller) = self.playback.controller_mut()
@@ -480,667 +474,17 @@ impl Session {
     pub(super) fn song_start(&self) -> u64 {
         u64::from(self.song_cursor)
     }
-
-    // ─── The mouse ───────────────────────────────────────────────────────────
-
-    /// A click on the song panel's list or arrangement; whether it was theirs.
-    pub fn song_click(&mut self, size: (i32, i32, i32), x: i32, y: i32, button: Button) -> bool {
-        let layout = self.song_layout(size);
-        let rows = self.song_rows();
-        let Some(hit) = layout.hit(&self.song_view_data(&rows, &layout), x, y) else { return false };
-        match (hit, button) {
-            (SongHit::Pattern(p), Button::Left) => {
-                let id = Id::SongPattern(p);
-                let now = Instant::now();
-                let double =
-                    self.chrome.widgets.last_click.is_some_and(|(last, at)| last == id && now - at < DOUBLE_CLICK);
-                self.chrome.widgets.last_click = if double { None } else { Some((id, now)) };
-                if double {
-                    self.add_at_playhead(p);
-                } else {
-                    self.step_pattern(p as isize - self.pattern_index as isize);
-                    self.press_song_drag(DragSource::Pattern(p), x, y);
-                }
-            }
-            (SongHit::Clip(clip), Button::Left) => {
-                let first = self.song_scroll(&layout, rows.len()).0;
-                let start = self.song().and_then(|s| s.clips.get(clip)).map_or(0, |c| c.start_measure);
-                let grab = layout.measure_at(x, first).saturating_sub(start);
-                self.press_song_drag(DragSource::Clip { clip, grab }, x, y);
-            }
-            (SongHit::RowName(r), Button::Left) if !rows[r].orphan => {
-                self.press_song_drag(DragSource::Row(r), x, y);
-            }
-            (SongHit::ScrollBar(axis), Button::Left) => {
-                self.song_panel.bar_drag = Some(axis);
-                self.song_bar_to(size, axis, x, y);
-            }
-            (SongHit::Pattern(p), Button::Right) => self.list_menu(p, x, y),
-            (SongHit::Description, Button::Left) => self.text_entry(Id::PatternDescription),
-            (SongHit::Ruler(m), Button::Left) => self.set_song_cursor(m),
-            (SongHit::Clip(c), Button::Right) => self.clip_menu(c, x, y),
-            (SongHit::RowName(r), Button::Right) => self.row_menu(&rows, r, x, y),
-            (SongHit::Cell { row, measure }, Button::Right) => {
-                let row = &rows[row];
-                let title = format!("Add \"{}\" at measure {}", row.name, measure + 1);
-                self.chrome.widgets.dropdown = Some(Dropdown::menu(
-                    Id::SongMenu,
-                    x,
-                    y,
-                    title,
-                    vec![format!("add:{measure}:{}", row.id)],
-                    vec!["Add here".into()],
-                ));
-            }
-            _ => return false,
-        }
-        true
-    }
-
-    // ─── Dragging ────────────────────────────────────────────────────────────
-
-    fn press_song_drag(&mut self, source: DragSource, x: i32, y: i32) {
-        self.song_panel.drag = Some(SongDrag {
-            source,
-            press: (x, y),
-            x,
-            y,
-            started: false,
-            revision: self.editor.revision(),
-            song: self.editor.selected_song(),
-        });
-    }
-
-    /// The drag under way, unless what it holds may have changed under it.
-    fn live_song_drag(&self) -> Option<SongDrag> {
-        self.song_panel.drag.filter(|d| {
-            d.started
-                && self.song_view_open()
-                && d.revision == self.editor.revision()
-                && d.song == self.editor.selected_song()
-        })
-    }
-
-    /// Measures shown past the end while dragging a clip or a pattern: a page to drop on.
-    fn song_room(&self, layout: &SongLayout) -> u32 {
-        let dragged = self.live_song_drag().filter(|d| !matches!(d.source, DragSource::Row(_)));
-        dragged.map_or(0, |_| layout.visible_measures())
-    }
-
-    /// The measure the pointer is on, and the drag.
-    fn song_drag_at(&self, layout: &SongLayout, rows: usize) -> Option<(SongDrag, u32)> {
-        let drag = self.live_song_drag()?;
-        Some((drag, layout.measure_at(drag.x, self.song_scroll(layout, rows).0)))
-    }
-
-    /// The clip being dragged and where it would start.
-    fn song_dragged_clip(&self, layout: &SongLayout, rows: usize) -> Option<(usize, u32)> {
-        match self.song_drag_at(layout, rows)? {
-            (SongDrag { source: DragSource::Clip { clip, grab }, .. }, at) => Some((clip, at.saturating_sub(grab))),
-            _ => None,
-        }
-    }
-
-    /// The row being dragged and the row it would take, among those of
-    /// patterns of the library (a missing pattern's row stays last).
-    fn song_row_drop(&self, layout: &SongLayout, rows: &[Row]) -> Option<(usize, usize)> {
-        let drag = self.live_song_drag()?;
-        let DragSource::Row(from) = drag.source else { return None };
-        let movable = rows.iter().filter(|r| !r.orphan).count();
-        let first = self.song_scroll(layout, rows.len()).1;
-        Some((from, layout.drop_row(drag.y, first).min(movable.saturating_sub(1))))
-    }
-
-    /// The pattern being dragged along the list and the place it would take.
-    fn song_list_drop(&self, layout: &SongLayout) -> Option<(usize, usize)> {
-        let drag = self.live_song_drag()?;
-        let DragSource::Pattern(from) = drag.source else { return None };
-        if !layout.list.contains(drag.x, drag.y) {
-            return None;
-        }
-        let count = self.editor.library().patterns.len();
-        Some((from, layout.list_drop_row(drag.y, self.list_scroll(layout), count)))
-    }
-
-    /// Where the pattern being dragged would land, the pointer over the arrangement.
-    fn song_ghost(&self, layout: &SongLayout, rows: &[Row]) -> Option<SongGhost> {
-        let (drag, measure) = self.song_drag_at(layout, rows.len())?;
-        let DragSource::Pattern(p) = drag.source else { return None };
-        if self.song().is_none() || !layout.grid.contains(drag.x, drag.y) {
-            return None;
-        }
-        let pattern = self.editor.library().patterns.get(p)?;
-        Some(SongGhost {
-            name: pattern.name.clone().unwrap_or_else(|| pattern.id.clone()),
-            row: rows.iter().position(|r| r.id == pattern.id).unwrap_or(rows.len()),
-            measure,
-            measure_count: measures_for_pattern(pattern.beat_count),
-        })
-    }
-
-    /// The mouse moved with a press held; whether to redraw.
-    pub(super) fn song_drag_move(&mut self, x: i32, y: i32) -> bool {
-        let Some(drag) = &mut self.song_panel.drag else { return false };
-        (drag.x, drag.y) = (x, y);
-        let (dx, dy) = (x - drag.press.0, y - drag.press.1);
-        drag.started |= dx.abs() >= DRAG_START_PX || dy.abs() >= DRAG_START_PX;
-        drag.started
-    }
-
-    /// The press released: a drag places or moves its clip; whether it was one.
-    pub fn song_release(&mut self, size: (i32, i32, i32)) -> bool {
-        let layout = self.song_layout(size);
-        let rows = self.song_rows();
-        let at = self.song_drag_at(&layout, rows.len());
-        let ghost = self.song_ghost(&layout, &rows);
-        let row_drop = self.song_row_drop(&layout, &rows);
-        let list_drop = self.song_list_drop(&layout);
-        let over_grid = at.is_some_and(|(drag, _)| layout.grid.contains(drag.x, drag.y));
-        self.song_panel.drag = None;
-        let Some((drag, measure)) = at else { return false };
-        match drag.source {
-            DragSource::Pattern(p) => {
-                if let Some((from, to)) = list_drop {
-                    self.move_pattern(from, to);
-                } else if self.song().is_none() && over_grid {
-                    self.message = "No song to add to".into();
-                } else if let (Some(ghost), Some(pattern)) = (ghost, self.editor.library().patterns.get(p)) {
-                    let value = format!("add:{}:{}", ghost.measure, pattern.id);
-                    self.song_menu_pick(&value);
-                }
-            }
-            DragSource::Clip { clip, grab } => {
-                let start = measure.saturating_sub(grab);
-                if self.editor.move_song_clip(None, clip, start) {
-                    self.edited();
-                    let id = self.song().and_then(|s| s.clips.get(clip)).map(|c| c.pattern_id.clone());
-                    let label = self.pattern_label(&id.unwrap_or_default());
-                    self.message = format!("\"{label}\" moved to measure {}", start + 1);
-                }
-            }
-            DragSource::Row(_) => {
-                if let Some((from, to)) = row_drop {
-                    self.move_row(from, to);
-                }
-            }
-        }
-        true
-    }
-
-    /// The scroll bar `axis` held at `(x, y)`: its thumb centred there; whether to redraw.
-    pub(super) fn song_bar_to(&mut self, size: (i32, i32, i32), axis: Axis, x: i32, y: i32) -> bool {
-        let layout = self.song_layout(size);
-        if axis == Axis::List {
-            let count = self.editor.library().patterns.len();
-            let first = layout.scroll_at(axis, x, y, layout.list_rows(), count);
-            let changed = first != self.list_scroll(&layout);
-            self.song_panel.list_scroll = (self.pattern_index, first);
-            return changed;
-        }
-        let rows = self.song_rows().len();
-        let (mut sx, mut sy) = self.song_scroll(&layout, rows);
-        match axis {
-            Axis::Measures => {
-                let (shown, total) = (layout.visible_measures() as usize, self.song_measure_total(&layout) as usize);
-                sx = layout.scroll_at(axis, x, y, shown, total) as u32;
-            }
-            Axis::Rows | Axis::List => sy = layout.scroll_at(axis, x, y, layout.visible_rows(), rows),
-        }
-        let changed = (sx, sy) != self.song_panel.scroll;
-        self.song_panel.scroll = (sx, sy);
-        changed
-    }
-
-    /// The wheel over the arrangement: measures, sideways ones too (Shift:
-    /// rows, which macOS turns into sideways notches); over the pattern's
-    /// description: its lines; over the pattern list: its rows; whether it
-    /// was theirs.
-    pub fn song_wheel(&mut self, size: (i32, i32, i32), x: i32, y: i32, wheel: (isize, isize), shift: bool) -> bool {
-        // Content moves right and down for positive notches: both show what is before.
-        let lines = wheel.0 + wheel.1;
-        let layout = self.song_layout(size);
-        if self.workspace == Workspace::Song && lines != 0 && layout.description.contains(x, y) {
-            let first = (self.description_scroll(&layout) as isize - lines).max(0) as usize;
-            self.song_panel.description_scroll = (self.pattern_index, first);
-            self.song_panel.description_scroll.1 = self.description_scroll(&layout);
-            return true;
-        }
-        if self.workspace == Workspace::Song && lines != 0 && layout.list.contains(x, y) {
-            let last = layout.list_last_scroll(self.editor.library().patterns.len());
-            let first = (self.list_scroll(&layout) as isize - lines).clamp(0, last as isize) as usize;
-            self.song_panel.list_scroll = (self.pattern_index, first);
-            return true;
-        }
-        if self.song().is_none() || self.workspace != Workspace::Song || lines == 0 || !layout.grid.contains(x, y) {
-            return false;
-        }
-        let rows = self.song_rows().len();
-        let (mut sx, mut sy) = self.song_scroll(&layout, rows);
-        if shift {
-            let last = rows.saturating_sub(layout.visible_rows());
-            sy = (sy as isize - lines).clamp(0, last as isize) as usize;
-        } else {
-            let last = self.song_measure_total(&layout).saturating_sub(layout.visible_measures());
-            sx = (i64::from(sx) - 4 * lines as i64).clamp(0, i64::from(last)) as u32;
-        }
-        self.song_panel.scroll = (sx, sy);
-        true
-    }
-
-    /// The mouse over the arrangement: the clip it is on, for its tooltip;
-    /// whether it changed.
-    pub fn song_hover(&mut self, size: (i32, i32, i32), x: i32, y: i32) -> bool {
-        let hover = if self.workspace == Workspace::Song
-            && self.chrome.widgets.drag.is_none()
-            && self.song_panel.drag.is_none()
-        {
-            let layout = self.song_layout(size);
-            let rows = self.song_rows();
-            match layout.hit(&self.song_view_data(&rows, &layout), x, y) {
-                Some(SongHit::Clip(c)) => Some(c),
-                _ => None,
-            }
-        } else {
-            None
-        };
-        let changed = hover != self.song_panel.hovered_clip;
-        self.song_panel.hovered_clip = hover;
-        changed
-    }
-
-    /// The tooltip of the clip under the mouse (the clip's `title`).
-    /// The tooltip of the clip under the mouse, or, while a pattern is
-    /// dragged over the arrangement, the measure it would be added at.
-    pub(super) fn draw_song_tooltip(&self, canvas: &mut Canvas, scale: i32) {
-        if self.chrome.covered() {
-            return;
-        }
-        let layout = self.song_layout((canvas.width(), canvas.height(), scale));
-        let rows = self.song_rows();
-        if let (Some(ghost), Some(drag)) = (self.song_ghost(&layout, &rows), self.live_song_drag()) {
-            let at = Rect::new(drag.x, drag.y, 0, 0);
-            return view::draw_tooltip(canvas, &format!("Add at measure {}", ghost.measure + 1), at, scale);
-        }
-        let Some(c) = self.song_panel.hovered_clip else { return };
-        let Some(clip) = self.song().and_then(|s| s.clips.get(c)) else { return };
-        let Some(rect) = layout.clip_rect(&self.song_view_data(&rows, &layout), c) else { return };
-        view::draw_tooltip(canvas, &clip_label(&clip.pattern_id, clip), rect, scale);
-    }
-
-    // ─── The menus ───────────────────────────────────────────────────────────
-
-    /// A pattern of the list: add it at the playhead (when there is a song),
-    /// move it up or down the list, rename it, or delete it.
-    fn list_menu(&mut self, p: usize, x: i32, y: i32) {
-        let patterns = &self.editor.library().patterns;
-        let Some(pattern) = patterns.get(p) else { return };
-        let (title, id, count) = (self.pattern_label(&pattern.id), pattern.id.clone(), patterns.len());
-        let (mut values, mut labels) = (Vec::new(), Vec::new());
-        if self.song().is_some() {
-            let measure = self.playhead_measure();
-            values.push(format!("add:{measure}:{id}"));
-            labels.push(format!("Add at measure {}", measure + 1));
-        }
-        if p > 0 {
-            values.push(format!("pattern-up:{p}"));
-            labels.push("Move up".into());
-        }
-        if p + 1 < count {
-            values.push(format!("pattern-down:{p}"));
-            labels.push("Move down".into());
-        }
-        values.extend([format!("rename:{p}"), format!("pattern-delete:{p}")]);
-        labels.extend(["Rename".into(), "Delete".into()]);
-        self.chrome.widgets.dropdown = Some(Dropdown::menu(Id::SongMenu, x, y, title, values, labels));
-    }
-
-    /// Pattern `p` of the list added to the arrangement at the playhead.
-    fn add_at_playhead(&mut self, p: usize) {
-        if self.song().is_none() {
-            self.message = "No song to add to".into();
-            return;
-        }
-        let Some(id) = self.editor.library().patterns.get(p).map(|pattern| pattern.id.clone()) else { return };
-        self.song_menu_pick(&format!("add:{}:{id}", self.playhead_measure()));
-    }
-
-    /// A clip: repeat it after itself, or remove it.
-    fn clip_menu(&mut self, c: usize, x: i32, y: i32) {
-        let Some(clip) = self.song().and_then(|s| s.clips.get(c)).cloned() else { return };
-        let title = clip_label(&self.pattern_label(&clip.pattern_id), &clip);
-        let values = vec![format!("next:{c}"), format!("delete:{c}")];
-        self.chrome.widgets.dropdown =
-            Some(Dropdown::menu(Id::SongMenu, x, y, title, values, vec!["Next".into(), "Delete".into()]));
-    }
-
-    /// Row `r`'s name: add its pattern at the playhead, move the row up or
-    /// down, or remove every clip of it.
-    fn row_menu(&mut self, rows: &[Row], r: usize, x: i32, y: i32) {
-        let row = &rows[r];
-        let count = self.song().map_or(0, |s| s.clips.iter().filter(|c| c.pattern_id == row.id).count());
-        let measure = self.playhead_measure();
-        let title = format!("{} - {count} clip(s)", row.name);
-        let mut values = vec![format!("add:{measure}:{}", row.id)];
-        let mut labels = vec![format!("Add at measure {}", measure + 1)];
-        if !row.orphan && r > 0 {
-            values.push(format!("up:{r}"));
-            labels.push("Move up".into());
-        }
-        if rows.get(r + 1).is_some_and(|next| !next.orphan) && !row.orphan {
-            values.push(format!("down:{r}"));
-            labels.push("Move down".into());
-        }
-        values.push(format!("row:{}", row.id));
-        labels.push("Delete row".into());
-        self.chrome.widgets.dropdown = Some(Dropdown::menu(Id::SongMenu, x, y, title, values, labels));
-    }
-
-    /// The name a clip's pattern is shown by (its id when it is gone).
-    pub(super) fn pattern_label(&self, id: &str) -> String {
-        self.editor.library().pattern(id).and_then(|p| p.name.clone()).unwrap_or_else(|| id.to_owned())
-    }
-
-    /// An action of a song panel menu (see the menus above, and Load).
-    pub(super) fn song_menu_pick(&mut self, value: &str) {
-        // A path may hold a `:` (`C:\…`): not split.
-        if let Some(path) = value.strip_prefix("load:") {
-            return self.ask(Pending::LoadSong(PathBuf::from(path)));
-        }
-        let mut parts = value.splitn(3, ':');
-        let (action, a, b) = (parts.next().unwrap_or_default(), parts.next().unwrap_or_default(), parts.next());
-        let result = match (action, b) {
-            ("add", Some(id)) => {
-                let measure = a.parse().unwrap_or(0);
-                let label = self.pattern_label(id);
-                self.editor
-                    .add_pattern_at_measure(id, measure, None, None)
-                    .map(|_| format!("\"{label}\" added at measure {}", measure + 1))
-            }
-            ("next", None) => {
-                let Some(clip) = a.parse().ok().and_then(|c: usize| self.song()?.clips.get(c).cloned()) else { return };
-                let label = self.pattern_label(&clip.pattern_id);
-                self.editor.repeat_pattern_at_measure(clip.start_measure, None).map(|_| {
-                    let at = f64::from(clip.start_measure) + clip.measure_count + 1.0;
-                    format!("\"{label}\" repeated at measure {}", num::text(at))
-                })
-            }
-            ("delete", None) => {
-                if let Some(c) = a.parse().ok().filter(|&c: &usize| self.song().is_some_and(|s| c < s.clips.len())) {
-                    self.undoable(|s| s.remove_clip(c));
-                }
-                return;
-            }
-            ("up", None) => {
-                if let Ok(r) = a.parse::<usize>() {
-                    self.move_row(r, r.saturating_sub(1));
-                }
-                return;
-            }
-            ("down", None) => {
-                if let Ok(r) = a.parse::<usize>() {
-                    self.move_row(r, r + 1);
-                }
-                return;
-            }
-            ("row", None) => return self.undoable(|s| s.remove_row(a)),
-            ("pattern-up" | "pattern-down" | "rename" | "pattern-delete", None) => {
-                let Some(p) = a.parse().ok().filter(|&p: &usize| p < self.editor.library().patterns.len()) else {
-                    return;
-                };
-                match action {
-                    "pattern-up" => self.move_pattern(p, p.saturating_sub(1)),
-                    "pattern-down" => self.move_pattern(p, p + 1),
-                    "rename" => self.text_entry(Id::SongPattern(p)),
-                    _ => self.undoable(|s| s.remove_pattern_now(p)),
-                }
-                return;
-            }
-            _ => return,
-        };
-        self.song_edit_result(result);
-    }
-
-    /// Move row `from` of the arrangement to the place of row `to`. Rows
-    /// follow the library's order, so the row's pattern takes the place of
-    /// that row's pattern in the library, in one undo step.
-    pub(super) fn move_row(&mut self, from: usize, to: usize) {
-        let rows = self.song_rows();
-        let patterns = &self.editor.library().patterns;
-        let index = |r: usize| {
-            rows.get(r).filter(|row| !row.orphan).and_then(|row| patterns.iter().position(|p| p.id == row.id))
-        };
-        let (Some(from), Some(to)) = (index(from), index(to)) else { return };
-        self.move_pattern(from, to);
-    }
-
-    /// Move pattern `from` of the library to index `to`, in one undo step;
-    /// the pattern shown stays the same one.
-    fn move_pattern(&mut self, from: usize, to: usize) {
-        if self.editor.move_pattern(from, to) {
-            self.pattern_index = moved_index(self.pattern_index, from, to);
-            self.song_panel.description_scroll.0 = moved_index(self.song_panel.description_scroll.0, from, to);
-            self.song_panel.list_scroll.0 = moved_index(self.song_panel.list_scroll.0, from, to);
-            self.edited();
-        }
-    }
-
-    /// Remove pattern `p` and its clips of every arrangement, in one undo
-    /// step; the pattern shown or playing stays the same one when it is
-    /// another. Its name and the clips removed.
-    pub(super) fn remove_pattern_with_clips(&mut self, p: usize) -> Result<(String, usize), String> {
-        let library = self.editor.library();
-        if library.patterns.len() <= 1 {
-            return Err("The last pattern of the library stays".into());
-        }
-        let Some(id) = library.patterns.get(p).map(|pattern| pattern.id.clone()) else {
-            return Err(format!("No pattern {}", p + 1));
-        };
-        let (name, songs) = (self.pattern_label(&id), library.songs.len());
-        let clips = self.editor.batch(&format!("Remove pattern \"{name}\""), |editor| {
-            let mut clips = 0;
-            for s in 0..songs {
-                clips += editor.remove_pattern_clips(&id, Some(s))?.len();
-            }
-            if !editor.remove_pattern(p) {
-                return Err("the pattern was not removed".to_owned());
-            }
-            Ok(clips)
-        })?;
-        if self.pattern_index > p {
-            self.pattern_index -= 1;
-        }
-        if let Some(controller) = self.playback.controller_mut() {
-            controller.remove_pattern(p);
-        }
-        self.clamp_selection();
-        Ok((name, clips))
-    }
-
-    /// Pattern `p` deleted with its clips.
-    pub(super) fn remove_pattern_now(&mut self, p: usize) {
-        let result = self
-            .remove_pattern_with_clips(p)
-            .map(|(name, clips)| format!("Removed pattern \"{name}\" and {clips} clip(s)"));
-        self.song_edit_result(result);
-    }
-
-    /// Remove clip `c` of the arrangement.
-    pub(super) fn remove_clip(&mut self, c: usize) {
-        let Some(clip) = self.song().and_then(|song| song.clips.get(c).cloned()) else { return };
-        let label = self.pattern_label(&clip.pattern_id);
-        self.editor.remove_song_clips(None, &[c]);
-        self.song_edit_result(Ok(format!("Removed \"{label}\" at measure {}", clip.start_measure + 1)));
-    }
-
-    /// Remove every clip of pattern `id` from the arrangement.
-    pub(super) fn remove_row(&mut self, id: &str) {
-        let label = self.pattern_label(id);
-        let result =
-            self.editor.remove_pattern_clips(id, None).map(|_| format!("Removed \"{label}\" from the arrangement"));
-        self.song_edit_result(result);
-    }
-
-    /// What an arrangement edit gave: its message, and the edit taken into account.
-    fn song_edit_result(&mut self, result: Result<String, String>) {
-        match result {
-            Ok(message) => {
-                self.edited();
-                self.message = message;
-            }
-            Err(message) => self.message = message,
-        }
-    }
-
-    // ─── Song files ──────────────────────────────────────────────────────────
-
-    /// The song file of the library: its patterns, its arrangements, what is selected.
-    pub(super) fn song_record(&self, stamp: &str) -> Value {
-        let library = self.editor.library();
-        library.song_record(&self.song_name(), self.pattern_index, self.editor.selected_song(), (stamp, now_ms()))
-    }
-
-    /// Save: the song to `songs/<name>.odbox` (`SongService.save`).
-    fn save_song(&mut self) {
-        let Some(dir) = &self.saving.songs_dir else {
-            self.message = "Save failed: no user data folder".into();
-            return;
-        };
-        let name = self.song_name();
-        let path = dir.join(format!("{}.odbox", store::safe_name(&name)));
-        self.message = match store::save_song(&path, &self.song_record("savedAt")) {
-            Ok(()) => format!("Song \"{name}\" saved"),
-            Err(e) => format!("Save failed: {}: {e}", path.display()),
-        };
-    }
-
-    /// Load: the songs saved, to choose from.
-    fn load_song_menu(&mut self) {
-        let Some(dir) = &self.saving.songs_dir else {
-            self.message = "No user data folder: no saved songs".into();
-            return;
-        };
-        let files = match store::list_songs(dir) {
-            Ok(files) => files,
-            Err(e) => {
-                self.message = format!("Songs not listed: {}: {e}", dir.display());
-                return;
-            }
-        };
-        if files.is_empty() {
-            self.message = "No saved songs found".into();
-            return;
-        }
-        let labels = files.iter().map(|f| f.file_stem().unwrap_or_default().to_string_lossy().into_owned()).collect();
-        let values = files.iter().map(|f| format!("load:{}", f.display())).collect();
-        let anchor = self.song_button_rect("load");
-        self.chrome.widgets.dropdown = Some(Dropdown {
-            title: Some("Load Song".into()),
-            ..Dropdown::new(Id::SongMenu, anchor, values, labels, 0)
-        });
-    }
-
-    /// Where a column button is (the Load list opens under it); without the
-    /// song panel (the Song menu), the middle of the window under the header.
-    fn song_button_rect(&self, id: &'static str) -> Rect {
-        let (width, height, scale) = self.chrome.panel_size;
-        let layout = self.panel_layout(width, height, scale);
-        panel::find(&layout.items, Id::SongButton(id))
-            .map_or_else(|| Rect::new(width / 2 - 100 * scale, frame::body_top(scale), 200 * scale, 0), |i| i.rect)
-    }
-
-    /// The file a song is written to (`<name>.odbox`).
-    pub(super) fn song_file_name(&self) -> String {
-        format!("{}.odbox", store::safe_name(&self.song_name()))
-    }
-
-    /// Save as: the song to `path`.
-    pub(super) fn save_song_as(&mut self, path: &Path) {
-        let name = self.song_name();
-        self.message = match store::save_song(path, &self.song_record("savedAt")) {
-            Ok(()) => format!("Song \"{name}\" saved to {}", path.display()),
-            Err(e) => format!("Save failed: {}: {e}", path.display()),
-        };
-    }
-
-    /// Export: the song to `path`.
-    pub(super) fn export_song(&mut self, path: &Path) {
-        let name = self.song_name();
-        self.message = match store::save_song(path, &self.song_record("exportedAt")) {
-            Ok(()) => format!("Song \"{name}\" exported to {}", path.display()),
-            Err(e) => format!("not exported: {}: {e}", path.display()),
-        };
-    }
-
-    /// A saved song chosen in the Load list.
-    pub(super) fn load_song_file(&mut self, path: &Path) {
-        match self.read_song_file(path) {
-            Ok(name) => self.message = format!("Song \"{name}\" loaded"),
-            Err(e) => self.message = e,
-        }
-    }
-
-    /// Import (the file picker), or a `.odbox` dropped on the window.
-    pub(super) fn import_song(&mut self, path: &Path) {
-        self.ask(Pending::ImportSong(path.to_path_buf()));
-    }
-
-    pub(super) fn import_song_now(&mut self, path: &Path) {
-        match self.read_song_file(path) {
-            Ok(name) => self.message = format!("Song \"{name}\" imported"),
-            Err(e) => self.message = e,
-        }
-    }
-
-    /// `library` in the place of the library: one undo step, `description`.
-    pub(super) fn put_library(&mut self, library: Library, description: &str) {
-        self.editor.replace_library(library, 0, description);
-        self.pattern_index = 0;
-        self.song_panel.scroll = (0, 0);
-        self.after_history(None);
-    }
-
-    /// Read a song file and put it in the place of the library
-    /// (`parseImportedFile`, `applyToAppState`: one undo step); its name.
-    pub(super) fn read_song_file(&mut self, path: &Path) -> Result<String, String> {
-        let text = std::fs::read_to_string(path).map_err(|e| format!("Load failed: {}: {e}", path.display()))?;
-        let value = json::parse(&text).map_err(|e| format!("Load failed: {e}"))?;
-        let infos = &self.editor.library().info;
-        let record = ordrumbox_core::Library::from_song_record(&value, infos).ok_or("Invalid song file")?;
-        let fallback = path.file_stem().unwrap_or_default().to_string_lossy().into_owned();
-        let name = record.name.clone().unwrap_or(fallback);
-        let mut library = record.library;
-        library.info.insert("name", Value::from(name.as_str()));
-        self.editor.load_library(library, record.selected_song);
-        self.pattern_index = record.selected_pattern;
-        self.song_panel.scroll = (0, 0);
-        self.after_history(None);
-        let dropped = &record.report.dropped_clips;
-        if !dropped.is_empty() {
-            let names: Vec<&str> = dropped.iter().map(|d| d.pattern.as_str()).collect();
-            self.status.push(format!(
-                "Ignored {} song clip(s) referencing an unknown pattern: {}",
-                dropped.len(),
-                names.join(", ")
-            ));
-        }
-        Ok(name)
-    }
-}
-
-/// A clip's description (its `title`): `PATTERN - measure N, M measure(s)`.
-fn clip_label(label: &str, clip: &SongClip) -> String {
-    format!("{label} - measure {}, {} measure(s)", clip.start_measure + 1, num::text(clip.measure_count))
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::*;
     use crate::kits::KitSet;
     use ordrumbox_core::Library;
 
-    const SIZE: (i32, i32, i32) = (1100, 680, 1);
+    pub(crate) const SIZE: (i32, i32, i32) = (1100, 680, 1);
 
-    fn session() -> Session {
+    pub(crate) fn session() -> Session {
         let (library, _) = Library::parse(
             r#"{"infos":{"name":"lib"},"songs":[{"name":"s","clips":[{"pattern":"b","startMeasure":0,"measureCount":2}]}],
                 "patterns":[{"name":"a","beatCount":3},{"name":"b"}]}"#,
@@ -1152,12 +496,12 @@ mod tests {
     }
 
     /// The menu open: its values.
-    fn menu(session: &Session) -> Vec<String> {
+    pub(crate) fn menu(session: &Session) -> Vec<String> {
         session.chrome.widgets.dropdown.as_ref().map(|d| d.values.clone()).unwrap_or_default()
     }
 
     /// Option `i` of the open menu chosen with the keys.
-    fn choose(session: &mut Session, i: usize) {
+    pub(crate) fn choose(session: &mut Session, i: usize) {
         for _ in 0..i {
             session.panel_key(SIZE, PanelKey::Down, false, false);
         }
@@ -1165,269 +509,14 @@ mod tests {
     }
 
     /// `text` typed in the open entry, then Enter.
-    fn type_entry(session: &mut Session, text: &str) {
+    pub(crate) fn type_entry(session: &mut Session, text: &str) {
         session.chrome.widgets.entry.as_mut().expect("an entry").text = text.into();
         session.panel_key(SIZE, PanelKey::Enter, false, false);
     }
 
-    fn clips(session: &Session) -> Vec<(String, u32, f64)> {
+    pub(crate) fn clips(session: &Session) -> Vec<(String, u32, f64)> {
         let song = session.song().unwrap();
         song.clips.iter().map(|c| (c.pattern_id.clone(), c.start_measure, c.measure_count)).collect()
-    }
-
-    #[test]
-    fn clip_labels() {
-        let clip = SongClip { pattern_id: "rock".into(), start_measure: 2, measure_count: 0.75 };
-        assert_eq!(clip_label("Rock", &clip), "Rock - measure 3, 0.75 measure(s)");
-    }
-
-    #[test]
-    fn the_mouse_places_repeats_and_removes_clips() {
-        let mut s = session();
-        let l = s.song_layout(SIZE);
-        // The ruler aims the cursor; a pattern of the list is added there.
-        let ruler_y = l.grid.y + 14 + 4;
-        let measure_x = |m: i32| l.grid.x + song_view::LABEL_WIDTH + m * 24 + 12;
-        assert!(s.song_click(SIZE, measure_x(1), ruler_y, Button::Left));
-        assert_eq!(s.song_cursor, 1);
-        assert!(s.song_click(SIZE, l.list.x + 2, l.list.y + 2, Button::Right));
-        assert_eq!(menu(&s), ["add:1:a", "pattern-down:0", "rename:0", "pattern-delete:0"]);
-        choose(&mut s, 0);
-        assert_eq!(s.message, "\"a\" added at measure 2");
-        assert_eq!(clips(&s), [("b".into(), 0, 2.0), ("a".into(), 1, 0.75)]);
-        // Rows: a, b (library order). The clip of a: repeat it.
-        let row_y = |r: i32| l.grid.y + 14 + 18 + r * 22 + 11;
-        assert!(s.song_click(SIZE, measure_x(1) - 4, row_y(0), Button::Right));
-        assert_eq!(menu(&s), ["next:1", "delete:1"]);
-        choose(&mut s, 0);
-        assert_eq!(s.message, "\"a\" repeated at measure 2.75");
-        assert_eq!(clips(&s)[2], ("a".into(), 1, 0.75));
-        // The bare grid of row a, measure 0: add a there.
-        assert!(s.song_click(SIZE, measure_x(0), row_y(0), Button::Right));
-        assert_eq!(menu(&s), ["add:0:a"]);
-        choose(&mut s, 0);
-        assert_eq!(clips(&s)[3], ("a".into(), 0, 0.75));
-        // Nothing past the arrangement's 2 measures.
-        assert!(!s.song_click(SIZE, measure_x(2), row_y(1), Button::Right));
-        // Row a's name: delete the row.
-        assert!(s.song_click(SIZE, l.grid.x + 2, row_y(0), Button::Right));
-        assert_eq!(menu(&s), ["add:1:a", "down:0", "row:a"]);
-        choose(&mut s, 2);
-        assert_eq!(s.message, "Removed \"a\" from the arrangement (Ctrl+Z: undo)");
-        assert_eq!(clips(&s), [("b".into(), 0, 2.0)]);
-        s.undo();
-        assert_eq!(clips(&s).len(), 4);
-    }
-
-    #[test]
-    fn the_pattern_list_adds_moves_and_deletes_patterns() {
-        let mut s = session();
-        let l = s.song_layout(SIZE);
-        let row = |r: i32| (l.list.x + 2, l.list.y + r * 12 + 2);
-        // A double-click adds the pattern at the playhead.
-        let (x, y) = row(0);
-        s.song_click(SIZE, x, y, Button::Left);
-        s.mouse_up();
-        s.song_click(SIZE, x, y, Button::Left);
-        s.mouse_up();
-        assert_eq!(s.message, "\"a\" added at measure 1");
-        assert_eq!(clips(&s), [("b".into(), 0, 2.0), ("a".into(), 0, 0.75)]);
-        // Move down, then up: the pattern shown follows.
-        s.song_click(SIZE, x, y, Button::Right);
-        choose(&mut s, 1);
-        assert_eq!(s.editor.library().patterns[1].name.as_deref(), Some("a"));
-        assert_eq!(s.pattern_index, 1);
-        let (x, y) = row(1);
-        s.song_click(SIZE, x, y, Button::Right);
-        assert_eq!(menu(&s), ["add:0:a", "pattern-up:1", "rename:1", "pattern-delete:1"]);
-        choose(&mut s, 1);
-        assert_eq!(s.editor.library().patterns[0].name.as_deref(), Some("a"));
-        // Delete is done at once, takes the clips along, and is one undo step.
-        let (x, y) = row(1);
-        s.song_click(SIZE, x, y, Button::Right);
-        choose(&mut s, 3);
-        assert!(!s.confirm_open());
-        assert_eq!(s.message, "Removed pattern \"b\" and 1 clip(s) (Ctrl+Z: undo)");
-        assert_eq!(s.editor.library().patterns.len(), 1);
-        assert_eq!(clips(&s), [("a".into(), 0, 0.75)]);
-        // The last pattern stays.
-        s.song_menu_pick("pattern-delete:0");
-        assert_eq!(s.message, "The last pattern of the library stays");
-        s.undo();
-        assert_eq!(s.editor.library().patterns.len(), 2);
-        assert_eq!(clips(&s).len(), 2);
-    }
-
-    #[test]
-    fn the_scroll_bars_and_the_wheel_reach_every_measure_and_row() {
-        // 30 patterns, each on a row of its own, the last clip at measure 200.
-        let patterns: Vec<String> = (0..30).map(|i| format!(r#"{{"name":"p{i}"}}"#)).collect();
-        let clips: Vec<String> = (0..30)
-            .map(|i| format!(r#"{{"pattern":"p{i}","startMeasure":{},"measureCount":1}}"#, i * 200 / 29))
-            .collect();
-        let json = format!(
-            r#"{{"songs":[{{"name":"s","clips":[{}]}}],"patterns":[{}]}}"#,
-            clips.join(","),
-            patterns.join(",")
-        );
-        let mut s = Session::new(Library::parse(&json).unwrap().0, KitSet::empty(), Vec::new());
-        s.toggle_song_view();
-        let l = s.song_layout(SIZE);
-        let rows = s.song_rows();
-        assert!(rows.len() > l.visible_rows());
-        let scroll = |s: &Session| s.song_view_data(&rows, &l).scroll;
-        let (last_measure, last_row) = (201 - l.visible_measures(), rows.len() - l.visible_rows());
-
-        // The measures' bar, dragged to its right end and back.
-        let bar = l.scroll_bar(Axis::Measures);
-        assert!(s.song_click(SIZE, bar.x + 1, bar.y + 1, Button::Left));
-        assert!(s.mouse_move(SIZE, bar.x + bar.w + 50, bar.y, false));
-        assert_eq!(scroll(&s), (last_measure, 0));
-        s.mouse_move(SIZE, bar.x - 50, bar.y, false);
-        assert_eq!(scroll(&s).0, 0);
-        s.mouse_up();
-        assert!(!s.mouse_move(SIZE, bar.x + bar.w, bar.y, false));
-
-        // The rows' bar: a click on its end.
-        let bar = l.scroll_bar(Axis::Rows);
-        assert!(s.song_click(SIZE, bar.x + 1, bar.y + bar.h - 1, Button::Left));
-        s.mouse_up();
-        assert_eq!(scroll(&s), (0, last_row));
-
-        // The wheel: sideways notches scroll the measures, Shift the rows.
-        let inside = (l.grid.x + l.grid.w / 2, l.grid.y + l.grid.h / 2);
-        assert!(s.song_wheel(SIZE, inside.0, inside.1, (-1000, 0), false));
-        assert_eq!(scroll(&s), (last_measure, last_row));
-        assert!(s.song_wheel(SIZE, inside.0, inside.1, (1000, 0), true));
-        assert_eq!(scroll(&s), (last_measure, 0));
-
-        // The pattern list: the wheel, its bar, and a pattern selected out of view.
-        let list_scroll = |s: &Session| s.song_view_data(&rows, &l).list_scroll;
-        let last = 30 - l.list_rows();
-        let in_list = (l.list.x + 2, l.list.y + 2);
-        assert!(s.song_wheel(SIZE, in_list.0, in_list.1, (0, -2), false));
-        assert_eq!(list_scroll(&s), 2);
-        assert!(s.song_wheel(SIZE, in_list.0, in_list.1, (0, -1000), false));
-        assert_eq!(list_scroll(&s), last);
-        assert!(s.song_click(SIZE, in_list.0, in_list.1, Button::Left));
-        s.mouse_up();
-        assert_eq!(s.pattern_index, last);
-        let bar = l.scroll_bar(Axis::List);
-        assert!(s.song_click(SIZE, bar.x + 1, bar.y + 1, Button::Left));
-        s.mouse_up();
-        assert_eq!(list_scroll(&s), 0);
-        s.step_pattern(1);
-        assert_eq!(list_scroll(&s), last + 1 - (l.list_rows() - 1));
-    }
-
-    #[test]
-    fn a_drag_adds_a_pattern_and_moves_a_clip() {
-        let mut s = session();
-        let l = s.song_layout(SIZE);
-        let measure_x = |m: i32| l.grid.x + song_view::LABEL_WIDTH + m * 24 + 12;
-        let row_y = |r: i32| l.grid.y + 14 + 18 + r * 22 + 11;
-        let list = (l.list.x + 2, l.list.y + 2);
-
-        // A press and release that hardly moves is a click.
-        assert!(s.song_click(SIZE, list.0, list.1, Button::Left));
-        s.mouse_move(SIZE, list.0 + 1, list.1, false);
-        assert!(!s.song_release(SIZE));
-        assert_eq!(clips(&s).len(), 1);
-
-        // Pattern a, not in the arrangement yet, dropped past its end.
-        s.chrome.widgets.last_click = None;
-        s.song_click(SIZE, list.0, list.1, Button::Left);
-        s.mouse_move(SIZE, measure_x(4), row_y(1), false);
-        let rows = s.song_rows();
-        let ghost = s.song_view_data(&rows, &l).ghost.unwrap();
-        assert_eq!((ghost.row, ghost.measure), (1, 4));
-        assert!(s.song_release(SIZE));
-        assert_eq!(s.message, "\"a\" added at measure 5");
-        assert_eq!(clips(&s), [("b".into(), 0, 2.0), ("a".into(), 4, 0.75)]);
-        s.undo();
-        assert_eq!(clips(&s).len(), 1);
-
-        // Dragged along the list: a line where it goes, and the pattern moves there.
-        s.chrome.widgets.last_click = None;
-        s.song_click(SIZE, list.0, list.1, Button::Left);
-        s.mouse_move(SIZE, list.0, list.1 + 12, false);
-        assert_eq!(s.song_view_data(&rows, &l).list_drop, Some((0, 1)));
-        assert!(s.song_release(SIZE));
-        let names: Vec<_> = s.editor.library().patterns.iter().map(|p| p.name.clone().unwrap()).collect();
-        assert_eq!((names, s.pattern_index), (vec!["b".to_owned(), "a".to_owned()], 1));
-        assert_eq!(clips(&s).len(), 1);
-        s.undo();
-        assert_eq!(s.editor.library().patterns[0].name.as_deref(), Some("a"));
-
-        // Dropped outside the arrangement: nothing.
-        s.chrome.widgets.last_click = None;
-        s.song_click(SIZE, list.0, list.1, Button::Left);
-        s.mouse_move(SIZE, l.column.x + 2, l.column.y + 2, false);
-        assert!(s.song_release(SIZE));
-        assert_eq!(clips(&s).len(), 1);
-
-        // The clip of b, held in its second measure: it keeps its row and its grip.
-        assert!(s.song_click(SIZE, measure_x(1), row_y(0), Button::Left));
-        s.mouse_move(SIZE, measure_x(4), row_y(0) + 40, false);
-        let rows = s.song_rows();
-        assert_eq!(s.song_view_data(&rows, &l).dragged_clip, Some((0, 3)));
-        assert_eq!(clips(&s)[0].1, 0, "nothing is edited before the release");
-        assert!(s.song_release(SIZE));
-        assert_eq!(s.message, "\"b\" moved to measure 4");
-        assert_eq!(clips(&s), [("b".into(), 3, 2.0)]);
-        assert_eq!(s.song().unwrap().loop_measures, Some(5.0));
-        s.undo();
-        assert_eq!(clips(&s), [("b".into(), 0, 2.0)]);
-
-        // An edit during the drag cancels it.
-        s.song_click(SIZE, measure_x(0), row_y(0), Button::Left);
-        s.mouse_move(SIZE, measure_x(4), row_y(0), false);
-        s.commit_text(Id::SongPattern(1), "renamed");
-        assert!(!s.song_release(SIZE));
-        assert_eq!(clips(&s), [("b".into(), 0, 2.0)]);
-    }
-
-    #[test]
-    fn rows_move_by_their_menu_and_by_a_drag() {
-        let mut s = session();
-        s.song_menu_pick("add:4:a");
-        let names = |s: &Session| s.song_rows().iter().map(|r| r.name.clone()).collect::<Vec<_>>();
-        assert_eq!(names(&s), ["a", "b"]);
-        let l = s.song_layout(SIZE);
-        let name_x = l.grid.x + 4;
-        let row_y = |r: i32| l.grid.y + 14 + 18 + r * 22 + 11;
-
-        // The first row moves down only, the last one up only.
-        assert!(s.song_click(SIZE, name_x, row_y(0), Button::Right));
-        assert!(menu(&s).contains(&"down:0".to_owned()) && !menu(&s).iter().any(|v| v.starts_with("up:")));
-        s.chrome.widgets.dropdown = None;
-        assert!(s.song_click(SIZE, name_x, row_y(1), Button::Right));
-        assert!(menu(&s).contains(&"up:1".to_owned()) && !menu(&s).iter().any(|v| v.starts_with("down:")));
-        s.chrome.widgets.dropdown = None;
-
-        // The pattern shown follows its row, through the undo too.
-        s.song_menu_pick("down:0");
-        assert_eq!(names(&s), ["b", "a"]);
-        assert_eq!(s.message, "Move pattern \"a\"");
-        assert_eq!(s.pattern().unwrap().id, "a");
-        s.undo();
-        assert_eq!(names(&s), ["a", "b"]);
-        assert_eq!(s.pattern().unwrap().id, "a");
-
-        // A press that hardly moves is a click; a drag moves the row on release, in one step.
-        assert!(s.song_click(SIZE, name_x, row_y(1), Button::Left));
-        s.mouse_move(SIZE, name_x, row_y(1) + 1, false);
-        assert!(!s.song_release(SIZE));
-        assert_eq!(names(&s), ["a", "b"]);
-        s.song_click(SIZE, name_x, row_y(1), Button::Left);
-        s.mouse_move(SIZE, name_x, row_y(0), false);
-        let rows = s.song_rows();
-        assert_eq!(s.song_view_data(&rows, &l).row_drop, Some((1, 0)));
-        assert_eq!(s.song_view_data(&rows, &l).room, 0, "no page to drop on for a row");
-        assert!(s.song_release(SIZE));
-        assert_eq!(names(&s), ["b", "a"]);
-        s.undo();
-        assert_eq!(names(&s), ["a", "b"]);
     }
 
     #[test]
@@ -1498,79 +587,5 @@ mod tests {
         type_entry(&mut s, "Third");
         s.run(Command::PreviousSong);
         assert_eq!(s.editor.selected_song(), 0);
-    }
-
-    #[test]
-    fn save_as_and_export_write_to_the_folder_picked() {
-        let mut s = session();
-        let dir = std::env::temp_dir().join(format!("ordrumbox-song-destination-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        s.chrome.last_dir = Some(dir.clone());
-        let name = store::safe_name(&s.song_name());
-        let path = dir.join(format!("{name}.odbox"));
-
-        // Escape writes nothing.
-        s.song_button("saveas");
-        assert!(s.overlay_open());
-        s.overlay_key(OverlayKey::Escape);
-        assert!(!path.exists());
-
-        for (id, stamp) in [("saveas", "savedAt"), ("export", "exportedAt")] {
-            s.song_button(id);
-            s.overlay_key(OverlayKey::Enter);
-            assert!(!s.overlay_open());
-            assert!(s.message.contains(&path.display().to_string()), "{}", s.message);
-            assert!(std::fs::read_to_string(&path).unwrap().contains(stamp), "{id}");
-            std::fs::remove_file(&path).unwrap();
-        }
-        std::fs::remove_dir_all(dir).unwrap();
-    }
-
-    #[test]
-    fn replacing_a_file_is_confirmed() {
-        let mut s = session();
-        let dir = std::env::temp_dir().join(format!("ordrumbox-song-replace-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        s.chrome.last_dir = Some(dir.clone());
-        let path = dir.join(s.song_file_name());
-        std::fs::write(&path, "old").unwrap();
-
-        // Escape keeps the file.
-        s.song_button("export");
-        s.overlay_key(OverlayKey::Enter);
-        assert!(s.overlay_open());
-        s.overlay_key(OverlayKey::Escape);
-        assert!(!s.overlay_open());
-        assert_eq!(std::fs::read_to_string(&path).unwrap(), "old");
-
-        // Enter replaces it.
-        s.song_button("export");
-        s.overlay_key(OverlayKey::Enter);
-        s.overlay_key(OverlayKey::Enter);
-        assert!(!s.overlay_open());
-        assert!(std::fs::read_to_string(&path).unwrap().contains("exportedAt"));
-        std::fs::remove_dir_all(dir).unwrap();
-    }
-
-    #[test]
-    fn song_files_load_as_one_undo_step() {
-        let mut s = session();
-        let dir = std::env::temp_dir().join(format!("ordrumbox-song-load-{}", std::process::id()));
-        let path = dir.join("lib.odbox");
-        store::save_song(&path, &s.song_record("savedAt")).unwrap();
-        s.editor.add_pattern_at_measure("a", 5, None, None).unwrap();
-        s.commit_text(Id::SongName, "changed");
-        s.load_song_file(&path);
-        assert_eq!(s.message, "Song \"lib\" loaded");
-        assert_eq!(clips(&s), [("b".into(), 0, 2.0)]);
-        assert_eq!(s.editor.history().next_undo(), Some("Load song"));
-        s.undo();
-        assert_eq!(clips(&s).len(), 2);
-        assert_eq!(s.song_name(), "changed");
-        std::fs::write(&path, r#"{"songs":[]}"#).unwrap();
-        s.import_song(&path);
-        s.overlay_key(OverlayKey::Enter);
-        assert_eq!(s.message, "Invalid song file");
-        std::fs::remove_dir_all(dir).unwrap();
     }
 }
