@@ -106,7 +106,10 @@ impl Comb {
     fn process(&mut self, input: f64, d1: f64, d2: f64, feedback: f64) -> f64 {
         let out = f64::from(self.buf[self.index]);
         self.store = out * d2 + self.store * d1;
-        self.buf[self.index] = (input + self.store * feedback) as f32;
+        flush(&mut self.store);
+        let mut write = input + self.store * feedback;
+        flush(&mut write);
+        self.buf[self.index] = write as f32;
         self.index += 1;
         if self.index >= self.buf.len() {
             self.index = 0;
@@ -130,7 +133,9 @@ impl Allpass {
     fn process(&mut self, input: f64) -> f64 {
         let bout = f64::from(self.buf[self.index]);
         let out = -input + bout;
-        self.buf[self.index] = (input + bout * 0.5) as f32;
+        let mut write = input + bout * 0.5;
+        flush(&mut write);
+        self.buf[self.index] = write as f32;
         self.index += 1;
         if self.index >= self.buf.len() {
             self.index = 0;
@@ -161,8 +166,11 @@ impl DelayLine {
         f64::from(self.buf[i]) * (1.0 - fraction) + f64::from(self.buf[next]) * fraction
     }
 
+    /// Push `value`, flushed to 0 when it is tiny: a line that feeds back
+    /// would otherwise fade into denormals.
     #[inline]
-    fn write(&mut self, value: f64) {
+    fn write(&mut self, mut value: f64) {
+        flush(&mut value);
         self.buf[self.index] = value as f32;
         self.index += 1;
         if self.index >= self.buf.len() {
@@ -377,10 +385,11 @@ impl Strip {
             self.filter_2 = [Svf::default(); 2];
         }
 
-        let frames = in_l.len().min(in_r.len()).min(out_l.len()).min(out_r.len());
-        for i in 0..frames {
+        let inputs = in_l.iter().zip(in_r);
+        let outputs = out_l.iter_mut().zip(out_r.iter_mut());
+        for ((&x_l, &x_r), (o_l, o_r)) in inputs.zip(outputs) {
             // 1. Filter.
-            let (mut dry_l, mut dry_r) = (f64::from(in_l[i]), f64::from(in_r[i]));
+            let (mut dry_l, mut dry_r) = (f64::from(x_l), f64::from(x_r));
             if filter_on {
                 dry_l = self.filter[0].process(dry_l, &stage_1, mode);
                 dry_r = self.filter[1].process(dry_r, &stage_1, mode);
@@ -456,6 +465,8 @@ impl Strip {
                 let delayed_r = self.delay_r.read(delay_time_r * sr + wow);
                 self.delay_filter_l += delay_tone * (delayed_l - self.delay_filter_l);
                 self.delay_filter_r += delay_tone * (delayed_r - self.delay_filter_r);
+                flush(&mut self.delay_filter_l);
+                flush(&mut self.delay_filter_r);
                 let fb_l = shape(self.delay_filter_l * delay_feedback, 1.5, 0.0, 0.5, 1.0);
                 let fb_r = shape(self.delay_filter_r * delay_feedback, 1.5, 0.0, 0.5, 1.0);
                 if ping_pong {
@@ -477,8 +488,8 @@ impl Strip {
             let mut right = (sat_r + rev_r + wet_r) * vol * pan_r * pan_comp;
             flush(&mut left);
             flush(&mut right);
-            out_l[i] += left.clamp(-2.0, 2.0) as f32;
-            out_r[i] += right.clamp(-2.0, 2.0) as f32;
+            *o_l += left.clamp(-2.0, 2.0) as f32;
+            *o_r += right.clamp(-2.0, 2.0) as f32;
         }
     }
 }

@@ -171,7 +171,8 @@ impl SampleVoice {
         let [ll, rl, lr, rr] = self.pan;
         let end_position = buffer.frames() as f64;
 
-        for i in start..frames {
+        let outputs = left[start..frames].iter_mut().zip(&mut right[start..frames]);
+        for (out_l, out_r) in outputs {
             if self.stage == Stage::Idle {
                 return;
             }
@@ -181,8 +182,8 @@ impl SampleVoice {
             }
             let in_l = SampleBuffer::read(&buffer.left, self.position) * self.gain;
             let in_r = SampleBuffer::read(right_channel, self.position) * self.gain;
-            left[i] += ll * in_l + rl * in_r;
-            right[i] += lr * in_l + rr * in_r;
+            *out_l += ll * in_l + rl * in_r;
+            *out_r += lr * in_l + rr * in_r;
             self.position += self.step;
             self.advance_envelope();
         }
