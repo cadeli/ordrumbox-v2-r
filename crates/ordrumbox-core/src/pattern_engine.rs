@@ -10,12 +10,11 @@ use std::collections::{BTreeMap, HashSet};
 
 use crate::arp;
 use crate::euclidean;
-use crate::js;
 use crate::note::Note;
 use crate::pattern::Pattern;
 use crate::rng::Rng;
 use crate::scales::Scales;
-use crate::steps::{TICK, absolute_step, step_spacing, step_to_tick};
+use crate::steps::{TICK, absolute_step, position_to_tick, step_spacing, step_to_tick};
 use crate::style::Macros;
 use crate::track::Track;
 use crate::variation;
@@ -46,15 +45,13 @@ pub fn pattern_ticks(pattern: &Pattern) -> i64 {
     i64::from(TICK) * i64::from(pattern.beat_count)
 }
 
-/// Length of one loop of a track, in ticks: `loopAtStep` when set, else the
+/// Length of one loop of a track, in steps: `loopAtStep` when set, else the
 /// track's own `beatCount`.
-pub fn track_loop_ticks(track: &Track) -> i64 {
-    let spb = f64::from(track.steps_per_beat);
-    let loop_steps = match track.loop_length {
-        Some(steps) if steps > 0 => f64::from(steps),
-        _ => f64::from(track.beat_count) * spb,
-    };
-    (loop_steps / spb * f64::from(TICK)).floor() as i64
+pub fn track_loop_steps(track: &Track) -> i64 {
+    match track.loop_length {
+        Some(steps) if steps > 0 => i64::from(steps),
+        _ => i64::from(track.beat_count) * i64::from(track.steps_per_beat),
+    }
 }
 
 /// Does a note with this `cycle`/`cycle_offset` fire on pass `pass`? It fires
@@ -79,7 +76,7 @@ pub fn expand_hits(pattern: &Pattern, pass: u32, rng: &mut Rng, scales: &Scales)
         if track.steps_per_beat <= 0 {
             continue; // no grid: JS computes NaN ticks for every note
         }
-        let loop_ticks = track_loop_ticks(track);
+        let loop_steps = track_loop_steps(track);
         let varied = variation::vary_notes(track, macro_factor, rng);
         let span_end = SpanResolver::new(track);
         // Probability is a manual-mode control: in auto mode only note.probability gates.
@@ -91,28 +88,31 @@ pub fn expand_hits(pattern: &Pattern, pass: u32, rng: &mut Rng, scales: &Scales)
             {
                 continue;
             }
-            let base = step_to_tick(absolute_step(note.beat, note.step, track.steps_per_beat), track.steps_per_beat);
-            if base >= pattern_ticks {
+            let step = absolute_step(note.beat, note.step, track.steps_per_beat);
+            if step_to_tick(step, track.steps_per_beat) >= pattern_ticks {
                 continue;
             }
             let ctx = NoteContext { track_index, track, note, note_index, pattern_ticks };
-            for tick in loop_occurrences(base, loop_ticks, pattern_ticks) {
-                ctx.add_sub_notes(&mut flat, tick, rng);
-                ctx.add_euclidean_fill(&mut flat, tick, &span_end, rng);
+            for at in loop_occurrences(step, loop_steps, track.steps_per_beat, pattern_ticks) {
+                ctx.add_sub_notes(&mut flat, at, rng);
+                ctx.add_euclidean_fill(&mut flat, at, &span_end, rng);
             }
         }
-        variation::apply(&mut flat, track_index, track, (loop_ticks, pattern_ticks), macro_factor, rng, scales);
+        variation::apply(&mut flat, track_index, track, (loop_steps, pattern_ticks), macro_factor, rng, scales);
     }
     flat
 }
 
-/// Ticks where a note at `base` sounds: repeated every loop when it sits
-/// inside the loop, once otherwise.
-fn loop_occurrences(base: i64, loop_ticks: i64, pattern_ticks: i64) -> Vec<i64> {
-    if base >= loop_ticks || loop_ticks <= 0 || loop_ticks >= pattern_ticks {
-        return vec![base];
+/// Absolute steps where a note at `step` sounds: repeated every loop when it
+/// sits inside the loop, once otherwise. Each one is turned into a tick from
+/// its own step, so a loop of a fractional tick length (4 steps at 3 a beat,
+/// 42.67 ticks) does not drift.
+fn loop_occurrences(step: i64, loop_steps: i64, steps_per_beat: i32, pattern_ticks: i64) -> Vec<i64> {
+    let tick = |step: i64| step_to_tick(step, steps_per_beat);
+    if step >= loop_steps || loop_steps <= 0 || tick(loop_steps) >= pattern_ticks {
+        return vec![step];
     }
-    (0..).map(|i| base + i * loop_ticks).take_while(|&t| t < pattern_ticks).collect()
+    (0..).map(|i| step + i * loop_steps).take_while(|&s| tick(s) < pattern_ticks).collect()
 }
 
 /// End (exclusive step) of the span a note's euclidean fill covers: the next
@@ -170,32 +170,33 @@ impl NoteContext<'_> {
         });
     }
 
-    /// Ticks between repeats / arpeggio notes for the note's `rate`.
-    fn repeat_spacing(&self) -> i64 {
-        let ticks_per_step = f64::from(TICK) / f64::from(self.track.steps_per_beat);
-        js::round(ticks_per_step * step_spacing(self.note.retrigger_rate)) as i64
+    /// Tick of the `i`-th repeat / arpeggio note of the note sounding at
+    /// absolute step `at`: rounded from its exact place, so the repeats keep
+    /// their spacing where a step is a fractional number of ticks.
+    fn repeat_tick(&self, at: i64, i: usize) -> i64 {
+        let offset = i as f64 * step_spacing(self.note.retrigger_rate);
+        position_to_tick(at as f64 + offset, self.track.steps_per_beat)
     }
 
-    /// The note and its repeats, or its arpeggio. Every
-    /// arpeggio note, the first included, and every repeat after the first
-    /// pass `arpTriggerProbability`.
-    fn add_sub_notes(&self, flat: &mut Hits, base: i64, rng: &mut Rng) {
+    /// The note sounding at absolute step `at` and its repeats, or its
+    /// arpeggio. Every arpeggio note, the first included, and every repeat
+    /// after the first pass `arpTriggerProbability`.
+    fn add_sub_notes(&self, flat: &mut Hits, at: i64, rng: &mut Rng) {
         let note = self.note;
-        let spacing = self.repeat_spacing();
         let trigger = note.retrigger_probability;
         if let Some(sequence) = arp::sequence(&note.arp, rng) {
             for i in 0..arp::note_count(note.retrigger_count) {
                 if rng.chance(trigger) {
-                    let tick = base + i as i64 * spacing;
+                    let tick = self.repeat_tick(at, i);
                     if tick < self.pattern_ticks {
                         self.push(flat, tick, sequence[i % sequence.len()]);
                     }
                 }
             }
         } else {
-            self.push(flat, base, 0.0);
-            for i in 1..i64::from(note.retrigger_count.max(1)) {
-                let tick = base + i * spacing;
+            self.push(flat, step_to_tick(at, self.track.steps_per_beat), 0.0);
+            for i in 1..note.retrigger_count.max(1) as usize {
+                let tick = self.repeat_tick(at, i);
                 if tick < self.pattern_ticks && rng.chance(trigger) {
                     self.push(flat, tick, 0.0);
                 }
@@ -203,9 +204,10 @@ impl NoteContext<'_> {
         }
     }
 
-    /// Euclidean onsets over the span to the next note; with an arpeggio they
-    /// continue its sequence after the arpeggio notes.
-    fn add_euclidean_fill(&self, flat: &mut Hits, base: i64, span_end: &SpanResolver, rng: &mut Rng) {
+    /// Euclidean onsets over the span to the next note, for the note sounding
+    /// at absolute step `at`; with an arpeggio they continue its sequence
+    /// after the arpeggio notes.
+    fn add_euclidean_fill(&self, flat: &mut Hits, at: i64, span_end: &SpanResolver, rng: &mut Rng) {
         let note = self.note;
         if note.euclidean_pulses <= 0 {
             return;
@@ -213,7 +215,6 @@ impl NoteContext<'_> {
         let sequence = arp::sequence(&note.arp, rng);
         let spb = self.track.steps_per_beat;
         let start = absolute_step(note.beat, note.step, spb);
-        let ticks_per_step = f64::from(TICK) / f64::from(spb);
         let positions = euclidean::fill_positions(
             start,
             span_end.end(note) - start,
@@ -221,7 +222,8 @@ impl NoteContext<'_> {
             note.euclidean_rotation,
         );
         for (i, step) in positions.into_iter().enumerate() {
-            let tick = base + js::round((step - start) as f64 * ticks_per_step) as i64;
+            // From the onset's own step, as a note written there would be.
+            let tick = step_to_tick(at + step - start, spb);
             if tick >= self.pattern_ticks || !rng.chance(note.retrigger_probability) {
                 continue;
             }
@@ -272,6 +274,30 @@ mod tests {
     fn notes_inside_the_loop_repeat() {
         let p = pattern(r#"{"tracks":[{"loopAtStep":4,"notes":[{"beatStep":1},{"beat":2}]}]}"#);
         assert_eq!(ticks(&p, 0), [(8, 0.0), (40, 0.0), (64, 0.0), (72, 0.0), (104, 0.0)]);
+    }
+
+    #[test]
+    fn a_loop_of_a_fractional_tick_length_does_not_drift() {
+        // 4 steps at 3 a beat last 42.67 ticks: each repeat is rounded from
+        // its own step (0, 43, 85), not from a floored loop (0, 42, 84).
+        let p = pattern(r#"{"tracks":[{"beatCount":4,"stepsPerBeat":3,"loopAtStep":4,"notes":[{}]}]}"#);
+        assert_eq!(ticks(&p, 0), [(0, 0.0), (43, 0.0), (85, 0.0)]);
+    }
+
+    #[test]
+    fn repeats_of_a_fractional_tick_spacing_do_not_drift() {
+        // A step at 3 a beat is 10.67 ticks: each repeat is rounded from its
+        // own place (0, 11, 21, 32), not from a rounded spacing (0, 11, 22, 33).
+        let p = pattern(r#"{"tracks":[{"stepsPerBeat":3,"notes":[{"retriggerCount":4,"rate":8}]}]}"#);
+        assert_eq!(ticks(&p, 0), [(0, 0.0), (11, 0.0), (21, 0.0), (32, 0.0)]);
+    }
+
+    #[test]
+    fn a_euclidean_onset_lands_where_a_written_note_would() {
+        // 2 pulses over the 2 steps to the next note: the onset at step 2 is
+        // tick 21, as a note written there, not 11 + 11.
+        let p = pattern(r#"{"tracks":[{"stepsPerBeat":3,"notes":[{"step":1,"euclideanPulses":2},{"beat":1}]}]}"#);
+        assert_eq!(ticks(&p, 0), [(11, 0.0), (21, 0.0), (32, 0.0)]);
     }
 
     #[test]

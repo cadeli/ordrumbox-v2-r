@@ -131,6 +131,7 @@ fn edge_cases_repair_and_report() {
     assert_eq!(
         messages,
         [
+            "patterns[0].tracks[0].notes[0].stepPercent: not a percent from 0 to 100 (999), derived from the step",
             "patterns[0].tracks[4].pan: not a number (\"left\"), pan taken from the track name",
             "patterns[0].tracks[4].mono: wrong type (\"yes\"), default kept",
             "patterns[0].tracks[4].notes[0]: more values than noteKeys, extra values ignored",

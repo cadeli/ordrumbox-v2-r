@@ -309,6 +309,10 @@ impl Editor {
                 for (key, value) in updates {
                     note.set_field(key, value);
                 }
+                // A note moved by hand has a new place: an older position in its beat must not come back.
+                if (note.beat, note.step) != (before.beat, before.step) {
+                    note.step_percent = None;
+                }
                 *note != before
             },
         )
@@ -1097,6 +1101,43 @@ mod tests {
     }
 
     #[test]
+    fn every_step_comes_back_after_going_down_to_one_and_up_again() {
+        let mut e = editor();
+        // SNARE at 8 steps per beat: a note on every step of beats 0 and 3.
+        for beat in [0, 3] {
+            for step in 0..8 {
+                e.add_note(0, 1, beat, step, 0.0);
+            }
+        }
+        let places = |e: &Editor| pattern(e).tracks[1].notes.iter().map(|n| (n.beat, n.step)).collect::<Vec<_>>();
+        let original = places(&e);
+        for grid in (1..8).rev() {
+            assert!(e.set_steps_per_beat(0, 1, f64::from(grid), true));
+        }
+        assert!(places(&e).iter().all(|&(_, step)| step == 0), "one step per beat");
+        // Saved and opened again at one step per beat: the positions are in the file.
+        let (library, report) = Library::parse(&e.library().to_file_text()).unwrap();
+        assert!(report.issues.is_empty(), "{:?}", report.issues);
+        let mut e = Editor::new(library);
+        for _ in 1..8 {
+            assert!(e.incr_steps_per_beat(0, 1));
+        }
+        assert_eq!(pattern(&e).tracks[1].steps_per_beat, 8);
+        assert_eq!(places(&e), original);
+    }
+
+    #[test]
+    fn a_moved_note_forgets_its_place_in_the_beat() {
+        let mut e = editor();
+        // SNARE: beat 1 step 7 of 8, brought down to 1 step per beat, moved to beat 2.
+        assert!(e.set_steps_per_beat(0, 1, 1.0, false));
+        assert!(e.update_note(0, 1, 0, &[("beat", Value::from(2))], None, false));
+        assert!(e.set_steps_per_beat(0, 1, 8.0, false));
+        let note = &pattern(&e).tracks[1].notes[0];
+        assert_eq!((note.beat, note.step), (2, 0), "where it was put, not at step 7");
+    }
+
+    #[test]
     fn loop_point_and_clean() {
         let mut e = editor();
         assert!(e.shorten_loop(0, 0));
@@ -1188,6 +1229,10 @@ mod tests {
         assert_eq!(pattern(&e).bpm, 120.0);
         assert!(e.rename_pattern(0, "  "));
         assert_eq!(pattern(&e).name.as_deref(), Some("rock"));
+        assert!(e.rename_pattern(0, "  Rock II "));
+        assert_eq!((pattern(&e).id.as_str(), pattern(&e).name.as_deref()), ("rock", Some("Rock II")));
+        assert_eq!(e.history().next_undo(), Some("Rename pattern → \"Rock II\""));
+        e.undo();
         assert!(e.remove_pattern(1));
         e.undo();
         assert_eq!(e.library().patterns.len(), 3);
@@ -1361,6 +1406,70 @@ mod tests {
         assert_eq!(e.history().next_undo(), Some("Rename arrangement → \"chorus\""));
         e.undo();
         assert_eq!(e.library().songs[0].name, "verse");
+    }
+
+    #[test]
+    fn clips_are_placed_by_id_or_name_and_refused_with_a_reason() {
+        let mut e = editor();
+        let no_song = Err("No arrangement to edit — create a song first".to_owned());
+        assert_eq!(e.add_pattern_at_measure("rock", 0, None, None), no_song);
+        e.add_song("verse");
+
+        let clip = e.add_pattern_at_measure("  ROCK ", 2, Some(0.75), None).unwrap();
+        assert_eq!((clip.pattern_id.as_str(), clip.start_measure, clip.measure_count), ("rock", 2, 0.75));
+        let clip = e.add_pattern_at_measure("rock", 0, Some(0.0), None).unwrap();
+        assert_eq!(clip.measure_count, 1.0, "no length given: the pattern's, 4 beats");
+        assert_eq!(e.history().next_undo(), Some("Add \"rock\" at measure 1"));
+        let steps = e.history().undo_len();
+        assert_eq!(
+            e.add_pattern_at_measure(" no such pattern ", 0, None, None),
+            Err("No pattern named \"no such pattern\" in the library".to_owned())
+        );
+        assert_eq!(e.add_pattern_at_measure("", 0, None, None), Err("No pattern named \"\" in the library".to_owned()));
+        assert_eq!(e.repeat_pattern_at_measure(998, None), Err("No clip at measure 999".to_owned()));
+        assert_eq!(e.remove_pattern_at_measure(998, None), Err("No clip at measure 999".to_owned()));
+        assert_eq!(e.remove_pattern_clips("ghost", None), Ok(Vec::new()));
+        assert_eq!(e.remove_pattern_clips("  ", None), Err("No pattern given to remove".to_owned()));
+        assert_eq!(e.history().undo_len(), steps, "a refused edit is no step");
+
+        // Repeated right after itself, floored: 2 + 0.75 → measure 2.
+        let repeat = e.repeat_pattern_at_measure(2, None).unwrap();
+        assert_eq!((repeat.start_measure, repeat.measure_count), (2, 0.75));
+        assert_eq!(e.library().songs[0].loop_measures, Some(2.75));
+
+        // Indices out of range and repeated count once; none left: no step.
+        assert!(e.remove_song_clips(None, &[0, 2, 2, 999]));
+        assert_eq!(e.history().next_undo(), Some("Remove 2 clips"));
+        assert!(!e.remove_song_clips(None, &[]));
+        assert!(!e.remove_song_clips(None, &[5]));
+        assert_eq!(e.library().songs[0].clips.len(), 1);
+    }
+
+    #[test]
+    fn arrangements_are_added_removed_and_selected_in_one_step() {
+        let mut e = editor();
+        assert_eq!(e.add_song("  New one "), 0);
+        assert_eq!(e.add_song(""), 1);
+        assert_eq!(e.add_song("Untitled"), 2);
+        let songs: Vec<_> = e.library().songs.iter().map(|s| (s.id.as_str(), s.name.as_str())).collect();
+        assert_eq!(songs, [("new-one", "New one"), ("untitled", "Untitled"), ("untitled-2", "Untitled")]);
+        assert_eq!(e.selected_song(), 2, "a new arrangement is selected");
+        assert_eq!(e.set_selected_song(99), 2, "clamped to the list");
+
+        assert!(!e.remove_song(Some(42)));
+        assert!(e.remove_song(Some(0)));
+        assert_eq!(e.selected_song(), 1, "kept inside the list");
+        assert!(e.remove_song(None));
+        assert_eq!((e.library().songs.len(), e.selected_song()), (1, 0));
+        assert_eq!(e.history().next_undo(), Some("Remove arrangement \"Untitled\""));
+
+        // Undo selects the arrangement it brings back, redo the one after.
+        e.undo();
+        assert_eq!((e.library().songs.len(), e.selected_song()), (2, 1));
+        e.undo();
+        assert_eq!(e.selected_song(), 0);
+        e.redo();
+        assert_eq!(e.selected_song(), 1);
     }
 
     #[test]

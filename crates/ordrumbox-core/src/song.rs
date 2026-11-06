@@ -325,6 +325,33 @@ mod tests {
     }
 
     #[test]
+    fn the_transport_wraps_on_the_loop() {
+        const TICKS_PER_BEAT: f64 = 32.0;
+        let tick = |measures: f64| measures * BEATS_PER_MEASURE * TICKS_PER_BEAT;
+        let clip = |start, count| SongClip { pattern_id: "a".into(), start_measure: start, measure_count: count };
+        let mut song = Song::from_json(&json::parse("{}").unwrap(), &HashSet::new(), "s", &mut Vec::new()).unwrap().0;
+        let at = |song: &Song, measures| song.measure_at_tick(tick(measures), TICKS_PER_BEAT);
+
+        // Nothing to loop on: the transport runs on.
+        assert_eq!(at(&song, 5.5), 5.5);
+        assert_eq!(at(&song, -1.0), 0.0, "0 before the start");
+
+        // Wrapped at the end of the last clip, 2.75 measures.
+        song.clips = vec![clip(0, 2.0), clip(2, 0.75)];
+        assert_eq!(at(&song, 0.0), 0.0);
+        assert_eq!(at(&song, 1.5), 1.5);
+        assert_eq!(at(&song, 2.75), 0.0);
+        assert_eq!(at(&song, 4.0), 1.25);
+        assert_eq!(at(&song, -1.0), 0.0);
+
+        // A loop length is taken as it is, not floored like `length_measures`.
+        song.loop_measures = Some(1.5);
+        assert_eq!(at(&song, 1.5), 0.0);
+        assert_eq!(at(&song, 2.0), 0.5);
+        assert_eq!(at(&song, 7.75), 0.25);
+    }
+
+    #[test]
     fn renames_duplicate_ids() {
         let raw = json::parse(r#"[{"id":"x"},{"id":"x"},{"id":"x"},"bad",{"clips":1}]"#).unwrap();
         let mut issues = Vec::new();

@@ -28,8 +28,9 @@ use super::smf::{self, NoteOn};
 pub const C3_MIDI_NOTE: f64 = 48.0;
 /// `MIDI_MAX_BEATS`, `MIDI_MAX_PATTERNS`.
 const PATTERN_BEATS: i32 = 32;
-const MAX_PATTERNS: f64 = 16.0;
-const TICK: f64 = ordrumbox_core::steps::TICK as f64;
+const MAX_PATTERNS: i64 = 16;
+/// Grid of the imported tracks.
+const STEPS_PER_BEAT: i32 = 4;
 
 /// What an import made.
 #[derive(Debug, Clone, PartialEq)]
@@ -176,7 +177,7 @@ pub fn import(file_name: &str, bytes: &[u8], roots: &[(String, f64)]) -> Result<
         format!("MIDI imported: {} track(s)", defs.len())
     };
     if cut {
-        message.push_str(&format!(", notes past beat {} left out", MAX_PATTERNS * f64::from(PATTERN_BEATS)));
+        message.push_str(&format!(", notes past beat {} left out", MAX_PATTERNS * i64::from(PATTERN_BEATS)));
     }
     Ok(Imported { patterns, track_count: defs.len(), message })
 }
@@ -195,33 +196,32 @@ fn strip_midi_extension(name: &str) -> &str {
 /// `#createPatternsFromTrackDefs`: 32-beat patterns covering the notes, every
 /// track in each of them, and whether notes fall past the last one.
 fn patterns_from(defs: &[TrackDef], base_name: &str, division: f64) -> (Vec<Pattern>, bool) {
-    let ratio = division / TICK;
-    let max_tick = defs.iter().flat_map(|d| &d.notes).map(|n| n.tick).fold(0, i64::max);
-    let total_ticks = js::round(max_tick as f64 / ratio);
-    let total_beats = (total_ticks / TICK).ceil();
-    let wanted = (total_beats.max(1.0) / f64::from(PATTERN_BEATS)).ceil();
-    let count = MAX_PATTERNS.min(wanted) as usize;
-    // The last pattern ends before this tick, so a note on it is left out.
-    let cut = total_ticks >= MAX_PATTERNS * f64::from(PATTERN_BEATS) * TICK;
+    // Each note goes to the step nearest its MIDI tick, rounded once: a note
+    // just before a beat rounds to that beat's first step, never to a step
+    // past the last one of the beat before.
+    let step_of = |tick: i64| js::round(tick as f64 * f64::from(STEPS_PER_BEAT) / division) as i64;
+    let pattern_steps = i64::from(PATTERN_BEATS * STEPS_PER_BEAT);
+    let last_step = defs.iter().flat_map(|d| &d.notes).map(|n| step_of(n.tick)).fold(0, i64::max);
+    let wanted = last_step / pattern_steps + 1;
+    let count = wanted.min(MAX_PATTERNS) as usize;
+    let cut = wanted > MAX_PATTERNS;
     let patterns = (0..count)
         .map(|p| {
-            let start_beat = (p as i32) * PATTERN_BEATS;
-            let (start_tick, end_tick) = (f64::from(start_beat) * TICK, f64::from(start_beat + PATTERN_BEATS) * TICK);
+            let first_step = p as i64 * pattern_steps;
             let suffix = if count > 1 { format!(" {}/{count}", p + 1) } else { String::new() };
             let tracks = defs
                 .iter()
                 .map(|def| {
-                    let mut track = Track::new(&def.name, PATTERN_BEATS, 4);
-                    let ticks_per_step = TICK / f64::from(track.steps_per_beat);
+                    let mut track = Track::new(&def.name, PATTERN_BEATS, STEPS_PER_BEAT);
                     for note in &def.notes {
-                        let ticks = js::round(note.tick as f64 / ratio);
-                        if ticks < start_tick || ticks >= end_tick {
+                        let step = step_of(note.tick) - first_step;
+                        if !(0..pattern_steps).contains(&step) {
                             continue;
                         }
-                        let beat = (ticks / TICK).floor() as i32 - start_beat;
-                        let beat_step = js::round((ticks % TICK) / ticks_per_step) as i32;
+                        let spb = i64::from(STEPS_PER_BEAT);
+                        let (beat, beat_step) = ((step / spb) as i32, (step % spb) as i32);
                         let pitch = note.note.map_or(f64::NAN, f64::from) - def.base_note;
-                        let step_percent = js::round(f64::from(beat_step) * 100.0 / f64::from(track.steps_per_beat));
+                        let step_percent = js::round(f64::from(beat_step) * 100.0 / f64::from(STEPS_PER_BEAT));
                         track.notes.push(Note {
                             velocity: smf::velocity_to_unit(note.velocity),
                             beat,
@@ -244,4 +244,47 @@ fn patterns_from(defs: &[TrackDef], base_name: &str, division: f64) -> (Vec<Patt
         })
         .collect();
     (patterns, cut)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn def(ticks: &[i64]) -> TrackDef {
+        let notes = ticks.iter().map(|&tick| NoteOn { tick, channel: 9, note: Some(36), velocity: 100, track: 0 });
+        TrackDef { name: "KICK".into(), notes: notes.collect(), base_note: 36.0 }
+    }
+
+    fn places(pattern: &Pattern) -> Vec<(i32, i32)> {
+        pattern.tracks[0].notes.iter().map(|n| (n.beat, n.step)).collect()
+    }
+
+    #[test]
+    fn a_note_just_before_a_beat_starts_that_beat() {
+        // 96 ticks a beat: tick 90 is 3.75 steps, the first step of beat 1,
+        // never step 4 of beat 0.
+        let (patterns, cut) = patterns_from(&[def(&[0, 30, 90])], "f", 96.0);
+        assert!(!cut);
+        assert_eq!(places(&patterns[0]), [(0, 0), (0, 1), (1, 0)]);
+    }
+
+    #[test]
+    fn a_note_rounded_past_the_last_step_opens_the_next_pattern() {
+        // 3.95 steps before the end of beat 31: it rounds to beat 32, the first
+        // of a second pattern, where it would have been lost.
+        let (patterns, cut) = patterns_from(&[def(&[0, 31 * 96 + 95])], "f", 96.0);
+        assert!(!cut);
+        assert_eq!(patterns.len(), 2);
+        assert_eq!(places(&patterns[0]), [(0, 0)]);
+        assert_eq!(places(&patterns[1]), [(0, 0)]);
+    }
+
+    #[test]
+    fn notes_past_the_last_pattern_are_cut() {
+        let last_beat = MAX_PATTERNS * i64::from(PATTERN_BEATS);
+        let (patterns, cut) = patterns_from(&[def(&[(last_beat - 1) * 96, last_beat * 96])], "f", 96.0);
+        assert!(cut);
+        assert_eq!(patterns.len(), 16);
+        assert_eq!(places(&patterns[15]), [(31, 0)]);
+    }
 }

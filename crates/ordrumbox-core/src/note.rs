@@ -54,43 +54,63 @@ json_record! {
         arp_direction: Option<String> = None => "arpDirection" | "_arpType",
     }
     other_fields {
-        /// Position in the beat, percent (`stepPercent`): never saved, kept
-        /// while editing so a change of steps per beat and back restores the
-        /// step. `None`: derived from `step`.
+        /// Position in the beat, percent (`stepPercent`), `0..100`: kept so
+        /// a change of steps per beat and back restores the step. Saved only
+        /// when `step` cannot give it back (`saved_step_percent`). `None`:
+        /// derived from `step`.
         step_percent: Option<f64> = None,
     }
 }
+
+/// The key of `step_percent`, after the table keys in a `noteKeys` header.
+const STEP_PERCENT_KEY: &str = "stepPercent";
 
 /// Keys written rounded to 2 decimals (`NOTE_ROUND_2D`).
 const ROUND_2D: [&str; 4] = ["velocity", "pan", "probability", "retriggerRate"];
 
 impl Note {
     /// A note from its object form (`{"beat": 1, "velocity": 0.5}`). Unknown
-    /// keys (`stepPercent`, recomputed; anything else) are ignored: the compact
-    /// format the app writes cannot hold them.
+    /// keys are ignored: the compact format the app writes cannot hold them.
     pub(crate) fn from_object(object: &Object, at: &str, issues: &mut Vec<Issue>) -> Self {
         let mut note = Self::default();
         let mut seen = Vec::new();
         for (key, value) in object.iter() {
-            check_duplicate(&mut seen, Self::canonical_key(key), key, at, issues);
+            check_duplicate(&mut seen, note_field(key), key, at, issues);
             note.set_or_report(key, value, at, issues);
         }
         note
     }
 
     fn set_or_report(&mut self, key: &str, value: &Value, at: &str, issues: &mut Vec<Issue>) {
-        if self.set_field(key, value) == SetField::WrongType {
+        if key == STEP_PERCENT_KEY {
+            match value.as_f64() {
+                Some(percent) if (0.0..100.0).contains(&percent) => self.step_percent = Some(percent),
+                _ if value.is_null() => self.step_percent = None,
+                _ => issues.push(Issue::new(
+                    format!("{at}.{key}"),
+                    format!("not a percent from 0 to 100 ({}), derived from the step", value.to_json()),
+                )),
+            }
+        } else if self.set_field(key, value) == SetField::WrongType {
             issues.push(Issue::new(format!("{at}.{key}"), format!("wrong type ({}), default kept", value.to_json())));
         }
     }
 
     /// `stepPercent` at `steps_per_beat` steps per beat.
     pub fn step_percent(&self, steps_per_beat: i32) -> f64 {
-        self.step_percent.filter(|p| p.is_finite()).unwrap_or_else(|| {
-            crate::js::round(
-                f64::from(self.step) * 100.0 / f64::from(if steps_per_beat == 0 { 4 } else { steps_per_beat }),
-            )
-        })
+        self.step_percent.filter(|p| p.is_finite()).unwrap_or_else(|| self.derived_step_percent(steps_per_beat))
+    }
+
+    /// `stepPercent` as `step` gives it at `steps_per_beat` steps per beat.
+    fn derived_step_percent(&self, steps_per_beat: i32) -> f64 {
+        let steps_per_beat = if steps_per_beat == 0 { 4 } else { steps_per_beat };
+        crate::js::round(f64::from(self.step) * 100.0 / f64::from(steps_per_beat))
+    }
+
+    /// The `stepPercent` a file must hold: the kept one when `step` does not
+    /// give it back (a track brought down to fewer steps per beat).
+    fn saved_step_percent(&self, steps_per_beat: i32) -> Option<f64> {
+        self.step_percent.filter(|p| p.is_finite() && *p != self.derived_step_percent(steps_per_beat))
     }
 
     /// Fold a `beatStep` past the end of its beat into the following beats:
@@ -149,6 +169,11 @@ pub fn upgrade_arp(arp: &mut Value) {
     }
 }
 
+/// The field a note key names: a table key, or `stepPercent`.
+fn note_field(key: &str) -> Option<&'static str> {
+    Note::canonical_key(key).or_else(|| (key == STEP_PERCENT_KEY).then_some(STEP_PERCENT_KEY))
+}
+
 /// The header keys, or `None` (reported) when they cannot name note fields.
 fn parse_header(keys: &Value, at: &str, issues: &mut Vec<Issue>) -> Option<Vec<String>> {
     let at = format!("{at}.noteKeys");
@@ -158,7 +183,7 @@ fn parse_header(keys: &Value, at: &str, issues: &mut Vec<Issue>) -> Option<Vec<S
     };
     let mut header: Vec<String> = Vec::with_capacity(items.len());
     for item in items {
-        match item.as_str().map(|key| (key, Note::canonical_key(key))) {
+        match item.as_str().map(|key| (key, note_field(key))) {
             Some((key, None)) => {
                 issues.push(Issue::new(at, format!("unknown note key {key:?}, compact notes skipped")));
                 return None;
@@ -181,17 +206,26 @@ fn parse_header(keys: &Value, at: &str, issues: &mut Vec<Issue>) -> Option<Vec<S
 /// Encode notes in the compact format (`Exporter.encodeNotes`): the header
 /// lists, in key order, every key some note holds at a non-default value; each
 /// note stops at its last non-default value. `velocity`, `pan`, `prob` and
-/// `rate` are rounded to 2 decimals.
-pub(crate) fn encode_notes(notes: &[Note]) -> (Vec<Value>, Vec<Value>) {
+/// `rate` are rounded to 2 decimals. `stepPercent` comes last, held only by
+/// the notes whose step at `steps_per_beat` cannot give it back.
+pub(crate) fn encode_notes(notes: &[Note], steps_per_beat: i32) -> (Vec<Value>, Vec<Value>) {
     let fields: Vec<_> = notes.iter().map(Note::table_fields).collect();
     let used: Vec<usize> = (0..Note::KEYS.len()).filter(|&k| fields.iter().any(|note| !note[k].2)).collect();
+    let percents: Vec<_> = notes.iter().map(|n| n.saved_step_percent(steps_per_beat)).collect();
 
-    let header = used.iter().map(|&k| Value::from(Note::KEYS[k])).collect();
+    let mut header: Vec<Value> = used.iter().map(|&k| Value::from(Note::KEYS[k])).collect();
+    if percents.iter().any(Option::is_some) {
+        header.push(Value::from(STEP_PERCENT_KEY));
+    }
     let encoded = fields
         .iter()
-        .map(|note| {
-            let last = used.iter().rposition(|&k| !note[k].2).map_or(0, |i| i + 1);
-            let values = used[..last]
+        .zip(&percents)
+        .map(|(note, percent)| {
+            let last = match percent {
+                Some(_) => used.len(),
+                None => used.iter().rposition(|&k| !note[k].2).map_or(0, |i| i + 1),
+            };
+            let mut values: Vec<Value> = used[..last]
                 .iter()
                 .map(|&k| {
                     let (key, value, _) = &note[k];
@@ -201,6 +235,7 @@ pub(crate) fn encode_notes(notes: &[Note]) -> (Vec<Value>, Vec<Value>) {
                     }
                 })
                 .collect();
+            values.extend(percent.map(Value::from));
             Value::Array(values)
         })
         .collect();
@@ -221,7 +256,7 @@ mod tests {
     }
 
     fn encode(notes: &[Note]) -> String {
-        let (header, encoded) = encode_notes(notes);
+        let (header, encoded) = encode_notes(notes, 4);
         format!("{} {}", Value::Array(header), Value::Array(encoded))
     }
 
@@ -332,6 +367,29 @@ mod tests {
     #[test]
     fn all_default_notes_keep_their_slot() {
         assert_eq!(encode(&[Note::default(), Note::default()]), "[] [[],[]]");
+    }
+
+    #[test]
+    fn a_percent_is_saved_only_when_the_step_cannot_give_it_back() {
+        // At 4 steps per beat, step 1 is 25 %: kept or derived, nothing to save.
+        let derived = Note { step: 1, step_percent: Some(25.0), ..Note::default() };
+        assert_eq!(encode(&[derived.clone(), Note::default()]), r#"["step"] [[1],[]]"#);
+        // 38 % (step 3 of 8, brought down to 4) is held by its note only.
+        let kept = Note { step: 2, step_percent: Some(38.0), ..Note::default() };
+        let text = encode(&[Note { velocity: 1.0, ..Note::default() }, kept.clone()]);
+        assert_eq!(text, r#"["velocity","step","stepPercent"] [[1],[0.8,2,38]]"#);
+        let (notes, issues) = decode(r#"[[1],[0.8,2,38]]"#, Some(r#"["velocity","step","stepPercent"]"#));
+        assert_eq!((notes[1].clone(), issues), (kept, vec![]));
+        let (notes, _) = decode(r#"[{"step":2,"stepPercent":38}]"#, None);
+        assert_eq!(notes[0].step_percent, Some(38.0), "object form too");
+    }
+
+    #[test]
+    fn a_percent_out_of_the_beat_is_reported() {
+        let (notes, issues) = decode(r#"[[2,100],[2,"x"]]"#, Some(r#"["step","stepPercent"]"#));
+        assert!(notes.iter().all(|n| n.step_percent.is_none()));
+        assert_eq!(issues.len(), 2);
+        assert_eq!(issues[0].at, "t.notes[0].stepPercent");
     }
 
     #[test]

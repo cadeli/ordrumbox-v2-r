@@ -27,6 +27,13 @@ pub fn step_to_tick(step: i64, steps_per_beat: i32) -> i64 {
     beat * i64::from(TICK) + js::round(beat_step as f64 * f64::from(TICK) / f64::from(steps_per_beat)) as i64
 }
 
+/// Tick nearest a position counted in steps, which may fall between steps (a
+/// repeat at a fraction of a step). For a whole step `>= 0` it is
+/// [`step_to_tick`].
+pub fn position_to_tick(steps: f64, steps_per_beat: i32) -> i64 {
+    js::round(steps * f64::from(TICK) / f64::from(steps_per_beat)) as i64
+}
+
 /// Spacing, in steps, of a `rate` code: below 8 it is `rate / 8` of a step,
 /// from 8 up `rate - 7` steps.
 pub fn step_spacing(rate: f64) -> f64 {

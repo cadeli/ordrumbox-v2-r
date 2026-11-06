@@ -195,7 +195,7 @@ pub(crate) fn apply(
     flat: &mut Hits,
     track_index: usize,
     track: &Track,
-    (loop_ticks, pattern_ticks): (i64, i64),
+    (steps_in_loop, pattern_ticks): (i64, i64),
     macro_factor: f64,
     rng: &mut Rng,
     scales: &Scales,
@@ -204,18 +204,19 @@ pub(crate) fn apply(
     let amount =
         if track.auto_mode { (track.auto_hit_amount() * macro_factor).min(100.0) } else { track.hit_variation };
     let budget = budget_for(amount);
-    if budget <= 0 || loop_ticks <= 0 {
+    if budget <= 0 || steps_in_loop <= 0 {
         return;
     }
     let spb = track.steps_per_beat;
-    let steps_in_loop = js::round(loop_ticks as f64 * f64::from(spb) / f64::from(crate::steps::TICK)) as i64;
-    let loop_count = ((pattern_ticks as f64 / loop_ticks as f64).ceil() as i64).max(1);
+    let loop_ticks = steps_in_loop as f64 * f64::from(crate::steps::TICK) / f64::from(spb);
+    let loop_count = ((pattern_ticks as f64 / loop_ticks).ceil() as i64).max(1);
     let budget = loop_budget(budget, loop_count);
     // A generated drum line keeps its sound and its accents.
     let drum_line = track.auto_mode && instrument_family(&track.name).is_drum();
 
     for lp in 0..loop_count {
-        let tick_of = |step: i64| lp * loop_ticks + step_to_tick(step, spb);
+        // Rounded from the step itself, as the engine places the repeats.
+        let tick_of = |step: i64| step_to_tick(lp * steps_in_loop + step, spb);
         let target = |step: i64| {
             let (beat, beat_step) = step_to_beat(step, spb);
             u32::try_from(tick_of(step)).ok().map(|tick| Target {
