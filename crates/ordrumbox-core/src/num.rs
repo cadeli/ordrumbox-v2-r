@@ -1,4 +1,4 @@
-//! Decimal rounding shared by the crates.
+//! Decimal rounding and wrapping shared by the crates.
 
 /// `x` rounded to `decimals` decimal places, halves away from zero (as
 /// [`f64::round`]). `x` is scaled first, so a value stored just under a half
@@ -15,6 +15,13 @@ pub fn round_to(x: f64, decimals: i32) -> f64 {
 /// other settings saved rounded.
 pub fn round2(x: f64) -> f64 {
     round_to(x, 2)
+}
+
+/// `x` wrapped into `[0, period)` ([`f64::rem_euclid`]); a tiny negative `x`,
+/// which `rem_euclid` rounds up to `period`, is `0`. NaN stays NaN.
+pub fn wrap(x: f64, period: f64) -> f64 {
+    let r = x.rem_euclid(period);
+    if r == period { 0.0 } else { r }
 }
 
 /// `x` as the UI shows it: its shortest form (`140`, `0.5`), zero without a
@@ -40,6 +47,16 @@ mod tests {
         assert_eq!(round_to(9.9996, 3), 10.0);
         assert!(round_to(f64::NAN, 2).is_nan());
         assert!(round_to(-0.004, 2).is_sign_positive());
+    }
+
+    #[test]
+    fn wraps_into_the_period() {
+        assert_eq!(wrap(14.0, 12.0), 2.0);
+        assert_eq!(wrap(-1.0, 12.0), 11.0);
+        assert_eq!(wrap(-12.0, 12.0), 0.0);
+        assert_eq!(wrap(-1e-20, 12.0), 0.0);
+        assert_eq!(wrap(0.5, 12.0), 0.5);
+        assert!(wrap(f64::NAN, 12.0).is_nan());
     }
 
     #[test]

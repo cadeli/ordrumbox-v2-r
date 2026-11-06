@@ -58,13 +58,11 @@ pub fn waveform(phase: f64, wave: f64) -> f64 {
     } else if wave < 3.5 {
         if p < 0.5 { 1.0 } else { -1.0 }
     } else {
-        // Sample and hold: integer hash of the cycle index, wrapping in i32.
-        let cycle = phase.floor() * 1_234_567.0 + 890_123.0;
-        let mut rng = if cycle.is_finite() { cycle.trunc().rem_euclid(4_294_967_296.0) as u32 as i32 } else { 0 };
-        rng ^= rng << 13;
-        rng ^= rng >> 17;
-        rng ^= rng << 5;
-        f64::from(rng) / 2_147_483_648.0
+        // Sample and hold: the splitmix64 finalizer of the cycle index
+        // (`as` saturates, NaN is cycle 0), its top 32 bits scaled to [-1, 1).
+        let mut state = phase.floor() as i64 as u64;
+        let x = crate::rng::splitmix64(&mut state);
+        f64::from((x >> 32) as u32) / 2_147_483_648.0 - 1.0
     }
 }
 

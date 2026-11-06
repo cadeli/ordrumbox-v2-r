@@ -117,7 +117,7 @@ fn pattern_harmony(pattern: &Pattern, style: &Style, section: &str, loop_in_elem
     let (root, scale) = section_harmony(&style.progression, section, loop_in_element);
     let offset = pattern_value(pattern, KEY_OFFSET).and_then(Value::to_number).unwrap_or(0.0);
     let scale = pattern_value(pattern, SCALE).and_then(Value::to_text).unwrap_or(scale);
-    Harmony { root: ((root + offset) % 12.0 + 12.0) % 12.0, scale: Some(scale) }
+    Harmony { root: ordrumbox_core::num::wrap(root + offset, 12.0), scale: Some(scale) }
 }
 
 /// `#randomDensity` of a melodic line: bass near full, chords vary more.

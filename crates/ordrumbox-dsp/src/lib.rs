@@ -47,6 +47,15 @@ macro_rules! audio_params {
     };
 }
 
+/// `x` wrapped into `[0, period)` ([`f64::rem_euclid`]); a tiny negative `x`,
+/// which `rem_euclid` rounds up to `period`, is `0`, so the result can index
+/// a buffer of `period` frames. NaN stays NaN.
+#[inline]
+pub(crate) fn wrap(x: f64, period: f64) -> f64 {
+    let r = x.rem_euclid(period);
+    if r == period { 0.0 } else { r }
+}
+
 pub mod lfo;
 pub mod master_bus;
 pub mod sample;
