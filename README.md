@@ -913,15 +913,37 @@ node tools/export_dsp_fixtures.mjs ../ordrumbox-v2
 - The strip settings the JS lacks (24 dB/oct filter, pre-delay, dispersion,
   gate, wow, feedback tone, ping-pong input) default to what the JS does, so
   the fixtures play them unset; unit tests (`strip.rs`, `synth.rs`) measure
-  them. `strip_settings.json` is checked on every track but those whose
-  settings depart on purpose (a `gated` reverb, a sounding `slap`, `pingpong`
-  or too long delay), which the unit tests of `strip_settings.rs` cover.
-- `ordrumbox-engine/tests/fixtures/strip_settings.json`: the strip parameters
-  `applyTrackToStrip()` sets for every track setup of `song.json`.
-- `ordrumbox-engine/tests/fixtures/lfo_values.json`: `computeLfoValue()` over
-  a range of ticks.
-- `ordrumbox-engine/tests/fixtures/synth_patches.json`: the message
-  `WorkletSynthVoice` sends to its processor for each preset.
+  them.
+
+The engine's mapping of settings and the synth editor's model no longer have
+a script; they are checked against Rust snapshots, from inputs the tests
+build (`ordrumbox-engine/tests/`):
+
+- `ordrumbox-engine/tests/fixtures/generated_sounds.json`: the web version's
+  synth presets (its `assets/data/generated_sounds.json`), an input of the
+  tests below, not a JS output.
+- `ordrumbox-engine/tests/fixtures/mapping_rust.txt` (`mapping.rs`): the
+  strip parameters of each distinct track setup of `song.json` and of
+  hand-made tracks; the values of every LFO of `song.json` and of hand-made
+  ones over 37.5 beats; the synth patch of every web preset, of two note
+  variants and of busy patches (every LFO target and wave, FM algorithm,
+  modulation target, bypass). It replaces `strip_settings.json`,
+  `lfo_values.json` and `synth_patches.json` (the JS `applyTrackToStrip()`,
+  `computeLfoValue()` and the `update` message of `WorkletSynthVoice`), which
+  it matched when written but on purpose: a `gated` reverb's room, a sounding
+  `slap` or `pingpong` delay (`strip_settings.rs`), and a patch's level,
+  which counts the noise in the mix (`synth_preset.rs`).
+  `cargo test -p ordrumbox-engine --test mapping -- --ignored` rewrites it.
+- `ordrumbox-engine/tests/fixtures/synth_editor_rust.txt` (`synth_editor.rs`):
+  the synth editor's draft of every web preset and of hand-made ones (empty,
+  partial and broken, bypassed), filled with the group defaults, their cards
+  in order and those bypassed, the LFO targets and their scales, and an LFO's
+  modulation for every target, wave and sync at several times (9 decimals:
+  the last bit of a sine is the platform's). It replaces `synth_editor.json`,
+  the JS `SynthPresetModel`, `getOrderedGroupNames()` and `computeLfoMod()`,
+  which it matched when written.
+  `cargo test -p ordrumbox-engine --test synth_editor -- --ignored` rewrites
+  it.
 
 The editing commands no longer have a script; their tests are Rust only:
 
@@ -1063,19 +1085,24 @@ MIDI files no longer have a script; their tests are Rust only
   `cargo test -p ordrumbox-logic --test midi -- --ignored` writes this file,
   only when the parser, the import or the export changes on purpose.
 
-The kit editor's sample analysis has a third script:
+The kit editor's sample analysis no longer has a script
+(`ordrumbox-engine/tests/analysis.rs`):
 
-```sh
-node tools/export_kit_fixtures.mjs ../ordrumbox-v2
-```
+- Sines of known frequency and amplitude, at several rates: the fundamental
+  within one sample of the period, the peak within half a sample's phase of
+  the crest, the RMS at the peak over √2, the note, the envelope; levels that
+  follow the amplitude, a DC offset that moves the peak and not the pitch, a
+  stereo file analysed as its mono mix, silence.
+- `ordrumbox-engine/tests/fixtures/analysis_rust.txt`: the edge cases, as WAV
+  files in every format the decoder reads (8, 16, 24 and 32-bit PCM, 32-bit
+  float, stereo): a decay, noise, a noisy tone, silence, an empty file, very
+  short files, a DC offset, the kick.wav fixture.
+  `cargo test -p ordrumbox-engine --test analysis -- --ignored` rewrites it.
+  It replaces `analysis.json`, the JS `Analyzer.analyzeWavBuffer()` and
+  `hzToNote()`, which it matched when written on the same files (the noise
+  apart, drawn now from the engine's own random stream).
 
-- `ordrumbox-engine/tests/fixtures/analysis.json`: `Analyzer.analyzeWavBuffer()`
-  (envelope, length, peak and RMS dB, fundamental and its confidence) and the
-  note of WAV files in every format the JS decodes (tones, noise, decays,
-  silence, very short files, stereo, the kick.wav fixture). Rust decodes the
-  same bytes and must report the same values exactly.
-
-The knobs and sliders have a fourth:
+The knobs and sliders have a third script:
 
 ```sh
 node tools/export_control_fixtures.mjs ../ordrumbox-v2
@@ -1088,7 +1115,7 @@ node tools/export_control_fixtures.mjs ../ordrumbox-v2
   `formatSignedDb`, the loop point label), and `formatNoteTooltip` for a set of
   notes and track pitches.
 
-The piano roll has a fifth:
+The piano roll has a fourth:
 
 ```sh
 node tools/export_piano_fixtures.mjs ../ordrumbox-v2
@@ -1096,18 +1123,6 @@ node tools/export_piano_fixtures.mjs ../ordrumbox-v2
 
 - `ordrumbox-ui/tests/fixtures/piano_roll.json`: `NoteDrag` driven through a
   fake window (velocity, pitch, the axis lock, the bounds), and `midiName()`.
-
-The synth editor has a sixth:
-
-```sh
-node tools/export_synth_fixtures.mjs ../ordrumbox-v2
-```
-
-- `ordrumbox-engine/tests/fixtures/synth_editor.json`: `SynthPresetModel`
-  on every preset of `generated_sounds.json` and hand-made ones (the defaults
-  filled in, the cards bypassed), `getOrderedGroupNames()`, the LFO targets
-  and their scales, and `computeLfoMod()` for every target, wave and sync at
-  several times.
 
 ## License
 
