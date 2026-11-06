@@ -90,7 +90,7 @@ fn snapshot_path() -> PathBuf {
 
 /// Writes `synth_editor_rust.txt` from the code as it is: `cargo test -p
 /// ordrumbox-engine --test synth_editor -- --ignored`, when the editor's
-/// model changes on purpose (`README.md`, "Golden fixtures").
+/// model changes on purpose (`README.md`, "Snapshots").
 #[test]
 #[ignore = "writes the snapshot"]
 fn write_the_snapshot() {

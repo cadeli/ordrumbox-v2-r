@@ -1286,19 +1286,66 @@ mod tests {
         assert_eq!(track_tooltip(&Track { auto_assign: false, ..Track::default() }, "").len(), 3);
     }
 
-    /// `formatNoteTooltip` (tools/export_control_fixtures.mjs).
+    /// A note's tooltip on tracks transposed by 0, -2 and 7 semitones.
     #[test]
-    fn golden_tooltips() {
-        let fixture = json::parse(include_str!("../tests/fixtures/controls.json")).unwrap();
-        let rows = fixture.get("tooltips").and_then(Value::as_array).unwrap();
-        assert!(rows.len() > 20);
-        for row in rows {
-            let r = row.as_array().unwrap();
-            let mut note = Note::default();
-            for (key, value) in r[0].as_object().unwrap().iter() {
-                let _ = note.set_field(key, value);
+    fn note_tooltips() {
+        let arp = |text: &str| json::parse(text).unwrap();
+        let busy = Note {
+            pitch: -13.0,
+            probability: 0.25,
+            cycle: 2,
+            retrigger_count: 3,
+            arp: arp(r#"{"intervals": [0, 4, 7], "mode": "up"}"#),
+            retrigger_probability: 0.5,
+            euclidean_pulses: 5,
+            euclidean_rotation: 2,
+            retrigger_rate: 12.0,
+            pan: -0.333,
+            ..Note::default()
+        };
+        let busy_text = "prob:0.25  every:2  retrig:3  arp:[0,4,7]  arpProb:0.5  eucl:5@2  rate:12  pan:-0.33";
+        let rows: [(Note, [&str; 3]); 9] = [
+            (Note::default(), ["C4  MIDI 60", "A#3  MIDI 58", "G4  MIDI 67"]),
+            (
+                Note { velocity: 0.5, pitch: 3.0, ..Note::default() },
+                ["D#4  MIDI 63  vel:0.5", "C#4  MIDI 61  vel:0.5", "A#4  MIDI 70  vel:0.5"],
+            ),
+            (
+                busy,
+                [
+                    &format!("B2  MIDI 47  {busy_text}"),
+                    &format!("A2  MIDI 45  {busy_text}"),
+                    &format!("F#3  MIDI 54  {busy_text}"),
+                ],
+            ),
+            (
+                Note { arp: arp("[0, 7]"), ..Note::default() },
+                ["C4  MIDI 60  arp:[0,7]", "A#3  MIDI 58  arp:[0,7]", "G4  MIDI 67  arp:[0,7]"],
+            ),
+            // One interval is no arpeggio.
+            (
+                Note { arp: arp(r#"{"intervals": [3]}"#), ..Note::default() },
+                ["C4  MIDI 60", "A#3  MIDI 58", "G4  MIDI 67"],
+            ),
+            (
+                Note { euclidean_pulses: 3, velocity: 1.0, ..Note::default() },
+                ["C4  MIDI 60  vel:1  eucl:3", "A#3  MIDI 58  vel:1  eucl:3", "G4  MIDI 67  vel:1  eucl:3"],
+            ),
+            (Note { pitch: 30.0, ..Note::default() }, ["F#6  MIDI 90", "E6  MIDI 88", "C#7  MIDI 97"]),
+            (
+                Note { pitch: -60.0, velocity: 0.123_456, ..Note::default() },
+                ["C-1  MIDI 0  vel:0.12", "A#-2  MIDI -2  vel:0.12", "G-1  MIDI 7  vel:0.12"],
+            ),
+            // A fractional pitch has no name.
+            (
+                Note { pitch: 0.5, ..Note::default() },
+                ["undefined4  MIDI 60.5", "undefined3  MIDI 58.5", "undefined4  MIDI 67.5"],
+            ),
+        ];
+        for (note, texts) in &rows {
+            for (track_pitch, text) in [0.0, -2.0, 7.0].into_iter().zip(texts) {
+                assert_eq!(note_tooltip(note, track_pitch), *text, "{note:?} on {track_pitch}");
             }
-            assert_eq!(note_tooltip(&note, r[1].as_f64().unwrap()), r[2].as_str().unwrap(), "{r:?}");
         }
     }
 

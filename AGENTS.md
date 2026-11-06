@@ -10,7 +10,7 @@ where it reads and writes its files.
 
 ```bash
 cargo run -p ordrumbox-app              # the app; finds assets/ from anywhere in the checkout
-cargo test --workspace                  # all tests, golden fixtures included
+cargo test --workspace                  # all tests, snapshots included
 cargo clippy --workspace --all-targets  # must be clean: CI sets RUSTFLAGS=-D warnings
 cargo fmt --all                         # rustfmt.toml: max_width 120; CI checks it
 cargo xtask bundle ordrumbox-plugin --release --features vst3   # target/bundled/orDrumbox.{clap,vst3}
@@ -34,7 +34,6 @@ ordrumbox-app     window, input translation, audio output           → core, en
 ordrumbox-plugin  CLAP/VST3 instrument following the host           → engine, ui, nih-plug, baseview, softbuffer
 xtask             `cargo xtask bundle`: plugin bundles, assets in   → nih_plug_xtask
 assets/           data/*.json and kits/**.wav, read at runtime
-tools/            scripts that regenerate the golden fixtures
 ```
 
 - The four domain crates take **no third-party dependency**. Only
@@ -61,8 +60,7 @@ tools/            scripts that regenerate the golden fixtures
   `session_mcp.rs` keeps those that play, touch files, kits, synth presets
   or the master, or change what the window shows. `ordrumbox --mcp` is the
   stdio bridge an MCP client starts (`README.md`, "AI clients").
-- Dependencies only point down the table. Nothing depends on
-  `ordrumbox-app`; `dsp` uses `core` only as a dev-dependency.
+- Dependencies only point down the table. Nothing depends on `ordrumbox-app`.
 - Workspace lints (`Cargo.toml`): `unsafe_code = "forbid"`,
   `missing_debug_implementations = "warn"`, clippy `all`. `ordrumbox-plugin`
   repeats them with `unsafe_code = "deny"`: only the export macros and the
@@ -139,28 +137,21 @@ tools/            scripts that regenerate the golden fixtures
 - Writes go through `store::write_atomic`. A file that cannot be read or parsed
   is reported, never replaced by defaults and saved over.
 
-## Golden fixtures
+## Snapshots
 
 - The `tests/fixtures/` of each crate are committed; tests need nothing outside
-  this repository.
-- The JS app (ordrumbox-v2) is no longer the reference for behaviour. The
-  fixtures the scripts in `tools/` generated from it (`README.md`, "Golden
-  fixtures") are non-regression tests only, to be replaced over time by pure
-  Rust tests (snapshots, property tests). New tests are written in Rust; add no
-  JS fixture, and don't re-run a script to follow the JS app.
-- Never edit a generated fixture by hand; the hand-written ones are named in
-  the README.
-- A test against a fixture that fails signals a change of behaviour: check
-  whether it is meant. If not, the code is wrong. DSP outputs must match within
-  2e-5; everything else matches exactly.
-- A change meant on purpose moves the cases concerned to a Rust snapshot or a
-  property test, and the README notes the departure. Never loosen a tolerance
-  or regenerate a JS fixture to make a test pass. "The JS app does it" is no
-  reason to keep a behaviour.
-- The synth voice and some effects are such departures (`README.md`,
-  "Golden fixtures", "Effects"): their cases are checked against
-  `synth_renders.bin` and `effect_renders.bin`, written from the Rust
-  processors. Rewrite them only for a change of sound you mean to make.
+  this repository. `README.md`, "Snapshots", lists them.
+- Expected outputs are Rust snapshots (`*_rust.txt`, `*_renders.bin`), which
+  each test writes with its `--ignored` test, tables in unit tests, and
+  property tests. The JS app (ordrumbox-v2) is not the reference for
+  behaviour: "the JS app does it" is no reason to keep or change one. Add no
+  fixture from it.
+- A snapshot that fails signals a change of behaviour: check whether it is
+  meant. If not, the code is wrong. Audio outputs must match within 2e-5;
+  everything else matches exactly. Never loosen a tolerance.
+- Rewrite a snapshot only for a change of behaviour you mean to make, and
+  note it in the README. Never edit one by hand; the hand-written inputs are
+  named in the README.
 
 ## Code conventions
 
@@ -181,5 +172,5 @@ tools/            scripts that regenerate the golden fixtures
 - One shared function instead of a repeated expression (a clamp range, a row
   hit test, a post-to-engine sequence); a named constant instead of a repeated
   literal.
-- Unit tests sit with the code (`#[cfg(test)] mod tests`); golden and
+- Unit tests sit with the code (`#[cfg(test)] mod tests`); snapshot and
   end-to-end tests go in each crate's `tests/`.

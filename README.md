@@ -817,21 +817,22 @@ candidate, and whether the sample stands in, is written by hand: a change in
 it is a change of what a user hears, to check by ear before the table is
 updated.
 
-## Golden fixtures
+## Snapshots
 
-The fixtures are committed: the tests need nothing outside this repository.
-They were produced by the JS app (ordrumbox-v2), from which this one was ported,
-with the scripts of `tools/`, which need a checkout of it only to make them
-again. They hold the JS names of the keys, which the load reads as
-alternative spellings.
+The tests need nothing outside this repository: their inputs and expected
+outputs are committed in each crate's `tests/fixtures/`. This app was ported
+from the JS app (ordrumbox-v2), whose outputs were the first expected ones;
+they are all replaced now by Rust snapshots, which the tests write from inputs
+they build or read, by tables in unit tests and by property tests. Each
+snapshot matched the JS app when it took over, apart from the departures noted
+below; the JS app is no longer the reference.
 
-The JS app is no longer the reference: the fixtures only guard against
-regressions, and are to be replaced over time by pure Rust tests. A test that
-fails signals a change of behaviour; if it is not meant, the code is wrong. A
-change meant on purpose moves the cases concerned to a Rust snapshot or a
-property test, and is noted here, as the synth voice's departures are below.
+A snapshot that fails signals a change of behaviour; if it is not meant, the
+code is wrong. A change meant on purpose rewrites the snapshot with the
+`--ignored` test named below, and is noted here. Audio outputs match within
+2e-5, everything else exactly. A snapshot is never edited by hand.
 
-The fixtures of `crates/ordrumbox-core/tests/fixtures/` need no script:
+`crates/ordrumbox-core/tests/fixtures/`:
 
 - `song.json`: the web version's demo library (its `assets/data/song.json`),
   copied verbatim; an input of the tests of every crate, not a JS output.
@@ -884,40 +885,33 @@ The fixtures of `crates/ordrumbox-core/tests/fixtures/` need no script:
   matched when written (a random arpeggio's pitches apart: the JS drew them,
   the snapshot holds seed 1's).
 
-The audio processors have their own script, which runs the JS AudioWorklet
-processors in Node (a minimal worklet scope, 128-frame quanta):
+The audio processors are rendered quantum by quantum (128 frames) on the
+cases of `ordrumbox-dsp/tests/render_cases/mod.rs`: strip and master bus
+settings, changed between quanta, over bursts of noise built from integer
+arithmetic; one note of every web synth preset, of two note variants and of
+busy patches (every LFO target and wave, FM algorithm, modulation target),
+and bypasses (`tests/processors.rs`):
 
-```sh
-node tools/export_dsp_fixtures.mjs ../ordrumbox-v2
-```
-
-- `ordrumbox-dsp/tests/fixtures/renders.{json,bin}`: strip, master bus and
-  synth voice outputs (every preset of `generated_sounds.json`, every LFO
-  target, FM algorithm and modulation target) for inputs both sides compute
-  bit for bit. The Rust processors must match within 2e-5, except the synth
-  cases that use what the voice does differently on purpose (below).
-- `ordrumbox-dsp/tests/fixtures/synth_renders.bin`: those synth cases as the
-  Rust voice renders them, one frame in 16. The voice departs from the JS
-  processor on its sub (an octave below oscillator 1, no DC), its pitch punch
-  (two octaves, not 24 cents), its FM (following the note, through zero) and
-  its noise (each note its own); the patch's level also counts the noise in
-  the mix. This file is the one fixture the JS app does not produce:
-  `cargo test -p ordrumbox-dsp --test processors -- --ignored` writes it, only
-  when the voice's sound changes on purpose.
-- `ordrumbox-dsp/tests/fixtures/effect_renders.bin`: the same for the strip
-  and master bus cases that use what they do differently on purpose (see
-  "Effects"): the reverb at 48 kHz (its tunings follow the rate), the `tape`
-  saturation, a master output above the limit's knee. The synth snapshot also
-  covers its filter opening to 0.45 × the rate (a quarter in JS). The same
-  command writes both files.
-- The strip settings the JS lacks (24 dB/oct filter, pre-delay, dispersion,
-  gate, wow, feedback tone, ping-pong input) default to what the JS does, so
-  the fixtures play them unset; unit tests (`strip.rs`, `synth.rs`) measure
+- `ordrumbox-dsp/tests/fixtures/synth_renders.bin` and `effect_renders.bin`:
+  what the synth voice, then the strip and master bus, render of every case,
+  f32 left then right, every frame below 1024 then one in 4.
+  `cargo test -p ordrumbox-dsp --test processors -- --ignored` writes both,
+  only when the sound changes on purpose. They replace `renders.{json,bin}`,
+  the JS AudioWorklet processors run in Node on the same cases, which they
+  matched within 2e-5 when written, but where the processors depart on
+  purpose: the voice's sub (an octave below oscillator 1, no DC), pitch punch
+  (two octaves, not 24 cents), FM (following the note, through zero), noise
+  (each note its own) and filter (opening to 0.45 × the rate, a quarter in
+  JS), the patch's level, which counts the noise in the mix; the reverb at
+  48 kHz (its tunings follow the rate), the `tape` saturation, a master output
+  above the limit's knee (see "Effects").
+- The strip settings the JS lacked (24 dB/oct filter, pre-delay, dispersion,
+  gate, wow, feedback tone, ping-pong input) default to what the JS did, so
+  the cases play them unset; unit tests (`strip.rs`, `synth.rs`) measure
   them.
 
-The engine's mapping of settings and the synth editor's model no longer have
-a script; they are checked against Rust snapshots, from inputs the tests
-build (`ordrumbox-engine/tests/`):
+The engine's mapping of settings and the synth editor's model are checked
+against Rust snapshots, from inputs the tests build (`ordrumbox-engine/tests/`):
 
 - `ordrumbox-engine/tests/fixtures/generated_sounds.json`: the web version's
   synth presets (its `assets/data/generated_sounds.json`), an input of the
@@ -945,7 +939,7 @@ build (`ordrumbox-engine/tests/`):
   `cargo test -p ordrumbox-engine --test synth_editor -- --ignored` rewrites
   it.
 
-The editing commands no longer have a script; their tests are Rust only:
+The editing commands are checked by properties:
 
 - `ordrumbox-logic/tests/edit_properties.rs`: seeded random sequences of
   every editing command of `Editor` (notes, tracks, patterns, generators,
@@ -974,9 +968,8 @@ step: stack sizes, descriptions, return values, patterns and arrangements.
 They matched, apart from one description: shortening a loop is "Shorten loop
 on" a track (the JS said "Loop point back on").
 
-Sound assignment, song playback and WAV encoding no longer have a script;
-their tests are Rust only (the instrument catalog is not generated:
-"Instrument catalog", above):
+Sound assignment, song playback and WAV encoding are checked by tables (the
+instrument catalog is not generated: "Instrument catalog", above):
 
 - `ordrumbox-core/tests/instruments.rs`: tables of what `by_id`, `by_name`
   and `from_file_name` find for a list of names (the demo library's track
@@ -1009,35 +1002,29 @@ Rust snapshot holds these names (below). The synth fallback is checked by
 unit tests, like the rules themselves (`ordrumbox-core/src/instruments.rs`,
 `ordrumbox-engine/src/assign.rs`).
 
-The generators have a second script; it also writes the variant tables the
-port reads (`ordrumbox-logic/data/generators.json`):
+The generators draw from a seeded stream (mulberry32) on the inputs of
+`ordrumbox-logic/tests/fixtures/generator_cases.json` (`tests/generators.rs`):
 
-```sh
-node tools/export_gen_fixtures.mjs ../ordrumbox-v2
-```
-
-- `ordrumbox-logic/tests/fixtures/generators.json`, with `Math.random`
-  replaced by a seeded stream (mulberry32, also in the Rust test): every
-  variant of every generator on several track setups, densities and seeds;
-  `generateRandom`. Rust must give the same notes, track settings and number of
-  draws for the melodic lines and `generateRandom`. For what departs on purpose
-  (below) the file holds the inputs and seeds only: the drum lines,
-  `generatePattern` on new and existing patterns, the player's loop start over
-  30–46 loops (auto tracks, `autoGen` patterns), the ↻ Drum / Bass / Chords
-  toggles. The bass lines sound an octave above the JS ones, whose variants sat
-  an octave too low: each bass variant's `rootNote` in `data/generators.json` is
-  12 above the JS table (re-apply it after running the script), and the test
-  compares the bass cases with the JS notes raised by 12.
-- `ordrumbox-logic/tests/fixtures/generators_rust.txt`: what departs from the
-  JS, from the same inputs and seeds, as the Rust generators make it: whole
-  patterns, loops and toggles. The drum lines no longer come from the JS
-  variant tables but from the styles (`assets/data/styles.json`, above): the
-  script no longer writes the drum and genre tables into
-  `data/generators.json`. Bass and chord lines hold through their section, with no
-  variation and no chord progression within it. A track's variation budget is for the whole pattern,
+- `generator_cases.json`: every melodic variant of the bass and chord
+  generators (and an unknown one) on several track setups, densities,
+  harmonies and bass lines; random tracks; patterns, new and existing, made
+  in a style or none; the player's loop start over 30–46 loops (auto tracks,
+  `autoGen` patterns); the ↻ Drum / Bass / Chords toggles. Inputs only,
+  patterns as a library saves them, with their seeds.
+- `ordrumbox-logic/tests/fixtures/generators_rust.txt`: what the generators
+  make of every case, and how many draws. `cargo test -p ordrumbox-logic
+  --test generators -- --ignored` writes it, only when what the generators
+  make changes on purpose. It replaces `generators.json`, written by the JS
+  app's generators with the same stream: the melodic lines and random tracks
+  matched it, notes, track settings and draws, but for the bass lines, which
+  sound an octave above the JS ones, whose variants sat an octave too low
+  (each bass variant's `rootNote` in `ordrumbox-logic/data/generators.json`,
+  the variant tables first taken from the JS app, is 12 above the JS table).
+  The rest departed: the drum lines no longer come from the JS variant tables
+  but from the styles (`assets/data/styles.json`, above); bass and chord
+  lines hold through their section, with no variation and no chord
+  progression within it; a track's variation budget is for the whole pattern,
   not for each of its loops (`ordrumbox-core/src/variation.rs`).
-  `cargo test -p ordrumbox-logic --test generators -- --ignored` writes this
-  file, only when what the generators make changes on purpose.
 - `ordrumbox-logic/tests/fixtures/compose_rust.txt`: one pattern per style
   (two seeds), its drum tracks, as `crate::compose` makes them; the properties
   of every style (exact hits, required and forbidden steps, the signature
@@ -1051,8 +1038,7 @@ node tools/export_gen_fixtures.mjs ../ordrumbox-v2
   It replaces `composition.json`, the JS `buildSequenceNotes()`, which it
   matched when written.
 
-MIDI files no longer have a script; their tests are Rust only
-(`ordrumbox-logic/tests/midi.rs`):
+MIDI files (`ordrumbox-logic/tests/midi.rs`):
 
 - `ordrumbox-logic/tests/fixtures/midi/`: the MIDI files read, hand-made ones
   covering the parser's paths (running status, sysex, truncation, garbage) and
@@ -1085,8 +1071,7 @@ MIDI files no longer have a script; their tests are Rust only
   `cargo test -p ordrumbox-logic --test midi -- --ignored` writes this file,
   only when the parser, the import or the export changes on purpose.
 
-The kit editor's sample analysis no longer has a script
-(`ordrumbox-engine/tests/analysis.rs`):
+The kit editor's sample analysis (`ordrumbox-engine/tests/analysis.rs`):
 
 - Sines of known frequency and amplitude, at several rates: the fundamental
   within one sample of the period, the peak within half a sample's phase of
@@ -1102,27 +1087,22 @@ The kit editor's sample analysis no longer has a script
   `hzToNote()`, which it matched when written on the same files (the noise
   apart, drawn now from the engine's own random stream).
 
-The knobs and sliders have a third script:
+The knobs, sliders and piano roll are checked by tables and properties in
+their unit tests:
 
-```sh
-node tools/export_control_fixtures.mjs ../ordrumbox-v2
-```
+- `ordrumbox-ui/src/control.rs`: drags (normal and fine, linear and
+  logarithmic), arrow keys with every modifier and typed numbers on ten
+  ranges, the knob's arc, the text of every format and of the loop point;
+  over a sweep of starts and drags, a value in range, on the step grid,
+  growing with the drag, a key moving its way. `editors.rs`: the note
+  tooltip, on three track transpositions.
+- `ordrumbox-ui/src/note_drag.rs`: a note dragged (velocity, pitch, the axis
+  lock, the bounds), and MIDI note names.
 
-- `ordrumbox-ui/tests/fixtures/controls.json`: the JS `OrKnob` and `OrSlider`
-  driven through a minimal fake DOM — drags (normal and fine, linear and
-  logarithmic), arrow keys with every modifier, typed numbers, the knob's arc
-  — and the value texts of every formatter (`fmt`, `knobFormat`, `fmtVal`,
-  `formatSignedDb`, the loop point label), and `formatNoteTooltip` for a set of
-  notes and track pitches.
-
-The piano roll has a fourth:
-
-```sh
-node tools/export_piano_fixtures.mjs ../ordrumbox-v2
-```
-
-- `ordrumbox-ui/tests/fixtures/piano_roll.json`: `NoteDrag` driven through a
-  fake window (velocity, pitch, the axis lock, the bounds), and `midiName()`.
+They replace `controls.json` and `piano_roll.json`, the JS `OrKnob`,
+`OrSlider`, formatters, `formatNoteTooltip`, `NoteDrag` and `midiName()`
+driven through a fake DOM, whose rows they hold (a fractional pitch still
+shows `undefined` as its name, as the JS did).
 
 ## License
 

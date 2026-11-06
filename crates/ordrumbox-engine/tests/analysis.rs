@@ -243,7 +243,7 @@ fn snapshot_path() -> PathBuf {
 
 /// Writes `analysis_rust.txt` from the code as it is: `cargo test -p
 /// ordrumbox-engine --test analysis -- --ignored`, when the analysis changes
-/// on purpose (`README.md`, "Golden fixtures").
+/// on purpose (`README.md`, "Snapshots").
 #[test]
 #[ignore = "writes the snapshot"]
 fn write_the_snapshot() {

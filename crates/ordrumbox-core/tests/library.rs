@@ -53,7 +53,7 @@ fn diff(actual: &Value, expected: &Value, at: &str) -> Option<String> {
 
 /// Writes the snapshots from the code as it is: `cargo test -p ordrumbox-core
 /// --test library -- --ignored`, when a load or a save changes on purpose
-/// (`README.md`, "Golden fixtures").
+/// (`README.md`, "Snapshots").
 #[test]
 #[ignore = "writes the snapshots"]
 fn write_the_snapshots() {

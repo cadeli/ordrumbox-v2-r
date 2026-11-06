@@ -1,21 +1,20 @@
-//! The melodic generators against the JS ones (`tests/fixtures/generators.json`,
-//! written by `tools/export_gen_fixtures.mjs`): with the same random stream,
-//! the same notes, the same track settings and the same number of draws. The
-//! drum lines come from the styles (`tests/compose.rs`): the whole patterns,
-//! auto mode loops and ↻ buttons are checked against `generators_rust.txt`
-//! from the fixture's inputs, and by properties.
+//! The generators on the inputs of `tests/fixtures/generator_cases.json`,
+//! drawing from a seeded stream: every melodic variant on several track
+//! setups, densities and harmonies, random tracks, whole patterns, auto mode
+//! loops and the ↻ buttons, checked against `generators_rust.txt`; the drum
+//! lines come from the styles (`tests/compose.rs`). Properties follow.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
 
 use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::json::{self, Object, Value};
-use ordrumbox_core::{Note, Pattern, Scales, Styles, Track};
+use ordrumbox_core::{Library, Note, Pattern, Scales, Styles, Track};
 use ordrumbox_logic::generate::{
     AutoGenerator, Harmony, MelodicKind, Options, generate_pattern, instrument_line, random_track, recompose,
     restyle_pattern, run_loop, toggle_auto, toggle_drums, toggle_melodic,
 };
 
-/// mulberry32, the stream the fixture script gives `Math.random`.
+/// mulberry32: a seeded stream for the generators.
 struct Stream {
     state: u32,
     draws: u64,
@@ -36,10 +35,10 @@ impl Stream {
     }
 }
 
-fn fixtures() -> Value {
-    let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/generators.json"))
-        .expect("tests/fixtures/generators.json (run tools/export_gen_fixtures.mjs)");
-    json::parse(&text).expect("fixture parses")
+fn cases() -> Value {
+    let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/generator_cases.json"))
+        .expect("tests/fixtures/generator_cases.json");
+    json::parse(&text).expect("generator_cases.json parses")
 }
 
 fn items<'a>(value: &'a Value, key: &str) -> &'a [Value] {
@@ -50,141 +49,37 @@ fn f(value: &Value, key: &str) -> f64 {
     value.get(key).and_then(Value::as_f64).unwrap_or_else(|| panic!("no number {key} in {value}"))
 }
 
-// ─── The JS shapes ───────────────────────────────────────────────────────────
-
-/// `noteOut` of the script: `[velocity, beat, beatStep, pitch, {other non-default keys, stepPercent}]`.
-fn note_out(note: &Note) -> Value {
-    let defaults = Note::default();
-    let mut extra = Object::new();
-    for key in [
-        "pan",
-        "every",
-        "prob",
-        "rate",
-        "retriggerCount",
-        "arp",
-        "arpTriggerProbability",
-        "euclideanFill",
-        "euclideanRotation",
-        "pos",
-    ] {
-        let mut value = note.field(key).unwrap_or(Value::Null);
-        // The script writes an arpeggio's direction under its JS key, `mode`.
-        if let Value::Object(arp) = &mut value
-            && let Some(direction) = arp.remove("direction")
-        {
-            arp.insert("mode", direction);
-        }
-        if Some(&value) != defaults.field(key).as_ref() {
-            extra.insert(key, value);
-        }
-    }
-    if let Some(percent) = note.step_percent {
-        extra.insert("stepPercent", Value::Number(percent));
-    }
-    let mut out =
-        vec![Value::Number(note.velocity), Value::from(note.beat), Value::from(note.step), Value::Number(note.pitch)];
-    if !extra.is_empty() {
-        out.push(Value::Object(extra));
-    }
-    Value::Array(out)
+fn data(file: &str) -> Value {
+    let path = format!("{}/../../assets/data/{file}", env!("CARGO_MANIFEST_DIR"));
+    let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path}: {e}"));
+    json::parse(&text).unwrap_or_else(|e| panic!("{path}: {e}"))
 }
 
-fn note_in(value: &Value) -> Note {
-    let v = value.as_array().expect("note array");
-    let mut note = Note {
-        velocity: v[0].as_f64().unwrap(),
-        beat: v[1].as_f64().unwrap() as i32,
-        step: v[2].as_f64().unwrap() as i32,
-        pitch: v[3].as_f64().unwrap(),
-        ..Note::default()
-    };
-    if let Some(extra) = v.get(4).and_then(Value::as_object) {
-        for (key, value) in extra.iter() {
-            if key == "stepPercent" {
-                note.step_percent = value.as_f64();
-            } else {
-                note.set_field(key, value);
-            }
-        }
-    }
-    note
-}
-
-/// A track as the script wrote it (`trackOut`).
-fn track_in(value: &Value) -> Track {
-    let mut track = Track::default();
-    for (key, value) in value.as_object().unwrap().iter() {
-        match key {
-            "notes" => track.notes = value.as_array().unwrap().iter().map(note_in).collect(),
-            "_toolbarAuto" => _ = track.extra.insert(key, value.clone()),
-            _ => _ = track.set_field(key, value),
-        }
-    }
-    track
-}
-
-fn pattern_in(value: &Value) -> Pattern {
-    let mut pattern = Pattern::default();
-    for (key, value) in value.as_object().unwrap().iter() {
-        match key {
-            "tracks" => pattern.tracks = value.as_array().unwrap().iter().map(track_in).collect(),
-            "beatCount" => pattern.beat_count = value.as_f64().unwrap() as i32,
-            _ => _ = pattern.extra.insert(current_pattern_key(key), value.clone()),
-        }
-    }
-    pattern
-}
-
-/// The generator's pattern keys: the script writes their JS names.
-const PATTERN_KEYS: [(&str, &str); 3] =
-    [("_autoGenGenre", "autoGenre"), ("_autoGenKeyOffset", "autoKeyOffset"), ("_autoGenScale", "autoScale")];
-
-fn current_pattern_key(key: &str) -> &str {
-    PATTERN_KEYS.iter().find(|(js, _)| *js == key).map_or(key, |(_, current)| current)
-}
-
-/// Compare a track with the script's `trackOut`: every key it wrote, and the
-/// optional keys it did not write must be unset here.
-fn check_track(track: &Track, expected: &Value, at: &str) {
-    let object = expected.as_object().unwrap();
-    for (key, value) in object.iter() {
-        let actual = match key {
-            "notes" => Value::Array(track.notes.iter().map(note_out).collect()),
-            "_toolbarAuto" => track.extra.get(key).cloned().unwrap_or(Value::Null),
-            _ => track.field(key).unwrap_or(Value::Null),
-        };
-        if actual != *value {
-            if key == "notes" {
-                let (a, e) = (actual.as_array().unwrap(), value.as_array().unwrap());
-                let first = a.iter().zip(e).position(|(a, e)| a != e).unwrap_or(a.len().min(e.len()));
-                panic!(
-                    "{at}: notes differ at {first} ({} vs {} notes)\n  rust: {}\n  js:   {}",
-                    a.len(),
-                    e.len(),
-                    a.get(first).map_or("-".into(), Value::to_json),
-                    e.get(first).map_or("-".into(), Value::to_json)
-                );
-            }
-            panic!("{at}: {key} is {actual}, JS {value}");
-        }
-    }
-    if !object.contains_key("_toolbarAuto") {
-        assert_eq!(track.extra.get("_toolbarAuto"), None, "{at}: _toolbarAuto set, JS left it unset");
-    }
-    for key in ["auto_variation", "auto_variation2"] {
-        if !object.contains_key(key) {
-            assert_eq!(track.field(key), Some(Value::Null), "{at}: {key} set, JS left it unset");
-        }
-    }
+fn scales() -> Scales {
+    Scales::from_json(&data("scales.json"))
 }
 
 fn styles() -> Styles {
-    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/data/styles.json");
-    let text = std::fs::read_to_string(path).expect("assets/data/styles.json");
-    let (styles, issues) = Styles::from_json(&json::parse(&text).expect("styles.json parses"));
+    let (styles, issues) = Styles::from_json(&data("styles.json"));
     assert_eq!(issues, [], "styles.json");
     styles
+}
+
+/// A pattern of the cases, loaded as a library loads it, with no id.
+fn pattern_in(value: &Value) -> Pattern {
+    let mut library = Object::new();
+    library.insert("patterns", Value::Array(vec![value.clone()]));
+    let (library, report) = Library::from_json(&Value::Object(library));
+    assert_eq!(report.issues, [], "{value}");
+    let mut pattern = library.patterns.into_iter().next().expect("one pattern");
+    pattern.id.clear();
+    pattern
+}
+
+/// A track as a pattern saves it.
+fn track_json(track: &Track) -> Value {
+    let pattern = Pattern { tracks: vec![track.clone()], ..Pattern::default() };
+    pattern.to_json().get("tracks").and_then(Value::as_array).unwrap()[0].clone()
 }
 
 fn harmony_in(value: Option<&Value>) -> Harmony {
@@ -196,17 +91,11 @@ fn harmony_in(value: Option<&Value>) -> Harmony {
     }
 }
 
-// ─── Cases ───────────────────────────────────────────────────────────────────
+// ─── Snapshot ────────────────────────────────────────────────────────────────
 
-/// The pattern of a track case, its track's index and its generator.
+/// The pattern of a melodic track case, its track's index and its generator.
 fn track_case(case: &Value) -> (Pattern, usize, InstrumentFamily) {
     let kind = match case.get("kind").and_then(Value::as_str).unwrap() {
-        "kick" => InstrumentFamily::Kick,
-        "snare" => InstrumentFamily::Snare,
-        "hat" => InstrumentFamily::Hat,
-        "clap" => InstrumentFamily::Clap,
-        "cowbell" => InstrumentFamily::Cowbell,
-        "perc" => InstrumentFamily::Perc,
         "melody" => InstrumentFamily::Piano,
         "bass" => InstrumentFamily::Bass,
         other => panic!("unknown kind {other}"),
@@ -227,88 +116,34 @@ fn track_case(case: &Value) -> (Pattern, usize, InstrumentFamily) {
     (pattern, t, kind)
 }
 
-#[test]
-fn every_variant_of_every_generator() {
-    let fixtures = fixtures();
-    let scales = Scales::from_json(fixtures.get("scales").unwrap());
-    let styles = Styles::default();
-    let cases = items(&fixtures, "tracks");
-    assert!(cases.len() > 500);
-    for case in cases.iter().filter(|c| is_melodic(c)) {
-        let name = case.get("name").and_then(Value::as_str).unwrap();
-        let variant = case.get("variant").and_then(Value::as_str);
-        let (beats, spb) = (f(case, "beatCount") as i32, f(case, "stepsPerBeat") as i32);
-        let (mut pattern, t, kind) = track_case(case);
-        let at = format!(
-            "{} {:?} {name} {beats}x{spb} d{} seed {}",
-            case.get("kind").unwrap(),
-            variant,
-            f(case, "density"),
-            f(case, "seed")
-        );
-        let mut stream = Stream::new(f(case, "seed"));
-        let mut rnd = || stream.next();
-        let mut g = AutoGenerator::new(&scales, &styles, &mut rnd);
-        instrument_line(&mut g, &mut pattern, t, kind, variant, f(case, "density"), &harmony_in(case.get("harmony")));
-        drop(g);
-        let mut expected = case.get("track").unwrap().clone();
-        if kind == InstrumentFamily::Bass {
-            raise_pitches(&mut expected, BASS_DEPARTURE);
-        }
-        check_track(&pattern.tracks[t], &expected, &at);
-        assert_eq!(stream.draws as f64, f(case, "draws"), "{at}: draws");
-    }
-}
-
-#[test]
-fn random_tracks() {
-    let fixtures = fixtures();
-    for case in items(&fixtures, "random") {
-        let mut track = Track::new("T1", f(case, "beatCount") as i32, f(case, "stepsPerBeat") as i32);
-        let mut stream = Stream::new(f(case, "seed"));
-        random_track(&mut track, &mut || stream.next());
-        let at = format!("random seed {}", f(case, "seed"));
-        check_track(&track, case.get("track").unwrap(), &at);
-        assert_eq!(stream.draws as f64, f(case, "draws"), "{at}: draws");
-    }
-}
-
-// ─── What departs from the JS ────────────────────────────────────────────────
-
-/// Semitones the bass lines sound above the JS ones (`README.md`, "Golden
-/// fixtures"): the JS variants sat an octave too low.
-const BASS_DEPARTURE: f64 = 12.0;
-
-/// Raise every note of a `trackOut` by `semitones`.
-fn raise_pitches(track: &mut Value, semitones: f64) {
-    let Some(Value::Array(notes)) = track.as_object_mut().unwrap().get_mut("notes") else { return };
-    for note in notes {
-        let Value::Array(fields) = note else { panic!("note {note}") };
-        let pitch = fields[3].as_f64().unwrap();
-        fields[3] = Value::Number(pitch + semitones);
-    }
-}
-
-/// Whether a track case is a melodic line, still the JS one (`README.md`,
-/// "Golden fixtures"): the drum lines come from the styles.
-fn is_melodic(case: &Value) -> bool {
-    matches!(case.get("kind").and_then(Value::as_str).unwrap(), "melody" | "bass")
-}
-
 /// One line of the snapshot: what a case made, and its draws.
 fn snapshot_line(at: &str, value: &Value, draws: u64) -> String {
     format!("{at} draws {draws} {}", value.to_json())
 }
 
-/// The whole patterns, loops and toggles as this code generates them, from
-/// the fixture's inputs and seeds.
-fn rust_snapshot() -> Vec<String> {
-    let fixtures = fixtures();
-    let scales = Scales::from_json(fixtures.get("scales").unwrap());
-    let styles = styles();
+/// What the generators make of every case.
+fn snapshot() -> Vec<String> {
+    let cases = cases();
+    let (scales, styles) = (scales(), styles());
     let mut lines = Vec::new();
-    for (n, case) in items(&fixtures, "patterns").iter().enumerate() {
-        let mut pattern = pattern_in(case.get("before").unwrap());
+    for (n, case) in items(&cases, "tracks").iter().enumerate() {
+        let (mut pattern, t, kind) = track_case(case);
+        let variant = case.get("variant").and_then(Value::as_str);
+        let mut stream = Stream::new(f(case, "seed"));
+        let mut rnd = || stream.next();
+        let mut g = AutoGenerator::new(&scales, &styles, &mut rnd);
+        instrument_line(&mut g, &mut pattern, t, kind, variant, f(case, "density"), &harmony_in(case.get("harmony")));
+        drop(g);
+        lines.push(snapshot_line(&format!("track {n}"), &track_json(&pattern.tracks[t]), stream.draws));
+    }
+    for (n, case) in items(&cases, "random").iter().enumerate() {
+        let mut track = Track::new("T1", f(case, "beatCount") as i32, f(case, "stepsPerBeat") as i32);
+        let mut stream = Stream::new(f(case, "seed"));
+        random_track(&mut track, &mut || stream.next());
+        lines.push(snapshot_line(&format!("random {n}"), &track_json(&track), stream.draws));
+    }
+    for (n, case) in items(&cases, "patterns").iter().enumerate() {
+        let mut pattern = pattern_in(case.get("pattern").unwrap());
         let options = match case.get("options").filter(|o| !o.is_null()) {
             Some(o) => Options {
                 genre: o.get("genre").and_then(Value::as_str).map(str::to_owned),
@@ -322,8 +157,8 @@ fn rust_snapshot() -> Vec<String> {
         generate_pattern(&mut AutoGenerator::new(&scales, &styles, &mut rnd), &mut pattern, &options);
         lines.push(snapshot_line(&format!("pattern {n}"), &pattern.to_json(), stream.draws));
     }
-    for (n, case) in items(&fixtures, "loops").iter().enumerate() {
-        let mut pattern = pattern_in(case.get("before").unwrap());
+    for (n, case) in items(&cases, "loops").iter().enumerate() {
+        let mut pattern = pattern_in(case.get("pattern").unwrap());
         let mut stream = Stream::new(f(case, "seed"));
         for index in 0..f(case, "loopCount") as usize {
             let start = stream.draws;
@@ -333,8 +168,8 @@ fn rust_snapshot() -> Vec<String> {
             lines.push(snapshot_line(&at, &pattern.to_json(), stream.draws - start));
         }
     }
-    for (n, case) in items(&fixtures, "toggles").iter().enumerate() {
-        let mut pattern = pattern_in(case.get("before").unwrap());
+    for (n, case) in items(&cases, "toggles").iter().enumerate() {
+        let mut pattern = pattern_in(case.get("pattern").unwrap());
         let mut stream = Stream::new(f(case, "seed"));
         for (i, step) in items(case, "steps").iter().enumerate() {
             let step = step.as_str().unwrap();
@@ -360,18 +195,18 @@ fn snapshot_path() -> std::path::PathBuf {
 
 /// Writes `generators_rust.txt` from the generators as they are: `cargo test
 /// -p ordrumbox-logic --test generators -- --ignored`, when what they make
-/// changes on purpose (`README.md`, "Golden fixtures").
+/// changes on purpose (`README.md`, "Snapshots").
 #[test]
 #[ignore = "writes the snapshot"]
 fn write_the_snapshot() {
-    std::fs::write(snapshot_path(), rust_snapshot().join("\n") + "\n").expect("written");
+    std::fs::write(snapshot_path(), snapshot().join("\n") + "\n").expect("written");
 }
 
 #[test]
-fn what_departs_from_the_js_matches_its_snapshot() {
+fn the_generators_match_their_snapshot() {
     let text = std::fs::read_to_string(snapshot_path()).expect("tests/fixtures/generators_rust.txt");
     let expected: Vec<&str> = text.lines().collect();
-    let actual = rust_snapshot();
+    let actual = snapshot();
     assert_eq!(actual.len(), expected.len(), "snapshot lines");
     for (actual, expected) in actual.iter().zip(expected) {
         assert_eq!(actual, expected);
@@ -379,10 +214,6 @@ fn what_departs_from_the_js_matches_its_snapshot() {
 }
 
 // ─── Patterns in a style ─────────────────────────────────────────────────────
-
-fn scales() -> Scales {
-    Scales::from_json(fixtures().get("scales").unwrap())
-}
 
 fn generated(genre: &str, scales: &Scales, styles: &Styles, stream: &mut Stream) -> Pattern {
     let mut pattern = Pattern { beat_count: 4, ..Pattern::default() };
