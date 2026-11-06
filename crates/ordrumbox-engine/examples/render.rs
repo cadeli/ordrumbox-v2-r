@@ -7,7 +7,7 @@
 //! ```
 //! `<assets>` is the repository's `assets` folder.
 
-#![allow(clippy::expect_used, clippy::print_stderr, reason = "a developer tool, run from a terminal")]
+#![expect(clippy::expect_used, clippy::print_stderr, reason = "a developer tool, run from a terminal")]
 
 use std::path::Path;
 use std::sync::Arc;

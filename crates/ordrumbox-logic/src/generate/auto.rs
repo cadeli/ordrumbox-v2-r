@@ -46,7 +46,6 @@ pub struct Harmony {
 }
 
 /// What generates: the scales, the styles and the random source.
-#[allow(missing_debug_implementations)]
 pub struct AutoGenerator<'a> {
     pub scales: &'a Scales,
     pub styles: &'a Styles,
@@ -55,6 +54,16 @@ pub struct AutoGenerator<'a> {
     /// The tempo drawn in the style of the last pattern made, for the
     /// library to play at: a pattern has none of its own.
     pub tempo: Option<f64>,
+}
+
+impl std::fmt::Debug for AutoGenerator<'_> {
+    /// Everything but the random source, a closure.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AutoGenerator")
+            .field("structure", &self.structure)
+            .field("tempo", &self.tempo)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<'a> AutoGenerator<'a> {

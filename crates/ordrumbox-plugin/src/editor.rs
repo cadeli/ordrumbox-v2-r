@@ -74,7 +74,7 @@ struct Open {
 // SAFETY: the host creates and drops the editor on its GUI thread, the
 // thread the window was opened on; this handle is only moved, never used, in
 // between. nih-plug requires `Send` for every editor handle.
-#[allow(unsafe_code, reason = "a window handle the host keeps on its GUI thread")]
+#[expect(unsafe_code, reason = "a window handle the host keeps on its GUI thread")]
 unsafe impl Send for Open {}
 
 impl Drop for Open {
@@ -312,7 +312,7 @@ struct HostWindow(ParentWindowHandle);
 
 // SAFETY: the handle is the host's window, valid while the editor is open,
 // and of the kind of this platform.
-#[allow(unsafe_code, reason = "raw-window-handle 0.5 makes this trait unsafe")]
+#[expect(unsafe_code, reason = "raw-window-handle 0.5 makes this trait unsafe")]
 unsafe impl HasRawWindowHandle for HostWindow {
     fn raw_window_handle(&self) -> RawWindowHandle {
         match self.0 {
@@ -379,7 +379,7 @@ impl rwh06::HasDisplayHandle for Target {
     fn display_handle(&self) -> Result<rwh06::DisplayHandle<'_>, rwh06::HandleError> {
         // SAFETY: the display of baseview's window, which outlives the
         // surface: the view that owns both is dropped with the window.
-        #[allow(unsafe_code, reason = "a raw handle borrowed for the window's lifetime")]
+        #[expect(unsafe_code, reason = "a raw handle borrowed for the window's lifetime")]
         Ok(unsafe { rwh06::DisplayHandle::borrow_raw(self.display) })
     }
 }
@@ -388,7 +388,7 @@ impl rwh06::HasWindowHandle for Target {
     fn window_handle(&self) -> Result<rwh06::WindowHandle<'_>, rwh06::HandleError> {
         let window = self.window.ok_or(rwh06::HandleError::Unavailable)?;
         // SAFETY: as for the display: baseview's window outlives the surface.
-        #[allow(unsafe_code, reason = "a raw handle borrowed for the window's lifetime")]
+        #[expect(unsafe_code, reason = "a raw handle borrowed for the window's lifetime")]
         Ok(unsafe { rwh06::WindowHandle::borrow_raw(window) })
     }
 }

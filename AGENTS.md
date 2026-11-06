@@ -63,8 +63,10 @@ assets/           data/*.json and kits/**.wav, read at runtime
 - Dependencies only point down the table. Nothing depends on `ordrumbox-app`.
 - Workspace lints (`Cargo.toml`): `unsafe_code = "forbid"`,
   `missing_debug_implementations = "warn"`, clippy `all`. `ordrumbox-plugin`
-  repeats them with `unsafe_code = "deny"`: only the export macros and the
-  window handle adapters (`editor.rs`) allow it, each with a `SAFETY` comment.
+  repeats them with `unsafe_code = "deny"`: only the window handle adapters
+  (`editor.rs`) take an `#[expect(unsafe_code)]`, each with a `SAFETY`
+  comment (the export macros' `unsafe` comes from nih-plug, which the lint
+  does not see).
 
 ## Audio thread
 
@@ -85,6 +87,28 @@ assets/           data/*.json and kits/**.wav, read at runtime
 - **Nothing reached from the audio callback allocates, frees, takes a
   blocking lock, or does I/O.** This covers `Engine::render` and every
   render path of `ordrumbox-dsp`. Buffers are sized before the stream starts.
+- The render path is written for speed first, then for elegance; a modern
+  idiom that costs a cycle per sample stays out. Concretely:
+  - Work per block, not per sample. Coefficients that depend on parameters
+    (`exp`, `pow`, `tan`, dB to gain) are computed once per block, or when
+    the parameter changes, never inside the sample loop.
+  - Hoist decisions out of the loop: `match` on the waveform, filter mode or
+    interpolation once, then run one tight loop per case (a generic or a
+    `const` parameter is fine; a per-sample `match` or closure is not).
+  - Let the compiler drop bounds checks without `unsafe`: zip the buffers,
+    or re-slice them to one length (`let left = &mut left[..frames];`)
+    before the loop. No `get_unchecked`: `unsafe` stays forbidden.
+  - Keep samples `f32` and buffers contiguous. Use `f64` where precision
+    builds up (phase, time, long sums), as `ordrumbox-dsp` does. Changing a
+    type's precision is a change of behaviour (snapshot, README).
+  - No panic on the render path: no `unwrap`, no division without a guarded
+    denominator, no index that the block length does not bound.
+  - Guard feedback paths (delay, filters, reverb) against denormals.
+  - `#[inline]` on small functions called per sample across crates
+    (`dsp` → `engine`); `#[inline(always)]` only with a measurement.
+- A change to a render path keeps the audio snapshots within 2e-5 and is
+  timed in release (`cargo test --release`, or `ordrumbox-probe`), not in
+  the `dev` profile.
 - The UI side holds a reference to everything it posted (`Arc<Pass>`,
   `Arc<SampleBank>`) until the engine is surely done with it, so the last
   reference is never dropped on the audio thread.
@@ -152,6 +176,27 @@ assets/           data/*.json and kits/**.wav, read at runtime
 - Rewrite a snapshot only for a change of behaviour you mean to make, and
   note it in the README. Never edit one by hand; the hand-written inputs are
   named in the README.
+
+## Modern Rust
+
+- Edition 2024, `rust-version` 1.88: use what they give. `let … else`,
+  `if let … && …` chains, `is_some_and`, `clamp`, `total_cmp`, `rem_euclid`
+  (through `num::wrap`), `div_euclid`, `checked_*`/`saturating_*`.
+- No emulation of another language's numbers. No ToInt32/Uint8 tricks, no
+  `((x % n) + n) % n`, no NaN as "missing": absence is an `Option`, a choice
+  is an `enum`, not a `bool` pair or a magic integer.
+- Conversions say their intent. Use `From`/`f64::from` when nothing is lost,
+  and `try_from` when the value comes from a file or the user. Use `as` only
+  when truncation or saturation is what you want, behind a named helper when
+  it repeats (`data_byte`).
+- Iterators and slice patterns over index loops (`zip`, `chunks_exact`,
+  `windows`, `split_at_mut`); an index is for when the position itself
+  matters.
+- Generics and `impl Trait` over `dyn Trait`; `dyn` only where the set of
+  types is open (plugin host, UI widgets), never on a render path.
+- `#[expect(lint, reason = "…")]`, never a bare `#[allow]`.
+- `#[must_use]` on functions that only compute a value; `const fn` and
+  `const` tables where the value is known at compile time.
 
 ## Code conventions
 

@@ -89,6 +89,11 @@ Tests need nothing outside the repository. Expected outputs are Rust snapshots
 in each crate's `tests/fixtures/`; see `AGENTS.md` for the rules (never edit a
 snapshot by hand, rewrite only for a meant change of behaviour).
 
+The triangle LFO now stays between its min and max, starting at min like the
+sine; it used to swing over twice that range. This rewrote `synth_renders.bin`
+(dsp), `mapping_rust.txt` and `synth_editor_rust.txt` (engine) and
+`midi_rust.txt` (logic).
+
 ## License
 
 MIT: see `LICENSE`. A plugin built with the `vst3` feature links GPLv3 VST3

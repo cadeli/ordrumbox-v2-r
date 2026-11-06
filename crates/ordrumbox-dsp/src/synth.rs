@@ -595,8 +595,7 @@ impl SynthVoice {
             (PI * clamp(nf_freq, crate::MIN_FILTER_FREQ, crate::MAX_FILTER_FREQ).min(sr * MAX_CUTOFF_RATIO) / sr).tan();
         let nf_k = 1.0 / clamp(nf_q, 0.1, 20.0);
 
-        let frames = left.len().min(right.len());
-        for i in 0..frames {
+        for (i, (out_l, out_r)) in left.iter_mut().zip(right.iter_mut()).enumerate() {
             let current_time = (first_frame + i as u64) as f64 / sr;
             let t = current_time - self.start_time;
             if t < 0.0 {
@@ -835,8 +834,8 @@ impl SynthVoice {
             let level = self.envelope_step(t, env, v);
             y *= (if bypass.env { 1.0 } else { level }) * master;
 
-            left[i] += (y * pan_l) as f32;
-            right[i] += (y * pan_r) as f32;
+            *out_l += (y * pan_l) as f32;
+            *out_r += (y * pan_r) as f32;
         }
         if self.env_segment == Segment::Idle {
             self.active = false;

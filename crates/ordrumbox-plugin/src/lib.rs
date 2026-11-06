@@ -145,16 +145,14 @@ impl Vst3Plugin for Ordrumbox {
         &[Vst3SubCategory::Instrument, Vst3SubCategory::Drum, Vst3SubCategory::Stereo];
 }
 
-// The entry points a host loads, written by nih-plug's macros.
-#[allow(unsafe_code, reason = "the CLAP entry point is an unsafe extern symbol")]
-#[allow(semicolon_in_expressions_from_non_local_macros, reason = "in nih-plug's macro")]
+// The entry points a host loads, written by nih-plug's macros. Their `unsafe`
+// comes from another crate's macro, which the `unsafe_code` lint does not see.
 mod clap_export {
     nih_plug::nih_export_clap!(crate::Ordrumbox);
 }
 
 #[cfg(feature = "vst3")]
-#[allow(unsafe_code, reason = "the VST3 entry points are unsafe extern symbols")]
-#[allow(semicolon_in_expressions_from_non_local_macros, reason = "in nih-plug's macro")]
+#[expect(semicolon_in_expressions_from_non_local_macros, reason = "in vst3-com's `vtable` macro")]
 mod vst3_export {
     nih_plug::nih_export_vst3!(crate::Ordrumbox);
 }

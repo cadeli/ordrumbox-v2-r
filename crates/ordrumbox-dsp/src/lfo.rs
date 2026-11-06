@@ -7,20 +7,19 @@ use std::f64::consts::TAU;
 pub const WAVE_NAMES: [&str; 5] = ["sine", "triangle", "sawtooth", "square", "random"];
 
 /// Value at `phase` (in cycles, not wrapped). Every shape is read a quarter
-/// cycle late, so the sine and the square start at -1. Values are in [-1, 1]
-/// except for the triangle, which the JS formula takes from -2 to 0, then from
-/// 2 to 0 (kept: it is what the app plays). `random` holds one value per cycle.
+/// cycle late, so the sine, the triangle and the square start at -1. Values
+/// are in [-1, 1]. `random` holds one value per cycle.
 pub fn wave(phase: f64, wave: f64) -> f64 {
     let p = (phase - 0.25) - (phase - 0.25).floor();
     if wave < 0.5 {
         (TAU * p).sin()
     } else if wave < 1.5 {
         if p < 0.25 {
-            p * 4.0 - 1.0
+            p * 4.0
         } else if p < 0.75 {
-            3.0 - p * 4.0
+            2.0 - p * 4.0
         } else {
-            p * 4.0 - 5.0
+            p * 4.0 - 4.0
         }
     } else if wave < 2.5 {
         p * 2.0 - 1.0
@@ -53,7 +52,7 @@ mod tests {
         assert!((wave(0.0, 0.0) + 1.0).abs() < 1e-12);
         assert_eq!([wave(0.0, 2.0), wave(0.0, 3.0)], [0.5, -1.0]);
         assert!((wave(0.5, 0.0) - 1.0).abs() < 1e-12);
-        assert_eq!([wave(0.0, 1.0), wave(0.25, 1.0), wave(0.5, 1.0), wave(0.75, 1.0)], [-2.0, -1.0, 2.0, 1.0]);
+        assert_eq!([wave(0.0, 1.0), wave(0.25, 1.0), wave(0.5, 1.0), wave(0.75, 1.0)], [-1.0, 0.0, 1.0, 0.0]);
         assert_eq!(wave(0.3, 4.0), wave(0.9, 4.0));
         assert_ne!(wave(0.3, 4.0), wave(1.3, 4.0));
     }

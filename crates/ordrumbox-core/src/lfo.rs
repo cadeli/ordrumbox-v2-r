@@ -38,20 +38,18 @@ pub fn value(lfo: &Object, tick: f64) -> f64 {
 }
 
 /// `getLfoWaveformValue()`: value at `phase` cycles for waveform code `wave`
-/// (0 sine, 1 triangle, 2 sawtooth, 3 square, 4 random), in [-1, 1] except
-/// the triangle, which the JS formula takes to [-2, 2] (kept as is: it is
-/// what the app plays).
+/// (0 sine, 1 triangle, 2 sawtooth, 3 square, 4 random), in [-1, 1].
 pub fn waveform(phase: f64, wave: f64) -> f64 {
     let p = (phase - 0.25) - (phase - 0.25).floor();
     if wave < 0.5 {
         (std::f64::consts::TAU * p).sin()
     } else if wave < 1.5 {
         if p < 0.25 {
-            p * 4.0 - 1.0
+            p * 4.0
         } else if p < 0.75 {
-            3.0 - p * 4.0
+            2.0 - p * 4.0
         } else {
-            p * 4.0 - 5.0
+            p * 4.0 - 4.0
         }
     } else if wave < 2.5 {
         p * 2.0 - 1.0
@@ -76,16 +74,16 @@ mod tests {
     }
 
     #[test]
-    fn triangle_is_the_js_one() {
-        // The JS "triangle" rises from -2 to 0 over the first half cycle, jumps
-        // to 2 and falls back to 0: the value leaves [min, max] by half the range.
+    fn triangle_stays_between_min_and_max() {
+        // Like the sine, the triangle starts at `min` and peaks at `max` half a
+        // cycle later.
         let l = lfo(r#"{"freq":1,"min":0,"max":1,"type":"triangle"}"#);
         let beats = |b: f64| b * f64::from(TICK);
-        assert_eq!(value(&l, beats(0.0)), -0.5);
-        assert_eq!(value(&l, beats(1.0)), 0.0);
-        assert_eq!(value(&l, beats(2.0)), 1.5);
-        assert_eq!(value(&l, beats(3.0)), 1.0);
-        assert_eq!(value(&l, beats(4.0)), -0.5);
+        assert_eq!(value(&l, beats(0.0)), 0.0);
+        assert_eq!(value(&l, beats(1.0)), 0.5);
+        assert_eq!(value(&l, beats(2.0)), 1.0);
+        assert_eq!(value(&l, beats(3.0)), 0.5);
+        assert_eq!(value(&l, beats(4.0)), 0.0);
     }
 
     #[test]
