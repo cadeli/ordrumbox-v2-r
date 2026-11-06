@@ -181,6 +181,7 @@ impl Session {
             }
             C::Shortcuts => self.chrome.overlay = Some(Overlay::Shortcuts { scroll: 0 }),
             C::About => self.chrome.overlay = Some(Overlay::About),
+            C::Manual => self.open_manual(),
             C::FactoryReset => self.chrome.overlay = Some(Overlay::FactoryReset),
             C::ExportLibrary => self.open_export(Export::Library),
             C::ImportLibrary => self.open_picker(Purpose::ImportLibrary),

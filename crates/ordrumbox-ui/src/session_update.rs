@@ -109,6 +109,15 @@ impl Session {
         true
     }
 
+    /// Help > User manual: the manual in the browser.
+    pub(super) fn open_manual(&mut self) {
+        const URL: &str = "https://www.ordrumbox.com/download/docs/user-manual.html";
+        self.message = match update::open_with_system(URL) {
+            Ok(()) => format!("opened {URL}"),
+            Err(e) => e,
+        };
+    }
+
     /// Help > Download: the newer release's page in the browser.
     pub(super) fn open_download_page(&mut self) {
         let Some(release) = &self.updates.newer_release else {
