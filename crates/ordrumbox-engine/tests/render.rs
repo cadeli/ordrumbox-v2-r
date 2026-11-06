@@ -60,9 +60,9 @@ fn every_note_becomes_an_event_on_its_frame() {
             sample_rate: RATE,
             first_tick: 0,
         };
-        let pass = build_pass(pattern, 0, &mut Rng::new(1), context);
+        let pass = build_pass(pattern, 0, &mut Rng::new(1), context, library.bpm);
         let flat = expand_hits(pattern, 0, &mut Rng::new(1), &scales);
-        let per_tick = frames_per_tick(pattern.bpm, RATE);
+        let per_tick = frames_per_tick(library.bpm, RATE);
 
         let any_solo = pattern.tracks.iter().any(|t| t.solo);
         let audible = |i: usize| if any_solo { pattern.tracks[i].solo } else { !pattern.tracks[i].mute };
@@ -100,7 +100,7 @@ fn rock_renders_clean_audio_starting_on_frame_zero() {
         sample_rate: RATE,
         first_tick: 0,
     };
-    let pass = Arc::new(build_pass(rock, 0, &mut Rng::new(1), context));
+    let pass = Arc::new(build_pass(rock, 0, &mut Rng::new(1), context, library.bpm));
     let frames = pass.frames as usize;
 
     let mut engine = Engine::new(RATE as f32, bank.clone());

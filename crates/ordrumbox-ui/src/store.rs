@@ -313,9 +313,9 @@ mod tests {
         let dir = env::temp_dir().join(format!("ordrumbox-store-{}", std::process::id()));
         let path = dir.join("sub").join(FILE_NAME);
         assert_eq!(load(&path), Ok(None));
-        let (library, _) = Library::parse(r#"{"patterns":[{"name":"p","bpm":99}]}"#).unwrap();
+        let (library, _) = Library::parse(r#"{"bpm":99,"patterns":[{"name":"p"}]}"#).unwrap();
         save(&path, &library).unwrap();
-        assert_eq!(load(&path).unwrap().unwrap().patterns[0].bpm, 99.0);
+        assert_eq!(load(&path).unwrap().unwrap().bpm, 99.0);
         fs::write(&path, "{").unwrap();
         assert!(load(&path).is_err());
         fs::remove_dir_all(dir).unwrap();

@@ -22,7 +22,7 @@ use crate::assign::{TrackSound, assign_track};
 use crate::engine::{Engine, HostTransport, MAX_TRACKS, Position, host_pass};
 use crate::kit::SampleBank;
 use crate::pass::{
-    HitsCache, Pass, PassContext, SONG_PASS_TICKS, SongContext, build_pass_at, build_preview, build_song_pass_at,
+    HitsCache, Pass, PassContext, SONG_PASS_TICKS, SongContext, build_pass, build_preview, build_song_pass_at,
     pattern_pass_ticks,
 };
 use crate::synth_preset::SynthPresets;
@@ -281,7 +281,7 @@ impl AudioSide {
 /// What plays.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
-    /// Pattern `index`, looped at its own tempo.
+    /// Pattern `index`, looped at the library's tempo.
     Pattern(usize),
     /// Song `index`: its arrangement, a measure per pass, at its tempo.
     Song(usize),
@@ -536,6 +536,16 @@ impl Controller {
         self.build_of(library, number, self.mode)
     }
 
+    /// The tempo `mode` plays at: the plugin host's, else the library's for
+    /// a pattern and the song's own for a song.
+    fn bpm_of(&self, library: &Library, mode: Mode) -> f64 {
+        let own = match mode {
+            Mode::Pattern(_) => library.bpm,
+            Mode::Song(s) => library.songs.get(s).map_or(library.bpm, |song| song.bpm),
+        };
+        self.tempo.unwrap_or_else(|| clamp_bpm(own))
+    }
+
     /// Pass `number` of `mode`.
     fn build_of(&mut self, library: &Library, number: u64, mode: Mode) -> Option<Arc<Pass>> {
         let pass = match mode {
@@ -551,8 +561,8 @@ impl Controller {
                     sample_rate: self.sample_rate,
                     first_tick: self.first_tick(number),
                 };
-                let bpm = self.tempo.unwrap_or_else(|| clamp_bpm(pattern.bpm));
-                build_pass_at(pattern, number, &mut self.rng, context, bpm)
+                let bpm = self.bpm_of(library, mode);
+                build_pass(pattern, number, &mut self.rng, context, bpm)
             }
             Mode::Song(s) => {
                 let song = library.songs.get(s)?;
@@ -575,7 +585,7 @@ impl Controller {
                     synths: &self.synths,
                     sample_rate: self.sample_rate,
                 };
-                let bpm = self.tempo.unwrap_or_else(|| clamp_bpm(song.bpm));
+                let bpm = self.bpm_of(library, mode);
                 build_song_pass_at(song, number, &mut self.rng, &mut self.song_notes, context, bpm)
             }
         };
@@ -604,7 +614,7 @@ impl Controller {
             sample_rate: self.sample_rate,
             first_tick: 0,
         };
-        let pass = build_preview(pattern, t, note, context);
+        let pass = build_preview(pattern, t, note, context, self.bpm_of(library, self.mode));
         if !pass.events.is_empty() {
             self.post_preview(pass);
         }

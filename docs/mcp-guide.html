@@ -137,7 +137,7 @@ start the program and ask again.</p>
 <p>You can talk naturally, but knowing these words helps you ask precisely and understand the answers.</p>
 
 <h3>A pattern</h3>
-<p>A short loop, usually one measure of 4 beats, with its own tempo (BPM). Patterns have a <strong>name</strong>; you
+<p>A short loop, usually one measure of 4 beats, played at the session's tempo (BPM; a song has its own). Patterns have a <strong>name</strong>; you
 refer to them by it ("the pattern <em>Funky</em>"), in any case.</p>
 
 <h3>A track</h3>
@@ -178,7 +178,7 @@ settings, so you can follow along), and what you will see in the window. You nev
 hi-hat on every eighth note. Then show it and play it.</p>
 <p>The assistant calls, in order:</p>
 <pre><code>createNewPattern   { "patternName": "First Beat" }
-setPatternBpm      { "patternName": "First Beat", "bpm": 95 }
+setBpm             { "bpm": 95 }
 addNotesToPattern  { "patternName": "First Beat", "notes": [
   { "trackName": "KICK",  "step": 0 }, { "trackName": "KICK",  "step": 4 },
   { "trackName": "KICK",  "step": 8 }, { "trackName": "KICK",  "step": 12 },
@@ -198,7 +198,7 @@ hear it loop. The tracks did not have to exist: adding notes to <code>KICK</code
 <p class="say">Which styles do you know? … OK, make me a new house pattern.</p>
 <pre><code>listStyles       { }
 generatePattern  { "style": "house" }</code></pre>
-<p>orDrumbox writes a whole pattern itself — tracks, tempo, swing, lines — as <strong>Pattern › New pattern in the style</strong>
+<p>orDrumbox writes a whole pattern itself — tracks, swing, lines, and the session's tempo — as <strong>Pattern › New pattern in the style</strong>
 does. Not happy with it?</p>
 <p class="say">Make it again, with more energy.</p>
 <pre><code>regeneratePattern { "patternName": "…", "style": "house" }
@@ -318,7 +318,7 @@ undo history. <code>redo</code> brings a change back.</p>
 <tr><th>Area</th><th>You can ask to…</th><th>Tools</th></tr>
 <tr><td>Patterns</td><td>list, show, create, rename, copy, delete, change the tempo, length, tags, description</td>
     <td><code>listPatterns</code>, <code>loadPattern</code>, <code>selectPattern</code>, <code>createNewPattern</code>,
-        <code>renamePattern</code>, <code>duplicatePattern</code>, <code>removePattern</code>, <code>setPatternBpm</code>,
+        <code>renamePattern</code>, <code>duplicatePattern</code>, <code>removePattern</code>, <code>setBpm</code>,
         <code>setPatternBeatCount</code>, <code>setPatternTags</code>, <code>setPatternDescription</code></td></tr>
 <tr><td>Notes and tracks</td><td>add or delete notes, change track settings, rename, copy, remove, listen to a track</td>
     <td><code>addNotesToPattern</code>, <code>deleteNotes</code>, <code>updateTrack</code>, <code>renameTrack</code>,

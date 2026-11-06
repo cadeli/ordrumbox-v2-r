@@ -90,7 +90,7 @@ pub fn render_pattern(
 ) -> Option<(Vec<f32>, Vec<f32>)> {
     let pattern = library.patterns.get(index)?;
     let ticks = f64::from(pattern.beat_count.max(1)) * f64::from(TICK) * f64::from(loops.max(1));
-    let length = frames(ticks, clamp_bpm(pattern.bpm), setup.sample_rate, false);
+    let length = frames(ticks, clamp_bpm(library.bpm), setup.sample_rate, false);
     Some(render(library, Mode::Pattern(index), length, setup, before_pass))
 }
 

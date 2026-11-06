@@ -165,7 +165,7 @@ fn rust_snapshot() -> Vec<String> {
         let (library, _) = Library::from_json(&Value::Object(wrapper));
         let pattern = &library.patterns[0];
         let loops = case.get("loops").and_then(Value::as_f64).unwrap() as u32;
-        let bytes = midi::export(pattern, loops, &roots, &mut Rng::new(1), &Scales::default());
+        let bytes = midi::export(pattern, library.bpm, loops, &roots, &mut Rng::new(1), &Scales::default());
         lines.push(format!("export {} x{loops} {}", pattern.id, hex(&bytes)));
     }
     lines
@@ -201,7 +201,7 @@ fn the_notes_of_one_tick_are_written_offs_first_then_by_key() {
         wrapper.insert("patterns", Value::Array(vec![case.get("source").unwrap().clone()]));
         let (library, _) = Library::from_json(&Value::Object(wrapper));
         let pattern = &library.patterns[0];
-        let bytes = midi::export(pattern, 3, &roots, &mut Rng::new(1), &Scales::default());
+        let bytes = midi::export(pattern, library.bpm, 3, &roots, &mut Rng::new(1), &Scales::default());
         for events in smf::parse(&bytes).tracks {
             // (tick, on, key) of each note event, in file order.
             let notes: Vec<(u64, bool, u8)> = events
@@ -219,7 +219,9 @@ fn the_notes_of_one_tick_are_written_offs_first_then_by_key() {
 }
 
 /// The patterns of `midi_exports.json`, with their loop count.
-fn export_cases(exports: &Value) -> Vec<(Pattern, u32)> {
+/// Each export case: its pattern, its tempo (the source's, which the library
+/// takes) and its loops.
+fn export_cases(exports: &Value) -> Vec<(Pattern, f64, u32)> {
     items(exports, "exports")
         .iter()
         .map(|case| {
@@ -227,7 +229,7 @@ fn export_cases(exports: &Value) -> Vec<(Pattern, u32)> {
             wrapper.insert("patterns", Value::Array(vec![case.get("source").unwrap().clone()]));
             let (mut library, _) = Library::from_json(&Value::Object(wrapper));
             let loops = case.get("loops").and_then(Value::as_f64).unwrap() as u32;
-            (library.patterns.remove(0), loops)
+            (library.patterns.remove(0), library.bpm, loops)
         })
         .collect()
 }
@@ -361,9 +363,9 @@ fn every_export_is_a_strict_file_of_the_notes_the_engine_plays() {
     let cases = export_cases(&exports);
     assert!(cases.len() > 80);
     let mut failures = Vec::new();
-    for (pattern, loops) in &cases {
+    for (pattern, bpm, loops) in &cases {
         let at = format!("{} × {loops}", pattern.id);
-        let bytes = midi::export(pattern, *loops, &roots, &mut Rng::new(1), &Scales::default());
+        let bytes = midi::export(pattern, *bpm, *loops, &roots, &mut Rng::new(1), &Scales::default());
         let tracks = match strict_tracks(&bytes) {
             Ok(tracks) => tracks,
             Err(e) => {
@@ -432,7 +434,7 @@ fn every_export_is_a_strict_file_of_the_notes_the_engine_plays() {
 fn track_names_are_written_in_utf8_and_read_in_utf8_or_latin1() {
     let (library, _) =
         Library::parse(r#"{"patterns":[{"tracks":[{"name":"Caisse claire é ☃","notes":[{}]}]}]}"#).unwrap();
-    let bytes = midi::export(&library.patterns[0], 1, &[], &mut Rng::new(1), &Scales::default());
+    let bytes = midi::export(&library.patterns[0], library.bpm, 1, &[], &mut Rng::new(1), &Scales::default());
     assert_eq!(smf::parse(&bytes).track_names[1], "Caisse claire é ☃");
     // An older file's Latin-1 name: 0xe9 alone is not UTF-8.
     let mut latin1 = b"MThd\0\0\0\x06\0\0\0\x01\0\x60MTrk\0\0\0\x0b\0\xff\x03\x03\x63\x61\xe9\0\xff\x2f\0".to_vec();

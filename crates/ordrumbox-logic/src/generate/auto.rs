@@ -51,15 +51,24 @@ pub struct AutoGenerator<'a> {
     pub styles: &'a Styles,
     pub rnd: &'a mut dyn FnMut() -> f64,
     structure: Structure,
+    /// The tempo drawn in the style of the last pattern made, for the
+    /// library to play at: a pattern has none of its own.
+    pub tempo: Option<f64>,
 }
 
 impl<'a> AutoGenerator<'a> {
     pub fn new(scales: &'a Scales, styles: &'a Styles, rnd: &'a mut dyn FnMut() -> f64) -> Self {
-        Self { scales, styles, rnd, structure: Structure::default() }
+        Self { scales, styles, rnd, structure: Structure::default(), tempo: None }
     }
 
     fn random(&mut self) -> f64 {
         (self.rnd)()
+    }
+
+    /// Draw a tempo in the range of `style`, whole BPM, into [`Self::tempo`].
+    fn draw_tempo(&mut self, style: &Style) {
+        let (low, high) = style.tempo;
+        self.tempo = Some((low + self.random() * (high - low)).round());
     }
 
     /// The style `name` (through its aliases), or one with no part of that name.
@@ -279,7 +288,8 @@ pub struct Options {
 
 /// `generatePattern`: a style (given, the pattern's, or drawn), a key and
 /// scale (kept when the pattern has them). An empty pattern gets the style's
-/// tracks (a drum part sometimes left out, by its chance), meter and tempo;
+/// tracks (a drum part sometimes left out, by its chance), meter and tempo
+/// (in [`AutoGenerator::tempo`]);
 /// an existing one new lines for its drum tracks (empty for those the style
 /// has no part for) and for the melodic tracks the style names. A BASS
 /// track (empty) is added when there is none.
@@ -305,8 +315,7 @@ pub fn generate_pattern(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, option
 
     let melodic: Vec<usize> = if pattern.tracks.is_empty() {
         pattern.beat_count = style.beat_count;
-        let (low, high) = style.tempo;
-        pattern.bpm = (low + g.random() * (high - low)).round();
+        g.draw_tempo(&style);
         for name in &style.tracks {
             if instrument_family(name).is_drum() {
                 let chance = style.part_for(name).map_or(0.0, |(_, p)| p.chance);
@@ -443,7 +452,7 @@ pub fn plays_auto(pattern: &Pattern) -> bool {
 }
 
 /// ⟳: the pattern made again in a style (given, the pattern's, or drawn) —
-/// its meter, tempo and tracks: a track the style names is kept with its
+/// its meter, tempo (in [`AutoGenerator::tempo`]) and tracks: a track the style names is kept with its
 /// sound and settings and gets a new line, the others go; a locked track
 /// stays as it is, its line included.
 pub fn restyle_pattern(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, options: &Options) {
@@ -454,8 +463,7 @@ pub fn restyle_pattern(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, options
     let style = g.style(&name);
     let mut old = std::mem::take(&mut pattern.tracks);
     pattern.beat_count = style.beat_count;
-    let (low, high) = style.tempo;
-    pattern.bpm = (low + g.random() * (high - low)).round();
+    g.draw_tempo(&style);
     for name in &style.tracks {
         let drum = instrument_family(name).is_drum();
         let chance = if drum { style.part_for(name).map_or(0.0, |(_, p)| p.chance) } else { 1.0 };

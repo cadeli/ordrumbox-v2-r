@@ -130,7 +130,7 @@ pub struct View<'a> {
     pub levels: Vec<f32>,
     /// Whether the VU meter stripe is shown.
     pub show_vus: bool,
-    /// The tempo's label: the pattern's in the app, the host's in a plugin.
+    /// The tempo's label: the session's or the song's in the app, the host's in a plugin.
     pub tempo_label: &'a str,
     /// A track being dragged by its name: from which row to which.
     pub track_drop: Option<(usize, usize)>,

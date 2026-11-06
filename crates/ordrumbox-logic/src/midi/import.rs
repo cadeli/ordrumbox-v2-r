@@ -10,7 +10,7 @@
 //!
 //! The JS rules are kept as they are: an instrument already made a track
 //! drops the later notes the catalog's mapping resolves to it; the tempo meta event is never
-//! read (120 BPM); every pattern is 32 beats long, up to 16 patterns.
+//! read (the library's tempo stays); every pattern is 32 beats long, up to 16 patterns.
 //!
 //! Three departures from the JS: a file timed in SMPTE frames or with a 0
 //! division is refused (the JS makes 16 patterns of misplaced notes), the
@@ -237,7 +237,6 @@ fn patterns_from(defs: &[TrackDef], base_name: &str, division: f64) -> (Vec<Patt
             Pattern {
                 name: Some(format!("{base_name}{suffix}")),
                 beat_count: PATTERN_BEATS,
-                bpm: 120.0,
                 tracks,
                 ..Pattern::default()
             }

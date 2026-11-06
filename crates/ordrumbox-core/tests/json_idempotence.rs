@@ -349,7 +349,10 @@ fn every_pattern_field_survives_saving() {
     );
     let library = saved_twice(&library_of(vec![full]));
     let p = &library.patterns[0];
-    assert_eq!((p.id.as_str(), p.name.as_deref(), p.beat_count, p.bpm), ("groove-1", Some("Groove"), 12, 133.5));
+    assert_eq!((p.id.as_str(), p.name.as_deref(), p.beat_count), ("groove-1", Some("Groove"), 12));
+    // A pattern's own tempo, from an older file, is the library's now.
+    assert_eq!(library.bpm, 133.5);
+    assert!(p.to_json().get("bpm").is_none());
     assert_eq!((p.description.as_str(), p.tags.as_slice()), ("a groove", &["funk".to_owned(), "70s".to_owned()][..]));
     for (key, value) in [("autoGenre", r#""rock""#), ("autoKeyOffset", "3"), ("autoScale", r#""dorian""#)] {
         assert_eq!(p.extra.get(key), Some(&parse(value)), "{key}");
@@ -431,5 +434,6 @@ fn a_song_file_is_saved_as_it_was_read() {
 fn the_demo_library_is_saved_as_it_was_read() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/data/library.json");
     let text = std::fs::read_to_string(&path).expect("assets/data/library.json");
-    saved_twice(&parse(&text));
+    // Its own tempo, not its first pattern's (Blues 12/8, 60 BPM).
+    assert_eq!(saved_twice(&parse(&text)).bpm, 120.0);
 }

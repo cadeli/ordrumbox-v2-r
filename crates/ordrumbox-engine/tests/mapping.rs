@@ -23,6 +23,11 @@ use ordrumbox_engine::synth_preset::{SynthNote, synth_patch};
 /// The tempo of the hand-made tracks.
 const EDGE_BPM: f64 = 97.0;
 
+/// A slow and a fast tempo the tracks of `song.json` are set up at, besides
+/// the library's: a strip's delay is in beats, its length in frames.
+const SLOW_BPM: f64 = 60.0;
+const FAST_BPM: f64 = 172.0;
+
 /// Tracks `song.json` does not reach, completed with the track defaults.
 const EDGE_TRACKS: [&str; 15] = [
     r#"{"name":"A","filterType":"notch","filterFreq":1200,"filterQ":3}"#,
@@ -133,13 +138,15 @@ fn strip_fields(s: &StripSettings) -> [(&'static str, f32); 18] {
 
 /// One line a strip setup: where it was first met, its tempo, and the
 /// strip's parameters; every hand-made track, and each distinct setup of
-/// `song.json`.
+/// `song.json` at the library's tempo, [`SLOW_BPM`] and [`FAST_BPM`].
 fn strip_lines(library: &Library, lines: &mut Vec<String>) {
     let mut cases = Vec::new();
     for pattern in &library.patterns {
         let name = pattern.name.as_deref().unwrap_or("?");
         for track in &pattern.tracks {
-            cases.push((format!("{name}/{}", track.name), track.clone(), pattern.bpm, false));
+            for bpm in [library.bpm, SLOW_BPM, FAST_BPM] {
+                cases.push((format!("{name}/{}", track.name), track.clone(), bpm, false));
+            }
         }
     }
     for text in EDGE_TRACKS {

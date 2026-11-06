@@ -154,8 +154,11 @@ fn snapshot() -> Vec<String> {
         };
         let mut stream = Stream::new(f(case, "seed"));
         let mut rnd = || stream.next();
-        generate_pattern(&mut AutoGenerator::new(&scales, &styles, &mut rnd), &mut pattern, &options);
-        lines.push(snapshot_line(&format!("pattern {n}"), &pattern.to_json(), stream.draws));
+        let mut g = AutoGenerator::new(&scales, &styles, &mut rnd);
+        generate_pattern(&mut g, &mut pattern, &options);
+        // The tempo drawn for the library, when the style drew one.
+        let at = g.tempo.map_or_else(|| format!("pattern {n}"), |bpm| format!("pattern {n} bpm {bpm}"));
+        lines.push(snapshot_line(&at, &pattern.to_json(), stream.draws));
     }
     for (n, case) in items(&cases, "loops").iter().enumerate() {
         let mut pattern = pattern_in(case.get("pattern").unwrap());
@@ -215,12 +218,14 @@ fn the_generators_match_their_snapshot() {
 
 // ─── Patterns in a style ─────────────────────────────────────────────────────
 
-fn generated(genre: &str, scales: &Scales, styles: &Styles, stream: &mut Stream) -> Pattern {
+/// A new pattern made in `genre`, and the tempo the style drew for it.
+fn generated(genre: &str, scales: &Scales, styles: &Styles, stream: &mut Stream) -> (Pattern, Option<f64>) {
     let mut pattern = Pattern { beat_count: 4, ..Pattern::default() };
     let options = Options { genre: Some(genre.to_owned()), ..Options::default() };
     let mut rnd = || stream.next();
-    generate_pattern(&mut AutoGenerator::new(scales, styles, &mut rnd), &mut pattern, &options);
-    pattern
+    let mut g = AutoGenerator::new(scales, styles, &mut rnd);
+    generate_pattern(&mut g, &mut pattern, &options);
+    (pattern, g.tempo)
 }
 
 #[test]
@@ -229,9 +234,10 @@ fn a_new_pattern_has_its_style_tracks_meter_and_tempo() {
     let mut stream = Stream::new(11.0);
     for style in &styles.list {
         for _ in 0..30 {
-            let pattern = generated(&style.name, &scales, &styles, &mut stream);
+            let (pattern, tempo) = generated(&style.name, &scales, &styles, &mut stream);
             assert_eq!(pattern.beat_count, style.beat_count, "{}", style.name);
-            assert!((style.tempo.0..=style.tempo.1).contains(&pattern.bpm), "{}: {}", style.name, pattern.bpm);
+            let bpm = tempo.unwrap_or(f64::NAN);
+            assert!((style.tempo.0..=style.tempo.1).contains(&bpm), "{}: {bpm}", style.name);
             for track in &pattern.tracks {
                 assert!(style.tracks.contains(&track.name), "{}: {}", style.name, track.name);
                 if instrument_family(&track.name).is_drum() {
@@ -331,7 +337,7 @@ fn bass_and_chords_hold_through_their_section_with_no_variation() {
 fn a_pattern_made_again_in_a_style_takes_its_tracks_and_keeps_the_locked_one() {
     let (scales, styles) = (scales(), styles());
     let mut stream = Stream::new(23.0);
-    let mut pattern = generated("rock", &scales, &styles, &mut stream);
+    let (mut pattern, _) = generated("rock", &scales, &styles, &mut stream);
     let t = pattern.tracks.iter().position(|t| t.name == "SNARE").unwrap();
     pattern.tracks[t].compose_lock = true;
     pattern.tracks[t].volume = 0.3;
@@ -382,7 +388,7 @@ fn the_macros_move_every_line_and_the_same_values_make_the_same_lines() {
 fn a_locked_track_holds_through_auto_mode_and_auto_leaves_it() {
     let (scales, styles) = (scales(), styles());
     let mut stream = Stream::new(31.0);
-    let mut pattern = generated("funk", &scales, &styles, &mut stream);
+    let (mut pattern, _) = generated("funk", &scales, &styles, &mut stream);
     pattern.tracks[0].compose_lock = true;
     assert!(toggle_auto(&mut pattern));
     assert!(!pattern.tracks[0].auto_mode && pattern.tracks[1..].iter().all(|t| t.auto_mode));

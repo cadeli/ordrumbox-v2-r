@@ -160,10 +160,18 @@ fn instrument_track(name: &str, target: Target, mut events: Vec<NoteEvent>) -> V
     track_chunk(bytes)
 }
 
-/// `MidiExporter.export`: pattern `pattern` played `loops` times. `roots`
+/// `MidiExporter.export`: pattern `pattern` played `loops` times at `bpm`
+/// (the library's tempo). `roots`
 /// are the samples' root notes (key, MIDI note); `rng` and `scales` feed
 /// the pattern engine as when it plays.
-pub fn export(pattern: &Pattern, loops: u32, roots: &[(String, f64)], rng: &mut Rng, scales: &Scales) -> Vec<u8> {
+pub fn export(
+    pattern: &Pattern,
+    bpm: f64,
+    loops: u32,
+    roots: &[(String, f64)],
+    rng: &mut Rng,
+    scales: &Scales,
+) -> Vec<u8> {
     let pattern_ticks = f64::from(TICK) * f64::from(pattern.beat_count);
     let any_solo = pattern.tracks.iter().any(|t| t.solo);
     let plays = |t: &ordrumbox_core::Track| if any_solo { t.solo } else { !t.mute };
@@ -219,7 +227,7 @@ pub fn export(pattern: &Pattern, loops: u32, roots: &[(String, f64)], rng: &mut 
     header.extend(((1 + chunks.len()) as u16).to_be_bytes());
     header.extend((PPQN as u16).to_be_bytes());
     let mut bytes = chunk(b"MThd", &header);
-    let us = js::round(60_000_000.0 / pattern.bpm);
+    let us = js::round(60_000_000.0 / bpm);
     let us = if us.is_finite() { us as i64 as u32 } else { 0 };
     let mut tempo = meta(0, 0x58, &[0x04, 0x02, 0x18, 0x08]);
     tempo.extend(meta(0, 0x51, &[(us >> 16) as u8, (us >> 8) as u8, us as u8]));

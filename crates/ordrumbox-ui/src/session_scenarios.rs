@@ -232,7 +232,7 @@ fn a_pattern_built_in_the_grid_is_saved_reloaded_and_exported() {
     }
     s.click(Hit::Solo(1));
     let pattern = s.pattern().unwrap().clone();
-    assert_eq!((pattern.beat_count, pattern.bpm), (8, 100.0));
+    assert_eq!((pattern.beat_count, s.editor.library().bpm), (8, 100.0));
     let names: Vec<&str> = pattern.tracks.iter().map(|t| t.name.as_str()).collect();
     assert_eq!(names, ["T1", "T2", "T3", "T4"]);
     let counts: Vec<usize> = pattern.tracks.iter().map(|t| t.notes.len()).collect();
@@ -250,7 +250,7 @@ fn a_pattern_built_in_the_grid_is_saved_reloaded_and_exported() {
     assert_eq!(reloaded.patterns[1].tracks[1].notes.len(), 2);
 
     // T4: MIDI, only the soloed track, after the conductor track.
-    let bytes = midi::export(&pattern, 1, &[], &mut Rng::new(1), &Scales::default());
+    let bytes = midi::export(&pattern, s.editor.library().bpm, 1, &[], &mut Rng::new(1), &Scales::default());
     let file = smf::parse(&bytes);
     assert_eq!((file.header.format, file.header.track_count, file.header.division), (1, 2, PPQN as u16));
     assert_eq!(file.track_names, ["orDrumbox Pattern", "T2"]);
@@ -428,13 +428,14 @@ fn a_session_through_the_menus_draws_every_step() {
     // Playing, with the length and tempo changed under it.
     s.run(Command::PlayPattern);
     assert!(run(&mut s, &mut audio, 4000) > 0.0);
-    let (bpm, beats) = s.pattern().map(|p| (p.bpm, p.beat_count)).unwrap();
+    let tempo = |s: &Session| (s.editor.library().bpm, s.pattern().unwrap().beat_count);
+    let (bpm, beats) = tempo(&s);
     s.run(Command::TempoUp);
     s.run(Command::LengthUp);
-    assert_eq!(s.pattern().map(|p| (p.bpm, p.beat_count)), Some((bpm + 1.0, beats + 1)));
+    assert_eq!(tempo(&s), (bpm + 1.0, beats + 1));
     s.run(Command::TempoDown);
     s.run(Command::LengthDown);
-    assert_eq!(s.pattern().map(|p| (p.bpm, p.beat_count)), Some((bpm, beats)));
+    assert_eq!(tempo(&s), (bpm, beats));
     draw(&mut s);
 
     // The cursor and the step it is on: a note in, the grid and loop of its track changed.

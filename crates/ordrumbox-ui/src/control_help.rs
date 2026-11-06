@@ -46,7 +46,7 @@ pub fn help(id: Id) -> Option<Help> {
             Field::Transpose => ["Transpose", "the sample's pitch, in semitones"],
             Field::Decay => ["Decay", "how long the sample rings, in ms"],
         },
-        Id::Bpm => ["Tempo", "beats per minute of the pattern"],
+        Id::Bpm => ["Tempo", "beats per minute: every pattern's; in the song panel, the song's"],
         Id::Beats => ["Beats", "the pattern's length, in beats"],
         Id::StyleList => ["Style", "picking one makes the pattern again in it"],
         Id::GeneratePattern => ["Make again (B)", "the pattern made again in its style"],

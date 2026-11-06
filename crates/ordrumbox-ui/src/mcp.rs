@@ -37,11 +37,11 @@ const NOTE_PLACE: [&str; 2] = ["beat", "step"];
 
 /// The tools, without the track and note settings (filled in by [`tools`]).
 const TOOLS: &str = r#"[
-  {"name": "listPatterns", "description": "The patterns of the library, in order, and the one shown.",
+  {"name": "listPatterns", "description": "The session tempo, the patterns of the library, in order, and the one shown.",
    "inputSchema": {"type": "object", "properties": {}}},
   {"name": "loadPattern", "description": "A pattern with its tracks (every setting) and notes (fields away from their default, and their absolute step).",
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string", "minLength": 1}}, "required": ["patternName"]}},
-  {"name": "createNewPattern", "description": "Adds an empty pattern (4 beats, 120 BPM) at the end of the library.",
+  {"name": "createNewPattern", "description": "Adds an empty pattern (4 beats) at the end of the library.",
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string", "minLength": 1}}, "required": ["patternName"]}},
   {"name": "selectPattern", "description": "Shows a pattern in the window (by name or index; a playing pattern switches at once). With neither, tells which one is shown.",
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}, "index": {"type": "integer", "minimum": 0}}}},
@@ -77,8 +77,8 @@ const TOOLS: &str = r#"[
      "updates": {"type": "object", "properties": {}, "additionalProperties": false},
      "noteUpdates": {"type": "object", "properties": {}, "additionalProperties": false}},
      "required": ["patternName", "trackName", "updates"]}},
-  {"name": "setPatternBpm", "description": "The tempo of a pattern, whole, 20 to 300.",
-   "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}, "bpm": {"type": "number", "minimum": 20, "maximum": 300}}, "required": ["patternName", "bpm"]}},
+  {"name": "setBpm", "description": "The session tempo every pattern plays at, whole, 20 to 300 (an arrangement plays at its own: updateArrangement).",
+   "inputSchema": {"type": "object", "properties": {"bpm": {"type": "number", "minimum": 20, "maximum": 300}}, "required": ["bpm"]}},
   {"name": "setPatternBeatCount", "description": "The length of a pattern in beats; every track follows.",
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}, "beatCount": {"type": "integer", "minimum": 1, "maximum": 16}}, "required": ["patternName", "beatCount"]}},
   {"name": "setPatternTags", "description": "The tags (genre, mood...) of a pattern.",
@@ -198,7 +198,7 @@ const TOOLS: &str = r#"[
      "required": ["patternName", "trackName", "newName"]}},
   {"name": "compactPattern", "description": "Shortens every track of a pattern to its shortest loop, when its notes repeat one (as Pattern > Compact tracks).",
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}}, "required": ["patternName"]}},
-  {"name": "generatePattern", "description": "Adds a pattern made in a style (listStyles; default: a drawn one): its tracks, meter, tempo and lines (as Pattern > New pattern in the style).",
+  {"name": "generatePattern", "description": "Adds a pattern made in a style (listStyles; default: a drawn one): its tracks, meter and lines, the session tempo drawn in the style's range (as Pattern > New pattern in the style).",
    "inputSchema": {"type": "object", "properties": {"style": {"type": "string"}}}},
   {"name": "regeneratePattern", "description": "Makes a pattern again in a style (default: its own, else a drawn one); locked tracks (composeLock) stay as they are.",
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}, "style": {"type": "string"}}, "required": ["patternName"]}},

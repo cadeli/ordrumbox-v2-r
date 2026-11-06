@@ -310,7 +310,7 @@ const SHORTCUTS: [&str; 59] = [
     "  1-9 / Shift+1-9        mute / solo track 1-9        Q-P  hear track 1-10 (any view)",
     "  Space / Shift+Space    play or stop the pattern / the song",
     "  [ ] / Shift+[ ]        previous / next pattern / song (also PageUp PageDown)",
-    "  - = (Shift: x10)       tempo",
+    "  - = (Shift: x10)       tempo (every pattern's; the song's in the song panel)",
     "  , .                    previous / next kit",
     "FILE AND EDIT",
     "  Ctrl+S                 save the library now (it is also saved on its own)",
@@ -797,7 +797,8 @@ impl Session {
     pub(super) fn write_midi(&self, p: usize, path: &Path) -> Result<String, String> {
         let pattern = self.editor.library().patterns.get(p).ok_or("No pattern selected")?;
         let mut rng = Rng::new(1);
-        let bytes = midi::export(pattern, 1, &self.roots, &mut rng, &self.scales);
+        let bpm = self.editor.library().bpm;
+        let bytes = midi::export(pattern, bpm, 1, &self.roots, &mut rng, &self.scales);
         store::write_atomic(path, &bytes).map_err(|e| format!("not exported: {}: {e}", path.display()))?;
         Ok(format!("exported {} ({} bytes)", path.display(), bytes.len()))
     }
@@ -1957,15 +1958,44 @@ impl Session {
     }
 
     pub fn step_tempo(&mut self, delta: f64) {
-        let Some(bpm) = self.pattern().map(|p| p.bpm) else { return };
-        self.set_tempo(bpm + delta);
+        self.set_tempo(self.tempo() + delta);
     }
 
-    /// The pattern at `bpm` (whole, inside the tempo bounds), a run of
+    /// The song the header's tempo is: the selected one in the song panel
+    /// (what Space plays there), else none (the library's tempo).
+    fn tempo_song(&self) -> Option<usize> {
+        (self.workspace == Workspace::Song && self.song().is_some()).then(|| self.editor.selected_song())
+    }
+
+    /// The tempo the header shows and turns: the selected song's in the
+    /// song panel, else the library's, which every pattern plays at.
+    pub fn tempo(&self) -> f64 {
+        self.tempo_song()
+            .and_then(|s| self.editor.library().songs.get(s))
+            .map_or(self.editor.library().bpm, |song| song.bpm)
+    }
+
+    /// The tempo the tracks play at: the host's in a plugin, else what
+    /// plays (the song's, the library's), else the header's.
+    pub(super) fn playing_bpm(&self) -> f64 {
+        let library = self.editor.library();
+        let own = match self.playback.mode().filter(|_| self.playback.is_playing()) {
+            Some(Mode::Song(s)) => library.songs.get(s).map(|song| song.bpm),
+            Some(Mode::Pattern(_)) => Some(library.bpm),
+            None => None,
+        };
+        self.host_bpm().or(own).unwrap_or_else(|| self.tempo())
+    }
+
+    /// That tempo at `bpm` (whole, inside the tempo bounds), a run of
     /// changes one undo step.
     pub(super) fn set_tempo(&mut self, bpm: f64) {
         let bpm = ordrumbox_core::song::clamp_bpm(bpm.round());
-        if self.editor.set_pattern_bpm(self.pattern_index, bpm, true) {
+        let changed = match self.tempo_song() {
+            Some(s) => self.editor.set_song_bpm(s, bpm, true),
+            None => self.editor.set_bpm(bpm, true),
+        };
+        if changed {
             self.edited();
         }
     }

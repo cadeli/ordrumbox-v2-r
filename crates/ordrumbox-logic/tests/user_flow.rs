@@ -30,11 +30,11 @@ fn note_on_ticks(bytes: &[u8]) -> Vec<i64> {
     ticks
 }
 
-/// Flow 1: a pattern at 140 bpm, KICK four on the floor, SNARE backbeat,
+/// Flow 1: a pattern, the session at 140 bpm, KICK four on the floor, SNARE backbeat,
 /// HIHAT eighths, BASS with its own pitches and velocities.
 fn build_beat(editor: &mut Editor) -> usize {
     let p = editor.add_pattern(Some("Beat"));
-    assert!(editor.set_pattern_bpm(p, 140.0, false));
+    assert!(editor.set_bpm(140.0, false));
     for name in ["KICK", "SNARE", "HIHAT", "BASS"] {
         editor.add_track(p, name, 4).expect("a track");
     }
@@ -58,7 +58,7 @@ fn flow_1_a_beat_built_command_by_command() {
     let p = build_beat(&mut editor);
     let pattern = &editor.library().patterns[p];
     assert_eq!(pattern.name.as_deref(), Some("Beat"));
-    assert_eq!(pattern.bpm, 140.0);
+    assert_eq!(editor.library().bpm, 140.0);
     let tracks: Vec<(&str, usize)> = pattern.tracks.iter().map(|t| (t.name.as_str(), t.notes.len())).collect();
     assert_eq!(tracks, [("KICK", 4), ("SNARE", 2), ("HIHAT", 8), ("BASS", 3)]);
     let bass: Vec<(f64, f64)> = pattern.tracks[3].notes.iter().map(|n| (n.pitch, n.velocity)).collect();
@@ -97,7 +97,8 @@ fn flow_3_track_settings_and_their_undo() {
     assert_eq!((tracks[2].sample_path.as_str(), tracks[2].auto_assign), ("kits/chh.wav", false));
     assert_eq!(tracks[3].name, "BASS2");
     // The muted track is left out of what plays (here, its MIDI file).
-    let bytes = midi::export(&editor.library().patterns[p], 1, &[], &mut Rng::new(1), &Scales::default());
+    let bytes =
+        midi::export(&editor.library().patterns[p], editor.library().bpm, 1, &[], &mut Rng::new(1), &Scales::default());
     assert_eq!(smf::parse(&bytes).track_names[1..], ["SNARE", "HIHAT", "BASS2"]);
     for _ in 0..4 {
         editor.undo().expect("an undo step");
@@ -131,7 +132,7 @@ fn flow_5_the_midi_file_of_the_beat() {
     }
     editor.update_note(p, 0, 0, &[("velocity", Value::from(0.5))], None, false);
     let pattern = &editor.library().patterns[p];
-    let export = |loops| midi::export(pattern, loops, &[], &mut Rng::new(1), &Scales::default());
+    let export = |loops| midi::export(pattern, editor.library().bpm, loops, &[], &mut Rng::new(1), &Scales::default());
 
     let bytes = export(1);
     let file = smf::parse(&bytes);
@@ -160,7 +161,7 @@ fn a_pattern_exported_to_midi_and_imported_back_plays_the_same_notes() {
     )
     .unwrap();
     let pattern = &library.patterns[0];
-    let bytes = midi::export(pattern, 1, &[], &mut Rng::new(1), &Scales::default());
+    let bytes = midi::export(pattern, library.bpm, 1, &[], &mut Rng::new(1), &Scales::default());
     let imported = midi::import("rt.mid", &bytes, &[]).expect("imports");
     let back = &imported.patterns[0];
     let expected = flat(pattern, 0);
