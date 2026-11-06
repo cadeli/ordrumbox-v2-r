@@ -103,6 +103,7 @@ pub enum Command {
     PreviewTrack,
     Shortcuts,
     About,
+    Manual,
     FactoryReset,
     /// The library written to a file of its own (`library.json` format).
     ExportLibrary,
@@ -435,6 +436,7 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
             items: vec![
                 command("Keyboard shortcuts", "F1", C::Shortcuts, true),
                 command("About orDrumbox", "", C::About, true),
+                command("User manual...", "", C::Manual, true),
                 command("Check for updates", "", C::CheckUpdates, !s.checking_updates),
                 match &s.newer_release {
                     Some(version) => command(format!("Download orDrumbox {version}..."), "", C::DownloadPage, true),
