@@ -163,7 +163,7 @@ pub struct Style {
 }
 
 /// Bounds of a style's meter: what a track's grid can hold.
-const STEPS_PER_BEAT: (i32, i32) = (1, 8);
+const STEPS_PER_BEAT: (i32, i32) = (1, crate::track::MAX_STEPS_PER_BEAT);
 const BEAT_COUNT: (i32, i32) = (1, 16);
 
 /// The parts of a style no file describes: hits on the plain meter.

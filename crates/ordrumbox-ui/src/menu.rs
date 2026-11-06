@@ -532,9 +532,6 @@ fn border_color() -> Rgb {
 fn highlight_color() -> Rgb {
     theme::highlight()
 }
-fn text_color() -> Rgb {
-    theme::text()
-}
 const DIM: Rgb = theme::CYAN;
 fn disabled_color() -> Rgb {
     theme::disabled()
@@ -637,7 +634,7 @@ pub fn draw(canvas: &mut Canvas, menus: &[Menu], open: Option<Open>, scale: i32)
         if is_open {
             canvas.fill_rect(x, 0, w, bar - scale.max(1), highlight_color());
         }
-        canvas.text(x + 8 * scale, text_y, menu.title, scale, if is_open { ACCENT } else { text_color() });
+        canvas.text(x + 8 * scale, text_y, menu.title, scale, if is_open { ACCENT } else { theme::text() });
     }
     let Some(open) = open else { return };
     let (px, py, width, tops) = panel(menus, open, scale);
@@ -680,7 +677,7 @@ pub fn draw(canvas: &mut Canvas, menus: &[Menu], open: Option<Open>, scale: i32)
                 } else if open.item == Some(i) {
                     ACCENT
                 } else {
-                    text_color()
+                    theme::text()
                 };
                 canvas.text(px + 18 * scale, ty, label, scale, color);
                 let sw = text_width(shortcut, scale);

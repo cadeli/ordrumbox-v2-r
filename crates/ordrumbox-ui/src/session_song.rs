@@ -27,6 +27,7 @@ use super::session_panel::{DOUBLE_CLICK, PanelLayout};
 use super::*;
 use crate::panel::{self, Item, Kind, Rect};
 use crate::song_view::{self, Axis, Row, SongGhost, SongHit, SongLayout, SongView};
+use crate::theme;
 
 /// The column's buttons: id and label.
 const BUTTONS: [(&str, &str); 7] = [
@@ -283,7 +284,7 @@ impl Session {
         let field = |y: i32| Rect::new(x + label_w, y, area.w - label_w, 12 * s);
         // The name (a click renames it), the date.
         for (label, id, text, color) in [
-            ("Song", Some(Id::SongName), self.song_name(), panel::text_color()),
+            ("Song", Some(Id::SongName), self.song_name(), theme::text()),
             ("Date", None, self.info("date"), panel::DIM),
         ] {
             layout.items.push(Item::text(x, y + 2 * s, label, panel::DIM, s));
@@ -295,7 +296,7 @@ impl Session {
         let (text, color) = if description.is_empty() {
             ("(description)".to_owned(), panel::DIM)
         } else {
-            (description, panel::text_color())
+            (description, theme::text())
         };
         let rect = Rect::new(x, y, area.w, 12 * s);
         layout.items.push(Item::new(Some(Id::SongDescription), rect, Kind::Text { text, color }));

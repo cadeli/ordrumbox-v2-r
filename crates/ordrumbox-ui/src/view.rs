@@ -6,6 +6,7 @@
 //! [`Layout`] places everything; drawing and mouse hit-testing both use it.
 
 use ordrumbox_core::steps::absolute_step;
+use ordrumbox_core::track::MAX_STEPS_PER_BEAT;
 use ordrumbox_core::{Note, Pattern, Track};
 
 use crate::canvas::{Canvas, Rgb, chars_in, small_cell, small_char_width, text_width};
@@ -31,12 +32,6 @@ fn cell_beat_color() -> Rgb {
     theme::cell_beat()
 }
 const NOTE: Rgb = theme::PINK;
-fn text_color() -> Rgb {
-    theme::text()
-}
-fn dim_color() -> Rgb {
-    theme::muted()
-}
 const ACCENT: Rgb = theme::PINK;
 const PLAYING: Rgb = theme::LIME;
 /// Above the pattern list while the pattern shown waits for the one playing to end its loop.
@@ -460,9 +455,9 @@ impl Layout {
         self.top + track as i32 * self.row
     }
 
-    /// The cell of a step of track `track` (`spb` steps per beat).
-    pub fn cell_rect(&self, track: usize, beat: i32, step: i32, spb: i32) -> Rect {
-        let spb = spb.clamp(1, 16);
+    /// The cell of a step of track `track` (`track_data` gives its steps per beat).
+    pub fn cell_rect(&self, track: usize, beat: i32, step: i32, track_data: &Track) -> Rect {
+        let spb = steps_per_beat(track_data);
         let local_beat = beat - self.start_beat;
         if local_beat < 0 || local_beat >= self.beats {
             return Rect::new(0, 0, 0, 0);
@@ -556,7 +551,7 @@ impl Layout {
 }
 
 fn steps_per_beat(track: &Track) -> i32 {
-    track.steps_per_beat.clamp(1, 16)
+    track.steps_per_beat.clamp(1, MAX_STEPS_PER_BEAT)
 }
 
 /// Draw `view`; `scale` is the integer UI scale (1 on a standard display, 2 on HiDPI).
@@ -592,7 +587,7 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
             label(canvas, *rect, text);
         }
     } else {
-        canvas.text(c.play.x, c.play.y + 4 * scale, "no pattern", scale, dim_color());
+        canvas.text(c.play.x, c.play.y + 4 * scale, "no pattern", scale, theme::muted());
     }
     label(canvas, c.views[0], "VIEW");
 
@@ -605,9 +600,9 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
         (None, None) => String::new(),
     };
     let x = canvas.text(margin, y, view.message, scale, VALUE) + 24 * scale;
-    let x = canvas.text(x.max(margin + canvas.width() / 3), y, &history, scale, dim_color()) + 24 * scale;
+    let x = canvas.text(x.max(margin + canvas.width() / 3), y, &history, scale, theme::muted()) + 24 * scale;
     if let Some(song) = view.song {
-        let color = if song.starts_with("SONG") { PLAYING } else { dim_color() };
+        let color = if song.starts_with("SONG") { PLAYING } else { theme::muted() };
         canvas.text(x.max(margin + canvas.width() * 2 / 3), y, song, scale, color);
     }
     // The header's lower edge.
@@ -633,7 +628,7 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
     } else {
         HELP
     };
-    canvas.text(margin, footer_y, help, scale, dim_color());
+    canvas.text(margin, footer_y, help, scale, theme::muted());
 
     // The window split: one main editor top-left, the track editor down the
     // right, the output strip along the bottom.
@@ -682,15 +677,15 @@ fn draw_ruler(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layo
     let pages = (pattern.beat_count.max(1) as usize).div_ceil(BEATS_PER_PAGE as usize);
     if pages > 1 {
         let text = format!("page {}/{pages}", view.current_page + 1);
-        canvas.text(layout.name_x, y, &text, scale, dim_color());
+        canvas.text(layout.name_x, y, &text, scale, theme::muted());
     }
     let dot_y = layout.top - 3 * scale;
     for beat in 0..layout.beats {
         let x = layout.beat_x(beat);
-        canvas.fill_rect(x, y, scale, RULER_HEIGHT * scale - 2 * scale, dim_color());
+        canvas.fill_rect(x, y, scale, RULER_HEIGHT * scale - 2 * scale, theme::muted());
         for step in 1..spb {
             let sx = layout.step_x(i64::from(beat) * i64::from(spb) + i64::from(step), spb);
-            canvas.fill_rect(sx, dot_y, scale, scale, dim_color());
+            canvas.fill_rect(sx, dot_y, scale, scale, theme::muted());
         }
         if beat % every == 0 {
             let color = if playing == Some(beat) { PLAYING } else { LABEL };
@@ -746,7 +741,7 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
                 box_y + inset,
                 letter,
                 letter_scale,
-                if on { background_color() } else { dim_color() },
+                if on { background_color() } else { theme::muted() },
             );
         }
         let label: String = track.name.chars().take(LABEL_CHARS).collect();
@@ -760,16 +755,16 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
             let width = layout.volume_x - layout.name_x - 4 * scale;
             let chars = usize::try_from(width / small_char_width(scale).max(1)).unwrap_or(0);
             let shown: String = sound.chars().take(chars).collect();
-            canvas.small_text(layout.name_x, label_y + 8 * layout.scale + 2 * scale, &shown, scale, dim_color());
+            canvas.small_text(layout.name_x, label_y + 8 * layout.scale + 2 * scale, &shown, scale, theme::muted());
         }
         let color = if mute {
-            dim_color()
+            theme::muted()
         } else if track.auto_mode {
             PLAYING // a new line every loop
         } else if focused {
             theme::track(i)
         } else {
-            text_color()
+            theme::text()
         };
         canvas.text(layout.name_x, label_y, &label, layout.scale, color);
         draw_track_steps(canvas, track, i, view, layout);
@@ -779,13 +774,13 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
     // out whatever the theme's cell colours.
     let rows_h = (layout.tracks as i32 * layout.row).min(layout.bottom - layout.top) - gap;
     for beat in 1..layout.beats {
-        canvas.fill_rect(layout.beat_x(beat) - gap, layout.top, gap, rows_h, dim_color());
+        canvas.fill_rect(layout.beat_x(beat) - gap, layout.top, gap, rows_h, theme::muted());
     }
 
     let add = layout.add_track_rect();
     canvas.fill_rect(add.x, add.y, add.w, add.h, box_off_color());
     let label_x = add.x + (add.w - text_width(ADD_TRACK_LABEL, scale)) / 2;
-    canvas.text(label_x, add.y + (add.h - 8 * scale) / 2, ADD_TRACK_LABEL, scale, text_color());
+    canvas.text(label_x, add.y + (add.h - 8 * scale) / 2, ADD_TRACK_LABEL, scale, theme::text());
 
     if let Some((from, to)) = view.track_drop.filter(|(from, to)| from != to) {
         // Where the track lands: above the row it takes moving up, below it moving down.
@@ -818,7 +813,7 @@ pub fn draw_tooltip_lines<S: AsRef<str>>(canvas: &mut Canvas, lines: &[S], cell:
     canvas.fill_rect(x, y, w, h, theme::line());
     canvas.fill_rect(x + scale, y + scale, w - 2 * scale, h - 2 * scale, theme::shade());
     for (i, line) in lines.iter().enumerate() {
-        canvas.text(x + 6 * scale, y + 3 * scale + i as i32 * line_h, line.as_ref(), scale, text_color());
+        canvas.text(x + 6 * scale, y + 3 * scale + i as i32 * line_h, line.as_ref(), scale, theme::text());
     }
 }
 
@@ -863,9 +858,9 @@ fn draw_notice_part(canvas: &mut Canvas, title: &str, lines: &[String], all: &[S
     canvas.fill_rect(x + scale, y + scale, width - 2 * scale, height - 2 * scale, theme::panel());
     canvas.text(x + 16 * scale, y + 10 * scale, title, scale, ACCENT);
     for (i, line) in lines.iter().enumerate() {
-        canvas.text(x + 16 * scale, y + 10 * scale + (i as i32 + 2) * line_h, line, scale, text_color());
+        canvas.text(x + 16 * scale, y + 10 * scale + (i as i32 + 2) * line_h, line, scale, theme::text());
     }
-    canvas.text(x + width - 16 * scale - text_width(close, scale), y + 10 * scale, close, scale, dim_color());
+    canvas.text(x + width - 16 * scale - text_width(close, scale), y + 10 * scale, close, scale, theme::muted());
 }
 
 /// The kit editor: the kit's samples on the left, the selected one on the
@@ -873,19 +868,19 @@ fn draw_notice_part(canvas: &mut Canvas, title: &str, lines: &[String], all: &[S
 fn draw_kit(canvas: &mut Canvas, kit: &KitView, layout: &KitLayout) {
     let scale = layout.scale;
     // Title line above the list.
-    canvas.text(layout.left, layout.top + 2 * scale, &format!("kit {}", kit.kit), scale, dim_color());
+    canvas.text(layout.left, layout.top + 2 * scale, &format!("kit {}", kit.kit), scale, theme::muted());
     let first = layout.first(kit.selected);
     if kit.samples.is_empty() {
-        canvas.text(layout.left, layout.list_top, "No samples in this kit", scale, dim_color());
+        canvas.text(layout.left, layout.list_top, "No samples in this kit", scale, theme::muted());
     }
     for (row, (i, (name, key))) in kit.samples.iter().enumerate().skip(first).take(layout.shown()).enumerate() {
         let y = layout.list_top + row as i32 * layout.row;
         if i == kit.selected {
             canvas.fill_rect(layout.left - 2 * scale, y - 2 * scale, layout.list_width, layout.row, focus_row_color());
         }
-        let color = if i == kit.selected { ACCENT } else { text_color() };
+        let color = if i == kit.selected { ACCENT } else { theme::text() };
         let x = canvas.text(layout.left, y, name, scale, color);
-        let x = canvas.text(x + 8 * scale, y, key, scale, dim_color());
+        let x = canvas.text(x + 8 * scale, y, key, scale, theme::muted());
         if let Some(users) = kit.users.get(i).filter(|u| !u.is_empty()) {
             let room = layout.left + layout.list_width - x - 20 * scale;
             let text: String = format!("< {}", users.join(", ")).chars().take(chars_in(room, scale)).collect();
@@ -896,7 +891,7 @@ fn draw_kit(canvas: &mut Canvas, kit: &KitView, layout: &KitLayout) {
     let x = layout.detail_x;
     let mut y = kit.details_top + 4 * scale;
     for line in [kit.info.as_deref(), kit.detected.as_deref()].into_iter().flatten() {
-        canvas.text(x, y, line, scale, dim_color());
+        canvas.text(x, y, line, scale, theme::muted());
         y += 12 * scale;
     }
 
@@ -934,7 +929,7 @@ fn draw_note_cell(canvas: &mut Canvas, cell: Rect, note: &Note, gap: i32) {
     let color = theme::note(note_color(note), velocity);
     canvas.fill_rect(cell.x, cell.y + cell.h - fill, cell.w, fill, color);
     if velocity >= ACCENT_VELOCITY {
-        canvas.fill_rect(cell.x, cell.y, cell.w, (2 * gap).min(cell.h), text_color());
+        canvas.fill_rect(cell.x, cell.y, cell.w, (2 * gap).min(cell.h), theme::text());
     }
 }
 
@@ -1168,7 +1163,7 @@ mod tests {
             let note = Note { velocity, ..Note::default() };
             draw_note_cell(&mut canvas, Rect::new(0, 0, 10, 40), &note, 1);
             let rows = pixels.chunks(w).filter(|row| row[5] != 0).count();
-            (rows, pixels[5] == text_color())
+            (rows, pixels[5] == theme::text())
         };
         assert_eq!(filled(0.5), (20, false), "half loud, half high");
         assert_eq!(filled(0.1), (10, false), "the softest still shows");
@@ -1186,7 +1181,7 @@ mod tests {
             assert_eq!(layout.top, body_top(scale) + RULER_HEIGHT * scale);
             assert_eq!(layout.hit(pattern, layout.grid_left + 2, layout.top - 2), None, "the ruler is not a row");
             for beat in 0..layout.beats {
-                let cell = layout.cell_rect(0, layout.start_beat + beat, 0, 4);
+                let cell = layout.cell_rect(0, layout.start_beat + beat, 0, &pattern.tracks[0]);
                 assert_eq!(layout.beat_x(beat), cell.x, "beat {beat}");
             }
         }

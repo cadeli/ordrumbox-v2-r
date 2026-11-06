@@ -19,9 +19,6 @@ pub fn border_color() -> Rgb {
 pub fn field_color() -> Rgb {
     theme::cell()
 }
-pub fn text_color() -> Rgb {
-    theme::text()
-}
 pub const DIM: Rgb = theme::CYAN;
 pub const ACCENT: Rgb = theme::CYAN;
 pub const ON: Rgb = theme::LIME;
@@ -377,7 +374,7 @@ fn draw_knob(canvas: &mut Canvas, cx: i32, cy: i32, size: i32, fraction: f64, co
     for k in 0..=disc {
         let x = cx + (a.cos() * f64::from(k)) as i32;
         let y = cy + (a.sin() * f64::from(k)) as i32;
-        canvas.fill_rect(x - scale.max(1) / 2, y - scale.max(1) / 2, scale.max(1), scale.max(1), text_color());
+        canvas.fill_rect(x - scale.max(1) / 2, y - scale.max(1) / 2, scale.max(1), scale.max(1), theme::text());
     }
 }
 
@@ -442,7 +439,7 @@ pub fn draw(canvas: &mut Canvas, items: &[Item], focus: Option<Id>, scale: i32) 
                 canvas.fill_rect(r.x, r.y, r.w, r.h, field_color());
                 let label = labels.get(*selected).map_or("", String::as_str);
                 let ty = r.y + (r.h - 8 * scale) / 2;
-                canvas.text(r.x + 4 * scale, ty, &fit(label, r.w - 16 * scale, scale), scale, text_color());
+                canvas.text(r.x + 4 * scale, ty, &fit(label, r.w - 16 * scale, scale), scale, theme::text());
                 canvas.text(r.x + r.w - 10 * scale, ty, "v", scale, DIM);
             }
             Kind::Toggle { on } => {
@@ -466,7 +463,7 @@ pub fn draw(canvas: &mut Canvas, items: &[Item], focus: Option<Id>, scale: i32) 
             }
             Kind::Button { label, on } => {
                 canvas.fill_rect(r.x, r.y, r.w, r.h, if *on { ACTIVE } else { field_color() });
-                let color = if *on { background_color() } else { text_color() };
+                let color = if *on { background_color() } else { theme::text() };
                 let x = r.x + (r.w - text_width(label, scale)) / 2;
                 canvas.text(x, r.y + (r.h - 8 * scale) / 2, label, scale, color);
             }
@@ -674,7 +671,7 @@ impl Dropdown {
             if k == self.at {
                 canvas.fill_rect(r.x + scale, y, r.w - 2 * scale, row, selected_row_color());
             }
-            let color = if k == self.at { TITLE } else { text_color() };
+            let color = if k == self.at { TITLE } else { theme::text() };
             canvas.text(r.x + 6 * scale, y + (row - 8 * scale) / 2, &fit(label, r.w - 12 * scale, scale), scale, color);
         }
         if self.labels.len() > self.shown() {
@@ -719,7 +716,7 @@ impl Entry {
         canvas.text(r.x + 12 * scale, r.y + 8 * scale, &self.title, scale, TITLE);
         let field = Rect::new(r.x + 12 * scale, r.y + 22 * scale, r.w - 24 * scale, 12 * scale);
         canvas.fill_rect(field.x, field.y, field.w, field.h, field_color());
-        let x = canvas.text(field.x + 4 * scale, field.y + 2 * scale, &self.text, scale, text_color());
+        let x = canvas.text(field.x + 4 * scale, field.y + 2 * scale, &self.text, scale, theme::text());
         canvas.fill_rect(x + scale, field.y + 2 * scale, scale.max(1), 8 * scale, ACCENT);
         canvas.text(r.x + 12 * scale, r.y + 40 * scale, "ENTER: set   ESC: cancel", scale, DIM);
     }

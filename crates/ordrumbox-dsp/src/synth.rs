@@ -571,7 +571,7 @@ impl SynthVoice {
         let Adsr { attack: a, decay: d, sustain: s, release: r } = p.envelope;
         let v = p.velocity;
 
-        let f_freq_mod = clamp(f_freq, 20.0, 20_000.0);
+        let f_freq_mod = clamp(f_freq, crate::MIN_FILTER_FREQ, crate::MAX_FILTER_FREQ);
         let f_q_val = clamp(f_q, 0.1, 20.0);
         let g_coeff = (PI * f_freq_mod.min(sr * MAX_CUTOFF_RATIO) / sr).tan();
         let k_coeff = 1.0 / f_q_val;
@@ -589,7 +589,8 @@ impl SynthVoice {
         let lfo2_on = !bypass.lfo2 && lfo2_freq > 0.0;
 
         let nf_mode = mode(nf_type);
-        let nf_g = (PI * clamp(nf_freq, 20.0, 20_000.0).min(sr * MAX_CUTOFF_RATIO) / sr).tan();
+        let nf_g =
+            (PI * clamp(nf_freq, crate::MIN_FILTER_FREQ, crate::MAX_FILTER_FREQ).min(sr * MAX_CUTOFF_RATIO) / sr).tan();
         let nf_k = 1.0 / clamp(nf_q, 0.1, 20.0);
 
         let frames = left.len().min(right.len());
@@ -663,10 +664,10 @@ impl SynthVoice {
                         self.filter_env_segment = 0;
                     }
                 }
-                f_freq_sample += (20_000.0 - f_freq_sample) * filter_env_amt * self.filter_env_level;
+                f_freq_sample += (crate::MAX_FILTER_FREQ - f_freq_sample) * filter_env_amt * self.filter_env_level;
             }
             if m_target == 1 && m_env > 0.001 {
-                f_freq_sample += (20_000.0 - f_freq_sample) * m_depth * m_env;
+                f_freq_sample += (crate::MAX_FILTER_FREQ - f_freq_sample) * m_depth * m_env;
             }
 
             let detune = |base: f64, i: usize| base + l1.detune[i] + l2.detune[i];
@@ -753,7 +754,9 @@ impl SynthVoice {
                 let freq = nf_freq + l1.noise_freq + l2.noise_freq;
                 let q = clamp(nf_q + l1.noise_q + l2.noise_q, 0.1, 20.0);
                 if freq != nf_freq || q != nf_q {
-                    g = (PI * clamp(freq, 20.0, 20_000.0).min(sr * MAX_CUTOFF_RATIO) / sr).tan();
+                    g = (PI * clamp(freq, crate::MIN_FILTER_FREQ, crate::MAX_FILTER_FREQ).min(sr * MAX_CUTOFF_RATIO)
+                        / sr)
+                        .tan();
                     k = 1.0 / q;
                 }
                 let a1 = 1.0 / (1.0 + g * (g + k));

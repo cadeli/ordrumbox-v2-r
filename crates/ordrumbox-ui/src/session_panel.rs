@@ -774,7 +774,7 @@ impl Session {
             view::Hit::Cell { track: t, beat, step } => {
                 let Some(track) = pattern.tracks.get(t) else { return };
                 let Some(note) = track.notes.iter().find(|n| n.beat == beat && n.step == step) else { return };
-                let cell = layout.cell_rect(t, beat, step, track.steps_per_beat);
+                let cell = layout.cell_rect(t, beat, step, track);
                 view::draw_tooltip(canvas, &editors::note_tooltip(note, track.transpose), cell, scale);
             }
             view::Hit::Name(t) => {

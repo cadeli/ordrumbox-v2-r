@@ -83,7 +83,7 @@ json_record! {
         filter_type: String = "allpass".to_owned() => "filterType",
         filter_cutoff_lfo: Option<Object> = None => "filterCutoffLfo" | "filterFreqLfo",
         /// Hz.
-        filter_cutoff: f64 = 20.0 => "filterCutoff" | "filterFreq",
+        filter_cutoff: f64 = MIN_FILTER_FREQ => "filterCutoff" | "filterFreq",
         filter_q_lfo: Option<Object> = None => "filterQLfo",
         filter_q: f64 = 0.707 => "filterQ",
         /// Filter slope, dB per octave: 12 or 24.
@@ -126,11 +126,11 @@ const VALUE_RANGES: [(&str, f64, f64); 39] = [
     ("pan", -1.0, 1.0),
     ("transpose", -24.0, 24.0),
     ("beatCount", 1.0, 16.0),
-    ("stepsPerBeat", 1.0, 8.0),
+    ("stepsPerBeat", 1.0, MAX_STEPS_PER_BEAT as f64),
     ("loopLength", 0.0, 1024.0),
-    ("swingResolution", 1.0, 8.0),
+    ("swingResolution", 1.0, MAX_STEPS_PER_BEAT as f64),
     ("swingAmount", 0.0, 1.0),
-    ("filterCutoff", 20.0, 20_000.0),
+    ("filterCutoff", MIN_FILTER_FREQ, MAX_FILTER_FREQ),
     ("filterQ", 0.707, 18.707),
     ("filterSlope", 12.0, 24.0),
     ("reverbMix", 0.0, 1.0),
@@ -190,6 +190,19 @@ const ROUND_2D: [&str; 10] = [
 pub const MAX_TRACKS: usize = 64;
 /// Steps a beat can be divided into.
 pub const MAX_STEPS_PER_BEAT: i32 = 8;
+/// Lowest frequency a filter cutoff can take, in Hz.
+pub const MIN_FILTER_FREQ: f64 = 20.0;
+/// Highest frequency a filter cutoff can take, in Hz.
+pub const MAX_FILTER_FREQ: f64 = 20_000.0;
+/// Aliases for the filter cutoff bounds.
+pub const MIN_FILTER_CUTOFF: f64 = MIN_FILTER_FREQ;
+pub const MAX_FILTER_CUTOFF: f64 = MAX_FILTER_FREQ;
+pub const MIN_FILTER_FREQUENCY: f64 = MIN_FILTER_FREQ;
+pub const MAX_FILTER_FREQUENCY: f64 = MAX_FILTER_FREQ;
+pub const FILTER_FREQ_MIN: f64 = MIN_FILTER_FREQ;
+pub const FILTER_FREQ_MAX: f64 = MAX_FILTER_FREQ;
+pub const FILTER_CUTOFF_MIN: f64 = MIN_FILTER_FREQ;
+pub const FILTER_CUTOFF_MAX: f64 = MAX_FILTER_FREQ;
 
 impl Track {
     /// A new track: `beat_count` beats at `steps_per_beat` (1 to

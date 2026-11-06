@@ -46,47 +46,47 @@ audio_params! {
     /// The strip processor's parameters (its `parameterDescriptors`).
     pub struct StripSettings {
         /// 0 skips the filter (the `allpass` filter type), 1 filters.
-        filter_on = 1.0, 0.0..=1.0;
+        filter_on = 1.0, 0.0, 1.0;
         /// Filter cutoff, Hz.
-        cutoff = 20_000.0, 20.0..=20_000.0;
-        q = 0.707, 0.707..=18.707;
+        cutoff = crate::MAX_FILTER_FREQ as f32, crate::MIN_FILTER_FREQ as f32, crate::MAX_FILTER_FREQ as f32;
+        q = 0.707, 0.707, 18.707;
         /// 0 lowpass, 1 highpass, 2 bandpass, 3 notch.
-        filter_mode = 0.0, 0.0..=3.0;
+        filter_mode = 0.0, 0.0, 3.0;
         /// dB per octave: 12 (one stage) or 24 (two stages).
-        filter_slope = 12.0, 12.0..=24.0;
+        filter_slope = 12.0, 12.0, 24.0;
         /// 0 tanh, 1 hard clip, 2 tape (an asymmetric tanh).
-        saturation_type = 0.0, 0.0..=2.0;
-        saturation_drive = 1.0, 1.0..=7.0;
-        saturation_output = 1.0, 0.0..=1.0;
-        saturation_mix = 0.0, 0.0..=1.0;
-        reverb_room = 0.5, 0.0..=1.0;
-        reverb_damping = 0.5, 0.0..=1.0;
-        reverb_width = 1.0, 0.0..=1.0;
-        reverb_mix = 0.0, 0.0..=1.0;
+        saturation_type = 0.0, 0.0, 2.0;
+        saturation_drive = 1.0, 1.0, 7.0;
+        saturation_output = 1.0, 0.0, 1.0;
+        saturation_mix = 0.0, 0.0, 1.0;
+        reverb_room = 0.5, 0.0, 1.0;
+        reverb_damping = 0.5, 0.0, 1.0;
+        reverb_width = 1.0, 0.0, 1.0;
+        reverb_mix = 0.0, 0.0, 1.0;
         /// Seconds before the reverb's input enters it.
-        reverb_predelay = 0.0, 0.0..=0.1;
+        reverb_predelay = 0.0, 0.0, 0.1;
         /// Spread of a spring (allpass coefficient), 0 none.
-        reverb_dispersion = 0.0, 0.0..=0.9;
+        reverb_dispersion = 0.0, 0.0, 0.9;
         /// Seconds the reverb stays open after its input falls under the
         /// gate's key, then it closes (gated reverb); 0 no gate.
-        reverb_gate = 0.0, 0.0..=1.0;
+        reverb_gate = 0.0, 0.0, 1.0;
         /// Delay times, seconds.
-        delay_time_l = 0.25, 0.0..=2.0;
-        delay_time_r = 0.25, 0.0..=2.0;
-        delay_feedback = 0.4, 0.0..=0.99;
-        delay_mix = 0.0, 0.0..=1.0;
+        delay_time_l = 0.25, 0.0, 2.0;
+        delay_time_r = 0.25, 0.0, 2.0;
+        delay_feedback = 0.4, 0.0, 0.99;
+        delay_mix = 0.0, 0.0, 1.0;
         /// 0 and 1 each side repeats itself, 2 the sides feed each other
         /// (ping-pong).
-        delay_mode = 1.0, 0.0..=2.0;
+        delay_mode = 1.0, 0.0, 2.0;
         /// Coefficient of the one-pole lowpass in the feedback: lower is darker.
-        delay_tone = 0.5, 0.05..=1.0;
+        delay_tone = 0.5, 0.05, 1.0;
         /// Depth of the tape wow, seconds of delay time.
-        delay_wow = 0.0, 0.0..=0.005;
+        delay_wow = 0.0, 0.0, 0.005;
         /// 1 feeds the mono sum into the left line only (a ping-pong starts
         /// on the left), 0 each side into its line.
-        delay_mono_in = 0.0, 0.0..=1.0;
-        volume = 1.0, 0.0..=2.0;
-        pan = 0.0, -1.0..=1.0;
+        delay_mono_in = 0.0, 0.0, 1.0;
+        volume = 1.0, 0.0, 2.0;
+        pan = 0.0, -1.0, 1.0;
     }
 }
 

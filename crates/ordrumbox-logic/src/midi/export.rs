@@ -34,11 +34,6 @@ fn uint8(x: f64) -> u8 {
     if x.is_finite() { x.trunc().rem_euclid(256.0) as u8 } else { 0 }
 }
 
-/// `Math.min(max, Math.max(min, value))` (NaN stays NaN).
-fn clamp(value: f64, min: f64, max: f64) -> f64 {
-    if value.is_nan() { value } else { value.max(min).min(max) }
-}
-
 fn meta(delta: u32, kind: u8, data: &[u8]) -> Vec<u8> {
     let mut out = encode_vlq(delta);
     out.extend([0xff, kind]);
@@ -199,13 +194,13 @@ pub fn export(
                 };
                 let mut velocity = note.velocity;
                 if let Some(l) = &track.volume_lfo {
-                    velocity = clamp(velocity * lfo::value(l, f64::from(tick)), 0.0, 1.0);
+                    velocity = crate::generate::clamp(velocity * lfo::value(l, f64::from(tick)), 0.0, 1.0);
                 }
                 let mut pitch = note.pitch + track.transpose;
                 if let Some(l) = &track.transpose_lfo {
                     pitch += lfo::value(l, f64::from(tick));
                 }
-                let key = clamp(target.note + pitch, 0.0, 127.0);
+                let key = crate::generate::clamp(target.note + pitch, 0.0, 127.0);
                 let velocity = js::round(velocity * 127.0);
                 // A note-on at velocity 0 is a note-off: a silent note is left out.
                 if velocity.is_nan() || velocity < 1.0 {

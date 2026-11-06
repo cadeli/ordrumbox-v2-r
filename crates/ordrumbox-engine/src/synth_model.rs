@@ -85,7 +85,10 @@ pub const METAS: [Meta; 32] = [
     meta("vco3.gain", 0.0, 1.0, 0.01, ""),
     meta("vco3.octave", -4.0, 4.0, 1.0, "oct"),
     meta("vco3.detune", -100.0, 100.0, 1.0, "ct"),
-    Meta { log: true, ..meta("filter.freq", 20.0, 20000.0, 1.0, "Hz") },
+    Meta {
+        log: true,
+        ..meta("filter.freq", ordrumbox_dsp::MIN_FILTER_FREQ, ordrumbox_dsp::MAX_FILTER_FREQ, 1.0, "Hz")
+    },
     meta("filter.Q", 0.1, 24.0, 0.1, ""),
     meta("filter.drive", 0.0, 1.0, 0.01, ""),
     Meta { label: Some("Env"), ..meta("filterEnv.filterEnvelopeAmount", 0.0, 1.0, 0.01, "") },
@@ -94,7 +97,10 @@ pub const METAS: [Meta; 32] = [
     Meta { log: true, ..meta("lfo2.freq", 0.01, 5.0, 0.01, "Hz") },
     meta("lfo2.depth", 0.0, 1.0, 0.01, ""),
     meta("noise.mix", 0.0, 1.0, 0.01, ""),
-    Meta { log: true, ..meta("noise.filterFreq", 20.0, 20000.0, 1.0, "Hz") },
+    Meta {
+        log: true,
+        ..meta("noise.filterFreq", ordrumbox_dsp::MIN_FILTER_FREQ, ordrumbox_dsp::MAX_FILTER_FREQ, 1.0, "Hz")
+    },
     meta("noise.filterQ", 0.1, 24.0, 0.1, ""),
     Meta { label: Some("FM"), ..meta("fm.amount", 0.0, 1.0, 0.01, "") },
     Meta { label: Some("Algo"), ..meta("fm.algo", 0.0, 4.0, 1.0, "") },
@@ -623,9 +629,12 @@ pub fn filter_response(kind: &str, fc: f64, q: f64, slope_db: f64, points: usize
 pub fn filter_now(draft: &Object, time: f64, bpm: f64) -> (String, f64, f64, f64, Option<(f64, f64)>) {
     let kind = text(draft, "filter.type").unwrap_or("lowpass").to_owned();
     let slope_db = number(draft, "filter.slope").unwrap_or(12.0);
-    let fc = number(draft, "filter.freq").unwrap_or(400.0).clamp(20.0, 20_000.0);
+    let fc = number(draft, "filter.freq")
+        .unwrap_or(400.0)
+        .clamp(ordrumbox_dsp::MIN_FILTER_FREQ, ordrumbox_dsp::MAX_FILTER_FREQ);
     let q = number(draft, "filter.Q").unwrap_or(1.0).clamp(0.1, 24.0);
-    let fc = (fc + lfo_mod_on(draft, "filter.freq", time, bpm)).clamp(20.0, 20_000.0);
+    let fc = (fc + lfo_mod_on(draft, "filter.freq", time, bpm))
+        .clamp(ordrumbox_dsp::MIN_FILTER_FREQ, ordrumbox_dsp::MAX_FILTER_FREQ);
     let q = (q + lfo_mod_on(draft, "filter.Q", time, bpm)).clamp(0.1, 24.0);
     let depth = lfos(draft)
         .into_iter()
@@ -633,7 +642,12 @@ pub fn filter_now(draft: &Object, time: f64, bpm: f64) -> (String, f64, f64, f64
         .filter(|l| l.get("target").and_then(Value::as_str) == Some("filter.freq"))
         .map(|l| l.get("depth").and_then(Value::as_f64).unwrap_or(0.0))
         .fold(0.0f64, f64::max);
-    let band = (depth > 0.0).then(|| ((fc - depth * 1000.0).max(20.0), (fc + depth * 1000.0).min(20_000.0)));
+    let band = (depth > 0.0).then(|| {
+        (
+            (fc - depth * 1000.0).max(ordrumbox_dsp::MIN_FILTER_FREQ),
+            (fc + depth * 1000.0).min(ordrumbox_dsp::MAX_FILTER_FREQ),
+        )
+    });
     (kind, fc, q, slope_db, band)
 }
 
