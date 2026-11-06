@@ -8,6 +8,8 @@
 
 mod action_log;
 mod assets;
+#[cfg(test)]
+mod assign_tests;
 mod audio_output;
 mod canvas;
 mod control;
@@ -15,8 +17,6 @@ mod control_help;
 mod editors;
 mod font;
 mod frame;
-#[cfg(test)]
-mod kit_import_tests;
 mod kits;
 mod master;
 mod mcp;

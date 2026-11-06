@@ -24,7 +24,7 @@ Statuts :
 | `auto-generation.spec.js` | 8 | Couvert | ↻ Drum/Bass/Chords et leur bascule : `generators.json` (toggles, notes, mode auto). Les boutons de barre d'outils sont des entrées de menu (D, S, A). |
 | `auto-generation.mobile.spec.js` | 4 | Sans objet | Barre d'outils mobile. |
 | `canvas-rendering.spec.js` | 1 | Partiel | Le spectre (output panel) est porté : la FFT et l'analyseur ont leurs tests (`spectrum.rs`), pas « des pixels non vides pendant la lecture ». |
-| `cold-start.spec.js` | 3 | Couvert | Chaque piste a un son avant la première lecture, le premier passage sonne : `scenarios.rs` (moteur), `assign.json`. L'AudioContext est sans objet. |
+| `cold-start.spec.js` | 3 | Couvert | Chaque piste a un son avant la première lecture, le premier passage sonne : `scenarios.rs` (moteur), table d'assignation de `assign_tests.rs` (ui). L'AudioContext est sans objet. |
 | `color-scheme.spec.js` | 4 | Non porté | Thèmes de couleur. |
 | `gen-sliders.spec.js` | 14 | Couvert | `gen_sliders.rs` (core) : chaque `prob_*` isolé, à 0 jamais d'effet, à 100 au moins une fois ; `pitch_range`, `pitch_scale_lock`, `prob_note_depth` (plancher 0,2 : test de `variation.rs`). Les curseurs eux-mêmes : `controls.json`. |
 | `kit-change.spec.js` | 2 | Couvert | Changement de kit en pleine lecture : toutes les pistes auto passent au nouveau kit, la lecture continue et les passes suivantes sonnent (`scenarios.rs`, moteur). |
@@ -43,7 +43,7 @@ Statuts :
 | `playback_tempo.spec.js` | 3 | Couvert | `session_scenarios.rs` : tempo du pattern en grille (et changé en pleine lecture), inchangé et sans redémarrage en passant par synthé et piano roll, tempo de la song dans la vue song, retour au pattern. |
 | `select_dropdown.spec.js` | 2 | Couvert | `Dropdown` : tests du panel (clavier, molette, clic, fermeture). |
 | `song-arrangement.spec.js` | 34 | Partiel (élevé) | Commandes : `edit_properties.rs` et tests unitaires de `editor.rs` ; menus, clics, Next/Delete/Add here/Delete row, annuler : tests `session_song` ; lignes, rectangles, règle, hit-test : tests `song_view`. Non vérifiés tels quels : curseur qui revient dans la grille en boucle, boucle d'animation arrêtée en quittant la vue. |
-| `song-playback.spec.js` | 6 | Couvert | Clips superposés : `song_sources.json` et le rendu (`scenarios.rs`) ; mode suivant la vue, avance mesure après mesure : `session_scenarios.rs` ; chaque pattern de l'arrangement a ses sons : `scenarios.rs`. |
+| `song-playback.spec.js` | 6 | Couvert | Clips superposés : tables de `instruments.rs` (core) et le rendu (`scenarios.rs`) ; mode suivant la vue, avance mesure après mesure : `session_scenarios.rs` ; chaque pattern de l'arrangement a ses sons : `scenarios.rs`. |
 | `song-view.spec.js` | 4 | Partiel | Vue, liste d'arrangements, liste de patterns qui défile : portés. Différence : en Rust le track editor est masqué dans la vue song. |
 | `song-wav-export.spec.js` | 5 | Couvert | `scenarios.rs` (moteur) : longueur au tempo de la song (120 et 240 bpm), en-tête 16 bits stéréo, son présent, un second clip change plus de la moitié des samples, refus sans clip jouable, boucle de l'arrangement raccourcie. Le bouton : Ctrl+Shift+E. |
 | `synth-modulators.spec.js` | 3 | Couvert (DSP) | Chaque cible de LFO : `renders.bin` (processeurs DSP). L'éditeur de synthé n'est pas porté. |
@@ -63,17 +63,17 @@ Statuts :
 
 | Sujet | Fichiers JS | Fixture(s) Rust |
 |---|---|---|
-| Format JSON, chargement, export | `exporter`, `pattern_fixer`, `defaults`, `model_schemas`, `serialize_roundtrip`, `roundtrip_integration`, `pattern_import_validation`, `multi_note_step` | `song.json`, `song.min.json`, `library.export.json`, `edge_library*.json`, `slugify.json` |
-| Moteur de patterns | `pattern_engine`, `pattern_manager`, `euclidean`, `notes`, `variation2` | `flat_notes/` |
-| Songs | `song_schema`, `song_playback`, `player_song_mode`, `song_roundtrip` | `song_sources.json` ; `measure_at_tick` : tests de `song.rs` |
+| Format JSON, chargement, export | `exporter`, `pattern_fixer`, `defaults`, `model_schemas`, `serialize_roundtrip`, `roundtrip_integration`, `pattern_import_validation`, `multi_note_step` | Rust seul : aller-retour et idempotence sur `song.json` et `edge_library.json` (`song_json.rs`), snapshots `library_rust.json`, `edge_library_rust.json` ; slugs : table de `ids.rs` |
+| Moteur de patterns | `pattern_engine`, `pattern_manager`, `euclidean`, `notes`, `variation2` | Rust seul : snapshot `flat_notes_rust.txt` (passes 0–3 de `song.json` et `engine_cases.json`), propriétés des passes aléatoires (`flat_notes.rs`), tests de `pattern_engine.rs` |
+| Songs | `song_schema`, `song_playback`, `player_song_mode`, `song_roundtrip` | Rust seul : tables des clips joués (`instruments.rs`) ; `measure_at_tick` : tests de `song.rs` |
 | Commandes, historique | `cmd`, `cmd_update`, `cmd_transaction`, `history_manager`, `undo_roundtrip`, `arrangement_section` (partie commandes) | Rust seul : `edit_properties.rs`, tests de `editor.rs` |
-| Générateurs | `generators`, `base_generator`, `pattern_auto_gen`, `song_structure`, `composition` | `generators.json`, `composition.json` |
+| Générateurs | `generators`, `base_generator`, `pattern_auto_gen`, `song_structure`, `composition` | `generators.json` ; progressions : snapshot Rust `composition_rust.txt` |
 | MIDI | `midi_exporter`, `midi_exporter_functional`, `midi_json_roundtrip`, `midi_import_service` | `midi/*.mid`, `midi_exports.json` ; attentes en snapshot Rust (`midi_rust.txt`) |
-| Instruments, assignation | `instrument_manager`, `auto_assign`, `tracks`, `drumkits_validation` | `instruments.json`, `assign.json` |
+| Instruments, assignation | `instrument_manager`, `auto_assign`, `tracks`, `drumkits_validation` | Rust seul : tables de recherche, notes et programmes GM (`instruments.rs`), assignation par kit, kits livrés et kits importés (`assign_tests.rs`, ui) |
 | DSP | `worklet_synth_voice`, `worklet_master_bus`, `strip_sync`, `fx_values`, `lfo_engine`, `math` | `renders.{json,bin}`, `strip_settings.json`, `lfo_values.json`, `synth_patches.json` |
-| WAV, analyse | `wav_encoder`, `sample_analyzer`, `hz_to_note` | `wav.json`, `analysis.json` |
+| WAV, analyse | `wav_encoder`, `sample_analyzer`, `hz_to_note` | WAV : tests de `wav.rs` (en-tête, aller-retour) ; `analysis.json` |
 | Contrôles | `base_control`, `or_knob_log`, `ui_utils` (formatage) | `controls.json` |
-| Scénarios | `e2e_user_flow`, `wav_midi_roundtrip` (aller-retour MIDI), `e2e_audio_comparison` | `user_flow.rs`, `scenarios.rs`, `wav.json` |
+| Scénarios | `e2e_user_flow`, `wav_midi_roundtrip` (aller-retour MIDI), `e2e_audio_comparison` | `user_flow.rs`, `scenarios.rs`, tests de `wav.rs` |
 
 ### Partiels (porté, non testé tel quel)
 
@@ -91,7 +91,7 @@ Statuts :
 `about_panel_lifecycle`, `tools_panel_clear_rnd`, `output_panel_sliders`,
 `undo_policy` (les réglages du master ne sont pas des étapes d'annulation,
 comme en JS), `pattern_settings_panel` (ses contrôles sont dans l'en-tête), `piano_roll`, `ghost_sync`
-(les fantômes : `sub_positions.json`), `synth_editor`, `synth_editor_display`,
+(les fantômes : snapshot Rust `sub_positions_rust.txt`), `synth_editor`, `synth_editor_display`,
 `synth_editor_implicit`, `synth_editor_import`, `synth_editor_preset_section`,
 `synth_editor_sliders`, `synth_preset_model` (le modèle : `synth_editor.json`).
 

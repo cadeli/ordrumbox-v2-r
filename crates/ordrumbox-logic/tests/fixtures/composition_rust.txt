@@ -1,0 +1,210 @@
+-2 canon I-V-vi-iii tonic 0 beats 0:
+-2 canon I-V-vi-iii tonic 0 beats 1: 0:0 0:4 0:7
+-2 canon I-V-vi-iii tonic 0 beats 3: 0:0 0:4 0:7
+-2 canon I-V-vi-iii tonic 0 beats 4: 0:0 0:4 0:7
+-2 canon I-V-vi-iii tonic 0 beats 7: 0:0 0:4 0:7 4:7 4:11 4:14
+-2 canon I-V-vi-iii tonic 0 beats 8: 0:0 0:4 0:7 4:7 4:11 4:14
+-2 canon I-V-vi-iii tonic 0 beats 16: 0:0 0:4 0:7 4:7 4:11 4:14 8:9 8:12 8:16 12:4 12:7 12:11
+-2 canon I-V-vi-iii tonic -5 beats 0:
+-2 canon I-V-vi-iii tonic -5 beats 1: 0:-5 0:-1 0:2
+-2 canon I-V-vi-iii tonic -5 beats 3: 0:-5 0:-1 0:2
+-2 canon I-V-vi-iii tonic -5 beats 4: 0:-5 0:-1 0:2
+-2 canon I-V-vi-iii tonic -5 beats 7: 0:-5 0:-1 0:2 4:2 4:6 4:9
+-2 canon I-V-vi-iii tonic -5 beats 8: 0:-5 0:-1 0:2 4:2 4:6 4:9
+-2 canon I-V-vi-iii tonic -5 beats 16: 0:-5 0:-1 0:2 4:2 4:6 4:9 8:4 8:7 8:11 12:-1 12:2 12:6
+-2 canon I-V-vi-iii tonic 7 beats 0:
+-2 canon I-V-vi-iii tonic 7 beats 1: 0:7 0:11 0:14
+-2 canon I-V-vi-iii tonic 7 beats 3: 0:7 0:11 0:14
+-2 canon I-V-vi-iii tonic 7 beats 4: 0:7 0:11 0:14
+-2 canon I-V-vi-iii tonic 7 beats 7: 0:7 0:11 0:14 4:14 4:18 4:21
+-2 canon I-V-vi-iii tonic 7 beats 8: 0:7 0:11 0:14 4:14 4:18 4:21
+-2 canon I-V-vi-iii tonic 7 beats 16: 0:7 0:11 0:14 4:14 4:18 4:21 8:16 8:19 8:23 12:11 12:14 12:18
+-1 ii-V-I ii-V-I tonic 0 beats 0:
+-1 ii-V-I ii-V-I tonic 0 beats 1: 0:2 0:5 0:9
+-1 ii-V-I ii-V-I tonic 0 beats 3: 0:2 0:5 0:9
+-1 ii-V-I ii-V-I tonic 0 beats 4: 0:2 0:5 0:9
+-1 ii-V-I ii-V-I tonic 0 beats 7: 0:2 0:5 0:9 4:7 4:11 4:14
+-1 ii-V-I ii-V-I tonic 0 beats 8: 0:2 0:5 0:9 4:7 4:11 4:14
+-1 ii-V-I ii-V-I tonic 0 beats 16: 0:2 0:5 0:9 4:7 4:11 4:14 8:0 8:4 8:7 12:2 12:5 12:9
+-1 ii-V-I ii-V-I tonic -5 beats 0:
+-1 ii-V-I ii-V-I tonic -5 beats 1: 0:-3 0:0 0:4
+-1 ii-V-I ii-V-I tonic -5 beats 3: 0:-3 0:0 0:4
+-1 ii-V-I ii-V-I tonic -5 beats 4: 0:-3 0:0 0:4
+-1 ii-V-I ii-V-I tonic -5 beats 7: 0:-3 0:0 0:4 4:2 4:6 4:9
+-1 ii-V-I ii-V-I tonic -5 beats 8: 0:-3 0:0 0:4 4:2 4:6 4:9
+-1 ii-V-I ii-V-I tonic -5 beats 16: 0:-3 0:0 0:4 4:2 4:6 4:9 8:-5 8:-1 8:2 12:-3 12:0 12:4
+-1 ii-V-I ii-V-I tonic 7 beats 0:
+-1 ii-V-I ii-V-I tonic 7 beats 1: 0:9 0:12 0:16
+-1 ii-V-I ii-V-I tonic 7 beats 3: 0:9 0:12 0:16
+-1 ii-V-I ii-V-I tonic 7 beats 4: 0:9 0:12 0:16
+-1 ii-V-I ii-V-I tonic 7 beats 7: 0:9 0:12 0:16 4:14 4:18 4:21
+-1 ii-V-I ii-V-I tonic 7 beats 8: 0:9 0:12 0:16 4:14 4:18 4:21
+-1 ii-V-I ii-V-I tonic 7 beats 16: 0:9 0:12 0:16 4:14 4:18 4:21 8:7 8:11 8:14 12:9 12:12 12:16
+0 pop I-V-vi-IV tonic 0 beats 0:
+0 pop I-V-vi-IV tonic 0 beats 1: 0:0 0:4 0:7
+0 pop I-V-vi-IV tonic 0 beats 3: 0:0 0:4 0:7
+0 pop I-V-vi-IV tonic 0 beats 4: 0:0 0:4 0:7
+0 pop I-V-vi-IV tonic 0 beats 7: 0:0 0:4 0:7 4:7 4:11 4:14
+0 pop I-V-vi-IV tonic 0 beats 8: 0:0 0:4 0:7 4:7 4:11 4:14
+0 pop I-V-vi-IV tonic 0 beats 16: 0:0 0:4 0:7 4:7 4:11 4:14 8:9 8:12 8:16 12:5 12:9 12:12
+0 pop I-V-vi-IV tonic -5 beats 0:
+0 pop I-V-vi-IV tonic -5 beats 1: 0:-5 0:-1 0:2
+0 pop I-V-vi-IV tonic -5 beats 3: 0:-5 0:-1 0:2
+0 pop I-V-vi-IV tonic -5 beats 4: 0:-5 0:-1 0:2
+0 pop I-V-vi-IV tonic -5 beats 7: 0:-5 0:-1 0:2 4:2 4:6 4:9
+0 pop I-V-vi-IV tonic -5 beats 8: 0:-5 0:-1 0:2 4:2 4:6 4:9
+0 pop I-V-vi-IV tonic -5 beats 16: 0:-5 0:-1 0:2 4:2 4:6 4:9 8:4 8:7 8:11 12:0 12:4 12:7
+0 pop I-V-vi-IV tonic 7 beats 0:
+0 pop I-V-vi-IV tonic 7 beats 1: 0:7 0:11 0:14
+0 pop I-V-vi-IV tonic 7 beats 3: 0:7 0:11 0:14
+0 pop I-V-vi-IV tonic 7 beats 4: 0:7 0:11 0:14
+0 pop I-V-vi-IV tonic 7 beats 7: 0:7 0:11 0:14 4:14 4:18 4:21
+0 pop I-V-vi-IV tonic 7 beats 8: 0:7 0:11 0:14 4:14 4:18 4:21
+0 pop I-V-vi-IV tonic 7 beats 16: 0:7 0:11 0:14 4:14 4:18 4:21 8:16 8:19 8:23 12:12 12:16 12:19
+1 doo-wop I-vi-IV-V tonic 0 beats 0:
+1 doo-wop I-vi-IV-V tonic 0 beats 1: 0:0 0:4 0:7
+1 doo-wop I-vi-IV-V tonic 0 beats 3: 0:0 0:4 0:7
+1 doo-wop I-vi-IV-V tonic 0 beats 4: 0:0 0:4 0:7
+1 doo-wop I-vi-IV-V tonic 0 beats 7: 0:0 0:4 0:7 4:9 4:12 4:16
+1 doo-wop I-vi-IV-V tonic 0 beats 8: 0:0 0:4 0:7 4:9 4:12 4:16
+1 doo-wop I-vi-IV-V tonic 0 beats 16: 0:0 0:4 0:7 4:9 4:12 4:16 8:5 8:9 8:12 12:7 12:11 12:14
+1 doo-wop I-vi-IV-V tonic -5 beats 0:
+1 doo-wop I-vi-IV-V tonic -5 beats 1: 0:-5 0:-1 0:2
+1 doo-wop I-vi-IV-V tonic -5 beats 3: 0:-5 0:-1 0:2
+1 doo-wop I-vi-IV-V tonic -5 beats 4: 0:-5 0:-1 0:2
+1 doo-wop I-vi-IV-V tonic -5 beats 7: 0:-5 0:-1 0:2 4:4 4:7 4:11
+1 doo-wop I-vi-IV-V tonic -5 beats 8: 0:-5 0:-1 0:2 4:4 4:7 4:11
+1 doo-wop I-vi-IV-V tonic -5 beats 16: 0:-5 0:-1 0:2 4:4 4:7 4:11 8:0 8:4 8:7 12:2 12:6 12:9
+1 doo-wop I-vi-IV-V tonic 7 beats 0:
+1 doo-wop I-vi-IV-V tonic 7 beats 1: 0:7 0:11 0:14
+1 doo-wop I-vi-IV-V tonic 7 beats 3: 0:7 0:11 0:14
+1 doo-wop I-vi-IV-V tonic 7 beats 4: 0:7 0:11 0:14
+1 doo-wop I-vi-IV-V tonic 7 beats 7: 0:7 0:11 0:14 4:16 4:19 4:23
+1 doo-wop I-vi-IV-V tonic 7 beats 8: 0:7 0:11 0:14 4:16 4:19 4:23
+1 doo-wop I-vi-IV-V tonic 7 beats 16: 0:7 0:11 0:14 4:16 4:19 4:23 8:12 8:16 8:19 12:14 12:18 12:21
+2 minor-natural i-VI-III-VII tonic 0 beats 0:
+2 minor-natural i-VI-III-VII tonic 0 beats 1: 0:0 0:3 0:7
+2 minor-natural i-VI-III-VII tonic 0 beats 3: 0:0 0:3 0:7
+2 minor-natural i-VI-III-VII tonic 0 beats 4: 0:0 0:3 0:7
+2 minor-natural i-VI-III-VII tonic 0 beats 7: 0:0 0:3 0:7 4:8 4:12 4:15
+2 minor-natural i-VI-III-VII tonic 0 beats 8: 0:0 0:3 0:7 4:8 4:12 4:15
+2 minor-natural i-VI-III-VII tonic 0 beats 16: 0:0 0:3 0:7 4:8 4:12 4:15 8:3 8:7 8:10 12:10 12:14 12:17
+2 minor-natural i-VI-III-VII tonic -5 beats 0:
+2 minor-natural i-VI-III-VII tonic -5 beats 1: 0:-5 0:-2 0:2
+2 minor-natural i-VI-III-VII tonic -5 beats 3: 0:-5 0:-2 0:2
+2 minor-natural i-VI-III-VII tonic -5 beats 4: 0:-5 0:-2 0:2
+2 minor-natural i-VI-III-VII tonic -5 beats 7: 0:-5 0:-2 0:2 4:3 4:7 4:10
+2 minor-natural i-VI-III-VII tonic -5 beats 8: 0:-5 0:-2 0:2 4:3 4:7 4:10
+2 minor-natural i-VI-III-VII tonic -5 beats 16: 0:-5 0:-2 0:2 4:3 4:7 4:10 8:-2 8:2 8:5 12:5 12:9 12:12
+2 minor-natural i-VI-III-VII tonic 7 beats 0:
+2 minor-natural i-VI-III-VII tonic 7 beats 1: 0:7 0:10 0:14
+2 minor-natural i-VI-III-VII tonic 7 beats 3: 0:7 0:10 0:14
+2 minor-natural i-VI-III-VII tonic 7 beats 4: 0:7 0:10 0:14
+2 minor-natural i-VI-III-VII tonic 7 beats 7: 0:7 0:10 0:14 4:15 4:19 4:22
+2 minor-natural i-VI-III-VII tonic 7 beats 8: 0:7 0:10 0:14 4:15 4:19 4:22
+2 minor-natural i-VI-III-VII tonic 7 beats 16: 0:7 0:10 0:14 4:15 4:19 4:22 8:10 8:14 8:17 12:17 12:21 12:24
+3 andalusian i-VII-VI-V tonic 0 beats 0:
+3 andalusian i-VII-VI-V tonic 0 beats 1: 0:0 0:3 0:7
+3 andalusian i-VII-VI-V tonic 0 beats 3: 0:0 0:3 0:7
+3 andalusian i-VII-VI-V tonic 0 beats 4: 0:0 0:3 0:7
+3 andalusian i-VII-VI-V tonic 0 beats 7: 0:0 0:3 0:7 4:10 4:14 4:17
+3 andalusian i-VII-VI-V tonic 0 beats 8: 0:0 0:3 0:7 4:10 4:14 4:17
+3 andalusian i-VII-VI-V tonic 0 beats 16: 0:0 0:3 0:7 4:10 4:14 4:17 8:8 8:12 8:15 12:7 12:11 12:14
+3 andalusian i-VII-VI-V tonic -5 beats 0:
+3 andalusian i-VII-VI-V tonic -5 beats 1: 0:-5 0:-2 0:2
+3 andalusian i-VII-VI-V tonic -5 beats 3: 0:-5 0:-2 0:2
+3 andalusian i-VII-VI-V tonic -5 beats 4: 0:-5 0:-2 0:2
+3 andalusian i-VII-VI-V tonic -5 beats 7: 0:-5 0:-2 0:2 4:5 4:9 4:12
+3 andalusian i-VII-VI-V tonic -5 beats 8: 0:-5 0:-2 0:2 4:5 4:9 4:12
+3 andalusian i-VII-VI-V tonic -5 beats 16: 0:-5 0:-2 0:2 4:5 4:9 4:12 8:3 8:7 8:10 12:2 12:6 12:9
+3 andalusian i-VII-VI-V tonic 7 beats 0:
+3 andalusian i-VII-VI-V tonic 7 beats 1: 0:7 0:10 0:14
+3 andalusian i-VII-VI-V tonic 7 beats 3: 0:7 0:10 0:14
+3 andalusian i-VII-VI-V tonic 7 beats 4: 0:7 0:10 0:14
+3 andalusian i-VII-VI-V tonic 7 beats 7: 0:7 0:10 0:14 4:17 4:21 4:24
+3 andalusian i-VII-VI-V tonic 7 beats 8: 0:7 0:10 0:14 4:17 4:21 4:24
+3 andalusian i-VII-VI-V tonic 7 beats 16: 0:7 0:10 0:14 4:17 4:21 4:24 8:15 8:19 8:22 12:14 12:18 12:21
+4 canon I-V-vi-iii tonic 0 beats 0:
+4 canon I-V-vi-iii tonic 0 beats 1: 0:0 0:4 0:7
+4 canon I-V-vi-iii tonic 0 beats 3: 0:0 0:4 0:7
+4 canon I-V-vi-iii tonic 0 beats 4: 0:0 0:4 0:7
+4 canon I-V-vi-iii tonic 0 beats 7: 0:0 0:4 0:7 4:7 4:11 4:14
+4 canon I-V-vi-iii tonic 0 beats 8: 0:0 0:4 0:7 4:7 4:11 4:14
+4 canon I-V-vi-iii tonic 0 beats 16: 0:0 0:4 0:7 4:7 4:11 4:14 8:9 8:12 8:16 12:4 12:7 12:11
+4 canon I-V-vi-iii tonic -5 beats 0:
+4 canon I-V-vi-iii tonic -5 beats 1: 0:-5 0:-1 0:2
+4 canon I-V-vi-iii tonic -5 beats 3: 0:-5 0:-1 0:2
+4 canon I-V-vi-iii tonic -5 beats 4: 0:-5 0:-1 0:2
+4 canon I-V-vi-iii tonic -5 beats 7: 0:-5 0:-1 0:2 4:2 4:6 4:9
+4 canon I-V-vi-iii tonic -5 beats 8: 0:-5 0:-1 0:2 4:2 4:6 4:9
+4 canon I-V-vi-iii tonic -5 beats 16: 0:-5 0:-1 0:2 4:2 4:6 4:9 8:4 8:7 8:11 12:-1 12:2 12:6
+4 canon I-V-vi-iii tonic 7 beats 0:
+4 canon I-V-vi-iii tonic 7 beats 1: 0:7 0:11 0:14
+4 canon I-V-vi-iii tonic 7 beats 3: 0:7 0:11 0:14
+4 canon I-V-vi-iii tonic 7 beats 4: 0:7 0:11 0:14
+4 canon I-V-vi-iii tonic 7 beats 7: 0:7 0:11 0:14 4:14 4:18 4:21
+4 canon I-V-vi-iii tonic 7 beats 8: 0:7 0:11 0:14 4:14 4:18 4:21
+4 canon I-V-vi-iii tonic 7 beats 16: 0:7 0:11 0:14 4:14 4:18 4:21 8:16 8:19 8:23 12:11 12:14 12:18
+5 ii-V-I ii-V-I tonic 0 beats 0:
+5 ii-V-I ii-V-I tonic 0 beats 1: 0:2 0:5 0:9
+5 ii-V-I ii-V-I tonic 0 beats 3: 0:2 0:5 0:9
+5 ii-V-I ii-V-I tonic 0 beats 4: 0:2 0:5 0:9
+5 ii-V-I ii-V-I tonic 0 beats 7: 0:2 0:5 0:9 4:7 4:11 4:14
+5 ii-V-I ii-V-I tonic 0 beats 8: 0:2 0:5 0:9 4:7 4:11 4:14
+5 ii-V-I ii-V-I tonic 0 beats 16: 0:2 0:5 0:9 4:7 4:11 4:14 8:0 8:4 8:7 12:2 12:5 12:9
+5 ii-V-I ii-V-I tonic -5 beats 0:
+5 ii-V-I ii-V-I tonic -5 beats 1: 0:-3 0:0 0:4
+5 ii-V-I ii-V-I tonic -5 beats 3: 0:-3 0:0 0:4
+5 ii-V-I ii-V-I tonic -5 beats 4: 0:-3 0:0 0:4
+5 ii-V-I ii-V-I tonic -5 beats 7: 0:-3 0:0 0:4 4:2 4:6 4:9
+5 ii-V-I ii-V-I tonic -5 beats 8: 0:-3 0:0 0:4 4:2 4:6 4:9
+5 ii-V-I ii-V-I tonic -5 beats 16: 0:-3 0:0 0:4 4:2 4:6 4:9 8:-5 8:-1 8:2 12:-3 12:0 12:4
+5 ii-V-I ii-V-I tonic 7 beats 0:
+5 ii-V-I ii-V-I tonic 7 beats 1: 0:9 0:12 0:16
+5 ii-V-I ii-V-I tonic 7 beats 3: 0:9 0:12 0:16
+5 ii-V-I ii-V-I tonic 7 beats 4: 0:9 0:12 0:16
+5 ii-V-I ii-V-I tonic 7 beats 7: 0:9 0:12 0:16 4:14 4:18 4:21
+5 ii-V-I ii-V-I tonic 7 beats 8: 0:9 0:12 0:16 4:14 4:18 4:21
+5 ii-V-I ii-V-I tonic 7 beats 16: 0:9 0:12 0:16 4:14 4:18 4:21 8:7 8:11 8:14 12:9 12:12 12:16
+6 pop I-V-vi-IV tonic 0 beats 0:
+6 pop I-V-vi-IV tonic 0 beats 1: 0:0 0:4 0:7
+6 pop I-V-vi-IV tonic 0 beats 3: 0:0 0:4 0:7
+6 pop I-V-vi-IV tonic 0 beats 4: 0:0 0:4 0:7
+6 pop I-V-vi-IV tonic 0 beats 7: 0:0 0:4 0:7 4:7 4:11 4:14
+6 pop I-V-vi-IV tonic 0 beats 8: 0:0 0:4 0:7 4:7 4:11 4:14
+6 pop I-V-vi-IV tonic 0 beats 16: 0:0 0:4 0:7 4:7 4:11 4:14 8:9 8:12 8:16 12:5 12:9 12:12
+6 pop I-V-vi-IV tonic -5 beats 0:
+6 pop I-V-vi-IV tonic -5 beats 1: 0:-5 0:-1 0:2
+6 pop I-V-vi-IV tonic -5 beats 3: 0:-5 0:-1 0:2
+6 pop I-V-vi-IV tonic -5 beats 4: 0:-5 0:-1 0:2
+6 pop I-V-vi-IV tonic -5 beats 7: 0:-5 0:-1 0:2 4:2 4:6 4:9
+6 pop I-V-vi-IV tonic -5 beats 8: 0:-5 0:-1 0:2 4:2 4:6 4:9
+6 pop I-V-vi-IV tonic -5 beats 16: 0:-5 0:-1 0:2 4:2 4:6 4:9 8:4 8:7 8:11 12:0 12:4 12:7
+6 pop I-V-vi-IV tonic 7 beats 0:
+6 pop I-V-vi-IV tonic 7 beats 1: 0:7 0:11 0:14
+6 pop I-V-vi-IV tonic 7 beats 3: 0:7 0:11 0:14
+6 pop I-V-vi-IV tonic 7 beats 4: 0:7 0:11 0:14
+6 pop I-V-vi-IV tonic 7 beats 7: 0:7 0:11 0:14 4:14 4:18 4:21
+6 pop I-V-vi-IV tonic 7 beats 8: 0:7 0:11 0:14 4:14 4:18 4:21
+6 pop I-V-vi-IV tonic 7 beats 16: 0:7 0:11 0:14 4:14 4:18 4:21 8:16 8:19 8:23 12:12 12:16 12:19
+7 doo-wop I-vi-IV-V tonic 0 beats 0:
+7 doo-wop I-vi-IV-V tonic 0 beats 1: 0:0 0:4 0:7
+7 doo-wop I-vi-IV-V tonic 0 beats 3: 0:0 0:4 0:7
+7 doo-wop I-vi-IV-V tonic 0 beats 4: 0:0 0:4 0:7
+7 doo-wop I-vi-IV-V tonic 0 beats 7: 0:0 0:4 0:7 4:9 4:12 4:16
+7 doo-wop I-vi-IV-V tonic 0 beats 8: 0:0 0:4 0:7 4:9 4:12 4:16
+7 doo-wop I-vi-IV-V tonic 0 beats 16: 0:0 0:4 0:7 4:9 4:12 4:16 8:5 8:9 8:12 12:7 12:11 12:14
+7 doo-wop I-vi-IV-V tonic -5 beats 0:
+7 doo-wop I-vi-IV-V tonic -5 beats 1: 0:-5 0:-1 0:2
+7 doo-wop I-vi-IV-V tonic -5 beats 3: 0:-5 0:-1 0:2
+7 doo-wop I-vi-IV-V tonic -5 beats 4: 0:-5 0:-1 0:2
+7 doo-wop I-vi-IV-V tonic -5 beats 7: 0:-5 0:-1 0:2 4:4 4:7 4:11
+7 doo-wop I-vi-IV-V tonic -5 beats 8: 0:-5 0:-1 0:2 4:4 4:7 4:11
+7 doo-wop I-vi-IV-V tonic -5 beats 16: 0:-5 0:-1 0:2 4:4 4:7 4:11 8:0 8:4 8:7 12:2 12:6 12:9
+7 doo-wop I-vi-IV-V tonic 7 beats 0:
+7 doo-wop I-vi-IV-V tonic 7 beats 1: 0:7 0:11 0:14
+7 doo-wop I-vi-IV-V tonic 7 beats 3: 0:7 0:11 0:14
+7 doo-wop I-vi-IV-V tonic 7 beats 4: 0:7 0:11 0:14
+7 doo-wop I-vi-IV-V tonic 7 beats 7: 0:7 0:11 0:14 4:16 4:19 4:23
+7 doo-wop I-vi-IV-V tonic 7 beats 8: 0:7 0:11 0:14 4:16 4:19 4:23
+7 doo-wop I-vi-IV-V tonic 7 beats 16: 0:7 0:11 0:14 4:16 4:19 4:23 8:12 8:16 8:19 12:14 12:18 12:21

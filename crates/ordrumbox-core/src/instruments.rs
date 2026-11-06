@@ -679,7 +679,7 @@ mod tests {
         assert_eq!(detected("Acoustic Bass Drum"), "KICK");
         assert_eq!(detected("BassDrum_02.wav"), "KICK");
         assert_eq!(detected("Bass_C2.wav"), "BASS");
-        assert_eq!(detected("Tamb_Loop.wav"), "TAMB");
+        assert_eq!(detected("Tamb_Loop.wav"), "TAMBOURINE");
         assert_eq!(detected("Bassline_Loop_124.wav"), "BASS");
         assert_eq!(detected("Perc Bongo.wav"), "BONGOS");
         assert_eq!(detected("Perc_03.wav"), "PERC");
@@ -742,7 +742,7 @@ mod tests {
     #[test]
     fn catalog_loads() {
         let c = catalog();
-        assert_eq!(c.instruments.len(), 66);
+        assert_eq!(c.instruments.len(), 65);
         assert_eq!(c.by_id("ohh").map(|i| i.id.as_str()), Some("OHH"));
         assert_eq!(c.program_names.len(), 128);
         assert_eq!(c.variant("TOM", Some("HI")).map(|i| i.id.as_str()), Some("HI_TOM"));

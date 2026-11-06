@@ -222,6 +222,48 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn pcm_16_header_and_samples() {
+        let bytes = encode(&[0.0, 1.0, -1.0], &[0.5, -0.5, 2.0], 44_100);
+        #[rustfmt::skip]
+        let header: [u8; 44] = [
+            b'R', b'I', b'F', b'F', 48, 0, 0, 0, b'W', b'A', b'V', b'E',
+            b'f', b'm', b't', b' ', 16, 0, 0, 0,
+            1, 0, // PCM
+            2, 0, // stereo
+            0x44, 0xAC, 0, 0, // 44100 Hz
+            0x10, 0xB1, 0x02, 0, // 176400 bytes a second
+            4, 0, // block
+            16, 0, // bits
+            b'd', b'a', b't', b'a', 12, 0, 0, 0,
+        ];
+        assert_eq!(bytes[..44], header);
+        let samples: Vec<i16> = bytes[44..].chunks(2).map(|b| i16::from_le_bytes([b[0], b[1]])).collect();
+        // Interleaved left, right; truncated toward zero, 2.0 clamped.
+        assert_eq!(samples, [0, 16_383, 32_767, -16_384, -32_768, 32_767]);
+        assert_eq!(encode(&[0.1, 0.2], &[0.3], 8_000).len(), 44 + 4, "the shorter channel sets the length");
+    }
+
+    #[test]
+    fn pcm_16_round_trip() {
+        let left: Vec<f32> = (0..40).map(|i| (i as f32 * 0.7).sin() * 1.3).collect();
+        let right: Vec<f32> = (0..40).map(|i| (i % 7) as f32 / 3.5 - 1.0).collect();
+        let decoded = decode(&encode(&left, &right, 48_000)).unwrap();
+        let quantized = |channel: &[f32]| -> Vec<f32> {
+            let level = |s: f32| {
+                let s = s.clamp(-1.0, 1.0);
+                if s < 0.0 { (s * 32_768.0).trunc() } else { (s * 32_767.0).trunc() }
+            };
+            channel.iter().map(|&s| level(s) / 32_768.0).collect()
+        };
+        assert_eq!(decoded.sample_rate, 48_000);
+        assert_eq!(decoded.left, quantized(&left));
+        assert_eq!(decoded.right, Some(quantized(&right)));
+        for (got, sent) in decoded.left.iter().zip(&left) {
+            assert!((got - sent.clamp(-1.0, 1.0)).abs() <= 2.0 / 32_768.0);
+        }
+    }
+
+    #[test]
     fn float_files_round_trip() {
         let mono = SampleBuffer::mono(vec![0.5, -0.25, 1.5e-7], 22_050);
         assert_eq!(decode(&encode_float(&mono)).unwrap(), mono);

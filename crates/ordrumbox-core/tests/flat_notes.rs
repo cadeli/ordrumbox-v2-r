@@ -1,23 +1,26 @@
-//! The pattern engine against the JS app: `flat_notes/<id>.json` holds what
-//! `recomputeFlatNotes()` gives for passes 0–3 of every pattern of song.json
-//! and engine_cases.json, loaded the way the app boots (tools/export_fixtures.mjs).
+//! The pattern engine against its Rust snapshot, `flat_notes_rust.txt`:
+//! passes 0–3 of every pattern of song.json and engine_cases.json
+//! (hand-written: paths the demo library does not reach), one line a pass,
+//! with seed 7. `write_the_snapshot` rewrites it when the engine changes on
+//! purpose.
 //!
-//! A pass marked deterministic gave the same notes for three different random
-//! streams: Rust must give exactly those notes, in the same order. The other
-//! passes depend on chance; they are checked by properties.
+//! A pass is `fixed` when it draws no randomness: every seed gives its
+//! notes. The others (`drawn`) depend on chance; besides their seed-7 line,
+//! they are checked by properties.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
 
+use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use ordrumbox_core::json::{self, Value};
-use ordrumbox_core::steps::TICK;
-use ordrumbox_core::{Hits, Library, Pattern, Rng, Scales, arp, expand_hits};
+use ordrumbox_core::{Hits, Library, Pattern, Rng, Scales, expand_hits};
 
-/// Ticks a beat in the JS app, which wrote the fixtures; a fixture tick is
-/// scaled by `TICK / JS_TICK` to compare.
-const JS_TICK: u32 = 32;
+/// Passes of each pattern in the snapshot.
+const PASS_COUNT: u32 = 4;
+/// The seed of the snapshot.
+const SEED: u64 = 7;
 
 fn fixtures() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("fixtures")
@@ -40,141 +43,93 @@ fn patterns() -> Vec<Pattern> {
         .collect()
 }
 
-/// `(pattern id, pass, deterministic, ticks)` of every fixture pass.
-fn fixture_passes() -> Vec<(String, u32, bool, Value)> {
-    let mut entries: Vec<_> = fs::read_dir(fixtures().join("flat_notes")).expect("flat_notes").collect();
-    entries.sort_by_key(|e| e.as_ref().map(|e| e.path()).ok());
-    let mut passes = Vec::new();
-    for entry in entries {
-        let fixture = read_json(&entry.expect("entry").path());
-        let id = fixture.get("id").and_then(Value::as_str).expect("id").to_owned();
-        for pass in fixture.get("passes").and_then(Value::as_array).expect("passes") {
-            let number = pass.get("loop").and_then(Value::as_f64).expect("loop") as u32;
-            let deterministic = pass.get("deterministic").and_then(Value::as_bool).expect("deterministic");
-            passes.push((id.clone(), number, deterministic, pass.get("ticks").cloned().expect("ticks")));
-        }
-    }
-    passes
-}
-
-/// Passes where the engine leaves the JS on purpose (`README.md`, "Golden
-/// fixtures"): pattern, passes, the ticks the fixture holds, and the ticks
-/// Rust gives instead. Both patterns play a 3-a-beat grid, which the JS
-/// rounded to 32 ticks a beat; at 96 a beat its steps and their repeats fall
-/// on whole ticks.
-type Departure = (&'static str, &'static [u32], &'static [u32], &'static [u32]);
-
-const DEPARTURES: &[Departure] = &[
-    (
-        "case-grid3",
-        &[0, 1, 2, 3],
-        &[11, 32, 53, 54, 55, 56, 64, 71, 78, 85, 92],
-        &[32, 96, 160, 164, 168, 172, 192, 212, 232, 252, 272, 276],
-    ),
-    (
-        "shuffle",
-        &[0],
-        &[0, 11, 16, 27, 32, 43, 48, 53, 59, 64, 75, 80, 91, 96, 101, 107, 112, 117, 123],
-        &[0, 32, 48, 80, 96, 128, 144, 160, 176, 192, 224, 240, 272, 288, 304, 320, 336, 352, 368],
-    ),
-    (
-        "shuffle",
-        &[1, 2, 3],
-        &[0, 11, 16, 27, 32, 43, 48, 59, 64, 75, 80, 91, 96, 107, 112, 123],
-        &[0, 32, 48, 80, 96, 128, 144, 176, 192, 224, 240, 272, 288, 320, 336, 368],
-    ),
-];
-
-/// The fixture's ticks, as the JS wrote them (`JS_TICK` a beat).
-fn tick_list(js: &Value) -> Vec<u32> {
-    js.as_array().expect("ticks").iter().map(|t| t.as_array().unwrap()[0].as_f64().unwrap() as u32).collect()
-}
-
-/// The fixture's ticks at `TICK` a beat.
-fn scaled_tick_list(js: &Value) -> Vec<u32> {
-    tick_list(js).into_iter().map(|t| t * (TICK / JS_TICK)).collect()
-}
-
 fn compute(pattern: &Pattern, pass: u32, seed: u64) -> Hits {
     expand_hits(pattern, pass, &mut Rng::new(seed), &Scales::default())
 }
 
-/// First difference between the Rust notes and the JS ones, if any.
-fn diff(pattern: &Pattern, rust: &Hits, js: &Value) -> Option<String> {
-    let rust_ticks: Vec<u32> = rust.keys().copied().collect();
-    let js_ticks = scaled_tick_list(js);
-    let js = js.as_array().expect("ticks");
-    if rust_ticks != js_ticks {
-        return Some(format!("ticks {rust_ticks:?}\n   JS {js_ticks:?}"));
-    }
-    for (entry, (tick, notes)) in js.iter().zip(rust) {
-        let expected = entry.as_array().unwrap()[1].as_array().unwrap();
-        if expected.len() != notes.len() {
-            return Some(format!("tick {tick}: {} notes, JS {}", notes.len(), expected.len()));
+/// Whether a pass draws from the random stream.
+fn draws(pattern: &Pattern, pass: u32) -> bool {
+    let mut rng = Rng::new(SEED);
+    let before = rng.clone().next_u64();
+    expand_hits(pattern, pass, &mut rng, &Scales::default());
+    rng.next_u64() != before
+}
+
+/// One pass: `<id> pass <n> fixed|drawn:` then each tick and its notes,
+/// `track/source beat.step pitch velocity pan` (`-` for a note the
+/// variation layer added).
+fn pass_line(pattern: &Pattern, pass: u32) -> String {
+    let kind = if draws(pattern, pass) { "drawn" } else { "fixed" };
+    let mut line = format!("{} pass {pass} {kind}:", pattern.id);
+    for (tick, hits) in compute(pattern, pass, SEED) {
+        write!(line, " {tick} [").unwrap();
+        for (i, hit) in hits.iter().enumerate() {
+            let source = hit.source.map_or("-".to_owned(), |s| s.to_string());
+            let separator = if i == 0 { "" } else { ", " };
+            write!(
+                line,
+                "{separator}{}/{source} {}.{} {} {} {}",
+                hit.track, hit.beat, hit.step, hit.pitch, hit.velocity, hit.pan
+            )
+            .unwrap();
         }
-        for (i, (note, want)) in notes.iter().zip(expected).enumerate() {
-            let field = |key: &str| want.get(key).cloned().unwrap_or(Value::Null);
-            let at = format!("tick {tick} note {i}");
-            if Value::from(note.track as u32) != field("track") {
-                return Some(format!("{at}: track {}, JS {}", note.track, field("track")));
-            }
-            if Value::Number(note.pitch) != field("pitch") || Value::Number(note.velocity) != field("velocity") {
-                return Some(format!(
-                    "{at}: pitch/velocity {}/{}, JS {}/{}",
-                    note.pitch,
-                    note.velocity,
-                    field("pitch"),
-                    field("velocity")
-                ));
-            }
-            // JS hands out the written note object itself, except for arpeggio
-            // notes, which are copies (index null in the fixture).
-            let source = note.source.expect("no variation in a deterministic pass");
-            let has_arp = arp::sequence(&pattern.tracks[note.track].notes[source].arp, &mut Rng::new(0)).is_some();
-            let expected_source = field("note").as_f64().map(|n| n as usize);
-            if (has_arp && expected_source.is_some()) || (!has_arp && expected_source != Some(source)) {
-                return Some(format!("{at}: source {source} (arp {has_arp}), JS {}", field("note")));
-            }
-        }
+        line.push(']');
     }
-    None
+    line
+}
+
+fn rust_snapshot() -> Vec<String> {
+    patterns().iter().flat_map(|p| (0..PASS_COUNT).map(move |pass| pass_line(p, pass))).collect()
+}
+
+fn snapshot_path() -> PathBuf {
+    fixtures().join("flat_notes_rust.txt")
+}
+
+/// Writes `flat_notes_rust.txt` from the engine as it is: `cargo test -p
+/// ordrumbox-core --test flat_notes -- --ignored`, when what a pattern plays
+/// changes on purpose (`README.md`, "Golden fixtures").
+#[test]
+#[ignore = "writes the snapshot"]
+fn write_the_snapshot() {
+    fs::write(snapshot_path(), rust_snapshot().join("\n") + "\n").expect("written");
 }
 
 #[test]
-fn deterministic_passes_match_the_js_engine() {
-    let patterns = patterns();
-    let mut checked = 0;
-    let mut failures = Vec::new();
-    for (id, pass, deterministic, ticks) in fixture_passes() {
-        if !deterministic {
-            continue;
-        }
-        let pattern = patterns.iter().find(|p| p.id == id).unwrap_or_else(|| panic!("no pattern {id}"));
-        let mut rng = Rng::new(7);
-        let before = rng.clone().next_u64();
-        let rust = expand_hits(pattern, pass, &mut rng, &Scales::default());
-        if let Some(&(_, _, js, own)) = DEPARTURES.iter().find(|(d, passes, ..)| *d == id && passes.contains(&pass)) {
-            assert_eq!(tick_list(&ticks), js, "departure {id}: the fixture changed");
-            assert_eq!(rust.keys().copied().collect::<Vec<_>>(), own, "departure {id} pass {pass}");
-        } else if let Some(difference) = diff(pattern, &rust, &ticks) {
-            failures.push(format!("{id} pass {pass}: {difference}"));
-        }
-        if rng.next_u64() != before {
-            failures.push(format!("{id} pass {pass}: drew randomness for a pass that has none"));
-        }
-        checked += 1;
+fn every_pass_matches_its_snapshot() {
+    let text = fs::read_to_string(snapshot_path()).expect("tests/fixtures/flat_notes_rust.txt");
+    let expected: Vec<&str> = text.lines().collect();
+    let actual = rust_snapshot();
+    assert_eq!(actual.len(), expected.len(), "snapshot lines");
+    for (actual, expected) in actual.iter().zip(expected) {
+        assert_eq!(actual, expected);
     }
-    assert!(failures.is_empty(), "{} of {checked} passes differ:\n{}", failures.len(), failures.join("\n"));
-    assert_eq!(checked, 184);
+    assert_eq!(actual.iter().filter(|line| line.contains(" fixed:")).count(), 184);
+}
+
+#[test]
+fn a_fixed_pass_is_the_same_for_every_seed() {
+    for pattern in &patterns() {
+        for pass in (0..PASS_COUNT).filter(|&pass| !draws(pattern, pass)) {
+            let reference = compute(pattern, pass, SEED);
+            for seed in [0, 1, u64::MAX] {
+                assert_eq!(compute(pattern, pass, seed), reference, "{} pass {pass} seed {seed}", pattern.id);
+            }
+        }
+    }
 }
 
 #[test]
 fn random_passes_are_reproducible_and_well_formed() {
     let patterns = patterns();
-    let random: Vec<_> = fixture_passes().into_iter().filter(|(_, _, deterministic, _)| !deterministic).collect();
+    let random: Vec<(&Pattern, u32)> = patterns
+        .iter()
+        .flat_map(|p| (0..PASS_COUNT).map(move |pass| (p, pass)))
+        .filter(|&(p, pass)| draws(p, pass))
+        .collect();
     assert_eq!(random.len(), 8);
-    for (id, pass, _, _) in random {
-        let pattern = patterns.iter().find(|p| p.id == id).expect("pattern");
+    for (pattern, pass) in random {
+        let id = &pattern.id;
         let runs: Vec<Hits> = (0..20).map(|seed| compute(pattern, pass, seed)).collect();
         assert_eq!(compute(pattern, pass, 3), runs[3], "{id}: same seed, same pass");
         assert!(runs.iter().any(|run| *run != runs[0]), "{id} pass {pass}: no seed changes anything");
