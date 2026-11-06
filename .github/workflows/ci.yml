@@ -7,6 +7,8 @@ on:
     # app's update check (Help > Check for updates) reads.
     tags: ["v*"]
   pull_request:
+  # Run by hand (Actions > CI > Run workflow) to get a Windows build of any branch.
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -31,10 +33,12 @@ jobs:
       - run: cargo test --workspace
 
   # The plugin bundles (CLAP and VST3, `assets/` inside), checked by the
-  # CLAP project's validator.
+  # CLAP project's validator. Built for a release tag only, or when the
+  # workflow is run by hand.
   plugin:
     name: plugin (${{ matrix.os }})
     needs: check
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -61,9 +65,11 @@ jobs:
           name: ordrumbox-plugin-${{ runner.os }}
           path: target/bundled
 
+  # Built for a release tag only, or when the workflow is run by hand.
   windows-exe:
     name: ordrumbox.exe
     needs: check
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7

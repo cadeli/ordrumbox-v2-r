@@ -561,9 +561,10 @@ cargo run --release -p ordrumbox-engine --example render -- assets rock 2 rock.w
 cargo run --release -p ordrumbox-engine --example render -- assets song:demo demo.wav
 ```
 
-Windows `.exe`: every push to `main` builds it in CI (artifact
-`ordrumbox-windows-x64`, the program with its `assets` folder next to it);
-a local build needs the `assets` folder copied next to it.
+Windows `.exe`: CI builds it for a release tag only, or when the workflow is
+run by hand (Actions > CI > Run workflow, on any branch): artifact
+`ordrumbox-windows-x64`, the program with its `assets` folder next to it.
+A local build needs the `assets` folder copied next to it.
 
 A release: set `version` in the root `Cargo.toml` (`0.2.0`), commit, then
 `git tag v0.2.0 && git push origin v0.2.0`. CI checks that the tag is the
@@ -600,8 +601,9 @@ Each bundle holds `assets/` in `Contents/Resources/`; on Windows, the
   `C:\Program Files\Common Files\VST3\`.
 
 The plugin looks for its assets in `$ORDRUMBOX_ASSETS`, in its bundle, next
-to its binary, then in this repository. CI builds both bundles on Windows and
-macOS (artifact `ordrumbox-plugin-<os>`) and runs `clap-validator` on the CLAP.
+to its binary, then in this repository. For a release tag, or when the
+workflow is run by hand, CI builds both bundles on Windows and macOS (artifact
+`ordrumbox-plugin-<os>`) and runs `clap-validator` on the CLAP.
 
 The plugin's window is the app's UI (`ordrumbox-ui`). It edits the project's
 library; kits, synth presets and settings are the user's files, shared with
