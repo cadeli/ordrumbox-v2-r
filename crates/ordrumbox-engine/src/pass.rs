@@ -13,6 +13,7 @@ use ordrumbox_dsp::{StripSettings, SynthPatch, VoiceStart};
 
 use crate::assign::TrackSound;
 use crate::kit::SampleBank;
+use crate::midi::{KeyMap, track_keys};
 use crate::strip_settings::{StripLfo, strip_lfo, strip_settings};
 use crate::synth_preset::{SynthNote, SynthPresets, note_seconds, synth_patch};
 
@@ -49,6 +50,8 @@ pub struct Event {
     pub sound: Sound,
     /// The track plays one note at a time: starting this one releases the others.
     pub mono: bool,
+    /// The note's velocity (0–1), for the MIDI note sent with it.
+    pub velocity: f32,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -69,6 +72,10 @@ pub struct Pass {
     pub lfos: Vec<StripLfo>,
     /// Synth patches the events refer to.
     pub patches: Vec<SynthPatch>,
+    /// The MIDI key of each strip's notes ([`crate::midi`]).
+    pub keys: Vec<Option<u8>>,
+    /// How long a MIDI note sent lasts, in frames: a 16th.
+    pub note_frames: u64,
 }
 
 impl Pass {
@@ -100,6 +107,18 @@ pub fn frames_per_tick(bpm: f64, sample_rate: f64) -> f64 {
     sample_rate * 60.0 / (bpm * f64::from(TICK))
 }
 
+/// Frames a MIDI note sent lasts at `per_tick` frames per tick: a 16th, at least one frame.
+fn note_frames(per_tick: f64) -> u64 {
+    (f64::from(TICK / 4) * per_tick).round().max(1.0) as u64
+}
+
+/// Whether track `t` of `pattern` is silent: muted, or silenced by another
+/// track's solo (`shouldTrackPlay()`).
+fn is_silent(pattern: &Pattern, t: usize) -> bool {
+    let tracks = &pattern.tracks;
+    if tracks.iter().any(|t| t.solo) { !tracks[t].solo } else { tracks[t].mute }
+}
+
 /// Ticks in one song pass: a measure of four beats.
 pub const SONG_PASS_TICKS: u32 = TICK * 4;
 
@@ -117,11 +136,7 @@ pub fn build_pass(pattern: &Pattern, number: u64, rng: &mut Rng, context: PassCo
     let frames = (f64::from(ticks) * per_tick).round().max(1.0) as u64;
     let pass_index = u32::try_from(number).unwrap_or(u32::MAX);
     let flat = expand_hits(pattern, pass_index, rng, context.scales);
-    let any_solo = pattern.tracks.iter().any(|t| t.solo);
-    let silent = |i: usize| {
-        let t = &pattern.tracks[i];
-        if any_solo { !t.solo } else { t.mute }
-    };
+    let silent = |i: usize| is_silent(pattern, i);
 
     let mut events = Vec::new();
     let mut patches = Vec::new();
@@ -138,7 +153,7 @@ pub fn build_pass(pattern: &Pattern, number: u64, rng: &mut Rng, context: PassCo
             let Some(assigned) = context.sounds.get(note.track) else { continue };
             let voice = Voice { strip: note.track, lfo_tick, bpm };
             if let Some(sound) = sound_for(pattern, note, assigned, voice, &context, &mut patches) {
-                events.push(Event { frame, sound, mono: track.mono });
+                events.push(Event { frame, sound, mono: track.mono, velocity: note.velocity as f32 });
             }
         }
     }
@@ -162,7 +177,18 @@ pub fn build_pass(pattern: &Pattern, number: u64, rng: &mut Rng, context: PassCo
         .enumerate()
         .filter_map(|(i, t)| strip_lfo(i, t, silent(i), context.first_tick, ticks))
         .collect();
-    Pass { number, first_tick: context.first_tick, frames, ticks, events, strips, lfos, patches }
+    Pass {
+        number,
+        first_tick: context.first_tick,
+        frames,
+        ticks,
+        events,
+        strips,
+        lfos,
+        patches,
+        keys: track_keys(pattern.tracks.iter().map(|t| t.name.as_str())),
+        note_frames: note_frames(per_tick),
+    }
 }
 
 /// Where and how a voice plays.
@@ -243,11 +269,38 @@ pub fn build_preview(pattern: &Pattern, t: usize, note: Option<&Note>, context: 
         .sounds
         .get(t)
         .and_then(|assigned| sound_for(pattern, &flat, assigned, voice, &context, &mut patches))
-        .map(|sound| Event { frame: 0, sound, mono: track.mono })
+        .map(|sound| Event { frame: 0, sound, mono: track.mono, velocity: 1.0 })
         .into_iter()
         .collect();
     let strips = pattern.tracks.iter().map(|t| strip_settings(t, bpm)).collect();
     Pass { frames: 1, ticks: 1, events, strips, patches, ..Pass::default() }
+}
+
+/// What each MIDI key plays live in `pattern` at tempo `bpm`: every track
+/// at full velocity and its own pan, through the pattern's strips (silent
+/// where the track is).
+pub fn build_keymap(pattern: &Pattern, context: PassContext<'_>, bpm: f64) -> KeyMap {
+    let mut patches = Vec::new();
+    let mut events = Vec::new();
+    for (t, track) in pattern.tracks.iter().enumerate() {
+        let hit = Hit { track: t, source: None, beat: 0, step: 0, pitch: 0.0, velocity: 1.0, pan: track.pan };
+        let voice = Voice { strip: t, lfo_tick: context.first_tick, bpm };
+        let sound = context.sounds.get(t).and_then(|a| sound_for(pattern, &hit, a, voice, &context, &mut patches));
+        if let Some(sound) = sound {
+            events.push(Event { frame: 0, sound, mono: track.mono, velocity: 1.0 });
+        }
+    }
+    let strips = (0..pattern.tracks.len())
+        .map(|t| {
+            let mut settings = strip_settings(&pattern.tracks[t], bpm);
+            if is_silent(pattern, t) {
+                settings.volume = 0.0;
+            }
+            settings
+        })
+        .collect();
+    let keys = track_keys(pattern.tracks.iter().map(|t| t.name.as_str()));
+    KeyMap::new(Pass { frames: 1, ticks: 1, events, strips, patches, keys: keys.clone(), ..Pass::default() }, &keys)
 }
 
 /// Hits of a pattern repetition, kept between song passes so a
@@ -318,10 +371,7 @@ pub fn build_song_pass_at(
         let name = &context.patterns[p].tracks[t].name;
         strips.iter().position(|&(sp, st)| context.patterns[sp].tracks[st].name == *name)
     };
-    let silent = |p: usize, t: usize| {
-        let tracks = &context.patterns[p].tracks;
-        if tracks.iter().any(|t| t.solo) { !tracks[t].solo } else { tracks[t].mute }
-    };
+    let silent = |p: usize, t: usize| is_silent(&context.patterns[p], t);
 
     let mut events = Vec::new();
     let mut patches = Vec::new();
@@ -353,7 +403,7 @@ pub fn build_song_pass_at(
                 let frame = (((f64::from(t) + swing_ticks) * per_tick).round() as u64).min(frames - 1);
                 let voice = Voice { strip, lfo_tick: tick, bpm };
                 if let Some(sound) = sound_for(pattern, note, assigned, voice, &pass_context, &mut patches) {
-                    events.push(Event { frame, sound, mono: track.mono });
+                    events.push(Event { frame, sound, mono: track.mono, velocity: note.velocity as f32 });
                 }
             }
         }
@@ -387,6 +437,8 @@ pub fn build_song_pass_at(
         strips: strips.iter().map(strip_settings_of).collect(),
         lfos,
         patches,
+        keys: track_keys(strips.iter().map(|&(p, t)| context.patterns[p].tracks[t].name.as_str())),
+        note_frames: note_frames(per_tick),
     }
 }
 

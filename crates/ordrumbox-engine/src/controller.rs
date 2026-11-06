@@ -21,9 +21,10 @@ use ordrumbox_dsp::MasterSettings;
 use crate::assign::{TrackSound, assign_track};
 use crate::engine::{Engine, HostTransport, MAX_TRACKS, Position, host_pass};
 use crate::kit::SampleBank;
+use crate::midi::{BlockNote, KeyMap};
 use crate::pass::{
-    HitsCache, Pass, PassContext, SONG_PASS_TICKS, SongContext, build_pass, build_preview, build_song_pass_at,
-    pattern_pass_ticks,
+    HitsCache, Pass, PassContext, SONG_PASS_TICKS, SongContext, build_keymap, build_pass, build_preview,
+    build_song_pass_at, pattern_pass_ticks,
 };
 use crate::synth_preset::SynthPresets;
 
@@ -42,6 +43,7 @@ struct Inbox {
     bank: Option<Arc<SampleBank>>,
     master: Option<MasterSettings>,
     preview: Option<Arc<Pass>>,
+    keymap: Option<Arc<KeyMap>>,
 }
 
 /// A host tempo change smaller than this is not one (passes are not rebuilt).
@@ -176,8 +178,8 @@ fn try_lock<T>(mutex: &Mutex<T>) -> Option<MutexGuard<'_, T>> {
 }
 
 /// Drop the references only `list` still holds; the newest is kept when
-/// `keep_last` (the next pass follows it).
-fn release(list: &mut VecDeque<Arc<Pass>>, keep_last: bool) {
+/// `keep_last` (the next pass follows it, the engine plays the last keymap).
+fn release<T>(list: &mut VecDeque<Arc<T>>, keep_last: bool) {
     let last = list.len().saturating_sub(1);
     let mut i = 0;
     list.retain(|pass| {
@@ -194,6 +196,10 @@ pub struct AudioSide {
     link: Arc<Link>,
     /// The scope ring, written every callback whatever the UI holds.
     scope: Scope,
+    /// The engine's clock at the start of the block being rendered (MIDI notes are timed from it).
+    block_start: u64,
+    /// Frames in that block.
+    block_frames: usize,
 }
 
 impl AudioSide {
@@ -208,6 +214,19 @@ impl AudioSide {
         self.engine.set_host_controls(gain, muted);
     }
 
+    /// Play MIDI key `key` at `velocity` (0–1), `offset` frames into the
+    /// next block: the track of the pattern that has the key
+    /// ([`crate::midi`]). Called before rendering the block.
+    pub fn trigger(&mut self, key: u8, velocity: f32, offset: u32) {
+        self.engine.trigger(key, velocity, offset);
+    }
+
+    /// The MIDI notes the block just rendered sent, in time order, on the
+    /// GM drum channel, each track on its key ([`crate::midi`]).
+    pub fn take_notes(&mut self, send: impl FnMut(BlockNote)) {
+        self.engine.take_notes(self.block_start, self.block_frames, send);
+    }
+
     /// Render one callback's worth of stereo frames.
     pub fn render(&mut self, left: &mut [f32], right: &mut [f32]) {
         self.take_inbox();
@@ -220,6 +239,7 @@ impl AudioSide {
     /// inside the pass it plays. When the host is in another pass, it says
     /// so, and the controller posts that pass ([`Controller::update`]).
     pub fn render_synced(&mut self, left: &mut [f32], right: &mut [f32], host: HostTransport) {
+        (self.block_start, self.block_frames) = (self.engine.clock(), left.len().min(right.len()));
         self.take_inbox();
         let lost = if host.rolling() {
             !self.engine.follow(host.beat)
@@ -253,6 +273,9 @@ impl AudioSide {
             }
             if let Some(preview) = inbox.preview.take() {
                 self.engine.preview(preview);
+            }
+            if let Some(keymap) = inbox.keymap.take() {
+                self.engine.set_keymap(keymap);
             }
         }
     }
@@ -314,6 +337,9 @@ pub struct Controller {
     pass_patterns: VecDeque<(u64, usize)>,
     /// Previews posted, oldest first, kept while the engine or the inbox may hold them.
     previews: VecDeque<Arc<Pass>>,
+    /// Keymaps posted, oldest first, kept while the engine or the inbox may
+    /// hold them (and the newest: the engine plays with it).
+    keymaps: VecDeque<Arc<KeyMap>>,
     playing: bool,
     /// The plugin host's tempo the passes are built at, once a host transport was seen.
     tempo: Option<f64>,
@@ -371,8 +397,13 @@ impl Controller {
             published: Published::default(),
         });
         let kit = bank.samples.first().map(|s| s.kit.clone()).unwrap_or_default();
-        let audio =
-            AudioSide { engine: Engine::new(sample_rate, bank.clone()), link: link.clone(), scope: Scope::default() };
+        let audio = AudioSide {
+            engine: Engine::new(sample_rate, bank.clone()),
+            link: link.clone(),
+            scope: Scope::default(),
+            block_start: 0,
+            block_frames: 0,
+        };
         let controller = Self {
             link,
             sample_rate: f64::from(sample_rate),
@@ -389,6 +420,7 @@ impl Controller {
             sent: VecDeque::new(),
             pass_patterns: VecDeque::new(),
             previews: VecDeque::new(),
+            keymaps: VecDeque::new(),
             playing: false,
             tempo: None,
         };
@@ -620,6 +652,31 @@ impl Controller {
         }
     }
 
+    /// Post what MIDI keys play now (the pattern playing, else the one
+    /// selected), when it is not what the engine has already: an edit, a
+    /// new kit or tempo, another pattern. Nothing in song mode.
+    fn post_keymap(&mut self, library: &Library) {
+        let Mode::Pattern(selected) = self.mode else { return };
+        let p = self.playing_pattern().unwrap_or(selected);
+        let Some(pattern) = library.patterns.get(p) else { return };
+        let sounds = self.sounds(library, p);
+        let context = PassContext {
+            bank: &self.bank,
+            sounds: &sounds,
+            scales: &self.scales,
+            synths: &self.synths,
+            sample_rate: self.sample_rate,
+            first_tick: 0,
+        };
+        let keymap = build_keymap(pattern, context, self.bpm_of(library, self.mode));
+        if self.keymaps.back().is_some_and(|posted| **posted == keymap) {
+            return;
+        }
+        let keymap = Arc::new(keymap);
+        self.keymaps.push_back(keymap.clone());
+        lock(&self.link.inbox).keymap = Some(keymap);
+    }
+
     /// Post `pass` to sound at once, kept here until the engine is done with it.
     fn post_preview(&mut self, pass: Pass) {
         let pass = Arc::new(pass);
@@ -646,7 +703,12 @@ impl Controller {
         self.post_preview(Pass {
             frames: 1,
             ticks: 1,
-            events: vec![crate::pass::Event { frame: 0, sound: crate::pass::Sound::Sample(voice), mono: false }],
+            events: vec![crate::pass::Event {
+                frame: 0,
+                sound: crate::pass::Sound::Sample(voice),
+                mono: false,
+                velocity: 1.0,
+            }],
             strips: vec![ordrumbox_dsp::StripSettings::default()],
             ..Pass::default()
         });
@@ -740,6 +802,7 @@ impl Controller {
         let snapshot = self.link.published.read();
         if let Some(host) = snapshot.host {
             self.follow_host(library, host, snapshot.lost);
+            self.post_keymap(library);
         }
         if let Some(number) = self.pending_pass().or_else(|| self.stale_next_pass())
             && let Some(pass) = self.build(library, number)
@@ -752,6 +815,7 @@ impl Controller {
             self.pass_patterns.retain(|(n, _)| *n >= oldest);
         }
         release(&mut self.previews, false);
+        release(&mut self.keymaps, true);
         self.old_banks.retain(|bank| Arc::strong_count(bank) > 1);
     }
 
@@ -838,6 +902,37 @@ mod tests {
         Arc::new(SampleBank {
             samples: vec![crate::kit::BankSample { kit: "x".into(), sample: instrument, buffer: buffer.into() }],
         })
+    }
+
+    #[test]
+    fn under_a_host_midi_keys_play_the_tracks_and_the_notes_go_out() {
+        let (library, _) = Library::parse(
+            r#"{"patterns":[{"name":"p","tracks":[{"name":"KICK","notes":[{"beat":1}]},{"name":"SNARE"}]}]}"#,
+        )
+        .unwrap();
+        let (mut controller, mut audio) = Controller::new(8000.0, bank(), Scales::default(), SynthPresets::default());
+        let (mut l, mut r) = (vec![0.0; 256], vec![0.0; 256]);
+        let stopped = HostTransport { playing: false, bpm: 120.0, beat: 0.0 };
+        audio.render_synced(&mut l, &mut r, stopped);
+        controller.update(&library);
+        assert_eq!(controller.keymaps.len(), 1, "a keymap once a host is seen");
+        controller.update(&library);
+        assert_eq!(controller.keymaps.len(), 1, "posted again only when it changes");
+
+        // Key 36 (Bass Drum 1) plays the KICK track, stopped or not.
+        audio.trigger(36, 1.0, 0);
+        audio.render_synced(&mut l, &mut r, stopped);
+        assert!(l.iter().any(|&s| s != 0.0));
+
+        // Playing: KICK's note on beat 1 (frame 4000 at 120 bpm) goes out on key 36.
+        let mut sent = Vec::new();
+        for block in 0..24_u32 {
+            let beat = f64::from(block * 256) / 4000.0;
+            controller.update(&library);
+            audio.render_synced(&mut l, &mut r, HostTransport { playing: true, bpm: 120.0, beat });
+            audio.take_notes(|n| sent.push((block * 256 + n.timing, n.key, n.velocity.is_some())));
+        }
+        assert_eq!(sent, [(4000, 36, true), (5000, 36, false)], "a 16th long");
     }
 
     #[test]

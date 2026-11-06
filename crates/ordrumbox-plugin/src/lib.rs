@@ -1,7 +1,11 @@
 //! orDrumbox as a CLAP (and, with the `vst3` feature, VST3) instrument: no
-//! input, a stereo output, playback that follows the host's transport (play
-//! and stop, position, tempo), the library saved in the host's project, and
-//! parameters a host automates (`params.rs`).
+//! audio input, a stereo output, playback that follows the host's transport
+//! (play and stop, position, tempo), the library saved in the host's
+//! project, and parameters a host automates (`params.rs`).
+//!
+//! MIDI: a note in plays the track of the pattern that has its key, at its
+//! velocity, on any channel; the notes the pattern plays go out on channel
+//! 10, each track on that same key (`ordrumbox_engine::midi`).
 //!
 //! Threads: the host's audio thread runs [`AudioSide::render_synced`]; the
 //! player thread ([`player::Ticker`]) builds and posts passes; the host's GUI
@@ -11,7 +15,7 @@ use std::num::NonZeroU32;
 use std::sync::Arc;
 
 use nih_plug::prelude::*;
-use ordrumbox_engine::{AudioSide, HostTransport};
+use ordrumbox_engine::{AudioSide, BlockNote, HostTransport};
 
 mod editor;
 pub mod params;
@@ -59,6 +63,15 @@ fn host_transport(playing: bool, tempo: Option<f64>, beat: Option<f64>, last_bpm
     }
 }
 
+/// A note the engine sent, as the host takes it.
+fn note_event(note: BlockNote) -> NoteEvent<()> {
+    let BlockNote { timing, channel, key, velocity } = note;
+    match velocity {
+        Some(velocity) => NoteEvent::NoteOn { timing, voice_id: None, channel, note: key, velocity },
+        None => NoteEvent::NoteOff { timing, voice_id: None, channel, note: key, velocity: 0.0 },
+    }
+}
+
 impl Plugin for Ordrumbox {
     const NAME: &'static str = "orDrumbox";
     const VENDOR: &'static str = "orDrumbox";
@@ -71,6 +84,9 @@ impl Plugin for Ordrumbox {
         main_output_channels: NonZeroU32::new(2),
         ..AudioIOLayout::const_default()
     }];
+
+    const MIDI_INPUT: MidiConfig = MidiConfig::Basic;
+    const MIDI_OUTPUT: MidiConfig = MidiConfig::Basic;
 
     type SysExMessage = ();
     type BackgroundTask = ();
@@ -120,7 +136,13 @@ impl Plugin for Ordrumbox {
         match (&mut self.audio, buffer.as_slice()) {
             (Some(audio), [left, right, ..]) => {
                 audio.set_host_controls(self.params.volume.value(), self.params.muted_tracks());
+                while let Some(event) = context.next_event() {
+                    if let NoteEvent::NoteOn { timing, note, velocity, .. } = event {
+                        audio.trigger(note, velocity, timing);
+                    }
+                }
                 audio.render_synced(left, right, host);
+                audio.take_notes(|note| context.send_event(note_event(note)));
             }
             (_, channels) => channels.iter_mut().for_each(|c| c.fill(0.0)),
         }
