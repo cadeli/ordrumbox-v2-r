@@ -17,8 +17,9 @@ cargo xtask bundle ordrumbox-plugin --release --features vst3   # target/bundled
 ```
 
 CI (`.github/workflows/ci.yml`) runs fmt, clippy and tests on Windows and
-macOS, then builds the release `ordrumbox.exe` with `assets/` next to it,
-and the plugin bundles, checked by `clap-validator`.
+macOS. For a `v*` tag or a manual run (`workflow_dispatch`) only, it then
+builds the release `ordrumbox.exe` with `assets/` next to it, and the plugin
+bundles, checked by `clap-validator`.
 
 ## Layout
 
