@@ -1,11 +1,11 @@
 # LF everywhere, on every OS. A Windows checkout (core.autocrlf=true on the
 # GitHub runners) would otherwise turn the fixtures into CRLF and break the
-# byte-for-byte JSON tests against song.json / song.min.json / flat_notes.
+# byte-for-byte tests against song.json and the Rust snapshots.
 * text=auto eol=lf
 *.wav binary
 *.png binary
 *.ico binary
 
-# Golden fixtures produced by the JS app (JSON compared byte for byte, binary
-# renders): never rewritten.
+# Test inputs and snapshots (compared byte for byte, binary renders): never
+# rewritten by a checkout.
 crates/*/tests/fixtures/** -text
