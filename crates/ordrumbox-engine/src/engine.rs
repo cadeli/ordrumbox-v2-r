@@ -12,9 +12,10 @@
 use std::sync::Arc;
 
 use ordrumbox_core::steps::TICK;
-use ordrumbox_dsp::{MasterBus, MasterSettings, SampleVoice, Strip, StripSettings, SynthVoice};
+use ordrumbox_dsp::{MasterBus, MasterSettings, SampleVoice, Strip, StripSettings, SynthPatch, SynthVoice, VoiceStart};
 
 use crate::kit::SampleBank;
+use crate::midi::{BlockNote, DRUM_CHANNEL, KEY_COUNT, KeyMap, NoteOut};
 use crate::pass::{Event, Pass, Sound};
 
 /// Sample voices playing at once; the oldest is cut when a new one needs a slot.
@@ -35,6 +36,12 @@ const IDLE_LEVEL: f32 = 1e-6;
 /// ...for this long (longer than the longest delay) is not processed until
 /// its input comes back.
 const IDLE_SECONDS: f32 = 2.5;
+
+/// Notes played live (MIDI in) one block can hold; more are not played.
+pub const LIVE_NOTES: usize = 256;
+/// MIDI notes (on and off) one block can send; more are not sent. A block
+/// would need hundreds of notes on one frame range to fill it.
+pub const NOTES_OUT: usize = 1024;
 
 /// Frames the transport may drift from the host's position before it seeks.
 pub const SEEK_TOLERANCE_FRAMES: u64 = 32;
@@ -90,6 +97,24 @@ pub struct Position {
     pub frames: u64,
 }
 
+/// A note played live, to start on its clock frame.
+#[derive(Debug, Clone, Copy)]
+struct LiveNote {
+    clock: u64,
+    /// Looked up when the note starts: the keymap may change before.
+    key: u8,
+    /// 0–1, scaling the event's level.
+    velocity: f32,
+}
+
+/// A MIDI note sent and not ended yet.
+#[derive(Debug, Clone, Copy)]
+struct Held {
+    /// When it started and when it ends, in clock frames.
+    on: u64,
+    off: u64,
+}
+
 /// One track's strip and its parameter state.
 #[derive(Debug, Clone)]
 struct Channel {
@@ -136,6 +161,15 @@ pub struct Engine {
     /// `exp(-quantum / τ)` for each ramp.
     keep: [f32; 3],
     idle_quanta: u32,
+    /// What MIDI keys play live; the caller keeps a reference.
+    keymap: Option<Arc<KeyMap>>,
+    /// Notes played live, by clock, the first `live_next` started.
+    live: Vec<LiveNote>,
+    live_next: usize,
+    /// MIDI notes sent and not taken yet ([`Self::take_notes`]).
+    notes_out: Vec<NoteOut>,
+    /// The note each key sounds, by key.
+    held: Vec<Option<Held>>,
 }
 
 impl Engine {
@@ -173,6 +207,11 @@ impl Engine {
             host_muted: 0,
             keep: [RAMP_FX, RAMP_MIX, RAMP_LFO].map(|tau| (-quantum_seconds / tau).exp()),
             idle_quanta: (IDLE_SECONDS / quantum_seconds).ceil() as u32,
+            keymap: None,
+            live: Vec::with_capacity(LIVE_NOTES),
+            live_next: 0,
+            notes_out: Vec::with_capacity(NOTES_OUT),
+            held: vec![None; KEY_COUNT],
         }
     }
 
@@ -220,20 +259,108 @@ impl Engine {
         }
     }
 
+    /// The strips of `strips`, at once, when the transport is stopped (a
+    /// playing pass keeps its own).
+    fn take_strips_when_stopped(&mut self, strips: &[StripSettings]) {
+        if self.current.is_some() {
+            return;
+        }
+        self.strip_count = self.strip_count.max(strips.len()).min(MAX_TRACKS);
+        for (channel, settings) in self.channels.iter_mut().zip(strips) {
+            channel.target = *settings;
+            channel.lfo = [false; 4];
+        }
+        self.settle_strips(strips.len().min(MAX_TRACKS));
+    }
+
     /// Start the events of `pass` now, outside the transport (auditioning a
     /// track or a note). When stopped, its strip settings apply at once.
     /// The caller keeps a reference to `pass` (this drops its own).
     pub fn preview(&mut self, pass: Arc<Pass>) {
-        if self.current.is_none() {
-            self.strip_count = self.strip_count.max(pass.strips.len()).min(MAX_TRACKS);
-            for (channel, settings) in self.channels.iter_mut().zip(&pass.strips) {
-                channel.target = *settings;
-                channel.lfo = [false; 4];
-            }
-            self.settle_strips(pass.strips.len().min(MAX_TRACKS));
-        }
+        self.take_strips_when_stopped(&pass.strips);
         for event in &pass.events {
-            self.start(event, &pass, self.clock);
+            self.start(event, &pass.patches, self.clock, 1.0);
+        }
+    }
+
+    /// What MIDI keys play from now on ([`Self::trigger`]). When stopped,
+    /// its strip settings apply at once. The caller keeps a reference to
+    /// `keymap` (this drops the one it replaces).
+    pub fn set_keymap(&mut self, keymap: Arc<KeyMap>) {
+        self.take_strips_when_stopped(&keymap.pass.strips);
+        self.keymap = Some(keymap);
+    }
+
+    /// Play key `key` live at `velocity` (0–1), `offset` frames into the
+    /// next rendered block, with the keymap the engine has then: nothing
+    /// when no track has the key, or when the block already holds
+    /// [`LIVE_NOTES`] notes.
+    pub fn trigger(&mut self, key: u8, velocity: f32, offset: u32) {
+        if self.live.len() == self.live.capacity() {
+            return;
+        }
+        // In the order they come: a note never starts before the one before it.
+        let clock = (self.clock + u64::from(offset)).max(self.live.last().map_or(0, |n| n.clock));
+        self.live.push(LiveNote { clock, key, velocity: velocity.clamp(0.0, 1.0) });
+    }
+
+    /// Frames rendered since the engine was made.
+    pub fn clock(&self) -> u64 {
+        self.clock
+    }
+
+    /// Give the MIDI notes sent since the last call to `send`, in time
+    /// order (a note-off before a note-on on the same frame), timed from
+    /// clock frame `block_start` up to `block_frames` frames.
+    pub fn take_notes(&mut self, block_start: u64, block_frames: usize, mut send: impl FnMut(BlockNote)) {
+        self.notes_out.sort_unstable_by_key(|n| (n.clock, n.velocity.is_some()));
+        let last = u32::try_from(block_frames.saturating_sub(1)).unwrap_or(u32::MAX);
+        for note in self.notes_out.drain(..) {
+            let timing = u32::try_from(note.clock.saturating_sub(block_start)).unwrap_or(u32::MAX).min(last);
+            send(BlockNote { timing, channel: DRUM_CHANNEL, key: note.key, velocity: note.velocity });
+        }
+    }
+
+    /// Queue a MIDI note, unless [`NOTES_OUT`] are waiting already.
+    fn send(&mut self, note: NoteOut) {
+        if self.notes_out.len() < self.notes_out.capacity() {
+            self.notes_out.push(note);
+        }
+    }
+
+    /// Send `event`'s MIDI note at clock frame `now`, ended `note_frames`
+    /// later; a key still sounding is ended first. A note of a track the
+    /// host mutes, or too quiet to be a MIDI note, is not sent, nor a second
+    /// one on the same key and frame.
+    fn send_note(&mut self, event: &Event, pass: &Pass, now: u64) {
+        let track = event.sound.track();
+        let Some(&Some(key)) = pass.keys.get(track) else { return };
+        let velocity = event.velocity.clamp(0.0, 1.0);
+        if host_muted(self.host_muted, track) || (velocity * 127.0).round() < 1.0 {
+            return;
+        }
+        let k = usize::from(key);
+        match self.held.get(k).copied().flatten() {
+            Some(Held { on, .. }) if on == now => return,
+            Some(Held { off, .. }) => self.send(NoteOut { clock: off.min(now), key, velocity: None }),
+            None => {}
+        }
+        if let Some(held) = self.held.get_mut(k) {
+            *held = Some(Held { on: now, off: now + pass.note_frames });
+            self.send(NoteOut { clock: now, key, velocity: Some(velocity) });
+        }
+    }
+
+    /// End the MIDI notes due before clock frame `until` (all of them with `None`).
+    fn end_notes(&mut self, until: Option<u64>) {
+        for key in (0..=u8::MAX).take(KEY_COUNT) {
+            let k = usize::from(key);
+            let Some(Held { off, .. }) = self.held[k] else { continue };
+            if until.is_none_or(|until| off < until) {
+                self.held[k] = None;
+                let clock = until.map_or(self.clock, |_| off);
+                self.send(NoteOut { clock, key, velocity: None });
+            }
         }
     }
 
@@ -272,6 +399,7 @@ impl Engine {
         for synth in &mut self.synths {
             synth.release_at(now);
         }
+        self.end_notes(None);
     }
 
     pub fn is_playing(&self) -> bool {
@@ -345,6 +473,11 @@ impl Engine {
             self.render_quantum(&mut left[done..done + n], &mut right[done..done + n]);
             done += n;
         }
+        self.end_notes(Some(self.clock));
+        if self.live_next >= self.live.len() {
+            self.live.clear();
+            self.live_next = 0;
+        }
     }
 
     fn render_quantum(&mut self, out_left: &mut [f32], out_right: &mut [f32]) {
@@ -357,6 +490,7 @@ impl Engine {
         let mut offset = 0;
         while offset < n {
             let until = self.dispatch_due_events(offset).map_or(n, |frames_left| (offset + frames_left).min(n));
+            let until = self.start_live_notes(offset).map_or(until, |frames_left| until.min(offset + frames_left));
             if offset == 0 {
                 self.apply_lfos();
             }
@@ -436,7 +570,8 @@ impl Engine {
             }
             let now = self.clock + offset as u64;
             while let Some(event) = pass.events.get(self.cursor).filter(|e| e.frame <= self.frame) {
-                self.start(event, &pass, now);
+                self.start(event, &pass.patches, now, 1.0);
+                self.send_note(event, &pass, now);
                 self.cursor += 1;
             }
             let next_stop = pass.events.get(self.cursor).map_or(pass.frames, |e| e.frame);
@@ -444,6 +579,25 @@ impl Engine {
             self.current = Some(pass);
             return Some(frames_left);
         }
+    }
+
+    /// Start the live notes due at `offset` in the quantum; frames until
+    /// the next one, `None` when none is left.
+    fn start_live_notes(&mut self, offset: usize) -> Option<usize> {
+        let now = self.clock + offset as u64;
+        // Taken out and put back, so no reference count changes here.
+        let keymap = self.keymap.take();
+        while let Some(note) = self.live.get(self.live_next).copied().filter(|n| n.clock <= now) {
+            if let Some(keymap) = &keymap
+                && let Some(event) = keymap.event(note.key).and_then(|e| keymap.pass.events.get(e))
+            {
+                self.start(event, &keymap.pass.patches, now, note.velocity);
+            }
+            self.live_next += 1;
+        }
+        self.keymap = keymap;
+        let next = self.live.get(self.live_next)?;
+        usize::try_from(next.clock.saturating_sub(now)).ok()
     }
 
     /// Set the strip targets from the LFO values of the tick playing.
@@ -455,7 +609,9 @@ impl Engine {
         }
     }
 
-    fn start(&mut self, event: &Event, pass: &Pass, now: u64) {
+    /// Start `event` at clock frame `now`, its level scaled by `velocity`
+    /// (1 for a note as built), its synth patch taken from `patches`.
+    fn start(&mut self, event: &Event, patches: &[SynthPatch], now: u64, velocity: f32) {
         let track = event.sound.track();
         if track >= MAX_TRACKS {
             return;
@@ -474,13 +630,15 @@ impl Engine {
             Sound::Sample(params) => {
                 let Some(sample) = self.bank.get(params.sample) else { return };
                 let slot = free_or_oldest(&self.voices, SampleVoice::is_active, SampleVoice::serial);
+                let params = VoiceStart { peak: params.peak * velocity, ..params };
                 self.voices[slot].start(&params, &sample.buffer, self.sample_rate, self.serial);
             }
             Sound::Synth(synth) => {
-                let Some(patch) = pass.patches.get(synth.patch) else { return };
+                let Some(&patch) = patches.get(synth.patch) else { return };
+                let patch = SynthPatch { velocity: patch.velocity * f64::from(velocity), ..patch };
                 let slot = free_or_oldest(&self.synths, SynthVoice::is_active, SynthVoice::serial);
                 let voice = &mut self.synths[slot];
-                voice.start(patch, track, now_seconds, self.serial);
+                voice.start(&patch, track, now_seconds, self.serial);
                 voice.release_at(now_seconds + synth.length);
             }
         }
@@ -547,7 +705,7 @@ mod tests {
 
     fn sample_event(frame: u64) -> Event {
         let voice = VoiceStart { sample: 0, track: 0, ratio: 1.0, peak: 1.0, decay: 10.0, pan: 0.0, delay: 0 };
-        Event { frame, sound: Sound::Sample(voice), mono: true }
+        Event { frame, sound: Sound::Sample(voice), mono: true, velocity: 1.0 }
     }
 
     fn pass(number: u64, frames: &[u64], length: u64) -> Arc<Pass> {
@@ -655,8 +813,12 @@ mod tests {
     fn synth_notes_play_for_their_length() {
         let mut engine = engine();
         let patch = SynthPatch { velocity: 0.5, volume: 1.0, ..SynthPatch::default() };
-        let event =
-            Event { frame: 64, sound: Sound::Synth(SynthStart { track: 0, patch: 0, length: 0.01 }), mono: false };
+        let event = Event {
+            frame: 64,
+            sound: Sound::Synth(SynthStart { track: 0, patch: 0, length: 0.01 }),
+            mono: false,
+            velocity: 1.0,
+        };
         let pass = Pass {
             frames: 48_000,
             ticks: 128,
@@ -680,6 +842,76 @@ mod tests {
         loud.strips[0].volume = 2.0;
         engine.play(Arc::new(loud));
         assert!(render(&mut engine, 1000).iter().all(|s| s.abs() <= 1.0));
+    }
+
+    /// A keymap with one event on track 0, played by `key`.
+    fn keymap(key: u8) -> Arc<KeyMap> {
+        let pass = (*pass(0, &[0], 1)).clone();
+        Arc::new(KeyMap::new(pass, &[Some(key)]))
+    }
+
+    fn notes(engine: &mut Engine, block_start: u64, frames: usize) -> Vec<(u32, u8, Option<f32>)> {
+        let mut notes = Vec::new();
+        engine.take_notes(block_start, frames, |n| {
+            assert_eq!(n.channel, DRUM_CHANNEL);
+            notes.push((n.timing, n.key, n.velocity));
+        });
+        notes
+    }
+
+    #[test]
+    fn a_live_note_starts_on_its_frame_at_its_velocity() {
+        let mut engine = engine();
+        engine.trigger(36, 1.0, 10);
+        assert!(render(&mut engine, 256).iter().all(|&s| s == 0.0), "no keymap: nothing plays");
+        engine.set_keymap(keymap(36));
+        engine.trigger(37, 1.0, 0);
+        engine.trigger(36, 1.0, 200);
+        let loud = render(&mut engine, 512);
+        assert_eq!(onsets(&loud), [200], "frame 200, across quanta; key 37 plays nothing");
+
+        engine.trigger(36, 1.0, 300);
+        engine.trigger(36, 1.0, 20);
+        let clocks: Vec<u64> = engine.live.iter().map(|n| n.clock).collect();
+        assert_eq!(clocks, [1068, 1068], "a note never starts before the one before it");
+
+        let mut quiet = self::engine();
+        quiet.set_keymap(keymap(36));
+        quiet.trigger(36, 0.5, 200);
+        let soft = render(&mut quiet, 512);
+        assert!((soft[300] / loud[300] - 0.5).abs() < 1e-4, "half the velocity, half the level");
+    }
+
+    #[test]
+    fn notes_go_out_on_their_key_and_end_a_16th_later_or_at_stop() {
+        let mut engine = engine();
+        let mut played = (*pass(0, &[3, 700], 1000)).clone();
+        played.keys = vec![Some(36)];
+        played.note_frames = 100;
+        engine.play(Arc::new(played));
+        render(&mut engine, 512);
+        assert_eq!(notes(&mut engine, 0, 512), [(3, 36, Some(1.0)), (103, 36, None)]);
+        render(&mut engine, 256);
+        engine.stop();
+        assert_eq!(notes(&mut engine, 512, 256), [(188, 36, Some(1.0)), (255, 36, None)], "ended at stop");
+    }
+
+    #[test]
+    fn a_note_struck_again_ends_first_and_a_muted_track_sends_none() {
+        let mut engine = engine();
+        let mut played = (*pass(0, &[3, 50], 1000)).clone();
+        played.keys = vec![Some(36)];
+        played.note_frames = 100;
+        let played = Arc::new(played);
+        engine.play(played.clone());
+        render(&mut engine, 128);
+        assert_eq!(notes(&mut engine, 0, 128), [(3, 36, Some(1.0)), (50, 36, None), (50, 36, Some(1.0))]);
+
+        let mut muted = self::engine();
+        muted.set_host_controls(1.0, 0b1);
+        muted.play(played);
+        render(&mut muted, 128);
+        assert_eq!(notes(&mut muted, 0, 128), []);
     }
 
     #[test]

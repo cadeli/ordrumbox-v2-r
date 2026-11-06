@@ -67,6 +67,16 @@ cargo xtask bundle ordrumbox-plugin --release --features vst3 # and orDrumbox.vs
 ```
 
 The plugin follows the host transport and saves its library in the host project.
+
+MIDI goes both ways, with one key per track of the pattern playing (or selected):
+a drum track has its instrument's GM key (KICK 36, SNARE 38…), the other tracks take
+the keys from 84 up, in track order.
+
+- **In**: a note on any channel plays the track with that key, at its velocity,
+  whether the host plays or not.
+- **Out**: the notes the pattern plays go out on channel 10, each on its track's key, a 16th
+  long. Tracks the host mutes send nothing. A clip recorded from this output and played back
+  into the plugin plays the same tracks.
 Building with `vst3` links GPLv3 bindings; the CLAP build stays MIT.
 
 ## Keys
