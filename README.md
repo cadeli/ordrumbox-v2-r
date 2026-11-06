@@ -102,15 +102,25 @@ from the JS app's (old name in brackets):
   It is read, and checked, in a note object too, where the JS app ignored
   it. A note moved by hand forgets it;
 - pattern: `autoGenre`, `autoKeyOffset`, `autoScale` (`_autoGen…`), no
-  more `application`/`url` header; song: `loopMeasures`
+  more `application`/`url` header, no more `bpm` (below); song: `loopMeasures`
   (`loopMeasureCount`), a clip's `patternId` (`pattern`); library: `info`
-  (`infos`), `selectedPattern`/`selectedSong` (`…Idx`);
+  (`infos`), `bpm` (new), `selectedPattern`/`selectedSong` (`…Idx`);
 - kit: `samples` (`instruments`), and for a sample `path`, `displayName`,
   `transpose` (`url`, `display_name`, `tune`).
 
 The old names are still read, so the JS assets and older saves load as
 before; the JS app does not know the new ones and drops those settings from
 a file written here.
+
+Tempo: a pattern has none of its own. The library's `bpm` (the session
+tempo, 120 by default, 20–300) is the one every pattern plays at, and a song
+plays at its own `bpm`. The header's **BPM** knob and **- =** turn the
+library's, or, in the song panel, the selected song's; each is an undo step
+(a run of turns one). A file from before has a `bpm` per pattern: they are
+read and dropped, the first one becoming the library's when the file has
+none. A pattern made in a style (**B**, **Shift B**) sets the library's tempo
+to one drawn in the style's range, in the same undo step; a style learned
+from the library's tags keeps the default range (100–130).
 
 Sounds: a track with auto-assign gets a sample of the selected kit by name,
 then of another kit, then a catalog substitute, then any sample (each a
@@ -132,8 +142,8 @@ at once. While a question is open, the MCP tools are refused.
 
 Generation, in three levels. **The header**: **STYLE** (the 14 styles, the
 learned ones, or random — picking one makes the pattern again in it), **↻**
-(**B**: the pattern made again in its style — its tracks, meter, tempo and
-lines; a track the style names keeps its sound and settings, the others go),
+(**B**: the pattern made again in its style — its tracks, meter and
+lines, the session at the style's tempo; a track the style names keeps its sound and settings, the others go),
 **AUTO** (every track in auto mode, or out of it), and three knobs over the
 whole pattern, 50 changing nothing: **ENERGY** (the hits and densities, ×0.5
 to ×1.5), **COMPLEX** (the complexity and syncopation of every drum part, −100
@@ -190,7 +200,7 @@ melodic instruments on their own channels at the sample's root note) to a
 folder picked. A `.mid` dropped on the window becomes new 32-beat patterns (up to
 16), one track per instrument found (by GM program, drum key, then track
 name), in one undo step. As in the JS app, the file's tempo is not read
-(120 BPM). Departures from the JS: a file timed in SMPTE frames or with a
+(the session's stays); the export writes the session's. Departures from the JS: a file timed in SMPTE frames or with a
 0 division is refused, the message says when notes past beat 512 (the
 16th pattern) are left out, and a drum key named by its GM name after an
 instrument another key plays keeps its notes on a numbered track ("Acoustic
@@ -388,7 +398,7 @@ start.
 
 The header, under the menu bar, is a row of labelled groups after the logo
 (the JS toolbar and its pattern settings panel): **PLAY** / **STOP**, **BPM**
-(the tempo knob, 20–250 as the JS slider), **PATTERN** (the pattern list,
+(the tempo knob: the session's, the song's in the song panel; see "Tempo"), **PATTERN** (the pattern list,
 and where it is in the library), **BEATS** (1–16), **KIT** (the kit list),
 **STYLE**, **↻**, **AUTO** and the **ENERGY**, **COMPLEX**, **VARY** knobs
 (above) and **VIEW** (**GRID**,
@@ -461,7 +471,8 @@ program's, `ordrumbox.exe` on Windows):
 
 The tools keep the JS names: `listPatterns`, `loadPattern`,
 `createNewPattern`, `selectPattern` (shows it in the window),
-`addNotesToPattern`, `updateTrack`, `setPatternBpm`, `setPatternBeatCount`,
+`addNotesToPattern`, `updateTrack`, `setBpm` (the session tempo; it was
+`setPatternBpm`, with a pattern), `setPatternBeatCount`,
 `setPatternTags`, `setPatternDescription`, `savePatternToJson` (to
 `exports/`), `listAllInstrumentsNames`, `listKitSamples`, `analyzeSamples`,
 `listArrangements`, `createArrangement`, `addPatternToArrangement`,
@@ -599,7 +610,7 @@ macOS: `cargo install cargo-xwin`, then
 orDrumbox also builds as an instrument plugin, CLAP and VST3: no input, a
 stereo output. It follows the host's transport: it plays and stops with it,
 plays the pass the host's position falls in (a loop of the pattern, or a
-measure of the song) and plays at the host's tempo, not the pattern's. The
+measure of the song) and plays at the host's tempo, not the session's or the song's. The
 library is saved in the host's project; a new instance starts from the demo
 library. The update check and the MCP link are off in the plugin.
 
@@ -629,7 +640,7 @@ the app. What the host does is greyed out in its menus, tagged *host's*
 and Factory reset, the user data folder commands, the Song menu), and its
 shortcuts are refused with a message: the host saves the library with the
 project and sets the tempo. The header shows the host's tempo, under HOST, in
-place of the pattern's BPM knob; its tooltip says so. A plugin plays patterns
+place of the session's BPM knob; its tooltip says so. A plugin plays patterns
 only: the SONG view button is greyed out (a click says why), and there are no
 song files (the songs of the library stay in it, for the app). It
 has no master strip either: the host mixes, and the master bus keeps its
@@ -850,7 +861,9 @@ code is wrong. A change meant on purpose rewrites the snapshot with the
   `song.json` saved the same values as the JS app, and so did
   `edge_library.json` apart from three fixes: its track `ODD`, which the JS
   app wrote back unrepaired, tags saved as an object (`{"0": "a"}`), written
-  back as a list, and a pattern id with spaces, trimmed.
+  back as a list, and a pattern id with spaces, trimmed. Rewritten when the
+  tempo moved from the patterns to the library: the library's `bpm` (the
+  first pattern's) after `info`, and no pattern's `bpm`.
 - The id slugs are a table in the unit tests of `ids.rs` (they were
   `slugify.json`, from the JS app's `slugify()`).
 - `flat_notes_rust.txt`: the Rust snapshot of what the pattern engine plays
@@ -928,6 +941,9 @@ against Rust snapshots, from inputs the tests build (`ordrumbox-engine/tests/`):
   `slap` or `pingpong` delay (`strip_settings.rs`), and a patch's level,
   which counts the noise in the mix (`synth_preset.rs`).
   `cargo test -p ordrumbox-engine --test mapping -- --ignored` rewrites it.
+  Rewritten when the tempo moved from the patterns to the library: the
+  tracks of `song.json` are set up at the library's tempo, 60 and 172 BPM,
+  no longer at their pattern's.
 - `ordrumbox-engine/tests/fixtures/synth_editor_rust.txt` (`synth_editor.rs`):
   the synth editor's draft of every web preset and of hand-made ones (empty,
   partial and broken, bypassed), filled with the group defaults, their cards
@@ -1024,13 +1040,18 @@ The generators draw from a seeded stream (mulberry32) on the inputs of
   but from the styles (`assets/data/styles.json`, above); bass and chord
   lines hold through their section, with no variation and no chord
   progression within it; a track's variation budget is for the whole pattern,
-  not for each of its loops (`ordrumbox-core/src/variation.rs`).
+  not for each of its loops (`ordrumbox-core/src/variation.rs`). Rewritten
+  when the tempo moved from the patterns to the library: the tempo a style
+  draws is after the case's name (`pattern 0 bpm 146`), no longer in the
+  pattern; notes and draws unchanged.
 - `ordrumbox-logic/tests/fixtures/compose_rust.txt`: one pattern per style
   (two seeds), its drum tracks, as `crate::compose` makes them; the properties
   of every style (exact hits, required and forbidden steps, the signature
   figures, closeness to the weights, coupling) are in `tests/compose.rs`.
   `cargo test -p ordrumbox-logic --test compose -- --ignored` writes it, only
-  when the drum lines change on purpose.
+  when the drum lines change on purpose. Rewritten when the tempo moved from
+  the patterns to the library: the tempo drawn is after the seed
+  (`seed 1 bpm 125`), no longer in the pattern; the drum lines unchanged.
 - `ordrumbox-logic/tests/fixtures/composition_rust.txt`: the notes of the
   chord progressions of "Add sequence", for every progression (indices past
   both ends too), three tonics and seven pattern lengths (`tests/composition.rs`;

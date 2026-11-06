@@ -7,14 +7,22 @@ use crate::ids::{slugify, unique_id};
 use crate::json::{self, Object, ParseError, Value};
 use crate::pattern::Pattern;
 use crate::record::Issue;
-use crate::song::{DroppedClip, Song, songs_from_json};
+use crate::song::{DEFAULT_BPM, DroppedClip, Song, bpm_from_json, songs_from_json};
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Library {
     /// Free-form header (`name`, `description`, `date`…), kept as written.
     pub info: Object,
+    /// The session's tempo: every pattern plays at it, a song at its own.
+    pub bpm: f64,
     pub songs: Vec<Song>,
     pub patterns: Vec<Pattern>,
+}
+
+impl Default for Library {
+    fn default() -> Self {
+        Self { info: Object::new(), bpm: DEFAULT_BPM, songs: Vec::new(), patterns: Vec::new() }
+    }
 }
 
 /// What a load had to repair or leave out.
@@ -45,6 +53,12 @@ impl Library {
             .unwrap_or_default();
 
         let raw_patterns = value.get("patterns").and_then(Value::as_array).unwrap_or_default();
+        // A file older than the session tempo has one per pattern: the first plays on.
+        let bpm = match (value.get("bpm"), raw_patterns.first().and_then(|p| p.get("bpm"))) {
+            (Some(raw), _) => bpm_from_json(raw, "bpm", &mut report.issues),
+            (None, Some(raw)) => bpm_from_json(raw, "patterns[0].bpm", &mut report.issues),
+            (None, None) => DEFAULT_BPM,
+        };
         let mut patterns: Vec<Pattern> = raw_patterns
             .iter()
             .enumerate()
@@ -56,12 +70,13 @@ impl Library {
         let (songs, dropped) =
             songs_from_json(value.get("songs").unwrap_or(&Value::Null), &known_ids, &mut report.issues);
         report.dropped_clips = dropped;
-        (Self { info, songs, patterns }, report)
+        (Self { info, bpm, songs, patterns }, report)
     }
 
     pub fn to_json(&self) -> Value {
         let mut object = Object::new();
         object.insert("info", Value::Object(self.info.clone()));
+        object.insert("bpm", Value::from(self.bpm));
         object.insert("songs", Value::Array(self.songs.iter().map(Song::to_json).collect()));
         object.insert("patterns", Value::Array(self.patterns.iter().map(Pattern::to_json).collect()));
         Value::Object(object)
@@ -78,7 +93,7 @@ impl Library {
 
     /// A song file (`SongService.buildSongData`, the record the song panel
     /// saves and exports as `.odbox`): the header's description and date,
-    /// the patterns, the arrangements, what is selected, and `stamp` (key
+    /// the session tempo, the patterns, the arrangements, what is selected, and `stamp` (key
     /// and time in ms: `savedAt` or `exportedAt`).
     pub fn song_record(&self, name: &str, selected_pattern: usize, selected_song: usize, stamp: (&str, f64)) -> Value {
         let info = |key: &str| self.info.get(key).cloned().unwrap_or_else(|| Value::from(""));
@@ -86,6 +101,7 @@ impl Library {
         object.insert("name", Value::from(name));
         object.insert("description", info("description"));
         object.insert("date", info("date"));
+        object.insert("bpm", Value::from(self.bpm));
         object.insert("patterns", Value::Array(self.patterns.iter().map(Pattern::to_json).collect()));
         object.insert("selectedPattern", Value::from(selected_pattern as f64));
         object.insert("songs", Value::Array(self.songs.iter().map(Song::to_json).collect()));
@@ -162,7 +178,7 @@ mod tests {
     #[test]
     fn song_records_round_trip() {
         let (library, _) = Library::parse(
-            r#"{"infos":{"name":"lib","date":"2026","url":"u"},"songs":[{"name":"s","clips":[{"pattern":"b"}]}],
+            r#"{"infos":{"name":"lib","date":"2026","url":"u"},"bpm":97,"songs":[{"name":"s","clips":[{"pattern":"b"}]}],
                 "patterns":[{"name":"a"},{"name":"b"}]}"#,
         )
         .unwrap();
@@ -170,11 +186,12 @@ mod tests {
         let keys: Vec<_> = record.as_object().unwrap().iter().map(|(k, _)| k.to_owned()).collect();
         assert_eq!(
             keys,
-            ["name", "description", "date", "patterns", "selectedPattern", "songs", "selectedSong", "savedAt"]
+            ["name", "description", "date", "bpm", "patterns", "selectedPattern", "songs", "selectedSong", "savedAt"]
         );
         let read = Library::from_song_record(&record, &library.info).unwrap();
         assert_eq!(read.name.as_deref(), Some("My song"));
         assert_eq!((read.selected_pattern, read.selected_song), (1, 0));
+        assert_eq!(read.library.bpm, 97.0);
         assert_eq!(read.library.songs, library.songs);
         assert_eq!(read.library.patterns, library.patterns);
         assert_eq!(read.library.info.get("url").and_then(Value::as_str), Some("u"));
@@ -191,5 +208,22 @@ mod tests {
         assert_eq!(library.songs[0].clips.len(), 1);
         assert_eq!(report.dropped_clips, [DroppedClip { pattern: "jazz".into(), reason: "unknown pattern id" }]);
         assert!(library.pattern("rock").is_some());
+    }
+
+    #[test]
+    fn the_session_tempo_is_the_files_else_the_first_patterns() {
+        let bpm = |text: &str| {
+            let (library, report) = Library::parse(text).unwrap();
+            (library.bpm, report.issues)
+        };
+        assert_eq!(bpm(r#"{"bpm":90,"patterns":[{"bpm":140}]}"#), (90.0, vec![]));
+        assert_eq!(bpm(r#"{"patterns":[{"bpm":140},{"bpm":70}]}"#), (140.0, vec![]));
+        assert_eq!(bpm(r#"{"patterns":[{"name":"p"}]}"#), (DEFAULT_BPM, vec![]));
+        assert_eq!(bpm(r#"{"bpm":400}"#), (DEFAULT_BPM, vec![Issue::new("bpm", "400 outside 20–300, 120 used")]));
+        let (library, _) = Library::parse(r#"{"patterns":[{"name":"p","bpm":140}]}"#).unwrap();
+        assert_eq!(
+            library.to_json().to_json(),
+            r#"{"info":{},"bpm":140,"songs":[],"patterns":[{"id":"p","name":"p"}]}"#
+        );
     }
 }

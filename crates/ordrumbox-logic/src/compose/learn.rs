@@ -190,11 +190,6 @@ fn new_style(name: &str, patterns: &[&Pattern]) -> Option<Style> {
     if let Some(t) = drums.first() {
         style.swing_resolution = t.swing_resolution;
     }
-    let tempos = patterns.iter().map(|p| p.bpm).filter(|b| b.is_finite() && *b > 0.0);
-    let (low, high) = tempos.fold((f64::INFINITY, 0.0_f64), |(l, h), b| (l.min(b), h.max(b)));
-    if low <= high {
-        style.tempo = (low, high);
-    }
     style.fill.part = style.parts.iter().find(|(n, _)| rank(n) == 1).map_or(style.fill.part, |(n, _)| n.clone());
     style.learned = Some((patterns.len(), measures));
     Some(style)
@@ -248,7 +243,7 @@ mod tests {
                 kick.notes.push(Note { beat: m * 4 + s / 4, step: s % 4, velocity: 0.9, ..Note::default() });
             }
         }
-        Pattern { tags: vec![tag.to_owned()], tracks: vec![kick], beat_count: beats, bpm: 100.0, ..Pattern::default() }
+        Pattern { tags: vec![tag.to_owned()], tracks: vec![kick], beat_count: beats, ..Pattern::default() }
     }
 
     #[test]

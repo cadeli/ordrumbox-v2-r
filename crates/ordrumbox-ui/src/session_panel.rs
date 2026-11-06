@@ -210,14 +210,15 @@ impl Session {
         ));
         let spec = Spec::knob(song::MIN_BPM, song::MAX_BPM, 1.0, song::DEFAULT_BPM);
         if self.hosted {
-            // The host's tempo plays, not the pattern's: shown, not turned.
+            // The host's tempo plays, not the session's: shown, not turned.
             let bpm = self.host_bpm();
             let text = bpm.map_or_else(|| "-".to_owned(), js::number_to_string);
-            let kind = Kind::Value { spec, value: bpm.unwrap_or(pattern.bpm), label: None, text, lfo: false };
+            let kind = Kind::Value { spec, value: bpm.unwrap_or_else(|| self.tempo()), label: None, text, lfo: false };
             layout.items.push(Item::new(None, controls.bpm, kind));
         } else {
-            let text = js::number_to_string(pattern.bpm);
-            let kind = Kind::Value { spec, value: pattern.bpm, label: None, text, lfo: false };
+            let bpm = self.tempo();
+            let text = js::number_to_string(bpm);
+            let kind = Kind::Value { spec, value: bpm, label: None, text, lfo: false };
             layout.items.push(Item::new(Some(Id::Bpm), controls.bpm, kind));
         }
         let beats: Vec<String> = (1..=ordrumbox_logic::editor::MAX_BEATS).map(|b| b.to_string()).collect();
@@ -423,7 +424,7 @@ impl Session {
                 .collect(),
             None => Vec::new(),
         };
-        let bpm = self.pattern().map_or(song::DEFAULT_BPM, |p| p.bpm);
+        let bpm = self.playing_bpm();
         let compose = self.compose_view(track);
         Some(TrackView { track, title, sample, decay, instruments, samples, synths, lfo, bpm, compose })
     }
@@ -1734,17 +1735,35 @@ mod tests {
     }
 
     #[test]
+    fn the_tempo_knob_is_the_songs_in_the_song_panel_else_the_sessions() {
+        let mut s = session();
+        let (x, y) = center(view::header_controls(1).bpm);
+        s.run(crate::menu::Command::SongView);
+        s.run(crate::menu::Command::NewSong);
+        s.chrome.widgets.entry.as_mut().unwrap().text = "verse".into();
+        s.panel_key(SIZE, PanelKey::Enter, false, false);
+        assert!(s.song_view_open());
+        let song_bpm = s.song().unwrap().bpm;
+        assert!(s.wheel(SIZE, x, y, 2, false, false));
+        assert_eq!((s.song().unwrap().bpm, s.editor.library().bpm), (song_bpm + 2.0, 100.0));
+        s.run(crate::menu::Command::SongView);
+        assert!(!s.song_view_open());
+        assert!(s.wheel(SIZE, x, y, 3, false, false));
+        assert_eq!((s.song().unwrap().bpm, s.editor.library().bpm), (song_bpm + 2.0, 103.0));
+    }
+
+    #[test]
     fn header_controls_set_tempo_length_and_generation() {
         let mut s = session();
         let c = view::header_controls(1);
         // The tempo knob: the wheel steps it, a typed number sets it.
         let (x, y) = center(c.bpm);
         assert!(s.wheel(SIZE, x, y, 3, false, false));
-        assert_eq!(s.pattern().unwrap().bpm, 103.0);
+        assert_eq!(s.editor.library().bpm, 103.0);
         s.mouse_down(SIZE, x, y, Button::Right, false);
         s.chrome.widgets.entry.as_mut().unwrap().text = "140".into();
         s.panel_key(SIZE, PanelKey::Enter, false, false);
-        assert_eq!(s.pattern().unwrap().bpm, 140.0);
+        assert_eq!(s.editor.library().bpm, 140.0);
         // The beats list: 8.
         let (x, y) = center(c.beats);
         s.mouse_down(SIZE, x, y, Button::Left, false);

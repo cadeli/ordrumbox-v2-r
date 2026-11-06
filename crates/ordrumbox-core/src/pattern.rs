@@ -1,14 +1,15 @@
-//! A pattern (`src/model/pattern_schema.js`): tempo, length, tags and tracks,
+//! A pattern (`src/model/pattern_schema.js`): length, tags and tracks,
 //! loaded like `fixPattern()` and saved like `Exporter.export()`.
 
 use crate::json::{Object, Value};
 use crate::record::Issue;
-use crate::song::{MAX_BPM, MIN_BPM, clamp_bpm};
 use crate::track::{MAX_TRACKS, Track};
 
 /// Keys read and dropped: `_revision` is runtime state; `application` and
-/// `url`, the web app's name and address, were written in every pattern.
-const DROPPED_KEYS: [&str; 3] = ["_revision", "application", "url"];
+/// `url`, the web app's name and address, were written in every pattern;
+/// `bpm`, a pattern's own tempo in older files, is the library's now
+/// (`Library::from_json` takes the first one when the file has no other).
+const DROPPED_KEYS: [&str; 4] = ["_revision", "application", "url", "bpm"];
 
 /// The generator's keys under their web-version names.
 const WEB_KEYS: [(&str, &str); 3] =
@@ -22,7 +23,6 @@ pub struct Pattern {
     pub name: Option<String>,
     /// Beats in the pattern (a measure is 4); 1–16.
     pub beat_count: i32,
-    pub bpm: f64,
     pub description: String,
     pub tags: Vec<String>,
     pub tracks: Vec<Track>,
@@ -36,7 +36,6 @@ impl Default for Pattern {
             id: String::new(),
             name: None,
             beat_count: 4,
-            bpm: 120.0,
             description: String::new(),
             tags: Vec::new(),
             tracks: Vec::new(),
@@ -76,10 +75,6 @@ impl Pattern {
                         None => wrong_type(key, value),
                     }
                 }
-                "bpm" => match value.as_f64().filter(|n| n.is_finite()) {
-                    Some(bpm) => pattern.bpm = bpm,
-                    None => wrong_type(key, value),
-                },
                 "description" => match value.as_str() {
                     Some(text) => pattern.description = text.to_owned(),
                     None => wrong_type(key, value),
@@ -94,11 +89,6 @@ impl Pattern {
                     pattern.extra.insert(Self::canonical_key(key), value.clone());
                 }
             }
-        }
-        if clamp_bpm(pattern.bpm) != pattern.bpm {
-            let message = format!("{} outside {MIN_BPM}–{MAX_BPM}, {} used", pattern.bpm, clamp_bpm(pattern.bpm));
-            issues.push(Issue::new(format!("{at}.bpm"), message));
-            pattern.bpm = clamp_bpm(pattern.bpm);
         }
         match object.get("tracks") {
             Some(Value::Array(tracks)) => {
@@ -130,9 +120,6 @@ impl Pattern {
         let defaults = Self::default();
         if self.beat_count != defaults.beat_count {
             object.insert("beatCount", Value::from(self.beat_count));
-        }
-        if self.bpm != defaults.bpm {
-            object.insert("bpm", Value::from(self.bpm));
         }
         if !self.description.is_empty() {
             object.insert("description", Value::from(self.description.as_str()));
@@ -182,15 +169,9 @@ mod tests {
 
     #[test]
     fn drops_the_web_header_and_renames_the_generator_keys() {
-        let (pattern, _) = load(r#"{"application":"other","url":"u","_autoGenGenre":"house","x":1,"bpm":97.5}"#);
-        assert_eq!(pattern.to_json().to_json(), r#"{"bpm":97.5,"autoGenre":"house","x":1}"#);
-    }
-
-    #[test]
-    fn a_tempo_outside_the_bounds_is_clamped_and_reported() {
-        let (pattern, issues) = load(r#"{"bpm":400}"#);
-        assert_eq!(pattern.bpm, 300.0);
-        assert_eq!(issues, [Issue::new("p.bpm", "400 outside 20–300, 300 used")]);
+        let (pattern, issues) = load(r#"{"application":"other","url":"u","_autoGenGenre":"house","x":1,"bpm":97.5}"#);
+        assert!(issues.is_empty());
+        assert_eq!(pattern.to_json().to_json(), r#"{"autoGenre":"house","x":1}"#);
     }
 
     #[test]

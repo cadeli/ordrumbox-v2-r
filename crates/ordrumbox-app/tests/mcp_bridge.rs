@@ -62,7 +62,7 @@ fn a_client_edits_the_session_through_the_bridge() {
         r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#.to_owned(),
         call(3, "createNewPattern", r#"{"patternName":"house"}"#),
         call(4, "listPatterns", "{}"),
-        call(5, "setPatternBpm", r#"{"patternName":"techno","bpm":120}"#),
+        call(5, "setPatternBeatCount", r#"{"patternName":"techno","beatCount":4}"#),
         call(6, "noSuchTool", "{}"),
         call(7, "undo", "{}"),
     ];

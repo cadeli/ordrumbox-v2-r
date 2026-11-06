@@ -76,11 +76,22 @@ impl Editor {
         select: Option<(usize, usize)>,
         edit: impl FnOnce(&mut Vec<Song>) -> R,
     ) -> R {
+        self.edit_songs_coalesced(desc, select, None, edit)
+    }
+
+    /// [`Self::edit_songs`], a run of edits under `coalesce` being one step.
+    fn edit_songs_coalesced<R>(
+        &mut self,
+        desc: String,
+        select: Option<(usize, usize)>,
+        coalesce: Option<String>,
+        edit: impl FnOnce(&mut Vec<Song>) -> R,
+    ) -> R {
         let before = self.library.songs.clone();
         let result = edit(&mut self.library.songs);
         if self.library.songs != before {
             let change = Change::Songs { before, after: self.library.songs.clone(), select };
-            self.record(desc, change, None);
+            self.record(desc, change, coalesce);
             self.revision += 1;
         }
         result
@@ -275,6 +286,21 @@ impl Editor {
             }
         });
         Ok(())
+    }
+
+    /// The tempo of arrangement `s` (brought inside the tempo bounds; not a
+    /// number: unchanged); with `coalesce`, a run of changes is one step.
+    /// Whether it changed.
+    pub fn set_song_bpm(&mut self, s: usize, bpm: f64, coalesce: bool) -> bool {
+        let Some(song) = self.library.songs.get(s) else { return false };
+        let bpm = clamp_bpm(bpm);
+        if !bpm.is_finite() || bpm == song.bpm {
+            return false;
+        }
+        let desc = format!("Set \"{}\" BPM → {}", song.name, number_to_string(bpm));
+        let coalesce = coalesce.then(|| format!("song:{s}:bpm"));
+        self.edit_songs_coalesced(desc, None, coalesce, |songs| songs[s].bpm = bpm);
+        true
     }
 
     /// Replace the whole library (`applyToAppState`: a song loaded or

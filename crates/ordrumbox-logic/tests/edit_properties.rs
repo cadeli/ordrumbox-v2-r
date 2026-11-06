@@ -72,7 +72,7 @@ const COMMAND_NAMES: [&str; 52] = [
     "rename_song",
     "repeat_pattern_at_measure",
     "set_pattern_beat_count",
-    "set_pattern_bpm",
+    "set_bpm",
     "set_pattern_description",
     "set_pattern_macro",
     "set_pattern_tags",
@@ -348,8 +348,8 @@ impl Fuzz {
             }
             29 => {
                 let (bpm, coalesce) = (self.pick(&[0.0, 90.0, 120.0, 174.0, f64::NAN]), self.coin());
-                self.editor.set_pattern_bpm(p, bpm, coalesce);
-                Outcome::new("set_pattern_bpm", coalesce)
+                self.editor.set_bpm(bpm, coalesce);
+                Outcome::new("set_bpm", coalesce)
             }
             30 => {
                 let beats = self.number(-2.0, 20.0).round();
@@ -523,7 +523,7 @@ impl Fuzz {
                     self.editor.update_note(p, t, n, &[("velocity", velocity)], None, true);
                 }
                 2 => {
-                    self.editor.set_pattern_bpm(p, 60.0 + (x * 120.0).round(), true);
+                    self.editor.set_bpm(60.0 + (x * 120.0).round(), true);
                 }
                 3 => {
                     self.editor.set_steps_per_beat(p, t, 1.0 + (x * 7.0).round(), true);
@@ -755,7 +755,7 @@ fn repeating_pattern(rng: &mut Rng) -> (Pattern, Vec<Option<i32>>) {
             track
         })
         .collect();
-    (Pattern { id: "p".into(), name: Some("p".into()), bpm: 120.0, beat_count, tracks, ..Pattern::default() }, periods)
+    (Pattern { id: "p".into(), name: Some("p".into()), beat_count, tracks, ..Pattern::default() }, periods)
 }
 
 #[test]

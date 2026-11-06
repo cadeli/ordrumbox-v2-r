@@ -507,9 +507,9 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     };
     let title = canvas.text(g.x, g.y, "Arrangement", s, dim_color()) + 8 * s;
     let total = song.length_measures().max(1.0).ceil() as u32;
-    // The arrangement's own tempo, which it plays at: not the header's (the pattern's).
+    // The arrangement's own tempo, which it plays at (the header's knob in this panel).
     let bpm = ordrumbox_core::js::number_to_string(song.bpm);
-    let meta = format!("{}  {} measures  plays at {bpm} BPM (the header: the pattern's)", song.name, total);
+    let meta = format!("{}  {} measures  plays at {bpm} BPM", song.name, total);
     canvas.text(title, g.y, &fit(&meta, g.x + g.w - title, s), s, text_color());
     if song.clips.is_empty() && view.ghost.is_none() {
         canvas.text(

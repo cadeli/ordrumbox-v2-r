@@ -214,7 +214,7 @@ impl Session {
 
     /// Seconds the LFOs are at, and the tempo they sync to.
     fn synth_clock(&self) -> (f64, f64) {
-        (self.synth_editor.started.elapsed().as_secs_f64(), self.pattern().map_or(120.0, |p| p.bpm))
+        (self.synth_editor.started.elapsed().as_secs_f64(), self.playing_bpm())
     }
 
     /// The editor as built for a `size` window, if it shows a preset.

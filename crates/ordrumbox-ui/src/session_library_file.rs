@@ -180,7 +180,7 @@ fn a_plugin_leaves_to_the_host_what_the_host_does() {
     let library = Library::parse(DEMO).unwrap().0;
     let mut s = Session::new(library, KitSet::empty(), Vec::new());
     s.hosted = true;
-    let bpm = s.pattern().unwrap().bpm;
+    let bpm = s.editor.library().bpm;
     let refused = [
         Command::Save,
         Command::Quit,
@@ -196,12 +196,12 @@ fn a_plugin_leaves_to_the_host_what_the_host_does() {
         assert_eq!(Some(s.message.as_str()), command.hosted_refusal(), "{command:?}");
     }
     assert!(!s.quit_requested());
-    assert_eq!(s.pattern().unwrap().bpm, bpm);
+    assert_eq!(s.editor.library().bpm, bpm);
     assert_eq!(s.editor.history().next_undo(), None);
     assert!(!s.song_view_open() && !s.playing());
     s.toggle_play_song();
     assert_eq!(s.message, crate::menu::SONGS_IN_THE_APP);
-    // Greyed out in the menus (`menu.rs` tests), and the tempo shown is not the pattern's knob.
+    // Greyed out in the menus (`menu.rs` tests), and the tempo shown is not the session's knob.
     let runnable = s.menus().into_iter().flat_map(|m| m.items).filter_map(|i| i.runnable());
     assert!(runnable.into_iter().all(|c| c.hosted_refusal().is_none()));
     let size = (1100, 680, 1);

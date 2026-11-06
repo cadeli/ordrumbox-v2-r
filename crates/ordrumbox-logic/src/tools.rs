@@ -56,7 +56,7 @@ impl Tools<'_> {
             "copyTrack" => self.copy_track(args),
             "updateTrack" => self.update_track(args),
             "renameTrack" => self.rename_track(args),
-            "setPatternBpm" => self.set_bpm(args),
+            "setBpm" => self.set_bpm(args),
             "setPatternBeatCount" => self.set_beat_count(args),
             "setPatternTags" => self.set_tags(args),
             "setPatternDescription" => self.set_description(args),
@@ -94,7 +94,10 @@ impl Tools<'_> {
 
     fn list_patterns(&self) -> Value {
         let patterns = self.library().patterns.iter().enumerate();
-        object([("patterns", Value::Array(patterns.map(|(i, p)| pattern_summary(i, p)).collect()))])
+        object([
+            ("bpm", Value::from(self.library().bpm)),
+            ("patterns", Value::Array(patterns.map(|(i, p)| pattern_summary(i, p)).collect())),
+        ])
     }
 
     fn load_pattern(&self, args: &Value) -> Result<Value, String> {
@@ -367,11 +370,10 @@ impl Tools<'_> {
     }
 
     fn set_bpm(&mut self, args: &Value) -> Result<Value, String> {
-        let p = self.pattern(text(args, "patternName")?)?;
         let asked = optional_number(args, "bpm")?.ok_or("bpm is required")?;
         // As the tempo field: whole, inside the bounds.
         let bpm = clamp_bpm(asked.round());
-        self.editor.set_pattern_bpm(p, bpm, false);
+        self.editor.set_bpm(bpm, false);
         let mut answer = object([("bpm", Value::from(bpm))]);
         if bpm != asked
             && let Some(object) = answer.as_object_mut()
@@ -881,7 +883,6 @@ pub fn pattern_summary(index: usize, pattern: &Pattern) -> Value {
         ("index", count(index)),
         ("id", Value::from(pattern.id.as_str())),
         ("name", pattern.name.as_deref().map_or(Value::Null, Value::from)),
-        ("bpm", Value::from(pattern.bpm)),
         ("beatCount", Value::from(pattern.beat_count)),
         ("trackCount", count(pattern.tracks.len())),
         ("tags", strings(&pattern.tags)),
@@ -1095,7 +1096,7 @@ mod tests {
         let mut b = bench();
         let created = call(&mut b, "createNewPattern", r#"{"patternName":"house"}"#).unwrap();
         assert_eq!(get(&created, &["index"]).as_f64(), Some(2.0));
-        let bpm = call(&mut b, "setPatternBpm", r#"{"patternName":"rock","bpm":128.4}"#).unwrap();
+        let bpm = call(&mut b, "setBpm", r#"{"bpm":128.4}"#).unwrap();
         assert_eq!(bpm.to_json(), r#"{"bpm":128,"note":"128.4 asked, 128 used (whole, 20 to 300)"}"#);
         call(&mut b, "setPatternTags", r#"{"patternName":"rock","tags":["dance"," "]}"#).unwrap();
         call(&mut b, "setPatternDescription", r#"{"patternName":"rock","description":"four on the floor"}"#).unwrap();
@@ -1103,7 +1104,7 @@ mod tests {
         let rock = &get(&listed, &["patterns"]).as_array().unwrap()[0];
         assert_eq!(
             rock.to_json(),
-            r#"{"index":0,"id":"rock","name":"rock","bpm":128,"beatCount":4,"trackCount":1,"tags":["dance"]}"#
+            r#"{"index":0,"id":"rock","name":"rock","beatCount":4,"trackCount":1,"tags":["dance"]}"#
         );
         let loaded = call(&mut b, "loadPattern", r#"{"patternName":"rock"}"#).unwrap();
         assert_eq!(get(&loaded, &["description"]).as_str(), Some("four on the floor"));

@@ -108,15 +108,10 @@ pub fn pattern_pass_ticks(pattern: &Pattern) -> u32 {
     u32::try_from(ordrumbox_core::pattern_engine::pattern_ticks(pattern).max(1)).unwrap_or(u32::MAX)
 }
 
-/// Build pass `number` of `pattern` at the pattern's own tempo. Notes of
-/// muted tracks (or of tracks another track's solo silences) are left out,
-/// as `shouldTrackPlay()` does.
-pub fn build_pass(pattern: &Pattern, number: u64, rng: &mut Rng, context: PassContext<'_>) -> Pass {
-    build_pass_at(pattern, number, rng, context, clamp_bpm(pattern.bpm))
-}
-
-/// [`build_pass`] at tempo `bpm` instead of the pattern's (a plugin host's tempo).
-pub fn build_pass_at(pattern: &Pattern, number: u64, rng: &mut Rng, context: PassContext<'_>, bpm: f64) -> Pass {
+/// Build pass `number` of `pattern` at tempo `bpm` (the library's, or a
+/// plugin host's). Notes of muted tracks (or of tracks another track's solo
+/// silences) are left out, as `shouldTrackPlay()` does.
+pub fn build_pass(pattern: &Pattern, number: u64, rng: &mut Rng, context: PassContext<'_>, bpm: f64) -> Pass {
     let per_tick = frames_per_tick(bpm, context.sample_rate);
     let ticks = pattern_pass_ticks(pattern);
     let frames = (f64::from(ticks) * per_tick).round().max(1.0) as u64;
@@ -228,12 +223,11 @@ fn sound_for(
     }))
 }
 
-/// A one-note pass to audition track `t`: `note` as written,
+/// A one-note pass to audition track `t` at tempo `bpm`: `note` as written,
 /// or, without one, a note at the track's velocity and pan. Its strips are
 /// the pattern's.
-pub fn build_preview(pattern: &Pattern, t: usize, note: Option<&Note>, context: PassContext<'_>) -> Pass {
+pub fn build_preview(pattern: &Pattern, t: usize, note: Option<&Note>, context: PassContext<'_>, bpm: f64) -> Pass {
     let Some(track) = pattern.tracks.get(t) else { return Pass::default() };
-    let bpm = clamp_bpm(pattern.bpm);
     let flat = Hit {
         track: t,
         source: None,

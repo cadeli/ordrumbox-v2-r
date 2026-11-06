@@ -339,12 +339,12 @@ use <kbd>←</kbd> <kbd>→</kbd> between menus, <kbd>↑</kbd> <kbd>↓</kbd> b
 <table>
 <tr><th>Group</th><th>Control</th><th>What it does</th></tr>
 <tr><td><strong>PLAY / STOP</strong></td><td>Button</td><td>Start / stop the pattern (lit while playing).</td></tr>
-<tr><td><strong>BPM</strong></td><td>Knob, 20–250</td><td>The pattern's tempo.</td></tr>
+<tr><td><strong>BPM</strong></td><td>Knob, 20–300</td><td>The session's tempo, which every pattern plays at; in the song panel, the selected song's.</td></tr>
 <tr><td><strong>PATTERN</strong></td><td>List</td><td>Pick a pattern. The label above it shows the grid page shown (<em>Page n/m</em>, 4 beats per page).</td></tr>
 <tr><td><strong>BEATS</strong></td><td>List, 1–16</td><td>The pattern's length in beats.</td></tr>
 <tr><td><strong>KIT</strong></td><td>List</td><td>The kit the tracks draw their samples from.</td></tr>
 <tr><td><strong>STYLE</strong></td><td>List</td><td>The 14 styles, the learned styles, or random. Picking one makes the pattern again in it.</td></tr>
-<tr><td><strong>↻</strong></td><td>Button (<kbd>B</kbd>)</td><td>Make the pattern again in its style: its tracks, meter, tempo and lines. A track the style names keeps its sound and settings; the others go. Draws a new seed.</td></tr>
+<tr><td><strong>↻</strong></td><td>Button (<kbd>B</kbd>)</td><td>Make the pattern again in its style: its tracks, meter and lines, and the session's tempo. A track the style names keeps its sound and settings; the others go. Draws a new seed.</td></tr>
 <tr><td><strong>AUTO</strong></td><td>Button</td><td>Every track of the pattern in auto mode, or out of it.</td></tr>
 <tr><td><strong>ENERGY</strong></td><td>Knob, 0–100 (50 = unchanged)</td><td>Scales the hits and densities of all lines, ×0.5 to ×1.5.</td></tr>
 <tr><td><strong>COMPLEX</strong></td><td>Knob, 0–100 (50 = unchanged)</td><td>Shifts the complexity and syncopation of every drum part, −100 to +100.</td></tr>
@@ -841,7 +841,7 @@ replaced only once confirmed.</p>
 <h3>Imports and drag &amp; drop</h3>
 <table>
 <tr><th>Drop on the window / command</th><th>Result</th></tr>
-<tr><td><code>.mid</code> file, <kbd>Ctrl</kbd>+<kbd>O</kbd>, or a <code>.mid</code> given on the command line</td><td>New 32-beat patterns (up to 16), one track per instrument found (by GM program, drum key, then track name), in one undo step. The file's tempo is not read (120 BPM).</td></tr>
+<tr><td><code>.mid</code> file, <kbd>Ctrl</kbd>+<kbd>O</kbd>, or a <code>.mid</code> given on the command line</td><td>New 32-beat patterns (up to 16), one track per instrument found (by GM program, drum key, then track name), in one undo step. The file's tempo is not read (the session's stays).</td></tr>
 <tr><td><code>.odbox</code> file, File › Import song</td><td>The song replaces the library (confirmed, one undo step).</td></tr>
 <tr><td><code>.wav</code> file, File › Add sample</td><td>Joins the current kit (<kbd>Shift</kbd> while dropping: replaces the kit editor's selected sample).</td></tr>
 <tr><td>Folder of WAVs, Kit › Import folder as kit</td><td>A new kit.</td></tr>

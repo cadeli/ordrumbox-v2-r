@@ -6,6 +6,7 @@
     "application": "online-ordrumbox",
     "url": "https://www.ordrumbox.com"
   },
+  "bpm": 120,
   "songs": [
     {
       "id": "demo",
@@ -458,7 +459,6 @@
     {
       "id": "slrock",
       "name": "slRock",
-      "bpm": 115,
       "tags": [
         "rock",
         "default"
@@ -1357,7 +1357,6 @@
       "id": "cmpbeat",
       "name": "CmpBeat",
       "beatCount": 8,
-      "bpm": 100,
       "tags": [
         "electro",
         "default"
@@ -1622,7 +1621,6 @@
     {
       "id": "shuffle",
       "name": "Shuffle",
-      "bpm": 80,
       "tags": [
         "swing",
         "default"
@@ -1832,7 +1830,6 @@
     {
       "id": "hard",
       "name": "hard",
-      "bpm": 130,
       "tags": [
         "rock",
         "default"
@@ -1961,7 +1958,6 @@
     {
       "id": "metal",
       "name": "metal",
-      "bpm": 130,
       "tags": [
         "rock",
         "default"
@@ -2322,7 +2318,6 @@
     {
       "id": "discobrk",
       "name": "DiscoBrk",
-      "bpm": 80,
       "tags": [
         "electro",
         "default"
@@ -2770,7 +2765,6 @@
     {
       "id": "batuc",
       "name": "batuc",
-      "bpm": 100,
       "tags": [
         "samba",
         "default"
@@ -3152,7 +3146,6 @@
     {
       "id": "mambo",
       "name": "mambo",
-      "bpm": 80,
       "tags": [
         "samba",
         "default"
@@ -3281,7 +3274,6 @@
     {
       "id": "march",
       "name": "march",
-      "bpm": 90,
       "tags": [
         "electro",
         "default"
@@ -3491,7 +3483,6 @@
     {
       "id": "merengue",
       "name": "merengue",
-      "bpm": 60,
       "tags": [
         "samba",
         "default"
@@ -3681,7 +3672,6 @@
     {
       "id": "salsa",
       "name": "salsa",
-      "bpm": 80,
       "tags": [
         "electro",
         "default"
@@ -3909,7 +3899,6 @@
     {
       "id": "salsagroovy",
       "name": "SalsaGroovy",
-      "bpm": 79,
       "tracks": [
         {
           "name": "KICK",
@@ -4349,7 +4338,6 @@
     {
       "id": "bossa",
       "name": "bossa",
-      "bpm": 60,
       "tags": [
         "samba",
         "default"
@@ -4549,7 +4537,6 @@
     {
       "id": "tango",
       "name": "tango",
-      "bpm": 70,
       "tags": [
         "samba",
         "default"
@@ -4690,7 +4677,6 @@
     {
       "id": "ragga",
       "name": "ragga",
-      "bpm": 80,
       "tags": [
         "reggae",
         "default"
@@ -4838,7 +4824,6 @@
     {
       "id": "rap",
       "name": "rap",
-      "bpm": 100,
       "tags": [
         "funk",
         "default"
@@ -5247,7 +5232,6 @@
       "id": "slfunk",
       "name": "SlFunk",
       "beatCount": 8,
-      "bpm": 60,
       "tags": [
         "funk",
         "default"
@@ -5595,7 +5579,6 @@
     {
       "id": "funkfill",
       "name": "FunkFill",
-      "bpm": 100,
       "tags": [
         "funk",
         "default"
@@ -5792,7 +5775,6 @@
       "id": "hip",
       "name": "hip",
       "beatCount": 8,
-      "bpm": 110,
       "tags": [
         "funk",
         "default"
@@ -7068,7 +7050,6 @@
     {
       "id": "slowtrap",
       "name": "SlowTrap",
-      "bpm": 100,
       "tags": [
         "electro",
         "default"
@@ -7227,7 +7208,6 @@
     {
       "id": "sweet",
       "name": "sweet",
-      "bpm": 90,
       "tags": [
         "electro",
         "default"
@@ -7411,7 +7391,6 @@
     {
       "id": "jazz",
       "name": "jazz",
-      "bpm": 60,
       "tags": [
         "jazz",
         "default"
@@ -7586,7 +7565,6 @@
     {
       "id": "polyrythm",
       "name": "PolyRythm",
-      "bpm": 60,
       "tags": [
         "jazz",
         "default"
@@ -7749,7 +7727,6 @@
       "id": "ltgroove",
       "name": "ltgroove",
       "beatCount": 8,
-      "bpm": 80,
       "tags": [
         "funk",
         "default"
@@ -7973,7 +7950,6 @@
       "id": "dub-roots",
       "name": "DUB_ROOTS",
       "beatCount": 16,
-      "bpm": 75,
       "description": "Dub roots heavy ",
       "tags": [
         "dub",

@@ -3,6 +3,7 @@
     "name": "edge cases",
     "description": "hand-written: fixer/exporter paths song.json does not reach"
   },
+  "bpm": 97.5,
   "songs": [
     {
       "id": "ebauche-n-1",
@@ -48,7 +49,6 @@
       "id": "objnotes",
       "name": "object notes",
       "beatCount": 3,
-      "bpm": 97.5,
       "tags": [
         "a",
         "b"

@@ -6,6 +6,7 @@
     "application": "online-ordrumbox",
     "url": "https://www.ordrumbox.com"
   },
+  "bpm": 120,
   "songs": [
     {
       "id": "demo",

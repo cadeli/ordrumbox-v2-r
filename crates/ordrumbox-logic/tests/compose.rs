@@ -175,9 +175,11 @@ fn rust_snapshot() -> Vec<String> {
             let mut rnd = || rng.next_f64();
             let mut pattern = Pattern { beat_count: 4, ..Pattern::default() };
             let options = Options { genre: Some(style.name.clone()), ..Options::default() };
-            generate_pattern(&mut AutoGenerator::new(&scales, &styles, &mut rnd), &mut pattern, &options);
+            let mut g = AutoGenerator::new(&scales, &styles, &mut rnd);
+            generate_pattern(&mut g, &mut pattern, &options);
+            let bpm = g.tempo.map_or_else(|| "-".to_owned(), |bpm| bpm.to_string());
             pattern.tracks.retain(|t| instrument_family(&t.name).is_drum());
-            lines.push(format!("{} seed {seed} {}", style.name, pattern.to_json().to_json()));
+            lines.push(format!("{} seed {seed} bpm {bpm} {}", style.name, pattern.to_json().to_json()));
         }
     }
     lines

@@ -35,6 +35,8 @@ pub enum Change {
     /// The whole library (a song loaded or imported), and the arrangement
     /// undo and redo select.
     Library { before: Box<Library>, after: Box<Library>, select: (usize, usize) },
+    /// The library's tempo, before and after.
+    Tempo { before: f64, after: f64 },
 }
 
 impl Change {
@@ -56,6 +58,7 @@ impl Change {
                 *target.library = if undo { before } else { after }.as_ref().clone();
                 *target.selected_song = if undo { *on_undo } else { *on_redo };
             }
+            Self::Tempo { before, after } => target.library.bpm = if undo { *before } else { *after },
         }
     }
 
@@ -64,7 +67,9 @@ impl Change {
         match (self, other) {
             (Self::Pattern { index: a, .. }, Self::Pattern { index: b, .. }) => a == b,
             (Self::Patterns { .. }, Self::Patterns { .. }) => true,
-            (Self::Songs { .. }, Self::Songs { .. }) | (Self::Library { .. }, Self::Library { .. }) => true,
+            (Self::Songs { .. }, Self::Songs { .. })
+            | (Self::Library { .. }, Self::Library { .. })
+            | (Self::Tempo { .. }, Self::Tempo { .. }) => true,
             _ => false,
         }
     }
@@ -76,6 +81,7 @@ impl Change {
             (Self::Patterns { after, .. }, Self::Patterns { after: next_after, .. }) => *after = next_after,
             (Self::Songs { after, .. }, Self::Songs { after: next_after, .. }) => *after = next_after,
             (Self::Library { after, .. }, Self::Library { after: next_after, .. }) => *after = next_after,
+            (Self::Tempo { after, .. }, Self::Tempo { after: next_after, .. }) => *after = next_after,
             _ => {}
         }
     }
@@ -177,8 +183,8 @@ impl History {
 mod tests {
     use super::*;
 
-    fn pattern(bpm: f64) -> Pattern {
-        Pattern { bpm, ..Pattern::default() }
+    fn pattern(beat_count: f64) -> Pattern {
+        Pattern { beat_count: beat_count as i32, ..Pattern::default() }
     }
 
     /// What the tests undo and redo on.
@@ -207,13 +213,13 @@ mod tests {
         let mut history = History::default();
         let mut state = State::new(vec![pattern(1.0)]);
         for i in 1..=60 {
-            history.record(format!("bpm {i}"), change(f64::from(i), f64::from(i + 1)), None, f64::from(i) * 1000.0);
+            history.record(format!("beats {i}"), change(f64::from(i), f64::from(i + 1)), None, f64::from(i) * 1000.0);
         }
         assert_eq!(history.undo_len(), MAX_STEPS);
-        assert_eq!(history.undo(state.target()).as_deref(), Some("bpm 60"));
-        assert_eq!(state.library.patterns[0].bpm, 60.0);
-        assert_eq!(history.redo(state.target()).as_deref(), Some("bpm 60"));
-        assert_eq!(state.library.patterns[0].bpm, 61.0);
+        assert_eq!(history.undo(state.target()).as_deref(), Some("beats 60"));
+        assert_eq!(state.library.patterns[0].beat_count, 60);
+        assert_eq!(history.redo(state.target()).as_deref(), Some("beats 60"));
+        assert_eq!(state.library.patterns[0].beat_count, 61);
         history.undo(state.target());
         history.record("new".into(), change(60.0, 3.0), None, 1e9);
         assert!(!history.can_redo());
@@ -230,8 +236,23 @@ mod tests {
         assert_eq!(history.undo_len(), 2);
         let mut state = State::new(vec![pattern(5.0)]);
         history.undo(state.target());
-        assert_eq!(state.library.patterns[0].bpm, 4.0);
+        assert_eq!(state.library.patterns[0].beat_count, 4);
         assert_eq!(history.undo(state.target()).as_deref(), Some("c"));
-        assert_eq!(state.library.patterns[0].bpm, 1.0);
+        assert_eq!(state.library.patterns[0].beat_count, 1);
+    }
+
+    #[test]
+    fn a_tempo_change_undoes_and_coalesces() {
+        let mut history = History::default();
+        let key = Some("bpm".to_owned());
+        history.record("a".into(), Change::Tempo { before: 120.0, after: 121.0 }, key.clone(), 0.0);
+        history.record("b".into(), Change::Tempo { before: 121.0, after: 122.0 }, key, 300.0);
+        assert_eq!(history.undo_len(), 1);
+        let mut state = State::new(Vec::new());
+        state.library.bpm = 122.0;
+        history.undo(state.target());
+        assert_eq!(state.library.bpm, 120.0);
+        history.redo(state.target());
+        assert_eq!(state.library.bpm, 122.0);
     }
 }

@@ -12,7 +12,7 @@ use crate::record::Issue;
 
 /// Beats in one 4/4 measure.
 pub const BEATS_PER_MEASURE: f64 = 4.0;
-/// Tempo bounds of a pattern or a song: a file or an edit outside them is
+/// Tempo bounds of the library or a song: a file or an edit outside them is
 /// brought inside, and the load or the edit says so.
 pub const MIN_BPM: f64 = 20.0;
 pub const MAX_BPM: f64 = 300.0;
@@ -21,6 +21,18 @@ pub const DEFAULT_BPM: f64 = 120.0;
 /// `bpm` inside [`MIN_BPM`]–[`MAX_BPM`].
 pub fn clamp_bpm(bpm: f64) -> f64 {
     bpm.clamp(MIN_BPM, MAX_BPM)
+}
+
+/// A tempo read from a file: a number or a numeric string (`"140"`), the
+/// default when outside the bounds, reported at `at`.
+pub fn bpm_from_json(raw: &Value, at: &str, issues: &mut Vec<Issue>) -> f64 {
+    match js::to_number(raw) {
+        bpm if (MIN_BPM..=MAX_BPM).contains(&bpm) => bpm,
+        bpm => {
+            issues.push(Issue::new(at, format!("{bpm} outside {MIN_BPM}–{MAX_BPM}, {DEFAULT_BPM} used")));
+            DEFAULT_BPM
+        }
+    }
 }
 
 /// One placement of a pattern on the timeline.
@@ -144,17 +156,7 @@ impl Song {
         }
 
         let text = |key: &str| field(key).map(js::to_string).unwrap_or_default();
-        let bpm = match field("bpm") {
-            None => DEFAULT_BPM,
-            Some(raw) => match js::to_number(raw) {
-                bpm if (MIN_BPM..=MAX_BPM).contains(&bpm) => bpm,
-                bpm => {
-                    let message = format!("{bpm} outside {MIN_BPM}–{MAX_BPM}, {DEFAULT_BPM} used");
-                    issues.push(Issue::new(format!("{at}.bpm"), message));
-                    DEFAULT_BPM
-                }
-            },
-        };
+        let bpm = field("bpm").map_or(DEFAULT_BPM, |raw| bpm_from_json(raw, &format!("{at}.bpm"), issues));
         let loop_count =
             ["loopMeasures", "loopMeasureCount"].iter().find_map(|key| object.get(key)).map_or(f64::NAN, js::to_number);
         let id = match text("id").trim() {

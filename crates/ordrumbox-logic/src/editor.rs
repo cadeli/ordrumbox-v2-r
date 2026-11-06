@@ -14,6 +14,7 @@ use ordrumbox_core::ids::{slugify, unique_id};
 use ordrumbox_core::js::{number_to_string, round};
 use ordrumbox_core::json::Value;
 use ordrumbox_core::note::{ACCENT_VELOCITY, ACCENTED_VELOCITY};
+use ordrumbox_core::song::{DEFAULT_BPM, clamp_bpm};
 use ordrumbox_core::style::{COMPLEXITY, ENERGY, MACRO_NEUTRAL};
 use ordrumbox_core::track::MAX_TRACKS;
 use ordrumbox_core::{Library, Note, Pattern, Scales, SetField, Styles, Track};
@@ -27,8 +28,7 @@ mod arrangement;
 
 /// Longest pattern, beats (`MAX_BEATS`).
 pub const MAX_BEATS: i32 = 16;
-/// Default tempo and length of a pattern (`PATTERN_DEFAULTS`).
-const DEFAULT_BPM: f64 = 120.0;
+/// Default length of a pattern (`PATTERN_DEFAULTS`).
 const DEFAULT_BEAT_COUNT: i32 = 4;
 /// Step of a velocity nudge (`VELOCITY_STEP`).
 pub const VELOCITY_STEP: f64 = 0.05;
@@ -634,7 +634,6 @@ impl Editor {
         Pattern {
             id: unique_id(&slugify(&name), &mut taken),
             name: Some(name),
-            bpm: DEFAULT_BPM,
             beat_count: DEFAULT_BEAT_COUNT,
             ..Pattern::default()
         }
@@ -707,13 +706,20 @@ impl Editor {
         .is_some()
     }
 
-    /// Tempo; 0 or not a number sets the default 120.
-    /// With `coalesce`, a run of changes is one step.
-    pub fn set_pattern_bpm(&mut self, p: usize, bpm: f64, coalesce: bool) -> bool {
-        let bpm = if bpm.is_finite() && bpm != 0.0 { bpm } else { DEFAULT_BPM };
-        let coalesce = coalesce.then(|| format!("pattern:{p}:bpm"));
-        self.edit(p, |_| format!("Set BPM → {}", number_to_string(bpm)), coalesce, |pattern| pattern.bpm = bpm)
-            .is_some()
+    /// The library's tempo, every pattern's (inside the tempo bounds; 0 or
+    /// not a number sets the default 120). With `coalesce`, a run of changes
+    /// is one step. Whether it changed.
+    pub fn set_bpm(&mut self, bpm: f64, coalesce: bool) -> bool {
+        let bpm = if bpm.is_finite() && bpm != 0.0 { clamp_bpm(bpm) } else { DEFAULT_BPM };
+        let before = self.library.bpm;
+        if bpm == before {
+            return false;
+        }
+        self.library.bpm = bpm;
+        let coalesce = coalesce.then(|| "bpm".to_owned());
+        self.record(format!("Set BPM → {}", number_to_string(bpm)), Change::Tempo { before, after: bpm }, coalesce);
+        self.revision += 1;
+        true
     }
 
     /// Length in beats, 1–16 (out of range: 4); every track follows and its
@@ -770,7 +776,8 @@ impl Editor {
 
 impl Editor {
     /// Shift+B: a new pattern made in a style (style `style`, else a drawn
-    /// one): its tracks, meter, tempo and lines, one undo step; its index.
+    /// one): its tracks, meter and lines, the library at the style's tempo,
+    /// one undo step; its index.
     pub fn generate_pattern(
         &mut self,
         scales: &Scales,
@@ -780,16 +787,29 @@ impl Editor {
     ) -> usize {
         let mut pattern = self.blank_pattern(None);
         let options = Options { genre: style.map(str::to_owned), ..Options::default() };
-        generate::restyle_pattern(&mut AutoGenerator::new(scales, styles, rnd), &mut pattern, &options);
+        let mut g = AutoGenerator::new(scales, styles, rnd);
+        generate::restyle_pattern(&mut g, &mut pattern, &options);
+        let tempo = g.tempo;
         let desc = format!("Generate pattern \"{}\"", pattern_name(&pattern));
-        self.edit_patterns(desc, |patterns| {
-            patterns.push(pattern);
-            patterns.len() - 1
+        self.batch(&desc.clone(), |e| {
+            e.set_style_tempo(tempo);
+            e.edit_patterns(desc, |patterns| {
+                patterns.push(pattern);
+                patterns.len() - 1
+            })
         })
     }
 
+    /// The library at the tempo a style drew, when it drew one.
+    fn set_style_tempo(&mut self, tempo: Option<f64>) {
+        if let Some(bpm) = tempo {
+            self.set_bpm(bpm, false);
+        }
+    }
+
     /// ⟳ (B): pattern `p` made again in style `style` (else its own, else a
-    /// drawn one), locked tracks kept; one undo step.
+    /// drawn one), locked tracks kept, the library at the style's tempo; one
+    /// undo step.
     pub fn regenerate_pattern(
         &mut self,
         p: usize,
@@ -799,13 +819,22 @@ impl Editor {
         rnd: &mut dyn FnMut() -> f64,
     ) -> bool {
         let options = Options { genre: style.map(str::to_owned), ..Options::default() };
-        self.edit(
-            p,
-            |pattern| format!("Generate \"{}\"", pattern_name(pattern)),
-            None,
-            |pattern| generate::restyle_pattern(&mut AutoGenerator::new(scales, styles, rnd), pattern, &options),
-        )
-        .is_some()
+        let Some(pattern) = self.library.patterns.get(p) else { return false };
+        let desc = format!("Generate \"{}\"", pattern_name(pattern));
+        self.batch(&desc, |e| {
+            let mut g = AutoGenerator::new(scales, styles, rnd);
+            e.edit(
+                p,
+                |pattern| format!("Generate \"{}\"", pattern_name(pattern)),
+                None,
+                |pattern| {
+                    generate::restyle_pattern(&mut g, pattern, &options);
+                },
+            );
+            let tempo = g.tempo;
+            e.set_style_tempo(tempo);
+        });
+        true
     }
 
     /// A generation macro of pattern `p` (`composeEnergy`…, 0–100) set to
@@ -1225,8 +1254,11 @@ mod tests {
         assert_eq!(pattern(&e).tracks[1].loop_length, Some(16));
         assert!(e.set_pattern_beat_count(0, 40.0));
         assert_eq!(pattern(&e).beat_count, 4);
-        assert!(e.set_pattern_bpm(0, f64::NAN, false));
-        assert_eq!(pattern(&e).bpm, 120.0);
+        // The tempo is the library's, from the file's first pattern.
+        assert_eq!(e.library().bpm, 100.0);
+        assert!(e.set_bpm(f64::NAN, false));
+        assert_eq!(e.library().bpm, 120.0);
+        assert!(!e.set_bpm(400.0, false) || e.library().bpm == 300.0);
         assert!(e.rename_pattern(0, "  "));
         assert_eq!(pattern(&e).name.as_deref(), Some("rock"));
         assert!(e.rename_pattern(0, "  Rock II "));
@@ -1360,7 +1392,7 @@ mod tests {
         let added = e.batch("Remote edit", |e| {
             let t = e.add_track(0, "HH", 4).unwrap();
             e.add_note(0, t, 0, 1, 0.0);
-            e.set_pattern_bpm(0, 140.0, false);
+            e.set_bpm(140.0, false);
             e.add_song("verse");
             e.batch("inner", |e| e.set_pattern_tags(0, &[" rock ".into(), " ".into()]));
             t
@@ -1376,7 +1408,7 @@ mod tests {
         e.redo();
         assert_eq!(e.library(), &after);
         // A batch that changes nothing records nothing.
-        e.batch("nothing", |e| e.set_pattern_bpm(0, 140.0, false));
+        e.batch("nothing", |e| e.set_bpm(140.0, false));
         assert_eq!(e.history().undo_len(), 2);
     }
 

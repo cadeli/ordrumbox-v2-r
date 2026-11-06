@@ -287,10 +287,7 @@ mod tests {
         });
         let mut link = Link { endpoint: endpoint.clone(), connection: None };
         let args = json::parse(r#"{"bpm":128}"#).unwrap();
-        assert_eq!(
-            link.call("setPatternBpm", &args).unwrap().to_json(),
-            r#"{"name":"setPatternBpm","args":{"bpm":128}}"#
-        );
+        assert_eq!(link.call("setBpm", &args).unwrap().to_json(), r#"{"name":"setBpm","args":{"bpm":128}}"#);
         assert_eq!(link.call("fail", &Value::Null), Err("it failed".to_owned()));
         window.join().unwrap();
 

@@ -600,7 +600,7 @@ mod tests {
         assert!(app.key(&press(Key::Letter('Z'))));
 
         let mut plugin = Ui::new(session(true));
-        let bpm = plugin.session.pattern().unwrap().bpm;
+        let bpm = plugin.session.tempo();
         // The host's: its transport, Ctrl/Cmd keys, what a plugin leaves out.
         for key in [Key::Space, Key::F(3), Key::Minus, Key::Equal, Key::BracketLeft] {
             let shift = key == Key::BracketLeft;
@@ -612,7 +612,7 @@ mod tests {
             assert!(!plugin.key(&press(key)), "Cmd+{key:?}");
         }
         assert!(!plugin.session.playing() && !plugin.session.song_view_open());
-        assert_eq!(plugin.session.pattern().unwrap().bpm, bpm);
+        assert_eq!(plugin.session.tempo(), bpm);
         assert_eq!(plugin.session.pattern().unwrap().beat_count, session(false).pattern().unwrap().beat_count);
         // The plugin's own keys stay its own.
         plugin.set_modifiers(Modifiers::default());
