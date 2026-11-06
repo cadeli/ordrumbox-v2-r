@@ -117,7 +117,8 @@ then of another kit, then a catalog substitute, then any sample (each a
 random pick among the candidates, made at play and on a kit change); a synth
 track without a known preset gets a random one.
 
-WAV exports (16-bit, 44.1 kHz, the pattern once or the whole song, no tail) go
+WAV exports (16-bit, 44.1 kHz, the pattern once or the whole song, no tail,
+signed `orDrumbox <version>` in the `ISFT` tag of a `LIST`/`INFO` chunk) go
 to the folder picked when exporting. Every export asks for its folder: the last
 one picked, at first `exports/` next to `library.json` if it exists, else the
 home folder; **Enter** on `[ Use this folder ]` writes there. A file of the same

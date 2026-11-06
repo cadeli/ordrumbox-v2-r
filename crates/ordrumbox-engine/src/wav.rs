@@ -109,14 +109,38 @@ fn decode_samples(format: &Format, data: &[u8]) -> Result<SampleBuffer, WavError
     })
 }
 
+/// The software that wrote an exported file, signed in its `ISFT` tag.
+pub const SIGNATURE: &str = concat!("orDrumbox ", env!("CARGO_PKG_VERSION"));
+
+/// A `LIST`/`INFO` chunk naming the software (`ISFT`): `SIGNATURE`,
+/// zero-terminated and padded to an even length.
+fn signature_chunk() -> Vec<u8> {
+    let mut text = SIGNATURE.as_bytes().to_vec();
+    text.push(0);
+    let text_len = text.len() as u32;
+    if text.len() % 2 == 1 {
+        text.push(0);
+    }
+    let mut out = Vec::with_capacity(20 + text.len());
+    out.extend_from_slice(b"LIST");
+    out.extend_from_slice(&(4 + 8 + text.len() as u32).to_le_bytes());
+    out.extend_from_slice(b"INFOISFT");
+    out.extend_from_slice(&text_len.to_le_bytes());
+    out.extend_from_slice(&text);
+    out
+}
+
 /// A stereo 16-bit PCM WAV file: samples clamped to ±1,
 /// negative ones scaled by 32768 and positive ones by 32767, truncated.
+/// It is signed by orDrumbox in a `LIST`/`INFO` chunk after the samples,
+/// so the 44-byte header stays where readers expect it.
 pub fn encode(left: &[f32], right: &[f32], sample_rate: u32) -> Vec<u8> {
     let frames = left.len().min(right.len());
     let data_len = (frames * 4) as u32;
-    let mut out = Vec::with_capacity(44 + frames * 4);
+    let signature = signature_chunk();
+    let mut out = Vec::with_capacity(44 + frames * 4 + signature.len());
     out.extend_from_slice(b"RIFF");
-    out.extend_from_slice(&(36 + data_len).to_le_bytes());
+    out.extend_from_slice(&(36 + data_len + signature.len() as u32).to_le_bytes());
     out.extend_from_slice(b"WAVEfmt ");
     out.extend_from_slice(&16u32.to_le_bytes());
     out.extend_from_slice(&1u16.to_le_bytes());
@@ -134,6 +158,7 @@ pub fn encode(left: &[f32], right: &[f32], sample_rate: u32) -> Vec<u8> {
             out.extend_from_slice(&(value.trunc() as i16).to_le_bytes());
         }
     }
+    out.extend_from_slice(&signature);
     out
 }
 
@@ -224,9 +249,10 @@ pub(crate) mod tests {
     #[test]
     fn pcm_16_header_and_samples() {
         let bytes = encode(&[0.0, 1.0, -1.0], &[0.5, -0.5, 2.0], 44_100);
+        let signature_len = signature_chunk().len() as u8;
         #[rustfmt::skip]
         let header: [u8; 44] = [
-            b'R', b'I', b'F', b'F', 48, 0, 0, 0, b'W', b'A', b'V', b'E',
+            b'R', b'I', b'F', b'F', 48 + signature_len, 0, 0, 0, b'W', b'A', b'V', b'E',
             b'f', b'm', b't', b' ', 16, 0, 0, 0,
             1, 0, // PCM
             2, 0, // stereo
@@ -237,10 +263,27 @@ pub(crate) mod tests {
             b'd', b'a', b't', b'a', 12, 0, 0, 0,
         ];
         assert_eq!(bytes[..44], header);
-        let samples: Vec<i16> = bytes[44..].chunks(2).map(|b| i16::from_le_bytes([b[0], b[1]])).collect();
+        let samples: Vec<i16> = bytes[44..56].chunks(2).map(|b| i16::from_le_bytes([b[0], b[1]])).collect();
         // Interleaved left, right; truncated toward zero, 2.0 clamped.
         assert_eq!(samples, [0, 16_383, 32_767, -16_384, -32_768, 32_767]);
-        assert_eq!(encode(&[0.1, 0.2], &[0.3], 8_000).len(), 44 + 4, "the shorter channel sets the length");
+        assert_eq!(
+            encode(&[0.1, 0.2], &[0.3], 8_000).len(),
+            44 + 4 + usize::from(signature_len),
+            "the shorter channel sets the length"
+        );
+    }
+
+    #[test]
+    fn pcm_16_is_signed_by_ordrumbox() {
+        let bytes = encode(&[0.0], &[0.0], 8_000);
+        let chunk = &bytes[48..];
+        assert_eq!(&chunk[..4], b"LIST");
+        assert_eq!(u32::from_le_bytes(chunk[4..8].try_into().unwrap()) as usize, chunk.len() - 8);
+        assert_eq!(&chunk[8..16], b"INFOISFT");
+        let text_len = u32::from_le_bytes(chunk[16..20].try_into().unwrap()) as usize;
+        assert_eq!(&chunk[20..20 + text_len], format!("{SIGNATURE}\0").as_bytes());
+        assert!(SIGNATURE.starts_with("orDrumbox "));
+        assert_eq!(chunk.len() % 2, 0, "chunks are word-aligned");
     }
 
     #[test]
