@@ -14,8 +14,8 @@ mod structure;
 
 use std::sync::OnceLock;
 
-use ordrumbox_core::js;
 use ordrumbox_core::json::{self, Object, Value};
+use ordrumbox_core::num::round2;
 use ordrumbox_core::{Note, Scales, Track};
 
 pub use auto::{
@@ -30,7 +30,7 @@ pub fn variant_names(kind: &str) -> Vec<&'static str> {
     table(kind).iter().map(|(name, _)| name).collect()
 }
 
-/// A random source with the `Math.random()` contract: uniform in `[0, 1)`.
+/// A random source, uniform in `[0, 1)`.
 pub type Random<'a> = &'a mut dyn FnMut() -> f64;
 
 /// The tables of `data/generators.json` (parsed once).
@@ -46,7 +46,7 @@ pub(crate) fn table(name: &str) -> &'static Object {
     tables().get(name).and_then(Value::as_object).unwrap_or_else(|| EMPTY.get_or_init(Object::new))
 }
 
-// ─── JS-style reads ──────────────────────────────────────────────────────────
+// ─── Table reads ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 /// `value[key]` when it is a number.
 pub(crate) fn num(value: &Value, key: &str) -> Option<f64> {
@@ -66,17 +66,18 @@ pub(crate) fn nums(value: &Value, key: &str) -> Option<Vec<f64>> {
     list(value, key).map(|items| items.iter().map(|v| v.as_f64().unwrap_or(f64::NAN)).collect())
 }
 
-/// `list[i % list.length]`, `None` for an empty list (`undefined` in JS).
+/// Item `i` of `items` taken cyclically, `None` for an empty list.
 pub(crate) fn cycle<T: Copy>(items: &[T], i: usize) -> Option<T> {
     if items.is_empty() { None } else { Some(items[i % items.len()]) }
 }
 
-/// `Math.min(max, Math.max(min, value))` (NaN stays NaN).
+/// `value` inside `min`–`max`, NaN kept; unlike [`f64::clamp`], `min > max`
+/// (bounds read from a table) gives `max` instead of a panic.
 pub(crate) fn clamp(value: f64, min: f64, max: f64) -> f64 {
     if value.is_nan() { value } else { value.max(min).min(max) }
 }
 
-/// `pickRandom(list)`: one draw, none for an empty list.
+/// One item of `items` drawn with one call to `rnd`, none for an empty list.
 pub(crate) fn pick<'a, T>(rnd: &mut dyn FnMut() -> f64, items: &'a [T]) -> Option<&'a T> {
     if items.is_empty() {
         return None;
@@ -88,7 +89,7 @@ pub(crate) fn pick<'a, T>(rnd: &mut dyn FnMut() -> f64, items: &'a [T]) -> Optio
 /// `NoteCommands.addNote` then the generator's velocity: a default note at
 /// `beat`/`beat_step` with its `stepPercent` on the track's current grid.
 pub(crate) fn add_note(track: &mut Track, beat: i32, beat_step: i32, pitch: f64, velocity: f64) -> &mut Note {
-    let step_percent = js::round(f64::from(beat_step) * 100.0 / f64::from(track.steps_per_beat));
+    let step_percent = (f64::from(beat_step) * 100.0 / f64::from(track.steps_per_beat)).round();
     track.notes.push(Note {
         velocity,
         beat,
@@ -150,7 +151,7 @@ pub(crate) struct VelocitySpec {
     pub variation: bool,
     /// Replaces the config's `base`.
     pub base: Option<f64>,
-    /// Round to 2 decimals (`toFixed`, default on).
+    /// Round to 2 decimals (default on).
     pub fixed: bool,
     /// Multiplies the sum before the clamp.
     pub scale: f64,
@@ -230,7 +231,7 @@ impl<'a> Generator<'a> {
         let min = num(vc, "clampMin").unwrap_or(0.25);
         let max = num(vc, "clampMax").unwrap_or(1.0);
         let result = clamp((base + accent + ghost + boost + offset) * context.scale, min, max);
-        if context.fixed { js::to_fixed(result, 2) } else { result }
+        if context.fixed { round2(result) } else { result }
     }
 
     /// `getScaleSteps`: the scale's degrees, or the major scale.

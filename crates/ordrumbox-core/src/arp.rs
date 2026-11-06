@@ -1,7 +1,6 @@
 //! Arpeggios (`normalizeArp()` in pattern_engine.js): what a note's `arp`
 //! field means, as a sequence of semitone offsets.
 
-use crate::js;
 use crate::json::Value;
 use crate::rng::Rng;
 
@@ -15,25 +14,25 @@ const MAJOR_SCALE: [f64; 8] = [0.0, 2.0, 4.0, 5.0, 7.0, 9.0, 11.0, 12.0];
 /// - `"up"`, `"down"`, `"updown"`, `"random"`: the major scale in that order;
 /// - `{"intervals": [0, 3, 7], "direction": "updown"}`.
 ///
-/// Intervals are coerced like JS `Number()` (`"4"` is 4), non-numbers dropped,
+/// Intervals are numbers or numeric strings (`"4"` is 4), anything else dropped,
 /// and a root (0) is added when missing. `updown` goes up then back down
 /// without repeating the ends (`0 4 7 4`). `random` shuffles on every call, so
 /// it draws from `rng`; every other form draws nothing.
 pub fn sequence(arp: &Value, rng: &mut Rng) -> Option<Vec<f64>> {
     let (intervals, mode): (Vec<f64>, String) = match arp {
-        Value::Array(items) => (items.iter().map(js::to_number).collect(), "up".into()),
+        Value::Array(items) => (items.iter().filter_map(Value::to_number).collect(), "up".into()),
         Value::String(text) => {
             let text = text.trim().to_lowercase();
             match text.as_str() {
                 "up" | "down" | "updown" | "random" => (MAJOR_SCALE.to_vec(), text),
                 _ if !text.contains(|c: char| c.is_ascii_digit()) => return None,
-                _ => (text.split(',').map(|part| js::to_number(&Value::from(part.trim()))).collect(), "up".into()),
+                _ => (text.split(',').filter_map(|part| Value::from(part).to_number()).collect(), "up".into()),
             }
         }
         Value::Object(object) => {
             let intervals = object.get("intervals").and_then(Value::as_array).unwrap_or_default();
-            let mode = object.get("direction").filter(|m| !m.is_null()).map_or_else(|| "up".to_owned(), js::to_string);
-            (intervals.iter().map(js::to_number).collect(), mode.to_lowercase())
+            let mode = object.get("direction").and_then(Value::to_text).unwrap_or_else(|| "up".to_owned());
+            (intervals.iter().filter_map(Value::to_number).collect(), mode.to_lowercase())
         }
         _ => return None,
     };

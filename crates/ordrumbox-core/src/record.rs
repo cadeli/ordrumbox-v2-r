@@ -129,11 +129,6 @@ pub(crate) fn check_duplicate(
     }
 }
 
-/// Round to 2 decimals like the JS exporter: `Math.round(v * 100) / 100`.
-pub(crate) fn round2(value: f64) -> f64 {
-    crate::js::round(value * 100.0) / 100.0
-}
-
 macro_rules! json_record {
     (
         $(#[$meta:meta])*
@@ -170,8 +165,7 @@ macro_rules! json_record {
                 }
             }
 
-            /// Set the field named `key`. `null` resets it to its default
-            /// (what `?? default` does on the JS side).
+            /// Set the field named `key`. `null` resets it to its default.
             pub fn set_field(&mut self, key: &str, value: &$crate::json::Value) -> $crate::record::SetField {
                 use $crate::record::{JsonField, SetField};
                 match key {
@@ -207,16 +201,6 @@ pub(crate) use json_record;
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn round2_matches_js_math_round() {
-        assert_eq!(round2(0.81234), 0.81);
-        assert_eq!(round2(0.876), 0.88);
-        assert_eq!(round2(1234.567), 1234.57);
-        assert_eq!(round2(-0.025), -0.02); // JS: Math.round(-2.5) = -2
-        assert_eq!(round2(0.125), 0.13);
-        assert_eq!(round2(1.0), 1.0);
-    }
 
     #[test]
     fn field_types() {

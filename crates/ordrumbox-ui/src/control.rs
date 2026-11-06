@@ -2,13 +2,13 @@
 //! `or_slider.js`): the value side of a knob or a slider — its range, step
 //! and scale, what a drag, a key, the wheel or a typed number make of the
 //! value — and the display formats of the track editor, the note editor and
-//! the kit editor, all computed as the JS computes them.
+//! the kit editor.
 //!
 //! Three additions: the mouse wheel steps any control like an arrow key,
-//! Shift drags a slider finely, as it already does a knob (the JS range
+//! Shift drags a slider finely, as it already does a knob (a plain range
 //! input has no fine drag), and a slider can be logarithmic.
 
-use ordrumbox_core::js;
+use ordrumbox_core::num::{self, round_to};
 
 /// Pixels of vertical drag that cross a knob's whole range (`/ 200`).
 const DRAG_RANGE_PX: f64 = 200.0;
@@ -42,7 +42,7 @@ impl Spec {
         Self { style: Style::Slider, min, max, step, default, log: false, full_travel: false }
     }
 
-    /// `scale: 'log'`; ignored (linear) unless `0 < min < max`, as in the JS.
+    /// `scale: 'log'`; ignored (linear) unless `0 < min < max`.
     pub const fn log(self) -> Self {
         Self { log: self.min > 0.0 && self.max > self.min, ..self }
     }
@@ -76,7 +76,7 @@ impl Spec {
 
     /// `#clampStep`: `raw` rounded to a multiple of `step`, inside the range.
     fn clamp_step(&self, raw: f64, step: f64) -> f64 {
-        self.clamp(js::round(raw / step) * step)
+        self.clamp((raw / step).round() * step)
     }
 
     /// A knob dragged `dy` pixels up (negative: down) from `start` (Shift: finely).
@@ -120,7 +120,7 @@ impl Spec {
     pub fn slider_at(&self, fraction: f64) -> f64 {
         let fraction = fraction.clamp(0.0, 1.0);
         let raw = if self.log { self.log_value(fraction) } else { self.min + fraction * (self.max - self.min) };
-        self.clamp(self.min + js::round((raw - self.min) / self.step) * self.step)
+        self.clamp(self.min + ((raw - self.min) / self.step).round() * self.step)
     }
 
     /// A slider dragged finely (Shift) by `dfraction` of its width from `start`.
@@ -145,32 +145,32 @@ impl Spec {
 
 // ─── Display ─────────────────────────────────────────────────────────────────
 
-/// How a value is shown (the `format` of each control in the JS).
+/// How a value is shown.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Format {
-    /// `fmt`: two decimals at most.
+    /// Two decimals at most: `0.5`, `0.33`.
     Fmt,
-    /// `String(v)`.
+    /// The number as is.
     Plain,
     /// Knob bar velocity: a percentage.
     Percent,
     /// Knob bar pitch: `+3`.
     SignedPlain,
-    /// `${Math.round(v)} ms`.
+    /// Whole milliseconds: `250 ms`.
     Millis,
     /// Filter frequency: `850Hz`, `1.2k`.
     Freq,
-    /// `toFixed(2)`.
+    /// Exactly two decimals: `0.50`.
     Fixed2,
-    /// `toFixed(1)`.
+    /// Exactly one decimal: `0.5`.
     Fixed1,
-    /// `formatSignedDb`: `+1.0`.
+    /// A gain in dB with its sign: `+1.0`.
     SignedFixed1,
     /// The loop length as `beat.step` at this many steps per beat.
     LoopLength(i32),
-    /// `parseFloat(v.toFixed(3))`.
+    /// Three decimals at most.
     Fmt3,
-    /// `Math.round(v)`.
+    /// The nearest whole number.
     Round,
     /// Auto density: `Auto` below 0.
     Density,
@@ -179,20 +179,20 @@ pub enum Format {
 }
 
 impl Format {
-    /// The value's text (the JS formatter's result, as `String()` shows it).
+    /// The value's text.
     pub fn text(self, v: f64) -> String {
         match self {
             Self::Fmt => fmt(v),
-            Self::Plain => js::number_to_string(v),
-            Self::Percent => js::number_to_string(js::round(v * 100.0)),
-            Self::SignedPlain => format!("{}{}", if v >= 0.0 { "+" } else { "" }, js::number_to_string(v)),
-            Self::Millis => format!("{} ms", js::number_to_string(js::round(v))),
+            Self::Plain => num::text(v),
+            Self::Percent => num::text((v * 100.0).round()),
+            Self::SignedPlain => format!("{}{}", if v >= 0.0 { "+" } else { "" }, num::text(v)),
+            Self::Millis => format!("{} ms", num::text(v.round())),
             Self::Freq => {
-                let hz = js::round(if v.is_finite() { v } else { 20.0 });
+                let hz = if v.is_finite() { v.round() } else { 20.0 };
                 if hz >= 1000.0 {
                     format!("{}k", to_fixed_text(hz / 1000.0, 1))
                 } else {
-                    format!("{}Hz", js::number_to_string(hz))
+                    format!("{}Hz", num::text(hz))
                 }
             }
             Self::Fixed2 => to_fixed_text(v, 2),
@@ -203,13 +203,13 @@ impl Format {
                 let step = v as i64 - 1;
                 format!("{}.{}", step.div_euclid(spb) + 1, step % spb + 1)
             }
-            Self::Fmt3 => js::number_to_string(js::to_fixed(v, 3)),
-            Self::Round => js::number_to_string(js::round(v)),
+            Self::Fmt3 => num::text(round_to(v, 3)),
+            Self::Round => num::text(v.round()),
             Self::Seed => {
                 if v < 1.0 {
                     "new".to_owned()
                 } else {
-                    js::number_to_string(v)
+                    num::text(v)
                 }
             }
             Self::Density => {
@@ -222,24 +222,23 @@ impl Format {
         }
     }
 
-    /// `formatValue`: the text cut to 8 characters, then the unit.
+    /// The text cut to 8 characters, then the unit.
     pub fn value(self, v: f64, unit: &str) -> String {
         let text: String = self.text(v).chars().take(8).collect();
         if unit.is_empty() { text } else { format!("{text} {unit}") }
     }
 }
 
-/// `fmt`: `parseFloat(Number(v).toFixed(2))`.
+/// `v` with two decimals at most (`0.5`, `0.33`).
 pub fn fmt(v: f64) -> String {
-    js::number_to_string(js::to_fixed(v, 2))
+    num::text(round_to(v, 2))
 }
 
-/// `v.toFixed(digits)`.
+/// `v` with exactly `digits` decimals, rounded as [`round_to`] does (the
+/// formatter alone would round an exact tie such as 0.125 to even).
 pub fn to_fixed_text(v: f64, digits: usize) -> String {
-    if !v.is_finite() {
-        return js::number_to_string(v);
-    }
-    format!("{:.*}", digits, js::to_fixed(v, digits))
+    let rounded = round_to(v, digits as i32);
+    format!("{rounded:.digits$}")
 }
 
 #[cfg(test)]
@@ -441,7 +440,7 @@ mod tests {
             [-1.0, -1.0, -0.5, 0.0, 0.004, 0.333, 1.0, 1.0, 1.0, 1.0, 1.0],
         ),
         (
-            [-24.0, -24.0, 0.0, 0.0, 0.0, 0.0, 1.0, 8.0, 20.0, 24.0, 24.0],
+            [-24.0, -24.0, -1.0, 0.0, 0.0, 0.0, 1.0, 8.0, 20.0, 24.0, 24.0],
             [-24.0, -24.0, -0.5, 0.0, 0.004, 0.333, 1.26, 7.77, 19.5, 24.0, 24.0],
         ),
         (
@@ -508,7 +507,7 @@ mod tests {
                 "-2400 %",
                 "-314 %",
                 "-100 %",
-                "-50 %",
+                "-51 %",
                 "-4 %",
                 "0 %",
                 "1 %",
@@ -574,7 +573,7 @@ mod tests {
             Format::Millis,
             "",
             [
-                "-1234 ms", "-24 ms", "-3 ms", "-1 ms", "-1 ms", "0 ms", "0 ms", "0 ms", "0 ms", "0 ms", "0 ms",
+                "-1235 ms", "-24 ms", "-3 ms", "-1 ms", "-1 ms", "0 ms", "0 ms", "0 ms", "0 ms", "0 ms", "0 ms",
                 "1 ms", "1 ms", "1 ms", "1 ms", "1 ms", "3 ms", "7 ms", "12 ms", "100 ms", "100 ms", "500 ms",
                 "999 ms", "1000 ms", "1000 ms", "1235 ms", "5000 ms", "12346 ms", "20000 ms",
             ],
@@ -583,7 +582,7 @@ mod tests {
             Format::Freq,
             "",
             [
-                "-1234Hz", "-24Hz", "-3Hz", "-1Hz", "-1Hz", "0Hz", "0Hz", "0Hz", "0Hz", "0Hz", "0Hz", "1Hz", "1Hz",
+                "-1235Hz", "-24Hz", "-3Hz", "-1Hz", "-1Hz", "0Hz", "0Hz", "0Hz", "0Hz", "0Hz", "0Hz", "1Hz", "1Hz",
                 "1Hz", "1Hz", "1Hz", "3Hz", "7Hz", "12Hz", "100Hz", "100Hz", "500Hz", "999Hz", "1.0k", "1.0k", "1.2k",
                 "5.0k", "12.3k", "20.0k",
             ],
@@ -606,7 +605,7 @@ mod tests {
                 "-3.1 dB",
                 "-1.0 dB",
                 "-0.5 dB",
-                "-0.0 dB",
+                "0.0 dB",
                 "0.0 dB",
                 "0.0 dB",
                 "0.0 dB",
@@ -641,7 +640,7 @@ mod tests {
                 "-3.1 st",
                 "-1.0 st",
                 "-0.5 st",
-                "-0.0 st",
+                "0.0 st",
                 "+0.0 st",
                 "+0.0 st",
                 "+0.0 st",
@@ -829,7 +828,7 @@ mod tests {
         assert_eq!(Format::Millis.value(5000.0, ""), "5000 ms");
         assert_eq!(Format::Plain.value(0.333_333, "x"), "0.333333 x");
         assert_eq!(Format::Plain.value(0.123_456_789, ""), "0.123456");
-        assert_eq!(Format::SignedFixed1.text(-0.04), "-0.0");
+        assert_eq!(Format::SignedFixed1.text(-0.04), "0.0");
     }
 
     #[test]

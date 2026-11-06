@@ -16,8 +16,8 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ordrumbox_core::js;
 use ordrumbox_core::json::{self, Value};
+use ordrumbox_core::num;
 use ordrumbox_core::song::measures_for_pattern;
 use ordrumbox_core::steps::TICK;
 use ordrumbox_core::{Song, SongClip};
@@ -169,7 +169,7 @@ impl Session {
     }
 
     pub(super) fn info(&self, key: &str) -> String {
-        self.editor.library().info.get(key).map(js::to_string).unwrap_or_default()
+        self.editor.library().info.get(key).and_then(Value::to_text).unwrap_or_default()
     }
 
     pub(super) fn song_rows(&self) -> Vec<Row> {
@@ -861,7 +861,7 @@ impl Session {
                 let label = self.pattern_label(&clip.pattern_id);
                 self.editor.repeat_pattern_at_measure(clip.start_measure, None).map(|_| {
                     let at = f64::from(clip.start_measure) + clip.measure_count + 1.0;
-                    format!("\"{label}\" repeated at measure {}", js::number_to_string(at))
+                    format!("\"{label}\" repeated at measure {}", num::text(at))
                 })
             }
             ("delete", None) => {
@@ -1129,7 +1129,7 @@ impl Session {
 
 /// A clip's description (its `title`): `PATTERN - measure N, M measure(s)`.
 fn clip_label(label: &str, clip: &SongClip) -> String {
-    format!("{label} - measure {}, {} measure(s)", clip.start_measure + 1, js::number_to_string(clip.measure_count))
+    format!("{label} - measure {}, {} measure(s)", clip.start_measure + 1, num::text(clip.measure_count))
 }
 
 #[cfg(test)]

@@ -6,7 +6,8 @@ use std::collections::HashMap;
 use crate::drum_taxonomy::{mono_from_track_name, pan_from_track_name};
 use crate::json::{Object, Value};
 use crate::note::{Note, decode_notes, encode_notes};
-use crate::record::{Issue, SetField, check_duplicate, json_record, round2};
+use crate::num::round2;
+use crate::record::{Issue, SetField, check_duplicate, json_record};
 
 json_record! {
     /// One track. Table fields are saved only when they differ from their

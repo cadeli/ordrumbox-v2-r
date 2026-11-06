@@ -1,6 +1,6 @@
 //! Reading Standard MIDI Files (`logic/midi/midi_parser.js`), with its
 //! leniency: chunks are walked by their declared lengths, reads past the end
-//! of the file give "nothing" (`undefined` in JS), and only meta, program and
+//! of the file give `None`, and only meta, program and
 //! note events are known (any other status is read as a two-byte event).
 
 /// Bytes read past the end of a track the file does not hold: beyond this,
@@ -216,7 +216,7 @@ impl Midi {
 
 /// `midiVelocityToNormalized`: 0–127 to 0–1, 2 decimals.
 pub fn velocity_to_unit(velocity: u8) -> f64 {
-    ordrumbox_core::js::round(f64::from(velocity) / 127.0 * 100.0) / 100.0
+    ordrumbox_core::num::round2(f64::from(velocity) / 127.0)
 }
 
 #[cfg(test)]

@@ -5,7 +5,6 @@
 //! one on or off does; the groups a control quietly switches on; the LFO
 //! modulation; and what the scope, the envelope and the filter curve plot.
 
-use ordrumbox_core::js;
 use ordrumbox_core::json::{self, Object, Value};
 use ordrumbox_core::lfo;
 
@@ -165,7 +164,11 @@ pub fn choices(path: &str) -> Option<Vec<&'static str>> {
 /// Value `value` of list control `path` as a preset holds it: the slope
 /// list holds numbers.
 pub fn choice_value(path: &str, value: &str) -> Value {
-    if path == "filter.slope" { Value::from(js::parse_float(&Value::from(value))) } else { Value::from(value) }
+    if path == "filter.slope" {
+        Value::from(value).to_number().map_or_else(|| Value::from(value), Value::from)
+    } else {
+        Value::from(value)
+    }
 }
 
 /// What one unit of an LFO's wave is worth on a target (`LFO_TARGET_SCALE`).
@@ -247,17 +250,6 @@ fn is_object(value: Option<&Value>) -> bool {
     matches!(value, Some(Value::Object(_)))
 }
 
-/// `Boolean(v)`.
-fn truthy(value: Option<&Value>) -> bool {
-    match value {
-        None | Some(Value::Null) => false,
-        Some(Value::Bool(b)) => *b,
-        Some(Value::Number(n)) => *n != 0.0 && !n.is_nan(),
-        Some(Value::String(s)) => !s.is_empty(),
-        Some(_) => true,
-    }
-}
-
 /// The value at a dotted `path` of `draft`.
 pub fn get<'a>(draft: &'a Object, path: &str) -> Option<&'a Value> {
     let mut parts = path.split('.');
@@ -325,7 +317,7 @@ pub fn bypassed(draft: &Object, group: &str) -> bool {
     if matches!(group, "vco1" | "vco2" | "vco3") {
         return number(draft, &format!("{group}.gain")) == Some(0.0);
     }
-    BYPASS_FLAGS.iter().find(|(g, _)| *g == group).is_some_and(|(_, flag)| truthy(draft.get(flag)))
+    BYPASS_FLAGS.iter().find(|(g, _)| *g == group).is_some_and(|(_, flag)| draft.get(flag).is_some_and(Value::is_true))
 }
 
 /// Whether a card has a bypass state (the oscillators and the flagged cards).
@@ -442,7 +434,9 @@ pub fn implicit_enable(draft: &mut Object, path: &str) -> Vec<String> {
 
 /// The LFOs playing (not bypassed): LFO1, LFO2.
 fn lfos(draft: &Object) -> [Option<&Object>; 2] {
-    let lfo = |group: &str, flag: &str| (!truthy(draft.get(flag))).then(|| draft.get(group)?.as_object()).flatten();
+    let lfo = |group: &str, flag: &str| {
+        (!draft.get(flag).is_some_and(Value::is_true)).then(|| draft.get(group)?.as_object()).flatten()
+    };
     [lfo("lfo", "bypassLfo1"), lfo("lfo2", "bypassLfo2")]
 }
 
@@ -455,8 +449,8 @@ pub fn lfo_mod(lfo: &Object, time: f64, bpm: f64) -> f64 {
         return 0.0;
     }
     let freq = crate::synth_preset::sync_to_hz(lfo.get("sync"), bpm)
-        .unwrap_or_else(|| lfo.get("freq").filter(|v| !v.is_null()).map_or(0.0, js::to_number));
-    let depth = lfo.get("depth").filter(|v| !v.is_null()).map_or(0.0, js::to_number);
+        .unwrap_or_else(|| lfo.get("freq").and_then(Value::to_number).unwrap_or(0.0));
+    let depth = lfo.get("depth").and_then(Value::to_number).unwrap_or(0.0);
     if freq <= 0.0 || depth <= 0.0 {
         return 0.0;
     }
@@ -654,7 +648,7 @@ pub fn filter_now(draft: &Object, time: f64, bpm: f64) -> (String, f64, f64, f64
 /// The module pills under the cards: label, active.
 pub fn modules(draft: &Object) -> Vec<(&'static str, bool)> {
     let n = |path: &str| number(draft, path).unwrap_or(0.0);
-    let flag = |key: &str| truthy(draft.get(key));
+    let flag = |key: &str| draft.get(key).is_some_and(Value::is_true);
     let gain = |v: usize| number(draft, &format!("vco{v}.gain")).unwrap_or(if v == 1 { 1.0 } else { 0.0 });
     let target = |path: &str, off: &str| text(draft, path).unwrap_or(off) != off;
     let env_amount = number(draft, "filterEnv.filterEnvelopeAmount")

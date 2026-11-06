@@ -8,7 +8,7 @@ Windows by CI).
 
 | Crate | Role | Dependencies |
 |---|---|---|
-| `ordrumbox-core` | data model, `library.json` codec, pattern engine, song clips, instrument catalog, JSON, RNG, JS number formatting | none |
+| `ordrumbox-core` | data model, `library.json` codec, pattern engine, song clips, instrument catalog, JSON, RNG, decimal rounding | none |
 | `ordrumbox-logic` | the library being edited: commands with undo/redo; pattern generators (drum lines from a style, styles learned from the library's tags, bass and chord variants, auto mode loop by loop); Standard MIDI Files (read, import, export) | core |
 | `ordrumbox-dsp` | sample voice, synth voice, channel strip (filter, saturation, reverb, delay), master bus; no allocation in render paths | none |
 | `ordrumbox-engine` | WAV decoding/encoding, kits and their files, sample analysis, sound auto-assignment, synth presets, passes (pattern and song: events, strip settings, LFO steps), sample-accurate engine, UI ↔ audio link, offline renders | core, dsp |
@@ -917,7 +917,10 @@ and bypasses (`tests/processors.rs`):
   (each note its own) and filter (opening to 0.45 × the rate, a quarter in
   JS), the patch's level, which counts the noise in the mix; the reverb at
   48 kHz (its tunings follow the rate), the `tape` saturation, a master output
-  above the limit's knee (see "Effects").
+  above the limit's knee (see "Effects"). `synth_renders.bin` was rewritten
+  when the random LFO wave stopped hashing its cycle through a JS-style
+  int32 xorshift: each cycle's value now comes from the splitmix64 finalizer,
+  so the busy patches with a random LFO play other values.
 - The strip settings the JS lacked (24 dB/oct filter, pre-delay, dispersion,
   gate, wow, feedback tone, ping-pong input) default to what the JS did, so
   the cases play them unset; unit tests (`strip.rs`, `synth.rs`) measure
@@ -944,6 +947,9 @@ against Rust snapshots, from inputs the tests build (`ordrumbox-engine/tests/`):
   Rewritten when the tempo moved from the patterns to the library: the
   tracks of `song.json` are set up at the library's tempo, 60 and 172 BPM,
   no longer at their pattern's.
+  Rewritten when the JS number helpers went: a value at a negative half
+  rounds away from zero (`f64::round`), so a track LFO at -0.125 is -0.13,
+  no longer -0.12.
 - `ordrumbox-engine/tests/fixtures/synth_editor_rust.txt` (`synth_editor.rs`):
   the synth editor's draft of every web preset and of hand-made ones (empty,
   partial and broken, bypassed), filled with the group defaults, their cards
@@ -954,6 +960,8 @@ against Rust snapshots, from inputs the tests build (`ordrumbox-engine/tests/`):
   which it matched when written.
   `cargo test -p ordrumbox-engine --test synth_editor -- --ignored` rewrites
   it.
+  Rewritten when the JS coercions went: a flag is on only when it is
+  `true`, so the partial preset's `"bypassFm": 1` no longer bypasses FM.
 
 The editing commands are checked by properties:
 
@@ -1122,8 +1130,11 @@ their unit tests:
 
 They replace `controls.json` and `piano_roll.json`, the JS `OrKnob`,
 `OrSlider`, formatters, `formatNoteTooltip`, `NoteDrag` and `midiName()`
-driven through a fake DOM, whose rows they hold (a fractional pitch still
-shows `undefined` as its name, as the JS did).
+driven through a fake DOM, whose rows they held. Changed since: a value
+at a negative half rounds away from zero (`-0.5` is `-1`, `-50.5 %` is `-51 %`), a value rounded to
+zero shows no sign, an exact tie such as 0.125 shows `0.13` at two
+decimals, and a fractional pitch has `?` for a name (the JS showed
+`undefined`).
 
 ## License
 

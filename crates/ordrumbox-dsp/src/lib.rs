@@ -74,36 +74,3 @@ pub const FILTER_FREQ_MIN: f64 = MIN_FILTER_FREQ;
 pub const FILTER_FREQ_MAX: f64 = MAX_FILTER_FREQ;
 pub const FILTER_CUTOFF_MIN: f64 = MIN_FILTER_FREQ;
 pub const FILTER_CUTOFF_MAX: f64 = MAX_FILTER_FREQ;
-
-/// `Math.round`: halves round up (toward +∞).
-#[inline]
-pub(crate) fn js_round(x: f64) -> f64 {
-    let floor = x.floor();
-    if x - floor >= 0.5 { floor + 1.0 } else { floor }
-}
-
-/// ECMAScript `ToInt32` (`x | 0`).
-#[inline]
-pub(crate) fn to_int32(x: f64) -> i32 {
-    if !x.is_finite() {
-        return 0;
-    }
-    let wrapped = x.trunc().rem_euclid(4_294_967_296.0);
-    let signed = if wrapped >= 2_147_483_648.0 { wrapped - 4_294_967_296.0 } else { wrapped };
-    signed as i32
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn js_number_helpers() {
-        assert_eq!([js_round(2.5), js_round(-2.5), js_round(-0.2), js_round(0.49)], [3.0, -2.0, 0.0, 0.0]);
-        assert_eq!(to_int32(4_294_967_297.0), 1);
-        assert_eq!(to_int32(2_147_483_648.0), i32::MIN);
-        assert_eq!(to_int32(-1.9), -1);
-        assert_eq!(to_int32(f64::NAN), 0);
-        assert_eq!(to_int32(1e20), (1e20f64 % 4_294_967_296.0) as i64 as i32);
-    }
-}

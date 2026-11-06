@@ -4,7 +4,7 @@
 //! A track's name dragged up or down moves the track to another row.
 
 use ordrumbox_core::instruments::catalog;
-use ordrumbox_core::js;
+use ordrumbox_core::num;
 
 use crate::panel::SUBMENU_MARK;
 
@@ -308,8 +308,7 @@ impl Session {
         self.selection.selected = Some((t, n));
         self.edited();
         self.audition(t, Some(n));
-        self.message =
-            format!("Added note (pitch {}) - {name} @ {}", js::number_to_string(pitch), beat_label(beat, step));
+        self.message = format!("Added note (pitch {}) - {name} @ {}", num::text(pitch), beat_label(beat, step));
     }
 }
 

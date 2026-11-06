@@ -8,7 +8,7 @@ use ordrumbox_dsp::SampleBuffer;
 
 use crate::wav;
 
-/// Decay used when a kit gives none (`sample.decay ?? 500` ms).
+/// Decay used when a kit gives none, ms.
 pub const DEFAULT_DECAY_MS: f64 = 500.0;
 
 /// One sample of a kit, as listed in drumkits.json.

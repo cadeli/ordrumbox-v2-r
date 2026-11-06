@@ -116,7 +116,7 @@ impl Library {
     pub fn from_song_record(value: &Value, info: &Object) -> Option<SongRecord> {
         value.get("patterns").and_then(Value::as_array)?;
         let (mut library, report) = Self::from_json(value);
-        let text = |key: &str| value.get(key).filter(|v| !v.is_null()).map(crate::js::to_string);
+        let text = |key: &str| value.get(key).and_then(Value::to_text);
         let name = text("name");
         library.info = info.clone();
         for (key, v) in [("description", text("description")), ("date", text("date"))] {
@@ -124,7 +124,7 @@ impl Library {
         }
         // `selectedPatternIdx`, `selectedSongIdx`: the JS keys, older saves.
         let index = |keys: [&str; 2]| {
-            let v = keys.iter().find_map(|key| value.get(key)).map_or(0.0, crate::js::to_number);
+            let v = keys.iter().find_map(|key| value.get(key)).and_then(Value::to_number).unwrap_or(0.0);
             if v > 0.0 { v as usize } else { 0 }
         };
         Some(SongRecord {

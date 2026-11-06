@@ -57,7 +57,7 @@ impl Session {
     pub(super) fn set_master_value(&mut self, key: &str, value: f64) {
         self.set_master(master::set(self.output_panel.master, key, value), true);
         let shown = master::get(&self.output_panel.master, key);
-        self.not_undoable(format!("master: {key} {}", ordrumbox_core::js::number_to_string(shown)));
+        self.not_undoable(format!("master: {key} {}", ordrumbox_core::num::text(shown)));
     }
 
     /// Write the master settings when they have settled; when to call again.

@@ -132,9 +132,35 @@ impl Value {
         }
     }
 
+    /// A flag is on only when it is `true`.
+    pub fn is_true(&self) -> bool {
+        matches!(self, Self::Bool(true))
+    }
+
     pub fn as_f64(&self) -> Option<f64> {
         match self {
             Self::Number(n) => Some(*n),
+            _ => None,
+        }
+    }
+
+    /// The number a file means here: a number, or a string holding a finite
+    /// one once trimmed (`"140"`). `None` for anything else.
+    pub fn to_number(&self) -> Option<f64> {
+        match self {
+            Self::Number(n) => Some(*n),
+            Self::String(s) => s.trim().parse::<f64>().ok().filter(|n| n.is_finite()),
+            _ => None,
+        }
+    }
+
+    /// The text a file means here: a string, or a number or boolean written
+    /// out (`140`, `true`). `None` for null, arrays and objects.
+    pub fn to_text(&self) -> Option<String> {
+        match self {
+            Self::String(s) => Some(s.clone()),
+            Self::Number(n) => Some(n.to_string()),
+            Self::Bool(b) => Some(b.to_string()),
             _ => None,
         }
     }

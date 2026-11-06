@@ -1,11 +1,9 @@
 //! Synth presets (`assets/data/generated_sounds.json`) and the patch a note
 //! plays with (`WorkletSynthVoice#sendUpdate()`).
 //!
-//! Presets are free-form JSON in the JS app; they are kept as JSON here too
-//! and read with the same lenient coercions (`toFiniteNumber`, `!!`, enum
-//! maps that fall back to 0).
+//! Presets are free-form JSON, read leniently: a number or a numeric string,
+//! else the default; a flag on only when `true`; an unknown enum name 0.
 
-use ordrumbox_core::js::{round, to_number, truthy};
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_dsp::SynthPatch;
 pub use ordrumbox_dsp::synth::FM_DEVIATION;
@@ -131,13 +129,12 @@ pub struct SynthNote {
     pub bpm: f64,
 }
 
-/// `toFiniteNumber(value, fallback)`; a missing value is `undefined`.
+/// The number `value` holds (a number or a numeric string), `fallback` without one.
 fn finite(value: Option<&Value>, fallback: f64) -> f64 {
-    let n = value.map_or(f64::NAN, to_number);
-    if n.is_finite() { n } else { fallback }
+    value.and_then(Value::to_number).unwrap_or(fallback)
 }
 
-/// `Math.min(max, Math.max(min, x))`.
+/// `x` inside `min`–`max`; `min > max` gives `max` instead of a panic.
 fn clamp(x: f64, min: f64, max: f64) -> f64 {
     x.max(min).min(max)
 }
@@ -154,11 +151,11 @@ fn lfo_target(value: Option<&Value>) -> f64 {
 
 /// `syncToHz()`: `None` when off, unknown, or without a tempo.
 pub fn sync_to_hz(sync: Option<&Value>, bpm: f64) -> Option<f64> {
-    let sync = sync.filter(|v| truthy(v))?;
-    if sync.as_str() == Some("off") || bpm.is_nan() || bpm <= 0.0 {
+    let sync = sync?.as_str()?;
+    if sync == "off" || bpm.is_nan() || bpm <= 0.0 {
         return None;
     }
-    let base = SYNC_NOTE_HZ.iter().find(|(label, _)| Some(*label) == sync.as_str())?.1;
+    let base = SYNC_NOTE_HZ.iter().find(|(label, _)| *label == sync)?.1;
     Some(base * (bpm / 60.0))
 }
 
@@ -167,7 +164,7 @@ fn get<'a>(value: Option<&'a Value>, key: &str) -> Option<&'a Value> {
     value.and_then(|v| v.as_object()).and_then(|o| o.get(key))
 }
 
-/// `a ?? b`: `a` unless missing or null.
+/// `a` unless missing or null, else `b`.
 fn or_else<'a>(a: Option<&'a Value>, b: Option<&'a Value>) -> Option<&'a Value> {
     a.filter(|v| !v.is_null()).or(b)
 }
@@ -183,7 +180,8 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
     let total_gain = gains[0] + gains[1] + gains[2];
     // The voice mixes oscillators and noise by `noise.mix`: both count, or a
     // sound mostly made of noise would be raised by its quiet oscillators.
-    let noise_mix = if at("bypassNoise").is_some_and(truthy) { 0.0 } else { finite(get(at("noise"), "mix"), 0.0) };
+    let noise_mix =
+        if at("bypassNoise").is_some_and(Value::is_true) { 0.0 } else { finite(get(at("noise"), "mix"), 0.0) };
     let mix_gain = total_gain * (1.0 - noise_mix) + noise_mix;
     let mix_norm = if mix_gain > 0.001 { 1.0 / mix_gain } else { 1.0 };
     let note_velo = note.velocity * mix_norm;
@@ -192,7 +190,7 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
     let peak = note_velo * master_volume * accent * 1.0;
 
     let osc_freq = vcos.map(|vco| {
-        if !vco.is_some_and(truthy) {
+        if !vco.is_some_and(|v| v.as_object().is_some()) {
             return 0.0;
         }
         let octave = clamp(finite(get(vco, "octave"), 0.0), -4.0, 4.0);
@@ -214,7 +212,7 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
     let mod_env = at("modEnvelope");
     let mod_target = get(mod_env, "target");
     let fm = at("fm");
-    let flag = |key: &str| at(key).is_some_and(truthy);
+    let flag = |key: &str| at(key).is_some_and(Value::is_true);
 
     SynthPatch {
         osc_freq,
@@ -245,7 +243,7 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
         lfo2: lfo("lfo2"),
         filter_env_amount: clamp(finite(get(or_else(at("filterEnv"), filter), "filterEnvelopeAmount"), 0.0), 0.0, 1.0),
         fm_amount: clamp(finite(get(fm, "amount"), 0.0), 0.0, 1.0),
-        fm_algorithm: clamp(round(finite(get(fm, "algo"), 0.0)), 0.0, 4.0),
+        fm_algorithm: clamp(finite(get(fm, "algo"), 0.0).round(), 0.0, 4.0),
         mod_envelope: Adsr {
             attack: clamp(finite(get(mod_env, "attack"), 0.01), 0.003, 0.5),
             decay: finite(get(mod_env, "decay"), 0.1).min(1.0),
@@ -253,7 +251,7 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
             release: clamp(finite(get(mod_env, "release"), 0.1), 0.008, 0.5),
         },
         mod_env_target: enum_code(mod_target, &MOD_ENV_TARGETS),
-        mod_env_depth: if mod_target.is_some_and(truthy) && mod_target.and_then(Value::as_str) != Some("off") {
+        mod_env_depth: if mod_target.and_then(Value::as_str).is_some_and(|t| !t.is_empty() && t != "off") {
             1.0
         } else {
             0.0

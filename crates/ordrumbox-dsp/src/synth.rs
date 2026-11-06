@@ -17,7 +17,7 @@
 use std::f64::consts::{PI, TAU};
 use std::sync::OnceLock;
 
-use crate::{js_round, lfo, slope};
+use crate::{lfo, slope};
 
 /// `Math.LN2 / 1200`: cents to a natural-log ratio.
 const LN2_OVER_1200: f64 = 0.000_577_622_650_466_621_1;
@@ -368,7 +368,7 @@ impl Default for SynthVoice {
     }
 }
 
-/// `Math.max(lo, Math.min(hi, x))`.
+/// `x` inside `lo`–`hi`; `lo > hi` gives `lo` instead of a panic.
 #[inline]
 fn clamp(x: f64, lo: f64, hi: f64) -> f64 {
     x.min(hi).max(lo)
@@ -539,16 +539,16 @@ impl SynthVoice {
         let f_type = p.filter_type;
         let f_freq = p.filter_freq;
         let f_q = p.filter_q;
-        let lfo1_target = js_round(p.lfo1.target) as i64;
-        let lfo1_wave = js_round(p.lfo1.wave);
+        let lfo1_target = p.lfo1.target.round() as i64;
+        let lfo1_wave = p.lfo1.wave.round();
         let lfo1_freq = p.lfo1.freq;
         let lfo1_depth = p.lfo1.depth;
-        let lfo2_target = js_round(p.lfo2.target) as i64;
-        let lfo2_wave = js_round(p.lfo2.wave);
+        let lfo2_target = p.lfo2.target.round() as i64;
+        let lfo2_wave = p.lfo2.wave.round();
         let lfo2_freq = p.lfo2.freq;
         let lfo2_depth = p.lfo2.depth;
-        let fm_algorithm = js_round(p.fm_algorithm);
-        let m_target = js_round(p.mod_env_target) as i64;
+        let fm_algorithm = p.fm_algorithm.round();
+        let m_target = p.mod_env_target.round() as i64;
         let m_depth = p.mod_env_depth;
         let bypass = p.bypass;
         let osc_mix = 1.0 - noise_mix;
@@ -617,7 +617,7 @@ impl SynthVoice {
             let pitch_punch = clamp(p.pitch_punch + l1.pitch_punch + l2.pitch_punch, 0.0, 1.0);
             let drive = clamp(p.drive + l1.drive + l2.drive, 0.0, 1.0);
             let fm_amount = clamp(p.fm_amount + l1.fm_amount + l2.fm_amount, 0.0, 1.0);
-            let fm_algorithm = clamp(js_round(fm_algorithm + l1.fm_algorithm + l2.fm_algorithm), 0.0, 4.0) as i64;
+            let fm_algorithm = clamp((fm_algorithm + l1.fm_algorithm + l2.fm_algorithm).round(), 0.0, 4.0) as i64;
             let env = Adsr {
                 attack: (a + l1.env[0] + l2.env[0]).max(0.0),
                 decay: (d + l1.env[1] + l2.env[1]).max(0.0),

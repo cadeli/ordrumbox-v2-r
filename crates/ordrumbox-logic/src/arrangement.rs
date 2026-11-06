@@ -297,7 +297,7 @@ impl Editor {
         if !bpm.is_finite() || bpm == song.bpm {
             return false;
         }
-        let desc = format!("Set \"{}\" BPM → {}", song.name, number_to_string(bpm));
+        let desc = format!("Set \"{}\" BPM → {}", song.name, bpm);
         let coalesce = coalesce.then(|| format!("song:{s}:bpm"));
         self.edit_songs_coalesced(desc, None, coalesce, |songs| songs[s].bpm = bpm);
         true

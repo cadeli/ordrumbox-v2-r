@@ -5,7 +5,8 @@
 //! trailing values at their default are left out.
 
 use crate::json::{Object, Value};
-use crate::record::{Issue, SetField, check_duplicate, json_record, round2};
+use crate::num::round2;
+use crate::record::{Issue, SetField, check_duplicate, json_record};
 
 /// The velocity from which a note is an accent: the generators accent at
 /// 0.95 give or take 0.05.
@@ -104,7 +105,7 @@ impl Note {
     /// `stepPercent` as `step` gives it at `steps_per_beat` steps per beat.
     fn derived_step_percent(&self, steps_per_beat: i32) -> f64 {
         let steps_per_beat = if steps_per_beat == 0 { 4 } else { steps_per_beat };
-        crate::js::round(f64::from(self.step) * 100.0 / f64::from(steps_per_beat))
+        (f64::from(self.step) * 100.0 / f64::from(steps_per_beat)).round()
     }
 
     /// The `stepPercent` a file must hold: the kept one when `step` does not

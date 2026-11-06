@@ -6,7 +6,6 @@
 use std::collections::HashSet;
 
 use crate::ids::{slugify, unique_id};
-use crate::js;
 use crate::json::{Object, Value};
 use crate::record::Issue;
 
@@ -26,9 +25,10 @@ pub fn clamp_bpm(bpm: f64) -> f64 {
 /// A tempo read from a file: a number or a numeric string (`"140"`), the
 /// default when outside the bounds, reported at `at`.
 pub fn bpm_from_json(raw: &Value, at: &str, issues: &mut Vec<Issue>) -> f64 {
-    match js::to_number(raw) {
-        bpm if (MIN_BPM..=MAX_BPM).contains(&bpm) => bpm,
+    match raw.to_number() {
+        Some(bpm) if (MIN_BPM..=MAX_BPM).contains(&bpm) => bpm,
         bpm => {
+            let bpm = bpm.map_or_else(|| raw.to_json(), |bpm| bpm.to_string());
             issues.push(Issue::new(at, format!("{bpm} outside {MIN_BPM}–{MAX_BPM}, {DEFAULT_BPM} used")));
             DEFAULT_BPM
         }
@@ -101,8 +101,8 @@ impl Song {
         measure.rem_euclid(total)
     }
 
-    /// Load one song as `normalizeSong()`: numbers coerced the JS way
-    /// (`"bpm": "140"` is 140), positions floored at 0, clips referencing an
+    /// Load one song as `normalizeSong()`: numbers read from numbers or
+    /// numeric strings (`"bpm": "140"` is 140), positions floored at 0, clips referencing an
     /// unknown pattern id dropped and reported, a tempo outside the bounds
     /// replaced by the default and reported in `issues` (at `at`). `Err` when
     /// the song itself is unusable.
@@ -133,7 +133,7 @@ impl Song {
             let reference = ["patternId", "pattern"]
                 .iter()
                 .find_map(|key| clip.get(key).filter(|v| !v.is_null()))
-                .map(js::to_string)
+                .and_then(Value::to_text)
                 .unwrap_or_default();
             let reference = reference.trim();
             if reference.is_empty() {
@@ -144,7 +144,7 @@ impl Song {
                 dropped.push(DroppedClip { pattern: reference.to_owned(), reason: "unknown pattern id" });
                 continue;
             }
-            let number = |key: &str| clip.get(key).map_or(f64::NAN, js::to_number);
+            let number = |key: &str| clip.get(key).and_then(Value::to_number).unwrap_or(f64::NAN);
             let start = number("startMeasure");
             let start = if start.is_nan() { 0.0 } else { start.floor().max(0.0) };
             let count = number("measureCount");
@@ -155,10 +155,13 @@ impl Song {
             });
         }
 
-        let text = |key: &str| field(key).map(js::to_string).unwrap_or_default();
+        let text = |key: &str| field(key).and_then(Value::to_text).unwrap_or_default();
         let bpm = field("bpm").map_or(DEFAULT_BPM, |raw| bpm_from_json(raw, &format!("{at}.bpm"), issues));
-        let loop_count =
-            ["loopMeasures", "loopMeasureCount"].iter().find_map(|key| object.get(key)).map_or(f64::NAN, js::to_number);
+        let loop_count = ["loopMeasures", "loopMeasureCount"]
+            .iter()
+            .find_map(|key| object.get(key))
+            .and_then(Value::to_number)
+            .unwrap_or(f64::NAN);
         let id = match text("id").trim() {
             "" => Some(slugify(&text("name"))).filter(|slug| !slug.is_empty()).unwrap_or_else(|| "song".to_owned()),
             id => id.to_owned(),
