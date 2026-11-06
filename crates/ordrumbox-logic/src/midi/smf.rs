@@ -160,15 +160,22 @@ pub fn parse(bytes: &[u8]) -> Midi {
             events
                 .iter()
                 .find_map(|e| match &e.kind {
-                    EventKind::Meta { meta_type: Some(0x03), data } => {
-                        Some(data.iter().map(|&b| char::from(b)).collect())
-                    }
+                    EventKind::Meta { meta_type: Some(0x03), data } => Some(text(data)),
                     _ => None,
                 })
                 .unwrap_or_default()
         })
         .collect();
     Midi { header, tracks, track_names }
+}
+
+/// A text event: UTF-8, as this app writes it, else Latin-1, as older files
+/// often are.
+fn text(data: &[u8]) -> String {
+    match std::str::from_utf8(data) {
+        Ok(text) => text.to_owned(),
+        Err(_) => data.iter().map(|&b| char::from(b)).collect(),
+    }
 }
 
 impl Midi {

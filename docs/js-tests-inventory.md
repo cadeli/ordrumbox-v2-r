@@ -68,7 +68,7 @@ Statuts :
 | Songs | `song_schema`, `song_playback`, `player_song_mode`, `song_roundtrip` | `song_sources.json`, `song_edits.json` |
 | Commandes, historique | `cmd`, `cmd_update`, `cmd_transaction`, `history_manager`, `undo_roundtrip`, `arrangement_section` (partie commandes) | `edits.json`, `song_edits.json` |
 | Générateurs | `generators`, `base_generator`, `pattern_auto_gen`, `song_structure`, `composition` | `generators.json`, `composition.json` |
-| MIDI | `midi_exporter`, `midi_exporter_functional`, `midi_json_roundtrip`, `midi_import_service` | `midi.json` |
+| MIDI | `midi_exporter`, `midi_exporter_functional`, `midi_json_roundtrip`, `midi_import_service` | `midi/*.mid`, `midi_exports.json` ; attentes en snapshot Rust (`midi_rust.txt`) |
 | Instruments, assignation | `instrument_manager`, `auto_assign`, `tracks`, `drumkits_validation` | `instruments.json`, `assign.json` |
 | DSP | `worklet_synth_voice`, `worklet_master_bus`, `strip_sync`, `fx_values`, `lfo_engine`, `math` | `renders.{json,bin}`, `strip_settings.json`, `lfo_values.json`, `synth_patches.json` |
 | WAV, analyse | `wav_encoder`, `sample_analyzer`, `hz_to_note` | `wav.json`, `analysis.json` |
