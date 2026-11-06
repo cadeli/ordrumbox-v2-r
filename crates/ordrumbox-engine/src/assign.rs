@@ -7,7 +7,7 @@
 //! JS choices can be reproduced. A synth track without a valid preset gets a
 //! random one. The same matching picks a synth preset for a track name
 //! ([`synth_for`]), the presets standing as one kit. Departing from the JS
-//! (`README.md`, "Golden fixtures"), a melodic track that no sample of its
+//! (`README.md`, "Snapshots"), a melodic track that no sample of its
 //! instrument plays gets the synth preset of its name instead of a substitute.
 
 use ordrumbox_core::drum_taxonomy::instrument_family;

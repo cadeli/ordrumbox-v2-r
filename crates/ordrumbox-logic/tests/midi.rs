@@ -173,7 +173,7 @@ fn rust_snapshot() -> Vec<String> {
 
 /// Writes `midi_rust.txt` from the code as it is: `cargo test -p
 /// ordrumbox-logic --test midi -- --ignored`, when the parser, the import or
-/// the export changes on purpose (`README.md`, "Golden fixtures").
+/// the export changes on purpose (`README.md`, "Snapshots").
 #[test]
 #[ignore = "writes the snapshot"]
 fn write_the_snapshot() {

@@ -1,0 +1,3310 @@
+{
+ "tracks": [
+  {
+   "kind": "melody",
+   "variant": "chordStab",
+   "name": "PIANO",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 1,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 426
+  },
+  {
+   "kind": "melody",
+   "variant": "chordStab",
+   "name": "ORGAN",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 0.5,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 427
+  },
+  {
+   "kind": "melody",
+   "variant": "chordStab",
+   "name": "ORGAN",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 1,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 428
+  },
+  {
+   "kind": "melody",
+   "variant": "chordStab",
+   "name": "PIANO",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 0.5,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 429
+  },
+  {
+   "kind": "melody",
+   "variant": "chordStab",
+   "name": "PIANO",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 1,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 430
+  },
+  {
+   "kind": "melody",
+   "variant": "chordStab",
+   "name": "ORGAN",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 0.5,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 431
+  },
+  {
+   "kind": "melody",
+   "variant": "chordStab",
+   "name": "ORGAN",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 1,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 432
+  },
+  {
+   "kind": "melody",
+   "variant": "chordStab",
+   "name": "PIANO",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 0.5,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 433
+  },
+  {
+   "kind": "melody",
+   "variant": "arpeggio",
+   "name": "PIANO",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 1,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 434
+  },
+  {
+   "kind": "melody",
+   "variant": "arpeggio",
+   "name": "ORGAN",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 0.5,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 435
+  },
+  {
+   "kind": "melody",
+   "variant": "arpeggio",
+   "name": "ORGAN",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 1,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 436
+  },
+  {
+   "kind": "melody",
+   "variant": "arpeggio",
+   "name": "PIANO",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 0.5,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 437
+  },
+  {
+   "kind": "melody",
+   "variant": "arpeggio",
+   "name": "PIANO",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 1,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 438
+  },
+  {
+   "kind": "melody",
+   "variant": "arpeggio",
+   "name": "ORGAN",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 0.5,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 439
+  },
+  {
+   "kind": "melody",
+   "variant": "arpeggio",
+   "name": "ORGAN",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 1,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 440
+  },
+  {
+   "kind": "melody",
+   "variant": "arpeggio",
+   "name": "PIANO",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 0.5,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 441
+  },
+  {
+   "kind": "melody",
+   "variant": "sparse",
+   "name": "PIANO",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 1,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 442
+  },
+  {
+   "kind": "melody",
+   "variant": "sparse",
+   "name": "ORGAN",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 0.5,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 443
+  },
+  {
+   "kind": "melody",
+   "variant": "sparse",
+   "name": "ORGAN",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 1,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 444
+  },
+  {
+   "kind": "melody",
+   "variant": "sparse",
+   "name": "PIANO",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 0.5,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 445
+  },
+  {
+   "kind": "melody",
+   "variant": "sparse",
+   "name": "PIANO",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 1,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 446
+  },
+  {
+   "kind": "melody",
+   "variant": "sparse",
+   "name": "ORGAN",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 0.5,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 447
+  },
+  {
+   "kind": "melody",
+   "variant": "sparse",
+   "name": "ORGAN",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 1,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 448
+  },
+  {
+   "kind": "melody",
+   "variant": "sparse",
+   "name": "PIANO",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 0.5,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 449
+  },
+  {
+   "kind": "melody",
+   "variant": "walking",
+   "name": "PIANO",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 1,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 450
+  },
+  {
+   "kind": "melody",
+   "variant": "walking",
+   "name": "ORGAN",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 0.5,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 451
+  },
+  {
+   "kind": "melody",
+   "variant": "walking",
+   "name": "ORGAN",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 1,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 452
+  },
+  {
+   "kind": "melody",
+   "variant": "walking",
+   "name": "PIANO",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 0.5,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 453
+  },
+  {
+   "kind": "melody",
+   "variant": "walking",
+   "name": "PIANO",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 1,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 454
+  },
+  {
+   "kind": "melody",
+   "variant": "walking",
+   "name": "ORGAN",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 0.5,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 455
+  },
+  {
+   "kind": "melody",
+   "variant": "walking",
+   "name": "ORGAN",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 1,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 456
+  },
+  {
+   "kind": "melody",
+   "variant": "walking",
+   "name": "PIANO",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 0.5,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 457
+  },
+  {
+   "kind": "melody",
+   "variant": "reggae",
+   "name": "PIANO",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 1,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 458
+  },
+  {
+   "kind": "melody",
+   "variant": "reggae",
+   "name": "ORGAN",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 0.5,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 459
+  },
+  {
+   "kind": "melody",
+   "variant": "reggae",
+   "name": "ORGAN",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 1,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 460
+  },
+  {
+   "kind": "melody",
+   "variant": "reggae",
+   "name": "PIANO",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 0.5,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 461
+  },
+  {
+   "kind": "melody",
+   "variant": "reggae",
+   "name": "PIANO",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 1,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 462
+  },
+  {
+   "kind": "melody",
+   "variant": "reggae",
+   "name": "ORGAN",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 0.5,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 463
+  },
+  {
+   "kind": "melody",
+   "variant": "reggae",
+   "name": "ORGAN",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 1,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 464
+  },
+  {
+   "kind": "melody",
+   "variant": "reggae",
+   "name": "PIANO",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 0.5,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 465
+  },
+  {
+   "kind": "melody",
+   "variant": "break",
+   "name": "PIANO",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 1,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 466
+  },
+  {
+   "kind": "melody",
+   "variant": "break",
+   "name": "ORGAN",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 0.5,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 467
+  },
+  {
+   "kind": "melody",
+   "variant": "break",
+   "name": "ORGAN",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 1,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 468
+  },
+  {
+   "kind": "melody",
+   "variant": "break",
+   "name": "PIANO",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 0.5,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 469
+  },
+  {
+   "kind": "melody",
+   "variant": "break",
+   "name": "PIANO",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 1,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 470
+  },
+  {
+   "kind": "melody",
+   "variant": "break",
+   "name": "ORGAN",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 0.5,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 471
+  },
+  {
+   "kind": "melody",
+   "variant": "break",
+   "name": "ORGAN",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 1,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 472
+  },
+  {
+   "kind": "melody",
+   "variant": "break",
+   "name": "PIANO",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 0.5,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 473
+  },
+  {
+   "kind": "melody",
+   "variant": "intro",
+   "name": "PIANO",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 1,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 474
+  },
+  {
+   "kind": "melody",
+   "variant": "intro",
+   "name": "ORGAN",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 0.5,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 475
+  },
+  {
+   "kind": "melody",
+   "variant": "intro",
+   "name": "ORGAN",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 1,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 476
+  },
+  {
+   "kind": "melody",
+   "variant": "intro",
+   "name": "PIANO",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 0.5,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 477
+  },
+  {
+   "kind": "melody",
+   "variant": "intro",
+   "name": "PIANO",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 1,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 478
+  },
+  {
+   "kind": "melody",
+   "variant": "intro",
+   "name": "ORGAN",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 0.5,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 479
+  },
+  {
+   "kind": "melody",
+   "variant": "intro",
+   "name": "ORGAN",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 1,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 480
+  },
+  {
+   "kind": "melody",
+   "variant": "intro",
+   "name": "PIANO",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 0.5,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 481
+  },
+  {
+   "kind": "melody",
+   "variant": "outro",
+   "name": "PIANO",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 1,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 482
+  },
+  {
+   "kind": "melody",
+   "variant": "outro",
+   "name": "ORGAN",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 0.5,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 483
+  },
+  {
+   "kind": "melody",
+   "variant": "outro",
+   "name": "ORGAN",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 1,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 484
+  },
+  {
+   "kind": "melody",
+   "variant": "outro",
+   "name": "PIANO",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 0.5,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 485
+  },
+  {
+   "kind": "melody",
+   "variant": "outro",
+   "name": "PIANO",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 1,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 486
+  },
+  {
+   "kind": "melody",
+   "variant": "outro",
+   "name": "ORGAN",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 0.5,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 487
+  },
+  {
+   "kind": "melody",
+   "variant": "outro",
+   "name": "ORGAN",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 1,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 488
+  },
+  {
+   "kind": "melody",
+   "variant": "outro",
+   "name": "PIANO",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 0.5,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 489
+  },
+  {
+   "kind": "melody",
+   "variant": "unknownVariant",
+   "name": "PIANO",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 1,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 490
+  },
+  {
+   "kind": "melody",
+   "variant": "unknownVariant",
+   "name": "ORGAN",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 0.5,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 491
+  },
+  {
+   "kind": "melody",
+   "variant": "unknownVariant",
+   "name": "ORGAN",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 1,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 492
+  },
+  {
+   "kind": "melody",
+   "variant": "unknownVariant",
+   "name": "PIANO",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 0.5,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 493
+  },
+  {
+   "kind": "melody",
+   "variant": "unknownVariant",
+   "name": "PIANO",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 1,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 494
+  },
+  {
+   "kind": "melody",
+   "variant": "unknownVariant",
+   "name": "ORGAN",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 0.5,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 495
+  },
+  {
+   "kind": "melody",
+   "variant": "unknownVariant",
+   "name": "ORGAN",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 1,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 496
+  },
+  {
+   "kind": "melody",
+   "variant": "unknownVariant",
+   "name": "PIANO",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 0.5,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 497
+  },
+  {
+   "kind": "melody",
+   "variant": null,
+   "name": "PIANO",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 1,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 498
+  },
+  {
+   "kind": "melody",
+   "variant": null,
+   "name": "ORGAN",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 0.5,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 499
+  },
+  {
+   "kind": "melody",
+   "variant": null,
+   "name": "ORGAN",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 1,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 500
+  },
+  {
+   "kind": "melody",
+   "variant": null,
+   "name": "PIANO",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 0.5,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 501
+  },
+  {
+   "kind": "melody",
+   "variant": null,
+   "name": "PIANO",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 1,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 502
+  },
+  {
+   "kind": "melody",
+   "variant": null,
+   "name": "ORGAN",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 0.5,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 503
+  },
+  {
+   "kind": "melody",
+   "variant": null,
+   "name": "ORGAN",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 1,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 504
+  },
+  {
+   "kind": "melody",
+   "variant": null,
+   "name": "PIANO",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 0.5,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": [
+    -12,
+    -5,
+    -12,
+    0,
+    -12
+   ],
+   "seed": 505
+  },
+  {
+   "kind": "bass",
+   "variant": "basic",
+   "name": "BASS",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 1,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 506
+  },
+  {
+   "kind": "bass",
+   "variant": "basic",
+   "name": "BASS",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 0.5,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 507
+  },
+  {
+   "kind": "bass",
+   "variant": "basic",
+   "name": "BASS",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 1,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 508
+  },
+  {
+   "kind": "bass",
+   "variant": "basic",
+   "name": "BASS",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 0.5,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 509
+  },
+  {
+   "kind": "bass",
+   "variant": "basic",
+   "name": "BASS",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 1,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 510
+  },
+  {
+   "kind": "bass",
+   "variant": "basic",
+   "name": "BASS",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 0.5,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 511
+  },
+  {
+   "kind": "bass",
+   "variant": "basic",
+   "name": "BASS",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 1,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 512
+  },
+  {
+   "kind": "bass",
+   "variant": "basic",
+   "name": "BASS",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 0.5,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 513
+  },
+  {
+   "kind": "bass",
+   "variant": "stepping",
+   "name": "BASS",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 1,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 514
+  },
+  {
+   "kind": "bass",
+   "variant": "stepping",
+   "name": "BASS",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 0.5,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 515
+  },
+  {
+   "kind": "bass",
+   "variant": "stepping",
+   "name": "BASS",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 1,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 516
+  },
+  {
+   "kind": "bass",
+   "variant": "stepping",
+   "name": "BASS",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 0.5,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 517
+  },
+  {
+   "kind": "bass",
+   "variant": "stepping",
+   "name": "BASS",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 1,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 518
+  },
+  {
+   "kind": "bass",
+   "variant": "stepping",
+   "name": "BASS",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 0.5,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 519
+  },
+  {
+   "kind": "bass",
+   "variant": "stepping",
+   "name": "BASS",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 1,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 520
+  },
+  {
+   "kind": "bass",
+   "variant": "stepping",
+   "name": "BASS",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 0.5,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 521
+  },
+  {
+   "kind": "bass",
+   "variant": "groove",
+   "name": "BASS",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 1,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 522
+  },
+  {
+   "kind": "bass",
+   "variant": "groove",
+   "name": "BASS",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 0.5,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 523
+  },
+  {
+   "kind": "bass",
+   "variant": "groove",
+   "name": "BASS",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 1,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 524
+  },
+  {
+   "kind": "bass",
+   "variant": "groove",
+   "name": "BASS",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 0.5,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 525
+  },
+  {
+   "kind": "bass",
+   "variant": "groove",
+   "name": "BASS",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 1,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 526
+  },
+  {
+   "kind": "bass",
+   "variant": "groove",
+   "name": "BASS",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 0.5,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 527
+  },
+  {
+   "kind": "bass",
+   "variant": "groove",
+   "name": "BASS",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 1,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 528
+  },
+  {
+   "kind": "bass",
+   "variant": "groove",
+   "name": "BASS",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 0.5,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 529
+  },
+  {
+   "kind": "bass",
+   "variant": "melodic",
+   "name": "BASS",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 1,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 530
+  },
+  {
+   "kind": "bass",
+   "variant": "melodic",
+   "name": "BASS",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 0.5,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 531
+  },
+  {
+   "kind": "bass",
+   "variant": "melodic",
+   "name": "BASS",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 1,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 532
+  },
+  {
+   "kind": "bass",
+   "variant": "melodic",
+   "name": "BASS",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 0.5,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 533
+  },
+  {
+   "kind": "bass",
+   "variant": "melodic",
+   "name": "BASS",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 1,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 534
+  },
+  {
+   "kind": "bass",
+   "variant": "melodic",
+   "name": "BASS",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 0.5,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 535
+  },
+  {
+   "kind": "bass",
+   "variant": "melodic",
+   "name": "BASS",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 1,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 536
+  },
+  {
+   "kind": "bass",
+   "variant": "melodic",
+   "name": "BASS",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 0.5,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 537
+  },
+  {
+   "kind": "bass",
+   "variant": "hypnotic",
+   "name": "BASS",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 1,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 538
+  },
+  {
+   "kind": "bass",
+   "variant": "hypnotic",
+   "name": "BASS",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 0.5,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 539
+  },
+  {
+   "kind": "bass",
+   "variant": "hypnotic",
+   "name": "BASS",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 1,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 540
+  },
+  {
+   "kind": "bass",
+   "variant": "hypnotic",
+   "name": "BASS",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 0.5,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 541
+  },
+  {
+   "kind": "bass",
+   "variant": "hypnotic",
+   "name": "BASS",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 1,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 542
+  },
+  {
+   "kind": "bass",
+   "variant": "hypnotic",
+   "name": "BASS",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 0.5,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 543
+  },
+  {
+   "kind": "bass",
+   "variant": "hypnotic",
+   "name": "BASS",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 1,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 544
+  },
+  {
+   "kind": "bass",
+   "variant": "hypnotic",
+   "name": "BASS",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 0.5,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 545
+  },
+  {
+   "kind": "bass",
+   "variant": "arpege",
+   "name": "BASS",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 1,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 546
+  },
+  {
+   "kind": "bass",
+   "variant": "arpege",
+   "name": "BASS",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 0.5,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 547
+  },
+  {
+   "kind": "bass",
+   "variant": "arpege",
+   "name": "BASS",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 1,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 548
+  },
+  {
+   "kind": "bass",
+   "variant": "arpege",
+   "name": "BASS",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 0.5,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 549
+  },
+  {
+   "kind": "bass",
+   "variant": "arpege",
+   "name": "BASS",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 1,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 550
+  },
+  {
+   "kind": "bass",
+   "variant": "arpege",
+   "name": "BASS",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 0.5,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 551
+  },
+  {
+   "kind": "bass",
+   "variant": "arpege",
+   "name": "BASS",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 1,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 552
+  },
+  {
+   "kind": "bass",
+   "variant": "arpege",
+   "name": "BASS",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 0.5,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 553
+  },
+  {
+   "kind": "bass",
+   "variant": "acid",
+   "name": "BASS",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 1,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 554
+  },
+  {
+   "kind": "bass",
+   "variant": "acid",
+   "name": "BASS",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 0.5,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 555
+  },
+  {
+   "kind": "bass",
+   "variant": "acid",
+   "name": "BASS",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 1,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 556
+  },
+  {
+   "kind": "bass",
+   "variant": "acid",
+   "name": "BASS",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 0.5,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 557
+  },
+  {
+   "kind": "bass",
+   "variant": "acid",
+   "name": "BASS",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 1,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 558
+  },
+  {
+   "kind": "bass",
+   "variant": "acid",
+   "name": "BASS",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 0.5,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 559
+  },
+  {
+   "kind": "bass",
+   "variant": "acid",
+   "name": "BASS",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 1,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 560
+  },
+  {
+   "kind": "bass",
+   "variant": "acid",
+   "name": "BASS",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 0.5,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 561
+  },
+  {
+   "kind": "bass",
+   "variant": "unknownVariant",
+   "name": "BASS",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 1,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 562
+  },
+  {
+   "kind": "bass",
+   "variant": "unknownVariant",
+   "name": "BASS",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 0.5,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 563
+  },
+  {
+   "kind": "bass",
+   "variant": "unknownVariant",
+   "name": "BASS",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 1,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 564
+  },
+  {
+   "kind": "bass",
+   "variant": "unknownVariant",
+   "name": "BASS",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 0.5,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 565
+  },
+  {
+   "kind": "bass",
+   "variant": "unknownVariant",
+   "name": "BASS",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 1,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 566
+  },
+  {
+   "kind": "bass",
+   "variant": "unknownVariant",
+   "name": "BASS",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 0.5,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 567
+  },
+  {
+   "kind": "bass",
+   "variant": "unknownVariant",
+   "name": "BASS",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 1,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 568
+  },
+  {
+   "kind": "bass",
+   "variant": "unknownVariant",
+   "name": "BASS",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 0.5,
+   "harmony": {
+    "root": 0,
+    "scale": null
+   },
+   "bass": null,
+   "seed": 569
+  },
+  {
+   "kind": "bass",
+   "variant": null,
+   "name": "BASS",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 1,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 570
+  },
+  {
+   "kind": "bass",
+   "variant": null,
+   "name": "BASS",
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "density": 0.5,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 571
+  },
+  {
+   "kind": "bass",
+   "variant": null,
+   "name": "BASS",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 1,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 572
+  },
+  {
+   "kind": "bass",
+   "variant": null,
+   "name": "BASS",
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "density": 0.5,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 573
+  },
+  {
+   "kind": "bass",
+   "variant": null,
+   "name": "BASS",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 1,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 574
+  },
+  {
+   "kind": "bass",
+   "variant": null,
+   "name": "BASS",
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "density": 0.5,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 575
+  },
+  {
+   "kind": "bass",
+   "variant": null,
+   "name": "BASS",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 1,
+   "harmony": {
+    "root": 5,
+    "scale": "dorian"
+   },
+   "bass": null,
+   "seed": 576
+  },
+  {
+   "kind": "bass",
+   "variant": null,
+   "name": "BASS",
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "density": 0.5,
+   "harmony": {
+    "root": 10,
+    "scale": "blues scale"
+   },
+   "bass": null,
+   "seed": 577
+  }
+ ],
+ "random": [
+  {
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "seed": 578
+  },
+  {
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "seed": 579
+  },
+  {
+   "beatCount": 4,
+   "stepsPerBeat": 4,
+   "seed": 580
+  },
+  {
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "seed": 581
+  },
+  {
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "seed": 582
+  },
+  {
+   "beatCount": 3,
+   "stepsPerBeat": 3,
+   "seed": 583
+  },
+  {
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "seed": 584
+  },
+  {
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "seed": 585
+  },
+  {
+   "beatCount": 8,
+   "stepsPerBeat": 8,
+   "seed": 586
+  },
+  {
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "seed": 587
+  },
+  {
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "seed": 588
+  },
+  {
+   "beatCount": 1,
+   "stepsPerBeat": 2,
+   "seed": 589
+  },
+  {
+   "beatCount": 16,
+   "stepsPerBeat": 4,
+   "seed": 590
+  },
+  {
+   "beatCount": 16,
+   "stepsPerBeat": 4,
+   "seed": 591
+  },
+  {
+   "beatCount": 16,
+   "stepsPerBeat": 4,
+   "seed": 592
+  }
+ ],
+ "patterns": [
+  {
+   "seed": 593,
+   "options": null,
+   "pattern": {}
+  },
+  {
+   "seed": 594,
+   "options": null,
+   "pattern": {}
+  },
+  {
+   "seed": 595,
+   "options": null,
+   "pattern": {}
+  },
+  {
+   "seed": 596,
+   "options": null,
+   "pattern": {}
+  },
+  {
+   "seed": 597,
+   "options": null,
+   "pattern": {}
+  },
+  {
+   "seed": 598,
+   "options": null,
+   "pattern": {}
+  },
+  {
+   "seed": 599,
+   "options": null,
+   "pattern": {
+    "beatCount": 2
+   }
+  },
+  {
+   "seed": 600,
+   "options": null,
+   "pattern": {
+    "beatCount": 2
+   }
+  },
+  {
+   "seed": 601,
+   "options": null,
+   "pattern": {
+    "beatCount": 8
+   }
+  },
+  {
+   "seed": 602,
+   "options": null,
+   "pattern": {
+    "beatCount": 8
+   }
+  },
+  {
+   "seed": 603,
+   "options": null,
+   "pattern": {
+    "tracks": [
+     {
+      "name": "KICK",
+      "loopLength": 16
+     },
+     {
+      "name": "SNARE",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "CHH",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "OHH",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "CLAP",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "BASS",
+      "loopLength": 16
+     },
+     {
+      "name": "PIANO",
+      "loopLength": 16
+     },
+     {
+      "name": "CONGAS",
+      "loopLength": 16
+     },
+     {
+      "name": "CRASH",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "COWBELL",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "HI_TOM",
+      "loopLength": 16
+     }
+    ]
+   }
+  },
+  {
+   "seed": 604,
+   "options": null,
+   "pattern": {
+    "tracks": [
+     {
+      "name": "KICK",
+      "loopLength": 16
+     },
+     {
+      "name": "SNARE",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "CHH",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "OHH",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "CLAP",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "BASS",
+      "loopLength": 16
+     },
+     {
+      "name": "PIANO",
+      "loopLength": 16
+     },
+     {
+      "name": "CONGAS",
+      "loopLength": 16
+     },
+     {
+      "name": "CRASH",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "COWBELL",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "HI_TOM",
+      "loopLength": 16
+     }
+    ]
+   }
+  },
+  {
+   "seed": 605,
+   "options": null,
+   "pattern": {
+    "tracks": [
+     {
+      "name": "KICK",
+      "loopLength": 16
+     },
+     {
+      "name": "SNARE",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "CHH",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "OHH",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "CLAP",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "PIANO",
+      "loopLength": 16
+     },
+     {
+      "name": "CONGAS",
+      "loopLength": 16
+     },
+     {
+      "name": "CRASH",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "COWBELL",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "HI_TOM",
+      "loopLength": 16
+     }
+    ]
+   }
+  },
+  {
+   "seed": 606,
+   "options": null,
+   "pattern": {
+    "tracks": [
+     {
+      "name": "KICK",
+      "loopLength": 16
+     },
+     {
+      "name": "SNARE",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "CHH",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "OHH",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "CLAP",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "PIANO",
+      "loopLength": 16
+     },
+     {
+      "name": "CONGAS",
+      "loopLength": 16
+     },
+     {
+      "name": "CRASH",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "COWBELL",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "HI_TOM",
+      "loopLength": 16
+     }
+    ]
+   }
+  },
+  {
+   "seed": 607,
+   "options": null,
+   "pattern": {
+    "autoKeyOffset": 7,
+    "autoScale": "phrygian",
+    "tracks": [
+     {
+      "name": "KICK",
+      "loopLength": 16
+     },
+     {
+      "name": "SNARE",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "T3",
+      "loopLength": 16
+     }
+    ]
+   }
+  },
+  {
+   "seed": 608,
+   "options": null,
+   "pattern": {
+    "autoKeyOffset": 7,
+    "autoScale": "phrygian",
+    "tracks": [
+     {
+      "name": "KICK",
+      "loopLength": 16
+     },
+     {
+      "name": "SNARE",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "T3",
+      "loopLength": 16
+     }
+    ]
+   }
+  },
+  {
+   "seed": 609,
+   "options": null,
+   "pattern": {
+    "beatCount": 3,
+    "tracks": [
+     {
+      "name": "808 KICK",
+      "beatCount": 3,
+      "loopLength": 12
+     },
+     {
+      "name": "SD",
+      "beatCount": 3,
+      "loopLength": 12
+     },
+     {
+      "name": "OPEN HAT",
+      "beatCount": 3,
+      "loopLength": 12
+     },
+     {
+      "name": "SYNTH LEAD",
+      "beatCount": 3,
+      "loopLength": 12
+     },
+     {
+      "name": "ORGAN",
+      "beatCount": 3,
+      "loopLength": 12
+     },
+     {
+      "name": "TOM",
+      "beatCount": 3,
+      "loopLength": 12,
+      "pan": 0
+     }
+    ]
+   }
+  },
+  {
+   "seed": 610,
+   "options": null,
+   "pattern": {
+    "beatCount": 3,
+    "tracks": [
+     {
+      "name": "808 KICK",
+      "beatCount": 3,
+      "loopLength": 12
+     },
+     {
+      "name": "SD",
+      "beatCount": 3,
+      "loopLength": 12
+     },
+     {
+      "name": "OPEN HAT",
+      "beatCount": 3,
+      "loopLength": 12
+     },
+     {
+      "name": "SYNTH LEAD",
+      "beatCount": 3,
+      "loopLength": 12
+     },
+     {
+      "name": "ORGAN",
+      "beatCount": 3,
+      "loopLength": 12
+     },
+     {
+      "name": "TOM",
+      "beatCount": 3,
+      "loopLength": 12,
+      "pan": 0
+     }
+    ]
+   }
+  },
+  {
+   "seed": 611,
+   "options": {
+    "genre": "reggae",
+    "keyOffset": 2,
+    "scale": "major"
+   },
+   "pattern": {}
+  },
+  {
+   "seed": 612,
+   "options": {
+    "genre": "reggae",
+    "keyOffset": 2,
+    "scale": "major"
+   },
+   "pattern": {}
+  }
+ ],
+ "loops": [
+  {
+   "seed": 613,
+   "loopCount": 46,
+   "pattern": {
+    "autoGenre": "house",
+    "autoKeyOffset": 3,
+    "autoScale": "dorian",
+    "tracks": [
+     {
+      "name": "KICK",
+      "loopLength": 16,
+      "autoMode": true
+     },
+     {
+      "name": "SNARE",
+      "loopLength": 16,
+      "pan": 0,
+      "autoMode": true
+     },
+     {
+      "name": "CHH",
+      "loopLength": 16,
+      "pan": 0,
+      "autoMode": true
+     },
+     {
+      "name": "OHH",
+      "loopLength": 16,
+      "pan": 0,
+      "autoMode": true
+     },
+     {
+      "name": "BASS",
+      "loopLength": 16,
+      "autoMode": true
+     },
+     {
+      "name": "PIANO",
+      "loopLength": 16,
+      "autoMode": true
+     },
+     {
+      "name": "CONGAS",
+      "loopLength": 16,
+      "autoMode": true
+     },
+     {
+      "name": "CLAP",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "COWBELL",
+      "loopLength": 16,
+      "pan": 0,
+      "autoMode": true
+     }
+    ]
+   }
+  },
+  {
+   "seed": 614,
+   "loopCount": 46,
+   "pattern": {
+    "autoGen": true,
+    "tracks": [
+     {
+      "name": "KICK",
+      "loopLength": 16,
+      "autoMode": true
+     },
+     {
+      "name": "SNARE",
+      "loopLength": 16,
+      "pan": 0,
+      "autoMode": true
+     },
+     {
+      "name": "CHH",
+      "loopLength": 16,
+      "pan": 0,
+      "autoMode": true
+     },
+     {
+      "name": "OHH",
+      "loopLength": 16,
+      "pan": 0,
+      "autoMode": true
+     },
+     {
+      "name": "BASS",
+      "loopLength": 16,
+      "autoMode": true
+     },
+     {
+      "name": "PIANO",
+      "loopLength": 16,
+      "autoMode": true
+     },
+     {
+      "name": "CONGAS",
+      "loopLength": 16,
+      "autoMode": true
+     },
+     {
+      "name": "CLAP",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "COWBELL",
+      "loopLength": 16,
+      "pan": 0,
+      "autoMode": true
+     }
+    ]
+   }
+  },
+  {
+   "seed": 615,
+   "loopCount": 30,
+   "pattern": {
+    "autoGenre": "techno",
+    "tracks": [
+     {
+      "name": "KICK",
+      "loopLength": 16,
+      "autoMode": true,
+      "autoDensity": 0.5
+     },
+     {
+      "name": "SNARE",
+      "loopLength": 16,
+      "pan": 0,
+      "autoMode": true,
+      "autoVariant": "ghost"
+     },
+     {
+      "name": "CHH",
+      "stepsPerBeat": 3,
+      "loopLength": 16,
+      "pan": 0,
+      "autoMode": true,
+      "autoVariant": "chhRoll"
+     },
+     {
+      "name": "OHH",
+      "loopLength": 16,
+      "pan": 0,
+      "autoMode": true
+     },
+     {
+      "name": "BASS",
+      "loopLength": 16,
+      "autoMode": true,
+      "autoVariant": "acid",
+      "autoHitVariation": 0
+     },
+     {
+      "name": "PIANO",
+      "loopLength": 16,
+      "autoMode": true,
+      "autoVariant": "walking"
+     },
+     {
+      "name": "CONGAS",
+      "loopLength": 16,
+      "autoMode": true
+     },
+     {
+      "name": "CLAP",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "COWBELL",
+      "loopLength": 16,
+      "pan": 0,
+      "autoMode": true
+     }
+    ]
+   }
+  },
+  {
+   "seed": 616,
+   "loopCount": 30,
+   "pattern": {
+    "autoGen": true,
+    "autoGenre": "funk",
+    "tracks": [
+     {
+      "name": "KICK",
+      "loopLength": 16,
+      "autoMode": true
+     },
+     {
+      "name": "SNARE",
+      "loopLength": 16,
+      "pan": 0,
+      "autoMode": true
+     },
+     {
+      "name": "CHH",
+      "loopLength": 16,
+      "pan": 0,
+      "autoMode": true
+     },
+     {
+      "name": "OHH",
+      "loopLength": 16,
+      "pan": 0,
+      "autoMode": true
+     },
+     {
+      "name": "BASS",
+      "loopLength": 16,
+      "autoMode": true
+     },
+     {
+      "name": "PIANO",
+      "loopLength": 16,
+      "autoMode": true
+     },
+     {
+      "name": "CONGAS",
+      "loopLength": 16,
+      "autoMode": true
+     },
+     {
+      "name": "CLAP",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "COWBELL",
+      "loopLength": 16,
+      "pan": 0,
+      "autoMode": true
+     }
+    ]
+   }
+  }
+ ],
+ "toggles": [
+  {
+   "seed": 617,
+   "steps": [
+    "drums",
+    "drums",
+    "drums"
+   ],
+   "pattern": {
+    "tracks": [
+     {
+      "name": "KICK",
+      "loopLength": 16
+     },
+     {
+      "name": "SNARE",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "CHH",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "BASS",
+      "loopLength": 16
+     }
+    ]
+   }
+  },
+  {
+   "seed": 618,
+   "steps": [
+    "drums",
+    "drums",
+    "drums"
+   ],
+   "pattern": {
+    "tracks": [
+     {
+      "name": "KICK",
+      "loopLength": 16,
+      "_toolbarAuto": true
+     },
+     {
+      "name": "SNARE",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "CHH",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "BASS",
+      "loopLength": 16
+     }
+    ]
+   }
+  },
+  {
+   "seed": 619,
+   "steps": [
+    "bass",
+    "chords",
+    "bass",
+    "drums",
+    "chords"
+   ],
+   "pattern": {
+    "tracks": [
+     {
+      "name": "KICK",
+      "loopLength": 16
+     },
+     {
+      "name": "SNARE",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "OHH",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "PIANO",
+      "loopLength": 16
+     }
+    ]
+   }
+  },
+  {
+   "seed": 620,
+   "steps": [
+    "bass",
+    "chords",
+    "bass",
+    "drums",
+    "chords"
+   ],
+   "pattern": {
+    "tracks": [
+     {
+      "name": "KICK",
+      "loopLength": 16,
+      "_toolbarAuto": true
+     },
+     {
+      "name": "SNARE",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "OHH",
+      "loopLength": 16,
+      "pan": 0
+     },
+     {
+      "name": "PIANO",
+      "loopLength": 16
+     }
+    ]
+   }
+  },
+  {
+   "seed": 621,
+   "steps": [
+    "bass",
+    "bass",
+    "chords"
+   ],
+   "pattern": {
+    "autoGenre": "disco",
+    "tracks": [
+     {
+      "name": "KICK",
+      "loopLength": 16
+     },
+     {
+      "name": "BASS",
+      "loopLength": 16
+     }
+    ]
+   }
+  },
+  {
+   "seed": 622,
+   "steps": [
+    "bass",
+    "bass",
+    "chords"
+   ],
+   "pattern": {
+    "autoGenre": "disco",
+    "tracks": [
+     {
+      "name": "KICK",
+      "loopLength": 16,
+      "_toolbarAuto": true
+     },
+     {
+      "name": "BASS",
+      "loopLength": 16
+     }
+    ]
+   }
+  },
+  {
+   "seed": 623,
+   "steps": [
+    "drums",
+    "bass",
+    "chords"
+   ],
+   "pattern": {}
+  },
+  {
+   "seed": 624,
+   "steps": [
+    "drums",
+    "bass",
+    "chords"
+   ],
+   "pattern": {}
+  }
+ ]
+}

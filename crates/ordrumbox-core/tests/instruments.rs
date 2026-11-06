@@ -1,7 +1,7 @@
 //! Catalog lookups and the clips a song plays at a tick, as explicit tables.
 //!
 //! The tables were checked against the JS app when they replaced its fixtures
-//! (`README.md`, "Golden fixtures"); a row that changes is a change of behaviour.
+//! (`README.md`, "Snapshots"); a row that changes is a change of behaviour.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
 

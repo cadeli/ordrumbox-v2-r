@@ -121,49 +121,119 @@ pub fn midi_name(midi: i32) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ordrumbox_core::json::{self, Value};
+    use Axis::{Pitch, Velocity};
+    use DragEvent::{Start, Value};
 
-    /// The JS `NoteDrag` and `midiName` (tools/export_piano_fixtures.mjs).
+    /// A note `(velocity, pitch)` on a track transposed by `track_pitch`,
+    /// dragged through `moves` from (0, 0): the events, and the axis claimed.
+    struct Case {
+        note: (f64, f64),
+        track_pitch: f64,
+        moves: &'static [(i32, i32)],
+        events: &'static [DragEvent],
+        axis: Option<Axis>,
+    }
+
+    const CASES: &[Case] = &[
+        // Up and down: the velocity, by hundredths, inside 0–1.
+        Case {
+            note: (0.8, 0.0),
+            track_pitch: 0.0,
+            moves: &[(1, -1), (2, -2), (0, -3), (0, -10), (0, -100), (5, 40), (0, 300)],
+            events: &[
+                Start(Velocity, 0.8),
+                Value(Velocity, 0.82, 1),
+                Value(Velocity, 0.85, 1),
+                Value(Velocity, 1.0, 1),
+                Value(Velocity, 0.6, -1),
+                Value(Velocity, 0.0, -1),
+            ],
+            axis: Some(Velocity),
+        },
+        // Sideways: the pitch, inside the piano roll's range.
+        Case {
+            note: (0.5, 3.0),
+            track_pitch: 0.0,
+            moves: &[(3, 1), (11, 0), (12, -2), (30, 9), (-50, 0), (-900, 0), (900, 0)],
+            events: &[
+                Start(Pitch, 3.0),
+                Value(Pitch, 4.0, 1),
+                Value(Pitch, 6.0, 1),
+                Value(Pitch, -1.0, -1),
+                Value(Pitch, -48.0, -1),
+                Value(Pitch, 48.0, 1),
+            ],
+            axis: Some(Pitch),
+        },
+        // The track's transposition narrows the range.
+        Case {
+            note: (0.8, 0.0),
+            track_pitch: 40.0,
+            moves: &[(4, 4), (200, 0)],
+            events: &[Start(Pitch, 0.0), Value(Pitch, 8.0, 1)],
+            axis: Some(Pitch),
+        },
+        // A fractional pitch starts from its rounding.
+        Case {
+            note: (0.8, 2.6),
+            track_pitch: 0.0,
+            moves: &[(-3, 3), (-13, 0)],
+            events: &[Start(Pitch, 3.0), Value(Pitch, 3.0, -1), Value(Pitch, 2.0, -1)],
+            axis: Some(Pitch),
+        },
+        Case {
+            note: (0.333, 0.0),
+            track_pitch: 0.0,
+            moves: &[(2, 3), (2, 5), (2, 4)],
+            events: &[Start(Velocity, 0.333), Value(Velocity, 0.32, -1), Value(Velocity, 0.31, -1)],
+            axis: Some(Velocity),
+        },
+        // Less than 3 px, or no movement: a click.
+        Case { note: (0.8, 0.0), track_pitch: 0.0, moves: &[(1, 1), (2, -2)], events: &[], axis: None },
+        Case { note: (0.8, 0.0), track_pitch: 0.0, moves: &[], events: &[], axis: None },
+    ];
+
     #[test]
-    fn golden_drags_and_names() {
-        let fixture = json::parse(include_str!("../tests/fixtures/piano_roll.json")).unwrap();
-        let drags = fixture.get("drags").and_then(Value::as_array).unwrap();
-        for case in drags {
-            let mut note = Note::default();
-            for (key, value) in case.get("start").and_then(Value::as_object).unwrap().iter() {
-                let _ = note.set_field(key, value);
-            }
-            let track_pitch = case.get("trackPitch").and_then(Value::as_f64).unwrap();
-            let mut drag = NoteDrag::new(0, 0, track_pitch);
-            let mut calls = Vec::new();
-            for m in case.get("moves").and_then(Value::as_array).unwrap() {
-                let m = m.as_array().unwrap();
-                let (x, y) = (m[0].as_f64().unwrap() as i32, m[1].as_f64().unwrap() as i32);
+    fn a_drag_gives_its_events() {
+        for case in CASES {
+            let mut note = Note { velocity: case.note.0, pitch: case.note.1, ..Note::default() };
+            let mut drag = NoteDrag::new(0, 0, case.track_pitch);
+            let mut events = Vec::new();
+            for &(x, y) in case.moves {
                 for event in drag.moved(x, y, &note) {
-                    calls.push(match event {
-                        DragEvent::Start(axis, v) => {
-                            format!(r#"{{"start":"{}","value":{}}}"#, axis.key(), Value::from(v).to_json())
+                    // The surface writes the value.
+                    if let Value(axis, v, _) = event {
+                        match axis {
+                            Pitch => note.pitch = v,
+                            Velocity => note.velocity = v,
                         }
-                        DragEvent::Value(axis, v, dir) => {
-                            // The surface writes the value.
-                            match axis {
-                                Axis::Pitch => note.pitch = v,
-                                Axis::Velocity => note.velocity = v,
-                            }
-                            format!(r#"{{"axis":"{}","value":{},"dir":{dir}}}"#, axis.key(), Value::from(v).to_json())
-                        }
-                    });
+                    }
+                    events.push(event);
                 }
             }
-            let expected: Vec<String> =
-                case.get("calls").and_then(Value::as_array).unwrap().iter().map(Value::to_json).collect();
-            assert_eq!(calls, expected, "{}", case.to_json());
-            let axis = case.get("axis").and_then(Value::as_str);
-            assert_eq!(drag.axis().map(Axis::key), axis);
+            assert_eq!(events, case.events, "{:?} on {} by {:?}", case.note, case.track_pitch, case.moves);
+            assert_eq!(drag.axis(), case.axis);
         }
-        let names = fixture.get("midiNames").and_then(Value::as_array).unwrap();
-        for (midi, name) in names.iter().enumerate() {
-            assert_eq!(midi_name(midi as i32), name.as_str().unwrap());
+    }
+
+    #[test]
+    fn midi_names() {
+        let names = [
+            (-2, "A#-2"),
+            (0, "C-1"),
+            (1, "C#-1"),
+            (11, "B-1"),
+            (12, "C0"),
+            (21, "A0"),
+            (59, "B3"),
+            (60, "C4"),
+            (61, "C#4"),
+            (69, "A4"),
+            (108, "C8"),
+            (127, "G9"),
+        ];
+        for (midi, name) in names {
+            assert_eq!(midi_name(midi), name);
         }
     }
 }

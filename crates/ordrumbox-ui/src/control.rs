@@ -246,81 +246,575 @@ pub fn to_fixed_text(v: f64, digits: usize) -> String {
 mod tests {
     use super::*;
 
-    use ordrumbox_core::json::{self, Value};
+    /// The ranges of the tables: those of the track and note editors, a
+    /// logarithmic one, and a logarithmic one from 0 (linear: log needs min > 0).
+    const VELOCITY: Spec = Spec::knob(0.0, 1.0, 0.01, 0.0);
+    const PAN: Spec = Spec::knob(-1.0, 1.0, 0.01, -1.0);
+    const PITCH: Spec = Spec::knob(-24.0, 24.0, 1.0, -24.0);
+    const DECAY: Spec = Spec::knob(20.0, 5000.0, 10.0, 20.0).log();
+    const FREQ: Spec = Spec::knob(20.0, 20000.0, 1.0, 20.0);
+    const Q: Spec = Spec::knob(0.707, 18.707, 0.01, 0.707);
+    const GAIN: Spec = Spec::knob(-24.0, 6.0, 0.1, -24.0);
+    const PROB: Spec = Spec::knob(0.0, 100.0, 1.0, 0.0);
+    const LFO_FREQ: Spec = Spec::knob(0.1, 2.0, 0.1, 0.1);
+    const LINEAR_LOG: Spec = Spec::knob(0.0, 10.0, 0.5, 0.0).log();
+    const SPECS: [Spec; 10] = [VELOCITY, PAN, PITCH, DECAY, FREQ, Q, GAIN, PROB, LFO_FREQ, LINEAR_LOG];
 
-    fn num(v: &Value) -> f64 {
-        v.as_f64().unwrap()
+    /// A knob dragged: `(spec, start, dy, fine, value)`.
+    const DRAGS: &[(Spec, f64, f64, bool, f64)] = &[
+        (VELOCITY, 0.137, -120.0, false, 0.0),
+        (VELOCITY, 0.137, -5.0, false, 0.11),
+        (VELOCITY, 0.137, -5.0, true, 0.135),
+        (VELOCITY, 0.137, 1.0, false, 0.14),
+        (VELOCITY, 0.137, 7.0, false, 0.17),
+        (VELOCITY, 0.137, 7.0, true, 0.14100000000000001),
+        (VELOCITY, 0.137, 133.0, false, 0.8),
+        (VELOCITY, 0.137, 133.0, true, 0.20400000000000001),
+        (VELOCITY, 0.0, 250.0, false, 1.0),
+        (VELOCITY, 1.0, -250.0, true, 0.875),
+        (PAN, -0.726, -120.0, false, -1.0),
+        (PAN, -0.726, -5.0, false, -0.78),
+        (PAN, -0.726, -5.0, true, -0.731),
+        (PAN, -0.726, 1.0, false, -0.72),
+        (PAN, -0.726, 7.0, false, -0.66),
+        (PAN, -0.726, 7.0, true, -0.719),
+        (PAN, -0.726, 133.0, false, 0.6),
+        (PAN, -0.726, 133.0, true, -0.593),
+        (PAN, -1.0, 250.0, false, 1.0),
+        (PAN, 1.0, -250.0, true, 0.75),
+        (PITCH, -17.424, -120.0, false, -24.0),
+        (PITCH, -17.424, -5.0, false, -19.0),
+        (PITCH, -17.424, -5.0, true, -17.5),
+        (PITCH, -17.424, 1.0, false, -17.0),
+        (PITCH, -17.424, 7.0, false, -16.0),
+        (PITCH, -17.424, 7.0, true, -17.3),
+        (PITCH, -17.424, 133.0, false, 14.0),
+        (PITCH, -17.424, 133.0, true, -14.200000000000001),
+        (PITCH, -24.0, 250.0, false, 24.0),
+        (PITCH, 24.0, -250.0, true, 18.0),
+        (DECAY, 702.2600000000001, -120.0, false, 20.0),
+        (DECAY, 702.2600000000001, -5.0, false, 500.0),
+        (DECAY, 702.2600000000001, -5.0, true, 679.0),
+        (DECAY, 702.2600000000001, 1.0, false, 750.0),
+        (DECAY, 702.2600000000001, 7.0, false, 1120.0),
+        (DECAY, 702.2600000000001, 7.0, true, 736.0),
+        (DECAY, 702.2600000000001, 133.0, false, 5000.0),
+        (DECAY, 702.2600000000001, 133.0, true, 1694.0),
+        (DECAY, 20.0, 250.0, false, 5000.0),
+        (DECAY, 5000.0, -250.0, true, 955.0),
+        (FREQ, 2757.26, -120.0, false, 20.0),
+        (FREQ, 2757.26, -5.0, false, 2258.0),
+        (FREQ, 2757.26, -5.0, true, 2707.3),
+        (FREQ, 2757.26, 1.0, false, 2857.0),
+        (FREQ, 2757.26, 7.0, false, 3457.0),
+        (FREQ, 2757.26, 7.0, true, 2827.2000000000003),
+        (FREQ, 2757.26, 133.0, false, 16044.0),
+        (FREQ, 2757.26, 133.0, true, 4085.9),
+        (FREQ, 20.0, 250.0, false, 20000.0),
+        (FREQ, 20000.0, -250.0, true, 17502.5),
+        (Q, 3.173, -120.0, false, 0.707),
+        (Q, 3.173, -5.0, false, 2.72),
+        (Q, 3.173, -5.0, true, 3.128),
+        (Q, 3.173, 1.0, false, 3.2600000000000002),
+        (Q, 3.173, 7.0, false, 3.8000000000000003),
+        (Q, 3.173, 7.0, true, 3.236),
+        (Q, 3.173, 133.0, false, 15.14),
+        (Q, 3.173, 133.0, true, 4.37),
+        (Q, 0.707, 250.0, false, 18.707),
+        (Q, 18.707, -250.0, true, 16.457),
+        (GAIN, -19.89, -120.0, false, -24.0),
+        (GAIN, -19.89, -5.0, false, -20.6),
+        (GAIN, -19.89, -5.0, true, -19.960000000000004),
+        (GAIN, -19.89, 1.0, false, -19.700000000000003),
+        (GAIN, -19.89, 7.0, false, -18.8),
+        (GAIN, -19.89, 7.0, true, -19.780000000000005),
+        (GAIN, -19.89, 133.0, false, 0.1),
+        (GAIN, -19.89, 133.0, true, -17.890000000000004),
+        (GAIN, -24.0, 250.0, false, 6.0),
+        (GAIN, 6.0, -250.0, true, 2.2500000000000004),
+        (PROB, 13.700000000000001, -120.0, false, 0.0),
+        (PROB, 13.700000000000001, -5.0, false, 11.0),
+        (PROB, 13.700000000000001, -5.0, true, 13.5),
+        (PROB, 13.700000000000001, 1.0, false, 14.0),
+        (PROB, 13.700000000000001, 7.0, false, 17.0),
+        (PROB, 13.700000000000001, 7.0, true, 14.100000000000001),
+        (PROB, 13.700000000000001, 133.0, false, 80.0),
+        (PROB, 13.700000000000001, 133.0, true, 20.400000000000002),
+        (PROB, 0.0, 250.0, false, 100.0),
+        (PROB, 100.0, -250.0, true, 87.5),
+        (LFO_FREQ, 0.4, -120.0, false, 0.1),
+        (LFO_FREQ, 0.4, -5.0, false, 0.4),
+        (LFO_FREQ, 0.4, -5.0, true, 0.4000000000000001),
+        (LFO_FREQ, 0.4, 1.0, false, 0.4),
+        (LFO_FREQ, 0.4, 7.0, false, 0.5),
+        (LFO_FREQ, 0.4, 7.0, true, 0.4100000000000001),
+        (LFO_FREQ, 0.4, 133.0, false, 1.7000000000000002),
+        (LFO_FREQ, 0.4, 133.0, true, 0.5300000000000001),
+        (LFO_FREQ, 0.1, 250.0, false, 2.0),
+        (LFO_FREQ, 2.0, -250.0, true, 1.7600000000000002),
+        (LINEAR_LOG, 1.5, -120.0, false, 0.0),
+        (LINEAR_LOG, 1.5, -5.0, false, 1.5),
+        (LINEAR_LOG, 1.5, -5.0, true, 1.5),
+        (LINEAR_LOG, 1.5, 1.0, false, 1.5),
+        (LINEAR_LOG, 1.5, 7.0, false, 2.0),
+        (LINEAR_LOG, 1.5, 7.0, true, 1.55),
+        (LINEAR_LOG, 1.5, 133.0, false, 8.0),
+        (LINEAR_LOG, 1.5, 133.0, true, 2.15),
+        (LINEAR_LOG, 0.0, 250.0, false, 10.0),
+        (LINEAR_LOG, 10.0, -250.0, true, 8.75),
+    ];
+
+    /// An arrow key on a knob and on a slider: `(spec, value, up, fine, coarse, knob, slider)`.
+    const KEYS: &[(Spec, f64, bool, bool, bool, f64, f64)] = &[
+        (VELOCITY, 0.137, true, false, false, 0.15, 0.14700000000000002),
+        (VELOCITY, 0.137, true, true, false, 0.138, 0.138),
+        (VELOCITY, 0.137, true, false, true, 0.24, 0.23700000000000002),
+        (VELOCITY, 0.137, false, false, false, 0.13, 0.127),
+        (VELOCITY, 0.137, false, true, false, 0.136, 0.136),
+        (VELOCITY, 0.137, false, false, true, 0.04, 0.037000000000000005),
+        (PAN, -0.726, true, false, false, -0.72, -0.716),
+        (PAN, -0.726, true, true, false, -0.725, -0.725),
+        (PAN, -0.726, true, false, true, -0.63, -0.626),
+        (PAN, -0.726, false, false, false, -0.74, -0.736),
+        (PAN, -0.726, false, true, false, -0.727, -0.727),
+        (PAN, -0.726, false, false, true, -0.8300000000000001, -0.826),
+        (PITCH, -17.424, true, false, false, -16.0, -16.424),
+        (PITCH, -17.424, true, true, false, -17.3, -17.323999999999998),
+        (PITCH, -17.424, true, false, true, -7.0, -7.4239999999999995),
+        (PITCH, -17.424, false, false, false, -18.0, -18.424),
+        (PITCH, -17.424, false, true, false, -17.5, -17.524),
+        (PITCH, -17.424, false, false, true, -24.0, -24.0),
+        (DECAY, 702.2600000000001, true, false, false, 710.0, 712.2600000000001),
+        (DECAY, 702.2600000000001, true, true, false, 703.0, 703.2600000000001),
+        (DECAY, 702.2600000000001, true, false, true, 800.0, 802.2600000000001),
+        (DECAY, 702.2600000000001, false, false, false, 690.0, 692.2600000000001),
+        (DECAY, 702.2600000000001, false, true, false, 701.0, 701.2600000000001),
+        (DECAY, 702.2600000000001, false, false, true, 600.0, 602.2600000000001),
+        (FREQ, 2757.26, true, false, false, 2758.0, 2758.26),
+        (FREQ, 2757.26, true, true, false, 2757.4, 2757.36),
+        (FREQ, 2757.26, true, false, true, 2767.0, 2767.26),
+        (FREQ, 2757.26, false, false, false, 2756.0, 2756.26),
+        (FREQ, 2757.26, false, true, false, 2757.2000000000003, 2757.1600000000003),
+        (FREQ, 2757.26, false, false, true, 2747.0, 2747.26),
+        (Q, 3.173, true, false, false, 3.18, 3.183),
+        (Q, 3.173, true, true, false, 3.174, 3.174),
+        (Q, 3.173, true, false, true, 3.27, 3.273),
+        (Q, 3.173, false, false, false, 3.16, 3.1630000000000003),
+        (Q, 3.173, false, true, false, 3.172, 3.172),
+        (Q, 3.173, false, false, true, 3.0700000000000003, 3.073),
+        (GAIN, -19.89, true, false, false, -19.8, -19.79),
+        (GAIN, -19.89, true, true, false, -19.880000000000003, -19.88),
+        (GAIN, -19.89, true, false, true, -18.900000000000002, -18.89),
+        (GAIN, -19.89, false, false, false, -20.0, -19.990000000000002),
+        (GAIN, -19.89, false, true, false, -19.900000000000002, -19.900000000000002),
+        (GAIN, -19.89, false, false, true, -20.900000000000002, -20.89),
+        (PROB, 13.700000000000001, true, false, false, 15.0, 14.700000000000001),
+        (PROB, 13.700000000000001, true, true, false, 13.8, 13.8),
+        (PROB, 13.700000000000001, true, false, true, 24.0, 23.700000000000003),
+        (PROB, 13.700000000000001, false, false, false, 13.0, 12.700000000000001),
+        (PROB, 13.700000000000001, false, true, false, 13.600000000000001, 13.600000000000001),
+        (PROB, 13.700000000000001, false, false, true, 4.0, 3.700000000000001),
+        (LFO_FREQ, 0.4, true, false, false, 0.5, 0.5),
+        (LFO_FREQ, 0.4, true, true, false, 0.4100000000000001, 0.41000000000000003),
+        (LFO_FREQ, 0.4, true, false, true, 1.4000000000000001, 1.4),
+        (LFO_FREQ, 0.4, false, false, false, 0.30000000000000004, 0.30000000000000004),
+        (LFO_FREQ, 0.4, false, true, false, 0.39000000000000007, 0.39),
+        (LFO_FREQ, 0.4, false, false, true, 0.1, 0.1),
+        (LINEAR_LOG, 1.5, true, false, false, 2.0, 2.0),
+        (LINEAR_LOG, 1.5, true, true, false, 1.55, 1.55),
+        (LINEAR_LOG, 1.5, true, false, true, 6.5, 6.5),
+        (LINEAR_LOG, 1.5, false, false, false, 1.0, 1.0),
+        (LINEAR_LOG, 1.5, false, true, false, 1.4500000000000002, 1.45),
+        (LINEAR_LOG, 1.5, false, false, true, 0.0, 0.0),
+    ];
+
+    /// Numbers typed in each range of `SPECS`.
+    const TYPED: [f64; 11] = [-1000000.0, -30.0, -0.5, 0.0, 0.004, 0.333, 1.26, 7.77, 19.5, 333.3, 1000000.0];
+    /// What a knob, then a slider, makes of `TYPED`, range by range.
+    const TYPED_VALUES: [([f64; 11], [f64; 11]); 10] = [
+        (
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.33, 1.0, 1.0, 1.0, 1.0, 1.0],
+            [0.0, 0.0, 0.0, 0.0, 0.004, 0.333, 1.0, 1.0, 1.0, 1.0, 1.0],
+        ),
+        (
+            [-1.0, -1.0, -0.5, 0.0, 0.0, 0.33, 1.0, 1.0, 1.0, 1.0, 1.0],
+            [-1.0, -1.0, -0.5, 0.0, 0.004, 0.333, 1.0, 1.0, 1.0, 1.0, 1.0],
+        ),
+        (
+            [-24.0, -24.0, 0.0, 0.0, 0.0, 0.0, 1.0, 8.0, 20.0, 24.0, 24.0],
+            [-24.0, -24.0, -0.5, 0.0, 0.004, 0.333, 1.26, 7.77, 19.5, 24.0, 24.0],
+        ),
+        (
+            [20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 330.0, 5000.0],
+            [20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 333.3, 5000.0],
+        ),
+        (
+            [20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 333.0, 20000.0],
+            [20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 333.3, 20000.0],
+        ),
+        (
+            [0.707, 0.707, 0.707, 0.707, 0.707, 0.707, 1.26, 7.7700000000000005, 18.707, 18.707, 18.707],
+            [0.707, 0.707, 0.707, 0.707, 0.707, 0.707, 1.26, 7.77, 18.707, 18.707, 18.707],
+        ),
+        (
+            [-24.0, -24.0, -0.5, 0.0, 0.0, 0.30000000000000004, 1.3, 6.0, 6.0, 6.0, 6.0],
+            [-24.0, -24.0, -0.5, 0.0, 0.004, 0.333, 1.26, 6.0, 6.0, 6.0, 6.0],
+        ),
+        (
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 8.0, 20.0, 100.0, 100.0],
+            [0.0, 0.0, 0.0, 0.0, 0.004, 0.333, 1.26, 7.77, 19.5, 100.0, 100.0],
+        ),
+        (
+            [0.1, 0.1, 0.1, 0.1, 0.1, 0.30000000000000004, 1.3, 2.0, 2.0, 2.0, 2.0],
+            [0.1, 0.1, 0.1, 0.1, 0.1, 0.333, 1.26, 2.0, 2.0, 2.0, 2.0],
+        ),
+        (
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 1.5, 8.0, 10.0, 10.0, 10.0],
+            [0.0, 0.0, 0.0, 0.0, 0.004, 0.333, 1.26, 7.77, 10.0, 10.0, 10.0],
+        ),
+    ];
+
+    /// Values shown by every format.
+    #[expect(clippy::approx_constant, reason = "a number with many decimals, not π")]
+    const SHOWN: [f64; 29] = [
+        -1234.5, -24.0, -3.14159, -1.0, -0.505, -0.04, 0.0, 0.005, 0.01, 0.125, 0.333333, 0.505, 0.707, 0.999, 1.0,
+        1.005, 2.5, 7.0, 12.0, 99.995, 100.0, 499.5, 999.4, 999.6, 1000.0, 1234.56, 5000.0, 12345.678, 20000.0,
+    ];
+    /// `(format, unit, texts of SHOWN)`.
+    const FORMATS: &[(Format, &str, [&str; 29])] = &[
+        (
+            Format::Fmt,
+            "",
+            [
+                "-1234.5", "-24", "-3.14", "-1", "-0.51", "-0.04", "0", "0.01", "0.01", "0.13", "0.33", "0.51", "0.71",
+                "1", "1", "1", "2.5", "7", "12", "100", "100", "499.5", "999.4", "999.6", "1000", "1234.56", "5000",
+                "12345.68", "20000",
+            ],
+        ),
+        (
+            Format::Plain,
+            "",
+            [
+                "-1234.5", "-24", "-3.14159", "-1", "-0.505", "-0.04", "0", "0.005", "0.01", "0.125", "0.333333",
+                "0.505", "0.707", "0.999", "1", "1.005", "2.5", "7", "12", "99.995", "100", "499.5", "999.4", "999.6",
+                "1000", "1234.56", "5000", "12345.67", "20000",
+            ],
+        ),
+        (
+            Format::Percent,
+            "%",
+            [
+                "-123450 %",
+                "-2400 %",
+                "-314 %",
+                "-100 %",
+                "-50 %",
+                "-4 %",
+                "0 %",
+                "1 %",
+                "1 %",
+                "13 %",
+                "33 %",
+                "51 %",
+                "71 %",
+                "100 %",
+                "100 %",
+                "100 %",
+                "250 %",
+                "700 %",
+                "1200 %",
+                "10000 %",
+                "10000 %",
+                "49950 %",
+                "99940 %",
+                "99960 %",
+                "100000 %",
+                "123456 %",
+                "500000 %",
+                "1234568 %",
+                "2000000 %",
+            ],
+        ),
+        (
+            Format::SignedPlain,
+            "st",
+            [
+                "-1234.5 st",
+                "-24 st",
+                "-3.14159 st",
+                "-1 st",
+                "-0.505 st",
+                "-0.04 st",
+                "+0 st",
+                "+0.005 st",
+                "+0.01 st",
+                "+0.125 st",
+                "+0.33333 st",
+                "+0.505 st",
+                "+0.707 st",
+                "+0.999 st",
+                "+1 st",
+                "+1.005 st",
+                "+2.5 st",
+                "+7 st",
+                "+12 st",
+                "+99.995 st",
+                "+100 st",
+                "+499.5 st",
+                "+999.4 st",
+                "+999.6 st",
+                "+1000 st",
+                "+1234.56 st",
+                "+5000 st",
+                "+12345.6 st",
+                "+20000 st",
+            ],
+        ),
+        (
+            Format::Millis,
+            "",
+            [
+                "-1234 ms", "-24 ms", "-3 ms", "-1 ms", "-1 ms", "0 ms", "0 ms", "0 ms", "0 ms", "0 ms", "0 ms",
+                "1 ms", "1 ms", "1 ms", "1 ms", "1 ms", "3 ms", "7 ms", "12 ms", "100 ms", "100 ms", "500 ms",
+                "999 ms", "1000 ms", "1000 ms", "1235 ms", "5000 ms", "12346 ms", "20000 ms",
+            ],
+        ),
+        (
+            Format::Freq,
+            "",
+            [
+                "-1234Hz", "-24Hz", "-3Hz", "-1Hz", "-1Hz", "0Hz", "0Hz", "0Hz", "0Hz", "0Hz", "0Hz", "1Hz", "1Hz",
+                "1Hz", "1Hz", "1Hz", "3Hz", "7Hz", "12Hz", "100Hz", "100Hz", "500Hz", "999Hz", "1.0k", "1.0k", "1.2k",
+                "5.0k", "12.3k", "20.0k",
+            ],
+        ),
+        (
+            Format::Fixed2,
+            "",
+            [
+                "-1234.50", "-24.00", "-3.14", "-1.00", "-0.51", "-0.04", "0.00", "0.01", "0.01", "0.13", "0.33",
+                "0.51", "0.71", "1.00", "1.00", "1.00", "2.50", "7.00", "12.00", "100.00", "100.00", "499.50",
+                "999.40", "999.60", "1000.00", "1234.56", "5000.00", "12345.68", "20000.00",
+            ],
+        ),
+        (
+            Format::Fixed1,
+            "dB",
+            [
+                "-1234.5 dB",
+                "-24.0 dB",
+                "-3.1 dB",
+                "-1.0 dB",
+                "-0.5 dB",
+                "-0.0 dB",
+                "0.0 dB",
+                "0.0 dB",
+                "0.0 dB",
+                "0.1 dB",
+                "0.3 dB",
+                "0.5 dB",
+                "0.7 dB",
+                "1.0 dB",
+                "1.0 dB",
+                "1.0 dB",
+                "2.5 dB",
+                "7.0 dB",
+                "12.0 dB",
+                "100.0 dB",
+                "100.0 dB",
+                "499.5 dB",
+                "999.4 dB",
+                "999.6 dB",
+                "1000.0 dB",
+                "1234.6 dB",
+                "5000.0 dB",
+                "12345.7 dB",
+                "20000.0 dB",
+            ],
+        ),
+        (
+            Format::SignedFixed1,
+            "st",
+            [
+                "-1234.5 st",
+                "-24.0 st",
+                "-3.1 st",
+                "-1.0 st",
+                "-0.5 st",
+                "-0.0 st",
+                "+0.0 st",
+                "+0.0 st",
+                "+0.0 st",
+                "+0.1 st",
+                "+0.3 st",
+                "+0.5 st",
+                "+0.7 st",
+                "+1.0 st",
+                "+1.0 st",
+                "+1.0 st",
+                "+2.5 st",
+                "+7.0 st",
+                "+12.0 st",
+                "+100.0 st",
+                "+100.0 st",
+                "+499.5 st",
+                "+999.4 st",
+                "+999.6 st",
+                "+1000.0 st",
+                "+1234.6 st",
+                "+5000.0 st",
+                "+12345.7 st",
+                "+20000.0 st",
+            ],
+        ),
+        (
+            Format::Density,
+            "",
+            [
+                "Auto", "Auto", "Auto", "Auto", "Auto", "Auto", "0.00", "0.01", "0.01", "0.13", "0.33", "0.51", "0.71",
+                "1.00", "1.00", "1.00", "2.50", "7.00", "12.00", "100.00", "100.00", "499.50", "999.40", "999.60",
+                "1000.00", "1234.56", "5000.00", "12345.68", "20000.00",
+            ],
+        ),
+    ];
+
+    /// The loop point label: `(steps per beat, step, text)`.
+    const LOOP_POINTS: &[(i32, f64, &str)] = &[
+        (1, 1.0, "1.1"),
+        (1, 2.0, "2.1"),
+        (1, 4.0, "4.1"),
+        (1, 5.0, "5.1"),
+        (1, 9.0, "9.1"),
+        (1, 17.0, "17.1"),
+        (1, 128.0, "128.1"),
+        (3, 1.0, "1.1"),
+        (3, 2.0, "1.2"),
+        (3, 4.0, "2.1"),
+        (3, 5.0, "2.2"),
+        (3, 9.0, "3.3"),
+        (3, 17.0, "6.2"),
+        (3, 128.0, "43.2"),
+        (4, 1.0, "1.1"),
+        (4, 2.0, "1.2"),
+        (4, 4.0, "1.4"),
+        (4, 5.0, "2.1"),
+        (4, 9.0, "3.1"),
+        (4, 17.0, "5.1"),
+        (4, 128.0, "32.4"),
+        (8, 1.0, "1.1"),
+        (8, 2.0, "1.2"),
+        (8, 4.0, "1.4"),
+        (8, 5.0, "1.5"),
+        (8, 9.0, "2.1"),
+        (8, 17.0, "3.1"),
+        (8, 128.0, "16.8"),
+    ];
+
+    /// Whether `value` is on the grid of `step`, or at an end of the range.
+    fn on_grid(spec: &Spec, value: f64, step: f64) -> bool {
+        let units = value / step;
+        (units - units.round()).abs() < 1e-6 || value == spec.min || value == spec.max
     }
 
-    fn rows<'a>(case: &'a Value, key: &str) -> &'a [Value] {
-        case.get(key).and_then(Value::as_array).unwrap()
+    /// Starts and drags swept by the properties.
+    fn starts(spec: &Spec) -> [f64; 4] {
+        [spec.min, spec.max, (spec.min + spec.max) / 2.0, spec.min + 0.137 * (spec.max - spec.min)]
     }
+    const DYS: [f64; 13] = [-250.0, -120.0, -37.0, -5.0, -1.0, 0.0, 1.0, 3.0, 7.0, 50.0, 133.0, 250.0, 400.0];
 
-    /// Every drag, key, typed number and arc of the JS OrKnob / OrSlider
-    /// (tools/export_control_fixtures.mjs), and every format.
     #[test]
-    fn golden_controls() {
-        let fixture = json::parse(include_str!("../tests/fixtures/controls.json")).unwrap();
-        let mut checked = 0;
-        for case in fixture.get("cases").and_then(Value::as_array).unwrap() {
-            let (min, max, step) =
-                (num(case.get("min").unwrap()), num(case.get("max").unwrap()), num(case.get("step").unwrap()));
-            let mut knob = Spec::knob(min, max, step, min);
-            if case.get("scale").and_then(Value::as_str) == Some("log") {
-                knob = knob.log();
-            }
-            let slider = Spec::slider(min, max, step, min);
-            let name = case.get("name").and_then(Value::as_str).unwrap();
-            for row in rows(case, "drags") {
-                let r = row.as_array().unwrap();
-                let got = knob.drag(num(&r[0]), num(&r[1]), r[2].as_bool().unwrap());
-                assert_eq!(got, num(&r[3]), "{name} drag {r:?}");
-                checked += 1;
-            }
-            for (key, spec) in [("knobKeys", knob), ("sliderKeys", slider)] {
-                for row in rows(case, key) {
-                    let r = row.as_array().unwrap();
-                    let b = |i: usize| r[i].as_bool().unwrap();
-                    let got = spec.nudge(num(&r[0]), b(1), b(2) || b(3), b(4));
-                    assert_eq!(got, num(&r[5]), "{name} {key} {r:?}");
-                    checked += 1;
-                }
-            }
-            for row in rows(case, "arcs") {
-                let r = row.as_array().unwrap();
-                assert!((knob.fraction(num(&r[0])) - num(&r[1])).abs() < 1e-12, "{name} arc {r:?}");
-            }
-            for (key, spec) in [("knobTyped", knob), ("sliderTyped", slider)] {
-                for row in rows(case, key) {
-                    let r = row.as_array().unwrap();
-                    assert_eq!(spec.typed(num(&r[0])), num(&r[1]), "{name} {key} {r:?}");
+    fn a_drag_gives_its_value() {
+        for &(spec, start, dy, fine, value) in DRAGS {
+            assert_eq!(spec.drag(start, dy, fine), value, "{spec:?} from {start} by {dy} (fine: {fine})");
+        }
+    }
+
+    /// A drag stays in range, on the (fine) step grid, and goes further the
+    /// further the pointer goes.
+    #[test]
+    fn a_drag_is_in_range_on_the_grid_and_monotonic() {
+        for spec in SPECS {
+            for start in starts(&spec) {
+                for fine in [false, true] {
+                    let step = if fine { spec.step * 0.1 } else { spec.step };
+                    let values = DYS.map(|dy| spec.drag(start, dy, fine));
+                    for (dy, v) in DYS.iter().zip(values) {
+                        assert!((spec.min..=spec.max).contains(&v), "{spec:?} from {start} by {dy}: {v}");
+                        assert!(on_grid(&spec, v, step), "{spec:?} from {start} by {dy}: {v} off the grid");
+                    }
+                    assert!(values.is_sorted(), "{spec:?} from {start} (fine: {fine}): {values:?}");
                 }
             }
         }
-        assert!(checked > 2000);
-        for format in fixture.get("formats").and_then(Value::as_array).unwrap() {
-            let f = match format.get("name").and_then(Value::as_str).unwrap() {
-                "Fmt" => Format::Fmt,
-                "Plain" => Format::Plain,
-                "Percent" => Format::Percent,
-                "SignedPlain" => Format::SignedPlain,
-                "Millis" => Format::Millis,
-                "Freq" => Format::Freq,
-                "Fixed2" => Format::Fixed2,
-                "Fixed1" => Format::Fixed1,
-                "SignedFixed1" => Format::SignedFixed1,
-                "Density" => Format::Density,
-                other => panic!("format {other}"),
-            };
-            let unit = format.get("unit").and_then(Value::as_str).unwrap();
-            for row in rows(format, "values") {
-                let r = row.as_array().unwrap();
-                assert_eq!(f.value(num(&r[0]), unit), r[1].as_str().unwrap(), "{f:?} {r:?}");
+    }
+
+    #[test]
+    fn a_key_gives_its_value() {
+        for &(spec, value, up, fine, coarse, knob, slider) in KEYS {
+            let row = format!("{spec:?} {value} up: {up} fine: {fine} coarse: {coarse}");
+            assert_eq!(spec.nudge(value, up, fine, coarse), knob, "knob {row}");
+            let slider_spec = Spec { style: Style::Slider, ..spec };
+            assert_eq!(slider_spec.nudge(value, up, fine, coarse), slider, "slider {row}");
+        }
+    }
+
+    /// A key moves the value its way, in range, Ctrl at least as far as no
+    /// modifier; a knob keeps to its step grid.
+    #[test]
+    fn a_key_moves_its_way() {
+        for spec in SPECS {
+            let slider = Spec { style: Style::Slider, ..spec };
+            for start in starts(&spec) {
+                for up in [true, false] {
+                    let way = |v: f64| if up { v >= start } else { v <= start };
+                    for s in [spec, slider] {
+                        let [plain, fine, coarse] =
+                            [(false, false), (true, false), (false, true)].map(|(f, c)| s.nudge(start, up, f, c));
+                        for v in [plain, fine, coarse] {
+                            assert!(way(v) && (s.min..=s.max).contains(&v), "{s:?} from {start} (up: {up}): {v}");
+                        }
+                        assert!((coarse - start).abs() >= (plain - start).abs(), "{s:?} from {start} (up: {up})");
+                        if s.style == Style::Knob {
+                            assert!(on_grid(&s, plain, s.step) && on_grid(&s, coarse, s.step), "{s:?} from {start}");
+                        }
+                    }
+                }
             }
         }
-        for row in fixture.get("loopPoints").and_then(Value::as_array).unwrap() {
-            let r = row.as_array().unwrap();
-            assert_eq!(Format::LoopLength(num(&r[0]) as i32).value(num(&r[1]), ""), r[2].as_str().unwrap());
+    }
+
+    #[test]
+    fn a_typed_number_gives_its_value() {
+        for (spec, (knob, slider)) in SPECS.iter().zip(TYPED_VALUES) {
+            let slider_spec = Spec { style: Style::Slider, ..*spec };
+            assert_eq!(TYPED.map(|n| spec.typed(n)), knob, "knob {spec:?}");
+            assert_eq!(TYPED.map(|n| slider_spec.typed(n)), slider, "slider {spec:?}");
+        }
+    }
+
+    /// The knob's arc: 0 at the minimum, 1 at the maximum, growing in
+    /// between; a logarithmic range is half way at its geometric middle.
+    #[test]
+    fn the_arc_grows_from_min_to_max() {
+        for spec in SPECS {
+            assert_eq!((spec.fraction(spec.min), spec.fraction(spec.max)), (0.0, 1.0), "{spec:?}");
+            assert_eq!((spec.fraction(spec.min - 1.0), spec.fraction(spec.max + 1.0)), (0.0, 1.0), "{spec:?}");
+            let sweep: Vec<f64> =
+                (0..=40).map(|i| spec.fraction(spec.min + f64::from(i) / 40.0 * (spec.max - spec.min))).collect();
+            assert!(sweep.is_sorted(), "{spec:?}");
+        }
+        assert!((DECAY.fraction((20.0_f64 * 5000.0).sqrt()) - 0.5).abs() < 1e-12);
+        assert!((DECAY.fraction(510.0) - 0.586_561_872_001_496_5).abs() < 1e-12);
+        assert_eq!(LINEAR_LOG.fraction(2.5), 0.25);
+    }
+
+    #[test]
+    fn a_format_gives_its_text() {
+        for (format, unit, texts) in FORMATS {
+            assert_eq!(SHOWN.map(|v| format.value(v, unit)), *texts, "{format:?}");
+        }
+        for &(steps_per_beat, step, text) in LOOP_POINTS {
+            assert_eq!(Format::LoopLength(steps_per_beat).value(step, ""), text, "{steps_per_beat} {step}");
         }
     }
 

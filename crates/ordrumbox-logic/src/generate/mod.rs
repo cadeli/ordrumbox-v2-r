@@ -3,12 +3,10 @@
 //! lines from the style (`crate::compose`), and the loop-by-loop regeneration
 //! of tracks in auto mode.
 //!
-//! The melodic variant tables are the JS ones (`data/generators.json`,
-//! exported by `tools/export_gen_fixtures.mjs`) and are read the way the JS
-//! reads them, key by key with its defaults. Every random draw of a melodic
-//! line is one `Math.random()` of the JS, in the same order, through the
-//! `rnd` source the caller gives: with the same stream the notes are the JS
-//! notes (`tests/generators.rs`).
+//! The melodic variant tables (`data/generators.json`, first taken from the
+//! JS app, bass lines an octave higher) are read key by key with their
+//! defaults. Every random draw goes through the `rnd` source the caller gives:
+//! with the same stream, the same notes (`tests/generators.rs`).
 
 mod auto;
 mod melodic;
