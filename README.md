@@ -116,9 +116,27 @@ Press **F1** in the app for the full keyboard shortcut list. Common keys:
 
 ## Files
 
-The app writes `library.json`, `kits.json`, `settings.json`, `synth_presets.json`,
-`songs/`, `samples/` and `exports/` in the user data folder. Pattern and track
-settings use camelCase keys; old (JS) spellings are still read.
+The app writes `library.json`, `kits.json`, `settings.json`, `songs/`, `samples/` and
+`exports/` in the user data folder. Pattern and track settings use camelCase keys; old (JS)
+spellings are still read.
+
+The synth presets edited (added, changed from the assets' ones, or deleted: `null`) are part
+of the library, under `synthPresets` in `library.json`, in File > Export library, and in a
+plugin's host project: each library, each project, has its own, and each change is an undo
+step (a knob turned is one). A preset of the assets it does not name plays as the assets hold
+it. A library saved before has none of its own: it takes those of `synth_presets.json` (or
+`generated_sounds.json`), which earlier versions wrote and which is now only read. File >
+Import library adds its presets, replacing those of the same name; a song loaded keeps them.
+
+File > Export kit with its samples makes a folder named after the kit, holding `kit.json`
+(the kit's mapping, each sample's path the name of its file there) and the samples' WAV
+files. Kit > Import folder as kit (or the folder dropped on the window) reads it back: the
+samples are copied to `samples/imported/<kit>/`, the kit replaces the kit of its name. A
+folder without `kit.json` is imported as before, each WAV's instrument guessed from its name.
+
+File > Back up user data copies all of it (the library with its synth presets, `kits.json`,
+`settings.json`, `samples/`, `songs/`) to a folder `orDrumbox-backup-<date>-<time>` (UTC);
+File > Restore user data puts such a folder back, the files there moved to `backups/` first.
 
 ## Tests and snapshots
 

@@ -202,6 +202,10 @@ pub enum LibrarySource {
     Host(Option<String>),
 }
 
+/// A library opened at start: the library, the file edits are saved to, the
+/// message to show.
+type Opened = (Library, Option<PathBuf>, String);
+
 pub struct Session {
     /// What the window shows around the library (`session_chrome.rs`).
     chrome: Chrome,
@@ -229,7 +233,12 @@ pub struct Session {
     kit_editor: Option<usize>,
     /// Analysis of the sample the kit editor shows, by url.
     analysis: Option<(String, Analysis)>,
+    /// The synth presets played and shown: the library's own over the assets'.
     synths: SynthPresets,
+    /// The assets' synth presets.
+    asset_synths: SynthPresets,
+    /// The editor revision `synths` was made at.
+    synths_revision: Option<u64>,
     pattern_index: usize,
     /// What is shown under the header.
     workspace: Workspace,
@@ -386,7 +395,7 @@ impl Session {
                 ],
             );
         };
-        let mut assets = match assets::load(&dir) {
+        let assets = match assets::load(&dir) {
             Ok(assets) => assets,
             Err(e) => return Self::new(Library::default(), KitSet::empty(), vec![e]),
         };
@@ -397,7 +406,7 @@ impl Session {
         }
 
         let hosted = matches!(source, LibrarySource::Host(_));
-        let (library, library_path, message) = match source {
+        let (mut library, library_path, message) = match source {
             LibrarySource::UserFile => {
                 if let Some(problem) = store::location_problem() {
                     status.push(format!("{problem}: File > Change user data folder"));
@@ -416,34 +425,38 @@ impl Session {
         let kits_file = if assets.kits_error.is_none() { store::kits_path() } else { None };
         let kits =
             KitSet::new(assets.kits, &assets.bank, Some(assets.sources.clone()), kits_file, store::samples_dir());
-        // The synth presets edited, over the assets' ones.
-        let synths_file =
-            Self::load_user_synths(store::saved_synths_path(), store::synths_path(), &mut assets.synths, &mut status);
+        // A library saved before the synth presets were saved with it takes
+        // those of the presets file.
+        if library.synths.is_none() {
+            library.synths = Self::read_user_synths(store::saved_synths_path(), &assets.synths, &mut status);
+        }
+        let synths = session_synth::merged_synths(library.synths.as_ref(), &assets.synths);
         let mut session = Self::new(library, kits, status);
+        session.asset_synths = assets.synths;
+        session.synths = synths.clone();
+        session.synths_revision = Some(session.editor.revision());
         session.hosted = hosted;
         session.assets_dir = Some(dir.clone());
         session.saving.songs_dir = store::songs_dir();
         session.scales = assets.scales.clone();
         session.styles = assets.styles.clone();
         session.scale_list = assets.scale_list.clone();
-        session.synths = assets.synths.clone();
         session.roots =
             assets.bank.samples.iter().filter_map(|s| Some((s.sample.key.clone(), s.sample.root_midi?))).collect();
         session.saving.library_path = library_path;
-        session.saving.synths_file = synths_file;
         session.message = message;
         let bank = Arc::new(assets.bank);
         if !bank.samples.is_empty() {
             session.render = Some(RenderSetup {
                 bank: bank.clone(),
                 scales: assets.scales.clone(),
-                synths: assets.synths.clone(),
+                synths: synths.clone(),
                 kit: session.kits.kits.first().map(|k| k.name.clone()).unwrap_or_default(),
                 sample_rate: offline::EXPORT_RATE,
                 seed: 1,
             });
         }
-        match start_output(bank, assets.scales, assets.synths) {
+        match start_output(bank, assets.scales, synths) {
             Ok((output, controller)) => session.playback = Playback::new(output, controller),
             Err(e) => session.status.push(format!("no sound: {e}")),
         }
@@ -461,11 +474,7 @@ impl Session {
     /// The library to start with: the user's file at `path` when there is
     /// one, else `demo`; the file edits are saved to (`None`: not saved, the
     /// reason pushed on `status`); the message to show.
-    fn open_library(
-        path: Option<PathBuf>,
-        demo: Library,
-        status: &mut Vec<String>,
-    ) -> (Library, Option<PathBuf>, String) {
+    fn open_library(path: Option<PathBuf>, demo: Library, status: &mut Vec<String>) -> Opened {
         let demo_message = "demo library (assets/data/library.json)".to_owned();
         match path {
             None => {
@@ -489,17 +498,14 @@ impl Session {
     /// The library of a plugin: the host's `text` when it kept one, else the
     /// user's file (read, never written), else `demo`; no file to save to; the
     /// message to show.
-    fn open_host_library(
-        text: Option<String>,
-        demo: Library,
-        status: &mut Vec<String>,
-    ) -> (Library, Option<PathBuf>, String) {
+    fn open_host_library(text: Option<String>, demo: Library, status: &mut Vec<String>) -> Opened {
+        let demo_message = || "demo library (assets/data/library.json)".to_owned();
         if let Some(text) = text {
             return match Library::parse(&text) {
                 Ok((library, _)) => (library, None, "library from the host project".to_owned()),
                 Err(e) => {
                     status.push(format!("library of the host project not loaded: {e}"));
-                    (demo, None, "demo library (assets/data/library.json)".to_owned())
+                    (demo, None, demo_message())
                 }
             };
         }
@@ -509,9 +515,9 @@ impl Session {
             }
             Some((Err(e), _)) => {
                 status.push(format!("library not loaded: {e}"));
-                (demo, None, "demo library (assets/data/library.json)".to_owned())
+                (demo, None, demo_message())
             }
-            Some((Ok(None), _)) | None => (demo, None, "demo library (assets/data/library.json)".to_owned()),
+            Some((Ok(None), _)) | None => (demo, None, demo_message()),
         }
     }
 
@@ -522,6 +528,7 @@ impl Session {
         self.editor.revision()
     }
 
+    /// The library's file text, with the synth presets saved with it.
     pub fn library_text(&self) -> String {
         self.editor.library().to_file_text()
     }
@@ -540,6 +547,8 @@ impl Session {
             kit_editor: None,
             analysis: None,
             synths: SynthPresets::default(),
+            asset_synths: SynthPresets::default(),
+            synths_revision: None,
             pattern_index: 0,
             workspace: Workspace::Grid,
             song_cursor: 0,
@@ -786,6 +795,7 @@ impl Session {
             Export::Song | Export::SongSaveAs => self.song_file_name(),
             Export::Synths => SYNTHS_FILE_NAME.to_owned(),
             Export::KitMapping => self.kits.mapping_file_name(self.kit_index)?,
+            Export::KitFolder => self.kits.folder_name(self.kit_index)?,
             Export::Library => session_user_data::LIBRARY_FILE_NAME.to_owned(),
             Export::UserData => crate::user_data::backup_name(&crate::user_data::now_stamp()),
         })
@@ -798,6 +808,7 @@ impl Session {
     pub fn update(&mut self) {
         // What the library's tags teach, learned again after an edit (the header and menus read it).
         learned_styles(&mut self.learned_styles, &self.styles, &self.editor);
+        self.refresh_synths();
         self.playback.update(&mut self.editor, self.pattern_index, |editor, p, pass| {
             auto_loop(editor, &mut self.learned_styles, &self.styles, &self.scales, &mut self.rng, p, pass)
         });
@@ -808,6 +819,7 @@ impl Session {
     /// After an edit: remember to save, show what happened.
     fn edited(&mut self) {
         self.saving.library.touch();
+        self.refresh_synths();
         if let Some(desc) = self.editor.history().next_undo() {
             self.message = desc.to_owned();
         }
@@ -848,6 +860,7 @@ impl Session {
         self.selection.selected = None;
         self.clamp_selection();
         self.saving.library.touch();
+        self.refresh_synths();
     }
 
     /// The tempo a plugin plays at: the host's, inside the tempo bounds
@@ -914,7 +927,7 @@ impl Session {
         };
         match store::save(&path, self.editor.library()) {
             Ok(()) => {
-                self.saving.library_saved(self.editor.revision());
+                self.saving.library_saved(self.library_revision());
                 self.message = format!("saved {}", path.display());
             }
             Err(e) => self.message = format!("not saved: {}: {e}", path.display()),
@@ -922,7 +935,7 @@ impl Session {
     }
 
     pub fn save_if_changed(&mut self) {
-        if self.saving.library_unsaved(self.editor.revision()) {
+        if self.saving.library_unsaved(self.library_revision()) {
             self.save();
         }
     }
@@ -936,12 +949,12 @@ impl Session {
 
     /// Save what is due (the library, kit knob edits); when the next save is.
     pub fn autosave(&mut self) -> Option<Instant> {
-        let due = [self.flush_kits(), self.flush_master(), self.flush_synths(), self.autosave_library()];
+        let due = [self.flush_kits(), self.flush_master(), self.autosave_library()];
         due.into_iter().flatten().min()
     }
 
     fn autosave_library(&mut self) -> Option<Instant> {
-        if let Err(next) = self.saving.library_ready(self.editor.revision()) {
+        if let Err(next) = self.saving.library_ready(self.library_revision()) {
             return next;
         }
         self.save();

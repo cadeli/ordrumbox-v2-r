@@ -8,6 +8,7 @@
 
 use super::*;
 use crate::user_data;
+use ordrumbox_core::json::Object;
 
 /// The file File > Export library writes: never named as the library the
 /// app saves to, so an export to the user data folder replaces nothing.
@@ -15,7 +16,7 @@ pub(super) const LIBRARY_FILE_NAME: &str = "ordrumbox-library.json";
 
 const NO_USER_FOLDER: &str = "no user data folder";
 
-/// A library file read: the library and how many values were repaired.
+/// A library file read: the library, and how many values were repaired.
 fn read_library(path: &Path) -> Result<(Library, usize), String> {
     let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let (library, report) = Library::parse(&text).map_err(|e| format!("{}: {e}", path.display()))?;
@@ -51,12 +52,24 @@ impl Session {
         };
     }
 
-    /// File > Import library, once confirmed.
+    /// File > Import library, once confirmed: its synth presets join the
+    /// presets, replacing those of the same name; one undo step.
     pub(super) fn import_library_now(&mut self, path: &Path) {
         self.message = match read_library(path) {
-            Ok((library, repaired)) => {
+            Ok((mut library, repaired)) => {
+                let mut synths = self.editor.library().synths.clone().unwrap_or_default();
+                let imported: Vec<_> =
+                    library.synths.iter().flat_map(Object::iter).filter(|(_, p)| !p.is_null()).collect();
+                let presets = match imported.len() {
+                    0 => String::new(),
+                    count => format!(", {count} synth preset(s)"),
+                };
+                for (key, preset) in imported {
+                    synths.insert(key, preset.clone());
+                }
+                library.synths = Some(synths);
                 self.put_library(library, "Import library");
-                with_repaired(format!("library imported from {}", path.display()), repaired)
+                with_repaired(format!("library imported from {}{presets}", path.display()), repaired)
             }
             Err(e) => format!("not imported: {e}"),
         };
@@ -313,10 +326,14 @@ mod tests {
     fn the_library_goes_out_to_a_file_and_comes_back_in_one_undo_step() {
         let dir = folder("library");
         let mut s = session();
+        // A preset of mine: it goes out with the library.
+        let lead = ordrumbox_core::json::parse(r#"{"vco1":{"gain":0.5}}"#).unwrap();
+        s.put_synth("lead", Some(lead.clone()), "New lead".into(), None);
         s.open_export(Export::Library);
         s.export_to(Export::Library, &dir);
         let path = dir.join(LIBRARY_FILE_NAME);
-        assert_eq!(fs::read_to_string(&path).unwrap(), s.editor.library().to_file_text(), "{}", s.message);
+        assert_eq!(fs::read_to_string(&path).unwrap(), s.library_text(), "{}", s.message);
+        assert!(s.library_text().contains(r#""lead": {"#));
 
         // The demo in its place, after a yes; Undo brings mine back.
         s.run(Command::DemoLibrary);
@@ -330,11 +347,19 @@ mod tests {
 
         // The demo again, then the file exported: mine.
         s.load_demo_library_now();
+        s.put_synth("lead", Some(ordrumbox_core::json::parse("{}").unwrap()), "Other lead".into(), None);
         s.picked(Purpose::ImportLibrary, path.clone());
         assert!(s.confirm_open());
         s.overlay_key(OverlayKey::Enter);
         assert_eq!(first_pattern(&s), Some("mine"), "{}", s.message);
         assert_eq!(s.editor.history().next_undo(), Some("Import library"));
+        // Its preset comes back with it, in the place of the one of that name.
+        assert!(s.message.ends_with(", 1 synth preset(s)"), "{}", s.message);
+        assert_eq!(s.synths.get("lead"), Some(&lead));
+        // Undone with the library.
+        s.undo();
+        assert_eq!(s.synths.get("lead").map(ordrumbox_core::json::Value::to_json).as_deref(), Some("{}"));
+        s.redo();
 
         // A file that is not a library: said, the library kept.
         fs::write(&path, "{").unwrap();

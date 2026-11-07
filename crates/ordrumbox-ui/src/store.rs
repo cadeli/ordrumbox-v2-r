@@ -1,6 +1,7 @@
 //! The user's files: what the JS app keeps in browser storage, kept here in
 //! the user data folder — the library (`library.json`, `song.json` format,
-//! written a moment after each edit and on quit), the kits once edited
+//! written a moment after each edit and on quit, with the synth presets
+//! edited), the kits once edited
 //! (`kits.json`, `drumkits.json` format) and the samples added or changed
 //! (`samples/`). The assets are only the starting point, never written.
 
@@ -11,7 +12,7 @@ use std::path::{Path, PathBuf};
 
 use ordrumbox_core::Library;
 use ordrumbox_core::json;
-use ordrumbox_engine::{Kit, kits_from_json, kits_to_json};
+use ordrumbox_engine::{Kit, SynthPresets, kits_from_json, kits_to_json};
 
 /// Environment variable naming the library file (overrides the default place).
 pub const ENV_VAR: &str = "ORDRUMBOX_LIBRARY";
@@ -206,14 +207,15 @@ pub fn mcp_endpoint_path() -> Option<PathBuf> {
     Some(user_dir()?.join("mcp.json"))
 }
 
-/// The synth presets, once edited.
+/// Where earlier versions saved the synth presets edited, for every library:
+/// read for a library saved without its own, never written.
 pub fn synths_path() -> Option<PathBuf> {
     Some(user_dir()?.join(SYNTHS_FILE))
 }
 
 pub const SYNTHS_FILE: &str = "synth_presets.json";
-/// Where older versions saved the synth presets: read when there is no
-/// `synth_presets.json` yet.
+/// Where still older versions saved them: read when there is no
+/// `synth_presets.json`.
 pub const OLD_SYNTHS_FILE: &str = "generated_sounds.json";
 
 /// The synth presets file to read: the current one, else an older save.
@@ -223,19 +225,19 @@ pub fn saved_synths_path() -> Option<PathBuf> {
     Some(if !current.exists() && old.is_file() { old } else { current })
 }
 
-/// The synth presets saved, if there are some (an unreadable file is an error).
-pub fn load_synths(path: &Path) -> Result<Option<ordrumbox_engine::SynthPresets>, String> {
+/// The synth presets of a presets file, if there is one (an unreadable file is an error).
+pub fn load_synths(path: &Path) -> Result<Option<SynthPresets>, String> {
     match fs::read_to_string(path) {
         Ok(text) => json::parse(&text)
-            .map(|v| Some(ordrumbox_engine::SynthPresets::from_json(&v)))
+            .map(|v| Some(SynthPresets::from_json(&v)))
             .map_err(|e| format!("{}: {e}", path.display())),
         Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
         Err(e) => Err(format!("{}: {e}", path.display())),
     }
 }
 
-/// Write the synth presets.
-pub fn save_synths(path: &Path, synths: &ordrumbox_engine::SynthPresets) -> io::Result<()> {
+/// Write a presets file (the synth editor's export).
+pub fn save_synths(path: &Path, synths: &SynthPresets) -> io::Result<()> {
     write_atomic(path, &(synths.to_json().to_json_pretty(2) + "\n"))
 }
 

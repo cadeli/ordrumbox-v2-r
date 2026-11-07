@@ -11,7 +11,7 @@ use std::time::Instant;
 
 use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family, mono_from_track_name};
 use ordrumbox_core::ids::{slugify, unique_id};
-use ordrumbox_core::json::Value;
+use ordrumbox_core::json::{Object, Value};
 use ordrumbox_core::note::{ACCENT_VELOCITY, ACCENTED_VELOCITY};
 use ordrumbox_core::num::round2;
 use ordrumbox_core::song::{DEFAULT_BPM, clamp_bpm};
@@ -229,6 +229,25 @@ impl Editor {
             self.revision += 1;
         }
         result
+    }
+
+    /// Run `edit` on the synth presets saved with the library (made when
+    /// there were none) and record it as step `desc` when it changed
+    /// something; edits with the same `coalesce` key close together are one
+    /// step (a knob turned). Whether it changed something.
+    pub fn edit_synths(&mut self, desc: String, coalesce: Option<String>, edit: impl FnOnce(&mut Object)) -> bool {
+        let before = self.library.synths.clone();
+        edit(self.library.synths.get_or_insert_default());
+        if before.is_none() && self.library.synths.as_ref().is_some_and(Object::is_empty) {
+            self.library.synths = None;
+        }
+        if self.library.synths == before {
+            return false;
+        }
+        let change = Change::Synths { before, after: self.library.synths.clone() };
+        self.record(desc, change, coalesce);
+        self.revision += 1;
+        true
     }
 
     // ─── Notes ───────────────────────────────────────────────────────────────
@@ -1518,5 +1537,37 @@ mod tests {
         e.undo();
         let song = &e.library().songs[0];
         assert_eq!((song.clips[0].start_measure, song.loop_measures), (0, Some(2.0)));
+    }
+
+    #[test]
+    fn synth_preset_edits_are_undone_and_a_knob_turned_is_one_step() {
+        let mut e = Editor::new(Library::default());
+        e.set_clock(Some(0.0));
+        let set = |e: &mut Editor, gain: f64| {
+            let preset = ordrumbox_core::json::parse(&format!(r#"{{"gain":{gain}}}"#)).unwrap();
+            e.edit_synths("Edit \"a\"".into(), Some("synth:a".into()), |synths| {
+                synths.insert("a", preset);
+            })
+        };
+        assert!(!e.edit_synths("nothing".into(), None, |_| {}), "nothing changed");
+        assert_eq!(e.library().synths, None);
+        assert!(set(&mut e, 0.5));
+        assert!(set(&mut e, 0.6));
+        assert!(!set(&mut e, 0.6));
+        assert_eq!(e.history().undo_len(), 1, "one step");
+        e.undo();
+        assert_eq!(e.library().synths, None);
+        e.redo();
+        assert_eq!(
+            e.library().synths.as_ref().and_then(|s| s.get("a")).map(Value::to_json).as_deref(),
+            Some(r#"{"gain":0.6}"#)
+        );
+        // A song loaded keeps the presets; a library with its own brings them.
+        e.load_library(Library::default(), 0);
+        assert!(e.library().synths.is_some());
+        e.replace_library(Library { synths: Some(Object::new()), ..Library::default() }, 0, "import");
+        assert_eq!(e.library().synths, Some(Object::new()));
+        e.undo();
+        assert!(e.library().synths.as_ref().is_some_and(|s| s.get("a").is_some()));
     }
 }
