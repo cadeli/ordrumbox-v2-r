@@ -67,6 +67,9 @@ cargo xtask bundle ordrumbox-plugin --release --features vst3 # and orDrumbox.vs
 ```
 
 The plugin follows the host transport and saves its library in the host project.
+Playback starts on the host's first block, on its first frame. An offline render (a
+bounce, or a host computing ahead of real time) plays as in real time, every note in its
+place: the plugin then waits for its pattern, kit and passes before each block.
 The grip in its window's bottom-right corner resizes the window (down to 320×200, where
 the layout scrolls); the project keeps the size.
 

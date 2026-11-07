@@ -11,6 +11,7 @@ use std::time::Duration;
 use ordrumbox_engine::AudioSide;
 use ordrumbox_ui::{LibrarySource, Session, Ui};
 
+use crate::lockstep::Steps;
 use crate::params::{HostControls, KIT_CHOICES, Names, OrdrumboxParams, PATTERN_CHOICES, choice_value};
 use crate::state::LibraryState;
 
@@ -201,7 +202,8 @@ pub fn lock(player: &SharedPlayer) -> MutexGuard<'_, Player> {
     player.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-/// The thread that ticks the player; dropping it stops the thread.
+/// The thread that ticks the player every [`TICK_INTERVAL`], or at once
+/// when the audio thread asks ([`Steps`]); dropping it stops the thread.
 #[derive(Debug)]
 pub struct Ticker {
     stop: Arc<AtomicBool>,
@@ -209,13 +211,14 @@ pub struct Ticker {
 }
 
 impl Ticker {
-    pub fn spawn(player: SharedPlayer, params: Arc<OrdrumboxParams>) -> std::io::Result<Self> {
+    pub fn spawn(player: SharedPlayer, params: Arc<OrdrumboxParams>, steps: Arc<Steps>) -> std::io::Result<Self> {
         let stop = Arc::new(AtomicBool::new(false));
         let stopped = stop.clone();
         let thread = std::thread::Builder::new().name("ordrumbox-player".into()).spawn(move || {
             while !stopped.load(Ordering::Acquire) {
+                let asked = steps.wait(TICK_INTERVAL);
                 lock(&player).tick(&params.library, params.controls(), &params.names);
-                std::thread::sleep(TICK_INTERVAL);
+                steps.done(asked);
             }
         })?;
         Ok(Self { stop, thread: Some(thread) })
@@ -341,7 +344,7 @@ mod tests {
     #[test]
     fn the_ticker_stops_when_dropped() {
         let player = SharedPlayer::default();
-        let ticker = Ticker::spawn(player.clone(), Arc::default()).unwrap();
+        let ticker = Ticker::spawn(player.clone(), Arc::default(), Arc::default()).unwrap();
         drop(ticker);
         assert_eq!(Arc::strong_count(&player), 1);
     }

@@ -45,6 +45,9 @@ struct Inbox {
     master: Option<MasterSettings>,
     preview: Option<Arc<Pass>>,
     keymap: Option<Arc<KeyMap>>,
+    /// Under a stopped plugin host: the pass it would start in, for the
+    /// engine to start on the block the host starts ([`Controller::update`]).
+    cue: Option<Arc<Pass>>,
 }
 
 /// A host tempo change smaller than this is not one (passes are not rebuilt).
@@ -241,43 +244,48 @@ impl AudioSide {
     /// so, and the controller posts that pass ([`Controller::update`]).
     pub fn render_synced(&mut self, left: &mut [f32], right: &mut [f32], host: HostTransport) {
         (self.block_start, self.block_frames) = (self.engine.clock(), left.len().min(right.len()));
-        self.take_inbox();
-        let lost = if host.rolling() {
-            !self.engine.follow(host.beat)
-        } else {
-            if self.engine.is_playing() {
-                self.engine.stop();
-            }
-            false
-        };
+        if let Some(mut inbox) = try_lock(&self.link.inbox) {
+            take(&mut self.engine, &mut inbox, Some(host));
+        }
+        let lost = self.follow(host);
         self.engine.render(left, right);
         self.publish(left, right, Some(host), lost);
+    }
+
+    /// Ready the block a plugin host is about to render, for a host that
+    /// renders ahead of real time (a bounce): what the controller posted is
+    /// taken, the host's transport followed and published, so that a
+    /// [`Controller::update`] made now posts what this very block needs.
+    /// [`Self::receive`] then takes it, and [`Self::render_synced`] renders.
+    pub fn announce(&mut self, host: HostTransport) {
+        self.receive(host);
+        let lost = self.follow(host);
+        self.link.published.write(self.snapshot(Some(host), lost));
+    }
+
+    /// Take what the controller posted, waiting for the lock: for a block
+    /// rendered ahead of real time, which can wait ([`Self::announce`]).
+    pub fn receive(&mut self, host: HostTransport) {
+        let mut inbox = lock(&self.link.inbox);
+        take(&mut self.engine, &mut inbox, Some(host));
+    }
+
+    /// Keep to the host's transport: stop with it, or move to its position
+    /// in the pass playing. True when the host is in another pass (or none plays).
+    fn follow(&mut self, host: HostTransport) -> bool {
+        if host.rolling() {
+            return !self.engine.follow(host.beat);
+        }
+        if self.engine.is_playing() {
+            self.engine.stop();
+        }
+        false
     }
 
     /// Take what the controller posted, if the lock is free.
     fn take_inbox(&mut self) {
         if let Some(mut inbox) = try_lock(&self.link.inbox) {
-            if let Some(bank) = inbox.bank.take() {
-                self.engine.set_bank(bank);
-            }
-            if let Some(master) = inbox.master.take() {
-                self.engine.set_master(master);
-            }
-            match inbox.command.take() {
-                Some(Command::Play(pass)) => self.engine.play(pass),
-                Some(Command::Replace(pass)) => self.engine.replace(pass),
-                Some(Command::Stop) => self.engine.stop(),
-                None => {}
-            }
-            if let Some(next) = inbox.next.take() {
-                self.engine.queue(next);
-            }
-            if let Some(preview) = inbox.preview.take() {
-                self.engine.preview(preview);
-            }
-            if let Some(keymap) = inbox.keymap.take() {
-                self.engine.set_keymap(keymap);
-            }
+            take(&mut self.engine, &mut inbox, None);
         }
     }
 
@@ -297,8 +305,46 @@ impl AudioSide {
             scope.samples.copy_from_slice(&self.scope.samples);
             scope.at = self.scope.at;
         }
+        self.link.published.write(self.snapshot(host, lost));
+    }
+
+    /// What the engine publishes now.
+    fn snapshot(&self, host: Option<HostTransport>, lost: bool) -> Snapshot {
         let wants = self.engine.wants_pass().map_or(0, |n| n + 1);
-        self.link.published.write(Snapshot { position: self.engine.position(), wants, host, lost });
+        Snapshot { position: self.engine.position(), wants, host, lost }
+    }
+}
+
+/// What the controller posted into `inbox`, taken by `engine`; under a
+/// plugin host that starts, the cue it posted when the host is at its pass.
+fn take(engine: &mut Engine, inbox: &mut Inbox, host: Option<HostTransport>) {
+    if let Some(bank) = inbox.bank.take() {
+        engine.set_bank(bank);
+    }
+    if let Some(master) = inbox.master.take() {
+        engine.set_master(master);
+    }
+    match inbox.command.take() {
+        Some(Command::Play(pass)) => engine.play(pass),
+        Some(Command::Replace(pass)) => engine.replace(pass),
+        Some(Command::Stop) => engine.stop(),
+        None => {}
+    }
+    if let Some(next) = inbox.next.take() {
+        engine.queue(next);
+    }
+    if let Some(preview) = inbox.preview.take() {
+        engine.preview(preview);
+    }
+    if let Some(keymap) = inbox.keymap.take() {
+        engine.set_keymap(keymap);
+    }
+    if let Some(host) = host.filter(|host| host.rolling() && !engine.is_playing())
+        && let Some(cue) =
+            inbox.cue.take_if(|cue| host_pass(host.beat, cue.ticks).is_some_and(|(n, _)| n == cue.number))
+    {
+        // Moved, not dropped: the controller keeps its own reference.
+        engine.play(cue);
     }
 }
 
@@ -345,6 +391,18 @@ pub struct Controller {
     /// The plugin host's tempo the passes are built at, once a host transport was seen.
     tempo: Option<f64>,
     /// A plugin host's swing on every track ([`PassContext::swing`]).
+    swing: f64,
+    /// What the cue posted was built from; `None`: none posted, or one to build again.
+    cue: Option<CueKey>,
+}
+
+/// What a cue ([`Inbox::cue`]) is built from: a cue built from the same is
+/// not built again.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct CueKey {
+    number: u64,
+    mode: Mode,
+    tempo: Option<f64>,
     swing: f64,
 }
 
@@ -427,6 +485,7 @@ impl Controller {
             playing: false,
             tempo: None,
             swing: STRAIGHT_SWING,
+            cue: None,
         };
         (controller, audio)
     }
@@ -439,6 +498,7 @@ impl Controller {
     pub fn set_kit(&mut self, name: &str) {
         self.kit = name.to_owned();
         self.assigned.clear();
+        self.cue = None;
     }
 
     pub fn bank(&self) -> &Arc<SampleBank> {
@@ -745,13 +805,17 @@ impl Controller {
         let mut inbox = lock(&self.link.inbox);
         inbox.command = Some(Command::Play(pass));
         inbox.next = None;
+        inbox.cue = None;
         drop(inbox);
         self.playing = true;
+        self.cue = None;
     }
 
     /// The library was edited: rebuild the pass playing now (it goes on from
     /// the same place), and the next ones follow the edit.
     pub fn refresh(&mut self, library: &Library) {
+        // A cue posted is built again from the edit.
+        self.cue = None;
         if !self.playing {
             return;
         }
@@ -810,7 +874,7 @@ impl Controller {
     pub fn update(&mut self, library: &Library) {
         let snapshot = self.link.published.read();
         if let Some(host) = snapshot.host {
-            self.follow_host(library, host, snapshot.lost);
+            self.follow_host(library, host, snapshot);
             self.post_keymap(library);
         }
         if let Some(number) = self.pending_pass().or_else(|| self.stale_next_pass())
@@ -849,6 +913,7 @@ impl Controller {
         self.old_banks.push(std::mem::replace(&mut self.bank, bank.clone()));
         lock(&self.link.inbox).bank = Some(bank);
         self.assigned.clear();
+        self.cue = None;
     }
 
     /// Playback position, `None` when stopped.
@@ -871,8 +936,9 @@ impl Controller {
 
     /// Follow the plugin host's transport: its tempo for every pass, start
     /// and stop with it, and the pass it is in when it jumps (a loop, a
-    /// click on its timeline).
-    fn follow_host(&mut self, library: &Library, host: HostTransport, lost: bool) {
+    /// click on its timeline). Stopped, the host is given a cue: the pass it
+    /// would start in, which the engine starts on its own.
+    fn follow_host(&mut self, library: &Library, host: HostTransport, snapshot: Snapshot) {
         let bpm = clamp_bpm(host.bpm);
         let new_tempo = self.tempo.is_none_or(|tempo| (tempo - bpm).abs() > TEMPO_EPSILON);
         if new_tempo {
@@ -881,14 +947,26 @@ impl Controller {
         if !host.rolling() {
             if self.playing {
                 self.stop();
+                // The next play assigns the sounds afresh.
+                self.assigned.clear();
+                self.cue = None;
             }
+            self.post_cue(library, host.beat);
             return;
         }
         // A Play still waiting is the host's pass already.
         if matches!(lock(&self.link.inbox).command, Some(Command::Play(_))) {
             return;
         }
-        if !self.playing || lost {
+        let cued = self.cue.is_some_and(|cue| snapshot.position.is_some_and(|at| at.pass == cue.number));
+        if !self.playing && !snapshot.lost && cued {
+            // The engine started from the cue: it plays on, at the tempo now.
+            self.playing = true;
+            self.cue = None;
+            if new_tempo {
+                self.refresh(library);
+            }
+        } else if !self.playing || snapshot.lost {
             let Some((number, _)) = self.pass_ticks(library).and_then(|ticks| host_pass(host.beat, ticks)) else {
                 return;
             };
@@ -899,6 +977,22 @@ impl Controller {
         } else if new_tempo {
             self.refresh(library);
         }
+    }
+
+    /// Under a stopped host at `beat`: the pass it would start in posted as
+    /// the cue, unless the one posted is still there and built from the same.
+    fn post_cue(&mut self, library: &Library, beat: f64) {
+        let Some((number, _)) = self.pass_ticks(library).and_then(|ticks| host_pass(beat, ticks)) else { return };
+        let key = CueKey { number, mode: self.mode, tempo: self.tempo, swing: self.swing };
+        // The engine took a cue when the host started and stopped before this thread saw it.
+        if self.cue == Some(key) && lock(&self.link.inbox).cue.is_some() {
+            return;
+        }
+        self.song_notes.clear();
+        self.pass_patterns.clear();
+        let Some(pass) = self.build(library, number) else { return };
+        lock(&self.link.inbox).cue = Some(pass);
+        self.cue = Some(key);
     }
 }
 
@@ -951,6 +1045,54 @@ mod tests {
             audio.take_notes(|n| sent.push((block * 256 + n.timing, n.channel, n.key, n.velocity.is_some())));
         }
         assert_eq!(sent, [(4000, 9, 36, true), (5000, 9, 36, false)], "on channel 10, a 16th long");
+    }
+
+    /// The notes `audio` sends over `blocks` blocks of 256 frames from host
+    /// beat `from` at 120 bpm (8000 Hz), with no controller update between:
+    /// (frame from the first block, key, note on).
+    fn host_notes(audio: &mut AudioSide, from: f64, blocks: u32) -> Vec<(u32, u8, bool)> {
+        let (mut l, mut r) = (vec![0.0; 256], vec![0.0; 256]);
+        let mut sent = Vec::new();
+        for block in 0..blocks {
+            let beat = from + f64::from(block * 256) / 4000.0;
+            audio.render_synced(&mut l, &mut r, HostTransport { playing: true, bpm: 120.0, beat });
+            audio.take_notes(|n| sent.push((block * 256 + n.timing, n.key, n.velocity.is_some())));
+        }
+        sent
+    }
+
+    #[test]
+    fn a_stopped_host_is_given_a_cue_that_plays_from_its_first_block() {
+        let parse = |json: &str| Library::parse(json).unwrap().0;
+        let library = parse(r#"{"patterns":[{"name":"p","tracks":[{"name":"KICK","notes":[{}]}]}]}"#);
+        let (mut controller, mut audio) = Controller::new(8000.0, bank(), Scales::default(), SynthPresets::default());
+        let (mut l, mut r) = (vec![0.0; 256], vec![0.0; 256]);
+        let stopped = |beat| HostTransport { playing: false, bpm: 120.0, beat };
+        audio.render_synced(&mut l, &mut r, stopped(0.0));
+        controller.update(&library);
+        let cue = lock(&controller.link.inbox).cue.clone().expect("a cue for the stopped host");
+        controller.update(&library);
+        assert!(Arc::ptr_eq(&cue, lock(&controller.link.inbox).cue.as_ref().unwrap()), "built once");
+        drop(cue);
+
+        // The host starts: the downbeat sounds on its first frame, with no update between.
+        assert_eq!(host_notes(&mut audio, 0.0, 1), [(0, 36, true)]);
+        controller.update(&library);
+        assert!(controller.is_playing(), "the controller follows the engine");
+        assert!(lock(&controller.link.inbox).command.is_none(), "no Play posted over the cue");
+
+        // Stopped at beat 5 (the second pass of 4 beats), after an edit: the
+        // cue is that pass, with the edit.
+        audio.render_synced(&mut l, &mut r, stopped(5.0));
+        audio.take_notes(|_| {});
+        controller.update(&library);
+        assert!(!controller.is_playing());
+        let edited = parse(r#"{"patterns":[{"name":"p","tracks":[{"name":"KICK","notes":[{"beat":2}]}]}]}"#);
+        controller.refresh(&edited);
+        controller.update(&edited);
+        assert_eq!(lock(&controller.link.inbox).cue.as_ref().map(|c| c.number), Some(1));
+        // From beat 5, beat 6 (the second pass's beat 2) is 4000 frames on.
+        assert_eq!(host_notes(&mut audio, 5.0, 16), [(4000, 36, true)]);
     }
 
     #[test]

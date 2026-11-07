@@ -13,15 +13,18 @@
 
 use std::num::NonZeroU32;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use nih_plug::prelude::*;
 use ordrumbox_engine::{AudioSide, BlockNote, HostTransport};
 
 mod editor;
+pub mod lockstep;
 pub mod params;
 pub mod player;
 pub mod state;
 
+use lockstep::{Pace, Steps};
 use params::OrdrumboxParams;
 use player::{SharedPlayer, Started, Ticker, lock};
 
@@ -36,6 +39,10 @@ pub struct Ordrumbox {
     /// Made in `initialize`, at the host's sample rate.
     audio: Option<Box<AudioSide>>,
     ticker: Option<Ticker>,
+    /// The audio thread's handshake with the ticker, for a host ahead of real time.
+    steps: Arc<Steps>,
+    /// How far ahead of real time the host renders.
+    pace: Pace,
     /// The host's last tempo (a host may leave it out of a block).
     bpm: f64,
 }
@@ -47,6 +54,8 @@ impl Default for Ordrumbox {
             player: SharedPlayer::default(),
             audio: None,
             ticker: None,
+            steps: Arc::default(),
+            pace: Pace::new(false),
             bpm: DEFAULT_BPM,
         }
     }
@@ -60,6 +69,19 @@ fn host_transport(playing: bool, tempo: Option<f64>, beat: Option<f64>, last_bpm
         Some(beat) => HostTransport { playing, bpm, beat },
         // Nowhere to follow: as if stopped.
         None => HostTransport { playing: false, bpm, beat: 0.0 },
+    }
+}
+
+/// Before a block of `frames` frames: when the host renders ahead of real
+/// time, the player thread ticks for this block first, so that its passes,
+/// pattern and kit are there however fast the host goes.
+fn ready(audio: &mut AudioSide, pace: &mut Pace, steps: &Steps, host: HostTransport, frames: usize) {
+    let length = Duration::from_secs_f64(frames as f64 / f64::from(audio.sample_rate()));
+    if let Some(budget) = pace.budget(Instant::now(), length) {
+        audio.announce(host);
+        if steps.tick(budget) {
+            audio.receive(host);
+        }
     }
 }
 
@@ -112,8 +134,11 @@ impl Plugin for Ordrumbox {
         if let Started::New(audio) = lock(&self.player).start(buffer_config.sample_rate, &self.params.library) {
             self.audio = audio;
         }
+        // nih-plug may keep the mode it had before a host's change: a host
+        // ahead of real time is also seen by its pace.
+        self.pace = Pace::new(buffer_config.process_mode == ProcessMode::Offline);
         if self.ticker.is_none() {
-            match Ticker::spawn(self.player.clone(), self.params.clone()) {
+            match Ticker::spawn(self.player.clone(), self.params.clone(), self.steps.clone()) {
                 Ok(ticker) => self.ticker = Some(ticker),
                 Err(e) => {
                     nih_log!("orDrumbox: cannot start the player thread: {e}");
@@ -135,6 +160,7 @@ impl Plugin for Ordrumbox {
         self.bpm = host.bpm;
         match (&mut self.audio, buffer.as_slice()) {
             (Some(audio), [left, right, ..]) => {
+                ready(audio, &mut self.pace, &self.steps, host, left.len());
                 audio.set_host_mix(self.params.mix());
                 while let Some(event) = context.next_event() {
                     if let NoteEvent::NoteOn { timing, channel, note, velocity, .. } = event {
@@ -190,5 +216,39 @@ mod tests {
         assert_eq!(host_transport(true, None, Some(4.0), 90.0).bpm, 90.0);
         let host = host_transport(true, Some(0.0), None, 90.0);
         assert_eq!(host, HostTransport { playing: false, bpm: 90.0, beat: 0.0 });
+    }
+
+    #[test]
+    fn a_bounce_plays_every_note_however_fast_the_host_goes() {
+        use nih_plug::params::persist::PersistentField;
+        use player::Player;
+        use state::LibraryText;
+
+        let params = Arc::new(params::OrdrumboxParams::default());
+        let kick = r#"{"name":"KICK","notes":[{},{"beat":1},{"beat":2},{"beat":3}]}"#;
+        params.library.set(LibraryText(format!(r#"{{"patterns":[{{"name":"p","tracks":[{kick}]}}]}}"#)));
+        let player = Arc::new(std::sync::Mutex::new(Player::default()));
+        let Started::New(Some(mut audio)) = lock(&player).start(48_000.0, &params.library) else { panic!("no sound") };
+        let steps = Arc::new(Steps::default());
+        let _ticker = Ticker::spawn(player.clone(), params.clone(), steps.clone()).unwrap();
+
+        // Offline, back to back: 3 passes of 4 beats at 120 bpm (24000 frames a beat).
+        let mut pace = Pace::new(true);
+        let (frames, beat_frames) = (512_u32, 24_000_u32);
+        let (mut left, mut right) = (vec![0.0; 512], vec![0.0; 512]);
+        let mut sent = Vec::new();
+        for block in 0..12 * beat_frames / frames {
+            let at = block * frames;
+            let host = HostTransport { playing: true, bpm: 120.0, beat: f64::from(at) / f64::from(beat_frames) };
+            ready(&mut audio, &mut pace, &steps, host, 512);
+            audio.render_synced(&mut left, &mut right, host);
+            audio.take_notes(|n| {
+                if n.velocity.is_some() {
+                    sent.push(at + n.timing);
+                }
+            });
+        }
+        let beats: Vec<u32> = (0..12).map(|b| b * beat_frames).collect();
+        assert_eq!(sent, beats, "every beat, from the first frame, once");
     }
 }

@@ -80,6 +80,8 @@ assets/           data/*.json and kits/**.wav, read at runtime
   transport (`HostTransport`): it stops with the host, and seeks inside the pass it
   plays. `Controller::update`, called even while stopped, starts playback,
   moves it to the host's pass and rebuilds passes at the host's tempo.
+  While the host is stopped, it posts a cue (the pass the host would start
+  in), which the engine starts on the host's first rolling block by itself.
   In the plugin, a thread of its own (`player.rs`, `Ticker`) calls it, through `Session::update`, every
   10 ms, editor open or not; `process()` only calls `render_synced` and
   never takes the player's lock. Engines are made and dropped in
@@ -87,6 +89,12 @@ assets/           data/*.json and kits/**.wav, read at runtime
 - **Nothing reached from the audio callback allocates, frees, takes a
   blocking lock, or does I/O.** This covers `Engine::render` and every
   render path of `ordrumbox-dsp`. Buffers are sized before the stream starts.
+  One exception, in the plugin only: when the host renders ahead of real
+  time (a bounce, `ProcessMode::Offline`, or a measured lead of 250 ms:
+  `lockstep.rs`, `Pace`), `process()` asks the `Ticker` for a tick and waits
+  for it (`Steps`, with a timeout) before it renders, so the passes of the
+  block are there however fast the host goes. It still never allocates. In
+  real time it never waits.
 - The render path is written for speed first, then for elegance; a modern
   idiom that costs a cycle per sample stays out. Concretely:
   - Work per block, not per sample. Coefficients that depend on parameters
