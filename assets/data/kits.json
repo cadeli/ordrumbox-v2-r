@@ -621,6 +621,14 @@
         "peakDb": -3,
         "rootMidi": 48,
         "decay": 5000
+      },
+      {
+        "displayName": "HUMAN BASS",
+        "key": "BASS",
+        "path": "human/human-bass.wav",
+        "peakDb": -3,
+        "rootMidi": 48,
+        "decay": 5000
       }
     ]
   },
