@@ -135,7 +135,7 @@ impl Plugin for Ordrumbox {
         self.bpm = host.bpm;
         match (&mut self.audio, buffer.as_slice()) {
             (Some(audio), [left, right, ..]) => {
-                audio.set_host_controls(self.params.volume.value(), self.params.muted_tracks());
+                audio.set_host_mix(self.params.mix());
                 while let Some(event) = context.next_event() {
                     if let NoteEvent::NoteOn { timing, channel, note, velocity, .. } = event {
                         audio.trigger(channel, note, velocity, timing);

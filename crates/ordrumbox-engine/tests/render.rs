@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use ordrumbox_core::json;
 use ordrumbox_core::steps::TICK;
+use ordrumbox_core::track::STRAIGHT_SWING;
 use ordrumbox_core::{Library, Rng, Scales, expand_hits};
 use ordrumbox_engine::assign::{TrackSound, assign_pattern};
 use ordrumbox_engine::kit::{BankSample, KitSample};
@@ -44,12 +45,16 @@ fn bank() -> SampleBank {
     SampleBank { samples }
 }
 
+/// A plugin host's swing: the second sixteenth of each pair on its last third.
+const HOST_SWING: f64 = 2.0 / 3.0;
+
 #[test]
 fn every_note_becomes_an_event_on_its_frame() {
     let library = library();
     let bank = bank();
     let scales = Scales::default();
-    for pattern in &library.patterns {
+    let mut swung = 0;
+    for (pattern, swing) in library.patterns.iter().flat_map(|p| [(p, STRAIGHT_SWING), (p, HOST_SWING)]) {
         let synths = SynthPresets::default();
         let sounds = assign_pattern(pattern, &bank, "test", &synths, &mut |_| 0);
         let context = PassContext {
@@ -59,6 +64,7 @@ fn every_note_becomes_an_event_on_its_frame() {
             synths: &synths,
             sample_rate: RATE,
             first_tick: 0,
+            swing,
         };
         let pass = build_pass(pattern, 0, &mut Rng::new(1), context, library.bpm);
         let flat = expand_hits(pattern, 0, &mut Rng::new(1), &scales);
@@ -71,8 +77,9 @@ fn every_note_becomes_an_event_on_its_frame() {
             .flat_map(|(&tick, notes)| {
                 notes.iter().filter(|n| matches!(sounds[n.track], TrackSound::Sample(_)) && audible(n.track)).map(
                     move |n| {
-                        let swing = n.swing_beats(&pattern.tracks[n.track]) * f64::from(TICK);
-                        (((f64::from(tick) + swing) * per_tick).round() as u64).min(pass.frames - 1)
+                        let track = &pattern.tracks[n.track];
+                        let late = (n.swing_beats(track) + n.pair_swing_beats(track, swing)) * f64::from(TICK);
+                        (((f64::from(tick) + late) * per_tick).round() as u64).min(pass.frames - 1)
                     },
                 )
             })
@@ -80,9 +87,12 @@ fn every_note_becomes_an_event_on_its_frame() {
         let mut expected = expected;
         expected.sort_unstable();
         let frames: Vec<u64> = pass.events.iter().map(|e| e.frame).collect();
-        assert_eq!(frames, expected, "{}", pattern.id);
+        assert_eq!(frames, expected, "{} at swing {swing}", pattern.id);
         assert_eq!(pass.frames, (f64::from(TICK) * f64::from(pattern.beat_count) * per_tick).round() as u64);
+        let straight = flat.values().flatten().all(|n| n.pair_swing_beats(&pattern.tracks[n.track], swing) == 0.0);
+        swung += usize::from(!straight);
     }
+    assert!(swung > 0, "the host's swing moves notes of some pattern");
 }
 
 #[test]
@@ -99,6 +109,7 @@ fn rock_renders_clean_audio_starting_on_frame_zero() {
         synths: &synths,
         sample_rate: RATE,
         first_tick: 0,
+        swing: STRAIGHT_SWING,
     };
     let pass = Arc::new(build_pass(rock, 0, &mut Rng::new(1), context, library.bpm));
     let frames = pass.frames as usize;

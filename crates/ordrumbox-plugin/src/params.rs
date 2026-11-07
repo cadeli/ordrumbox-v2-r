@@ -1,13 +1,17 @@
 //! The parameters a host shows and automates: the pattern and the kit
-//! played, the master volume, a mute per track. The pattern and the kit are
-//! applied by the player thread, which also shows the mutes in the window;
-//! the volume and the mutes are applied by the audio thread, every block.
+//! played, the master volume, the swing, and a mute, a volume and a pan per
+//! track. The pattern, the kit and the swing are applied by the player
+//! thread, which also shows the mutes in the window; the volumes, the pans
+//! and the mutes are applied by the audio thread, every block, on top of the
+//! pattern's own (the library is not edited).
 //! A pattern or kit chosen in the window is given back to the host
 //! (`editor.rs`).
 
 use std::sync::{Arc, RwLock};
 
 use nih_plug::prelude::*;
+use ordrumbox_core::track::STRAIGHT_SWING;
+use ordrumbox_engine::{HOST_TRACKS, HostMix};
 
 use crate::editor;
 use crate::state::{EditorSize, LibraryState};
@@ -16,10 +20,10 @@ use crate::state::{EditorSize, LibraryState};
 pub const PATTERN_CHOICES: i32 = 128;
 /// Kits a host can choose (the parameter's range, from 1).
 pub const KIT_CHOICES: i32 = 64;
-/// Tracks with a mute parameter, from the first.
-pub const MUTE_TRACKS: usize = 16;
-/// The master volume's range, linear (+6 dB at the top).
+/// The range of the volumes (the master's and the tracks'), linear (+6 dB at the top).
 const VOLUME_MAX: f32 = 2.0;
+/// The most swing: the second step of each pair on its last quarter.
+const SWING_MAX: f32 = 0.75;
 /// The lowest volume shown in dB on the knob's scale; below it, silence.
 const VOLUME_FLOOR_DB: f32 = -60.0;
 
@@ -41,18 +45,58 @@ pub struct OrdrumboxParams {
     /// A gain on the master volume.
     #[id = "volume"]
     pub volume: FloatParam,
-    /// Track `t + 1` muted; ids `mute_1` to `mute_16`.
-    #[nested(array, group = "Mute")]
-    pub mutes: [MuteParam; MUTE_TRACKS],
+    /// A swing on every track, on top of their own: where the second step
+    /// of each pair starts, 50 % (straight) to 75 %.
+    #[id = "swing"]
+    pub swing: FloatParam,
+    /// Track `t + 1`'s mute, volume and pan; ids `mute_1`, `track_volume_1`,
+    /// `track_pan_1` to `_16`.
+    #[nested(array, group = "Track")]
+    pub tracks: [TrackParams; HOST_TRACKS],
     /// The names the pattern and kit parameters show.
     pub names: Arc<Names>,
 }
 
-/// One track's mute.
+/// One track's mix.
 #[derive(Debug, Params)]
-pub struct MuteParam {
+pub struct TrackParams {
     #[id = "mute"]
     pub mute: BoolParam,
+    /// A gain on the track's volume.
+    #[id = "track_volume"]
+    pub volume: FloatParam,
+    /// Added to the track's pan: -1 (left) to 1 (right).
+    #[id = "track_pan"]
+    pub pan: FloatParam,
+}
+
+impl TrackParams {
+    /// The parameters of track `number` (from 1).
+    fn new(number: usize) -> Self {
+        Self {
+            mute: BoolParam::new(format!("Mute track {number}"), false),
+            volume: volume_param(format!("Volume track {number}")),
+            pan: FloatParam::new(format!("Pan track {number}"), 0.0, FloatRange::Linear { min: -1.0, max: 1.0 })
+                .with_value_to_string(formatters::v2s_f32_panning())
+                .with_string_to_value(formatters::s2v_f32_panning()),
+        }
+    }
+}
+
+/// A volume parameter named `name`, a linear gain shown in dB, at 0 dB.
+fn volume_param(name: impl Into<String>) -> FloatParam {
+    FloatParam::new(
+        name,
+        1.0,
+        FloatRange::Skewed {
+            min: 0.0,
+            max: VOLUME_MAX,
+            factor: FloatRange::gain_skew_factor(VOLUME_FLOOR_DB, util::gain_to_db(VOLUME_MAX)),
+        },
+    )
+    .with_unit(" dB")
+    .with_value_to_string(formatters::v2s_f32_gain_to_db(1))
+    .with_string_to_value(formatters::s2v_f32_gain_to_db())
 }
 
 impl Default for OrdrumboxParams {
@@ -68,19 +112,16 @@ impl Default for OrdrumboxParams {
             kit: IntParam::new("Kit", 1, IntRange::Linear { min: 1, max: KIT_CHOICES })
                 .with_value_to_string(Arc::new(move |v| kit_names.show(&kit_names.kits, v)))
                 .with_string_to_value(Arc::new(|s| choice_number(s, KIT_CHOICES))),
-            volume: FloatParam::new(
-                "Volume",
-                1.0,
-                FloatRange::Skewed {
-                    min: 0.0,
-                    max: VOLUME_MAX,
-                    factor: FloatRange::gain_skew_factor(VOLUME_FLOOR_DB, util::gain_to_db(VOLUME_MAX)),
-                },
+            volume: volume_param("Volume"),
+            swing: FloatParam::new(
+                "Swing",
+                straight_swing(),
+                FloatRange::Linear { min: straight_swing(), max: SWING_MAX },
             )
-            .with_unit(" dB")
-            .with_value_to_string(formatters::v2s_f32_gain_to_db(1))
-            .with_string_to_value(formatters::s2v_f32_gain_to_db()),
-            mutes: std::array::from_fn(|t| MuteParam { mute: BoolParam::new(format!("Mute track {}", t + 1), false) }),
+            .with_unit(" %")
+            .with_value_to_string(formatters::v2s_f32_percentage(1))
+            .with_string_to_value(formatters::s2v_f32_percentage()),
+            tracks: std::array::from_fn(|t| TrackParams::new(t + 1)),
             names,
         }
     }
@@ -88,19 +129,40 @@ impl Default for OrdrumboxParams {
 
 impl OrdrumboxParams {
     /// What the player thread follows: the pattern and the kit the host asks
-    /// for, and the tracks it mutes.
+    /// for, the tracks it mutes and its swing.
     pub fn controls(&self) -> HostControls {
-        HostControls { pattern: choice_index(&self.pattern), kit: choice_index(&self.kit), muted: self.muted_tracks() }
+        HostControls {
+            pattern: choice_index(&self.pattern),
+            kit: choice_index(&self.kit),
+            muted: self.muted_tracks(),
+            swing: f64::from(self.swing.value()),
+        }
+    }
+
+    /// What the audio thread applies: the volumes, the pans and the mutes.
+    pub fn mix(&self) -> HostMix {
+        HostMix {
+            gain: self.volume.value(),
+            muted: self.muted_tracks(),
+            track_gains: self.tracks.each_ref().map(|t| t.volume.value()),
+            track_pans: self.tracks.each_ref().map(|t| t.pan.value()),
+        }
     }
 
     /// The tracks muted, bit `t` for track `t`.
     pub fn muted_tracks(&self) -> u64 {
-        self.mutes.iter().enumerate().fold(0, |mask, (t, m)| mask | u64::from(m.mute.value()) << t)
+        self.tracks.iter().enumerate().fold(0, |mask, (t, track)| mask | u64::from(track.mute.value()) << t)
     }
 }
 
+/// The swing parameter's straight value.
+fn straight_swing() -> f32 {
+    // 0.5: exact in `f32`.
+    STRAIGHT_SWING as f32
+}
+
 /// What a host's parameters ask of the player thread.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HostControls {
     /// The pattern, from 0.
     pub pattern: usize,
@@ -108,6 +170,8 @@ pub struct HostControls {
     pub kit: usize,
     /// The tracks muted, bit `t` for track `t`.
     pub muted: u64,
+    /// Where the second step of each pair starts ([`STRAIGHT_SWING`]: straight).
+    pub swing: f64,
 }
 
 /// Choice parameter `param` (from 1) as an index from 0.
@@ -191,13 +255,18 @@ mod tests {
     }
 
     #[test]
-    fn the_defaults_choose_the_first_pattern_and_kit_and_mute_nothing() {
+    fn the_defaults_choose_the_first_pattern_and_kit_and_change_nothing() {
         let params = OrdrumboxParams::default();
-        assert_eq!(params.controls(), HostControls { pattern: 0, kit: 0, muted: 0 });
+        let controls = HostControls { pattern: 0, kit: 0, muted: 0, swing: STRAIGHT_SWING };
+        assert_eq!(params.controls(), controls);
         assert_eq!(params.muted_tracks(), 0);
-        assert_eq!(params.volume.value(), 1.0);
+        assert_eq!(params.mix(), HostMix::default());
+        assert_eq!(params.swing.normalized_value_to_string(0.0, true), "50.0 %");
+        assert_eq!(params.tracks[0].pan.normalized_value_to_string(0.5, true), "C");
         let ids: Vec<String> = params.param_map().into_iter().map(|(id, _, _)| id).collect();
-        for id in ["pattern", "kit", "volume", "mute_1", "mute_16"] {
+        let saved = ["pattern", "kit", "volume", "mute_1", "mute_16"];
+        let added = ["swing", "track_volume_1", "track_pan_1", "track_volume_16", "track_pan_16"];
+        for id in saved.into_iter().chain(added) {
             assert!(ids.iter().any(|i| i == id), "no parameter {id} in {ids:?}");
         }
     }

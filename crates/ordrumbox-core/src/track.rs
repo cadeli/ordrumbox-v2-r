@@ -189,6 +189,9 @@ const ROUND_2D: [&str; 10] = [
 /// Tracks a pattern plays, each through its own strip: an edit adds no
 /// track past them, a load reports the tracks beyond.
 pub const MAX_TRACKS: usize = 64;
+/// A pair swing that delays nothing: the second step of a pair at its
+/// middle ([`crate::Hit::pair_swing_beats`]).
+pub const STRAIGHT_SWING: f64 = 0.5;
 /// Steps a beat can be divided into.
 pub const MAX_STEPS_PER_BEAT: i32 = 8;
 /// Lowest frequency a filter cutoff can take, in Hz.

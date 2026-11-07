@@ -3,7 +3,7 @@
 
 use crate::pattern_engine::Hit;
 use crate::steps::semitone_ratio;
-use crate::track::Track;
+use crate::track::{STRAIGHT_SWING, Track};
 
 impl Hit {
     /// Stereo position: the mean of the note and track pans, floored to 0.01
@@ -27,6 +27,17 @@ impl Hit {
     pub fn swing_beats(&self, track: &Track) -> f64 {
         let grid = track.swing_resolution.max(1);
         if grid == 1 || self.step % grid != 1 { 0.0 } else { track.swing_amount }
+    }
+
+    /// Delay of a swing set for every track (a plugin host's), in beats:
+    /// in each pair of steps, the second one starts at `ratio` of the pair
+    /// ([`STRAIGHT_SWING`] is straight, 2/3 a triplet feel). A track with an
+    /// odd number of steps per beat has pairs across its beats: it is not swung.
+    pub fn pair_swing_beats(&self, track: &Track, ratio: f64) -> f64 {
+        if track.steps_per_beat % 2 != 0 || self.step % 2 != 1 {
+            return 0.0;
+        }
+        (ratio - STRAIGHT_SWING).max(0.0) * 2.0 / f64::from(track.steps_per_beat)
     }
 }
 
@@ -61,5 +72,17 @@ mod tests {
         assert_eq!(note(2, 0.0, 0.0).swing_beats(&swung), 0.0);
         let straight = Track { swing_amount: 0.5, ..Track::default() };
         assert_eq!(note(1, 0.0, 0.0).swing_beats(&straight), 0.0);
+    }
+
+    #[test]
+    fn pair_swing_pushes_the_second_step_of_each_pair() {
+        let sixteenths = Track::default();
+        assert_eq!(note(1, 0.0, 0.0).pair_swing_beats(&sixteenths, STRAIGHT_SWING), 0.0);
+        // A triplet feel: the second sixteenth of a pair on its last third.
+        let triplet = note(3, 0.0, 0.0).pair_swing_beats(&sixteenths, 2.0 / 3.0);
+        assert!((triplet - 1.0 / 12.0).abs() < 1e-12);
+        assert_eq!(note(2, 0.0, 0.0).pair_swing_beats(&sixteenths, 0.75), 0.0);
+        let triplets = Track { steps_per_beat: 3, ..Track::default() };
+        assert_eq!(note(1, 0.0, 0.0).pair_swing_beats(&triplets, 0.75), 0.0);
     }
 }

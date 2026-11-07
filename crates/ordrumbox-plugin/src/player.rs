@@ -108,9 +108,9 @@ impl Player {
     }
 
     /// One step of the UI side: the host's pattern and kit applied when
-    /// they changed (or when a refused one can be), its mutes shown, the
-    /// controller fed, the names the host shows updated, the library saved
-    /// into the project when it changed.
+    /// they changed (or when a refused one can be), its mutes shown, its
+    /// swing applied, the controller fed, the names the host shows updated,
+    /// the library saved into the project when it changed.
     pub fn tick(&mut self, state: &LibraryState, host: HostControls, names: &Names) {
         let Some(ui) = &mut self.ui else { return };
         let session = &mut ui.session;
@@ -125,6 +125,7 @@ impl Player {
             self.redraw = true;
         }
         self.redraw |= session.set_host_muted(host.muted);
+        session.set_host_swing(host.swing);
         session.update();
         // What the host or the playback chose is not given back to the host.
         self.pattern.known = Some(session.pattern_index());
@@ -235,12 +236,13 @@ impl Drop for Ticker {
 #[cfg(test)]
 mod tests {
     use nih_plug::params::persist::PersistentField;
+    use ordrumbox_core::track::STRAIGHT_SWING;
     use ordrumbox_engine::HostTransport;
 
     use super::*;
     use crate::state::LibraryText;
 
-    const FIRST: HostControls = HostControls { pattern: 0, kit: 0, muted: 0 };
+    const FIRST: HostControls = HostControls { pattern: 0, kit: 0, muted: 0, swing: STRAIGHT_SWING };
 
     fn audio(started: Started) -> Box<AudioSide> {
         match started {
