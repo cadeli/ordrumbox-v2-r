@@ -113,7 +113,7 @@ fn parse(text: &str) -> Value {
     json::parse(text).expect("parses")
 }
 
-fn strip_fields(s: &StripSettings) -> [(&'static str, f32); 18] {
+fn strip_fields(s: &StripSettings) -> [(&'static str, f32); 20] {
     [
         ("cutoff", s.cutoff),
         ("q", s.q),
@@ -125,10 +125,12 @@ fn strip_fields(s: &StripSettings) -> [(&'static str, f32); 18] {
         ("revRoom", s.reverb_room),
         ("revDamp", s.reverb_damping),
         ("revWidth", s.reverb_width),
+        ("revOn", s.reverb_on),
         ("revMix", s.reverb_mix),
         ("dlyTimeL", s.delay_time_l),
         ("dlyTimeR", s.delay_time_r),
         ("dlyFb", s.delay_feedback),
+        ("dlyOn", s.delay_on),
         ("dlyMix", s.delay_mix),
         ("dlyMode", s.delay_mode),
         ("volume", s.volume),

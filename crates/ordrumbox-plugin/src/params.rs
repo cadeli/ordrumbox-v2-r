@@ -1,9 +1,10 @@
 //! The parameters a host shows and automates: the pattern and the kit
-//! played, the master volume, the swing, and a mute, a volume and a pan per
-//! track. The pattern, the kit and the swing are applied by the player
-//! thread, which also shows the mutes in the window; the volumes, the pans
-//! and the mutes are applied by the audio thread, every block, on top of the
-//! pattern's own (the library is not edited).
+//! played, the master volume, the swing, and per track a mute, a volume, a
+//! pan, the filter's cutoff and Q, the reverb, delay and saturation amounts,
+//! the delay feedback and a transpose. The pattern, the kit and the swing
+//! are applied by the player thread, which also shows the mutes in the
+//! window; the track parameters are applied by the audio thread, every
+//! block, on top of the pattern's own (the library is not edited).
 //! A pattern or kit chosen in the window is given back to the host
 //! (`editor.rs`).
 
@@ -11,7 +12,7 @@ use std::sync::{Arc, RwLock};
 
 use nih_plug::prelude::*;
 use ordrumbox_core::track::STRAIGHT_SWING;
-use ordrumbox_engine::{HOST_TRACKS, HostMix};
+use ordrumbox_engine::{HOST_TRACKS, HostMix, HostTrack};
 
 use crate::editor;
 use crate::state::{EditorSize, LibraryState};
@@ -26,6 +27,13 @@ const VOLUME_MAX: f32 = 2.0;
 const SWING_MAX: f32 = 0.75;
 /// The lowest volume shown in dB on the knob's scale; below it, silence.
 const VOLUME_FLOOR_DB: f32 = -60.0;
+/// The most a host moves a track's filter cutoff, octaves each way.
+const CUTOFF_OCTAVES_MAX: f32 = 4.0;
+/// The most a host adds to or takes from a track's filter Q (its range is
+/// 0.707 to 18.707).
+const Q_OFFSET_MAX: f32 = 18.0;
+/// The most a host transposes a track, semitones each way (the editor's).
+const TRANSPOSE_MAX: i32 = 24;
 
 /// What the project saves and the host automates. The IDs are what a host
 /// saves automation under: never rename them.
@@ -49,15 +57,15 @@ pub struct OrdrumboxParams {
     /// of each pair starts, 50 % (straight) to 75 %.
     #[id = "swing"]
     pub swing: FloatParam,
-    /// Track `t + 1`'s mute, volume and pan; ids `mute_1`, `track_volume_1`,
-    /// `track_pan_1` to `_16`.
+    /// Track `t + 1`'s parameters; ids `mute_1`, `track_volume_1`,
+    /// `track_pan_1`, `track_cutoff_1`… to `_16`.
     #[nested(array, group = "Track")]
     pub tracks: [TrackParams; HOST_TRACKS],
     /// The names the pattern and kit parameters show.
     pub names: Arc<Names>,
 }
 
-/// One track's mix.
+/// One track's parameters, each changing nothing at its default.
 #[derive(Debug, Params)]
 pub struct TrackParams {
     #[id = "mute"]
@@ -68,6 +76,27 @@ pub struct TrackParams {
     /// Added to the track's pan: -1 (left) to 1 (right).
     #[id = "track_pan"]
     pub pan: FloatParam,
+    /// Octaves the filter cutoff moves by.
+    #[id = "track_cutoff"]
+    pub cutoff: FloatParam,
+    /// Added to the filter's Q.
+    #[id = "track_q"]
+    pub q: FloatParam,
+    /// Added to the reverb amount.
+    #[id = "track_reverb"]
+    pub reverb: FloatParam,
+    /// Added to the delay amount.
+    #[id = "track_delay"]
+    pub delay: FloatParam,
+    /// Added to the delay feedback.
+    #[id = "track_feedback"]
+    pub feedback: FloatParam,
+    /// Added to the saturation amount.
+    #[id = "track_saturation"]
+    pub saturation: FloatParam,
+    /// Semitones added to the track's transpose.
+    #[id = "track_transpose"]
+    pub transpose: IntParam,
 }
 
 impl TrackParams {
@@ -79,8 +108,43 @@ impl TrackParams {
             pan: FloatParam::new(format!("Pan track {number}"), 0.0, FloatRange::Linear { min: -1.0, max: 1.0 })
                 .with_value_to_string(formatters::v2s_f32_panning())
                 .with_string_to_value(formatters::s2v_f32_panning()),
+            cutoff: offset_param(format!("Cutoff track {number}"), CUTOFF_OCTAVES_MAX).with_unit(" oct"),
+            q: offset_param(format!("Q track {number}"), Q_OFFSET_MAX),
+            reverb: offset_param(format!("Reverb track {number}"), 1.0),
+            delay: offset_param(format!("Delay track {number}"), 1.0),
+            feedback: offset_param(format!("Feedback track {number}"), 1.0),
+            saturation: offset_param(format!("Saturation track {number}"), 1.0),
+            transpose: IntParam::new(
+                format!("Transpose track {number}"),
+                0,
+                IntRange::Linear { min: -TRANSPOSE_MAX, max: TRANSPOSE_MAX },
+            )
+            .with_unit(" st"),
         }
     }
+
+    /// What the audio thread applies to the track.
+    fn host_track(&self) -> HostTrack {
+        HostTrack {
+            gain: self.volume.value(),
+            pan: self.pan.value(),
+            cutoff_octaves: self.cutoff.value(),
+            q: self.q.value(),
+            reverb: self.reverb.value(),
+            delay: self.delay.value(),
+            feedback: self.feedback.value(),
+            saturation: self.saturation.value(),
+            transpose: self.transpose.value(),
+        }
+    }
+}
+
+/// An offset parameter named `name`, from `-max` to `max`, at 0, shown with
+/// its sign.
+fn offset_param(name: impl Into<String>, max: f32) -> FloatParam {
+    FloatParam::new(name, 0.0, FloatRange::Linear { min: -max, max })
+        .with_step_size(0.01)
+        .with_value_to_string(Arc::new(|v| format!("{v:+.2}")))
 }
 
 /// A volume parameter named `name`, a linear gain shown in dB, at 0 dB.
@@ -139,13 +203,13 @@ impl OrdrumboxParams {
         }
     }
 
-    /// What the audio thread applies: the volumes, the pans and the mutes.
+    /// What the audio thread applies: the master volume, the mutes and the
+    /// track parameters.
     pub fn mix(&self) -> HostMix {
         HostMix {
             gain: self.volume.value(),
             muted: self.muted_tracks(),
-            track_gains: self.tracks.each_ref().map(|t| t.volume.value()),
-            track_pans: self.tracks.each_ref().map(|t| t.pan.value()),
+            tracks: self.tracks.each_ref().map(TrackParams::host_track),
         }
     }
 
@@ -263,10 +327,14 @@ mod tests {
         assert_eq!(params.mix(), HostMix::default());
         assert_eq!(params.swing.normalized_value_to_string(0.0, true), "50.0 %");
         assert_eq!(params.tracks[0].pan.normalized_value_to_string(0.5, true), "C");
+        assert_eq!(params.tracks[0].cutoff.normalized_value_to_string(1.0, true), "+4.00 oct");
+        assert_eq!(params.tracks[0].transpose.normalized_value_to_string(0.0, true), "-24 st");
         let ids: Vec<String> = params.param_map().into_iter().map(|(id, _, _)| id).collect();
         let saved = ["pattern", "kit", "volume", "mute_1", "mute_16"];
         let added = ["swing", "track_volume_1", "track_pan_1", "track_volume_16", "track_pan_16"];
-        for id in saved.into_iter().chain(added) {
+        let fx = ["track_cutoff_16", "track_q_1", "track_reverb_1", "track_delay_1", "track_feedback_1"];
+        let more = ["track_saturation_1", "track_transpose_1", "track_transpose_16"];
+        for id in saved.into_iter().chain(added).chain(fx).chain(more) {
             assert!(ids.iter().any(|i| i == id), "no parameter {id} in {ids:?}");
         }
     }
