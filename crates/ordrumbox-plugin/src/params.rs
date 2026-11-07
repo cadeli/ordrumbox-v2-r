@@ -9,7 +9,8 @@ use std::sync::{Arc, RwLock};
 
 use nih_plug::prelude::*;
 
-use crate::state::LibraryState;
+use crate::editor;
+use crate::state::{EditorSize, LibraryState};
 
 /// Patterns a host can choose (the parameter's range, from 1).
 pub const PATTERN_CHOICES: i32 = 128;
@@ -28,6 +29,9 @@ const VOLUME_FLOOR_DB: f32 = -60.0;
 pub struct OrdrumboxParams {
     #[persist = "library"]
     pub library: Arc<LibraryState>,
+    /// The window's size, in logical pixels.
+    #[persist = "editor-size"]
+    pub editor_size: Arc<EditorSize>,
     /// The pattern played, from 1.
     #[id = "pattern"]
     pub pattern: IntParam,
@@ -57,6 +61,7 @@ impl Default for OrdrumboxParams {
         let (pattern_names, kit_names) = (names.clone(), names.clone());
         Self {
             library: Arc::default(),
+            editor_size: Arc::new(EditorSize::new(editor::SIZE)),
             pattern: IntParam::new("Pattern", 1, IntRange::Linear { min: 1, max: PATTERN_CHOICES })
                 .with_value_to_string(Arc::new(move |v| pattern_names.show(&pattern_names.patterns, v)))
                 .with_string_to_value(Arc::new(|s| choice_number(s, PATTERN_CHOICES))),

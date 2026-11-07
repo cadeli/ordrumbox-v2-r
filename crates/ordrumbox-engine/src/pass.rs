@@ -8,12 +8,12 @@ use ordrumbox_core::song::clamp_bpm;
 use ordrumbox_core::steps::TICK;
 use std::collections::HashMap;
 
-use ordrumbox_core::{Hit, Hits, Note, Pattern, Rng, Scales, Song, expand_hits, lfo};
+use ordrumbox_core::{Hit, Hits, Note, Pattern, Rng, Scales, Song, Track, expand_hits, lfo};
 use ordrumbox_dsp::{StripSettings, SynthPatch, VoiceStart};
 
 use crate::assign::TrackSound;
 use crate::kit::SampleBank;
-use crate::midi::{KeyMap, track_keys};
+use crate::midi::{C3_KEY, KeyMap, MidiNote, Target, track_targets};
 use crate::strip_settings::{StripLfo, strip_lfo, strip_settings};
 use crate::synth_preset::{SynthNote, SynthPresets, note_seconds, synth_patch};
 
@@ -52,6 +52,8 @@ pub struct Event {
     pub mono: bool,
     /// The note's velocity (0–1), for the MIDI note sent with it.
     pub velocity: f32,
+    /// The MIDI note sent with it, if any ([`crate::midi`]).
+    pub note: Option<MidiNote>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -72,8 +74,6 @@ pub struct Pass {
     pub lfos: Vec<StripLfo>,
     /// Synth patches the events refer to.
     pub patches: Vec<SynthPatch>,
-    /// The MIDI key of each strip's notes ([`crate::midi`]).
-    pub keys: Vec<Option<u8>>,
     /// How long a MIDI note sent lasts, in frames: a 16th.
     pub note_frames: u64,
 }
@@ -112,6 +112,21 @@ fn note_frames(per_tick: f64) -> u64 {
     (f64::from(TICK / 4) * per_tick).round().max(1.0) as u64
 }
 
+/// The key of a track's pitch 0 with `assigned`: its sample's root note, else C3.
+fn root_key(assigned: Option<&TrackSound>, bank: &SampleBank) -> f64 {
+    match assigned {
+        Some(TrackSound::Sample(sample)) => bank.get(*sample).and_then(|s| s.sample.root_midi).unwrap_or(C3_KEY),
+        _ => C3_KEY,
+    }
+}
+
+/// The MIDI note `note` of `track` sends at transport tick `lfo_tick`, to
+/// `target`: its pitch with the track's transpose and pitch LFO.
+fn midi_note(target: Option<Target>, note: &Hit, track: &Track, lfo_tick: u64) -> Option<MidiNote> {
+    let lfo = track.transpose_lfo.as_ref().map_or(0.0, |l| lfo::value(l, lfo_tick as f64));
+    Some(target?.note(note.pitch + track.transpose + lfo))
+}
+
 /// Whether track `t` of `pattern` is silent: muted, or silenced by another
 /// track's solo (`shouldTrackPlay()`).
 fn is_silent(pattern: &Pattern, t: usize) -> bool {
@@ -137,6 +152,13 @@ pub fn build_pass(pattern: &Pattern, number: u64, rng: &mut Rng, context: PassCo
     let pass_index = u32::try_from(number).unwrap_or(u32::MAX);
     let flat = expand_hits(pattern, pass_index, rng, context.scales);
     let silent = |i: usize| is_silent(pattern, i);
+    let targets = track_targets(
+        pattern
+            .tracks
+            .iter()
+            .enumerate()
+            .map(|(t, track)| (track.name.as_str(), root_key(context.sounds.get(t), context.bank))),
+    );
 
     let mut events = Vec::new();
     let mut patches = Vec::new();
@@ -153,7 +175,8 @@ pub fn build_pass(pattern: &Pattern, number: u64, rng: &mut Rng, context: PassCo
             let Some(assigned) = context.sounds.get(note.track) else { continue };
             let voice = Voice { strip: note.track, lfo_tick, bpm };
             if let Some(sound) = sound_for(pattern, note, assigned, voice, &context, &mut patches) {
-                events.push(Event { frame, sound, mono: track.mono, velocity: note.velocity as f32 });
+                let midi = midi_note(targets.get(note.track).copied().flatten(), note, track, lfo_tick);
+                events.push(Event { frame, sound, mono: track.mono, velocity: note.velocity as f32, note: midi });
             }
         }
     }
@@ -186,7 +209,6 @@ pub fn build_pass(pattern: &Pattern, number: u64, rng: &mut Rng, context: PassCo
         strips,
         lfos,
         patches,
-        keys: track_keys(pattern.tracks.iter().map(|t| t.name.as_str())),
         note_frames: note_frames(per_tick),
     }
 }
@@ -269,7 +291,7 @@ pub fn build_preview(pattern: &Pattern, t: usize, note: Option<&Note>, context: 
         .sounds
         .get(t)
         .and_then(|assigned| sound_for(pattern, &flat, assigned, voice, &context, &mut patches))
-        .map(|sound| Event { frame: 0, sound, mono: track.mono, velocity: 1.0 })
+        .map(|sound| Event { frame: 0, sound, mono: track.mono, velocity: 1.0, note: None })
         .into_iter()
         .collect();
     let strips = pattern.tracks.iter().map(|t| strip_settings(t, bpm)).collect();
@@ -287,7 +309,7 @@ pub fn build_keymap(pattern: &Pattern, context: PassContext<'_>, bpm: f64) -> Ke
         let voice = Voice { strip: t, lfo_tick: context.first_tick, bpm };
         let sound = context.sounds.get(t).and_then(|a| sound_for(pattern, &hit, a, voice, &context, &mut patches));
         if let Some(sound) = sound {
-            events.push(Event { frame: 0, sound, mono: track.mono, velocity: 1.0 });
+            events.push(Event { frame: 0, sound, mono: track.mono, velocity: 1.0, note: None });
         }
     }
     let strips = (0..pattern.tracks.len())
@@ -299,8 +321,19 @@ pub fn build_keymap(pattern: &Pattern, context: PassContext<'_>, bpm: f64) -> Ke
             settings
         })
         .collect();
-    let keys = track_keys(pattern.tracks.iter().map(|t| t.name.as_str()));
-    KeyMap::new(Pass { frames: 1, ticks: 1, events, strips, patches, keys: keys.clone(), ..Pass::default() }, &keys)
+    // The events play pitch 0 with the track's transpose: so does their key.
+    let targets: Vec<Option<Target>> = track_targets(
+        pattern
+            .tracks
+            .iter()
+            .enumerate()
+            .map(|(t, track)| (track.name.as_str(), root_key(context.sounds.get(t), context.bank))),
+    )
+    .into_iter()
+    .zip(&pattern.tracks)
+    .map(|(target, track)| target.map(|target| target.transposed(track.transpose)))
+    .collect();
+    KeyMap::new(Pass { frames: 1, ticks: 1, events, strips, patches, ..Pass::default() }, &targets)
 }
 
 /// Hits of a pattern repetition, kept between song passes so a
@@ -372,6 +405,10 @@ pub fn build_song_pass_at(
         strips.iter().position(|&(sp, st)| context.patterns[sp].tracks[st].name == *name)
     };
     let silent = |p: usize, t: usize| is_silent(&context.patterns[p], t);
+    let targets = track_targets(strips.iter().map(|&(p, t)| {
+        let sounds = context.sounds.get(p).map_or(&[][..], Vec::as_slice);
+        (context.patterns[p].tracks[t].name.as_str(), root_key(sounds.get(t), context.bank))
+    }));
 
     let mut events = Vec::new();
     let mut patches = Vec::new();
@@ -403,7 +440,8 @@ pub fn build_song_pass_at(
                 let frame = (((f64::from(t) + swing_ticks) * per_tick).round() as u64).min(frames - 1);
                 let voice = Voice { strip, lfo_tick: tick, bpm };
                 if let Some(sound) = sound_for(pattern, note, assigned, voice, &pass_context, &mut patches) {
-                    events.push(Event { frame, sound, mono: track.mono, velocity: note.velocity as f32 });
+                    let midi = midi_note(targets.get(strip).copied().flatten(), note, track, tick);
+                    events.push(Event { frame, sound, mono: track.mono, velocity: note.velocity as f32, note: midi });
                 }
             }
         }
@@ -437,7 +475,6 @@ pub fn build_song_pass_at(
         strips: strips.iter().map(strip_settings_of).collect(),
         lfos,
         patches,
-        keys: track_keys(strips.iter().map(|&(p, t)| context.patterns[p].tracks[t].name.as_str())),
         note_frames: note_frames(per_tick),
     }
 }

@@ -16,6 +16,7 @@ use super::Session;
 use crate::kits::KitSet;
 use crate::menu::Command;
 use crate::panel::{self, Id, Kind};
+use crate::scale::Scale;
 use crate::ui_input::Button;
 use crate::view;
 use crate::view::Hit;
@@ -204,7 +205,7 @@ fn a_plugin_leaves_to_the_host_what_the_host_does() {
     // Greyed out in the menus (`menu.rs` tests), and the tempo shown is not the session's knob.
     let runnable = s.menus().into_iter().flat_map(|m| m.items).filter_map(|i| i.runnable());
     assert!(runnable.into_iter().all(|c| c.hosted_refusal().is_none()));
-    let size = (1100, 680, 1);
+    let size = (1100, 680, Scale::ONE);
     let layout = s.panel_layout(size.0, size.1, size.2);
     assert!(!layout.items.iter().any(|i| i.id == Some(Id::Bpm)));
     // The SONG view button greyed out: a click says why.
@@ -219,14 +220,14 @@ fn a_plugin_leaves_to_the_host_what_the_host_does() {
     // Tooltips say whose the tempo and the songs are.
     s.control_hover(size, x, y);
     assert_eq!(s.chrome.control_hover.map(|(id, _)| s.control_tip(id).unwrap()[0]), Some("Song: in the app only"));
-    let bpm = view::header_controls(1).bpm;
+    let bpm = view::header_controls(Scale::ONE).bpm;
     s.control_hover(size, bpm.x + 2, bpm.y + 2);
     assert_eq!(s.chrome.control_hover.map(|(id, _)| s.control_tip(id).unwrap()[0]), Some("Tempo (HOST)"));
     // No master strip: the editors reach down to where it was.
     assert!(!layout.items.iter().any(|i| matches!(i.id, Some(Id::OutTab(_) | Id::Master(_)))));
     assert!(s.output_view().is_none());
-    let body = s.body((1100, 680, 1));
+    let body = s.body((1100, 680, Scale::ONE));
     assert_eq!(body.output.h, 0);
     s.hosted = false;
-    assert!(s.body((1100, 680, 1)).main_bottom < body.main_bottom);
+    assert!(s.body((1100, 680, Scale::ONE)).main_bottom < body.main_bottom);
 }

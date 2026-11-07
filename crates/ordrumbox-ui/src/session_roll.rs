@@ -10,6 +10,7 @@
 //! Enter adds, selects or deletes at the cursor, Delete deletes the selected
 //! note. The wheel scrolls the keyboard (Shift: the pages).
 
+use crate::scale::Scale;
 use ordrumbox_core::json::Value;
 use ordrumbox_core::note_positions::sub_positions;
 use ordrumbox_core::num;
@@ -89,7 +90,7 @@ impl Session {
         self.editor_track()
     }
 
-    pub(super) fn roll_layout(&self, size: (i32, i32, i32)) -> RollLayout {
+    pub(super) fn roll_layout(&self, size: (i32, i32, Scale)) -> RollLayout {
         let body = self.body(size);
         let spb = self.roll_track().and_then(|t| self.track(t)).map_or(4, steps_per_beat);
         RollLayout::new(body.main_w, body.editor_h, size.2, self.status.len(), spb)
@@ -148,7 +149,7 @@ impl Session {
     }
 
     /// The header's track list (which track the roll shows).
-    pub(super) fn roll_items(&self, layout: &mut session_panel::PanelLayout, size: (i32, i32, i32)) {
+    pub(super) fn roll_items(&self, layout: &mut session_panel::PanelLayout, size: (i32, i32, Scale)) {
         let Some(pattern) = self.pattern().filter(|p| !p.tracks.is_empty()) else { return };
         let roll = self.roll_layout(size);
         let s = size.2;
@@ -239,7 +240,7 @@ impl Session {
     // ─── The mouse ───────────────────────────────────────────────────────────
 
     /// A press on the piano roll; whether it was its.
-    pub fn roll_click(&mut self, size: (i32, i32, i32), x: i32, y: i32, button: Button) -> bool {
+    pub fn roll_click(&mut self, size: (i32, i32, Scale), x: i32, y: i32, button: Button) -> bool {
         let layout = self.roll_layout(size);
         let Some(view) = self.roll_view(&layout) else { return false };
         let (page, pages) = (view.page, view.pages());
@@ -313,7 +314,7 @@ impl Session {
 
     /// The wheel over the piano roll: the keyboard (Shift: the pages);
     /// whether it was its.
-    pub fn roll_wheel(&mut self, size: (i32, i32, i32), x: i32, y: i32, lines: isize, shift: bool) -> bool {
+    pub fn roll_wheel(&mut self, size: (i32, i32, Scale), x: i32, y: i32, lines: isize, shift: bool) -> bool {
         let layout = self.roll_layout(size);
         if self.workspace != Workspace::PianoRoll
             || lines == 0
@@ -331,7 +332,7 @@ impl Session {
     }
 
     /// The note under the mouse, for its tooltip; whether it changed.
-    pub fn roll_hover(&mut self, size: (i32, i32, i32), x: i32, y: i32) -> bool {
+    pub fn roll_hover(&mut self, size: (i32, i32, Scale), x: i32, y: i32) -> bool {
         let hover = (self.workspace == Workspace::PianoRoll && self.roll.drag.is_none())
             .then(|| {
                 let layout = self.roll_layout(size);
@@ -346,7 +347,7 @@ impl Session {
 
     /// The bubble over a note: the drag's value (the gauge), else the hovered
     /// note's tooltip.
-    pub(super) fn draw_roll_tooltip(&self, canvas: &mut Canvas, scale: i32) {
+    pub(super) fn draw_roll_tooltip(&self, canvas: &mut Canvas, scale: Scale) {
         if self.chrome.covered() {
             return;
         }
@@ -614,7 +615,7 @@ mod tests {
     use super::*;
     use crate::kits::KitSet;
 
-    const SIZE: (i32, i32, i32) = (1100, 680, 1);
+    const SIZE: (i32, i32, Scale) = (1100, 680, Scale::ONE);
 
     fn session() -> Session {
         let (library, _) = Library::parse(

@@ -17,6 +17,7 @@
 //! The mouse is in `session_song_mouse.rs`, the menus and the edits they
 //! lead to in `session_song_menu.rs`, song files in `session_song_files.rs`.
 
+use crate::scale::Scale;
 use ordrumbox_core::Song;
 use ordrumbox_core::json::Value;
 use ordrumbox_core::steps::TICK;
@@ -232,7 +233,7 @@ impl Session {
         first.min(layout.list_last_scroll(self.editor.library().patterns.len()))
     }
 
-    pub(super) fn song_layout(&self, size: (i32, i32, i32)) -> SongLayout {
+    pub(super) fn song_layout(&self, size: (i32, i32, Scale)) -> SongLayout {
         let body = self.body(size);
         SongLayout::new(body.main_w, body.editor_h, size.2, self.status.len())
     }
@@ -267,7 +268,7 @@ impl Session {
     // ─── The column ──────────────────────────────────────────────────────────
 
     /// The song's column: name, date, description, arrangement, buttons.
-    pub(super) fn song_items(&self, layout: &mut PanelLayout, width: i32, height: i32, scale: i32) {
+    pub(super) fn song_items(&self, layout: &mut PanelLayout, width: i32, height: i32, scale: Scale) {
         let s = scale;
         let area = self.song_layout((width, height, scale)).column;
         if area.w <= 0 {
@@ -482,7 +483,7 @@ pub(super) mod tests {
     use crate::kits::KitSet;
     use ordrumbox_core::Library;
 
-    pub(crate) const SIZE: (i32, i32, i32) = (1100, 680, 1);
+    pub(crate) const SIZE: (i32, i32, Scale) = (1100, 680, Scale::ONE);
 
     pub(crate) fn session() -> Session {
         let (library, _) = Library::parse(
@@ -577,7 +578,7 @@ pub(super) mod tests {
         s.toggle_song_view();
         assert_eq!(
             s.song_button_rect("load"),
-            panel::find(&s.panel_layout(SIZE.0, SIZE.1, 1).items, Id::SongButton("load")).unwrap().rect
+            panel::find(&s.panel_layout(SIZE.0, SIZE.1, Scale::ONE).items, Id::SongButton("load")).unwrap().rect
         );
         s.run(Command::RenameSong);
         assert_eq!(s.chrome.widgets.entry.as_ref().map(|e| e.id), Some(Id::SongName));

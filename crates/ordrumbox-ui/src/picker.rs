@@ -3,6 +3,7 @@
 //! file, Backspace goes up, a letter jumps to the next name starting with
 //! it, Escape cancels. On Windows, above a drive are the drives.
 
+use crate::scale::Scale;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -323,11 +324,11 @@ pub struct PickerLayout {
     list_top: i32,
     row: i32,
     rows: usize,
-    scale: i32,
+    scale: Scale,
 }
 
 impl PickerLayout {
-    pub fn new(width: i32, height: i32, scale: i32) -> Self {
+    pub fn new(width: i32, height: i32, scale: Scale) -> Self {
         let margin = 40 * scale;
         let (w, h) = ((width - 2 * margin).max(80 * scale), (height - 2 * margin).max(80 * scale));
         let (x, y) = ((width - w) / 2, (height - h) / 2);
@@ -362,7 +363,7 @@ pub fn draw(canvas: &mut Canvas, picker: &Picker, layout: &PickerLayout) {
     let s = layout.scale;
     canvas.fill_rect(layout.x - 4 * s, layout.y - 4 * s, layout.width + 8 * s, layout.height + 8 * s, shade_color());
     canvas.fill_rect(layout.x, layout.y, layout.width, layout.height, border_color());
-    canvas.fill_rect(layout.x + s, layout.y + s, layout.width - 2 * s, layout.height - 2 * s, panel_color());
+    canvas.fill_rect(layout.x + s.px(), layout.y + s.px(), layout.width - 2 * s, layout.height - 2 * s, panel_color());
     let x = layout.x + 10 * s;
     canvas.text(x, layout.y + 8 * s, picker.purpose.title(), s, ACCENT);
     let place = picker.dir.as_ref().map_or_else(|| "Drives".to_owned(), |d| d.display().to_string());
@@ -433,7 +434,7 @@ mod tests {
         assert!(destination.entries.iter().all(|e| !matches!(e, Entry::File(_))));
         assert_eq!(destination.activate(), Outcome::Picked(dir.clone()));
 
-        let layout = PickerLayout::new(800, 600, 1);
+        let layout = PickerLayout::new(800, 600, Scale::ONE);
         let mut pixels = vec![0; 800 * 600];
         draw(&mut Canvas::new(&mut pixels, 800, 600), &picker, &layout);
         assert_eq!(layout.hit(&picker, layout.x + 20, layout.list_top + 1), Some(0));

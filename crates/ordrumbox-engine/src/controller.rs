@@ -214,11 +214,11 @@ impl AudioSide {
         self.engine.set_host_controls(gain, muted);
     }
 
-    /// Play MIDI key `key` at `velocity` (0–1), `offset` frames into the
-    /// next block: the track of the pattern that has the key
-    /// ([`crate::midi`]). Called before rendering the block.
-    pub fn trigger(&mut self, key: u8, velocity: f32, offset: u32) {
-        self.engine.trigger(key, velocity, offset);
+    /// Play MIDI key `key` of channel `channel` at `velocity` (0–1),
+    /// `offset` frames into the next block: the track of the pattern that
+    /// has the note, at its pitch ([`crate::midi`]). Called before rendering the block.
+    pub fn trigger(&mut self, channel: u8, key: u8, velocity: f32, offset: u32) {
+        self.engine.trigger(channel, key, velocity, offset);
     }
 
     /// The MIDI notes the block just rendered sent, in time order, on the
@@ -708,6 +708,7 @@ impl Controller {
                 sound: crate::pass::Sound::Sample(voice),
                 mono: false,
                 velocity: 1.0,
+                note: None,
             }],
             strips: vec![ordrumbox_dsp::StripSettings::default()],
             ..Pass::default()
@@ -920,7 +921,7 @@ mod tests {
         assert_eq!(controller.keymaps.len(), 1, "posted again only when it changes");
 
         // Key 36 (Bass Drum 1) plays the KICK track, stopped or not.
-        audio.trigger(36, 1.0, 0);
+        audio.trigger(crate::DRUM_CHANNEL, 36, 1.0, 0);
         audio.render_synced(&mut l, &mut r, stopped);
         assert!(l.iter().any(|&s| s != 0.0));
 
@@ -930,9 +931,9 @@ mod tests {
             let beat = f64::from(block * 256) / 4000.0;
             controller.update(&library);
             audio.render_synced(&mut l, &mut r, HostTransport { playing: true, bpm: 120.0, beat });
-            audio.take_notes(|n| sent.push((block * 256 + n.timing, n.key, n.velocity.is_some())));
+            audio.take_notes(|n| sent.push((block * 256 + n.timing, n.channel, n.key, n.velocity.is_some())));
         }
-        assert_eq!(sent, [(4000, 36, true), (5000, 36, false)], "a 16th long");
+        assert_eq!(sent, [(4000, 9, 36, true), (5000, 9, 36, false)], "on channel 10, a 16th long");
     }
 
     #[test]

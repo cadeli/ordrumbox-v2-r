@@ -9,6 +9,7 @@
 //! show, `session_panel_input.rs` takes the mouse and the keys, and
 //! `session_panel_edit.rs` makes the edits.
 
+use crate::scale::Scale;
 use ordrumbox_core::json::Value;
 use ordrumbox_core::style::{self, Macros};
 use ordrumbox_core::{num, song};
@@ -77,7 +78,7 @@ pub(super) enum NoteTarget {
 }
 
 /// Width of the track editor on a `width`-wide window.
-fn panel_width(width: i32, scale: i32) -> i32 {
+fn panel_width(width: i32, scale: Scale) -> i32 {
     (360 * scale).min(width / 2)
 }
 
@@ -94,7 +95,7 @@ impl Session {
     }
 
     /// The widgets of a `width` × `height` window.
-    pub(super) fn panel_layout(&self, width: i32, height: i32, scale: i32) -> PanelLayout {
+    pub(super) fn panel_layout(&self, width: i32, height: i32, scale: Scale) -> PanelLayout {
         let mut layout = PanelLayout::default();
         let s = scale;
         // The header's pattern and kit lists (`rebuildPatternSelect`, `rebuildDrumkitSelect`).
@@ -196,7 +197,7 @@ impl Session {
 
     /// The header's transport and generation controls (the toolbar's
     /// transport and the pattern settings panel of the JS).
-    fn header_items(&self, layout: &mut PanelLayout, pattern: &Pattern, scale: i32) {
+    fn header_items(&self, layout: &mut PanelLayout, pattern: &Pattern, scale: Scale) {
         let controls = view::header_controls(scale);
         let playing = self.playing();
         let label = if playing { "STOP" } else { "PLAY" };
@@ -251,7 +252,7 @@ impl Session {
     /// Width the track editor takes on the right of a `width`-wide window (0:
     /// none). It is shown for every main editor (grid, piano roll, song, synth,
     /// the kit editor) whenever it is toggled on and the window is wide enough.
-    pub fn track_editor_width(&self, width: i32, scale: i32) -> i32 {
+    pub fn track_editor_width(&self, width: i32, scale: Scale) -> i32 {
         if self.chrome.show_track_editor && width >= 480 * scale { panel_width(width, scale) } else { 0 }
     }
 
@@ -396,7 +397,7 @@ mod tests {
         assert_eq!(history_label(Id::NoteKnob("velocity")), "Velocity");
     }
 
-    const SIZE: (i32, i32, i32) = (1100, 680, 1);
+    const SIZE: (i32, i32, Scale) = (1100, 680, Scale::ONE);
 
     #[test]
     fn the_mouse_over_a_tab_or_a_knob_shows_what_it_is() {
@@ -482,7 +483,7 @@ mod tests {
         let mut s = Session::new(library, KitSet::empty(), Vec::new());
         s.status = vec!["a status line".into()];
         let mut tallest = 0;
-        for scale in [1, 2] {
+        for scale in (Scale::ONE.quarters()..=Scale::MAX.quarters()).map(Scale::from_quarters) {
             let (width, height) = view::min_window_size(scale, true);
             let body = view::Body::new(width, height, scale, s.track_editor_width(width, scale), 1, true);
             for (track, tab, sub, note_tab, advanced) in (0..2).flat_map(|t| {
@@ -504,7 +505,9 @@ mod tests {
                     .max()
                     .unwrap();
                 assert!(bottom <= body.main_bottom, "scale {scale} tab {tab}/{sub} note tab {note_tab}: {bottom}");
-                tallest = tallest.max((bottom - frame::body_top(scale)) / scale);
+                if scale == Scale::ONE {
+                    tallest = tallest.max(bottom - frame::body_top(scale));
+                }
             }
             let views = view::header_controls(scale).views;
             assert!(views[4].x + views[4].w <= width);
@@ -516,7 +519,7 @@ mod tests {
     #[test]
     fn the_tempo_knob_is_the_songs_in_the_song_panel_else_the_sessions() {
         let mut s = session();
-        let (x, y) = center(view::header_controls(1).bpm);
+        let (x, y) = center(view::header_controls(Scale::ONE).bpm);
         s.run(crate::menu::Command::SongView);
         s.run(crate::menu::Command::NewSong);
         s.chrome.widgets.entry.as_mut().unwrap().text = "verse".into();
@@ -534,7 +537,7 @@ mod tests {
     #[test]
     fn header_controls_set_tempo_length_and_generation() {
         let mut s = session();
-        let c = view::header_controls(1);
+        let c = view::header_controls(Scale::ONE);
         // The tempo knob: the wheel steps it, a typed number sets it.
         let (x, y) = center(c.bpm);
         assert!(s.wheel(SIZE, x, y, 3, false, false));
@@ -555,7 +558,7 @@ mod tests {
         let (x, y) = center(c.auto);
         s.mouse_down(SIZE, x, y, Button::Left, false);
         assert!(s.pattern().unwrap().tracks.iter().all(|t| t.auto_mode));
-        let layout = s.panel_layout(SIZE.0, SIZE.1, 1);
+        let layout = s.panel_layout(SIZE.0, SIZE.1, Scale::ONE);
         assert!(matches!(panel::find(&layout.items, Id::AutoAll).unwrap().kind, Kind::Button { on: true, .. }));
     }
 
@@ -576,14 +579,14 @@ mod tests {
 
         // The Gen tab of the KICK: the style's hits, then the track's own.
         s.editors.tab = editors::GEN_TAB;
-        let layout = s.panel_layout(SIZE.0, SIZE.1, 1);
+        let layout = s.panel_layout(SIZE.0, SIZE.1, Scale::ONE);
         let hits = panel::find(&layout.items, Id::Compose("composeHitsPerMeasure")).unwrap();
         assert!(matches!(&hits.kind, Kind::Value { value, text, .. } if *value == 1.0 && text == "1*"));
         s.set_value(Id::Compose("composeHitsPerMeasure"), 3.0);
         assert_eq!(s.track(0).unwrap().compose_hits_per_measure, Some(3.0));
         assert_eq!(s.editor.history().next_undo(), Some("Hits/Measure on KICK"));
         // ↻: a new line with three kicks, the third beat among them.
-        let regenerate = panel::find(&s.panel_layout(SIZE.0, SIZE.1, 1).items, Id::Regenerate).unwrap().rect;
+        let regenerate = panel::find(&s.panel_layout(SIZE.0, SIZE.1, Scale::ONE).items, Id::Regenerate).unwrap().rect;
         let (x, y) = center(regenerate);
         s.mouse_down(SIZE, x, y, Button::Left, false);
         let kick = s.track(0).unwrap();
@@ -600,7 +603,7 @@ mod tests {
         let kick = s.track(0).unwrap();
         assert_eq!(kick.notes.len(), 2);
         assert!(kick.notes.iter().any(|n| (n.beat, n.step) == (2, 0)));
-        let layout = s.panel_layout(SIZE.0, SIZE.1, 1);
+        let layout = s.panel_layout(SIZE.0, SIZE.1, Scale::ONE);
         let hits = panel::find(&layout.items, Id::Compose("composeHitsPerMeasure")).unwrap();
         assert!(matches!(&hits.kind, Kind::Value { text, .. } if text == "1\u{2192}2*"), "{:?}", hits.kind);
         // The same knob value makes the same lines.
@@ -613,7 +616,8 @@ mod tests {
         s.run(Command::LockTrack);
         assert!(s.track(0).unwrap().compose_lock);
         let kick = s.track(0).unwrap().clone();
-        let (x, y) = center(panel::find(&s.panel_layout(SIZE.0, SIZE.1, 1).items, Id::GeneratePattern).unwrap().rect);
+        let (x, y) =
+            center(panel::find(&s.panel_layout(SIZE.0, SIZE.1, Scale::ONE).items, Id::GeneratePattern).unwrap().rect);
         s.mouse_down(SIZE, x, y, Button::Left, false);
         assert_eq!(s.pattern().unwrap().tracks.iter().find(|t| t.name == "KICK"), Some(&kick));
         assert_eq!(s.editor.history().next_undo(), Some("Generate \"p\""));

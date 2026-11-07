@@ -2,6 +2,7 @@
 //! arrangement, drags of patterns, clips and rows (one undo step on release),
 //! the scroll bars, the wheel, and the clip tooltip.
 
+use crate::scale::Scale;
 use ordrumbox_core::song::measures_for_pattern;
 
 use super::session_panel::DOUBLE_CLICK;
@@ -13,7 +14,7 @@ use crate::song_view::{Axis, Row, SongGhost, SongHit, SongLayout};
 
 impl Session {
     /// A click on the song panel's list or arrangement; whether it was theirs.
-    pub fn song_click(&mut self, size: (i32, i32, i32), x: i32, y: i32, button: Button) -> bool {
+    pub fn song_click(&mut self, size: (i32, i32, Scale), x: i32, y: i32, button: Button) -> bool {
         let layout = self.song_layout(size);
         let rows = self.song_rows();
         let Some(hit) = layout.hit(&self.song_view_data(&rows, &layout), x, y) else { return false };
@@ -157,7 +158,7 @@ impl Session {
     }
 
     /// The press released: a drag places or moves its clip; whether it was one.
-    pub fn song_release(&mut self, size: (i32, i32, i32)) -> bool {
+    pub fn song_release(&mut self, size: (i32, i32, Scale)) -> bool {
         let layout = self.song_layout(size);
         let rows = self.song_rows();
         let at = self.song_drag_at(&layout, rows.len());
@@ -197,7 +198,7 @@ impl Session {
     }
 
     /// The scroll bar `axis` held at `(x, y)`: its thumb centred there; whether to redraw.
-    pub(super) fn song_bar_to(&mut self, size: (i32, i32, i32), axis: Axis, x: i32, y: i32) -> bool {
+    pub(super) fn song_bar_to(&mut self, size: (i32, i32, Scale), axis: Axis, x: i32, y: i32) -> bool {
         let layout = self.song_layout(size);
         if axis == Axis::List {
             let count = self.editor.library().patterns.len();
@@ -224,7 +225,7 @@ impl Session {
     /// rows, which macOS turns into sideways notches); over the pattern's
     /// description: its lines; over the pattern list: its rows; whether it
     /// was theirs.
-    pub fn song_wheel(&mut self, size: (i32, i32, i32), x: i32, y: i32, wheel: (isize, isize), shift: bool) -> bool {
+    pub fn song_wheel(&mut self, size: (i32, i32, Scale), x: i32, y: i32, wheel: (isize, isize), shift: bool) -> bool {
         // Content moves right and down for positive notches: both show what is before.
         let lines = wheel.0 + wheel.1;
         let layout = self.song_layout(size);
@@ -258,7 +259,7 @@ impl Session {
 
     /// The mouse over the arrangement: the clip it is on, for its tooltip;
     /// whether it changed.
-    pub fn song_hover(&mut self, size: (i32, i32, i32), x: i32, y: i32) -> bool {
+    pub fn song_hover(&mut self, size: (i32, i32, Scale), x: i32, y: i32) -> bool {
         let hover = if self.workspace == Workspace::Song
             && self.chrome.widgets.drag.is_none()
             && self.song_panel.drag.is_none()
@@ -280,7 +281,7 @@ impl Session {
     /// The tooltip of the clip under the mouse (the clip's `title`).
     /// The tooltip of the clip under the mouse, or, while a pattern is
     /// dragged over the arrangement, the measure it would be added at.
-    pub(super) fn draw_song_tooltip(&self, canvas: &mut Canvas, scale: i32) {
+    pub(super) fn draw_song_tooltip(&self, canvas: &mut Canvas, scale: Scale) {
         if self.chrome.covered() {
             return;
         }

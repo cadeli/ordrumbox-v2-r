@@ -7,6 +7,7 @@
 //! [`OutputLayout`] places everything; the controls are panel items, the
 //! curve and the spectrum are drawn here.
 
+use crate::scale::Scale;
 use ordrumbox_engine::MasterSettings;
 
 use crate::canvas::{Canvas, Rgb, text_width};
@@ -89,7 +90,7 @@ const CURVE_Y: (f64, f64) = (-60.0, 12.0);
 /// Where the output panel's parts are.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct OutputLayout {
-    scale: i32,
+    scale: Scale,
     /// The band the panel is drawn in (the bottom strip; empty in the full layout).
     pub band: Rect,
     pub title: (i32, i32),
@@ -110,7 +111,7 @@ pub struct OutputLayout {
 impl OutputLayout {
     /// The compact bottom strip: the title and the three tabs stacked on the
     /// left, the active tab's controls in one horizontal row across `band`.
-    pub fn strip(width: i32, band: Rect, scale: i32) -> Self {
+    pub fn strip(width: i32, band: Rect, scale: Scale) -> Self {
         let s = scale;
         let pad = 8 * s;
         let top = band.y + pad;
@@ -191,7 +192,7 @@ pub fn draw(canvas: &mut Canvas, view: &OutputView, layout: &OutputLayout) {
     if layout.band.h > 0 {
         // The strip: a panel along the bottom, edged on top.
         canvas.fill_rect(layout.band.x, layout.band.y, layout.band.w, layout.band.h, theme::panel());
-        canvas.fill_rect(layout.band.x, layout.band.y, layout.band.w, s.max(1), theme::line());
+        canvas.fill_rect(layout.band.x, layout.band.y, layout.band.w, s.px(), theme::line());
     }
     canvas.text(layout.title.0, layout.title.1, "Master", s, ACCENT);
     match view.tab {
@@ -223,22 +224,22 @@ fn line(canvas: &mut Canvas, (x0, y0): (i32, i32), (x1, y1): (i32, i32), t: i32,
 
 /// The compressor's transfer curve: -60 to 0 dB in, -60 to
 /// +12 dB out, the unity line, the threshold, the curve.
-fn draw_curve(canvas: &mut Canvas, master: &MasterSettings, r: Rect, s: i32) {
+fn draw_curve(canvas: &mut Canvas, master: &MasterSettings, r: Rect, s: Scale) {
     canvas.fill_rect(r.x, r.y, r.w, r.h, surface_color());
     let x_px = |db: f64| r.x + ((db - CURVE_X.0) / (CURVE_X.1 - CURVE_X.0) * f64::from(r.w)) as i32;
     let y_px = |db: f64| r.y + r.h - ((db - CURVE_Y.0) / (CURVE_Y.1 - CURVE_Y.0) * f64::from(r.h)) as i32;
     for db in [-60.0, -40.0, -20.0, 0.0] {
         let (x, y) = (x_px(db).min(r.x + r.w - 1), y_px(db));
-        canvas.fill_rect(x, r.y, s.max(1), r.h, grid_color());
-        canvas.fill_rect(r.x, y, r.w, s.max(1), grid_color());
+        canvas.fill_rect(x, r.y, s.px(), r.h, grid_color());
+        canvas.fill_rect(r.x, y, r.w, s.px(), grid_color());
     }
     let (from, to) = (CURVE_X.0.max(CURVE_Y.0), CURVE_X.1.min(CURVE_Y.1));
-    line(canvas, (x_px(from), y_px(from)), (x_px(to), y_px(to)), s.max(1), muted_color(), Some((6 * s, 6 * s)));
+    line(canvas, (x_px(from), y_px(from)), (x_px(to), y_px(to)), s.px(), muted_color(), Some((6 * s, 6 * s)));
     let bypass = master.bypass >= 0.5;
     let threshold = f64::from(master.threshold);
     if !bypass && (CURVE_X.0..=CURVE_X.1).contains(&threshold) {
         let x = x_px(threshold).min(r.x + r.w - 1);
-        line(canvas, (x, r.y), (x, r.y + r.h - 1), s.max(1), WARNING, Some((4 * s, 4 * s)));
+        line(canvas, (x, r.y), (x, r.y + r.h - 1), s.px(), WARNING, Some((4 * s, 4 * s)));
     }
     let color = if bypass { muted_color() } else { ACCENT };
     let mut previous = None;
@@ -262,13 +263,13 @@ fn draw_curve(canvas: &mut Canvas, master: &MasterSettings, r: Rect, s: i32) {
 
 /// The spectrum: a grid, then the first bins (one a
 /// column of the JS canvas, 256) as a line, louder higher.
-fn draw_spectrum(canvas: &mut Canvas, bins: &[u8], r: Rect, s: i32) {
+fn draw_spectrum(canvas: &mut Canvas, bins: &[u8], r: Rect, s: Scale) {
     canvas.fill_rect(r.x, r.y, r.w, r.h, scope_bg_color());
     for i in 1..8 {
-        canvas.fill_rect(r.x + r.w * i / 8, r.y, s.max(1), r.h, scope_grid_color());
+        canvas.fill_rect(r.x + r.w * i / 8, r.y, s.px(), r.h, scope_grid_color());
     }
     for i in 1..4 {
-        canvas.fill_rect(r.x, r.y + r.h * i / 4, r.w, s.max(1), scope_grid_color());
+        canvas.fill_rect(r.x, r.y + r.h * i / 4, r.w, s.px(), scope_grid_color());
     }
     let count = bins.len().min(256);
     let mut previous = None;
@@ -311,7 +312,7 @@ mod tests {
             let mut canvas = Canvas::new(&mut pixels, w, h);
             let (wi, hi) = (w as i32, h as i32);
             let band = Rect::new(0, (hi - 88).max(0), wi, hi.min(88));
-            let layout = OutputLayout::strip(wi, band, 1);
+            let layout = OutputLayout::strip(wi, band, Scale::ONE);
             for tab in 0..3 {
                 let master = MasterSettings { bypass: f32::from(tab == 2), ..MasterSettings::default() };
                 draw(&mut canvas, &OutputView { tab, master, spectrum: bins.clone() }, &layout);

@@ -6,6 +6,7 @@
 //! click runs a command. Keyboard: F10 or Alt opens the first menu, arrows
 //! move, Enter runs, Escape closes.
 
+use crate::scale::Scale;
 use std::borrow::Cow;
 
 use crate::canvas::{Canvas, Rgb, text_width};
@@ -96,6 +97,7 @@ pub enum Command {
     ZoomIn,
     ZoomOut,
     ZoomReset,
+    ZoomToFit,
     ExportPatternJson,
     ConvertToSynth,
     AutoAssignAll,
@@ -359,6 +361,7 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
                 command("Zoom in", "Ctrl++", C::ZoomIn, true),
                 command("Zoom out", "Ctrl+Shift+-", C::ZoomOut, true),
                 command("Actual size", "Ctrl+0", C::ZoomReset, true),
+                command("Zoom: fit to window", "", C::ZoomToFit, true),
             ],
         },
         Menu {
@@ -541,20 +544,20 @@ fn disabled_color() -> Rgb {
 const ACCENT: Rgb = theme::PINK;
 
 /// Height of the menu bar.
-pub fn bar_height(scale: i32) -> i32 {
+pub fn bar_height(scale: Scale) -> i32 {
     14 * scale
 }
 
-fn item_height(scale: i32) -> i32 {
+fn item_height(scale: Scale) -> i32 {
     13 * scale
 }
 
-fn separator_height(scale: i32) -> i32 {
+fn separator_height(scale: Scale) -> i32 {
     7 * scale
 }
 
 /// Left edge and width of each title in the bar.
-fn titles(menus: &[Menu], scale: i32) -> Vec<(i32, i32)> {
+fn titles(menus: &[Menu], scale: Scale) -> Vec<(i32, i32)> {
     let mut x = 8 * scale;
     menus
         .iter()
@@ -568,7 +571,7 @@ fn titles(menus: &[Menu], scale: i32) -> Vec<(i32, i32)> {
 }
 
 /// The open menu's panel: left, top, width, and each item's top.
-fn panel(menus: &[Menu], open: Open, scale: i32) -> (i32, i32, i32, Vec<i32>) {
+fn panel(menus: &[Menu], open: Open, scale: Scale) -> (i32, i32, i32, Vec<i32>) {
     let (x, _) = titles(menus, scale)[open.menu];
     let menu = &menus[open.menu];
     let mut label_w = 0;
@@ -604,7 +607,7 @@ pub enum Hit {
     Bar,
 }
 
-pub fn hit(menus: &[Menu], open: Option<Open>, scale: i32, x: i32, y: i32) -> Option<Hit> {
+pub fn hit(menus: &[Menu], open: Option<Open>, scale: Scale, x: i32, y: i32) -> Option<Hit> {
     if (0..bar_height(scale)).contains(&y) {
         let title = titles(menus, scale).iter().position(|&(tx, w)| (tx..tx + w).contains(&x));
         return Some(title.map_or(Hit::Bar, Hit::Title));
@@ -626,15 +629,15 @@ pub fn hit(menus: &[Menu], open: Option<Open>, scale: i32, x: i32, y: i32) -> Op
 // ─── Drawing ─────────────────────────────────────────────────────────────────
 
 /// The bar, and the open menu over everything.
-pub fn draw(canvas: &mut Canvas, menus: &[Menu], open: Option<Open>, scale: i32) {
+pub fn draw(canvas: &mut Canvas, menus: &[Menu], open: Option<Open>, scale: Scale) {
     let bar = bar_height(scale);
     canvas.fill_rect(0, 0, canvas.width(), bar, bar_background_color());
-    canvas.fill_rect(0, bar - scale.max(1), canvas.width(), scale.max(1), border_color());
+    canvas.fill_rect(0, bar - scale.px(), canvas.width(), scale.px(), border_color());
     let text_y = (bar - 8 * scale) / 2;
     for (i, (menu, (x, w))) in menus.iter().zip(titles(menus, scale)).enumerate() {
         let is_open = open.is_some_and(|o| o.menu == i);
         if is_open {
-            canvas.fill_rect(x, 0, w, bar - scale.max(1), highlight_color());
+            canvas.fill_rect(x, 0, w, bar - scale.px(), highlight_color());
         }
         canvas.text(x + 8 * scale, text_y, menu.title, scale, if is_open { ACCENT } else { theme::text() });
     }
@@ -643,7 +646,7 @@ pub fn draw(canvas: &mut Canvas, menus: &[Menu], open: Option<Open>, scale: i32)
     let items = &menus[open.menu].items;
     let bottom = tops.last().map_or(py, |&t| t + item_height(scale)) + 2 * scale;
     canvas.fill_rect(px, py, width, bottom - py, border_color());
-    canvas.fill_rect(px + scale, py, width - 2 * scale, bottom - py - scale, panel_color());
+    canvas.fill_rect(px + scale.px(), py, width - 2 * scale, bottom - py - scale.px(), panel_color());
     for (i, (item, &top)) in items.iter().zip(&tops).enumerate() {
         match item {
             Item::Separator => {
@@ -651,22 +654,22 @@ pub fn draw(canvas: &mut Canvas, menus: &[Menu], open: Option<Open>, scale: i32)
                     px + 6 * scale,
                     top + separator_height(scale) / 2,
                     width - 12 * scale,
-                    scale.max(1),
+                    scale.px(),
                     border_color(),
                 );
             }
             Item::Command { label, shortcut, enabled, checked, .. } => {
                 let h = item_height(scale);
                 if open.item == Some(i) && *enabled {
-                    canvas.fill_rect(px + scale, top, width - 2 * scale, h, highlight_color());
+                    canvas.fill_rect(px + scale.px(), top, width - 2 * scale, h, highlight_color());
                 }
                 let ty = top + (h - 8 * scale) / 2;
                 if let Some(on) = checked {
-                    let (bx, by, b) = (px + 5 * scale, ty + scale, 6 * scale);
+                    let (bx, by, b) = (px + 5 * scale, ty + scale.px(), 6 * scale);
                     if *on {
                         canvas.fill_rect(bx, by, b, b, if *enabled { ACCENT } else { disabled_color() });
                     } else {
-                        let line = scale.max(1);
+                        let line = scale.px();
                         let c = if *enabled { DIM } else { disabled_color() };
                         canvas.fill_rect(bx, by, b, line, c);
                         canvas.fill_rect(bx, by + b - line, b, line, c);

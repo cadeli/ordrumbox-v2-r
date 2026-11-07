@@ -67,16 +67,23 @@ cargo xtask bundle ordrumbox-plugin --release --features vst3 # and orDrumbox.vs
 ```
 
 The plugin follows the host transport and saves its library in the host project.
+The grip in its window's bottom-right corner resizes the window (down to 320×200, where
+the layout scrolls); the project keeps the size.
 
-MIDI goes both ways, with one key per track of the pattern playing (or selected):
-a drum track has its instrument's GM key (KICK 36, SNARE 38…), the other tracks take
-the keys from 84 up, in track order.
+MIDI goes both ways, with one place per track of the pattern playing (or selected):
+a drum track is on channel 10 at its instrument's GM key (KICK 36, SNARE 38…), whatever
+the note's pitch. Any other track (melodic, unknown name, a second track of one drum) has a
+channel of its own (1–9, 11–16, in track order), its notes on the key of their pitch: the
+track's pitch 0 is its sample's root note, C3 (48) without one and for a synth. Past the 15
+channels, the tracks left take keys of channel 10 from 84 up.
 
-- **In**: a note on any channel plays the track with that key, at its velocity,
-  whether the host plays or not.
-- **Out**: the notes the pattern plays go out on channel 10, each on its track's key, a 16th
-  long. Tracks the host mutes send nothing. A clip recorded from this output and played back
-  into the plugin plays the same tracks.
+- **In**: a note on a track's channel plays that track at the note's pitch; a note on any
+  other channel plays the drum track with that key. At its velocity, whether the host plays
+  or not.
+- **Out**: the notes the pattern plays go out where they come in, with their pitch (the
+  track's transpose and pitch LFO included), a 16th long. Tracks the host mutes send nothing.
+  A clip recorded from this output and played back into the plugin plays the same tracks at
+  the same pitches.
 Building with `vst3` links GPLv3 bindings; the CLAP build stays MIT.
 
 ## Keys
@@ -86,6 +93,16 @@ Press **F1** in the app for the full keyboard shortcut list. Common keys:
 - **Space**: play / stop
 - **F2**: track editor, **F3**: song panel, **F4**: piano roll, **F5**: grid, **F6**: synth editor
 - **Ctrl K**: kit editor, **Ctrl M**: export MIDI, **Ctrl E**: export WAV
+- **Ctrl +** / **Ctrl Shift -**: zoom in / out a quarter at a time (×1, ×1.25,
+  ×1.5… up to ×4), **Ctrl 0**: the display's scale, **View > Zoom: fit to
+  window**: the biggest of these scales the window shows whole. The zoom does not depend
+  on the window's size: a window too small for it gets scrollbars (drag them,
+  click beside the thumb, or turn the wheel where nothing else takes it). A
+  window goes down to 320×200, the app's and the plugin's. The
+  zoom is kept in `settings.json` (`uiZoom`, scale units added to the
+  display's, such as `0.5`; whole numbers from earlier versions still read). A
+  display at 150 % shows at ×1.5. In the plugin, Alt stands for Ctrl (the host
+  keeps Ctrl).
 
 ## Files
 

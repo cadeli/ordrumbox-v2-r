@@ -17,6 +17,7 @@
 //! `keyboard_section.js`, `clipboard_section.js`): a click on an empty step
 //! adds a note, on a note selects it, on the selected note deletes it.
 
+use crate::scale::Scale;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -591,7 +592,7 @@ impl Session {
 
     /// The window split for `size` (a real window size): the main editor
     /// region (top-left) and the output strip (bottom).
-    pub(super) fn body(&self, size: (i32, i32, i32)) -> view::Body {
+    pub(super) fn body(&self, size: (i32, i32, Scale)) -> view::Body {
         let (width, height, scale) = size;
         view::Body::new(width, height, scale, self.track_editor_width(width, scale), self.status.len(), !self.hosted)
     }
@@ -950,11 +951,11 @@ impl Session {
     // ─── Drawing ─────────────────────────────────────────────────────────────
 
     /// The window's size and scale (where the lists opened from the menus go).
-    pub fn set_size(&mut self, size: (i32, i32, i32)) {
+    pub fn set_size(&mut self, size: (i32, i32, Scale)) {
         self.chrome.panel_size = size;
     }
 
-    pub fn draw(&mut self, canvas: &mut Canvas, scale: i32) {
+    pub fn draw(&mut self, canvas: &mut Canvas, scale: Scale) {
         // The scheme is per thread: a plugin draws on another than it loads on.
         theme::set_scheme(self.color_scheme);
         self.note_actions();

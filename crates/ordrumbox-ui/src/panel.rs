@@ -8,6 +8,7 @@
 use crate::canvas::{Canvas, Rgb, text_width};
 use crate::control::{Spec, Style};
 use crate::kits::Field;
+use crate::scale::Scale;
 use crate::theme;
 
 pub fn background_color() -> Rgb {
@@ -267,7 +268,7 @@ impl Item {
         Self { id, rect, kind }
     }
 
-    pub fn text(x: i32, y: i32, text: impl Into<String>, color: Rgb, scale: i32) -> Self {
+    pub fn text(x: i32, y: i32, text: impl Into<String>, color: Rgb, scale: Scale) -> Self {
         let text = text.into();
         let rect = Rect::new(x, y, text_width(&text, scale), 8 * scale);
         Self { id: None, rect, kind: Kind::Text { text, color } }
@@ -312,24 +313,24 @@ pub fn next_focus(items: &[Item], from: Option<Id>, delta: isize) -> Option<Id> 
 // ─── Geometry shared by drawing and the mouse ────────────────────────────────
 
 /// Width of a slider row's label.
-pub fn label_width(scale: i32) -> i32 {
+pub fn label_width(scale: Scale) -> i32 {
     88 * scale
 }
 
 /// Width of a slider row's value text.
-fn value_width(scale: i32) -> i32 {
+fn value_width(scale: Scale) -> i32 {
     64 * scale
 }
 
 /// The bar of a slider item (with a label, with a value text): left edge and width.
-pub fn slider_bar(rect: Rect, labelled: bool, valued: bool, scale: i32) -> (i32, i32) {
+pub fn slider_bar(rect: Rect, labelled: bool, valued: bool, scale: Scale) -> (i32, i32) {
     let left = rect.x + if labelled { label_width(scale) } else { 0 } + 4 * scale;
     let right = rect.x + rect.w - if valued { value_width(scale) + 6 * scale } else { 2 * scale };
     (left, (right - left).max(8 * scale))
 }
 
 /// Diameter of a knob in an item of height `h`.
-fn knob_size(rect: Rect, scale: i32) -> i32 {
+fn knob_size(rect: Rect, scale: Scale) -> i32 {
     if rect.h >= 40 * scale { 26 * scale } else { (rect.h - 2 * scale).max(8 * scale) }
 }
 
@@ -350,14 +351,14 @@ fn fill_circle(canvas: &mut Canvas, cx: i32, cy: i32, r: i32, color: Rgb) {
 }
 
 /// Text cut to `width` pixels.
-fn fit(text: &str, width: i32, scale: i32) -> String {
+fn fit(text: &str, width: i32, scale: Scale) -> String {
     text.chars().take(crate::canvas::chars_in(width, scale)).collect()
 }
 
 /// A knob: a 270° arc from bottom left, lit up to `fraction`, a disc and its pointer.
-fn draw_knob(canvas: &mut Canvas, cx: i32, cy: i32, size: i32, fraction: f64, color: Rgb, scale: i32) {
+fn draw_knob(canvas: &mut Canvas, cx: i32, cy: i32, size: i32, fraction: f64, color: Rgb, scale: Scale) {
     let r = f64::from(size) / 2.0;
-    let dot = scale.max(1) * if size >= 20 * scale { 2 } else { 1 };
+    let dot = scale.px() * if size >= 20 * scale { 2 } else { 1 };
     let start = 135f64.to_radians();
     let sweep = 270f64.to_radians();
     let steps = (r * 6.0) as i32 + 24;
@@ -374,13 +375,13 @@ fn draw_knob(canvas: &mut Canvas, cx: i32, cy: i32, size: i32, fraction: f64, co
     for k in 0..=disc {
         let x = cx + (a.cos() * f64::from(k)) as i32;
         let y = cy + (a.sin() * f64::from(k)) as i32;
-        canvas.fill_rect(x - scale.max(1) / 2, y - scale.max(1) / 2, scale.max(1), scale.max(1), theme::text());
+        canvas.fill_rect(x - scale.px() / 2, y - scale.px() / 2, scale.px(), scale.px(), theme::text());
     }
 }
 
 /// Draw `items`; `focus` gets an outline.
-pub fn draw(canvas: &mut Canvas, items: &[Item], focus: Option<Id>, scale: i32) {
-    let t = scale.max(1);
+pub fn draw(canvas: &mut Canvas, items: &[Item], focus: Option<Id>, scale: Scale) {
+    let t = scale.px();
     for item in items {
         let r = item.rect;
         let focused = item.id.is_some() && item.id == focus;
@@ -424,7 +425,7 @@ pub fn draw(canvas: &mut Canvas, items: &[Item], focus: Option<Id>, scale: i32) 
                         }
                         let (left, width) = slider_bar(r, label.is_some(), !text.is_empty(), scale);
                         // A thin line, lit up to the value, and a square handle.
-                        let bar_y = r.y + r.h / 2 - scale.max(1) / 2;
+                        let bar_y = r.y + r.h / 2 - scale.px() / 2;
                         canvas.fill_rect(left, bar_y, width, 2 * t, border_color());
                         let filled = (fraction * f64::from(width)) as i32;
                         canvas.fill_rect(left, bar_y, filled, 2 * t, color);
@@ -541,7 +542,7 @@ impl Dropdown {
     /// right, or on its left where the `width` × `height` window ends).
     pub fn submenu(
         parent: Dropdown,
-        size: (i32, i32, i32),
+        size: (i32, i32, Scale),
         id: Id,
         title: String,
         values: Vec<String>,
@@ -572,7 +573,7 @@ impl Dropdown {
 
     /// The menu above whose list is at `(x, y)` (the nearest first), and the
     /// option there: a click on it goes back to it.
-    pub fn parent_at(self, width: i32, height: i32, scale: i32, x: i32, y: i32) -> Option<(Dropdown, Option<usize>)> {
+    pub fn parent_at(self, width: i32, height: i32, scale: Scale, x: i32, y: i32) -> Option<(Dropdown, Option<usize>)> {
         let mut menu = self.back();
         while let Some(m) = menu {
             if m.rect(width, height, scale).contains(x, y) {
@@ -630,7 +631,7 @@ impl Dropdown {
     }
 
     /// The list's place in a `width` × `height` window.
-    pub fn rect(&self, width: i32, height: i32, scale: i32) -> Rect {
+    pub fn rect(&self, width: i32, height: i32, scale: Scale) -> Rect {
         let row = row_height(scale);
         let longest = self.labels.iter().chain(&self.title).map(|l| text_width(l, scale)).max().unwrap_or(0);
         let w = (longest + 20 * scale).max(self.anchor.w).min(width);
@@ -642,7 +643,7 @@ impl Dropdown {
     }
 
     /// The option under `(x, y)`.
-    pub fn hit(&self, width: i32, height: i32, scale: i32, x: i32, y: i32) -> Option<usize> {
+    pub fn hit(&self, width: i32, height: i32, scale: Scale, x: i32, y: i32) -> Option<usize> {
         let r = self.rect(width, height, scale);
         if !r.contains(x, y) {
             return None;
@@ -653,13 +654,13 @@ impl Dropdown {
     }
 
     /// The menus above first, then this one over them.
-    pub fn draw(&self, canvas: &mut Canvas, scale: i32) {
+    pub fn draw(&self, canvas: &mut Canvas, scale: Scale) {
         if let Some(parent) = &self.parent {
             parent.draw(canvas, scale);
         }
         let r = self.rect(canvas.width(), canvas.height(), scale);
         canvas.fill_rect(r.x, r.y, r.w, r.h, border_color());
-        canvas.fill_rect(r.x + scale, r.y + scale, r.w - 2 * scale, r.h - 2 * scale, background_color());
+        canvas.fill_rect(r.x + scale.px(), r.y + scale.px(), r.w - 2 * scale, r.h - 2 * scale, background_color());
         let row = row_height(scale);
         if let Some(title) = &self.title {
             let y = r.y + 2 * scale + (row - 8 * scale) / 2;
@@ -669,7 +670,7 @@ impl Dropdown {
         for (k, label) in self.labels.iter().enumerate().skip(self.first).take(self.shown()) {
             let y = top + (k - self.first) as i32 * row;
             if k == self.at {
-                canvas.fill_rect(r.x + scale, y, r.w - 2 * scale, row, selected_row_color());
+                canvas.fill_rect(r.x + scale.px(), y, r.w - 2 * scale, row, selected_row_color());
             }
             let color = if k == self.at { TITLE } else { theme::text() };
             canvas.text(r.x + 6 * scale, y + (row - 8 * scale) / 2, &fit(label, r.w - 12 * scale, scale), scale, color);
@@ -685,7 +686,7 @@ impl Dropdown {
     }
 }
 
-fn row_height(scale: i32) -> i32 {
+fn row_height(scale: Scale) -> i32 {
     12 * scale
 }
 
@@ -702,22 +703,22 @@ pub struct Entry {
 }
 
 impl Entry {
-    pub fn rect(&self, width: i32, height: i32, scale: i32) -> Rect {
+    pub fn rect(&self, width: i32, height: i32, scale: Scale) -> Rect {
         let w = (text_width(&self.title, scale) + 32 * scale).max(220 * scale).min(width);
         let h = 52 * scale;
         Rect::new((width - w) / 2, (height - h) / 2, w, h)
     }
 
-    pub fn draw(&self, canvas: &mut Canvas, scale: i32) {
+    pub fn draw(&self, canvas: &mut Canvas, scale: Scale) {
         let r = self.rect(canvas.width(), canvas.height(), scale);
         canvas.fill_rect(r.x - 4 * scale, r.y - 4 * scale, r.w + 8 * scale, r.h + 8 * scale, theme::shade());
         canvas.fill_rect(r.x, r.y, r.w, r.h, border_color());
-        canvas.fill_rect(r.x + scale, r.y + scale, r.w - 2 * scale, r.h - 2 * scale, background_color());
+        canvas.fill_rect(r.x + scale.px(), r.y + scale.px(), r.w - 2 * scale, r.h - 2 * scale, background_color());
         canvas.text(r.x + 12 * scale, r.y + 8 * scale, &self.title, scale, TITLE);
         let field = Rect::new(r.x + 12 * scale, r.y + 22 * scale, r.w - 24 * scale, 12 * scale);
         canvas.fill_rect(field.x, field.y, field.w, field.h, field_color());
         let x = canvas.text(field.x + 4 * scale, field.y + 2 * scale, &self.text, scale, theme::text());
-        canvas.fill_rect(x + scale, field.y + 2 * scale, scale.max(1), 8 * scale, ACCENT);
+        canvas.fill_rect(x + scale.px(), field.y + 2 * scale, scale.px(), 8 * scale, ACCENT);
         canvas.text(r.x + 12 * scale, r.y + 40 * scale, "ENTER: set   ESC: cancel", scale, DIM);
     }
 }
@@ -758,8 +759,8 @@ mod tests {
         d.scroll(-100);
         assert_eq!(d.first, 0);
         assert_eq!(d.at, LIST_ROWS - 1);
-        let r = d.rect(800, 600, 1);
-        assert_eq!(d.hit(800, 600, 1, r.x + 5, r.y + 2 + 12 * 3 + 1), Some(3));
+        let r = d.rect(800, 600, Scale::ONE);
+        assert_eq!(d.hit(800, 600, Scale::ONE, r.x + 5, r.y + 2 + 12 * 3 + 1), Some(3));
         d.jump('i');
         assert_eq!(d.at, LIST_ROWS);
         // A menu: its title row takes no click.
@@ -771,10 +772,10 @@ mod tests {
             vec!["a".into(), "b".into()],
             vec!["A".into(), "B".into()],
         );
-        let r = m.rect(800, 600, 1);
-        assert_eq!(m.hit(800, 600, 1, r.x + 5, r.y + 3), None);
-        assert_eq!(m.hit(800, 600, 1, r.x + 5, r.y + 2 + 12 + 1), Some(0));
-        assert_eq!(m.hit(800, 600, 1, r.x + 5, r.y + 2 + 24 + 1), Some(1));
+        let r = m.rect(800, 600, Scale::ONE);
+        assert_eq!(m.hit(800, 600, Scale::ONE, r.x + 5, r.y + 3), None);
+        assert_eq!(m.hit(800, 600, Scale::ONE, r.x + 5, r.y + 2 + 12 + 1), Some(0));
+        assert_eq!(m.hit(800, 600, Scale::ONE, r.x + 5, r.y + 2 + 24 + 1), Some(1));
     }
 
     #[test]
@@ -811,12 +812,13 @@ mod tests {
             ),
             Item::new(None, Rect::new(0, 120, 300, 40), Kind::Envelope { points: vec![0.0, 1.0], marker: Some(0.5) }),
         ];
-        draw(&mut canvas, &items, Some(Id::Sample), 1);
+        draw(&mut canvas, &items, Some(Id::Sample), Scale::ONE);
         Dropdown::new(Id::Sample, Rect::new(390, 290, 20, 12), vec!["x".into(); 3], vec!["x".into(); 3], 0)
-            .draw(&mut canvas, 1);
+            .draw(&mut canvas, Scale::ONE);
         let spec = Spec::knob(20.0, 5000.0, 10.0, 500.0);
-        Entry { id: Id::Decay, spec: Some(spec), title: "Enter value".into(), text: "12".into() }.draw(&mut canvas, 1);
+        Entry { id: Id::Decay, spec: Some(spec), title: "Enter value".into(), text: "12".into() }
+            .draw(&mut canvas, Scale::ONE);
         Dropdown::menu(Id::SongMenu, 390, 290, "rock".into(), vec!["a".into()], vec!["Add".into()])
-            .draw(&mut canvas, 1);
+            .draw(&mut canvas, Scale::ONE);
     }
 }

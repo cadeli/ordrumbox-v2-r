@@ -2,6 +2,7 @@
 //! history, About, the factory reset, and the keys and clicks they take.
 
 use super::*;
+use crate::scale::Scale;
 
 /// Every key, for Help > Keyboard shortcuts.
 const SHORTCUTS: [&str; 59] = [
@@ -227,7 +228,7 @@ impl Session {
     }
 
     /// A click while a panel is open.
-    pub fn overlay_click(&mut self, width: i32, height: i32, scale: i32, x: i32, y: i32) {
+    pub fn overlay_click(&mut self, width: i32, height: i32, scale: Scale, x: i32, y: i32) {
         if matches!(self.chrome.overlay, Some(Overlay::History { .. })) {
             if !LogLayout::new(width, height, scale).contains(x, y) {
                 self.chrome.overlay = None;

@@ -170,6 +170,7 @@ impl Session {
             C::ZoomIn => self.zoom(1),
             C::ZoomOut => self.zoom(-1),
             C::ZoomReset => self.zoom(0),
+            C::ZoomToFit => self.zoom_to_fit(),
             C::ExportPatternJson => self.open_export(Export::PatternJson),
             C::ConvertToSynth => self.convert_to_generated_sounds(self.pattern_index),
             C::AutoAssignAll => self.auto_assign_all_tracks(self.pattern_index),

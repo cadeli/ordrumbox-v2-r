@@ -4,6 +4,7 @@
 //! what each shows, in the JS order, with the JS ranges, defaults and
 //! formats. What the widgets do is in the session.
 
+use crate::scale::Scale;
 use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::json::Value;
 use ordrumbox_core::num;
@@ -12,7 +13,6 @@ use ordrumbox_core::{Note, ScaleList, Track};
 use ordrumbox_engine::strip_settings::delay_beats_used;
 use ordrumbox_logic::generate;
 
-use crate::canvas::text_width;
 use crate::control::{Format, Spec};
 use crate::kits::{DECAY_RANGE, Field, GAIN_RANGE, TRANSPOSE_RANGE};
 use crate::panel::{ACCENT, DIM, Id, Item, Kind, LfoParam, Rect, label_width};
@@ -659,16 +659,19 @@ pub struct KitControls {
 
 // ─── Layout ──────────────────────────────────────────────────────────────────
 
-fn row_h(scale: i32) -> i32 {
+fn row_h(scale: Scale) -> i32 {
     16 * scale
 }
+
+/// A tab: its id, its LED's id, its label, active, LED on.
+type TabSlot<'a> = (Id, Option<Id>, &'a str, bool, bool);
 
 /// Places rows top to bottom in a column.
 struct Rows {
     x: i32,
     w: i32,
     y: i32,
-    scale: i32,
+    scale: Scale,
     items: Vec<Item>,
 }
 
@@ -702,12 +705,13 @@ impl Rows {
         Rect::new(x, r.y + 2 * s, w.min(r.x + r.w - x), r.h - 4 * s)
     }
 
-    fn tabs(&mut self, ids: &[(Id, Option<Id>, &str, bool, bool)]) {
-        // (tab id, led id, label, active, led on)
+    /// A row of tabs, one slot each; an empty slot (`None`) keeps its place,
+    /// so the tabs after it do not move when it goes.
+    fn tabs(&mut self, ids: &[Option<TabSlot>]) {
         let s = self.scale;
         let r = Rect::new(self.x, self.y, self.w, 14 * s);
         let n = ids.len().max(1) as i32;
-        for (i, (tab, led, label, active, on)) in ids.iter().enumerate() {
+        for (i, (tab, led, label, active, on)) in ids.iter().enumerate().filter_map(|(i, t)| Some((i, t.as_ref()?))) {
             let x = r.x + i as i32 * r.w / n;
             let w = (i as i32 + 1) * r.w / n - i as i32 * r.w / n;
             let led_w = if led.is_some() { 10 * s } else { 0 };
@@ -715,7 +719,7 @@ impl Rows {
                 self.items.push(Item::new(Some(*led), Rect::new(x, r.y, led_w, r.h), Kind::Led { on: *on }));
             }
             let kind = Kind::Tab { label: (*label).to_owned(), active: *active };
-            self.items.push(Item::new(Some(*tab), Rect::new(x + led_w, r.y, w - led_w - s, r.h), kind));
+            self.items.push(Item::new(Some(*tab), Rect::new(x + led_w, r.y, w - led_w - s.px(), r.h), kind));
         }
         self.y += 18 * s;
     }
@@ -756,8 +760,9 @@ fn default_of(key: &str, min: f64) -> f64 {
     Track::default().field(key).and_then(|v| v.as_f64()).unwrap_or(min)
 }
 
-/// The track editor in `area`; the y under it.
-pub fn track_editor(view: &TrackView, state: &EditorState, area: Rect, scale: i32) -> (Vec<Item>, i32) {
+/// The track editor in `area`; the y under its tallest tab, the same
+/// whatever the tab shown.
+pub fn track_editor(view: &TrackView, state: &EditorState, area: Rect, scale: Scale) -> (Vec<Item>, i32) {
     let s = scale;
     let track = view.track;
     let mut rows = Rows { x: area.x, w: area.w, y: area.y, scale: s, items: Vec::new() };
@@ -800,9 +805,10 @@ pub fn track_editor(view: &TrackView, state: &EditorState, area: Rect, scale: i3
     rows.knob_bar(knobs, 4);
 
     let tabs: Vec<_> =
-        TABS.iter().enumerate().map(|(i, l)| (Id::Tab(i as u8), None, *l, state.tab == i as u8, false)).collect();
+        TABS.iter().enumerate().map(|(i, l)| Some((Id::Tab(i as u8), None, *l, state.tab == i as u8, false))).collect();
     rows.tabs(&tabs);
 
+    let bottom = tallest_tab_bottom(rows.y, s);
     match state.tab {
         TAB_FX => fx_tab(&mut rows, view, state),
         TAB_SOUND => sound_tab(&mut rows, view),
@@ -810,7 +816,6 @@ pub fn track_editor(view: &TrackView, state: &EditorState, area: Rect, scale: i3
         TAB_LOOP => loop_tab(&mut rows, track),
         _ => generation_tab(&mut rows, track, view.compose.as_ref(), state),
     }
-    let bottom = rows.y;
     (rows.items, bottom)
 }
 
@@ -821,17 +826,20 @@ fn fx_tab(rows: &mut Rows, view: &TrackView, state: &EditorState) {
         .iter()
         .enumerate()
         .map(|(i, fx)| {
-            (Id::FxTab(i as u8), Some(Id::FxLed(i as u8)), fx.label, state.fx_tab == i as u8, fx_on(track, fx))
+            Some((Id::FxTab(i as u8), Some(Id::FxLed(i as u8)), fx.label, state.fx_tab == i as u8, fx_on(track, fx)))
         })
         .collect();
     rows.tabs(&tabs);
     let fx = &FX_DEFS[usize::from(state.fx_tab.min(3))];
     for &key in fx.controls {
-        // A slap is one echo: no feedback to set.
+        let r = rows.row();
+        // A slap is one echo: no feedback to set, its row kept greyed out.
         if key == "delayFeedback" && track.delay_type == "slap" {
+            rows.label(r, fx_label(key), None, false);
+            let kind = Kind::Disabled { label: "one echo".into() };
+            rows.items.push(Item::new(None, rows.field(r, 120 * s), kind));
             continue;
         }
-        let r = rows.row();
         if key == "filterType" {
             rows.label(r, "Type", Some(key), state.selected_prop == Some(key));
             for (i, (icon, value)) in FILTER_ICONS.iter().zip(FILTER_TYPES).enumerate() {
@@ -892,6 +900,9 @@ fn sound_tab(rows: &mut Rows, view: &TrackView) {
     }
 }
 
+/// The characters an LFO range's text takes: `-24.00..-24.00`, the widest.
+const RANGE_TEXT_CHARS: usize = 14;
+
 fn lfo_tab(rows: &mut Rows, view: &TrackView, state: &EditorState) {
     let s = rows.scale;
     let track = view.track;
@@ -947,8 +958,10 @@ fn lfo_tab(rows: &mut Rows, view: &TrackView, state: &EditorState) {
         spec = spec.log();
     }
     let field = rows.field(r, r.w);
-    let text = format!("{}..{}", crate::control::fmt(min), crate::control::fmt(max));
-    let text_w = text_width(&text, s) + 4 * s;
+    let text: String =
+        format!("{}..{}", crate::control::fmt(min), crate::control::fmt(max)).chars().take(RANGE_TEXT_CHARS).collect();
+    // One width for every value and target: the sliders never resize.
+    let text_w = RANGE_TEXT_CHARS as i32 * crate::canvas::char_width(s) + 4 * s;
     let half = ((field.w - text_w) / 2).max(16 * s);
     let rows_label = |rows: &mut Rows| rows.label(r, "Range", None, false);
     rows_label(rows);
@@ -1010,6 +1023,9 @@ fn generation_tab(rows: &mut Rows, track: &Track, compose: Option<&ComposeView>,
     let button = Kind::Button { label: "\u{21bb}".into(), on: false };
     rows.items.push(Item::new(Some(Id::Regenerate), rows.field(r, 36 * s), button));
     let melodic = instrument_family(&track.name).is_melodic();
+    // The part above Advanced takes the compose view's height whatever the
+    // track: Advanced stays put when the sound changes.
+    let simple_bottom = simple_part_bottom(rows.y, s);
     match compose {
         Some(view) => {
             rows.text(&format!("{} / {}  (* = style)", view.style, view.shown.part), DIM);
@@ -1023,6 +1039,7 @@ fn generation_tab(rows: &mut Rows, track: &Track, compose: Option<&ComposeView>,
         }
         None => rows.text("no part for this track in the pattern's style", DIM),
     }
+    rows.y = rows.y.max(simple_bottom);
     // Everything else, folded.
     let r = rows.row();
     let label = if state.generation_advanced { "Advanced \u{25be}" } else { "Advanced \u{25b8}" };
@@ -1032,18 +1049,19 @@ fn generation_tab(rows: &mut Rows, track: &Track, compose: Option<&ComposeView>,
         return;
     }
     let compose_tab = compose.is_some() && state.generation_tab == COMPOSE_TAB;
-    let mut tabs = if track.auto_mode {
-        vec![
-            (Id::GenerationTab(0), None, "Groove", !compose_tab && state.generation_tab == 0, false),
-            (Id::GenerationTab(1), None, "Engine", !compose_tab && state.generation_tab == 1, false),
+    // Three slots whatever shows: Compose stays put when Auto turns Engine off.
+    let tabs = if track.auto_mode {
+        [
+            Some((Id::GenerationTab(0), None, "Groove", !compose_tab && state.generation_tab == 0, false)),
+            Some((Id::GenerationTab(1), None, "Engine", !compose_tab && state.generation_tab == 1, false)),
+            None,
         ]
     } else {
-        vec![(Id::GenerationTab(0), None, "Manual", !compose_tab, false)]
+        [Some((Id::GenerationTab(0), None, "Manual", !compose_tab, false)), None, None]
     };
-    if compose.is_some() {
-        tabs.push((Id::GenerationTab(COMPOSE_TAB), None, "Compose", compose_tab, false));
-    }
-    rows.tabs(&tabs);
+    let [first, second, _] = tabs;
+    let compose_slot = compose.map(|_| (Id::GenerationTab(COMPOSE_TAB), None, "Compose", compose_tab, false));
+    rows.tabs(&[first, second, compose_slot]);
     if let (true, Some(view)) = (compose_tab, compose) {
         for p in &GENERATION_COMPOSE {
             compose_slider(rows, track, view, p, state);
@@ -1072,6 +1090,51 @@ fn generation_tab(rows: &mut Rows, track: &Track, compose: Option<&ComposeView>,
             }
         }
     }
+}
+
+/// The y under the Gen tab's simple part (from `top`): its tallest, a style's
+/// line and its compose sliders.
+fn simple_part_bottom(top: i32, scale: Scale) -> i32 {
+    let mut rows = Rows { x: 0, w: 0, y: top, scale, items: Vec::new() };
+    rows.y += 12 * scale;
+    for _ in SIMPLE_COMPOSE {
+        rows.row();
+    }
+    rows.y
+}
+
+/// The rows of the Gen tab's tallest sub-tab.
+const GENERATION_ROWS: usize =
+    max_len(&[GENERATION_GROOVE.len(), GENERATION_ENGINE.len(), GENERATION_COMPOSE.len(), GENERATION_MANUAL.len()]);
+
+const fn max_len(lens: &[usize]) -> usize {
+    let mut max = 0;
+    let mut i = 0;
+    while i < lens.len() {
+        if lens[i] > max {
+            max = lens[i];
+        }
+        i += 1;
+    }
+    max
+}
+
+/// The y under the tallest tab (from `top`, under the main tabs): the Gen
+/// tab's Advanced settings. The note editor starts there whatever the tab, so
+/// it never moves.
+fn tallest_tab_bottom(top: i32, scale: Scale) -> i32 {
+    let mut rows = Rows { x: 0, w: 0, y: top, scale, items: Vec::new() };
+    // Auto, Lock, New line.
+    for _ in 0..3 {
+        rows.row();
+    }
+    rows.y = simple_part_bottom(rows.y, scale);
+    rows.row(); // Advanced
+    rows.tabs(&[]);
+    for _ in 0..GENERATION_ROWS {
+        rows.row();
+    }
+    rows.y
 }
 
 /// The compose settings of the simple view.
@@ -1165,10 +1228,10 @@ fn note_default(key: &str, min: f64) -> f64 {
 }
 
 /// The note editor in `area`.
-pub fn note_editor(view: &NoteView, state: &EditorState, area: Rect, scale: i32) -> Vec<Item> {
+pub fn note_editor(view: &NoteView, state: &EditorState, area: Rect, scale: Scale) -> Vec<Item> {
     let s = scale;
     let mut rows = Rows { x: area.x, w: area.w, y: area.y, scale: s, items: Vec::new() };
-    rows.items.push(Item::new(None, Rect::new(area.x, area.y, area.w, s), Kind::Line));
+    rows.items.push(Item::new(None, Rect::new(area.x, area.y, area.w, s.px()), Kind::Line));
     rows.y += 6 * s;
     rows.text(&view.title, ACCENT);
     let Some(note) = &view.note else { return rows.items };
@@ -1184,7 +1247,7 @@ pub fn note_editor(view: &NoteView, state: &EditorState, area: Rect, scale: i32)
     let tabs: Vec<_> = NOTE_TABS
         .iter()
         .enumerate()
-        .map(|(i, l)| (Id::NoteTab(i as u8), None, *l, state.note_tab == i as u8, false))
+        .map(|(i, l)| Some((Id::NoteTab(i as u8), None, *l, state.note_tab == i as u8, false)))
         .collect();
     rows.tabs(&tabs);
     for row in NOTE_GROUPS[usize::from(state.note_tab.min(3))] {
@@ -1210,7 +1273,7 @@ pub fn note_editor(view: &NoteView, state: &EditorState, area: Rect, scale: i32)
 }
 
 /// The kit editor's selects and knobs at `area`; the y under them.
-pub fn kit_controls(view: &KitControls, area: Rect, scale: i32) -> (Vec<Item>, i32) {
+pub fn kit_controls(view: &KitControls, area: Rect, scale: Scale) -> (Vec<Item>, i32) {
     let s = scale;
     let mut rows = Rows { x: area.x, w: area.w, y: area.y, scale: s, items: Vec::new() };
     for (id, label, choice) in [(Id::KitKit, "Kit:", &view.kits), (Id::KitInstrument, "Instrument:", &view.instruments)]
@@ -1410,7 +1473,7 @@ mod tests {
             if !sample {
                 view.sample = None;
             }
-            let (items, bottom) = track_editor(&view, &EditorState::default(), Rect::new(0, 0, 360, 600), 1);
+            let (items, bottom) = track_editor(&view, &EditorState::default(), Rect::new(0, 0, 360, 600), Scale::ONE);
             (items.into_iter().find(|i| i.id == Some(Id::Tab(0))).map(|i| i.rect), bottom)
         };
         assert_eq!(tab_rect(true), tab_rect(false));
@@ -1431,19 +1494,19 @@ mod tests {
                         lfo_target: sub,
                         ..EditorState::default()
                     };
-                    let (items, bottom) = track_editor(&view(&track), &state, Rect::new(700, 30, 360, 600), 1);
+                    let (items, bottom) = track_editor(&view(&track), &state, Rect::new(700, 30, 360, 600), Scale::ONE);
                     assert!(bottom > 30 && items.iter().any(|i| i.id == Some(Id::Decay)));
                 }
             }
         }
         // Folded: the simple view only.
         let state = EditorState { tab: 4, ..EditorState::default() };
-        let (items, _) = track_editor(&view(&track), &state, Rect::new(0, 0, 360, 600), 1);
+        let (items, _) = track_editor(&view(&track), &state, Rect::new(0, 0, 360, 600), Scale::ONE);
         assert!(items.iter().any(|i| i.id == Some(Id::Toggle("composeLock"))));
         assert!(items.iter().any(|i| i.id == Some(Id::GenerationAdvanced)));
         assert!(!items.iter().any(|i| i.id == Some(Id::Generation("autoPitchChance"))));
         let state = EditorState { generation_advanced: true, ..state };
-        let (items, _) = track_editor(&view(&track), &state, Rect::new(0, 0, 360, 600), 1);
+        let (items, _) = track_editor(&view(&track), &state, Rect::new(0, 0, 360, 600), Scale::ONE);
         assert!(items.iter().any(|i| i.id == Some(Id::Generation("autoPitchChance"))));
         assert!(!items.iter().any(|i| i.id == Some(Id::Generation("hitVariation"))));
     }
@@ -1457,7 +1520,7 @@ mod tests {
             if instrument_family(&track.name).is_melodic() {
                 view.compose = None;
             }
-            track_editor(&view, &state, Rect::new(0, 0, 360, 600), 1).0
+            track_editor(&view, &state, Rect::new(0, 0, 360, 600), Scale::ONE).0
         };
         let kick = Track { name: "KICK".into(), auto_mode: true, auto_hit_variation: Some(20.0), ..Track::default() };
         let groove = ids(&kick, 0);
@@ -1484,7 +1547,7 @@ mod tests {
         track.compose_syncopation = Some(70.0);
         let state =
             EditorState { tab: 4, generation_tab: COMPOSE_TAB, generation_advanced: true, ..EditorState::default() };
-        let (items, _) = track_editor(&view(&track), &state, Rect::new(0, 0, 360, 600), 1);
+        let (items, _) = track_editor(&view(&track), &state, Rect::new(0, 0, 360, 600), Scale::ONE);
         let shown = |key: &'static str| {
             items.iter().find(|i| i.id == Some(Id::Compose(key))).and_then(|i| match &i.kind {
                 Kind::Value { value, text, spec, .. } => Some((*value, text.clone(), spec.default)),
@@ -1499,7 +1562,7 @@ mod tests {
         // A melodic track has no Compose tab: the manual sliders show.
         let mut bass = view(&track);
         bass.compose = None;
-        let (items, _) = track_editor(&bass, &state, Rect::new(0, 0, 360, 600), 1);
+        let (items, _) = track_editor(&bass, &state, Rect::new(0, 0, 360, 600), Scale::ONE);
         assert!(items.iter().any(|i| i.id == Some(Id::Generation("hitVariation"))));
     }
 
@@ -1513,7 +1576,7 @@ mod tests {
             arp_range: 0,
         };
         let state = EditorState { note_tab: 2, ..EditorState::default() };
-        let items = note_editor(&view, &state, Rect::new(0, 0, 360, 300), 1);
+        let items = note_editor(&view, &state, Rect::new(0, 0, 360, 300), Scale::ONE);
         let sliders: Vec<_> = items
             .iter()
             .filter_map(|i| match i.id {
@@ -1522,5 +1585,87 @@ mod tests {
             })
             .collect();
         assert_eq!(sliders, ["euclideanPulses", "euclideanRotation"]);
+    }
+
+    /// Records the place of every control of `items` (the nth of an id
+    /// shown twice: the compose sliders); one that has had another place in an
+    /// earlier layout fails.
+    fn assert_put(places: &mut Vec<(Id, usize, Rect)>, items: &[Item], state: &str) {
+        for (i, item) in items.iter().enumerate() {
+            let Some(id) = item.id else { continue };
+            let nth = items[..i].iter().filter(|other| other.id == Some(id)).count();
+            match places.iter().find(|(seen, n, _)| *seen == id && *n == nth) {
+                Some((_, _, rect)) => assert_eq!(*rect, item.rect, "{id:?} moved: {state}"),
+                None => places.push((id, nth, item.rect)),
+            }
+        }
+    }
+
+    #[test]
+    fn no_control_moves_whatever_the_tab_and_the_settings() {
+        let area = Rect::new(700, 30, 360, 600);
+        let lfo = ordrumbox_core::json::parse(r#"{"freq":1.5,"min":20,"max":19999.5}"#).unwrap();
+        let mut places = Vec::new();
+        let mut bottoms = Vec::new();
+        for (name, compose, sample) in [("KICK", true, true), ("KICK", false, false), ("BASS", false, true)] {
+            for (auto, slap, with_lfo) in (0..8).map(|bits: u8| (bits & 1 == 1, bits & 2 == 2, bits & 4 == 4)) {
+                let track = Track {
+                    name: name.into(),
+                    auto_mode: auto,
+                    delay_type: if slap { "slap" } else { "tape" }.into(),
+                    filter_cutoff_lfo: with_lfo.then(|| lfo.as_object().cloned()).flatten(),
+                    ..Track::default()
+                };
+                let mut view = view(&track);
+                if !compose {
+                    view.compose = None;
+                }
+                if !sample {
+                    view.sample = None;
+                }
+                for (tab, sub, advanced, selected) in (0..5u8).flat_map(|tab| {
+                    (0..5u8).flat_map(move |sub| {
+                        [false, true].into_iter().flat_map(move |a| [None, Some("autoMode")].map(|p| (tab, sub, a, p)))
+                    })
+                }) {
+                    let state = EditorState {
+                        tab,
+                        fx_tab: sub % 4,
+                        lfo_target: sub,
+                        generation_tab: sub % 3,
+                        generation_advanced: advanced,
+                        selected_prop: selected,
+                        ..EditorState::default()
+                    };
+                    let (items, bottom) = track_editor(&view, &state, area, Scale::ONE);
+                    let shown = format!("{name} auto {auto} slap {slap} lfo {with_lfo} compose {compose} {state:?}");
+                    assert_put(&mut places, &items, &shown);
+                    // Nothing under the track editor's tab moves either.
+                    let content = items.iter().filter(|i| i.rect.y > area.y + 120).map(|i| i.rect.y + i.rect.h);
+                    assert!(content.max().is_some_and(|y| y <= bottom), "{shown}");
+                    bottoms.push(bottom);
+                }
+            }
+        }
+        // The note editor starts at one y whatever the tab: under the tallest, and no lower.
+        assert!(bottoms.windows(2).all(|w| w[0] == w[1]));
+        let tallest = places.iter().map(|(_, _, r)| r.y + r.h).max().unwrap();
+        assert!(bottoms[0] - tallest < row_h(Scale::ONE) + 2, "{} under {tallest}", bottoms[0]);
+
+        let mut places = Vec::new();
+        for note in [Some(Note::default()), None] {
+            for note_tab in 0..4 {
+                let view = NoteView {
+                    title: "KICK [beat 1 step 1]".into(),
+                    note: note.clone(),
+                    scales: Choice { values: vec!["major".into()], labels: Vec::new(), selected: 0 },
+                    arp_direction: Choice { values: vec!["up".into()], labels: Vec::new(), selected: 0 },
+                    arp_range: 2,
+                };
+                let state = EditorState { note_tab, ..EditorState::default() };
+                let items = note_editor(&view, &state, Rect::new(700, 400, 360, 200), Scale::ONE);
+                assert_put(&mut places, &items, &format!("note tab {note_tab}"));
+            }
+        }
     }
 }

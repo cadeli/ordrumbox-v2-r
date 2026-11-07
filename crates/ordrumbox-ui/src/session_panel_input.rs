@@ -1,6 +1,7 @@
 //! The mouse, the wheel and the keys on the editors' widgets: what a click,
 //! a drag, a hover, a key or a typed number on them does, and the tooltip.
 
+use crate::scale::Scale;
 use ordrumbox_core::json::Value;
 use ordrumbox_core::num;
 
@@ -16,7 +17,7 @@ impl Session {
     // ─── The mouse ───────────────────────────────────────────────────────────
 
     /// A press at `(x, y)`; whether the widgets took it.
-    pub fn mouse_down(&mut self, size: (i32, i32, i32), x: i32, y: i32, button: Button, shift: bool) -> bool {
+    pub fn mouse_down(&mut self, size: (i32, i32, Scale), x: i32, y: i32, button: Button, shift: bool) -> bool {
         self.chrome.panel_size = size;
         let (width, height, scale) = size;
         if let Some(dropdown) = self.chrome.widgets.dropdown.take() {
@@ -96,7 +97,7 @@ impl Session {
     }
 
     /// The mouse moved; whether to redraw.
-    pub fn mouse_move(&mut self, size: (i32, i32, i32), x: i32, y: i32, shift: bool) -> bool {
+    pub fn mouse_move(&mut self, size: (i32, i32, Scale), x: i32, y: i32, shift: bool) -> bool {
         if self.roll.dragging() {
             return self.roll_drag_move(x, y);
         }
@@ -135,7 +136,7 @@ impl Session {
     }
 
     /// The mouse over the grid: the step or the track name it is on, for its tooltip; whether it changed.
-    pub fn grid_hover(&mut self, size: (i32, i32, i32), x: i32, y: i32) -> bool {
+    pub fn grid_hover(&mut self, size: (i32, i32, Scale), x: i32, y: i32) -> bool {
         let body = self.body(size);
         let scale = size.2;
         let hover = match self.pattern() {
@@ -168,7 +169,7 @@ impl Session {
 
     /// The mouse over the panels: the control under it that has a tooltip
     /// (none while a control is dragged); whether it changed.
-    pub fn control_hover(&mut self, size: (i32, i32, i32), x: i32, y: i32) -> bool {
+    pub fn control_hover(&mut self, size: (i32, i32, Scale), x: i32, y: i32) -> bool {
         let (width, height, scale) = size;
         let hover = if self.chrome.widgets.drag.is_some() || self.chrome.covered() {
             None
@@ -206,7 +207,7 @@ impl Session {
 
     /// The tooltip of the note under the mouse (the first of its step), as
     /// `PointerSection.onMouseOver` shows it; over a control, what it is.
-    pub(super) fn draw_tooltip(&self, canvas: &mut Canvas, scale: i32, right: i32) {
+    pub(super) fn draw_tooltip(&self, canvas: &mut Canvas, scale: Scale, right: i32) {
         if let Some((id, rect)) = self.chrome.control_hover.filter(|_| !self.chrome.covered())
             && let Some(lines) = self.control_tip(id)
         {
@@ -250,7 +251,7 @@ impl Session {
     }
 
     /// The wheel over the widgets (one notch: one step); whether it was theirs.
-    pub fn wheel(&mut self, size: (i32, i32, i32), x: i32, y: i32, lines: isize, shift: bool, ctrl: bool) -> bool {
+    pub fn wheel(&mut self, size: (i32, i32, Scale), x: i32, y: i32, lines: isize, shift: bool, ctrl: bool) -> bool {
         if let Some(dropdown) = &mut self.chrome.widgets.dropdown {
             dropdown.scroll(-lines);
             return true;
@@ -275,7 +276,7 @@ impl Session {
         true
     }
 
-    fn current_value(&self, size: (i32, i32, i32), id: Id) -> Option<f64> {
+    fn current_value(&self, size: (i32, i32, Scale), id: Id) -> Option<f64> {
         let layout = self.panel_layout(size.0, size.1, size.2);
         match panel::find(&layout.items, id)?.kind {
             Kind::Value { value, .. } => Some(value),
@@ -283,7 +284,7 @@ impl Session {
         }
     }
 
-    fn slider_width(&self, size: (i32, i32, i32), id: Id) -> i32 {
+    fn slider_width(&self, size: (i32, i32, Scale), id: Id) -> i32 {
         let layout = self.panel_layout(size.0, size.1, size.2);
         match panel::find(&layout.items, id) {
             Some(Item { rect, kind: Kind::Value { label, text, .. }, .. }) => {
@@ -297,7 +298,7 @@ impl Session {
 
     /// A key for the widgets (the focused one, the open list or entry);
     /// whether it was theirs.
-    pub fn panel_key(&mut self, size: (i32, i32, i32), key: PanelKey, shift: bool, ctrl: bool) -> bool {
+    pub fn panel_key(&mut self, size: (i32, i32, Scale), key: PanelKey, shift: bool, ctrl: bool) -> bool {
         self.chrome.panel_size = size;
         if let Some(entry) = &mut self.chrome.widgets.entry {
             match key {

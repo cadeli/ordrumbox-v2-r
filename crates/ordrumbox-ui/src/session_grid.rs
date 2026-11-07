@@ -3,6 +3,7 @@
 //! cannot run (paste with nothing copied, delete on an empty step) is left out.
 //! A track's name dragged up or down moves the track to another row.
 
+use crate::scale::Scale;
 use ordrumbox_core::instruments::catalog;
 use ordrumbox_core::num;
 
@@ -46,7 +47,7 @@ pub(super) fn moved_index(t: usize, from: usize, to: usize) -> usize {
 
 impl Session {
     /// The grid's layout, when the grid is shown.
-    fn grid_layout(&self, size: (i32, i32, i32)) -> Option<view::Layout> {
+    fn grid_layout(&self, size: (i32, i32, Scale)) -> Option<view::Layout> {
         if self.workspace != Workspace::Grid || self.kit_editor.is_some() {
             return None;
         }
@@ -63,12 +64,12 @@ impl Session {
     }
 
     /// What of the grid is at `(x, y)`.
-    pub fn grid_hit(&self, size: (i32, i32, i32), x: i32, y: i32) -> Option<Hit> {
+    pub fn grid_hit(&self, size: (i32, i32, Scale), x: i32, y: i32) -> Option<Hit> {
         self.grid_layout(size)?.hit(self.pattern()?, x, y)
     }
 
     /// A right-click on the grid opens its menu; whether it was the grid's.
-    pub fn grid_menu(&mut self, size: (i32, i32, i32), x: i32, y: i32) -> bool {
+    pub fn grid_menu(&mut self, size: (i32, i32, Scale), x: i32, y: i32) -> bool {
         match self.grid_hit(size, x, y) {
             Some(Hit::Mute(t) | Hit::Solo(t) | Hit::Name(t)) => self.track_menu(t, x, y),
             Some(Hit::Cell { track, beat, step }) => self.step_menu(track, beat, step, x, y),
@@ -260,7 +261,7 @@ impl Session {
     }
 
     /// The track dragged and the row it would take.
-    pub(super) fn track_drop(&self, size: (i32, i32, i32)) -> Option<(usize, usize)> {
+    pub(super) fn track_drop(&self, size: (i32, i32, Scale)) -> Option<(usize, usize)> {
         let drag = self.live_track_drag()?;
         Some((drag.track, self.grid_layout(size)?.drop_row(drag.y)))
     }
@@ -275,7 +276,7 @@ impl Session {
     }
 
     /// The press released: a drag moves its track; whether it was one.
-    pub fn track_release(&mut self, size: (i32, i32, i32)) -> bool {
+    pub fn track_release(&mut self, size: (i32, i32, Scale)) -> bool {
         let drop = self.track_drop(size);
         self.chrome.track_drag = None;
         let Some((from, to)) = drop else { return false };
@@ -317,7 +318,7 @@ mod tests {
     use super::*;
     use crate::kits::KitSet;
 
-    const SIZE: (i32, i32, i32) = (1100, 680, 1);
+    const SIZE: (i32, i32, Scale) = (1100, 680, Scale::ONE);
 
     fn session() -> Session {
         let (library, _) =
@@ -423,7 +424,7 @@ mod tests {
         assert_eq!(child.x, parent.x + parent.w, "on the right of the categories");
         // A click on another category of the menu above: its instruments instead.
         let hats = catalog().categories.iter().position(|(c, _)| c == "Hats & cymbals").unwrap();
-        let y = parent.y + 2 * scale + (hats as i32 + 1) * 12 * scale + scale;
+        let y = parent.y + 2 * scale + (hats as i32 + 1) * 12 * scale + scale.px();
         assert!(s.mouse_down(SIZE, parent.x + 4, y, Button::Left, false));
         assert_eq!(menu_titles(&s), ["Add track", "Hats & cymbals"]);
         // Left (or Escape) goes back a menu, Right opens the highlighted category again.
