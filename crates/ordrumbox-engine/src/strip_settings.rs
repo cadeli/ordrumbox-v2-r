@@ -131,6 +131,10 @@ pub fn strip_settings(track: &Track, bpm: f64) -> StripSettings {
         _ => 0.0,
     };
     set_saturation(&mut s, amount);
+    // Bitcrusher and hard clipper, in the saturation's panel: its LED counts.
+    let in_panel = |amount: f64| if track.saturation_on { finite_or(amount, 0.0).clamp(0.0, 1.0) as f32 } else { 0.0 };
+    s.crush = in_panel(track.bitcrush);
+    s.clip = in_panel(track.hard_clip);
 
     // Reverb.
     let amount = if track.reverb_on { finite_or(track.reverb_mix, 0.0).clamp(0.0, 1.0) } else { 0.0 };
@@ -296,6 +300,15 @@ mod tests {
         assert_eq!(saturation_amount(&s), 0.0);
         set_saturation(&mut s, 0.25);
         assert_eq!((s.saturation_drive, s.saturation_mix, saturation_amount(&s)), (2.5, 1.0, 0.25));
+    }
+
+    #[test]
+    fn the_bitcrush_and_clip_follow_the_saturation_led() {
+        let crushed = Track { bitcrush: 0.4, hard_clip: 0.6, ..Track::default() };
+        let on = strip_settings(&crushed, 120.0);
+        assert_eq!((on.crush, on.clip), (0.4, 0.6));
+        let off = strip_settings(&Track { saturation_on: false, ..crushed }, 120.0);
+        assert_eq!((off.crush, off.clip), (0.0, 0.0));
     }
 
     #[test]

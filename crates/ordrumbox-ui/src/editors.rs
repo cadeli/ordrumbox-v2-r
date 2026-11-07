@@ -39,7 +39,11 @@ pub struct FxDef {
 pub const FX_DEFS: [FxDef; 4] = [
     FxDef { key: "reverbMix", label: "Reverb", controls: &["reverbMix", "reverbType"] },
     FxDef { key: "delayMix", label: "Delay", controls: &["delayMix", "delayBeats", "delayFeedback", "delayType"] },
-    FxDef { key: "saturationMix", label: "Saturation", controls: &["saturationMix", "saturationType"] },
+    FxDef {
+        key: "saturationMix",
+        label: "Saturation",
+        controls: &["saturationMix", "saturationType", "bitcrush", "hardClip"],
+    },
     // The filter is on when its type is not the allpass bypass.
     FxDef { key: "filterType", label: "Filter", controls: &["filterType", "filterSlope", "filterCutoff", "filterQ"] },
 ];
@@ -153,11 +157,13 @@ const fn prop(key: &'static str, label: &'static str, min: f64, max: f64, step: 
 }
 
 /// The effect knobs.
-pub const FX_KNOBS: [Prop; 6] = [
+pub const FX_KNOBS: [Prop; 8] = [
     prop("reverbMix", "Mix", 0.0, 1.0, 0.01, Format::Plain),
     prop("delayMix", "Mix", 0.0, 1.0, 0.01, Format::Plain),
     prop("delayFeedback", "Feedback", 0.0, 0.95, 0.01, Format::Plain),
     prop("saturationMix", "Mix", 0.0, 1.0, 0.01, Format::Plain),
+    prop("bitcrush", "Crush", 0.0, 1.0, 0.01, Format::Plain),
+    prop("hardClip", "Clip", 0.0, 1.0, 0.01, Format::Plain),
     prop("filterCutoff", "Cutoff", 20.0, 20_000.0, 1.0, Format::Freq),
     prop("filterQ", "Q", 0.707, 18.707, 0.01, Format::Fixed2),
 ];

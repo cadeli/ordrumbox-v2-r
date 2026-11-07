@@ -485,7 +485,7 @@
   {
     "name": "generated",
     "info": "ordrumbox kit",
-    "desc": "this kit was generated a long time ago by the soft synth from the ordrumbox java application",
+    "desc": "this kit was generated a long time ago by the soft synth from the orDrumbox java application",
     "samples": [
       {
         "displayName": "KICK",
@@ -556,7 +556,7 @@
   {
     "name": "human",
     "info": "ordrumbox kit",
-    "desc": "this is a human beat box, sampled by ordrumbox",
+    "desc": "this is a human beat box, sampled by orDrumbox team",
     "samples": [
       {
         "displayName": "KICK",
@@ -722,7 +722,7 @@
   {
     "name": "delagrange",
     "info": "ordrumbox kit",
-    "desc": "Accoustic strange experimental percussions sampled by ordrumbox",
+    "desc": "Accoustic strange experimental percussions sampled by orDrumbox in Delagrange Research Lab",
     "samples": [
       {
         "displayName": "KICK",
