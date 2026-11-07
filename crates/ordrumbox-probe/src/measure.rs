@@ -49,9 +49,9 @@ const SPECTROGRAM_FRAME: usize = 2048;
 /// over, summed, read this many times its power.
 const HANN_ENERGY_BINS: f64 = 1.5;
 /// Last part of a sound compared to its peak.
-const END_WINDOW_MS: f64 = 5.0;
+pub const END_WINDOW_MS: f64 = 5.0;
 /// Share of the peak where a sound counts as started.
-const LEAD_IN_LEVEL: f64 = 0.01;
+pub const LEAD_IN_LEVEL: f64 = 0.01;
 
 /// A frequency band.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -194,7 +194,8 @@ fn power_db(power: f64, reference: f64) -> f64 {
     if power > 0.0 && reference > 0.0 { (10.0 * (power / reference).log10()).max(FLOOR_DB) } else { FLOOR_DB }
 }
 
-fn rms(samples: &[f64]) -> f64 {
+/// Root mean square of `samples`, 0 when there are none.
+pub fn rms(samples: &[f64]) -> f64 {
     if samples.is_empty() {
         return 0.0;
     }

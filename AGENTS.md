@@ -68,6 +68,28 @@ assets/           data/*.json and kits/**.wav, read at runtime
   comment (the export macros' `unsafe` comes from nih-plug, which the lint
   does not see).
 
+## Kits and samples
+
+- Kits are folders of `assets/kits/`, declared in `assets/data/kits.json`.
+  A kit sample is 16-bit PCM, mono, 44.1 kHz, peak at −3 dB, starting at
+  once and fading out to silence.
+- `ordrumbox-probe` (not shipped) checks and repairs them:
+
+  ```bash
+  cargo run -p ordrumbox-probe -- kit human              # what is worth a look in a kit
+  cargo run -p ordrumbox-probe -- fix assets/kits/human  # what fix would repair
+  cargo run -p ordrumbox-probe -- fix assets/kits/human --write
+  ```
+
+  `fix` repairs what `kit` flags: a late start is trimmed to 1 ms before the
+  sound, a loud end is faded out (130 ms, at most half the sample), DC is
+  removed, the peak is set to −3 dB (`--peak keep` leaves it). `--highpass
+  <hz>` and `--length <ms>` also filter and cut. It saves over the files only
+  with `--write`; `--help` lists the options.
+- A sample added to or removed from a kit changes which sample each track
+  plays, in that kit and in the kits that borrow it: the table of
+  `ordrumbox-ui/src/assign_tests.rs` is then rewritten, as a meant change.
+
 ## Audio thread
 
 - Playback runs on two threads, which share state only through

@@ -1,5 +1,5 @@
-//! `ordrumbox-probe`: measures synth presets and WAV files (`README.md`,
-//! "Sound measurements").
+//! `ordrumbox-probe`: measures synth presets and WAV files, reviews and
+//! repairs kits (`AGENTS.md`, "Kits and samples").
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -9,8 +9,9 @@ use ordrumbox_core::json::{self, Object, Value};
 use ordrumbox_engine::SynthPresets;
 use ordrumbox_engine::synth_preset::note_seconds;
 use ordrumbox_engine::{SampleBuffer, wav};
-use ordrumbox_probe::kit::{parse_note, summarize};
-use ordrumbox_probe::measure::{Measures, measure};
+use ordrumbox_probe::fix::{FixSettings, fix};
+use ordrumbox_probe::kit::{parse_note, sample_flags, summarize};
+use ordrumbox_probe::measure::{Measures, amplitude_db, measure};
 use ordrumbox_probe::mix::measure_mix;
 use ordrumbox_probe::plot::to_svg;
 use ordrumbox_probe::render::{NoteSettings, render_note, repeat_difference_db};
@@ -24,6 +25,7 @@ ordrumbox-probe wav <file>...  [--json f] [--svg d]   measure WAV files, one sou
 ordrumbox-probe kit [<kit>...]  [--kits d] [...]      review kits: a summary and what is worth a look
 ordrumbox-probe mix <file>...  [--bpm n] [...]        measure exports: loudness, true peak, hits
 ordrumbox-probe compare <before.json> <after.json>    what changed between two reports
+ordrumbox-probe fix <file|folder>...  [--write] [...] repair what kit flags: lists it, saves it with --write
 
 options of preset:
   --presets <file>        presets file (default: assets/data/synth_presets.json of this checkout)
@@ -39,6 +41,12 @@ options of kit:
 options of mix:
   --bpm <n>               check the hits on a grid of this tempo
   --steps-per-beat <n>    of that grid, default 4
+options of fix:
+  --write                 save the repaired files over the originals, 16-bit PCM
+  --peak <dB> | keep      peak level to set (default -3)
+  --fade-out <ms>         length of a fade-out (default 130)
+  --highpass <hz>         also filter out what is below
+  --length <ms>           also cut what is longer, and fade it out
 all:
   --json <file>           write the report, curves included
   --svg <folder>          write one picture per sound
@@ -63,6 +71,9 @@ struct Options {
     svg: Option<PathBuf>,
     note_text: Option<String>,
     settings: NoteSettings,
+    /// Given with `--write`: `fix` only lists its repairs unless asked.
+    write: bool,
+    fix: FixSettings,
 }
 
 /// Parse `text` as `key`'s number, within `range`.
@@ -86,6 +97,10 @@ fn parse_options(arguments: &[String]) -> Result<Options, String> {
     while let Some(argument) = iter.next() {
         if argument == "--all" {
             options.all = true;
+            continue;
+        }
+        if argument == "--write" {
+            options.write = true;
             continue;
         }
         if !argument.starts_with("--") {
@@ -112,6 +127,11 @@ fn parse_options(arguments: &[String]) -> Result<Options, String> {
             "--steps-per-beat" => settings.steps_per_beat = number_in(argument, value, 1.0..=64.0)? as i32,
             "--gate" => settings.gate_seconds = Some(number_in(argument, value, 0.0..=60.0)?),
             "--rate" => settings.sample_rate = number_in(argument, value, 8000.0..=192_000.0)? as u32,
+            "--peak" if value == "keep" => options.fix.peak_db = None,
+            "--peak" => options.fix.peak_db = Some(number_in(argument, value, -60.0..=0.0)?),
+            "--fade-out" => options.fix.fade_out_ms = number_in(argument, value, 1.0..=10_000.0)?,
+            "--highpass" => options.fix.highpass_hz = Some(number_in(argument, value, 1.0..=2000.0)?),
+            "--length" => options.fix.length_ms = Some(number_in(argument, value, 1.0..=60_000.0)?),
             _ => return Err(format!("unknown option {argument}\n\n{USAGE}")),
         }
     }
@@ -325,12 +345,59 @@ fn run_mixes(arguments: &[String]) -> Result<(), String> {
     write_report(&report_to_json(Object::new(), sounds), &options)
 }
 
+/// Repair each WAV file given, or under each folder given: list what is done
+/// and what is still worth a look, and save it only with `--write`.
+fn run_fix(arguments: &[String]) -> Result<(), String> {
+    let options = parse_options(arguments)?;
+    if options.positional.is_empty() {
+        return Err(format!("give WAV files or folders\n\n{USAGE}"));
+    }
+    let mut files = Vec::new();
+    for given in &options.positional {
+        let path = PathBuf::from(given);
+        if path.is_dir() {
+            wav_files(&path, &mut files)?;
+        } else {
+            files.push(path);
+        }
+    }
+    let mut fixed_count = 0;
+    for file in &files {
+        let fixed = fix(&read_wav(file)?, &options.fix);
+        let name = file.display().to_string();
+        let m = measure(&fixed.buffer);
+        let level_db = options.fix.peak_db.unwrap_or_else(|| amplitude_db(m.peak));
+        let remaining = sample_flags(&name, &m, level_db);
+        if fixed.changes.is_empty() && remaining.is_empty() {
+            continue;
+        }
+        println!("{name}");
+        for change in &fixed.changes {
+            println!("  {change}");
+        }
+        for flag in &remaining {
+            println!("  still: {flag}");
+        }
+        if fixed.changes.is_empty() {
+            continue;
+        }
+        fixed_count += 1;
+        if options.write {
+            fs::write(file, wav::encode_pcm16(&fixed.buffer)).map_err(|e| format!("{}: {e}", file.display()))?;
+        }
+    }
+    let outcome = if options.write || fixed_count == 0 { "" } else { ": give --write to save them" };
+    println!("{fixed_count} of {} files to repair{outcome}", files.len());
+    Ok(())
+}
+
 fn run(arguments: &[String]) -> Result<(), String> {
     match arguments.split_first() {
         Some((command, rest)) if command == "preset" => run_presets(rest),
         Some((command, rest)) if command == "wav" => run_wavs(rest),
         Some((command, rest)) if command == "kit" => run_kits(rest),
         Some((command, rest)) if command == "mix" => run_mixes(rest),
+        Some((command, rest)) if command == "fix" => run_fix(rest),
         Some((command, [before, after])) if command == "compare" => {
             print!("{}", compare(&read_json(Path::new(before))?, &read_json(Path::new(after))?)?);
             Ok(())
@@ -382,5 +449,10 @@ mod tests {
         assert!(parse(&["--velocity", "2"]).is_err());
         assert!(parse(&["--bpm"]).is_err());
         assert!(parse(&["--nope", "1"]).is_err());
+        let fix = parse(&["kits", "--write", "--peak", "keep", "--highpass", "80"]).unwrap();
+        assert!(fix.write);
+        assert_eq!((fix.fix.peak_db, fix.fix.highpass_hz), (None, Some(80.0)));
+        assert_eq!(parse(&["--peak", "-6"]).unwrap().fix.peak_db, Some(-6.0));
+        assert!(parse(&["--peak", "3"]).is_err());
     }
 }

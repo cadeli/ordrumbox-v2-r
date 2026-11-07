@@ -4,11 +4,11 @@
 use crate::measure::{Measures, amplitude_db, median};
 
 const NOTE_NAMES: [&str; 12] = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-const DC_LIMIT: f64 = 0.02;
+pub const DC_LIMIT: f64 = 0.02;
 /// Last 5 ms over the peak: louder than this, the sample is cut or fades very
 /// fast, which can click.
-const END_LEVEL_LIMIT_DB: f64 = -40.0;
-const LEAD_IN_LIMIT_MS: f64 = 5.0;
+pub const END_LEVEL_LIMIT_DB: f64 = -40.0;
+pub const LEAD_IN_LIMIT_MS: f64 = 5.0;
 const LEVEL_OUTLIER_DB: f64 = 6.0;
 const DETUNE_LIMIT_CENTS: f64 = 25.0;
 
