@@ -21,7 +21,7 @@ pub mod wav;
 
 pub use assign::TrackSound;
 pub use controller::{AudioSide, Controller, Mode, SCOPE_SIZE};
-pub use engine::{Engine, HostTransport, Position, host_muted, host_pass};
+pub use engine::{Engine, HOST_TRACKS, HostMix, HostTransport, Position, host_muted, host_pass};
 pub use kit::{Kit, KitSample, SampleBank, kits_from_json, kits_to_json};
 pub use midi::{BlockNote, DRUM_CHANNEL, KeyMap};
 pub use ordrumbox_dsp::{MasterSettings, SampleBuffer, slope};

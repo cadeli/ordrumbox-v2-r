@@ -122,6 +122,15 @@ impl Session {
         std::mem::replace(&mut self.host_muted, muted) != muted
     }
 
+    /// A plugin host's swing on every track: where the second step of each
+    /// pair starts (`ordrumbox_core::track::STRAIGHT_SWING`: none). The pass
+    /// playing is rebuilt when it changes.
+    pub fn set_host_swing(&mut self, swing: f64) {
+        if let Some(controller) = self.playback.controller_mut() {
+            controller.set_host_swing(self.editor.library(), swing);
+        }
+    }
+
     /// Show `message` as the outcome of the last action.
     pub fn tell(&mut self, message: String) {
         self.message = message;

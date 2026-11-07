@@ -1676,6 +1676,7 @@ dependencies = [
  "baseview",
  "keyboard-types",
  "nih_plug",
+ "ordrumbox-core",
  "ordrumbox-engine",
  "ordrumbox-ui",
  "process_path",

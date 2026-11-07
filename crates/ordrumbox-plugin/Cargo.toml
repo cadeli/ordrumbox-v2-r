@@ -19,6 +19,7 @@ default = []
 vst3 = ["nih_plug/vst3"]
 
 [dependencies]
+ordrumbox-core.workspace = true
 ordrumbox-engine.workspace = true
 ordrumbox-ui.workspace = true
 # Pinned: nih-plug has no release, and this is the baseview revision its

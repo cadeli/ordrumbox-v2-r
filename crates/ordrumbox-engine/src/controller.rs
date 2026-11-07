@@ -15,11 +15,12 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering, fence};
 use std::sync::{Arc, Mutex, MutexGuard, TryLockError};
 
 use ordrumbox_core::song::clamp_bpm;
+use ordrumbox_core::track::STRAIGHT_SWING;
 use ordrumbox_core::{Library, Rng, Scales, Track};
 use ordrumbox_dsp::MasterSettings;
 
 use crate::assign::{TrackSound, assign_track};
-use crate::engine::{Engine, HostTransport, MAX_TRACKS, Position, host_pass};
+use crate::engine::{Engine, HostMix, HostTransport, MAX_TRACKS, Position, host_pass};
 use crate::kit::SampleBank;
 use crate::midi::{BlockNote, KeyMap};
 use crate::pass::{
@@ -48,6 +49,8 @@ struct Inbox {
 
 /// A host tempo change smaller than this is not one (passes are not rebuilt).
 const TEMPO_EPSILON: f64 = 1e-6;
+/// A host swing change smaller than this is not one (the pass is not rebuilt).
+const SWING_EPSILON: f64 = 1e-4;
 
 /// Samples the scope keeps (the JS analyser's `fftSize`).
 pub const SCOPE_SIZE: usize = 4096;
@@ -207,11 +210,9 @@ impl AudioSide {
         self.engine.sample_rate()
     }
 
-    /// A plugin host's controls for the blocks to come: a gain on the master
-    /// volume and the tracks it mutes, bit `t` for track `t`
-    /// ([`Engine::set_host_controls`]).
-    pub fn set_host_controls(&mut self, gain: f32, muted: u64) {
-        self.engine.set_host_controls(gain, muted);
+    /// A plugin host's mix for the blocks to come ([`Engine::set_host_mix`]).
+    pub fn set_host_mix(&mut self, mix: HostMix) {
+        self.engine.set_host_mix(mix);
     }
 
     /// Play MIDI key `key` of channel `channel` at `velocity` (0–1),
@@ -343,6 +344,8 @@ pub struct Controller {
     playing: bool,
     /// The plugin host's tempo the passes are built at, once a host transport was seen.
     tempo: Option<f64>,
+    /// A plugin host's swing on every track ([`PassContext::swing`]).
+    swing: f64,
 }
 
 /// What a track's sound depends on.
@@ -423,6 +426,7 @@ impl Controller {
             keymaps: VecDeque::new(),
             playing: false,
             tempo: None,
+            swing: STRAIGHT_SWING,
         };
         (controller, audio)
     }
@@ -592,6 +596,7 @@ impl Controller {
                     synths: &self.synths,
                     sample_rate: self.sample_rate,
                     first_tick: self.first_tick(number),
+                    swing: self.swing,
                 };
                 let bpm = self.bpm_of(library, mode);
                 build_pass(pattern, number, &mut self.rng, context, bpm)
@@ -616,6 +621,7 @@ impl Controller {
                     scales: &self.scales,
                     synths: &self.synths,
                     sample_rate: self.sample_rate,
+                    swing: self.swing,
                 };
                 let bpm = self.bpm_of(library, mode);
                 build_song_pass_at(song, number, &mut self.rng, &mut self.song_notes, context, bpm)
@@ -645,6 +651,7 @@ impl Controller {
             synths: &self.synths,
             sample_rate: self.sample_rate,
             first_tick: 0,
+            swing: self.swing,
         };
         let pass = build_preview(pattern, t, note, context, self.bpm_of(library, self.mode));
         if !pass.events.is_empty() {
@@ -667,6 +674,7 @@ impl Controller {
             synths: &self.synths,
             sample_rate: self.sample_rate,
             first_tick: 0,
+            swing: self.swing,
         };
         let keymap = build_keymap(pattern, context, self.bpm_of(library, self.mode));
         if self.keymaps.back().is_some_and(|posted| **posted == keymap) {
@@ -818,6 +826,15 @@ impl Controller {
         release(&mut self.previews, false);
         release(&mut self.keymaps, true);
         self.old_banks.retain(|bank| Arc::strong_count(bank) > 1);
+    }
+
+    /// A plugin host's swing on every track ([`PassContext::swing`]): when
+    /// it changes, the pass playing is rebuilt with it.
+    pub fn set_host_swing(&mut self, library: &Library, swing: f64) {
+        if (self.swing - swing).abs() > SWING_EPSILON {
+            self.swing = swing;
+            self.refresh(library);
+        }
     }
 
     /// Replace the synth presets (an edit in the synth editor): the pass

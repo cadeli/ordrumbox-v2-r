@@ -70,6 +70,13 @@ The plugin follows the host transport and saves its library in the host project.
 The grip in its window's bottom-right corner resizes the window (down to 320×200, where
 the layout scrolls); the project keeps the size.
 
+Parameters the host automates: **Pattern** and **Kit** (by number, from 1), **Volume**
+(master, -60 to +6 dB), **Swing** (50 % straight to 75 %: in each pair of steps, where the
+second one starts, on every track with an even number of steps per beat, on top of the
+track's own swing), and for tracks 1–16 **Mute**, **Volume** (a gain on the track's own,
+-60 to +6 dB) and **Pan** (added to the track's own). They change what plays, not the
+library.
+
 MIDI goes both ways, with one place per track of the pattern playing (or selected):
 a drum track is on channel 10 at its instrument's GM key (KICK 36, SNARE 38…), whatever
 the note's pitch. Any other track (melodic, unknown name, a second track of one drum) has a
