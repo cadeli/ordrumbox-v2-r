@@ -4,6 +4,7 @@
 //! master bus; a WAV file is measured as it is.
 
 pub mod fft;
+pub mod fix;
 pub mod kit;
 pub mod measure;
 pub mod mix;

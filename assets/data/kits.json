@@ -629,6 +629,22 @@
         "peakDb": -3,
         "rootMidi": 48,
         "decay": 5000
+      },
+      {
+        "displayName": "CLAP",
+        "key": "CLAP",
+        "path": "human/human-clap.wav",
+        "peakDb": -3,
+        "rootMidi": 48,
+        "decay": 5000
+      },
+      {
+        "displayName": "RIMSHOT",
+        "key": "RIMSHOT",
+        "path": "human/human-rimshot.wav",
+        "peakDb": -3,
+        "rootMidi": 48,
+        "decay": 5000
       }
     ]
   },

@@ -136,29 +136,62 @@ fn signature_chunk() -> Vec<u8> {
 /// so the 44-byte header stays where readers expect it.
 pub fn encode(left: &[f32], right: &[f32], sample_rate: u32) -> Vec<u8> {
     let frames = left.len().min(right.len());
-    let data_len = (frames * 4) as u32;
     let signature = signature_chunk();
-    let mut out = Vec::with_capacity(44 + frames * 4 + signature.len());
+    let mut out = pcm16_header(2, sample_rate, frames, signature.len());
+    for (&l, &r) in left[..frames].iter().zip(&right[..frames]) {
+        out.extend_from_slice(&pcm16(l));
+        out.extend_from_slice(&pcm16(r));
+    }
+    out.extend_from_slice(&signature);
+    out
+}
+
+/// A 16-bit PCM WAV file of `buffer`, mono or stereo as it is, at its sample
+/// rate, unsigned: what a kit sample is saved as. Samples are converted as by
+/// `encode`.
+pub fn encode_pcm16(buffer: &SampleBuffer) -> Vec<u8> {
+    let Some(right) = &buffer.right else {
+        let mut out = pcm16_header(1, buffer.sample_rate, buffer.left.len(), 0);
+        for &sample in &buffer.left {
+            out.extend_from_slice(&pcm16(sample));
+        }
+        return out;
+    };
+    let frames = buffer.left.len().min(right.len());
+    let mut out = pcm16_header(2, buffer.sample_rate, frames, 0);
+    for (&l, &r) in buffer.left[..frames].iter().zip(&right[..frames]) {
+        out.extend_from_slice(&pcm16(l));
+        out.extend_from_slice(&pcm16(r));
+    }
+    out
+}
+
+/// One 16-bit PCM sample: clamped to ±1, negative values scaled by 32768 and
+/// positive ones by 32767, truncated.
+fn pcm16(sample: f32) -> [u8; 2] {
+    let s = f64::from(sample).clamp(-1.0, 1.0);
+    let value = if s < 0.0 { s * 32768.0 } else { s * 32767.0 };
+    (value.trunc() as i16).to_le_bytes()
+}
+
+/// The 44-byte header of a 16-bit PCM WAV file of `frames` frames, followed
+/// by `trailer_len` bytes of other chunks; the samples come next.
+fn pcm16_header(channels: u16, sample_rate: u32, frames: usize, trailer_len: usize) -> Vec<u8> {
+    let block = channels * 2;
+    let data_len = (frames * usize::from(block)) as u32;
+    let mut out = Vec::with_capacity(44 + data_len as usize + trailer_len);
     out.extend_from_slice(b"RIFF");
-    out.extend_from_slice(&(36 + data_len + signature.len() as u32).to_le_bytes());
+    out.extend_from_slice(&(36 + data_len + trailer_len as u32).to_le_bytes());
     out.extend_from_slice(b"WAVEfmt ");
     out.extend_from_slice(&16u32.to_le_bytes());
-    out.extend_from_slice(&1u16.to_le_bytes());
-    out.extend_from_slice(&2u16.to_le_bytes());
+    out.extend_from_slice(&FORMAT_PCM.to_le_bytes());
+    out.extend_from_slice(&channels.to_le_bytes());
     out.extend_from_slice(&sample_rate.to_le_bytes());
-    out.extend_from_slice(&(sample_rate * 4).to_le_bytes());
-    out.extend_from_slice(&4u16.to_le_bytes());
+    out.extend_from_slice(&(sample_rate * u32::from(block)).to_le_bytes());
+    out.extend_from_slice(&block.to_le_bytes());
     out.extend_from_slice(&16u16.to_le_bytes());
     out.extend_from_slice(b"data");
     out.extend_from_slice(&data_len.to_le_bytes());
-    for i in 0..frames {
-        for sample in [left[i], right[i]] {
-            let s = f64::from(sample).clamp(-1.0, 1.0);
-            let value = if s < 0.0 { s * 32768.0 } else { s * 32767.0 };
-            out.extend_from_slice(&(value.trunc() as i16).to_le_bytes());
-        }
-    }
-    out.extend_from_slice(&signature);
     out
 }
 
@@ -304,6 +337,18 @@ pub(crate) mod tests {
         for (got, sent) in decoded.left.iter().zip(&left) {
             assert!((got - sent.clamp(-1.0, 1.0)).abs() <= 2.0 / 32_768.0);
         }
+    }
+
+    #[test]
+    fn unsigned_pcm_16_keeps_its_channels() {
+        let mono = SampleBuffer::mono(vec![0.5, -0.25, 0.0, -1.0], 44_100);
+        let bytes = encode_pcm16(&mono);
+        assert_eq!(bytes.len(), 44 + 4 * 2);
+        assert_eq!(decode(&bytes).unwrap(), SampleBuffer::mono(vec![16_383.0 / 32_768.0, -0.25, 0.0, -1.0], 44_100));
+        let stereo = SampleBuffer { left: vec![0.25, -0.5], right: Some(vec![-0.25, 0.0]), sample_rate: 48_000 };
+        let decoded = decode(&encode_pcm16(&stereo)).unwrap();
+        assert_eq!(decoded.right, Some(vec![-0.25, 0.0]));
+        assert_eq!(decoded.sample_rate, 48_000);
     }
 
     #[test]
