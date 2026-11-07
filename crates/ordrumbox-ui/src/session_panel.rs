@@ -445,7 +445,7 @@ mod tests {
         assert!(s.editor.history().next_undo().is_none());
 
         let presets = ordrumbox_core::json::parse(r#"{"BASS0":{},"KICK_SYNTH":{},"SNARE_SYNTH":{}}"#).unwrap();
-        s.synths = SynthPresets::from_json(&presets);
+        s.set_asset_synths(SynthPresets::from_json(&presets));
         s.run(Command::ConvertToSynth);
         let tracks = &s.pattern().unwrap().tracks;
         assert!(tracks.iter().all(|t| t.use_synth && !t.auto_assign));

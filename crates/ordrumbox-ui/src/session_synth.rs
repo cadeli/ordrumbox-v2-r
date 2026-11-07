@@ -3,10 +3,11 @@
 //! editor's track's preset (else the first one, and a line above the cards
 //! says what the track plays, with a button to put it on the preset shown)
 //! and every change goes to
-//! that preset at once — the player rebuilds what plays with it — and to
-//! `generated_sounds.json` in the user data folder half a second later (the
-//! JS caches them in IndexedDB), read at start over the assets' presets.
-//! Revert puts back the preset as it was when it was opened.
+//! that preset at once — the player rebuilds what plays with it. The
+//! presets the assets do not hold as they are belong to the library
+//! (`Library::synths`): each change is an undo step, and they are saved with
+//! it (`library.json`, the host's project). Revert puts back the preset as it
+//! was when it was opened.
 
 use crate::scale::Scale;
 use std::time::Instant;
@@ -132,68 +133,120 @@ impl Session {
         self.synth_editor.edit = Some(SynthEdit { key: key.to_owned(), original: preset, draft });
     }
 
-    /// The presets saved at `path`, read at start over the assets' ones. An
-    /// asset's preset the save does not hold is kept: a new version's presets appear.
-    /// Returns where edits are saved: `save_to`, or none when the saved presets
-    /// cannot be read (never written over).
-    pub(super) fn load_user_synths(
+    /// For a library saved without presets of its own (before they were
+    /// saved with it): those of the presets file `path` earlier versions
+    /// saved that `assets` does not hold as they are. Saved with the library
+    /// from then on; a file that cannot be read is said, left as it is, and
+    /// read again at the next start (`None`).
+    pub(super) fn read_user_synths(
         path: Option<PathBuf>,
-        save_to: Option<PathBuf>,
-        synths: &mut SynthPresets,
+        assets: &SynthPresets,
         status: &mut Vec<String>,
-    ) -> Option<PathBuf> {
-        let Some(path) = path else { return save_to };
+    ) -> Option<Object> {
+        let Some(path) = path else { return Some(Object::new()) };
         match store::load_synths(&path) {
-            Ok(Some(mut saved)) => {
-                saved.add_missing(synths);
-                *synths = saved;
-                save_to
+            Ok(saved) => {
+                let mut own = Object::new();
+                if let Some(saved) = &saved {
+                    for key in saved.keys() {
+                        if let Some(preset) = saved.get(key)
+                            && assets.get(key) != Some(preset)
+                        {
+                            own.insert(key, preset.clone());
+                        }
+                    }
+                }
+                Some(own)
             }
-            Ok(None) => save_to,
             Err(e) => {
-                status.push(format!("synth presets not loaded, not saved over: {e}"));
+                status.push(format!(
+                    "synth presets not loaded: {e} (once repaired, import it from the synth editor's preset bar)"
+                ));
                 None
             }
         }
     }
 
-    /// The presets changed: to the player, to exports, to the disk soon.
-    pub(super) fn synths_changed(&mut self) {
+    /// The presets played and shown follow the library's own, when the
+    /// library changed since they were made (an edit, an undo, a library
+    /// replaced): to the player, to exports, to the preset edited.
+    pub(super) fn refresh_synths(&mut self) {
+        let revision = self.editor.revision();
+        if self.synths_revision == Some(revision) {
+            return;
+        }
+        self.synths_revision = Some(revision);
+        let synths = merged_synths(self.editor.library().synths.as_ref(), &self.asset_synths);
+        if synths == self.synths {
+            return;
+        }
+        self.synths = synths;
         if let Some(controller) = self.playback.controller_mut() {
             controller.set_synths(self.editor.library(), self.synths.clone());
         }
         if let Some(render) = &mut self.render {
             render.synths = self.synths.clone();
         }
-        self.saving.synths.touch();
-    }
-
-    /// The draft into its preset (`commit`).
-    fn commit_synth(&mut self) {
+        // The preset edited changed from elsewhere (an undo, an import):
+        // opened again, Revert goes back to it; gone, the first one.
         let Some(edit) = &self.synth_editor.edit else { return };
         let key = edit.key.clone();
-        self.synths.set(&key, Value::Object(edit.draft.clone()));
-        self.synths_changed();
-        self.not_undoable(format!("synth preset \"{key}\" changed"));
+        match self.synths.get(&key) {
+            Some(preset) if preset.as_object() != Some(&edit.draft) => self.load_synth(&key),
+            Some(_) => {}
+            None => match self.synth_keys().into_iter().next() {
+                Some(first) => self.load_synth(&first),
+                None => self.synth_editor.edit = None,
+            },
+        }
     }
 
-    /// Write the presets when the edits have settled; when to call again.
-    pub(super) fn flush_synths(&mut self) -> Option<Instant> {
-        if let Err(next) = self.saving.synths.ready() {
-            return next;
-        }
-        match &self.saving.synths_file {
-            Some(path) => {
-                if let Err(e) = store::save_synths(path, &self.synths) {
-                    self.message = format!("Synth preset changes are not being saved: {}: {e}", path.display());
-                }
+    /// The assets' presets are `synths` (tests): the presets played follow.
+    #[cfg(test)]
+    pub(super) fn set_asset_synths(&mut self, synths: SynthPresets) {
+        self.asset_synths = synths;
+        self.synths_revision = None;
+        self.refresh_synths();
+    }
+
+    /// Preset `key` becomes `preset` (`None`: deleted), one undo step `desc`
+    /// (with `coalesce`, one with the edits of that key just before). One
+    /// the assets hold as it is goes back to being theirs. Whether it changed.
+    pub(super) fn put_synth(
+        &mut self,
+        key: &str,
+        preset: Option<Value>,
+        desc: String,
+        coalesce: Option<String>,
+    ) -> bool {
+        self.put_synths(&[(key, preset)], desc, coalesce)
+    }
+
+    /// [`Self::put_synth`] for several presets, one undo step.
+    fn put_synths(&mut self, presets: &[(&str, Option<Value>)], desc: String, coalesce: Option<String>) -> bool {
+        let assets = &self.asset_synths;
+        let changed = self.editor.edit_synths(desc, coalesce, |own| {
+            for (key, preset) in presets {
+                match (preset, assets.get(key)) {
+                    (Some(preset), Some(asset)) if preset == asset => own.remove(key),
+                    (Some(preset), _) => own.insert(*key, preset.clone()),
+                    (None, Some(_)) => own.insert(*key, Value::Null),
+                    (None, None) => own.remove(key),
+                };
             }
-            None => {
-                self.message =
-                    "Synth preset changes are not being saved: no synth presets file (see the messages below)".into();
-            }
+        });
+        if changed {
+            self.edited();
         }
-        None
+        changed
+    }
+
+    /// The draft into its preset (`commit`): a knob turned is one undo step.
+    fn commit_synth(&mut self) {
+        let Some(edit) = &self.synth_editor.edit else { return };
+        let (key, preset) = (edit.key.clone(), Value::Object(edit.draft.clone()));
+        let desc = format!("Edit synth preset \"{key}\"");
+        self.put_synth(&key, Some(preset), desc, Some(format!("synth:{key}")));
     }
 
     /// Set `path` of the draft (a group off by default is switched on when
@@ -340,12 +393,10 @@ impl Session {
         let keys = self.synth_keys();
         let list: Vec<&str> = keys.iter().map(String::as_str).collect();
         let next = model::after_delete(&list, key).map(str::to_owned);
-        self.synths.remove(key);
-        self.synths_changed();
         if let Some(next) = next {
             self.load_synth(&next);
         }
-        self.message = format!("Deleted \"{key}\"");
+        self.put_synth(key, None, format!("Delete synth preset \"{key}\""), None);
     }
 
     /// The preset bar's buttons (`preset_section.js`).
@@ -363,27 +414,24 @@ impl Session {
             "new" => {
                 let keys = self.synth_keys();
                 let name = model::new_preset_name(&keys.iter().map(String::as_str).collect::<Vec<_>>());
-                self.synths.set(&name, Value::Object(model::defaults()));
-                self.synths_changed();
+                let desc = format!("New synth preset \"{name}\"");
+                self.put_synth(&name, Some(Value::Object(model::defaults())), desc, None);
                 self.load_synth(&name);
-                self.message = format!("Preset \"{name}\" created");
             }
             "duplicate" => {
                 let Some(edit) = &mut self.synth_editor.edit else { return };
                 let key = format!("{}_copy", edit.key);
                 edit.key = key.clone();
                 edit.original = Value::Object(edit.draft.clone());
-                self.commit_synth();
-                self.message = format!("Preset \"{key}\" created");
+                let preset = edit.original.clone();
+                self.put_synth(&key, Some(preset), format!("Duplicate synth preset as \"{key}\""), None);
             }
             "revert" => {
                 let Some(edit) = &mut self.synth_editor.edit else { return };
                 edit.draft = edit.original.as_object().cloned().unwrap_or_default();
                 model::hydrate(&mut edit.draft);
                 let (key, original) = (edit.key.clone(), edit.original.clone());
-                self.synths.set(&key, original);
-                self.synths_changed();
-                self.message = format!("\"{key}\" reverted");
+                self.put_synth(&key, Some(original), format!("Revert synth preset \"{key}\""), None);
             }
             USE_BUTTON => {
                 let Some(key) = self.synth_editor.edit.as_ref().map(|e| e.key.clone()) else { return };
@@ -425,19 +473,35 @@ impl Session {
             self.message = "Invalid synth file: expected a JSON object".into();
             return;
         };
-        let mut count = 0;
-        for (key, preset) in object.iter() {
-            if preset.as_object().is_some() {
-                self.synths.set(key, preset.clone());
-                count += 1;
-            }
-        }
-        self.synths_changed();
-        if let Some(key) = self.synth_editor.edit.as_ref().map(|e| e.key.clone()) {
-            self.load_synth(&key);
-        }
-        self.message = format!("Imported {count} synth sound(s)");
+        let presets: Vec<(&str, Option<Value>)> = object
+            .iter()
+            .filter(|(_, preset)| preset.as_object().is_some())
+            .map(|(k, p)| (k, Some(p.clone())))
+            .collect();
+        let desc = format!("Import {} synth preset(s)", presets.len());
+        self.put_synths(&presets, desc, None);
+        self.message = format!("Imported {} synth sound(s)", presets.len());
     }
+}
+
+/// The presets played: `own`, a library's (`null`: one of the assets'
+/// deleted), then the assets' ones it does not name, so a new version's
+/// presets appear.
+pub(super) fn merged_synths(own: Option<&Object>, assets: &SynthPresets) -> SynthPresets {
+    let mut merged = SynthPresets::default();
+    for (key, preset) in own.into_iter().flat_map(Object::iter) {
+        if !preset.is_null() {
+            merged.set(key, preset.clone());
+        }
+    }
+    for key in assets.keys() {
+        if own.is_none_or(|own| own.get(key).is_none())
+            && let Some(preset) = assets.get(key)
+        {
+            merged.set(key, preset.clone());
+        }
+    }
+    merged
 }
 
 #[cfg(test)]
@@ -453,8 +517,9 @@ mod tests {
         )
         .unwrap();
         let mut s = Session::new(library, KitSet::empty(), Vec::new());
-        s.synths =
-            SynthPresets::from_json(&ordrumbox_core::json::parse(r#"{"b":{"vco1":{"gain":0.5}},"a":{}}"#).unwrap());
+        s.set_asset_synths(SynthPresets::from_json(
+            &ordrumbox_core::json::parse(r#"{"b":{"vco1":{"gain":0.5}},"a":{}}"#).unwrap(),
+        ));
         s.set_size(SIZE);
         s
     }
@@ -483,7 +548,7 @@ mod tests {
         let preset = s.synths.get("b").unwrap();
         assert_eq!(model::get(preset.as_object().unwrap(), "vco2.wave"), Some(&Value::from("sawtooth")));
         assert_eq!(model::number(preset.as_object().unwrap(), "vco2.gain"), Some(0.5));
-        assert!(s.saving.synths.pending());
+        assert!(s.saving.library.pending(), "saved with the library");
         // A knob: VCO1's gain, with the wheel.
         let fi = fields.iter().position(|f| f == "vco1.gain").unwrap() as u16;
         let knob = item(&s, |i| i.id == Some(Id::SynthField(fi)));
@@ -552,5 +617,38 @@ mod tests {
         assert!(model::bypassed(&s.synth_editor.edit.as_ref().unwrap().draft, "envelope"));
         s.toggle_synth();
         assert!(s.synth_editor.edit.is_none() && s.workspace == Workspace::Grid);
+    }
+
+    #[test]
+    fn preset_edits_are_undone_and_saved_with_the_library() {
+        let mut s = session();
+        s.toggle_synth();
+        let gain = |s: &Session| model::number(s.synths.get("b").unwrap().as_object().unwrap(), "vco1.gain");
+        let revision = s.library_revision();
+        let fi = synth_view::all_fields(&s.synth_editor.edit.as_ref().unwrap().draft)
+            .iter()
+            .position(|f| f == "vco1.gain")
+            .unwrap() as u16;
+        s.synth_value(fi, 0.3);
+        assert_eq!(gain(&s), Some(0.3));
+        assert_ne!(s.library_revision(), revision, "a plugin gives the host the library again");
+        assert!(s.library_text().contains("\"synthPresets\""));
+        // Undo: as the assets hold it, the editor showing it.
+        s.undo();
+        assert_eq!(gain(&s), Some(0.5));
+        assert_eq!(model::number(&s.synth_editor.edit.as_ref().unwrap().draft, "vco1.gain"), Some(0.5));
+        assert_eq!(s.editor.library().synths, None, "nothing of its own");
+        s.redo();
+        assert_eq!(gain(&s), Some(0.3));
+
+        // An asset's preset deleted stays deleted: saved as null.
+        s.remove_synth("a");
+        assert_eq!(s.synth_keys(), ["b"]);
+        let (library, _) = Library::parse(&s.library_text()).unwrap();
+        let own = library.synths.clone().unwrap();
+        assert!(own.get("a").is_some_and(Value::is_null));
+        assert_eq!(merged_synths(Some(&own), &s.asset_synths).keys(), ["b"]);
+        s.undo();
+        assert_eq!(s.synth_keys(), ["a", "b"]);
     }
 }

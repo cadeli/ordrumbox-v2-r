@@ -58,7 +58,10 @@ impl Session {
             return;
         };
         let path = dir.join(name);
-        if path.exists() {
+        // A folder made for the export is never written into one already there.
+        if path.exists() && matches!(export, Export::KitFolder | Export::UserData) {
+            self.message = format!("not exported: {} already exists", path.display());
+        } else if path.exists() {
             self.chrome.overlay = Some(Overlay::ConfirmOverwrite { export, path });
         } else {
             self.write_export(export, &path);
@@ -75,6 +78,7 @@ impl Session {
             Export::SongSaveAs => self.save_song_as(path),
             Export::Synths => self.export_synths(path),
             Export::KitMapping => self.kit_export(path),
+            Export::KitFolder => self.message = self.kits.export_folder(self.kit_index, path).unwrap_or_else(|e| e),
             Export::Library => self.export_library(path),
             Export::UserData => self.back_up_user_data(path),
         }

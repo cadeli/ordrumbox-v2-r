@@ -309,8 +309,12 @@ impl Editor {
         self.replace_library(library, selected_song, "Load song");
     }
 
-    /// The same, the undo step described as `description`.
-    pub fn replace_library(&mut self, library: Library, selected_song: usize, description: &str) {
+    /// The same, the undo step described as `description`. A library
+    /// without synth presets of its own (a song file) keeps those there were.
+    pub fn replace_library(&mut self, mut library: Library, selected_song: usize, description: &str) {
+        if library.synths.is_none() {
+            library.synths.clone_from(&self.library.synths);
+        }
         let previous = self.selected_song;
         let before = Box::new(std::mem::replace(&mut self.library, library));
         self.set_selected_song(selected_song);

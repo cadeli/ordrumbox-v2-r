@@ -159,6 +159,7 @@ impl Session {
             C::ImportSong => self.song_button("import"),
             C::NormalizeKit => self.kit_normalize(),
             C::ExportMapping => self.open_export(Export::KitMapping),
+            C::ExportKitFolder => self.open_export(Export::KitFolder),
             C::LoadMapping => self.open_picker(Purpose::LoadMapping),
             C::AddSample => self.open_picker(Purpose::AddSample),
             C::ReplaceSample => self.open_picker(Purpose::ReplaceSample),

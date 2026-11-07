@@ -1,5 +1,6 @@
 //! A library file (`assets/data/song.json`): `{info, songs, patterns}`, the
-//! patterns being shared by every song of the file.
+//! patterns being shared by every song of the file, and the synth presets
+//! saved with it (`synthPresets`).
 
 use std::collections::HashSet;
 
@@ -17,13 +18,20 @@ pub struct Library {
     pub bpm: f64,
     pub songs: Vec<Song>,
     pub patterns: Vec<Pattern>,
+    /// The synth presets saved with the library, by key, over the assets'
+    /// ones: `null` for one of the assets' deleted. `None` for a file saved
+    /// before they were.
+    pub synths: Option<Object>,
 }
 
 impl Default for Library {
     fn default() -> Self {
-        Self { info: Object::new(), bpm: DEFAULT_BPM, songs: Vec::new(), patterns: Vec::new() }
+        Self { info: Object::new(), bpm: DEFAULT_BPM, songs: Vec::new(), patterns: Vec::new(), synths: None }
     }
 }
+
+/// The key of the synth presets in a library file.
+const SYNTHS_KEY: &str = "synthPresets";
 
 /// What a load had to repair or leave out.
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -70,7 +78,8 @@ impl Library {
         let (songs, dropped) =
             songs_from_json(value.get("songs").unwrap_or(&Value::Null), &known_ids, &mut report.issues);
         report.dropped_clips = dropped;
-        (Self { info, bpm, songs, patterns }, report)
+        let synths = value.get(SYNTHS_KEY).map(|raw| synths_from_json(raw, &mut report.issues));
+        (Self { info, bpm, songs, patterns, synths }, report)
     }
 
     pub fn to_json(&self) -> Value {
@@ -79,6 +88,9 @@ impl Library {
         object.insert("bpm", Value::from(self.bpm));
         object.insert("songs", Value::Array(self.songs.iter().map(Song::to_json).collect()));
         object.insert("patterns", Value::Array(self.patterns.iter().map(Pattern::to_json).collect()));
+        if let Some(synths) = &self.synths {
+            object.insert(SYNTHS_KEY, Value::Object(synths.clone()));
+        }
         Value::Object(object)
     }
 
@@ -148,6 +160,24 @@ pub struct SongRecord {
     pub selected_song: usize,
 }
 
+/// The synth presets of a library file: an object of presets (objects), or
+/// `null` for one deleted; anything else is left out and reported.
+fn synths_from_json(raw: &Value, issues: &mut Vec<Issue>) -> Object {
+    let Some(object) = raw.as_object() else {
+        issues.push(Issue::new(SYNTHS_KEY, "not an object: no synth preset read"));
+        return Object::new();
+    };
+    let mut synths = Object::new();
+    for (key, preset) in object.iter() {
+        if matches!(preset, Value::Object(_) | Value::Null) {
+            synths.insert(key, preset.clone());
+        } else {
+            issues.push(Issue::new(format!("{SYNTHS_KEY}.{key}"), "not a synth preset: left out"));
+        }
+    }
+    synths
+}
+
 /// Give every pattern an id, in file order, as `ensurePatternId()`: an existing
 /// id is kept, a missing one is the slug of the name made unique against the
 /// ids met so far.
@@ -195,8 +225,24 @@ mod tests {
         assert_eq!(read.library.songs, library.songs);
         assert_eq!(read.library.patterns, library.patterns);
         assert_eq!(read.library.info.get("url").and_then(Value::as_str), Some("u"));
+        assert_eq!(read.library.synths, None, "a song file holds no synth presets");
         assert_eq!(read.library.info.get("description").and_then(Value::as_str), Some(""));
         assert!(Library::from_song_record(&json::parse(r#"{"songs":[]}"#).unwrap(), &Object::new()).is_none());
+    }
+
+    #[test]
+    fn synth_presets_are_kept_and_a_wrong_one_is_left_out() {
+        let text = r#"{"synthPresets":{"a":{"vco1":{"gain":0.5}},"gone":null,"bad":3},"patterns":[]}"#;
+        let (library, report) = Library::parse(text).unwrap();
+        let synths = library.synths.as_ref().unwrap();
+        assert_eq!(synths.iter().map(|(k, _)| k).collect::<Vec<_>>(), ["a", "gone"]);
+        assert_eq!(report.issues, [Issue::new("synthPresets.bad", "not a synth preset: left out")]);
+        let again = Library::parse(&library.to_file_text()).unwrap().0;
+        assert_eq!(again, library);
+        assert_eq!(Library::parse("{}").unwrap().0.synths, None, "a file from before");
+        let (library, report) = Library::parse(r#"{"synthPresets":[]}"#).unwrap();
+        assert_eq!(library.synths, Some(Object::new()));
+        assert_eq!(report.issues.len(), 1);
     }
 
     #[test]

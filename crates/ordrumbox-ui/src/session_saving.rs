@@ -1,6 +1,6 @@
-//! Where the session's files go and when they are written: the library a
-//! moment after each edit, kit knobs, synth presets and the master once the
-//! edits have settled.
+//! Where the session's files go and when they are written: the library (and
+//! the synth presets saved with it) a moment after each edit, kit knobs and
+//! the master once the edits have settled.
 
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -9,8 +9,6 @@ use std::time::{Duration, Instant};
 const LIBRARY_DELAY: Duration = Duration::from_secs(1);
 /// Kit knob edits reach the player and the disk this long after the last one.
 const KITS_DELAY: Duration = Duration::from_millis(200);
-/// Synth preset edits are saved this long after the last one.
-const SYNTHS_DELAY: Duration = Duration::from_millis(500);
 /// Master changes reach `settings.json` this long after the last one.
 const MASTER_DELAY: Duration = Duration::from_millis(500);
 
@@ -69,16 +67,12 @@ pub(super) struct Saving {
     pub(super) library_path: Option<PathBuf>,
     /// Editor revision the library file holds.
     saved_revision: u64,
-    /// Library edits since the last save.
+    /// Library edits (synth presets included) since the last save.
     pub(super) library: Settle,
     /// Kit knob edits not yet applied to the bank and saved.
     pub(super) kits: Settle,
-    /// Synth preset edits not yet saved.
-    pub(super) synths: Settle,
     /// Master bus changes not yet saved.
     pub(super) master: Settle,
-    /// Where the synth presets are saved; none when the saved ones could not be read.
-    pub(super) synths_file: Option<PathBuf>,
     /// The settings file the colour scheme and the zoom are saved to (`None`: not saved).
     pub(super) settings_file: Option<PathBuf>,
     /// Where the song panel saves songs; `None`: no user data folder.
@@ -92,9 +86,7 @@ impl Default for Saving {
             saved_revision: 0,
             library: Settle::new(LIBRARY_DELAY),
             kits: Settle::new(KITS_DELAY),
-            synths: Settle::new(SYNTHS_DELAY),
             master: Settle::new(MASTER_DELAY),
-            synths_file: None,
             settings_file: None,
             songs_dir: None,
         }
@@ -104,7 +96,7 @@ impl Default for Saving {
 impl Saving {
     /// Every write waiting is due now (before the files are moved or copied).
     pub(super) fn expire_all(&mut self) {
-        for settle in [&mut self.library, &mut self.kits, &mut self.synths, &mut self.master] {
+        for settle in [&mut self.library, &mut self.kits, &mut self.master] {
             settle.expire();
         }
     }

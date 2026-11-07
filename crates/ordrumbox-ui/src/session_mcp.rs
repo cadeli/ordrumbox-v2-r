@@ -337,8 +337,7 @@ impl Session {
             model::implicit_enable(&mut draft, path);
             model::set(&mut draft, path, value.clone());
         }
-        self.synths.set(key, Value::Object(draft.clone()));
-        self.synths_changed();
+        self.put_synth(key, Some(Value::Object(draft.clone())), format!("Set synth preset \"{key}\""), None);
         if self.synth_editor.edits(key) {
             self.load_synth(key);
         }
@@ -361,9 +360,7 @@ impl Session {
             // The editor shows the next preset, as its Delete button does.
             self.remove_synth(&key);
         } else {
-            self.synths.remove(&key);
-            self.synths_changed();
-            self.message = format!("Deleted \"{key}\"");
+            self.put_synth(&key, None, format!("Delete synth preset \"{key}\""), None);
         }
         Ok(object([("removed", Value::from(key)), ("tracksUsing", strings(&using))]))
     }

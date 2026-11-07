@@ -6,6 +6,7 @@
 //! arrangements, or the whole library), which needs no per-command inverse
 //! and cannot drift from the state.
 
+use ordrumbox_core::json::Object;
 use ordrumbox_core::{Library, Pattern, Song};
 
 /// What undo and redo act on.
@@ -37,6 +38,8 @@ pub enum Change {
     Library { before: Box<Library>, after: Box<Library>, select: (usize, usize) },
     /// The library's tempo, before and after.
     Tempo { before: f64, after: f64 },
+    /// The synth presets saved with the library, before and after.
+    Synths { before: Option<Object>, after: Option<Object> },
 }
 
 impl Change {
@@ -59,6 +62,7 @@ impl Change {
                 *target.selected_song = if undo { *on_undo } else { *on_redo };
             }
             Self::Tempo { before, after } => target.library.bpm = if undo { *before } else { *after },
+            Self::Synths { before, after } => target.library.synths = if undo { before } else { after }.clone(),
         }
     }
 
@@ -69,7 +73,8 @@ impl Change {
             (Self::Patterns { .. }, Self::Patterns { .. }) => true,
             (Self::Songs { .. }, Self::Songs { .. })
             | (Self::Library { .. }, Self::Library { .. })
-            | (Self::Tempo { .. }, Self::Tempo { .. }) => true,
+            | (Self::Tempo { .. }, Self::Tempo { .. })
+            | (Self::Synths { .. }, Self::Synths { .. }) => true,
             _ => false,
         }
     }
@@ -82,6 +87,7 @@ impl Change {
             (Self::Songs { after, .. }, Self::Songs { after: next_after, .. }) => *after = next_after,
             (Self::Library { after, .. }, Self::Library { after: next_after, .. }) => *after = next_after,
             (Self::Tempo { after, .. }, Self::Tempo { after: next_after, .. }) => *after = next_after,
+            (Self::Synths { after, .. }, Self::Synths { after: next_after, .. }) => *after = next_after,
             _ => {}
         }
     }

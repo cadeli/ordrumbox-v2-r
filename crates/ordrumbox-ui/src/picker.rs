@@ -48,6 +48,8 @@ pub enum Export {
     SongSaveAs,
     Synths,
     KitMapping,
+    /// The kit with its samples, in a folder of its own made in the folder picked.
+    KitFolder,
     Library,
     /// The user's files, in a folder of their own made in the folder picked.
     UserData,
@@ -75,6 +77,7 @@ impl Purpose {
             Self::Export(Export::SongSaveAs) => "Save song to folder",
             Self::Export(Export::Synths) => "Export synth sounds to folder",
             Self::Export(Export::KitMapping) => "Export kit mapping to folder",
+            Self::Export(Export::KitFolder) => "Export kit with its samples to folder",
             Self::Export(Export::Library) => "Export library to folder",
             Self::Export(Export::UserData) => "Back up user data to folder",
         }
