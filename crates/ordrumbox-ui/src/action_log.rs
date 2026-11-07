@@ -3,6 +3,7 @@
 
 use crate::canvas::{Canvas, text_width};
 use crate::panel::Rect;
+use crate::scale::Scale;
 use crate::theme;
 
 /// Lines kept; the oldest go first.
@@ -96,11 +97,11 @@ pub struct LogLayout {
     row: i32,
     rows: usize,
     chars_per_row: usize,
-    scale: i32,
+    scale: Scale,
 }
 
 impl LogLayout {
-    pub fn new(width: i32, height: i32, scale: i32) -> Self {
+    pub fn new(width: i32, height: i32, scale: Scale) -> Self {
         let margin = 40 * scale;
         let (w, h) = ((width - 2 * margin).max(80 * scale), (height - 2 * margin).max(80 * scale));
         let (x, y) = ((width - w) / 2, (height - h) / 2);
@@ -129,7 +130,7 @@ pub fn draw(canvas: &mut Canvas, log: &ActionLog, scroll: usize, layout: &LogLay
     let Rect { x, y, w, h } = layout.panel;
     canvas.fill_rect(x - 4 * s, y - 4 * s, w + 8 * s, h + 8 * s, theme::shade());
     canvas.fill_rect(x, y, w, h, theme::line());
-    canvas.fill_rect(x + s, y + s, w - 2 * s, h - 2 * s, theme::panel());
+    canvas.fill_rect(x + s.px(), y + s.px(), w - 2 * s, h - 2 * s, theme::panel());
     let text_x = x + 10 * s;
     canvas.text(text_x, y + 8 * s, "History", s, theme::PINK);
     let rows = log.rows(layout.chars_per_row);
@@ -209,7 +210,7 @@ mod tests {
         log.note(seen("abcdefgh", 0, 0, None));
         assert_eq!(log.rows(3), ["abc", "def", "gh", "old"]);
 
-        let layout = LogLayout::new(800, 600, 1);
+        let layout = LogLayout::new(800, 600, Scale::ONE);
         assert_eq!(layout.max_scroll(&log), 0);
         for i in 0..200 {
             log.note(seen(&i.to_string(), 0, 0, None));

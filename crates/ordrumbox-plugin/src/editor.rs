@@ -1,7 +1,8 @@
 //! The plugin's window: a baseview child of the host's window showing the
 //! app's UI, drawn in software and shown through softbuffer, its input
 //! translated into the UI's. A pattern or kit chosen in it is given to the
-//! host's parameters.
+//! host's parameters. A grip in its bottom-right corner resizes it: the host
+//! is asked for the new size, which the project saves.
 
 use std::num::{NonZeroIsize, NonZeroU32};
 use std::ptr::NonNull;
@@ -14,6 +15,7 @@ use baseview::{
 use keyboard_types::{KeyState, KeyboardEvent};
 use nih_plug::nih_log;
 use nih_plug::prelude::{Editor, GuiContext, IntParam, ParamSetter, ParentWindowHandle};
+use ordrumbox_ui::Scale;
 use ordrumbox_ui::ui_input::{self, Button, Key, KeyEvent, Modifiers};
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle, RawDisplayHandle, RawWindowHandle};
 use raw_window_handle_06 as rwh06;
@@ -21,8 +23,18 @@ use raw_window_handle_06 as rwh06;
 use crate::params::OrdrumboxParams;
 use crate::player::{SharedPlayer, lock};
 
-/// The window's size in logical pixels (the app's first window size).
+/// The window's first size in logical pixels (the app's first window size).
 pub const SIZE: (u32, u32) = (1100, 680);
+
+/// The largest side the grip makes, in logical pixels.
+const MAX_SIDE: u32 = 8192;
+
+/// The resize grip's side in logical pixels, in the window's bottom-right
+/// corner, over the UI.
+const GRIP: u32 = 14;
+
+/// The grip's stripes.
+const GRIP_COLOR: u32 = 0x0080_8090;
 
 /// The window's colour where the UI cannot draw (no font, no session).
 const BACKGROUND: u32 = 0x0018_1820;
@@ -42,7 +54,7 @@ impl Editor for OrdrumboxEditor {
             &HostWindow(parent),
             WindowOpenOptions {
                 title: "orDrumbox".into(),
-                size: baseview::Size::new(f64::from(SIZE.0), f64::from(SIZE.1)),
+                size: logical(self.size()),
                 scale: WindowScalePolicy::SystemScaleFactor,
             },
             move |window: &mut baseview::Window<'_>| View::new(window, player, host),
@@ -51,7 +63,7 @@ impl Editor for OrdrumboxEditor {
     }
 
     fn size(&self) -> (u32, u32) {
-        SIZE
+        fitted(self.params.editor_size.get())
     }
 
     fn set_scale_factor(&self, _factor: f32) -> bool {
@@ -64,6 +76,17 @@ impl Editor for OrdrumboxEditor {
     fn param_modulation_changed(&self, _id: &str, _modulation_offset: f32) {}
 
     fn param_values_changed(&self) {}
+}
+
+/// `size` within [`ordrumbox_ui::MIN_WINDOW`] and [`MAX_SIDE`]: a project may
+/// hold any size. The layout scrolls in a smaller window than it needs.
+fn fitted((width, height): (u32, u32)) -> (u32, u32) {
+    let (min_width, min_height) = ordrumbox_ui::MIN_WINDOW;
+    (width.clamp(min_width, MAX_SIDE), height.clamp(min_height, MAX_SIDE))
+}
+
+fn logical((width, height): (u32, u32)) -> baseview::Size {
+    baseview::Size::new(f64::from(width), f64::from(height))
 }
 
 /// The open window; the host drops it to close the window.
@@ -115,6 +138,17 @@ struct View {
     scale: f64,
     /// Something changed since the last frame drawn.
     dirty: bool,
+    /// The pointer, in logical pixels.
+    pointer: (f64, f64),
+    /// The grip is being dragged.
+    drag: Option<Drag>,
+}
+
+/// A drag of the resize grip: where it started, and the size then.
+#[derive(Clone, Copy)]
+struct Drag {
+    pointer: (f64, f64),
+    size: (u32, u32),
 }
 
 /// A softbuffer surface and the context it needs alive.
@@ -136,7 +170,18 @@ impl View {
         let surface = softbuffer::Context::new(target.clone()).and_then(|context| {
             softbuffer::Surface::new(&context, target).map(|surface| Surface { _context: context, surface })
         });
-        let mut view = Self { player, host, surface: None, font, width: 0, height: 0, scale: 1.0, dirty: true };
+        let mut view = Self {
+            player,
+            host,
+            surface: None,
+            font,
+            width: 0,
+            height: 0,
+            scale: 1.0,
+            dirty: true,
+            pointer: (0.0, 0.0),
+            drag: None,
+        };
         match surface {
             Ok(surface) => view.surface = Some(surface),
             Err(e) => view.fail(&e),
@@ -162,6 +207,7 @@ impl View {
         let choices = lock(&self.player).take_window_choices();
         self.host.set(&self.host.params.pattern, choices.pattern);
         self.host.set(&self.host.params.kit, choices.kit);
+        let grip = self.grip_side();
         let Some(surface) = &mut self.surface else { return Ok(()) };
         if self.width == 0 {
             return Ok(());
@@ -180,11 +226,12 @@ impl View {
         let mut buffer = surface.surface.buffer_mut()?;
         match player.ui().filter(|_| self.font) {
             Some(ui) => {
-                ui.set_size(width as i32, height as i32, self.scale.round().max(1.0) as i32);
+                ui.set_size(width as i32, height as i32, Scale::from_factor(self.scale));
                 ui.draw(&mut buffer, width, height);
             }
             None => buffer.fill(BACKGROUND),
         }
+        draw_grip(&mut buffer, width, height, grip);
         self.dirty = false;
         buffer.present()
     }
@@ -202,13 +249,66 @@ impl View {
         }
     }
 
-    fn mouse(&mut self, event: MouseEvent) -> EventStatus {
+    /// The grip's side in physical pixels.
+    fn grip_side(&self) -> usize {
+        // The scale of a display, a few units at most.
+        GRIP as usize * self.scale.round().max(1.0) as usize
+    }
+
+    /// The pointer is on the grip.
+    fn on_grip(&self) -> bool {
+        let side = self.grip_side() as f64;
+        let (x, y) = (self.pointer.0 * self.scale, self.pointer.1 * self.scale);
+        x >= f64::from(self.width) - side && y >= f64::from(self.height) - side
+    }
+
+    /// The grip dragged to the pointer: the window takes the size the drag
+    /// gives, if the host agrees.
+    fn drag_to(&mut self, window: &mut baseview::Window<'_>, drag: Drag) {
+        let side = |from: u32, moved: f64| (f64::from(from) + moved).round().clamp(0.0, f64::from(MAX_SIDE)) as u32;
+        let size = fitted((
+            side(drag.size.0, self.pointer.0 - drag.pointer.0),
+            side(drag.size.1, self.pointer.1 - drag.pointer.1),
+        ));
+        self.ask_size(window, size);
+    }
+
+    /// The window resized to `size` (logical pixels), if the host agrees.
+    fn ask_size(&mut self, window: &mut baseview::Window<'_>, size: (u32, u32)) {
+        let sizes = &self.host.params.editor_size;
+        let before = sizes.get();
+        if size == before {
+            return;
+        }
+        // The host asks the editor for its size while it decides.
+        sizes.set(size);
+        if self.host.context.request_resize() {
+            window.resize(logical(size));
+        } else {
+            sizes.set(before);
+        }
+    }
+
+    fn mouse(&mut self, window: &mut baseview::Window<'_>, event: MouseEvent) -> EventStatus {
         let scale = self.scale;
         match event {
-            MouseEvent::CursorMoved { position, modifiers } => self.with_ui(|ui| {
-                ui.set_modifiers(ui_modifiers(modifiers));
-                ui.pointer_moved(position.x * scale, position.y * scale)
-            }),
+            MouseEvent::CursorMoved { position, modifiers } => {
+                self.pointer = (position.x, position.y);
+                if let Some(drag) = self.drag {
+                    self.drag_to(window, drag);
+                } else {
+                    self.with_ui(|ui| {
+                        ui.set_modifiers(ui_modifiers(modifiers));
+                        ui.pointer_moved(position.x * scale, position.y * scale)
+                    });
+                }
+            }
+            MouseEvent::ButtonPressed { button: MouseButton::Left, .. } if self.on_grip() => {
+                self.drag = Some(Drag { pointer: self.pointer, size: self.host.params.editor_size.get() });
+            }
+            MouseEvent::ButtonReleased { button: MouseButton::Left, .. } if self.drag.is_some() => {
+                self.drag = None;
+            }
             MouseEvent::ButtonPressed { button, modifiers } => {
                 let Some(button) = ui_button(button) else { return EventStatus::Ignored };
                 self.with_ui(|ui| {
@@ -268,6 +368,25 @@ impl View {
     }
 }
 
+/// The resize grip: diagonal stripes in the bottom-right `side` × `side`
+/// pixels of `buffer` (`width` × `height`).
+fn draw_grip(buffer: &mut [u32], width: usize, height: usize, side: usize) {
+    if side == 0 || width < side || height < side || buffer.len() < width * height {
+        return;
+    }
+    let period = side / 4;
+    let rows = buffer[..width * height].chunks_exact_mut(width).skip(height - side);
+    for (y, row) in rows.enumerate() {
+        for (x, pixel) in row[width - side..].iter_mut().enumerate() {
+            // From the corner: a stripe every `period` along the diagonal.
+            let from_corner = (side - 1 - x) + (side - 1 - y);
+            if from_corner < side && from_corner % period < period / 2 {
+                *pixel = GRIP_COLOR;
+            }
+        }
+    }
+}
+
 fn ui_modifiers(modifiers: keyboard_types::Modifiers) -> Modifiers {
     use keyboard_types::Modifiers as M;
     Modifiers {
@@ -293,7 +412,7 @@ impl baseview::WindowHandler for View {
         }
     }
 
-    fn on_event(&mut self, _window: &mut baseview::Window<'_>, event: Event) -> EventStatus {
+    fn on_event(&mut self, window: &mut baseview::Window<'_>, event: Event) -> EventStatus {
         match event {
             Event::Window(WindowEvent::Resized(info)) => {
                 let size = info.physical_size();
@@ -301,7 +420,7 @@ impl baseview::WindowHandler for View {
                 EventStatus::Captured
             }
             Event::Window(_) => EventStatus::Ignored,
-            Event::Mouse(event) => self.mouse(event),
+            Event::Mouse(event) => self.mouse(window, event),
             Event::Keyboard(event) => self.key(&event),
         }
     }
@@ -390,5 +509,36 @@ impl rwh06::HasWindowHandle for Target {
         // SAFETY: as for the display: baseview's window outlives the surface.
         #[expect(unsafe_code, reason = "a raw handle borrowed for the window's lifetime")]
         Ok(unsafe { rwh06::WindowHandle::borrow_raw(window) })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_size_is_fitted_to_the_smallest_window() {
+        assert_eq!(fitted(SIZE), SIZE);
+        assert_eq!(fitted((0, 0)), ordrumbox_ui::MIN_WINDOW);
+        assert_eq!(fitted((u32::MAX, u32::MAX)), (MAX_SIDE, MAX_SIDE));
+    }
+
+    #[test]
+    fn the_grip_stays_in_its_corner() {
+        let (width, height, side) = (40, 30, 14);
+        let mut buffer = vec![0; width * height];
+        draw_grip(&mut buffer, width, height, side);
+        let drawn = |x: usize, y: usize| buffer[y * width + x] == GRIP_COLOR;
+        assert!(drawn(width - 1, height - 1), "the corner itself");
+        for (i, &pixel) in buffer.iter().enumerate() {
+            let (x, y) = (i % width, i / width);
+            if pixel == GRIP_COLOR {
+                assert!(x >= width - side && y >= height - side, "({x}, {y}) out of the corner");
+            }
+        }
+        // Too small a window: nothing drawn, no panic.
+        let mut small = vec![0; 4];
+        draw_grip(&mut small, 2, 2, side);
+        assert!(small.iter().all(|&p| p == 0));
     }
 }

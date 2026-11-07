@@ -150,7 +150,7 @@ mod tests {
         let mut s = session();
         s.run(Command::DemoLibrary);
         assert!(s.confirm_open());
-        s.overlay_click(800, 600, 1, 10, 10);
+        s.overlay_click(800, 600, Scale::ONE, 10, 10);
         assert!(!s.confirm_open());
         assert_eq!(s.pattern().unwrap().name.as_deref(), Some("p"));
     }

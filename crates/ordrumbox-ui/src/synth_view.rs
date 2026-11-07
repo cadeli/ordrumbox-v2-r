@@ -10,6 +10,7 @@
 //! name groups and fields by their index in [`model::groups`] and
 //! [`all_fields`]); [`draw`] paints the cards and the plots under them.
 
+use crate::scale::Scale;
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_engine::synth_model::{
     self as model, FILTER_SLOPES, FILTER_TYPES, LFO_SYNCS, MOD_ENV_TARGETS, TABS, WAVES,
@@ -144,7 +145,7 @@ pub enum Plot {
 /// Where the editor's parts are.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SynthLayout {
-    scale: i32,
+    scale: Scale,
     pub preset: Rect,
     pub buttons: [Rect; 6],
     pub tabs: [Rect; 4],
@@ -153,7 +154,7 @@ pub struct SynthLayout {
 
 impl SynthLayout {
     /// The editor on a `width` × `height` window (`width` without the track editor).
-    pub fn new(width: i32, height: i32, scale: i32, status_lines: usize) -> Self {
+    pub fn new(width: i32, height: i32, scale: Scale, status_lines: usize) -> Self {
         let s = scale;
         let margin = 16 * s;
         let top = frame::body_top(scale);
@@ -347,8 +348,8 @@ pub fn draw(canvas: &mut Canvas, draft: &Object, built: &Built, layout: &SynthLa
         let r = card.rect;
         canvas.fill_rect(r.x, r.y, r.w, r.h, border_color());
         canvas.fill_rect(
-            r.x + s,
-            r.y + s,
+            r.x + s.px(),
+            r.y + s.px(),
             r.w - 2 * s,
             r.h - 2 * s,
             if card.bypassed { card_off_color() } else { card_color() },
@@ -392,9 +393,9 @@ fn polyline(canvas: &mut Canvas, points: impl Iterator<Item = (i32, i32)>, t: i3
 }
 
 /// The scope: the samples across, -1 to 1 around the middle.
-fn draw_scope(canvas: &mut Canvas, samples: &[f64], r: Rect, s: i32) {
+fn draw_scope(canvas: &mut Canvas, samples: &[f64], r: Rect, s: Scale) {
     let mid = r.y + r.h / 2;
-    canvas.fill_rect(r.x, mid, r.w, s.max(1), grid_color());
+    canvas.fill_rect(r.x, mid, r.w, s.px(), grid_color());
     let n = samples.len().max(1);
     let points = samples
         .iter()
@@ -404,9 +405,9 @@ fn draw_scope(canvas: &mut Canvas, samples: &[f64], r: Rect, s: i32) {
 }
 
 /// The envelope: attack, decay, sustain, release.
-fn draw_envelope(canvas: &mut Canvas, draft: &Object, r: Rect, s: i32) {
+fn draw_envelope(canvas: &mut Canvas, draft: &Object, r: Rect, s: Scale) {
     let mid = r.y + r.h / 2;
-    canvas.fill_rect(r.x, mid, r.w, s.max(1), grid_color());
+    canvas.fill_rect(r.x, mid, r.w, s.px(), grid_color());
     let (points, total) = model::envelope(draft);
     let point = |(t, v): (f64, f64)| {
         (r.x + ((t / total) * f64::from(r.w - 1)) as i32, mid - (v * f64::from(r.h / 2 - 4 * s)) as i32)
@@ -416,14 +417,14 @@ fn draw_envelope(canvas: &mut Canvas, draft: &Object, r: Rect, s: i32) {
 
 /// The filter's response, 20 Hz to 20 kHz across, -30 to +12 dB, and the
 /// band an LFO on the frequency sweeps.
-fn draw_filter(canvas: &mut Canvas, draft: &Object, r: Rect, s: i32, time: f64, bpm: f64) {
+fn draw_filter(canvas: &mut Canvas, draft: &Object, r: Rect, s: Scale, time: f64, bpm: f64) {
     let to_x = |f: f64| r.x + (((f.log10() - 20f64.log10()) / 3.0) * f64::from(r.w)) as i32;
     let to_y = |db: f64| r.y + r.h - 1 - (((db + 30.0) / 42.0) * f64::from(r.h - 1)) as i32;
     for f in [100.0, 1000.0, 10_000.0] {
-        canvas.fill_rect(to_x(f), r.y, s.max(1), r.h, grid_color());
+        canvas.fill_rect(to_x(f), r.y, s.px(), r.h, grid_color());
     }
     for db in [0.0, -20.0] {
-        canvas.fill_rect(r.x, to_y(db), r.w, s.max(1), grid_color());
+        canvas.fill_rect(r.x, to_y(db), r.w, s.px(), grid_color());
     }
     const N: usize = 200;
     let (kind, fc, q, slope_db, band) = model::filter_now(draft, time, bpm);
@@ -437,8 +438,8 @@ fn draw_filter(canvas: &mut Canvas, draft: &Object, r: Rect, s: i32, time: f64, 
         );
     };
     if let Some((low, high)) = band {
-        curve(canvas, low, ACCENT_DIM, s.max(1));
-        curve(canvas, high, ACCENT_DIM, s.max(1));
+        curve(canvas, low, ACCENT_DIM, s.px());
+        curve(canvas, high, ACCENT_DIM, s.px());
     }
     curve(canvas, fc, ACCENT, (s * 3 / 2).max(1));
 }
@@ -465,7 +466,7 @@ mod tests {
     #[test]
     fn builds_every_tab_and_names_fields_by_index() {
         let d = draft();
-        let layout = SynthLayout::new(740, 680, 1, 0);
+        let layout = SynthLayout::new(740, 680, Scale::ONE, 0);
         let fields = all_fields(&d);
         let mut knobs = 0;
         for tab in 0..4 {
@@ -494,7 +495,7 @@ mod tests {
         for (w, h) in [(1, 1), (40, 30), (740, 680)] {
             let mut pixels = vec![0; w * h];
             let mut canvas = Canvas::new(&mut pixels, w, h);
-            let layout = SynthLayout::new(w as i32, h as i32, 1, 0);
+            let layout = SynthLayout::new(w as i32, h as i32, Scale::ONE, 0);
             for tab in 0..4 {
                 let built = build(&d, &[], "", tab, &layout, &|_| None);
                 draw(&mut canvas, &d, &built, &layout, 0.3, 120.0);

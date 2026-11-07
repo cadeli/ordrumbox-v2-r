@@ -8,6 +8,7 @@
 //! JS caches them in IndexedDB), read at start over the assets' presets.
 //! Revert puts back the preset as it was when it was opened.
 
+use crate::scale::Scale;
 use std::time::Instant;
 
 use ordrumbox_core::json::{Object, Value};
@@ -98,7 +99,7 @@ impl Session {
 
     /// The line under the preset bar, right of the tabs: what the track
     /// plays, and when it is not the preset shown, a button that puts it on it.
-    fn track_line(&self, layout: &SynthLayout, scale: i32, items: &mut Vec<Item>) {
+    fn track_line(&self, layout: &SynthLayout, scale: Scale, items: &mut Vec<Item>) {
         let Some((name, plays)) = self.track_plays() else { return };
         let tab = layout.tabs[layout.tabs.len() - 1];
         let mut x = tab.x + tab.w + 16 * scale;
@@ -207,7 +208,7 @@ impl Session {
 
     // ─── What is shown ───────────────────────────────────────────────────────
 
-    fn synth_layout(&self, size: (i32, i32, i32)) -> SynthLayout {
+    fn synth_layout(&self, size: (i32, i32, Scale)) -> SynthLayout {
         let body = self.body(size);
         SynthLayout::new(body.main_w, body.editor_h, size.2, self.status.len())
     }
@@ -218,7 +219,7 @@ impl Session {
     }
 
     /// The editor as built for a `size` window, if it shows a preset.
-    pub(super) fn synth_built(&self, size: (i32, i32, i32)) -> Option<(Built, SynthLayout)> {
+    pub(super) fn synth_built(&self, size: (i32, i32, Scale)) -> Option<(Built, SynthLayout)> {
         let edit = self.synth_editor.edit.as_ref()?;
         let layout = self.synth_layout(size);
         let (time, bpm) = self.synth_clock();
@@ -230,7 +231,7 @@ impl Session {
         Some((built, layout))
     }
 
-    pub(super) fn synth_items(&self, layout: &mut session_panel::PanelLayout, size: (i32, i32, i32)) {
+    pub(super) fn synth_items(&self, layout: &mut session_panel::PanelLayout, size: (i32, i32, Scale)) {
         if let Some((built, synth_layout)) = self.synth_built(size) {
             layout.items.extend(built.items);
             self.track_line(&synth_layout, size.2, &mut layout.items);
@@ -238,7 +239,7 @@ impl Session {
     }
 
     /// What the view paints under the items: the cards and the plots.
-    pub(super) fn draw_synth(&self, canvas: &mut Canvas, scale: i32) {
+    pub(super) fn draw_synth(&self, canvas: &mut Canvas, scale: Scale) {
         if !self.synth_open() {
             return;
         }
@@ -444,7 +445,7 @@ mod tests {
     use super::*;
     use crate::kits::KitSet;
 
-    const SIZE: (i32, i32, i32) = (1100, 680, 1);
+    const SIZE: (i32, i32, Scale) = (1100, 680, Scale::ONE);
 
     fn session() -> Session {
         let (library, _) = Library::parse(
@@ -459,7 +460,7 @@ mod tests {
     }
 
     fn item(s: &Session, pick: impl Fn(&Item) -> bool) -> Item {
-        let layout = s.panel_layout(SIZE.0, SIZE.1, 1);
+        let layout = s.panel_layout(SIZE.0, SIZE.1, Scale::ONE);
         layout.items.into_iter().find(|i| pick(i)).expect("an item")
     }
 
@@ -508,7 +509,7 @@ mod tests {
         assert_eq!(s.synth_editor.edit.as_ref().map(|e| e.key.as_str()), Some("a"), "the first preset");
         assert_eq!(s.message, "KICK plays a sample: \"a\" shown, USE ON KICK to play it");
         let text = |s: &Session| {
-            let layout = s.panel_layout(SIZE.0, SIZE.1, 1);
+            let layout = s.panel_layout(SIZE.0, SIZE.1, Scale::ONE);
             layout.items.iter().find_map(|i| match &i.kind {
                 Kind::Text { text, .. } if text.starts_with("KICK plays") => Some(text.clone()),
                 _ => None,
@@ -522,7 +523,7 @@ mod tests {
         assert!(track.use_synth && track.synth_preset.as_deref() == Some("a"));
         assert_eq!(s.message, "KICK plays \"a\"");
         assert_eq!(text(&s).as_deref(), Some("KICK plays this preset"));
-        let layout = s.panel_layout(SIZE.0, SIZE.1, 1);
+        let layout = s.panel_layout(SIZE.0, SIZE.1, Scale::ONE);
         assert!(!layout.items.iter().any(|i| i.id == Some(Id::SynthButton(USE_BUTTON))));
         // Another preset picked: the track still plays its own.
         s.synth_select(Id::SynthPreset, "b");

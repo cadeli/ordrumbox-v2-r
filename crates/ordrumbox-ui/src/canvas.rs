@@ -4,6 +4,7 @@
 //! in the system's monospace font; lines and knob arcs come with the editors.
 
 use crate::font;
+use crate::scale::Scale;
 
 /// A pixel colour, `0x00RRGGBB` (the softbuffer format).
 pub type Rgb = u32;
@@ -54,13 +55,13 @@ impl<'a> Canvas<'a> {
     /// Draw `text` with its top-left corner at `(x, y)`, one cell of
     /// `font::SIZE × scale` pixels per character, blended over what is there;
     /// returns the x after the last character.
-    pub fn text(&mut self, x: i32, y: i32, text: &str, scale: i32, color: Rgb) -> i32 {
-        self.text_quarters(x, y, text, 4 * scale, color)
+    pub fn text(&mut self, x: i32, y: i32, text: &str, scale: Scale, color: Rgb) -> i32 {
+        self.text_quarters(x, y, text, scale.quarters(), color)
     }
 
     /// The same in the small font: cells three quarters the size.
-    pub fn small_text(&mut self, x: i32, y: i32, text: &str, scale: i32, color: Rgb) -> i32 {
-        self.text_quarters(x, y, text, font::SMALL_QUARTERS * scale, color)
+    pub fn small_text(&mut self, x: i32, y: i32, text: &str, scale: Scale, color: Rgb) -> i32 {
+        self.text_quarters(x, y, text, small(scale).quarters(), color)
     }
 
     fn text_quarters(&mut self, x: i32, y: i32, text: &str, quarters: i32, color: Rgb) -> i32 {
@@ -93,28 +94,33 @@ impl<'a> Canvas<'a> {
 }
 
 /// Width of `text` drawn at `scale`.
-pub fn text_width(text: &str, scale: i32) -> i32 {
+pub fn text_width(text: &str, scale: Scale) -> i32 {
     text.chars().count() as i32 * char_width(scale)
 }
 
 /// Width of one character at `scale`.
-pub fn char_width(scale: i32) -> i32 {
-    font::WIDTH * scale
+pub fn char_width(scale: Scale) -> i32 {
+    font::advance(scale.quarters())
 }
 
 /// How many characters fit in `width` pixels at `scale`.
-pub fn chars_in(width: i32, scale: i32) -> usize {
+pub fn chars_in(width: i32, scale: Scale) -> usize {
     usize::try_from(width / char_width(scale).max(1)).unwrap_or(0)
 }
 
 /// Height of a line of the small font at `scale`.
-pub fn small_cell(scale: i32) -> i32 {
-    font::SIZE * font::SMALL_QUARTERS * scale / 4
+pub fn small_cell(scale: Scale) -> i32 {
+    font::SIZE * small(scale)
 }
 
 /// Width of one character of the small font at `scale`.
-pub fn small_char_width(scale: i32) -> i32 {
-    font::advance(font::SMALL_QUARTERS * scale)
+pub fn small_char_width(scale: Scale) -> i32 {
+    font::advance(small(scale).quarters())
+}
+
+/// The scale of the small font's cells at `scale`.
+fn small(scale: Scale) -> Scale {
+    scale.part(font::SMALL_QUARTERS)
 }
 
 #[cfg(test)]
@@ -148,13 +154,13 @@ mod tests {
     fn text_is_blended_inside_its_cells() {
         let mut pixels = vec![0; 32 * 16];
         let mut canvas = Canvas::new(&mut pixels, 32, 16);
-        assert_eq!(canvas.text(0, 0, "Hé", 2, 0xff_ff_ff), 24);
+        assert_eq!(canvas.text(0, 0, "Hé", Scale::whole(2), 0xff_ff_ff), 24);
         let lit =
             |x0: usize, x1: usize| (0..16).any(|y| pixels[y * 32 + x0..y * 32 + x1].iter().any(|&p| p > 0x80_80_80));
         assert!(lit(0, 12) && lit(12, 24), "both cells drawn");
         assert!(!lit(24, 32), "nothing past them");
         // Coverage blends: some pixels are neither background nor full colour.
         assert!(pixels.iter().any(|&p| p != 0 && p != 0xff_ff_ff));
-        assert_eq!(text_width("abc", 2), 36);
+        assert_eq!(text_width("abc", Scale::whole(2)), 36);
     }
 }

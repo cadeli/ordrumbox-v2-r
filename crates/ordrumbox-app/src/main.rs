@@ -15,7 +15,7 @@ use std::num::NonZeroU32;
 use std::rc::Rc;
 
 use ordrumbox_ui::ui_input::{Button, Key, KeyEvent, Modifiers, ScrollDelta};
-use ordrumbox_ui::{Command, PanelId, Session, Ui};
+use ordrumbox_ui::{Command, PanelId, Scale, Session, Ui};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
@@ -52,7 +52,7 @@ impl App {
     fn sync_size(&mut self) {
         if let Some(gfx) = &self.gfx {
             let size = gfx.window.inner_size();
-            let scale = gfx.window.scale_factor().round().max(1.0) as i32;
+            let scale = Scale::from_factor(gfx.window.scale_factor());
             self.ui.set_size(size.width as i32, size.height as i32, scale);
         }
     }
@@ -177,12 +177,16 @@ impl ApplicationHandler for App {
         if self.gfx.is_some() {
             return;
         }
-        // The smallest window the layout fits at scale 1, in logical pixels:
-        // on a HiDPI display the UI's scale and the window grow together.
-        let (min_width, min_height) = ordrumbox_ui::min_window_size(1, true);
+        // The first window holds the layout at scale 1, in logical pixels: on
+        // a HiDPI display the UI's scale and the window grow together. A
+        // smaller window scrolls.
+        let (layout_width, layout_height) = ordrumbox_ui::min_window_size(Scale::ONE, true);
+        let initial = LogicalSize::new(
+            INITIAL_SIZE.width.max(f64::from(layout_width)),
+            INITIAL_SIZE.height.max(f64::from(layout_height)),
+        );
+        let (min_width, min_height) = ordrumbox_ui::MIN_WINDOW;
         let min_size = LogicalSize::new(f64::from(min_width), f64::from(min_height));
-        let initial =
-            LogicalSize::new(INITIAL_SIZE.width.max(min_size.width), INITIAL_SIZE.height.max(min_size.height));
         let attributes = Window::default_attributes()
             .with_title(format!("orDrumbox {}", ordrumbox_ui::BUILD))
             .with_min_inner_size(min_size)
@@ -214,7 +218,8 @@ impl ApplicationHandler for App {
                 }
                 false
             }
-            WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. } => true,
+            WindowEvent::Resized(_) => true,
+            WindowEvent::ScaleFactorChanged { .. } => true,
             WindowEvent::ModifiersChanged(state) => {
                 self.ui.set_modifiers(modifiers(state.state()));
                 false

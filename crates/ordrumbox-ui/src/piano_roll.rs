@@ -7,6 +7,7 @@
 //!
 //! [`RollLayout`] places everything; drawing and mouse hit-testing both use it.
 
+use crate::scale::Scale;
 use ordrumbox_core::note_positions::{SubKind, SubPosition};
 use ordrumbox_core::steps::absolute_step;
 use ordrumbox_core::track::MAX_STEPS_PER_BEAT;
@@ -162,7 +163,7 @@ pub enum RollHit {
 /// Where the piano roll's parts are.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RollLayout {
-    scale: i32,
+    scale: Scale,
     /// The title line.
     pub title: Rect,
     /// The page buttons.
@@ -178,7 +179,7 @@ pub struct RollLayout {
 impl RollLayout {
     /// The piano roll on a `width` × `height` window (`width` without the
     /// track editor), for a track of `spb` steps per beat.
-    pub fn new(width: i32, height: i32, scale: i32, status_lines: usize, spb: i32) -> Self {
+    pub fn new(width: i32, height: i32, scale: Scale, status_lines: usize, spb: i32) -> Self {
         let s = scale;
         let margin = 16 * s;
         let top = frame::body_top(scale);
@@ -241,7 +242,7 @@ impl RollLayout {
         if step < start || step >= end || !self.shown_row(view, row) {
             return None;
         }
-        let s = self.scale.max(1);
+        let s = self.scale.px();
         let (x, y) = (self.step_x(view, step), self.row_y(view.top_row, row));
         Some(Rect::new(x + s, y + s, self.cell - 2 * s, self.row - 2 * s))
     }
@@ -318,7 +319,13 @@ pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &s
         let black = BLACK_KEYS.contains(&midi.rem_euclid(12));
         let c = midi.rem_euclid(12) == 0;
         let k = layout.keys;
-        canvas.fill_rect(k.x, y, k.w - s, layout.row - s, if black { key_black_color() } else { key_white_color() });
+        canvas.fill_rect(
+            k.x,
+            y,
+            k.w - s.px(),
+            layout.row - s.px(),
+            if black { key_black_color() } else { key_white_color() },
+        );
         if c {
             canvas.text(
                 k.x + k.w - 8 * s - text_width(&midi_name(midi), s),
@@ -336,7 +343,7 @@ pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &s
             if black { row_black_color() } else { row_white_color() },
         );
         if c {
-            canvas.fill_rect(layout.grid.x, y + layout.row - s, width, s, octave_color());
+            canvas.fill_rect(layout.grid.x, y + layout.row - s.px(), width, s.px(), octave_color());
         }
     }
     let grid_h = (view.top_row - first_row + 1) * layout.row;
@@ -350,11 +357,11 @@ pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &s
         } else {
             column_step_color()
         };
-        canvas.fill_rect(layout.step_x(view, step), layout.grid.y, s, grid_h, color);
+        canvas.fill_rect(layout.step_x(view, step), layout.grid.y, s.px(), grid_h, color);
     }
     // The loop point.
     if let Some(loop_length) = view.track.loop_length.map(i64::from).filter(|&l| l > start && l <= end) {
-        canvas.fill_rect(layout.step_x(view, loop_length) - s, layout.grid.y, 2 * s, grid_h, LOOP_MARK);
+        canvas.fill_rect(layout.step_x(view, loop_length) - s.px(), layout.grid.y, 2 * s, grid_h, LOOP_MARK);
     }
 
     // Ghosts, then notes.
@@ -367,7 +374,7 @@ pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &s
             }
             let (x, y) = (layout.step_x(view, sub.step), layout.row_y(view.top_row, ghost_row));
             let color = if sub.kind == SubKind::Euclidean { GHOST_EUCLIDEAN } else { GHOST_RETRIGGER };
-            stroke(canvas, Rect::new(x + s, y + s, layout.cell - 2 * s, layout.row - 2 * s), s, color);
+            stroke(canvas, Rect::new(x + s.px(), y + s.px(), layout.cell - 2 * s, layout.row - 2 * s), s.px(), color);
         }
     }
     for n in 0..view.track.notes.len() {
@@ -392,7 +399,7 @@ pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &s
             canvas.fill_rect(r.x, r.y, r.w, 2 * s, trig);
         }
         if view.selected == Some(n) {
-            stroke(canvas, r, s.max(1) * 2, SELECTED);
+            stroke(canvas, r, s.px() * 2, SELECTED);
         }
     }
     // The cursor, when no note is selected.
@@ -454,7 +461,7 @@ mod tests {
     fn hit_testing_matches_the_drawing() {
         let library = library();
         let track = &library.patterns[0].tracks[0];
-        let layout = RollLayout::new(1100, 680, 1, 0, 4);
+        let layout = RollLayout::new(1100, 680, Scale::ONE, 0, 4);
         // Track BASS is an octave down: its C is MIDI 48, row 36.
         let row = note_row(&track.notes[0], track);
         assert_eq!(row, 36);
@@ -480,7 +487,7 @@ mod tests {
 
     #[test]
     fn scroll_stays_on_the_keyboard() {
-        let layout = RollLayout::new(1100, 680, 1, 0, 4);
+        let layout = RollLayout::new(1100, 680, Scale::ONE, 0, 4);
         let rows = layout.visible_rows();
         assert!(rows < TOTAL_KEYS);
         assert_eq!(layout.centered_top(0), rows - 1);
@@ -504,7 +511,7 @@ mod tests {
         for (w, h) in [(1, 1), (40, 30), (1100, 680)] {
             let mut pixels = vec![0; w * h];
             let mut canvas = Canvas::new(&mut pixels, w, h);
-            let layout = RollLayout::new(w as i32, h as i32, 1, 1, 4);
+            let layout = RollLayout::new(w as i32, h as i32, Scale::ONE, 1, 4);
             for page in [0, 1] {
                 draw(&mut canvas, &view(track, page, layout.centered_top(40)), &layout, "Piano Roll - BASS");
             }

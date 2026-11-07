@@ -3,9 +3,9 @@
 //! (play and stop, position, tempo), the library saved in the host's
 //! project, and parameters a host automates (`params.rs`).
 //!
-//! MIDI: a note in plays the track of the pattern that has its key, at its
-//! velocity, on any channel; the notes the pattern plays go out on channel
-//! 10, each track on that same key (`ordrumbox_engine::midi`).
+//! MIDI: the notes the pattern plays go out where a note in plays them:
+//! drums on channel 10 at their GM key, the other tracks each on a channel
+//! of its own at the note's pitch (`ordrumbox_engine::midi`).
 //!
 //! Threads: the host's audio thread runs [`AudioSide::render_synced`]; the
 //! player thread ([`player::Ticker`]) builds and posts passes; the host's GUI
@@ -137,8 +137,8 @@ impl Plugin for Ordrumbox {
             (Some(audio), [left, right, ..]) => {
                 audio.set_host_controls(self.params.volume.value(), self.params.muted_tracks());
                 while let Some(event) = context.next_event() {
-                    if let NoteEvent::NoteOn { timing, note, velocity, .. } = event {
-                        audio.trigger(note, velocity, timing);
+                    if let NoteEvent::NoteOn { timing, channel, note, velocity, .. } = event {
+                        audio.trigger(channel, note, velocity, timing);
                     }
                 }
                 audio.render_synced(left, right, host);

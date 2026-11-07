@@ -8,6 +8,7 @@
 //!
 //! [`SongLayout`] places everything; drawing and mouse hit-testing both use it.
 
+use crate::scale::Scale;
 use ordrumbox_core::{Pattern, Song};
 
 use crate::canvas::{Canvas, Rgb, text_width};
@@ -165,7 +166,7 @@ pub enum SongHit {
 /// Where the song panel's parts are.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SongLayout {
-    scale: i32,
+    scale: Scale,
     /// The pattern list.
     pub list: Rect,
     /// The selected pattern's description: its title line, then its frame.
@@ -177,7 +178,7 @@ pub struct SongLayout {
 }
 
 impl SongLayout {
-    pub fn new(width: i32, height: i32, scale: i32, status_lines: usize) -> Self {
+    pub fn new(width: i32, height: i32, scale: Scale, status_lines: usize) -> Self {
         let s = scale;
         let margin = 16 * s;
         let top = frame::body_top(scale);
@@ -444,14 +445,14 @@ fn draw_list(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
         let edge = if to > from { to + 1 } else { to };
         if (first..=first + shown).contains(&edge) {
             let y = r.y + (edge - first) as i32 * LIST_ROW * s - 2 * s;
-            canvas.fill_rect(r.x - 2 * s, y - s, names_right - r.x + 2 * s, 2 * s, ACCENT);
+            canvas.fill_rect(r.x - 2 * s, y - s.px(), names_right - r.x + 2 * s, 2 * s, ACCENT);
         }
     }
     if total > shown {
         let bar = layout.scroll_bar(Axis::List);
         canvas.fill_rect(bar.x, bar.y, bar.w, bar.h, cell_color());
         let (start, len) = layout.thumb(Axis::List, first, shown, total);
-        canvas.fill_rect(bar.x + s, start, bar.w - 2 * s, len, theme::muted());
+        canvas.fill_rect(bar.x + s.px(), start, bar.w - 2 * s, len, theme::muted());
     }
 }
 
@@ -466,9 +467,12 @@ fn draw_description(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     }
     canvas.text(d.x, d.y, &fit("Pattern description", d.w, s), s, theme::muted());
     let f = layout.description_frame();
-    for (x, y, w, h) in
-        [(f.x, f.y, f.w, s), (f.x, f.y + f.h - s, f.w, s), (f.x, f.y, s, f.h), (f.x + f.w - s, f.y, s, f.h)]
-    {
+    for (x, y, w, h) in [
+        (f.x, f.y, f.w, s.px()),
+        (f.x, f.y + f.h - s.px(), f.w, s.px()),
+        (f.x, f.y, s.px(), f.h),
+        (f.x + f.w - s.px(), f.y, s.px(), f.h),
+    ] {
         canvas.fill_rect(x, y, w, h, line_color());
     }
     let (x, top) = (f.x + DESCRIPTION_PAD * s, f.y + DESCRIPTION_PAD * s);
@@ -535,7 +539,7 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
         } else {
             cell_color()
         };
-        canvas.fill_rect(x, layout.ruler_top(), layout.measure_width() - s, HEADER_HEIGHT * s - s, color);
+        canvas.fill_rect(x, layout.ruler_top(), layout.measure_width() - s.px(), HEADER_HEIGHT * s - s.px(), color);
         let label = (m + 1).to_string();
         let tx = x + (layout.measure_width() - text_width(&label, s)) / 2;
         let text = if m == current {
@@ -551,7 +555,7 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     // Rows: the name in the frozen column, a line under each.
     for (k, row) in view.rows.iter().enumerate().skip(first_row).take(shown_rows) {
         let y = layout.row_y(k, first_row);
-        canvas.fill_rect(g.x, y + layout.row_height() - s, layout.label_width() + body_w, s, line_color());
+        canvas.fill_rect(g.x, y + layout.row_height() - s.px(), layout.label_width() + body_w, s.px(), line_color());
         let name = fit(&row.name, layout.label_width() - 6 * s, s);
         canvas.text(
             g.x,
@@ -564,7 +568,13 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     // Measure lines, every fourth brighter.
     for m in first_measure..=first_measure + shown_measures {
         let x = layout.measure_x(f64::from(m), first_measure);
-        canvas.fill_rect(x - s, layout.body_top(), s, body_h, if m % 4 == 0 { major_color() } else { cell_color() });
+        canvas.fill_rect(
+            x - s.px(),
+            layout.body_top(),
+            s.px(),
+            body_h,
+            if m % 4 == 0 { major_color() } else { cell_color() },
+        );
     }
 
     // A clip takes its row's colour; the one dragged is over the others.
@@ -592,7 +602,7 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     if let Some((from, to)) = view.row_drop.filter(|&(from, to)| from != to) {
         let edge = if to > from { to + 1 } else { to };
         if (first_row..=first_row + shown_rows).contains(&edge) {
-            let y = layout.row_y(edge, first_row) - s;
+            let y = layout.row_y(edge, first_row) - s.px();
             canvas.fill_rect(g.x, y, layout.label_width() + body_w, 2 * s, ACCENT);
         }
     }
@@ -600,7 +610,7 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     // The cursor: where the song plays, else (dimmer) where play starts.
     if (f64::from(first_measure)..f64::from(first_measure + shown_measures)).contains(&cursor_measure) {
         let x = layout.measure_x(cursor_measure, first_measure);
-        canvas.fill_rect(x - s, layout.body_top(), 2 * s, body_h, if view.playing { CURSOR } else { CURSOR_IDLE });
+        canvas.fill_rect(x - s.px(), layout.body_top(), 2 * s, body_h, if view.playing { CURSOR } else { CURSOR_IDLE });
     }
 
     // The scroll bars: what is shown, over the whole arrangement.
@@ -614,8 +624,8 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
         let (start, len) = layout.thumb(axis, first, shown, total);
         let color = if total > shown { theme::muted() } else { line_color() };
         match axis {
-            Axis::Measures => canvas.fill_rect(start, r.y + s, len, r.h - 2 * s, color),
-            Axis::Rows | Axis::List => canvas.fill_rect(r.x + s, start, r.w - 2 * s, len, color),
+            Axis::Measures => canvas.fill_rect(start, r.y + s.px(), len, r.h - 2 * s, color),
+            Axis::Rows | Axis::List => canvas.fill_rect(r.x + s.px(), start, r.w - 2 * s, len, color),
         }
     }
 }
@@ -652,7 +662,7 @@ fn wrap(text: &str, chars: usize) -> Vec<String> {
 }
 
 /// Text cut to `width` pixels.
-fn fit(text: &str, width: i32, scale: i32) -> String {
+fn fit(text: &str, width: i32, scale: Scale) -> String {
     let chars = crate::canvas::chars_in(width, scale);
     text.chars().take(chars).collect()
 }
@@ -703,7 +713,7 @@ mod tests {
             description: Some("x"),
             description_scroll: 0,
         };
-        let layout = SongLayout::new(1100, 680, 1, 0);
+        let layout = SongLayout::new(1100, 680, Scale::ONE, 0);
         let (mw, rh) = (layout.measure_width(), layout.row_height());
         let in_row = |row: usize| layout.body_top() + row as i32 * rh + rh / 2;
         let at_measure = |m: i32| layout.body_left() + m * mw + mw / 2;
@@ -751,7 +761,7 @@ mod tests {
         for (w, h) in [(1, 1), (40, 30), (1100, 680)] {
             let mut pixels = vec![0; w * h];
             let mut canvas = Canvas::new(&mut pixels, w, h);
-            let layout = SongLayout::new(w as i32, h as i32, 1, 1);
+            let layout = SongLayout::new(w as i32, h as i32, Scale::ONE, 1);
             for (song, playing) in [(library.songs.first(), true), (empty.songs.first(), false), (None, false)] {
                 let view = SongView {
                     patterns: vec!["a".into(); 40],

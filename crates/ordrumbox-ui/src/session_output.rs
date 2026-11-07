@@ -3,6 +3,7 @@
 //! `settings.json` half a second after the last change,
 //! the tabs, the spectrum of what plays.
 
+use crate::scale::Scale;
 use ordrumbox_engine::{MasterSettings, SCOPE_SIZE};
 
 use super::*;
@@ -74,7 +75,7 @@ impl Session {
     }
 
     /// The output strip's controls: the tabs, then the tab's knobs and sliders.
-    pub(super) fn output_items(&self, layout: &mut session_panel::PanelLayout, width: i32, band: Rect, scale: i32) {
+    pub(super) fn output_items(&self, layout: &mut session_panel::PanelLayout, width: i32, band: Rect, scale: Scale) {
         let out = OutputLayout::strip(width, band, scale);
         for (i, (rect, label)) in out.tabs.iter().zip(output::TABS).enumerate() {
             let kind = Kind::Tab { label: label.into(), active: usize::from(self.output_panel.tab) == i };
@@ -146,7 +147,7 @@ mod tests {
     use super::*;
     use crate::kits::KitSet;
 
-    const SIZE: (i32, i32, i32) = (1100, 680, 1);
+    const SIZE: (i32, i32, Scale) = (1100, 680, Scale::ONE);
 
     #[test]
     fn knobs_tabs_and_the_compressor_button() {
@@ -155,7 +156,7 @@ mod tests {
         // The output strip is always shown along the bottom.
         let out = {
             let band = s.body(SIZE).output;
-            OutputLayout::strip(SIZE.0, band, 1)
+            OutputLayout::strip(SIZE.0, band, Scale::ONE)
         };
         // Vol: the wheel on the volume knob.
         let (x, y) = (out.volume.x + out.volume.w / 2, out.volume.y + 10);
@@ -176,7 +177,7 @@ mod tests {
         // Flt: a click on the low cut slider's bar.
         s.mouse_down(SIZE, out.tabs[2].x + 4, out.tabs[2].y + 4, Button::Left, false);
         let f = out.filters[0];
-        let (left, w) = crate::panel::slider_bar(f, true, true, 1);
+        let (left, w) = crate::panel::slider_bar(f, true, true, Scale::ONE);
         s.mouse_down(SIZE, left + w, f.y + 8, Button::Left, false);
         s.mouse_up();
         assert_eq!(s.output_panel.master.lowcut, 500.0);

@@ -3,6 +3,7 @@
 //! page, the panels shown, the VU levels. Undo, saving and playback never
 //! touch it.
 
+use crate::scale::Scale;
 use std::path::PathBuf;
 
 use super::{Overlay, Widgets, menu, session_grid};
@@ -31,17 +32,19 @@ pub(super) struct Chrome {
     /// A track pressed by its name, that may be dragged to another row.
     pub(super) track_drag: Option<session_grid::TrackDrag>,
     /// Window size and scale of the last mouse or key event on the widgets.
-    pub(super) panel_size: (i32, i32, i32),
+    pub(super) panel_size: (i32, i32, Scale),
     /// Current page of the pattern grid (BEATS_PER_PAGE beats).
     pub(super) current_page: usize,
     /// The track editor (and its note editor) shown on the right.
     pub(super) show_track_editor: bool,
     /// Whether the VU meter stripe is shown.
     pub(super) show_vus: bool,
-    /// The display's scale factor (≥ 1).
-    pub(super) display_scale: i32,
-    /// Whole scales added to the display's (Ctrl++, Ctrl+-; `session_zoom.rs`).
+    /// The display's scale factor (at least ×1), to the nearest quarter.
+    pub(super) display_scale: Scale,
+    /// Quarters of a scale unit added to the display's (Ctrl++, Ctrl+-; `session_zoom.rs`).
     pub(super) zoom: i32,
+    /// The window's size in physical pixels, which "Zoom: fit to window" fits.
+    pub(super) window: (i32, i32),
     /// Smoothed per-track levels for the VU meter stripe.
     track_levels: Vec<f32>,
 }
@@ -56,12 +59,13 @@ impl Default for Chrome {
             hover: None,
             control_hover: None,
             track_drag: None,
-            panel_size: (0, 0, 1),
+            panel_size: (0, 0, Scale::ONE),
             current_page: 0,
             show_track_editor: true,
             show_vus: true,
-            display_scale: 1,
+            display_scale: Scale::ONE,
             zoom: 0,
+            window: (0, 0),
             track_levels: Vec::new(),
         }
     }

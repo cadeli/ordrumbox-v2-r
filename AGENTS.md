@@ -144,8 +144,9 @@ assets/           data/*.json and kits/**.wav, read at runtime
   appears or goes, an analysis still running, a playing or stopped transport.
   A block that can be empty keeps its place (drawn empty or greyed out); a
   text that varies in length gets a fixed width and is fitted to it.
-- The window's minimum size (`view::min_window_size`,
-  `TRACK_EDITOR_HEIGHT`) covers the tallest state, not the most common one.
+- The layout's size (`view::min_window_size`, `TRACK_EDITOR_HEIGHT`) covers
+  the tallest state, not the most common one. A window smaller than it
+  (down to `MIN_WINDOW`, `scroll.rs`) scrolls; the layout never shrinks.
   A test that changes the state checks that the rects under it stay put
   (`editors.rs`, `the_rows_stay_put_without_a_sample`).
 

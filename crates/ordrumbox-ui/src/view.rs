@@ -5,6 +5,7 @@
 //!
 //! [`Layout`] places everything; drawing and mouse hit-testing both use it.
 
+use crate::scale::Scale;
 use ordrumbox_core::steps::absolute_step;
 use ordrumbox_core::track::MAX_STEPS_PER_BEAT;
 use ordrumbox_core::{Note, Pattern, Track};
@@ -157,7 +158,7 @@ pub struct KitView<'a> {
 /// Where the kit editor's parts are.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct KitLayout {
-    scale: i32,
+    scale: Scale,
     top: i32,
     list_top: i32,
     bottom: i32,
@@ -171,7 +172,7 @@ pub struct KitLayout {
 }
 
 impl KitLayout {
-    pub fn new(width: i32, height: i32, scale: i32, status_lines: usize) -> Self {
+    pub fn new(width: i32, height: i32, scale: Scale, status_lines: usize) -> Self {
         let margin = margin(scale);
         let top = body_top(scale);
         let bottom = footer_top(height, scale, status_lines) - margin / 2;
@@ -252,7 +253,7 @@ const ADD_TRACK_LABEL: &str = "+ NEW TRACK";
 /// Where the track rows are.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Layout {
-    scale: i32,
+    scale: Scale,
     /// Top of the first row, height of a row, bottom of the grid area.
     top: i32,
     row: i32,
@@ -271,12 +272,12 @@ pub struct Layout {
 }
 
 /// Text scale of the header (the 8 px font at 16 px per scale unit).
-fn header_text(scale: i32) -> i32 {
-    2 * scale
+fn header_text(scale: Scale) -> Scale {
+    scale.times(2)
 }
 
 /// The header's pattern list and kit list (`PatternNav`'s two selects).
-pub fn header_selects(scale: i32) -> (Rect, Rect) {
+pub fn header_selects(scale: Scale) -> (Rect, Rect) {
     let c = header_controls(scale);
     (c.pattern, c.kit)
 }
@@ -312,7 +313,7 @@ pub const MACROS: [(&str, &str); 3] = [
 /// and the kit editor.
 pub const VIEWS: [&str; 5] = ["GRID", "ROLL", "SONG", "SYNTH", "KIT"];
 
-pub fn header_controls(scale: i32) -> HeaderControls {
+pub fn header_controls(scale: Scale) -> HeaderControls {
     let s = scale;
     let (margin, top) = (margin(scale), content_top(scale));
     let y = top + 11 * s;
@@ -336,15 +337,22 @@ pub fn header_controls(scale: i32) -> HeaderControls {
 }
 
 /// Height of the output strip always shown along the bottom of the window.
-pub fn output_height(scale: i32) -> i32 {
+pub fn output_height(scale: Scale) -> i32 {
     88 * scale
 }
 
 /// The height the track editor and its note editor take at most, at scale 1:
-/// the Gen tab's Advanced settings on a track in auto mode, under the
-/// sample bar (kept even without a sample). A test checks
-/// that every tab fits in it.
-pub const TRACK_EDITOR_HEIGHT: i32 = 523;
+/// the Gen tab's Advanced settings on a track in auto mode, under its simple
+/// part as tall as a drum track's compose view, under the sample bar (kept
+/// even without a sample). The note editor sits under it whatever the tab.
+/// A test checks that every tab fits in it.
+pub const TRACK_EDITOR_HEIGHT: i32 = 577;
+
+/// The pixels the track editor's rows add up to beyond `TRACK_EDITOR_HEIGHT *
+/// scale` at a scale of an odd number of quarters (×1.25, ×1.75…): each row
+/// is rounded to the pixel on its own. A test checks every scale up to
+/// [`Scale::MAX`].
+const TRACK_EDITOR_ROUNDING: i32 = 11;
 
 /// The footer status lines the smallest window leaves room for.
 const MIN_STATUS_LINES: usize = 1;
@@ -353,27 +361,14 @@ const MIN_STATUS_LINES: usize = 1;
 /// the header's controls across; down, the header, the tallest track editor,
 /// the output strip (`output`: the app's, a plugin has none) and a footer of
 /// one status line.
-pub fn min_window_size(scale: i32, output: bool) -> (i32, i32) {
+pub fn min_window_size(scale: Scale, output: bool) -> (i32, i32) {
     let views = header_controls(scale).views;
     let width = views[4].x + views[4].w + margin(scale);
     // `Body::new` places the editors' bottom at a fixed distance above the
     // window's bottom edge: at a height of 0 it is minus that distance.
     let below = -Body::new(0, 0, scale, 0, MIN_STATUS_LINES, output).main_bottom;
-    (width, body_top(scale) + TRACK_EDITOR_HEIGHT * scale + below)
-}
-
-/// The scale the window shows at: `scale` (the display's), else the largest
-/// smaller one whose layout fits the window's `width` × `height`, at least 1.
-/// A display at 150 % rounds to 2, which a window under twice the smallest
-/// size cannot hold.
-pub fn fit_scale(width: i32, height: i32, scale: i32, output: bool) -> i32 {
-    (1..=scale.max(1))
-        .rev()
-        .find(|&s| {
-            let (w, h) = min_window_size(s, output);
-            width >= w && height >= h
-        })
-        .unwrap_or(1)
+    let rounding = if scale.quarters() % 2 == 1 { TRACK_EDITOR_ROUNDING } else { 0 };
+    (width, body_top(scale) + TRACK_EDITOR_HEIGHT * scale + rounding + below)
 }
 
 /// How the window is split: one main editor (grid, piano roll, song, synth or
@@ -399,7 +394,7 @@ impl Body {
     /// The split of a `width` × `height` window at `scale`, `right` pixels
     /// wide on the right for the track editor, with `status_lines` footer
     /// lines; `output`: with the output strip (else it is 0 high).
-    pub fn new(width: i32, height: i32, scale: i32, right: i32, status_lines: usize, output: bool) -> Self {
+    pub fn new(width: i32, height: i32, scale: Scale, right: i32, status_lines: usize, output: bool) -> Self {
         let margin = margin(scale);
         let output_h = if output { output_height(scale) } else { 0 };
         let output_bottom = footer_top(height, scale, status_lines) - margin / 2;
@@ -416,7 +411,7 @@ impl Body {
 impl Layout {
     /// The rows of `pattern` on a `width` × `height` screen, with
     /// `status_lines` message lines in the footer.
-    pub fn new(width: i32, height: i32, scale: i32, pattern: &Pattern, status_lines: usize, page: usize) -> Self {
+    pub fn new(width: i32, height: i32, scale: Scale, pattern: &Pattern, status_lines: usize, page: usize) -> Self {
         let margin = margin(scale);
         let top = body_top(scale) + RULER_HEIGHT * scale;
         let bottom = footer_top(height, scale, status_lines) - margin / 2;
@@ -555,7 +550,7 @@ fn steps_per_beat(track: &Track) -> i32 {
 }
 
 /// Draw `view`; `scale` is the integer UI scale (1 on a standard display, 2 on HiDPI).
-pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
+pub fn draw(canvas: &mut Canvas, view: &View, scale: Scale) {
     canvas.clear(background_color());
     let text = header_text(scale);
     let margin = margin(scale);
@@ -575,7 +570,15 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
                 canvas.text(c.pattern.x, top, WAITING_LABEL, scale, color);
                 if on {
                     let r = c.pattern;
-                    stroke(canvas, r.x - scale, r.y - scale, r.w + 2 * scale, r.h + 2 * scale, scale, PLAYING);
+                    stroke(
+                        canvas,
+                        r.x - scale.px(),
+                        r.y - scale.px(),
+                        r.w + 2 * scale,
+                        r.h + 2 * scale,
+                        scale.px(),
+                        PLAYING,
+                    );
                 }
             }
             (None, _) => label(canvas, c.pattern, PATTERN_LABEL),
@@ -612,7 +615,7 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: i32) {
     let mut footer_y = footer_top(canvas.height(), scale, view.status.len()) + 4 * scale;
     // Problems at start: a band of their own, hard to miss, until quit.
     for message in view.status {
-        canvas.fill_rect(0, footer_y - scale, canvas.width(), 10 * scale, WARNING);
+        canvas.fill_rect(0, footer_y - scale.px(), canvas.width(), 10 * scale, WARNING);
         let text: String = format!("! {message}").chars().take(chars_in(canvas.width() - 2 * margin, scale)).collect();
         canvas.text(margin, footer_y, &text, scale, background_color());
         footer_y += 10 * scale;
@@ -682,10 +685,10 @@ fn draw_ruler(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layo
     let dot_y = layout.top - 3 * scale;
     for beat in 0..layout.beats {
         let x = layout.beat_x(beat);
-        canvas.fill_rect(x, y, scale, RULER_HEIGHT * scale - 2 * scale, theme::muted());
+        canvas.fill_rect(x, y, scale.px(), RULER_HEIGHT * scale - 2 * scale, theme::muted());
         for step in 1..spb {
             let sx = layout.step_x(i64::from(beat) * i64::from(spb) + i64::from(step), spb);
-            canvas.fill_rect(sx, dot_y, scale, scale, theme::muted());
+            canvas.fill_rect(sx, dot_y, scale.px(), scale.px(), theme::muted());
         }
         if beat % every == 0 {
             let color = if playing == Some(beat) { PLAYING } else { LABEL };
@@ -696,7 +699,7 @@ fn draw_ruler(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layo
 
 fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layout) {
     let scale = layout.scale;
-    let gap = scale.max(1);
+    let gap = scale.px();
     draw_ruler(canvas, pattern, view, layout);
     for (i, track) in pattern.tracks.iter().enumerate().take(layout.tracks) {
         let y = layout.row_top(i);
@@ -734,7 +737,7 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
         for (solo, on, color, letter) in [(false, mute, mute_color, "M"), (true, track.solo, SOLO_ON, "S")] {
             let x = layout.box_x(solo);
             canvas.fill_rect(x, box_y, layout.box_size, layout.box_size, if on { color } else { box_off_color() });
-            let letter_scale = (layout.box_size / 10).max(1);
+            let letter_scale = Scale::whole((layout.box_size / 10).max(1));
             let inset = (layout.box_size - 8 * letter_scale) / 2;
             canvas.text(
                 x + inset,
@@ -786,24 +789,24 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
         // Where the track lands: above the row it takes moving up, below it moving down.
         let y = layout.row_top(if to > from { to + 1 } else { to });
         let right = layout.grid_left + layout.grid_width;
-        canvas.fill_rect(layout.left - 4 * scale, y - scale, right - layout.left + 4 * scale, 2 * scale, ACCENT);
+        canvas.fill_rect(layout.left - 4 * scale, y - scale.px(), right - layout.left + 4 * scale, 2 * scale, ACCENT);
     }
 
     if let Some(fraction) = view.playhead {
         let x = layout.grid_left + (fraction.clamp(0.0, 1.0) * f64::from(layout.grid_width)) as i32;
         let height = (layout.tracks as i32 * layout.row).min(layout.bottom - layout.top) - gap;
-        canvas.fill_rect(x - scale, layout.top, 2 * scale, height, PLAYHEAD);
+        canvas.fill_rect(x - scale.px(), layout.top, 2 * scale, height, PLAYHEAD);
     }
 }
 
 /// The hover bubble over a note (`pp-tooltip`): centered above `cell`, kept in the window.
-pub fn draw_tooltip(canvas: &mut Canvas, text: &str, cell: Rect, scale: i32) {
+pub fn draw_tooltip(canvas: &mut Canvas, text: &str, cell: Rect, scale: Scale) {
     draw_tooltip_lines(canvas, &[text], cell, scale);
 }
 
 /// A bubble of several lines over `cell`: above it, or below it when there
 /// is no room above, kept in the window.
-pub fn draw_tooltip_lines<S: AsRef<str>>(canvas: &mut Canvas, lines: &[S], cell: Rect, scale: i32) {
+pub fn draw_tooltip_lines<S: AsRef<str>>(canvas: &mut Canvas, lines: &[S], cell: Rect, scale: Scale) {
     let line_h = 10 * scale;
     let widest = lines.iter().map(|l| text_width(l.as_ref(), scale)).max().unwrap_or(0);
     let (w, h) = (widest + 12 * scale, lines.len() as i32 * line_h + 4 * scale);
@@ -811,14 +814,14 @@ pub fn draw_tooltip_lines<S: AsRef<str>>(canvas: &mut Canvas, lines: &[S], cell:
     let above = cell.y - h - 4 * scale;
     let y = if above >= 0 { above } else { (cell.y + cell.h + 4 * scale).min((canvas.height() - h).max(0)) };
     canvas.fill_rect(x, y, w, h, theme::line());
-    canvas.fill_rect(x + scale, y + scale, w - 2 * scale, h - 2 * scale, theme::shade());
+    canvas.fill_rect(x + scale.px(), y + scale.px(), w - 2 * scale, h - 2 * scale, theme::shade());
     for (i, line) in lines.iter().enumerate() {
         canvas.text(x + 6 * scale, y + 3 * scale + i as i32 * line_h, line.as_ref(), scale, theme::text());
     }
 }
 
 /// A panel over the window: a title and lines of text (the key list, about).
-pub fn draw_notice(canvas: &mut Canvas, title: &str, lines: &[String], scale: i32) {
+pub fn draw_notice(canvas: &mut Canvas, title: &str, lines: &[String], scale: Scale) {
     draw_notice_part(canvas, title, lines, lines, scale);
 }
 
@@ -826,14 +829,14 @@ pub fn draw_notice(canvas: &mut Canvas, title: &str, lines: &[String], scale: i3
 const NOTICE_LINE: i32 = 11;
 
 /// How many lines a notice shows at most in a window `height` pixels high.
-pub fn notice_rows(height: i32, scale: i32) -> usize {
+pub fn notice_rows(height: i32, scale: Scale) -> usize {
     let room = height - menu::bar_height(scale) - 24 * scale;
     usize::try_from(room / (NOTICE_LINE * scale) - 3).unwrap_or(0).max(1)
 }
 
 /// A notice too long for the window, from line `scroll` on: as many lines
 /// as fit, the title saying which and how to see the others.
-pub fn draw_notice_scrolled(canvas: &mut Canvas, title: &str, lines: &[String], scroll: usize, scale: i32) {
+pub fn draw_notice_scrolled(canvas: &mut Canvas, title: &str, lines: &[String], scroll: usize, scale: Scale) {
     let rows = notice_rows(canvas.height(), scale);
     if lines.len() <= rows {
         return draw_notice(canvas, title, lines, scale);
@@ -844,7 +847,7 @@ pub fn draw_notice_scrolled(canvas: &mut Canvas, title: &str, lines: &[String], 
 }
 
 /// A notice showing `lines`, as wide as the widest of `all`.
-fn draw_notice_part(canvas: &mut Canvas, title: &str, lines: &[String], all: &[String], scale: i32) {
+fn draw_notice_part(canvas: &mut Canvas, title: &str, lines: &[String], all: &[String], scale: Scale) {
     let line_h = NOTICE_LINE * scale;
     let close = "ESC or click: close";
     // The title shares its line with `close`.
@@ -855,7 +858,7 @@ fn draw_notice_part(canvas: &mut Canvas, title: &str, lines: &[String], all: &[S
     let y = ((canvas.height() - height) / 2).max(menu::bar_height(scale));
     canvas.fill_rect(x - 4 * scale, y - 4 * scale, width + 8 * scale, height + 8 * scale, theme::shade());
     canvas.fill_rect(x, y, width, height, theme::line());
-    canvas.fill_rect(x + scale, y + scale, width - 2 * scale, height - 2 * scale, theme::panel());
+    canvas.fill_rect(x + scale.px(), y + scale.px(), width - 2 * scale, height - 2 * scale, theme::panel());
     canvas.text(x + 16 * scale, y + 10 * scale, title, scale, ACCENT);
     for (i, line) in lines.iter().enumerate() {
         canvas.text(x + 16 * scale, y + 10 * scale + (i as i32 + 2) * line_h, line, scale, theme::text());
@@ -910,7 +913,7 @@ fn draw_kit(canvas: &mut Canvas, kit: &KitView, layout: &KitLayout) {
     }
     if let Some(ratio) = kit.decay_marker {
         let mx = x + (ratio.clamp(0.0, 1.0) * f64::from(width - 1)) as i32;
-        canvas.fill_rect(mx, y, scale.max(1), height, PLAYHEAD);
+        canvas.fill_rect(mx, y, scale.px(), height, PLAYHEAD);
     }
 }
 
@@ -949,7 +952,7 @@ fn note_color(note: &Note) -> Rgb {
 
 /// One track's steps, its notes lit by velocity, the cursor and the selection.
 fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &View, layout: &Layout) {
-    let gap = layout.scale.max(1);
+    let gap = layout.scale.px();
     let spb = steps_per_beat(track);
     let steps = i64::from(layout.beats) * i64::from(spb);
     let start = i64::from(layout.start_beat) * i64::from(spb);
@@ -1097,17 +1100,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_scale_drops_to_the_largest_whose_layout_fits() {
-        let (w, h) = min_window_size(1, true);
-        assert_eq!(min_window_size(2, true), (2 * w, 2 * h));
-        // A display at 150 % rounds to 2: a window 1.5 times the smallest shows at 1.
-        assert_eq!(fit_scale(w * 3 / 2, h * 3 / 2, 2, true), 1);
-        assert_eq!(fit_scale(2 * w, 2 * h, 2, true), 2);
-        assert_eq!(fit_scale(2 * w, 2 * h - 1, 2, true), 1);
-        // Smaller than the smallest window: 1 all the same.
-        assert_eq!(fit_scale(w / 2, h / 2, 1, true), 1);
+    fn whole_scales_need_whole_multiples_of_the_smallest_window() {
+        let (w, h) = min_window_size(Scale::ONE, true);
+        assert_eq!(min_window_size(Scale::whole(2), true), (2 * w, 2 * h));
         // Without the output strip (a plugin) the layout needs less height.
-        assert!(min_window_size(1, false).1 < h);
+        assert!(min_window_size(Scale::ONE, false).1 < h);
     }
     use ordrumbox_core::Library;
 
@@ -1150,7 +1147,7 @@ mod tests {
                 message: "hello",
                 status: &["warning".into()],
             };
-            draw(&mut canvas, &view, 1);
+            draw(&mut canvas, &view, Scale::ONE);
         }
     }
 
@@ -1176,7 +1173,7 @@ mod tests {
     fn the_ruler_sits_above_the_rows_and_its_beats_start_their_cells() {
         let library = library();
         let pattern = library.patterns.first().unwrap();
-        for scale in [1, 2] {
+        for scale in [Scale::ONE, Scale::from_quarters(6), Scale::whole(2)] {
             let layout = Layout::new(1100 * scale, 688 * scale, scale, pattern, 0, 0);
             assert_eq!(layout.top, body_top(scale) + RULER_HEIGHT * scale);
             assert_eq!(layout.hit(pattern, layout.grid_left + 2, layout.top - 2), None, "the ruler is not a row");
@@ -1191,7 +1188,7 @@ mod tests {
     fn body_splits_the_window_above_the_output_strip() {
         let library = library();
         let pattern = library.patterns.first().unwrap();
-        for scale in [1, 2] {
+        for scale in [Scale::ONE, Scale::from_quarters(6), Scale::whole(2)] {
             for (w, h) in [(1100, 680), (1280, 800)] {
                 for status in [0, 1, 3] {
                     for right in [0, 300 * scale] {
@@ -1234,9 +1231,9 @@ mod tests {
                 envelope: &envelope,
                 decay_marker: Some(0.5),
             };
-            draw_kit(&mut canvas, &kit, &KitLayout::new(w as i32, h as i32, 1, 0));
+            draw_kit(&mut canvas, &kit, &KitLayout::new(w as i32, h as i32, Scale::ONE, 0));
         }
-        let layout = KitLayout::new(1024, 640, 1, 0);
+        let layout = KitLayout::new(1024, 640, Scale::ONE, 0);
         assert_eq!(layout.hit(0, 40, layout.left + 2, layout.list_top + 1), Some(0));
         assert_eq!(layout.hit(0, 1, layout.left + 2, layout.list_top + layout.row + 1), None);
         assert_eq!(layout.hit(0, 40, layout.left + 2, layout.detail_y), None);
@@ -1246,7 +1243,7 @@ mod tests {
     fn hit_testing_matches_the_drawing() {
         let library = library();
         let pattern = &library.patterns[0];
-        let layout = Layout::new(1024, 640, 1, pattern, 0, 0);
+        let layout = Layout::new(1024, 640, Scale::ONE, pattern, 0, 0);
         let y = layout.row_top(2) + layout.row / 2;
         assert_eq!(layout.hit(pattern, layout.box_x(false) + 1, y), Some(Hit::Mute(2)));
         assert_eq!(layout.hit(pattern, layout.box_x(true) + 1, y), Some(Hit::Solo(2)));

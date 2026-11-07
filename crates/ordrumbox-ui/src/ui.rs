@@ -3,12 +3,14 @@
 //! [`crate::ui_input`] and calls these; each says whether the window must be
 //! redrawn.
 
+use crate::scale::Scale;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
 use crate::canvas::Canvas;
 use crate::frame;
 use crate::menu::{self, Command};
+use crate::scroll::{Scroll, Viewport};
 use crate::session::{Button, Move, OverlayKey, PanelKey, Session};
 use crate::ui_input::{Key, KeyEvent, Modifiers, ScrollDelta};
 use crate::view::{self, KitLayout};
@@ -62,28 +64,54 @@ pub struct Ui {
     pointer: (f64, f64),
     /// The window's size in physical pixels.
     window: (i32, i32),
+    /// The display's scale, which the scrollbars are drawn at.
+    display: Scale,
+    /// The part of the UI the window shows when it cannot show it all.
+    scroll: Scroll,
     /// Alt is down and no other key was pressed since.
     alt_alone: bool,
 }
 
 impl Ui {
     pub fn new(session: Session) -> Self {
-        Self { session, modifiers: Modifiers::default(), pointer: (0.0, 0.0), window: (0, 0), alt_alone: false }
+        Self {
+            session,
+            modifiers: Modifiers::default(),
+            pointer: (0.0, 0.0),
+            window: (0, 0),
+            display: Scale::ONE,
+            scroll: Scroll::default(),
+            alt_alone: false,
+        }
     }
 
     /// The window's size in physical pixels and the display's scale factor
     /// (≥ 1), which the zoom starts from (`session_zoom.rs`).
-    pub fn set_size(&mut self, width: i32, height: i32, scale: i32) {
+    pub fn set_size(&mut self, width: i32, height: i32, scale: Scale) {
         self.window = (width, height);
+        self.display = scale;
         self.session.set_display_scale(scale);
+        self.session.set_window_size(width, height);
     }
 
-    /// The window's size in physical pixels and the scale the UI shows at:
-    /// the zoomed one, or a smaller one when the window cannot hold the
-    /// layout at it ([`view::fit_scale`]).
-    fn size(&self) -> (i32, i32, i32) {
-        let (width, height) = self.window;
-        (width, height, self.session.fit_scale(width, height))
+    /// How a window of `window` pixels shows the UI at its zoom: whole, or
+    /// a part with scrollbars.
+    fn viewport(&self, window: (i32, i32)) -> Viewport {
+        let needed = view::min_window_size(self.session.wanted_scale(), !self.session.hosted());
+        Viewport::new(window, needed, self.display)
+    }
+
+    /// The UI's size in physical pixels (the window's, or the layout's when
+    /// it scrolls) and the scale it shows at: the zoomed one, whatever the
+    /// window's size.
+    fn size(&self) -> (i32, i32, Scale) {
+        let (width, height) = self.viewport(self.window).content;
+        (width, height, self.session.wanted_scale())
+    }
+
+    /// The pointer in the UI's pixels.
+    fn at(&self) -> (i32, i32) {
+        self.scroll.to_content((self.pointer.0 as i32, self.pointer.1 as i32))
     }
 
     pub fn set_modifiers(&mut self, modifiers: Modifiers) {
@@ -92,9 +120,20 @@ impl Ui {
 
     /// Draw the window, `pixels` holding `width × height` `0x00RRGGBB` pixels.
     pub fn draw(&mut self, pixels: &mut [u32], width: usize, height: usize) {
-        let scale = self.size().2;
-        self.session.set_size((width as i32, height as i32, scale));
-        self.session.draw(&mut Canvas::new(pixels, width, height), scale);
+        let scale = self.session.wanted_scale();
+        // A window's size: well within `i32`.
+        let viewport = self.viewport((width as i32, height as i32));
+        self.scroll.fit(&viewport);
+        let (content_w, content_h) = viewport.content;
+        self.session.set_size((content_w, content_h, scale));
+        if !viewport.scrolls() {
+            self.session.draw(&mut Canvas::new(pixels, width, height), scale);
+            return;
+        }
+        let content = self.scroll.content_buffer(&viewport);
+        let (w, h) = (content_w.unsigned_abs() as usize, content_h.unsigned_abs() as usize);
+        self.session.draw(&mut Canvas::new(content, w, h), scale);
+        self.scroll.show(&viewport, pixels, width, height);
     }
 
     /// Between events: MCP calls, autosave, audio errors, update checks and
@@ -117,9 +156,13 @@ impl Ui {
 
     /// A button pressed at the pointer.
     pub fn pointer_pressed(&mut self, button: Button) -> bool {
+        let window = (self.pointer.0 as i32, self.pointer.1 as i32);
+        if button == Button::Left && self.scroll.press(&self.viewport(self.window), window) {
+            return true;
+        }
         let size = self.size();
         let (width, height, scale) = size;
-        let (x, y) = (self.pointer.0 as i32, self.pointer.1 as i32);
+        let (x, y) = self.at();
         let shift = self.modifiers.shift;
         let s = &mut self.session;
         // An open list or number entry takes the click; the right button is the widgets'.
@@ -189,6 +232,9 @@ impl Ui {
         if button != Button::Left {
             return false;
         }
+        if self.scroll.release() {
+            return true;
+        }
         let redraw = self.session.song_release(self.size()) | self.session.track_release(self.size());
         self.session.mouse_up();
         redraw
@@ -197,9 +243,12 @@ impl Ui {
     /// The pointer moved to `(x, y)`, in physical pixels.
     pub fn pointer_moved(&mut self, x: f64, y: f64) -> bool {
         self.pointer = (x, y);
+        if self.scroll.dragging() {
+            return self.scroll.drag_to(&self.viewport(self.window), (x as i32, y as i32));
+        }
         let hovered_menu = self.hover();
         let size = self.size();
-        let (x, y) = (x as i32, y as i32);
+        let (x, y) = self.at();
         let moved = self.session.mouse_move(size, x, y, self.modifiers.shift);
         let hovered = self.session.grid_hover(size, x, y)
             | self.session.control_hover(size, x, y)
@@ -211,10 +260,11 @@ impl Ui {
     /// The pointer moved: an open menu follows it.
     fn hover(&mut self) -> bool {
         let scale = self.size().2;
+        let (x, y) = self.at();
         let s = &mut self.session;
         let Some(open) = s.open_menu() else { return false };
         let menus = s.menus();
-        let next = match menu::hit(&menus, Some(open), scale, self.pointer.0 as i32, self.pointer.1 as i32) {
+        let next = match menu::hit(&menus, Some(open), scale, x, y) {
             Some(menu::Hit::Title(i)) if i != open.menu => menu::Open::new(&menus, i, false),
             Some(menu::Hit::Item(i)) => menu::Open { item: Some(i), ..open },
             Some(menu::Hit::Title(_)) => open,
@@ -238,12 +288,14 @@ impl Ui {
             return true;
         }
         let size = self.size();
-        let (x, y) = (self.pointer.0 as i32, self.pointer.1 as i32);
+        let (x, y) = self.at();
         let m = self.modifiers;
         let (fine, coarse) = (m.shift || m.alt, m.command());
+        // What the pointer is over first; the view scrolls with what is left.
         self.session.wheel(size, x, y, lines, fine, coarse)
             || self.session.song_wheel(size, x, y, (columns, lines), m.shift)
             || self.session.roll_wheel(size, x, y, lines, m.shift)
+            || self.scroll.wheel(&self.viewport(self.window), (columns, lines), self.display)
     }
 
     /// A file or folder dropped on the window.
@@ -584,6 +636,30 @@ mod tests {
             assert_eq!(shortcut(Key::Letter(letter), false, false), None, "{letter} alone");
             assert!(shift_hint(Key::Letter(letter)).is_some(), "{letter} says to hold Shift");
         }
+    }
+
+    #[test]
+    fn a_zoom_bigger_than_the_window_scrolls_it() {
+        let library =
+            ordrumbox_core::Library::parse(r#"{"patterns":[{"name":"demo","tracks":[{"name":"KICK"}]}]}"#).unwrap().0;
+        let mut ui = Ui::new(Session::for_tests(library, false));
+        let (w, h) = view::min_window_size(Scale::ONE, true);
+        ui.set_size(w, h, Scale::ONE);
+        ui.session.run(Command::ZoomIn);
+        ui.session.run(Command::ZoomIn);
+        let mut pixels = vec![0; (w * h) as usize];
+        ui.draw(&mut pixels, w as usize, h as usize);
+        let viewport = ui.viewport((w, h));
+        assert!(viewport.scrolls(), "the UI at ×1.5 is drawn whole, the window shows a part");
+        assert_eq!(ui.session.wanted_scale(), Scale::from_quarters(6), "the zoom asked for, not one that fits");
+        // The vertical bar's thumb, dragged to the bottom: the window shows the UI's bottom.
+        let bar_x = f64::from(viewport.view.0 + 2);
+        ui.pointer_moved(bar_x, 4.0);
+        assert!(ui.pointer_pressed(Button::Left));
+        assert!(ui.pointer_moved(bar_x, f64::from(h)));
+        assert!(ui.pointer_released(Button::Left));
+        ui.pointer_moved(0.0, 0.0);
+        assert_eq!(ui.at().1, viewport.content.1 - viewport.view.1);
     }
 
     #[test]

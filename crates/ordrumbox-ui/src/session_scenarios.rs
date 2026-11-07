@@ -6,6 +6,7 @@
 //! The session gets a real [`Controller`]; its audio side is rendered here as
 //! the audio callback would, with `update` before each callback as the UI does.
 
+use crate::scale::Scale;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -344,7 +345,7 @@ fn an_edit_in_auto_mode_goes_on_the_loop_being_heard_and_stays() {
 
 // ─── A whole session ────────────────────────────────────────────────────────
 
-const WINDOW: (i32, i32, i32) = (1100, 680, 1);
+const WINDOW: (i32, i32, Scale) = (1100, 680, Scale::ONE);
 
 /// One frame of the window, as the UI thread draws it after each event.
 fn draw(s: &mut Session) {
