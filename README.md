@@ -77,8 +77,14 @@ Parameters the host automates: **Pattern** and **Kit** (by number, from 1), **Vo
 (master, -60 to +6 dB), **Swing** (50 % straight to 75 %: in each pair of steps, where the
 second one starts, on every track with an even number of steps per beat, on top of the
 track's own swing), and for tracks 1–16 **Mute**, **Volume** (a gain on the track's own,
--60 to +6 dB) and **Pan** (added to the track's own). They change what plays, not the
-library.
+-60 to +6 dB), **Pan** (added to the track's own), **Cutoff** (moves the filter's
+cutoff by up to ±4 octaves), **Q** (added to the filter's), **Reverb**, **Delay** and
+**Saturation** (added to the effect's amount, kept within 0 to 1; with the effect's LED
+off, the track's amount counts as 0), **Feedback** (added to the delay's, up to 0.95; a
+slap delay keeps its single echo) and **Transpose** (±24 semitones on the notes played,
+MIDI input included, not on the MIDI notes sent out). At their defaults they change
+nothing. A filter of type `allpass`, and a reverb or delay of type `none`, stay off.
+They change what plays, not the library.
 
 MIDI goes both ways, with one place per track of the pattern playing (or selected):
 a drum track is on channel 10 at its instrument's GM key (KICK 36, SNARE 38…), whatever
@@ -148,6 +154,11 @@ The triangle LFO now stays between its min and max, starting at min like the
 sine; it used to swing over twice that range. This rewrote `synth_renders.bin`
 (dsp), `mapping_rust.txt` and `synth_editor_rust.txt` (engine) and
 `midi_rust.txt` (logic).
+
+A track's delay is now set up (time, mode, feedback) even when its amount is 0, and
+the strip has a `reverb_on` and a `delay_on` flag (0 for the `none` types), so that a
+plugin host can raise an effect the pattern leaves silent. This rewrote
+`mapping_rust.txt` (engine); the audio renders are unchanged.
 
 ## License
 

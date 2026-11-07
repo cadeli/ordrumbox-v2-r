@@ -62,6 +62,8 @@ audio_params! {
         reverb_room = 0.5, 0.0, 1.0;
         reverb_damping = 0.5, 0.0, 1.0;
         reverb_width = 1.0, 0.0, 1.0;
+        /// 0 skips the reverb (the `none` reverb type), 1 lets `reverb_mix` through.
+        reverb_on = 1.0, 0.0, 1.0;
         reverb_mix = 0.0, 0.0, 1.0;
         /// Seconds before the reverb's input enters it.
         reverb_predelay = 0.0, 0.0, 0.1;
@@ -74,6 +76,8 @@ audio_params! {
         delay_time_l = 0.25, 0.0, 2.0;
         delay_time_r = 0.25, 0.0, 2.0;
         delay_feedback = 0.4, 0.0, 0.99;
+        /// 0 skips the delay (the `none` delay type), 1 lets `delay_mix` through.
+        delay_on = 1.0, 0.0, 1.0;
         delay_mix = 0.0, 0.0, 1.0;
         /// 0 and 1 each side repeats itself, 2 the sides feed each other
         /// (ping-pong).
@@ -362,8 +366,8 @@ impl Strip {
         let damp2 = 1.0 - damp1;
         let width1 = reverb_width * 0.5 + 0.5;
         let width2 = (1.0 - reverb_width) * 0.5;
-        let has_reverb = reverb_mix > 0.001;
-        let has_delay = delay_mix > 0.001;
+        let has_reverb = s.reverb_on > 0.5 && reverb_mix > 0.001;
+        let has_delay = s.delay_on > 0.5 && delay_mix > 0.001;
         let has_sat = saturation_mix > 0.0;
         let ping_pong = delay_mode > 1.5;
 

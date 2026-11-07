@@ -46,6 +46,11 @@ fn reverb_preset(name: &str) -> Option<ReverbPreset> {
     })
 }
 
+/// The saturation drive added at full amount, over 1.
+const SATURATION_DRIVE_RANGE: f64 = 6.0;
+/// The output level taken off at full amount, to make up for the drive.
+const SATURATION_OUTPUT_DROP: f64 = 0.15;
+
 /// Longest delay the strip holds, seconds (its `delay_time_*` range).
 const MAX_DELAY_SECONDS: f64 = 2.0;
 /// Wow depth (seconds) and feedback tone of the `tape` delay.
@@ -78,9 +83,18 @@ fn filter_slope(db_per_octave: f64) -> f32 {
     if db_per_octave >= 18.0 { 24.0 } else { 12.0 }
 }
 
+/// The strip's `delay_mode` of the slap delay, which plays one echo.
+const SLAP_MODE: f32 = 0.0;
+
+/// Whether `s` plays a slap delay (one echo, no feedback).
+#[must_use]
+pub fn is_slap(s: &StripSettings) -> bool {
+    s.delay_mode < 0.5
+}
+
 fn delay_mode(name: &str) -> Option<f32> {
     Some(match name {
-        "slap" => 0.0,
+        "slap" => SLAP_MODE,
         "tape" => 1.0,
         "pingpong" => 2.0,
         _ => return None,
@@ -116,9 +130,7 @@ pub fn strip_settings(track: &Track, bpm: f64) -> StripSettings {
         "tape" => 2.0,
         _ => 0.0,
     };
-    s.saturation_drive = (1.0 + amount * 6.0) as f32;
-    s.saturation_output = (1.0 - amount * 0.15) as f32;
-    s.saturation_mix = if amount > 0.0 { 1.0 } else { 0.0 };
+    set_saturation(&mut s, amount);
 
     // Reverb.
     let amount = if track.reverb_on { finite_or(track.reverb_mix, 0.0).clamp(0.0, 1.0) } else { 0.0 };
@@ -131,11 +143,18 @@ pub fn strip_settings(track: &Track, bpm: f64) -> StripSettings {
         s.reverb_dispersion = p.dispersion;
         s.reverb_gate = p.gate;
     }
-    s.reverb_mix = if reverb == "none" { 0.0 } else { amount as f32 };
+    if reverb == "none" {
+        s.reverb_on = 0.0;
+        s.reverb_mix = 0.0;
+    } else {
+        s.reverb_mix = amount as f32;
+    }
 
-    // Delay: 'none' or no amount only silences the send.
+    // Delay: 'none' skips it. Without an amount it is still set up, silent,
+    // for a plugin host to raise.
     let amount = if track.delay_on { finite_or(track.delay_mix, 0.0).clamp(0.0, 1.0) } else { 0.0 };
-    if track.delay_type == "none" || amount <= 0.0 {
+    if track.delay_type == "none" {
+        s.delay_on = 0.0;
         s.delay_mix = 0.0;
     } else {
         let mode = delay_mode(&track.delay_type).unwrap_or(1.0);
@@ -146,7 +165,7 @@ pub fn strip_settings(track: &Track, bpm: f64) -> StripSettings {
         s.delay_mode = mode;
         s.delay_mix = amount as f32;
         s.delay_feedback = finite_or(track.delay_feedback, 0.4).clamp(0.0, 0.95) as f32;
-        if mode < 0.5 {
+        if is_slap(&s) {
             // Slap: one echo.
             s.delay_feedback = 0.0;
         } else if mode < 1.5 {
@@ -167,6 +186,23 @@ pub fn strip_settings(track: &Track, bpm: f64) -> StripSettings {
         s.volume = 0.0;
     }
     s
+}
+
+/// The saturation `amount` (0 to 1) as the strip's drive, output and mix.
+pub fn set_saturation(s: &mut StripSettings, amount: f64) {
+    s.saturation_drive = (1.0 + amount * SATURATION_DRIVE_RANGE) as f32;
+    s.saturation_output = (1.0 - amount * SATURATION_OUTPUT_DROP) as f32;
+    s.saturation_mix = if amount > 0.0 { 1.0 } else { 0.0 };
+}
+
+/// The saturation amount (0 to 1) `s` was set to by [`set_saturation`].
+#[must_use]
+pub fn saturation_amount(s: &StripSettings) -> f64 {
+    if s.saturation_mix > 0.0 {
+        ((f64::from(s.saturation_drive) - 1.0) / SATURATION_DRIVE_RANGE).clamp(0.0, 1.0)
+    } else {
+        0.0
+    }
 }
 
 fn finite_or(x: f64, fallback: f64) -> f64 {
@@ -243,6 +279,23 @@ mod tests {
         let s = strip_settings(&track, 120.0);
         assert_eq!((s.delay_time_l, s.delay_time_r, s.delay_mode, s.delay_mix), (0.25, 0.25, 2.0, 0.4));
         assert_eq!((s.delay_mono_in, s.delay_feedback), (1.0, 0.4));
+    }
+
+    #[test]
+    fn a_delay_without_amount_is_set_up_silent_and_none_is_off() {
+        let silent = strip_settings(&Track { delay_beats: 0.5, delay_mix: 0.0, ..Track::default() }, 120.0);
+        assert_eq!((silent.delay_on, silent.delay_mix, silent.delay_time_l), (1.0, 0.0, 0.25));
+        let none = Track { delay_type: "none".into(), reverb_type: "none".into(), delay_mix: 0.5, ..Track::default() };
+        let none = strip_settings(&none, 120.0);
+        assert_eq!((none.delay_on, none.delay_mix, none.reverb_on, none.reverb_mix), (0.0, 0.0, 0.0, 0.0));
+    }
+
+    #[test]
+    fn the_saturation_amount_reads_back() {
+        let mut s = StripSettings::default();
+        assert_eq!(saturation_amount(&s), 0.0);
+        set_saturation(&mut s, 0.25);
+        assert_eq!((s.saturation_drive, s.saturation_mix, saturation_amount(&s)), (2.5, 1.0, 0.25));
     }
 
     #[test]

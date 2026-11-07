@@ -17,6 +17,7 @@ use ordrumbox_dsp::{MasterBus, MasterSettings, SampleVoice, Strip, StripSettings
 use crate::kit::SampleBank;
 use crate::midi::{BlockNote, CHANNEL_COUNT, KEY_COUNT, KeyMap, MidiNote, NoteOut};
 use crate::pass::{Event, Pass, Sound};
+use crate::strip_settings::{is_slap, saturation_amount, set_saturation};
 
 /// Sample voices playing at once; the oldest is cut when a new one needs a slot.
 pub const MAX_VOICES: usize = 64;
@@ -87,26 +88,84 @@ fn held_index(note: MidiNote) -> Option<usize> {
     (channel < CHANNEL_COUNT && key < KEY_COUNT).then_some(channel * KEY_COUNT + key)
 }
 
-/// Tracks a plugin host mixes (a gain and a pan each), from the first.
+/// Tracks a plugin host changes ([`HostTrack`]), from the first.
 pub const HOST_TRACKS: usize = 16;
 
 /// A plugin host's mix, on top of the pattern's, reached through the
-/// volume and pan ramps.
+/// strips' ramps.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HostMix {
     /// A gain on the master volume (linear).
     pub gain: f32,
     /// The tracks muted: bit `t` for track `t`.
     pub muted: u64,
-    /// A gain on the volume of each of the first tracks (linear).
-    pub track_gains: [f32; HOST_TRACKS],
-    /// Added to the pan of each of the first tracks, the sum kept within -1 to 1.
-    pub track_pans: [f32; HOST_TRACKS],
+    /// The changes to each of the first tracks.
+    pub tracks: [HostTrack; HOST_TRACKS],
 }
 
 impl Default for HostMix {
     fn default() -> Self {
-        Self { gain: 1.0, muted: 0, track_gains: [1.0; HOST_TRACKS], track_pans: [0.0; HOST_TRACKS] }
+        Self { gain: 1.0, muted: 0, tracks: [HostTrack::default(); HOST_TRACKS] }
+    }
+}
+
+/// A plugin host's changes to one track, on top of its own settings: at
+/// their defaults, none. The effect amounts are added to the track's (0 when
+/// its LED is off) and kept within 0 to 1; an effect whose type is `none`,
+/// or a filter of type `allpass`, stays off.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct HostTrack {
+    /// A gain on the volume (linear).
+    pub gain: f32,
+    /// Added to the pan, the sum kept within -1 to 1.
+    pub pan: f32,
+    /// Octaves the filter cutoff moves by.
+    pub cutoff_octaves: f32,
+    /// Added to the filter's Q.
+    pub q: f32,
+    /// Added to the reverb amount.
+    pub reverb: f32,
+    /// Added to the delay amount.
+    pub delay: f32,
+    /// Added to the delay feedback (kept within 0 to 0.95; a slap delay has none).
+    pub feedback: f32,
+    /// Added to the saturation amount.
+    pub saturation: f32,
+    /// Semitones the notes started move by (not the MIDI notes sent).
+    pub transpose: i32,
+}
+
+impl Default for HostTrack {
+    fn default() -> Self {
+        Self {
+            gain: 1.0,
+            pan: 0.0,
+            cutoff_octaves: 0.0,
+            q: 0.0,
+            reverb: 0.0,
+            delay: 0.0,
+            feedback: 0.0,
+            saturation: 0.0,
+            transpose: 0,
+        }
+    }
+}
+
+/// The highest delay feedback a host can reach (the editor's).
+const HOST_FEEDBACK_MAX: f32 = 0.95;
+
+/// What a [`HostTrack`] multiplies, computed when the host's mix changes.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct HostRatios {
+    cutoff: f32,
+    pitch: f64,
+}
+
+impl HostRatios {
+    const NONE: Self = Self { cutoff: 1.0, pitch: 1.0 };
+
+    fn of(track: &HostTrack) -> Self {
+        Self { cutoff: track.cutoff_octaves.exp2(), pitch: (f64::from(track.transpose) / 12.0).exp2() }
     }
 }
 
@@ -115,15 +174,46 @@ impl HostMix {
     /// muted, else scaled by the track's gain.
     #[must_use]
     fn volume(&self, volume: f32, track: usize) -> f32 {
-        if host_muted(self.muted, track) { 0.0 } else { volume * self.track_gains.get(track).copied().unwrap_or(1.0) }
+        if host_muted(self.muted, track) { 0.0 } else { volume * self.tracks.get(track).map_or(1.0, |t| t.gain) }
     }
 
-    /// The pan the strip of `track`, at `pan`, goes to.
+    /// The settings the strip of `track`, at `target`, goes to, its cutoff
+    /// multiplied by `ratios.cutoff`.
     #[must_use]
-    fn pan(&self, pan: f32, track: usize) -> f32 {
-        self.track_pans.get(track).map_or(pan, |offset| (pan + offset).clamp(-1.0, 1.0))
+    fn strip(&self, target: &StripSettings, track: usize, ratios: &HostRatios) -> StripSettings {
+        let mut s = *target;
+        s.volume = self.volume(target.volume, track);
+        let Some(host) = self.tracks.get(track) else { return s };
+        let add = |value: f32, offset: f32, max: f32| (value + offset).clamp(0.0, max);
+        s.pan = (s.pan + host.pan).clamp(-1.0, 1.0);
+        if ratios.cutoff != 1.0 {
+            s.cutoff = (s.cutoff * ratios.cutoff).clamp(MIN_CUTOFF, MAX_CUTOFF);
+        }
+        if host.q != 0.0 {
+            s.q = (s.q + host.q).clamp(MIN_Q, MAX_Q);
+        }
+        if host.reverb != 0.0 {
+            s.reverb_mix = add(s.reverb_mix, host.reverb, 1.0);
+        }
+        if host.delay != 0.0 {
+            s.delay_mix = add(s.delay_mix, host.delay, 1.0);
+        }
+        if host.feedback != 0.0 && !is_slap(&s) {
+            s.delay_feedback = add(s.delay_feedback, host.feedback, HOST_FEEDBACK_MAX);
+        }
+        if host.saturation != 0.0 {
+            let amount = (saturation_amount(&s) + f64::from(host.saturation)).clamp(0.0, 1.0);
+            set_saturation(&mut s, amount);
+        }
+        s
     }
 }
+
+/// The filter's range, as the strip takes it.
+const MIN_CUTOFF: f32 = ordrumbox_dsp::MIN_FILTER_FREQ as f32;
+const MAX_CUTOFF: f32 = ordrumbox_dsp::MAX_FILTER_FREQ as f32;
+const MIN_Q: f32 = 0.707;
+const MAX_Q: f32 = 18.707;
 
 /// Where playback is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -195,6 +285,8 @@ pub struct Engine {
     master_target: MasterSettings,
     /// A plugin host's mix.
     host: HostMix,
+    /// What its tracks' changes multiply.
+    host_ratios: [HostRatios; HOST_TRACKS],
     /// `exp(-quantum / τ)` for each ramp.
     keep: [f32; 3],
     idle_quanta: u32,
@@ -241,6 +333,7 @@ impl Engine {
             master_current: MasterSettings::default(),
             master_target: MasterSettings::default(),
             host: HostMix::default(),
+            host_ratios: [HostRatios::NONE; HOST_TRACKS],
             keep: [RAMP_FX, RAMP_MIX, RAMP_LFO].map(|tau| (-quantum_seconds / tau).exp()),
             idle_quanta: (IDLE_SECONDS / quantum_seconds).ceil() as u32,
             keymap: None,
@@ -273,7 +366,29 @@ impl Engine {
 
     /// A plugin host's mix, for the blocks to come.
     pub fn set_host_mix(&mut self, mix: HostMix) {
+        // The ratios cost an `exp2` each: computed only for a track that changed.
+        for ((ratios, new), old) in self.host_ratios.iter_mut().zip(&mix.tracks).zip(&self.host.tracks) {
+            if new != old {
+                *ratios = HostRatios::of(new);
+            }
+        }
         self.host = mix;
+    }
+
+    /// The pitch ratio a plugin host gives the notes of `track`.
+    fn host_pitch(&self, track: usize) -> f64 {
+        self.host_ratios.get(track).map_or(1.0, |r| r.pitch)
+    }
+
+    /// The settings the strip of `track` goes to, the host's changes on top
+    /// of the track's.
+    fn host_target(
+        host: &HostMix,
+        ratios: &[HostRatios; HOST_TRACKS],
+        channel: &Channel,
+        track: usize,
+    ) -> StripSettings {
+        host.strip(&channel.target, track, ratios.get(track).unwrap_or(&HostRatios::NONE))
     }
 
     /// Start playing `pass` from its first frame; its strip settings apply at once.
@@ -287,9 +402,7 @@ impl Engine {
     /// The first `count` strips at their targets at once, as the host mixes them.
     fn settle_strips(&mut self, count: usize) {
         for (track, channel) in self.channels[..count].iter_mut().enumerate() {
-            channel.current = channel.target;
-            channel.current.volume = self.host.volume(channel.target.volume, track);
-            channel.current.pan = self.host.pan(channel.target.pan, track);
+            channel.current = Self::host_target(&self.host, &self.host_ratios, channel, track);
         }
     }
 
@@ -539,16 +652,16 @@ impl Engine {
         out_left.fill(0.0);
         out_right.fill(0.0);
         let [keep_fx, keep_mix, keep_lfo] = self.keep;
-        let host = &self.host;
+        let (host, ratios) = (&self.host, &self.host_ratios);
         for (track, channel) in self.channels[..strips].iter_mut().enumerate() {
-            let target = channel.target;
+            let target = Self::host_target(host, ratios, channel, track);
             let before = channel.current;
             channel.current.approach(&target, keep_fx);
             let ramp = |from: f32, to: f32, keep: f32| to + (from - to) * keep;
             let [lfo_volume, lfo_pan, lfo_cutoff, lfo_q] = channel.lfo;
             let mix_or_lfo = |lfo: bool| if lfo { keep_lfo } else { keep_mix };
-            channel.current.volume = ramp(before.volume, host.volume(target.volume, track), mix_or_lfo(lfo_volume));
-            channel.current.pan = ramp(before.pan, host.pan(target.pan, track), mix_or_lfo(lfo_pan));
+            channel.current.volume = ramp(before.volume, target.volume, mix_or_lfo(lfo_volume));
+            channel.current.pan = ramp(before.pan, target.pan, mix_or_lfo(lfo_pan));
             if lfo_cutoff {
                 channel.current.cutoff = ramp(before.cutoff, target.cutoff, keep_lfo);
             }
@@ -653,6 +766,7 @@ impl Engine {
         if track >= MAX_TRACKS {
             return;
         }
+        let ratio = ratio * self.host_pitch(track);
         let now_seconds = self.seconds(now);
         if event.mono {
             for voice in self.voices.iter_mut().filter(|v| v.is_active() && v.track() == track) {
@@ -852,10 +966,53 @@ mod tests {
         assert_eq!(level(mixed(|m| m.muted = 0b10), 2000), full, "another track's mute changes nothing");
         // The master's 20 ms ramp has settled after 0.25 s.
         assert!((level(mixed(|m| m.gain = 0.5), 12_000) / level(HostMix::default(), 12_000) - 0.5).abs() < 1e-3);
-        let half = level(mixed(|m| m.track_gains[0] = 0.5), 2000);
+        let half = level(mixed(|m| m.tracks[0].gain = 0.5), 2000);
         assert!((half / full - 0.5).abs() < 1e-3, "a track's gain scales it: {half} / {full}");
-        assert_eq!(level(mixed(|m| m.track_gains[1] = 0.0), 2000), full, "another track's gain changes nothing");
-        assert!(level(mixed(|m| m.track_pans[0] = 1.0), 0) < 1e-3, "panned right, from the start");
+        assert_eq!(level(mixed(|m| m.tracks[1].gain = 0.0), 2000), full, "another track's gain changes nothing");
+        assert!(level(mixed(|m| m.tracks[0].pan = 1.0), 0) < 1e-3, "panned right, from the start");
+    }
+
+    #[test]
+    fn the_host_moves_the_effects_of_its_tracks_and_leaves_the_rest() {
+        let ratios = |host: &HostMix, t: usize| HostRatios::of(&host.tracks[t]);
+        let target = StripSettings { cutoff: 1000.0, delay_mode: 1.0, ..StripSettings::default() };
+        let none = HostMix::default();
+        assert_eq!(none.strip(&target, 0, &ratios(&none, 0)), target, "the defaults change nothing");
+        let mut host = HostMix::default();
+        host.tracks[0] = HostTrack {
+            cutoff_octaves: 1.0,
+            q: 2.0,
+            reverb: 0.5,
+            delay: 2.0,
+            feedback: 0.25,
+            saturation: 0.5,
+            ..HostTrack::default()
+        };
+        let s = host.strip(&target, 0, &ratios(&host, 0));
+        assert_eq!((s.cutoff, s.q), (2000.0, 2.707));
+        assert_eq!((s.reverb_mix, s.delay_mix, s.delay_feedback), (0.5, 1.0, 0.65), "amounts kept within 0 to 1");
+        assert_eq!((s.saturation_drive, s.saturation_mix), (4.0, 1.0));
+        assert_eq!(saturation_amount(&s), 0.5);
+        assert_eq!(host.strip(&target, 1, &ratios(&host, 1)), target, "another track changes nothing");
+        let slap = StripSettings { delay_mode: 0.0, delay_feedback: 0.0, ..target };
+        assert_eq!(host.strip(&slap, 0, &ratios(&host, 0)).delay_feedback, 0.0, "a slap has one echo");
+        host.tracks[0].cutoff_octaves = 8.0;
+        assert_eq!(host.strip(&target, 0, &ratios(&host, 0)).cutoff, MAX_CUTOFF);
+    }
+
+    #[test]
+    fn the_host_transposes_the_notes_of_its_tracks() {
+        // Frames a 100-frame sample sounds, at a host transpose of `semitones`.
+        let sounding = |semitones: i32| {
+            let mut engine = engine();
+            let mut host = HostMix::default();
+            host.tracks[0].transpose = semitones;
+            engine.set_host_mix(host);
+            engine.play(pass(0, &[0], 48_000));
+            render(&mut engine, 400).iter().filter(|s| s.abs() > 0.01).count()
+        };
+        let (straight, octave_up) = (sounding(0), sounding(12));
+        assert!(straight >= 95 && octave_up.abs_diff(straight / 2) <= 4, "{straight} then {octave_up} frames");
     }
 
     #[test]
