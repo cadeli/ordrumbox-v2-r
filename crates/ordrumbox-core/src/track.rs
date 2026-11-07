@@ -99,6 +99,10 @@ json_record! {
         saturation_type: String = "soft".to_owned() => "saturationType",
         saturation_mix: f64 = 0.0 => "saturationMix" | "saturationAmount",
         saturation_on: bool = true => "saturationOn" | "sat",
+        /// Bitcrusher amount, 0–1, in the saturation's panel (its LED counts).
+        bitcrush: f64 = 0.0 => "bitcrush",
+        /// Hard clipper amount, 0–1, in the saturation's panel (its LED counts).
+        hard_clip: f64 = 0.0 => "hardClip",
         reverb_on: bool = true => "reverbOn",
         delay_on: bool = true => "delayOn",
         /// Synth preset played when `use_synth` is on.
@@ -122,7 +126,7 @@ json_record! {
 }
 
 /// `TRACK_VALUE_RANGES`: bounds of the numeric settings an edit clamps to.
-const VALUE_RANGES: [(&str, f64, f64); 39] = [
+const VALUE_RANGES: [(&str, f64, f64); 41] = [
     ("volume", 0.0, 1.0),
     ("pan", -1.0, 1.0),
     ("transpose", -24.0, 24.0),
@@ -139,6 +143,8 @@ const VALUE_RANGES: [(&str, f64, f64); 39] = [
     ("delayMix", 0.0, 1.0),
     ("delayFeedback", 0.0, 0.95),
     ("saturationMix", 0.0, 1.0),
+    ("bitcrush", 0.0, 1.0),
+    ("hardClip", 0.0, 1.0),
     ("hitVariation", 0.0, 100.0),
     ("noteVariation", 0.0, 100.0),
     ("autoPitchChance", 0.0, 100.0),
@@ -173,7 +179,7 @@ const AUTO_HIT_VARIATION_FALLBACK: f64 = 60.0;
 const AUTO_NOTE_VARIATION_FALLBACK: f64 = 40.0;
 
 /// Keys written rounded to 2 decimals (`ROUND_2D` in exporter.js).
-const ROUND_2D: [&str; 10] = [
+const ROUND_2D: [&str; 12] = [
     "volume",
     "pan",
     "reverbMix",
@@ -181,6 +187,8 @@ const ROUND_2D: [&str; 10] = [
     "delayFeedback",
     "delayBeats",
     "saturationMix",
+    "bitcrush",
+    "hardClip",
     "swingAmount",
     "filterCutoff",
     "filterQ",

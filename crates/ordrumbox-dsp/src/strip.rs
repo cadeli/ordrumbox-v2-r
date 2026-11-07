@@ -1,6 +1,6 @@
 //! A track's channel strip (`worklets/processors/strip_source.js`): a stereo
 //! TPT state-variable filter (12 dB/oct, or two in series for 24 dB/oct),
-//! saturation, a Freeverb reverb (with a pre-delay, a spring's dispersion and a
+//! saturation, a bitcrusher, a hard clipper, a Freeverb reverb (with a pre-delay, a spring's dispersion and a
 //! gate), a delay (tape wow, ping-pong), then volume and compensated
 //! equal-power pan.
 //!
@@ -35,6 +35,21 @@ const GATE_CLOSE_SECONDS: f64 = 0.01;
 const WOW_HZ: f64 = 0.6;
 /// Bias of the tape saturation: the curve is asymmetric (even harmonics).
 const TAPE_BIAS: f64 = 0.25;
+/// Bit depth of the bitcrusher at the smallest amount, and at full amount.
+const CRUSH_BITS_MAX: f64 = 16.0;
+const CRUSH_BITS_MIN: f64 = 4.0;
+/// Rate the bitcrusher holds samples at, at the smallest amount, Hz; full
+/// amount lowers it by [`CRUSH_OCTAVES`] (to about 1.4 kHz).
+const CRUSH_RATE_HZ: f64 = 44_100.0;
+const CRUSH_OCTAVES: f64 = 5.0;
+/// Gain the hard clipper drives into its ceiling at full amount, dB.
+const CLIP_DRIVE_DB: f64 = 18.0;
+/// The hard clipper's ceiling: −3 dBFS, the peak of a kit sample, so the
+/// clipper adds density, not peak level.
+const CLIP_CEILING: f64 = 0.707_945_784_384_137_9;
+/// Below this step between two samples, the clipper's anti-aliasing takes
+/// the clip of their midpoint (the divided difference would lose precision).
+const CLIP_ADAA_EPSILON: f64 = 1e-6;
 /// Longest delay, seconds (the `dlyTime*` parameters stop at 2).
 const DELAY_SECONDS: f64 = 2.1;
 /// The JS delay line always holds 2.1 s at 48 kHz, whatever the rate.
@@ -59,6 +74,12 @@ audio_params! {
         saturation_drive = 1.0, 1.0, 7.0;
         saturation_output = 1.0, 0.0, 1.0;
         saturation_mix = 0.0, 0.0, 1.0;
+        /// Bitcrusher amount: 0 off; up to 1, fewer bits (16 to 4) and a
+        /// lower rate (44.1 kHz to about 1.4 kHz).
+        crush = 0.0, 0.0, 1.0;
+        /// Hard clipper amount: 0 off; up to 1, a drive of up to
+        /// [`CLIP_DRIVE_DB`] into a ceiling of −3 dBFS, anti-aliased.
+        clip = 0.0, 0.0, 1.0;
         reverb_room = 0.5, 0.0, 1.0;
         reverb_damping = 0.5, 0.0, 1.0;
         reverb_width = 1.0, 0.0, 1.0;
@@ -268,6 +289,25 @@ fn shape(x: f64, drive: f64, kind: f64, mix: f64, out: f64) -> f64 {
     (x * (1.0 - mix) + s * mix) * out
 }
 
+/// Antiderivative of the hard clip at ±1.
+#[inline]
+fn clip_antiderivative(x: f64) -> f64 {
+    if x.abs() <= 1.0 { 0.5 * x * x } else { x.abs() - 0.5 }
+}
+
+/// Hard clip at ±1 with first-order antiderivative anti-aliasing (ADAA):
+/// the clip's mean over the segment from `prev` to `x`, which cuts the
+/// aliasing of a plain clip, at the cost of half a sample of delay.
+#[inline]
+fn clip_adaa(x: f64, prev: f64) -> f64 {
+    let dx = x - prev;
+    if dx.abs() < CLIP_ADAA_EPSILON {
+        (0.5 * (x + prev)).clamp(-1.0, 1.0)
+    } else {
+        (clip_antiderivative(x) - clip_antiderivative(prev)) / dx
+    }
+}
+
 #[inline]
 fn flush(x: &mut f64) {
     if x.abs() < FLUSH {
@@ -298,6 +338,12 @@ pub struct Strip {
     delay_filter_r: f64,
     /// Phase of the wow, cycles.
     wow_phase: f64,
+    /// Phase of the bitcrusher's sample and hold, samples (a new one at 1),
+    /// and the samples held, left and right.
+    crush_phase: f64,
+    crush_hold: [f64; 2],
+    /// The hard clipper's previous input, left and right, over its ceiling.
+    clip_prev: [f64; 2],
 }
 
 impl Strip {
@@ -324,6 +370,9 @@ impl Strip {
             delay_filter_l: 0.0,
             delay_filter_r: 0.0,
             wow_phase: 0.0,
+            crush_phase: 1.0,
+            crush_hold: [0.0; 2],
+            clip_prev: [0.0; 2],
         }
     }
 
@@ -369,6 +418,18 @@ impl Strip {
         let has_reverb = s.reverb_on > 0.5 && reverb_mix > 0.001;
         let has_delay = s.delay_on > 0.5 && delay_mix > 0.001;
         let has_sat = saturation_mix > 0.0;
+        let crush = f64::from(s.crush);
+        let has_crush = crush > 0.0;
+        // Quantization levels on each side of 0, and the hold's phase step.
+        let crush_levels = (CRUSH_BITS_MAX - crush * (CRUSH_BITS_MAX - CRUSH_BITS_MIN) - 1.0).exp2();
+        let crush_step = (CRUSH_RATE_HZ * (-CRUSH_OCTAVES * crush).exp2() / sr).min(1.0);
+        let has_clip = s.clip > 0.0;
+        // Drive into the ceiling, as a gain over the ceiling (the clip is at ±1).
+        let clip_gain = 10_f64.powf(f64::from(s.clip) * CLIP_DRIVE_DB / 20.0) / CLIP_CEILING;
+        if !has_clip {
+            // Turned back on, the clipper starts from silence.
+            self.clip_prev = [0.0; 2];
+        }
         let ping_pong = delay_mode > 1.5;
 
         let p = f64::from(s.pan);
@@ -404,16 +465,35 @@ impl Strip {
             }
 
             // 2. Saturation.
-            let sat_l = if has_sat {
+            let mut sat_l = if has_sat {
                 shape(dry_l, saturation_drive, saturation_type, saturation_mix, saturation_output)
             } else {
                 dry_l
             };
-            let sat_r = if has_sat {
+            let mut sat_r = if has_sat {
                 shape(dry_r, saturation_drive, saturation_type, saturation_mix, saturation_output)
             } else {
                 dry_r
             };
+
+            // 2b. Bitcrusher: a sample and hold, then fewer levels.
+            if has_crush {
+                if self.crush_phase >= 1.0 {
+                    self.crush_phase -= 1.0;
+                    self.crush_hold =
+                        [(sat_l * crush_levels).round() / crush_levels, (sat_r * crush_levels).round() / crush_levels];
+                }
+                self.crush_phase += crush_step;
+                [sat_l, sat_r] = self.crush_hold;
+            }
+
+            // 2c. Hard clipper, last: its ceiling holds.
+            if has_clip {
+                let (u_l, u_r) = (sat_l * clip_gain, sat_r * clip_gain);
+                sat_l = clip_adaa(u_l, self.clip_prev[0]) * CLIP_CEILING;
+                sat_r = clip_adaa(u_r, self.clip_prev[1]) * CLIP_CEILING;
+                self.clip_prev = [u_l, u_r];
+            }
 
             // 3. Reverb.
             let (mut rev_l, mut rev_r) = (0.0, 0.0);
@@ -585,6 +665,59 @@ mod tests {
         assert_eq!(shape(0.0, 4.0, 2.0, 1.0, 1.0), 0.0);
         let (up, down) = (shape(0.5, 4.0, 2.0, 1.0, 1.0), shape(-0.5, 4.0, 2.0, 1.0, 1.0));
         assert!(up > 0.0 && down < 0.0 && (up + down).abs() > 0.05, "{up} {down}");
+    }
+
+    #[test]
+    fn full_crush_holds_samples_on_4_bit_levels() {
+        let input: Vec<f32> = (0..480).map(|i| (f64::from(i) / 480.0 - 0.5) as f32).collect();
+        let crushed = StripSettings { filter_on: 0.0, crush: 1.0, ..StripSettings::default() };
+        let (l, r) = run(&crushed, &input);
+        assert_eq!(l, r);
+        // 4 bits: 8 levels on each side of 0.
+        for x in &l {
+            let level = f64::from(*x) * 8.0;
+            assert!((level - level.round()).abs() < 1e-4, "{x} is not on a level");
+        }
+        // Held at about 1.4 kHz: a new value every 35 frames at 48 kHz.
+        let changes = l.windows(2).filter(|w| w[0] != w[1]).count();
+        assert!((5..=14).contains(&changes), "{changes} changes");
+        let (plain, _) = run(&StripSettings { filter_on: 0.0, ..StripSettings::default() }, &input);
+        assert!(plain.windows(2).filter(|w| w[0] != w[1]).count() > 400, "off: untouched");
+    }
+
+    #[test]
+    fn the_clipper_holds_its_ceiling_and_aliases_less_than_a_plain_clip() {
+        // A loud 5 kHz sine, driven 18 dB into the ceiling.
+        let rate = 48_000.0;
+        let frames = 4_800;
+        let freq = 5_000.0;
+        let input: Vec<f32> = (0..frames).map(|i| (0.7 * (TAU * freq * f64::from(i) / rate).sin()) as f32).collect();
+        let clipped = StripSettings { filter_on: 0.0, clip: 1.0, ..StripSettings::default() };
+        let (l, r) = run(&clipped, &input);
+        assert_eq!(l, r);
+        let peak = l.iter().fold(0.0_f64, |m, x| m.max(f64::from(x.abs())));
+        assert!(peak <= CLIP_CEILING + 1e-6 && peak > CLIP_CEILING - 0.01, "peak {peak}");
+
+        // Energy away from the harmonics of 5 kHz (odd ones fold back
+        // between them), against a plain clip of the same drive.
+        let gain = 10_f64.powf(CLIP_DRIVE_DB / 20.0) / CLIP_CEILING;
+        let plain: Vec<f64> = input.iter().map(|&x| (f64::from(x) * gain).clamp(-1.0, 1.0) * CLIP_CEILING).collect();
+        let ours: Vec<f64> = l.iter().map(|&x| f64::from(x)).collect();
+        let alias = |signal: &[f64]| -> f64 {
+            // 1 kHz bins up to 23 kHz, skipping the multiples of 5 kHz.
+            (1..24)
+                .filter(|k| k % 5 != 0)
+                .map(|k| {
+                    let w = TAU * f64::from(k) * 1_000.0 / rate;
+                    let (re, im) = signal.iter().enumerate().fold((0.0, 0.0), |(re, im), (n, x)| {
+                        (re + x * (w * n as f64).cos(), im - x * (w * n as f64).sin())
+                    });
+                    re * re + im * im
+                })
+                .sum()
+        };
+        let (ours, plain) = (alias(&ours[480..]), alias(&plain[480..]));
+        assert!(ours < plain * 0.5, "aliasing {ours} against {plain}");
     }
 
     #[test]

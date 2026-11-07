@@ -127,6 +127,8 @@ fn setting_help(key: &str) -> Option<Help> {
         "delayFeedback" => ["Feedback", "how much of each echo comes back"],
         "delayType" => ["Delay type", "slap: one echo; tape; pingpong: left and right"],
         "saturationType" => ["Saturation type", "soft, hard or tape drive"],
+        "bitcrush" => ["Bitcrush", "fewer bits and a lower sample rate: lo-fi grit"],
+        "hardClip" => ["Hard clip", "up to +18 dB into a -3 dB ceiling: denser, same peaks"],
         "filterType" => ["Filter type", "lowpass, highpass, bandpass, notch"],
         "filterSlope" => ["Filter slope", "how steeply it cuts, dB per octave"],
         "filterCutoff" => ["Cutoff", "where the filter cuts, in Hz"],
