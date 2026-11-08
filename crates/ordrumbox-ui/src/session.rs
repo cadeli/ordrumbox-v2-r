@@ -259,6 +259,8 @@ pub struct Session {
     status: Vec<String>,
     /// Outcome of the last action.
     message: String,
+    /// The message as last shown, and until when its toast is shown.
+    flash: Flash,
     /// What was done so far, shown by a click on the status line.
     action_log: ActionLog,
     /// The assets folder in use.
@@ -368,6 +370,25 @@ const _: fn() = || {
 impl std::fmt::Debug for Session {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Session").field("pattern_index", &self.pattern_index).finish_non_exhaustive()
+    }
+}
+
+/// How long a new message is shown as a toast.
+const FLASH: Duration = Duration::from_secs(1);
+
+/// The message last shown on the status line, and until when its toast is shown.
+#[derive(Debug, Clone, Default)]
+struct Flash {
+    text: String,
+    until: Option<Instant>,
+}
+
+impl Flash {
+    /// `text` is shown at `now`: it stands out for [`FLASH`], or not at all
+    /// when empty.
+    fn shown(&mut self, text: &str, now: Instant) {
+        self.text = text.to_owned();
+        self.until = (!text.is_empty()).then_some(now + FLASH);
     }
 }
 
@@ -567,6 +588,7 @@ impl Session {
             chrome: Chrome::default(),
             status,
             message: String::new(),
+            flash: Flash::default(),
             action_log: ActionLog::default(),
             assets_dir: None,
             quit: false,
@@ -595,14 +617,53 @@ impl Session {
         self.status.len()
     }
 
-    /// What the last action said.
     /// Show `text` on the status line.
     pub fn say(&mut self, text: &str) {
         self.message = text.into();
     }
 
+    /// What the last action said.
     pub fn message(&self) -> &str {
         &self.message
+    }
+
+    /// Before an input: the message shown, taken away so that what the
+    /// input says, even the same words again, is known as new
+    /// ([`Self::input_done`]).
+    pub(crate) fn input_starts(&mut self) -> String {
+        std::mem::take(&mut self.message)
+    }
+
+    /// After an input: a message it gave stands out; without one, `before`
+    /// (from [`Self::input_starts`]) stays as it was.
+    pub(crate) fn input_done(&mut self, before: String) {
+        if self.message.is_empty() {
+            self.message = before;
+        } else {
+            self.flash.shown(&self.message, Instant::now());
+        }
+    }
+
+    /// A message that changed outside an input (an MCP call, a drag, an
+    /// update check) stands out too.
+    pub(crate) fn note_message(&mut self) {
+        if self.message != self.flash.text {
+            self.flash.shown(&self.message, Instant::now());
+        }
+    }
+
+    /// When the message stops standing out; `None` when it does not.
+    pub(crate) fn flash_until(&self) -> Option<Instant> {
+        self.flash.until
+    }
+
+    /// The message stops standing out if its time is over; whether it did.
+    pub(crate) fn end_flash(&mut self, now: Instant) -> bool {
+        let over = self.flash.until.is_some_and(|until| until <= now);
+        if over {
+            self.flash.until = None;
+        }
+        over
     }
 
     /// The window split for `size` (a real window size): the main editor
@@ -978,6 +1039,7 @@ impl Session {
         // The scheme is per thread: a plugin draws on another than it loads on.
         theme::set_scheme(self.color_scheme);
         self.note_actions();
+        self.note_message();
         let layout = self.panel_layout(canvas.width(), canvas.height(), scale);
         let position = self.playback.position();
         let history = self.editor.history();
@@ -1065,6 +1127,9 @@ impl Session {
         }
         if let Some(entry) = &self.chrome.widgets.entry {
             entry.draw(canvas, scale);
+        }
+        if self.flash.until.is_some() && !self.message.is_empty() {
+            view::draw_toast(canvas, &self.message, canvas.height() - 2 * crate::frame::margin(scale), scale);
         }
         match &self.chrome.overlay {
             Some(Overlay::Picker(p)) => {

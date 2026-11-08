@@ -52,6 +52,17 @@ impl<'a> Canvas<'a> {
         }
     }
 
+    /// Lay `color` over the rectangle at `(x, y)` of size `w × h` at
+    /// `opacity` (0–255), what is under it showing through; parts outside
+    /// the canvas are dropped.
+    pub fn shade_rect(&mut self, x: i32, y: i32, w: i32, h: i32, color: Rgb, opacity: u8) {
+        for row in y.max(0)..y.saturating_add(h).min(self.height as i32) {
+            for col in x.max(0)..x.saturating_add(w).min(self.width as i32) {
+                self.blend(col, row, color, opacity);
+            }
+        }
+    }
+
     /// Draw `text` with its top-left corner at `(x, y)`, one cell of
     /// `font::SIZE × scale` pixels per character, blended over what is there;
     /// returns the x after the last character.
