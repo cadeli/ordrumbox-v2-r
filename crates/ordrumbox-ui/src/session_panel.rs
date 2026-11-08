@@ -151,15 +151,27 @@ impl Session {
             let back = Rect::new(width - right, top - 4 * s, right, bottom - top + 8 * s);
             layout.items.push(Item::new(None, back, Kind::Panel));
             let area = Rect::new(back.x + 10 * s, top, back.w - 20 * s, bottom - top);
+            // Each editor in a card of its own, from `from` to `to`, a few
+            // pixels around its rows.
+            let card = |from: i32, to: i32| {
+                let (x, w) = (back.x + 4 * s, back.w - 8 * s);
+                Item::new(None, Rect::new(x, from - 3 * s, w, to - from + 5 * s), Kind::Card)
+            };
             match self.editor_track().and_then(|t| Some((t, self.track_view(t)?))) {
                 Some((t, view)) => {
                     let (items, y) = editors::track_editor(&view, &self.editors, area, scale);
+                    layout.items.push(card(top, y));
                     layout.items.extend(items);
                     let note = self.note_view(t);
-                    let area = Rect::new(area.x, y + 4 * s, area.w, bottom - y);
+                    let note_top = y + 10 * s;
+                    layout.items.push(card(note_top, bottom));
+                    let area = Rect::new(area.x, note_top, area.w, bottom - note_top);
                     layout.items.extend(editors::note_editor(&note, &self.editors, area, scale));
                 }
-                None => layout.items.push(Item::text(area.x, area.y, "No track", panel::dim(), s)),
+                None => {
+                    layout.items.push(card(top, bottom));
+                    layout.items.push(Item::text(area.x, area.y, "No track", panel::dim(), s));
+                }
             }
         }
         // The output strip along the bottom, in the app only.
@@ -499,7 +511,7 @@ mod tests {
                 let layout = s.panel_layout(width, height, scale);
                 let bottom = (layout.items.iter())
                     .filter(|i| i.rect.x >= width - layout.right && i.rect.y < body.output.y)
-                    .filter(|i| !matches!(i.kind, Kind::Panel))
+                    .filter(|i| !matches!(i.kind, Kind::Panel | Kind::Card))
                     .map(|i| i.rect.y + i.rect.h)
                     .max()
                     .unwrap();

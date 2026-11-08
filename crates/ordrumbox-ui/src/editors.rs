@@ -1266,8 +1266,6 @@ fn note_default(key: &str, min: f64) -> f64 {
 pub fn note_editor(view: &NoteView, state: &EditorState, area: Rect, scale: Scale) -> Vec<Item> {
     let s = scale;
     let mut rows = Rows { x: area.x, w: area.w, y: area.y, scale: s, items: Vec::new() };
-    rows.items.push(Item::new(None, Rect::new(area.x, area.y, area.w, s.px()), Kind::Line));
-    rows.y += 6 * s;
     rows.text(&view.title, theme::ACCENT);
     let Some(note) = &view.note else { return rows.items };
     let knobs = NOTE_KNOBS

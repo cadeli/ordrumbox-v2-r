@@ -297,9 +297,11 @@ impl Session {
         let name = self.track(t).map_or("", |tr| tr.name.as_str());
         let note = self.shown_note(t);
         let title = match (self.note_target(t), &note) {
-            (NoteTarget::Empty { beat, step }, _) => format!("{name} [beat {} step {}] — no note", beat + 1, step + 1),
-            (_, Some(n)) => format!("{name} [beat {} step {}]", n.beat + 1, n.step + 1),
-            _ => name.to_owned(),
+            (NoteTarget::Empty { beat, step }, _) => {
+                format!("Note: {name} [beat {} step {}] — no note", beat + 1, step + 1)
+            }
+            (_, Some(n)) => format!("Note: {name} [beat {} step {}]", n.beat + 1, n.step + 1),
+            _ => format!("Note: {name}"),
         };
         let Some(n) = &note else {
             return NoteView {
