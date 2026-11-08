@@ -171,7 +171,7 @@ impl Session {
                     self.set_kit_sample_value(kit, sample, Field::Decay, value);
                 }
             }
-            Id::Lfo(param) => self.lfo_value(t, param, value),
+            Id::Lfo(i, param) => self.lfo_value(t, i, param, value),
             Id::NoteKnob(key) | Id::NoteSlider(key) => self.note_value(t, key, value),
             _ => {}
         }
@@ -208,9 +208,9 @@ impl Session {
         }
     }
 
-    /// The selected LFO target's LFO object (a default one first).
-    fn lfo_object(&self, t: usize, kind: &str) -> (Object, &'static str, bool) {
-        let target = &LFO_TARGETS[usize::from(self.editors.lfo_target.min(4))];
+    /// The LFO object of target `i` (a default one first).
+    fn lfo_object(&self, t: usize, i: u8, kind: &str) -> (Object, &'static str, bool) {
+        let target = &LFO_TARGETS[usize::from(i).min(LFO_TARGETS.len() - 1)];
         let current = self.track(t).and_then(|tr| tr.field(target.lfo_key)).and_then(|v| v.as_object().cloned());
         let created = current.is_none();
         let object = current.unwrap_or_else(|| {
@@ -225,8 +225,8 @@ impl Session {
         (object, target.lfo_key, created)
     }
 
-    fn lfo_value(&mut self, t: usize, param: LfoParam, value: f64) {
-        let (mut object, lfo_key, _) = self.lfo_object(t, "sine");
+    fn lfo_value(&mut self, t: usize, i: u8, param: LfoParam, value: f64) {
+        let (mut object, lfo_key, _) = self.lfo_object(t, i, "sine");
         object.insert(param.key(), number(value));
         let desc = format!("LFO {} on {}", param.key(), self.track_name(t));
         self.update_track(t, &[(lfo_key, Value::Object(object))], &desc, true);
@@ -374,13 +374,8 @@ impl Session {
                 };
                 self.update_track(t, &[(key, v)], &format!("{} on {name}", history_label(id)), false);
             }
-            Id::LfoTarget => {
-                if let Some(i) = LFO_TARGETS.iter().position(|target| target.key == value) {
-                    self.editors.lfo_target = i as u8;
-                }
-            }
-            Id::LfoType => {
-                let (mut object, lfo_key, _) = self.lfo_object(t, value);
+            Id::LfoType(i) => {
+                let (mut object, lfo_key, _) = self.lfo_object(t, i, value);
                 object.insert("type", Value::String(value.to_owned()));
                 self.update_track(t, &[(lfo_key, Value::Object(object))], &format!("LFO type on {name}"), false);
             }
@@ -471,12 +466,11 @@ impl Session {
                 self.editors.prev_filter_type = (current != value).then_some(current);
                 self.update_track(t, &updates, &format!("Filter type on {name}"), false);
             }
-            Id::LfoLed(i) => {
-                self.editors.lfo_target = i;
-                let target = &LFO_TARGETS[usize::from(i.min(4))];
-                let on = track.field(target.lfo_key).is_some_and(|v| !v.is_null());
-                let value = if on { Value::Null } else { Value::Object(self.lfo_object(t, "sine").0) };
-                self.update_track(t, &[(target.lfo_key, value)], &format!("LFO {} on {name}", target.label), false);
+            Id::LfoPower(i) => {
+                let (object, lfo_key, created) = self.lfo_object(t, i, "sine");
+                let target = &LFO_TARGETS[usize::from(i).min(LFO_TARGETS.len() - 1)];
+                let value = if created { Value::Object(object) } else { Value::Null };
+                self.update_track(t, &[(lfo_key, value)], &format!("LFO {} on {name}", target.label), false);
             }
             Id::Toggle(key) => {
                 let on = track.field(key).and_then(|v| v.as_bool()).unwrap_or(false);

@@ -83,6 +83,16 @@ pub enum LfoParam {
 }
 
 impl LfoParam {
+    /// Its knob's label.
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Freq => "Freq",
+            Self::Min => "Min",
+            Self::Max => "Max",
+            Self::Phase => "Phase",
+        }
+    }
+
     pub fn key(self) -> &'static str {
         match self {
             Self::Freq => "freq",
@@ -109,9 +119,8 @@ pub enum Id {
     Regenerate,
     /// The Gen tab's Advanced settings, shown or folded.
     GenerationAdvanced,
-    /// LFO target list, and the on/off LED of a target.
-    LfoTarget,
-    LfoLed(u8),
+    /// The on / off button of an LFO target, named after it.
+    LfoPower(u8),
     /// The knob bar (volume, pan, pitch).
     KnobBar(&'static str),
     /// The knob bar's decay (the sample's, not the track's).
@@ -122,8 +131,9 @@ pub enum Id {
     Generation(&'static str),
     /// A loop slider.
     Loop(&'static str),
-    Lfo(LfoParam),
-    LfoType,
+    /// A setting of the LFO of a target (an index in `LFO_TARGETS`), and its wave.
+    Lfo(u8, LfoParam),
+    LfoType(u8),
     /// A select of a track setting (effect types, delay time, variant).
     TrackSelect(&'static str),
     /// An ON/OFF button of a track setting (mono, auto, scale lock).

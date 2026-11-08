@@ -91,12 +91,11 @@ pub fn track_select_options(key: &str) -> (Vec<String>, Vec<String>) {
     }
 }
 
-/// A target of the modulation tab: the setting, its short label, its name,
-/// its LFO's key, its range and step.
+/// A target of the modulation tab: the setting, its label, its LFO's key,
+/// its range and step.
 pub struct LfoTarget {
     pub key: &'static str,
     pub label: &'static str,
-    pub name: &'static str,
     pub lfo_key: &'static str,
     pub min: f64,
     pub max: f64,
@@ -105,35 +104,11 @@ pub struct LfoTarget {
 
 /// The settings that take an LFO, in the JS order (track props, then the knob bar's).
 pub const LFO_TARGETS: [LfoTarget; 5] = [
-    LfoTarget {
-        key: "filterCutoff",
-        label: "Cutoff",
-        name: "filter cutoff, Hz",
-        lfo_key: "filterCutoffLfo",
-        min: 20.0,
-        max: 20_000.0,
-        step: 1.0,
-    },
-    LfoTarget {
-        key: "filterQ",
-        label: "Q",
-        name: "filter Q",
-        lfo_key: "filterQLfo",
-        min: 0.707,
-        max: 18.707,
-        step: 0.01,
-    },
-    LfoTarget { key: "volume", label: "Vol", name: "volume", lfo_key: "volumeLfo", min: 0.0, max: 1.0, step: 0.01 },
-    LfoTarget { key: "pan", label: "Pan", name: "pan", lfo_key: "panLfo", min: -1.0, max: 1.0, step: 0.01 },
-    LfoTarget {
-        key: "transpose",
-        label: "Transpose",
-        name: "transpose, semitones",
-        lfo_key: "transposeLfo",
-        min: -24.0,
-        max: 24.0,
-        step: 1.0,
-    },
+    LfoTarget { key: "filterCutoff", label: "Cutoff", lfo_key: "filterCutoffLfo", min: 20.0, max: 20_000.0, step: 1.0 },
+    LfoTarget { key: "filterQ", label: "Q", lfo_key: "filterQLfo", min: 0.707, max: 18.707, step: 0.01 },
+    LfoTarget { key: "volume", label: "Volume", lfo_key: "volumeLfo", min: 0.0, max: 1.0, step: 0.01 },
+    LfoTarget { key: "pan", label: "Pan", lfo_key: "panLfo", min: -1.0, max: 1.0, step: 0.01 },
+    LfoTarget { key: "transpose", label: "Transpose", lfo_key: "transposeLfo", min: -24.0, max: 24.0, step: 1.0 },
 ];
 
 /// The LFO key of a setting, if it takes one.
@@ -338,8 +313,6 @@ pub const KIT_KNOBS: [(Field, Prop, &str, f64); 3] = [
 pub struct EditorState {
     pub tab: u8,
     pub generation_tab: u8,
-    /// Index in [`LFO_TARGETS`].
-    pub lfo_target: u8,
     pub note_tab: u8,
     /// The Gen tab shows its Advanced settings.
     pub generation_advanced: bool,
@@ -765,14 +738,14 @@ impl Rows {
 
     /// A control that is not a knob in a knob's slot: where the knob would
     /// be, its label under it, on the knobs' label line. The label is the
-    /// setting's row (its tooltip).
-    fn slot_choice(&mut self, slot: Rect, label: &str, key: &'static str, id: Option<Id>, kind: Kind) {
+    /// setting's row (its tooltip), when it has one.
+    fn slot_choice(&mut self, slot: Rect, label: &str, key: Option<&'static str>, id: Option<Id>, kind: Kind) {
         let s = self.scale;
         let field = Rect::new(slot.x + 4 * s, slot.y + 7 * s, slot.w - 8 * s, KNOB_SIZE * s - 14 * s);
         self.items.push(Item::new(id, field, kind));
         let width = crate::canvas::text_width(label, s).min(slot.w);
         let text = Rect::new(slot.x + (slot.w - width) / 2, slot.y + (KNOB_SIZE + 3) * s, width, 8 * s);
-        self.items.push(Item::new(Some(Id::Row(key)), text, Kind::Text { text: label.to_owned(), color: dim() }));
+        self.items.push(Item::new(key.map(Id::Row), text, Kind::Text { text: label.to_owned(), color: dim() }));
     }
 
     fn text(&mut self, text: &str, color: u32) {
@@ -852,7 +825,7 @@ pub fn track_editor(view: &TrackView, state: &EditorState, area: Rect, scale: Sc
     match state.tab {
         TAB_FX => fx_tab(&mut rows, view),
         TAB_SOUND => sound_tab(&mut rows, view),
-        TAB_LFO => lfo_tab(&mut rows, view, state),
+        TAB_LFO => lfo_tab(&mut rows, view),
         TAB_LOOP => loop_tab(&mut rows, track),
         _ => generation_tab(&mut rows, track, view.compose.as_ref(), state),
     }
@@ -892,7 +865,7 @@ fn fx_strip(rows: &mut Rows, view: &TrackView, i: u8, fx: &FxDef) {
         slot += 1;
         // A slap is one echo: no feedback to set, its knob kept greyed out.
         if p.key == "delayFeedback" && track.delay_type == "slap" {
-            rows.slot_choice(rect, p.label, p.key, None, Kind::Disabled { label: "one echo".into() });
+            rows.slot_choice(rect, p.label, Some(p.key), None, Kind::Disabled { label: "one echo".into() });
             continue;
         }
         let value = view.lfo.iter().find(|(k, _)| *k == p.key).map_or_else(|| number(track, p.key), |&(_, v)| v);
@@ -919,7 +892,7 @@ fn fx_strip(rows: &mut Rows, view: &TrackView, i: u8, fx: &FxDef) {
             }
         }
         let choice = Choice { values, labels, selected };
-        rows.slot_choice(rect, fx_label(key), key, Some(Id::TrackSelect(key)), choice.kind());
+        rows.slot_choice(rect, fx_label(key), Some(key), Some(Id::TrackSelect(key)), choice.kind());
     }
     rows.y += knob_row_h(s) + FX_STRIP_GAP * s;
 }
@@ -951,93 +924,63 @@ fn sound_tab(rows: &mut Rows, view: &TrackView) {
     }
 }
 
-/// The characters an LFO range's text takes: `-24.00..-24.00`, the widest.
-const RANGE_TEXT_CHARS: usize = 14;
+/// The LFO tab: the five targets one under the other, each a strip of its
+/// own, as in the FX tab: its on / off button (named) in the label column,
+/// then its wave and its knobs (five strips under a button row each would
+/// not fit the editor).
+fn lfo_tab(rows: &mut Rows, view: &TrackView) {
+    for (i, target) in LFO_TARGETS.iter().enumerate() {
+        lfo_strip(rows, view.track, i as u8, target);
+    }
+}
 
-fn lfo_tab(rows: &mut Rows, view: &TrackView, state: &EditorState) {
+/// Slots of an LFO strip's knob row: the wave (two, its names are long),
+/// then frequency, min, max, phase.
+const LFO_SLOTS: i32 = 6;
+
+fn lfo_strip(rows: &mut Rows, track: &Track, i: u8, target: &LfoTarget) {
     let s = rows.scale;
-    let track = view.track;
-    let target = &LFO_TARGETS[usize::from(state.lfo_target.min(4))];
     let lfo = track.field(target.lfo_key).and_then(|v| v.as_object().cloned());
     let get = |key: &str, fallback: f64| {
         lfo.as_ref().map_or(fallback, |o| o.get(key).and_then(Value::as_f64).unwrap_or(f64::NAN))
     };
-    let kind_now = lfo
+    let wave = lfo
         .as_ref()
         .map_or_else(|| "sine".to_owned(), |o| o.get("type").and_then(Value::as_str).unwrap_or("sine").to_owned());
 
-    // Target: its on/off LED, then the list (a target with an LFO on says so).
-    let r = rows.row();
-    rows.label(r, "Target", None, false);
-    let field = rows.field(r, r.w);
-    let led_w = 10 * s;
-    let on = |t: &LfoTarget| track.field(t.lfo_key).is_some_and(|v| !v.is_null());
-    let led = Id::LfoLed(state.lfo_target.min(4));
-    rows.items.push(Item::new(Some(led), Rect::new(field.x, field.y, led_w, field.h), Kind::Led { on: on(target) }));
-    let values = LFO_TARGETS.iter().map(|t| t.key.to_owned()).collect();
-    let labels =
-        LFO_TARGETS.iter().map(|t| if on(t) { format!("{} (on)", t.name) } else { t.name.to_owned() }).collect();
-    let choice = Choice { values, labels, selected: usize::from(state.lfo_target.min(4)) };
-    let select = Rect::new(field.x + led_w + 2 * s, field.y, (200 * s).min(field.w - led_w - 2 * s), field.h);
-    rows.items.push(Item::new(Some(Id::LfoTarget), select, choice.kind()));
+    // The button level with the knobs, the knobs right of the label column.
+    let button = Rect::new(rows.x, rows.y + (KNOB_SIZE * s - row_h(s)) / 2, label_width(s) - 4 * s, row_h(s));
+    let power = Kind::Button { label: target.label.to_owned(), on: lfo.is_some() };
+    rows.items.push(Item::new(Some(Id::LfoPower(i)), button, power));
+    let (x, w) = (rows.x, rows.w);
+    rows.x += label_width(s);
+    rows.w -= label_width(s);
 
-    let r = rows.row();
-    rows.label(r, "Type", None, false);
     let values: Vec<String> = WAVE_TYPES.iter().map(|w| (*w).to_owned()).collect();
-    let selected = index_of(&values, &kind_now);
-    rows.items.push(Item::new(
-        Some(Id::LfoType),
-        rows.field(r, 120 * s),
-        Choice { values, labels: Vec::new(), selected }.kind(),
-    ));
+    let selected = index_of(&values, &wave);
+    let choice = Choice { values, labels: Vec::new(), selected };
+    let (first, second) = (rows.slot(0, LFO_SLOTS), rows.slot(1, LFO_SLOTS));
+    let wave_slot = Rect::new(first.x, first.y, second.x + second.w - first.x, first.h);
+    rows.slot_choice(wave_slot, "Wave", None, Some(Id::LfoType(i)), choice.kind());
 
-    let freq = get("freq", 1.0);
-    rows.slider(
-        Id::Lfo(LfoParam::Freq),
-        Spec::slider(0.1, 2.0, 0.1, 1.0),
-        freq,
-        "Freq",
-        crate::control::fmt(freq),
-        false,
-    );
-
-    // Range: two sliders side by side, one value.
-    let (min, max) = (get("min", target.min), get("max", target.max));
-    let r = rows.row();
-    let mut spec = Spec::slider(target.min, target.max, target.step, target.min);
-    if target.key == "filterCutoff" {
-        spec = spec.log();
+    // Min and max: the target's range, its own end the default of each.
+    let range = |default: f64| {
+        let spec = Spec::knob(target.min, target.max, target.step, default);
+        if target.key == "filterCutoff" { spec.log_full_travel() } else { spec }
+    };
+    let knobs = [
+        (LfoParam::Freq, Spec::knob(0.1, 2.0, 0.1, 1.0), get("freq", 1.0)),
+        (LfoParam::Min, range(target.min), get("min", target.min)),
+        (LfoParam::Max, range(target.max), get("max", target.max)),
+        (LfoParam::Phase, Spec::knob(0.0, 1.0, 0.01, 0.0), get("phase", 0.0)),
+    ];
+    for (slot, (param, spec, value)) in (2..).zip(knobs) {
+        let text = crate::control::fmt(value);
+        let kind = Kind::Value { spec, value, label: Some(param.label().to_owned()), text, lfo: false };
+        rows.items.push(Item::new(Some(Id::Lfo(i, param)), rows.slot(slot, LFO_SLOTS), kind));
     }
-    let field = rows.field(r, r.w);
-    let text: String =
-        format!("{}..{}", crate::control::fmt(min), crate::control::fmt(max)).chars().take(RANGE_TEXT_CHARS).collect();
-    // One width for every value and target: the sliders never resize.
-    let text_w = RANGE_TEXT_CHARS as i32 * crate::canvas::char_width(s) + 4 * s;
-    let half = ((field.w - text_w) / 2).max(16 * s);
-    let rows_label = |rows: &mut Rows| rows.label(r, "Range", None, false);
-    rows_label(rows);
-    let value_kind = |value: f64| Kind::Value { spec, value, label: None, text: String::new(), lfo: false };
-    rows.items.push(Item::new(
-        Some(Id::Lfo(LfoParam::Min)),
-        Rect::new(field.x - 4 * s, r.y, half, r.h),
-        value_kind(min),
-    ));
-    rows.items.push(Item::new(
-        Some(Id::Lfo(LfoParam::Max)),
-        Rect::new(field.x - 4 * s + half, r.y, half, r.h),
-        value_kind(max),
-    ));
-    rows.items.push(Item::text(field.x - 4 * s + 2 * half + 2 * s, r.y + (r.h - 8 * s) / 2, text, theme::text(), s));
-
-    let phase = get("phase", 0.0);
-    rows.slider(
-        Id::Lfo(LfoParam::Phase),
-        Spec::slider(0.0, 1.0, 0.01, 0.0),
-        phase,
-        "Phase",
-        crate::control::fmt(phase),
-        false,
-    );
+    (rows.x, rows.w) = (x, w);
+    rows.y += knob_row_h(s) + FX_STRIP_GAP * s;
 }
 
 fn loop_tab(rows: &mut Rows, track: &Track) {
@@ -1539,7 +1482,6 @@ mod tests {
                         tab,
                         generation_tab: sub % 3,
                         generation_advanced: sub >= 3,
-                        lfo_target: sub,
                         ..EditorState::default()
                     };
                     let (items, bottom) = track_editor(&view(&track), &state, Rect::new(700, 30, 360, 600), Scale::ONE);
@@ -1666,6 +1608,40 @@ mod tests {
         }
     }
 
+    #[test]
+    fn the_lfo_tab_shows_every_target_and_moves_nothing_when_one_goes_on() {
+        let area = Rect::new(700, 30, 360, 600);
+        let state = EditorState { tab: TAB_LFO, ..EditorState::default() };
+        let off = Track { name: "KICK".into(), ..Track::default() };
+        let lfo = ordrumbox_core::json::parse(r#"{"type":"square","freq":1.5,"min":0.2,"max":0.8,"phase":0}"#).unwrap();
+        let on = Track {
+            name: "KICK".into(),
+            filter_cutoff_lfo: lfo.as_object().cloned(),
+            filter_q_lfo: lfo.as_object().cloned(),
+            volume_lfo: lfo.as_object().cloned(),
+            pan_lfo: lfo.as_object().cloned(),
+            transpose_lfo: lfo.as_object().cloned(),
+            ..Track::default()
+        };
+        let mut places = Vec::new();
+        for (track, lit) in [(&off, false), (&on, true)] {
+            let (items, bottom) = track_editor(&view(track), &state, area, Scale::ONE);
+            assert_put(&mut places, &items, &format!("LFOs on {lit}"));
+            for i in 0..LFO_TARGETS.len() as u8 {
+                let power = items.iter().find(|item| item.id == Some(Id::LfoPower(i))).map(|item| &item.kind);
+                assert!(matches!(power, Some(Kind::Button { on, .. }) if *on == lit), "LFO {i} on {lit}");
+                assert!(items.iter().any(|item| item.id == Some(Id::LfoType(i))), "LFO {i} wave");
+            }
+            // Every LFO value is a knob of the knob bar's size, under the tab.
+            let knobs: Vec<_> = items.iter().filter(|item| matches!(item.id, Some(Id::Lfo(..)))).collect();
+            assert_eq!(knobs.len(), LFO_TARGETS.len() * 4);
+            for item in knobs {
+                assert_eq!(item.rect.h, knob_row_h(Scale::ONE), "{:?}", item.id);
+                assert!(item.rect.y + item.rect.h <= bottom, "{:?}", item.id);
+            }
+        }
+    }
+
     /// Records the place of every control of `items` (the nth of an id
     /// shown twice: the compose sliders); one that has had another place in an
     /// earlier layout fails.
@@ -1709,7 +1685,6 @@ mod tests {
                 }) {
                     let state = EditorState {
                         tab,
-                        lfo_target: sub,
                         generation_tab: sub % 3,
                         generation_advanced: advanced,
                         selected_prop: selected,
