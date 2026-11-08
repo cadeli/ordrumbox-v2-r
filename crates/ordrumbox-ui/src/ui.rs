@@ -68,7 +68,7 @@ pub struct Ui {
     display: Scale,
     /// The part of the UI the window shows when it cannot show it all.
     scroll: Scroll,
-    /// Alt is down and no other key was pressed since.
+    /// Alt is down and no other key, click or wheel turn came since.
     alt_alone: bool,
 }
 
@@ -156,6 +156,8 @@ impl Ui {
 
     /// A button pressed at the pointer.
     pub fn pointer_pressed(&mut self, button: Button) -> bool {
+        // Alt+click or Alt+drag: releasing Alt then leaves the menus closed.
+        self.alt_alone = false;
         let window = (self.pointer.0 as i32, self.pointer.1 as i32);
         if button == Button::Left && self.scroll.press(&self.viewport(self.window), window) {
             return true;
@@ -279,6 +281,7 @@ impl Ui {
 
     /// The wheel turned over the pointer.
     pub fn wheel(&mut self, delta: ScrollDelta) -> bool {
+        self.alt_alone = false;
         let (columns, lines) = delta.lines();
         if self.session.overlay_open() {
             if lines == 0 {
@@ -704,5 +707,31 @@ mod tests {
         assert!(plugin.session.kit_editor_open());
         assert!(!plugin.key(&press(Key::Letter('S'))), "the host saves");
         assert!(!plugin.key(&press(Key::Letter('Q'))), "the host closes");
+    }
+
+    #[test]
+    fn alt_alone_opens_the_menus_but_not_after_a_click_or_a_wheel_turn() {
+        let library =
+            ordrumbox_core::Library::parse(r#"{"patterns":[{"name":"demo","tracks":[{"name":"KICK"}]}]}"#).unwrap().0;
+        let mut ui = Ui::new(Session::for_tests(library, false));
+        let alt = |pressed| KeyEvent { key: Key::Alt, pressed, repeat: false, text: None };
+
+        ui.key(&alt(true));
+        assert!(ui.key(&alt(false)));
+        assert!(ui.session.open_menu().is_some(), "Alt alone");
+        ui.key(&alt(true));
+        ui.key(&alt(false));
+        assert!(ui.session.open_menu().is_none(), "Alt alone again closes them");
+
+        ui.key(&alt(true));
+        ui.pointer_pressed(Button::Left);
+        ui.pointer_released(Button::Left);
+        assert!(!ui.key(&alt(false)));
+        assert!(ui.session.open_menu().is_none(), "Alt+click");
+
+        ui.key(&alt(true));
+        ui.wheel(ScrollDelta::Lines(0.0, 1.0));
+        assert!(!ui.key(&alt(false)));
+        assert!(ui.session.open_menu().is_none(), "Alt+wheel");
     }
 }
