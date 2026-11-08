@@ -329,12 +329,8 @@ impl Session {
         let names: Vec<String> = self.kits.kits.iter().map(|k| k.name.clone()).collect();
         let kits =
             Choice { selected: self.kit_index.min(names.len().saturating_sub(1)), values: names, labels: Vec::new() };
-        let ids: Vec<String> = catalog().instruments.iter().map(|i| i.id.clone()).collect();
-        let instruments =
-            Choice { selected: editors::index_of(&ids, &instrument.key), values: ids, labels: Vec::new() };
         Some(KitControls {
             kits,
-            instruments,
             gain: instrument.gain_db,
             transpose: instrument.transpose,
             decay: instrument.decay.unwrap_or(0.0),

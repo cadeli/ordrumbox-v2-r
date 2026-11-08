@@ -53,15 +53,21 @@ pub struct SampleSources {
 
 impl SampleSources {
     pub fn read(&self, url: &str) -> std::io::Result<Vec<u8>> {
-        if let Some(path) = self.user.as_deref().and_then(|dir| store::sample_path(dir, url))
-            && path.is_file()
-        {
-            return fs::read(path);
-        }
-        match store::sample_path(&self.assets, url) {
+        match self.file(url) {
             Some(path) => fs::read(path),
             None => Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "unsafe sample path")),
         }
+    }
+
+    /// The file sample `url` is read from: the user's, else the assets'
+    /// (which may not exist); `None` for a path outside both folders.
+    pub fn file(&self, url: &str) -> Option<PathBuf> {
+        if let Some(path) = self.user.as_deref().and_then(|dir| store::sample_path(dir, url))
+            && path.is_file()
+        {
+            return Some(path);
+        }
+        store::sample_path(&self.assets, url)
     }
 }
 
@@ -79,7 +85,9 @@ pub fn candidates(first: &[PathBuf]) -> Vec<PathBuf> {
     if let Ok(cwd) = env::current_dir() {
         dirs.push(cwd.join("assets"));
     }
-    dirs.push(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets"));
+    // This crate is `crates/ordrumbox-ui`: two folders under the checkout.
+    let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
+    dirs.push(manifest.ancestors().nth(2).unwrap_or(manifest).join("assets"));
     dirs
 }
 

@@ -730,21 +730,25 @@ A knob an LFO moves is purple and follows it. The pills under the cards show the
 
 <!-- ───────────────────────────────────────────────────────────── -->
 <h2 id="kit">13. Kit editor</h2>
-<p><kbd>Ctrl</kbd>+<kbd>K</kbd>. Shows the current kit's samples and the selected sample's details.
+<p><kbd>Ctrl</kbd>+<kbd>K</kbd>. Shows the current kit (its name, the folder its samples are read from, its title and notes), a table of its samples, and the selected sample's details.
 Kits are saved to <code>kits.json</code>; new sample audio to <code>samples/</code>.</p>
 <figure>
-  <img src="images/kit-editor.png" alt="The kit editor: sample list of the real kit, kit and instrument lists, gain, transpose and decay knobs, analysis and envelope">
-  <figcaption>The kit editor on the <em>real</em> kit: the samples with their instrument, the selected sample's lists and knobs, its analysis and envelope (the decay end is the vertical line).</figcaption>
+  <img src="images/kit-editor.png" alt="The kit editor: the real kit's title and notes, its sample table with an instrument list per row, gain, transpose and decay knobs, analysis and envelope">
+  <figcaption>The kit editor on the <em>real</em> kit: its title and notes, the samples with their instrument and the tracks that play them, the selected sample's knobs, its analysis and envelope (the decay end is the vertical line).</figcaption>
 </figure>
 <table>
 <tr><th>Control</th><th>Range</th><th>What it does</th></tr>
-<tr><td>Sample list</td><td></td><td>The kit's samples (<kbd>↑</kbd> <kbd>↓</kbd> to select).</td></tr>
-<tr><td>Kit:</td><td>all kits</td><td>Move the sample to another kit.</td></tr>
-<tr><td>Instrument:</td><td>all instruments</td><td>What the sample is (KICK, SNARE…), used by auto-assign.</td></tr>
+<tr><td>Folder</td><td></td><td>Where the kit's samples are read from (the user's samples folder or the assets'); when they are in several folders, the one most are in.</td></tr>
+<tr><td>Title, Notes</td><td></td><td>The kit's title and description: a click edits them, in a box that opens at the mouse; saved in <code>kits.json</code> (<code>info</code>, <code>desc</code>).</td></tr>
+<tr><td>Sample table</td><td></td><td>Number, file name, instrument, played by track (<kbd>↑</kbd> <kbd>↓</kbd> or a click to select).</td></tr>
+<tr><td>Played by track</td><td></td><td>The tracks (rows of the grid: KICK, SNARE…) of the pattern shown that play the sample; "-" when none does. Another pattern may play it on other tracks, or not at all. The header counts the samples the pattern's tracks play.</td></tr>
+<tr><td>Instrument</td><td>all instruments</td><td>In each row: what the sample is (KICK, SNARE…), used by auto-assign. A click opens the instrument categories, then a category's instruments, as <strong>Rename track</strong> does.</td></tr>
+<tr><td>AUTO</td><td></td><td>In each row, after the instrument: the instrument guessed from the sample's file name (<code>kick_01.wav</code>: KICK), as when a folder is imported. A name that gives none leaves the instrument as it is, with a message. The button is lit while the instrument is the one the name gives.</td></tr>
+<tr><td>Move to:</td><td>all kits</td><td>Move the selected sample to another kit.</td></tr>
 <tr><td>Gain</td><td>−24 to +6 dB</td><td>Level trim.</td></tr>
 <tr><td>Transp</td><td>−12 to +12 st</td><td>Tuning.</td></tr>
 <tr><td>Decay</td><td>20–5000 ms</td><td>Decay; the end shows on the envelope.</td></tr>
-<tr><td>Info</td><td></td><td>Detected note, length, peak and RMS levels, envelope.</td></tr>
+<tr><td>Pitch … File</td><td></td><td>Detected pitch, length, peak and RMS levels, the instrument its name suggests, its full path; the envelope under them.</td></tr>
 </table>
 <table>
 <tr><th>Key / action</th><th>What it does</th></tr>

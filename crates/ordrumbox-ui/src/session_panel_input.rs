@@ -19,6 +19,7 @@ impl Session {
     /// A press at `(x, y)`; whether the widgets took it.
     pub fn mouse_down(&mut self, size: (i32, i32, Scale), x: i32, y: i32, button: Button, shift: bool) -> bool {
         self.chrome.panel_size = size;
+        self.chrome.widgets.pointer = (x, y);
         let (width, height, scale) = size;
         if let Some(dropdown) = self.chrome.widgets.dropdown.take() {
             let left = button == Button::Left;
@@ -105,7 +106,7 @@ impl Session {
             }
             Kind::Select { values, labels, selected } => {
                 self.chrome.widgets.focus = Some(id);
-                self.chrome.widgets.dropdown = Some(Dropdown::new(id, item.rect, values, labels, selected));
+                self.open_select(id, item.rect, values, labels, selected);
             }
             _ => self.activate(id),
         }
@@ -114,6 +115,7 @@ impl Session {
 
     /// The mouse moved; whether to redraw.
     pub fn mouse_move(&mut self, size: (i32, i32, Scale), x: i32, y: i32, shift: bool) -> bool {
+        self.chrome.widgets.pointer = (x, y);
         if self.roll.dragging() {
             return self.roll_drag_move(x, y);
         }
@@ -398,7 +400,7 @@ impl Session {
                     PanelKey::Up | PanelKey::Left | PanelKey::Minus => -1,
                     PanelKey::Down | PanelKey::Right | PanelKey::Plus => 1,
                     PanelKey::Enter | PanelKey::Space => {
-                        self.chrome.widgets.dropdown = Some(Dropdown::new(id, item.rect, values, labels, selected));
+                        self.open_select(id, item.rect, values, labels, selected);
                         return true;
                     }
                     _ => return false,
@@ -442,6 +444,15 @@ impl Session {
         false
     }
 
+    /// The list of select `id`, under `rect`; a kit sample's instrument opens
+    /// the instrument menus instead, its categories first.
+    fn open_select(&mut self, id: Id, rect: panel::Rect, values: Vec<String>, labels: Vec<String>, selected: usize) {
+        match id {
+            Id::KitSampleInstrument(sample) => self.kit_instrument_menu(sample, rect),
+            _ => self.chrome.widgets.dropdown = Some(Dropdown::new(id, rect, values, labels, selected)),
+        }
+    }
+
     // ─── Number entry ────────────────────────────────────────────────────────
 
     /// `promptNumericInput`: `Enter value for LABEL (min–max unit):`.
@@ -452,7 +463,14 @@ impl Session {
         let (min, max) = (num::text(spec.shown(spec.min)), num::text(spec.shown(spec.max)));
         let title = format!("Enter value for {label} ({min}–{max}{unit}):");
         let text = num::text(spec.shown(value));
-        self.chrome.widgets.entry = Some(Entry { id, spec: Some(spec), title, text });
+        self.show_entry(id, Some(spec), title, text);
+    }
+
+    /// The entry of `id` (a number by `spec`, else a text), titled `title`,
+    /// holding `text`, opened at the mouse.
+    pub(super) fn show_entry(&mut self, id: Id, spec: Option<Spec>, title: String, text: String) {
+        let at = self.chrome.widgets.pointer;
+        self.chrome.widgets.entry = Some(Entry { id, spec, title, text, at });
     }
 
     fn commit_entry(&mut self) {

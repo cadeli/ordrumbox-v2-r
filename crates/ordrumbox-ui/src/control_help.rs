@@ -45,6 +45,19 @@ pub fn help(id: Id) -> Option<Help> {
             Field::Transpose => ["Transpose", "the sample's pitch, in semitones"],
             Field::Decay => ["Decay", "how long the sample rings, in ms"],
         },
+        Id::KitKit => ["Move to kit", "the selected sample, moved into another kit"],
+        Id::KitSampleInstrument(_) => {
+            ["Instrument", "the kind of sound this sample is (a click: by category); tracks of it play it"]
+        }
+        Id::KitAutoInstrument(_) => {
+            ["Auto-assign", "the instrument guessed from the sample's file name (kick_01.wav: KICK)"]
+        }
+        Id::KitPlayedBy => [
+            "Played by track",
+            "the tracks (rows) of the pattern shown that play this sample; another pattern may use other ones",
+        ],
+        Id::KitText("info") => ["Kit title", "a click edits it; saved with the kits"],
+        Id::KitText(_) => ["Kit notes", "what the kit is, where it comes from; a click edits them"],
         Id::Bpm => ["Tempo", "beats per minute: every pattern's; in the song panel, the song's"],
         Id::Beats => ["Beats", "the pattern's length, in beats"],
         Id::StyleList => ["Style", "picking one makes the pattern again in it"],

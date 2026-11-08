@@ -586,7 +586,7 @@ pub struct Choice {
 }
 
 impl Choice {
-    fn kind(&self) -> Kind {
+    pub fn kind(&self) -> Kind {
         let labels = if self.labels.is_empty() { self.values.clone() } else { self.labels.clone() };
         Kind::Select { values: self.values.clone(), labels, selected: self.selected }
     }
@@ -637,8 +637,8 @@ pub struct NoteView {
 /// What the kit editor's controls show.
 #[derive(Debug, Clone)]
 pub struct KitControls {
+    /// The kit to move the sample to (the kit it is in, selected).
     pub kits: Choice,
-    pub instruments: Choice,
     pub gain: f64,
     pub transpose: f64,
     pub decay: f64,
@@ -1270,12 +1270,9 @@ pub fn note_editor(view: &NoteView, state: &EditorState, area: Rect, scale: Scal
 pub fn kit_controls(view: &KitControls, area: Rect, scale: Scale) -> (Vec<Item>, i32) {
     let s = scale;
     let mut rows = Rows { x: area.x, w: area.w, y: area.y, scale: s, items: Vec::new() };
-    for (id, label, choice) in [(Id::KitKit, "Kit:", &view.kits), (Id::KitInstrument, "Instrument:", &view.instruments)]
-    {
-        let r = rows.row();
-        rows.label(r, label, None, false);
-        rows.items.push(Item::new(Some(id), rows.field(r, 160 * s), choice.kind()));
-    }
+    let r = rows.row();
+    rows.label(r, "Move to:", None, false);
+    rows.items.push(Item::new(Some(Id::KitKit), rows.field(r, 160 * s), view.kits.kind()));
     rows.y += 4 * s;
     let knobs = KIT_KNOBS
         .iter()

@@ -633,7 +633,7 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
 
 /// `text` in lines of at most `chars` characters, cut at spaces (a word longer
 /// than a line is cut in it) and at line breaks.
-fn wrap(text: &str, chars: usize) -> Vec<String> {
+pub fn wrap(text: &str, chars: usize) -> Vec<String> {
     let mut lines = Vec::new();
     if chars == 0 {
         return lines;

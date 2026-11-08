@@ -233,6 +233,9 @@ pub struct Session {
     kit_editor: Option<usize>,
     /// Analysis of the sample the kit editor shows, by url.
     analysis: Option<(String, Analysis)>,
+    /// Where the kit editor's kit and sample are read from (folder, file),
+    /// found with the analysis: looking costs a file system call a sample.
+    kit_files: (String, Option<PathBuf>),
     /// The synth presets played and shown: the library's own over the assets'.
     synths: SynthPresets,
     /// The assets' synth presets.
@@ -307,6 +310,8 @@ struct Widgets {
     drag: Option<Drag>,
     dropdown: Option<Dropdown>,
     entry: Option<Entry>,
+    /// The mouse, at its last move or press: where a text entry opens.
+    pointer: (i32, i32),
     /// Last click on a widget, for double-clicks.
     last_click: Option<(Id, Instant)>,
 }
@@ -546,6 +551,7 @@ impl Session {
             kit_index: 0,
             kit_editor: None,
             analysis: None,
+            kit_files: (String::new(), None),
             synths: SynthPresets::default(),
             asset_synths: SynthPresets::default(),
             synths_revision: None,

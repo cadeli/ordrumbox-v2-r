@@ -156,9 +156,17 @@ pub enum Id {
     /// Arp scale / direction select.
     NoteSelect(&'static str),
     // Kit editor.
+    /// The kit to move the selected sample to.
     KitKit,
-    KitInstrument,
+    /// The instrument of a sample, by its index in the kit (its table row).
+    KitSampleInstrument(usize),
+    /// The auto-assign button of a sample's row: its instrument from its file name.
+    KitAutoInstrument(usize),
     KitKnob(Field),
+    /// The kit's title or description, by its `kits.json` key.
+    KitText(&'static str),
+    /// The title of the table's column of tracks playing each sample.
+    KitPlayedBy,
     // Header.
     PatternList,
     KitList,
@@ -215,6 +223,9 @@ pub enum Id {
     /// The instrument menus that name a track: the categories, then a
     /// category's instruments. `None`: a new track; `Some(t)`: track `t` renamed.
     TrackNameMenu(Option<usize>),
+    /// The instrument menus of a kit's sample (its index): the categories,
+    /// then a category's instruments.
+    KitInstrumentMenu(usize),
 }
 
 /// What a widget shows.
@@ -749,6 +760,9 @@ fn row_height(scale: Scale) -> i32 {
 
 // ─── Number entry ────────────────────────────────────────────────────────────
 
+/// Where a text entry's field is in it (unscaled): the mouse that opened it is there.
+const ENTRY_FIELD: (i32, i32) = (12, 22);
+
 /// The number typed for a control (`promptNumericInput`, right-click or
 /// Enter), or a text (a name, a description: `spec` is `None`).
 #[derive(Debug, Clone, PartialEq)]
@@ -757,13 +771,17 @@ pub struct Entry {
     pub spec: Option<Spec>,
     pub title: String,
     pub text: String,
+    /// The mouse when it opened: its field starts there.
+    pub at: (i32, i32),
 }
 
 impl Entry {
+    /// The entry with its field at the mouse, inside the `width` × `height` window.
     pub fn rect(&self, width: i32, height: i32, scale: Scale) -> Rect {
         let w = (text_width(&self.title, scale) + 32 * scale).max(220 * scale).min(width);
         let h = 52 * scale;
-        Rect::new((width - w) / 2, (height - h) / 2, w, h)
+        let (x, y) = (self.at.0 - ENTRY_FIELD.0 * scale, self.at.1 - ENTRY_FIELD.1 * scale);
+        Rect::new(x.clamp(0, (width - w).max(0)), y.clamp(0, (height - h).max(0)), w, h)
     }
 
     pub fn draw(&self, canvas: &mut Canvas, scale: Scale) {
@@ -772,7 +790,7 @@ impl Entry {
         canvas.fill_rect(r.x, r.y, r.w, r.h, border_color());
         canvas.fill_rect(r.x + scale.px(), r.y + scale.px(), r.w - 2 * scale, r.h - 2 * scale, background_color());
         canvas.text(r.x + 12 * scale, r.y + 8 * scale, &self.title, scale, TITLE);
-        let field = Rect::new(r.x + 12 * scale, r.y + 22 * scale, r.w - 24 * scale, 12 * scale);
+        let field = Rect::new(r.x + ENTRY_FIELD.0 * scale, r.y + ENTRY_FIELD.1 * scale, r.w - 24 * scale, 12 * scale);
         canvas.fill_rect(field.x, field.y, field.w, field.h, field_color());
         let x = canvas.text(field.x + 4 * scale, field.y + 2 * scale, &self.text, scale, theme::text());
         canvas.fill_rect(x + scale.px(), field.y + 2 * scale, scale.px(), 8 * scale, CARET);
@@ -873,7 +891,7 @@ mod tests {
         Dropdown::new(Id::Sample, Rect::new(390, 290, 20, 12), vec!["x".into(); 3], vec!["x".into(); 3], 0)
             .draw(&mut canvas, Scale::ONE);
         let spec = Spec::knob(20.0, 5000.0, 10.0, 500.0);
-        Entry { id: Id::Decay, spec: Some(spec), title: "Enter value".into(), text: "12".into() }
+        Entry { id: Id::Decay, spec: Some(spec), title: "Enter value".into(), text: "12".into(), at: (390, 290) }
             .draw(&mut canvas, Scale::ONE);
         Dropdown::menu(Id::SongMenu, 390, 290, "rock".into(), vec!["a".into()], vec!["Add".into()])
             .draw(&mut canvas, Scale::ONE);

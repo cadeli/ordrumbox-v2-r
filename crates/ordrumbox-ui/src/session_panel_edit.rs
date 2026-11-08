@@ -300,6 +300,7 @@ impl Session {
         match dropdown.id {
             Id::GridMenu => self.grid_menu_pick(&value, dropdown),
             Id::TrackNameMenu(target) => self.track_name_menu_pick(target, &value, dropdown),
+            Id::KitInstrumentMenu(sample) => self.kit_instrument_menu_pick(sample, &value, dropdown),
             id => self.select(id, &value),
         }
     }
@@ -342,7 +343,7 @@ impl Session {
             }
             Id::RollMenu => return self.roll_menu_pick(value),
             // Picked with where they are (`pick`).
-            Id::GridMenu | Id::TrackNameMenu(_) => return,
+            Id::GridMenu | Id::TrackNameMenu(_) | Id::KitInstrumentMenu(_) => return,
             Id::SynthPreset | Id::SynthField(_) => return self.synth_select(id, value),
             Id::KitKit => {
                 let target = self.kits.kits.iter().position(|k| k.name == value);
@@ -353,14 +354,7 @@ impl Session {
                 }
                 return;
             }
-            Id::KitInstrument => {
-                if let Some(sample) = self.kit_editor
-                    && let Some(message) = self.kits.set_instrument(self.kit_index, sample, value)
-                {
-                    self.kits_changed(message);
-                }
-                return;
-            }
+            Id::KitSampleInstrument(sample) => return self.kit_set_instrument(sample, value),
             _ => {}
         }
         let Some(t) = self.editor_track() else { return };
@@ -426,6 +420,10 @@ impl Session {
             Id::GeneratePattern => self.run(Command::GeneratePattern),
             Id::AutoAll => self.run(Command::AutoAll),
             Id::SongName | Id::SongDescription | Id::PatternDescription => self.text_entry(id),
+            Id::KitText(key) => self.kit_text_entry(key),
+            Id::KitAutoInstrument(sample) => self.kit_auto_instrument(sample),
+            // Only a title, with a tooltip.
+            Id::KitPlayedBy => {}
             _ => {
                 let Some(t) = self.editor_track() else { return };
                 self.activate_on_track(t, id);
