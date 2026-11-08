@@ -12,7 +12,7 @@ pub type Help = [&'static str; 2];
 pub fn help(id: Id) -> Option<Help> {
     Some(match id {
         Id::Tab(tab) => tab_help(tab)?,
-        Id::FxTab(fx) | Id::FxLed(fx) => fx_help(fx)?,
+        Id::FxPower(fx) => fx_help(fx)?,
         Id::GenerationTab(tab) => match tab {
             0 => ["Groove (Manual out of auto mode)", "how the hits vary from loop to loop"],
             1 => ["Engine", "what the auto engine adds to the notes"],
@@ -83,10 +83,10 @@ fn tab_help(tab: u8) -> Option<Help> {
 
 fn fx_help(fx: u8) -> Option<Help> {
     Some(match fx {
-        0 => ["Reverb", "the room around the sound (the LED: on / off)"],
-        1 => ["Delay", "echoes of the sound (the LED: on / off)"],
-        2 => ["Saturation", "drive and grit (the LED: on / off)"],
-        3 => ["Filter", "cuts lows or highs (the LED: on / off)"],
+        0 => ["Reverb", "the room around the sound, lit when on"],
+        1 => ["Delay", "echoes of the sound, lit when on"],
+        2 => ["Saturation", "drive and grit, lit when on"],
+        3 => ["Filter", "cuts lows or highs, lit when on"],
         _ => return None,
     })
 }
@@ -224,7 +224,7 @@ mod tests {
             assert!(help(Id::NoteTab(tab)).is_some(), "note tab {tab}");
         }
         for fx in 0..4 {
-            assert!(help(Id::FxTab(fx)).is_some(), "effect {fx}");
+            assert!(help(Id::FxPower(fx)).is_some(), "effect {fx}");
         }
         for view in 0..crate::view::VIEWS.len() as u8 {
             assert!(help(Id::View(view)).is_some(), "view {view}");

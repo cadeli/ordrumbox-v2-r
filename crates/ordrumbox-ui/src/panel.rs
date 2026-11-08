@@ -99,9 +99,8 @@ pub enum Id {
     // Track editor.
     /// Main tab: fx, sound, mod, loop, gen.
     Tab(u8),
-    /// Effect sub-tab (Rev, Dly, Sat, fltr), and its on/off LED.
-    FxTab(u8),
-    FxLed(u8),
+    /// An effect's on / off button, named after it.
+    FxPower(u8),
     /// Groove / Engine / Compose sub-tab.
     GenerationTab(u8),
     /// A compose setting of a drum track (its style's value when unset).
@@ -335,9 +334,12 @@ pub fn slider_bar(rect: Rect, labelled: bool, valued: bool, scale: Scale) -> (i3
     (left, (right - left).max(8 * scale))
 }
 
+/// Diameter of a knob in a row of knobs (at scale 1).
+pub const KNOB_SIZE: i32 = 26;
+
 /// Diameter of a knob in an item of height `h`.
 fn knob_size(rect: Rect, scale: Scale) -> i32 {
-    if rect.h >= 40 * scale { 26 * scale } else { (rect.h - 2 * scale).max(8 * scale) }
+    if rect.h >= 40 * scale { KNOB_SIZE * scale } else { (rect.h - 2 * scale).max(8 * scale) }
 }
 
 // ─── Drawing ─────────────────────────────────────────────────────────────────
