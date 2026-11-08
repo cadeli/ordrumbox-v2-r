@@ -189,7 +189,6 @@ pub enum Id {
     /// The right-click menu of the song panel.
     SongMenu,
     // Output panel.
-    OutTab(u8),
     /// A master bus setting, by its `settings.master` key.
     Master(&'static str),
     // Synth editor.

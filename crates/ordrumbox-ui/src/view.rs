@@ -390,7 +390,7 @@ impl HeaderControls {
 
 /// Height of the output strip always shown along the bottom of the window.
 pub fn output_height(scale: Scale) -> i32 {
-    88 * scale
+    output::STRIP_HEIGHT * scale
 }
 
 /// The height the track editor and its note editor take at most, at scale 1:
