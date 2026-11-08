@@ -416,7 +416,6 @@ impl Session {
     pub(super) fn activate(&mut self, id: Id) {
         match id {
             Id::Tab(i) => self.editors.tab = i,
-            Id::FxTab(i) => self.editors.fx_tab = i,
             Id::GenerationTab(i) => self.editors.generation_tab = i,
             Id::GenerationAdvanced => self.editors.generation_advanced = !self.editors.generation_advanced,
             Id::NoteTab(i) => self.editors.note_tab = i,
@@ -444,7 +443,7 @@ impl Session {
         let name = &track.name;
         match id {
             Id::Regenerate => self.regenerate_track(t),
-            Id::FxLed(i) => {
+            Id::FxPower(i) => {
                 // `toggleFxByKey`.
                 let fx = &FX_DEFS[usize::from(i.min(3))];
                 let updates = if fx.key == "filterType" {

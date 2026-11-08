@@ -15,7 +15,7 @@ use ordrumbox_logic::generate;
 
 use crate::control::{Format, Spec};
 use crate::kits::{DECAY_RANGE, Field, GAIN_RANGE, TRANSPOSE_RANGE};
-use crate::panel::{Id, Item, Kind, LfoParam, Rect, dim, label_width};
+use crate::panel::{Id, Item, KNOB_SIZE, Kind, LfoParam, Rect, dim, label_width};
 use crate::theme;
 
 // ─── Tables (track_editor_constants.js, sync_section.js) ─────────────────────
@@ -29,7 +29,7 @@ pub const TAB_SOUND: u8 = 1;
 pub const TAB_LFO: u8 = 2;
 pub const TAB_LOOP: u8 = 3;
 
-/// An effect: the setting its LED reads and writes, its tab label, its rows.
+/// An effect: the setting its on / off button reads and writes, its name, its controls.
 pub struct FxDef {
     pub key: &'static str,
     pub label: &'static str,
@@ -325,11 +325,10 @@ pub const KIT_KNOBS: [(Field, Prop, &str, f64); 3] = [
 // ─── State ───────────────────────────────────────────────────────────────────
 
 /// What the editors remember between frames: the tabs, the selected
-/// setting, the filter type an off LED restores.
+/// setting, the filter type an effect button turns back on.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct EditorState {
     pub tab: u8,
-    pub fx_tab: u8,
     pub generation_tab: u8,
     /// Index in [`LFO_TARGETS`].
     pub lfo_target: u8,
@@ -338,7 +337,7 @@ pub struct EditorState {
     pub generation_advanced: bool,
     /// The row last clicked.
     pub selected_prop: Option<&'static str>,
-    /// The filter type the fx LED turns back on.
+    /// The filter type the Filter button turns back on.
     pub prev_filter_type: Option<String>,
 }
 
@@ -669,6 +668,11 @@ fn row_h(scale: Scale) -> i32 {
     16 * scale
 }
 
+/// Height of a row of knobs: the knob, its label, its value.
+fn knob_row_h(scale: Scale) -> i32 {
+    48 * scale
+}
+
 /// A tab: its id, its LED's id, its label, active, LED on.
 type TabSlot<'a> = (Id, Option<Id>, &'a str, bool, bool);
 
@@ -737,16 +741,30 @@ impl Rows {
     }
 
     fn knob_bar(&mut self, knobs: Vec<(Id, Spec, f64, &str, String, bool)>, slots: i32) {
-        let s = self.scale;
-        let h = 48 * s;
         for (i, (id, spec, value, label, text, lfo)) in knobs.into_iter().enumerate() {
-            let i = i as i32;
-            let x = self.x + i * self.w / slots;
-            let w = (i + 1) * self.w / slots - i * self.w / slots;
             let kind = Kind::Value { spec, value, label: Some(label.to_owned()), text, lfo };
-            self.items.push(Item::new(Some(id), Rect::new(x, self.y, w, h), kind));
+            self.items.push(Item::new(Some(id), self.slot(i as i32, slots), kind));
         }
-        self.y += h + 4 * s;
+        self.y += knob_row_h(self.scale) + 4 * self.scale;
+    }
+
+    /// Slot `i` of a row of `slots` knobs, at the current y (which it leaves).
+    fn slot(&self, i: i32, slots: i32) -> Rect {
+        let x = self.x + i * self.w / slots;
+        let w = (i + 1) * self.w / slots - i * self.w / slots;
+        Rect::new(x, self.y, w, knob_row_h(self.scale))
+    }
+
+    /// A control that is not a knob in a knob's slot: where the knob would
+    /// be, its label under it, on the knobs' label line. The label is the
+    /// setting's row (its tooltip).
+    fn slot_choice(&mut self, slot: Rect, label: &str, key: &'static str, id: Option<Id>, kind: Kind) {
+        let s = self.scale;
+        let field = Rect::new(slot.x + 4 * s, slot.y + 7 * s, slot.w - 8 * s, KNOB_SIZE * s - 14 * s);
+        self.items.push(Item::new(id, field, kind));
+        let width = crate::canvas::text_width(label, s).min(slot.w);
+        let text = Rect::new(slot.x + (slot.w - width) / 2, slot.y + (KNOB_SIZE + 3) * s, width, 8 * s);
+        self.items.push(Item::new(Some(Id::Row(key)), text, Kind::Text { text: label.to_owned(), color: dim() }));
     }
 
     fn text(&mut self, text: &str, color: u32) {
@@ -816,7 +834,7 @@ pub fn track_editor(view: &TrackView, state: &EditorState, area: Rect, scale: Sc
 
     let bottom = tallest_tab_bottom(rows.y, s);
     match state.tab {
-        TAB_FX => fx_tab(&mut rows, view, state),
+        TAB_FX => fx_tab(&mut rows, view),
         TAB_SOUND => sound_tab(&mut rows, view),
         TAB_LFO => lfo_tab(&mut rows, view, state),
         TAB_LOOP => loop_tab(&mut rows, track),
@@ -825,62 +843,73 @@ pub fn track_editor(view: &TrackView, state: &EditorState, area: Rect, scale: Sc
     (rows.items, bottom)
 }
 
-fn fx_tab(rows: &mut Rows, view: &TrackView, state: &EditorState) {
-    let s = rows.scale;
-    let track = view.track;
-    let tabs: Vec<_> = FX_DEFS
-        .iter()
-        .enumerate()
-        .map(|(i, fx)| {
-            Some((Id::FxTab(i as u8), Some(Id::FxLed(i as u8)), fx.label, state.fx_tab == i as u8, fx_on(track, fx)))
-        })
-        .collect();
-    rows.tabs(&tabs);
-    let fx = &FX_DEFS[usize::from(state.fx_tab.min(3))];
-    for &key in fx.controls {
-        let r = rows.row();
-        // A slap is one echo: no feedback to set, its row kept greyed out.
-        if key == "delayFeedback" && track.delay_type == "slap" {
-            rows.label(r, fx_label(key), None, false);
-            let kind = Kind::Disabled { label: "one echo".into() };
-            rows.items.push(Item::new(None, rows.field(r, 120 * s), kind));
-            continue;
-        }
-        if key == "filterType" {
-            rows.label(r, "Type", Some(key), state.selected_prop == Some(key));
-            for (i, (icon, value)) in FILTER_ICONS.iter().zip(FILTER_TYPES).enumerate() {
-                let rect = Rect::new(r.x + label_width(s) + i as i32 * 30 * s, r.y + 2 * s, 26 * s, r.h - 4 * s);
-                let kind = Kind::Button { label: (*icon).to_owned(), on: track.filter_type == value };
-                rows.items.push(Item::new(Some(Id::FilterIcon(i as u8)), rect, kind));
-            }
-        } else if let Some(p) = FX_KNOBS.iter().find(|p| p.key == key) {
-            rows.label(r, p.label, Some(key), state.selected_prop == Some(key));
-            let value = view.lfo.iter().find(|(k, _)| *k == key).map_or_else(|| number(track, key), |&(_, v)| v);
-            let mut spec = value_spec(p, default_of(key, p.min), true);
-            if p.format == Format::Freq {
-                spec = spec.log_full_travel();
-            }
-            let kind =
-                Kind::Value { spec, value, label: None, text: p.format.value(value, ""), lfo: has_lfo(track, key) };
-            rows.items.push(Item::new(Some(Id::Fx(key)), rows.field(r, 120 * s), kind));
-        } else {
-            rows.label(r, fx_label(key), Some(key), state.selected_prop == Some(key));
-            let (values, mut labels) = track_select_options(key);
-            let selected = index_of(&values, &text_of(track, key));
-            if key == "delayBeats" {
-                // Too long a delay plays at fewer beats: shown on the choice.
-                let used = delay_beats_used(track.delay_beats, view.bpm);
-                if used != track.delay_beats
-                    && let Some(label) = labels.get_mut(selected)
-                {
-                    *label = format!("{label} ({} used)", num::text(used));
-                }
-            }
-            let choice = Choice { values, labels, selected };
-            rows.items.push(Item::new(Some(Id::TrackSelect(key)), rows.field(r, 120 * s), choice.kind()));
-        }
+/// The FX tab: the four effects one under the other, each a strip of its
+/// own: its on / off button (named), then its knobs and its choices.
+fn fx_tab(rows: &mut Rows, view: &TrackView) {
+    for (i, fx) in FX_DEFS.iter().enumerate() {
+        fx_strip(rows, view, i as u8, fx);
     }
 }
+
+/// Slots of an effect strip's knob row: the most controls an effect has.
+const FX_SLOTS: i32 = 4;
+
+fn fx_strip(rows: &mut Rows, view: &TrackView, i: u8, fx: &FxDef) {
+    let s = rows.scale;
+    let track = view.track;
+    let r = rows.row();
+    let power = Kind::Button { label: fx.label.to_owned(), on: fx_on(track, fx) };
+    rows.items.push(Item::new(Some(Id::FxPower(i)), Rect::new(r.x, r.y, label_width(s) - 4 * s, r.h), power));
+    if fx.key == "filterType" {
+        for (i, (icon, value)) in FILTER_ICONS.iter().zip(FILTER_TYPES).enumerate() {
+            let rect = Rect::new(r.x + label_width(s) + i as i32 * 30 * s, r.y + 2 * s, 26 * s, r.h - 4 * s);
+            let kind = Kind::Button { label: (*icon).to_owned(), on: track.filter_type == value };
+            rows.items.push(Item::new(Some(Id::FilterIcon(i as u8)), rect, kind));
+        }
+    }
+    // The knobs first, then the choices: every strip reads the same way.
+    let knobs = fx.controls.iter().filter_map(|&key| FX_KNOBS.iter().find(|p| p.key == key));
+    let choices = fx.controls.iter().filter(|&&key| key != "filterType" && !FX_KNOBS.iter().any(|p| p.key == key));
+    let mut slot = 0;
+    for p in knobs {
+        let rect = rows.slot(slot, FX_SLOTS);
+        slot += 1;
+        // A slap is one echo: no feedback to set, its knob kept greyed out.
+        if p.key == "delayFeedback" && track.delay_type == "slap" {
+            rows.slot_choice(rect, p.label, p.key, None, Kind::Disabled { label: "one echo".into() });
+            continue;
+        }
+        let value = view.lfo.iter().find(|(k, _)| *k == p.key).map_or_else(|| number(track, p.key), |&(_, v)| v);
+        let mut spec = value_spec(p, default_of(p.key, p.min), true);
+        if p.format == Format::Freq {
+            spec = spec.log_full_travel();
+        }
+        let text = p.format.value(value, "");
+        let kind = Kind::Value { spec, value, label: Some(p.label.to_owned()), text, lfo: has_lfo(track, p.key) };
+        rows.items.push(Item::new(Some(Id::Fx(p.key)), rect, kind));
+    }
+    for &key in choices {
+        let rect = rows.slot(slot, FX_SLOTS);
+        slot += 1;
+        let (values, mut labels) = track_select_options(key);
+        let selected = index_of(&values, &text_of(track, key));
+        if key == "delayBeats" {
+            // Too long a delay plays at fewer beats: shown on the choice.
+            let used = delay_beats_used(track.delay_beats, view.bpm);
+            if used != track.delay_beats
+                && let Some(label) = labels.get_mut(selected)
+            {
+                *label = format!("{label} ({} used)", num::text(used));
+            }
+        }
+        let choice = Choice { values, labels, selected };
+        rows.slot_choice(rect, fx_label(key), key, Some(Id::TrackSelect(key)), choice.kind());
+    }
+    rows.y += knob_row_h(s) + FX_STRIP_GAP * s;
+}
+
+/// Pixels between two effect strips (at scale 1).
+const FX_STRIP_GAP: i32 = 4;
 
 fn sound_tab(rows: &mut Rows, view: &TrackView) {
     let s = rows.scale;
@@ -1494,7 +1523,6 @@ mod tests {
                 for sub in 0..6 {
                     let state = EditorState {
                         tab,
-                        fx_tab: sub % 4,
                         generation_tab: sub % 3,
                         generation_advanced: sub >= 3,
                         lfo_target: sub,
@@ -1593,6 +1621,37 @@ mod tests {
         assert_eq!(sliders, ["euclideanPulses", "euclideanRotation"]);
     }
 
+    #[test]
+    fn the_fx_tab_shows_every_effect_and_moves_nothing_when_one_goes_on() {
+        let area = Rect::new(700, 30, 360, 600);
+        let state = EditorState { tab: TAB_FX, ..EditorState::default() };
+        let off = Track { name: "KICK".into(), filter_type: "allpass".into(), ..Track::default() };
+        let on = Track {
+            name: "KICK".into(),
+            reverb_mix: 0.5,
+            delay_mix: 0.5,
+            delay_type: "slap".into(),
+            saturation_mix: 0.5,
+            filter_type: "lowpass".into(),
+            ..Track::default()
+        };
+        let mut places = Vec::new();
+        for (track, lit) in [(&off, false), (&on, true)] {
+            let (items, bottom) = track_editor(&view(track), &state, area, Scale::ONE);
+            assert_put(&mut places, &items, &format!("effects on {lit}"));
+            for i in 0..FX_DEFS.len() as u8 {
+                let power = items.iter().find(|item| item.id == Some(Id::FxPower(i))).map(|item| &item.kind);
+                assert!(matches!(power, Some(Kind::Button { on, .. }) if *on == lit), "effect {i} on {lit}");
+            }
+            // Every effect value is a knob of the knob bar's size, under the tab.
+            let knobs = items.iter().filter(|item| matches!(item.id, Some(Id::Fx(_))));
+            for item in knobs {
+                assert_eq!(item.rect.h, knob_row_h(Scale::ONE), "{:?}", item.id);
+                assert!(item.rect.y + item.rect.h <= bottom, "{:?}", item.id);
+            }
+        }
+    }
+
     /// Records the place of every control of `items` (the nth of an id
     /// shown twice: the compose sliders); one that has had another place in an
     /// earlier layout fails.
@@ -1636,7 +1695,6 @@ mod tests {
                 }) {
                     let state = EditorState {
                         tab,
-                        fx_tab: sub % 4,
                         lfo_target: sub,
                         generation_tab: sub % 3,
                         generation_advanced: advanced,

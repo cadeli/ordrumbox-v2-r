@@ -79,7 +79,7 @@ second one starts, on every track with an even number of steps per beat, on top 
 track's own swing), and for tracks 1–16 **Mute**, **Volume** (a gain on the track's own,
 -60 to +6 dB), **Pan** (added to the track's own), **Cutoff** (moves the filter's
 cutoff by up to ±4 octaves), **Q** (added to the filter's), **Reverb**, **Delay** and
-**Saturation** (added to the effect's amount, kept within 0 to 1; with the effect's LED
+**Saturation** (added to the effect's amount, kept within 0 to 1; with the effect's button
 off, the track's amount counts as 0), **Feedback** (added to the delay's, up to 0.95; a
 slap delay keeps its single echo) and **Transpose** (±24 semitones on the notes played,
 MIDI input included, not on the MIDI notes sent out). At their defaults they change

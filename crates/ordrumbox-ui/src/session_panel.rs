@@ -492,7 +492,6 @@ mod tests {
                 })
             }) {
                 s.editors.tab = tab;
-                s.editors.fx_tab = sub;
                 s.editors.generation_tab = sub;
                 s.editors.note_tab = note_tab;
                 s.editors.generation_advanced = advanced;
