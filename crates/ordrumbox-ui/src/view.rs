@@ -162,78 +162,172 @@ pub struct View<'a> {
 #[derive(Debug)]
 pub struct KitView<'a> {
     pub kit: &'a str,
-    /// Display name and instrument key of each sample.
-    pub samples: Vec<(&'a str, &'a str)>,
+    /// The folder the kit's samples are read from, `-` when not known.
+    pub folder: String,
+    /// File name of each sample (its instrument is a select of the panel).
+    pub samples: Vec<&'a str>,
     /// The pattern's tracks that play each sample, by name (empty: none).
     pub users: Vec<Vec<String>>,
     pub selected: usize,
     /// Top of the sample's details, under its controls (selects and knobs).
     pub details_top: i32,
-    /// Note, length and levels of the selected sample.
-    pub info: Option<String>,
-    /// The instrument its name suggests.
-    pub detected: Option<String>,
+    /// The selected sample's measurements: label and value, always the same
+    /// labels ([`KIT_FACTS`]), the value `-` when unknown.
+    pub facts: Vec<(&'static str, String)>,
     /// Peak of each slice, 0–1.
     pub envelope: &'a [f64],
     /// Where the decay ends, as a fraction of the sample.
     pub decay_marker: Option<f64>,
 }
 
-/// Where the kit editor's parts are.
+/// How many measurements the kit editor shows of a sample (note, length,
+/// peak, RMS, detected instrument, file): a fixed count, so that nothing
+/// under them moves.
+pub const KIT_FACTS: usize = 6;
+/// Lines of the kit's description.
+pub const KIT_DESC_LINES: usize = 2;
+
+/// Where the kit editor's parts are: the kit's header (name, folder, title,
+/// description), the table of its samples (number, name, instrument, the
+/// tracks that play it), then the selected sample: its controls on the left,
+/// its measurements on the right, its envelope under both.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct KitLayout {
     scale: Scale,
     top: i32,
-    list_top: i32,
     bottom: i32,
     left: i32,
+    width: i32,
+    /// The kit's name, folder, title and description, after their labels.
+    head_x: i32,
+    /// The kit's folder line, title line and first description line.
+    folder_y: i32,
+    title_y: i32,
+    desc_y: i32,
+    /// The table: its column titles, first row, row height, row count.
+    columns_y: i32,
+    list_top: i32,
     list_width: i32,
     row: i32,
-    detail_x: i32,
-    detail_y: i32,
     list_rows: i32,
-    width: i32,
+    /// Columns: sample name, instrument select (its auto-assign button
+    /// after it), the tracks playing it.
+    name_x: i32,
+    instrument_x: i32,
+    users_x: i32,
+    detail_y: i32,
+    /// The measurements' column.
+    facts_x: i32,
 }
+
+/// The kit editor's table row height, per scale unit (a select fits in it).
+const KIT_ROW: i32 = 14;
+/// A text line of the kit editor's header and measurements, per scale unit.
+const KIT_LINE: i32 = 11;
+/// Width of the instrument column, per scale unit.
+const KIT_INSTRUMENT_W: i32 = 112;
+/// Width of a row's auto-assign button, per scale unit ("AUTO").
+const KIT_AUTO_W: i32 = 40;
+/// The widest a sample name gets, in characters.
+const KIT_NAME_CHARS: usize = 24;
+/// Labels of the measurements, in characters (their values after).
+const KIT_FACT_LABEL: usize = 9;
+/// Labels of the kit's header ("Notes"), in characters.
+const KIT_HEAD_LABEL: usize = 7;
 
 impl KitLayout {
     pub fn new(width: i32, height: i32, scale: Scale, status_lines: usize) -> Self {
+        let s = scale;
         let margin = margin(scale);
         let top = body_top(scale);
         let bottom = footer_top(height, scale, status_lines) - margin / 2;
-        // The sample list takes the full width (long file names), on the top
-        // rows; the selected sample's details go below it.
+        let left = margin;
         let list_width = (width - 2 * margin).max(40 * scale);
-        let row = 12 * scale;
-        let list_top = top + row;
-        let list_rows = ((bottom - top) / (row * 4)).clamp(3, 10);
-        let detail_y = list_top + list_rows * row + 8 * scale;
+        let line = KIT_LINE * s;
+        let folder_y = top + line + 2 * s;
+        let title_y = folder_y + line;
+        let desc_y = title_y + line;
+        let columns_y = desc_y + KIT_DESC_LINES as i32 * line + 6 * s;
+        let row = KIT_ROW * s;
+        let list_top = columns_y + line;
+        // The details take what they need (controls, measurements, a short
+        // envelope); the rows the rest, a window size giving one count.
+        let details = 8 * s + KIT_FACTS as i32 * line + 40 * s;
+        let list_rows = ((bottom - list_top - details) / row).clamp(3, 16);
+        let detail_y = list_top + list_rows * row + 8 * s;
+        // Columns: the number ("12"), the name, the instrument, the tracks.
+        let name_x = left + text_width("000", s);
+        let room = list_width - (name_x - left) - (KIT_INSTRUMENT_W + KIT_AUTO_W) * s - 20 * s;
+        let name_w = text_width(&"m".repeat(KIT_NAME_CHARS), s).min(room / 2).max(0);
+        let instrument_x = name_x + name_w + 8 * s;
+        let users_x = instrument_x + (KIT_INSTRUMENT_W + KIT_AUTO_W) * s + 12 * s;
+        let controls_w = (list_width / 2).min(360 * s);
         Self {
             scale,
             top,
-            list_top,
             bottom,
-            left: margin,
+            left,
+            width,
+            head_x: left + text_width(&"m".repeat(KIT_HEAD_LABEL), s),
+            folder_y,
+            title_y,
+            desc_y,
+            columns_y,
+            list_top,
             list_width,
             row,
-            detail_x: margin,
-            detail_y,
-            width,
             list_rows,
+            name_x,
+            instrument_x,
+            users_x,
+            detail_y,
+            facts_x: left + controls_w + 16 * s,
         }
     }
 
     /// Where the selected sample's selects and knobs go.
     pub fn controls_area(&self) -> Rect {
-        let s = self.scale;
-        Rect::new(self.detail_x, self.detail_y, (self.width - 2 * self.detail_x).clamp(0, 420 * s), 0)
+        Rect::new(self.left, self.detail_y, (self.facts_x - self.left - 16 * self.scale).max(0), 0)
     }
 
-    fn shown(&self) -> usize {
+    /// The kit's title, a click edits it.
+    pub fn title_rect(&self) -> Rect {
+        let x = self.head_x;
+        Rect::new(x, self.title_y, self.left + self.list_width - x, 8 * self.scale)
+    }
+
+    /// Line `line` of the kit's description, a click edits it.
+    pub fn desc_rect(&self, line: usize) -> Rect {
+        let x = self.head_x;
+        let y = self.desc_y + line as i32 * KIT_LINE * self.scale;
+        Rect::new(x, y, self.left + self.list_width - x, 8 * self.scale)
+    }
+
+    /// The title of the column of tracks playing each sample.
+    pub fn played_by_rect(&self) -> Rect {
+        let x = self.users_x;
+        Rect::new(x, self.columns_y, (self.left + self.list_width - x).max(0), 8 * self.scale)
+    }
+
+    /// The instrument select of the table's row `row` (from the first shown).
+    pub fn instrument_rect(&self, row: usize) -> Rect {
+        let s = self.scale;
+        let y = self.list_top + row as i32 * self.row;
+        Rect::new(self.instrument_x, y + s.px(), KIT_INSTRUMENT_W * s, self.row - 2 * s)
+    }
+
+    /// The auto-assign button of the table's row `row`, after its select.
+    pub fn auto_rect(&self, row: usize) -> Rect {
+        let select = self.instrument_rect(row);
+        Rect { x: select.x + select.w + 4 * self.scale, w: KIT_AUTO_W * self.scale, ..select }
+    }
+
+    pub fn shown(&self) -> usize {
         self.list_rows as usize
     }
 
     /// First list row shown, so that `selected` is visible.
-    fn first(&self, selected: usize) -> usize {
+    pub fn first(&self, selected: usize) -> usize {
         selected.saturating_sub(self.shown().saturating_sub(1))
     }
 
@@ -245,6 +339,11 @@ impl KitLayout {
         }
         let i = self.first(view_selected) + row_at(y, self.list_top, self.row)?;
         (i < count).then_some(i)
+    }
+
+    /// Bottom of the measurements: the envelope starts under them.
+    fn facts_bottom(&self) -> i32 {
+        self.detail_y + KIT_FACTS as i32 * KIT_LINE * self.scale
     }
 }
 
@@ -937,36 +1036,75 @@ fn draw_notice_part(canvas: &mut Canvas, title: &str, lines: &[String], all: &[S
 /// right (fields, analysis, envelope with the decay marked).
 fn draw_kit(canvas: &mut Canvas, kit: &KitView, layout: &KitLayout) {
     let scale = layout.scale;
-    // Title line above the list.
-    canvas.text(layout.left, layout.top + 2 * scale, &format!("kit {}", kit.kit), scale, theme::muted());
-    let first = layout.first(kit.selected);
-    if kit.samples.is_empty() {
-        canvas.text(layout.left, layout.list_top, "No samples in this kit", scale, theme::muted());
+    let fitted = |text: &str, width: i32| -> String { text.chars().take(chars_in(width, scale)).collect() };
+    let right = layout.left + layout.list_width;
+    // A path too long keeps its end, the file and the folders nearest to it.
+    let fitted_end = |text: &str, width: i32| -> String {
+        let room = chars_in(width, scale);
+        let count = text.chars().count();
+        if count <= room {
+            return text.to_owned();
+        }
+        let tail: String = text.chars().skip(count - room.saturating_sub(3)).collect();
+        format!("...{tail}")
+    };
+
+    // The kit: its name and counts, then the labels of its title and
+    // description (their texts are the panel's, a click edits them).
+    let used = kit.users.iter().filter(|u| !u.is_empty()).count();
+    let counts = format!("{} samples, {used} played by the pattern's tracks", kit.samples.len());
+    let counts_x = right - text_width(&counts, scale);
+    canvas.text(layout.left, layout.top + 2 * scale, "KIT", scale, theme::muted());
+    let name = fitted(kit.kit, counts_x - layout.head_x - 8 * scale);
+    canvas.text(layout.head_x, layout.top + 2 * scale, &name, scale, ACCENT);
+    canvas.text(counts_x.max(layout.head_x), layout.top + 2 * scale, &counts, scale, theme::muted());
+    for (label, y) in [("Folder", layout.folder_y), ("Title", layout.title_y), ("Notes", layout.desc_y)] {
+        canvas.text(layout.left, y, label, scale, theme::muted());
     }
-    for (row, (i, (name, key))) in kit.samples.iter().enumerate().skip(first).take(layout.shown()).enumerate() {
+    let folder = fitted_end(&kit.folder, right - layout.head_x);
+    canvas.text(layout.head_x, layout.folder_y, &folder, scale, theme::text());
+
+    // The table: column titles, then a row per sample.
+    let columns_y = layout.columns_y;
+    canvas.text(layout.left, columns_y, "#", scale, theme::muted());
+    canvas.text(layout.name_x, columns_y, "File", scale, theme::muted());
+    canvas.text(layout.instrument_x, columns_y, "Instrument", scale, theme::muted());
+    // "Played by track" is an item of the panel: it has a tooltip.
+    canvas.fill_rect(layout.left, layout.list_top - 3 * scale, layout.list_width, scale.px(), theme::line());
+    if kit.samples.is_empty() {
+        canvas.text(layout.name_x, layout.list_top + 3 * scale, "No samples in this kit", scale, theme::muted());
+    }
+    let first = layout.first(kit.selected);
+    let name_w = layout.instrument_x - layout.name_x - 8 * scale;
+    for (row, (i, name)) in kit.samples.iter().enumerate().skip(first).take(layout.shown()).enumerate() {
         let y = layout.list_top + row as i32 * layout.row;
-        if i == kit.selected {
-            canvas.fill_rect(layout.left - 2 * scale, y - 2 * scale, layout.list_width, layout.row, focus_row_color());
+        let text_y = y + (layout.row - 8 * scale) / 2;
+        let selected = i == kit.selected;
+        if selected {
+            canvas.fill_rect(layout.left - 2 * scale, y, layout.list_width + 4 * scale, layout.row, focus_row_color());
         }
-        let color = if i == kit.selected { ACCENT } else { theme::text() };
-        let x = canvas.text(layout.left, y, name, scale, color);
-        let x = canvas.text(x + 8 * scale, y, key, scale, theme::muted());
-        if let Some(users) = kit.users.get(i).filter(|u| !u.is_empty()) {
-            let room = layout.left + layout.list_width - x - 20 * scale;
-            let text: String = format!("< {}", users.join(", ")).chars().take(chars_in(room, scale)).collect();
-            canvas.text(x + 16 * scale, y, &text, scale, theme::text());
-        }
+        canvas.text(layout.left, text_y, &(i + 1).to_string(), scale, theme::muted());
+        canvas.text(layout.name_x, text_y, &fitted(name, name_w), scale, if selected { ACCENT } else { theme::text() });
+        let (users, color) = match kit.users.get(i).filter(|u| !u.is_empty()) {
+            Some(users) => (users.join(", "), theme::text()),
+            None => ("-".to_owned(), theme::muted()),
+        };
+        canvas.text(layout.users_x, text_y, &fitted(&users, right - layout.users_x), scale, color);
     }
 
-    let x = layout.detail_x;
-    let mut y = kit.details_top + 4 * scale;
-    for line in [kit.info.as_deref(), kit.detected.as_deref()].into_iter().flatten() {
-        canvas.text(x, y, line, scale, theme::muted());
-        y += 12 * scale;
+    // The selected sample's measurements, right of its controls.
+    let label_w = text_width(&"m".repeat(KIT_FACT_LABEL), scale);
+    let value_x = layout.facts_x + label_w;
+    for (line, (label, value)) in kit.facts.iter().enumerate() {
+        let y = layout.detail_y + 2 * scale + line as i32 * KIT_LINE * scale;
+        canvas.text(layout.facts_x, y, &fitted(label, label_w - 4 * scale), scale, theme::muted());
+        canvas.text(value_x, y, &fitted_end(value, right - value_x), scale, theme::text());
     }
 
     // Envelope: one bar per point, the decay end as a line.
-    let (width, height) = (layout.width - x - 16 * scale, (layout.bottom - y - 4 * scale).min(80 * scale));
+    let x = layout.left;
+    let y = kit.details_top.max(layout.facts_bottom()) + 4 * scale;
+    let (width, height) = (layout.list_width, (layout.bottom - y - 4 * scale).min(80 * scale));
     if kit.envelope.is_empty() || width <= 0 || height <= 4 * scale {
         return;
     }
@@ -1315,25 +1453,37 @@ mod tests {
 
     #[test]
     fn kit_editor_draws_and_hits() {
-        let samples: Vec<(&str, &str)> = (0..40).map(|_| ("kick.wav", "KICK")).collect();
+        let samples: Vec<&str> = (0..40).map(|_| "kick.wav").collect();
         let envelope = [0.0, 1.0, 0.5, 0.25];
         for (w, h) in [(1, 1), (40, 30), (1024, 640)] {
             let mut pixels = vec![0; w * h];
             let mut canvas = Canvas::new(&mut pixels, w, h);
             let kit = KitView {
                 kit: "real",
+                folder: "/a/very/long/folder/name/that/does/not/fit/in/the/header/line/of/the/kit/editor/real".into(),
                 samples: samples.clone(),
                 users: vec![vec!["KICK".into(), "CRASH".into()]],
                 selected: 39,
                 details_top: 200,
-                info: Some("A4 0ct".into()),
-                detected: Some("Detected: KICK".into()),
+                facts: vec![("Pitch", "A4 0ct".into()); KIT_FACTS],
                 envelope: &envelope,
                 decay_marker: Some(0.5),
             };
             draw_kit(&mut canvas, &kit, &KitLayout::new(w as i32, h as i32, Scale::ONE, 0));
         }
         let layout = KitLayout::new(1024, 640, Scale::ONE, 0);
+        // The columns in order, the instrument select inside its row, the
+        // details under the table, the measurements right of the controls.
+        assert!(layout.left < layout.name_x && layout.name_x < layout.instrument_x);
+        let select = layout.instrument_rect(1);
+        let auto = layout.auto_rect(1);
+        assert!(select.x + select.w < auto.x && auto.x + auto.w < layout.users_x);
+        assert!(select.y >= layout.list_top + layout.row && select.y + select.h <= layout.list_top + 2 * layout.row);
+        assert!(layout.desc_rect(KIT_DESC_LINES - 1).y < layout.columns_y);
+        assert!(layout.list_top + layout.list_rows * layout.row < layout.detail_y);
+        let controls = layout.controls_area();
+        assert!(controls.x + controls.w < layout.facts_x);
+        assert!(layout.facts_bottom() < layout.bottom);
         assert_eq!(layout.hit(0, 40, layout.left + 2, layout.list_top + 1), Some(0));
         assert_eq!(layout.hit(0, 1, layout.left + 2, layout.list_top + layout.row + 1), None);
         assert_eq!(layout.hit(0, 40, layout.left + 2, layout.detail_y), None);

@@ -335,12 +335,7 @@ impl Session {
             "export" => self.open_export(Export::Song),
             "import" => self.open_picker(Purpose::ImportSong),
             "new" => {
-                self.chrome.widgets.entry = Some(Entry {
-                    id: Id::SongButton("new"),
-                    spec: None,
-                    title: "New arrangement name:".into(),
-                    text: String::new(),
-                });
+                self.show_entry(Id::SongButton("new"), None, "New arrangement name:".into(), String::new());
             }
             "delete" => {
                 if self.song().is_some() {
@@ -372,7 +367,7 @@ impl Session {
             }
             _ => return,
         };
-        self.chrome.widgets.entry = Some(Entry { id, spec: None, title: title.into(), text });
+        self.show_entry(id, None, title.into(), text);
     }
 
     /// A text entry confirmed.
@@ -411,6 +406,7 @@ impl Session {
                 }
             }
             Id::SongButton("new") => self.add_song(text),
+            Id::KitText(key) => self.commit_kit_text(key, text),
             _ => {}
         }
     }

@@ -32,6 +32,20 @@ const INSTRUMENT_VALUE: &str = "instrument:";
 /// Value of the line of the rename menus that asks for any name.
 const FREE_NAME_VALUE: &str = "free-name";
 
+/// The lines of an instrument menu that open a category's instruments
+/// ([`Session::category_submenu`]): values and labels.
+pub(super) fn category_lines() -> (Vec<String>, Vec<String>) {
+    let categories = &catalog().categories;
+    let values = (0..categories.len()).map(|i| format!("{CATEGORY_VALUE}{i}")).collect();
+    let labels = categories.iter().map(|(category, _)| format!("{category}{SUBMENU_MARK}")).collect();
+    (values, labels)
+}
+
+/// The instrument a line of a category's list stands for.
+pub(super) fn picked_instrument(value: &str) -> Option<&str> {
+    value.strip_prefix(INSTRUMENT_VALUE)
+}
+
 /// Where item `t` of a list is once the item `from` moved to `to`.
 pub(super) fn moved_index(t: usize, from: usize, to: usize) -> usize {
     if t == from {
@@ -113,10 +127,7 @@ impl Session {
             self.message = format!("a pattern holds at most {MAX_TRACKS} tracks");
             return;
         }
-        let categories = &catalog().categories;
-        let mut values: Vec<String> = (0..categories.len()).map(|i| format!("{CATEGORY_VALUE}{i}")).collect();
-        let mut labels: Vec<String> =
-            categories.iter().map(|(category, _)| format!("{category}{SUBMENU_MARK}")).collect();
+        let (mut values, mut labels) = category_lines();
         let title = match target {
             Some(t) => {
                 let Some(track) = self.track(t) else { return };
@@ -133,21 +144,29 @@ impl Session {
     /// list of its instruments beside it, an instrument names the track,
     /// "Free name" asks for the name.
     pub(super) fn track_name_menu_pick(&mut self, target: Option<usize>, value: &str, menu: Dropdown) {
-        if let Some(index) = value.strip_prefix(CATEGORY_VALUE).and_then(|i| i.parse::<usize>().ok()) {
-            let Some((category, ids)) = catalog().categories.get(index) else { return };
-            let values = ids.iter().map(|id| format!("{INSTRUMENT_VALUE}{id}")).collect();
-            let labels = ids.clone();
-            let id = Id::TrackNameMenu(target);
-            let submenu = Dropdown::submenu(menu, self.chrome.panel_size, id, (*category).to_owned(), values, labels);
-            self.chrome.widgets.dropdown = Some(submenu);
+        if self.category_submenu(Id::TrackNameMenu(target), value, menu) {
             return;
         }
-        match (target, value.strip_prefix(INSTRUMENT_VALUE)) {
+        match (target, picked_instrument(value)) {
             (None, Some(name)) => self.add_track_named(name),
             (Some(t), Some(name)) => self.commit_text(Id::TrackName(t), name),
             (Some(t), None) if value == FREE_NAME_VALUE => self.text_entry(Id::TrackName(t)),
             _ => {}
         }
+    }
+
+    /// `value`, picked in the instrument menu `menu` (of id `id`), when it is
+    /// a category: the list of its instruments beside it. Whether it was one.
+    pub(super) fn category_submenu(&mut self, id: Id, value: &str, menu: Dropdown) -> bool {
+        let Some(index) = value.strip_prefix(CATEGORY_VALUE).and_then(|i| i.parse::<usize>().ok()) else {
+            return false;
+        };
+        let Some((category, ids)) = catalog().categories.get(index) else { return true };
+        let values = ids.iter().map(|id| format!("{INSTRUMENT_VALUE}{id}")).collect();
+        let labels = ids.clone();
+        let submenu = Dropdown::submenu(menu, self.chrome.panel_size, id, (*category).to_owned(), values, labels);
+        self.chrome.widgets.dropdown = Some(submenu);
+        true
     }
 
     /// A track: rename, copy, paste after it, move up or down, duplicate,

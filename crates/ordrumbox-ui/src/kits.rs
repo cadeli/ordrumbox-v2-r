@@ -149,6 +149,11 @@ impl KitSet {
         self.buffers.get(url)
     }
 
+    /// The file sample `url` plays from; `None` without sample folders (tests).
+    pub fn file(&self, url: &str) -> Option<PathBuf> {
+        self.sources.as_ref()?.file(url)
+    }
+
     pub fn sample(&self, kit: usize, sample: usize) -> Option<&KitSample> {
         self.kits.get(kit)?.samples.get(sample)
     }
@@ -200,6 +205,33 @@ impl KitSet {
             instrument.key = id.to_owned();
             format!("Set \"{}\" to instrument \"{id}\"", instrument.display_name)
         })
+    }
+
+    /// The instrument of sample `sample` of kit `kit` guessed from its file
+    /// name; `Err` when the name gives none.
+    pub fn guess_instrument(&self, kit: usize, sample: usize) -> Result<String, String> {
+        let Some(s) = self.sample(kit, sample) else { return Err("No such sample".into()) };
+        let file = s.path.rsplit_once('/').map_or(s.path.as_str(), |(_, name)| name);
+        match detect_key(file) {
+            key if key == NOT_FOUND => Err(format!("No instrument in the name \"{file}\"")),
+            key => Ok(key),
+        }
+    }
+
+    /// A text of kit `kit` (its title, its description) by its `kits.json`
+    /// key; empty, the key goes. The message when it changed.
+    pub fn set_text(&mut self, kit: usize, key: &str, text: &str) -> Option<String> {
+        let kit = self.kits.get_mut(kit)?;
+        let before = kit.extra.get(key).and_then(|v| v.as_str()).unwrap_or_default();
+        if before == text {
+            return None;
+        }
+        if text.is_empty() {
+            kit.extra.remove(key);
+        } else {
+            kit.extra.insert(key, ordrumbox_core::json::Value::from(text));
+        }
+        Some(format!("Kit \"{}\": {key} changed", kit.name))
     }
 
     /// `moveToKit`: a sample into kit `target`.
@@ -518,6 +550,12 @@ mod tests {
         assert!(kits.set_instrument(0, 0, "SNARE").is_some());
         assert_eq!(kits.kits[0].samples[0].key, "SNARE");
         assert_eq!(kits.find_path("k.wav"), Some((0, 0)));
+        // The kit's texts: set, unchanged, then gone when empty.
+        assert!(kits.set_text(0, "desc", "dry, close-miked").is_some());
+        assert_eq!(kits.set_text(0, "desc", "dry, close-miked"), None);
+        assert_eq!(kits.kits[0].to_json().as_object().unwrap().get("desc").unwrap().as_str(), Some("dry, close-miked"));
+        assert!(kits.set_text(0, "desc", "").is_some());
+        assert!(kits.kits[0].extra.get("desc").is_none());
 
         assert_eq!(kits.normalize(0), Ok(1));
         // The gain comes from the peak in dB to 3 decimals, as in the JS: about 0 dB.

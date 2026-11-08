@@ -184,6 +184,7 @@ impl Session {
             let kit_layout = KitLayout::new(body.main_w, body.editor_h, scale, self.status.len());
             let area = kit_layout.controls_area();
             layout.details_top = area.y;
+            layout.items.extend(self.kit_items(&kit_layout, scale));
             if let Some(view) = self.kit_controls() {
                 let (items, bottom) = editors::kit_controls(&view, area, scale);
                 layout.items.extend(items);
