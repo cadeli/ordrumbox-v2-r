@@ -256,9 +256,11 @@ pub enum Kind {
     },
     /// A highlighted row background (the selected setting).
     Highlight,
-    /// A panel's background (the track editor's).
+    /// A panel's background (the track editor's column, under its cards).
     Panel,
-    Line,
+    /// A card: a raised block with a border that groups one editor (the
+    /// track's, the note's) apart from its neighbour.
+    Card,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -289,7 +291,7 @@ impl Item {
                     | Kind::Envelope { .. }
                     | Kind::Highlight
                     | Kind::Panel
-                    | Kind::Line
+                    | Kind::Card
             )
             && !matches!(self.id, Some(Id::Row(_)))
     }
@@ -396,10 +398,13 @@ pub fn draw(canvas: &mut Canvas, items: &[Item], focus: Option<Id>, scale: Scale
         match &item.kind {
             Kind::Highlight => canvas.fill_rect(r.x, r.y, r.w, r.h, selected_row_color()),
             Kind::Panel => {
-                canvas.fill_rect(r.x, r.y, r.w, r.h, background_color());
+                canvas.fill_rect(r.x, r.y, r.w, r.h, theme::bg());
                 canvas.fill_rect(r.x, r.y, 2 * t, r.h, theme::ACCENT);
             }
-            Kind::Line => canvas.fill_rect(r.x, r.y, r.w, t, border_color()),
+            Kind::Card => {
+                canvas.fill_rect(r.x, r.y, r.w, r.h, border_color());
+                canvas.fill_rect(r.x + t, r.y + t, r.w - 2 * t, r.h - 2 * t, background_color());
+            }
             Kind::Text { text, color } => {
                 canvas.text(r.x, r.y, &fit(text, r.w.max(text_width(text, scale)), scale), scale, *color);
             }
@@ -747,7 +752,7 @@ mod tests {
         let r = Rect::new(0, 0, 10, 10);
         let items = vec![
             Item::new(Some(Id::Tab(0)), r, Kind::Tab { label: "FX".into(), active: true }),
-            Item::new(None, r, Kind::Line),
+            Item::new(None, r, Kind::Card),
             Item::new(Some(Id::Row("x")), r, Kind::Highlight),
             Item::new(Some(Id::Toggle("mono")), r, Kind::Toggle { on: false }),
         ];
