@@ -49,7 +49,7 @@ pub const FILTERS: [Param; 2] = [
     param("hicut", "High Cut", Spec::slider(1000.0, 20_000.0, 100.0, 18_500.0).log(), Format::Round, "Hz"),
 ];
 /// The tabs.
-pub const TABS: [&str; 3] = ["Volume", "Comp", "Filter"];
+pub const TABS: [&str; 3] = ["Volume", "Compressor", "Filter"];
 
 /// Every knob and slider.
 pub fn params() -> impl Iterator<Item = &'static Param> {
@@ -118,7 +118,7 @@ impl OutputLayout {
         let inner_h = (band.h - 2 * pad).max(1);
         let title = (band.x + pad, top);
         // The tabs, stacked under the title on the left.
-        let tab_w = 56 * s;
+        let tab_w = 68 * s;
         let tabs = [0, 1, 2].map(|i| Rect::new(band.x + pad, top + 13 * s + i * 15 * s, tab_w, 12 * s));
         // The controls fill what is left of the width, one row, vertically centred.
         let cx = band.x + pad + tab_w + 16 * s;

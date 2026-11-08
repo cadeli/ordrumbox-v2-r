@@ -447,9 +447,12 @@ impl Session {
     /// `promptNumericInput`: `Enter value for LABEL (min–max unit):`.
     fn open_entry(&mut self, id: Id, spec: Spec, value: f64) {
         let (label, unit) = control_name(id);
+        let unit = spec.shown_unit().unwrap_or(unit);
         let unit = if unit.is_empty() { String::new() } else { format!(" {unit}") };
-        let title = format!("Enter value for {label} ({}–{}{unit}):", num::text(spec.min), num::text(spec.max));
-        self.chrome.widgets.entry = Some(Entry { id, spec: Some(spec), title, text: num::text(value) });
+        let (min, max) = (num::text(spec.shown(spec.min)), num::text(spec.shown(spec.max)));
+        let title = format!("Enter value for {label} ({min}–{max}{unit}):");
+        let text = num::text(spec.shown(value));
+        self.chrome.widgets.entry = Some(Entry { id, spec: Some(spec), title, text });
     }
 
     fn commit_entry(&mut self) {
@@ -459,7 +462,7 @@ impl Session {
             return;
         }
         match Value::from(entry.text.as_str()).to_number() {
-            Some(number) => self.set_value(entry.id, spec.typed(number)),
+            Some(number) => self.set_value(entry.id, spec.typed(spec.typed_shown(number))),
             None => self.tell(format!("\"{}\" is not a number", entry.text.trim())),
         }
     }

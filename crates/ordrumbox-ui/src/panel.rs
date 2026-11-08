@@ -86,7 +86,7 @@ impl LfoParam {
     /// Its knob's label.
     pub const fn label(self) -> &'static str {
         match self {
-            Self::Freq => "Freq",
+            Self::Freq => "Rate",
             Self::Min => "Min",
             Self::Max => "Max",
             Self::Phase => "Phase",
@@ -117,7 +117,7 @@ pub enum Id {
     Compose(&'static str),
     /// ↻: a new line on the edited track.
     Regenerate,
-    /// The Gen tab's Advanced settings, shown or folded.
+    /// The Generate tab's Advanced settings, shown or folded.
     GenerationAdvanced,
     /// The on / off button of an LFO target, named after it.
     LfoPower(u8),
@@ -380,6 +380,13 @@ fn fill_circle(canvas: &mut Canvas, cx: i32, cy: i32, r: i32, color: Rgb) {
     }
 }
 
+/// A label centred in `r`, cut to its width so it never spills out.
+fn centered_label(canvas: &mut Canvas, r: Rect, label: &str, scale: Scale, color: Rgb) {
+    let label = fit(label, r.w - 2 * scale, scale);
+    let x = r.x + (r.w - text_width(&label, scale)) / 2;
+    canvas.text(x, r.y + (r.h - 8 * scale) / 2, &label, scale, color);
+}
+
 /// Text cut to `width` pixels.
 fn fit(text: &str, width: i32, scale: Scale) -> String {
     text.chars().take(crate::canvas::chars_in(width, scale)).collect()
@@ -513,19 +520,16 @@ pub fn draw(canvas: &mut Canvas, items: &[Item], focus: Option<Id>, scale: Scale
                     canvas.fill_rect(r.x, r.y + r.h - 2 * t, r.w, 2 * t, ACTIVE);
                 }
                 let color = if *active { ACTIVE } else { dim() };
-                let x = r.x + (r.w - text_width(label, scale)) / 2;
-                canvas.text(x, r.y + (r.h - 8 * scale) / 2, label, scale, color);
+                centered_label(canvas, r, label, scale, color);
             }
             Kind::Button { label, on } => {
                 canvas.fill_rect(r.x, r.y, r.w, r.h, if *on { ACTIVE } else { field_color() });
                 let color = if *on { background_color() } else { theme::text() };
-                let x = r.x + (r.w - text_width(label, scale)) / 2;
-                canvas.text(x, r.y + (r.h - 8 * scale) / 2, label, scale, color);
+                centered_label(canvas, r, label, scale, color);
             }
             Kind::Disabled { label } => {
                 canvas.fill_rect(r.x, r.y, r.w, r.h, field_color());
-                let x = r.x + (r.w - text_width(label, scale)) / 2;
-                canvas.text(x, r.y + (r.h - 8 * scale) / 2, label, scale, theme::disabled());
+                centered_label(canvas, r, label, scale, theme::disabled());
             }
             Kind::Envelope { points, marker } => {
                 canvas.fill_rect(r.x, r.y, r.w, r.h, field_color());

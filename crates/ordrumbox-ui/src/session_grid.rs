@@ -190,7 +190,7 @@ impl Session {
         if has_notes {
             items.push(("delete-notes", "Delete notes"));
         }
-        items.push(("random-note", "Add rnd note"));
+        items.push(("random-note", "Add random note"));
         let values = items.iter().map(|(action, _)| format!("{action}:{t}:{beat}:{step}")).collect();
         let labels = items.iter().map(|(_, label)| (*label).to_owned()).collect();
         self.chrome.widgets.dropdown = Some(Dropdown::menu(Id::GridMenu, x, y, title, values, labels));
@@ -594,8 +594,8 @@ mod tests {
         let mut s = session();
         s.editor.clean_track(s.pattern_index, 0);
         s.step_menu(0, 1, 0, 10, 10);
-        assert_eq!(labels(&s), ["Copy notes", "Add rnd note"]);
-        pick(&mut s, "Add rnd note");
+        assert_eq!(labels(&s), ["Copy notes", "Add random note"]);
+        pick(&mut s, "Add random note");
         let note = s.track(0).unwrap().notes[0].clone();
         assert_eq!((note.beat, note.step), (1, 0));
         let range = s.track(0).unwrap().pitch_range.max(1.0);
@@ -634,7 +634,7 @@ mod tests {
         );
         let (x, y) = cell.expect("a step");
         assert!(s.grid_menu(SIZE, x, y));
-        assert!(labels(&s).contains(&"Add rnd note".to_owned()));
+        assert!(labels(&s).contains(&"Add random note".to_owned()));
         assert!(!s.grid_menu(SIZE, 0, 0), "the menu bar is not the grid");
     }
 }

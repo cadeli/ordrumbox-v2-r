@@ -21,8 +21,8 @@ use crate::theme;
 // ─── Tables (track_editor_constants.js, sync_section.js) ─────────────────────
 
 /// Main tabs.
-pub const TABS: [&str; 5] = ["FX", "Sound", "LFO", "Loop", "Gen"];
-/// The index of the Gen tab in [`TABS`].
+pub const TABS: [&str; 5] = ["FX", "Sound", "LFO", "Loop", "Generate"];
+/// The index of the Generate tab in [`TABS`].
 pub const GEN_TAB: u8 = 4;
 pub const TAB_FX: u8 = 0;
 pub const TAB_SOUND: u8 = 1;
@@ -172,9 +172,9 @@ pub const DEFAULT_DECAY: f64 = 500.0;
 
 /// Generation tab, shown while auto is off.
 pub const GENERATION_MANUAL: [Prop; 3] = [
-    prop("hitVariation", "Hit Variation", 0.0, 100.0, 1.0, Format::Plain),
-    prop("noteVariation", "Note Variation", 0.0, 100.0, 1.0, Format::Plain),
-    prop("probability", "Probability", 0.0, 1.0, 0.01, Format::Plain),
+    prop("hitVariation", "Hit Variation", 0.0, 100.0, 1.0, Format::Chance),
+    prop("noteVariation", "Note Variation", 0.0, 100.0, 1.0, Format::Chance),
+    prop("probability", "Probability", 0.0, 1.0, 0.01, Format::Percent),
 ];
 
 /// A row of the Groove / Engine sub-tabs.
@@ -186,30 +186,30 @@ pub enum GenerationRow {
 }
 
 pub const GENERATION_GROOVE: [GenerationRow; 8] = [
-    GenerationRow::Slider(prop("autoHitVariation", "Hit Variation", 0.0, 100.0, 1.0, Format::Plain)),
-    GenerationRow::Slider(prop("autoPitchChance", "Pitch", 0.0, 100.0, 1.0, Format::Plain)),
-    GenerationRow::Slider(prop("autoVelocityChance", "Velocity", 0.0, 100.0, 1.0, Format::Plain)),
-    GenerationRow::Slider(prop("autoSilenceChance", "Silence", 0.0, 100.0, 1.0, Format::Plain)),
-    GenerationRow::Slider(prop("autoFillChance", "Fill", 0.0, 100.0, 1.0, Format::Plain)),
-    GenerationRow::Slider(prop("autoGhostChance", "Ghost", 0.0, 100.0, 1.0, Format::Plain)),
+    GenerationRow::Slider(prop("autoHitVariation", "Hit Variation", 0.0, 100.0, 1.0, Format::Chance)),
+    GenerationRow::Slider(prop("autoPitchChance", "Pitch", 0.0, 100.0, 1.0, Format::Chance)),
+    GenerationRow::Slider(prop("autoVelocityChance", "Velocity", 0.0, 100.0, 1.0, Format::Chance)),
+    GenerationRow::Slider(prop("autoSilenceChance", "Silence", 0.0, 100.0, 1.0, Format::Chance)),
+    GenerationRow::Slider(prop("autoFillChance", "Fill", 0.0, 100.0, 1.0, Format::Chance)),
+    GenerationRow::Slider(prop("autoGhostChance", "Ghost", 0.0, 100.0, 1.0, Format::Chance)),
     GenerationRow::Slider(count("pitchRange", "Pitch Range", 1.0, 24.0, Format::Plain)),
     GenerationRow::Toggle("pitchScaleLock", "Scale Lock"),
 ];
 
 pub const GENERATION_ENGINE: [GenerationRow; 8] = [
-    GenerationRow::Slider(prop("autoNoteVariation", "Note Variation", 0.0, 100.0, 1.0, Format::Plain)),
-    GenerationRow::Slider(prop("autoRetriggerChance", "Retrigger", 0.0, 100.0, 1.0, Format::Plain)),
-    GenerationRow::Slider(prop("autoEuclideanChance", "Euclidean", 0.0, 100.0, 1.0, Format::Plain)),
-    GenerationRow::Slider(prop("autoNoteProbabilityChance", "Note Prob", 0.0, 100.0, 1.0, Format::Plain)),
-    GenerationRow::Slider(prop("autoNoteProbabilityRange", "Depth", 0.0, 100.0, 1.0, Format::Plain)),
-    GenerationRow::Slider(prop("autoArpChance", "Arpeggio", 0.0, 100.0, 1.0, Format::Plain)),
+    GenerationRow::Slider(prop("autoNoteVariation", "Note Variation", 0.0, 100.0, 1.0, Format::Chance)),
+    GenerationRow::Slider(prop("autoRetriggerChance", "Retrigger", 0.0, 100.0, 1.0, Format::Chance)),
+    GenerationRow::Slider(prop("autoEuclideanChance", "Euclidean", 0.0, 100.0, 1.0, Format::Chance)),
+    GenerationRow::Slider(prop("autoNoteProbabilityChance", "Probability", 0.0, 100.0, 1.0, Format::Chance)),
+    GenerationRow::Slider(prop("autoNoteProbabilityRange", "Depth", 0.0, 100.0, 1.0, Format::Chance)),
+    GenerationRow::Slider(prop("autoArpChance", "Arpeggio", 0.0, 100.0, 1.0, Format::Chance)),
     GenerationRow::Select("autoVariant", "Variant"),
     GenerationRow::Slider(prop("autoDensity", "Density", -1.0, 1.0, 0.01, Format::Density)),
 ];
 
 /// The Compose sub-tab: how a drum track plays its style's part.
 pub const GENERATION_COMPOSE: [Prop; 7] = [
-    count("composeHitsPerMeasure", "Hits/Measure", 0.0, 32.0, Format::Plain),
+    count("composeHitsPerMeasure", "Measure Hits", 0.0, 32.0, Format::Plain),
     prop("composeComplexity", "Complexity", 0.0, 100.0, 1.0, Format::Plain),
     prop("composeSyncopation", "Syncopation", 0.0, 100.0, 1.0, Format::Plain),
     prop("composeCoupling", "Coupling", -100.0, 100.0, 1.0, Format::Plain),
@@ -227,7 +227,7 @@ pub const COMPOSE_TAB: u8 = 2;
 
 /// The loop tab.
 pub const LOOP_PROPS: [Prop; 3] = [
-    count("stepsPerBeat", "Steps/Beat", 1.0, MAX_STEPS_PER_BEAT as f64, Format::Plain),
+    count("stepsPerBeat", "Steps per Beat", 1.0, MAX_STEPS_PER_BEAT as f64, Format::Plain),
     count("loopLength", "Loop Length", 1.0, 128.0, Format::Plain),
     prop("swingAmount", "Swing", 0.0, 1.0, 0.01, Format::Plain),
 ];
@@ -249,8 +249,9 @@ pub enum NoteRow {
     Select(&'static str, &'static str),
 }
 
-const fn note_slider(key: &'static str, label: &'static str, min: f64, max: f64, step: f64) -> NoteRow {
-    NoteRow::Slider(prop(key, label, min, max, step, Format::Fmt))
+/// A note's chance, 0–1, shown as a percentage.
+const fn note_chance(key: &'static str, label: &'static str) -> NoteRow {
+    NoteRow::Slider(prop(key, label, 0.0, 1.0, 0.01, Format::Percent))
 }
 
 const fn note_count(key: &'static str, label: &'static str, min: f64, max: f64) -> NoteRow {
@@ -264,12 +265,12 @@ pub const NOTE_GROUPS: [&[NoteRow]; 4] = [
     &[
         note_count("cycle", "Cycle", 1.0, 16.0),
         note_count("cycleOffset", "Offset", 0.0, 15.0),
-        note_slider("probability", "Probability", 0.0, 1.0, 0.01),
+        note_chance("probability", "Probability"),
     ],
     &[
         note_count("retriggerCount", "Retrigger", 1.0, 16.0),
         note_count("retriggerRate", "Rate", 1.0, 16.0),
-        note_slider("retriggerProbability", "Probability", 0.0, 1.0, 0.01),
+        note_chance("retriggerProbability", "Probability"),
     ],
     &[note_count("euclideanPulses", "Pulses", 0.0, 16.0), note_count("euclideanRotation", "Rotation", 0.0, 15.0)],
     &[
@@ -314,7 +315,7 @@ pub struct EditorState {
     pub tab: u8,
     pub generation_tab: u8,
     pub note_tab: u8,
-    /// The Gen tab shows its Advanced settings.
+    /// The Generate tab shows its Advanced settings.
     pub generation_advanced: bool,
     /// The row last clicked.
     pub selected_prop: Option<&'static str>,
@@ -759,13 +760,14 @@ impl Rows {
 /// A setting's control: a knob in a bar of knobs, else a stepper for a
 /// count and a slider for the rest.
 fn value_spec(p: &Prop, default: f64, knob: bool) -> Spec {
-    if knob {
+    let spec = if knob {
         Spec::knob(p.min, p.max, p.step, default)
     } else if p.count {
         Spec::stepper(p.min, p.max, p.step, default)
     } else {
         Spec::slider(p.min, p.max, p.step, default)
-    }
+    };
+    if p.format == Format::Percent { spec.percent() } else { spec }
 }
 
 /// Default of a setting, else its minimum.
@@ -914,7 +916,7 @@ fn sound_tab(rows: &mut Rows, view: &TrackView) {
     ));
     rows.items.push(Item::text(r.x + 14 * s, r.y + (r.h - 8 * s) / 2, "auto", dim(), s));
     for (id, label, choice) in [
-        (Id::Instrument, "Instr", &view.instruments),
+        (Id::Instrument, "Instrument", &view.instruments),
         (Id::Sample, "Sample", &view.samples),
         (Id::Synth, "Synth", &view.synths),
     ] {
@@ -1086,7 +1088,7 @@ fn generation_tab(rows: &mut Rows, track: &Track, compose: Option<&ComposeView>,
     }
 }
 
-/// The y under the Gen tab's simple part (from `top`): its tallest, a style's
+/// The y under the Generate tab's simple part (from `top`): its tallest, a style's
 /// line and its compose sliders.
 fn simple_part_bottom(top: i32, scale: Scale) -> i32 {
     let mut rows = Rows { x: 0, w: 0, y: top, scale, items: Vec::new() };
@@ -1097,7 +1099,7 @@ fn simple_part_bottom(top: i32, scale: Scale) -> i32 {
     rows.y
 }
 
-/// The rows of the Gen tab's tallest sub-tab.
+/// The rows of the Generate tab's tallest sub-tab.
 const GENERATION_ROWS: usize =
     max_len(&[GENERATION_GROOVE.len(), GENERATION_ENGINE.len(), GENERATION_COMPOSE.len(), GENERATION_MANUAL.len()]);
 

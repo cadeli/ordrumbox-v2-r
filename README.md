@@ -13,6 +13,12 @@ The JavaScript/web v(ersion https://github.com/cadeli/ordrumbox-v2), is a web de
 
 The app is a single executable with its `assets/` folder next to it.
 
+## Documentation
+
+- User manual: [`docs/user-manual.html`](docs/user-manual.html), with its
+  screenshots in `docs/images/`.
+- AI clients (MCP): [`docs/mcp-guide.html`](docs/mcp-guide.html).
+
 ## Crates
 
 | Crate | Role | Dependencies |
