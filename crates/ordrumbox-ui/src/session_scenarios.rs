@@ -602,7 +602,7 @@ fn every_knob_of_the_editors_is_undone() {
     for tab in 0..editors::TABS.len() as u8 {
         for sub_tab in 0..4 {
             s.editors.tab = tab;
-            (s.editors.generation_tab, s.editors.lfo_target, s.editors.note_tab) = (sub_tab % 3, sub_tab, sub_tab);
+            (s.editors.generation_tab, s.editors.note_tab) = (sub_tab % 3, sub_tab);
             let knobs: Vec<Id> = s
                 .panel_layout(width, height, scale)
                 .items

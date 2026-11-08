@@ -26,10 +26,9 @@ pub fn help(id: Id) -> Option<Help> {
             2 => ["Euclidean", "hits spread evenly up to the next note"],
             _ => ["Arpeggio", "the note played as a run of scale notes"],
         },
-        Id::LfoTarget => ["LFO target", "the setting the LFO below moves"],
-        Id::LfoLed(_) => ["LFO on / off", "a lit LED: this setting has an LFO"],
-        Id::LfoType => ["LFO wave", "the shape the setting follows"],
-        Id::Lfo(param) => match param {
+        Id::LfoPower(_) => ["LFO on / off", "lit: this setting moves with its LFO"],
+        Id::LfoType(_) => ["LFO wave", "the shape the setting follows"],
+        Id::Lfo(_, param) => match param {
             LfoParam::Freq => ["LFO frequency", "how fast the setting moves, in Hz"],
             LfoParam::Min => ["LFO minimum", "the lowest value the setting reaches"],
             LfoParam::Max => ["LFO maximum", "the highest value the setting reaches"],

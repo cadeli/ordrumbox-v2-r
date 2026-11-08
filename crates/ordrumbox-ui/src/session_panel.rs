@@ -20,7 +20,7 @@ use crate::editors::{
     self, FX_DEFS, FX_KNOBS, GENERATION_COMPOSE, GENERATION_ENGINE, GENERATION_GROOVE, GENERATION_MANUAL,
     GenerationRow, KIT_KNOBS, KNOB_BAR, LOOP_PROPS, NOTE_GROUPS, NOTE_KNOBS, NoteRow,
 };
-use crate::panel::{self, Item, Kind, LfoParam, Rect};
+use crate::panel::{self, Item, Kind, Rect};
 use crate::view::{KitLayout, Layout};
 
 /// The ⟳ button's label: the pattern made again.
@@ -309,15 +309,7 @@ pub(super) fn control_name(id: Id) -> (&'static str, &'static str) {
         }
         Id::Compose(key) => (prop(&GENERATION_COMPOSE, key), ""),
         Id::Loop(key) => (prop(&LOOP_PROPS, key), ""),
-        Id::Lfo(param) => (
-            match param {
-                LfoParam::Freq => "Freq",
-                LfoParam::Min => "Min",
-                LfoParam::Max => "Max",
-                LfoParam::Phase => "Phase",
-            },
-            "",
-        ),
+        Id::Lfo(_, param) => (param.label(), ""),
         Id::NoteKnob(key) => NOTE_KNOBS.iter().find(|(p, _)| p.key == key).map_or(("", ""), |(p, u)| (p.label, *u)),
         Id::NoteSlider(key) => {
             let label = NOTE_GROUPS
