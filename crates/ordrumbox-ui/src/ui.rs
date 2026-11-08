@@ -136,8 +136,8 @@ impl Ui {
         self.scroll.show(&viewport, pixels, width, height);
     }
 
-    /// Between events: MCP calls, autosave, audio errors, update checks and
-    /// the playhead.
+    /// Between events: MCP calls, autosave, audio errors, update checks,
+    /// the playhead and the end of a new message's band.
     pub fn idle(&mut self) -> Idle {
         // MCP calls first: the autosave below counts their edits.
         let called = self.session.poll_mcp();
@@ -149,13 +149,24 @@ impl Ui {
         }
         // While playing (the playhead) or while an LFO moves the synth editor.
         let animating = playing || self.session.synth_animating();
-        redraw |= animating;
-        let wake_at = if animating { Some(Instant::now() + FRAME) } else { save_at };
+        self.session.note_message();
+        let now = Instant::now();
+        // A new message's band goes when its time is over.
+        redraw |= animating || self.session.end_flash(now);
+        let wake_at = if animating {
+            Some(now + FRAME)
+        } else {
+            [save_at, self.session.flash_until()].into_iter().flatten().min()
+        };
         Idle { redraw, wake_at }
     }
 
     /// A button pressed at the pointer.
     pub fn pointer_pressed(&mut self, button: Button) -> bool {
+        self.input(|ui| ui.pressed(button))
+    }
+
+    fn pressed(&mut self, button: Button) -> bool {
         // Alt+click or Alt+drag: releasing Alt then leaves the menus closed.
         self.alt_alone = false;
         let window = (self.pointer.0 as i32, self.pointer.1 as i32);
@@ -231,6 +242,10 @@ impl Ui {
 
     /// A button released.
     pub fn pointer_released(&mut self, button: Button) -> bool {
+        self.input(|ui| ui.released(button))
+    }
+
+    fn released(&mut self, button: Button) -> bool {
         if button != Button::Left {
             return false;
         }
@@ -303,9 +318,21 @@ impl Ui {
 
     /// A file or folder dropped on the window.
     pub fn drop_path(&mut self, path: &Path) -> bool {
-        self.session.close_overlay();
-        self.session.drop_path(path, self.modifiers.shift);
-        true
+        self.input(|ui| {
+            ui.session.close_overlay();
+            ui.session.drop_path(path, ui.modifiers.shift);
+            true
+        })
+    }
+
+    /// Run `handle`, an input: a message it gives stands out, even the one
+    /// already shown said again (a refusal repeated).
+    fn input(&mut self, handle: impl FnOnce(&mut Self) -> bool) -> bool {
+        let before = self.session.input_starts();
+        let redraw = handle(self);
+        let said = !self.session.message().is_empty();
+        self.session.input_done(before);
+        redraw || said
     }
 
     /// Open the first menu from the keyboard, or close the open one.
@@ -319,6 +346,10 @@ impl Ui {
 
     /// A key pressed or released.
     pub fn key(&mut self, event: &KeyEvent) -> bool {
+        self.input(|ui| ui.key_event(event))
+    }
+
+    fn key_event(&mut self, event: &KeyEvent) -> bool {
         let code = event.key;
         let is_alt = code == Key::Alt;
         if !event.pressed {
@@ -733,5 +764,38 @@ mod tests {
         ui.wheel(ScrollDelta::Lines(0.0, 1.0));
         assert!(!ui.key(&alt(false)));
         assert!(ui.session.open_menu().is_none(), "Alt+wheel");
+    }
+
+    #[test]
+    fn a_new_message_stands_out_even_the_same_words_again_and_then_goes_back() {
+        let library =
+            ordrumbox_core::Library::parse(r#"{"patterns":[{"name":"demo","tracks":[{"name":"KICK"}]}]}"#).unwrap().0;
+        let mut ui = Ui::new(Session::for_tests(library, false));
+        let refuse = |ui: &mut Ui| {
+            ui.session.say("select a track first");
+            false
+        };
+
+        assert!(ui.input(refuse), "a message is a redraw");
+        let first = ui.session.flash_until().expect("stands out");
+        assert!(ui.session.end_flash(first));
+        assert_eq!(ui.session.flash_until(), None, "its time is over");
+
+        // The same refusal again stands out again.
+        assert!(ui.input(refuse));
+        assert!(ui.session.flash_until().is_some_and(|until| until >= first));
+
+        // An input that says nothing keeps the message, its toast left as it is.
+        let until = ui.session.flash_until();
+        assert!(!ui.input(|_| false));
+        assert_eq!(ui.session.message(), "select a track first");
+        assert_eq!(ui.session.flash_until(), until);
+
+        // A message given outside an input (an MCP call) stands out at the next idle pass.
+        ui.session.end_flash(Instant::now() + Duration::from_secs(60));
+        ui.session.say("stopped");
+        let idle = ui.idle();
+        assert!(ui.session.flash_until().is_some());
+        assert!(idle.wake_at.is_some(), "woken when the toast goes");
     }
 }

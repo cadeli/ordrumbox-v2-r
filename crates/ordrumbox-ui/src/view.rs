@@ -11,6 +11,7 @@ use ordrumbox_core::track::MAX_STEPS_PER_BEAT;
 use ordrumbox_core::{Note, Pattern, Track};
 
 use crate::canvas::{Canvas, Rgb, chars_in, small_cell, small_char_width, text_width};
+use crate::font;
 use crate::frame::{body_top, content_top, footer_top, margin, status_line};
 use crate::menu;
 use crate::output::{self, OutputLayout, OutputView};
@@ -984,6 +985,36 @@ pub fn draw_tooltip_lines<S: AsRef<str>>(canvas: &mut Canvas, lines: &[S], cell:
     for (i, line) in lines.iter().enumerate() {
         canvas.text(x + 6 * scale, y + 3 * scale + i as i32 * line_h, line.as_ref(), scale, theme::text());
     }
+}
+
+/// How opaque a toast's background is (0–255): the window shows through.
+const TOAST_OPACITY: u8 = 190;
+
+/// A new message as a toast centred over the bottom of the window, in a
+/// larger font, its lower edge at `bottom`: over the rest, so that nothing
+/// moves.
+pub fn draw_toast(canvas: &mut Canvas, message: &str, bottom: i32, scale: Scale) {
+    let big = scale.times(2);
+    let (margin, pad_x, pad_y, border) = (margin(scale), 24 * scale, 12 * scale, scale.px());
+    let room = canvas.width() - 2 * margin - 2 * pad_x;
+    let text: String = message.chars().take(chars_in(room, big)).collect();
+    let w = (text_width(&text, big) + 2 * pad_x).max((320 * scale).min(canvas.width() - 2 * margin));
+    let h = font::SIZE * big + 2 * pad_y;
+    let (x, y) = ((canvas.width() - w) / 2, bottom - h);
+    // Each pixel shaded once, so that the window shows through evenly.
+    canvas.shade_rect(x + border, y + border, w - 2 * border, h - 2 * border, theme::panel(), TOAST_OPACITY);
+    let side = h - 2 * border;
+    let edges = [
+        (x, y, w, border),
+        (x, y + h - border, w, border),
+        (x, y + border, border, side),
+        (x + w - border, y + border, border, side),
+    ];
+    for (sx, sy, sw, sh) in edges {
+        canvas.shade_rect(sx, sy, sw, sh, theme::line(), TOAST_OPACITY);
+    }
+    let text_x = x + (w - text_width(&text, big)) / 2;
+    canvas.text(text_x, y + pad_y, &text, big, theme::text());
 }
 
 /// A panel over the window: a title and lines of text (the key list, about).
