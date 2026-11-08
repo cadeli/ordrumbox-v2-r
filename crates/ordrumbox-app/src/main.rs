@@ -15,7 +15,7 @@ use std::num::NonZeroU32;
 use std::rc::Rc;
 
 use ordrumbox_ui::ui_input::{Button, Key, KeyEvent, Modifiers, ScrollDelta};
-use ordrumbox_ui::{Command, PanelId, Scale, Session, Ui};
+use ordrumbox_ui::{Command, Scale, Session, Ui};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
@@ -335,15 +335,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             session.import_midi(&path);
         }
     }
-    // `ORDRUMBOX_VIEW=roll|song|synth|kit|comp|flt|gen`: which view the window
+    // `ORDRUMBOX_VIEW=roll|song|synth|kit|gen`: which view the window
     // starts on (with `ORDRUMBOX_SCREENSHOT`, to capture that layout).
     match std::env::var("ORDRUMBOX_VIEW").as_deref() {
         Ok("roll") => session.toggle_piano_roll(),
         Ok("song") => session.toggle_song_view(),
         Ok("synth") => session.toggle_synth(),
         Ok("kit") => session.toggle_kit_editor(),
-        Ok("comp") => session.output_activate(PanelId::OutTab(1)),
-        Ok("flt") => session.output_activate(PanelId::OutTab(2)),
         Ok("gen") => session.show_generation_tab(),
         Ok("reset") => session.run(Command::FactoryReset),
         _ => {}

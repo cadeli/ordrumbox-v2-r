@@ -224,7 +224,7 @@ fn a_plugin_leaves_to_the_host_what_the_host_does() {
     s.control_hover(size, bpm.x + 2, bpm.y + 2);
     assert_eq!(s.chrome.control_hover.map(|(id, _)| s.control_tip(id).unwrap()[0]), Some("Tempo (HOST)"));
     // No master strip: the editors reach down to where it was.
-    assert!(!layout.items.iter().any(|i| matches!(i.id, Some(Id::OutTab(_) | Id::Master(_)))));
+    assert!(!layout.items.iter().any(|i| matches!(i.id, Some(Id::Master(_)))));
     assert!(s.output_view().is_none());
     let body = s.body((1100, 680, Scale::ONE));
     assert_eq!(body.output.h, 0);

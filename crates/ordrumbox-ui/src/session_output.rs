@@ -1,7 +1,7 @@
 //! The session's side of the output panel (`output_panel.js`): the master
 //! bus settings sent to the player as they change and saved to
 //! `settings.json` half a second after the last change,
-//! the tabs, the spectrum of what plays.
+//! the spectrum of what plays.
 
 use crate::scale::Scale;
 use ordrumbox_engine::{MasterSettings, SCOPE_SIZE};
@@ -11,12 +11,11 @@ use crate::master;
 use crate::output::{self, OutputLayout, OutputView};
 use crate::panel::{Item, Kind, Rect};
 
-/// The output panel's state: the master bus settings; the tab (Vol, Comp, Flt); the spectrum's analyser and its
-/// last bins.
+/// The output panel's state: the master bus settings; the spectrum's analyser
+/// and its last bins.
 #[derive(Debug, Default)]
 pub(super) struct OutputPanel {
     master: MasterSettings,
-    tab: u8,
     analyser: std::cell::RefCell<crate::spectrum::Analyser>,
     spectrum: std::cell::RefCell<Vec<u8>>,
 }
@@ -74,71 +73,48 @@ impl Session {
         None
     }
 
-    /// The output strip's controls: the tabs, then the tab's knobs and sliders.
+    /// The output strip's controls: its knobs, its button and its sliders.
     pub(super) fn output_items(&self, layout: &mut session_panel::PanelLayout, width: i32, band: Rect, scale: Scale) {
         let out = OutputLayout::strip(width, band, scale);
-        for (i, (rect, label)) in out.tabs.iter().zip(output::TABS).enumerate() {
-            let kind = Kind::Tab { label: label.into(), active: usize::from(self.output_panel.tab) == i };
-            layout.items.push(Item::new(Some(Id::OutTab(i as u8)), *rect, kind));
-        }
         let mut control = |param: &output::Param, rect: Rect| {
             let value = master::get(&self.output_panel.master, param.key);
             let text = param.format.value(value, param.unit);
             let kind = Kind::Value { spec: param.spec, value, label: Some(param.label.into()), text, lfo: false };
             layout.items.push(Item::new(Some(Id::Master(param.key)), rect, kind));
         };
-        match self.output_panel.tab {
-            0 => control(&output::VOLUME, out.volume),
-            1 => {
-                control(&output::PRE_GAIN, out.pre_gain);
-                for (param, rect) in output::COMPRESSOR.iter().zip(out.compressor) {
-                    control(param, rect);
-                }
-            }
-            _ => {
-                for (param, rect) in output::FILTERS.iter().zip(out.filters) {
-                    control(param, rect);
-                }
-            }
+        control(&output::VOLUME, out.volume);
+        control(&output::PRE_GAIN, out.pre_gain);
+        for (param, rect) in output::COMPRESSOR.iter().zip(out.compressor) {
+            control(param, rect);
         }
-        if self.output_panel.tab == 1 {
-            // The compressor's on/off button (lit: on).
-            let kind = Kind::Toggle { on: self.output_panel.master.bypass < 0.5 };
-            layout.items.push(Item::new(Some(Id::Master("compBypass")), out.bypass, kind));
+        for (param, rect) in output::FILTERS.iter().zip(out.filters) {
+            control(param, rect);
         }
+        // The compressor's on/off button (lit: on).
+        let kind = Kind::Toggle { on: self.output_panel.master.bypass < 0.5 };
+        layout.items.push(Item::new(Some(Id::Master("compBypass")), out.bypass, kind));
     }
 
-    /// A tab or the compressor button pressed.
+    /// The compressor button pressed.
     pub fn output_activate(&mut self, id: Id) {
-        match id {
-            Id::OutTab(i) => self.output_panel.tab = i.min(2),
-            Id::Master("compBypass") => {
-                let bypass = if self.output_panel.master.bypass >= 0.5 { 0.0 } else { 1.0 };
-                self.set_master_value("compBypass", bypass);
-            }
-            _ => {}
+        if id == Id::Master("compBypass") {
+            let bypass = if self.output_panel.master.bypass >= 0.5 { 0.0 } else { 1.0 };
+            self.set_master_value("compBypass", bypass);
         }
     }
 
-    /// What the output strip draws: on the Vol tab, the spectrum of the
-    /// last samples played (the analyser keeps its smoothing between frames).
+    /// What the output strip draws: the spectrum of the last samples played (the analyser keeps its smoothing between frames).
     /// `None` in a plugin: it has no output strip.
     pub(super) fn output_view(&self) -> Option<OutputView> {
         if self.hosted {
             return None;
         }
-        if self.output_panel.tab == 0
-            && let Some(controller) = self.playback.controller()
-        {
+        if let Some(controller) = self.playback.controller() {
             let mut samples = [0.0f32; SCOPE_SIZE];
             controller.scope(&mut samples);
             *self.output_panel.spectrum.borrow_mut() = self.output_panel.analyser.borrow_mut().bytes(&samples);
         }
-        Some(OutputView {
-            tab: self.output_panel.tab,
-            master: self.output_panel.master,
-            spectrum: self.output_panel.spectrum.borrow().clone(),
-        })
+        Some(OutputView { master: self.output_panel.master, spectrum: self.output_panel.spectrum.borrow().clone() })
     }
 }
 
@@ -150,7 +126,7 @@ mod tests {
     const SIZE: (i32, i32, Scale) = (1100, 680, Scale::ONE);
 
     #[test]
-    fn knobs_tabs_and_the_compressor_button() {
+    fn knobs_sliders_and_the_compressor_button() {
         let mut s = Session::new(Library::default(), KitSet::empty(), Vec::new());
         s.set_size(SIZE);
         // The output strip is always shown along the bottom.
@@ -158,14 +134,12 @@ mod tests {
             let band = s.body(SIZE).output;
             OutputLayout::strip(SIZE.0, band, Scale::ONE)
         };
-        // Vol: the wheel on the volume knob.
+        // The wheel on the volume knob.
         let (x, y) = (out.volume.x + out.volume.w / 2, out.volume.y + 10);
         assert!(s.wheel(SIZE, x, y, -10, false, false));
         assert!((s.output_panel.master.master - 0.9).abs() < 1e-6);
         assert!(s.saving.master.pending());
-        // Comp: the button bypasses the compressor.
-        s.mouse_down(SIZE, out.tabs[1].x + 4, out.tabs[1].y + 4, Button::Left, false);
-        assert_eq!(s.output_panel.tab, 1);
+        // The button bypasses the compressor.
         s.mouse_down(SIZE, out.bypass.x + 4, out.bypass.y + 4, Button::Left, false);
         assert_eq!(s.output_panel.master.bypass, 1.0);
         // A typed threshold.
@@ -174,8 +148,7 @@ mod tests {
         s.chrome.widgets.entry.as_mut().unwrap().text = "-30".into();
         s.panel_key(SIZE, PanelKey::Enter, false, false);
         assert_eq!(s.output_panel.master.threshold, -30.0);
-        // Flt: a click on the low cut slider's bar.
-        s.mouse_down(SIZE, out.tabs[2].x + 4, out.tabs[2].y + 4, Button::Left, false);
+        // A click on the low cut slider's bar.
         let f = out.filters[0];
         let (left, w) = crate::panel::slider_bar(f, true, true, Scale::ONE);
         s.mouse_down(SIZE, left + w, f.y + 8, Button::Left, false);

@@ -419,7 +419,7 @@ impl Session {
             Id::SongButton(button) => self.song_button(button),
             Id::Transport => self.toggle_play(),
             Id::View(i) => self.show_view(i),
-            Id::OutTab(_) | Id::Master(_) => self.output_activate(id),
+            Id::Master(_) => self.output_activate(id),
             Id::SynthTab(_) | Id::SynthButton(_) | Id::SynthPower(_) | Id::SynthIcon(..) | Id::SynthField(_) => {
                 self.synth_activate(id);
             }

@@ -662,11 +662,10 @@ mod tests {
 
     #[test]
     fn the_output_strip_and_the_track_editor_stay_with_every_main_editor() {
-        /// The strip's tabs and knobs are there, all inside the bottom band.
+        /// The strip's knobs are there, all inside the bottom band.
         fn strip(band: Rect, layout: &PanelLayout) {
-            let items: Vec<&Item> =
-                layout.items.iter().filter(|i| matches!(i.id, Some(Id::OutTab(_) | Id::Master(_)))).collect();
-            assert!(items.len() >= 2, "the strip's tabs and controls are missing");
+            let items: Vec<&Item> = layout.items.iter().filter(|i| matches!(i.id, Some(Id::Master(_)))).collect();
+            assert!(items.len() >= 2, "the strip's controls are missing");
             for item in items {
                 assert!(
                     item.rect.y >= band.y && item.rect.y + item.rect.h <= band.y + band.h,

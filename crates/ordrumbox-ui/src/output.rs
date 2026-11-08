@@ -1,8 +1,8 @@
-//! The output panel (`output_panel.js` and its sections), in the place of
-//! the grid: the master bus settings in three tabs — **Vol** (the master
-//! volume, the spectrum), **Comp** (pre-gain, the compressor's transfer curve,
-//! its on/off button and six knobs), **Flt** (low cut, high cut) — kept in
-//! `settings.json` (`settings.master`, `MASTER_BUS_DEFAULTS` for what it lacks).
+//! The output panel, a strip along the bottom of the window: the master bus
+//! settings in one row — the master volume and the spectrum; pre-gain, the
+//! compressor's six knobs, its on/off button and transfer curve; low cut and
+//! high cut — kept in `settings.json` (`settings.master`,
+//! `MASTER_BUS_DEFAULTS` for what it lacks).
 //!
 //! [`OutputLayout`] places everything; the controls are panel items, the
 //! curve and the spectrum are drawn here.
@@ -30,9 +30,9 @@ const fn param(key: &'static str, label: &'static str, spec: Spec, format: Forma
     Param { key, label, spec, format, unit }
 }
 
-/// The volume knob (Vol tab).
+/// The volume knob.
 pub const VOLUME: Param = param("volume", "Volume", Spec::knob(0.0, 2.0, 0.01, 1.0), Format::Fixed2, "");
-/// The pre-gain knob (Comp tab).
+/// The pre-gain knob, ahead of the compressor.
 pub const PRE_GAIN: Param = param("preGain", "Pre-Gain", Spec::knob(-20.0, 20.0, 0.5, 0.0), Format::SignedFixed1, "dB");
 /// The compressor knobs (`COMPRESSOR_PARAMS`): under 1 a step shows 3 decimals, else whole.
 pub const COMPRESSOR: [Param; 6] = [
@@ -43,13 +43,11 @@ pub const COMPRESSOR: [Param; 6] = [
     param("knee", "Knee", Spec::knob(0.0, 40.0, 1.0, 3.0), Format::Round, "dB"),
     param("makeup", "Makeup", Spec::knob(0.0, 24.0, 0.5, 8.0), Format::Fmt3, "dB"),
 ];
-/// The filter sliders (Flt tab).
+/// The filter sliders.
 pub const FILTERS: [Param; 2] = [
     param("lowcut", "Low Cut", Spec::slider(10.0, 500.0, 1.0, 35.0).log(), Format::Round, "Hz"),
     param("hicut", "High Cut", Spec::slider(1000.0, 20_000.0, 100.0, 18_500.0).log(), Format::Round, "Hz"),
 ];
-/// The tabs.
-pub const TABS: [&str; 3] = ["Volume", "Compressor", "Filter"];
 
 /// Every knob and slider.
 pub fn params() -> impl Iterator<Item = &'static Param> {
@@ -87,75 +85,73 @@ pub fn transfer(master: &MasterSettings, input: f64) -> f64 {
 const CURVE_X: (f64, f64) = (-60.0, 0.0);
 const CURVE_Y: (f64, f64) = (-60.0, 12.0);
 
+/// Height of the output strip, at scale 1: a knob between two pads.
+pub const STRIP_HEIGHT: i32 = KNOB_HEIGHT + 2 * PAD;
+/// The strip's inner margin, at scale 1.
+const PAD: i32 = 8;
+/// A knob's slot: the knob, its label and its value, at scale 1.
+const KNOB_WIDTH: i32 = 60;
+const KNOB_HEIGHT: i32 = 48;
+/// The "Master" title's column, at scale 1.
+const TITLE_WIDTH: i32 = 44;
+/// The spectrum's width, at scale 1.
+const SPECTRUM_WIDTH: i32 = 120;
+/// The compressor's transfer curve's width, at scale 1.
+const CURVE_WIDTH: i32 = 96;
+/// The compressor's on/off button, at scale 1.
+const BYPASS_SIZE: (i32, i32) = (36, 14);
+/// The space between two groups, a divider in its middle, at scale 1.
+const GROUP_GAP: i32 = 12;
+
 /// Where the output panel's parts are.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct OutputLayout {
     scale: Scale,
-    /// The band the panel is drawn in (the bottom strip; empty in the full layout).
+    /// The band the panel is drawn in (the bottom strip).
     pub band: Rect,
     pub title: (i32, i32),
-    pub tabs: [Rect; 3],
-    /// Vol: the volume knob, the spectrum.
+    /// The volume knob, the spectrum.
     pub volume: Rect,
     pub spectrum: Rect,
-    /// Comp: the pre-gain knob, the curve, the on/off button, the six knobs.
+    /// The pre-gain knob, the six knobs, the on/off button, the curve.
     pub pre_gain: Rect,
-    pub curve: Rect,
-    pub compressor_title: (i32, i32),
-    pub bypass: Rect,
     pub compressor: [Rect; 6],
-    /// Flt: the two sliders.
+    pub bypass: Rect,
+    pub curve: Rect,
+    /// The two sliders, one under the other.
     pub filters: [Rect; 2],
+    /// The dividers between the groups: their x.
+    dividers: [i32; 2],
 }
 
 impl OutputLayout {
-    /// The compact bottom strip: the title and the three tabs stacked on the
-    /// left, the active tab's controls in one horizontal row across `band`.
+    /// The strip: the title, then every group in one row across `band`.
     pub fn strip(width: i32, band: Rect, scale: Scale) -> Self {
         let s = scale;
-        let pad = 8 * s;
-        let top = band.y + pad;
-        let inner_h = (band.h - 2 * pad).max(1);
-        let title = (band.x + pad, top);
-        // The tabs, stacked under the title on the left.
-        let tab_w = 68 * s;
-        let tabs = [0, 1, 2].map(|i| Rect::new(band.x + pad, top + 13 * s + i * 15 * s, tab_w, 12 * s));
-        // The controls fill what is left of the width, one row, vertically centred.
-        let cx = band.x + pad + tab_w + 16 * s;
-        let right = width - pad;
-        let knob_w = 76 * s;
-        let knob_h = inner_h.min(64 * s);
+        let knob_h = KNOB_HEIGHT * s;
         let knob_y = band.y + (band.h - knob_h) / 2;
-        let knob = |x: i32, w: i32| Rect::new(x, knob_y, w, knob_h);
-        let after_knobs = |n: i32| cx + n * (knob_w + 4 * s);
-        // Vol: the volume knob, then the spectrum filling the rest.
-        let volume = knob(cx, knob_w);
-        let spectrum = Rect::new(cx + knob_w + 12 * s, top, (right - (cx + knob_w + 12 * s)).max(0), inner_h);
-        // Comp: pre-gain + six knobs + the on/off button, the curve on the right.
-        let pre_gain = knob(cx, knob_w);
-        let compressor = [0, 1, 2, 3, 4, 5].map(|i| knob(after_knobs(i + 1), knob_w));
-        let bypass = Rect::new(after_knobs(7), band.y + (band.h - 12 * s) / 2, 40 * s, 12 * s);
-        let curve_x = after_knobs(7) + 52 * s;
-        let curve = Rect::new(curve_x, top, (right - curve_x).max(0), inner_h);
-        // Flt: the two sliders, one under the other, across the width.
+        let knob = |x: i32| Rect::new(x, knob_y, KNOB_WIDTH * s, knob_h);
+        let title = (band.x + PAD * s, band.y + (band.h - 8 * s) / 2);
+        // The volume, then the spectrum.
+        let volume = knob(title.0 + TITLE_WIDTH * s);
+        let spectrum = Rect::new(volume.x + volume.w + PAD * s, knob_y, SPECTRUM_WIDTH * s, knob_h);
+        // The compressor: pre-gain, six knobs, the on/off button, the curve.
+        let comp_x = spectrum.x + spectrum.w + GROUP_GAP * s;
+        let pre_gain = knob(comp_x);
+        let compressor = [1, 2, 3, 4, 5, 6].map(|i| knob(comp_x + i * KNOB_WIDTH * s));
+        let (bypass_w, bypass_h) = (BYPASS_SIZE.0 * s, BYPASS_SIZE.1 * s);
+        let bypass =
+            Rect::new(comp_x + 7 * KNOB_WIDTH * s + 4 * s, band.y + (band.h - bypass_h) / 2, bypass_w, bypass_h);
+        let curve = Rect::new(bypass.x + bypass.w + PAD * s, knob_y, CURVE_WIDTH * s, knob_h);
+        // The filters fill what is left of the width.
+        let filter_x = curve.x + curve.w + GROUP_GAP * s;
+        let filter_w = (width - PAD * s - filter_x).max(0);
         let filters = [
-            Rect::new(cx, band.y + band.h / 2 - 18 * s, (right - cx).max(0), 16 * s),
-            Rect::new(cx, band.y + band.h / 2 + 2 * s, (right - cx).max(0), 16 * s),
+            Rect::new(filter_x, band.y + band.h / 2 - 18 * s, filter_w, 16 * s),
+            Rect::new(filter_x, band.y + band.h / 2 + 2 * s, filter_w, 16 * s),
         ];
-        Self {
-            scale,
-            band,
-            title,
-            tabs,
-            volume,
-            spectrum,
-            pre_gain,
-            curve,
-            compressor_title: (curve_x, band.y + 2 * s),
-            bypass,
-            compressor,
-            filters,
-        }
+        let dividers = [comp_x - GROUP_GAP * s / 2, filter_x - GROUP_GAP * s / 2];
+        Self { scale, band, title, volume, spectrum, pre_gain, compressor, bypass, curve, filters, dividers }
     }
 }
 
@@ -183,7 +179,6 @@ const PHOSPHOR: Rgb = theme::LIVE;
 /// What the output panel draws besides its controls.
 #[derive(Debug)]
 pub struct OutputView {
-    pub tab: u8,
     pub master: MasterSettings,
     /// The analyser's bytes, one a bin.
     pub spectrum: Vec<u8>,
@@ -197,15 +192,12 @@ pub fn draw(canvas: &mut Canvas, view: &OutputView, layout: &OutputLayout) {
         canvas.fill_rect(layout.band.x, layout.band.y, layout.band.w, s.px(), theme::line());
     }
     canvas.text(layout.title.0, layout.title.1, "Master", s, ACCENT);
-    match view.tab {
-        0 if layout.spectrum.w > 8 * s && layout.spectrum.h > 8 * s => {
-            draw_spectrum(canvas, &view.spectrum, layout.spectrum, s);
-        }
-        1 if layout.curve.w > 8 * s && layout.curve.h > 8 * s => {
-            draw_curve(canvas, &view.master, layout.curve, s);
-            canvas.text(layout.compressor_title.0, layout.compressor_title.1, "COMPRESSOR", s, muted_color());
-        }
-        _ => {}
+    if layout.spectrum.h > 8 * s {
+        draw_spectrum(canvas, &view.spectrum, layout.spectrum, s);
+        draw_curve(canvas, &view.master, layout.curve, s);
+    }
+    for x in layout.dividers {
+        canvas.fill_rect(x, layout.volume.y, s.px(), layout.volume.h, theme::line());
     }
 }
 
@@ -254,9 +246,12 @@ fn draw_curve(canvas: &mut Canvas, master: &MasterSettings, r: Rect, s: Scale) {
         }
         previous = Some(point);
     }
-    canvas.text(r.x + 4 * s, r.y + 4 * s, "12 dB", s, muted_color());
-    canvas.text(r.x + 4 * s, r.y + r.h - 12 * s, "-60 dB", s, muted_color());
-    canvas.text(r.x + r.w - 4 * s - text_width("0 dB", s), r.y + r.h - 12 * s, "0 dB", s, muted_color());
+    // The scale's ends, when they fit side by side.
+    if text_width("-60 dB", s) + text_width("0 dB", s) + 16 * s <= r.w {
+        canvas.text(r.x + 4 * s, r.y + 4 * s, "12 dB", s, muted_color());
+        canvas.text(r.x + 4 * s, r.y + r.h - 12 * s, "-60 dB", s, muted_color());
+        canvas.text(r.x + r.w - 4 * s - text_width("0 dB", s), r.y + r.h - 12 * s, "0 dB", s, muted_color());
+    }
     if bypass {
         let label = "BYPASSED";
         canvas.text(r.x + (r.w - text_width(label, s)) / 2, r.y + r.h / 2 - 4 * s, label, s, muted_color());
@@ -305,17 +300,17 @@ mod tests {
     }
 
     #[test]
-    fn draws_every_tab_at_any_size() {
+    fn draws_at_any_size() {
         let bins: Vec<u8> = (0..2048).map(|i| (i % 256) as u8).collect();
         for (w, h) in [(1, 1), (40, 30), (1100, 680)] {
             let mut pixels = vec![0; w * h];
             let mut canvas = Canvas::new(&mut pixels, w, h);
             let (wi, hi) = (w as i32, h as i32);
-            let band = Rect::new(0, (hi - 88).max(0), wi, hi.min(88));
+            let band = Rect::new(0, (hi - STRIP_HEIGHT).max(0), wi, hi.min(STRIP_HEIGHT));
             let layout = OutputLayout::strip(wi, band, Scale::ONE);
-            for tab in 0..3 {
-                let master = MasterSettings { bypass: f32::from(tab == 2), ..MasterSettings::default() };
-                draw(&mut canvas, &OutputView { tab, master, spectrum: bins.clone() }, &layout);
+            for bypass in [0.0, 1.0] {
+                let master = MasterSettings { bypass, ..MasterSettings::default() };
+                draw(&mut canvas, &OutputView { master, spectrum: bins.clone() }, &layout);
             }
         }
     }
