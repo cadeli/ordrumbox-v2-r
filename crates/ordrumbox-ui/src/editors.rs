@@ -141,7 +141,8 @@ pub fn lfo_key(key: &str) -> Option<&'static str> {
     LFO_TARGETS.iter().find(|t| t.key == key).map(|t| t.lfo_key)
 }
 
-/// A value setting of the track editor: key, label, range, step, format.
+/// A value setting of the track editor: key, label, range, step, format,
+/// and whether it is a count (a whole number of things: a stepper in a row).
 #[derive(Debug, Clone, Copy)]
 pub struct Prop {
     pub key: &'static str,
@@ -150,10 +151,16 @@ pub struct Prop {
     pub max: f64,
     pub step: f64,
     pub format: Format,
+    pub count: bool,
 }
 
 const fn prop(key: &'static str, label: &'static str, min: f64, max: f64, step: f64, format: Format) -> Prop {
-    Prop { key, label, min, max, step, format }
+    Prop { key, label, min, max, step, format, count: false }
+}
+
+/// A count, one by one: shown as a stepper in a row.
+const fn count(key: &'static str, label: &'static str, min: f64, max: f64, format: Format) -> Prop {
+    Prop { key, label, min, max, step: 1.0, format, count: true }
 }
 
 /// The effect knobs.
@@ -210,7 +217,7 @@ pub const GENERATION_GROOVE: [GenerationRow; 8] = [
     GenerationRow::Slider(prop("autoSilenceChance", "Silence", 0.0, 100.0, 1.0, Format::Plain)),
     GenerationRow::Slider(prop("autoFillChance", "Fill", 0.0, 100.0, 1.0, Format::Plain)),
     GenerationRow::Slider(prop("autoGhostChance", "Ghost", 0.0, 100.0, 1.0, Format::Plain)),
-    GenerationRow::Slider(prop("pitchRange", "Pitch Range", 1.0, 24.0, 1.0, Format::Plain)),
+    GenerationRow::Slider(count("pitchRange", "Pitch Range", 1.0, 24.0, Format::Plain)),
     GenerationRow::Toggle("pitchScaleLock", "Scale Lock"),
 ];
 
@@ -227,13 +234,13 @@ pub const GENERATION_ENGINE: [GenerationRow; 8] = [
 
 /// The Compose sub-tab: how a drum track plays its style's part.
 pub const GENERATION_COMPOSE: [Prop; 7] = [
-    prop("composeHitsPerMeasure", "Hits/Measure", 0.0, 32.0, 1.0, Format::Plain),
+    count("composeHitsPerMeasure", "Hits/Measure", 0.0, 32.0, Format::Plain),
     prop("composeComplexity", "Complexity", 0.0, 100.0, 1.0, Format::Plain),
     prop("composeSyncopation", "Syncopation", 0.0, 100.0, 1.0, Format::Plain),
     prop("composeCoupling", "Coupling", -100.0, 100.0, 1.0, Format::Plain),
     prop("composeVariation", "Variation", 0.0, 100.0, 1.0, Format::Plain),
     prop("composeStyleWeight", "Style Weight", 0.0, 100.0, 1.0, Format::Plain),
-    prop("composeSeed", "Seed", 0.0, 9999.0, 1.0, Format::Seed),
+    count("composeSeed", "Seed", 0.0, 9999.0, Format::Seed),
 ];
 
 /// What a double-click on a compose slider sets: the setting given back to
@@ -245,8 +252,8 @@ pub const COMPOSE_TAB: u8 = 2;
 
 /// The loop tab.
 pub const LOOP_PROPS: [Prop; 3] = [
-    prop("stepsPerBeat", "Steps/Beat", 1.0, MAX_STEPS_PER_BEAT as f64, 1.0, Format::Plain),
-    prop("loopLength", "Loop Length", 1.0, 128.0, 1.0, Format::Plain),
+    count("stepsPerBeat", "Steps/Beat", 1.0, MAX_STEPS_PER_BEAT as f64, Format::Plain),
+    count("loopLength", "Loop Length", 1.0, 128.0, Format::Plain),
     prop("swingAmount", "Swing", 0.0, 1.0, 0.01, Format::Plain),
 ];
 
@@ -271,28 +278,29 @@ const fn note_slider(key: &'static str, label: &'static str, min: f64, max: f64,
     NoteRow::Slider(prop(key, label, min, max, step, Format::Fmt))
 }
 
+const fn note_count(key: &'static str, label: &'static str, min: f64, max: f64) -> NoteRow {
+    NoteRow::Slider(count(key, label, min, max, Format::Fmt))
+}
+
 /// The rows of each note tab. As in the JS, the Euclidean tab's "Prob"
 /// (the same setting as the Retrig tab's) never shows: both sliders share
 /// one key, and the second one takes the first one's place.
 pub const NOTE_GROUPS: [&[NoteRow]; 4] = [
     &[
-        note_slider("cycle", "Cycle", 1.0, 16.0, 1.0),
-        note_slider("cycleOffset", "Offset", 0.0, 15.0, 1.0),
+        note_count("cycle", "Cycle", 1.0, 16.0),
+        note_count("cycleOffset", "Offset", 0.0, 15.0),
         note_slider("probability", "Probability", 0.0, 1.0, 0.01),
     ],
     &[
-        note_slider("retriggerCount", "Retrigger", 1.0, 16.0, 1.0),
-        note_slider("retriggerRate", "Rate", 1.0, 16.0, 1.0),
+        note_count("retriggerCount", "Retrigger", 1.0, 16.0),
+        note_count("retriggerRate", "Rate", 1.0, 16.0),
         note_slider("retriggerProbability", "Probability", 0.0, 1.0, 0.01),
     ],
-    &[
-        note_slider("euclideanPulses", "Pulses", 0.0, 16.0, 1.0),
-        note_slider("euclideanRotation", "Rotation", 0.0, 15.0, 1.0),
-    ],
+    &[note_count("euclideanPulses", "Pulses", 0.0, 16.0), note_count("euclideanRotation", "Rotation", 0.0, 15.0)],
     &[
         NoteRow::Select("arpScale", "Scale"),
         NoteRow::Select("arpDirection", "Direction"),
-        note_slider("arpRange", "Range", 0.0, 12.0, 1.0),
+        note_count("arpRange", "Range", 0.0, 12.0),
     ],
 ];
 
@@ -775,8 +783,16 @@ impl Rows {
     }
 }
 
+/// A setting's control: a knob in a bar of knobs, else a stepper for a
+/// count and a slider for the rest.
 fn value_spec(p: &Prop, default: f64, knob: bool) -> Spec {
-    if knob { Spec::knob(p.min, p.max, p.step, default) } else { Spec::slider(p.min, p.max, p.step, default) }
+    if knob {
+        Spec::knob(p.min, p.max, p.step, default)
+    } else if p.count {
+        Spec::stepper(p.min, p.max, p.step, default)
+    } else {
+        Spec::slider(p.min, p.max, p.step, default)
+    }
 }
 
 /// Default of a setting, else its minimum.
@@ -1030,14 +1046,14 @@ fn loop_tab(rows: &mut Rows, track: &Track) {
     for p in &LOOP_PROPS {
         let default = default_of(p.key, p.min);
         let (value, spec, format) = match p.key {
-            "stepsPerBeat" => (f64::from(spb), Spec::slider(p.min, p.max, p.step, default), p.format),
-            // The loop length's slider ends at the track's length.
+            "stepsPerBeat" => (f64::from(spb), value_spec(p, default, false), p.format),
+            // The loop length ends at the track's length.
             "loopLength" => (
                 loop_length(track).min(max_steps),
-                Spec::slider(p.min, max_steps, p.step, p.min),
+                value_spec(&Prop { max: max_steps, ..*p }, p.min, false),
                 Format::LoopLength(spb),
             ),
-            _ => (track.swing_amount, Spec::slider(p.min, p.max, p.step, default), p.format),
+            _ => (track.swing_amount, value_spec(p, default, false), p.format),
         };
         rows.slider(Id::Loop(p.key), spec, value, p.label, format.value(value, ""), false);
     }
@@ -1252,7 +1268,7 @@ fn compose_slider(rows: &mut Rows, track: &Track, view: &ComposeView, p: &Prop, 
     if state.selected_prop == Some(p.key) {
         rows.items.push(Item::new(None, Rect::new(r.x - 2 * s, r.y, r.w + 4 * s, r.h), Kind::Highlight));
     }
-    let spec = Spec::slider(p.min, p.max, p.step, default);
+    let spec = value_spec(p, default, false);
     let kind = Kind::Value { spec, value, label: Some(p.label.to_owned()), text, lfo: false };
     rows.items.push(Item::new(Some(Id::Compose(p.key)), r, kind));
 }
