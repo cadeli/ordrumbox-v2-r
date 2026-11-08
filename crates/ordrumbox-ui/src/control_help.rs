@@ -29,7 +29,7 @@ pub fn help(id: Id) -> Option<Help> {
         Id::LfoPower(_) => ["LFO on / off", "lit: this setting moves with its LFO"],
         Id::LfoType(_) => ["LFO wave", "the shape the setting follows"],
         Id::Lfo(_, param) => match param {
-            LfoParam::Freq => ["LFO frequency", "how fast the setting moves, in Hz"],
+            LfoParam::Freq => ["LFO rate", "how fast the setting moves, in Hz"],
             LfoParam::Min => ["LFO minimum", "the lowest value the setting reaches"],
             LfoParam::Max => ["LFO maximum", "the highest value the setting reaches"],
             LfoParam::Phase => ["LFO phase", "where in its wave the LFO starts"],

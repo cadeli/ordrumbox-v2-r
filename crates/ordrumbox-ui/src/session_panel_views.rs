@@ -217,7 +217,7 @@ impl Session {
         Some(TrackView { track, title, sample, decay, instruments, samples, synths, lfo, bpm, compose })
     }
 
-    /// The styles the header and the Gen tab show: what the library taught,
+    /// The styles the header and the Generate tab show: what the library taught,
     /// else (before the first frame learned it) the written ones.
     pub(super) fn shown_styles(&self) -> &Styles {
         if self.learned_styles.1.is_some() { &self.learned_styles.0 } else { &self.styles }

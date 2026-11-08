@@ -329,8 +329,8 @@ pub struct HeaderControls {
 /// The header's macro knobs: their pattern key and label.
 pub const MACROS: [(&str, &str); 3] = [
     (ordrumbox_core::style::ENERGY, "ENERGY"),
-    (ordrumbox_core::style::COMPLEXITY, "COMPLEX"),
-    (ordrumbox_core::style::VARIATION, "VARY"),
+    (ordrumbox_core::style::COMPLEXITY, "COMPLEXITY"),
+    (ordrumbox_core::style::VARIATION, "VARIATION"),
 ];
 
 /// The view buttons' labels: the main editor (grid, piano roll, song, synth)
@@ -357,7 +357,7 @@ pub fn header_controls(scale: Scale) -> HeaderControls {
     let style = next(90, 4);
     let generate = next(22, 4);
     let auto = next(38, 6);
-    let macros = [next(52, 4), next(60, 4), next(42, HEADER_GROUP_GAP + 2)];
+    let macros = [next(44, 4), next(64, 4), next(56, HEADER_GROUP_GAP + 2)];
     let views = [next(40, 2), next(40, 2), next(40, 2), next(48, 2), next(40, 0)];
     HeaderControls { play, bpm, pattern, beats, kit, style, generate, auto, macros, views }
 }
@@ -394,7 +394,7 @@ pub fn output_height(scale: Scale) -> i32 {
 }
 
 /// The height the track editor and its note editor take at most, at scale 1:
-/// the Gen tab's Advanced settings on a track in auto mode, under its simple
+/// the Generate tab's Advanced settings on a track in auto mode, under its simple
 /// part as tall as a drum track's compose view, under the sample bar (kept
 /// even without a sample). The note editor sits under it whatever the tab.
 /// A test checks that every tab fits in it.

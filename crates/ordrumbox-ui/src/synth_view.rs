@@ -26,7 +26,7 @@ use crate::theme;
 pub const BUTTONS: [(&str, &str, i32); 6] = [
     ("delete", "x", 20),
     ("new", "+", 20),
-    ("duplicate", "Dup", 36),
+    ("duplicate", "Duplicate", 60),
     ("revert", "Revert", 56),
     ("export", "Export", 56),
     ("import", "Import", 56),

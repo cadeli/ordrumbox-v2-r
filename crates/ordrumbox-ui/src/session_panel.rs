@@ -279,7 +279,7 @@ impl Session {
         self.chrome.widgets.entry.is_some()
     }
 
-    /// The track editor on its Gen tab.
+    /// The track editor on its Generate tab.
     pub fn show_generation_tab(&mut self) {
         self.chrome.show_track_editor = true;
         self.editors.tab = editors::GEN_TAB;
@@ -580,14 +580,14 @@ mod tests {
         assert_eq!(pattern.tracks[0].notes.iter().map(|n| (n.beat, n.step)).collect::<Vec<_>>(), [(2, 0)]);
         assert!(pattern.tracks.iter().all(|t| t.name != "TOM"));
 
-        // The Gen tab of the KICK: the style's hits, then the track's own.
+        // The Generate tab of the KICK: the style's hits, then the track's own.
         s.editors.tab = editors::GEN_TAB;
         let layout = s.panel_layout(SIZE.0, SIZE.1, Scale::ONE);
         let hits = panel::find(&layout.items, Id::Compose("composeHitsPerMeasure")).unwrap();
         assert!(matches!(&hits.kind, Kind::Value { value, text, .. } if *value == 1.0 && text == "1*"));
         s.set_value(Id::Compose("composeHitsPerMeasure"), 3.0);
         assert_eq!(s.track(0).unwrap().compose_hits_per_measure, Some(3.0));
-        assert_eq!(s.editor.history().next_undo(), Some("Hits/Measure on KICK"));
+        assert_eq!(s.editor.history().next_undo(), Some("Measure Hits on KICK"));
         // ↻: a new line with three kicks, the third beat among them.
         let regenerate = panel::find(&s.panel_layout(SIZE.0, SIZE.1, Scale::ONE).items, Id::Regenerate).unwrap().rect;
         let (x, y) = center(regenerate);

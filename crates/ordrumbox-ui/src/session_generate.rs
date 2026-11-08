@@ -130,7 +130,7 @@ impl Session {
         };
     }
 
-    /// ↻ in the Gen tab: a new line on the edited track, in the pattern's style.
+    /// ↻ in the Generate tab: a new line on the edited track, in the pattern's style.
     pub fn regenerate_track(&mut self, t: usize) {
         let styles = self.generation_styles();
         let name = self.track(t).map(|tr| tr.name.clone()).unwrap_or_default();

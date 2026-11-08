@@ -22,6 +22,9 @@ pub enum Style {
     Stepper,
 }
 
+/// A fraction as a percentage: 0.5 is 50 %.
+const PERCENT: f64 = 100.0;
+
 /// A control's range: `min`–`max` by `step`, `default` restored by a
 /// double-click, logarithmic when asked and possible.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -33,20 +36,21 @@ pub struct Spec {
     pub default: f64,
     log: bool,
     full_travel: bool,
+    percent: bool,
 }
 
 impl Spec {
     pub const fn knob(min: f64, max: f64, step: f64, default: f64) -> Self {
-        Self { style: Style::Knob, min, max, step, default, log: false, full_travel: false }
+        Self { style: Style::Knob, min, max, step, default, log: false, full_travel: false, percent: false }
     }
 
     pub const fn slider(min: f64, max: f64, step: f64, default: f64) -> Self {
-        Self { style: Style::Slider, min, max, step, default, log: false, full_travel: false }
+        Self { style: Style::Slider, min, max, step, default, log: false, full_travel: false, percent: false }
     }
 
     /// A count: whole steps only, one per click on its - and + buttons.
     pub const fn stepper(min: f64, max: f64, step: f64, default: f64) -> Self {
-        Self { style: Style::Stepper, min, max, step, default, log: false, full_travel: false }
+        Self { style: Style::Stepper, min, max, step, default, log: false, full_travel: false, percent: false }
     }
 
     /// `scale: 'log'`; ignored (linear) unless `0 < min < max`.
@@ -59,6 +63,30 @@ impl Spec {
     /// for a three-decade frequency.
     pub const fn log_full_travel(self) -> Self {
         Self { full_travel: true, ..self.log() }
+    }
+
+    /// A fraction shown and typed as a percentage: 0.5 is `50 %`.
+    pub const fn percent(self) -> Self {
+        Self { percent: true, ..self }
+    }
+
+    /// How the user reads and types `value`: as a percentage for a [`Self::percent`] spec.
+    #[must_use]
+    pub fn shown(&self, value: f64) -> f64 {
+        // Rounded: 0.57 * 100 is not exactly 57.
+        if self.percent { round_to(value * PERCENT, 2) } else { value }
+    }
+
+    /// The value of a number typed as [`Self::shown`] shows it.
+    #[must_use]
+    pub fn typed_shown(&self, number: f64) -> f64 {
+        if self.percent { number / PERCENT } else { number }
+    }
+
+    /// The unit [`Self::shown`] reads in, if it adds one.
+    #[must_use]
+    pub const fn shown_unit(&self) -> Option<&'static str> {
+        if self.percent { Some("%") } else { None }
     }
 
     fn clamp(&self, value: f64) -> f64 {
@@ -163,8 +191,10 @@ pub enum Format {
     Fmt,
     /// The number as is.
     Plain,
-    /// Knob bar velocity: a percentage.
+    /// A fraction as a percentage: `50 %` for 0.5.
     Percent,
+    /// A chance out of 100: `50 %`.
+    Chance,
     /// Knob bar pitch: `+3`.
     SignedPlain,
     /// Whole milliseconds: `250 ms`.
@@ -195,7 +225,8 @@ impl Format {
         match self {
             Self::Fmt => fmt(v),
             Self::Plain => num::text(v),
-            Self::Percent => num::text((v * 100.0).round()),
+            Self::Percent => num::text((v * PERCENT).round()),
+            Self::Chance => num::text(v.round()),
             Self::SignedPlain => format!("{}{}", if v >= 0.0 { "+" } else { "" }, num::text(v)),
             Self::Millis => format!("{} ms", num::text(v.round())),
             Self::Freq => {
@@ -233,8 +264,17 @@ impl Format {
         }
     }
 
-    /// The text cut to 8 characters, then the unit.
+    /// The unit the format gives its text, if any: `%` for a percentage.
+    pub const fn unit(self) -> &'static str {
+        match self {
+            Self::Percent | Self::Chance => "%",
+            _ => "",
+        }
+    }
+
+    /// The text cut to 8 characters, then the unit (the format's own when `unit` is empty).
     pub fn value(self, v: f64, unit: &str) -> String {
+        let unit = if unit.is_empty() { self.unit() } else { unit };
         let text: String = self.text(v).chars().take(8).collect();
         if unit.is_empty() { text } else { format!("{text} {unit}") }
     }
@@ -886,5 +926,17 @@ mod tests {
         assert_eq!(s.slider_at(1.0), 1000.0);
         assert!((s.fraction(100.0) - 0.5).abs() < 1e-12);
         assert_eq!(s.slider_fine(100.0, 1.0), 158.5);
+    }
+
+    #[test]
+    fn chances_and_fractions_read_and_type_as_percentages() {
+        assert_eq!(Format::Chance.value(35.0, ""), "35 %");
+        assert_eq!(Format::Percent.value(0.57, ""), "57 %");
+        assert_eq!(Format::Plain.value(0.57, ""), "0.57");
+        let spec = Spec::slider(0.0, 1.0, 0.01, 1.0).percent();
+        assert_eq!((spec.shown(0.57), spec.shown_unit()), (57.0, Some("%")));
+        assert_eq!(spec.typed(spec.typed_shown(50.0)), 0.5);
+        let plain = Spec::slider(0.0, 1.0, 0.01, 1.0);
+        assert_eq!((plain.shown(0.57), plain.typed_shown(0.5), plain.shown_unit()), (0.57, 0.5, None));
     }
 }
