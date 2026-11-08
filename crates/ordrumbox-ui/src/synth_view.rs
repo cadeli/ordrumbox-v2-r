@@ -55,8 +55,12 @@ fn surface_color() -> Rgb {
 fn grid_color() -> Rgb {
     theme::panel_2()
 }
-const ACCENT: Rgb = theme::LIME;
-const ACCENT_DIM: Rgb = theme::VIOLET;
+/// The sound's curves and the switches that are on.
+const ACCENT: Rgb = theme::LIVE;
+/// The same, a step back: an on switch's ground, the filter's side curves.
+fn accent_dim() -> Rgb {
+    theme::mix(theme::LIVE, theme::panel(), 0.55)
+}
 
 /// Every field of the draft's cards, card after card: the index a
 /// [`Id::SynthField`] names.
@@ -368,7 +372,7 @@ pub fn draw(canvas: &mut Canvas, draft: &Object, built: &Built, layout: &SynthLa
     let y = layout.area.y + layout.area.h + 4 * s;
     for (label, on) in model::modules(draft) {
         let w = text_width(label, s) + 8 * s;
-        canvas.fill_rect(x, y, w, 12 * s, if on { ACCENT_DIM } else { card_off_color() });
+        canvas.fill_rect(x, y, w, 12 * s, if on { accent_dim() } else { card_off_color() });
         canvas.text(x + 4 * s, y + 2 * s, label, s, if on { ACCENT } else { theme::muted() });
         x += w + 4 * s;
     }
@@ -438,8 +442,8 @@ fn draw_filter(canvas: &mut Canvas, draft: &Object, r: Rect, s: Scale, time: f64
         );
     };
     if let Some((low, high)) = band {
-        curve(canvas, low, ACCENT_DIM, s.px());
-        curve(canvas, high, ACCENT_DIM, s.px());
+        curve(canvas, low, accent_dim(), s.px());
+        curve(canvas, high, accent_dim(), s.px());
     }
     curve(canvas, fc, ACCENT, (s * 3 / 2).max(1));
 }

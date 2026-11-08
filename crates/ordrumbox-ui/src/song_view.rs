@@ -58,14 +58,15 @@ fn major_color() -> Rgb {
 fn line_color() -> Rgb {
     theme::line()
 }
-const ACCENT: Rgb = theme::PINK;
-const ORPHAN: Rgb = theme::RED;
+const ACCENT: Rgb = theme::ACCENT;
+const ORPHAN: Rgb = theme::ALERT;
 fn selected_color() -> Rgb {
     theme::selected_row()
 }
-const CURSOR: Rgb = theme::LIME;
-const CURSOR_IDLE: Rgb = theme::CYAN;
-const CURRENT: Rgb = theme::LIME;
+/// The song cursor: where it plays, else where it will start.
+const CURSOR: Rgb = theme::LIVE;
+const CURSOR_IDLE: Rgb = theme::FOCUS;
+const CURRENT: Rgb = theme::LIVE;
 
 /// One row of the arrangement: a pattern it uses.
 #[derive(Debug, Clone, PartialEq, Eq)]

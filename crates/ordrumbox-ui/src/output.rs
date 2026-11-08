@@ -168,15 +168,17 @@ fn grid_color() -> Rgb {
 fn muted_color() -> Rgb {
     theme::muted()
 }
-const ACCENT: Rgb = theme::PINK;
-const WARNING: Rgb = theme::YELLOW;
+const ACCENT: Rgb = theme::ACCENT;
+/// The compressor's threshold, a value the user set.
+const THRESHOLD: Rgb = theme::VALUE;
 fn scope_bg_color() -> Rgb {
     theme::screen()
 }
 fn scope_grid_color() -> Rgb {
     theme::panel_2()
 }
-const PHOSPHOR: Rgb = theme::CYAN;
+/// The scope's and the spectrum's trace: the sound playing.
+const PHOSPHOR: Rgb = theme::LIVE;
 
 /// What the output panel draws besides its controls.
 #[derive(Debug)]
@@ -239,7 +241,7 @@ fn draw_curve(canvas: &mut Canvas, master: &MasterSettings, r: Rect, s: Scale) {
     let threshold = f64::from(master.threshold);
     if !bypass && (CURVE_X.0..=CURVE_X.1).contains(&threshold) {
         let x = x_px(threshold).min(r.x + r.w - 1);
-        line(canvas, (x, r.y), (x, r.y + r.h - 1), s.px(), WARNING, Some((4 * s, 4 * s)));
+        line(canvas, (x, r.y), (x, r.y + r.h - 1), s.px(), THRESHOLD, Some((4 * s, 4 * s)));
     }
     let color = if bypass { muted_color() } else { ACCENT };
     let mut previous = None;
@@ -276,10 +278,8 @@ fn draw_spectrum(canvas: &mut Canvas, bins: &[u8], r: Rect, s: Scale) {
     for (i, &v) in bins.iter().take(count).enumerate() {
         let x = r.x + (i as i32 * r.w) / count as i32;
         let y = r.y + r.h - 1 - (i32::from(v) * (r.h - 1)) / 255;
-        // Low to high: pink, violet, cyan, lime, yellow.
-        let band = [theme::PINK, theme::VIOLET, PHOSPHOR, theme::LIME, theme::YELLOW][i * 5 / count.max(1)];
         if let Some(p) = previous {
-            line(canvas, p, (x, y), 2 * s, band, None);
+            line(canvas, p, (x, y), 2 * s, PHOSPHOR, None);
         }
         previous = Some((x, y));
     }

@@ -314,8 +314,8 @@ fn border_color() -> Rgb {
 fn highlight_color() -> Rgb {
     theme::highlight()
 }
-const ACCENT: Rgb = theme::PINK;
-const WARNING: Rgb = theme::RED;
+const ACCENT: Rgb = theme::ACCENT;
+const WARNING: Rgb = theme::ALERT;
 
 /// Where the picker's list is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

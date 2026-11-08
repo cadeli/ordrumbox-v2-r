@@ -132,7 +132,7 @@ pub fn draw(canvas: &mut Canvas, log: &ActionLog, scroll: usize, layout: &LogLay
     canvas.fill_rect(x, y, w, h, theme::line());
     canvas.fill_rect(x + s.px(), y + s.px(), w - 2 * s, h - 2 * s, theme::panel());
     let text_x = x + 10 * s;
-    canvas.text(text_x, y + 8 * s, "History", s, theme::PINK);
+    canvas.text(text_x, y + 8 * s, "History", s, theme::ACCENT);
     let rows = log.rows(layout.chars_per_row);
     if rows.is_empty() {
         canvas.text(text_x, layout.list_top, "(nothing done yet)", s, theme::muted());
@@ -147,7 +147,7 @@ pub fn draw(canvas: &mut Canvas, log: &ActionLog, scroll: usize, layout: &LogLay
         let top = (track - thumb) * scroll as i32 / layout.max_scroll(log).max(1) as i32;
         let bar_x = x + w - 8 * s;
         canvas.fill_rect(bar_x, layout.list_top, 3 * s, track, theme::line());
-        canvas.fill_rect(bar_x, layout.list_top + top, 3 * s, thumb, theme::PINK);
+        canvas.fill_rect(bar_x, layout.list_top + top, 3 * s, thumb, theme::ACCENT);
     }
     let hint = "wheel, arrows, PAGE UP/DOWN, HOME/END: scroll   ESC or click outside: close";
     canvas.text(text_x, y + h - 14 * s, hint, s, theme::muted());

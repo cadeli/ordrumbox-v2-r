@@ -17,7 +17,7 @@ use ordrumbox_engine::synth_model as model;
 
 use super::*;
 use crate::canvas::text_width;
-use crate::panel::{DIM, Item, Kind, Rect};
+use crate::panel::{Item, Kind, Rect, dim};
 use crate::synth_view::{self, Built, SynthLayout};
 
 /// The button that puts the track editor's track on the preset shown.
@@ -115,7 +115,7 @@ impl Session {
                 format!("{name} {plays}")
             }
         };
-        items.push(Item::text(x, tab.y + 3 * scale, text, DIM, scale));
+        items.push(Item::text(x, tab.y + 3 * scale, text, dim(), scale));
     }
 
     /// The presets' keys, sorted.
@@ -298,7 +298,7 @@ impl Session {
         }
         let Some(edit) = &self.synth_editor.edit else {
             let s = scale;
-            canvas.text(16 * s, frame::body_top(scale), "No synth presets loaded.", s, crate::panel::DIM);
+            canvas.text(16 * s, frame::body_top(scale), "No synth presets loaded.", s, crate::panel::dim());
             return;
         };
         let Some((built, layout)) = self.synth_built((canvas.width(), canvas.height(), scale)) else { return };

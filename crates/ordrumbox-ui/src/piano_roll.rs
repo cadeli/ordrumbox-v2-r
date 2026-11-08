@@ -59,15 +59,15 @@ fn key_black_color() -> Rgb {
     theme::panel()
 }
 
-const PLAYING: Rgb = theme::LIME;
+const PLAYING: Rgb = theme::LIVE;
 const SELECTED: Rgb = theme::WHITE;
-const CURSOR: Rgb = theme::CYAN;
-const LOOP_MARK: Rgb = theme::YELLOW;
-const PLAYHEAD: Rgb = theme::LIME;
-const GHOST_RETRIGGER: Rgb = theme::ORANGE;
-const GHOST_EUCLIDEAN: Rgb = theme::LIME;
-const TRIG_RAND: Rgb = theme::VIOLET;
-const TRIG_FIXED: Rgb = theme::CYAN;
+const CURSOR: Rgb = theme::FOCUS;
+const LOOP_MARK: Rgb = theme::VALUE;
+const PLAYHEAD: Rgb = theme::LIVE;
+const GHOST_RETRIGGER: Rgb = theme::GENERATED;
+const GHOST_EUCLIDEAN: Rgb = theme::GENERATED;
+const TRIG_RAND: Rgb = theme::CHANCE;
+const TRIG_FIXED: Rgb = theme::VALUE;
 
 /// The MIDI note of row `row` (0: the lowest key).
 pub fn row_midi(row: i32) -> i32 {
@@ -446,7 +446,7 @@ mod tests {
     fn view(track: &Track, page: i32, top_row: i32) -> RollView<'_> {
         RollView {
             track,
-            color: theme::PINK,
+            color: theme::track(0),
             beat_count: 6,
             page,
             top_row,

@@ -20,24 +20,30 @@ pub fn border_color() -> Rgb {
 pub fn field_color() -> Rgb {
     theme::cell()
 }
-pub const DIM: Rgb = theme::CYAN;
-pub const ACCENT: Rgb = theme::CYAN;
-pub const ON: Rgb = theme::LIME;
-const FOCUS: Rgb = theme::YELLOW;
+/// Labels and secondary text.
+pub fn dim() -> Rgb {
+    theme::muted()
+}
+/// A knob's or a slider's arc: the value it holds.
+const ARC: Rgb = theme::VALUE;
+/// A text field's caret.
+const CARET: Rgb = theme::FOCUS;
+pub const ON: Rgb = theme::LIVE;
+const FOCUS: Rgb = theme::FOCUS;
 /// Values, the active tab and button, slider handles, titles.
-const VALUE: Rgb = theme::YELLOW;
-const ACTIVE: Rgb = theme::YELLOW;
-const HANDLE: Rgb = theme::PINK;
-const TITLE: Rgb = theme::PINK;
-const LFO: Rgb = theme::VIOLET;
+const VALUE: Rgb = theme::VALUE;
+const ACTIVE: Rgb = theme::VALUE;
+const HANDLE: Rgb = theme::ACCENT;
+const TITLE: Rgb = theme::ACCENT;
+const LFO: Rgb = theme::CHANCE;
 fn disc_color() -> Rgb {
     theme::panel_2()
 }
 fn selected_row_color() -> Rgb {
     theme::selected_row()
 }
-const ENVELOPE: Rgb = theme::LIME;
-const MARKER: Rgb = theme::PINK;
+const ENVELOPE: Rgb = theme::LIVE;
+const MARKER: Rgb = theme::ACCENT;
 
 /// The row of a list under `y`, rows `row_height` high from `top`; `None`
 /// above the list (a division alone would put the pixels just above in row 0).
@@ -389,7 +395,7 @@ pub fn draw(canvas: &mut Canvas, items: &[Item], focus: Option<Id>, scale: Scale
             Kind::Highlight => canvas.fill_rect(r.x, r.y, r.w, r.h, selected_row_color()),
             Kind::Panel => {
                 canvas.fill_rect(r.x, r.y, r.w, r.h, background_color());
-                canvas.fill_rect(r.x, r.y, 2 * t, r.h, theme::PINK);
+                canvas.fill_rect(r.x, r.y, 2 * t, r.h, theme::ACCENT);
             }
             Kind::Line => canvas.fill_rect(r.x, r.y, r.w, t, border_color()),
             Kind::Text { text, color } => {
@@ -397,7 +403,7 @@ pub fn draw(canvas: &mut Canvas, items: &[Item], focus: Option<Id>, scale: Scale
             }
             Kind::Value { spec, value, label, text, lfo } => {
                 let fraction = spec.fraction(*value);
-                let color = if *lfo { LFO } else { ACCENT };
+                let color = if *lfo { LFO } else { ARC };
                 match spec.style {
                     Style::Knob => {
                         let size = knob_size(r, scale);
@@ -407,7 +413,7 @@ pub fn draw(canvas: &mut Canvas, items: &[Item], focus: Option<Id>, scale: Scale
                             let mut y = r.y + size + 3 * scale;
                             if let Some(label) = label {
                                 let label = fit(label, r.w, scale);
-                                canvas.text(cx - text_width(&label, scale) / 2, y, &label, scale, DIM);
+                                canvas.text(cx - text_width(&label, scale) / 2, y, &label, scale, dim());
                                 y += 10 * scale;
                             }
                             let text = fit(text, r.w, scale);
@@ -421,7 +427,7 @@ pub fn draw(canvas: &mut Canvas, items: &[Item], focus: Option<Id>, scale: Scale
                     Style::Slider => {
                         let ty = r.y + (r.h - 8 * scale) / 2;
                         if let Some(label) = label {
-                            canvas.text(r.x, ty, &fit(label, label_width(scale) - 4 * scale, scale), scale, DIM);
+                            canvas.text(r.x, ty, &fit(label, label_width(scale) - 4 * scale, scale), scale, dim());
                         }
                         let (left, width) = slider_bar(r, label.is_some(), !text.is_empty(), scale);
                         // A thin line, lit up to the value, and a square handle.
@@ -441,12 +447,12 @@ pub fn draw(canvas: &mut Canvas, items: &[Item], focus: Option<Id>, scale: Scale
                 let label = labels.get(*selected).map_or("", String::as_str);
                 let ty = r.y + (r.h - 8 * scale) / 2;
                 canvas.text(r.x + 4 * scale, ty, &fit(label, r.w - 16 * scale, scale), scale, theme::text());
-                canvas.text(r.x + r.w - 10 * scale, ty, "v", scale, DIM);
+                canvas.text(r.x + r.w - 10 * scale, ty, "v", scale, dim());
             }
             Kind::Toggle { on } => {
                 canvas.fill_rect(r.x, r.y, r.w, r.h, if *on { ON } else { field_color() });
                 let text = if *on { "ON" } else { "OFF" };
-                let color = if *on { background_color() } else { DIM };
+                let color = if *on { background_color() } else { dim() };
                 canvas.text(r.x + (r.w - text_width(text, scale)) / 2, r.y + (r.h - 8 * scale) / 2, text, scale, color);
             }
             Kind::Led { on } => {
@@ -458,7 +464,7 @@ pub fn draw(canvas: &mut Canvas, items: &[Item], focus: Option<Id>, scale: Scale
                 if *active {
                     canvas.fill_rect(r.x, r.y + r.h - 2 * t, r.w, 2 * t, ACTIVE);
                 }
-                let color = if *active { ACTIVE } else { DIM };
+                let color = if *active { ACTIVE } else { dim() };
                 let x = r.x + (r.w - text_width(label, scale)) / 2;
                 canvas.text(x, r.y + (r.h - 8 * scale) / 2, label, scale, color);
             }
@@ -664,7 +670,7 @@ impl Dropdown {
         let row = row_height(scale);
         if let Some(title) = &self.title {
             let y = r.y + 2 * scale + (row - 8 * scale) / 2;
-            canvas.text(r.x + 6 * scale, y, &fit(title, r.w - 12 * scale, scale), scale, DIM);
+            canvas.text(r.x + 6 * scale, y, &fit(title, r.w - 12 * scale, scale), scale, dim());
         }
         let top = r.y + 2 * scale + self.head() as i32 * row;
         for (k, label) in self.labels.iter().enumerate().skip(self.first).take(self.shown()) {
@@ -681,7 +687,7 @@ impl Dropdown {
             let track = r.h - 4 * scale - self.head() as i32 * row;
             let top = top + track * self.first as i32 / total;
             let len = (track * self.shown() as i32 / total).max(4 * scale);
-            canvas.fill_rect(r.x + r.w - 4 * scale, top, 2 * scale, len, DIM);
+            canvas.fill_rect(r.x + r.w - 4 * scale, top, 2 * scale, len, dim());
         }
     }
 }
@@ -718,8 +724,8 @@ impl Entry {
         let field = Rect::new(r.x + 12 * scale, r.y + 22 * scale, r.w - 24 * scale, 12 * scale);
         canvas.fill_rect(field.x, field.y, field.w, field.h, field_color());
         let x = canvas.text(field.x + 4 * scale, field.y + 2 * scale, &self.text, scale, theme::text());
-        canvas.fill_rect(x + scale.px(), field.y + 2 * scale, scale.px(), 8 * scale, ACCENT);
-        canvas.text(r.x + 12 * scale, r.y + 40 * scale, "ENTER: set   ESC: cancel", scale, DIM);
+        canvas.fill_rect(x + scale.px(), field.y + 2 * scale, scale.px(), 8 * scale, CARET);
+        canvas.text(r.x + 12 * scale, r.y + 40 * scale, "ENTER: set   ESC: cancel", scale, dim());
     }
 }
 

@@ -1,5 +1,5 @@
 //! The screen: header (pattern, generation, tempo, length, kit, transport,
-//! undo), then the song panel (`song_view`), the kit editor, or one row per track (mute and solo boxes, name — green in auto mode —,
+//! undo), then the song panel (`song_view`), the kit editor, or one row per track (mute and solo boxes, name — violet in auto mode —,
 //! steps with their notes), the grid cursor, the selected note, the playhead,
 //! the messages and the key help.
 //!
@@ -32,29 +32,31 @@ fn cell_color() -> Rgb {
 fn cell_beat_color() -> Rgb {
     theme::cell_beat()
 }
-const NOTE: Rgb = theme::PINK;
-const ACCENT: Rgb = theme::PINK;
-const PLAYING: Rgb = theme::LIME;
+/// A sample's envelope in the kit editor: the sound's shape.
+const ENVELOPE: Rgb = theme::LIVE;
+const ACCENT: Rgb = theme::ACCENT;
+const PLAYING: Rgb = theme::LIVE;
+/// A track in auto mode (a new line every loop).
+const AUTO: Rgb = theme::CHANCE;
 /// Above the pattern list while the pattern shown waits for the one playing to end its loop.
 const WAITING_LABEL: &str = "NEXT";
 /// The label above the pattern list.
 const PATTERN_LABEL: &str = "PATTERN";
-const WARNING: Rgb = theme::RED;
-const PLAYHEAD: Rgb = theme::LIME;
-const LOOP_MARK: Rgb = theme::YELLOW;
-const CURSOR: Rgb = theme::CYAN;
+const WARNING: Rgb = theme::ALERT;
+const PLAYHEAD: Rgb = theme::LIVE;
+const LOOP_MARK: Rgb = theme::VALUE;
+const CURSOR: Rgb = theme::FOCUS;
 const SELECTED: Rgb = theme::WHITE;
 fn focus_row_color() -> Rgb {
     theme::selected_row()
 }
-const MUTE_ON: Rgb = theme::RED;
-/// A track a plugin host mutes.
-const MUTE_HOST: Rgb = theme::ORANGE;
-/// The logo, the header's labels, values.
-const LOGO: Rgb = theme::LIME;
-const LABEL: Rgb = theme::CYAN;
-const VALUE: Rgb = theme::YELLOW;
-const SOLO_ON: Rgb = theme::YELLOW;
+const MUTE_ON: Rgb = theme::ALERT;
+/// A track a plugin host mutes: a mute, dimmed.
+fn mute_host_color() -> Rgb {
+    theme::mix(theme::ALERT, theme::bg(), 0.5)
+}
+const LOGO: Rgb = theme::ACCENT;
+const SOLO_ON: Rgb = theme::VALUE;
 fn box_off_color() -> Rgb {
     theme::line()
 }
@@ -77,6 +79,28 @@ const KIT_HELP: &str =
 const LABEL_CHARS: usize = 10;
 /// Width of a row's volume slider, per scale unit.
 const VOLUME_WIDTH: i32 = 48;
+
+/// What a track plays, in the two small lines under its name.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SoundLabel {
+    /// Where the sound comes from: its kit (after `for CONGAS:` when it
+    /// stands in for the track's instrument), `synth`; empty for none.
+    pub source: String,
+    /// The sample's file name without its extension, the synth preset, or
+    /// `no sound`.
+    pub name: String,
+}
+
+impl SoundLabel {
+    /// The label of the sample at `path` (`kit/file.wav`): the kit above, the
+    /// file without its extension below.
+    #[must_use]
+    pub fn sample(path: &str) -> Self {
+        let (kit, file) = path.rsplit_once('/').unwrap_or(("", path));
+        let name = file.rsplit_once('.').map_or(file, |(stem, _)| if stem.is_empty() { file } else { stem });
+        Self { source: kit.to_owned(), name: name.to_owned() }
+    }
+}
 
 /// The grid cursor (keyboard focus): track row and step.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -117,7 +141,7 @@ pub struct View<'a> {
     /// The synth editor is shown (the session paints it).
     pub synth: bool,
     /// What each track plays (its sample, its synth preset), under its name.
-    pub sounds: Vec<String>,
+    pub sounds: Vec<SoundLabel>,
     /// Width kept on the right (for the track editor).
     pub right: i32,
     /// Current page of the pattern grid (BEATS_PER_PAGE beats).
@@ -323,17 +347,45 @@ pub fn header_controls(scale: Scale) -> HeaderControls {
         x += (w + gap) * s;
         rect
     };
-    let play = next(36, 8);
-    let bpm = next(52, 8);
-    let pattern = next(104, 8);
-    let beats = next(36, 8);
-    let kit = next(84, 10);
+    // Close inside a group, wide between groups: the same total width as
+    // when every gap was alike, so the window's minimum width is kept.
+    let play = next(36, 4);
+    let bpm = next(52, HEADER_GROUP_GAP);
+    let pattern = next(104, 4);
+    let beats = next(36, 4);
+    let kit = next(84, HEADER_GROUP_GAP);
     let style = next(90, 4);
     let generate = next(22, 4);
-    let auto = next(38, 10);
-    let macros = [next(52, 4), next(60, 4), next(42, 10)];
+    let auto = next(38, 6);
+    let macros = [next(52, 4), next(60, 4), next(42, HEADER_GROUP_GAP + 2)];
     let views = [next(40, 2), next(40, 2), next(40, 2), next(48, 2), next(40, 0)];
     HeaderControls { play, bpm, pattern, beats, kit, style, generate, auto, macros, views }
+}
+
+/// The gap between two of the header's groups, at scale 1: room for both
+/// groups' frames and a gap between them.
+const HEADER_GROUP_GAP: i32 = 14;
+/// How far a header group's frame reaches beyond its controls, at scale 1.
+const HEADER_GROUP_PAD: i32 = 4;
+
+impl HeaderControls {
+    /// The frames of the header's groups: transport (play, tempo), pattern
+    /// (pattern, beats, kit), generation (style, ⟳, AUTO, macros) and views.
+    /// Each covers its controls and their labels above them.
+    #[must_use]
+    pub fn groups(&self, scale: Scale) -> [Rect; 4] {
+        let pad = HEADER_GROUP_PAD * scale;
+        let top = content_top(scale) - 3 * scale;
+        let frame = |first: Rect, last: Rect| {
+            Rect::new(first.x - pad, top, last.x + last.w - first.x + 2 * pad, first.y + first.h + 3 * scale - top)
+        };
+        [
+            frame(self.play, self.bpm),
+            frame(self.pattern, self.kit),
+            frame(self.style, self.macros[2]),
+            frame(self.views[0], self.views[4]),
+        ]
+    }
 }
 
 /// Height of the output strip always shown along the bottom of the window.
@@ -559,14 +611,24 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: Scale) {
     let top = content_top(scale);
     canvas.text(margin, top + 9 * scale, "orDrumbox", text, LOGO);
     let c = header_controls(scale);
+    // The groups' frames, behind their widgets (panel items, drawn later).
+    // The generation's only with a pattern: it has nothing to show without.
+    for (i, group) in c.groups(scale).into_iter().enumerate() {
+        if view.pattern.is_none() && i != 3 {
+            continue;
+        }
+        canvas.fill_rect(group.x, group.y, group.w, group.h, theme::panel());
+        stroke(canvas, group.x, group.y, group.w, group.h, scale.px(), theme::line());
+    }
+    // Labels in a muted color: the values under them stand out.
     let label = |canvas: &mut Canvas, r: Rect, text: &str| {
-        canvas.text(r.x, top, text, scale, LABEL);
+        canvas.text(r.x, top, text, scale, theme::muted());
     };
     if view.pattern.is_some() {
         label(canvas, c.bpm, view.tempo_label);
         match (view.waiting, view.pattern) {
             (Some(on), _) => {
-                let color = if on { PLAYING } else { LABEL };
+                let color = if on { PLAYING } else { theme::muted() };
                 canvas.text(c.pattern.x, top, WAITING_LABEL, scale, color);
                 if on {
                     let r = c.pattern;
@@ -602,7 +664,7 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: Scale) {
         (None, Some(redo)) => format!("redo: {redo}"),
         (None, None) => String::new(),
     };
-    let x = canvas.text(margin, y, view.message, scale, VALUE) + 24 * scale;
+    let x = canvas.text(margin, y, view.message, scale, theme::text()) + 24 * scale;
     let x = canvas.text(x.max(margin + canvas.width() / 3), y, &history, scale, theme::muted()) + 24 * scale;
     if let Some(song) = view.song {
         let color = if song.starts_with("SONG") { PLAYING } else { theme::muted() };
@@ -691,7 +753,7 @@ fn draw_ruler(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layo
             canvas.fill_rect(sx, dot_y, scale.px(), scale.px(), theme::muted());
         }
         if beat % every == 0 {
-            let color = if playing == Some(beat) { PLAYING } else { LABEL };
+            let color = if playing == Some(beat) { PLAYING } else { theme::muted() };
             canvas.text(x + 3 * scale, y, &(layout.start_beat + beat + 1).to_string(), scale, color);
         }
     }
@@ -733,7 +795,7 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
         let box_y = y + (layout.row - layout.box_size) / 2;
         // A mute from the host is lit in its own colour: the track's own stays off.
         let host_mute = ordrumbox_engine::host_muted(view.host_muted, i);
-        let (mute, mute_color) = if track.mute { (true, MUTE_ON) } else { (host_mute, MUTE_HOST) };
+        let (mute, mute_color) = if track.mute { (true, MUTE_ON) } else { (host_mute, mute_host_color()) };
         for (solo, on, color, letter) in [(false, mute, mute_color, "M"), (true, track.solo, SOLO_ON, "S")] {
             let x = layout.box_x(solo);
             canvas.fill_rect(x, box_y, layout.box_size, layout.box_size, if on { color } else { box_off_color() });
@@ -748,22 +810,27 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
             );
         }
         let label: String = track.name.chars().take(LABEL_CHARS).collect();
-        // The name, and under it, in the small font, what the track plays
-        // when there is room (all of it in the name's tooltip).
+        // The name, and under it, in the small font, what the track plays:
+        // its kit, then its sample, as many lines as the row has room for,
+        // the sample's first (all of it in the name's tooltip). The room
+        // alone sets the lines, so the name never moves with the sound.
         let sound_h = small_cell(scale) + 2 * scale;
-        let sound = view.sounds.get(i).filter(|s| !s.is_empty() && layout.row >= 8 * layout.scale + sound_h);
-        let block = 8 * layout.scale + if sound.is_some() { sound_h } else { 0 };
-        let label_y = y + (layout.row - block) / 2;
-        if let Some(sound) = sound {
+        let lines = usize::try_from((layout.row - 8 * layout.scale) / sound_h.max(1)).unwrap_or(0).min(2);
+        let label_y = y + (layout.row - 8 * layout.scale - lines as i32 * sound_h) / 2;
+        if let Some(sound) = view.sounds.get(i) {
             let width = layout.volume_x - layout.name_x - 4 * scale;
             let chars = usize::try_from(width / small_char_width(scale).max(1)).unwrap_or(0);
-            let shown: String = sound.chars().take(chars).collect();
-            canvas.small_text(layout.name_x, label_y + 8 * layout.scale + 2 * scale, &shown, scale, theme::muted());
+            let shown = [(&sound.source, theme::disabled()), (&sound.name, theme::muted())];
+            for (line, (text, color)) in shown[2 - lines..].iter().enumerate() {
+                let text: String = text.chars().take(chars).collect();
+                let line_y = label_y + 8 * layout.scale + 2 * scale + line as i32 * sound_h;
+                canvas.small_text(layout.name_x, line_y, &text, scale, *color);
+            }
         }
         let color = if mute {
             theme::muted()
         } else if track.auto_mode {
-            PLAYING // a new line every loop
+            AUTO
         } else if focused {
             theme::track(i)
         } else {
@@ -887,7 +954,7 @@ fn draw_kit(canvas: &mut Canvas, kit: &KitView, layout: &KitLayout) {
         if let Some(users) = kit.users.get(i).filter(|u| !u.is_empty()) {
             let room = layout.left + layout.list_width - x - 20 * scale;
             let text: String = format!("< {}", users.join(", ")).chars().take(chars_in(room, scale)).collect();
-            canvas.text(x + 16 * scale, y, &text, scale, PLAYING);
+            canvas.text(x + 16 * scale, y, &text, scale, theme::text());
         }
     }
 
@@ -909,7 +976,7 @@ fn draw_kit(canvas: &mut Canvas, kit: &KitView, layout: &KitLayout) {
         let bar_x = x + i as i32 * width / n;
         let bar_w = ((i as i32 + 1) * width / n - i as i32 * width / n).max(1);
         let bar_h = (v.clamp(0.0, 1.0) * f64::from(height)).round() as i32;
-        canvas.fill_rect(bar_x, y + height - bar_h, bar_w, bar_h, NOTE);
+        canvas.fill_rect(bar_x, y + height - bar_h, bar_w, bar_h, ENVELOPE);
     }
     if let Some(ratio) = kit.decay_marker {
         let mx = x + (ratio.clamp(0.0, 1.0) * f64::from(width - 1)) as i32;
@@ -917,10 +984,6 @@ fn draw_kit(canvas: &mut Canvas, kit: &KitView, layout: &KitLayout) {
     }
 }
 
-/// Base colour of a note in the grid, from its own properties (trigger
-/// probability, retrigger, euclidean, every-Nth-pass) rather than from its
-/// track: a plain note is lime, a probabilistic one cyan, a fixed-trigger
-/// one violet, a retriggered one orange, an euclidean one yellow.
 /// The smallest share of a cell a note fills, so the softest stays visible.
 const MIN_NOTE_FILL: f64 = 0.25;
 
@@ -936,17 +999,18 @@ fn draw_note_cell(canvas: &mut Canvas, cell: Rect, note: &Note, gap: i32) {
     }
 }
 
+/// Base colour of a note in the grid, from its own properties rather than
+/// from its track: one that makes hits of its own (retrigger, euclidean)
+/// is [`theme::GENERATED`], one that may not play (probability, every Nth
+/// loop) [`theme::CHANCE`], a plain one [`theme::LIVE`].
 fn note_color(note: &Note) -> Rgb {
-    if note.euclidean_pulses > 0 {
-        theme::YELLOW
-    } else if note.retrigger_count > 1 || (note.retrigger_rate - 1.0).abs() > 1e-9 {
-        theme::ORANGE
-    } else if note.probability < 1.0 {
-        theme::CYAN
-    } else if note.cycle > 1 {
-        theme::VIOLET
+    let generated = note.euclidean_pulses > 0 || note.retrigger_count > 1 || (note.retrigger_rate - 1.0).abs() > 1e-9;
+    if generated {
+        theme::GENERATED
+    } else if note.probability < 1.0 || note.cycle > 1 {
+        theme::CHANCE
     } else {
-        theme::LIME
+        theme::LIVE
     }
 }
 
@@ -1020,7 +1084,7 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
                 continue;
             }
             let gcolor = match gkind {
-                ordrumbox_core::note_positions::SubKind::Euclidean => theme::YELLOW,
+                ordrumbox_core::note_positions::SubKind::Euclidean => theme::GENERATED,
                 ordrumbox_core::note_positions::SubKind::Retrigger => theme::muted(),
             };
             let color = theme::note(gcolor, gnote.velocity);
@@ -1106,6 +1170,26 @@ mod tests {
         // Without the output strip (a plugin) the layout needs less height.
         assert!(min_window_size(Scale::ONE, false).1 < h);
     }
+
+    #[test]
+    fn the_header_groups_are_apart_and_inside_the_header() {
+        for quarters in 4..=Scale::MAX.quarters() {
+            let scale = Scale::from_quarters(quarters);
+            let c = header_controls(scale);
+            let groups = c.groups(scale);
+            let (width, _) = min_window_size(scale, true);
+            let logo_end = margin(scale) + text_width("orDrumbox", header_text(scale));
+            assert!(groups[0].x > logo_end, "scale {scale}: the logo");
+            assert!(groups[3].x + groups[3].w <= width, "scale {scale}: the window's edge");
+            for pair in groups.windows(2) {
+                assert!(pair[0].x + pair[0].w < pair[1].x, "scale {scale}: {pair:?}");
+            }
+            for group in groups {
+                assert!(group.y >= menu::bar_height(scale), "scale {scale}: the menu bar");
+                assert!(group.y + group.h <= status_line(scale), "scale {scale}: the status line");
+            }
+        }
+    }
     use ordrumbox_core::Library;
 
     fn library() -> Library {
@@ -1114,6 +1198,19 @@ mod tests {
         )
         .unwrap()
         .0
+    }
+
+    #[test]
+    fn a_sample_label_puts_the_kit_above_the_name_without_its_extension() {
+        let label = |path: &str| {
+            let l = SoundLabel::sample(path);
+            (l.source, l.name)
+        };
+        let owned = |a: &str, b: &str| (a.to_owned(), b.to_owned());
+        assert_eq!(label("real/kick.wav"), owned("real", "kick"));
+        assert_eq!(label("human/toms/tom.lo.wav"), owned("human/toms", "tom.lo"), "the last dot only");
+        assert_eq!(label("chh"), owned("", "chh"), "no kit, no extension");
+        assert_eq!(label("real/.wav"), owned("real", ".wav"), "a name is never emptied");
     }
 
     #[test]
@@ -1128,7 +1225,10 @@ mod tests {
                 waiting: None,
                 song: Some("SONG demo  measure 3/66"),
                 kit_view: None,
-                sounds: vec!["real/kick.wav".into(), "synth BASS5".into()],
+                sounds: vec![
+                    SoundLabel::sample("real/kick.wav"),
+                    SoundLabel { source: "synth".into(), name: "BASS5".into() },
+                ],
                 arrangement: None,
                 piano_roll: None,
                 output: None,
