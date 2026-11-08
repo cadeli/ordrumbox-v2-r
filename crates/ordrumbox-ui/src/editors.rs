@@ -783,20 +783,13 @@ pub fn track_editor(view: &TrackView, state: &EditorState, area: Rect, scale: Sc
     let mut rows = Rows { x: area.x, w: area.w, y: area.y, scale: s, items: Vec::new() };
     rows.text(&view.title, theme::ACCENT);
 
-    // Sample bar: analysis, load button, envelope with the decay end. Its
-    // place is kept without a sample (a synth track), so the rows under it
-    // stay put when the sound changes.
-    let load_w = 40 * s;
+    // Sample bar: analysis, envelope with the decay end. Its place is kept
+    // without a sample (a synth track), so the rows under it stay put when
+    // the sound changes.
     if let Some(bar) = &view.sample {
-        let info: String = bar.info.chars().take(crate::canvas::chars_in(area.w - load_w, s)).collect();
+        let info: String = bar.info.chars().take(crate::canvas::chars_in(area.w, s)).collect();
         rows.items.push(Item::text(area.x, rows.y + 2 * s, info, theme::text(), s));
     }
-    let button = Kind::Button { label: "Load".into(), on: false };
-    rows.items.push(Item::new(
-        Some(Id::LoadSample),
-        Rect::new(area.x + area.w - load_w, rows.y, load_w, 12 * s),
-        button,
-    ));
     rows.y += 15 * s;
     let (points, marker) = view.sample.as_ref().map_or((Vec::new(), None), |bar| (bar.envelope.clone(), bar.marker));
     rows.items.push(Item::new(None, Rect::new(area.x, rows.y, area.w, 32 * s), Kind::Envelope { points, marker }));
@@ -922,9 +915,22 @@ fn sound_tab(rows: &mut Rows, view: &TrackView) {
     ] {
         let r = rows.row();
         rows.label(r, label, None, false);
-        rows.items.push(Item::new(Some(id), rows.field(r, r.w), choice.kind()));
+        if id == Id::Sample {
+            // The sample's choice, then the button that loads one from a file.
+            let field = rows.field(r, r.w);
+            let load = Rect::new(field.x + field.w - LOAD_W * s, field.y, LOAD_W * s, field.h);
+            let choice_field = Rect::new(field.x, field.y, field.w - (LOAD_W + 4) * s, field.h);
+            rows.items.push(Item::new(Some(id), choice_field, choice.kind()));
+            let button = Kind::Button { label: "File...".into(), on: false };
+            rows.items.push(Item::new(Some(Id::LoadSample), load, button));
+        } else {
+            rows.items.push(Item::new(Some(id), rows.field(r, r.w), choice.kind()));
+        }
     }
 }
+
+/// Width of the Sound tab's File... button (at scale 1): its label and a margin.
+const LOAD_W: i32 = 48;
 
 /// The LFO tab: the five targets one under the other, each a strip of its
 /// own, as in the FX tab: its on / off button (named) in the label column,
