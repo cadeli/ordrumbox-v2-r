@@ -540,11 +540,13 @@ fn border_color() -> Rgb {
 fn highlight_color() -> Rgb {
     theme::highlight()
 }
-const DIM: Rgb = theme::CYAN;
+fn dim() -> Rgb {
+    theme::muted()
+}
 fn disabled_color() -> Rgb {
     theme::disabled()
 }
-const ACCENT: Rgb = theme::PINK;
+const ACCENT: Rgb = theme::ACCENT;
 
 /// Height of the menu bar.
 pub fn bar_height(scale: Scale) -> i32 {
@@ -673,7 +675,7 @@ pub fn draw(canvas: &mut Canvas, menus: &[Menu], open: Option<Open>, scale: Scal
                         canvas.fill_rect(bx, by, b, b, if *enabled { ACCENT } else { disabled_color() });
                     } else {
                         let line = scale.px();
-                        let c = if *enabled { DIM } else { disabled_color() };
+                        let c = if *enabled { dim() } else { disabled_color() };
                         canvas.fill_rect(bx, by, b, line, c);
                         canvas.fill_rect(bx, by + b - line, b, line, c);
                         canvas.fill_rect(bx, by, line, b, c);
@@ -694,7 +696,7 @@ pub fn draw(canvas: &mut Canvas, menus: &[Menu], open: Option<Open>, scale: Scal
                     ty,
                     shortcut,
                     scale,
-                    if *enabled { DIM } else { disabled_color() },
+                    if *enabled { dim() } else { disabled_color() },
                 );
             }
         }

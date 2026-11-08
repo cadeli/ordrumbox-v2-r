@@ -15,7 +15,7 @@ use ordrumbox_logic::generate;
 
 use crate::control::{Format, Spec};
 use crate::kits::{DECAY_RANGE, Field, GAIN_RANGE, TRANSPOSE_RANGE};
-use crate::panel::{ACCENT, DIM, Id, Item, Kind, LfoParam, Rect, label_width};
+use crate::panel::{Id, Item, Kind, LfoParam, Rect, dim, label_width};
 use crate::theme;
 
 // ─── Tables (track_editor_constants.js, sync_section.js) ─────────────────────
@@ -694,12 +694,12 @@ impl Rows {
             self.items.push(Item::new(None, Rect::new(r.x - 2 * s, r.y, r.w + 4 * s, r.h), Kind::Highlight));
         }
         let rect = Rect::new(r.x, r.y + (r.h - 8 * s) / 2, label_width(s) - 4 * s, 8 * s);
-        self.items.push(Item::new(None, rect, Kind::Text { text: text.to_owned(), color: DIM }));
+        self.items.push(Item::new(None, rect, Kind::Text { text: text.to_owned(), color: dim() }));
         if let Some(key) = key {
             self.items.push(Item::new(Some(Id::Row(key)), Rect::new(r.x, r.y, label_width(s), r.h), Kind::Highlight));
             // The row id goes under the label only: drop its highlight look.
             if let Some(last) = self.items.last_mut() {
-                last.kind = Kind::Text { text: String::new(), color: DIM };
+                last.kind = Kind::Text { text: String::new(), color: dim() };
             }
         }
     }
@@ -772,7 +772,7 @@ pub fn track_editor(view: &TrackView, state: &EditorState, area: Rect, scale: Sc
     let s = scale;
     let track = view.track;
     let mut rows = Rows { x: area.x, w: area.w, y: area.y, scale: s, items: Vec::new() };
-    rows.text(&view.title, ACCENT);
+    rows.text(&view.title, theme::ACCENT);
 
     // Sample bar: analysis, load button, envelope with the decay end. Its
     // place is kept without a sample (a synth track), so the rows under it
@@ -894,7 +894,7 @@ fn sound_tab(rows: &mut Rows, view: &TrackView) {
         Rect::new(r.x, r.y, 12 * s, r.h),
         Kind::Led { on: track.auto_assign },
     ));
-    rows.items.push(Item::text(r.x + 14 * s, r.y + (r.h - 8 * s) / 2, "auto", DIM, s));
+    rows.items.push(Item::text(r.x + 14 * s, r.y + (r.h - 8 * s) / 2, "auto", dim(), s));
     for (id, label, choice) in [
         (Id::Instrument, "Instr", &view.instruments),
         (Id::Sample, "Sample", &view.samples),
@@ -1034,7 +1034,7 @@ fn generation_tab(rows: &mut Rows, track: &Track, compose: Option<&ComposeView>,
     let simple_bottom = simple_part_bottom(rows.y, s);
     match compose {
         Some(view) => {
-            rows.text(&format!("{} / {}  (* = style)", view.style, view.shown.part), DIM);
+            rows.text(&format!("{} / {}  (* = style)", view.style, view.shown.part), dim());
             for p in GENERATION_COMPOSE.iter().filter(|p| SIMPLE_COMPOSE.contains(&p.key)) {
                 compose_slider(rows, track, view, p, state);
             }
@@ -1043,7 +1043,7 @@ fn generation_tab(rows: &mut Rows, track: &Track, compose: Option<&ComposeView>,
             variant_select(rows, track, state);
             generation_slider(rows, track, &GENERATION_DENSITY, state);
         }
-        None => rows.text("no part for this track in the pattern's style", DIM),
+        None => rows.text("no part for this track in the pattern's style", dim()),
     }
     rows.y = rows.y.max(simple_bottom);
     // Everything else, folded.
@@ -1239,7 +1239,7 @@ pub fn note_editor(view: &NoteView, state: &EditorState, area: Rect, scale: Scal
     let mut rows = Rows { x: area.x, w: area.w, y: area.y, scale: s, items: Vec::new() };
     rows.items.push(Item::new(None, Rect::new(area.x, area.y, area.w, s.px()), Kind::Line));
     rows.y += 6 * s;
-    rows.text(&view.title, ACCENT);
+    rows.text(&view.title, theme::ACCENT);
     let Some(note) = &view.note else { return rows.items };
     let knobs = NOTE_KNOBS
         .iter()

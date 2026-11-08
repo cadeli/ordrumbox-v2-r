@@ -159,7 +159,7 @@ impl Session {
                     let area = Rect::new(area.x, y + 4 * s, area.w, bottom - y);
                     layout.items.extend(editors::note_editor(&note, &self.editors, area, scale));
                 }
-                None => layout.items.push(Item::text(area.x, area.y, "No track", panel::DIM, s)),
+                None => layout.items.push(Item::text(area.x, area.y, "No track", panel::dim(), s)),
             }
         }
         // The output strip along the bottom, in the app only.
@@ -634,6 +634,9 @@ mod tests {
         // No samples loaded: nothing for the kick, the preset, the sample set by hand.
         let labels: Vec<String> = (0..3).map(|t| s.track_sound_label(t)).collect();
         assert_eq!(labels, ["no sound", "synth BASS5", "real/x.wav"]);
+        let lines: Vec<(String, String)> = (0..3).map(|t| s.track_sound_lines(t)).map(|l| (l.source, l.name)).collect();
+        let owned = |a: &str, b: &str| (a.to_owned(), b.to_owned());
+        assert_eq!(lines, [owned("", "no sound"), owned("synth", "BASS5"), owned("real", "x")]);
     }
 
     #[test]

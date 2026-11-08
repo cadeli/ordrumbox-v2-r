@@ -1,10 +1,10 @@
 //! The app's colours: a ground (the window, panels a step lighter, lines,
-//! text) taken from the colour scheme in use, and five neon accents shared
-//! by every scheme, with one role each — pink for titles, the selection and
-//! the slider handles; cyan for labels, sliders and knobs; lime for play,
-//! what is on and the playhead; yellow for values and generation; violet
-//! and orange, with the others, for the tracks (each track has its colour,
-//! which its notes take). Flat colours only: no glow, no gradient.
+//! text) taken from the colour scheme in use, and six neon accents shared
+//! by every scheme. Each accent has one meaning, the same in every view: the
+//! roles below ([`ACCENT`], [`FOCUS`], [`LIVE`], [`VALUE`], [`CHANCE`],
+//! [`GENERATED`], [`ALERT`]) are the only way to them, besides the tracks'
+//! own colours (a track's stripe and its notes in the piano roll). Labels
+//! are muted, not coloured. Flat colours only: no glow, no gradient.
 
 use std::cell::Cell;
 
@@ -209,14 +209,34 @@ pub const WHITE: Rgb = 0x00FF_FFFF;
 
 // ─── Accents ─────────────────────────────────────────────────────────────────
 
-pub const PINK: Rgb = 0x00FF_4FA3;
-pub const CYAN: Rgb = 0x0038_D9F5;
-pub const LIME: Rgb = 0x00B8_F23A;
-pub const YELLOW: Rgb = 0x00FF_D23F;
-pub const VIOLET: Rgb = 0x009B_7BFF;
-pub const ORANGE: Rgb = 0x00FF_8A3D;
-/// Problems, mute.
-pub const RED: Rgb = 0x00FF_5C6C;
+const PINK: Rgb = 0x00FF_4FA3;
+const CYAN: Rgb = 0x0038_D9F5;
+const LIME: Rgb = 0x00B8_F23A;
+const YELLOW: Rgb = 0x00FF_D23F;
+const VIOLET: Rgb = 0x009B_7BFF;
+const ORANGE: Rgb = 0x00FF_8A3D;
+const RED: Rgb = 0x00FF_5C6C;
+
+// ─── Roles ───────────────────────────────────────────────────────────────────
+
+/// The app itself: the logo, titles, the header's edge, the selected item
+/// of a list, slider handles, where a dragged item lands.
+pub const ACCENT: Rgb = PINK;
+/// Keyboard focus: the grid cursor, the focused control, a text caret.
+pub const FOCUS: Rgb = CYAN;
+/// What sounds: the transport playing, a switch that is on, the playhead,
+/// the beat heard, the pattern next in line, the scope, a plain note.
+pub const LIVE: Rgb = LIME;
+/// What the user set: values and the arcs of their knobs, the active tab,
+/// a solo, loop marks, a fixed trig condition.
+pub const VALUE: Rgb = YELLOW;
+/// What varies by itself: a note's probability or cycle, a random trig
+/// condition, an LFO, a track in auto mode.
+pub const CHANCE: Rgb = VIOLET;
+/// The hits a note makes by itself: retriggers, euclidean pulses.
+pub const GENERATED: Rgb = ORANGE;
+/// Problems and mutes (a mute from a plugin host is dimmed).
+pub const ALERT: Rgb = RED;
 
 /// The colour of track `index` (its stripe, its notes): pink, cyan,
 /// yellow, violet, orange, lime, round again.

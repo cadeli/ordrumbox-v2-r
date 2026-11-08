@@ -12,6 +12,21 @@ use super::*;
 use crate::editors::{
     self, ARP_DIRECTIONS, Choice, ComposeView, KitControls, LFO_TARGETS, NoteView, SampleBar, TrackView,
 };
+use crate::view::SoundLabel;
+
+/// What a track plays, before it is worded for the grid or a tooltip.
+#[derive(Debug)]
+enum Sounding {
+    /// The sample at `path` (`kit/file.wav`), standing in for the `wanted`
+    /// instrument when the track's own is not in the kit.
+    Sample {
+        path: String,
+        wanted: Option<String>,
+    },
+    /// A synth preset, by its key when it has one.
+    Synth(Option<String>),
+    Nothing,
+}
 
 impl Session {
     /// What track `t` plays: what the player assigned it, else its first pick.
@@ -28,32 +43,60 @@ impl Session {
         }
     }
 
-    /// What the grid shows under track `t`'s name: its sample (`kit/file`, after
-    /// `for CONGAS:` when it stands in for the track's instrument), its synth
-    /// preset, or that it has none.
-    pub(super) fn track_sound_label(&self, t: usize) -> String {
-        let Some(track) = self.track(t) else { return String::new() };
-        let bank = self
-            .playback
-            .controller()
-            .map(|c| c.bank().clone())
-            .or_else(|| self.render.as_ref().map(|r| r.bank.clone()));
-        match self.track_sound(t) {
+    /// What track `t` plays, before it is worded; `None` when that is not
+    /// known (no such track, a sample the bank does not hold).
+    fn track_sounding(&self, t: usize) -> Option<Sounding> {
+        let track = self.track(t)?;
+        Some(match self.track_sound(t) {
             TrackSound::Sample(i) => {
-                let Some(sample) = bank.as_ref().and_then(|b| b.get(i)) else { return String::new() };
+                let bank = self
+                    .playback
+                    .controller()
+                    .map(|c| c.bank().clone())
+                    .or_else(|| self.render.as_ref().map(|r| r.bank.clone()));
+                let sample = &bank.as_ref().and_then(|b| b.get(i))?.sample;
                 // A sample picked for want of the track's own instrument says so.
-                match substitute_for(&track.name, &sample.sample.key).filter(|_| track.auto_assign) {
-                    Some(wanted) => format!("for {wanted}: {}", sample.sample.path),
-                    None => sample.sample.path.clone(),
+                let wanted = substitute_for(&track.name, &sample.key).filter(|_| track.auto_assign);
+                Sounding::Sample { path: sample.path.clone(), wanted }
+            }
+            TrackSound::Synth(key) => Sounding::Synth(Some(key)),
+            TrackSound::None if track.use_synth => Sounding::Synth(track.synth_preset.clone()),
+            TrackSound::None if !track.auto_assign && !track.sample_path.is_empty() => {
+                Sounding::Sample { path: track.sample_path.clone(), wanted: None }
+            }
+            TrackSound::None => Sounding::Nothing,
+        })
+    }
+
+    /// What track `t` plays, in full (its name's tooltip): its sample
+    /// (`kit/file`, after `for CONGAS:` when it stands in for the track's
+    /// instrument), its synth preset, or that it has none.
+    pub(super) fn track_sound_label(&self, t: usize) -> String {
+        match self.track_sounding(t) {
+            None => String::new(),
+            Some(Sounding::Sample { path, wanted: Some(wanted) }) => format!("for {wanted}: {path}"),
+            Some(Sounding::Sample { path, wanted: None }) => path,
+            Some(Sounding::Synth(Some(key))) => format!("synth {key}"),
+            Some(Sounding::Synth(None)) => "synth".to_owned(),
+            Some(Sounding::Nothing) => "no sound".to_owned(),
+        }
+    }
+
+    /// What the grid shows under track `t`'s name: where its sound comes
+    /// from (its kit, `synth`) above the sound's own name (the sample's file
+    /// without its extension, the preset).
+    pub(super) fn track_sound_lines(&self, t: usize) -> SoundLabel {
+        match self.track_sounding(t) {
+            None => SoundLabel::default(),
+            Some(Sounding::Sample { path, wanted }) => {
+                let sample = SoundLabel::sample(&path);
+                match wanted {
+                    Some(wanted) => SoundLabel { source: format!("for {wanted}: {}", sample.source), ..sample },
+                    None => sample,
                 }
             }
-            TrackSound::Synth(key) => format!("synth {key}"),
-            TrackSound::None if track.use_synth => match &track.synth_preset {
-                Some(key) => format!("synth {key}"),
-                None => "synth".to_owned(),
-            },
-            TrackSound::None if !track.auto_assign && !track.sample_path.is_empty() => track.sample_path.clone(),
-            TrackSound::None => "no sound".to_owned(),
+            Some(Sounding::Synth(key)) => SoundLabel { source: "synth".to_owned(), name: key.unwrap_or_default() },
+            Some(Sounding::Nothing) => SoundLabel { source: String::new(), name: "no sound".to_owned() },
         }
     }
 

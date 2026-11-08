@@ -280,16 +280,16 @@ impl Session {
         // The name (a click renames it), the date.
         for (label, id, text, color) in [
             ("Song", Some(Id::SongName), self.song_name(), theme::text()),
-            ("Date", None, self.info("date"), panel::DIM),
+            ("Date", None, self.info("date"), panel::dim()),
         ] {
-            layout.items.push(Item::text(x, y + 2 * s, label, panel::DIM, s));
+            layout.items.push(Item::text(x, y + 2 * s, label, panel::dim(), s));
             layout.items.push(Item::new(id, field(y), Kind::Text { text, color }));
             y += line;
         }
         // The description, a click edits it.
         let description = self.info("description");
         let (text, color) = if description.is_empty() {
-            ("(description)".to_owned(), panel::DIM)
+            ("(description)".to_owned(), panel::dim())
         } else {
             (description, theme::text())
         };
@@ -298,12 +298,12 @@ impl Session {
         y += line + 4 * s;
 
         // The arrangement, under its label.
-        layout.items.push(Item::text(x, y, "Arrangement", panel::DIM, s));
+        layout.items.push(Item::text(x, y, "Arrangement", panel::dim(), s));
         y += 12 * s;
         let select = Rect::new(x, y, area.w, 12 * s);
         let songs = &self.editor.library().songs;
         if songs.is_empty() {
-            let text = Kind::Text { text: "No arrangement".into(), color: panel::DIM };
+            let text = Kind::Text { text: "No arrangement".into(), color: panel::dim() };
             layout.items.push(Item::new(None, select, text));
         } else {
             let labels = songs.iter().map(|s| s.name.clone()).collect();
