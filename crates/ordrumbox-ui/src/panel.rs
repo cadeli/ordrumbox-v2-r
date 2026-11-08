@@ -336,6 +336,16 @@ pub fn slider_bar(rect: Rect, labelled: bool, valued: bool, scale: Scale) -> (i3
     (left, (right - left).max(8 * scale))
 }
 
+/// The parts of a stepper item (with a label): its minus button, its value,
+/// its plus button. Square buttons the row's height around a value as wide
+/// as a slider's; the same width whatever the value.
+pub fn stepper_parts(rect: Rect, labelled: bool, scale: Scale) -> [Rect; 3] {
+    let left = rect.x + if labelled { label_width(scale) } else { 0 } + 4 * scale;
+    let button = rect.h;
+    let value = Rect::new(left + button, rect.y, value_width(scale), rect.h);
+    [Rect::new(left, rect.y, button, rect.h), value, Rect::new(value.x + value.w, rect.y, button, rect.h)]
+}
+
 /// Diameter of a knob in a row of knobs (at scale 1).
 pub const KNOB_SIZE: i32 = 26;
 
@@ -446,6 +456,27 @@ pub fn draw(canvas: &mut Canvas, items: &[Item], focus: Option<Id>, scale: Scale
                         canvas.fill_rect(thumb, r.y + r.h / 2 - 4 * scale, 8 * scale, 8 * scale, HANDLE);
                         let x = left + width + 6 * scale;
                         canvas.text(x, ty, &fit(text, r.x + r.w - x, scale), scale, VALUE);
+                    }
+                    Style::Stepper => {
+                        let ty = r.y + (r.h - 8 * scale) / 2;
+                        if let Some(label) = label {
+                            canvas.text(r.x, ty, &fit(label, label_width(scale) - 4 * scale, scale), scale, dim());
+                        }
+                        let [down, field, up] = stepper_parts(r, label.is_some(), scale);
+                        // A button is greyed out at its end of the range.
+                        for (button, glyph, live) in [(down, "-", *value > spec.min), (up, "+", *value < spec.max)] {
+                            canvas.fill_rect(
+                                button.x + t,
+                                button.y + t,
+                                button.w - 2 * t,
+                                button.h - 2 * t,
+                                field_color(),
+                            );
+                            let x = button.x + (button.w - text_width(glyph, scale)) / 2;
+                            canvas.text(x, ty, glyph, scale, if live { theme::text() } else { dim() });
+                        }
+                        let text = fit(text, field.w, scale);
+                        canvas.text(field.x + (field.w - text_width(&text, scale)) / 2, ty, &text, scale, VALUE);
                     }
                 }
             }

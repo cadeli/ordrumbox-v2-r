@@ -13,11 +13,13 @@ use ordrumbox_core::num::{self, round_to};
 /// Pixels of vertical drag that cross a knob's whole range (`/ 200`).
 const DRAG_RANGE_PX: f64 = 200.0;
 
-/// Knob or slider.
+/// How a value is shown: a knob for a sound, a slider for an amount, a
+/// stepper (- 4 +) for a count.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Style {
     Knob,
     Slider,
+    Stepper,
 }
 
 /// A control's range: `min`–`max` by `step`, `default` restored by a
@@ -40,6 +42,11 @@ impl Spec {
 
     pub const fn slider(min: f64, max: f64, step: f64, default: f64) -> Self {
         Self { style: Style::Slider, min, max, step, default, log: false, full_travel: false }
+    }
+
+    /// A count: whole steps only, one per click on its - and + buttons.
+    pub const fn stepper(min: f64, max: f64, step: f64, default: f64) -> Self {
+        Self { style: Style::Stepper, min, max, step, default, log: false, full_travel: false }
     }
 
     /// `scale: 'log'`; ignored (linear) unless `0 < min < max`.
@@ -99,8 +106,10 @@ impl Spec {
 
     /// An arrow key, or a wheel notch: one step up or down (Shift or Alt: a
     /// tenth of a step, Ctrl: ten steps). A knob keeps to its (fine) step; a
-    /// slider is only kept in range (`OrSlider.handleKeydown`).
+    /// slider is only kept in range (`OrSlider.handleKeydown`). A stepper
+    /// has no fine step.
     pub fn nudge(&self, value: f64, up: bool, fine: bool, coarse: bool) -> f64 {
+        let fine = fine && self.style != Style::Stepper;
         let multiplier = if fine {
             0.1
         } else if coarse {
@@ -110,7 +119,9 @@ impl Spec {
         };
         let delta = if up { 1.0 } else { -1.0 } * self.step * multiplier;
         match self.style {
-            Style::Knob => self.clamp_step(value + delta, if fine { self.step * 0.1 } else { self.step }),
+            Style::Knob | Style::Stepper => {
+                self.clamp_step(value + delta, if fine { self.step * 0.1 } else { self.step })
+            }
             Style::Slider => self.clamp(value + delta),
         }
     }
@@ -133,11 +144,11 @@ impl Spec {
         self.clamp_step(raw, self.step * 0.1)
     }
 
-    /// A number typed in: a knob on its step grid, a
+    /// A number typed in: a knob or a stepper on its step grid, a
     /// slider in range.
     pub fn typed(&self, number: f64) -> f64 {
         match self.style {
-            Style::Knob => self.clamp_step(number, self.step),
+            Style::Knob | Style::Stepper => self.clamp_step(number, self.step),
             Style::Slider => self.clamp(number),
         }
     }
@@ -780,6 +791,17 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// A stepper counts in whole steps: a key (Shift or not) or a typed
+    /// number lands on its grid, in range.
+    #[test]
+    fn a_stepper_keeps_to_whole_steps() {
+        let s = Spec::stepper(1.0, 16.0, 1.0, 1.0);
+        assert_eq!([false, true].map(|fine| s.nudge(4.0, true, fine, false)), [5.0, 5.0]);
+        assert_eq!(s.nudge(1.0, false, false, false), 1.0);
+        assert_eq!(s.nudge(10.0, true, false, true), 16.0);
+        assert_eq!([3.4, 0.0, 20.0].map(|n| s.typed(n)), [3.0, 1.0, 16.0]);
     }
 
     #[test]

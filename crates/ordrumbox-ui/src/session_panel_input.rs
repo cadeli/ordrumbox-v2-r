@@ -62,6 +62,22 @@ impl Session {
         match item.kind {
             Kind::Value { spec, value, label, text, .. } => {
                 self.chrome.widgets.focus = Some(id);
+                if spec.style == Style::Stepper {
+                    let [down, field, up] = panel::stepper_parts(item.rect, label.is_some(), scale);
+                    if x < down.x - 2 * scale {
+                        self.select_row(id);
+                        return true;
+                    }
+                    // A button is one step a click, however fast the clicks.
+                    if let Some(up) = [(down, false), (up, true)].iter().find(|(r, _)| r.contains(x, y)).map(|p| p.1) {
+                        self.chrome.widgets.last_click = None;
+                        self.set_value(id, spec.nudge(value, up, false, false));
+                        return true;
+                    }
+                    if !field.contains(x, y) {
+                        return true;
+                    }
+                }
                 if double {
                     // Double-click: the default value.
                     self.chrome.widgets.last_click = None;
@@ -121,6 +137,7 @@ impl Session {
         let Some(drag) = self.chrome.widgets.drag else { return false };
         let value = match (drag.spec.style, drag.bar) {
             (Style::Knob, _) => drag.spec.drag(drag.start, f64::from(drag.y - y), shift),
+            (Style::Stepper, _) => drag.spec.drag(drag.start, f64::from(drag.y - y), false),
             (Style::Slider, Some((left, w))) => drag.spec.slider_at(f64::from(x - left) / f64::from(w.max(1))),
             (Style::Slider, None) => {
                 let w = self.slider_width(size, drag.id).max(1);
