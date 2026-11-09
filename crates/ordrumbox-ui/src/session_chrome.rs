@@ -41,6 +41,8 @@ pub(super) struct Chrome {
     pub(super) show_track_editor: bool,
     /// The note editor shown under the grid and the piano roll.
     pub(super) show_note_editor: bool,
+    /// The master strip shown along the bottom (in the app: a plugin has none).
+    pub(super) show_master_strip: bool,
     /// Whether the VU meter stripe is shown.
     pub(super) show_vus: bool,
     /// The display's scale factor (at least ×1), to the nearest quarter.
@@ -68,6 +70,7 @@ impl Default for Chrome {
             current_page: 0,
             show_track_editor: true,
             show_note_editor: true,
+            show_master_strip: true,
             show_vus: true,
             display_scale: Scale::ONE,
             zoom: 0,

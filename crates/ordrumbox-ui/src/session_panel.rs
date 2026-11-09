@@ -172,8 +172,8 @@ impl Session {
                 None => layout.items.push(Item::text(r.x, r.y, "No note", panel::dim(), s)),
             }
         }
-        // The output strip along the bottom, in the app only.
-        if !self.hosted {
+        // The output strip along the bottom, in the app only, unless folded.
+        if self.output_shown() {
             self.output_items(&mut layout, width, body.output, scale);
         }
         // The main editor (top-left): exactly one of the kit editor, the song

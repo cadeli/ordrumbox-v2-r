@@ -810,7 +810,7 @@ impl Session {
     pub(super) fn body(&self, size: (i32, i32, Scale)) -> view::Body {
         let (width, height, scale) = size;
         let right = self.track_editor_width(width, scale);
-        view::Body::new(width, height, scale, right, self.status.len(), !self.hosted, self.note_editor_shown())
+        view::Body::new(width, height, scale, right, self.status.len(), self.output_shown(), self.note_editor_shown())
     }
 
     /// The note editor is shown, under the grid or the piano roll: the
@@ -821,10 +821,16 @@ impl Session {
             && matches!(self.workspace, Workspace::Grid | Workspace::PianoRoll)
     }
 
+    /// The master strip (the output panel) is shown along the bottom: in
+    /// the app, unless View > Master folded it.
+    pub(super) fn output_shown(&self) -> bool {
+        !self.hosted && self.chrome.show_master_strip
+    }
+
     /// What the window shows that sets the room the layout needs.
     pub fn shown(&self) -> view::Shown {
         view::Shown {
-            output: !self.hosted,
+            output: self.output_shown(),
             track_editor: self.chrome.show_track_editor,
             grid: self.kit_editor.is_none() && self.workspace == Workspace::Grid,
             note_editor: self.chrome.show_note_editor,
