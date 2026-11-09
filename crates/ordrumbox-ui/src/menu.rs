@@ -460,6 +460,29 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
         },
     ];
     if s.hosted {
+        // A plugin does not show what it cannot run: drop those entries
+        // instead of greying them out. Clean up the separators they leave
+        // behind, and the menus that end up empty.
+        for menu in &mut menus {
+            menu.items.retain(|item| match item {
+                Item::Command { command, .. } => command.hosted_refusal().is_none(),
+                Item::Separator => true,
+            });
+            let mut cleaned: Vec<Item> = Vec::with_capacity(menu.items.len());
+            for item in std::mem::take(&mut menu.items) {
+                if matches!(item, Item::Separator) {
+                    if cleaned.is_empty() || matches!(cleaned.last(), Some(Item::Separator)) {
+                        continue;
+                    }
+                }
+                cleaned.push(item);
+            }
+            while matches!(cleaned.last(), Some(Item::Separator)) {
+                cleaned.pop();
+            }
+            menu.items = cleaned;
+        }
+        menus.retain(|menu| !menu.items.is_empty());
         for item in menus.iter_mut().flat_map(|menu| &mut menu.items) {
             host_item(item);
         }
@@ -899,22 +922,23 @@ mod tests {
     }
 
     #[test]
-    fn a_plugin_menu_greys_out_what_it_leaves_and_says_whose_it_is() {
+    fn a_plugin_menu_drops_what_it_leaves_and_says_whose_it_is() {
         let state = MenuState { can_save: true, has_songs: true, hosted: true, ..state() };
         let menus = menus(&state);
         let app = super::menus(&MenuState { hosted: false, ..state.clone() });
-        assert_eq!(menus.len(), app.len(), "the Song menu too");
-        for (menu, app_menu) in menus.iter().zip(&app) {
-            assert_eq!(menu.items.len(), app_menu.items.len(), "{}", menu.title);
+        // A whole menu whose every command is refused is dropped (the Song menu).
+        assert!(!menus.iter().any(|m| m.title == "Song"), "the Song menu too");
+        assert_eq!(menus.len(), app.len() - 1);
+        for menu in &menus {
+            let app_menu = app.iter().find(|m| m.title == menu.title).unwrap();
             for item in &menu.items {
                 let Item::Command { shortcut, command, enabled, .. } = item else { continue };
-                match command.hosted_refusal() {
-                    Some(_) => {
-                        assert!(!enabled, "{command:?}");
-                        assert!([HOST_TAG, APP_TAG].contains(&shortcut.as_ref()), "{command:?}: {shortcut}");
-                    }
-                    None => assert!(!shortcut.starts_with(CONTROL_PREFIX) && !shortcut.contains("Space")),
-                }
+                // Nothing a plugin refuses is left in the menus.
+                assert!(command.hosted_refusal().is_none(), "{command:?}");
+                assert!(!shortcut.starts_with(CONTROL_PREFIX) && !shortcut.contains("Space"));
+                // The item existed in the app's menu.
+                assert!(app_menu.items.iter().any(|i| matches!(i, Item::Command { command: c, .. } if *c == *command)), "{command:?}");
+                let _ = enabled;
             }
         }
         let item = |command| {
@@ -925,11 +949,13 @@ mod tests {
                 _ => None,
             })
         };
-        assert_eq!(item(Command::Save), Some((HOST_TAG, false)));
-        assert_eq!(item(Command::SongView), Some((APP_TAG, false)));
+        // Kept commands show their Alt shortcut.
         assert_eq!(item(Command::KitEditor), Some(("Alt+K", true)));
         assert_eq!(item(Command::Undo), Some(("Alt+Z", true)));
         assert_eq!(item(Command::Shortcuts), Some(("F1", true)));
+        // Dropped commands are nowhere to be found.
+        assert!(item(Command::Save).is_none());
+        assert!(item(Command::SongView).is_none());
     }
 
     #[test]
