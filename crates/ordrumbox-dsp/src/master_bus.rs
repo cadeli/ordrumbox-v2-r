@@ -63,8 +63,11 @@ pub struct MasterBus {
     lp_y_r: f64,
 }
 
-/// Gain reduction in dB (positive) for a level `input_db`.
-fn gain_reduction(input_db: f64, threshold: f64, ratio: f64, knee: f64) -> f64 {
+/// The compressor's gain reduction in dB (positive) for a level `input_db`:
+/// the curve the bus applies and the output panel draws.
+#[must_use]
+#[inline]
+pub fn gain_reduction(input_db: f64, threshold: f64, ratio: f64, knee: f64) -> f64 {
     let over = input_db - threshold;
     if over <= -knee / 2.0 {
         return 0.0;

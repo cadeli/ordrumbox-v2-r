@@ -24,6 +24,6 @@ pub use controller::{AudioSide, Controller, Mode, SCOPE_SIZE};
 pub use engine::{Engine, HOST_TRACKS, HostMix, HostTrack, HostTransport, Position, host_muted, host_pass};
 pub use kit::{Kit, KitSample, KitsRead, SampleBank, kits_from_json, kits_to_json};
 pub use midi::{BlockNote, DRUM_CHANNEL, KeyMap};
-pub use ordrumbox_dsp::{MasterSettings, SampleBuffer, slope};
+pub use ordrumbox_dsp::{MasterSettings, SampleBuffer, gain_reduction, slope};
 pub use pass::Pass;
 pub use synth_preset::SynthPresets;

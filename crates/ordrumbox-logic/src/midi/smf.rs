@@ -1,7 +1,8 @@
 //! Reading Standard MIDI Files (`logic/midi/midi_parser.js`), with its
 //! leniency: chunks are walked by their declared lengths, reads past the end
-//! of the file give `None`, and only meta, program and
-//! note events are known (any other status is read as a two-byte event).
+//! of the file give `None`, sysex events are skipped by their length, and only
+//! meta, program and note events are known (any other status is read as a
+//! two-byte event).
 
 /// Bytes read past the end of a track the file does not hold: beyond this,
 /// a declared length is taken as garbage (the JS would read on until it).
@@ -116,6 +117,13 @@ fn parse_track(bytes: &[u8], start: usize, length: usize) -> Vec<Event> {
             events.push(Event { tick, kind: EventKind::Meta { meta_type, data } });
             pos = to;
             running = 0;
+        } else if status == 0xf0 || status == 0xf7 {
+            // A sysex: `F0 length data` (or `F7 length data`, a continued or
+            // escaped packet), skipped by its length. Like a meta event, it
+            // cancels running status.
+            let (len, read) = decode_vlq(bytes, pos);
+            pos = (pos + read).saturating_add(len as usize);
+            running = 0;
         } else {
             let (hi, channel) = (status & 0xf0, status & 0x0f);
             if hi == 0xc0 || hi == 0xd0 {
@@ -177,12 +185,16 @@ fn text(data: &[u8]) -> String {
 }
 
 impl Midi {
-    /// `findAllNotes`: the note-ons with a velocity, track 0 skipped in a
-    /// format 1 file (its tempo track).
+    /// The tracks that hold the music: all of them, but track 0 in a format 1
+    /// file (its tempo track).
+    fn music_tracks(&self) -> impl Iterator<Item = (usize, &Vec<Event>)> {
+        self.tracks.iter().enumerate().skip(usize::from(self.header.format == 1))
+    }
+
+    /// The note-ons with a velocity, of the music tracks.
     pub fn note_ons(&self) -> Vec<NoteOn> {
-        let first = usize::from(self.header.format == 1);
         let mut notes = Vec::new();
-        for (track, events) in self.tracks.iter().enumerate().skip(first) {
+        for (track, events) in self.music_tracks() {
             for event in events {
                 if let EventKind::Note { status: 0x90, channel, note, velocity } = event.kind
                     && velocity > 0
@@ -194,11 +206,11 @@ impl Midi {
         notes
     }
 
-    /// `extractProgramChanges`: the last program of each channel, in the
-    /// order channels first got one; read from track 1 on, whatever the format.
+    /// The last program of each channel, in the order channels first got
+    /// one, read from the music tracks.
     pub fn program_changes(&self) -> Vec<(u8, Option<u8>)> {
         let mut programs: Vec<(u8, Option<u8>)> = Vec::new();
-        for events in self.tracks.iter().skip(1) {
+        for (_, events) in self.music_tracks() {
             for event in events {
                 if let EventKind::Program { status: 0xc0, channel, program } = event.kind {
                     match programs.iter_mut().find(|(c, _)| *c == channel) {
@@ -229,5 +241,39 @@ mod tests {
         }
         assert_eq!(encode_vlq(0x80), [0x81, 0x00]);
         assert_eq!(decode_vlq(&[0x81], 0), (0x80, 2)); // the missing byte reads as 0
+    }
+
+    /// A file of one track of `events`, in `format`.
+    fn file(format: u8, events: &[u8]) -> Vec<u8> {
+        let mut bytes = b"MThd\0\0\0\x06\0".to_vec();
+        bytes.extend([format, 0, 1, 0, 96]);
+        bytes.extend(b"MTrk");
+        bytes.extend(u32::try_from(events.len()).unwrap().to_be_bytes());
+        bytes.extend(events);
+        bytes
+    }
+
+    #[test]
+    fn a_sysex_is_skipped_by_its_length() {
+        // GM reset (F0 05 7E 7F 09 01 F7), then a kick at tick 0 and an
+        // escaped packet (F7 02 xx xx) before a snare at tick 96.
+        let bytes = file(
+            0,
+            &[
+                0x00, 0xf0, 0x05, 0x7e, 0x7f, 0x09, 0x01, 0xf7, //
+                0x00, 0x99, 36, 100, //
+                0x00, 0xf7, 0x02, 0x12, 0x34, //
+                0x60, 0x99, 38, 90, //
+                0x00, 0xff, 0x2f, 0x00,
+            ],
+        );
+        let notes: Vec<_> = parse(&bytes).note_ons().iter().map(|n| (n.tick, n.note)).collect();
+        assert_eq!(notes, [(0, Some(36)), (96, Some(38))]);
+    }
+
+    #[test]
+    fn the_programs_of_a_format_0_file_are_read() {
+        let events = [0x00, 0xc1, 33, 0x00, 0x91, 40, 100, 0x00, 0xff, 0x2f, 0x00];
+        assert_eq!(parse(&file(0, &events)).program_changes(), [(1, Some(33))]);
     }
 }
