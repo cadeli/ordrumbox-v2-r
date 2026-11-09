@@ -298,6 +298,9 @@ pub struct Session {
     hosted: bool,
     /// The tracks a plugin host mutes, bit `t` for track `t`.
     host_muted: u64,
+    /// The host's tempo last said to be outside the tempo bounds
+    /// (`report_host_tempo`), so the message is given once.
+    host_tempo_outside: Option<f64>,
     /// The output panel: the master bus, its tab, the spectrum.
     output_panel: session_output::OutputPanel,
     /// The update check (`session_update.rs`).
@@ -670,6 +673,7 @@ impl Session {
             color_scheme: 1,
             hosted: false,
             host_muted: 0,
+            host_tempo_outside: None,
             output_panel: session_output::OutputPanel::default(),
             updates: session_update::Updates::default(),
             mcp: None,
@@ -983,6 +987,7 @@ impl Session {
         self.playback.update(&mut self.editor, self.pattern_index, |editor, p, pass| {
             auto_loop(editor, &mut self.learned_styles, &self.styles, &self.scales, &mut self.rng, p, pass)
         });
+        self.report_host_tempo();
     }
 
     // ─── Editing ─────────────────────────────────────────────────────────────
@@ -1220,7 +1225,7 @@ impl Session {
             note_editor: self.note_editor_shown(),
             levels,
             show_vus: self.chrome.show_vus,
-            tempo_label: (!self.hosted).then_some("BPM"),
+            transport: !self.hosted,
             host_muted: self.host_muted,
             track_drop: self.track_drop((canvas.width(), canvas.height(), scale)),
             waiting,

@@ -478,7 +478,10 @@ mod tests {
         s.kit_set_instrument(0, "SNARE");
         let (x, y) = item_at(&s, Id::KitAutoInstrument(0));
         assert!(s.control_hover(SIZE, x, y));
-        assert_eq!(s.chrome.control_hover.and_then(|(id, _)| s.control_tip(id)).map(|t| t[0]), Some("Auto-assign"));
+        assert_eq!(
+            s.chrome.control_hover.and_then(|(id, _)| s.control_tip(id)).map(|[title, _]| title).as_deref(),
+            Some("Auto-assign")
+        );
         assert!(!auto_lit(&s, 0), "SNARE is not what kick.wav gives");
         s.mouse_down(SIZE, x, y, Button::Left, false);
         assert_eq!(s.kits.sample(0, 0).map(|k| k.key.as_str()), Some("KICK"), "kick.wav");

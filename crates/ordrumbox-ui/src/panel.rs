@@ -273,7 +273,7 @@ pub enum Kind {
         label: String,
         on: bool,
     },
-    /// A button greyed out: a click only says why (a plugin's SONG).
+    /// A control greyed out: shown, not used (a slap's echo feedback).
     Disabled {
         label: String,
     },

@@ -293,6 +293,27 @@ mod tests {
     }
 
     #[test]
+    fn a_host_tempo_out_of_bounds_is_said_once() {
+        let state = Arc::new(LibraryState::default());
+        let mut player = Player::default();
+        let mut audio = audio(player.start(48_000.0, &state));
+        let (mut left, mut right) = (vec![0.0; 512], vec![0.0; 512]);
+        let mut play_at = |player: &mut Player, bpm| {
+            audio.render_synced(&mut left, &mut right, HostTransport { playing: true, bpm, beat: 0.0 });
+            player.tick(&state, FIRST, &Names::default());
+            player.ui().map(|ui| ui.session.message().to_owned()).unwrap_or_default()
+        };
+        assert_eq!(play_at(&mut player, 400.0), "host tempo 400 outside 20–300: plays at 300");
+        // Said once: another message stays.
+        if let Some(ui) = player.ui() {
+            ui.session.run(ordrumbox_ui::Command::Undo);
+        }
+        assert_eq!(play_at(&mut player, 400.0), "nothing to undo");
+        play_at(&mut player, 120.0);
+        assert_eq!(play_at(&mut player, 10.0), "host tempo 10 outside 20–300: plays at 20");
+    }
+
+    #[test]
     fn the_host_chooses_the_pattern_when_its_parameter_changes() {
         let state = Arc::new(LibraryState::default());
         let names = Names::default();
