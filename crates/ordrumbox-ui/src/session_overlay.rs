@@ -5,10 +5,11 @@ use super::*;
 use crate::scale::Scale;
 
 /// Every key, for Help > Keyboard shortcuts.
-const SHORTCUTS: [&str; 60] = [
+const SHORTCUTS: [&str; 61] = [
     "MENUS",
     "  F10 or Alt             open the menus: Arrows move, Enter runs, Esc closes",
     "  F1 F2 F3 F4 F5 F6      this list, track editor, song, piano roll, grid, synth (Ctrl+K: kit editor)",
+    "  F7                     note editor under the grid and the piano roll, shown or folded",
     "GRID",
     "  Arrows                 move the cursor",
     "  Enter / click          switch the step on (a note) or off (all its notes)",
@@ -78,6 +79,7 @@ const PLUGIN_SHORTCUTS: &[&str] = &[
     "MENUS",
     "  F10 or Alt             open the menus: Arrows move, Enter runs, Esc closes",
     "  F1 F2 F4 F5 F6         this list, track editor, piano roll, grid, synth",
+    "  F2, F7                 the track editor, the note editor: shown or folded (the window follows)",
     "  songs, tempo, saving   the app's or the host's: no F3, no - = (the tempo is HOST's)",
     "GRID",
     "  Arrows                 move the cursor",

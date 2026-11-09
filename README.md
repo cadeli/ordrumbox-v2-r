@@ -86,8 +86,11 @@ plays at the nearest bound, and the status line says so.
 Playback starts on the host's first block, on its first frame. An offline render (a
 bounce, or a host computing ahead of real time) plays as in real time, every note in its
 place: the plugin then waits for its pattern, kit and passes before each block.
-The grip in its window's bottom-right corner resizes the window (down to 320×200, where
-the layout scrolls); the project keeps the size.
+Its window opens compact, the grid alone (1072×388 at scale 1), to leave the host's
+arrangement in view: **F2** shows or folds the track editor, **F7** the note editor, and the
+window grows or shrinks with them when it showed the layout whole. The grip in its
+bottom-right corner resizes the window (down to 320×200, where the layout scrolls, its
+scrollbars stopping short of the grip); the project keeps the size.
 
 Parameters the host automates: **Pattern** and **Kit** (by number, from 1), **Volume**
 (master, -60 to +6 dB), **Swing** (50 % straight to 75 %: in each pair of steps, where the
@@ -137,7 +140,8 @@ keyboard's layout marks (Ctrl Z is the key marked Z on AZERTY too), except the t
 that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their place. Common keys:
 
 - **Space**: play / stop
-- **F2**: track editor, **F3**: song panel, **F4**: piano roll, **F5**: grid, **F6**: synth editor
+- **F2**: track editor, **F3**: song panel, **F4**: piano roll, **F5**: grid, **F6**: synth editor, **F7**: note editor
+  (shown or folded)
 - **Ctrl K**: kit editor, **Ctrl M**: export MIDI, **Ctrl E**: export WAV
 - **Ctrl +** / **Ctrl Shift -**: zoom in / out a quarter at a time (×1, ×1.25,
   ×1.5… up to ×4), **Ctrl 0**: the display's scale, **View > Zoom: fit to

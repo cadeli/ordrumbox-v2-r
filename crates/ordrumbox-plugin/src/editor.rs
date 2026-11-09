@@ -2,7 +2,9 @@
 //! app's UI, drawn in software and shown through softbuffer, its input
 //! translated into the UI's. A pattern or kit chosen in it is given to the
 //! host's parameters. A grip in its bottom-right corner resizes it: the host
-//! is asked for the new size, which the project saves.
+//! is asked for the new size, which the project saves. It opens compact (the
+//! grid alone, small over the host's arrangement) and follows the layout
+//! when the track editor or the note editor is shown or folded.
 
 use std::num::{NonZeroIsize, NonZeroU32};
 use std::ptr::NonNull;
@@ -15,23 +17,16 @@ use baseview::{
 use keyboard_types::{KeyState, KeyboardEvent};
 use nih_plug::nih_log;
 use nih_plug::prelude::{Editor, GuiContext, IntParam, ParamSetter, ParentWindowHandle};
-use ordrumbox_ui::Scale;
 use ordrumbox_ui::ui_input::{self, Button, Key, KeyEvent, Modifiers};
+use ordrumbox_ui::{Scale, Shown};
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle, RawDisplayHandle, RawWindowHandle};
 use raw_window_handle_06 as rwh06;
 
 use crate::params::OrdrumboxParams;
 use crate::player::{SharedPlayer, lock};
 
-/// The window's first size in logical pixels (the app's first window size).
-pub const SIZE: (u32, u32) = (1100, 680);
-
 /// The largest side the grip makes, in logical pixels.
 const MAX_SIDE: u32 = 8192;
-
-/// The resize grip's side in logical pixels, in the window's bottom-right
-/// corner, over the UI.
-const GRIP: u32 = 14;
 
 /// The grip's stripes.
 const GRIP_COLOR: u32 = 0x0080_8090;
@@ -78,11 +73,36 @@ impl Editor for OrdrumboxEditor {
     fn param_values_changed(&self) {}
 }
 
+/// The window's first size in logical pixels: the compact view's, the grid
+/// alone, whole at scale 1.
+#[must_use]
+pub fn default_size() -> (u32, u32) {
+    let (width, height) = ordrumbox_ui::min_window_size(Scale::ONE, Shown::grid_alone(false));
+    fitted((width.unsigned_abs(), height.unsigned_abs()))
+}
+
+/// The side of a window (logical pixels) after what it shows changed, the
+/// layout needing `before` then `after`: a window that showed the layout
+/// whole keeps it whole, growing as it needs and, fitted to it, shrinking
+/// with it; one that scrolled, or had room to spare, keeps its side.
+#[must_use]
+fn follow(side: u32, before: u32, after: u32) -> u32 {
+    let fitted = side.abs_diff(before) <= 1;
+    if (side >= before && side < after) || (fitted && after < before) { after } else { side }
+}
+
 /// `size` within [`ordrumbox_ui::MIN_WINDOW`] and [`MAX_SIDE`]: a project may
 /// hold any size. The layout scrolls in a smaller window than it needs.
 fn fitted((width, height): (u32, u32)) -> (u32, u32) {
     let (min_width, min_height) = ordrumbox_ui::MIN_WINDOW;
     (width.clamp(min_width, MAX_SIDE), height.clamp(min_height, MAX_SIDE))
+}
+
+/// `size` in physical pixels as logical ones at `scale`, rounded up.
+fn logical_size((width, height): (i32, i32), scale: f64) -> (u32, u32) {
+    // A layout's size: positive and small, well within `u32`.
+    let side = |pixels: i32| (f64::from(pixels) / scale.max(1.0)).ceil().max(0.0) as u32;
+    (side(width), side(height))
 }
 
 fn logical((width, height): (u32, u32)) -> baseview::Size {
@@ -142,6 +162,11 @@ struct View {
     pointer: (f64, f64),
     /// The grip is being dragged.
     drag: Option<Drag>,
+    /// What the UI showed at the last frame, and the size (logical pixels)
+    /// its layout needed then.
+    layout: Option<(Shown, (u32, u32))>,
+    /// The size to ask the host for: the layout changed.
+    follow: Option<(u32, u32)>,
 }
 
 /// A drag of the resize grip: where it started, and the size then.
@@ -181,6 +206,8 @@ impl View {
             dirty: true,
             pointer: (0.0, 0.0),
             drag: None,
+            layout: None,
+            follow: None,
         };
         match surface {
             Ok(surface) => view.surface = Some(surface),
@@ -208,6 +235,7 @@ impl View {
         self.host.set(&self.host.params.pattern, choices.pattern);
         self.host.set(&self.host.params.kit, choices.kit);
         let grip = self.grip_side();
+        let scale = self.scale;
         let Some(surface) = &mut self.surface else { return Ok(()) };
         if self.width == 0 {
             return Ok(());
@@ -216,7 +244,18 @@ impl View {
         let host_changed = player.take_redraw();
         let ui = player.ui().filter(|_| self.font);
         let redraw = match ui {
-            Some(ui) => ui.idle().redraw || host_changed,
+            Some(ui) => {
+                let redraw = ui.idle().redraw || host_changed;
+                let layout = (ui.session.shown(), logical_size(ui.needed_size(), scale));
+                if let Some((shown, before)) = self.layout.replace(layout)
+                    && shown != layout.0
+                {
+                    let size = self.host.params.editor_size.get();
+                    let after = layout.1;
+                    self.follow = Some((follow(size.0, before.0, after.0), follow(size.1, before.1, after.1)));
+                }
+                redraw
+            }
             None => false,
         };
         if !(redraw || self.dirty) {
@@ -249,10 +288,9 @@ impl View {
         }
     }
 
-    /// The grip's side in physical pixels.
+    /// The grip's side in physical pixels: the UI's scrollbars stop short of it.
     fn grip_side(&self) -> usize {
-        // The scale of a display, a few units at most.
-        GRIP as usize * self.scale.round().max(1.0) as usize
+        ordrumbox_ui::grip_side(Scale::from_factor(self.scale)).unsigned_abs() as usize
     }
 
     /// The pointer is on the grip.
@@ -409,9 +447,14 @@ fn ui_button(button: MouseButton) -> Option<Button> {
 }
 
 impl baseview::WindowHandler for View {
-    fn on_frame(&mut self, _window: &mut baseview::Window<'_>) {
+    fn on_frame(&mut self, window: &mut baseview::Window<'_>) {
         if let Err(e) = self.frame() {
             self.fail(&e);
+        }
+        if let Some(size) = self.follow.take()
+            && self.drag.is_none()
+        {
+            self.ask_size(window, fitted(size));
         }
     }
 
@@ -520,8 +563,33 @@ mod tests {
     use super::*;
 
     #[test]
+    fn the_window_opens_compact() {
+        let (width, height) = default_size();
+        let (full_width, full_height) = ordrumbox_ui::min_window_size(Scale::ONE, Shown::all(false));
+        assert_eq!(i64::from(width), i64::from(full_width), "the header's width");
+        assert!(i64::from(height) < i64::from(full_height) * 3 / 4, "{height} high, {full_height} with the editors");
+        assert!(height <= 400, "{height}");
+    }
+
+    #[test]
+    fn the_window_follows_the_layout_it_showed_whole() {
+        // Fitted: it grows and shrinks with the layout.
+        assert_eq!(follow(388, 388, 559), 559);
+        assert_eq!(follow(559, 559, 388), 388);
+        // Bigger than both: it keeps its side.
+        assert_eq!(follow(900, 388, 559), 900);
+        assert_eq!(follow(900, 559, 388), 900);
+        // Between: whole before, it grows to stay whole.
+        assert_eq!(follow(450, 388, 559), 559);
+        // Scrolling (the user made it small): it stays small.
+        assert_eq!(follow(250, 388, 559), 250);
+        assert_eq!(follow(250, 559, 388), 250);
+        assert_eq!(logical_size((1072, 777), 2.0), (536, 389));
+    }
+
+    #[test]
     fn a_size_is_fitted_to_the_smallest_window() {
-        assert_eq!(fitted(SIZE), SIZE);
+        assert_eq!(fitted(default_size()), default_size());
         assert_eq!(fitted((0, 0)), ordrumbox_ui::MIN_WINDOW);
         assert_eq!(fitted((u32::MAX, u32::MAX)), (MAX_SIDE, MAX_SIDE));
     }

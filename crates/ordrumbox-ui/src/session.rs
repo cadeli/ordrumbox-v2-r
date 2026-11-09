@@ -569,6 +569,9 @@ impl Session {
         session.synths = synths.clone();
         session.synths_revision = Some(session.editor.revision());
         session.hosted = hosted;
+        if hosted {
+            session.chrome.fold_editors();
+        }
         session.assets_dir = Some(dir.clone());
         session.saving.songs_dir = store::songs_dir();
         session.scales = assets.scales.clone();
@@ -813,7 +816,19 @@ impl Session {
     /// The note editor is shown, under the grid or the piano roll: the
     /// views that edit notes.
     pub(super) fn note_editor_shown(&self) -> bool {
-        self.kit_editor.is_none() && matches!(self.workspace, Workspace::Grid | Workspace::PianoRoll)
+        self.chrome.show_note_editor
+            && self.kit_editor.is_none()
+            && matches!(self.workspace, Workspace::Grid | Workspace::PianoRoll)
+    }
+
+    /// What the window shows that sets the room the layout needs.
+    pub fn shown(&self) -> view::Shown {
+        view::Shown {
+            output: !self.hosted,
+            track_editor: self.chrome.show_track_editor,
+            grid: self.kit_editor.is_none() && self.workspace == Workspace::Grid,
+            note_editor: self.chrome.show_note_editor,
+        }
     }
 
     /// While the pattern shown waits for the one playing to end its loop:

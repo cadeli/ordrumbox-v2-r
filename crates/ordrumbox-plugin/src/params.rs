@@ -169,7 +169,7 @@ impl Default for OrdrumboxParams {
         let (pattern_names, kit_names) = (names.clone(), names.clone());
         Self {
             library: Arc::default(),
-            editor_size: Arc::new(EditorSize::new(editor::SIZE)),
+            editor_size: Arc::new(EditorSize::new(editor::default_size())),
             pattern: IntParam::new("Pattern", 1, IntRange::Linear { min: 1, max: PATTERN_CHOICES })
                 .with_value_to_string(Arc::new(move |v| pattern_names.show(&pattern_names.patterns, v)))
                 .with_string_to_value(Arc::new(|s| choice_number(s, PATTERN_CHOICES))),

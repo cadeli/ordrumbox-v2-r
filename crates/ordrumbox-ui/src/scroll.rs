@@ -19,6 +19,14 @@ const MIN_THUMB: i32 = 2;
 /// The pixels one line of the wheel scrolls, in scale units.
 const WHEEL_STEP: i32 = 40;
 
+/// The side of a resize grip in the window's bottom-right corner, at the
+/// display's scale `display`: a scrollbar's thickness, so that the bars
+/// stop short of it ([`Viewport::new`] with `grip`).
+#[must_use]
+pub fn grip_side(display: Scale) -> i32 {
+    THICKNESS * display
+}
+
 /// One of the two directions the UI scrolls in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Axis {
@@ -47,13 +55,17 @@ pub struct Viewport {
     horizontal: bool,
     vertical: bool,
     thickness: i32,
+    /// A resize grip holds the window's bottom-right corner: a bar alone
+    /// stops short of it, as it does of the other bar.
+    grip: bool,
 }
 
 impl Viewport {
     /// A window of `window` pixels showing a layout of `needed` pixels, on a
-    /// display at `display`.
+    /// display at `display`; `grip`: a resize grip in its bottom-right
+    /// corner, which the bars leave free.
     #[must_use]
-    pub fn new(window: (i32, i32), needed: (i32, i32), display: Scale) -> Self {
+    pub fn new(window: (i32, i32), needed: (i32, i32), display: Scale, grip: bool) -> Self {
         let thickness = THICKNESS * display;
         let (width, height) = (window.0.max(0), window.1.max(0));
         let less = |bar: bool| if bar { thickness } else { 0 };
@@ -63,7 +75,7 @@ impl Viewport {
         let horizontal = horizontal || needed.0 > width - less(vertical);
         let vertical = needed.1 > height - less(horizontal);
         let view = ((width - less(vertical)).max(0), (height - less(horizontal)).max(0));
-        Self { content: (needed.0.max(view.0), needed.1.max(view.1)), view, horizontal, vertical, thickness }
+        Self { content: (needed.0.max(view.0), needed.1.max(view.1)), view, horizontal, vertical, thickness, grip }
     }
 
     /// The window shows only a part of the UI.
@@ -79,6 +91,17 @@ impl Viewport {
         }
     }
 
+    /// The length of `axis`'s bar: along the view, short of the grip's
+    /// corner when the other bar does not already leave it free.
+    const fn track(&self, axis: Axis) -> i32 {
+        let other = match axis {
+            Axis::Horizontal => self.vertical,
+            Axis::Vertical => self.horizontal,
+        };
+        let length = axis.of(self.view) - if self.grip && !other { self.thickness } else { 0 };
+        if length > 0 { length } else { 0 }
+    }
+
     /// How far the UI scrolls along `axis`.
     const fn range(&self, axis: Axis) -> i32 {
         let range = axis.of(self.content) - axis.of(self.view);
@@ -88,7 +111,7 @@ impl Viewport {
     /// The thumb on `axis`'s bar for `offset`: where it starts along the
     /// bar, and its length.
     fn thumb(&self, axis: Axis, offset: i32) -> (i32, i32) {
-        let (track, content, range) = (axis.of(self.view), axis.of(self.content), self.range(axis));
+        let (track, content, range) = (self.track(axis), axis.of(self.content), self.range(axis));
         if range == 0 || content == 0 {
             return (0, track);
         }
@@ -101,9 +124,9 @@ impl Viewport {
     fn bar_at(&self, (x, y): (i32, i32)) -> Option<(Axis, i32)> {
         let (view_w, view_h) = self.view;
         let across = |at: i32, from: i32| at >= from && at < from + self.thickness;
-        if self.horizontal && x < view_w && across(y, view_h) {
+        if self.horizontal && x < self.track(Axis::Horizontal) && across(y, view_h) {
             Some((Axis::Horizontal, x))
-        } else if self.vertical && y < view_h && across(x, view_w) {
+        } else if self.vertical && y < self.track(Axis::Vertical) && across(x, view_w) {
             Some((Axis::Vertical, y))
         } else {
             None
@@ -186,7 +209,7 @@ impl Scroll {
     pub fn drag_to(&mut self, viewport: &Viewport, at: (i32, i32)) -> bool {
         let Some(drag) = self.drag else { return false };
         let (_, length) = viewport.thumb(drag.axis, drag.offset);
-        let travel = drag.axis.of(viewport.view) - length;
+        let travel = viewport.track(drag.axis) - length;
         let moved = (drag.axis.of(at) - drag.from) * viewport.range(drag.axis);
         self.set(viewport, drag.axis, drag.offset + moved.checked_div(travel).unwrap_or(0))
     }
@@ -243,19 +266,24 @@ impl Scroll {
             let held = self.drag.is_some_and(|d| d.axis == axis);
             let thumb = if held { theme::text() } else { theme::muted() };
             let inset = (t / 4).max(1);
+            let track = viewport.track(axis);
             match axis {
                 Axis::Horizontal => {
-                    canvas.fill_rect(0, view_h, view_w, t, theme::panel());
+                    canvas.fill_rect(0, view_h, track, t, theme::panel());
                     canvas.fill_rect(start, view_h + inset, length, t - 2 * inset, thumb);
                 }
                 Axis::Vertical => {
-                    canvas.fill_rect(view_w, 0, t, view_h, theme::panel());
+                    canvas.fill_rect(view_w, 0, t, track, theme::panel());
                     canvas.fill_rect(view_w + inset, start, t - 2 * inset, length, thumb);
                 }
             }
         }
         if viewport.horizontal && viewport.vertical {
             canvas.fill_rect(view_w, view_h, t, t, theme::panel());
+        } else if viewport.grip && viewport.horizontal {
+            canvas.fill_rect(view_w - t, view_h, t, t, theme::panel());
+        } else if viewport.grip && viewport.vertical {
+            canvas.fill_rect(view_w, view_h - t, t, t, theme::panel());
         }
     }
 }
@@ -266,23 +294,23 @@ mod tests {
 
     #[test]
     fn bars_show_only_where_the_layout_overflows() {
-        let fits = Viewport::new((800, 600), (800, 600), Scale::ONE);
+        let fits = Viewport::new((800, 600), (800, 600), Scale::ONE, false);
         assert!(!fits.scrolls());
         assert_eq!((fits.content, fits.view), ((800, 600), (800, 600)));
-        let taller = Viewport::new((800, 600), (700, 900), Scale::ONE);
+        let taller = Viewport::new((800, 600), (700, 900), Scale::ONE, false);
         assert_eq!((taller.horizontal, taller.vertical), (false, true));
         assert_eq!(taller.view, (800 - THICKNESS, 600));
         assert_eq!(taller.content, (800 - THICKNESS, 900), "the UI fills the view across");
         // The vertical bar takes the width the layout needed: a bar across too.
-        let both = Viewport::new((800, 600), (795, 900), Scale::ONE);
+        let both = Viewport::new((800, 600), (795, 900), Scale::ONE, false);
         assert_eq!((both.horizontal, both.vertical), (true, true));
         assert_eq!(both.view, (800 - THICKNESS, 600 - THICKNESS));
-        assert_eq!(Viewport::new((800, 600), (700, 900), Scale::whole(2)).view.0, 800 - 2 * THICKNESS);
+        assert_eq!(Viewport::new((800, 600), (700, 900), Scale::whole(2), false).view.0, 800 - 2 * THICKNESS);
     }
 
     #[test]
     fn a_thumb_drags_the_view_from_end_to_end() {
-        let viewport = Viewport::new((400, 300), (300, 1200), Scale::ONE);
+        let viewport = Viewport::new((400, 300), (300, 1200), Scale::ONE, false);
         let mut scroll = Scroll::default();
         let bar_x = viewport.view.0 + 1;
         assert!(scroll.press(&viewport, (bar_x, 5)), "the thumb, at the top");
@@ -298,8 +326,33 @@ mod tests {
     }
 
     #[test]
+    fn a_bar_stops_short_of_the_grip() {
+        let t = THICKNESS;
+        // A vertical bar alone: down to the grip's corner, no further.
+        let viewport = Viewport::new((400, 300), (300, 1200), Scale::ONE, true);
+        assert_eq!(viewport.track(Axis::Vertical), 300 - t);
+        assert_eq!(viewport.bar_at((400 - 1, 300 - t - 1)), Some((Axis::Vertical, 300 - t - 1)));
+        assert_eq!(viewport.bar_at((400 - 1, 300 - t)), None, "the grip's");
+        let mut scroll = Scroll::default();
+        assert!(scroll.press(&viewport, (400 - 1, 2)));
+        assert!(scroll.drag_to(&viewport, (400 - 1, 1000)));
+        assert_eq!(scroll.to_content((0, 0)), (0, 900), "the whole range still");
+        let mut pixels = vec![1; 400 * 300];
+        scroll.content_buffer(&viewport);
+        scroll.show(&viewport, &mut pixels, 400, 300);
+        let at = |x: usize, y: usize| pixels[y * 400 + x];
+        assert_eq!(at(399, 299), theme::panel(), "the corner left to the grip, painted as the bar");
+        // A horizontal bar alone, and both: the corner is free either way.
+        let across = Viewport::new((400, 300), (900, 200), Scale::ONE, true);
+        assert_eq!(across.track(Axis::Horizontal), 400 - t);
+        let both = Viewport::new((400, 300), (900, 900), Scale::ONE, true);
+        assert_eq!((both.track(Axis::Horizontal), both.track(Axis::Vertical)), (400 - t, 300 - t));
+        assert_eq!(grip_side(Scale::whole(2)), 2 * t);
+    }
+
+    #[test]
     fn the_view_shows_the_part_scrolled_to() {
-        let viewport = Viewport::new((4, 3), (1, 6), Scale::from_quarters(1));
+        let viewport = Viewport::new((4, 3), (1, 6), Scale::from_quarters(1), false);
         assert_eq!(viewport.view, (1, 3), "a thickness of 3 at ×¼");
         let mut scroll = Scroll::default();
         for (i, pixel) in scroll.content_buffer(&viewport).iter_mut().enumerate() {

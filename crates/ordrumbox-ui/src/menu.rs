@@ -16,6 +16,7 @@ use crate::theme;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Command {
     TrackEditor,
+    NoteEditor,
     Grid,
     SongView,
     PianoRoll,
@@ -228,6 +229,7 @@ pub struct MenuState {
     pub kit_index: usize,
     pub kit_editor: bool,
     pub track_editor: bool,
+    pub note_editor: bool,
     pub grid: bool,
     /// VU meters on the track stripes (V).
     pub show_vus: bool,
@@ -341,6 +343,7 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
             title: "View",
             items: vec![
                 check("Track editor", "F2", C::TrackEditor, true, s.track_editor),
+                check("Note editor", "F7", C::NoteEditor, true, s.note_editor),
                 Item::Separator,
                 check("Grid", "F5", C::Grid, true, s.grid),
                 check("Piano roll", "F4", C::PianoRoll, true, s.piano_roll),
