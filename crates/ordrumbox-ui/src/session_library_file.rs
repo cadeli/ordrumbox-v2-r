@@ -14,7 +14,7 @@ use ordrumbox_core::Library;
 
 use super::Session;
 use crate::kits::KitSet;
-use crate::menu::Command;
+use crate::menu::{Command, LibraryState};
 use crate::panel::{self, Id, Kind};
 use crate::scale::Scale;
 use crate::ui_input::Button;
@@ -37,10 +37,11 @@ fn library_file(name: &str) -> PathBuf {
 fn start(path: &Path) -> Session {
     let mut status = Vec::new();
     let demo = Library::parse(DEMO).unwrap().0;
-    let (library, library_path, message) = Session::open_library(Some(path.to_owned()), demo, &mut status);
-    let mut session = Session::new(library, KitSet::empty(), status);
-    session.saving.library_path = library_path;
-    session.message = message;
+    let opened = Session::open_library(Some(path.to_owned()), demo, &mut status);
+    let mut session = Session::new(opened.library, KitSet::empty(), status);
+    session.saving.library_path = opened.file;
+    session.saving.on_disk = opened.on_disk;
+    session.message = opened.message;
     session
 }
 
@@ -72,6 +73,7 @@ fn a_library_file_that_cannot_be_read_is_never_written_over() {
     assert!(s.status.iter().any(|line| line.starts_with("library not loaded, not saved over")), "{:?}", s.status);
     assert_eq!(s.pattern().unwrap().name.as_deref(), Some("demo"), "the demo library instead");
     assert_eq!(s.saving.library_path, None);
+    assert_eq!(s.library_state(), LibraryState::NotSaved);
 
     // Edits, the save a moment later, an explicit save, the save on quit.
     add_note(&mut s, 1);
@@ -94,9 +96,12 @@ fn an_edit_is_saved_a_moment_later_and_read_at_the_next_start() {
     assert!(s.status.is_empty(), "{:?}", s.status);
     assert_eq!(s.saving.library_path.as_deref(), Some(path.as_path()));
     assert!(!path.exists());
+    assert_eq!(s.library_state(), LibraryState::New);
+    assert!(s.message.contains("copy of the demo"), "{}", s.message);
 
     // An edit: saved once the delay has passed, not before.
     add_note(&mut s, 1);
+    assert_eq!(s.library_state(), LibraryState::Modified);
     let due = s.autosave().expect("a save to come");
     assert!(due > Instant::now());
     assert!(!path.exists(), "saved before the delay");
@@ -104,7 +109,8 @@ fn an_edit_is_saved_a_moment_later_and_read_at_the_next_start() {
     assert_eq!(s.autosave(), None);
     assert!(path.exists());
     assert!(!temporary(&path).exists());
-    assert!(s.message.starts_with("saved"), "{}", s.message);
+    assert_eq!(s.library_state(), LibraryState::Saved);
+    assert!(!s.message.contains("library.json"), "saved without a word: {}", s.message);
 
     // An edit just before quitting: saved on quit.
     add_note(&mut s, 2);
@@ -115,7 +121,8 @@ fn an_edit_is_saved_a_moment_later_and_read_at_the_next_start() {
     // The next start reads it.
     let mut next = start(&path);
     assert!(next.status.is_empty(), "{:?}", next.status);
-    assert!(next.message.starts_with("library "), "{}", next.message);
+    assert_eq!(next.message, "library loaded");
+    assert_eq!(next.library_state(), LibraryState::Saved);
     assert_eq!(next.editor.library().to_file_text(), saved);
     assert_eq!(next.pattern().unwrap().tracks[0].notes.len(), 3);
 
@@ -138,17 +145,19 @@ fn a_save_that_fails_is_reported_and_done_later() {
 
     add_note(&mut s, 1);
     s.save_if_changed();
-    assert!(s.message.starts_with("not saved: "), "{}", s.message);
+    assert!(s.message.starts_with("library not saved: "), "{}", s.message);
+    assert_eq!(s.library_state(), LibraryState::Failed);
     assert!(path.is_dir());
     // Still to save: the save a moment later tries again, and fails again.
     wait_save_delay(&mut s);
     assert_eq!(s.autosave(), None);
-    assert!(s.message.starts_with("not saved: "), "{}", s.message);
+    assert!(s.message.starts_with("library not saved: "), "{}", s.message);
 
     // Once the way is clear, the next save writes the file whole.
     fs::remove_dir(&path).unwrap();
-    s.save_if_changed();
-    assert!(s.message.starts_with("saved"), "{}", s.message);
+    s.save();
+    assert_eq!(s.message, "library saved");
+    assert_eq!(s.library_state(), LibraryState::Saved);
     assert_eq!(fs::read_to_string(&path).unwrap(), s.editor.library().to_file_text());
     assert!(!temporary(&path).exists());
     assert_eq!(start(&path).pattern().unwrap().tracks[0].notes.len(), 2);
@@ -160,19 +169,20 @@ fn a_host_library_comes_back_as_text_and_is_never_saved() {
     let demo = Library::parse(DEMO).unwrap().0;
     let saved = r#"{"patterns":[{"name":"kept","tracks":[{"name":"SNARE","notes":[{},{}]}]}]}"#;
     let mut status = Vec::new();
-    let (library, path, message) = Session::open_host_library(Some(saved.to_owned()), demo.clone(), &mut status);
-    assert_eq!((path, message.as_str(), status.len()), (None, "library from the host project", 0));
-    let mut s = Session::new(library, KitSet::empty(), status);
+    let opened = Session::open_host_library(Some(saved.to_owned()), demo.clone(), &mut status);
+    assert_eq!((opened.file, opened.message.as_str(), status.len()), (None, "library from the host project", 0));
+    let mut s = Session::new(opened.library, KitSet::empty(), status);
     s.hosted = true;
+    assert_eq!(s.library_state(), LibraryState::Host);
     assert_eq!(s.pattern().unwrap().name.as_deref(), Some("kept"));
     s.save();
     assert_eq!(s.message, "the host saves the library with its project");
-    let (again, _, _) = Session::open_host_library(Some(s.library_text()), demo.clone(), &mut Vec::new());
+    let again = Session::open_host_library(Some(s.library_text()), demo.clone(), &mut Vec::new()).library;
     assert_eq!(again.to_file_text(), s.library_text());
 
     let mut status = Vec::new();
-    let (library, path, _) = Session::open_host_library(Some("{".to_owned()), demo, &mut status);
-    assert_eq!((library.patterns[0].name.as_deref(), path), (Some("demo"), None));
+    let opened = Session::open_host_library(Some("{".to_owned()), demo, &mut status);
+    assert_eq!((opened.library.patterns[0].name.as_deref(), opened.file), (Some("demo"), None));
     assert!(status[0].starts_with("library of the host project not loaded: "), "{status:?}");
 }
 

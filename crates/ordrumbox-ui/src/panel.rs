@@ -5,7 +5,7 @@
 //! hit-testing both use it. The open drop-down list and the number entry
 //! are drawn over everything.
 
-use crate::canvas::{Canvas, Rgb, text_width};
+use crate::canvas::{Canvas, Rgb, fit, text_width};
 use crate::control::{Spec, Style};
 use crate::kits::Field;
 use crate::scale::Scale;
@@ -397,11 +397,6 @@ fn centered_label(canvas: &mut Canvas, r: Rect, label: &str, scale: Scale, color
     let label = fit(label, r.w - 2 * scale, scale);
     let x = r.x + (r.w - text_width(&label, scale)) / 2;
     canvas.text(x, r.y + (r.h - 8 * scale) / 2, &label, scale, color);
-}
-
-/// Text cut to `width` pixels.
-fn fit(text: &str, width: i32, scale: Scale) -> String {
-    text.chars().take(crate::canvas::chars_in(width, scale)).collect()
 }
 
 /// A knob: a 270° arc from bottom left, lit up to `fraction`, a disc and its pointer.

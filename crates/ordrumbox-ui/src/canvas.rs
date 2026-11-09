@@ -114,6 +114,11 @@ pub fn char_width(scale: Scale) -> i32 {
     font::advance(scale.quarters())
 }
 
+/// `text` cut to `width` pixels at `scale`.
+pub fn fit(text: &str, width: i32, scale: Scale) -> String {
+    text.chars().take(chars_in(width, scale)).collect()
+}
+
 /// How many characters fit in `width` pixels at `scale`.
 pub fn chars_in(width: i32, scale: Scale) -> usize {
     usize::try_from(width / char_width(scale).max(1)).unwrap_or(0)
