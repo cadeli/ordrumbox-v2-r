@@ -66,6 +66,30 @@ impl RollState {
 /// Rows a notch of the wheel scrolls.
 const WHEEL_ROWS: i32 = 3;
 
+/// A chord type offered by the piano roll's right-click menu.
+#[derive(Debug, Clone, Copy)]
+struct RollChord {
+    /// Key used in the menu value (`"{key}:{step}:{pitch}"`) and in the
+    /// result message (`"Added {key} chord"`).
+    key: &'static str,
+    /// Label shown in the menu (`"Add {key} chord"`).
+    label: &'static str,
+    /// Intervals in semitones from the root.
+    intervals: &'static [f64],
+}
+
+/// The chord types generated from a right-click on the grid: the common
+/// triads first, then the enriched (seventh) ones.
+const ROLL_CHORDS: &[RollChord] = &[
+    RollChord { key: "minor", label: "Add minor chord", intervals: &[0.0, 3.0, 7.0] },
+    RollChord { key: "major", label: "Add major chord", intervals: &[0.0, 4.0, 7.0] },
+    RollChord { key: "diminished", label: "Add diminished chord", intervals: &[0.0, 3.0, 6.0] },
+    RollChord { key: "major7", label: "Add major7 chord", intervals: &[0.0, 4.0, 7.0, 11.0] },
+    RollChord { key: "minor7", label: "Add minor7 chord", intervals: &[0.0, 3.0, 7.0, 10.0] },
+    RollChord { key: "sus4", label: "Add sus4 chord", intervals: &[0.0, 5.0, 7.0] },
+    RollChord { key: "seventh", label: "Add seventh chord", intervals: &[0.0, 4.0, 7.0, 10.0] },
+];
+
 impl Session {
     // ─── State ───────────────────────────────────────────────────────────────
 
@@ -509,8 +533,10 @@ impl Session {
                 labels.push("Delete note".to_owned());
             }
         }
-        values.extend([format!("minor:{at}"), format!("major:{at}")]);
-        labels.extend(["Add minor chord".to_owned(), "Add major chord".to_owned()]);
+        for chord in ROLL_CHORDS {
+            values.push(format!("{}:{at}", chord.key));
+            labels.push(chord.label.to_owned());
+        }
         self.chrome.widgets.dropdown = Some(Dropdown::menu(Id::RollMenu, x, y, title, values, labels));
     }
 
@@ -539,10 +565,11 @@ impl Session {
                     self.message = format!("Deleted note - {name} @ {}", beat_label(note.beat, note.step));
                 }
             }
-            quality @ ("minor" | "major") => {
+            key if ROLL_CHORDS.iter().any(|c| c.key == key) => {
                 let (step, root) = (number(1) as i64, number(2));
-                let intervals: [f64; 3] = if quality == "minor" { [0.0, 3.0, 7.0] } else { [0.0, 4.0, 7.0] };
-                self.roll_chord(t, step, root, &intervals, quality);
+                if let Some(chord) = ROLL_CHORDS.iter().find(|c| c.key == key) {
+                    self.roll_chord(t, step, root, chord.intervals, chord.key);
+                }
             }
             "clear" => self.clear_track(t),
             "sequence" => self.roll_sequence_from(t, number(1)),
