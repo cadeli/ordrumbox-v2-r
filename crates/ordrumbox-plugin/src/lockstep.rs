@@ -53,6 +53,8 @@ impl Pace {
 struct Count {
     asked: u64,
     done: u64,
+    /// Blocks rendered without their tick, since the player thread last looked.
+    late: u64,
 }
 
 /// The audio thread's handshake with the player thread.
@@ -85,10 +87,11 @@ impl Steps {
         count.asked += 1;
         let asked = count.asked;
         self.changed.notify_all();
-        let (_count, wait) = self
+        let (mut count, wait) = self
             .changed
             .wait_timeout_while(count, timeout, |count| count.done < asked)
             .unwrap_or_else(|poisoned| poisoned.into_inner());
+        count.late += u64::from(wait.timed_out());
         !wait.timed_out()
     }
 
@@ -101,6 +104,12 @@ impl Steps {
             .wait_timeout_while(count, timeout, |count| count.done >= count.asked)
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         count.asked
+    }
+
+    /// Player thread: how many blocks rendered without waiting for their
+    /// tick (past [`MAX_WAIT`]) since the last call.
+    pub fn take_late(&self) -> u64 {
+        std::mem::take(&mut self.lock().late)
     }
 
     /// Player thread: the ticks asked up to `asked` are done.
@@ -142,6 +151,8 @@ mod tests {
     fn a_tick_asked_is_waited_for() {
         let steps = Arc::new(Steps::default());
         assert!(!steps.tick(Duration::from_millis(1)), "no player thread");
+        assert_eq!(steps.take_late(), 1, "the block rendered without its tick is counted");
+        assert_eq!(steps.take_late(), 0, "and told once");
         let player = steps.clone();
         let thread = std::thread::spawn(move || {
             // The tick that timed out, then the two below (some answered together).
@@ -157,5 +168,6 @@ mod tests {
             assert!(steps.tick(Duration::from_secs(5)));
         }
         thread.join().unwrap();
+        assert_eq!(steps.take_late(), 0);
     }
 }

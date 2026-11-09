@@ -305,7 +305,7 @@ mod tests {
 
     fn synths(keys: &[&str]) -> SynthPresets {
         let entries: Vec<String> = keys.iter().map(|key| format!("\"{key}\":{{}}")).collect();
-        SynthPresets::from_json(&json::parse(&format!("{{{}}}", entries.join(","))).unwrap())
+        SynthPresets::from_json(&json::parse(&format!("{{{}}}", entries.join(","))).unwrap()).unwrap()
     }
 
     #[test]

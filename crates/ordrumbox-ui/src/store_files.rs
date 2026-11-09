@@ -75,7 +75,7 @@ fn every_synth_control_survives_saving() {
     let dir = folder("synths");
     let path = dir.join("synth_presets.json");
     let (draft, values) = full_preset();
-    let mut presets = SynthPresets::from_json(&json::parse(&asset("synth_presets.json")).unwrap());
+    let mut presets = SynthPresets::from_json(&json::parse(&asset("synth_presets.json")).unwrap()).unwrap();
     presets.set("FULL", Value::Object(draft.clone()));
 
     store::save_synths(&path, &presets).unwrap();
@@ -154,17 +154,18 @@ fn the_shipped_files_are_written_again_unchanged() {
     let (library, _) = Library::parse(&asset("library.json")).unwrap();
     store::save(&path, &library).unwrap();
     let first = fs::read_to_string(&path).unwrap();
-    store::save(&path, &store::load(&path).unwrap().expect("saved")).unwrap();
+    store::save(&path, &store::load(&path).unwrap().expect("saved").0).unwrap();
     assert_eq!(fs::read_to_string(&path).unwrap(), first, "library.json");
 
     let path = dir.join("kits.json");
-    store::save_kits(&path, &kits_from_json(&json::parse(&asset("kits.json")).unwrap())).unwrap();
+    store::save_kits(&path, &kits_from_json(&json::parse(&asset("kits.json")).unwrap()).unwrap().0).unwrap();
     let first = fs::read_to_string(&path).unwrap();
-    store::save_kits(&path, &store::load_kits(&path).unwrap().expect("saved")).unwrap();
+    store::save_kits(&path, &store::load_kits(&path).unwrap().expect("saved").0).unwrap();
     assert_eq!(fs::read_to_string(&path).unwrap(), first, "kits.json");
 
     let path = dir.join("synth_presets.json");
-    store::save_synths(&path, &SynthPresets::from_json(&json::parse(&asset("synth_presets.json")).unwrap())).unwrap();
+    store::save_synths(&path, &SynthPresets::from_json(&json::parse(&asset("synth_presets.json")).unwrap()).unwrap())
+        .unwrap();
     let first = fs::read_to_string(&path).unwrap();
     store::save_synths(&path, &store::load_synths(&path).unwrap().expect("saved")).unwrap();
     assert_eq!(fs::read_to_string(&path).unwrap(), first, "synth_presets.json");
@@ -187,7 +188,7 @@ fn a_factory_reset_leaves_the_shipped_presets() {
     assert!(aside.names.contains(&"synth_presets.json".to_owned()));
     assert_eq!(store::load_synths(&path).unwrap(), None);
 
-    let shipped = SynthPresets::from_json(&json::parse(&asset("synth_presets.json")).unwrap());
+    let shipped = SynthPresets::from_json(&json::parse(&asset("synth_presets.json")).unwrap()).unwrap();
     for key in [
         "KICK_SYNTH",
         "SNARE_SYNTH",

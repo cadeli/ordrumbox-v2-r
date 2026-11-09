@@ -28,6 +28,9 @@ const MAX_LINE_BYTES: u64 = 16 << 20;
 /// How long the bridge waits for the app to accept, and to answer a call.
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(2);
 const REPLY_TIMEOUT: Duration = Duration::from_secs(60);
+/// The pause after a connection the system failed to accept, so that a
+/// lasting failure (no file handle left) does not spin the listener.
+const ACCEPT_RETRY: Duration = Duration::from_millis(200);
 
 /// A tool call from the bridge, waiting for the window's answer.
 #[derive(Debug)]
@@ -46,10 +49,18 @@ impl Request {
     }
 }
 
+/// What the listener passes to the window: a call, or a connection it
+/// failed to accept (told once per run of failures).
+#[derive(Debug)]
+pub enum Incoming {
+    Call(Request),
+    Failed(String),
+}
+
 /// The app's end: a listener on a thread of its own, the calls it took.
 #[derive(Debug)]
 pub struct Server {
-    requests: Receiver<Request>,
+    requests: Receiver<Incoming>,
     /// What the endpoint file holds: the port and the token.
     endpoint_text: String,
 }
@@ -75,8 +86,8 @@ impl Server {
         store::write_atomic(endpoint, &self.endpoint_text).map_err(|e| format!("{}: {e}", endpoint.display()))
     }
 
-    /// The next call waiting, if any.
-    pub fn poll(&self) -> Option<Request> {
+    /// The next call or failure waiting, if any.
+    pub fn poll(&self) -> Option<Incoming> {
         // Disconnected: the listener stopped, and so did the calls.
         self.requests.try_recv().ok()
     }
@@ -90,11 +101,27 @@ fn new_token() -> String {
     format!("{a:016x}{b:016x}")
 }
 
-/// Serve each connection on a thread of its own.
-fn accept(listener: &TcpListener, token: &str, sender: &Sender<Request>, waker: &Waker) {
+/// Serve each connection on a thread of its own. A failure to accept is
+/// passed to the window once, until a connection opens again.
+fn accept(listener: &TcpListener, token: &str, sender: &Sender<Incoming>, waker: &Waker) {
+    let mut failing = false;
     for stream in listener.incoming() {
-        // A connection that failed to open: the bridge sees it and tells its client.
-        let Ok(stream) = stream else { continue };
+        let stream = match stream {
+            Ok(stream) => stream,
+            Err(e) => {
+                if !failing {
+                    failing = true;
+                    if sender.send(Incoming::Failed(format!("MCP: a connection failed to open: {e}"))).is_err() {
+                        // The window is gone: so is whoever would call.
+                        return;
+                    }
+                    waker.wake();
+                }
+                thread::sleep(ACCEPT_RETRY);
+                continue;
+            }
+        };
+        failing = false;
         let (token, sender, waker) = (token.to_owned(), sender.clone(), waker.clone());
         thread::spawn(move || {
             match serve(stream, &token, &sender, &waker) {
@@ -140,7 +167,7 @@ fn parse_call(line: &str) -> Result<(String, Value), String> {
 }
 
 /// The token, then calls until the bridge hangs up.
-fn serve(stream: TcpStream, token: &str, sender: &Sender<Request>, waker: &Waker) -> io::Result<()> {
+fn serve(stream: TcpStream, token: &str, sender: &Sender<Incoming>, waker: &Waker) -> io::Result<()> {
     let mut reader = BufReader::new(stream.try_clone()?);
     let mut writer = stream;
     let Some(hello) = read_line(&mut reader)? else { return Ok(()) };
@@ -156,7 +183,7 @@ fn serve(stream: TcpStream, token: &str, sender: &Sender<Request>, waker: &Waker
         let outcome = match parse_call(&line) {
             Ok((name, arguments)) => {
                 let (reply, answer) = mpsc::channel();
-                if sender.send(Request { name, arguments, reply }).is_err() {
+                if sender.send(Incoming::Call(Request { name, arguments, reply })).is_err() {
                     return Ok(()); // the window is gone
                 }
                 waker.wake();
@@ -271,7 +298,7 @@ mod tests {
         let window = thread::spawn(move || {
             for _ in 0..2 {
                 let request = loop {
-                    if let Some(request) = server.poll() {
+                    if let Some(Incoming::Call(request)) = server.poll() {
                         break request;
                     }
                     thread::sleep(Duration::from_millis(5));

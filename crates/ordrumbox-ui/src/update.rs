@@ -155,7 +155,7 @@ fn outcome(answer: Result<Answer, String>) -> Outcome {
 
 /// `program` with `args`, without a console window flashing up on Windows
 /// (the release build has none of its own).
-fn command(program: &str, args: &[&str]) -> Command {
+pub(crate) fn command(program: &str, args: &[&str]) -> Command {
     let mut command = Command::new(program);
     command.args(args);
     #[cfg(windows)]

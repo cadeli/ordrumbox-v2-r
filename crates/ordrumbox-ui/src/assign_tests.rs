@@ -1183,7 +1183,7 @@ const EXPECTED: &[(&str, &str, &str, &str, bool)] = &[
 
 /// The synth presets the app starts with.
 fn presets() -> SynthPresets {
-    SynthPresets::from_json(&asset("synth_presets.json"))
+    SynthPresets::from_json(&asset("synth_presets.json")).unwrap()
 }
 
 fn asset(name: &str) -> json::Value {
@@ -1193,7 +1193,7 @@ fn asset(name: &str) -> json::Value {
 
 /// The kits the app ships with, in one bank: a kit lacking an instrument borrows it from another.
 fn shipped() -> (SampleBank, Vec<String>) {
-    let kits = kits_from_json(&asset("kits.json"));
+    let kits = kits_from_json(&asset("kits.json")).unwrap().0;
     let samples = kits
         .iter()
         .flat_map(|kit| {

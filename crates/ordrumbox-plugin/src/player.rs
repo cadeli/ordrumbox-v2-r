@@ -161,6 +161,18 @@ impl Player {
         }
     }
 
+    /// `count` blocks of a render ahead of real time were rendered without
+    /// waiting for their tick: said in the window, since notes may be missing.
+    pub fn report_late(&mut self, count: u64) {
+        let Some(ui) = &mut self.ui else { return };
+        if count > 0 {
+            ui.session.tell(format!(
+                "host render: {count} block(s) rendered before the player was ready, notes may be missing"
+            ));
+            self.redraw = true;
+        }
+    }
+
     /// Whether the host changed what the window shows since the last call.
     pub fn take_redraw(&mut self) -> bool {
         std::mem::take(&mut self.redraw)
@@ -217,7 +229,10 @@ impl Ticker {
         let thread = std::thread::Builder::new().name("ordrumbox-player".into()).spawn(move || {
             while !stopped.load(Ordering::Acquire) {
                 let asked = steps.wait(TICK_INTERVAL);
-                lock(&player).tick(&params.library, params.controls(), &params.names);
+                let mut player = lock(&player);
+                player.tick(&params.library, params.controls(), &params.names);
+                player.report_late(steps.take_late());
+                drop(player);
                 steps.done(asked);
             }
         })?;

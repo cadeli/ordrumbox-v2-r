@@ -517,9 +517,10 @@ mod tests {
         )
         .unwrap();
         let mut s = Session::new(library, KitSet::empty(), Vec::new());
-        s.set_asset_synths(SynthPresets::from_json(
-            &ordrumbox_core::json::parse(r#"{"b":{"vco1":{"gain":0.5}},"a":{}}"#).unwrap(),
-        ));
+        s.set_asset_synths(
+            SynthPresets::from_json(&ordrumbox_core::json::parse(r#"{"b":{"vco1":{"gain":0.5}},"a":{}}"#).unwrap())
+                .unwrap(),
+        );
         s.set_size(SIZE);
         s
     }

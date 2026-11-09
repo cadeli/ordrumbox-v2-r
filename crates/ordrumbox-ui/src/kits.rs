@@ -584,7 +584,7 @@ mod tests {
         assert_eq!(kits.load_mapping(&mapping).unwrap().0, 0);
         assert_eq!(kits.kits[0].samples.len(), 1);
         kits.save().unwrap();
-        assert_eq!(store::load_kits(&dir.join("kits.json")).unwrap().unwrap()[0].name, "a");
+        assert_eq!(store::load_kits(&dir.join("kits.json")).unwrap().unwrap().0[0].name, "a");
         fs::remove_dir_all(dir).unwrap();
     }
 

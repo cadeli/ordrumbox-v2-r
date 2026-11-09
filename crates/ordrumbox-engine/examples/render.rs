@@ -32,7 +32,7 @@ fn main() {
     let assets = Path::new(assets);
     let data = assets.join("data");
     let (library, _) = Library::from_json(&read_json(&data.join("library.json")));
-    let kits = kits_from_json(&read_json(&data.join("kits.json")));
+    let (kits, _) = kits_from_json(&read_json(&data.join("kits.json"))).expect("kits.json");
     let (bank, errors) = SampleBank::load(&kits, |url| std::fs::read(assets.join("kits").join(url)));
     if !errors.is_empty() {
         eprintln!("{} sample(s) not loaded, first: {}", errors.len(), errors[0]);
@@ -40,7 +40,7 @@ fn main() {
     let setup = RenderSetup {
         bank: Arc::new(bank),
         scales: Scales::from_json(&read_json(&data.join("scales.json"))),
-        synths: SynthPresets::from_json(&read_json(&data.join("synth_presets.json"))),
+        synths: SynthPresets::from_json(&read_json(&data.join("synth_presets.json"))).expect("synth_presets.json"),
         kit: kits.first().map(|k| k.name.clone()).unwrap_or_default(),
         sample_rate: EXPORT_RATE,
         seed: 1,

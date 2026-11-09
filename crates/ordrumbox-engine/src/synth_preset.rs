@@ -71,9 +71,9 @@ const SYNC_NOTE_HZ: [(&str, f64); 7] = [
 pub struct SynthPresets(Object);
 
 impl SynthPresets {
-    /// Read generated_sounds.json; anything but an object gives no preset.
-    pub fn from_json(value: &Value) -> Self {
-        Self(value.as_object().cloned().unwrap_or_default())
+    /// Read a presets file; anything but an object is an error.
+    pub fn from_json(value: &Value) -> Result<Self, String> {
+        value.as_object().cloned().map(Self).ok_or_else(|| "not an object of presets".to_owned())
     }
 
     pub fn get(&self, key: &str) -> Option<&Value> {
@@ -294,7 +294,7 @@ mod tests {
 
     #[test]
     fn add_missing_keeps_what_is_there() {
-        let presets = |text: &str| SynthPresets::from_json(&json::parse(text).unwrap());
+        let presets = |text: &str| SynthPresets::from_json(&json::parse(text).unwrap()).unwrap();
         let mut saved = presets(r#"{"A":{"masterVolume":0.1}}"#);
         saved.add_missing(&presets(r#"{"A":{"masterVolume":0.9},"B":{"masterVolume":0.5}}"#));
         assert_eq!(saved, presets(r#"{"A":{"masterVolume":0.1},"B":{"masterVolume":0.5}}"#));

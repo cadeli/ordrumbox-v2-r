@@ -10,9 +10,9 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use ordrumbox_core::Library;
 use ordrumbox_core::json;
-use ordrumbox_engine::{Kit, SynthPresets, kits_from_json, kits_to_json};
+use ordrumbox_core::{Library, LoadReport};
+use ordrumbox_engine::{Kit, KitsRead, SynthPresets, kits_from_json, kits_to_json};
 
 /// Environment variable naming the library file (overrides the default place).
 pub const ENV_VAR: &str = "ORDRUMBOX_LIBRARY";
@@ -229,7 +229,9 @@ pub fn saved_synths_path() -> Option<PathBuf> {
 pub fn load_synths(path: &Path) -> Result<Option<SynthPresets>, String> {
     match fs::read_to_string(path) {
         Ok(text) => json::parse(&text)
-            .map(|v| Some(SynthPresets::from_json(&v)))
+            .map_err(|e| e.to_string())
+            .and_then(|v| SynthPresets::from_json(&v))
+            .map(Some)
             .map_err(|e| format!("{}: {e}", path.display())),
         Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
         Err(e) => Err(format!("{}: {e}", path.display())),
@@ -259,12 +261,15 @@ pub fn sample_path(dir: &Path, url: &str) -> Option<PathBuf> {
     (safe && !url.is_empty()).then(|| dir.join(relative))
 }
 
-/// The saved kits, if there are some (an unreadable file is an error).
-pub fn load_kits(path: &Path) -> Result<Option<Vec<Kit>>, String> {
+/// The saved kits, if there are some, with the kits and samples skipped (to
+/// be shown). An unreadable file is an error.
+pub fn load_kits(path: &Path) -> Result<Option<KitsRead>, String> {
     match fs::read_to_string(path) {
-        Ok(text) => {
-            json::parse(&text).map(|v| Some(kits_from_json(&v))).map_err(|e| format!("{}: {e}", path.display()))
-        }
+        Ok(text) => json::parse(&text)
+            .map_err(|e| e.to_string())
+            .and_then(|v| kits_from_json(&v))
+            .map(Some)
+            .map_err(|e| format!("{}: {e}", path.display())),
         Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
         Err(e) => Err(format!("{}: {e}", path.display())),
     }
@@ -288,13 +293,12 @@ pub fn write_atomic(path: &Path, contents: impl AsRef<[u8]>) -> io::Result<()> {
     fs::rename(&temporary, path)
 }
 
-/// The saved library, if there is one. A file that cannot be read or parsed
-/// is an error (the caller must not overwrite it).
-pub fn load(path: &Path) -> Result<Option<Library>, String> {
+/// The saved library, if there is one, with what loading it repaired (to be
+/// shown). A file that cannot be read or parsed is an error (the caller must
+/// not overwrite it).
+pub fn load(path: &Path) -> Result<Option<(Library, LoadReport)>, String> {
     match fs::read_to_string(path) {
-        Ok(text) => {
-            Library::parse(&text).map(|(library, _)| Some(library)).map_err(|e| format!("{}: {e}", path.display()))
-        }
+        Ok(text) => Library::parse(&text).map(Some).map_err(|e| format!("{}: {e}", path.display())),
         Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
         Err(e) => Err(format!("{}: {e}", path.display())),
     }
@@ -317,7 +321,7 @@ mod tests {
         assert_eq!(load(&path), Ok(None));
         let (library, _) = Library::parse(r#"{"bpm":99,"patterns":[{"name":"p"}]}"#).unwrap();
         save(&path, &library).unwrap();
-        assert_eq!(load(&path).unwrap().unwrap().bpm, 99.0);
+        assert_eq!(load(&path).unwrap().unwrap().0.bpm, 99.0);
         fs::write(&path, "{").unwrap();
         assert!(load(&path).is_err());
         fs::remove_dir_all(dir).unwrap();

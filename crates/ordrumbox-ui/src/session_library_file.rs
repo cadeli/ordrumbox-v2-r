@@ -246,3 +246,22 @@ fn a_plugin_leaves_to_the_host_what_the_host_does() {
     s.hosted = false;
     assert!(s.body((1100, 680, Scale::ONE)).main_bottom < body.main_bottom);
 }
+
+#[test]
+fn the_values_repaired_in_the_library_are_shown() {
+    let path = library_file("repaired");
+    fs::write(&path, r#"{"bpm":"fast","patterns":[{"name":"p"}]}"#).unwrap();
+    let s = start(&path);
+    assert_eq!(s.status.len(), 1, "{:?}", s.status);
+    assert!(
+        s.status[0].starts_with(&format!("{}: 1 value(s) repaired, first: bpm: ", path.display())),
+        "{:?}",
+        s.status
+    );
+
+    let mut status = Vec::new();
+    let demo = Library::parse(DEMO).unwrap().0;
+    Session::open_host_library(Some(r#"{"bpm":"fast"}"#.to_owned()), demo, &mut status);
+    assert!(status[0].starts_with("library of the host project: 1 value(s) repaired"), "{status:?}");
+    fs::remove_dir_all(path.parent().unwrap()).unwrap();
+}

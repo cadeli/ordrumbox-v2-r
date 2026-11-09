@@ -36,12 +36,18 @@ impl Session {
         }
     }
 
-    /// Run the MCP calls waiting; whether there was one.
+    /// Run the MCP calls waiting, and show a connection that failed to
+    /// open; whether there was either.
     pub fn poll_mcp(&mut self) -> bool {
         let mut called = false;
-        while let Some(request) = self.mcp.as_ref().and_then(mcp_link::Server::poll) {
-            let outcome = self.mcp_call(&request.name, &request.arguments);
-            request.answer(outcome);
+        while let Some(incoming) = self.mcp.as_ref().and_then(mcp_link::Server::poll) {
+            match incoming {
+                mcp_link::Incoming::Call(request) => {
+                    let outcome = self.mcp_call(&request.name, &request.arguments);
+                    request.answer(outcome);
+                }
+                mcp_link::Incoming::Failed(message) => self.tell(message),
+            }
             called = true;
         }
         called

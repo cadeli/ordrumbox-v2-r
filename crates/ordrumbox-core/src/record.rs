@@ -104,7 +104,7 @@ pub struct Issue {
 }
 
 impl Issue {
-    pub(crate) fn new(at: impl Into<String>, message: impl Into<String>) -> Self {
+    pub fn new(at: impl Into<String>, message: impl Into<String>) -> Self {
         Self { at: at.into(), message: message.into() }
     }
 }
