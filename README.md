@@ -196,6 +196,14 @@ at 1 the repeats step down towards silence and at 0 they all play at the note's
 velocity. Arpeggio notes and euclidean fills do not fade. Saved notes without the key
 take 0.6. This rewrote `flat_notes_rust.txt` (core) and `midi_rust.txt` (logic).
 
+A MIDI file's sysex events (`F0`/`F7`) are now skipped by their length; they used
+to be read as two-byte events, which shifted every later event of the track (a GM
+reset at the start moved the notes after it, or lost them). The program changes of
+a format 0 file, all in its one track, are now read. An instrument that already has
+a track gets another, numbered (`PERC 2`, `BASS 2`), where its notes used to be
+dropped; a channel left with no instrument is named in the import message. This
+rewrote `midi_rust.txt` (logic).
+
 ## License
 
 MIT: see `LICENSE`. A plugin built with the `vst3` feature links GPLv3 VST3

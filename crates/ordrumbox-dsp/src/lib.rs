@@ -32,6 +32,11 @@ macro_rules! audio_params {
         }
 
         impl $name {
+            /// The lowest value of each parameter, which [`Self::clamped`] keeps.
+            pub const MIN: Self = Self { $( $field: $min, )* };
+            /// The highest value of each parameter, which [`Self::clamped`] keeps.
+            pub const MAX: Self = Self { $( $field: $max, )* };
+
             /// Every value moved toward `target` by one step of an exponential
             /// approach (`AudioParam.setTargetAtTime`): `keep` is
             /// `exp(-step / time_constant)`, 0 jumps to the target.
@@ -41,7 +46,7 @@ macro_rules! audio_params {
 
             /// Values clamped to their nominal range, as a browser computes them.
             pub fn clamped(&self) -> Self {
-                Self { $( $field: self.$field.clamp($min, $max), )* }
+                Self { $( $field: self.$field.clamp(Self::MIN.$field, Self::MAX.$field), )* }
             }
         }
     };
@@ -64,7 +69,7 @@ pub mod strip;
 pub mod synth;
 pub mod voice;
 
-pub use master_bus::{MasterBus, MasterSettings};
+pub use master_bus::{MasterBus, MasterSettings, gain_reduction};
 pub use sample::SampleBuffer;
 pub use strip::{Strip, StripSettings};
 pub use synth::{SynthPatch, SynthVoice};

@@ -8,15 +8,13 @@
 //! 3. otherwise the melodic instrument the track name names;
 //! 4. otherwise the first catalog instrument not used yet.
 //!
-//! The JS rules are kept as they are: an instrument already made a track
-//! drops the later notes the catalog's mapping resolves to it; the tempo meta event is never
-//! read (the library's tempo stays); every pattern is 32 beats long, up to 16 patterns.
-//!
-//! Three departures from the JS: a file timed in SMPTE frames or with a 0
-//! division is refused (the JS makes 16 patterns of misplaced notes), the
-//! message says when notes past the 16th pattern are left out, and a drum key
-//! found by its GM name, whose instrument another key plays, gets a numbered
-//! track (`KICK 2`) instead of losing its notes.
+//! An instrument that already has a track gets another one, numbered
+//! (`KICK 2`, `BASS 2`): no note is dropped for sharing an instrument. A
+//! channel left with no instrument at all is left out, and the message says
+//! so, as it says when notes fall past the 16th pattern. The tempo meta event
+//! is never read (the library's tempo stays); every pattern is 32 beats long,
+//! up to 16 patterns. A file timed in SMPTE frames or with a 0 division is
+//! refused.
 
 use ordrumbox_core::instruments::{Catalog, Instrument, catalog};
 use ordrumbox_core::{Note, Pattern, Track};
@@ -58,8 +56,20 @@ fn found(instrument: Option<&Instrument>) -> Option<&Instrument> {
     instrument.filter(|i| i.id != ordrumbox_core::instruments::NOT_FOUND)
 }
 
-/// `#resolveDrumTrack`: one track per instrument the notes resolve to.
-fn drum_tracks(c: &Catalog, notes: &[NoteOn], channel: u8) -> Option<Vec<TrackDef>> {
+/// The track name of instrument `id`: `id`, else the first of `id 2`,
+/// `id 3`… that `taken` leaves free.
+fn free_name(id: &str, taken: impl Fn(&str) -> bool) -> String {
+    let numbered = (2..).map(|n| format!("{id} {n}"));
+    std::iter::once(id.to_owned()).chain(numbered).find(|name| !taken(name)).unwrap_or_default()
+}
+
+fn has_track(defs: &[TrackDef], name: &str) -> bool {
+    defs.iter().any(|d| d.name == name)
+}
+
+/// One track per drum key the notes of `channel` resolve to an instrument,
+/// named apart from the tracks of `before`.
+fn drum_tracks(c: &Catalog, notes: &[NoteOn], channel: u8, before: &[TrackDef]) -> Option<Vec<TrackDef>> {
     let mut groups: Vec<(Option<u8>, Vec<NoteOn>)> = Vec::new();
     for note in notes {
         match groups.iter_mut().find(|(n, _)| *n == note.note) {
@@ -81,25 +91,20 @@ fn drum_tracks(c: &Catalog, notes: &[NoteOn], channel: u8) -> Option<Vec<TrackDe
         .collect();
     let mut defs: Vec<TrackDef> = Vec::new();
     for (key, group, instrument, mapped) in &resolved {
-        let name = if *mapped {
-            instrument.id.clone()
-        } else {
-            // A key named after an instrument another key plays ("Acoustic Bass Drum"
-            // beside "Bass Drum 1") is another sound of it: a track of its own, numbered.
-            let taken = |name: &str| {
-                defs.iter().any(|d| d.name == name) || resolved.iter().any(|(_, _, i, m)| *m && i.id == name)
-            };
-            let numbered = (2..).map(|n| format!("{} {n}", instrument.id));
-            std::iter::once(instrument.id.clone()).chain(numbered).find(|name| !taken(name)).unwrap_or_default()
-        };
-        if !defs.iter().any(|d| d.name == name) {
-            defs.push(TrackDef { name, notes: group.clone(), base_note: f64::from(*key) });
-        }
+        // A key the mapping names claims its instrument's plain name; a key
+        // named after an instrument another key plays ("Acoustic Bass Drum"
+        // beside "Bass Drum 1") is another sound of it: a track of its own, numbered.
+        let name = free_name(&instrument.id, |name| {
+            has_track(before, name)
+                || has_track(&defs, name)
+                || (!mapped && resolved.iter().any(|(_, _, i, m)| *m && i.id == name))
+        });
+        defs.push(TrackDef { name, notes: group.clone(), base_note: f64::from(*key) });
     }
     (!defs.is_empty()).then_some(defs)
 }
 
-/// `importFile`: the patterns of `bytes`, a MIDI file named `file_name`;
+/// The patterns of `bytes`, a MIDI file named `file_name`;
 /// `Err` with the reason when nothing can be imported.
 pub fn import(file_name: &str, bytes: &[u8], roots: &[(String, f64)]) -> Result<Imported, String> {
     let midi = smf::parse(bytes);
@@ -136,32 +141,33 @@ pub fn import(file_name: &str, bytes: &[u8], roots: &[(String, f64)]) -> Result<
         if *channel != 9
             && let Some(instrument) = found(c.from_midi_program(i64::from(program))).filter(|i| !i.drum)
         {
-            if !defs.iter().any(|d| d.name == instrument.id) {
-                let base_note = root_or_c3(&instrument.id);
-                defs.push(TrackDef { name: instrument.id.clone(), notes: list.clone(), base_note });
-            }
+            let name = free_name(&instrument.id, |name| has_track(&defs, name));
+            defs.push(TrackDef { name, notes: list.clone(), base_note: root_or_c3(&instrument.id) });
             continue;
         }
-        if let Some(drums) = drum_tracks(c, list, *channel) {
+        if let Some(drums) = drum_tracks(c, list, *channel, &defs) {
             defs.extend(drums);
             continue;
         }
         if !track_name.is_empty()
             && let Some(instrument) = found(c.by_name(track_name)).filter(|i| !i.drum)
         {
-            if !defs.iter().any(|d| d.name == instrument.id) {
-                let base_note = root_or_c3(&instrument.id);
-                defs.push(TrackDef { name: instrument.id.clone(), notes: list.clone(), base_note });
-            }
+            let name = free_name(&instrument.id, |name| has_track(&defs, name));
+            defs.push(TrackDef { name, notes: list.clone(), base_note: root_or_c3(&instrument.id) });
             continue;
         }
         skipped.push(*channel);
     }
     let mut ids: Vec<&str> = c.instruments.iter().map(|i| i.id.as_str()).collect();
     ids.sort_unstable();
+    // Notes of the channels no instrument was left for.
+    let mut unplaced = 0;
     for channel in skipped {
-        let Some(id) = ids.iter().find(|id| !defs.iter().any(|d| d.name == **id)) else { continue };
         let list = channels.iter().find(|(ch, _, _)| *ch == channel).map(|(_, l, _)| l.clone()).unwrap_or_default();
+        let Some(id) = ids.iter().find(|id| !has_track(&defs, id)) else {
+            unplaced += list.len();
+            continue;
+        };
         defs.push(TrackDef { name: (*id).to_owned(), notes: list, base_note: root_or_c3(id) });
     }
     if defs.is_empty() {
@@ -177,6 +183,9 @@ pub fn import(file_name: &str, bytes: &[u8], roots: &[(String, f64)]) -> Result<
     };
     if cut {
         message.push_str(&format!(", notes past beat {} left out", MAX_PATTERNS * i64::from(PATTERN_BEATS)));
+    }
+    if unplaced > 0 {
+        message.push_str(&format!(", {unplaced} note(s) left out: no instrument left for their channel"));
     }
     Ok(Imported { patterns, track_count: defs.len(), message })
 }
@@ -275,6 +284,24 @@ mod tests {
         assert_eq!(patterns.len(), 2);
         assert_eq!(places(&patterns[0]), [(0, 0)]);
         assert_eq!(places(&patterns[1]), [(0, 0)]);
+    }
+
+    #[test]
+    fn two_channels_of_one_instrument_make_two_tracks() {
+        // Channels 0 and 1, both program 33 (a bass), one note each.
+        let events = [
+            0x00, 0xc0, 33, 0x00, 0xc1, 33, //
+            0x00, 0x90, 40, 100, 0x00, 0x91, 43, 100, //
+            0x00, 0xff, 0x2f, 0x00,
+        ];
+        let mut bytes = b"MThd\0\0\0\x06\0\0\0\x01\0\x60MTrk".to_vec();
+        bytes.extend(u32::try_from(events.len()).unwrap().to_be_bytes());
+        bytes.extend(events);
+        let imported = import("two.mid", &bytes, &[]).unwrap();
+        let names: Vec<&str> = imported.patterns[0].tracks.iter().map(|t| t.name.as_str()).collect();
+        assert_eq!(names.len(), 2, "{names:?}");
+        assert_eq!(names[1], format!("{} 2", names[0]));
+        assert!(imported.patterns[0].tracks.iter().all(|t| t.notes.len() == 1));
     }
 
     #[test]

@@ -8,7 +8,7 @@
 //! curve and the spectrum are drawn here.
 
 use crate::scale::Scale;
-use ordrumbox_engine::MasterSettings;
+use ordrumbox_engine::{MasterSettings, gain_reduction};
 
 use crate::canvas::{Canvas, Rgb, text_width};
 use crate::control::{Format, Spec};
@@ -34,19 +34,21 @@ const fn param(key: &'static str, label: &'static str, spec: Spec, format: Forma
 pub const VOLUME: Param = param("volume", "Volume", Spec::knob(0.0, 2.0, 0.01, 1.0), Format::Fixed2, "");
 /// The pre-gain knob, ahead of the compressor.
 pub const PRE_GAIN: Param = param("preGain", "Pre-Gain", Spec::knob(-20.0, 20.0, 0.5, 0.0), Format::SignedFixed1, "dB");
-/// The compressor knobs (`COMPRESSOR_PARAMS`): under 1 a step shows 3 decimals, else whole.
+/// The compressor knobs: under 1 a step shows 3 decimals, else whole. Each
+/// range is the one the master bus clamps to (`MasterSettings::MIN`, `MAX`),
+/// so the value shown is the value used.
 pub const COMPRESSOR: [Param; 6] = [
-    param("threshold", "Threshold", Spec::knob(-40.0, 0.0, 1.0, -18.0), Format::Round, "dB"),
+    param("threshold", "Threshold", Spec::knob(-60.0, 0.0, 1.0, -18.0), Format::Round, "dB"),
     param("ratio", "Ratio", Spec::knob(1.0, 20.0, 0.5, 8.0), Format::Fmt3, ""),
-    param("attack", "Attack", Spec::knob(0.0, 1.0, 0.001, 0.002), Format::Fmt3, "s"),
-    param("release", "Release", Spec::knob(0.0, 1.0, 0.001, 0.08), Format::Fmt3, "s"),
+    param("attack", "Attack", Spec::knob(0.001, 1.0, 0.001, 0.002), Format::Fmt3, "s"),
+    param("release", "Release", Spec::knob(0.01, 1.0, 0.001, 0.08), Format::Fmt3, "s"),
     param("knee", "Knee", Spec::knob(0.0, 40.0, 1.0, 3.0), Format::Round, "dB"),
     param("makeup", "Makeup", Spec::knob(0.0, 24.0, 0.5, 8.0), Format::Fmt3, "dB"),
 ];
 /// The filter sliders.
 pub const FILTERS: [Param; 2] = [
     param("lowcut", "Low Cut", Spec::slider(10.0, 500.0, 1.0, 35.0).log(), Format::Round, "Hz"),
-    param("hicut", "High Cut", Spec::slider(1000.0, 20_000.0, 100.0, 18_500.0).log(), Format::Round, "Hz"),
+    param("hicut", "High Cut", Spec::slider(1000.0, 22_000.0, 100.0, 18_500.0).log(), Format::Round, "Hz"),
 ];
 
 /// Every knob and slider.
@@ -58,21 +60,10 @@ pub fn find(key: &str) -> Option<&'static Param> {
     params().find(|p| p.key == key)
 }
 
-/// The compressor's gain reduction at `input` dB.
-fn gain_reduction(input: f64, threshold: f64, ratio: f64, knee: f64) -> f64 {
-    let over = input - threshold;
-    if over <= -knee / 2.0 {
-        return 0.0;
-    }
-    if knee > 0.0 && over < knee / 2.0 {
-        let d = over + knee / 2.0;
-        return (1.0 - 1.0 / ratio) * d * d / (2.0 * knee);
-    }
-    over * (1.0 - 1.0 / ratio)
-}
-
-/// The output level for `input` dB (the curve): the input when bypassed.
+/// The output level for `input` dB (the curve), with the settings the bus
+/// uses (clamped): the input when bypassed.
 pub fn transfer(master: &MasterSettings, input: f64) -> f64 {
+    let master = master.clamped();
     if master.bypass >= 0.5 {
         return input;
     }
@@ -288,6 +279,33 @@ mod tests {
     fn every_control_is_a_saved_setting() {
         let keys: Vec<_> = params().map(|p| p.key).collect();
         assert_eq!(keys, crate::master::KEYS);
+    }
+
+    /// The master bus setting a control sets.
+    fn setting(settings: &MasterSettings, key: &str) -> f32 {
+        match key {
+            "volume" => settings.master,
+            "preGain" => settings.pre_gain,
+            "threshold" => settings.threshold,
+            "ratio" => settings.ratio,
+            "attack" => settings.attack,
+            "release" => settings.release,
+            "knee" => settings.knee,
+            "makeup" => settings.makeup,
+            "lowcut" => settings.lowcut,
+            "hicut" => settings.hicut,
+            other => panic!("no setting for {other}"),
+        }
+    }
+
+    #[test]
+    fn every_control_spans_the_range_the_bus_uses() {
+        for p in params() {
+            let (min, max, default) = (p.spec.min as f32, p.spec.max as f32, p.spec.default as f32);
+            assert_eq!(min, setting(&MasterSettings::MIN, p.key), "{} min", p.key);
+            assert_eq!(max, setting(&MasterSettings::MAX, p.key), "{} max", p.key);
+            assert_eq!(default, setting(&MasterSettings::default(), p.key), "{} default", p.key);
+        }
     }
 
     #[test]
