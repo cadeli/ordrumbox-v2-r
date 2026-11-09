@@ -28,6 +28,13 @@ impl Session {
         self.chrome.widgets.dropdown = None;
     }
 
+    /// View > Master: the master strip along the bottom, shown or folded.
+    pub fn toggle_master_strip(&mut self) {
+        self.chrome.show_master_strip = !self.chrome.show_master_strip;
+        self.chrome.widgets.focus = None;
+        self.chrome.widgets.dropdown = None;
+    }
+
     /// H: every track of pattern `p` on the synth patch that matches its name, written to the
     /// track; a random patch for a name nothing matches.
     pub fn convert_to_generated_sounds(&mut self, p: usize) {

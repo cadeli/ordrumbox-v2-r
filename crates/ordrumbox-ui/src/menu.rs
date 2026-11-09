@@ -17,6 +17,7 @@ use crate::theme;
 pub enum Command {
     TrackEditor,
     NoteEditor,
+    MasterStrip,
     Grid,
     SongView,
     PianoRoll,
@@ -149,6 +150,7 @@ impl Command {
             Self::PlayPattern => Some("the host's transport plays the pattern"),
             Self::CheckUpdates | Self::DownloadPage => Some("update check: in the app only, not in a plugin"),
             Self::FactoryReset => Some("factory reset: in the app only, not in a plugin"),
+            Self::MasterStrip => Some("the master strip: in the app only, not in a plugin"),
             Self::BackUpUserData
             | Self::RestoreUserData
             | Self::ChangeUserFolder
@@ -230,6 +232,8 @@ pub struct MenuState {
     pub kit_editor: bool,
     pub track_editor: bool,
     pub note_editor: bool,
+    /// The master strip along the bottom (View > Master).
+    pub master_strip: bool,
     pub grid: bool,
     /// VU meters on the track stripes (V).
     pub show_vus: bool,
@@ -344,6 +348,7 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
             items: vec![
                 check("Track editor", "F2", C::TrackEditor, true, s.track_editor),
                 check("Note editor", "F7", C::NoteEditor, true, s.note_editor),
+                check("Master", "", C::MasterStrip, true, s.master_strip),
                 Item::Separator,
                 check("Grid", "F5", C::Grid, true, s.grid),
                 check("Piano roll", "F4", C::PianoRoll, true, s.piano_roll),

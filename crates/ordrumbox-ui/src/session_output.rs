@@ -104,9 +104,9 @@ impl Session {
     }
 
     /// What the output strip draws: the spectrum of the last samples played (the analyser keeps its smoothing between frames).
-    /// `None` in a plugin: it has no output strip.
+    /// `None` in a plugin (it has no output strip) or when View > Master folded it.
     pub(super) fn output_view(&self) -> Option<OutputView> {
-        if self.hosted {
+        if !self.output_shown() {
             return None;
         }
         if let Some(controller) = self.playback.controller() {
@@ -154,5 +154,23 @@ mod tests {
         s.mouse_down(SIZE, left + w, f.y + 8, Button::Left, false);
         s.mouse_up();
         assert_eq!(s.output_panel.master.lowcut, 500.0);
+    }
+
+    #[test]
+    fn view_master_folds_the_strip() {
+        let mut s = Session::new(Library::default(), KitSet::empty(), Vec::new());
+        s.set_size(SIZE);
+        let shown = s.body(SIZE);
+        s.run(crate::menu::Command::MasterStrip);
+        // No strip, nothing of it to click: the editors reach down to where it was.
+        let folded = s.body(SIZE);
+        assert_eq!(folded.output.h, 0);
+        assert!(folded.main_bottom > shown.main_bottom);
+        assert!(s.output_view().is_none());
+        assert!(!s.panel_layout(SIZE.0, SIZE.1, Scale::ONE).items.iter().any(|i| matches!(i.id, Some(Id::Master(_)))));
+        assert!(!s.shown().output);
+        s.run(crate::menu::Command::MasterStrip);
+        assert_eq!(s.body(SIZE), shown);
+        assert!(s.output_view().is_some());
     }
 }
