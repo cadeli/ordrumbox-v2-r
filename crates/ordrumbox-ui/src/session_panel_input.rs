@@ -197,13 +197,8 @@ impl Session {
             None
         } else {
             let layout = self.panel_layout(width, height, scale);
-            // A plugin's tempo is shown, not turned: no id, but a tooltip.
-            let host_tempo = Some(view::header_controls(scale).bpm)
-                .filter(|rect| self.hosted && self.pattern().is_some() && rect.contains(x, y))
-                .map(|rect| (Id::Bpm, rect));
             panel::hit(&layout.items, x, y)
                 .and_then(|item| Some((item.id?, item.rect)))
-                .or(host_tempo)
                 .filter(|(id, _)| self.control_tip(*id).is_some())
         };
         let changed = hover != self.chrome.control_hover;
@@ -211,18 +206,11 @@ impl Session {
         changed
     }
 
-    /// What a control is, said in its tooltip; a plugin's tells where the
-    /// host or the app does the thing instead.
+    /// What a control is, said in its tooltip; a plugin's gives its own
+    /// shortcuts (Alt for Ctrl).
     pub(super) fn control_tip(&self, id: Id) -> Option<control_help::Help> {
-        if self.hosted {
-            match id {
-                Id::Bpm => return Some(["Tempo (HOST)", "the host's: a plugin plays at the host's tempo"]),
-                Id::View(2) => {
-                    return Some(["Song: in the app only", "a plugin plays patterns, the host arranges them"]);
-                }
-                Id::View(4) => return Some(["Kit editor (Alt+K)", "the kit's samples and their settings"]),
-                _ => {}
-            }
+        if self.hosted && id == Id::View(4) {
+            return Some(["Kit editor (Alt+K)", "the kit's samples and their settings"]);
         }
         control_help::help(id)
     }

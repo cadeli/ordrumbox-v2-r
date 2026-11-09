@@ -130,10 +130,8 @@ impl Session {
         let views = view::header_controls(scale).views;
         let kit_open = self.kit_editor.is_some();
         for (i, (rect, label)) in views.iter().zip(view::VIEWS).enumerate() {
-            // A plugin has no song view: its button only says so.
+            // A plugin has no song view: no button, its place left empty.
             if self.hosted && shown.get(i) == Some(&Workspace::Song) {
-                let kind = Kind::Disabled { label: label.into() };
-                layout.items.push(Item::new(Some(Id::View(i as u8)), *rect, kind));
                 continue;
             }
             let on = if i == 4 { kit_open } else { !kit_open && self.workspace == shown[i] };
@@ -216,21 +214,17 @@ impl Session {
     /// transport and the pattern settings panel of the JS).
     fn header_items(&self, layout: &mut PanelLayout, pattern: &Pattern, scale: Scale) {
         let controls = view::header_controls(scale);
-        let playing = self.playing();
-        let label = if playing { "STOP" } else { "PLAY" };
-        layout.items.push(Item::new(
-            Some(Id::Transport),
-            controls.play,
-            Kind::Button { label: label.into(), on: playing },
-        ));
-        let spec = Spec::knob(song::MIN_BPM, song::MAX_BPM, 1.0, song::DEFAULT_BPM);
-        if self.hosted {
-            // The host's tempo plays, not the session's: shown, not turned.
-            let bpm = self.host_bpm();
-            let text = bpm.map_or_else(|| "-".to_owned(), num::text);
-            let kind = Kind::Value { spec, value: bpm.unwrap_or_else(|| self.tempo()), label: None, text, lfo: false };
-            layout.items.push(Item::new(None, controls.bpm, kind));
-        } else {
+        // A plugin has no transport: the host plays, at its own tempo. Its
+        // place stays empty, so nothing else moves.
+        if !self.hosted {
+            let playing = self.playing();
+            let label = if playing { "STOP" } else { "PLAY" };
+            layout.items.push(Item::new(
+                Some(Id::Transport),
+                controls.play,
+                Kind::Button { label: label.into(), on: playing },
+            ));
+            let spec = Spec::knob(song::MIN_BPM, song::MAX_BPM, 1.0, song::DEFAULT_BPM);
             let bpm = self.tempo();
             let text = num::text(bpm);
             let kind = Kind::Value { spec, value: bpm, label: None, text, lfo: false };

@@ -15,7 +15,7 @@ use ordrumbox_core::Library;
 use super::Session;
 use crate::kits::KitSet;
 use crate::menu::{Command, LibraryState};
-use crate::panel::{self, Id, Kind};
+use crate::panel::{self, Id};
 use crate::scale::Scale;
 use crate::ui_input::Button;
 use crate::view;
@@ -196,6 +196,7 @@ fn a_plugin_leaves_to_the_host_what_the_host_does() {
         Command::Save,
         Command::Quit,
         Command::TempoUp,
+        Command::PlayPattern,
         Command::CheckUpdates,
         Command::FactoryReset,
         Command::SongView,
@@ -212,27 +213,26 @@ fn a_plugin_leaves_to_the_host_what_the_host_does() {
     assert!(!s.song_view_open() && !s.playing());
     s.toggle_play_song();
     assert_eq!(s.message, crate::menu::SONGS_IN_THE_APP);
-    // Greyed out in the menus (`menu.rs` tests), and the tempo shown is not the session's knob.
+    // Left out of the menus (`menu.rs` tests), and no tempo knob: the host's tempo plays.
     let runnable = s.menus().into_iter().flat_map(|m| m.items).filter_map(|i| i.runnable());
     assert!(runnable.into_iter().all(|c| c.hosted_refusal().is_none()));
     let size = (1100, 680, Scale::ONE);
     let layout = s.panel_layout(size.0, size.1, size.2);
     assert!(!layout.items.iter().any(|i| i.id == Some(Id::Bpm)));
-    // The SONG view button greyed out: a click says why.
-    let song = panel::find(&layout.items, Id::View(2)).unwrap();
-    assert!(matches!(song.kind, Kind::Disabled { .. }));
-    let (x, y) = (song.rect.x + 2, song.rect.y + 2);
-    s.message.clear();
+    // No SONG view button: a click where it would be does nothing.
+    assert!(panel::find(&layout.items, Id::View(2)).is_none());
+    let song = view::header_controls(Scale::ONE).views[2];
+    let (x, y) = (song.x + 2, song.y + 2);
+    assert!(panel::hit(&layout.items, x, y).is_none());
     s.mouse_down(size, x, y, Button::Left, false);
     s.mouse_up();
-    assert_eq!(s.message, crate::menu::SONGS_IN_THE_APP);
     assert!(!s.song_view_open());
-    // Tooltips say whose the tempo and the songs are.
-    s.control_hover(size, x, y);
-    assert_eq!(s.chrome.control_hover.map(|(id, _)| s.control_tip(id).unwrap()[0]), Some("Song: in the app only"));
+    // No transport: the host plays, at its tempo; nothing under the mouse there.
+    assert!(!layout.items.iter().any(|i| i.id == Some(Id::Transport)));
     let bpm = view::header_controls(Scale::ONE).bpm;
+    assert!(panel::hit(&layout.items, bpm.x + 2, bpm.y + 2).is_none());
     s.control_hover(size, bpm.x + 2, bpm.y + 2);
-    assert_eq!(s.chrome.control_hover.map(|(id, _)| s.control_tip(id).unwrap()[0]), Some("Tempo (HOST)"));
+    assert!(s.chrome.control_hover.is_none());
     // No master strip: the editors reach down to where it was.
     assert!(!layout.items.iter().any(|i| matches!(i.id, Some(Id::Master(_)))));
     assert!(s.output_view().is_none());

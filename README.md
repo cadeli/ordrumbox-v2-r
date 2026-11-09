@@ -79,6 +79,9 @@ cargo xtask bundle ordrumbox-plugin --release --features vst3 # and orDrumbox.vs
 ```
 
 The plugin follows the host transport and saves its library in the host project.
+Its window has no play button and no tempo (the host's transport plays, at the host's
+tempo), and its menus leave out what the host or the app does: save, quit, play, tempo,
+songs, the user data folder, updates, factory reset.
 Playback starts on the host's first block, on its first frame. An offline render (a
 bounce, or a host computing ahead of real time) plays as in real time, every note in its
 place: the plugin then waits for its pattern, kit and passes before each block.

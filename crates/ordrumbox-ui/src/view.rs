@@ -166,8 +166,9 @@ pub struct View<'a> {
     pub levels: Vec<f32>,
     /// Whether the VU meter stripe is shown.
     pub show_vus: bool,
-    /// The tempo's label: the session's or the song's in the app, the host's in a plugin.
-    pub tempo_label: &'a str,
+    /// The tempo's label (the session's or the song's); `None` in a plugin,
+    /// which leaves the transport and the tempo to the host: no transport group.
+    pub tempo_label: Option<&'a str>,
     /// A track being dragged by its name: from which row to which.
     pub track_drop: Option<(usize, usize)>,
     /// The tracks a plugin host mutes, bit `t` for track `t`.
@@ -850,7 +851,7 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: Scale) {
     // The groups' frames, behind their widgets (panel items, drawn later).
     // The generation's only with a pattern: it has nothing to show without.
     for (i, group) in c.groups(scale).into_iter().enumerate() {
-        if view.pattern.is_none() && i != 3 {
+        if view.pattern.is_none() && i != 3 || view.tempo_label.is_none() && i == 0 {
             continue;
         }
         canvas.fill_rect(group.x, group.y, group.w, group.h, theme::panel());
@@ -861,7 +862,9 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: Scale) {
         canvas.text(r.x, top, text, scale, theme::muted());
     };
     if view.pattern.is_some() {
-        label(canvas, c.bpm, view.tempo_label);
+        if let Some(tempo) = view.tempo_label {
+            label(canvas, c.bpm, tempo);
+        }
         match (view.waiting, view.pattern) {
             (Some(on), _) => {
                 let color = if on { PLAYING } else { theme::muted() };
@@ -1633,7 +1636,7 @@ mod tests {
                 note_editor: true,
                 levels: vec![0.0; 2],
                 show_vus: true,
-                tempo_label: "BPM",
+                tempo_label: Some("BPM"),
                 track_drop: None,
                 host_muted: 0b10,
                 cursor: Some(Cursor { track: 0, beat: 1, step: 2 }),
