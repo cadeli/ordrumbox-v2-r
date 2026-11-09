@@ -62,7 +62,7 @@ fn synths() -> SynthPresets {
     let preset = presets.get("BASS0").cloned().expect("a preset");
     let mut presets = Object::new();
     presets.insert("BASS0", preset);
-    SynthPresets::from_json(&Value::Object(presets))
+    SynthPresets::from_json(&Value::Object(presets)).unwrap()
 }
 
 fn setup(seed: u64) -> RenderSetup {

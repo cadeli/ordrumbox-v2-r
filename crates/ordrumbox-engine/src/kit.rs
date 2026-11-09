@@ -3,6 +3,7 @@
 
 use std::sync::Arc;
 
+use ordrumbox_core::Issue;
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_dsp::SampleBuffer;
 
@@ -133,10 +134,27 @@ pub struct Kit {
 }
 
 impl Kit {
-    fn from_json(value: &Value) -> Option<Self> {
+    /// The kit at `at` (`[2]`), `None` without a name; a sample without a
+    /// path is skipped. What is skipped goes to `issues`.
+    fn from_json(value: &Value, at: &str, issues: &mut Vec<Issue>) -> Option<Self> {
+        let Some(name) = value.get("name").and_then(Value::as_str) else {
+            issues.push(Issue::new(at, "kit without a name: skipped"));
+            return None;
+        };
         let object = value.as_object()?;
-        let name = object.get("name")?.as_str()?.to_owned();
-        let samples = sample_entries(value).unwrap_or_default().iter().filter_map(KitSample::from_json).collect();
+        let name = name.to_owned();
+        let samples = sample_entries(value)
+            .unwrap_or_default()
+            .iter()
+            .enumerate()
+            .filter_map(|(index, entry)| {
+                let sample = KitSample::from_json(entry);
+                if sample.is_none() {
+                    issues.push(Issue::new(format!("{at}.samples[{index}]"), "sample without a path: skipped"));
+                }
+                sample
+            })
+            .collect();
         let mut extra = Object::new();
         for (key, value) in object.iter() {
             match key {
@@ -192,9 +210,20 @@ impl Kit {
     }
 }
 
-/// Read drumkits.json (an array of kits); malformed entries are skipped.
-pub fn kits_from_json(value: &Value) -> Vec<Kit> {
-    value.as_array().unwrap_or_default().iter().filter_map(Kit::from_json).collect()
+/// Kits read from a file, and the kits and samples of it skipped.
+pub type KitsRead = (Vec<Kit>, Vec<Issue>);
+
+/// Read kits.json (an array of kits): the kits, and the kits and samples
+/// skipped (malformed). Anything but an array is an error.
+pub fn kits_from_json(value: &Value) -> Result<KitsRead, String> {
+    let entries = value.as_array().ok_or("not an array of kits")?;
+    let mut issues = Vec::new();
+    let kits = entries
+        .iter()
+        .enumerate()
+        .filter_map(|(index, entry)| Kit::from_json(entry, &format!("[{index}]"), &mut issues))
+        .collect();
+    Ok((kits, issues))
 }
 
 /// drumkits.json from kits.
@@ -272,6 +301,16 @@ mod tests {
     use ordrumbox_core::json;
 
     #[test]
+    fn what_is_skipped_is_told() {
+        let value = json::parse(r#"[{"name":"a","samples":[{"key":"k"},{"path":"a.wav"}]},{"samples":[]}]"#).unwrap();
+        let (kits, issues) = kits_from_json(&value).unwrap();
+        assert_eq!((kits.len(), kits[0].samples.len()), (1, 1));
+        let at: Vec<_> = issues.iter().map(|i| i.at.as_str()).collect();
+        assert_eq!(at, ["[0].samples[0]", "[1]"]);
+        assert_eq!(kits_from_json(&json::parse("{}").unwrap()), Err("not an array of kits".to_owned()));
+    }
+
+    #[test]
     fn kits_and_samples_load() {
         let kits = kits_from_json(
             &json::parse(
@@ -280,7 +319,7 @@ mod tests {
                     {"instruments":[]}]"#,
             )
             .unwrap(),
-        );
+        ).unwrap().0;
         assert_eq!(kits.len(), 2);
         assert_eq!(kits[0].samples[1].decay_ms(), DEFAULT_DECAY_MS);
         assert_eq!(kits[0].samples[0].decay, Some(5000.0));
@@ -312,7 +351,7 @@ mod tests {
     #[test]
     fn kit_files_round_trip() {
         let text = r#"[{"name":"real","infos":" kit","instruments":[{"display_name":"kick","key":"KICK","url":"real/kick.wav","peakDb":-3,"rootMidi":72,"decay":5000,"x":1},{"display_name":"s","key":"SNARE","url":"s.wav","gainDb":-2.5,"tune":1}]}]"#;
-        let kits = kits_from_json(&json::parse(text).unwrap());
+        let kits = kits_from_json(&json::parse(text).unwrap()).unwrap().0;
         // Read under the JS key, written under the current one.
         // Read under the JS keys, written under the current ones.
         let current = [
@@ -325,7 +364,7 @@ mod tests {
         .iter()
         .fold(text.to_owned(), |text, (old, new)| text.replace(&format!("\"{old}\""), &format!("\"{new}\"")));
         assert_eq!(kits_to_json(&kits).to_json(), current);
-        assert_eq!(kits_from_json(&kits_to_json(&kits)), kits);
+        assert_eq!(kits_from_json(&kits_to_json(&kits)).unwrap().0, kits);
         assert_eq!(
             kits[0].to_mapping_json().to_json(),
             r#"{"name":"real","samples":[{"path":"real/kick.wav","displayName":"kick","key":"KICK","rootMidi":72,"peakDb":-3,"decay":5000,"gainDb":0,"transpose":0},{"path":"s.wav","displayName":"s","key":"SNARE","rootMidi":null,"peakDb":null,"decay":null,"gainDb":-2.5,"transpose":1}]}"#

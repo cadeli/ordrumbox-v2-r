@@ -226,10 +226,7 @@ fn run_presets(arguments: &[String]) -> Result<(), String> {
     let options = parse_options(arguments)?;
     let path = options.presets.clone().map_or_else(|| in_checkout(PRESETS_FILE, "--presets"), Ok)?;
     let value = read_json(&path)?;
-    if value.as_object().is_none() {
-        return Err(format!("{}: not an object of presets", path.display()));
-    }
-    let presets = SynthPresets::from_json(&value);
+    let presets = SynthPresets::from_json(&value).map_err(|e| format!("{}: {e}", path.display()))?;
     let names: Vec<String> = if options.all {
         presets.keys().iter().map(|&key| key.to_owned()).collect()
     } else {

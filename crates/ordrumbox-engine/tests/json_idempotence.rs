@@ -27,9 +27,9 @@ fn kits_text(kits: &[Kit]) -> String {
 /// Read `value`, save, read and save again: the same text, the same kits.
 /// The kits read back from the first save.
 fn kits_saved_twice(value: &Value) -> Vec<Kit> {
-    let kits = kits_from_json(value);
+    let kits = kits_from_json(value).unwrap().0;
     let first = kits_text(&kits);
-    let reloaded = kits_from_json(&parse(&first));
+    let reloaded = kits_from_json(&parse(&first)).unwrap().0;
     assert_eq!(kits_text(&reloaded), first, "a second save changes the file");
     assert_eq!(reloaded, kits, "the file does not hold the whole kits");
     reloaded
@@ -100,11 +100,11 @@ fn the_shipped_kits_are_saved_as_they_were_read() {
 fn the_synth_presets_are_saved_as_they_were_read() {
     // Presets are kept as written: every key of every preset, in its order.
     let value = asset("synth_presets.json");
-    let presets = SynthPresets::from_json(&value);
+    let presets = SynthPresets::from_json(&value).unwrap();
     assert!(!presets.is_empty());
     let first = presets.to_json().to_json_pretty(2) + "\n";
     assert_eq!(parse(&first), value, "a preset value changed");
-    let reloaded = SynthPresets::from_json(&parse(&first));
+    let reloaded = SynthPresets::from_json(&parse(&first)).unwrap();
     assert_eq!(reloaded, presets);
     assert_eq!(reloaded.to_json().to_json_pretty(2) + "\n", first);
 }

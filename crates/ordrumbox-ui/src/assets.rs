@@ -38,6 +38,9 @@ pub struct Assets {
     /// The user's `kits.json` could not be read: the assets' kits are used
     /// and kit edits are not saved (so as not to overwrite it).
     pub kits_error: Option<String>,
+    /// Kits and samples of the kits file read that were skipped (malformed),
+    /// with that file's name.
+    pub kit_issues: (String, Vec<Issue>),
     /// Asset files that could not be read (`kits.json`, `scales.json`,
     /// `synth_presets.json`, `styles.json`): what they hold is missing.
     pub errors: Vec<String>,
@@ -101,6 +104,21 @@ fn read_json(path: &Path) -> Result<json::Value, String> {
     json::parse(&text).map_err(|e| format!("{}: {e}", path.display()))
 }
 
+/// Asset file `name` of `data`, read and decoded; `None` when it cannot be,
+/// the error pushed on `errors`.
+fn read_asset<T>(
+    data: &Path,
+    name: &str,
+    errors: &mut Vec<String>,
+    decode: impl FnOnce(json::Value) -> Result<T, String>,
+) -> Option<T> {
+    let path = data.join(name);
+    read_json(&path)
+        .and_then(|v| decode(v).map_err(|e| format!("{}: {e}", path.display())))
+        .map_err(|e| errors.push(e))
+        .ok()
+}
+
 /// The demo library, the starting point of the user's.
 pub const LIBRARY: &str = "library.json";
 
@@ -116,20 +134,26 @@ fn load_with(dir: &Path, user_kits: Option<PathBuf>, user_samples: Option<PathBu
     let data = dir.join("data");
     let (library, report) = Library::from_json(&read_json(&data.join(LIBRARY))?);
     let mut errors = Vec::new();
-    // An asset file that cannot be read: its error reported, `None` used.
-    let mut read = |name: &str| read_json(&data.join(name)).map_err(|e| errors.push(e)).ok();
-    let saved = user_kits.map(|p| store::load_kits(&p));
+    let saved = user_kits.map(|p| (store::load_kits(&p), p));
     let (kits, kits_error) = match saved {
-        Some(Ok(Some(kits))) => (Some(kits), None),
-        Some(Err(e)) => (None, Some(e)),
+        Some((Ok(Some((kits, issues))), path)) => (Some((kits, (path.display().to_string(), issues))), None),
+        Some((Err(e), _)) => (None, Some(e)),
         _ => (None, None),
     };
-    let kits = kits.or_else(|| read("kits.json").map(|v| kits_from_json(&v))).unwrap_or_default();
-    let scales_json = read("scales.json");
-    let synths = read("synth_presets.json").map(|v| SynthPresets::from_json(&v)).unwrap_or_default();
+    // The assets' kits, when the user has none.
+    let (kits, kit_issues) = kits
+        .or_else(|| {
+            let kits = read_asset(&data, "kits.json", &mut errors, |v| kits_from_json(&v))?;
+            Some((kits.0, ("kits.json".to_owned(), kits.1)))
+        })
+        .unwrap_or_default();
+    let scales_json = read_asset(&data, "scales.json", &mut errors, Ok);
+    let synths =
+        read_asset(&data, "synth_presets.json", &mut errors, |v| SynthPresets::from_json(&v)).unwrap_or_default();
     let scales = scales_json.as_ref().map(Scales::from_json).unwrap_or_default();
     let scale_list = scales_json.as_ref().map(ScaleList::from_json).unwrap_or_default();
-    let (styles, style_issues) = read("styles.json").map(|v| Styles::from_json(&v)).unwrap_or_default();
+    let (styles, style_issues) =
+        read_asset(&data, "styles.json", &mut errors, |v| Ok(Styles::from_json(&v))).unwrap_or_default();
     let sources = SampleSources { assets: dir.join("kits"), user: user_samples };
     let (bank, sample_errors) = SampleBank::load(&kits, |url| sources.read(url));
     Ok(Assets {
@@ -145,6 +169,7 @@ fn load_with(dir: &Path, user_kits: Option<PathBuf>, user_samples: Option<PathBu
         sample_errors,
         sources,
         kits_error,
+        kit_issues,
         errors,
     })
 }
@@ -167,6 +192,7 @@ mod tests {
         let assets = repository_assets();
         assert_eq!(assets.errors, Vec::<String>::new());
         assert_eq!(assets.kits_error, None);
+        assert_eq!(assets.kit_issues.1, Vec::new());
         assert_eq!(assets.report.issues, Vec::new());
         assert_eq!(assets.report.dropped_clips, Vec::new());
         assert_eq!(assets.style_issues, Vec::new());

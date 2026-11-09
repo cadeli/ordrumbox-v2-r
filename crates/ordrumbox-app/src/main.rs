@@ -333,6 +333,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("orDrumbox {}", ordrumbox_ui::BUILD);
         return Ok(());
     }
+    // A failure from here on keeps the window from opening: told where the
+    // user sees it, not on stderr only.
+    open_window().map_err(|e| ordrumbox_ui::report_startup_error(&e.to_string()).into())
+}
+
+/// The window, until the user quits it.
+fn open_window() -> Result<(), Box<dyn std::error::Error>> {
     // No text without it: stop with where it was looked for.
     ordrumbox_ui::load_font()?;
     let event_loop = EventLoop::new()?;

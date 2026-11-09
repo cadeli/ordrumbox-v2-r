@@ -24,7 +24,7 @@ use std::time::{Duration, Instant};
 
 use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::track::MAX_TRACKS;
-use ordrumbox_core::{Library, Note, Pattern, Rng, ScaleList, Scales, Styles, Track};
+use ordrumbox_core::{Library, LoadReport, Note, Pattern, Rng, ScaleList, Scales, Styles, Track};
 use ordrumbox_engine::analysis::{self, Analysis};
 use ordrumbox_engine::offline::{self, RenderSetup};
 use ordrumbox_engine::{Mode, SynthPresets, wav};
@@ -215,13 +215,39 @@ struct Opened {
     on_disk: bool,
     /// The message to show.
     message: String,
+    /// The library is the demo (its repairs are those of the assets' file).
+    demo: bool,
 }
 
 impl Opened {
     /// `library`, not saved to any file.
     fn unsaved(library: Library, message: &str) -> Self {
-        Self { library, file: None, on_disk: false, message: message.to_owned() }
+        Self { library, file: None, on_disk: false, message: message.to_owned(), demo: false }
     }
+
+    /// The demo library, not saved to any file.
+    fn demo(library: Library, message: &str) -> Self {
+        Self { demo: true, ..Self::unsaved(library, message) }
+    }
+}
+
+/// The status line saying what loading `file` repaired, `None` when nothing:
+/// how many values took their default and song clips were dropped, and the
+/// first of each.
+fn repaired_status(file: &str, report: &LoadReport) -> Option<String> {
+    let mut parts = Vec::new();
+    if let Some(first) = report.issues.first() {
+        parts.push(format!("{} value(s) repaired, first: {}: {}", report.issues.len(), first.at, first.message));
+    }
+    if let Some(first) = report.dropped_clips.first() {
+        parts.push(format!(
+            "{} song clip(s) dropped, first: {}: {}",
+            report.dropped_clips.len(),
+            first.pattern,
+            first.reason
+        ));
+    }
+    (!parts.is_empty()).then(|| format!("{file}: {}", parts.join("; ")))
 }
 
 /// The message of the demo library when no file keeps its edits.
@@ -504,12 +530,16 @@ impl Session {
         };
         let mut status: Vec<String> = assets.errors.iter().map(|e| format!("not loaded: {e}")).collect();
         status.extend(assets.style_issues.iter().map(|i| format!("styles.json: {}: {}", i.at, i.message)));
+        let (kits_file, kit_issues) = &assets.kit_issues;
+        if let Some(first) = kit_issues.first() {
+            status.push(format!("{kits_file}: {} skipped, first: {}: {}", kit_issues.len(), first.at, first.message));
+        }
         if let Some(first) = assets.sample_errors.first() {
             status.push(format!("{} sample(s) not loaded, first: {first}", assets.sample_errors.len()));
         }
 
         let hosted = matches!(source, LibrarySource::Host(_));
-        let Opened { mut library, file: library_path, on_disk, message } = match source {
+        let Opened { mut library, file: library_path, on_disk, message, demo } = match source {
             LibrarySource::UserFile => {
                 if let Some(problem) = store::location_problem() {
                     status.push(format!("{problem}: File > Change user data folder"));
@@ -518,8 +548,8 @@ impl Session {
             }
             LibrarySource::Host(text) => Self::open_host_library(text, assets.library, &mut status),
         };
-        if library_path.is_none() && !assets.report.issues.is_empty() {
-            status.push(format!("library.json: {} value(s) repaired", assets.report.issues.len()));
+        if demo {
+            status.extend(repaired_status(assets::LIBRARY, &assets.report));
         }
 
         if let Some(e) = &assets.kits_error {
@@ -581,21 +611,26 @@ impl Session {
     fn open_library(path: Option<PathBuf>, demo: Library, status: &mut Vec<String>) -> Opened {
         let Some(path) = path else {
             status.push("no user data folder: edits are not saved".into());
-            return Opened::unsaved(demo, DEMO_NOT_SAVED);
+            return Opened::demo(demo, DEMO_NOT_SAVED);
         };
         match store::load(&path) {
-            Ok(Some(saved)) => {
-                Opened { library: saved, file: Some(path), on_disk: true, message: "library loaded".into() }
+            Ok(Some((saved, report))) => {
+                status.extend(repaired_status(&path.display().to_string(), &report));
+                Opened {
+                    library: saved,
+                    file: Some(path),
+                    on_disk: true,
+                    message: "library loaded".into(),
+                    demo: false,
+                }
             }
             Ok(None) => Opened {
-                library: demo,
                 file: Some(path),
-                on_disk: false,
-                message: "your library starts as a copy of the demo: edits are saved".into(),
+                ..Opened::demo(demo, "your library starts as a copy of the demo: edits are saved")
             },
             Err(e) => {
                 status.push(format!("library not loaded, not saved over: {e}"));
-                Opened::unsaved(demo, DEMO_NOT_SAVED)
+                Opened::demo(demo, DEMO_NOT_SAVED)
             }
         }
     }
@@ -606,20 +641,29 @@ impl Session {
         const DEMO: &str = "demo library, saved with the host project";
         if let Some(text) = text {
             return match Library::parse(&text) {
-                Ok((library, _)) => Opened::unsaved(library, "library from the host project"),
+                Ok((library, report)) => {
+                    status.extend(repaired_status("library of the host project", &report));
+                    Opened::unsaved(library, "library from the host project")
+                }
                 Err(e) => {
                     status.push(format!("library of the host project not loaded: {e}"));
-                    Opened::unsaved(demo, DEMO)
+                    Opened::demo(demo, DEMO)
                 }
             };
         }
-        match store::path().map(|path| store::load(&path)) {
-            Some(Ok(Some(saved))) => Opened::unsaved(saved, "your library, copied into the host project"),
-            Some(Err(e)) => {
-                status.push(format!("library not loaded: {e}"));
-                Opened::unsaved(demo, DEMO)
+        let Some(path) = store::path() else {
+            return Opened::demo(demo, DEMO);
+        };
+        match store::load(&path) {
+            Ok(Some((saved, report))) => {
+                status.extend(repaired_status(&path.display().to_string(), &report));
+                Opened::unsaved(saved, "your library, copied into the host project")
             }
-            Some(Ok(None)) | None => Opened::unsaved(demo, DEMO),
+            Err(e) => {
+                status.push(format!("library not loaded: {e}"));
+                Opened::demo(demo, DEMO)
+            }
+            Ok(None) => Opened::demo(demo, DEMO),
         }
     }
 

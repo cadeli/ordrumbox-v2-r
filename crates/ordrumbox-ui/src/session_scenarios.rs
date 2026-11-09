@@ -240,7 +240,7 @@ fn a_pattern_built_in_the_grid_is_saved_reloaded_and_exported() {
     let dir = std::env::temp_dir().join(format!("ordrumbox-lifecycle-{}", std::process::id()));
     let path = dir.join("library.json");
     store::save(&path, s.editor.library()).unwrap();
-    let reloaded = store::load(&path).unwrap().expect("saved");
+    let (reloaded, _) = store::load(&path).unwrap().expect("saved");
     std::fs::remove_dir_all(&dir).ok();
     // (`step_percent` is an editing aid, never saved: the files are compared.)
     assert_eq!(reloaded.to_file_text(), s.editor.library().to_file_text());
@@ -733,7 +733,7 @@ fn a_folder_dropped_becomes_a_kit_and_a_wav_dropped_with_shift_replaces_a_sample
 fn synth_presets_exported_are_imported_and_saved_ones_read_at_start() {
     let dir = scratch_dir("synth-files");
     let (mut s, _audio) = demo_session(&dir.join("samples"));
-    let presets = |text: &str| SynthPresets::from_json(&json::parse(text).unwrap());
+    let presets = |text: &str| SynthPresets::from_json(&json::parse(text).unwrap()).unwrap();
     s.set_asset_synths(presets(r#"{"bass":{"vco1":{"gain":0.5}},"lead":{"vco1":{"gain":0.25}}}"#));
     let exported = s.synths.to_json().to_json();
 

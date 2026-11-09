@@ -10,7 +10,7 @@ use ordrumbox_probe::report::{report_to_json, sound_to_json};
 
 fn presets() -> SynthPresets {
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/data/synth_presets.json");
-    SynthPresets::from_json(&json::parse(&std::fs::read_to_string(path).unwrap()).unwrap())
+    SynthPresets::from_json(&json::parse(&std::fs::read_to_string(path).unwrap()).unwrap()).unwrap()
 }
 
 #[test]
