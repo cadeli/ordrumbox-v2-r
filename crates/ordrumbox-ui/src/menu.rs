@@ -95,6 +95,7 @@ pub enum Command {
     SelectRandomPattern,
     SelectRandomDrumkit,
     ToggleVus,
+    ToggleToasts,
     NextColorScheme,
     ZoomIn,
     ZoomOut,
@@ -243,6 +244,8 @@ pub struct MenuState {
     pub grid: bool,
     /// VU meters on the track stripes (V).
     pub show_vus: bool,
+    /// Messages pop up as toasts (View > Toasts).
+    pub show_toasts: bool,
     pub song_view: bool,
     pub piano_roll: bool,
     pub synth: bool,
@@ -359,6 +362,7 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
                 check("Kit editor", "Ctrl+K", C::KitEditor, true, s.kit_editor),
                 Item::Separator,
                 check("VU meters", "V", C::ToggleVus, true, s.show_vus),
+                check("Toasts", "", C::ToggleToasts, true, s.show_toasts),
                 command("Next colour scheme", "C", C::NextColorScheme, true),
                 Item::Separator,
                 command("Zoom in", "Ctrl++", C::ZoomIn, true),

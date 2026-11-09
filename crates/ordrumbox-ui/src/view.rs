@@ -1183,7 +1183,7 @@ pub fn draw_tooltip_lines<S: AsRef<str>>(canvas: &mut Canvas, lines: &[S], cell:
 }
 
 /// How opaque a toast's background is (0–255): the window shows through.
-const TOAST_OPACITY: u8 = 190;
+const TOAST_OPACITY: u8 = 225;
 
 /// Where the toast of `message` goes in a window `width` wide, its lower
 /// edge at `bottom`, and the text it shows.
@@ -1195,6 +1195,12 @@ fn toast_layout(width: i32, message: &str, bottom: i32, scale: Scale) -> (Rect, 
     let w = (text_width(&text, big) + 2 * pad_x).max((320 * scale).min(width - 2 * margin));
     let h = font::SIZE * big + 2 * pad_y;
     (Rect::new((width - w) / 2, bottom - h, w, h), text)
+}
+
+/// The space between two stacked toasts.
+#[must_use]
+pub fn toast_gap(scale: Scale) -> i32 {
+    6 * scale
 }
 
 /// The rectangle of the toast of `message` (a click on it hides it).
@@ -1211,7 +1217,7 @@ pub fn draw_toast(canvas: &mut Canvas, message: &str, bottom: i32, scale: Scale)
     let (pad_y, border) = (12 * scale, scale.px());
     let (Rect { x, y, w, h }, text) = toast_layout(canvas.width(), message, bottom, scale);
     // Each pixel shaded once, so that the window shows through evenly.
-    canvas.shade_rect(x + border, y + border, w - 2 * border, h - 2 * border, theme::panel(), TOAST_OPACITY);
+    canvas.shade_rect(x + border, y + border, w - 2 * border, h - 2 * border, theme::toast(), TOAST_OPACITY);
     let side = h - 2 * border;
     let edges = [
         (x, y, w, border),
@@ -1220,7 +1226,7 @@ pub fn draw_toast(canvas: &mut Canvas, message: &str, bottom: i32, scale: Scale)
         (x + w - border, y + border, border, side),
     ];
     for (sx, sy, sw, sh) in edges {
-        canvas.shade_rect(sx, sy, sw, sh, theme::line(), TOAST_OPACITY);
+        canvas.shade_rect(sx, sy, sw, sh, theme::toast_edge(), TOAST_OPACITY);
     }
     let text_x = x + (w - text_width(&text, big)) / 2;
     canvas.text(text_x, y + pad_y, &text, big, theme::text());
@@ -1257,7 +1263,7 @@ fn draw_notice_part(canvas: &mut Canvas, title: &str, lines: &[String], all: &[S
     let line_h = NOTICE_LINE * scale;
     let close = "ESC or click: close";
     // The title shares its line with `close`.
-    let title_width = text_width(title, scale) + 16 * scale + text_width(close, scale);
+    let title_width = text_width(title, scale.title()) + 16 * scale + text_width(close, scale);
     let width = all.iter().map(|l| text_width(l, scale)).chain([title_width]).max().unwrap_or(0) + 32 * scale;
     let height = (lines.len() as i32 + 3) * line_h + 16 * scale;
     let x = ((canvas.width() - width) / 2).max(0);
@@ -1265,7 +1271,7 @@ fn draw_notice_part(canvas: &mut Canvas, title: &str, lines: &[String], all: &[S
     canvas.fill_rect(x - 4 * scale, y - 4 * scale, width + 8 * scale, height + 8 * scale, theme::shade());
     canvas.fill_rect(x, y, width, height, theme::line());
     canvas.fill_rect(x + scale.px(), y + scale.px(), width - 2 * scale, height - 2 * scale, theme::panel());
-    canvas.text(x + 16 * scale, y + 10 * scale, title, scale, ACCENT);
+    canvas.text(x + 16 * scale, y + 10 * scale, title, scale.title(), ACCENT);
     for (i, line) in lines.iter().enumerate() {
         canvas.text(x + 16 * scale, y + 10 * scale + (i as i32 + 2) * line_h, line, scale, theme::text());
     }

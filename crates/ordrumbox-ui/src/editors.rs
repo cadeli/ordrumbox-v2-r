@@ -778,6 +778,14 @@ impl Rows {
         self.items.push(Item::text(self.x, self.y, fitted, color, s));
         self.y += 12 * s;
     }
+
+    /// A panel's title: [`Scale::title`] in the same row.
+    fn title(&mut self, text: &str) {
+        let s = self.scale.title();
+        let fitted: String = text.chars().take(crate::canvas::chars_in(self.w, s)).collect();
+        self.items.push(Item::title(self.x, self.y, fitted, self.scale));
+        self.y += 12 * self.scale;
+    }
 }
 
 /// A setting's control: a knob in a bar of knobs, else a stepper for a
@@ -804,7 +812,7 @@ pub fn track_editor(view: &TrackView, state: &EditorState, area: Rect, scale: Sc
     let s = scale;
     let track = view.track;
     let mut rows = Rows { x: area.x, w: area.w, y: area.y, scale: s, items: Vec::new() };
-    rows.text(&view.title, theme::ACCENT);
+    rows.title(&view.title);
 
     // Sample bar: analysis, envelope with the decay end. Its place is kept
     // without a sample (a synth track), so the rows under it stay put when
@@ -1259,7 +1267,7 @@ pub fn note_editor(view: &NoteView, state: &EditorState, area: Rect, scale: Scal
     let s = scale;
     let left_w = area.w * NOTE_LEFT_PERCENT / 100;
     let mut rows = Rows { x: area.x, w: left_w, y: area.y, scale: s, items: Vec::new() };
-    rows.text(&view.title, theme::ACCENT);
+    rows.title(&view.title);
     let Some(note) = &view.note else { return rows.items };
     let knobs = NOTE_KNOBS
         .iter()

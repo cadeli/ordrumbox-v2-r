@@ -24,16 +24,23 @@ pub fn field_color() -> Rgb {
 pub fn dim() -> Rgb {
     theme::muted()
 }
-/// A knob's or a slider's arc: the value it holds.
-const ARC: Rgb = theme::VALUE;
+/// A knob's or a slider's arc, its handle and its value: neutral, so the
+/// accents keep their meaning ([`theme::control`], [`theme::text`]).
+fn arc_color() -> Rgb {
+    theme::control()
+}
+fn handle_color() -> Rgb {
+    theme::text()
+}
+fn value_color() -> Rgb {
+    theme::text()
+}
 /// A text field's caret.
 const CARET: Rgb = theme::FOCUS;
 pub const ON: Rgb = theme::LIVE;
 const FOCUS: Rgb = theme::FOCUS;
-/// Values, the active tab and button, slider handles, titles.
-const VALUE: Rgb = theme::VALUE;
+/// The active tab and button.
 const ACTIVE: Rgb = theme::VALUE;
-const HANDLE: Rgb = theme::ACCENT;
 const TITLE: Rgb = theme::ACCENT;
 const LFO: Rgb = theme::CHANCE;
 fn disc_color() -> Rgb {
@@ -274,6 +281,10 @@ pub enum Kind {
         text: String,
         color: Rgb,
     },
+    /// A panel's title, at [`Scale::title`].
+    Title {
+        text: String,
+    },
     /// A sample's envelope (peaks 0–1) and where its decay ends (0–1).
     Envelope {
         points: Vec<f64>,
@@ -306,12 +317,20 @@ impl Item {
         Self { id: None, rect, kind: Kind::Text { text, color } }
     }
 
+    /// A panel's title at `(x, y)`, in a row of text at `scale`.
+    pub fn title(x: i32, y: i32, text: impl Into<String>, scale: Scale) -> Self {
+        let text = text.into();
+        let rect = Rect::new(x, y, text_width(&text, scale.title()), 8 * scale.title());
+        Self { id: None, rect, kind: Kind::Title { text } }
+    }
+
     /// Takes the keyboard focus (Tab cycles through these).
     pub fn focusable(&self) -> bool {
         self.id.is_some()
             && !matches!(
                 self.kind,
                 Kind::Text { .. }
+                    | Kind::Title { .. }
                     | Kind::Disabled { .. }
                     | Kind::Envelope { .. }
                     | Kind::Highlight
@@ -442,12 +461,15 @@ pub fn draw(canvas: &mut Canvas, items: &[Item], focus: Option<Id>, scale: Scale
                 canvas.fill_rect(r.x, r.y, r.w, r.h, border_color());
                 canvas.fill_rect(r.x + t, r.y + t, r.w - 2 * t, r.h - 2 * t, background_color());
             }
+            Kind::Title { text } => {
+                canvas.text(r.x, r.y, text, scale.title(), TITLE);
+            }
             Kind::Text { text, color } => {
                 canvas.text(r.x, r.y, &fit(text, r.w.max(text_width(text, scale)), scale), scale, *color);
             }
             Kind::Value { spec, value, label, text, lfo } => {
                 let fraction = spec.fraction(*value);
-                let color = if *lfo { LFO } else { ARC };
+                let color = if *lfo { LFO } else { arc_color() };
                 match spec.style {
                     Style::Knob => {
                         let size = knob_size(r, scale);
@@ -461,11 +483,17 @@ pub fn draw(canvas: &mut Canvas, items: &[Item], focus: Option<Id>, scale: Scale
                                 y += 10 * scale;
                             }
                             let text = fit(text, r.w, scale);
-                            canvas.text(cx - text_width(&text, scale) / 2, y, &text, scale, VALUE);
+                            canvas.text(cx - text_width(&text, scale) / 2, y, &text, scale, value_color());
                         } else {
                             draw_knob(canvas, r.x + size / 2, r.y + r.h / 2, size, fraction, color, scale);
                             let x = r.x + size + 6 * scale;
-                            canvas.text(x, r.y + (r.h - 8 * scale) / 2, &fit(text, r.x + r.w - x, scale), scale, VALUE);
+                            canvas.text(
+                                x,
+                                r.y + (r.h - 8 * scale) / 2,
+                                &fit(text, r.x + r.w - x, scale),
+                                scale,
+                                value_color(),
+                            );
                         }
                     }
                     Style::Slider => {
@@ -480,9 +508,9 @@ pub fn draw(canvas: &mut Canvas, items: &[Item], focus: Option<Id>, scale: Scale
                         let filled = (fraction * f64::from(width)) as i32;
                         canvas.fill_rect(left, bar_y, filled, 2 * t, color);
                         let thumb = left + filled - 4 * scale;
-                        canvas.fill_rect(thumb, r.y + r.h / 2 - 4 * scale, 8 * scale, 8 * scale, HANDLE);
+                        canvas.fill_rect(thumb, r.y + r.h / 2 - 4 * scale, 8 * scale, 8 * scale, handle_color());
                         let x = left + width + 6 * scale;
-                        canvas.text(x, ty, &fit(text, r.x + r.w - x, scale), scale, VALUE);
+                        canvas.text(x, ty, &fit(text, r.x + r.w - x, scale), scale, value_color());
                     }
                     Style::Stepper => {
                         let ty = r.y + (r.h - 8 * scale) / 2;
@@ -503,7 +531,13 @@ pub fn draw(canvas: &mut Canvas, items: &[Item], focus: Option<Id>, scale: Scale
                             canvas.text(x, ty, glyph, scale, if live { theme::text() } else { dim() });
                         }
                         let text = fit(text, field.w, scale);
-                        canvas.text(field.x + (field.w - text_width(&text, scale)) / 2, ty, &text, scale, VALUE);
+                        canvas.text(
+                            field.x + (field.w - text_width(&text, scale)) / 2,
+                            ty,
+                            &text,
+                            scale,
+                            value_color(),
+                        );
                     }
                 }
             }

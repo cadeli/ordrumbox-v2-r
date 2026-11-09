@@ -59,6 +59,13 @@ impl Scale {
         Self::from_quarters(round_quarters(self.0.saturating_mul(quarters)))
     }
 
+    /// The scale of a title: a quarter bigger than the text, still within
+    /// a row of text (12 units high).
+    #[must_use]
+    pub const fn title(self) -> Self {
+        self.part(5)
+    }
+
     /// One scale unit in pixels, rounded, at least 1: the thickness of a line.
     #[must_use]
     pub const fn px(self) -> i32 {

@@ -43,6 +43,7 @@ use crate::frame;
 use crate::kits::KitSet;
 use crate::mcp_link;
 use crate::menu::{self, Command, MenuState};
+use crate::panel::Rect;
 use crate::panel::{Dropdown, Entry, Id};
 use crate::picker::{self, Export, Outcome, Picker, PickerLayout, Purpose};
 use crate::store;
@@ -279,7 +280,7 @@ pub struct Session {
     status: Vec<String>,
     /// Outcome of the last action.
     message: String,
-    /// The message as last shown, and until when its toast is shown.
+    /// The message as last shown, and the toasts on screen.
     flash: Flash,
     /// What was done so far, shown by a click on the status line.
     action_log: ActionLog,
@@ -401,19 +402,67 @@ fn toast_bottom(height: i32, scale: Scale) -> i32 {
 /// How long a new message is shown as a toast.
 const FLASH: Duration = Duration::from_secs(1);
 
-/// The message last shown on the status line, and until when its toast is shown.
+/// How many toasts are on screen at most; a new one beyond pushes out the oldest.
+const TOAST_LIMIT: usize = 5;
+
+/// The words of a toast for `text` shown `repeat_count` times in a row: the
+/// count follows them from the second time on.
+#[must_use]
+fn toast_text(text: &str, repeat_count: u32) -> String {
+    if repeat_count > 1 { format!("{text} (×{repeat_count})") } else { text.to_owned() }
+}
+
+/// A message shown as a toast, until a time.
+#[derive(Debug, Clone)]
+struct Toast {
+    text: String,
+    until: Instant,
+}
+
+/// The message last shown on the status line, how many times in a row, and
+/// the toasts still on screen, the oldest first.
 #[derive(Debug, Clone, Default)]
 struct Flash {
     text: String,
-    until: Option<Instant>,
+    repeat_count: u32,
+    toasts: Vec<Toast>,
+    /// No toast is shown (View > Toasts unchecked); messages still go on the status line.
+    hidden: bool,
 }
 
 impl Flash {
-    /// `text` is shown at `now`: it stands out for [`FLASH`], or not at all
-    /// when empty.
+    /// `text` is shown at `now`: it stands out for [`FLASH`] in a toast of
+    /// its own, under the ones still there, or not at all when empty. The same
+    /// words again get a toast of their own too, which counts the repeats.
     fn shown(&mut self, text: &str, now: Instant) {
+        self.repeat_count = if text == self.text { self.repeat_count.saturating_add(1) } else { 1 };
         self.text = text.to_owned();
-        self.until = (!text.is_empty()).then_some(now + FLASH);
+        if text.is_empty() || self.hidden {
+            return;
+        }
+        if self.toasts.len() == TOAST_LIMIT {
+            self.toasts.remove(0);
+        }
+        let text = toast_text(text, self.repeat_count);
+        self.toasts.push(Toast { text, until: now + FLASH });
+    }
+
+    /// Each toast with its rectangle in a window `width` × `height`: the
+    /// newest at the bottom, the older ones stacked above it.
+    fn rects(&self, width: i32, height: i32, scale: Scale) -> Vec<(Rect, &Toast)> {
+        let mut bottom = toast_bottom(height, scale);
+        let mut rects: Vec<(Rect, &Toast)> = self
+            .toasts
+            .iter()
+            .rev()
+            .map(|toast| {
+                let rect = view::toast_rect(width, &toast.text, bottom, scale);
+                bottom = rect.y - view::toast_gap(scale);
+                (rect, toast)
+            })
+            .collect();
+        rects.reverse();
+        rects
     }
 }
 
@@ -676,31 +725,33 @@ impl Session {
         }
     }
 
-    /// When the message stops standing out; `None` when it does not.
+    /// When the next toast goes; `None` when there is none.
     pub(crate) fn flash_until(&self) -> Option<Instant> {
-        self.flash.until
+        self.flash.toasts.iter().map(|toast| toast.until).min()
     }
 
-    /// A press at `(x, y)` on the toast hides it at once; whether there was
-    /// one there. Called during an input, when the message is the flash's.
+    /// The toasts on screen, the oldest first.
+    #[cfg(test)]
+    pub(crate) fn toast_texts(&self) -> Vec<&str> {
+        self.flash.toasts.iter().map(|toast| toast.text.as_str()).collect()
+    }
+
+    /// A press at `(x, y)` on a toast hides it at once; whether there was
+    /// one there.
     pub(crate) fn toast_click(&mut self, size: (i32, i32, Scale), x: i32, y: i32) -> bool {
         let (width, height, scale) = size;
-        let on_toast = self.flash.until.is_some()
-            && !self.flash.text.is_empty()
-            && view::toast_rect(width, &self.flash.text, toast_bottom(height, scale), scale).contains(x, y);
-        if on_toast {
-            self.flash.until = None;
+        let hit = self.flash.rects(width, height, scale).iter().position(|(rect, _)| rect.contains(x, y));
+        if let Some(index) = hit {
+            self.flash.toasts.remove(index);
         }
-        on_toast
+        hit.is_some()
     }
 
-    /// The message stops standing out if its time is over; whether it did.
+    /// The toasts whose time is over go; whether one did.
     pub(crate) fn end_flash(&mut self, now: Instant) -> bool {
-        let over = self.flash.until.is_some_and(|until| until <= now);
-        if over {
-            self.flash.until = None;
-        }
-        over
+        let count = self.flash.toasts.len();
+        self.flash.toasts.retain(|toast| toast.until > now);
+        self.flash.toasts.len() != count
     }
 
     /// The window split for `size` (a real window size): the main editor
@@ -826,6 +877,15 @@ impl Session {
     pub fn toggle_vus(&mut self) {
         self.chrome.show_vus = !self.chrome.show_vus;
         self.message = if self.chrome.show_vus { "VU meters on".into() } else { "VU meters off".into() };
+    }
+
+    /// View > Toasts: show or hide the messages that pop up over the window.
+    pub fn toggle_toasts(&mut self) {
+        self.flash.hidden = !self.flash.hidden;
+        if self.flash.hidden {
+            self.flash.toasts.clear();
+        }
+        self.message = if self.flash.hidden { "toasts off".into() } else { "toasts on".into() };
     }
 
     // ─── Menus and commands ──────────────────────────────────────────────────
@@ -1198,8 +1258,8 @@ impl Session {
         if let Some(entry) = &self.chrome.widgets.entry {
             entry.draw(canvas, scale);
         }
-        if self.flash.until.is_some() && !self.message.is_empty() {
-            view::draw_toast(canvas, &self.message, toast_bottom(canvas.height(), scale), scale);
+        for (rect, toast) in self.flash.rects(canvas.width(), canvas.height(), scale) {
+            view::draw_toast(canvas, &toast.text, rect.y + rect.h, scale);
         }
         match &self.chrome.overlay {
             Some(Overlay::Picker(p)) => {
