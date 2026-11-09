@@ -301,7 +301,30 @@ impl Session {
             Id::GridMenu => self.grid_menu_pick(&value, dropdown),
             Id::TrackNameMenu(target) => self.track_name_menu_pick(target, &value, dropdown),
             Id::KitInstrumentMenu(sample) => self.kit_instrument_menu_pick(sample, &value, dropdown),
+            Id::InstrumentMenu => self.instrument_menu_pick(&value, dropdown),
             id => self.select(id, &value),
+        }
+    }
+
+    /// The Sound tab's instrument menus under `rect` (`current` is the
+    /// track's instrument): the categories of the instruments that have samples.
+    pub(super) fn instrument_menu(&mut self, current: &str, rect: crate::panel::Rect) {
+        let sampled = self.sampled_instruments();
+        let (values, labels) = session_grid::category_lines_where(|id| sampled.contains(id));
+        let title = format!("Instrument: {current}");
+        let menu = Dropdown::menu(Id::InstrumentMenu, rect.x, rect.y + rect.h, title, values, labels);
+        self.chrome.widgets.dropdown = Some(menu);
+    }
+
+    /// A line of the Sound tab's instrument menus, picked in `menu`: a
+    /// category opens its instruments beside it, an instrument is the track's.
+    fn instrument_menu_pick(&mut self, value: &str, menu: Dropdown) {
+        let sampled = self.sampled_instruments();
+        if self.category_submenu_where(Id::InstrumentMenu, value, menu, |id| sampled.contains(id)) {
+            return;
+        }
+        if let Some(id) = session_grid::picked_instrument(value) {
+            self.select(Id::Instrument, id);
         }
     }
 
@@ -343,7 +366,7 @@ impl Session {
             }
             Id::RollMenu => return self.roll_menu_pick(value),
             // Picked with where they are (`pick`).
-            Id::GridMenu | Id::TrackNameMenu(_) | Id::KitInstrumentMenu(_) => return,
+            Id::GridMenu | Id::TrackNameMenu(_) | Id::KitInstrumentMenu(_) | Id::InstrumentMenu => return,
             Id::SynthPreset | Id::SynthField(_) => return self.synth_select(id, value),
             Id::KitKit => {
                 let target = self.kits.kits.iter().position(|k| k.name == value);

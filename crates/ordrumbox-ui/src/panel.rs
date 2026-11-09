@@ -228,6 +228,9 @@ pub enum Id {
     /// The instrument menus of a kit's sample (its index): the categories,
     /// then a category's instruments.
     KitInstrumentMenu(usize),
+    /// The instrument menus of the track editor's Sound tab: the categories,
+    /// then a category's instruments, those that have samples only.
+    InstrumentMenu,
 }
 
 /// What a widget shows.

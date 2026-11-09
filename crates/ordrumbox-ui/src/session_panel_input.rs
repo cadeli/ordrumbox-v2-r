@@ -448,11 +448,12 @@ impl Session {
         false
     }
 
-    /// The list of select `id`, under `rect`; a kit sample's instrument opens
-    /// the instrument menus instead, its categories first.
+    /// The list of select `id`, under `rect`; a kit sample's or a track's
+    /// instrument opens the instrument menus instead, its categories first.
     fn open_select(&mut self, id: Id, rect: panel::Rect, values: Vec<String>, labels: Vec<String>, selected: usize) {
         match id {
             Id::KitSampleInstrument(sample) => self.kit_instrument_menu(sample, rect),
+            Id::Instrument => self.instrument_menu(values.get(selected).map_or("", String::as_str), rect),
             _ => self.chrome.widgets.dropdown = Some(Dropdown::new(id, rect, values, labels, selected)),
         }
     }
