@@ -128,7 +128,9 @@ views that edit notes. The track editor, on the right, holds the track's setting
 
 ## Keys
 
-Press **F1** in the app for the full keyboard shortcut list. Common keys:
+Press **F1** in the app for the full keyboard shortcut list. Keys are the ones the
+keyboard's layout marks (Ctrl Z is the key marked Z on AZERTY too), except the two rows
+that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their place. Common keys:
 
 - **Space**: play / stop
 - **F2**: track editor, **F3**: song panel, **F4**: piano roll, **F5**: grid, **F6**: synth editor

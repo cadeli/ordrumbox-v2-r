@@ -41,7 +41,7 @@ const TOOLS: &str = r#"[
    "inputSchema": {"type": "object", "properties": {}}},
   {"name": "loadPattern", "description": "A pattern with its tracks (every setting) and notes (fields away from their default, and their absolute step).",
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string", "minLength": 1}}, "required": ["patternName"]}},
-  {"name": "createNewPattern", "description": "Adds an empty pattern (4 beats) at the end of the library.",
+  {"name": "createNewPattern", "description": "Adds a pattern (4 beats) with 8 tracks (KICK, SNARE, CHH, OHH, CYM, HTOM, LTOM, CLAP) at the end of the library.",
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string", "minLength": 1}}, "required": ["patternName"]}},
   {"name": "selectPattern", "description": "Shows a pattern in the window (by name or index; a playing pattern switches at once). With neither, tells which one is shown.",
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}, "index": {"type": "integer", "minimum": 0}}}},

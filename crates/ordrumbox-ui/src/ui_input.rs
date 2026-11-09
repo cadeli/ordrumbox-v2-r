@@ -39,6 +39,8 @@ pub enum Key {
     BracketRight,
     Comma,
     Period,
+    /// A keypad key other than Enter, + and -: what it types is read where it is.
+    Numpad,
     /// Any other key: it still ends an Alt pressed alone, and its text is typed.
     Other,
 }
@@ -85,6 +87,7 @@ impl Key {
             "BracketRight" => Self::BracketRight,
             "Comma" => Self::Comma,
             "Period" => Self::Period,
+            _ if code.starts_with("Numpad") => Self::Numpad,
             _ => Self::Other,
         }
     }
@@ -99,6 +102,53 @@ pub struct KeyEvent {
     pub repeat: bool,
     /// The text the key types with the current layout, if any.
     pub text: Option<String>,
+    /// The character the key types with the current layout and no modifier
+    /// held, if it types one: what its cap shows.
+    pub unmodified: Option<char>,
+}
+
+impl KeyEvent {
+    /// The key a shortcut reads: the one the layout marks. A letter, a digit
+    /// or `- = [ ] , .` is the one the key types (Ctrl+Z is the key marked Z on
+    /// an AZERTY keyboard too, where it sits in the place of W; `-` there is
+    /// on the 6); a key of the main block that types other ASCII (AZERTY's `;`
+    /// in the place of `,`) is none of them. The other keys (arrows, keypad…),
+    /// a layout outside ASCII (Cyrillic, AZERTY's `à` on the 0) and a key whose
+    /// character is unknown are read by their place.
+    #[must_use]
+    pub fn layout_key(&self) -> Key {
+        let main_block = matches!(
+            self.key,
+            Key::Letter(_)
+                | Key::Digit(_)
+                | Key::Minus
+                | Key::Equal
+                | Key::BracketLeft
+                | Key::BracketRight
+                | Key::Comma
+                | Key::Period
+                | Key::Other
+        );
+        let Some(c) = self.unmodified.filter(|c| main_block && c.is_ascii_graphic()) else { return self.key };
+        match c {
+            'a'..='z' | 'A'..='Z' => Key::Letter(c.to_ascii_uppercase()),
+            '0'..='9' => c.to_digit(10).and_then(|d| u8::try_from(d).ok()).map_or(Key::Other, Key::Digit),
+            '-' => Key::Minus,
+            '=' => Key::Equal,
+            '[' => Key::BracketLeft,
+            ']' => Key::BracketRight,
+            ',' => Key::Comma,
+            '.' => Key::Period,
+            _ => Key::Other,
+        }
+    }
+}
+
+/// The one character of a key's text, if it is one character.
+#[must_use]
+pub fn single_char(text: &str) -> Option<char> {
+    let mut chars = text.chars();
+    chars.next().filter(|_| chars.next().is_none())
 }
 
 /// The modifier keys held.
@@ -151,9 +201,40 @@ mod tests {
         assert_eq!(Key::from_code("F12"), Key::F(12));
         assert_eq!(Key::from_code("AltRight"), Key::Alt);
         assert_eq!(Key::from_code("NumpadEnter"), Key::NumpadEnter);
-        for other in ["F13", "Digit10", "Keya", "KeyAB", "Numpad1", ""] {
+        assert_eq!(Key::from_code("Numpad1"), Key::Numpad);
+        for other in ["F13", "Digit10", "Keya", "KeyAB", "Backquote", ""] {
             assert_eq!(Key::from_code(other), Key::Other, "{other}");
         }
+    }
+
+    #[test]
+    fn shortcut_keys_follow_the_layout() {
+        let event = |key, unmodified| KeyEvent { key, pressed: true, repeat: false, text: None, unmodified };
+        // AZERTY: Z in the place of W, A in the place of Q, M in the place of `;`,
+        // `,` in the place of M, `;` in the place of `,`, `-` on the 6, `^` in the place of `[`.
+        assert_eq!(event(Key::Letter('W'), Some('z')).layout_key(), Key::Letter('Z'));
+        assert_eq!(event(Key::Letter('Q'), Some('a')).layout_key(), Key::Letter('A'));
+        assert_eq!(event(Key::Other, Some('m')).layout_key(), Key::Letter('M'));
+        assert_eq!(event(Key::Letter('M'), Some(',')).layout_key(), Key::Comma);
+        assert_eq!(event(Key::Comma, Some(';')).layout_key(), Key::Other);
+        assert_eq!(event(Key::Digit(6), Some('-')).layout_key(), Key::Minus);
+        assert_eq!(event(Key::Minus, Some(')')).layout_key(), Key::Other);
+        assert_eq!(event(Key::BracketLeft, Some('^')).layout_key(), Key::Other);
+        // QWERTZ: Y and Z swapped, `-` in the place of `/`.
+        assert_eq!(event(Key::Letter('Y'), Some('z')).layout_key(), Key::Letter('Z'));
+        assert_eq!(event(Key::Other, Some('-')).layout_key(), Key::Minus);
+        // Cyrillic, AZERTY's `à` on the 0, a dead key: by place.
+        assert_eq!(event(Key::Letter('Z'), Some('я')).layout_key(), Key::Letter('Z'));
+        assert_eq!(event(Key::Digit(0), Some('à')).layout_key(), Key::Digit(0));
+        assert_eq!(event(Key::BracketLeft, None).layout_key(), Key::BracketLeft);
+        // Keys outside the main block stay what they are.
+        assert_eq!(event(Key::NumpadSubtract, Some('-')).layout_key(), Key::NumpadSubtract);
+        assert_eq!(event(Key::Numpad, Some('.')).layout_key(), Key::Numpad);
+        assert_eq!(event(Key::Space, Some(' ')).layout_key(), Key::Space);
+        assert_eq!(event(Key::Enter, Some('\r')).layout_key(), Key::Enter);
+        assert_eq!(single_char("z"), Some('z'));
+        assert_eq!(single_char("ab"), None);
+        assert_eq!(single_char(""), None);
     }
 
     #[test]

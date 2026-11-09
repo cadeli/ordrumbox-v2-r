@@ -356,6 +356,9 @@ impl View {
                 keyboard_types::Key::Character(text) => Some(text.clone()),
                 _ => None,
             },
+            // Its shortcuts are Alt's, which changes the character typed
+            // (Option on macOS), and baseview gives none without it: read by place.
+            unmodified: None,
         };
         let pressed = key.pressed;
         let mut taken = false;
