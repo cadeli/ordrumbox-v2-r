@@ -471,7 +471,14 @@ fn a_session_through_the_menus_draws_every_step() {
     s.run(Command::PreviousPattern);
 
     // Every view, drawn playing.
-    for command in [Command::SongView, Command::PianoRoll, Command::SynthEditor, Command::Grid, Command::TrackEditor] {
+    for command in [
+        Command::SongView,
+        Command::PianoRoll,
+        Command::SynthEditor,
+        Command::Grid,
+        Command::TrackEditor,
+        Command::NoteEditor,
+    ] {
         s.run(command);
         run(&mut s, &mut audio, CALLBACK);
         draw(&mut s);

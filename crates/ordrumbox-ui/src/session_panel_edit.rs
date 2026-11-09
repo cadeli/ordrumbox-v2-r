@@ -21,6 +21,13 @@ impl Session {
         self.chrome.widgets.dropdown = None;
     }
 
+    /// View > Note editor.
+    pub fn toggle_note_editor(&mut self) {
+        self.chrome.show_note_editor = !self.chrome.show_note_editor;
+        self.chrome.widgets.focus = None;
+        self.chrome.widgets.dropdown = None;
+    }
+
     /// H: every track of pattern `p` on the synth patch that matches its name, written to the
     /// track; a random patch for a name nothing matches.
     pub fn convert_to_generated_sounds(&mut self, p: usize) {

@@ -101,7 +101,10 @@ impl Player {
         // The project keeps its own text (even one that could not be read)
         // until the library is edited; a new instance saves what it plays.
         self.published = if state.is_empty() { None } else { Some(session.library_revision()) };
-        self.ui = Some(Ui::new(session));
+        let mut ui = Ui::new(session);
+        // The window's grip (`editor.rs`) holds its bottom-right corner.
+        ui.set_grip(true);
+        self.ui = Some(ui);
         (self.pattern, self.kit, self.named) = (Follow::default(), Follow::default(), None);
         self.sample_rate = sample_rate;
         self.publish(state);
@@ -267,6 +270,19 @@ mod tests {
             Started::New(Some(audio)) => audio,
             other => panic!("expected a new engine, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn the_ui_opens_compact_in_the_window_it_fits() {
+        let state = Arc::new(LibraryState::default());
+        let mut player = Player::default();
+        let _audio = player.start(48_000.0, &state);
+        let ui = player.ui().unwrap();
+        assert_eq!(ui.session.shown(), ordrumbox_ui::Shown::grid_alone(false), "the grid alone");
+        let (width, height) = crate::editor::default_size();
+        assert_eq!(ui.needed_size(), (i32::try_from(width).unwrap(), i32::try_from(height).unwrap()));
+        ui.session.run(ordrumbox_ui::Command::NoteEditor);
+        assert!(ui.needed_size().1 > i32::try_from(height).unwrap(), "the note editor unfolded: taller");
     }
 
     #[test]

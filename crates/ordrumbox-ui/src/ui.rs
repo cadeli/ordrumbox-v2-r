@@ -70,6 +70,9 @@ pub struct Ui {
     scroll: Scroll,
     /// Alt is down and no other key, click or wheel turn came since.
     alt_alone: bool,
+    /// The window has a resize grip in its bottom-right corner (a
+    /// plugin's): the scrollbars leave it free.
+    grip: bool,
 }
 
 impl Ui {
@@ -82,7 +85,21 @@ impl Ui {
             display: Scale::ONE,
             scroll: Scroll::default(),
             alt_alone: false,
+            grip: false,
         }
+    }
+
+    /// The window has a resize grip of [`crate::grip_side`] in its
+    /// bottom-right corner, which the scrollbars leave free.
+    pub fn set_grip(&mut self, grip: bool) {
+        self.grip = grip;
+    }
+
+    /// The smallest window, in physical pixels, that shows the whole UI at
+    /// its zoom with what it shows now; a smaller one scrolls.
+    #[must_use]
+    pub fn needed_size(&self) -> (i32, i32) {
+        view::min_window_size(self.session.wanted_scale(), self.session.shown())
     }
 
     /// The window's size in physical pixels and the display's scale factor
@@ -97,8 +114,7 @@ impl Ui {
     /// How a window of `window` pixels shows the UI at its zoom: whole, or
     /// a part with scrollbars.
     fn viewport(&self, window: (i32, i32)) -> Viewport {
-        let needed = view::min_window_size(self.session.wanted_scale(), !self.session.hosted());
-        Viewport::new(window, needed, self.display)
+        Viewport::new(window, self.needed_size(), self.display, self.grip)
     }
 
     /// The UI's size in physical pixels (the window's, or the layout's when
@@ -632,6 +648,7 @@ fn shortcut(code: Key, shift: bool, control: bool) -> Option<Command> {
             Key::F(4) => C::PianoRoll,
             Key::F(5) => C::Grid,
             Key::F(6) => C::SynthEditor,
+            Key::F(7) => C::NoteEditor,
             Key::BracketLeft if shift => C::PreviousSong,
             Key::BracketRight if shift => C::NextSong,
             Key::BracketLeft | Key::PageUp => C::PreviousPattern,
@@ -713,7 +730,7 @@ mod tests {
         let library =
             ordrumbox_core::Library::parse(r#"{"patterns":[{"name":"demo","tracks":[{"name":"KICK"}]}]}"#).unwrap().0;
         let mut ui = Ui::new(Session::for_tests(library, false));
-        let (w, h) = view::min_window_size(Scale::ONE, true);
+        let (w, h) = view::min_window_size(Scale::ONE, view::Shown::all(true));
         ui.set_size(w, h, Scale::ONE);
         ui.session.run(Command::ZoomIn);
         ui.session.run(Command::ZoomIn);

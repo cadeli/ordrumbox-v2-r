@@ -37,8 +37,10 @@ pub(super) struct Chrome {
     pub(super) panel_size: (i32, i32, Scale),
     /// Current page of the pattern grid (`view::page_beats` beats).
     pub(super) current_page: usize,
-    /// The track editor (and its note editor) shown on the right.
+    /// The track editor shown on the right.
     pub(super) show_track_editor: bool,
+    /// The note editor shown under the grid and the piano roll.
+    pub(super) show_note_editor: bool,
     /// Whether the VU meter stripe is shown.
     pub(super) show_vus: bool,
     /// The display's scale factor (at least ×1), to the nearest quarter.
@@ -65,6 +67,7 @@ impl Default for Chrome {
             panel_size: (0, 0, Scale::ONE),
             current_page: 0,
             show_track_editor: true,
+            show_note_editor: true,
             show_vus: true,
             display_scale: Scale::ONE,
             zoom: 0,
@@ -75,6 +78,14 @@ impl Default for Chrome {
 }
 
 impl Chrome {
+    /// The compact view: the grid alone, the track editor and the note
+    /// editor folded away (a plugin's window starts so, small over the
+    /// host's arrangement).
+    pub(super) fn fold_editors(&mut self) {
+        self.show_track_editor = false;
+        self.show_note_editor = false;
+    }
+
     /// A dropdown or an entry is open.
     pub(super) fn popup_open(&self) -> bool {
         self.widgets.dropdown.is_some() || self.widgets.entry.is_some()

@@ -196,7 +196,7 @@ impl ApplicationHandler for App {
         // The first window holds the layout at scale 1, in logical pixels: on
         // a HiDPI display the UI's scale and the window grow together. A
         // smaller window scrolls.
-        let (layout_width, layout_height) = ordrumbox_ui::min_window_size(Scale::ONE, true);
+        let (layout_width, layout_height) = ordrumbox_ui::min_window_size(Scale::ONE, ordrumbox_ui::Shown::all(true));
         let initial = LogicalSize::new(
             INITIAL_SIZE.width.max(f64::from(layout_width)),
             INITIAL_SIZE.height.max(f64::from(layout_height)),

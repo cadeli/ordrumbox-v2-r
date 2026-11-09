@@ -487,7 +487,7 @@ mod tests {
         s.status = vec!["a status line".into()];
         let mut tallest = 0;
         for scale in (Scale::ONE.quarters()..=Scale::MAX.quarters()).map(Scale::from_quarters) {
-            let (width, height) = view::min_window_size(scale, true);
+            let (width, height) = view::min_window_size(scale, view::Shown::all(true));
             let body = view::Body::new(width, height, scale, s.track_editor_width(width, scale), 1, true, true);
             for (track, tab, sub, note_tab, advanced) in (0..2).flat_map(|t| {
                 (0..6u8).flat_map(move |tab| {

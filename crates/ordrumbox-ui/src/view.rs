@@ -572,18 +572,67 @@ const TRACK_EDITOR_ROUNDING: i32 = 8;
 /// The footer status lines the smallest window leaves room for.
 const MIN_STATUS_LINES: usize = 1;
 
-/// The smallest window, in physical pixels, that the layout fits at `scale`:
-/// the header's controls across; down, the header, the tallest track editor,
-/// the output strip (`output`: the app's, a plugin has none) and a footer of
-/// one status line.
-pub fn min_window_size(scale: Scale, output: bool) -> (i32, i32) {
+/// The track rows the grid has room for without the track editor, at their
+/// smallest: a compact window (a plugin's, over the host's arrangement)
+/// still shows a full drum pattern.
+const COMPACT_ROWS: i32 = 16;
+
+/// The smallest row the grid draws, per scale unit.
+const MIN_ROW: i32 = 10;
+
+/// The height the grid takes at least without the track editor: the ruler,
+/// [`COMPACT_ROWS`] rows, the add-track button and the lane, each rounded to
+/// the pixel as [`Layout::new`] rounds it.
+fn compact_grid_height(scale: Scale) -> i32 {
+    let rows = COMPACT_ROWS * (MIN_ROW * scale);
+    RULER_HEIGHT * scale + rows + (ADD_TRACK_GAP + ADD_TRACK_HEIGHT) * scale + LANE_GAP * scale + lane_height() * scale
+}
+
+/// What the window shows that sets the room the layout needs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Shown {
+    /// The output strip along the bottom (the app's; a plugin has none).
+    pub output: bool,
+    /// The track editor down the right edge.
+    pub track_editor: bool,
+    /// The main editor is the grid (another one keeps the track editor's height).
+    pub grid: bool,
+    /// The note editor under the grid.
+    pub note_editor: bool,
+}
+
+impl Shown {
+    /// Everything, the tallest state: with the output strip when `output`.
+    #[must_use]
+    pub const fn all(output: bool) -> Self {
+        Self { output, track_editor: true, grid: true, note_editor: true }
+    }
+
+    /// The compact view: the grid alone, with the output strip when `output`.
+    #[must_use]
+    pub const fn grid_alone(output: bool) -> Self {
+        Self { output, track_editor: false, grid: true, note_editor: false }
+    }
+}
+
+/// The smallest window, in physical pixels, that the layout fits at `scale`
+/// with what `shown` shows: the header's controls across; down, the header,
+/// the tallest track editor (or, the grid without it, the grid and its note
+/// editor), the output strip and a footer of one status line.
+pub fn min_window_size(scale: Scale, shown: Shown) -> (i32, i32) {
     let views = header_controls(scale).views;
     let width = views[4].x + views[4].w + margin(scale);
     // `Body::new` places the editors' bottom at a fixed distance above the
     // window's bottom edge: at a height of 0 it is minus that distance.
-    let below = -Body::new(0, 0, scale, 0, MIN_STATUS_LINES, output, false).main_bottom;
-    let rounding = if scale.quarters() % 2 == 1 { TRACK_EDITOR_ROUNDING } else { 0 };
-    (width, body_top(scale) + TRACK_EDITOR_HEIGHT * scale + rounding + below)
+    let below = -Body::new(0, 0, scale, 0, MIN_STATUS_LINES, shown.output, false).main_bottom;
+    let main = if shown.track_editor || !shown.grid {
+        let rounding = if scale.quarters() % 2 == 1 { TRACK_EDITOR_ROUNDING } else { 0 };
+        TRACK_EDITOR_HEIGHT * scale + rounding
+    } else {
+        let note = if shown.note_editor { editors::note_strip_height(scale) + NOTE_GAP * scale } else { 0 };
+        compact_grid_height(scale) + note
+    };
+    (width, body_top(scale) + main + below)
 }
 
 /// How the window is split: one main editor (grid, piano roll, song, synth or
@@ -657,7 +706,7 @@ impl Layout {
         // the rows leave (its tabs stay at the bottom).
         let tabs_top = bottom - lane_height() * scale;
         let rows_h = tabs_top - LANE_GAP * scale - top - (ADD_TRACK_HEIGHT + ADD_TRACK_GAP) * scale;
-        let row = (rows_h / tracks.max(1) as i32).clamp(10 * scale, MAX_ROW * scale);
+        let row = (rows_h / tracks.max(1) as i32).clamp(MIN_ROW * scale, MAX_ROW * scale);
         let box_size = (row - 4 * scale).clamp(6 * scale, MAX_BOX * scale);
         let left = margin;
         let (name_x, volume_x, grid_left) = grid_columns(left, box_size, scale);
@@ -1562,11 +1611,31 @@ mod tests {
     }
 
     #[test]
+    fn the_compact_grid_shows_a_full_drum_pattern() {
+        let tracks: Vec<String> = (0..COMPACT_ROWS).map(|t| format!(r#"{{"name":"T{t}"}}"#)).collect();
+        let json = format!(r#"{{"patterns":[{{"name":"p","tracks":[{}]}}]}}"#, tracks.join(","));
+        let library = ordrumbox_core::Library::parse(&json).unwrap().0;
+        let pattern = &library.patterns[0];
+        for quarters in 4..=Scale::MAX.quarters() {
+            let scale = Scale::from_quarters(quarters);
+            for note_editor in [false, true] {
+                let shown = Shown { note_editor, ..Shown::grid_alone(false) };
+                let (width, height) = min_window_size(scale, shown);
+                assert!(height < min_window_size(scale, Shown::all(false)).1, "scale {scale}");
+                let body = Body::new(width, height, scale, 0, MIN_STATUS_LINES, false, note_editor);
+                let layout = Layout::new(body.main_w, body.editor_h, scale, pattern, MIN_STATUS_LINES, 0);
+                assert_eq!(layout.tracks, pattern.tracks.len(), "scale {scale}, note editor {note_editor}");
+                assert!(layout.bottom <= body.note.y.min(body.main_bottom) || !note_editor, "scale {scale}");
+            }
+        }
+    }
+
+    #[test]
     fn whole_scales_need_whole_multiples_of_the_smallest_window() {
-        let (w, h) = min_window_size(Scale::ONE, true);
-        assert_eq!(min_window_size(Scale::whole(2), true), (2 * w, 2 * h));
+        let (w, h) = min_window_size(Scale::ONE, Shown::all(true));
+        assert_eq!(min_window_size(Scale::whole(2), Shown::all(true)), (2 * w, 2 * h));
         // Without the output strip (a plugin) the layout needs less height.
-        assert!(min_window_size(Scale::ONE, false).1 < h);
+        assert!(min_window_size(Scale::ONE, Shown::all(false)).1 < h);
     }
 
     #[test]
@@ -1575,7 +1644,7 @@ mod tests {
             let scale = Scale::from_quarters(quarters);
             let c = header_controls(scale);
             let groups = c.groups(scale);
-            let (width, _) = min_window_size(scale, true);
+            let (width, _) = min_window_size(scale, Shown::all(true));
             let logo_end = margin(scale) + text_width("orDrumbox", header_text(scale));
             assert!(groups[0].x > logo_end, "scale {scale}: the logo");
             assert!(groups[3].x + groups[3].w <= width, "scale {scale}: the window's edge");
