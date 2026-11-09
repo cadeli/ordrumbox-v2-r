@@ -302,6 +302,39 @@ impl Editor {
         .unwrap_or(false)
     }
 
+    /// Set field `key` of notes of track `t`, each to its own value (`values`:
+    /// note index, value) as one edit named `desc`. With `coalesce`, a run of
+    /// them on the same field of the same track is one undo step: a lane of
+    /// the grid painted with the mouse.
+    pub fn set_note_values(
+        &mut self,
+        p: usize,
+        t: usize,
+        key: &str,
+        values: &[(usize, f64)],
+        desc: &str,
+        coalesce: bool,
+    ) -> bool {
+        let coalesce = coalesce.then(|| format!("notes:{p}:{t}:{key}"));
+        self.edit_track(
+            p,
+            t,
+            |_| desc.to_owned(),
+            coalesce,
+            |track| {
+                let mut changed = false;
+                for &(n, value) in values {
+                    let Some(note) = track.notes.get_mut(n) else { continue };
+                    let before = note.clone();
+                    note.set_field(key, &Value::Number(value));
+                    changed |= *note != before;
+                }
+                changed
+            },
+        )
+        .unwrap_or(false)
+    }
+
     /// Set note fields by JSON key; values of the wrong type
     /// are ignored. With `coalesce`, repeated edits of the same fields of the
     /// same note are one undo step.
@@ -1132,6 +1165,23 @@ mod tests {
         assert_eq!(e.history().undo_len(), 1);
         e.undo();
         assert_eq!(pattern(&e).tracks[0].volume, 1.0);
+    }
+
+    #[test]
+    fn a_painted_lane_is_one_step() {
+        let mut e = editor();
+        assert!(e.set_note_values(0, 0, "velocity", &[(0, 0.5)], "Edit velocity", true));
+        e.set_clock(Some(100.0));
+        assert!(e.set_note_values(0, 0, "velocity", &[(0, 0.4), (1, 0.3), (9, 1.0)], "Edit velocity", true));
+        assert!(e.set_note_values(0, 0, "retriggerCount", &[(1, 3.0)], "Edit retrigger", false));
+        let notes = &pattern(&e).tracks[0].notes;
+        assert_eq!((notes[0].velocity, notes[1].velocity, notes[1].retrigger_count), (0.4, 0.3, 3));
+        // The same values: no change, no step.
+        assert!(!e.set_note_values(0, 0, "velocity", &[(0, 0.4)], "Edit velocity", true));
+        assert_eq!(e.history().undo_len(), 2);
+        e.undo();
+        e.undo();
+        assert_eq!(pattern(&e).tracks[0].notes[1].velocity, 0.8);
     }
 
     #[test]

@@ -122,6 +122,9 @@ pub(crate) fn apply_note_properties(note: &mut Note, source: &Value) {
     if let Some(n) = num(source, "retriggerProbability") {
         note.retrigger_probability = n;
     }
+    if let Some(n) = num(source, "retriggerFade") {
+        note.retrigger_fade = n;
+    }
 }
 
 // ─── Velocity ────────────────────────────────────────────────────────────────

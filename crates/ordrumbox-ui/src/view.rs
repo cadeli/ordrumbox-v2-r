@@ -11,6 +11,7 @@ use ordrumbox_core::track::MAX_STEPS_PER_BEAT;
 use ordrumbox_core::{Note, Pattern, Track};
 
 use crate::canvas::{Canvas, Rgb, chars_in, small_cell, small_char_width, text_width};
+use crate::editors;
 use crate::font;
 use crate::frame::{body_top, content_top, footer_top, margin, status_line};
 use crate::menu;
@@ -18,8 +19,17 @@ use crate::output::{self, OutputLayout, OutputView};
 use crate::panel::{Rect, row_at};
 use ordrumbox_core::note::ACCENT_VELOCITY;
 
-/// Beats shown per page of the pattern grid (JS `BEATS_PER_PAGE`).
+/// The fewest beats a page of the pattern grid shows; a wide grid shows 8
+/// or 16 ([`page_beats`]).
 pub const BEATS_PER_PAGE: i32 = 4;
+/// The beats a page of the grid may show, the most first: whole measures of 4/4.
+const PAGE_BEATS: [i32; 3] = [16, 8, BEATS_PER_PAGE];
+/// The narrowest step, at scale 1, of a track of [`PAGE_STEPS_PER_BEAT`]
+/// steps per beat, for a page of more than [`BEATS_PER_PAGE`] beats.
+const MIN_STEP_WIDTH: i32 = 16;
+/// The steps per beat a page's width is reckoned for (the default): the
+/// beats of a page depend on the window only, not on the tracks.
+const PAGE_STEPS_PER_BEAT: i32 = 4;
 use crate::piano_roll::{self, RollLayout, RollView};
 use crate::song_view::{self, SongLayout, SongView};
 use crate::theme;
@@ -145,8 +155,13 @@ pub struct View<'a> {
     pub sounds: Vec<SoundLabel>,
     /// Width kept on the right (for the track editor).
     pub right: i32,
-    /// Current page of the pattern grid (BEATS_PER_PAGE beats).
+    /// Current page of the pattern grid ([`page_beats`] beats).
     pub current_page: usize,
+    /// The note editor is under the main editor (the grid, the piano roll).
+    pub note_editor: bool,
+    /// The track the lane under the grid shows, and the lane (an index in
+    /// `editors::LANES`).
+    pub lane: (Option<usize>, usize),
     /// Per-track levels (0–1) for the VU meter stripe, when playing.
     pub levels: Vec<f32>,
     /// Whether the VU meter stripe is shown.
@@ -373,6 +388,45 @@ const ADD_TRACK_GAP: i32 = 4;
 const RULER_HEIGHT: i32 = 12;
 /// The add-track button's label.
 const ADD_TRACK_LABEL: &str = "+ NEW TRACK";
+/// Height of a lane tab, the gap between two, per scale unit: the tabs stand
+/// one under the other left of the lane, which is as high as they are.
+const LANE_TAB_HEIGHT: i32 = 14;
+const LANE_TAB_GAP: i32 = 2;
+/// The gap between the add-track button and the lane, per scale unit.
+const LANE_GAP: i32 = 8;
+/// The tallest the lane's bars get, per scale unit: they take the room the
+/// rows leave, up to this.
+const MAX_LANE: i32 = 160;
+
+/// Height of the lane under the rows, per scale unit: its tabs, one under the other.
+const fn lane_height() -> i32 {
+    let tabs = editors::LANES.len() as i32;
+    tabs * LANE_TAB_HEIGHT + (tabs - 1) * LANE_TAB_GAP
+}
+
+/// The left edge of the grid's steps, `box_size` the size of its mute and
+/// solo boxes; and the name's, the volume slider's.
+fn grid_columns(left: i32, box_size: i32, scale: Scale) -> (i32, i32, i32) {
+    let name_x = left + 2 * (box_size + 3 * scale) + 4 * scale;
+    let volume_x = name_x + text_width(&"W".repeat(LABEL_CHARS), scale) + 6 * scale;
+    (name_x, volume_x, volume_x + VOLUME_WIDTH * scale + 8 * scale)
+}
+
+/// The beats a page of the grid shows in a main editor `width` wide: the
+/// most of [`PAGE_BEATS`] whose steps keep [`MIN_STEP_WIDTH`], else
+/// [`BEATS_PER_PAGE`]. The widest boxes are reckoned with, so that the
+/// count depends on the window only.
+#[must_use]
+pub fn page_beats(width: i32, scale: Scale) -> i32 {
+    let margin = margin(scale);
+    let (_, _, grid_left) = grid_columns(margin, MAX_BOX * scale, scale);
+    let grid_width = width - margin - grid_left;
+    let fits = |beats: i32| grid_width >= beats * PAGE_STEPS_PER_BEAT * MIN_STEP_WIDTH * scale;
+    PAGE_BEATS.into_iter().find(|&beats| fits(beats)).unwrap_or(BEATS_PER_PAGE)
+}
+
+/// The biggest mute or solo box, per scale unit.
+const MAX_BOX: i32 = 14;
 
 /// Where the track rows are.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -392,7 +446,12 @@ pub struct Layout {
     beats: i32,
     /// First beat shown on this page.
     start_beat: i32,
+    /// Beats a full page shows.
+    page_beats: i32,
     tracks: usize,
+    /// Top of the lane's bars under the rows (their bottom is `bottom`), the
+    /// tabs' top or higher.
+    lane_top: i32,
 }
 
 /// Text scale of the header (the 8 px font at 16 px per scale unit).
@@ -488,23 +547,26 @@ impl HeaderControls {
     }
 }
 
+/// The room between the main editor and the note editor under it, per scale unit.
+const NOTE_GAP: i32 = 14;
+
 /// Height of the output strip always shown along the bottom of the window.
 pub fn output_height(scale: Scale) -> i32 {
     output::STRIP_HEIGHT * scale
 }
 
-/// The height the track editor and its note editor take at most, at scale 1:
-/// the Generate tab's Advanced settings on a track in auto mode, under its simple
-/// part as tall as a drum track's compose view, under the sample bar (kept
-/// even without a sample). The note editor sits under it whatever the tab.
+/// The height the track editor takes at most, at scale 1: the Generate tab's
+/// Advanced settings on a track in auto mode, under its simple part as tall
+/// as a drum track's compose view, under the sample bar (kept even without a
+/// sample). The note editor is under the grid and the piano roll, not here.
 /// A test checks that every tab fits in it.
-pub const TRACK_EDITOR_HEIGHT: i32 = 577;
+pub const TRACK_EDITOR_HEIGHT: i32 = 431;
 
 /// The pixels the track editor's rows add up to beyond `TRACK_EDITOR_HEIGHT *
 /// scale` at a scale of an odd number of quarters (×1.25, ×1.75…): each row
 /// is rounded to the pixel on its own. A test checks every scale up to
 /// [`Scale::MAX`].
-const TRACK_EDITOR_ROUNDING: i32 = 11;
+const TRACK_EDITOR_ROUNDING: i32 = 8;
 
 /// The footer status lines the smallest window leaves room for.
 const MIN_STATUS_LINES: usize = 1;
@@ -518,15 +580,16 @@ pub fn min_window_size(scale: Scale, output: bool) -> (i32, i32) {
     let width = views[4].x + views[4].w + margin(scale);
     // `Body::new` places the editors' bottom at a fixed distance above the
     // window's bottom edge: at a height of 0 it is minus that distance.
-    let below = -Body::new(0, 0, scale, 0, MIN_STATUS_LINES, output).main_bottom;
+    let below = -Body::new(0, 0, scale, 0, MIN_STATUS_LINES, output, false).main_bottom;
     let rounding = if scale.quarters() % 2 == 1 { TRACK_EDITOR_ROUNDING } else { 0 };
     (width, body_top(scale) + TRACK_EDITOR_HEIGHT * scale + rounding + below)
 }
 
 /// How the window is split: one main editor (grid, piano roll, song, synth or
-/// the kit editor) in the top-left, the track editor down the right edge (shown
-/// or hidden), and the output panel as a full-width strip along the bottom
-/// (in the app; a plugin has none).
+/// the kit editor) in the top-left, under the grid and the piano roll the
+/// note editor, the track editor down the right edge (shown or hidden), and
+/// the output panel as a full-width strip along the bottom (in the app; a
+/// plugin has none).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Body {
     /// The main editor's width (the window minus the track editor).
@@ -536,8 +599,11 @@ pub struct Body {
     /// is the height whose `footer_top` lands just above the output strip —
     /// `height - margin/2 - output_height` — not the region's literal height.
     pub editor_h: i32,
-    /// The real bottom edge (y) shared by the main editor and the track editor.
+    /// The real bottom edge (y) shared by the main editor (its note editor
+    /// included) and the track editor.
     pub main_bottom: i32,
+    /// The note editor, under the main editor and as wide (0 high: none).
+    pub note: Rect,
     /// The output strip's bounds (full width).
     pub output: Rect,
 }
@@ -545,16 +611,33 @@ pub struct Body {
 impl Body {
     /// The split of a `width` × `height` window at `scale`, `right` pixels
     /// wide on the right for the track editor, with `status_lines` footer
-    /// lines; `output`: with the output strip (else it is 0 high).
-    pub fn new(width: i32, height: i32, scale: Scale, right: i32, status_lines: usize, output: bool) -> Self {
+    /// lines; `output`: with the output strip (else it is 0 high); `note`:
+    /// with the note editor under the main editor (the grid's, the piano roll's).
+    pub fn new(
+        width: i32,
+        height: i32,
+        scale: Scale,
+        right: i32,
+        status_lines: usize,
+        output: bool,
+        note: bool,
+    ) -> Self {
         let margin = margin(scale);
         let output_h = if output { output_height(scale) } else { 0 };
         let output_bottom = footer_top(height, scale, status_lines) - margin / 2;
         let output_top = output_bottom - output_h;
+        let main_bottom = output_top - margin / 2;
+        let main_w = (width - right).max(1);
+        // The note editor's card reaches a few pixels around it, as the
+        // track editor's do: the room above it keeps them apart.
+        let note_h = if note { editors::note_strip_height(scale) } else { 0 };
+        let above_note = if note { NOTE_GAP * scale } else { 0 };
+        let note_top = main_bottom - note_h;
         Self {
-            main_w: (width - right).max(1),
-            editor_h: height - margin / 2 - output_h,
-            main_bottom: output_top - margin / 2,
+            main_w,
+            editor_h: height - margin / 2 - output_h - note_h - above_note,
+            main_bottom,
+            note: Rect::new(margin, note_top, (main_w - 2 * margin).max(1), note_h),
             output: Rect::new(0, output_top, width, output_h),
         }
     }
@@ -568,19 +651,22 @@ impl Layout {
         let top = body_top(scale) + RULER_HEIGHT * scale;
         let bottom = footer_top(height, scale, status_lines) - margin / 2;
         let tracks = pattern.tracks.len();
-        // The rows share the height left above the add-track button.
-        let rows_h = bottom - top - (ADD_TRACK_HEIGHT + ADD_TRACK_GAP) * scale;
+        // The lane keeps the bottom of the grid; the rows share the height
+        // left above the add-track button, and the lane's bars take what
+        // the rows leave (its tabs stay at the bottom).
+        let tabs_top = bottom - lane_height() * scale;
+        let rows_h = tabs_top - LANE_GAP * scale - top - (ADD_TRACK_HEIGHT + ADD_TRACK_GAP) * scale;
         let row = (rows_h / tracks.max(1) as i32).clamp(10 * scale, MAX_ROW * scale);
-        let box_size = (row - 4 * scale).clamp(6 * scale, 14 * scale);
+        let box_size = (row - 4 * scale).clamp(6 * scale, MAX_BOX * scale);
         let left = margin;
-        let name_x = left + 2 * (box_size + 3 * scale) + 4 * scale;
-        let volume_x = name_x + text_width(&"W".repeat(LABEL_CHARS), scale) + 6 * scale;
-        let grid_left = volume_x + VOLUME_WIDTH * scale + 8 * scale;
-        // Pagination: BEATS_PER_PAGE beats per page (JS BEATS_PER_PAGE).
+        let (name_x, volume_x, grid_left) = grid_columns(left, box_size, scale);
+        let page_beats = page_beats(width, scale);
         let total_beats = pattern.beat_count.max(1);
-        let start_beat = (page as i32 * BEATS_PER_PAGE).min(total_beats - 1).max(0);
-        let beats = (total_beats - start_beat).clamp(1, BEATS_PER_PAGE);
+        let start_beat = (page as i32 * page_beats).min(total_beats - 1).max(0);
+        let beats = (total_beats - start_beat).clamp(1, page_beats);
         let shown = usize::try_from(rows_h.max(0) / row.max(1)).unwrap_or(0).min(tracks);
+        let under_rows = top + shown as i32 * row + (ADD_TRACK_GAP + ADD_TRACK_HEIGHT + LANE_GAP) * scale;
+        let lane_top = under_rows.max(bottom - MAX_LANE * scale).min(tabs_top);
         Self {
             scale,
             top,
@@ -594,8 +680,57 @@ impl Layout {
             grid_width: (width - margin - grid_left).max(1),
             beats,
             start_beat,
+            page_beats,
             tracks: shown,
+            lane_top,
         }
+    }
+
+    /// The lane's bars: under the steps, as wide as they are.
+    #[must_use]
+    pub fn lane_rect(&self) -> Rect {
+        Rect::new(self.grid_left, self.lane_top, self.grid_width, self.bottom - self.lane_top)
+    }
+
+    /// The tab of lane `lane`, left of the bars, as wide as the add-track
+    /// button; the tabs keep the bottom of the grid, whatever the bars' height.
+    #[must_use]
+    pub fn lane_tab_rect(&self, lane: usize) -> Rect {
+        let y = self.bottom - lane_height() * self.scale + lane as i32 * (LANE_TAB_HEIGHT + LANE_TAB_GAP) * self.scale;
+        let w = self.volume_x + VOLUME_WIDTH * self.scale - self.left;
+        Rect::new(self.left, y, w, LANE_TAB_HEIGHT * self.scale)
+    }
+
+    /// The step of the page (0: its first) of a track of `spb` steps per
+    /// beat whose bar is at `(x, y)`, if any.
+    #[must_use]
+    pub fn lane_step(&self, x: i32, y: i32, spb: i32) -> Option<i64> {
+        if !self.lane_rect().contains(x, y) {
+            return None;
+        }
+        let step = ((f64::from(x - self.grid_left) * f64::from(spb)) / self.beat_width()) as i64;
+        (step < i64::from(self.beats) * i64::from(spb)).then_some(step)
+    }
+
+    /// The step under `x` of a track of `spb` steps per beat, kept to the
+    /// page: where a drag along the lane is.
+    #[must_use]
+    pub fn lane_step_clamped(&self, x: i32, spb: i32) -> i64 {
+        let step = ((f64::from(x - self.grid_left) * f64::from(spb)) / self.beat_width()).floor() as i64;
+        step.clamp(0, (i64::from(self.beats) * i64::from(spb) - 1).max(0))
+    }
+
+    /// The fraction of the lane's height at `y`: 0 on its lowest pixel row, 1 on its top one.
+    #[must_use]
+    pub fn lane_fraction(&self, y: i32) -> f64 {
+        let h = (self.bottom - self.lane_top - 1).max(1);
+        (f64::from(self.bottom - 1 - y) / f64::from(h)).clamp(0.0, 1.0)
+    }
+
+    /// First beat of the page.
+    #[must_use]
+    pub const fn start_beat(&self) -> i32 {
+        self.start_beat
     }
 
     pub(crate) fn row_top(&self, track: usize) -> i32 {
@@ -697,7 +832,8 @@ impl Layout {
     }
 }
 
-fn steps_per_beat(track: &Track) -> i32 {
+/// The steps per beat the grid shows of `track`.
+pub(crate) fn steps_per_beat(track: &Track) -> i32 {
     track.steps_per_beat.clamp(1, MAX_STEPS_PER_BEAT)
 }
 
@@ -797,7 +933,15 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: Scale) {
 
     // The window split: one main editor top-left, the track editor down the
     // right, the output strip along the bottom.
-    let body = Body::new(canvas.width(), canvas.height(), scale, view.right, view.status.len(), view.output.is_some());
+    let body = Body::new(
+        canvas.width(),
+        canvas.height(),
+        scale,
+        view.right,
+        view.status.len(),
+        view.output.is_some(),
+        view.note_editor,
+    );
 
     // The main editor (top-left): exactly one of the song panel, the kit
     // editor, the synth editor (painted by the session), the piano roll, the grid.
@@ -839,7 +983,7 @@ fn draw_ruler(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layo
         every *= 2;
     }
     // The page, left of the ruler, when the pattern takes more than one.
-    let pages = (pattern.beat_count.max(1) as usize).div_ceil(BEATS_PER_PAGE as usize);
+    let pages = (pattern.beat_count.max(1) as usize).div_ceil(layout.page_beats as usize);
     if pages > 1 {
         let text = format!("page {}/{pages}", view.current_page + 1);
         canvas.text(layout.name_x, y, &text, scale, theme::muted());
@@ -959,10 +1103,61 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
         canvas.fill_rect(layout.left - 4 * scale, y - scale.px(), right - layout.left + 4 * scale, 2 * scale, ACCENT);
     }
 
+    draw_lane(canvas, pattern, view, layout);
+
     if let Some(fraction) = view.playhead {
         let x = layout.grid_left + (fraction.clamp(0.0, 1.0) * f64::from(layout.grid_width)) as i32;
         let height = (layout.tracks as i32 * layout.row).min(layout.bottom - layout.top) - gap;
         canvas.fill_rect(x - scale.px(), layout.top, 2 * scale, height, PLAYHEAD);
+        let lane = layout.lane_rect();
+        canvas.fill_rect(x - scale.px(), lane.y, 2 * scale, lane.h, PLAYHEAD);
+    }
+}
+
+/// The lane under the rows: a cell per step of the lane's track on the
+/// page, and in it a bar as high as the lane's setting of the step's notes,
+/// from the bottom, or from the middle for a setting either side of 0 (pan).
+/// Without a track, the lane is drawn empty.
+fn draw_lane(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layout) {
+    let scale = layout.scale;
+    let gap = scale.px();
+    let r = layout.lane_rect();
+    canvas.fill_rect(r.x - gap, r.y - gap, r.w + gap, r.h + 2 * gap, theme::panel());
+    let (lane_track, lane) = view.lane;
+    let track = lane_track.and_then(|t| Some((t, pattern.tracks.get(t)?)));
+    let spb = track.map_or(PAGE_STEPS_PER_BEAT, |(_, track)| steps_per_beat(track));
+    let steps = i64::from(layout.beats) * i64::from(spb);
+    let cell = |step: i64| {
+        let x = layout.step_x(step, spb);
+        (x, (layout.step_x(step + 1, spb) - x - gap).max(1))
+    };
+    for step in 0..steps {
+        let (x, w) = cell(step);
+        let color = if step % i64::from(spb) == 0 { cell_beat_color() } else { cell_color() };
+        canvas.fill_rect(x, r.y, w, r.h, color);
+    }
+    let Some((t, track)) = track else { return };
+    let Some(prop) = editors::LANES.get(lane).and_then(|(key, _)| editors::note_prop(key)) else { return };
+    let span = prop.max - prop.min;
+    if span <= 0.0 {
+        return;
+    }
+    let y_of = |v: f64| r.y + r.h - ((v.clamp(prop.min, prop.max) - prop.min) / span * f64::from(r.h)).round() as i32;
+    let base_y = y_of(if prop.min < 0.0 && prop.max > 0.0 { 0.0 } else { prop.min });
+    if base_y < r.y + r.h {
+        canvas.fill_rect(r.x, base_y, r.w, gap, theme::muted());
+    }
+    let start = i64::from(layout.start_beat) * i64::from(spb);
+    for (n, note) in track.notes.iter().enumerate() {
+        let local = absolute_step(note.beat, note.step, spb) - start;
+        if !(0..steps).contains(&local) {
+            continue;
+        }
+        let (x, w) = cell(local);
+        let y = y_of(editors::note_value(note, prop));
+        let (top, h) = if y < base_y { (y, base_y - y) } else { (base_y, y - base_y) };
+        let color = if view.selected == Some((t, n)) { SELECTED } else { theme::track(t) };
+        canvas.fill_rect(x + gap, top.min(r.y + r.h - 2 * gap), (w - 2 * gap).max(1), h.max(2 * gap), color);
     }
 }
 
@@ -990,17 +1185,31 @@ pub fn draw_tooltip_lines<S: AsRef<str>>(canvas: &mut Canvas, lines: &[S], cell:
 /// How opaque a toast's background is (0–255): the window shows through.
 const TOAST_OPACITY: u8 = 190;
 
+/// Where the toast of `message` goes in a window `width` wide, its lower
+/// edge at `bottom`, and the text it shows.
+fn toast_layout(width: i32, message: &str, bottom: i32, scale: Scale) -> (Rect, String) {
+    let big = scale.times(2);
+    let (margin, pad_x, pad_y) = (margin(scale), 24 * scale, 12 * scale);
+    let room = width - 2 * margin - 2 * pad_x;
+    let text: String = message.chars().take(chars_in(room, big)).collect();
+    let w = (text_width(&text, big) + 2 * pad_x).max((320 * scale).min(width - 2 * margin));
+    let h = font::SIZE * big + 2 * pad_y;
+    (Rect::new((width - w) / 2, bottom - h, w, h), text)
+}
+
+/// The rectangle of the toast of `message` (a click on it hides it).
+#[must_use]
+pub fn toast_rect(width: i32, message: &str, bottom: i32, scale: Scale) -> Rect {
+    toast_layout(width, message, bottom, scale).0
+}
+
 /// A new message as a toast centred over the bottom of the window, in a
 /// larger font, its lower edge at `bottom`: over the rest, so that nothing
 /// moves.
 pub fn draw_toast(canvas: &mut Canvas, message: &str, bottom: i32, scale: Scale) {
     let big = scale.times(2);
-    let (margin, pad_x, pad_y, border) = (margin(scale), 24 * scale, 12 * scale, scale.px());
-    let room = canvas.width() - 2 * margin - 2 * pad_x;
-    let text: String = message.chars().take(chars_in(room, big)).collect();
-    let w = (text_width(&text, big) + 2 * pad_x).max((320 * scale).min(canvas.width() - 2 * margin));
-    let h = font::SIZE * big + 2 * pad_y;
-    let (x, y) = ((canvas.width() - w) / 2, bottom - h);
+    let (pad_y, border) = (12 * scale, scale.px());
+    let (Rect { x, y, w, h }, text) = toast_layout(canvas.width(), message, bottom, scale);
     // Each pixel shaded once, so that the window shows through evenly.
     canvas.shade_rect(x + border, y + border, w - 2 * border, h - 2 * border, theme::panel(), TOAST_OPACITY);
     let side = h - 2 * border;
@@ -1333,6 +1542,16 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_wide_grid_shows_more_beats_a_page() {
+        let one = Scale::ONE;
+        assert_eq!(page_beats(500, one), BEATS_PER_PAGE);
+        assert_eq!(page_beats(900, one), 8);
+        assert_eq!(page_beats(1600, one), 16);
+        assert_eq!(page_beats(1600, Scale::whole(2)), 8, "the same steps at twice the scale");
+        assert!(page_beats(-10, one) == BEATS_PER_PAGE);
+    }
+
+    #[test]
     fn whole_scales_need_whole_multiples_of_the_smallest_window() {
         let (w, h) = min_window_size(Scale::ONE, true);
         assert_eq!(min_window_size(Scale::whole(2), true), (2 * w, 2 * h));
@@ -1404,6 +1623,8 @@ mod tests {
                 synth: false,
                 right: 300,
                 current_page: 0,
+                lane: (None, 0),
+                note_editor: true,
                 levels: vec![0.0; 2],
                 show_vus: true,
                 tempo_label: "BPM",
@@ -1461,7 +1682,7 @@ mod tests {
             for (w, h) in [(1100, 680), (1280, 800)] {
                 for status in [0, 1, 3] {
                     for right in [0, 300 * scale] {
-                        let body = Body::new(w, h, scale, right, status, true);
+                        let body = Body::new(w, h, scale, right, status, true, true);
                         assert_eq!(body.main_w, w - right);
                         // The strip's bottom edge is the footer's top, less a margin.
                         assert_eq!(body.output.y + body.output.h, footer_top(h, scale, status) - margin(scale) / 2);
@@ -1470,12 +1691,16 @@ mod tests {
                         // The editor height is virtual: a layout built with it
                         // (and the real status count) ends exactly at main_bottom.
                         let grid = Layout::new(body.main_w, body.editor_h, scale, pattern, status, 0);
-                        assert_eq!(grid.bottom, body.main_bottom);
+                        assert_eq!(grid.bottom, body.note.y - NOTE_GAP * scale);
+                        assert_eq!(body.note.y + body.note.h, body.main_bottom);
+                        let alone = Body::new(w, h, scale, right, status, true, false);
+                        let grid = Layout::new(alone.main_w, alone.editor_h, scale, pattern, status, 0);
+                        assert_eq!((grid.bottom, alone.note.h), (body.main_bottom, 0));
                         // Without the strip (a plugin), the same down to where it was.
-                        let bare = Body::new(w, h, scale, right, status, false);
+                        let bare = Body::new(w, h, scale, right, status, false, true);
                         assert_eq!((bare.output.h, bare.main_bottom), (0, body.main_bottom + body.output.h));
                         let grid = Layout::new(bare.main_w, bare.editor_h, scale, pattern, status, 0);
-                        assert_eq!(grid.bottom, bare.main_bottom);
+                        assert_eq!(grid.bottom, bare.note.y - NOTE_GAP * scale);
                     }
                 }
             }

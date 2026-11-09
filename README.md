@@ -108,6 +108,18 @@ channels, the tracks left take keys of channel 10 from 84 up.
   the same pitches.
 Building with `vst3` links GPLv3 bindings; the CLAP build stays MIT.
 
+## The grid
+
+One row per track, a page of beats across: 4 beats, or 8 or 16 when the window is wide
+enough for steps of a usable size. Under the rows, the **lane** shows one setting of the
+track editor's track, a bar per note: **VELOCITY**, **CHANCE** (its probability), **RETRIG**
+(how many times it plays) or **PAN**, picked by the tabs on its left. Click a bar to set
+its value at that height, or drag across the bars to draw them; a drag is one undo step.
+
+The **note editor** (the selected note's velocity, pitch, pan, trigger, retrigger,
+euclidean and arpeggio settings) is a strip under the grid and under the piano roll, the
+views that edit notes. The track editor, on the right, holds the track's settings only.
+
 ## Keys
 
 Press **F1** in the app for the full keyboard shortcut list. Common keys:
@@ -165,6 +177,12 @@ A track's delay is now set up (time, mode, feedback) even when its amount is 0, 
 the strip has a `reverb_on` and a `delay_on` flag (0 for the `none` types), so that a
 plugin host can raise an effect the pattern leaves silent. This rewrote
 `mapping_rust.txt` (engine); the audio renders are unchanged.
+
+A retrigger now fades: a note's `retriggerFade` (0–1, 0.6 by default, the Fade slider of
+the note editor's Retrigger tab) lowers each repeat's velocity by `fade × i / count`, so
+at 1 the repeats step down towards silence and at 0 they all play at the note's
+velocity. Arpeggio notes and euclidean fills do not fade. Saved notes without the key
+take 0.6. This rewrote `flat_notes_rust.txt` (core) and `midi_rust.txt` (logic).
 
 ## License
 

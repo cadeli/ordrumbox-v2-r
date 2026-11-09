@@ -142,7 +142,7 @@ impl Session {
         // The window split: the main editor top-left, the track editor down the
         // right, the output strip along the bottom (always shown).
         let right = self.track_editor_width(width, scale);
-        let body = view::Body::new(width, height, scale, right, self.status.len(), !self.hosted);
+        let body = self.body((width, height, scale));
         layout.right = right;
         // The track editor, always down the right edge (when shown).
         if right > 0 {
@@ -157,21 +157,21 @@ impl Session {
                 let (x, w) = (back.x + 4 * s, back.w - 8 * s);
                 Item::new(None, Rect::new(x, from - 3 * s, w, to - from + 5 * s), Kind::Card)
             };
-            match self.editor_track().and_then(|t| Some((t, self.track_view(t)?))) {
-                Some((t, view)) => {
-                    let (items, y) = editors::track_editor(&view, &self.editors, area, scale);
-                    layout.items.push(card(top, y));
-                    layout.items.extend(items);
-                    let note = self.note_view(t);
-                    let note_top = y + 10 * s;
-                    layout.items.push(card(note_top, bottom));
-                    let area = Rect::new(area.x, note_top, area.w, bottom - note_top);
-                    layout.items.extend(editors::note_editor(&note, &self.editors, area, scale));
-                }
-                None => {
-                    layout.items.push(card(top, bottom));
-                    layout.items.push(Item::text(area.x, area.y, "No track", panel::dim(), s));
-                }
+            layout.items.push(card(top, bottom));
+            match self.editor_track().and_then(|t| self.track_view(t)) {
+                Some(view) => layout.items.extend(editors::track_editor(&view, &self.editors, area, scale).0),
+                None => layout.items.push(Item::text(area.x, area.y, "No track", panel::dim(), s)),
+            }
+        }
+        // The note editor, under the grid or the piano roll, in a card of its own.
+        if body.note.h > 0 {
+            let r = body.note;
+            let pad = 6 * s;
+            let back = Rect::new(r.x - pad, r.y - 4 * s, r.w + 2 * pad, r.h + 6 * s);
+            layout.items.push(Item::new(None, back, Kind::Card));
+            match self.editor_track() {
+                Some(t) => layout.items.extend(editors::note_editor(&self.note_view(t), &self.editors, r, scale)),
+                None => layout.items.push(Item::text(r.x, r.y, "No note", panel::dim(), s)),
             }
         }
         // The output strip along the bottom, in the app only.
@@ -199,6 +199,10 @@ impl Session {
         } else if let Some(pattern) = self.pattern() {
             let grid =
                 Layout::new(body.main_w, body.editor_h, scale, pattern, self.status.len(), self.chrome.current_page);
+            for (i, (_, label)) in editors::LANES.iter().enumerate() {
+                let kind = Kind::Tab { label: (*label).to_owned(), active: usize::from(self.editors.lane) == i };
+                layout.items.push(Item::new(Some(Id::Lane(i as u8)), grid.lane_tab_rect(i), kind));
+            }
             let spec = Spec::slider(0.0, 1.0, 0.01, 1.0);
             for (t, track) in pattern.tracks.iter().enumerate().take(grid.tracks()) {
                 let kind = Kind::Value { spec, value: track.volume, label: None, text: String::new(), lfo: false };
@@ -490,7 +494,7 @@ mod tests {
         let mut tallest = 0;
         for scale in (Scale::ONE.quarters()..=Scale::MAX.quarters()).map(Scale::from_quarters) {
             let (width, height) = view::min_window_size(scale, true);
-            let body = view::Body::new(width, height, scale, s.track_editor_width(width, scale), 1, true);
+            let body = view::Body::new(width, height, scale, s.track_editor_width(width, scale), 1, true, true);
             for (track, tab, sub, note_tab, advanced) in (0..2).flat_map(|t| {
                 (0..6u8).flat_map(move |tab| {
                     (0..5u8).flat_map(move |sub| (0..5u8).flat_map(move |n| [false, true].map(|a| (t, tab, sub, n, a))))
@@ -511,6 +515,16 @@ mod tests {
                 assert!(bottom <= body.main_bottom, "scale {scale} tab {tab}/{sub} note tab {note_tab}: {bottom}");
                 if scale == Scale::ONE {
                     tallest = tallest.max(bottom - frame::body_top(scale));
+                }
+                // The note editor, under the grid: inside its strip.
+                let strip = body.note;
+                for item in layout.items.iter().filter(|i| i.rect.x < width - layout.right && i.rect.y >= strip.y) {
+                    if matches!(item.kind, Kind::Panel | Kind::Card) || item.rect.y >= body.output.y {
+                        continue;
+                    }
+                    let r = item.rect;
+                    assert!(r.y + r.h <= body.main_bottom, "scale {scale} note tab {note_tab}: {r:?}");
+                    assert!(r.x + r.w <= strip.x + strip.w, "scale {scale} note tab {note_tab}: {r:?}");
                 }
             }
             let views = view::header_controls(scale).views;

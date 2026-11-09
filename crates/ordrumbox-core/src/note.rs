@@ -43,6 +43,10 @@ json_record! {
         arp: Value = Value::Null => "arp",
         /// Probability of each arpeggio/retrigger hit, 0–1.
         retrigger_probability: f64 = 1.0 => "retriggerProbability" | "arpTriggerProbability",
+        /// How the repeats of a retrigger fade, 0–1: 0 plays them all at the
+        /// note's velocity, 1 lowers them evenly towards silence
+        /// ([`Note::retrigger_gain`]). Not applied to arpeggio notes.
+        retrigger_fade: f64 = 0.6 => "retriggerFade",
         /// Euclidean pulses over the span to the next note, base note included (0 = off).
         euclidean_pulses: i32 = 0 => "euclideanPulses" | "euclideanFill",
         /// Rotation of the euclidean pattern, in steps.
@@ -67,7 +71,7 @@ json_record! {
 const STEP_PERCENT_KEY: &str = "stepPercent";
 
 /// Keys written rounded to 2 decimals (`NOTE_ROUND_2D`).
-const ROUND_2D: [&str; 4] = ["velocity", "pan", "probability", "retriggerRate"];
+const ROUND_2D: [&str; 5] = ["velocity", "pan", "probability", "retriggerRate", "retriggerFade"];
 
 impl Note {
     /// A note from its object form (`{"beat": 1, "velocity": 0.5}`). Unknown
@@ -95,6 +99,16 @@ impl Note {
         } else if self.set_field(key, value) == SetField::WrongType {
             issues.push(Issue::new(format!("{at}.{key}"), format!("wrong type ({}), default kept", value.to_json())));
         }
+    }
+
+    /// The velocity factor of hit `i` of the note's retrigger (0 is the note
+    /// itself): `1 - fade * i / count`, so with a fade of 1 the hits step
+    /// down evenly towards the silence that would follow the last one.
+    #[must_use]
+    pub fn retrigger_gain(&self, i: usize) -> f64 {
+        let count = self.retrigger_count.max(1);
+        let fade = self.retrigger_fade.clamp(0.0, 1.0);
+        1.0 - fade * i as f64 / f64::from(count)
     }
 
     /// `stepPercent` at `steps_per_beat` steps per beat.
@@ -277,6 +291,7 @@ mod tests {
                 "retriggerCount",
                 "arp",
                 "retriggerProbability",
+                "retriggerFade",
                 "euclideanPulses",
                 "euclideanRotation",
                 "cycleOffset",

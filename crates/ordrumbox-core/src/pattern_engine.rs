@@ -158,6 +158,10 @@ struct NoteContext<'a> {
 
 impl NoteContext<'_> {
     fn push(&self, flat: &mut Hits, tick: i64, pitch_offset: f64) {
+        self.push_at(flat, tick, pitch_offset, self.note.velocity);
+    }
+
+    fn push_at(&self, flat: &mut Hits, tick: i64, pitch_offset: f64, velocity: f64) {
         let Ok(tick) = u32::try_from(tick) else { return }; // before the pattern start
         flat.entry(tick).or_default().push(Hit {
             track: self.track_index,
@@ -165,7 +169,7 @@ impl NoteContext<'_> {
             beat: self.note.beat,
             step: self.note.step,
             pitch: self.note.pitch + pitch_offset,
-            velocity: self.note.velocity,
+            velocity,
             pan: self.note.pan,
         });
     }
@@ -180,7 +184,8 @@ impl NoteContext<'_> {
 
     /// The note sounding at absolute step `at` and its repeats, or its
     /// arpeggio. Every arpeggio note, the first included, and every repeat
-    /// after the first pass `arpTriggerProbability`.
+    /// after the first pass `arpTriggerProbability`; the repeats fade by
+    /// `retriggerFade`.
     fn add_sub_notes(&self, flat: &mut Hits, at: i64, rng: &mut Rng) {
         let note = self.note;
         let trigger = note.retrigger_probability;
@@ -198,7 +203,7 @@ impl NoteContext<'_> {
             for i in 1..note.retrigger_count.max(1) as usize {
                 let tick = self.repeat_tick(at, i);
                 if tick < self.pattern_ticks && rng.chance(trigger) {
-                    self.push(flat, tick, 0.0);
+                    self.push_at(flat, tick, 0.0, note.velocity * note.retrigger_gain(i));
                 }
             }
         }
@@ -268,6 +273,21 @@ mod tests {
         assert_eq!(ticks(&p, 0), [(0, 0.0), (24, 0.0), (48, 0.0), (72, 0.0)]);
         let p = pattern(r#"{"tracks":[{"notes":[{"retriggerCount":3,"rate":4}]}]}"#);
         assert_eq!(ticks(&p, 0), [(0, 0.0), (12, 0.0), (24, 0.0)]);
+    }
+
+    #[test]
+    fn repeats_fade_towards_silence() {
+        let velocities = |text: &str| {
+            let p = pattern(text);
+            let flat = expand_hits(&p, 0, &mut Rng::new(0), &Scales::default());
+            flat.values().flatten().map(|hit| (hit.velocity * 100.0).round() / 100.0).collect::<Vec<_>>()
+        };
+        let notes = r#"{"tracks":[{"notes":[{"velocity":1,"retriggerCount":4,"rate":8"#;
+        assert_eq!(velocities(&format!("{notes}}}]}}]}}")), [1.0, 0.85, 0.7, 0.55]);
+        assert_eq!(velocities(&format!(r#"{notes},"retriggerFade":0}}]}}]}}"#)), [1.0; 4]);
+        assert_eq!(velocities(&format!(r#"{notes},"retriggerFade":1}}]}}]}}"#)), [1.0, 0.75, 0.5, 0.25]);
+        // An arpeggio does not fade.
+        assert_eq!(velocities(&format!(r#"{notes},"arp":[0,4]}}]}}]}}"#)), [1.0; 4]);
     }
 
     #[test]
