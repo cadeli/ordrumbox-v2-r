@@ -169,6 +169,28 @@ impl Session {
         self.message = format!("compacted {count} track{}", if count == 1 { "" } else { "s" });
     }
 
+    /// Pattern > Clear pattern: every track's notes removed, the tracks and
+    /// their attributes kept.
+    pub fn clear_pattern(&mut self) {
+        let has_notes = self.pattern().is_some_and(|p| p.tracks.iter().any(|t| !t.notes.is_empty()));
+        if has_notes {
+            self.undoable(Self::clear_pattern_now);
+        } else {
+            self.clear_pattern_now();
+        }
+    }
+
+    fn clear_pattern_now(&mut self) {
+        if !self.pattern().is_some_and(|p| p.tracks.iter().any(|t| !t.notes.is_empty())) {
+            self.message = "No notes to clear".into();
+            return;
+        }
+        self.editor.clean_pattern(self.pattern_index);
+        self.selection.selected = None;
+        self.clamp_selection();
+        self.edited();
+        self.message = "Cleared notes".into();
+    }
     /// Clear the cursor step (Ctrl+Z undoes it).
     pub fn delete_step(&mut self) {
         if self.selection.cursor.is_some() {
@@ -303,7 +325,16 @@ impl Session {
     }
 
     pub fn new_pattern(&mut self) {
-        self.pattern_index = self.editor.add_pattern(None);
+        let names = ["KICK", "SNARE", "CHH", "OHH", "CYM", "HTOM", "LTOM", "CLAP"];
+        let next = self.editor.library().patterns.len();
+        let name = format!("NewPat_{next}");
+        self.pattern_index = self.editor.batch(&format!("Add pattern \"{}\"", name), |editor| {
+            let p = editor.add_pattern(Some(&name));
+            for track in names {
+                editor.add_track(p, track, 4);
+            }
+            p
+        });
         self.deselect();
         self.edited();
         self.chrome.current_page = 0;

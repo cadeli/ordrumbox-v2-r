@@ -216,15 +216,11 @@ fn space_in_the_song_view_plays_the_song() {
 fn a_pattern_built_in_the_grid_is_saved_reloaded_and_exported() {
     let (mut s, _audio) = session(r#"{"patterns":[{"name":"demo","tracks":[{"name":"KICK","notes":[{}]}]}]}"#);
 
-    // T1: a new pattern, 4 tracks, 8 beats at 100 bpm, notes clicked in, T2 soloed.
+    // T1: a new pattern (its 8 tracks), 8 beats at 100 bpm, notes clicked in, SNARE soloed.
     s.new_pattern();
     assert_eq!(s.pattern_index, 1);
-    // (The length first: a track keeps the loop point it was made with.)
     s.set_length(8);
     s.set_tempo(100.0);
-    for t in 1..=4 {
-        s.add_track_named(&format!("T{t}"));
-    }
     let notes: [(usize, &[i32]); 3] = [(0, &[0, 2, 4, 6]), (1, &[1, 5]), (2, &[3])];
     for (track, beats) in notes {
         for &beat in beats {
@@ -235,9 +231,9 @@ fn a_pattern_built_in_the_grid_is_saved_reloaded_and_exported() {
     let pattern = s.pattern().unwrap().clone();
     assert_eq!((pattern.beat_count, s.editor.library().bpm), (8, 100.0));
     let names: Vec<&str> = pattern.tracks.iter().map(|t| t.name.as_str()).collect();
-    assert_eq!(names, ["T1", "T2", "T3", "T4"]);
+    assert_eq!(names, ["KICK", "SNARE", "CHH", "OHH", "CYM", "HTOM", "LTOM", "CLAP"]);
     let counts: Vec<usize> = pattern.tracks.iter().map(|t| t.notes.len()).collect();
-    assert_eq!(counts, [4, 2, 1, 0]);
+    assert_eq!(counts, [4, 2, 1, 0, 0, 0, 0, 0]);
     assert!(pattern.tracks[1].solo);
 
     // T2: saved and loaded again, nothing lost.
@@ -254,7 +250,7 @@ fn a_pattern_built_in_the_grid_is_saved_reloaded_and_exported() {
     let bytes = midi::export(&pattern, s.editor.library().bpm, 1, &[], &mut Rng::new(1), &Scales::default());
     let file = smf::parse(&bytes);
     assert_eq!((file.header.format, file.header.track_count, file.header.division), (1, 2, PPQN as u16));
-    assert_eq!(file.track_names, ["orDrumbox Pattern", "T2"]);
+    assert_eq!(file.track_names, ["orDrumbox Pattern", "SNARE"]);
     let meta = |kind: u8| {
         file.tracks[0].iter().find_map(|e| match &e.kind {
             smf::EventKind::Meta { meta_type: Some(t), data } if *t == kind => Some(data.clone()),

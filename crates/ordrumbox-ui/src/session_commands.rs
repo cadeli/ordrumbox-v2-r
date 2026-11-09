@@ -122,6 +122,7 @@ impl Session {
             C::NextGrid => self.next_grid(),
             C::ShortenLoop => self.shorten_loop(),
             C::CompactTracks => self.compact_tracks(),
+            C::ClearPattern => self.clear_pattern(),
             C::GeneratePattern => self.regenerate_pattern(),
             C::GenerateDrums => self.toggle_generation(None),
             C::GenerateBass => self.toggle_generation(Some(MelodicKind::Bass)),

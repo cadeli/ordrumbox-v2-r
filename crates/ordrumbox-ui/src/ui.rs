@@ -151,8 +151,9 @@ impl Ui {
         let animating = playing || self.session.synth_animating();
         self.session.note_message();
         let now = Instant::now();
-        // A new message's band goes when its time is over.
-        redraw |= animating || self.session.end_flash(now);
+        // A toast goes when its time is over, playing or not: checked first,
+        // so `animating` cannot skip it.
+        redraw |= self.session.end_flash(now) || animating;
         let wake_at = if animating {
             Some(now + FRAME)
         } else {
@@ -399,36 +400,44 @@ impl Ui {
             }
             return true;
         }
-        if self.widget_key(event, shift || alt, control) {
-            return true;
-        }
         // A plugin's Alt stands for the Ctrl/Cmd the host keeps (the menus say Alt+…).
         let command_key = control || (alt && self.session.hosted());
-        if let Some(command) = shortcut(code, shift, command_key) {
-            // A command a plugin leaves to the host leaves it its key too.
-            if self.session.hosted() && command.hosted_refusal().is_some() {
-                return false;
-            }
-            self.session.run(command);
+        // The keys of the rows (1-9 mute, Q-P hear) are read by their place, a
+        // keyboard of its own on every layout; every other key is the one the
+        // layout marks. The kit editor keeps its own letters (N, R, E).
+        let layout = event.layout_key();
+        let kit_letter = self.session.kit_editor_open() && matches!(layout, Key::Letter('N' | 'R' | 'E'));
+        let row_key = !command_key && !kit_letter && (ROW_DIGITS.contains(&code) || ROW_LETTERS.contains(&code));
+        let key = if row_key { code } else { layout };
+        if self.widget_key(event, key, shift || alt, control) {
             return true;
         }
         let s = &mut self.session;
+        if let Some(row) = ROW_DIGITS.iter().position(|&k| k == code).filter(|_| row_key) {
+            s.toggle_row(row, if shift { "solo" } else { "mute" });
+            return true;
+        }
+        if let Some(row) = ROW_LETTERS.iter().position(|&k| k == code).filter(|_| row_key) {
+            s.audition_row(row);
+            return true;
+        }
+        if let Some(command) = shortcut(key, shift, command_key) {
+            // A command a plugin leaves to the host leaves it its key too.
+            if s.hosted() && command.hosted_refusal().is_some() {
+                return false;
+            }
+            s.run(command);
+            return true;
+        }
         if command_key {
             return false;
         }
-        if let Some(hint) = shift_hint(code).filter(|_| !shift && !s.kit_editor_open()) {
+        if let Some(hint) = shift_hint(key).filter(|_| !shift && !s.kit_editor_open()) {
             s.say(hint);
             return true;
         }
-        // Mute (1-9) and hear (Q-P) a track in every view, as in the JS; the
-        // kit editor keeps its own letters (N, R, E).
-        let kit_letter = s.kit_editor_open() && matches!(code, Key::Letter('N' | 'R' | 'E'));
-        if let Some(row) = ROW_DIGITS.iter().position(|&k| k == code) {
-            s.toggle_row(row, if shift { "solo" } else { "mute" });
-        } else if let Some(row) = ROW_LETTERS.iter().position(|&k| k == code).filter(|_| !kit_letter) {
-            s.audition_row(row);
-        } else if s.kit_editor_open() {
-            match code {
+        if s.kit_editor_open() {
+            match key {
                 Key::Escape => s.toggle_kit_editor(),
                 Key::ArrowUp => s.kit_select(-1),
                 Key::ArrowDown => s.kit_select(1),
@@ -439,12 +448,12 @@ impl Ui {
                 _ => return false,
             }
         } else if s.synth_open() {
-            match code {
+            match key {
                 Key::Escape => s.toggle_synth(),
                 _ => return false,
             }
         } else if s.piano_roll_open() {
-            match code {
+            match key {
                 Key::Escape => s.roll_escape(),
                 Key::ArrowLeft => s.roll_arrow(Move::Left, shift),
                 Key::ArrowRight => s.roll_arrow(Move::Right, shift),
@@ -455,7 +464,7 @@ impl Ui {
                 _ => return false,
             }
         } else if s.song_view_open() {
-            match code {
+            match key {
                 Key::Escape => s.toggle_song_view(),
                 Key::ArrowLeft => s.move_song_cursor(-1),
                 Key::ArrowRight => s.move_song_cursor(1),
@@ -466,7 +475,7 @@ impl Ui {
         } else {
             let tempo = if shift { 10.0 } else { 1.0 };
             let tempo_keys = !s.hosted();
-            match code {
+            match key {
                 Key::Minus | Key::NumpadSubtract if tempo_keys => s.step_tempo(-tempo),
                 Key::Equal | Key::NumpadAdd if tempo_keys => s.step_tempo(tempo),
                 Key::ArrowLeft if shift => s.nudge(Move::Left),
@@ -489,9 +498,9 @@ impl Ui {
     /// Keys for the editors' widgets: an open list or number entry takes
     /// them all; a focused knob, slider, select or button its own; Tab moves
     /// the focus. Whether the key was theirs.
-    fn widget_key(&mut self, event: &KeyEvent, fine: bool, control: bool) -> bool {
+    fn widget_key(&mut self, event: &KeyEvent, key: Key, fine: bool, control: bool) -> bool {
         let size = self.size();
-        let key = match event.key {
+        let key = match key {
             Key::ArrowUp => Some(PanelKey::Up),
             Key::ArrowDown => Some(PanelKey::Down),
             Key::ArrowLeft => Some(PanelKey::Left),
@@ -633,6 +642,7 @@ fn shortcut(code: Key, shift: bool, control: bool) -> Option<Command> {
             Key::Letter('B') => C::GeneratePattern,
             Key::Letter('F') => C::SelectRandomPattern,
             // What changes every track wants Shift: a slip off the play keys (Q-P, 1-9) does nothing.
+            // No letter that some layout puts on the play keys (A and Z on AZERTY).
             Key::Letter('G') if shift => C::SelectRandomDrumkit,
             Key::Letter('V') => C::ToggleVus,
             Key::Letter('C') => C::NextColorScheme,
@@ -641,8 +651,6 @@ fn shortcut(code: Key, shift: bool, control: bool) -> Option<Command> {
             Key::Letter('K') if shift => C::RandomSamples,
             Key::Letter('D') => C::GenerateDrums,
             Key::Letter('S') => C::GenerateBass,
-            Key::Letter('A') => C::GenerateChords,
-            Key::Letter('Z') => C::TrackAuto,
             Key::Letter('X') => C::RandomTrack,
             Key::Letter('L') => C::ToggleAccent,
             _ => return None,
@@ -658,7 +666,8 @@ mod tests {
     fn shortcuts_follow_the_command_modifier() {
         assert_eq!(shortcut(Key::Letter('Z'), false, true), Some(Command::Undo));
         assert_eq!(shortcut(Key::Letter('Z'), true, true), Some(Command::Redo));
-        assert_eq!(shortcut(Key::Letter('Z'), false, false), Some(Command::TrackAuto));
+        assert_eq!(shortcut(Key::Letter('Z'), false, false), None, "on the play keys of AZERTY");
+        assert_eq!(shortcut(Key::Letter('A'), false, false), None, "on the play keys of AZERTY");
         // Only the main row's minus changes the length; the keypad's zooms.
         assert_eq!(shortcut(Key::Minus, false, true), Some(Command::LengthDown));
         assert_eq!(shortcut(Key::NumpadSubtract, false, true), Some(Command::ZoomOut));
@@ -677,6 +686,26 @@ mod tests {
             assert_eq!(shortcut(Key::Letter(letter), false, false), None, "{letter} alone");
             assert!(shift_hint(Key::Letter(letter)).is_some(), "{letter} says to hold Shift");
         }
+    }
+
+    #[test]
+    fn the_play_rows_stay_put_and_other_keys_follow_the_layout() {
+        let library =
+            ordrumbox_core::Library::parse(r#"{"patterns":[{"name":"demo","tracks":[{"name":"KICK"}]}]}"#).unwrap().0;
+        let mut ui = Ui::new(Session::for_tests(library, false));
+        let press = |key, c| KeyEvent { key, pressed: true, repeat: false, text: None, unmodified: Some(c) };
+        let bpm = ui.session.tempo();
+        let beats = ui.session.pattern().unwrap().beat_count;
+        // AZERTY's `-` is on the 6: alone, it mutes track 6; with Ctrl, it shortens the pattern.
+        assert!(ui.key(&press(Key::Digit(6), '-')));
+        assert_eq!(ui.session.tempo(), bpm);
+        ui.set_modifiers(Modifiers { control: true, ..Modifiers::default() });
+        assert!(ui.key(&press(Key::Digit(6), '-')));
+        assert_eq!(ui.session.pattern().unwrap().beat_count, beats - 1);
+        // QWERTZ's `-`, in the place of `/`: the tempo.
+        ui.set_modifiers(Modifiers::default());
+        assert!(ui.key(&press(Key::Other, '-')));
+        assert_eq!(ui.session.tempo(), bpm - 1.0);
     }
 
     #[test]
@@ -708,7 +737,7 @@ mod tests {
         let library =
             ordrumbox_core::Library::parse(r#"{"patterns":[{"name":"demo","tracks":[{"name":"KICK"}]}]}"#).unwrap().0;
         let session = |hosted| Session::for_tests(library.clone(), hosted);
-        let press = |key| KeyEvent { key, pressed: true, repeat: false, text: None };
+        let press = |key| KeyEvent { key, pressed: true, repeat: false, text: None, unmodified: None };
         let command = Modifiers { logo: true, ..Modifiers::default() };
 
         let mut app = Ui::new(session(false));
@@ -752,7 +781,7 @@ mod tests {
         let library =
             ordrumbox_core::Library::parse(r#"{"patterns":[{"name":"demo","tracks":[{"name":"KICK"}]}]}"#).unwrap().0;
         let mut ui = Ui::new(Session::for_tests(library, false));
-        let alt = |pressed| KeyEvent { key: Key::Alt, pressed, repeat: false, text: None };
+        let alt = |pressed| KeyEvent { key: Key::Alt, pressed, repeat: false, text: None, unmodified: None };
 
         ui.key(&alt(true));
         assert!(ui.key(&alt(false)));

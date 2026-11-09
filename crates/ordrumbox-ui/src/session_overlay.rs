@@ -5,7 +5,7 @@ use super::*;
 use crate::scale::Scale;
 
 /// Every key, for Help > Keyboard shortcuts.
-const SHORTCUTS: [&str; 59] = [
+const SHORTCUTS: [&str; 60] = [
     "MENUS",
     "  F10 or Alt             open the menus: Arrows move, Enter runs, Esc closes",
     "  F1 F2 F3 F4 F5 F6      this list, track editor, song, piano roll, grid, synth (Ctrl+K: kit editor)",
@@ -22,6 +22,7 @@ const SHORTCUTS: [&str; 59] = [
     "  Shift+H, J, K          every track: synth sounds, auto-assigned, random samples",
     "PLAY",
     "  1-9 / Shift+1-9        mute / solo track 1-9        Q-P  hear track 1-10 (any view)",
+    "                         (these two rows by their place; other keys as the layout marks them)",
     "  Space / Shift+Space    play or stop the pattern / the song",
     "  [ ] / Shift+[ ]        previous / next pattern / song (also PageUp PageDown)",
     "  - = (Shift: x10)       tempo (every pattern's; the song's in the song panel)",
@@ -40,8 +41,8 @@ const SHORTCUTS: [&str; 59] = [
     "  Ctrl++ Ctrl+_ Ctrl+0   zoom in, out, back to the display's size (also Ctrl and keypad + -)",
     "GENERATE",
     "  B, Shift+B             the pattern again in its style, a new pattern in the style",
-    "  D, S, A                drums, bass, chords in auto mode (again: off)",
-    "  Z, X                   track in auto mode, random notes on the track",
+    "  D, S                   drums, bass in auto mode (again: off)",
+    "  X                      random notes on the track",
     "KNOBS, SLIDERS, LISTS (track editor, note editor, kit editor, volumes)",
     "  Tab / Shift+Tab        focus the next / previous control      Esc  back to the grid",
     "  Arrows, - =, wheel     change (Shift or Alt: finely, Ctrl: x10); a list: next option",
@@ -91,12 +92,13 @@ const PLUGIN_SHORTCUTS: &[&str] = &[
     "  Shift+H, J, K          every track: synth sounds, auto-assigned, random samples",
     "PLAY",
     "  1-9 / Shift+1-9        mute / solo track 1-9        Q-P  hear track 1-10 (any view)",
+    "                         (these two rows by their place; other keys as the layout marks them)",
     "  [ ]                    previous / next pattern (also PageUp PageDown)",
     "  , .                    previous / next kit",
     "GENERATE",
     "  B, Shift+B             the pattern again in its style, a new pattern in the style",
-    "  D, S, A                drums, bass, chords in auto mode (again: off)",
-    "  Z, X                   track in auto mode, random notes on the track",
+    "  D, S                   drums, bass in auto mode (again: off)",
+    "  X                      random notes on the track",
     "KNOBS, SLIDERS, LISTS (track editor, note editor, kit editor, volumes)",
     "  Tab / Shift+Tab        focus the next / previous control      Esc  back to the grid",
     "  Arrows, - =, wheel     change (Shift or Alt: finely); a list: next option",

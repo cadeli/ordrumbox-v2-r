@@ -14,13 +14,14 @@ mod audio;
 use std::num::NonZeroU32;
 use std::rc::Rc;
 
-use ordrumbox_ui::ui_input::{Button, Key, KeyEvent, Modifiers, ScrollDelta};
+use ordrumbox_ui::ui_input::{Button, Key, KeyEvent, Modifiers, ScrollDelta, single_char};
 use ordrumbox_ui::{Command, Scale, Session, Ui};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopClosed};
 use winit::keyboard::{KeyCode, ModifiersState, PhysicalKey};
+use winit::platform::modifier_supplement::KeyEventExtModifierSupplement;
 use winit::window::{Window, WindowId};
 
 const INITIAL_SIZE: LogicalSize<f64> = LogicalSize::new(1100.0, 680.0);
@@ -164,6 +165,21 @@ fn key(code: KeyCode) -> Key {
         K::BracketRight => Key::BracketRight,
         K::Comma => Key::Comma,
         K::Period => Key::Period,
+        K::Numpad0
+        | K::Numpad1
+        | K::Numpad2
+        | K::Numpad3
+        | K::Numpad4
+        | K::Numpad5
+        | K::Numpad6
+        | K::Numpad7
+        | K::Numpad8
+        | K::Numpad9
+        | K::NumpadDecimal
+        | K::NumpadComma
+        | K::NumpadDivide
+        | K::NumpadMultiply
+        | K::NumpadEqual => Key::Numpad,
         _ => Key::Other,
     }
 }
@@ -229,6 +245,7 @@ impl ApplicationHandler for App {
                     key: key(code),
                     pressed: event.state == ElementState::Pressed,
                     repeat: event.repeat,
+                    unmodified: event.key_without_modifiers().to_text().and_then(single_char),
                     text: event.text.map(|t| t.to_string()),
                 }),
                 PhysicalKey::Unidentified(_) => false,
