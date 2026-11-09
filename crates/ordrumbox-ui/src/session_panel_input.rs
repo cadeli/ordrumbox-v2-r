@@ -4,6 +4,7 @@
 use crate::scale::Scale;
 use ordrumbox_core::json::Value;
 use ordrumbox_core::num;
+use std::borrow::Cow;
 
 use super::session_panel::{DOUBLE_CLICK, control_name};
 use super::*;
@@ -208,11 +209,9 @@ impl Session {
 
     /// What a control is, said in its tooltip; a plugin's gives its own
     /// shortcuts (Alt for Ctrl).
-    pub(super) fn control_tip(&self, id: Id) -> Option<control_help::Help> {
-        if self.hosted && id == Id::View(4) {
-            return Some(["Kit editor (Alt+K)", "the kit's samples and their settings"]);
-        }
-        control_help::help(id)
+    pub(super) fn control_tip(&self, id: Id) -> Option<[Cow<'static, str>; 2]> {
+        let lines = control_help::help(id)?;
+        Some(lines.map(|line| if self.hosted { menu::hosted_shortcuts(line) } else { line.into() }))
     }
 
     /// The tooltip of the note under the mouse (the first of its step), as

@@ -116,6 +116,22 @@ impl Session {
         true
     }
 
+    /// Say once when the host's tempo is outside the tempo bounds: a plugin
+    /// shows no tempo, and plays at the nearest bound instead.
+    pub(super) fn report_host_tempo(&mut self) {
+        use ordrumbox_core::num;
+        use ordrumbox_core::song::{MAX_BPM, MIN_BPM, clamp_bpm};
+        let outside = self.playback.host().map(|host| host.bpm).filter(|bpm| !(MIN_BPM..=MAX_BPM).contains(bpm));
+        if outside == self.host_tempo_outside {
+            return;
+        }
+        self.host_tempo_outside = outside;
+        if let Some(bpm) = outside {
+            let (host, used) = (num::text(bpm), num::text(clamp_bpm(bpm)));
+            self.message = format!("host tempo {host} outside {MIN_BPM}–{MAX_BPM}: plays at {used}");
+        }
+    }
+
     /// The tracks a plugin host mutes, bit `t` for track `t`, shown on their
     /// mute boxes; true when they changed.
     pub fn set_host_muted(&mut self, muted: u64) -> bool {

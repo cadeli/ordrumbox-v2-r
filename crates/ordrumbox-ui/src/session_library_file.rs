@@ -233,6 +233,11 @@ fn a_plugin_leaves_to_the_host_what_the_host_does() {
     assert!(panel::hit(&layout.items, bpm.x + 2, bpm.y + 2).is_none());
     s.control_hover(size, bpm.x + 2, bpm.y + 2);
     assert!(s.chrome.control_hover.is_none());
+    // Tooltips give the plugin's shortcuts: Alt in place of Ctrl.
+    let kit = view::header_controls(Scale::ONE).views[4];
+    s.control_hover(size, kit.x + 2, kit.y + 2);
+    let tip = s.chrome.control_hover.and_then(|(id, _)| s.control_tip(id)).map(|[title, _]| title);
+    assert_eq!(tip.as_deref(), Some("Kit editor (Alt+K)"));
     // No master strip: the editors reach down to where it was.
     assert!(!layout.items.iter().any(|i| matches!(i.id, Some(Id::Master(_)))));
     assert!(s.output_view().is_none());

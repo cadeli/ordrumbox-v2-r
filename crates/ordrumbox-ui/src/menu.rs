@@ -478,11 +478,17 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
 /// Ctrl/Cmd key, which Alt replaces there (`Ui::key`).
 const CONTROL_PREFIX: &str = "Ctrl+";
 
+/// `text` (a shortcut, a tooltip) as a plugin shows it: Alt in place of Ctrl.
+#[must_use]
+pub fn hosted_shortcuts(text: &str) -> Cow<'_, str> {
+    if text.contains(CONTROL_PREFIX) { text.replace(CONTROL_PREFIX, "Alt+").into() } else { text.into() }
+}
+
 /// What a plugin shows of the shortcut of `item`: Alt in place of Ctrl.
 fn host_item(item: &mut Item) {
     let Item::Command { shortcut, .. } = item else { return };
-    if let Some(key) = shortcut.strip_prefix(CONTROL_PREFIX) {
-        *shortcut = format!("Alt+{key}").into();
+    if let Cow::Owned(alt) = hosted_shortcuts(shortcut) {
+        *shortcut = alt.into();
     }
 }
 
