@@ -1220,7 +1220,7 @@ impl Session {
             note_editor: self.note_editor_shown(),
             levels,
             show_vus: self.chrome.show_vus,
-            tempo_label: if self.hosted { "HOST" } else { "BPM" },
+            tempo_label: (!self.hosted).then_some("BPM"),
             host_muted: self.host_muted,
             track_drop: self.track_drop((canvas.width(), canvas.height(), scale)),
             waiting,

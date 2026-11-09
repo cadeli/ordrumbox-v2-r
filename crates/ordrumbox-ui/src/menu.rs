@@ -145,6 +145,7 @@ impl Command {
             Self::Save => Some("the host saves the library with its project"),
             Self::Quit => Some("the host closes the plugin's window"),
             Self::TempoDown | Self::TempoUp => Some("the tempo is the host's"),
+            Self::PlayPattern => Some("the host's transport plays the pattern"),
             Self::CheckUpdates | Self::DownloadPage => Some("update check: in the app only, not in a plugin"),
             Self::FactoryReset => Some("factory reset: in the app only, not in a plugin"),
             Self::BackUpUserData
@@ -169,22 +170,7 @@ impl Command {
             _ => None,
         }
     }
-
-    /// What a plugin's menu shows in place of the shortcut of a command it
-    /// does not run: whose it is.
-    fn hosted_tag(self) -> Option<&'static str> {
-        match self {
-            Self::Save | Self::Quit | Self::TempoDown | Self::TempoUp => Some(HOST_TAG),
-            _ => self.hosted_refusal().map(|_| APP_TAG),
-        }
-    }
 }
-
-/// A plugin's tag for a command the host does.
-const HOST_TAG: &str = "host's";
-
-/// A plugin's tag for a command of the app alone.
-const APP_TAG: &str = "app only";
 
 /// One line of a menu.
 #[derive(Debug, Clone, PartialEq)]
@@ -260,7 +246,7 @@ pub struct MenuState {
     pub checking_updates: bool,
     /// The version of a newer release found.
     pub newer_release: Option<String>,
-    /// Shown by a plugin: the commands the host does are left out.
+    /// Shown by a plugin: what it leaves to the host or the app is left out.
     pub hosted: bool,
     /// The assets' library can be loaded (Load the demo library).
     pub has_demo: bool,
@@ -470,12 +456,10 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
             });
             let mut cleaned: Vec<Item> = Vec::with_capacity(menu.items.len());
             for item in std::mem::take(&mut menu.items) {
-                if matches!(item, Item::Separator) {
-                    if cleaned.is_empty() || matches!(cleaned.last(), Some(Item::Separator)) {
-                        continue;
-                    }
+                let after_item = matches!(cleaned.last(), Some(Item::Command { .. }));
+                if after_item || matches!(item, Item::Command { .. }) {
+                    cleaned.push(item);
                 }
-                cleaned.push(item);
             }
             while matches!(cleaned.last(), Some(Item::Separator)) {
                 cleaned.pop();
@@ -494,18 +478,11 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
 /// Ctrl/Cmd key, which Alt replaces there (`Ui::key`).
 const CONTROL_PREFIX: &str = "Ctrl+";
 
-/// What a plugin shows of `item`: a command it does not run greyed out,
-/// with whose it is (the host's, the app's) in place of its shortcut; Alt in
-/// place of Ctrl; no Space, the host's transport.
+/// What a plugin shows of the shortcut of `item`: Alt in place of Ctrl.
 fn host_item(item: &mut Item) {
-    let Item::Command { shortcut, command, enabled, .. } = item else { return };
-    if let Some(tag) = command.hosted_tag() {
-        *enabled = false;
-        *shortcut = tag.into();
-    } else if let Some(key) = shortcut.strip_prefix(CONTROL_PREFIX) {
+    let Item::Command { shortcut, .. } = item else { return };
+    if let Some(key) = shortcut.strip_prefix(CONTROL_PREFIX) {
         *shortcut = format!("Alt+{key}").into();
-    } else if shortcut.contains("Space") {
-        *shortcut = "".into();
     }
 }
 
@@ -922,7 +899,7 @@ mod tests {
     }
 
     #[test]
-    fn a_plugin_menu_drops_what_it_leaves_and_says_whose_it_is() {
+    fn a_plugin_menu_drops_what_it_leaves_to_the_host_or_the_app() {
         let state = MenuState { can_save: true, has_songs: true, hosted: true, ..state() };
         let menus = menus(&state);
         let app = super::menus(&MenuState { hosted: false, ..state.clone() });
@@ -932,13 +909,15 @@ mod tests {
         for menu in &menus {
             let app_menu = app.iter().find(|m| m.title == menu.title).unwrap();
             for item in &menu.items {
-                let Item::Command { shortcut, command, enabled, .. } = item else { continue };
+                let Item::Command { shortcut, command, .. } = item else { continue };
                 // Nothing a plugin refuses is left in the menus.
                 assert!(command.hosted_refusal().is_none(), "{command:?}");
                 assert!(!shortcut.starts_with(CONTROL_PREFIX) && !shortcut.contains("Space"));
                 // The item existed in the app's menu.
-                assert!(app_menu.items.iter().any(|i| matches!(i, Item::Command { command: c, .. } if *c == *command)), "{command:?}");
-                let _ = enabled;
+                assert!(
+                    app_menu.items.iter().any(|i| matches!(i, Item::Command { command: c, .. } if *c == *command)),
+                    "{command:?}"
+                );
             }
         }
         let item = |command| {
@@ -956,6 +935,8 @@ mod tests {
         // Dropped commands are nowhere to be found.
         assert!(item(Command::Save).is_none());
         assert!(item(Command::SongView).is_none());
+        assert!(item(Command::PlayPattern).is_none(), "the host's transport plays");
+        assert!(item(Command::TempoUp).is_none());
     }
 
     #[test]

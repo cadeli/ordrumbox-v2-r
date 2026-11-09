@@ -74,7 +74,7 @@ const PLUGIN_SHORTCUTS: &[&str] = &[
     "THE HOST'S KEYS",
     "  Space, every Ctrl/Cmd key   the host's: its transport, its save, undo, zoom...",
     "  Alt + the app's Ctrl key    orDrumbox's: Alt+Z undo, Alt+C copy, Alt+K kit editor...",
-    "                              (the menus show them; greyed out: the host's or the app's)",
+    "                              (the menus show them)",
     "MENUS",
     "  F10 or Alt             open the menus: Arrows move, Enter runs, Esc closes",
     "  F1 F2 F4 F5 F6         this list, track editor, piano roll, grid, synth",
