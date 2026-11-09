@@ -9,7 +9,7 @@
 use crate::scale::Scale;
 use std::borrow::Cow;
 
-use crate::canvas::{Canvas, Rgb, text_width};
+use crate::canvas::{Canvas, Rgb, char_width, fit, text_width};
 use crate::theme;
 
 /// What a menu item (or its shortcut) does.
@@ -631,6 +631,81 @@ pub fn hit(menus: &[Menu], open: Option<Open>, scale: Scale, x: i32, y: i32) -> 
     Some(found.filter(|&i| !matches!(items[i], Item::Separator)).map_or(Hit::Panel, Hit::Item))
 }
 
+// ─── The library ─────────────────────────────────────────────────────────────
+
+/// Where the library's edits stand, shown after its name at the right of the bar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LibraryState {
+    /// The file holds every edit.
+    Saved,
+    /// The library will be saved at the first edit: its file does not exist yet.
+    New,
+    /// Edits wait to be saved (a moment after the last one).
+    Modified,
+    /// The last save failed; the next edit, or File > Save, tries again.
+    Failed,
+    /// No file: edits are lost on quit (the footer says why).
+    NotSaved,
+    /// A plugin's: the host saves it with its project.
+    Host,
+}
+
+impl LibraryState {
+    /// Every state, the longest label setting the column's width.
+    const ALL: [Self; 6] = [Self::Saved, Self::New, Self::Modified, Self::Failed, Self::NotSaved, Self::Host];
+
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Saved => "saved",
+            Self::New => "new",
+            Self::Modified => "modified",
+            Self::Failed => "save failed",
+            Self::NotSaved => "not saved",
+            Self::Host => "in host project",
+        }
+    }
+
+    fn color(self) -> Rgb {
+        match self {
+            Self::Saved => theme::LIVE,
+            Self::Modified => theme::VALUE,
+            Self::Failed | Self::NotSaved => theme::ALERT,
+            Self::New | Self::Host => dim(),
+        }
+    }
+}
+
+/// Characters of the library's place in the bar, its state included.
+const LIBRARY_CHARS: i32 = 44;
+
+/// The library's place at the right of the bar: left edge and width, the
+/// same whatever its name and state; empty when the titles leave no room.
+fn library_field(menus: &[Menu], width: i32, scale: Scale) -> (i32, i32) {
+    let titles_end = titles(menus, scale).last().map_or(0, |&(x, w)| x + w);
+    let right = width - 8 * scale;
+    let field = (LIBRARY_CHARS * char_width(scale)).min(right - titles_end - 16 * scale).max(0);
+    (right - field, field)
+}
+
+/// The library's name and state at the right of the bar: the state in a
+/// column of its own, the name fitted to what is left.
+pub fn draw_library(canvas: &mut Canvas, menus: &[Menu], name: &str, state: LibraryState, scale: Scale) {
+    let (x, field) = library_field(menus, canvas.width(), scale);
+    let longest = LibraryState::ALL.iter().map(|s| text_width(s.label(), scale)).max().unwrap_or(0);
+    let dot = 4 * scale;
+    let state_w = dot + 4 * scale + longest;
+    let name_w = field - state_w - 12 * scale;
+    if name_w <= 0 {
+        return;
+    }
+    let text_y = (bar_height(scale) - 8 * scale) / 2;
+    canvas.text(x, text_y, &fit(name, name_w, scale), scale, theme::text());
+    let state_x = x + field - state_w;
+    canvas.fill_rect(state_x, text_y + 2 * scale, dot, dot, state.color());
+    canvas.text(state_x + dot + 4 * scale, text_y, state.label(), scale, state.color());
+}
+
 // ─── Drawing ─────────────────────────────────────────────────────────────────
 
 /// The bar, and the open menu over everything.
@@ -714,6 +789,20 @@ mod tests {
             undo: Some("Add note".into()),
             ..MenuState::default()
         }
+    }
+
+    #[test]
+    fn the_library_keeps_its_place_right_of_the_titles() {
+        let menus = menus(&state());
+        let titles_end = titles(&menus, Scale::ONE).last().map(|&(x, w)| x + w).unwrap();
+        for width in [200, 400, 700, 1100, 2000] {
+            let (x, field) = library_field(&menus, width, Scale::ONE);
+            assert!(field >= 0 && x + field <= width, "{width}: {x} {field}");
+            assert!(field == 0 || x > titles_end, "{width}: over the titles");
+        }
+        // Wide enough: the full field, whatever the name and the state.
+        let (_, field) = library_field(&menus, 1100, Scale::ONE);
+        assert_eq!(field, LIBRARY_CHARS * char_width(Scale::ONE));
     }
 
     #[test]

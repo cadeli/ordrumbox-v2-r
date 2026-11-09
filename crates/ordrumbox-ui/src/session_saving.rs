@@ -5,6 +5,8 @@
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
+use crate::menu::LibraryState;
+
 /// The library is saved this long after the last edit.
 const LIBRARY_DELAY: Duration = Duration::from_secs(1);
 /// Kit knob edits reach the player and the disk this long after the last one.
@@ -67,6 +69,10 @@ pub(super) struct Saving {
     pub(super) library_path: Option<PathBuf>,
     /// Editor revision the library file holds.
     saved_revision: u64,
+    /// The library file exists: read at start, or written since.
+    pub(super) on_disk: bool,
+    /// The last library save failed.
+    pub(super) failed: bool,
     /// Library edits (synth presets included) since the last save.
     pub(super) library: Settle,
     /// Kit knob edits not yet applied to the bank and saved.
@@ -84,6 +90,8 @@ impl Default for Saving {
         Self {
             library_path: None,
             saved_revision: 0,
+            on_disk: false,
+            failed: false,
             library: Settle::new(LIBRARY_DELAY),
             kits: Settle::new(KITS_DELAY),
             master: Settle::new(MASTER_DELAY),
@@ -109,7 +117,27 @@ impl Saving {
     /// The library file now holds editor revision `revision`.
     pub(super) fn library_saved(&mut self, revision: u64) {
         self.saved_revision = revision;
+        self.on_disk = true;
+        self.failed = false;
         self.library.clear();
+    }
+
+    /// Where the library's edits stand at editor revision `revision`, a
+    /// plugin's when `hosted`.
+    pub(super) fn library_state(&self, revision: u64, hosted: bool) -> LibraryState {
+        if hosted {
+            LibraryState::Host
+        } else if self.library_path.is_none() {
+            LibraryState::NotSaved
+        } else if self.failed {
+            LibraryState::Failed
+        } else if self.library_unsaved(revision) {
+            LibraryState::Modified
+        } else if self.on_disk {
+            LibraryState::Saved
+        } else {
+            LibraryState::New
+        }
     }
 
     /// `Ok` when the library, at editor revision `revision`, is due to be

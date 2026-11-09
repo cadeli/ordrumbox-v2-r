@@ -48,6 +48,12 @@ in this repository's `assets/`. User data is saved under the OS user data folder
 macOS, `~/.local/share/ordrumbox` elsewhere), or the file named by
 `$ORDRUMBOX_LIBRARY`.
 
+The library's name and whether its edits are saved show at the right of the
+menu bar: *saved*, *modified* (saved a moment after the last edit), *new*
+(a copy of the demo, written at the first edit), *save failed*, *not saved*
+(no user data folder), or *in host project* (the plugin). Help > About gives
+the file's path.
+
 ## Commands
 
 ```sh

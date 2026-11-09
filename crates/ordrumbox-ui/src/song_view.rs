@@ -11,7 +11,7 @@
 use crate::scale::Scale;
 use ordrumbox_core::{Pattern, Song};
 
-use crate::canvas::{Canvas, Rgb, text_width};
+use crate::canvas::{Canvas, Rgb, fit, text_width};
 use crate::frame;
 use crate::panel::{Rect, row_at};
 use crate::theme;
@@ -660,12 +660,6 @@ pub fn wrap(text: &str, chars: usize) -> Vec<String> {
         lines.push(line.into_iter().collect());
     }
     lines
-}
-
-/// Text cut to `width` pixels.
-fn fit(text: &str, width: i32, scale: Scale) -> String {
-    let chars = crate::canvas::chars_in(width, scale);
-    text.chars().take(chars).collect()
 }
 
 #[cfg(test)]

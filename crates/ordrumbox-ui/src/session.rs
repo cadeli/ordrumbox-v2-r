@@ -204,9 +204,27 @@ pub enum LibrarySource {
     Host(Option<String>),
 }
 
-/// A library opened at start: the library, the file edits are saved to, the
-/// message to show.
-type Opened = (Library, Option<PathBuf>, String);
+/// A library opened at start.
+#[derive(Debug)]
+struct Opened {
+    library: Library,
+    /// The file edits are saved to; `None`: not saved.
+    file: Option<PathBuf>,
+    /// The library was read from that file (else it is written at the first edit).
+    on_disk: bool,
+    /// The message to show.
+    message: String,
+}
+
+impl Opened {
+    /// `library`, not saved to any file.
+    fn unsaved(library: Library, message: &str) -> Self {
+        Self { library, file: None, on_disk: false, message: message.to_owned() }
+    }
+}
+
+/// The message of the demo library when no file keeps its edits.
+const DEMO_NOT_SAVED: &str = "demo library: edits are not saved";
 
 pub struct Session {
     /// What the window shows around the library (`session_chrome.rs`).
@@ -439,7 +457,7 @@ impl Session {
         }
 
         let hosted = matches!(source, LibrarySource::Host(_));
-        let (mut library, library_path, message) = match source {
+        let Opened { mut library, file: library_path, on_disk, message } = match source {
             LibrarySource::UserFile => {
                 if let Some(problem) = store::location_problem() {
                     status.push(format!("{problem}: File > Change user data folder"));
@@ -477,6 +495,7 @@ impl Session {
         session.roots =
             assets.bank.samples.iter().filter_map(|s| Some((s.sample.key.clone(), s.sample.root_midi?))).collect();
         session.saving.library_path = library_path;
+        session.saving.on_disk = on_disk;
         session.message = message;
         let bank = Arc::new(assets.bank);
         if !bank.samples.is_empty() {
@@ -505,52 +524,50 @@ impl Session {
     }
 
     /// The library to start with: the user's file at `path` when there is
-    /// one, else `demo`; the file edits are saved to (`None`: not saved, the
-    /// reason pushed on `status`); the message to show.
+    /// one, else `demo`, written to that file at the first edit (no file: the
+    /// reason pushed on `status`).
     fn open_library(path: Option<PathBuf>, demo: Library, status: &mut Vec<String>) -> Opened {
-        let demo_message = "demo library (assets/data/library.json)".to_owned();
-        match path {
-            None => {
-                status.push("no user data folder: edits are not saved".into());
-                (demo, None, demo_message)
+        let Some(path) = path else {
+            status.push("no user data folder: edits are not saved".into());
+            return Opened::unsaved(demo, DEMO_NOT_SAVED);
+        };
+        match store::load(&path) {
+            Ok(Some(saved)) => {
+                Opened { library: saved, file: Some(path), on_disk: true, message: "library loaded".into() }
             }
-            Some(path) => match store::load(&path) {
-                Ok(Some(saved)) => {
-                    let message = format!("library {}", path.display());
-                    (saved, Some(path), message)
-                }
-                Ok(None) => (demo, Some(path), demo_message),
-                Err(e) => {
-                    status.push(format!("library not loaded, not saved over: {e}"));
-                    (demo, None, demo_message)
-                }
+            Ok(None) => Opened {
+                library: demo,
+                file: Some(path),
+                on_disk: false,
+                message: "your library starts as a copy of the demo: edits are saved".into(),
             },
+            Err(e) => {
+                status.push(format!("library not loaded, not saved over: {e}"));
+                Opened::unsaved(demo, DEMO_NOT_SAVED)
+            }
         }
     }
 
     /// The library of a plugin: the host's `text` when it kept one, else the
-    /// user's file (read, never written), else `demo`; no file to save to; the
-    /// message to show.
+    /// user's file (read, never written), else `demo`; no file to save to.
     fn open_host_library(text: Option<String>, demo: Library, status: &mut Vec<String>) -> Opened {
-        let demo_message = || "demo library (assets/data/library.json)".to_owned();
+        const DEMO: &str = "demo library, saved with the host project";
         if let Some(text) = text {
             return match Library::parse(&text) {
-                Ok((library, _)) => (library, None, "library from the host project".to_owned()),
+                Ok((library, _)) => Opened::unsaved(library, "library from the host project"),
                 Err(e) => {
                     status.push(format!("library of the host project not loaded: {e}"));
-                    (demo, None, demo_message())
+                    Opened::unsaved(demo, DEMO)
                 }
             };
         }
-        match store::path().map(|path| (store::load(&path), path)) {
-            Some((Ok(Some(saved)), path)) => {
-                (saved, None, format!("library {} (copied into the host project)", path.display()))
-            }
-            Some((Err(e), _)) => {
+        match store::path().map(|path| store::load(&path)) {
+            Some(Ok(Some(saved))) => Opened::unsaved(saved, "your library, copied into the host project"),
+            Some(Err(e)) => {
                 status.push(format!("library not loaded: {e}"));
-                (demo, None, demo_message())
+                Opened::unsaved(demo, DEMO)
             }
-            Some((Ok(None), _)) | None => (demo, None, demo_message()),
+            Some(Ok(None)) | None => Opened::unsaved(demo, DEMO),
         }
     }
 
@@ -1010,27 +1027,46 @@ impl Session {
 
     // ─── Saving ──────────────────────────────────────────────────────────────
 
+    /// File > Save: the library written now.
     pub fn save(&mut self) {
-        let Some(path) = self.saving.library_path.clone() else {
+        if self.saving.library_path.is_none() {
             self.message = if let Some(refusal) = Command::Save.hosted_refusal().filter(|_| self.hosted) {
                 refusal.into()
             } else {
                 "not saved: no library file (see the messages below)".into()
             };
             return;
-        };
+        }
+        if self.write_library() {
+            self.message = "library saved".into();
+        }
+    }
+
+    /// The library written to its file, without a word when it is (the menu
+    /// bar shows it saved); whether it was. A failure is the message.
+    fn write_library(&mut self) -> bool {
+        let Some(path) = self.saving.library_path.clone() else { return false };
         match store::save(&path, self.editor.library()) {
             Ok(()) => {
                 self.saving.library_saved(self.library_revision());
-                self.message = format!("saved {}", path.display());
+                true
             }
-            Err(e) => self.message = format!("not saved: {}: {e}", path.display()),
+            Err(e) => {
+                self.saving.failed = true;
+                self.message = format!("library not saved: {}: {e}", path.display());
+                false
+            }
         }
+    }
+
+    /// Where the library's edits stand, as the menu bar shows it.
+    pub(super) fn library_state(&self) -> menu::LibraryState {
+        self.saving.library_state(self.library_revision(), self.hosted)
     }
 
     pub fn save_if_changed(&mut self) {
         if self.saving.library_unsaved(self.library_revision()) {
-            self.save();
+            self.write_library();
         }
     }
 
@@ -1051,7 +1087,7 @@ impl Session {
         if let Err(next) = self.saving.library_ready(self.library_revision()) {
             return next;
         }
-        self.save();
+        self.write_library();
         None
     }
 
@@ -1152,7 +1188,10 @@ impl Session {
         self.draw_synth(canvas, scale);
         crate::panel::draw(canvas, &layout.items, self.chrome.widgets.focus, scale);
         self.draw_tooltip(canvas, scale);
-        menu::draw(canvas, &self.menus(), self.chrome.menu, scale);
+        let menus = self.menus();
+        menu::draw(canvas, &menus, self.chrome.menu, scale);
+        // In the bar, which the open menu's panel hangs under.
+        menu::draw_library(canvas, &menus, &self.song_name(), self.library_state(), scale);
         if let Some(dropdown) = &self.chrome.widgets.dropdown {
             dropdown.draw(canvas, scale);
         }
