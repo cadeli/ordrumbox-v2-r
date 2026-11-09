@@ -42,7 +42,7 @@ pub fn help(id: Id) -> Option<Help> {
         },
         Id::FilterIcon(_) => ["Filter type", "LP lowpass, HP highpass, BP bandpass, NT notch"],
         Id::AutoAssign => ["Auto-assign", "the kit picks the sample from the track's name"],
-        Id::Instrument => ["Instrument", "the kind of sound the track asks the kit for"],
+        Id::Instrument => ["Instrument", "the kind of sound the track asks the kit for (a click: by category)"],
         Id::Sample => ["Sample", "the audio file the track plays"],
         Id::Synth => ["Synth preset", "the soft-synth sound the track plays instead of a sample"],
         Id::LoadSample => ["Load sample", "replace the track's sample with a file"],

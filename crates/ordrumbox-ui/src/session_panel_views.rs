@@ -156,8 +156,7 @@ impl Session {
         });
 
         // Instruments that have samples, sorted; the current one.
-        let keys: std::collections::HashSet<&str> =
-            self.kits.kits.iter().flat_map(|k| k.samples.iter().map(|i| i.key.as_str())).collect();
+        let keys = self.sampled_instruments();
         let mut ids: Vec<String> =
             catalog().instruments.iter().map(|i| i.id.clone()).filter(|id| keys.contains(id.as_str())).collect();
         ids.sort();
@@ -234,6 +233,11 @@ impl Session {
         let macros = Macros::of(self.pattern()?);
         let shown = compose::track_settings(track, style, macros)?;
         Some(ComposeView { style: style.name.clone(), shown })
+    }
+
+    /// The instruments some kit has a sample of.
+    pub(super) fn sampled_instruments(&self) -> std::collections::HashSet<String> {
+        self.kits.kits.iter().flat_map(|k| k.samples.iter().map(|i| i.key.clone())).collect()
     }
 
     /// Every sample of instrument `id`: (kit, url, name), the current kit's

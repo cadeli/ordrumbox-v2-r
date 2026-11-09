@@ -377,11 +377,19 @@ mod tests {
 
     const SIZE: (i32, i32, Scale) = (1100, 680, Scale::ONE);
 
-    /// A session on kit `real`: a KICK and a sample of no known instrument.
+    /// A session on kit `real`: a KICK and a sample of no known instrument,
+    /// its kit editor open.
     fn session() -> Session {
+        let mut s = session_of(&[("KICK", "real/kick.wav"), ("WEIRD", "real/x.wav")]);
+        s.toggle_kit_editor();
+        s
+    }
+
+    /// A session of a KICK track on kit `real`, of `samples` (instrument, path).
+    fn session_of(samples: &[(&str, &str)]) -> Session {
         let (library, _) = Library::parse(r#"{"patterns":[{"name":"p","tracks":[{"name":"KICK"}]}]}"#).unwrap();
         let sample = |key: &str, path: &str| KitSample { key: key.into(), path: path.into(), ..Default::default() };
-        let samples = vec![sample("KICK", "real/kick.wav"), sample("WEIRD", "real/x.wav")];
+        let samples: Vec<_> = samples.iter().map(|&(key, path)| sample(key, path)).collect();
         let buffer = Arc::new(SampleBuffer::mono(vec![0.25, -0.5, 0.1], 44_100));
         let bank = SampleBank {
             samples: samples
@@ -393,7 +401,6 @@ mod tests {
         let mut s = Session::new(library, KitSet::new(kits, &bank, None, None, None), Vec::new());
         s.set_size(SIZE);
         s.kits_changed("kits loaded".into());
-        s.toggle_kit_editor();
         s
     }
 
@@ -429,6 +436,25 @@ mod tests {
         pick(&mut s, "COWBELL");
         assert_eq!(s.kits.sample(0, 1).map(|i| i.key.as_str()), Some("COWBELL"));
         assert_eq!(s.kits.sample(0, 0).map(|i| i.key.as_str()), Some("KICK"), "only that sample");
+    }
+
+    #[test]
+    fn the_sound_tab_picks_the_instrument_by_category_among_the_sampled_ones() {
+        let mut s = session_of(&[("KICK", "real/kick.wav"), ("COWBELL", "real/bell.wav"), ("SNARE", "real/sn.wav")]);
+        s.selection.cursor = Some(view::Cursor { track: 0, beat: 0, step: 0 });
+        s.editors.tab = crate::editors::TAB_SOUND;
+        let (x, y) = item_at(&s, Id::Instrument);
+        assert!(s.mouse_down(SIZE, x, y, Button::Left, false));
+        let menu = s.chrome.widgets.dropdown.as_ref().expect("a menu");
+        assert_eq!(menu.id, Id::InstrumentMenu);
+        assert_eq!(menu.title.as_deref(), Some("Instrument: KICK"));
+        assert!(!menu.labels.contains(&"Toms >".to_owned()), "no tom sampled: {:?}", menu.labels);
+        pick(&mut s, "Percussion >");
+        let labels = &s.chrome.widgets.dropdown.as_ref().expect("the submenu").labels;
+        assert_eq!(labels, &["COWBELL"], "only the sampled ones");
+        pick(&mut s, "COWBELL");
+        assert!(s.chrome.widgets.dropdown.is_none());
+        assert_eq!(s.pattern().unwrap().tracks[0].sample_path, "real/bell.wav");
     }
 
     #[test]
