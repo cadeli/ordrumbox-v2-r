@@ -1,8 +1,9 @@
 //! Which sound each track plays (`logic/services/auto_assign.js`).
 //!
-//! A track with auto-assign on gets a sample by name, in tiers: an exact key
-//! in the selected kit, then in another kit, then the catalog's substitutes
-//!, then any sample. Each tier picks at random among
+//! A track with auto-assign on gets a sound by name, in tiers: its instrument
+//! (or a variant of it) in the selected kit, then the synth preset of its name,
+//! then an exact key in another kit, then the catalog's substitutes, then any
+//! sample. Each tier picks at random among
 //! its candidates; `pick(n)` makes that choice (an index below `n`), so the
 //! JS choices can be reproduced. A synth track without a valid preset gets a
 //! random one. The same matching picks a synth preset for a track name
@@ -61,6 +62,8 @@ fn preset_match_key(key: &str) -> &str {
 pub struct AutoAssign<'a> {
     candidates: Vec<Candidate<'a>>,
     kit: &'a str,
+    /// Whether the matching stays in the selected kit, never looking at another.
+    kit_only: bool,
     catalog: &'a Catalog,
     pick: &'a mut dyn FnMut(usize) -> usize,
 }
@@ -74,13 +77,25 @@ impl std::fmt::Debug for AutoAssign<'_> {
 impl<'a> AutoAssign<'a> {
     pub fn new(bank: &'a SampleBank, kit: &'a str, pick: &'a mut dyn FnMut(usize) -> usize) -> Self {
         let candidates = bank.samples.iter().map(|s: &'a BankSample| Candidate { kit: &s.kit, key: &s.sample.key });
-        Self { candidates: candidates.collect(), kit, catalog: instruments::catalog(), pick }
+        Self { candidates: candidates.collect(), kit, kit_only: false, catalog: instruments::catalog(), pick }
+    }
+
+    /// The same matching, kept in the selected kit.
+    #[must_use]
+    fn kit_only(self) -> Self {
+        Self { kit_only: true, ..self }
     }
 
     /// The matching over the synth presets, all in one kit.
     fn over_synths(synths: &'a SynthPresets, pick: &'a mut dyn FnMut(usize) -> usize) -> Self {
         let candidates = synths.keys().into_iter().map(|key| Candidate { kit: SYNTH_KIT, key: preset_match_key(key) });
-        Self { candidates: candidates.collect(), kit: SYNTH_KIT, catalog: instruments::catalog(), pick }
+        Self {
+            candidates: candidates.collect(),
+            kit: SYNTH_KIT,
+            kit_only: false,
+            catalog: instruments::catalog(),
+            pick,
+        }
     }
 
     fn pick_from(&mut self, candidates: &[usize]) -> Option<usize> {
@@ -91,8 +106,10 @@ impl<'a> AutoAssign<'a> {
         candidates.get(i.min(candidates.len() - 1)).copied()
     }
 
-    /// Candidates of `kit` (`Some`), of every kit but `exclude` (`exclude`), or all.
+    /// Candidates of `kit` (`Some`), of every kit but `exclude` (`exclude`), or all;
+    /// only those of the selected kit when the matching is kept there.
     fn in_scope(&self, kit: Option<&str>, exclude: Option<&str>) -> Vec<(usize, Candidate<'a>)> {
+        let kit = if self.kit_only { Some(self.kit) } else { kit };
         let in_it = |c: &Candidate<'a>| kit.is_none_or(|k| c.kit == k) && exclude.is_none_or(|k| c.kit != k);
         self.candidates.iter().copied().enumerate().filter(|(_, c)| in_it(c)).collect()
     }
@@ -126,19 +143,31 @@ impl<'a> AutoAssign<'a> {
         self.pick_from(&all)
     }
 
-    /// The candidate that matches the track name `name`: by key, then by the
-    /// catalog's substitutes.
-    fn matching(&mut self, name: &str) -> Option<usize> {
+    /// The names a track named `name` is matched by: its own, and its catalog id when it differs.
+    fn names_for(&self, name: &str) -> (Vec<String>, String) {
         let match_name = self.resolve_instrument_id(name);
         let mut names = vec![normalize(name)];
         if normalize(&match_name) != names[0] {
             names.push(normalize(&match_name));
         }
-        let kit = self.kit;
-        let tier1 = self.exact(&names, Some(kit), None);
-        if let Some(found) = self.pick_from(&tier1) {
+        (names, match_name)
+    }
+
+    /// A candidate of the selected kit whose key is the track name `name` (or its catalog id).
+    fn in_kit(&mut self, name: &str) -> Option<usize> {
+        let (names, _) = self.names_for(name);
+        let tier1 = self.exact(&names, Some(self.kit), None);
+        self.pick_from(&tier1)
+    }
+
+    /// The candidate that matches the track name `name`: by key, then by the
+    /// catalog's substitutes.
+    fn matching(&mut self, name: &str) -> Option<usize> {
+        if let Some(found) = self.in_kit(name) {
             return Some(found);
         }
+        let (names, match_name) = self.names_for(name);
+        let kit = self.kit;
         let tier2 = self.exact(&names, None, Some(kit));
         if let Some(found) = self.pick_from(&tier2) {
             return Some(found);
@@ -222,8 +251,14 @@ impl<'a> AutoAssign<'a> {
 /// asks, or a variant of it (`HI_CONGAS` for a conga track).
 pub fn substitute_for(track_name: &str, sample_key: &str) -> Option<String> {
     let mut pick = |_: usize| 0;
-    let wanted = AutoAssign { candidates: Vec::new(), kit: "", catalog: instruments::catalog(), pick: &mut pick }
-        .resolve_instrument_id(track_name);
+    let wanted = AutoAssign {
+        candidates: Vec::new(),
+        kit: "",
+        kit_only: false,
+        catalog: instruments::catalog(),
+        pick: &mut pick,
+    }
+    .resolve_instrument_id(track_name);
     let key = normalize(sample_key);
     // A variant of the instrument is not a stand-in: a high conga plays a conga track.
     let catalog = instruments::catalog();
@@ -236,6 +271,13 @@ pub fn substitute_for(track_name: &str, sample_key: &str) -> Option<String> {
 /// the auto-assignment; `None` when none does.
 pub fn synth_for(name: &str, synths: &SynthPresets, pick: &mut dyn FnMut(usize) -> usize) -> Option<String> {
     let found = AutoAssign::over_synths(synths, pick).matching(name)?;
+    synths.keys().get(found).map(|key| (*key).to_owned())
+}
+
+/// The synth preset named after a track named `name` (`KICK_SYNTH` for a kick,
+/// `BASS_FM` for a bass), without the catalog's substitutes; `None` when none is.
+fn synth_named(name: &str, synths: &SynthPresets, pick: &mut dyn FnMut(usize) -> usize) -> Option<String> {
+    let found = AutoAssign::over_synths(synths, pick).in_kit(name)?;
     synths.keys().get(found).map(|key| (*key).to_owned())
 }
 
@@ -274,26 +316,47 @@ pub fn assign_track(
     if !track.auto_assign {
         return bank.find_path(&track.sample_path).map_or(TrackSound::None, TrackSound::Sample);
     }
-    let sample = if bank.samples.is_empty() { None } else { AutoAssign::new(bank, kit, pick).sample_for(&track.name) };
+    if bank.samples.is_empty() || kit.is_empty() {
+        // No kit to play: only a melodic track gets its preset (below).
+        return melodic_synth(track, synths, pick).unwrap_or_default();
+    }
+    // The instrument, or a variant of it, in the selected kit.
+    let own = AutoAssign::new(bank, kit, pick).kit_only().matching(&track.name);
+    if let Some(i) = own.filter(|&i| substitute_for(&track.name, &bank.samples[i].sample.key).is_none()) {
+        return TrackSound::Sample(i);
+    }
+    // A sound the selected kit lacks: the synth preset of its name, before another kit's sample.
+    if let Some(key) = synth_named(&track.name, synths, pick) {
+        return TrackSound::Synth(key);
+    }
+    let sample = AutoAssign::new(bank, kit, pick).sample_for(&track.name);
     let own = sample.filter(|&i| substitute_for(&track.name, &bank.samples[i].sample.key).is_none());
     if let Some(i) = own {
         return TrackSound::Sample(i);
     }
-    // A melodic track no sample of its instrument plays: the synth preset of its
-    // name, rather than a drum sound or another instrument's.
-    if is_melodic(&track.name)
-        && let Some(key) = synth_for(&track.name, synths, pick)
-    {
-        return TrackSound::Synth(key);
+    melodic_synth(track, synths, pick).unwrap_or_else(|| sample.map_or(TrackSound::None, TrackSound::Sample))
+}
+
+/// For a melodic track no sample of its instrument plays: the synth preset of its
+/// name or of a substitute, rather than a drum sound or another instrument's.
+fn melodic_synth(track: &Track, synths: &SynthPresets, pick: &mut dyn FnMut(usize) -> usize) -> Option<TrackSound> {
+    if !is_melodic(&track.name) {
+        return None;
     }
-    sample.map_or(TrackSound::None, TrackSound::Sample)
+    synth_for(&track.name, synths, pick).map(TrackSound::Synth)
 }
 
 /// Whether a track named `name` plays a melodic instrument of the catalog (a lead, a pad, a piano).
 fn is_melodic(name: &str) -> bool {
     let mut pick = |_: usize| 0;
-    let id = AutoAssign { candidates: Vec::new(), kit: "", catalog: instruments::catalog(), pick: &mut pick }
-        .resolve_instrument_id(name);
+    let id = AutoAssign {
+        candidates: Vec::new(),
+        kit: "",
+        kit_only: false,
+        catalog: instruments::catalog(),
+        pick: &mut pick,
+    }
+    .resolve_instrument_id(name);
     instruments::catalog().by_exact_id(&id).is_some_and(|i| i.melodic)
 }
 
@@ -358,6 +421,30 @@ mod tests {
         // A percussion track waits for a sample.
         assert_eq!(assign_track(&track("Perc"), &bank, "real", &presets, &mut first), TrackSound::None);
         assert!(is_melodic("Bass") && is_melodic("Bell") && !is_melodic("Kick") && !is_melodic("Loop"));
+    }
+
+    #[test]
+    fn a_sound_the_kit_lacks_comes_from_its_preset_before_another_kit() {
+        let sample = |kit: &str, key: &str| BankSample {
+            kit: kit.to_owned(),
+            sample: crate::kit::KitSample {
+                key: key.to_owned(),
+                path: format!("{kit}/{key}.wav"),
+                ..Default::default()
+            },
+            buffer: ordrumbox_dsp::SampleBuffer::mono(vec![0.0], 44_100).into(),
+        };
+        let bank = SampleBank { samples: vec![sample("a", "KICK"), sample("b", "KICK"), sample("b", "TOM")] };
+        let presets = synths(&["KICK_SYNTH"]);
+        let track = |name: &str| Track { name: name.to_owned(), ..Track::default() };
+        let mut first = |_: usize| 0;
+        assert_eq!(assign_track(&track("KICK"), &bank, "a", &presets, &mut first), TrackSound::Sample(0));
+        assert_eq!(
+            assign_track(&track("KICK"), &bank, "c", &presets, &mut first),
+            TrackSound::Synth("KICK_SYNTH".into())
+        );
+        // No preset of its name: the sample of another kit.
+        assert_eq!(assign_track(&track("TOM"), &bank, "a", &presets, &mut first), TrackSound::Sample(2));
     }
 
     #[test]

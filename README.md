@@ -208,6 +208,12 @@ a track gets another, numbered (`PERC 2`, `BASS 2`), where its notes used to be
 dropped; a channel left with no instrument is named in the import message. This
 rewrote `midi_rust.txt` (logic).
 
+A track with auto-assign on now plays the synth preset of its name (`CLAP_SYNTH`,
+`COWBELL_SYNTH`, `BASS_FM`…) when the selected kit has neither its instrument nor a
+variant of it, where it used to borrow the sample of another kit; another kit's sample
+is taken only when no preset has its name. A variant in the kit (its tom for a `HI_TOM`
+track) is kept before both. This rewrote the table of `ordrumbox-ui/src/assign_tests.rs`.
+
 ## License
 
 MIT: see `LICENSE`. A plugin built with the `vst3` feature links GPLv3 VST3
