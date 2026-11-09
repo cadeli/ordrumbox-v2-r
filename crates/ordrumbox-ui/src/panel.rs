@@ -216,6 +216,8 @@ pub enum Id {
     RollMenu,
     // Grid.
     TrackVolume(usize),
+    /// A tab of the lane under the grid: an index in `editors::LANES`.
+    Lane(u8),
     /// A track's rename entry.
     TrackName(usize),
     /// The grid's right-click menus.
@@ -543,13 +545,21 @@ pub fn draw(canvas: &mut Canvas, items: &[Item], focus: Option<Id>, scale: Scale
             }
             Kind::Envelope { points, marker } => {
                 canvas.fill_rect(r.x, r.y, r.w, r.h, field_color());
+                // The waveform, mirrored around the middle and scaled to its
+                // own peak: a quiet sample shows its shape as well as a loud one.
+                let peak = points.iter().fold(0.0f64, |m, v| m.max(v.abs()));
+                let gain = if peak > 0.0 { 1.0 / peak } else { 0.0 };
+                let mid = r.y + r.h / 2;
+                canvas.fill_rect(r.x, mid, r.w, t, theme::mix(field_color(), ENVELOPE, 0.4));
                 let n = points.len() as i32;
                 for (i, v) in points.iter().enumerate() {
                     let i = i as i32;
                     let x = r.x + i * r.w / n.max(1);
                     let w = ((i + 1) * r.w / n.max(1) - i * r.w / n.max(1)).max(1);
-                    let h = (v.clamp(0.0, 1.0) * f64::from(r.h)).round() as i32;
-                    canvas.fill_rect(x, r.y + r.h - h, w, h, ENVELOPE);
+                    let half = ((v.abs() * gain).min(1.0) * f64::from(r.h / 2)).round() as i32;
+                    if half > 0 {
+                        canvas.fill_rect(x, mid - half, w, 2 * half, ENVELOPE);
+                    }
                 }
                 if let Some(m) = marker {
                     let x = r.x + (m.clamp(0.0, 1.0) * f64::from(r.w - 1)) as i32;

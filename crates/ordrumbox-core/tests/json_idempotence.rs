@@ -13,7 +13,7 @@ use ordrumbox_core::json::{self, Object, Value};
 use ordrumbox_core::{Library, Note, Track};
 
 /// A non-default value of every note field, in `Note::KEYS` order.
-const NOTE_VALUES: [(&str, &str); 16] = [
+const NOTE_VALUES: [(&str, &str); 17] = [
     ("velocity", "0.55"),
     ("beat", "5"),
     ("step", "2"),
@@ -25,6 +25,7 @@ const NOTE_VALUES: [(&str, &str); 16] = [
     ("retriggerCount", "4"),
     ("arp", r#"{"intervals":[0,4,7],"direction":"up"}"#),
     ("retriggerProbability", "0.6"),
+    ("retriggerFade", "0.25"),
     ("euclideanPulses", "5"),
     ("euclideanRotation", "2"),
     ("cycleOffset", "1"),

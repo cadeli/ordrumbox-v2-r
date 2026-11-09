@@ -125,6 +125,9 @@ impl Session {
         if self.chrome.track_drag.is_some() {
             return self.track_drag_move(x, y);
         }
+        if self.chrome.lane_drag.is_some() {
+            return self.lane_drag_move(size, x, y);
+        }
         if let Some(axis) = self.song_panel.held_bar() {
             return self.song_bar_to(size, axis, x, y);
         }
@@ -226,7 +229,7 @@ impl Session {
 
     /// The tooltip of the note under the mouse (the first of its step), as
     /// `PointerSection.onMouseOver` shows it; over a control, what it is.
-    pub(super) fn draw_tooltip(&self, canvas: &mut Canvas, scale: Scale, right: i32) {
+    pub(super) fn draw_tooltip(&self, canvas: &mut Canvas, scale: Scale) {
         if let Some((id, rect)) = self.chrome.control_hover.filter(|_| !self.chrome.covered())
             && let Some(lines) = self.control_tip(id)
         {
@@ -243,7 +246,7 @@ impl Session {
             return;
         }
         let Some(pattern) = self.pattern() else { return };
-        let body = view::Body::new(canvas.width(), canvas.height(), scale, right, self.status.len(), !self.hosted);
+        let body = self.body((canvas.width(), canvas.height(), scale));
         let layout =
             Layout::new(body.main_w, body.editor_h, scale, pattern, self.status.len(), self.chrome.current_page);
         match hover {
@@ -266,6 +269,7 @@ impl Session {
         self.chrome.widgets.drag = None;
         self.song_panel.release_bar();
         self.chrome.track_drag = None;
+        self.chrome.lane_drag = None;
         self.roll_release();
     }
 

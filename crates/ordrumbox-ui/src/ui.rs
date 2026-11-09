@@ -178,6 +178,10 @@ impl Ui {
         let (x, y) = self.at();
         let shift = self.modifiers.shift;
         let s = &mut self.session;
+        // The toast is over everything but the overlays: a click on it hides it.
+        if !s.overlay_open() && s.toast_click(size, x, y) {
+            return true;
+        }
         // An open list or number entry takes the click; the right button is the widgets'.
         if s.popup_open() || button == Button::Right {
             let menus_open = s.open_menu().is_some() || s.overlay_open();
@@ -227,6 +231,9 @@ impl Ui {
             let layout = KitLayout::new(body.main_w, body.editor_h, size.2, s.status_lines());
             let Some(hit) = layout.hit(selected, count, x, y) else { return false };
             s.kit_click(hit);
+            return true;
+        }
+        if s.lane_press(size, x, y) {
             return true;
         }
         let Some(hit) = s.grid_hit(size, x, y) else { return false };
@@ -797,5 +804,27 @@ mod tests {
         let idle = ui.idle();
         assert!(ui.session.flash_until().is_some());
         assert!(idle.wake_at.is_some(), "woken when the toast goes");
+    }
+
+    #[test]
+    fn a_click_on_the_toast_hides_it_at_once() {
+        let library =
+            ordrumbox_core::Library::parse(r#"{"patterns":[{"name":"demo","tracks":[{"name":"KICK"}]}]}"#).unwrap().0;
+        let mut ui = Ui::new(Session::for_tests(library, false));
+        ui.input(|ui| {
+            ui.session.say("select a track first");
+            false
+        });
+        assert!(ui.session.flash_until().is_some());
+        let (width, height, scale) = ui.size();
+        let toast = view::toast_rect(width, "select a track first", height - 2 * frame::margin(scale), scale);
+        // Off the toast: it stays.
+        assert!(!ui.session.toast_click((width, height, scale), toast.x - 1, toast.y));
+        assert!(ui.session.flash_until().is_some());
+        // On it: it goes, the message stays on the status line.
+        let at = (toast.x + toast.w / 2, toast.y + toast.h / 2);
+        assert!(ui.input(|ui| ui.session.toast_click((width, height, scale), at.0, at.1)));
+        assert_eq!(ui.session.flash_until(), None);
+        assert_eq!(ui.session.message(), "select a track first");
     }
 }

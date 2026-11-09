@@ -71,6 +71,8 @@ mod session_files;
 mod session_generate;
 #[path = "session_grid.rs"]
 mod session_grid;
+#[path = "session_lane.rs"]
+mod session_lane;
 #[path = "session_zoom.rs"]
 mod session_zoom;
 
@@ -373,6 +375,11 @@ impl std::fmt::Debug for Session {
     }
 }
 
+/// The lower edge of the toast in a window `height` high.
+fn toast_bottom(height: i32, scale: Scale) -> i32 {
+    height - 2 * crate::frame::margin(scale)
+}
+
 /// How long a new message is shown as a toast.
 const FLASH: Duration = Duration::from_secs(1);
 
@@ -657,6 +664,19 @@ impl Session {
         self.flash.until
     }
 
+    /// A press at `(x, y)` on the toast hides it at once; whether there was
+    /// one there. Called during an input, when the message is the flash's.
+    pub(crate) fn toast_click(&mut self, size: (i32, i32, Scale), x: i32, y: i32) -> bool {
+        let (width, height, scale) = size;
+        let on_toast = self.flash.until.is_some()
+            && !self.flash.text.is_empty()
+            && view::toast_rect(width, &self.flash.text, toast_bottom(height, scale), scale).contains(x, y);
+        if on_toast {
+            self.flash.until = None;
+        }
+        on_toast
+    }
+
     /// The message stops standing out if its time is over; whether it did.
     pub(crate) fn end_flash(&mut self, now: Instant) -> bool {
         let over = self.flash.until.is_some_and(|until| until <= now);
@@ -670,7 +690,14 @@ impl Session {
     /// region (top-left) and the output strip (bottom).
     pub(super) fn body(&self, size: (i32, i32, Scale)) -> view::Body {
         let (width, height, scale) = size;
-        view::Body::new(width, height, scale, self.track_editor_width(width, scale), self.status.len(), !self.hosted)
+        let right = self.track_editor_width(width, scale);
+        view::Body::new(width, height, scale, right, self.status.len(), !self.hosted, self.note_editor_shown())
+    }
+
+    /// The note editor is shown, under the grid or the piano roll: the
+    /// views that edit notes.
+    pub(super) fn note_editor_shown(&self) -> bool {
+        self.kit_editor.is_none() && matches!(self.workspace, Workspace::Grid | Workspace::PianoRoll)
     }
 
     /// While the pattern shown waits for the one playing to end its loop:
@@ -1057,16 +1084,18 @@ impl Session {
             _ => library.songs.get(self.editor.selected_song()).map(|s| format!("song {}", s.name)),
         };
         // Auto-page: keep the cursor / playhead on the current page.
+        let size = (canvas.width(), canvas.height(), scale);
+        let page_beats = view::page_beats(self.body(size).main_w, scale) as usize;
         let beat_count = self.pattern().map(|p| p.beat_count.max(1)).unwrap_or(1);
-        let page_count = (beat_count as usize).div_ceil(view::BEATS_PER_PAGE as usize).max(1);
-        let cursor_page = self.selection.cursor.map(|c| (c.beat.max(0) as usize) / view::BEATS_PER_PAGE as usize);
+        let page_count = (beat_count as usize).div_ceil(page_beats).max(1);
+        let cursor_page = self.selection.cursor.map(|c| (c.beat.max(0) as usize) / page_beats);
         // The pass playing is another pattern's while the one shown waits.
         let waiting = self.waiting_blink();
         let playhead_page = if self.playing() && waiting.is_none() {
             position.map(|p| {
                 let frac = p.frame as f64 / p.frames.max(1) as f64;
                 let global_beat = (frac * beat_count as f64).floor() as usize;
-                global_beat / view::BEATS_PER_PAGE as usize
+                global_beat / page_beats
             })
         } else {
             None
@@ -1091,6 +1120,8 @@ impl Session {
             kit_view: self.kit_view(layout.details_top),
             right: layout.right,
             current_page: self.chrome.current_page,
+            lane: (self.editor_track(), usize::from(self.editors.lane)),
+            note_editor: self.note_editor_shown(),
             levels,
             show_vus: self.chrome.show_vus,
             tempo_label: if self.hosted { "HOST" } else { "BPM" },
@@ -1104,9 +1135,9 @@ impl Session {
                     let global_frac = p.frame as f64 / p.frames.max(1) as f64;
                     let total_beats = self.pattern().map(|pat| pat.beat_count.max(1)).unwrap_or(1) as f64;
                     let global_beat = global_frac * total_beats;
-                    let start_beat = self.chrome.current_page as f64 * view::BEATS_PER_PAGE as f64;
-                    let page_beats = view::BEATS_PER_PAGE as f64;
-                    ((global_beat - start_beat) / page_beats).clamp(0.0, 1.0)
+                    let start_beat = (self.chrome.current_page * page_beats) as f64;
+                    let page_end = (start_beat + page_beats as f64).min(total_beats);
+                    ((global_beat - start_beat) / (page_end - start_beat).max(1.0)).clamp(0.0, 1.0)
                 })
             },
             song: song.as_deref().filter(|_| !self.hosted),
@@ -1120,7 +1151,7 @@ impl Session {
         view::draw(canvas, &view, scale);
         self.draw_synth(canvas, scale);
         crate::panel::draw(canvas, &layout.items, self.chrome.widgets.focus, scale);
-        self.draw_tooltip(canvas, scale, layout.right);
+        self.draw_tooltip(canvas, scale);
         menu::draw(canvas, &self.menus(), self.chrome.menu, scale);
         if let Some(dropdown) = &self.chrome.widgets.dropdown {
             dropdown.draw(canvas, scale);
@@ -1129,7 +1160,7 @@ impl Session {
             entry.draw(canvas, scale);
         }
         if self.flash.until.is_some() && !self.message.is_empty() {
-            view::draw_toast(canvas, &self.message, canvas.height() - 2 * crate::frame::margin(scale), scale);
+            view::draw_toast(canvas, &self.message, toast_bottom(canvas.height(), scale), scale);
         }
         match &self.chrome.overlay {
             Some(Overlay::Picker(p)) => {

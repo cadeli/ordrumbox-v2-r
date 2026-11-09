@@ -271,6 +271,7 @@ pub const NOTE_GROUPS: [&[NoteRow]; 4] = [
         note_count("retriggerCount", "Retrigger", 1.0, 16.0),
         note_count("retriggerRate", "Rate", 1.0, 16.0),
         note_chance("retriggerProbability", "Probability"),
+        NoteRow::Slider(prop("retriggerFade", "Fade", 0.0, 1.0, 0.01, Format::Percent)),
     ],
     &[note_count("euclideanPulses", "Pulses", 0.0, 16.0), note_count("euclideanRotation", "Rotation", 0.0, 15.0)],
     &[
@@ -283,13 +284,30 @@ pub const NOTE_GROUPS: [&[NoteRow]; 4] = [
 /// The range of a note setting in the note editor. Not the pitch: the knob
 /// spans two octaves, the piano roll more.
 pub fn note_range(key: &str) -> Option<(f64, f64)> {
+    let prop = note_prop(key).filter(|_| key != "pitch")?;
+    Some((prop.min, prop.max))
+}
+
+/// The note editor's setting of key `key`: a knob's or a slider's.
+#[must_use]
+pub fn note_prop(key: &str) -> Option<&'static Prop> {
     let knobs = NOTE_KNOBS.iter().map(|(prop, _)| prop);
     let sliders = NOTE_GROUPS.iter().flat_map(|rows| rows.iter()).filter_map(|row| match row {
         NoteRow::Slider(prop) => Some(prop),
         NoteRow::Select(..) => None,
     });
-    let prop = knobs.chain(sliders).find(|prop| prop.key == key && key != "pitch")?;
-    Some((prop.min, prop.max))
+    knobs.chain(sliders).find(|prop| prop.key == key)
+}
+
+/// The note settings the grid's lane shows, one bar per step: their keys
+/// (settings of the note editor) and the labels of their tabs.
+pub const LANES: [(&str, &str); 4] =
+    [("velocity", "VELOCITY"), ("probability", "CHANCE"), ("retriggerCount", "RETRIG"), ("pan", "PAN")];
+
+/// The value of note setting `prop` of `note`, else its default.
+#[must_use]
+pub fn note_value(note: &Note, prop: &Prop) -> f64 {
+    note.field(prop.key).and_then(|v| v.as_f64()).unwrap_or_else(|| note_default(prop.key, prop.min))
 }
 
 pub const ARP_DIRECTIONS: [&str; 4] = ["up", "down", "updown", "random"];
@@ -315,6 +333,8 @@ pub struct EditorState {
     pub tab: u8,
     pub generation_tab: u8,
     pub note_tab: u8,
+    /// The lane under the grid: an index in [`LANES`].
+    pub lane: u8,
     /// The Generate tab shows its Advanced settings.
     pub generation_advanced: bool,
     /// The row last clicked.
@@ -489,6 +509,9 @@ pub fn note_tooltip(note: &Note, track_pitch: f64) -> String {
     }
     if note.retrigger_rate != 1.0 {
         parts.push(format!("rate:{}", fmt(note.retrigger_rate)));
+    }
+    if note.retrigger_fade != Note::default().retrigger_fade {
+        parts.push(format!("fade:{}", fmt(note.retrigger_fade)));
     }
     if note.pan != 0.0 {
         parts.push(format!("pan:{}", fmt(note.pan)));
@@ -1229,10 +1252,13 @@ fn note_default(key: &str, min: f64) -> f64 {
     Note::default().field(key).and_then(|v| v.as_f64()).unwrap_or(min)
 }
 
-/// The note editor in `area`.
+/// The note editor in `area`, a strip under the grid or the piano roll: on
+/// the left its title and its knobs, on the right its tabs and their rows.
+/// It is [`note_strip_height`] high whatever the tab.
 pub fn note_editor(view: &NoteView, state: &EditorState, area: Rect, scale: Scale) -> Vec<Item> {
     let s = scale;
-    let mut rows = Rows { x: area.x, w: area.w, y: area.y, scale: s, items: Vec::new() };
+    let left_w = area.w * NOTE_LEFT_PERCENT / 100;
+    let mut rows = Rows { x: area.x, w: left_w, y: area.y, scale: s, items: Vec::new() };
     rows.text(&view.title, theme::ACCENT);
     let Some(note) = &view.note else { return rows.items };
     let knobs = NOTE_KNOBS
@@ -1243,7 +1269,9 @@ pub fn note_editor(view: &NoteView, state: &EditorState, area: Rect, scale: Scal
             (Id::NoteKnob(p.key), spec, value, p.label, p.format.value(value, unit), false)
         })
         .collect();
-    rows.knob_bar(knobs, 4);
+    rows.knob_bar(knobs, NOTE_KNOBS.len() as i32);
+    let gap = NOTE_COLUMN_GAP * s;
+    let mut rows = Rows { x: area.x + left_w + gap, w: area.w - left_w - gap, y: area.y, scale: s, items: rows.items };
     let tabs: Vec<_> = NOTE_TABS
         .iter()
         .enumerate()
@@ -1270,6 +1298,26 @@ pub fn note_editor(view: &NoteView, state: &EditorState, area: Rect, scale: Scal
         }
     }
     rows.items
+}
+
+/// The share of the note editor's width its title and knobs take, in percent.
+const NOTE_LEFT_PERCENT: i32 = 40;
+/// The gap between the note editor's two columns, per scale unit.
+const NOTE_COLUMN_GAP: i32 = 16;
+
+/// The height of the note editor: the taller of its columns, the title over
+/// the knobs, the tabs over the most rows a tab has.
+#[must_use]
+pub fn note_strip_height(scale: Scale) -> i32 {
+    let mut left = Rows { x: 0, w: 0, y: 0, scale, items: Vec::new() };
+    left.y += 12 * scale;
+    left.y += knob_row_h(scale) + 4 * scale;
+    let mut right = Rows { x: 0, w: 0, y: 0, scale, items: Vec::new() };
+    right.tabs(&[]);
+    for _ in 0..NOTE_GROUPS.iter().map(|rows| rows.len()).max().unwrap_or(0) {
+        right.row();
+    }
+    left.y.max(right.y)
 }
 
 /// The kit editor's selects and knobs at `area`; the y under them.

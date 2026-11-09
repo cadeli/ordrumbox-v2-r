@@ -408,6 +408,7 @@ impl Session {
             Id::GenerationTab(i) => self.editors.generation_tab = i,
             Id::GenerationAdvanced => self.editors.generation_advanced = !self.editors.generation_advanced,
             Id::NoteTab(i) => self.editors.note_tab = i,
+            Id::Lane(i) => self.editors.lane = i,
             Id::Row(_) => self.select_row(id),
             Id::LoadSample => self.open_picker(Purpose::ReplaceTrackSample),
             Id::SongButton(button) => self.song_button(button),
