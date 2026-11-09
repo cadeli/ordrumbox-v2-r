@@ -60,6 +60,11 @@ assets/           data/*.json and kits/**.wav, read at runtime
   `session_mcp.rs` keeps those that play, touch files, kits, synth presets
   or the master, or change what the window shows. `ordrumbox --mcp` is the
   stdio bridge an MCP client starts (`README.md`, "AI clients").
+- An MCP client writes notes itself; it uses the automatic generation only
+  when the user asks for it explicitly. The server says so in `INSTRUCTIONS`
+  (`mcp.rs`), and starts the description of every tool of `GENERATION_TOOLS`
+  with `GENERATION_RULE`: a new tool that generates, regenerates or
+  randomizes notes joins that list.
 - Dependencies only point down the table. Nothing depends on `ordrumbox-app`.
 - Workspace lints (`Cargo.toml`): `unsafe_code = "forbid"`,
   `missing_debug_implementations = "warn"`, clippy `all`. `ordrumbox-plugin`

@@ -28,7 +28,28 @@ const INVALID_PARAMS: f64 = -32602.0;
 const INSTRUCTIONS: &str = "Controls the orDrumbox window running on this computer: every edit is \
 shown at once, is one step of Edit > Undo, and is saved with the library. Patterns are named by \
 their name (any case) and hold tracks named by their instrument (KICK, SNARE, CHH...: \
-listAllInstrumentsNames); a note's place is an absolute step, beat * stepsPerBeat + step.";
+listAllInstrumentsNames); a note's place is an absolute step, beat * stepsPerBeat + step. \
+Write patterns yourself, note by note (addNotesToPattern, updateTrack). orDrumbox's automatic \
+generation (generatePattern, regeneratePattern, regenerateTrack, randomizeTrack, toggleGeneration, \
+togglePatternAuto, setPatternMacro, and a track's autoMode) is only for when the user explicitly \
+asks for it, in words such as \"generate\", \"auto mode\" or \"random\": a request for a style, a \
+groove or a song is not such a request.";
+
+/// The tools of orDrumbox's automatic generation, which a client calls
+/// only when the user asks for generation ([`GENERATION_RULE`]).
+const GENERATION_TOOLS: [&str; 7] = [
+    "generatePattern",
+    "regeneratePattern",
+    "regenerateTrack",
+    "randomizeTrack",
+    "toggleGeneration",
+    "togglePatternAuto",
+    "setPatternMacro",
+];
+/// What the description of each generation tool, and of a track's
+/// `autoMode`, starts with.
+const GENERATION_RULE: &str = "Automatic generation: call only when the user explicitly asks for generation, \
+auto mode or random notes, never to fulfil a request for a style, a groove or a song (write the notes instead).";
 
 /// Track settings a tool may not set: the track is named by `trackName`.
 const NOT_EDITED: [&str; 1] = ["name"];
@@ -310,9 +331,23 @@ fn track_properties() -> Value {
     let keys = Track::KEYS.iter().filter(|k| Track::is_setting(k) && !NOT_EDITED.contains(k));
     let entries = keys.map(|&key| {
         let default = defaults.field(key).unwrap_or_default();
-        (key, setting_schema(key, &default, Track::value_range(key)))
+        let mut schema = setting_schema(key, &default, Track::value_range(key));
+        if key == "autoMode"
+            && let Some(schema) = schema.as_object_mut()
+        {
+            schema.insert("description", Value::from(format!("{GENERATION_RULE} A new line every loop.")));
+        }
+        (key, schema)
     });
     object(entries)
+}
+
+/// Start the description of tool `tool` with [`GENERATION_RULE`].
+fn mark_generation(tool: &mut Value) {
+    let Some(tool) = tool.as_object_mut() else { return };
+    let description = tool.get("description").and_then(Value::as_str).unwrap_or_default();
+    let marked = format!("{GENERATION_RULE} {description}");
+    tool.insert("description", Value::from(marked));
 }
 
 /// The note fields a tool may set, as schema properties.
@@ -392,6 +427,7 @@ pub fn tools() -> Value {
             "setMaster" => {
                 add_properties(tool, &[schema[0], schema[1], "settings", "properties"], &master_properties())
             }
+            name if GENERATION_TOOLS.contains(&name) => mark_generation(tool),
             _ => {}
         }
     }
@@ -504,6 +540,25 @@ mod tests {
         let cycle = notes.get("properties").unwrap().get("cycle").unwrap();
         assert_eq!(cycle.to_json(), r#"{"type":"number","minimum":1,"maximum":16}"#);
         assert!(notes.get("properties").unwrap().get("beat").is_none());
+    }
+
+    #[test]
+    fn generation_is_only_for_when_the_user_asks_for_it() {
+        let tools = tools();
+        let tools = tools.as_array().unwrap();
+        let description = |tool: &Value| tool.get("description").and_then(Value::as_str).unwrap().to_owned();
+        for tool in tools {
+            let name = tool.get("name").and_then(Value::as_str).unwrap();
+            let marked = description(tool).starts_with(GENERATION_RULE);
+            assert_eq!(marked, GENERATION_TOOLS.contains(&name), "{name}");
+        }
+        let named = |name: &str| tools.iter().any(|t| t.get("name").and_then(Value::as_str) == Some(name));
+        assert!(GENERATION_TOOLS.iter().all(|name| named(name)), "a generation tool is gone");
+        assert!(GENERATION_TOOLS.iter().all(|name| INSTRUCTIONS.contains(name)));
+        let update = tools.iter().find(|t| t.get("name").and_then(Value::as_str) == Some("updateTrack")).unwrap();
+        let updates = update.get("inputSchema").unwrap().get("properties").unwrap().get("updates").unwrap();
+        let auto_mode = updates.get("properties").unwrap().get("autoMode").unwrap();
+        assert!(description(auto_mode).starts_with(GENERATION_RULE));
     }
 
     #[test]

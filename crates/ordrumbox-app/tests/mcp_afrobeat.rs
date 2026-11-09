@@ -3,7 +3,8 @@
 //! melodic progressions and breaks". The `ordrumbox --mcp` bridge is started
 //! as a client starts it; each call goes through it to a session in this
 //! process, which answers between its "frames", and the client reads each
-//! answer before its next call, as a client does.
+//! answer before its next call, as a client does. The request does not ask
+//! for orDrumbox's automatic generation, so the client writes every note.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
 
@@ -33,6 +34,17 @@ const VERSE_CHORDS: &str = "afro verse chords";
 const CHORUS_CHORDS: &str = "afro chorus chords";
 const FILL: &str = "afro fill";
 const STOP: &str = "afro stop";
+/// The tools of orDrumbox's automatic generation: the request does not ask
+/// for it, so the client calls none.
+const GENERATION_TOOLS: [&str; 7] = [
+    "generatePattern",
+    "regeneratePattern",
+    "regenerateTrack",
+    "randomizeTrack",
+    "toggleGeneration",
+    "togglePatternAuto",
+    "setPatternMacro",
+];
 /// Measures of each harmony pattern: 16 beats.
 const HARMONY_MEASURES: u32 = 4;
 
@@ -84,6 +96,8 @@ struct Client {
     stdin: Option<ChildStdin>,
     answers: Receiver<String>,
     next_id: u32,
+    /// The tools called, in order.
+    called: Vec<String>,
 }
 
 impl Client {
@@ -106,7 +120,7 @@ impl Client {
                 }
             }
         });
-        Self { bridge, stdin, answers, next_id: 1 }
+        Self { bridge, stdin, answers, next_id: 1, called: Vec::new() }
     }
 
     fn send(&mut self, line: &str) {
@@ -139,6 +153,7 @@ impl Client {
     /// Call tool `name`, which must succeed; its answer, parsed.
     fn call(&mut self, session: &mut Session, name: &str, arguments: &str) -> Value {
         json::parse(arguments).unwrap_or_else(|e| panic!("{name}: arguments not JSON ({e}): {arguments}"));
+        self.called.push(name.to_owned());
         let answer = self.request(session, "tools/call", &format!(r#"{{"name":"{name}","arguments":{arguments}}}"#));
         let result = answer.get("result").unwrap_or_else(|| panic!("{name}: no result in {answer}"));
         let content = result.get("content").and_then(Value::as_array).unwrap();
@@ -174,6 +189,41 @@ fn notes_json(notes: &[String]) -> String {
 
 fn note(track: &str, step: i32, fields: &str) -> String {
     format!(r#"{{"trackName":"{track}","step":{step}{fields}}}"#)
+}
+
+/// Hits on `track`: step and velocity.
+fn hits(track: &str, hits: &[(i32, f64)]) -> impl Iterator<Item = String> {
+    hits.iter().map(move |(step, velocity)| note(track, *step, &format!(r#","velocity":{velocity}"#)))
+}
+
+/// A one-measure afrobeat groove, 4 steps a beat: the kick around 1 and
+/// the push, the backbeat with ghost notes, sixteenths on the hi-hat
+/// opened on the off-beats, the bell and the shaker over them.
+fn groove_a_notes() -> String {
+    let sixteenths: Vec<(i32, f64)> =
+        (0..16).filter(|s| s % 8 != 2).map(|s| (s, if s % 4 == 0 { 0.7 } else { 0.4 })).collect();
+    let notes = hits("KICK", &[(0, 1.0), (6, 0.8), (10, 0.85)])
+        .chain(hits("SNARE", &[(4, 0.9), (7, 0.35), (12, 0.95), (14, 0.3)]))
+        .chain(hits("CHH", &sixteenths))
+        .chain(hits("OHH", &[(2, 0.6), (10, 0.6)]))
+        .chain(hits("COWBELL", &[(0, 0.8), (3, 0.6), (6, 0.6), (8, 0.7), (10, 0.6), (13, 0.6)]))
+        .chain(hits("SHAKER", &[(1, 0.4), (5, 0.4), (9, 0.4), (13, 0.4)]));
+    notes_json(&notes.collect::<Vec<_>>())
+}
+
+/// The chorus groove: more kicks and ghost notes, a clap on the backbeat.
+fn groove_b_notes() -> String {
+    let sixteenths: Vec<(i32, f64)> =
+        (0..16).filter(|s| s % 8 != 6).map(|s| (s, if s % 4 == 0 { 0.75 } else { 0.45 })).collect();
+    let shaker: Vec<(i32, f64)> = (1..16).step_by(2).map(|s| (s, if s % 4 == 1 { 0.45 } else { 0.35 })).collect();
+    let notes = hits("KICK", &[(0, 1.0), (3, 0.7), (6, 0.85), (10, 0.9), (13, 0.7)])
+        .chain(hits("SNARE", &[(2, 0.3), (4, 0.95), (9, 0.35), (12, 1.0), (15, 0.4)]))
+        .chain(hits("CHH", &sixteenths))
+        .chain(hits("OHH", &[(6, 0.65), (14, 0.65)]))
+        .chain(hits("COWBELL", &[(0, 0.85), (2, 0.6), (5, 0.6), (7, 0.6), (8, 0.75), (10, 0.6), (13, 0.6), (15, 0.6)]))
+        .chain(hits("SHAKER", &shaker))
+        .chain(hits("CLAP", &[(12, 0.7)]));
+    notes_json(&notes.collect::<Vec<_>>())
 }
 
 /// A bass line and a chord progression over `roots`, one chord a measure,
@@ -234,25 +284,23 @@ fn a_client_composes_an_afrobeat_song_of_64_measures() {
     let mut client = Client::start(&dir);
 
     let init = client.request(&mut session, "initialize", r#"{"protocolVersion":"2024-11-05"}"#);
-    assert!(init.get("result").and_then(|r| r.get("serverInfo")).is_some(), "{init}");
+    let result = init.get("result").unwrap_or_else(|| panic!("{init}"));
+    assert!(result.get("serverInfo").is_some(), "{init}");
+    // The client is told to write the notes itself.
+    let instructions = result.get("instructions").and_then(Value::as_str).unwrap();
+    assert!(instructions.contains("Write patterns yourself"), "{instructions}");
     client.send(r#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#);
     let tools = client.request(&mut session, "tools/list", "{}");
     let tools = tools.get("result").and_then(|r| r.get("tools")).and_then(Value::as_array).unwrap();
     let names: BTreeSet<&str> = tools.iter().filter_map(|t| t.get("name").and_then(Value::as_str)).collect();
-    for needed in ["listStyles", "generatePattern", "addNotesToPattern", "createArrangement", "addPatternToArrangement"]
-    {
+    for needed in ["createNewPattern", "addNotesToPattern", "createArrangement", "addPatternToArrangement"] {
         assert!(names.contains(needed), "no tool {needed}");
     }
 
-    // The client looks for the style, then has two grooves made in it.
-    let styles = client.call(&mut session, "listStyles", "{}");
-    assert!(styles.to_json().contains("afrobeat"), "no afrobeat style: {styles}");
-    for name in [GROOVE_A, GROOVE_B] {
-        let made = client.call(&mut session, "generatePattern", r#"{"style":"afrobeat"}"#);
-        assert_eq!(str_field(&made, "style"), "afrobeat", "{made}");
-        let generated = str_field(&made, "name").to_owned();
-        let arguments = format!(r#"{{"patternName":"{generated}","newName":"{name}"}}"#);
-        client.call(&mut session, "renamePattern", &arguments);
+    // Two grooves, written note by note: the request asks for no generation.
+    for (name, notes) in [(GROOVE_A, groove_a_notes()), (GROOVE_B, groove_b_notes())] {
+        client.call(&mut session, "createNewPattern", &format!(r#"{{"patternName":"{name}"}}"#));
+        client.call(&mut session, "addNotesToPattern", &format!(r#"{{"patternName":"{name}","notes":{notes}}}"#));
     }
 
     // The harmony: a bass and chords over a progression, 4 measures long.
@@ -313,7 +361,7 @@ fn a_client_composes_an_afrobeat_song_of_64_measures() {
     let groove = client.call(&mut session, "loadPattern", &format!(r#"{{"patternName":"{GROOVE_A}"}}"#));
     let tracks = groove.get("tracks").and_then(Value::as_array).unwrap();
     let track_names: BTreeSet<&str> = tracks.iter().map(|t| str_field(t, "name")).collect();
-    assert!(["KICK", "SNARE", "BASS", "ORGAN"].iter().all(|t| track_names.contains(t)), "{track_names:?}");
+    assert!(["KICK", "SNARE", "CHH", "COWBELL"].iter().all(|t| track_names.contains(t)), "{track_names:?}");
 
     // It plays.
     let played = client.call(&mut session, "play", r#"{"song":true}"#);
@@ -321,6 +369,8 @@ fn a_client_composes_an_afrobeat_song_of_64_measures() {
     let state = client.call(&mut session, "getPlaybackState", "{}");
     assert_eq!(str_field(&state, "arrangement"), ARRANGEMENT, "{state}");
     client.call(&mut session, "stop", "{}");
+    let generated: Vec<&String> = client.called.iter().filter(|c| GENERATION_TOOLS.contains(&c.as_str())).collect();
+    assert!(generated.is_empty(), "generation was not asked for: {generated:?}");
     client.finish();
     std::fs::remove_dir_all(&dir).unwrap();
 
@@ -332,7 +382,7 @@ fn a_client_composes_an_afrobeat_song_of_64_measures() {
         let groove = pattern(&library, name);
         assert_eq!(groove.tags, ["afrobeat"]);
         let sounding = sounding_tracks(groove);
-        assert!(["KICK", "SNARE"].iter().all(|t| sounding.contains(t)), "{name}: {sounding:?}");
+        assert!(["KICK", "SNARE", "COWBELL"].iter().all(|t| sounding.contains(t)), "{name}: {sounding:?}");
     }
     // The harmony moves: the bass follows the progression, the chords too.
     for (name, roots) in [(VERSE_CHORDS, &VERSE_ROOTS), (CHORUS_CHORDS, &CHORUS_ROOTS)] {
