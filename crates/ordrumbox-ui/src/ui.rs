@@ -807,6 +807,35 @@ mod tests {
     }
 
     #[test]
+    fn with_toasts_off_a_message_only_goes_on_the_status_line() {
+        let library =
+            ordrumbox_core::Library::parse(r#"{"patterns":[{"name":"demo","tracks":[{"name":"KICK"}]}]}"#).unwrap().0;
+        let mut ui = Ui::new(Session::for_tests(library, false));
+        let refuse = |ui: &mut Ui| {
+            ui.session.say("select a track first");
+            false
+        };
+        ui.input(refuse);
+        assert!(ui.session.flash_until().is_some());
+
+        // Turning them off takes the ones on screen away too.
+        ui.input(|ui| {
+            ui.session.toggle_toasts();
+            false
+        });
+        assert_eq!(ui.session.flash_until(), None);
+        ui.input(refuse);
+        assert_eq!(ui.session.flash_until(), None);
+        assert_eq!(ui.session.message(), "select a track first");
+
+        ui.input(|ui| {
+            ui.session.toggle_toasts();
+            false
+        });
+        assert_eq!(ui.session.toast_texts(), ["toasts on"]);
+    }
+
+    #[test]
     fn a_click_on_the_toast_hides_it_at_once() {
         let library =
             ordrumbox_core::Library::parse(r#"{"patterns":[{"name":"demo","tracks":[{"name":"KICK"}]}]}"#).unwrap().0;
@@ -826,5 +855,50 @@ mod tests {
         assert!(ui.input(|ui| ui.session.toast_click((width, height, scale), at.0, at.1)));
         assert_eq!(ui.session.flash_until(), None);
         assert_eq!(ui.session.message(), "select a track first");
+    }
+
+    #[test]
+    fn toasts_stack_upwards_up_to_five_and_a_click_hides_one() {
+        let library =
+            ordrumbox_core::Library::parse(r#"{"patterns":[{"name":"demo","tracks":[{"name":"KICK"}]}]}"#).unwrap().0;
+        let mut ui = Ui::new(Session::for_tests(library, false));
+        let say = |ui: &mut Ui, text: &'static str| {
+            ui.input(|ui| {
+                ui.session.say(text);
+                false
+            })
+        };
+        say(&mut ui, "one");
+        say(&mut ui, "two");
+        assert_eq!(ui.session.toast_texts(), ["one", "two"]);
+        // The same words again get a toast of their own, which counts them.
+        say(&mut ui, "two");
+        say(&mut ui, "two");
+        assert_eq!(ui.session.toast_texts(), ["one", "two", "two (×2)", "two (×3)"]);
+        for text in ["three", "four", "five", "six"] {
+            say(&mut ui, text);
+        }
+        assert_eq!(ui.session.toast_texts(), ["two (×3)", "three", "four", "five", "six"], "five at most");
+        // Other words in between start the count again.
+        say(&mut ui, "five");
+        assert_eq!(ui.session.toast_texts(), ["three", "four", "five", "six", "five"]);
+
+        // The newest at the bottom, the older ones above it, apart.
+        let (width, height, scale) = ui.size();
+        let bottom = height - 2 * frame::margin(scale);
+        let newest = view::toast_rect(width, "five", bottom, scale);
+        let above = view::toast_rect(width, "six", newest.y - view::toast_gap(scale), scale);
+        assert_eq!(newest.y + newest.h, bottom);
+        assert!(above.y + above.h < newest.y);
+
+        // A click on the one above hides it alone.
+        let at = (above.x + above.w / 2, above.y + above.h / 2);
+        assert!(ui.input(|ui| ui.session.toast_click((width, height, scale), at.0, at.1)));
+        assert_eq!(ui.session.toast_texts(), ["three", "four", "five", "five"]);
+
+        // They go when their time is over.
+        assert!(ui.session.end_flash(Instant::now() + Duration::from_secs(60)));
+        assert!(ui.session.toast_texts().is_empty());
+        assert_eq!(ui.session.flash_until(), None);
     }
 }
