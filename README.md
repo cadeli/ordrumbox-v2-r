@@ -106,6 +106,13 @@ MIDI input included, not on the MIDI notes sent out). At their defaults they cha
 nothing. A filter of type `allpass`, and a reverb or delay of type `none`, stay off.
 They change what plays, not the library.
 
+The plugin has 17 stereo outputs: **Mix**, and **Track 1** to **Track 16**. Every track plays
+in the mix until its **Output** parameter is set to *Own*: track 3 then leaves the mix and
+plays on **Track 3**, with its own volume, pan, filter and effects, for the host to mix and
+process apart. The master's compressor, filters, limit and volume act on the mix only. An
+output with no track on it is silent. A host that gives the plugin a single stereo output
+keeps every track in the mix, whatever the parameter says; tracks past the 16th always are.
+
 MIDI goes both ways, with one place per track of the pattern playing (or selected):
 a drum track is on channel 10 at its instrument's GM key (KICK 36, SNARE 38…), whatever
 the note's pitch. Any other track (melodic, unknown name, a second track of one drum) has a

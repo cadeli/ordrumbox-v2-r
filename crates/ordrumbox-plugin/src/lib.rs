@@ -1,5 +1,6 @@
 //! orDrumbox as a CLAP (and, with the `vst3` feature, VST3) instrument: no
-//! audio input, a stereo output, playback that follows the host's transport
+//! audio input, a stereo output and one more per track of the first 16
+//! (for the tracks the host takes out of the mix), playback that follows the host's transport
 //! (play and stop, position, tempo), the library saved in the host's
 //! project, and parameters a host automates (`params.rs`).
 //!
@@ -16,7 +17,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use nih_plug::prelude::*;
-use ordrumbox_engine::{AudioSide, BlockNote, HostTransport};
+use ordrumbox_engine::{AudioSide, BlockNote, HOST_TRACKS, HostTransport};
 
 mod editor;
 pub mod lockstep;
@@ -85,6 +86,26 @@ fn ready(audio: &mut AudioSide, pace: &mut Pace, steps: &Steps, host: HostTransp
     }
 }
 
+/// The stereo outputs past the main one, one per track a host changes.
+const TRACK_OUTPUTS: [NonZeroU32; HOST_TRACKS] = [new_nonzero_u32(2); HOST_TRACKS];
+const TRACK_OUTPUT_NAMES: [&str; HOST_TRACKS] = [
+    "Track 1", "Track 2", "Track 3", "Track 4", "Track 5", "Track 6", "Track 7", "Track 8", "Track 9", "Track 10",
+    "Track 11", "Track 12", "Track 13", "Track 14", "Track 15", "Track 16",
+];
+
+/// The tracks that have an output among `outputs` of them, as a mask (bit
+/// `t` for track `t`): the others stay in the mix.
+fn with_output(outputs: usize) -> u64 {
+    u32::try_from(outputs).ok().and_then(|n| 1_u64.checked_shl(n)).map_or(u64::MAX, |bit| bit - 1)
+}
+
+/// `samples` written into `out`, `at` frames in; nothing past its end.
+fn write_at(out: &mut [f32], at: usize, samples: &[f32]) {
+    if let Some(out) = out.get_mut(at..).and_then(|out| out.get_mut(..samples.len())) {
+        out.copy_from_slice(samples);
+    }
+}
+
 /// A note the engine sent, as the host takes it.
 fn note_event(note: BlockNote) -> NoteEvent<()> {
     let BlockNote { timing, channel, key, velocity } = note;
@@ -101,11 +122,28 @@ impl Plugin for Ordrumbox {
     const EMAIL: &'static str = "";
     const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
-    const AUDIO_IO_LAYOUTS: &'static [AudioIOLayout] = &[AudioIOLayout {
-        main_input_channels: None,
-        main_output_channels: NonZeroU32::new(2),
-        ..AudioIOLayout::const_default()
-    }];
+    // The first is the default; a host that takes one stereo output only
+    // picks the second, where every track stays in the mix.
+    const AUDIO_IO_LAYOUTS: &'static [AudioIOLayout] = &[
+        AudioIOLayout {
+            main_input_channels: None,
+            main_output_channels: NonZeroU32::new(2),
+            aux_output_ports: &TRACK_OUTPUTS,
+            names: PortNames {
+                layout: Some("Stereo and track outputs"),
+                main_output: Some("Mix"),
+                aux_outputs: &TRACK_OUTPUT_NAMES,
+                ..PortNames::const_default()
+            },
+            ..AudioIOLayout::const_default()
+        },
+        AudioIOLayout {
+            main_input_channels: None,
+            main_output_channels: NonZeroU32::new(2),
+            names: PortNames { layout: Some("Stereo"), ..PortNames::const_default() },
+            ..AudioIOLayout::const_default()
+        },
+    ];
 
     const MIDI_INPUT: MidiConfig = MidiConfig::Basic;
     const MIDI_OUTPUT: MidiConfig = MidiConfig::Basic;
@@ -152,22 +190,32 @@ impl Plugin for Ordrumbox {
     fn process(
         &mut self,
         buffer: &mut Buffer,
-        _aux: &mut AuxiliaryBuffers,
+        aux: &mut AuxiliaryBuffers,
         context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
         let transport = context.transport();
         let host = host_transport(transport.playing, transport.tempo, transport.pos_beats(), self.bpm);
         self.bpm = host.bpm;
+        // Silent unless a track plays there.
+        let outputs = &mut *aux.outputs;
+        outputs.iter_mut().flat_map(|output| output.as_slice().iter_mut()).for_each(|c| c.fill(0.0));
         match (&mut self.audio, buffer.as_slice()) {
             (Some(audio), [left, right, ..]) => {
                 ready(audio, &mut self.pace, &self.steps, host, left.len());
-                audio.set_host_mix(self.params.mix());
+                let mut mix = self.params.mix();
+                mix.split &= with_output(outputs.len());
+                audio.set_host_mix(mix);
                 while let Some(event) = context.next_event() {
                     if let NoteEvent::NoteOn { timing, channel, note, velocity, .. } = event {
                         audio.trigger(channel, note, velocity, timing);
                     }
                 }
-                audio.render_synced(left, right, host);
+                audio.render_synced_split(left, right, host, |track, at, track_left, track_right| {
+                    if let Some([out_left, out_right, ..]) = outputs.get_mut(track).map(Buffer::as_slice) {
+                        write_at(out_left, at, track_left);
+                        write_at(out_right, at, track_right);
+                    }
+                });
                 audio.take_notes(|note| context.send_event(note_event(note)));
             }
             (_, channels) => channels.iter_mut().for_each(|c| c.fill(0.0)),
@@ -216,6 +264,19 @@ mod tests {
         assert_eq!(host_transport(true, None, Some(4.0), 90.0).bpm, 90.0);
         let host = host_transport(true, Some(0.0), None, 90.0);
         assert_eq!(host, HostTransport { playing: false, bpm: 90.0, beat: 0.0 });
+    }
+
+    #[test]
+    fn tracks_past_the_outputs_stay_in_the_mix_and_nothing_is_written_past_a_block() {
+        assert_eq!(with_output(0), 0);
+        assert_eq!(with_output(HOST_TRACKS), 0xFFFF);
+        assert_eq!(with_output(64), u64::MAX);
+        assert_eq!(TRACK_OUTPUT_NAMES[HOST_TRACKS - 1], format!("Track {HOST_TRACKS}"));
+        let mut out = [0.0; 4];
+        write_at(&mut out, 2, &[1.0, 2.0]);
+        assert_eq!(out, [0.0, 0.0, 1.0, 2.0]);
+        write_at(&mut out, 3, &[5.0, 5.0]);
+        assert_eq!(out, [0.0, 0.0, 1.0, 2.0]);
     }
 
     #[test]

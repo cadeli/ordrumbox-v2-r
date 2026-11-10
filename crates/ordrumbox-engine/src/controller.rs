@@ -243,12 +243,24 @@ impl AudioSide {
     /// inside the pass it plays. When the host is in another pass, it says
     /// so, and the controller posts that pass ([`Controller::update`]).
     pub fn render_synced(&mut self, left: &mut [f32], right: &mut [f32], host: HostTransport) {
+        self.render_synced_split(left, right, host, |_, _, _, _| {});
+    }
+
+    /// [`Self::render_synced`], the tracks the host's mix splits given to
+    /// `aux` instead of the mix ([`Engine::render_split`]).
+    pub fn render_synced_split(
+        &mut self,
+        left: &mut [f32],
+        right: &mut [f32],
+        host: HostTransport,
+        aux: impl FnMut(usize, usize, &[f32], &[f32]),
+    ) {
         (self.block_start, self.block_frames) = (self.engine.clock(), left.len().min(right.len()));
         if let Some(mut inbox) = try_lock(&self.link.inbox) {
             take(&mut self.engine, &mut inbox, Some(host));
         }
         let lost = self.follow(host);
-        self.engine.render(left, right);
+        self.engine.render_split(left, right, aux);
         self.publish(left, right, Some(host), lost);
     }
 
