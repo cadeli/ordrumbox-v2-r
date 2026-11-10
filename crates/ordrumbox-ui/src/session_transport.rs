@@ -117,7 +117,7 @@ impl Session {
     }
 
     /// Say once when the host's tempo is outside the tempo bounds: a plugin
-    /// shows no tempo, and plays at the nearest bound instead.
+    /// plays at the nearest bound instead, the tempo its header shows.
     pub(super) fn report_host_tempo(&mut self) {
         use ordrumbox_core::num;
         use ordrumbox_core::song::{MAX_BPM, MIN_BPM, clamp_bpm};
@@ -136,6 +136,18 @@ impl Session {
     /// mute boxes; true when they changed.
     pub fn set_host_muted(&mut self, muted: u64) -> bool {
         std::mem::replace(&mut self.host_muted, muted) != muted
+    }
+
+    /// Take what the plugin host's transport does now, for the header:
+    /// whether it plays, and the tempo played, to a tenth. True when what
+    /// the header shows changed.
+    pub fn watch_host(&mut self) -> bool {
+        use ordrumbox_core::{num, song::clamp_bpm};
+        let shown = self
+            .playback
+            .host()
+            .map(|host| crate::view::HostState { playing: host.playing, bpm: num::round_to(clamp_bpm(host.bpm), 1) });
+        std::mem::replace(&mut self.host_shown, shown) != shown
     }
 
     /// A plugin host's swing on every track: where the second step of each

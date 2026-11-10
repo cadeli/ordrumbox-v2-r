@@ -166,9 +166,8 @@ pub struct View<'a> {
     pub levels: Vec<f32>,
     /// Whether the VU meter stripe is shown.
     pub show_vus: bool,
-    /// The transport group (play and tempo) is shown: not in a plugin,
-    /// which leaves them to the host, its place left empty.
-    pub transport: bool,
+    /// What the header's first group shows.
+    pub transport: Transport,
     /// A track being dragged by its name: from which row to which.
     pub track_drop: Option<(usize, usize)>,
     /// The tracks a plugin host mutes, bit `t` for track `t`.
@@ -458,6 +457,24 @@ pub struct Layout {
 /// Text scale of the header (the 8 px font at 16 px per scale unit).
 fn header_text(scale: Scale) -> Scale {
     scale.times(2)
+}
+
+/// The header's first group: the app's transport, or a plugin host's.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Transport {
+    /// Play and the tempo knob (panel items).
+    Own,
+    /// What the host's transport does, only shown: whether it plays and the
+    /// tempo the pattern plays at (`None` before the host's first block).
+    Host(Option<HostState>),
+}
+
+/// A plugin host's transport, as the header shows it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct HostState {
+    pub playing: bool,
+    /// The tempo played: the host's, inside the tempo bounds, to a tenth.
+    pub bpm: f64,
 }
 
 /// The header's pattern list and kit list (`PatternNav`'s two selects).
@@ -900,8 +917,7 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: Scale) {
     // The groups' frames, behind their widgets (panel items, drawn later).
     // The generation's only with a pattern: it has nothing to show without.
     for (i, group) in c.groups(scale).into_iter().enumerate() {
-        let empty = (view.pattern.is_none() && i != 3) || (!view.transport && i == 0);
-        if empty {
+        if view.pattern.is_none() && i != 3 {
             continue;
         }
         canvas.fill_rect(group.x, group.y, group.w, group.h, theme::panel());
@@ -912,8 +928,10 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: Scale) {
         canvas.text(r.x, top, text, scale, theme::muted());
     };
     if view.pattern.is_some() {
-        if view.transport {
-            label(canvas, c.bpm, "BPM");
+        label(canvas, c.bpm, "BPM");
+        if let Transport::Host(host) = view.transport {
+            label(canvas, c.play, "HOST");
+            draw_host_state(canvas, &c, host, scale);
         }
         match (view.waiting, view.pattern) {
             (Some(on), _) => {
@@ -1019,6 +1037,28 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: Scale) {
     if let Some(out) = &view.output {
         output::draw(canvas, out, &OutputLayout::strip(canvas.width(), body.output, scale));
     }
+}
+
+/// A plugin host's transport, where the app has its play button and tempo
+/// knob: a triangle while it plays, a square while stopped, and the tempo
+/// played. Both keep their place before the host was seen, the tempo a dash.
+fn draw_host_state(canvas: &mut Canvas, c: &HeaderControls, host: Option<HostState>, scale: Scale) {
+    let size = 8 * scale;
+    let (x, y) = (c.play.x + 2 * scale, c.play.y + (c.play.h - size) / 2);
+    if host.is_some_and(|host| host.playing) {
+        // Pointing right: each column shorter by a pixel at both ends.
+        for col in 0..size {
+            let inset = col / 2;
+            canvas.fill_rect(x + col, y + inset, 1, size - 2 * inset, PLAYING);
+        }
+    } else {
+        canvas.fill_rect(x, y, size, size, theme::muted());
+    }
+    let (tempo, color) = match host {
+        Some(host) => (ordrumbox_core::num::text(host.bpm), theme::text()),
+        None => ("-".to_owned(), theme::muted()),
+    };
+    canvas.text(c.bpm.x, c.bpm.y + 4 * scale, &tempo, scale, color);
 }
 
 /// The beat ruler above the rows: each beat's number (the one playing lit),
@@ -1681,6 +1721,29 @@ mod tests {
     }
 
     #[test]
+    fn a_host_transport_is_shown_in_the_transport_group_and_nowhere_else() {
+        let scale = Scale::ONE;
+        let controls = header_controls(scale);
+        let group = controls.groups(scale)[0];
+        let (w, h) = (400usize, 80usize);
+        let drawn = |host: Option<HostState>| {
+            let mut pixels = vec![0; w * h];
+            draw_host_state(&mut Canvas::new(&mut pixels, w, h), &controls, host, scale);
+            let inside = |i: usize| {
+                let (x, y) = ((i % w) as i32, (i / w) as i32);
+                x >= group.x && x < group.x + group.w && y >= group.y && y < group.y + group.h
+            };
+            assert!(pixels.iter().enumerate().all(|(i, p)| *p == 0 || inside(i)), "{host:?}");
+            let count = |color: Rgb| pixels.iter().filter(|p| **p == color).count();
+            (count(PLAYING), count(theme::muted()))
+        };
+        let (playing, stopped) = (drawn(Some(HostState { playing: true, bpm: 97.5 })).0, drawn(None).1);
+        assert!(playing > 0, "a triangle while the host plays");
+        assert!(stopped >= 64, "a square before the host was seen");
+        assert_eq!(drawn(Some(HostState { playing: false, bpm: 300.0 })).0, 0, "nothing lit while stopped");
+    }
+
+    #[test]
     fn draws_without_panicking_at_any_size() {
         let library = library();
         for (w, h) in [(1, 1), (40, 30), (1024, 640)] {
@@ -1706,7 +1769,7 @@ mod tests {
                 note_editor: true,
                 levels: vec![0.0; 2],
                 show_vus: true,
-                transport: true,
+                transport: Transport::Own,
                 track_drop: None,
                 host_muted: 0b10,
                 cursor: Some(Cursor { track: 0, beat: 1, step: 2 }),

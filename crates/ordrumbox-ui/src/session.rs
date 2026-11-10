@@ -327,6 +327,8 @@ pub struct Session {
     /// The host's tempo last said to be outside the tempo bounds
     /// (`report_host_tempo`), so the message is given once.
     host_tempo_outside: Option<f64>,
+    /// A plugin host's transport as the header shows it (`watch_host`).
+    host_shown: Option<view::HostState>,
     /// The output panel: the master bus, its tab, the spectrum.
     output_panel: session_output::OutputPanel,
     /// The update check (`session_update.rs`).
@@ -721,6 +723,7 @@ impl Session {
             hosted: false,
             host_muted: 0,
             host_tempo_outside: None,
+            host_shown: None,
             output_panel: session_output::OutputPanel::default(),
             updates: session_update::Updates::default(),
             mcp: None,
@@ -1111,6 +1114,11 @@ impl Session {
         Some(ordrumbox_core::song::clamp_bpm(host.bpm.round()))
     }
 
+    /// The header's first group: a plugin shows its host's transport there.
+    fn transport_shown(&self) -> view::Transport {
+        if self.hosted { view::Transport::Host(self.host_shown) } else { view::Transport::Own }
+    }
+
     /// The tempo the tracks play at: the host's in a plugin, else what
     /// plays (the song's, the library's), else the header's.
     pub(super) fn playing_bpm(&self) -> f64 {
@@ -1290,7 +1298,7 @@ impl Session {
             note_editor: self.note_editor_shown(),
             levels,
             show_vus: self.chrome.show_vus,
-            transport: !self.hosted,
+            transport: self.transport_shown(),
             host_muted: self.host_muted,
             track_drop: self.track_drop((canvas.width(), canvas.height(), scale)),
             waiting,
