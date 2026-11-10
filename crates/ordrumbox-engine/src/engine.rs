@@ -77,7 +77,8 @@ pub fn host_pass(beat: f64, ticks: u32) -> Option<(u64, f64)> {
 // One bit per track in the host's mute mask.
 const _: () = assert!(MAX_TRACKS <= u64::BITS as usize);
 
-/// Whether a plugin host's mute mask `muted` (bit `t` for track `t`) mutes `track`.
+/// Whether a plugin host's mute mask `muted` (bit `t` for track `t`) mutes
+/// `track`; the same for any of its track masks.
 pub fn host_muted(muted: u64, track: usize) -> bool {
     u32::try_from(track).ok().and_then(|t| muted.checked_shr(t)).is_some_and(|m| m & 1 == 1)
 }
@@ -99,13 +100,16 @@ pub struct HostMix {
     pub gain: f32,
     /// The tracks muted: bit `t` for track `t`.
     pub muted: u64,
+    /// The tracks left out of the mix and given apart, each on an output of
+    /// its own ([`Engine::render_split`]): bit `t` for track `t`.
+    pub split: u64,
     /// The changes to each of the first tracks.
     pub tracks: [HostTrack; HOST_TRACKS],
 }
 
 impl Default for HostMix {
     fn default() -> Self {
-        Self { gain: 1.0, muted: 0, tracks: [HostTrack::default(); HOST_TRACKS] }
+        Self { gain: 1.0, muted: 0, split: 0, tracks: [HostTrack::default(); HOST_TRACKS] }
     }
 }
 
@@ -615,11 +619,25 @@ impl Engine {
 
     /// Render `left.len()` frames (both slices the same length), replacing their content.
     pub fn render(&mut self, left: &mut [f32], right: &mut [f32]) {
+        self.render_split(left, right, |_, _, _, _| {});
+    }
+
+    /// [`Self::render`], the tracks a plugin host splits ([`HostMix::split`])
+    /// left out of the mix and given to `aux` instead: the track, the frame
+    /// of the block its samples start at, and its strip's output, left and
+    /// right, which the master bus has not touched. A track whose strip is
+    /// idle gives nothing: its output is silent there.
+    pub fn render_split(
+        &mut self,
+        left: &mut [f32],
+        right: &mut [f32],
+        mut aux: impl FnMut(usize, usize, &[f32], &[f32]),
+    ) {
         let frames = left.len().min(right.len());
         let mut done = 0;
         while done < frames {
             let n = (frames - done).min(QUANTUM);
-            self.render_quantum(&mut left[done..done + n], &mut right[done..done + n]);
+            self.render_quantum(&mut left[done..done + n], &mut right[done..done + n], done, &mut aux);
             done += n;
         }
         self.end_notes(Some(self.clock));
@@ -629,7 +647,14 @@ impl Engine {
         }
     }
 
-    fn render_quantum(&mut self, out_left: &mut [f32], out_right: &mut [f32]) {
+    /// One quantum, `at` frames into the block.
+    fn render_quantum(
+        &mut self,
+        out_left: &mut [f32],
+        out_right: &mut [f32],
+        at: usize,
+        aux: &mut impl FnMut(usize, usize, &[f32], &[f32]),
+    ) {
         let n = out_left.len();
         let strips = self.strip_count;
         self.input_left[..strips * QUANTUM].fill(0.0);
@@ -680,9 +705,15 @@ impl Engine {
             let (mut strip_l, mut strip_r) = ([0.0_f32; QUANTUM], [0.0_f32; QUANTUM]);
             channel.strip.process(&channel.current, in_l, in_r, &mut strip_l[..n], &mut strip_r[..n]);
             let mut peak = 0.0_f32;
-            for (out, s) in out_left.iter_mut().zip(&strip_l[..n]).chain(out_right.iter_mut().zip(&strip_r[..n])) {
-                *out += s;
-                peak = peak.max(s.abs());
+            if host_muted(host.split, track) {
+                // On an output of its own: not in the mix.
+                aux(track, at, &strip_l[..n], &strip_r[..n]);
+                peak = strip_l[..n].iter().chain(&strip_r[..n]).fold(peak, |peak, s| peak.max(s.abs()));
+            } else {
+                for (out, s) in out_left.iter_mut().zip(&strip_l[..n]).chain(out_right.iter_mut().zip(&strip_r[..n])) {
+                    *out += s;
+                    peak = peak.max(s.abs());
+                }
             }
             channel.idle = if silent_input && peak < IDLE_LEVEL { channel.idle.saturating_add(1) } else { 0 };
             self.peaks[track] = peak;
@@ -970,6 +1001,30 @@ mod tests {
         assert!((half / full - 0.5).abs() < 1e-3, "a track's gain scales it: {half} / {full}");
         assert_eq!(level(mixed(|m| m.tracks[1].gain = 0.0), 2000), full, "another track's gain changes nothing");
         assert!(level(mixed(|m| m.tracks[0].pan = 1.0), 0) < 1e-3, "panned right, from the start");
+    }
+
+    #[test]
+    fn a_split_track_leaves_the_mix_for_an_output_of_its_own() {
+        let frames = 300;
+        let rendered = |split: u64| {
+            let mut engine = engine();
+            engine.set_host_mix(HostMix { split, ..HostMix::default() });
+            engine.play(pass(0, &[0], 48_000));
+            let (mut left, mut right) = (vec![0.0; frames], vec![0.0; frames]);
+            let mut own = vec![0.0; frames];
+            engine.render_split(&mut left, &mut right, |track, at, l, _| {
+                assert_eq!(track, 0);
+                own[at..at + l.len()].copy_from_slice(l);
+            });
+            (left, own, engine.peaks()[0])
+        };
+        let (mixed, none, peak) = rendered(0b10);
+        assert!(mixed.iter().any(|&s| s != 0.0) && none.iter().all(|&s| s == 0.0), "another track's split");
+        let (main, own, own_peak) = rendered(0b1);
+        assert!(main.iter().all(|&s| s == 0.0), "nothing of it is left in the mix");
+        // The master bus is bypassed at unity gain: the same samples, across quanta.
+        assert_eq!(own, mixed);
+        assert_eq!(own_peak, peak, "its meter still moves");
     }
 
     #[test]

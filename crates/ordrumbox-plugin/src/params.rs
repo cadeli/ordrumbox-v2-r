@@ -1,7 +1,8 @@
 //! The parameters a host shows and automates: the pattern and the kit
 //! played, the master volume, the swing, and per track a mute, a volume, a
 //! pan, the filter's cutoff and Q, the reverb, delay and saturation amounts,
-//! the delay feedback and a transpose. The pattern, the kit and the swing
+//! the delay feedback, a transpose and the output it plays on (the mix, or
+//! one of its own). The pattern, the kit and the swing
 //! are applied by the player thread, which also shows the mutes in the
 //! window; the track parameters are applied by the audio thread, every
 //! block, on top of the pattern's own (the library is not edited).
@@ -34,6 +35,10 @@ const CUTOFF_OCTAVES_MAX: f32 = 4.0;
 const Q_OFFSET_MAX: f32 = 18.0;
 /// The most a host transposes a track, semitones each way (the editor's).
 const TRANSPOSE_MAX: i32 = 24;
+
+/// What the output parameter of a track shows: the mix, or its own output.
+const OUTPUT_MAIN: &str = "Main";
+const OUTPUT_OWN: &str = "Own";
 
 /// What the project saves and the host automates. The IDs are what a host
 /// saves automation under: never rename them.
@@ -97,6 +102,9 @@ pub struct TrackParams {
     /// Semitones added to the track's transpose.
     #[id = "track_transpose"]
     pub transpose: IntParam,
+    /// On: the track leaves the mix for the output of its number.
+    #[id = "track_output"]
+    pub output: BoolParam,
 }
 
 impl TrackParams {
@@ -120,6 +128,13 @@ impl TrackParams {
                 IntRange::Linear { min: -TRANSPOSE_MAX, max: TRANSPOSE_MAX },
             )
             .with_unit(" st"),
+            output: BoolParam::new(format!("Output track {number}"), false)
+                .with_value_to_string(Arc::new(|own| if own { OUTPUT_OWN } else { OUTPUT_MAIN }.to_owned()))
+                .with_string_to_value(Arc::new(|text| match text.trim() {
+                    t if t.eq_ignore_ascii_case(OUTPUT_OWN) => Some(true),
+                    t if t.eq_ignore_ascii_case(OUTPUT_MAIN) => Some(false),
+                    _ => None,
+                })),
         }
     }
 
@@ -203,19 +218,25 @@ impl OrdrumboxParams {
         }
     }
 
-    /// What the audio thread applies: the master volume, the mutes and the
-    /// track parameters.
+    /// What the audio thread applies: the master volume, the mutes, the
+    /// tracks on an output of their own and the track parameters.
     pub fn mix(&self) -> HostMix {
         HostMix {
             gain: self.volume.value(),
             muted: self.muted_tracks(),
+            split: self.track_mask(|track| track.output.value()),
             tracks: self.tracks.each_ref().map(TrackParams::host_track),
         }
     }
 
     /// The tracks muted, bit `t` for track `t`.
     pub fn muted_tracks(&self) -> u64 {
-        self.tracks.iter().enumerate().fold(0, |mask, (t, track)| mask | u64::from(track.mute.value()) << t)
+        self.track_mask(|track| track.mute.value())
+    }
+
+    /// The tracks `on` holds for, bit `t` for track `t`.
+    fn track_mask(&self, on: impl Fn(&TrackParams) -> bool) -> u64 {
+        self.tracks.iter().enumerate().fold(0, |mask, (t, track)| mask | u64::from(on(track)) << t)
     }
 }
 
@@ -319,6 +340,15 @@ mod tests {
     }
 
     #[test]
+    fn a_track_on_its_own_output_is_split_from_the_mix() {
+        let params = OrdrumboxParams::default();
+        let output = &params.tracks[2].output;
+        assert_eq!(output.normalized_value_to_string(0.0, true), "Main");
+        assert_eq!(output.string_to_normalized_value(" own"), Some(1.0));
+        assert_eq!(output.string_to_normalized_value("3"), None);
+    }
+
+    #[test]
     fn the_defaults_choose_the_first_pattern_and_kit_and_change_nothing() {
         let params = OrdrumboxParams::default();
         let controls = HostControls { pattern: 0, kit: 0, muted: 0, swing: STRAIGHT_SWING };
@@ -333,7 +363,8 @@ mod tests {
         let saved = ["pattern", "kit", "volume", "mute_1", "mute_16"];
         let added = ["swing", "track_volume_1", "track_pan_1", "track_volume_16", "track_pan_16"];
         let fx = ["track_cutoff_16", "track_q_1", "track_reverb_1", "track_delay_1", "track_feedback_1"];
-        let more = ["track_saturation_1", "track_transpose_1", "track_transpose_16"];
+        let more =
+            ["track_saturation_1", "track_transpose_1", "track_transpose_16", "track_output_1", "track_output_16"];
         for id in saved.into_iter().chain(added).chain(fx).chain(more) {
             assert!(ids.iter().any(|i| i == id), "no parameter {id} in {ids:?}");
         }
