@@ -112,9 +112,10 @@ impl Player {
     }
 
     /// One step of the UI side: the host's pattern and kit applied when
-    /// they changed (or when a refused one can be), its mutes shown, its
-    /// swing applied, the controller fed, the names the host shows updated,
-    /// the library saved into the project when it changed.
+    /// they changed (or when a refused one can be), its mutes and its
+    /// transport shown, its swing applied, the controller fed, the names
+    /// the host shows updated, the library saved into the project when it
+    /// changed.
     pub fn tick(&mut self, state: &LibraryState, host: HostControls, names: &Names) {
         let Some(ui) = &mut self.ui else { return };
         let session = &mut ui.session;
@@ -131,6 +132,7 @@ impl Player {
         self.redraw |= session.set_host_muted(host.muted);
         session.set_host_swing(host.swing);
         session.update();
+        self.redraw |= session.watch_host();
         // What the host or the playback chose is not given back to the host.
         self.pattern.known = Some(session.pattern_index());
         self.kit.known = Some(session.kit_index());
@@ -299,6 +301,14 @@ mod tests {
             audio.render_synced(&mut left, &mut right, host);
         }
         assert!(player.ui().is_some_and(|ui| ui.session.playing()));
+
+        // The window shows the host's transport when it changes, not at every tick.
+        player.take_redraw();
+        player.tick(&state, FIRST, &Names::default());
+        assert!(!player.take_redraw());
+        audio.render_synced(&mut left, &mut right, HostTransport { playing: false, ..host });
+        player.tick(&state, FIRST, &Names::default());
+        assert!(player.take_redraw(), "the host stopped");
 
         assert!(matches!(player.start(48_000.0, &state), Started::Kept));
         assert!(matches!(player.start(44_100.0, &state), Started::New(Some(_))));

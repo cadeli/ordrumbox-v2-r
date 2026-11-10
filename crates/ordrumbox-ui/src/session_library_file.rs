@@ -227,7 +227,7 @@ fn a_plugin_leaves_to_the_host_what_the_host_does() {
     s.mouse_down(size, x, y, Button::Left, false);
     s.mouse_up();
     assert!(!s.song_view_open());
-    // No transport: the host plays, at its tempo; nothing under the mouse there.
+    // No transport: the host plays, at its tempo, both only shown; nothing under the mouse there.
     assert!(!layout.items.iter().any(|i| i.id == Some(Id::Transport)));
     let bpm = view::header_controls(Scale::ONE).bpm;
     assert!(panel::hit(&layout.items, bpm.x + 2, bpm.y + 2).is_none());

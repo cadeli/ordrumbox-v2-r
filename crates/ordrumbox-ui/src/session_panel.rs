@@ -214,8 +214,8 @@ impl Session {
     /// transport and the pattern settings panel of the JS).
     fn header_items(&self, layout: &mut PanelLayout, pattern: &Pattern, scale: Scale) {
         let controls = view::header_controls(scale);
-        // A plugin has no transport: the host plays, at its own tempo. Its
-        // place stays empty, so nothing else moves.
+        // A plugin has no transport: the host plays, at its own tempo. The
+        // view shows the host's there (`view::Transport::Host`).
         if !self.hosted {
             let playing = self.playing();
             let label = if playing { "STOP" } else { "PLAY" };
