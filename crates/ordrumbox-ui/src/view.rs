@@ -578,13 +578,13 @@ pub fn output_height(scale: Scale) -> i32 {
 /// as a drum track's compose view, under the sample bar (kept even without a
 /// sample). The note editor is under the grid and the piano roll, not here.
 /// A test checks that every tab fits in it.
-pub const TRACK_EDITOR_HEIGHT: i32 = 431;
+pub const TRACK_EDITOR_HEIGHT: i32 = 445;
 
 /// The pixels the track editor's rows add up to beyond `TRACK_EDITOR_HEIGHT *
 /// scale` at a scale of an odd number of quarters (×1.25, ×1.75…): each row
 /// is rounded to the pixel on its own. A test checks every scale up to
 /// [`Scale::MAX`].
-const TRACK_EDITOR_ROUNDING: i32 = 8;
+const TRACK_EDITOR_ROUNDING: i32 = 9;
 
 /// The footer status lines the smallest window leaves room for.
 const MIN_STATUS_LINES: usize = 1;

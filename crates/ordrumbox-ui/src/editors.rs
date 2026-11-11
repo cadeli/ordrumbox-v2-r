@@ -678,6 +678,17 @@ fn knob_row_h(scale: Scale) -> i32 {
     48 * scale
 }
 
+/// Height of a row of tabs.
+const TAB_H: i32 = 14;
+
+/// Height of the track editor's main tab bar: taller than a row of sub-tabs,
+/// so it reads as the head of its card.
+const MAIN_TAB_H: i32 = 18;
+
+/// The gap between the track editor's two cards: its sound (the sample bar
+/// and the knob bar), then its tabs.
+const CARD_GAP: i32 = 10;
+
 /// A tab: its id, its LED's id, its label, active, LED on.
 type TabSlot<'a> = (Id, Option<Id>, &'a str, bool, bool);
 
@@ -723,8 +734,19 @@ impl Rows {
     /// A row of tabs, one slot each; an empty slot (`None`) keeps its place,
     /// so the tabs after it do not move when it goes.
     fn tabs(&mut self, ids: &[Option<TabSlot>]) {
+        self.tab_row(ids, TAB_H, |label, active| Kind::Tab { label, active });
+    }
+
+    /// The track editor's main tabs: the taller, filled tab bar its tab card
+    /// starts with.
+    fn main_tabs(&mut self, ids: &[Option<TabSlot>]) {
+        self.tab_row(ids, MAIN_TAB_H, |label, active| Kind::MainTab { label, active });
+    }
+
+    /// A row of tabs `h` high (at scale 1), each drawn as `kind` makes it.
+    fn tab_row(&mut self, ids: &[Option<TabSlot>], h: i32, kind: fn(String, bool) -> Kind) {
         let s = self.scale;
-        let r = Rect::new(self.x, self.y, self.w, 14 * s);
+        let r = Rect::new(self.x, self.y, self.w, h * s);
         let n = ids.len().max(1) as i32;
         for (i, (tab, led, label, active, on)) in ids.iter().enumerate().filter_map(|(i, t)| Some((i, t.as_ref()?))) {
             let x = r.x + i as i32 * r.w / n;
@@ -733,10 +755,10 @@ impl Rows {
             if let Some(led) = led {
                 self.items.push(Item::new(Some(*led), Rect::new(x, r.y, led_w, r.h), Kind::Led { on: *on }));
             }
-            let kind = Kind::Tab { label: (*label).to_owned(), active: *active };
+            let kind = kind((*label).to_owned(), *active);
             self.items.push(Item::new(Some(*tab), Rect::new(x + led_w, r.y, w - led_w - s.px(), r.h), kind));
         }
-        self.y += 18 * s;
+        self.y += (h + 4) * s;
     }
 
     fn slider(&mut self, id: Id, spec: Spec, value: f64, label: &str, text: String, lfo: bool) {
@@ -806,9 +828,24 @@ fn default_of(key: &str, min: f64) -> f64 {
     Track::default().field(key).and_then(|v| v.as_f64()).unwrap_or(min)
 }
 
-/// The track editor in `area`; the y under its tallest tab, the same
-/// whatever the tab shown.
-pub fn track_editor(view: &TrackView, state: &EditorState, area: Rect, scale: Scale) -> (Vec<Item>, i32) {
+/// The track editor's widgets, and where its two cards go: the sound card
+/// (title, sample bar, knob bar), then the tab card, which starts with the
+/// main tab bar.
+#[derive(Debug)]
+pub struct TrackEditor {
+    pub items: Vec<Item>,
+    /// The y under the knob bar: the sound card's bottom.
+    pub sound_bottom: i32,
+    /// The y of the main tab bar: the tab card's top.
+    pub tabs_top: i32,
+    /// The y under the tallest tab, the same whatever the tab shown (the
+    /// tab card runs down to the editor's bottom instead).
+    #[cfg_attr(not(test), expect(dead_code, reason = "the tests check that nothing under it moves"))]
+    pub bottom: i32,
+}
+
+/// The track editor in `area`.
+pub fn track_editor(view: &TrackView, state: &EditorState, area: Rect, scale: Scale) -> TrackEditor {
     let s = scale;
     let track = view.track;
     let mut rows = Rows { x: area.x, w: area.w, y: area.y, scale: s, items: Vec::new() };
@@ -842,10 +879,13 @@ pub fn track_editor(view: &TrackView, state: &EditorState, area: Rect, scale: Sc
         })
         .collect();
     rows.knob_bar(knobs, 4);
+    let sound_bottom = rows.y;
 
+    rows.y += CARD_GAP * s;
+    let tabs_top = rows.y;
     let tabs: Vec<_> =
         TABS.iter().enumerate().map(|(i, l)| Some((Id::Tab(i as u8), None, *l, state.tab == i as u8, false))).collect();
-    rows.tabs(&tabs);
+    rows.main_tabs(&tabs);
 
     let bottom = tallest_tab_bottom(rows.y, s);
     match state.tab {
@@ -855,7 +895,7 @@ pub fn track_editor(view: &TrackView, state: &EditorState, area: Rect, scale: Sc
         TAB_LOOP => loop_tab(&mut rows, track),
         _ => generation_tab(&mut rows, track, view.compose.as_ref(), state),
     }
-    (rows.items, bottom)
+    TrackEditor { items: rows.items, sound_bottom, tabs_top, bottom }
 }
 
 /// The FX tab: the four effects one under the other, each a strip of its
@@ -1526,7 +1566,8 @@ mod tests {
             if !sample {
                 view.sample = None;
             }
-            let (items, bottom) = track_editor(&view, &EditorState::default(), Rect::new(0, 0, 360, 600), Scale::ONE);
+            let TrackEditor { items, bottom, .. } =
+                track_editor(&view, &EditorState::default(), Rect::new(0, 0, 360, 600), Scale::ONE);
             (items.into_iter().find(|i| i.id == Some(Id::Tab(0))).map(|i| i.rect), bottom)
         };
         assert_eq!(tab_rect(true), tab_rect(false));
@@ -1545,19 +1586,20 @@ mod tests {
                         generation_advanced: sub >= 3,
                         ..EditorState::default()
                     };
-                    let (items, bottom) = track_editor(&view(&track), &state, Rect::new(700, 30, 360, 600), Scale::ONE);
+                    let TrackEditor { items, bottom, .. } =
+                        track_editor(&view(&track), &state, Rect::new(700, 30, 360, 600), Scale::ONE);
                     assert!(bottom > 30 && items.iter().any(|i| i.id == Some(Id::Decay)));
                 }
             }
         }
         // Folded: the simple view only.
         let state = EditorState { tab: 4, ..EditorState::default() };
-        let (items, _) = track_editor(&view(&track), &state, Rect::new(0, 0, 360, 600), Scale::ONE);
+        let TrackEditor { items, .. } = track_editor(&view(&track), &state, Rect::new(0, 0, 360, 600), Scale::ONE);
         assert!(items.iter().any(|i| i.id == Some(Id::Toggle("composeLock"))));
         assert!(items.iter().any(|i| i.id == Some(Id::GenerationAdvanced)));
         assert!(!items.iter().any(|i| i.id == Some(Id::Generation("autoPitchChance"))));
         let state = EditorState { generation_advanced: true, ..state };
-        let (items, _) = track_editor(&view(&track), &state, Rect::new(0, 0, 360, 600), Scale::ONE);
+        let TrackEditor { items, .. } = track_editor(&view(&track), &state, Rect::new(0, 0, 360, 600), Scale::ONE);
         assert!(items.iter().any(|i| i.id == Some(Id::Generation("autoPitchChance"))));
         assert!(!items.iter().any(|i| i.id == Some(Id::Generation("hitVariation"))));
     }
@@ -1571,7 +1613,7 @@ mod tests {
             if instrument_family(&track.name).is_melodic() {
                 view.compose = None;
             }
-            track_editor(&view, &state, Rect::new(0, 0, 360, 600), Scale::ONE).0
+            track_editor(&view, &state, Rect::new(0, 0, 360, 600), Scale::ONE).items
         };
         let kick = Track { name: "KICK".into(), auto_mode: true, auto_hit_variation: Some(20.0), ..Track::default() };
         let groove = ids(&kick, 0);
@@ -1598,7 +1640,7 @@ mod tests {
         track.compose_syncopation = Some(70.0);
         let state =
             EditorState { tab: 4, generation_tab: COMPOSE_TAB, generation_advanced: true, ..EditorState::default() };
-        let (items, _) = track_editor(&view(&track), &state, Rect::new(0, 0, 360, 600), Scale::ONE);
+        let TrackEditor { items, .. } = track_editor(&view(&track), &state, Rect::new(0, 0, 360, 600), Scale::ONE);
         let shown = |key: &'static str| {
             items.iter().find(|i| i.id == Some(Id::Compose(key))).and_then(|i| match &i.kind {
                 Kind::Value { value, text, spec, .. } => Some((*value, text.clone(), spec.default)),
@@ -1613,7 +1655,7 @@ mod tests {
         // A melodic track has no Compose tab: the manual sliders show.
         let mut bass = view(&track);
         bass.compose = None;
-        let (items, _) = track_editor(&bass, &state, Rect::new(0, 0, 360, 600), Scale::ONE);
+        let TrackEditor { items, .. } = track_editor(&bass, &state, Rect::new(0, 0, 360, 600), Scale::ONE);
         assert!(items.iter().any(|i| i.id == Some(Id::Generation("hitVariation"))));
     }
 
@@ -1654,7 +1696,7 @@ mod tests {
         };
         let mut places = Vec::new();
         for (track, lit) in [(&off, false), (&on, true)] {
-            let (items, bottom) = track_editor(&view(track), &state, area, Scale::ONE);
+            let TrackEditor { items, bottom, .. } = track_editor(&view(track), &state, area, Scale::ONE);
             assert_put(&mut places, &items, &format!("effects on {lit}"));
             for i in 0..FX_DEFS.len() as u8 {
                 let power = items.iter().find(|item| item.id == Some(Id::FxPower(i))).map(|item| &item.kind);
@@ -1686,7 +1728,7 @@ mod tests {
         };
         let mut places = Vec::new();
         for (track, lit) in [(&off, false), (&on, true)] {
-            let (items, bottom) = track_editor(&view(track), &state, area, Scale::ONE);
+            let TrackEditor { items, bottom, .. } = track_editor(&view(track), &state, area, Scale::ONE);
             assert_put(&mut places, &items, &format!("LFOs on {lit}"));
             for i in 0..LFO_TARGETS.len() as u8 {
                 let power = items.iter().find(|item| item.id == Some(Id::LfoPower(i))).map(|item| &item.kind);
@@ -1751,7 +1793,7 @@ mod tests {
                         selected_prop: selected,
                         ..EditorState::default()
                     };
-                    let (items, bottom) = track_editor(&view, &state, area, Scale::ONE);
+                    let TrackEditor { items, bottom, .. } = track_editor(&view, &state, area, Scale::ONE);
                     let shown = format!("{name} auto {auto} slap {slap} lfo {with_lfo} compose {compose} {state:?}");
                     assert_put(&mut places, &items, &shown);
                     // Nothing under the track editor's tab moves either.

@@ -155,10 +155,18 @@ impl Session {
                 let (x, w) = (back.x + 4 * s, back.w - 8 * s);
                 Item::new(None, Rect::new(x, from - 3 * s, w, to - from + 5 * s), Kind::Card)
             };
-            layout.items.push(card(top, bottom));
             match self.editor_track().and_then(|t| self.track_view(t)) {
-                Some(view) => layout.items.extend(editors::track_editor(&view, &self.editors, area, scale).0),
-                None => layout.items.push(Item::text(area.x, area.y, "No track", panel::dim(), s)),
+                // Two cards: the sound (sample bar, knobs), then the tabs.
+                Some(view) => {
+                    let editor = editors::track_editor(&view, &self.editors, area, scale);
+                    layout.items.push(card(top, editor.sound_bottom));
+                    layout.items.push(card(editor.tabs_top, bottom));
+                    layout.items.extend(editor.items);
+                }
+                None => {
+                    layout.items.push(card(top, bottom));
+                    layout.items.push(Item::text(area.x, area.y, "No track", panel::dim(), s));
+                }
             }
         }
         // The note editor, under the grid or the piano roll, in a card of its own.
