@@ -9,6 +9,9 @@
 ### Changed
 - The release ships the CLAP plugin: `orDrumbox.clap` in the Windows zip, next to
   `ordrumbox.exe`, and a zip of the macOS bundle.
+- The release has a Windows setup (`ordrumbox-<version>-windows-x64-setup.exe`): it
+  installs the app with a Start menu shortcut and, as an option, the CLAP plugin in
+  `Common Files\CLAP\orDrumbox\`. The zip stays, for use without setup.
 
 ## 0.1.1
 

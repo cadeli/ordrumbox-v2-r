@@ -13,11 +13,24 @@ The JavaScript/web version (<https://github.com/cadeli/ordrumbox-v2>) is a web d
 
 The app is a single executable with its `assets/` folder next to it.
 
+On Windows, a release holds a setup and a zip:
+
+- `ordrumbox-<version>-windows-x64-setup.exe` installs orDrumbox in `Program Files`, with a
+  Start menu shortcut, and the CLAP plugin in `C:\Program Files\Common Files\CLAP\orDrumbox\`
+  (an option, on by default). Running the setup of a newer version updates it. Uninstalling
+  (Windows settings, or the Start menu) removes what the setup installed, never your library
+  and settings in the user data folder. The setup is not signed: Windows may warn about an
+  unknown publisher (More info > Run anyway).
+- `ordrumbox-<version>-windows-x64.zip` is the same app without setup: unzip it anywhere
+  and start `ordrumbox.exe`.
+
 The CLAP plugin comes with each release:
 
-- **Windows**: `orDrumbox.clap` is in the app's zip, next to `ordrumbox.exe`. It reads the
-  `assets/` folder next to it: copy both, `orDrumbox.clap` and `assets/`, into
-  `C:\Program Files\Common Files\CLAP\` (or any folder your host scans for CLAP plugins).
+- **Windows**: the setup installs it. Without the setup, `orDrumbox.clap` is in the app's
+  zip, next to `ordrumbox.exe`. It reads the `assets/` folder next to it: copy both,
+  `orDrumbox.clap` and `assets/`, into a folder of their own, such as
+  `C:\Program Files\Common Files\CLAP\orDrumbox\` (or any folder your host scans for CLAP
+  plugins).
 - **macOS**: `ordrumbox-<version>-macos-clap.zip` holds `orDrumbox.clap`, its assets inside.
   Unzip it into `~/Library/Audio/Plug-Ins/CLAP/`. It is not notarized: if the host refuses
   to load it, run `xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/CLAP/orDrumbox.clap`.
