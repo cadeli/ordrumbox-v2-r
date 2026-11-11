@@ -114,7 +114,7 @@ fn snapshot_path(file: &str) -> PathBuf {
 
 /// Writes the snapshots from the processors as they are: `cargo test -p
 /// ordrumbox-dsp --test processors -- --ignored`, when their sound changes on
-/// purpose (`README.md`, "Snapshots").
+/// purpose (`DEVELOPMENT.md`, "Snapshots").
 #[test]
 #[ignore = "writes the snapshots"]
 fn write_the_snapshots() {

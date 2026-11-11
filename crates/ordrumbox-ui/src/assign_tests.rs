@@ -1,7 +1,7 @@
 //! The sample each canonical track gets in a kit: the kits the app ships with,
 //! and folders of samples imported as kits, end to end. The packs are file
 //! names as sample packs and drum machines name them; the expectations are
-//! written by hand (`README.md`, "Instrument catalog").
+//! written by hand (`DEVELOPMENT.md`, "Instrument catalog").
 
 use std::fs;
 use std::path::Path;

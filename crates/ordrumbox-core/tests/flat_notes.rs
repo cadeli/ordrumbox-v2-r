@@ -88,7 +88,7 @@ fn snapshot_path() -> PathBuf {
 
 /// Writes `flat_notes_rust.txt` from the engine as it is: `cargo test -p
 /// ordrumbox-core --test flat_notes -- --ignored`, when what a pattern plays
-/// changes on purpose (`README.md`, "Snapshots").
+/// changes on purpose (`DEVELOPMENT.md`, "Snapshots").
 #[test]
 #[ignore = "writes the snapshot"]
 fn write_the_snapshot() {

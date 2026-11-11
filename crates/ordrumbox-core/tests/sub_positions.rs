@@ -77,7 +77,7 @@ fn snapshot_path() -> PathBuf {
 
 /// Writes `sub_positions_rust.txt` from the code as it is: `cargo test -p
 /// ordrumbox-core --test sub_positions -- --ignored`, when where the ghosts
-/// fall changes on purpose (`README.md`, "Snapshots").
+/// fall changes on purpose (`DEVELOPMENT.md`, "Snapshots").
 #[test]
 #[ignore = "writes the snapshot"]
 fn write_the_snapshot() {

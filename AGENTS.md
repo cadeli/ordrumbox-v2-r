@@ -3,8 +3,9 @@
 Drum machine and step sequencer: patterns of tracks of notes, songs arranged
 from patterns, sample kits and a soft synth, played live or rendered to WAV
 and MIDI. One native program, `ordrumbox.exe` on Windows (also runs on macOS),
-with a software-rendered UI. `README.md` describes the app, its keys, and
-where it reads and writes its files.
+with a software-rendered UI. `README.md` is the user documentation: the app, its keys, and
+where it reads and writes its files. Everything for developers (building,
+tests, snapshots) is in `DEVELOPMENT.md`, never in `README.md`.
 
 ## Commands
 
@@ -52,14 +53,14 @@ assets/           data/*.json and kits/**.wav, read at runtime
 - The update check (`ordrumbox-ui/src/update.rs`) runs the system's `curl`
   on a thread of its own, never on the UI or audio thread; it only tells,
   never downloads. A release is a `v<version>` tag matching `Cargo.toml`
-  (`README.md`, "Commands").
+  (`DEVELOPMENT.md`, "Commands").
 - The MCP link (`ordrumbox-ui/src/mcp_link.rs`) listens on `127.0.0.1`
   only, on threads of its own; the tool calls run on the UI thread between
   frames (`session_mcp.rs`), each one undo step. The tools that only edit
   the library are `ordrumbox-logic/src/tools.rs`, tested without the app;
   `session_mcp.rs` keeps those that play, touch files, kits, synth presets
   or the master, or change what the window shows. `ordrumbox --mcp` is the
-  stdio bridge an MCP client starts (`README.md`, "AI clients").
+  stdio bridge an MCP client starts (`docs/mcp-guide.html`).
 - An MCP client writes notes itself; it uses the automatic generation only
   when the user asks for it explicitly. The server says so in `INSTRUCTIONS`
   (`mcp.rs`), and starts the description of every tool of `GENERATION_TOOLS`
@@ -135,7 +136,7 @@ assets/           data/*.json and kits/**.wav, read at runtime
     before the loop. No `get_unchecked`: `unsafe` stays forbidden.
   - Keep samples `f32` and buffers contiguous. Use `f64` where precision
     builds up (phase, time, long sums), as `ordrumbox-dsp` does. Changing a
-    type's precision is a change of behaviour (snapshot, README).
+    type's precision is a change of behaviour (snapshot, `DEVELOPMENT.md`).
   - No panic on the render path: no `unwrap`, no division without a guarded
     denominator, no index that the block length does not bound.
   - Guard feedback paths (delay, filters, reverb) against denormals.
@@ -189,7 +190,7 @@ assets/           data/*.json and kits/**.wav, read at runtime
 
 - The library, kits, synth presets and settings are JSON, written with the
   in-house codec (`ordrumbox-core/src/json.rs`), camelCase keys. `README.md`
-  lists the key names and the user data folder.
+  gives the user data folder.
 - A record's keys are declared once, in its `json_record!` table
   (`track.rs`, `note.rs`): field, default, key. Alternative spellings after
   `|` are read, never written; files from the web version use them. Add no new
@@ -200,7 +201,7 @@ assets/           data/*.json and kits/**.wav, read at runtime
 ## Snapshots
 
 - The `tests/fixtures/` of each crate are committed; tests need nothing outside
-  this repository. `README.md`, "Snapshots", lists them.
+  this repository. `DEVELOPMENT.md`, "Snapshots", lists them.
 - Expected outputs are Rust snapshots (`*_rust.txt`, `*_renders.bin`), which
   each test writes with its `--ignored` test, tables in unit tests, and
   property tests. The JS app (ordrumbox-v2) is not the reference for
@@ -210,8 +211,8 @@ assets/           data/*.json and kits/**.wav, read at runtime
   meant. If not, the code is wrong. Audio outputs must match within 2e-5;
   everything else matches exactly. Never loosen a tolerance.
 - Rewrite a snapshot only for a change of behaviour you mean to make, and
-  note it in the README. Never edit one by hand; the hand-written inputs are
-  named in the README.
+  note it in `DEVELOPMENT.md` ("Changes of behaviour"). Never edit one by hand;
+  the inputs are named there.
 
 ## Modern Rust
 

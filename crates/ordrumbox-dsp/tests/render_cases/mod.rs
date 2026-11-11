@@ -1,7 +1,7 @@
 //! The cases the processors are rendered on (`processors.rs`): strip and
 //! master bus settings over noise bursts, and synth patches. They are the
 //! inputs the JS worklets were first checked on, which the snapshots of
-//! `tests/fixtures/` matched when written (`README.md`, "Snapshots").
+//! `tests/fixtures/` matched when written (`DEVELOPMENT.md`, "Snapshots").
 
 use ordrumbox_dsp::synth::{Adsr, SynthBypass, SynthLfo};
 use ordrumbox_dsp::{MasterSettings, StripSettings, SynthPatch};

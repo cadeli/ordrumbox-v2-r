@@ -4,7 +4,7 @@
 //! files, kit import).
 //!
 //! Everything the detection knows is data, in `data/instruments.json`, which is
-//! edited by hand (`README.md`, "Instrument catalog"); this module only reads it
+//! edited by hand (`DEVELOPMENT.md`, "Instrument catalog"); this module only reads it
 //! and applies its rules.
 
 use std::sync::OnceLock;

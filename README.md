@@ -4,7 +4,7 @@ Note: the legacy orDrumbox V1, the old Java drum machine, has been largely
 improved upon and superseded; it is no longer current. This Rust port is the
 active version.
 
-The JavaScript/web v(ersion https://github.com/cadeli/ordrumbox-v2), is a web demo of this Rust version: it is less complete than the downloadable (native) version.
+The JavaScript/web version (<https://github.com/cadeli/ordrumbox-v2>) is a web demo of this Rust version: it is less complete than the downloadable (native) version.
 
 ## Download
 
@@ -18,35 +18,13 @@ The app is a single executable with its `assets/` folder next to it.
 - User manual: [`docs/user-manual.html`](docs/user-manual.html), with its
   screenshots in `docs/images/`.
 - AI clients (MCP): [`docs/mcp-guide.html`](docs/mcp-guide.html).
+- Building from source, tests: [`DEVELOPMENT.md`](DEVELOPMENT.md).
 
-## Crates
+## The library
 
-| Crate | Role | Dependencies |
-|---|---|---|
-| `ordrumbox-core` | data model, `library.json` codec, pattern engine, song clips, instrument catalog, JSON, RNG, decimal rounding | none |
-| `ordrumbox-logic` | library being edited: commands with undo/redo; pattern generators; Standard MIDI Files | core |
-| `ordrumbox-dsp` | sample voice, synth voice, channel strip, master bus | none |
-| `ordrumbox-engine` | WAV, kits, sample analysis, synth presets, passes, engine, UI link, offline renders | core, dsp |
-| `ordrumbox-probe` | sound measurements, command-line only | core, dsp, engine |
-| `ordrumbox-ui` | session, views, input, MCP link, update check | core, logic, engine, fontdue |
-| `ordrumbox-app` | window, input translation, audio output (`ordrumbox.exe`) | core, engine, ui, winit, softbuffer, cpal |
-| `ordrumbox-plugin` | CLAP and VST3 instrument | engine, ui, nih-plug, baseview, softbuffer |
-| `xtask` | plugin bundling | nih-plug's bundler |
-
-The domain crates take no third-party dependency.
-
-## Running
-
-```sh
-cargo run -p ordrumbox-app
-```
-
-The app reads its `assets/` folder (`data/*.json` and `kits/**.wav`) and looks
-for it in `$ORDRUMBOX_ASSETS`, next to the program, in the working folder, then
-in this repository's `assets/`. User data is saved under the OS user data folder
+User data is saved under the OS user data folder
 (`%APPDATA%\orDrumbox` on Windows, `~/Library/Application Support/orDrumbox` on
-macOS, `~/.local/share/ordrumbox` elsewhere), or the file named by
-`$ORDRUMBOX_LIBRARY`.
+macOS, `~/.local/share/ordrumbox` elsewhere).
 
 The library's name and whether its edits are saved show at the right of the
 menu bar: *saved*, *modified* (saved a moment after the last edit), *new*
@@ -54,29 +32,7 @@ menu bar: *saved*, *modified* (saved a moment after the last edit), *new*
 (no user data folder), or *in host project* (the plugin). Help > About gives
 the file's path.
 
-## Commands
-
-```sh
-cargo run -p ordrumbox-app            # the app
-cargo test --workspace                # all tests
-cargo clippy --workspace --all-targets # must be clean (CI: RUSTFLAGS=-D warnings)
-cargo fmt --all                       # rustfmt (max_width 120)
-cargo build --release -p ordrumbox-app # target/release/ordrumbox(.exe)
-```
-
-Offline render:
-
-```sh
-cargo run --release -p ordrumbox-engine --example render -- assets rock 2 rock.wav
-cargo run --release -p ordrumbox-engine --example render -- assets song:demo demo.wav
-```
-
 ## Plugin
-
-```sh
-cargo xtask bundle ordrumbox-plugin --release                 # target/bundled/orDrumbox.clap
-cargo xtask bundle ordrumbox-plugin --release --features vst3 # and orDrumbox.vst3
-```
 
 The plugin follows the host transport and saves its library in the host project.
 Its window has no play button and no tempo knob (the host's transport plays, at the host's
@@ -128,7 +84,6 @@ channels, the tracks left take keys of channel 10 from 84 up.
   track's transpose and pitch LFO included), a 16th long. Tracks the host mutes send nothing.
   A clip recorded from this output and played back into the plugin plays the same tracks at
   the same pitches.
-Building with `vst3` links GPLv3 bindings; the CLAP build stays MIT.
 
 ## The grid
 
@@ -187,47 +142,8 @@ File > Back up user data copies all of it (the library with its synth presets, `
 `settings.json`, `samples/`, `songs/`) to a folder `orDrumbox-backup-<date>-<time>` (UTC);
 File > Restore user data puts such a folder back, the files there moved to `backups/` first.
 
-## Tests and snapshots
-
-Tests need nothing outside the repository. Expected outputs are Rust snapshots
-in each crate's `tests/fixtures/`; see `AGENTS.md` for the rules (never edit a
-snapshot by hand, rewrite only for a meant change of behaviour).
-
-The triangle LFO now stays between its min and max, starting at min like the
-sine; it used to swing over twice that range. This rewrote `synth_renders.bin`
-(dsp), `mapping_rust.txt` and `synth_editor_rust.txt` (engine) and
-`midi_rust.txt` (logic).
-
-A track's delay is now set up (time, mode, feedback) even when its amount is 0, and
-the strip has a `reverb_on` and a `delay_on` flag (0 for the `none` types), so that a
-plugin host can raise an effect the pattern leaves silent. This rewrote
-`mapping_rust.txt` (engine); the audio renders are unchanged.
-
-A retrigger now fades: a note's `retriggerFade` (0–1, 0.6 by default, the Fade slider of
-the note editor's Retrigger tab) lowers each repeat's velocity by `fade × i / count`, so
-at 1 the repeats step down towards silence and at 0 they all play at the note's
-velocity. Arpeggio notes and euclidean fills do not fade. Saved notes without the key
-take 0.6. This rewrote `flat_notes_rust.txt` (core) and `midi_rust.txt` (logic).
-
-A MIDI file's sysex events (`F0`/`F7`) are now skipped by their length; they used
-to be read as two-byte events, which shifted every later event of the track (a GM
-reset at the start moved the notes after it, or lost them). The program changes of
-a format 0 file, all in its one track, are now read. An instrument that already has
-a track gets another, numbered (`PERC 2`, `BASS 2`), where its notes used to be
-dropped; a channel left with no instrument is named in the import message. This
-rewrote `midi_rust.txt` (logic).
-
-A track with auto-assign on now plays the synth preset of its name (`CLAP_SYNTH`,
-`COWBELL_SYNTH`, `BASS_FM`…) when the selected kit has neither its instrument nor a
-variant of it, where it used to borrow the sample of another kit; another kit's sample
-is taken only when no preset has its name. A variant in the kit (its tom for a `HI_TOM`
-track) is kept before both. This rewrote the table of `ordrumbox-ui/src/assign_tests.rs`.
-
-The strip's compressor has two cases of its own, `comp` and `comp_parallel`, added
-after `delay_pingpong` to `effect_renders.bin` (dsp); the other cases are unchanged.
-
 ## License
 
-MIT: see `LICENSE`. A plugin built with the `vst3` feature links GPLv3 VST3
-bindings, so that `orDrumbox.vst3` is GPLv3 as a whole. The CLAP build stays
+MIT: see `LICENSE`. The VST3 plugin links GPLv3 VST3 bindings, so that
+`orDrumbox.vst3` is GPLv3 as a whole. The CLAP build stays
 MIT.

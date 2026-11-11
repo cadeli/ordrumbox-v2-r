@@ -350,8 +350,8 @@ fn snapshot_path() -> PathBuf {
 
 /// Writes `mapping_rust.txt` from the code as it is: `cargo test -p
 /// ordrumbox-engine --test mapping -- --ignored`, when the strip settings,
-/// the LFOs or the synth patches change on purpose (`README.md`, "Golden
-/// fixtures").
+/// the LFOs or the synth patches change on purpose (`DEVELOPMENT.md`,
+/// "Snapshots").
 #[test]
 #[ignore = "writes the snapshot"]
 fn write_the_snapshot() {
