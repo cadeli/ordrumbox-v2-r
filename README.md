@@ -223,6 +223,9 @@ variant of it, where it used to borrow the sample of another kit; another kit's 
 is taken only when no preset has its name. A variant in the kit (its tom for a `HI_TOM`
 track) is kept before both. This rewrote the table of `ordrumbox-ui/src/assign_tests.rs`.
 
+The strip's compressor has two cases of its own, `comp` and `comp_parallel`, added
+after `delay_pingpong` to `effect_renders.bin` (dsp); the other cases are unchanged.
+
 ## License
 
 MIT: see `LICENSE`. A plugin built with the `vst3` feature links GPLv3 VST3
