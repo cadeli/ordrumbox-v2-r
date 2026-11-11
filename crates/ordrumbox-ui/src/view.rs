@@ -17,7 +17,6 @@ use crate::frame::{body_top, content_top, footer_top, margin, status_line};
 use crate::menu;
 use crate::output::{self, OutputLayout, OutputView};
 use crate::panel::{Rect, row_at};
-use ordrumbox_core::note::ACCENT_VELOCITY;
 
 /// The fewest beats a page of the pattern grid shows; a wide grid shows 8
 /// or 16 ([`page_beats`]).
@@ -1480,15 +1479,20 @@ fn draw_kit(canvas: &mut Canvas, kit: &KitView, layout: &KitLayout) {
 const MIN_NOTE_FILL: f64 = 0.25;
 
 /// A note in its cell: filled from the bottom as high as it is loud, its
-/// colour fading with it too, and an accent topped with a bright bar.
+/// colour fading with it too.
 fn draw_note_cell(canvas: &mut Canvas, cell: Rect, note: &Note, gap: i32) {
     let velocity = note.velocity.clamp(0.0, 1.0);
     let fill = ((f64::from(cell.h) * velocity.max(MIN_NOTE_FILL)).round() as i32).clamp(1, cell.h);
     let color = theme::note(note_color(note), velocity);
-    canvas.fill_rect(cell.x, cell.y + cell.h - fill, cell.w, fill, color);
-    if velocity >= ACCENT_VELOCITY {
-        canvas.fill_rect(cell.x, cell.y, cell.w, (2 * gap).min(cell.h), theme::text());
-    }
+    let radius = 2 * gap;
+    canvas.fill_rounded_gradient(cell.x, cell.y + cell.h - fill, cell.w, fill, note_gradient(color, false), radius);
+}
+
+/// The light-to-dark gradient of a note of `color`, lighter while it plays;
+/// the piano roll's, so both views shade a note alike.
+fn note_gradient(color: Rgb, lit: bool) -> (Rgb, Rgb) {
+    let light = if lit { piano_roll::NOTE_LIGHT_PLAYING } else { piano_roll::NOTE_LIGHT };
+    (theme::mix(color, theme::WHITE, light), theme::mix(color, 0x00_00_00, piano_roll::NOTE_DARK))
 }
 
 /// Base colour of a note in the grid, from its own properties rather than
@@ -1582,7 +1586,8 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
             let color = theme::note(gcolor, gnote.velocity);
             let iw = ((f64::from(width) * 0.5).round() as i32).max(1);
             let ih = ((f64::from(height) * 0.5).round() as i32).max(1);
-            canvas.fill_rect(x + (width - iw) / 2, y + (height - ih) / 2, iw, ih, color);
+            let (gx, gy) = (x + (width - iw) / 2, y + (height - ih) / 2);
+            canvas.fill_rounded_gradient(gx, gy, iw, ih, note_gradient(color, false), gap);
         }
         for (gpos, gnote) in &loop_ghosts {
             if *gpos != step {
@@ -1591,7 +1596,8 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
             let color = theme::note(theme::mix(theme::track(index), theme::bg(), 0.3), gnote.velocity);
             let iw = ((f64::from(width) * 0.5).round() as i32).max(1);
             let ih = ((f64::from(height) * 0.5).round() as i32).max(1);
-            canvas.fill_rect(x + (width - iw) / 2, y + (height - ih) / 2, iw, ih, color);
+            let (gx, gy) = (x + (width - iw) / 2, y + (height - ih) / 2);
+            canvas.fill_rounded_gradient(gx, gy, iw, ih, note_gradient(color, false), gap);
         }
     }
     // Flash (with glow) the cells currently being played.
@@ -1611,7 +1617,7 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
                 let flash = theme::mix(base_color, theme::WHITE, 0.6);
                 let glow = theme::mix(flash, theme::bg(), 0.5);
                 canvas.fill_rect(x - 2 * gap, y - 2 * gap, width + 4 * gap, height + 4 * gap, glow);
-                canvas.fill_rect(x, y, width, height, flash);
+                canvas.fill_rounded_gradient(x, y, width, height, note_gradient(flash, true), 2 * gap);
             }
         }
     }
@@ -1799,21 +1805,18 @@ mod tests {
     }
 
     #[test]
-    fn a_note_fills_its_cell_as_high_as_it_is_loud_and_an_accent_is_topped() {
+    fn a_note_fills_its_cell_as_high_as_it_is_loud() {
         let filled = |velocity: f64| {
             let (w, h) = (10usize, 40usize);
             let mut pixels = vec![0; w * h];
             let mut canvas = Canvas::new(&mut pixels, w, h);
             let note = Note { velocity, ..Note::default() };
             draw_note_cell(&mut canvas, Rect::new(0, 0, 10, 40), &note, 1);
-            let rows = pixels.chunks(w).filter(|row| row[5] != 0).count();
-            (rows, pixels[5] == theme::text())
+            pixels.chunks(w).filter(|row| row[5] != 0).count()
         };
-        assert_eq!(filled(0.5), (20, false), "half loud, half high");
-        assert_eq!(filled(0.1), (10, false), "the softest still shows");
-        assert!(!filled(ACCENT_VELOCITY - 0.01).1);
-        assert!(filled(ACCENT_VELOCITY).1, "an accent is topped");
-        assert_eq!(filled(1.0), (40, true), "the loudest fills it");
+        assert_eq!(filled(0.5), 20, "half loud, half high");
+        assert_eq!(filled(0.1), 10, "the softest still shows");
+        assert_eq!(filled(1.0), 40, "the loudest fills it");
     }
 
     #[test]
