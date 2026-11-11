@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### New
+- **Plugin**: a MIDI program change chooses the pattern (program 1–128 → pattern 1–128),
+  in the CLAP plugin.
+
+### Changed
+- The release ships the CLAP plugin: `orDrumbox.clap` in the Windows zip, next to
+  `ordrumbox.exe`, and a zip of the macOS bundle.
+
 ## 0.1.1
 
 ### New

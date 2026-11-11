@@ -112,10 +112,10 @@ impl Player {
     }
 
     /// One step of the UI side: the host's pattern and kit applied when
-    /// they changed (or when a refused one can be), its mutes and its
-    /// transport shown, its swing applied, the controller fed, the names
-    /// the host shows updated, the library saved into the project when it
-    /// changed.
+    /// they changed (or when a refused one can be), then its MIDI program
+    /// change, its mutes and its transport shown, its swing applied, the
+    /// controller fed, the names the host shows updated, the library saved
+    /// into the project when it changed.
     pub fn tick(&mut self, state: &LibraryState, host: HostControls, names: &Names) {
         let Some(ui) = &mut self.ui else { return };
         let session = &mut ui.session;
@@ -127,6 +127,13 @@ impl Player {
         }
         if self.pattern.due(host.pattern, session.pattern_names().count()) {
             self.pattern.refused = !session.host_select_pattern(host.pattern);
+            self.redraw = true;
+        }
+        if let Some(program) = host.program {
+            // Refused or not (the message says so), it replaces a refused
+            // parameter value, as a choice in the window does.
+            session.host_select_pattern(program);
+            self.pattern.refused = false;
             self.redraw = true;
         }
         self.redraw |= session.set_host_muted(host.muted);
@@ -235,7 +242,8 @@ impl Ticker {
             while !stopped.load(Ordering::Acquire) {
                 let asked = steps.wait(TICK_INTERVAL);
                 let mut player = lock(&player);
-                player.tick(&params.library, params.controls(), &params.names);
+                let host = HostControls { program: params.midi_program.take(), ..params.controls() };
+                player.tick(&params.library, host, &params.names);
                 player.report_late(steps.take_late());
                 drop(player);
                 steps.done(asked);
@@ -265,7 +273,7 @@ mod tests {
     use super::*;
     use crate::state::LibraryText;
 
-    const FIRST: HostControls = HostControls { pattern: 0, kit: 0, muted: 0, swing: STRAIGHT_SWING };
+    const FIRST: HostControls = HostControls { program: None, pattern: 0, kit: 0, muted: 0, swing: STRAIGHT_SWING };
 
     fn audio(started: Started) -> Box<AudioSide> {
         match started {
@@ -388,6 +396,39 @@ mod tests {
         session.step_pattern(-2);
         player.tick(&state, third, &names);
         assert_eq!(player.ui().unwrap().session.pattern_index(), 2);
+    }
+
+    #[test]
+    fn a_midi_program_change_chooses_the_pattern() {
+        let state = Arc::new(LibraryState::default());
+        let names = Names::default();
+        let mut player = Player::default();
+        let text = r#"{"patterns":[{"name":"a","tracks":[]},{"name":"b","tracks":[]}]}"#;
+        state.set(LibraryText(text.into()));
+        let _audio = audio(player.start(48_000.0, &state));
+        let shown = |player: &mut Player| player.ui().map(|ui| ui.session.pattern_index());
+
+        player.tick(&state, FIRST, &names);
+        player.take_redraw();
+        player.tick(&state, HostControls { program: Some(1), ..FIRST }, &names);
+        assert_eq!(shown(&mut player), Some(1));
+        assert!(player.take_redraw());
+        assert_eq!(player.take_window_choices(), WindowChoices::default(), "not given back to the host");
+
+        // The unchanged parameter leaves it alone.
+        player.tick(&state, FIRST, &names);
+        assert_eq!(shown(&mut player), Some(1));
+
+        // The same program again undoes a choice made in the window.
+        player.ui().unwrap().session.step_pattern(-1);
+        player.tick(&state, FIRST, &names);
+        player.tick(&state, HostControls { program: Some(1), ..FIRST }, &names);
+        assert_eq!(shown(&mut player), Some(1));
+
+        // A program past the library is refused with a message.
+        player.tick(&state, HostControls { program: Some(5), ..FIRST }, &names);
+        assert_eq!(shown(&mut player), Some(1));
+        assert_eq!(player.ui().unwrap().session.message(), "host: no pattern 6 (the library has 2)");
     }
 
     #[test]
