@@ -120,6 +120,21 @@ jobs:
         with:
           name: ordrumbox-windows-x64
           path: dist
+      # The setup (`installer/ordrumbox.iss`), from the same `dist/`. The version comes from
+      # `Cargo.toml`, so a run by hand without a tag builds one too. pwsh, not bash: Git Bash
+      # would turn `/DAppVersion=…` into a path. Inno Setup is installed by Chocolatey rather
+      # than taken from the runner image, which may drop it.
+      - run: choco install innosetup -y --no-progress
+      - name: Setup
+        shell: pwsh
+        run: |
+          $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.*)"$' | Select-Object -First 1).Matches.Groups[1].Value
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$version" installer\ordrumbox.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ordrumbox-windows-setup
+          path: setup
 
   release:
     name: GitHub release
@@ -148,6 +163,10 @@ jobs:
           name: ordrumbox-clap-macOS
           path: clap-macos
       - run: mv clap-macos/orDrumbox.clap.zip "ordrumbox-$GITHUB_REF_NAME-macos-clap.zip"
-      - run: gh release create "$GITHUB_REF_NAME" --title "orDrumbox $GITHUB_REF_NAME" --generate-notes ./*.zip
+      - uses: actions/download-artifact@v8
+        with:
+          name: ordrumbox-windows-setup
+          path: setup
+      - run: gh release create "$GITHUB_REF_NAME" --title "orDrumbox $GITHUB_REF_NAME" --generate-notes ./*.zip ./setup/*.exe
         env:
           GH_TOKEN: ${{ github.token }}
