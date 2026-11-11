@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>orDrumbox User Manual</title>
-<meta name="description" content="orDrumbox (native desktop version) user manual: window layout, menus, header, pattern grid, track and note editors, piano roll, song panel, synth editor, kit editor, output panel, generation, files, keyboard shortcuts and AI clients.">
+<meta name="description" content="orDrumbox user manual (native program and CLAP / VST3 plugin): window, menus, header, pattern grid and lane, track and note editors, piano roll, song panel, synth editor, kit editor, master strip, generation, files and backups, keyboard shortcuts, the plugin and AI clients.">
 <style>
 :root {
   --bg: #f7f6fb; --fg: #1d1b2e; --muted: #5b5873; --line: #d9d6e8;
@@ -47,12 +47,12 @@ figcaption { color: var(--muted); font-size: .9em; margin-top: .4em; }
 <main>
 
 <h1>orDrumbox User Manual</h1>
-<p class="subtitle">Native desktop version (Windows <code>ordrumbox.exe</code>, also runs on macOS) — version 0.1</p>
+<p class="subtitle">Native version: the program (Windows <code>ordrumbox.exe</code>, also runs on macOS) and the CLAP / VST3 plugin — version 0.1.1</p>
 
 <div class="note">
-This manual describes the native orDrumbox program. It differs from the browser version
-(orDrumbox-v2): there is a menu bar, one window with a fixed layout, a song panel, a style-based
-pattern generator, and files are saved on disk instead of in the browser.
+This manual describes the native orDrumbox: one program with a menu bar and one window, and the same
+window as an instrument plugin in a DAW (<a href="#plugin">section 19</a>). The web version (orDrumbox-v2)
+is a demo of it and does less: files here are saved on disk, not in the browser.
 </div>
 
 <div class="toc">
@@ -71,11 +71,12 @@ pattern generator, and files are saved on disk instead of in the browser.
   <li><a href="#song">Song panel</a></li>
   <li><a href="#synth">Synth editor</a></li>
   <li><a href="#kit">Kit editor</a></li>
-  <li><a href="#output">Output panel</a></li>
+  <li><a href="#output">Master strip</a></li>
   <li><a href="#generation">Generation, styles and auto mode</a></li>
-  <li><a href="#files">Files: save, import, export</a></li>
+  <li><a href="#files">Files: save, import, export, back up</a></li>
   <li><a href="#shortcuts">Keyboard shortcuts</a></li>
   <li><a href="#signal">Audio signal flow</a></li>
+  <li><a href="#plugin">The plugin (CLAP / VST3)</a></li>
   <li><a href="#mcp">AI clients (MCP)</a></li>
   <li><a href="#updates">Updates, About, factory reset</a></li>
 </ol>
@@ -85,62 +86,81 @@ pattern generator, and files are saved on disk instead of in the browser.
 <h2 id="getting-started">1. Getting started</h2>
 
 <h3>Installing</h3>
-<p>Download the release zip (<code>ordrumbox-v&lt;version&gt;-windows-x64.zip</code>) and unpack it.
+<p>Download the release zip (<code>ordrumbox-v&lt;version&gt;-windows-x64.zip</code>, from the
+<a href="https://www.ordrumbox.com/download/download.html">download page</a> or the GitHub releases) and unpack it.
 It holds <code>ordrumbox.exe</code> and an <code>assets</code> folder; keep them side by side.
 The <code>assets</code> folder holds the demo library, the kits and their samples, the scales, the
-synth presets and the generation styles. No installer is needed.</p>
+synth presets and the generation styles. No installer is needed. The plugin comes as
+<code>orDrumbox.clap</code> and <code>orDrumbox.vst3</code> (<a href="#plugin">section 19</a>).</p>
 
 <h3>First steps</h3>
 <ol>
   <li>Start <code>ordrumbox.exe</code>. The demo library opens on its first pattern.</li>
   <li>Press <kbd>Space</kbd> (or click <strong>PLAY</strong>) to start and stop playback.</li>
-  <li>Click an empty step of the grid to add a note; click a note to select it; click the selected note to delete it.</li>
+  <li>Click a step of the grid to switch it on (a note); click it again to switch it off.
+      <kbd>Shift</kbd>+click a note to select it: the <a href="#note-editor">note editor</a> under the grid shows it.</li>
   <li>Click a track's name to select the track: the <a href="#track-editor">track editor</a> on the right shows its settings.</li>
   <li>Pick a <strong>STYLE</strong> in the header, or press <kbd>B</kbd>, to make the pattern again in a style.</li>
   <li>Press <kbd>F1</kbd> at any time for the list of keys.</li>
 </ol>
 
 <h3>Where your work is kept</h3>
-<p>Everything is saved automatically: the library one second after each edit and on quit.
-There is no "unsaved changes" state. The files are in the user data folder:</p>
+<p>Everything is saved automatically: the library a moment after each edit, and on quit.
+<kbd>Ctrl</kbd>+<kbd>S</kbd> (<strong>File › Save</strong>) saves at once. The right end of the menu bar
+tells where the library stands:</p>
+<table>
+<tr><th>Shown</th><th>Meaning</th></tr>
+<tr><td><em>saved</em></td><td>Every edit is on disk.</td></tr>
+<tr><td><em>modified</em></td><td>An edit is waiting: it is saved a moment after the last one.</td></tr>
+<tr><td><em>new</em></td><td>A copy of the demo, written at the first edit.</td></tr>
+<tr><td><em>save failed</em></td><td>The file could not be written; the status line says why.</td></tr>
+<tr><td><em>not saved</em></td><td>There is no user data folder to save in.</td></tr>
+<tr><td><em>in host project</em></td><td>The plugin: the host saves the library with its project.</td></tr>
+</table>
+<p>The files are in the user data folder:</p>
 <table>
 <tr><th>System</th><th>User data folder</th></tr>
 <tr><td>Windows</td><td><code>%APPDATA%\orDrumbox</code></td></tr>
 <tr><td>macOS</td><td><code>~/Library/Application Support/orDrumbox</code></td></tr>
 <tr><td>Linux / other</td><td><code>~/.local/share/ordrumbox</code></td></tr>
 </table>
+<p><strong>File › Change user data folder...</strong> moves it elsewhere (a cloud folder, a USB key); the choice is
+noted in <code>location.json</code> in the default folder. <strong>Help › About</strong> gives the paths in use.</p>
 <table>
 <tr><th>File</th><th>Holds</th></tr>
-<tr><td><code>library.json</code></td><td>Patterns and arrangements (the song) being edited.</td></tr>
+<tr><td><code>library.json</code></td><td>Patterns, arrangements (the song) and the synth presets edited.</td></tr>
 <tr><td><code>kits.json</code></td><td>The kits and their sample settings, as edited in the kit editor.</td></tr>
-<tr><td><code>samples/</code></td><td>Audio of added, replaced or normalized samples (32-bit float WAV).</td></tr>
-<tr><td><code>synth_presets.json</code></td><td>The synth presets, as edited in the synth editor.</td></tr>
-<tr><td><code>settings.json</code></td><td>The master bus, the colour scheme, the update check.</td></tr>
+<tr><td><code>samples/</code></td><td>Audio of added, replaced, imported or normalized samples.</td></tr>
+<tr><td><code>settings.json</code></td><td>The master bus, the colour scheme, the zoom, the update check.</td></tr>
 <tr><td><code>songs/</code></td><td>Songs saved with <strong>File › Save song</strong> (<code>.odbox</code>).</td></tr>
+<tr><td><code>exports/</code></td><td>The first folder offered to exports.</td></tr>
+<tr><td><code>backups/</code></td><td>Files moved aside by a factory reset or a restore.</td></tr>
 <tr><td><code>mcp.json</code></td><td>The port and token of the AI client link.</td></tr>
 </table>
-<p>To start again from the demo, use <strong>Help › Factory reset...</strong> (see <a href="#updates">section 20</a>).</p>
+<p><code>synth_presets.json</code>, written by earlier versions, is now only read: a library saved before has no
+presets of its own and takes those. To start again from the demo, use <strong>Help › Factory reset...</strong>
+(<a href="#updates">section 21</a>), or <strong>File › Load the demo library...</strong> for the library alone.</p>
 
 <!-- ───────────────────────────────────────────────────────────── -->
 <h2 id="window">2. The window</h2>
 <figure>
-  <img src="images/window-grid.png" alt="The orDrumbox window: menu bar, header, pattern grid, track editor on the right, output panel at the bottom">
-  <figcaption>The window on the demo library: the grid as main editor, the track editor on the right, the output panel at the bottom.</figcaption>
+  <img src="images/window-grid.png" alt="The orDrumbox window: menu bar, header, pattern grid, track editor on the right, master strip at the bottom">
+  <figcaption>The window on the demo library: the grid as main editor, the track editor on the right, the master strip at the bottom.</figcaption>
 </figure>
 <p>The window always keeps the same parts, whatever is being edited:</p>
 <pre class="layout">┌──────────────────────────────────────────────────────────────┐
-│ Menu bar: File Edit View Pattern Generate Play Song Kit Help │
+│ Menu bar: File Edit View Pattern Generate Play Song Kit Help │ saved
 ├──────────────────────────────────────────────────────────────┤
-│ Header: PLAY  BPM  PATTERN  BEATS  KIT  STYLE ↻ AUTO … VIEW  │
+│ Header: PLAY BPM PATTERN BEATS KIT STYLE ↻ AUTO knobs VIEW   │
 │ Status line: last action · undo / redo · song                │
 ├─────────────────────────────────────────────┬────────────────┤
-│                                             │                │
 │  Main editor (one of):                      │  Track editor  │
 │   grid · piano roll · song · synth          │  (F2)          │
-│   (or the kit editor over them)             │  + note editor │
-│                                             │                │
+│   (or the kit editor over them)             │                │
+├─────────────────────────────────────────────┤                │
+│  Note editor (F7, under the grid and roll)  │                │
 ├─────────────────────────────────────────────┴────────────────┤
-│ Output panel: master Vol · Comp · Flt (always shown)          │
+│ Master strip: volume · spectrum · compressor · filters       │
 └──────────────────────────────────────────────────────────────┘</pre>
 <table>
 <tr><th>Part</th><th>How to show it</th></tr>
@@ -149,11 +169,25 @@ There is no "unsaved changes" state. The files are in the user data folder:</p>
 <tr><td>Song panel</td><td><kbd>F3</kbd>, <strong>View › Song</strong>, <strong>Song › Song view</strong>, header <strong>SONG</strong></td></tr>
 <tr><td>Synth editor</td><td><kbd>F6</kbd>, <strong>View › Synth</strong>, header <strong>SYNTH</strong></td></tr>
 <tr><td>Kit editor (over the main editor)</td><td><kbd>Ctrl</kbd>+<kbd>K</kbd>, <strong>View › Kit editor</strong>, <strong>Kit › Kit editor</strong>, header <strong>KIT</strong></td></tr>
-<tr><td>Track editor (right edge)</td><td><kbd>F2</kbd> or <strong>View › Track editor</strong> shows or hides it</td></tr>
-<tr><td>Output panel (bottom strip)</td><td>Always shown</td></tr>
+<tr><td>Track editor (right edge)</td><td><kbd>F2</kbd> or <strong>View › Track editor</strong> shows or folds it</td></tr>
+<tr><td>Note editor (under the grid and the piano roll)</td><td><kbd>F7</kbd> or <strong>View › Note editor</strong> shows or folds it</td></tr>
+<tr><td>Master strip (bottom)</td><td><strong>View › Master</strong> shows or folds it</td></tr>
 </table>
 <p><kbd>F3</kbd>, <kbd>F4</kbd> and <kbd>F6</kbd> toggle: pressed again, they go back to the grid.
-In the song panel, piano roll and synth editor, <kbd>Esc</kbd> also goes back to the grid.</p>
+In the song panel, piano roll and synth editor, <kbd>Esc</kbd> also goes back to the grid.
+Nothing moves when a state changes (a sample replaced by a synth, a value that appears, playback that starts):
+an empty part keeps its place.</p>
+
+<h3>Zoom and window size</h3>
+<p>The window can be resized freely, down to 320×200. The zoom does not follow the window's size:</p>
+<table>
+<tr><th>Command</th><th>Shortcut</th><th>What it does</th></tr>
+<tr><td>View › Zoom in / Zoom out</td><td><kbd>Ctrl</kbd>+<kbd>+</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>-</kbd> (also the keypad's <kbd>+</kbd> <kbd>-</kbd> with <kbd>Ctrl</kbd>)</td><td>A quarter at a time: ×1, ×1.25, ×1.5… up to ×4.</td></tr>
+<tr><td>View › Actual size</td><td><kbd>Ctrl</kbd>+<kbd>0</kbd></td><td>Back to the display's scale (a display at 150 % shows at ×1.5).</td></tr>
+<tr><td>View › Zoom: fit to window</td><td></td><td>The biggest of these scales at which the window shows the whole layout.</td></tr>
+</table>
+<p>A window too small for its zoom gets scrollbars: drag them, click beside the thumb, or turn the wheel where
+nothing else takes it. The zoom is saved in <code>settings.json</code>.</p>
 
 <h3>Colours</h3>
 <p>A deep ground with neon accents, each one meaning one thing: pink for the app itself (the logo,
@@ -179,44 +213,48 @@ out most). The choice is saved.</p>
 <tr><td>Right-click, or <kbd>Enter</kbd> when focused</td><td colspan="2">Type a number</td></tr>
 </table>
 <ul>
+  <li><strong>Steppers</strong> (a count: steps per beat, loop length, retriggers, pulses…) show the number between
+      <strong>−</strong> and <strong>+</strong>; the wheel, the arrows and a typed number work as on a knob.</li>
   <li><strong>Lists</strong> open on a click (or <kbd>Enter</kbd> / <kbd>Space</kbd>): arrows to move, a letter to jump, the wheel to scroll, <kbd>Enter</kbd> to choose, <kbd>Esc</kbd> to close.</li>
   <li><strong>Focus</strong>: <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> move the keyboard focus through the controls of the editors; <kbd>Esc</kbd> gives the keys back to the grid.</li>
-  <li><strong>LEDs</strong> (small on/off lights) switch an effect, an LFO or a mode on and off.</li>
+  <li><strong>Power buttons</strong> (named buttons, lit when on) switch an effect or an LFO on and off; <strong>LEDs</strong> (small lights) switch a mode.</li>
   <li>While playing, a setting moved by an LFO shows the LFO's current value.</li>
   <li>A value outside its range is brought inside it, and the control shows the value actually used.</li>
 </ul>
 
-<h3>Confirmations</h3>
-<p>Everything that removes or replaces work asks first — <kbd>Enter</kbd> goes on, <kbd>Esc</kbd> or a
-click cancels: deleting a track, a clip, a song row, an arrangement, a kit's sample or a synth preset;
-clearing a track or a step holding several notes; random notes over a track's notes; compacting tracks;
-loading or importing a song; replacing an existing file on export. Deleting a single note happens at once
-(and can be undone).</p>
-
-<h3>Undo</h3>
-<p>Every edit is one undo step: <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes, <kbd>Ctrl</kbd>+<kbd>Y</kbd> (or
+<h3>Undo and confirmations</h3>
+<p>Every edit of the library is one undo step: <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes, <kbd>Ctrl</kbd>+<kbd>Y</kbd> (or
 <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>) redoes, up to 50 steps. The <strong>Edit</strong> menu names
-the step it will undo or redo. Kit edits, synth preset edits and master settings are saved directly and are
-not undo steps.</p>
+the step it will undo or redo. This includes the synth presets, which are part of the library (a knob turned is
+one step). Kit edits and the master strip are saved directly and are not undo steps.</p>
+<p>What can be undone is done at once — deleting a track, a clip, an arrangement, clearing notes, random notes,
+compacting tracks… — and its message on the status line ends with <em>(Ctrl+Z: undo)</em>. What cannot be undone
+asks first, <kbd>Enter</kbd> goes on, <kbd>Esc</kbd> or a click cancels: removing a kit's sample or a synth preset,
+loading or importing a song or a library, loading the demo library, restoring user data, changing the user data
+folder, a factory reset, and an export that would replace a file.</p>
 
 <!-- ───────────────────────────────────────────────────────────── -->
 <h2 id="menus">4. Menu bar</h2>
 <p>The menu bar lists every command with its shortcut. Commands that cannot run are greyed out; on/off
 commands show a box (filled when on). Click a title, or press <kbd>F10</kbd> or <kbd>Alt</kbd> alone, then
 use <kbd>←</kbd> <kbd>→</kbd> between menus, <kbd>↑</kbd> <kbd>↓</kbd> between items, <kbd>Enter</kbd> to run,
-<kbd>Esc</kbd> to close. Commands ending in "..." ask for a name, a file or a folder.</p>
+<kbd>Esc</kbd> to close. Commands ending in "..." ask for a name, a file or a folder. The save status
+(<a href="#getting-started">section 1</a>) shows at the right end of the bar.</p>
 
 <h3>File</h3>
 <table>
 <tr><th>Command</th><th>Shortcut</th><th>What it does</th></tr>
-<tr><td>Save</td><td></td><td>Save the library now (it is also saved on its own after each edit).</td></tr>
+<tr><td>Save</td><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Save the library now (it is also saved on its own after each edit).</td></tr>
 <tr><td>Save song</td><td></td><td>Write the song (patterns, arrangements, selection) to <code>songs/&lt;name&gt;.odbox</code> in the user data folder.</td></tr>
 <tr><td>Save song as...</td><td></td><td>Write the song file to a folder you pick.</td></tr>
-<tr><td>Load song...</td><td></td><td>List the songs in <code>songs/</code> and load one (replaces the library; one undo step; confirmed).</td></tr>
+<tr><td>Load song...</td><td></td><td>List the songs in <code>songs/</code> and load one (replaces the library; confirmed).</td></tr>
 <tr><td>Export song...</td><td></td><td>Write the <code>.odbox</code> song file to a folder you pick.</td></tr>
-<tr><td>Import song...</td><td></td><td>Read a <code>.odbox</code> file (replaces the library; one undo step; confirmed).</td></tr>
+<tr><td>Import song...</td><td></td><td>Read a <code>.odbox</code> file (replaces the library; confirmed).</td></tr>
+<tr><td>Export library...</td><td></td><td>Write the whole library, synth presets included, to <code>ordrumbox-library.json</code> in a folder you pick.</td></tr>
+<tr><td>Import library...</td><td></td><td>Read such a file in place of the library (one undo step; confirmed). Its synth presets replace those of the same name.</td></tr>
+<tr><td>Load the demo library...</td><td></td><td>The assets' demo library in place of yours (one undo step; confirmed).</td></tr>
 <tr><td>Import MIDI file...</td><td><kbd>Ctrl</kbd>+<kbd>O</kbd></td><td>Turn a <code>.mid</code> file into new patterns (see <a href="#files">Files</a>).</td></tr>
-<tr><td>Export pattern as JSON...</td><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Write <code>ordrumbox-&lt;name&gt;.json</code> to a folder you pick.</td></tr>
+<tr><td>Export pattern as JSON...</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>Write <code>ordrumbox-&lt;name&gt;.json</code> to a folder you pick.</td></tr>
 <tr><td>Export pattern as MIDI...</td><td><kbd>Ctrl</kbd>+<kbd>M</kbd></td><td>Write the pattern as a type 1 MIDI file.</td></tr>
 <tr><td>Export pattern as WAV...</td><td><kbd>Ctrl</kbd>+<kbd>E</kbd></td><td>Render the pattern once to a 16-bit 44.1 kHz WAV.</td></tr>
 <tr><td>Export song as WAV...</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Render the whole selected arrangement to WAV.</td></tr>
@@ -224,6 +262,12 @@ use <kbd>←</kbd> <kbd>→</kbd> between menus, <kbd>↑</kbd> <kbd>↓</kbd> b
 <tr><td>Replace sample...</td><td></td><td>Replace the kit editor's selected sample with a WAV file.</td></tr>
 <tr><td>Load kit mapping...</td><td></td><td>Load a kit from a <code>.json</code> mapping.</td></tr>
 <tr><td>Export kit mapping...</td><td></td><td>Write the current kit's mapping as <code>.json</code>.</td></tr>
+<tr><td>Export kit with its samples...</td><td></td><td>Write a folder named after the kit: its mapping (<code>kit.json</code>) and its WAV files.</td></tr>
+<tr><td>Back up user data...</td><td></td><td>Copy all your files to a folder <code>orDrumbox-backup-&lt;date&gt;-&lt;time&gt;</code> (UTC).</td></tr>
+<tr><td>Restore user data...</td><td></td><td>Put such a backup back; the files there are moved to <code>backups/</code> first (confirmed).</td></tr>
+<tr><td>Change user data folder...</td><td></td><td>Use another folder from now on; your files are copied there (confirmed).</td></tr>
+<tr><td>Use the default user data folder...</td><td></td><td>Back to the system's folder (confirmed).</td></tr>
+<tr><td>Open user data folder</td><td></td><td>Show it in the Explorer or the Finder.</td></tr>
 <tr><td>Quit</td><td><kbd>Ctrl</kbd>+<kbd>Q</kbd></td><td>Save and quit.</td></tr>
 </table>
 
@@ -237,13 +281,16 @@ use <kbd>←</kbd> <kbd>→</kbd> between menus, <kbd>↑</kbd> <kbd>↓</kbd> b
 <tr><td>Paste</td><td><kbd>Ctrl</kbd>+<kbd>V</kbd></td><td>Paste the copied step at the cursor.</td></tr>
 <tr><td>Paste track</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd></td><td>Paste the copied track into the pattern.</td></tr>
 <tr><td>Clear step</td><td><kbd>Delete</kbd></td><td>Remove the notes of the cursor step.</td></tr>
+<tr><td>Accent on / off</td><td><kbd>L</kbd></td><td>Accent the notes of the cursor step (velocity 100 %), or take the accent off.</td></tr>
 <tr><td>Deselect</td><td><kbd>Esc</kbd></td><td>Drop the selection and the cursor.</td></tr>
 </table>
 
 <h3>View</h3>
 <table>
 <tr><th>Command</th><th>Shortcut</th><th>What it does</th></tr>
-<tr><td>Track editor</td><td><kbd>F2</kbd></td><td>Show / hide the track editor on the right.</td></tr>
+<tr><td>Track editor</td><td><kbd>F2</kbd></td><td>Show / fold the track editor on the right.</td></tr>
+<tr><td>Note editor</td><td><kbd>F7</kbd></td><td>Show / fold the note editor under the grid and the piano roll.</td></tr>
+<tr><td>Master</td><td></td><td>Show / fold the master strip at the bottom.</td></tr>
 <tr><td>Grid</td><td><kbd>F5</kbd></td><td>The pattern grid as main editor.</td></tr>
 <tr><td>Piano roll</td><td><kbd>F4</kbd></td><td>The piano roll as main editor.</td></tr>
 <tr><td>Song</td><td><kbd>F3</kbd></td><td>The song panel as main editor.</td></tr>
@@ -252,6 +299,7 @@ use <kbd>←</kbd> <kbd>→</kbd> between menus, <kbd>↑</kbd> <kbd>↓</kbd> b
 <tr><td>VU meters</td><td><kbd>V</kbd></td><td>Level meters on the track stripes of the grid.</td></tr>
 <tr><td>Toasts</td><td></td><td>Show / hide the messages that pop up at the bottom of the window; they still go on the status line.</td></tr>
 <tr><td>Next colour scheme</td><td><kbd>C</kbd></td><td>Indigo → Amber → Deep sea → Crimson → Toxic → Graphite.</td></tr>
+<tr><td>Zoom in, Zoom out, Actual size, Zoom: fit to window</td><td><kbd>Ctrl</kbd>+<kbd>+</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>-</kbd>, <kbd>Ctrl</kbd>+<kbd>0</kbd></td><td>See <a href="#window">Zoom and window size</a>.</td></tr>
 </table>
 
 <h3>Pattern</h3>
@@ -265,12 +313,13 @@ use <kbd>←</kbd> <kbd>→</kbd> between menus, <kbd>↑</kbd> <kbd>↓</kbd> b
 <tr><td>Random pattern</td><td><kbd>F</kbd></td><td>Jump to a random pattern of the library.</td></tr>
 <tr><td>Tempo -1 / +1</td><td><kbd>-</kbd> <kbd>=</kbd></td><td>Change the tempo by 1 BPM (<kbd>Shift</kbd>: by 10).</td></tr>
 <tr><td>Length -1 / +1 beat</td><td><kbd>Ctrl</kbd>+<kbd>-</kbd> <kbd>Ctrl</kbd>+<kbd>=</kbd></td><td>Pattern length, 1 to 16 beats.</td></tr>
-<tr><td>Add track...</td><td></td><td>Add a track (up to 64): pick an instrument category, then the instrument that names the track (also <b>+ NEW TRACK</b> and a track's right-click menu, whose Rename track offers the same menus plus <b>Free name...</b>). The categories stay shown beside the instruments: <kbd>Left</kbd>, <kbd>Backspace</kbd> or <kbd>Esc</kbd> goes back.</td></tr>
+<tr><td>Add track...</td><td></td><td>Add a track (up to 64): pick an instrument category, then the instrument that names the track (also <b>+ NEW TRACK</b> under the rows and a track's right-click menu, whose <b>Rename track</b> offers the same menus plus <b>Free name...</b>). The categories stay shown beside the instruments: <kbd>Left</kbd>, <kbd>Backspace</kbd> or <kbd>Esc</kbd> goes back.</td></tr>
 <tr><td>Add KICK track</td><td><kbd>Ctrl</kbd>+<kbd>T</kbd></td><td>Add a track named KICK.</td></tr>
-<tr><td>Remove track</td><td><kbd>Ctrl</kbd>+<kbd>Backspace</kbd></td><td>Remove the focused track (confirmed).</td></tr>
+<tr><td>Remove track</td><td><kbd>Ctrl</kbd>+<kbd>Backspace</kbd></td><td>Remove the focused track.</td></tr>
 <tr><td>Next grid</td><td><kbd>Ctrl</kbd>+<kbd>G</kbd></td><td>Next steps-per-beat value for the focused track.</td></tr>
 <tr><td>Loop one step shorter</td><td><kbd>Ctrl</kbd>+<kbd>L</kbd></td><td>Shorten the focused track's loop by one step.</td></tr>
-<tr><td>Compact tracks</td><td></td><td>Shorten every track whose notes repeat to its shortest loop (loop length set, the notes past it removed; confirmed).</td></tr>
+<tr><td>Compact tracks</td><td></td><td>Shorten every track whose notes repeat to its shortest loop (loop length set, the notes past it removed; what plays does not change).</td></tr>
+<tr><td>Clear pattern</td><td></td><td>Remove every note of the pattern, keeping its tracks.</td></tr>
 </table>
 
 <h3>Generate</h3>
@@ -281,12 +330,11 @@ use <kbd>←</kbd> <kbd>→</kbd> between menus, <kbd>↑</kbd> <kbd>↓</kbd> b
 <tr><td>Auto (every track)</td><td></td><td>Every track in auto mode, or out of it (same as header AUTO).</td></tr>
 <tr><td>Drums (auto)</td><td><kbd>D</kbd></td><td>Generate the drum lines in auto mode; again: off.</td></tr>
 <tr><td>Bass (auto)</td><td><kbd>S</kbd></td><td>Generate the bass line in auto mode; again: off.</td></tr>
-<tr><td>Chords (auto)</td><td><kbd>A</kbd></td><td>Generate the chord lines in auto mode; again: off.</td></tr>
-<tr><td>Track in auto mode</td><td><kbd>Z</kbd></td><td>Toggle auto mode of the focused track.</td></tr>
+<tr><td>Chords (auto)</td><td></td><td>Generate the chord lines in auto mode; again: off.</td></tr>
+<tr><td>Track in auto mode</td><td></td><td>Toggle auto mode of the focused track (also the Generate tab's <strong>Auto</strong>).</td></tr>
 <tr><td>Lock the track</td><td></td><td>Protect the focused track from the generation.</td></tr>
-<tr><td>Random notes on the track</td><td><kbd>X</kbd></td><td>Random notes on the focused track (confirmed if it has notes).</td></tr>
+<tr><td>Random notes on the track</td><td><kbd>X</kbd></td><td>Random notes on the focused track.</td></tr>
 </table>
-<p>The Generate menu also lists the <em>learned styles</em> with the patterns and measures they rest on (see <a href="#generation">section 15</a>).</p>
 
 <h3>Play</h3>
 <table>
@@ -304,7 +352,7 @@ use <kbd>←</kbd> <kbd>→</kbd> between menus, <kbd>↑</kbd> <kbd>↓</kbd> b
 <tr><td>Song view</td><td><kbd>F3</kbd></td><td>Show / hide the song panel.</td></tr>
 <tr><td>Play song</td><td><kbd>Shift</kbd>+<kbd>Space</kbd></td><td>Play the selected arrangement.</td></tr>
 <tr><td>New arrangement...</td><td></td><td>Add an arrangement.</td></tr>
-<tr><td>Remove arrangement</td><td></td><td>Remove the selected arrangement (confirmed).</td></tr>
+<tr><td>Remove arrangement</td><td></td><td>Remove the selected arrangement.</td></tr>
 <tr><td>Previous / Next arrangement</td><td><kbd>Shift</kbd>+<kbd>[</kbd> <kbd>Shift</kbd>+<kbd>]</kbd></td><td>Select another arrangement.</td></tr>
 <tr><td>Rename song...</td><td></td><td>Edit the song's name.</td></tr>
 <tr><td>Song description...</td><td></td><td>Edit the song's description.</td></tr>
@@ -314,21 +362,23 @@ use <kbd>←</kbd> <kbd>→</kbd> between menus, <kbd>↑</kbd> <kbd>↓</kbd> b
 <table>
 <tr><th>Command</th><th>Shortcut</th><th>What it does</th></tr>
 <tr><td>Previous / Next kit</td><td><kbd>,</kbd> <kbd>.</kbd></td><td>Select another kit.</td></tr>
-<tr><td>Random kit</td><td><kbd>G</kbd></td><td>Select a random kit.</td></tr>
-<tr><td>Auto-assign all tracks</td><td><kbd>J</kbd></td><td>Every track back on auto-assign (a sample of the kit by the track's name).</td></tr>
-<tr><td>Use synth kit</td><td><kbd>H</kbd></td><td>Every track on the synth preset matching its name (KICK → KICK_SYNTH, SNARE → SNARE_SYNTH…; random when none matches).</td></tr>
-<tr><td>Random samples on all tracks</td><td><kbd>K</kbd></td><td>A random sample, from any kit, on every track.</td></tr>
-<tr><td>&lt;kit names&gt;</td><td></td><td>The kits; the current one is ticked.</td></tr>
+<tr><td>Random kit</td><td><kbd>Shift</kbd>+<kbd>G</kbd></td><td>Select a random kit.</td></tr>
+<tr><td>Auto-assign all tracks</td><td><kbd>Shift</kbd>+<kbd>J</kbd></td><td>Every track back on auto-assign (its sound found by its name, see the <a href="#track-editor">Sound tab</a>).</td></tr>
+<tr><td>Use synth kit</td><td><kbd>Shift</kbd>+<kbd>H</kbd></td><td>Every track on the synth preset matching its name (KICK → KICK_SYNTH, SNARE → SNARE_SYNTH…; random when none matches).</td></tr>
+<tr><td>Random samples on all tracks</td><td><kbd>Shift</kbd>+<kbd>K</kbd></td><td>A random sample, from any kit, on every track.</td></tr>
 <tr><td>Kit editor</td><td><kbd>Ctrl</kbd>+<kbd>K</kbd></td><td>Open / close the kit editor.</td></tr>
 <tr><td>Normalize kit</td><td></td><td>Bring every sample of the kit to 0 dB peak.</td></tr>
-<tr><td>Import folder as kit...</td><td></td><td>Make a new kit from a folder of WAV files.</td></tr>
+<tr><td>Import folder as kit...</td><td></td><td>Make a kit from a folder of WAV files (see <a href="#files">Files</a>).</td></tr>
 </table>
+<p>The letters that change every track (<kbd>G</kbd>, <kbd>H</kbd>, <kbd>J</kbd>, <kbd>K</kbd>) need <kbd>Shift</kbd>, so that a
+slip off the play keys changes nothing; pressed alone, they say so on the status line.</p>
 
 <h3>Help</h3>
 <table>
 <tr><th>Command</th><th>Shortcut</th><th>What it does</th></tr>
 <tr><td>Keyboard shortcuts</td><td><kbd>F1</kbd></td><td>The list of every key.</td></tr>
-<tr><td>About orDrumbox</td><td></td><td>The build and the folders in use.</td></tr>
+<tr><td>About orDrumbox</td><td></td><td>The build and the paths in use (library, user data, exports, assets).</td></tr>
+<tr><td>User manual...</td><td></td><td>Open this manual on the web site.</td></tr>
 <tr><td>Check for updates</td><td></td><td>Ask now whether a newer release exists.</td></tr>
 <tr><td>Download orDrumbox &lt;version&gt;...</td><td></td><td>Open the page of the newer release (enabled when one was found).</td></tr>
 <tr><td>Factory reset...</td><td></td><td>Move your files aside and restart from the demo (confirmed).</td></tr>
@@ -338,22 +388,22 @@ use <kbd>←</kbd> <kbd>→</kbd> between menus, <kbd>↑</kbd> <kbd>↓</kbd> b
 <h2 id="header">5. Header (toolbar)</h2>
 <figure>
   <img src="images/header.png" alt="The menu bar and the header">
-  <figcaption>The menu bar and the header. Under the logo: where the library comes from; on the right: the arrangement.</figcaption>
+  <figcaption>The menu bar (the library's name and its save status on the right) and the header.</figcaption>
 </figure>
 <p>Under the menu bar, after the logo, a row of labelled groups:</p>
 <table>
 <tr><th>Group</th><th>Control</th><th>What it does</th></tr>
-<tr><td><strong>PLAY / STOP</strong></td><td>Button</td><td>Start / stop the pattern (lit while playing).</td></tr>
+<tr><td><strong>PLAY / STOP</strong></td><td>Button</td><td>Start / stop the pattern (lit while playing). In the plugin, <strong>HOST</strong> shows the host's transport instead (<a href="#plugin">section 19</a>).</td></tr>
 <tr><td><strong>BPM</strong></td><td>Knob, 20–300</td><td>The session's tempo, which every pattern plays at; in the song panel, the selected song's.</td></tr>
-<tr><td><strong>PATTERN</strong></td><td>List</td><td>Pick a pattern. The label above it shows the grid page shown (<em>Page n/m</em>, 4 beats per page).</td></tr>
+<tr><td><strong>PATTERN</strong></td><td>List</td><td>Pick a pattern. While playing, the pattern picked waits for the one playing to end its loop: the label reads <strong>NEXT</strong> until it starts.</td></tr>
 <tr><td><strong>BEATS</strong></td><td>List, 1–16</td><td>The pattern's length in beats.</td></tr>
 <tr><td><strong>KIT</strong></td><td>List</td><td>The kit the tracks draw their samples from.</td></tr>
 <tr><td><strong>STYLE</strong></td><td>List</td><td>The 14 styles, the learned styles, or random. Picking one makes the pattern again in it.</td></tr>
 <tr><td><strong>↻</strong></td><td>Button (<kbd>B</kbd>)</td><td>Make the pattern again in its style: its tracks, meter and lines, and the session's tempo. A track the style names keeps its sound and settings; the others go. Draws a new seed.</td></tr>
 <tr><td><strong>AUTO</strong></td><td>Button</td><td>Every track of the pattern in auto mode, or out of it.</td></tr>
 <tr><td><strong>ENERGY</strong></td><td>Knob, 0–100 (50 = unchanged)</td><td>Scales the hits and densities of all lines, ×0.5 to ×1.5.</td></tr>
-<tr><td><strong>COMPLEX</strong></td><td>Knob, 0–100 (50 = unchanged)</td><td>Shifts the complexity and syncopation of every drum part, −100 to +100.</td></tr>
-<tr><td><strong>VARY</strong></td><td>Knob, 0–100 (50 = unchanged)</td><td>Scales the variation of the lines and of the play, from none to twice.</td></tr>
+<tr><td><strong>COMPLEXITY</strong></td><td>Knob, 0–100 (50 = unchanged)</td><td>Shifts the complexity and syncopation of every drum part, −100 to +100.</td></tr>
+<tr><td><strong>VARIATION</strong></td><td>Knob, 0–100 (50 = unchanged)</td><td>Scales the variation of the lines and of the play, from none to twice.</td></tr>
 <tr><td><strong>VIEW</strong></td><td><strong>GRID</strong> <strong>ROLL</strong> <strong>SONG</strong> <strong>SYNTH</strong> <strong>KIT</strong></td><td>The main editor shown (lit). <strong>KIT</strong> toggles the kit editor.</td></tr>
 </table>
 <p>The three knobs remake the lines at once from the pattern's seed: the same values always give the same lines.</p>
@@ -361,55 +411,65 @@ use <kbd>←</kbd> <kbd>→</kbd> between menus, <kbd>↑</kbd> <kbd>↓</kbd> b
 <!-- ───────────────────────────────────────────────────────────── -->
 <h2 id="status">6. Status line and action log</h2>
 <p>The line under the header shows the last action or message, what undo and redo would do, and the song
-position while a song plays. Errors (a file that cannot be read, a value that was refused) are shown there too.
+position while a song plays. Errors (a file that cannot be read, a value that was refused) are shown there too;
+a problem found at start stays in a band of its own at the bottom of the window until you quit.
 A click on the status line opens the <strong>action log</strong>: everything done since the app started,
 newest first. Scroll it with the wheel, the arrows, <kbd>Page Up</kbd>/<kbd>Page Down</kbd>, <kbd>Home</kbd>/<kbd>End</kbd>.</p>
 
 <!-- ───────────────────────────────────────────────────────────── -->
 <h2 id="grid">7. Pattern grid</h2>
-<p>The grid (<kbd>F5</kbd>) shows the pattern's tracks as rows of steps, 4 beats per page; the page follows the
-playhead while playing and the cursor otherwise.</p>
+<p>The grid (<kbd>F5</kbd>) shows the pattern's tracks as rows of steps, a page of beats across: 4 beats, or 8 or
+16 when the window is wide enough for steps of a usable size. The page follows the playhead while playing and the
+cursor otherwise. Under the rows: the <strong>+ NEW TRACK</strong> button, then the lane.</p>
 <figure>
-  <img src="images/grid.png" alt="The pattern grid: five tracks with mute and solo boxes, names, samples, volume sliders and steps">
-  <figcaption>The grid: per track the M / S boxes, the name and its sample, the volume slider, then the steps. The CHH track loops after 3 steps: the steps past its loop point show as ghosts.</figcaption>
+  <img src="images/grid.png" alt="The pattern grid: tracks with mute and solo boxes, names, samples, volume sliders and steps, the add-track button and the velocity lane">
+  <figcaption>The grid on a 12/8 pattern: per track the M / S boxes, the name and its sample, the volume slider, then the steps (the CHH track has 3 steps per beat). Under the rows, <strong>+ NEW TRACK</strong> and the lane on VELOCITY for the KICK track.</figcaption>
 </figure>
 
 <h3>A track row</h3>
 <ul>
   <li><strong>Colour stripe</strong> — the track's colour; with <kbd>V</kbd>, a VU meter.</li>
   <li><strong>M</strong> / <strong>S</strong> boxes — mute / solo.</li>
-  <li><strong>Name</strong> — the instrument (KICK, SNARE, CHH…). Green when the track is in auto mode.
+  <li><strong>Name</strong> — the instrument (KICK, SNARE, CHH…), in violet when the track is in auto mode.
       Under it, what it plays: its sample (<code>kit/file</code>) or its synth preset (<code>synth BASS_ACID</code>).</li>
   <li><strong>Volume slider</strong> — the track's volume.</li>
   <li><strong>Steps</strong> — notes in the track's colour, brighter with velocity; a mark at each beat, the loop point at the track's loop length.</li>
 </ul>
 
+<h3>The lane</h3>
+<p>Under the rows, the lane shows one setting of the track editor's track, a bar per note:
+<strong>VELOCITY</strong>, <strong>CHANCE</strong> (its probability), <strong>RETRIG</strong> (how many times it plays)
+or <strong>PAN</strong>, picked by the tabs on its left. Click a bar to set its value at that height, or drag across
+the bars to draw them; a drag is one undo step.</p>
+
 <h3>Mouse</h3>
 <table>
 <tr><th>Action</th><th>Result</th></tr>
-<tr><td>Click an empty step</td><td>Add a note.</td></tr>
-<tr><td>Click a note</td><td>Select it (and hear it); the note editor shows it.</td></tr>
-<tr><td>Click the selected note</td><td>Delete it.</td></tr>
+<tr><td>Click an empty step</td><td>Switch it on: add a note.</td></tr>
+<tr><td>Click a step with notes</td><td>Switch it off: remove all its notes (one undo step).</td></tr>
+<tr><td><kbd>Shift</kbd>+click a step</td><td>Select its note (and hear it); the note editor shows it.</td></tr>
 <tr><td>Click a track's name</td><td>Select the track (and hear it); the track editor shows it.</td></tr>
 <tr><td>Drag a track's name up or down</td><td>Move the track to another row (one undo step).</td></tr>
 <tr><td>Hover a note</td><td>A bubble shows its pitch, MIDI number and the settings that differ from the defaults.</td></tr>
+<tr><td>Hover a track's name</td><td>A bubble shows its states, its sound, its mix and length, and its generator settings away from the defaults.</td></tr>
 <tr><td>Click <strong>M</strong> / <strong>S</strong></td><td>Mute / solo the track.</td></tr>
 </table>
 
 <h3>Right-click menus</h3>
 <table>
 <tr><th>On</th><th>Items</th></tr>
-<tr><td>A track's name</td><td><strong>Rename track</strong>, <strong>Copy track</strong>, <strong>Paste track</strong> (after a copy), <strong>Move up</strong>, <strong>Move down</strong>, <strong>Duplicate track</strong>, <strong>Delete track</strong>, <strong>Randomize</strong>, <strong>Clear notes</strong></td></tr>
-<tr><td>A step</td><td><strong>Copy notes</strong>, <strong>Paste notes</strong> (after a copy), <strong>Delete notes</strong> (when there are notes), <strong>Add rnd note</strong> (a note at a random pitch)</td></tr>
+<tr><td>A track's name, M or S</td><td><strong>Rename track ›</strong>, <strong>Copy track</strong>, <strong>Paste track</strong> (after a copy), <strong>Move up</strong>, <strong>Move down</strong>, <strong>Duplicate track</strong>, <strong>Delete track</strong>, <strong>Randomize</strong>, <strong>Clear notes</strong>, <strong>Add track ›</strong></td></tr>
+<tr><td>A step</td><td><strong>Copy notes</strong>, <strong>Paste notes</strong> (after a copy), <strong>Delete notes</strong> (when there are notes), <strong>Add random note</strong> (a note at a random pitch)</td></tr>
 </table>
 
 <h3>Keys</h3>
 <table>
 <tr><th>Key</th><th>Action</th></tr>
 <tr><td>Arrows</td><td>Move the grid cursor.</td></tr>
-<tr><td><kbd>Enter</kbd></td><td>Like a click at the cursor: add, select, delete.</td></tr>
+<tr><td><kbd>Enter</kbd></td><td>Like a click at the cursor: switch the step on or off.</td></tr>
 <tr><td><kbd>Shift</kbd>+<kbd>↑</kbd> <kbd>↓</kbd></td><td>Velocity of the selected note ±0.05.</td></tr>
 <tr><td><kbd>Shift</kbd>+<kbd>←</kbd> <kbd>→</kbd></td><td>Pitch of the selected note ±1 semitone.</td></tr>
+<tr><td><kbd>L</kbd></td><td>Accent the cursor step's notes, or take the accent off.</td></tr>
 <tr><td><kbd>Delete</kbd></td><td>Clear the cursor step.</td></tr>
 <tr><td><kbd>Esc</kbd></td><td>Deselect.</td></tr>
 <tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd></td><td>Copy / paste the cursor step (<kbd>Shift</kbd>: the track).</td></tr>
@@ -417,88 +477,96 @@ playhead while playing and the cursor otherwise.</p>
 
 <!-- ───────────────────────────────────────────────────────────── -->
 <h2 id="track-editor">8. Track editor</h2>
-<p>Down the right edge (<kbd>F2</kbd> shows or hides it). It edits the track of the cursor or of the
-selected note. From top to bottom: the sample bar, the knob bar, five tabs, then the
-<a href="#note-editor">note editor</a>.</p>
+<p>Down the right edge (<kbd>F2</kbd> shows or folds it). It edits the track of the cursor or of the
+selected note, and holds the track's settings only (the note's are in the <a href="#note-editor">note editor</a>).
+Two cards: the sound card (the track's name, the sample bar, the knob bar), then five tabs:
+<strong>FX</strong>, <strong>Sound</strong>, <strong>LFO</strong>, <strong>Loop</strong>, <strong>Generate</strong>.</p>
 <figure class="narrow">
-  <img src="images/track-editor.png" alt="The track editor with the FX tab open, and the note editor under it">
-  <figcaption>The track editor (FX tab, reverb) and, under the line, the note editor (Trig tab).</figcaption>
+  <img src="images/track-editor.png" alt="The track editor on the FX tab: reverb, delay, saturation, compressor and filter strips">
+  <figcaption>The track editor on the FX tab: the five effects, each with its power button on the left.</figcaption>
 </figure>
 
 <h3>Sample bar</h3>
-<p>The sample's detected note, length, peak level and envelope with the decay end marked.
-<strong>Load</strong> replaces the track's sample with a WAV file.</p>
+<p>The sample's detected note, length and peak level, and its envelope with the decay end marked. A synth track
+keeps the place empty, so that nothing under it moves.</p>
 
 <h3>Knob bar</h3>
 <table>
 <tr><th>Knob</th><th>Range</th><th>What it does</th></tr>
-<tr><td><strong>Vol</strong></td><td>0–100 %</td><td>Track volume (LFO-capable).</td></tr>
+<tr><td><strong>Volume</strong></td><td>0–100 %</td><td>Track volume (LFO-capable).</td></tr>
 <tr><td><strong>Pan</strong></td><td>−1 to +1</td><td>Stereo position (LFO-capable).</td></tr>
-<tr><td><strong>Transp</strong></td><td>−24 to +24 st</td><td>Transpose in semitones (LFO-capable).</td></tr>
+<tr><td><strong>Transpose</strong></td><td>−24 to +24 st</td><td>Transpose in semitones (LFO-capable).</td></tr>
 <tr><td><strong>Decay</strong></td><td>20–5000 ms (default 500)</td><td>The sample's decay: how long it sounds after the attack.</td></tr>
 </table>
 
 <h3>FX tab</h3>
-<p>Four sub-tabs, <strong>Rev</strong>, <strong>Dly</strong>, <strong>Sat</strong>, <strong>Flt</strong>, each with an
-on/off LED. Touching a control of an effect that is off switches it on.</p>
+<p>The five effects one under the other, each a strip: its power button (named) on the left, then its knobs and
+lists. Touching a control of an effect that is off switches it on.</p>
 <table>
 <tr><th>Effect</th><th>Control</th><th>Values</th><th>Notes</th></tr>
-<tr><td rowspan="2"><strong>Rev</strong> (reverb)</td><td>Mix</td><td>0–1</td><td>Wet amount.</td></tr>
+<tr><td rowspan="2"><strong>Reverb</strong></td><td>Mix</td><td>0–1</td><td>Wet amount.</td></tr>
 <tr><td>Type</td><td>none, room, hall, plate, spring, gated</td><td><em>hall</em> and <em>plate</em> have a pre-delay, <em>spring</em> a dispersion, <em>gated</em> a large room cut 250 ms after the hit.</td></tr>
-<tr><td rowspan="4"><strong>Dly</strong> (delay)</td><td>Mix</td><td>0–1</td><td>Wet amount.</td></tr>
+<tr><td rowspan="4"><strong>Delay</strong></td><td>Mix</td><td>0–1</td><td>Wet amount.</td></tr>
+<tr><td>Feedback</td><td>0–0.95 (default 0.4)</td><td>How many repeats. Greyed out for <em>slap</em> (one echo).</td></tr>
 <tr><td>Beats</td><td>1/16, 1/8, 1/4, 1/2, 1, 2, 4</td><td>Delay time in beats. Longer than 2 s at the tempo, it plays at the longest halving that fits (shown on the choice).</td></tr>
-<tr><td>Fdbk</td><td>0–0.95 (default 0.4)</td><td>How many repeats. Not used by <em>slap</em>.</td></tr>
 <tr><td>Type</td><td>none, slap, tape, pingpong</td><td><em>slap</em>: one clean echo; <em>tape</em>: darker repeats with wow; <em>pingpong</em>: starts left, then alternates.</td></tr>
-<tr><td rowspan="2"><strong>Sat</strong> (saturation)</td><td>Mix</td><td>0–1</td><td>Drive amount.</td></tr>
+<tr><td rowspan="4"><strong>Saturation</strong></td><td>Mix</td><td>0–1</td><td>Drive amount.</td></tr>
+<tr><td>Crush</td><td>0–1</td><td>Bitcrusher: fewer bits and a lower sample rate as it rises.</td></tr>
+<tr><td>Clip</td><td>0–1</td><td>Hard clipper driven into a −3 dB ceiling: density, not level.</td></tr>
 <tr><td>Type</td><td>soft, hard, tape</td><td><em>soft</em>: tanh; <em>hard</em>: clip; <em>tape</em>: asymmetric, even harmonics.</td></tr>
-<tr><td rowspan="4"><strong>Flt</strong> (filter)</td><td>Type</td><td>LP, HP, BP, NT (lowpass, highpass, bandpass, notch)</td><td>LED off = bypass. Switched on from its 20 Hz default, the cutoff goes to 1 kHz.</td></tr>
-<tr><td>Slope</td><td>12 dB, 24 dB</td><td>Per octave.</td></tr>
-<tr><td>Freq</td><td>20 Hz – 20 kHz</td><td>Cutoff (LFO-capable).</td></tr>
+<tr><td rowspan="5"><strong>Compressor</strong></td><td>Mix</td><td>0–1</td><td>Switched on at 1: a plain compressor; lower, it is mixed in parallel with the dry sound.</td></tr>
+<tr><td>Thresh</td><td>−60 to 0 dB (default −18)</td><td>Where compression starts.</td></tr>
+<tr><td>Ratio</td><td>1–20 (default 4)</td><td>How hard it compresses.</td></tr>
+<tr><td>Attack</td><td>0.1–200 ms (default 10)</td><td>How fast it reacts.</td></tr>
+<tr><td>Release</td><td>10–2000 ms (default 100)</td><td>How fast it lets go.</td></tr>
+<tr><td rowspan="4"><strong>Filter</strong></td><td>LP HP BP NT</td><td>lowpass, highpass, bandpass, notch</td><td>The type buttons under the power button. Off = bypass. Switched on from its 20 Hz default, the cutoff goes to 1 kHz.</td></tr>
+<tr><td>Cutoff</td><td>20 Hz – 20 kHz</td><td>LFO-capable.</td></tr>
 <tr><td>Q</td><td>0.707–18.707</td><td>Resonance (LFO-capable).</td></tr>
+<tr><td>Slope</td><td>12 dB, 24 dB</td><td>Per octave.</td></tr>
 </table>
 
 <h3>Sound tab</h3>
 <table>
 <tr><th>Control</th><th>What it does</th></tr>
 <tr><td><strong>Mono</strong></td><td>A new note cuts the previous one.</td></tr>
-<tr><td><strong>auto</strong> (LED)</td><td>Auto-assign: the track takes a sample of the selected kit by its name, else of another kit, else a catalog substitute, else any sample (a random pick among the candidates, made at play and on a kit change).</td></tr>
-<tr><td><strong>Instr</strong></td><td>The instrument (KICK, SNARE, CHH, BASS…).</td></tr>
-<tr><td><strong>Sample</strong></td><td>A specific sample file.</td></tr>
+<tr><td><strong>auto</strong> (LED)</td><td>Auto-assign: the track's sound follows its name and the selected kit. It takes the kit's sample of its instrument, else of a variant of it (its tom for a HI_TOM track), else the synth preset of its name (<code>CLAP_SYNTH</code>, <code>BASS_FM</code>…), else another kit's sample, else a substitute. Made again at play and on a kit change.</td></tr>
+<tr><td><strong>Instrument</strong></td><td>The instrument (KICK, SNARE, CHH, BASS…).</td></tr>
+<tr><td><strong>Sample</strong></td><td>A specific sample of the kits. <strong>File...</strong> loads a WAV file instead.</td></tr>
 <tr><td><strong>Synth</strong></td><td>A synth preset instead of a sample (edit it in the <a href="#synth">synth editor</a>).</td></tr>
 </table>
 
 <h3>LFO tab</h3>
-<p>One LFO per setting. Choose the setting with <strong>Target</strong>; its LED switches that LFO on or off.</p>
+<p>One LFO per setting, the five one under the other: <strong>Cutoff</strong>, <strong>Q</strong>, <strong>Volume</strong>,
+<strong>Pan</strong>, <strong>Transpose</strong>. Each strip's power button switches its LFO on or off.</p>
 <table>
 <tr><th>Control</th><th>Values</th><th>What it does</th></tr>
-<tr><td><strong>Target</strong></td><td>Cutoff, Q, Vol, Pan, Transp</td><td>The setting the LFO moves.</td></tr>
-<tr><td><strong>Type</strong></td><td>sine, triangle, sawtooth, square, random</td><td>The waveform.</td></tr>
-<tr><td><strong>Freq</strong></td><td></td><td>The rate, in cycles per 4 beats.</td></tr>
-<tr><td><strong>Range</strong></td><td>min – max of the target</td><td>The span the LFO sweeps.</td></tr>
+<tr><td><strong>Wave</strong></td><td>sine, triangle, sawtooth, square, random</td><td>The waveform.</td></tr>
+<tr><td><strong>Freq</strong></td><td>0.1–2</td><td>The rate, in cycles per 4 beats.</td></tr>
+<tr><td><strong>Min</strong>, <strong>Max</strong></td><td>the target's range</td><td>The span the LFO sweeps.</td></tr>
 <tr><td><strong>Phase</strong></td><td>0–1</td><td>Start offset within the cycle.</td></tr>
 </table>
 
 <h3>Loop tab</h3>
 <table>
 <tr><th>Control</th><th>Range</th><th>What it does</th></tr>
-<tr><td><strong>Steps/Beat</strong></td><td>1–8</td><td>The track's grid (<kbd>Ctrl</kbd>+<kbd>G</kbd> steps through it). Tracks may differ: 3 for triplets, 4 for sixteenths…</td></tr>
-<tr><td><strong>Loop Len</strong></td><td>1–128 steps</td><td>The track loops after this many steps (<kbd>Ctrl</kbd>+<kbd>L</kbd>: one shorter). Polyrhythms come from tracks of different lengths.</td></tr>
+<tr><td><strong>Steps per Beat</strong></td><td>1–8</td><td>The track's grid (<kbd>Ctrl</kbd>+<kbd>G</kbd> steps through it). Tracks may differ: 3 for triplets, 4 for sixteenths…</td></tr>
+<tr><td><strong>Loop Length</strong></td><td>1 step to the track's length</td><td>The track loops after this many steps (<kbd>Ctrl</kbd>+<kbd>L</kbd>: one shorter). Polyrhythms come from tracks of different lengths.</td></tr>
 <tr><td><strong>Swing</strong></td><td>0–1</td><td>Delays the off-beat steps.</td></tr>
 </table>
 
-<h3>Gen tab</h3>
+<h3>Generate tab</h3>
 <p>How the generator treats this track (see <a href="#generation">section 15</a>).</p>
 <figure class="narrow">
-  <img src="images/track-editor-gen.png" alt="The Gen tab of the track editor: Auto, Lock, New line and Advanced">
-  <figcaption>The Gen tab, folded. On a pattern with no style part for the track, only Auto, Lock and New line show.</figcaption>
+  <img src="images/track-editor-gen.png" alt="The Generate tab of the track editor: Auto, Lock, New line and Advanced">
+  <figcaption>The Generate tab, folded, on a house pattern: the KICK track plays the style's KICK part. On a pattern with no style part for the track, only Auto, Lock and New line show.</figcaption>
 </figure>
 <table>
 <tr><th>Control</th><th>What it does</th></tr>
-<tr><td><strong>Auto</strong></td><td>Auto mode: the track's line follows the song form as it plays (<kbd>Z</kbd>).</td></tr>
+<tr><td><strong>Auto</strong></td><td>Auto mode: the track's line follows the song form as it plays.</td></tr>
 <tr><td><strong>Lock</strong></td><td>↻, the header knobs and auto mode leave the track as it is.</td></tr>
 <tr><td><strong>New line ↻</strong></td><td>Make a new line for this track alone.</td></tr>
 <tr><td><em>style / part</em></td><td>The pattern's style and the part this track plays in it (<code>*</code> = a value taken from the style).</td></tr>
-<tr><td><strong>Hits/Meas</strong>, <strong>Complexity</strong>, <strong>Variation</strong></td><td>Drum track: how many hits per measure, how far from the strong steps, how much the line changes from loop to loop.</td></tr>
+<tr><td><strong>Measure Hits</strong>, <strong>Complexity</strong>, <strong>Variation</strong></td><td>Drum track: how many hits per measure, how far from the strong steps, how much the line changes from loop to loop.</td></tr>
 <tr><td><strong>Variant</strong>, <strong>Density</strong></td><td>Bass or chord track: the variant it plays (bass variants on a bass track, chord and melody ones on the others; empty = the style's) and its density (−1 to +1).</td></tr>
 </table>
 <p>A value ending in <code>*</code> is the style's; a double-click gives a value back to the style.
@@ -506,23 +574,29 @@ on/off LED. Touching a control of an effect that is off switches it on.</p>
 <p><strong>Advanced ▸</strong> unfolds more settings:</p>
 <table>
 <tr><th>Sub-tab</th><th>Shown</th><th>Settings</th></tr>
-<tr><td><strong>Manual</strong></td><td>Auto mode off</td><td><strong>Var Hits</strong> (0–100), <strong>Var Notes</strong> (0–100), <strong>Prob</strong> (0–1, the track's note probability)</td></tr>
-<tr><td><strong>Groove</strong></td><td>Auto mode on</td><td><strong>Var Hits</strong>, chances (0–100) of <strong>Pitch</strong>, <strong>Velocity</strong>, <strong>Silence</strong>, <strong>Fill</strong>, <strong>Ghost</strong>; <strong>Pitch Rng</strong> (1–24); <strong>Scale Lock</strong></td></tr>
-<tr><td><strong>Engine</strong></td><td>Auto mode on</td><td><strong>Var Notes</strong>, chances of <strong>Retrig</strong>, <strong>Euclid</strong>, <strong>Note Prob</strong> and its <strong>Depth</strong>, <strong>Arp</strong>; <strong>Variant</strong>; <strong>Density</strong></td></tr>
-<tr><td><strong>Compose</strong></td><td>Drum track</td><td><strong>Hits/Meas</strong> (0–32), <strong>Complexity</strong>, <strong>Syncopation</strong> (0–100), <strong>Coupling</strong> (−100 to +100, toward or away from the coupled part), <strong>Variation</strong>, <strong>Style</strong> (how much the style's weights count against the plain meter), <strong>Seed</strong> (0 = new each time; above 0 the same line every time)</td></tr>
+<tr><td><strong>Manual</strong></td><td>Auto mode off</td><td><strong>Hit Variation</strong> (0–100), <strong>Note Variation</strong> (0–100), <strong>Probability</strong> (the track's note probability)</td></tr>
+<tr><td><strong>Groove</strong></td><td>Auto mode on</td><td><strong>Hit Variation</strong>, chances (0–100) of <strong>Pitch</strong>, <strong>Velocity</strong>, <strong>Silence</strong>, <strong>Fill</strong>, <strong>Ghost</strong>; <strong>Pitch Range</strong> (1–24); <strong>Scale Lock</strong></td></tr>
+<tr><td><strong>Engine</strong></td><td>Auto mode on</td><td><strong>Note Variation</strong>, chances of <strong>Retrigger</strong>, <strong>Euclidean</strong>, <strong>Probability</strong> and its <strong>Depth</strong>, <strong>Arpeggio</strong>; <strong>Variant</strong>; <strong>Density</strong></td></tr>
+<tr><td><strong>Compose</strong></td><td>Drum track</td><td><strong>Measure Hits</strong> (0–32), <strong>Complexity</strong>, <strong>Syncopation</strong> (0–100), <strong>Coupling</strong> (−100 to +100, toward or away from the coupled part), <strong>Variation</strong>, <strong>Style Weight</strong> (how much the style's weights count against the plain meter), <strong>Seed</strong> (0 = new each time; above 0 the same line every time)</td></tr>
 </table>
-<p><strong>Var Hits</strong> and <strong>Var Notes</strong> are variation budgets: 100 gives 16 units per pattern; a
+<p><strong>Hit Variation</strong> and <strong>Note Variation</strong> are variation budgets: 100 gives 16 units per pattern; a
 velocity or pitch change costs 1, a silence, fill or ghost 3. The chances say how those units are spent.
-The header's VARY knob scales them.</p>
+The header's VARIATION knob scales them.</p>
 
 <!-- ───────────────────────────────────────────────────────────── -->
 <h2 id="note-editor">9. Note editor</h2>
-<p>Under the track editor. It shows the selected note, else the step under the cursor, else the track's first note.</p>
+<p>A strip under the grid and under the piano roll, the views that edit notes (<kbd>F7</kbd> shows or folds it).
+It shows the selected note (<kbd>Shift</kbd>+click in the grid, a click in the piano roll), else the step under the
+cursor, else the track's first note.</p>
+<figure>
+  <img src="images/note-editor.png" alt="The note editor: velocity, pitch and pan knobs, and the Trigger tab">
+  <figcaption>The note editor on the first KICK note, Trigger tab.</figcaption>
+</figure>
 
 <h3>Knobs</h3>
 <table>
 <tr><th>Knob</th><th>Range</th><th>What it does</th></tr>
-<tr><td><strong>Vel</strong></td><td>0–100 %</td><td>Velocity.</td></tr>
+<tr><td><strong>Velocity</strong></td><td>0–100 %</td><td>How hard the note is hit. From 90 % it counts as an accent (<kbd>L</kbd>).</td></tr>
 <tr><td><strong>Pitch</strong></td><td>−24 to +24 st</td><td>Semitones from the track's pitch.</td></tr>
 <tr><td><strong>Pan</strong></td><td>−1 to +1</td><td>The note's stereo position.</td></tr>
 </table>
@@ -530,27 +604,29 @@ The header's VARY knob scales them.</p>
 <h3>Tabs</h3>
 <table>
 <tr><th>Tab</th><th>Control</th><th>Range</th><th>What it does</th></tr>
-<tr><td rowspan="3"><strong>Trig</strong></td><td>Cycle</td><td>1–16</td><td>Play once every N loops.</td></tr>
+<tr><td rowspan="3"><strong>Trigger</strong></td><td>Cycle</td><td>1–16</td><td>Play once every N loops.</td></tr>
 <tr><td>Offset</td><td>0–15</td><td>Which loop of the cycle plays.</td></tr>
-<tr><td>Prob</td><td>0–1</td><td>Chance that the note plays.</td></tr>
-<tr><td rowspan="3"><strong>Retr</strong></td><td>Retrig</td><td>1–16</td><td>Number of hits (rolls, flams).</td></tr>
+<tr><td>Probability</td><td>0–100 %</td><td>Chance that the note plays.</td></tr>
+<tr><td rowspan="4"><strong>Retrigger</strong></td><td>Retrigger</td><td>1–16</td><td>Number of hits (rolls, flams).</td></tr>
 <tr><td>Rate</td><td>1–16</td><td>Spacing of the retriggers.</td></tr>
-<tr><td>Prob</td><td>0–1</td><td>Chance of each extra hit (retriggers, euclidean fills, arpeggio notes). The first hit always plays.</td></tr>
-<tr><td rowspan="2"><strong>Eucl</strong></td><td>Pulses</td><td>0–16</td><td>Evenly spaced extra hits between this note and the next.</td></tr>
-<tr><td>Rot</td><td>0–15</td><td>Rotation of those pulses.</td></tr>
-<tr><td rowspan="3"><strong>Arp</strong></td><td>Scale</td><td>the scales of <code>scales.json</code></td><td>The scale the arpeggio climbs.</td></tr>
-<tr><td>Dir</td><td>up, down, updown, random</td><td>The direction.</td></tr>
+<tr><td>Probability</td><td>0–100 %</td><td>Chance of each extra hit (retriggers, euclidean fills, arpeggio notes). The first hit always plays.</td></tr>
+<tr><td>Fade</td><td>0–100 % (default 60 %)</td><td>How far the repeats step down in velocity: at 100 % towards silence, at 0 all at the note's velocity.</td></tr>
+<tr><td rowspan="2"><strong>Euclidean</strong></td><td>Pulses</td><td>0–16</td><td>Evenly spaced extra hits between this note and the next.</td></tr>
+<tr><td>Rotation</td><td>0–15</td><td>Rotation of those pulses.</td></tr>
+<tr><td rowspan="3"><strong>Arpeggio</strong></td><td>Scale</td><td>the scales of <code>scales.json</code></td><td>The scale the arpeggio climbs.</td></tr>
+<tr><td>Direction</td><td>up, down, updown, random</td><td>The direction.</td></tr>
 <tr><td>Range</td><td>0–12</td><td>Number of arpeggio notes (0 = off).</td></tr>
 </table>
-<p>A cycled note plays when <code>(loop + Offset) mod Cycle = 0</code>.</p>
+<p>A cycled note plays when <code>(loop + Offset) mod Cycle = 0</code>. Arpeggio notes and euclidean fills do not fade.</p>
 
 <!-- ───────────────────────────────────────────────────────────── -->
 <h2 id="piano-roll">10. Piano roll</h2>
 <p><kbd>F4</kbd>. The track editor's track on a grid of steps (the list next to the title picks another track),
-4 beats per page, pitches from MIDI 12 to 108 with a keyboard on the left. It opens on the track's pitch.</p>
+4 beats per page, pitches from MIDI 12 to 108 with a keyboard on the left. It opens on the track's pitch.
+The note editor stays under it.</p>
 <figure>
   <img src="images/piano-roll.png" alt="The piano roll showing the KICK track">
-  <figcaption>The piano roll on the KICK track; the range shown is written under the keyboard (E5 – A2).</figcaption>
+  <figcaption>The piano roll on the KICK track, the note editor under it; the range shown is written under the keyboard (C#5 – C3).</figcaption>
 </figure>
 <ul>
   <li>Notes are drawn by velocity; a bar on top marks a probability (purple) or a cycle (blue).</li>
@@ -588,7 +664,8 @@ The header's VARY knob scales them.</p>
 <!-- ───────────────────────────────────────────────────────────── -->
 <h2 id="song">11. Song panel</h2>
 <p><kbd>F3</kbd>. A song is the library: its patterns and one or more <strong>arrangements</strong>.
-An arrangement places patterns as <strong>clips</strong> on a timeline of measures.</p>
+An arrangement places patterns as <strong>clips</strong> on a timeline of measures. The song panel is the app's
+only: the plugin plays patterns.</p>
 <figure>
   <img src="images/song-panel.png" alt="The song panel: arrangement grid, pattern list, description and song buttons">
   <figcaption>The song panel: the arrangement on top (one row per pattern, one bar per clip), the pattern list, the selected pattern's description, the song's information and buttons.</figcaption>
@@ -609,11 +686,11 @@ An arrangement places patterns as <strong>clips</strong> on a timeline of measur
 <tr><th>Button</th><th>What it does</th></tr>
 <tr><td>Save</td><td>Write <code>songs/&lt;name&gt;.odbox</code> in the user data folder.</td></tr>
 <tr><td>Save as</td><td>Write the song file to a folder you pick.</td></tr>
-<tr><td>Load</td><td>List the saved songs and load one (replaces the library, one undo step).</td></tr>
+<tr><td>Load</td><td>List the saved songs and load one (replaces the library; confirmed).</td></tr>
 <tr><td>Export</td><td>Write the song file to a folder you pick.</td></tr>
-<tr><td>Import</td><td>Read a <code>.odbox</code> file (replaces the library, one undo step).</td></tr>
+<tr><td>Import</td><td>Read a <code>.odbox</code> file (replaces the library; confirmed).</td></tr>
 <tr><td>New</td><td>Add an arrangement.</td></tr>
-<tr><td>Delete</td><td>Remove the selected arrangement (confirmed).</td></tr>
+<tr><td>Delete</td><td>Remove the selected arrangement.</td></tr>
 </table>
 
 <h3>Mouse</h3>
@@ -632,7 +709,7 @@ An arrangement places patterns as <strong>clips</strong> on a timeline of measur
 <h3>Right-click menus</h3>
 <table>
 <tr><th>On</th><th>Items</th></tr>
-<tr><td>A pattern of the list</td><td><strong>Add at measure n</strong> (the playhead or cursor), <strong>Move up</strong>, <strong>Move down</strong>, <strong>Rename</strong>, <strong>Delete</strong> (with its clips; confirmed)</td></tr>
+<tr><td>A pattern of the list</td><td><strong>Add at measure n</strong> (the playhead or cursor), <strong>Move up</strong>, <strong>Move down</strong>, <strong>Rename</strong>, <strong>Delete</strong> (with its clips)</td></tr>
 <tr><td>A row's name</td><td><strong>Add at measure n</strong>, <strong>Move up</strong>, <strong>Move down</strong>, <strong>Delete row</strong></td></tr>
 <tr><td>A clip</td><td><strong>Next</strong> (the same clip right after it), <strong>Delete</strong></td></tr>
 <tr><td>An empty cell</td><td><strong>Add here</strong> (the row's pattern at that measure)</td></tr>
@@ -651,10 +728,12 @@ An arrangement places patterns as <strong>clips</strong> on a timeline of measur
 <!-- ───────────────────────────────────────────────────────────── -->
 <h2 id="synth">12. Synth editor</h2>
 <p><kbd>F6</kbd>. Edits the synth preset of the track editor's track (else the first preset). Every change plays
-at once and is saved half a second later to <code>synth_presets.json</code>.</p>
+at once. The presets you add, change or delete are part of the library: saved with it (and in a plugin's host
+project), exported with File › Export library, and each change is an undo step (a knob turned is one).
+A built-in preset you have not changed plays as the assets hold it.</p>
 <figure>
   <img src="images/synth-editor.png" alt="The synth editor on the OSC tab: scope, VCO1 to VCO3 and FM cards">
-  <figcaption>The synth editor on the OSC tab (preset BASS0). The pills at the bottom show the modules in use.</figcaption>
+  <figcaption>The synth editor on the OSC tab (preset BASS_ACID, while the KICK track plays a sample: <strong>USE ON KICK</strong> would put the preset on it). The pills at the bottom show the modules in use.</figcaption>
 </figure>
 
 <h3>Preset bar</h3>
@@ -663,14 +742,15 @@ at once and is saved half a second later to <code>synth_presets.json</code>.</p>
 <tr><td>Preset list</td><td>Pick another preset.</td></tr>
 <tr><td><strong>x</strong></td><td>Delete the preset (confirmed).</td></tr>
 <tr><td><strong>+</strong></td><td>Create a new preset.</td></tr>
-<tr><td><strong>Dup</strong></td><td>Duplicate the preset.</td></tr>
+<tr><td><strong>Duplicate</strong></td><td>Duplicate the preset.</td></tr>
 <tr><td><strong>Revert</strong></td><td>Back to the preset as it was when opened.</td></tr>
 <tr><td><strong>Export</strong></td><td>Write <code>ordrumbox-synth-sounds.json</code> to a folder you pick.</td></tr>
 <tr><td><strong>Import</strong></td><td>Read presets from a file.</td></tr>
+<tr><td><strong>USE ON &lt;track&gt;</strong></td><td>Shown when the track editor's track plays something else (a sample, another preset): puts the preset shown on it. Beside it, what the track plays.</td></tr>
 </table>
 <p>The built-in presets include one per base sound of the kits: <code>KICK_SYNTH</code>, <code>SNARE_SYNTH</code>,
 <code>TOM_SYNTH</code>, <code>CLAP_SYNTH</code>, <code>COWBELL_SYNTH</code>, <code>CHH_SYNTH</code>, <code>OHH_SYNTH</code>,
-<code>CRASH_SYNTH</code>. A deleted built-in preset comes back at the next start.</p>
+<code>CRASH_SYNTH</code>. Auto-assign plays them on a track whose instrument the kit lacks.</p>
 
 <h3>Cards</h3>
 <p>Four tabs of cards. Each card has a power button; touching a control of a card that is off switches it on
@@ -714,7 +794,7 @@ A knob an LFO moves is purple and follows it. The pills under the cards show the
 <table>
 <tr><th>Card</th><th>Control</th><th>Range</th><th>What it does</th></tr>
 <tr><td rowspan="5"><strong>LFO1</strong>, <strong>lfo2</strong></td><td>target</td><td>off, or any synth control</td><td>What the LFO moves.</td></tr>
-<tr><td>wave</td><td>sin, tri, saw, sqr, rnd</td><td>Waveform.</td></tr>
+<tr><td>wave</td><td>sin, tri, saw, sqr, rnd</td><td>Waveform. The triangle stays between the LFO's ends, starting at the lower one, like the sine.</td></tr>
 <tr><td>freq</td><td>0.01–5 Hz</td><td>Rate (when not synced).</td></tr>
 <tr><td>depth</td><td>0–1</td><td>Amount.</td></tr>
 <tr><td>sync</td><td>free, 1/1, 1/2, 1/4, 1/8, 1/16, 1/8T, 1/16T</td><td>Lock the rate to the tempo (T = triplet).</td></tr>
@@ -736,7 +816,7 @@ A knob an LFO moves is purple and follows it. The pills under the cards show the
 <!-- ───────────────────────────────────────────────────────────── -->
 <h2 id="kit">13. Kit editor</h2>
 <p><kbd>Ctrl</kbd>+<kbd>K</kbd>. Shows the current kit (its name, the folder its samples are read from, its title and notes), a table of its samples, and the selected sample's details.
-Kits are saved to <code>kits.json</code>; new sample audio to <code>samples/</code>.</p>
+Kits are saved to <code>kits.json</code>; new sample audio to <code>samples/</code>. Kit edits are not undo steps.</p>
 <figure>
   <img src="images/kit-editor.png" alt="The kit editor: the real kit's title and notes, its sample table with an instrument list per row, gain, transpose and decay knobs, analysis and envelope">
   <figcaption>The kit editor on the <em>real</em> kit: its title and notes, the samples with their instrument and the tracks that play them, the selected sample's knobs, its analysis and envelope (the decay end is the vertical line).</figcaption>
@@ -751,7 +831,7 @@ Kits are saved to <code>kits.json</code>; new sample audio to <code>samples/</co
 <tr><td>AUTO</td><td></td><td>In each row, after the instrument: the instrument guessed from the sample's file name (<code>kick_01.wav</code>: KICK), as when a folder is imported. A name that gives none leaves the instrument as it is, with a message. The button is lit while the instrument is the one the name gives.</td></tr>
 <tr><td>Move to:</td><td>all kits</td><td>Move the selected sample to another kit.</td></tr>
 <tr><td>Gain</td><td>−24 to +6 dB</td><td>Level trim.</td></tr>
-<tr><td>Transp</td><td>−12 to +12 st</td><td>Tuning.</td></tr>
+<tr><td>Transpose</td><td>−12 to +12 st</td><td>Tuning.</td></tr>
 <tr><td>Decay</td><td>20–5000 ms</td><td>Decay; the end shows on the envelope.</td></tr>
 <tr><td>Pitch … File</td><td></td><td>Detected pitch, length, peak and RMS levels, the instrument its name suggests, its full path; the envelope under them.</td></tr>
 </table>
@@ -762,41 +842,36 @@ Kits are saved to <code>kits.json</code>; new sample audio to <code>samples/</co
 <tr><td><kbd>N</kbd></td><td>Normalize the kit to 0 dB.</td></tr>
 <tr><td><kbd>E</kbd></td><td>Export the kit mapping (<code>.json</code>).</td></tr>
 <tr><td>Drop a <code>.wav</code></td><td>It joins the kit (<kbd>Shift</kbd>: replaces the selected sample).</td></tr>
-<tr><td>Drop a folder of WAVs</td><td>It becomes a new kit, its samples matched to instruments by name.</td></tr>
+<tr><td>Drop a folder</td><td>It becomes a kit (see <a href="#files">Files</a>).</td></tr>
 <tr><td>Drop a <code>.json</code> mapping</td><td>The kit is loaded.</td></tr>
 </table>
 <p>While the kit editor is open, <kbd>Q</kbd>–<kbd>P</kbd> still play tracks, except <kbd>E</kbd> and <kbd>R</kbd>
 (tracks 3 and 4), which are kept for the kit editor. Built-in kits: real, matt, electro, open, ropen, generated, human, 8bits, delagrange, vintage, punchy.</p>
 
 <!-- ───────────────────────────────────────────────────────────── -->
-<h2 id="output">14. Output panel</h2>
-<p>The strip along the bottom: the master bus, in three tabs. Settings play at once and are saved to <code>settings.json</code>.</p>
+<h2 id="output">14. Master strip</h2>
+<p>The strip along the bottom (<strong>View › Master</strong> shows or folds it): the master bus, in one row.
+Settings play at once and are saved to <code>settings.json</code>; they are not undo steps. The plugin has no
+master strip: the host mixes.</p>
 <figure>
-  <img src="images/output-vol.png" alt="Output panel, Vol tab: master volume and spectrum">
-  <figcaption>Vol: the master volume and the spectrum.</figcaption>
-</figure>
-<figure>
-  <img src="images/output-comp.png" alt="Output panel, Comp tab: compressor knobs, ON button and transfer curve">
-  <figcaption>Comp: the compressor's knobs, its ON button and its transfer curve (the threshold is the dashed vertical line).</figcaption>
-</figure>
-<figure>
-  <img src="images/output-flt.png" alt="Output panel, Flt tab: low cut and high cut sliders">
-  <figcaption>Flt: the low cut and the high cut.</figcaption>
+  <img src="images/output.png" alt="The master strip: volume and spectrum, pre-gain and compressor knobs with the ON button and transfer curve, low cut and high cut sliders">
+  <figcaption>The master strip: the volume and the spectrum; the compressor's knobs, its ON button and its transfer curve (the threshold is the dashed vertical line); the low cut and the high cut.</figcaption>
 </figure>
 <table>
-<tr><th>Tab</th><th>Control</th><th>Range</th><th>Default</th><th>What it does</th></tr>
-<tr><td rowspan="2"><strong>Vol</strong></td><td>Volume</td><td>0–2</td><td>1</td><td>Master volume.</td></tr>
+<tr><th>Group</th><th>Control</th><th>Range</th><th>Default</th><th>What it does</th></tr>
+<tr><td rowspan="2"><strong>Volume</strong></td><td>Volume</td><td>0–2</td><td>1</td><td>Master volume.</td></tr>
 <tr><td>Spectrum</td><td></td><td></td><td>The spectrum of what plays (−100 to −30 dB).</td></tr>
-<tr><td rowspan="8"><strong>Comp</strong></td><td>Power button</td><td>on/off</td><td></td><td>Compressor on or bypassed.</td></tr>
-<tr><td>Pre-Gain</td><td>−20 to +20 dB</td><td>0</td><td>Gain before the compressor.</td></tr>
-<tr><td>Threshold</td><td>−40 to 0 dB</td><td>−18</td><td>Where compression starts (shown on the transfer curve).</td></tr>
+<tr><td rowspan="9"><strong>Compressor</strong></td><td>Pre-Gain</td><td>−20 to +20 dB</td><td>0</td><td>Gain before the compressor.</td></tr>
+<tr><td>Threshold</td><td>−60 to 0 dB</td><td>−18</td><td>Where compression starts.</td></tr>
 <tr><td>Ratio</td><td>1–20</td><td>8</td><td>How hard it compresses.</td></tr>
-<tr><td>Attack</td><td>0–1 s</td><td>0.002</td><td>How fast it reacts.</td></tr>
-<tr><td>Release</td><td>0–1 s</td><td>0.08</td><td>How fast it lets go.</td></tr>
+<tr><td>Attack</td><td>0.001–1 s</td><td>0.002</td><td>How fast it reacts.</td></tr>
+<tr><td>Release</td><td>0.01–1 s</td><td>0.08</td><td>How fast it lets go.</td></tr>
 <tr><td>Knee</td><td>0–40 dB</td><td>3</td><td>Softness of the curve.</td></tr>
 <tr><td>Makeup</td><td>0–24 dB</td><td>8</td><td>Gain after compression.</td></tr>
-<tr><td rowspan="2"><strong>Flt</strong></td><td>Low Cut</td><td>10–500 Hz</td><td>35</td><td>Removes the lowest frequencies.</td></tr>
-<tr><td>High Cut</td><td>1–20 kHz</td><td>18 500</td><td>Removes the highest frequencies.</td></tr>
+<tr><td>On / off button</td><td></td><td></td><td>Compressor on, or bypassed (<em>BYPASSED</em> over the curve).</td></tr>
+<tr><td>Transfer curve</td><td></td><td></td><td>Output level against input level, with the threshold marked.</td></tr>
+<tr><td rowspan="2"><strong>Filters</strong></td><td>Low Cut</td><td>10–500 Hz</td><td>35</td><td>Removes the lowest frequencies.</td></tr>
+<tr><td>High Cut</td><td>1–22 kHz</td><td>18 500</td><td>Removes the highest frequencies.</td></tr>
 </table>
 
 <!-- ───────────────────────────────────────────────────────────── -->
@@ -804,11 +879,11 @@ Kits are saved to <code>kits.json</code>; new sample audio to <code>samples/</co
 
 <h3>Three levels</h3>
 <ol>
-  <li><strong>The header</strong>: STYLE, ↻, AUTO and the ENERGY / COMPLEX / VARY knobs act on the whole pattern.</li>
-  <li><strong>The Gen tab</strong> of a track: Auto, Lock, a new line for the track alone, and its main settings.</li>
-  <li><strong>Advanced</strong> in the Gen tab: the manual, Groove, Engine and full Compose settings.</li>
+  <li><strong>The header</strong>: STYLE, ↻, AUTO and the ENERGY / COMPLEXITY / VARIATION knobs act on the whole pattern.</li>
+  <li><strong>The Generate tab</strong> of a track: Auto, Lock, a new line for the track alone, and its main settings.</li>
+  <li><strong>Advanced</strong> in the Generate tab: the Manual, Groove, Engine and full Compose settings.</li>
 </ol>
-<p><kbd>D</kbd>, <kbd>S</kbd>, <kbd>A</kbd> (Generate menu) make the drum, bass or chord lines alone, in auto mode.
+<p><kbd>D</kbd> and <kbd>S</kbd> (and <strong>Generate › Chords (auto)</strong>) make the drum, bass or chord lines alone, in auto mode.
 <kbd>Shift</kbd>+<kbd>B</kbd> makes a new pattern in the chosen style.</p>
 
 <h3>Styles</h3>
@@ -821,41 +896,55 @@ complexity, syncopation, coupling to another part, variation, ghost notes and ro
 <h3>Learned styles</h3>
 <p>Tag patterns with a style's name (or alias) and the style moves toward what they play — each part's weights and hits, the
 required steps, the swing — in proportion to the measures seen. A tag that names no style becomes a style of its own. Fewer than
-4 measures teach nothing. The Generate menu and the STYLE list show them.</p>
+4 measures teach nothing. The STYLE list shows them.</p>
 
 <h3>Auto mode</h3>
-<p>A track in auto mode (its name in green; <kbd>Z</kbd> toggles it) follows the song form as it plays — intro, verse, chorus,
-break…: a new line at the start of each section (the drums thinner in quiet sections); a drum line then moves a few hits from loop
-to loop and the style's fill fills its last loop; bass and chord lines hold through the section. These lines are saved but are not
-undo steps. Exports regenerate them on their own copy. <kbd>X</kbd> puts random notes on the focused track.</p>
+<p>A track in auto mode (its name in violet; the Generate tab's <strong>Auto</strong> or <strong>Generate › Track in auto mode</strong>
+toggles it) follows the song form as it plays — intro, verse, chorus, break…: a new line at the start of each section (the drums
+thinner in quiet sections); a drum line then moves a few hits from loop to loop and the style's fill fills its last loop; bass and
+chord lines hold through the section. These lines are saved but are not undo steps. Exports regenerate them on their own copy.
+<kbd>X</kbd> puts random notes on the focused track.</p>
 
 <!-- ───────────────────────────────────────────────────────────── -->
-<h2 id="files">16. Files: save, import, export</h2>
+<h2 id="files">16. Files: save, import, export, back up</h2>
 
 <h3>Exports</h3>
 <table>
 <tr><th>What</th><th>Command</th><th>Format</th></tr>
-<tr><td>Pattern as JSON</td><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td><code>ordrumbox-&lt;name&gt;.json</code></td></tr>
+<tr><td>Pattern as JSON</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td><code>ordrumbox-&lt;name&gt;.json</code></td></tr>
 <tr><td>Pattern as MIDI</td><td><kbd>Ctrl</kbd>+<kbd>M</kbd></td><td>Type 1, 96 PPQN; drums on channel 10 at their GM keys, melodic instruments on their own channels at the sample's root note.</td></tr>
 <tr><td>Pattern as WAV</td><td><kbd>Ctrl</kbd>+<kbd>E</kbd></td><td>16-bit, 44.1 kHz, the pattern once, no tail.</td></tr>
 <tr><td>Song as WAV</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>The whole selected arrangement.</td></tr>
 <tr><td>Song file</td><td>File › Save song / Save song as / Export song</td><td><code>.odbox</code></td></tr>
+<tr><td>Library</td><td>File › Export library</td><td><code>ordrumbox-library.json</code>, synth presets included</td></tr>
 <tr><td>Kit mapping</td><td>File › Export kit mapping, or <kbd>E</kbd> in the kit editor</td><td><code>.json</code></td></tr>
+<tr><td>Kit with its samples</td><td>File › Export kit with its samples</td><td>A folder named after the kit: <code>kit.json</code> (each sample's path the name of its file there) and the WAV files</td></tr>
 <tr><td>Synth presets</td><td>Synth editor › Export</td><td><code>ordrumbox-synth-sounds.json</code></td></tr>
 </table>
-<p>Every export asks for its folder: the last one picked, at first <code>exports/</code> next to <code>library.json</code> if it
+<p>Every export asks for its folder: the last one picked, at first <code>exports/</code> in the user data folder if it
 exists, else the home folder. <kbd>Enter</kbd> on <strong>[ Use this folder ]</strong> writes there. A file of the same name is
-replaced only once confirmed.</p>
+replaced only once confirmed; a folder export never writes into a folder already there.</p>
 
 <h3>Imports and drag &amp; drop</h3>
 <table>
 <tr><th>Drop on the window / command</th><th>Result</th></tr>
-<tr><td><code>.mid</code> file, <kbd>Ctrl</kbd>+<kbd>O</kbd>, or a <code>.mid</code> given on the command line</td><td>New 32-beat patterns (up to 16), one track per instrument found (by GM program, drum key, then track name), in one undo step. The file's tempo is not read (the session's stays).</td></tr>
-<tr><td><code>.odbox</code> file, File › Import song</td><td>The song replaces the library (confirmed, one undo step).</td></tr>
+<tr><td><code>.mid</code> file, <kbd>Ctrl</kbd>+<kbd>O</kbd>, or a <code>.mid</code> given on the command line</td><td>New 32-beat patterns (up to 16), one track per instrument found (by GM program, drum key, then track name; a second track of one instrument is numbered: <code>PERC 2</code>), in one undo step. The file's tempo is not read (the session's stays).</td></tr>
+<tr><td><code>.odbox</code> file, File › Import song</td><td>The song replaces the library (confirmed).</td></tr>
+<tr><td>File › Import library</td><td>A library file replaces the library (confirmed, one undo step); its synth presets replace those of the same name.</td></tr>
 <tr><td><code>.wav</code> file, File › Add sample</td><td>Joins the current kit (<kbd>Shift</kbd> while dropping: replaces the kit editor's selected sample).</td></tr>
-<tr><td>Folder of WAVs, Kit › Import folder as kit</td><td>A new kit.</td></tr>
+<tr><td>Folder, Kit › Import folder as kit</td><td>A folder with a <code>kit.json</code> (made by Export kit with its samples) is read back: its samples are copied to <code>samples/imported/&lt;kit&gt;/</code> and the kit replaces the kit of its name. A folder of WAV files without one becomes a new kit, each sample's instrument guessed from its name.</td></tr>
 <tr><td><code>.json</code> kit mapping, File › Load kit mapping</td><td>The kit is loaded.</td></tr>
 </table>
+
+<h3>Backups and the user data folder</h3>
+<ul>
+  <li><strong>File › Back up user data...</strong> copies all your work (the library with its synth presets, <code>kits.json</code>,
+      <code>settings.json</code>, <code>samples/</code>, <code>songs/</code>) to a folder <code>orDrumbox-backup-&lt;date&gt;-&lt;time&gt;</code> (UTC) you place.</li>
+  <li><strong>File › Restore user data...</strong> puts such a folder back. The files there are first moved to <code>backups/</code>,
+      so nothing is lost; the app then loads again as at start.</li>
+  <li><strong>File › Change user data folder...</strong> and <strong>Use the default user data folder...</strong> switch folders;
+      <strong>Open user data folder</strong> shows it in the system's file manager.</li>
+</ul>
 
 <h3>File picker</h3>
 <p>Commands ending in "..." open the built-in file picker. <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Page Up</kbd>/<kbd>Page Down</kbd>,
@@ -865,15 +954,16 @@ the drives are listed above a drive's root. It starts in the home folder, then w
 
 <!-- ───────────────────────────────────────────────────────────── -->
 <h2 id="shortcuts">17. Keyboard shortcuts</h2>
-<p>Keys are read by position, like the web version: on an AZERTY keyboard, <kbd>[</kbd> <kbd>]</kbd> are the two keys right of
-<kbd>P</kbd>, <kbd>Q</kbd>–<kbd>P</kbd> start at <kbd>A</kbd>, and <kbd>A</kbd> and <kbd>Z</kbd> are the <kbd>Q</kbd> and <kbd>W</kbd> keys.
-On macOS, <kbd>Cmd</kbd> works for <kbd>Ctrl</kbd>. <kbd>Page Up</kbd>/<kbd>Page Down</kbd> and the keypad <kbd>-</kbd> <kbd>+</kbd> work too.</p>
+<p>Keys are the ones the keyboard's layout marks (<kbd>Ctrl</kbd>+<kbd>Z</kbd> is the key marked Z on AZERTY too), except the
+two rows that play, read by their place: <kbd>1</kbd>–<kbd>9</kbd> (mute, <kbd>Shift</kbd>: solo) and <kbd>Q</kbd>–<kbd>P</kbd>
+(hear a track), which on AZERTY start at <kbd>&amp;</kbd> and <kbd>A</kbd>. On macOS, <kbd>Cmd</kbd> works for <kbd>Ctrl</kbd>.
+In the plugin, <kbd>Alt</kbd> stands for <kbd>Ctrl</kbd> (<a href="#plugin">section 19</a>). <kbd>F1</kbd> lists every key.</p>
 
 <h3>Play</h3>
 <table>
 <tr><th>Key</th><th>Action</th></tr>
 <tr><td><kbd>Space</kbd></td><td>Play / stop the pattern (<kbd>Shift</kbd>, or in the song panel: the song, from its cursor)</td></tr>
-<tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>Previous / next pattern (<kbd>Shift</kbd>: arrangement)</td></tr>
+<tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>Previous / next pattern (<kbd>Shift</kbd>: arrangement; also <kbd>Page Up</kbd> <kbd>Page Down</kbd>)</td></tr>
 <tr><td><kbd>-</kbd> <kbd>=</kbd></td><td>Tempo −1 / +1 (<kbd>Shift</kbd>: ×10)</td></tr>
 <tr><td><kbd>,</kbd> <kbd>.</kbd></td><td>Previous / next kit</td></tr>
 <tr><td><kbd>1</kbd>–<kbd>9</kbd></td><td>Mute track 1–9 (<kbd>Shift</kbd>: solo), in every view</td></tr>
@@ -884,13 +974,14 @@ On macOS, <kbd>Cmd</kbd> works for <kbd>Ctrl</kbd>. <kbd>Page Up</kbd>/<kbd>Page
 <table>
 <tr><th>Key</th><th>Action</th></tr>
 <tr><td>Arrows</td><td>Move the grid cursor</td></tr>
-<tr><td><kbd>Enter</kbd></td><td>Like a click at the cursor</td></tr>
+<tr><td><kbd>Enter</kbd> / click</td><td>Switch the step on or off (<kbd>Shift</kbd>+click: select its note)</td></tr>
 <tr><td><kbd>Shift</kbd>+<kbd>↑</kbd><kbd>↓</kbd> / <kbd>←</kbd><kbd>→</kbd></td><td>Velocity ±0.05 / pitch ±1 of the selected note</td></tr>
+<tr><td><kbd>L</kbd></td><td>Accent the cursor step, or take the accent off</td></tr>
 <tr><td><kbd>Delete</kbd></td><td>Clear the cursor step</td></tr>
 <tr><td><kbd>Esc</kbd></td><td>Deselect</td></tr>
 <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd>, <kbd>Ctrl</kbd>+<kbd>Y</kbd> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>)</td><td>Undo, redo (50 steps)</td></tr>
 <tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>V</kbd></td><td>Copy / paste the cursor step (<kbd>Shift</kbd>: the track)</td></tr>
-<tr><td><kbd>Ctrl</kbd>+<kbd>T</kbd>, <kbd>Ctrl</kbd>+<kbd>Backspace</kbd></td><td>Add a track, remove the focused track</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>T</kbd>, <kbd>Ctrl</kbd>+<kbd>Backspace</kbd></td><td>Add a KICK track, remove the focused track</td></tr>
 <tr><td><kbd>Ctrl</kbd>+<kbd>G</kbd>, <kbd>Ctrl</kbd>+<kbd>L</kbd></td><td>Next grid (steps per beat), loop one step shorter</td></tr>
 <tr><td><kbd>Ctrl</kbd>+<kbd>-</kbd> <kbd>=</kbd></td><td>Pattern length −1 / +1 beat</td></tr>
 <tr><td><kbd>Ctrl</kbd>+<kbd>N</kbd>, <kbd>Ctrl</kbd>+<kbd>D</kbd></td><td>New pattern, duplicate pattern</td></tr>
@@ -901,12 +992,12 @@ On macOS, <kbd>Cmd</kbd> works for <kbd>Ctrl</kbd>. <kbd>Page Up</kbd>/<kbd>Page
 <tr><th>Key</th><th>Action</th></tr>
 <tr><td><kbd>B</kbd></td><td>Make the pattern again in its style</td></tr>
 <tr><td><kbd>Shift</kbd>+<kbd>B</kbd></td><td>A new pattern in the chosen style</td></tr>
-<tr><td><kbd>D</kbd>, <kbd>S</kbd>, <kbd>A</kbd></td><td>Drums, bass, chords: generate in auto mode / auto mode off</td></tr>
-<tr><td><kbd>Z</kbd>, <kbd>X</kbd></td><td>Auto mode of the focused track, random notes on it</td></tr>
-<tr><td><kbd>F</kbd>, <kbd>G</kbd></td><td>A random pattern, a random kit</td></tr>
-<tr><td><kbd>H</kbd></td><td>Every track on its matching synth preset</td></tr>
-<tr><td><kbd>J</kbd></td><td>Every track back on auto-assign</td></tr>
-<tr><td><kbd>K</kbd></td><td>A random sample (of any kit) on every track</td></tr>
+<tr><td><kbd>D</kbd>, <kbd>S</kbd></td><td>Drums, bass: generate in auto mode / auto mode off</td></tr>
+<tr><td><kbd>X</kbd></td><td>Random notes on the focused track</td></tr>
+<tr><td><kbd>F</kbd>, <kbd>Shift</kbd>+<kbd>G</kbd></td><td>A random pattern, a random kit</td></tr>
+<tr><td><kbd>Shift</kbd>+<kbd>H</kbd></td><td>Every track on its matching synth preset</td></tr>
+<tr><td><kbd>Shift</kbd>+<kbd>J</kbd></td><td>Every track back on auto-assign</td></tr>
+<tr><td><kbd>Shift</kbd>+<kbd>K</kbd></td><td>A random sample (of any kit) on every track</td></tr>
 <tr><td><kbd>V</kbd></td><td>VU meters on / off</td></tr>
 <tr><td><kbd>C</kbd></td><td>Next colour scheme</td></tr>
 </table>
@@ -914,58 +1005,121 @@ On macOS, <kbd>Cmd</kbd> works for <kbd>Ctrl</kbd>. <kbd>Page Up</kbd>/<kbd>Page
 <h3>Files and windows</h3>
 <table>
 <tr><th>Key</th><th>Action</th></tr>
-<tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Export the pattern as JSON (the library saves itself)</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Save the library now (<kbd>Shift</kbd>: export the pattern as JSON)</td></tr>
 <tr><td><kbd>Ctrl</kbd>+<kbd>E</kbd></td><td>Export the pattern to WAV (<kbd>Shift</kbd>: the song)</td></tr>
 <tr><td><kbd>Ctrl</kbd>+<kbd>M</kbd></td><td>Export the pattern to MIDI</td></tr>
 <tr><td><kbd>Ctrl</kbd>+<kbd>O</kbd></td><td>Import a MIDI file</td></tr>
 <tr><td><kbd>Ctrl</kbd>+<kbd>K</kbd></td><td>Kit editor open / close</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>+</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>-</kbd>, <kbd>Ctrl</kbd>+<kbd>0</kbd></td><td>Zoom in, zoom out, the display's size</td></tr>
 <tr><td><kbd>Ctrl</kbd>+<kbd>Q</kbd></td><td>Save and quit</td></tr>
 <tr><td><kbd>F10</kbd>, <kbd>Alt</kbd></td><td>Open the menus</td></tr>
 <tr><td><kbd>F1</kbd></td><td>The list of keys</td></tr>
-<tr><td><kbd>F2</kbd></td><td>Track editor shown / hidden</td></tr>
+<tr><td><kbd>F2</kbd></td><td>Track editor shown / folded</td></tr>
 <tr><td><kbd>F3</kbd></td><td>Song panel</td></tr>
 <tr><td><kbd>F4</kbd></td><td>Piano roll</td></tr>
 <tr><td><kbd>F5</kbd></td><td>Grid</td></tr>
 <tr><td><kbd>F6</kbd></td><td>Synth editor</td></tr>
+<tr><td><kbd>F7</kbd></td><td>Note editor shown / folded</td></tr>
 <tr><td><kbd>Tab</kbd>, <kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Focus the next / previous control of the editors</td></tr>
 </table>
 
 <!-- ───────────────────────────────────────────────────────────── -->
 <h2 id="signal">18. Audio signal flow</h2>
 <h3>Each track</h3>
-<pre>Sample or synth voice → Filter → Saturation → Reverb → Delay → Volume → Pan → Mix bus</pre>
+<pre>Sample or synth voice → Filter → Compressor → Saturation → Bitcrusher → Hard clip → Reverb → Delay → Volume → Pan → Mix bus</pre>
 <h3>Master bus</h3>
 <pre>Mix bus → Pre-gain → Compressor → Low cut → High cut → Volume → Soft limit → Output (and spectrum)</pre>
-<p>The soft limit leaves the signal unchanged under 0.9 and rounds it toward ±1 above, so loud mixes do not clip harshly.</p>
+<p>The soft limit leaves the signal unchanged under 0.9 and rounds it toward ±1 above, so loud mixes do not clip harshly.
+In the plugin, a track sent to its own output (<a href="#plugin">section 19</a>) leaves the mix bus after its pan: the master acts on the mix only.</p>
 
 <!-- ───────────────────────────────────────────────────────────── -->
-<h2 id="mcp">19. AI clients (MCP)</h2>
+<h2 id="plugin">19. The plugin (CLAP / VST3)</h2>
+<p>orDrumbox also runs as an instrument in a DAW: copy <code>orDrumbox.clap</code> or <code>orDrumbox.vst3</code> to the host's
+plugin folder. Its window is the app's, without what the host does.</p>
+
+<h3>What differs from the app</h3>
+<ul>
+  <li><strong>Transport and tempo</strong> are the host's. In place of PLAY, <strong>HOST</strong> shows whether the host plays
+      (a triangle) or is stopped (a square), and the tempo played. A host tempo outside 20–300 BPM plays at the nearest bound,
+      and the status line says so. Playback starts on the host's first block. An offline render (a bounce) plays as in real
+      time, every note in its place.</li>
+  <li><strong>The library</strong> is saved in the host's project: each project has its own, synth presets included.</li>
+  <li><strong>The menus</strong> leave out what the host or the app does: save, quit, play, tempo, songs, the user data folder,
+      updates, factory reset, the master strip.</li>
+  <li><strong>Keys</strong>: <kbd>Space</kbd> and every <kbd>Ctrl</kbd>/<kbd>Cmd</kbd> key are the host's. orDrumbox's
+      <kbd>Ctrl</kbd> keys take <kbd>Alt</kbd> instead (<kbd>Alt</kbd>+<kbd>Z</kbd> undo, <kbd>Alt</kbd>+<kbd>K</kbd> kit editor…);
+      the menus show them.</li>
+  <li><strong>The window</strong> opens compact, the grid alone (1072×388 at scale 1), to leave the host's arrangement in view.
+      <kbd>F2</kbd> shows or folds the track editor, <kbd>F7</kbd> the note editor, and the window grows or shrinks with them.
+      The grip in its bottom-right corner resizes it (down to 320×200); the project keeps the size.</li>
+</ul>
+
+<h3>Automatable parameters</h3>
+<table>
+<tr><th>Parameter</th><th>What it does</th></tr>
+<tr><td><strong>Pattern</strong>, <strong>Kit</strong></td><td>The pattern and the kit played, by number from 1.</td></tr>
+<tr><td><strong>Volume</strong></td><td>Master volume, −60 to +6 dB.</td></tr>
+<tr><td><strong>Swing</strong></td><td>50 % (straight) to 75 %: where the second step of each pair starts, on every track with an even number of steps per beat, on top of the track's own swing.</td></tr>
+<tr><td>For tracks 1–16: <strong>Mute</strong>, <strong>Volume</strong>, <strong>Pan</strong></td><td>A gain on the track's own volume (−60 to +6 dB), a pan added to its own.</td></tr>
+<tr><td><strong>Cutoff</strong>, <strong>Q</strong></td><td>Moves the filter's cutoff by up to ±4 octaves; adds to its Q.</td></tr>
+<tr><td><strong>Reverb</strong>, <strong>Delay</strong>, <strong>Saturation</strong>, <strong>Compressor</strong></td><td>Added to the effect's amount, kept within 0 to 1; with the effect's button off, the track's amount counts as 0.</td></tr>
+<tr><td><strong>Threshold</strong>, <strong>Feedback</strong></td><td>dB added to the compressor's threshold (kept within −60 to 0); added to the delay's feedback (up to 0.95; a slap keeps its single echo).</td></tr>
+<tr><td><strong>Transpose</strong></td><td>±24 semitones on the notes played, MIDI input included.</td></tr>
+<tr><td><strong>Output</strong></td><td><em>Mix</em> or <em>Own</em>: see below.</td></tr>
+</table>
+<p>At their defaults they change nothing. They change what plays, not the library. A filter off, and a reverb or delay of
+type <em>none</em>, stay off.</p>
+
+<h3>Outputs</h3>
+<p>17 stereo outputs: <strong>Mix</strong>, and <strong>Track 1</strong> to <strong>Track 16</strong>. Every track plays in the mix
+until its <strong>Output</strong> parameter is set to <em>Own</em>: it then leaves the mix and plays on its own output, with its own
+volume, pan, filter and effects, for the host to mix and process apart. An output with no track on it is silent. A host that gives the
+plugin a single stereo output keeps every track in the mix; tracks past the 16th always are.</p>
+
+<h3>MIDI</h3>
+<p>MIDI goes both ways, one place per track of the pattern playing. A drum track is on channel 10 at its instrument's GM key
+(KICK 36, SNARE 38…). Any other track (melodic, unknown name, a second track of one drum) has a channel of its own (1–9, 11–16,
+in track order), its notes on the key of their pitch (the track's pitch 0 is its sample's root note, C3 = 48 without one and for a
+synth). Past the 15 channels, the tracks left take keys of channel 10 from 84 up.</p>
+<ul>
+  <li><strong>In</strong>: a note on a track's channel plays that track at the note's pitch; a note on any other channel plays the drum
+      track with that key, at its velocity, whether the host plays or not.</li>
+  <li><strong>Out</strong>: the notes the pattern plays go out where they come in, with their pitch, a 16th long. Tracks the host mutes
+      send nothing. A clip recorded from this output and played back into the plugin plays the same tracks at the same pitches.</li>
+</ul>
+
+<!-- ───────────────────────────────────────────────────────────── -->
+<h2 id="mcp">20. AI clients (MCP)</h2>
 <p>An MCP client (Claude Desktop, Claude Code, Cursor…) can drive the running app. The client starts <code>ordrumbox --mcp</code>,
 which passes each tool call to the open window: the edit shows at once, is one step of <strong>Edit › Undo</strong>, and is saved
 with the library. The window listens on <code>127.0.0.1</code> only, with a token written to <code>mcp.json</code>. With the window
-closed, a call answers that orDrumbox is not running. While a confirmation is open in the window, the tools are refused.</p>
+closed, a call answers that orDrumbox is not running. While a confirmation is open in the window, the tools are refused.
+The link is the app's: the plugin does not offer it.</p>
 <p>In the client's settings (use the program's path; <code>ordrumbox.exe</code> on Windows):</p>
 <pre>{ "mcpServers": { "ordrumbox": { "command": "/path/to/ordrumbox", "args": ["--mcp"] } } }</pre>
 <p>The tools cover patterns (list, create, select, rename, duplicate, remove, notes, tracks, tempo, length, tags, description),
-generation (generate, regenerate, toggles, macros), arrangements and clips, song files, kits and samples, synth presets, the master
-bus, exports (WAV, MIDI, JSON), MIDI import, play, stop, undo and redo, and the playback state.</p>
+arrangements and clips, song files, kits and samples, synth presets, the master bus, exports (WAV, MIDI, JSON), MIDI import,
+play, stop, undo and redo, and the playback state. The client writes the notes itself; orDrumbox's automatic generation
+(generate, regenerate, auto mode, macros, random notes) is used only when you ask for it in words.</p>
 <p>New to this? The <a href="mcp-guide.html">beginner's guide to the AI link</a> walks through the setup and worked examples.</p>
 
 <!-- ───────────────────────────────────────────────────────────── -->
-<h2 id="updates">20. Updates, About, factory reset</h2>
+<h2 id="updates">21. Updates, About, factory reset</h2>
 <h3>Updates</h3>
 <p>At start, at most once a day, the app asks GitHub whether a newer release exists (with the system's <code>curl</code>; the request
 carries only the program's name and version). A newer one is shown on the status line and <strong>Help › Download orDrumbox …</strong>
 opens its page. Nothing is downloaded or installed by the app. <strong>Help › Check for updates</strong> checks now. To stop the check
-at start, set <code>"check": false</code> under <code>updates</code> in <code>settings.json</code>.</p>
+at start, set <code>"check": false</code> under <code>updates</code> in <code>settings.json</code>. The plugin does not check.</p>
 <h3>About</h3>
 <p><strong>Help › About orDrumbox</strong> shows the build (also in the window title and with <code>ordrumbox --version</code>) and the
-folders in use: the assets and the user data folder. A release is named by its version alone (<code>0.1.0</code>); other builds add
-<code>dev</code>, the commit and its date.</p>
+paths in use: the library file, the user data folder (and whether it was chosen in the app), the exports folder and the assets.
+A release is named by its version alone (<code>0.1.1</code>); other builds add <code>dev</code>, the commit and its date.
+<strong>Help › User manual...</strong> opens this manual on the web site.</p>
 <h3>Factory reset</h3>
-<p><strong>Help › Factory reset...</strong> moves your files out of the way — <code>library.json</code>, <code>kits.json</code>,
-<code>settings.json</code>, <code>synth_presets.json</code>, <code>samples/</code>, <code>songs/</code> — and reloads everything from the
-assets, as at first start. <kbd>Enter</kbd> restores, <kbd>Esc</kbd> or a click cancels.</p>
+<p><strong>Help › Factory reset...</strong> moves your files to <code>backups/</code> in the user data folder — <code>library.json</code>,
+<code>kits.json</code>, <code>settings.json</code>, <code>synth_presets.json</code>, <code>samples/</code>, <code>songs/</code> — and reloads
+everything from the assets, as at first start. <strong>File › Restore user data</strong> brings them back. <kbd>Enter</kbd> resets,
+<kbd>Esc</kbd> or a click cancels.</p>
 
 </main>
 <footer style="text-align:center;color:var(--muted);padding:24px 16px;border-top:1px solid var(--line)">
