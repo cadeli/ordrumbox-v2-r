@@ -32,9 +32,11 @@ jobs:
       - run: cargo clippy --workspace --all-targets
       - run: cargo test --workspace
 
-  # The plugin bundles (CLAP and VST3, `assets/` inside), checked by the
-  # CLAP project's validator. Built for a release tag only, or when the
-  # workflow is run by hand.
+  # The plugin bundles (`assets/` inside), checked by the CLAP project's
+  # validator. Built for a release tag only, or when the workflow is run by hand.
+  # The CLAP is built first without `vst3`, so that the one shipped in the
+  # release stays MIT (README.md, "License"); the VST3 build, GPLv3, is only an
+  # artifact of the run.
   plugin:
     name: plugin (${{ matrix.os }})
     needs: check
@@ -48,7 +50,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo xtask bundle ordrumbox-plugin --release --features vst3
+      - run: cargo xtask bundle ordrumbox-plugin --release
       # 0.3.2 no longer builds: its lockfile pins `time` 0.3.20, which recent
       # rustc rejects. The workflow's `-D warnings` is for this repository's
       # code: a warning in the validator's own code must not fail its build.
@@ -60,6 +62,22 @@ jobs:
       # (random bytes abort on the allocation), and does not ask the host to
       # rescan the parameter values afterwards.
       - run: clap-validator validate --exclude 'state-invalid-random|state-reproducibility' target/bundled/orDrumbox.clap
+      # The CLAP of the release. On Windows it is a single file, which reads the
+      # `assets/` next to it: the Windows zip puts it beside `ordrumbox.exe`.
+      # On macOS it is a bundle, `assets/` inside, zipped by `ditto` to keep its
+      # signature and the binary's permissions.
+      - name: CLAP of the release (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: mkdir clap && cp target/bundled/orDrumbox.clap clap/
+      - name: CLAP of the release (macOS)
+        if: runner.os == 'macOS'
+        run: mkdir clap && ditto -c -k --norsrc --noextattr --noacl --keepParent target/bundled/orDrumbox.clap clap/orDrumbox.clap.zip
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ordrumbox-clap-${{ runner.os }}
+          path: clap
+      - run: cargo xtask bundle ordrumbox-plugin --release --features vst3
       - uses: actions/upload-artifact@v7
         with:
           name: ordrumbox-plugin-${{ runner.os }}
@@ -68,7 +86,7 @@ jobs:
   # Built for a release tag only, or when the workflow is run by hand.
   windows-exe:
     name: ordrumbox.exe
-    needs: check
+    needs: [check, plugin]
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     steps:
@@ -90,9 +108,14 @@ jobs:
             echo "tag $GITHUB_REF_NAME, but the program is $build"
             exit 1
           fi
-      # The program, the assets it reads from the folder next to it, its license.
+      # The program, the CLAP plugin, the assets both read from the folder next
+      # to them, the license.
+      - uses: actions/download-artifact@v8
+        with:
+          name: ordrumbox-clap-Windows
+          path: dist
       - shell: bash
-        run: mkdir dist && cp target/release/ordrumbox.exe LICENSE dist/ && cp -r assets dist/
+        run: cp target/release/ordrumbox.exe LICENSE dist/ && cp -r assets dist/
       - uses: actions/upload-artifact@v7
         with:
           name: ordrumbox-windows-x64
@@ -100,7 +123,7 @@ jobs:
 
   release:
     name: GitHub release
-    needs: windows-exe
+    needs: [windows-exe, plugin]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -120,6 +143,11 @@ jobs:
           name: ordrumbox-windows-x64
           path: ordrumbox
       - run: zip -r "ordrumbox-$GITHUB_REF_NAME-windows-x64.zip" ordrumbox
+      - uses: actions/download-artifact@v8
+        with:
+          name: ordrumbox-clap-macOS
+          path: clap-macos
+      - run: mv clap-macos/orDrumbox.clap.zip "ordrumbox-$GITHUB_REF_NAME-macos-clap.zip"
       - run: gh release create "$GITHUB_REF_NAME" --title "orDrumbox $GITHUB_REF_NAME" --generate-notes ./*.zip
         env:
           GH_TOKEN: ${{ github.token }}
