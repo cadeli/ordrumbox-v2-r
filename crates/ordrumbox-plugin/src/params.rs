@@ -7,8 +7,10 @@
 //! window; the track parameters are applied by the audio thread, every
 //! block, on top of the pattern's own (the library is not edited).
 //! A pattern or kit chosen in the window is given back to the host
-//! (`editor.rs`).
+//! (`editor.rs`). A MIDI program change chooses the pattern too
+//! ([`MidiProgram`]).
 
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, RwLock};
 
 use nih_plug::prelude::*;
@@ -71,6 +73,8 @@ pub struct OrdrumboxParams {
     pub tracks: [TrackParams; HOST_TRACKS],
     /// The names the pattern and kit parameters show.
     pub names: Arc<Names>,
+    /// The last MIDI program change, from the audio thread to the player thread.
+    pub midi_program: MidiProgram,
 }
 
 /// One track's parameters, each changing nothing at its default.
@@ -222,15 +226,19 @@ impl Default for OrdrumboxParams {
             .with_string_to_value(formatters::s2v_f32_percentage()),
             tracks: std::array::from_fn(|t| TrackParams::new(t + 1)),
             names,
+            midi_program: MidiProgram::default(),
         }
     }
 }
 
 impl OrdrumboxParams {
     /// What the player thread follows: the pattern and the kit the host asks
-    /// for, the tracks it mutes and its swing.
+    /// for, the tracks it mutes and its swing. No program change: the player
+    /// thread takes it from [`MidiProgram`].
+    #[must_use]
     pub fn controls(&self) -> HostControls {
         HostControls {
+            program: None,
             pattern: choice_index(&self.pattern),
             kit: choice_index(&self.kit),
             muted: self.muted_tracks(),
@@ -266,9 +274,12 @@ fn straight_swing() -> f32 {
     STRAIGHT_SWING as f32
 }
 
-/// What a host's parameters ask of the player thread.
+/// What a host's parameters and MIDI input ask of the player thread.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HostControls {
+    /// The pattern (from 0) of a MIDI program change received since the
+    /// last tick; it wins over the pattern parameter.
+    pub program: Option<usize>,
     /// The pattern, from 0.
     pub pattern: usize,
     /// The kit, from 0.
@@ -289,6 +300,29 @@ fn choice_index(param: &IntParam) -> usize {
 /// choices; `None` past them.
 pub fn choice_value(index: usize, max: i32) -> Option<i32> {
     i32::try_from(index + 1).ok().filter(|&v| v <= max)
+}
+
+/// Program change bit: a program was received (the low byte holds it).
+const PROGRAM_RECEIVED: u32 = 1 << 8;
+
+/// The last MIDI program change received, set by the audio thread (an
+/// atomic store: no lock, no allocation) and taken by the player thread,
+/// which plays pattern `program + 1`. A program received twice is applied
+/// twice: the second one undoes a choice made in the window since.
+#[derive(Debug, Default)]
+pub struct MidiProgram(AtomicU32);
+
+impl MidiProgram {
+    /// Program `program` (0 to 127) received; it replaces one not taken yet.
+    pub fn receive(&self, program: u8) {
+        self.0.store(PROGRAM_RECEIVED | u32::from(program), Ordering::Release);
+    }
+
+    /// The program received since the last call, as a pattern index.
+    pub fn take(&self) -> Option<usize> {
+        let received = self.0.swap(0, Ordering::Acquire);
+        (received & PROGRAM_RECEIVED != 0).then_some(usize::from(received.to_le_bytes()[0]))
+    }
 }
 
 /// The names of the patterns and the kits, kept up to date by the player
@@ -360,6 +394,18 @@ mod tests {
     }
 
     #[test]
+    fn a_program_change_is_taken_once_and_the_last_one_wins() {
+        let program = MidiProgram::default();
+        assert_eq!(program.take(), None);
+        program.receive(0);
+        assert_eq!(program.take(), Some(0));
+        assert_eq!(program.take(), None);
+        program.receive(3);
+        program.receive(127);
+        assert_eq!(program.take(), Some(127));
+    }
+
+    #[test]
     fn a_track_on_its_own_output_is_split_from_the_mix() {
         let params = OrdrumboxParams::default();
         let output = &params.tracks[2].output;
@@ -371,7 +417,7 @@ mod tests {
     #[test]
     fn the_defaults_choose_the_first_pattern_and_kit_and_change_nothing() {
         let params = OrdrumboxParams::default();
-        let controls = HostControls { pattern: 0, kit: 0, muted: 0, swing: STRAIGHT_SWING };
+        let controls = HostControls { program: None, pattern: 0, kit: 0, muted: 0, swing: STRAIGHT_SWING };
         assert_eq!(params.controls(), controls);
         assert_eq!(params.muted_tracks(), 0);
         assert_eq!(params.mix(), HostMix::default());

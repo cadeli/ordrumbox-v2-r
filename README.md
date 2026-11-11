@@ -13,6 +13,15 @@ The JavaScript/web version (<https://github.com/cadeli/ordrumbox-v2>) is a web d
 
 The app is a single executable with its `assets/` folder next to it.
 
+The CLAP plugin comes with each release:
+
+- **Windows**: `orDrumbox.clap` is in the app's zip, next to `ordrumbox.exe`. It reads the
+  `assets/` folder next to it: copy both, `orDrumbox.clap` and `assets/`, into
+  `C:\Program Files\Common Files\CLAP\` (or any folder your host scans for CLAP plugins).
+- **macOS**: `ordrumbox-<version>-macos-clap.zip` holds `orDrumbox.clap`, its assets inside.
+  Unzip it into `~/Library/Audio/Plug-Ins/CLAP/`. It is not notarized: if the host refuses
+  to load it, run `xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/CLAP/orDrumbox.clap`.
+
 ## Documentation
 
 - User manual: [`docs/user-manual.html`](docs/user-manual.html), with its
@@ -80,6 +89,11 @@ channels, the tracks left take keys of channel 10 from 84 up.
 - **In**: a note on a track's channel plays that track at the note's pitch; a note on any
   other channel plays the drum track with that key. At its velocity, whether the host plays
   or not.
+- **Program change** (in): program 1–128, on any channel, chooses pattern 1–128, as the
+  **Pattern** parameter does: shown at once, played once the pattern playing ends its loop.
+  A program the library has no pattern for is refused, and the status line says so. The
+  host's Pattern parameter keeps its value. CLAP only: a VST3 host gives a plugin no program
+  change (map a MIDI control to the Pattern parameter instead).
 - **Out**: the notes the pattern plays go out where they come in, with their pitch (the
   track's transpose and pitch LFO included), a 16th long. Tracks the host mutes send nothing.
   A clip recorded from this output and played back into the plugin plays the same tracks at

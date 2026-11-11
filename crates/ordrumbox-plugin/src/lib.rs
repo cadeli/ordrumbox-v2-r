@@ -6,7 +6,8 @@
 //!
 //! MIDI: the notes the pattern plays go out where a note in plays them:
 //! drums on channel 10 at their GM key, the other tracks each on a channel
-//! of its own at the note's pitch (`ordrumbox_engine::midi`).
+//! of its own at the note's pitch (`ordrumbox_engine::midi`). A program
+//! change, on any channel, chooses the pattern (`params::MidiProgram`).
 //!
 //! Threads: the host's audio thread runs [`AudioSide::render_synced`]; the
 //! player thread ([`player::Ticker`]) builds and posts passes; the host's GUI
@@ -145,7 +146,8 @@ impl Plugin for Ordrumbox {
         },
     ];
 
-    const MIDI_INPUT: MidiConfig = MidiConfig::Basic;
+    // `MidiCCs` for program changes (CLAP; VST3 gives none): the CCs are ignored.
+    const MIDI_INPUT: MidiConfig = MidiConfig::MidiCCs;
     const MIDI_OUTPUT: MidiConfig = MidiConfig::Basic;
 
     type SysExMessage = ();
@@ -201,15 +203,20 @@ impl Plugin for Ordrumbox {
         outputs.iter_mut().flat_map(|output| output.as_slice().iter_mut()).for_each(|c| c.fill(0.0));
         match (&mut self.audio, buffer.as_slice()) {
             (Some(audio), [left, right, ..]) => {
-                ready(audio, &mut self.pace, &self.steps, host, left.len());
                 let mut mix = self.params.mix();
                 mix.split &= with_output(outputs.len());
                 audio.set_host_mix(mix);
+                // Before the tick of a render ahead of real time: it applies the program change.
                 while let Some(event) = context.next_event() {
-                    if let NoteEvent::NoteOn { timing, channel, note, velocity, .. } = event {
-                        audio.trigger(channel, note, velocity, timing);
+                    match event {
+                        NoteEvent::NoteOn { timing, channel, note, velocity, .. } => {
+                            audio.trigger(channel, note, velocity, timing);
+                        }
+                        NoteEvent::MidiProgramChange { program, .. } => self.params.midi_program.receive(program),
+                        _ => {}
                     }
                 }
+                ready(audio, &mut self.pace, &self.steps, host, left.len());
                 audio.render_synced_split(left, right, host, |track, at, track_left, track_right| {
                     if let Some([out_left, out_right, ..]) = outputs.get_mut(track).map(Buffer::as_slice) {
                         write_at(out_left, at, track_left);
