@@ -476,7 +476,7 @@ impl Session {
             Id::Regenerate => self.regenerate_track(t),
             Id::FxPower(i) => {
                 // `toggleFxByKey`.
-                let fx = &FX_DEFS[usize::from(i.min(3))];
+                let fx = &FX_DEFS[usize::from(i).min(FX_DEFS.len() - 1)];
                 let updates = if fx.key == "filterType" {
                     if editors::fx_on(&track, fx) {
                         self.editors.prev_filter_type = Some(track.filter_type.clone());
@@ -487,7 +487,7 @@ impl Session {
                     }
                 } else {
                     let on = editors::number(&track, fx.key) > 0.0;
-                    vec![(fx.key, number(if on { 0.0 } else { 0.5 }))]
+                    vec![(fx.key, number(if on { 0.0 } else { fx.on_value }))]
                 };
                 self.update_track(t, &updates, &format!("Toggle {} on {name}", fx.label), false);
             }

@@ -123,6 +123,13 @@ pub fn strip_settings(track: &Track, bpm: f64) -> StripSettings {
         s.filter_slope = filter_slope(track.filter_slope);
     }
 
+    // Compressor: its mix is its amount, 0 skips it.
+    s.comp_mix = finite_or(track.comp_mix, 0.0).clamp(0.0, 1.0) as f32;
+    s.comp_threshold_db = finite_or(track.comp_threshold_db, -18.0) as f32;
+    s.comp_ratio = finite_or(track.comp_ratio, 4.0) as f32;
+    s.comp_attack_seconds = (finite_or(track.comp_attack_ms, 10.0) / 1000.0) as f32;
+    s.comp_release_seconds = (finite_or(track.comp_release_ms, 100.0) / 1000.0) as f32;
+
     // Saturation.
     let amount = if track.saturation_on { finite_or(track.saturation_mix, 0.0).clamp(0.0, 1.0) } else { 0.0 };
     s.saturation_type = match track.saturation_type.as_str() {
@@ -309,6 +316,15 @@ mod tests {
         assert_eq!((on.crush, on.clip), (0.4, 0.6));
         let off = strip_settings(&Track { saturation_on: false, ..crushed }, 120.0);
         assert_eq!((off.crush, off.clip), (0.0, 0.0));
+    }
+
+    #[test]
+    fn the_compressor_takes_the_tracks_settings() {
+        let track = Track { comp_mix: 0.7, comp_threshold_db: -30.0, comp_attack_ms: 5.0, ..Track::default() };
+        let s = strip_settings(&track, 120.0);
+        assert_eq!((s.comp_mix, s.comp_threshold_db, s.comp_ratio), (0.7, -30.0, 4.0));
+        assert_eq!((s.comp_attack_seconds, s.comp_release_seconds), (0.005, 0.1));
+        assert_eq!(strip_settings(&Track::default(), 120.0).comp_mix, 0.0);
     }
 
     #[test]
