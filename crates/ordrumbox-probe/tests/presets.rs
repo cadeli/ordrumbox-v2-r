@@ -14,13 +14,13 @@ fn presets() -> SynthPresets {
 }
 
 #[test]
-fn every_preset_sounds_and_ends() {
+fn every_preset_sounds_ends_and_does_not_clip() {
     let presets = presets();
     assert!(!presets.is_empty());
     for key in presets.keys() {
         let buffer = render_note(presets.get(key).unwrap(), &NoteSettings::default()).unwrap();
         let m = measure(&buffer);
-        assert!(m.peak > 0.0 && m.peak.is_finite(), "{key}: {}", m.peak);
+        assert!(m.peak > 0.0 && m.peak < 1.0, "{key}: peak {}", m.peak);
         assert!(m.attack_ms.is_some() && m.end_ms.is_some() && m.centroid_hz.is_some(), "{key}");
         let report = report_to_json(json::Object::new(), vec![sound_to_json(key, &m, None)]);
         json::parse(&report.to_json()).unwrap();
@@ -28,7 +28,7 @@ fn every_preset_sounds_and_ends() {
 }
 
 #[test]
-fn every_kit_sound_has_a_preset_and_no_preset_clips() {
+fn every_kit_sound_has_a_preset() {
     let presets = presets();
     for key in [
         "KICK_SYNTH",
@@ -41,10 +41,6 @@ fn every_kit_sound_has_a_preset_and_no_preset_clips() {
         "CRASH_SYNTH",
     ] {
         assert!(presets.get(key).is_some(), "{key}");
-    }
-    for key in presets.keys() {
-        let m = measure(&render_note(presets.get(key).unwrap(), &NoteSettings::default()).unwrap());
-        assert!(m.peak < 1.0, "{key}: {}", m.peak);
     }
 }
 

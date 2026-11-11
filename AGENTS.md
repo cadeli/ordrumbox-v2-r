@@ -77,7 +77,7 @@ assets/           data/*.json and kits/**.wav, read at runtime
 ## Kits and samples
 
 - Kits are folders of `assets/kits/`, declared in `assets/data/kits.json`.
-  A kit sample is 16-bit PCM, mono, 44.1 kHz, peak at −3 dB, starting at
+  A kit sample is 16- or 24-bit PCM, mono, 44.1 kHz, peak at −3 dB, starting at
   once and fading out to silence.
 - `ordrumbox-probe` (not shipped) checks and repairs them:
 

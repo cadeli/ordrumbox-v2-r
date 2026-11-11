@@ -7,7 +7,8 @@ use crate::drum_taxonomy::{mono_from_track_name, pan_from_track_name};
 use crate::json::{Object, Value};
 use crate::note::{Note, decode_notes, encode_notes};
 use crate::num::round2;
-use crate::record::{Issue, SetField, check_duplicate, json_record};
+use crate::record::{Issue, SetField, check_duplicate, json_record, past_max, refusal};
+use crate::steps::{MAX_LOADED_BEATS, MAX_LOADED_STEPS, MAX_LOADED_STEPS_PER_BEAT};
 
 json_record! {
     /// One track. Table fields are saved only when they differ from their
@@ -220,6 +221,10 @@ const ROUND_2D: [&str; 14] = [
 /// Tracks a pattern plays, each through its own strip: an edit adds no
 /// track past them, a load reports the tracks beyond.
 pub const MAX_TRACKS: usize = 64;
+/// The most a file may give for a track's lengths, by key; a value past it
+/// is reported and the default kept.
+const LOADED_MAX: [(&str, i32); 3] =
+    [("beatCount", MAX_LOADED_BEATS), ("stepsPerBeat", MAX_LOADED_STEPS_PER_BEAT), ("loopLength", MAX_LOADED_STEPS)];
 /// A pair swing that delays nothing: the second step of a pair at its
 /// middle ([`crate::Hit::pair_swing_beats`]).
 pub const STRAIGHT_SWING: f64 = 0.5;
@@ -294,6 +299,9 @@ impl Track {
             match key {
                 // `fxSelected`: an editor tab the JS app saved with the track.
                 "notes" | "noteKeys" | "fxSelected" => {}
+                _ if Self::canonical_key(key)
+                    .and_then(|field| LOADED_MAX.iter().find(|(k, _)| *k == field))
+                    .is_some_and(|&(_, max)| past_max(value, max, format!("{at}.{key}"), issues)) => {}
                 _ => match track.set_field(key, value) {
                     SetField::Set => {}
                     SetField::WrongType if key == "pan" => {
@@ -301,7 +309,7 @@ impl Track {
                         issues.push(Issue::new(format!("{at}.pan"), message));
                     }
                     SetField::WrongType => {
-                        issues.push(Issue::new(format!("{at}.{key}"), format!("wrong type ({value}), default kept")));
+                        issues.push(Issue::new(format!("{at}.{key}"), refusal(value)));
                     }
                     SetField::Unknown => {
                         track.extra.insert(key, value.clone());

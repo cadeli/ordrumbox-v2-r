@@ -490,27 +490,65 @@ fn notes_past_the_last_pattern_are_announced() {
 
 #[test]
 fn a_damaged_file_is_imported_or_refused_never_a_panic() {
-    // A drum channel, melodic programs and running status: most of the parser's paths.
-    let bytes = file("band-format1.mid");
-    let mut damaged: Vec<Vec<u8>> = (0..bytes.len()).map(|n| bytes[..n].to_vec()).collect();
-    for at in 0..bytes.len() {
-        for value in [0x00, 0x7f, 0x80, 0xff] {
+    // A drum channel, melodic programs and running status; a format 0 file;
+    // sysex and meta events: most of the parser's paths.
+    for name in ["band-format1.mid", "drums-format0.mid", "sysex-and-oddities.mid"] {
+        let bytes = file(name);
+        let mut damaged: Vec<Vec<u8>> = (0..bytes.len()).map(|n| bytes[..n].to_vec()).collect();
+        for at in 0..bytes.len() {
+            for value in [0x00, 0x7f, 0x80, 0xff] {
+                let mut copy = bytes.clone();
+                copy[at] = value;
+                damaged.push(copy);
+            }
+        }
+        let mut rng = Rng::new(7);
+        for _ in 0..2000 {
             let mut copy = bytes.clone();
-            copy[at] = value;
+            for _ in 0..4 {
+                let at = (rng.next_u64() % copy.len() as u64) as usize;
+                copy[at] = rng.next_u64() as u8;
+            }
             damaged.push(copy);
         }
-    }
-    let mut rng = Rng::new(7);
-    for _ in 0..2000 {
-        let mut copy = bytes.clone();
-        for _ in 0..4 {
-            let at = (rng.next_u64() % copy.len() as u64) as usize;
-            copy[at] = rng.next_u64() as u8;
+        for (case, file) in damaged.iter().enumerate() {
+            let outcome = std::panic::catch_unwind(|| midi::import("damaged.mid", file, &[]));
+            assert!(outcome.is_ok(), "{name}, case {case} panics: {file:?}");
         }
-        damaged.push(copy);
     }
-    for (case, file) in damaged.iter().enumerate() {
-        let outcome = std::panic::catch_unwind(|| midi::import("damaged.mid", file, &[]));
-        assert!(outcome.is_ok(), "case {case} panics: {file:?}");
+}
+
+/// The keys a pattern strikes and when, as an export writes them, whatever their track.
+fn struck_keys(pattern: &Pattern, roots: &[(String, f64)]) -> Vec<(u64, u8)> {
+    let mut keys: Vec<(u64, u8)> = expected_tracks(pattern, 1, roots)
+        .into_iter()
+        .flat_map(|(_, _, notes)| notes)
+        .map(|(tick, key, _)| (tick, key))
+        .collect();
+    keys.sort_unstable();
+    keys.dedup();
+    keys
+}
+
+#[test]
+fn an_imported_file_exported_and_imported_again_strikes_the_same_keys() {
+    let roots = roots(&exports());
+    let mut patterns = 0;
+    for (name, bytes) in files() {
+        let Ok(first) = midi::import(&name, &bytes, &roots) else { continue };
+        for (p, pattern) in first.patterns.iter().enumerate() {
+            if pattern.tracks.iter().all(|track| track.notes.is_empty()) {
+                continue;
+            }
+            let at = format!("{name}, pattern {p}");
+            let exported = midi::export(pattern, 120.0, 1, &roots, &mut Rng::new(1), &Scales::default());
+            let again = midi::import(&name, &exported, &roots).unwrap_or_else(|e| panic!("{at}: {e}"));
+            assert_eq!(again.patterns.len(), 1, "{at}: one pattern out, one pattern in");
+            // The tracks may differ: several instruments share a key, and a
+            // key comes back as one track.
+            assert_eq!(struck_keys(&again.patterns[0], &roots), struck_keys(pattern, &roots), "{at}");
+            patterns += 1;
+        }
     }
+    assert!(patterns > 20, "{patterns} patterns went round");
 }

@@ -123,7 +123,7 @@ fn edge_cases_repair_and_report() {
     assert_eq!(library.patterns[1].tags, ["legacy", "object"]);
 }
 
-/// Saving rounds some values to 2 decimals (as the JS exporter does), so the
+/// Saving rounds some values to 2 decimals (0.792 -> 0.79), so the
 /// first save may change the model; from then on save/load is stable.
 #[test]
 fn saving_is_stable() {
@@ -144,20 +144,4 @@ fn infos_are_kept_as_written() {
     let (library, _) = load("song.json");
     let infos: &Object = &library.info;
     assert_eq!(infos.get("name").and_then(Value::as_str), Some("orDrumbox Demo lib"));
-}
-
-#[test]
-fn a_saved_library_loads_back_to_the_same_file() {
-    // song.json has the web version's key names; the save writes the current
-    // ones. The file, not the model, is compared: a save rounds some values
-    // (0.792 -> 0.79).
-    for name in ["song.json", "edge_library.json"] {
-        let (library, _) = load(name);
-        let saved = library.to_json();
-        let (reloaded, report) = Library::from_json(&saved);
-        assert!(report.issues.is_empty(), "{name}: {:#?}", report.issues);
-        if let Some(difference) = diff(&reloaded.to_json(), &saved, name) {
-            panic!("{difference}");
-        }
-    }
 }

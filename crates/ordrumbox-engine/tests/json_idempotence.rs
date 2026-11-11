@@ -1,7 +1,7 @@
 //! Saving the kits and the synth presets is idempotent: a file holding every
 //! field is saved, read back and saved again; the second save writes the
 //! first one's text and every value is the one written. The first save may
-//! normalize (the JS app's keys); the saves after it never change the file.
+//! normalize (the web version's keys); the saves after it never change the file.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
 
@@ -73,7 +73,7 @@ fn every_kit_field_survives_saving() {
 }
 
 #[test]
-fn the_js_kit_keys_are_saved_under_their_current_name() {
+fn the_web_kit_keys_are_saved_under_their_current_name() {
     let web = parse(
         r#"[{"name":"studio","infos":"a kit","instruments":[
               {"display_name":"kick","key":"KICK","url":"studio/kick.wav","tune":-1.5}]}]"#,
