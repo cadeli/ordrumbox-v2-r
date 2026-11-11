@@ -63,6 +63,34 @@ impl<'a> Canvas<'a> {
         }
     }
 
+    /// Fill the rectangle at `(x, y)` of size `w × h` with a vertical gradient
+    /// from `top` to `bottom` (the pair), its corners rounded to `radius` pixels and
+    /// smoothed over what is under them; parts outside the canvas are dropped.
+    pub fn fill_rounded_gradient(&mut self, x: i32, y: i32, w: i32, h: i32, (top, bottom): (Rgb, Rgb), radius: i32) {
+        if w <= 0 || h <= 0 {
+            return;
+        }
+        let radius = radius.clamp(0, w.min(h) / 2);
+        for row in 0..h {
+            let color = lerp(top, bottom, row, h - 1);
+            // Distance below the top or above the bottom edge, inside the corner band.
+            let edge = row.min(h - 1 - row);
+            if edge >= radius {
+                self.fill_rect(x, y + row, w, 1, color);
+                continue;
+            }
+            self.fill_rect(x + radius, y + row, w - 2 * radius, 1, color);
+            for col in 0..radius {
+                // Coverage of the pixel by the circle of the corner, from its centre.
+                let (dx, dy) = (f64::from(radius - col) - 0.5, f64::from(radius - edge) - 0.5);
+                let coverage = (f64::from(radius) + 0.5 - dx.hypot(dy)).clamp(0.0, 1.0);
+                let alpha = (coverage * 255.0).round() as u8;
+                self.blend(x + col, y + row, color, alpha);
+                self.blend(x + w - 1 - col, y + row, color, alpha);
+            }
+        }
+    }
+
     /// Draw `text` with its top-left corner at `(x, y)`, one cell of
     /// `font::SIZE × scale` pixels per character, blended over what is there;
     /// returns the x after the last character.
@@ -102,6 +130,16 @@ impl<'a> Canvas<'a> {
         };
         *pixel = mix(16) | mix(8) | mix(0);
     }
+}
+
+/// The colour `index / last` of the way from `from` to `to`.
+fn lerp(from: Rgb, to: Rgb, index: i32, last: i32) -> Rgb {
+    let (index, last) = (index.max(0) as u32, last.max(1) as u32);
+    let channel = |shift: u32| {
+        let (a, b) = ((from >> shift) & 0xff, (to >> shift) & 0xff);
+        ((a * (last - index.min(last)) + b * index.min(last) + last / 2) / last) << shift
+    };
+    channel(16) | channel(8) | channel(0)
 }
 
 /// Width of `text` drawn at `scale`.
@@ -154,6 +192,17 @@ mod tests {
             7, 7, 0, 0,
             7, 7, 0, 0,
         ]);
+    }
+
+    #[test]
+    fn rounded_gradient_smooths_corners_and_blends_top_to_bottom() {
+        let mut pixels = vec![0; 8 * 8];
+        let mut canvas = Canvas::new(&mut pixels, 8, 8);
+        canvas.fill_rounded_gradient(0, 0, 8, 8, (0x40_40_40, 0xff_ff_ff), 3);
+        assert!(pixels[0] < 0x20_20_20, "the corner is mostly background");
+        assert_ne!(pixels[2], 0, "the corner's edge is partly covered");
+        assert!(pixels[3 * 8 + 4] < pixels[4 * 8 + 4], "darker on top");
+        assert_eq!(pixels[7 * 8 + 4], 0xff_ff_ff);
     }
 
     #[test]

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>orDrumbox AI Guide</title>
-<meta name="description" content="A beginner's guide to driving orDrumbox from an AI assistant (MCP): setup in Claude Desktop or Claude Code, the few ideas to know, and worked examples.">
+<meta name="description" content="A beginner's guide to driving orDrumbox from an AI assistant (MCP): works with any MCP client — Claude, OpenCode, Antigravity, Cursor… — setup, the few ideas to know, and worked examples.">
 <style>
 :root {
   --bg: #f7f6fb; --fg: #1d1b2e; --muted: #5b5873; --line: #d9d6e8;
@@ -49,7 +49,8 @@ th { background: var(--code); }
 <p class="subtitle">A beginner's guide to the orDrumbox MCP link — see also the <a href="user-manual.html#mcp">user manual, section 20</a></p>
 
 <div class="note">
-<strong>In one sentence:</strong> you connect an AI assistant (such as Claude) to orDrumbox, then you ask it in plain
+<strong>In one sentence:</strong> you connect an AI assistant to orDrumbox — any that speaks MCP works:
+Claude (Desktop or Code), OpenCode, Antigravity, Cursor and the rest — then you ask it in plain
 words — "make me a hip-hop beat at 90 BPM" — and it edits the patterns in the orDrumbox window while you watch and listen.
 You do not need to know any programming.
 </div>
@@ -79,6 +80,9 @@ chooses which ones to call to do what you asked.</p>
   <li>Every change is <strong>saved</strong> with your library, like your own edits.</li>
   <li>The link stays <strong>on your computer</strong>: orDrumbox only accepts connections from the same machine
       (<code>127.0.0.1</code>), with a secret token.</li>
+  <li>It works with <strong>every AI assistant that speaks MCP</strong>: Claude Desktop and Claude Code, OpenCode,
+      Antigravity, Cursor and any other MCP client — the examples below use Claude, the setup is the same
+      idea everywhere.</li>
 </ul>
 
 <!-- ───────────────────────────────────────────────────────────── -->
@@ -116,10 +120,14 @@ On macOS, select the file in the Finder and press <kbd>⌥ Option</kbd>+<kbd>⌘
 not <code>C:\Programs\ordrumbox\ordrumbox.exe</code>. Forward slashes also work: <code>C:/Programs/ordrumbox/ordrumbox.exe</code>.
 </div>
 
-<h3>Step 2b — Or with Claude Code (in a terminal)</h3>
+<h3>Step 2b — Or with another MCP client (Claude Code, OpenCode, Antigravity…)</h3>
+<p>With Claude Code, in a terminal:</p>
 <pre><code>claude mcp add ordrumbox -- /path/to/ordrumbox --mcp</code></pre>
-<p>Other MCP clients (Cursor, …) take the same two things: the <em>command</em> (the program's path) and the
-<em>argument</em> <code>--mcp</code>.</p>
+<p>With OpenCode, in a terminal:</p>
+<pre><code>opencode mcp add ordrumbox -- /path/to/ordrumbox --mcp</code></pre>
+<p>Antigravity and the other MCP clients (Cursor, …) take the same two things, through their own settings:
+the <em>command</em> (the program's path) and the <em>argument</em> <code>--mcp</code> — the same JSON as
+step 2a above, pasted where the client lists its MCP servers.</p>
 
 <h3>Step 3 — Start orDrumbox</h3>
 <p>The assistant drives the <strong>open window</strong>. Start orDrumbox as usual, before you ask anything, and keep it open.</p>

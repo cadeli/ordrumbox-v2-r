@@ -64,10 +64,19 @@ const SELECTED: Rgb = theme::WHITE;
 const CURSOR: Rgb = theme::FOCUS;
 const LOOP_MARK: Rgb = theme::VALUE;
 const PLAYHEAD: Rgb = theme::LIVE;
-const GHOST_RETRIGGER: Rgb = theme::GENERATED;
-const GHOST_EUCLIDEAN: Rgb = theme::GENERATED;
 const TRIG_RAND: Rgb = theme::CHANCE;
 const TRIG_FIXED: Rgb = theme::VALUE;
+/// How much lighter the top of a note is than its colour, and how much darker the bottom.
+pub(crate) const NOTE_LIGHT: f64 = 0.18;
+pub(crate) const NOTE_DARK: f64 = 0.12;
+/// Opacity (0–255) of the shadow under a note and of the light edge on top.
+const NOTE_SHADOW: u8 = 70;
+const NOTE_SHEEN: u8 = 80;
+/// A playing note is lighter, and glows around it.
+pub(crate) const NOTE_LIGHT_PLAYING: f64 = 0.35;
+const NOTE_GLOW: u8 = 90;
+/// Opacity of the velocity bar.
+const VELOCITY_BAR: u8 = 150;
 
 /// The MIDI note of row `row` (0: the lowest key).
 pub fn row_midi(row: i32) -> i32 {
@@ -84,9 +93,9 @@ pub fn steps_per_beat(track: &Track) -> i32 {
     track.steps_per_beat.clamp(1, MAX_STEPS_PER_BEAT)
 }
 
-/// Opacity a note is drawn at: 0.25 to 1.
+/// Opacity a note is drawn at: 0.5 to 1 (the velocity bar tells the rest).
 fn note_opacity(velocity: f64) -> f64 {
-    0.25 + velocity * 0.75
+    0.5 + velocity * 0.5
 }
 
 /// What the piano roll shows.
@@ -373,8 +382,13 @@ pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &s
                 continue;
             }
             let (x, y) = (layout.step_x(view, sub.step), layout.row_y(view.top_row, ghost_row));
-            let color = if sub.kind == SubKind::Euclidean { GHOST_EUCLIDEAN } else { GHOST_RETRIGGER };
-            stroke(canvas, Rect::new(x + s.px(), y + s.px(), layout.cell - 2 * s, layout.row - 2 * s), s.px(), color);
+            // The same small rounded square as in the pattern grid: half a cell, centred.
+            let base = if sub.kind == SubKind::Euclidean { theme::GENERATED } else { theme::muted() };
+            let color = theme::note(base, note.velocity);
+            let (w, h) = ((layout.cell / 2).max(1), (layout.row / 2).max(1));
+            let (gx, gy) = (x + (layout.cell - w) / 2, y + (layout.row - h) / 2);
+            let gradient = (theme::mix(color, 0xff_ff_ff, NOTE_LIGHT), theme::mix(color, 0x00_00_00, NOTE_DARK));
+            canvas.fill_rounded_gradient(gx, gy, w, h, gradient, s.px());
         }
     }
     for n in 0..view.track.notes.len() {
@@ -386,20 +400,42 @@ pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &s
             if lit { PLAYING } else { view.color },
             note_opacity(note.velocity.clamp(0.0, 1.0)),
         );
-        canvas.fill_rect(r.x, r.y, r.w, r.h, color);
-        // The trigger kind: probability wins over the cycle.
-        let trig = if note.probability < 1.0 {
-            Some(TRIG_RAND)
-        } else if note.cycle > 1 {
-            Some(TRIG_FIXED)
-        } else {
-            None
-        };
-        if let Some(trig) = trig {
-            canvas.fill_rect(r.x, r.y, r.w, 2 * s, trig);
+        let radius = (2 * s.px()).min(r.w / 2).min(r.h / 2);
+        let selected = view.selected == Some(n);
+        // A playing note glows in the margin around it.
+        if lit {
+            canvas.shade_rect(r.x - s.px(), r.y - s.px(), r.w + 2 * s, r.h + 2 * s, PLAYING, NOTE_GLOW);
         }
-        if view.selected == Some(n) {
-            stroke(canvas, r, s.px() * 2, SELECTED);
+        // Relief: a soft shadow in the margin below, a gradient, a light top edge.
+        canvas.shade_rect(r.x + radius, r.y + r.h, r.w - 2 * radius, s.px(), 0x00_00_00, NOTE_SHADOW);
+        // A selected note is ringed: a white rounded shape, the note drawn inside it.
+        let body = if selected {
+            let ring = s.px();
+            canvas.fill_rounded_gradient(r.x, r.y, r.w, r.h, (SELECTED, SELECTED), radius);
+            Rect::new(r.x + ring, r.y + ring, r.w - 2 * ring, r.h - 2 * ring)
+        } else {
+            r
+        };
+        let light = if lit { NOTE_LIGHT_PLAYING } else { NOTE_LIGHT };
+        canvas.fill_rounded_gradient(
+            body.x,
+            body.y,
+            body.w,
+            body.h,
+            (theme::mix(color, 0xff_ff_ff, light), theme::mix(color, 0x00_00_00, NOTE_DARK)),
+            (radius - if selected { s.px() } else { 0 }).max(0),
+        );
+        canvas.shade_rect(body.x + radius, body.y, body.w - 2 * radius, s.px(), 0xff_ff_ff, NOTE_SHEEN);
+        // The velocity, as a bar along the bottom edge.
+        let bar = ((f64::from(body.w - 2 * radius) * note.velocity.clamp(0.0, 1.0)).round() as i32).max(s.px());
+        canvas.shade_rect(body.x + radius, body.y + body.h - 2 * s, bar, s.px(), 0xff_ff_ff, VELOCITY_BAR);
+        // The trigger kind, a marker in the top right corner: probability wins over the cycle.
+        let size = 3 * s.px();
+        let (mx, my) = (body.x + body.w - size - s.px(), body.y + s.px());
+        if note.probability < 1.0 {
+            canvas.fill_rounded_gradient(mx, my, size, size, (TRIG_RAND, TRIG_RAND), size / 2);
+        } else if note.cycle > 1 {
+            diamond(canvas, mx, my, size, TRIG_FIXED);
         }
     }
     // The cursor, when no note is selected.
@@ -417,6 +453,15 @@ pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &s
     if first_row > 0 || view.top_row < TOTAL_KEYS - 1 {
         let hint = format!("{} - {}", midi_name(row_midi(view.top_row)), midi_name(row_midi(first_row)));
         canvas.text(layout.keys.x, layout.grid.y + grid_h + 4 * s, &hint, s, theme::muted());
+    }
+}
+
+/// A diamond filling the `size` square at `(x, y)`.
+fn diamond(canvas: &mut Canvas, x: i32, y: i32, size: i32, color: Rgb) {
+    let half = size / 2;
+    for row in 0..size {
+        let inset = (half - row).abs().min(half);
+        canvas.fill_rect(x + inset, y + row, size - 2 * inset, 1, color);
     }
 }
 
