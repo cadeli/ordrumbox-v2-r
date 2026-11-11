@@ -46,7 +46,7 @@ th { background: var(--code); }
 <main>
 
 <h1>Making beats with an AI assistant</h1>
-<p class="subtitle">A beginner's guide to the orDrumbox MCP link — see also the <a href="user-manual.html#mcp">user manual, section 19</a></p>
+<p class="subtitle">A beginner's guide to the orDrumbox MCP link — see also the <a href="user-manual.html#mcp">user manual, section 20</a></p>
 
 <div class="note">
 <strong>In one sentence:</strong> you connect an AI assistant (such as Claude) to orDrumbox, then you ask it in plain
@@ -198,7 +198,7 @@ hear it loop. The tracks did not have to exist: adding notes to <code>KICK</code
 <p class="say">Which styles do you know? … OK, make me a new house pattern.</p>
 <pre><code>listStyles       { }
 generatePattern  { "style": "house" }</code></pre>
-<p>orDrumbox writes a whole pattern itself — tracks, swing, lines, and the session's tempo — as <strong>Pattern › New pattern in the style</strong>
+<p>orDrumbox writes a whole pattern itself — tracks, swing, lines, and the session's tempo — as <strong>Generate › New pattern in the style</strong>
 does. Not happy with it?</p>
 <p class="say">Make it again, with more energy.</p>
 <pre><code>regeneratePattern { "patternName": "…", "style": "house" }
@@ -216,6 +216,14 @@ as in example 1, so you get exactly what it describes.</p>
               "updates": { "volume": 0.6, "pan": -0.4 } }</code></pre>
 <p><code>volume</code> 1 is the normal level; <code>pan</code> goes from −1 (left) to 1 (right). If a value is out of range,
 orDrumbox brings it inside and the assistant tells you the value used.</p>
+<p class="say">Compress the snare to make it punchier, keeping some of its dry sound.</p>
+<pre><code>updateTrack { "patternName": "First Beat", "trackName": "SNARE",
+              "updates": { "compMix": 0.6, "compThresholdDb": -24, "compRatio": 6,
+                           "compAttackMs": 15, "compReleaseMs": 120 } }</code></pre>
+<p>This is the track's own compressor (the FX tab of the track editor). <code>compMix</code> goes from 0 (off) to 1
+(a plain compressor); in between, the compressed sound is mixed with the dry one. The threshold goes from −60 to
+0 dB, the ratio from 1 to 20, the attack from 0.1 to 200 ms and the release from 10 to 2000 ms. A slower attack
+lets the hit through before the compressor reacts.</p>
 </div>
 
 <div class="example">
@@ -309,9 +317,11 @@ undo history. <code>redo</code> brings a change back.</p>
 <tr><td>"No pattern named …"</td><td>Ask "what patterns do I have?" and use one of the names it gives.</td></tr>
 <tr><td>A value is not the one you asked for</td>
     <td>It was out of range (tempo 20 to 300, at most 16 beats…): orDrumbox used the nearest allowed value and the answer says which.</td></tr>
-<tr><td>Undo does not bring back a synth preset, the master or a kit</td>
-    <td>Changes to synth presets, the master bus and kits are saved with the settings, not in the undo history. Ask the assistant
-        to set the old values back.</td></tr>
+<tr><td>Undo does not bring back the master or a kit</td>
+    <td>Changes to the master bus and to kits are saved with the settings, not in the undo history. Ask the assistant
+        to set the old values back. Synth presets are part of the library: their changes are undone like the others.</td></tr>
+<tr><td>Nothing happens with orDrumbox open as a plugin in a DAW</td>
+    <td>The AI link is the app's only. Start <code>ordrumbox.exe</code> (or <code>ordrumbox</code> on macOS) itself.</td></tr>
 </table>
 
 <!-- ───────────────────────────────────────────────────────────── -->
@@ -325,17 +335,23 @@ undo history. <code>redo</code> brings a change back.</p>
         <code>setPatternBeatCount</code>, <code>setPatternTags</code>, <code>setPatternDescription</code></td></tr>
 <tr><td>Notes and tracks</td><td>add or delete notes, change track settings, rename, copy, remove, listen to a track</td>
     <td><code>addNotesToPattern</code>, <code>deleteNotes</code>, <code>updateTrack</code>, <code>renameTrack</code>,
-        <code>copyTrack</code>, <code>removeTrack</code>, <code>auditionTrack</code>, <code>compactPattern</code></td></tr>
+        <code>copyTrack</code>, <code>removeTrack</code>, <code>auditionTrack</code>, <code>compactPattern</code>,
+        <code>listAllInstrumentsNames</code></td></tr>
 <tr><td>Generation</td><td>make a pattern in a style, remake it or one track, auto mode, macros, random notes</td>
     <td><code>listStyles</code>, <code>generatePattern</code>, <code>regeneratePattern</code>, <code>regenerateTrack</code>,
         <code>randomizeTrack</code>, <code>toggleGeneration</code>, <code>togglePatternAuto</code>, <code>setPatternMacro</code></td></tr>
 <tr><td>Sounds</td><td>choose a kit, give tracks kit, synth or random sounds, edit synth presets, analyse samples</td>
     <td><code>listKitSamples</code>, <code>selectKit</code>, <code>assignSounds</code>, <code>listSynthPresets</code>,
-        <code>getSynthPreset</code>, <code>createSynthPreset</code>, <code>updateSynthPreset</code>, <code>analyzeSamples</code></td></tr>
-<tr><td>Songs</td><td>build and edit arrangements, move and repeat clips, save and load song files</td>
-    <td><code>listArrangements</code>, <code>createArrangement</code>, <code>addPatternToArrangement</code>,
-        <code>removePatternFromArrangement</code>, <code>moveClip</code>, <code>repeatClip</code>, <code>saveSong</code>,
-        <code>loadSong</code></td></tr>
+        <code>getSynthPreset</code>, <code>createSynthPreset</code>, <code>updateSynthPreset</code>, <code>removeSynthPreset</code>,
+        <code>listScales</code>, <code>analyzeSamples</code></td></tr>
+<tr><td>Kits</td><td>add or replace a sample, normalize a kit, make a kit from a folder, load or export a kit mapping</td>
+    <td><code>addSampleToKit</code>, <code>replaceKitSample</code>, <code>normalizeKit</code>, <code>importKitFolder</code>,
+        <code>loadKitMapping</code>, <code>exportKitMapping</code></td></tr>
+<tr><td>Songs</td><td>build and edit arrangements, move and repeat clips, name the song, save, load and export song files</td>
+    <td><code>listArrangements</code>, <code>createArrangement</code>, <code>selectArrangement</code>, <code>renameArrangement</code>,
+        <code>updateArrangement</code>, <code>removeArrangement</code>, <code>addPatternToArrangement</code>,
+        <code>removePatternFromArrangement</code>, <code>moveClip</code>, <code>repeatClip</code>, <code>setSongInfo</code>,
+        <code>listSavedSongs</code>, <code>saveSong</code>, <code>loadSong</code>, <code>exportSong</code></td></tr>
 <tr><td>Playback</td><td>play, stop, tell what is playing</td>
     <td><code>play</code>, <code>stop</code>, <code>getPlaybackState</code></td></tr>
 <tr><td>Files</td><td>export WAV, MIDI or JSON, import a MIDI file</td>

@@ -1,11 +1,23 @@
 # Tests JS d'ordrumbox-v2 face au portage Rust
 
+> **Archive.** Cet inventaire date du portage (2026-10-28) et n'est plus tenu
+> à jour test par test. Depuis le 2026-11-06, l'app JS n'est plus la
+> référence : les scripts `tools/*.mjs` et toutes les sorties attendues
+> produites par le JS ont été supprimés. Les tests Rust vérifient des
+> snapshots Rust (`*_rust.txt`, `*_renders.bin`), des tables et des
+> propriétés ; la liste des snapshots et de leurs entrées est dans
+> `DEVELOPMENT.md`, « Snapshots ». Mise à jour du 2026-11-11 : noms des
+> fixtures actuelles, et fonctionnalités portées depuis (thèmes, serveur
+> MCP, MIDI en direct dans le plugin, éditeur de synthé, glisser dans le
+> piano roll).
+
 Inventaire au 2026-10-28 (commit Rust `03003a7`, plus les tests de
 scénario portés : `scenarios.rs`, `gen_sliders.rs`, `user_flow.rs`,
 `session_scenarios.rs`). Aucun test JS n'est lancé
-ni porté tel quel : le portage se vérifie contre le **code source** JS, que
-les scripts `tools/export_*_fixtures.mjs` exécutent pour produire les
-fixtures que les tests Rust doivent reproduire.
+ni porté tel quel. Au moment de l'inventaire, le portage se vérifiait contre
+le **code source** JS, que des scripts `tools/export_*_fixtures.mjs`
+exécutaient pour produire des fixtures ; ces fixtures sont aujourd'hui
+remplacées par des snapshots Rust.
 
 Statuts :
 
@@ -21,12 +33,12 @@ Statuts :
 
 | Spec | Tests | Statut | Détail |
 |---|---|---|---|
-| `auto-generation.spec.js` | 8 | Couvert | ↻ Drum/Bass/Chords et leur bascule : `generators.json` (toggles, notes, mode auto). Les boutons de barre d'outils sont des entrées de menu (D, S, A). |
+| `auto-generation.spec.js` | 8 | Couvert | ↻ Drum/Bass/Chords et leur bascule : snapshot `generators_rust.txt` (entrées `generator_cases.json` : bascules, notes, mode auto). Les boutons de barre d'outils sont des entrées du menu Generate (D, S ; Chords sans touche). |
 | `auto-generation.mobile.spec.js` | 4 | Sans objet | Barre d'outils mobile. |
 | `canvas-rendering.spec.js` | 1 | Partiel | Le spectre (output panel) est porté : la FFT et l'analyseur ont leurs tests (`spectrum.rs`), pas « des pixels non vides pendant la lecture ». |
 | `cold-start.spec.js` | 3 | Couvert | Chaque piste a un son avant la première lecture, le premier passage sonne : `scenarios.rs` (moteur), table d'assignation de `assign_tests.rs` (ui). L'AudioContext est sans objet. |
-| `color-scheme.spec.js` | 4 | Non porté | Thèmes de couleur. |
-| `gen-sliders.spec.js` | 14 | Couvert | `gen_sliders.rs` (core) : chaque `prob_*` isolé, à 0 jamais d'effet, à 100 au moins une fois ; `pitch_range`, `pitch_scale_lock`, `prob_note_depth` (plancher 0,2 : test de `variation.rs`). Les curseurs eux-mêmes : `controls.json`. |
+| `color-scheme.spec.js` | 4 | Partiel | Six thèmes (View › Next colour scheme, C), sauvés dans `settings.json` ; tests unitaires de `theme.rs`. |
+| `gen-sliders.spec.js` | 14 | Couvert | `gen_sliders.rs` (core) : chaque `prob_*` isolé, à 0 jamais d'effet, à 100 au moins une fois ; `pitch_range`, `pitch_scale_lock`, `prob_note_depth` (plancher 0,2 : test de `variation.rs`). Les curseurs eux-mêmes : tables des tests de `control.rs`. |
 | `kit-change.spec.js` | 2 | Couvert | Changement de kit en pleine lecture : toutes les pistes auto passent au nouveau kit, la lecture continue et les passes suivantes sonnent (`scenarios.rs`, moteur). |
 | `layout.spec.js` | 3 | Sans objet | Disposition DOM (les tests Rust vérifient dessin et hit-test ensemble). |
 | `live-vs-export.spec.js` | 2 | Couvert | `scenarios.rs` (moteur) : lecture et export identiques au sample près pour des callbacks multiples de 128 frames, dans les tolérances du test JS sinon ; export d'un pattern de synthé audible à chaque rendu. |
@@ -34,10 +46,10 @@ Statuts :
 | `offline.spec.js` | 1 | Sans objet | Service worker. |
 | `page-matrix.spec.js` | 1 | Sans objet | Pagination de la grille : la grille Rust montre tout le pattern. |
 | `panels.spec.js` | 4 | Partiel | About, track editor (F2) et éditeur de synthé (F6) portés ; ces bascules ne sont pas testées telles quelles. |
-| `pattern-grid-drag.spec.js` | 9 | Partiel | Glisser une note (vélocité, hauteur, jauge) non porté ; Shift+flèches porté (`nudge_*`). |
+| `pattern-grid-drag.spec.js` | 9 | Partiel | Glisser une note sur la grille non porté : la lane sous la grille règle vélocité, chance, retrig et pan au clic ou en glissant ; Shift+flèches porté (`nudge_*`). |
 | `pattern-lifecycle.spec.js` | 5 | Partiel | Parcours condensé dans la session (`session_scenarios.rs`) : pattern construit dans la grille, sauvé et rechargé à l'identique, exporté en MIDI (seule la piste solo, tempo, 4/4, note-on/off appariés) et en WAV (longueur, son). Non repris : chaque réglage de piste, de note et de synthé via son contrôle. |
 | `persistence.spec.js` | 3 | Partiel | Sauvegarde et rechargement : test `save_then_load` du store. Version de cache IndexedDB et `clearAllCache` : sans objet. |
-| `piano_roll.spec.js` | 7 | Partiel | Glisser (vélocité, hauteur, axe verrouillé), clic qui sélectionne puis supprime, annuler en une étape, Shift+flèches : tests `session_roll` et `piano_roll.json` (`NoteDrag`). La jauge est une bulle de texte. |
+| `piano_roll.spec.js` | 7 | Partiel | Glisser (vélocité, hauteur, axe verrouillé), clic qui sélectionne puis supprime, annuler en une étape, Shift+flèches : tests `session_roll` et de `note_drag.rs` (`NoteDrag`). La jauge est une bulle de texte. |
 | `piano-roll.mobile.spec.js` | 4 | Sans objet | Piano roll sur mobile. |
 | `playback.spec.js` | 5 | Couvert | `session_scenarios.rs` : Espace lance, la tête de lecture avance, Espace arrête ; un clic sur une case (vide, note, nom de piste) fait entendre la note à l'arrêt. Écran d'accueil et 404 : sans objet. |
 | `playback_tempo.spec.js` | 3 | Couvert | `session_scenarios.rs` : tempo du pattern en grille (et changé en pleine lecture), inchangé et sans redémarrage en passant par synthé et piano roll, tempo de la song dans la vue song, retour au pattern. |
@@ -46,12 +58,12 @@ Statuts :
 | `song-playback.spec.js` | 6 | Couvert | Clips superposés : tables de `instruments.rs` (core) et le rendu (`scenarios.rs`) ; mode suivant la vue, avance mesure après mesure : `session_scenarios.rs` ; chaque pattern de l'arrangement a ses sons : `scenarios.rs`. |
 | `song-view.spec.js` | 4 | Partiel | Vue, liste d'arrangements, liste de patterns qui défile : portés. Différence : en Rust le track editor est masqué dans la vue song. |
 | `song-wav-export.spec.js` | 5 | Couvert | `scenarios.rs` (moteur) : longueur au tempo de la song (120 et 240 bpm), en-tête 16 bits stéréo, son présent, un second clip change plus de la moitié des samples, refus sans clip jouable, boucle de l'arrangement raccourcie. Le bouton : Ctrl+Shift+E. |
-| `synth-modulators.spec.js` | 3 | Couvert (DSP) | Chaque cible de LFO : `renders.bin` (processeurs DSP). L'éditeur de synthé n'est pas porté. |
-| `synth-params.spec.js` | 4 | Couvert (DSP) | Presets, formes d'onde, algorithmes FM, filtres : `renders.bin` ; patches : snapshot Rust `mapping_rust.txt`. |
+| `synth-modulators.spec.js` | 3 | Couvert (DSP) | Chaque cible de LFO : `synth_renders.bin` (processeurs DSP). L'éditeur de synthé est porté (F6) ; son modèle : `synth_editor_rust.txt`. |
+| `synth-params.spec.js` | 4 | Couvert (DSP) | Presets, formes d'onde, algorithmes FM, filtres : `synth_renders.bin` ; patches : snapshot Rust `mapping_rust.txt`. |
 | `synth_group_titles.spec.js` | 1 | Sans objet | Position du titre dans le DOM. |
 | `synth_implicit_enable.spec.js` | 1 | Couvert | `implicit_enable_and_cards` (`synth_model.rs`) et le test de session de l'éditeur. |
 | `tools-import-export.spec.js` | 8 | Partiel | Import/export MIDI et export WAV (menus, fixtures d'octets), notes aléatoires (X) : portés. « Compact Tracks » : Pattern › Compact tracks, `edit_properties.rs` (ce qui joue ne change pas). « Exporting... » : sans objet. |
-| `track-editor-loop.spec.js` | 3 | Couvert | Steps/beat et point de boucle, bornage du point de boucle : `edit_properties.rs`, tests de `editor.rs`, `controls.json`. |
+| `track-editor-loop.spec.js` | 3 | Couvert | Steps/beat et point de boucle, bornage du point de boucle : `edit_properties.rs`, tests de `editor.rs`, tables de `control.rs`. |
 | `track-editor.mobile.spec.js` | 4 | Sans objet | Mobile. |
 | `undo_redo.spec.js` | 3 | Couvert | `edit_properties.rs` (séquences aléatoires : chaque annulation, tout annuler, tout refaire). |
 | `viewport-fit.mobile.spec.js` | 1 | Sans objet | Mobile. |
@@ -59,7 +71,7 @@ Statuts :
 
 ## Tests unitaires vitest (`tests/`, 159 fichiers, ~3100 tests)
 
-### Couverts par les fixtures (même code JS exécuté par `tools/`)
+### Couverts par des snapshots et des tables Rust
 
 | Sujet | Fichiers JS | Fixture(s) Rust |
 |---|---|---|
@@ -67,12 +79,12 @@ Statuts :
 | Moteur de patterns | `pattern_engine`, `pattern_manager`, `euclidean`, `notes`, `variation2` | Rust seul : snapshot `flat_notes_rust.txt` (passes 0–3 de `song.json` et `engine_cases.json`), propriétés des passes aléatoires (`flat_notes.rs`), tests de `pattern_engine.rs` |
 | Songs | `song_schema`, `song_playback`, `player_song_mode`, `song_roundtrip` | Rust seul : tables des clips joués (`instruments.rs`) ; `measure_at_tick` : tests de `song.rs` |
 | Commandes, historique | `cmd`, `cmd_update`, `cmd_transaction`, `history_manager`, `undo_roundtrip`, `arrangement_section` (partie commandes) | Rust seul : `edit_properties.rs`, tests de `editor.rs` |
-| Générateurs | `generators`, `base_generator`, `pattern_auto_gen`, `song_structure`, `composition` | `generators.json` ; progressions : snapshot Rust `composition_rust.txt` |
+| Générateurs | `generators`, `base_generator`, `pattern_auto_gen`, `song_structure`, `composition` | `generators_rust.txt` (entrées `generator_cases.json`) ; progressions : `composition_rust.txt` |
 | MIDI | `midi_exporter`, `midi_exporter_functional`, `midi_json_roundtrip`, `midi_import_service` | `midi/*.mid`, `midi_exports.json` ; attentes en snapshot Rust (`midi_rust.txt`) |
 | Instruments, assignation | `instrument_manager`, `auto_assign`, `tracks`, `drumkits_validation` | Rust seul : tables de recherche, notes et programmes GM (`instruments.rs`), assignation par kit, kits livrés et kits importés (`assign_tests.rs`, ui) |
-| DSP | `worklet_synth_voice`, `worklet_master_bus`, `strip_sync`, `fx_values`, `lfo_engine`, `math` | `renders.{json,bin}` ; réglages de strip, LFO et patches de synthé : snapshot Rust `mapping_rust.txt` (`mapping.rs`) |
+| DSP | `worklet_synth_voice`, `worklet_master_bus`, `strip_sync`, `fx_values`, `lfo_engine`, `math` | `effect_renders.bin`, `synth_renders.bin` ; réglages de strip, LFO et patches de synthé : snapshot Rust `mapping_rust.txt` (`mapping.rs`) |
 | WAV, analyse | `wav_encoder`, `sample_analyzer`, `hz_to_note` | WAV : tests de `wav.rs` (en-tête, aller-retour) ; analyse : Rust seul, sinusoïdes de fréquence et d'amplitude connues et snapshot `analysis_rust.txt` des cas limites (`analysis.rs`) |
-| Contrôles | `base_control`, `or_knob_log`, `ui_utils` (formatage) | `controls.json` |
+| Contrôles | `base_control`, `or_knob_log`, `ui_utils` (formatage) | tables des tests de `control.rs` |
 | Scénarios | `e2e_user_flow`, `wav_midi_roundtrip` (aller-retour MIDI), `e2e_audio_comparison` | `user_flow.rs`, `scenarios.rs`, tests de `wav.rs` |
 
 ### Partiels (porté, non testé tel quel)
@@ -95,15 +107,24 @@ comme en JS), `pattern_settings_panel` (ses contrôles sont dans l'en-tête), `p
 `synth_editor_implicit`, `synth_editor_import`, `synth_editor_preset_section`,
 `synth_editor_sliders`, `synth_preset_model` (le modèle : snapshot Rust `synth_editor_rust.txt`).
 
+### Portés depuis l'inventaire (non vérifiés test par test)
+
+- MIDI en direct : `midi_manager`, `midi_out`, `midi_indicator_view`. Le
+  plugin CLAP / VST3 reçoit et envoie le MIDI de chaque piste
+  (`ordrumbox-plugin`, `host_sync.rs` dans le moteur).
+- Thèmes : `color_scheme` (six thèmes, `theme.rs`). `mcp_color_scheme` :
+  sans outil MCP de thème.
+- Serveur MCP : `mcp_tools`, `mcp_arrangements`, `mcp_alignment`,
+  `mcp_disk_roundtrip`, `mcp_selection_playback`. Outils de la bibliothèque :
+  `ordrumbox-logic/src/tools.rs` (tests unitaires) ; les autres :
+  `session_mcp.rs` ; le pont stdio : `ordrumbox-app/tests/mcp_bridge.rs`,
+  `mcp_afrobeat.rs`.
+
 ### Non portés (fonctionnalité absente)
 
-- MIDI en direct : `midi_manager`, `midi_out`, `midi_indicator_view`.
-- Thèmes : `color_scheme`, `mcp_color_scheme`.
 - Glisser des notes sur la grille, onglets, outils : `pattern_grid_drag`,
   `or_tab`, `tools_panel_sliders`, `toolbar_overflow`,
   `playback_overlay_section`, `page_nav_e2e`.
-- Serveur MCP : `mcp_tools`, `mcp_arrangements`, `mcp_alignment`,
-  `mcp_disk_roundtrip`, `mcp_selection_playback`.
 
 ### Sans objet (navigateur, architecture JS)
 
@@ -128,7 +149,7 @@ Les scénarios e2e des fonctionnalités portées sont maintenant vérifiés au
 niveau du moteur (`ordrumbox-engine/tests/scenarios.rs`), du moteur de
 patterns (`ordrumbox-core/tests/gen_sliders.rs`), de la logique
 (`ordrumbox-logic/tests/user_flow.rs`) et de la `Session`
-(`ordrumbox-app/src/session_scenarios.rs`, avec un vrai `Controller` rendu
+(`ordrumbox-ui/src/session_scenarios.rs`, avec un vrai `Controller` rendu
 comme un callback audio). Restent : le parcours complet de
 `pattern-lifecycle` contrôle par contrôle, et les glisser de notes sur la grille.
 
