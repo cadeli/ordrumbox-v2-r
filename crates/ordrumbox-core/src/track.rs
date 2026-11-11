@@ -105,6 +105,15 @@ json_record! {
         hard_clip: f64 = 0.0 => "hardClip",
         reverb_on: bool = true => "reverbOn",
         delay_on: bool = true => "delayOn",
+        /// Compressor dry/wet, 0–1 (parallel compression); 0 is off.
+        comp_mix: f64 = 0.0 => "compMix",
+        /// Compressor threshold, dBFS, -60–0.
+        comp_threshold_db: f64 = -18.0 => "compThresholdDb",
+        /// Compressor ratio, 1–20 (dB in for one dB out over the threshold).
+        comp_ratio: f64 = 4.0 => "compRatio",
+        /// Compressor attack and release, ms.
+        comp_attack_ms: f64 = 10.0 => "compAttackMs",
+        comp_release_ms: f64 = 100.0 => "compReleaseMs",
         /// Synth preset played when `use_synth` is on.
         synth_preset: Option<String> = None => "synthPreset" | "synthSoundKey",
         // Not in TRACK_DEFAULTS: written by the auto generator / scale picker,
@@ -126,7 +135,7 @@ json_record! {
 }
 
 /// `TRACK_VALUE_RANGES`: bounds of the numeric settings an edit clamps to.
-const VALUE_RANGES: [(&str, f64, f64); 41] = [
+const VALUE_RANGES: [(&str, f64, f64); 46] = [
     ("volume", 0.0, 1.0),
     ("pan", -1.0, 1.0),
     ("transpose", -24.0, 24.0),
@@ -145,6 +154,11 @@ const VALUE_RANGES: [(&str, f64, f64); 41] = [
     ("saturationMix", 0.0, 1.0),
     ("bitcrush", 0.0, 1.0),
     ("hardClip", 0.0, 1.0),
+    ("compMix", 0.0, 1.0),
+    ("compThresholdDb", COMP_THRESHOLD_DB_RANGE.0, COMP_THRESHOLD_DB_RANGE.1),
+    ("compRatio", COMP_RATIO_RANGE.0, COMP_RATIO_RANGE.1),
+    ("compAttackMs", COMP_ATTACK_MS_RANGE.0, COMP_ATTACK_MS_RANGE.1),
+    ("compReleaseMs", COMP_RELEASE_MS_RANGE.0, COMP_RELEASE_MS_RANGE.1),
     ("hitVariation", 0.0, 100.0),
     ("noteVariation", 0.0, 100.0),
     ("autoPitchChance", 0.0, 100.0),
@@ -170,6 +184,13 @@ const VALUE_RANGES: [(&str, f64, f64); 41] = [
     ("composeSeed", 0.0, 9999.0),
 ];
 
+/// Ranges of the compressor's settings: threshold (dBFS), ratio, attack
+/// and release (ms).
+pub const COMP_THRESHOLD_DB_RANGE: (f64, f64) = (-60.0, 0.0);
+pub const COMP_RATIO_RANGE: (f64, f64) = (1.0, 20.0);
+pub const COMP_ATTACK_MS_RANGE: (f64, f64) = (0.1, 200.0);
+pub const COMP_RELEASE_MS_RANGE: (f64, f64) = (10.0, 2000.0);
+
 /// Table keys that are not track settings (`TRACK_DEFAULTS` lacks them):
 /// an edit never sets them.
 const NOT_SETTINGS: [&str; 1] = ["scaleName"];
@@ -179,7 +200,7 @@ const AUTO_HIT_VARIATION_FALLBACK: f64 = 60.0;
 const AUTO_NOTE_VARIATION_FALLBACK: f64 = 40.0;
 
 /// Keys written rounded to 2 decimals (`ROUND_2D` in exporter.js).
-const ROUND_2D: [&str; 12] = [
+const ROUND_2D: [&str; 14] = [
     "volume",
     "pan",
     "reverbMix",
@@ -189,6 +210,8 @@ const ROUND_2D: [&str; 12] = [
     "saturationMix",
     "bitcrush",
     "hardClip",
+    "compMix",
+    "compRatio",
     "swingAmount",
     "filterCutoff",
     "filterQ",

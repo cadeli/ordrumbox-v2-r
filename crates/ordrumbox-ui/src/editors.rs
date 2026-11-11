@@ -8,7 +8,9 @@ use crate::scale::Scale;
 use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::json::Value;
 use ordrumbox_core::num;
-use ordrumbox_core::track::MAX_STEPS_PER_BEAT;
+use ordrumbox_core::track::{
+    COMP_ATTACK_MS_RANGE, COMP_RATIO_RANGE, COMP_RELEASE_MS_RANGE, COMP_THRESHOLD_DB_RANGE, MAX_STEPS_PER_BEAT,
+};
 use ordrumbox_core::{Note, ScaleList, Track};
 use ordrumbox_engine::strip_settings::delay_beats_used;
 use ordrumbox_logic::generate;
@@ -29,23 +31,43 @@ pub const TAB_SOUND: u8 = 1;
 pub const TAB_LFO: u8 = 2;
 pub const TAB_LOOP: u8 = 3;
 
-/// An effect: the setting its on / off button reads and writes, its name, its controls.
+/// An effect: the setting its on / off button reads and writes, its name,
+/// its controls, and the value its button turns it on at.
 pub struct FxDef {
     pub key: &'static str,
     pub label: &'static str,
     pub controls: &'static [&'static str],
+    pub on_value: f64,
 }
 
-pub const FX_DEFS: [FxDef; 4] = [
-    FxDef { key: "reverbMix", label: "Reverb", controls: &["reverbMix", "reverbType"] },
-    FxDef { key: "delayMix", label: "Delay", controls: &["delayMix", "delayBeats", "delayFeedback", "delayType"] },
+pub const FX_DEFS: [FxDef; 5] = [
+    FxDef { key: "reverbMix", label: "Reverb", controls: &["reverbMix", "reverbType"], on_value: 0.5 },
+    FxDef {
+        key: "delayMix",
+        label: "Delay",
+        controls: &["delayMix", "delayBeats", "delayFeedback", "delayType"],
+        on_value: 0.5,
+    },
     FxDef {
         key: "saturationMix",
         label: "Saturation",
         controls: &["saturationMix", "saturationType", "bitcrush", "hardClip"],
+        on_value: 0.5,
+    },
+    // On at full mix: a plain compressor; less mixes it in parallel.
+    FxDef {
+        key: "compMix",
+        label: "Compressor",
+        controls: &["compMix", "compThresholdDb", "compRatio", "compAttackMs", "compReleaseMs"],
+        on_value: 1.0,
     },
     // The filter is on when its type is not the allpass bypass.
-    FxDef { key: "filterType", label: "Filter", controls: &["filterType", "filterSlope", "filterCutoff", "filterQ"] },
+    FxDef {
+        key: "filterType",
+        label: "Filter",
+        controls: &["filterType", "filterSlope", "filterCutoff", "filterQ"],
+        on_value: 0.0,
+    },
 ];
 
 pub const FILTER_TYPES: [&str; 4] = ["lowpass", "highpass", "bandpass", "notch"];
@@ -139,13 +161,18 @@ const fn count(key: &'static str, label: &'static str, min: f64, max: f64, forma
 }
 
 /// The effect knobs.
-pub const FX_KNOBS: [Prop; 8] = [
+pub const FX_KNOBS: [Prop; 13] = [
     prop("reverbMix", "Mix", 0.0, 1.0, 0.01, Format::Plain),
     prop("delayMix", "Mix", 0.0, 1.0, 0.01, Format::Plain),
     prop("delayFeedback", "Feedback", 0.0, 0.95, 0.01, Format::Plain),
     prop("saturationMix", "Mix", 0.0, 1.0, 0.01, Format::Plain),
     prop("bitcrush", "Crush", 0.0, 1.0, 0.01, Format::Plain),
     prop("hardClip", "Clip", 0.0, 1.0, 0.01, Format::Plain),
+    prop("compMix", "Mix", 0.0, 1.0, 0.01, Format::Plain),
+    prop("compThresholdDb", "Thresh", COMP_THRESHOLD_DB_RANGE.0, COMP_THRESHOLD_DB_RANGE.1, 0.5, Format::Decibels),
+    prop("compRatio", "Ratio", COMP_RATIO_RANGE.0, COMP_RATIO_RANGE.1, 0.1, Format::Ratio),
+    prop("compAttackMs", "Attack", COMP_ATTACK_MS_RANGE.0, COMP_ATTACK_MS_RANGE.1, 0.1, Format::FineMillis),
+    prop("compReleaseMs", "Release", COMP_RELEASE_MS_RANGE.0, COMP_RELEASE_MS_RANGE.1, 1.0, Format::FineMillis),
     prop("filterCutoff", "Cutoff", 20.0, 20_000.0, 1.0, Format::Freq),
     prop("filterQ", "Q", 0.707, 18.707, 0.01, Format::Fixed2),
 ];
@@ -898,8 +925,9 @@ pub fn track_editor(view: &TrackView, state: &EditorState, area: Rect, scale: Sc
     TrackEditor { items: rows.items, sound_bottom, tabs_top, bottom }
 }
 
-/// The FX tab: the four effects one under the other, each a strip of its
-/// own: its on / off button (named), then its knobs and its choices.
+/// The FX tab: the effects one under the other, each a strip of its own, as
+/// in the LFO tab: its on / off button (named) in the label column, level
+/// with its knobs and its choices.
 fn fx_tab(rows: &mut Rows, view: &TrackView) {
     for (i, fx) in FX_DEFS.iter().enumerate() {
         fx_strip(rows, view, i as u8, fx);
@@ -907,21 +935,33 @@ fn fx_tab(rows: &mut Rows, view: &TrackView) {
 }
 
 /// Slots of an effect strip's knob row: the most controls an effect has.
-const FX_SLOTS: i32 = 4;
+const FX_SLOTS: i32 = 5;
+
+/// Width of a filter type icon, and the step from one to the next (at scale 1):
+/// the four fit the label column.
+const FILTER_ICON_W: i32 = 19;
+const FILTER_ICON_STEP: i32 = 21;
+/// Height of a filter type icon (at scale 1).
+const FILTER_ICON_H: i32 = 14;
 
 fn fx_strip(rows: &mut Rows, view: &TrackView, i: u8, fx: &FxDef) {
     let s = rows.scale;
     let track = view.track;
-    let r = rows.row();
+    let button = Rect::new(rows.x, rows.y + (KNOB_SIZE * s - row_h(s)) / 2, label_width(s) - 4 * s, row_h(s));
     let power = Kind::Button { label: fx.label.to_owned(), on: fx_on(track, fx) };
-    rows.items.push(Item::new(Some(Id::FxPower(i)), Rect::new(r.x, r.y, label_width(s) - 4 * s, r.h), power));
+    rows.items.push(Item::new(Some(Id::FxPower(i)), button, power));
     if fx.key == "filterType" {
+        // The filter's types, under its button.
+        let y = button.y + button.h + 2 * s;
         for (i, (icon, value)) in FILTER_ICONS.iter().zip(FILTER_TYPES).enumerate() {
-            let rect = Rect::new(r.x + label_width(s) + i as i32 * 30 * s, r.y + 2 * s, 26 * s, r.h - 4 * s);
+            let rect = Rect::new(rows.x + i as i32 * FILTER_ICON_STEP * s, y, FILTER_ICON_W * s, FILTER_ICON_H * s);
             let kind = Kind::Button { label: (*icon).to_owned(), on: track.filter_type == value };
             rows.items.push(Item::new(Some(Id::FilterIcon(i as u8)), rect, kind));
         }
     }
+    let (x, w) = (rows.x, rows.w);
+    rows.x += label_width(s);
+    rows.w -= label_width(s);
     // The knobs first, then the choices: every strip reads the same way.
     let knobs = fx.controls.iter().filter_map(|&key| FX_KNOBS.iter().find(|p| p.key == key));
     let choices = fx.controls.iter().filter(|&&key| key != "filterType" && !FX_KNOBS.iter().any(|p| p.key == key));
@@ -936,7 +976,8 @@ fn fx_strip(rows: &mut Rows, view: &TrackView, i: u8, fx: &FxDef) {
         }
         let value = view.lfo.iter().find(|(k, _)| *k == p.key).map_or_else(|| number(track, p.key), |&(_, v)| v);
         let mut spec = value_spec(p, default_of(p.key, p.min), true);
-        if p.format == Format::Freq {
+        // Ranges over decades: a logarithmic knob.
+        if matches!(p.format, Format::Freq | Format::FineMillis) {
             spec = spec.log_full_travel();
         }
         let text = p.format.value(value, "");
@@ -960,6 +1001,7 @@ fn fx_strip(rows: &mut Rows, view: &TrackView, i: u8, fx: &FxDef) {
         let choice = Choice { values, labels, selected };
         rows.slot_choice(rect, fx_label(key), Some(key), Some(Id::TrackSelect(key)), choice.kind());
     }
+    (rows.x, rows.w) = (x, w);
     rows.y += knob_row_h(s) + FX_STRIP_GAP * s;
 }
 
@@ -1691,6 +1733,7 @@ mod tests {
             delay_mix: 0.5,
             delay_type: "slap".into(),
             saturation_mix: 0.5,
+            comp_mix: 1.0,
             filter_type: "lowpass".into(),
             ..Track::default()
         };

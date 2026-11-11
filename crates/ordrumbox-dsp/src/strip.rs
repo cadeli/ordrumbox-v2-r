@@ -1,6 +1,6 @@
 //! A track's channel strip (`worklets/processors/strip_source.js`): a stereo
 //! TPT state-variable filter (12 dB/oct, or two in series for 24 dB/oct),
-//! saturation, a bitcrusher, a hard clipper, a Freeverb reverb (with a pre-delay, a spring's dispersion and a
+//! a compressor, saturation, a bitcrusher, a hard clipper, a Freeverb reverb (with a pre-delay, a spring's dispersion and a
 //! gate), a delay (tape wow, ping-pong), then volume and compensated
 //! equal-power pan.
 //!
@@ -56,6 +56,14 @@ const DELAY_SECONDS: f64 = 2.1;
 const DELAY_MIN_RATE: f64 = 48_000.0;
 /// Level below which states and outputs are flushed to zero.
 const FLUSH: f64 = 1e-15;
+/// Width of the compressor's soft knee, dB around the threshold.
+const COMP_KNEE_DB: f64 = 6.0;
+/// Share of the gain reduction at 0 dBFS the compressor makes up.
+const COMP_MAKEUP_SHARE: f64 = 0.5;
+/// Level the compressor's detector reads as silence, dB.
+const COMP_FLOOR_DB: f64 = -120.0;
+/// dB per neper: `20 / ln 10`.
+const DB_PER_NEPER: f64 = 8.685_889_638_065_037;
 
 audio_params! {
     /// The strip processor's parameters (its `parameterDescriptors`).
@@ -69,6 +77,16 @@ audio_params! {
         filter_mode = 0.0, 0.0, 3.0;
         /// dB per octave: 12 (one stage) or 24 (two stages).
         filter_slope = 12.0, 12.0, 24.0;
+        /// Compressor, after the filter: its dry/wet (parallel compression),
+        /// 0 skips it.
+        comp_mix = 0.0, 0.0, 1.0;
+        /// Level, dBFS, above which the compressor lowers the gain.
+        comp_threshold_db = 0.0, -60.0, 0.0;
+        /// dB in for one dB out above the threshold.
+        comp_ratio = 4.0, 1.0, 20.0;
+        /// Seconds the gain reduction takes to set in, and to let go.
+        comp_attack_seconds = 0.01, 0.0001, 0.2;
+        comp_release_seconds = 0.1, 0.01, 2.0;
         /// 0 tanh, 1 hard clip, 2 tape (an asymmetric tanh).
         saturation_type = 0.0, 0.0, 2.0;
         saturation_drive = 1.0, 1.0, 7.0;
@@ -315,6 +333,73 @@ fn flush(x: &mut f64) {
     }
 }
 
+/// The compressor's settings for one block: a feed-forward, stereo-linked
+/// peak compressor with a soft knee, an automatic make-up gain and a dry/wet
+/// mix.
+#[derive(Debug, Clone, Copy)]
+struct Compressor {
+    threshold_db: f64,
+    /// `1 - 1 / ratio`: the share of the excess over the threshold taken off.
+    slope: f64,
+    attack: f64,
+    release: f64,
+    makeup: f64,
+    mix: f64,
+}
+
+impl Compressor {
+    /// The compressor of `s` at `sr`, `None` when it is off.
+    fn new(s: &StripSettings, sr: f64) -> Option<Self> {
+        let mix = f64::from(s.comp_mix);
+        if mix <= 0.0 {
+            return None;
+        }
+        let threshold_db = f64::from(s.comp_threshold_db);
+        let slope = 1.0 - 1.0 / f64::from(s.comp_ratio);
+        // One-pole coefficients: the share of the way to the target per sample.
+        let coefficient = |seconds: f32| 1.0 - (-1.0 / (f64::from(seconds) * sr)).exp();
+        let makeup_db = -threshold_db * slope * COMP_MAKEUP_SHARE;
+        Some(Self {
+            threshold_db,
+            slope,
+            attack: coefficient(s.comp_attack_seconds),
+            release: coefficient(s.comp_release_seconds),
+            makeup: (makeup_db / DB_PER_NEPER).exp(),
+            mix,
+        })
+    }
+
+    /// The gain reduction, dB, the gain computer asks for at `level_db`.
+    #[inline]
+    fn target_db(&self, level_db: f64) -> f64 {
+        let over = level_db - self.threshold_db;
+        if over <= -COMP_KNEE_DB / 2.0 {
+            0.0
+        } else if over >= COMP_KNEE_DB / 2.0 {
+            -self.slope * over
+        } else {
+            let x = over + COMP_KNEE_DB / 2.0;
+            -self.slope * x * x / (2.0 * COMP_KNEE_DB)
+        }
+    }
+
+    /// Compress one frame, moving the gain reduction `reduction_db` toward
+    /// what its level asks for.
+    #[inline]
+    fn process(&self, reduction_db: &mut f64, l: f64, r: f64) -> (f64, f64) {
+        let peak = l.abs().max(r.abs());
+        let level_db = if peak > 0.0 { (peak.ln() * DB_PER_NEPER).max(COMP_FLOOR_DB) } else { COMP_FLOOR_DB };
+        let target = self.target_db(level_db);
+        // Deeper reduction is the attack, less is the release.
+        let speed = if target < *reduction_db { self.attack } else { self.release };
+        *reduction_db += speed * (target - *reduction_db);
+        flush(reduction_db);
+        let gain = (*reduction_db / DB_PER_NEPER).exp() * self.makeup;
+        let wet = self.mix * gain + (1.0 - self.mix);
+        (l * wet, r * wet)
+    }
+}
+
 /// State of one strip.
 #[derive(Debug, Clone)]
 pub struct Strip {
@@ -344,6 +429,8 @@ pub struct Strip {
     crush_hold: [f64; 2],
     /// The hard clipper's previous input, left and right, over its ceiling.
     clip_prev: [f64; 2],
+    /// The compressor's gain reduction, dB (0 or less).
+    comp_reduction_db: f64,
 }
 
 impl Strip {
@@ -373,6 +460,7 @@ impl Strip {
             crush_phase: 1.0,
             crush_hold: [0.0; 2],
             clip_prev: [0.0; 2],
+            comp_reduction_db: 0.0,
         }
     }
 
@@ -431,6 +519,11 @@ impl Strip {
             self.clip_prev = [0.0; 2];
         }
         let ping_pong = delay_mode > 1.5;
+        let comp = Compressor::new(&s, sr);
+        if comp.is_none() {
+            // Turned back on, the compressor starts released.
+            self.comp_reduction_db = 0.0;
+        }
 
         let p = f64::from(s.pan);
         let pan_l = ((p + 1.0) * PI / 4.0).cos();
@@ -464,7 +557,12 @@ impl Strip {
                 dry_r = self.filter_2[1].process(dry_r, stage_2, mode) * gain_2;
             }
 
-            // 2. Saturation.
+            // 2. Compressor.
+            if let Some(comp) = &comp {
+                (dry_l, dry_r) = comp.process(&mut self.comp_reduction_db, dry_l, dry_r);
+            }
+
+            // 3. Saturation.
             let mut sat_l = if has_sat {
                 shape(dry_l, saturation_drive, saturation_type, saturation_mix, saturation_output)
             } else {
@@ -476,7 +574,7 @@ impl Strip {
                 dry_r
             };
 
-            // 2b. Bitcrusher: a sample and hold, then fewer levels.
+            // 3b. Bitcrusher: a sample and hold, then fewer levels.
             if has_crush {
                 if self.crush_phase >= 1.0 {
                     self.crush_phase -= 1.0;
@@ -487,7 +585,7 @@ impl Strip {
                 [sat_l, sat_r] = self.crush_hold;
             }
 
-            // 2c. Hard clipper, last: its ceiling holds.
+            // 3c. Hard clipper, last: its ceiling holds.
             if has_clip {
                 let (u_l, u_r) = (sat_l * clip_gain, sat_r * clip_gain);
                 sat_l = clip_adaa(u_l, self.clip_prev[0]) * CLIP_CEILING;
@@ -495,7 +593,7 @@ impl Strip {
                 self.clip_prev = [u_l, u_r];
             }
 
-            // 3. Reverb.
+            // 4. Reverb.
             let (mut rev_l, mut rev_r) = (0.0, 0.0);
             if has_reverb {
                 let mut input = (sat_l + sat_r) * 0.0075;
@@ -535,7 +633,7 @@ impl Strip {
                 }
             }
 
-            // 4. Delay.
+            // 5. Delay.
             let (mut wet_l, mut wet_r) = (0.0, 0.0);
             let (send_l, send_r) = if delay_mono_in { ((sat_l + sat_r) * 0.5, 0.0) } else { (sat_l, sat_r) };
             if has_delay {
@@ -567,7 +665,7 @@ impl Strip {
                 self.delay_r.write(send_r);
             }
 
-            // 5. Volume and pan.
+            // 6. Volume and pan.
             let mut left = (sat_l + rev_l + wet_l) * vol * pan_l * pan_comp;
             let mut right = (sat_r + rev_r + wet_r) * vol * pan_r * pan_comp;
             flush(&mut left);
@@ -782,6 +880,40 @@ mod tests {
         assert!(echo(&l, 480) > 0.1 && echo(&r, 480) < 1e-6);
         assert!(echo(&r, 960) > 0.01 && echo(&l, 960) < 1e-6);
         assert!(echo(&l, 1440) > 0.001 && echo(&r, 1440) < 1e-6);
+    }
+
+    #[test]
+    fn the_compressor_lowers_loud_parts_by_its_ratio() {
+        // A 0 dBFS square, one second, through a -24 dB threshold at 4:1.
+        let input: Vec<f32> = (0..48_000).map(|i| if (i / 50) % 2 == 0 { 1.0 } else { -1.0 }).collect();
+        let off = StripSettings { filter_on: 0.0, ..StripSettings::default() };
+        let comp = StripSettings { comp_mix: 1.0, comp_threshold_db: -24.0, comp_ratio: 4.0, ..off };
+        let (l, r) = run(&comp, &input);
+        assert_eq!(l, r);
+        // 24 dB over: 18 dB taken off, half of it made up, settled.
+        let settled = f64::from(l[47_999].abs());
+        let expected = (-18.0_f64 + 9.0) / 20.0;
+        assert!((settled.log10() - expected).abs() < 0.01, "{}", 20.0 * settled.log10());
+        // The attack lets the first hit through louder than the settled level.
+        assert!(f64::from(l[0].abs()) > settled * 2.0);
+        // Off, the signal goes through untouched.
+        assert_eq!(run(&off, &input).0, input);
+    }
+
+    #[test]
+    fn the_compressor_leaves_quiet_parts_and_mixes_in_parallel() {
+        let quiet = vec![0.01_f32; 4_800];
+        let comp =
+            StripSettings { filter_on: 0.0, comp_mix: 1.0, comp_threshold_db: -12.0, ..StripSettings::default() };
+        let (l, _) = run(&comp, &quiet);
+        // -40 dBFS is far under the knee: only the make-up gain (4.5 dB).
+        let makeup = 10_f64.powf(12.0 * 0.75 * COMP_MAKEUP_SHARE / 20.0);
+        assert!((f64::from(l[4_799]) / 0.01 - makeup).abs() < 1e-4, "{}", l[4_799]);
+
+        let loud = vec![1.0_f32; 48_000];
+        let full = run(&StripSettings { comp_threshold_db: -30.0, ..comp }, &loud).0[47_999];
+        let half = run(&StripSettings { comp_threshold_db: -30.0, comp_mix: 0.5, ..comp }, &loud).0[47_999];
+        assert!((f64::from(half) - (0.5 + 0.5 * f64::from(full))).abs() < 1e-4, "{half} {full}");
     }
 
     #[test]

@@ -1,7 +1,7 @@
 //! The parameters a host shows and automates: the pattern and the kit
 //! played, the master volume, the swing, and per track a mute, a volume, a
 //! pan, the filter's cutoff and Q, the reverb, delay and saturation amounts,
-//! the delay feedback, a transpose and the output it plays on (the mix, or
+//! the delay feedback, the compressor's mix and threshold, a transpose and the output it plays on (the mix, or
 //! one of its own). The pattern, the kit and the swing
 //! are applied by the player thread, which also shows the mutes in the
 //! window; the track parameters are applied by the audio thread, every
@@ -33,6 +33,9 @@ const CUTOFF_OCTAVES_MAX: f32 = 4.0;
 /// The most a host adds to or takes from a track's filter Q (its range is
 /// 0.707 to 18.707).
 const Q_OFFSET_MAX: f32 = 18.0;
+/// The most a host moves a track's compressor threshold, dB each way (its range is
+/// -60 to 0 dBFS).
+const THRESHOLD_OFFSET_MAX_DB: f32 = 60.0;
 /// The most a host transposes a track, semitones each way (the editor's).
 const TRANSPOSE_MAX: i32 = 24;
 
@@ -99,6 +102,12 @@ pub struct TrackParams {
     /// Added to the saturation amount.
     #[id = "track_saturation"]
     pub saturation: FloatParam,
+    /// Added to the compressor's mix.
+    #[id = "track_compressor"]
+    pub compressor: FloatParam,
+    /// Decibels added to the compressor's threshold.
+    #[id = "track_threshold"]
+    pub threshold: FloatParam,
     /// Semitones added to the track's transpose.
     #[id = "track_transpose"]
     pub transpose: IntParam,
@@ -122,6 +131,15 @@ impl TrackParams {
             delay: offset_param(format!("Delay track {number}"), 1.0),
             feedback: offset_param(format!("Feedback track {number}"), 1.0),
             saturation: offset_param(format!("Saturation track {number}"), 1.0),
+            compressor: offset_param(format!("Compressor track {number}"), 1.0),
+            threshold: FloatParam::new(
+                format!("Threshold track {number}"),
+                0.0,
+                FloatRange::Linear { min: -THRESHOLD_OFFSET_MAX_DB, max: THRESHOLD_OFFSET_MAX_DB },
+            )
+            .with_step_size(0.1)
+            .with_unit(" dB")
+            .with_value_to_string(Arc::new(|v| format!("{v:+.1}"))),
             transpose: IntParam::new(
                 format!("Transpose track {number}"),
                 0,
@@ -149,6 +167,8 @@ impl TrackParams {
             delay: self.delay.value(),
             feedback: self.feedback.value(),
             saturation: self.saturation.value(),
+            compressor: self.compressor.value(),
+            threshold_db: self.threshold.value(),
             transpose: self.transpose.value(),
         }
     }
@@ -359,13 +379,15 @@ mod tests {
         assert_eq!(params.tracks[0].pan.normalized_value_to_string(0.5, true), "C");
         assert_eq!(params.tracks[0].cutoff.normalized_value_to_string(1.0, true), "+4.00 oct");
         assert_eq!(params.tracks[0].transpose.normalized_value_to_string(0.0, true), "-24 st");
+        assert_eq!(params.tracks[0].threshold.normalized_value_to_string(0.25, true), "-30.0 dB");
         let ids: Vec<String> = params.param_map().into_iter().map(|(id, _, _)| id).collect();
         let saved = ["pattern", "kit", "volume", "mute_1", "mute_16"];
         let added = ["swing", "track_volume_1", "track_pan_1", "track_volume_16", "track_pan_16"];
         let fx = ["track_cutoff_16", "track_q_1", "track_reverb_1", "track_delay_1", "track_feedback_1"];
         let more =
             ["track_saturation_1", "track_transpose_1", "track_transpose_16", "track_output_1", "track_output_16"];
-        for id in saved.into_iter().chain(added).chain(fx).chain(more) {
+        let comp = ["track_compressor_1", "track_compressor_16", "track_threshold_1", "track_threshold_16"];
+        for id in saved.into_iter().chain(added).chain(fx).chain(more).chain(comp) {
             assert!(ids.iter().any(|i| i == id), "no parameter {id} in {ids:?}");
         }
     }

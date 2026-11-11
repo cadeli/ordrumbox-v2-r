@@ -217,6 +217,12 @@ pub enum Format {
     Density,
     /// A seed: `new` below 1 (a new line each time).
     Seed,
+    /// A level in dB, one decimal: `-18.0 dB`.
+    Decibels,
+    /// A compressor ratio, one decimal: `4.0:1`.
+    Ratio,
+    /// Milliseconds, one decimal under 10: `2.5 ms`, `120 ms`.
+    FineMillis,
 }
 
 impl Format {
@@ -247,6 +253,12 @@ impl Format {
             }
             Self::Fmt3 => num::text(round_to(v, 3)),
             Self::Round => num::text(v.round()),
+            Self::Decibels => to_fixed_text(v, 1),
+            Self::Ratio => format!("{}:1", to_fixed_text(v, 1)),
+            Self::FineMillis => {
+                let digits = if v < FINE_MILLIS_BELOW { 1 } else { 0 };
+                format!("{} ms", to_fixed_text(v, digits))
+            }
             Self::Seed => {
                 if v < 1.0 {
                     "new".to_owned()
@@ -268,6 +280,7 @@ impl Format {
     pub const fn unit(self) -> &'static str {
         match self {
             Self::Percent | Self::Chance => "%",
+            Self::Decibels => "dB",
             _ => "",
         }
     }
@@ -279,6 +292,9 @@ impl Format {
         if unit.is_empty() { text } else { format!("{text} {unit}") }
     }
 }
+
+/// Milliseconds under which [`Format::FineMillis`] shows a decimal.
+const FINE_MILLIS_BELOW: f64 = 10.0;
 
 /// `v` with two decimals at most (`0.5`, `0.33`).
 pub fn fmt(v: f64) -> String {

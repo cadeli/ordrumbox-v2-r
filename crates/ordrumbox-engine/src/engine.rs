@@ -135,6 +135,10 @@ pub struct HostTrack {
     pub feedback: f32,
     /// Added to the saturation amount.
     pub saturation: f32,
+    /// Added to the compressor's mix (0: off, 1: fully compressed).
+    pub compressor: f32,
+    /// Decibels added to the compressor's threshold, the sum kept within its range.
+    pub threshold_db: f32,
     /// Semitones the notes started move by (not the MIDI notes sent).
     pub transpose: i32,
 }
@@ -150,6 +154,8 @@ impl Default for HostTrack {
             delay: 0.0,
             feedback: 0.0,
             saturation: 0.0,
+            compressor: 0.0,
+            threshold_db: 0.0,
             transpose: 0,
         }
     }
@@ -209,6 +215,12 @@ impl HostMix {
             let amount = (saturation_amount(&s) + f64::from(host.saturation)).clamp(0.0, 1.0);
             set_saturation(&mut s, amount);
         }
+        if host.compressor != 0.0 {
+            s.comp_mix = add(s.comp_mix, host.compressor, 1.0);
+        }
+        if host.threshold_db != 0.0 {
+            s.comp_threshold_db = (s.comp_threshold_db + host.threshold_db).clamp(MIN_THRESHOLD_DB, MAX_THRESHOLD_DB);
+        }
         s
     }
 }
@@ -218,6 +230,9 @@ const MIN_CUTOFF: f32 = ordrumbox_dsp::MIN_FILTER_FREQ as f32;
 const MAX_CUTOFF: f32 = ordrumbox_dsp::MAX_FILTER_FREQ as f32;
 const MIN_Q: f32 = 0.707;
 const MAX_Q: f32 = 18.707;
+/// The compressor's threshold range, as the strip takes it.
+const MIN_THRESHOLD_DB: f32 = StripSettings::MIN.comp_threshold_db;
+const MAX_THRESHOLD_DB: f32 = StripSettings::MAX.comp_threshold_db;
 
 /// Where playback is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1041,6 +1056,8 @@ mod tests {
             delay: 2.0,
             feedback: 0.25,
             saturation: 0.5,
+            compressor: 0.8,
+            threshold_db: -100.0,
             ..HostTrack::default()
         };
         let s = host.strip(&target, 0, &ratios(&host, 0));
@@ -1048,6 +1065,7 @@ mod tests {
         assert_eq!((s.reverb_mix, s.delay_mix, s.delay_feedback), (0.5, 1.0, 0.65), "amounts kept within 0 to 1");
         assert_eq!((s.saturation_drive, s.saturation_mix), (4.0, 1.0));
         assert_eq!(saturation_amount(&s), 0.5);
+        assert_eq!((s.comp_mix, s.comp_threshold_db), (0.8, MIN_THRESHOLD_DB), "the threshold kept in its range");
         assert_eq!(host.strip(&target, 1, &ratios(&host, 1)), target, "another track changes nothing");
         let slap = StripSettings { delay_mode: 0.0, delay_feedback: 0.0, ..target };
         assert_eq!(host.strip(&slap, 0, &ratios(&host, 0)).delay_feedback, 0.0, "a slap has one echo");
