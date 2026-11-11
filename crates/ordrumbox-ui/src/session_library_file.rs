@@ -219,12 +219,16 @@ fn a_plugin_leaves_to_the_host_what_the_host_does() {
     let size = (1100, 680, Scale::ONE);
     let layout = s.panel_layout(size.0, size.1, size.2);
     assert!(!layout.items.iter().any(|i| i.id == Some(Id::Bpm)));
-    // No SONG view button: a click where it would be does nothing.
+    // No SONG view button: SYNTH and KIT move into its place, no gap after ROLL.
     assert!(panel::find(&layout.items, Id::View(2)).is_none());
-    let song = view::header_controls(Scale::ONE).views[2];
-    let (x, y) = (song.x + 2, song.y + 2);
-    assert!(panel::hit(&layout.items, x, y).is_none());
-    s.mouse_down(size, x, y, Button::Left, false);
+    let app = view::header_controls(Scale::ONE).views;
+    let views = view::header_controls(Scale::ONE).hosted().views;
+    assert_eq!(views[3].x, app[2].x);
+    assert_eq!(panel::find(&layout.items, Id::View(3)).map(|i| i.rect), Some(views[3]));
+    assert_eq!(panel::find(&layout.items, Id::View(4)).map(|i| i.rect), Some(views[4]));
+    let after = views[4].x + views[4].w;
+    assert!(panel::hit(&layout.items, after + 2, views[4].y + 2).is_none());
+    s.mouse_down(size, after + 2, views[4].y + 2, Button::Left, false);
     s.mouse_up();
     assert!(!s.song_view_open());
     // No transport: the host plays, at its tempo, both only shown; nothing under the mouse there.
@@ -234,7 +238,7 @@ fn a_plugin_leaves_to_the_host_what_the_host_does() {
     s.control_hover(size, bpm.x + 2, bpm.y + 2);
     assert!(s.chrome.control_hover.is_none());
     // Tooltips give the plugin's shortcuts: Alt in place of Ctrl.
-    let kit = view::header_controls(Scale::ONE).views[4];
+    let kit = views[4];
     s.control_hover(size, kit.x + 2, kit.y + 2);
     let tip = s.chrome.control_hover.and_then(|(id, _)| s.control_tip(id)).map(|[title, _]| title);
     assert_eq!(tip.as_deref(), Some("Kit editor (Alt+K)"));
