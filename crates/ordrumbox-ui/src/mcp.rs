@@ -6,7 +6,7 @@
 //! it (`session_mcp.rs`) as one undo step.
 //!
 //! Tool and parameter names are the JS server's; the track and note settings
-//! are named by their keys in the files this app writes (`README.md`).
+//! are named by their keys in the files this app writes (their `json_record!` tables).
 
 use ordrumbox_core::json::{self, Object, Value};
 use ordrumbox_core::{Note, Track};

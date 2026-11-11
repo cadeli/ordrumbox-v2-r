@@ -198,7 +198,7 @@ fn snapshot_path() -> std::path::PathBuf {
 
 /// Writes `generators_rust.txt` from the generators as they are: `cargo test
 /// -p ordrumbox-logic --test generators -- --ignored`, when what they make
-/// changes on purpose (`README.md`, "Snapshots").
+/// changes on purpose (`DEVELOPMENT.md`, "Snapshots").
 #[test]
 #[ignore = "writes the snapshot"]
 fn write_the_snapshot() {

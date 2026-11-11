@@ -2,7 +2,7 @@
 //! style promises (its required and forbidden steps, its meter, the exact
 //! hits), how close the lines stay to its weights, and a snapshot of one
 //! pattern per style (`tests/fixtures/compose_rust.txt`, written from this
-//! code: `README.md`, "Snapshots").
+//! code: `DEVELOPMENT.md`, "Snapshots").
 
 #![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
 

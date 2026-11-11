@@ -40,7 +40,7 @@ fn snapshot_path() -> PathBuf {
 
 /// Writes `composition_rust.txt` from the progressions as they are: `cargo
 /// test -p ordrumbox-logic --test composition -- --ignored`, when a
-/// progression changes on purpose (`README.md`, "Snapshots").
+/// progression changes on purpose (`DEVELOPMENT.md`, "Snapshots").
 #[test]
 #[ignore = "writes the snapshot"]
 fn write_the_snapshot() {
