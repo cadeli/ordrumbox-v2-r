@@ -15,11 +15,21 @@ const BUNDLE_NAME: &str = "orDrumbox";
 
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    let bundling = args.first().is_some_and(|command| command.starts_with("bundle"));
+    let bundled =
+        std::env::var_os("CARGO_TARGET_DIR").map_or_else(|| PathBuf::from("target"), PathBuf::from).join("bundled");
+    // The bundles of an earlier build go first: a build without `vst3` would
+    // otherwise leave an old `orDrumbox.vst3` there (a CI cache restores
+    // `target/`), which the loop below would sign as if it were new.
+    if bundling && bundled.exists() {
+        for bundle in bundles(&bundled)? {
+            remove(&bundle)?;
+        }
+    }
     nih_plug_xtask::main_with_args("cargo xtask", args.iter().cloned())?;
     // nih-plug's bundler left the current folder at the workspace root.
-    if args.first().is_some_and(|command| command.starts_with("bundle")) {
-        let target = std::env::var_os("CARGO_TARGET_DIR").map_or_else(|| PathBuf::from("target"), PathBuf::from);
-        for bundle in bundles(&target.join("bundled"))? {
+    if bundling {
+        for bundle in bundles(&bundled)? {
             add_assets(&bundle, Path::new("assets"))?;
             println!("Added assets to {}", bundle.display());
         }
@@ -58,6 +68,11 @@ fn add_assets(bundle: &Path, assets: &Path) -> Result<()> {
         anyhow_ensure(status.success(), format!("codesign {} failed: {status}", bundle.display()))?;
     }
     Ok(())
+}
+
+/// `path`, a folder with its contents or a single file.
+fn remove(path: &Path) -> io::Result<()> {
+    if path.is_dir() { fs::remove_dir_all(path) } else { fs::remove_file(path) }
 }
 
 fn anyhow_ensure(ok: bool, message: String) -> Result<()> {
