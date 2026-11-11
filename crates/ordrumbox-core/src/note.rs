@@ -6,7 +6,15 @@
 
 use crate::json::{Object, Value};
 use crate::num::round2;
-use crate::record::{Issue, SetField, check_duplicate, json_record};
+use crate::record::{Issue, SetField, check_duplicate, json_record, past_max, refusal};
+use crate::steps::{MAX_LOADED_BEATS, MAX_LOADED_STEPS};
+
+/// The most hits a file may give a note's retrigger: each one is a note played.
+pub const MAX_LOADED_RETRIGGER_COUNT: i32 = 64;
+/// The most a file may give for a note's place and counts, by key; a value
+/// past it is reported and the default kept.
+const LOADED_MAX: [(&str, i32); 3] =
+    [("beat", MAX_LOADED_BEATS), ("step", MAX_LOADED_STEPS), ("retriggerCount", MAX_LOADED_RETRIGGER_COUNT)];
 
 /// The velocity from which a note is an accent: the generators accent at
 /// 0.95 give or take 0.05.
@@ -96,8 +104,12 @@ impl Note {
                     format!("not a percent from 0 to 100 ({}), derived from the step", value.to_json()),
                 )),
             }
-        } else if self.set_field(key, value) == SetField::WrongType {
-            issues.push(Issue::new(format!("{at}.{key}"), format!("wrong type ({}), default kept", value.to_json())));
+        } else if !Self::canonical_key(key)
+            .and_then(|field| LOADED_MAX.iter().find(|(k, _)| *k == field))
+            .is_some_and(|&(_, max)| past_max(value, max, format!("{at}.{key}"), issues))
+            && self.set_field(key, value) == SetField::WrongType
+        {
+            issues.push(Issue::new(format!("{at}.{key}"), refusal(value)));
         }
     }
 

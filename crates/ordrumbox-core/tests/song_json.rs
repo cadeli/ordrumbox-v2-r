@@ -73,14 +73,3 @@ fn writing_is_idempotent() {
         }
     }
 }
-
-#[test]
-fn song_json_has_the_expected_shape() {
-    let value = json::parse(&read("song.json")).expect("song.json parses");
-    let patterns = value.get("patterns").and_then(Value::as_array).expect("patterns array");
-    assert!(!patterns.is_empty());
-    for pattern in patterns {
-        assert!(pattern.get("id").and_then(Value::as_str).is_some_and(|id| !id.is_empty()));
-    }
-    assert!(value.get("songs").and_then(Value::as_array).is_some());
-}

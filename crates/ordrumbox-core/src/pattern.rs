@@ -2,7 +2,8 @@
 //! loaded like `fixPattern()` and saved like `Exporter.export()`.
 
 use crate::json::{Object, Value};
-use crate::record::Issue;
+use crate::record::{Issue, refusal};
+use crate::steps::MAX_LOADED_BEATS;
 use crate::track::{MAX_TRACKS, Track};
 
 /// Keys read and dropped: `_revision` is runtime state; `application` and
@@ -59,7 +60,7 @@ impl Pattern {
         };
         let mut pattern = Self::default();
         let mut wrong_type = |key: &str, value: &Value| {
-            issues.push(Issue::new(format!("{at}.{key}"), format!("wrong type ({value}), default kept")));
+            issues.push(Issue::new(format!("{at}.{key}"), refusal(value)));
         };
         for (key, value) in object.iter() {
             match key {
@@ -70,7 +71,8 @@ impl Pattern {
                     None => wrong_type(key, value),
                 },
                 "beatCount" => {
-                    match value.as_f64().filter(|n| n.fract() == 0.0 && *n >= 1.0 && *n <= f64::from(i32::MAX)) {
+                    match value.as_f64().filter(|n| n.fract() == 0.0 && (1.0..=f64::from(MAX_LOADED_BEATS)).contains(n))
+                    {
                         Some(n) => pattern.beat_count = n as i32,
                         None => wrong_type(key, value),
                     }
@@ -153,6 +155,7 @@ fn tags_from_json(value: &Value) -> Option<Vec<String>> {
 mod tests {
     use super::*;
     use crate::json;
+    use crate::note::Note;
 
     fn load(text: &str) -> (Pattern, Vec<Issue>) {
         let mut issues = Vec::new();
@@ -172,6 +175,36 @@ mod tests {
         let (pattern, issues) = load(r#"{"application":"other","url":"u","_autoGenGenre":"house","x":1,"bpm":97.5}"#);
         assert!(issues.is_empty());
         assert_eq!(pattern.to_json().to_json(), r#"{"autoGenre":"house","x":1}"#);
+    }
+
+    #[test]
+    fn a_length_past_what_a_file_may_hold_is_reported_and_the_default_kept() {
+        let (pattern, issues) = load(
+            r#"{"beatCount":1025,"tracks":[{"beatCount":1e9,"stepsPerBeat":97,"loopLength":-98305,
+                "notes":[{"beat":-1025,"step":98305,"retriggerCount":65,"velocity":1e308}]}]}"#,
+        );
+        let (track, note) = (&pattern.tracks[0], &pattern.tracks[0].notes[0]);
+        assert_eq!((pattern.beat_count, track.beat_count, track.steps_per_beat, track.loop_length), (4, 4, 4, None));
+        assert_eq!((note.beat, note.step, note.retrigger_count, note.velocity), (0, 0, 1, Note::default().velocity));
+        let issues: Vec<_> = issues.iter().map(|issue| format!("{}: {}", issue.at, issue.message)).collect();
+        assert_eq!(
+            issues,
+            [
+                "p.beatCount: out of range (1025), default kept",
+                "p.tracks[0].beatCount: past 1024 (1000000000), default kept",
+                "p.tracks[0].stepsPerBeat: past 96 (97), default kept",
+                "p.tracks[0].loopLength: past 98304 (-98305), default kept",
+                "p.tracks[0].notes[0].beat: past 1024 (-1025), default kept",
+                "p.tracks[0].notes[0].step: past 98304 (98305), default kept",
+                "p.tracks[0].notes[0].retriggerCount: past 64 (65), default kept",
+                "p.tracks[0].notes[0].velocity: out of range (1e+308), default kept",
+            ]
+        );
+        // The longest a file may hold loads as written.
+        let (pattern, issues) =
+            load(r#"{"beatCount":1024,"tracks":[{"beatCount":1024,"stepsPerBeat":96,"loopLength":98304}]}"#);
+        assert!(issues.is_empty(), "{issues:#?}");
+        assert_eq!((pattern.beat_count, pattern.tracks[0].loop_length), (1024, Some(98304)));
     }
 
     #[test]

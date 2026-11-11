@@ -26,9 +26,15 @@ impl JsonField for bool {
     }
 }
 
+/// Largest number a setting is read as, either side of 0: far past any
+/// level, time or frequency, and small enough that settings multiplied
+/// together stay finite as `f32`.
+pub const MAX_NUMBER: f64 = 1e9;
+
 impl JsonField for f64 {
+    /// Numbers within [`MAX_NUMBER`] only.
     fn from_json(value: &Value) -> Option<Self> {
-        value.as_f64().filter(|n| n.is_finite())
+        value.as_f64().filter(|n| n.abs() <= MAX_NUMBER)
     }
     fn to_json(&self) -> Value {
         Value::Number(*self)
@@ -107,6 +113,22 @@ impl Issue {
     pub fn new(at: impl Into<String>, message: impl Into<String>) -> Self {
         Self { at: at.into(), message: message.into() }
     }
+}
+
+/// Why a record did not take `value` for a field: a number it cannot hold, or another type.
+pub(crate) fn refusal(value: &Value) -> String {
+    let what = if value.as_f64().is_some() { "out of range" } else { "wrong type" };
+    format!("{what} ({}), default kept", value.to_json())
+}
+
+/// Report `value` at `at` when it is a number past `max` either side of 0,
+/// the most a file may give for this length, count or position. Whether it was.
+pub(crate) fn past_max(value: &Value, max: i32, at: String, issues: &mut Vec<Issue>) -> bool {
+    let past = value.as_f64().is_some_and(|n| n.abs() > f64::from(max));
+    if past {
+        issues.push(Issue::new(at, format!("past {max} ({}), default kept", value.to_json())));
+    }
+    past
 }
 
 /// Report `key` when an earlier key of the same object named the same

@@ -1,10 +1,10 @@
-//! `e2e/gen-sliders.spec.js` of ordrumbox-v2: each generation slider of an
-//! auto-mode track has its own effect on the notes the pattern engine plays.
+//! Each generation slider of an auto-mode track has its own effect on the
+//! notes the pattern engine plays.
 //!
-//! As in the JS test, every operation gate but the one under test is closed
-//! (so the whole variation budget goes to that effect), the projection is
-//! rolled many times, and a one-sided invariant is checked against the
-//! written notes: at 0 the effect never appears, at 100 it appears at least once.
+//! Every operation gate but the one under test is closed (so the whole
+//! variation budget goes to that effect), the projection is rolled many
+//! times, and a one-sided invariant is checked against the written notes: at
+//! 0 the effect never appears, at 100 it appears at least once.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
 
@@ -138,7 +138,7 @@ fn pitch_range_bounds_how_far_a_pitch_can_travel() {
 fn pitch_scale_lock_keeps_every_varied_pitch_inside_the_scale() {
     let mut pattern = pattern(sparse_grid(), "prob_pitch");
     set(&mut pattern.tracks[0], "pitch_range", 24.0);
-    // No scale named: the major scale, as `pickPitch` falls back to.
+    // No scale named: the major scale.
     let on_scale = |pitch: f64| [0.0, 2.0, 4.0, 5.0, 7.0, 9.0, 11.0].contains(&(pitch.abs() % 12.0));
     let mut rng = Rng::new(9);
     pattern.tracks[0].pitch_scale_lock = true;

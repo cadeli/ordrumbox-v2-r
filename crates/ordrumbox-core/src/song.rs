@@ -16,6 +16,9 @@ pub const BEATS_PER_MEASURE: f64 = 4.0;
 pub const MIN_BPM: f64 = 20.0;
 pub const MAX_BPM: f64 = 300.0;
 pub const DEFAULT_BPM: f64 = 120.0;
+/// Measures of the longest song a file may hold: a clip or a loop that ends
+/// past it is left out, and the load says so.
+pub const MAX_LOADED_MEASURES: f64 = 10_000.0;
 
 /// `bpm` inside [`MIN_BPM`]–[`MAX_BPM`].
 pub fn clamp_bpm(bpm: f64) -> f64 {
@@ -148,6 +151,10 @@ impl Song {
             let start = number("startMeasure");
             let start = if start.is_nan() { 0.0 } else { start.floor().max(0.0) };
             let count = number("measureCount");
+            if start + count.max(1.0) > MAX_LOADED_MEASURES {
+                dropped.push(DroppedClip { pattern: reference.to_owned(), reason: "clip past the longest song" });
+                continue;
+            }
             clips.push(SongClip {
                 pattern_id: reference.to_owned(),
                 start_measure: start.min(f64::from(u32::MAX)) as u32,
@@ -162,6 +169,10 @@ impl Song {
             .find_map(|key| object.get(key))
             .and_then(Value::to_number)
             .unwrap_or(f64::NAN);
+        if loop_count > MAX_LOADED_MEASURES {
+            let message = format!("{loop_count} measures, over {MAX_LOADED_MEASURES}: no loop");
+            issues.push(Issue::new(format!("{at}.loopMeasures"), message));
+        }
         let id = match text("id").trim() {
             "" => Some(slugify(&text("name"))).filter(|slug| !slug.is_empty()).unwrap_or_else(|| "song".to_owned()),
             id => id.to_owned(),
@@ -171,7 +182,8 @@ impl Song {
             name: text("name"),
             description: text("description"),
             bpm,
-            loop_measures: (loop_count > 0.0).then(|| loop_count.floor()),
+            // Whole measures; under one, no loop (not a loop of 0 measures).
+            loop_measures: Some(loop_count.floor()).filter(|count| *count > 0.0 && *count <= MAX_LOADED_MEASURES),
             clips,
         };
         Ok((song, dropped))
@@ -295,6 +307,22 @@ mod tests {
     }
 
     #[test]
+    fn a_clip_or_a_loop_past_the_longest_song_is_left_out_and_reported() {
+        let raw = json::parse(
+            r#"{"loopMeasures":1e9,"clips":[{"patternId":"a","startMeasure":9999,"measureCount":1},
+                {"patternId":"a","startMeasure":9999,"measureCount":2},{"patternId":"a","startMeasure":1e308},
+                {"patternId":"a","measureCount":1e9}]}"#,
+        )
+        .unwrap();
+        let mut issues = Vec::new();
+        let (song, dropped) = Song::from_json(&raw, &ids(&["a"]), "s", &mut issues).unwrap();
+        assert_eq!(song.clips, [SongClip { pattern_id: "a".into(), start_measure: 9999, measure_count: 1.0 }]);
+        assert_eq!(dropped, vec![DroppedClip { pattern: "a".into(), reason: "clip past the longest song" }; 3]);
+        assert_eq!(song.loop_measures, None);
+        assert_eq!(issues, [Issue::new("s.loopMeasures", "1000000000 measures, over 10000: no loop")]);
+    }
+
+    #[test]
     fn coerces_and_clamps_like_normalize_song() {
         let raw = json::parse(
             r#"{"name":"Ébauche","bpm":"140","loopMeasureCount":7.9,
@@ -306,6 +334,9 @@ mod tests {
         assert_eq!(song.bpm, 140.0);
         assert_eq!(song.loop_measures, Some(7.0));
         assert_eq!(song.clips, [SongClip { pattern_id: "a".into(), start_measure: 2, measure_count: 1.0 }]);
+        // Under a measure there is no loop, rather than one of 0 measures that a save would not keep.
+        let short = json::parse(r#"{"name":"s","loopMeasures":0.5}"#).unwrap();
+        assert_eq!(Song::from_json(&short, &ids(&[]), "s", &mut Vec::new()).unwrap().0.loop_measures, None);
         assert_eq!(
             dropped,
             [

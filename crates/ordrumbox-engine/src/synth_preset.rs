@@ -134,6 +134,12 @@ fn finite(value: Option<&Value>, fallback: f64) -> f64 {
     value.and_then(Value::to_number).unwrap_or(fallback)
 }
 
+/// A level of a preset (a gain, a mix, the master volume), inside 0–1 as
+/// its control is: a file's level outside would play louder than full scale.
+fn level(value: Option<&Value>, fallback: f64) -> f64 {
+    clamp(finite(value, fallback), 0.0, 1.0)
+}
+
 /// `x` inside `min`–`max`; `min > max` gives `max` instead of a panic.
 fn clamp(x: f64, min: f64, max: f64) -> f64 {
     x.max(min).min(max)
@@ -176,17 +182,17 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
     let note_ratio = finite(Some(&Value::Number(note.ratio)), 1.0).max(MIN_NOTE_RATIO);
 
     let vcos = [at("vco1"), at("vco2"), at("vco3")];
-    let gains = vcos.map(|vco| finite(get(vco, "gain"), 0.0));
+    let gains = vcos.map(|vco| level(get(vco, "gain"), 0.0));
     let total_gain = gains[0] + gains[1] + gains[2];
     // The voice mixes oscillators and noise by `noise.mix`: both count, or a
     // sound mostly made of noise would be raised by its quiet oscillators.
     let noise_mix =
-        if at("bypassNoise").is_some_and(Value::is_true) { 0.0 } else { finite(get(at("noise"), "mix"), 0.0) };
+        if at("bypassNoise").is_some_and(Value::is_true) { 0.0 } else { level(get(at("noise"), "mix"), 0.0) };
     let mix_gain = total_gain * (1.0 - noise_mix) + noise_mix;
     let mix_norm = if mix_gain > 0.001 { 1.0 / mix_gain } else { 1.0 };
     let note_velo = note.velocity * mix_norm;
     let accent = if note_velo > 0.5 { 1.0 + 0.5 * 0.5 } else { 1.0 };
-    let master_volume = finite(at("masterVolume"), 0.8);
+    let master_volume = level(at("masterVolume"), 0.8);
     let peak = note_velo * master_volume * accent * 1.0;
 
     let osc_freq = vcos.map(|vco| {
@@ -219,7 +225,7 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
         osc_gain: gains,
         osc_detune: vcos.map(|vco| finite(get(vco, "detune"), 0.0)),
         osc_wave: vcos.map(|vco| enum_code(get(vco, "wave"), &WAVES)),
-        noise_mix: finite(get(noise, "mix"), 0.0),
+        noise_mix: level(get(noise, "mix"), 0.0),
         noise_filter_type: enum_code(get(noise, "filterType"), &FILTERS),
         noise_filter_freq: finite(get(noise, "filterFreq"), 1000.0),
         noise_filter_q: finite(get(noise, "filterQ"), 0.7),
@@ -229,7 +235,7 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
         filter_slope: finite(get(filter, "slope"), 12.0),
         drive: finite(get(filter, "drive"), 0.0),
         pitch_punch: finite(at("pitchPunch"), 0.0),
-        sub_gain: finite(at("subGain"), 0.0),
+        sub_gain: level(at("subGain"), 0.0),
         envelope: Adsr {
             attack: clamp(finite(get(env, "attack"), 0.01), 0.003, 0.5),
             decay: finite(get(env, "decay"), 0.1).min(1.0),
@@ -278,6 +284,20 @@ pub fn note_seconds(bpm: f64, steps_per_beat: i32) -> f64 {
 mod tests {
     use super::*;
     use ordrumbox_core::json;
+
+    #[test]
+    fn a_level_outside_its_control_is_brought_inside() {
+        let patch = synth_patch(
+            &json::parse(
+                r#"{"masterVolume":1e308,"subGain":-3,"vco1":{"gain":2},"vco2":{"gain":-1e308},"noise":{"mix":7}}"#,
+            )
+            .unwrap(),
+            SynthNote { ratio: 1.0, velocity: 0.4, pan: 0.0, bpm: 120.0 },
+        );
+        assert_eq!((patch.osc_gain, patch.noise_mix, patch.sub_gain), ([1.0, 0.0, 0.0], 1.0, 0.0));
+        // All noise at full mix: the note's velocity at a master volume of 1.
+        assert_eq!(patch.velocity, 0.4);
+    }
 
     #[test]
     fn missing_sections_fall_back() {

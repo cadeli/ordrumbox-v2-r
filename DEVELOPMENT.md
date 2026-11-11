@@ -77,7 +77,7 @@ a meant change of behaviour, and note that change below).
 |---|---|---|
 | core | `flat_notes_rust.txt`, `library_rust.json`, `edge_library_rust.json`, `sub_positions_rust.txt` | `edge_library.json`, `engine_cases.json`, `song.json` |
 | dsp | `effect_renders.bin`, `synth_renders.bin` | |
-| engine | `analysis_rust.txt`, `mapping_rust.txt`, `synth_editor_rust.txt` | `generated_sounds.json`, `kick.wav` |
+| engine | `analysis_rust.txt`, `mapping_rust.txt`, `pattern_renders.bin`, `synth_editor_rust.txt` | `generated_sounds.json`, `kick.wav` |
 | logic | `compose_rust.txt`, `composition_rust.txt`, `generators_rust.txt`, `midi_rust.txt` | `generator_cases.json`, `midi/`, `midi_exports.json` |
 
 ### Changes of behaviour
@@ -114,3 +114,20 @@ track) is kept before both. This rewrote the table of `ordrumbox-ui/src/assign_t
 
 The strip's compressor has two cases of its own, `comp` and `comp_parallel`, added
 after `delay_pingpong` to `effect_renders.bin` (dsp); the other cases are unchanged.
+
+The whole chain has a snapshot of its own, `pattern_renders.bin` (engine): hand-written
+patterns and a song rendered as the WAV export does, from the notes to the master bus.
+It is new: no other snapshot changed.
+
+A song's loop of less than one measure in a file (`"loopMeasures": 0.5`) is now no loop;
+it used to be read as a loop of 0 measures, which played as none but was saved as `0`
+and dropped by the save after. No snapshot changed.
+
+A file's numbers are bounded when it loads. A setting past ±1e9 is reported and takes its
+default. So is a length past what a file may hold: 1024 beats for a pattern or a track,
+96 steps a beat, 98304 steps for a loop, beat 1024 and step 98304 for a note's place
+(either side of 0), 64 hits for a retrigger. A song's clip that ends past measure 10000
+is left out and reported, a loop past it is no loop. A synth preset's levels (master
+volume, oscillator and sub gains, noise mix) are brought inside 0–1, the range of their
+controls. These used to be taken as written: a track of a billion beats ran out of
+memory, a level of 1e308 played samples that were not numbers. No snapshot changed.

@@ -8,6 +8,13 @@
 /// Ticks per **beat** (not per step). The JS app counted 32, which rounded
 /// triplets; MIDI files are written at the same 96 PPQN.
 pub const TICK: u32 = 96;
+/// Beats of the longest pattern or track a file may hold (an edit stops well
+/// before): what plays a pattern works in memory with its length.
+pub const MAX_LOADED_BEATS: i32 = 1024;
+/// Steps a beat of a file may be divided into: every tick of it.
+pub const MAX_LOADED_STEPS_PER_BEAT: i32 = TICK as i32;
+/// Steps of the longest track a file may hold.
+pub const MAX_LOADED_STEPS: i32 = MAX_LOADED_BEATS * MAX_LOADED_STEPS_PER_BEAT;
 
 /// Absolute step of a note in its track: `beat * stepsPerBeat + beatStep`.
 pub fn absolute_step(beat: i32, beat_step: i32, steps_per_beat: i32) -> i64 {

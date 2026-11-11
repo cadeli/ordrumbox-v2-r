@@ -1,7 +1,6 @@
-//! The Playwright scenarios of ordrumbox-v2 that go through the session:
-//! `e2e/playback`, `playback_tempo`, `song-playback` (the view decides what
-//! plays and at which tempo) and `pattern-lifecycle` (a pattern built in the
-//! grid, saved, reloaded, exported to MIDI and WAV).
+//! Scenarios that go through the session: playback, its tempo and song
+//! playback (the view decides what plays and at which tempo), and the life
+//! of a pattern (built in the grid, saved, reloaded, exported to MIDI and WAV).
 //!
 //! The session gets a real [`Controller`]; its audio side is rendered here as
 //! the audio callback would, with `update` before each callback as the UI does.
@@ -90,7 +89,7 @@ fn assert_pass_frames(session: &Session, beats: f64, bpm: f64) {
 const LIBRARY: &str = r#"{"songs":[{"name":"s","bpm":120,"clips":[{"pattern":"p","startMeasure":0,"measureCount":4}]}],
     "patterns":[{"name":"p","bpm":140,"tracks":[{"name":"KICK","notes":[{},{"beat":2}]}]}]}"#;
 
-// ─── playback.spec.js ───────────────────────────────────────────────────────
+// ─── playback ───────────────────────────────────────────────────────────────
 
 #[test]
 fn space_plays_the_playhead_advances_and_space_stops() {
@@ -129,7 +128,7 @@ fn a_click_on_a_grid_cell_sounds_the_note() {
     assert!(run(&mut s, &mut audio, 512) > 0.0);
 }
 
-// ─── playback_tempo.spec.js, song-playback.spec.js ──────────────────────────
+// ─── the tempo, song playback ───────────────────────────────────────────────
 
 #[test]
 fn the_tempo_and_what_plays_follow_the_view() {
@@ -210,7 +209,7 @@ fn space_in_the_song_view_plays_the_song() {
     assert_pass_frames(&s, 4.0, 120.0);
 }
 
-// ─── pattern-lifecycle.spec.js ──────────────────────────────────────────────
+// ─── the life of a pattern ──────────────────────────────────────────────────
 
 #[test]
 fn a_pattern_built_in_the_grid_is_saved_reloaded_and_exported() {

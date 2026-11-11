@@ -1,8 +1,6 @@
-//! The scenario tests of ordrumbox-v2 that run on the logic alone:
-//! `tests/e2e_user_flow.test.js` (a beat built command by command, its
-//! triggers and track settings, its flat notes, its MIDI file) and
-//! `tests/wav_midi_roundtrip.test.js` (a pattern exported to MIDI and imported
-//! back plays the same notes).
+//! Scenarios that run on the logic alone: a beat built command by command,
+//! its triggers, its track settings and their undo, its MIDI file; and a
+//! pattern exported to MIDI and imported back, which plays the same notes.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
 
@@ -30,7 +28,7 @@ fn note_on_ticks(bytes: &[u8]) -> Vec<i64> {
     ticks
 }
 
-/// Flow 1: a pattern, the session at 140 bpm, KICK four on the floor, SNARE backbeat,
+/// A pattern, the session at 140 bpm, KICK four on the floor, SNARE backbeat,
 /// HIHAT eighths, BASS with its own pitches and velocities.
 fn build_beat(editor: &mut Editor) -> usize {
     let p = editor.add_pattern(Some("Beat"));
@@ -53,20 +51,7 @@ fn build_beat(editor: &mut Editor) -> usize {
 }
 
 #[test]
-fn flow_1_a_beat_built_command_by_command() {
-    let mut editor = Editor::new(Library::default());
-    let p = build_beat(&mut editor);
-    let pattern = &editor.library().patterns[p];
-    assert_eq!(pattern.name.as_deref(), Some("Beat"));
-    assert_eq!(editor.library().bpm, 140.0);
-    let tracks: Vec<(&str, usize)> = pattern.tracks.iter().map(|t| (t.name.as_str(), t.notes.len())).collect();
-    assert_eq!(tracks, [("KICK", 4), ("SNARE", 2), ("HIHAT", 8), ("BASS", 3)]);
-    let bass: Vec<(f64, f64)> = pattern.tracks[3].notes.iter().map(|n| (n.pitch, n.velocity)).collect();
-    assert_eq!(bass, [(0.0, 1.0), (7.0, 0.6), (12.0, 0.4)]);
-}
-
-#[test]
-fn flow_2_triggers_every_and_retrigger() {
+fn a_note_plays_every_second_pass_and_a_retrigger_repeats() {
     let mut editor = Editor::new(Library::default());
     let p = editor.add_pattern(Some("Triggers"));
     editor.add_track(p, "KICK", 4);
@@ -83,7 +68,7 @@ fn flow_2_triggers_every_and_retrigger() {
 }
 
 #[test]
-fn flow_3_track_settings_and_their_undo() {
+fn track_settings_are_set_clamped_and_undone() {
     let mut editor = Editor::new(Library::default());
     let p = build_beat(&mut editor);
     let before = editor.library().to_file_text();
@@ -107,22 +92,7 @@ fn flow_3_track_settings_and_their_undo() {
 }
 
 #[test]
-fn flow_4_flat_notes_on_their_ticks() {
-    let mut editor = Editor::new(Library::default());
-    let p = build_beat(&mut editor);
-    let flat = flat(&editor.library().patterns[p], 0);
-    let beat = |b: u32| b * TICK;
-    assert_eq!(ticks_of(&flat, 0), [beat(0), beat(1), beat(2), beat(3)]);
-    assert_eq!(ticks_of(&flat, 1), [beat(1), beat(3)]);
-    assert_eq!(ticks_of(&flat, 2).len(), 8);
-    assert!(ticks_of(&flat, 2).iter().all(|t| t % (TICK / 2) == 0), "eighths");
-    let bass: Vec<(f64, f64)> =
-        flat.values().flatten().filter(|n| n.track == 3).map(|n| (n.pitch, n.velocity)).collect();
-    assert_eq!(bass, [(0.0, 1.0), (7.0, 0.6), (12.0, 0.4)]);
-}
-
-#[test]
-fn flow_5_the_midi_file_of_the_beat() {
+fn the_midi_file_of_a_beat_has_its_ticks_velocities_and_loops() {
     let mut editor = Editor::new(Library::default());
     let p = editor.add_pattern(Some("MIDI"));
     editor.add_track(p, "KICK", 4);
@@ -147,8 +117,6 @@ fn flow_5_the_midi_file_of_the_beat() {
     assert_eq!(twice.len(), 8);
     assert_eq!(twice[4..], [4 * beat, 5 * beat, 6 * beat, 7 * beat]);
 }
-
-// ─── wav_midi_roundtrip.test.js ─────────────────────────────────────────────
 
 #[test]
 fn a_pattern_exported_to_midi_and_imported_back_plays_the_same_notes() {

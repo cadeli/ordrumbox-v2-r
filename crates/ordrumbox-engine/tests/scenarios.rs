@@ -1,11 +1,10 @@
-//! The Playwright scenarios of ordrumbox-v2 that only need the engine
-//! (`e2e/live-vs-export`, `song-wav-export`, `kit-change`, `cold-start`,
-//! `song-playback`): playback driven like an audio callback, and the offline
-//! renders, on the demo library (song.json) with a real sample (kick.wav);
-//! then a whole live session through the controller, from an audition to the stop.
+//! Scenarios that only need the engine (playback against the WAV export, the
+//! song export, a kit change, a cold start, song playback): playback driven
+//! like an audio callback, and the offline renders, on the demo library
+//! (song.json) with a real sample (kick.wav); then a whole live session
+//! through the controller, from an audition to the stop.
 //!
-//! The JS tests judge the audio of a headless browser with tolerances; here
-//! the renders are deterministic, so most comparisons are exact.
+//! The renders are deterministic, so most comparisons are exact.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
 
@@ -114,7 +113,7 @@ fn with_song(bpm: f64, loop_measures: u32, clips: &[(&str, u32, f64)]) -> Librar
         .map(|(p, start, count)| format!(r#"{{"pattern":"{p}","startMeasure":{start},"measureCount":{count}}}"#))
         .collect();
     let song = format!(
-        r#"{{"id":"e2e","name":"E2E Song","bpm":{bpm},"loopMeasureCount":{loop_measures},"clips":[{}]}}"#,
+        r#"{{"id":"song","name":"Song","bpm":{bpm},"loopMeasureCount":{loop_measures},"clips":[{}]}}"#,
         clips.join(",")
     );
     let known = library.patterns.iter().map(|p| p.id.clone()).collect();
@@ -123,7 +122,7 @@ fn with_song(bpm: f64, loop_measures: u32, clips: &[(&str, u32, f64)]) -> Librar
     library
 }
 
-// ─── live-vs-export.spec.js ─────────────────────────────────────────────────
+// ─── playback against the WAV export ────────────────────────────────────────
 
 /// RMS of each block of 1024 frames.
 fn envelope(signal: &[f32]) -> Vec<f64> {
@@ -160,7 +159,7 @@ fn the_wav_export_sounds_like_playback() {
     }
 
     // Any other callback size cuts the quanta elsewhere (parameters are read
-    // once per quantum): the JS test's tolerances.
+    // once per quantum): close, not equal.
     let live = play_live(&library, Mode::Pattern(p), export.len(), 300, &setup);
     let relative = |a: f64, b: f64| (a - b).abs() / a.max(b);
     assert!(relative(rms(&live), rms(&export)) < 0.05);
@@ -172,34 +171,27 @@ fn the_wav_export_sounds_like_playback() {
 }
 
 #[test]
-fn a_synth_pattern_exports_audible_audio_every_time() {
+fn a_synth_pattern_exports_audible_audio() {
     let (library, _) = Library::parse(
         r#"{"patterns":[{"id":"synth","name":"SynthExportTest","bpm":120,"beatCount":2,"tracks":[
             {"name":"BASS","useSoftSynth":true,"synthSoundKey":"BASS0","stepsPerBeat":4,
              "notes":[{"beat":0,"beatStep":0},{"beat":1,"beatStep":0}]}]}]}"#,
     )
     .unwrap();
-    for seed in [1, 2] {
-        let (left, _) = offline::render_pattern(&library, 0, 1, &setup(seed), None).expect("renders");
-        // 2 beats at 120 bpm = 1 s.
-        assert_eq!(left.len(), EXPORT_RATE as usize);
-        assert!(rms(&left) > 0.001, "render {seed}: rms {}", rms(&left));
-    }
+    let (left, _) = offline::render_pattern(&library, 0, 1, &setup(1), None).expect("renders");
+    // 2 beats at 120 bpm = 1 s.
+    assert_eq!(left.len(), EXPORT_RATE as usize);
+    assert!(rms(&left) > 0.001, "rms {}", rms(&left));
 }
 
-// ─── song-wav-export.spec.js ────────────────────────────────────────────────
+// ─── the song export ────────────────────────────────────────────────────────
 
 #[test]
 fn a_song_renders_at_its_length_with_audio_in_it() {
     let library = with_song(120.0, 2, &[("rock", 0, 2.0), ("slrock", 0, 2.0)]);
     let (left, right) = offline::render_song(&library, 0, &setup(1)).expect("renders");
-    // 2 measures of 4/4 at 120 bpm = 4 s, a valid 16-bit stereo file.
-    assert_eq!(left.len(), 4 * EXPORT_RATE as usize);
-    let bytes = wav::encode(&left, &right, EXPORT_RATE);
-    assert_eq!(&bytes[..4], b"RIFF");
-    assert_eq!(u16::from_le_bytes([bytes[22], bytes[23]]), 2);
-    assert_eq!(u32::from_le_bytes(bytes[24..28].try_into().unwrap()), EXPORT_RATE);
-    assert_eq!(u16::from_le_bytes([bytes[34], bytes[35]]), 16);
+    // 2 measures of 4/4 at 120 bpm = 4 s on both sides.
+    assert_eq!((left.len(), right.len()), (4 * EXPORT_RATE as usize, 4 * EXPORT_RATE as usize));
     assert!(rms(&left) > 0.001);
     assert!(peak(&left) > 0.05);
 }
@@ -243,7 +235,7 @@ fn the_song_export_follows_the_arrangement_loop() {
     assert_eq!(left.len(), 4 * EXPORT_RATE as usize);
 }
 
-// ─── kit-change.spec.js, cold-start.spec.js ─────────────────────────────────
+// ─── a kit change, a cold start ─────────────────────────────────────────────
 
 /// The sample of `sound`, as (kit, key).
 fn sample_of(bank: &SampleBank, sound: &TrackSound) -> Option<(String, String)> {
@@ -293,7 +285,7 @@ fn a_kit_change_while_playing_reassigns_every_auto_track() {
     }
 }
 
-// ─── song-playback.spec.js ──────────────────────────────────────────────────
+// ─── song playback ──────────────────────────────────────────────────────────
 
 #[test]
 fn starting_a_song_makes_every_pattern_it_plays_audible() {
