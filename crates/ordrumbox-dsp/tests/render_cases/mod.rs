@@ -173,6 +173,32 @@ pub const STRIP_CASES: &[StripCase] = &[
         })],
     },
     StripCase {
+        name: "comp",
+        sample_rate: 48000.0,
+        frames: 8192,
+        input: (1, 2, 1.0),
+        changes: &[(0, |s| {
+            s.comp_mix = 1.0;
+            s.comp_threshold_db = -24.0;
+            s.comp_ratio = 4.0;
+            s.comp_attack_seconds = 0.005;
+            s.comp_release_seconds = 0.05;
+        })],
+    },
+    StripCase {
+        name: "comp_parallel",
+        sample_rate: 48000.0,
+        frames: 8192,
+        input: (1, 2, 1.0),
+        changes: &[(0, |s| {
+            s.comp_mix = 0.5;
+            s.comp_threshold_db = -40.0;
+            s.comp_ratio = 20.0;
+            s.comp_attack_seconds = 0.0001;
+            s.comp_release_seconds = 0.2;
+        })],
+    },
+    StripCase {
         name: "everything",
         sample_rate: 48000.0,
         frames: 8192,
