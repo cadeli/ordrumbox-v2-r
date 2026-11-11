@@ -269,6 +269,12 @@ pub enum Kind {
         label: String,
         active: bool,
     },
+    /// A tab of the track editor's main tab bar: a filled block, the active
+    /// one lit, over a line that runs under the whole bar.
+    MainTab {
+        label: String,
+        active: bool,
+    },
     Button {
         label: String,
         on: bool,
@@ -564,6 +570,13 @@ pub fn draw(canvas: &mut Canvas, items: &[Item], focus: Option<Id>, scale: Scale
                     canvas.fill_rect(r.x, r.y + r.h - 2 * t, r.w, 2 * t, ACTIVE);
                 }
                 let color = if *active { ACTIVE } else { dim() };
+                centered_label(canvas, r, label, scale, color);
+            }
+            Kind::MainTab { label, active } => {
+                let (fill, color) = if *active { (ACTIVE, background_color()) } else { (field_color(), theme::text()) };
+                canvas.fill_rect(r.x, r.y, r.w, r.h, fill);
+                // The line under the bar, through the gap to the next tab.
+                canvas.fill_rect(r.x, r.y + r.h - 2 * t, r.w + t, 2 * t, ACTIVE);
                 centered_label(canvas, r, label, scale, color);
             }
             Kind::Button { label, on } => {
