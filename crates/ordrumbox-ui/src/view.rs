@@ -546,6 +546,18 @@ const HEADER_GROUP_GAP: i32 = 14;
 const HEADER_GROUP_PAD: i32 = 4;
 
 impl HeaderControls {
+    /// The header of a plugin, which has no song view: the SONG slot is
+    /// empty (no width) and the buttons after it move into its place.
+    #[must_use]
+    pub fn hosted(mut self) -> Self {
+        let shift = self.views[3].x - self.views[2].x;
+        for rect in &mut self.views[3..] {
+            rect.x -= shift;
+        }
+        self.views[2].w = 0;
+        self
+    }
+
     /// The frames of the header's groups: transport (play, tempo), pattern
     /// (pattern, beats, kit), generation (style, ⟳, AUTO, macros) and views.
     /// Each covers its controls and their labels above them.
@@ -913,7 +925,10 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: Scale) {
     // Header: the logo, then the labelled groups (their widgets are panel items).
     let top = content_top(scale);
     canvas.text(margin, top + 9 * scale, "orDrumbox", text, LOGO);
-    let c = header_controls(scale);
+    let c = match view.transport {
+        Transport::Own => header_controls(scale),
+        Transport::Host(_) => header_controls(scale).hosted(),
+    };
     // The groups' frames, behind their widgets (panel items, drawn later).
     // The generation's only with a pattern: it has nothing to show without.
     for (i, group) in c.groups(scale).into_iter().enumerate() {

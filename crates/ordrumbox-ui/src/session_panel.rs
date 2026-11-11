@@ -127,10 +127,10 @@ impl Session {
         }
         // The view buttons (the main editor, then the kit editor): the one shown lit.
         let shown = [Workspace::Grid, Workspace::PianoRoll, Workspace::Song, Workspace::Synth];
-        let views = view::header_controls(scale).views;
+        let views = self.header_controls(scale).views;
         let kit_open = self.kit_editor.is_some();
         for (i, (rect, label)) in views.iter().zip(view::VIEWS).enumerate() {
-            // A plugin has no song view: no button, its place left empty.
+            // A plugin has no song view: no button, the next ones in its place.
             if self.hosted && shown.get(i) == Some(&Workspace::Song) {
                 continue;
             }
@@ -216,6 +216,12 @@ impl Session {
             }
         }
         layout
+    }
+
+    /// The header's controls: a plugin's without the song view button.
+    pub(super) fn header_controls(&self, scale: Scale) -> view::HeaderControls {
+        let controls = view::header_controls(scale);
+        if self.hosted { controls.hosted() } else { controls }
     }
 
     /// The header's transport and generation controls (the toolbar's
