@@ -7,7 +7,7 @@ on:
     # app's update check (Help > Check for updates) reads.
     tags: ["v*"]
   pull_request:
-  # Run by hand (Actions > CI > Run workflow) to get a Windows build of any branch.
+  # Run by hand (Actions > CI > Run workflow) to get a Windows or Linux build of any branch.
   workflow_dispatch:
 
 env:
@@ -21,13 +21,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        os: [windows-latest, macos-latest, ubuntu-latest]
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+      # The workspace tests and clippy build every crate, among them the app
+      # (winit, cpal) and the plugin (baseview), which link the system's X11,
+      # Wayland and ALSA libraries.
+      - name: System packages (Linux)
+        if: runner.os == 'Linux'
+        run: >
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends
+          pkg-config libasound2-dev libx11-dev libxcb1-dev libx11-xcb-dev
+          libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets
       - run: cargo test --workspace
@@ -45,11 +54,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        os: [windows-latest, macos-latest, ubuntu-latest]
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - name: System packages (Linux)
+        if: runner.os == 'Linux'
+        run: >
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends
+          pkg-config libasound2-dev libx11-dev libxcb1-dev libx11-xcb-dev
+          libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev
       - run: cargo xtask bundle ordrumbox-plugin --release
       # 0.3.2 no longer builds: its lockfile pins `time` 0.3.20, which recent
       # rustc rejects. The workflow's `-D warnings` is for this repository's
@@ -62,13 +77,16 @@ jobs:
       # (random bytes abort on the allocation), and does not ask the host to
       # rescan the parameter values afterwards.
       - run: clap-validator validate --exclude 'state-invalid-random|state-reproducibility' target/bundled/orDrumbox.clap
-      # The CLAP of the release. On Windows it is a single file, which reads the
-      # `assets/` next to it: the Windows zip puts it beside `ordrumbox.exe`.
+      # The CLAP of the release. On Windows and Linux it is a single file, which
+      # reads the `assets/` next to it: the zips put it beside the program.
       # On macOS it is a bundle, `assets/` inside, zipped by `ditto` to keep its
       # signature and the binary's permissions.
       - name: CLAP of the release (Windows)
         if: runner.os == 'Windows'
         shell: bash
+        run: mkdir clap && cp target/bundled/orDrumbox.clap clap/
+      - name: CLAP of the release (Linux)
+        if: runner.os == 'Linux'
         run: mkdir clap && cp target/bundled/orDrumbox.clap clap/
       - name: CLAP of the release (macOS)
         if: runner.os == 'macOS'
@@ -136,9 +154,51 @@ jobs:
           name: ordrumbox-windows-setup
           path: setup
 
+  # Built for a release tag only, or when the workflow is run by hand.
+  linux-app:
+    name: ordrumbox (linux)
+    needs: [check, plugin]
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        # The whole history and its tags: the program names its build from
+        # them (`crates/ordrumbox-ui/build.rs`).
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: System packages
+        run: >
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends
+          pkg-config libasound2-dev libx11-dev libxcb1-dev libx11-xcb-dev
+          libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev
+      - run: cargo build --release -p ordrumbox-app
+      # A release names itself by its version alone, not as a dev build.
+      - name: Release build is named by its version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          build=$(target/release/ordrumbox --version)
+          if [ "$build" != "orDrumbox ${GITHUB_REF_NAME#v}" ]; then
+            echo "tag $GITHUB_REF_NAME, but the program is $build"
+            exit 1
+          fi
+      # The program, the CLAP plugin, the assets both read from the folder next
+      # to them, the license. The zip does not bundle the system libraries the
+      # binary links at run time (ALSA, X11).
+      - uses: actions/download-artifact@v8
+        with:
+          name: ordrumbox-clap-Linux
+          path: clap
+      - run: mkdir -p dist && cp clap/orDrumbox.clap target/release/ordrumbox LICENSE dist/ && cp -r assets dist/
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ordrumbox-linux-x64
+          path: dist
+
   release:
     name: GitHub release
-    needs: [windows-exe, plugin]
+    needs: [windows-exe, linux-app, plugin]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -160,9 +220,19 @@ jobs:
       - run: zip -r "ordrumbox-$GITHUB_REF_NAME-windows-x64.zip" ordrumbox
       - uses: actions/download-artifact@v8
         with:
+          name: ordrumbox-linux-x64
+          path: ordrumbox-linux
+      - run: zip -r "ordrumbox-$GITHUB_REF_NAME-linux-x64.zip" ordrumbox-linux
+      - uses: actions/download-artifact@v8
+        with:
           name: ordrumbox-clap-macOS
           path: clap-macos
       - run: mv clap-macos/orDrumbox.clap.zip "ordrumbox-$GITHUB_REF_NAME-macos-clap.zip"
+      - uses: actions/download-artifact@v8
+        with:
+          name: ordrumbox-clap-Linux
+          path: clap-linux
+      - run: zip -j "ordrumbox-$GITHUB_REF_NAME-linux-clap.zip" clap-linux/orDrumbox.clap
       - uses: actions/download-artifact@v8
         with:
           name: ordrumbox-windows-setup

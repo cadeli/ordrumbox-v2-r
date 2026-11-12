@@ -23,6 +23,10 @@ On Windows, a release holds a setup and a zip:
   unknown publisher (More info > Run anyway).
 - `ordrumbox-<version>-windows-x64.zip` is the same app without setup: unzip it anywhere
   and start `ordrumbox.exe`.
+- On Linux, `ordrumbox-<version>-linux-x64.zip` holds the same files as the Windows zip:
+  unzip it anywhere and run `./ordrumbox`. The binary is built against the system's ALSA
+  and X11 libraries; on a Debian-like distribution, `sudo apt install libasound2
+  libxkbcommon-x11-0 libxkbcommon0` installs what it links at run time.
 
 The CLAP plugin comes with each release:
 
@@ -31,6 +35,9 @@ The CLAP plugin comes with each release:
   `orDrumbox.clap` and `assets/`, into a folder of their own, such as
   `C:\Program Files\Common Files\CLAP\orDrumbox\` (or any folder your host scans for CLAP
   plugins).
+- **Linux**: `ordrumbox-<version>-linux-clap.zip` holds `orDrumbox.clap`, to use as on
+  Windows: put it with an `assets/` folder in a folder your host scans for CLAP plugins,
+  such as `~/.clap/`.
 - **macOS**: `ordrumbox-<version>-macos-clap.zip` holds `orDrumbox.clap`, its assets inside.
   Unzip it into `~/Library/Audio/Plug-Ins/CLAP/`. It is not notarized: if the host refuses
   to load it, run `xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/CLAP/orDrumbox.clap`.

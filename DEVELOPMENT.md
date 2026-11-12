@@ -38,9 +38,10 @@ instead of the one in the user data folder.
 A release is a `v<version>` tag matching `Cargo.toml`: CI then builds the release
 `ordrumbox.exe` with `assets/` next to it, and the plugin bundles. The release
 holds the Windows zip (`ordrumbox.exe`, `orDrumbox.clap`, `assets/`, `LICENSE`),
-the Windows setup made from the same files, and the macOS CLAP bundle, zipped.
-Both CLAPs are built without `vst3`, so they stay MIT; the VST3 bundles are only
-artifacts of the CI run.
+the Windows setup made from the same files, the Linux zip (the same files, the
+binary linked at run time against the system's ALSA and X11 libraries), and the
+macOS and Linux CLAPs, zipped. Both CLAPs are built without `vst3`, so they stay
+MIT; the VST3 bundles are only artifacts of the CI run.
 
 The setup is `installer/ordrumbox.iss`, built by Inno Setup 6 (Windows only), with
 the version of `Cargo.toml`:
