@@ -7,6 +7,7 @@
 //! object references). An edit that changes nothing records nothing.
 
 use std::collections::HashSet;
+use std::ops::RangeInclusive;
 use std::time::Instant;
 
 use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family, mono_from_track_name};
@@ -23,6 +24,7 @@ use crate::block::{self, Block, Pasted, StepAt, Zone};
 use crate::generate::{self, AutoGenerator, MelodicKind, Options};
 use crate::history::{Change, History, Target};
 use crate::midi;
+use crate::roll_block::{self, RollBlock, RollZone};
 
 #[path = "arrangement.rs"]
 mod arrangement;
@@ -447,6 +449,41 @@ impl Editor {
             |_| format!("Paste notes in \"{pattern}\""),
             None,
             |pattern| block::paste_block(pattern, at, block),
+        )
+        .unwrap_or_default()
+    }
+
+    /// Remove the notes of pattern `p` inside the piano roll zone `zone`
+    /// ([`roll_block::delete_roll_zone`]), as one step; how many.
+    pub fn delete_roll_zone(&mut self, p: usize, zone: &RollZone) -> usize {
+        let Some(pattern) = self.library.patterns.get(p).map(|p| pattern_name(p).to_owned()) else { return 0 };
+        self.edit(
+            p,
+            |_| format!("Delete notes in \"{pattern}\""),
+            None,
+            |pattern| roll_block::delete_roll_zone(pattern, zone),
+        )
+        .unwrap_or(0)
+    }
+
+    /// Paste `block` on track `t` of pattern `p` from `step`, its top on
+    /// `top_key` ([`roll_block::paste_roll_block`]), as one step.
+    pub fn paste_roll_block(
+        &mut self,
+        p: usize,
+        t: usize,
+        (step, top_key): (i64, i32),
+        block: &RollBlock,
+        keys: RangeInclusive<i32>,
+    ) -> Pasted<RollZone> {
+        let Some(pattern) = self.library.patterns.get(p).map(|p| pattern_name(p).to_owned()) else {
+            return Pasted::default();
+        };
+        self.edit(
+            p,
+            |_| format!("Paste notes in \"{pattern}\""),
+            None,
+            |pattern| roll_block::paste_roll_block(pattern, t, step, top_key, block, keys),
         )
         .unwrap_or_default()
     }

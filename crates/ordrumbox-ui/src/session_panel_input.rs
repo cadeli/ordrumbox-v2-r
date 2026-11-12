@@ -120,6 +120,9 @@ impl Session {
         if self.roll.dragging() {
             return self.roll_drag_move(x, y);
         }
+        if self.roll.zone_drag.is_some() {
+            return self.roll_zone_move(size, x, y);
+        }
         if self.song_panel.dragging() {
             return self.song_drag_move(x, y);
         }

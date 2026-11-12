@@ -194,7 +194,9 @@ impl Session {
     }
     /// Clear the zone, else the cursor step (Ctrl+Z undoes it).
     pub fn delete_step(&mut self) {
-        if let Some(zone) = self.selection.zone {
+        if self.piano_roll_open() {
+            self.roll_delete();
+        } else if let Some(zone) = self.selection.zone {
             self.delete_zone(&zone);
         } else if self.selection.cursor.is_some() {
             self.undoable(Self::delete_step_now);
@@ -355,6 +357,9 @@ impl Session {
     /// Ctrl+C: the notes of the zone, else of the cursor step (with Shift,
     /// or no cursor: the track).
     pub fn copy(&mut self, track: bool) {
+        if !track && self.piano_roll_open() {
+            return self.roll_copy();
+        }
         if !track && let Some(zone) = self.selection.zone {
             return self.copy_zone(&zone);
         }
@@ -388,7 +393,14 @@ impl Session {
                     self.edited();
                 }
             }
-            Some(Clipboard::Step(_) | Clipboard::Block(_)) if track_only => self.message = "no track copied".into(),
+            Some(Clipboard::Step(_) | Clipboard::Block(_) | Clipboard::Roll(_)) if track_only => {
+                self.message = "no track copied".into();
+            }
+            Some(Clipboard::Roll(block)) if self.piano_roll_open() => self.roll_paste(&block),
+            Some(Clipboard::Roll(_)) => self.message = "notes copied in the piano roll paste in the piano roll".into(),
+            Some(Clipboard::Step(_) | Clipboard::Block(_)) if self.piano_roll_open() => {
+                self.message = "notes copied in the grid paste in the grid".into();
+            }
             Some(Clipboard::Block(block)) => self.paste_block(&block),
             Some(Clipboard::Step(notes)) => {
                 let c = self.selection.cursor.unwrap_or(Cursor { track: 0, beat: 0, step: 0 });

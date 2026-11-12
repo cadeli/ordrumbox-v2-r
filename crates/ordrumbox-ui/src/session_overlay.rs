@@ -5,7 +5,7 @@ use super::*;
 use crate::scale::Scale;
 
 /// Every key, for Help > Keyboard shortcuts.
-const SHORTCUTS: [&str; 62] = [
+const SHORTCUTS: [&str; 63] = [
     "MENUS",
     "  F10 or Alt             open the menus: Arrows move, Enter runs, Esc closes",
     "  F1 F2 F3 F4 F5 F6      this list, track editor, song, piano roll, grid, synth (Ctrl+K: kit editor)",
@@ -54,6 +54,7 @@ const SHORTCUTS: [&str; 62] = [
     "PIANO ROLL (F4)",
     "  click / drag / right-click a cell: add, select, delete; velocity (up/down) or pitch; menu",
     "  Arrows, Shift+Arrows   the cursor; the selected note's velocity / pitch    Enter, Delete",
+    "  Shift+drag             a zone of steps and keys: Ctrl+C, Ctrl+X, Delete; Ctrl+V at the cursor",
     "  a key: hear it, right-click: clear, chord progression     wheel (Shift: pages)",
     "SYNTH EDITOR (F6)",
     "  OSC, FLT, MOD, ENV     the track's preset: knobs, waves, lists, power buttons (saved)",
@@ -112,6 +113,7 @@ const PLUGIN_SHORTCUTS: &[&str] = &[
     "PIANO ROLL (F4)",
     "  click / drag / right-click a cell: add, select, delete; velocity (up/down) or pitch; menu",
     "  Arrows, Shift+Arrows   the cursor; the selected note's velocity / pitch    Enter, Delete",
+    "  Shift+drag             a zone of steps and keys: copy, cut, Delete; paste at the cursor",
     "  a key: hear it, right-click: clear, chord progression     wheel (Shift: pages)",
     "SYNTH EDITOR (F6)",
     "  OSC, FLT, MOD, ENV     the track's preset: knobs, waves, lists, power buttons (saved)",
