@@ -10,7 +10,9 @@ use ordrumbox_core::num;
 use crate::panel::SUBMENU_MARK;
 
 use super::session_song::DRAG_START_PX;
+use super::session_zone::zone_label;
 use super::*;
+use ordrumbox_logic::block::step_start_units;
 
 /// A press on a track's name that may become a drag. Nothing is edited before
 /// the release, so the move is one undo step.
@@ -219,20 +221,29 @@ impl Session {
     }
 
     /// A step: copy its notes, paste on it, delete them, add a random note.
+    /// Inside the zone drawn, copy, cut and delete take the whole zone.
     fn step_menu(&mut self, t: usize, beat: i32, step: i32, x: i32, y: i32) {
         let Some(track) = self.track(t) else { return };
-        let title = format!("{} @ {}.{}", track.name, beat + 1, step + 1);
+        let mut title = format!("{} @ {}.{}", track.name, beat + 1, step + 1);
         let has_notes = track.notes.iter().any(|n| n.beat == beat && n.step == step);
-        let mut items = vec![("copy-notes", "Copy notes")];
+        let units = step_start_units(beat, step, track.steps_per_beat);
+        let zone = self.selection.zone.filter(|z| z.holds(t, units));
+        let mut items = match zone {
+            Some(zone) => {
+                title = format!("Zone — {}", zone_label(&zone));
+                vec![("copy-zone", "Copy zone"), ("cut-zone", "Cut zone"), ("delete-zone", "Delete zone")]
+            }
+            None => vec![("copy-notes", "Copy notes")],
+        };
         let pasteable = match &self.selection.clipboard {
             Some(Clipboard::Step(notes)) => !notes.is_empty(),
             Some(Clipboard::Block(_)) => true,
-            Some(Clipboard::Track(_)) | None => false,
+            Some(Clipboard::Track(_) | Clipboard::Roll(_)) | None => false,
         };
         if pasteable {
             items.push(("paste-notes", "Paste notes"));
         }
-        if has_notes {
+        if has_notes && zone.is_none() {
             items.push(("delete-notes", "Delete notes"));
         }
         items.push(("random-note", "Add random note"));
@@ -252,6 +263,15 @@ impl Session {
             return;
         }
         let (beat, step) = (number().unwrap_or(0), number().unwrap_or(0));
+        // The zone's actions keep it, and the cursor where it was.
+        if let Some(zone) = self.selection.zone {
+            match action {
+                "copy-zone" => return self.copy_zone(&zone),
+                "cut-zone" => return self.cut_zone(&zone),
+                "delete-zone" => return self.delete_zone(&zone),
+                _ => {}
+            }
+        }
         // The menu's step or track, not a zone drawn before.
         self.selection.zone = None;
         self.selection.cursor = Some(Cursor { track: t, beat, step });

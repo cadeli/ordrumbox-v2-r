@@ -74,6 +74,8 @@ mod session_generate;
 mod session_grid;
 #[path = "session_lane.rs"]
 mod session_lane;
+#[path = "session_roll_zone.rs"]
+mod session_roll_zone;
 #[path = "session_zone.rs"]
 mod session_zone;
 #[path = "session_zoom.rs"]

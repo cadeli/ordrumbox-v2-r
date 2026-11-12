@@ -40,7 +40,7 @@ pub(super) struct RollState {
     /// Highest row shown; `None`: centered on the track's pitch.
     top: Option<i32>,
     /// The keyboard cursor: step, row.
-    cursor: Option<(i64, i32)>,
+    pub(super) cursor: Option<(i64, i32)>,
     /// The note pressed.
     drag: Option<RollDrag>,
     /// The edited value shown over the note.
@@ -49,6 +49,8 @@ pub(super) struct RollState {
     sequence: i64,
     /// The note under the mouse.
     hover: Option<usize>,
+    /// A Shift+press on a cell, which may become a zone.
+    pub(super) zone_drag: Option<super::session_roll_zone::RollZoneDrag>,
 }
 
 impl RollState {
@@ -60,6 +62,7 @@ impl RollState {
     /// Let go of the note held, if any.
     pub(super) fn release(&mut self) {
         self.drag = None;
+        self.zone_drag = None;
     }
 }
 
@@ -107,10 +110,11 @@ impl Session {
         self.roll.cursor = None;
         self.roll.gauge = None;
         self.selection.selected = None;
+        self.selection.roll_zone = None;
     }
 
     /// The track the piano roll shows (the track editor's).
-    fn roll_track(&self) -> Option<usize> {
+    pub(super) fn roll_track(&self) -> Option<usize> {
         self.editor_track()
     }
 
@@ -151,6 +155,7 @@ impl Session {
             cursor: self.roll.cursor,
             playhead,
             subs: Vec::new(),
+            zone: self.roll_zone().map(|zone| self.roll_span(&zone, track)),
         };
         let per_page = i64::from(BEATS_PER_PAGE * steps_per_beat(track));
         view.page = match playhead {
@@ -192,6 +197,7 @@ impl Session {
         }
         self.selection.cursor = Some(Cursor { track: t, beat: 0, step: 0 });
         self.selection.selected = None;
+        self.selection.roll_zone = None;
         self.selection.note_focus = Some(NoteFocus::Track(t));
         self.roll.cursor = None;
         self.roll.top = None;
@@ -199,7 +205,7 @@ impl Session {
     }
 
     /// The note of track `t` at `step` on `row`.
-    fn roll_note_at(&self, t: usize, step: i64, row: i32) -> Option<usize> {
+    pub(super) fn roll_note_at(&self, t: usize, step: i64, row: i32) -> Option<usize> {
         let track = self.track(t)?;
         let spb = steps_per_beat(track);
         let midi = f64::from(piano_roll::row_midi(row));
@@ -220,7 +226,7 @@ impl Session {
     }
 
     /// Select note `n` of track `t`, the cursor on it.
-    fn roll_select(&mut self, t: usize, n: usize) {
+    pub(super) fn roll_select(&mut self, t: usize, n: usize) {
         self.selection.selected = Some((t, n));
         self.roll_follow();
     }
@@ -271,6 +277,9 @@ impl Session {
         let Some(hit) = layout.hit(&view, x, y) else { return false };
         let Some(t) = self.roll_track() else { return false };
         self.roll.gauge = None;
+        if matches!(hit, RollHit::Cell { .. }) {
+            self.selection.roll_zone = None;
+        }
         match (hit, button) {
             (RollHit::PreviousPage, Button::Left) => self.roll.page = (page - 1).max(0),
             (RollHit::NextPage, Button::Left) => self.roll.page = (page + 1).min(pages - 1),
@@ -482,9 +491,10 @@ impl Session {
         }
     }
 
-    /// Esc: no selection and no cursor, else back to the grid.
+    /// Esc: no zone, no selection and no cursor, else back to the grid.
     pub fn roll_escape(&mut self) {
-        if self.selection.selected.is_some() || self.roll.cursor.is_some() {
+        if self.selection.selected.is_some() || self.roll.cursor.is_some() || self.selection.roll_zone.is_some() {
+            self.selection.roll_zone = None;
             self.selection.selected = None;
             self.roll.cursor = None;
             self.roll.gauge = None;
@@ -493,9 +503,11 @@ impl Session {
         }
     }
 
-    /// Delete: the selected note.
+    /// Delete: the zone's notes, else the selected note.
     pub fn roll_delete(&mut self) {
-        if let Some((t, n)) = self.selection.selected {
+        if let Some(zone) = self.roll_zone() {
+            self.undoable(|s| s.roll_delete_zone(&zone));
+        } else if let Some((t, n)) = self.selection.selected {
             self.roll_delete_note(t, n);
         }
     }

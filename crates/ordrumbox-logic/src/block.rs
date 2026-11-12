@@ -108,12 +108,18 @@ impl Block {
 
 /// What a paste did: notes placed, and notes left out because their row or
 /// their time fell past the pattern.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct Pasted {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Pasted<Z = Zone> {
     pub placed: usize,
     pub dropped: usize,
-    /// The zone the block now covers (its rows that found a track).
-    pub zone: Option<Zone>,
+    /// The zone the block now covers (what found a place for it).
+    pub zone: Option<Z>,
+}
+
+impl<Z> Default for Pasted<Z> {
+    fn default() -> Self {
+        Self { placed: 0, dropped: 0, zone: None }
+    }
 }
 
 /// Remove the notes of `pattern` inside `zone`; how many.
@@ -147,20 +153,13 @@ pub fn paste_block(pattern: &mut Pattern, at: StepAt, block: &Block) -> Pasted {
         };
         last_track = Some(at.track + r);
         let steps_per_beat = track.steps_per_beat;
-        let units = step_units(steps_per_beat);
-        let spb = BEAT_UNITS / units;
-        let track_steps = i64::from(track.beat_count) * spb;
         track.notes.retain(|n| !(start..end).contains(&note_units(n, steps_per_beat)));
         for (offset, note) in row {
-            // To the nearest step of this track (half a step rounds up).
-            let step = (start + offset + units / 2).div_euclid(units);
-            let place = (0..track_steps).contains(&step).then(|| step_place(step, spb)).flatten();
-            let Some((beat, beat_step)) = place else {
+            let Some(placed) = place_note(note, start + offset, steps_per_beat, track.beat_count) else {
                 pasted.dropped += 1;
                 continue;
             };
-            let percent = crate::editor::step_percent(beat_step, steps_per_beat);
-            track.notes.push(Note { beat, step: beat_step, step_percent: Some(percent), ..note.clone() });
+            track.notes.push(placed);
             pasted.placed += 1;
         }
     }
@@ -169,9 +168,19 @@ pub fn paste_block(pattern: &mut Pattern, at: StepAt, block: &Block) -> Pasted {
     pasted
 }
 
-/// Step `step` from a track's start as its beat and its step in the beat.
-fn step_place(step: i64, steps_per_beat: i64) -> Option<(i32, i32)> {
-    Some((i32::try_from(step.div_euclid(steps_per_beat)).ok()?, i32::try_from(step.rem_euclid(steps_per_beat)).ok()?))
+/// `note` moved to the step of a track (`steps_per_beat`, `beat_count`)
+/// nearest to `units` (half a step rounds up); `None` past the track's end.
+pub(crate) fn place_note(note: &Note, units: i64, steps_per_beat: i32, beat_count: i32) -> Option<Note> {
+    let step_length = step_units(steps_per_beat);
+    let spb = BEAT_UNITS / step_length;
+    let step = (units + step_length / 2).div_euclid(step_length);
+    if !(0..i64::from(beat_count) * spb).contains(&step) {
+        return None;
+    }
+    let beat = i32::try_from(step.div_euclid(spb)).ok()?;
+    let beat_step = i32::try_from(step.rem_euclid(spb)).ok()?;
+    let percent = crate::editor::step_percent(beat_step, steps_per_beat);
+    Some(Note { beat, step: beat_step, step_percent: Some(percent), ..note.clone() })
 }
 
 #[cfg(test)]

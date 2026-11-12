@@ -242,7 +242,7 @@ impl Ui {
             return s.song_click(size, x, y, Button::Left);
         }
         if s.piano_roll_open() {
-            return s.roll_click(size, x, y, Button::Left);
+            return if shift { s.roll_shift_press(size, x, y) } else { s.roll_click(size, x, y, Button::Left) };
         }
         let body = s.body(size);
         if let Some((selected, count)) = s.kit_list() {

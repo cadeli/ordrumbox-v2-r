@@ -67,13 +67,20 @@ impl Session {
 
     /// Ctrl+X: the zone's notes copied and cleared, else the cursor step's.
     pub fn cut(&mut self) {
-        if let Some(zone) = self.selection.zone {
-            self.copy_zone(&zone);
-            self.undoable(|s| s.delete_zone_now(&zone));
+        if self.piano_roll_open() {
+            self.roll_cut();
+        } else if let Some(zone) = self.selection.zone {
+            self.cut_zone(&zone);
         } else if self.selection.cursor.is_some() {
             self.copy(false);
             self.delete_step();
         }
+    }
+
+    /// Ctrl+X on a zone: its notes copied and cleared.
+    pub(super) fn cut_zone(&mut self, zone: &Zone) {
+        self.copy_zone(zone);
+        self.undoable(|s| s.delete_zone_now(zone));
     }
 
     /// Delete on a zone: its notes cleared.
@@ -109,21 +116,28 @@ impl Session {
 }
 
 /// `tracks 1-3, beats 2-4.2`: the rows and the time of a zone.
-fn zone_label(zone: &Zone) -> String {
-    use ordrumbox_logic::block::BEAT_UNITS;
+pub(super) fn zone_label(zone: &Zone) -> String {
     let tracks = if zone.first_track == zone.last_track {
         format!("track {}", zone.first_track + 1)
     } else {
         format!("tracks {}-{}", zone.first_track + 1, zone.last_track + 1)
     };
-    let beats = |units: i64| units as f64 / BEAT_UNITS as f64 + 1.0;
-    format!("{tracks}, beats {}-{}", num::round2(beats(zone.start_units)), num::round2(beats(zone.end_units)))
+    format!("{tracks}, {}", beats_label(zone.start_units, zone.end_units))
+}
+
+/// `beats 2-4.2`: the time from `start_units` to `end_units`.
+pub(super) fn beats_label(start_units: i64, end_units: i64) -> String {
+    use ordrumbox_logic::block::BEAT_UNITS;
+    let beats = |units: i64| num::round2(units as f64 / BEAT_UNITS as f64 + 1.0);
+    format!("beats {}-{}", beats(start_units), beats(end_units))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::kits::KitSet;
+    use crate::ui::Ui;
+    use crate::ui_input::{Button, Key, KeyEvent, Modifiers};
 
     const SIZE: (i32, i32, Scale) = (1100, 680, Scale::ONE);
 
@@ -143,9 +157,59 @@ mod tests {
 
     /// The centre of a step's cell.
     fn centre(s: &Session, t: usize, beat: i32, step: i32) -> (i32, i32) {
+        centre_in(s, SIZE, t, beat, step)
+    }
+
+    fn centre_in(s: &Session, size: (i32, i32, Scale), t: usize, beat: i32, step: i32) -> (i32, i32) {
         let pattern = s.pattern().unwrap();
-        let r = s.grid_layout(SIZE).unwrap().cell_rect(t, beat, step, &pattern.tracks[t]);
+        let r = s.grid_layout(size).unwrap().cell_rect(t, beat, step, &pattern.tracks[t]);
         (r.x + r.w / 2, r.y + r.h / 2)
+    }
+
+    /// The session in a window of the layout's size, driven by its input.
+    fn ui() -> (Ui, (i32, i32, Scale)) {
+        let mut ui = Ui::new(session());
+        let (w, h) = ui.needed_size();
+        ui.set_size(w, h, Scale::ONE);
+        (ui, (w, h, Scale::ONE))
+    }
+
+    /// The pointer on a step's cell.
+    fn point(ui: &mut Ui, size: (i32, i32, Scale), (t, beat, step): (usize, i32, i32)) {
+        let (x, y) = centre_in(&ui.session, size, t, beat, step);
+        ui.pointer_moved(f64::from(x), f64::from(y));
+    }
+
+    /// Shift+drag with the mouse from one step to another.
+    fn drag_zone(ui: &mut Ui, size: (i32, i32, Scale), from: (usize, i32, i32), to: (usize, i32, i32)) {
+        ui.set_modifiers(Modifiers { shift: true, ..Modifiers::default() });
+        point(ui, size, from);
+        assert!(ui.pointer_pressed(Button::Left));
+        point(ui, size, to);
+        ui.pointer_released(Button::Left);
+        ui.set_modifiers(Modifiers::default());
+    }
+
+    /// A key pressed with `modifiers` held.
+    fn press(ui: &mut Ui, modifiers: Modifiers, key: Key) {
+        ui.set_modifiers(modifiers);
+        let event = KeyEvent { key, pressed: true, repeat: false, text: None, unmodified: None };
+        assert!(ui.key(&event), "{key:?} taken");
+        ui.set_modifiers(Modifiers::default());
+    }
+
+    const CONTROL: Modifiers = Modifiers { shift: false, control: true, alt: false, logo: false };
+    const NONE: Modifiers = Modifiers { shift: false, control: false, alt: false, logo: false };
+
+    /// Pick the line labelled `label` of the open menu, as a click does.
+    fn pick(s: &mut Session, label: &str) {
+        let d = s.chrome.widgets.dropdown.as_ref().expect("a menu");
+        let i = d.labels.iter().position(|l| l == label).unwrap_or_else(|| panic!("{label} in {:?}", d.labels));
+        s.pick(i);
+    }
+
+    fn labels(s: &Session) -> Vec<String> {
+        s.chrome.widgets.dropdown.as_ref().map(|d| d.labels.clone()).unwrap_or_default()
     }
 
     /// Shift+drag from one step to another.
@@ -242,5 +306,101 @@ mod tests {
         let start = StepAt { track: 0, beat: 0, step: 0 };
         assert_eq!(Some(zone), Zone::between(pattern, start, StepAt { track: t, beat, step }));
         assert_eq!(beat + 1, s.grid_layout(SIZE).unwrap().start_beat() + 4, "the page's last beat");
+    }
+
+    #[test]
+    fn the_keys_copy_paste_cut_and_delete_a_zone_drawn_with_the_mouse() {
+        let (mut ui, size) = ui();
+        // KICK and SNARE, beats 1 and 2.
+        drag_zone(&mut ui, size, (0, 0, 0), (1, 1, 3));
+        let zone = ui.session.selection.zone.expect("a zone");
+        assert_eq!((zone.first_track, zone.last_track), (0, 1));
+        press(&mut ui, CONTROL, Key::Letter('C'));
+        assert!(matches!(&ui.session.selection.clipboard, Some(Clipboard::Block(b)) if b.note_count() == 3));
+        // The arrows take the cursor to SNARE's beat 3.
+        press(&mut ui, NONE, Key::ArrowDown);
+        for _ in 0..8 {
+            press(&mut ui, NONE, Key::ArrowRight);
+        }
+        assert_eq!(ui.session.selection.cursor, Some(Cursor { track: 1, beat: 2, step: 0 }));
+        press(&mut ui, CONTROL, Key::Letter('V'));
+        assert_eq!(beats(&ui.session, 0), [0, 1, 2, 3], "KICK unchanged");
+        assert_eq!(beats(&ui.session, 1), [1, 2, 3], "beat 4 replaced by beat 2's note");
+        assert_eq!(beats(&ui.session, 2), [3]);
+        press(&mut ui, CONTROL, Key::Letter('Z'));
+        assert_eq!((beats(&ui.session, 1), beats(&ui.session, 2)), (vec![1, 3], vec![]), "one undo step");
+
+        drag_zone(&mut ui, size, (1, 3, 3), (0, 1, 0));
+        press(&mut ui, CONTROL, Key::Letter('X'));
+        assert_eq!((beats(&ui.session, 0), beats(&ui.session, 1)), (vec![0], vec![]));
+        assert!(matches!(&ui.session.selection.clipboard, Some(Clipboard::Block(b)) if b.note_count() == 5));
+        press(&mut ui, CONTROL, Key::Letter('Z'));
+        assert_eq!((beats(&ui.session, 0), beats(&ui.session, 1)), (vec![0, 1, 2, 3], vec![1, 3]));
+
+        drag_zone(&mut ui, size, (0, 2, 0), (0, 3, 0));
+        press(&mut ui, NONE, Key::Delete);
+        assert_eq!(beats(&ui.session, 0), [0, 1]);
+        assert!(matches!(&ui.session.selection.clipboard, Some(Clipboard::Block(b)) if b.note_count() == 5), "kept");
+        press(&mut ui, CONTROL, Key::Letter('Z'));
+        assert_eq!(beats(&ui.session, 0), [0, 1, 2, 3]);
+    }
+
+    #[test]
+    fn the_step_menu_pastes_a_zone_on_the_step_clicked() {
+        let (mut ui, size) = ui();
+        drag_zone(&mut ui, size, (0, 0, 0), (1, 1, 3));
+        press(&mut ui, CONTROL, Key::Letter('C'));
+        // A right-click on HAT's beat 3: the zone's top row goes there.
+        point(&mut ui, size, (2, 2, 0));
+        assert!(ui.pointer_pressed(Button::Right));
+        assert_eq!(labels(&ui.session), ["Copy notes", "Paste notes", "Add random note"]);
+        pick(&mut ui.session, "Paste notes");
+        assert_eq!(beats(&ui.session, 2), [2, 3], "KICK's row, past HAT the SNARE row is dropped");
+        assert_eq!(beats(&ui.session, 1), [1, 3], "SNARE unchanged");
+        let pasted = ui.session.selection.zone.expect("the zone shows the pasted notes");
+        assert_eq!((pasted.first_track, pasted.last_track), (2, 2));
+        press(&mut ui, CONTROL, Key::Letter('Z'));
+        assert_eq!(beats(&ui.session, 2), Vec::<i32>::new(), "one undo step");
+        // The block stays in the clipboard: pasted again elsewhere.
+        point(&mut ui, size, (1, 2, 0));
+        assert!(ui.pointer_pressed(Button::Right));
+        pick(&mut ui.session, "Paste notes");
+        assert_eq!((beats(&ui.session, 1), beats(&ui.session, 2)), (vec![1, 2, 3], vec![3]));
+    }
+
+    #[test]
+    fn a_right_click_inside_the_zone_copies_cuts_or_deletes_all_of_it() {
+        let (mut ui, size) = ui();
+        drag_zone(&mut ui, size, (0, 0, 0), (1, 1, 3));
+        // A right-click on a step of the zone, empty or not.
+        point(&mut ui, size, (1, 0, 2));
+        assert!(ui.pointer_pressed(Button::Right));
+        assert_eq!(labels(&ui.session), ["Copy zone", "Cut zone", "Delete zone", "Add random note"]);
+        pick(&mut ui.session, "Copy zone");
+        assert!(matches!(&ui.session.selection.clipboard, Some(Clipboard::Block(b)) if b.note_count() == 3));
+        assert!(ui.session.selection.zone.is_some(), "the zone stays");
+        // Outside it, the step's own menu, with the zone to paste.
+        point(&mut ui, size, (1, 2, 0));
+        assert!(ui.pointer_pressed(Button::Right));
+        assert_eq!(labels(&ui.session), ["Copy notes", "Paste notes", "Add random note"]);
+        pick(&mut ui.session, "Paste notes");
+        assert_eq!((beats(&ui.session, 1), beats(&ui.session, 2)), (vec![1, 2, 3], vec![3]));
+        press(&mut ui, CONTROL, Key::Letter('Z'));
+
+        drag_zone(&mut ui, size, (0, 0, 0), (1, 1, 3));
+        point(&mut ui, size, (0, 1, 0));
+        assert!(ui.pointer_pressed(Button::Right));
+        pick(&mut ui.session, "Cut zone");
+        assert_eq!((beats(&ui.session, 0), beats(&ui.session, 1)), (vec![2, 3], vec![3]));
+        assert!(matches!(&ui.session.selection.clipboard, Some(Clipboard::Block(b)) if b.note_count() == 3));
+        press(&mut ui, CONTROL, Key::Letter('Z'));
+        assert_eq!((beats(&ui.session, 0), beats(&ui.session, 1)), (vec![0, 1, 2, 3], vec![1, 3]), "one undo step");
+
+        point(&mut ui, size, (0, 0, 0));
+        assert!(ui.pointer_pressed(Button::Right));
+        pick(&mut ui.session, "Delete zone");
+        assert_eq!((beats(&ui.session, 0), beats(&ui.session, 1)), (vec![2, 3], vec![3]));
+        press(&mut ui, CONTROL, Key::Letter('Z'));
+        assert_eq!((beats(&ui.session, 0), beats(&ui.session, 1)), (vec![0, 1, 2, 3], vec![1, 3]), "one undo step");
     }
 }

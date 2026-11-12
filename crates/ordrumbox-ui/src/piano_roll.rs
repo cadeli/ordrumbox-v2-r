@@ -18,6 +18,7 @@ use crate::frame;
 use crate::note_drag::{MIDDLE_C, MIDI_MIN, midi_name};
 use crate::panel::Rect;
 use crate::theme;
+use crate::view::{ZONE, ZONE_OPACITY};
 
 /// Height of a key row, px per scale unit (`NOTE_HEIGHT`).
 const NOTE_HEIGHT: i32 = 14;
@@ -83,6 +84,19 @@ pub fn row_midi(row: i32) -> i32 {
     MIDI_MIN as i32 + row
 }
 
+/// The row of middle C.
+const MIDDLE_C_ROW: i32 = (MIDDLE_C - MIDI_MIN) as i32;
+
+/// The key of row `row`: semitones from middle C (`roll_block::note_key`).
+pub fn row_key(row: i32) -> i32 {
+    row - MIDDLE_C_ROW
+}
+
+/// The row of key `key`.
+pub fn key_row(key: i32) -> i32 {
+    key + MIDDLE_C_ROW
+}
+
 /// The row a note of `track` is on (may be off the keyboard).
 pub fn note_row(note: &Note, track: &Track) -> i32 {
     (MIDDLE_C + track.transpose + note.pitch - MIDI_MIN).round() as i32
@@ -118,6 +132,17 @@ pub struct RollView<'a> {
     pub playhead: Option<i64>,
     /// Sub-positions of each note.
     pub subs: Vec<Vec<SubPosition>>,
+    /// The zone drawn with Shift+drag.
+    pub zone: Option<RollSpan>,
+}
+
+/// A zone of the roll: steps `start_step..end_step`, rows `low_row..=high_row`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RollSpan {
+    pub start_step: i64,
+    pub end_step: i64,
+    pub low_row: i32,
+    pub high_row: i32,
 }
 
 impl RollView<'_> {
@@ -238,6 +263,23 @@ impl RollLayout {
         self.grid.x + (step - view.page_steps().0) as i32 * self.cell
     }
 
+    /// The lowest row shown.
+    fn first_row(&self, view: &RollView) -> i32 {
+        (view.top_row - self.visible_rows() + 1).max(0)
+    }
+
+    /// The cell of the page nearest to `(x, y)`: step, row (a drag past the
+    /// grid stops at its edge).
+    pub fn nearest_cell(&self, view: &RollView, x: i32, y: i32) -> Option<(i64, i32)> {
+        let (start, end) = view.page_steps();
+        if end <= start {
+            return None;
+        }
+        let column = i64::from((x - self.grid.x).max(0) / self.cell.max(1)).min(end - start - 1);
+        let row = (view.top_row - (y - self.grid.y).max(0) / self.row.max(1)).clamp(self.first_row(view), view.top_row);
+        Some((start + column, row))
+    }
+
     fn shown_row(&self, view: &RollView, row: i32) -> bool {
         row <= view.top_row && row > view.top_row - self.visible_rows() && (0..TOTAL_KEYS).contains(&row)
     }
@@ -317,8 +359,7 @@ pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &s
 
     let spb = steps_per_beat(view.track);
     let (start, end) = view.page_steps();
-    let rows = layout.visible_rows();
-    let first_row = (view.top_row - rows + 1).max(0);
+    let first_row = layout.first_row(view);
     let width = (end - start) as i32 * layout.cell;
 
     // Keys and row backgrounds.
@@ -438,6 +479,9 @@ pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &s
             diamond(canvas, mx, my, size, TRIG_FIXED);
         }
     }
+    if let Some(zone) = &view.zone {
+        draw_zone(canvas, view, layout, zone);
+    }
     // The cursor, when no note is selected.
     if let Some((step, row)) = view.cursor.filter(|_| view.selected.is_none())
         && step >= start
@@ -454,6 +498,21 @@ pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &s
         let hint = format!("{} - {}", midi_name(row_midi(view.top_row)), midi_name(row_midi(first_row)));
         canvas.text(layout.keys.x, layout.grid.y + grid_h + 4 * s, &hint, s, theme::muted());
     }
+}
+
+/// The zone over its steps and its rows on the page: shaded, outlined.
+fn draw_zone(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, zone: &RollSpan) {
+    let (start, end) = view.page_steps();
+    let (first, last) = (zone.start_step.max(start), zone.end_step.min(end));
+    let (low, high) = (zone.low_row.max(layout.first_row(view)), zone.high_row.min(view.top_row));
+    if first >= last || low > high {
+        return;
+    }
+    let (left, right) = (layout.step_x(view, first), layout.step_x(view, last));
+    let (top, bottom) = (layout.row_y(view.top_row, high), layout.row_y(view.top_row, low) + layout.row);
+    let r = Rect::new(left, top, right - left, bottom - top);
+    canvas.shade_rect(r.x, r.y, r.w, r.h, ZONE, ZONE_OPACITY);
+    stroke(canvas, r, layout.scale.px(), ZONE);
 }
 
 /// A diamond filling the `size` square at `(x, y)`.
@@ -499,6 +558,7 @@ mod tests {
             cursor: Some((3, 40)),
             playhead: Some(16),
             subs: vec![Vec::new(); 3],
+            zone: Some(RollSpan { start_step: 2, end_step: 20, low_row: 30, high_row: 44 }),
         }
     }
 
@@ -524,6 +584,10 @@ mod tests {
         assert_eq!(v2.page_steps(), (16, 24));
         let r = layout.note_rect(&v2, 2).unwrap();
         assert_eq!(layout.hit(&v2, r.x + 2, r.y + 2), Some(RollHit::Cell { step: 16, row: 36 }));
+        // A drag past the grid stops at the page's last step and the lowest row shown.
+        let lowest = layout.first_row(&v2);
+        assert_eq!(layout.nearest_cell(&v2, 5000, 5000), Some((23, lowest)));
+        assert_eq!(layout.nearest_cell(&v2, 0, 0), Some((16, top)));
         // Past the last step of a short page: nothing.
         assert_eq!(layout.hit(&v2, layout.grid.x + 8 * layout.cell + 2, r.y + 2), None);
         assert_eq!(layout.hit(&v2, layout.previous.x + 2, layout.previous.y + 2), Some(RollHit::PreviousPage));
