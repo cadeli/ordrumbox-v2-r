@@ -9,6 +9,7 @@ use crate::scale::Scale;
 use ordrumbox_core::steps::absolute_step;
 use ordrumbox_core::track::MAX_STEPS_PER_BEAT;
 use ordrumbox_core::{Note, Pattern, Track};
+use ordrumbox_logic::block::{BEAT_UNITS, Zone};
 
 use crate::canvas::{Canvas, Rgb, chars_in, small_cell, small_char_width, text_width};
 use crate::editors;
@@ -57,6 +58,9 @@ const PLAYHEAD: Rgb = theme::LIVE;
 const LOOP_MARK: Rgb = theme::VALUE;
 const CURSOR: Rgb = theme::FOCUS;
 const SELECTED: Rgb = theme::WHITE;
+/// The zone drawn with Shift+drag, and how much its shade covers (of 255).
+const ZONE: Rgb = theme::FOCUS;
+const ZONE_OPACITY: u8 = 56;
 fn focus_row_color() -> Rgb {
     theme::selected_row()
 }
@@ -134,6 +138,8 @@ pub struct View<'a> {
     pub cursor: Option<Cursor>,
     /// Selected note: track and index in its notes.
     pub selected: Option<(usize, usize)>,
+    /// The zone drawn over the grid (Shift+drag).
+    pub zone: Option<Zone>,
     pub undo: Option<&'a str>,
     pub redo: Option<&'a str>,
     /// Outcome of the last action.
@@ -827,6 +833,26 @@ impl Layout {
         Rect::new(x, self.row_top(track), self.step_x(at + 1, spb) - x, self.row)
     }
 
+    /// The x of a time in units ([`BEAT_UNITS`] a beat), kept on the page.
+    fn units_x(&self, units: i64) -> i32 {
+        let page = (units - i64::from(self.start_beat) * BEAT_UNITS).clamp(0, i64::from(self.beats) * BEAT_UNITS);
+        self.grid_left + (page as f64 * self.beat_width() / BEAT_UNITS as f64) as i32
+    }
+
+    /// The step under `(x, y)`, or the nearest of the page when it is off
+    /// the steps: track, beat and step. A drag that leaves the grid ends on
+    /// its edge.
+    #[must_use]
+    pub fn nearest_cell(&self, pattern: &Pattern, x: i32, y: i32) -> Option<(usize, i32, i32)> {
+        let rows = i32::try_from(self.tracks.min(pattern.tracks.len())).ok().filter(|&r| r > 0)?;
+        let y = y.clamp(self.top, self.top + rows * self.row - 1);
+        let x = x.clamp(self.grid_left, self.grid_left + self.grid_width - 1);
+        match self.hit(pattern, x, y)? {
+            Hit::Cell { track, beat, step } => Some((track, beat, step)),
+            Hit::Mute(_) | Hit::Solo(_) | Hit::Name(_) | Hit::AddTrack => None,
+        }
+    }
+
     /// Tracks shown.
     pub fn tracks(&self) -> usize {
         self.tracks
@@ -1202,6 +1228,10 @@ fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, layout: &Layou
     canvas.fill_rect(add.x, add.y, add.w, add.h, box_off_color());
     let label_x = add.x + (add.w - text_width(ADD_TRACK_LABEL, scale)) / 2;
     canvas.text(label_x, add.y + (add.h - 8 * scale) / 2, ADD_TRACK_LABEL, scale, theme::text());
+
+    if let Some(zone) = view.zone {
+        draw_zone(canvas, &zone, layout);
+    }
 
     if let Some((from, to)) = view.track_drop.filter(|(from, to)| from != to) {
         // Where the track lands: above the row it takes moving up, below it moving down.
@@ -1655,6 +1685,22 @@ fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize, view: &Vie
     }
 }
 
+/// The zone over its rows and its time on the page: shaded, outlined.
+fn draw_zone(canvas: &mut Canvas, zone: &Zone, layout: &Layout) {
+    let last = zone.last_track.min(layout.tracks.saturating_sub(1));
+    if zone.first_track > last {
+        return;
+    }
+    let (left, right) = (layout.units_x(zone.start_units), layout.units_x(zone.end_units));
+    if right <= left {
+        return;
+    }
+    let top = layout.row_top(zone.first_track);
+    let height = layout.row_top(last + 1) - top - layout.scale.px();
+    canvas.shade_rect(left, top, right - left, height, ZONE, ZONE_OPACITY);
+    stroke(canvas, left, top, right - left, height, layout.scale.px(), ZONE);
+}
+
 /// Rectangle outline, `thickness` wide, inside `(x, y, width, height)`.
 fn stroke(canvas: &mut Canvas, x: i32, y: i32, width: i32, height: i32, thickness: i32, color: Rgb) {
     canvas.fill_rect(x, y, width, thickness, color);
@@ -1801,6 +1847,7 @@ mod tests {
                 host_muted: 0b10,
                 cursor: Some(Cursor { track: 0, beat: 1, step: 2 }),
                 selected: Some((0, 0)),
+                zone: None,
                 undo: Some("Add note"),
                 redo: None,
                 message: "hello",

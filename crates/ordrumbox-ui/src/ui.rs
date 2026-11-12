@@ -233,7 +233,8 @@ impl Ui {
     }
 
     /// A click on the grid, the song panel or the kit editor (Shift on a
-    /// grid cell: select its note rather than switch the step).
+    /// grid cell: select its note rather than switch the step, and a drag
+    /// from it draws a zone).
     fn click_content(&mut self, x: i32, y: i32, shift: bool) -> bool {
         let size = self.size();
         let s = &mut self.session;
@@ -255,7 +256,10 @@ impl Ui {
         }
         let Some(hit) = s.grid_hit(size, x, y) else { return false };
         match hit {
-            view::Hit::Cell { track, beat, step } if shift => s.select_step_note(track, beat, step),
+            view::Hit::Cell { track, beat, step } if shift => {
+                s.select_step_note(track, beat, step);
+                s.press_zone_drag(track, beat, step, x, y);
+            }
             _ => s.click(hit),
         }
         if let view::Hit::Name(t) = hit {
@@ -614,6 +618,7 @@ fn shortcut(code: Key, shift: bool, control: bool) -> Option<Command> {
             Key::Letter('Y') => C::Redo,
             Key::Letter('C') if shift => C::CopyTrack,
             Key::Letter('C') => C::CopyStep,
+            Key::Letter('X') => C::Cut,
             Key::Letter('V') if shift => C::PasteTrack,
             Key::Letter('V') => C::Paste,
             Key::Letter('S') if shift => C::ExportPatternJson,

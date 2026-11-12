@@ -32,6 +32,7 @@ impl Session {
             }
             Hit::Cell { track, beat, step } => {
                 self.selection.cursor = Some(Cursor { track, beat, step });
+                self.selection.zone = None;
                 self.toggle_note(track, beat, step);
             }
             Hit::AddTrack => self.add_track_menu_at_button(),
@@ -191,9 +192,11 @@ impl Session {
         self.edited();
         self.message = "Cleared notes".into();
     }
-    /// Clear the cursor step (Ctrl+Z undoes it).
+    /// Clear the zone, else the cursor step (Ctrl+Z undoes it).
     pub fn delete_step(&mut self) {
-        if self.selection.cursor.is_some() {
+        if let Some(zone) = self.selection.zone {
+            self.delete_zone(&zone);
+        } else if self.selection.cursor.is_some() {
             self.undoable(Self::delete_step_now);
         }
     }
@@ -349,8 +352,12 @@ impl Session {
         }
     }
 
-    /// Ctrl+C: the notes of the cursor step (with Shift, or no cursor: the track).
+    /// Ctrl+C: the notes of the zone, else of the cursor step (with Shift,
+    /// or no cursor: the track).
     pub fn copy(&mut self, track: bool) {
+        if !track && let Some(zone) = self.selection.zone {
+            return self.copy_zone(&zone);
+        }
         let Some(t) = self.focus_track() else { return };
         let Some(source) = self.track(t).cloned() else { return };
         let name = source.name.clone();
@@ -365,8 +372,8 @@ impl Session {
         }
     }
 
-    /// Ctrl+V: the copied step at the cursor, or the copied track after the
-    /// focused one (with Shift, only a track).
+    /// Ctrl+V: the copied step or zone at the cursor, or the copied track
+    /// after the focused one (with Shift, only a track).
     pub fn paste(&mut self, track_only: bool) {
         let p = self.pattern_index;
         match self.selection.clipboard.clone() {
@@ -381,7 +388,8 @@ impl Session {
                     self.edited();
                 }
             }
-            Some(Clipboard::Step(_)) if track_only => self.message = "no track copied".into(),
+            Some(Clipboard::Step(_) | Clipboard::Block(_)) if track_only => self.message = "no track copied".into(),
+            Some(Clipboard::Block(block)) => self.paste_block(&block),
             Some(Clipboard::Step(notes)) => {
                 let c = self.selection.cursor.unwrap_or(Cursor { track: 0, beat: 0, step: 0 });
                 if self.editor.paste_step_notes(p, c.track, c.beat, c.step, &notes) {

@@ -74,6 +74,8 @@ mod session_generate;
 mod session_grid;
 #[path = "session_lane.rs"]
 mod session_lane;
+#[path = "session_zone.rs"]
+mod session_zone;
 #[path = "session_zoom.rs"]
 mod session_zoom;
 
@@ -1317,6 +1319,7 @@ impl Session {
             song: song.as_deref().filter(|_| !self.hosted),
             cursor: self.selection.cursor,
             selected: self.selection.selected,
+            zone: self.selection.zone,
             undo: history.next_undo(),
             redo: history.next_redo(),
             message: &self.message,

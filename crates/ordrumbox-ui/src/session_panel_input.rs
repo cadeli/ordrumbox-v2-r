@@ -126,6 +126,9 @@ impl Session {
         if self.chrome.track_drag.is_some() {
             return self.track_drag_move(x, y);
         }
+        if self.chrome.zone_drag.is_some() {
+            return self.zone_drag_move(size, x, y);
+        }
         if self.chrome.lane_drag.is_some() {
             return self.lane_drag_move(size, x, y);
         }
@@ -167,7 +170,8 @@ impl Session {
                 if self.kit_editor.is_none()
                     && self.workspace == Workspace::Grid
                     && self.chrome.widgets.drag.is_none()
-                    && self.chrome.track_drag.is_none() =>
+                    && self.chrome.track_drag.is_none()
+                    && self.chrome.zone_drag.is_none() =>
             {
                 match Layout::new(
                     body.main_w,
@@ -256,6 +260,7 @@ impl Session {
         self.chrome.widgets.drag = None;
         self.song_panel.release_bar();
         self.chrome.track_drag = None;
+        self.chrome.zone_drag = None;
         self.chrome.lane_drag = None;
         self.roll_release();
     }

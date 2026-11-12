@@ -1,8 +1,9 @@
-//! What the grid's edits apply to: the cursor, the selected note, the
-//! clipboard, and what the note editor follows. Indices into the pattern
+//! What the grid's edits apply to: the cursor, the selected note, the zone
+//! drawn with Shift+drag, the clipboard, and what the note editor follows. Indices into the pattern
 //! shown; the session keeps them inside it after each edit.
 
 use ordrumbox_core::{Note, Pattern, Track};
+use ordrumbox_logic::block::{Block, Zone};
 
 use crate::view::Cursor;
 
@@ -11,6 +12,8 @@ use crate::view::Cursor;
 pub(super) enum Clipboard {
     Step(Vec<Note>),
     Track(Box<Track>),
+    /// The notes of a zone, row by row.
+    Block(Block),
 }
 
 /// What the note editor shows when no note is selected.
@@ -28,6 +31,8 @@ pub(super) struct Selection {
     pub(super) cursor: Option<Cursor>,
     /// Selected note: track and index in its notes.
     pub(super) selected: Option<(usize, usize)>,
+    /// The zone drawn over the grid: copy, cut, delete and paste take it.
+    pub(super) zone: Option<Zone>,
     pub(super) clipboard: Option<Clipboard>,
     /// What the note editor follows when no note is selected.
     pub(super) note_focus: Option<NoteFocus>,
@@ -37,16 +42,18 @@ pub(super) struct Selection {
 }
 
 impl Selection {
-    /// No cursor, no note selected.
+    /// No cursor, no note selected, no zone.
     pub(super) fn clear(&mut self) {
         self.cursor = None;
         self.selected = None;
+        self.zone = None;
     }
 
-    /// The cursor at `cursor`, no note selected.
+    /// The cursor at `cursor`, no note selected, no zone.
     pub(super) fn put_cursor(&mut self, cursor: Cursor) {
         self.cursor = Some(cursor);
         self.selected = None;
+        self.zone = None;
     }
 
     /// The track the cursor is on, else the selected note's.
@@ -66,6 +73,7 @@ impl Selection {
         }
         let valid = |&(t, n): &(usize, usize)| pattern.and_then(|p| p.tracks.get(t)).is_some_and(|t| n < t.notes.len());
         self.selected = self.selected.filter(valid);
+        self.zone = self.zone.filter(|z| z.last_track < tracks);
     }
 
     /// The tracks reordered, track `t` now at `moved(t)`: everything follows its track.
@@ -74,6 +82,8 @@ impl Selection {
             cursor.track = moved(cursor.track);
         }
         self.selected = self.selected.map(|(t, n)| (moved(t), n));
+        // Its rows are no longer side by side.
+        self.zone = None;
         self.note_focus = self.note_focus.map(|focus| match focus {
             NoteFocus::Track(t) => NoteFocus::Track(moved(t)),
             NoteFocus::Step { track, beat, step } => NoteFocus::Step { track: moved(track), beat, step },

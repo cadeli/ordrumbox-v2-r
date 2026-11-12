@@ -224,7 +224,12 @@ impl Session {
         let title = format!("{} @ {}.{}", track.name, beat + 1, step + 1);
         let has_notes = track.notes.iter().any(|n| n.beat == beat && n.step == step);
         let mut items = vec![("copy-notes", "Copy notes")];
-        if matches!(&self.selection.clipboard, Some(Clipboard::Step(notes)) if !notes.is_empty()) {
+        let pasteable = match &self.selection.clipboard {
+            Some(Clipboard::Step(notes)) => !notes.is_empty(),
+            Some(Clipboard::Block(_)) => true,
+            Some(Clipboard::Track(_)) | None => false,
+        };
+        if pasteable {
             items.push(("paste-notes", "Paste notes"));
         }
         if has_notes {
@@ -247,6 +252,8 @@ impl Session {
             return;
         }
         let (beat, step) = (number().unwrap_or(0), number().unwrap_or(0));
+        // The menu's step or track, not a zone drawn before.
+        self.selection.zone = None;
         self.selection.cursor = Some(Cursor { track: t, beat, step });
         match action {
             "rename" => self.track_name_submenu(Some(t), menu),
