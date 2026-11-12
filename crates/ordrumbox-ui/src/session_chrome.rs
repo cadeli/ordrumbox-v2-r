@@ -6,7 +6,7 @@
 use crate::scale::Scale;
 use std::path::PathBuf;
 
-use super::{Overlay, Widgets, menu, session_grid, session_lane};
+use super::{Overlay, Widgets, menu, session_grid, session_lane, session_zone};
 
 /// How fast a VU level falls, per frame drawn.
 const LEVEL_DECAY: f32 = 0.88;
@@ -31,6 +31,8 @@ pub(super) struct Chrome {
     pub(super) control_hover: Option<(crate::panel::Id, crate::panel::Rect)>,
     /// A track pressed by its name, that may be dragged to another row.
     pub(super) track_drag: Option<session_grid::TrackDrag>,
+    /// A step Shift+pressed, that may be dragged into a zone.
+    pub(super) zone_drag: Option<session_zone::ZoneDrag>,
     /// The lane under the grid, pressed and painted.
     pub(super) lane_drag: Option<session_lane::LaneDrag>,
     /// Window size and scale of the last mouse or key event on the widgets.
@@ -65,6 +67,7 @@ impl Default for Chrome {
             hover: None,
             control_hover: None,
             track_drag: None,
+            zone_drag: None,
             lane_drag: None,
             panel_size: (0, 0, Scale::ONE),
             current_page: 0,

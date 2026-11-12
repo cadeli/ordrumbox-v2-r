@@ -41,6 +41,8 @@ pub enum Command {
     Redo,
     CopyStep,
     CopyTrack,
+    /// The zone's notes, else the cursor step's, copied and cleared.
+    Cut,
     Paste,
     PasteTrack,
     ClearStep,
@@ -218,6 +220,10 @@ pub struct MenuState {
     pub can_remove_track: bool,
     pub clipboard_step: bool,
     pub clipboard_track: bool,
+    /// A zone's notes copied.
+    pub clipboard_block: bool,
+    /// A zone drawn over the grid (Shift+drag).
+    pub has_zone: bool,
     pub has_selection: bool,
     pub playing: bool,
     pub has_songs: bool,
@@ -273,6 +279,7 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
     use Command as C;
     let p = s.has_pattern;
     let track = s.focus_track.is_some();
+    let zone = s.has_zone;
     let (auto, mute, solo) = s.focus_track.unwrap_or_default();
     let undo = s.undo.as_ref().map_or_else(|| "Undo".to_owned(), |d| format!("Undo: {d}"));
     let redo = s.redo.as_ref().map_or_else(|| "Redo".to_owned(), |d| format!("Redo: {d}"));
@@ -333,14 +340,15 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
                 command(undo, "Ctrl+Z", C::Undo, s.undo.is_some()),
                 command(redo, "Ctrl+Y", C::Redo, s.redo.is_some()),
                 Item::Separator,
-                command("Copy step", "Ctrl+C", C::CopyStep, s.has_cursor),
+                command(if zone { "Copy zone" } else { "Copy step" }, "Ctrl+C", C::CopyStep, s.has_cursor || zone),
+                command(if zone { "Cut zone" } else { "Cut step" }, "Ctrl+X", C::Cut, s.has_cursor || zone),
                 command("Copy track", "Ctrl+Shift+C", C::CopyTrack, track),
-                command("Paste", "Ctrl+V", C::Paste, p && (s.clipboard_step || s.clipboard_track)),
+                command("Paste", "Ctrl+V", C::Paste, p && (s.clipboard_step || s.clipboard_track || s.clipboard_block)),
                 command("Paste track", "Ctrl+Shift+V", C::PasteTrack, p && s.clipboard_track),
                 Item::Separator,
-                command("Clear step", "Delete", C::ClearStep, s.has_cursor),
+                command(if zone { "Clear zone" } else { "Clear step" }, "Delete", C::ClearStep, s.has_cursor || zone),
                 command("Accent on / off", "L", C::ToggleAccent, s.has_cursor),
-                command("Deselect", "Esc", C::Deselect, s.has_cursor || s.has_selection),
+                command("Deselect", "Esc", C::Deselect, s.has_cursor || s.has_selection || zone),
             ],
         },
         Menu {

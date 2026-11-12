@@ -5,7 +5,7 @@ use super::*;
 use crate::scale::Scale;
 
 /// Every key, for Help > Keyboard shortcuts.
-const SHORTCUTS: [&str; 61] = [
+const SHORTCUTS: [&str; 62] = [
     "MENUS",
     "  F10 or Alt             open the menus: Arrows move, Enter runs, Esc closes",
     "  F1 F2 F3 F4 F5 F6      this list, track editor, song, piano roll, grid, synth (Ctrl+K: kit editor)",
@@ -14,8 +14,9 @@ const SHORTCUTS: [&str; 61] = [
     "  Arrows                 move the cursor",
     "  Enter / click          switch the step on (a note) or off (all its notes)",
     "  Shift+click            select the step's note for the note editor, and hear it",
+    "  Shift+drag             draw a zone: Ctrl+C, Ctrl+X, Delete take its notes",
     "  Shift+Arrows           velocity (up/down), pitch (left/right) of the selected note",
-    "  Delete                 clear the cursor step        Esc  deselect",
+    "  Delete                 clear the zone or the step   Esc  deselect",
     "  L                      accent the cursor step's notes, or take the accent off",
     "  right-click            a track's name: track menu   a step: notes menu",
     "  F, Shift+G, V          random pattern, random drumkit, VU meters on/off",
@@ -34,7 +35,7 @@ const SHORTCUTS: [&str; 61] = [
     "  Ctrl+O, Ctrl+Q         import a MIDI file, quit",
     "  Ctrl+E, Ctrl+M         export WAV (Shift: the song), export MIDI",
     "  Ctrl+Z, Ctrl+Y         undo, redo (also Ctrl+Shift+Z)",
-    "  Ctrl+C, Ctrl+V         copy, paste the step (Shift: the track)",
+    "  Ctrl+C, Ctrl+X, Ctrl+V copy, cut, paste the zone or the step (Shift: the track)",
     "  Ctrl+N, Ctrl+D         new pattern, duplicate pattern",
     "  Ctrl+T, Ctrl+Backspace add a KICK track, remove a track",
     "  Ctrl+G, Ctrl+L         next grid, loop one step shorter",
@@ -85,8 +86,9 @@ const PLUGIN_SHORTCUTS: &[&str] = &[
     "  Arrows                 move the cursor",
     "  Enter / click          switch the step on (a note) or off (all its notes)",
     "  Shift+click            select the step's note for the note editor, and hear it",
+    "  Shift+drag             draw a zone: Ctrl+C, Ctrl+X, Delete take its notes",
     "  Shift+Arrows           velocity (up/down), pitch (left/right) of the selected note",
-    "  Delete                 clear the cursor step        Esc  deselect",
+    "  Delete                 clear the zone or the step   Esc  deselect",
     "  L                      accent the cursor step's notes, or take the accent off",
     "  right-click            a track's name: track menu   a step: notes menu",
     "  F, Shift+G, V          random pattern, random drumkit, VU meters on/off",

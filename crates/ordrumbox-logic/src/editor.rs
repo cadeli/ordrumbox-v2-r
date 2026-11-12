@@ -19,6 +19,7 @@ use ordrumbox_core::style::{COMPLEXITY, ENERGY, MACRO_NEUTRAL};
 use ordrumbox_core::track::{MAX_STEPS_PER_BEAT, MAX_TRACKS};
 use ordrumbox_core::{Library, Note, Pattern, Scales, SetField, Styles, Track};
 
+use crate::block::{self, Block, Pasted, StepAt, Zone};
 use crate::generate::{self, AutoGenerator, MelodicKind, Options};
 use crate::history::{Change, History, Target};
 use crate::midi;
@@ -64,7 +65,7 @@ pub fn nudge_pitch(pitch: f64, up: bool, track_pitch: f64) -> f64 {
 }
 
 /// Step position in percent of the beat.
-fn step_percent(beat_step: i32, steps_per_beat: i32) -> f64 {
+pub(crate) fn step_percent(beat_step: i32, steps_per_beat: i32) -> f64 {
     (f64::from(beat_step) * 100.0 / f64::from(steps_per_beat.max(1))).round()
 }
 
@@ -427,6 +428,27 @@ impl Editor {
             },
         )
         .is_some()
+    }
+
+    /// Remove the notes inside `zone` of pattern `p`, as one step; how many.
+    pub fn delete_zone(&mut self, p: usize, zone: &Zone) -> usize {
+        let Some(pattern) = self.library.patterns.get(p).map(|p| pattern_name(p).to_owned()) else { return 0 };
+        self.edit(p, |_| format!("Delete notes in \"{pattern}\""), None, |pattern| block::delete_zone(pattern, zone))
+            .unwrap_or(0)
+    }
+
+    /// Paste `block` at step `at` of pattern `p` ([`block::paste_block`]), as one step.
+    pub fn paste_block(&mut self, p: usize, at: StepAt, block: &Block) -> Pasted {
+        let Some(pattern) = self.library.patterns.get(p).map(|p| pattern_name(p).to_owned()) else {
+            return Pasted::default();
+        };
+        self.edit(
+            p,
+            |_| format!("Paste notes in \"{pattern}\""),
+            None,
+            |pattern| block::paste_block(pattern, at, block),
+        )
+        .unwrap_or_default()
     }
 
     // ─── Tracks ──────────────────────────────────────────────────────────────
