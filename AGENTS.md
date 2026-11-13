@@ -95,7 +95,7 @@ assets/           data/*.json and kits/**.wav, read at runtime
   with `--write`; `--help` lists the options.
 - A sample added to or removed from a kit changes which sample each track
   plays, in that kit and in the kits that borrow it: the table of
-  `ordrumbox-ui/src/assign_tests.rs` is then rewritten, as a meant change.
+  `ordrumbox-ui/src/assign_tests/data.rs` is then rewritten, as a meant change.
 
 ## Audio thread
 

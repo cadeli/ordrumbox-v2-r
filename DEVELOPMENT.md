@@ -78,7 +78,7 @@ Building with `vst3` links GPLv3 bindings; the CLAP build stays MIT (`README.md`
 (`KICK`, `OHH`, `CONGAS`…), their name patterns, words, substitutes, GM MIDI keys and
 default pan. It is edited by hand; `ordrumbox-core/src/instruments.rs` only reads it.
 The sample each track gets in each kit is the hand-written table of
-`ordrumbox-ui/src/assign_tests.rs`.
+`ordrumbox-ui/src/assign_tests/data.rs`.
 
 ## Snapshots
 
@@ -124,7 +124,7 @@ A track with auto-assign on now plays the synth preset of its name (`CLAP_SYNTH`
 `COWBELL_SYNTH`, `BASS_FM`…) when the selected kit has neither its instrument nor a
 variant of it, where it used to borrow the sample of another kit; another kit's sample
 is taken only when no preset has its name. A variant in the kit (its tom for a `HI_TOM`
-track) is kept before both. This rewrote the table of `ordrumbox-ui/src/assign_tests.rs`.
+track) is kept before both. This rewrote the table of `ordrumbox-ui/src/assign_tests/data.rs`.
 
 The strip's compressor has two cases of its own, `comp` and `comp_parallel`, added
 after `delay_pingpong` to `effect_renders.bin` (dsp); the other cases are unchanged.
