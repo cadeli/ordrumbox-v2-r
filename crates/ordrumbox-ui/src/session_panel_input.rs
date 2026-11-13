@@ -52,9 +52,10 @@ impl Session {
         };
         let Some(id) = item.id else { return false };
         if button == Button::Right {
-            if let Kind::Value { spec, value, .. } = item.kind {
-                self.chrome.widgets.focus = Some(id);
-                self.open_entry(id, spec, value);
+            // A knob or a slider: its menu (type a value, its default, copy,
+            // paste). The other widgets have no menu of their own.
+            if matches!(item.kind, Kind::Value { .. }) {
+                self.control_menu(id, x, y);
             }
             return true;
         }
@@ -268,28 +269,93 @@ impl Session {
         self.roll_release();
     }
 
-    /// The wheel over the widgets (one notch: one step); whether it was theirs.
+    /// The right-click menu of a knob or a slider: type a value, its
+    /// default, copy it, paste one copied.
+    fn control_menu(&mut self, id: Id, x: i32, y: i32) {
+        let (values, labels) = (
+            vec!["type".into(), "default".into(), "copy".into(), "paste".into()],
+            vec![
+                "Type a value...".to_owned(),
+                "Default value".to_owned(),
+                "Copy value".to_owned(),
+                "Paste value".to_owned(),
+            ],
+        );
+        let (label, _) = control_name(id);
+        let mut menu = Dropdown::menu(Id::ControlMenu, x, y, label.to_owned(), values, labels);
+        menu.control = Some(id);
+        self.chrome.widgets.dropdown = Some(menu);
+    }
+
+    /// A line of a control's right-click menu picked (`control`: whose).
+    pub(super) fn control_menu_pick(&mut self, value: &str, control: Option<Id>) {
+        let Some(id) = control else { return };
+        let size = self.chrome.panel_size;
+        let layout = self.panel_layout(size.0, size.1, size.2);
+        let Some(item) = panel::find(&layout.items, id) else { return };
+        let Kind::Value { spec, value: current, .. } = item.kind else { return };
+        match value {
+            "type" => {
+                self.chrome.widgets.focus = Some(id);
+                self.open_entry(id, spec, current);
+            }
+            "default" => self.set_value(id, spec.default),
+            "copy" => {
+                self.chrome.widgets.copied_value = Some(current);
+                self.message = format!("value {} copied", num::text(spec.shown(current)));
+            }
+            "paste" => match self.chrome.widgets.copied_value {
+                Some(copied) if (spec.min..=spec.max).contains(&copied) => self.set_value(id, copied),
+                Some(copied) => {
+                    self.message = format!(
+                        "{} is out of this value's {}–{}",
+                        num::text(copied),
+                        num::text(spec.min),
+                        num::text(spec.max)
+                    )
+                }
+                None => self.message = "no value copied".into(),
+            },
+            _ => {}
+        }
+    }
+
+    /// The wheel over the widgets (one notch: one step); whether it was
+    /// theirs. Over a control it is only theirs: the window never scrolls
+    /// under a knob a wheel turn would turn, a fine delta included.
     pub fn wheel(&mut self, size: (i32, i32, Scale), x: i32, y: i32, lines: isize, shift: bool, ctrl: bool) -> bool {
         if let Some(dropdown) = &mut self.chrome.widgets.dropdown {
             dropdown.scroll(-lines);
             return true;
         }
-        if lines == 0 || self.chrome.widgets.entry.is_some() {
+        if self.chrome.widgets.entry.is_some() {
             return false;
         }
         let (width, height, scale) = size;
         let layout = self.panel_layout(width, height, scale);
-        let Some(Item { id: Some(id), kind: Kind::Value { spec, value, .. }, .. }) =
-            panel::hit(&layout.items, x, y).cloned()
-        else {
+        let Some(item) = panel::hit(&layout.items, x, y).cloned() else {
             return false;
         };
-        let mut v = value;
-        for _ in 0..lines.unsigned_abs() {
-            v = spec.nudge(v, lines > 0, shift, ctrl);
-        }
-        if v != value {
-            self.set_value(id, v);
+        let Some(id) = item.id else { return false };
+        match item.kind {
+            Kind::Value { spec, value, .. } => {
+                let mut v = value;
+                for _ in 0..lines.unsigned_abs() {
+                    v = spec.nudge(v, lines > 0, shift, ctrl);
+                }
+                if v != value {
+                    self.set_value(id, v);
+                }
+            }
+            Kind::Select { values, selected, .. } => {
+                let at = (selected as isize + lines).clamp(0, values.len() as isize - 1) as usize;
+                if at != selected
+                    && let Some(value) = values.get(at)
+                {
+                    self.select(id, value);
+                }
+            }
+            _ => {}
         }
         true
     }

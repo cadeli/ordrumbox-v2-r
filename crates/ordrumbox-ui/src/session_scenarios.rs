@@ -507,6 +507,7 @@ fn a_session_through_the_menus_draws_every_step() {
     s.kit_remove();
     assert!(s.confirm_open());
     draw(&mut s);
+    s.overlay_key(OverlayKey::Move(1));
     s.overlay_key(OverlayKey::Enter);
     assert_eq!(s.kit_list(), Some((0, KIT_KEYS.len() - 1)));
     s.drop_path(Path::new("notes.txt"), false);
@@ -846,6 +847,7 @@ fn a_song_saved_comes_back_from_the_load_menu() {
     s.song_menu_pick(&value);
     assert!(s.confirm_open(), "loading replaces the library: asked first");
     draw(&mut s);
+    s.overlay_key(OverlayKey::Move(1));
     s.overlay_key(OverlayKey::Enter);
     assert!(s.message.starts_with("Song \"") && s.message.ends_with("\" loaded"), "{}", s.message);
     assert_eq!(s.editor.library().patterns.len(), count);
@@ -867,4 +869,145 @@ fn a_song_saved_comes_back_from_the_load_menu() {
     s.run(Command::LoadSong);
     assert!(s.message.starts_with("Songs not listed: "), "{}", s.message);
     std::fs::remove_dir_all(&dir).unwrap();
+}
+
+// ─── pause, rewind, loop, metronome, recording ─────────────────────────────
+
+/// Frames of a song measure at 120 BPM.
+const MEASURE: usize = 16_000;
+
+#[test]
+fn a_song_pauses_where_it_is_and_home_goes_back() {
+    let (mut s, mut audio) = session(LIBRARY);
+    s.toggle_song_view();
+    s.toggle_play();
+    run(&mut s, &mut audio, MEASURE * 5 / 2);
+    s.toggle_play();
+    assert!(!s.playing());
+    assert_eq!(s.song_cursor, 2, "paused in measure 3");
+    assert!(s.message.starts_with("paused at measure 3"), "{}", s.message);
+    // Space goes on from there.
+    s.toggle_play();
+    run(&mut s, &mut audio, CALLBACK);
+    assert_eq!(position(&s).map(|p| p.pass), Some(2));
+    // Home goes back to the first measure, and plays on from it.
+    s.rewind();
+    run(&mut s, &mut audio, CALLBACK);
+    assert_eq!(position(&s).map(|p| p.pass), Some(0));
+    assert!(s.playing());
+    // Stopped, it only moves the cursor.
+    s.toggle_play();
+    s.song_cursor = 3;
+    s.rewind();
+    assert!(!s.playing());
+    assert_eq!(s.song_cursor, 0);
+}
+
+#[test]
+fn a_pattern_plays_again_from_its_first_beat_on_home() {
+    let (mut s, mut audio) = session(LIBRARY);
+    s.toggle_play();
+    run(&mut s, &mut audio, 6000);
+    assert!(position(&s).is_some_and(|p| p.frame > 4000));
+    s.rewind();
+    run(&mut s, &mut audio, CALLBACK);
+    assert!(position(&s).is_some_and(|p| p.frame <= CALLBACK as u64 + 8), "{:?}", position(&s));
+    assert!(s.playing());
+}
+
+#[test]
+fn a_loop_keeps_the_song_in_its_measures_and_playing_on() {
+    let (mut s, mut audio) = session(LIBRARY);
+    s.toggle_song_view();
+    s.set_song_cursor(1);
+    s.loop_to(2);
+    assert_eq!(s.song_loop_region(), Some((1, 3)));
+    assert!(s.message.starts_with("loop: measures 2-3"), "{}", s.message);
+    s.toggle_play();
+    let mut heard = 0.0;
+    let mut seen = std::collections::BTreeSet::new();
+    for _ in 0..(MEASURE * 7 / 1000) {
+        heard += run(&mut s, &mut audio, 1000);
+        let tick = s.playback.tick().expect("playing");
+        let measure = s.song().unwrap().measure_at_tick(tick as f64, f64::from(ordrumbox_core::steps::TICK)).floor();
+        seen.insert(measure as u32);
+    }
+    assert!(s.playing());
+    assert_eq!(seen.into_iter().collect::<Vec<_>>(), [1, 2], "only the looped measures play, again and again");
+    assert!(heard > 0.0);
+    // Cleared, the song goes on to its end.
+    s.clear_loop();
+    assert_eq!(s.song_loop_region(), None);
+    s.clear_loop();
+    assert!(s.message.starts_with("no loop"));
+    // A loop of one song does not apply to another.
+    s.loop_to(0);
+    s.editor.add_song("other");
+    s.select_song(1);
+    assert_eq!(s.song_loop_region(), None);
+}
+
+#[test]
+fn the_metronome_clicks_an_empty_pattern_and_stops_when_off() {
+    let (mut s, mut audio) = session(r#"{"patterns":[{"name":"p","tracks":[{"name":"KICK"}]}]}"#);
+    s.toggle_play();
+    assert_eq!(run(&mut s, &mut audio, 8000), 0.0, "an empty pattern is silent");
+    s.run(Command::Metronome);
+    assert!(s.metronome && s.message == "metronome on");
+    // The pass playing is rebuilt with the clicks, the next ones follow.
+    assert!(run(&mut s, &mut audio, 16_000) > 0.0, "clicks");
+    s.run(Command::Metronome);
+    run(&mut s, &mut audio, 16_000);
+    assert_eq!(run(&mut s, &mut audio, 8000), 0.0, "off again");
+}
+
+#[test]
+fn recording_puts_a_note_on_the_step_the_pattern_plays() {
+    let (mut s, mut audio) = session(r#"{"patterns":[{"name":"p","bpm":120,"tracks":[{"name":"KICK"}]}]}"#);
+    // Not playing: told, nothing recorded.
+    s.run(Command::Record);
+    assert!(s.recording());
+    s.record_note(0);
+    assert!(s.message.contains("Space plays"), "{}", s.message);
+    assert!(s.pattern().unwrap().tracks[0].notes.is_empty());
+    s.toggle_play();
+    // 4 beats of 4 steps at 120 BPM: a step is 2000 frames; step 4 (beat 1) is at 8000.
+    run(&mut s, &mut audio, 8000);
+    s.record_note(0);
+    let notes: Vec<_> = s.pattern().unwrap().tracks[0].notes.iter().map(|n| (n.beat, n.step)).collect();
+    assert_eq!(notes.len(), 1, "{}", s.message);
+    assert!(s.message.starts_with("recorded KICK @"), "{}", s.message);
+    // The same step again: told, not doubled.
+    let before = s.pattern().unwrap().tracks[0].notes.len();
+    s.record_note(0);
+    assert_eq!(s.pattern().unwrap().tracks[0].notes.len(), before);
+    assert!(s.message.contains("a note is there already"), "{}", s.message);
+    // Off: nothing recorded.
+    s.run(Command::Record);
+    run(&mut s, &mut audio, 6000);
+    let count = s.pattern().unwrap().tracks[0].notes.len();
+    s.record_note(0);
+    assert_eq!(s.pattern().unwrap().tracks[0].notes.len(), count);
+}
+
+#[test]
+fn f11_asks_for_full_screen_and_ctrl_w_quits() {
+    use crate::ui::Ui;
+    use crate::ui_input::{Key, KeyEvent, Modifiers};
+    let (s, _) = session(LIBRARY);
+    let mut ui = Ui::new(s);
+    let press = |ui: &mut Ui, modifiers: Modifiers, key: Key| {
+        ui.set_modifiers(modifiers);
+        let event = KeyEvent { key, pressed: true, repeat: false, text: None, unmodified: None };
+        assert!(ui.key(&event), "{key:?}");
+        ui.set_modifiers(Modifiers::default());
+    };
+    press(&mut ui, Modifiers::default(), Key::F(11));
+    assert_eq!(ui.session.take_fullscreen_request(), Some(true));
+    assert_eq!(ui.session.take_fullscreen_request(), None, "asked once");
+    press(&mut ui, Modifiers::default(), Key::F(11));
+    assert_eq!(ui.session.take_fullscreen_request(), Some(false));
+    assert!(!ui.session.quit_requested());
+    press(&mut ui, Modifiers { control: true, ..Modifiers::default() }, Key::Letter('W'));
+    assert!(ui.session.quit_requested());
 }

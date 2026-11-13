@@ -195,9 +195,17 @@ mod tests {
         assert!(!s.overlay_open());
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "old");
 
-        // Enter replaces it.
+        // Enter is the default button: it keeps too.
         s.song_button("export");
         s.overlay_key(OverlayKey::Enter);
+        s.overlay_key(OverlayKey::Enter);
+        assert!(!s.overlay_open());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "old");
+
+        // Arrows move to "Replace it", Enter runs it.
+        s.song_button("export");
+        s.overlay_key(OverlayKey::Enter);
+        s.overlay_key(OverlayKey::Move(1));
         s.overlay_key(OverlayKey::Enter);
         assert!(!s.overlay_open());
         assert!(std::fs::read_to_string(&path).unwrap().contains("exportedAt"));
@@ -221,6 +229,12 @@ mod tests {
         assert_eq!(s.song_name(), "changed");
         std::fs::write(&path, r#"{"songs":[]}"#).unwrap();
         s.import_song(&path);
+        // The confirm's default keeps: ENTER closes it, the import did not run.
+        s.overlay_key(OverlayKey::Enter);
+        assert!(!s.overlay_open());
+        // Confirming it runs it, and the invalid file is reported.
+        s.import_song(&path);
+        s.overlay_key(OverlayKey::Move(1));
         s.overlay_key(OverlayKey::Enter);
         assert_eq!(s.message, "Invalid song file");
         std::fs::remove_dir_all(dir).unwrap();

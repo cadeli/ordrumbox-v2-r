@@ -15,7 +15,9 @@ const SHORTCUTS: &[&str] = &[
     "  Enter / click          switch the step on (a note) or off (all its notes)",
     "  Shift+click            select the step's note for the note editor, and hear it",
     "  Shift+drag             draw a zone: Ctrl+C, Ctrl+X, Delete take its notes",
-    "  Shift+Arrows           pitch (up/down) of the selected note, one step in time (left/right)",
+    "  Shift+Arrows           grow a zone from the cursor     Ctrl+click  take a step into it",
+    "  Ctrl+A                 select the whole pattern as a zone",
+    "  Alt+Arrows             pitch (up/down) of the selected note, one step in time (left/right)",
     "  Delete                 clear the zone or the step   Esc  deselect",
     "  L                      accent the cursor step's notes, or take the accent off",
     "  right-click            a track's name: track menu   a step: notes menu",
@@ -26,20 +28,24 @@ const SHORTCUTS: &[&str] = &[
     "  M, S                   mute / solo the track under the cursor",
     "  1-9 / Shift+1-9        mute / solo track 1-9        Q-P  hear track 1-10 (any view)",
     "                         (these two rows by their place; other keys as the layout marks them)",
-    "  Space / Shift+Space    play or stop the pattern / the song",
+    "  Space / Shift+Space    play or stop the pattern / the song (a song stops where it is: Space goes on)",
+    "  Home, keypad Enter     back to the first beat / measure (the loop's first measure)",
+    "  Shift+click (ruler)    loop the song from the cursor's measure to that one (Play > Clear the loop)",
+    "  F9, F8                 metronome on/off, tap the tempo (a tap a beat)",
+    "  Ctrl+R                 record: while the pattern plays, Q-P put a note on the step that plays",
     "  [ ] / Shift+[ ]        previous / next pattern / song (also PageUp PageDown)",
     "  - = (Shift: x10)       tempo (every pattern's; the song's in the song panel)",
     "  , .                    previous / next kit",
     "FILE AND EDIT",
     "  Ctrl+S                 save the library now (it is also saved on its own)",
     "  Ctrl+Shift+S           export the pattern as JSON",
-    "  Ctrl+O, Ctrl+Q         import a MIDI file, quit",
+    "  Ctrl+O, Ctrl+Q         load a song, quit (Ctrl+W too)       F11  full screen",
     "  Ctrl+E, Ctrl+Shift+M   export WAV (Shift: the song), export MIDI",
     "  Ctrl+Z, Ctrl+Shift+Z   undo, redo (also Ctrl+Y)",
     "  Ctrl+C, Ctrl+X, Ctrl+V copy, cut, paste the zone or the step (Shift: the track)",
     "  Ctrl+N, Ctrl+D         new pattern, duplicate pattern",
     "  Ctrl+T, Ctrl+Backspace add a KICK track, remove a track",
-    "  Ctrl+G, Ctrl+L         next grid, loop one step shorter",
+    "  Ctrl+G                 next grid (loop one step shorter: the Pattern menu)",
     "  Ctrl+- Ctrl+= Ctrl+0   zoom out, in, back to the display's size (also the keypad's - +)",
     "GENERATE",
     "  Shift+B, Ctrl+Shift+B  the pattern again in its style, a new pattern in the style",
@@ -88,7 +94,9 @@ const PLUGIN_SHORTCUTS: &[&str] = &[
     "  Enter / click          switch the step on (a note) or off (all its notes)",
     "  Shift+click            select the step's note for the note editor, and hear it",
     "  Shift+drag             draw a zone: Alt+C, Alt+X, Delete take its notes",
-    "  Shift+Arrows           pitch (up/down) of the selected note, one step in time (left/right)",
+    "  Shift+Arrows           grow a zone from the cursor     Ctrl+click  take a step into it",
+    "  Ctrl+A                 select the whole pattern as a zone",
+    "  Alt+Arrows             pitch (up/down) of the selected note, one step in time (left/right)",
     "  Delete                 clear the zone or the step   Esc  deselect",
     "  L                      accent the cursor step's notes, or take the accent off",
     "  right-click            a track's name: track menu   a step: notes menu",
@@ -200,20 +208,26 @@ impl Session {
         if self.history_key(&key) || self.shortcuts_key(&key) {
             return;
         }
-        let is_factory = matches!(self.chrome.overlay, Some(Overlay::FactoryReset));
-        let Some(Overlay::Picker(picker)) = &mut self.chrome.overlay else {
-            if is_factory && matches!(key, OverlayKey::Enter) {
-                self.factory_reset();
-                return;
-            }
-            if matches!(key, OverlayKey::Enter) {
-                match self.chrome.overlay.take() {
-                    Some(Overlay::ConfirmOverwrite { export, path }) => self.write_export(export, &path),
-                    Some(Overlay::Confirm(pending)) => self.run_pending(pending),
-                    _ => {}
+        // The confirms: the default is to keep (ENTER closes), ← → choose,
+        // ENTER on the chosen button runs it.
+        if self.notice_confirm_open() {
+            let mut yes = self.confirm_yes();
+            match key {
+                OverlayKey::Move(_) => yes = !yes,
+                OverlayKey::Enter if yes => {
+                    self.run_confirm();
+                    return;
                 }
-                return;
+                OverlayKey::Enter | OverlayKey::Escape => {
+                    self.chrome.overlay = None;
+                    return;
+                }
+                _ => {}
             }
+            self.set_confirm_yes(yes);
+            return;
+        }
+        let Some(Overlay::Picker(picker)) = &mut self.chrome.overlay else {
             if matches!(key, OverlayKey::Escape) {
                 self.chrome.overlay = None;
             }
@@ -305,7 +319,7 @@ impl Session {
             String::new(),
             format!("folder: {}", self.user_folder().map_or_else(|| "-".to_owned(), |p| p.display().to_string())),
             String::new(),
-            "ENTER: restore     ESC or click: cancel".into(),
+            "← →: choose   ENTER: the chosen".into(),
         ]
     }
 }

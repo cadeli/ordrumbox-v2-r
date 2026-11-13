@@ -608,6 +608,7 @@ mod tests {
         s.synth_button("duplicate");
         assert_eq!(s.synth_keys(), ["a", "b", "new_preset", "new_preset_copy"]);
         s.synth_button("delete");
+        s.overlay_key(OverlayKey::Move(1));
         s.overlay_key(OverlayKey::Enter);
         assert_eq!(s.synth_editor.edit.as_ref().unwrap().key, "new_preset");
         // The power button of the envelope (ENV tab).

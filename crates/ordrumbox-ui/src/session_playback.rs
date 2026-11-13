@@ -7,7 +7,7 @@ use ordrumbox_core::Track;
 use ordrumbox_engine::{Controller, HostTransport, Mode, Position};
 use ordrumbox_logic::Editor;
 
-use crate::audio_output::{AudioOutput, StartOutput};
+use crate::audio_output::{AudioOutput, OutputDevices, StartOutput};
 
 /// The next loop of a pattern in auto mode, posted ahead to the engine. Its
 /// lines enter the library when that loop starts: what the grid shows and what
@@ -29,6 +29,8 @@ pub(super) struct Playback {
     /// What started `output`, to start it again when the session reloads
     /// (`None`: a session built without assets or by a test).
     start_output: Option<StartOutput>,
+    /// Lists the devices the output can play on (`None`: the program offers no choice).
+    devices: Option<OutputDevices>,
     /// Editor revision the playing pass was built from.
     played_revision: u64,
     upcoming_loop: Option<UpcomingLoop>,
@@ -58,6 +60,15 @@ impl Playback {
     /// Keep `start_output`, to start the sound again on a reload.
     pub(super) fn keep_start_output(&mut self, start_output: StartOutput) {
         self.start_output = Some(start_output);
+    }
+
+    /// Keep `devices`, which lists what the sound can play on.
+    pub(super) fn keep_devices(&mut self, devices: OutputDevices) {
+        self.devices = Some(devices);
+    }
+
+    pub(super) fn devices(&self) -> Option<OutputDevices> {
+        self.devices
     }
 
     /// What started the sound, given up for a new session.
@@ -126,6 +137,20 @@ impl Playback {
         self.upcoming_loop = None;
         controller.play(editor.library(), mode);
         self.played_revision = editor.revision();
+    }
+
+    /// The measures a song plays in a loop (`None`: on to its end).
+    pub(super) fn set_song_loop(&mut self, editor: &Editor, region: Option<(u64, u64)>) {
+        if let Some(controller) = &mut self.controller {
+            controller.set_song_loop(editor.library(), region);
+        }
+    }
+
+    /// The metronome on or off.
+    pub(super) fn set_metronome(&mut self, editor: &Editor, on: bool) {
+        if let Some(controller) = &mut self.controller {
+            controller.set_metronome(editor.library(), on);
+        }
     }
 
     /// Stop; the loop posted ahead is dropped with what played.

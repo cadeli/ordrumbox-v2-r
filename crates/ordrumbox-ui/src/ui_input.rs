@@ -50,6 +50,14 @@ pub enum Key {
 }
 
 impl Key {
+    /// The key's letter, when it is one.
+    pub fn letter(self) -> Option<char> {
+        match self {
+            Self::Letter(c) => Some(c),
+            _ => None,
+        }
+    }
+
     /// The key a W3C `KeyboardEvent.code` value names (`"KeyA"`, `"Digit1"`,
     /// `"ArrowUp"`…), the names winit's `KeyCode` and `keyboard-types`'
     /// `Code` both use.

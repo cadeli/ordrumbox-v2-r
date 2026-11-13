@@ -28,12 +28,51 @@ pub(super) enum Pending {
 impl Session {
     /// Show the notice of `pending`.
     pub(super) fn ask(&mut self, pending: Pending) {
-        self.chrome.overlay = Some(Overlay::Confirm(pending));
+        self.chrome.overlay = Some(Overlay::Confirm { pending, yes: false });
     }
 
     /// Whether a confirmation is waiting for the user.
     pub(super) fn confirm_open(&self) -> bool {
-        matches!(self.chrome.overlay, Some(Overlay::Confirm(_)))
+        matches!(self.chrome.overlay, Some(Overlay::Confirm { .. }))
+    }
+
+    /// Whether a confirm (replace the library, replace a file, factory
+    /// reset) is open: its keys are the buttons'.
+    pub(super) fn notice_confirm_open(&self) -> bool {
+        matches!(
+            self.chrome.overlay,
+            Some(Overlay::Confirm { .. } | Overlay::FactoryReset { .. } | Overlay::ConfirmOverwrite { .. })
+        )
+    }
+
+    /// The button ENTER runs of the confirm open (`false`: keep, the default).
+    pub(super) fn confirm_yes(&mut self) -> bool {
+        match &mut self.chrome.overlay {
+            Some(Overlay::Confirm { yes, .. })
+            | Some(Overlay::FactoryReset { yes })
+            | Some(Overlay::ConfirmOverwrite { yes, .. }) => *yes,
+            _ => false,
+        }
+    }
+
+    pub(super) fn set_confirm_yes(&mut self, yes: bool) {
+        if let Some(slot) = match &mut self.chrome.overlay {
+            Some(Overlay::Confirm { yes, .. }) | Some(Overlay::FactoryReset { yes }) => Some(yes),
+            Some(Overlay::ConfirmOverwrite { yes, .. }) => Some(yes),
+            _ => None,
+        } {
+            *slot = yes;
+        }
+    }
+
+    /// Run what the confirm open asks for (its chosen button).
+    pub(super) fn run_confirm(&mut self) {
+        match self.chrome.overlay.take() {
+            Some(Overlay::FactoryReset { .. }) => self.factory_reset(),
+            Some(Overlay::ConfirmOverwrite { export, path, .. }) => self.write_export(export, &path),
+            Some(Overlay::Confirm { pending, .. }) => self.run_pending(pending),
+            _ => {}
+        }
     }
 
     /// The user said yes.
@@ -67,8 +106,9 @@ impl Session {
         }
     }
 
-    /// The title and the lines of the notice of `pending`.
-    pub(super) fn confirm_text(&self, pending: &Pending) -> (&'static str, Vec<String>) {
+    /// The title, the lines and the action button of the notice of `pending`
+    /// (the other button, the default, keeps).
+    pub(super) fn confirm_text(&self, pending: &Pending) -> (&'static str, Vec<String>, String) {
         const NO_UNDO: &str = "This cannot be undone.";
         let (title, what, verb) = match pending {
             Pending::RemoveSample { kit, sample } => {
@@ -93,7 +133,9 @@ impl Session {
             }
             Pending::UserFolder(path) => ("Change the user data folder?", Self::user_folder_text(path), "change"),
         };
-        (title, vec![what, String::new(), format!("ENTER: {verb}   ESC: cancel")])
+        // The default is to keep: ← → moves the buttons, ENTER runs the chosen.
+        let action = format!("{} it", verb[..1].to_uppercase() + &verb[1..]);
+        (title, vec![what, String::new(), "← →: choose   ENTER: the chosen".into()], action)
     }
 }
 

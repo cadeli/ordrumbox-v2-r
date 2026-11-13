@@ -67,6 +67,18 @@ impl Session {
         true
     }
 
+    /// Shift+click on the song panel: on the ruler, a loop from the cursor to
+    /// that measure; elsewhere a plain click.
+    pub fn song_shift_click(&mut self, size: (i32, i32, Scale), x: i32, y: i32) -> bool {
+        let layout = self.song_layout(size);
+        let rows = self.song_rows();
+        if let Some(SongHit::Ruler(measure)) = layout.hit(&self.song_view_data(&rows, &layout), x, y) {
+            self.loop_to(measure);
+            return true;
+        }
+        self.song_click(size, x, y, Button::Left)
+    }
+
     // ─── Dragging ────────────────────────────────────────────────────────────
 
     fn press_song_drag(&mut self, source: DragSource, x: i32, y: i32) {

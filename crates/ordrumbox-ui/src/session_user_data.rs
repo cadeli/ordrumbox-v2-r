@@ -14,7 +14,7 @@ use ordrumbox_core::json::Object;
 /// app saves to, so an export to the user data folder replaces nothing.
 pub(super) const LIBRARY_FILE_NAME: &str = "ordrumbox-library.json";
 
-const NO_USER_FOLDER: &str = "no user data folder";
+pub(super) const NO_USER_FOLDER: &str = "no user data folder";
 
 /// A library file read: the library, and how many values were repaired.
 fn read_library(path: &Path) -> Result<(Library, usize), String> {
@@ -92,7 +92,7 @@ impl Session {
 
     /// Write now what waits to be written (library, kits, synth presets,
     /// master), before the user's files are copied or moved.
-    fn write_pending(&mut self) {
+    pub(super) fn write_pending(&mut self) {
         self.saving.expire_all();
         self.autosave();
         self.save_if_changed();
@@ -106,7 +106,11 @@ impl Session {
         let waker = self.updates.take_waker();
         let mcp = self.mcp.take();
         let start_output = self.playback.take_start_output().unwrap_or_else(|| Box::new(no_output));
+        let devices = self.playback.devices();
         *self = Self::load(start_output);
+        if let Some(devices) = devices {
+            self.playback.keep_devices(devices);
+        }
         self.action_log = action_log;
         if let Some(waker) = waker {
             self.updates.keep_waker(waker);
@@ -338,6 +342,14 @@ mod tests {
         // The demo in its place, after a yes; Undo brings mine back.
         s.run(Command::DemoLibrary);
         assert!(s.confirm_open());
+        // ENTER alone keeps: nothing ran, the library is mine.
+        s.overlay_key(OverlayKey::Enter);
+        assert!(!s.overlay_open());
+        assert_eq!(first_pattern(&s), Some("mine"));
+        // Asked again, the action is chosen with ← → and runs with ENTER.
+        s.run(Command::DemoLibrary);
+        assert!(s.confirm_open());
+        s.overlay_key(OverlayKey::Move(1));
         s.overlay_key(OverlayKey::Enter);
         assert!(s.message.starts_with("demo library loaded"), "{}", s.message);
         assert_ne!(first_pattern(&s), Some("mine"));
@@ -350,6 +362,7 @@ mod tests {
         s.put_synth("lead", Some(ordrumbox_core::json::parse("{}").unwrap()), "Other lead".into(), None);
         s.picked(Purpose::ImportLibrary, path.clone());
         assert!(s.confirm_open());
+        s.overlay_key(OverlayKey::Move(1));
         s.overlay_key(OverlayKey::Enter);
         assert_eq!(first_pattern(&s), Some("mine"), "{}", s.message);
         assert_eq!(s.editor.history().next_undo(), Some("Import library"));

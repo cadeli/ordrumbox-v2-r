@@ -48,6 +48,8 @@ pub enum Command {
     PasteTrack,
     ClearStep,
     ToggleAccent,
+    /// Ctrl+A: every note of the pattern as a zone.
+    SelectAll,
     Deselect,
     NewPattern,
     DuplicatePattern,
@@ -76,6 +78,16 @@ pub enum Command {
     RandomTrack,
     PlayPattern,
     PlaySong,
+    /// Home: back to the first beat or measure.
+    Rewind,
+    /// F8: the tempo from the time between taps.
+    TapTempo,
+    /// F9: a click on every beat.
+    Metronome,
+    /// Ctrl+R: the row keys put notes on the step that plays.
+    Record,
+    /// The song's loop region removed.
+    ClearLoop,
     PreviousSong,
     NextSong,
     Mute,
@@ -134,6 +146,10 @@ pub enum Command {
     OpenUserFolder,
     CheckUpdates,
     DownloadPage,
+    /// File > Audio output: the sound device to play on.
+    AudioDevice,
+    /// F11: the window full screen, or back.
+    Fullscreen,
 }
 
 /// Why a plugin leaves the user data folder alone.
@@ -151,9 +167,13 @@ impl Command {
             Self::Quit => Some("the host closes the plugin's window"),
             Self::TempoDown | Self::TempoUp => Some("the tempo is the host's"),
             Self::PlayPattern => Some("the host's transport plays the pattern"),
+            Self::Rewind => Some("the host's transport rewinds"),
+            Self::TapTempo => Some("the tempo is the host's"),
             Self::CheckUpdates | Self::DownloadPage => Some("update check: in the app only, not in a plugin"),
             Self::FactoryReset => Some("factory reset: in the app only, not in a plugin"),
             Self::MasterStrip => Some("the master strip: in the app only, not in a plugin"),
+            Self::AudioDevice => Some("the host owns the sound output"),
+            Self::Fullscreen => Some("the host owns the window"),
             Self::BackUpUserData
             | Self::RestoreUserData
             | Self::ChangeUserFolder
@@ -161,6 +181,7 @@ impl Command {
             | Self::OpenUserFolder => Some(USER_DATA_IN_THE_APP),
             Self::SongView
             | Self::PlaySong
+            | Self::ClearLoop
             | Self::PreviousSong
             | Self::NextSong
             | Self::NewSong
@@ -199,6 +220,14 @@ impl Item {
             _ => None,
         }
     }
+
+    /// What the item is called, `None` for a separator.
+    pub fn label(&self) -> Option<&str> {
+        match self {
+            Self::Command { label, .. } => Some(label),
+            Self::Separator => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -227,6 +256,11 @@ pub struct MenuState {
     pub has_zone: bool,
     pub has_selection: bool,
     pub playing: bool,
+    pub metronome: bool,
+    pub recording: bool,
+    /// The program lets the sound device be chosen.
+    pub audio_devices: bool,
+    pub fullscreen: bool,
     pub has_songs: bool,
     /// Generation on: drums, bass, chords.
     pub generation: [bool; 3],
@@ -324,6 +358,12 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
         check("Kit editor", "Ctrl+K", C::KitEditor, true, s.kit_editor),
         command("Normalize kit", "", C::NormalizeKit, !s.kits.is_empty()),
         Item::Separator,
+        command("Add sample...", "", C::AddSample, !s.kits.is_empty()),
+        command("Replace sample...", "", C::ReplaceSample, s.kit_sample),
+        command("Load kit mapping...", "", C::LoadMapping, true),
+        command("Export kit mapping...", "", C::ExportMapping, !s.kits.is_empty()),
+        command("Export kit with its samples...", "", C::ExportKitFolder, !s.kits.is_empty()),
+        Item::Separator,
         command("Import folder as kit...", "", C::ImportFolder, true),
     ];
     let mut menus = vec![
@@ -334,7 +374,7 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
                 Item::Separator,
                 command("Save song", "", C::SaveSong, s.can_save_song),
                 command("Save song as...", "", C::SaveSongAs, true),
-                command("Load song...", "", C::LoadSong, s.saved_songs),
+                command("Load song...", "Ctrl+O", C::LoadSong, s.saved_songs),
                 command("Export song...", "", C::ExportSong, true),
                 command("Import song...", "", C::ImportSong, true),
                 Item::Separator,
@@ -342,17 +382,13 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
                 command("Import library...", "", C::ImportLibrary, true),
                 command("Load the demo library...", "", C::DemoLibrary, s.has_demo),
                 Item::Separator,
-                command("Import MIDI file...", "Ctrl+O", C::ImportMidi, true),
+                command("Import MIDI file...", "", C::ImportMidi, true),
                 command("Export pattern as JSON...", "Ctrl+Shift+S", C::ExportPatternJson, p),
                 command("Export pattern as MIDI...", if MACOS { "Cmd+Shift+M" } else { "Ctrl+M" }, C::ExportMidi, p),
                 command("Export pattern as WAV...", "Ctrl+E", C::ExportWav, p && s.can_render),
                 command("Export song as WAV...", "Ctrl+Shift+E", C::ExportSongWav, s.has_songs && s.can_render),
                 Item::Separator,
-                command("Add sample...", "", C::AddSample, !s.kits.is_empty()),
-                command("Replace sample...", "", C::ReplaceSample, s.kit_sample),
-                command("Load kit mapping...", "", C::LoadMapping, true),
-                command("Export kit mapping...", "", C::ExportMapping, !s.kits.is_empty()),
-                command("Export kit with its samples...", "", C::ExportKitFolder, !s.kits.is_empty()),
+                command("Audio output...", "", C::AudioDevice, s.audio_devices),
                 Item::Separator,
                 command("Back up user data...", "", C::BackUpUserData, s.user_folder),
                 command("Restore user data...", "", C::RestoreUserData, s.user_folder),
@@ -360,7 +396,7 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
                 command("Use the default user data folder...", "", C::DefaultUserFolder, s.user_folder),
                 command("Open user data folder", "", C::OpenUserFolder, s.user_folder),
                 Item::Separator,
-                command("Quit", "Ctrl+Q", C::Quit, true),
+                command("Quit", "Ctrl+Q, Ctrl+W", C::Quit, true),
             ],
         },
         Menu {
@@ -377,6 +413,7 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
                 Item::Separator,
                 command(if zone { "Clear zone" } else { "Clear step" }, "Delete", C::ClearStep, s.has_cursor || zone),
                 command("Accent on / off", "L", C::ToggleAccent, s.has_cursor),
+                command("Select all", "Ctrl+A", C::SelectAll, p),
                 command("Deselect", "Esc", C::Deselect, s.has_cursor || s.has_selection || zone),
             ],
         },
@@ -394,13 +431,14 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
                 check("Kit editor", "Ctrl+K", C::KitEditor, true, s.kit_editor),
                 Item::Separator,
                 check("VU meters", "Shift+V", C::ToggleVus, true, s.show_vus),
-                check("Toasts", "", C::ToggleToasts, true, s.show_toasts),
+                check("Toasts", "Ctrl+Shift+T", C::ToggleToasts, true, s.show_toasts),
                 command("Next colour scheme", "Shift+C", C::NextColorScheme, true),
                 Item::Separator,
                 command("Zoom in", "Ctrl+=", C::ZoomIn, true),
                 command("Zoom out", "Ctrl+-", C::ZoomOut, true),
                 command("Actual size", "Ctrl+0", C::ZoomReset, true),
                 command("Zoom: fit to window", "", C::ZoomToFit, true),
+                check("Full screen", "F11", C::Fullscreen, true, s.fullscreen),
             ],
         },
         Menu {
@@ -424,7 +462,7 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
                 command("Add KICK track", "Ctrl+T", C::AddTrack, p),
                 command("Remove track", "Ctrl+Backspace", C::RemoveTrack, s.can_remove_track),
                 command("Next grid", "Ctrl+G", C::NextGrid, track),
-                command("Loop one step shorter", "Ctrl+L", C::ShortenLoop, track),
+                command("Loop one step shorter", "", C::ShortenLoop, track),
                 Item::Separator,
                 command("Compact tracks", "", C::CompactTracks, p),
                 command("Clear pattern", "", C::ClearPattern, p),
@@ -451,6 +489,12 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
             items: vec![
                 check("Play pattern", "Space", C::PlayPattern, p, s.playing),
                 command("Play song", "Shift+Space", C::PlaySong, s.has_songs),
+                command("Rewind", "Home", C::Rewind, true),
+                command("Clear the loop", "", C::ClearLoop, s.has_songs),
+                Item::Separator,
+                check("Record notes", "Ctrl+R", C::Record, p, s.recording),
+                check("Metronome", "F9", C::Metronome, true, s.metronome),
+                command("Tap tempo", "F8", C::TapTempo, true),
                 Item::Separator,
                 check("Mute track", "M, 1-9", C::Mute, track, mute),
                 check("Solo track", "S, Shift+1-9", C::Solo, track, solo),
@@ -461,8 +505,6 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
             title: "Song",
             items: vec![
                 check("Song view", "F3", C::SongView, true, s.song_view),
-                Item::Separator,
-                command("Play song", "Shift+Space", C::PlaySong, s.has_songs),
                 Item::Separator,
                 command("New arrangement...", "", C::NewSong, true),
                 command("Remove arrangement", "", C::RemoveSong, s.has_songs),
@@ -567,6 +609,21 @@ impl Open {
             i = (i + delta).rem_euclid(n);
             if items[i as usize].runnable().is_some() {
                 return Self { item: Some(i as usize), ..self };
+            }
+        }
+        self
+    }
+
+    /// The first item from the highlighted one on whose label starts with
+    /// `letter` (wrapping; a repeat skips to the next one).
+    pub fn jump(self, menus: &[Menu], letter: char) -> Self {
+        let items = &menus[self.menu].items;
+        let n = items.len();
+        let start = self.item.map_or(0, |i| (i + 1) % n);
+        for skip in 0..n {
+            let i = (start + skip) % n;
+            if items[i].label().is_some_and(|label| label.to_lowercase().starts_with(letter.to_ascii_lowercase())) {
+                return Self { item: Some(i), ..self };
             }
         }
         self
@@ -867,8 +924,9 @@ mod tests {
         let edit = menus.iter().position(|m| m.title == "Edit").unwrap();
         let open = Open::new(&menus, edit, true);
         assert_eq!(open.command(&menus), Some(Command::Undo));
-        // Redo, copy and paste cannot run: the next is nothing else but Undo again.
-        assert_eq!(open.step(&menus, 1).command(&menus), Some(Command::Undo));
+        // Redo, copy and paste cannot run: Select all is the next, then Undo again.
+        assert_eq!(open.step(&menus, 1).command(&menus), Some(Command::SelectAll));
+        assert_eq!(open.step(&menus, 1).step(&menus, 1).command(&menus), Some(Command::Undo));
         let file = Open::new(&menus, 0, true);
         // Save, Save song and Load song are greyed out: the first item highlighted is Save song as.
         assert_eq!(file.command(&menus), Some(Command::SaveSongAs));
@@ -884,10 +942,12 @@ mod tests {
         };
         let (song, file) = (runnable("Song"), runnable("File"));
         use Command as C;
-        for command in [C::SongView, C::PlaySong, C::NewSong, C::RemoveSong, C::PreviousSong, C::NextSong] {
+        // Play song lives in the Play menu only.
+        for command in [C::SongView, C::NewSong, C::RemoveSong, C::PreviousSong, C::NextSong] {
             assert!(song.contains(&command), "{command:?}");
         }
         assert!(song.contains(&C::RenameSong) && song.contains(&C::SongDescription));
+        assert!(!song.contains(&C::PlaySong) && runnable("Play").contains(&C::PlaySong));
         for command in [C::SaveSong, C::SaveSongAs, C::ExportSong, C::ImportSong] {
             assert!(file.contains(&command), "{command:?}");
         }
@@ -908,11 +968,6 @@ mod tests {
             C::ImportSong,
             C::ImportMidi,
             C::ExportMidi,
-            C::AddSample,
-            C::ReplaceSample,
-            C::LoadMapping,
-            C::ExportMapping,
-            C::ExportKitFolder,
             C::ExportLibrary,
             C::ImportLibrary,
             C::DemoLibrary,
@@ -946,6 +1001,20 @@ mod tests {
         for command in [C::AutoAssignAll, C::ConvertToSynth, C::ImportFolder] {
             assert!(commands.contains(&command), "{command:?}");
         }
+    }
+
+    #[test]
+    fn the_kit_menu_has_the_sample_and_mapping_commands() {
+        let all = MenuState { kit_sample: true, ..state() };
+        let kit = menus(&all).into_iter().find(|m| m.title == "Kit").unwrap();
+        let commands: Vec<Command> = kit.items.iter().filter_map(Item::runnable).collect();
+        use Command as C;
+        for command in [C::AddSample, C::ReplaceSample, C::LoadMapping, C::ExportMapping, C::ExportKitFolder] {
+            assert!(commands.contains(&command), "{command:?}");
+        }
+        // Not in the File menu any more.
+        let file: Vec<Command> = menus(&all)[0].items.iter().filter_map(Item::runnable).collect();
+        assert!(!file.contains(&C::AddSample));
     }
 
     #[test]

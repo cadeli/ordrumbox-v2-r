@@ -22,7 +22,7 @@ use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopClosed};
 use winit::keyboard::{KeyCode, ModifiersState, PhysicalKey};
 use winit::platform::modifier_supplement::KeyEventExtModifierSupplement;
-use winit::window::{Window, WindowId};
+use winit::window::{Fullscreen, Window, WindowId};
 
 const INITIAL_SIZE: LogicalSize<f64> = LogicalSize::new(1100.0, 680.0);
 
@@ -234,7 +234,13 @@ impl ApplicationHandler for App {
                 }
                 false
             }
-            WindowEvent::Resized(_) => true,
+            WindowEvent::Resized(_) => {
+                // Full screen left by the system's own means: the menu's check follows.
+                if let Some(gfx) = &self.gfx {
+                    self.ui.session.set_fullscreen(gfx.window.fullscreen().is_some());
+                }
+                true
+            }
             WindowEvent::ScaleFactorChanged { .. } => true,
             WindowEvent::ModifiersChanged(state) => {
                 self.ui.set_modifiers(modifiers(state.state()));
@@ -287,6 +293,12 @@ impl ApplicationHandler for App {
 impl App {
     /// After each window event: a quit asked from the menus or the keyboard.
     fn after_event(&mut self, event_loop: &ActiveEventLoop) {
+        if let Some(on) = self.ui.session.take_fullscreen_request()
+            && let Some(gfx) = &self.gfx
+        {
+            gfx.window.set_fullscreen(on.then_some(Fullscreen::Borderless(None)));
+            self.request_redraw();
+        }
         if self.ui.session.quit_requested() {
             self.quit(event_loop);
         }
@@ -349,6 +361,7 @@ fn open_window() -> Result<(), Box<dyn std::error::Error>> {
         // Closed: the app is quitting, there is nothing to wake.
         Ok(()) | Err(EventLoopClosed(())) => {}
     });
+    session.offer_devices(audio::devices);
     session.start_updates(waker.clone());
     session.start_mcp(waker);
     // MIDI files given on the command line ("open with"): imported.

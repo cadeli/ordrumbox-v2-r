@@ -227,7 +227,7 @@ impl Ui {
             // Before the panel's: with the track editor open, its side claims the whole column.
             None if frame::on_status_line(y, scale) => s.open_history(),
             None if s.mouse_down(size, x, y, Button::Left, shift) => {}
-            None => return self.click_content(x, y, shift),
+            None => return self.click_content(x, y, shift, self.modifiers.command()),
         }
         true
     }
@@ -235,11 +235,11 @@ impl Ui {
     /// A click on the grid, the song panel or the kit editor (Shift on a
     /// grid cell: select its note rather than switch the step, and a drag
     /// from it draws a zone).
-    fn click_content(&mut self, x: i32, y: i32, shift: bool) -> bool {
+    fn click_content(&mut self, x: i32, y: i32, shift: bool, control: bool) -> bool {
         let size = self.size();
         let s = &mut self.session;
         if s.song_view_open() {
-            return s.song_click(size, x, y, Button::Left);
+            return if shift { s.song_shift_click(size, x, y) } else { s.song_click(size, x, y, Button::Left) };
         }
         if s.piano_roll_open() {
             return if shift { s.roll_shift_press(size, x, y) } else { s.roll_click(size, x, y, Button::Left) };
@@ -260,6 +260,8 @@ impl Ui {
                 s.select_step_note(track, beat, step);
                 s.press_zone_drag(track, beat, step, x, y);
             }
+            // Ctrl+click: the zone grows to take the step in.
+            view::Hit::Cell { track, beat, step } if control => s.extend_zone_to(track, beat, step),
             _ => s.click(hit),
         }
         if let view::Hit::Name(t) = hit {
@@ -402,6 +404,21 @@ impl Ui {
         if let Some(open) = self.session.open_menu() {
             return self.menu_key(open, code);
         }
+        // Alt plus the first letter of a menu's title opens it (Y: Play, the
+        // Pattern's P taken). The app only: a plugin's Alt is the Ctrl the
+        // host keeps.
+        if alt
+            && !self.session.hosted()
+            && let Some(i) = code.letter()
+        {
+            let s = &mut self.session;
+            let menus = s.menus();
+            if let Some(menu) = menus.iter().position(|m| menu_letter(m.title, i)) {
+                s.close_overlay();
+                s.set_menu(Some(menu::Open::new(&menus, menu, true)));
+                return true;
+            }
+        }
         if self.session.overlay_open() {
             return self.overlay_key(event);
         }
@@ -439,6 +456,9 @@ impl Ui {
         }
         if let Some(row) = ROW_LETTERS.iter().position(|&k| k == code).filter(|_| row_key) {
             s.audition_row(row);
+            if !event.repeat {
+                s.record_note(row);
+            }
             return true;
         }
         if let Some(command) = shortcut(key, shift, command_key) {
@@ -449,11 +469,19 @@ impl Ui {
             s.run(command);
             return true;
         }
-        if command_key {
+        // Alt+arrows nudge the selected note, in a plugin too, where Alt is the host's Ctrl.
+        let nudge_key =
+            alt && !control && matches!(key, Key::ArrowLeft | Key::ArrowRight | Key::ArrowUp | Key::ArrowDown);
+        if command_key && !nudge_key {
             return false;
         }
         if let Some(hint) = shift_hint(key).filter(|_| !shift && !s.kit_editor_open()) {
             s.say(hint);
+            return true;
+        }
+        // Home and the keypad's Enter rewind the transport (the kit editor's Enter hears a sample).
+        if matches!(key, Key::Home | Key::NumpadEnter) && !s.hosted() && !s.kit_editor_open() && !s.synth_open() {
+            s.rewind();
             return true;
         }
         if s.kit_editor_open() {
@@ -498,10 +526,14 @@ impl Ui {
             match key {
                 Key::Minus | Key::NumpadSubtract if tempo_keys => s.step_tempo(-tempo),
                 Key::Equal | Key::NumpadAdd if tempo_keys => s.step_tempo(tempo),
-                Key::ArrowLeft if shift => s.nudge(Move::Left),
-                Key::ArrowRight if shift => s.nudge(Move::Right),
-                Key::ArrowUp if shift => s.nudge(Move::Up),
-                Key::ArrowDown if shift => s.nudge(Move::Down),
+                Key::ArrowLeft if alt => s.nudge(Move::Left),
+                Key::ArrowRight if alt => s.nudge(Move::Right),
+                Key::ArrowUp if alt => s.nudge(Move::Up),
+                Key::ArrowDown if alt => s.nudge(Move::Down),
+                Key::ArrowLeft if shift => s.extend_zone(Move::Left),
+                Key::ArrowRight if shift => s.extend_zone(Move::Right),
+                Key::ArrowUp if shift => s.extend_zone(Move::Up),
+                Key::ArrowDown if shift => s.extend_zone(Move::Down),
                 Key::ArrowLeft => s.move_cursor(Move::Left),
                 Key::ArrowRight => s.move_cursor(Move::Right),
                 Key::ArrowUp => s.move_cursor(Move::Up),
@@ -566,6 +598,9 @@ impl Ui {
             Key::ArrowRight => s.set_menu(Some(open.switch(&menus, 1))),
             Key::ArrowUp => s.set_menu(Some(open.step(&menus, -1))),
             Key::ArrowDown => s.set_menu(Some(open.step(&menus, 1))),
+            Key::Home => s.set_menu(Some(open.step(&menus, isize::MIN / 2))),
+            Key::End => s.set_menu(Some(open.step(&menus, isize::MAX / 2))),
+            Key::Letter(c) => s.set_menu(Some(open.jump(&menus, c))),
             Key::Enter | Key::NumpadEnter | Key::Space => match open.command(&menus) {
                 Some(command) => s.run(command),
                 None => return false,
@@ -624,11 +659,13 @@ fn shortcut(code: Key, shift: bool, control: bool) -> Option<Command> {
             Key::Letter('C') if shift => C::CopyTrack,
             Key::Letter('C') => C::CopyStep,
             Key::Letter('X') => C::Cut,
+            Key::Letter('R') => C::Record,
+            Key::Letter('A') => C::SelectAll,
             Key::Letter('V') if shift => C::PasteTrack,
             Key::Letter('V') => C::Paste,
             Key::Letter('S') if shift => C::ExportPatternJson,
             Key::Letter('S') => C::Save,
-            Key::Letter('O') => C::ImportMidi,
+            Key::Letter('O') => C::LoadSong,
             Key::Letter('E') if shift => C::ExportSongWav,
             Key::Letter('E') => C::ExportWav,
             // Cmd+M is the Mac's "minimize the window": the export takes Shift there.
@@ -636,10 +673,10 @@ fn shortcut(code: Key, shift: bool, control: bool) -> Option<Command> {
             Key::Letter('K') => C::KitEditor,
             Key::Letter('N') => C::NewPattern,
             Key::Letter('D') => C::DuplicatePattern,
+            Key::Letter('T') if shift => C::ToggleToasts,
             Key::Letter('T') => C::AddTrack,
             Key::Backspace | Key::Delete => C::RemoveTrack,
             Key::Letter('G') => C::NextGrid,
-            Key::Letter('L') => C::ShortenLoop,
             // The zoom of everywhere else, the keypad's keys included; the
             // pattern length has no key (the menus and the song panel).
             Key::Minus | Key::NumpadSubtract => C::ZoomOut,
@@ -648,7 +685,7 @@ fn shortcut(code: Key, shift: bool, control: bool) -> Option<Command> {
             // The views F1–F7 switch, on the keyboards whose F keys want Fn.
             Key::Digit(n @ 1..=7) => view_command(n),
             Key::Letter('B') if shift => C::NewGeneratedPattern,
-            Key::Letter('Q') => C::Quit,
+            Key::Letter('Q') | Key::Letter('W') => C::Quit,
             _ => return None,
         }
     } else {
@@ -660,6 +697,9 @@ fn shortcut(code: Key, shift: bool, control: bool) -> Option<Command> {
             Key::F(5) => C::Grid,
             Key::F(6) => C::SynthEditor,
             Key::F(7) => C::NoteEditor,
+            Key::F(8) => C::TapTempo,
+            Key::F(11) => C::Fullscreen,
+            Key::F(9) => C::Metronome,
             Key::BracketLeft if shift => C::PreviousSong,
             Key::BracketRight if shift => C::NextSong,
             Key::BracketLeft | Key::PageUp => C::PreviousPattern,
@@ -686,6 +726,13 @@ fn shortcut(code: Key, shift: bool, control: bool) -> Option<Command> {
             _ => return None,
         }
     })
+}
+
+/// Whether `title` is the menu `c` opens with Alt: its first letter, or
+/// Play (whose P is the Pattern's) by its Y.
+fn menu_letter(title: &str, c: char) -> bool {
+    let lower = c.to_ascii_lowercase();
+    title.to_lowercase().starts_with(lower) || (lower == 'y' && title == "Play")
 }
 
 /// The command F(n) and Ctrl+n run: the panels, in their menu order.
@@ -727,6 +774,9 @@ mod tests {
         assert_eq!(shortcut(Key::Letter('L'), false, false), Some(Command::ToggleAccent));
         assert_eq!(shortcut(Key::Letter('S'), false, true), Some(Command::Save));
         assert_eq!(shortcut(Key::Letter('S'), true, true), Some(Command::ExportPatternJson));
+        // Ctrl+O loads a song (O alone hears track 9); importing a MIDI file has no key.
+        assert_eq!(shortcut(Key::Letter('O'), false, true), Some(Command::LoadSong));
+        assert_eq!(shortcut(Key::Letter('O'), false, false), None);
         // Solo and mute of the focused track, as every DAW spells them.
         assert_eq!(shortcut(Key::Letter('S'), false, false), Some(Command::Solo));
         assert_eq!(shortcut(Key::Letter('M'), false, false), Some(Command::Mute));

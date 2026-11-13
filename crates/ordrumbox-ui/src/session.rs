@@ -56,6 +56,8 @@ use session_playback::Playback;
 use session_saving::Saving;
 use session_selection::{Clipboard, NoteFocus, Selection};
 
+#[path = "session_audio.rs"]
+mod session_audio;
 #[path = "session_chrome.rs"]
 mod session_chrome;
 #[path = "session_color.rs"]
@@ -74,8 +76,12 @@ mod session_generate;
 mod session_grid;
 #[path = "session_lane.rs"]
 mod session_lane;
+#[path = "session_record.rs"]
+mod session_record;
 #[path = "session_roll_zone.rs"]
 mod session_roll_zone;
+#[path = "session_tempo.rs"]
+mod session_tempo;
 #[path = "session_zone.rs"]
 mod session_zone;
 #[path = "session_zoom.rs"]
@@ -298,6 +304,14 @@ pub struct Session {
     workspace: Workspace,
     /// The measure the song plays from.
     song_cursor: u32,
+    /// The measures a song plays in a loop: its index, first measure, end (excluded).
+    song_loop: Option<(usize, u32, u32)>,
+    /// A click on every beat.
+    metronome: bool,
+    /// The row keys put notes on the step the pattern plays (`session_record.rs`).
+    recording: bool,
+    /// When tempo was tapped, oldest first (`session_tempo.rs`).
+    taps: Vec<Instant>,
     /// The song panel's scrolls and what the mouse holds in it.
     song_panel: session_song::SongPanel,
     /// The piano roll's view and what the mouse holds in it.
@@ -318,6 +332,10 @@ pub struct Session {
     assets_dir: Option<PathBuf>,
     /// File > Quit was chosen.
     quit: bool,
+    /// The window is full screen.
+    fullscreen: bool,
+    /// A change of the window's mode the program has not applied yet.
+    fullscreen_request: Option<bool>,
     /// The scale names, in file order (arpeggios).
     scale_list: ScaleList,
     /// Tabs and selection of the track and note editors.
@@ -372,6 +390,9 @@ struct Widgets {
     pointer: (i32, i32),
     /// Last click on a widget, for double-clicks.
     last_click: Option<(Id, Instant)>,
+    /// A control's value copied from its right-click menu, to paste on
+    /// another whose range holds it.
+    copied_value: Option<f64>,
 }
 
 /// What is shown over the window.
@@ -383,18 +404,28 @@ enum Overlay {
         scroll: usize,
     },
     About,
-    FactoryReset,
+    /// Help > Factory reset, until the user says so: `yes` is the button
+    /// ENTER would run, `false` (the default) keeps.
+    FactoryReset {
+        yes: bool,
+    },
     /// What was done; the first row shown.
     History {
         scroll: usize,
     },
-    /// The file an export would replace, until the user says so.
+    /// The file an export would replace, until the user says so: `yes` is
+    /// the button ENTER would run, `false` (the default) keeps the file.
     ConfirmOverwrite {
         export: Export,
         path: PathBuf,
+        yes: bool,
     },
-    /// What removes or replaces the user's work, until the user says so.
-    Confirm(Pending),
+    /// What removes or replaces the user's work, until the user says so:
+    /// `yes` is the button ENTER would run, `false` (the default) keeps.
+    Confirm {
+        pending: Pending,
+        yes: bool,
+    },
 }
 
 /// The loop start of pattern `p` (loop `pass` of the playback): new lines for
@@ -504,6 +535,11 @@ impl Flash {
 impl Session {
     /// The session for the assets found and the user's files, its sound
     /// started by `start_output`.
+    /// The program lists the sound devices with `devices`, for File > Audio output.
+    pub fn offer_devices(&mut self, devices: crate::audio_output::OutputDevices) {
+        self.playback.keep_devices(devices);
+    }
+
     pub fn load(start_output: StartOutput) -> Self {
         Self::load_from(start_output, LibrarySource::UserFile)
     }
@@ -708,6 +744,10 @@ impl Session {
             pattern_index: 0,
             workspace: Workspace::Grid,
             song_cursor: 0,
+            song_loop: None,
+            metronome: false,
+            recording: false,
+            taps: Vec::new(),
             song_panel: session_song::SongPanel::default(),
             roll: session_roll::RollState::default(),
             render: None,
@@ -721,6 +761,8 @@ impl Session {
             action_log: ActionLog::default(),
             assets_dir: None,
             quit: false,
+            fullscreen: false,
+            fullscreen_request: None,
             scale_list: ScaleList::default(),
             editors: EditorState::default(),
             color_scheme: 1,
@@ -1056,6 +1098,9 @@ impl Session {
         // What the library's tags teach, learned again after an edit (the header and menus read it).
         learned_styles(&mut self.learned_styles, &self.styles, &self.editor);
         self.refresh_synths();
+        let region = self.song_loop_region().map(|(first, end)| (u64::from(first), u64::from(end)));
+        self.playback.set_song_loop(&self.editor, region);
+        self.playback.set_metronome(&self.editor, self.metronome);
         self.playback.update(&mut self.editor, self.pattern_index, |editor, p, pass| {
             auto_loop(editor, &mut self.learned_styles, &self.styles, &self.scales, &mut self.rng, p, pass)
         });
@@ -1357,22 +1402,30 @@ impl Session {
                 let layout = LogLayout::new(canvas.width(), canvas.height(), scale);
                 action_log::draw(canvas, &self.action_log, *scroll, &layout);
             }
-            Some(Overlay::FactoryReset) => {
-                view::draw_notice(canvas, "Factory reset", &self.factory_reset_lines(), scale)
-            }
-            Some(Overlay::ConfirmOverwrite { path, .. }) => {
+            Some(Overlay::FactoryReset { yes }) => view::draw_notice_choice(
+                canvas,
+                "Factory reset",
+                &self.factory_reset_lines(),
+                ["Keep", "Reset"],
+                usize::from(*yes),
+                scale,
+            ),
+            Some(Overlay::ConfirmOverwrite { path, yes, .. }) => {
                 // The name alone: the folder was just picked, and a long path would not fit.
                 let name = path.file_name().unwrap_or(path.as_os_str()).to_string_lossy();
-                let lines = [
-                    format!("{name} already exists in this folder."),
-                    String::new(),
-                    "ENTER: replace it   ESC: keep it".to_owned(),
-                ];
-                view::draw_notice(canvas, "Replace the file?", &lines, scale)
+                let lines = [format!("{name} already exists in this folder."), String::new()];
+                view::draw_notice_choice(
+                    canvas,
+                    "Replace the file?",
+                    &lines,
+                    ["Keep it", "Replace it"],
+                    usize::from(*yes),
+                    scale,
+                )
             }
-            Some(Overlay::Confirm(pending)) => {
-                let (title, lines) = self.confirm_text(pending);
-                view::draw_notice(canvas, title, &lines, scale)
+            Some(Overlay::Confirm { pending, yes }) => {
+                let (title, lines, action) = self.confirm_text(pending);
+                view::draw_notice_choice(canvas, title, &lines, ["Keep", &action], usize::from(*yes), scale)
             }
             None => {}
         }

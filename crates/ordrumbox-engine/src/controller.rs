@@ -406,6 +406,10 @@ pub struct Controller {
     swing: f64,
     /// What the cue posted was built from; `None`: none posted, or one to build again.
     cue: Option<CueKey>,
+    /// The measures a song plays in a loop, `first..end` (`end` excluded).
+    song_loop: Option<(u64, u64)>,
+    /// A click on every beat of the passes built.
+    metronome: bool,
 }
 
 /// What a cue ([`Inbox::cue`]) is built from: a cue built from the same is
@@ -498,6 +502,8 @@ impl Controller {
             tempo: None,
             swing: STRAIGHT_SWING,
             cue: None,
+            song_loop: None,
+            metronome: false,
         };
         (controller, audio)
     }
@@ -654,6 +660,41 @@ impl Controller {
         self.tempo.unwrap_or_else(|| clamp_bpm(own))
     }
 
+    /// The measures of a song that play in a loop, `first..end`, or `None`
+    /// to play on to the end. The pass playing is rebuilt, the next ones
+    /// follow the region: a song that reaches `end` goes back to `first`.
+    pub fn set_song_loop(&mut self, library: &Library, region: Option<(u64, u64)>) {
+        let region = region.filter(|(first, end)| first < end);
+        if self.song_loop != region {
+            self.song_loop = region;
+            self.refresh(library);
+        }
+    }
+
+    /// The metronome on or off: the pass playing is rebuilt with it, the
+    /// next ones follow.
+    pub fn set_metronome(&mut self, library: &Library, on: bool) {
+        if self.metronome != on {
+            self.metronome = on;
+            self.cue = None;
+            self.refresh(library);
+        }
+    }
+
+    pub fn metronome(&self) -> bool {
+        self.metronome
+    }
+
+    /// The song measure the pass of sequence `number` plays: the pass numbers
+    /// only count up (the engine takes them in order), so the loop is made
+    /// here, in what each pass holds.
+    fn song_measure(&self, number: u64) -> u64 {
+        match self.song_loop {
+            Some((first, end)) if number >= end => first + (number - first) % (end - first),
+            _ => number,
+        }
+    }
+
     /// Pass `number` of `mode`.
     fn build_of(&mut self, library: &Library, number: u64, mode: Mode) -> Option<Arc<Pass>> {
         let pass = match mode {
@@ -696,9 +737,16 @@ impl Controller {
                     swing: self.swing,
                 };
                 let bpm = self.bpm_of(library, mode);
-                build_song_pass_at(song, number, &mut self.rng, &mut self.song_notes, context, bpm)
+                let measure = self.song_measure(number);
+                let mut pass = build_song_pass_at(song, measure, &mut self.rng, &mut self.song_notes, context, bpm);
+                pass.number = number;
+                pass
             }
         };
+        let mut pass = pass;
+        if self.metronome {
+            crate::metronome::add_clicks(&mut pass);
+        }
         let pass = Arc::new(pass);
         self.sent.push_back(pass.clone());
         Some(pass)
@@ -1223,6 +1271,17 @@ mod tests {
             step(&mut controller, true, &mut seen);
         }
         assert_eq!(seen, [3, 4, 5, 1, 2, 3]);
+    }
+
+    #[test]
+    fn a_song_loop_wraps_the_measures_but_not_the_pass_numbers() {
+        let (mut controller, _audio) = Controller::new(8000.0, bank(), Scales::default(), SynthPresets::default());
+        let library = Library::default();
+        assert_eq!((0..5).map(|n| controller.song_measure(n)).collect::<Vec<_>>(), [0, 1, 2, 3, 4], "no loop");
+        controller.set_song_loop(&library, Some((2, 4)));
+        assert_eq!((0..8).map(|n| controller.song_measure(n)).collect::<Vec<_>>(), [0, 1, 2, 3, 2, 3, 2, 3]);
+        controller.set_song_loop(&library, Some((3, 3)));
+        assert_eq!(controller.song_measure(9), 9, "an empty region is no loop");
     }
 
     #[test]

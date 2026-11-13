@@ -57,6 +57,71 @@ impl Session {
         changed
     }
 
+    /// Ctrl+A: the whole pattern as a zone: every track, every beat.
+    pub fn select_all(&mut self) {
+        let Some(pattern) = self.pattern() else { return };
+        let Some(last_track) = pattern.tracks.len().checked_sub(1) else {
+            self.message = "no track to select".into();
+            return;
+        };
+        let last_step = |t: usize| {
+            let track = &pattern.tracks[t];
+            StepAt { track: t, beat: pattern.beat_count.max(1) - 1, step: track.steps_per_beat.max(1) - 1 }
+        };
+        let first = StepAt { track: 0, beat: 0, step: 0 };
+        // The zone is the rectangle: the latest end of any track bounds it.
+        let zone = (0..=last_track).filter_map(|t| Zone::between(pattern, first, last_step(t))).reduce(|a, b| Zone {
+            last_track: b.last_track.max(a.last_track),
+            end_units: a.end_units.max(b.end_units),
+            ..a
+        });
+        self.selection.zone = zone;
+        self.selection.zone_anchor = Some(first);
+        self.selection.selected = None;
+        self.message = zone.map_or_else(String::new, |z| format!("selected all — {}", zone_label(&z)));
+    }
+
+    /// Shift+arrows: the zone grows by a step or a row from the cursor, which
+    /// moves with its far corner; the corner it started from stays.
+    pub fn extend_zone(&mut self, direction: Move) {
+        let Some(cursor) = self.selection.cursor.or_else(|| self.first_step()) else { return };
+        let anchor =
+            self.selection.zone_anchor.unwrap_or(StepAt { track: cursor.track, beat: cursor.beat, step: cursor.step });
+        self.selection.cursor = Some(cursor);
+        self.move_cursor(direction);
+        self.selection.zone_anchor = Some(anchor);
+        self.selection.selected = None;
+        if let Some(head) = self.selection.cursor {
+            self.zone_to(anchor, StepAt { track: head.track, beat: head.beat, step: head.step });
+        }
+    }
+
+    /// Ctrl+click on a step: the zone grows to take it in, from the zone's
+    /// anchor, else from the cursor.
+    pub fn extend_zone_to(&mut self, t: usize, beat: i32, step: i32) {
+        let head = StepAt { track: t, beat, step };
+        let anchor = self
+            .selection
+            .zone_anchor
+            .or_else(|| self.selection.cursor.map(|c| StepAt { track: c.track, beat: c.beat, step: c.step }));
+        let anchor = anchor.unwrap_or(head);
+        self.selection.cursor = Some(Cursor { track: t, beat, step });
+        self.selection.zone_anchor = Some(anchor);
+        self.selection.selected = None;
+        self.zone_to(anchor, head);
+    }
+
+    fn zone_to(&mut self, anchor: StepAt, head: StepAt) {
+        let Some(pattern) = self.pattern() else { return };
+        let zone = Zone::between(pattern, anchor, head);
+        self.message = zone.as_ref().map_or_else(String::new, zone_label);
+        self.selection.zone = zone;
+    }
+
+    fn first_step(&self) -> Option<Cursor> {
+        self.pattern().filter(|p| !p.tracks.is_empty()).map(|_| Cursor { track: 0, beat: 0, step: 0 })
+    }
+
     /// Ctrl+C on a zone: its notes.
     pub(super) fn copy_zone(&mut self, zone: &Zone) {
         let Some(pattern) = self.pattern() else { return };
@@ -402,5 +467,89 @@ mod tests {
         assert_eq!((beats(&ui.session, 0), beats(&ui.session, 1)), (vec![2, 3], vec![3]));
         press(&mut ui, CONTROL, Key::Letter('Z'));
         assert_eq!((beats(&ui.session, 0), beats(&ui.session, 1)), (vec![0, 1, 2, 3], vec![1, 3]), "one undo step");
+    }
+
+    const SHIFT: Modifiers = Modifiers { shift: true, control: false, alt: false, logo: false };
+    const ALT: Modifiers = Modifiers { shift: false, control: false, alt: true, logo: false };
+
+    fn zone_tracks_and_beats(s: &Session) -> Option<(usize, usize, i64, i64)> {
+        s.selection.zone.map(|z| (z.first_track, z.last_track, z.start_units, z.end_units))
+    }
+
+    #[test]
+    fn ctrl_a_selects_the_whole_pattern_and_what_the_zone_takes_follows() {
+        let (mut ui, _) = ui();
+        press(&mut ui, CONTROL, Key::Letter('A'));
+        let zone = ui.session.selection.zone.expect("a zone");
+        assert_eq!((zone.first_track, zone.last_track, zone.start_units), (0, 2, 0));
+        assert!(ui.session.message().starts_with("selected all"), "{}", ui.session.message());
+        press(&mut ui, CONTROL, Key::Letter('C'));
+        assert!(matches!(&ui.session.selection.clipboard, Some(Clipboard::Block(b)) if b.note_count() == 6));
+        press(&mut ui, NONE, Key::Delete);
+        assert_eq!((beats(&ui.session, 0), beats(&ui.session, 1)), (Vec::<i32>::new(), Vec::<i32>::new()));
+        press(&mut ui, CONTROL, Key::Letter('Z'));
+        assert_eq!(beats(&ui.session, 0), [0, 1, 2, 3]);
+    }
+
+    #[test]
+    fn shift_arrows_grow_the_zone_from_the_cursor_and_back_to_it() {
+        let (mut ui, _) = ui();
+        ui.session.click(crate::view::Hit::Cell { track: 0, beat: 1, step: 0 });
+        press(&mut ui, SHIFT, Key::ArrowRight);
+        let one = zone_tracks_and_beats(&ui.session).expect("a zone");
+        assert_eq!((one.0, one.1), (0, 0));
+        press(&mut ui, SHIFT, Key::ArrowRight);
+        let two = zone_tracks_and_beats(&ui.session).unwrap();
+        assert_eq!(two.2, one.2, "the anchor stays");
+        assert!(two.3 > one.3, "the far corner moves");
+        press(&mut ui, SHIFT, Key::ArrowDown);
+        assert_eq!(zone_tracks_and_beats(&ui.session).map(|z| (z.0, z.1)), Some((0, 1)));
+        // Back over the way it came: the zone shrinks to the step.
+        press(&mut ui, SHIFT, Key::ArrowUp);
+        press(&mut ui, SHIFT, Key::ArrowLeft);
+        press(&mut ui, SHIFT, Key::ArrowLeft);
+        assert_eq!(zone_tracks_and_beats(&ui.session).map(|z| (z.0, z.1)), Some((0, 0)));
+        // A plain arrow starts over: the next Shift+arrow grows from the new step.
+        press(&mut ui, NONE, Key::ArrowDown);
+        press(&mut ui, SHIFT, Key::ArrowRight);
+        assert_eq!(zone_tracks_and_beats(&ui.session).map(|z| (z.0, z.1)), Some((1, 1)));
+    }
+
+    #[test]
+    fn alt_arrows_nudge_the_note_and_shift_arrows_select() {
+        let (mut ui, _) = ui();
+        ui.session.select_step_note(0, 1, 0);
+        let at =
+            |s: &Session| s.pattern().unwrap().tracks[0].notes.iter().map(|n| (n.beat, n.step)).collect::<Vec<_>>();
+        assert!(at(&ui.session).contains(&(1, 0)));
+        press(&mut ui, ALT, Key::ArrowRight);
+        assert!(at(&ui.session).contains(&(1, 1)), "one step later: {:?}", at(&ui.session));
+        assert!(ui.session.selection.zone.is_none());
+        press(&mut ui, SHIFT, Key::ArrowRight);
+        assert!(at(&ui.session).contains(&(1, 1)), "Shift+arrow moves no note");
+        assert!(ui.session.selection.zone.is_some());
+    }
+
+    #[test]
+    fn ctrl_click_takes_a_step_into_the_zone() {
+        let (mut ui, size) = ui();
+        point(&mut ui, size, (0, 0, 0));
+        ui.pointer_pressed(Button::Left);
+        ui.pointer_released(Button::Left);
+        let revision = ui.session.library_revision();
+        ui.set_modifiers(CONTROL);
+        point(&mut ui, size, (1, 1, 0));
+        assert!(ui.pointer_pressed(Button::Left));
+        ui.pointer_released(Button::Left);
+        ui.set_modifiers(NONE);
+        assert_eq!(ui.session.library_revision(), revision, "no note switched");
+        assert_eq!(zone_tracks_and_beats(&ui.session).map(|z| (z.0, z.1)), Some((0, 1)));
+        // A second Ctrl+click grows it again from the same corner.
+        ui.set_modifiers(CONTROL);
+        point(&mut ui, size, (2, 3, 0));
+        ui.pointer_pressed(Button::Left);
+        ui.pointer_released(Button::Left);
+        ui.set_modifiers(NONE);
+        assert_eq!(zone_tracks_and_beats(&ui.session).map(|z| (z.0, z.1)), Some((0, 2)));
     }
 }

@@ -62,7 +62,7 @@ impl Session {
         if path.exists() && matches!(export, Export::KitFolder | Export::UserData) {
             self.message = format!("not exported: {} already exists", path.display());
         } else if path.exists() {
-            self.chrome.overlay = Some(Overlay::ConfirmOverwrite { export, path });
+            self.chrome.overlay = Some(Overlay::ConfirmOverwrite { export, path, yes: false });
         } else {
             self.write_export(export, &path);
         }
