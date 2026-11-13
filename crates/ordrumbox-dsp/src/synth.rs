@@ -14,6 +14,7 @@
 use std::f64::consts::PI;
 
 use crate::slope::{self, FilterMode};
+use crate::svf::{Svf, tap, tap_weights};
 
 mod envelope;
 mod filter;
@@ -22,7 +23,7 @@ mod oscillator;
 pub mod patch;
 
 use envelope::{Envelope, FilterEnvelope, Segment};
-use filter::{Tpt, cutoff_coefficient, tap, tap_weights};
+use filter::{coefficients, cutoff_coefficient};
 use modulation::{
     DETUNE_SLOTS, ENV_SLOTS, GAIN_SLOTS, LfoMods, LfoRoute, MOD_ENV_SLOTS, Slot, modulated, modulated_adsr,
 };
@@ -119,10 +120,10 @@ pub struct SynthVoice {
     rng: u32,
     lfo_phase: [f64; 2],
     lfo_seeded: bool,
-    filter: Tpt,
+    filter: Svf,
     /// Second filter stage (24 dB/oct only).
-    filter_2: Tpt,
-    noise_filter: Tpt,
+    filter_2: Svf,
+    noise_filter: Svf,
     env: Envelope,
     filter_env: FilterEnvelope,
     mod_env: Envelope,
@@ -143,9 +144,9 @@ impl Default for SynthVoice {
             rng: NOISE_SEED,
             lfo_phase: [0.0; 2],
             lfo_seeded: false,
-            filter: Tpt::default(),
-            filter_2: Tpt::default(),
-            noise_filter: Tpt::default(),
+            filter: Svf::default(),
+            filter_2: Svf::default(),
+            noise_filter: Svf::default(),
             env: Envelope::new(Segment::Idle),
             filter_env: FilterEnvelope::new(Segment::Idle),
             mod_env: Envelope::new(Segment::Idle),
@@ -427,7 +428,7 @@ impl SynthVoice {
         } else {
             (b.noise_g, b.noise_k)
         };
-        tap(self.noise_filter.step(raw, g, k), b.noise_weights)
+        tap(self.noise_filter.step(raw, &coefficients(g, k)), b.noise_weights)
     }
 
     /// `x` through the main filter at `cutoff` Hz. The coefficients are the
@@ -447,11 +448,11 @@ impl SynthVoice {
             (b.g, b.k)
         };
         if !b.is_steep {
-            return tap(self.filter.step(x, g, k), b.filter_weights);
+            return tap(self.filter.step(x, &coefficients(g, k)), b.filter_weights);
         }
         let (k1, k2, gain_2) = slope::stages(k, b.filter_mode);
-        let first = tap(self.filter.step(x, g, k1), b.filter_weights);
-        tap(self.filter_2.step(first, g, k2), b.filter_weights) * gain_2
+        let first = tap(self.filter.step(x, &coefficients(g, k1)), b.filter_weights);
+        tap(self.filter_2.step(first, &coefficients(g, k2)), b.filter_weights) * gain_2
     }
 }
 

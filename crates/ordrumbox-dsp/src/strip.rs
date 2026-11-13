@@ -14,7 +14,8 @@
 
 use std::f64::consts::{PI, TAU};
 
-use crate::slope;
+use crate::slope::{self, FilterMode};
+use crate::svf::{Svf, SvfCoeffs, output};
 
 const COMB_TUNINGS_L: [usize; 8] = [1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617];
 const COMB_TUNINGS_R: [usize; 8] = [1139, 1211, 1300, 1379, 1445, 1514, 1580, 1640];
@@ -240,69 +241,48 @@ impl Dispersion {
     }
 }
 
-/// TPT state-variable filter state (one channel, one stage).
-#[derive(Debug, Clone, Copy, Default)]
-struct Svf {
-    z1: f64,
-    z2: f64,
+/// The curve of the saturation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Saturation {
+    Tanh,
+    HardClip,
+    /// An asymmetric tanh.
+    Tape,
 }
 
-/// Coefficients of one [`Svf`] stage at a cutoff and damping.
-#[derive(Debug, Clone, Copy)]
-struct SvfCoeffs {
-    k: f64,
-    a1: f64,
-    a2: f64,
-    a3: f64,
-}
-
-impl SvfCoeffs {
-    /// `g` is `tan(pi * cutoff / sample_rate)`, `k` is `1 / q`.
-    fn new(g: f64, k: f64) -> Self {
-        let a1 = 1.0 / (1.0 + g * (g + k));
-        let a2 = g * a1;
-        Self { k, a1, a2, a3: g * a2 }
-    }
-}
-
-impl Svf {
-    /// Filter `x` and return the output of `mode` (as `filter_mode`).
-    #[inline]
-    fn process(&mut self, x: f64, c: &SvfCoeffs, mode: f64) -> f64 {
-        let v3 = x - self.z2;
-        let v1 = c.a1 * self.z1 + c.a2 * v3;
-        let v2 = self.z2 + c.a2 * self.z1 + c.a3 * v3;
-        self.z1 = 2.0 * v1 - self.z1;
-        self.z2 = 2.0 * v2 - self.z2;
-        flush(&mut self.z1);
-        flush(&mut self.z2);
-        if mode < 0.5 {
-            v2
-        } else if mode < 1.5 {
-            x - c.k * v1 - v2
-        } else if mode < 2.5 {
-            v1
+impl Saturation {
+    /// The curve a `saturation_type` setting stands for: the nearest code,
+    /// the tape above the last.
+    fn from_setting(setting: f64) -> Self {
+        if setting < 0.5 {
+            Self::Tanh
+        } else if setting < 1.5 {
+            Self::HardClip
         } else {
-            x - c.k * v1
+            Self::Tape
         }
     }
 }
 
 /// `#shape()`: drive, waveshape, dry/wet, output gain.
+///
+/// The `match` runs for every sample: the curve of a block never changes, so
+/// the branch is always the same one, and a loop per curve would triple the
+/// strip's loop.
 #[inline]
-fn shape(x: f64, drive: f64, kind: f64, mix: f64, out: f64) -> f64 {
+fn shape(x: f64, drive: f64, curve: Saturation, mix: f64, out: f64) -> f64 {
     if mix <= 0.0 {
         return x;
     }
     let d = x * drive;
-    let s = if kind < 0.5 {
-        d.tanh()
-    } else if kind < 1.5 {
-        d.clamp(-1.0, 1.0)
-    } else {
-        // Biased and re-centred (0 stays 0), unity slope at 0.
-        let bias = TAPE_BIAS.tanh();
-        ((d + TAPE_BIAS).tanh() - bias) / (1.0 - bias * bias)
+    let s = match curve {
+        Saturation::Tanh => d.tanh(),
+        Saturation::HardClip => d.clamp(-1.0, 1.0),
+        Saturation::Tape => {
+            // Biased and re-centred (0 stays 0), unity slope at 0.
+            let bias = TAPE_BIAS.tanh();
+            ((d + TAPE_BIAS).tanh() - bias) / (1.0 - bias * bias)
+        }
     };
     (x * (1.0 - mix) + s * mix) * out
 }
@@ -476,13 +456,11 @@ impl Strip {
     ) {
         let s = settings.clamped();
         let sr = self.sample_rate;
-        let (cutoff, q, mode) = (f64::from(s.cutoff), f64::from(s.q), f64::from(s.filter_mode));
-        let (saturation_drive, saturation_type, saturation_mix, saturation_output) = (
-            f64::from(s.saturation_drive),
-            f64::from(s.saturation_type),
-            f64::from(s.saturation_mix),
-            f64::from(s.saturation_output),
-        );
+        let (cutoff, q) = (f64::from(s.cutoff), f64::from(s.q));
+        let mode = FilterMode::from_setting(f64::from(s.filter_mode));
+        let saturation = Saturation::from_setting(f64::from(s.saturation_type));
+        let (saturation_drive, saturation_mix, saturation_output) =
+            (f64::from(s.saturation_drive), f64::from(s.saturation_mix), f64::from(s.saturation_output));
         let (reverb_room, reverb_damping, reverb_width, reverb_mix) =
             (f64::from(s.reverb_room), f64::from(s.reverb_damping), f64::from(s.reverb_width), f64::from(s.reverb_mix));
         let (delay_mix, delay_feedback, delay_mode) =
@@ -533,7 +511,7 @@ impl Strip {
 
         let g = (PI * cutoff / sr).tan();
         let (stage_1, stage_2, gain_2) = if slope::is_steep(f64::from(s.filter_slope)) {
-            let (k1, k2, gain_2) = slope::stages(1.0 / q, slope::FilterMode::from_setting(mode));
+            let (k1, k2, gain_2) = slope::stages(1.0 / q, mode);
             (SvfCoeffs::new(g, k1), Some(SvfCoeffs::new(g, k2)), gain_2)
         } else {
             (SvfCoeffs::new(g, 1.0 / q), None, 1.0)
@@ -549,12 +527,12 @@ impl Strip {
             // 1. Filter.
             let (mut dry_l, mut dry_r) = (f64::from(x_l), f64::from(x_r));
             if filter_on {
-                dry_l = self.filter[0].process(dry_l, &stage_1, mode);
-                dry_r = self.filter[1].process(dry_r, &stage_1, mode);
+                dry_l = output(self.filter[0].step(dry_l, &stage_1), mode);
+                dry_r = output(self.filter[1].step(dry_r, &stage_1), mode);
             }
             if let (true, Some(stage_2)) = (filter_on, &stage_2) {
-                dry_l = self.filter_2[0].process(dry_l, stage_2, mode) * gain_2;
-                dry_r = self.filter_2[1].process(dry_r, stage_2, mode) * gain_2;
+                dry_l = output(self.filter_2[0].step(dry_l, stage_2), mode) * gain_2;
+                dry_r = output(self.filter_2[1].step(dry_r, stage_2), mode) * gain_2;
             }
 
             // 2. Compressor.
@@ -564,12 +542,12 @@ impl Strip {
 
             // 3. Saturation.
             let mut sat_l = if has_sat {
-                shape(dry_l, saturation_drive, saturation_type, saturation_mix, saturation_output)
+                shape(dry_l, saturation_drive, saturation, saturation_mix, saturation_output)
             } else {
                 dry_l
             };
             let mut sat_r = if has_sat {
-                shape(dry_r, saturation_drive, saturation_type, saturation_mix, saturation_output)
+                shape(dry_r, saturation_drive, saturation, saturation_mix, saturation_output)
             } else {
                 dry_r
             };
@@ -649,8 +627,8 @@ impl Strip {
                 self.delay_filter_r += delay_tone * (delayed_r - self.delay_filter_r);
                 flush(&mut self.delay_filter_l);
                 flush(&mut self.delay_filter_r);
-                let fb_l = shape(self.delay_filter_l * delay_feedback, 1.5, 0.0, 0.5, 1.0);
-                let fb_r = shape(self.delay_filter_r * delay_feedback, 1.5, 0.0, 0.5, 1.0);
+                let fb_l = shape(self.delay_filter_l * delay_feedback, 1.5, Saturation::Tanh, 0.5, 1.0);
+                let fb_r = shape(self.delay_filter_r * delay_feedback, 1.5, Saturation::Tanh, 0.5, 1.0);
                 if ping_pong {
                     self.delay_l.write(send_l + fb_r);
                     self.delay_r.write(send_r + fb_l);
@@ -760,8 +738,8 @@ mod tests {
 
     #[test]
     fn tape_saturation_keeps_silence_and_bends_one_side_more() {
-        assert_eq!(shape(0.0, 4.0, 2.0, 1.0, 1.0), 0.0);
-        let (up, down) = (shape(0.5, 4.0, 2.0, 1.0, 1.0), shape(-0.5, 4.0, 2.0, 1.0, 1.0));
+        assert_eq!(shape(0.0, 4.0, Saturation::Tape, 1.0, 1.0), 0.0);
+        let (up, down) = (shape(0.5, 4.0, Saturation::Tape, 1.0, 1.0), shape(-0.5, 4.0, Saturation::Tape, 1.0, 1.0));
         assert!(up > 0.0 && down < 0.0 && (up + down).abs() > 0.05, "{up} {down}");
     }
 
