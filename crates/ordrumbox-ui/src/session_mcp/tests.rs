@@ -252,7 +252,7 @@ fn kits_are_listed_chosen_and_changed() {
     let args = object([("kit", Value::from("a")), ("filePath", Value::from(snare.display().to_string()))]);
     let added = s.mcp_call("addSampleToKit", &args).unwrap();
     assert_eq!(get(&added, &["key"]).as_str(), Some("SNARE"));
-    assert_eq!(s.kits.kits[0].samples.len(), 2);
+    assert_eq!(s.kits.kits()[0].samples.len(), 2);
 
     let mut args = object([
         ("kit", Value::from("a")),
@@ -260,7 +260,7 @@ fn kits_are_listed_chosen_and_changed() {
         ("filePath", Value::from(snare.display().to_string())),
     ]);
     s.mcp_call("replaceKitSample", &args).unwrap();
-    assert_eq!(s.kits.kits[0].samples[0].display_name, "SnareDrum.wav");
+    assert_eq!(s.kits.kits()[0].samples[0].display_name, "SnareDrum.wav");
     if let Some(fields) = args.as_object_mut() {
         fields.insert("samplePath", Value::from("none.wav"));
     }
@@ -276,10 +276,10 @@ fn kits_are_listed_chosen_and_changed() {
 
     let mapping = dir.join("mapping.json");
     s.kits.export_mapping(0, &mapping).unwrap();
-    s.kits.kits[0].samples.clear();
+    while s.kits.remove(0, 0).is_some() {}
     let args = object([("filePath", Value::from(mapping.display().to_string()))]);
     let loaded = s.mcp_call("loadKitMapping", &args).unwrap();
-    assert_eq!((get(&loaded, &["kit"]).as_str(), s.kits.kits[0].samples.len()), (Some("a"), 2));
+    assert_eq!((get(&loaded, &["kit"]).as_str(), s.kits.kits()[0].samples.len()), (Some("a"), 2));
 
     let random = call(&mut s, "assignSounds", r#"{"patternName":"rock","sounds":"random"}"#).unwrap();
     let sound = get(&random, &["tracks"]).as_array().map(|t| get(&t[0], &["sound"]).clone());

@@ -121,10 +121,10 @@ impl Session {
             "listKitSamples" => Ok(self.mcp_kits()),
             "selectKit" => {
                 let wanted = text(args, "kit")?;
-                let found = self.kits.kits.iter().position(|k| same_name(&k.name, wanted));
+                let found = self.kits.kits().iter().position(|k| same_name(&k.name, wanted));
                 let index = found.ok_or_else(|| format!("No kit named \"{wanted}\" (listKitSamples gives them)"))?;
                 self.use_kit(index);
-                Ok(object([("kit", Value::from(self.kits.kits[index].name.as_str()))]))
+                Ok(object([("kit", Value::from(self.kits.kits()[index].name.as_str()))]))
             }
             "analyzeSamples" => self.mcp_analyze(args),
             "removeArrangement" => self.mcp_remove_arrangement(args),
@@ -179,15 +179,15 @@ impl Session {
                 let k = self.mcp_kit(args)?;
                 let n = self.kits.normalize(k)?;
                 self.kits_changed(format!("Normalized {n} sample(s)"));
-                Ok(object([("kit", Value::from(self.kits.kits[k].name.as_str())), ("normalized", count(n))]))
+                Ok(object([("kit", Value::from(self.kits.kits()[k].name.as_str())), ("normalized", count(n))]))
             }
             "addSampleToKit" => {
                 let k = self.mcp_kit(args)?;
                 let (sample, message) = self.kits.add_sample(k, Path::new(text(args, "filePath")?.trim()))?;
                 self.kits_changed(message);
-                let added = &self.kits.kits[k].samples[sample];
+                let added = &self.kits.kits()[k].samples[sample];
                 Ok(object([
-                    ("kit", Value::from(self.kits.kits[k].name.as_str())),
+                    ("kit", Value::from(self.kits.kits()[k].name.as_str())),
                     ("key", Value::from(added.key.as_str())),
                     ("path", Value::from(added.path.as_str())),
                 ]))
@@ -195,7 +195,7 @@ impl Session {
             "replaceKitSample" => {
                 let k = self.mcp_kit(args)?;
                 let path = text(args, "samplePath")?.trim();
-                let sample = self.kits.kits[k].samples.iter().position(|s| s.path == path);
+                let sample = self.kits.kits()[k].samples.iter().position(|s| s.path == path);
                 let sample =
                     sample.ok_or_else(|| format!("No sample \"{path}\" in that kit (listKitSamples gives them)"))?;
                 let message = self.kits.replace_sample(k, sample, Path::new(text(args, "filePath")?.trim()))?;
@@ -376,7 +376,7 @@ impl Session {
     }
 
     fn mcp_kits(&self) -> Value {
-        let kits = self.kits.kits.iter().map(|kit| {
+        let kits = self.kits.kits().iter().map(|kit| {
             let samples = kit.samples.iter().map(|s| {
                 object([
                     ("key", Value::from(s.key.as_str())),
@@ -458,7 +458,7 @@ impl Session {
             "kit" => self.auto_assign_all_tracks(p),
             "synth" if self.synths.presets.is_empty() => return Err("No synth preset (createSynthPreset)".into()),
             "synth" => self.convert_to_generated_sounds(p),
-            "random" if self.kits.kits.iter().all(|k| k.samples.is_empty()) => {
+            "random" if self.kits.kits().iter().all(|k| k.samples.is_empty()) => {
                 return Err("No sample in the kits".into());
             }
             "random" => self.assign_random_samples(p),
@@ -563,18 +563,18 @@ impl Session {
         match optional_text(args, "kit")?.filter(|k| !k.trim().is_empty()) {
             Some(wanted) => self
                 .kits
-                .kits
+                .kits()
                 .iter()
                 .position(|k| same_name(&k.name, wanted))
                 .ok_or_else(|| format!("No kit named \"{}\" (listKitSamples gives them)", wanted.trim())),
-            None => Some(self.kit_index).filter(|&k| k < self.kits.kits.len()).ok_or_else(|| "No kit loaded".into()),
+            None => Some(self.kit_index).filter(|&k| k < self.kits.kits().len()).ok_or_else(|| "No kit loaded".into()),
         }
     }
 
     /// Kit `k`, read from a folder or a mapping: the kits saved, its samples told.
     fn mcp_kit_added(&mut self, k: usize, message: String) -> Result<Value, String> {
         self.kits_changed(message);
-        let kit = &self.kits.kits[k];
+        let kit = &self.kits.kits()[k];
         let samples = kit
             .samples
             .iter()

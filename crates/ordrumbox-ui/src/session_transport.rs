@@ -135,7 +135,7 @@ impl Session {
     }
 
     pub fn step_kit(&mut self, delta: isize) {
-        let count = self.kits.kits.len();
+        let count = self.kits.kits().len();
         if count == 0 {
             return;
         }
@@ -173,7 +173,7 @@ impl Session {
     /// Kit `index` (from 0) used, as a plugin host's parameter asks. False,
     /// with a message, when there is no such kit.
     pub fn host_select_kit(&mut self, index: usize) -> bool {
-        let count = self.kits.kits.len();
+        let count = self.kits.kits().len();
         if index >= count {
             self.message = format!("host: no kit {} (there are {count})", index + 1);
             return false;
@@ -205,20 +205,20 @@ impl Session {
 
     /// The names of the kits, in order.
     pub fn kit_names(&self) -> impl Iterator<Item = &str> + Clone {
-        self.kits.kits.iter().map(|k| k.name.as_str())
+        self.kits.kits().iter().map(|k| k.name.as_str())
     }
 
     /// Use kit `index` and say so.
     pub(super) fn use_kit(&mut self, index: usize) {
         self.select_kit(index);
-        if let Some(kit) = self.kits.kits.get(index) {
+        if let Some(kit) = self.kits.kits().get(index) {
             self.message = format!("kit {}", kit.name);
         }
     }
 
     /// Use kit `index` (its sounds are assigned again).
     pub(super) fn select_kit(&mut self, index: usize) {
-        let Some(kit) = self.kits.kits.get(index) else { return };
+        let Some(kit) = self.kits.kits().get(index) else { return };
         self.kit_index = index;
         // A kit change affects every track's sound: rebuild the pass
         // playing now so it is heard at once (not at the next loop).
@@ -251,7 +251,7 @@ impl Session {
 
     /// G: a random drumkit.
     pub fn select_random_drumkit(&mut self) {
-        let count = self.kits.kits.len();
+        let count = self.kits.kits().len();
         if count == 0 {
             return;
         }

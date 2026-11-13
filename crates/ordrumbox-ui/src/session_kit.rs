@@ -107,7 +107,7 @@ impl Session {
             (Ok(()), Some(first)) => format!("{message} ({} sample(s) not loaded, first: {first})", errors.len()),
             (Ok(()), None) => message,
         };
-        self.kit_index = self.kit_index.min(self.kits.kits.len().saturating_sub(1));
+        self.kit_index = self.kit_index.min(self.kits.kits().len().saturating_sub(1));
         self.kit_editor.analysis = None;
         self.select_kit(self.kit_index);
     }
@@ -147,7 +147,7 @@ impl Session {
     pub fn kit_remove(&mut self) {
         let Some(sample) = self.kit_editor.sample else { return };
         let kit = self.kit_index;
-        if self.kits.kits.get(kit).is_some_and(|k| sample < k.samples.len()) {
+        if self.kits.kits().get(kit).is_some_and(|k| sample < k.samples.len()) {
             self.ask(Pending::RemoveSample { kit, sample });
         }
     }

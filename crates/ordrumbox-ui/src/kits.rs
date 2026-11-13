@@ -38,7 +38,7 @@ pub enum Field {
 /// The kits, the decoded audio of their samples, and where they are saved.
 #[derive(Debug)]
 pub struct KitSet {
-    pub kits: Vec<Kit>,
+    kits: Vec<Kit>,
     /// Audio by sample url.
     buffers: HashMap<String, Arc<SampleBuffer>>,
     sources: Option<SampleSources>,
@@ -147,6 +147,12 @@ impl KitSet {
     /// The file sample `url` plays from; `None` without sample folders (tests).
     pub fn file(&self, url: &str) -> Option<PathBuf> {
         self.sources.as_ref()?.file(url)
+    }
+
+    /// The kits, in order. They change through the methods below, which keep
+    /// the audio and the files with them.
+    pub fn kits(&self) -> &[Kit] {
+        &self.kits
     }
 
     pub fn sample(&self, kit: usize, sample: usize) -> Option<&KitSample> {

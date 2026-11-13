@@ -32,7 +32,7 @@ fn a_folder_dropped_becomes_a_kit_and_a_wav_dropped_with_shift_replaces_a_sample
     let dir = scratch_dir("kit-files");
     let samples = dir.join("samples");
     let (mut s, mut audio) = demo_session(&samples);
-    let kit_count = s.kits.kits.len();
+    let kit_count = s.kits.kits().len();
 
     // A folder of WAV files, with a file that is not one and one that does not decode.
     let folder = dir.join("my kit");
@@ -43,9 +43,9 @@ fn a_folder_dropped_becomes_a_kit_and_a_wav_dropped_with_shift_replaces_a_sample
     std::fs::write(folder.join("notes.txt"), b"not audio").unwrap();
     s.drop_path(&folder, false);
     assert_eq!(s.message, "Imported 2 files into kit \"my kit\" (1 not decoded)");
-    assert_eq!(s.kits.kits.len(), kit_count + 1);
+    assert_eq!(s.kits.kits().len(), kit_count + 1);
     assert_eq!(s.kit_index, kit_count);
-    let keys: Vec<&str> = s.kits.kits[kit_count].samples.iter().map(|i| i.key.as_str()).collect();
+    let keys: Vec<&str> = s.kits.kits()[kit_count].samples.iter().map(|i| i.key.as_str()).collect();
     assert_eq!(keys, ["KICK", "SNARE"]);
     assert_eq!(s.kit_list(), Some((0, 2)), "the kit editor is on its first sample");
     // The audio is kept in the user's samples folder, as it came, in a folder of the kit's.
@@ -60,7 +60,7 @@ fn a_folder_dropped_becomes_a_kit_and_a_wav_dropped_with_shift_replaces_a_sample
     write_wav(&quiet, 0.1, 800);
     s.drop_path(&quiet, true);
     assert_eq!(s.message, "Replaced with \"quiet.wav\"");
-    let sample = &s.kits.kits[kit_count].samples[0];
+    let sample = &s.kits.kits()[kit_count].samples[0];
     assert_eq!(
         (sample.path.as_str(), sample.display_name.as_str(), sample.key.as_str()),
         ("imported/my_kit/Kick01.wav", "quiet.wav", "KICK")
@@ -69,17 +69,17 @@ fn a_folder_dropped_becomes_a_kit_and_a_wav_dropped_with_shift_replaces_a_sample
     assert_eq!(saved.left, wav::decode(&std::fs::read(&quiet).unwrap()).unwrap().left);
     let replaced = heard(&mut s, &mut audio, 0);
     assert!(replaced > 0.0 && replaced * 10.0 < loud, "the new audio is heard: {replaced} vs {loud}");
-    assert_eq!(s.kits.kits[kit_count].samples.len(), 2, "replaced, not added");
+    assert_eq!(s.kits.kits()[kit_count].samples.len(), 2, "replaced, not added");
 
     // A file that does not decode replaces nothing.
     s.drop_path(&folder.join("broken.wav"), true);
     assert!(s.message.starts_with("Failed to decode WAV"), "{}", s.message);
-    assert_eq!(s.kits.kits[kit_count].samples[0].display_name, "quiet.wav");
+    assert_eq!(s.kits.kits()[kit_count].samples[0].display_name, "quiet.wav");
 
     // The folder again: the kit of that name is replaced, not doubled.
     s.drop_path(&folder, false);
-    assert_eq!(s.kits.kits.len(), kit_count + 1);
-    assert_eq!(s.kits.kits[kit_count].samples[0].display_name, "Kick01.wav");
+    assert_eq!(s.kits.kits().len(), kit_count + 1);
+    assert_eq!(s.kits.kits()[kit_count].samples[0].display_name, "Kick01.wav");
     let back = heard(&mut s, &mut audio, 0);
     assert!(back > replaced * 10.0, "the folder's audio is back: {back} vs {replaced}");
 
@@ -88,7 +88,7 @@ fn a_folder_dropped_becomes_a_kit_and_a_wav_dropped_with_shift_replaces_a_sample
     std::fs::create_dir_all(&empty).unwrap();
     s.drop_path(&empty, false);
     assert_eq!(s.message, "No audio files found in selected directory");
-    assert_eq!(s.kits.kits.len(), kit_count + 1);
+    assert_eq!(s.kits.kits().len(), kit_count + 1);
     draw(&mut s);
     std::fs::remove_dir_all(&dir).unwrap();
 }

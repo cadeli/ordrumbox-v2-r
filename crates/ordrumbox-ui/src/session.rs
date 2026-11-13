@@ -250,7 +250,7 @@ impl Session {
 
     /// The kit used.
     fn kit(&self) -> Option<&Kit> {
-        self.kits.kits.get(self.kit_index)
+        self.kits.kits().get(self.kit_index)
     }
 
     fn track(&self, t: usize) -> Option<&Track> {
