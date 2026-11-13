@@ -132,7 +132,7 @@ impl Session {
         // The view buttons (the main editor, then the kit editor): the one shown lit.
         let shown = [Workspace::Grid, Workspace::PianoRoll, Workspace::Song, Workspace::Synth];
         let views = self.header_controls(scale).views;
-        let kit_open = self.kit_editor.is_some();
+        let kit_open = self.kit_editor.is_open();
         for (i, (rect, label)) in views.iter().zip(view::VIEWS).enumerate() {
             // The song's slot has no button: the mode switch is its own.
             if shown.get(i) == Some(&Workspace::Song) {

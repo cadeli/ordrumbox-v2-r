@@ -4,12 +4,14 @@ use super::session_chrome::Chrome;
 use super::session_commands::Program;
 use super::session_generators::Generators;
 use super::session_host::Host;
+use super::session_kit::KitEditor;
 use super::session_playback::Playback;
 use super::session_saving::Saving;
 use super::session_selection::Selection;
+use super::session_toast::Flash;
 use super::session_transport::Transport;
 use super::session_types::Workspace;
-use super::{Flash, Session, session_output, session_roll, session_song, session_synth, session_update};
+use super::{Session, session_output, session_roll, session_song, session_synth, session_update};
 use crate::action_log::ActionLog;
 use crate::audio_output::StartOutput;
 use crate::editors::EditorState;
@@ -273,9 +275,7 @@ impl Session {
             roots: Vec::new(),
             kits,
             kit_index: 0,
-            kit_editor: None,
-            analysis: None,
-            kit_files: (String::new(), None),
+            kit_editor: KitEditor::default(),
             synths: session_synth::Synths::default(),
             pattern_index: 0,
             workspace: Workspace::Grid,

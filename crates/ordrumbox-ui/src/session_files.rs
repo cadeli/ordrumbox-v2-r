@@ -122,7 +122,7 @@ impl Session {
                 "mid" | "midi" => return self.import_midi(path),
                 "odbox" => return self.import_song(path),
                 "json" => self.kits.load_mapping(path).map(|(kit, message)| (kit, 0, message)),
-                "wav" => match self.kit_editor {
+                "wav" => match self.kit_editor.sample {
                     Some(sample) if shift => self
                         .kits
                         .replace_sample(self.kit_index, sample, path)
@@ -138,7 +138,7 @@ impl Session {
         match result {
             Ok((kit, sample, message)) => {
                 self.kit_index = kit;
-                self.kit_editor = Some(sample);
+                self.kit_editor.sample = Some(sample);
                 self.kits_changed(message);
             }
             Err(e) => self.message = e,

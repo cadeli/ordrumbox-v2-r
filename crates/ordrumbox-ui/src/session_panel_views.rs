@@ -334,7 +334,7 @@ impl Session {
     }
 
     pub(super) fn kit_controls(&self) -> Option<KitControls> {
-        let sample = self.kit_editor?;
+        let sample = self.kit_editor.sample?;
         let instrument = self.kits.sample(self.kit_index, sample)?;
         let names: Vec<String> = self.kits.kits.iter().map(|k| k.name.clone()).collect();
         let kits =

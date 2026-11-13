@@ -229,8 +229,8 @@ impl Session {
         if let Some(render) = &mut self.render {
             render.kit.clone_from(&kit.name);
         }
-        if let Some(sample) = self.kit_editor {
-            self.kit_editor = Some(sample.min(kit.samples.len().saturating_sub(1)));
+        if let Some(sample) = self.kit_editor.sample {
+            self.kit_editor.sample = Some(sample.min(kit.samples.len().saturating_sub(1)));
         }
         self.update_analysis();
     }

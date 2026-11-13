@@ -28,7 +28,7 @@ impl Session {
     /// views that edit notes.
     pub(crate) fn note_editor_shown(&self) -> bool {
         self.chrome.show_note_editor
-            && self.kit_editor.is_none()
+            && !self.kit_editor.is_open()
             && matches!(self.workspace, Workspace::Grid | Workspace::PianoRoll)
     }
 
@@ -43,7 +43,7 @@ impl Session {
         view::Shown {
             output: self.output_shown(),
             track_editor: self.chrome.show_track_editor,
-            grid: self.kit_editor.is_none() && self.workspace == Workspace::Grid,
+            grid: !self.kit_editor.is_open() && self.workspace == Workspace::Grid,
             note_editor: self.chrome.show_note_editor,
         }
     }

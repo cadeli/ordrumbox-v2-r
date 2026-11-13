@@ -177,7 +177,7 @@ impl Session {
         let scale = size.2;
         let hover = match self.pattern() {
             Some(pattern)
-                if self.kit_editor.is_none()
+                if !self.kit_editor.is_open()
                     && self.workspace == Workspace::Grid
                     && self.chrome.widgets.drag.is_none()
                     && self.chrome.track_drag.is_none()
@@ -243,7 +243,7 @@ impl Session {
             return self.draw_roll_tooltip(canvas, scale);
         }
         let Some(hover) = self.chrome.hover else { return };
-        if self.chrome.covered() || self.kit_editor.is_some() {
+        if self.chrome.covered() || self.kit_editor.is_open() {
             return;
         }
         let Some(pattern) = self.pattern() else { return };

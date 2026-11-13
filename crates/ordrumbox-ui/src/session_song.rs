@@ -118,7 +118,7 @@ impl Session {
 
     /// The song panel is shown (the kit editor opens over it).
     pub fn song_view_open(&self) -> bool {
-        self.workspace == Workspace::Song && self.kit_editor.is_none()
+        self.workspace == Workspace::Song && !self.kit_editor.is_open()
     }
 
     /// F3, View > Song: the song panel in the place of the grid, or back.
@@ -136,7 +136,7 @@ impl Session {
     pub(super) fn set_workspace(&mut self, workspace: Workspace) {
         let was_song = self.workspace == Workspace::Song;
         self.workspace = workspace;
-        self.kit_editor = None;
+        self.kit_editor.sample = None;
         self.chrome.widgets.focus = None;
         self.chrome.widgets.dropdown = None;
         self.song_panel.hovered_clip = None;
