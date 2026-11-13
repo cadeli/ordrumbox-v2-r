@@ -1,0 +1,108 @@
+//! The track editor (`ui/track_editor.js` and its sections), the note editor
+//! (`ui/note_editor.js`, `note_editor/sync_section.js`) and the kit editor's
+//! controls (`ui/drumkit_manager/detail_section.js`), as [`panel`] items:
+//! what each shows, in the JS order, with the JS ranges, defaults and
+//! formats. What the widgets do is in the session.
+
+use crate::scale::Scale;
+use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
+use ordrumbox_core::json::Value;
+use ordrumbox_core::num;
+use ordrumbox_core::track::{
+    COMP_ATTACK_MS_RANGE, COMP_RATIO_RANGE, COMP_RELEASE_MS_RANGE, COMP_THRESHOLD_DB_RANGE, MAX_STEPS_PER_BEAT,
+};
+use ordrumbox_core::{Note, ScaleList, Track};
+use ordrumbox_engine::strip_settings::delay_beats_used;
+use ordrumbox_logic::generate;
+
+use crate::control::{Format, Spec};
+use crate::kits::{DECAY_RANGE, Field, GAIN_RANGE, TRANSPOSE_RANGE};
+use crate::panel::{Id, Item, KNOB_SIZE, Kind, LfoParam, Rect, dim, label_width};
+use crate::theme;
+
+// ─── Views ───────────────────────────────────────────────────────────────────
+
+/// What the sample bar shows.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SampleBar {
+    pub info: String,
+    pub envelope: Vec<f64>,
+    pub marker: Option<f64>,
+}
+
+/// A select's options and the one shown.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Choice {
+    pub values: Vec<String>,
+    pub labels: Vec<String>,
+    pub selected: usize,
+}
+
+impl Choice {
+    pub fn kind(&self) -> Kind {
+        let labels = if self.labels.is_empty() { self.values.clone() } else { self.labels.clone() };
+        Kind::Select { values: self.values.clone(), labels, selected: self.selected }
+    }
+}
+
+/// What the track editor shows of a track, beyond its settings.
+#[derive(Debug, Clone)]
+pub struct TrackView<'a> {
+    pub track: &'a Track,
+    /// `Track: NAME - kit/sample`.
+    pub title: String,
+    pub sample: Option<SampleBar>,
+    /// The sample's decay (0 without one).
+    pub decay: f64,
+    pub instruments: Choice,
+    pub samples: Choice,
+    pub synths: Choice,
+    /// LFO values while playing, by setting.
+    pub lfo: Vec<(&'static str, f64)>,
+    /// Tempo the track plays at (the delay's beats may not fit at it).
+    pub bpm: f64,
+    /// A drum track: how it plays its pattern's style.
+    pub compose: Option<ComposeView>,
+}
+
+/// What the Compose sub-tab shows of a drum track.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ComposeView {
+    /// The pattern's style.
+    pub style: String,
+    /// The part the track plays in it, its settings with and without the
+    /// pattern's macros, the hits a measure can hold.
+    pub shown: ordrumbox_logic::compose::TrackCompose,
+}
+
+/// What the note editor shows.
+#[derive(Debug, Clone)]
+pub struct NoteView {
+    /// `NAME [beat b step s]`, `— no note` when the step has none.
+    pub title: String,
+    /// The note (a default one when the track has none).
+    pub note: Option<Note>,
+    pub scales: Choice,
+    pub arp_direction: Choice,
+    pub arp_range: usize,
+}
+
+/// What the kit editor's controls show.
+#[derive(Debug, Clone)]
+pub struct KitControls {
+    /// The kit to move the sample to (the kit it is in, selected).
+    pub kits: Choice,
+    pub gain: f64,
+    pub transpose: f64,
+    pub decay: f64,
+}
+
+mod layout;
+mod tables;
+#[cfg(test)]
+mod tests;
+mod values;
+
+pub use layout::*;
+pub use tables::*;
+pub use values::*;

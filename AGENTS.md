@@ -185,7 +185,7 @@ assets/           data/*.json and kits/**.wav, read at runtime
   the tallest state, not the most common one. A window smaller than it
   (down to `MIN_WINDOW`, `scroll.rs`) scrolls; the layout never shrinks.
   A test that changes the state checks that the rects under it stay put
-  (`editors.rs`, `the_rows_stay_put_without_a_sample`).
+  (`editors/tests.rs`, `the_rows_stay_put_without_a_sample`).
 
 ## Files
 
