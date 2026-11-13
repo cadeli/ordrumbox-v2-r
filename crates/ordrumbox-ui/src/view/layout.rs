@@ -1,6 +1,14 @@
 //! Where everything sits: the grid, the header, the body and what the mouse hits.
 
-use super::*;
+use super::{BEATS_PER_PAGE, LABEL_CHARS, MIN_STEP_WIDTH, PAGE_BEATS, PAGE_STEPS_PER_BEAT, VOLUME_WIDTH};
+use crate::canvas::text_width;
+use crate::frame::{body_top, content_top, footer_top, margin};
+use crate::panel::{Rect, row_at};
+use crate::scale::Scale;
+use crate::{editors, output};
+use ordrumbox_core::track::MAX_STEPS_PER_BEAT;
+use ordrumbox_core::{Pattern, Track};
+use ordrumbox_logic::block::BEAT_UNITS;
 
 /// What is under the mouse.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

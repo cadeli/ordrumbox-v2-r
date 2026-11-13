@@ -1,6 +1,13 @@
 //! The tables the editors read: tabs, effects, settings, ranges and labels.
 
-use super::*;
+use super::layout::note_default;
+use crate::control::Format;
+use crate::kits::{DECAY_RANGE, Field, GAIN_RANGE, TRANSPOSE_RANGE};
+use ordrumbox_core::Note;
+use ordrumbox_core::track::{
+    COMP_ATTACK_MS_RANGE, COMP_RATIO_RANGE, COMP_RELEASE_MS_RANGE, COMP_THRESHOLD_DB_RANGE, MAX_STEPS_PER_BEAT,
+};
+use ordrumbox_logic::generate;
 
 /// Main tabs.
 pub const TABS: [&str; 5] = ["FX", "Sound", "LFO", "Loop", "Generate"];

@@ -12,9 +12,7 @@ use ordrumbox_core::json::{self, Object, Value};
 use ordrumbox_engine::synth_model as model;
 use ordrumbox_engine::{MasterSettings, SynthPresets, kits_from_json};
 
-use crate::master;
-use crate::store;
-use crate::update;
+use crate::{master, store, update};
 
 /// A folder of its own for test `name`, empty.
 fn folder(name: &str) -> PathBuf {

@@ -1,6 +1,8 @@
 //! The message line and the toasts that pop up over the window.
 
-use super::*;
+use super::Session;
+use crate::scale::Scale;
+use std::time::Instant;
 
 impl Session {
     /// Before an input: the message shown, taken away so that what the

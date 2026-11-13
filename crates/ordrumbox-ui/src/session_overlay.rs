@@ -1,8 +1,12 @@
 //! The overlays drawn over the window: the keyboard shortcuts, the edit
 //! history, About, the factory reset, and the keys and clicks they take.
 
-use super::*;
+use super::{Overlay, OverlayKey, Session};
+use crate::action_log::{LogLayout, Seen};
+use crate::picker::{Outcome, PickerLayout};
 use crate::scale::Scale;
+use crate::{store, update, view};
+use std::path::PathBuf;
 
 /// Every key, for Help > Keyboard shortcuts.
 const SHORTCUTS: &[&str] = &[

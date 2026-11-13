@@ -1,6 +1,17 @@
 //! A whole session, through the menus, and every knob of the editors undone.
 
-use super::*;
+use super::super::{Move, OverlayKey, Session};
+use super::{CALLBACK, KIT_KEYS, WINDOW, demo_session, draw, run};
+use crate::menu::Command;
+use crate::panel::{Id, Kind, Rect};
+use crate::picker::Export;
+use crate::test_support::scratch_dir;
+use crate::ui_input::Button;
+use crate::view::Hit;
+use crate::{editors, panel};
+use ordrumbox_core::{Library, json};
+use ordrumbox_logic::history::MAX_STEPS;
+use std::path::Path;
 
 // ─── A whole session ────────────────────────────────────────────────────────
 

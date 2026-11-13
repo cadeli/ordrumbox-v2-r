@@ -6,12 +6,8 @@
 //! click runs a command. Keyboard: F10 or Alt opens the first menu, arrows
 //! move, Enter runs, Escape closes.
 
-use crate::scale::Scale;
 use crate::ui_input::MACOS;
 use std::borrow::Cow;
-
-use crate::canvas::{Canvas, Rgb, char_width, fit, text_width};
-use crate::theme;
 
 /// What a menu item (or its shortcut) does.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

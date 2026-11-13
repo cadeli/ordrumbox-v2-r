@@ -13,21 +13,14 @@ use ordrumbox_core::json;
 use ordrumbox_core::{Library, Rng, Scales};
 use ordrumbox_engine::kit::{BankSample, Kit, KitSample};
 use ordrumbox_engine::offline::{self, EXPORT_RATE, RenderSetup};
-use ordrumbox_engine::{AudioSide, Controller, Mode, Position, SampleBank, SampleBuffer, SynthPresets, wav};
-use ordrumbox_logic::history::MAX_STEPS;
+use ordrumbox_engine::{AudioSide, Controller, Mode, Position, SampleBank, SampleBuffer, SynthPresets};
 use ordrumbox_logic::midi::{self, PPQN, smf};
 
 use super::session_playback::Playback;
-use super::{Move, OverlayKey, SYNTHS_FILE_NAME, Session, Workspace};
+use super::{Session, Workspace};
 use crate::canvas::Canvas;
-use crate::editors;
 use crate::kits::KitSet;
-use crate::menu::Command;
-use crate::panel::{self, Id, Kind, Rect};
-use crate::picker::{Export, Outcome};
 use crate::store;
-use crate::test_support::scratch_dir;
-use crate::ui_input::Button;
 use crate::view::Hit;
 
 const RATE: f32 = 8000.0;

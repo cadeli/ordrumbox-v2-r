@@ -1,7 +1,8 @@
 //! The update check (`update.rs`): at start when due, from Help on demand;
 //! a newer release goes in the status lines and enables Help > Download.
 
-use super::*;
+use super::Session;
+use crate::{store, update};
 
 /// The update check: its settings, the one under way, a newer release
 /// found, and how a finished check wakes the window.

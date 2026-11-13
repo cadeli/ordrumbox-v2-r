@@ -1,7 +1,16 @@
 //! The menu bar: what each menu shows (checked, greyed out) and what each
 //! command runs.
 
-use super::*;
+use super::session_confirm::Pending;
+use super::session_selection::Clipboard;
+use super::{Overlay, Session, Workspace};
+use crate::menu::{Command, MenuState};
+use crate::panel::Id;
+use crate::picker::{Export, Purpose};
+use crate::{menu, store};
+use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
+use ordrumbox_logic::generate;
+use ordrumbox_logic::generate::MelodicKind;
 
 impl Session {
     /// Generation on (tracks in auto mode): drums, bass, chords.

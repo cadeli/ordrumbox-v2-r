@@ -1,6 +1,8 @@
 //! Pause, rewind, loop, metronome, recording, MIDI input and preferences.
 
-use super::*;
+use super::super::Session;
+use super::{CALLBACK, LIBRARY, position, run, session};
+use crate::menu::Command;
 
 // ─── pause, rewind, loop, metronome, recording ─────────────────────────────
 

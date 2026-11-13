@@ -1,5 +1,9 @@
 use super::*;
-use ordrumbox_core::json;
+use crate::panel::{Id, Item, Rect};
+use crate::scale::Scale;
+use ordrumbox_core::drum_taxonomy::instrument_family;
+use ordrumbox_core::json::Value;
+use ordrumbox_core::{ScaleList, json};
 
 fn scales() -> ScaleList {
     ScaleList::from_json(

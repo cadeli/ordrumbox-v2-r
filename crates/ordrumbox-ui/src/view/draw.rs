@@ -1,7 +1,27 @@
 //! Drawing the pattern grid, its lane and the header.
 
-use super::*;
+use super::kit::{KitLayout, draw_kit};
+use super::layout::{
+    ADD_TRACK_LABEL, Body, HeaderControls, HostState, Layout, MACROS, RULER_HEIGHT, Transport, header_controls,
+    header_text, steps_per_beat,
+};
+use super::{
+    ACCENT, AUTO, CURSOR, HELP, KIT_HELP, LABEL_CHARS, LOGO, LOOP_MARK, MUTE_ON, PAGE_STEPS_PER_BEAT, PATTERN_LABEL,
+    PLAYHEAD, PLAYING, ROLL_HELP, SELECTED, SOLO_ON, SONG_HELP, SYNTH_HELP, View, WAITING_LABEL, WARNING,
+    background_color, box_off_color, cell_beat_color, cell_color, focus_row_color, mute_host_color,
+};
+use crate::canvas::{Canvas, Rgb, chars_in, small_cell, small_char_width, text_width};
+use crate::frame::{body_top, content_top, footer_top, margin, status_line};
+use crate::output::OutputLayout;
+use crate::panel::Rect;
+use crate::piano_roll::RollLayout;
+use crate::scale::Scale;
+use crate::song_view::SongLayout;
 use crate::theme::{ZONE, ZONE_OPACITY};
+use crate::{editors, output, piano_roll, song_view, theme};
+use ordrumbox_core::steps::absolute_step;
+use ordrumbox_core::{Note, Pattern, Track};
+use ordrumbox_logic::block::Zone;
 
 /// Draw `view`; `scale` is the integer UI scale (1 on a standard display, 2 on HiDPI).
 pub fn draw(canvas: &mut Canvas, view: &View, scale: Scale) {

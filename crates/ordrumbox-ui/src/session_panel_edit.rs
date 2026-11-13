@@ -8,10 +8,14 @@ use ordrumbox_core::json::{Object, Value};
 use ordrumbox_engine::assign::synth_for;
 
 use super::session_panel::{NoteTarget, filter_on, history_label, number};
-use super::*;
+use super::{Session, session_grid};
 use crate::editors::{self, FILTER_TYPES, FX_DEFS, KNOB_BAR, LFO_TARGETS, STYLE_DEFAULT};
 use crate::kits::Field;
-use crate::panel::LfoParam;
+use crate::menu::Command;
+use crate::panel::{Dropdown, Id, LfoParam};
+use crate::picker::Purpose;
+use std::path::Path;
+use std::time::Instant;
 
 impl Session {
     /// View > Track editor.

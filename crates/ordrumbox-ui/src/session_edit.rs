@@ -2,7 +2,12 @@
 //! cursor, the tracks added, removed and compacted, the pattern's length,
 //! new patterns, and copy and paste.
 
-use super::*;
+use super::session_selection::{Clipboard, NoteFocus};
+use super::{DEFAULT_TRACK_NAME, Move, Session, beat_label, notes_label};
+use crate::view::{Cursor, Hit};
+use ordrumbox_core::track::MAX_TRACKS;
+use ordrumbox_core::{Note, Track};
+use ordrumbox_logic::Nudge;
 
 impl Session {
     pub(super) fn audition(&mut self, t: usize, note: Option<usize>) {

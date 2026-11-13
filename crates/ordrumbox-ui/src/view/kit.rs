@@ -1,6 +1,11 @@
 //! The kit editor: its view, its layout and its drawing.
 
-use super::*;
+use super::{ACCENT, ENVELOPE, PLAYHEAD, cell_color, focus_row_color};
+use crate::canvas::{Canvas, chars_in, text_width};
+use crate::frame::{body_top, footer_top, margin};
+use crate::panel::{Rect, row_at};
+use crate::scale::Scale;
+use crate::theme;
 
 /// What the kit editor shows.
 #[derive(Debug)]

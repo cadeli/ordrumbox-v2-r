@@ -23,10 +23,13 @@ use ordrumbox_core::json::Value;
 use ordrumbox_core::steps::TICK;
 
 use super::session_panel::PanelLayout;
-use super::*;
+use super::{Session, Workspace};
+use crate::panel::Id;
 use crate::panel::{self, Item, Kind, Rect};
+use crate::picker::{Export, Purpose};
 use crate::song_view::{self, Row, SongLayout, SongView};
 use crate::theme;
+use ordrumbox_engine::Mode;
 
 /// The column's buttons: id and label.
 const BUTTONS: [(&str, &str); 7] = [
@@ -476,8 +479,11 @@ impl Session {
 
 #[cfg(test)]
 pub(super) mod tests {
+    use super::super::session_panel::PanelKey;
     use super::*;
     use crate::kits::KitSet;
+    use crate::menu::Command;
+    use crate::ui_input::Button;
     use ordrumbox_core::Library;
 
     pub(crate) use crate::test_support::SIZE;

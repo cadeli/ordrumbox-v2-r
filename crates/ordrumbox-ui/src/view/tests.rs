@@ -1,5 +1,10 @@
 use super::*;
-
+use crate::canvas::{Canvas, text_width};
+use crate::frame::{body_top, footer_top, margin, status_line};
+use crate::menu;
+use crate::panel::Rect;
+use crate::scale::Scale;
+use ordrumbox_core::Note;
 #[test]
 fn a_wide_grid_shows_more_beats_a_page() {
     let one = Scale::ONE;

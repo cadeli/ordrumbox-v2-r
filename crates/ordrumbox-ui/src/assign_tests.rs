@@ -6,8 +6,7 @@
 use std::fs;
 use std::path::Path;
 
-use ordrumbox_core::Track;
-use ordrumbox_core::json;
+use ordrumbox_core::{Track, json};
 use ordrumbox_engine::assign::{TrackSound, assign_track, substitute_for};
 use ordrumbox_engine::kit::BankSample;
 use ordrumbox_engine::{SampleBank, SampleBuffer, SynthPresets, kits_from_json, wav};

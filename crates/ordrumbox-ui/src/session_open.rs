@@ -1,6 +1,24 @@
 //! Opening the session: its library and assets found, its first state built.
 
-use super::*;
+use super::session_chrome::Chrome;
+use super::session_playback::Playback;
+use super::session_saving::Saving;
+use super::session_selection::Selection;
+use super::{
+    DEMO_NOT_SAVED, Flash, LibrarySource, Opened, Session, Workspace, repaired_status, session_output, session_roll,
+    session_song, session_synth, session_update,
+};
+use crate::action_log::ActionLog;
+use crate::audio_output::StartOutput;
+use crate::editors::EditorState;
+use crate::kits::KitSet;
+use crate::{assets, store};
+use ordrumbox_core::{Library, Rng, ScaleList, Scales, Styles};
+use ordrumbox_engine::offline::RenderSetup;
+use ordrumbox_engine::{SynthPresets, offline};
+use ordrumbox_logic::Editor;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 impl Session {
     pub fn load(start_output: StartOutput) -> Self {

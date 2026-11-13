@@ -5,10 +5,8 @@
 //! (`kits.json`, `drumkits.json` format) and the samples added or changed
 //! (`samples/`). The assets are only the starting point, never written.
 
-use std::env;
-use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
+use std::{env, fs, io};
 
 use ordrumbox_core::json;
 use ordrumbox_core::{Library, LoadReport};

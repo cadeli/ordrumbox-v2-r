@@ -2,7 +2,9 @@
 //! stepped through or picked at random, the tempo, and the choices a plugin
 //! host makes.
 
-use super::*;
+use super::{Session, Workspace, auto_loop};
+use crate::menu;
+use ordrumbox_engine::Mode;
 
 impl Session {
     pub fn playing(&self) -> bool {

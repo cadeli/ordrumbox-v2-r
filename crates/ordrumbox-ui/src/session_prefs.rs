@@ -8,8 +8,10 @@
 use ordrumbox_core::json::Value;
 
 use super::session_user_data::NO_USER_FOLDER;
-use super::*;
+use super::{Overlay, OverlayKey, Session};
 use crate::audio_output::{DEVICE_KEY, MIDI_KEY, MidiInput, chosen_device, chosen_midi_input};
+use crate::scale::Scale;
+use crate::{store, view};
 
 /// The longest a device's name is shown (the modal keeps its width).
 const NAME_CHARS: usize = 36;

@@ -5,8 +5,14 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use ordrumbox_core::json::{self, Value};
 
-use super::*;
+use super::Session;
+use super::session_confirm::Pending;
+use crate::frame;
 use crate::panel::{self, Rect};
+use crate::panel::{Dropdown, Id};
+use crate::store;
+use ordrumbox_core::Library;
+use std::path::Path;
 
 fn now_ms() -> f64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map_or(0.0, |d| d.as_millis() as f64)
@@ -149,6 +155,7 @@ impl Session {
 
 #[cfg(test)]
 mod tests {
+    use super::super::OverlayKey;
     use super::*;
     use crate::session::session_song::tests::{clips, session};
 

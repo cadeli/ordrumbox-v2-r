@@ -2,7 +2,9 @@
 //! is kept in `settings.json` (`colorScheme`, from 1, as in the web version,
 //! which knows the first three).
 
-use super::*;
+use super::Session;
+use crate::store;
+use std::path::PathBuf;
 
 use crate::theme;
 use ordrumbox_core::json;
@@ -48,7 +50,10 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::kits::KitSet;
+    use crate::menu::Command;
     use crate::test_support::scratch_dir;
+    use ordrumbox_core::Library;
 
     #[test]
     fn c_cycles_the_schemes_and_saves_the_choice() {

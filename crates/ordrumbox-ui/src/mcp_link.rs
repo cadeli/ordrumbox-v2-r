@@ -19,9 +19,8 @@ use std::time::Duration;
 use ordrumbox_core::json::{self, Value};
 use ordrumbox_logic::tools::object;
 
-use crate::mcp;
-use crate::store;
 use crate::update::Waker;
+use crate::{mcp, store};
 
 /// Longest line read, bytes: a call is a few kilobytes.
 const MAX_LINE_BYTES: u64 = 16 << 20;

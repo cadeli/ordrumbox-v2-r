@@ -6,13 +6,18 @@ use ordrumbox_core::json::Value;
 use ordrumbox_core::num;
 use std::borrow::Cow;
 
+use super::session_panel::PanelKey;
 use super::session_panel::{DOUBLE_CLICK, control_name};
-use super::*;
+use super::{Drag, Session, Workspace};
+use crate::canvas::Canvas;
 use crate::control::{Spec, Style};
-use crate::control_help;
-use crate::editors;
 use crate::panel::{self, Item, Kind};
+use crate::panel::{Dropdown, Entry, Id};
+use crate::ui_input::Button;
+use crate::view;
 use crate::view::Layout;
+use crate::{control_help, editors, menu};
+use std::time::Instant;
 
 impl Session {
     // ─── The mouse ───────────────────────────────────────────────────────────

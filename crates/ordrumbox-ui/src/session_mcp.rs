@@ -12,9 +12,13 @@ use ordrumbox_logic::tools::{
     pattern_name, pattern_summary, same_name, song_json, strings, text,
 };
 
-use super::*;
+use super::Session;
 use crate::editors::note_range;
+use crate::picker::Export;
 use crate::{master, output};
+use crate::{mcp_link, store, update};
+use ordrumbox_engine::{Mode, analysis};
+use std::path::{Path, PathBuf};
 
 impl Session {
     /// Start the MCP link: its port goes to `mcp.json`. A failure is a

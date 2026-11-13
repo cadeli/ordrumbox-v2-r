@@ -7,8 +7,10 @@ use crate::scale::Scale;
 use ordrumbox_core::num;
 use ordrumbox_logic::block::{Block, StepAt, Zone};
 
+use super::session_selection::Clipboard;
 use super::session_song::DRAG_START_PX;
-use super::*;
+use super::{Move, Session, notes_label};
+use crate::view::Cursor;
 
 /// A Shift+press on a step that may become a zone.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -201,8 +203,11 @@ pub(super) fn beats_label(start_units: i64, end_units: i64) -> String {
 mod tests {
     use super::*;
     use crate::kits::KitSet;
+    use crate::menu::Command;
     use crate::ui::Ui;
     use crate::ui_input::{Button, Key, KeyEvent, Modifiers};
+    use crate::view::Hit;
+    use ordrumbox_core::Library;
 
     use crate::test_support::SIZE;
 
