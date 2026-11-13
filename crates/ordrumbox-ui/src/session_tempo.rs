@@ -1,6 +1,8 @@
-//! Tap tempo: the tempo follows the time between taps.
+//! The tempo: the one that plays, the one the header sets, and tap tempo,
+//! where it follows the time between taps.
 
 use super::Session;
+use ordrumbox_engine::Mode;
 use std::time::{Duration, Instant};
 
 /// Taps older than this start a new count.
@@ -52,6 +54,40 @@ impl Session {
     pub fn toggle_metronome(&mut self) {
         self.transport.metronome = !self.transport.metronome;
         self.message = if self.transport.metronome { "metronome on" } else { "metronome off" }.into();
+    }
+}
+
+impl Session {
+    /// The tempo a plugin plays at: the host's, inside the tempo bounds
+    /// (`None` before the host's transport was seen).
+    pub(super) fn host_bpm(&self) -> Option<f64> {
+        let host = self.playback.host()?;
+        Some(ordrumbox_core::song::clamp_bpm(host.bpm.round()))
+    }
+
+    /// The tempo the tracks play at: the host's in a plugin, else what
+    /// plays (the song's, the library's), else the header's.
+    pub(super) fn playing_bpm(&self) -> f64 {
+        let library = self.editor.library();
+        let own = match self.playback.mode().filter(|_| self.playback.is_playing()) {
+            Some(Mode::Song(s)) => library.songs.get(s).map(|song| song.bpm),
+            Some(Mode::Pattern(_)) => Some(library.bpm),
+            None => None,
+        };
+        self.host_bpm().or(own).unwrap_or_else(|| self.tempo())
+    }
+
+    /// That tempo at `bpm` (whole, inside the tempo bounds), a run of
+    /// changes one undo step.
+    pub(super) fn set_tempo(&mut self, bpm: f64) {
+        let bpm = ordrumbox_core::song::clamp_bpm(bpm.round());
+        let changed = match self.tempo_song() {
+            Some(s) => self.editor.set_song_bpm(s, bpm, true),
+            None => self.editor.set_bpm(bpm, true),
+        };
+        if changed {
+            self.edited();
+        }
     }
 }
 

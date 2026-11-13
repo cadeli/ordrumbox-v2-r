@@ -277,3 +277,28 @@ impl Session {
             .map_or(self.editor.library().bpm, |song| song.bpm)
     }
 }
+
+impl Session {
+    /// Show pattern `index` (it must exist), and play it if a pattern plays.
+    pub(super) fn show_pattern(&mut self, index: usize) {
+        self.pattern_index = index;
+        self.deselect();
+        self.chrome.current_page = 0;
+        self.message = format!("pattern {}", self.pattern().and_then(|p| p.name.as_deref()).unwrap_or_default());
+        // In pattern mode the new pattern plays once the one playing ends its loop.
+        if let Some(controller) = self.playback.controller_mut()
+            && let Mode::Pattern(_) = controller.mode()
+        {
+            controller.select_pattern(self.pattern_index);
+            let library = self.editor.library();
+            if let Some(name) = controller
+                .playing_pattern()
+                .filter(|&p| p != index)
+                .and_then(|p| library.patterns.get(p))
+                .map(|p| p.name.as_deref().unwrap_or_default())
+            {
+                self.message = format!("{} - next, after {name}", self.message);
+            }
+        }
+    }
+}

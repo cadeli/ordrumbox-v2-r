@@ -2,14 +2,17 @@
 //! cursor, the tracks added, removed and compacted, the pattern's length,
 //! new patterns, and copy and paste.
 
+use super::Session;
 use super::session_labels::{beat_label, notes_label};
 use super::session_selection::{Clipboard, NoteFocus};
 use super::session_types::Move;
-use super::{DEFAULT_TRACK_NAME, Session};
 use crate::view::{Cursor, Hit};
 use ordrumbox_core::track::MAX_TRACKS;
 use ordrumbox_core::{Note, Track};
 use ordrumbox_logic::Nudge;
+
+/// The name of the track Ctrl+T adds.
+const DEFAULT_TRACK_NAME: &str = "KICK";
 
 impl Session {
     pub(super) fn audition(&mut self, t: usize, note: Option<usize>) {
@@ -423,6 +426,27 @@ impl Session {
                     self.edited();
                 }
             }
+        }
+    }
+}
+
+impl Session {
+    /// The pattern `beats` long (1–16).
+    pub(super) fn set_length(&mut self, beats: i32) {
+        let beats = beats.clamp(1, ordrumbox_logic::editor::MAX_BEATS);
+        if self.editor.set_pattern_beat_count(self.pattern_index, f64::from(beats)) {
+            self.edited();
+            self.clamp_cursor_to_grid();
+        }
+    }
+
+    /// Remove every note of track `t`.
+    pub(super) fn clear_track(&mut self, t: usize) {
+        let Some(track) = self.track(t) else { return };
+        if track.notes.is_empty() {
+            self.message = "No notes to clear".into();
+        } else {
+            self.undoable(|s| s.clear_track_now(t));
         }
     }
 }

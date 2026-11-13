@@ -6,7 +6,42 @@
 use crate::scale::Scale;
 use std::path::PathBuf;
 
-use super::{Overlay, Widgets, menu, session_grid, session_lane, session_zone};
+use super::session_overlay::Overlay;
+use super::{menu, session_grid, session_lane, session_zone};
+use crate::panel::{Dropdown, Entry, Id};
+use std::time::Instant;
+
+/// A drag in progress.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(super) struct Drag {
+    pub(super) id: Id,
+    pub(super) spec: crate::control::Spec,
+    pub(super) start: f64,
+    pub(super) x: i32,
+    pub(super) y: i32,
+    /// A slider's bar (left, width), when it follows the mouse.
+    pub(super) bar: Option<(i32, i32)>,
+    /// A slider dragged finely: from where.
+    pub(super) fine: bool,
+}
+
+/// What the mouse and the keyboard hold among the widgets of every panel.
+#[derive(Debug, Default)]
+pub(super) struct Widgets {
+    /// The widget with the keyboard focus.
+    pub(super) focus: Option<Id>,
+    /// A knob or slider being dragged.
+    pub(super) drag: Option<Drag>,
+    pub(super) dropdown: Option<Dropdown>,
+    pub(super) entry: Option<Entry>,
+    /// The mouse, at its last move or press: where a text entry opens.
+    pub(super) pointer: (i32, i32),
+    /// Last click on a widget, for double-clicks.
+    pub(super) last_click: Option<(Id, Instant)>,
+    /// A control's value copied from its right-click menu, to paste on
+    /// another whose range holds it.
+    pub(super) copied_value: Option<f64>,
+}
 
 /// How fast a VU level falls, per frame drawn.
 const LEVEL_DECAY: f32 = 0.88;

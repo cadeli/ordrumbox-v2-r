@@ -130,33 +130,6 @@ impl Session {
         self.set_workspace(if self.workspace == Workspace::Song { Workspace::Grid } else { Workspace::Song });
     }
 
-    /// Show `workspace`. While playing, a switch to or from the song panel
-    /// switches the playback to the view's mode, from its start
-    ///; the grid and the piano roll share one mode.
-    pub(super) fn set_workspace(&mut self, workspace: Workspace) {
-        let was_song = self.workspace == Workspace::Song;
-        self.workspace = workspace;
-        self.kit_editor.sample = None;
-        self.chrome.widgets.focus = None;
-        self.chrome.widgets.dropdown = None;
-        self.song_panel.hovered_clip = None;
-        self.song_panel.drag = None;
-        self.song_panel.bar_drag = None;
-        self.roll.release();
-        if self.playing() && was_song != (workspace == Workspace::Song) {
-            let mode = self.play_mode();
-            self.playback.play(&self.editor, mode);
-        }
-    }
-
-    /// What Space plays: the song in the song panel, else the pattern.
-    fn play_mode(&self) -> Mode {
-        match self.workspace {
-            Workspace::Song => Mode::Song(self.editor.selected_song()),
-            _ => Mode::Pattern(self.pattern_index),
-        }
-    }
-
     pub(super) fn song(&self) -> Option<&Song> {
         self.editor.library().songs.get(self.editor.selected_song())
     }

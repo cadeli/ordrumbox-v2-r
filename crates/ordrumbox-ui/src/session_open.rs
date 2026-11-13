@@ -303,3 +303,13 @@ impl Session {
         }
     }
 }
+
+impl Session {
+    /// A session of `library` with no kit, a plugin's when `hosted`.
+    #[cfg(test)]
+    pub(crate) fn for_tests(library: Library, hosted: bool) -> Self {
+        let mut session = Self::new(library, KitSet::empty(), Vec::new());
+        session.host.hosted = hosted;
+        session
+    }
+}

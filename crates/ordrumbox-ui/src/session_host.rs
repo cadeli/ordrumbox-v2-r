@@ -53,3 +53,11 @@ impl Session {
         std::mem::replace(&mut self.host.shown, shown) != shown
     }
 }
+
+impl Session {
+    /// The session is a plugin's: the host plays, saves and has the keys it
+    /// leaves out of the menus.
+    pub fn hosted(&self) -> bool {
+        self.host.hosted
+    }
+}

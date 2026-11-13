@@ -1,13 +1,50 @@
 //! The overlays drawn over the window: the keyboard shortcuts, the edit
 //! history, About, the factory reset, and the keys and clicks they take.
 
+use super::session_confirm::Pending;
 use super::session_types::OverlayKey;
-use super::{Overlay, Session};
+use super::{Session, session_prefs};
 use crate::action_log::{LogLayout, Seen};
+use crate::picker::{Export, Picker};
 use crate::picker::{Outcome, PickerLayout};
 use crate::scale::Scale;
 use crate::{store, update, view};
 use std::path::PathBuf;
+
+/// What is shown over the window.
+#[derive(Debug)]
+pub(super) enum Overlay {
+    Picker(Picker),
+    /// The keyboard shortcuts, from line `scroll` on.
+    Shortcuts {
+        scroll: usize,
+    },
+    About,
+    /// Edit > Preferences: the settings being chosen, kept when OK is chosen.
+    Preferences(session_prefs::Prefs),
+    /// Help > Factory reset, until the user says so: `yes` is the button
+    /// ENTER would run, `false` (the default) keeps.
+    FactoryReset {
+        yes: bool,
+    },
+    /// What was done; the first row shown.
+    History {
+        scroll: usize,
+    },
+    /// The file an export would replace, until the user says so: `yes` is
+    /// the button ENTER would run, `false` (the default) keeps the file.
+    ConfirmOverwrite {
+        export: Export,
+        path: PathBuf,
+        yes: bool,
+    },
+    /// What removes or replaces the user's work, until the user says so:
+    /// `yes` is the button ENTER would run, `false` (the default) keeps.
+    Confirm {
+        pending: Pending,
+        yes: bool,
+    },
+}
 
 /// Every key, for Help > Keyboard shortcuts.
 const SHORTCUTS: &[&str] = &[

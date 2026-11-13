@@ -2,7 +2,8 @@
 //! for Enter in a notice; Esc or a click cancels it. An edit that Ctrl+Z
 //! undoes is done at once, and its message says how to undo it.
 
-use super::{Overlay, Session};
+use super::Session;
+use super::session_overlay::Overlay;
 use std::path::PathBuf;
 
 /// What the message of a change outside the library's history ends with.

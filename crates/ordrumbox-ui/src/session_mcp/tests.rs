@@ -2,8 +2,8 @@
 
 use super::*;
 use crate::kits::KitSet;
-use crate::session::NOTHING_TO_RENDER;
 use crate::session::session_confirm::Pending;
+use crate::session::session_files::NOTHING_TO_RENDER;
 use crate::session::session_playback::Playback;
 use crate::test_support::scratch_dir;
 use ordrumbox_core::json;

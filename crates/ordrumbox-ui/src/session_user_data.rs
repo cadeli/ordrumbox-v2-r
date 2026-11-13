@@ -7,7 +7,8 @@
 //! again from the files, as at start.
 
 use super::session_confirm::Pending;
-use super::{Overlay, Session, no_output};
+use super::session_overlay::Overlay;
+use super::{Session, no_output};
 use crate::menu::Command;
 use crate::picker::{Picker, Purpose};
 use crate::{assets, store, update, user_data};
