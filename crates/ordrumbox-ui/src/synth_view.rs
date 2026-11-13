@@ -18,6 +18,7 @@ use ordrumbox_engine::synth_model::{
 
 use crate::canvas::{Canvas, Rgb, text_width};
 use crate::control::Spec;
+use crate::editors::FILTER_ICONS;
 use crate::frame;
 use crate::panel::{Id, Item, Kind, Rect};
 use crate::theme;
@@ -31,9 +32,8 @@ pub const BUTTONS: [(&str, &str, i32); 6] = [
     ("export", "Export", 56),
     ("import", "Import", 56),
 ];
-/// The waves and filter types as their icons are labelled here (the font has no curves).
+/// The waves as their icons are labelled here (the font has no curves).
 const WAVE_LABELS: [&str; 5] = ["sin", "tri", "saw", "sqr", "rnd"];
-const FILTER_LABELS: [&str; 3] = ["LP", "HP", "BP"];
 
 const CARD_WIDTH: i32 = 330;
 const KNOB_W: i32 = 64;
@@ -126,7 +126,7 @@ fn icon_choices(group: &str) -> Option<(String, Vec<(Value, &'static str)>)> {
         let key = if group == "filter" { "type" } else { "filterType" };
         Some((
             format!("{group}.{key}"),
-            FILTER_TYPES.iter().zip(FILTER_LABELS).map(|(t, l)| (Value::from(*t), l)).collect(),
+            FILTER_TYPES.iter().zip(FILTER_ICONS).map(|(t, l)| (Value::from(*t), l)).collect(),
         ))
     } else if group == "fm" {
         Some((

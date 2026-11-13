@@ -13,6 +13,8 @@ use ordrumbox_core::json::Object;
 use ordrumbox_core::lfo;
 use ordrumbox_dsp::StripSettings;
 
+use crate::synth_preset::FILTER_TYPES;
+
 /// A reverb type's settings: room, damp and width (`REVERB_PRESETS`), then
 /// pre-delay (seconds), dispersion and gate (seconds), which the JS lacks.
 #[derive(Debug, Clone, Copy)]
@@ -68,13 +70,7 @@ pub fn delay_beats_used(beats: f64, bpm: f64) -> f64 {
 }
 
 fn filter_mode(name: &str) -> Option<f32> {
-    Some(match name {
-        "lowpass" => 0.0,
-        "highpass" => 1.0,
-        "bandpass" => 2.0,
-        "notch" => 3.0,
-        _ => return None,
-    })
+    FILTER_TYPES.iter().position(|filter_type| *filter_type == name).map(|code| code as f32)
 }
 
 /// The strip's `filter_slope` for a track's `filterSlope`: 24 from 18 dB/oct

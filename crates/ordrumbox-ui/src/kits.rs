@@ -47,11 +47,6 @@ pub struct KitSet {
     samples_dir: Option<PathBuf>,
 }
 
-/// `kit.name.replaceAll(/[^a-z0-9_-]/gi, '_')`.
-pub fn safe_name(name: &str) -> String {
-    name.chars().map(|c| if c.is_ascii_alphanumeric() || c == '_' || c == '-' { c } else { '_' }).collect()
-}
-
 /// `findInstrumentFromFileName(name).id` (`NOT_FOUND` when nothing matches).
 fn detect_key(file_name: &str) -> String {
     catalog().from_file_name(file_name).map_or_else(|| NOT_FOUND.to_owned(), |i| i.id.clone())
@@ -62,7 +57,7 @@ fn detect_key(file_name: &str) -> String {
 /// overwrite each other, and apart from the assets' folders, which the
 /// user's `samples/` would otherwise shadow.
 fn imported_url(kit_name: &str, file_name: &str) -> String {
-    format!("{IMPORTED_DIR}/{}/{file_name}", safe_name(kit_name))
+    format!("{IMPORTED_DIR}/{}/{file_name}", store::safe_name(kit_name))
 }
 
 /// The folder of `samples/` that the imported files are copied to.
@@ -439,7 +434,7 @@ impl KitSet {
 
     /// The folder kit `kit` is exported to, with its samples.
     pub fn folder_name(&self, kit: usize) -> Option<String> {
-        Some(safe_name(&self.kits.get(kit)?.name))
+        Some(store::safe_name(&self.kits.get(kit)?.name))
     }
 
     /// The audio file of sample `url`, as it plays: the user's over the
@@ -494,7 +489,7 @@ impl KitSet {
 
     /// The file kit `kit`'s mapping is exported to.
     pub fn mapping_file_name(&self, kit: usize) -> Option<String> {
-        Some(format!("ordrumbox-drumkit-{}.json", safe_name(&self.kits.get(kit)?.name)))
+        Some(format!("ordrumbox-drumkit-{}.json", store::safe_name(&self.kits.get(kit)?.name)))
     }
 
     /// `exportCurrentKit`: kit `kit`'s mapping (no audio) to `path`.
@@ -677,10 +672,5 @@ mod tests {
         assert_eq!(kits.export_folder(0, &none), Err("gone.wav: no audio".into()));
         assert!(!none.exists());
         fs::remove_dir_all(&dir).unwrap();
-    }
-
-    #[test]
-    fn safe_names() {
-        assert_eq!(safe_name("My kit/2 é"), "My_kit_2__");
     }
 }

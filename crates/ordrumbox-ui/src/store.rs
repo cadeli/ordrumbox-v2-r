@@ -144,8 +144,8 @@ pub fn songs_dir() -> Option<PathBuf> {
     Some(user_dir()?.join("songs"))
 }
 
-/// A song name as a file name (`exportToFile`: what is not a letter, a
-/// digit, `_` or `-` becomes `_`).
+/// A song, pattern or kit name as a file or folder name: what is not an
+/// ASCII letter, a digit, `_` or `-` becomes `_`.
 pub fn safe_name(name: &str) -> String {
     name.chars().map(|c| if c.is_ascii_alphanumeric() || c == '_' || c == '-' { c } else { '_' }).collect()
 }
