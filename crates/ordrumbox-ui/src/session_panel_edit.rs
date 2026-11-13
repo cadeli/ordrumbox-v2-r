@@ -366,7 +366,6 @@ impl Session {
                 return;
             }
             Id::SongMenu => return self.song_menu_pick(value),
-            Id::AudioMenu => return self.choose_audio_device(value),
             Id::StyleList => return self.choose_style(value),
             Id::Beats => {
                 if let Ok(beats) = value.parse::<i32>() {

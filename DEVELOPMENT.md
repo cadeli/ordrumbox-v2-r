@@ -168,6 +168,10 @@ from the cursor set by hand. A song's loop (Shift+click on the ruler) is made in
 (`Controller::set_song_loop`): a pass keeps the sequence number the engine counts and holds the
 measure of the loop. The metronome is built into the passes (`ordrumbox-engine/src/metronome.rs`),
 a synth click on a strip after the tracks' (none when the pattern has 64 tracks). The output
-device is a setting (`audioDevice`) read by `ordrumbox-app` each time it starts the sound; File
-> Audio output reloads the session. No snapshot changed: the passes of a song without a loop or a
+device is a setting (`audioDevice`) read by `ordrumbox-app` each time it starts the sound; Edit >
+Preferences (`session_prefs.rs`) chooses it, and a new one reloads the session. The MIDI input
+(`midiInput`, `ordrumbox-app/src/midi.rs`, `midir`) is opened by the program, which feeds the notes to
+the audio callback through a lock-free ring (`AudioSide::trigger`, the same path as a plugin host's
+MIDI) and to the UI thread through a channel, where `Session::midi_note` writes them when recording.
+`Controller::set_live_midi` makes the controller post the pattern's key map without a host. No snapshot changed: the passes of a song without a loop or a
 metronome are built as before.

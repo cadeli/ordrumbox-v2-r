@@ -99,6 +99,10 @@ where
     device.build_output_stream(
         *config,
         move |data: &mut [T], _| {
+            // The notes played on the MIDI keyboard since the last callback.
+            while let Some(note) = crate::midi::NOTES.pop() {
+                audio.trigger(note.channel, note.key, note.velocity, 0);
+            }
             for chunk in data.chunks_mut(SCRATCH_FRAMES * channels) {
                 let frames = chunk.len() / channels;
                 audio.render(&mut left[..frames], &mut right[..frames]);

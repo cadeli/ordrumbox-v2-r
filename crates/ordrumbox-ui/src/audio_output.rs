@@ -40,6 +40,48 @@ pub fn chosen_device() -> Result<Option<String>, String> {
     Ok(value.and_then(|v| v.as_str().map(str::to_owned)).filter(|name| !name.is_empty()))
 }
 
+/// The `settings.json` key of the MIDI input chosen: absent or empty, the
+/// first port there is; `"off"`, none; else the name of a port.
+pub const MIDI_KEY: &str = "midiInput";
+
+/// The value of [`MIDI_KEY`] that turns the MIDI input off.
+pub const MIDI_OFF: &str = "off";
+
+/// Which MIDI input the program opens.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MidiInput {
+    /// The first port there is, which a controller plugged in later takes over.
+    First,
+    Off,
+    Named(String),
+}
+
+impl MidiInput {
+    /// The setting's text.
+    pub fn setting(&self) -> &str {
+        match self {
+            Self::First => "",
+            Self::Off => MIDI_OFF,
+            Self::Named(name) => name,
+        }
+    }
+
+    fn from_setting(text: &str) -> Self {
+        match text {
+            "" => Self::First,
+            MIDI_OFF => Self::Off,
+            name => Self::Named(name.to_owned()),
+        }
+    }
+}
+
+/// The MIDI input chosen in Edit > Preferences.
+pub fn chosen_midi_input() -> Result<MidiInput, String> {
+    let Some(path) = crate::store::settings_path() else { return Ok(MidiInput::First) };
+    let value = crate::store::load_setting(&path, MIDI_KEY)?;
+    Ok(value.as_ref().and_then(|v| v.as_str()).map_or(MidiInput::First, MidiInput::from_setting))
+}
+
 /// The output of a plugin: its host plays what the engine renders.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HostOutput {

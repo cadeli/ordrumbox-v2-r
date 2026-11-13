@@ -32,7 +32,7 @@ const SHORTCUTS: &[&str] = &[
     "  Home, keypad Enter     back to the first beat / measure (the loop's first measure)",
     "  Shift+click (ruler)    loop the song from the cursor's measure to that one (Play > Clear the loop)",
     "  F9, F8                 metronome on/off, tap the tempo (a tap a beat)",
-    "  Ctrl+R                 record: while the pattern plays, Q-P put a note on the step that plays",
+    "  Ctrl+R                 record: while the pattern plays, Q-P (or a MIDI keyboard) put notes on the step",
     "  [ ] / Shift+[ ]        previous / next pattern / song (also PageUp PageDown)",
     "  - = (Shift: x10)       tempo (every pattern's; the song's in the song panel)",
     "  , .                    previous / next kit",
@@ -42,6 +42,7 @@ const SHORTCUTS: &[&str] = &[
     "  Ctrl+O, Ctrl+Q         load a song, quit (Ctrl+W too)       F11  full screen",
     "  Ctrl+E, Ctrl+Shift+M   export WAV (Shift: the song), export MIDI",
     "  Ctrl+Z, Ctrl+Shift+Z   undo, redo (also Ctrl+Y)",
+    "  Ctrl+,                 preferences: sound output, MIDI input, metronome, VU meters, toasts",
     "  Ctrl+C, Ctrl+X, Ctrl+V copy, cut, paste the zone or the step (Shift: the track)",
     "  Ctrl+N, Ctrl+D         new pattern, duplicate pattern",
     "  Ctrl+T, Ctrl+Backspace add a KICK track, remove a track",
@@ -198,14 +199,14 @@ impl Session {
             OverlayKey::Move(delta) => *scroll = (*scroll).min(max).saturating_add_signed(*delta).min(max),
             OverlayKey::Edge(end) => *scroll = if *end { max } else { 0 },
             OverlayKey::Escape => self.chrome.overlay = None,
-            OverlayKey::Enter | OverlayKey::Back | OverlayKey::Letter(_) => {}
+            OverlayKey::Enter | OverlayKey::Back | OverlayKey::Side(_) | OverlayKey::Letter(_) => {}
         }
         true
     }
 
     /// A key while a panel is open: the file picker's keys, or any key closes it.
     pub fn overlay_key(&mut self, key: OverlayKey) {
-        if self.history_key(&key) || self.shortcuts_key(&key) {
+        if self.history_key(&key) || self.shortcuts_key(&key) || self.prefs_key(&key) {
             return;
         }
         // The confirms: the default is to keep (ENTER closes), ← → choose,
@@ -247,6 +248,7 @@ impl Session {
                 picker.step(delta);
                 Outcome::Browsing
             }
+            OverlayKey::Side(_) => Outcome::Browsing,
             OverlayKey::Edge(end) => {
                 picker.home_end(end);
                 Outcome::Browsing
@@ -261,6 +263,9 @@ impl Session {
 
     /// A click while a panel is open.
     pub fn overlay_click(&mut self, width: i32, height: i32, scale: Scale, x: i32, y: i32) {
+        if self.prefs_click(width, height, scale, x, y) {
+            return;
+        }
         if matches!(self.chrome.overlay, Some(Overlay::History { .. })) {
             if !LogLayout::new(width, height, scale).contains(x, y) {
                 self.chrome.overlay = None;

@@ -22,7 +22,7 @@ use ordrumbox_dsp::MasterSettings;
 use crate::assign::{TrackSound, assign_track};
 use crate::engine::{Engine, HostMix, HostTransport, MAX_TRACKS, Position, host_pass};
 use crate::kit::SampleBank;
-use crate::midi::{BlockNote, KeyMap};
+use crate::midi::{BlockNote, KeyMap, Target};
 use crate::pass::{
     HitsCache, Pass, PassContext, SONG_PASS_TICKS, SongContext, build_keymap, build_pass, build_preview,
     build_song_pass_at, pattern_pass_ticks,
@@ -410,6 +410,8 @@ pub struct Controller {
     song_loop: Option<(u64, u64)>,
     /// A click on every beat of the passes built.
     metronome: bool,
+    /// A MIDI input is open: the pattern's key map is posted for its notes, as under a host.
+    live_midi: bool,
 }
 
 /// What a cue ([`Inbox::cue`]) is built from: a cue built from the same is
@@ -504,6 +506,7 @@ impl Controller {
             cue: None,
             song_loop: None,
             metronome: false,
+            live_midi: false,
         };
         (controller, audio)
     }
@@ -679,6 +682,33 @@ impl Controller {
             self.cue = None;
             self.refresh(library);
         }
+    }
+
+    /// A MIDI input is open (or not): the notes it plays reach the tracks
+    /// of the pattern ([`AudioSide::trigger`]).
+    pub fn set_live_midi(&mut self, on: bool) {
+        self.live_midi = on;
+    }
+
+    /// The track of the pattern shown (the one playing, else the selected
+    /// one) that MIDI key `key` of channel `channel` plays, and the pitch the
+    /// note then has: what a note played live is recorded as. Like the
+    /// engine's key map: a channel with a melodic track plays it, any other
+    /// channel the drum keys.
+    pub fn midi_track(&mut self, library: &Library, channel: u8, key: u8) -> Option<(usize, f64)> {
+        let Mode::Pattern(selected) = self.mode else { return None };
+        let p = self.playing_pattern().unwrap_or(selected);
+        let pattern = library.patterns.get(p)?;
+        let sounds = self.sounds(library, p);
+        let targets = crate::pass::keymap_targets(pattern, &sounds, &self.bank);
+        let melodic =
+            targets.iter().position(|t| matches!(t, Some(Target::Melodic { channel: c, .. }) if *c == channel));
+        if let Some(t) = melodic
+            && let Some(Target::Melodic { root, .. }) = targets[t]
+        {
+            return Some((t, f64::from(key) - root));
+        }
+        targets.iter().position(|t| matches!(t, Some(Target::Drum(k)) if *k == key)).map(|t| (t, 0.0))
     }
 
     pub fn metronome(&self) -> bool {
@@ -935,6 +965,8 @@ impl Controller {
         let snapshot = self.link.published.read();
         if let Some(host) = snapshot.host {
             self.follow_host(library, host, snapshot);
+        }
+        if snapshot.host.is_some() || self.live_midi {
             self.post_keymap(library);
         }
         if let Some(number) = self.pending_pass().or_else(|| self.stale_next_pass())
@@ -1271,6 +1303,19 @@ mod tests {
             step(&mut controller, true, &mut seen);
         }
         assert_eq!(seen, [3, 4, 5, 1, 2, 3]);
+    }
+
+    #[test]
+    fn a_midi_key_finds_the_track_that_plays_it_and_its_pitch() {
+        let (mut controller, _audio) = Controller::new(8000.0, bank(), Scales::default(), SynthPresets::default());
+        let (library, _) =
+            Library::parse(r#"{"patterns":[{"name":"p","tracks":[{"name":"KICK"},{"name":"SNARE"}]}]}"#).unwrap();
+        assert_eq!(controller.midi_track(&library, 9, 36), Some((0, 0.0)), "GM kick");
+        assert_eq!(controller.midi_track(&library, 9, 38), Some((1, 0.0)), "GM snare");
+        assert_eq!(controller.midi_track(&library, 9, 100), None);
+        // A song plays no pattern: no live notes to write.
+        controller.mode = Mode::Song(0);
+        assert_eq!(controller.midi_track(&library, 9, 36), None);
     }
 
     #[test]

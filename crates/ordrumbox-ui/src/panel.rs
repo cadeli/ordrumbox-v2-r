@@ -203,8 +203,6 @@ pub enum Id {
     PatternDescription,
     /// The right-click menu of the song panel.
     SongMenu,
-    /// The list of sound devices File > Audio output opens.
-    AudioMenu,
     // Output panel.
     /// A master bus setting, by its `settings.master` key.
     Master(&'static str),

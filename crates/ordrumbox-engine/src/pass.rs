@@ -308,6 +308,19 @@ pub fn build_preview(pattern: &Pattern, t: usize, note: Option<&Note>, context: 
     Pass { frames: 1, ticks: 1, events, strips, patches, ..Pass::default() }
 }
 
+/// The MIDI target of each track of `pattern` with the sounds `sounds`: where
+/// its notes go out, and which keys play it live. The events of a key map play
+/// pitch 0 with the track's transpose: so does their key.
+pub fn keymap_targets(pattern: &Pattern, sounds: &[TrackSound], bank: &SampleBank) -> Vec<Option<Target>> {
+    track_targets(
+        pattern.tracks.iter().enumerate().map(|(t, track)| (track.name.as_str(), root_key(sounds.get(t), bank))),
+    )
+    .into_iter()
+    .zip(&pattern.tracks)
+    .map(|(target, track)| target.map(|target| target.transposed(track.transpose)))
+    .collect()
+}
+
 /// What each MIDI key plays live in `pattern` at tempo `bpm`: every track
 /// at full velocity and its own pan, through the pattern's strips (silent
 /// where the track is).
@@ -331,18 +344,7 @@ pub fn build_keymap(pattern: &Pattern, context: PassContext<'_>, bpm: f64) -> Ke
             settings
         })
         .collect();
-    // The events play pitch 0 with the track's transpose: so does their key.
-    let targets: Vec<Option<Target>> = track_targets(
-        pattern
-            .tracks
-            .iter()
-            .enumerate()
-            .map(|(t, track)| (track.name.as_str(), root_key(context.sounds.get(t), context.bank))),
-    )
-    .into_iter()
-    .zip(&pattern.tracks)
-    .map(|(target, track)| target.map(|target| target.transposed(track.transpose)))
-    .collect();
+    let targets = keymap_targets(pattern, context.sounds, context.bank);
     KeyMap::new(Pass { frames: 1, ticks: 1, events, strips, patches, ..Pass::default() }, &targets)
 }
 

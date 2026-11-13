@@ -1011,3 +1011,82 @@ fn f11_asks_for_full_screen_and_ctrl_w_quits() {
     press(&mut ui, Modifiers { control: true, ..Modifiers::default() }, Key::Letter('W'));
     assert!(ui.session.quit_requested());
 }
+
+// ─── MIDI input, preferences ────────────────────────────────────────────────
+
+#[test]
+fn a_midi_note_is_recorded_on_the_track_that_key_plays_at_its_velocity() {
+    let (mut s, mut audio) =
+        session(r#"{"patterns":[{"name":"p","bpm":120,"tracks":[{"name":"KICK"},{"name":"SNARE"}]}]}"#);
+    s.set_midi_open(true);
+    // Not recording: heard, never written.
+    s.midi_note(9, 36, 0.5);
+    assert!(s.pattern().unwrap().tracks[0].notes.is_empty());
+    s.run(Command::Record);
+    s.toggle_play();
+    run(&mut s, &mut audio, 8000);
+    // GM 36 is the kick, 38 the snare.
+    s.midi_note(9, 36, 0.5);
+    let kick = &s.pattern().unwrap().tracks[0].notes;
+    assert_eq!(kick.len(), 1, "{}", s.message);
+    assert!((kick[0].velocity - 0.5).abs() < 1e-9);
+    s.midi_note(9, 38, 1.0);
+    assert_eq!(s.pattern().unwrap().tracks[1].notes.len(), 1);
+    // A key no track plays is said.
+    s.midi_note(9, 100, 1.0);
+    assert!(s.message.contains("no track plays MIDI key 100"), "{}", s.message);
+    s.undo();
+    assert!(s.pattern().unwrap().tracks[1].notes.is_empty(), "one undo step a note");
+}
+
+#[test]
+fn the_preferences_keep_what_ok_applies_and_esc_leaves() {
+    use crate::session::OverlayKey;
+    let (mut s, _audio) = session(LIBRARY);
+    s.run(Command::Preferences);
+    assert!(s.overlay_open());
+    // Rows with no sound device or MIDI port offered: metronome, VU meters, toasts, OK.
+    s.overlay_key(OverlayKey::Enter);
+    assert!(!s.metronome, "a draft: nothing changes before OK");
+    s.overlay_key(OverlayKey::Move(1));
+    s.overlay_key(OverlayKey::Side(1));
+    s.overlay_key(OverlayKey::Escape);
+    assert!(!s.overlay_open() && !s.metronome && s.chrome.show_vus, "Esc leaves everything");
+
+    s.run(Command::Preferences);
+    s.overlay_key(OverlayKey::Enter);
+    s.overlay_key(OverlayKey::Move(1));
+    s.overlay_key(OverlayKey::Enter);
+    s.overlay_key(OverlayKey::Move(2));
+    s.overlay_key(OverlayKey::Enter);
+    assert!(!s.overlay_open());
+    assert!(s.metronome && !s.chrome.show_vus);
+    assert_eq!(s.message, "preferences kept");
+}
+
+#[test]
+fn the_preferences_list_the_devices_and_ports_the_program_offers() {
+    use crate::session::OverlayKey;
+    let (mut s, _audio) = session(LIBRARY);
+    s.offer_devices(|| vec!["Speakers".into()]);
+    s.offer_midi_inputs(|| vec!["Pad".into(), "Keys".into()]);
+    s.run(Command::Preferences);
+    let lines = match &s.chrome.overlay {
+        Some(super::Overlay::Preferences(prefs)) => prefs.lines(),
+        _ => panic!("not open"),
+    };
+    assert!(lines[0].starts_with("> Audio output"), "{lines:?}");
+    assert!(lines[1].contains("MIDI input"), "{lines:?}");
+    // The modal keeps its width whichever value is shown.
+    let width = |s: &Session| match &s.chrome.overlay {
+        Some(super::Overlay::Preferences(prefs)) => prefs.lines().iter().map(|l| l.chars().count()).collect::<Vec<_>>(),
+        _ => vec![],
+    };
+    let before = width(&s);
+    s.overlay_key(OverlayKey::Move(1));
+    for _ in 0..4 {
+        s.overlay_key(OverlayKey::Side(1));
+        assert_eq!(width(&s), before, "no layout shift");
+    }
+    s.overlay_key(OverlayKey::Escape);
+}
