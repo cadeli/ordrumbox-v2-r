@@ -57,8 +57,9 @@ pub const FX_DEFS: [FxDef; 5] = [
     },
 ];
 
-pub const FILTER_TYPES: [&str; 4] = ["lowpass", "highpass", "bandpass", "notch"];
-pub(super) const FILTER_ICONS: [&str; 4] = ["LP", "HP", "BP", "NT"];
+pub use ordrumbox_engine::synth_preset::FILTER_TYPES;
+/// The filter types as their buttons are labelled (the font has no curves).
+pub const FILTER_ICONS: [&str; 4] = ["LP", "HP", "BP", "NT"];
 /// Cutoff a filter gets when switched on from its 20 Hz default, Hz (a
 /// lowpass at 20 Hz is silence).
 pub const FILTER_ON_CUTOFF: f64 = 1_000.0;

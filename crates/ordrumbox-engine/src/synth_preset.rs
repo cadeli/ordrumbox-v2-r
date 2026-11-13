@@ -14,8 +14,10 @@ const C3_FREQ: f64 = 130.812_782_650_299_3;
 /// `MIN_NOTE_RATIO`.
 const MIN_NOTE_RATIO: f64 = 0.0001;
 
-const WAVES: [&str; 5] = ["sine", "triangle", "sawtooth", "square", "random"];
-const FILTERS: [&str; 4] = ["lowpass", "highpass", "bandpass", "notch"];
+/// The oscillator and LFO waves, by code.
+pub const WAVES: [&str; 5] = ["sine", "triangle", "sawtooth", "square", "random"];
+/// The filter types, by code (a strip's and a synth voice's filter mode).
+pub const FILTER_TYPES: [&str; 4] = ["lowpass", "highpass", "bandpass", "notch"];
 const MOD_ENV_TARGETS: [&str; 5] = ["off", "filter", "pitch", "fm", "shape"];
 /// `LFO_TARGET_TO_INT`, by code (two names share 16).
 const LFO_TARGETS: [(&str, u8); 35] = [
@@ -226,10 +228,10 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
         osc_detune: vcos.map(|vco| finite(get(vco, "detune"), 0.0)),
         osc_wave: vcos.map(|vco| enum_code(get(vco, "wave"), &WAVES)),
         noise_mix: level(get(noise, "mix"), 0.0),
-        noise_filter_type: enum_code(get(noise, "filterType"), &FILTERS),
+        noise_filter_type: enum_code(get(noise, "filterType"), &FILTER_TYPES),
         noise_filter_freq: finite(get(noise, "filterFreq"), 1000.0),
         noise_filter_q: finite(get(noise, "filterQ"), 0.7),
-        filter_type: enum_code(get(filter, "type"), &FILTERS),
+        filter_type: enum_code(get(filter, "type"), &FILTER_TYPES),
         filter_freq: finite(get(filter, "freq"), 1000.0),
         filter_q: finite(get(filter, "Q"), 0.7),
         filter_slope: finite(get(filter, "slope"), 12.0),

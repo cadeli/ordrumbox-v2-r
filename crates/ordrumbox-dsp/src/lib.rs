@@ -79,12 +79,3 @@ pub use voice::{SampleVoice, VoiceStart};
 pub const MIN_FILTER_FREQ: f64 = 20.0;
 /// Highest frequency a filter cutoff can take, in Hz.
 pub const MAX_FILTER_FREQ: f64 = 20_000.0;
-/// Aliases for the filter cutoff bounds.
-pub const MIN_FILTER_CUTOFF: f64 = MIN_FILTER_FREQ;
-pub const MAX_FILTER_CUTOFF: f64 = MAX_FILTER_FREQ;
-pub const MIN_FILTER_FREQUENCY: f64 = MIN_FILTER_FREQ;
-pub const MAX_FILTER_FREQUENCY: f64 = MAX_FILTER_FREQ;
-pub const FILTER_FREQ_MIN: f64 = MIN_FILTER_FREQ;
-pub const FILTER_FREQ_MAX: f64 = MAX_FILTER_FREQ;
-pub const FILTER_CUTOFF_MIN: f64 = MIN_FILTER_FREQ;
-pub const FILTER_CUTOFF_MAX: f64 = MAX_FILTER_FREQ;

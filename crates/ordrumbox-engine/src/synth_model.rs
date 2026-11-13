@@ -11,9 +11,7 @@ use ordrumbox_core::lfo;
 use crate::slope;
 use crate::synth_preset::FM_DEVIATION;
 
-/// The oscillator waves (`WAVE_TYPES`) and filter types (`FILTER_TYPES`).
-pub const WAVES: [&str; 5] = ["sine", "triangle", "sawtooth", "square", "random"];
-pub const FILTER_TYPES: [&str; 3] = ["lowpass", "highpass", "bandpass"];
+pub use crate::synth_preset::{FILTER_TYPES, WAVES};
 /// The mod envelope's targets and the LFO syncs (value, label).
 pub const MOD_ENV_TARGETS: [(&str, &str); 5] =
     [("off", "Off"), ("filter", "Filter"), ("pitch", "Pitch"), ("fm", "FM"), ("shape", "Shape")];
