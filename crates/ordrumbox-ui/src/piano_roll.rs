@@ -18,7 +18,7 @@ use crate::frame;
 use crate::note_drag::{MIDDLE_C, MIDI_MIN, midi_name};
 use crate::panel::Rect;
 use crate::theme;
-use crate::view::{ZONE, ZONE_OPACITY};
+use crate::theme::{ZONE, ZONE_OPACITY};
 
 /// Height of a key row, px per scale unit (`NOTE_HEIGHT`).
 const NOTE_HEIGHT: i32 = 14;

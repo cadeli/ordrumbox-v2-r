@@ -257,6 +257,9 @@ const RED: Rgb = 0x00FF_5C6C;
 pub const ACCENT: Rgb = PINK;
 /// Keyboard focus: the grid cursor, the focused control, a text caret.
 pub const FOCUS: Rgb = CYAN;
+/// The zone drawn with Shift+drag, and how much its shade covers (of 255).
+pub const ZONE: Rgb = FOCUS;
+pub const ZONE_OPACITY: u8 = 56;
 /// What sounds: the transport playing, a switch that is on, the playhead,
 /// the beat heard, the pattern next in line, the scope, a plain note.
 pub const LIVE: Rgb = LIME;

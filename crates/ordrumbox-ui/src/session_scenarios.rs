@@ -17,7 +17,6 @@ use ordrumbox_engine::{AudioSide, Controller, Mode, Position, SampleBank, Sample
 use ordrumbox_logic::history::MAX_STEPS;
 use ordrumbox_logic::midi::{self, PPQN, smf};
 
-use super::session_panel::Button;
 use super::session_playback::Playback;
 use super::{Move, OverlayKey, SYNTHS_FILE_NAME, Session, Workspace};
 use crate::canvas::Canvas;
@@ -28,6 +27,7 @@ use crate::panel::{self, Id, Kind, Rect};
 use crate::picker::{Export, Outcome};
 use crate::store;
 use crate::test_support::scratch_dir;
+use crate::ui_input::Button;
 use crate::view::Hit;
 
 const RATE: f32 = 8000.0;

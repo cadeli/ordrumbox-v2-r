@@ -1,6 +1,7 @@
 //! Drawing the pattern grid, its lane and the header.
 
 use super::*;
+use crate::theme::{ZONE, ZONE_OPACITY};
 
 /// Draw `view`; `scale` is the integer UI scale (1 on a standard display, 2 on HiDPI).
 pub fn draw(canvas: &mut Canvas, view: &View, scale: Scale) {

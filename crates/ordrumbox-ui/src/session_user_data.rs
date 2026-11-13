@@ -7,6 +7,7 @@
 //! again from the files, as at start.
 
 use super::*;
+use crate::store;
 use crate::user_data;
 use ordrumbox_core::json::Object;
 
@@ -208,7 +209,7 @@ impl Session {
 
     /// Folder `dir` is picked as the user data folder: asked, unless it is already.
     pub(super) fn ask_user_folder(&mut self, dir: PathBuf) {
-        if self.user_folder().is_some_and(|current| user_data::same_folder(&current, &dir)) {
+        if self.user_folder().is_some_and(|current| store::same_folder(&current, &dir)) {
             self.message = format!("{} is already the user data folder", dir.display());
             return;
         }
