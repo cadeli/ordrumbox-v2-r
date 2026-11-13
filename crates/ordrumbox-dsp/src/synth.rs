@@ -1,309 +1,107 @@
-//! One synth note (`worklets/processors/synth_voice_source.js`): three
-//! oscillators with FM, a sub-oscillator, filtered noise, drive, a TPT
-//! state-variable filter with its envelope, an ADSR, a modulation envelope and
-//! two LFOs routed to any of 33 targets, then equal-power pan.
+//! One synth note: three oscillators with FM, a sub-oscillator, filtered
+//! noise, drive, a TPT state-variable filter with its envelope, an ADSR, a
+//! modulation envelope and two LFOs routed to any of 33 targets, then
+//! equal-power pan.
 //!
-//! The JS processor is driven by messages (`trigger`, `release`, `update`);
-//! here [`SynthVoice::start`] is the trigger with the update's values (a
-//! [`SynthPatch`]) and [`SynthVoice::release_at`] the release. Starting,
-//! releasing and rendering never allocate.
+//! [`SynthVoice::start`] starts a note of a [`SynthPatch`] and
+//! [`SynthVoice::release_at`] releases it. Starting, releasing and rendering
+//! never allocate.
 //!
-//! It departs from the JS processor on purpose where that one did not do what
-//! its controls say: the sub-oscillator sounds an octave below oscillator 1,
-//! the pitch punch reaches two octaves, FM follows the note and goes through
-//! zero, each note has its own noise, and the filter opens up to 0.45 × the
-//! sample rate (a quarter in JS).
+//! The sub-oscillator sounds an octave below oscillator 1, the pitch punch
+//! reaches two octaves, FM follows the note and goes through zero, each note
+//! has its own noise, and the filter opens up to 0.45 × the sample rate.
 
-use std::f64::consts::{PI, TAU};
-use std::sync::OnceLock;
+use std::f64::consts::PI;
 
-use crate::{lfo, slope};
+use crate::slope::{self, FilterMode};
+
+mod envelope;
+mod filter;
+mod modulation;
+mod oscillator;
+pub mod patch;
+
+use envelope::{Envelope, FilterEnvelope, Segment};
+use filter::{Tpt, cutoff_coefficient, tap, tap_weights};
+use modulation::{
+    DETUNE_SLOTS, ENV_SLOTS, GAIN_SLOTS, LfoMods, LfoRoute, MOD_ENV_SLOTS, Slot, modulated, modulated_adsr,
+};
+pub use oscillator::FM_DEVIATION;
+use oscillator::{
+    NOISE_SEED, SineTable, fm_frequencies, noise_sample, noise_seed, oscillator, sin_lookup, sine_table, xorshift32,
+};
+use patch::{Adsr, ModEnvTarget, SynthPatch};
 
 /// Cents to a natural-log ratio.
 const LN2_OVER_1200: f64 = std::f64::consts::LN_2 / 1200.0;
-const SINE_TABLE_SIZE: usize = 4096;
-/// Initial state of the noise generator.
-const NOISE_SEED: u32 = 54_321;
-const FLUSH: f64 = 1e-15;
 /// Pitch rise of a full pitch punch at the start of a note, cents.
 const PITCH_PUNCH_CENTS: f64 = 2400.0;
-/// Highest filter cutoff, as a fraction of the sample rate (the JS stops at a
-/// quarter: 12 kHz at 48 kHz, too dark for hats and noise).
-const MAX_CUTOFF_RATIO: f64 = 0.45;
-/// Frequency deviation of a full FM amount, as a multiple of the carrier's
-/// frequency: the timbre stays the same over the keyboard.
-pub const FM_DEVIATION: f64 = 2.0;
+/// How long the pitch punch lasts, seconds.
+const PITCH_PUNCH_SECONDS: f64 = 0.06;
+/// A level, an amount or a depth at or below this does nothing: its stage is skipped.
+const SILENT: f64 = 0.001;
 
-/// Initial noise state of the note numbered `serial`: every note has its own,
-/// the same from one render to the next. A xorshift never leaves a state of 0.
-fn noise_seed(serial: u64) -> u32 {
-    // The low 32 bits of the product.
-    let seed = NOISE_SEED ^ serial.wrapping_sub(1).wrapping_mul(0x9E37_79B1) as u32;
-    if seed == 0 { NOISE_SEED } else { seed }
-}
-
-/// Frequencies of oscillators 1 and 2 under FM of `amount`, routed by
-/// `algorithm` from the raw `o1`, `o2` and `o3`.
+/// `x` inside `lo`–`hi`; `lo > hi` gives `lo` instead of a panic.
 #[inline]
-fn fm_frequencies(amount: f64, algorithm: i64, (f1, f2): (f64, f64), [o1, o2, o3]: [f64; 3]) -> (f64, f64) {
-    let (d1, d2) = (f1 * amount * FM_DEVIATION, f2 * amount * FM_DEVIATION);
-    match algorithm {
-        0 => (f1 + o2 * d1, f2),
-        1 => (f1 + o3 * d1, f2),
-        2 => (f1 + o2 * d1, f2 + o3 * d2),
-        3 => (f1 + (o2 + o3) * d1, f2),
-        4 => (f1 + o2 * d1, f2 + o1 * d2),
-        _ => (f1, f2),
-    }
+fn clamp(x: f64, lo: f64, hi: f64) -> f64 {
+    x.min(hi).max(lo)
 }
 
-fn sine_table() -> &'static [f32; SINE_TABLE_SIZE] {
-    static TABLE: OnceLock<[f32; SINE_TABLE_SIZE]> = OnceLock::new();
-    TABLE.get_or_init(|| std::array::from_fn(|i| (TAU * i as f64 / SINE_TABLE_SIZE as f64).sin() as f32))
-}
-
-/// Sine of `phase` cycles from the 4096-entry table, linearly interpolated.
+/// The frequency ratio of a detune of `cents`.
 #[inline]
-fn sin_lookup(table: &[f32; SINE_TABLE_SIZE], phase: f64) -> f64 {
-    let p = crate::wrap(phase, 1.0);
-    let index = p * SINE_TABLE_SIZE as f64;
-    let i = index as usize;
-    let fraction = index - i as f64;
-    f64::from(table[i & (SINE_TABLE_SIZE - 1)]) * (1.0 - fraction)
-        + f64::from(table[(i + 1) & (SINE_TABLE_SIZE - 1)]) * fraction
+fn cents_ratio(cents: f64) -> f64 {
+    if cents == 0.0 { 1.0 } else { (cents * LN2_OVER_1200).exp() }
 }
 
-/// PolyBLEP correction at phase `t` for a phase increment `dt`.
-#[inline]
-fn poly_blep(t: f64, dt: f64) -> f64 {
-    if dt <= 0.00001 || dt >= 0.5 {
-        return 0.0;
-    }
-    if t < dt {
-        let n = t / dt;
-        return n + n - n * n - 1.0;
-    }
-    if t > 1.0 - dt {
-        let n = (t - 1.0) / dt;
-        return n * n + n + n + 1.0;
-    }
-    0.0
-}
-
-/// Marsaglia's xorshift32: the next state of the noise generator.
-#[inline]
-fn xorshift32(mut state: u32) -> u32 {
-    state ^= state << 13;
-    state ^= state >> 17;
-    state ^= state << 5;
-    state
-}
-
-/// Oscillator `shape` (0 sine, 1 triangle, 2 saw, 3 square, 4 random per cycle).
-#[inline]
-fn oscillator(table: &[f32; SINE_TABLE_SIZE], shape: f64, phase: f64, dt: f64, cycle: f64) -> f64 {
-    if shape < 0.5 {
-        sin_lookup(table, phase)
-    } else if shape < 1.5 {
-        if phase < 0.25 {
-            phase * 4.0
-        } else if phase < 0.75 {
-            2.0 - phase * 4.0
-        } else {
-            phase * 4.0 - 4.0
-        }
-    } else if shape < 2.5 {
-        phase * 2.0 - 1.0 - poly_blep(phase, dt)
-    } else if shape < 3.5 {
-        let square = if phase < 0.5 { 1.0 } else { -1.0 };
-        square + poly_blep(phase, dt) - poly_blep((phase + 0.5) % 1.0, dt)
-    } else {
-        lfo::sample_and_hold(cycle)
-    }
-}
-
-/// One LFO of a patch.
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub struct SynthLfo {
-    /// Routing code, 0 (off) to 33 (see `LFO_TARGET_TO_INT` in worklet_synth_voice.js).
-    pub target: f64,
-    /// Waveform code (see [`lfo::wave`]).
-    pub wave: f64,
-    /// Hz; 0 or less is off.
-    pub freq: f64,
-    pub depth: f64,
-}
-
-/// An ADSR, seconds and level.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Adsr {
-    pub attack: f64,
-    pub decay: f64,
-    pub sustain: f64,
-    pub release: f64,
-}
-
-/// Stages switched off (`bypass*` of the preset).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct SynthBypass {
-    pub noise: bool,
-    pub filter: bool,
-    pub env: bool,
-    pub lfo1: bool,
-    pub lfo2: bool,
-    pub fm: bool,
-    pub mod_env: bool,
-    pub filter_env: bool,
-}
-
-/// Everything one note plays with: the processor's `update` message.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct SynthPatch {
-    /// Hz, before detune.
-    pub osc_freq: [f64; 3],
-    pub osc_gain: [f64; 3],
-    /// Cents.
-    pub osc_detune: [f64; 3],
-    pub osc_wave: [f64; 3],
-    pub noise_mix: f64,
-    /// 0 lowpass, 1 highpass, 2 bandpass, 3 notch.
-    pub noise_filter_type: f64,
-    pub noise_filter_freq: f64,
-    pub noise_filter_q: f64,
-    /// 0 lowpass, 1 highpass, 2 bandpass, 3 notch.
-    pub filter_type: f64,
-    pub filter_freq: f64,
-    pub filter_q: f64,
-    /// dB per octave: 12, or 24 (two filter stages).
-    pub filter_slope: f64,
-    pub drive: f64,
-    pub pitch_punch: f64,
-    pub sub_gain: f64,
-    pub envelope: Adsr,
-    pub volume: f64,
-    pub pan: f64,
-    /// Peak level of the note (the `velocity` parameter).
-    pub velocity: f64,
-    pub lfo1: SynthLfo,
-    pub lfo2: SynthLfo,
-    pub filter_env_amount: f64,
-    pub fm_amount: f64,
-    /// 0–4.
-    pub fm_algorithm: f64,
-    pub mod_envelope: Adsr,
-    /// 0 off, 1 filter, 2 pitch, 3 FM, 4 shape.
-    pub mod_env_target: f64,
-    pub mod_env_depth: f64,
-    pub bypass: SynthBypass,
-}
-
-impl Default for SynthPatch {
-    /// The processor's parameter defaults.
-    fn default() -> Self {
-        let lfo = SynthLfo { target: 0.0, wave: 0.0, freq: 1.0, depth: 0.0 };
-        Self {
-            osc_freq: [440.0; 3],
-            osc_gain: [0.5; 3],
-            osc_detune: [0.0; 3],
-            osc_wave: [0.0; 3],
-            noise_mix: 0.0,
-            noise_filter_type: 0.0,
-            noise_filter_freq: 1000.0,
-            noise_filter_q: 0.7,
-            filter_type: 0.0,
-            filter_freq: 1000.0,
-            filter_q: 0.7,
-            filter_slope: 12.0,
-            drive: 0.0,
-            pitch_punch: 0.0,
-            sub_gain: 0.0,
-            envelope: Adsr { attack: 0.01, decay: 0.1, sustain: 0.7, release: 0.1 },
-            volume: 0.8,
-            pan: 0.0,
-            velocity: 0.8,
-            lfo1: lfo,
-            lfo2: lfo,
-            filter_env_amount: 0.0,
-            fm_amount: 0.0,
-            fm_algorithm: 0.0,
-            mod_envelope: Adsr { attack: 0.01, decay: 0.1, sustain: 0.0, release: 0.1 },
-            mod_env_target: 0.0,
-            mod_env_depth: 0.0,
-            bypass: SynthBypass::default(),
-        }
-    }
-}
-
-/// What an LFO adds this sample: detune per oscillator,
-/// gain per oscillator, and the other targets.
-#[derive(Debug, Clone, Copy, Default)]
-struct LfoMods {
-    detune: [f64; 3],
-    gain: [f64; 3],
-    filter: f64,
-    master: f64,
+/// What a block of a note is rendered with: everything of the patch that no
+/// sample changes, worked out once.
+#[derive(Debug)]
+struct Block {
+    table: &'static SineTable,
+    sample_rate: f64,
+    lfos: [Option<LfoRoute>; 2],
+    /// Phase step of the two LFOs, cycles per sample.
+    lfo_steps: [f64; 2],
+    /// What the modulation envelope moves; off when it is bypassed or has no depth.
+    mod_target: ModEnvTarget,
+    filter_mode: FilterMode,
+    filter_weights: [f64; 3],
+    is_steep: bool,
+    /// The filter's Q, coefficient and damping while nothing modulates it.
     q: f64,
-    noise: f64,
-    filter_env_amount: f64,
-    sub_gain: f64,
-    pitch_punch: f64,
-    drive: f64,
-    noise_freq: f64,
-    noise_q: f64,
-    fm_amount: f64,
-    fm_algorithm: f64,
-    env: [f64; 4],
-    mod_env: [f64; 4],
+    g: f64,
+    k: f64,
+    noise_weights: [f64; 3],
+    noise_g: f64,
+    noise_k: f64,
+    pan_left: f64,
+    pan_right: f64,
 }
 
-impl LfoMods {
-    fn new(target: i64, depth: f64, phase: f64, wave: f64) -> Self {
-        let mut m = Self::default();
-        if target == 0 {
-            return m;
+impl Block {
+    fn new(p: &SynthPatch, sample_rate: f64) -> Self {
+        let pan = clamp(p.pan, -1.0, 1.0);
+        let q = clamp(p.filter_q, 0.1, 20.0);
+        let has_mod_env = !p.bypass.mod_env && p.mod_env_depth > SILENT;
+        Self {
+            table: sine_table(),
+            sample_rate,
+            lfos: [LfoRoute::new(&p.lfo1, p.bypass.lfo1), LfoRoute::new(&p.lfo2, p.bypass.lfo2)],
+            lfo_steps: [p.lfo1.freq / sample_rate, p.lfo2.freq / sample_rate],
+            mod_target: if has_mod_env { p.mod_env_target } else { ModEnvTarget::Off },
+            filter_mode: p.filter_type,
+            filter_weights: tap_weights(p.filter_type),
+            is_steep: slope::is_steep(p.filter_slope),
+            q,
+            g: cutoff_coefficient(p.filter_freq, sample_rate),
+            k: 1.0 / q,
+            noise_weights: tap_weights(p.noise_filter_type),
+            noise_g: cutoff_coefficient(p.noise_filter_freq, sample_rate),
+            noise_k: 1.0 / clamp(p.noise_filter_q, 0.1, 20.0),
+            pan_left: ((pan + 1.0) * PI / 4.0).cos(),
+            pan_right: ((pan + 1.0) * PI / 4.0).sin(),
         }
-        let raw = lfo::wave(phase, wave) * depth;
-        match target {
-            1 | 15 => m.filter = raw * 1000.0,
-            2..=4 => m.detune[(target - 2) as usize] = raw * 1000.0,
-            5 => m.master = raw,
-            6 | 9 | 12 => m.gain[((target - 6) / 3) as usize] = raw,
-            7 | 10 | 13 => m.detune[((target - 7) / 3) as usize] = raw * 100.0,
-            8 | 11 | 14 => m.detune[((target - 8) / 3) as usize] = raw * 1200.0,
-            16 => m.filter_env_amount = raw,
-            17 => m.q = raw * 24.0,
-            18 => m.noise = raw,
-            19 => m.sub_gain = raw,
-            20 => m.pitch_punch = raw,
-            21 => m.drive = raw,
-            22 => m.noise_freq = raw * 10_000.0,
-            23 => m.noise_q = raw * 24.0,
-            24 => m.fm_amount = raw,
-            25 => m.fm_algorithm = raw,
-            26 | 29 => m.env[(target - 26) as usize] = raw * 0.25,
-            27 | 28 => m.env[(target - 26) as usize] = raw * 0.5,
-            30 | 33 => m.mod_env[(target - 30) as usize] = raw * 0.25,
-            31 | 32 => m.mod_env[(target - 30) as usize] = raw * 0.5,
-            _ => {}
-        }
-        m
     }
-}
-
-/// TPT state-variable filter state.
-#[derive(Debug, Clone, Copy, Default)]
-struct Tpt {
-    z1: f64,
-    z2: f64,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Segment {
-    Idle,
-    Attack,
-    Decay,
-    Sustain,
-    Release,
 }
 
 /// One playing synth note.
@@ -316,7 +114,6 @@ pub struct SynthVoice {
     /// Trigger and release times, seconds on the engine clock (-1: none).
     start_time: f64,
     release_time: f64,
-    release_start_level: f64,
     phase: [f64; 3],
     osc_cycle: [f64; 3],
     rng: u32,
@@ -326,16 +123,9 @@ pub struct SynthVoice {
     /// Second filter stage (24 dB/oct only).
     filter_2: Tpt,
     noise_filter: Tpt,
-    env_level: f64,
-    env_segment: Segment,
-    env_segment_start: f64,
-    filter_env_level: f64,
-    /// 0 off, 1 attack, 2 decay.
-    filter_env_segment: u8,
-    mod_env_level: f64,
-    mod_env_segment: Segment,
-    mod_env_segment_start: f64,
-    mod_env_release_start_level: f64,
+    env: Envelope,
+    filter_env: FilterEnvelope,
+    mod_env: Envelope,
 }
 
 impl Default for SynthVoice {
@@ -348,7 +138,6 @@ impl Default for SynthVoice {
             patch: SynthPatch::default(),
             start_time: -1.0,
             release_time: -1.0,
-            release_start_level: 0.0,
             phase: [0.0; 3],
             osc_cycle: [0.0; 3],
             rng: NOISE_SEED,
@@ -357,23 +146,11 @@ impl Default for SynthVoice {
             filter: Tpt::default(),
             filter_2: Tpt::default(),
             noise_filter: Tpt::default(),
-            env_level: 0.0,
-            env_segment: Segment::Idle,
-            env_segment_start: 0.0,
-            filter_env_level: 0.0,
-            filter_env_segment: 0,
-            mod_env_level: 0.0,
-            mod_env_segment: Segment::Idle,
-            mod_env_segment_start: 0.0,
-            mod_env_release_start_level: 0.0,
+            env: Envelope::new(Segment::Idle),
+            filter_env: FilterEnvelope::new(Segment::Idle),
+            mod_env: Envelope::new(Segment::Idle),
         }
     }
-}
-
-/// `x` inside `lo`–`hi`; `lo > hi` gives `lo` instead of a panic.
-#[inline]
-fn clamp(x: f64, lo: f64, hi: f64) -> f64 {
-    x.min(hi).max(lo)
 }
 
 impl SynthVoice {
@@ -390,13 +167,20 @@ impl SynthVoice {
     }
 
     /// Start a note at `start_time` (seconds on the clock [`Self::render`]
-    /// is given), on a fresh voice (a pooled JS node is reset before reuse).
+    /// is given), on a fresh voice.
     pub fn start(&mut self, patch: &SynthPatch, track: usize, start_time: f64, serial: u64) {
-        *self =
-            Self { active: true, track, serial, patch: *patch, start_time, rng: noise_seed(serial), ..Self::default() };
-        self.env_segment = Segment::Attack;
-        self.filter_env_segment = 1;
-        self.mod_env_segment = Segment::Attack;
+        *self = Self {
+            active: true,
+            track,
+            serial,
+            patch: *patch,
+            start_time,
+            rng: noise_seed(serial),
+            env: Envelope::new(Segment::Attack),
+            filter_env: FilterEnvelope::new(Segment::Attack),
+            mod_env: Envelope::new(Segment::Attack),
+            ..Self::default()
+        };
     }
 
     /// Release the note at `time` (seconds, same clock), replacing any release
@@ -407,457 +191,282 @@ impl SynthVoice {
         }
     }
 
-    /// ADSR step, `peak` the note's peak level.
-    fn envelope_step(&mut self, t: f64, env: Adsr, peak: f64) -> f64 {
-        if t < 0.0 || self.env_segment == Segment::Idle {
-            return 0.0;
-        }
-        let Adsr { attack, decay, sustain, release } = env;
-        if self.env_segment == Segment::Attack {
-            let dt = t - self.env_segment_start;
-            if attack <= 0.0001 || dt >= attack {
-                self.env_level = peak;
-                self.env_segment = Segment::Decay;
-                self.env_segment_start = t;
-            } else {
-                let norm = (dt / attack).max(0.0);
-                self.env_level = peak * norm * norm;
-            }
-        }
-        if self.env_segment == Segment::Decay {
-            let dt = t - self.env_segment_start;
-            if decay <= 0.0001 || dt >= decay {
-                self.env_level = peak * sustain;
-                self.env_segment = Segment::Sustain;
-            } else {
-                let norm = clamp(1.0 - dt / decay, 0.0, 1.0);
-                let curve = norm * norm * norm;
-                self.env_level = peak * (sustain + (1.0 - sustain) * curve);
-            }
-        }
-        if self.env_segment == Segment::Sustain {
-            self.env_level = peak * sustain;
-        }
-        if self.env_segment == Segment::Release {
-            let rt = t - self.env_segment_start;
-            if release <= 0.0001 || rt >= release {
-                self.env_level = 0.0;
-                self.env_segment = Segment::Idle;
-            } else {
-                let norm = clamp(1.0 - rt / release, 0.0, 1.0);
-                self.env_level = self.release_start_level * (norm * norm * norm);
-            }
-        }
-        if self.env_level.is_finite() && self.env_level > 0.0 { self.env_level } else { 0.0 }
-    }
-
-    /// Modulation envelope step: linear attack, levels 0–1.
-    fn mod_env_step(&mut self, t: f64, env: Adsr) -> f64 {
-        if t < 0.0 || self.mod_env_segment == Segment::Idle {
-            return 0.0;
-        }
-        let Adsr { attack, decay, sustain, release } = env;
-        if self.mod_env_segment == Segment::Attack {
-            let dt = t - self.mod_env_segment_start;
-            if attack <= 0.0001 || dt >= attack {
-                self.mod_env_level = 1.0;
-                self.mod_env_segment = Segment::Decay;
-                self.mod_env_segment_start = t;
-            } else {
-                self.mod_env_level = (dt / attack).max(0.0);
-            }
-        }
-        if self.mod_env_segment == Segment::Decay {
-            let dt = t - self.mod_env_segment_start;
-            if decay <= 0.0001 || dt >= decay {
-                self.mod_env_level = sustain;
-                self.mod_env_segment = Segment::Sustain;
-            } else {
-                let norm = clamp(1.0 - dt / decay, 0.0, 1.0);
-                self.mod_env_level = sustain + (1.0 - sustain) * (norm * norm * norm);
-            }
-        }
-        if self.mod_env_segment == Segment::Sustain {
-            self.mod_env_level = sustain;
-        }
-        if self.mod_env_segment == Segment::Release {
-            let rt = t - self.mod_env_segment_start;
-            if release <= 0.0001 || rt >= release {
-                self.mod_env_level = 0.0;
-                self.mod_env_segment = Segment::Idle;
-            } else {
-                let norm = clamp(1.0 - rt / release, 0.0, 1.0);
-                self.mod_env_level = self.mod_env_release_start_level * (norm * norm * norm);
-            }
-        }
-        if self.mod_env_level.is_finite() && self.mod_env_level > 0.0 { self.mod_env_level } else { 0.0 }
-    }
-
-    /// Main filter step of stage `f`: (lowpass, highpass, bandpass).
-    #[inline]
-    fn filter_step(f: &mut Tpt, x: f64, g: f64, k: f64) -> (f64, f64, f64) {
-        if !f.z1.is_finite() {
-            f.z1 = 0.0;
-        }
-        if !f.z2.is_finite() {
-            f.z2 = 0.0;
-        }
-        let g = clamp(g, 0.0001, 10.0);
-        let k = clamp(k, 0.05, 10.0);
-        let a1 = 1.0 / (1.0 + g * (g + k));
-        let a2 = g * a1;
-        let a3 = g * a2;
-        let v3 = x - f.z2;
-        let v1 = a1 * f.z1 + a2 * v3;
-        let v2 = f.z2 + a2 * f.z1 + a3 * v3;
-        f.z1 = 2.0 * v1 - f.z1;
-        f.z2 = 2.0 * v2 - f.z2;
-        if f.z1.abs() < FLUSH || !f.z1.is_finite() {
-            f.z1 = 0.0;
-        }
-        if f.z2.abs() < FLUSH || !f.z2.is_finite() {
-            f.z2 = 0.0;
-        }
-        (v2, v3 - v1 * k, v1)
-    }
-
     /// ADD the next `left.len()` frames to `left`/`right`; `first_frame` is
     /// the clock position of the first one (in frames at `sample_rate`).
     pub fn render(&mut self, sample_rate: f32, first_frame: u64, left: &mut [f32], right: &mut [f32]) {
         if !self.active {
             return;
         }
-        let table = sine_table();
-        let sr = f64::from(sample_rate);
-        let p = self.patch;
-        let [f1, f2, f3] = p.osc_freq;
-        let [g1, g2, g3] = p.osc_gain;
-        let [d1, d2, d3] = p.osc_detune;
-        let [w1, w2, w3] = p.osc_wave;
-        let noise_mix = p.noise_mix;
-        let nf_type = p.noise_filter_type;
-        let nf_freq = p.noise_filter_freq;
-        let nf_q = p.noise_filter_q;
-        let f_type = p.filter_type;
-        let f_freq = p.filter_freq;
-        let f_q = p.filter_q;
-        let lfo1_target = p.lfo1.target.round() as i64;
-        let lfo1_wave = p.lfo1.wave.round();
-        let lfo1_freq = p.lfo1.freq;
-        let lfo1_depth = p.lfo1.depth;
-        let lfo2_target = p.lfo2.target.round() as i64;
-        let lfo2_wave = p.lfo2.wave.round();
-        let lfo2_freq = p.lfo2.freq;
-        let lfo2_depth = p.lfo2.depth;
-        let fm_algorithm = p.fm_algorithm.round();
-        let m_target = p.mod_env_target.round() as i64;
-        let m_depth = p.mod_env_depth;
-        let bypass = p.bypass;
-        let osc_mix = 1.0 - noise_mix;
-
-        let pan = clamp(p.pan, -1.0, 1.0);
-        let pan_l = ((pan + 1.0) * PI / 4.0).cos();
-        let pan_r = ((pan + 1.0) * PI / 4.0).sin();
-        let mode = |t: f64| {
-            if (0.5..1.5).contains(&t) {
-                1
-            } else if (1.5..2.5).contains(&t) {
-                2
-            } else if t >= 2.5 {
-                3
-            } else {
-                0
-            }
-        };
-        let filter_mode = mode(f_type);
-        let Adsr { attack: a, decay: d, sustain: s, release: r } = p.envelope;
-        let v = p.velocity;
-
-        let f_freq_mod = clamp(f_freq, crate::MIN_FILTER_FREQ, crate::MAX_FILTER_FREQ);
-        let f_q_val = clamp(f_q, 0.1, 20.0);
-        let g_coeff = (PI * f_freq_mod.min(sr * MAX_CUTOFF_RATIO) / sr).tan();
-        let k_coeff = 1.0 / f_q_val;
-        let steep = slope::is_steep(p.filter_slope);
-        let select = |(lp, hp, bp): (f64, f64, f64)| match filter_mode {
-            0 => lp,
-            1 => hp,
-            2 => bp,
-            _ => lp + hp,
-        };
-
-        let lfo1_inc = lfo1_freq / sr;
-        let lfo2_inc = lfo2_freq / sr;
-        let lfo1_on = !bypass.lfo1 && lfo1_freq > 0.0;
-        let lfo2_on = !bypass.lfo2 && lfo2_freq > 0.0;
-
-        let nf_mode = mode(nf_type);
-        let nf_g =
-            (PI * clamp(nf_freq, crate::MIN_FILTER_FREQ, crate::MAX_FILTER_FREQ).min(sr * MAX_CUTOFF_RATIO) / sr).tan();
-        let nf_k = 1.0 / clamp(nf_q, 0.1, 20.0);
-
-        for (i, (out_l, out_r)) in left.iter_mut().zip(right.iter_mut()).enumerate() {
-            let current_time = (first_frame + i as u64) as f64 / sr;
-            let t = current_time - self.start_time;
+        let patch = self.patch;
+        let block = Block::new(&patch, f64::from(sample_rate));
+        // Each LFO writes its one slot; the others stay 0 for the whole block.
+        let mut mods = [LfoMods::default(); 2];
+        for (i, (out_left, out_right)) in left.iter_mut().zip(right.iter_mut()).enumerate() {
+            let time = (first_frame + i as u64) as f64 / block.sample_rate;
+            let t = time - self.start_time;
             if t < 0.0 {
                 continue;
             }
-
-            if self.lfo_seeded {
-                self.lfo_phase[0] += lfo1_inc;
-                self.lfo_phase[1] += lfo2_inc;
-            } else {
-                self.lfo_phase = [current_time * lfo1_freq, current_time * lfo2_freq];
-                self.lfo_seeded = true;
-            }
-            let l1 = LfoMods::new(if lfo1_on { lfo1_target } else { 0 }, lfo1_depth, self.lfo_phase[0], lfo1_wave);
-            let l2 = LfoMods::new(if lfo2_on { lfo2_target } else { 0 }, lfo2_depth, self.lfo_phase[1], lfo2_wave);
-
-            let mut f_freq_sample = f_freq + l1.filter + l2.filter;
-            let filter_env_amt = (p.filter_env_amount + l1.filter_env_amount + l2.filter_env_amount).max(0.0);
-            let sub_gain = clamp(p.sub_gain + l1.sub_gain + l2.sub_gain, 0.0, 1.0);
-            let pitch_punch = clamp(p.pitch_punch + l1.pitch_punch + l2.pitch_punch, 0.0, 1.0);
-            let drive = clamp(p.drive + l1.drive + l2.drive, 0.0, 1.0);
-            let fm_amount = clamp(p.fm_amount + l1.fm_amount + l2.fm_amount, 0.0, 1.0);
-            let fm_algorithm = clamp((fm_algorithm + l1.fm_algorithm + l2.fm_algorithm).round(), 0.0, 4.0) as i64;
-            let env = Adsr {
-                attack: (a + l1.env[0] + l2.env[0]).max(0.0),
-                decay: (d + l1.env[1] + l2.env[1]).max(0.0),
-                sustain: clamp(s + l1.env[2] + l2.env[2], 0.0, 1.0),
-                release: (r + l1.env[3] + l2.env[3]).max(0.0),
-            };
-            let me = p.mod_envelope;
-            let mod_env = Adsr {
-                attack: (me.attack + l1.mod_env[0] + l2.mod_env[0]).max(0.0),
-                decay: (me.decay + l1.mod_env[1] + l2.mod_env[1]).max(0.0),
-                sustain: clamp(me.sustain + l1.mod_env[2] + l2.mod_env[2], 0.0, 1.0),
-                release: (me.release + l1.mod_env[3] + l2.mod_env[3]).max(0.0),
-            };
-
-            // Modulation envelope.
-            let mut m_env = 0.0;
-            if !bypass.mod_env && m_target > 0 && m_depth > 0.001 {
-                if matches!(self.mod_env_segment, Segment::Attack | Segment::Decay | Segment::Sustain)
-                    && self.release_time > 0.0
-                    && current_time >= self.release_time
-                {
-                    self.mod_env_release_start_level = self.mod_env_level;
-                    self.mod_env_segment = Segment::Release;
-                    self.mod_env_segment_start = t;
-                }
-                m_env = self.mod_env_step(t, mod_env);
-            }
-
-            // Filter envelope.
-            if !bypass.filter_env && filter_env_amt > 0.001 && self.filter_env_segment > 0 {
-                if self.filter_env_segment == 1 {
-                    if env.attack > 0.0001 && t < env.attack {
-                        self.filter_env_level = t / env.attack;
-                    } else {
-                        self.filter_env_level = 1.0;
-                        self.filter_env_segment = 2;
-                    }
-                } else {
-                    let dt = t - env.attack;
-                    if env.decay > 0.0001 && dt < env.decay {
-                        self.filter_env_level = 1.0 - dt / env.decay;
-                    } else {
-                        self.filter_env_level = 0.0;
-                        self.filter_env_segment = 0;
-                    }
-                }
-                f_freq_sample += (crate::MAX_FILTER_FREQ - f_freq_sample) * filter_env_amt * self.filter_env_level;
-            }
-            if m_target == 1 && m_env > 0.001 {
-                f_freq_sample += (crate::MAX_FILTER_FREQ - f_freq_sample) * m_depth * m_env;
-            }
-
-            let detune = |base: f64, i: usize| base + l1.detune[i] + l2.detune[i];
-            let (d1m, d2m, d3m) = (detune(d1, 0), detune(d2, 1), detune(d3, 2));
-            let gain = |base: f64, i: usize| clamp(base + l1.gain[i] + l2.gain[i], 0.0, 1.0);
-            let (mut g1c, mut g2c, mut g3c) = (gain(g1, 0), gain(g2, 1), gain(g3, 2));
-            let master = (p.volume + l1.master + l2.master).max(0.0);
-
-            let ratio = |cents: f64| if cents == 0.0 { 1.0 } else { (cents * LN2_OVER_1200).exp() };
-            let mut f1d = f1 * ratio(d1m);
-            let mut f2d = f2 * ratio(d2m);
-            let mut f3d = f3 * ratio(d3m);
-
-            if pitch_punch > 0.001 && t < 0.06 {
-                let punch = (((1.0 - t / 0.06) * pitch_punch * PITCH_PUNCH_CENTS) * LN2_OVER_1200).exp();
-                f1d *= punch;
-                f2d *= punch;
-                f3d *= punch;
-            }
-
-            // FM.
-            let (phase, cycle) = (self.phase, self.osc_cycle);
-            let raw =
-                |shape: f64, n: usize, freq: f64| oscillator(table, shape, phase[n], (freq / sr).min(0.49), cycle[n]);
-            let raw_oscillators = || [raw(w1, 0, f1d), raw(w2, 1, f2d), raw(w3, 2, f3d)];
-            let (mut f1fm, mut f2fm) = (f1d, f2d);
-            if !bypass.fm && fm_amount > 0.001 {
-                (f1fm, f2fm) = fm_frequencies(fm_amount, fm_algorithm, (f1d, f2d), raw_oscillators());
-            }
-
-            if m_target > 0 && m_env > 0.001 {
-                match m_target {
-                    2 => {
-                        let pitch = ((m_depth * m_env * 1200.0) * LN2_OVER_1200).exp();
-                        f1fm *= pitch;
-                        f2fm *= pitch;
-                        f3d *= pitch;
-                    }
-                    3 if !bypass.fm => {
-                        let amount = fm_amount * m_depth * m_env;
-                        if amount > 0.001 {
-                            let (a, b) = fm_frequencies(amount, fm_algorithm, (f1d, f2d), raw_oscillators());
-                            f1fm += a - f1d;
-                            f2fm += b - f2d;
-                        }
-                    }
-                    4 => {
-                        let shape = |g: f64| clamp(g + m_depth * m_env * (1.0 - g), 0.0, 1.0);
-                        g1c = shape(g1c);
-                        g2c = shape(g2c);
-                        g3c = shape(g3c);
-                    }
-                    _ => {}
-                }
-            }
-
-            // Oscillators.
-            // A negative frequency runs the phase backwards: through-zero FM
-            // keeps the note's pitch, where stopping at zero would raise it.
-            let dts = [clamp(f1fm / sr, -0.49, 0.49), clamp(f2fm / sr, -0.49, 0.49), clamp(f3d / sr, -0.49, 0.49)];
-            for (n, dt) in dts.iter().enumerate() {
-                let advanced = self.phase[n] + dt;
-                self.osc_cycle[n] += advanced.floor();
-                self.phase[n] = advanced.rem_euclid(1.0);
-            }
-            let o1 = oscillator(table, w1, self.phase[0], dts[0].abs(), self.osc_cycle[0]) * g1c;
-            let o2 = oscillator(table, w2, self.phase[1], dts[1].abs(), self.osc_cycle[1]) * g2c;
-            let o3 = oscillator(table, w3, self.phase[2], dts[2].abs(), self.osc_cycle[2]) * g3c;
-            // One cycle over two of oscillator 1: an octave below it.
-            let sub = if sub_gain > 0.001 {
-                sin_lookup(table, (self.osc_cycle[0].rem_euclid(2.0) + self.phase[0]) * 0.5) * sub_gain
-            } else {
-                0.0
-            };
-            let osc_sum = (o1 + o2 + o3 + sub) * osc_mix;
-
-            // Noise.
-            self.rng = xorshift32(self.rng);
-            let mut noise = 0.0;
-            if !bypass.noise {
-                let level = clamp(noise_mix + l1.noise + l2.noise, 0.0, 1.0);
-                let noise_raw = (f64::from(self.rng) / 2_147_483_648.0 - 1.0) * level;
-                let (mut g, mut k) = (nf_g, nf_k);
-                let freq = nf_freq + l1.noise_freq + l2.noise_freq;
-                let q = clamp(nf_q + l1.noise_q + l2.noise_q, 0.1, 20.0);
-                if freq != nf_freq || q != nf_q {
-                    g = (PI * clamp(freq, crate::MIN_FILTER_FREQ, crate::MAX_FILTER_FREQ).min(sr * MAX_CUTOFF_RATIO)
-                        / sr)
-                        .tan();
-                    k = 1.0 / q;
-                }
-                let a1 = 1.0 / (1.0 + g * (g + k));
-                let a2 = g * a1;
-                let a3 = g * a2;
-                let nf = &mut self.noise_filter;
-                let v3 = noise_raw - nf.z2;
-                let v1 = a1 * nf.z1 + a2 * v3;
-                let v2 = nf.z2 + a2 * nf.z1 + a3 * v3;
-                nf.z1 = 2.0 * v1 - nf.z1;
-                nf.z2 = 2.0 * v2 - nf.z2;
-                if nf.z1.abs() < FLUSH || !nf.z1.is_finite() {
-                    nf.z1 = 0.0;
-                }
-                if nf.z2.abs() < FLUSH || !nf.z2.is_finite() {
-                    nf.z2 = 0.0;
-                }
-                noise = match nf_mode {
-                    0 => v2,
-                    1 => noise_raw - k * v1 - v2,
-                    2 => v1,
-                    _ => (noise_raw - k * v1 - v2) + v2,
-                };
-            }
-
-            let mut dry = osc_sum + noise;
-            if drive > 0.001 {
-                let driven = dry * (1.0 + drive * 3.5);
-                dry = driven / (1.0 + driven.abs() * 0.6);
-            }
-
-            // Filter.
-            let q_mod = f_q_val + l1.q + l2.q;
-            let k_mod = 1.0 / clamp(q_mod, 0.1, 20.0);
-            let recompute = l1.filter != 0.0
-                || l2.filter != 0.0
-                || (filter_env_amt > 0.001 && self.filter_env_segment > 0)
-                || l1.q != 0.0
-                || l2.q != 0.0
-                || (m_target == 1 && m_env > 0.001);
-            let mut y = if bypass.filter {
-                dry
-            } else {
-                let (g, k) = if recompute {
-                    let f = if f_freq_sample < 20.0 {
-                        20.0
-                    } else if f_freq_sample > sr * MAX_CUTOFF_RATIO {
-                        sr * MAX_CUTOFF_RATIO
-                    } else {
-                        f_freq_sample
-                    };
-                    ((PI * f / sr).tan(), k_mod)
-                } else {
-                    (g_coeff, k_coeff)
-                };
-                if steep {
-                    let (k1, k2, gain_2) = slope::stages(k, f64::from(filter_mode));
-                    let y = select(Self::filter_step(&mut self.filter, dry, g, k1));
-                    select(Self::filter_step(&mut self.filter_2, y, g, k2)) * gain_2
-                } else {
-                    select(Self::filter_step(&mut self.filter, dry, g, k))
-                }
-            };
-
-            // Amplitude envelope.
-            if matches!(self.env_segment, Segment::Attack | Segment::Decay | Segment::Sustain)
-                && self.release_time > 0.0
-                && current_time >= self.release_time
-            {
-                self.release_start_level = self.env_level;
-                self.env_segment = Segment::Release;
-                self.env_segment_start = t;
-            }
-            let level = self.envelope_step(t, env, v);
-            y *= (if bypass.env { 1.0 } else { level }) * master;
-
-            *out_l += (y * pan_l) as f32;
-            *out_r += (y * pan_r) as f32;
+            self.step_lfos(&patch, &block, time, &mut mods);
+            let y = self.sample(&patch, &block, &mods, time, t);
+            *out_left += (y * block.pan_left) as f32;
+            *out_right += (y * block.pan_right) as f32;
         }
-        if self.env_segment == Segment::Idle {
+        if self.env.is_idle() {
             self.active = false;
         }
+    }
+
+    /// Move the LFOs on by a sample and write what they add into `mods`.
+    #[inline]
+    fn step_lfos(&mut self, p: &SynthPatch, b: &Block, time: f64, mods: &mut [LfoMods; 2]) {
+        if self.lfo_seeded {
+            self.lfo_phase[0] += b.lfo_steps[0];
+            self.lfo_phase[1] += b.lfo_steps[1];
+        } else {
+            // LFOs run on the engine clock, not from the note's start.
+            self.lfo_phase = [time * p.lfo1.freq, time * p.lfo2.freq];
+            self.lfo_seeded = true;
+        }
+        for ((route, phase), mods) in b.lfos.iter().zip(self.lfo_phase).zip(mods) {
+            if let Some(route) = route {
+                route.apply(phase, mods);
+            }
+        }
+    }
+
+    /// Whether the note's release has come at `time`.
+    #[inline]
+    fn is_released(&self, time: f64) -> bool {
+        self.release_time > 0.0 && time >= self.release_time
+    }
+
+    /// The sample at `time`, `t` seconds into the note, before the pan.
+    #[inline]
+    fn sample(&mut self, p: &SynthPatch, b: &Block, mods: &[LfoMods; 2], time: f64, t: f64) -> f64 {
+        let env = modulated_adsr(mods, p.envelope, ENV_SLOTS);
+        let mod_level = self.mod_env_level(p, b, mods, time, t);
+        let filter_env_amount = modulated(mods, p.filter_env_amount, Slot::FilterEnvAmount).max(0.0);
+        let cutoff = self.cutoff(p, b, mods, &env, filter_env_amount, mod_level, t);
+
+        let mut gains = [0.0; 3];
+        for ((gain, base), slot) in gains.iter_mut().zip(p.osc_gain).zip(GAIN_SLOTS) {
+            *gain = clamp(modulated(mods, base, slot), 0.0, 1.0);
+        }
+        let frequencies = self.frequencies(p, b, mods, &mut gains, mod_level, t);
+        let oscillators = self.oscillators(p, b, mods, frequencies, gains);
+        let mut dry = oscillators * (1.0 - p.noise_mix) + self.noise(p, b, mods);
+
+        let drive = clamp(modulated(mods, p.drive, Slot::Drive), 0.0, 1.0);
+        if drive > SILENT {
+            let driven = dry * (1.0 + drive * 3.5);
+            dry = driven / (1.0 + driven.abs() * 0.6);
+        }
+
+        let is_swept = (filter_env_amount > SILENT && !self.filter_env.is_idle())
+            || (b.mod_target == ModEnvTarget::Filter && mod_level > SILENT);
+        let filtered = if p.bypass.filter { dry } else { self.filter(b, mods, dry, cutoff, is_swept) };
+
+        if self.is_released(time) {
+            self.env.release(t);
+        }
+        let peak = p.velocity;
+        let level = self.env.step(t, env, peak, |norm| peak * norm * norm);
+        let volume = modulated(mods, p.volume, Slot::Volume).max(0.0);
+        filtered * ((if p.bypass.env { 1.0 } else { level }) * volume)
+    }
+
+    /// The level of the modulation envelope (0–1); 0 when it moves nothing.
+    #[inline]
+    fn mod_env_level(&mut self, p: &SynthPatch, b: &Block, mods: &[LfoMods; 2], time: f64, t: f64) -> f64 {
+        if b.mod_target == ModEnvTarget::Off {
+            return 0.0;
+        }
+        if self.is_released(time) {
+            self.mod_env.release(t);
+        }
+        self.mod_env.step(t, modulated_adsr(mods, p.mod_envelope, MOD_ENV_SLOTS), 1.0, |norm| norm)
+    }
+
+    /// The filter cutoff of this sample, Hz: the patch's, moved by the LFOs
+    /// and opened by the filter envelope and the modulation envelope.
+    #[inline]
+    #[expect(clippy::too_many_arguments, reason = "the values of one sample, worked out by `sample`")]
+    fn cutoff(
+        &mut self,
+        p: &SynthPatch,
+        b: &Block,
+        mods: &[LfoMods; 2],
+        env: &Adsr,
+        filter_env_amount: f64,
+        mod_level: f64,
+        t: f64,
+    ) -> f64 {
+        let mut cutoff = modulated(mods, p.filter_freq, Slot::Filter);
+        if !p.bypass.filter_env && filter_env_amount > SILENT && !self.filter_env.is_idle() {
+            let level = self.filter_env.step(t, env.attack, env.decay);
+            cutoff += (crate::MAX_FILTER_FREQ - cutoff) * filter_env_amount * level;
+        }
+        if b.mod_target == ModEnvTarget::Filter && mod_level > SILENT {
+            cutoff += (crate::MAX_FILTER_FREQ - cutoff) * p.mod_env_depth * mod_level;
+        }
+        cutoff
+    }
+
+    /// The frequencies of the three oscillators for this sample, Hz: detune,
+    /// pitch punch, FM and what the modulation envelope adds, which also
+    /// raises `gains` when it shapes.
+    #[inline]
+    fn frequencies(
+        &self,
+        p: &SynthPatch,
+        b: &Block,
+        mods: &[LfoMods; 2],
+        gains: &mut [f64; 3],
+        mod_level: f64,
+        t: f64,
+    ) -> [f64; 3] {
+        let mut detuned = [0.0; 3];
+        for (n, frequency) in detuned.iter_mut().enumerate() {
+            *frequency = p.osc_freq[n] * cents_ratio(modulated(mods, p.osc_detune[n], DETUNE_SLOTS[n]));
+        }
+        let pitch_punch = clamp(modulated(mods, p.pitch_punch, Slot::PitchPunch), 0.0, 1.0);
+        if pitch_punch > SILENT && t < PITCH_PUNCH_SECONDS {
+            let punch = (((1.0 - t / PITCH_PUNCH_SECONDS) * pitch_punch * PITCH_PUNCH_CENTS) * LN2_OVER_1200).exp();
+            detuned = detuned.map(|frequency| frequency * punch);
+        }
+
+        let fm_amount = clamp(modulated(mods, p.fm_amount, Slot::FmAmount), 0.0, 1.0);
+        let algorithm = clamp(modulated(mods, p.fm_algorithm.round(), Slot::FmAlgorithm).round(), 0.0, 4.0);
+        let carriers = (detuned[0], detuned[1]);
+        let [mut f1, mut f2, mut f3] = detuned;
+        if !p.bypass.fm && fm_amount > SILENT {
+            (f1, f2) = fm_frequencies(fm_amount, algorithm, carriers, self.raw_oscillators(p, b, detuned));
+        }
+        if mod_level <= SILENT {
+            return [f1, f2, f3];
+        }
+        // Only while the modulation envelope is up, and always the same arm.
+        match b.mod_target {
+            ModEnvTarget::Pitch => {
+                let pitch = ((p.mod_env_depth * mod_level * 1200.0) * LN2_OVER_1200).exp();
+                [f1, f2, f3] = [f1 * pitch, f2 * pitch, f3 * pitch];
+            }
+            ModEnvTarget::Fm if !p.bypass.fm => {
+                let amount = fm_amount * p.mod_env_depth * mod_level;
+                if amount > SILENT {
+                    let (a, b) = fm_frequencies(amount, algorithm, carriers, self.raw_oscillators(p, b, detuned));
+                    f1 += a - carriers.0;
+                    f2 += b - carriers.1;
+                }
+            }
+            ModEnvTarget::Shape => {
+                *gains = gains.map(|gain| clamp(gain + p.mod_env_depth * mod_level * (1.0 - gain), 0.0, 1.0));
+            }
+            ModEnvTarget::Off | ModEnvTarget::Filter | ModEnvTarget::Fm => {}
+        }
+        [f1, f2, f3]
+    }
+
+    /// The three oscillators where they stand, at full gain: what FM
+    /// modulates with.
+    #[inline]
+    fn raw_oscillators(&self, p: &SynthPatch, b: &Block, frequencies: [f64; 3]) -> [f64; 3] {
+        let mut raw = [0.0; 3];
+        for (n, value) in raw.iter_mut().enumerate() {
+            let dt = (frequencies[n] / b.sample_rate).min(0.49);
+            *value = oscillator(b.table, p.osc_wave[n], self.phase[n], dt, self.osc_cycle[n]);
+        }
+        raw
+    }
+
+    /// Move the oscillators on by a sample at `frequencies` and mix them,
+    /// with the sub-oscillator, at `gains`.
+    #[inline]
+    fn oscillators(
+        &mut self,
+        p: &SynthPatch,
+        b: &Block,
+        mods: &[LfoMods; 2],
+        frequencies: [f64; 3],
+        gains: [f64; 3],
+    ) -> f64 {
+        let mut outputs = [0.0; 3];
+        for (n, output) in outputs.iter_mut().enumerate() {
+            // A negative frequency runs the phase backwards: through-zero FM
+            // keeps the note's pitch, where stopping at zero would raise it.
+            let dt = clamp(frequencies[n] / b.sample_rate, -0.49, 0.49);
+            let advanced = self.phase[n] + dt;
+            self.osc_cycle[n] += advanced.floor();
+            self.phase[n] = advanced.rem_euclid(1.0);
+            *output = oscillator(b.table, p.osc_wave[n], self.phase[n], dt.abs(), self.osc_cycle[n]) * gains[n];
+        }
+        let sub_gain = clamp(modulated(mods, p.sub_gain, Slot::SubGain), 0.0, 1.0);
+        // One cycle over two of oscillator 1: an octave below it.
+        let sub = if sub_gain > SILENT {
+            sin_lookup(b.table, (self.osc_cycle[0].rem_euclid(2.0) + self.phase[0]) * 0.5) * sub_gain
+        } else {
+            0.0
+        };
+        outputs[0] + outputs[1] + outputs[2] + sub
+    }
+
+    /// The next sample of filtered noise, at its level in the mix.
+    #[inline]
+    fn noise(&mut self, p: &SynthPatch, b: &Block, mods: &[LfoMods; 2]) -> f64 {
+        self.rng = xorshift32(self.rng);
+        if p.bypass.noise {
+            return 0.0;
+        }
+        let level = clamp(modulated(mods, p.noise_mix, Slot::NoiseMix), 0.0, 1.0);
+        let raw = noise_sample(self.rng) * level;
+        let freq = modulated(mods, p.noise_filter_freq, Slot::NoiseFreq);
+        let q = clamp(modulated(mods, p.noise_filter_q, Slot::NoiseQ), 0.1, 20.0);
+        let (g, k) = if freq != p.noise_filter_freq || q != p.noise_filter_q {
+            (cutoff_coefficient(freq, b.sample_rate), 1.0 / q)
+        } else {
+            (b.noise_g, b.noise_k)
+        };
+        tap(self.noise_filter.step(raw, g, k), b.noise_weights)
+    }
+
+    /// `x` through the main filter at `cutoff` Hz. The coefficients are the
+    /// block's unless an LFO or an envelope moves them (`is_swept`) for this
+    /// sample.
+    #[inline]
+    fn filter(&mut self, b: &Block, mods: &[LfoMods; 2], x: f64, cutoff: f64, is_swept: bool) -> f64 {
+        let is_modulated = is_swept
+            || mods[0][Slot::Filter] != 0.0
+            || mods[1][Slot::Filter] != 0.0
+            || mods[0][Slot::FilterQ] != 0.0
+            || mods[1][Slot::FilterQ] != 0.0;
+        let (g, k) = if is_modulated {
+            let q = clamp(modulated(mods, b.q, Slot::FilterQ), 0.1, 20.0);
+            (cutoff_coefficient(cutoff, b.sample_rate), 1.0 / q)
+        } else {
+            (b.g, b.k)
+        };
+        if !b.is_steep {
+            return tap(self.filter.step(x, g, k), b.filter_weights);
+        }
+        let (k1, k2, gain_2) = slope::stages(k, b.filter_mode);
+        let first = tap(self.filter.step(x, g, k1), b.filter_weights);
+        tap(self.filter_2.step(first, g, k2), b.filter_weights) * gain_2
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::f64::consts::TAU;
+
+    use super::patch::SynthBypass;
     use super::*;
+    use crate::lfo::Wave;
 
     fn render(voice: &mut SynthVoice, frames: usize) -> Vec<f32> {
         let (mut l, mut r) = (vec![0.0; frames], vec![0.0; frames]);
         voice.render(48_000.0, 0, &mut l, &mut r);
         l
-    }
-
-    #[test]
-    fn sine_table_lookup() {
-        let table = sine_table();
-        assert!((sin_lookup(table, 0.25) - 1.0).abs() < 1e-6);
-        assert!((sin_lookup(table, -0.25) + 1.0).abs() < 1e-6);
     }
 
     #[test]
@@ -903,7 +512,7 @@ mod tests {
             let patch = SynthPatch {
                 osc_freq: [100.0; 3],
                 osc_gain: [1.0, 0.0, 0.0],
-                osc_wave: [2.0; 3],
+                osc_wave: [Wave::Sawtooth; 3],
                 filter_freq: 1_000.0,
                 filter_slope,
                 volume: 1.0,

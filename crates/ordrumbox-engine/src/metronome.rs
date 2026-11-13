@@ -5,7 +5,7 @@
 
 use ordrumbox_core::steps::TICK;
 use ordrumbox_core::track::MAX_TRACKS;
-use ordrumbox_dsp::synth::Adsr;
+use ordrumbox_dsp::synth::patch::Adsr;
 use ordrumbox_dsp::{StripSettings, SynthPatch};
 
 use crate::pass::{Event, Pass, Sound, SynthStart};

@@ -201,13 +201,13 @@ fn patch_fields(p: &SynthPatch) -> Vec<(String, f64)> {
         add(&format!("osc{}Freq", i + 1), p.osc_freq[i]);
         add(&format!("osc{}Gain", i + 1), p.osc_gain[i]);
         add(&format!("osc{}Detune", i + 1), p.osc_detune[i]);
-        add(&format!("osc{}Wave", i + 1), p.osc_wave[i]);
+        add(&format!("osc{}Wave", i + 1), f64::from(p.osc_wave[i].code()));
     }
     add("noiseMix", p.noise_mix);
-    add("noiseFilterType", p.noise_filter_type);
+    add("noiseFilterType", f64::from(p.noise_filter_type.code()));
     add("noiseFilterFreq", p.noise_filter_freq);
     add("noiseFilterQ", p.noise_filter_q);
-    add("filterType", p.filter_type);
+    add("filterType", f64::from(p.filter_type.code()));
     add("filterFreq", p.filter_freq);
     add("filterQ", p.filter_q);
     add("drive", p.drive);
@@ -221,8 +221,8 @@ fn patch_fields(p: &SynthPatch) -> Vec<(String, f64)> {
     add("pan", p.pan);
     add("velocity", p.velocity);
     for (i, l) in [(1, p.lfo1), (2, p.lfo2)] {
-        add(&format!("lfo{i}Target"), l.target);
-        add(&format!("lfo{i}Wave"), l.wave);
+        add(&format!("lfo{i}Target"), f64::from(l.target.code()));
+        add(&format!("lfo{i}Wave"), f64::from(l.wave.code()));
         add(&format!("lfo{i}Freq"), l.freq);
         add(&format!("lfo{i}Depth"), l.depth);
     }
@@ -233,7 +233,7 @@ fn patch_fields(p: &SynthPatch) -> Vec<(String, f64)> {
     add("modEnvDecay", p.mod_envelope.decay);
     add("modEnvSustain", p.mod_envelope.sustain);
     add("modEnvRelease", p.mod_envelope.release);
-    add("modEnvTarget", p.mod_env_target);
+    add("modEnvTarget", f64::from(p.mod_env_target.code()));
     add("modEnvDepth", p.mod_env_depth);
     let b = p.bypass;
     for (key, on) in [

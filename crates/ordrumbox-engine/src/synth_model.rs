@@ -597,9 +597,9 @@ pub fn filter_response(kind: &str, fc: f64, q: f64, slope_db: f64, points: usize
         }
     };
     let mode = match kind {
-        "highpass" => 1.0,
-        "bandpass" => 2.0,
-        _ => 0.0,
+        "highpass" => slope::FilterMode::Highpass,
+        "bandpass" => slope::FilterMode::Bandpass,
+        _ => slope::FilterMode::Lowpass,
     };
     let (k1, k2, _) = slope::stages(1.0 / q, mode);
     (0..=points)

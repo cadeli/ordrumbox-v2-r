@@ -72,7 +72,8 @@ pub mod voice;
 pub use master_bus::{MasterBus, MasterSettings, gain_reduction};
 pub use sample::SampleBuffer;
 pub use strip::{Strip, StripSettings};
-pub use synth::{SynthPatch, SynthVoice};
+pub use synth::SynthVoice;
+pub use synth::patch::SynthPatch;
 pub use voice::{SampleVoice, VoiceStart};
 
 /// Lowest frequency a filter cutoff can take, in Hz.

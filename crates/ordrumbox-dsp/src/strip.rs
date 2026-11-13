@@ -279,11 +279,11 @@ impl Svf {
         if mode < 0.5 {
             v2
         } else if mode < 1.5 {
-            v3 - v1 * c.k
+            x - c.k * v1 - v2
         } else if mode < 2.5 {
             v1
         } else {
-            v3 - v1 * c.k + v2
+            x - c.k * v1
         }
     }
 }
@@ -533,7 +533,7 @@ impl Strip {
 
         let g = (PI * cutoff / sr).tan();
         let (stage_1, stage_2, gain_2) = if slope::is_steep(f64::from(s.filter_slope)) {
-            let (k1, k2, gain_2) = slope::stages(1.0 / q, mode);
+            let (k1, k2, gain_2) = slope::stages(1.0 / q, slope::FilterMode::from_setting(mode));
             (SvfCoeffs::new(g, k1), Some(SvfCoeffs::new(g, k2)), gain_2)
         } else {
             (SvfCoeffs::new(g, 1.0 / q), None, 1.0)
