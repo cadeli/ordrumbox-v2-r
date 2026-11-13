@@ -56,13 +56,13 @@ impl Session {
         self.message = format!("{what} ({NOT_UNDOABLE})");
     }
 
-    /// Run `action`, an edit that Ctrl+Z undoes, at once instead of asking
-    /// first; its message, when it edited, says how to undo it.
+    /// Run `action`, an edit that Ctrl+Z (Cmd on macOS) undoes, at once
+    /// instead of asking first; its message, when it edited, says how to undo it.
     pub(super) fn undoable(&mut self, action: impl FnOnce(&mut Self)) {
         let revision = self.editor.revision();
         action(self);
         if self.editor.revision() != revision {
-            let key = if self.hosted { "Alt+Z" } else { "Ctrl+Z" };
+            let key = if self.hosted { "Alt+Z".to_owned() } else { format!("{}+Z", crate::menu::command_label()) };
             self.message = format!("{} ({key}: undo)", self.message);
         }
     }
@@ -119,7 +119,7 @@ mod tests {
         s.remove_track();
         assert!(!s.confirm_open());
         assert_eq!(s.pattern().unwrap().tracks.len(), tracks - 1);
-        assert_eq!(s.message, "Track deleted (Ctrl+Z: undo)");
+        assert_eq!(s.message, format!("Track deleted ({}+Z: undo)", crate::menu::command_label()));
         s.undo();
         assert_eq!(s.pattern().unwrap().tracks.len(), tracks);
 
@@ -129,13 +129,13 @@ mod tests {
         s.delete_step();
         assert!(!s.confirm_open());
         assert_eq!(s.step_note_count(c), 0);
-        assert!(s.message.ends_with("(Ctrl+Z: undo)"), "{}", s.message);
+        assert!(s.message.ends_with(&format!("({}+Z: undo)", crate::menu::command_label())), "{}", s.message);
 
         s.randomize_track();
         assert!(!s.confirm_open() && !s.track(0).unwrap().notes.is_empty());
         s.clear_track(0);
         assert!(!s.confirm_open() && s.track(0).unwrap().notes.is_empty());
-        assert_eq!(s.message, "Cleared notes on \"KICK\" (Ctrl+Z: undo)");
+        assert_eq!(s.message, format!("Cleared notes on \"KICK\" ({}+Z: undo)", crate::menu::command_label()));
         // Nothing done, nothing to undo.
         s.clear_track(0);
         assert_eq!(s.message, "No notes to clear");

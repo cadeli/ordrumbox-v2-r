@@ -675,7 +675,7 @@ mod tests {
         s.step_menu(0, 1, 0, 10, 10);
         pick(&mut s, "Delete notes");
         assert_eq!(s.track(0).unwrap().notes.len(), 1);
-        assert_eq!(s.message, "Deleted 1 note - KICK @ beat 2.1 (Ctrl+Z: undo)");
+        assert_eq!(s.message, format!("Deleted 1 note - KICK @ beat 2.1 ({}+Z: undo)", crate::menu::command_label()));
     }
 
     #[test]

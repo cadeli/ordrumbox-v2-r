@@ -145,3 +145,15 @@ is left out and reported, a loop past it is no loop. A synth preset's levels (ma
 volume, oscillator and sub gains, noise mix) are brought inside 0–1, the range of their
 controls. These used to be taken as written: a track of a billion beats ran out of
 memory, a level of 1e308 played samples that were not numbers. No snapshot changed.
+
+The keys change: Ctrl+- / Ctrl+= (and the keypad's) zoom, as everywhere else, where
+they used to change the pattern's length — the length has no key any more, the Song
+panel and the menus change it. The letters that change every track (B, C, D, G, H, J,
+K, V, X) now want Shift, as G H J K already did; S alone solos and M alone mutes the
+track under the cursor, and Ctrl+1–7 run what F1–F7 do. Shift+arrows on a selected
+note are up / down the pitch and left / right one step in time (they used to be up /
+down the velocity and left / right the pitch), and dragging a note follows the piano
+roll's axes: up / down the pitch, sideways the velocity. On macOS the menus show
+Cmd+ (the key that runs them), redo is Cmd+Shift+Z, and export MIDI needs Shift
+(Cmd+M minimizes the window). No snapshot changed; the unit tests of the keys and
+the drags were rewritten with them.

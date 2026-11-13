@@ -281,7 +281,7 @@ mod tests {
         assert!(s.song_click(SIZE, l.grid.x + 2, row_y(0), Button::Right));
         assert_eq!(menu(&s), ["add:1:a", "down:0", "row:a"]);
         choose(&mut s, 2);
-        assert_eq!(s.message, "Removed \"a\" from the arrangement (Ctrl+Z: undo)");
+        assert_eq!(s.message, format!("Removed \"a\" from the arrangement ({}+Z: undo)", crate::menu::command_label()));
         assert_eq!(clips(&s), [("b".into(), 0, 2.0)]);
         s.undo();
         assert_eq!(clips(&s).len(), 4);
@@ -315,7 +315,10 @@ mod tests {
         s.song_click(SIZE, x, y, Button::Right);
         choose(&mut s, 3);
         assert!(!s.confirm_open());
-        assert_eq!(s.message, "Removed pattern \"b\" and 1 clip(s) (Ctrl+Z: undo)");
+        assert_eq!(
+            s.message,
+            format!("Removed pattern \"b\" and 1 clip(s) ({}+Z: undo)", crate::menu::command_label())
+        );
         assert_eq!(s.editor.library().patterns.len(), 1);
         assert_eq!(clips(&s), [("a".into(), 0, 0.75)]);
         // The last pattern stays.

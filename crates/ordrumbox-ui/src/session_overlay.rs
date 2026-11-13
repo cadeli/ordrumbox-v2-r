@@ -5,24 +5,25 @@ use super::*;
 use crate::scale::Scale;
 
 /// Every key, for Help > Keyboard shortcuts.
-const SHORTCUTS: [&str; 63] = [
+const SHORTCUTS: &[&str] = &[
     "MENUS",
     "  F10 or Alt             open the menus: Arrows move, Enter runs, Esc closes",
-    "  F1 F2 F3 F4 F5 F6      this list, track editor, song, piano roll, grid, synth (Ctrl+K: kit editor)",
-    "  F7                     note editor under the grid and the piano roll, shown or folded",
+    "  F1-F7, Ctrl+1-7        this list, track editor, song, piano roll, grid, synth, note editor",
+    "                         (Ctrl+K: kit editor)",
     "GRID",
     "  Arrows                 move the cursor",
     "  Enter / click          switch the step on (a note) or off (all its notes)",
     "  Shift+click            select the step's note for the note editor, and hear it",
     "  Shift+drag             draw a zone: Ctrl+C, Ctrl+X, Delete take its notes",
-    "  Shift+Arrows           velocity (up/down), pitch (left/right) of the selected note",
+    "  Shift+Arrows           pitch (up/down) of the selected note, one step in time (left/right)",
     "  Delete                 clear the zone or the step   Esc  deselect",
     "  L                      accent the cursor step's notes, or take the accent off",
     "  right-click            a track's name: track menu   a step: notes menu",
-    "  F, Shift+G, V          random pattern, random drumkit, VU meters on/off",
-    "  C                      next colour scheme",
+    "  F, Shift+G             random pattern, random drumkit",
+    "  Shift+V, Shift+C       VU meters on/off, next colour scheme",
     "  Shift+H, J, K          every track: synth sounds, auto-assigned, random samples",
     "PLAY",
+    "  M, S                   mute / solo the track under the cursor",
     "  1-9 / Shift+1-9        mute / solo track 1-9        Q-P  hear track 1-10 (any view)",
     "                         (these two rows by their place; other keys as the layout marks them)",
     "  Space / Shift+Space    play or stop the pattern / the song",
@@ -33,18 +34,17 @@ const SHORTCUTS: [&str; 63] = [
     "  Ctrl+S                 save the library now (it is also saved on its own)",
     "  Ctrl+Shift+S           export the pattern as JSON",
     "  Ctrl+O, Ctrl+Q         import a MIDI file, quit",
-    "  Ctrl+E, Ctrl+M         export WAV (Shift: the song), export MIDI",
-    "  Ctrl+Z, Ctrl+Y         undo, redo (also Ctrl+Shift+Z)",
+    "  Ctrl+E, Ctrl+Shift+M   export WAV (Shift: the song), export MIDI",
+    "  Ctrl+Z, Ctrl+Shift+Z   undo, redo (also Ctrl+Y)",
     "  Ctrl+C, Ctrl+X, Ctrl+V copy, cut, paste the zone or the step (Shift: the track)",
     "  Ctrl+N, Ctrl+D         new pattern, duplicate pattern",
     "  Ctrl+T, Ctrl+Backspace add a KICK track, remove a track",
     "  Ctrl+G, Ctrl+L         next grid, loop one step shorter",
-    "  Ctrl+- Ctrl+=          pattern length",
-    "  Ctrl++ Ctrl+_ Ctrl+0   zoom in, out, back to the display's size (also Ctrl and keypad + -)",
+    "  Ctrl+- Ctrl+= Ctrl+0   zoom out, in, back to the display's size (also the keypad's - +)",
     "GENERATE",
-    "  B, Shift+B             the pattern again in its style, a new pattern in the style",
-    "  D, S                   drums, bass in auto mode (again: off)",
-    "  X                      random notes on the track",
+    "  Shift+B, Ctrl+Shift+B  the pattern again in its style, a new pattern in the style",
+    "  Shift+D, Shift+S       drums, bass in auto mode (again: off)",
+    "  Shift+X                random notes on the track",
     "KNOBS, SLIDERS, LISTS (track editor, note editor, kit editor, volumes)",
     "  Tab / Shift+Tab        focus the next / previous control      Esc  back to the grid",
     "  Arrows, - =, wheel     change (Shift or Alt: finely, Ctrl: x10); a list: next option",
@@ -52,8 +52,8 @@ const SHORTCUTS: [&str; 63] = [
     "  double-click           default value     right-click or Enter: type a value",
     "  Enter or Space         open a list, press a button",
     "PIANO ROLL (F4)",
-    "  click / drag / right-click a cell: add, select, delete; velocity (up/down) or pitch; menu",
-    "  Arrows, Shift+Arrows   the cursor; the selected note's velocity / pitch    Enter, Delete",
+    "  click / drag / right-click a cell: add, select, delete; pitch (up/down) or velocity; menu",
+    "  Arrows, Shift+Arrows   the cursor; the note's pitch (up/down), time (left/right)   Enter, Delete",
     "  Shift+drag             a zone of steps and keys: Ctrl+C, Ctrl+X, Delete; Ctrl+V at the cursor",
     "  a key: hear it, right-click: clear, chord progression     wheel (Shift: pages)",
     "SYNTH EDITOR (F6)",
@@ -80,30 +80,31 @@ const PLUGIN_SHORTCUTS: &[&str] = &[
     "                              (the menus show them)",
     "MENUS",
     "  F10 or Alt             open the menus: Arrows move, Enter runs, Esc closes",
-    "  F1 F2 F4 F5 F6         this list, track editor, piano roll, grid, synth",
+    "  F1 F2 F4 F5 F6 F7      this list, track editor, piano roll, grid, synth, note editor",
     "  F2, F7                 the track editor, the note editor: shown or folded (the window follows)",
     "  songs, tempo, saving   the app's or the host's: no F3, no - = (the tempo is HOST's)",
     "GRID",
     "  Arrows                 move the cursor",
     "  Enter / click          switch the step on (a note) or off (all its notes)",
     "  Shift+click            select the step's note for the note editor, and hear it",
-    "  Shift+drag             draw a zone: Ctrl+C, Ctrl+X, Delete take its notes",
-    "  Shift+Arrows           velocity (up/down), pitch (left/right) of the selected note",
+    "  Shift+drag             draw a zone: Alt+C, Alt+X, Delete take its notes",
+    "  Shift+Arrows           pitch (up/down) of the selected note, one step in time (left/right)",
     "  Delete                 clear the zone or the step   Esc  deselect",
     "  L                      accent the cursor step's notes, or take the accent off",
     "  right-click            a track's name: track menu   a step: notes menu",
-    "  F, Shift+G, V          random pattern, random drumkit, VU meters on/off",
-    "  C                      next colour scheme",
+    "  F, Shift+G             random pattern, random drumkit",
+    "  Shift+V, Shift+C       VU meters on/off, next colour scheme",
     "  Shift+H, J, K          every track: synth sounds, auto-assigned, random samples",
     "PLAY",
+    "  M, S                   mute / solo the track under the cursor",
     "  1-9 / Shift+1-9        mute / solo track 1-9        Q-P  hear track 1-10 (any view)",
     "                         (these two rows by their place; other keys as the layout marks them)",
     "  [ ]                    previous / next pattern (also PageUp PageDown)",
     "  , .                    previous / next kit",
     "GENERATE",
-    "  B, Shift+B             the pattern again in its style, a new pattern in the style",
-    "  D, S                   drums, bass in auto mode (again: off)",
-    "  X                      random notes on the track",
+    "  Shift+B                the pattern again in its style (Alt+Shift+B: a new one)",
+    "  Shift+D, Shift+S       drums, bass in auto mode (again: off)",
+    "  Shift+X                random notes on the track",
     "KNOBS, SLIDERS, LISTS (track editor, note editor, kit editor, volumes)",
     "  Tab / Shift+Tab        focus the next / previous control      Esc  back to the grid",
     "  Arrows, - =, wheel     change (Shift or Alt: finely); a list: next option",
@@ -111,8 +112,8 @@ const PLUGIN_SHORTCUTS: &[&str] = &[
     "  double-click           default value     right-click or Enter: type a value",
     "  Enter                  open a list, press a button",
     "PIANO ROLL (F4)",
-    "  click / drag / right-click a cell: add, select, delete; velocity (up/down) or pitch; menu",
-    "  Arrows, Shift+Arrows   the cursor; the selected note's velocity / pitch    Enter, Delete",
+    "  click / drag / right-click a cell: add, select, delete; pitch (up/down) or velocity; menu",
+    "  Arrows, Shift+Arrows   the cursor; the note's pitch (up/down), time (left/right)   Enter, Delete",
     "  Shift+drag             a zone of steps and keys: copy, cut, Delete; paste at the cursor",
     "  a key: hear it, right-click: clear, chord progression     wheel (Shift: pages)",
     "SYNTH EDITOR (F6)",
@@ -152,9 +153,18 @@ impl Session {
         });
     }
 
-    /// The lines of the keyboard shortcuts panel.
-    pub(super) fn shortcut_lines(&self) -> &'static [&'static str] {
-        if self.hosted { PLUGIN_SHORTCUTS } else { &SHORTCUTS }
+    /// The lines of the keyboard shortcuts panel, as the platform shows them
+    /// (Cmd in place of Ctrl on macOS; a plugin's say Alt, as its menus do).
+    pub(super) fn shortcut_lines(&self) -> Vec<String> {
+        let table: &[&str] = if self.hosted { PLUGIN_SHORTCUTS } else { SHORTCUTS };
+        table
+            .iter()
+            .map(
+                |line| {
+                    if self.hosted { (*line).to_owned() } else { crate::menu::platform_shortcuts(line).into_owned() }
+                },
+            )
+            .collect()
     }
 
     /// Scroll the shortcuts panel, if open, for `key`; whether it was.

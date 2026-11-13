@@ -556,7 +556,7 @@ pub(super) mod tests {
         assert_eq!((s.editor.selected_song(), s.song().unwrap().name.as_str()), (1, "Second"));
         s.select_song(0);
         s.song_button("delete");
-        assert_eq!(s.message, "Removed the arrangement \"s\" (Ctrl+Z: undo)");
+        assert_eq!(s.message, format!("Removed the arrangement \"s\" ({}+Z: undo)", crate::menu::command_label()));
         assert_eq!(s.editor.library().songs.len(), 1);
         assert_eq!(s.song().unwrap().name, "Second");
         s.undo();
