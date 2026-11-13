@@ -123,7 +123,7 @@ impl Session {
 
     /// F3, View > Song: the song panel in the place of the grid, or back.
     pub fn toggle_song_view(&mut self) {
-        if self.hosted {
+        if self.host.hosted {
             self.message = crate::menu::SONGS_IN_THE_APP.into();
             return;
         }
@@ -186,7 +186,7 @@ impl Session {
         let Some(song) = self.song() else { return 0.0 };
         let measure = match self.playback.tick() {
             Some(tick) if self.song_playing() => song.measure_at_tick(tick as f64, f64::from(TICK)),
-            _ => f64::from(self.song_cursor),
+            _ => f64::from(self.transport.song_cursor),
         };
         measure.min((song.length_measures() - 1.0).max(0.0))
     }
@@ -423,7 +423,7 @@ impl Session {
         let selected = self.editor.set_selected_song(index);
         self.song_panel.scroll = (0, 0);
         if playing {
-            self.playback.play_from(&self.editor, Mode::Song(selected), u64::from(self.song_cursor));
+            self.playback.play_from(&self.editor, Mode::Song(selected), u64::from(self.transport.song_cursor));
         }
         if let Some(song) = self.song() {
             self.message = format!("song {} ({} measures)", song.name, song.length_measures());
@@ -455,7 +455,7 @@ impl Session {
     /// Aim the cursor at `measure`: play starts there, and
     /// a song playing goes there at once.
     pub(super) fn set_song_cursor(&mut self, measure: u32) {
-        self.song_cursor = measure;
+        self.transport.song_cursor = measure;
         if self.song_playing()
             && let Some(controller) = self.playback.controller_mut()
         {
@@ -474,7 +474,7 @@ impl Session {
 
     /// Play the selected song from the cursor (`#applySongCursor` at start).
     pub(super) fn song_start(&self) -> u64 {
-        u64::from(self.song_cursor)
+        u64::from(self.transport.song_cursor)
     }
 }
 

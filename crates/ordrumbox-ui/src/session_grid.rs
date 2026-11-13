@@ -378,7 +378,7 @@ impl Session {
     fn add_random_note(&mut self, t: usize, beat: i32, step: i32) {
         let Some(track) = self.track(t) else { return };
         let (name, range) = (track.name.clone(), track.pitch_range.max(1.0));
-        let pitch = (self.rng.next_f64() * (range * 2.0 + 1.0)).floor() - range;
+        let pitch = (self.generators.rng.next_f64() * (range * 2.0 + 1.0)).floor() - range;
         let Some(n) = self.editor.add_note(self.pattern_index, t, beat, step, pitch) else { return };
         self.selection.selected = Some((t, n));
         self.edited();

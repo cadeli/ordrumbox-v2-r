@@ -77,8 +77,8 @@ impl Session {
         let kit = self.kits.kits.get(self.kit_index).map(|k| k.name.clone()).unwrap_or_default();
         self.render = (!bank.samples.is_empty()).then(|| RenderSetup {
             bank: bank.clone(),
-            scales: self.scales.clone(),
-            synths: self.synths.clone(),
+            scales: self.generators.scales.clone(),
+            synths: self.synths.presets.clone(),
             kit,
             sample_rate: offline::EXPORT_RATE,
             seed: 1,

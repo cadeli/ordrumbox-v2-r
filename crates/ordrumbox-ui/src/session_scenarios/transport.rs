@@ -17,7 +17,7 @@ fn a_song_pauses_where_it_is_and_home_goes_back() {
     run(&mut s, &mut audio, MEASURE * 5 / 2);
     s.toggle_play();
     assert!(!s.playing());
-    assert_eq!(s.song_cursor, 2, "paused in measure 3");
+    assert_eq!(s.transport.song_cursor, 2, "paused in measure 3");
     assert!(s.message.starts_with("paused at measure 3"), "{}", s.message);
     // Space goes on from there.
     s.toggle_play();
@@ -30,10 +30,10 @@ fn a_song_pauses_where_it_is_and_home_goes_back() {
     assert!(s.playing());
     // Stopped, it only moves the cursor.
     s.toggle_play();
-    s.song_cursor = 3;
+    s.transport.song_cursor = 3;
     s.rewind();
     assert!(!s.playing());
-    assert_eq!(s.song_cursor, 0);
+    assert_eq!(s.transport.song_cursor, 0);
 }
 
 #[test]
@@ -86,7 +86,7 @@ fn the_metronome_clicks_an_empty_pattern_and_stops_when_off() {
     s.toggle_play();
     assert_eq!(run(&mut s, &mut audio, 8000), 0.0, "an empty pattern is silent");
     s.run(Command::Metronome);
-    assert!(s.metronome && s.message == "metronome on");
+    assert!(s.transport.metronome && s.message == "metronome on");
     // The pass playing is rebuilt with the clicks, the next ones follow.
     assert!(run(&mut s, &mut audio, 16_000) > 0.0, "clicks");
     s.run(Command::Metronome);
@@ -180,11 +180,11 @@ fn the_preferences_keep_what_ok_applies_and_esc_leaves() {
     assert!(s.overlay_open());
     // Rows with no sound device or MIDI port offered: metronome, VU meters, toasts, OK.
     s.overlay_key(OverlayKey::Enter);
-    assert!(!s.metronome, "a draft: nothing changes before OK");
+    assert!(!s.transport.metronome, "a draft: nothing changes before OK");
     s.overlay_key(OverlayKey::Move(1));
     s.overlay_key(OverlayKey::Side(1));
     s.overlay_key(OverlayKey::Escape);
-    assert!(!s.overlay_open() && !s.metronome && s.chrome.show_vus, "Esc leaves everything");
+    assert!(!s.overlay_open() && !s.transport.metronome && s.chrome.show_vus, "Esc leaves everything");
 
     s.run(Command::Preferences);
     s.overlay_key(OverlayKey::Enter);
@@ -193,7 +193,7 @@ fn the_preferences_keep_what_ok_applies_and_esc_leaves() {
     s.overlay_key(OverlayKey::Move(2));
     s.overlay_key(OverlayKey::Enter);
     assert!(!s.overlay_open());
-    assert!(s.metronome && !s.chrome.show_vus);
+    assert!(s.transport.metronome && !s.chrome.show_vus);
     assert_eq!(s.message, "preferences kept");
 }
 

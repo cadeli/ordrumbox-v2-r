@@ -225,7 +225,7 @@ impl Session {
     /// shortcuts (Alt for Ctrl).
     pub(super) fn control_tip(&self, id: Id) -> Option<[Cow<'static, str>; 2]> {
         let lines = control_help::help(id)?;
-        Some(lines.map(|line| if self.hosted { menu::hosted_shortcuts(line) } else { line.into() }))
+        Some(lines.map(|line| if self.host.hosted { menu::hosted_shortcuts(line) } else { line.into() }))
     }
 
     /// The tooltip of the note under the mouse (the first of its step), as

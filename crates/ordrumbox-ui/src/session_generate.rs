@@ -6,7 +6,6 @@ use super::session_labels::style_label;
 use ordrumbox_core::Styles;
 use ordrumbox_logic::generate;
 use ordrumbox_logic::generate::MelodicKind;
-use ordrumbox_logic::tools::learned_styles;
 
 impl Session {
     // ─── Generation ──────────────────────────────────────────────────────────
@@ -14,17 +13,17 @@ impl Session {
     /// The styles the generation follows now: `styles.json` with what the
     /// library's tags teach.
     fn generation_styles(&mut self) -> Styles {
-        learned_styles(&mut self.learned_styles, &self.styles, &self.editor).clone()
+        self.generators.learn(&self.editor).clone()
     }
 
     /// The header's style list: style `name` (empty: a drawn one) for the
     /// patterns to come, and the current pattern made again in it.
     pub fn choose_style(&mut self, name: &str) {
-        self.gen_style = Some(name.to_owned()).filter(|n| !n.is_empty());
-        let style = self.gen_style.clone().or_else(|| {
+        self.generators.style = Some(name.to_owned()).filter(|n| !n.is_empty());
+        let style = self.generators.style.clone().or_else(|| {
             let styles = self.generation_styles();
             let names = styles.names();
-            let i = (self.rng.next_f64() * names.len() as f64) as usize;
+            let i = (self.generators.rng.next_f64() * names.len() as f64) as usize;
             names.get(i.min(names.len().saturating_sub(1))).map(|n| (*n).to_owned())
         });
         self.regenerate_pattern_in(style.as_deref());
@@ -35,7 +34,7 @@ impl Session {
     pub fn regenerate_pattern(&mut self) {
         let has_style =
             self.pattern().is_some_and(|p| p.extra.get(generate::GENRE).is_some_and(|g| g.as_str().is_some()));
-        let style = if has_style { None } else { self.gen_style.clone() };
+        let style = if has_style { None } else { self.generators.style.clone() };
         self.regenerate_pattern_in(style.as_deref());
     }
 
@@ -44,9 +43,9 @@ impl Session {
             return self.generate_pattern();
         }
         let styles = self.generation_styles();
-        let rng = &mut self.rng;
+        let rng = &mut self.generators.rng;
         let p = self.pattern_index;
-        if self.editor.regenerate_pattern(p, &self.scales, &styles, style, &mut || rng.next_f64()) {
+        if self.editor.regenerate_pattern(p, &self.generators.scales, &styles, style, &mut || rng.next_f64()) {
             self.clamp_selection();
             self.edited();
         }
@@ -62,8 +61,8 @@ impl Session {
     /// A header macro (`composeEnergy`…) of the pattern set to `value`.
     pub fn set_macro(&mut self, key: &'static str, value: f64) {
         let styles = self.generation_styles();
-        let rng = &mut self.rng;
-        let sources = (&self.scales, &styles);
+        let rng = &mut self.generators.rng;
+        let sources = (&self.generators.scales, &styles);
         if self.editor.set_pattern_macro(self.pattern_index, key, value, sources, &mut || rng.next_f64()) {
             self.edited();
         }
@@ -95,9 +94,10 @@ impl Session {
     /// Shift+B: a new pattern, generated (style, tracks and lines).
     pub fn generate_pattern(&mut self) {
         let styles = self.generation_styles();
-        let rng = &mut self.rng;
-        let style = self.gen_style.as_deref();
-        self.pattern_index = self.editor.generate_pattern(&self.scales, &styles, style, &mut || rng.next_f64());
+        let rng = &mut self.generators.rng;
+        let style = self.generators.style.as_deref();
+        self.pattern_index =
+            self.editor.generate_pattern(&self.generators.scales, &styles, style, &mut || rng.next_f64());
         self.deselect();
         self.edited();
         self.chrome.current_page = 0;
@@ -112,11 +112,13 @@ impl Session {
     pub fn toggle_generation(&mut self, part: Option<MelodicKind>) {
         let p = self.pattern_index;
         let styles = self.generation_styles();
-        let rng = &mut self.rng;
+        let rng = &mut self.generators.rng;
         let rnd = &mut || rng.next_f64();
         let on = match part {
-            None => self.editor.toggle_drums(p, &self.scales, &styles, self.gen_style.as_deref(), rnd),
-            Some(kind) => self.editor.toggle_melodic(p, kind, &self.scales, &styles, rnd),
+            None => {
+                self.editor.toggle_drums(p, &self.generators.scales, &styles, self.generators.style.as_deref(), rnd)
+            }
+            Some(kind) => self.editor.toggle_melodic(p, kind, &self.generators.scales, &styles, rnd),
         };
         let Some(on) = on else { return };
         self.clamp_selection();
@@ -143,8 +145,9 @@ impl Session {
             self.message = format!("{name} is locked: unlock it for a new line");
             return;
         }
-        let rng = &mut self.rng;
-        if self.editor.regenerate_track(self.pattern_index, t, &self.scales, &styles, &mut || rng.next_f64()) {
+        let rng = &mut self.generators.rng;
+        if self.editor.regenerate_track(self.pattern_index, t, &self.generators.scales, &styles, &mut || rng.next_f64())
+        {
             self.edited();
             self.message = format!("new line on {name}");
         }
@@ -171,7 +174,7 @@ impl Session {
     }
 
     fn randomize_track_now(&mut self, t: usize) {
-        let rng = &mut self.rng;
+        let rng = &mut self.generators.rng;
         if self.editor.randomize_track(self.pattern_index, t, &mut || rng.next_f64()) {
             self.selection.selected = None;
             self.edited();

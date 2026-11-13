@@ -40,6 +40,17 @@ pub(super) struct SynthEdit {
     draft: Object,
 }
 
+/// The synth presets of a session.
+#[derive(Debug, Default)]
+pub(super) struct Synths {
+    /// Those played and shown: the library's own over the assets'.
+    pub(super) presets: SynthPresets,
+    /// The assets' presets.
+    pub(super) assets: SynthPresets,
+    /// The editor revision `presets` was made at.
+    pub(super) revision: Option<u64>,
+}
+
 /// The synth editor: the preset edited, the tab, and when the session
 /// started (the LFO clock).
 #[derive(Debug)]
@@ -80,7 +91,8 @@ impl Session {
         }
         self.set_workspace(Workspace::Synth);
         let track_key = self.editor_track().and_then(|t| self.track(t)).and_then(|t| t.synth_preset.clone());
-        let key = track_key.filter(|k| self.synths.get(k).is_some()).or_else(|| self.synth_keys().into_iter().next());
+        let key =
+            track_key.filter(|k| self.synths.presets.get(k).is_some()).or_else(|| self.synth_keys().into_iter().next());
         match key {
             Some(key) => {
                 self.load_synth(&key);
@@ -128,14 +140,14 @@ impl Session {
 
     /// The presets' keys, sorted.
     pub(super) fn synth_keys(&self) -> Vec<String> {
-        let mut keys: Vec<String> = self.synths.keys().into_iter().map(str::to_owned).collect();
+        let mut keys: Vec<String> = self.synths.presets.keys().into_iter().map(str::to_owned).collect();
         keys.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()).then_with(|| a.cmp(b)));
         keys
     }
 
     /// Edit preset `key`.
     pub(super) fn load_synth(&mut self, key: &str) {
-        let Some(preset) = self.synths.get(key).cloned() else { return };
+        let Some(preset) = self.synths.presets.get(key).cloned() else { return };
         let mut draft = preset.as_object().cloned().unwrap_or_default();
         model::hydrate(&mut draft);
         self.synth_editor.edit = Some(SynthEdit { key: key.to_owned(), original: preset, draft });
@@ -180,26 +192,26 @@ impl Session {
     /// replaced): to the player, to exports, to the preset edited.
     pub(super) fn refresh_synths(&mut self) {
         let revision = self.editor.revision();
-        if self.synths_revision == Some(revision) {
+        if self.synths.revision == Some(revision) {
             return;
         }
-        self.synths_revision = Some(revision);
-        let synths = merged_synths(self.editor.library().synths.as_ref(), &self.asset_synths);
-        if synths == self.synths {
+        self.synths.revision = Some(revision);
+        let synths = merged_synths(self.editor.library().synths.as_ref(), &self.synths.assets);
+        if synths == self.synths.presets {
             return;
         }
-        self.synths = synths;
+        self.synths.presets = synths;
         if let Some(controller) = self.playback.controller_mut() {
-            controller.set_synths(self.editor.library(), self.synths.clone());
+            controller.set_synths(self.editor.library(), self.synths.presets.clone());
         }
         if let Some(render) = &mut self.render {
-            render.synths = self.synths.clone();
+            render.synths = self.synths.presets.clone();
         }
         // The preset edited changed from elsewhere (an undo, an import):
         // opened again, Revert goes back to it; gone, the first one.
         let Some(edit) = &self.synth_editor.edit else { return };
         let key = edit.key.clone();
-        match self.synths.get(&key) {
+        match self.synths.presets.get(&key) {
             Some(preset) if preset.as_object() != Some(&edit.draft) => self.load_synth(&key),
             Some(_) => {}
             None => match self.synth_keys().into_iter().next() {
@@ -212,8 +224,8 @@ impl Session {
     /// The assets' presets are `synths` (tests): the presets played follow.
     #[cfg(test)]
     pub(super) fn set_asset_synths(&mut self, synths: SynthPresets) {
-        self.asset_synths = synths;
-        self.synths_revision = None;
+        self.synths.assets = synths;
+        self.synths.revision = None;
         self.refresh_synths();
     }
 
@@ -232,7 +244,7 @@ impl Session {
 
     /// [`Self::put_synth`] for several presets, one undo step.
     fn put_synths(&mut self, presets: &[(&str, Option<Value>)], desc: String, coalesce: Option<String>) -> bool {
-        let assets = &self.asset_synths;
+        let assets = &self.synths.assets;
         let changed = self.editor.edit_synths(desc, coalesce, |own| {
             for (key, preset) in presets {
                 match (preset, assets.get(key)) {
@@ -455,11 +467,11 @@ impl Session {
 
     /// Export: every preset to `path`.
     pub(super) fn export_synths(&mut self, path: &Path) {
-        if self.synths.is_empty() {
+        if self.synths.presets.is_empty() {
             self.message = NO_SYNTHS.into();
             return;
         }
-        self.message = match store::save_synths(path, &self.synths) {
+        self.message = match store::save_synths(path, &self.synths.presets) {
             Ok(()) => format!("Synth sounds exported to {}", path.display()),
             Err(e) => format!("Export failed: {}: {e}", path.display()),
         };
@@ -557,7 +569,7 @@ mod tests {
         let icon = item(&s, |i| i.id == Some(Id::SynthIcon(vco2, 2)));
         let (x, y) = center(icon.rect);
         click(&mut s, x, y);
-        let preset = s.synths.get("b").unwrap();
+        let preset = s.synths.presets.get("b").unwrap();
         assert_eq!(model::get(preset.as_object().unwrap(), "vco2.wave"), Some(&Value::from("sawtooth")));
         assert_eq!(model::number(preset.as_object().unwrap(), "vco2.gain"), Some(0.5));
         assert!(s.saving.library.pending(), "saved with the library");
@@ -566,10 +578,10 @@ mod tests {
         let knob = item(&s, |i| i.id == Some(Id::SynthField(fi)));
         let (x, y) = center(knob.rect);
         s.wheel(SIZE, x, y, 2, false, false);
-        assert_eq!(model::number(s.synths.get("b").unwrap().as_object().unwrap(), "vco1.gain"), Some(0.52));
+        assert_eq!(model::number(s.synths.presets.get("b").unwrap().as_object().unwrap(), "vco1.gain"), Some(0.52));
         // Revert: as it was.
         s.synth_button("revert");
-        assert_eq!(s.synths.get("b").unwrap().to_json(), r#"{"vco1":{"gain":0.5}}"#);
+        assert_eq!(s.synths.presets.get("b").unwrap().to_json(), r#"{"vco1":{"gain":0.5}}"#);
         assert_eq!(model::number(&s.synth_editor.edit.as_ref().unwrap().draft, "vco2.gain"), Some(0.0));
     }
 
@@ -636,7 +648,7 @@ mod tests {
     fn preset_edits_are_undone_and_saved_with_the_library() {
         let mut s = session();
         s.toggle_synth();
-        let gain = |s: &Session| model::number(s.synths.get("b").unwrap().as_object().unwrap(), "vco1.gain");
+        let gain = |s: &Session| model::number(s.synths.presets.get("b").unwrap().as_object().unwrap(), "vco1.gain");
         let revision = s.library_revision();
         let fi = synth_view::all_fields(&s.synth_editor.edit.as_ref().unwrap().draft)
             .iter()
@@ -660,7 +672,7 @@ mod tests {
         let (library, _) = Library::parse(&s.library_text()).unwrap();
         let own = library.synths.clone().unwrap();
         assert!(own.get("a").is_some_and(Value::is_null));
-        assert_eq!(merged_synths(Some(&own), &s.asset_synths).keys(), ["b"]);
+        assert_eq!(merged_synths(Some(&own), &s.synths.assets).keys(), ["b"]);
         s.undo();
         assert_eq!(s.synth_keys(), ["a", "b"]);
     }

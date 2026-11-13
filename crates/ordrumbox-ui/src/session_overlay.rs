@@ -170,12 +170,16 @@ impl Session {
     /// The lines of the keyboard shortcuts panel, as the platform shows them
     /// (Cmd in place of Ctrl on macOS; a plugin's say Alt, as its menus do).
     pub(super) fn shortcut_lines(&self) -> Vec<String> {
-        let table: &[&str] = if self.hosted { PLUGIN_SHORTCUTS } else { SHORTCUTS };
+        let table: &[&str] = if self.host.hosted { PLUGIN_SHORTCUTS } else { SHORTCUTS };
         table
             .iter()
             .map(
                 |line| {
-                    if self.hosted { (*line).to_owned() } else { crate::menu::platform_shortcuts(line).into_owned() }
+                    if self.host.hosted {
+                        (*line).to_owned()
+                    } else {
+                        crate::menu::platform_shortcuts(line).into_owned()
+                    }
                 },
             )
             .collect()

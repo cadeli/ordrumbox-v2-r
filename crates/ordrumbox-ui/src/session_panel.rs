@@ -225,7 +225,7 @@ impl Session {
     /// The header's controls: a plugin's without the song view button.
     pub(super) fn header_controls(&self, scale: Scale) -> view::HeaderControls {
         let controls = view::header_controls(scale);
-        if self.hosted { controls.hosted() } else { controls }
+        if self.host.hosted { controls.hosted() } else { controls }
     }
 
     /// The header's transport and generation controls (the toolbar's
@@ -234,7 +234,7 @@ impl Session {
         let controls = self.header_controls(scale);
         // A plugin has no song (no mode switch) and no transport: the host plays, at its own tempo. The
         // view shows the host's there (`view::Transport::Host`).
-        if !self.hosted {
+        if !self.host.hosted {
             let song = self.workspace == Workspace::Song;
             for (i, (rect, label)) in controls.mode.iter().zip(view::MODES).enumerate() {
                 let kind = Kind::Button { label: label.into(), on: song == (i == 1) };
@@ -640,7 +640,7 @@ mod tests {
     fn a_pattern_in_the_chosen_style_and_its_drum_track_composed_from_the_gen_tab() {
         let mut s = session();
         let text = include_str!("../../../assets/data/styles.json");
-        s.styles = Styles::from_json(&ordrumbox_core::json::parse(text).unwrap()).0;
+        s.generators.styles = Styles::from_json(&ordrumbox_core::json::parse(text).unwrap()).0;
         s.update();
         // The header's style list: the pattern made again in reggae.
         s.select(Id::StyleList, "reggae");

@@ -293,7 +293,7 @@ fn the_grid_shows_the_loop_being_heard_in_auto_mode() {
         r#"{"patterns":[{"name":"p","bpm":120,"tracks":[
             {"name":"KICK","autoMode":true,"autoHitVariation":0,"autoNoteVariation":0}]}]}"#,
     );
-    s.rng = Rng::new(7);
+    s.generators.rng = Rng::new(7);
     s.toggle_play();
     let (mut left, mut right) = (vec![0.0; CALLBACK], vec![0.0; CALLBACK]);
     let mut heard = Vec::new();
@@ -378,7 +378,7 @@ fn demo_session(samples_dir: &Path) -> (Session, AudioSide) {
         .to_vec();
     let kits = KitSet::new(kits, &bank, None, None, Some(samples_dir.to_path_buf()));
     let mut session = Session::new(library, kits, Vec::new());
-    session.rng = Rng::new(1);
+    session.generators.rng = Rng::new(1);
     let (controller, audio) =
         Controller::with_rng(RATE, Arc::new(bank), Scales::default(), SynthPresets::default(), Rng::new(1));
     session.playback = Playback::without_output(controller);

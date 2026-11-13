@@ -102,7 +102,7 @@ impl Session {
         let revision = self.editor.revision();
         action(self);
         if self.editor.revision() != revision {
-            let key = if self.hosted { "Alt+Z".to_owned() } else { format!("{}+Z", crate::menu::command_label()) };
+            let key = if self.host.hosted { "Alt+Z".to_owned() } else { format!("{}+Z", crate::menu::command_label()) };
             self.message = format!("{} ({key}: undo)", self.message);
         }
     }
@@ -195,7 +195,7 @@ mod tests {
         s.clear_track(0);
         assert_eq!(s.message, "No notes to clear");
         // A plugin's undo key is Alt+Z.
-        s.hosted = true;
+        s.host.hosted = true;
         s.randomize_track();
         assert!(s.message.ends_with("(Alt+Z: undo)"), "{}", s.message);
     }

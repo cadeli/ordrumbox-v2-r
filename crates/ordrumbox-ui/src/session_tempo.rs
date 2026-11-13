@@ -17,19 +17,19 @@ impl Session {
     }
 
     pub(super) fn tap_tempo_at(&mut self, now: Instant) {
-        if self.hosted {
+        if self.host.hosted {
             self.message = "the tempo is the host's".into();
             return;
         }
-        if self.taps.last().is_some_and(|&last| now.duration_since(last) > TAP_RESET) {
-            self.taps.clear();
+        if self.transport.taps.last().is_some_and(|&last| now.duration_since(last) > TAP_RESET) {
+            self.transport.taps.clear();
         }
-        self.taps.push(now);
-        if self.taps.len() > TAP_WINDOW {
-            self.taps.remove(0);
+        self.transport.taps.push(now);
+        if self.transport.taps.len() > TAP_WINDOW {
+            self.transport.taps.remove(0);
         }
-        let (Some(&first), Some(&last)) = (self.taps.first(), self.taps.last()) else { return };
-        let gaps = self.taps.len() - 1;
+        let (Some(&first), Some(&last)) = (self.transport.taps.first(), self.transport.taps.last()) else { return };
+        let gaps = self.transport.taps.len() - 1;
         if gaps == 0 {
             self.message = "tap tempo: tap again".into();
             return;
@@ -50,8 +50,8 @@ impl Session {
 
     /// F9: the click on every beat, on or off.
     pub fn toggle_metronome(&mut self) {
-        self.metronome = !self.metronome;
-        self.message = if self.metronome { "metronome on" } else { "metronome off" }.into();
+        self.transport.metronome = !self.transport.metronome;
+        self.message = if self.transport.metronome { "metronome on" } else { "metronome off" }.into();
     }
 }
 

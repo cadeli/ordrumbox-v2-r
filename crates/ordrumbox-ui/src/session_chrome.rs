@@ -53,6 +53,8 @@ pub(super) struct Chrome {
     pub(super) zoom: i32,
     /// The window's size in physical pixels, which "Zoom: fit to window" fits.
     pub(super) window: (i32, i32),
+    /// The colour scheme in use, from 1, set again on the thread that draws.
+    pub(super) color_scheme: usize,
     /// Smoothed per-track levels for the VU meter stripe.
     track_levels: Vec<f32>,
 }
@@ -78,6 +80,7 @@ impl Default for Chrome {
             display_scale: Scale::ONE,
             zoom: 0,
             window: (0, 0),
+            color_scheme: 1,
             track_levels: Vec::new(),
         }
     }

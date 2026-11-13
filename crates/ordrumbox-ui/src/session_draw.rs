@@ -13,7 +13,7 @@ use ordrumbox_engine::Mode;
 impl Session {
     /// The header's first group: a plugin shows its host's transport there.
     pub(super) fn transport_shown(&self) -> view::Transport {
-        if self.hosted { view::Transport::Host(self.host_shown) } else { view::Transport::Own }
+        if self.host.hosted { view::Transport::Host(self.host.shown) } else { view::Transport::Own }
     }
 
     /// The window split for `size` (a real window size): the main editor
@@ -35,7 +35,7 @@ impl Session {
     /// The master strip (the output panel) is shown along the bottom: in
     /// the app, unless View > Master folded it.
     pub(crate) fn output_shown(&self) -> bool {
-        !self.hosted && self.chrome.show_master_strip
+        !self.host.hosted && self.chrome.show_master_strip
     }
 
     /// What the window shows that sets the room the layout needs.
@@ -68,7 +68,7 @@ impl Session {
 
     pub fn draw(&mut self, canvas: &mut Canvas, scale: Scale) {
         // The scheme is per thread: a plugin draws on another than it loads on.
-        theme::set_scheme(self.color_scheme);
+        theme::set_scheme(self.chrome.color_scheme);
         self.note_actions();
         self.note_message();
         let layout = self.panel_layout(canvas.width(), canvas.height(), scale);
@@ -129,7 +129,7 @@ impl Session {
             levels,
             show_vus: self.chrome.show_vus,
             transport: self.transport_shown(),
-            host_muted: self.host_muted,
+            host_muted: self.host.muted,
             track_drop: self.track_drop((canvas.width(), canvas.height(), scale)),
             waiting,
             playhead: if song_mode.is_some() || waiting.is_some() {
@@ -144,7 +144,7 @@ impl Session {
                     ((global_beat - start_beat) / (page_end - start_beat).max(1.0)).clamp(0.0, 1.0)
                 })
             },
-            song: song.as_deref().filter(|_| !self.hosted),
+            song: song.as_deref().filter(|_| !self.host.hosted),
             cursor: self.selection.cursor,
             selected: self.selection.selected,
             zone: self.selection.zone,

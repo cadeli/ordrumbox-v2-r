@@ -260,7 +260,7 @@ mod tests {
         let ruler_y = l.grid.y + 14 + 4;
         let measure_x = |m: i32| l.grid.x + song_view::LABEL_WIDTH + m * 24 + 12;
         assert!(s.song_click(SIZE, measure_x(1), ruler_y, Button::Left));
-        assert_eq!(s.song_cursor, 1);
+        assert_eq!(s.transport.song_cursor, 1);
         assert!(s.song_click(SIZE, l.list.x + 2, l.list.y + 2, Button::Right));
         assert_eq!(menu(&s), ["add:1:a", "pattern-down:0", "rename:0", "pattern-delete:0"]);
         choose(&mut s, 0);
