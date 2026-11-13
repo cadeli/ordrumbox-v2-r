@@ -16,21 +16,56 @@ pub fn is_steep(db_per_octave: f64) -> bool {
     db_per_octave > SLOPE_24_FROM
 }
 
-/// Dampings (1/Q) of the two stages of a 24 dB/oct filter in `mode`
-/// (0 lowpass, 1 highpass, 2 bandpass, 3 notch) whose single stage would
-/// have damping `k`, and the gain applied to the second stage's output.
+/// What a state-variable filter lets through.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum FilterMode {
+    #[default]
+    Lowpass,
+    Highpass,
+    Bandpass,
+    Notch,
+}
+
+impl FilterMode {
+    /// Every mode, each at its code.
+    pub const ALL: [Self; 4] = [Self::Lowpass, Self::Highpass, Self::Bandpass, Self::Notch];
+
+    /// Its code: its place in [`Self::ALL`].
+    #[must_use]
+    pub const fn code(self) -> u8 {
+        self as u8
+    }
+
+    /// The mode a strip's `filter_mode` setting stands for: the nearest code,
+    /// the notch above the last.
+    #[must_use]
+    pub fn from_setting(setting: f64) -> Self {
+        if setting < 0.5 {
+            Self::Lowpass
+        } else if setting < 1.5 {
+            Self::Highpass
+        } else if setting < 2.5 {
+            Self::Bandpass
+        } else {
+            Self::Notch
+        }
+    }
+}
+
+/// Dampings (1/Q) of the two stages of a 24 dB/oct filter in `mode` whose
+/// single stage would have damping `k`, and the gain applied to the second
+/// stage's output.
 ///
 /// The lowpass and highpass are a Butterworth pair whose second stage carries
 /// the resonance, so the peak at the cutoff is as high as one stage's at the
 /// same Q. The bandpass and notch repeat the stage; the second bandpass is
 /// normalized (peak gain 1), so the peak stays the single stage's.
 #[inline]
-pub fn stages(k: f64, mode: f64) -> (f64, f64, f64) {
-    if mode < 1.5 {
-        (1.0 / BUTTERWORTH_Q1, k * FRAC_1_SQRT_2 / BUTTERWORTH_Q2, 1.0)
-    } else if mode < 2.5 {
-        (k, k, k)
-    } else {
-        (k, k, 1.0)
+#[must_use]
+pub fn stages(k: f64, mode: FilterMode) -> (f64, f64, f64) {
+    match mode {
+        FilterMode::Lowpass | FilterMode::Highpass => (1.0 / BUTTERWORTH_Q1, k * FRAC_1_SQRT_2 / BUTTERWORTH_Q2, 1.0),
+        FilterMode::Bandpass => (k, k, k),
+        FilterMode::Notch => (k, k, 1.0),
     }
 }

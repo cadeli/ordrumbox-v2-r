@@ -96,6 +96,14 @@ a meant change of behaviour, and note that change below).
 
 ### Changes of behaviour
 
+The state-variable filter of the synth voice and of the channel strip is now the
+textbook one. Its highpass (and so its notch) used to let some of the bandpass
+through, more of it the higher the cutoff: a highpass now sounds a little thinner
+and quieter (the synth presets `SN`, `CHH_SYNTH` and `OHH_SYNTH` lose up to 1 dB).
+A synth cutoff moved by an LFO or an envelope now stops at 20 kHz like one that is
+not; it used to reach 0.45 × the sample rate. This rewrote `synth_renders.bin` and
+`effect_renders.bin` (dsp).
+
 The triangle LFO now stays between its min and max, starting at min like the
 sine; it used to swing over twice that range. This rewrote `synth_renders.bin`
 (dsp), `mapping_rust.txt` and `synth_editor_rust.txt` (engine) and

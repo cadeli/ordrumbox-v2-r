@@ -6,8 +6,10 @@
 
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_dsp::SynthPatch;
+use ordrumbox_dsp::lfo::Wave;
+use ordrumbox_dsp::slope::FilterMode;
 pub use ordrumbox_dsp::synth::FM_DEVIATION;
-use ordrumbox_dsp::synth::{Adsr, SynthBypass, SynthLfo};
+use ordrumbox_dsp::synth::patch::{Adsr, LfoTarget, ModEnvTarget, SynthBypass, SynthLfo};
 
 /// `C3_FREQ`, Hz: the pitch of ratio 1.
 const C3_FREQ: f64 = 130.812_782_650_299_3;
@@ -15,47 +17,47 @@ const C3_FREQ: f64 = 130.812_782_650_299_3;
 const MIN_NOTE_RATIO: f64 = 0.0001;
 
 /// The oscillator and LFO waves, by code.
-pub const WAVES: [&str; 5] = ["sine", "triangle", "sawtooth", "square", "random"];
+pub const WAVES: [&str; 5] = ordrumbox_dsp::lfo::WAVE_NAMES;
 /// The filter types, by code (a strip's and a synth voice's filter mode).
 pub const FILTER_TYPES: [&str; 4] = ["lowpass", "highpass", "bandpass", "notch"];
 const MOD_ENV_TARGETS: [&str; 5] = ["off", "filter", "pitch", "fm", "shape"];
-/// `LFO_TARGET_TO_INT`, by code (two names share 16).
-const LFO_TARGETS: [(&str, u8); 35] = [
-    ("NOT", 0),
-    ("FLT", 1),
-    ("VCO1", 2),
-    ("VCO2", 3),
-    ("VCO3", 4),
-    ("masterVolume", 5),
-    ("vco1.gain", 6),
-    ("vco1.detune", 7),
-    ("vco1.octave", 8),
-    ("vco2.gain", 9),
-    ("vco2.detune", 10),
-    ("vco2.octave", 11),
-    ("vco3.gain", 12),
-    ("vco3.detune", 13),
-    ("vco3.octave", 14),
-    ("filter.freq", 15),
-    ("filter.filterEnvelopeAmount", 16),
-    ("filterEnv.filterEnvelopeAmount", 16),
-    ("filter.Q", 17),
-    ("noise.mix", 18),
-    ("subGain", 19),
-    ("pitchPunch", 20),
-    ("filter.drive", 21),
-    ("noise.filterFreq", 22),
-    ("noise.filterQ", 23),
-    ("fm.amount", 24),
-    ("fm.algo", 25),
-    ("envelope.attack", 26),
-    ("envelope.decay", 27),
-    ("envelope.sustain", 28),
-    ("envelope.release", 29),
-    ("modEnvelope.attack", 30),
-    ("modEnvelope.decay", 31),
-    ("modEnvelope.sustain", 32),
-    ("modEnvelope.release", 33),
+/// The LFO targets by their name in a preset (two names for the filter envelope amount).
+const LFO_TARGETS: [(&str, LfoTarget); 35] = [
+    ("NOT", LfoTarget::Off),
+    ("FLT", LfoTarget::Filter),
+    ("VCO1", LfoTarget::Osc1),
+    ("VCO2", LfoTarget::Osc2),
+    ("VCO3", LfoTarget::Osc3),
+    ("masterVolume", LfoTarget::Volume),
+    ("vco1.gain", LfoTarget::Osc1Gain),
+    ("vco1.detune", LfoTarget::Osc1Detune),
+    ("vco1.octave", LfoTarget::Osc1Octave),
+    ("vco2.gain", LfoTarget::Osc2Gain),
+    ("vco2.detune", LfoTarget::Osc2Detune),
+    ("vco2.octave", LfoTarget::Osc2Octave),
+    ("vco3.gain", LfoTarget::Osc3Gain),
+    ("vco3.detune", LfoTarget::Osc3Detune),
+    ("vco3.octave", LfoTarget::Osc3Octave),
+    ("filter.freq", LfoTarget::FilterFreq),
+    ("filter.filterEnvelopeAmount", LfoTarget::FilterEnvAmount),
+    ("filterEnv.filterEnvelopeAmount", LfoTarget::FilterEnvAmount),
+    ("filter.Q", LfoTarget::FilterQ),
+    ("noise.mix", LfoTarget::NoiseMix),
+    ("subGain", LfoTarget::SubGain),
+    ("pitchPunch", LfoTarget::PitchPunch),
+    ("filter.drive", LfoTarget::Drive),
+    ("noise.filterFreq", LfoTarget::NoiseFilterFreq),
+    ("noise.filterQ", LfoTarget::NoiseFilterQ),
+    ("fm.amount", LfoTarget::FmAmount),
+    ("fm.algo", LfoTarget::FmAlgorithm),
+    ("envelope.attack", LfoTarget::EnvAttack),
+    ("envelope.decay", LfoTarget::EnvDecay),
+    ("envelope.sustain", LfoTarget::EnvSustain),
+    ("envelope.release", LfoTarget::EnvRelease),
+    ("modEnvelope.attack", LfoTarget::ModEnvAttack),
+    ("modEnvelope.decay", LfoTarget::ModEnvDecay),
+    ("modEnvelope.sustain", LfoTarget::ModEnvSustain),
+    ("modEnvelope.release", LfoTarget::ModEnvRelease),
 ];
 /// `SYNC_NOTE_HZ`: LFO cycles per beat-second for each sync label.
 const SYNC_NOTE_HZ: [(&str, f64); 7] = [
@@ -147,14 +149,16 @@ fn clamp(x: f64, min: f64, max: f64) -> f64 {
     x.max(min).min(max)
 }
 
-/// `mapEnum()`: index of a known name, else 0.
-fn enum_code(value: Option<&Value>, names: &[&str]) -> f64 {
-    value.and_then(Value::as_str).and_then(|v| names.iter().position(|n| *n == v)).map_or(0.0, |i| i as f64)
+/// The choice of `choices` at the place `value` has in `names`; an unknown
+/// name is the first choice.
+fn choice<T: Copy + Default>(value: Option<&Value>, names: &[&str], choices: &[T]) -> T {
+    let name = value.and_then(Value::as_str);
+    names.iter().zip(choices).find(|(n, _)| Some(**n) == name).map_or_else(T::default, |(_, choice)| *choice)
 }
 
-fn lfo_target(value: Option<&Value>) -> f64 {
+fn lfo_target(value: Option<&Value>) -> LfoTarget {
     let name = value.and_then(Value::as_str);
-    LFO_TARGETS.iter().find(|(n, _)| Some(*n) == name).map_or(0.0, |&(_, code)| f64::from(code))
+    LFO_TARGETS.iter().find(|(n, _)| Some(*n) == name).map_or(LfoTarget::Off, |&(_, target)| target)
 }
 
 /// `syncToHz()`: `None` when off, unknown, or without a tempo.
@@ -212,7 +216,7 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
         let l = at(key);
         SynthLfo {
             target: lfo_target(get(l, "target")),
-            wave: enum_code(get(l, "wave"), &WAVES),
+            wave: choice(get(l, "wave"), &WAVES, &Wave::ALL),
             freq: sync_to_hz(get(l, "sync"), note.bpm).unwrap_or_else(|| finite(get(l, "freq"), 0.0)),
             depth: finite(get(l, "depth"), 0.0),
         }
@@ -226,12 +230,12 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
         osc_freq,
         osc_gain: gains,
         osc_detune: vcos.map(|vco| finite(get(vco, "detune"), 0.0)),
-        osc_wave: vcos.map(|vco| enum_code(get(vco, "wave"), &WAVES)),
+        osc_wave: vcos.map(|vco| choice(get(vco, "wave"), &WAVES, &Wave::ALL)),
         noise_mix: level(get(noise, "mix"), 0.0),
-        noise_filter_type: enum_code(get(noise, "filterType"), &FILTER_TYPES),
+        noise_filter_type: choice(get(noise, "filterType"), &FILTER_TYPES, &FilterMode::ALL),
         noise_filter_freq: finite(get(noise, "filterFreq"), 1000.0),
         noise_filter_q: finite(get(noise, "filterQ"), 0.7),
-        filter_type: enum_code(get(filter, "type"), &FILTER_TYPES),
+        filter_type: choice(get(filter, "type"), &FILTER_TYPES, &FilterMode::ALL),
         filter_freq: finite(get(filter, "freq"), 1000.0),
         filter_q: finite(get(filter, "Q"), 0.7),
         filter_slope: finite(get(filter, "slope"), 12.0),
@@ -258,7 +262,7 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
             sustain: finite(get(mod_env, "sustain"), 0.0),
             release: clamp(finite(get(mod_env, "release"), 0.1), 0.008, 0.5),
         },
-        mod_env_target: enum_code(mod_target, &MOD_ENV_TARGETS),
+        mod_env_target: choice(mod_target, &MOD_ENV_TARGETS, &ModEnvTarget::ALL),
         mod_env_depth: if mod_target.and_then(Value::as_str).is_some_and(|t| !t.is_empty() && t != "off") {
             1.0
         } else {
@@ -308,7 +312,7 @@ mod tests {
             SynthNote { ratio: 2.0, velocity: 0.8, pan: 0.0, bpm: 120.0 },
         );
         assert_eq!(patch.osc_freq, [C3_FREQ, 0.0, 0.0]);
-        assert_eq!(patch.osc_wave, [3.0, 0.0, 0.0]);
+        assert_eq!(patch.osc_wave, [Wave::Square, Wave::Sine, Wave::Sine]);
         // 0.8 / 0.5 = 1.6, accented (×1.25), master volume 0.8.
         assert!((patch.velocity - 1.6 * 0.8 * 1.25).abs() < 1e-12);
         assert_eq!(patch.envelope, Adsr { attack: 0.01, decay: 0.1, sustain: 0.7, release: 0.1 });
@@ -342,8 +346,8 @@ mod tests {
             json::parse(r#"{"lfo":{"target":"filter.Q","wave":"random","freq":3,"sync":"1/8"},"lfo2":{"target":"x"}}"#)
                 .unwrap();
         let patch = synth_patch(&preset, SynthNote { ratio: 1.0, velocity: 0.5, pan: 0.0, bpm: 90.0 });
-        assert_eq!((patch.lfo1.target, patch.lfo1.wave, patch.lfo1.freq), (17.0, 4.0, 3.0));
-        assert_eq!(patch.lfo2.target, 0.0);
+        assert_eq!((patch.lfo1.target, patch.lfo1.wave, patch.lfo1.freq), (LfoTarget::FilterQ, Wave::Random, 3.0));
+        assert_eq!(patch.lfo2.target, LfoTarget::Off);
         assert_eq!(note_seconds(120.0, 4), 0.125);
     }
 }

@@ -1,32 +1,60 @@
-//! LFO waveforms (`getLfoWaveformValue()` in `src/audio/math.js`, inlined as
-//! `lfoWave()` in the synth voice processor).
+//! LFO and oscillator waveforms.
 
 use std::f64::consts::TAU;
 
-/// Waveform codes: 0 sine, 1 triangle, 2 sawtooth, 3 square, 4 random.
+/// The names of the waveforms, in the order of [`Wave::ALL`].
 pub const WAVE_NAMES: [&str; 5] = ["sine", "triangle", "sawtooth", "square", "random"];
+
+/// A waveform of an oscillator or an LFO.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Wave {
+    #[default]
+    Sine,
+    Triangle,
+    Sawtooth,
+    Square,
+    /// One random value per cycle.
+    Random,
+}
+
+impl Wave {
+    /// Every waveform, each at its code.
+    pub const ALL: [Self; 5] = [Self::Sine, Self::Triangle, Self::Sawtooth, Self::Square, Self::Random];
+
+    /// Its code: its place in [`Self::ALL`] and [`WAVE_NAMES`].
+    #[must_use]
+    pub const fn code(self) -> u8 {
+        self as u8
+    }
+}
 
 /// Value at `phase` (in cycles, not wrapped). Every shape is read a quarter
 /// cycle late, so the sine, the triangle and the square start at -1. Values
 /// are in [-1, 1]. `random` holds one value per cycle.
-pub fn wave(phase: f64, wave: f64) -> f64 {
+#[inline]
+#[must_use]
+pub fn wave(phase: f64, wave: Wave) -> f64 {
     let p = (phase - 0.25) - (phase - 0.25).floor();
-    if wave < 0.5 {
-        (TAU * p).sin()
-    } else if wave < 1.5 {
-        if p < 0.25 {
-            p * 4.0
-        } else if p < 0.75 {
-            2.0 - p * 4.0
-        } else {
-            p * 4.0 - 4.0
+    match wave {
+        Wave::Sine => (TAU * p).sin(),
+        Wave::Triangle => {
+            if p < 0.25 {
+                p * 4.0
+            } else if p < 0.75 {
+                2.0 - p * 4.0
+            } else {
+                p * 4.0 - 4.0
+            }
         }
-    } else if wave < 2.5 {
-        p * 2.0 - 1.0
-    } else if wave < 3.5 {
-        if p < 0.5 { 1.0 } else { -1.0 }
-    } else {
-        sample_and_hold(phase.floor())
+        Wave::Sawtooth => p * 2.0 - 1.0,
+        Wave::Square => {
+            if p < 0.5 {
+                1.0
+            } else {
+                -1.0
+            }
+        }
+        Wave::Random => sample_and_hold(phase.floor()),
     }
 }
 
@@ -49,12 +77,23 @@ mod tests {
 
     #[test]
     fn shapes() {
-        assert!((wave(0.0, 0.0) + 1.0).abs() < 1e-12);
-        assert_eq!([wave(0.0, 2.0), wave(0.0, 3.0)], [0.5, -1.0]);
-        assert!((wave(0.5, 0.0) - 1.0).abs() < 1e-12);
-        assert_eq!([wave(0.0, 1.0), wave(0.25, 1.0), wave(0.5, 1.0), wave(0.75, 1.0)], [-1.0, 0.0, 1.0, 0.0]);
-        assert_eq!(wave(0.3, 4.0), wave(0.9, 4.0));
-        assert_ne!(wave(0.3, 4.0), wave(1.3, 4.0));
+        assert!((wave(0.0, Wave::Sine) + 1.0).abs() < 1e-12);
+        assert_eq!([wave(0.0, Wave::Sawtooth), wave(0.0, Wave::Square)], [0.5, -1.0]);
+        assert!((wave(0.5, Wave::Sine) - 1.0).abs() < 1e-12);
+        assert_eq!(
+            [
+                wave(0.0, Wave::Triangle),
+                wave(0.25, Wave::Triangle),
+                wave(0.5, Wave::Triangle),
+                wave(0.75, Wave::Triangle)
+            ],
+            [-1.0, 0.0, 1.0, 0.0]
+        );
+        assert_eq!(wave(0.3, Wave::Random), wave(0.9, Wave::Random));
+        assert_ne!(wave(0.3, Wave::Random), wave(1.3, Wave::Random));
+        for (code, wave) in Wave::ALL.iter().enumerate() {
+            assert_eq!(usize::from(wave.code()), code);
+        }
     }
 
     #[test]
