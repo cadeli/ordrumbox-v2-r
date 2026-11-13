@@ -56,7 +56,7 @@ impl Session {
     /// File > Save: the library written now.
     pub fn save(&mut self) {
         if self.saving.library_path.is_none() {
-            self.message = if let Some(refusal) = Command::Save.hosted_refusal().filter(|_| self.hosted) {
+            self.message = if let Some(refusal) = Command::Save.hosted_refusal().filter(|_| self.host.hosted) {
                 refusal.into()
             } else {
                 "not saved: no library file (see the messages below)".into()
@@ -87,7 +87,7 @@ impl Session {
 
     /// Where the library's edits stand, as the menu bar shows it.
     pub(crate) fn library_state(&self) -> menu::LibraryState {
-        self.saving.library_state(self.library_revision(), self.hosted)
+        self.saving.library_state(self.library_revision(), self.host.hosted)
     }
 
     pub fn save_if_changed(&mut self) {

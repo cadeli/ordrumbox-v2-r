@@ -13,6 +13,20 @@ use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_logic::generate;
 use ordrumbox_logic::generate::MelodicKind;
 
+/// What the session asks of the program that runs it, which has the window
+/// and the MIDI input.
+#[derive(Debug, Default)]
+pub(super) struct Program {
+    /// File > Quit was chosen.
+    pub(super) quit: bool,
+    /// The MIDI input chosen changed and the program has not opened it yet.
+    pub(super) midi_changed: bool,
+    /// The window is full screen.
+    pub(super) fullscreen: bool,
+    /// A change of the window's mode the program has not applied yet.
+    pub(super) fullscreen_request: Option<bool>,
+}
+
 impl Session {
     /// Generation on (tracks in auto mode): drums, bass, chords.
     fn generation(&self) -> [bool; 3] {
@@ -47,9 +61,9 @@ impl Session {
             has_zone: self.selection.zone.is_some() || self.roll_zone().is_some(),
             has_selection: self.selection.selected.is_some(),
             playing: self.playing(),
-            metronome: self.metronome,
-            recording: self.recording,
-            fullscreen: self.fullscreen,
+            metronome: self.transport.metronome,
+            recording: self.transport.recording,
+            fullscreen: self.program.fullscreen,
             has_songs: !self.editor.library().songs.is_empty(),
             generation: self.generation(),
             auto_all: self.pattern_auto(),
@@ -75,7 +89,7 @@ impl Session {
             kit_sample: self.kit_list().is_some_and(|(s, n)| s < n),
             checking_updates: self.updates.checking(),
             newer_release: self.updates.newer_release().map(|r| r.version.clone()),
-            hosted: self.hosted,
+            hosted: self.host.hosted,
             has_demo: self.has_demo(),
             user_folder: self.user_folder().is_some(),
         }
@@ -94,33 +108,33 @@ impl Session {
         self.chrome.menu = open;
     }
 
-    /// File > Quit was chosen.
     /// A change of the window's mode (F11) asked for since the last call:
     /// full screen when `Some(true)`, the window as it was when `Some(false)`.
     pub fn take_fullscreen_request(&mut self) -> Option<bool> {
-        self.fullscreen_request.take()
+        self.program.fullscreen_request.take()
     }
 
     /// F11: the window full screen, or back.
     pub fn toggle_fullscreen(&mut self) {
-        self.fullscreen = !self.fullscreen;
-        self.fullscreen_request = Some(self.fullscreen);
+        self.program.fullscreen = !self.program.fullscreen;
+        self.program.fullscreen_request = Some(self.program.fullscreen);
     }
 
     /// The window left full screen by other means (the system's own key).
     pub fn set_fullscreen(&mut self, on: bool) {
-        self.fullscreen = on;
+        self.program.fullscreen = on;
     }
 
+    /// File > Quit was chosen.
     pub fn quit_requested(&self) -> bool {
-        self.quit
+        self.program.quit
     }
 
     /// Run a menu command (or its shortcut).
     pub fn run(&mut self, command: Command) {
         use Command as C;
         self.chrome.menu = None;
-        if let Some(refusal) = command.hosted_refusal().filter(|_| self.hosted) {
+        if let Some(refusal) = command.hosted_refusal().filter(|_| self.host.hosted) {
             self.message = refusal.into();
             return;
         }
@@ -130,7 +144,7 @@ impl Session {
             C::ExportWav => self.open_export(Export::PatternWav),
             C::ExportSongWav => self.open_export(Export::SongWav),
             C::ExportMidi => self.open_export(Export::PatternMidi),
-            C::Quit => self.quit = true,
+            C::Quit => self.program.quit = true,
             C::Undo => self.undo(),
             C::Redo => self.redo(),
             C::CopyStep => self.copy(false),

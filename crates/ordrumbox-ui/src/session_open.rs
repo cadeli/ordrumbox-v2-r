@@ -1,9 +1,13 @@
 //! Opening the session: its library and assets found, its first state built.
 
 use super::session_chrome::Chrome;
+use super::session_commands::Program;
+use super::session_generators::Generators;
+use super::session_host::Host;
 use super::session_playback::Playback;
 use super::session_saving::Saving;
 use super::session_selection::Selection;
+use super::session_transport::Transport;
 use super::session_types::Workspace;
 use super::{Flash, Session, session_output, session_roll, session_song, session_synth, session_update};
 use crate::action_log::ActionLog;
@@ -11,9 +15,9 @@ use crate::audio_output::StartOutput;
 use crate::editors::EditorState;
 use crate::kits::KitSet;
 use crate::{assets, store};
-use ordrumbox_core::{Library, LoadReport, Rng, ScaleList, Scales, Styles};
+use ordrumbox_core::{Library, LoadReport};
+use ordrumbox_engine::offline;
 use ordrumbox_engine::offline::RenderSetup;
-use ordrumbox_engine::{SynthPresets, offline};
 use ordrumbox_logic::Editor;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -145,18 +149,18 @@ impl Session {
         }
         let synths = session_synth::merged_synths(library.synths.as_ref(), &assets.synths);
         let mut session = Self::new(library, kits, status);
-        session.asset_synths = assets.synths;
-        session.synths = synths.clone();
-        session.synths_revision = Some(session.editor.revision());
-        session.hosted = hosted;
+        session.synths.assets = assets.synths;
+        session.synths.presets = synths.clone();
+        session.synths.revision = Some(session.editor.revision());
+        session.host.hosted = hosted;
         if hosted {
             session.chrome.fold_editors();
         }
         session.assets_dir = Some(dir.clone());
         session.saving.songs_dir = store::songs_dir();
-        session.scales = assets.scales.clone();
-        session.styles = assets.styles.clone();
-        session.scale_list = assets.scale_list.clone();
+        session.generators.scales = assets.scales.clone();
+        session.generators.styles = assets.styles.clone();
+        session.generators.scale_list = assets.scale_list.clone();
         session.roots =
             assets.bank.samples.iter().filter_map(|s| Some((s.sample.key.clone(), s.sample.root_midi?))).collect();
         session.saving.library_path = library_path;
@@ -265,27 +269,17 @@ impl Session {
     pub(super) fn new(library: Library, kits: KitSet, status: Vec<String>) -> Self {
         Self {
             editor: Editor::new(library),
-            scales: Scales::default(),
-            styles: Styles::default(),
-            learned_styles: (Styles::default(), None),
-            gen_style: None,
-            rng: Rng::from_time(),
+            generators: Generators::default(),
             roots: Vec::new(),
             kits,
             kit_index: 0,
             kit_editor: None,
             analysis: None,
             kit_files: (String::new(), None),
-            synths: SynthPresets::default(),
-            asset_synths: SynthPresets::default(),
-            synths_revision: None,
+            synths: session_synth::Synths::default(),
             pattern_index: 0,
             workspace: Workspace::Grid,
-            song_cursor: 0,
-            song_loop: None,
-            metronome: false,
-            recording: false,
-            taps: Vec::new(),
+            transport: Transport::default(),
             song_panel: session_song::SongPanel::default(),
             roll: session_roll::RollState::default(),
             render: None,
@@ -298,17 +292,9 @@ impl Session {
             flash: Flash::default(),
             action_log: ActionLog::default(),
             assets_dir: None,
-            quit: false,
-            midi_changed: false,
-            fullscreen: false,
-            fullscreen_request: None,
-            scale_list: ScaleList::default(),
+            program: Program::default(),
             editors: EditorState::default(),
-            color_scheme: 1,
-            hosted: false,
-            host_muted: 0,
-            host_tempo_outside: None,
-            host_shown: None,
+            host: Host::default(),
             output_panel: session_output::OutputPanel::default(),
             updates: session_update::Updates::default(),
             mcp: None,

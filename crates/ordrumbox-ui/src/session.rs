@@ -10,6 +10,12 @@
 //! (exports, imports, dropped files), and `session_panel*.rs` (the editors'
 //! widgets).
 //!
+//! The state is held in groups, each declared with the code that owns it:
+//! `Chrome`, `Selection`, `Saving`, `Playback`, `Transport`
+//! (`session_transport.rs`), `Generators` (`session_generators.rs`), `Synths`
+//! (`session_synth.rs`), `Host` (`session_host.rs`) and `Program`
+//! (`session_commands.rs`).
+//!
 //! The song panel (F3) and the piano roll (F4) take the grid's place:
 //! `session_song*.rs`, `session_roll.rs`.
 //!
@@ -22,13 +28,12 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use ordrumbox_core::{Library, Pattern, Rng, ScaleList, Scales, Styles, Track};
+use ordrumbox_core::{Library, Pattern, Rng, Scales, Track};
 use ordrumbox_engine::analysis::Analysis;
 use ordrumbox_engine::offline::{self, RenderSetup};
 use ordrumbox_engine::{Mode, SynthPresets, wav};
 use ordrumbox_logic::generate::{self, AutoGenerator};
 use ordrumbox_logic::midi;
-use ordrumbox_logic::tools::learned_styles;
 use ordrumbox_logic::{Editor, compose};
 
 use crate::action_log::ActionLog;
@@ -43,6 +48,7 @@ use crate::store;
 use crate::view::{self};
 use session_chrome::Chrome;
 use session_confirm::Pending;
+use session_generators::Generators;
 use session_playback::Playback;
 use session_saving::Saving;
 use session_selection::Selection;
@@ -63,10 +69,14 @@ mod session_edit;
 mod session_files;
 #[path = "session_generate.rs"]
 mod session_generate;
+#[path = "session_generators.rs"]
+mod session_generators;
 #[path = "session_grid.rs"]
 mod session_grid;
 #[path = "session_history.rs"]
 mod session_history;
+#[path = "session_host.rs"]
+mod session_host;
 #[path = "session_labels.rs"]
 mod session_labels;
 #[path = "session_lane.rs"]
@@ -163,17 +173,8 @@ pub struct Session {
     /// Where the files go and when (`session_saving.rs`).
     saving: Saving,
     editor: Editor,
-    /// What the generators read (`scales.json`).
-    scales: Scales,
-    /// The styles of `styles.json`.
-    styles: Styles,
-    /// Those styles with what the library's tags teach, and the library
-    /// revision they were learned at.
-    learned_styles: (Styles, Option<u64>),
-    /// The style B and D generate in (Generate menu); `None`: the pattern's, else a drawn one.
-    gen_style: Option<String>,
-    /// Random draws of the generators.
-    rng: Rng,
+    /// What the generators read and draw from (`session_generators.rs`).
+    generators: Generators,
     /// Root note of the loaded samples that have one (key, MIDI note), for MIDI files.
     roots: Vec<(String, f64)>,
     kits: KitSet,
@@ -185,25 +186,13 @@ pub struct Session {
     /// Where the kit editor's kit and sample are read from (folder, file),
     /// found with the analysis: looking costs a file system call a sample.
     kit_files: (String, Option<PathBuf>),
-    /// The synth presets played and shown: the library's own over the assets'.
-    synths: SynthPresets,
-    /// The assets' synth presets.
-    asset_synths: SynthPresets,
-    /// The editor revision `synths` was made at.
-    synths_revision: Option<u64>,
+    /// The synth presets: those played, the assets' (`session_synth.rs`).
+    synths: session_synth::Synths,
     pattern_index: usize,
     /// What is shown under the header.
     workspace: Workspace,
-    /// The measure the song plays from.
-    song_cursor: u32,
-    /// The measures a song plays in a loop: its index, first measure, end (excluded).
-    song_loop: Option<(usize, u32, u32)>,
-    /// A click on every beat.
-    metronome: bool,
-    /// The row keys put notes on the step the pattern plays (`session_record.rs`).
-    recording: bool,
-    /// When tempo was tapped, oldest first (`session_tempo.rs`).
-    taps: Vec<Instant>,
+    /// Where and how the session plays (`session_transport.rs`).
+    transport: session_transport::Transport,
     /// The song panel's scrolls and what the mouse holds in it.
     song_panel: session_song::SongPanel,
     /// The piano roll's view and what the mouse holds in it.
@@ -222,29 +211,12 @@ pub struct Session {
     action_log: ActionLog,
     /// The assets folder in use.
     assets_dir: Option<PathBuf>,
-    /// File > Quit was chosen.
-    quit: bool,
-    /// The MIDI input chosen changed and the program has not opened it yet.
-    midi_changed: bool,
-    /// The window is full screen.
-    fullscreen: bool,
-    /// A change of the window's mode the program has not applied yet.
-    fullscreen_request: Option<bool>,
-    /// The scale names, in file order (arpeggios).
-    scale_list: ScaleList,
+    /// What the session asks of the program that runs it (`session_commands.rs`).
+    program: session_commands::Program,
     /// Tabs and selection of the track and note editors.
     editors: EditorState,
-    /// The scheme in use, from 1, set again on the thread that draws.
-    color_scheme: usize,
-    /// The library lives in a plugin host's project, not in a file.
-    hosted: bool,
-    /// The tracks a plugin host mutes, bit `t` for track `t`.
-    host_muted: u64,
-    /// The host's tempo last said to be outside the tempo bounds
-    /// (`report_host_tempo`), so the message is given once.
-    host_tempo_outside: Option<f64>,
-    /// A plugin host's transport as the header shows it (`watch_host`).
-    host_shown: Option<view::HostState>,
+    /// The plugin host the session follows, if any (`session_host.rs`).
+    host: session_host::Host,
     /// The output panel: the master bus, its tab, the spectrum.
     output_panel: session_output::OutputPanel,
     /// The update check (`session_update.rs`).
@@ -322,21 +294,6 @@ enum Overlay {
         pending: Pending,
         yes: bool,
     },
-}
-
-/// The loop start of pattern `p` (loop `pass` of the playback): new lines for
-/// its tracks in auto mode, in the styles the library teaches; whether any changed.
-fn auto_loop(
-    editor: &mut Editor,
-    learned: &mut (Styles, Option<u64>),
-    styles: &Styles,
-    scales: &Scales,
-    rng: &mut Rng,
-    p: usize,
-    pass: u64,
-) -> bool {
-    let styles = learned_styles(learned, styles, editor).clone();
-    editor.auto_loop(p, pass, scales, &styles, &mut || rng.next_f64())
 }
 
 /// The output of a session that had none: none again.
@@ -450,7 +407,7 @@ impl Session {
     /// The MIDI input chosen in Edit > Preferences changed since the last
     /// call: the program opens the one now chosen.
     pub fn take_midi_change(&mut self) -> bool {
-        std::mem::take(&mut self.midi_changed)
+        std::mem::take(&mut self.program.midi_changed)
     }
 
     pub fn pattern(&self) -> Option<&Pattern> {
@@ -490,8 +447,8 @@ impl Session {
             }
             Mode::Pattern(p) => {
                 // Tracks in auto mode get their new lines loop after loop, on the render's copy.
-                let (scales, mut rng) = (&self.scales, Rng::new(setup.seed));
-                let styles = compose::learn(&self.styles, &library.patterns);
+                let (scales, mut rng) = (&self.generators.scales, Rng::new(setup.seed));
+                let styles = compose::learn(&self.generators.styles, &library.patterns);
                 let mut loop_start = |library: &mut Library, p: usize, number: u64| {
                     if let Some(pattern) = library.patterns.get_mut(p).filter(|p| generate::plays_auto(p)) {
                         let mut rnd = || rng.next_f64();
@@ -517,7 +474,7 @@ impl Session {
         let pattern = self.editor.library().patterns.get(p).ok_or("No pattern selected")?;
         let mut rng = Rng::new(1);
         let bpm = self.editor.library().bpm;
-        let bytes = midi::export(pattern, bpm, 1, &self.roots, &mut rng, &self.scales);
+        let bytes = midi::export(pattern, bpm, 1, &self.roots, &mut rng, &self.generators.scales);
         store::write_atomic(path, &bytes).map_err(|e| format!("not exported: {}: {e}", path.display()))?;
         Ok(format!("exported {} ({} bytes)", path.display(), bytes.len()))
     }
@@ -628,14 +585,14 @@ impl Session {
     /// The session is a plugin's: the host plays, saves and has the keys it
     /// leaves out of the menus.
     pub fn hosted(&self) -> bool {
-        self.hosted
+        self.host.hosted
     }
 
     /// A session of `library` with no kit, a plugin's when `hosted`.
     #[cfg(test)]
     pub(crate) fn for_tests(library: Library, hosted: bool) -> Self {
         let mut session = Self::new(library, KitSet::empty(), Vec::new());
-        session.hosted = hosted;
+        session.host.hosted = hosted;
         session
     }
 
@@ -644,7 +601,7 @@ impl Session {
     pub(super) fn open_export(&mut self, export: Export) {
         let refusal = match export {
             Export::PatternWav | Export::SongWav if self.render.is_none() => Some(NOTHING_TO_RENDER),
-            Export::Synths if self.synths.is_empty() => Some(NO_SYNTHS),
+            Export::Synths if self.synths.presets.is_empty() => Some(NO_SYNTHS),
             _ => None,
         };
         if let Some(refusal) = refusal {
@@ -681,16 +638,15 @@ impl Session {
     /// when that pass starts.
     pub fn update(&mut self) {
         // What the library's tags teach, learned again after an edit (the header and menus read it).
-        learned_styles(&mut self.learned_styles, &self.styles, &self.editor);
+        self.generators.learn(&self.editor);
         self.refresh_synths();
         let region = self.song_loop_region().map(|(first, end)| (u64::from(first), u64::from(end)));
         self.playback.set_song_loop(&self.editor, region);
-        self.playback.set_metronome(&self.editor, self.metronome);
+        self.playback.set_metronome(&self.editor, self.transport.metronome);
         let midi_open = self.playback.offers().midi_open;
         self.playback.set_live_midi(midi_open);
-        self.playback.update(&mut self.editor, self.pattern_index, |editor, p, pass| {
-            auto_loop(editor, &mut self.learned_styles, &self.styles, &self.scales, &mut self.rng, p, pass)
-        });
+        self.playback
+            .update(&mut self.editor, self.pattern_index, |editor, p, pass| self.generators.auto_loop(editor, p, pass));
         self.report_host_tempo();
     }
 

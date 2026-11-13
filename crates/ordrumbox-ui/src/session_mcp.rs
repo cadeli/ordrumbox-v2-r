@@ -102,7 +102,7 @@ impl Session {
             "importMidi" => self.mcp_import_midi(args),
             "getSynthPreset" => {
                 let key = self.mcp_synth(text(args, "preset")?)?;
-                let mut draft = self.synths.get(&key).and_then(Value::as_object).cloned().unwrap_or_default();
+                let mut draft = self.synths.presets.get(&key).and_then(Value::as_object).cloned().unwrap_or_default();
                 model::hydrate(&mut draft);
                 Ok(object([("preset", Value::from(key)), ("settings", Value::Object(draft))]))
             }
@@ -110,12 +110,12 @@ impl Session {
             "updateSynthPreset" => {
                 let key = self.mcp_synth(text(args, "preset")?)?;
                 let settings = synth_settings(args, true)?;
-                let draft = self.synths.get(&key).and_then(Value::as_object).cloned().unwrap_or_default();
+                let draft = self.synths.presets.get(&key).and_then(Value::as_object).cloned().unwrap_or_default();
                 Ok(self.mcp_write_synth(&key, draft, &settings))
             }
             "removeSynthPreset" => self.mcp_remove_synth(args),
             "listSynthPresets" => {
-                let keys = self.synths.keys().into_iter().map(Value::from).collect::<Vec<_>>();
+                let keys = self.synths.presets.keys().into_iter().map(Value::from).collect::<Vec<_>>();
                 Ok(object([("count", count(keys.len())), ("presets", Value::Array(keys))]))
             }
             "listKitSamples" => Ok(self.mcp_kits()),
@@ -229,14 +229,14 @@ impl Session {
     /// Run library tool `name` (`ordrumbox_logic::tools`) on the editor and
     /// what the generators read.
     fn mcp_library_tool(&mut self, name: &str, args: &Value) -> Result<Value, String> {
-        let synth_presets = self.synths.keys();
+        let synth_presets = self.synths.presets.keys();
         let mut tools = Tools {
             editor: &mut self.editor,
-            scales: &self.scales,
-            scale_list: &self.scale_list,
-            styles: &self.styles,
-            learned_styles: &mut self.learned_styles,
-            rng: &mut self.rng,
+            scales: &self.generators.scales,
+            scale_list: &self.generators.scale_list,
+            styles: &self.generators.styles,
+            learned_styles: &mut self.generators.learned_styles,
+            rng: &mut self.generators.rng,
             synth_presets: &synth_presets,
             note_range,
         };
@@ -313,7 +313,7 @@ impl Session {
 
     /// A synth preset's key, by key (else in any case).
     fn mcp_synth(&self, name: &str) -> Result<String, String> {
-        let keys = self.synths.keys();
+        let keys = self.synths.presets.keys();
         let found = keys.iter().find(|k| **k == name.trim()).or_else(|| keys.iter().find(|k| same_name(k, name)));
         found
             .map(|k| (*k).to_owned())
@@ -331,7 +331,7 @@ impl Session {
         let draft = match optional_text(args, "from")?.filter(|f| !f.trim().is_empty()) {
             Some(from) => {
                 let from = self.mcp_synth(from)?;
-                self.synths.get(&from).and_then(Value::as_object).cloned().unwrap_or_default()
+                self.synths.presets.get(&from).and_then(Value::as_object).cloned().unwrap_or_default()
             }
             None => model::defaults(),
         };
@@ -357,7 +357,7 @@ impl Session {
 
     fn mcp_remove_synth(&mut self, args: &Value) -> Result<Value, String> {
         let key = self.mcp_synth(text(args, "preset")?)?;
-        if self.synths.len() <= 1 {
+        if self.synths.presets.len() <= 1 {
             return Err("The last synth preset stays".into());
         }
         let library = self.editor.library();
@@ -438,7 +438,7 @@ impl Session {
             if self.editor.library().songs.is_empty() {
                 return Err("No arrangement to play: createArrangement".into());
             }
-            self.song_cursor = 0;
+            self.transport.song_cursor = 0;
             self.toggle(Mode::Song(self.editor.selected_song()), 0);
         } else {
             self.toggle(Mode::Pattern(self.pattern_index), 0);
@@ -456,7 +456,7 @@ impl Session {
         // What the window says in its message is refused here.
         match text(args, "sounds")? {
             "kit" => self.auto_assign_all_tracks(p),
-            "synth" if self.synths.is_empty() => return Err("No synth preset (createSynthPreset)".into()),
+            "synth" if self.synths.presets.is_empty() => return Err("No synth preset (createSynthPreset)".into()),
             "synth" => self.convert_to_generated_sounds(p),
             "random" if self.kits.kits.iter().all(|k| k.samples.is_empty()) => {
                 return Err("No sample in the kits".into());

@@ -46,12 +46,12 @@ impl Session {
             self.message = "No pattern selected".into();
             return;
         }
-        let keys: Vec<String> = self.synths.keys().into_iter().map(str::to_owned).collect();
+        let keys: Vec<String> = self.synths.presets.keys().into_iter().map(str::to_owned).collect();
         if keys.is_empty() {
             self.message = "No synth patches loaded".into();
             return;
         }
-        let (rng, synths) = (&mut self.rng, &self.synths);
+        let (rng, synths) = (&mut self.generators.rng, &self.synths.presets);
         let mut random = Vec::new();
         let changed = self.editor.update_tracks(p, "Convert tracks to generated sounds", |_, track| {
             let mut pick = |n: usize| rng.below(n as u64) as usize;
@@ -108,7 +108,7 @@ impl Session {
             self.message = "No samples loaded".into();
             return;
         }
-        let rng = &mut self.rng;
+        let rng = &mut self.generators.rng;
         let changed = self.editor.update_tracks(p, "Random samples on all tracks", |_, _| {
             let url = urls[rng.below(urls.len() as u64) as usize].clone();
             vec![
@@ -254,7 +254,10 @@ impl Session {
         let Some(note) = self.shown_note(t) else { return };
         let (updates, what) = if key == "arpRange" {
             let range = value.max(0.0) as usize;
-            (vec![("arp", editors::arp_value(&note, &self.scale_list, None, None, Some(range)))], "arp".to_owned())
+            (
+                vec![("arp", editors::arp_value(&note, &self.generators.scale_list, None, None, Some(range)))],
+                "arp".to_owned(),
+            )
         } else {
             (vec![(key, number(value))], history_label(Id::NoteSlider(key)))
         };
@@ -432,9 +435,9 @@ impl Session {
             Id::NoteSelect(key) => {
                 let Some(note) = self.shown_note(t) else { return };
                 let (field, arp) = if key == "arpScale" {
-                    ("arpScale", editors::arp_value(&note, &self.scale_list, Some(value), None, None))
+                    ("arpScale", editors::arp_value(&note, &self.generators.scale_list, Some(value), None, None))
                 } else {
-                    ("arpDirection", editors::arp_value(&note, &self.scale_list, None, Some(value), None))
+                    ("arpDirection", editors::arp_value(&note, &self.generators.scale_list, None, Some(value), None))
                 };
                 let updates = [(field, Value::String(value.to_owned())), ("arp", arp)];
                 self.update_note(t, &updates, &format!("Edit note {} on {name}", history_label(id)), false);

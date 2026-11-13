@@ -168,7 +168,7 @@ fn synth_presets_are_designed() {
     let removed = call(&mut s, "removeSynthPreset", r#"{"preset":"acid"}"#).unwrap();
     assert_eq!(removed.to_json(), r#"{"removed":"acid","tracksUsing":["rock/KICK"]}"#);
     assert!(call(&mut s, "removeSynthPreset", r#"{"preset":"acid 2"}"#).is_err(), "the last preset stays");
-    assert_eq!(s.synths.keys(), ["acid 2"]);
+    assert_eq!(s.synths.presets.keys(), ["acid 2"]);
 }
 #[test]
 fn songs_kits_and_playback_without_files_or_sound() {

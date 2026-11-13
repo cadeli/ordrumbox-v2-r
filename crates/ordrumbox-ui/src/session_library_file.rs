@@ -168,7 +168,7 @@ fn a_host_library_comes_back_as_text_and_is_never_saved() {
     let opened = Session::open_host_library(Some(saved.to_owned()), demo.clone(), &mut status);
     assert_eq!((opened.file, opened.message.as_str(), status.len()), (None, "library from the host project", 0));
     let mut s = Session::new(opened.library, KitSet::empty(), status);
-    s.hosted = true;
+    s.host.hosted = true;
     assert_eq!(s.library_state(), LibraryState::Host);
     assert_eq!(s.pattern().unwrap().name.as_deref(), Some("kept"));
     s.save();
@@ -186,7 +186,7 @@ fn a_host_library_comes_back_as_text_and_is_never_saved() {
 fn a_plugin_leaves_to_the_host_what_the_host_does() {
     let library = Library::parse(DEMO).unwrap().0;
     let mut s = Session::new(library, KitSet::empty(), Vec::new());
-    s.hosted = true;
+    s.host.hosted = true;
     let bpm = s.editor.library().bpm;
     let refused = [
         Command::Save,
@@ -245,7 +245,7 @@ fn a_plugin_leaves_to_the_host_what_the_host_does() {
     assert!(s.output_view().is_none());
     let body = s.body((1100, 680, Scale::ONE));
     assert_eq!(body.output.h, 0);
-    s.hosted = false;
+    s.host.hosted = false;
     assert!(s.body((1100, 680, Scale::ONE)).main_bottom < body.main_bottom);
 }
 

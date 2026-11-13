@@ -277,7 +277,7 @@ impl Session {
     /// Help > Factory reset, once confirmed: the user's files moved to
     /// `backups/`, the session loaded again from the assets, as at first start.
     pub fn factory_reset(&mut self) {
-        if let Some(refusal) = Command::FactoryReset.hosted_refusal().filter(|_| self.hosted) {
+        if let Some(refusal) = Command::FactoryReset.hosted_refusal().filter(|_| self.host.hosted) {
             self.message = refusal.into();
             return;
         }
@@ -371,10 +371,10 @@ mod tests {
         assert_eq!(s.editor.history().next_undo(), Some("Import library"));
         // Its preset comes back with it, in the place of the one of that name.
         assert!(s.message.ends_with(", 1 synth preset(s)"), "{}", s.message);
-        assert_eq!(s.synths.get("lead"), Some(&lead));
+        assert_eq!(s.synths.presets.get("lead"), Some(&lead));
         // Undone with the library.
         s.undo();
-        assert_eq!(s.synths.get("lead").map(ordrumbox_core::json::Value::to_json).as_deref(), Some("{}"));
+        assert_eq!(s.synths.presets.get("lead").map(ordrumbox_core::json::Value::to_json).as_deref(), Some("{}"));
         s.redo();
 
         // A file that is not a library: said, the library kept.
@@ -401,7 +401,7 @@ mod tests {
     #[test]
     fn a_plugin_leaves_the_user_data_folder_alone() {
         let mut s = session();
-        s.hosted = true;
+        s.host.hosted = true;
         for command in [
             Command::BackUpUserData,
             Command::RestoreUserData,

@@ -98,7 +98,7 @@ fn synth_presets_exported_are_imported_and_saved_ones_read_at_start() {
     let (mut s, _audio) = demo_session(&dir.join("samples"));
     let presets = |text: &str| SynthPresets::from_json(&json::parse(text).unwrap()).unwrap();
     s.set_asset_synths(presets(r#"{"bass":{"vco1":{"gain":0.5}},"lead":{"vco1":{"gain":0.25}}}"#));
-    let exported = s.synths.to_json().to_json();
+    let exported = s.synths.presets.to_json().to_json();
 
     // Export, from the synth editor's preset bar: a folder picked.
     s.run(Command::SynthEditor);
@@ -119,15 +119,15 @@ fn synth_presets_exported_are_imported_and_saved_ones_read_at_start() {
     other.picker_outcome(Outcome::Picked(file.clone()));
     assert_eq!(other.message, "Imported 2 synth sound(s)");
     assert_eq!(other.synth_keys(), ["bass", "lead", "pad"]);
-    assert_eq!(other.synths.get("lead"), s.synths.get("lead"));
+    assert_eq!(other.synths.presets.get("lead"), s.synths.presets.get("lead"));
     assert!(other.saving.library.pending(), "the imported presets wait to be saved with the library");
     draw(&mut other);
     // Revert goes back to the imported preset, not the one it replaced.
     other.synth_button("revert");
-    assert_eq!(other.synths.get("lead"), s.synths.get("lead"));
+    assert_eq!(other.synths.presets.get("lead"), s.synths.presets.get("lead"));
 
     // Files that are not presets change nothing.
-    let before = other.synths.to_json().to_json();
+    let before = other.synths.presets.to_json().to_json();
     for (name, text, message) in [
         ("list.json", "[1]", "Invalid synth file: expected a JSON object"),
         ("cut.json", "{", "Import failed: "),
@@ -139,7 +139,7 @@ fn synth_presets_exported_are_imported_and_saved_ones_read_at_start() {
         }
         other.import_synths(&path);
         assert!(other.message.starts_with(message), "{name}: {}", other.message);
-        assert_eq!(other.synths.to_json().to_json(), before, "{name}");
+        assert_eq!(other.synths.presets.to_json().to_json(), before, "{name}");
     }
 
     // A presets file of an earlier version, for a library without presets of

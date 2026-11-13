@@ -2,10 +2,25 @@
 //! stepped through or picked at random, the tempo, and the choices a plugin
 //! host makes.
 
+use super::Session;
 use super::session_types::Workspace;
-use super::{Session, auto_loop};
 use crate::menu;
 use ordrumbox_engine::Mode;
+
+/// Where and how the session plays, beside the engine's own state.
+#[derive(Debug, Default)]
+pub(super) struct Transport {
+    /// The measure the song plays from.
+    pub(super) song_cursor: u32,
+    /// The measures a song plays in a loop: its index, first measure, end (excluded).
+    pub(super) song_loop: Option<(usize, u32, u32)>,
+    /// A click on every beat.
+    pub(super) metronome: bool,
+    /// The row keys put notes on the step the pattern plays (`session_record.rs`).
+    pub(super) recording: bool,
+    /// When tempo was tapped, oldest first (`session_tempo.rs`).
+    pub(super) taps: Vec<std::time::Instant>,
+}
 
 impl Session {
     pub fn playing(&self) -> bool {
@@ -24,7 +39,7 @@ impl Session {
 
     /// Shift+Space: play or stop the selected song (its arrangement), from the cursor.
     pub fn toggle_play_song(&mut self) {
-        if self.hosted {
+        if self.host.hosted {
             self.message = menu::SONGS_IN_THE_APP.into();
             return;
         }
@@ -44,13 +59,14 @@ impl Session {
         if self.playback.is_playing() {
             // A song stops where it is: Space goes on from this measure, Home goes back.
             if matches!(mode, Mode::Song(_)) && self.song_playing() {
-                self.song_cursor = self.playhead_measure();
-                self.message = format!("paused at measure {}, Space goes on, Home rewinds", self.song_cursor + 1);
+                self.transport.song_cursor = self.playhead_measure();
+                self.message =
+                    format!("paused at measure {}, Space goes on, Home rewinds", self.transport.song_cursor + 1);
             }
             self.playback.stop();
         } else {
             if let Mode::Pattern(p) = mode {
-                auto_loop(&mut self.editor, &mut self.learned_styles, &self.styles, &self.scales, &mut self.rng, p, 0);
+                self.generators.auto_loop(&mut self.editor, p, 0);
             }
             self.playback.play_from(&self.editor, mode, first);
         }
@@ -74,7 +90,7 @@ impl Session {
 
     /// The measures the selected song plays in a loop, `first..end`.
     pub(super) fn song_loop_region(&self) -> Option<(u32, u32)> {
-        let (song, first, end) = self.song_loop?;
+        let (song, first, end) = self.transport.song_loop?;
         (song == self.editor.selected_song() && first < end).then_some((first, end))
     }
 
@@ -83,7 +99,7 @@ impl Session {
     pub(super) fn loop_to(&mut self, measure: u32) {
         let from = self.playhead_measure();
         let (first, last) = (from.min(measure), from.max(measure));
-        self.song_loop = Some((self.editor.selected_song(), first, last + 1));
+        self.transport.song_loop = Some((self.editor.selected_song(), first, last + 1));
         self.message = if first == last {
             format!("loop: measure {}, Play > Clear the loop ends it", first + 1)
         } else {
@@ -93,7 +109,7 @@ impl Session {
 
     /// Play > Clear the loop: the song plays on to its end.
     pub fn clear_loop(&mut self) {
-        if self.song_loop.take().is_some() {
+        if self.transport.song_loop.take().is_some() {
             self.message = "loop cleared".into();
         } else {
             self.message = "no loop: Shift+click the song's ruler sets one".into();
@@ -168,40 +184,6 @@ impl Session {
         true
     }
 
-    /// Say once when the host's tempo is outside the tempo bounds: a plugin
-    /// plays at the nearest bound instead, the tempo its header shows.
-    pub(super) fn report_host_tempo(&mut self) {
-        use ordrumbox_core::num;
-        use ordrumbox_core::song::{MAX_BPM, MIN_BPM, clamp_bpm};
-        let outside = self.playback.host().map(|host| host.bpm).filter(|bpm| !(MIN_BPM..=MAX_BPM).contains(bpm));
-        if outside == self.host_tempo_outside {
-            return;
-        }
-        self.host_tempo_outside = outside;
-        if let Some(bpm) = outside {
-            let (host, used) = (num::text(bpm), num::text(clamp_bpm(bpm)));
-            self.message = format!("host tempo {host} outside {MIN_BPM}–{MAX_BPM}: plays at {used}");
-        }
-    }
-
-    /// The tracks a plugin host mutes, bit `t` for track `t`, shown on their
-    /// mute boxes; true when they changed.
-    pub fn set_host_muted(&mut self, muted: u64) -> bool {
-        std::mem::replace(&mut self.host_muted, muted) != muted
-    }
-
-    /// Take what the plugin host's transport does now, for the header:
-    /// whether it plays, and the tempo played, to a tenth. True when what
-    /// the header shows changed.
-    pub fn watch_host(&mut self) -> bool {
-        use ordrumbox_core::{num, song::clamp_bpm};
-        let shown = self
-            .playback
-            .host()
-            .map(|host| crate::view::HostState { playing: host.playing, bpm: num::round_to(clamp_bpm(host.bpm), 1) });
-        std::mem::replace(&mut self.host_shown, shown) != shown
-    }
-
     /// A plugin host's swing on every track: where the second step of each
     /// pair starts (`ordrumbox_core::track::STRAIGHT_SWING`: none). The pass
     /// playing is rebuilt when it changes.
@@ -259,7 +241,7 @@ impl Session {
         if count == 0 {
             return;
         }
-        let index = self.rng.below(count as u64) as usize;
+        let index = self.generators.rng.below(count as u64) as usize;
         self.pattern_index = index;
         self.deselect();
         self.edited();
@@ -273,7 +255,7 @@ impl Session {
         if count == 0 {
             return;
         }
-        let index = self.rng.below(count as u64) as usize;
+        let index = self.generators.rng.below(count as u64) as usize;
         self.use_kit(index);
     }
 

@@ -134,10 +134,10 @@ impl Session {
             }
         };
         let mut rows = Vec::new();
-        if !self.hosted && offers.devices.is_some() {
+        if !self.host.hosted && offers.devices.is_some() {
             rows.push(Row::Audio);
         }
-        if !self.hosted && offers.midi_ports.is_some() {
+        if !self.host.hosted && offers.midi_ports.is_some() {
             rows.push(Row::Midi);
         }
         rows.extend([Row::Metronome, Row::Vus, Row::Toasts, Row::Ok]);
@@ -146,7 +146,7 @@ impl Session {
             row: 0,
             audio,
             midi,
-            metronome: self.metronome,
+            metronome: self.transport.metronome,
             vus: self.chrome.show_vus,
             toasts: !self.flash.hidden,
         }));
@@ -211,7 +211,7 @@ impl Session {
     /// OK: the draft applied. The sound output last: it reloads the session.
     fn apply_preferences(&mut self) {
         let Some(Overlay::Preferences(prefs)) = self.chrome.overlay.take() else { return };
-        self.metronome = prefs.metronome;
+        self.transport.metronome = prefs.metronome;
         if prefs.vus != self.chrome.show_vus {
             self.toggle_vus();
         }
@@ -222,7 +222,7 @@ impl Session {
         if prefs.rows.contains(&Row::Midi) && prefs.midi.changed() {
             match self.save_choice(MIDI_KEY, prefs.midi.value()) {
                 Ok(()) => {
-                    self.midi_changed = true;
+                    self.program.midi_changed = true;
                     self.message = "MIDI input chosen".into();
                 }
                 Err(e) => self.message = format!("MIDI input not saved: {e}"),

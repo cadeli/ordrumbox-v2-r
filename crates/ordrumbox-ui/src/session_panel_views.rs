@@ -43,7 +43,7 @@ impl Session {
             (Some(c), _) => c.track_sound(library, self.pattern_index, t),
             (None, Some(render)) => {
                 let kit = self.kits.kits.get(self.kit_index).map_or("", |k| k.name.as_str());
-                assign_track(track, &render.bank, kit, &self.synths, &mut |_| 0)
+                assign_track(track, &render.bank, kit, &self.synths.presets, &mut |_| 0)
             }
             (None, None) => TrackSound::None,
         }
@@ -193,7 +193,7 @@ impl Session {
         };
 
         // Synth presets.
-        let keys = self.synths.keys();
+        let keys = self.synths.presets.keys();
         let current = if track.use_synth {
             track.synth_preset.clone().unwrap_or_else(|| ordrumbox_logic::generate::BASS_PRESET.into())
         } else {
@@ -225,7 +225,7 @@ impl Session {
     /// The styles the header and the Generate tab show: what the library taught,
     /// else (before the first frame learned it) the written ones.
     pub(super) fn shown_styles(&self) -> &Styles {
-        if self.learned_styles.1.is_some() { &self.learned_styles.0 } else { &self.styles }
+        self.generators.shown_styles()
     }
 
     /// How a drum track plays its pattern's style (the style the
@@ -322,8 +322,8 @@ impl Session {
                 arp_range: 0,
             };
         };
-        let state = editors::arp_state(n, &self.scale_list);
-        let names = self.scale_list.names.clone();
+        let state = editors::arp_state(n, &self.generators.scale_list);
+        let names = self.generators.scale_list.names.clone();
         let scale = n.arp_scale.clone().unwrap_or_else(|| state.scale.clone());
         let scales = Choice { selected: editors::index_of(&names, &scale), values: names, labels: Vec::new() };
         let directions: Vec<String> = ARP_DIRECTIONS.iter().map(|d| (*d).to_owned()).collect();

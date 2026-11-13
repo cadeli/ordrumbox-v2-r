@@ -10,13 +10,13 @@ use ordrumbox_engine::Mode;
 
 impl Session {
     pub fn recording(&self) -> bool {
-        self.recording
+        self.transport.recording
     }
 
     /// Ctrl+R: recording on or off.
     pub fn toggle_record(&mut self) {
-        self.recording = !self.recording;
-        self.message = match (self.recording, self.playing()) {
+        self.transport.recording = !self.transport.recording;
+        self.message = match (self.transport.recording, self.playing()) {
             (false, _) => "recording off".into(),
             (true, true) => "recording: hit Q-P for the tracks, each key puts a note on the step".into(),
             (true, false) => "recording: Space plays, then hit Q-P for the tracks".into(),
@@ -34,7 +34,7 @@ impl Session {
     /// recorded on the track of the pattern that key plays, at its pitch and
     /// its velocity, when recording.
     pub fn midi_note(&mut self, channel: u8, key: u8, velocity: f32) {
-        if !self.recording {
+        if !self.transport.recording {
             return;
         }
         match self.playback.midi_track(&self.editor, channel, key) {
@@ -44,7 +44,7 @@ impl Session {
     }
 
     fn record_at(&mut self, t: usize, pitch: f64, velocity: Option<f64>) {
-        if !self.recording {
+        if !self.transport.recording {
             return;
         }
         if self.workspace == Workspace::Song || !matches!(self.playback.mode(), Some(Mode::Pattern(_))) {
