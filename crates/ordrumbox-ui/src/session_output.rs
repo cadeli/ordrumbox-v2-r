@@ -123,7 +123,7 @@ mod tests {
     use super::*;
     use crate::kits::KitSet;
 
-    const SIZE: (i32, i32, Scale) = (1100, 680, Scale::ONE);
+    use crate::test_support::{SIZE, click};
 
     #[test]
     fn knobs_sliders_and_the_compressor_button() {
@@ -140,7 +140,7 @@ mod tests {
         assert!((s.output_panel.master.master - 0.9).abs() < 1e-6);
         assert!(s.saving.master.pending());
         // The button bypasses the compressor.
-        s.mouse_down(SIZE, out.bypass.x + 4, out.bypass.y + 4, Button::Left, false);
+        click(&mut s, out.bypass.x + 4, out.bypass.y + 4);
         assert_eq!(s.output_panel.master.bypass, 1.0);
         // A typed threshold (right-click menu: "Type a value...").
         let t = out.compressor[0];
@@ -152,7 +152,7 @@ mod tests {
         // A click on the low cut slider's bar.
         let f = out.filters[0];
         let (left, w) = crate::panel::slider_bar(f, true, true, Scale::ONE);
-        s.mouse_down(SIZE, left + w, f.y + 8, Button::Left, false);
+        click(&mut s, left + w, f.y + 8);
         s.mouse_up();
         assert_eq!(s.output_panel.master.lowcut, 500.0);
     }

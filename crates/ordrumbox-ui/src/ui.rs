@@ -755,6 +755,11 @@ fn view_command(n: u8) -> Command {
 mod tests {
     use super::*;
 
+    /// A `Ui` on `library`, not hosted by a plugin.
+    fn standalone_ui(library: ordrumbox_core::Library) -> Ui {
+        Ui::new(Session::for_tests(library, false))
+    }
+
     #[test]
     fn shortcuts_follow_the_command_modifier() {
         assert_eq!(shortcut(Key::Letter('Z'), false, true), Some(Command::Undo));
@@ -804,7 +809,7 @@ mod tests {
     fn the_play_rows_stay_put_and_other_keys_follow_the_layout() {
         let library =
             ordrumbox_core::Library::parse(r#"{"patterns":[{"name":"demo","tracks":[{"name":"KICK"}]}]}"#).unwrap().0;
-        let mut ui = Ui::new(Session::for_tests(library, false));
+        let mut ui = standalone_ui(library);
         let press = |key, c| KeyEvent { key, pressed: true, repeat: false, text: None, unmodified: Some(c) };
         let bpm = ui.session.tempo();
         // AZERTY's `-` is on the 6: alone, it mutes track 6; with Ctrl, it zooms out.
@@ -823,7 +828,7 @@ mod tests {
     fn a_zoom_bigger_than_the_window_scrolls_it() {
         let library =
             ordrumbox_core::Library::parse(r#"{"patterns":[{"name":"demo","tracks":[{"name":"KICK"}]}]}"#).unwrap().0;
-        let mut ui = Ui::new(Session::for_tests(library, false));
+        let mut ui = standalone_ui(library);
         let (w, h) = view::min_window_size(Scale::ONE, view::Shown::all(true));
         ui.set_size(w, h, Scale::ONE);
         ui.session.run(Command::ZoomIn);
@@ -891,7 +896,7 @@ mod tests {
     fn alt_alone_opens_the_menus_but_not_after_a_click_or_a_wheel_turn() {
         let library =
             ordrumbox_core::Library::parse(r#"{"patterns":[{"name":"demo","tracks":[{"name":"KICK"}]}]}"#).unwrap().0;
-        let mut ui = Ui::new(Session::for_tests(library, false));
+        let mut ui = standalone_ui(library);
         let alt = |pressed| KeyEvent { key: Key::Alt, pressed, repeat: false, text: None, unmodified: None };
 
         ui.key(&alt(true));
@@ -917,7 +922,7 @@ mod tests {
     fn a_new_message_stands_out_even_the_same_words_again_and_then_goes_back() {
         let library =
             ordrumbox_core::Library::parse(r#"{"patterns":[{"name":"demo","tracks":[{"name":"KICK"}]}]}"#).unwrap().0;
-        let mut ui = Ui::new(Session::for_tests(library, false));
+        let mut ui = standalone_ui(library);
         let refuse = |ui: &mut Ui| {
             ui.session.say("select a track first");
             false
@@ -950,7 +955,7 @@ mod tests {
     fn with_toasts_off_a_message_only_goes_on_the_status_line() {
         let library =
             ordrumbox_core::Library::parse(r#"{"patterns":[{"name":"demo","tracks":[{"name":"KICK"}]}]}"#).unwrap().0;
-        let mut ui = Ui::new(Session::for_tests(library, false));
+        let mut ui = standalone_ui(library);
         let refuse = |ui: &mut Ui| {
             ui.session.say("select a track first");
             false
@@ -979,7 +984,7 @@ mod tests {
     fn a_click_on_the_toast_hides_it_at_once() {
         let library =
             ordrumbox_core::Library::parse(r#"{"patterns":[{"name":"demo","tracks":[{"name":"KICK"}]}]}"#).unwrap().0;
-        let mut ui = Ui::new(Session::for_tests(library, false));
+        let mut ui = standalone_ui(library);
         ui.input(|ui| {
             ui.session.say("select a track first");
             false
@@ -1001,7 +1006,7 @@ mod tests {
     fn toasts_stack_upwards_up_to_five_and_a_click_hides_one() {
         let library =
             ordrumbox_core::Library::parse(r#"{"patterns":[{"name":"demo","tracks":[{"name":"KICK"}]}]}"#).unwrap().0;
-        let mut ui = Ui::new(Session::for_tests(library, false));
+        let mut ui = standalone_ui(library);
         let say = |ui: &mut Ui, text: &'static str| {
             ui.input(|ui| {
                 ui.session.say(text);

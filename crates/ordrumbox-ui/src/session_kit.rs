@@ -371,11 +371,10 @@ fn instrument_choice(key: &str) -> Choice {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ui_input::Button;
     use ordrumbox_engine::kit::{BankSample, Kit};
     use ordrumbox_engine::{SampleBank, SampleBuffer};
 
-    const SIZE: (i32, i32, Scale) = (1100, 680, Scale::ONE);
+    use crate::test_support::{SIZE, click};
 
     /// A session on kit `real`: a KICK and a sample of no known instrument,
     /// its kit editor open.
@@ -430,7 +429,7 @@ mod tests {
     fn an_instrument_is_picked_by_category_as_a_track_is_renamed() {
         let mut s = session();
         let (x, y) = item_at(&s, Id::KitSampleInstrument(1));
-        assert!(s.mouse_down(SIZE, x, y, Button::Left, false));
+        assert!(click(&mut s, x, y));
         assert_eq!(s.chrome.widgets.dropdown.as_ref().map(|d| d.id), Some(Id::KitInstrumentMenu(1)));
         pick(&mut s, "Percussion >");
         pick(&mut s, "COWBELL");
@@ -444,7 +443,7 @@ mod tests {
         s.selection.cursor = Some(view::Cursor { track: 0, beat: 0, step: 0 });
         s.editors.tab = crate::editors::TAB_SOUND;
         let (x, y) = item_at(&s, Id::Instrument);
-        assert!(s.mouse_down(SIZE, x, y, Button::Left, false));
+        assert!(click(&mut s, x, y));
         let menu = s.chrome.widgets.dropdown.as_ref().expect("a menu");
         assert_eq!(menu.id, Id::InstrumentMenu);
         assert_eq!(menu.title.as_deref(), Some("Instrument: KICK"));
@@ -468,7 +467,7 @@ mod tests {
         assert!(text.contains("tracks") && text.contains("pattern"), "{text}");
         // A click on the title does nothing.
         let before = s.chrome.widgets.dropdown.is_some() || s.chrome.widgets.entry.is_some();
-        s.mouse_down(SIZE, x, y, Button::Left, false);
+        click(&mut s, x, y);
         assert_eq!(s.chrome.widgets.dropdown.is_some() || s.chrome.widgets.entry.is_some(), before);
     }
 
@@ -483,14 +482,14 @@ mod tests {
             Some("Auto-assign")
         );
         assert!(!auto_lit(&s, 0), "SNARE is not what kick.wav gives");
-        s.mouse_down(SIZE, x, y, Button::Left, false);
+        click(&mut s, x, y);
         assert_eq!(s.kits.sample(0, 0).map(|k| k.key.as_str()), Some("KICK"), "kick.wav");
         assert!(auto_lit(&s, 0), "KICK is");
-        s.mouse_down(SIZE, x, y, Button::Left, false);
+        click(&mut s, x, y);
         assert_eq!(s.message, "Already KICK");
         // x.wav names no instrument: the sample keeps its own.
         let (x, y) = item_at(&s, Id::KitAutoInstrument(1));
-        s.mouse_down(SIZE, x, y, Button::Left, false);
+        click(&mut s, x, y);
         assert_eq!(s.kits.sample(0, 1).map(|k| k.key.as_str()), Some("WEIRD"));
         assert!(s.message.contains("x.wav"), "{}", s.message);
         assert!(!auto_lit(&s, 1), "no guess, never lit");
@@ -507,7 +506,7 @@ mod tests {
     fn the_text_entries_open_at_the_mouse() {
         let mut s = session();
         let (x, y) = item_at(&s, Id::KitText(KIT_DESC));
-        assert!(s.mouse_down(SIZE, x, y, Button::Left, false));
+        assert!(click(&mut s, x, y));
         let entry = s.chrome.widgets.entry.as_ref().expect("the entry");
         assert_eq!(entry.id, Id::KitText(KIT_DESC));
         let r = entry.rect(SIZE.0, SIZE.1, SIZE.2);

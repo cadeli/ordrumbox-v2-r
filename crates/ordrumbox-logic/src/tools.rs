@@ -92,6 +92,11 @@ impl Tools<'_> {
         find_pattern(self.library(), reference)
     }
 
+    /// The pattern named by argument `patternName`.
+    fn pattern_arg(&self, args: &Value) -> Result<usize, String> {
+        self.pattern(text(args, "patternName")?)
+    }
+
     fn list_patterns(&self) -> Value {
         let patterns = self.library().patterns.iter().enumerate();
         object([
@@ -101,7 +106,7 @@ impl Tools<'_> {
     }
 
     fn load_pattern(&self, args: &Value) -> Result<Value, String> {
-        let p = self.pattern(text(args, "patternName")?)?;
+        let p = self.pattern_arg(args)?;
         let pattern = &self.library().patterns[p];
         let mut json = pattern_summary(p, pattern);
         if let Some(object) = json.as_object_mut() {
@@ -131,14 +136,14 @@ impl Tools<'_> {
     }
 
     fn rename_pattern(&mut self, args: &Value) -> Result<Value, String> {
-        let p = self.pattern(text(args, "patternName")?)?;
+        let p = self.pattern_arg(args)?;
         let name = self.new_name(args, "newName", Some(p))?;
         self.editor.rename_pattern(p, name);
         Ok(pattern_summary(p, &self.library().patterns[p]))
     }
 
     fn duplicate_pattern(&mut self, args: &Value) -> Result<Value, String> {
-        let p = self.pattern(text(args, "patternName")?)?;
+        let p = self.pattern_arg(args)?;
         let name = match optional_text(args, "newName")? {
             Some(_) => Some(self.new_name(args, "newName", None)?),
             None => None,
@@ -176,7 +181,7 @@ impl Tools<'_> {
     }
 
     fn add_notes(&mut self, args: &Value) -> Result<Value, String> {
-        let p = self.pattern(text(args, "patternName")?)?;
+        let p = self.pattern_arg(args)?;
         let pattern = &self.library().patterns[p];
         let mut planned = Vec::new();
         let mut new_tracks: Vec<String> = Vec::new();
@@ -236,7 +241,7 @@ impl Tools<'_> {
     }
 
     fn delete_notes(&mut self, args: &Value) -> Result<Value, String> {
-        let p = self.pattern(text(args, "patternName")?)?;
+        let p = self.pattern_arg(args)?;
         let pattern = &self.library().patterns[p];
         let mut planned: Vec<(usize, i32, i32)> = Vec::new();
         for (i, item) in list(args, "notes")?.iter().enumerate() {
@@ -314,7 +319,7 @@ impl Tools<'_> {
     }
 
     fn update_track(&mut self, args: &Value) -> Result<Value, String> {
-        let p = self.pattern(text(args, "patternName")?)?;
+        let p = self.pattern_arg(args)?;
         let name = text(args, "trackName")?.trim().to_uppercase();
         let updates = args.get("updates").and_then(Value::as_object).ok_or("updates: not an object")?;
         let updates = track_fields(updates, "updates")?;
@@ -384,7 +389,7 @@ impl Tools<'_> {
     }
 
     fn set_beat_count(&mut self, args: &Value) -> Result<Value, String> {
-        let p = self.pattern(text(args, "patternName")?)?;
+        let p = self.pattern_arg(args)?;
         let beats = optional_whole(args, "beatCount")?.ok_or("beatCount is required")?;
         if !(1..=MAX_BEATS as u32).contains(&beats) {
             return Err(format!("beatCount: {beats} is outside 1 to {MAX_BEATS}"));
@@ -394,7 +399,7 @@ impl Tools<'_> {
     }
 
     fn set_tags(&mut self, args: &Value) -> Result<Value, String> {
-        let p = self.pattern(text(args, "patternName")?)?;
+        let p = self.pattern_arg(args)?;
         let tags = list(args, "tags")?
             .iter()
             .map(|t| t.as_str().map(str::to_owned).ok_or_else(|| format!("tags: {t} is not a string")));
@@ -404,14 +409,14 @@ impl Tools<'_> {
     }
 
     fn set_description(&mut self, args: &Value) -> Result<Value, String> {
-        let p = self.pattern(text(args, "patternName")?)?;
+        let p = self.pattern_arg(args)?;
         let description = text(args, "description")?;
         self.editor.set_pattern_description(p, description);
         Ok(object([("description", Value::from(description))]))
     }
 
     fn compact_pattern(&mut self, args: &Value) -> Result<Value, String> {
-        let p = self.pattern(text(args, "patternName")?)?;
+        let p = self.pattern_arg(args)?;
         let desc = format!("Compact the tracks of \"{}\"", pattern_name(&self.library().patterns[p]));
         let compacted = self.editor.batch(&desc, |editor| editor.compact_pattern(p));
         Ok(object([("tracksCompacted", count(compacted))]))
@@ -481,7 +486,7 @@ impl Tools<'_> {
     }
 
     fn regenerate_pattern(&mut self, args: &Value) -> Result<Value, String> {
-        let p = self.pattern(text(args, "patternName")?)?;
+        let p = self.pattern_arg(args)?;
         let (styles, style) = self.style(args)?;
         let rng = &mut *self.rng;
         self.editor.regenerate_pattern(p, self.scales, &styles, style.as_deref(), &mut || rng.next_f64());
@@ -489,7 +494,7 @@ impl Tools<'_> {
     }
 
     fn toggle_generation(&mut self, args: &Value) -> Result<Value, String> {
-        let p = self.pattern(text(args, "patternName")?)?;
+        let p = self.pattern_arg(args)?;
         let part = text(args, "part")?;
         let (styles, style) = self.style(args)?;
         let rng = &mut *self.rng;
@@ -510,13 +515,13 @@ impl Tools<'_> {
     }
 
     fn toggle_pattern_auto(&mut self, args: &Value) -> Result<Value, String> {
-        let p = self.pattern(text(args, "patternName")?)?;
+        let p = self.pattern_arg(args)?;
         let on = self.editor.toggle_pattern_auto(p).ok_or("The pattern has no track to put in auto mode")?;
         Ok(object([("auto", Value::Bool(on))]))
     }
 
     fn set_macro(&mut self, args: &Value) -> Result<Value, String> {
-        let p = self.pattern(text(args, "patternName")?)?;
+        let p = self.pattern_arg(args)?;
         let name = text(args, "macro")?;
         let key = match name {
             "energy" => style::ENERGY,

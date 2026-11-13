@@ -662,7 +662,7 @@ mod tests {
     use super::*;
     use crate::kits::KitSet;
 
-    const SIZE: (i32, i32, Scale) = (1100, 680, Scale::ONE);
+    use crate::test_support::SIZE;
 
     fn session() -> Session {
         let (library, _) = Library::parse(

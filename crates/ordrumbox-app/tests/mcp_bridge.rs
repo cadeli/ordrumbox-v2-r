@@ -5,8 +5,11 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
 
+mod common;
+
+use common::scratch_dir;
+
 use std::io::{BufRead, BufReader, Write};
-use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -18,15 +21,6 @@ use ordrumbox_ui::{LibrarySource, Session, Waker, host_output};
 const LIBRARY: &str = r#"{"patterns":[{"name":"rock","bpm":100,"tracks":[{"name":"KICK","notes":[{"beat":0}]}]}]}"#;
 /// How long the bridge may take for the whole exchange.
 const DEADLINE: Duration = Duration::from_secs(30);
-
-fn scratch_dir() -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("ordrumbox-mcp-bridge-{}", std::process::id()));
-    if dir.exists() {
-        std::fs::remove_dir_all(&dir).unwrap();
-    }
-    std::fs::create_dir_all(&dir).unwrap();
-    dir
-}
 
 fn call(id: u32, name: &str, arguments: &str) -> String {
     format!(
@@ -43,7 +37,7 @@ fn tool_text(answer: &Value) -> (String, bool) {
 
 #[test]
 fn a_client_edits_the_session_through_the_bridge() {
-    let dir = scratch_dir();
+    let dir = scratch_dir("mcp-bridge");
     let (start, _audio) = host_output(48_000.0);
     let mut session = Session::load_from(start, LibrarySource::Host(Some(LIBRARY.into())));
     // The bridge finds the window by the file next to the library.

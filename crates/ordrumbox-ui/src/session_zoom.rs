@@ -170,8 +170,7 @@ mod tests {
 
     #[test]
     fn the_zoom_is_saved_and_read_back() {
-        let dir = std::env::temp_dir().join(format!("ordrumbox-zoom-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
+        let dir = crate::test_support::scratch_dir("zoom");
         let path = dir.join("settings.json");
         std::fs::write(&path, r#"{"colorScheme":2}"#).unwrap();
         let mut s = session(Scale::ONE);

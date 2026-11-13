@@ -48,16 +48,11 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn folder(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("ordrumbox-color-{name}-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        dir
-    }
+    use crate::test_support::scratch_dir;
 
     #[test]
     fn c_cycles_the_schemes_and_saves_the_choice() {
-        let dir = folder("cycle");
+        let dir = scratch_dir("color-cycle");
         let path = dir.join("settings.json");
         std::fs::write(&path, r#"{"colorScheme":2,"master":{"volume":0.5}}"#).unwrap();
         let mut s = Session::new(Library::default(), KitSet::empty(), Vec::new());
@@ -81,7 +76,7 @@ mod tests {
 
     #[test]
     fn an_unknown_scheme_is_reported_and_the_first_used() {
-        let dir = folder("unknown");
+        let dir = scratch_dir("color-unknown");
         let path = dir.join("settings.json");
         std::fs::write(&path, r#"{"colorScheme":9}"#).unwrap();
         let mut s = Session::new(Library::default(), KitSet::empty(), Vec::new());

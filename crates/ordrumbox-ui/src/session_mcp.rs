@@ -632,6 +632,7 @@ fn exported(path: &Path, message: String) -> Result<Value, String> {
 mod tests {
     use super::*;
     use crate::kits::KitSet;
+    use crate::test_support::scratch_dir;
     use ordrumbox_core::json;
     use ordrumbox_engine::kit::{BankSample, Kit, KitSample};
     use ordrumbox_engine::{Controller, SampleBank, SampleBuffer};
@@ -830,15 +831,6 @@ mod tests {
     }
 
     const RATE: f32 = 8000.0;
-
-    fn scratch_dir(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("ordrumbox-mcp-{name}-{}", std::process::id()));
-        if dir.exists() {
-            std::fs::remove_dir_all(&dir).unwrap();
-        }
-        std::fs::create_dir_all(&dir).unwrap();
-        dir
-    }
 
     fn write_wav(path: &Path, level: f32) {
         let buffer = SampleBuffer::mono((0..400).map(|i| level * (i as f32 * 0.3).sin()).collect(), RATE as u32);
