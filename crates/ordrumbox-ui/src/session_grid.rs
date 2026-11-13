@@ -9,10 +9,12 @@ use ordrumbox_core::num;
 
 use crate::panel::SUBMENU_MARK;
 
+use super::Session;
+use super::session_labels::beat_label;
 use super::session_selection::Clipboard;
 use super::session_song::DRAG_START_PX;
+use super::session_types::Workspace;
 use super::session_zone::zone_label;
-use super::{Session, Workspace, beat_label};
 use crate::panel::{Dropdown, Id};
 use crate::view::{Cursor, Hit};
 use crate::{menu, view};

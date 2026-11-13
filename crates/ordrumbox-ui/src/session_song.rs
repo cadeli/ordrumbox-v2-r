@@ -22,8 +22,9 @@ use ordrumbox_core::Song;
 use ordrumbox_core::json::Value;
 use ordrumbox_core::steps::TICK;
 
+use super::Session;
 use super::session_panel::PanelLayout;
-use super::{Session, Workspace};
+use super::session_types::Workspace;
 use crate::panel::Id;
 use crate::panel::{self, Item, Kind, Rect};
 use crate::picker::{Export, Purpose};

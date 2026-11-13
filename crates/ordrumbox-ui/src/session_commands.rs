@@ -3,7 +3,8 @@
 
 use super::session_confirm::Pending;
 use super::session_selection::Clipboard;
-use super::{Overlay, Session, Workspace};
+use super::session_types::Workspace;
+use super::{Overlay, Session};
 use crate::menu::{Command, MenuState};
 use crate::panel::Id;
 use crate::picker::{Export, Purpose};

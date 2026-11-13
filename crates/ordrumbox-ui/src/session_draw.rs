@@ -1,6 +1,7 @@
 //! The session drawn: the window split and what it shows, and the frame.
 
-use super::{Overlay, Session, Workspace};
+use super::session_types::Workspace;
+use super::{Overlay, Session};
 use crate::action_log::LogLayout;
 use crate::canvas::Canvas;
 use crate::picker::PickerLayout;

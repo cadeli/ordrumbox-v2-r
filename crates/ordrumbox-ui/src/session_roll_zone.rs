@@ -10,10 +10,11 @@ use ordrumbox_core::steps::absolute_step;
 use ordrumbox_logic::block::step_units;
 use ordrumbox_logic::roll_block::{RollBlock, RollZone, note_key};
 
+use super::Session;
+use super::session_labels::notes_label;
 use super::session_selection::Clipboard;
 use super::session_song::DRAG_START_PX;
 use super::session_zone::beats_label;
-use super::{Session, notes_label};
 use crate::note_drag::{MIDDLE_C, midi_name};
 use crate::piano_roll::{RollHit, RollSpan, TOTAL_KEYS, key_row, row_key, steps_per_beat};
 use crate::ui_input::Button;

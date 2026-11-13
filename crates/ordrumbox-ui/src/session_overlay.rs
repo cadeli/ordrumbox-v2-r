@@ -1,7 +1,8 @@
 //! The overlays drawn over the window: the keyboard shortcuts, the edit
 //! history, About, the factory reset, and the keys and clicks they take.
 
-use super::{Overlay, OverlayKey, Session};
+use super::session_types::OverlayKey;
+use super::{Overlay, Session};
 use crate::action_log::{LogLayout, Seen};
 use crate::picker::{Outcome, PickerLayout};
 use crate::scale::Scale;

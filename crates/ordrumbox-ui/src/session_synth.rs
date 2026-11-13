@@ -16,7 +16,8 @@ use ordrumbox_core::json::{Object, Value};
 use ordrumbox_engine::synth_model as model;
 
 use super::session_confirm::Pending;
-use super::{NO_SYNTHS, Session, Workspace, session_panel};
+use super::session_types::Workspace;
+use super::{NO_SYNTHS, Session, session_panel};
 use crate::canvas::{Canvas, text_width};
 use crate::frame;
 use crate::panel::Id;

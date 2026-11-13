@@ -5,10 +5,11 @@
 use crate::scale::Scale;
 use ordrumbox_core::song::measures_for_pattern;
 
+use super::Session;
 use super::session_panel::DOUBLE_CLICK;
 use super::session_song::{DRAG_START_PX, DragSource, SongDrag};
 use super::session_song_menu::clip_label;
-use super::{Session, Workspace};
+use super::session_types::Workspace;
 use crate::canvas::Canvas;
 use crate::panel::{Dropdown, Id, Rect};
 use crate::song_view::{Axis, Row, SongGhost, SongHit, SongLayout};
