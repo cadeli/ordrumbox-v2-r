@@ -8,10 +8,15 @@
 //! its last clip, so the grid and the playback never show
 //! or play measures nothing is placed on.
 
+use super::Editor;
+use crate::history::Change;
+use ordrumbox_core::ids::{slugify, unique_id};
+use ordrumbox_core::json::Value;
+use ordrumbox_core::{Library, Pattern};
+use std::collections::HashSet;
+
 use ordrumbox_core::song::{DEFAULT_BPM, clamp_bpm, measures_for_pattern};
 use ordrumbox_core::{Song, SongClip};
-
-use super::*;
 
 /// The loop length after a clip edit: the end of the last clip, none
 /// without clips.

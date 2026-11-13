@@ -1,6 +1,9 @@
 //! The audio-callback side of playback.
 
-use super::*;
+use super::link::{Command, Inbox, Link, SCOPE_SIZE, Scope, Snapshot, lock, try_lock};
+use crate::engine::{Engine, HostMix, HostTransport, host_pass};
+use crate::midi::BlockNote;
+use std::sync::Arc;
 
 /// The audio-callback side: owns the [`Engine`].
 #[derive(Debug)]

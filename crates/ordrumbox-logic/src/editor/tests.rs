@@ -1,4 +1,8 @@
 use super::*;
+use crate::generate::MelodicKind;
+use ordrumbox_core::note::ACCENTED_VELOCITY;
+use ordrumbox_core::track::MAX_TRACKS;
+use ordrumbox_core::{Note, Scales, Styles};
 
 #[test]
 fn an_accent_toggles_on_the_notes_of_a_step_in_one_undo_step() {

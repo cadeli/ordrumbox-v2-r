@@ -1,6 +1,11 @@
 //! Editing tracks: add, move, paste, settings, loop, sound, name.
 
-use super::*;
+use super::{Editor, apply_updates, clean, pattern_name};
+use ordrumbox_core::Track;
+use ordrumbox_core::drum_taxonomy::mono_from_track_name;
+use ordrumbox_core::json::Value;
+use ordrumbox_core::track::{MAX_STEPS_PER_BEAT, MAX_TRACKS};
+use std::collections::HashSet;
 
 impl Editor {
     /// Whether pattern `p` can take one more track ([`MAX_TRACKS`]).

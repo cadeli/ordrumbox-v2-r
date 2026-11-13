@@ -6,11 +6,10 @@
 //! The tools that play, read or write files, or show something stay in the
 //! app, and use the lookups and the views of this module.
 
-use ordrumbox_core::instruments::catalog;
 use ordrumbox_core::json::{Object, Value};
-use ordrumbox_core::song::{SongClip, clamp_bpm};
+use ordrumbox_core::song::clamp_bpm;
 use ordrumbox_core::track::MAX_TRACKS;
-use ordrumbox_core::{Library, Note, Pattern, Rng, ScaleList, Scales, SetField, Styles, Track, style};
+use ordrumbox_core::{Library, Note, Rng, ScaleList, Scales, SetField, Styles, style};
 
 use crate::compose;
 use crate::editor::{Editor, MAX_BEATS};

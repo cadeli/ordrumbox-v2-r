@@ -1,6 +1,9 @@
 //! A plugin host's transport and mix, as the engine follows them.
 
-use super::*;
+use crate::strip_settings::{is_slap, saturation_amount, set_saturation};
+use ordrumbox_core::steps::TICK;
+use ordrumbox_core::track::MAX_TRACKS;
+use ordrumbox_dsp::StripSettings;
 
 /// A plugin host's transport at the start of a block.
 #[derive(Debug, Clone, Copy, PartialEq)]

@@ -6,25 +6,13 @@
 //! Patterns, tracks and notes are addressed by index (the JS commands take
 //! object references). An edit that changes nothing records nothing.
 
-use std::collections::HashSet;
-use std::ops::RangeInclusive;
 use std::time::Instant;
 
-use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family, mono_from_track_name};
-use ordrumbox_core::ids::{slugify, unique_id};
 use ordrumbox_core::json::{Object, Value};
-use ordrumbox_core::note::{ACCENT_VELOCITY, ACCENTED_VELOCITY};
 use ordrumbox_core::num::round2;
-use ordrumbox_core::song::{DEFAULT_BPM, clamp_bpm};
-use ordrumbox_core::style::{COMPLEXITY, ENERGY, MACRO_NEUTRAL};
-use ordrumbox_core::track::{MAX_STEPS_PER_BEAT, MAX_TRACKS};
-use ordrumbox_core::{Library, Note, Pattern, Scales, SetField, Styles, Track};
+use ordrumbox_core::{Library, Pattern, SetField, Track};
 
-use crate::block::{self, Block, Pasted, StepAt, Zone};
-use crate::generate::{self, AutoGenerator, MelodicKind, Options};
 use crate::history::{Change, History, Target};
-use crate::midi;
-use crate::roll_block::{self, RollBlock, RollZone};
 
 #[path = "arrangement.rs"]
 mod arrangement;

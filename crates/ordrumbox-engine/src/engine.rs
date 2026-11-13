@@ -11,13 +11,11 @@
 
 use std::sync::Arc;
 
-use ordrumbox_core::steps::TICK;
 use ordrumbox_dsp::{MasterBus, MasterSettings, SampleVoice, Strip, StripSettings, SynthPatch, SynthVoice, VoiceStart};
 
 use crate::kit::SampleBank;
 use crate::midi::{BlockNote, CHANNEL_COUNT, KEY_COUNT, KeyMap, MidiNote, NoteOut};
 use crate::pass::{Event, Pass, Sound};
-use crate::strip_settings::{is_slap, saturation_amount, set_saturation};
 
 /// Sample voices playing at once; the oldest is cut when a new one needs a slot.
 pub const MAX_VOICES: usize = 64;
