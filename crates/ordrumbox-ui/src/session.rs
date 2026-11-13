@@ -2,8 +2,8 @@
 //! generators, MIDI files, the grid cursor and selection, the clipboard, saving. Edits go through the
 //! [`Editor`] (each one an undo step); the playing pass is rebuilt after each.
 //!
-//! This file holds the session's state, its loading, undo and saving, and
-//! its drawing; the rest is in `session_*.rs`, one `impl Session` each:
+//! This file holds the session's state; its loading is `session_open.rs`, undo and saving `session_history.rs`,
+//! its drawing `session_draw.rs`, its toasts `session_toast.rs`; the rest is in `session_*.rs`, one `impl Session` each:
 //! `session_transport.rs` (play, the pattern, kit and tempo), `session_edit.rs`
 //! (the grid's edits), `session_generate.rs`, `session_commands.rs` (the
 //! menus), `session_overlay.rs`, `session_kit.rs`, `session_files.rs`
@@ -64,6 +64,8 @@ mod session_color;
 mod session_commands;
 #[path = "session_confirm.rs"]
 mod session_confirm;
+#[path = "session_draw.rs"]
+mod session_draw;
 #[path = "session_edit.rs"]
 mod session_edit;
 #[path = "session_files.rs"]
@@ -72,8 +74,12 @@ mod session_files;
 mod session_generate;
 #[path = "session_grid.rs"]
 mod session_grid;
+#[path = "session_history.rs"]
+mod session_history;
 #[path = "session_lane.rs"]
 mod session_lane;
+#[path = "session_open.rs"]
+mod session_open;
 #[path = "session_prefs.rs"]
 mod session_prefs;
 #[path = "session_record.rs"]
@@ -82,6 +88,8 @@ mod session_record;
 mod session_roll_zone;
 #[path = "session_tempo.rs"]
 mod session_tempo;
+#[path = "session_toast.rs"]
+mod session_toast;
 #[path = "session_zone.rs"]
 mod session_zone;
 #[path = "session_zoom.rs"]
@@ -563,245 +571,6 @@ impl Session {
         std::mem::take(&mut self.midi_changed)
     }
 
-    pub fn load(start_output: StartOutput) -> Self {
-        Self::load_from(start_output, LibrarySource::UserFile)
-    }
-
-    /// The same with its library from `source`.
-    pub fn load_from(start_output: StartOutput, source: LibrarySource) -> Self {
-        Self::load_with_assets(start_output, source, &[])
-    }
-
-    /// The same, the assets searched in `first` before the usual folders (a
-    /// plugin's bundle).
-    pub fn load_with_assets(mut start_output: StartOutput, source: LibrarySource, first: &[PathBuf]) -> Self {
-        let Some(dir) = assets::find(first) else {
-            let searched: Vec<String> = assets::candidates(first).iter().map(|d| d.display().to_string()).collect();
-            return Self::new(
-                Library::default(),
-                KitSet::empty(),
-                vec![
-                    format!(
-                        "assets folder not found: copy this repository's assets folder next to the program, or set {}",
-                        assets::ENV_VAR
-                    ),
-                    format!("searched: {}", searched.join(", ")),
-                ],
-            );
-        };
-        let assets = match assets::load(&dir) {
-            Ok(assets) => assets,
-            Err(e) => return Self::new(Library::default(), KitSet::empty(), vec![e]),
-        };
-        let mut status: Vec<String> = assets.errors.iter().map(|e| format!("not loaded: {e}")).collect();
-        status.extend(assets.style_issues.iter().map(|i| format!("styles.json: {}: {}", i.at, i.message)));
-        let (kits_file, kit_issues) = &assets.kit_issues;
-        if let Some(first) = kit_issues.first() {
-            status.push(format!("{kits_file}: {} skipped, first: {}: {}", kit_issues.len(), first.at, first.message));
-        }
-        if let Some(first) = assets.sample_errors.first() {
-            status.push(format!("{} sample(s) not loaded, first: {first}", assets.sample_errors.len()));
-        }
-
-        let hosted = matches!(source, LibrarySource::Host(_));
-        let Opened { mut library, file: library_path, on_disk, message, demo } = match source {
-            LibrarySource::UserFile => {
-                if let Some(problem) = store::location_problem() {
-                    status.push(format!("{problem}: File > Change user data folder"));
-                }
-                Self::open_library(store::path(), assets.library, &mut status)
-            }
-            LibrarySource::Host(text) => Self::open_host_library(text, assets.library, &mut status),
-        };
-        if demo {
-            status.extend(repaired_status(assets::LIBRARY, &assets.report));
-        }
-
-        if let Some(e) = &assets.kits_error {
-            status.push(format!("kits.json not loaded, kit edits not saved: {e}"));
-        }
-        let kits_file = if assets.kits_error.is_none() { store::kits_path() } else { None };
-        let kits =
-            KitSet::new(assets.kits, &assets.bank, Some(assets.sources.clone()), kits_file, store::samples_dir());
-        // A library saved before the synth presets were saved with it takes
-        // those of the presets file.
-        if library.synths.is_none() {
-            library.synths = Self::read_user_synths(store::saved_synths_path(), &assets.synths, &mut status);
-        }
-        let synths = session_synth::merged_synths(library.synths.as_ref(), &assets.synths);
-        let mut session = Self::new(library, kits, status);
-        session.asset_synths = assets.synths;
-        session.synths = synths.clone();
-        session.synths_revision = Some(session.editor.revision());
-        session.hosted = hosted;
-        if hosted {
-            session.chrome.fold_editors();
-        }
-        session.assets_dir = Some(dir.clone());
-        session.saving.songs_dir = store::songs_dir();
-        session.scales = assets.scales.clone();
-        session.styles = assets.styles.clone();
-        session.scale_list = assets.scale_list.clone();
-        session.roots =
-            assets.bank.samples.iter().filter_map(|s| Some((s.sample.key.clone(), s.sample.root_midi?))).collect();
-        session.saving.library_path = library_path;
-        session.saving.on_disk = on_disk;
-        session.message = message;
-        let bank = Arc::new(assets.bank);
-        if !bank.samples.is_empty() {
-            session.render = Some(RenderSetup {
-                bank: bank.clone(),
-                scales: assets.scales.clone(),
-                synths: synths.clone(),
-                kit: session.kits.kits.first().map(|k| k.name.clone()).unwrap_or_default(),
-                sample_rate: offline::EXPORT_RATE,
-                seed: 1,
-            });
-        }
-        match start_output(bank, assets.scales, synths) {
-            Ok((output, controller)) => session.playback = Playback::new(output, controller),
-            Err(e) => session.status.push(format!("no sound: {e}")),
-        }
-        session.playback.keep_start_output(start_output);
-        // A plugin shows no master panel: the host mixes, the default master applies.
-        if !hosted {
-            session.load_master();
-        }
-        session.load_update_settings();
-        session.load_color_scheme(store::settings_path());
-        session.load_zoom(store::settings_path());
-        session
-    }
-
-    /// The library to start with: the user's file at `path` when there is
-    /// one, else `demo`, written to that file at the first edit (no file: the
-    /// reason pushed on `status`).
-    fn open_library(path: Option<PathBuf>, demo: Library, status: &mut Vec<String>) -> Opened {
-        let Some(path) = path else {
-            status.push("no user data folder: edits are not saved".into());
-            return Opened::demo(demo, DEMO_NOT_SAVED);
-        };
-        match store::load(&path) {
-            Ok(Some((saved, report))) => {
-                status.extend(repaired_status(&path.display().to_string(), &report));
-                Opened {
-                    library: saved,
-                    file: Some(path),
-                    on_disk: true,
-                    message: "library loaded".into(),
-                    demo: false,
-                }
-            }
-            Ok(None) => Opened {
-                file: Some(path),
-                ..Opened::demo(demo, "your library starts as a copy of the demo: edits are saved")
-            },
-            Err(e) => {
-                status.push(format!("library not loaded, not saved over: {e}"));
-                Opened::demo(demo, DEMO_NOT_SAVED)
-            }
-        }
-    }
-
-    /// The library of a plugin: the host's `text` when it kept one, else the
-    /// user's file (read, never written), else `demo`; no file to save to.
-    fn open_host_library(text: Option<String>, demo: Library, status: &mut Vec<String>) -> Opened {
-        const DEMO: &str = "demo library, saved with the host project";
-        if let Some(text) = text {
-            return match Library::parse(&text) {
-                Ok((library, report)) => {
-                    status.extend(repaired_status("library of the host project", &report));
-                    Opened::unsaved(library, "library from the host project")
-                }
-                Err(e) => {
-                    status.push(format!("library of the host project not loaded: {e}"));
-                    Opened::demo(demo, DEMO)
-                }
-            };
-        }
-        let Some(path) = store::path() else {
-            return Opened::demo(demo, DEMO);
-        };
-        match store::load(&path) {
-            Ok(Some((saved, report))) => {
-                status.extend(repaired_status(&path.display().to_string(), &report));
-                Opened::unsaved(saved, "your library, copied into the host project")
-            }
-            Err(e) => {
-                status.push(format!("library not loaded: {e}"));
-                Opened::demo(demo, DEMO)
-            }
-            Ok(None) => Opened::demo(demo, DEMO),
-        }
-    }
-
-    /// The library as its file holds it, for a plugin host to keep in its project.
-    /// Changes made to the library so far: compare to know when to ask
-    /// [`library_text`](Self::library_text) again.
-    pub fn library_revision(&self) -> u64 {
-        self.editor.revision()
-    }
-
-    /// The library's file text, with the synth presets saved with it.
-    pub fn library_text(&self) -> String {
-        self.editor.library().to_file_text()
-    }
-
-    fn new(library: Library, kits: KitSet, status: Vec<String>) -> Self {
-        Self {
-            editor: Editor::new(library),
-            scales: Scales::default(),
-            styles: Styles::default(),
-            learned_styles: (Styles::default(), None),
-            gen_style: None,
-            rng: Rng::from_time(),
-            roots: Vec::new(),
-            kits,
-            kit_index: 0,
-            kit_editor: None,
-            analysis: None,
-            kit_files: (String::new(), None),
-            synths: SynthPresets::default(),
-            asset_synths: SynthPresets::default(),
-            synths_revision: None,
-            pattern_index: 0,
-            workspace: Workspace::Grid,
-            song_cursor: 0,
-            song_loop: None,
-            metronome: false,
-            recording: false,
-            taps: Vec::new(),
-            song_panel: session_song::SongPanel::default(),
-            roll: session_roll::RollState::default(),
-            render: None,
-            playback: Playback::default(),
-            selection: Selection::default(),
-            saving: Saving::default(),
-            chrome: Chrome::default(),
-            status,
-            message: String::new(),
-            flash: Flash::default(),
-            action_log: ActionLog::default(),
-            assets_dir: None,
-            quit: false,
-            midi_changed: false,
-            fullscreen: false,
-            fullscreen_request: None,
-            scale_list: ScaleList::default(),
-            editors: EditorState::default(),
-            color_scheme: 1,
-            hosted: false,
-            host_muted: 0,
-            host_tempo_outside: None,
-            host_shown: None,
-            output_panel: session_output::OutputPanel::default(),
-            updates: session_update::Updates::default(),
-            mcp: None,
-            synth_editor: session_synth::SynthEditor::new(),
-            track_analysis: std::cell::RefCell::default(),
-        }
-    }
-
     pub fn pattern(&self) -> Option<&Pattern> {
         self.editor.library().patterns.get(self.pattern_index)
     }
@@ -822,105 +591,6 @@ impl Session {
     /// What the last action said.
     pub fn message(&self) -> &str {
         &self.message
-    }
-
-    /// Before an input: the message shown, taken away so that what the
-    /// input says, even the same words again, is known as new
-    /// ([`Self::input_done`]).
-    pub(crate) fn input_starts(&mut self) -> String {
-        std::mem::take(&mut self.message)
-    }
-
-    /// After an input: a message it gave stands out; without one, `before`
-    /// (from [`Self::input_starts`]) stays as it was.
-    pub(crate) fn input_done(&mut self, before: String) {
-        if self.message.is_empty() {
-            self.message = before;
-        } else {
-            self.flash.shown(&self.message, Instant::now());
-        }
-    }
-
-    /// A message that changed outside an input (an MCP call, a drag, an
-    /// update check) stands out too.
-    pub(crate) fn note_message(&mut self) {
-        if self.message != self.flash.text {
-            self.flash.shown(&self.message, Instant::now());
-        }
-    }
-
-    /// When the next toast goes; `None` when there is none.
-    pub(crate) fn flash_until(&self) -> Option<Instant> {
-        self.flash.toasts.iter().map(|toast| toast.until).min()
-    }
-
-    /// The toasts on screen, the oldest first.
-    #[cfg(test)]
-    pub(crate) fn toast_texts(&self) -> Vec<&str> {
-        self.flash.toasts.iter().map(|toast| toast.text.as_str()).collect()
-    }
-
-    /// A press at `(x, y)` on a toast hides it at once; whether there was
-    /// one there.
-    pub(crate) fn toast_click(&mut self, size: (i32, i32, Scale), x: i32, y: i32) -> bool {
-        let (width, height, scale) = size;
-        let hit = self.flash.rects(width, height, scale).iter().position(|(rect, _)| rect.contains(x, y));
-        if let Some(index) = hit {
-            self.flash.toasts.remove(index);
-        }
-        hit.is_some()
-    }
-
-    /// The toasts whose time is over go; whether one did.
-    pub(crate) fn end_flash(&mut self, now: Instant) -> bool {
-        let count = self.flash.toasts.len();
-        self.flash.toasts.retain(|toast| toast.until > now);
-        self.flash.toasts.len() != count
-    }
-
-    /// The window split for `size` (a real window size): the main editor
-    /// region (top-left) and the output strip (bottom).
-    pub(super) fn body(&self, size: (i32, i32, Scale)) -> view::Body {
-        let (width, height, scale) = size;
-        let right = self.track_editor_width(width, scale);
-        view::Body::new(width, height, scale, right, self.status.len(), self.output_shown(), self.note_editor_shown())
-    }
-
-    /// The note editor is shown, under the grid or the piano roll: the
-    /// views that edit notes.
-    pub(super) fn note_editor_shown(&self) -> bool {
-        self.chrome.show_note_editor
-            && self.kit_editor.is_none()
-            && matches!(self.workspace, Workspace::Grid | Workspace::PianoRoll)
-    }
-
-    /// The master strip (the output panel) is shown along the bottom: in
-    /// the app, unless View > Master folded it.
-    pub(super) fn output_shown(&self) -> bool {
-        !self.hosted && self.chrome.show_master_strip
-    }
-
-    /// What the window shows that sets the room the layout needs.
-    pub fn shown(&self) -> view::Shown {
-        view::Shown {
-            output: self.output_shown(),
-            track_editor: self.chrome.show_track_editor,
-            grid: self.kit_editor.is_none() && self.workspace == Workspace::Grid,
-            note_editor: self.chrome.show_note_editor,
-        }
-    }
-
-    /// While the pattern shown waits for the one playing to end its loop:
-    /// the blink of its marker, on in the first half of each beat.
-    pub(super) fn waiting_blink(&self) -> Option<bool> {
-        let playing = self.playback.controller()?.playing_pattern()?;
-        if playing == self.pattern_index {
-            return None;
-        }
-        let at = self.playback.position()?;
-        let beat_count = self.editor.library().patterns.get(playing).map_or(1, |p| p.beat_count.max(1));
-        let beat = at.frame as f64 / at.frames.max(1) as f64 * beat_count as f64;
-        Some(beat.fract() < 0.5)
     }
 
     /// What `mode` plays (a pattern once, a song whole) as a WAV file at
@@ -1142,65 +812,11 @@ impl Session {
         self.report_host_tempo();
     }
 
-    // ─── Editing ─────────────────────────────────────────────────────────────
-
-    /// After an edit: remember to save, show what happened.
-    fn edited(&mut self) {
-        self.saving.library.touch();
-        self.refresh_synths();
-        if let Some(desc) = self.editor.history().next_undo() {
-            self.message = desc.to_owned();
-        }
-    }
-
-    /// Keep the pattern, cursor and selection inside the (changed) library.
-    fn clamp_selection(&mut self) {
-        let count = self.editor.library().patterns.len();
-        self.pattern_index = self.pattern_index.min(count.saturating_sub(1));
-        let pattern = self.editor.library().patterns.get(self.pattern_index);
-        self.selection.clamp(pattern);
-    }
-
-    pub fn undo(&mut self) {
-        let shown = self.pattern().map(|p| p.id.clone());
-        self.message = match self.editor.undo() {
-            Some(desc) => format!("undone: {desc}"),
-            None => "nothing to undo".into(),
-        };
-        self.after_history(shown);
-    }
-
-    pub fn redo(&mut self) {
-        let shown = self.pattern().map(|p| p.id.clone());
-        self.message = match self.editor.redo() {
-            Some(desc) => format!("redone: {desc}"),
-            None => "nothing to redo".into(),
-        };
-        self.after_history(shown);
-    }
-
-    /// After an undo or a redo: the pattern `shown` before stays shown where
-    /// it moved to (a pattern moved, added or removed).
-    fn after_history(&mut self, shown: Option<String>) {
-        if let Some(index) = shown.and_then(|id| self.editor.library().patterns.iter().position(|p| p.id == id)) {
-            self.pattern_index = index;
-        }
-        self.selection.selected = None;
-        self.clamp_selection();
-        self.saving.library.touch();
-        self.refresh_synths();
-    }
-
     /// The tempo a plugin plays at: the host's, inside the tempo bounds
     /// (`None` before the host's transport was seen).
     pub(super) fn host_bpm(&self) -> Option<f64> {
         let host = self.playback.host()?;
         Some(ordrumbox_core::song::clamp_bpm(host.bpm.round()))
-    }
-
-    /// The header's first group: a plugin shows its host's transport there.
-    fn transport_shown(&self) -> view::Transport {
-        if self.hosted { view::Transport::Host(self.host_shown) } else { view::Transport::Own }
     }
 
     /// The tempo the tracks play at: the host's in a plugin, else what
@@ -1244,228 +860,6 @@ impl Session {
             self.message = "No notes to clear".into();
         } else {
             self.undoable(|s| s.clear_track_now(t));
-        }
-    }
-
-    // ─── Saving ──────────────────────────────────────────────────────────────
-
-    /// File > Save: the library written now.
-    pub fn save(&mut self) {
-        if self.saving.library_path.is_none() {
-            self.message = if let Some(refusal) = Command::Save.hosted_refusal().filter(|_| self.hosted) {
-                refusal.into()
-            } else {
-                "not saved: no library file (see the messages below)".into()
-            };
-            return;
-        }
-        if self.write_library() {
-            self.message = "library saved".into();
-        }
-    }
-
-    /// The library written to its file, without a word when it is (the menu
-    /// bar shows it saved); whether it was. A failure is the message.
-    fn write_library(&mut self) -> bool {
-        let Some(path) = self.saving.library_path.clone() else { return false };
-        match store::save(&path, self.editor.library()) {
-            Ok(()) => {
-                self.saving.library_saved(self.library_revision());
-                true
-            }
-            Err(e) => {
-                self.saving.failed = true;
-                self.message = format!("library not saved: {}: {e}", path.display());
-                false
-            }
-        }
-    }
-
-    /// Where the library's edits stand, as the menu bar shows it.
-    pub(super) fn library_state(&self) -> menu::LibraryState {
-        self.saving.library_state(self.library_revision(), self.hosted)
-    }
-
-    pub fn save_if_changed(&mut self) {
-        if self.saving.library_unsaved(self.library_revision()) {
-            self.write_library();
-        }
-    }
-
-    /// Show an audio output error reported since the last call; whether there was one.
-    pub fn check_audio(&mut self) -> bool {
-        let Some(error) = self.playback.take_output_error() else { return false };
-        self.message = format!("audio output: {error}");
-        true
-    }
-
-    /// Save what is due (the library, kit knob edits); when the next save is.
-    pub fn autosave(&mut self) -> Option<Instant> {
-        let due = [self.flush_kits(), self.flush_master(), self.autosave_library()];
-        due.into_iter().flatten().min()
-    }
-
-    fn autosave_library(&mut self) -> Option<Instant> {
-        if let Err(next) = self.saving.library_ready(self.library_revision()) {
-            return next;
-        }
-        self.write_library();
-        None
-    }
-
-    // ─── Drawing ─────────────────────────────────────────────────────────────
-
-    /// The window's size and scale (where the lists opened from the menus go).
-    pub fn set_size(&mut self, size: (i32, i32, Scale)) {
-        self.chrome.panel_size = size;
-    }
-
-    pub fn draw(&mut self, canvas: &mut Canvas, scale: Scale) {
-        // The scheme is per thread: a plugin draws on another than it loads on.
-        theme::set_scheme(self.color_scheme);
-        self.note_actions();
-        self.note_message();
-        let layout = self.panel_layout(canvas.width(), canvas.height(), scale);
-        let position = self.playback.position();
-        let history = self.editor.history();
-        let library = self.editor.library();
-        let song_mode = match self.playback.mode() {
-            Some(Mode::Song(s)) => library.songs.get(s),
-            _ => None,
-        };
-        let song = match (song_mode, position) {
-            (Some(song), Some(p)) => {
-                let total = song.length_measures().max(1.0);
-                let measure = (p.pass as f64 + p.frame as f64 / p.frames.max(1) as f64) % total;
-                Some(format!("SONG {}  measure {}/{}", song.name, measure.floor() + 1.0, total.ceil()))
-            }
-            _ => library.songs.get(self.editor.selected_song()).map(|s| format!("song {}", s.name)),
-        };
-        // Auto-page: keep the cursor / playhead on the current page.
-        let size = (canvas.width(), canvas.height(), scale);
-        let page_beats = view::page_beats(self.body(size).main_w, scale) as usize;
-        let beat_count = self.pattern().map(|p| p.beat_count.max(1)).unwrap_or(1);
-        let page_count = (beat_count as usize).div_ceil(page_beats).max(1);
-        let cursor_page = self.selection.cursor.map(|c| (c.beat.max(0) as usize) / page_beats);
-        // The pass playing is another pattern's while the one shown waits.
-        let waiting = self.waiting_blink();
-        let playhead_page = if self.playing() && waiting.is_none() {
-            position.map(|p| {
-                let frac = p.frame as f64 / p.frames.max(1) as f64;
-                let global_beat = (frac * beat_count as f64).floor() as usize;
-                global_beat / page_beats
-            })
-        } else {
-            None
-        };
-        let new_page = playhead_page.or(cursor_page).unwrap_or(self.chrome.current_page);
-        self.chrome.current_page = new_page.min(page_count.saturating_sub(1));
-
-        // Smoothed per-track levels for the VU meter stripe (peak-hold + decay).
-        let levels = self.chrome.smooth_levels(&self.playback.levels()).to_vec();
-        let pattern = self.pattern();
-        let song_layout = self.song_layout((canvas.width(), canvas.height(), scale));
-        let rows = if self.workspace == Workspace::Song { self.song_rows() } else { Vec::new() };
-        let roll_layout = self.roll_layout((canvas.width(), canvas.height(), scale));
-        let roll = self.piano_roll_open().then(|| Some((self.roll_view(&roll_layout)?, self.roll_title()))).flatten();
-        let view = View {
-            pattern,
-            sounds: pattern.map_or_else(Vec::new, |p| (0..p.tracks.len()).map(|t| self.track_sound_lines(t)).collect()),
-            arrangement: self.song_view_open().then(|| self.song_view_data(&rows, &song_layout)),
-            piano_roll: roll,
-            output: self.output_view(),
-            synth: self.synth_open(),
-            kit_view: self.kit_view(layout.details_top),
-            right: layout.right,
-            current_page: self.chrome.current_page,
-            lane: (self.editor_track(), usize::from(self.editors.lane)),
-            note_editor: self.note_editor_shown(),
-            levels,
-            show_vus: self.chrome.show_vus,
-            transport: self.transport_shown(),
-            host_muted: self.host_muted,
-            track_drop: self.track_drop((canvas.width(), canvas.height(), scale)),
-            waiting,
-            playhead: if song_mode.is_some() || waiting.is_some() {
-                None
-            } else {
-                position.map(|p| {
-                    let global_frac = p.frame as f64 / p.frames.max(1) as f64;
-                    let total_beats = self.pattern().map(|pat| pat.beat_count.max(1)).unwrap_or(1) as f64;
-                    let global_beat = global_frac * total_beats;
-                    let start_beat = (self.chrome.current_page * page_beats) as f64;
-                    let page_end = (start_beat + page_beats as f64).min(total_beats);
-                    ((global_beat - start_beat) / (page_end - start_beat).max(1.0)).clamp(0.0, 1.0)
-                })
-            },
-            song: song.as_deref().filter(|_| !self.hosted),
-            cursor: self.selection.cursor,
-            selected: self.selection.selected,
-            zone: self.selection.zone,
-            undo: history.next_undo(),
-            redo: history.next_redo(),
-            message: &self.message,
-            status: &self.status,
-        };
-        view::draw(canvas, &view, scale);
-        self.draw_synth(canvas, scale);
-        crate::panel::draw(canvas, &layout.items, self.chrome.widgets.focus, scale);
-        self.draw_tooltip(canvas, scale);
-        let menus = self.menus();
-        menu::draw(canvas, &menus, self.chrome.menu, scale);
-        // In the bar, which the open menu's panel hangs under.
-        menu::draw_library(canvas, &menus, &self.song_name(), self.library_state(), scale);
-        if let Some(dropdown) = &self.chrome.widgets.dropdown {
-            dropdown.draw(canvas, scale);
-        }
-        if let Some(entry) = &self.chrome.widgets.entry {
-            entry.draw(canvas, scale);
-        }
-        for (rect, toast) in self.flash.rects(canvas.width(), canvas.height(), scale) {
-            view::draw_toast(canvas, &toast.text, rect.y + rect.h, scale);
-        }
-        match &self.chrome.overlay {
-            Some(Overlay::Picker(p)) => {
-                let layout = PickerLayout::new(canvas.width(), canvas.height(), scale);
-                picker::draw(canvas, p, &layout);
-            }
-            Some(Overlay::Shortcuts { scroll }) => {
-                view::draw_notice_scrolled(canvas, "Keyboard shortcuts", &self.shortcut_lines(), *scroll, scale);
-            }
-            Some(Overlay::About) => view::draw_notice(canvas, "About orDrumbox", &self.about(), scale),
-            Some(Overlay::Preferences(prefs)) => {
-                view::draw_notice(canvas, "Preferences", &prefs.lines(), scale);
-            }
-            Some(Overlay::History { scroll }) => {
-                let layout = LogLayout::new(canvas.width(), canvas.height(), scale);
-                action_log::draw(canvas, &self.action_log, *scroll, &layout);
-            }
-            Some(Overlay::FactoryReset { yes }) => view::draw_notice_choice(
-                canvas,
-                "Factory reset",
-                &self.factory_reset_lines(),
-                ["Keep", "Reset"],
-                usize::from(*yes),
-                scale,
-            ),
-            Some(Overlay::ConfirmOverwrite { path, yes, .. }) => {
-                // The name alone: the folder was just picked, and a long path would not fit.
-                let name = path.file_name().unwrap_or(path.as_os_str()).to_string_lossy();
-                let lines = [format!("{name} already exists in this folder."), String::new()];
-                view::draw_notice_choice(
-                    canvas,
-                    "Replace the file?",
-                    &lines,
-                    ["Keep it", "Replace it"],
-                    usize::from(*yes),
-                    scale,
-                )
-            }
-            Some(Overlay::Confirm { pending, yes }) => {
-                let (title, lines, action) = self.confirm_text(pending);
-                view::draw_notice_choice(canvas, title, &lines, ["Keep", &action], usize::from(*yes), scale)
-            }
-            None => {}
         }
     }
 }
