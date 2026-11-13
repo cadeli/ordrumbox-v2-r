@@ -480,7 +480,7 @@ pub(super) mod tests {
     use crate::kits::KitSet;
     use ordrumbox_core::Library;
 
-    pub(crate) const SIZE: (i32, i32, Scale) = (1100, 680, Scale::ONE);
+    pub(crate) use crate::test_support::SIZE;
 
     pub(crate) fn session() -> Session {
         let (library, _) = Library::parse(

@@ -385,7 +385,7 @@ mod tests {
     use super::*;
     use crate::kits::KitSet;
 
-    const SIZE: (i32, i32, Scale) = (1100, 680, Scale::ONE);
+    use crate::test_support::{SIZE, click};
 
     fn session() -> Session {
         let (library, _) =
@@ -492,7 +492,7 @@ mod tests {
         // A click on another category of the menu above: its instruments instead.
         let hats = catalog().categories.iter().position(|(c, _)| c == "Hats & cymbals").unwrap();
         let y = parent.y + 2 * scale + (hats as i32 + 1) * 12 * scale + scale.px();
-        assert!(s.mouse_down(SIZE, parent.x + 4, y, Button::Left, false));
+        assert!(click(&mut s, parent.x + 4, y));
         assert_eq!(menu_titles(&s), ["Add track", "Hats & cymbals"]);
         // Left (or Escape) goes back a menu, Right opens the highlighted category again.
         s.panel_key(SIZE, PanelKey::Left, false, false);

@@ -204,7 +204,7 @@ mod tests {
     use crate::ui::Ui;
     use crate::ui_input::{Button, Key, KeyEvent, Modifiers};
 
-    const SIZE: (i32, i32, Scale) = (1100, 680, Scale::ONE);
+    use crate::test_support::SIZE;
 
     /// KICK on every beat, SNARE on beats 2 and 4, HAT empty.
     fn session() -> Session {

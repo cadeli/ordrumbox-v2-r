@@ -301,18 +301,9 @@ mod tests {
     use std::fs;
 
     use super::*;
+    use crate::test_support::scratch_dir;
 
     const MINE: &str = r#"{"patterns":[{"name":"mine","tracks":[{"name":"KICK","notes":[{}]}]}]}"#;
-
-    /// A folder of its own for test `name`, empty.
-    fn folder(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("ordrumbox-session-data-{name}-{}", std::process::id()));
-        if dir.exists() {
-            fs::remove_dir_all(&dir).unwrap();
-        }
-        fs::create_dir_all(&dir).unwrap();
-        dir
-    }
 
     fn session() -> Session {
         let mut s = Session::new(Library::parse(MINE).unwrap().0, KitSet::empty(), Vec::new());
@@ -326,7 +317,7 @@ mod tests {
 
     #[test]
     fn the_library_goes_out_to_a_file_and_comes_back_in_one_undo_step() {
-        let dir = folder("library");
+        let dir = scratch_dir("session-data-library");
         let mut s = session();
         // A preset of mine: it goes out with the library.
         let lead = ordrumbox_core::json::parse(r#"{"vco1":{"gain":0.5}}"#).unwrap();
@@ -382,7 +373,7 @@ mod tests {
 
     #[test]
     fn a_folder_without_user_files_is_not_offered_for_a_restore() {
-        let dir = folder("restore-empty");
+        let dir = scratch_dir("session-data-restore-empty");
         let mut s = session();
         s.picked(Purpose::RestoreUserData, dir.clone());
         assert!(!s.confirm_open());
@@ -412,7 +403,7 @@ mod tests {
 
     #[test]
     fn the_folder_asked_for_says_whether_its_files_are_used() {
-        let dir = folder("ask");
+        let dir = scratch_dir("session-data-ask");
         assert!(Session::user_folder_text(&dir).starts_with("The user files are copied to"));
         fs::write(dir.join("library.json"), MINE).unwrap();
         assert!(Session::user_folder_text(&dir).starts_with("The user files already in"));

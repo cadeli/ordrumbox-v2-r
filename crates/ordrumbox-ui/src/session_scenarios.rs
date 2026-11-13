@@ -6,7 +6,7 @@
 //! the audio callback would, with `update` before each callback as the UI does.
 
 use crate::scale::Scale;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
 use ordrumbox_core::json;
@@ -27,6 +27,7 @@ use crate::menu::Command;
 use crate::panel::{self, Id, Kind, Rect};
 use crate::picker::{Export, Outcome};
 use crate::store;
+use crate::test_support::scratch_dir;
 use crate::view::Hit;
 
 const RATE: f32 = 8000.0;
@@ -390,12 +391,6 @@ fn demo_session(samples_dir: &Path) -> (Session, AudioSide) {
     // As after loading the assets: the bank, the exports, the kit in use.
     session.kits_changed("kits loaded".into());
     (session, audio)
-}
-
-fn scratch_dir(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("ordrumbox-{name}-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).unwrap();
-    dir
 }
 
 #[test]

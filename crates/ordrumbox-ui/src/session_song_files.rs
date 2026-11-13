@@ -155,8 +155,7 @@ mod tests {
     #[test]
     fn save_as_and_export_write_to_the_folder_picked() {
         let mut s = session();
-        let dir = std::env::temp_dir().join(format!("ordrumbox-song-destination-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
+        let dir = crate::test_support::scratch_dir("song-destination");
         s.chrome.last_dir = Some(dir.clone());
         let name = store::safe_name(&s.song_name());
         let path = dir.join(format!("{name}.odbox"));
@@ -181,8 +180,7 @@ mod tests {
     #[test]
     fn replacing_a_file_is_confirmed() {
         let mut s = session();
-        let dir = std::env::temp_dir().join(format!("ordrumbox-song-replace-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
+        let dir = crate::test_support::scratch_dir("song-replace");
         s.chrome.last_dir = Some(dir.clone());
         let path = dir.join(s.song_file_name());
         std::fs::write(&path, "old").unwrap();
@@ -215,7 +213,7 @@ mod tests {
     #[test]
     fn song_files_load_as_one_undo_step() {
         let mut s = session();
-        let dir = std::env::temp_dir().join(format!("ordrumbox-song-load-{}", std::process::id()));
+        let dir = crate::test_support::scratch_dir("song-load");
         let path = dir.join("lib.odbox");
         store::save_song(&path, &s.song_record("savedAt")).unwrap();
         s.editor.add_pattern_at_measure("a", 5, None, None).unwrap();

@@ -35,6 +35,8 @@ mod spectrum;
 mod startup_error;
 mod store;
 mod synth_view;
+#[cfg(test)]
+mod test_support;
 mod theme;
 mod ui;
 pub mod ui_input;

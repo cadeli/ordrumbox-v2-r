@@ -181,7 +181,7 @@ mod tests {
     use super::*;
     use crate::kits::KitSet;
 
-    const SIZE: (i32, i32, Scale) = (1100, 680, Scale::ONE);
+    use crate::test_support::SIZE;
 
     /// BASS, an octave down: C, E, G on beat 1, D on beat 2 (keys -12, -8,
     /// -5 and -10, rows 36, 40, 43 and 38).

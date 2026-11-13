@@ -509,7 +509,7 @@ mod tests {
     use super::*;
     use crate::kits::KitSet;
 
-    const SIZE: (i32, i32, Scale) = (1100, 680, Scale::ONE);
+    use crate::test_support::{SIZE, click};
 
     fn session() -> Session {
         let (library, _) = Library::parse(
@@ -545,7 +545,7 @@ mod tests {
         let vco2 = groups.iter().position(|g| g == "vco2").unwrap() as u8;
         let icon = item(&s, |i| i.id == Some(Id::SynthIcon(vco2, 2)));
         let (x, y) = center(icon.rect);
-        s.mouse_down(SIZE, x, y, Button::Left, false);
+        click(&mut s, x, y);
         let preset = s.synths.get("b").unwrap();
         assert_eq!(model::get(preset.as_object().unwrap(), "vco2.wave"), Some(&Value::from("sawtooth")));
         assert_eq!(model::number(preset.as_object().unwrap(), "vco2.gain"), Some(0.5));
@@ -584,7 +584,7 @@ mod tests {
         assert_eq!(text(&s).as_deref(), Some("KICK plays a sample"));
         let button = item(&s, |i| i.id == Some(Id::SynthButton(USE_BUTTON)));
         let (x, y) = center(button.rect);
-        s.mouse_down(SIZE, x, y, Button::Left, false);
+        click(&mut s, x, y);
         let track = s.track(0).unwrap();
         assert!(track.use_synth && track.synth_preset.as_deref() == Some("a"));
         assert_eq!(s.message, "KICK plays \"a\"");

@@ -8,9 +8,12 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
 
+mod common;
+
+use common::scratch_dir;
+
 use std::collections::BTreeSet;
 use std::io::{BufRead, BufReader, Write};
-use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc::{self, Receiver};
 use std::thread;
@@ -80,15 +83,6 @@ const SECTIONS: [Section; 11] = [
 /// A chord progression, one chord a measure: its root, in semitones.
 const VERSE_ROOTS: [i32; 4] = [0, 0, 5, 7]; // i i iv v
 const CHORUS_ROOTS: [i32; 4] = [-4, -2, 0, 0]; // VI VII i i
-
-fn scratch_dir() -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("ordrumbox-mcp-afrobeat-{}", std::process::id()));
-    if dir.exists() {
-        std::fs::remove_dir_all(&dir).unwrap();
-    }
-    std::fs::create_dir_all(&dir).unwrap();
-    dir
-}
 
 /// The client: the bridge it started, and the answers read from it.
 struct Client {
@@ -276,7 +270,7 @@ fn sounding_tracks(pattern: &Pattern) -> BTreeSet<&str> {
 
 #[test]
 fn a_client_composes_an_afrobeat_song_of_64_measures() {
-    let dir = scratch_dir();
+    let dir = scratch_dir("mcp-afrobeat");
     let (start, _audio) = host_output(48_000.0);
     let mut session = Session::load_from(start, LibrarySource::Host(Some(LIBRARY.into())));
     // The bridge finds the window by the file next to the library.

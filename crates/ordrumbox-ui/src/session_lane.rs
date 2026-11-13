@@ -108,7 +108,7 @@ mod tests {
     use super::*;
     use crate::kits::KitSet;
 
-    const SIZE: (i32, i32, Scale) = (1100, 680, Scale::ONE);
+    use crate::test_support::{SIZE, click};
 
     fn session() -> Session {
         let (library, _) = Library::parse(
@@ -170,7 +170,7 @@ mod tests {
         s.selection.cursor = Some(Cursor { track: 1, beat: 0, step: 0 });
         let layout = s.grid_layout(SIZE).expect("the grid is shown");
         let tab = layout.lane_tab_rect(2);
-        assert!(s.mouse_down(SIZE, tab.x + 2, tab.y + 2, Button::Left, false));
+        assert!(click(&mut s, tab.x + 2, tab.y + 2));
         assert_eq!(s.editors.lane, 2);
         let (x, y) = bar(&s, 1, 1.0);
         assert!(s.lane_press(SIZE, x, y));

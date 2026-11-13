@@ -422,7 +422,7 @@ mod tests {
         assert_eq!(history_label(Id::NoteKnob("velocity")), "Velocity");
     }
 
-    const SIZE: (i32, i32, Scale) = (1100, 680, Scale::ONE);
+    use crate::test_support::{SIZE, click};
 
     #[test]
     fn the_mouse_over_a_tab_or_a_knob_shows_what_it_is() {
@@ -562,15 +562,15 @@ mod tests {
             })
         };
         assert_eq!(lit(&s), [true, false]);
-        s.mouse_down(SIZE, c.mode[1].x + 2, c.mode[1].y + 2, Button::Left, false);
+        click(&mut s, c.mode[1].x + 2, c.mode[1].y + 2);
         s.mouse_up();
         assert!(s.song_view_open());
         assert_eq!(lit(&s), [false, true]);
         // Again: nothing changes. The pattern's button brings the grid back.
-        s.mouse_down(SIZE, c.mode[1].x + 2, c.mode[1].y + 2, Button::Left, false);
+        click(&mut s, c.mode[1].x + 2, c.mode[1].y + 2);
         s.mouse_up();
         assert!(s.song_view_open());
-        s.mouse_down(SIZE, c.mode[0].x + 2, c.mode[0].y + 2, Button::Left, false);
+        click(&mut s, c.mode[0].x + 2, c.mode[0].y + 2);
         s.mouse_up();
         assert!(!s.song_view_open());
         assert_eq!(lit(&s), [true, false]);
@@ -615,7 +615,7 @@ mod tests {
         assert_eq!(s.editor.library().bpm, 140.0);
         // The beats list: 8.
         let (x, y) = center(c.beats);
-        s.mouse_down(SIZE, x, y, Button::Left, false);
+        click(&mut s, x, y);
         for _ in 0..4 {
             s.panel_key(SIZE, PanelKey::Down, false, false);
         }
@@ -623,7 +623,7 @@ mod tests {
         assert_eq!(s.pattern().unwrap().beat_count, 8);
         // AUTO: every track in auto mode, the button lit.
         let (x, y) = center(c.auto);
-        s.mouse_down(SIZE, x, y, Button::Left, false);
+        click(&mut s, x, y);
         assert!(s.pattern().unwrap().tracks.iter().all(|t| t.auto_mode));
         let layout = s.panel_layout(SIZE.0, SIZE.1, Scale::ONE);
         assert!(matches!(panel::find(&layout.items, Id::AutoAll).unwrap().kind, Kind::Button { on: true, .. }));
@@ -655,7 +655,7 @@ mod tests {
         // ↻: a new line with three kicks, the third beat among them.
         let regenerate = panel::find(&s.panel_layout(SIZE.0, SIZE.1, Scale::ONE).items, Id::Regenerate).unwrap().rect;
         let (x, y) = center(regenerate);
-        s.mouse_down(SIZE, x, y, Button::Left, false);
+        click(&mut s, x, y);
         let kick = s.track(0).unwrap();
         assert_eq!(kick.notes.len(), 3);
         assert!(kick.notes.iter().any(|n| (n.beat, n.step) == (2, 0)));
@@ -685,7 +685,7 @@ mod tests {
         let kick = s.track(0).unwrap().clone();
         let (x, y) =
             center(panel::find(&s.panel_layout(SIZE.0, SIZE.1, Scale::ONE).items, Id::GeneratePattern).unwrap().rect);
-        s.mouse_down(SIZE, x, y, Button::Left, false);
+        click(&mut s, x, y);
         assert_eq!(s.pattern().unwrap().tracks.iter().find(|t| t.name == "KICK"), Some(&kick));
         assert_eq!(s.editor.history().next_undo(), Some("Generate \"p\""));
     }

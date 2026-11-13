@@ -17,6 +17,7 @@ use crate::kits::KitSet;
 use crate::menu::{Command, LibraryState};
 use crate::panel::{self, Id};
 use crate::scale::Scale;
+use crate::test_support::scratch_dir;
 use crate::ui_input::Button;
 use crate::view;
 use crate::view::Hit;
@@ -25,12 +26,7 @@ const DEMO: &str = r#"{"patterns":[{"name":"demo","tracks":[{"name":"KICK","note
 
 /// `library.json` in a folder of its own for test `name`, the folder empty.
 fn library_file(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("ordrumbox-library-{name}-{}", std::process::id()));
-    if dir.exists() {
-        fs::remove_dir_all(&dir).unwrap();
-    }
-    fs::create_dir_all(&dir).unwrap();
-    dir.join("library.json")
+    scratch_dir(&format!("library-{name}")).join("library.json")
 }
 
 /// A session started on the library file `path`, the demo library otherwise.
