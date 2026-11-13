@@ -290,7 +290,7 @@ impl Session {
     }
 
     fn set_kit_value(&mut self, field: Field, value: f64) {
-        let Some(sample) = self.kit_editor else { return };
+        let Some(sample) = self.kit_editor.sample else { return };
         self.set_kit_sample_value(self.kit_index, sample, field, value);
     }
 
@@ -392,7 +392,7 @@ impl Session {
             Id::SynthPreset | Id::SynthField(_) => return self.synth_select(id, value),
             Id::KitKit => {
                 let target = self.kits.kits.iter().position(|k| k.name == value);
-                if let (Some(sample), Some(target)) = (self.kit_editor, target)
+                if let (Some(sample), Some(target)) = (self.kit_editor.sample, target)
                     && let Some(message) = self.kits.move_to_kit(self.kit_index, sample, target)
                 {
                     self.kits_changed(message);

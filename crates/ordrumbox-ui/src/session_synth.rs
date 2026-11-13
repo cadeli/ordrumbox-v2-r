@@ -79,7 +79,7 @@ impl SynthEditor {
 impl Session {
     /// The synth editor is shown (the kit editor opens over it).
     pub fn synth_open(&self) -> bool {
-        self.workspace == Workspace::Synth && self.kit_editor.is_none()
+        self.workspace == Workspace::Synth && !self.kit_editor.is_open()
     }
 
     /// F6, View > Synth: the synth editor in the place of the grid (on the

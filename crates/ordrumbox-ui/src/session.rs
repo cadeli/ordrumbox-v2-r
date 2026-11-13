@@ -13,8 +13,9 @@
 //! The state is held in groups, each declared with the code that owns it:
 //! `Chrome`, `Selection`, `Saving`, `Playback`, `Transport`
 //! (`session_transport.rs`), `Generators` (`session_generators.rs`), `Synths`
-//! (`session_synth.rs`), `Host` (`session_host.rs`) and `Program`
-//! (`session_commands.rs`).
+//! (`session_synth.rs`), `Host` (`session_host.rs`), `Program`
+//! (`session_commands.rs`), `KitEditor` (`session_kit.rs`) and `Flash`
+//! (`session_toast.rs`).
 //!
 //! The song panel (F3) and the piano roll (F4) take the grid's place:
 //! `session_song*.rs`, `session_roll.rs`.
@@ -23,10 +24,9 @@
 //! `keyboard_section.js`, `clipboard_section.js`): a click on an empty step
 //! adds a note, on a note selects it, on the selected note deletes it.
 
-use crate::scale::Scale;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use ordrumbox_core::{Library, Pattern, Rng, Scales, Track};
 use ordrumbox_engine::analysis::Analysis;
@@ -41,11 +41,9 @@ use crate::editors::EditorState;
 use crate::kits::KitSet;
 use crate::mcp_link;
 use crate::menu::{self};
-use crate::panel::Rect;
 use crate::panel::{Dropdown, Entry, Id};
 use crate::picker::{Export, Picker, Purpose};
 use crate::store;
-use crate::view::{self};
 use session_chrome::Chrome;
 use session_confirm::Pending;
 use session_generators::Generators;
@@ -179,13 +177,8 @@ pub struct Session {
     roots: Vec<(String, f64)>,
     kits: KitSet,
     kit_index: usize,
-    /// The kit editor, when open: selected sample of the current kit.
-    kit_editor: Option<usize>,
-    /// Analysis of the sample the kit editor shows, by url.
-    analysis: Option<(String, Analysis)>,
-    /// Where the kit editor's kit and sample are read from (folder, file),
-    /// found with the analysis: looking costs a file system call a sample.
-    kit_files: (String, Option<PathBuf>),
+    /// The kit editor (`session_kit.rs`).
+    kit_editor: session_kit::KitEditor,
     /// The synth presets: those played, the assets' (`session_synth.rs`).
     synths: session_synth::Synths,
     pattern_index: usize,
@@ -205,8 +198,8 @@ pub struct Session {
     status: Vec<String>,
     /// Outcome of the last action.
     message: String,
-    /// The message as last shown, and the toasts on screen.
-    flash: Flash,
+    /// The message as last shown, and the toasts on screen (`session_toast.rs`).
+    flash: session_toast::Flash,
     /// What was done so far, shown by a click on the status line.
     action_log: ActionLog,
     /// The assets folder in use.
@@ -310,78 +303,6 @@ const _: fn() = || {
 impl std::fmt::Debug for Session {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Session").field("pattern_index", &self.pattern_index).finish_non_exhaustive()
-    }
-}
-
-/// The lower edge of the toast in a window `height` high.
-fn toast_bottom(height: i32, scale: Scale) -> i32 {
-    height - 2 * crate::frame::margin(scale)
-}
-
-/// How long a new message is shown as a toast.
-const FLASH: Duration = Duration::from_secs(1);
-
-/// How many toasts are on screen at most; a new one beyond pushes out the oldest.
-const TOAST_LIMIT: usize = 5;
-
-/// The words of a toast for `text` shown `repeat_count` times in a row: the
-/// count follows them from the second time on.
-#[must_use]
-fn toast_text(text: &str, repeat_count: u32) -> String {
-    if repeat_count > 1 { format!("{text} (×{repeat_count})") } else { text.to_owned() }
-}
-
-/// A message shown as a toast, until a time.
-#[derive(Debug, Clone)]
-struct Toast {
-    text: String,
-    until: Instant,
-}
-
-/// The message last shown on the status line, how many times in a row, and
-/// the toasts still on screen, the oldest first.
-#[derive(Debug, Clone, Default)]
-struct Flash {
-    text: String,
-    repeat_count: u32,
-    toasts: Vec<Toast>,
-    /// No toast is shown (View > Toasts unchecked); messages still go on the status line.
-    hidden: bool,
-}
-
-impl Flash {
-    /// `text` is shown at `now`: it stands out for [`FLASH`] in a toast of
-    /// its own, under the ones still there, or not at all when empty. The same
-    /// words again get a toast of their own too, which counts the repeats.
-    fn shown(&mut self, text: &str, now: Instant) {
-        self.repeat_count = if text == self.text { self.repeat_count.saturating_add(1) } else { 1 };
-        self.text = text.to_owned();
-        if text.is_empty() || self.hidden {
-            return;
-        }
-        if self.toasts.len() == TOAST_LIMIT {
-            self.toasts.remove(0);
-        }
-        let text = toast_text(text, self.repeat_count);
-        self.toasts.push(Toast { text, until: now + FLASH });
-    }
-
-    /// Each toast with its rectangle in a window `width` × `height`: the
-    /// newest at the bottom, the older ones stacked above it.
-    fn rects(&self, width: i32, height: i32, scale: Scale) -> Vec<(Rect, &Toast)> {
-        let mut bottom = toast_bottom(height, scale);
-        let mut rects: Vec<(Rect, &Toast)> = self
-            .toasts
-            .iter()
-            .rev()
-            .map(|toast| {
-                let rect = view::toast_rect(width, &toast.text, bottom, scale);
-                bottom = rect.y - view::toast_gap(scale);
-                (rect, toast)
-            })
-            .collect();
-        rects.reverse();
-        rects
     }
 }
 
@@ -530,15 +451,6 @@ impl Session {
         self.message = if self.chrome.show_vus { "VU meters on".into() } else { "VU meters off".into() };
     }
 
-    /// View > Toasts: show or hide the messages that pop up over the window.
-    pub fn toggle_toasts(&mut self) {
-        self.flash.hidden = !self.flash.hidden;
-        if self.flash.hidden {
-            self.flash.toasts.clear();
-        }
-        self.message = if self.flash.hidden { "toasts off".into() } else { "toasts on".into() };
-    }
-
     // ─── Menus and commands ──────────────────────────────────────────────────
 
     /// A view button (`view::VIEWS`): show that view, unless it is shown.
@@ -550,10 +462,10 @@ impl Session {
         }
         let target = [Workspace::Grid, Workspace::PianoRoll, Workspace::Song, Workspace::Synth];
         let Some(&target) = target.get(usize::from(i)) else { return };
-        if self.workspace == target && self.kit_editor.is_none() {
+        if self.workspace == target && !self.kit_editor.is_open() {
             return;
         }
-        self.kit_editor = None;
+        self.kit_editor.sample = None;
         if self.workspace != target {
             match target {
                 Workspace::Grid => {
@@ -570,7 +482,7 @@ impl Session {
     /// A mode button: the song panel, or the grid in its place (what is
     /// shown is left as it is when it already is the mode).
     pub(super) fn show_mode(&mut self, song: bool) {
-        if song == (self.workspace == Workspace::Song) && self.kit_editor.is_none() {
+        if song == (self.workspace == Workspace::Song) && !self.kit_editor.is_open() {
             return;
         }
         self.show_view(if song { 2 } else { 0 });

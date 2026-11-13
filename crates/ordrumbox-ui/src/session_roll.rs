@@ -108,7 +108,7 @@ impl Session {
 
     /// The piano roll is shown (the kit editor opens over it).
     pub fn piano_roll_open(&self) -> bool {
-        self.workspace == Workspace::PianoRoll && self.kit_editor.is_none()
+        self.workspace == Workspace::PianoRoll && !self.kit_editor.is_open()
     }
 
     /// F4, View > Piano roll: the piano roll in the place of the grid, or

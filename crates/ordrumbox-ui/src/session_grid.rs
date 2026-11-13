@@ -80,7 +80,7 @@ pub(super) fn moved_index(t: usize, from: usize, to: usize) -> usize {
 impl Session {
     /// The grid's layout, when the grid is shown.
     pub(super) fn grid_layout(&self, size: (i32, i32, Scale)) -> Option<view::Layout> {
-        if self.workspace != Workspace::Grid || self.kit_editor.is_some() {
+        if self.workspace != Workspace::Grid || self.kit_editor.is_open() {
             return None;
         }
         let body = self.body(size);

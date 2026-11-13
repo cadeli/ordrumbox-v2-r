@@ -8,10 +8,11 @@ use crate::scale::Scale;
 use crate::view::KitView;
 use crate::{theme, view};
 use ordrumbox_core::instruments::catalog;
+use ordrumbox_engine::analysis::Analysis;
 use ordrumbox_engine::kit::KitSample;
 use ordrumbox_engine::offline::RenderSetup;
 use ordrumbox_engine::{analysis, offline};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::canvas::{chars_in, text_width};
@@ -20,22 +21,40 @@ use crate::panel::{self, Item, Kind, Rect};
 use crate::song_view;
 use crate::view::KitLayout;
 
+/// The kit editor: what it shows of the current kit.
+#[derive(Debug, Default)]
+pub(super) struct KitEditor {
+    /// The sample selected in the current kit, when the editor is open.
+    pub(super) sample: Option<usize>,
+    /// Analysis of the sample shown, by url.
+    pub(super) analysis: Option<(String, Analysis)>,
+    /// Where the kit and the sample shown are read from (folder, file),
+    /// found with the analysis: looking costs a file system call a sample.
+    pub(super) files: (String, Option<PathBuf>),
+}
+
+impl KitEditor {
+    pub(super) const fn is_open(&self) -> bool {
+        self.sample.is_some()
+    }
+}
+
 impl Session {
     // ─── Kit editor ──────────────────────────────────────────────────────────
 
     pub fn kit_editor_open(&self) -> bool {
-        self.kit_editor.is_some()
+        self.kit_editor.is_open()
     }
 
     /// The kit editor's selected sample and the kit's sample count, when open.
     pub fn kit_list(&self) -> Option<(usize, usize)> {
-        let sample = self.kit_editor?;
+        let sample = self.kit_editor.sample?;
         Some((sample, self.kits.kits.get(self.kit_index).map_or(0, |k| k.samples.len())))
     }
 
     /// Ctrl+K: the kit editor (the drumkit manager), open or closed.
     pub fn toggle_kit_editor(&mut self) {
-        self.kit_editor = match self.kit_editor {
+        self.kit_editor.sample = match self.kit_editor.sample {
             Some(_) => None,
             None => Some(0),
         };
@@ -46,15 +65,15 @@ impl Session {
 
     /// The analysis of the sample shown, computed when it changes.
     pub(super) fn update_analysis(&mut self) {
-        let url = self.kit_editor.and_then(|s| self.kits.sample(self.kit_index, s)).map(|i| i.path.clone());
+        let url = self.kit_editor.sample.and_then(|s| self.kits.sample(self.kit_index, s)).map(|i| i.path.clone());
         match url {
-            Some(url) if self.analysis.as_ref().is_some_and(|(u, _)| *u == url) => {}
+            Some(url) if self.kit_editor.analysis.as_ref().is_some_and(|(u, _)| *u == url) => {}
             Some(url) => {
-                self.analysis = self.kits.buffer(&url).map(|b| (url.clone(), analysis::analyze(b)));
+                self.kit_editor.analysis = self.kits.buffer(&url).map(|b| (url.clone(), analysis::analyze(b)));
             }
-            None => self.analysis = None,
+            None => self.kit_editor.analysis = None,
         }
-        self.kit_files = match (self.kit_editor, self.kits.kits.get(self.kit_index)) {
+        self.kit_editor.files = match (self.kit_editor.sample, self.kits.kits.get(self.kit_index)) {
             (Some(sample), Some(kit)) => {
                 (self.kit_folder(kit), kit.samples.get(sample).and_then(|s| self.kits.file(&s.path)))
             }
@@ -89,33 +108,33 @@ impl Session {
             (Ok(()), None) => message,
         };
         self.kit_index = self.kit_index.min(self.kits.kits.len().saturating_sub(1));
-        self.analysis = None;
+        self.kit_editor.analysis = None;
         self.select_kit(self.kit_index);
     }
 
     /// ↑↓: the previous / next sample of the kit.
     pub fn kit_select(&mut self, delta: isize) {
-        let Some(sample) = self.kit_editor else { return };
+        let Some(sample) = self.kit_editor.sample else { return };
         let count = self.kits.kits.get(self.kit_index).map_or(0, |k| k.samples.len());
         if count > 0 {
-            self.kit_editor = Some((sample as isize + delta).rem_euclid(count as isize) as usize);
+            self.kit_editor.sample = Some((sample as isize + delta).rem_euclid(count as isize) as usize);
             self.update_analysis();
         }
     }
 
     /// A click on the kit editor's list: that sample, heard.
     pub fn kit_click(&mut self, sample: usize) {
-        if self.kit_editor.is_none() {
+        if !self.kit_editor.is_open() {
             return;
         }
-        self.kit_editor = Some(sample);
+        self.kit_editor.sample = Some(sample);
         self.update_analysis();
         self.kit_audition();
     }
 
     /// Enter: the selected sample, as it is.
     pub fn kit_audition(&mut self) {
-        let Some(sample) = self.kit_editor else { return };
+        let Some(sample) = self.kit_editor.sample else { return };
         let Some(url) = self.kits.sample(self.kit_index, sample).map(|i| i.path.clone()) else { return };
         if let Some(controller) = self.playback.controller_mut()
             && let Some(index) = controller.bank().find_path(&url)
@@ -126,7 +145,7 @@ impl Session {
 
     /// Delete: the selected sample out of the kit.
     pub fn kit_remove(&mut self) {
-        let Some(sample) = self.kit_editor else { return };
+        let Some(sample) = self.kit_editor.sample else { return };
         let kit = self.kit_index;
         if self.kits.kits.get(kit).is_some_and(|k| sample < k.samples.len()) {
             self.ask(Pending::RemoveSample { kit, sample });
@@ -157,7 +176,7 @@ impl Session {
     /// and description (a click edits them), the instrument of each sample
     /// shown in the table.
     pub(super) fn kit_items(&self, layout: &KitLayout, scale: Scale) -> Vec<Item> {
-        let (Some(sample), Some(kit)) = (self.kit_editor, self.kits.kits.get(self.kit_index)) else {
+        let (Some(sample), Some(kit)) = (self.kit_editor.sample, self.kits.kits.get(self.kit_index)) else {
             return Vec::new();
         };
         let mut items = Vec::new();
@@ -259,13 +278,17 @@ impl Session {
 
     /// What the kit editor shows; its sample's details start at `details_top`.
     pub(super) fn kit_view(&self, details_top: i32) -> Option<KitView<'_>> {
-        let sample = self.kit_editor?;
+        let sample = self.kit_editor.sample?;
         let kit = self.kits.kits.get(self.kit_index)?;
         let samples = kit.samples.iter().map(|i| sample_file_name(&i.path)).collect();
         let selected = kit.samples.get(sample);
-        let analysis =
-            self.analysis.as_ref().filter(|(url, _)| selected.is_some_and(|i| i.path == *url)).map(|(_, a)| a);
-        let facts = kit_facts(selected, self.kit_files.1.as_deref(), analysis);
+        let analysis = self
+            .kit_editor
+            .analysis
+            .as_ref()
+            .filter(|(url, _)| selected.is_some_and(|i| i.path == *url))
+            .map(|(_, a)| a);
+        let facts = kit_facts(selected, self.kit_editor.files.1.as_deref(), analysis);
         let decay_marker = match (selected, analysis) {
             (Some(i), Some(a)) if a.duration_sec > 0.0 => Some((i.decay_ms() / 1000.0 / a.duration_sec).min(1.0)),
             _ => None,
@@ -281,7 +304,7 @@ impl Session {
             .collect();
         Some(KitView {
             kit: &kit.name,
-            folder: self.kit_files.0.clone(),
+            folder: self.kit_editor.files.0.clone(),
             samples,
             users,
             selected: sample,

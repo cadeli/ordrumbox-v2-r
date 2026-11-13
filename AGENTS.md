@@ -236,6 +236,99 @@ assets/           data/*.json and kits/**.wav, read at runtime
 - `#[must_use]` on functions that only compute a value; `const fn` and
   `const` tables where the value is known at compile time.
 
+## Structure: do and do not
+
+Decoupling, file size, naming, reuse. A rule here is checked in review; a
+file or function that breaks one carries a comment saying why.
+
+### Decoupling
+
+- **Do** give each module one reason to change, and say it in its first doc
+  line. **Do** put a type with the functions that act on it (`impl` in the
+  module of the type), not in a "utils" or "helpers" module.
+- **Do** depend on the narrowest thing: pass `&Pattern`, a slice, or a small
+  struct of what the function reads, not the whole `Session`. A function that
+  needs two fields of `Session` takes the two fields.
+- **Do** keep logic that needs no window, no sound device and no file in the
+  domain crates (`core`, `logic`, `dsp`), where it is tested without the app.
+  The UI calls it; it does not re-implement it.
+- **Do** use a trait or a generic only at a seam that already exists (see
+  Modern Rust); otherwise a plain function and a struct.
+- **Do not** reach into another module's fields. Give the type a method or a
+  getter instead; keep fields private (`pub(crate)` at most, never `pub` by
+  habit).
+- **Do not** add a dependency that points up the table of "Layout", or a
+  cycle between modules of a crate. **Do** re-export (`pub use`) only once,
+  to shape a crate's public surface in `lib.rs`; **do not** create internal
+  aliases: one type, one home.
+- **Do not** let a view mutate the model directly. A view reads state and
+  returns a command; `Session` applies it as one undo step.
+- **Do not** use a global, a `static mut`, a `thread_local` or a singleton to
+  avoid passing a parameter.
+
+### File and function size
+
+- **Do** keep a file under about 500 lines of code (tests excluded) and a
+  function under about 60. Past 800 lines, or when a file holds two
+  separate ideas, split it before adding to it.
+- **Do** split by concept, as a folder module (`foo.rs` + `foo/`), with a
+  name that says what the part is: `session_roll.rs` and `session_song.rs`
+  are parts of the session, not `session2.rs`. The parent keeps the type and
+  the public surface; the parts keep the details.
+- **Do** move tests that outgrow their file to `foo/tests.rs` or the crate's
+  `tests/`; move big literal tables to a `data.rs` next to them.
+- **Do not** grow an existing large file to add a feature: put the feature in
+  a new module and call it from there. **Do not** split by size alone
+  (`part1`, `part2`, `misc`, `more`): a split must follow a seam.
+- **Do not** nest deeper than three levels of `if`/`match`/loop: extract a
+  function, use an early `return`, `let … else`, or `?`.
+
+### Naming
+
+- **Do** give one concept one name across all crates, and look for it before
+  coining another (`rg` the term). `pattern`, `track`, `note`, `kit`, `sample`,
+  `synth`, `measure`, `clip` mean one thing each, as in "Code conventions".
+- **Do** name an accessor after the field, with no `get_` prefix (`name()`,
+  `set_name()`).
+- **Do** use the same verb for the same action: `new` / `from_*` build,
+  `to_*` / `as_*` / `into_*` convert, `is_*` / `has_*` ask a yes/no, `set_*`
+  writes one value, `update_*` recomputes, `apply_*` runs a command,
+  `draw_*` paints, `handle_*` takes input, `load_*` / `save_*` touch files.
+- **Do** name files after the main type or idea they hold; a prefix groups
+  the parts of one subject (`session_*`, `editors/`). A test file ends in
+  `_tests` or lives in `tests/`.
+- **Do** name a function for what it does, a type for what it is, a `bool`
+  as a question (`is_playing`, not `playing_flag`).
+- **Do not** abbreviate beyond the short names of "Code conventions" (`p`, `t`,
+  `n`); no `mgr`, `ctx`, `tmp`, `data`, `info`, `util`, `helper` as a name.
+- **Do not** name the same thing two ways in two places (`step`/`slot`,
+  `volume`/`gain`/`level` for the same value): rename one to match the other
+  in the same change.
+
+### Reuse
+
+- **Do** search before writing: `rg` the verb and the type for an existing
+  function, constant or test helper, and extend it if it is close.
+- **Do** extract at the second copy of a rule that must stay the same
+  everywhere (a clamp, a hit test, a unit conversion, a layout rect), and at
+  the third copy of any other block of more than about 3 lines. **Do** put it in the lowest crate that
+  can own it, so every layer above can call it.
+- **Do** make a shared function small and general: parameters for what
+  varies, no `bool` flag that switches two behaviours (that is two functions,
+  or an `enum`).
+- **Do** use the standard library and the iterator adapters before a loop of
+  your own, and one shared test helper (`fixtures`, builders) before a new
+  setup in each test.
+- **Do not** copy a block and edit it. **Do not** add a near-duplicate
+  function beside an existing one (`draw_row_2`, `foo_alt`); change the
+  original, or give both a shared core.
+- **Do not** write a wrapper that only forwards a call, or a trait with one
+  implementation and no seam. **Do not** abstract before the second use: three
+  similar lines are better than a premature framework, but a rule repeated is
+  a bug waiting.
+- **Do not** leave dead code, `_unused` parameters or a commented-out block
+  behind: delete it; git remembers.
+
 ## Code conventions
 
 - English only, in code, comments and names.
