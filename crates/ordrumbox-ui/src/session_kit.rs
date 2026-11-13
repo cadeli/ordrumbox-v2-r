@@ -49,7 +49,7 @@ impl Session {
     /// The kit editor's selected sample and the kit's sample count, when open.
     pub fn kit_list(&self) -> Option<(usize, usize)> {
         let sample = self.kit_editor.sample?;
-        Some((sample, self.kits.kits.get(self.kit_index).map_or(0, |k| k.samples.len())))
+        Some((sample, self.kit().map_or(0, |k| k.samples.len())))
     }
 
     /// Ctrl+K: the kit editor (the drumkit manager), open or closed.
@@ -73,7 +73,7 @@ impl Session {
             }
             None => self.kit_editor.analysis = None,
         }
-        self.kit_editor.files = match (self.kit_editor.sample, self.kits.kits.get(self.kit_index)) {
+        self.kit_editor.files = match (self.kit_editor.sample, self.kit()) {
             (Some(sample), Some(kit)) => {
                 (self.kit_folder(kit), kit.samples.get(sample).and_then(|s| self.kits.file(&s.path)))
             }
@@ -93,7 +93,7 @@ impl Session {
             controller.set_bank(bank.clone());
             controller.refresh(self.editor.library());
         }
-        let kit = self.kits.kits.get(self.kit_index).map(|k| k.name.clone()).unwrap_or_default();
+        let kit = self.kit().map(|k| k.name.clone()).unwrap_or_default();
         self.render = (!bank.samples.is_empty()).then(|| RenderSetup {
             bank: bank.clone(),
             scales: self.generators.scales.clone(),
@@ -115,7 +115,7 @@ impl Session {
     /// ↑↓: the previous / next sample of the kit.
     pub fn kit_select(&mut self, delta: isize) {
         let Some(sample) = self.kit_editor.sample else { return };
-        let count = self.kits.kits.get(self.kit_index).map_or(0, |k| k.samples.len());
+        let count = self.kit().map_or(0, |k| k.samples.len());
         if count > 0 {
             self.kit_editor.sample = Some((sample as isize + delta).rem_euclid(count as isize) as usize);
             self.update_analysis();
@@ -176,7 +176,7 @@ impl Session {
     /// and description (a click edits them), the instrument of each sample
     /// shown in the table.
     pub(super) fn kit_items(&self, layout: &KitLayout, scale: Scale) -> Vec<Item> {
-        let (Some(sample), Some(kit)) = (self.kit_editor.sample, self.kits.kits.get(self.kit_index)) else {
+        let (Some(sample), Some(kit)) = (self.kit_editor.sample, self.kit()) else {
             return Vec::new();
         };
         let mut items = Vec::new();
@@ -220,7 +220,7 @@ impl Session {
 
     /// The text entry of the kit's title or description.
     pub(super) fn kit_text_entry(&mut self, key: &'static str) {
-        let Some(kit) = self.kits.kits.get(self.kit_index) else { return };
+        let Some(kit) = self.kit() else { return };
         let title = if key == KIT_TITLE { "Kit title:" } else { "Kit description:" };
         let text = kit_text(kit, key);
         self.show_entry(Id::KitText(key), None, title.into(), text);
@@ -279,7 +279,7 @@ impl Session {
     /// What the kit editor shows; its sample's details start at `details_top`.
     pub(super) fn kit_view(&self, details_top: i32) -> Option<KitView<'_>> {
         let sample = self.kit_editor.sample?;
-        let kit = self.kits.kits.get(self.kit_index)?;
+        let kit = self.kit()?;
         let samples = kit.samples.iter().map(|i| sample_file_name(&i.path)).collect();
         let selected = kit.samples.get(sample);
         let analysis = self

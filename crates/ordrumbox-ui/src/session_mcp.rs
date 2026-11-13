@@ -386,7 +386,7 @@ impl Session {
             });
             object([("name", Value::from(kit.name.as_str())), ("samples", Value::Array(samples.collect()))])
         });
-        let current = self.kits.kits.get(self.kit_index).map_or(Value::Null, |k| Value::from(k.name.as_str()));
+        let current = self.kit().map_or(Value::Null, |k| Value::from(k.name.as_str()));
         object([("kit", current), ("kits", Value::Array(kits.collect()))])
     }
 

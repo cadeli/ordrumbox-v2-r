@@ -144,11 +144,11 @@ fn a_session_through_the_menus_draws_every_step() {
     assert!(rows < s.shortcut_lines().len());
     s.overlay_key(OverlayKey::Edge(true));
     assert!(
-        matches!(s.chrome.overlay, Some(crate::session::Overlay::Shortcuts { scroll }) if scroll == s.shortcut_lines().len() - rows)
+        matches!(s.chrome.overlay, Some(crate::session::session_overlay::Overlay::Shortcuts { scroll }) if scroll == s.shortcut_lines().len() - rows)
     );
     s.overlay_key(OverlayKey::Move(-2));
     assert!(
-        matches!(s.chrome.overlay, Some(crate::session::Overlay::Shortcuts { scroll }) if scroll == s.shortcut_lines().len() - rows - 2)
+        matches!(s.chrome.overlay, Some(crate::session::session_overlay::Overlay::Shortcuts { scroll }) if scroll == s.shortcut_lines().len() - rows - 2)
     );
     draw(&mut s);
     s.overlay_key(OverlayKey::Escape);

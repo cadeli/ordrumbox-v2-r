@@ -1,6 +1,7 @@
 //! Files out and back in: kits, synth presets and songs.
 
-use super::super::{OverlayKey, SYNTHS_FILE_NAME, Session};
+use super::super::session_files::SYNTHS_FILE_NAME;
+use super::super::{OverlayKey, Session};
 use super::{RATE, demo_session, draw, run};
 use crate::menu::Command;
 use crate::picker::Outcome;

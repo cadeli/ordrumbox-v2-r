@@ -2,11 +2,33 @@
 //! exports, the MIDI import, the file picker that names them, and the files
 //! dropped on the window.
 
+use super::Session;
 use super::session_confirm::Pending;
-use super::{Overlay, Session};
+use super::session_overlay::Overlay;
+use super::session_user_data;
 use crate::picker::{Export, Outcome, Picker, Purpose};
-use ordrumbox_engine::Mode;
+use crate::store;
+use ordrumbox_core::{Library, Pattern, Rng};
+use ordrumbox_engine::offline;
+use ordrumbox_engine::{Mode, wav};
+use ordrumbox_logic::generate::{self, AutoGenerator};
+use ordrumbox_logic::{compose, midi};
 use std::path::{Path, PathBuf};
+use std::time::Instant;
+
+/// Why a WAV export is refused.
+pub(super) const NOTHING_TO_RENDER: &str = "nothing to render with (no samples loaded)";
+
+/// Why the synth sounds cannot be exported.
+pub(super) const NO_SYNTHS: &str = "No synth sounds loaded";
+
+/// The file the synth sounds are exported to.
+pub(super) const SYNTHS_FILE_NAME: &str = "ordrumbox-synth-sounds.json";
+
+/// The file a pattern is exported to as JSON (`ordrumbox-<name>.json`).
+fn pattern_json_file_name(pattern: &Pattern) -> String {
+    format!("ordrumbox-{}.json", store::safe_name(pattern.name.as_deref().unwrap_or("pattern")))
+}
 
 impl Session {
     /// Ctrl+E: the selected pattern (with Shift: the selected song) to a WAV
@@ -143,5 +165,112 @@ impl Session {
             }
             Err(e) => self.message = e,
         }
+    }
+}
+
+impl Session {
+    /// What `mode` plays (a pattern once, a song whole) as a WAV file at
+    /// `path`; what was written.
+    pub(super) fn write_wav(&self, mode: Mode, path: &Path) -> Result<String, String> {
+        let setup = self.render.as_ref().ok_or(NOTHING_TO_RENDER)?;
+        let library = self.editor.library();
+        let started = Instant::now();
+        let rendered = match mode {
+            Mode::Song(index) => {
+                if library.songs.get(index).is_none() {
+                    return Err("no song in the library".into());
+                }
+                offline::render_song(library, index, setup)
+            }
+            Mode::Pattern(p) => {
+                // Tracks in auto mode get their new lines loop after loop, on the render's copy.
+                let (scales, mut rng) = (&self.generators.scales, Rng::new(setup.seed));
+                let styles = compose::learn(&self.generators.styles, &library.patterns);
+                let mut loop_start = |library: &mut Library, p: usize, number: u64| {
+                    if let Some(pattern) = library.patterns.get_mut(p).filter(|p| generate::plays_auto(p)) {
+                        let mut rnd = || rng.next_f64();
+                        generate::run_loop(&mut AutoGenerator::new(scales, &styles, &mut rnd), pattern, number);
+                    }
+                };
+                offline::render_pattern(library, p, 1, setup, Some(&mut loop_start))
+            }
+        };
+        let (left, right) = rendered.ok_or("nothing to export (no playable clip)")?;
+        let bytes = wav::encode(&left, &right, setup.sample_rate);
+        store::write_atomic(path, bytes).map_err(|e| format!("not exported: {}: {e}", path.display()))?;
+        Ok(format!(
+            "exported {} ({:.1} s of audio in {:.1} s)",
+            path.display(),
+            left.len() as f64 / f64::from(setup.sample_rate),
+            started.elapsed().as_secs_f64()
+        ))
+    }
+
+    /// Pattern `p` as a MIDI file at `path`; what was written.
+    pub(super) fn write_midi(&self, p: usize, path: &Path) -> Result<String, String> {
+        let pattern = self.editor.library().patterns.get(p).ok_or("No pattern selected")?;
+        let mut rng = Rng::new(1);
+        let bpm = self.editor.library().bpm;
+        let bytes = midi::export(pattern, bpm, 1, &self.roots, &mut rng, &self.generators.scales);
+        store::write_atomic(path, &bytes).map_err(|e| format!("not exported: {}: {e}", path.display()))?;
+        Ok(format!("exported {} ({} bytes)", path.display(), bytes.len()))
+    }
+
+    /// Pattern `p` as JSON at `path`.
+    pub(super) fn write_pattern_json(&self, p: usize, path: &Path) -> Result<(), String> {
+        let pattern = self.editor.library().patterns.get(p).ok_or("No pattern selected")?;
+        let text = pattern.to_json().to_json_pretty(2) + "\n";
+        store::write_atomic(path, text).map_err(|e| format!("not exported: {}: {e}", path.display()))
+    }
+
+    /// New patterns from the MIDI file at `path`, the last one shown; what
+    /// the import says.
+    pub(super) fn import_midi_file(&mut self, path: &Path) -> Result<String, String> {
+        let name = path.file_name().map_or_else(|| "midi".into(), |n| n.to_string_lossy().into_owned());
+        let bytes = std::fs::read(path).map_err(|e| format!("not imported: {}: {e}", path.display()))?;
+        let (index, message) =
+            self.editor.import_midi(&name, &bytes, &self.roots).map_err(|reason| format!("{name}: {reason}"))?;
+        self.pattern_index = index;
+        self.deselect();
+        self.edited();
+        self.message.clone_from(&message);
+        self.chrome.current_page = 0;
+        Ok(message)
+    }
+
+    /// Ask for the folder to write `export` to: the last one picked, at first
+    /// the exports folder. What cannot be exported is said at once.
+    pub(super) fn open_export(&mut self, export: Export) {
+        let refusal = match export {
+            Export::PatternWav | Export::SongWav if self.render.is_none() => Some(NOTHING_TO_RENDER),
+            Export::Synths if self.synths.presets.is_empty() => Some(NO_SYNTHS),
+            _ => None,
+        };
+        if let Some(refusal) = refusal {
+            self.message = refusal.into();
+            return;
+        }
+        let start = self.chrome.last_dir.clone().filter(|d| d.is_dir()).or_else(store::exports_dir);
+        self.chrome.overlay = Some(Overlay::Picker(Picker::new(Purpose::Export(export), start.as_deref())));
+    }
+
+    /// The name of the file `export` writes for pattern `p` or song `s`.
+    pub(super) fn export_file_name_of(&self, export: Export, p: usize, s: usize) -> Option<String> {
+        let library = self.editor.library();
+        let pattern = library.patterns.get(p);
+        // Ids come as they are from the files loaded: one with `/` or `..`
+        // must not lead the write out of the folder picked.
+        Some(match export {
+            Export::PatternWav => format!("ordrumbox-{}.wav", store::safe_name(&pattern?.id)),
+            Export::SongWav => format!("ordrumbox-song-{}.wav", store::safe_name(&library.songs.get(s)?.id)),
+            Export::PatternMidi => format!("ordrumbox-{}.mid", store::safe_name(&pattern?.id)),
+            Export::PatternJson => pattern_json_file_name(pattern?),
+            Export::Song | Export::SongSaveAs => self.song_file_name(),
+            Export::Synths => SYNTHS_FILE_NAME.to_owned(),
+            Export::KitMapping => self.kits.mapping_file_name(self.kit_index)?,
+            Export::KitFolder => self.kits.folder_name(self.kit_index)?,
+            Export::Library => session_user_data::LIBRARY_FILE_NAME.to_owned(),
+            Export::UserData => crate::user_data::backup_name(&crate::user_data::now_stamp()),
+        })
     }
 }

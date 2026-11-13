@@ -42,7 +42,7 @@ impl Session {
         match (self.playback.controller(), &self.render) {
             (Some(c), _) => c.track_sound(library, self.pattern_index, t),
             (None, Some(render)) => {
-                let kit = self.kits.kits.get(self.kit_index).map_or("", |k| k.name.as_str());
+                let kit = self.kit().map_or("", |k| k.name.as_str());
                 assign_track(track, &render.bank, kit, &self.synths.presets, &mut |_| 0)
             }
             (None, None) => TrackSound::None,
@@ -249,7 +249,7 @@ impl Session {
     /// Every sample of instrument `id`: (kit, url, name), the current kit's
     /// first, then by kit and name.
     pub(super) fn samples_for(&self, id: &str) -> Vec<(String, String, String)> {
-        let current = self.kits.kits.get(self.kit_index).map_or("", |k| k.name.as_str());
+        let current = self.kit().map_or("", |k| k.name.as_str());
         let mut found: Vec<(String, String, String)> = self
             .kits
             .kits

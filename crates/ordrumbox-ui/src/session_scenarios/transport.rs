@@ -205,14 +205,14 @@ fn the_preferences_list_the_devices_and_ports_the_program_offers() {
     s.offer_midi_inputs(|| vec!["Pad".into(), "Keys".into()]);
     s.run(Command::Preferences);
     let lines = match &s.chrome.overlay {
-        Some(crate::session::Overlay::Preferences(prefs)) => prefs.lines(),
+        Some(crate::session::session_overlay::Overlay::Preferences(prefs)) => prefs.lines(),
         _ => panic!("not open"),
     };
     assert!(lines[0].starts_with("> Audio output"), "{lines:?}");
     assert!(lines[1].contains("MIDI input"), "{lines:?}");
     // The modal keeps its width whichever value is shown.
     let width = |s: &Session| match &s.chrome.overlay {
-        Some(crate::session::Overlay::Preferences(prefs)) => {
+        Some(crate::session::session_overlay::Overlay::Preferences(prefs)) => {
             prefs.lines().iter().map(|l| l.chars().count()).collect::<Vec<_>>()
         }
         _ => vec![],

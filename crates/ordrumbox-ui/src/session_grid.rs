@@ -389,8 +389,9 @@ impl Session {
 
 #[cfg(test)]
 mod tests {
+    use super::super::OverlayKey;
+    use super::super::session_overlay::Overlay;
     use super::super::session_panel::PanelKey;
-    use super::super::{Overlay, OverlayKey};
     use super::*;
     use crate::kits::KitSet;
     use crate::menu::Command;
