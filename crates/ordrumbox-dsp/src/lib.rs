@@ -66,6 +66,7 @@ pub mod master_bus;
 pub mod sample;
 pub mod slope;
 pub mod strip;
+mod svf;
 pub mod synth;
 pub mod voice;
 
