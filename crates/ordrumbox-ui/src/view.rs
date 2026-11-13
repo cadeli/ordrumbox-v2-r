@@ -482,18 +482,15 @@ pub struct HostState {
     pub bpm: f64,
 }
 
-/// The header's pattern list and kit list (`PatternNav`'s two selects).
-pub fn header_selects(scale: Scale) -> (Rect, Rect) {
-    let c = header_controls(scale);
-    (c.pattern, c.kit)
-}
-
 /// The header (the JS toolbar and its pattern settings panel), a row of
-/// labelled groups after the logo: play; BPM (the tempo knob); PATTERN;
+/// labelled groups after the logo: MODE (the pattern or the song: what PLAY
+/// plays and what the main editor shows); play; BPM (the tempo knob); PATTERN;
 /// BEATS; KIT; GENERATE (drums, bass, chords); VIEW (grid, piano roll,
-/// song, synth, output).
+/// synth, kit editor).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HeaderControls {
+    /// The mode switch: the pattern, the song.
+    pub mode: [Rect; 2],
     pub play: Rect,
     pub bpm: Rect,
     pub pattern: Rect,
@@ -515,8 +512,12 @@ pub const MACROS: [(&str, &str); 3] = [
     (ordrumbox_core::style::VARIATION, "VARIATION"),
 ];
 
+/// The mode switch's labels: what the window edits and plays.
+pub const MODES: [&str; 2] = ["PATT", "SONG"];
+
 /// The view buttons' labels: the main editor (grid, piano roll, song, synth)
-/// and the kit editor.
+/// and the kit editor. The song has no button of its own: it is the mode
+/// switch's (its slot has no width).
 pub const VIEWS: [&str; 5] = ["GRID", "ROLL", "SONG", "SYNTH", "KIT"];
 
 pub fn header_controls(scale: Scale) -> HeaderControls {
@@ -531,6 +532,7 @@ pub fn header_controls(scale: Scale) -> HeaderControls {
     };
     // Close inside a group, wide between groups: the same total width as
     // when every gap was alike, so the window's minimum width is kept.
+    let mode = [next(52, 2), next(52, HEADER_GROUP_GAP)];
     let play = next(36, 4);
     let bpm = next(52, HEADER_GROUP_GAP);
     let pattern = next(104, 4);
@@ -540,8 +542,11 @@ pub fn header_controls(scale: Scale) -> HeaderControls {
     let generate = next(22, 4);
     let auto = next(38, 6);
     let macros = [next(44, 4), next(64, 4), next(56, HEADER_GROUP_GAP + 2)];
-    let views = [next(40, 2), next(40, 2), next(40, 2), next(48, 2), next(40, 0)];
-    HeaderControls { play, bpm, pattern, beats, kit, style, generate, auto, macros, views }
+    let (grid, roll) = (next(40, 2), next(40, 2));
+    // The song's slot, closed: the mode switch is its button.
+    let song = next(0, 0);
+    let views = [grid, roll, song, next(48, 2), next(40, 0)];
+    HeaderControls { mode, play, bpm, pattern, beats, kit, style, generate, auto, macros, views }
 }
 
 /// The gap between two of the header's groups, at scale 1: room for both
@@ -551,29 +556,44 @@ const HEADER_GROUP_GAP: i32 = 14;
 const HEADER_GROUP_PAD: i32 = 4;
 
 impl HeaderControls {
-    /// The header of a plugin, which has no song view: the SONG slot is
-    /// empty (no width) and the buttons after it move into its place.
+    /// The header of a plugin, which has no song: no mode switch, the
+    /// controls after it move into its place.
     #[must_use]
     pub fn hosted(mut self) -> Self {
-        let shift = self.views[3].x - self.views[2].x;
-        for rect in &mut self.views[3..] {
+        let shift = self.play.x - self.mode[0].x;
+        let rects = [
+            &mut self.play,
+            &mut self.bpm,
+            &mut self.pattern,
+            &mut self.beats,
+            &mut self.kit,
+            &mut self.style,
+            &mut self.generate,
+            &mut self.auto,
+        ];
+        for rect in rects.into_iter().chain(&mut self.macros).chain(&mut self.views) {
             rect.x -= shift;
         }
-        self.views[2].w = 0;
+        for rect in &mut self.mode {
+            rect.w = 0;
+        }
+        self.mode[1].x = self.mode[0].x;
         self
     }
 
-    /// The frames of the header's groups: transport (play, tempo), pattern
-    /// (pattern, beats, kit), generation (style, ⟳, AUTO, macros) and views.
-    /// Each covers its controls and their labels above them.
+    /// The frames of the header's groups: mode (pattern or song), transport
+    /// (play, tempo), pattern (pattern, beats, kit), generation (style, ⟳,
+    /// AUTO, macros) and views. Each covers its controls and their labels
+    /// above them.
     #[must_use]
-    pub fn groups(&self, scale: Scale) -> [Rect; 4] {
+    pub fn groups(&self, scale: Scale) -> [Rect; 5] {
         let pad = HEADER_GROUP_PAD * scale;
         let top = content_top(scale) - 3 * scale;
         let frame = |first: Rect, last: Rect| {
             Rect::new(first.x - pad, top, last.x + last.w - first.x + 2 * pad, first.y + first.h + 3 * scale - top)
         };
         [
+            frame(self.mode[0], self.mode[1]),
             frame(self.play, self.bpm),
             frame(self.pattern, self.kit),
             frame(self.style, self.macros[2]),
@@ -957,7 +977,8 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: Scale) {
     // The groups' frames, behind their widgets (panel items, drawn later).
     // The generation's only with a pattern: it has nothing to show without.
     for (i, group) in c.groups(scale).into_iter().enumerate() {
-        if view.pattern.is_none() && i != 3 {
+        // The mode switch is the app's: a plugin has no song.
+        if (view.pattern.is_none() && i != 4) || (i == 0 && matches!(view.transport, Transport::Host(_))) {
             continue;
         }
         canvas.fill_rect(group.x, group.y, group.w, group.h, theme::panel());
@@ -968,6 +989,9 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: Scale) {
         canvas.text(r.x, top, text, scale, theme::muted());
     };
     if view.pattern.is_some() {
+        if matches!(view.transport, Transport::Own) {
+            label(canvas, c.mode[0], "MODE");
+        }
         label(canvas, c.bpm, "BPM");
         if let Transport::Host(host) = view.transport {
             label(canvas, c.play, "HOST");
@@ -1839,7 +1863,7 @@ mod tests {
             let (width, _) = min_window_size(scale, Shown::all(true));
             let logo_end = margin(scale) + text_width("orDrumbox", header_text(scale));
             assert!(groups[0].x > logo_end, "scale {scale}: the logo");
-            assert!(groups[3].x + groups[3].w <= width, "scale {scale}: the window's edge");
+            assert!(groups[4].x + groups[4].w <= width, "scale {scale}: the window's edge");
             for pair in groups.windows(2) {
                 assert!(pair[0].x + pair[0].w < pair[1].x, "scale {scale}: {pair:?}");
             }
@@ -1876,7 +1900,7 @@ mod tests {
     fn a_host_transport_is_shown_in_the_transport_group_and_nowhere_else() {
         let scale = Scale::ONE;
         let controls = header_controls(scale);
-        let group = controls.groups(scale)[0];
+        let group = controls.groups(scale)[1];
         let (w, h) = (400usize, 80usize);
         let drawn = |host: Option<HostState>| {
             let mut pixels = vec![0; w * h];

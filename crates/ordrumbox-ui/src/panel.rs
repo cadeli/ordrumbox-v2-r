@@ -188,8 +188,11 @@ pub enum Id {
     GeneratePattern,
     AutoAll,
     Macro(&'static str),
-    /// A view button: grid, piano roll, song, synth, output.
+    /// A view button: grid, piano roll, synth, kit editor (the song's slot,
+    /// 2, has no button).
     View(u8),
+    /// The mode switch: 0 the pattern, 1 the song.
+    Mode(u8),
     // Song panel.
     /// The arrangement select.
     SongList,

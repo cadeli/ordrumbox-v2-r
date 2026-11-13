@@ -1058,6 +1058,15 @@ impl Session {
         }
     }
 
+    /// A mode button: the song panel, or the grid in its place (what is
+    /// shown is left as it is when it already is the mode).
+    pub(super) fn show_mode(&mut self, song: bool) {
+        if song == (self.workspace == Workspace::Song) && self.kit_editor.is_none() {
+            return;
+        }
+        self.show_view(if song { 2 } else { 0 });
+    }
+
     /// Show the grid (View > Grid, F5).
     pub(super) fn show_grid(&mut self) {
         self.synth_editor.close();

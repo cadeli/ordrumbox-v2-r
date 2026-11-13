@@ -71,6 +71,8 @@ pub fn help(id: Id) -> Option<Help> {
         Id::AutoAll => ["Auto, every track", "every track in auto mode, or out of it"],
         Id::Macro(key) => macro_help(key)?,
         Id::View(view) => view_help(view)?,
+        Id::Mode(0) => ["Pattern (F5)", "edit and play one pattern, over and over"],
+        Id::Mode(_) => ["Song (F3)", "edit and play the song: patterns arranged one after another"],
         Id::TrackVolume(_) => ["Volume", "the track's level: the track editor's Volume knob too"],
         Id::Decay => setting_help("decay")?,
         Id::KnobBar(key)

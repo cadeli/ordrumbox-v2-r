@@ -99,7 +99,10 @@ impl Session {
         let mut layout = PanelLayout::default();
         let s = scale;
         // The header's pattern and kit lists (`rebuildPatternSelect`, `rebuildDrumkitSelect`).
-        let (pattern_rect, kit_rect) = view::header_selects(scale);
+        let (pattern_rect, kit_rect) = {
+            let c = self.header_controls(scale);
+            (c.pattern, c.kit)
+        };
         let library = self.editor.library();
         if !library.patterns.is_empty() {
             let labels = library
@@ -130,8 +133,8 @@ impl Session {
         let views = self.header_controls(scale).views;
         let kit_open = self.kit_editor.is_some();
         for (i, (rect, label)) in views.iter().zip(view::VIEWS).enumerate() {
-            // A plugin has no song view: no button, the next ones in its place.
-            if self.hosted && shown.get(i) == Some(&Workspace::Song) {
+            // The song's slot has no button: the mode switch is its own.
+            if shown.get(i) == Some(&Workspace::Song) {
                 continue;
             }
             let on = if i == 4 { kit_open } else { !kit_open && self.workspace == shown[i] };
@@ -227,10 +230,15 @@ impl Session {
     /// The header's transport and generation controls (the toolbar's
     /// transport and the pattern settings panel of the JS).
     fn header_items(&self, layout: &mut PanelLayout, pattern: &Pattern, scale: Scale) {
-        let controls = view::header_controls(scale);
-        // A plugin has no transport: the host plays, at its own tempo. The
+        let controls = self.header_controls(scale);
+        // A plugin has no song (no mode switch) and no transport: the host plays, at its own tempo. The
         // view shows the host's there (`view::Transport::Host`).
         if !self.hosted {
+            let song = self.workspace == Workspace::Song;
+            for (i, (rect, label)) in controls.mode.iter().zip(view::MODES).enumerate() {
+                let kind = Kind::Button { label: label.into(), on: song == (i == 1) };
+                layout.items.push(Item::new(Some(Id::Mode(i as u8)), *rect, kind));
+            }
             let playing = self.playing();
             let label = if playing { "STOP" } else { "PLAY" };
             layout.items.push(Item::new(
@@ -540,6 +548,37 @@ mod tests {
         }
         // The constant is the tallest tab, not more: the window is no taller than it needs.
         assert_eq!(tallest, view::TRACK_EDITOR_HEIGHT);
+    }
+
+    #[test]
+    fn the_mode_switch_goes_between_the_pattern_and_the_song() {
+        let mut s = session();
+        let c = view::header_controls(Scale::ONE);
+        let lit = |s: &Session| {
+            let items = s.panel_layout(SIZE.0, SIZE.1, SIZE.2).items;
+            [0, 1].map(|i| match panel::find(&items, Id::Mode(i)).map(|item| &item.kind) {
+                Some(Kind::Button { on, .. }) => *on,
+                other => panic!("mode {i}: {other:?}"),
+            })
+        };
+        assert_eq!(lit(&s), [true, false]);
+        s.mouse_down(SIZE, c.mode[1].x + 2, c.mode[1].y + 2, Button::Left, false);
+        s.mouse_up();
+        assert!(s.song_view_open());
+        assert_eq!(lit(&s), [false, true]);
+        // Again: nothing changes. The pattern's button brings the grid back.
+        s.mouse_down(SIZE, c.mode[1].x + 2, c.mode[1].y + 2, Button::Left, false);
+        s.mouse_up();
+        assert!(s.song_view_open());
+        s.mouse_down(SIZE, c.mode[0].x + 2, c.mode[0].y + 2, Button::Left, false);
+        s.mouse_up();
+        assert!(!s.song_view_open());
+        assert_eq!(lit(&s), [true, false]);
+        // The view buttons leave the song too, and the switch follows.
+        s.run(crate::menu::Command::SongView);
+        assert_eq!(lit(&s), [false, true]);
+        s.run(crate::menu::Command::SongView);
+        assert_eq!(lit(&s), [true, false]);
     }
 
     #[test]
