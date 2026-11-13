@@ -2,10 +2,11 @@
 
 Drum machine and step sequencer: patterns of tracks of notes, songs arranged
 from patterns, sample kits and a soft synth, played live or rendered to WAV
-and MIDI. One native program, `ordrumbox.exe` on Windows (also runs on macOS),
-with a software-rendered UI. `README.md` is the user documentation: the app, its keys, and
-where it reads and writes its files. Everything for developers (building,
-tests, snapshots) is in `DEVELOPMENT.md`, never in `README.md`.
+and MIDI. A native program, `ordrumbox.exe` on Windows (also runs on macOS),
+and a CLAP/VST3 plugin, both with the same software-rendered UI. `README.md`
+is the user documentation: the app, its keys, and where it reads and writes
+its files. Everything for developers (building, tests, snapshots) is in
+`DEVELOPMENT.md`, never in `README.md`.
 
 ## Commands
 
@@ -32,15 +33,18 @@ ordrumbox-logic   editor with undo/redo, generators, MIDI files     → core
 ordrumbox-engine  kits, WAV, passes, engine, UI ↔ audio link        → core, dsp
 ordrumbox-probe   sound measurements (command line, not shipped)    → core, dsp, engine
 ordrumbox-ui      session, views, input, MCP link, update check     → core, logic, engine, fontdue
-ordrumbox-app     window, input translation, audio output           → core, engine, ui, winit, softbuffer, cpal
-ordrumbox-plugin  CLAP/VST3 instrument following the host           → engine, ui, nih-plug, baseview, softbuffer
+ordrumbox-app     window, input translation, audio output, MIDI in  → core, engine, ui, winit, softbuffer, cpal, midir
+ordrumbox-plugin  CLAP/VST3 instrument following the host           → core, engine, ui, nih-plug, baseview, softbuffer
 xtask             `cargo xtask bundle`: plugin bundles, assets in   → nih_plug_xtask
 assets/           data/*.json and kits/**.wav, read at runtime
 ```
 
-- The four domain crates take **no third-party dependency**. Only
-  `ordrumbox-app` talks to the OS (window, screen, sound device), through
-  `winit`, `softbuffer` and `cpal`.
+- The four domain crates (`core`, `dsp`, `logic`, `engine`) take **no
+  third-party dependency** and touch no file, socket or process: what they
+  read comes in as bytes, text or a `read` function. Only `ordrumbox-app`
+  opens a window, a sound device or a MIDI port, through `winit`,
+  `softbuffer`, `cpal` and `midir`. `ordrumbox-ui` reaches the OS for the
+  rest: files (`store.rs`), the MCP socket, the system font, `curl`.
   `ordrumbox-plugin` talks to a plugin host instead, through `nih-plug`
   (pinned git revision) and `baseview`; the `vst3` feature links GPLv3
   bindings (`README.md`, "License"), so it stays off by default.
@@ -69,7 +73,8 @@ assets/           data/*.json and kits/**.wav, read at runtime
   randomizes notes joins that list.
 - Dependencies only point down the table. Nothing depends on `ordrumbox-app`.
 - Workspace lints (`Cargo.toml`): `unsafe_code = "forbid"`,
-  `missing_debug_implementations = "warn"`, clippy `all`. `ordrumbox-plugin`
+  `missing_debug_implementations = "warn"`, clippy `all` (`float_cmp`
+  allowed) and the four lints of "Errors". `ordrumbox-plugin`
   repeats them with `unsafe_code = "deny"`: only the window handle adapters
   (`editor.rs`) take an `#[expect(unsafe_code)]`, each with a `SAFETY`
   comment (the export macros' `unsafe` comes from nih-plug, which the lint
@@ -203,7 +208,8 @@ assets/           data/*.json and kits/**.wav, read at runtime
 
 - The `tests/fixtures/` of each crate are committed; tests need nothing outside
   this repository. `DEVELOPMENT.md`, "Snapshots", lists them.
-- Expected outputs are Rust snapshots (`*_rust.txt`, `*_renders.bin`), which
+- Expected outputs are Rust snapshots (`*_rust.txt`, a suffix kept from the
+  time there were JS ones, and `*_renders.bin`), which
   each test writes with its `--ignored` test, tables in unit tests, and
   property tests. The JS app (ordrumbox-v2) is not the reference for
   behaviour: "the JS app does it" is no reason to keep or change one. Add no
@@ -219,7 +225,8 @@ assets/           data/*.json and kits/**.wav, read at runtime
 
 - Edition 2024, `rust-version` 1.88: use what they give. `let … else`,
   `if let … && …` chains, `is_some_and`, `clamp`, `total_cmp`, `rem_euclid`
-  (through `num::wrap`), `div_euclid`, `checked_*`/`saturating_*`.
+  (through `num::wrap`; `ordrumbox-dsp` has its own `wrap`), `div_euclid`,
+  `checked_*`/`saturating_*`.
 - No emulation of another language's numbers. No ToInt32/Uint8 tricks, no
   `((x % n) + n) % n`, no NaN as "missing": absence is an `Option`, a choice
   is an `enum`, not a `bool` pair or a magic integer.
@@ -250,7 +257,7 @@ file or function that breaks one carries a comment saying why.
   struct of what the function reads, not the whole `Session`. A function that
   needs two fields of `Session` takes the two fields.
 - **Do** keep logic that needs no window, no sound device and no file in the
-  domain crates (`core`, `logic`, `dsp`), where it is tested without the app.
+  domain crates (`core`, `dsp`, `logic`, `engine`), where it is tested without the app.
   The UI calls it; it does not re-implement it.
 - **Do** use a trait or a generic only at a seam that already exists (see
   Modern Rust); otherwise a plain function and a struct.
@@ -292,15 +299,18 @@ file or function that breaks one carries a comment saying why.
   `set_name()`).
 - **Do** use the same verb for the same action: `new` / `from_*` build,
   `to_*` / `as_*` / `into_*` convert, `is_*` / `has_*` ask a yes/no, `set_*`
-  writes one value, `update_*` recomputes, `apply_*` runs a command,
-  `draw_*` paints, `handle_*` takes input, `load_*` / `save_*` touch files.
+  writes one value, `update` / `update_*` brings a state up to date,
+  `apply` / `apply_*` runs a command, `draw` / `draw_*` paints, `key` /
+  `*_key` / `pointer*` takes input, `load_*` / `save_*` touch files.
 - **Do** name files after the main type or idea they hold; a prefix groups
-  the parts of one subject (`session_*`, `editors/`). A test file ends in
-  `_tests` or lives in `tests/`.
+  the parts of one subject (`session_*`, `editors/`). A test file is
+  `foo/tests.rs`, ends in `_tests`, or lives in the crate's `tests/`.
 - **Do** name a function for what it does, a type for what it is, a `bool`
   as a question (`is_playing`, not `playing_flag`).
 - **Do not** abbreviate beyond the short names of "Code conventions" (`p`, `t`,
-  `n`); no `mgr`, `ctx`, `tmp`, `data`, `info`, `util`, `helper` as a name.
+  `n`); no `mgr`, `ctx`, `tmp`, `util`, `helper`, and no bare `data` or
+  `info`, as a name. A name that says which data is fine (`data_byte`);
+  `data.rs` is only for the literal tables of "File and function size".
 - **Do not** name the same thing two ways in two places (`step`/`slot`,
   `volume`/`gain`/`level` for the same value): rename one to match the other
   in the same change.
@@ -311,17 +321,19 @@ file or function that breaks one carries a comment saying why.
   function, constant or test helper, and extend it if it is close.
 - **Do** extract at the second copy of a rule that must stay the same
   everywhere (a clamp, a hit test, a unit conversion, a layout rect), and at
-  the third copy of any other block of more than about 3 lines. **Do** put it in the lowest crate that
-  can own it, so every layer above can call it.
+  the third copy of any other block of more than about 3 lines. **Do** put
+  it in the lowest crate that can own it, so every layer above can call it.
+  `core` and `dsp` share no crate: the rare helper both need (`wrap`) exists
+  in each, under the same name.
 - **Do** make a shared function small and general: parameters for what
   varies, no `bool` flag that switches two behaviours (that is two functions,
   or an `enum`).
 - **Do** use the standard library and the iterator adapters before a loop of
   your own, and one shared test helper (`fixtures`, builders) before a new
   setup in each test.
-- **Do not** copy a block and edit it. **Do not** add a near-duplicate
-  function beside an existing one (`draw_row_2`, `foo_alt`); change the
-  original, or give both a shared core.
+- **Do not** add a near-duplicate function beside an existing one (a copy
+  with a few edits, `draw_row_2`, `foo_alt`); change the original, or give
+  both a shared core.
 - **Do not** write a wrapper that only forwards a call, or a trait with one
   implementation and no seam. **Do not** abstract before the second use: three
   similar lines are better than a premature framework, but a rule repeated is
@@ -336,8 +348,9 @@ file or function that breaks one carries a comment saying why.
   types; `SCREAMING_SNAKE_CASE` constants.
 - A number of things ends in `_count` (`beat_count`, `track_count`,
   `retrigger_count`), never `nb_` or `num_`. A length or a duration ends in
-  its unit (`pattern_ticks`, `decay_frames`, `delay_beats`,
-  `length_measures`); a clip's `measure_count` is both. An index ends in `_index`
+  its unit (`pattern_ticks`, `decay_frames`, `delay_beats`, a song's
+  `length_measures`). The beats a pattern is made of and the measures a
+  clip is given are counts: `beat_count`, `measure_count`. An index ends in `_index`
   (`pattern_index`, `kit_index`), not `_idx`; in a short scope, `p` (pattern),
   `t` (track) and `n` (note) are fine.
 - Music vocabulary: a measure is a **measure**, never a bar (`bar` is UI
@@ -345,8 +358,8 @@ file or function that breaks one carries a comment saying why.
   soft-synth sound is a **synth** preset, a set of samples is a **kit**.
 - Doc comments say what a thing is or does, in plain sentences; comments in
   bodies say why. Match the comment density of the surrounding code.
-- One shared function instead of a repeated expression (a clamp range, a row
-  hit test, a post-to-engine sequence); a named constant instead of a repeated
-  literal.
+- One shared function for a rule that repeats (a clamp range, a row hit
+  test, a post-to-engine sequence), from its second copy ("Reuse"); a named
+  constant instead of a repeated literal.
 - Unit tests sit with the code (`#[cfg(test)] mod tests`); snapshot and
   end-to-end tests go in each crate's `tests/`.
