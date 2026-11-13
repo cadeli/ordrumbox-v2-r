@@ -3,7 +3,12 @@
 //! translates its window events into these (winit in the app, the plugin
 //! window later).
 
-pub use crate::session::Button;
+/// A mouse button.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Button {
+    Left,
+    Right,
+}
 
 /// The program runs on macOS: its Ctrl key is the Command one (the menus say
 /// Cmd+, Export MIDI takes Shift to leave Cmd+M to the window).

@@ -149,7 +149,8 @@ mod session_transport;
 mod session_update;
 #[path = "session_user_data.rs"]
 mod session_user_data;
-pub use session_panel::{Button, PanelKey};
+use crate::ui_input::Button;
+pub use session_panel::PanelKey;
 
 /// What the main editor (top-left) shows under the header. The kit editor
 /// opens over any of them; the track editor (right) and the output strip

@@ -39,13 +39,6 @@ pub struct PanelLayout {
     pub details_top: i32,
 }
 
-/// A mouse button.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Button {
-    Left,
-    Right,
-}
-
 /// The keys the widgets read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PanelKey {

@@ -58,9 +58,6 @@ const PLAYHEAD: Rgb = theme::LIVE;
 const LOOP_MARK: Rgb = theme::VALUE;
 const CURSOR: Rgb = theme::FOCUS;
 const SELECTED: Rgb = theme::WHITE;
-/// The zone drawn with Shift+drag, and how much its shade covers (of 255).
-pub(crate) const ZONE: Rgb = theme::FOCUS;
-pub(crate) const ZONE_OPACITY: u8 = 56;
 fn focus_row_color() -> Rgb {
     theme::selected_row()
 }

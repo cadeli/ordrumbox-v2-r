@@ -113,7 +113,7 @@ pub struct Restored {
 /// are moved aside first ([`move_aside`], `before-restore`). A folder
 /// without user files, or `dir` itself, is refused and nothing is moved.
 pub fn restore(backup: &Path, dir: &Path, stamp: &str) -> Result<Restored, String> {
-    if same_folder(backup, dir) {
+    if store::same_folder(backup, dir) {
         return Err("this is the user data folder itself, not a backup".into());
     }
     if present(backup).is_empty() {
@@ -125,14 +125,6 @@ pub fn restore(backup: &Path, dir: &Path, stamp: &str) -> Result<Restored, Strin
         None => e.to_string(),
     })?;
     Ok(Restored { aside, names })
-}
-
-/// `a` and `b` are the same folder (compared as written when one cannot be resolved).
-pub fn same_folder(a: &Path, b: &Path) -> bool {
-    match (a.canonicalize(), b.canonicalize()) {
-        (Ok(a), Ok(b)) => a == b,
-        _ => a == b,
-    }
 }
 
 /// Now, as [`stamp`] writes it.
@@ -281,8 +273,8 @@ mod tests {
         assert_eq!(copy_files(&from, &to).unwrap().len(), 6);
         assert_eq!(fs::read_to_string(to.join("kits.json")).unwrap(), "[]");
         assert_eq!(fs::read_to_string(to.join("notes.txt")).unwrap(), "mine");
-        assert!(same_folder(&to, &to.join(".")));
-        assert!(!same_folder(&to, &from));
+        assert!(store::same_folder(&to, &to.join(".")));
+        assert!(!store::same_folder(&to, &from));
         fs::remove_dir_all(from).unwrap();
         fs::remove_dir_all(to).unwrap();
     }

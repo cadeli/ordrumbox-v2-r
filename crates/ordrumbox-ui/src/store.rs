@@ -99,6 +99,14 @@ fn chosen_dir_in(default: &Path) -> Result<Option<PathBuf>, String> {
     Ok(Some(dir))
 }
 
+/// `a` and `b` are the same folder (compared as written when one cannot be resolved).
+pub fn same_folder(a: &Path, b: &Path) -> bool {
+    match (a.canonicalize(), b.canonicalize()) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => a == b,
+    }
+}
+
 /// Use `dir` as the user data folder from now on (at the next load): noted
 /// in the default folder, or the note removed when `dir` is the default.
 pub fn choose_dir(dir: &Path) -> Result<(), String> {
@@ -108,7 +116,7 @@ pub fn choose_dir(dir: &Path) -> Result<(), String> {
 
 fn choose_dir_in(default: &Path, dir: &Path) -> Result<(), String> {
     let path = default.join(LOCATION_FILE);
-    if crate::user_data::same_folder(dir, default) {
+    if same_folder(dir, default) {
         return match fs::remove_file(&path) {
             Ok(()) => Ok(()),
             Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
