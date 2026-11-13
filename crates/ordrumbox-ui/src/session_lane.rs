@@ -7,8 +7,9 @@
 use crate::scale::Scale;
 use ordrumbox_core::steps::absolute_step;
 
-use super::*;
+use super::Session;
 use crate::editors::{self, LANES, Prop};
+use crate::view;
 
 /// A press on the lane, held: the track and the setting it paints, and the
 /// last step painted and its value.
@@ -107,6 +108,8 @@ fn between(from: (i64, f64), to: (i64, f64), step: i64, prop: &Prop) -> f64 {
 mod tests {
     use super::*;
     use crate::kits::KitSet;
+    use crate::view::Cursor;
+    use ordrumbox_core::Library;
 
     use crate::test_support::{SIZE, click};
 

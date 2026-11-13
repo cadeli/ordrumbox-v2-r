@@ -2,7 +2,11 @@
 //! exports, the MIDI import, the file picker that names them, and the files
 //! dropped on the window.
 
-use super::*;
+use super::session_confirm::Pending;
+use super::{Overlay, Session};
+use crate::picker::{Export, Outcome, Picker, Purpose};
+use ordrumbox_engine::Mode;
+use std::path::{Path, PathBuf};
 
 impl Session {
     /// Ctrl+E: the selected pattern (with Shift: the selected song) to a WAV

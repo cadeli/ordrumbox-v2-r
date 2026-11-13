@@ -1,6 +1,7 @@
 //! Tap tempo: the tempo follows the time between taps.
 
-use super::*;
+use super::Session;
+use std::time::{Duration, Instant};
 
 /// Taps older than this start a new count.
 const TAP_RESET: Duration = Duration::from_secs(2);

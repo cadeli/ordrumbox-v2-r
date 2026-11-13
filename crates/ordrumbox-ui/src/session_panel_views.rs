@@ -7,12 +7,18 @@ use ordrumbox_core::style::Macros;
 use ordrumbox_engine::TrackSound;
 use ordrumbox_engine::assign::{assign_track, substitute_for};
 
+use super::Session;
 use super::session_panel::NoteTarget;
-use super::*;
+use super::session_selection::NoteFocus;
 use crate::editors::{
     self, ARP_DIRECTIONS, Choice, ComposeView, KitControls, LFO_TARGETS, NoteView, SampleBar, TrackView,
 };
 use crate::view::SoundLabel;
+use ordrumbox_core::drum_taxonomy::instrument_family;
+use ordrumbox_core::{Note, Styles, Track};
+use ordrumbox_engine::analysis;
+use ordrumbox_engine::analysis::Analysis;
+use ordrumbox_logic::{compose, generate};
 
 /// What a track plays, before it is worded for the grid or a tooltip.
 #[derive(Debug)]

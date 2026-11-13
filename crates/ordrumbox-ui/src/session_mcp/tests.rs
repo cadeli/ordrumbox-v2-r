@@ -2,10 +2,16 @@
 
 use super::*;
 use crate::kits::KitSet;
+use crate::session::NOTHING_TO_RENDER;
+use crate::session::session_confirm::Pending;
+use crate::session::session_playback::Playback;
 use crate::test_support::scratch_dir;
 use ordrumbox_core::json;
+use ordrumbox_core::{Library, Rng, Scales};
 use ordrumbox_engine::kit::{BankSample, Kit, KitSample};
 use ordrumbox_engine::{Controller, SampleBank, SampleBuffer};
+use ordrumbox_engine::{SynthPresets, wav};
+use std::sync::Arc;
 
 fn session() -> Session {
     let (library, _) = Library::parse(

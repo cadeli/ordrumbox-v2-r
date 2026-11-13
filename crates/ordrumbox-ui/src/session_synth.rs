@@ -15,10 +15,17 @@ use std::time::Instant;
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_engine::synth_model as model;
 
-use super::*;
-use crate::canvas::text_width;
+use super::session_confirm::Pending;
+use super::{NO_SYNTHS, Session, Workspace, session_panel};
+use crate::canvas::{Canvas, text_width};
+use crate::frame;
+use crate::panel::Id;
 use crate::panel::{Item, Kind, Rect, dim};
+use crate::picker::{Export, Purpose};
+use crate::store;
 use crate::synth_view::{self, Built, SynthLayout};
+use ordrumbox_engine::SynthPresets;
+use std::path::{Path, PathBuf};
 
 /// The button that puts the track editor's track on the preset shown.
 const USE_BUTTON: &str = "use";
@@ -506,8 +513,11 @@ pub(super) fn merged_synths(own: Option<&Object>, assets: &SynthPresets) -> Synt
 
 #[cfg(test)]
 mod tests {
+    use super::super::OverlayKey;
     use super::*;
     use crate::kits::KitSet;
+    use crate::view::Cursor;
+    use ordrumbox_core::Library;
 
     use crate::test_support::{SIZE, click};
 

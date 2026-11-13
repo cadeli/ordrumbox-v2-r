@@ -9,9 +9,14 @@ use ordrumbox_core::num;
 
 use crate::panel::SUBMENU_MARK;
 
+use super::session_selection::Clipboard;
 use super::session_song::DRAG_START_PX;
 use super::session_zone::zone_label;
-use super::*;
+use super::{Session, Workspace, beat_label};
+use crate::panel::{Dropdown, Id};
+use crate::view::{Cursor, Hit};
+use crate::{menu, view};
+use ordrumbox_core::track::MAX_TRACKS;
 use ordrumbox_logic::block::step_start_units;
 
 /// A press on a track's name that may become a drag. Nothing is edited before
@@ -382,8 +387,12 @@ impl Session {
 
 #[cfg(test)]
 mod tests {
+    use super::super::session_panel::PanelKey;
+    use super::super::{Overlay, OverlayKey};
     use super::*;
     use crate::kits::KitSet;
+    use crate::menu::Command;
+    use ordrumbox_core::Library;
 
     use crate::test_support::{SIZE, click};
 

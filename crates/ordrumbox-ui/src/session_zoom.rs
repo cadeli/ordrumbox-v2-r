@@ -6,7 +6,9 @@
 //! in `settings.json` (`uiZoom`, the scale units added to the display's:
 //! `0.5`, `-1`).
 
-use super::*;
+use super::Session;
+use crate::{store, view};
+use std::path::PathBuf;
 
 use crate::scale::Scale;
 use ordrumbox_core::json;
@@ -97,6 +99,9 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::kits::KitSet;
+    use crate::menu::Command;
+    use ordrumbox_core::Library;
 
     fn session(display: Scale) -> Session {
         let mut s = Session::new(Library::default(), KitSet::empty(), Vec::new());

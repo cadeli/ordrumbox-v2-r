@@ -12,7 +12,7 @@ use crate::frame;
 use crate::menu::{self, Command};
 use crate::scroll::{Scroll, Viewport};
 use crate::session::{Move, OverlayKey, PanelKey, Session};
-use crate::ui_input::{Button, Key, KeyEvent, MACOS, Modifiers, ScrollDelta};
+use crate::ui_input::{Button, Key, KeyEvent, Modifiers, ScrollDelta};
 use crate::view::{self, KitLayout};
 
 /// Redraw interval while playing (the playhead moves).

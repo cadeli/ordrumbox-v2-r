@@ -1,7 +1,11 @@
 //! The generators: a pattern or a track made in a style, the style's macros,
 //! the tracks and patterns in auto mode, and the random track.
 
-use super::*;
+use super::{Session, style_label};
+use ordrumbox_core::Styles;
+use ordrumbox_logic::generate;
+use ordrumbox_logic::generate::MelodicKind;
+use ordrumbox_logic::tools::learned_styles;
 
 impl Session {
     // ─── Generation ──────────────────────────────────────────────────────────

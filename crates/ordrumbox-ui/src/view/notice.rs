@@ -1,6 +1,11 @@
 //! Tooltips, toasts and notices drawn over the screen.
 
-use super::*;
+use super::ACCENT;
+use crate::canvas::{Canvas, chars_in, text_width};
+use crate::frame::margin;
+use crate::panel::Rect;
+use crate::scale::Scale;
+use crate::{font, menu, theme};
 
 /// The hover bubble over a note (`pp-tooltip`): centered above `cell`, kept in the window.
 pub fn draw_tooltip(canvas: &mut Canvas, text: &str, cell: Rect, scale: Scale) {

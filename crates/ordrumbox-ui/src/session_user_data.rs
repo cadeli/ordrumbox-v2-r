@@ -6,10 +6,14 @@
 //! files moves the ones there to `backups/` first, then loads the session
 //! again from the files, as at start.
 
-use super::*;
-use crate::store;
-use crate::user_data;
+use super::session_confirm::Pending;
+use super::{Overlay, Session, no_output};
+use crate::menu::Command;
+use crate::picker::{Picker, Purpose};
+use crate::{assets, store, update, user_data};
+use ordrumbox_core::Library;
 use ordrumbox_core::json::Object;
+use std::path::{Path, PathBuf};
 
 /// The file File > Export library writes: never named as the library the
 /// app saves to, so an export to the user data folder replaces nothing.
@@ -302,6 +306,15 @@ mod tests {
     use std::fs;
 
     use super::*;
+
+    use crate::kits::KitSet;
+
+    use crate::menu;
+
+    use crate::picker::Export;
+
+    use super::super::OverlayKey;
+
     use crate::test_support::scratch_dir;
 
     const MINE: &str = r#"{"patterns":[{"name":"mine","tracks":[{"name":"KICK","notes":[{}]}]}]}"#;

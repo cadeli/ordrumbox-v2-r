@@ -18,11 +18,19 @@ use ordrumbox_core::pattern_engine::SpanResolver;
 use ordrumbox_core::steps::{TICK, absolute_step};
 use ordrumbox_logic::composition;
 
-use super::*;
+use super::session_selection::NoteFocus;
+use super::{Move, Session, Workspace, beat_label, notes_label, session_panel};
+use crate::canvas::Canvas;
 use crate::editors;
 use crate::note_drag::{Axis, DragEvent, MIDDLE_C, MIDI_MIN, NoteDrag, midi_name};
+use crate::panel::{Dropdown, Id};
 use crate::panel::{Item, Kind, Rect};
 use crate::piano_roll::{self, BEATS_PER_PAGE, RollHit, RollLayout, RollView, TOTAL_KEYS, note_row, steps_per_beat};
+use crate::ui_input::Button;
+use crate::view;
+use crate::view::Cursor;
+use ordrumbox_core::{Note, Rng};
+use ordrumbox_engine::Mode;
 
 /// A note being dragged in the piano roll.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -659,8 +667,11 @@ impl Session {
 
 #[cfg(test)]
 mod tests {
+    use super::super::OverlayKey;
+    use super::super::session_panel::PanelKey;
     use super::*;
     use crate::kits::KitSet;
+    use ordrumbox_core::Library;
 
     use crate::test_support::SIZE;
 

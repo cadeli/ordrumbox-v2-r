@@ -1,9 +1,18 @@
 //! The kit editor (Ctrl+K): the kit's samples, the one selected and its
 //! analysis, and what its keys do (hear, remove, normalize, export).
 
-use super::*;
+use super::session_confirm::Pending;
+use super::{Session, session_grid};
+use crate::panel::{Dropdown, Id};
+use crate::scale::Scale;
+use crate::view::KitView;
+use crate::{theme, view};
 use ordrumbox_core::instruments::catalog;
 use ordrumbox_engine::kit::KitSample;
+use ordrumbox_engine::offline::RenderSetup;
+use ordrumbox_engine::{analysis, offline};
+use std::path::Path;
+use std::sync::Arc;
 
 use crate::canvas::{chars_in, text_width};
 use crate::editors::Choice;
@@ -371,6 +380,8 @@ fn instrument_choice(key: &str) -> Choice {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::kits::KitSet;
+    use ordrumbox_core::Library;
     use ordrumbox_engine::kit::{BankSample, Kit};
     use ordrumbox_engine::{SampleBank, SampleBuffer};
 

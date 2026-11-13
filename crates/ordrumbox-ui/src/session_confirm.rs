@@ -2,7 +2,8 @@
 //! for Enter in a notice; Esc or a click cancels it. An edit that Ctrl+Z
 //! undoes is done at once, and its message says how to undo it.
 
-use super::*;
+use super::{Overlay, Session};
+use std::path::PathBuf;
 
 /// What the message of a change outside the library's history ends with.
 pub(super) const NOT_UNDOABLE: &str = "not undoable";
@@ -144,6 +145,18 @@ mod tests {
     use ordrumbox_core::json::Value;
 
     use super::*;
+
+    use crate::kits::KitSet;
+
+    use crate::menu::Command;
+
+    use crate::scale::Scale;
+
+    use crate::view::Cursor;
+
+    use ordrumbox_core::Library;
+
+    use super::super::OverlayKey;
 
     fn session() -> Session {
         let (library, _) =

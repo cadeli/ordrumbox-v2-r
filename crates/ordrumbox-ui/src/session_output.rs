@@ -6,10 +6,13 @@
 use crate::scale::Scale;
 use ordrumbox_engine::{MasterSettings, SCOPE_SIZE};
 
-use super::*;
+use super::{Session, session_panel};
 use crate::master;
 use crate::output::{self, OutputLayout, OutputView};
+use crate::panel::Id;
 use crate::panel::{Item, Kind, Rect};
+use crate::store;
+use std::time::Instant;
 
 /// The output panel's state: the master bus settings; the spectrum's analyser
 /// and its last bins.
@@ -120,8 +123,11 @@ impl Session {
 
 #[cfg(test)]
 mod tests {
+    use super::super::session_panel::PanelKey;
     use super::*;
     use crate::kits::KitSet;
+    use crate::ui_input::Button;
+    use ordrumbox_core::Library;
 
     use crate::test_support::{SIZE, click};
 

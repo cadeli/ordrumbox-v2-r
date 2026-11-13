@@ -3,7 +3,8 @@
 //! also puts a note on its track, on the step the playhead is nearest to.
 //! Each note is one undo step.
 
-use super::*;
+use super::{Session, Workspace, beat_label};
+use ordrumbox_engine::Mode;
 
 impl Session {
     pub fn recording(&self) -> bool {

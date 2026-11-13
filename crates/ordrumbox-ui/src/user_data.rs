@@ -6,10 +6,9 @@
 //! not: `mcp.json` is the running app's address, `exports/` what the app
 //! wrote out, `backups/` the files moved aside.
 
-use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::{fs, io};
 
 use crate::store;
 

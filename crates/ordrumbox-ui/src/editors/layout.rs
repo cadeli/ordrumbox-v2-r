@@ -1,6 +1,26 @@
 //! The editors laid out as panel items.
 
-use super::*;
+use super::tables::{
+    COMPOSE_TAB, DEFAULT_DECAY, FILTER_ICONS, FILTER_TYPES, FX_DEFS, FX_KNOBS, FxDef, GENERATION_COMPOSE,
+};
+use super::tables::{
+    GENERATION_ENGINE, GENERATION_GROOVE, GENERATION_MANUAL, GenerationRow, KIT_KNOBS, KNOB_BAR, LFO_TARGETS,
+    LOOP_PROPS, LfoTarget, NOTE_GROUPS, NOTE_KNOBS, NOTE_TABS, NoteRow, Prop, STYLE_DEFAULT, TABS, WAVE_TYPES,
+    fx_label, prop, track_select_options,
+};
+use super::tables::{TAB_FX, TAB_LFO, TAB_LOOP, TAB_SOUND};
+use super::values::{EditorState, flag, fx_on, has_lfo, index_of, loop_length, number, text_of};
+use super::{Choice, ComposeView, KitControls, NoteView, TrackView};
+use crate::control::{Format, Spec};
+use crate::kits::Field;
+use crate::panel::{Id, Item, KNOB_SIZE, Kind, LfoParam, Rect, dim, label_width};
+use crate::scale::Scale;
+use crate::theme;
+use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
+use ordrumbox_core::json::Value;
+use ordrumbox_core::{Note, Track, num};
+use ordrumbox_engine::strip_settings::delay_beats_used;
+use ordrumbox_logic::generate;
 
 // ─── Layout ──────────────────────────────────────────────────────────────────
 

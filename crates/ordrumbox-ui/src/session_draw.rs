@@ -1,6 +1,13 @@
 //! The session drawn: the window split and what it shows, and the frame.
 
-use super::*;
+use super::{Overlay, Session, Workspace};
+use crate::action_log::LogLayout;
+use crate::canvas::Canvas;
+use crate::picker::PickerLayout;
+use crate::scale::Scale;
+use crate::view::View;
+use crate::{action_log, menu, picker, theme, view};
+use ordrumbox_engine::Mode;
 
 impl Session {
     /// The header's first group: a plugin shows its host's transport there.

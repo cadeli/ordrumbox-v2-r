@@ -1,6 +1,9 @@
 //! The edits' undo steps and the library's saving.
 
-use super::*;
+use super::Session;
+use crate::menu::Command;
+use crate::{menu, store};
+use std::time::Instant;
 
 impl Session {
     /// After an edit: remember to save, show what happened.

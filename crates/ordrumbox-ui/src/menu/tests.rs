@@ -2,6 +2,10 @@
 
 use super::*;
 
+use crate::canvas::char_width;
+
+use crate::scale::Scale;
+
 fn state() -> MenuState {
     MenuState {
         has_pattern: true,

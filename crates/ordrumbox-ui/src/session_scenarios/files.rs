@@ -1,6 +1,14 @@
 //! Files out and back in: kits, synth presets and songs.
 
-use super::*;
+use super::super::{OverlayKey, SYNTHS_FILE_NAME, Session};
+use super::{RATE, demo_session, draw, run};
+use crate::menu::Command;
+use crate::picker::Outcome;
+use crate::store;
+use crate::test_support::scratch_dir;
+use ordrumbox_core::json;
+use ordrumbox_engine::{AudioSide, SampleBuffer, SynthPresets, wav};
+use std::path::Path;
 
 // ─── Files out and back in ──────────────────────────────────────────────────
 

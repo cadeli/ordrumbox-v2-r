@@ -1,6 +1,8 @@
 //! What a track or a note holds, read for the editors: values, arpeggio, tooltips, ordering.
 
-use super::*;
+use super::tables::{ARP_DIRECTIONS, FxDef, lfo_key};
+use ordrumbox_core::json::Value;
+use ordrumbox_core::{Note, ScaleList, Track, num};
 
 // ─── State ───────────────────────────────────────────────────────────────────
 

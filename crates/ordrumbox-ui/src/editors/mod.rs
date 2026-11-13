@@ -4,21 +4,9 @@
 //! what each shows, in the JS order, with the JS ranges, defaults and
 //! formats. What the widgets do is in the session.
 
-use crate::scale::Scale;
-use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
-use ordrumbox_core::json::Value;
-use ordrumbox_core::num;
-use ordrumbox_core::track::{
-    COMP_ATTACK_MS_RANGE, COMP_RATIO_RANGE, COMP_RELEASE_MS_RANGE, COMP_THRESHOLD_DB_RANGE, MAX_STEPS_PER_BEAT,
-};
-use ordrumbox_core::{Note, ScaleList, Track};
-use ordrumbox_engine::strip_settings::delay_beats_used;
-use ordrumbox_logic::generate;
+use ordrumbox_core::{Note, Track};
 
-use crate::control::{Format, Spec};
-use crate::kits::{DECAY_RANGE, Field, GAIN_RANGE, TRANSPOSE_RANGE};
-use crate::panel::{Id, Item, KNOB_SIZE, Kind, LfoParam, Rect, dim, label_width};
-use crate::theme;
+use crate::panel::Kind;
 
 // ─── Views ───────────────────────────────────────────────────────────────────
 

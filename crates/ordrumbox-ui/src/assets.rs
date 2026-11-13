@@ -3,9 +3,8 @@
 //! to the program, in this repository or given by `ORDRUMBOX_ASSETS`, and
 //! loaded into the model.
 
-use std::env;
-use std::fs;
 use std::path::{Path, PathBuf};
+use std::{env, fs};
 
 use ordrumbox_core::json;
 use ordrumbox_core::{Issue, Library, LoadReport, ScaleList, Scales, Styles};

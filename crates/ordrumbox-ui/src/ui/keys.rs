@@ -1,6 +1,7 @@
 //! The keys: shortcuts, shift hints and the view commands.
 
-use super::*;
+use crate::menu::Command;
+use crate::ui_input::{Key, MACOS};
 
 /// What a letter that changes every track says when pressed without Shift.
 pub(super) fn shift_hint(code: Key) -> Option<&'static str> {

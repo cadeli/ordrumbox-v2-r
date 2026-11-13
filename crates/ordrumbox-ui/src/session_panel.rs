@@ -14,14 +14,20 @@ use ordrumbox_core::json::Value;
 use ordrumbox_core::style::{self, Macros};
 use ordrumbox_core::{num, song};
 
-use super::*;
+use super::{Session, Workspace, style_label};
 use crate::control::Spec;
 use crate::editors::{
     self, FX_DEFS, FX_KNOBS, GENERATION_COMPOSE, GENERATION_ENGINE, GENERATION_GROOVE, GENERATION_MANUAL,
     GenerationRow, KIT_KNOBS, KNOB_BAR, LOOP_PROPS, NOTE_GROUPS, NOTE_KNOBS, NoteRow,
 };
+use crate::frame;
+use crate::panel::Id;
 use crate::panel::{self, Item, Kind, Rect};
+use crate::view;
 use crate::view::{KitLayout, Layout};
+use ordrumbox_core::{Pattern, Track};
+use ordrumbox_logic::generate;
+use std::time::Duration;
 
 /// The ⟳ button's label: the pattern made again.
 const GENERATE_LABEL: &str = "\u{21bb}";
@@ -396,9 +402,15 @@ pub(super) fn history_label(id: Id) -> String {
 
 #[cfg(test)]
 mod tests {
+    use super::super::OverlayKey;
     use super::*;
+    use crate::canvas::Canvas;
     use crate::editors::STYLE_DEFAULT;
     use crate::kits::KitSet;
+    use crate::menu::Command;
+    use crate::ui_input::Button;
+    use ordrumbox_core::{Library, Styles};
+    use ordrumbox_engine::SynthPresets;
 
     #[test]
     fn history_names_an_edit_by_its_label() {

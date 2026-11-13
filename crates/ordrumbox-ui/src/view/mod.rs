@@ -5,19 +5,11 @@
 //!
 //! [`Layout`] places everything; drawing and mouse hit-testing both use it.
 
-use crate::scale::Scale;
-use ordrumbox_core::steps::absolute_step;
-use ordrumbox_core::track::MAX_STEPS_PER_BEAT;
-use ordrumbox_core::{Note, Pattern, Track};
-use ordrumbox_logic::block::{BEAT_UNITS, Zone};
+use ordrumbox_core::Pattern;
+use ordrumbox_logic::block::Zone;
 
-use crate::canvas::{Canvas, Rgb, chars_in, small_cell, small_char_width, text_width};
-use crate::editors;
-use crate::font;
-use crate::frame::{body_top, content_top, footer_top, margin, status_line};
-use crate::menu;
-use crate::output::{self, OutputLayout, OutputView};
-use crate::panel::{Rect, row_at};
+use crate::canvas::Rgb;
+use crate::output::OutputView;
 
 /// The fewest beats a page of the pattern grid shows; a wide grid shows 8
 /// or 16 ([`page_beats`]).
@@ -30,8 +22,8 @@ const MIN_STEP_WIDTH: i32 = 16;
 /// The steps per beat a page's width is reckoned for (the default): the
 /// beats of a page depend on the window only, not on the tracks.
 const PAGE_STEPS_PER_BEAT: i32 = 4;
-use crate::piano_roll::{self, RollLayout, RollView};
-use crate::song_view::{self, SongLayout, SongView};
+use crate::piano_roll::RollView;
+use crate::song_view::SongView;
 use crate::theme;
 
 fn background_color() -> Rgb {

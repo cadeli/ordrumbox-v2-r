@@ -22,39 +22,30 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
-use ordrumbox_core::track::MAX_TRACKS;
-use ordrumbox_core::{Library, LoadReport, Note, Pattern, Rng, ScaleList, Scales, Styles, Track};
-use ordrumbox_engine::analysis::{self, Analysis};
+use ordrumbox_core::{Library, LoadReport, Pattern, Rng, ScaleList, Scales, Styles, Track};
+use ordrumbox_engine::analysis::Analysis;
 use ordrumbox_engine::offline::{self, RenderSetup};
 use ordrumbox_engine::{Mode, SynthPresets, wav};
-use ordrumbox_logic::compose;
-use ordrumbox_logic::generate::{self, AutoGenerator, MelodicKind};
+use ordrumbox_logic::generate::{self, AutoGenerator};
 use ordrumbox_logic::midi;
 use ordrumbox_logic::tools::learned_styles;
-use ordrumbox_logic::{Editor, Nudge};
+use ordrumbox_logic::{Editor, compose};
 
-use crate::action_log::{self, ActionLog, LogLayout, Seen};
-use crate::assets;
-use crate::audio_output::StartOutput;
-use crate::canvas::Canvas;
+use crate::action_log::ActionLog;
 use crate::editors::EditorState;
-use crate::frame;
 use crate::kits::KitSet;
 use crate::mcp_link;
-use crate::menu::{self, Command, MenuState};
+use crate::menu::{self};
 use crate::panel::Rect;
 use crate::panel::{Dropdown, Entry, Id};
-use crate::picker::{self, Export, Outcome, Picker, PickerLayout, Purpose};
+use crate::picker::{Export, Picker, Purpose};
 use crate::store;
-use crate::theme;
-use crate::update;
-use crate::view::{self, Cursor, Hit, KitView, View};
+use crate::view::{self};
 use session_chrome::Chrome;
 use session_confirm::Pending;
 use session_playback::Playback;
 use session_saving::Saving;
-use session_selection::{Clipboard, NoteFocus, Selection};
+use session_selection::Selection;
 
 #[path = "session_chrome.rs"]
 mod session_chrome;
@@ -149,7 +140,6 @@ mod session_transport;
 mod session_update;
 #[path = "session_user_data.rs"]
 mod session_user_data;
-use crate::ui_input::Button;
 pub use session_panel::PanelKey;
 
 /// What the main editor (top-left) shows under the header. The kit editor

@@ -1,12 +1,14 @@
 //! The song panel's right-click menus (a pattern of the list, a clip, a row
 //! name, the bare grid) and the arrangement edits they lead to.
 
-use ordrumbox_core::SongClip;
-use ordrumbox_core::num;
+use ordrumbox_core::{SongClip, num};
 
+use super::Session;
+use super::session_confirm::Pending;
 use super::session_grid::moved_index;
-use super::*;
+use crate::panel::{Dropdown, Id};
 use crate::song_view::Row;
+use std::path::PathBuf;
 
 impl Session {
     /// A pattern of the list: add it at the playhead (when there is a song),
@@ -242,6 +244,7 @@ mod tests {
     use super::*;
     use crate::session::session_song::tests::{SIZE, choose, clips, menu, session};
     use crate::song_view;
+    use crate::ui_input::Button;
 
     #[test]
     fn clip_labels() {

@@ -8,9 +8,13 @@ use ordrumbox_core::song::measures_for_pattern;
 use super::session_panel::DOUBLE_CLICK;
 use super::session_song::{DRAG_START_PX, DragSource, SongDrag};
 use super::session_song_menu::clip_label;
-use super::*;
-use crate::panel::Rect;
+use super::{Session, Workspace};
+use crate::canvas::Canvas;
+use crate::panel::{Dropdown, Id, Rect};
 use crate::song_view::{Axis, Row, SongGhost, SongHit, SongLayout};
+use crate::ui_input::Button;
+use crate::view;
+use std::time::Instant;
 
 impl Session {
     /// A click on the song panel's list or arrangement; whether it was theirs.

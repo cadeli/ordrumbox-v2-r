@@ -1,6 +1,9 @@
 //! Where the menu bar goes and how it is drawn, the library field included.
 
-use super::*;
+use super::{Item, Menu, Open};
+use crate::canvas::{Canvas, Rgb, char_width, fit, text_width};
+use crate::scale::Scale;
+use crate::theme;
 
 // ─── Geometry ────────────────────────────────────────────────────────────────
 
