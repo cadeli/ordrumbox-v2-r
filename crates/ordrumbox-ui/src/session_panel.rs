@@ -564,11 +564,13 @@ mod tests {
     fn header_controls_set_tempo_length_and_generation() {
         let mut s = session();
         let c = view::header_controls(Scale::ONE);
-        // The tempo knob: the wheel steps it, a typed number sets it.
+        // The tempo knob: the wheel steps it, a typed number sets it (its
+        // right-click menu's "Type a value...").
         let (x, y) = center(c.bpm);
         assert!(s.wheel(SIZE, x, y, 3, false, false));
         assert_eq!(s.editor.library().bpm, 103.0);
         s.mouse_down(SIZE, x, y, Button::Right, false);
+        s.pick(0);
         s.chrome.widgets.entry.as_mut().unwrap().text = "140".into();
         s.panel_key(SIZE, PanelKey::Enter, false, false);
         assert_eq!(s.editor.library().bpm, 140.0);

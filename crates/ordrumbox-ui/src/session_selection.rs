@@ -3,7 +3,7 @@
 //! shown; the session keeps them inside it after each edit.
 
 use ordrumbox_core::{Note, Pattern, Track};
-use ordrumbox_logic::block::{Block, Zone};
+use ordrumbox_logic::block::{Block, StepAt, Zone};
 use ordrumbox_logic::roll_block::{RollBlock, RollZone};
 
 use crate::view::Cursor;
@@ -36,6 +36,8 @@ pub(super) struct Selection {
     pub(super) selected: Option<(usize, usize)>,
     /// The zone drawn over the grid: copy, cut, delete and paste take it.
     pub(super) zone: Option<Zone>,
+    /// The step Shift+arrows or Ctrl+click grow the zone from: the corner that stays put.
+    pub(super) zone_anchor: Option<StepAt>,
     /// The zone drawn over the piano roll (Shift+drag): its track, steps and keys.
     pub(super) roll_zone: Option<RollZone>,
     pub(super) clipboard: Option<Clipboard>,
@@ -52,6 +54,7 @@ impl Selection {
         self.cursor = None;
         self.selected = None;
         self.zone = None;
+        self.zone_anchor = None;
         self.roll_zone = None;
     }
 
@@ -60,6 +63,7 @@ impl Selection {
         self.cursor = Some(cursor);
         self.selected = None;
         self.zone = None;
+        self.zone_anchor = None;
         self.roll_zone = None;
     }
 

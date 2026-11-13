@@ -42,11 +42,30 @@ impl std::fmt::Debug for Output {
     }
 }
 
-/// Open the default output device and start rendering.
+fn name_of(device: &cpal::Device) -> String {
+    device.description().map(|d| d.name().to_owned()).unwrap_or_else(|_| "unnamed device".into())
+}
+
+/// The names of the output devices, for File > Audio output.
+pub fn devices() -> Vec<String> {
+    // A host that cannot list its devices offers none: the menu then holds the default alone.
+    cpal::default_host().output_devices().map(|devices| devices.map(|d| name_of(&d)).collect()).unwrap_or_default()
+}
+
+/// Open the output device chosen in File > Audio output, else the default
+/// one, and start rendering. A device chosen that is gone (unplugged) gives
+/// way to the default one, and the name shown says so.
 pub fn start(bank: Arc<SampleBank>, scales: Scales, synths: SynthPresets) -> StartedOutput {
     let host = cpal::default_host();
-    let device = host.default_output_device().ok_or("no audio output device")?;
-    let name = device.description().map(|d| d.name().to_owned()).unwrap_or_else(|_| "default".into());
+    let wanted = ordrumbox_ui::chosen_device()?;
+    let chosen =
+        wanted.as_deref().and_then(|wanted| host.output_devices().ok()?.find(|device| name_of(device) == wanted));
+    let missing = wanted.as_deref().filter(|_| chosen.is_none());
+    let device = chosen.or_else(|| host.default_output_device()).ok_or("no audio output device")?;
+    let name = match missing {
+        Some(missing) => format!("{} (\"{missing}\" not found)", name_of(&device)),
+        None => name_of(&device),
+    };
     let supported = device.default_output_config().map_err(|e| format!("{name}: {e}"))?;
     let config: StreamConfig = supported.config();
     let (controller, audio) = Controller::new(config.sample_rate as f32, bank, scales, synths);

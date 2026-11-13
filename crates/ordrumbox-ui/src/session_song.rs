@@ -172,7 +172,7 @@ impl Session {
     }
 
     /// The song playing now, if the selected one plays.
-    fn song_playing(&self) -> bool {
+    pub(super) fn song_playing(&self) -> bool {
         self.playback.plays(Mode::Song(self.editor.selected_song()))
     }
 
@@ -262,6 +262,7 @@ impl Session {
             room: self.song_room(layout),
             description: self.pattern().map(|p| p.description.as_str()),
             description_scroll: self.description_scroll(layout),
+            loop_region: self.song_loop_region(),
         }
     }
 

@@ -26,6 +26,20 @@ pub type StartedOutput = Result<(Box<dyn AudioOutput>, Controller), String>;
 /// `Session::load`, and again when a factory reset reloads the session.
 pub type StartOutput = Box<dyn FnMut(Arc<SampleBank>, Scales, SynthPresets) -> StartedOutput + Send>;
 
+/// Lists the sound devices the program can play on, by name.
+pub type OutputDevices = fn() -> Vec<String>;
+
+/// The `settings.json` key of the output device chosen (a name; absent: the system's default).
+pub const DEVICE_KEY: &str = "audioDevice";
+
+/// The output device chosen in File > Audio output, by name; `None`: the
+/// system's default. The program reads it each time it starts the sound.
+pub fn chosen_device() -> Result<Option<String>, String> {
+    let Some(path) = crate::store::settings_path() else { return Ok(None) };
+    let value = crate::store::load_setting(&path, DEVICE_KEY)?;
+    Ok(value.and_then(|v| v.as_str().map(str::to_owned)).filter(|name| !name.is_empty()))
+}
+
 /// The output of a plugin: its host plays what the engine renders.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HostOutput {

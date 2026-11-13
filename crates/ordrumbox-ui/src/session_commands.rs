@@ -37,6 +37,10 @@ impl Session {
             has_zone: self.selection.zone.is_some() || self.roll_zone().is_some(),
             has_selection: self.selection.selected.is_some(),
             playing: self.playing(),
+            metronome: self.metronome,
+            recording: self.recording,
+            audio_devices: self.playback.devices().is_some(),
+            fullscreen: self.fullscreen,
             has_songs: !self.editor.library().songs.is_empty(),
             generation: self.generation(),
             auto_all: self.pattern_auto(),
@@ -82,6 +86,23 @@ impl Session {
     }
 
     /// File > Quit was chosen.
+    /// A change of the window's mode (F11) asked for since the last call:
+    /// full screen when `Some(true)`, the window as it was when `Some(false)`.
+    pub fn take_fullscreen_request(&mut self) -> Option<bool> {
+        self.fullscreen_request.take()
+    }
+
+    /// F11: the window full screen, or back.
+    pub fn toggle_fullscreen(&mut self) {
+        self.fullscreen = !self.fullscreen;
+        self.fullscreen_request = Some(self.fullscreen);
+    }
+
+    /// The window left full screen by other means (the system's own key).
+    pub fn set_fullscreen(&mut self, on: bool) {
+        self.fullscreen = on;
+    }
+
     pub fn quit_requested(&self) -> bool {
         self.quit
     }
@@ -110,6 +131,7 @@ impl Session {
             C::PasteTrack => self.paste(true),
             C::ClearStep => self.delete_step(),
             C::ToggleAccent => self.toggle_accent(),
+            C::SelectAll => self.select_all(),
             C::Deselect => self.deselect(),
             C::NewPattern => self.new_pattern(),
             C::DuplicatePattern => self.duplicate_pattern(),
@@ -136,6 +158,13 @@ impl Session {
             C::RandomTrack => self.randomize_track(),
             C::PlayPattern => self.toggle_play(),
             C::PlaySong => self.toggle_play_song(),
+            C::Rewind => self.rewind(),
+            C::Record => self.toggle_record(),
+            C::AudioDevice => self.open_audio_devices(),
+            C::Fullscreen => self.toggle_fullscreen(),
+            C::TapTempo => self.tap_tempo(),
+            C::Metronome => self.toggle_metronome(),
+            C::ClearLoop => self.clear_loop(),
             C::PreviousSong => self.step_song(-1),
             C::NextSong => self.step_song(1),
             C::Mute | C::Solo => {
@@ -194,7 +223,7 @@ impl Session {
             C::Shortcuts => self.chrome.overlay = Some(Overlay::Shortcuts { scroll: 0 }),
             C::About => self.chrome.overlay = Some(Overlay::About),
             C::Manual => self.open_manual(),
-            C::FactoryReset => self.chrome.overlay = Some(Overlay::FactoryReset),
+            C::FactoryReset => self.chrome.overlay = Some(Overlay::FactoryReset { yes: false }),
             C::ExportLibrary => self.open_export(Export::Library),
             C::ImportLibrary => self.open_picker(Purpose::ImportLibrary),
             C::DemoLibrary => self.ask(Pending::DemoLibrary),

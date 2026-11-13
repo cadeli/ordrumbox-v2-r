@@ -203,6 +203,8 @@ pub enum Id {
     PatternDescription,
     /// The right-click menu of the song panel.
     SongMenu,
+    /// The list of sound devices File > Audio output opens.
+    AudioMenu,
     // Output panel.
     /// A master bus setting, by its `settings.master` key.
     Master(&'static str),
@@ -238,6 +240,9 @@ pub enum Id {
     /// The instrument menus of the track editor's Sound tab: the categories,
     /// then a category's instruments, those that have samples only.
     InstrumentMenu,
+    /// The right-click menu of a knob or a slider: the control it is for is
+    /// the dropdown's `control`.
+    ControlMenu,
 }
 
 /// What a widget shows.
@@ -644,6 +649,8 @@ pub struct Dropdown {
     /// The menu this one is a submenu of, still shown, its line that opened
     /// this one highlighted.
     pub parent: Option<Box<Dropdown>>,
+    /// The control a `ControlMenu` is for.
+    pub control: Option<Id>,
 }
 
 /// The label end of a line that opens a submenu.
@@ -651,7 +658,8 @@ pub const SUBMENU_MARK: &str = " >";
 
 impl Dropdown {
     pub fn new(id: Id, anchor: Rect, values: Vec<String>, labels: Vec<String>, selected: usize) -> Self {
-        let mut d = Self { id, title: None, anchor, values, labels, at: selected, first: 0, parent: None };
+        let mut d =
+            Self { id, title: None, anchor, values, labels, at: selected, first: 0, parent: None, control: None };
         d.show_at();
         d
     }

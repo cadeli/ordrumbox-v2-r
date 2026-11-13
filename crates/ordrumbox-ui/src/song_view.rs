@@ -68,6 +68,11 @@ const CURSOR: Rgb = theme::LIVE;
 const CURSOR_IDLE: Rgb = theme::FOCUS;
 const CURRENT: Rgb = theme::LIVE;
 
+/// The ruler's measures that play in a loop.
+fn loop_color() -> Rgb {
+    theme::mix(cell_color(), theme::LIVE, 0.45)
+}
+
 /// One row of the arrangement: a pattern it uses.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Row {
@@ -124,6 +129,8 @@ pub struct SongView<'a> {
     /// its first line shown.
     pub description: Option<&'a str>,
     pub description_scroll: usize,
+    /// The measures that play in a loop, `first..end`.
+    pub loop_region: Option<(u32, u32)>,
 }
 
 /// Where a pattern dragged from the list would land.
@@ -533,8 +540,11 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     // Ruler: one numbered cell per measure, every fourth marked.
     for m in first_measure..first_measure + shown_measures {
         let x = layout.measure_x(f64::from(m), first_measure);
+        let looped = view.loop_region.is_some_and(|(first, end)| (first..end).contains(&m));
         let color = if m == current {
             CURRENT
+        } else if looped {
+            loop_color()
         } else if m % 4 == 0 {
             major_color()
         } else {
@@ -707,6 +717,7 @@ mod tests {
             room: 0,
             description: Some("x"),
             description_scroll: 0,
+            loop_region: None,
         };
         let layout = SongLayout::new(1100, 680, Scale::ONE, 0);
         let (mw, rh) = (layout.measure_width(), layout.row_height());
@@ -773,6 +784,7 @@ mod tests {
                     list_drop: Some((39, 31)),
                     room: 8,
                     description: song.map(|_| long.as_str()),
+                    loop_region: Some((1, 3)),
                     description_scroll: 3,
                 };
                 draw(&mut canvas, &view, &layout);

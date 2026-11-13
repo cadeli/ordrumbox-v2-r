@@ -11,6 +11,7 @@ pub mod assign;
 pub mod controller;
 pub mod engine;
 pub mod kit;
+pub mod metronome;
 pub mod midi;
 pub mod offline;
 pub mod pass;

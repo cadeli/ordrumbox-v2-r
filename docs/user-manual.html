@@ -468,7 +468,8 @@ the bars to draw them; a drag is one undo step.</p>
 <tr><td>Arrows</td><td>Move the grid cursor.</td></tr>
 <tr><td><kbd>Enter</kbd></td><td>Like a click at the cursor: switch the step on or off.</td></tr>
 <tr><td><kbd>Shift</kbd>+<kbd>↑</kbd> <kbd>↓</kbd></td><td>Velocity of the selected note ±0.05.</td></tr>
-<tr><td><kbd>Shift</kbd>+<kbd>←</kbd> <kbd>→</kbd></td><td>Pitch of the selected note ±1 semitone.</td></tr>
+<tr><td><kbd>Alt</kbd>+<kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd></td><td>Nudge the selected note: one step in time, ±1 semitone of pitch.</td></tr>
+<tr><td><kbd>Shift</kbd>+arrows</td><td>Grow a zone from the cursor (<kbd>Ctrl</kbd>+click on a step takes it in; <kbd>Ctrl</kbd>+<kbd>A</kbd> selects the whole pattern).</td></tr>
 <tr><td><kbd>L</kbd></td><td>Accent the cursor step's notes, or take the accent off.</td></tr>
 <tr><td><kbd>Delete</kbd></td><td>Clear the cursor step.</td></tr>
 <tr><td><kbd>Esc</kbd></td><td>Deselect.</td></tr>
@@ -963,6 +964,11 @@ In the plugin, <kbd>Alt</kbd> stands for <kbd>Ctrl</kbd> (<a href="#plugin">sect
 <table>
 <tr><th>Key</th><th>Action</th></tr>
 <tr><td><kbd>Space</kbd></td><td>Play / stop the pattern (<kbd>Shift</kbd>, or in the song panel: the song, from its cursor)</td></tr>
+<tr><td><kbd>Home</kbd>, keypad <kbd>Enter</kbd></td><td>Back to the first beat or measure. A song stopped keeps its place: <kbd>Space</kbd> goes on from there.</td></tr>
+<tr><td><kbd>Shift</kbd>+click on the song ruler</td><td>Loop the song from the cursor's measure to the one clicked (Play &gt; Clear the loop ends it).</td></tr>
+<tr><td><kbd>F9</kbd> <kbd>F8</kbd></td><td>Metronome on / off; tap the tempo.</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>R</kbd></td><td>Record: while the pattern plays, <kbd>Q</kbd>–<kbd>P</kbd> also put a note on the step that plays.</td></tr>
+<tr><td><kbd>F11</kbd>, <kbd>Ctrl</kbd>+<kbd>W</kbd></td><td>Full screen; close the window.</td></tr>
 <tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>Previous / next pattern (<kbd>Shift</kbd>: arrangement; also <kbd>Page Up</kbd> <kbd>Page Down</kbd>)</td></tr>
 <tr><td><kbd>-</kbd> <kbd>=</kbd></td><td>Tempo −1 / +1 (<kbd>Shift</kbd>: ×10)</td></tr>
 <tr><td><kbd>,</kbd> <kbd>.</kbd></td><td>Previous / next kit</td></tr>

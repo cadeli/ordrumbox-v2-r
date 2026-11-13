@@ -137,7 +137,15 @@ Press **F1** in the app for the full keyboard shortcut list. Keys are the ones t
 keyboard's layout marks (Ctrl Z is the key marked Z on AZERTY too), except the two rows
 that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their place. Common keys:
 
-- **Space**: play / stop
+- **Space**: play / stop. A song stops where it is and **Space** goes on from that
+  measure; **Home** (or the keypad's **Enter**) goes back to the first beat, or measure.
+  **Shift + click** on the song panel's ruler loops the song from the cursor's measure to
+  the one clicked (the ruler shows it; Play > Clear the loop ends it).
+- **F9**: metronome (a click on every beat, the first of a measure higher), **F8**: tap
+  the tempo (tap on the beat; a pause of 2 seconds starts the count again)
+- **Ctrl R**: record. While the pattern plays, **Q–P** also put a note on their track, on
+  the step nearest to the playhead (one undo step each; a step that has a note keeps it)
+- **F11**: full screen, **Ctrl W**: close the window (as **Ctrl Q**)
 - **F1–F7** (also **Ctrl 1–7**, for the keyboards whose F keys want Fn): the shortcut list,
   track editor, song panel, piano roll, grid, synth editor, note editor (shown or folded)
 - **Ctrl K**: kit editor, **Ctrl Shift M**: export MIDI (**Ctrl E**: export WAV)
@@ -156,9 +164,15 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   scheme, D: drums in auto, G, H, J, K, V: the VU meters, X: random notes), so a
   slip off the play rows does nothing; the pattern's length has no key (the
   Song panel and the menus change it).
-- **Shift + arrows** on a selected note: up / down a semitone of pitch, left / right
-  one step in time (in the grid as in the piano roll, whose drag follows the same
-  axes: up / down the pitch, sideways the velocity).
+- **Ctrl A**: select the whole pattern as a zone. **Shift + arrows** grow a zone from the
+  cursor, **Ctrl + click** on a step takes it into the zone (it stays a rectangle); copy,
+  cut and delete then act on it.
+- **Alt + arrows** on a selected note in the grid: up / down a semitone of pitch, left /
+  right one step in time (in the piano roll, **Shift + arrows**, and its drag follows the
+  same axes: up / down the pitch, sideways the velocity).
+- **File > Audio output...** lists the sound devices; the choice is kept in `settings.json`
+  (`audioDevice`) and the sound starts again on it. A device gone gives way to the
+  system's, and the status line names the one in use.
 - **On macOS** the menus show **Cmd** in place of Ctrl (the same key here); redo is
   **Cmd Shift Z** (also Cmd Y), and export MIDI is **Cmd Shift M**: Cmd M alone
   minimizes the window.

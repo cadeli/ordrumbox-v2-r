@@ -142,9 +142,10 @@ mod tests {
         // The button bypasses the compressor.
         s.mouse_down(SIZE, out.bypass.x + 4, out.bypass.y + 4, Button::Left, false);
         assert_eq!(s.output_panel.master.bypass, 1.0);
-        // A typed threshold.
+        // A typed threshold (right-click menu: "Type a value...").
         let t = out.compressor[0];
         s.mouse_down(SIZE, t.x + t.w / 2, t.y + 10, Button::Right, false);
+        s.pick(0);
         s.chrome.widgets.entry.as_mut().unwrap().text = "-30".into();
         s.panel_key(SIZE, PanelKey::Enter, false, false);
         assert_eq!(s.output_panel.master.threshold, -30.0);

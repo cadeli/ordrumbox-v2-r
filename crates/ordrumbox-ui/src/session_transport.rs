@@ -39,12 +39,61 @@ impl Session {
             return;
         }
         if self.playback.is_playing() {
+            // A song stops where it is: Space goes on from this measure, Home goes back.
+            if matches!(mode, Mode::Song(_)) && self.song_playing() {
+                self.song_cursor = self.playhead_measure();
+                self.message = format!("paused at measure {}, Space goes on, Home rewinds", self.song_cursor + 1);
+            }
             self.playback.stop();
         } else {
             if let Mode::Pattern(p) = mode {
                 auto_loop(&mut self.editor, &mut self.learned_styles, &self.styles, &self.scales, &mut self.rng, p, 0);
             }
             self.playback.play_from(&self.editor, mode, first);
+        }
+    }
+
+    /// Home: back to the start. A song goes to its first measure, or its
+    /// loop's, and goes on from there if it plays; a pattern plays from its
+    /// first beat again if it plays.
+    pub fn rewind(&mut self) {
+        if self.workspace == Workspace::Song {
+            let first = self.song_loop_region().map_or(0, |(first, _)| first);
+            self.set_song_cursor(first);
+            self.message = format!("back to measure {}", first + 1);
+        } else if self.playback.is_playing() {
+            self.playback.play_from(&self.editor, Mode::Pattern(self.pattern_index), 0);
+            self.message = "back to the first beat".into();
+        } else {
+            self.message = "stopped at the first beat".into();
+        }
+    }
+
+    /// The measures the selected song plays in a loop, `first..end`.
+    pub(super) fn song_loop_region(&self) -> Option<(u32, u32)> {
+        let (song, first, end) = self.song_loop?;
+        (song == self.editor.selected_song() && first < end).then_some((first, end))
+    }
+
+    /// Shift+click on the ruler: the song loops from the measure the cursor
+    /// is on to measure `measure`, both included.
+    pub(super) fn loop_to(&mut self, measure: u32) {
+        let from = self.playhead_measure();
+        let (first, last) = (from.min(measure), from.max(measure));
+        self.song_loop = Some((self.editor.selected_song(), first, last + 1));
+        self.message = if first == last {
+            format!("loop: measure {}, Play > Clear the loop ends it", first + 1)
+        } else {
+            format!("loop: measures {}-{}, Play > Clear the loop ends it", first + 1, last + 1)
+        };
+    }
+
+    /// Play > Clear the loop: the song plays on to its end.
+    pub fn clear_loop(&mut self) {
+        if self.song_loop.take().is_some() {
+            self.message = "loop cleared".into();
+        } else {
+            self.message = "no loop: Shift+click the song's ruler sets one".into();
         }
     }
 

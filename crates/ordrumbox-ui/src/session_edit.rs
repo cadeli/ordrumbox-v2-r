@@ -118,6 +118,7 @@ impl Session {
         let spb = pattern.tracks[c.track].steps_per_beat.max(1);
         c.step = c.step.min(spb - 1);
         self.selection.cursor = Some(c);
+        self.selection.zone_anchor = None;
         self.selection.note_focus = Some(NoteFocus::Step { track: c.track, beat: c.beat, step: c.step });
         let note = pattern.tracks[c.track].notes.iter().position(|n| n.beat == c.beat && n.step == c.step);
         self.selection.selected = note.map(|n| (c.track, n));

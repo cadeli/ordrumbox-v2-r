@@ -157,3 +157,17 @@ roll's axes: up / down the pitch, sideways the velocity. On macOS the menus show
 Cmd+ (the key that runs them), redo is Cmd+Shift+Z, and export MIDI needs Shift
 (Cmd+M minimizes the window). No snapshot changed; the unit tests of the keys and
 the drags were rewritten with them.
+
+Transport, selection and window keys. Shift+arrows in the grid now grow a zone from the
+cursor; nudging the selected note (pitch, one step in time) moved to Alt+arrows, in a plugin
+too. Ctrl+A selects the whole pattern, Ctrl+click on a step takes it into the zone, Ctrl+W
+quits, F11 is full screen, F8 taps the tempo, F9 is the metronome, Ctrl+R records, Home and the
+keypad's Enter rewind (the kit editor keeps its Enter). A song stopped keeps its place: the
+cursor goes to the measure it was in, so Space goes on from there where it used to start over
+from the cursor set by hand. A song's loop (Shift+click on the ruler) is made in the controller
+(`Controller::set_song_loop`): a pass keeps the sequence number the engine counts and holds the
+measure of the loop. The metronome is built into the passes (`ordrumbox-engine/src/metronome.rs`),
+a synth click on a strip after the tracks' (none when the pattern has 64 tracks). The output
+device is a setting (`audioDevice`) read by `ordrumbox-app` each time it starts the sound; File
+> Audio output reloads the session. No snapshot changed: the passes of a song without a loop or a
+metronome are built as before.

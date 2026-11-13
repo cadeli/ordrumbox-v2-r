@@ -77,7 +77,7 @@ fn box_off_color() -> Rgb {
 
 /// The key help line under the grid (every command is in the menus, with
 /// its shortcut; Help > Keyboard shortcuts lists them all).
-const HELP: &str = "F10 or ALT: menus   ARROWS: cursor   ENTER or click: step on/off   SHIFT+ARROWS: velocity/pitch   TAB: track editor   F1: all keys";
+const HELP: &str = "F10 or ALT: menus   ARROWS: cursor   ENTER or click: step on/off   SHIFT+ARROWS: select   ALT+ARROWS: nudge note   TAB: track editor   F1: all keys";
 /// The same in the song panel.
 const SONG_HELP: &str = "SONG   click the ruler: cursor   right-click: add / repeat / remove   SPACE: play from the cursor   F3 or ESC: grid";
 /// The same in the piano roll.
@@ -1377,7 +1377,21 @@ pub fn draw_toast(canvas: &mut Canvas, message: &str, bottom: i32, scale: Scale)
 
 /// A panel over the window: a title and lines of text (the key list, about).
 pub fn draw_notice(canvas: &mut Canvas, title: &str, lines: &[String], scale: Scale) {
-    draw_notice_part(canvas, title, lines, lines, scale);
+    draw_notice_part(canvas, title, lines, scale, None);
+}
+
+/// A notice with two buttons under its lines: `buttons.0` is the default
+/// (ENTER closes, nothing done), `focus` says which one ENTER would run,
+/// shown in brackets and in colour.
+pub fn draw_notice_choice(
+    canvas: &mut Canvas,
+    title: &str,
+    lines: &[String],
+    buttons: [&str; 2],
+    focus: usize,
+    scale: Scale,
+) {
+    draw_notice_part(canvas, title, lines, scale, Some((buttons, focus)));
 }
 
 /// Height of a notice's line, per scale unit.
@@ -1398,17 +1412,34 @@ pub fn draw_notice_scrolled(canvas: &mut Canvas, title: &str, lines: &[String], 
     }
     let first = scroll.min(lines.len() - rows);
     let title = format!("{title}  {}-{} of {}, wheel or arrows: more", first + 1, first + rows, lines.len());
-    draw_notice_part(canvas, &title, &lines[first..first + rows], lines, scale);
+    draw_notice_part(canvas, &title, &lines[first..first + rows], scale, None);
 }
 
-/// A notice showing `lines`, as wide as the widest of `all`.
-fn draw_notice_part(canvas: &mut Canvas, title: &str, lines: &[String], all: &[String], scale: Scale) {
+/// A notice showing `lines`, as wide as the widest of them (`choice` adds
+/// its two buttons as one more line).
+fn draw_notice_part(
+    canvas: &mut Canvas,
+    title: &str,
+    lines: &[String],
+    scale: Scale,
+    choice: Option<([&str; 2], usize)>,
+) {
     let line_h = NOTICE_LINE * scale;
     let close = "ESC or click: close";
+    // The buttons share one line, the one ENTER runs in brackets.
+    let buttons = choice.map(|(buttons, focus)| {
+        let (a, b) = (buttons[0], buttons[1]);
+        let first = if focus == 0 { format!("[ {a} ]") } else { a.to_owned() };
+        let second = if focus == 0 { b.to_owned() } else { format!("[ {b} ]") };
+        (format!("{first}   {second}"), first, second, focus)
+    });
     // The title shares its line with `close`.
     let title_width = text_width(title, scale.title()) + 16 * scale + text_width(close, scale);
-    let width = all.iter().map(|l| text_width(l, scale)).chain([title_width]).max().unwrap_or(0) + 32 * scale;
-    let height = (lines.len() as i32 + 3) * line_h + 16 * scale;
+    let all: Vec<&String> = lines.iter().collect();
+    let buttons_width = buttons.as_ref().map_or(0, |(line, ..)| text_width(line, scale));
+    let lines_width = all.iter().map(|l| text_width(l, scale)).max().unwrap_or(0).max(buttons_width);
+    let width = lines_width.max(title_width) + 32 * scale;
+    let height = (lines.len() as i32 + 3 + i32::from(buttons.is_some())) * line_h + 16 * scale;
     let x = ((canvas.width() - width) / 2).max(0);
     let y = ((canvas.height() - height) / 2).max(menu::bar_height(scale));
     canvas.fill_rect(x - 4 * scale, y - 4 * scale, width + 8 * scale, height + 8 * scale, theme::shade());
@@ -1417,6 +1448,12 @@ fn draw_notice_part(canvas: &mut Canvas, title: &str, lines: &[String], all: &[S
     canvas.text(x + 16 * scale, y + 10 * scale, title, scale.title(), ACCENT);
     for (i, line) in lines.iter().enumerate() {
         canvas.text(x + 16 * scale, y + 10 * scale + (i as i32 + 2) * line_h, line, scale, theme::text());
+    }
+    if let Some((_, first, second, focus)) = &buttons {
+        let y = y + 10 * scale + (lines.len() as i32 + 2) * line_h;
+        let (first_color, second_color) = if *focus == 0 { (ACCENT, theme::muted()) } else { (theme::muted(), ACCENT) };
+        canvas.text(x + 16 * scale, y, first, scale, first_color);
+        canvas.text(x + 16 * scale + text_width(first, scale) + 3 * scale, y, second, scale, second_color);
     }
     canvas.text(x + width - 16 * scale - text_width(close, scale), y + 10 * scale, close, scale, theme::muted());
 }

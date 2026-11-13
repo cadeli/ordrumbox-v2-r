@@ -316,6 +316,7 @@ impl Session {
             Id::TrackNameMenu(target) => self.track_name_menu_pick(target, &value, dropdown),
             Id::KitInstrumentMenu(sample) => self.kit_instrument_menu_pick(sample, &value, dropdown),
             Id::InstrumentMenu => self.instrument_menu_pick(&value, dropdown),
+            Id::ControlMenu => self.control_menu_pick(&value, dropdown.control),
             id => self.select(id, &value),
         }
     }
@@ -365,6 +366,7 @@ impl Session {
                 return;
             }
             Id::SongMenu => return self.song_menu_pick(value),
+            Id::AudioMenu => return self.choose_audio_device(value),
             Id::StyleList => return self.choose_style(value),
             Id::Beats => {
                 if let Ok(beats) = value.parse::<i32>() {
