@@ -170,9 +170,17 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
 - **Alt + arrows** on a selected note in the grid: up / down a semitone of pitch, left /
   right one step in time (in the piano roll, **Shift + arrows**, and its drag follows the
   same axes: up / down the pitch, sideways the velocity).
-- **File > Audio output...** lists the sound devices; the choice is kept in `settings.json`
-  (`audioDevice`) and the sound starts again on it. A device gone gives way to the
-  system's, and the status line names the one in use.
+- **Edit > Preferences...** (**Ctrl ,**) gathers the sound output, the MIDI input, the
+  metronome, the VU meters and the toasts in one window. Up / Down choose a line, Enter or
+  Left / Right change it, **OK** applies and **Esc** leaves everything as it was. The sound
+  output and the MIDI input are kept in `settings.json` (`audioDevice`, `midiInput`: empty
+  is the system's device or the first port, `"off"` no MIDI). A new output starts the sound
+  again; a device gone gives way to the system's, and the status line names the one in use.
+- **MIDI keyboard or pad** (the app; a plugin takes its host's): the notes it plays sound
+  the pattern's tracks, drums by their General MIDI key (kick 36, snare 38…), a melodic
+  track on its own channel at the note's pitch. With **Ctrl R** on and the pattern playing,
+  each note is also written to its track, on the step nearest to the playhead, at the
+  velocity played (one undo step each).
 - **On macOS** the menus show **Cmd** in place of Ctrl (the same key here); redo is
   **Cmd Shift Z** (also Cmd Y), and export MIDI is **Cmd Shift M**: Cmd M alone
   minimizes the window.

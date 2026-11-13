@@ -10,9 +10,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod audio;
+mod midi;
 
 use std::num::NonZeroU32;
 use std::rc::Rc;
+use std::sync::mpsc::{Receiver, Sender};
 
 use ordrumbox_ui::ui_input::{Button, Key, KeyEvent, Modifiers, ScrollDelta, single_char};
 use ordrumbox_ui::{Command, Scale, Session, Ui};
@@ -35,12 +37,48 @@ struct App {
     gfx: Option<Gfx>,
     ui: Ui,
     error: Option<String>,
+    /// The MIDI input open, and where its notes come to the UI thread.
+    midi: Option<midi::Input>,
+    notes: Receiver<midi::NoteOn>,
+    notes_sender: Sender<midi::NoteOn>,
+    waker: ordrumbox_ui::Waker,
 }
 
 impl App {
     fn fail(&mut self, event_loop: &ActiveEventLoop, context: &str, error: impl std::fmt::Display) {
         self.error = Some(format!("{context}: {error}"));
         event_loop.exit();
+    }
+
+    /// Open the MIDI input now chosen, the one open closed first; what goes
+    /// wrong, or that none is there, is said in the status line.
+    fn open_midi(&mut self) {
+        self.midi = None;
+        let opened = ordrumbox_ui::chosen_midi_input()
+            .and_then(|choice| midi::open(&choice, self.notes_sender.clone(), self.waker.clone()));
+        match opened {
+            Ok(Some(input)) => {
+                self.ui.session.say(&format!("MIDI input: {}", input.name));
+                self.midi = Some(input);
+            }
+            Ok(None) => {}
+            Err(e) => self.ui.session.say(&e),
+        }
+        self.ui.session.set_midi_open(self.midi.is_some());
+    }
+
+    /// Between frames: a MIDI input chosen is opened, the notes played reach the session.
+    fn midi_idle(&mut self) -> bool {
+        let mut redraw = false;
+        if self.ui.session.take_midi_change() {
+            self.open_midi();
+            redraw = true;
+        }
+        while let Ok(note) = self.notes.try_recv() {
+            self.ui.session.midi_note(note.channel, note.key, note.velocity);
+            redraw = true;
+        }
+        redraw
     }
 
     fn request_redraw(&self) {
@@ -282,8 +320,9 @@ impl ApplicationHandler for App {
     }
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        let midi = self.midi_idle();
         let idle = self.ui.idle();
-        if idle.redraw {
+        if idle.redraw || midi {
             self.request_redraw();
         }
         event_loop.set_control_flow(idle.wake_at.map_or(ControlFlow::Wait, ControlFlow::WaitUntil));
@@ -362,8 +401,9 @@ fn open_window() -> Result<(), Box<dyn std::error::Error>> {
         Ok(()) | Err(EventLoopClosed(())) => {}
     });
     session.offer_devices(audio::devices);
+    session.offer_midi_inputs(midi::ports);
     session.start_updates(waker.clone());
-    session.start_mcp(waker);
+    session.start_mcp(waker.clone());
     // MIDI files given on the command line ("open with"): imported.
     for arg in std::env::args_os().skip(1) {
         let path = std::path::PathBuf::from(arg);
@@ -383,7 +423,9 @@ fn open_window() -> Result<(), Box<dyn std::error::Error>> {
         Ok("reset") => session.run(Command::FactoryReset),
         _ => {}
     }
-    let mut app = App { gfx: None, ui: Ui::new(session), error: None };
+    let (notes_sender, notes) = std::sync::mpsc::channel();
+    let mut app = App { gfx: None, ui: Ui::new(session), error: None, midi: None, notes, notes_sender, waker };
+    app.open_midi();
     event_loop.run_app(&mut app)?;
     match app.error {
         Some(error) => Err(error.into()),

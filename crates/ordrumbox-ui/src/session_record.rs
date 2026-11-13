@@ -1,6 +1,7 @@
 //! Recording notes while the pattern plays: with recording on, a row key
-//! (Q-P, the keys that hear the tracks) also puts a note on its track, on the
-//! step the playhead is nearest to. Each note is one undo step.
+//! (Q-P, the keys that hear the tracks) or a note played on a MIDI keyboard
+//! also puts a note on its track, on the step the playhead is nearest to.
+//! Each note is one undo step.
 
 use super::*;
 
@@ -23,6 +24,23 @@ impl Session {
     /// Nothing happens when recording is off; hitting it with nothing
     /// playing, in the song panel, or on a step that has a note says so.
     pub fn record_note(&mut self, t: usize) {
+        self.record_at(t, 0.0, None);
+    }
+
+    /// A MIDI note played (key `key` of channel `channel`, `velocity` 0–1):
+    /// recorded on the track of the pattern that key plays, at its pitch and
+    /// its velocity, when recording.
+    pub fn midi_note(&mut self, channel: u8, key: u8, velocity: f32) {
+        if !self.recording {
+            return;
+        }
+        match self.playback.midi_track(&self.editor, channel, key) {
+            Some((t, pitch)) => self.record_at(t, pitch, Some(f64::from(velocity))),
+            None => self.message = format!("recording: no track plays MIDI key {key}"),
+        }
+    }
+
+    fn record_at(&mut self, t: usize, pitch: f64, velocity: Option<f64>) {
         if !self.recording {
             return;
         }
@@ -43,12 +61,12 @@ impl Session {
             i64::from(pattern.beat_count.max(1)),
             i64::from(track.steps_per_beat.max(1)),
         );
-        if track.notes.iter().any(|n| n.beat == beat && n.step == step) {
+        if track.notes.iter().any(|n| n.beat == beat && n.step == step && n.pitch == pitch) {
             self.message = format!("{} @ {}: a note is there already", track.name, beat_label(beat, step));
             return;
         }
         let name = track.name.clone();
-        if self.editor.add_note(p, t, beat, step, 0.0).is_some() {
+        if self.editor.add_note_played(p, t, beat, step, pitch, velocity).is_some() {
             self.edited();
             self.message = format!("recorded {name} @ {}", beat_label(beat, step));
         }

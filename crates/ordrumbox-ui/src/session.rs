@@ -56,8 +56,6 @@ use session_playback::Playback;
 use session_saving::Saving;
 use session_selection::{Clipboard, NoteFocus, Selection};
 
-#[path = "session_audio.rs"]
-mod session_audio;
 #[path = "session_chrome.rs"]
 mod session_chrome;
 #[path = "session_color.rs"]
@@ -76,6 +74,8 @@ mod session_generate;
 mod session_grid;
 #[path = "session_lane.rs"]
 mod session_lane;
+#[path = "session_prefs.rs"]
+mod session_prefs;
 #[path = "session_record.rs"]
 mod session_record;
 #[path = "session_roll_zone.rs"]
@@ -199,6 +199,8 @@ pub enum OverlayKey {
     /// Backspace: the parent folder.
     Back,
     Move(isize),
+    /// ← (-1) / → (1): the value of a setting.
+    Side(isize),
     /// Home (false) / End (true).
     Edge(bool),
     Letter(char),
@@ -332,6 +334,8 @@ pub struct Session {
     assets_dir: Option<PathBuf>,
     /// File > Quit was chosen.
     quit: bool,
+    /// The MIDI input chosen changed and the program has not opened it yet.
+    midi_changed: bool,
     /// The window is full screen.
     fullscreen: bool,
     /// A change of the window's mode the program has not applied yet.
@@ -404,6 +408,8 @@ enum Overlay {
         scroll: usize,
     },
     About,
+    /// Edit > Preferences: the settings being chosen, kept when OK is chosen.
+    Preferences(session_prefs::Prefs),
     /// Help > Factory reset, until the user says so: `yes` is the button
     /// ENTER would run, `false` (the default) keeps.
     FactoryReset {
@@ -537,7 +543,24 @@ impl Session {
     /// started by `start_output`.
     /// The program lists the sound devices with `devices`, for File > Audio output.
     pub fn offer_devices(&mut self, devices: crate::audio_output::OutputDevices) {
-        self.playback.keep_devices(devices);
+        self.playback.offers_mut().devices = Some(devices);
+    }
+
+    /// The program lists the MIDI inputs with `ports`, for Edit > Preferences.
+    pub fn offer_midi_inputs(&mut self, ports: crate::audio_output::OutputDevices) {
+        self.playback.offers_mut().midi_ports = Some(ports);
+    }
+
+    /// The program has a MIDI input open (or has not): its notes are
+    /// recorded when recording, and play the pattern's tracks.
+    pub fn set_midi_open(&mut self, open: bool) {
+        self.playback.offers_mut().midi_open = open;
+    }
+
+    /// The MIDI input chosen in Edit > Preferences changed since the last
+    /// call: the program opens the one now chosen.
+    pub fn take_midi_change(&mut self) -> bool {
+        std::mem::take(&mut self.midi_changed)
     }
 
     pub fn load(start_output: StartOutput) -> Self {
@@ -761,6 +784,7 @@ impl Session {
             action_log: ActionLog::default(),
             assets_dir: None,
             quit: false,
+            midi_changed: false,
             fullscreen: false,
             fullscreen_request: None,
             scale_list: ScaleList::default(),
@@ -1101,6 +1125,8 @@ impl Session {
         let region = self.song_loop_region().map(|(first, end)| (u64::from(first), u64::from(end)));
         self.playback.set_song_loop(&self.editor, region);
         self.playback.set_metronome(&self.editor, self.metronome);
+        let midi_open = self.playback.offers().midi_open;
+        self.playback.set_live_midi(midi_open);
         self.playback.update(&mut self.editor, self.pattern_index, |editor, p, pass| {
             auto_loop(editor, &mut self.learned_styles, &self.styles, &self.scales, &mut self.rng, p, pass)
         });
@@ -1398,6 +1424,9 @@ impl Session {
                 view::draw_notice_scrolled(canvas, "Keyboard shortcuts", &self.shortcut_lines(), *scroll, scale);
             }
             Some(Overlay::About) => view::draw_notice(canvas, "About orDrumbox", &self.about(), scale),
+            Some(Overlay::Preferences(prefs)) => {
+                view::draw_notice(canvas, "Preferences", &prefs.lines(), scale);
+            }
             Some(Overlay::History { scroll }) => {
                 let layout = LogLayout::new(canvas.width(), canvas.height(), scale);
                 action_log::draw(canvas, &self.action_log, *scroll, &layout);

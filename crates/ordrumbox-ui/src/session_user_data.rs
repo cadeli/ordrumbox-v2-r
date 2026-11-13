@@ -106,11 +106,9 @@ impl Session {
         let waker = self.updates.take_waker();
         let mcp = self.mcp.take();
         let start_output = self.playback.take_start_output().unwrap_or_else(|| Box::new(no_output));
-        let devices = self.playback.devices();
+        let offers = self.playback.offers();
         *self = Self::load(start_output);
-        if let Some(devices) = devices {
-            self.playback.keep_devices(devices);
-        }
+        *self.playback.offers_mut() = offers;
         self.action_log = action_log;
         if let Some(waker) = waker {
             self.updates.keep_waker(waker);

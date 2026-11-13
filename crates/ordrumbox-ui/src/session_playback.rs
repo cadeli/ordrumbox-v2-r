@@ -19,6 +19,18 @@ struct UpcomingLoop {
     tracks: Vec<Track>,
 }
 
+/// What the program lets the user choose, and the MIDI input it has open:
+/// kept when the session reloads.
+#[derive(Debug, Clone, Copy, Default)]
+pub(super) struct Offers {
+    /// Lists the sound devices (`None`: the program offers no choice).
+    pub(super) devices: Option<OutputDevices>,
+    /// Lists the MIDI inputs (`None`: the program has no MIDI input).
+    pub(super) midi_ports: Option<OutputDevices>,
+    /// A MIDI input is open.
+    pub(super) midi_open: bool,
+}
+
 /// The engine as the session drives it; without a sound device, everything
 /// it is asked does nothing and it never plays.
 #[derive(Default)]
@@ -29,8 +41,8 @@ pub(super) struct Playback {
     /// What started `output`, to start it again when the session reloads
     /// (`None`: a session built without assets or by a test).
     start_output: Option<StartOutput>,
-    /// Lists the devices the output can play on (`None`: the program offers no choice).
-    devices: Option<OutputDevices>,
+    /// What the program offers for the sound and the MIDI input.
+    offers: Offers,
     /// Editor revision the playing pass was built from.
     played_revision: u64,
     upcoming_loop: Option<UpcomingLoop>,
@@ -62,13 +74,24 @@ impl Playback {
         self.start_output = Some(start_output);
     }
 
-    /// Keep `devices`, which lists what the sound can play on.
-    pub(super) fn keep_devices(&mut self, devices: OutputDevices) {
-        self.devices = Some(devices);
+    pub(super) fn offers(&self) -> Offers {
+        self.offers
     }
 
-    pub(super) fn devices(&self) -> Option<OutputDevices> {
-        self.devices
+    pub(super) fn offers_mut(&mut self) -> &mut Offers {
+        &mut self.offers
+    }
+
+    /// The MIDI input open or not: the notes it plays reach the pattern's tracks.
+    pub(super) fn set_live_midi(&mut self, on: bool) {
+        if let Some(controller) = &mut self.controller {
+            controller.set_live_midi(on);
+        }
+    }
+
+    /// The track and pitch MIDI key `key` of channel `channel` plays.
+    pub(super) fn midi_track(&mut self, editor: &Editor, channel: u8, key: u8) -> Option<(usize, f64)> {
+        self.controller.as_mut()?.midi_track(editor.library(), channel, key)
     }
 
     /// What started the sound, given up for a new session.

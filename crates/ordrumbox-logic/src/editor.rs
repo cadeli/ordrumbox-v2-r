@@ -262,6 +262,20 @@ impl Editor {
 
     /// Add a note (defaults) at `beat`/`beat_step`; its index in the track.
     pub fn add_note(&mut self, p: usize, t: usize, beat: i32, beat_step: i32, pitch: f64) -> Option<usize> {
+        self.add_note_played(p, t, beat, beat_step, pitch, None)
+    }
+
+    /// Add a note at `beat`/`beat_step` as it was played: at `velocity` (0–1)
+    /// when given, else the default one; its index in the track.
+    pub fn add_note_played(
+        &mut self,
+        p: usize,
+        t: usize,
+        beat: i32,
+        beat_step: i32,
+        pitch: f64,
+        velocity: Option<f64>,
+    ) -> Option<usize> {
         let pattern = pattern_name(self.library.patterns.get(p)?).to_owned();
         self.edit_track(
             p,
@@ -270,7 +284,11 @@ impl Editor {
             None,
             |track| {
                 let percent = step_percent(beat_step, track.steps_per_beat);
-                track.notes.push(Note { beat, step: beat_step, pitch, step_percent: Some(percent), ..Note::default() });
+                let mut note = Note { beat, step: beat_step, pitch, step_percent: Some(percent), ..Note::default() };
+                if let Some(velocity) = velocity {
+                    note.velocity = velocity.clamp(0.0, 1.0);
+                }
+                track.notes.push(note);
                 track.notes.len() - 1
             },
         )

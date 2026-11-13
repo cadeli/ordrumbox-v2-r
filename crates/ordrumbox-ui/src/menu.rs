@@ -146,8 +146,8 @@ pub enum Command {
     OpenUserFolder,
     CheckUpdates,
     DownloadPage,
-    /// File > Audio output: the sound device to play on.
-    AudioDevice,
+    /// Edit > Preferences: the sound output, the MIDI input and what is shown.
+    Preferences,
     /// F11: the window full screen, or back.
     Fullscreen,
 }
@@ -172,7 +172,6 @@ impl Command {
             Self::CheckUpdates | Self::DownloadPage => Some("update check: in the app only, not in a plugin"),
             Self::FactoryReset => Some("factory reset: in the app only, not in a plugin"),
             Self::MasterStrip => Some("the master strip: in the app only, not in a plugin"),
-            Self::AudioDevice => Some("the host owns the sound output"),
             Self::Fullscreen => Some("the host owns the window"),
             Self::BackUpUserData
             | Self::RestoreUserData
@@ -258,8 +257,6 @@ pub struct MenuState {
     pub playing: bool,
     pub metronome: bool,
     pub recording: bool,
-    /// The program lets the sound device be chosen.
-    pub audio_devices: bool,
     pub fullscreen: bool,
     pub has_songs: bool,
     /// Generation on: drums, bass, chords.
@@ -388,8 +385,6 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
                 command("Export pattern as WAV...", "Ctrl+E", C::ExportWav, p && s.can_render),
                 command("Export song as WAV...", "Ctrl+Shift+E", C::ExportSongWav, s.has_songs && s.can_render),
                 Item::Separator,
-                command("Audio output...", "", C::AudioDevice, s.audio_devices),
-                Item::Separator,
                 command("Back up user data...", "", C::BackUpUserData, s.user_folder),
                 command("Restore user data...", "", C::RestoreUserData, s.user_folder),
                 command("Change user data folder...", "", C::ChangeUserFolder, s.user_folder),
@@ -415,6 +410,8 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
                 command("Accent on / off", "L", C::ToggleAccent, s.has_cursor),
                 command("Select all", "Ctrl+A", C::SelectAll, p),
                 command("Deselect", "Esc", C::Deselect, s.has_cursor || s.has_selection || zone),
+                Item::Separator,
+                command("Preferences...", "Ctrl+,", C::Preferences, true),
             ],
         },
         Menu {
@@ -924,9 +921,11 @@ mod tests {
         let edit = menus.iter().position(|m| m.title == "Edit").unwrap();
         let open = Open::new(&menus, edit, true);
         assert_eq!(open.command(&menus), Some(Command::Undo));
-        // Redo, copy and paste cannot run: Select all is the next, then Undo again.
+        // Redo, copy and paste cannot run: Select all is the next, then Preferences, then Undo again.
         assert_eq!(open.step(&menus, 1).command(&menus), Some(Command::SelectAll));
-        assert_eq!(open.step(&menus, 1).step(&menus, 1).command(&menus), Some(Command::Undo));
+        let preferences = open.step(&menus, 1).step(&menus, 1);
+        assert_eq!(preferences.command(&menus), Some(Command::Preferences));
+        assert_eq!(preferences.step(&menus, 1).command(&menus), Some(Command::Undo));
         let file = Open::new(&menus, 0, true);
         // Save, Save song and Load song are greyed out: the first item highlighted is Save song as.
         assert_eq!(file.command(&menus), Some(Command::SaveSongAs));

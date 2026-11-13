@@ -1415,6 +1415,54 @@ pub fn draw_notice_scrolled(canvas: &mut Canvas, title: &str, lines: &[String], 
     draw_notice_part(canvas, &title, &lines[first..first + rows], scale, None);
 }
 
+/// Where a notice of `lines` is in a window of `window` pixels: its left,
+/// top, width and height. `buttons_width` is the width of its line of
+/// buttons, when it has one.
+pub fn notice_box(
+    window: (i32, i32),
+    title: &str,
+    lines: &[String],
+    buttons_width: i32,
+    has_buttons: bool,
+    scale: Scale,
+) -> (i32, i32, i32, i32) {
+    let line_h = NOTICE_LINE * scale;
+    let close = "ESC or click: close";
+    // The title shares its line with `close`.
+    let title_width = text_width(title, scale.title()) + 16 * scale + text_width(close, scale);
+    let lines_width = lines.iter().map(|l| text_width(l, scale)).max().unwrap_or(0).max(buttons_width);
+    let width = lines_width.max(title_width) + 32 * scale;
+    let height = (lines.len() as i32 + 3 + i32::from(has_buttons)) * line_h + 16 * scale;
+    let x = ((window.0 - width) / 2).max(0);
+    let y = ((window.1 - height) / 2).max(menu::bar_height(scale));
+    (x, y, width, height)
+}
+
+/// The line of a notice's `lines` that `(px, py)` is on, in a window of
+/// `window` pixels; `None` outside the notice or off its lines.
+pub fn notice_line_at(
+    window: (i32, i32),
+    title: &str,
+    lines: &[String],
+    scale: Scale,
+    px: i32,
+    py: i32,
+) -> Option<usize> {
+    let (x, y, width, height) = notice_box(window, title, lines, 0, false, scale);
+    if px < x || px >= x + width || py < y || py >= y + height {
+        return None;
+    }
+    let line_h = NOTICE_LINE * scale;
+    let first = y + 10 * scale + 2 * line_h;
+    usize::try_from((py - first).div_euclid(line_h)).ok().filter(|&i| py >= first && i < lines.len())
+}
+
+/// Whether `(px, py)` is inside a notice of `lines`.
+pub fn notice_contains(window: (i32, i32), title: &str, lines: &[String], scale: Scale, px: i32, py: i32) -> bool {
+    let (x, y, width, height) = notice_box(window, title, lines, 0, false, scale);
+    (x..x + width).contains(&px) && (y..y + height).contains(&py)
+}
+
 /// A notice showing `lines`, as wide as the widest of them (`choice` adds
 /// its two buttons as one more line).
 fn draw_notice_part(
@@ -1433,15 +1481,9 @@ fn draw_notice_part(
         let second = if focus == 0 { b.to_owned() } else { format!("[ {b} ]") };
         (format!("{first}   {second}"), first, second, focus)
     });
-    // The title shares its line with `close`.
-    let title_width = text_width(title, scale.title()) + 16 * scale + text_width(close, scale);
-    let all: Vec<&String> = lines.iter().collect();
     let buttons_width = buttons.as_ref().map_or(0, |(line, ..)| text_width(line, scale));
-    let lines_width = all.iter().map(|l| text_width(l, scale)).max().unwrap_or(0).max(buttons_width);
-    let width = lines_width.max(title_width) + 32 * scale;
-    let height = (lines.len() as i32 + 3 + i32::from(buttons.is_some())) * line_h + 16 * scale;
-    let x = ((canvas.width() - width) / 2).max(0);
-    let y = ((canvas.height() - height) / 2).max(menu::bar_height(scale));
+    let (x, y, width, height) =
+        notice_box((canvas.width(), canvas.height()), title, lines, buttons_width, buttons.is_some(), scale);
     canvas.fill_rect(x - 4 * scale, y - 4 * scale, width + 8 * scale, height + 8 * scale, theme::shade());
     canvas.fill_rect(x, y, width, height, theme::line());
     canvas.fill_rect(x + scale.px(), y + scale.px(), width - 2 * scale, height - 2 * scale, theme::panel());
