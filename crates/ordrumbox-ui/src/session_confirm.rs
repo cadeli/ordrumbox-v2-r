@@ -114,7 +114,7 @@ impl Session {
         const NO_UNDO: &str = "This cannot be undone.";
         let (title, what, verb) = match pending {
             Pending::RemoveSample { kit, sample } => {
-                let kit = self.kits.kits.get(*kit);
+                let kit = self.kits.kits().get(*kit);
                 let name = kit.and_then(|k| k.samples.get(*sample)).map_or("", |s| s.display_name.as_str());
                 let what = format!("\"{name}\" from kit \"{}\". {NO_UNDO}", kit.map_or("", |k| k.name.as_str()));
                 ("Remove the sample?", what, "remove")

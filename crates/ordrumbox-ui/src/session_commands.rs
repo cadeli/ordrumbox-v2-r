@@ -69,7 +69,7 @@ impl Session {
             generation: self.generation(),
             auto_all: self.pattern_auto(),
             locked: self.focus_track().and_then(|t| self.track(t)).is_some_and(|t| t.compose_lock),
-            kits: self.kits.kits.iter().map(|k| k.name.clone()).collect(),
+            kits: self.kits.kits().iter().map(|k| k.name.clone()).collect(),
             kit_index: self.kit_index,
             kit_editor: self.kit_editor.is_open(),
             track_editor: self.chrome.show_track_editor,

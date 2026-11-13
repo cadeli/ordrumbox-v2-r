@@ -138,7 +138,7 @@ impl Session {
         let url = self.track_sample_path(t);
         let place = url.as_deref().and_then(|u| self.kits.find_path(u));
         let instrument = place.and_then(|(k, i)| self.kits.sample(k, i));
-        let kit_name = place.and_then(|(k, _)| self.kits.kits.get(k)).map(|k| k.name.as_str());
+        let kit_name = place.and_then(|(k, _)| self.kits.kits().get(k)).map(|k| k.name.as_str());
 
         // `getSoundInfo`.
         let info = if track.use_synth {
@@ -243,7 +243,7 @@ impl Session {
 
     /// The instruments some kit has a sample of.
     pub(super) fn sampled_instruments(&self) -> std::collections::HashSet<String> {
-        self.kits.kits.iter().flat_map(|k| k.samples.iter().map(|i| i.key.clone())).collect()
+        self.kits.kits().iter().flat_map(|k| k.samples.iter().map(|i| i.key.clone())).collect()
     }
 
     /// Every sample of instrument `id`: (kit, url, name), the current kit's
@@ -252,7 +252,7 @@ impl Session {
         let current = self.kit().map_or("", |k| k.name.as_str());
         let mut found: Vec<(String, String, String)> = self
             .kits
-            .kits
+            .kits()
             .iter()
             .flat_map(|kit| {
                 kit.samples.iter().filter(|i| i.key == id).map(|i| {
@@ -336,7 +336,7 @@ impl Session {
     pub(super) fn kit_controls(&self) -> Option<KitControls> {
         let sample = self.kit_editor.sample?;
         let instrument = self.kits.sample(self.kit_index, sample)?;
-        let names: Vec<String> = self.kits.kits.iter().map(|k| k.name.clone()).collect();
+        let names: Vec<String> = self.kits.kits().iter().map(|k| k.name.clone()).collect();
         let kits =
             Choice { selected: self.kit_index.min(names.len().saturating_sub(1)), values: names, labels: Vec::new() };
         Some(KitControls {

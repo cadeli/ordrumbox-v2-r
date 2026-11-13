@@ -101,7 +101,7 @@ impl Session {
             return;
         }
         let mut urls: Vec<String> =
-            self.kits.kits.iter().flat_map(|k| k.samples.iter().map(|i| i.path.clone())).collect();
+            self.kits.kits().iter().flat_map(|k| k.samples.iter().map(|i| i.path.clone())).collect();
         urls.sort_unstable();
         urls.dedup();
         if urls.is_empty() {
@@ -391,7 +391,7 @@ impl Session {
             Id::GridMenu | Id::TrackNameMenu(_) | Id::KitInstrumentMenu(_) | Id::InstrumentMenu => return,
             Id::SynthPreset | Id::SynthField(_) => return self.synth_select(id, value),
             Id::KitKit => {
-                let target = self.kits.kits.iter().position(|k| k.name == value);
+                let target = self.kits.kits().iter().position(|k| k.name == value);
                 if let (Some(sample), Some(target)) = (self.kit_editor.sample, target)
                     && let Some(message) = self.kits.move_to_kit(self.kit_index, sample, target)
                 {

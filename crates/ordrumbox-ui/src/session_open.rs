@@ -174,7 +174,7 @@ impl Session {
                 bank: bank.clone(),
                 scales: assets.scales.clone(),
                 synths: synths.clone(),
-                kit: session.kits.kits.first().map(|k| k.name.clone()).unwrap_or_default(),
+                kit: session.kits.kits().first().map(|k| k.name.clone()).unwrap_or_default(),
                 sample_rate: offline::EXPORT_RATE,
                 seed: 1,
             });

@@ -120,10 +120,10 @@ impl Session {
                 Kind::Select { values, labels, selected },
             ));
         }
-        if !self.kits.kits.is_empty() {
-            let labels = self.kits.kits.iter().map(|k| k.name.clone()).collect();
-            let values = (0..self.kits.kits.len()).map(|i| i.to_string()).collect();
-            let selected = self.kit_index.min(self.kits.kits.len() - 1);
+        if !self.kits.kits().is_empty() {
+            let labels = self.kits.kits().iter().map(|k| k.name.clone()).collect();
+            let values = (0..self.kits.kits().len()).map(|i| i.to_string()).collect();
+            let selected = self.kit_index.min(self.kits.kits().len() - 1);
             layout.items.push(Item::new(Some(Id::KitList), kit_rect, Kind::Select { values, labels, selected }));
         }
         if let Some(pattern) = self.pattern() {
