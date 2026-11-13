@@ -1,7 +1,12 @@
 //! Helpers of the tools: reading the arguments, looking things up, shaping the answers
 //! and the edits shared by several tools.
 
-use super::*;
+use super::NOT_EDITED;
+use crate::editor::{Editor, MAX_BEATS};
+use ordrumbox_core::instruments::catalog;
+use ordrumbox_core::json::{Object, Value};
+use ordrumbox_core::song::SongClip;
+use ordrumbox_core::{Library, Note, Pattern, SetField, Track};
 
 // ─── Arguments ───────────────────────────────────────────────────────────────
 

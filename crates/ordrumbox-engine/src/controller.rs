@@ -11,8 +11,7 @@
 //! holds the only one left, so the audio thread never drops a last reference.
 
 use std::collections::{HashMap, VecDeque};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering, fence};
-use std::sync::{Arc, Mutex, MutexGuard, TryLockError};
+use std::sync::{Arc, Mutex};
 
 use ordrumbox_core::song::clamp_bpm;
 use ordrumbox_core::track::STRAIGHT_SWING;
@@ -20,9 +19,9 @@ use ordrumbox_core::{Library, Rng, Scales, Track};
 use ordrumbox_dsp::MasterSettings;
 
 use crate::assign::{TrackSound, assign_track};
-use crate::engine::{Engine, HostMix, HostTransport, MAX_TRACKS, Position, host_pass};
+use crate::engine::{Engine, HostTransport, MAX_TRACKS, Position, host_pass};
 use crate::kit::SampleBank;
-use crate::midi::{BlockNote, KeyMap, Target};
+use crate::midi::{KeyMap, Target};
 use crate::pass::{
     HitsCache, Pass, PassContext, SONG_PASS_TICKS, SongContext, build_keymap, build_pass, build_preview,
     build_song_pass_at, pattern_pass_ticks,

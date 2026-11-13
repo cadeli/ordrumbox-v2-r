@@ -1,6 +1,11 @@
 //! Editing patterns and the song settings: add, move, rename, tempo, length, tags.
 
-use super::*;
+use super::{DEFAULT_BEAT_COUNT, Editor, MAX_BEATS, pattern_name};
+use crate::history::Change;
+use ordrumbox_core::Pattern;
+use ordrumbox_core::ids::{slugify, unique_id};
+use ordrumbox_core::song::{DEFAULT_BPM, clamp_bpm};
+use std::collections::HashSet;
 
 impl Editor {
     /// A new empty pattern (`createPattern`; default name `NewPat_<count>`)

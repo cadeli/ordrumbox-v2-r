@@ -1,6 +1,14 @@
 //! Generating notes and importing MIDI (only when asked for).
 
-use super::*;
+use super::{Editor, pattern_name};
+use crate::generate::{AutoGenerator, MelodicKind, Options};
+use crate::{generate, midi};
+use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
+use ordrumbox_core::ids::{slugify, unique_id};
+use ordrumbox_core::json::Value;
+use ordrumbox_core::style::{COMPLEXITY, ENERGY, MACRO_NEUTRAL};
+use ordrumbox_core::{Pattern, Scales, Styles, Track};
+use std::collections::HashSet;
 
 impl Editor {
     /// Shift+B: a new pattern made in a style (style `style`, else a drawn

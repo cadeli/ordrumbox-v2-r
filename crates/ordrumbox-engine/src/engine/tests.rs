@@ -1,6 +1,8 @@
 use super::*;
 use crate::midi::{DRUM_CHANNEL, Target};
 use crate::pass::SynthStart;
+use crate::strip_settings::saturation_amount;
+use ordrumbox_core::steps::TICK;
 use ordrumbox_dsp::{SampleBuffer, SynthPatch, VoiceStart};
 
 const RATE: f32 = 48_000.0;

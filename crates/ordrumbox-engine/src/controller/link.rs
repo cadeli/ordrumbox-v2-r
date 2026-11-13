@@ -1,7 +1,14 @@
 //! What the two sides share: the inbox the controller posts into, the scope and
 //! the published position.
 
-use super::*;
+use crate::engine::{HostTransport, Position};
+use crate::kit::SampleBank;
+use crate::midi::KeyMap;
+use crate::pass::Pass;
+use ordrumbox_dsp::MasterSettings;
+use std::collections::VecDeque;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering, fence};
+use std::sync::{Arc, Mutex, MutexGuard, TryLockError};
 
 #[derive(Debug)]
 pub(super) enum Command {

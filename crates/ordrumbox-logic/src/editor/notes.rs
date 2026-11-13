@@ -1,6 +1,13 @@
 //! Editing notes: add, delete, nudge, paste, zones.
 
-use super::*;
+use super::{Editor, Nudge, nudge_pitch, nudge_velocity, pattern_name, step_percent};
+use crate::block::{Block, Pasted, StepAt, Zone};
+use crate::roll_block::{RollBlock, RollZone};
+use crate::{block, roll_block};
+use ordrumbox_core::json::Value;
+use ordrumbox_core::note::{ACCENT_VELOCITY, ACCENTED_VELOCITY};
+use ordrumbox_core::{Note, Track};
+use std::ops::RangeInclusive;
 
 impl Editor {
     /// Add a note (defaults) at `beat`/`beat_step`; its index in the track.
