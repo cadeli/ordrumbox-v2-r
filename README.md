@@ -138,11 +138,11 @@ keyboard's layout marks (Ctrl Z is the key marked Z on AZERTY too), except the t
 that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their place. Common keys:
 
 - **Space**: play / stop
-- **F2**: track editor, **F3**: song panel, **F4**: piano roll, **F5**: grid, **F6**: synth editor, **F7**: note editor
-  (shown or folded)
-- **Ctrl K**: kit editor, **Ctrl M**: export MIDI, **Ctrl E**: export WAV
-- **Ctrl +** / **Ctrl Shift -**: zoom in / out a quarter at a time (×1, ×1.25,
-  ×1.5… up to ×4), **Ctrl 0**: the display's scale, **View > Zoom: fit to
+- **F1–F7** (also **Ctrl 1–7**, for the keyboards whose F keys want Fn): the shortcut list,
+  track editor, song panel, piano roll, grid, synth editor, note editor (shown or folded)
+- **Ctrl K**: kit editor, **Ctrl Shift M**: export MIDI (**Ctrl E**: export WAV)
+- **Ctrl -** / **Ctrl =**: zoom out / in a quarter at a time (×1, ×1.25, ×1.5… up to ×4,
+  the keypad's keys too), **Ctrl 0**: the display's scale, **View > Zoom: fit to
   window**: the biggest of these scales the window shows whole. The zoom does not depend
   on the window's size: a window too small for it gets scrollbars (drag them,
   click beside the thumb, or turn the wheel where nothing else takes it). A
@@ -151,6 +151,17 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   display's, such as `0.5`; whole numbers from earlier versions still read). A
   display at 150 % shows at ×1.5. In the plugin, Alt stands for Ctrl (the host
   keeps Ctrl).
+- **M** / **S**: mute / solo the track under the cursor. The letters that change
+  every track want **Shift** (B: the pattern again in its style, C: the next colour
+  scheme, D: drums in auto, G, H, J, K, V: the VU meters, X: random notes), so a
+  slip off the play rows does nothing; the pattern's length has no key (the
+  Song panel and the menus change it).
+- **Shift + arrows** on a selected note: up / down a semitone of pitch, left / right
+  one step in time (in the grid as in the piano roll, whose drag follows the same
+  axes: up / down the pitch, sideways the velocity).
+- **On macOS** the menus show **Cmd** in place of Ctrl (the same key here); redo is
+  **Cmd Shift Z** (also Cmd Y), and export MIDI is **Cmd Shift M**: Cmd M alone
+  minimizes the window.
 
 ## Files
 

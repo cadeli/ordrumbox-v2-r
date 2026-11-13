@@ -1350,8 +1350,7 @@ impl Session {
                 picker::draw(canvas, p, &layout);
             }
             Some(Overlay::Shortcuts { scroll }) => {
-                let lines: Vec<String> = self.shortcut_lines().iter().map(|l| (*l).to_owned()).collect();
-                view::draw_notice_scrolled(canvas, "Keyboard shortcuts", &lines, *scroll, scale);
+                view::draw_notice_scrolled(canvas, "Keyboard shortcuts", &self.shortcut_lines(), *scroll, scale);
             }
             Some(Overlay::About) => view::draw_notice(canvas, "About orDrumbox", &self.about(), scale),
             Some(Overlay::History { scroll }) => {

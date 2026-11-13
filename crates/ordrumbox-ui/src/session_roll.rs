@@ -1,7 +1,7 @@
 //! The session's side of the piano roll (`piano_roll_panel.js` and its
 //! sections), on the track editor's track: a click on an empty cell adds a
 //! note there, on a note selects it (and plays it), on the selected note
-//! deletes it; dragging a note changes its velocity (up, down) or its pitch
+//! deletes it; dragging a note changes its pitch (up, down) or its velocity
 //! (sideways), one undo step per drag; a click on a key plays it. Right-click
 //! menus: on the keyboard, clear the track or write a chord progression from
 //! that key; on the grid, add or delete the note, add a minor or major
@@ -231,12 +231,17 @@ impl Session {
         self.roll_follow();
     }
 
-    /// The cursor on the selected note (it follows a transposition).
+    /// The cursor and the page on the selected note (it follows its
+    /// transposition and its moves in time).
     fn roll_follow(&mut self) {
         let Some((t, n)) = self.selection.selected else { return };
         let Some(track) = self.track(t) else { return };
         let Some(note) = track.notes.get(n) else { return };
-        self.roll.cursor = Some((absolute_step(note.beat, note.step, steps_per_beat(track)), note_row(note, track)));
+        let spb = steps_per_beat(track);
+        let step = absolute_step(note.beat, note.step, spb);
+        let row = note_row(note, track);
+        self.roll.cursor = Some((step, row));
+        self.roll.page = (step / i64::from(BEATS_PER_PAGE * spb)) as i32;
     }
 
     /// Add a note at `step`, `row` and select it.
@@ -428,15 +433,18 @@ impl Session {
     // ─── The keyboard ────────────────────────────────────────────────────────
 
     /// An arrow: the cursor (wrapping, the page following), or with Shift the
-    /// selected note's velocity and pitch.
+    /// selected note's pitch (↑↓) and its time (←→).
     pub fn roll_arrow(&mut self, direction: Move, shift: bool) {
         let Some(t) = self.roll_track() else { return };
         if shift && self.selection.selected.is_some_and(|(st, _)| st == t) {
             self.nudge(direction);
             self.roll_follow();
-            let axis = if matches!(direction, Move::Up | Move::Down) { Axis::Velocity } else { Axis::Pitch };
+            let axis = match direction {
+                Move::Up | Move::Down => Some(Axis::Pitch),
+                _ => None,
+            };
             if let Some((_, n)) = self.selection.selected {
-                self.roll.gauge = Some(self.gauge_text(t, n, axis));
+                self.roll.gauge = axis.map(|axis| self.gauge_text(t, n, axis));
             }
             return;
         }
@@ -718,20 +726,22 @@ mod tests {
         s.editor.set_clock(Some(0.0));
         let (x, y) = cell(&s, 4, 39);
         s.roll_click(SIZE, x, y, Button::Left);
+        // Up and down: the pitch, semitone by semitone (the roll's vertical axis).
         for dy in [2, 10, 40, 41] {
             s.roll_drag_move(x + 1, y - dy);
         }
         s.mouse_up();
-        assert_eq!(notes(&s), [(1, 0, 3.0, 1.0)]);
+        assert_eq!(notes(&s), [(1, 0, 6.0, 0.8)]);
         // Dragged, not clicked: still there and selected.
         assert_eq!(s.selection.selected, Some((1, 0)));
-        let (x, y) = cell(&s, 4, 39);
+        // Sideways: the velocity, to the right louder (the note moved up: row 42).
+        let (x, y) = cell(&s, 4, 42);
         s.roll_click(SIZE, x, y, Button::Left);
         s.roll_drag_move(x + 30, y);
         s.mouse_up();
-        assert_eq!(notes(&s), [(1, 0, 6.0, 1.0)]);
+        assert_eq!(notes(&s), [(1, 0, 6.0, 0.95)]);
         s.undo();
-        assert_eq!(notes(&s), [(1, 0, 3.0, 1.0)]);
+        assert_eq!(notes(&s), [(1, 0, 6.0, 0.8)]);
         s.undo();
         assert_eq!(notes(&s), [(1, 0, 3.0, 0.8)]);
     }
@@ -744,9 +754,9 @@ mod tests {
         s.roll_enter();
         assert_eq!(notes(&s).len(), 2);
         s.roll_arrow(Move::Up, true);
-        assert_eq!(notes(&s)[1].3, 0.85);
+        assert_eq!(notes(&s)[1].2, 13.0, "Shift+Up: a semitone up");
         s.roll_arrow(Move::Right, true);
-        assert_eq!(s.roll.cursor.map(|c| c.1), Some(TOTAL_KEYS - 1 - TOTAL_KEYS / 2 + 1));
+        assert_eq!(notes(&s)[1], (0, 2, 13.0, 0.8), "Shift+Right: one step later");
         s.roll_delete();
         assert_eq!(notes(&s).len(), 1);
         // Left from step 0 wraps to the last step, on page 2.

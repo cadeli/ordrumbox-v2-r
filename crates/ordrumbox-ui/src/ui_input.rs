@@ -5,6 +5,10 @@
 
 pub use crate::session::Button;
 
+/// The program runs on macOS: its Ctrl key is the Command one (the menus say
+/// Cmd+, Export MIDI takes Shift to leave Cmd+M to the window).
+pub const MACOS: bool = cfg!(target_os = "macos");
+
 /// A physical key, by its place on a US keyboard.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Key {

@@ -41,13 +41,18 @@ const MIDI_MIN: f64 = 12.0;
 const MIDI_MAX: f64 = 108.0;
 const MIDDLE_C: f64 = 60.0;
 
-/// What a nudge changes: ↑/↓ velocity, ←/→ pitch.
+/// What a nudge changes: ↑/↓ pitch, ←/→ one step in time (the velocity nudge
+/// stays for the note editor and the drag).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Nudge {
     VelocityUp,
     VelocityDown,
     PitchUp,
     PitchDown,
+    /// One step later in the pattern (it wraps at its length).
+    Later,
+    /// One step earlier in the pattern (it wraps at its length).
+    Earlier,
 }
 
 /// `nudgeVelocity()`: ±0.05, rounded to 2 decimals, unchanged past 0–1.
@@ -394,20 +399,39 @@ impl Editor {
         Some(accent)
     }
 
-    /// Nudge note `n` (`applyNoteNudge`: velocity ±0.05, pitch ±1).
+    /// Nudge note `n` (`applyNoteNudge`: pitch ±1, one step in time; the
+    /// velocity ±0.05 stays for the note editor and the drag).
     pub fn nudge_note(&mut self, p: usize, t: usize, n: usize, nudge: Nudge) -> bool {
         let Some(track) = self.library.patterns.get(p).and_then(|p| p.tracks.get(t)) else { return false };
         let Some(note) = track.notes.get(n) else { return false };
-        let (key, value) = match nudge {
+        let field = match nudge {
             Nudge::VelocityUp | Nudge::VelocityDown => {
-                ("velocity", nudge_velocity(note.velocity, nudge == Nudge::VelocityUp))
+                Some(("velocity", nudge_velocity(note.velocity, nudge == Nudge::VelocityUp)))
             }
             Nudge::PitchUp | Nudge::PitchDown => {
-                ("pitch", nudge_pitch(note.pitch, nudge == Nudge::PitchUp, track.transpose))
+                Some(("pitch", nudge_pitch(note.pitch, nudge == Nudge::PitchUp, track.transpose)))
             }
+            Nudge::Later | Nudge::Earlier => None,
         };
-        let desc = format!("Edit note {key} on {}", track.name);
-        self.update_note(p, t, n, &[(key, Value::Number(value))], Some(&desc), true)
+        if let Some((key, value)) = field {
+            let desc = format!("Edit note {key} on {}", track.name);
+            return self.update_note(p, t, n, &[(key, Value::Number(value))], Some(&desc), true);
+        }
+        // One step in the pattern's time, wrapping at its length, the cursor's way.
+        let spb = i64::from(track.steps_per_beat.max(1));
+        let total = i64::from(self.library.patterns.get(p).map_or(1, |p| p.beat_count.max(1))) * spb;
+        let position = i64::from(note.beat) * spb + i64::from(note.step);
+        let next = (position + if nudge == Nudge::Later { 1 } else { -1 }).rem_euclid(total);
+        let (beat, step) = ((next / spb) as i32, (next % spb) as i32);
+        let desc = format!("Move note on {}", track.name);
+        self.update_note(
+            p,
+            t,
+            n,
+            &[("beat", Value::Number(f64::from(beat))), ("step", Value::Number(f64::from(step)))],
+            Some(&desc),
+            true,
+        )
     }
 
     /// Replace the notes at a step by copies of `notes`.

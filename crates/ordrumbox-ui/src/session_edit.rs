@@ -126,22 +126,28 @@ impl Session {
         }
     }
 
-    /// Shift+arrows on the selected note: ↑↓ velocity, ←→ pitch.
+    /// Shift+arrows on the selected note: ↑↓ pitch, ←→ one step in time.
     pub fn nudge(&mut self, direction: Move) {
         let Some((t, n)) = self.selection.selected else {
             self.message = "select a note first".into();
             return;
         };
         let nudge = match direction {
-            Move::Up => Nudge::VelocityUp,
-            Move::Down => Nudge::VelocityDown,
-            Move::Right => Nudge::PitchUp,
-            Move::Left => Nudge::PitchDown,
+            Move::Up => Nudge::PitchUp,
+            Move::Down => Nudge::PitchDown,
+            Move::Right => Nudge::Later,
+            Move::Left => Nudge::Earlier,
         };
         if self.editor.nudge_note(self.pattern_index, t, n, nudge) {
             self.edited();
             if let Some(note) = self.track(t).and_then(|track| track.notes.get(n)) {
-                self.message = format!("velocity {}  pitch {}", note.velocity, note.pitch);
+                self.message = match direction {
+                    Move::Up | Move::Down => format!("pitch {}", note.pitch),
+                    _ => {
+                        let name = self.track(t).map(|track| track.name.clone()).unwrap_or_default();
+                        format!("{name} @ {}", beat_label(note.beat, note.step))
+                    }
+                };
             }
             self.audition(t, Some(n));
         }
