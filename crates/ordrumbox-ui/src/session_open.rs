@@ -4,21 +4,78 @@ use super::session_chrome::Chrome;
 use super::session_playback::Playback;
 use super::session_saving::Saving;
 use super::session_selection::Selection;
-use super::{
-    DEMO_NOT_SAVED, Flash, LibrarySource, Opened, Session, Workspace, repaired_status, session_output, session_roll,
-    session_song, session_synth, session_update,
-};
+use super::session_types::Workspace;
+use super::{Flash, Session, session_output, session_roll, session_song, session_synth, session_update};
 use crate::action_log::ActionLog;
 use crate::audio_output::StartOutput;
 use crate::editors::EditorState;
 use crate::kits::KitSet;
 use crate::{assets, store};
-use ordrumbox_core::{Library, Rng, ScaleList, Scales, Styles};
+use ordrumbox_core::{Library, LoadReport, Rng, ScaleList, Scales, Styles};
 use ordrumbox_engine::offline::RenderSetup;
 use ordrumbox_engine::{SynthPresets, offline};
 use ordrumbox_logic::Editor;
 use std::path::PathBuf;
 use std::sync::Arc;
+
+/// Where a session's library comes from, and where its edits go.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LibrarySource {
+    /// The user's `library.json` (else the demo), saved a moment after each edit.
+    UserFile,
+    /// A plugin's: the text its host kept in the project (`None`: a new
+    /// instance, which starts from the user's library, else the demo). It is
+    /// never saved to a file: the host asks [`Session::library_text`].
+    Host(Option<String>),
+}
+
+/// A library opened at start.
+#[derive(Debug)]
+pub(super) struct Opened {
+    pub(super) library: Library,
+    /// The file edits are saved to; `None`: not saved.
+    pub(super) file: Option<PathBuf>,
+    /// The library was read from that file (else it is written at the first edit).
+    pub(super) on_disk: bool,
+    /// The message to show.
+    pub(super) message: String,
+    /// The library is the demo (its repairs are those of the assets' file).
+    pub(super) demo: bool,
+}
+
+impl Opened {
+    /// `library`, not saved to any file.
+    fn unsaved(library: Library, message: &str) -> Self {
+        Self { library, file: None, on_disk: false, message: message.to_owned(), demo: false }
+    }
+
+    /// The demo library, not saved to any file.
+    fn demo(library: Library, message: &str) -> Self {
+        Self { demo: true, ..Self::unsaved(library, message) }
+    }
+}
+
+/// The status line saying what loading `file` repaired, `None` when nothing:
+/// how many values took their default and song clips were dropped, and the
+/// first of each.
+fn repaired_status(file: &str, report: &LoadReport) -> Option<String> {
+    let mut parts = Vec::new();
+    if let Some(first) = report.issues.first() {
+        parts.push(format!("{} value(s) repaired, first: {}: {}", report.issues.len(), first.at, first.message));
+    }
+    if let Some(first) = report.dropped_clips.first() {
+        parts.push(format!(
+            "{} song clip(s) dropped, first: {}: {}",
+            report.dropped_clips.len(),
+            first.pattern,
+            first.reason
+        ));
+    }
+    (!parts.is_empty()).then(|| format!("{file}: {}", parts.join("; ")))
+}
+
+/// The message of the demo library when no file keeps its edits.
+const DEMO_NOT_SAVED: &str = "demo library: edits are not saved";
 
 impl Session {
     pub fn load(start_output: StartOutput) -> Self {

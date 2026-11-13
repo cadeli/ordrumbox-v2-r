@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use ordrumbox_core::{Library, LoadReport, Pattern, Rng, ScaleList, Scales, Styles, Track};
+use ordrumbox_core::{Library, Pattern, Rng, ScaleList, Scales, Styles, Track};
 use ordrumbox_engine::analysis::Analysis;
 use ordrumbox_engine::offline::{self, RenderSetup};
 use ordrumbox_engine::{Mode, SynthPresets, wav};
@@ -67,6 +67,8 @@ mod session_generate;
 mod session_grid;
 #[path = "session_history.rs"]
 mod session_history;
+#[path = "session_labels.rs"]
+mod session_labels;
 #[path = "session_lane.rs"]
 mod session_lane;
 #[path = "session_open.rs"]
@@ -85,14 +87,6 @@ mod session_toast;
 mod session_zone;
 #[path = "session_zoom.rs"]
 mod session_zoom;
-
-/// A style's name in the menus: a learned one says from how many patterns.
-pub fn style_label(style: &ordrumbox_core::Style) -> String {
-    match style.learned {
-        Some((patterns, measures)) => format!("{} (learned: {patterns} patterns, {measures} measures)", style.name),
-        None => style.name.clone(),
-    }
-}
 
 #[path = "session_kit.rs"]
 mod session_kit;
@@ -136,25 +130,15 @@ mod session_song_mouse;
 mod session_synth;
 #[path = "session_transport.rs"]
 mod session_transport;
+#[path = "session_types.rs"]
+mod session_types;
 #[path = "session_update.rs"]
 mod session_update;
 #[path = "session_user_data.rs"]
 mod session_user_data;
+pub use session_open::LibrarySource;
 pub use session_panel::PanelKey;
-
-/// What the main editor (top-left) shows under the header. The kit editor
-/// opens over any of them; the track editor (right) and the output strip
-/// (bottom) are always available.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Workspace {
-    Grid,
-    /// The piano roll (F4): the track editor's track.
-    PianoRoll,
-    /// The song panel (F3): Space plays the song.
-    Song,
-    /// The synth editor (F6): the track editor's track's preset.
-    Synth,
-}
+pub use session_types::{Move, OverlayKey, Workspace};
 
 /// Why a WAV export is refused.
 const NOTHING_TO_RENDER: &str = "nothing to render with (no samples loaded)";
@@ -170,99 +154,6 @@ const DEFAULT_TRACK_NAME: &str = "KICK";
 fn pattern_json_file_name(pattern: &Pattern) -> String {
     format!("ordrumbox-{}.json", store::safe_name(pattern.name.as_deref().unwrap_or("pattern")))
 }
-
-/// `beat 2.3`: a cursor position.
-fn beat_label(beat: i32, step: i32) -> String {
-    format!("beat {}.{}", beat + 1, step + 1)
-}
-
-/// `3 notes`.
-fn notes_label(count: usize) -> String {
-    format!("{count} note{}", if count == 1 { "" } else { "s" })
-}
-
-/// A direction (arrow key).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Move {
-    Left,
-    Right,
-    Up,
-    Down,
-}
-
-/// Keys a panel over the window reads.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OverlayKey {
-    Escape,
-    Enter,
-    /// Backspace: the parent folder.
-    Back,
-    Move(isize),
-    /// ← (-1) / → (1): the value of a setting.
-    Side(isize),
-    /// Home (false) / End (true).
-    Edge(bool),
-    Letter(char),
-}
-
-/// Where a session's library comes from, and where its edits go.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum LibrarySource {
-    /// The user's `library.json` (else the demo), saved a moment after each edit.
-    UserFile,
-    /// A plugin's: the text its host kept in the project (`None`: a new
-    /// instance, which starts from the user's library, else the demo). It is
-    /// never saved to a file: the host asks [`Session::library_text`].
-    Host(Option<String>),
-}
-
-/// A library opened at start.
-#[derive(Debug)]
-struct Opened {
-    library: Library,
-    /// The file edits are saved to; `None`: not saved.
-    file: Option<PathBuf>,
-    /// The library was read from that file (else it is written at the first edit).
-    on_disk: bool,
-    /// The message to show.
-    message: String,
-    /// The library is the demo (its repairs are those of the assets' file).
-    demo: bool,
-}
-
-impl Opened {
-    /// `library`, not saved to any file.
-    fn unsaved(library: Library, message: &str) -> Self {
-        Self { library, file: None, on_disk: false, message: message.to_owned(), demo: false }
-    }
-
-    /// The demo library, not saved to any file.
-    fn demo(library: Library, message: &str) -> Self {
-        Self { demo: true, ..Self::unsaved(library, message) }
-    }
-}
-
-/// The status line saying what loading `file` repaired, `None` when nothing:
-/// how many values took their default and song clips were dropped, and the
-/// first of each.
-fn repaired_status(file: &str, report: &LoadReport) -> Option<String> {
-    let mut parts = Vec::new();
-    if let Some(first) = report.issues.first() {
-        parts.push(format!("{} value(s) repaired, first: {}: {}", report.issues.len(), first.at, first.message));
-    }
-    if let Some(first) = report.dropped_clips.first() {
-        parts.push(format!(
-            "{} song clip(s) dropped, first: {}: {}",
-            report.dropped_clips.len(),
-            first.pattern,
-            first.reason
-        ));
-    }
-    (!parts.is_empty()).then(|| format!("{file}: {}", parts.join("; ")))
-}
-
-/// The message of the demo library when no file keeps its edits.
-const DEMO_NOT_SAVED: &str = "demo library: edits are not saved";
 
 pub struct Session {
     /// What the window shows around the library (`session_chrome.rs`).

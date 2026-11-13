@@ -18,8 +18,10 @@ use ordrumbox_core::pattern_engine::SpanResolver;
 use ordrumbox_core::steps::{TICK, absolute_step};
 use ordrumbox_logic::composition;
 
+use super::session_labels::{beat_label, notes_label};
 use super::session_selection::NoteFocus;
-use super::{Move, Session, Workspace, beat_label, notes_label, session_panel};
+use super::session_types::{Move, Workspace};
+use super::{Session, session_panel};
 use crate::canvas::Canvas;
 use crate::editors;
 use crate::note_drag::{Axis, DragEvent, MIDDLE_C, MIDI_MIN, NoteDrag, midi_name};

@@ -8,7 +8,8 @@ use std::borrow::Cow;
 
 use super::session_panel::PanelKey;
 use super::session_panel::{DOUBLE_CLICK, control_name};
-use super::{Drag, Session, Workspace};
+use super::session_types::Workspace;
+use super::{Drag, Session};
 use crate::canvas::Canvas;
 use crate::control::{Spec, Style};
 use crate::panel::{self, Item, Kind};

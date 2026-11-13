@@ -14,7 +14,9 @@ use ordrumbox_core::json::Value;
 use ordrumbox_core::style::{self, Macros};
 use ordrumbox_core::{num, song};
 
-use super::{Session, Workspace, style_label};
+use super::Session;
+use super::session_labels::style_label;
+use super::session_types::Workspace;
 use crate::control::Spec;
 use crate::editors::{
     self, FX_DEFS, FX_KNOBS, GENERATION_COMPOSE, GENERATION_ENGINE, GENERATION_GROOVE, GENERATION_MANUAL,

@@ -2,7 +2,8 @@
 //! stepped through or picked at random, the tempo, and the choices a plugin
 //! host makes.
 
-use super::{Session, Workspace, auto_loop};
+use super::session_types::Workspace;
+use super::{Session, auto_loop};
 use crate::menu;
 use ordrumbox_engine::Mode;
 

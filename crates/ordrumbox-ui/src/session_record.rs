@@ -3,7 +3,9 @@
 //! also puts a note on its track, on the step the playhead is nearest to.
 //! Each note is one undo step.
 
-use super::{Session, Workspace, beat_label};
+use super::Session;
+use super::session_labels::beat_label;
+use super::session_types::Workspace;
 use ordrumbox_engine::Mode;
 
 impl Session {

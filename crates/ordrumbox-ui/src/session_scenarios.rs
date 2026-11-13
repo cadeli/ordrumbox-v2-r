@@ -16,8 +16,9 @@ use ordrumbox_engine::offline::{self, EXPORT_RATE, RenderSetup};
 use ordrumbox_engine::{AudioSide, Controller, Mode, Position, SampleBank, SampleBuffer, SynthPresets};
 use ordrumbox_logic::midi::{self, PPQN, smf};
 
+use super::Session;
 use super::session_playback::Playback;
-use super::{Session, Workspace};
+use super::session_types::Workspace;
 use crate::canvas::Canvas;
 use crate::kits::KitSet;
 use crate::store;

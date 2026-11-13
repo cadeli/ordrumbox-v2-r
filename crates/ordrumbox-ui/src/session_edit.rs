@@ -2,8 +2,10 @@
 //! cursor, the tracks added, removed and compacted, the pattern's length,
 //! new patterns, and copy and paste.
 
+use super::session_labels::{beat_label, notes_label};
 use super::session_selection::{Clipboard, NoteFocus};
-use super::{DEFAULT_TRACK_NAME, Move, Session, beat_label, notes_label};
+use super::session_types::Move;
+use super::{DEFAULT_TRACK_NAME, Session};
 use crate::view::{Cursor, Hit};
 use ordrumbox_core::track::MAX_TRACKS;
 use ordrumbox_core::{Note, Track};
