@@ -239,6 +239,7 @@ impl OrdrumboxParams {
     pub fn controls(&self) -> HostControls {
         HostControls {
             program: None,
+            now: false,
             pattern: choice_index(&self.pattern),
             kit: choice_index(&self.kit),
             muted: self.muted_tracks(),
@@ -280,6 +281,8 @@ pub struct HostControls {
     /// The pattern (from 0) of a MIDI program change received since the
     /// last tick; it wins over the pattern parameter.
     pub program: Option<usize>,
+    /// That program came from a note on the pattern channel: the pattern playing is left at once.
+    pub now: bool,
     /// The pattern, from 0.
     pub pattern: usize,
     /// The kit, from 0.
@@ -304,6 +307,8 @@ pub fn choice_value(index: usize, max: i32) -> Option<i32> {
 
 /// Program change bit: a program was received (the low byte holds it).
 const PROGRAM_RECEIVED: u32 = 1 << 8;
+/// The program was a note on the pattern channel: it applies at once.
+const PROGRAM_NOW: u32 = 1 << 9;
 
 /// The last MIDI program change received, set by the audio thread (an
 /// atomic store: no lock, no allocation) and taken by the player thread,
@@ -318,10 +323,18 @@ impl MidiProgram {
         self.0.store(PROGRAM_RECEIVED | u32::from(program), Ordering::Release);
     }
 
-    /// The program received since the last call, as a pattern index.
-    pub fn take(&self) -> Option<usize> {
+    /// A note on the pattern channel, key `key` (0 to 127), received: the
+    /// pattern is left for at once, not at the end of its loop.
+    pub fn receive_now(&self, key: u8) {
+        self.0.store(PROGRAM_RECEIVED | PROGRAM_NOW | u32::from(key), Ordering::Release);
+    }
+
+    /// The program received since the last call, as a pattern index, and
+    /// whether it applies at once.
+    pub fn take(&self) -> Option<(usize, bool)> {
         let received = self.0.swap(0, Ordering::Acquire);
-        (received & PROGRAM_RECEIVED != 0).then_some(usize::from(received.to_le_bytes()[0]))
+        (received & PROGRAM_RECEIVED != 0)
+            .then_some((usize::from(received.to_le_bytes()[0]), received & PROGRAM_NOW != 0))
     }
 }
 
@@ -398,11 +411,13 @@ mod tests {
         let program = MidiProgram::default();
         assert_eq!(program.take(), None);
         program.receive(0);
-        assert_eq!(program.take(), Some(0));
+        assert_eq!(program.take(), Some((0, false)));
         assert_eq!(program.take(), None);
         program.receive(3);
         program.receive(127);
-        assert_eq!(program.take(), Some(127));
+        assert_eq!(program.take(), Some((127, false)));
+        program.receive_now(5);
+        assert_eq!(program.take(), Some((5, true)), "a note on the pattern channel applies at once");
     }
 
     #[test]
@@ -417,7 +432,7 @@ mod tests {
     #[test]
     fn the_defaults_choose_the_first_pattern_and_kit_and_change_nothing() {
         let params = OrdrumboxParams::default();
-        let controls = HostControls { program: None, pattern: 0, kit: 0, muted: 0, swing: STRAIGHT_SWING };
+        let controls = HostControls { program: None, now: false, pattern: 0, kit: 0, muted: 0, swing: STRAIGHT_SWING };
         assert_eq!(params.controls(), controls);
         assert_eq!(params.muted_tracks(), 0);
         assert_eq!(params.mix(), HostMix::default());

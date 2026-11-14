@@ -2,6 +2,7 @@
 
 use super::{Editor, Nudge, Played, nudge_pitch, nudge_velocity, pattern_name, step_percent};
 use crate::block::{Block, Pasted, StepAt, Zone};
+use crate::quantize::{self, Quantize, Scope};
 use crate::roll_block::{RollBlock, RollZone};
 use crate::{block, roll_block};
 use ordrumbox_core::json::Value;
@@ -225,6 +226,19 @@ impl Editor {
         let Some(pattern) = self.library.patterns.get(p).map(|p| pattern_name(p).to_owned()) else { return 0 };
         self.edit(p, |_| format!("Delete notes in \"{pattern}\""), None, |pattern| block::delete_zone(pattern, zone))
             .unwrap_or(0)
+    }
+
+    /// Quantize the notes of pattern `p` in `scope` ([`crate::quantize::quantize`]),
+    /// as one step; how many moved.
+    pub fn quantize(&mut self, p: usize, scope: Scope, how: Quantize) -> usize {
+        let Some(pattern) = self.library.patterns.get(p).map(|p| pattern_name(p).to_owned()) else { return 0 };
+        self.edit(
+            p,
+            |_| format!("Quantize notes in \"{pattern}\""),
+            None,
+            |pattern| quantize::quantize(pattern, scope, how),
+        )
+        .unwrap_or(0)
     }
 
     /// Paste `block` at step `at` of pattern `p` ([`block::paste_block`]), as one step.

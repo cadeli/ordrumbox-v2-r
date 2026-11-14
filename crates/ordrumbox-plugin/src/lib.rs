@@ -7,7 +7,8 @@
 //! MIDI: the notes the pattern plays go out where a note in plays them:
 //! drums on channel 10 at their GM key, the other tracks each on a channel
 //! of its own at the note's pitch (`ordrumbox_engine::midi`). A program
-//! change, on any channel, chooses the pattern (`params::MidiProgram`).
+//! change, on any channel, chooses the pattern (`params::MidiProgram`), and so does
+//! a note on channel 16 (key 0 is the first pattern), at once.
 //!
 //! Threads: the host's audio thread runs [`AudioSide::render_synced`]; the
 //! player thread ([`player::Ticker`]) builds and posts passes; the host's GUI
@@ -210,7 +211,11 @@ impl Plugin for Ordrumbox {
                 while let Some(event) = context.next_event() {
                     match event {
                         NoteEvent::NoteOn { timing, channel, note, velocity, .. } => {
-                            audio.trigger(channel, note, velocity, timing);
+                            if ordrumbox_engine::pattern_key(channel, note).is_some() {
+                                self.params.midi_program.receive_now(note);
+                            } else {
+                                audio.trigger(channel, note, velocity, timing);
+                            }
                         }
                         NoteEvent::MidiProgramChange { program, .. } => self.params.midi_program.receive(program),
                         _ => {}

@@ -223,3 +223,5 @@ editor has a Timing tab (Length, Shift), the lane two more settings (LENGTH, SHI
 now in two columns), the piano roll draws a note as wide as it is long and its right edge
 drags (`session_roll_length.rs`); Play > Record off the grid keeps a recorded note's timing as
 its shift (off by default). A MIDI import still reads neither lengths nor timing.
+
+Quantize (Edit > Quantize, `ordrumbox-logic/src/quantize.rs`, `session_quantize.rs`) is a pure function of a pattern, a scope (zone, track, pattern), a grid and a strength; a note's place is its step plus `shiftSteps`, and what a strength leaves is kept as the shift. No snapshot changed.

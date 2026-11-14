@@ -188,6 +188,7 @@ impl Session {
             C::RecordTiming => self.toggle_record_timing(),
             C::Preferences => self.open_preferences(),
             C::MidiControls => self.open_controls(),
+            C::Quantize => self.open_quantize(),
             C::Fullscreen => self.toggle_fullscreen(),
             C::TapTempo => self.tap_tempo(),
             C::Metronome => self.toggle_metronome(),
