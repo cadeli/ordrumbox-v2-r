@@ -180,17 +180,45 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
 - **Alt + arrows** on a selected note in the grid: up / down a semitone of pitch, left /
   right one step in time (in the piano roll, **Shift + arrows**, and its drag follows the
   same axes: up / down the pitch, sideways the velocity).
-- **Edit > Preferences...** (**Ctrl ,**) gathers the sound output, the MIDI input, the
-  metronome, the VU meters and the toasts in one window. Up / Down choose a line, Enter or
+- **Edit > Preferences...** (**Ctrl ,**) gathers the sound output, the MIDI ports and clock,
+  the metronome, the VU meters and the toasts in one window. Up / Down choose a line, Enter or
   Left / Right change it, **OK** applies and **Esc** leaves everything as it was. The sound
   output and the MIDI input are kept in `settings.json` (`audioDevice`, `midiInput`: empty
   is the system's device or the first port, `"off"` no MIDI). A new output starts the sound
   again; a device gone gives way to the system's, and the status line names the one in use.
+  The MIDI output (`midiOutput`: a port's name, none by default), the clock it sends
+  (`midiClockOut`, `true` or `false`) and the clock followed (`midiClockIn`) are kept there too.
 - **MIDI keyboard or pad** (the app; a plugin takes its host's): the notes it plays sound
   the pattern's tracks, drums by their General MIDI key (kick 36, snare 38…), a melodic
   track on its own channel at the note's pitch. With **Ctrl R** on and the pattern playing,
   each note is also written to its track, on the step nearest to the playhead, at the
   velocity played (one undo step each).
+- **MIDI output** (the app): the notes the pattern plays go out of the port chosen in the
+  Preferences, as a plugin sends them: drums on channel 10 at their GM key, any other track
+  on a channel of its own at its pitch, as long as the note. They leave when the block that
+  plays them is rendered, so a sound device with a long buffer plays a few milliseconds after
+  them.
+- **MIDI clock out** (the app, with a MIDI output): the app sends 24 pulses a beat while it
+  plays, **Start** from the first beat, and **Song position** then **Continue** when a song
+  plays from a later measure, and **Stop**: a drum machine or a synth set to an external clock
+  plays along. The clock follows the tempo, the pattern's length and the swing.
+- **MIDI clock in** (the app, with a MIDI input): with *MIDI clock in: follow*, the machine
+  sending to the input is the master. Its **Start**, **Continue**, **Stop** and **Song position**
+  start, stop and place the transport; its pulses set the tempo, to a tenth of a beat a
+  minute, and keep the playing in step with it. Nothing plays until it starts, so Space does
+  nothing while following: choose *ignore* to play on its own again. A master that stops
+  sending pulses for a second stops the transport.
+- **Edit > MIDI controls...** binds the knobs of a MIDI controller (the app; a plugin has its
+  host's parameters). Choose a control with Left / Right (the master volume, then each track
+  of the pattern shown: **volume**, **pan**, **cutoff**, **mute**; the first 16 tracks),
+  go to **Learn**, press Enter and turn the knob: its control change (number and channel) is
+  bound to it. One knob has one control and a control one knob; **Clear** lets it go. The
+  bindings are kept in `settings.json` (`midiControls`). A knob moves its control on top of
+  what the track has, as a plugin host's mix does, so nothing is saved with the library and
+  no undo step is made: volumes go from silence (knob down) to the one set; pan and cutoff
+  go from the one set (knob in the middle: no change) up to the end of the knob, the cutoff
+  by four octaves; a mute is on from the middle of the knob up, and shows on the track's mute
+  box. A knob takes its control to its place as soon as it is turned, wherever the control was.
 - **On macOS** the menus show **Cmd** in place of Ctrl (the same key here); redo is
   **Cmd Shift Z** (also Cmd Y), and export MIDI is **Cmd Shift M**: Cmd M alone
   minimizes the window.

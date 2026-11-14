@@ -146,6 +146,8 @@ pub enum Command {
     DownloadPage,
     /// Edit > Preferences: the sound output, the MIDI input and what is shown.
     Preferences,
+    /// Edit > MIDI controls: bind the knobs of a MIDI controller.
+    MidiControls,
     /// F11: the window full screen, or back.
     Fullscreen,
 }
@@ -411,6 +413,7 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
                 command("Deselect", "Esc", C::Deselect, s.has_cursor || s.has_selection || zone),
                 Item::Separator,
                 command("Preferences...", "Ctrl+,", C::Preferences, true),
+                command("MIDI controls...", "", C::MidiControls, p),
             ],
         },
         Menu {

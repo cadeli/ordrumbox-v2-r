@@ -14,8 +14,10 @@ use std::sync::Arc;
 use ordrumbox_dsp::{MasterBus, MasterSettings, SampleVoice, Strip, StripSettings, SynthPatch, SynthVoice, VoiceStart};
 
 use crate::kit::SampleBank;
-use crate::midi::{BlockNote, CHANNEL_COUNT, KEY_COUNT, KeyMap, MidiNote, NoteOut};
+use crate::midi::{BlockClock, BlockNote, CHANNEL_COUNT, KEY_COUNT, KeyMap, MidiNote, NoteOut};
 use crate::pass::{Event, Pass, Sound};
+
+use clock_out::ClockSender;
 
 /// Sample voices playing at once; the oldest is cut when a new one needs a slot.
 pub const MAX_VOICES: usize = 64;
@@ -137,6 +139,8 @@ pub struct Engine {
     notes_out: Vec<NoteOut>,
     /// The note each key sounds, by key.
     held: Vec<Option<Held>>,
+    /// The MIDI clock sent, when asked for (`clock_out.rs`).
+    clock_out: ClockSender,
 }
 
 impl Engine {
@@ -180,6 +184,7 @@ impl Engine {
             live_next: 0,
             notes_out: Vec::with_capacity(NOTES_OUT),
             held: vec![None; CHANNEL_COUNT * KEY_COUNT],
+            clock_out: ClockSender::new(),
         }
     }
 
@@ -235,6 +240,9 @@ impl Engine {
         self.pass_number = pass.number;
         self.load(pass);
         self.next = None;
+        if let Some(pass) = &self.current {
+            self.clock_out.started(self.clock, pass);
+        }
         self.settle_strips(self.strip_count);
     }
 
@@ -305,6 +313,18 @@ impl Engine {
         }
     }
 
+    /// Send the MIDI clock from now on (or stop sending it): a pulse 24
+    /// times a beat while a pass plays, Start, Continue and Stop with the transport.
+    pub fn set_clock_out(&mut self, on: bool) {
+        self.clock_out.set_enabled(on);
+    }
+
+    /// Give the MIDI clock messages sent since the last call to `send`, in
+    /// time order, timed from clock frame `block_start` up to `block_frames` frames.
+    pub fn take_clock(&mut self, block_start: u64, block_frames: usize, send: impl FnMut(BlockClock)) {
+        self.clock_out.take(block_start, block_frames, send);
+    }
+
     /// Queue a MIDI note, unless [`NOTES_OUT`] are waiting already.
     fn send(&mut self, note: NoteOut) {
         if self.notes_out.len() < self.notes_out.capacity() {
@@ -362,6 +382,7 @@ impl Engine {
         self.frame = frame;
         if let Some(current) = &self.current {
             self.cursor = current.events.partition_point(|e| e.frame < frame);
+            self.clock_out.seek(current, frame);
         }
     }
 
@@ -374,6 +395,9 @@ impl Engine {
 
     /// Stop the transport; playing voices are released, effect tails ring out.
     pub fn stop(&mut self) {
+        if self.current.is_some() {
+            self.clock_out.stopped(self.clock);
+        }
         self.current = None;
         self.next = None;
         for voice in &mut self.voices {
@@ -411,6 +435,7 @@ impl Engine {
         }
         self.cursor = pass.events.partition_point(|e| e.frame < frame);
         self.frame = frame;
+        self.clock_out.seek(pass, frame);
         true
     }
 
@@ -451,6 +476,7 @@ impl Engine {
         }
         self.frame = 0;
         self.cursor = 0;
+        self.clock_out.restart();
         self.current = Some(pass);
     }
 
@@ -589,6 +615,7 @@ impl Engine {
                         // Next pass late: play this one again rather than stop.
                         self.frame = 0;
                         self.cursor = 0;
+                        self.clock_out.restart();
                         self.current = Some(pass);
                     }
                 }
@@ -601,6 +628,7 @@ impl Engine {
                 self.cursor += 1;
             }
             let next_stop = pass.events.get(self.cursor).map_or(pass.frames, |e| e.frame);
+            let next_stop = self.clock_out.due(&pass, self.frame, now).map_or(next_stop, |pulse| pulse.min(next_stop));
             let frames_left = (next_stop - self.frame) as usize;
             self.current = Some(pass);
             return Some(frames_left);
@@ -711,6 +739,8 @@ fn free_or_oldest<V>(voices: &[V], active: fn(&V) -> bool, serial: fn(&V) -> u64
         .unwrap_or_else(|| (0..voices.len()).min_by_key(|&i| serial(&voices[i])).unwrap_or(0))
 }
 
+#[path = "engine/clock_out.rs"]
+mod clock_out;
 #[path = "engine/host.rs"]
 mod host;
 #[cfg(test)]

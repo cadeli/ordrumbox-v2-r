@@ -4,7 +4,7 @@
 //! only through it.
 
 use ordrumbox_core::Track;
-use ordrumbox_engine::{Controller, HostTransport, Mode, Position};
+use ordrumbox_engine::{Controller, HostMix, HostTransport, Mode, Position};
 use ordrumbox_logic::Editor;
 
 use crate::audio_output::{AudioOutput, OutputDevices, StartOutput};
@@ -29,6 +29,12 @@ pub(super) struct Offers {
     pub(super) midi_ports: Option<OutputDevices>,
     /// A MIDI input is open.
     pub(super) midi_open: bool,
+    /// Lists the MIDI outputs (`None`: the program has no MIDI output).
+    pub(super) midi_out_ports: Option<OutputDevices>,
+    /// The transport follows the MIDI clock of the input.
+    pub(super) clock_follow: bool,
+    /// The machine whose clock is followed plays.
+    pub(super) clock_running: bool,
 }
 
 /// The engine as the session drives it; without a sound device, everything
@@ -86,6 +92,22 @@ impl Playback {
     pub(super) fn set_live_midi(&mut self, on: bool) {
         if let Some(controller) = &mut self.controller {
             controller.set_live_midi(on);
+        }
+    }
+
+    /// The live mix a MIDI controller's knobs make.
+    pub(super) fn set_live_mix(&mut self, mix: HostMix) {
+        if let Some(controller) = &mut self.controller {
+            controller.set_live_mix(mix);
+        }
+    }
+
+    /// The transport follows a MIDI clock, or does not any more.
+    pub(super) fn set_clock_follow(&mut self, editor: &Editor, on: bool) {
+        match &mut self.controller {
+            Some(controller) if on => controller.follow_clock_again(),
+            Some(controller) => controller.leave_host(editor.library()),
+            None => {}
         }
     }
 

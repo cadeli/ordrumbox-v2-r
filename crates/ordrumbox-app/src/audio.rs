@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{FromSample, SampleFormat, SizedSample, StreamConfig};
 use ordrumbox_core::Scales;
-use ordrumbox_engine::{AudioSide, Controller, SampleBank, SynthPresets};
+use ordrumbox_engine::{AudioSide, Controller, HostTransport, SampleBank, SynthPresets};
 use ordrumbox_ui::{AudioOutput, StartedOutput};
 
 /// Frames rendered per engine call inside a callback (scratch size).
@@ -93,6 +93,9 @@ where
     T: SizedSample + FromSample<f32>,
 {
     let channels = usize::from(config.channels);
+    let rate = config.sample_rate;
+    // The transport the last block followed, kept when the MIDI thread holds the clock.
+    let mut followed = HostTransport { playing: false, bpm: 120.0, beat: 0.0 };
     // Allocated here, before the stream starts: the callback never allocates.
     let mut left = vec![0.0f32; SCRATCH_FRAMES];
     let mut right = vec![0.0f32; SCRATCH_FRAMES];
@@ -103,9 +106,19 @@ where
             while let Some(note) = crate::midi::NOTES.pop() {
                 audio.trigger(note.channel, note.key, note.velocity, 0);
             }
+            let mut done = 0;
             for chunk in data.chunks_mut(SCRATCH_FRAMES * channels) {
                 let frames = chunk.len() / channels;
-                audio.render(&mut left[..frames], &mut right[..frames]);
+                if crate::midi_sync::following() {
+                    // The MIDI clock's transport, where it is when this chunk plays.
+                    let ahead = done as f64 / f64::from(rate);
+                    followed = crate::midi_sync::transport(ahead).unwrap_or(followed);
+                    audio.render_synced(&mut left[..frames], &mut right[..frames], followed);
+                } else {
+                    audio.render(&mut left[..frames], &mut right[..frames]);
+                }
+                crate::midi_out::send_block(&mut audio, done, rate);
+                done += frames;
                 for (i, frame) in chunk.chunks_mut(channels).enumerate() {
                     match frame {
                         [mono] => *mono = T::from_sample((left[i] + right[i]) * 0.5),

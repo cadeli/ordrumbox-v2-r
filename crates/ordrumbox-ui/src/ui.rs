@@ -160,11 +160,14 @@ impl Ui {
         let save_at = self.session.autosave();
         let mut redraw = called || self.session.check_audio() || self.session.poll_updates();
         let playing = self.session.playing();
-        if playing {
+        // Following a MIDI clock, the engine is fed even while stopped: the
+        // pass it starts in is posted before the other machine starts.
+        if playing || self.session.follows_clock() {
             self.session.update();
         }
-        // While playing (the playhead) or while an LFO moves the synth editor.
-        let animating = playing || self.session.synth_animating();
+        // While playing (the playhead), while the other machine plays, or
+        // while an LFO moves the synth editor.
+        let animating = playing || self.session.clock_running() || self.session.synth_animating();
         self.session.note_message();
         let now = Instant::now();
         // A toast goes when its time is over, playing or not: checked first,

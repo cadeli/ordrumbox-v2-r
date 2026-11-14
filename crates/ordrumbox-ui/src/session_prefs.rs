@@ -11,7 +11,11 @@ use super::Session;
 use super::session_overlay::Overlay;
 use super::session_types::OverlayKey;
 use super::session_user_data::NO_USER_FOLDER;
-use crate::audio_output::{DEVICE_KEY, MIDI_KEY, MidiInput, chosen_device, chosen_midi_input};
+use crate::audio_output::{DEVICE_KEY, chosen_device};
+use crate::midi_settings::{
+    CLOCK_IN_KEY, CLOCK_OUT_KEY, MIDI_KEY, MIDI_OUT_KEY, MidiPort, chosen_clock_in, chosen_clock_out,
+    chosen_midi_input, chosen_midi_output,
+};
 use crate::scale::Scale;
 use crate::{store, view};
 
@@ -23,6 +27,9 @@ const NAME_CHARS: usize = 36;
 enum Row {
     Audio,
     Midi,
+    ClockIn,
+    MidiOut,
+    ClockOut,
     Metronome,
     Vus,
     Toasts,
@@ -69,6 +76,12 @@ pub(super) struct Prefs {
     row: usize,
     audio: Choice,
     midi: Choice,
+    midi_out: Choice,
+    clock_in: bool,
+    /// The clock settings when the modal opened.
+    clock_in_was: bool,
+    clock_out: bool,
+    clock_out_was: bool,
     metronome: bool,
     vus: bool,
     toasts: bool,
@@ -84,6 +97,9 @@ impl Prefs {
         match row {
             Row::Audio => ("Audio output", choice(&self.audio)),
             Row::Midi => ("MIDI input", choice(&self.midi)),
+            Row::ClockIn => ("MIDI clock in", if self.clock_in { "follow" } else { "ignore" }.to_owned()),
+            Row::MidiOut => ("MIDI output", choice(&self.midi_out)),
+            Row::ClockOut => ("MIDI clock out", on(self.clock_out)),
             Row::Metronome => ("Metronome", on(self.metronome)),
             Row::Vus => ("VU meters", on(self.vus)),
             Row::Toasts => ("Toasts", on(self.toasts)),
@@ -101,7 +117,7 @@ impl Prefs {
                 let mark = if i == self.row { ">" } else { " " };
                 match self.text(row) {
                     (label, value) if row == Row::Ok => format!("{mark} [ {label} ]{value}"),
-                    (label, value) => format!("{mark} {label:<13} {value}"),
+                    (label, value) => format!("{mark} {label:<15} {value}"),
                 }
             })
             .collect();
@@ -115,6 +131,9 @@ impl Prefs {
         match self.rows[self.row] {
             Row::Audio => self.audio.at = wrap(self.audio.at, self.audio.options.len()),
             Row::Midi => self.midi.at = wrap(self.midi.at, self.midi.options.len()),
+            Row::ClockIn => self.clock_in = !self.clock_in,
+            Row::MidiOut => self.midi_out.at = wrap(self.midi_out.at, self.midi_out.options.len()),
+            Row::ClockOut => self.clock_out = !self.clock_out,
             Row::Metronome => self.metronome = !self.metronome,
             Row::Vus => self.vus = !self.vus,
             Row::Toasts => self.toasts = !self.toasts,
@@ -127,9 +146,18 @@ impl Session {
     /// Edit > Preferences.
     pub fn open_preferences(&mut self) {
         let offers = self.playback.offers();
-        let (audio, midi) = match (self.audio_choice(), self.midi_choice()) {
-            (Ok(audio), Ok(midi)) => (audio, midi),
-            (Err(e), _) | (_, Err(e)) => {
+        let chosen = (|| {
+            Ok::<_, String>((
+                self.audio_choice()?,
+                self.midi_choice()?,
+                self.midi_out_choice()?,
+                chosen_clock_in()?,
+                chosen_clock_out()?,
+            ))
+        })();
+        let (audio, midi, midi_out, clock_in, clock_out) = match chosen {
+            Ok(chosen) => chosen,
+            Err(e) => {
                 self.message = format!("preferences: {e}");
                 return;
             }
@@ -139,7 +167,10 @@ impl Session {
             rows.push(Row::Audio);
         }
         if !self.host.hosted && offers.midi_ports.is_some() {
-            rows.push(Row::Midi);
+            rows.extend([Row::Midi, Row::ClockIn]);
+        }
+        if !self.host.hosted && offers.midi_out_ports.is_some() {
+            rows.extend([Row::MidiOut, Row::ClockOut]);
         }
         rows.extend([Row::Metronome, Row::Vus, Row::Toasts, Row::Ok]);
         self.chrome.overlay = Some(Overlay::Preferences(Prefs {
@@ -147,6 +178,11 @@ impl Session {
             row: 0,
             audio,
             midi,
+            midi_out,
+            clock_in,
+            clock_in_was: clock_in,
+            clock_out,
+            clock_out_was: clock_out,
             metronome: self.transport.metronome,
             vus: self.chrome.show_vus,
             toasts: !self.flash.hidden,
@@ -163,13 +199,21 @@ impl Session {
 
     fn midi_choice(&self) -> Result<Choice, String> {
         let mut options = vec![
-            (MidiInput::First.setting().to_owned(), "First available".to_owned()),
-            (MidiInput::Off.setting().to_owned(), "None".to_owned()),
+            (MidiPort::First.setting().to_owned(), "First available".to_owned()),
+            (MidiPort::Off.setting().to_owned(), "None".to_owned()),
         ];
         if let Some(list) = self.playback.offers().midi_ports {
             options.extend(list().into_iter().map(|name| (name.clone(), name)));
         }
         Ok(Choice::new(options, chosen_midi_input()?.setting()))
+    }
+
+    fn midi_out_choice(&self) -> Result<Choice, String> {
+        let mut options = vec![(MidiPort::Off.setting().to_owned(), "None".to_owned())];
+        if let Some(list) = self.playback.offers().midi_out_ports {
+            options.extend(list().into_iter().map(|name| (name.clone(), name)));
+        }
+        Ok(Choice::new(options, chosen_midi_output()?.setting()))
     }
 
     /// A key while the modal is open; whether it was.
@@ -220,15 +264,7 @@ impl Session {
             self.toggle_toasts();
         }
         self.message = "preferences kept".into();
-        if prefs.rows.contains(&Row::Midi) && prefs.midi.changed() {
-            match self.save_choice(MIDI_KEY, prefs.midi.value()) {
-                Ok(()) => {
-                    self.program.midi_changed = true;
-                    self.message = "MIDI input chosen".into();
-                }
-                Err(e) => self.message = format!("MIDI input not saved: {e}"),
-            }
-        }
+        self.apply_midi_preferences(&prefs);
         if prefs.rows.contains(&Row::Audio) && prefs.audio.changed() {
             if let Err(e) = self.save_choice(DEVICE_KEY, prefs.audio.value()) {
                 self.message = format!("audio output not saved: {e}");
@@ -239,6 +275,34 @@ impl Session {
             self.write_pending();
             self.reload(message);
         }
+    }
+
+    /// The MIDI rows of the draft that changed, saved: the program opens its ports again.
+    fn apply_midi_preferences(&mut self, prefs: &Prefs) {
+        let rows = |row| prefs.rows.contains(&row);
+        let settings = [
+            (rows(Row::Midi) && prefs.midi.changed(), MIDI_KEY, Value::from(prefs.midi.value())),
+            (rows(Row::ClockIn) && prefs.clock_in != prefs.clock_in_was, CLOCK_IN_KEY, Value::from(prefs.clock_in)),
+            (rows(Row::MidiOut) && prefs.midi_out.changed(), MIDI_OUT_KEY, Value::from(prefs.midi_out.value())),
+            (
+                rows(Row::ClockOut) && prefs.clock_out != prefs.clock_out_was,
+                CLOCK_OUT_KEY,
+                Value::from(prefs.clock_out),
+            ),
+        ];
+        for (_, key, value) in settings.into_iter().filter(|(changed, ..)| *changed) {
+            if let Err(e) = self.save_setting_value(key, value) {
+                self.message = format!("MIDI setting {key} not saved: {e}");
+                return;
+            }
+            self.program.midi_changed = true;
+            self.message = "MIDI settings chosen".into();
+        }
+    }
+
+    fn save_setting_value(&self, key: &str, value: Value) -> Result<(), String> {
+        let path = store::settings_path().ok_or(NO_USER_FOLDER)?;
+        store::save_setting(&path, key, value).map_err(|e| e.to_string())
     }
 
     fn save_choice(&self, key: &str, value: &str) -> Result<(), String> {

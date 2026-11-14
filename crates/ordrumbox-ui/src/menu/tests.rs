@@ -35,11 +35,13 @@ fn keyboard_skips_what_cannot_run() {
     let edit = menus.iter().position(|m| m.title == "Edit").unwrap();
     let open = Open::new(&menus, edit, true);
     assert_eq!(open.command(&menus), Some(Command::Undo));
-    // Redo, copy and paste cannot run: Select all is the next, then Preferences, then Undo again.
+    // Redo, copy and paste cannot run: Select all is the next, then Preferences, then MIDI controls, then Undo again.
     assert_eq!(open.step(&menus, 1).command(&menus), Some(Command::SelectAll));
     let preferences = open.step(&menus, 1).step(&menus, 1);
     assert_eq!(preferences.command(&menus), Some(Command::Preferences));
-    assert_eq!(preferences.step(&menus, 1).command(&menus), Some(Command::Undo));
+    let controls = preferences.step(&menus, 1);
+    assert_eq!(controls.command(&menus), Some(Command::MidiControls));
+    assert_eq!(controls.step(&menus, 1).command(&menus), Some(Command::Undo));
     let file = Open::new(&menus, 0, true);
     // Save, Save song and Load song are greyed out: the first item highlighted is Save song as.
     assert_eq!(file.command(&menus), Some(Command::SaveSongAs));

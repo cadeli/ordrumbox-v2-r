@@ -19,7 +19,7 @@ use ordrumbox_core::{Library, Rng, Scales, Track};
 use ordrumbox_dsp::MasterSettings;
 
 use crate::assign::{TrackSound, assign_track};
-use crate::engine::{Engine, HostTransport, MAX_TRACKS, Position, host_pass};
+use crate::engine::{Engine, HostMix, HostTransport, MAX_TRACKS, Position, host_pass};
 use crate::kit::SampleBank;
 use crate::midi::{KeyMap, Target};
 use crate::pass::{
@@ -97,6 +97,8 @@ pub struct Controller {
     metronome: bool,
     /// A MIDI input is open: the pattern's key map is posted for its notes, as under a host.
     live_midi: bool,
+    /// The host's blocks are not followed, until one that is not one is seen ([`Self::leave_host`]).
+    host_left: bool,
 }
 
 /// What a cue ([`Inbox::cue`]) is built from: a cue built from the same is
@@ -192,6 +194,7 @@ impl Controller {
             song_loop: None,
             metronome: false,
             live_midi: false,
+            host_left: false,
         };
         (controller, audio)
     }
@@ -261,6 +264,13 @@ impl Controller {
     pub fn set_master(&mut self, master: MasterSettings) {
         self.master = master;
         lock(&self.link.inbox).master = Some(master);
+    }
+
+    /// A live mix on top of the tracks' settings (a MIDI controller's
+    /// knobs): the engine takes it with the next block. Not for a plugin,
+    /// whose host mixes ([`AudioSide::set_host_mix`]).
+    pub fn set_live_mix(&mut self, mix: HostMix) {
+        lock(&self.link.inbox).mix = Some(mix);
     }
 
     /// Per-track peak of the last rendered quantum (0–1), for VU meters.
@@ -651,8 +661,16 @@ impl Controller {
     /// stops and moves playback with the host.
     pub fn update(&mut self, library: &Library) {
         let snapshot = self.link.published.read();
-        if let Some(host) = snapshot.host {
-            self.follow_host(library, host, snapshot);
+        match snapshot.host {
+            // A block rendered before the clock was let go.
+            Some(_) if self.host_left => {}
+            Some(host) => self.follow_host(library, host, snapshot),
+            None => {
+                self.host_left = false;
+                if self.tempo.is_some() {
+                    self.release_host(library);
+                }
+            }
         }
         if snapshot.host.is_some() || self.live_midi {
             self.post_keymap(library);
@@ -757,6 +775,26 @@ impl Controller {
         } else if new_tempo {
             self.refresh(library);
         }
+    }
+
+    /// The transport followed a clock outside (a MIDI clock) and does no
+    /// more: the library's tempo plays again, and the cue is dropped. The
+    /// blocks rendered while it was followed are not followed any more
+    /// ([`Self::follow_clock_again`] follows them again).
+    pub fn leave_host(&mut self, library: &Library) {
+        self.host_left = true;
+        self.release_host(library);
+    }
+
+    /// The transport follows a clock outside again ([`AudioSide::render_synced`]).
+    pub fn follow_clock_again(&mut self) {
+        self.host_left = false;
+    }
+
+    fn release_host(&mut self, library: &Library) {
+        self.tempo = None;
+        lock(&self.link.inbox).cue = None;
+        self.refresh(library);
     }
 
     /// Under a stopped host at `beat`: the pass it would start in posted as

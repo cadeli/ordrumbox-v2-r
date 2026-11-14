@@ -54,6 +54,8 @@ mod session_color;
 mod session_commands;
 #[path = "session_confirm.rs"]
 mod session_confirm;
+#[path = "session_controls.rs"]
+mod session_controls;
 #[path = "session_draw.rs"]
 mod session_draw;
 #[path = "session_edit.rs"]
@@ -194,6 +196,8 @@ pub struct Session {
     editors: EditorState,
     /// The plugin host the session follows, if any (`session_host.rs`).
     host: session_host::Host,
+    /// The knobs of a MIDI controller and what they move (`session_controls.rs`).
+    controls: ordrumbox_engine::ControlMap,
     /// The output panel: the master bus, its tab, the spectrum.
     output_panel: session_output::OutputPanel,
     /// The update check (`session_update.rs`).
@@ -234,14 +238,19 @@ impl Session {
         self.playback.offers_mut().midi_ports = Some(ports);
     }
 
+    /// The program lists the MIDI outputs with `ports`, for Edit > Preferences.
+    pub fn offer_midi_outputs(&mut self, ports: crate::audio_output::OutputDevices) {
+        self.playback.offers_mut().midi_out_ports = Some(ports);
+    }
+
     /// The program has a MIDI input open (or has not): its notes are
     /// recorded when recording, and play the pattern's tracks.
     pub fn set_midi_open(&mut self, open: bool) {
         self.playback.offers_mut().midi_open = open;
     }
 
-    /// The MIDI input chosen in Edit > Preferences changed since the last
-    /// call: the program opens the one now chosen.
+    /// The MIDI ports or the clock chosen in Edit > Preferences changed
+    /// since the last call: the program opens what is now chosen.
     pub fn take_midi_change(&mut self) -> bool {
         std::mem::take(&mut self.program.midi_changed)
     }

@@ -3,7 +3,7 @@
 
 use super::session_confirm::Pending;
 use super::session_types::OverlayKey;
-use super::{Session, session_prefs};
+use super::{Session, session_controls, session_prefs};
 use crate::action_log::{LogLayout, Seen};
 use crate::picker::{Export, Picker};
 use crate::picker::{Outcome, PickerLayout};
@@ -22,6 +22,8 @@ pub(super) enum Overlay {
     About,
     /// Edit > Preferences: the settings being chosen, kept when OK is chosen.
     Preferences(session_prefs::Prefs),
+    /// Edit > MIDI controls: the knob being bound.
+    Controls(session_controls::Draft),
     /// Help > Factory reset, until the user says so: `yes` is the button
     /// ENTER would run, `false` (the default) keeps.
     FactoryReset {
@@ -95,7 +97,8 @@ const SHORTCUTS: &[&str] = &[
     "  Ctrl+O, Ctrl+Q         load a song, quit (Ctrl+W too)       F11  full screen",
     "  Ctrl+E, Ctrl+Shift+M   export WAV (Shift: the song), export MIDI",
     "  Ctrl+Z, Ctrl+Shift+Z   undo, redo (also Ctrl+Y)",
-    "  Ctrl+,                 preferences: sound output, MIDI input, metronome, VU meters, toasts",
+    "  Ctrl+,                 preferences: sound output, MIDI ports and clock, metronome, VU meters, toasts",
+    "  (Edit menu)            MIDI controls: bind the knobs of a MIDI controller to volumes, pans, cutoffs, mutes",
     "  Ctrl+C, Ctrl+X, Ctrl+V copy, cut, paste the zone or the step (Shift: the track)",
     "  Ctrl+N, Ctrl+D         new pattern, duplicate pattern",
     "  Ctrl+T, Ctrl+Backspace add a KICK track, remove a track",
@@ -265,7 +268,7 @@ impl Session {
 
     /// A key while a panel is open: the file picker's keys, or any key closes it.
     pub fn overlay_key(&mut self, key: OverlayKey) {
-        if self.history_key(&key) || self.shortcuts_key(&key) || self.prefs_key(&key) {
+        if self.history_key(&key) || self.shortcuts_key(&key) || self.prefs_key(&key) || self.controls_key(&key) {
             return;
         }
         // The confirms: the default is to keep (ENTER closes), ← → choose,
@@ -322,7 +325,7 @@ impl Session {
 
     /// A click while a panel is open.
     pub fn overlay_click(&mut self, width: i32, height: i32, scale: Scale, x: i32, y: i32) {
-        if self.prefs_click(width, height, scale, x, y) {
+        if self.prefs_click(width, height, scale, x, y) || self.controls_click(width, height, scale, x, y) {
             return;
         }
         // A choice notice: its buttons take the click as ENTER takes the

@@ -190,6 +190,7 @@ impl Session {
         }
         session.load_update_settings();
         session.load_color_scheme(store::settings_path());
+        session.load_controls();
         session.load_zoom(store::settings_path());
         session
     }
@@ -295,6 +296,7 @@ impl Session {
             program: Program::default(),
             editors: EditorState::default(),
             host: Host::default(),
+            controls: ordrumbox_engine::ControlMap::new(),
             output_panel: session_output::OutputPanel::default(),
             updates: session_update::Updates::default(),
             mcp: None,

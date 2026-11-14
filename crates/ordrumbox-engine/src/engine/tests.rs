@@ -1,5 +1,5 @@
 use super::*;
-use crate::midi::{DRUM_CHANNEL, Target};
+use crate::midi::{ClockMessage, DRUM_CHANNEL, Target};
 use crate::pass::SynthStart;
 use crate::strip_settings::saturation_amount;
 use ordrumbox_core::steps::TICK;
@@ -466,4 +466,63 @@ fn replace_keeps_the_position_and_plays_what_is_ahead() {
     assert_eq!(onsets(&signal), [100, 500], "frames 400 and 800 of the pass");
     engine.replace(pass(5, &[0], 1000)); // not the playing pass: ignored
     assert_eq!(engine.position().map(|p| p.frame), Some(1000));
+}
+
+fn clock(engine: &mut Engine, block_start: u64, frames: usize) -> Vec<(u32, ClockMessage)> {
+    let mut sent = Vec::new();
+    engine.take_clock(block_start, frames, |c| sent.push((c.timing, c.message)));
+    sent
+}
+
+#[test]
+fn the_clock_goes_out_as_a_start_24_pulses_a_beat_and_a_stop() {
+    let mut engine = engine();
+    // Off unless asked for.
+    engine.play(pass(0, &[], 1000));
+    render(&mut engine, 1000);
+    assert_eq!(clock(&mut engine, 0, 1000), []);
+
+    engine.set_clock_out(true);
+    engine.play(pass(0, &[], 1000));
+    render(&mut engine, 1000);
+    let sent = clock(&mut engine, 1000, 1000);
+    assert_eq!(sent[0], (0, ClockMessage::Start));
+    assert!(sent[1..].iter().all(|&(_, m)| m == ClockMessage::Pulse));
+    let pulses: Vec<u32> = sent[1..].iter().map(|&(timing, _)| timing).collect();
+    assert_eq!(pulses.len(), 24, "a pass is a beat");
+    assert_eq!(pulses[..3], [0, 42, 84], "a pulse every 1000 / 24 frames, rounded up");
+    assert_eq!(pulses[23], 959);
+
+    // The pass plays again (the next one is late): the pulses start again with it.
+    render(&mut engine, 1000);
+    let again = clock(&mut engine, 2000, 1000);
+    assert_eq!(again.len(), 24);
+    assert_eq!(again[0], (0, ClockMessage::Pulse));
+
+    engine.stop();
+    render(&mut engine, 10);
+    assert_eq!(clock(&mut engine, 3000, 10), [(0, ClockMessage::Stop)]);
+    engine.stop();
+    render(&mut engine, 10);
+    assert_eq!(clock(&mut engine, 3010, 10), [], "stopped already");
+}
+
+#[test]
+fn a_seek_skips_the_pulses_before_it_and_a_later_pass_continues_from_its_position() {
+    let mut engine = engine();
+    engine.set_clock_out(true);
+    engine.play(pass(0, &[], 1000));
+    assert!(engine.follow(0.5));
+    render(&mut engine, 100);
+    let sent = clock(&mut engine, 0, 100);
+    assert_eq!(sent[0], (0, ClockMessage::Start));
+    assert_eq!(sent[1], (0, ClockMessage::Pulse), "the 13th pulse, at frame 500, is due now");
+    assert_eq!(sent.len(), 4, "the Start and the pulses at 500, 542 and 584");
+
+    let mut later = (*pass(4, &[], 1000)).clone();
+    later.first_tick = 4 * u64::from(TICK);
+    engine.play(Arc::new(later));
+    render(&mut engine, 10);
+    let sent = clock(&mut engine, 100, 10);
+    assert_eq!(&sent[..2], [(0, ClockMessage::Position(16)), (0, ClockMessage::Continue)], "4 beats on: 16 sixteenths");
 }

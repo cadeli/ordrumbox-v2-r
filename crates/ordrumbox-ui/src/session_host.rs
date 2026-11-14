@@ -1,5 +1,6 @@
 //! The plugin host a session follows: whether there is one, and what of its
-//! transport and mutes the window shows.
+//! transport and mutes the window shows. And, in the app, the MIDI clock of
+//! another machine, followed as a host's transport is.
 
 use super::Session;
 use crate::view;
@@ -55,6 +56,33 @@ impl Session {
 }
 
 impl Session {
+    /// The program follows the MIDI clock of its input, or does not any more:
+    /// the machine whose clock it is starts, stops and sets the tempo of the
+    /// transport (`Ui::idle` keeps the engine fed while it does).
+    pub fn set_clock_follow(&mut self, on: bool) {
+        let offers = self.playback.offers_mut();
+        if std::mem::replace(&mut offers.clock_follow, on) == on {
+            return;
+        }
+        offers.clock_running = offers.clock_running && on;
+        self.playback.set_clock_follow(&self.editor, on);
+    }
+
+    /// The machine whose clock is followed started or stopped.
+    pub fn set_clock_running(&mut self, running: bool) {
+        self.playback.offers_mut().clock_running = running;
+    }
+
+    /// The transport follows a MIDI clock.
+    pub fn follows_clock(&self) -> bool {
+        self.playback.offers().clock_follow
+    }
+
+    /// The transport follows a MIDI clock, and the machine plays.
+    pub fn clock_running(&self) -> bool {
+        self.playback.offers().clock_running
+    }
+
     /// The session is a plugin's: the host plays, saves and has the keys it
     /// leaves out of the menus.
     pub fn hosted(&self) -> bool {

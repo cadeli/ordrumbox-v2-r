@@ -389,6 +389,8 @@ fn demo_session(samples_dir: &Path) -> (Session, AudioSide) {
 
 #[path = "session_scenarios/files.rs"]
 mod files;
+#[path = "session_scenarios/midi_sync.rs"]
+mod midi_sync;
 #[path = "session_scenarios/transport.rs"]
 mod transport;
 #[path = "session_scenarios/whole_session.rs"]
