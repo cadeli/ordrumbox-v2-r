@@ -11,7 +11,7 @@ use super::Session;
 use super::session_panel::NoteTarget;
 use super::session_selection::NoteFocus;
 use crate::editors::{
-    self, ARP_DIRECTIONS, Choice, ComposeView, KitControls, LFO_TARGETS, NoteView, SampleBar, TrackView,
+    self, ARP_DIRECTIONS, Choice, ComposeView, KitControls, LFO_TARGETS, NoteView, Overlay, SampleBar, Shape, TrackView,
 };
 use crate::view::SoundLabel;
 use ordrumbox_core::drum_taxonomy::instrument_family;
@@ -153,12 +153,15 @@ impl Session {
 
         // Sample bar: analysis text, envelope, decay end (0 without a decay).
         let decay = instrument.and_then(|i| i.decay).unwrap_or(0.0);
-        let sample = url.as_deref().filter(|_| !track.use_synth).and_then(|u| self.analysis_of(u)).map(|a| {
+        let analysis = url.as_deref().filter(|_| !track.use_synth).and_then(|u| self.analysis_of(u));
+        let duration_ms = analysis.as_ref().map_or(0.0, |a| a.duration_sec * 1000.0);
+        let shape = instrument.map_or_else(Shape::default, |i| Shape::of(i, duration_ms));
+        let overlay = Overlay::new(&shape);
+        let sample = analysis.map(|a| {
             let pitch = a.note.map_or_else(|| "—".to_owned(), |n| format!("{}{}", n.name, n.octave));
             let duration = format!("{} ms", crate::control::to_fixed_text(a.duration_sec * 1000.0, 0));
             let peak = format!("{} dB", crate::control::to_fixed_text(a.peak_db, 1));
-            let marker = (a.duration_sec > 0.0).then(|| (decay / 1000.0 / a.duration_sec).min(1.0));
-            SampleBar { info: format!("{pitch} · {duration} · {peak}"), envelope: a.envelope.clone(), marker }
+            SampleBar { info: format!("{pitch} · {duration} · {peak}"), envelope: a.envelope.clone(), overlay }
         });
 
         // Instruments that have samples, sorted; the current one.
@@ -235,7 +238,20 @@ impl Session {
         };
         let bpm = self.playing_bpm();
         let compose = self.compose_view(track);
-        Some(TrackView { track, title, sample, decay, instruments, sidechains, samples, synths, lfo, bpm, compose })
+        Some(TrackView {
+            track,
+            title,
+            sample,
+            decay,
+            shape,
+            instruments,
+            sidechains,
+            samples,
+            synths,
+            lfo,
+            bpm,
+            compose,
+        })
     }
 
     /// The styles the header and the Generate tab show: what the library taught,
@@ -355,11 +371,15 @@ impl Session {
         let names: Vec<String> = self.kits.kits().iter().map(|k| k.name.clone()).collect();
         let kits =
             Choice { selected: self.kit_index.min(names.len().saturating_sub(1)), values: names, labels: Vec::new() };
+        let duration_ms = (self.kit_editor.analysis.as_ref())
+            .filter(|(url, _)| *url == instrument.path)
+            .map_or(0.0, |(_, a)| a.duration_sec * 1000.0);
         Some(KitControls {
             kits,
             gain: instrument.gain_db,
             transpose: instrument.transpose,
             decay: instrument.decay.unwrap_or(0.0),
+            shape: Shape::of(instrument, duration_ms),
         })
     }
 }

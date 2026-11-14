@@ -1,6 +1,7 @@
 //! One playing sample (`audio/voices/sample_voice.js`): read at a pitch
 //! ratio with cubic interpolation, shaped by a 5 ms linear attack and an
-//! exponential decay to -60 dB, placed in the stereo field like a Web Audio
+//! exponential decay to -60 dB (a [`SampleShape`] moves the start, the end,
+//! the direction, the loop, the attack and a hold at full level), placed in the stereo field like a Web Audio
 //! `StereoPannerNode`.
 //!
 //! A voice is a plain value: starting, releasing and rendering it never allocates.
@@ -15,8 +16,37 @@ const ATTACK_SECONDS: f32 = 0.005;
 const RELEASE_SECONDS: f32 = 0.015;
 /// Level the decay ends at (`MIN_GAIN_VALUE`, -60 dB): the voice stops there.
 const MIN_GAIN: f32 = 0.001;
+/// Overlap of a loop's two ends, so that it does not click: the end fades
+/// into the start (at most a quarter of the loop).
+const LOOP_CROSSFADE_SECONDS: f64 = 0.01;
 /// Shortest decay a sample may have.
 const MIN_DECAY_SECONDS: f32 = 0.02;
+
+/// How a sample is read and shaped, besides its pitch and decay. The default
+/// plays the whole sample forward, once, with the 5 ms attack.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SampleShape {
+    /// Where reading starts, seconds into the sample.
+    pub start: f32,
+    /// Where reading ends, seconds into the sample; `None`: the sample's end.
+    pub end: Option<f32>,
+    /// Read from the end of the region back to its start.
+    pub reverse: bool,
+    /// Read the region over and over, until the decay ends the voice.
+    pub looping: bool,
+    /// Linear rise to the peak, seconds.
+    pub attack: f32,
+    /// Time kept at the peak before the decay, seconds.
+    pub hold: f32,
+    /// Keep the peak until the note ends (`VoiceStart::length`): the decay is then its release.
+    pub gated: bool,
+}
+
+impl Default for SampleShape {
+    fn default() -> Self {
+        Self { start: 0.0, end: None, reverse: false, looping: false, attack: ATTACK_SECONDS, hold: 0.0, gated: false }
+    }
+}
 
 /// What to play.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -35,12 +65,16 @@ pub struct VoiceStart {
     pub pan: f32,
     /// Frames to wait, within the next rendered block, before the first sample.
     pub delay: usize,
+    /// How long the note lasts, seconds (only a gated shape reads it).
+    pub length: f32,
+    pub shape: SampleShape,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Stage {
     Idle,
     Attack,
+    Hold,
     Decay,
     Release,
 }
@@ -52,13 +86,21 @@ pub struct SampleVoice {
     track: usize,
     /// Read position in the sample, in its own frames.
     position: f64,
-    /// Sample frames advanced per output frame.
+    /// Sample frames advanced per output frame (negative when reversed).
     step: f64,
+    /// The region read, `[low, high)`, in the sample's own frames.
+    low: f64,
+    high: f64,
+    looping: bool,
+    /// Frames of the loop's crossfade (0: none).
+    fade: f64,
     gain: f32,
+    peak: f32,
     /// Output frames left in the current stage.
     stage_left: u32,
     attack_step: f32,
     decay_factor: f32,
+    hold_frames: u32,
     decay_frames: u32,
     release_factor: f32,
     /// `[in_left → out_left, in_right → out_left, in_left → out_right, in_right → out_right]`.
@@ -76,10 +118,16 @@ impl Default for SampleVoice {
             track: 0,
             position: 0.0,
             step: 1.0,
+            low: 0.0,
+            high: 0.0,
+            looping: false,
+            fade: 0.0,
             gain: 0.0,
+            peak: 0.0,
             stage_left: 0,
             attack_step: 0.0,
             decay_factor: 1.0,
+            hold_frames: 0,
             decay_frames: 0,
             release_factor: 1.0,
             pan: [0.0; 4],
@@ -129,18 +177,33 @@ impl SampleVoice {
             self.stage = Stage::Idle;
             return;
         }
-        let attack_frames = (ATTACK_SECONDS * sample_rate).round().max(1.0) as u32;
+        let shape = &params.shape;
+        let attack_frames = (shape.attack.max(0.0) * sample_rate).round().max(1.0) as u32;
+        // A gated voice holds until its note ends, then decays.
+        let held = if shape.gated { shape.hold.max(params.length - shape.attack) } else { shape.hold };
+        let hold_frames = (held.max(0.0) * sample_rate).round() as u32;
+        let frames = buffer.frames() as f64;
+        let per_second = f64::from(buffer.sample_rate);
+        let low = (f64::from(shape.start.max(0.0)) * per_second).min(frames - 1.0).floor();
+        let high = shape.end.map_or(frames, |end| (f64::from(end) * per_second).min(frames).ceil()).max(low + 1.0);
+        let step = params.ratio * per_second / f64::from(sample_rate);
         let decay_frames = (params.decay.max(MIN_DECAY_SECONDS) * sample_rate).round().max(1.0) as u32;
         *self = Self {
             stage: Stage::Attack,
             sample: params.sample,
             track: params.track,
-            position: 0.0,
-            step: params.ratio * f64::from(buffer.sample_rate) / f64::from(sample_rate),
+            position: if shape.reverse { high - 1.0 } else { low },
+            step: if shape.reverse { -step } else { step },
+            low,
+            high,
+            looping: shape.looping,
+            fade: loop_fade(shape.looping, high - low, per_second),
             gain: 0.0,
+            peak: params.peak,
             stage_left: attack_frames,
             attack_step: params.peak / attack_frames as f32,
             decay_factor: (MIN_GAIN / params.peak).powf(1.0 / decay_frames as f32),
+            hold_frames,
             decay_frames,
             release_factor: 1.0,
             pan: stereo_panner(params.pan, buffer.is_stereo()),
@@ -169,19 +232,38 @@ impl SampleVoice {
         self.delay -= start;
         let right_channel = buffer.right.as_deref().unwrap_or(&buffer.left);
         let [ll, rl, lr, rr] = self.pan;
-        let end_position = buffer.frames() as f64;
+        let (low, high, fade) = (self.low, self.high, self.fade);
 
         let outputs = left[start..frames].iter_mut().zip(&mut right[start..frames]);
         for (out_l, out_r) in outputs {
             if self.stage == Stage::Idle {
                 return;
             }
-            if self.position >= end_position {
-                self.stage = Stage::Idle;
-                return;
+            if self.position >= high || self.position < low {
+                if !self.looping {
+                    self.stage = Stage::Idle;
+                    return;
+                }
+                // The loop restarts `fade` frames in: its first frames were already heard in the crossfade.
+                self.position = if self.step > 0.0 {
+                    low + fade + (self.position - low - fade).rem_euclid(high - low - fade)
+                } else {
+                    high - fade - (high - fade - self.position).rem_euclid(high - low - fade)
+                };
             }
-            let in_l = SampleBuffer::read(&buffer.left, self.position) * self.gain;
-            let in_r = SampleBuffer::read(right_channel, self.position) * self.gain;
+            let (mut in_l, mut in_r) =
+                (SampleBuffer::read(&buffer.left, self.position), SampleBuffer::read(right_channel, self.position));
+            if fade > 0.0 {
+                // Near the edge the voice is heading to, the loop's other end fades in.
+                let distance = if self.step > 0.0 { high - self.position } else { self.position - low };
+                if distance < fade {
+                    let mix = (1.0 - distance / fade) as f32;
+                    let partner = if self.step > 0.0 { low + fade - distance } else { high - fade + distance };
+                    in_l += (SampleBuffer::read(&buffer.left, partner) - in_l) * mix;
+                    in_r += (SampleBuffer::read(right_channel, partner) - in_r) * mix;
+                }
+            }
+            let (in_l, in_r) = (in_l * self.gain, in_r * self.gain);
             *out_l += ll * in_l + rl * in_r;
             *out_r += lr * in_l + rr * in_r;
             self.position += self.step;
@@ -193,6 +275,7 @@ impl SampleVoice {
     fn advance_envelope(&mut self) {
         match self.stage {
             Stage::Attack => self.gain += self.attack_step,
+            Stage::Hold => {}
             Stage::Decay => self.gain *= self.decay_factor,
             Stage::Release => self.gain *= self.release_factor,
             Stage::Idle => return,
@@ -200,7 +283,12 @@ impl SampleVoice {
         self.stage_left = self.stage_left.saturating_sub(1);
         if self.stage_left == 0 {
             match self.stage {
-                Stage::Attack => {
+                Stage::Attack if self.hold_frames > 0 => {
+                    self.stage = Stage::Hold;
+                    self.stage_left = self.hold_frames;
+                    self.gain = self.peak;
+                }
+                Stage::Attack | Stage::Hold => {
                     self.stage = Stage::Decay;
                     self.stage_left = self.decay_frames;
                 }
@@ -208,6 +296,12 @@ impl SampleVoice {
             }
         }
     }
+}
+
+/// Frames of a loop's crossfade: its length in seconds at `per_second`, at most a quarter of the loop.
+fn loop_fade(looping: bool, length: f64, per_second: f64) -> f64 {
+    let fade = (LOOP_CROSSFADE_SECONDS * per_second).min(length / 4.0).floor();
+    if looping && fade >= 2.0 { fade } else { 0.0 }
 }
 
 #[cfg(test)]
@@ -221,7 +315,17 @@ mod tests {
     }
 
     fn params() -> VoiceStart {
-        VoiceStart { sample: 0, track: 0, ratio: 1.0, peak: 1.0, decay: 0.1, pan: 0.0, delay: 0 }
+        VoiceStart {
+            sample: 0,
+            track: 0,
+            ratio: 1.0,
+            peak: 1.0,
+            decay: 0.1,
+            pan: 0.0,
+            delay: 0,
+            length: 0.0,
+            shape: SampleShape::default(),
+        }
     }
 
     fn render(voice: &mut SampleVoice, buffer: &SampleBuffer, frames: usize) -> (Vec<f32>, Vec<f32>) {
@@ -275,6 +379,92 @@ mod tests {
         voice.release(RATE);
         let (l, _) = render(&mut voice, &buffer, 30);
         assert!(l[14] < 0.002 && !voice.is_active());
+    }
+
+    /// A ramp of `frames` frames, 0, 1, 2…: each frame says where it was read.
+    fn ramp(frames: usize) -> SampleBuffer {
+        SampleBuffer::mono((0..frames).map(|i| i as f32).collect(), 1000)
+    }
+
+    fn shaped(shape: SampleShape) -> VoiceStart {
+        VoiceStart { decay: 10.0, shape: SampleShape { attack: 0.001, ..shape }, ..params() }
+    }
+
+    #[test]
+    fn start_and_end_cut_the_region() {
+        let buffer = ramp(100);
+        let mut voice = SampleVoice::default();
+        voice.start(&shaped(SampleShape { start: 0.02, end: Some(0.04), ..SampleShape::default() }), &buffer, RATE, 1);
+        let (l, _) = render(&mut voice, &buffer, 60);
+        assert!(l[0] == 0.0 && l[1] > 0.0, "the first read frame is frame 20, not 0");
+        assert_eq!(l[21], 0.0, "stops at the end, after 20 frames");
+        assert!(!voice.is_active());
+    }
+
+    #[test]
+    fn reverse_reads_the_region_backwards() {
+        let buffer = ramp(100);
+        let mut voice = SampleVoice::default();
+        voice.start(
+            &shaped(SampleShape { end: Some(0.05), reverse: true, ..SampleShape::default() }),
+            &buffer,
+            RATE,
+            1,
+        );
+        let (l, _) = render(&mut voice, &buffer, 80);
+        // Frame 49 first, then 48…: the ramp falls while the gain is steady.
+        assert!(l[20] > l[30] && l[30] > l[40], "{} {} {}", l[20], l[30], l[40]);
+        assert_eq!(l[60], 0.0, "ends after the 50 frames of the region");
+    }
+
+    #[test]
+    fn a_loop_plays_until_the_decay_ends() {
+        let buffer = ones(10);
+        let mut voice = SampleVoice::default();
+        voice.start(&shaped(SampleShape { looping: true, ..SampleShape::default() }), &buffer, RATE, 1);
+        let (l, _) = render(&mut voice, &buffer, 5000);
+        assert!(l[500] > 0.0 && l[900] > 0.0, "still playing long after the 10 frames");
+        assert!(l[4900] > 0.0 && voice.is_active(), "the 10 s decay is far from over");
+    }
+
+    #[test]
+    fn hold_keeps_the_peak_before_the_decay() {
+        let buffer = ones(1000);
+        let mut voice = SampleVoice::default();
+        let shape = SampleShape { hold: 0.1, ..SampleShape::default() };
+        voice.start(&VoiceStart { decay: 0.1, shape, ..params() }, &buffer, RATE, 1);
+        let (l, _) = render(&mut voice, &buffer, 300);
+        let center = (std::f32::consts::FRAC_PI_4).cos();
+        assert!((l[50] / center - 1.0).abs() < 1e-3 && (l[100] / center - 1.0).abs() < 1e-3, "{} {}", l[50], l[100]);
+        assert!(l[150] < l[100] * 0.5, "the decay has begun: {}", l[150]);
+    }
+
+    #[test]
+    fn a_gated_voice_holds_until_the_note_ends() {
+        let buffer = ones(100);
+        let mut voice = SampleVoice::default();
+        let shape = SampleShape { gated: true, looping: true, ..SampleShape::default() };
+        voice.start(&VoiceStart { decay: 0.1, length: 0.3, shape, ..params() }, &buffer, RATE, 1);
+        let (l, _) = render(&mut voice, &buffer, 600);
+        let center = (std::f32::consts::FRAC_PI_4).cos();
+        assert!((l[290] / center - 1.0).abs() < 1e-3, "still at the peak just before the note ends: {}", l[290]);
+        assert!(l[350] < l[290] * 0.5, "the decay follows the note end: {}", l[350]);
+        assert!(!voice.is_active());
+    }
+
+    #[test]
+    fn a_loop_crossfades_its_ends_without_a_jump() {
+        // A ramp's ends are far apart: a hard loop jumps by the whole ramp.
+        let buffer = ramp(100);
+        for reverse in [false, true] {
+            let mut voice = SampleVoice::default();
+            let shape = SampleShape { looping: true, reverse, ..SampleShape::default() };
+            voice.start(&shaped(shape), &buffer, RATE, 1);
+            let (l, _) = render(&mut voice, &buffer, 600);
+            let center = (std::f32::consts::FRAC_PI_4).cos();
+            let jump = l[20..500].windows(2).map(|w| (w[1] - w[0]).abs() / center).fold(0.0, f32::max);
+            assert!(jump < 10.0, "reverse {reverse}: the loop seam jumps by {jump}");
+        }
     }
 
     #[test]

@@ -183,6 +183,11 @@ impl Session {
                 self.update_track(t, &[(key, value)], &format!("{} on {name}", history_label(id)), true)
             }
             Id::Loop(key) => self.loop_slider(t, key, value),
+            Id::SampleKnob(field) => {
+                if let Some((kit, sample)) = self.track_sample_path(t).and_then(|u| self.kits.find_path(&u)) {
+                    self.set_kit_sample_value(kit, sample, field, value);
+                }
+            }
             Id::Decay => {
                 // The sample's decay (the sound registry's in the JS): not undoable.
                 if let Some((kit, sample)) = self.track_sample_path(t).and_then(|u| self.kits.find_path(&u)) {
@@ -292,6 +297,17 @@ impl Session {
     fn set_kit_value(&mut self, field: Field, value: f64) {
         let Some(sample) = self.kit_editor.sample else { return };
         self.set_kit_sample_value(self.kit_index, sample, field, value);
+    }
+
+    /// The reverse or loop switch of a sample turned over.
+    fn toggle_sample_switch(&mut self, kit: usize, sample: usize, field: Field) {
+        let Some(s) = self.kits.sample(kit, sample) else { return };
+        let on = match field {
+            Field::Reverse => s.reverse,
+            Field::Loop => s.looping,
+            _ => s.gated,
+        };
+        self.set_kit_sample_value(kit, sample, field, if on { 0.0 } else { 1.0 });
     }
 
     /// A kit knob: the kit changes now, the player and the disk shortly after.
@@ -469,6 +485,18 @@ impl Session {
             Id::SongName | Id::SongDescription | Id::PatternDescription => self.text_entry(id),
             Id::KitText(key) => self.kit_text_entry(key),
             Id::KitAutoInstrument(sample) => self.kit_auto_instrument(sample),
+            Id::KitToggle(field) => {
+                if let Some(sample) = self.kit_editor.sample {
+                    self.toggle_sample_switch(self.kit_index, sample, field);
+                }
+            }
+            Id::SampleToggle(field) => {
+                let place =
+                    self.editor_track().and_then(|t| self.track_sample_path(t)).and_then(|u| self.kits.find_path(&u));
+                if let Some((kit, sample)) = place {
+                    self.toggle_sample_switch(kit, sample, field);
+                }
+            }
             // Only a title, with a tooltip.
             Id::KitPlayedBy => {}
             _ => {

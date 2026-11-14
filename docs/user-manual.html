@@ -490,8 +490,9 @@ Two cards: the sound card (the track's name, the sample bar, the knob bar), then
 </figure>
 
 <h3>Sample bar</h3>
-<p>The sample's detected note, length and peak level, and its envelope with the decay end marked. A synth track
-keeps the place empty, so that nothing under it moves.</p>
+<p>The sample's detected note, length and peak level, and its waveform with how the sample plays drawn over it:
+the start and end lines (what is outside is darkened), an arrow for the direction, bars along the top and bottom when it
+loops, and the level curve (attack, hold, decay). A synth track keeps the place empty, so that nothing under it moves.</p>
 
 <h3>Knob bar</h3>
 <table>
@@ -501,6 +502,10 @@ keeps the place empty, so that nothing under it moves.</p>
 <tr><td><strong>Transpose</strong></td><td>−24 to +24 st</td><td>Transpose in semitones (LFO-capable).</td></tr>
 <tr><td><strong>Decay</strong></td><td>20–5000 ms (default 500)</td><td>The sample's decay: how long it sounds after the attack.</td></tr>
 </table>
+<p>The <strong>Sound</strong> tab has the same playback controls as the kit editor, on the track's sample: the
+<strong>Start</strong>, <strong>End</strong>, <strong>Attack</strong> and <strong>Hold</strong> knobs and the
+<strong>Reverse</strong>, <strong>Loop</strong> and <strong>Gate</strong> switches (see the kit editor). They are the sample's, so every track that
+plays it follows them.</p>
 
 <h3>FX tab</h3>
 <p>The five effects one under the other, each a strip: its power button (named) on the left, then its knobs and
@@ -840,6 +845,13 @@ Kits are saved to <code>kits.json</code>; new sample audio to <code>samples/</co
 <tr><td>Gain</td><td>−24 to +6 dB</td><td>Level trim.</td></tr>
 <tr><td>Transpose</td><td>−12 to +12 st</td><td>Tuning.</td></tr>
 <tr><td>Decay</td><td>20–5000 ms</td><td>Decay; the end shows on the envelope.</td></tr>
+<tr><td>Start</td><td>0 – the sample's length</td><td>Where playback starts in the sample (a line on the waveform; what is before it is darkened).</td></tr>
+<tr><td>End</td><td>0 – the sample's length</td><td>Where playback ends (the default is the end of the sample).</td></tr>
+<tr><td>Attack</td><td>0–500 ms (default 5)</td><td>The rise to full level.</td></tr>
+<tr><td>Hold</td><td>0–2000 ms</td><td>Time kept at full level before the decay starts.</td></tr>
+<tr><td>Reverse</td><td>on / off</td><td>Plays the region from its end to its start.</td></tr>
+<tr><td>Loop</td><td>on / off</td><td>Plays the region between Start and End over and over, until the decay ends the sound.</td></tr>
+<tr><td>Gate</td><td>on / off</td><td>Holds the sound at full level for the note's length, then lets it decay: the decay becomes the release. With Loop, a note lasts as long as it is written. Only in a pattern (the audition has no note).</td></tr>
 <tr><td>Pitch … File</td><td></td><td>Detected pitch, length, peak and RMS levels, the instrument its name suggests, its full path; the envelope under them.</td></tr>
 </table>
 <table>

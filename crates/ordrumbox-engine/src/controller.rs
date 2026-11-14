@@ -538,10 +538,12 @@ impl Controller {
             track: 0,
             ratio: (sample.sample.transpose / 12.0).exp2(),
             peak: sample.sample.gain() as f32,
-            // No decay envelope: one that outlasts any sample.
-            decay: 600.0,
+            // No decay envelope: one that outlasts any sample, but a loop, which only the decay ends.
+            decay: if sample.sample.looping { (sample.sample.decay_ms() / 1000.0) as f32 } else { 600.0 },
             pan: 0.0,
             delay: 0,
+            length: 0.0,
+            shape: sample.sample.shape(),
         };
         self.post_preview(Pass {
             frames: 1,

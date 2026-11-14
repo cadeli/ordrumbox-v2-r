@@ -1,16 +1,17 @@
 //! The editors laid out as panel items.
 
 use super::tables::{
-    COMPOSE_TAB, DEFAULT_DECAY, FILTER_ICONS, FILTER_TYPES, FX_DEFS, FX_KNOBS, FxDef, GENERATION_COMPOSE,
+    COMPOSE_TAB, DEFAULT_ATTACK, DEFAULT_DECAY, FILTER_ICONS, FILTER_TYPES, FX_DEFS, FX_KNOBS, FxDef,
+    GENERATION_COMPOSE,
 };
 use super::tables::{
     GENERATION_ENGINE, GENERATION_GROOVE, GENERATION_MANUAL, GenerationRow, KIT_KNOBS, KNOB_BAR, LFO_TARGETS,
-    LOOP_PROPS, LfoTarget, NOTE_GROUPS, NOTE_KNOBS, NOTE_TABS, NoteRow, Prop, STYLE_DEFAULT, TABS, WAVE_TYPES,
-    fx_label, prop, track_select_options,
+    LOOP_PROPS, LfoTarget, NOTE_GROUPS, NOTE_KNOBS, NOTE_TABS, NoteRow, Prop, SHAPE_KNOBS, SHAPE_RANGES,
+    SHAPE_SWITCHES, STYLE_DEFAULT, TABS, WAVE_TYPES, fx_label, prop, track_select_options,
 };
 use super::tables::{TAB_FX, TAB_LFO, TAB_LOOP, TAB_SOUND};
 use super::values::{EditorState, flag, fx_on, has_lfo, index_of, loop_length, number, text_of};
-use super::{Choice, ComposeView, KitControls, NoteView, TrackView};
+use super::{Choice, ComposeView, KitControls, NoteView, Shape, TrackView};
 use crate::control::{Format, Spec};
 use crate::kits::Field;
 use crate::panel::{Id, Item, KNOB_SIZE, Kind, LfoParam, Rect, dim, label_width};
@@ -221,8 +222,8 @@ pub fn track_editor(view: &TrackView, state: &EditorState, area: Rect, scale: Sc
         rows.items.push(Item::text(area.x, rows.y + 2 * s, info, theme::text(), s));
     }
     rows.y += 15 * s;
-    let (points, marker) = view.sample.as_ref().map_or((Vec::new(), None), |bar| (bar.envelope.clone(), bar.marker));
-    rows.items.push(Item::new(None, Rect::new(area.x, rows.y, area.w, 32 * s), Kind::Envelope { points, marker }));
+    let (points, overlay) = view.sample.as_ref().map_or((Vec::new(), None), |bar| (bar.envelope.clone(), bar.overlay));
+    rows.items.push(Item::new(None, Rect::new(area.x, rows.y, area.w, 32 * s), Kind::Envelope { points, overlay }));
     rows.y += 36 * s;
 
     // Knob bar: while playing, a setting with an LFO shows the LFO's value.
@@ -358,6 +359,7 @@ pub(super) fn sound_tab(rows: &mut Rows, view: &TrackView) {
         let field = rows.field(r, 36 * s);
         rows.items.push(Item::new(Some(Id::Toggle(key)), field, Kind::Toggle { on }));
     }
+    shape_controls(rows, &view.shape, (Id::SampleKnob, Id::SampleToggle));
     let r = rows.row();
     rows.items.push(Item::new(
         Some(Id::AutoAssign),
@@ -779,6 +781,44 @@ pub fn kit_controls(view: &KitControls, area: Rect, scale: Scale) -> (Vec<Item>,
         })
         .collect();
     rows.knob_bar(knobs, 4);
+    shape_controls(&mut rows, &view.shape, (Id::KitKnob, Id::KitToggle));
     let bottom = rows.y;
     (rows.items, bottom)
+}
+
+/// The id of a playback control, by its field.
+pub(super) type IdOf = fn(Field) -> Id;
+
+/// The playback controls of a sample (start, end, attack, hold, and the
+/// reverse and loop switches), whose ids the editor gives: the kit editor's
+/// and the track editor's act on the same settings, each on its sample.
+pub(super) fn shape_controls(rows: &mut Rows, shape: &Shape, (knob_id, toggle_id): (IdOf, IdOf)) {
+    let s = rows.scale;
+    // The length of the sample is the range of the start and the end; without
+    // one (a synth track) the knobs keep their place, at nothing.
+    let length = shape.duration_ms.max(1.0);
+    let knobs = SHAPE_KNOBS
+        .iter()
+        .map(|&(field, label, step)| {
+            let (value, spec) = match field {
+                Field::Start => (shape.start_ms, Spec::knob(0.0, length, step, 0.0)),
+                Field::End => (shape.end_ms, Spec::knob(0.0, length, step, length)),
+                Field::Attack => (shape.attack_ms, Spec::knob(0.0, SHAPE_RANGES.0, step, DEFAULT_ATTACK)),
+                _ => (shape.hold_ms, Spec::knob(0.0, SHAPE_RANGES.1, step, 0.0)),
+            };
+            (knob_id(field), spec, value, label, Format::Millis.value(value, ""), false)
+        })
+        .collect();
+    rows.knob_bar(knobs, 4);
+    for (field, label) in SHAPE_SWITCHES {
+        let on = match field {
+            Field::Reverse => shape.reverse,
+            Field::Loop => shape.looping,
+            _ => shape.gated,
+        };
+        let r = rows.row();
+        rows.label(r, label, None, false);
+        let switch = rows.field(r, 36 * s);
+        rows.items.push(Item::new(Some(toggle_id(field)), switch, Kind::Toggle { on }));
+    }
 }

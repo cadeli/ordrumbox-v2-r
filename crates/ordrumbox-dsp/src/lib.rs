@@ -75,7 +75,7 @@ pub use sample::SampleBuffer;
 pub use strip::{Strip, StripSettings};
 pub use synth::SynthVoice;
 pub use synth::patch::SynthPatch;
-pub use voice::{SampleVoice, VoiceStart};
+pub use voice::{SampleShape, SampleVoice, VoiceStart};
 
 /// Lowest frequency a filter cutoff can take, in Hz.
 pub const MIN_FILTER_FREQ: f64 = 20.0;

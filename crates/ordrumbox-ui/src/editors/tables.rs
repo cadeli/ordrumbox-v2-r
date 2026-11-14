@@ -2,7 +2,7 @@
 
 use super::layout::note_default;
 use crate::control::Format;
-use crate::kits::{DECAY_RANGE, Field, GAIN_RANGE, TRANSPOSE_RANGE};
+use crate::kits::{ATTACK_RANGE, DECAY_RANGE, Field, GAIN_RANGE, HOLD_RANGE, TRANSPOSE_RANGE};
 use ordrumbox_core::Note;
 use ordrumbox_core::note::{MAX_LENGTH_STEPS, MAX_SHIFT_STEPS};
 use ordrumbox_core::track::{
@@ -372,3 +372,22 @@ pub const KIT_KNOBS: [(Field, Prop, &str, f64); 3] = [
     ),
     (Field::Decay, prop("decay", "Decay", DECAY_RANGE.0, DECAY_RANGE.1, 10.0, Format::Millis), "", DEFAULT_DECAY),
 ];
+
+/// The playback knobs of a sample, in a row of four: field, label, step, default (the
+/// end's is the sample's length, the range of the start and the end too).
+pub const SHAPE_KNOBS: [(Field, &str, f64); 4] = [
+    (Field::Start, "Start", 1.0),
+    (Field::End, "End", 1.0),
+    (Field::Attack, "Attack", 1.0),
+    (Field::Hold, "Hold", 5.0),
+];
+
+/// The longest a knob sets the attack and the hold, ms.
+pub const SHAPE_RANGES: (f64, f64) = (ATTACK_RANGE.1, HOLD_RANGE.1);
+
+/// Attack a double-click restores, ms (the voice's own).
+pub const DEFAULT_ATTACK: f64 = ordrumbox_engine::kit::DEFAULT_ATTACK_MS;
+
+/// The playback switches of a sample: field, label.
+pub const SHAPE_SWITCHES: [(Field, &str); 3] =
+    [(Field::Reverse, "Reverse"), (Field::Loop, "Loop"), (Field::Gate, "Gate")];

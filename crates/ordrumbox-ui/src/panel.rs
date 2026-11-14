@@ -8,6 +8,7 @@
 use crate::canvas::{Canvas, Rgb, fit, text_width};
 use crate::control::{Spec, Style};
 use crate::kits::Field;
+use crate::sample_overlay::Overlay;
 use crate::scale::Scale;
 use crate::theme;
 
@@ -50,7 +51,6 @@ fn selected_row_color() -> Rgb {
     theme::selected_row()
 }
 const ENVELOPE: Rgb = theme::LIVE;
-const MARKER: Rgb = theme::ACCENT;
 
 /// The row of a list under `y`, rows `row_height` high from `top`; `None`
 /// above the list (a division alone would put the pixels just above in row 0).
@@ -170,6 +170,11 @@ pub enum Id {
     /// The auto-assign button of a sample's row: its instrument from its file name.
     KitAutoInstrument(usize),
     KitKnob(Field),
+    /// A sample's reverse or loop switch in the kit editor.
+    KitToggle(Field),
+    /// The same settings in the track editor, on the track's sample.
+    SampleKnob(Field),
+    SampleToggle(Field),
     /// The kit's title or description, by its `kits.json` key.
     KitText(&'static str),
     /// The title of the table's column of tracks playing each sample.
@@ -297,10 +302,10 @@ pub enum Kind {
     Title {
         text: String,
     },
-    /// A sample's envelope (peaks 0–1) and where its decay ends (0–1).
+    /// A sample's waveform (peaks 0–1) and how it plays over it.
     Envelope {
         points: Vec<f64>,
-        marker: Option<f64>,
+        overlay: Option<Overlay>,
     },
     /// A highlighted row background (the selected setting).
     Highlight,
@@ -594,7 +599,7 @@ pub fn draw(canvas: &mut Canvas, items: &[Item], focus: Option<Id>, scale: Scale
                 canvas.fill_rect(r.x, r.y, r.w, r.h, field_color());
                 centered_label(canvas, r, label, scale, theme::disabled());
             }
-            Kind::Envelope { points, marker } => {
+            Kind::Envelope { points, overlay } => {
                 canvas.fill_rect(r.x, r.y, r.w, r.h, field_color());
                 // The waveform, mirrored around the middle and scaled to its
                 // own peak: a quiet sample shows its shape as well as a loud one.
@@ -612,13 +617,8 @@ pub fn draw(canvas: &mut Canvas, items: &[Item], focus: Option<Id>, scale: Scale
                         canvas.fill_rect(x, mid - half, w, 2 * half, ENVELOPE);
                     }
                 }
-                if let Some(m) = marker {
-                    let x = r.x + (m.clamp(0.0, 1.0) * f64::from(r.w - 1)) as i32;
-                    let mut y = r.y;
-                    while y < r.y + r.h {
-                        canvas.fill_rect(x, y, t, (4 * scale).min(r.y + r.h - y), MARKER);
-                        y += 8 * scale;
-                    }
+                if let Some(overlay) = overlay {
+                    overlay.draw(canvas, (r.x, r.y, r.w, r.h), scale);
                 }
             }
         }
@@ -949,7 +949,7 @@ mod tests {
                 Rect::new(0, 100, 120, 12),
                 Kind::Select { values: vec!["a".into()], labels: vec!["a".into()], selected: 0 },
             ),
-            Item::new(None, Rect::new(0, 120, 300, 40), Kind::Envelope { points: vec![0.0, 1.0], marker: Some(0.5) }),
+            Item::new(None, Rect::new(0, 120, 300, 40), Kind::Envelope { points: vec![0.0, 1.0], overlay: None }),
         ];
         draw(&mut canvas, &items, Some(Id::Sample), Scale::ONE);
         Dropdown::new(Id::Sample, Rect::new(390, 290, 20, 12), vec!["x".into(); 3], vec!["x".into(); 3], 0)

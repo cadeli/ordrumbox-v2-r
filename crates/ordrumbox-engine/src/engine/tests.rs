@@ -22,7 +22,17 @@ fn bank() -> Arc<SampleBank> {
 }
 
 fn sample_event(frame: u64) -> Event {
-    let voice = VoiceStart { sample: 0, track: 0, ratio: 1.0, peak: 1.0, decay: 10.0, pan: 0.0, delay: 0 };
+    let voice = VoiceStart {
+        sample: 0,
+        track: 0,
+        ratio: 1.0,
+        peak: 1.0,
+        decay: 10.0,
+        pan: 0.0,
+        delay: 0,
+        length: 0.0,
+        shape: Default::default(),
+    };
     Event { frame, sound: Sound::Sample(voice), mono: true, velocity: 1.0, note: None, note_frames: 0 }
 }
 
@@ -117,7 +127,17 @@ fn ducked_level(playing: &[usize], keys: Vec<Option<usize>>) -> f32 {
             ..engine.bank.samples[0].clone()
         }],
     });
-    let voice = |track| VoiceStart { sample: 0, track, ratio: 1.0, peak: 1.0, decay: 10.0, pan: 0.0, delay: 0 };
+    let voice = |track| VoiceStart {
+        sample: 0,
+        track,
+        ratio: 1.0,
+        peak: 1.0,
+        decay: 10.0,
+        pan: 0.0,
+        delay: 0,
+        length: 0.0,
+        shape: Default::default(),
+    };
     let events = playing.iter().map(|&track| Event { sound: Sound::Sample(voice(track)), ..sample_event(0) }).collect();
     let ducked = StripSettings { duck_amount: 1.0, ..StripSettings::default() };
     engine.play(Arc::new(Pass {

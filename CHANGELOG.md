@@ -3,6 +3,13 @@
 ## Unreleased
 
 ### New
+- **Sample playback**: a sample has *Start*, *End*, *Attack*, *Hold*, *Reverse*, *Loop* and *Gate* (the sound holds for the note's
+  length, then the decay is its release),
+  next to its decay, in the kit editor and on the track editor's Sound tab. The waveform
+  shows them: the start and end lines, the direction, the loop and the level curve. They
+  are saved with the kit (`start`, `end`, `attack`, `hold`, `reverse`, `loop`, `gate`; times in ms); a
+  sample without them plays as before. A loop crossfades its two ends (10 ms at most) so
+  that it does not click.
 - **Per-track sidechain**: the FX tab has a *Sidechain* strip. Pick another track of the
   pattern as the *Key*: its sound turns this track's volume down (*Duck*, with a *Release*
   time) and, when the compressor is on, is what the compressor listens to. The key is the

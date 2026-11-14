@@ -49,10 +49,20 @@ pub fn help(id: Id) -> Option<Help> {
         Id::Sample => ["Sample", "the audio file the track plays"],
         Id::Synth => ["Synth preset", "the soft-synth sound the track plays instead of a sample"],
         Id::LoadSample => ["Load sample", "replace the track's sample with a file"],
-        Id::KitKnob(field) => match field {
+        Id::KitKnob(field) | Id::SampleKnob(field) | Id::KitToggle(field) | Id::SampleToggle(field) => match field {
             Field::Gain => ["Gain", "the sample's level, in dB"],
             Field::Transpose => ["Transpose", "the sample's pitch, in semitones"],
             Field::Decay => ["Decay", "how long the sample rings, in ms"],
+            Field::Start => ["Start", "where playback starts in the sample, in ms"],
+            Field::End => ["End", "where playback ends in the sample, in ms"],
+            Field::Attack => ["Attack", "the time the sound takes to reach its level, in ms"],
+            Field::Hold => ["Hold", "the time the sound stays at its level before it decays, in ms"],
+            Field::Reverse => ["Reverse", "play the sample backwards, from its end to its start"],
+            Field::Gate => [
+                "Gate",
+                "hold the sound for the note's length, then let it decay: with a loop, a note lasts as long as it is written",
+            ],
+            Field::Loop => ["Loop", "play between start and end over and over, until the decay ends it"],
         },
         Id::KitKit => ["Move to kit", "the selected sample, moved into another kit"],
         Id::KitSampleInstrument(_) => {

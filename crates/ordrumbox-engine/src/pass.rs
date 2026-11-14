@@ -298,6 +298,8 @@ fn sound_for(
         decay: (bank_sample.sample.decay_ms() / 1000.0) as f32,
         pan: note.playback_pan(track) as f32,
         delay: 0,
+        length: (note_seconds(bpm, track.steps_per_beat) * note.length_steps) as f32,
+        shape: bank_sample.sample.shape(),
     }))
 }
 

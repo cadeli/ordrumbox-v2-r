@@ -7,6 +7,7 @@
 use ordrumbox_core::{Note, Track};
 
 use crate::panel::Kind;
+pub use crate::sample_overlay::{Overlay, Shape};
 
 // ─── Views ───────────────────────────────────────────────────────────────────
 
@@ -15,7 +16,8 @@ use crate::panel::Kind;
 pub struct SampleBar {
     pub info: String,
     pub envelope: Vec<f64>,
-    pub marker: Option<f64>,
+    /// The sample's playback drawn over its waveform.
+    pub overlay: Option<Overlay>,
 }
 
 /// A select's options and the one shown.
@@ -42,6 +44,8 @@ pub struct TrackView<'a> {
     pub sample: Option<SampleBar>,
     /// The sample's decay (0 without one).
     pub decay: f64,
+    /// How the sample is read and shaped (its length 0 without a sample).
+    pub shape: Shape,
     pub instruments: Choice,
     /// The tracks of the pattern that can key this one (a sidechain), `none` first.
     pub sidechains: Choice,
@@ -85,6 +89,7 @@ pub struct KitControls {
     pub gain: f64,
     pub transpose: f64,
     pub decay: f64,
+    pub shape: Shape,
 }
 
 mod layout;

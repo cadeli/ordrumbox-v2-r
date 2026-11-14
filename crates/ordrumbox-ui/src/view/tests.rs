@@ -3,6 +3,7 @@ use crate::canvas::{Canvas, text_width};
 use crate::frame::{body_top, footer_top, margin, status_line};
 use crate::menu;
 use crate::panel::Rect;
+use crate::sample_overlay::{Overlay, Shape};
 use crate::scale::Scale;
 use ordrumbox_core::Note;
 #[test]
@@ -228,7 +229,7 @@ fn kit_editor_draws_and_hits() {
             details_top: 200,
             facts: vec![("Pitch", "A4 0ct".into()); KIT_FACTS],
             envelope: &envelope,
-            decay_marker: Some(0.5),
+            overlay: Overlay::new(&Shape { duration_ms: 100.0, end_ms: 100.0, decay_ms: 50.0, ..Shape::default() }),
         };
         draw_kit(&mut canvas, &kit, &KitLayout::new(w as i32, h as i32, Scale::ONE, 0));
     }
