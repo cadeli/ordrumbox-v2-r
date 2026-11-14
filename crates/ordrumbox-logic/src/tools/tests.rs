@@ -223,6 +223,28 @@ fn notes_and_tracks_are_deleted() {
 }
 
 #[test]
+fn a_sidechain_is_set_by_name_and_follows_a_rename() {
+    let mut b = bench();
+    call(&mut b, "addNotesToPattern", r#"{"patternName":"rock","notes":[{"trackName":"SNARE","step":4}]}"#).unwrap();
+    let updates = r#"{"sidechainSource":"KICK","duckAmount":0.7,"duckReleaseMs":200}"#;
+    let set =
+        call(&mut b, "updateTrack", &format!(r#"{{"patternName":"rock","trackName":"SNARE","updates":{updates}}}"#));
+    assert_eq!(get(&set.unwrap(), &["settings", "sidechainSource"]).as_str(), Some("KICK"));
+    let out_of_range = r#"{"patternName":"rock","trackName":"SNARE","updates":{"duckAmount":3}}"#;
+    assert_eq!(
+        get(&call(&mut b, "updateTrack", out_of_range).unwrap(), &["settings", "duckAmount"]).as_f64(),
+        Some(1.0)
+    );
+    call(&mut b, "renameTrack", r#"{"patternName":"rock","trackName":"kick","newName":"bd"}"#).unwrap();
+    let tracks = &b.editor.library().patterns[0].tracks;
+    assert_eq!(tracks.iter().find(|t| t.name == "SNARE").map(|t| t.sidechain_source.as_str()), Some("BD"));
+    // One undo step puts the name and the key back.
+    b.editor.undo();
+    let tracks = &b.editor.library().patterns[0].tracks;
+    assert_eq!(tracks.iter().find(|t| t.name == "SNARE").map(|t| t.sidechain_source.as_str()), Some("KICK"));
+}
+
+#[test]
 fn tracks_are_copied_renamed_and_compacted() {
     let mut b = bench();
     let args = r#"{"patternName":"rock","trackName":"kick","toPatternName":"jazz"}"#;

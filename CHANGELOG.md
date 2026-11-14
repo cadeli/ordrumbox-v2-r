@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### New
+- **Per-track sidechain**: the FX tab has a *Sidechain* strip. Pick another track of the
+  pattern as the *Key*: its sound turns this track's volume down (*Duck*, with a *Release*
+  time) and, when the compressor is on, is what the compressor listens to. The key is the
+  track's sound before its own effects, so a muted or turned-down key still keys. MCP:
+  `sidechainSource`, `duckAmount` and `duckReleaseMs` in `updateTrack`.
 - **Plugin**: a MIDI program change chooses the pattern (program 1–128 → pattern 1–128),
   in the CLAP plugin.
 

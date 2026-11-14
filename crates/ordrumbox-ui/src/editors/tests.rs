@@ -141,6 +141,7 @@ fn view(track: &Track) -> TrackView<'_> {
         sample: Some(SampleBar { info: "C4 - 210 ms - -0.3 dB".into(), envelope: vec![0.5; 8], marker: Some(0.4) }),
         decay: 0.0,
         instruments: Choice { values: vec!["KICK".into()], labels: Vec::new(), selected: 0 },
+        sidechains: Choice { values: vec![String::new()], labels: vec!["none".into()], selected: 0 },
         samples: Choice::default(),
         synths: Choice { values: vec!["none".into()], labels: Vec::new(), selected: 0 },
         lfo: Vec::new(),
@@ -290,6 +291,8 @@ fn the_fx_tab_shows_every_effect_and_moves_nothing_when_one_goes_on() {
         delay_type: "slap".into(),
         saturation_mix: 0.5,
         comp_mix: 1.0,
+        duck_amount: 0.5,
+        sidechain_source: "SNARE".into(),
         filter_type: "lowpass".into(),
         ..Track::default()
     };

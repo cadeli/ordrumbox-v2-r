@@ -91,6 +91,8 @@ struct Channel {
     lfo: [bool; 4],
     /// Quanta in a row with no input and a quiet output.
     idle: u32,
+    /// The track whose sound is this strip's sidechain key.
+    key: Option<usize>,
 }
 
 #[derive(Debug)]
@@ -146,6 +148,7 @@ impl Engine {
             target: StripSettings::default(),
             lfo: [false; 4],
             idle: 0,
+            key: None,
         };
         let quantum_seconds = QUANTUM as f32 / sample_rate;
         Self {
@@ -244,23 +247,19 @@ impl Engine {
 
     /// The strips of `strips`, at once, when the transport is stopped (a
     /// playing pass keeps its own).
-    fn take_strips_when_stopped(&mut self, strips: &[StripSettings]) {
+    fn take_strips_when_stopped(&mut self, pass: &Pass) {
         if self.current.is_some() {
             return;
         }
-        self.strip_count = self.strip_count.max(strips.len()).min(MAX_TRACKS);
-        for (channel, settings) in self.channels.iter_mut().zip(strips) {
-            channel.target = *settings;
-            channel.lfo = [false; 4];
-        }
-        self.settle_strips(strips.len().min(MAX_TRACKS));
+        self.take_strips(pass);
+        self.settle_strips(pass.strips.len().min(MAX_TRACKS));
     }
 
     /// Start the events of `pass` now, outside the transport (auditioning a
     /// track or a note). When stopped, its strip settings apply at once.
     /// The caller keeps a reference to `pass` (this drops its own).
     pub fn preview(&mut self, pass: Arc<Pass>) {
-        self.take_strips_when_stopped(&pass.strips);
+        self.take_strips_when_stopped(&pass);
         for event in &pass.events {
             self.start(event, &pass.patches, self.clock, 1.0, 1.0);
         }
@@ -270,7 +269,7 @@ impl Engine {
     /// its strip settings apply at once. The caller keeps a reference to
     /// `keymap` (this drops the one it replaces).
     pub fn set_keymap(&mut self, keymap: Arc<KeyMap>) {
-        self.take_strips_when_stopped(&keymap.pass.strips);
+        self.take_strips_when_stopped(&keymap.pass);
         self.keymap = Some(keymap);
     }
 
@@ -434,12 +433,18 @@ impl Engine {
         clock as f64 / f64::from(self.sample_rate)
     }
 
-    fn load(&mut self, pass: Arc<Pass>) {
+    /// The targets, sidechain keys and LFO flags of the strips of `pass`.
+    fn take_strips(&mut self, pass: &Pass) {
         self.strip_count = self.strip_count.max(pass.strips.len()).min(MAX_TRACKS);
-        for (channel, settings) in self.channels.iter_mut().zip(&pass.strips) {
+        for (track, (channel, settings)) in self.channels.iter_mut().zip(&pass.strips).enumerate() {
             channel.target = *settings;
+            channel.key = pass.keys.get(track).copied().flatten();
             channel.lfo = [false; 4];
         }
+    }
+
+    fn load(&mut self, pass: Arc<Pass>) {
+        self.take_strips(&pass);
         for lfo in pass.lfos.iter().filter(|l| l.track < MAX_TRACKS) {
             self.channels[lfo.track].lfo =
                 [!lfo.volume.is_empty(), !lfo.pan.is_empty(), !lfo.cutoff.is_empty(), !lfo.q.is_empty()];
@@ -535,7 +540,17 @@ impl Engine {
             }
             // Rendered on the side to measure the strip's own level.
             let (mut strip_l, mut strip_r) = ([0.0_f32; QUANTUM], [0.0_f32; QUANTUM]);
-            channel.strip.process(&channel.current, in_l, in_r, &mut strip_l[..n], &mut strip_r[..n]);
+            // The key is the level of another track's sound, before its strip.
+            let mut key = [0.0_f32; QUANTUM];
+            let key = channel.key.filter(|&k| k < strips).map(|k| {
+                let range = k * QUANTUM..k * QUANTUM + n;
+                let (key_l, key_r) = (&self.input_left[range.clone()], &self.input_right[range]);
+                for (level, (l, r)) in key.iter_mut().zip(key_l.iter().zip(key_r)) {
+                    *level = l.abs().max(r.abs());
+                }
+                &key[..n]
+            });
+            channel.strip.process(&channel.current, key, in_l, in_r, &mut strip_l[..n], &mut strip_r[..n]);
             let mut peak = 0.0_f32;
             if host_muted(host.split, track) {
                 // On an output of its own: not in the mix.

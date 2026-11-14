@@ -63,6 +63,10 @@ const COMP_KNEE_DB: f64 = 6.0;
 const COMP_MAKEUP_SHARE: f64 = 0.5;
 /// Level the compressor's detector reads as silence, dB.
 const COMP_FLOOR_DB: f64 = -120.0;
+/// Seconds the sidechain's ducking takes to close on a key.
+const DUCK_ATTACK_SECONDS: f64 = 0.002;
+/// Level of the key, linear, at which the ducking is at its full amount.
+const DUCK_FULL_LEVEL: f64 = 0.5;
 /// dB per neper: `20 / ln 10`.
 const DB_PER_NEPER: f64 = 8.685_889_638_065_037;
 
@@ -129,6 +133,11 @@ audio_params! {
         /// 1 feeds the mono sum into the left line only (a ping-pong starts
         /// on the left), 0 each side into its line.
         delay_mono_in = 0.0, 0.0, 1.0;
+        /// Sidechain ducking: the share of the gain a key at full level
+        /// takes off, 0 none (it needs a key, see [`Strip::process`]).
+        duck_amount = 0.0, 0.0, 1.0;
+        /// Seconds the gain takes to come back once the key falls.
+        duck_release_seconds = 0.15, 0.01, 2.0;
         volume = 1.0, 0.0, 2.0;
         pan = 0.0, -1.0, 1.0;
     }
@@ -364,10 +373,9 @@ impl Compressor {
     }
 
     /// Compress one frame, moving the gain reduction `reduction_db` toward
-    /// what its level asks for.
+    /// what the level `peak` asks for: the frame's own, or a sidechain key's.
     #[inline]
-    fn process(&self, reduction_db: &mut f64, l: f64, r: f64) -> (f64, f64) {
-        let peak = l.abs().max(r.abs());
+    fn process(&self, reduction_db: &mut f64, peak: f64, l: f64, r: f64) -> (f64, f64) {
         let level_db = if peak > 0.0 { (peak.ln() * DB_PER_NEPER).max(COMP_FLOOR_DB) } else { COMP_FLOOR_DB };
         let target = self.target_db(level_db);
         // Deeper reduction is the attack, less is the release.
@@ -377,6 +385,40 @@ impl Compressor {
         let gain = (*reduction_db / DB_PER_NEPER).exp() * self.makeup;
         let wet = self.mix * gain + (1.0 - self.mix);
         (l * wet, r * wet)
+    }
+}
+
+/// The sidechain ducking's settings for one block: an envelope follower on
+/// the key, and the gain it takes off.
+#[derive(Debug, Clone, Copy)]
+struct Ducker {
+    amount: f64,
+    attack: f64,
+    release: f64,
+}
+
+impl Ducker {
+    /// The ducker of `s` at `sr`, `None` when it is off.
+    fn new(s: &StripSettings, sr: f64) -> Option<Self> {
+        let amount = f64::from(s.duck_amount);
+        if amount <= 0.0 {
+            return None;
+        }
+        let coefficient = |seconds: f64| 1.0 - (-1.0 / (seconds * sr)).exp();
+        Some(Self {
+            amount,
+            attack: coefficient(DUCK_ATTACK_SECONDS),
+            release: coefficient(f64::from(s.duck_release_seconds)),
+        })
+    }
+
+    /// The gain for one frame, `envelope` following the key's level `peak`.
+    #[inline]
+    fn gain(&self, envelope: &mut f64, peak: f64) -> f64 {
+        let speed = if peak > *envelope { self.attack } else { self.release };
+        *envelope += speed * (peak - *envelope);
+        flush(envelope);
+        1.0 - self.amount * (*envelope / DUCK_FULL_LEVEL).min(1.0)
     }
 }
 
@@ -411,6 +453,8 @@ pub struct Strip {
     clip_prev: [f64; 2],
     /// The compressor's gain reduction, dB (0 or less).
     comp_reduction_db: f64,
+    /// The sidechain ducking's envelope of the key, linear.
+    duck_envelope: f64,
 }
 
 impl Strip {
@@ -441,14 +485,36 @@ impl Strip {
             crush_hold: [0.0; 2],
             clip_prev: [0.0; 2],
             comp_reduction_db: 0.0,
+            duck_envelope: 0.0,
         }
     }
 
     /// Process `in_l`/`in_r` with `settings` and ADD the result to
     /// `out_l`/`out_r` (all four the same length).
+    ///
+    /// `key` is a sidechain: the level, per frame, of another track. When it
+    /// is given (and as long as the input), the compressor reads it instead of
+    /// the strip's own signal, and `duck_amount` lowers the gain by it.
     pub fn process(
         &mut self,
         settings: &StripSettings,
+        key: Option<&[f32]>,
+        in_l: &[f32],
+        in_r: &[f32],
+        out_l: &mut [f32],
+        out_r: &mut [f32],
+    ) {
+        match key.and_then(|key| key.get(..in_l.len())) {
+            Some(key) => self.run::<true>(settings, key, in_l, in_r, out_l, out_r),
+            None => self.run::<false>(settings, &[], in_l, in_r, out_l, out_r),
+        }
+    }
+
+    /// [`Self::process`], with the key's case chosen once for the block.
+    fn run<const KEYED: bool>(
+        &mut self,
+        settings: &StripSettings,
+        key: &[f32],
         in_l: &[f32],
         in_r: &[f32],
         out_l: &mut [f32],
@@ -502,6 +568,10 @@ impl Strip {
             // Turned back on, the compressor starts released.
             self.comp_reduction_db = 0.0;
         }
+        let duck = if KEYED { Ducker::new(&s, sr) } else { None };
+        if duck.is_none() {
+            self.duck_envelope = 0.0;
+        }
 
         let p = f64::from(s.pan);
         let pan_l = ((p + 1.0) * PI / 4.0).cos();
@@ -523,7 +593,7 @@ impl Strip {
 
         let inputs = in_l.iter().zip(in_r);
         let outputs = out_l.iter_mut().zip(out_r.iter_mut());
-        for ((&x_l, &x_r), (o_l, o_r)) in inputs.zip(outputs) {
+        for (frame, ((&x_l, &x_r), (o_l, o_r))) in inputs.zip(outputs).enumerate() {
             // 1. Filter.
             let (mut dry_l, mut dry_r) = (f64::from(x_l), f64::from(x_r));
             if filter_on {
@@ -537,7 +607,8 @@ impl Strip {
 
             // 2. Compressor.
             if let Some(comp) = &comp {
-                (dry_l, dry_r) = comp.process(&mut self.comp_reduction_db, dry_l, dry_r);
+                let peak = if KEYED { f64::from(key[frame]) } else { dry_l.abs().max(dry_r.abs()) };
+                (dry_l, dry_r) = comp.process(&mut self.comp_reduction_db, peak, dry_l, dry_r);
             }
 
             // 3. Saturation.
@@ -643,9 +714,11 @@ impl Strip {
                 self.delay_r.write(send_r);
             }
 
-            // 6. Volume and pan.
-            let mut left = (sat_l + rev_l + wet_l) * vol * pan_l * pan_comp;
-            let mut right = (sat_r + rev_r + wet_r) * vol * pan_r * pan_comp;
+            // 6. Sidechain ducking, volume and pan.
+            let duck_gain = duck.map_or(1.0, |duck| duck.gain(&mut self.duck_envelope, f64::from(key[frame])));
+            let volume = vol * duck_gain;
+            let mut left = (sat_l + rev_l + wet_l) * volume * pan_l * pan_comp;
+            let mut right = (sat_r + rev_r + wet_r) * volume * pan_r * pan_comp;
             flush(&mut left);
             flush(&mut right);
             *o_l += left.clamp(-2.0, 2.0) as f32;
@@ -661,7 +734,7 @@ mod tests {
     fn run(settings: &StripSettings, input: &[f32]) -> (Vec<f32>, Vec<f32>) {
         let mut strip = Strip::new(48_000.0);
         let (mut l, mut r) = (vec![0.0; input.len()], vec![0.0; input.len()]);
-        strip.process(settings, input, input, &mut l, &mut r);
+        strip.process(settings, None, input, input, &mut l, &mut r);
         (l, r)
     }
 
@@ -852,7 +925,7 @@ mod tests {
         };
         let mut strip = Strip::new(48_000.0);
         let (mut l, mut r) = (vec![0.0; input.len()], vec![0.0; input.len()]);
-        strip.process(&settings, &input, &input, &mut l, &mut r);
+        strip.process(&settings, None, &input, &input, &mut l, &mut r);
         // The dry hit is on both sides; then 480 left, 960 right, 1440 left.
         let echo = |s: &[f32], at: usize| s[at - 5..at + 5].iter().fold(0.0f32, |m, x| m.max(x.abs()));
         assert!(echo(&l, 480) > 0.1 && echo(&r, 480) < 1e-6);
@@ -876,6 +949,63 @@ mod tests {
         assert!(f64::from(l[0].abs()) > settled * 2.0);
         // Off, the signal goes through untouched.
         assert_eq!(run(&off, &input).0, input);
+    }
+
+    /// `input` through a fresh strip with `key` as its sidechain.
+    fn run_keyed(settings: &StripSettings, key: &[f32], input: &[f32]) -> Vec<f32> {
+        let mut strip = Strip::new(48_000.0);
+        let (mut l, mut r) = (vec![0.0; input.len()], vec![0.0; input.len()]);
+        strip.process(settings, Some(key), input, input, &mut l, &mut r);
+        l
+    }
+
+    #[test]
+    fn a_silent_key_ducks_nothing_and_a_loud_one_does_by_its_amount() {
+        let input = vec![0.25_f32; 9_600];
+        let ducked =
+            StripSettings { filter_on: 0.0, duck_amount: 0.8, duck_release_seconds: 0.05, ..Default::default() };
+        let silence = vec![0.0_f32; input.len()];
+        assert_eq!(run_keyed(&ducked, &silence, &input), input);
+        // A key past the full level, held: the gain settles at 1 - amount.
+        let loud = vec![1.0_f32; input.len()];
+        let out = run_keyed(&ducked, &loud, &input);
+        assert!((out[9_599] - 0.25 * 0.2).abs() < 1e-4, "{}", out[9_599]);
+        // Without a key (or with a key that is too short), the ducking is off.
+        assert_eq!(run(&ducked, &input).0, input);
+        let mut strip = Strip::new(48_000.0);
+        let (mut l, mut r) = (vec![0.0; input.len()], vec![0.0; input.len()]);
+        strip.process(&ducked, Some(&loud[..10]), &input, &input, &mut l, &mut r);
+        assert_eq!(l, input);
+    }
+
+    #[test]
+    fn the_ducking_lets_go_after_the_key() {
+        let input = vec![0.25_f32; 24_000];
+        let ducked =
+            StripSettings { filter_on: 0.0, duck_amount: 1.0, duck_release_seconds: 0.05, ..Default::default() };
+        let key: Vec<f32> = (0..input.len()).map(|i| if i < 2_400 { 1.0 } else { 0.0 }).collect();
+        let out = run_keyed(&ducked, &key, &input);
+        assert!(out[2_000] < 0.01, "ducked while the key plays");
+        assert!(out[2_400 + 4_800] > out[2_400 + 480], "it comes back");
+        assert!((out[23_999] - 0.25).abs() < 1e-3, "and is back");
+    }
+
+    #[test]
+    fn a_keyed_compressor_follows_the_key_not_its_own_signal() {
+        let input = vec![0.01_f32; 24_000];
+        let comp = StripSettings {
+            filter_on: 0.0,
+            comp_mix: 1.0,
+            comp_threshold_db: -24.0,
+            comp_ratio: 20.0,
+            comp_attack_seconds: 0.0001,
+            ..Default::default()
+        };
+        let own = run(&comp, &input).0[23_999];
+        let loud = run_keyed(&comp, &vec![1.0; input.len()], &input)[23_999];
+        let quiet = run_keyed(&comp, &vec![0.0; input.len()], &input)[23_999];
+        assert!(loud < own * 0.3, "a loud key compresses a quiet signal: {loud} against {own}");
+        assert!((quiet - own).abs() < 1e-6, "a silent key is as the signal's own level (under the knee)");
     }
 
     #[test]

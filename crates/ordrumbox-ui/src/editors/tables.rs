@@ -6,7 +6,8 @@ use crate::kits::{DECAY_RANGE, Field, GAIN_RANGE, TRANSPOSE_RANGE};
 use ordrumbox_core::Note;
 use ordrumbox_core::note::{MAX_LENGTH_STEPS, MAX_SHIFT_STEPS};
 use ordrumbox_core::track::{
-    COMP_ATTACK_MS_RANGE, COMP_RATIO_RANGE, COMP_RELEASE_MS_RANGE, COMP_THRESHOLD_DB_RANGE, MAX_STEPS_PER_BEAT,
+    COMP_ATTACK_MS_RANGE, COMP_RATIO_RANGE, COMP_RELEASE_MS_RANGE, COMP_THRESHOLD_DB_RANGE, DUCK_RELEASE_MS_RANGE,
+    MAX_STEPS_PER_BEAT,
 };
 use ordrumbox_logic::generate;
 
@@ -28,7 +29,7 @@ pub struct FxDef {
     pub on_value: f64,
 }
 
-pub const FX_DEFS: [FxDef; 5] = [
+pub const FX_DEFS: [FxDef; 6] = [
     FxDef { key: "reverbMix", label: "Reverb", controls: &["reverbMix", "reverbType"], on_value: 0.5 },
     FxDef {
         key: "delayMix",
@@ -48,6 +49,13 @@ pub const FX_DEFS: [FxDef; 5] = [
         label: "Compressor",
         controls: &["compMix", "compThresholdDb", "compRatio", "compAttackMs", "compReleaseMs"],
         on_value: 1.0,
+    },
+    // Another track's sound ducks this one's volume and keys its compressor.
+    FxDef {
+        key: "duckAmount",
+        label: "Sidechain",
+        controls: &["duckAmount", "duckReleaseMs", "sidechainSource"],
+        on_value: 0.5,
     },
     // The filter is on when its type is not the allpass bypass.
     FxDef {
@@ -157,7 +165,7 @@ pub(super) const fn count(key: &'static str, label: &'static str, min: f64, max:
 }
 
 /// The effect knobs.
-pub const FX_KNOBS: [Prop; 13] = [
+pub const FX_KNOBS: [Prop; 15] = [
     prop("reverbMix", "Mix", 0.0, 1.0, 0.01, Format::Plain),
     prop("delayMix", "Mix", 0.0, 1.0, 0.01, Format::Plain),
     prop("delayFeedback", "Feedback", 0.0, 0.95, 0.01, Format::Plain),
@@ -169,6 +177,8 @@ pub const FX_KNOBS: [Prop; 13] = [
     prop("compRatio", "Ratio", COMP_RATIO_RANGE.0, COMP_RATIO_RANGE.1, 0.1, Format::Ratio),
     prop("compAttackMs", "Attack", COMP_ATTACK_MS_RANGE.0, COMP_ATTACK_MS_RANGE.1, 0.1, Format::FineMillis),
     prop("compReleaseMs", "Release", COMP_RELEASE_MS_RANGE.0, COMP_RELEASE_MS_RANGE.1, 1.0, Format::FineMillis),
+    prop("duckAmount", "Duck", 0.0, 1.0, 0.01, Format::Plain),
+    prop("duckReleaseMs", "Release", DUCK_RELEASE_MS_RANGE.0, DUCK_RELEASE_MS_RANGE.1, 1.0, Format::FineMillis),
     prop("filterCutoff", "Cutoff", 20.0, 20_000.0, 1.0, Format::Freq),
     prop("filterQ", "Q", 0.707, 18.707, 0.01, Format::Fixed2),
 ];
@@ -178,6 +188,7 @@ pub fn fx_label(key: &str) -> &'static str {
     match key {
         "delayBeats" => "Beats",
         "filterSlope" => "Slope",
+        "sidechainSource" => "Key",
         _ => "Type",
     }
 }

@@ -117,6 +117,14 @@ json_record! {
         /// Compressor attack and release, ms.
         comp_attack_ms: f64 = 10.0 => "compAttackMs",
         comp_release_ms: f64 = 100.0 => "compReleaseMs",
+        /// Name of the track whose sound is this track's sidechain key (its
+        /// compressor listens to it, and `duck_amount` lowers the volume by
+        /// it); empty is none.
+        sidechain_source: String = String::new() => "sidechainSource",
+        /// Share of the volume a key at full level takes off, 0–1; 0 is off.
+        duck_amount: f64 = 0.0 => "duckAmount",
+        /// Milliseconds the volume takes to come back once the key falls.
+        duck_release_ms: f64 = 150.0 => "duckReleaseMs",
         /// Synth preset played when `use_synth` is on.
         synth_preset: Option<String> = None => "synthPreset" | "synthSoundKey",
         // Not in TRACK_DEFAULTS: written by the auto generator / scale picker,
@@ -138,7 +146,7 @@ json_record! {
 }
 
 /// `TRACK_VALUE_RANGES`: bounds of the numeric settings an edit clamps to.
-const VALUE_RANGES: [(&str, f64, f64); 46] = [
+const VALUE_RANGES: [(&str, f64, f64); 48] = [
     ("volume", 0.0, 1.0),
     ("pan", -1.0, 1.0),
     ("transpose", -24.0, 24.0),
@@ -162,6 +170,8 @@ const VALUE_RANGES: [(&str, f64, f64); 46] = [
     ("compRatio", COMP_RATIO_RANGE.0, COMP_RATIO_RANGE.1),
     ("compAttackMs", COMP_ATTACK_MS_RANGE.0, COMP_ATTACK_MS_RANGE.1),
     ("compReleaseMs", COMP_RELEASE_MS_RANGE.0, COMP_RELEASE_MS_RANGE.1),
+    ("duckAmount", 0.0, 1.0),
+    ("duckReleaseMs", DUCK_RELEASE_MS_RANGE.0, DUCK_RELEASE_MS_RANGE.1),
     ("hitVariation", 0.0, 100.0),
     ("noteVariation", 0.0, 100.0),
     ("autoPitchChance", 0.0, 100.0),
@@ -193,6 +203,8 @@ pub const COMP_THRESHOLD_DB_RANGE: (f64, f64) = (-60.0, 0.0);
 pub const COMP_RATIO_RANGE: (f64, f64) = (1.0, 20.0);
 pub const COMP_ATTACK_MS_RANGE: (f64, f64) = (0.1, 200.0);
 pub const COMP_RELEASE_MS_RANGE: (f64, f64) = (10.0, 2000.0);
+/// Range of the sidechain ducking's release, ms.
+pub const DUCK_RELEASE_MS_RANGE: (f64, f64) = (10.0, 2000.0);
 
 /// Table keys that are not track settings (`TRACK_DEFAULTS` lacks them):
 /// an edit never sets them.
@@ -203,7 +215,7 @@ const AUTO_HIT_VARIATION_FALLBACK: f64 = 60.0;
 const AUTO_NOTE_VARIATION_FALLBACK: f64 = 40.0;
 
 /// Keys written rounded to 2 decimals (`ROUND_2D` in exporter.js).
-const ROUND_2D: [&str; 14] = [
+const ROUND_2D: [&str; 15] = [
     "volume",
     "pan",
     "reverbMix",
@@ -215,6 +227,7 @@ const ROUND_2D: [&str; 14] = [
     "hardClip",
     "compMix",
     "compRatio",
+    "duckAmount",
     "swingAmount",
     "filterCutoff",
     "filterQ",

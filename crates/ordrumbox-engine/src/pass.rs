@@ -72,6 +72,9 @@ pub struct Pass {
     pub events: Vec<Event>,
     /// Strip parameters, by track index (a silent track has volume 0).
     pub strips: Vec<StripSettings>,
+    /// The strip, by track index, whose sound is each strip's sidechain key
+    /// (see [`key_strips`]); a strip past the end has none.
+    pub keys: Vec<Option<usize>>,
     /// Strip LFOs of the tracks that have some.
     pub lfos: Vec<StripLfo>,
     /// Synth patches the events refer to.
@@ -219,7 +222,25 @@ pub fn build_pass(pattern: &Pattern, number: u64, rng: &mut Rng, context: PassCo
         .enumerate()
         .filter_map(|(i, t)| strip_lfo(i, t, silent(i), context.first_tick, ticks))
         .collect();
-    Pass { number, first_tick: context.first_tick, frames, ticks, events, strips, lfos, patches }
+    let keys = key_strips(pattern.tracks.iter());
+    Pass { number, first_tick: context.first_tick, frames, ticks, events, strips, keys, lfos, patches }
+}
+
+/// The strip each of `tracks` takes its sidechain key from: the one named by
+/// its `sidechain_source`, none when the name is empty, unknown, or its own.
+/// A track is named by its instrument, so a key follows its track through a
+/// reorder, a removal or another pattern of a song.
+pub fn key_strips<'a>(tracks: impl Iterator<Item = &'a Track> + Clone) -> Vec<Option<usize>> {
+    tracks
+        .clone()
+        .enumerate()
+        .map(|(i, track)| {
+            if track.sidechain_source.is_empty() {
+                return None;
+            }
+            tracks.clone().position(|key| key.name == track.sidechain_source).filter(|&key| key != i)
+        })
+        .collect()
 }
 
 /// Where and how a voice plays.
@@ -305,7 +326,8 @@ pub fn build_preview(pattern: &Pattern, t: usize, note: Option<&Note>, context: 
         .into_iter()
         .collect();
     let strips = pattern.tracks.iter().map(|t| strip_settings(t, bpm)).collect();
-    Pass { frames: 1, ticks: 1, events, strips, patches, ..Pass::default() }
+    let keys = key_strips(pattern.tracks.iter());
+    Pass { frames: 1, ticks: 1, events, strips, keys, patches, ..Pass::default() }
 }
 
 /// The MIDI target of each track of `pattern` with the sounds `sounds`: where
@@ -354,7 +376,8 @@ pub fn build_keymap(pattern: &Pattern, context: PassContext<'_>, bpm: f64) -> Ke
         })
         .collect();
     let targets = keymap_targets(pattern, context.sounds, context.bank);
-    KeyMap::new(Pass { frames: 1, ticks: 1, events, strips, patches, ..Pass::default() }, &targets)
+    let keys = key_strips(pattern.tracks.iter());
+    KeyMap::new(Pass { frames: 1, ticks: 1, events, strips, keys, patches, ..Pass::default() }, &targets)
 }
 
 /// Hits of a pattern repetition, kept between song passes so a
@@ -504,6 +527,7 @@ pub fn build_song_pass_at(
         ticks,
         events,
         strips: strips.iter().map(strip_settings_of).collect(),
+        keys: key_strips(strips.iter().map(|&(p, t)| &context.patterns[p].tracks[t])),
         lfos,
         patches,
     }
@@ -512,6 +536,14 @@ pub fn build_song_pass_at(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_key_is_the_strip_of_the_track_named_and_never_its_own() {
+        let track =
+            |name: &str, source: &str| Track { name: name.into(), sidechain_source: source.into(), ..Track::default() };
+        let tracks = [track("KICK", ""), track("BASS", "KICK"), track("PAD", "NOPE"), track("HAT", "HAT")];
+        assert_eq!(key_strips(tracks.iter()), [None, Some(0), None, None]);
+    }
 
     #[test]
     fn a_midi_note_lasts_the_steps_its_note_is_held() {

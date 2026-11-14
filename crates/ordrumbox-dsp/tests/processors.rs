@@ -60,7 +60,7 @@ fn render_strip(case: &StripCase) -> (Vec<f32>, Vec<f32>) {
             change(&mut settings);
         }
         let to = (from + QUANTUM).min(frames);
-        strip.process(&settings, &in_l[from..to], &in_r[from..to], &mut out_l[from..to], &mut out_r[from..to]);
+        strip.process(&settings, None, &in_l[from..to], &in_r[from..to], &mut out_l[from..to], &mut out_r[from..to]);
     }
     (out_l, out_r)
 }

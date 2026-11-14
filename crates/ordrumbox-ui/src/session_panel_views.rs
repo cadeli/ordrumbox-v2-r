@@ -173,6 +173,22 @@ impl Session {
         };
         let instruments = Choice { selected: editors::index_of(&ids, &current_id), values: ids, labels: Vec::new() };
 
+        // The other tracks of the pattern, which can key this one.
+        let source = track.sidechain_source.as_str();
+        let mut sidechain_values = vec![String::new()];
+        let tracks = self.pattern().map_or(&[][..], |p| p.tracks.as_slice());
+        sidechain_values.extend(tracks.iter().map(|other| other.name.clone()).filter(|name| *name != track.name));
+        if !source.is_empty() && !sidechain_values.iter().any(|name| name == source) {
+            // A key the pattern lacks (a song's other pattern has it): kept, shown.
+            sidechain_values.push(source.to_owned());
+        }
+        let sidechain_labels = sidechain_values.iter().map(|n| if n.is_empty() { "none".into() } else { n.clone() });
+        let sidechains = Choice {
+            selected: editors::index_of(&sidechain_values, source),
+            labels: sidechain_labels.collect(),
+            values: sidechain_values,
+        };
+
         // Samples of that instrument: the current kit's first.
         let current_url = url.clone().unwrap_or_else(|| track.sample_path.clone());
         let found = self.samples_for(&current_id);
@@ -219,7 +235,7 @@ impl Session {
         };
         let bpm = self.playing_bpm();
         let compose = self.compose_view(track);
-        Some(TrackView { track, title, sample, decay, instruments, samples, synths, lfo, bpm, compose })
+        Some(TrackView { track, title, sample, decay, instruments, sidechains, samples, synths, lfo, bpm, compose })
     }
 
     /// The styles the header and the Generate tab show: what the library taught,
