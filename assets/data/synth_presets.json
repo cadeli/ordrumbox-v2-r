@@ -559,6 +559,76 @@
       "target": "off"
     }
   },
+  "SYNTHLEAD_SUPERSAW": {
+    "masterVolume": 0.7,
+    "vco1": {
+      "gain": 0.5,
+      "octave": 0,
+      "detune": -14,
+      "wave": "sawtooth"
+    },
+    "vco2": {
+      "gain": 0.5,
+      "octave": 0,
+      "detune": 0,
+      "wave": "sawtooth"
+    },
+    "vco3": {
+      "gain": 0.5,
+      "octave": 0,
+      "detune": 14,
+      "wave": "sawtooth"
+    },
+    "subGain": 0,
+    "pitchPunch": 0,
+    "filter": {
+      "type": "lowpass",
+      "freq": 7000,
+      "Q": 0.8,
+      "drive": 0.2,
+      "slope": 12
+    },
+    "filterEnv": {
+      "filterEnvelopeAmount": 0.1
+    },
+    "fm": {
+      "amount": 0.0,
+      "algo": 0
+    },
+    "noise": {
+      "mix": 0,
+      "filterType": "highpass",
+      "filterFreq": 2000,
+      "filterQ": 1
+    },
+    "envelope": {
+      "attack": 0.01,
+      "decay": 0.3,
+      "sustain": 0.85,
+      "release": 0.3
+    },
+    "lfo": {
+      "target": "vco3.detune",
+      "wave": "sine",
+      "freq": 0.3,
+      "depth": 0.15,
+      "sync": "off"
+    },
+    "lfo2": {
+      "target": "NOT",
+      "wave": "sine",
+      "freq": 0,
+      "depth": 0,
+      "sync": "off"
+    },
+    "modEnvelope": {
+      "attack": 0.005,
+      "decay": 0.12,
+      "sustain": 0,
+      "release": 0.1,
+      "target": "off"
+    }
+  },
   "SYNTHPAD_WARM": {
     "masterVolume": 0.9,
     "vco1": {
