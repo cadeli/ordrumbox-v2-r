@@ -44,7 +44,8 @@ pub struct Midi {
     pub track_names: Vec<String>,
 }
 
-/// A note-on with a velocity.
+/// A note-on with a velocity and, when the file pairs it with a note-off,
+/// how long it lasts in ticks (0: no note-off found).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NoteOn {
     pub tick: i64,
@@ -52,6 +53,8 @@ pub struct NoteOn {
     pub note: Option<u8>,
     pub velocity: u8,
     pub track: usize,
+    /// Ticks from the note-on to the matching note-off, 0 without one.
+    pub duration: i64,
 }
 
 fn byte(bytes: &[u8], at: usize) -> Option<u8> {
@@ -191,15 +194,25 @@ impl Midi {
         self.tracks.iter().enumerate().skip(usize::from(self.header.format == 1))
     }
 
-    /// The note-ons with a velocity, of the music tracks.
+    /// The note-ons with a velocity, of the music tracks, each with the
+    /// duration its matching note-off gives (first in first out on its key:
+    /// an off ends the note struck longest ago; no off, no duration).
     pub fn note_ons(&self) -> Vec<NoteOn> {
         let mut notes = Vec::new();
         for (track, events) in self.music_tracks() {
+            // The note-ons of each key still waiting for their note-off.
+            let mut open: Vec<Vec<(usize, i64)>> = vec![Vec::new(); 16 * 128];
             for event in events {
-                if let EventKind::Note { status: 0x90, channel, note, velocity } = event.kind
-                    && velocity > 0
-                {
-                    notes.push(NoteOn { tick: event.tick, channel, note, velocity, track });
+                let EventKind::Note { status, channel, note, velocity } = event.kind else { continue };
+                let Some(note) = note else { continue };
+                let slot = usize::from(channel) * 128 + usize::from(note & 0x7f);
+                let is_off = status == 0x80 || (status == 0x90 && velocity == 0);
+                if status == 0x90 && velocity > 0 {
+                    notes.push(NoteOn { tick: event.tick, channel, note: Some(note), velocity, track, duration: 0 });
+                    open[slot].push((notes.len() - 1, event.tick));
+                } else if is_off && let Some(&(index, on_tick)) = open[slot].first() {
+                    open[slot].remove(0);
+                    notes[index].duration = (event.tick - on_tick).max(0);
                 }
             }
         }

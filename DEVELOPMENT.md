@@ -96,6 +96,11 @@ a meant change of behaviour, and note that change below).
 
 ### Changes of behaviour
 
+A MIDI file's import now reads note lengths: a note lasts until the note-off
+its file pairs it with (first in first out on its key, a velocity-0 note-on
+counts as an off), written as `lengthSteps` to 2 decimals; a note with no
+note-off plays one step, as before. This rewrote `midi_rust.txt` (logic).
+
 The state-variable filter of the synth voice and of the channel strip is now the
 textbook one. Its highpass (and so its notch) used to let some of the bandpass
 through, more of it the higher the cutoff: a highpass now sounds a little thinner
