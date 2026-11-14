@@ -3,7 +3,7 @@
 
 use std::ops::Index;
 
-use super::patch::{Adsr, LfoTarget, SynthLfo};
+use super::patch::{Adsr, LfoTarget, MATRIX_SIZE, MatrixRoute, MatrixSource, SynthLfo};
 use crate::lfo::{self, Wave};
 
 /// A value an LFO can add to.
@@ -58,15 +58,24 @@ impl Index<Slot> for LfoMods {
     }
 }
 
-/// `base` with what the two LFOs add to `slot`.
+/// What modulates a sample: the two LFOs' targets, then the matrix.
+pub(super) type Mods = [LfoMods; 3];
+
+/// `base` with what the LFOs and the matrix add to `slot`.
 #[inline]
-pub(super) fn modulated(mods: &[LfoMods; 2], base: f64, slot: Slot) -> f64 {
-    base + mods[0][slot] + mods[1][slot]
+pub(super) fn modulated(mods: &Mods, base: f64, slot: Slot) -> f64 {
+    base + mods[0][slot] + mods[1][slot] + mods[2][slot]
 }
 
-/// `adsr` with what the two LFOs add to its four `slots`, kept in range.
+/// Whether anything adds to `slot` this sample.
 #[inline]
-pub(super) fn modulated_adsr(mods: &[LfoMods; 2], adsr: Adsr, slots: [Slot; 4]) -> Adsr {
+pub(super) fn is_moved(mods: &Mods, slot: Slot) -> bool {
+    mods[0][slot] != 0.0 || mods[1][slot] != 0.0 || mods[2][slot] != 0.0
+}
+
+/// `adsr` with what the LFOs and the matrix add to its four `slots`, kept in range.
+#[inline]
+pub(super) fn modulated_adsr(mods: &Mods, adsr: Adsr, slots: [Slot; 4]) -> Adsr {
     let [attack, decay, sustain, release] = slots;
     Adsr {
         attack: modulated(mods, adsr.attack, attack).max(0.0),
@@ -100,6 +109,73 @@ impl LfoRoute {
     #[inline]
     pub(super) fn apply(&self, phase: f64, mods: &mut LfoMods) {
         mods.0[self.slot as usize] = lfo::wave(phase, self.wave) * self.depth * self.scale;
+    }
+}
+
+/// The values the sources of the matrix have at one sample.
+#[derive(Debug, Clone, Copy, Default)]
+pub(super) struct SourceValues {
+    pub(super) lfo: [f64; 2],
+    pub(super) envelope: f64,
+    pub(super) mod_envelope: f64,
+    pub(super) velocity: f64,
+    pub(super) key: f64,
+    pub(super) random: f64,
+}
+
+impl SourceValues {
+    #[inline]
+    fn of(&self, source: MatrixSource) -> f64 {
+        match source {
+            MatrixSource::Off => 0.0,
+            MatrixSource::Lfo1 => self.lfo[0],
+            MatrixSource::Lfo2 => self.lfo[1],
+            MatrixSource::Envelope => self.envelope,
+            MatrixSource::ModEnvelope => self.mod_envelope,
+            MatrixSource::Velocity => self.velocity,
+            MatrixSource::Key => self.key,
+            MatrixSource::Random => self.random,
+        }
+    }
+}
+
+/// The matrix of a patch, resolved once per block: the routes that read
+/// something and write somewhere.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct Matrix {
+    routes: [Option<(MatrixSource, Slot, f64)>; MATRIX_SIZE],
+}
+
+impl Matrix {
+    pub(super) fn new(routes: &[MatrixRoute; MATRIX_SIZE]) -> Self {
+        Self {
+            routes: routes.map(|route| {
+                if route.source == MatrixSource::Off || route.amount == 0.0 || route.amount.is_nan() {
+                    return None;
+                }
+                let (slot, scale) = destination(route.target)?;
+                Some((route.source, slot, route.amount.clamp(-1.0, 1.0) * scale))
+            }),
+        }
+    }
+
+    /// Whether a route reads `source`.
+    pub(super) fn reads(&self, source: MatrixSource) -> bool {
+        self.routes.iter().flatten().any(|&(s, ..)| s == source)
+    }
+
+    /// Whether any route is on.
+    pub(super) fn is_empty(&self) -> bool {
+        self.routes.iter().all(Option::is_none)
+    }
+
+    /// Write what the routes add at `values` into `mods`.
+    #[inline]
+    pub(super) fn apply(&self, values: &SourceValues, mods: &mut LfoMods) {
+        mods.0 = [0.0; SLOT_COUNT];
+        for &(source, slot, factor) in self.routes.iter().flatten() {
+            mods.0[slot as usize] += values.of(source) * factor;
+        }
     }
 }
 
@@ -152,7 +228,7 @@ mod tests {
     fn an_lfo_adds_to_its_slot_only() {
         let lfo = SynthLfo { target: LfoTarget::Osc2Octave, wave: Wave::Square, freq: 2.0, depth: 0.5 };
         let route = LfoRoute::new(&lfo, false).unwrap();
-        let mut mods = [LfoMods::default(); 2];
+        let mut mods = [LfoMods::default(); 3];
         // A square starts low: half of an octave down.
         route.apply(0.0, &mut mods[1]);
         assert_eq!(modulated(&mods, 7.0, Slot::Detune2), 7.0 - 600.0);

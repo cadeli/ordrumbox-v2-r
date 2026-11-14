@@ -281,11 +281,15 @@ pub fn build(
             y += (h + 6) * s;
             (plot, rect)
         });
+        let is_matrix = group == "matrix";
+        if is_matrix {
+            y = crate::synth_matrix::push_lines(items, draft, &fields, inner, y, s);
+        }
         // Knobs, in rows.
         let per_row = (inner.w / (KNOB_W * s)).max(1);
         let mut knobs = 0;
         let mut rows = Vec::new();
-        for path in model::fields(draft, group) {
+        for path in model::fields(draft, group).into_iter().filter(|_| !is_matrix) {
             let Some(fi) = fields.iter().position(|f| *f == path) else { continue };
             let id = Some(Id::SynthField(fi as u16));
             let key = path.rsplit('.').next().unwrap_or(&path);
@@ -494,6 +498,33 @@ mod tests {
             groups,
             [("scope", false), ("vco1", false), ("vco2", true), ("vco3", true), ("unison", false), ("fm", false)]
         );
+    }
+
+    #[test]
+    fn the_matrix_card_has_a_line_per_route_and_it_stays_put() {
+        let layout = SynthLayout::new(740, 680, Scale::ONE, 0);
+        let names = ["presets".to_owned()];
+        let rects = |d: &Object| {
+            let built = build(d, &names, "presets", 2, &layout, &|_| None);
+            let card = built.cards.iter().find(|c| c.group == "matrix").expect("the matrix card").rect;
+            let fields: Vec<_> = built
+                .items
+                .iter()
+                .filter(|i| matches!(i.id, Some(Id::SynthField(fi)) if all_fields(d)[usize::from(fi)].starts_with("matrix.")))
+                .map(|i| i.rect)
+                .collect();
+            (card, fields)
+        };
+        let plain = draft();
+        let (card, fields) = rects(&plain);
+        assert_eq!(fields.len(), 3 * model::MATRIX_SIZE);
+        assert!(fields.iter().all(|r| r.x >= card.x && r.x + r.w <= card.x + card.w && r.y + r.h <= card.y + card.h));
+        // A line set changes no place.
+        let mut set = draft();
+        model::set(&mut set, "matrix.source1", Value::from("lfo1"));
+        model::set(&mut set, "matrix.target1", Value::from("filter.freq"));
+        model::set(&mut set, "matrix.amount1", Value::from(-0.7));
+        assert_eq!(rects(&set), (card, fields));
     }
 
     #[test]

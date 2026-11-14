@@ -13,6 +13,7 @@
 
 use std::f64::consts::PI;
 
+use crate::lfo::{self, Wave};
 use crate::slope::{self, FilterMode};
 use crate::svf::{Svf, tap, tap_weights};
 
@@ -26,13 +27,14 @@ mod unison;
 use envelope::{Envelope, FilterEnvelope, Segment};
 use filter::{coefficients, cutoff_coefficient};
 use modulation::{
-    DETUNE_SLOTS, ENV_SLOTS, GAIN_SLOTS, LfoMods, LfoRoute, MOD_ENV_SLOTS, Slot, modulated, modulated_adsr,
+    DETUNE_SLOTS, ENV_SLOTS, GAIN_SLOTS, LfoMods, LfoRoute, MOD_ENV_SLOTS, Matrix, Mods, Slot, SourceValues, is_moved,
+    modulated, modulated_adsr,
 };
 pub use oscillator::FM_DEVIATION;
 use oscillator::{
     NOISE_SEED, SineTable, fm_frequencies, noise_sample, noise_seed, oscillator, sin_lookup, sine_table, xorshift32,
 };
-use patch::{Adsr, ModEnvTarget, SynthPatch};
+use patch::{Adsr, MatrixSource, ModEnvTarget, SynthLfo, SynthPatch};
 pub use unison::MAX_UNISON;
 use unison::{Layer, layers, start_phases, unison_oscillator};
 
@@ -68,6 +70,11 @@ struct Block {
     lfo_steps: [f64; 2],
     /// What the modulation envelope moves; off when it is bypassed or has no depth.
     mod_target: ModEnvTarget,
+    /// Whether the modulation envelope runs: it moves something, or the matrix reads it.
+    runs_mod_env: bool,
+    matrix: Matrix,
+    /// The wave of each LFO the matrix reads; `None` when it is not read, stopped or bypassed.
+    matrix_lfo_waves: [Option<Wave>; 2],
     filter_mode: FilterMode,
     filter_weights: [f64; 3],
     is_steep: bool,
@@ -94,12 +101,24 @@ impl Block {
         let q = clamp(p.filter_q, 0.1, 20.0);
         let has_mod_env = !p.bypass.mod_env && p.mod_env_depth > SILENT;
         let layer_count = p.unison_count.clamp(1, MAX_UNISON);
+        let matrix = Matrix::new(&p.matrix);
+        let lfo_wave = |lfo: &SynthLfo, is_bypassed: bool, source| {
+            (matrix.reads(source) && !is_bypassed && lfo.freq > 0.0).then_some(lfo.wave)
+        };
+        let matrix_lfo_waves = [
+            lfo_wave(&p.lfo1, p.bypass.lfo1, MatrixSource::Lfo1),
+            lfo_wave(&p.lfo2, p.bypass.lfo2, MatrixSource::Lfo2),
+        ];
         Self {
             table: sine_table(),
             sample_rate,
             lfos: [LfoRoute::new(&p.lfo1, p.bypass.lfo1), LfoRoute::new(&p.lfo2, p.bypass.lfo2)],
             lfo_steps: [p.lfo1.freq / sample_rate, p.lfo2.freq / sample_rate],
             mod_target: if has_mod_env { p.mod_env_target } else { ModEnvTarget::Off },
+            runs_mod_env: has_mod_env && p.mod_env_target != ModEnvTarget::Off
+                || matrix.reads(MatrixSource::ModEnvelope) && !p.bypass.mod_env,
+            matrix,
+            matrix_lfo_waves,
             filter_mode: p.filter_type,
             filter_weights: tap_weights(p.filter_type),
             is_steep: slope::is_steep(p.filter_slope),
@@ -132,6 +151,9 @@ pub struct SynthVoice {
     phase: [[f64; MAX_UNISON]; 3],
     osc_cycle: [[f64; MAX_UNISON]; 3],
     rng: u32,
+    /// What the matrix's sources read that a sample does not work out: the
+    /// envelopes' last levels, and the value drawn for the note.
+    sources: SourceValues,
     lfo_phase: [f64; 2],
     lfo_seeded: bool,
     filter: Svf,
@@ -159,6 +181,7 @@ impl Default for SynthVoice {
             phase: [[0.0; MAX_UNISON]; 3],
             osc_cycle: [[0.0; MAX_UNISON]; 3],
             rng: NOISE_SEED,
+            sources: SourceValues::default(),
             lfo_phase: [0.0; 2],
             lfo_seeded: false,
             filter: Svf::default(),
@@ -196,6 +219,12 @@ impl SynthVoice {
             patch: *patch,
             start_time,
             rng: noise_seed(serial),
+            sources: SourceValues {
+                velocity: clamp(patch.note_velocity, 0.0, 1.0),
+                key: clamp(patch.note_key, -1.0, 1.0),
+                random: noise_sample(xorshift32(noise_seed(serial))),
+                ..SourceValues::default()
+            },
             env: Envelope::new(Segment::Attack),
             filter_env: FilterEnvelope::new(Segment::Attack),
             mod_env: Envelope::new(Segment::Attack),
@@ -227,7 +256,8 @@ impl SynthVoice {
         let patch = self.patch;
         let block = Block::new(&patch, f64::from(sample_rate));
         // Each LFO writes its one slot; the others stay 0 for the whole block.
-        let mut mods = [LfoMods::default(); 2];
+        let mut mods = [LfoMods::default(); 3];
+        let has_matrix = !block.matrix.is_empty();
         for (i, (out_left, out_right)) in left.iter_mut().zip(right.iter_mut()).enumerate() {
             let time = (first_frame + i as u64) as f64 / block.sample_rate;
             let t = time - self.start_time;
@@ -235,6 +265,9 @@ impl SynthVoice {
                 continue;
             }
             self.step_lfos(&patch, &block, time, &mut mods);
+            if has_matrix {
+                block.matrix.apply(&self.sources, &mut mods[2]);
+            }
             let y = self.sample(&patch, &block, &mods, time, t);
             *out_left += (y[0] * block.pan_left) as f32;
             *out_right += (y[1] * block.pan_right) as f32;
@@ -246,7 +279,7 @@ impl SynthVoice {
 
     /// Move the LFOs on by a sample and write what they add into `mods`.
     #[inline]
-    fn step_lfos(&mut self, p: &SynthPatch, b: &Block, time: f64, mods: &mut [LfoMods; 2]) {
+    fn step_lfos(&mut self, p: &SynthPatch, b: &Block, time: f64, mods: &mut Mods) {
         if self.lfo_seeded {
             self.lfo_phase[0] += b.lfo_steps[0];
             self.lfo_phase[1] += b.lfo_steps[1];
@@ -255,10 +288,13 @@ impl SynthVoice {
             self.lfo_phase = [time * p.lfo1.freq, time * p.lfo2.freq];
             self.lfo_seeded = true;
         }
-        for ((route, phase), mods) in b.lfos.iter().zip(self.lfo_phase).zip(mods) {
+        for ((route, phase), mods) in b.lfos.iter().zip(self.lfo_phase).zip(mods.iter_mut()) {
             if let Some(route) = route {
                 route.apply(phase, mods);
             }
+        }
+        for ((wave, phase), value) in b.matrix_lfo_waves.iter().zip(self.lfo_phase).zip(&mut self.sources.lfo) {
+            *value = wave.map_or(0.0, |wave| lfo::wave(phase, wave));
         }
     }
 
@@ -270,7 +306,7 @@ impl SynthVoice {
 
     /// The left and right samples at `time`, `t` seconds into the note, before the pan.
     #[inline]
-    fn sample(&mut self, p: &SynthPatch, b: &Block, mods: &[LfoMods; 2], time: f64, t: f64) -> [f64; 2] {
+    fn sample(&mut self, p: &SynthPatch, b: &Block, mods: &Mods, time: f64, t: f64) -> [f64; 2] {
         let env = modulated_adsr(mods, p.envelope, ENV_SLOTS);
         let mod_level = self.mod_env_level(p, b, mods, time, t);
         let filter_env_amount = modulated(mods, p.filter_env_amount, Slot::FilterEnvAmount).max(0.0);
@@ -304,6 +340,9 @@ impl SynthVoice {
         }
         let peak = p.velocity;
         let level = self.env.step(t, env, peak, |norm| peak * norm * norm);
+        if peak > 0.0 {
+            self.sources.envelope = level / peak;
+        }
         let volume = modulated(mods, p.volume, Slot::Volume).max(0.0);
         let gain = (if p.bypass.env { 1.0 } else { level }) * volume;
         [filtered[0] * gain, filtered[1] * gain]
@@ -311,14 +350,16 @@ impl SynthVoice {
 
     /// The level of the modulation envelope (0–1); 0 when it moves nothing.
     #[inline]
-    fn mod_env_level(&mut self, p: &SynthPatch, b: &Block, mods: &[LfoMods; 2], time: f64, t: f64) -> f64 {
-        if b.mod_target == ModEnvTarget::Off {
+    fn mod_env_level(&mut self, p: &SynthPatch, b: &Block, mods: &Mods, time: f64, t: f64) -> f64 {
+        if !b.runs_mod_env {
             return 0.0;
         }
         if self.is_released(time) {
             self.mod_env.release(t);
         }
-        self.mod_env.step(t, modulated_adsr(mods, p.mod_envelope, MOD_ENV_SLOTS), 1.0, |norm| norm)
+        let level = self.mod_env.step(t, modulated_adsr(mods, p.mod_envelope, MOD_ENV_SLOTS), 1.0, |norm| norm);
+        self.sources.mod_envelope = level;
+        level
     }
 
     /// The filter cutoff of this sample, Hz: the patch's, moved by the LFOs
@@ -329,7 +370,7 @@ impl SynthVoice {
         &mut self,
         p: &SynthPatch,
         b: &Block,
-        mods: &[LfoMods; 2],
+        mods: &Mods,
         env: &Adsr,
         filter_env_amount: f64,
         mod_level: f64,
@@ -354,7 +395,7 @@ impl SynthVoice {
         &self,
         p: &SynthPatch,
         b: &Block,
-        mods: &[LfoMods; 2],
+        mods: &Mods,
         gains: &mut [f64; 3],
         mod_level: f64,
         t: f64,
@@ -421,7 +462,7 @@ impl SynthVoice {
         &mut self,
         p: &SynthPatch,
         b: &Block,
-        mods: &[LfoMods; 2],
+        mods: &Mods,
         frequencies: [f64; 3],
         gains: [f64; 3],
     ) -> [f64; 2] {
@@ -469,7 +510,7 @@ impl SynthVoice {
 
     /// The next sample of filtered noise, at its level in the mix.
     #[inline]
-    fn noise(&mut self, p: &SynthPatch, b: &Block, mods: &[LfoMods; 2]) -> f64 {
+    fn noise(&mut self, p: &SynthPatch, b: &Block, mods: &Mods) -> f64 {
         self.rng = xorshift32(self.rng);
         if p.bypass.noise {
             return 0.0;
@@ -491,12 +532,8 @@ impl SynthVoice {
     /// (`is_swept`) for this sample. The right channel has its own filter
     /// when the layers are spread, else it is the left one.
     #[inline]
-    fn filter(&mut self, b: &Block, mods: &[LfoMods; 2], x: [f64; 2], cutoff: f64, is_swept: bool) -> [f64; 2] {
-        let is_modulated = is_swept
-            || mods[0][Slot::Filter] != 0.0
-            || mods[1][Slot::Filter] != 0.0
-            || mods[0][Slot::FilterQ] != 0.0
-            || mods[1][Slot::FilterQ] != 0.0;
+    fn filter(&mut self, b: &Block, mods: &Mods, x: [f64; 2], cutoff: f64, is_swept: bool) -> [f64; 2] {
+        let is_modulated = is_swept || is_moved(mods, Slot::Filter) || is_moved(mods, Slot::FilterQ);
         let (g, k) = if is_modulated {
             let q = clamp(modulated(mods, b.q, Slot::FilterQ), 0.1, 20.0);
             (cutoff_coefficient(cutoff, b.sample_rate), 1.0 / q)
@@ -529,9 +566,8 @@ fn filter_channel(first: &mut Svf, second: &mut Svf, b: &Block, g: f64, k: f64, 
 mod tests {
     use std::f64::consts::TAU;
 
-    use super::patch::SynthBypass;
+    use super::patch::{LfoTarget, MATRIX_SIZE, MatrixRoute, SynthBypass};
     use super::*;
-    use crate::lfo::Wave;
 
     fn render(voice: &mut SynthVoice, frames: usize) -> Vec<f32> {
         let (mut l, mut r) = (vec![0.0; frames], vec![0.0; frames]);
@@ -655,5 +691,54 @@ mod tests {
         };
         assert_eq!(note(3), note(3));
         assert_ne!(note(3), note(4));
+    }
+
+    fn routed(route: MatrixRoute) -> SynthPatch {
+        let mut matrix = [MatrixRoute::default(); MATRIX_SIZE];
+        matrix[3] = route;
+        SynthPatch { osc_gain: [1.0, 0.0, 0.0], matrix, ..SynthPatch::default() }
+    }
+
+    fn peak(out: &[f32]) -> f32 {
+        out.iter().fold(0.0, |peak, s| peak.max(s.abs()))
+    }
+
+    #[test]
+    fn an_empty_matrix_changes_nothing() {
+        let plain = SynthPatch { osc_gain: [1.0, 0.0, 0.0], ..SynthPatch::default() };
+        let silent_routes = routed(MatrixRoute { source: MatrixSource::Lfo1, target: LfoTarget::Volume, amount: 0.0 });
+        assert_eq!(held(plain, 2_000), held(silent_routes, 2_000));
+    }
+
+    #[test]
+    fn velocity_through_the_matrix_sets_the_volume() {
+        let route = |velocity| {
+            let patch = routed(MatrixRoute { source: MatrixSource::Velocity, target: LfoTarget::Volume, amount: -1.0 });
+            // The volume of 1 falls to 1 - velocity.
+            peak(&held(SynthPatch { note_velocity: velocity, ..patch }, 2_000))
+        };
+        assert!(route(0.0) > 0.4, "no velocity leaves the volume");
+        assert!(route(0.9) < route(0.0) * 0.2, "a high velocity takes it down");
+    }
+
+    #[test]
+    fn a_negative_amount_inverts_the_source() {
+        let at = |amount| {
+            let patch = routed(MatrixRoute { source: MatrixSource::Key, target: LfoTarget::Osc1Detune, amount });
+            let mut voice = SynthVoice::default();
+            voice.start(&SynthPatch { note_key: 1.0, ..patch }, 0, 0.0, 1);
+            render(&mut voice, 4_800)
+        };
+        // 100 cents either way from 440 Hz: the two renders cannot be the same.
+        assert_ne!(at(1.0), at(-1.0));
+    }
+
+    #[test]
+    fn the_modulation_envelope_is_read_without_a_target() {
+        let patch = routed(MatrixRoute { source: MatrixSource::ModEnvelope, target: LfoTarget::Volume, amount: -1.0 });
+        let patch = SynthPatch { mod_envelope: Adsr { attack: 0.0, decay: 0.0, sustain: 1.0, release: 0.1 }, ..patch };
+        // The envelope sits at 1 and the volume goes to 0, once the first sample has set it.
+        let out = held(patch, 2_000);
+        assert!(peak(&out[10..]) < 1e-3, "{}", peak(&out[10..]));
     }
 }

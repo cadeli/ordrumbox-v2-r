@@ -3,6 +3,13 @@
 ## Unreleased
 
 ### New
+- **Synth modulation matrix**: a *Matrix* card on the synth editor's MOD tab holds 8 lines, each a source, a
+  target and an amount from -1 to 1 (a negative one inverts the source). The sources are LFO 1 and 2 (at their
+  own rate and wave, whatever they target), the envelope and the mod envelope, the note's velocity and pitch, and a
+  value drawn once per note; the targets are those of an LFO, with the same scale, and a line adds to what the
+  LFOs' own targets add. Choosing a source with no target aims it at the filter, at half. Saved as the preset's
+  `matrix` group (`source1`..`source8`, `target1`..`target8`, `amount1`..`amount8`); MCP: the same paths in
+  `createSynthPreset` and `updateSynthPreset`. A preset without a `matrix` group plays as before.
 - **Synth unison**: a *Unison* card on the synth editor's OSC tab makes each oscillator sound as 1 to 8 detuned
   layers (*Layers*, *detune* in cents, stereo *spread*), each starting at its own phase: a supersaw is one saw
   with 7 layers (the factory preset `SYNTHLEAD_SUPERSAW`). With a spread, the filter runs once per side. A preset

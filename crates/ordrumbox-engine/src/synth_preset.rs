@@ -10,7 +10,9 @@ use ordrumbox_dsp::lfo::Wave;
 use ordrumbox_dsp::slope::FilterMode;
 pub use ordrumbox_dsp::synth::FM_DEVIATION;
 use ordrumbox_dsp::synth::MAX_UNISON;
-use ordrumbox_dsp::synth::patch::{Adsr, LfoTarget, ModEnvTarget, SynthBypass, SynthLfo};
+use ordrumbox_dsp::synth::patch::{
+    Adsr, LfoTarget, MATRIX_SIZE, MatrixRoute, MatrixSource, ModEnvTarget, SynthBypass, SynthLfo,
+};
 
 /// `C3_FREQ`, Hz: the pitch of ratio 1.
 const C3_FREQ: f64 = 130.812_782_650_299_3;
@@ -21,6 +23,8 @@ const MIN_NOTE_RATIO: f64 = 0.0001;
 pub const WAVES: [&str; 5] = ordrumbox_dsp::lfo::WAVE_NAMES;
 /// The filter types, by code (a strip's and a synth voice's filter mode).
 pub const FILTER_TYPES: [&str; 4] = ["lowpass", "highpass", "bandpass", "notch"];
+/// What a line of a preset's `matrix` reads, by code.
+pub const MATRIX_SOURCES: [&str; 8] = ["off", "lfo1", "lfo2", "env", "modEnv", "velocity", "key", "random"];
 const MOD_ENV_TARGETS: [&str; 5] = ["off", "filter", "pitch", "fm", "shape"];
 /// The LFO targets by their name in a preset (two names for the filter envelope amount).
 const LFO_TARGETS: [(&str, LfoTarget); 35] = [
@@ -157,6 +161,19 @@ fn choice<T: Copy + Default>(value: Option<&Value>, names: &[&str], choices: &[T
     names.iter().zip(choices).find(|(n, _)| Some(**n) == name).map_or_else(T::default, |(_, choice)| *choice)
 }
 
+/// The routes of a preset's `matrix` group: line `n` (1 to [`MATRIX_SIZE`])
+/// is its `source<n>`, `target<n>` and `amount<n>`; a line missing is empty.
+fn matrix(group: Option<&Value>) -> [MatrixRoute; MATRIX_SIZE] {
+    std::array::from_fn(|i| {
+        let key = |name: &str| format!("{name}{}", i + 1);
+        MatrixRoute {
+            source: choice(get(group, &key("source")), &MATRIX_SOURCES, &MatrixSource::ALL),
+            target: lfo_target(get(group, &key("target"))),
+            amount: clamp(finite(get(group, &key("amount")), 0.0), -1.0, 1.0),
+        }
+    })
+}
+
 fn lfo_target(value: Option<&Value>) -> LfoTarget {
     let name = value.and_then(Value::as_str);
     LFO_TARGETS.iter().find(|(n, _)| Some(*n) == name).map_or(LfoTarget::Off, |&(_, target)| target)
@@ -273,6 +290,10 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
         unison_count: unison_count(get(unison, "count")),
         unison_detune: clamp(finite(get(unison, "detune"), 0.0), 0.0, 100.0),
         unison_spread: clamp(finite(get(unison, "spread"), 0.0), 0.0, 1.0),
+        matrix: matrix(at("matrix")),
+        note_velocity: clamp(finite(Some(&Value::Number(note.velocity)), 0.0), 0.0, 1.0),
+        // Two octaves each way fill the source: ratio 1 is C3.
+        note_key: clamp(note_ratio.log2() / 2.0, -1.0, 1.0),
         bypass: SynthBypass {
             noise: flag("bypassNoise"),
             filter: flag("bypassFilter"),
@@ -361,5 +382,21 @@ mod tests {
         assert_eq!((patch.lfo1.target, patch.lfo1.wave, patch.lfo1.freq), (LfoTarget::FilterQ, Wave::Random, 3.0));
         assert_eq!(patch.lfo2.target, LfoTarget::Off);
         assert_eq!(note_seconds(120.0, 4), 0.125);
+    }
+
+    #[test]
+    fn a_matrix_is_read_line_by_line() {
+        let preset = r#"{"matrix":{"source2":"lfo2","target2":"filter.freq","amount2":0.5,
+            "source3":"nope","target3":"nope","amount3":9,"amount4":"-0.25"}}"#;
+        let note = SynthNote { ratio: 4.0, velocity: 0.5, pan: 0.0, bpm: 120.0 };
+        let patch = synth_patch(&json::parse(preset).unwrap(), note);
+        let mut routes = [MatrixRoute::default(); MATRIX_SIZE];
+        routes[1] = MatrixRoute { source: MatrixSource::Lfo2, target: LfoTarget::FilterFreq, amount: 0.5 };
+        // A name that is none leaves a line empty, and an amount stays in range.
+        routes[2].amount = 1.0;
+        routes[3].amount = -0.25;
+        assert_eq!(patch.matrix, routes);
+        // Two octaves up is the end of the key source.
+        assert_eq!((patch.note_key, patch.note_velocity), (1.0, 0.5));
     }
 }

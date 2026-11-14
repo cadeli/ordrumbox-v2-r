@@ -118,6 +118,53 @@ impl ModEnvTarget {
     }
 }
 
+/// What a matrix route reads: a value that moves while a note plays, or is
+/// fixed by it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum MatrixSource {
+    /// The route is empty.
+    #[default]
+    Off,
+    /// LFO 1 and 2 at their own rate and wave, from -1 to 1, whatever they target.
+    Lfo1,
+    Lfo2,
+    /// The amplitude envelope, 0 to 1 (as it stood one sample ago).
+    Envelope,
+    /// The modulation envelope, 0 to 1 (as it stood one sample ago).
+    ModEnvelope,
+    /// The note's velocity, 0 to 1.
+    Velocity,
+    /// The note's pitch around C3, -1 to 1 over two octaves down and up.
+    Key,
+    /// A value drawn once per note, -1 to 1.
+    Random,
+}
+
+impl MatrixSource {
+    /// Every source, each at its code.
+    pub const ALL: [Self; 8] =
+        [Self::Off, Self::Lfo1, Self::Lfo2, Self::Envelope, Self::ModEnvelope, Self::Velocity, Self::Key, Self::Random];
+
+    /// Its code: its place in [`Self::ALL`].
+    #[must_use]
+    pub const fn code(self) -> u8 {
+        self as u8
+    }
+}
+
+/// Routes of a patch's modulation matrix.
+pub const MATRIX_SIZE: usize = 8;
+
+/// One line of the matrix: `source`, times `amount`, times what one unit is
+/// worth on `target`, is added to the target's value, every sample.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct MatrixRoute {
+    pub source: MatrixSource,
+    pub target: LfoTarget,
+    /// From -1 to 1.
+    pub amount: f64,
+}
+
 /// One LFO of a patch.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct SynthLfo {
@@ -194,6 +241,12 @@ pub struct SynthPatch {
     pub unison_detune: f64,
     /// How far the layers spread over the stereo field, 0–1.
     pub unison_spread: f64,
+    /// The modulation matrix, on top of the LFOs' own targets.
+    pub matrix: [MatrixRoute; MATRIX_SIZE],
+    /// The note's velocity before the patch's levels, 0–1: [`MatrixSource::Velocity`].
+    pub note_velocity: f64,
+    /// The note's pitch from C3 in octaves, -1 to 1: [`MatrixSource::Key`].
+    pub note_key: f64,
 }
 
 impl Default for SynthPatch {
@@ -231,6 +284,9 @@ impl Default for SynthPatch {
             unison_count: 1,
             unison_detune: 0.0,
             unison_spread: 0.0,
+            matrix: [MatrixRoute::default(); MATRIX_SIZE],
+            note_velocity: 0.8,
+            note_key: 0.0,
         }
     }
 }
@@ -243,6 +299,9 @@ mod tests {
     fn every_target_sits_at_its_code() {
         for (code, target) in LfoTarget::ALL.iter().enumerate() {
             assert_eq!(usize::from(target.code()), code);
+        }
+        for (code, source) in MatrixSource::ALL.iter().enumerate() {
+            assert_eq!(usize::from(source.code()), code);
         }
         for (code, target) in ModEnvTarget::ALL.iter().enumerate() {
             assert_eq!(usize::from(target.code()), code);
