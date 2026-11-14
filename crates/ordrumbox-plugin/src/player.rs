@@ -132,7 +132,11 @@ impl Player {
         if let Some(program) = host.program {
             // Refused or not (the message says so), it replaces a refused
             // parameter value, as a choice in the window does.
-            session.host_select_pattern(program);
+            if host.now {
+                session.select_pattern_now(program);
+            } else {
+                session.host_select_pattern(program);
+            }
             self.pattern.refused = false;
             self.redraw = true;
         }
@@ -242,7 +246,8 @@ impl Ticker {
             while !stopped.load(Ordering::Acquire) {
                 let asked = steps.wait(TICK_INTERVAL);
                 let mut player = lock(&player);
-                let host = HostControls { program: params.midi_program.take(), ..params.controls() };
+                let (program, now) = params.midi_program.take().unzip();
+                let host = HostControls { program, now: now.unwrap_or(false), ..params.controls() };
                 player.tick(&params.library, host, &params.names);
                 player.report_late(steps.take_late());
                 drop(player);
@@ -273,7 +278,8 @@ mod tests {
     use super::*;
     use crate::state::LibraryText;
 
-    const FIRST: HostControls = HostControls { program: None, pattern: 0, kit: 0, muted: 0, swing: STRAIGHT_SWING };
+    const FIRST: HostControls =
+        HostControls { program: None, now: false, pattern: 0, kit: 0, muted: 0, swing: STRAIGHT_SWING };
 
     fn audio(started: Started) -> Box<AudioSide> {
         match started {
@@ -429,6 +435,18 @@ mod tests {
         player.tick(&state, HostControls { program: Some(5), ..FIRST }, &names);
         assert_eq!(shown(&mut player), Some(1));
         assert_eq!(player.ui().unwrap().session.message(), "host: no pattern 6 (the library has 2)");
+    }
+
+    #[test]
+    fn a_note_on_the_pattern_channel_chooses_the_pattern_at_once() {
+        let state = Arc::new(LibraryState::default());
+        let mut player = Player::default();
+        let text = r#"{"patterns":[{"name":"a","tracks":[]},{"name":"b","tracks":[]}]}"#;
+        state.set(LibraryText(text.into()));
+        let _audio = audio(player.start(48_000.0, &state));
+        player.tick(&state, FIRST, &Names::default());
+        player.tick(&state, HostControls { program: Some(1), now: true, ..FIRST }, &Names::default());
+        assert_eq!(player.ui().map(|ui| ui.session.pattern_index()), Some(1));
     }
 
     #[test]

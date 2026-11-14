@@ -11,6 +11,7 @@ pub mod editor;
 pub mod generate;
 pub mod history;
 pub mod midi;
+pub mod quantize;
 pub mod roll_block;
 pub mod tools;
 

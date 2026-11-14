@@ -25,6 +25,8 @@ pub struct NoteOn {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Event {
     Note(NoteOn),
+    /// A note on the pattern channel: the pattern (from 0) it chooses.
+    Pattern(usize),
     /// A control change: the value (0–127) of a controller on a channel.
     Control {
         channel: u8,
@@ -149,9 +151,12 @@ pub fn open(choice: &MidiPort, ui: Sender<Event>, waker: Waker) -> Result<Option
             move |_, message, ()| {
                 let event = match ClockMessage::parse(message) {
                     Some(clock) => crate::midi_sync::input(clock).map(Event::Clock),
-                    None => note_on(message).map(|note| {
-                        NOTES.push(note);
-                        Event::Note(note)
+                    None => note_on(message).map(|note| match ordrumbox_engine::pattern_key(note.channel, note.key) {
+                        Some(pattern) => Event::Pattern(pattern),
+                        None => {
+                            NOTES.push(note);
+                            Event::Note(note)
+                        }
                     }),
                 }
                 .or_else(|| control(message));

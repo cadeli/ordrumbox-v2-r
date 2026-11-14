@@ -125,6 +125,10 @@ impl App {
                     self.ui.session.midi_note(note.channel, note.key, note.velocity);
                     true
                 }
+                midi::Event::Pattern(index) => {
+                    self.ui.session.select_pattern_now(index);
+                    true
+                }
                 midi::Event::Control { channel, controller, value } => {
                     self.ui.session.midi_control(channel, controller, value)
                 }

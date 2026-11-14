@@ -95,6 +95,18 @@ impl Playback {
         }
     }
 
+    /// Pattern `index` plays now, if a pattern plays: its pass starts over.
+    pub(super) fn restart_pattern(&mut self, editor: &Editor, index: usize) {
+        let Some(controller) = &mut self.controller else { return };
+        controller.select_pattern(index);
+        if let (true, Mode::Pattern(_), Some(at)) = (controller.is_playing(), controller.mode(), controller.position())
+        {
+            self.upcoming_loop = None;
+            controller.jump(editor.library(), at.pass);
+            self.played_revision = editor.revision();
+        }
+    }
+
     /// The live mix a MIDI controller's knobs make.
     pub(super) fn set_live_mix(&mut self, mix: HostMix) {
         if let Some(controller) = &mut self.controller {

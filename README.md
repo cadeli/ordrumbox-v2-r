@@ -102,13 +102,19 @@ keeps every track in the mix, whatever the parameter says; tracks past the 16th 
 MIDI goes both ways, with one place per track of the pattern playing (or selected):
 a drum track is on channel 10 at its instrument's GM key (KICK 36, SNARE 38…), whatever
 the note's pitch. Any other track (melodic, unknown name, a second track of one drum) has a
-channel of its own (1–9, 11–16, in track order), its notes on the key of their pitch: the
-track's pitch 0 is its sample's root note, C3 (48) without one and for a synth. Past the 15
+channel of its own (1–9, 11–15, in track order), its notes on the key of their pitch: the
+track's pitch 0 is its sample's root note, C3 (48) without one and for a synth. Past the 14
 channels, the tracks left take keys of channel 10 from 84 up.
 
 - **In**: a note on a track's channel plays that track at the note's pitch; a note on any
   other channel plays the drum track with that key. At its velocity, whether the host plays
   or not.
+- **Pattern by note** (in, the app too): a note on channel 16 chooses a pattern: key 0 (C-2,
+  or C-1 by the keyboard's naming) is pattern 1, key 1 pattern 2… up to 128. It applies at
+  once: a pattern playing is left for the new one from its first beat (a plugin keeps to the
+  host's place in the pass). No track is on channel 16, so the melodic tracks use channels
+  1–9 and 11–15, and the tracks left past them take keys of channel 10. A pattern the library
+  does not have is refused, and the status line says so.
 - **Program change** (in): program 1–128, on any channel, chooses pattern 1–128, as the
   **Pattern** parameter does: shown at once, played once the pattern playing ends its loop.
   A program the library has no pattern for is refused, and the status line says so. The
@@ -177,6 +183,12 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
 - **Ctrl A**: select the whole pattern as a zone. **Shift + arrows** grow a zone from the
   cursor, **Ctrl + click** on a step takes it into the zone (it stays a rectangle); copy,
   cut and delete then act on it.
+- **Edit > Quantize...** moves notes towards the lines of a grid (1/4, 1/8, 1/16 or 1/32 of a
+  note) by a strength of 25, 50, 75 or 100 %. It takes the zone selected, else the track under
+  the cursor, else the whole pattern. At 100 % on the track's own grid it takes the shift off
+  notes recorded with *Record off the grid*; a coarser grid also moves their steps (a step
+  halfway between two lines goes to the later one); a lower strength keeps what is left as a
+  shift. A note pushed past the pattern's end or start wraps round it. One undo step.
 - **Alt + arrows** on a selected note in the grid: up / down a semitone of pitch, left /
   right one step in time (in the piano roll, **Shift + arrows**, and its drag follows the
   same axes: up / down the pitch, sideways the velocity).

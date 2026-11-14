@@ -245,3 +245,53 @@ fn the_preferences_list_the_devices_and_ports_the_program_offers() {
     }
     s.overlay_key(OverlayKey::Escape);
 }
+
+#[test]
+fn a_midi_note_on_the_pattern_channel_leaves_the_pattern_playing_for_the_chosen_one_at_once() {
+    let (mut s, mut audio) = session(
+        r#"{"patterns":[{"name":"a","bpm":120,"tracks":[{"name":"KICK","notes":[{}]}]},
+            {"name":"b","bpm":120,"beatCount":2,"tracks":[{"name":"KICK","notes":[{}]}]}]}"#,
+    );
+    s.toggle_play();
+    run(&mut s, &mut audio, 3000);
+    super::assert_pass_frames(&s, 4.0, 120.0);
+    assert!(s.select_pattern_now(1));
+    run(&mut s, &mut audio, CALLBACK * 2);
+    assert!(s.playing());
+    assert_eq!(s.pattern_index, 1);
+    super::assert_pass_frames(&s, 2.0, 120.0);
+    assert!(!s.select_pattern_now(9), "no such pattern");
+    assert!(s.message.contains("no pattern 10"), "{}", s.message);
+    assert_eq!(s.pattern_index, 1);
+}
+
+#[test]
+fn quantize_takes_the_shift_off_the_notes_of_the_zone_or_track_and_undo_puts_it_back() {
+    use crate::session::OverlayKey;
+    let (mut s, _audio) = session(
+        r#"{"patterns":[{"name":"p","bpm":120,"tracks":[
+            {"name":"KICK","notes":[{"step":1,"shiftSteps":0.3},{"beat":1,"shiftSteps":-0.4}]},
+            {"name":"SNARE","notes":[{"step":2,"shiftSteps":0.2}]}]}]}"#,
+    );
+    let shifts = |s: &Session, t: usize| -> Vec<f64> {
+        s.pattern().unwrap().tracks[t].notes.iter().map(|n| n.shift_steps).collect()
+    };
+    // No cursor, no zone: the pattern. Half the way first: Strength is the second line.
+    s.run(Command::Quantize);
+    s.overlay_key(OverlayKey::Move(1));
+    s.overlay_key(OverlayKey::Side(-1));
+    s.overlay_key(OverlayKey::Move(1));
+    s.overlay_key(OverlayKey::Enter);
+    assert!(!s.overlay_open());
+    assert!(s.message.contains("at 75%"), "{}", s.message);
+    assert_eq!(shifts(&s, 1), [0.05]);
+    // Then all the way, on the cursor's track only.
+    s.selection.put_cursor(crate::view::Cursor { track: 0, beat: 0, step: 0 });
+    s.run(Command::Quantize);
+    s.overlay_key(OverlayKey::Move(2));
+    s.overlay_key(OverlayKey::Enter);
+    assert_eq!(shifts(&s, 0), [0.0, 0.0]);
+    assert_eq!(shifts(&s, 1), [0.05], "the other track is left");
+    s.undo();
+    assert_eq!(shifts(&s, 0), [0.07, -0.1]);
+}

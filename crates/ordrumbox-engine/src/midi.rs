@@ -3,7 +3,7 @@
 //! at its instrument's GM key, whatever the note's pitch. Any other track
 //! (melodic, unknown names, a second track of one drum) has a channel of its
 //! own, its notes on the key of their pitch: the track's pitch 0 is the
-//! sample's root note (C3 without one, and for a synth). Past the 15 channels,
+//! sample's root note (C3 without one, and for a synth). Past the 14 channels,
 //! the tracks left take spare keys of the drum channel, from
 //! [`FIRST_SPARE_KEY`] up.
 //!
@@ -20,8 +20,11 @@ pub const KEY_COUNT: usize = 128;
 pub const CHANNEL_COUNT: usize = 16;
 /// The GM drum channel (channel 10).
 pub const DRUM_CHANNEL: u8 = 9;
-/// The channels given to tracks that are not drums: all 16 but the drums'.
-const MELODIC_CHANNELS: [u8; 15] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15];
+/// The channel whose notes choose the pattern (channel 16): key 0 is the
+/// first pattern, key 1 the second... No track is on it.
+pub const PATTERN_CHANNEL: u8 = 15;
+/// The channels given to tracks that are not drums: all 16 but the drums' and the patterns'.
+const MELODIC_CHANNELS: [u8; 14] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14];
 /// The first drum-channel key given to a track with no GM drum key and no
 /// channel left: above the GM drum keys (35–81), so that none takes the place of a drum.
 pub const FIRST_SPARE_KEY: u8 = 84;
@@ -142,6 +145,12 @@ impl KeyMap {
         }
         self.drums.get(usize::from(key)).copied().flatten().map(|event| (event, 1.0))
     }
+}
+
+/// The pattern (from 0) a note on `channel` at `key` chooses, if it is on the pattern channel.
+#[must_use]
+pub fn pattern_key(channel: u8, key: u8) -> Option<usize> {
+    (channel == PATTERN_CHANNEL).then_some(usize::from(key))
 }
 
 /// A note sent out, at an engine clock frame.

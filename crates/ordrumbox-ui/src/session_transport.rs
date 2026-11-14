@@ -172,6 +172,17 @@ impl Session {
         true
     }
 
+    /// Pattern `index` (from 0) chosen by a MIDI note: as [`Self::host_select_pattern`],
+    /// and a pattern playing is left at once for the new one, from its first
+    /// beat (under a plugin host, from the host's place in the pass).
+    pub fn select_pattern_now(&mut self, index: usize) -> bool {
+        let chosen = self.host_select_pattern(index);
+        if chosen {
+            self.playback.restart_pattern(&self.editor, index);
+        }
+        chosen
+    }
+
     /// Kit `index` (from 0) used, as a plugin host's parameter asks. False,
     /// with a message, when there is no such kit.
     pub fn host_select_kit(&mut self, index: usize) -> bool {
