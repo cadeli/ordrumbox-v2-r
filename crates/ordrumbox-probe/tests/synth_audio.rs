@@ -567,3 +567,63 @@ fn an_exported_pattern_plays_its_notes_at_their_pitch_and_time() {
     let silence = analyze(&beat(3));
     assert!(silence.rms_db < levels[0] - 40.0, "{} dB after the notes, {} during", silence.rms_db, levels[0]);
 }
+
+// ─── The presets that use the matrix ─────────────────────────────────────────
+
+const MATRIX_PRESETS: [&str; 4] = ["BASS_TOUCH", "BASS_WOBBLE", "SYNTHPAD_DRIFT", "PIANO_KEYBELL"];
+
+/// A factory preset, its matrix emptied when `without_matrix`.
+fn preset_of(key: &str, without_matrix: bool) -> Value {
+    let mut preset = factory_presets().get(key).unwrap().clone();
+    if without_matrix {
+        preset.as_object_mut().unwrap().remove("matrix");
+    }
+    preset
+}
+
+/// The share of a steady note's energy above 800 Hz.
+fn brightness(preset: &Value, velocity: f64) -> f64 {
+    let note = render(preset, &at(0.5, velocity, GATE));
+    let samples: Vec<f64> = note.left.iter().map(|&s| f64::from(s)).collect();
+    let power = spectrum(&samples);
+    let from = (800.0 * WINDOW as f64 / RATE) as usize;
+    power[from..].iter().sum::<f64>() / power.iter().sum::<f64>()
+}
+
+#[test]
+fn the_matrix_presets_sound_unlike_themselves_without_the_matrix() {
+    for key in MATRIX_PRESETS {
+        let with = render(&preset_of(key, false), &at(1.0, 0.8, GATE));
+        let without = render(&preset_of(key, true), &at(1.0, 0.8, GATE));
+        let (a, b): (Vec<f64>, Vec<f64>) =
+            (with.left.iter().map(|&s| f64::from(s)).collect(), without.left.iter().map(|&s| f64::from(s)).collect());
+        let alike = correlation(&a, &b);
+        assert!(alike < 0.995, "{key}: the matrix changes nothing (correlation {alike})");
+    }
+}
+
+#[test]
+fn a_touch_sensitive_bass_is_brighter_when_hit_harder() {
+    let preset = preset_of("BASS_TOUCH", false);
+    let (soft, hard) = (brightness(&preset, 0.3), brightness(&preset, 1.0));
+    assert!(hard > soft * 1.5, "soft {soft:.4}, hard {hard:.4}");
+    // Without the matrix the velocity only sets the level.
+    let flat = preset_of("BASS_TOUCH", true);
+    let (soft, hard) = (brightness(&flat, 0.3), brightness(&flat, 1.0));
+    assert!((hard / soft - 1.0).abs() < 0.2, "soft {soft:.4}, hard {hard:.4}");
+}
+
+#[test]
+fn a_drifting_pad_is_not_the_same_on_every_note() {
+    let preset = preset_of("SYNTHPAD_DRIFT", false);
+    let note = |serial: u64| {
+        let mut voice = SynthVoice::default();
+        let note = SynthNote { ratio: 1.0, velocity: 0.8, pan: 0.0, bpm: 120.0 };
+        voice.start(&synth_patch(&preset, note), 0, 0.0, serial);
+        let (mut left, mut right) = (vec![0.0f32; 24_000], vec![0.0f32; 24_000]);
+        voice.render(RATE as f32, 0, &mut left, &mut right);
+        left.iter().map(|&s| f64::from(s)).collect::<Vec<f64>>()
+    };
+    assert!(correlation(&note(1), &note(2)) < 0.999, "two notes are alike");
+    assert_eq!(note(1), note(1), "a note is not the same twice");
+}

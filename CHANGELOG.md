@@ -10,6 +10,9 @@
   LFOs' own targets add. Choosing a source with no target aims it at the filter, at half. Saved as the preset's
   `matrix` group (`source1`..`source8`, `target1`..`target8`, `amount1`..`amount8`); MCP: the same paths in
   `createSynthPreset` and `updateSynthPreset`. A preset without a `matrix` group plays as before.
+- **Four factory presets that use the matrix**: `BASS_TOUCH` (velocity opens the filter and adds drive),
+  `BASS_WOBBLE` (one LFO on cutoff and detune), `SYNTHPAD_DRIFT` (a random draw per note) and `PIANO_KEYBELL` (FM
+  that follows velocity, pitch and the modulation envelope).
 - **Synth unison**: a *Unison* card on the synth editor's OSC tab makes each oscillator sound as 1 to 8 detuned
   layers (*Layers*, *detune* in cents, stereo *spread*), each starting at its own phase: a supersaw is one saw
   with 7 layers (the factory preset `SYNTHLEAD_SUPERSAW`). With a spread, the filter runs once per side. A preset

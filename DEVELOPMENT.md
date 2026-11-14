@@ -113,6 +113,10 @@ The synth editor has a `matrix` group (`source1`..`source8`, `target1`..`target8
 Matrix card. This rewrote `synth_editor_rust.txt` (engine); the audio renders are unchanged,
 a preset whose lines are all `off` adds nothing to any control.
 
+Four factory presets use the matrix (`BASS_TOUCH`, `BASS_WOBBLE`, `SYNTHPAD_DRIFT`, `PIANO_KEYBELL`). They
+sort last in their families, so the auto-assign picks them as the last candidate of `BASS`, `SYNTHPAD`
+and `PIANO` tracks: those rows of `assign_tests/data.rs` were rewritten.
+
 The synth editor has a `unison` group (`count`, `detune`, `spread`) in its defaults, so a
 hydrated preset holds it and the OSC tab has a Unison card. This rewrote
 `synth_editor_rust.txt` (engine); the audio renders are unchanged, a preset without the
