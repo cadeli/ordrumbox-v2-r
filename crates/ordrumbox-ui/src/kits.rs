@@ -26,6 +26,9 @@ use crate::store;
 pub const GAIN_RANGE: (f64, f64) = (-24.0, 6.0);
 pub const TRANSPOSE_RANGE: (f64, f64) = (-12.0, 12.0);
 pub const DECAY_RANGE: (f64, f64) = (20.0, 5000.0);
+/// Longest attack and hold a knob sets, ms.
+pub const ATTACK_RANGE: (f64, f64) = (0.0, 500.0);
+pub const HOLD_RANGE: (f64, f64) = (0.0, 2000.0);
 
 /// What a kit knob changes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -33,6 +36,15 @@ pub enum Field {
     Gain,
     Transpose,
     Decay,
+    /// Where reading starts and ends, ms into the sample.
+    Start,
+    End,
+    Attack,
+    Hold,
+    /// On / off, set to 1 or 0.
+    Reverse,
+    Loop,
+    Gate,
 }
 
 /// The kits, the decoded audio of their samples, and where they are saved.
@@ -177,8 +189,9 @@ impl KitSet {
         self.kits.iter().enumerate().find_map(|(k, kit)| Some((k, kit.samples.iter().position(|i| i.path == url)?)))
     }
 
-    /// Set gain (dB), tune (semitones) or decay (ms) of a sample, from a
-    /// knob; the message when it changed.
+    /// Set gain (dB), tune (semitones), decay, start, end, attack or hold (ms)
+    /// of a sample, from a knob, or its reverse or loop switch (1 or 0); the
+    /// message when it changed.
     pub fn set_value(&mut self, kit: usize, sample: usize, field: Field, value: f64) -> Option<String> {
         let instrument = self.kits.get_mut(kit)?.samples.get_mut(sample)?;
         let name = instrument.display_name.clone();
@@ -194,6 +207,34 @@ impl KitSet {
             Field::Decay if Some(value) != instrument.decay => {
                 instrument.decay = Some(value);
                 Some(format!("{name}: decay {value} ms"))
+            }
+            Field::Start if value != instrument.start => {
+                instrument.start = value;
+                Some(format!("{name}: start {value} ms"))
+            }
+            Field::End if Some(value) != instrument.end => {
+                instrument.end = Some(value);
+                Some(format!("{name}: end {value} ms"))
+            }
+            Field::Attack if Some(value) != instrument.attack => {
+                instrument.attack = Some(value);
+                Some(format!("{name}: attack {value} ms"))
+            }
+            Field::Hold if value != instrument.hold => {
+                instrument.hold = value;
+                Some(format!("{name}: hold {value} ms"))
+            }
+            Field::Reverse if (value >= 0.5) != instrument.reverse => {
+                instrument.reverse = value >= 0.5;
+                Some(format!("{name}: reverse {}", if instrument.reverse { "on" } else { "off" }))
+            }
+            Field::Gate if (value >= 0.5) != instrument.gated => {
+                instrument.gated = value >= 0.5;
+                Some(format!("{name}: follow note length {}", if instrument.gated { "on" } else { "off" }))
+            }
+            Field::Loop if (value >= 0.5) != instrument.looping => {
+                instrument.looping = value >= 0.5;
+                Some(format!("{name}: loop {}", if instrument.looping { "on" } else { "off" }))
             }
             _ => None,
         }

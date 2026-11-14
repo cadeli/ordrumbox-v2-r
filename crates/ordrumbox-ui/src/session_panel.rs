@@ -344,9 +344,12 @@ pub(super) fn control_name(id: Id) -> (&'static str, &'static str) {
                 .unwrap_or("");
             (label, "")
         }
-        Id::KitKnob(field) => {
-            KIT_KNOBS.iter().find(|(f, ..)| *f == field).map_or(("", ""), |(_, p, u, _)| (p.label, *u))
-        }
+        Id::KitKnob(field) | Id::SampleKnob(field) => KIT_KNOBS
+            .iter()
+            .find(|(f, ..)| *f == field)
+            .map(|(_, p, u, _)| (p.label, *u))
+            .or_else(|| editors::SHAPE_KNOBS.iter().find(|(f, ..)| *f == field).map(|(_, label, _)| (*label, "ms")))
+            .unwrap_or(("", "")),
         Id::TrackSelect("autoVariant") => ("Variant", ""),
         Id::TrackSelect(key) => (editors::fx_label(key), ""),
         Id::Toggle("mono") => ("Mono", ""),

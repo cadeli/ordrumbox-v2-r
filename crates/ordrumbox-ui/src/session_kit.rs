@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::canvas::{chars_in, text_width};
-use crate::editors::Choice;
+use crate::editors::{Choice, Overlay, Shape};
 use crate::panel::{self, Item, Kind, Rect};
 use crate::song_view;
 use crate::view::KitLayout;
@@ -289,8 +289,8 @@ impl Session {
             .filter(|(url, _)| selected.is_some_and(|i| i.path == *url))
             .map(|(_, a)| a);
         let facts = kit_facts(selected, self.kit_editor.files.1.as_deref(), analysis);
-        let decay_marker = match (selected, analysis) {
-            (Some(i), Some(a)) if a.duration_sec > 0.0 => Some((i.decay_ms() / 1000.0 / a.duration_sec).min(1.0)),
+        let overlay = match (selected, analysis) {
+            (Some(i), Some(a)) => Overlay::new(&Shape::of(i, a.duration_sec * 1000.0)),
             _ => None,
         };
         // Which tracks of the pattern play each sample.
@@ -311,7 +311,7 @@ impl Session {
             details_top,
             facts,
             envelope: analysis.map_or(&[][..], |a| &a.envelope),
-            decay_marker,
+            overlay,
         })
     }
 }
@@ -403,7 +403,7 @@ fn instrument_choice(key: &str) -> Choice {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::kits::KitSet;
+    use crate::kits::{Field, KitSet};
     use ordrumbox_core::Library;
     use ordrumbox_engine::kit::{BankSample, Kit};
     use ordrumbox_engine::{SampleBank, SampleBuffer};
@@ -448,6 +448,35 @@ mod tests {
         let d = s.chrome.widgets.dropdown.as_ref().expect("a menu");
         let i = d.labels.iter().position(|l| l == label).unwrap_or_else(|| panic!("{label} in {:?}", d.labels));
         s.pick(i);
+    }
+
+    #[test]
+    fn the_playback_controls_set_the_samples_start_reverse_and_loop() {
+        let mut s = session();
+        s.set_value(Id::KitKnob(Field::Start), 20.0);
+        s.set_value(Id::KitKnob(Field::Hold), 50.0);
+        s.activate(Id::KitToggle(Field::Reverse));
+        s.activate(Id::KitToggle(Field::Loop));
+        let sample = s.kits.sample(0, 0).unwrap();
+        assert_eq!((sample.start, sample.hold, sample.reverse, sample.looping), (20.0, 50.0, true, true));
+        s.activate(Id::KitToggle(Field::Loop));
+        assert!(!s.kits.sample(0, 0).unwrap().looping, "a second click turns it off");
+        // The track editor's controls act on the same sample.
+        s.set_value(Id::SampleKnob(Field::Attack), 30.0);
+        assert_eq!(s.kits.sample(0, 0).unwrap().attack, Some(30.0));
+    }
+
+    #[test]
+    fn the_controls_leave_the_envelope_room_at_every_scale() {
+        for quarters in 4..=Scale::MAX.quarters() {
+            let scale = Scale::from_quarters(quarters);
+            let mut s = session();
+            let (w, h) = view::min_window_size(scale, view::Shown::all(false));
+            s.set_size((w, h, scale));
+            let layout = s.panel_layout(w, h, scale);
+            let room = view::KitLayout::new(w, h, scale, 1).envelope_rect(layout.details_top).h;
+            assert!(room >= 8 * scale, "scale {scale}: {room} px left for the envelope");
+        }
     }
 
     #[test]

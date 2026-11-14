@@ -5,12 +5,14 @@ use std::sync::Arc;
 
 use ordrumbox_core::Issue;
 use ordrumbox_core::json::{Object, Value};
-use ordrumbox_dsp::SampleBuffer;
+use ordrumbox_dsp::{SampleBuffer, SampleShape};
 
 use crate::wav;
 
 /// Decay used when a kit gives none, ms.
 pub const DEFAULT_DECAY_MS: f64 = 500.0;
+/// Attack used when a kit gives none, ms.
+pub const DEFAULT_ATTACK_MS: f64 = 5.0;
 
 /// One sample of a kit, as listed in drumkits.json.
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -28,6 +30,20 @@ pub struct KitSample {
     pub root_midi: Option<f64>,
     /// Peak level the kit measured, dB (`peakDb`), kept as written.
     pub peak_db: Option<f64>,
+    /// Where reading starts, ms into the sample.
+    pub start: f64,
+    /// Where reading ends, ms into the sample, when the kit sets one: else the sample's end.
+    pub end: Option<f64>,
+    /// Read the region backwards.
+    pub reverse: bool,
+    /// Read the region over and over until the decay ends it (`loop`).
+    pub looping: bool,
+    /// Attack, ms, when the kit sets one (see [`KitSample::attack_ms`]).
+    pub attack: Option<f64>,
+    /// Time kept at the peak before the decay, ms.
+    pub hold: f64,
+    /// Hold the peak until the note ends, the decay then being its release (`gate`).
+    pub gated: bool,
     /// Gain trim, dB (`gainDb`).
     pub gain_db: f64,
     /// Transposition, semitones.
@@ -42,6 +58,24 @@ impl KitSample {
         self.decay.unwrap_or(DEFAULT_DECAY_MS)
     }
 
+    /// Attack, ms (5 when the kit sets none).
+    pub fn attack_ms(&self) -> f64 {
+        self.attack.unwrap_or(DEFAULT_ATTACK_MS)
+    }
+
+    /// How the sample is read and shaped.
+    pub fn shape(&self) -> SampleShape {
+        SampleShape {
+            start: (self.start / 1000.0) as f32,
+            end: self.end.map(|end| (end / 1000.0) as f32),
+            reverse: self.reverse,
+            looping: self.looping,
+            attack: (self.attack_ms() / 1000.0) as f32,
+            hold: (self.hold / 1000.0) as f32,
+            gated: self.gated,
+        }
+    }
+
     /// Linear gain of the trim.
     pub fn gain(&self) -> f64 {
         10f64.powf(self.gain_db / 20.0)
@@ -52,6 +86,7 @@ impl KitSample {
         let text =
             |keys: &[&str]| keys.iter().find_map(|key| object.get(key).and_then(Value::as_str)).map(str::to_owned);
         let number = |keys: &[&str]| keys.iter().find_map(|key| object.get(key).and_then(Value::as_f64));
+        let flag = |key: &str| object.get(key).and_then(Value::as_bool).unwrap_or(false);
         let path = text(&["path", "url"])?;
         let mut extra = Object::new();
         for (key, value) in object.iter() {
@@ -64,6 +99,13 @@ impl KitSample {
             display_name: text(&["displayName", "display_name"]).unwrap_or_default(),
             path,
             decay: number(&["decay"]),
+            start: number(&["start"]).unwrap_or(0.0),
+            end: number(&["end"]),
+            reverse: flag("reverse"),
+            looping: flag("loop"),
+            attack: number(&["attack"]),
+            hold: number(&["hold"]).unwrap_or(0.0),
+            gated: flag("gate"),
             root_midi: number(&["rootMidi"]),
             peak_db: number(&["peakDb"]),
             gain_db: number(&["gainDb"]).unwrap_or(0.0),
@@ -87,6 +129,7 @@ impl KitSample {
         if let Some(decay) = self.decay {
             o.insert("decay", Value::Number(decay));
         }
+        self.insert_shape(&mut o);
         if self.gain_db != 0.0 {
             o.insert("gainDb", Value::Number(self.gain_db));
         }
@@ -97,6 +140,31 @@ impl KitSample {
             o.insert(key, value.clone());
         }
         Value::Object(o)
+    }
+
+    /// The playback settings that differ from the defaults, as kits.json keys.
+    fn insert_shape(&self, o: &mut Object) {
+        if self.start != 0.0 {
+            o.insert("start", Value::Number(self.start));
+        }
+        if let Some(end) = self.end {
+            o.insert("end", Value::Number(end));
+        }
+        if self.reverse {
+            o.insert("reverse", Value::Bool(true));
+        }
+        if self.looping {
+            o.insert("loop", Value::Bool(true));
+        }
+        if let Some(attack) = self.attack {
+            o.insert("attack", Value::Number(attack));
+        }
+        if self.hold != 0.0 {
+            o.insert("hold", Value::Number(self.hold));
+        }
+        if self.gated {
+            o.insert("gate", Value::Bool(true));
+        }
     }
 
     /// The entry of a kit mapping file: every field,
@@ -112,13 +180,32 @@ impl KitSample {
         o.insert("decay", opt(self.decay));
         o.insert("gainDb", Value::Number(self.gain_db));
         o.insert("transpose", Value::Number(self.transpose));
+        self.insert_shape(&mut o);
         Value::Object(o)
     }
 }
 
 /// `display_name`, `url`, `tune`: the keys of the JS app's drumkits.json and older saves.
-const KNOWN_KEYS: [&str; 11] =
-    ["key", "displayName", "display_name", "path", "url", "decay", "rootMidi", "peakDb", "gainDb", "transpose", "tune"];
+const KNOWN_KEYS: [&str; 18] = [
+    "key",
+    "displayName",
+    "display_name",
+    "path",
+    "url",
+    "decay",
+    "start",
+    "end",
+    "reverse",
+    "loop",
+    "attack",
+    "hold",
+    "gate",
+    "rootMidi",
+    "peakDb",
+    "gainDb",
+    "transpose",
+    "tune",
+];
 
 /// A kit's samples: `instruments` in the JS app's drumkits.json and older saves.
 fn sample_entries(value: &Value) -> Option<&[Value]> {
@@ -378,5 +465,28 @@ mod tests {
         assert_eq!(Kit::from_mapping_json(&unnamed), Err("Missing kit name or samples".into()));
         let defaults = json::parse(r#"{"name":"n","instruments":[{"url":"a.wav","key":"K"}]}"#).unwrap();
         assert_eq!(Kit::from_mapping_json(&defaults).unwrap().samples[0].display_name, "a.wav");
+    }
+
+    #[test]
+    fn playback_settings_round_trip_and_stay_out_of_the_file_when_default() {
+        let plain = KitSample { path: "a.wav".into(), ..KitSample::default() };
+        assert_eq!(plain.to_json().to_json(), r#"{"displayName":"","key":"","path":"a.wav"}"#);
+        assert_eq!(plain.shape(), SampleShape::default());
+        let shaped = KitSample {
+            start: 20.0,
+            end: Some(300.0),
+            reverse: true,
+            looping: true,
+            attack: Some(1.0),
+            hold: 50.0,
+            gated: true,
+            ..plain
+        };
+        let back = KitSample::from_json(&shaped.to_json()).unwrap();
+        assert_eq!(back, shaped);
+        let shape = back.shape();
+        assert_eq!((shape.start, shape.end, shape.attack, shape.hold), (0.02, Some(0.3), 0.001, 0.05));
+        assert!(shape.reverse && shape.looping);
+        assert!(back.extra.get("loop").is_none(), "known keys are not kept as extra ones");
     }
 }

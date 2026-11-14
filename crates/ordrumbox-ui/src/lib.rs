@@ -27,6 +27,7 @@ mod output;
 mod panel;
 mod piano_roll;
 mod picker;
+mod sample_overlay;
 mod scale;
 mod scroll;
 mod session;

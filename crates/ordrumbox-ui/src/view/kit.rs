@@ -1,9 +1,10 @@
 //! The kit editor: its view, its layout and its drawing.
 
-use super::{ACCENT, ENVELOPE, PLAYHEAD, cell_color, focus_row_color};
+use super::{ACCENT, ENVELOPE, cell_color, focus_row_color};
 use crate::canvas::{Canvas, chars_in, text_width};
 use crate::frame::{body_top, footer_top, margin};
 use crate::panel::{Rect, row_at};
+use crate::sample_overlay::Overlay;
 use crate::scale::Scale;
 use crate::theme;
 
@@ -25,8 +26,8 @@ pub struct KitView<'a> {
     pub facts: Vec<(&'static str, String)>,
     /// Peak of each slice, 0–1.
     pub envelope: &'a [f64],
-    /// Where the decay ends, as a fraction of the sample.
-    pub decay_marker: Option<f64>,
+    /// How the sample plays, drawn over its waveform.
+    pub overlay: Option<Overlay>,
 }
 
 /// How many measurements the kit editor shows of a sample (note, length,
@@ -71,6 +72,9 @@ pub struct KitLayout {
 
 /// The kit editor's table row height, per scale unit (a select fits in it).
 pub(super) const KIT_ROW: i32 = 14;
+/// The height of the selected sample's controls (the kit select, the two rows
+/// of knobs, the two switches), per scale unit: a test checks it.
+pub(super) const KIT_CONTROLS_HEIGHT: i32 = 182;
 /// A text line of the kit editor's header and measurements, per scale unit.
 pub(super) const KIT_LINE: i32 = 11;
 /// Width of the instrument column, per scale unit.
@@ -101,7 +105,7 @@ impl KitLayout {
         let list_top = columns_y + line;
         // The details take what they need (controls, measurements, a short
         // envelope); the rows the rest, a window size giving one count.
-        let details = 8 * s + KIT_FACTS as i32 * line + 40 * s;
+        let details = 8 * s + (KIT_FACTS as i32 * line).max(KIT_CONTROLS_HEIGHT * s) + 40 * s;
         let list_rows = ((bottom - list_top - details) / row).clamp(3, 16);
         let detail_y = list_top + list_rows * row + 8 * s;
         // Columns: the number ("12"), the name, the instrument, the tracks.
@@ -190,6 +194,15 @@ impl KitLayout {
         (i < count).then_some(i)
     }
 
+    /// Where the waveform goes: under the measurements and the sample's
+    /// controls (which end at `details_top`), down to the bottom; empty when
+    /// there is no room.
+    pub fn envelope_rect(&self, details_top: i32) -> Rect {
+        let s = self.scale;
+        let y = details_top.max(self.facts_bottom()) + 4 * s;
+        Rect::new(self.left, y, self.list_width, (self.bottom - y - 4 * s).min(80 * s))
+    }
+
     /// Bottom of the measurements: the envelope starts under them.
     pub(super) fn facts_bottom(&self) -> i32 {
         self.detail_y + KIT_FACTS as i32 * KIT_LINE * self.scale
@@ -266,9 +279,7 @@ pub(super) fn draw_kit(canvas: &mut Canvas, kit: &KitView, layout: &KitLayout) {
     }
 
     // Envelope: one bar per point, the decay end as a line.
-    let x = layout.left;
-    let y = kit.details_top.max(layout.facts_bottom()) + 4 * scale;
-    let (width, height) = (layout.list_width, (layout.bottom - y - 4 * scale).min(80 * scale));
+    let Rect { x, y, w: width, h: height } = layout.envelope_rect(kit.details_top);
     if kit.envelope.is_empty() || width <= 0 || height <= 4 * scale {
         return;
     }
@@ -280,8 +291,7 @@ pub(super) fn draw_kit(canvas: &mut Canvas, kit: &KitView, layout: &KitLayout) {
         let bar_h = (v.clamp(0.0, 1.0) * f64::from(height)).round() as i32;
         canvas.fill_rect(bar_x, y + height - bar_h, bar_w, bar_h, ENVELOPE);
     }
-    if let Some(ratio) = kit.decay_marker {
-        let mx = x + (ratio.clamp(0.0, 1.0) * f64::from(width - 1)) as i32;
-        canvas.fill_rect(mx, y, scale.px(), height, PLAYHEAD);
+    if let Some(overlay) = &kit.overlay {
+        overlay.draw(canvas, (x, y, width, height), scale);
     }
 }

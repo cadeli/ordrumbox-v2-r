@@ -136,9 +136,14 @@ fn settings(hits: f64) -> ordrumbox_logic::compose::Settings {
 
 fn view(track: &Track) -> TrackView<'_> {
     TrackView {
+        shape: Shape::default(),
         track,
         title: "Track: KICK - real/kick".into(),
-        sample: Some(SampleBar { info: "C4 - 210 ms - -0.3 dB".into(), envelope: vec![0.5; 8], marker: Some(0.4) }),
+        sample: Some(SampleBar {
+            info: "C4 - 210 ms - -0.3 dB".into(),
+            envelope: vec![0.5; 8],
+            overlay: Overlay::new(&Shape { duration_ms: 210.0, end_ms: 210.0, decay_ms: 100.0, ..Shape::default() }),
+        }),
         decay: 0.0,
         instruments: Choice { values: vec!["KICK".into()], labels: Vec::new(), selected: 0 },
         sidechains: Choice { values: vec![String::new()], labels: vec!["none".into()], selected: 0 },

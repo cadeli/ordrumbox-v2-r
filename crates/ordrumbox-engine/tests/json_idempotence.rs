@@ -61,6 +61,7 @@ fn every_kit_field_survives_saving() {
         gain_db: -2.5,
         transpose: -1.5,
         extra: kick.extra.clone(),
+        ..KitSample::default()
     };
     assert_eq!(*kick, expected);
     assert_eq!(kick.extra.get("someFutureKey"), Some(&parse("[1,2]")), "an unknown key is kept");
