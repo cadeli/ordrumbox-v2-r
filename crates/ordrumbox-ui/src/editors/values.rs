@@ -1,6 +1,7 @@
 //! What a track or a note holds, read for the editors: values, arpeggio, tooltips, ordering.
 
 use super::tables::{ARP_DIRECTIONS, FxDef, lfo_key};
+use ordrumbox_core::arp::MAX_OCTAVES;
 use ordrumbox_core::json::Value;
 use ordrumbox_core::{Note, ScaleList, Track, num};
 
@@ -84,11 +85,13 @@ pub struct ArpState {
     pub scale: String,
     pub direction: String,
     pub range: usize,
+    /// Octaves the arpeggio spans, 1 when it does not say.
+    pub octaves: usize,
 }
 
 pub fn arp_state(note: &Note, scales: &ScaleList) -> ArpState {
     let Some(arp) = note.arp.as_object() else {
-        return ArpState { scale: "major".into(), direction: "up".into(), range: 0 };
+        return ArpState { scale: "major".into(), direction: "up".into(), range: 0, octaves: 1 };
     };
     let mode = arp.get("direction").and_then(Value::as_str).map(str::to_lowercase).unwrap_or_else(|| "up".into());
     let direction = if ARP_DIRECTIONS.contains(&mode.as_str()) { mode } else { "up".into() };
@@ -109,7 +112,9 @@ pub fn arp_state(note: &Note, scales: &ScaleList) -> ArpState {
             break;
         }
     }
-    ArpState { scale, direction, range: intervals.len() }
+    let octaves =
+        arp.get("octaves").and_then(Value::as_f64).map_or(1, |o| o.round().clamp(1.0, MAX_OCTAVES as f64) as usize);
+    ArpState { scale, direction, range: intervals.len(), octaves }
 }
 
 /// `#arpValue`: the note's `arp` with these overrides.
@@ -119,10 +124,13 @@ pub fn arp_value(
     scale: Option<&str>,
     direction: Option<&str>,
     range: Option<usize>,
+    octaves: Option<usize>,
 ) -> Value {
     let scale = scale.or(note.arp_scale.as_deref()).unwrap_or("major");
     let direction = direction.or(note.arp_direction.as_deref()).unwrap_or("up");
-    let range = range.unwrap_or_else(|| arp_state(note, scales).range);
+    let state = arp_state(note, scales);
+    let range = range.unwrap_or(state.range);
+    let octaves = octaves.unwrap_or(state.octaves);
     if range == 0 {
         return Value::Null;
     }
@@ -130,6 +138,9 @@ pub fn arp_value(
     let intervals = scales.intervals(scale, range).into_iter().map(|i| Value::Number(f64::from(i))).collect();
     object.insert("intervals", Value::Array(intervals));
     object.insert("direction", Value::String(direction.to_owned()));
+    if octaves > 1 {
+        object.insert("octaves", Value::Number(octaves as f64));
+    }
     Value::Object(object)
 }
 

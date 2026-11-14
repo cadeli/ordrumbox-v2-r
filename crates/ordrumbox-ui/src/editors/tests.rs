@@ -19,12 +19,24 @@ fn arpeggios_round_trip() {
     assert_eq!(scales.intervals("minor", 9), [0, 2, 3, 5, 7, 8, 10, 12, 14]);
     assert_eq!(scales.intervals("odd", 3), [0]);
     let mut note = Note::default();
-    assert_eq!(arp_state(&note, &scales), ArpState { scale: "major".into(), direction: "up".into(), range: 0 });
+    assert_eq!(
+        arp_state(&note, &scales),
+        ArpState { scale: "major".into(), direction: "up".into(), range: 0, octaves: 1 }
+    );
     note.arp_direction = Some("down".into());
-    note.arp = arp_value(&note, &scales, Some("minor"), None, Some(4));
+    note.arp = arp_value(&note, &scales, Some("minor"), None, Some(4), None);
     assert_eq!(note.arp.to_json(), r#"{"intervals":[0,2,3,5],"direction":"down"}"#);
-    assert_eq!(arp_state(&note, &scales), ArpState { scale: "minor".into(), direction: "down".into(), range: 4 });
-    assert_eq!(arp_value(&note, &scales, None, None, Some(0)), Value::Null);
+    assert_eq!(
+        arp_state(&note, &scales),
+        ArpState { scale: "minor".into(), direction: "down".into(), range: 4, octaves: 1 }
+    );
+    assert_eq!(arp_value(&note, &scales, None, None, Some(0), None), Value::Null);
+    note.arp = arp_value(&note, &scales, None, None, None, Some(3));
+    assert_eq!(note.arp.to_json(), r#"{"intervals":[0,2,3,5],"direction":"down","octaves":3}"#);
+    assert_eq!(arp_state(&note, &scales).octaves, 3);
+    // A scale or a direction picked later keeps the octaves.
+    note.arp = arp_value(&note, &scales, Some("major"), None, None, None);
+    assert_eq!(arp_state(&note, &scales).octaves, 3);
 }
 
 #[test]
@@ -271,6 +283,7 @@ fn note_editor_hides_the_euclidean_prob() {
         scales: Choice::default(),
         arp_direction: Choice::default(),
         arp_range: 0,
+        arp_octaves: 1,
     };
     let state = EditorState { note_tab: 2, ..EditorState::default() };
     let items = note_editor(&view, &state, Rect::new(0, 0, 360, 300), Scale::ONE);
@@ -424,6 +437,7 @@ fn no_control_moves_whatever_the_tab_and_the_settings() {
                 scales: Choice { values: vec!["major".into()], labels: Vec::new(), selected: 0 },
                 arp_direction: Choice { values: vec!["up".into()], labels: Vec::new(), selected: 0 },
                 arp_range: 2,
+                arp_octaves: 2,
             };
             let state = EditorState { note_tab, ..EditorState::default() };
             let items = note_editor(&view, &state, Rect::new(700, 400, 360, 200), Scale::ONE);

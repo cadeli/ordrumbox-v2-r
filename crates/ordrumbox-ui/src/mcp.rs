@@ -317,7 +317,7 @@ fn setting_schema(key: &str, default: &Value, range: Option<(f64, f64)>) -> Valu
             }
         }
         // Unset by default: an LFO (`{type, freq, min, max, phase}`), a synth
-        // preset key, an arpeggio (intervals, "0,4,7", a direction); null unsets.
+        // preset key, an arpeggio (intervals, "0,4,7", a direction, octaves 1-4); null unsets.
         _ if key.ends_with("Lfo") => _ = schema.insert("type", types(&["object", "null"])),
         _ if key == "arp" => _ = schema.insert("type", types(&["string", "array", "object", "null"])),
         _ => _ = schema.insert("type", types(&["string", "null"])),

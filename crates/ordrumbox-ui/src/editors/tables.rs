@@ -4,6 +4,7 @@ use super::layout::note_default;
 use crate::control::Format;
 use crate::kits::{ATTACK_RANGE, DECAY_RANGE, Field, GAIN_RANGE, HOLD_RANGE, TRANSPOSE_RANGE};
 use ordrumbox_core::Note;
+use ordrumbox_core::arp::MAX_OCTAVES;
 use ordrumbox_core::note::{MAX_LENGTH_STEPS, MAX_SHIFT_STEPS};
 use ordrumbox_core::track::{
     COMP_ATTACK_MS_RANGE, COMP_RATIO_RANGE, COMP_RELEASE_MS_RANGE, COMP_THRESHOLD_DB_RANGE, DUCK_RELEASE_MS_RANGE,
@@ -314,6 +315,7 @@ pub const NOTE_GROUPS: [&[NoteRow]; NOTE_TABS.len()] = [
         NoteRow::Select("arpScale", "Scale"),
         NoteRow::Select("arpDirection", "Direction"),
         note_count("arpRange", "Range", 0.0, 12.0),
+        note_count("arpOctaves", "Octaves", 1.0, MAX_OCTAVES as f64),
     ],
     &[NoteRow::Slider(prop("shiftSteps", "Shift", -MAX_SHIFT_STEPS, MAX_SHIFT_STEPS, 0.01, Format::Percent))],
 ];

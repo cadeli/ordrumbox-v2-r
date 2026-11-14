@@ -352,6 +352,7 @@ impl Session {
                 scales: Choice::default(),
                 arp_direction: Choice::default(),
                 arp_range: 0,
+                arp_octaves: 1,
             };
         };
         let state = editors::arp_state(n, &self.generators.scale_list);
@@ -362,7 +363,7 @@ impl Session {
         let direction = n.arp_direction.clone().unwrap_or_else(|| state.direction.clone());
         let arp_direction =
             Choice { selected: editors::index_of(&directions, &direction), values: directions, labels: Vec::new() };
-        NoteView { title, note, scales, arp_direction, arp_range: state.range }
+        NoteView { title, note, scales, arp_direction, arp_range: state.range, arp_octaves: state.octaves }
     }
 
     pub(super) fn kit_controls(&self) -> Option<KitControls> {

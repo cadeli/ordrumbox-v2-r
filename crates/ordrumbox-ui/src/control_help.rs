@@ -230,6 +230,7 @@ fn setting_help(key: &str) -> Option<Help> {
         "euclideanRotation" => ["Rotation", "the spread hits shifted, in steps"],
         "arpScale" => ["Arpeggio scale", "the scale its notes come from"],
         "arpDirection" => ["Direction", "up, down, up and down, or random"],
+        "arpOctaves" => ["Octaves", "how many octaves the arpeggio climbs through (1: its own range)"],
         "arpRange" => ["Range", "how many scale notes the arpeggio plays (0: off)"],
         "lengthSteps" => ["Length", "how long the note is held, in steps: a synth note, a MIDI note sent or exported"],
         "shiftSteps" => ["Shift", "the note off the grid, in % of a step: below 0 early, above late"],

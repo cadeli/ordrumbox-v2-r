@@ -623,9 +623,10 @@ cursor, else the track's first note.</p>
 <tr><td>Fade</td><td>0–100 % (default 60 %)</td><td>How far the repeats step down in velocity: at 100 % towards silence, at 0 all at the note's velocity.</td></tr>
 <tr><td rowspan="2"><strong>Euclidean</strong></td><td>Pulses</td><td>0–16</td><td>Evenly spaced extra hits between this note and the next.</td></tr>
 <tr><td>Rotation</td><td>0–15</td><td>Rotation of those pulses.</td></tr>
-<tr><td rowspan="3"><strong>Arpeggio</strong></td><td>Scale</td><td>the scales of <code>scales.json</code></td><td>The scale the arpeggio climbs.</td></tr>
+<tr><td rowspan="4"><strong>Arpeggio</strong></td><td>Scale</td><td>the scales of <code>scales.json</code></td><td>The scale the arpeggio climbs.</td></tr>
 <tr><td>Direction</td><td>up, down, updown, random</td><td>The direction.</td></tr>
-<tr><td>Range</td><td>0–12</td><td>Number of arpeggio notes (0 = off).</td></tr>
+<tr><td>Range</td><td>0–12</td><td>Number of scale notes (0 = off).</td></tr>
+<tr><td>Octaves</td><td>1–4</td><td>How many octaves the arpeggio climbs through: its notes are repeated 12 semitones higher. The Retrigger count sets how many notes play, up to 16.</td></tr>
 <tr><td><strong>Timing</strong></td><td>Shift</td><td>−50–50 % of a step</td><td>The note off the grid: below 0 early, above late, with its retriggers.</td></tr>
 </table>
 <p>A cycled note plays when <code>(loop + Offset) mod Cycle = 0</code>. Arpeggio notes and euclidean fills do not fade.</p>
