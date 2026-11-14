@@ -31,7 +31,11 @@ fn bench() -> Bench {
 
 /// The note editor's ranges of the settings the tests set.
 fn note_range(key: &str) -> Option<(f64, f64)> {
-    ["velocity", "probability"].contains(&key).then_some((0.0, 1.0))
+    match key {
+        "velocity" | "probability" => Some((0.0, 1.0)),
+        "lengthSteps" => Some((0.25, 1024.0)),
+        _ => None,
+    }
 }
 
 fn call(b: &mut Bench, name: &str, args: &str) -> Result<Value, String> {
@@ -54,6 +58,46 @@ fn get<'a>(value: &'a Value, path: &[&str]) -> &'a Value {
 
 fn undo_len(b: &Bench) -> usize {
     b.editor.history().undo_len()
+}
+
+#[test]
+fn legato_mono_and_note_length_go_through_the_tools() {
+    let mut b = bench();
+    // Legato and mono, of the track; the length of every note it has.
+    let updated = call(
+        &mut b,
+        "updateTrack",
+        r#"{"patternName":"rock","trackName":"KICK","updates":{"legato":true,"mono":true},"noteUpdates":{"lengthSteps":4}}"#,
+    )
+    .unwrap();
+    assert_eq!(get(&updated, &["settings"]).to_json(), r#"{"legato":true,"mono":true}"#);
+    assert_eq!(get(&updated, &["notesUpdated"]).as_f64(), Some(2.0));
+    // A note added with its length.
+    call(
+        &mut b,
+        "addNotesToPattern",
+        r#"{"patternName":"rock","notes":[{"trackName":"SNARE","step":0,"lengthSteps":2.5}]}"#,
+    )
+    .unwrap();
+    let loaded = call(&mut b, "loadPattern", r#"{"patternName":"rock"}"#).unwrap();
+    let tracks = get(&loaded, &["tracks"]).as_array().unwrap();
+    let kick = &tracks[0];
+    assert_eq!(get(kick, &["legato"]).as_bool(), Some(true));
+    assert_eq!(get(kick, &["mono"]).as_bool(), Some(true));
+    let lengths: Vec<f64> =
+        get(kick, &["notes"]).as_array().unwrap().iter().map(|n| get(n, &["lengthSteps"]).as_f64().unwrap()).collect();
+    assert_eq!(lengths, [4.0, 4.0]);
+    let snare = &tracks[1];
+    let lengths: Vec<f64> =
+        get(snare, &["notes"]).as_array().unwrap().iter().map(|n| get(n, &["lengthSteps"]).as_f64().unwrap()).collect();
+    assert_eq!(lengths, [2.5]);
+    // A length past the note editor's range is refused.
+    let refused = call(
+        &mut b,
+        "addNotesToPattern",
+        r#"{"patternName":"rock","notes":[{"trackName":"SNARE","step":4,"lengthSteps":2048}]}"#,
+    );
+    assert_eq!(refused.unwrap_err(), "notes[0].lengthSteps: 2048 is outside 0.25 to 1024");
 }
 
 #[test]

@@ -11,7 +11,9 @@
 //! An instrument that already has a track gets another one, numbered
 //! (`KICK 2`, `BASS 2`): no note is dropped for sharing an instrument. A
 //! channel left with no instrument at all is left out, and the message says
-//! so, as it says when notes fall past the 16th pattern. The tempo meta event
+//! so, as it says when notes fall past the 16th pattern. A note lasts until
+//! the note-off its file pairs it with (2 decimals of a step); a note with
+//! no note-off plays one step. The tempo meta event
 //! is never read (the library's tempo stays); every pattern is 32 beats long,
 //! up to 16 patterns. A file timed in SMPTE frames or with a 0 division is
 //! refused.
@@ -201,6 +203,16 @@ fn strip_midi_extension(name: &str) -> &str {
     name
 }
 
+/// The steps a note held `ticks` lasts, at the file's `division`, as the
+/// file writes lengths (2 decimals); a note with no note-off plays one step.
+fn note_length(ticks: i64, division: f64) -> f64 {
+    if ticks <= 0 {
+        return 1.0;
+    }
+    let steps = ticks as f64 * f64::from(STEPS_PER_BEAT) / division;
+    ordrumbox_core::num::round2(steps.max(0.01))
+}
+
 /// `#createPatternsFromTrackDefs`: 32-beat patterns covering the notes, every
 /// track in each of them, and whether notes fall past the last one.
 fn patterns_from(defs: &[TrackDef], base_name: &str, division: f64) -> (Vec<Pattern>, bool) {
@@ -236,6 +248,7 @@ fn patterns_from(defs: &[TrackDef], base_name: &str, division: f64) -> (Vec<Patt
                             step: beat_step,
                             pitch,
                             step_percent: Some(step_percent),
+                            length_steps: note_length(note.duration, division),
                             ..Note::default()
                         });
                     }
@@ -258,7 +271,8 @@ mod tests {
     use super::*;
 
     fn def(ticks: &[i64]) -> TrackDef {
-        let notes = ticks.iter().map(|&tick| NoteOn { tick, channel: 9, note: Some(36), velocity: 100, track: 0 });
+        let notes =
+            ticks.iter().map(|&tick| NoteOn { tick, channel: 9, note: Some(36), velocity: 100, track: 0, duration: 0 });
         TrackDef { name: "KICK".into(), notes: notes.collect(), base_note: 36.0 }
     }
 
@@ -311,5 +325,61 @@ mod tests {
         assert!(cut);
         assert_eq!(patterns.len(), 16);
         assert_eq!(places(&patterns[15]), [(31, 0)]);
+    }
+
+    #[test]
+    fn a_note_lasts_until_its_note_off_and_one_step_without_one() {
+        // A bass note from tick 0 to tick 144 (1.5 beats, 6 steps), then a
+        // drum note with no note-off.
+        let (patterns, _) = patterns_from(
+            &[TrackDef {
+                name: "BASS".into(),
+                notes: vec![
+                    NoteOn { tick: 0, channel: 0, note: Some(36), velocity: 100, track: 0, duration: 144 },
+                    NoteOn { tick: 192, channel: 9, note: Some(36), velocity: 100, track: 0, duration: 0 },
+                ],
+                base_note: 36.0,
+            }],
+            "f",
+            96.0,
+        );
+        let lengths: Vec<f64> = patterns[0].tracks[0].notes.iter().map(|n| n.length_steps).collect();
+        assert_eq!(lengths, [6.0, 1.0]);
+    }
+
+    #[test]
+    fn an_off_ends_the_note_struck_longest_ago() {
+        // Two overlapping notes of one key: the first off ends the first on.
+        let (patterns, _) = patterns_from(
+            &[TrackDef {
+                name: "BASS".into(),
+                notes: vec![
+                    NoteOn { tick: 0, channel: 0, note: Some(36), velocity: 100, track: 0, duration: 96 },
+                    NoteOn { tick: 48, channel: 0, note: Some(36), velocity: 100, track: 0, duration: 144 },
+                ],
+                base_note: 36.0,
+            }],
+            "f",
+            96.0,
+        );
+        let lengths: Vec<f64> = patterns[0].tracks[0].notes.iter().map(|n| n.length_steps).collect();
+        assert_eq!(lengths, [4.0, 6.0]);
+    }
+
+    #[test]
+    fn a_note_off_is_a_velocity_0_note_on_too() {
+        // The same file, its second note ended by a note-on at velocity 0.
+        let bytes = [
+            0x00, 0xc0, 33, //
+            0x00, 0x90, 40, 100, //
+            0x60, 0x90, 40, 0, //
+            0x00, 0xff, 0x2f, 0x00,
+        ];
+        let mut file = b"MThd\0\0\0\x06\0\0\0\x01\0\x60MTrk".to_vec();
+        file.extend(u32::try_from(bytes.len()).unwrap().to_be_bytes());
+        file.extend(bytes);
+        let imported = import("off.mid", &file, &[]).unwrap();
+        let lengths: Vec<f64> = imported.patterns[0].tracks[0].notes.iter().map(|n| n.length_steps).collect();
+        assert_eq!(lengths, [4.0]);
     }
 }

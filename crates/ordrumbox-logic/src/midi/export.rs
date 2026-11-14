@@ -255,6 +255,56 @@ pub fn export(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ordrumbox_core::{Note, Track};
+
+    /// A pattern of one melodic track with notes of `lengths` steps.
+    fn pattern(name: &str, lengths: &[f64]) -> Pattern {
+        let mut track = Track::new(name, 2, 4);
+        for (i, &length) in lengths.iter().enumerate() {
+            track.notes.push(Note {
+                beat: (i as i32) / 4,
+                step: (i as i32) % 4,
+                length_steps: length,
+                pitch: 12.0 * f64::from(i as i32),
+                ..Note::default()
+            });
+        }
+        Pattern { name: Some("p".into()), beat_count: 2, tracks: vec![track], ..Pattern::default() }
+    }
+
+    /// The (tick, key, velocity) note events of `bytes`, in file order.
+    fn note_events(bytes: &[u8]) -> Vec<(i64, u8, u8, bool)> {
+        let midi = crate::midi::smf::parse(bytes);
+        midi.tracks
+            .iter()
+            .flat_map(|events| events.iter())
+            .filter_map(|e| match e.kind {
+                crate::midi::smf::EventKind::Note { status, note, velocity, .. } => {
+                    note.map(|n| (e.tick, n, velocity, status == 0x90 && velocity > 0))
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_note_is_written_its_length_long() {
+        let c = catalog();
+        let name = c
+            .instruments
+            .iter()
+            .map(|i| i.id.as_str())
+            .find(|id| c.by_name(id).is_some_and(|i| !i.drum && !i.midi.is_empty()))
+            .unwrap();
+        let pattern = pattern(name, &[1.0, 2.5]);
+        let bytes = export(&pattern, 120.0, 1, &[], &mut Rng::new(1), &Scales::default());
+        // 2.5 steps at 4 a beat are 2.5 * 24 = 60 ticks.
+        let events = note_events(&bytes);
+        let ons: Vec<i64> = events.iter().filter(|(.., on)| *on).map(|(t, ..)| *t).collect();
+        let offs: Vec<i64> = events.iter().filter(|(.., on)| !*on).map(|(t, ..)| *t).collect();
+        assert_eq!(ons, [0, 24]);
+        assert_eq!(offs, [24, 84]);
+    }
 
     #[test]
     fn melodic_channels_skip_the_drums_and_stay_in_range() {
