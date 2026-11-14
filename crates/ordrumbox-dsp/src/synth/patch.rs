@@ -188,6 +188,12 @@ pub struct SynthPatch {
     pub mod_env_target: ModEnvTarget,
     pub mod_env_depth: f64,
     pub bypass: SynthBypass,
+    /// Layers each oscillator sounds as, 1 (none) to [`super::MAX_UNISON`].
+    pub unison_count: usize,
+    /// Cents between the pitch and the outermost layer, on each side.
+    pub unison_detune: f64,
+    /// How far the layers spread over the stereo field, 0–1.
+    pub unison_spread: f64,
 }
 
 impl Default for SynthPatch {
@@ -222,6 +228,9 @@ impl Default for SynthPatch {
             mod_env_target: ModEnvTarget::Off,
             mod_env_depth: 0.0,
             bypass: SynthBypass::default(),
+            unison_count: 1,
+            unison_detune: 0.0,
+            unison_spread: 0.0,
         }
     }
 }

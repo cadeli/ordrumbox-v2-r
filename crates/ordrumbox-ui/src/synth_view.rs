@@ -488,9 +488,12 @@ mod tests {
         assert_eq!(knobs, model::metas().count() - 1);
         let built = build(&d, &["a".into(), "b".into()], "b", 0, &layout, &|_| None);
         assert!(matches!(built.items[0].kind, Kind::Select { selected: 1, .. }));
-        // OSC: the scope, the oscillators (vco2, vco3 off: gain 0), FM (its flag unset).
+        // OSC: the scope, the oscillators (vco2, vco3 off: gain 0), the unison, FM (its flag unset).
         let groups: Vec<_> = built.cards.iter().map(|c| (c.group.as_str(), c.bypassed)).collect();
-        assert_eq!(groups, [("scope", false), ("vco1", false), ("vco2", true), ("vco3", true), ("fm", false)]);
+        assert_eq!(
+            groups,
+            [("scope", false), ("vco1", false), ("vco2", true), ("vco3", true), ("unison", false), ("fm", false)]
+        );
     }
 
     #[test]

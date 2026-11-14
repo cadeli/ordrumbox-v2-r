@@ -350,6 +350,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.0, fm_algorithm: 0.0, mod_env_target: ModEnvTarget::Off, mod_env_depth: 0.0,
                 mod_envelope: Adsr { attack: 0.005, decay: 0.12, sustain: 0.0, release: 0.1 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -367,6 +368,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.0, fm_algorithm: 0.0, mod_env_target: ModEnvTarget::Off, mod_env_depth: 0.0,
                 mod_envelope: Adsr { attack: 0.005, decay: 0.12, sustain: 0.0, release: 0.1 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -384,6 +386,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.0, fm_algorithm: 0.0, mod_env_target: ModEnvTarget::Off, mod_env_depth: 0.0,
                 mod_envelope: Adsr { attack: 0.005, decay: 0.12, sustain: 0.0, release: 0.1 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -401,6 +404,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.0, fm_algorithm: 0.0, mod_env_target: ModEnvTarget::Off, mod_env_depth: 0.0,
                 mod_envelope: Adsr { attack: 0.005, decay: 0.12, sustain: 0.0, release: 0.1 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -418,6 +422,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.0, fm_algorithm: 0.0, mod_env_target: ModEnvTarget::Off, mod_env_depth: 0.0,
                 mod_envelope: Adsr { attack: 0.005, decay: 0.12, sustain: 0.0, release: 0.1 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -435,6 +440,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.45, fm_algorithm: 0.0, mod_env_target: ModEnvTarget::Off, mod_env_depth: 0.0,
                 mod_envelope: Adsr { attack: 0.005, decay: 0.12, sustain: 0.0, release: 0.1 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -452,6 +458,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.0, fm_algorithm: 0.0, mod_env_target: ModEnvTarget::Off, mod_env_depth: 0.0,
                 mod_envelope: Adsr { attack: 0.005, decay: 0.12, sustain: 0.0, release: 0.1 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -469,6 +476,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.0, fm_algorithm: 0.0, mod_env_target: ModEnvTarget::Off, mod_env_depth: 0.0,
                 mod_envelope: Adsr { attack: 0.005, decay: 0.12, sustain: 0.0, release: 0.1 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -486,6 +494,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.1, fm_algorithm: 0.0, mod_env_target: ModEnvTarget::Off, mod_env_depth: 0.0,
                 mod_envelope: Adsr { attack: 0.005, decay: 0.12, sustain: 0.0, release: 0.1 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -503,6 +512,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.0, fm_algorithm: 0.0, mod_env_target: ModEnvTarget::Off, mod_env_depth: 0.0,
                 mod_envelope: Adsr { attack: 0.005, decay: 0.45, sustain: 0.52, release: 0.248 },
                 bypass: SynthBypass { noise: true, filter: true, lfo1: true, lfo2: true, fm: true, mod_env: true, filter_env: true, ..SynthBypass::default() },
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -520,6 +530,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.0, fm_algorithm: 0.0, mod_env_target: ModEnvTarget::Off, mod_env_depth: 0.0,
                 mod_envelope: Adsr { attack: 0.005, decay: 0.12, sustain: 0.0, release: 0.1 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -537,6 +548,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.0, fm_algorithm: 0.0, mod_env_target: ModEnvTarget::Off, mod_env_depth: 0.0,
                 mod_envelope: Adsr { attack: 0.005, decay: 0.12, sustain: 0.0, release: 0.1 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -554,6 +566,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.2, fm_algorithm: 0.0, mod_env_target: ModEnvTarget::Off, mod_env_depth: 0.0,
                 mod_envelope: Adsr { attack: 0.005, decay: 0.12, sustain: 0.0, release: 0.1 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -571,6 +584,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.2, fm_algorithm: 0.0, mod_env_target: ModEnvTarget::Off, mod_env_depth: 0.0,
                 mod_envelope: Adsr { attack: 0.005, decay: 0.12, sustain: 0.0, release: 0.1 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -588,6 +602,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.6, fm_algorithm: 0.0, mod_env_target: ModEnvTarget::Off, mod_env_depth: 0.0,
                 mod_envelope: Adsr { attack: 0.005, decay: 0.12, sustain: 0.0, release: 0.1 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -605,6 +620,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.4, fm_algorithm: 0.0, mod_env_target: ModEnvTarget::Off, mod_env_depth: 0.0,
                 mod_envelope: Adsr { attack: 0.005, decay: 0.12, sustain: 0.0, release: 0.1 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -622,6 +638,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.0, fm_algorithm: 0.0, mod_env_target: ModEnvTarget::Off, mod_env_depth: 0.0,
                 mod_envelope: Adsr { attack: 0.005, decay: 0.45, sustain: 0.52, release: 0.248 },
                 bypass: SynthBypass { noise: true, filter: true, lfo1: true, lfo2: true, fm: true, mod_env: true, filter_env: true, ..SynthBypass::default() },
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -639,6 +656,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.0, fm_algorithm: 0.0, mod_env_target: ModEnvTarget::Off, mod_env_depth: 0.0,
                 mod_envelope: Adsr { attack: 0.005, decay: 0.12, sustain: 0.0, release: 0.1 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -656,6 +674,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.0, fm_algorithm: 0.0, mod_env_target: ModEnvTarget::Off, mod_env_depth: 0.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -673,6 +692,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.1, fm_algorithm: 1.0, mod_env_target: ModEnvTarget::Filter, mod_env_depth: 1.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -690,6 +710,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.2, fm_algorithm: 2.0, mod_env_target: ModEnvTarget::Pitch, mod_env_depth: 1.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -707,6 +728,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.30000000000000004, fm_algorithm: 3.0, mod_env_target: ModEnvTarget::Fm, mod_env_depth: 1.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -724,6 +746,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.0, fm_algorithm: 4.0, mod_env_target: ModEnvTarget::Shape, mod_env_depth: 1.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -741,6 +764,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.1, fm_algorithm: 0.0, mod_env_target: ModEnvTarget::Off, mod_env_depth: 0.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -758,6 +782,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.2, fm_algorithm: 1.0, mod_env_target: ModEnvTarget::Filter, mod_env_depth: 1.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -775,6 +800,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.30000000000000004, fm_algorithm: 2.0, mod_env_target: ModEnvTarget::Pitch, mod_env_depth: 1.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -792,6 +818,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.0, fm_algorithm: 3.0, mod_env_target: ModEnvTarget::Fm, mod_env_depth: 1.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -809,6 +836,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.1, fm_algorithm: 4.0, mod_env_target: ModEnvTarget::Shape, mod_env_depth: 1.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -826,6 +854,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.2, fm_algorithm: 0.0, mod_env_target: ModEnvTarget::Off, mod_env_depth: 0.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -843,6 +872,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.30000000000000004, fm_algorithm: 1.0, mod_env_target: ModEnvTarget::Filter, mod_env_depth: 1.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -860,6 +890,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.0, fm_algorithm: 2.0, mod_env_target: ModEnvTarget::Pitch, mod_env_depth: 1.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -877,6 +908,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.1, fm_algorithm: 3.0, mod_env_target: ModEnvTarget::Fm, mod_env_depth: 1.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -894,6 +926,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.2, fm_algorithm: 4.0, mod_env_target: ModEnvTarget::Shape, mod_env_depth: 1.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -911,6 +944,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.30000000000000004, fm_algorithm: 0.0, mod_env_target: ModEnvTarget::Off, mod_env_depth: 0.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -928,6 +962,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.0, fm_algorithm: 1.0, mod_env_target: ModEnvTarget::Filter, mod_env_depth: 1.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -945,6 +980,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.1, fm_algorithm: 2.0, mod_env_target: ModEnvTarget::Pitch, mod_env_depth: 1.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -962,6 +998,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.2, fm_algorithm: 3.0, mod_env_target: ModEnvTarget::Fm, mod_env_depth: 1.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -979,6 +1016,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.30000000000000004, fm_algorithm: 4.0, mod_env_target: ModEnvTarget::Shape, mod_env_depth: 1.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -996,6 +1034,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.0, fm_algorithm: 0.0, mod_env_target: ModEnvTarget::Off, mod_env_depth: 0.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -1013,6 +1052,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.1, fm_algorithm: 1.0, mod_env_target: ModEnvTarget::Filter, mod_env_depth: 1.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -1030,6 +1070,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.2, fm_algorithm: 2.0, mod_env_target: ModEnvTarget::Pitch, mod_env_depth: 1.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -1047,6 +1088,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.30000000000000004, fm_algorithm: 3.0, mod_env_target: ModEnvTarget::Fm, mod_env_depth: 1.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -1064,6 +1106,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.0, fm_algorithm: 4.0, mod_env_target: ModEnvTarget::Shape, mod_env_depth: 1.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -1081,6 +1124,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.1, fm_algorithm: 0.0, mod_env_target: ModEnvTarget::Off, mod_env_depth: 0.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -1098,6 +1142,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.2, fm_algorithm: 1.0, mod_env_target: ModEnvTarget::Filter, mod_env_depth: 1.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -1115,6 +1160,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.30000000000000004, fm_algorithm: 2.0, mod_env_target: ModEnvTarget::Pitch, mod_env_depth: 1.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -1132,6 +1178,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.0, fm_algorithm: 3.0, mod_env_target: ModEnvTarget::Fm, mod_env_depth: 1.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -1149,6 +1196,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.1, fm_algorithm: 4.0, mod_env_target: ModEnvTarget::Shape, mod_env_depth: 1.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -1166,6 +1214,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.2, fm_algorithm: 0.0, mod_env_target: ModEnvTarget::Off, mod_env_depth: 0.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -1183,6 +1232,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.30000000000000004, fm_algorithm: 1.0, mod_env_target: ModEnvTarget::Filter, mod_env_depth: 1.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -1200,6 +1250,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.0, fm_algorithm: 2.0, mod_env_target: ModEnvTarget::Pitch, mod_env_depth: 1.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass::default(),
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -1217,6 +1268,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.3, fm_algorithm: 1.0, mod_env_target: ModEnvTarget::Pitch, mod_env_depth: 1.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass { noise: true, filter: true, lfo1: true, fm: true, mod_env: true, filter_env: true, ..SynthBypass::default() },
+                ..SynthPatch::default()
             },
         },
         SynthCase {
@@ -1234,6 +1286,7 @@ pub fn synth_cases() -> Vec<SynthCase> {
                 fm_amount: 0.0, fm_algorithm: 0.0, mod_env_target: ModEnvTarget::Off, mod_env_depth: 0.0,
                 mod_envelope: Adsr { attack: 0.01, decay: 0.05, sustain: 0.3, release: 0.05 },
                 bypass: SynthBypass { env: true, ..SynthBypass::default() },
+                ..SynthPatch::default()
             },
         },
     ]

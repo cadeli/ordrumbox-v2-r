@@ -126,9 +126,10 @@ pub fn arp_value(
     range: Option<usize>,
     octaves: Option<usize>,
 ) -> Value {
-    let scale = scale.or(note.arp_scale.as_deref()).unwrap_or("major");
-    let direction = direction.or(note.arp_direction.as_deref()).unwrap_or("up");
     let state = arp_state(note, scales);
+    // The scale the arpeggio already plays, so that a change of range or octaves keeps it.
+    let scale = scale.or(note.arp_scale.as_deref()).unwrap_or(&state.scale);
+    let direction = direction.or(note.arp_direction.as_deref()).unwrap_or("up");
     let range = range.unwrap_or(state.range);
     let octaves = octaves.unwrap_or(state.octaves);
     if range == 0 {

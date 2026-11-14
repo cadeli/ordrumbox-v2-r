@@ -96,6 +96,12 @@ a meant change of behaviour, and note that change below).
 
 ### Changes of behaviour
 
+The synth editor has a `unison` group (`count`, `detune`, `spread`) in its defaults, so a
+hydrated preset holds it and the OSC tab has a Unison card. This rewrote
+`synth_editor_rust.txt` (engine); the audio renders are unchanged, a preset without the
+group has one layer. The factory preset `SYNTHLEAD_SUPERSAW` is the second `SYNTHLEAD` the
+auto-assign picks, so the `SYNTHLEAD` rows of `assign_tests/data.rs` were rewritten.
+
 A MIDI file's import now reads note lengths: a note lasts until the note-off
 its file pairs it with (first in first out on its key, a velocity-0 note-on
 counts as an off), written as `lengthSteps` to 2 decimals; a note with no

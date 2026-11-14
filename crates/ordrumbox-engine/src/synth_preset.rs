@@ -9,6 +9,7 @@ use ordrumbox_dsp::SynthPatch;
 use ordrumbox_dsp::lfo::Wave;
 use ordrumbox_dsp::slope::FilterMode;
 pub use ordrumbox_dsp::synth::FM_DEVIATION;
+use ordrumbox_dsp::synth::MAX_UNISON;
 use ordrumbox_dsp::synth::patch::{Adsr, LfoTarget, ModEnvTarget, SynthBypass, SynthLfo};
 
 /// `C3_FREQ`, Hz: the pitch of ratio 1.
@@ -224,6 +225,7 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
     let mod_env = at("modEnvelope");
     let mod_target = get(mod_env, "target");
     let fm = at("fm");
+    let unison = at("unison");
     let flag = |key: &str| at(key).is_some_and(Value::is_true);
 
     SynthPatch {
@@ -268,6 +270,9 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
         } else {
             0.0
         },
+        unison_count: unison_count(get(unison, "count")),
+        unison_detune: clamp(finite(get(unison, "detune"), 0.0), 0.0, 100.0),
+        unison_spread: clamp(finite(get(unison, "spread"), 0.0), 0.0, 1.0),
         bypass: SynthBypass {
             noise: flag("bypassNoise"),
             filter: flag("bypassFilter"),
@@ -279,6 +284,13 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
             filter_env: flag("bypassFilterEnv"),
         },
     }
+}
+
+/// The layers of a unison from a preset's `count`: a whole number from 1 to [`MAX_UNISON`].
+fn unison_count(value: Option<&Value>) -> usize {
+    let count = clamp(finite(value, 1.0).round(), 1.0, MAX_UNISON as f64);
+    // In range and whole: the conversion loses nothing.
+    count as usize
 }
 
 /// Note length of a synth note: one grid step (`60 / bpm / stepsPerBeat`).

@@ -1,4 +1,4 @@
-//! One synth note: three oscillators with FM, a sub-oscillator, filtered
+//! One synth note: three oscillators with FM and unison, a sub-oscillator, filtered
 //! noise, drive, a TPT state-variable filter with its envelope, an ADSR, a
 //! modulation envelope and two LFOs routed to any of 33 targets, then
 //! equal-power pan.
@@ -21,6 +21,7 @@ mod filter;
 mod modulation;
 mod oscillator;
 pub mod patch;
+mod unison;
 
 use envelope::{Envelope, FilterEnvelope, Segment};
 use filter::{coefficients, cutoff_coefficient};
@@ -32,6 +33,8 @@ use oscillator::{
     NOISE_SEED, SineTable, fm_frequencies, noise_sample, noise_seed, oscillator, sin_lookup, sine_table, xorshift32,
 };
 use patch::{Adsr, ModEnvTarget, SynthPatch};
+pub use unison::MAX_UNISON;
+use unison::{Layer, layers, start_phases, unison_oscillator};
 
 /// Cents to a natural-log ratio.
 const LN2_OVER_1200: f64 = std::f64::consts::LN_2 / 1200.0;
@@ -77,6 +80,12 @@ struct Block {
     noise_k: f64,
     pan_left: f64,
     pan_right: f64,
+    /// The layers of each oscillator and how many are used.
+    layers: [Layer; MAX_UNISON],
+    layer_count: usize,
+    /// Whether the layers differ from one side to the other: the left and
+    /// right channels are then filtered apart.
+    is_stereo: bool,
 }
 
 impl Block {
@@ -84,6 +93,7 @@ impl Block {
         let pan = clamp(p.pan, -1.0, 1.0);
         let q = clamp(p.filter_q, 0.1, 20.0);
         let has_mod_env = !p.bypass.mod_env && p.mod_env_depth > SILENT;
+        let layer_count = p.unison_count.clamp(1, MAX_UNISON);
         Self {
             table: sine_table(),
             sample_rate,
@@ -101,6 +111,9 @@ impl Block {
             noise_k: 1.0 / clamp(p.noise_filter_q, 0.1, 20.0),
             pan_left: ((pan + 1.0) * PI / 4.0).cos(),
             pan_right: ((pan + 1.0) * PI / 4.0).sin(),
+            layers: layers(layer_count, p.unison_detune, p.unison_spread),
+            layer_count,
+            is_stereo: layer_count > 1 && p.unison_spread > SILENT,
         }
     }
 }
@@ -115,14 +128,18 @@ pub struct SynthVoice {
     /// Trigger and release times, seconds on the engine clock (-1: none).
     start_time: f64,
     release_time: f64,
-    phase: [f64; 3],
-    osc_cycle: [f64; 3],
+    /// Phase and cycle count of each layer of each oscillator; layer 0 is on the pitch.
+    phase: [[f64; MAX_UNISON]; 3],
+    osc_cycle: [[f64; MAX_UNISON]; 3],
     rng: u32,
     lfo_phase: [f64; 2],
     lfo_seeded: bool,
     filter: Svf,
     /// Second filter stage (24 dB/oct only).
     filter_2: Svf,
+    /// The same two stages for the right channel, when the layers are spread.
+    filter_right: Svf,
+    filter_right_2: Svf,
     noise_filter: Svf,
     env: Envelope,
     filter_env: FilterEnvelope,
@@ -139,13 +156,15 @@ impl Default for SynthVoice {
             patch: SynthPatch::default(),
             start_time: -1.0,
             release_time: -1.0,
-            phase: [0.0; 3],
-            osc_cycle: [0.0; 3],
+            phase: [[0.0; MAX_UNISON]; 3],
+            osc_cycle: [[0.0; MAX_UNISON]; 3],
             rng: NOISE_SEED,
             lfo_phase: [0.0; 2],
             lfo_seeded: false,
             filter: Svf::default(),
             filter_2: Svf::default(),
+            filter_right: Svf::default(),
+            filter_right_2: Svf::default(),
             noise_filter: Svf::default(),
             env: Envelope::new(Segment::Idle),
             filter_env: FilterEnvelope::new(Segment::Idle),
@@ -182,6 +201,13 @@ impl SynthVoice {
             mod_env: Envelope::new(Segment::Attack),
             ..Self::default()
         };
+        if patch.unison_count > 1 {
+            // Each oscillator's layers start apart: the saws of a supersaw
+            // do not rise together.
+            for (n, phases) in self.phase.iter_mut().enumerate() {
+                *phases = start_phases(noise_seed(serial).rotate_left(8 * n as u32 + 5));
+            }
+        }
     }
 
     /// Release the note at `time` (seconds, same clock), replacing any release
@@ -210,8 +236,8 @@ impl SynthVoice {
             }
             self.step_lfos(&patch, &block, time, &mut mods);
             let y = self.sample(&patch, &block, &mods, time, t);
-            *out_left += (y * block.pan_left) as f32;
-            *out_right += (y * block.pan_right) as f32;
+            *out_left += (y[0] * block.pan_left) as f32;
+            *out_right += (y[1] * block.pan_right) as f32;
         }
         if self.env.is_idle() {
             self.active = false;
@@ -242,9 +268,9 @@ impl SynthVoice {
         self.release_time > 0.0 && time >= self.release_time
     }
 
-    /// The sample at `time`, `t` seconds into the note, before the pan.
+    /// The left and right samples at `time`, `t` seconds into the note, before the pan.
     #[inline]
-    fn sample(&mut self, p: &SynthPatch, b: &Block, mods: &[LfoMods; 2], time: f64, t: f64) -> f64 {
+    fn sample(&mut self, p: &SynthPatch, b: &Block, mods: &[LfoMods; 2], time: f64, t: f64) -> [f64; 2] {
         let env = modulated_adsr(mods, p.envelope, ENV_SLOTS);
         let mod_level = self.mod_env_level(p, b, mods, time, t);
         let filter_env_amount = modulated(mods, p.filter_env_amount, Slot::FilterEnvAmount).max(0.0);
@@ -256,12 +282,17 @@ impl SynthVoice {
         }
         let frequencies = self.frequencies(p, b, mods, &mut gains, mod_level, t);
         let oscillators = self.oscillators(p, b, mods, frequencies, gains);
-        let mut dry = oscillators * (1.0 - p.noise_mix) + self.noise(p, b, mods);
+        let noise = self.noise(p, b, mods);
+        let mut dry = [oscillators[0] * (1.0 - p.noise_mix) + noise, oscillators[1] * (1.0 - p.noise_mix) + noise];
 
         let drive = clamp(modulated(mods, p.drive, Slot::Drive), 0.0, 1.0);
         if drive > SILENT {
-            let driven = dry * (1.0 + drive * 3.5);
-            dry = driven / (1.0 + driven.abs() * 0.6);
+            let saturate = |x: f64| {
+                let driven = x * (1.0 + drive * 3.5);
+                driven / (1.0 + driven.abs() * 0.6)
+            };
+            dry[0] = saturate(dry[0]);
+            dry[1] = if b.is_stereo { saturate(dry[1]) } else { dry[0] };
         }
 
         let is_swept = (filter_env_amount > SILENT && !self.filter_env.is_idle())
@@ -274,7 +305,8 @@ impl SynthVoice {
         let peak = p.velocity;
         let level = self.env.step(t, env, peak, |norm| peak * norm * norm);
         let volume = modulated(mods, p.volume, Slot::Volume).max(0.0);
-        filtered * ((if p.bypass.env { 1.0 } else { level }) * volume)
+        let gain = (if p.bypass.env { 1.0 } else { level }) * volume;
+        [filtered[0] * gain, filtered[1] * gain]
     }
 
     /// The level of the modulation envelope (0–1); 0 when it moves nothing.
@@ -376,13 +408,14 @@ impl SynthVoice {
         let mut raw = [0.0; 3];
         for (n, value) in raw.iter_mut().enumerate() {
             let dt = (frequencies[n] / b.sample_rate).min(0.49);
-            *value = oscillator(b.table, p.osc_wave[n], self.phase[n], dt, self.osc_cycle[n]);
+            *value = oscillator(b.table, p.osc_wave[n], self.phase[n][0], dt, self.osc_cycle[n][0]);
         }
         raw
     }
 
     /// Move the oscillators on by a sample at `frequencies` and mix them,
-    /// with the sub-oscillator, at `gains`.
+    /// with the sub-oscillator, at `gains`: the left and right samples, the
+    /// same unless the layers of a unison are spread.
     #[inline]
     fn oscillators(
         &mut self,
@@ -391,25 +424,47 @@ impl SynthVoice {
         mods: &[LfoMods; 2],
         frequencies: [f64; 3],
         gains: [f64; 3],
-    ) -> f64 {
-        let mut outputs = [0.0; 3];
-        for (n, output) in outputs.iter_mut().enumerate() {
-            // A negative frequency runs the phase backwards: through-zero FM
-            // keeps the note's pitch, where stopping at zero would raise it.
-            let dt = clamp(frequencies[n] / b.sample_rate, -0.49, 0.49);
-            let advanced = self.phase[n] + dt;
-            self.osc_cycle[n] += advanced.floor();
-            self.phase[n] = advanced.rem_euclid(1.0);
-            *output = oscillator(b.table, p.osc_wave[n], self.phase[n], dt.abs(), self.osc_cycle[n]) * gains[n];
-        }
+    ) -> [f64; 2] {
         let sub_gain = clamp(modulated(mods, p.sub_gain, Slot::SubGain), 0.0, 1.0);
-        // One cycle over two of oscillator 1: an octave below it.
-        let sub = if sub_gain > SILENT {
-            sin_lookup(b.table, (self.osc_cycle[0].rem_euclid(2.0) + self.phase[0]) * 0.5) * sub_gain
+        let mut sum = [0.0; 2];
+        if b.layer_count > 1 {
+            for n in 0..3 {
+                // An oscillator at no gain only keeps its first layer going,
+                // for FM and the sub.
+                let used = if gains[n] > 0.0 { b.layer_count } else { 1 };
+                let layered = unison_oscillator(
+                    b.table,
+                    p.osc_wave[n],
+                    &mut self.phase[n][..used],
+                    &mut self.osc_cycle[n][..used],
+                    &b.layers[..used],
+                    frequencies[n],
+                    b.sample_rate,
+                );
+                sum[0] += layered[0] * gains[n];
+                sum[1] += layered[1] * gains[n];
+            }
         } else {
-            0.0
-        };
-        outputs[0] + outputs[1] + outputs[2] + sub
+            let mut outputs = [0.0; 3];
+            for (n, output) in outputs.iter_mut().enumerate() {
+                // A negative frequency runs the phase backwards: through-zero FM
+                // keeps the note's pitch, where stopping at zero would raise it.
+                let dt = clamp(frequencies[n] / b.sample_rate, -0.49, 0.49);
+                let advanced = self.phase[n][0] + dt;
+                self.osc_cycle[n][0] += advanced.floor();
+                self.phase[n][0] = advanced.rem_euclid(1.0);
+                *output =
+                    oscillator(b.table, p.osc_wave[n], self.phase[n][0], dt.abs(), self.osc_cycle[n][0]) * gains[n];
+            }
+            let mono = outputs[0] + outputs[1] + outputs[2];
+            sum = [mono, mono];
+        }
+        // One cycle over two of oscillator 1: an octave below it.
+        if sub_gain > SILENT {
+            let sub = sin_lookup(b.table, (self.osc_cycle[0][0].rem_euclid(2.0) + self.phase[0][0]) * 0.5) * sub_gain;
+            sum = sum.map(|side| side + sub);
+        }
+        sum
     }
 
     /// The next sample of filtered noise, at its level in the mix.
@@ -431,11 +486,12 @@ impl SynthVoice {
         tap(self.noise_filter.step(raw, &coefficients(g, k)), b.noise_weights)
     }
 
-    /// `x` through the main filter at `cutoff` Hz. The coefficients are the
-    /// block's unless an LFO or an envelope moves them (`is_swept`) for this
-    /// sample.
+    /// `x` (left, right) through the main filter at `cutoff` Hz. The
+    /// coefficients are the block's unless an LFO or an envelope moves them
+    /// (`is_swept`) for this sample. The right channel has its own filter
+    /// when the layers are spread, else it is the left one.
     #[inline]
-    fn filter(&mut self, b: &Block, mods: &[LfoMods; 2], x: f64, cutoff: f64, is_swept: bool) -> f64 {
+    fn filter(&mut self, b: &Block, mods: &[LfoMods; 2], x: [f64; 2], cutoff: f64, is_swept: bool) -> [f64; 2] {
         let is_modulated = is_swept
             || mods[0][Slot::Filter] != 0.0
             || mods[1][Slot::Filter] != 0.0
@@ -447,13 +503,26 @@ impl SynthVoice {
         } else {
             (b.g, b.k)
         };
-        if !b.is_steep {
-            return tap(self.filter.step(x, &coefficients(g, k)), b.filter_weights);
-        }
-        let (k1, k2, gain_2) = slope::stages(k, b.filter_mode);
-        let first = tap(self.filter.step(x, &coefficients(g, k1)), b.filter_weights);
-        tap(self.filter_2.step(first, &coefficients(g, k2)), b.filter_weights) * gain_2
+        let left = filter_channel(&mut self.filter, &mut self.filter_2, b, g, k, x[0]);
+        let right = if b.is_stereo {
+            filter_channel(&mut self.filter_right, &mut self.filter_right_2, b, g, k, x[1])
+        } else {
+            left
+        };
+        [left, right]
     }
+}
+
+/// `x` through the filter stages `first` and `second` (24 dB/oct only), at
+/// coefficient `g` and damping `k`.
+#[inline]
+fn filter_channel(first: &mut Svf, second: &mut Svf, b: &Block, g: f64, k: f64, x: f64) -> f64 {
+    if !b.is_steep {
+        return tap(first.step(x, &coefficients(g, k)), b.filter_weights);
+    }
+    let (k1, k2, gain_2) = slope::stages(k, b.filter_mode);
+    let stage_1 = tap(first.step(x, &coefficients(g, k1)), b.filter_weights);
+    tap(second.step(stage_1, &coefficients(g, k2)), b.filter_weights) * gain_2
 }
 
 #[cfg(test)]

@@ -133,6 +133,24 @@ fn lists_exports_and_imports() {
 }
 
 #[test]
+fn a_synth_preset_takes_unison_settings_even_copied_from_one_without() {
+    let mut s = session();
+    let plain =
+        ordrumbox_core::json::parse(r#"{"vco1":{"gain":0.6,"wave":"sawtooth"},"filter":{"freq":3500}}"#).unwrap();
+    s.synths.presets.set("PLAIN", plain);
+    let args =
+        r#"{"preset":"saws","from":"PLAIN","settings":{"unison.count":7,"unison.detune":30,"unison.spread":0.8}}"#;
+    let made = call(&mut s, "createSynthPreset", args).unwrap();
+    assert_eq!(get(&made, &["settings", "unison", "count"]).as_f64(), Some(7.0));
+    assert_eq!(get(&made, &["settings", "unison", "detune"]).as_f64(), Some(30.0));
+    assert_eq!(get(&made, &["settings", "unison", "spread"]).as_f64(), Some(0.8));
+    for refused in [r#"{"unison.count":9}"#, r#"{"unison.count":0}"#, r#"{"unison.spread":1.5}"#] {
+        let args = format!(r#"{{"preset":"saws","settings":{refused}}}"#);
+        assert!(call(&mut s, "updateSynthPreset", &args).is_err(), "{refused}");
+    }
+}
+
+#[test]
 fn synth_presets_are_designed() {
     let mut s = session();
     let args = r#"{"preset":"acid","settings":{"vco1.wave":"sawtooth","filter.freq":800,"filter.slope":24,

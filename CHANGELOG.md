@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### New
+- **Synth unison**: a *Unison* card on the synth editor's OSC tab makes each oscillator sound as 1 to 8 detuned
+  layers (*Layers*, *detune* in cents, stereo *spread*), each starting at its own phase: a supersaw is one saw
+  with 7 layers (the factory preset `SYNTHLEAD_SUPERSAW`). With a spread, the filter runs once per side. A preset
+  without a `unison` group plays as before; MCP: `unison.count`, `unison.detune` and `unison.spread` in
+  `createSynthPreset` and `updateSynthPreset`.
 - **Sample playback**: a sample has *Start*, *End*, *Attack*, *Hold*, *Reverse*, *Loop* and *Gate* (the sound holds for the note's
   length, then the decay is its release),
   next to its decay, in the kit editor and on the track editor's Sound tab. The waveform
