@@ -562,22 +562,27 @@
   "SYNTHLEAD_SUPERSAW": {
     "masterVolume": 0.7,
     "vco1": {
-      "gain": 0.5,
-      "octave": 0,
-      "detune": -14,
-      "wave": "sawtooth"
-    },
-    "vco2": {
-      "gain": 0.5,
+      "gain": 0.8,
       "octave": 0,
       "detune": 0,
       "wave": "sawtooth"
     },
-    "vco3": {
-      "gain": 0.5,
+    "vco2": {
+      "gain": 0,
       "octave": 0,
-      "detune": 14,
-      "wave": "sawtooth"
+      "detune": 0,
+      "wave": "sine"
+    },
+    "vco3": {
+      "gain": 0,
+      "octave": 0,
+      "detune": 0,
+      "wave": "sine"
+    },
+    "unison": {
+      "count": 7,
+      "detune": 22,
+      "spread": 0.8
     },
     "subGain": 0,
     "pitchPunch": 0,
@@ -608,10 +613,10 @@
       "release": 0.3
     },
     "lfo": {
-      "target": "vco3.detune",
+      "target": "NOT",
       "wave": "sine",
-      "freq": 0.3,
-      "depth": 0.15,
+      "freq": 0,
+      "depth": 0,
       "sync": "off"
     },
     "lfo2": {

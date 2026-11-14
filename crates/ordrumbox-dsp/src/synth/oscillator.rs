@@ -94,6 +94,31 @@ pub(super) fn noise_sample(state: u32) -> f64 {
     f64::from(state) / 2_147_483_648.0 - 1.0
 }
 
+/// The triangle wave at `phase` (0–1).
+#[inline]
+pub(super) fn triangle(phase: f64) -> f64 {
+    if phase < 0.25 {
+        phase * 4.0
+    } else if phase < 0.75 {
+        2.0 - phase * 4.0
+    } else {
+        phase * 4.0 - 4.0
+    }
+}
+
+/// The band-limited sawtooth at `phase`, moving by `dt` a sample.
+#[inline]
+pub(super) fn sawtooth(phase: f64, dt: f64) -> f64 {
+    phase * 2.0 - 1.0 - poly_blep(phase, dt)
+}
+
+/// The band-limited square at `phase`, moving by `dt` a sample.
+#[inline]
+pub(super) fn square(phase: f64, dt: f64) -> f64 {
+    let level = if phase < 0.5 { 1.0 } else { -1.0 };
+    level + poly_blep(phase, dt) - poly_blep((phase + 0.5) % 1.0, dt)
+}
+
 /// An oscillator of `wave` at `phase` (0–1) of its cycle number `cycle`,
 /// moving by `dt` a sample.
 ///
@@ -104,20 +129,9 @@ pub(super) fn noise_sample(state: u32) -> f64 {
 pub(super) fn oscillator(table: &SineTable, wave: Wave, phase: f64, dt: f64, cycle: f64) -> f64 {
     match wave {
         Wave::Sine => sin_lookup(table, phase),
-        Wave::Triangle => {
-            if phase < 0.25 {
-                phase * 4.0
-            } else if phase < 0.75 {
-                2.0 - phase * 4.0
-            } else {
-                phase * 4.0 - 4.0
-            }
-        }
-        Wave::Sawtooth => phase * 2.0 - 1.0 - poly_blep(phase, dt),
-        Wave::Square => {
-            let square = if phase < 0.5 { 1.0 } else { -1.0 };
-            square + poly_blep(phase, dt) - poly_blep((phase + 0.5) % 1.0, dt)
-        }
+        Wave::Triangle => triangle(phase),
+        Wave::Sawtooth => sawtooth(phase, dt),
+        Wave::Square => square(phase, dt),
         Wave::Random => lfo::sample_and_hold(cycle),
     }
 }

@@ -36,6 +36,7 @@ const DEFAULTS: &str = r#"{"masterVolume":0.8,"subGain":0,"pitchPunch":0,
     "filter":{"type":"lowpass","freq":400,"Q":1,"drive":0},
     "filterEnv":{"filterEnvelopeAmount":0},
     "fm":{"amount":0,"algo":0},
+    "unison":{"count":1,"detune":0,"spread":0},
     "lfo":{"target":"NOT","wave":"sine","freq":0,"depth":0,"sync":"off"},
     "lfo2":{"target":"NOT","wave":"sine","freq":0,"depth":0,"sync":"off"},
     "noise":{"mix":0,"filterType":"highpass","filterFreq":1000,"filterQ":1},
@@ -69,7 +70,7 @@ const fn meta(path: &'static str, min: f64, max: f64, step: f64, unit: &'static 
 }
 
 /// Every numeric control, in the JS order (the LFO targets follow it).
-pub const METAS: [Meta; 32] = [
+pub const METAS: [Meta; 35] = [
     meta("masterVolume", 0.0, 1.0, 0.01, ""),
     meta("subGain", 0.0, 1.0, 0.01, ""),
     meta("pitchPunch", 0.0, 1.0, 0.01, ""),
@@ -101,6 +102,9 @@ pub const METAS: [Meta; 32] = [
     meta("noise.filterQ", 0.1, 24.0, 0.1, ""),
     Meta { label: Some("FM"), ..meta("fm.amount", 0.0, 1.0, 0.01, "") },
     Meta { label: Some("Algo"), ..meta("fm.algo", 0.0, 4.0, 1.0, "") },
+    Meta { label: Some("Layers"), ..meta("unison.count", 1.0, ordrumbox_dsp::synth::MAX_UNISON as f64, 1.0, "") },
+    meta("unison.detune", 0.0, 100.0, 1.0, "ct"),
+    meta("unison.spread", 0.0, 1.0, 0.01, ""),
     meta("envelope.attack", 0.0, 0.5, 0.001, "s"),
     meta("envelope.decay", 0.0, 1.0, 0.001, "s"),
     meta("envelope.sustain", 0.0, 1.0, 0.01, ""),
@@ -121,10 +125,14 @@ pub fn find_meta(path: &str) -> Option<&'static Meta> {
     metas().find(|m| m.path == path)
 }
 
-/// What an LFO can modulate (`SYNTH_LFO_TARGETS`): off, then every control but the LFOs'.
+/// What an LFO can modulate (`SYNTH_LFO_TARGETS`): off, then every control but the LFOs' and the unison's.
 pub fn lfo_targets() -> Vec<&'static str> {
     std::iter::once("NOT")
-        .chain(metas().map(|m| m.path).filter(|p| !p.starts_with("lfo.") && !p.starts_with("lfo2.")))
+        .chain(
+            metas()
+                .map(|m| m.path)
+                .filter(|p| !p.starts_with("lfo.") && !p.starts_with("lfo2.") && !p.starts_with("unison.")),
+        )
         .collect()
 }
 
@@ -197,11 +205,12 @@ pub const BYPASS_FLAGS: [(&str, &str); 8] = [
 ];
 
 /// The cards in order (`SYNTH_GROUP_ORDER`), and the master card's controls.
-pub const GROUP_ORDER: [&str; 13] = [
+pub const GROUP_ORDER: [&str; 14] = [
     "scope",
     "vco1",
     "vco2",
     "vco3",
+    "unison",
     "fm",
     "filter",
     "filterEnv",
@@ -234,6 +243,7 @@ pub fn group_label(group: &str) -> String {
         "filter" => "Filter".into(),
         "filterEnv" => "Filter Env".into(),
         "fm" => "FM".into(),
+        "unison" => "Unison".into(),
         "lfo" => "LFO1".into(),
         "envelope" => "Envelope".into(),
         "modEnvelope" => "Mod Env".into(),
