@@ -22,6 +22,7 @@ mod master;
 mod mcp;
 mod mcp_link;
 mod menu;
+mod midi_settings;
 mod note_drag;
 mod output;
 mod panel;
@@ -46,12 +47,12 @@ mod user_data;
 mod view;
 
 pub use audio_output::{
-    AudioOutput, HostOutput, MidiInput, OutputDevices, StartOutput, StartedOutput, chosen_device, chosen_midi_input,
-    host_output,
+    AudioOutput, HostOutput, OutputDevices, StartOutput, StartedOutput, chosen_device, host_output,
 };
 pub use font::load as load_font;
 pub use mcp_link::run_bridge as run_mcp_bridge;
 pub use menu::Command;
+pub use midi_settings::{MidiPort, chosen_clock_in, chosen_clock_out, chosen_midi_input, chosen_midi_output};
 pub use panel::Id as PanelId;
 pub use scale::Scale;
 pub use scroll::{MIN_WINDOW, grip_side};

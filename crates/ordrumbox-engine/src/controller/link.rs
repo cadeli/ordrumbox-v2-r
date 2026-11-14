@@ -1,7 +1,7 @@
 //! What the two sides share: the inbox the controller posts into, the scope and
 //! the published position.
 
-use crate::engine::{HostTransport, Position};
+use crate::engine::{HostMix, HostTransport, Position};
 use crate::kit::SampleBank;
 use crate::midi::KeyMap;
 use crate::pass::Pass;
@@ -24,6 +24,8 @@ pub(super) struct Inbox {
     pub(super) next: Option<Arc<Pass>>,
     pub(super) bank: Option<Arc<SampleBank>>,
     pub(super) master: Option<MasterSettings>,
+    /// A live mix on top of the tracks' (a MIDI controller's knobs).
+    pub(super) mix: Option<HostMix>,
     pub(super) preview: Option<Arc<Pass>>,
     pub(super) keymap: Option<Arc<KeyMap>>,
     /// Under a stopped plugin host: the pass it would start in, for the

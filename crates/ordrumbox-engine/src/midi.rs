@@ -165,6 +165,68 @@ pub struct BlockNote {
     pub velocity: Option<f32>,
 }
 
+/// A MIDI timing message: the clock and the transport, sent out with the
+/// notes or followed from a device.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClockMessage {
+    /// One of the 24 pulses of a beat.
+    Pulse,
+    Start,
+    Continue,
+    Stop,
+    /// Song position pointer: sixteenth notes (6 pulses each) from the start.
+    Position(u16),
+}
+
+/// The highest song position a pointer holds (14 bits).
+const MAX_POSITION: u16 = 0x3FFF;
+
+impl ClockMessage {
+    /// The message `bytes` is, if it is one.
+    #[must_use]
+    pub fn parse(bytes: &[u8]) -> Option<Self> {
+        match *bytes {
+            [0xF8, ..] => Some(Self::Pulse),
+            [0xFA, ..] => Some(Self::Start),
+            [0xFB, ..] => Some(Self::Continue),
+            [0xFC, ..] => Some(Self::Stop),
+            [0xF2, low, high, ..] => Some(Self::Position(u16::from(low & 0x7F) | u16::from(high & 0x7F) << 7)),
+            _ => None,
+        }
+    }
+
+    /// The bytes of the message, and how many of the three are used.
+    #[must_use]
+    pub fn bytes(self) -> ([u8; 3], usize) {
+        match self {
+            Self::Pulse => ([0xF8, 0, 0], 1),
+            Self::Start => ([0xFA, 0, 0], 1),
+            Self::Continue => ([0xFB, 0, 0], 1),
+            Self::Stop => ([0xFC, 0, 0], 1),
+            Self::Position(position) => {
+                let position = position.min(MAX_POSITION);
+                ([0xF2, (position & 0x7F) as u8, (position >> 7) as u8], 3)
+            }
+        }
+    }
+}
+
+/// A timing message sent out, at an engine clock frame.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ClockEvent {
+    /// Frames rendered since the engine was made, when the message is due.
+    pub clock: u64,
+    pub message: ClockMessage,
+}
+
+/// A timing message sent out, timed in the block it falls in.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BlockClock {
+    /// Frames from the start of the block.
+    pub timing: u32,
+    pub message: ClockMessage,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -207,6 +269,23 @@ mod tests {
         keys.dedup();
         assert_eq!(keys.len(), KEY_COUNT, "each key once");
         assert_eq!(rest[KEY_COUNT], None);
+    }
+
+    #[test]
+    fn timing_messages_round_trip_through_their_bytes() {
+        for message in [
+            ClockMessage::Pulse,
+            ClockMessage::Start,
+            ClockMessage::Continue,
+            ClockMessage::Stop,
+            ClockMessage::Position(0x2ABC),
+        ] {
+            let (bytes, used) = message.bytes();
+            assert_eq!(ClockMessage::parse(&bytes[..used]), Some(message));
+        }
+        assert_eq!(ClockMessage::parse(&[0x90, 60, 100]), None);
+        assert_eq!(ClockMessage::parse(&[0xF2, 1]), None, "a position needs both its bytes");
+        assert_eq!(ClockMessage::Position(u16::MAX).bytes().0, [0xF2, 0x7F, 0x7F], "kept in 14 bits");
     }
 
     #[test]

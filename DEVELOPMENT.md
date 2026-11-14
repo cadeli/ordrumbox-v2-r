@@ -192,6 +192,25 @@ MIDI) and to the UI thread through a channel, where `Session::midi_note` writes 
 `Controller::set_live_midi` makes the controller post the pattern's key map without a host. No snapshot changed: the passes of a song without a loop or a
 metronome are built as before.
 
+The app's MIDI also goes out, and a clock comes in. Output (`midiOutput`, `midiClockOut`;
+`ordrumbox-app/src/midi_out.rs`): after each chunk the callback takes the engine's notes
+(`take_notes`, which a plugin already sends) and clock (`Engine::set_clock_out`, `take_clock`,
+`engine/clock_out.rs`: 24 pulses a beat at the pass's frames, Start or Position + Continue on
+`Engine::play`, Stop on `stop`, none under a plugin) and writes them, with their offset, to a ring;
+a thread reads it every half millisecond, holds each message until its time and sends it. The
+device's latency is not compensated. Input clock (`midiClockIn`, `midi_sync.rs`): the MIDI thread
+feeds `ClockFollower` (`ordrumbox-engine/src/clock_in.rs`, a pure state machine, tested without a
+port), the callback asks it for a `HostTransport` and calls `render_synced`, so the transport follows
+a MIDI clock exactly as it follows a plugin host: the controller posts a cue while stopped, plays
+at the tempo (a tenth of a beat a minute, with hysteresis, so jitter does not rebuild the passes)
+and seeks past 32 frames of drift. `Session::set_clock_follow` and `Ui::idle` keep `update` running
+while it follows; `Controller::leave_host` gives the library's tempo back when it stops.
+The knobs (`ordrumbox-engine/src/controls.rs`, `ordrumbox-ui/src/session_controls.rs`, the
+`midiControls` setting) make a `HostMix` the controller posts (`Controller::set_live_mix`): the
+engine's host path, so no pass is rebuilt and nothing is an undo step. No snapshot changed: the
+engine sends no clock unless asked, and `AudioSide::render` now sets the block it takes MIDI
+from, as `render_synced` did.
+
 A note has a length and a shift. `lengthSteps` (1 by default, in steps of its track, may be a
 fraction) is how long it is held: a synth note before its release, the MIDI note the plugin
 sends, the note a MIDI export writes; a sample plays to its own end. `shiftSteps` (0 by

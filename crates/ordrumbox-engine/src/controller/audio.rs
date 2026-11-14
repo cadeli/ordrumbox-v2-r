@@ -2,7 +2,7 @@
 
 use super::link::{Command, Inbox, Link, SCOPE_SIZE, Scope, Snapshot, lock, try_lock};
 use crate::engine::{Engine, HostMix, HostTransport, host_pass};
-use crate::midi::BlockNote;
+use crate::midi::{BlockClock, BlockNote};
 use std::sync::Arc;
 
 /// The audio-callback side: owns the [`Engine`].
@@ -41,8 +41,19 @@ impl AudioSide {
         self.engine.take_notes(self.block_start, self.block_frames, send);
     }
 
+    /// The MIDI clock the block just rendered sent ([`Self::set_clock_out`]), in time order.
+    pub fn take_clock(&mut self, send: impl FnMut(BlockClock)) {
+        self.engine.take_clock(self.block_start, self.block_frames, send);
+    }
+
+    /// Send the MIDI clock from now on (or stop sending it).
+    pub fn set_clock_out(&mut self, on: bool) {
+        self.engine.set_clock_out(on);
+    }
+
     /// Render one callback's worth of stereo frames.
     pub fn render(&mut self, left: &mut [f32], right: &mut [f32]) {
+        (self.block_start, self.block_frames) = (self.engine.clock(), left.len().min(right.len()));
         self.take_inbox();
         self.engine.render(left, right);
         self.publish(left, right, None, false);
@@ -145,6 +156,9 @@ pub(super) fn take(engine: &mut Engine, inbox: &mut Inbox, host: Option<HostTran
     }
     if let Some(master) = inbox.master.take() {
         engine.set_master(master);
+    }
+    if let Some(mix) = inbox.mix.take() {
+        engine.set_host_mix(mix);
     }
     match inbox.command.take() {
         Some(Command::Play(pass)) => engine.play(pass),

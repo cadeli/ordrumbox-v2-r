@@ -11,6 +11,8 @@
 
 mod audio;
 mod midi;
+mod midi_out;
+mod midi_sync;
 
 use std::num::NonZeroU32;
 use std::rc::Rc;
@@ -37,10 +39,12 @@ struct App {
     gfx: Option<Gfx>,
     ui: Ui,
     error: Option<String>,
-    /// The MIDI input open, and where its notes come to the UI thread.
+    /// The MIDI input open, and where its notes, knobs and clock come to the UI thread.
     midi: Option<midi::Input>,
-    notes: Receiver<midi::NoteOn>,
-    notes_sender: Sender<midi::NoteOn>,
+    events: Receiver<midi::Event>,
+    events_sender: Sender<midi::Event>,
+    /// The MIDI output open.
+    midi_out: Option<midi_out::Output>,
     waker: ordrumbox_ui::Waker,
 }
 
@@ -50,12 +54,15 @@ impl App {
         event_loop.exit();
     }
 
-    /// Open the MIDI input now chosen, the one open closed first; what goes
+    /// Open the MIDI ports now chosen, the ones open closed first; what goes
     /// wrong, or that none is there, is said in the status line.
     fn open_midi(&mut self) {
+        // Following the clock needs the clock's input: not before the input is open.
+        midi_sync::set_following(false);
         self.midi = None;
+        self.midi_out = None;
         let opened = ordrumbox_ui::chosen_midi_input()
-            .and_then(|choice| midi::open(&choice, self.notes_sender.clone(), self.waker.clone()));
+            .and_then(|choice| midi::open(&choice, self.events_sender.clone(), self.waker.clone()));
         match opened {
             Ok(Some(input)) => {
                 self.ui.session.say(&format!("MIDI input: {}", input.name));
@@ -65,18 +72,67 @@ impl App {
             Err(e) => self.ui.session.say(&e),
         }
         self.ui.session.set_midi_open(self.midi.is_some());
+        self.open_midi_out();
+        self.follow_midi_clock();
     }
 
-    /// Between frames: a MIDI input chosen is opened, the notes played reach the session.
+    /// Open the MIDI output now chosen, and send the clock through it if asked.
+    fn open_midi_out(&mut self) {
+        match ordrumbox_ui::chosen_midi_output().and_then(|choice| midi_out::open(&choice)) {
+            Ok(Some(output)) => {
+                self.ui.session.say(&format!("MIDI output: {}", output.name));
+                self.midi_out = Some(output);
+            }
+            Ok(None) => {}
+            Err(e) => self.ui.session.say(&e),
+        }
+        let clock = ordrumbox_ui::chosen_clock_out().unwrap_or_else(|e| {
+            self.ui.session.say(&e);
+            false
+        });
+        midi_out::set_clock(clock);
+    }
+
+    /// Follow the clock of the MIDI input, if asked and an input is open.
+    fn follow_midi_clock(&mut self) {
+        let asked = ordrumbox_ui::chosen_clock_in().unwrap_or_else(|e| {
+            self.ui.session.say(&e);
+            false
+        });
+        let follow = asked && self.midi.is_some();
+        midi_sync::set_following(follow);
+        self.ui.session.set_clock_follow(follow);
+        if follow {
+            self.ui.session.say("MIDI clock: the transport follows it");
+        }
+    }
+
+    /// Between frames: the MIDI ports chosen are opened, what the input
+    /// played reaches the session, and what the output says.
     fn midi_idle(&mut self) -> bool {
         let mut redraw = false;
         if self.ui.session.take_midi_change() {
             self.open_midi();
             redraw = true;
         }
-        while let Ok(note) = self.notes.try_recv() {
-            self.ui.session.midi_note(note.channel, note.key, note.velocity);
+        if let Some(error) = self.midi_out.as_ref().and_then(midi_out::Output::take_error) {
+            self.ui.session.say(&error);
             redraw = true;
+        }
+        while let Ok(event) = self.events.try_recv() {
+            redraw |= match event {
+                midi::Event::Note(note) => {
+                    self.ui.session.midi_note(note.channel, note.key, note.velocity);
+                    true
+                }
+                midi::Event::Control { channel, controller, value } => {
+                    self.ui.session.midi_control(channel, controller, value)
+                }
+                midi::Event::Clock(running) => {
+                    self.ui.session.set_clock_running(running);
+                    true
+                }
+            };
         }
         redraw
     }
@@ -402,6 +458,7 @@ fn open_window() -> Result<(), Box<dyn std::error::Error>> {
     });
     session.offer_devices(audio::devices);
     session.offer_midi_inputs(midi::ports);
+    session.offer_midi_outputs(midi_out::ports);
     session.start_updates(waker.clone());
     session.start_mcp(waker.clone());
     // MIDI files given on the command line ("open with"): imported.
@@ -423,8 +480,9 @@ fn open_window() -> Result<(), Box<dyn std::error::Error>> {
         Ok("reset") => session.run(Command::FactoryReset),
         _ => {}
     }
-    let (notes_sender, notes) = std::sync::mpsc::channel();
-    let mut app = App { gfx: None, ui: Ui::new(session), error: None, midi: None, notes, notes_sender, waker };
+    let (events_sender, events) = std::sync::mpsc::channel();
+    let mut app =
+        App { gfx: None, ui: Ui::new(session), error: None, midi: None, events, events_sender, midi_out: None, waker };
     app.open_midi();
     event_loop.run_app(&mut app)?;
     match app.error {

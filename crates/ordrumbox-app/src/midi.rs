@@ -2,13 +2,16 @@
 //! `midir`. A note on plays the pattern's tracks (the engine's key map, as
 //! under a plugin host) and, when recording, is written to the pattern. The
 //! notes cross two ways: a ring the audio callback empties without locking
-//! or allocating, and a channel the UI thread reads between frames.
+//! or allocating, and a channel the UI thread reads between frames. A
+//! control change goes to the UI thread (the knobs, `Session::midi_control`);
+//! the clock goes to `midi_sync` when it is followed.
 
 use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 use std::sync::mpsc::Sender;
 
 use midir::{MidiInput, MidiInputConnection};
-use ordrumbox_ui::{MidiInput as Choice, Waker};
+use ordrumbox_engine::ClockMessage;
+use ordrumbox_ui::{MidiPort, Waker};
 
 /// A note on: its channel, key and velocity (0–1).
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -16,6 +19,20 @@ pub struct NoteOn {
     pub channel: u8,
     pub key: u8,
     pub velocity: f32,
+}
+
+/// What the MIDI thread tells the UI thread.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Event {
+    Note(NoteOn),
+    /// A control change: the value (0–127) of a controller on a channel.
+    Control {
+        channel: u8,
+        controller: u8,
+        value: u8,
+    },
+    /// The machine whose clock is followed started (`true`) or stopped.
+    Clock(bool),
 }
 
 /// Notes the ring holds; past them the oldest wait and the newest are lost.
@@ -82,6 +99,17 @@ pub fn note_on(message: &[u8]) -> Option<NoteOn> {
     })
 }
 
+/// The control change a MIDI message is, if it is one (the controllers from
+/// 120 up are channel modes, not knobs).
+pub fn control(message: &[u8]) -> Option<Event> {
+    let [status, controller, value, ..] = *message else { return None };
+    (status & 0xF0 == 0xB0 && controller < 120).then(|| Event::Control {
+        channel: status & 0x0F,
+        controller,
+        value: value.min(127),
+    })
+}
+
 /// The names of the MIDI input ports, for Edit > Preferences.
 pub fn ports() -> Vec<String> {
     let Ok(input) = MidiInput::new("orDrumbox ports") else { return Vec::new() };
@@ -101,15 +129,16 @@ impl std::fmt::Debug for Input {
 }
 
 /// Open the port `choice` names, its notes going to [`NOTES`] and to `ui`,
-/// which `waker` then wakes. `Ok(None)`: no port to open (none chosen, none
-/// connected, or the port chosen is not).
-pub fn open(choice: &Choice, ui: Sender<NoteOn>, waker: Waker) -> Result<Option<Input>, String> {
+/// which `waker` then wakes, with its control changes and the starts and
+/// stops of the clock followed. `Ok(None)`: no port to open (none chosen,
+/// none connected, or the port chosen is not).
+pub fn open(choice: &MidiPort, ui: Sender<Event>, waker: Waker) -> Result<Option<Input>, String> {
     let input = MidiInput::new("orDrumbox").map_err(|e| format!("MIDI: {e}"))?;
     let ports = input.ports();
     let port = match choice {
-        Choice::Off => return Ok(None),
-        Choice::First => ports.first(),
-        Choice::Named(wanted) => ports.iter().find(|p| input.port_name(p).is_ok_and(|name| name == *wanted)),
+        MidiPort::Off => return Ok(None),
+        MidiPort::First => ports.first(),
+        MidiPort::Named(wanted) => ports.iter().find(|p| input.port_name(p).is_ok_and(|name| name == *wanted)),
     };
     let Some(port) = port else { return Ok(None) };
     let name = input.port_name(port).map_err(|e| format!("MIDI: {e}"))?;
@@ -118,10 +147,18 @@ pub fn open(choice: &Choice, ui: Sender<NoteOn>, waker: Waker) -> Result<Option<
             port,
             "orDrumbox in",
             move |_, message, ()| {
-                let Some(note) = note_on(message) else { return };
-                NOTES.push(note);
+                let event = match ClockMessage::parse(message) {
+                    Some(clock) => crate::midi_sync::input(clock).map(Event::Clock),
+                    None => note_on(message).map(|note| {
+                        NOTES.push(note);
+                        Event::Note(note)
+                    }),
+                }
+                .or_else(|| control(message));
                 // The UI thread is gone when the app quits: nobody to tell.
-                if ui.send(note).is_ok() {
+                if let Some(event) = event
+                    && ui.send(event).is_ok()
+                {
                     waker.wake();
                 }
             },
@@ -142,6 +179,14 @@ mod tests {
         assert_eq!(note_on(&[0x80, 60, 64]), None);
         assert_eq!(note_on(&[0xB0, 1, 64]), None);
         assert_eq!(note_on(&[0x90, 60]), None);
+    }
+
+    #[test]
+    fn a_control_change_is_a_knob_unless_it_is_a_channel_mode() {
+        assert_eq!(control(&[0xB2, 21, 99]), Some(Event::Control { channel: 2, controller: 21, value: 99 }));
+        assert_eq!(control(&[0xB0, 120, 0]), None, "all sound off");
+        assert_eq!(control(&[0x90, 21, 99]), None);
+        assert_eq!(control(&[0xB0, 7]), None);
     }
 
     #[test]
