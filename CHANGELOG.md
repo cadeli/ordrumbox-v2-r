@@ -3,6 +3,14 @@
 ## Unreleased
 
 ### New
+- **Twelve demo patterns with chords, organ, strings, leads and pads** in the factory library: *Neo Soul Keys*,
+  *Funk Clav Riff*, *Blues Organ 12 Bar*, *Reggae Organ Bubble*, *Disco Strings and Brass*, *Bossa Pizzicato*,
+  *Synthwave Lead*, *Trance Supersaw*, *Ambient Pads*, *Chiptune Arp*, *Marimba Phasing* (two phrases of 12 and 11
+  steps) and *Arp Showcase*. Chords are notes on the same step of a synth track.
+- **Six demo patterns with a synth bass** in the factory library, each a drum groove of the library plus a `BASS`
+  track on a bass preset: *Reggae Sub Bass* (`BASS_SUB`), *Acid Squelch* (`BASS_ACID`), *House Pluck Bass*
+  (`BASS_PLUCK`), *DnB Wobble Bass* (`BASS_WOBBLE`), *Funk Slap Bass* (`BASS_TOUCH`) and *Electro FM Bass*
+  (`BASS_FM`).
 - **Synth modulation matrix**: a *Matrix* card on the synth editor's MOD tab holds 8 lines, each a source, a
   target and an amount from -1 to 1 (a negative one inverts the source). The sources are LFO 1 and 2 (at their
   own rate and wave, whatever they target), the envelope and the mod envelope, the note's velocity and pitch, and a
