@@ -57,6 +57,7 @@ pub fn add_clicks(pass: &mut Pass) {
             mono: false,
             velocity: CLICK_LEVEL as f32,
             note: None,
+            note_frames: 0,
         });
     }
     // Stable: a note and a click on the same frame keep their order.

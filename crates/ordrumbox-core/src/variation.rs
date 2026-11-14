@@ -320,7 +320,7 @@ pub(crate) fn apply(
     }
 }
 
-/// A note added by the variation: pitch and pan of `from`, default everything else.
+/// A note added by the variation: pitch, pan and length of `from`, default everything else.
 fn add(flat: &mut Hits, track_index: usize, from: &Hit, target: Target, velocity: f64) {
     flat.entry(target.tick).or_default().push(Hit {
         track: track_index,
@@ -330,6 +330,7 @@ fn add(flat: &mut Hits, track_index: usize, from: &Hit, target: Target, velocity
         pitch: from.pitch,
         velocity,
         pan: from.pan,
+        length_steps: from.length_steps,
     });
 }
 

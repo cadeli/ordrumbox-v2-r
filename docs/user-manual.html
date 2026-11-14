@@ -440,7 +440,8 @@ cursor otherwise. Under the rows: the <strong>+ NEW TRACK</strong> button, then 
 <h3>The lane</h3>
 <p>Under the rows, the lane shows one setting of the track editor's track, a bar per note:
 <strong>VELOCITY</strong>, <strong>CHANCE</strong> (its probability), <strong>RETRIG</strong> (how many times it plays)
-or <strong>PAN</strong>, picked by the tabs on its left. Click a bar to set its value at that height, or drag across
+<strong>PAN</strong>, <strong>LENGTH</strong> (how long it is held, in steps) or <strong>SHIFT</strong> (how early or
+late it plays, off the grid), picked by the tabs on its left. Click a bar to set its value at that height, or drag across
 the bars to draw them; a drag is one undo step.</p>
 
 <h3>Mouse</h3>
@@ -591,7 +592,7 @@ The header's VARIATION knob scales them.</p>
 It shows the selected note (<kbd>Shift</kbd>+click in the grid, a click in the piano roll), else the step under the
 cursor, else the track's first note.</p>
 <figure>
-  <img src="images/note-editor.png" alt="The note editor: velocity, pitch and pan knobs, and the Trigger tab">
+  <img src="images/note-editor.png" alt="The note editor: velocity, pitch, pan and length knobs, and the Trigger tab">
   <figcaption>The note editor on the first KICK note, Trigger tab.</figcaption>
 </figure>
 
@@ -601,6 +602,7 @@ cursor, else the track's first note.</p>
 <tr><td><strong>Velocity</strong></td><td>0–100 %</td><td>How hard the note is hit. From 90 % it counts as an accent (<kbd>L</kbd>).</td></tr>
 <tr><td><strong>Pitch</strong></td><td>−24 to +24 st</td><td>Semitones from the track's pitch.</td></tr>
 <tr><td><strong>Pan</strong></td><td>−1 to +1</td><td>The note's stereo position.</td></tr>
+<tr><td><strong>Length</strong></td><td>0.25–16 steps (default 1)</td><td>How long the note is held: a synth note before its release, the MIDI note sent or exported. A sample plays to its own end. The piano roll draws a note out further.</td></tr>
 </table>
 
 <h3>Tabs</h3>
@@ -618,6 +620,7 @@ cursor, else the track's first note.</p>
 <tr><td rowspan="3"><strong>Arpeggio</strong></td><td>Scale</td><td>the scales of <code>scales.json</code></td><td>The scale the arpeggio climbs.</td></tr>
 <tr><td>Direction</td><td>up, down, updown, random</td><td>The direction.</td></tr>
 <tr><td>Range</td><td>0–12</td><td>Number of arpeggio notes (0 = off).</td></tr>
+<tr><td><strong>Timing</strong></td><td>Shift</td><td>−50–50 % of a step</td><td>The note off the grid: below 0 early, above late, with its retriggers.</td></tr>
 </table>
 <p>A cycled note plays when <code>(loop + Offset) mod Cycle = 0</code>. Arpeggio notes and euclidean fills do not fade.</p>
 
@@ -642,6 +645,7 @@ The note editor stays under it.</p>
 <tr><td>Click a note</td><td>Select it (and hear it).</td></tr>
 <tr><td>Click the selected note</td><td>Delete it.</td></tr>
 <tr><td>Drag a note</td><td>Up / down: velocity; sideways: pitch (a semitone every 12 px). The first movement chooses which; the value shows over the note; one undo step per drag.</td></tr>
+<tr><td>Drag the right edge of a note</td><td>Its length, by quarters of a step, up to the end of the pattern; one undo step per drag. A note is drawn as wide as it is long, and moved by its shift.</td></tr>
 <tr><td>Click a key</td><td>Hear that pitch.</td></tr>
 <tr><td>Wheel</td><td>Scroll the pitches (<kbd>Shift</kbd>: the pages).</td></tr>
 <tr><td><strong>&lt;</strong> <strong>&gt;</strong></td><td>Previous / next page.</td></tr>
@@ -968,7 +972,7 @@ In the plugin, <kbd>Alt</kbd> stands for <kbd>Ctrl</kbd> (<a href="#plugin">sect
 <tr><td><kbd>Home</kbd>, keypad <kbd>Enter</kbd></td><td>Back to the first beat or measure. A song stopped keeps its place: <kbd>Space</kbd> goes on from there.</td></tr>
 <tr><td><kbd>Shift</kbd>+click on the song ruler</td><td>Loop the song from the cursor's measure to the one clicked (Play &gt; Clear the loop ends it).</td></tr>
 <tr><td><kbd>F9</kbd> <kbd>F8</kbd></td><td>Metronome on / off; tap the tempo.</td></tr>
-<tr><td><kbd>Ctrl</kbd>+<kbd>R</kbd></td><td>Record: while the pattern plays, <kbd>Q</kbd>–<kbd>P</kbd> also put a note on the step that plays.</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>R</kbd></td><td>Record: while the pattern plays, <kbd>Q</kbd>–<kbd>P</kbd> also put a note on the step that plays. With <strong>Play › Record off the grid</strong> on, the note keeps how early or late it was played, as its Shift.</td></tr>
 <tr><td><kbd>Ctrl</kbd>+<kbd>,</kbd></td><td>Preferences: sound output, MIDI input (a keyboard or pad plays the tracks, and is recorded with <kbd>Ctrl</kbd>+<kbd>R</kbd>), metronome, VU meters, toasts.</td></tr>
 <tr><td><kbd>F11</kbd>, <kbd>Ctrl</kbd>+<kbd>W</kbd></td><td>Full screen; close the window.</td></tr>
 <tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>Previous / next pattern (<kbd>Shift</kbd>: arrangement; also <kbd>Page Up</kbd> <kbd>Page Down</kbd>)</td></tr>
@@ -1092,7 +1096,7 @@ synth). Past the 15 channels, the tracks left take keys of channel 10 from 84 up
 <ul>
   <li><strong>In</strong>: a note on a track's channel plays that track at the note's pitch; a note on any other channel plays the drum
       track with that key, at its velocity, whether the host plays or not.</li>
-  <li><strong>Out</strong>: the notes the pattern plays go out where they come in, with their pitch, a 16th long. Tracks the host mutes
+  <li><strong>Out</strong>: the notes the pattern plays go out where they come in, with their pitch, as long as the note (a step of its track unless its Length says otherwise). Tracks the host mutes
       send nothing. A clip recorded from this output and played back into the plugin plays the same tracks at the same pitches.</li>
 </ul>
 
@@ -1126,8 +1130,9 @@ A release is named by its version alone (<code>0.1.1</code>); other builds add <
 <h3>Factory reset</h3>
 <p><strong>Help › Factory reset...</strong> moves your files to <code>backups/</code> in the user data folder — <code>library.json</code>,
 <code>kits.json</code>, <code>settings.json</code>, <code>synth_presets.json</code>, <code>samples/</code>, <code>songs/</code> — and reloads
-everything from the assets, as at first start. <strong>File › Restore user data</strong> brings them back. <kbd>Enter</kbd> resets,
-<kbd>Esc</kbd> or a click cancels.</p>
+everything from the assets, as at first start. <strong>File › Restore user data</strong> brings them back. <kbd>←</kbd> <kbd>→</kbd> choose between
+<em>Keep</em> and <em>Reset</em>, <kbd>Enter</kbd> runs the chosen one, <kbd>Esc</kbd> cancels; a click on a button takes it,
+a click elsewhere cancels.</p>
 
 </main>
 <footer style="text-align:center;color:var(--muted);padding:24px 16px;border-top:1px solid var(--line)">

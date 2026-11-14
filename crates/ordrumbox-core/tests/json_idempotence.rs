@@ -13,7 +13,7 @@ use ordrumbox_core::json::{self, Object, Value};
 use ordrumbox_core::{Library, Note, Track};
 
 /// A non-default value of every note field, in `Note::KEYS` order.
-const NOTE_VALUES: [(&str, &str); 17] = [
+const NOTE_VALUES: [(&str, &str); 19] = [
     ("velocity", "0.55"),
     ("beat", "5"),
     ("step", "2"),
@@ -31,12 +31,14 @@ const NOTE_VALUES: [(&str, &str); 17] = [
     ("cycleOffset", "1"),
     ("arpScale", r#""minor""#),
     ("arpDirection", r#""down""#),
+    ("lengthSteps", "2.5"),
+    ("shiftSteps", "-0.25"),
 ];
 
 const LFO: &str = r#"{"freq":2,"min":0.2,"max":0.9,"phase":0.25,"type":"triangle"}"#;
 
 /// A non-default value of every track field, in `Track::KEYS` order.
-const TRACK_VALUES: [(&str, &str); 72] = [
+const TRACK_VALUES: [(&str, &str); 73] = [
     ("name", r#""SNARE""#),
     ("autoAssign", "false"),
     ("samplePath", r#""real/snare.wav""#),
@@ -56,6 +58,7 @@ const TRACK_VALUES: [(&str, &str); 72] = [
     ("autoMode", "true"),
     ("useSynth", "true"),
     ("mono", "true"),
+    ("legato", "true"),
     ("hitVariation", "40"),
     ("noteVariation", "60"),
     ("probability", "0.9"),

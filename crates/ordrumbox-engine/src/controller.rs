@@ -552,6 +552,7 @@ impl Controller {
                 mono: false,
                 velocity: 1.0,
                 note: None,
+                note_frames: 0,
             }],
             strips: vec![ordrumbox_dsp::StripSettings::default()],
             ..Pass::default()

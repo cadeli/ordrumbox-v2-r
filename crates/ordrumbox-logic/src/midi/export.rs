@@ -7,7 +7,8 @@
 //! next free channel at the sample's root note (else their mapping's key,
 //! else C3), past the 15th sharing them again from the first; a name the
 //! catalog does not know is a bass drum. The velocity LFO
-//! scales the velocity, the pitch LFO adds semitones; notes last a 16th, or
+//! scales the velocity, the pitch LFO adds semitones; notes last their length
+//! (a step of their track by default), or
 //! end where their key is struck again on their track, so that no key is
 //! struck while it sounds. The tempo track carries a signature, a text event.
 
@@ -25,8 +26,6 @@ const MIDI_RATIO: f64 = PPQN as f64 / TICK as f64;
 const DRUM_CHANNEL: u8 = 9;
 /// The channels left to melodic instruments: all 16 but the drums'.
 const MELODIC_CHANNELS: [u8; 15] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15];
-/// A 16th at 96 PPQN.
-const NOTE_LENGTH: f64 = 24.0;
 /// Bass Drum 1.
 const DEFAULT_NOTE: f64 = 36.0;
 /// The largest tempo event value, microseconds per beat (24 bits).
@@ -114,10 +113,12 @@ fn assign(names: &[&str], roots: &[(String, f64)]) -> Vec<(String, Target)> {
     targets
 }
 
-/// A note as written: its tick, key and velocity bytes.
+/// A note as written: its tick, how long it lasts in ticks, its key and
+/// velocity bytes.
 #[derive(Debug, Clone, Copy)]
 struct NoteEvent {
     tick: f64,
+    length_ticks: f64,
     key: u8,
     velocity: u8,
 }
@@ -125,20 +126,21 @@ struct NoteEvent {
 /// `buildInstrumentTrackFromEvents`: name, program, then note on/off pairs.
 fn instrument_track(name: &str, target: Target, mut events: Vec<NoteEvent>) -> Vec<u8> {
     events.sort_by(|a, b| a.tick.total_cmp(&b.tick).then(a.key.cmp(&b.key)));
-    // Notes of one key at one tick are one note, at the loudest velocity.
+    // Notes of one key at one tick are one note, at the loudest velocity and the longest length.
     events.dedup_by(|later, kept| {
         let same = later.tick == kept.tick && later.key == kept.key;
         if same {
             kept.velocity = kept.velocity.max(later.velocity);
+            kept.length_ticks = kept.length_ticks.max(later.length_ticks);
         }
         same
     });
-    // A note ends a 16th later, or where its key is struck again.
+    // A note ends its length later (a whole tick at least), or where its key is struck again.
     let mut next_strike = [f64::INFINITY; 128];
     let mut ends = vec![0.0; events.len()];
     for (end, e) in ends.iter_mut().zip(&events).rev() {
         let key = usize::from(e.key & 0x7f);
-        *end = (e.tick + NOTE_LENGTH).min(next_strike[key]);
+        *end = (e.tick + e.length_ticks.round().max(1.0)).min(next_strike[key]);
         next_strike[key] = e.tick;
     }
     // (tick, on, key, velocity)
@@ -215,7 +217,13 @@ pub fn export(
                 if velocity.is_nan() || velocity < 1.0 {
                     continue;
                 }
-                events.push(NoteEvent { tick: midi_tick, key: data_byte(key), velocity: data_byte(velocity) });
+                let step_ticks = f64::from(PPQN) / f64::from(track.steps_per_beat.max(1));
+                events.push(NoteEvent {
+                    tick: midi_tick,
+                    length_ticks: note.length_steps * step_ticks,
+                    key: data_byte(key),
+                    velocity: data_byte(velocity),
+                });
             }
         }
     }

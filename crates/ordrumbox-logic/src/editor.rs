@@ -29,6 +29,15 @@ const MIDI_MIN: f64 = 12.0;
 const MIDI_MAX: f64 = 108.0;
 const MIDDLE_C: f64 = 60.0;
 
+/// How a note was played: its pitch, its velocity (0–1; `None`: the default
+/// one), and how far off its step, in steps (0: on it).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Played {
+    pub pitch: f64,
+    pub velocity: Option<f64>,
+    pub shift_steps: f64,
+}
+
 /// What a nudge changes: ↑/↓ pitch, ←/→ one step in time (the velocity nudge
 /// stays for the note editor and the drag).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

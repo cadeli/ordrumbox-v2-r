@@ -206,7 +206,7 @@ mod tests {
         let after = s.grid_layout(SIZE).expect("the grid is shown");
         let moved: Vec<_> = (0..LANES.len()).map(|i| after.lane_tab_rect(i)).collect();
         assert_eq!(tabs, moved, "the tabs never move");
-        assert!(after.lane_rect().h <= lane.h && after.lane_rect().h >= tabs[0].h * LANES.len() as i32);
+        assert!(after.lane_rect().h <= lane.h && after.lane_rect().h >= tabs[0].h * view::lane_tab_rows());
         assert!(after.lane_rect().y >= after.add_track_rect().y + after.add_track_rect().h);
     }
 }

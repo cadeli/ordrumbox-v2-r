@@ -44,6 +44,8 @@ json_record! {
         auto_mode: bool = false => "autoMode" | "auto",
         use_synth: bool = false => "useSynth" | "useSoftSynth",
         mono: bool = false => "mono",
+        /// Each note lasts until the next one of the track starts (the last one, to the pass end).
+        legato: bool = false => "legato",
         /// Variation amounts, 0–100.
         hit_variation: f64 = 0.0 => "hitVariation" | "variation",
         note_variation: f64 = 0.0 => "noteVariation" | "variation2",

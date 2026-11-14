@@ -25,6 +25,10 @@ const NOTE_HEIGHT: i32 = 14;
 /// Width of the keyboard, and the narrowest cell (`KEYS_COLUMN_WIDTH`, `MIN_CELL_WIDTH`).
 const KEYS_WIDTH: i32 = 80;
 const MIN_CELL_WIDTH: i32 = 16;
+/// The narrowest a note is drawn, and the width of its right edge, which a
+/// drag draws out, px per scale unit.
+const MIN_NOTE_WIDTH: i32 = 3;
+const NOTE_EDGE: i32 = 5;
 /// Beats a page shows (`BEATS_PER_PAGE`).
 pub const BEATS_PER_PAGE: i32 = 4;
 /// Keys, MIDI 12 to 108 (`TOTAL_KEYS`).
@@ -284,7 +288,9 @@ impl RollLayout {
         row <= view.top_row && row > view.top_row - self.visible_rows() && (0..TOTAL_KEYS).contains(&row)
     }
 
-    /// Where note `n` of the view's track is drawn, if it is on the page.
+    /// Where note `n` of the view's track is drawn, if it is on the page:
+    /// from its step, moved by its shift, as wide as it is long (up to the
+    /// end of the page).
     pub fn note_rect(&self, view: &RollView, n: usize) -> Option<Rect> {
         let note = view.track.notes.get(n)?;
         let step = absolute_step(note.beat, note.step, steps_per_beat(view.track));
@@ -294,8 +300,21 @@ impl RollLayout {
             return None;
         }
         let s = self.scale.px();
-        let (x, y) = (self.step_x(view, step), self.row_y(view.top_row, row));
-        Some(Rect::new(x + s, y + s, self.cell - 2 * s, self.row - 2 * s))
+        let cell = f64::from(self.cell);
+        let x = (self.step_x(view, step) + (note.late_steps() * cell).round() as i32).max(self.grid.x);
+        let y = self.row_y(view.top_row, row);
+        let right = (x + (note.held_steps() * cell).round() as i32).min(self.step_x(view, end));
+        Some(Rect::new(x + s, y + s, (right - x - 2 * s).max(MIN_NOTE_WIDTH * s), self.row - 2 * s))
+    }
+
+    /// The note drawn at `(x, y)` (the last one, drawn over the others), and
+    /// whether the pointer is on its right edge, where a drag draws it out.
+    pub fn note_at(&self, view: &RollView, x: i32, y: i32) -> Option<(usize, bool)> {
+        (0..view.track.notes.len()).rev().find_map(|n| {
+            let r = self.note_rect(view, n).filter(|r| r.contains(x, y))?;
+            let edge = (NOTE_EDGE * self.scale).min(r.w / 3);
+            Some((n, x >= r.x + r.w - edge))
+        })
     }
 
     /// What is at `(x, y)`.

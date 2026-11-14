@@ -166,6 +166,39 @@ pub fn notice_contains(window: (i32, i32), title: &str, lines: &[String], scale:
     (x..x + width).contains(&px) && (y..y + height).contains(&py)
 }
 
+/// The two buttons of a choice notice, as drawn: the one ENTER would run
+/// (`focus`) in brackets, with the whole line they share.
+fn button_texts(buttons: [&str; 2], focus: usize) -> (String, String, String) {
+    let (a, b) = (buttons[0], buttons[1]);
+    let first = if focus == 0 { format!("[ {a} ]") } else { a.to_owned() };
+    let second = if focus == 0 { b.to_owned() } else { format!("[ {b} ]") };
+    (format!("{first}   {second}"), first, second)
+}
+
+/// The button of a choice notice that `(px, py)` is on: 0 keeps (the
+/// default), 1 runs; `None` elsewhere, where the notice closes.
+pub fn notice_button_at(
+    window: (i32, i32),
+    title: &str,
+    lines: &[String],
+    buttons: [&str; 2],
+    focus: usize,
+    scale: Scale,
+    at: (i32, i32),
+) -> Option<usize> {
+    let (line, first, second) = button_texts(buttons, focus);
+    let (x, y, ..) = notice_box(window, title, lines, text_width(&line, scale), true, scale);
+    let line_h = NOTICE_LINE * scale;
+    let button_y = y + 10 * scale + (lines.len() as i32 + 2) * line_h;
+    let first_w = text_width(&first, scale);
+    [
+        Rect::new(x + 16 * scale, button_y, first_w, line_h),
+        Rect::new(x + 16 * scale + first_w + 3 * scale, button_y, text_width(&second, scale), line_h),
+    ]
+    .into_iter()
+    .position(|rect| rect.contains(at.0, at.1))
+}
+
 /// A notice showing `lines`, as wide as the widest of them (`choice` adds
 /// its two buttons as one more line).
 pub(super) fn draw_notice_part(
@@ -179,10 +212,8 @@ pub(super) fn draw_notice_part(
     let close = "ESC or click: close";
     // The buttons share one line, the one ENTER runs in brackets.
     let buttons = choice.map(|(buttons, focus)| {
-        let (a, b) = (buttons[0], buttons[1]);
-        let first = if focus == 0 { format!("[ {a} ]") } else { a.to_owned() };
-        let second = if focus == 0 { b.to_owned() } else { format!("[ {b} ]") };
-        (format!("{first}   {second}"), first, second, focus)
+        let (line, first, second) = button_texts(buttons, focus);
+        (line, first, second, focus)
     });
     let buttons_width = buttons.as_ref().map_or(0, |(line, ..)| text_width(line, scale));
     let (x, y, width, height) =

@@ -196,6 +196,12 @@ pub fn note_tooltip(note: &Note, track_pitch: f64) -> String {
     if note.pan != 0.0 {
         parts.push(format!("pan:{}", fmt(note.pan)));
     }
+    if note.length_steps != Note::default().length_steps {
+        parts.push(format!("length:{}", fmt(note.length_steps)));
+    }
+    if note.shift_steps != 0.0 {
+        parts.push(format!("shift:{}", fmt(note.shift_steps)));
+    }
     parts.join("  ")
 }
 
@@ -211,6 +217,7 @@ pub fn track_tooltip(track: &Track, sound: &str) -> Vec<String> {
         (track.solo, "solo"),
         (track.auto_mode, "auto"),
         (track.mono, "mono"),
+        (track.legato, "legato"),
         (track.auto_assign && !track.use_synth, "auto-assigned"),
     ];
     let mut title = track.name.clone();

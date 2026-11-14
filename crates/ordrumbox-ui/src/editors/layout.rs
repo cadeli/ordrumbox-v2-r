@@ -346,9 +346,12 @@ pub(super) const FX_STRIP_GAP: i32 = 4;
 pub(super) fn sound_tab(rows: &mut Rows, view: &TrackView) {
     let s = rows.scale;
     let track = view.track;
-    let r = rows.row();
-    rows.label(r, "Mono", None, false);
-    rows.items.push(Item::new(Some(Id::Toggle("mono")), rows.field(r, 36 * s), Kind::Toggle { on: track.mono }));
+    for (key, label, on) in [("mono", "Mono", track.mono), ("legato", "Legato", track.legato)] {
+        let r = rows.row();
+        rows.label(r, label, None, false);
+        let field = rows.field(r, 36 * s);
+        rows.items.push(Item::new(Some(Id::Toggle(key)), field, Kind::Toggle { on }));
+    }
     let r = rows.row();
     rows.items.push(Item::new(
         Some(Id::AutoAssign),
@@ -703,7 +706,7 @@ pub fn note_editor(view: &NoteView, state: &EditorState, area: Rect, scale: Scal
         .map(|(i, l)| Some((Id::NoteTab(i as u8), None, *l, state.note_tab == i as u8, false)))
         .collect();
     rows.tabs(&tabs);
-    for row in NOTE_GROUPS[usize::from(state.note_tab.min(3))] {
+    for row in NOTE_GROUPS[usize::from(state.note_tab).min(NOTE_GROUPS.len() - 1)] {
         match row {
             NoteRow::Slider(p) => {
                 let value = if p.key == "arpRange" {

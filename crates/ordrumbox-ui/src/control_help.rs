@@ -24,13 +24,16 @@ pub fn help(id: Id) -> Option<Help> {
             0 => ["Trigger", "when the note plays: every N loops, its chance"],
             1 => ["Retrigger", "repeats of the note, how fast, their chance, their fade"],
             2 => ["Euclidean", "hits spread evenly up to the next note"],
-            _ => ["Arpeggio", "the note played as a run of scale notes"],
+            3 => ["Arpeggio", "the note played as a run of scale notes"],
+            _ => ["Timing", "how long the note is held, how far off the grid it plays"],
         },
         Id::Lane(lane) => match lane {
             0 => ["Velocity lane", "how loud each note of the track is: click or drag the bars"],
             1 => ["Chance lane", "how likely each note of the track is to play: click or drag the bars"],
             2 => ["Retrigger lane", "how many times each note of the track plays: click or drag the bars"],
-            _ => ["Pan lane", "where each note of the track sits, left to right: click or drag the bars"],
+            3 => ["Pan lane", "where each note of the track sits, left to right: click or drag the bars"],
+            4 => ["Length lane", "how long each note of the track is held, in steps: click or drag the bars"],
+            _ => ["Shift lane", "how early or late each note of the track plays, off the grid: click or drag the bars"],
         },
         Id::LfoPower(_) => ["LFO on / off", "lit: this setting moves with its LFO"],
         Id::LfoType(_) => ["LFO wave", "the shape the setting follows"],
@@ -160,6 +163,7 @@ fn setting_help(key: &str) -> Option<Help> {
         "filterQ" => ["Resonance (Q)", "how much the cutoff rings"],
         // Sound.
         "mono" => ["Mono", "one note at a time: a new one cuts the last"],
+        "legato" => ["Legato", "each note lasts until the next one starts"],
         // Loop.
         "stepsPerBeat" => ["Steps per beat", "the grid of the track: 4 is 16ths, 3 triplets"],
         "loopLength" => ["Loop length", "the track loops after this many steps"],
@@ -208,6 +212,8 @@ fn setting_help(key: &str) -> Option<Help> {
         "arpScale" => ["Arpeggio scale", "the scale its notes come from"],
         "arpDirection" => ["Direction", "up, down, up and down, or random"],
         "arpRange" => ["Range", "how many scale notes the arpeggio plays (0: off)"],
+        "lengthSteps" => ["Length", "how long the note is held, in steps: a synth note, a MIDI note sent or exported"],
+        "shiftSteps" => ["Shift", "the note off the grid, in % of a step: below 0 early, above late"],
         _ => return None,
     })
 }
@@ -238,7 +244,16 @@ mod tests {
                 NoteRow::Select(key, _) => key,
             });
         }
-        keys.extend(["mono", "autoMode", "composeLock", "delayBeats", "filterSlope", "reverbType", "delayType"]);
+        keys.extend([
+            "mono",
+            "legato",
+            "autoMode",
+            "composeLock",
+            "delayBeats",
+            "filterSlope",
+            "reverbType",
+            "delayType",
+        ]);
         for key in keys {
             assert!(help(Id::Fx(key)).is_some(), "{key}");
             assert!(help(Id::Row(key)).is_some(), "the label of {key}");

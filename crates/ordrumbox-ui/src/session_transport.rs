@@ -18,6 +18,8 @@ pub(super) struct Transport {
     pub(super) metronome: bool,
     /// The row keys put notes on the step the pattern plays (`session_record.rs`).
     pub(super) recording: bool,
+    /// Recorded notes keep how early or late they were played, as their shift.
+    pub(super) record_timing: bool,
     /// When tempo was tapped, oldest first (`session_tempo.rs`).
     pub(super) taps: Vec<std::time::Instant>,
 }
