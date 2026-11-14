@@ -79,6 +79,7 @@ pub struct NoteView {
     pub scales: Choice,
     pub arp_direction: Choice,
     pub arp_range: usize,
+    pub arp_octaves: usize,
 }
 
 /// What the kit editor's controls show.

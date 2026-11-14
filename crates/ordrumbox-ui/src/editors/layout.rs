@@ -720,6 +720,8 @@ pub fn note_editor(view: &NoteView, state: &EditorState, area: Rect, scale: Scal
             NoteRow::Slider(p) => {
                 let value = if p.key == "arpRange" {
                     view.arp_range as f64
+                } else if p.key == "arpOctaves" {
+                    view.arp_octaves as f64
                 } else {
                     note.field(p.key).and_then(|v| v.as_f64()).unwrap_or(p.min)
                 };

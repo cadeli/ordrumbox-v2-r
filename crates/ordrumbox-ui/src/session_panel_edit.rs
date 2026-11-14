@@ -257,11 +257,15 @@ impl Session {
 
     fn note_value(&mut self, t: usize, key: &'static str, value: f64) {
         let Some(note) = self.shown_note(t) else { return };
+        let scales = &self.generators.scale_list;
         let (updates, what) = if key == "arpRange" {
             let range = value.max(0.0) as usize;
+            (vec![("arp", editors::arp_value(&note, scales, None, None, Some(range), None))], "arp".to_owned())
+        } else if key == "arpOctaves" {
+            let octaves = value.max(1.0) as usize;
             (
-                vec![("arp", editors::arp_value(&note, &self.generators.scale_list, None, None, Some(range)))],
-                "arp".to_owned(),
+                vec![("arp", editors::arp_value(&note, scales, None, None, None, Some(octaves)))],
+                "arp octaves".to_owned(),
             )
         } else {
             (vec![(key, number(value))], history_label(Id::NoteSlider(key)))
@@ -451,9 +455,12 @@ impl Session {
             Id::NoteSelect(key) => {
                 let Some(note) = self.shown_note(t) else { return };
                 let (field, arp) = if key == "arpScale" {
-                    ("arpScale", editors::arp_value(&note, &self.generators.scale_list, Some(value), None, None))
+                    ("arpScale", editors::arp_value(&note, &self.generators.scale_list, Some(value), None, None, None))
                 } else {
-                    ("arpDirection", editors::arp_value(&note, &self.generators.scale_list, None, Some(value), None))
+                    (
+                        "arpDirection",
+                        editors::arp_value(&note, &self.generators.scale_list, None, Some(value), None, None),
+                    )
                 };
                 let updates = [(field, Value::String(value.to_owned())), ("arp", arp)];
                 self.update_note(t, &updates, &format!("Edit note {} on {name}", history_label(id)), false);
