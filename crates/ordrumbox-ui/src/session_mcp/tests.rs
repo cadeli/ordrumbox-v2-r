@@ -151,6 +151,28 @@ fn a_synth_preset_takes_unison_settings_even_copied_from_one_without() {
 }
 
 #[test]
+fn a_synth_preset_takes_matrix_lines() {
+    let mut s = session();
+    let args = r#"{"preset":"wobble","settings":{"matrix.source1":"lfo1","matrix.target1":"filter.freq",
+        "matrix.amount1":-0.5,"matrix.source2":"velocity"}}"#;
+    let made = call(&mut s, "createSynthPreset", args).unwrap();
+    assert_eq!(get(&made, &["settings", "matrix", "source1"]).as_str(), Some("lfo1"));
+    assert_eq!(get(&made, &["settings", "matrix", "amount1"]).as_f64(), Some(-0.5));
+    // A source with nowhere to go is aimed at the filter, at half, as the editor does.
+    assert_eq!(get(&made, &["settings", "matrix", "target2"]).as_str(), Some("filter.freq"));
+    assert_eq!(get(&made, &["settings", "matrix", "amount2"]).as_f64(), Some(0.5));
+    for refused in [
+        r#"{"matrix.source1":"lfo3"}"#,
+        r#"{"matrix.target1":"nowhere"}"#,
+        r#"{"matrix.amount1":1.5}"#,
+        r#"{"matrix.source9":"lfo1"}"#,
+    ] {
+        let args = format!(r#"{{"preset":"wobble","settings":{refused}}}"#);
+        assert!(call(&mut s, "updateSynthPreset", &args).is_err(), "{refused}");
+    }
+}
+
+#[test]
 fn synth_presets_are_designed() {
     let mut s = session();
     let args = r#"{"preset":"acid","settings":{"vco1.wave":"sawtooth","filter.freq":800,"filter.slope":24,

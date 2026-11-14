@@ -94,7 +94,24 @@ a meant change of behaviour, and note that change below).
 | engine | `analysis_rust.txt`, `mapping_rust.txt`, `pattern_renders.bin`, `synth_editor_rust.txt` | `generated_sounds.json`, `kick.wav` |
 | logic | `compose_rust.txt`, `composition_rust.txt`, `generators_rust.txt`, `midi_rust.txt` | `generator_cases.json`, `midi/`, `midi_exports.json` |
 
+### The synth, measured
+
+A snapshot says the sound did not change, not that it is right. `ordrumbox-probe/tests/synth_audio.rs`
+renders notes with the real voice (and, for the last test, a whole pattern through the engine, a
+WAV file and back), measures them and compares the measures with what the settings say: pitch,
+the harmonics of each wave, aliasing against a naive saw, the slope, notch, bandpass and resonance
+of the filter against the filter's own formula, the envelope's times and levels, an LFO's rate and
+depth, unison lines and stereo spread, and each source and target of the modulation matrix. Every
+factory preset also plays a finite, silent-ended note at three pitches, the same one every time,
+whatever the size of the blocks it is rendered in. No fixture, nothing to rewrite: a failure is a
+wrong sound or a wrong threshold.
+
 ### Changes of behaviour
+
+The synth editor has a `matrix` group (`source1`..`source8`, `target1`..`target8`,
+`amount1`..`amount8`) in its defaults, so a hydrated preset holds it and the MOD tab has a
+Matrix card. This rewrote `synth_editor_rust.txt` (engine); the audio renders are unchanged,
+a preset whose lines are all `off` adds nothing to any control.
 
 The synth editor has a `unison` group (`count`, `detune`, `spread`) in its defaults, so a
 hydrated preset holds it and the OSC tab has a Unison card. This rewrote

@@ -10,8 +10,9 @@ use ordrumbox_core::lfo;
 
 use crate::slope;
 use crate::synth_preset::FM_DEVIATION;
+pub use ordrumbox_dsp::synth::patch::MATRIX_SIZE;
 
-pub use crate::synth_preset::{FILTER_TYPES, WAVES};
+pub use crate::synth_preset::{FILTER_TYPES, MATRIX_SOURCES, WAVES};
 /// The mod envelope's targets and the LFO syncs (value, label).
 pub const MOD_ENV_TARGETS: [(&str, &str); 5] =
     [("off", "Off"), ("filter", "Filter"), ("pitch", "Pitch"), ("fm", "FM"), ("shape", "Shape")];
@@ -50,7 +51,16 @@ const EXTRA_FIELDS: [(&str, &str); 1] = [("filter", "slope")];
 
 #[expect(clippy::expect_used, reason = "a constant, read by the tests")]
 pub fn defaults() -> Object {
-    json::parse(DEFAULTS).ok().and_then(|v| v.as_object().cloned()).expect("DEFAULTS is a JSON object")
+    let mut defaults =
+        json::parse(DEFAULTS).ok().and_then(|v| v.as_object().cloned()).expect("DEFAULTS is a JSON object");
+    let mut matrix = Object::default();
+    for n in 1..=MATRIX_SIZE {
+        matrix.insert(format!("source{n}"), Value::from("off"));
+        matrix.insert(format!("target{n}"), Value::from("NOT"));
+        matrix.insert(format!("amount{n}"), Value::from(0.0));
+    }
+    defaults.insert("matrix", Value::Object(matrix));
+    defaults
 }
 
 /// A numeric control (`SYNTH_PARAM_META`): its path, range, step, unit, label.
@@ -117,27 +127,41 @@ pub const METAS: [Meta; 35] = [
 /// `modEnvelope.release` (`METAS` is full at 32).
 const MOD_RELEASE: Meta = meta("modEnvelope.release", 0.0, 0.5, 0.001, "s");
 
+/// The amount of each line of the matrix: either way, a fraction of what a
+/// full swing is worth on the target.
+pub const MATRIX_AMOUNTS: [Meta; MATRIX_SIZE] = [
+    meta("matrix.amount1", -1.0, 1.0, 0.01, ""),
+    meta("matrix.amount2", -1.0, 1.0, 0.01, ""),
+    meta("matrix.amount3", -1.0, 1.0, 0.01, ""),
+    meta("matrix.amount4", -1.0, 1.0, 0.01, ""),
+    meta("matrix.amount5", -1.0, 1.0, 0.01, ""),
+    meta("matrix.amount6", -1.0, 1.0, 0.01, ""),
+    meta("matrix.amount7", -1.0, 1.0, 0.01, ""),
+    meta("matrix.amount8", -1.0, 1.0, 0.01, ""),
+];
+
 pub fn metas() -> impl Iterator<Item = &'static Meta> {
-    METAS.iter().chain(std::iter::once(&MOD_RELEASE))
+    METAS.iter().chain(std::iter::once(&MOD_RELEASE)).chain(&MATRIX_AMOUNTS)
 }
 
 pub fn find_meta(path: &str) -> Option<&'static Meta> {
     metas().find(|m| m.path == path)
 }
 
-/// What an LFO can modulate (`SYNTH_LFO_TARGETS`): off, then every control but the LFOs' and the unison's.
+/// What an LFO or a line of the matrix can modulate (`SYNTH_LFO_TARGETS`): off, then every control but the
+/// LFOs', the unison's and the matrix's.
 pub fn lfo_targets() -> Vec<&'static str> {
     std::iter::once("NOT")
         .chain(
             metas()
                 .map(|m| m.path)
-                .filter(|p| !p.starts_with("lfo.") && !p.starts_with("lfo2.") && !p.starts_with("unison.")),
+                .filter(|p| !["lfo.", "lfo2.", "unison.", "matrix."].iter().any(|group| p.starts_with(group))),
         )
         .collect()
 }
 
 /// The controls set from a list (`filter.slope` holds numbers).
-pub const CHOICE_PATHS: [&str; 13] = [
+pub const CHOICE_PATHS: [&str; 13 + 2 * MATRIX_SIZE] = [
     "vco1.wave",
     "vco2.wave",
     "vco3.wave",
@@ -151,7 +175,30 @@ pub const CHOICE_PATHS: [&str; 13] = [
     "lfo2.target",
     "lfo.sync",
     "lfo2.sync",
+    "matrix.source1",
+    "matrix.target1",
+    "matrix.source2",
+    "matrix.target2",
+    "matrix.source3",
+    "matrix.target3",
+    "matrix.source4",
+    "matrix.target4",
+    "matrix.source5",
+    "matrix.target5",
+    "matrix.source6",
+    "matrix.target6",
+    "matrix.source7",
+    "matrix.target7",
+    "matrix.source8",
+    "matrix.target8",
 ];
+
+/// Whether `path` is `matrix.<name><n>` for a line `n` of the matrix.
+fn is_matrix_line(path: &str, name: &str) -> bool {
+    path.strip_prefix("matrix.")
+        .and_then(|rest| rest.strip_prefix(name))
+        .is_some_and(|n| (1..=MATRIX_SIZE).any(|line| line.to_string() == n))
+}
 
 /// The values control `path` takes from a list, if it is one of [`CHOICE_PATHS`].
 pub fn choices(path: &str) -> Option<Vec<&'static str>> {
@@ -163,6 +210,8 @@ pub fn choices(path: &str) -> Option<Vec<&'static str>> {
         "modEnvelope.target" => values(&MOD_ENV_TARGETS),
         "lfo.target" | "lfo2.target" => lfo_targets(),
         "lfo.sync" | "lfo2.sync" => values(&LFO_SYNCS),
+        _ if is_matrix_line(path, "source") => MATRIX_SOURCES.to_vec(),
+        _ if is_matrix_line(path, "target") => lfo_targets(),
         _ => return None,
     })
 }
@@ -205,7 +254,7 @@ pub const BYPASS_FLAGS: [(&str, &str); 8] = [
 ];
 
 /// The cards in order (`SYNTH_GROUP_ORDER`), and the master card's controls.
-pub const GROUP_ORDER: [&str; 14] = [
+pub const GROUP_ORDER: [&str; 15] = [
     "scope",
     "vco1",
     "vco2",
@@ -216,6 +265,7 @@ pub const GROUP_ORDER: [&str; 14] = [
     "filterEnv",
     "lfo",
     "lfo2",
+    "matrix",
     "noise",
     "master",
     "envelope",
@@ -229,7 +279,7 @@ pub const TABS: [&str; 4] = ["OSC", "FLT", "MOD", "ENV"];
 pub fn group_tab(group: &str) -> usize {
     match group {
         "filter" | "filterEnv" | "modEnvelope" => 1,
-        "lfo" | "lfo2" | "noise" => 2,
+        "lfo" | "lfo2" | "matrix" | "noise" => 2,
         "envelope" | "master" => 3,
         _ => 0,
     }
@@ -245,6 +295,7 @@ pub fn group_label(group: &str) -> String {
         "fm" => "FM".into(),
         "unison" => "Unison".into(),
         "lfo" => "LFO1".into(),
+        "matrix" => "Matrix".into(),
         "envelope" => "Envelope".into(),
         "modEnvelope" => "Mod Env".into(),
         g if g.len() > 3 && g[..3].eq_ignore_ascii_case("vco") && g[3..].chars().all(|c| c.is_ascii_digit()) => {
@@ -429,6 +480,17 @@ pub fn implicit_enable(draft: &mut Object, path: &str) -> Vec<String> {
             changed.push(format!("{group}.depth"));
         }
         changed.push(format!("{group}.target"));
+    } else if group == "matrix"
+        && let Some(n) = key.strip_prefix("source")
+        && text(draft, &format!("matrix.target{n}")) == Some("NOT")
+    {
+        // A source touched with nowhere to go: onto the filter, at half (an `off` source adds nothing).
+        set(draft, &format!("matrix.target{n}"), Value::from("filter.freq"));
+        changed.push(format!("matrix.target{n}"));
+        if number(draft, &format!("matrix.amount{n}")).unwrap_or(0.0) == 0.0 {
+            set(draft, &format!("matrix.amount{n}"), Value::from(0.5));
+            changed.push(format!("matrix.amount{n}"));
+        }
     } else if group == "modEnvelope"
         && matches!(key, "attack" | "decay" | "sustain" | "release")
         && text(draft, "modEnvelope.target") == Some("off")

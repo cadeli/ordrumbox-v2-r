@@ -36,6 +36,7 @@ mod song_view;
 mod spectrum;
 mod startup_error;
 mod store;
+mod synth_matrix;
 mod synth_view;
 #[cfg(test)]
 mod test_support;
