@@ -14,5 +14,5 @@ pub mod midi;
 pub mod roll_block;
 pub mod tools;
 
-pub use editor::{Editor, Nudge};
+pub use editor::{Editor, Nudge, Played};
 pub use history::History;

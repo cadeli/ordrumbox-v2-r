@@ -1,31 +1,25 @@
 //! Editing notes: add, delete, nudge, paste, zones.
 
-use super::{Editor, Nudge, nudge_pitch, nudge_velocity, pattern_name, step_percent};
+use super::{Editor, Nudge, Played, nudge_pitch, nudge_velocity, pattern_name, step_percent};
 use crate::block::{Block, Pasted, StepAt, Zone};
 use crate::roll_block::{RollBlock, RollZone};
 use crate::{block, roll_block};
 use ordrumbox_core::json::Value;
-use ordrumbox_core::note::{ACCENT_VELOCITY, ACCENTED_VELOCITY};
+use ordrumbox_core::note::{ACCENT_VELOCITY, ACCENTED_VELOCITY, MAX_SHIFT_STEPS};
+use ordrumbox_core::num::round2;
 use ordrumbox_core::{Note, Track};
 use std::ops::RangeInclusive;
 
 impl Editor {
     /// Add a note (defaults) at `beat`/`beat_step`; its index in the track.
     pub fn add_note(&mut self, p: usize, t: usize, beat: i32, beat_step: i32, pitch: f64) -> Option<usize> {
-        self.add_note_played(p, t, beat, beat_step, pitch, None)
+        self.add_note_played(p, t, beat, beat_step, Played { pitch, velocity: None, shift_steps: 0.0 })
     }
 
-    /// Add a note at `beat`/`beat_step` as it was played: at `velocity` (0–1)
-    /// when given, else the default one; its index in the track.
-    pub fn add_note_played(
-        &mut self,
-        p: usize,
-        t: usize,
-        beat: i32,
-        beat_step: i32,
-        pitch: f64,
-        velocity: Option<f64>,
-    ) -> Option<usize> {
+    /// Add a note at `beat`/`beat_step` as it was played ([`Played`]); its
+    /// index in the track.
+    pub fn add_note_played(&mut self, p: usize, t: usize, beat: i32, beat_step: i32, played: Played) -> Option<usize> {
+        let Played { pitch, velocity, shift_steps } = played;
         let pattern = pattern_name(self.library.patterns.get(p)?).to_owned();
         self.edit_track(
             p,
@@ -38,6 +32,8 @@ impl Editor {
                 if let Some(velocity) = velocity {
                     note.velocity = velocity.clamp(0.0, 1.0);
                 }
+                // Two decimals, as a note's shift is saved.
+                note.shift_steps = round2(shift_steps.clamp(-MAX_SHIFT_STEPS, MAX_SHIFT_STEPS));
                 track.notes.push(note);
                 track.notes.len() - 1
             },

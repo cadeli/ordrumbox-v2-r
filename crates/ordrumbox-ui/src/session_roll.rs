@@ -54,25 +54,28 @@ pub(super) struct RollState {
     /// The note pressed.
     drag: Option<RollDrag>,
     /// The edited value shown over the note.
-    gauge: Option<String>,
+    pub(super) gauge: Option<String>,
     /// The next chord progression.
     sequence: i64,
     /// The note under the mouse.
     hover: Option<usize>,
     /// A Shift+press on a cell, which may become a zone.
     pub(super) zone_drag: Option<super::session_roll_zone::RollZoneDrag>,
+    /// A press on the right edge of a note, which draws it out.
+    pub(super) length_drag: Option<super::session_roll_length::RollLengthDrag>,
 }
 
 impl RollState {
     /// A note is held by the mouse.
     pub(super) fn dragging(&self) -> bool {
-        self.drag.is_some()
+        self.drag.is_some() || self.length_drag.is_some()
     }
 
     /// Let go of the note held, if any.
     pub(super) fn release(&mut self) {
         self.drag = None;
         self.zone_drag = None;
+        self.length_drag = None;
     }
 }
 
@@ -290,6 +293,8 @@ impl Session {
         let Some(view) = self.roll_view(&layout) else { return false };
         let (page, pages) = (view.page, view.pages());
         let Some(hit) = layout.hit(&view, x, y) else { return false };
+        // A note drawn out covers the cells after its own: the note under the pointer first.
+        let drawn = layout.note_at(&view, x, y);
         let Some(t) = self.roll_track() else { return false };
         self.roll.gauge = None;
         if matches!(hit, RollHit::Cell { .. }) {
@@ -300,18 +305,22 @@ impl Session {
             (RollHit::NextPage, Button::Left) => self.roll.page = (page + 1).min(pages - 1),
             (RollHit::Key(midi), Button::Left) => self.roll_play_key(t, midi),
             (RollHit::Key(midi), Button::Right) => self.roll_key_menu(t, midi, x, y),
-            (RollHit::Cell { step, row }, Button::Left) => match self.roll_note_at(t, step, row) {
-                // A press on a note: a drag, or a click when it does not move.
-                Some(n) => {
-                    let pitch = self.track(t).map_or(0.0, |track| track.transpose);
-                    self.roll.drag = Some(RollDrag { track: t, note: n, drag: NoteDrag::new(x, y, pitch) });
-                }
-                None => {
-                    if let Some(n) = self.roll_add(t, step, row) {
-                        self.audition(t, Some(n));
+            (RollHit::Cell { step, row }, Button::Left) => {
+                match drawn.or_else(|| self.roll_note_at(t, step, row).map(|n| (n, false))) {
+                    // A press on the right edge of a note draws it out.
+                    Some((n, true)) => self.roll_length_press(t, n, x, layout.cell),
+                    // A press on a note: a drag, or a click when it does not move.
+                    Some((n, false)) => {
+                        let pitch = self.track(t).map_or(0.0, |track| track.transpose);
+                        self.roll.drag = Some(RollDrag { track: t, note: n, drag: NoteDrag::new(x, y, pitch) });
+                    }
+                    None => {
+                        if let Some(n) = self.roll_add(t, step, row) {
+                            self.audition(t, Some(n));
+                        }
                     }
                 }
-            },
+            }
             (RollHit::Cell { step, row }, Button::Right) => self.roll_grid_menu(t, step, row, x, y),
             _ => return false,
         }
@@ -320,6 +329,9 @@ impl Session {
 
     /// The mouse moved while a note is pressed; whether to redraw.
     pub fn roll_drag_move(&mut self, x: i32, y: i32) -> bool {
+        if self.roll.length_drag.is_some() {
+            return self.roll_length_move(x);
+        }
         let Some(RollDrag { track: t, note: n, mut drag }) = self.roll.drag else { return false };
         let Some(note) = self.track(t).and_then(|track| track.notes.get(n)).cloned() else { return false };
         let events = drag.moved(x, y, &note);
@@ -347,6 +359,10 @@ impl Session {
     /// The press ended: a press that did not drag is a click on its note —
     /// it selects it, or deletes it when it was selected.
     pub(super) fn roll_release(&mut self) {
+        if self.roll.length_drag.take().is_some() {
+            self.roll.gauge = None;
+            return;
+        }
         let Some(RollDrag { track: t, note: n, drag }) = self.roll.drag.take() else { return };
         self.roll.gauge = None;
         if drag.axis().is_some() {

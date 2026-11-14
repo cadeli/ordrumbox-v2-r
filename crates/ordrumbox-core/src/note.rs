@@ -65,6 +65,13 @@ json_record! {
         arp_scale: Option<String> = None => "arpScale" | "_arpScale",
         /// Arpeggio direction picked in the note editor.
         arp_direction: Option<String> = None => "arpDirection" | "_arpType",
+        /// How long the note is held, in steps of its track (may be a
+        /// fraction): a synth note is released at its end, a MIDI note sent
+        /// or exported ends there. A sample plays to its own end.
+        length_steps: f64 = 1.0 => "lengthSteps",
+        /// How late the note plays, in steps of its track: a fraction of a
+        /// step either side of its place on the grid (negative is early).
+        shift_steps: f64 = 0.0 => "shiftSteps",
     }
     other_fields {
         /// Position in the beat, percent (`stepPercent`), `0..100`: kept so
@@ -79,7 +86,16 @@ json_record! {
 const STEP_PERCENT_KEY: &str = "stepPercent";
 
 /// Keys written rounded to 2 decimals (`NOTE_ROUND_2D`).
-const ROUND_2D: [&str; 5] = ["velocity", "pan", "probability", "retriggerRate", "retriggerFade"];
+const ROUND_2D: [&str; 7] =
+    ["velocity", "pan", "probability", "retriggerRate", "retriggerFade", "lengthSteps", "shiftSteps"];
+
+/// The shortest and the longest a note is held, in steps: what a length
+/// outside them plays as.
+pub const MIN_LENGTH_STEPS: f64 = 0.05;
+pub const MAX_LENGTH_STEPS: f64 = 1024.0;
+/// The furthest a note is shifted from its step, in steps, either way: half
+/// a step, past which it would be nearer the next one.
+pub const MAX_SHIFT_STEPS: f64 = 0.5;
 
 impl Note {
     /// A note from its object form (`{"beat": 1, "velocity": 0.5}`). Unknown
@@ -121,6 +137,20 @@ impl Note {
         let count = self.retrigger_count.max(1);
         let fade = self.retrigger_fade.clamp(0.0, 1.0);
         1.0 - fade * i as f64 / f64::from(count)
+    }
+
+    /// The steps the note is held, as it plays: from [`MIN_LENGTH_STEPS`] to
+    /// [`MAX_LENGTH_STEPS`] (a length that is not a number is one step).
+    #[must_use]
+    pub fn held_steps(&self) -> f64 {
+        if self.length_steps.is_finite() { self.length_steps.clamp(MIN_LENGTH_STEPS, MAX_LENGTH_STEPS) } else { 1.0 }
+    }
+
+    /// The steps the note is late, as it plays: within [`MAX_SHIFT_STEPS`]
+    /// either way (a shift that is not a number is none).
+    #[must_use]
+    pub fn late_steps(&self) -> f64 {
+        if self.shift_steps.is_finite() { self.shift_steps.clamp(-MAX_SHIFT_STEPS, MAX_SHIFT_STEPS) } else { 0.0 }
     }
 
     /// `stepPercent` at `steps_per_beat` steps per beat.
@@ -309,6 +339,8 @@ mod tests {
                 "cycleOffset",
                 "arpScale",
                 "arpDirection",
+                "lengthSteps",
+                "shiftSteps",
             ]
         );
     }

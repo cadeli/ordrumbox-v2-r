@@ -46,6 +46,16 @@ pub(super) enum Overlay {
     },
 }
 
+/// The choice notice open: what it shows, its two buttons (the first keeps,
+/// the second runs) and the one ENTER would run.
+#[derive(Debug)]
+pub(super) struct NoticeChoice {
+    pub(super) title: String,
+    pub(super) lines: Vec<String>,
+    pub(super) buttons: [String; 2],
+    pub(super) focus: usize,
+}
+
 /// Every key, for Help > Keyboard shortcuts.
 const SHORTCUTS: &[&str] = &[
     "MENUS",
@@ -75,6 +85,7 @@ const SHORTCUTS: &[&str] = &[
     "  Shift+click (ruler)    loop the song from the cursor's measure to that one (Play > Clear the loop)",
     "  F9, F8                 metronome on/off, tap the tempo (a tap a beat)",
     "  Ctrl+R                 record: while the pattern plays, Q-P (or a MIDI keyboard) put notes on the step",
+    "                         (Play > Record off the grid: they keep how early or late they were played)",
     "  [ ] / Shift+[ ]        previous / next pattern / song (also PageUp PageDown)",
     "  - = (Shift: x10)       tempo (every pattern's; the song's in the song panel)",
     "  , .                    previous / next kit",
@@ -102,6 +113,7 @@ const SHORTCUTS: &[&str] = &[
     "  Enter or Space         open a list, press a button",
     "PIANO ROLL (F4)",
     "  click / drag / right-click a cell: add, select, delete; pitch (up/down) or velocity; menu",
+    "  drag a note's right edge                its length, by quarters of a step",
     "  Arrows, Shift+Arrows   the cursor; the note's pitch (up/down), time (left/right)   Enter, Delete",
     "  Shift+drag             a zone of steps and keys: Ctrl+C, Ctrl+X, Delete; Ctrl+V at the cursor",
     "  a key: hear it, right-click: clear, chord progression     wheel (Shift: pages)",
@@ -164,6 +176,7 @@ const PLUGIN_SHORTCUTS: &[&str] = &[
     "  Enter                  open a list, press a button",
     "PIANO ROLL (F4)",
     "  click / drag / right-click a cell: add, select, delete; pitch (up/down) or velocity; menu",
+    "  drag a note's right edge                its length, by quarters of a step",
     "  Arrows, Shift+Arrows   the cursor; the note's pitch (up/down), time (left/right)   Enter, Delete",
     "  Shift+drag             a zone of steps and keys: copy, cut, Delete; paste at the cursor",
     "  a key: hear it, right-click: clear, chord progression     wheel (Shift: pages)",
@@ -312,6 +325,25 @@ impl Session {
         if self.prefs_click(width, height, scale, x, y) {
             return;
         }
+        // A choice notice: its buttons take the click as ENTER takes the
+        // focused one, the rest of it closes as its title says.
+        if let Some(choice) = self.notice_choice() {
+            let hit = view::notice_button_at(
+                (width, height),
+                &choice.title,
+                &choice.lines,
+                [&choice.buttons[0], &choice.buttons[1]],
+                choice.focus,
+                scale,
+                (x, y),
+            );
+            if hit == Some(1) {
+                self.run_confirm();
+            } else {
+                self.chrome.overlay = None;
+            }
+            return;
+        }
         if matches!(self.chrome.overlay, Some(Overlay::History { .. })) {
             if !LogLayout::new(width, height, scale).contains(x, y) {
                 self.chrome.overlay = None;
@@ -372,5 +404,37 @@ impl Session {
             String::new(),
             "← →: choose   ENTER: the chosen".into(),
         ]
+    }
+
+    /// The choice notice open, if any: what the factory reset, the replace
+    /// of a file and the confirms show.
+    pub(super) fn notice_choice(&self) -> Option<NoticeChoice> {
+        match &self.chrome.overlay {
+            Some(Overlay::FactoryReset { yes }) => Some(NoticeChoice {
+                title: "Factory reset".into(),
+                lines: self.factory_reset_lines(),
+                buttons: ["Keep".into(), "Reset".into()],
+                focus: usize::from(*yes),
+            }),
+            Some(Overlay::ConfirmOverwrite { path, yes, .. }) => {
+                let name = path.file_name().unwrap_or(path.as_os_str()).to_string_lossy();
+                Some(NoticeChoice {
+                    title: "Replace the file?".into(),
+                    lines: vec![format!("{name} already exists in this folder."), String::new()],
+                    buttons: ["Keep it".into(), "Replace it".into()],
+                    focus: usize::from(*yes),
+                })
+            }
+            Some(Overlay::Confirm { pending, yes }) => {
+                let (title, lines, action) = self.confirm_text(pending);
+                Some(NoticeChoice {
+                    title: title.into(),
+                    lines,
+                    buttons: ["Keep".into(), action],
+                    focus: usize::from(*yes),
+                })
+            }
+            _ => None,
+        }
     }
 }

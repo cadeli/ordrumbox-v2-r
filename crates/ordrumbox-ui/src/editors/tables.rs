@@ -4,6 +4,7 @@ use super::layout::note_default;
 use crate::control::Format;
 use crate::kits::{DECAY_RANGE, Field, GAIN_RANGE, TRANSPOSE_RANGE};
 use ordrumbox_core::Note;
+use ordrumbox_core::note::{MAX_LENGTH_STEPS, MAX_SHIFT_STEPS};
 use ordrumbox_core::track::{
     COMP_ATTACK_MS_RANGE, COMP_RATIO_RANGE, COMP_RELEASE_MS_RANGE, COMP_THRESHOLD_DB_RANGE, MAX_STEPS_PER_BEAT,
 };
@@ -255,13 +256,15 @@ pub const LOOP_PROPS: [Prop; 3] = [
 ];
 
 /// Note editor tabs.
-pub const NOTE_TABS: [&str; 4] = ["Trigger", "Retrigger", "Euclidean", "Arpeggio"];
+pub const NOTE_TABS: [&str; 5] = ["Trigger", "Retrigger", "Euclidean", "Arpeggio", "Timing"];
 
 /// The note editor's knobs and their units.
-pub const NOTE_KNOBS: [(Prop, &str); 3] = [
+pub const NOTE_KNOBS: [(Prop, &str); 4] = [
     (prop("velocity", "Velocity", 0.0, 1.0, 0.01, Format::Percent), "%"),
     (prop("pitch", "Pitch", -24.0, 24.0, 1.0, Format::SignedPlain), "st"),
     (prop("pan", "Pan", -1.0, 1.0, 0.01, Format::Fmt), ""),
+    // In steps of the track: longer notes are drawn out in the piano roll.
+    (prop("lengthSteps", "Length", MIN_LENGTH_SLIDER, MAX_LENGTH_SLIDER, 0.25, Format::Fmt), ""),
 ];
 
 /// A row of a note editor tab.
@@ -283,7 +286,7 @@ pub(super) const fn note_count(key: &'static str, label: &'static str, min: f64,
 /// The rows of each note tab. As in the JS, the Euclidean tab's "Prob"
 /// (the same setting as the Retrig tab's) never shows: both sliders share
 /// one key, and the second one takes the first one's place.
-pub const NOTE_GROUPS: [&[NoteRow]; 4] = [
+pub const NOTE_GROUPS: [&[NoteRow]; NOTE_TABS.len()] = [
     &[
         note_count("cycle", "Cycle", 1.0, 16.0),
         note_count("cycleOffset", "Offset", 0.0, 15.0),
@@ -301,13 +304,20 @@ pub const NOTE_GROUPS: [&[NoteRow]; 4] = [
         NoteRow::Select("arpDirection", "Direction"),
         note_count("arpRange", "Range", 0.0, 12.0),
     ],
+    &[NoteRow::Slider(prop("shiftSteps", "Shift", -MAX_SHIFT_STEPS, MAX_SHIFT_STEPS, 0.01, Format::Percent))],
 ];
 
-/// The range of a note setting in the note editor. Not the pitch: the knob
-/// spans two octaves, the piano roll more.
+/// The shortest and the longest note the note editor's slider and the lane
+/// set, in steps; the piano roll draws a note out further.
+pub const MIN_LENGTH_SLIDER: f64 = 0.25;
+pub const MAX_LENGTH_SLIDER: f64 = 16.0;
+
+/// The range of a note setting. Not the pitch: the knob spans two octaves,
+/// the piano roll more. The length goes past its slider, as far as the piano
+/// roll draws a note out.
 pub fn note_range(key: &str) -> Option<(f64, f64)> {
     let prop = note_prop(key).filter(|_| key != "pitch")?;
-    Some((prop.min, prop.max))
+    Some((prop.min, if key == "lengthSteps" { MAX_LENGTH_STEPS } else { prop.max }))
 }
 
 /// The note editor's setting of key `key`: a knob's or a slider's.
@@ -323,8 +333,14 @@ pub fn note_prop(key: &str) -> Option<&'static Prop> {
 
 /// The note settings the grid's lane shows, one bar per step: their keys
 /// (settings of the note editor) and the labels of their tabs.
-pub const LANES: [(&str, &str); 4] =
-    [("velocity", "VELOCITY"), ("probability", "CHANCE"), ("retriggerCount", "RETRIG"), ("pan", "PAN")];
+pub const LANES: [(&str, &str); 6] = [
+    ("velocity", "VELOCITY"),
+    ("probability", "CHANCE"),
+    ("retriggerCount", "RETRIG"),
+    ("pan", "PAN"),
+    ("lengthSteps", "LENGTH"),
+    ("shiftSteps", "SHIFT"),
+];
 
 /// The value of note setting `prop` of `note`, else its default.
 #[must_use]

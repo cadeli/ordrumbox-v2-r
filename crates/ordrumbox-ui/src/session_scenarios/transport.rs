@@ -124,6 +124,26 @@ fn recording_puts_a_note_on_the_step_the_pattern_plays() {
 }
 
 #[test]
+fn recording_off_the_grid_keeps_how_late_the_note_was_played() {
+    let (mut s, mut audio) = session(r#"{"patterns":[{"name":"p","bpm":120,"tracks":[{"name":"KICK"}]}]}"#);
+    s.run(Command::Record);
+    s.toggle_play();
+    // On the grid, the default: a note played between two steps goes on the nearest, unshifted.
+    run(&mut s, &mut audio, 8500);
+    s.record_note(0);
+    let shifts = |s: &Session| s.pattern().unwrap().tracks[0].notes.iter().map(|n| n.shift_steps).collect::<Vec<_>>();
+    assert_eq!(shifts(&s), [0.0], "{}", s.message);
+    // Off the grid: the next one keeps its place between the steps.
+    s.run(Command::RecordTiming);
+    run(&mut s, &mut audio, 4000);
+    s.record_note(0);
+    let recorded = shifts(&s);
+    assert_eq!(recorded.len(), 2, "{}", s.message);
+    assert!(recorded[1] != 0.0 && recorded[1].abs() <= 0.5, "{recorded:?}");
+    assert_eq!(recorded[1], (recorded[1] * 100.0).round() / 100.0, "two decimals, as it is saved");
+}
+
+#[test]
 fn f11_asks_for_full_screen_and_ctrl_w_quits() {
     use crate::ui::Ui;
     use crate::ui_input::{Key, KeyEvent, Modifiers};

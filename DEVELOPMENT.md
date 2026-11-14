@@ -183,3 +183,16 @@ the audio callback through a lock-free ring (`AudioSide::trigger`, the same path
 MIDI) and to the UI thread through a channel, where `Session::midi_note` writes them when recording.
 `Controller::set_live_midi` makes the controller post the pattern's key map without a host. No snapshot changed: the passes of a song without a loop or a
 metronome are built as before.
+
+A note has a length and a shift. `lengthSteps` (1 by default, in steps of its track, may be a
+fraction) is how long it is held: a synth note before its release, the MIDI note the plugin
+sends, the note a MIDI export writes; a sample plays to its own end. `shiftSteps` (0 by
+default, half a step either way) moves the note and its repeats off the grid, in the hits
+themselves (`expand_hits`), so every reader of the hits gets it. A MIDI note sent or exported
+used to last a 16th whatever the track's grid; it now lasts a step of its track, so the notes
+of tracks that are not 4 steps a beat changed length. This rewrote the export lines of
+`midi_rust.txt` (logic); the audio renders and `flat_notes_rust.txt` are unchanged. The note
+editor has a Timing tab (Length, Shift), the lane two more settings (LENGTH, SHIFT, its tabs
+now in two columns), the piano roll draws a note as wide as it is long and its right edge
+drags (`session_roll_length.rs`); Play > Record off the grid keeps a recorded note's timing as
+its shift (off by default). A MIDI import still reads neither lengths nor timing.

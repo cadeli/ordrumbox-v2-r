@@ -313,11 +313,11 @@ impl Engine {
         }
     }
 
-    /// Send `event`'s MIDI note at clock frame `now`, ended `note_frames`
+    /// Send `event`'s MIDI note at clock frame `now`, ended its `note_frames`
     /// later; a note still sounding is ended first. A note of a track the
     /// host mutes, or too quiet to be a MIDI note, is not sent, nor a second
     /// one on the same channel, key and frame.
-    fn send_note(&mut self, event: &Event, pass: &Pass, now: u64) {
+    fn send_note(&mut self, event: &Event, now: u64) {
         let Some(note) = event.note else { return };
         let velocity = event.velocity.clamp(0.0, 1.0);
         if host_muted(self.host.muted, event.sound.track()) || (velocity * 127.0).round() < 1.0 {
@@ -329,7 +329,7 @@ impl Engine {
             Some(Held { off, .. }) => self.send(NoteOut { clock: off.min(now), note, velocity: None }),
             None => {}
         }
-        self.held[index] = Some(Held { on: now, off: now + pass.note_frames });
+        self.held[index] = Some(Held { on: now, off: now + event.note_frames });
         self.send(NoteOut { clock: now, note, velocity: Some(velocity) });
     }
 
@@ -582,7 +582,7 @@ impl Engine {
             let now = self.clock + offset as u64;
             while let Some(event) = pass.events.get(self.cursor).filter(|e| e.frame <= self.frame) {
                 self.start(event, &pass.patches, now, 1.0, 1.0);
-                self.send_note(event, &pass, now);
+                self.send_note(event, now);
                 self.cursor += 1;
             }
             let next_stop = pass.events.get(self.cursor).map_or(pass.frames, |e| e.frame);

@@ -299,17 +299,24 @@ fn target(name: &str, roots: &[(String, f64)], melodic_count: &mut u8) -> (u8, f
 
 /// A note as a file holds it: tick, key, velocity.
 type FileNote = (u64, u8, u8);
+/// How long the note of a key struck at a tick lasts, in ticks.
+type Lengths = std::collections::BTreeMap<(u64, u8), u64>;
+/// The notes an instrument track of a file must hold: its name, its channel, the notes, their lengths.
+type ExpectedTrack = (String, u8, Vec<FileNote>, Lengths);
 
 /// The notes each instrument track of the file must hold, straight from the
 /// pattern engine: by track name, in the order the names first come, the
 /// flat notes of every playing track of that name, pass after pass, on that
 /// name's channel; the notes of one key at one tick as one, at the loudest
-/// velocity.
-fn expected_tracks(pattern: &Pattern, loops: u32, roots: &[(String, f64)]) -> Vec<(String, u8, Vec<FileNote>)> {
+/// velocity and the longest length (a note lasts its `lengthSteps` steps of
+/// its track, a whole tick at least).
+fn expected_tracks(pattern: &Pattern, loops: u32, roots: &[(String, f64)]) -> Vec<ExpectedTrack> {
     let any_solo = pattern.tracks.iter().any(|t| t.solo);
     let plays: Vec<bool> = pattern.tracks.iter().map(|t| if any_solo { t.solo } else { !t.mute }).collect();
     let mut melodic_count = 0;
-    let mut by_name: Vec<(String, u8, f64, Vec<FileNote>)> = Vec::new();
+    // Name, channel, base note, and the notes with their lengths.
+    type Played = (String, u8, f64, Vec<(FileNote, u64)>);
+    let mut by_name: Vec<Played> = Vec::new();
     for track in pattern.tracks.iter().zip(&plays).filter(|(_, plays)| **plays).map(|(t, _)| t) {
         // A repeated name keeps the channel it was given first.
         if !by_name.iter().any(|(n, ..)| *n == track.name) {
@@ -337,7 +344,9 @@ fn expected_tracks(pattern: &Pattern, loops: u32, roots: &[(String, f64)]) -> Ve
                 // A silent note is not written: a note-on at velocity 0 would be a note-off.
                 let velocity = (velocity * 127.0).round() as u8;
                 if velocity > 0 {
-                    entry.3.push((u64::from(tick) * midi_ratio + offset, key, velocity));
+                    let step_ticks = f64::from(PPQN) / f64::from(track.steps_per_beat.max(1));
+                    let length = (hit.length_steps * step_ticks).round().max(1.0) as u64;
+                    entry.3.push(((u64::from(tick) * midi_ratio + offset, key, velocity), length));
                 }
             }
         }
@@ -347,11 +356,15 @@ fn expected_tracks(pattern: &Pattern, loops: u32, roots: &[(String, f64)]) -> Ve
         .filter(|e| !e.3.is_empty())
         .map(|(name, channel, _, notes)| {
             let mut loudest: std::collections::BTreeMap<(u64, u8), u8> = std::collections::BTreeMap::new();
-            for (tick, key, velocity) in notes {
+            let mut lengths = Lengths::new();
+            for ((tick, key, velocity), length) in notes {
                 let v = loudest.entry((tick, key)).or_default();
                 *v = (*v).max(velocity);
+                let l = lengths.entry((tick, key)).or_default();
+                *l = (*l).max(length);
             }
-            (name, channel, loudest.into_iter().map(|((tick, key), velocity)| (tick, key, velocity)).collect())
+            let notes = loudest.into_iter().map(|((tick, key), velocity)| (tick, key, velocity)).collect();
+            (name, channel, notes, lengths)
         })
         .collect()
 }
@@ -386,7 +399,7 @@ fn every_export_is_a_strict_file_of_the_notes_the_engine_plays() {
             failures.push(format!("{at}: tracks {names:?}, want {want:?}"));
             continue;
         }
-        for (events, (name, channel, want)) in tracks[1..].iter().zip(&expected) {
+        for (events, (name, channel, want, lengths)) in tracks[1..].iter().zip(&expected) {
             let mut ons: Vec<FileNote> = Vec::new();
             let mut offs: Vec<(u64, u8)> = Vec::new();
             for (tick, e) in events.iter().filter(|(_, e)| e[0] != 0xff) {
@@ -412,12 +425,13 @@ fn every_export_is_a_strict_file_of_the_notes_the_engine_plays() {
                     want.get(first)
                 ));
             }
-            // A note lasts a 16th, or ends where its key is struck again.
+            // A note lasts its length, or ends where its key is struck again.
             let mut ends: Vec<(u64, u8)> = want
                 .iter()
                 .map(|&(tick, key, _)| {
                     let next = want.iter().filter(|n| n.1 == key && n.0 > tick).map(|n| n.0).min();
-                    (next.map_or(tick + 24, |next| next.min(tick + 24)), key)
+                    let end = tick + lengths[&(tick, key)];
+                    (next.map_or(end, |next| next.min(end)), key)
                 })
                 .collect();
             ends.sort_unstable();
@@ -522,7 +536,7 @@ fn a_damaged_file_is_imported_or_refused_never_a_panic() {
 fn struck_keys(pattern: &Pattern, roots: &[(String, f64)]) -> Vec<(u64, u8)> {
     let mut keys: Vec<(u64, u8)> = expected_tracks(pattern, 1, roots)
         .into_iter()
-        .flat_map(|(_, _, notes)| notes)
+        .flat_map(|(_, _, notes, _)| notes)
         .map(|(tick, key, _)| (tick, key))
         .collect();
     keys.sort_unstable();

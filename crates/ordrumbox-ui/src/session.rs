@@ -80,6 +80,8 @@ mod session_open;
 mod session_prefs;
 #[path = "session_record.rs"]
 mod session_record;
+#[path = "session_roll_length.rs"]
+mod session_roll_length;
 #[path = "session_roll_zone.rs"]
 mod session_roll_zone;
 #[path = "session_tempo.rs"]

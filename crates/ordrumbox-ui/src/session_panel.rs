@@ -350,6 +350,7 @@ pub(super) fn control_name(id: Id) -> (&'static str, &'static str) {
         Id::TrackSelect("autoVariant") => ("Variant", ""),
         Id::TrackSelect(key) => (editors::fx_label(key), ""),
         Id::Toggle("mono") => ("Mono", ""),
+        Id::Toggle("legato") => ("Legato", ""),
         Id::Toggle("autoMode") => ("Auto", ""),
         Id::Toggle("composeLock") => ("Lock", ""),
         Id::Toggle(key) => {

@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, HashSet};
 
 use crate::arp;
 use crate::euclidean;
-use crate::note::Note;
+use crate::note::{MIN_LENGTH_STEPS, Note};
 use crate::pattern::Pattern;
 use crate::rng::Rng;
 use crate::scales::Scales;
@@ -35,6 +35,8 @@ pub struct Hit {
     pub pitch: f64,
     pub velocity: f64,
     pub pan: f64,
+    /// How long it is held, in steps of its track ([`Note::held_steps`]).
+    pub length_steps: f64,
 }
 
 /// The hits of one pass (the notes expanded into what plays), by tick (a beat is [`TICK`] ticks).
@@ -92,7 +94,8 @@ pub fn expand_hits(pattern: &Pattern, pass: u32, rng: &mut Rng, scales: &Scales)
             if step_to_tick(step, track.steps_per_beat) >= pattern_ticks {
                 continue;
             }
-            let ctx = NoteContext { track_index, track, note, note_index, pattern_ticks };
+            let late_ticks = position_to_tick(note.late_steps(), track.steps_per_beat);
+            let ctx = NoteContext { track_index, track, note, note_index, pattern_ticks, late_ticks };
             for at in loop_occurrences(step, loop_steps, track.steps_per_beat, pattern_ticks) {
                 ctx.add_sub_notes(&mut flat, at, rng);
                 ctx.add_euclidean_fill(&mut flat, at, &span_end, rng);
@@ -100,7 +103,27 @@ pub fn expand_hits(pattern: &Pattern, pass: u32, rng: &mut Rng, scales: &Scales)
         }
         variation::apply(&mut flat, track_index, track, (loop_steps, pattern_ticks), macro_factor, rng, scales);
     }
+    for (track_index, track) in pattern.tracks.iter().enumerate().filter(|(_, t)| t.legato && t.steps_per_beat > 0) {
+        extend_to_next_note(&mut flat, track_index, track.steps_per_beat, pattern_ticks);
+    }
     flat
+}
+
+/// Make every hit of `track_index` last until the next tick where that track
+/// plays (the last ones, until the pass end): a legato line.
+fn extend_to_next_note(flat: &mut Hits, track_index: usize, steps_per_beat: i32, pattern_ticks: i64) {
+    let step_ticks = f64::from(TICK) / f64::from(steps_per_beat);
+    let mut next_tick = pattern_ticks;
+    for (&tick, hits) in flat.iter_mut().rev() {
+        let mut played = false;
+        for hit in hits.iter_mut().filter(|h| h.track == track_index) {
+            hit.length_steps = ((next_tick - i64::from(tick)) as f64 / step_ticks).max(MIN_LENGTH_STEPS);
+            played = true;
+        }
+        if played {
+            next_tick = i64::from(tick);
+        }
+    }
 }
 
 /// Absolute steps where a note at `step` sounds: repeated every loop when it
@@ -154,6 +177,8 @@ struct NoteContext<'a> {
     note: &'a Note,
     note_index: usize,
     pattern_ticks: i64,
+    /// How late every hit of the note is, in ticks (its `shiftSteps`).
+    late_ticks: i64,
 }
 
 impl NoteContext<'_> {
@@ -161,8 +186,15 @@ impl NoteContext<'_> {
         self.push_at(flat, tick, pitch_offset, self.note.velocity);
     }
 
+    /// A hit at `tick` and the note's shift: one shifted before the pattern
+    /// start plays on its first tick, one shifted past its end is left out.
     fn push_at(&self, flat: &mut Hits, tick: i64, pitch_offset: f64, velocity: f64) {
         let Ok(tick) = u32::try_from(tick) else { return }; // before the pattern start
+        let shifted = (i64::from(tick) + self.late_ticks).max(0);
+        if shifted >= self.pattern_ticks {
+            return;
+        }
+        let Ok(tick) = u32::try_from(shifted) else { return };
         flat.entry(tick).or_default().push(Hit {
             track: self.track_index,
             source: Some(self.note_index),
@@ -171,6 +203,7 @@ impl NoteContext<'_> {
             pitch: self.note.pitch + pitch_offset,
             velocity,
             pan: self.note.pan,
+            length_steps: self.note.held_steps(),
         });
     }
 
@@ -327,6 +360,35 @@ mod tests {
         // at step 3 is tick 58, as a note written there, not 38 + 19.
         let p = pattern(r#"{"tracks":[{"stepsPerBeat":5,"notes":[{"step":2,"euclideanPulses":2},{"step":4}]}]}"#);
         assert_eq!(ticks(&p, 0), [(38, 0.0), (58, 0.0), (77, 0.0)]);
+    }
+
+    #[test]
+    fn a_shift_moves_the_note_and_its_repeats_off_the_grid() {
+        // A step of 24 ticks: a quarter of a step late is 6 ticks, early -6.
+        let p = pattern(r#"{"tracks":[{"notes":[{"beat":1,"shiftSteps":0.25,"retriggerCount":2,"rate":8}]}]}"#);
+        assert_eq!(ticks(&p, 0), [(102, 0.0), (126, 0.0)]);
+        let p = pattern(r#"{"tracks":[{"notes":[{"beat":1,"shiftSteps":-0.25}]}]}"#);
+        assert_eq!(ticks(&p, 0), [(90, 0.0)]);
+        // Before the pattern start: its first tick. Past half a step: half a step.
+        let p = pattern(r#"{"tracks":[{"notes":[{"shiftSteps":-0.25},{"beat":2,"shiftSteps":3}]}]}"#);
+        assert_eq!(ticks(&p, 0), [(0, 0.0), (204, 0.0)]);
+    }
+
+    #[test]
+    fn a_hit_is_held_as_long_as_its_note() {
+        let p = pattern(r#"{"tracks":[{"notes":[{},{"beat":1,"lengthSteps":2.5},{"beat":2,"lengthSteps":0}]}]}"#);
+        let flat = expand_hits(&p, 0, &mut Rng::new(0), &Scales::default());
+        let lengths: Vec<f64> = flat.values().flatten().map(|hit| hit.length_steps).collect();
+        assert_eq!(lengths, [1.0, 2.5, crate::note::MIN_LENGTH_STEPS]);
+    }
+
+    #[test]
+    fn a_legato_track_holds_each_note_until_the_next() {
+        let p = pattern(r#"{"tracks":[{"legato":true,"notes":[{},{"step":2},{"beat":2,"lengthSteps":0.5}]}]}"#);
+        let flat = expand_hits(&p, 0, &mut Rng::new(0), &Scales::default());
+        let lengths: Vec<f64> = flat.values().flatten().map(|hit| hit.length_steps).collect();
+        // 4 steps a beat, a 4-beat pattern: the last note runs to step 16.
+        assert_eq!(lengths, [2.0, 6.0, 8.0]);
     }
 
     #[test]

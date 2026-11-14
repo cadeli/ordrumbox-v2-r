@@ -82,6 +82,8 @@ pub enum Command {
     Metronome,
     /// Ctrl+R: the row keys put notes on the step that plays.
     Record,
+    /// Recorded notes keep the timing played, or go on the step.
+    RecordTiming,
     /// The song's loop region removed.
     ClearLoop,
     PreviousSong,
@@ -253,6 +255,7 @@ pub struct MenuState {
     pub playing: bool,
     pub metronome: bool,
     pub recording: bool,
+    pub record_timing: bool,
     pub fullscreen: bool,
     pub has_songs: bool,
     /// Generation on: drums, bass, chords.
@@ -486,6 +489,7 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
                 command("Clear the loop", "", C::ClearLoop, s.has_songs),
                 Item::Separator,
                 check("Record notes", "Ctrl+R", C::Record, p, s.recording),
+                check("Record off the grid", "", C::RecordTiming, p, s.record_timing),
                 check("Metronome", "F9", C::Metronome, true, s.metronome),
                 command("Tap tempo", "F8", C::TapTempo, true),
                 Item::Separator,

@@ -409,7 +409,7 @@ fn no_control_moves_whatever_the_tab_and_the_settings() {
 
     let mut places = Vec::new();
     for note in [Some(Note::default()), None] {
-        for note_tab in 0..4 {
+        for note_tab in 0..NOTE_TABS.len() as u8 {
             let view = NoteView {
                 title: "KICK [beat 1 step 1]".into(),
                 note: note.clone(),

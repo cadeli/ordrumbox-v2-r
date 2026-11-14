@@ -115,7 +115,8 @@ channels, the tracks left take keys of channel 10 from 84 up.
   host's Pattern parameter keeps its value. CLAP only: a VST3 host gives a plugin no program
   change (map a MIDI control to the Pattern parameter instead).
 - **Out**: the notes the pattern plays go out where they come in, with their pitch (the
-  track's transpose and pitch LFO included), a 16th long. Tracks the host mutes send nothing.
+  track's transpose and pitch LFO included), as long as the note (a step of its track unless
+  its **Length** says otherwise). Tracks the host mutes send nothing.
   A clip recorded from this output and played back into the plugin plays the same tracks at
   the same pitches.
 
@@ -124,12 +125,19 @@ channels, the tracks left take keys of channel 10 from 84 up.
 One row per track, a page of beats across: 4 beats, or 8 or 16 when the window is wide
 enough for steps of a usable size. Under the rows, the **lane** shows one setting of the
 track editor's track, a bar per note: **VELOCITY**, **CHANCE** (its probability), **RETRIG**
-(how many times it plays) or **PAN**, picked by the tabs on its left. Click a bar to set
+(how many times it plays), **PAN**, **LENGTH** (how long it is held, in steps) or **SHIFT**
+(how early or late it plays, off the grid), picked by the tabs on its left. Click a bar to set
 its value at that height, or drag across the bars to draw them; a drag is one undo step.
 
 The **note editor** (the selected note's velocity, pitch, pan, trigger, retrigger,
-euclidean and arpeggio settings) is a strip under the grid and under the piano roll, the
+euclidean, arpeggio and timing settings) is a strip under the grid and under the piano roll, the
 views that edit notes. The track editor, on the right, holds the track's settings only.
+
+A note's **Length** (a knob beside Velocity, Pitch and Pan, 1 step by default, a quarter of a step at least) is how
+long a synth note is held before its release, and how long the MIDI note sent or exported
+lasts; a sample plays to its own end whatever the length. In the piano roll a note is as wide
+as it is long: drag its right edge to draw it out. Its **Shift** moves it off the grid, up
+to half a step early or late, with its retriggers.
 
 ## Keys
 
@@ -144,7 +152,9 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
 - **F9**: metronome (a click on every beat, the first of a measure higher), **F8**: tap
   the tempo (tap on the beat; a pause of 2 seconds starts the count again)
 - **Ctrl R**: record. While the pattern plays, **Q–P** also put a note on their track, on
-  the step nearest to the playhead (one undo step each; a step that has a note keeps it)
+  the step nearest to the playhead (one undo step each; a step that has a note keeps it).
+  With **Play > Record off the grid** on, a recorded note also keeps how early or late it
+  was played, as its Shift
 - **F11**: full screen, **Ctrl W**: close the window (as **Ctrl Q**)
 - **F1–F7** (also **Ctrl 1–7**, for the keyboards whose F keys want Fn): the shortcut list,
   track editor, song panel, piano roll, grid, synth editor, note editor (shown or folded)

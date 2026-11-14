@@ -46,7 +46,7 @@ mod tests {
     use super::*;
 
     fn note(beat_step: i32, pitch: f64, pan: f64) -> Hit {
-        Hit { track: 0, source: Some(0), beat: 0, step: beat_step, pitch, velocity: 0.8, pan }
+        Hit { track: 0, source: Some(0), beat: 0, step: beat_step, pitch, velocity: 0.8, pan, length_steps: 1.0 }
     }
 
     #[test]

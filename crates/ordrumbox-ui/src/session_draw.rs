@@ -187,30 +187,19 @@ impl Session {
                 let layout = LogLayout::new(canvas.width(), canvas.height(), scale);
                 action_log::draw(canvas, &self.action_log, *scroll, &layout);
             }
-            Some(Overlay::FactoryReset { yes }) => view::draw_notice_choice(
-                canvas,
-                "Factory reset",
-                &self.factory_reset_lines(),
-                ["Keep", "Reset"],
-                usize::from(*yes),
-                scale,
-            ),
-            Some(Overlay::ConfirmOverwrite { path, yes, .. }) => {
-                // The name alone: the folder was just picked, and a long path would not fit.
-                let name = path.file_name().unwrap_or(path.as_os_str()).to_string_lossy();
-                let lines = [format!("{name} already exists in this folder."), String::new()];
-                view::draw_notice_choice(
-                    canvas,
-                    "Replace the file?",
-                    &lines,
-                    ["Keep it", "Replace it"],
-                    usize::from(*yes),
-                    scale,
-                )
-            }
-            Some(Overlay::Confirm { pending, yes }) => {
-                let (title, lines, action) = self.confirm_text(pending);
-                view::draw_notice_choice(canvas, title, &lines, ["Keep", &action], usize::from(*yes), scale)
+            // The choice notices: what `notice_choice` describes, drawn with
+            // its two buttons.
+            Some(Overlay::FactoryReset { .. } | Overlay::ConfirmOverwrite { .. } | Overlay::Confirm { .. }) => {
+                if let Some(choice) = self.notice_choice() {
+                    view::draw_notice_choice(
+                        canvas,
+                        &choice.title,
+                        &choice.lines,
+                        [&choice.buttons[0], &choice.buttons[1]],
+                        choice.focus,
+                        scale,
+                    );
+                }
             }
             None => {}
         }

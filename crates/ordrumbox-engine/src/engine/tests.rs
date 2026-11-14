@@ -23,7 +23,7 @@ fn bank() -> Arc<SampleBank> {
 
 fn sample_event(frame: u64) -> Event {
     let voice = VoiceStart { sample: 0, track: 0, ratio: 1.0, peak: 1.0, decay: 10.0, pan: 0.0, delay: 0 };
-    Event { frame, sound: Sound::Sample(voice), mono: true, velocity: 1.0, note: None }
+    Event { frame, sound: Sound::Sample(voice), mono: true, velocity: 1.0, note: None, note_frames: 0 }
 }
 
 fn pass(number: u64, frames: &[u64], length: u64) -> Arc<Pass> {
@@ -217,6 +217,7 @@ fn synth_notes_play_for_their_length() {
         mono: false,
         velocity: 1.0,
         note: None,
+        note_frames: 0,
     };
     let pass = Pass {
         frames: 48_000,
@@ -254,8 +255,8 @@ fn sending(pass: Arc<Pass>, notes: &[MidiNote]) -> Arc<Pass> {
     let mut pass = (*pass).clone();
     for (event, &note) in pass.events.iter_mut().zip(notes) {
         event.note = Some(note);
+        event.note_frames = 100;
     }
-    pass.note_frames = 100;
     Arc::new(pass)
 }
 

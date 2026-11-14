@@ -143,6 +143,8 @@ impl Session {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use ordrumbox_core::json::Value;
 
     use super::*;
@@ -152,6 +154,10 @@ mod tests {
     use crate::menu::Command;
 
     use crate::scale::Scale;
+
+    use crate::test_support::scratch_dir;
+
+    use crate::view;
 
     use crate::view::Cursor;
 
@@ -209,6 +215,50 @@ mod tests {
         s.overlay_click(800, 600, Scale::ONE, 10, 10);
         assert!(!s.confirm_open());
         assert_eq!(s.pattern().unwrap().name.as_deref(), Some("p"));
+    }
+
+    #[test]
+    fn a_click_on_the_notice_buttons_takes_the_choice() {
+        // A user data folder of its own: the reset touches nothing of the user's.
+        let dir = scratch_dir("confirm-reset");
+        let mut s = session();
+        s.saving.library_path = Some(dir.join("library.json"));
+        s.run(Command::FactoryReset);
+        assert!(s.overlay_open());
+        // The Reset button runs what ENTER on the focused one would.
+        let (x, y) = button_point(&s, 1);
+        s.overlay_click(800, 600, Scale::ONE, x, y);
+        assert!(!s.overlay_open());
+        assert!(s.message.starts_with("factory settings restored"), "{}", s.message);
+        // The Keep button only closes.
+        s.run(Command::FactoryReset);
+        let (x, y) = button_point(&s, 0);
+        s.overlay_click(800, 600, Scale::ONE, x, y);
+        assert!(!s.overlay_open());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// A point on `button` of the notice open (the layout is the view's:
+    /// the test finds the button where the clicks would land).
+    fn button_point(s: &Session, button: usize) -> (i32, i32) {
+        let choice = s.notice_choice().unwrap();
+        for x in (0..800).step_by(2) {
+            for y in (0..600).step_by(2) {
+                let hit = view::notice_button_at(
+                    (800, 600),
+                    &choice.title,
+                    &choice.lines,
+                    [&choice.buttons[0], &choice.buttons[1]],
+                    choice.focus,
+                    Scale::ONE,
+                    (x, y),
+                );
+                if hit == Some(button) {
+                    return (x, y);
+                }
+            }
+        }
+        panic!("no button {button} drawn");
     }
 
     #[test]
