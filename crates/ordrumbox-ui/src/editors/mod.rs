@@ -43,6 +43,8 @@ pub struct TrackView<'a> {
     /// The sample's decay (0 without one).
     pub decay: f64,
     pub instruments: Choice,
+    /// The tracks of the pattern that can key this one (a sidechain), `none` first.
+    pub sidechains: Choice,
     pub samples: Choice,
     pub synths: Choice,
     /// LFO values while playing, by setting.

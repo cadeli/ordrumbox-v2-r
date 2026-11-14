@@ -238,18 +238,36 @@ impl Editor {
         .is_some()
     }
 
-    /// Rename track `t`; a track renamed to a bass becomes mono.
+    /// Rename track `t`; a track renamed to a bass becomes mono. The tracks
+    /// of the pattern that took it as their sidechain key follow its name, in
+    /// the same undo step.
     pub fn change_track_name(&mut self, p: usize, t: usize, name: &str) -> bool {
-        self.edit_track(
-            p,
-            t,
-            |_| format!("Rename track → {name}"),
-            None,
-            |track| {
-                track.name = name.to_owned();
-                track.mono |= mono_from_track_name(name);
-            },
-        )
-        .is_some()
+        let Some(pattern) = self.library().patterns.get(p) else { return false };
+        let Some(old) = pattern.tracks.get(t).map(|track| track.name.clone()) else { return false };
+        let keyed: Vec<usize> = pattern
+            .tracks
+            .iter()
+            .enumerate()
+            .filter(|(i, track)| *i != t && track.sidechain_source == old)
+            .map(|(i, _)| i)
+            .collect();
+        self.batch(&format!("Rename track → {name}"), |editor| {
+            let renamed = editor
+                .edit_track(
+                    p,
+                    t,
+                    |_| format!("Rename track → {name}"),
+                    None,
+                    |track| {
+                        track.name = name.to_owned();
+                        track.mono |= mono_from_track_name(name);
+                    },
+                )
+                .is_some();
+            for other in keyed {
+                editor.edit_track(p, other, |_| String::new(), None, |track| track.sidechain_source = name.to_owned());
+            }
+            renamed
+        })
     }
 }

@@ -142,6 +142,9 @@ track) is kept before both. This rewrote the table of `ordrumbox-ui/src/assign_t
 The strip's compressor has two cases of its own, `comp` and `comp_parallel`, added
 after `delay_pingpong` to `effect_renders.bin` (dsp); the other cases are unchanged.
 
+The per-track sidechain (`Strip::process`'s `key`, `Pass::keys`) changes no snapshot: a
+track with no key and no `duckAmount` renders as before.
+
 The whole chain has a snapshot of its own, `pattern_renders.bin` (engine): hand-written
 patterns and a song rendered as the WAV export does, from the notes to the master bus.
 It is new: no other snapshot changed.

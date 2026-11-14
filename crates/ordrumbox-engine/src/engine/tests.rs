@@ -106,6 +106,48 @@ fn a_silent_strip_outputs_nothing() {
     assert!(render(&mut engine, 500).iter().all(|&s| s == 0.0));
 }
 
+/// The tracks of `playing` play the same long sample at frame 0 through two
+/// strips, the second of which ducks fully by the key `keys` gives it. The
+/// left output's level, once the ducking has settled.
+fn ducked_level(playing: &[usize], keys: Vec<Option<usize>>) -> f32 {
+    let mut engine = engine();
+    engine.bank = Arc::new(SampleBank {
+        samples: vec![crate::kit::BankSample {
+            buffer: SampleBuffer::mono(vec![1.0; 48_000], 48_000).into(),
+            ..engine.bank.samples[0].clone()
+        }],
+    });
+    let voice = |track| VoiceStart { sample: 0, track, ratio: 1.0, peak: 1.0, decay: 10.0, pan: 0.0, delay: 0 };
+    let events = playing.iter().map(|&track| Event { sound: Sound::Sample(voice(track)), ..sample_event(0) }).collect();
+    let ducked = StripSettings { duck_amount: 1.0, ..StripSettings::default() };
+    engine.play(Arc::new(Pass {
+        frames: 48_000,
+        ticks: TICK,
+        events,
+        strips: vec![StripSettings::default(), ducked],
+        keys,
+        ..Pass::default()
+    }));
+    let signal = render(&mut engine, 9_600);
+    signal[9_000..].iter().fold(0.0_f32, |peak, s| peak.max(s.abs()))
+}
+
+#[test]
+fn a_strip_ducks_by_the_key_track_it_is_given() {
+    let alone = ducked_level(&[0], vec![]);
+    let free = ducked_level(&[0, 1], vec![]);
+    assert!(free > alone * 1.3, "both tracks are louder than one: {free} against {alone}");
+    // Keyed by the first track, which plays, the second is ducked away.
+    let keyed = ducked_level(&[0, 1], vec![None, Some(0)]);
+    assert!((keyed - alone).abs() < alone * 0.02, "{keyed} against {alone}");
+    // Keyed by a track that is silent, or by one past the strips: no ducking.
+    for (playing, keys) in [(&[1][..], vec![None, Some(0)]), (&[0, 1][..], vec![None, Some(7)])] {
+        let level = ducked_level(playing, keys);
+        let expected = if playing.len() == 1 { alone } else { free };
+        assert!((level - expected).abs() < expected * 0.02, "{level} against {expected}");
+    }
+}
+
 #[test]
 fn the_host_mix_mutes_scales_and_pans_tracks_and_scales_the_master() {
     let long = || SampleBuffer::mono(vec![1.0; 48_000], 48_000);

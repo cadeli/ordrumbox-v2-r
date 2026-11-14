@@ -232,6 +232,13 @@ orDrumbox brings it inside and the assistant tells you the value used.</p>
 (a plain compressor); in between, the compressed sound is mixed with the dry one. The threshold goes from −60 to
 0 dB, the ratio from 1 to 20, the attack from 0.1 to 200 ms and the release from 10 to 2000 ms. A slower attack
 lets the hit through before the compressor reacts.</p>
+<p class="say">Make the bass duck under the kick, as a sidechain.</p>
+<pre><code>updateTrack { "patternName": "First Beat", "trackName": "BASS",
+              "updates": { "sidechainSource": "KICK", "duckAmount": 0.8, "duckReleaseMs": 180 } }</code></pre>
+<p>The key is another track of the pattern, by name; an empty <code>sidechainSource</code> is none. Each time the key
+sounds, <code>duckAmount</code> (0 to 1) of the track's volume is taken off, and it comes back over
+<code>duckReleaseMs</code> (10 to 2000 ms). With a key, the track's compressor listens to the key instead of the track's
+own sound. The key is heard before its own effects, so a turned-down key still keys.</p>
 </div>
 
 <div class="example">

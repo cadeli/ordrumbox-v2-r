@@ -260,12 +260,11 @@ pub fn output_height(scale: Scale) -> i32 {
     output::STRIP_HEIGHT * scale
 }
 
-/// The height the track editor takes at most, at scale 1: the Generate tab's
-/// Advanced settings on a track in auto mode, under its simple part as tall
-/// as a drum track's compose view, under the sample bar (kept even without a
+/// The height the track editor takes at most, at scale 1: the FX tab's six
+/// effects, one strip each, under the sample bar (kept even without a
 /// sample). The note editor is under the grid and the piano roll, not here.
 /// A test checks that every tab fits in it.
-pub const TRACK_EDITOR_HEIGHT: i32 = 445;
+pub const TRACK_EDITOR_HEIGHT: i32 = 455;
 
 /// The pixels the track editor's rows add up to beyond `TRACK_EDITOR_HEIGHT *
 /// scale` at a scale of an odd number of quarters (×1.25, ×1.75…): each row

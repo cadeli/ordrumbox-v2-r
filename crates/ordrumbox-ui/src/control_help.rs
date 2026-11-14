@@ -109,7 +109,9 @@ fn fx_help(fx: u8) -> Option<Help> {
         0 => ["Reverb", "the room around the sound, lit when on"],
         1 => ["Delay", "echoes of the sound, lit when on"],
         2 => ["Saturation", "drive and grit, lit when on"],
-        3 => ["Filter", "cuts lows or highs, lit when on"],
+        3 => ["Compressor", "turns loud parts down, lit when on"],
+        4 => ["Sidechain", "another track's sound turns this one down, lit when on"],
+        5 => ["Filter", "cuts lows or highs, lit when on"],
         _ => return None,
     })
 }
@@ -157,6 +159,13 @@ fn setting_help(key: &str) -> Option<Help> {
         "compRatio" => ["Ratio", "dB in for one dB out above the threshold: 4 turns 8 dB over into 2"],
         "compAttackMs" => ["Attack", "how fast it turns down, in ms: slower lets the hit's front through"],
         "compReleaseMs" => ["Release", "how fast it lets go, in ms"],
+        "duckAmount" => {
+            ["Duck", "how far the key track turns this one down: its volume (and its tails) follow the key"]
+        }
+        "duckReleaseMs" => ["Release", "how fast the volume comes back after the key, in ms"],
+        "sidechainSource" => {
+            ["Key", "the track this one listens to: its sound ducks the volume and keys the compressor"]
+        }
         "filterType" => ["Filter type", "lowpass, highpass, bandpass, notch"],
         "filterSlope" => ["Filter slope", "how steeply it cuts, dB per octave"],
         "filterCutoff" => ["Cutoff", "where the filter cuts, in Hz"],
@@ -222,8 +231,8 @@ fn setting_help(key: &str) -> Option<Help> {
 mod tests {
     use super::*;
     use crate::editors::{
-        FX_KNOBS, GENERATION_COMPOSE, GENERATION_ENGINE, GENERATION_GROOVE, GENERATION_MANUAL, GenerationRow, KNOB_BAR,
-        LOOP_PROPS, NOTE_GROUPS, NOTE_TABS, NoteRow, TABS,
+        FX_DEFS, FX_KNOBS, GENERATION_COMPOSE, GENERATION_ENGINE, GENERATION_GROOVE, GENERATION_MANUAL, GenerationRow,
+        KNOB_BAR, LOOP_PROPS, NOTE_GROUPS, NOTE_TABS, NoteRow, TABS,
     };
 
     #[test]
@@ -253,6 +262,7 @@ mod tests {
             "filterSlope",
             "reverbType",
             "delayType",
+            "sidechainSource",
         ]);
         for key in keys {
             assert!(help(Id::Fx(key)).is_some(), "{key}");
@@ -264,7 +274,7 @@ mod tests {
         for tab in 0..NOTE_TABS.len() as u8 {
             assert!(help(Id::NoteTab(tab)).is_some(), "note tab {tab}");
         }
-        for fx in 0..4 {
+        for fx in 0..FX_DEFS.len() as u8 {
             assert!(help(Id::FxPower(fx)).is_some(), "effect {fx}");
         }
         for view in 0..crate::view::VIEWS.len() as u8 {

@@ -126,6 +126,10 @@ pub fn strip_settings(track: &Track, bpm: f64) -> StripSettings {
     s.comp_attack_seconds = (finite_or(track.comp_attack_ms, 10.0) / 1000.0) as f32;
     s.comp_release_seconds = (finite_or(track.comp_release_ms, 100.0) / 1000.0) as f32;
 
+    // Sidechain ducking (the engine gives the strip its key).
+    s.duck_amount = finite_or(track.duck_amount, 0.0).clamp(0.0, 1.0) as f32;
+    s.duck_release_seconds = (finite_or(track.duck_release_ms, 150.0) / 1000.0) as f32;
+
     // Saturation.
     let amount = if track.saturation_on { finite_or(track.saturation_mix, 0.0).clamp(0.0, 1.0) } else { 0.0 };
     s.saturation_type = match track.saturation_type.as_str() {

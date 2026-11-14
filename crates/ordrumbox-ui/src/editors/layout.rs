@@ -322,22 +322,28 @@ pub(super) fn fx_strip(rows: &mut Rows, view: &TrackView, i: u8, fx: &FxDef) {
     for &key in choices {
         let rect = rows.slot(slot, FX_SLOTS);
         slot += 1;
-        let (values, mut labels) = track_select_options(key);
-        let selected = index_of(&values, &text_of(track, key));
-        if key == "delayBeats" {
-            // Too long a delay plays at fewer beats: shown on the choice.
-            let used = delay_beats_used(track.delay_beats, view.bpm);
-            if used != track.delay_beats
-                && let Some(label) = labels.get_mut(selected)
-            {
-                *label = format!("{label} ({} used)", num::text(used));
-            }
-        }
-        let choice = Choice { values, labels, selected };
+        let choice = if key == "sidechainSource" { view.sidechains.clone() } else { fx_choice(view, key) };
         rows.slot_choice(rect, fx_label(key), Some(key), Some(Id::TrackSelect(key)), choice.kind());
     }
     (rows.x, rows.w) = (x, w);
     rows.y += knob_row_h(s) + FX_STRIP_GAP * s;
+}
+
+/// The choice of the effect setting `key` (a select of fixed options).
+fn fx_choice(view: &TrackView, key: &str) -> Choice {
+    let track = view.track;
+    let (values, mut labels) = track_select_options(key);
+    let selected = index_of(&values, &text_of(track, key));
+    if key == "delayBeats" {
+        // Too long a delay plays at fewer beats: shown on the choice.
+        let used = delay_beats_used(track.delay_beats, view.bpm);
+        if used != track.delay_beats
+            && let Some(label) = labels.get_mut(selected)
+        {
+            *label = format!("{label} ({} used)", num::text(used));
+        }
+    }
+    Choice { values, labels, selected }
 }
 
 /// Pixels between two effect strips (at scale 1).
@@ -573,8 +579,8 @@ pub(super) const fn max_len(lens: &[usize]) -> usize {
 }
 
 /// The y under the tallest tab (from `top`, under the main tabs): the Gen
-/// tab's Advanced settings. The note editor starts there whatever the tab, so
-/// it never moves.
+/// tab's Advanced settings, or the FX tab's strips. The note editor starts
+/// there whatever the tab, so it never moves.
 pub(super) fn tallest_tab_bottom(top: i32, scale: Scale) -> i32 {
     let mut rows = Rows { x: 0, w: 0, y: top, scale, items: Vec::new() };
     // Auto, Lock, New line.
@@ -587,7 +593,8 @@ pub(super) fn tallest_tab_bottom(top: i32, scale: Scale) -> i32 {
     for _ in 0..GENERATION_ROWS {
         rows.row();
     }
-    rows.y
+    let fx_bottom = top + FX_DEFS.len() as i32 * (knob_row_h(scale) + FX_STRIP_GAP * scale);
+    rows.y.max(fx_bottom)
 }
 
 /// The compose settings of the simple view.
