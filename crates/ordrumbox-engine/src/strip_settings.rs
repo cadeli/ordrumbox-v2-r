@@ -370,4 +370,26 @@ mod tests {
         assert_eq!(l.pan[four_beats as usize / 2], 1.0); // 0.8 + 0.5, clamped
         assert!(strip_lfo(0, &Track::default(), false, 0, four_beats).is_none());
     }
+
+    #[test]
+    fn each_strip_lfo_fills_its_own_values_only() {
+        let lfo = |min: f64, max: f64| {
+            ordrumbox_core::json::parse(&format!(r#"{{"freq":1,"min":{min},"max":{max},"type":"sine"}}"#))
+                .unwrap()
+                .as_object()
+                .cloned()
+        };
+        let ticks = ordrumbox_core::steps::TICK;
+        let lengths = |track: &Track| {
+            let l = strip_lfo(0, track, false, 0, ticks).unwrap();
+            [l.volume.len(), l.pan.len(), l.cutoff.len(), l.q.len()]
+        };
+        let n = ticks as usize;
+        assert_eq!(lengths(&Track { volume_lfo: lfo(0.0, 1.0), ..Track::default() }), [n, 0, 0, 0]);
+        assert_eq!(lengths(&Track { pan_lfo: lfo(-1.0, 1.0), ..Track::default() }), [0, n, 0, 0]);
+        assert_eq!(lengths(&Track { filter_cutoff_lfo: lfo(0.0, 1.0), ..Track::default() }), [0, 0, n, 0]);
+        assert_eq!(lengths(&Track { filter_q_lfo: lfo(0.0, 1.0), ..Track::default() }), [0, 0, 0, n]);
+        let silent = Track { volume_lfo: lfo(0.0, 1.0), ..Track::default() };
+        assert!(strip_lfo(0, &silent, true, 0, ticks).is_none(), "a silent track gets no volume LFO");
+    }
 }

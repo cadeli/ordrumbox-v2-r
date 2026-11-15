@@ -135,6 +135,11 @@ fn root_key(assigned: Option<&TrackSound>, bank: &SampleBank) -> f64 {
     }
 }
 
+/// The pitch ratio the track's transpose LFO gives at transport tick `lfo_tick`: 1 without one.
+fn pitch_lfo_ratio(track: &Track, lfo_tick: u64) -> f64 {
+    track.transpose_lfo.as_ref().map_or(1.0, |l| (lfo::value(l, lfo_tick as f64) / 12.0).exp2())
+}
+
 /// The MIDI note `note` of `track` sends at transport tick `lfo_tick`, to
 /// `target`: its pitch with the track's transpose and pitch LFO.
 fn midi_note(target: Option<Target>, note: &Hit, track: &Track, lfo_tick: u64) -> Option<MidiNote> {
@@ -270,7 +275,7 @@ fn sound_for(
         TrackSound::Synth(key) => {
             let preset = context.synths.get(key)?;
             let synth_note = SynthNote {
-                ratio: note.playback_ratio(track),
+                ratio: note.playback_ratio(track) * pitch_lfo_ratio(track, lfo_tick),
                 velocity: note.velocity,
                 pan: note.playback_pan(track),
                 bpm,
@@ -286,10 +291,8 @@ fn sound_for(
     };
     let bank_sample = context.bank.get(sample)?;
     // The sample's tune and gain trim (`sample.tune`, `sample.gainDb`).
-    let mut ratio = note.playback_ratio(track) * (bank_sample.sample.transpose / 12.0).exp2();
-    if let Some(pitch_lfo) = &track.transpose_lfo {
-        ratio *= (lfo::value(pitch_lfo, lfo_tick as f64) / 12.0).exp2();
-    }
+    let ratio =
+        note.playback_ratio(track) * (bank_sample.sample.transpose / 12.0).exp2() * pitch_lfo_ratio(track, lfo_tick);
     Some(Sound::Sample(VoiceStart {
         sample,
         track: strip,
@@ -628,5 +631,68 @@ mod tests {
         assert_eq!(events(2, &mut cache), [(1, 0), (2, 2)]);
         // The song is 3 measures long: measure 3 is measure 0 again.
         assert_eq!(events(3, &mut cache), [(0, 0), (1, 1), (2, 0)]);
+    }
+
+    /// A one-track pattern of two notes (beats 0 and 2) with `lfo` as its transpose LFO, played by `sound`:
+    /// the pitch of each note, as a sample's ratio or as a synth's first oscillator in Hz.
+    fn pitches_with_transpose_lfo(lfo: &str, sound: TrackSound) -> Vec<f64> {
+        let text = format!(
+            r#"{{"patterns":[{{"id":"a","name":"a","tracks":[{{"name":"KICK","transposeLfo":{lfo},
+                "notes":[{{"beat":0}},{{"beat":2}}]}}]}}]}}"#
+        );
+        let (library, _) = Library::parse(&text).unwrap();
+        let instrument =
+            KitSample { key: "X".into(), display_name: "x".into(), path: "x".into(), ..Default::default() };
+        let bank = SampleBank {
+            samples: vec![BankSample {
+                kit: "k".into(),
+                sample: instrument,
+                buffer: SampleBuffer::mono(vec![1.0], 48_000).into(),
+            }],
+        };
+        let mut synths = SynthPresets::default();
+        synths.set("S", ordrumbox_core::json::parse(r#"{"vco1":{"gain":1,"octave":0}}"#).unwrap());
+        let sounds = [sound];
+        let scales = Scales::default();
+        let context = PassContext {
+            bank: &bank,
+            sounds: &sounds,
+            scales: &scales,
+            synths: &synths,
+            sample_rate: 48_000.0,
+            first_tick: 0,
+            swing: STRAIGHT_SWING,
+        };
+        let pass = build_pass(&library.patterns[0], 0, &mut Rng::new(1), context, 120.0);
+        pass.events
+            .iter()
+            .map(|event| match event.sound {
+                Sound::Sample(voice) => voice.ratio,
+                Sound::Synth(synth) => pass.patches[synth.patch].osc_freq[0],
+            })
+            .collect()
+    }
+
+    const OCTAVE_UP: &str = r#"{"type":"sine","freq":1,"min":12,"max":12}"#;
+    const SWEEP: &str = r#"{"type":"sine","freq":1,"min":-12,"max":12}"#;
+
+    #[test]
+    fn a_transpose_lfo_moves_a_synth_as_it_moves_a_sample() {
+        for (name, sound) in [("sample", TrackSound::Sample(0)), ("synth", TrackSound::Synth("S".into()))] {
+            let flat = pitches_with_transpose_lfo("null", sound.clone());
+            let up = pitches_with_transpose_lfo(OCTAVE_UP, sound);
+            for (flat, up) in flat.iter().zip(&up) {
+                assert!((up / flat - 2.0).abs() < 1e-9, "{name}: +12 semitones is an octave ({flat} -> {up})");
+            }
+        }
+    }
+
+    #[test]
+    fn a_transpose_lfo_changes_the_pitch_from_note_to_note() {
+        for sound in [TrackSound::Sample(0), TrackSound::Synth("S".into())] {
+            let pitches = pitches_with_transpose_lfo(SWEEP, sound);
+            assert_eq!(pitches.len(), 2);
+            assert!((pitches[0] - pitches[1]).abs() > 1e-6, "the LFO has moved between beats 0 and 2: {pitches:?}");
+        }
     }
 }
