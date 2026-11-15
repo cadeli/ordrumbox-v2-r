@@ -201,6 +201,8 @@ mod tests {
         let locked = locks(&s);
         assert!(locked[1].is_some_and(|v| (v - 0.5).abs() <= 0.02), "half the lane's height: {locked:?}");
         assert_eq!([locked[0], locked[2], locked[3]], [None; 3], "only the step pressed");
+        // A second gesture, past the coalescing window: its own undo step.
+        s.editor.set_clock(Some(1000.0));
         let (x, y) = bar(&s, 1, 0.0);
         assert!(s.lane_press(SIZE, x, y));
         s.mouse_up();
