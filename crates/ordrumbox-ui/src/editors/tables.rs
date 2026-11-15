@@ -341,19 +341,42 @@ pub fn note_prop(key: &str) -> Option<&'static Prop> {
         NoteRow::Slider(prop) => Some(prop),
         NoteRow::Select(..) => None,
     });
-    knobs.chain(sliders).find(|prop| prop.key == key)
+    knobs.chain(sliders).chain(LOCK_PROPS.iter()).find(|prop| prop.key == key)
 }
 
 /// The note settings the grid's lane shows, one bar per step: their keys
 /// (settings of the note editor) and the labels of their tabs.
-pub const LANES: [(&str, &str); 6] = [
+pub const LANES: [(&str, &str); 9] = [
     ("velocity", "VELOCITY"),
     ("probability", "CHANCE"),
     ("retriggerCount", "RETRIG"),
     ("pan", "PAN"),
     ("lengthSteps", "LENGTH"),
     ("shiftSteps", "SHIFT"),
+    ("filterLock", "FILTER"),
+    ("reverbLock", "REVERB"),
+    ("delayLock", "DELAY"),
 ];
+
+/// The parameter locks of a note: set in the lane only, each bar a lock, no
+/// bar none. Painting a bar to the bottom clears the lock.
+pub const LOCK_PROPS: [Prop; 3] = [
+    prop("filterLock", "Filter", 0.0, 1.0, 0.01, Format::Percent),
+    prop("reverbLock", "Reverb", 0.0, 1.0, 0.01, Format::Percent),
+    prop("delayLock", "Delay", 0.0, 1.0, 0.01, Format::Percent),
+];
+
+/// Whether `prop` is a parameter lock, which a note may not have.
+#[must_use]
+pub fn is_lock(prop: &Prop) -> bool {
+    LOCK_PROPS.iter().any(|lock| lock.key == prop.key)
+}
+
+/// The value of lane setting `prop` of `note`; `None` for a lock it has not set.
+#[must_use]
+pub fn note_lane_value(note: &Note, prop: &Prop) -> Option<f64> {
+    if is_lock(prop) { note.field(prop.key).and_then(|v| v.as_f64()) } else { Some(note_value(note, prop)) }
+}
 
 /// The value of note setting `prop` of `note`, else its default.
 #[must_use]

@@ -76,7 +76,7 @@ impl Editor {
     }
 
     /// Set field `key` of notes of track `t`, each to its own value (`values`:
-    /// note index, value) as one edit named `desc`. With `coalesce`, a run of
+    /// note index, value; `None` resets the field to its default) as one edit named `desc`. With `coalesce`, a run of
     /// them on the same field of the same track is one undo step: a lane of
     /// the grid painted with the mouse.
     pub fn set_note_values(
@@ -84,7 +84,7 @@ impl Editor {
         p: usize,
         t: usize,
         key: &str,
-        values: &[(usize, f64)],
+        values: &[(usize, Option<f64>)],
         desc: &str,
         coalesce: bool,
     ) -> bool {
@@ -99,7 +99,7 @@ impl Editor {
                 for &(n, value) in values {
                     let Some(note) = track.notes.get_mut(n) else { continue };
                     let before = note.clone();
-                    note.set_field(key, &Value::Number(value));
+                    note.set_field(key, &value.map_or(Value::Null, Value::Number));
                     changed |= *note != before;
                 }
                 changed

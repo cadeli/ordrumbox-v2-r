@@ -134,7 +134,13 @@ fn render(tracks: &[TrackSpec<'_>]) -> Wav {
         r#"{{"bpm":120,"patterns":[{{"id":"fx","name":"Fx","bpm":120,"beatCount":4,"tracks":[{}]}}]}}"#,
         tracks.join(",")
     );
-    let (library, report) = Library::parse(&text).expect("parses");
+    render_library(&text)
+}
+
+/// The library `text`'s first pattern, rendered once, written to a WAV file
+/// and read back.
+fn render_library(text: &str) -> Wav {
+    let (library, report) = Library::parse(text).expect("parses");
     assert!(report.issues.is_empty(), "{:?}", report.issues);
     let (left, right) = offline::render_pattern(&library, 0, 1, &setup(), None).expect("renders");
     assert_eq!(left.len(), 2 * EXPORT_RATE as usize, "4 beats at 120 bpm");
@@ -267,6 +273,51 @@ fn the_filters_take_the_highs_or_the_lows_off() {
     assert!(dry > 1.2, "white noise under the master's 18.5 kHz cut: brightness {dry}");
     assert!(low < dry * 0.05, "lowpass at 500 Hz: brightness {low} from {dry}");
     assert!(high > dry * 1.2, "highpass at 5 kHz: brightness {high} from {dry}");
+}
+
+/// The KICK with `settings`, played by two notes, on beats 0 and 1, `first`
+/// and `second` given as JSON members of the notes (their locks).
+fn locked_kick(settings: &str, first: &str, second: &str) -> Wav {
+    let text = format!(
+        r#"{{"bpm":120,"patterns":[{{"id":"fx","name":"Fx","bpm":120,"beatCount":4,"tracks":[
+            {{"name":"KICK","stepsPerBeat":4,"notes":[{{"beat":0{first}}},{{"beat":1{second}}}]{settings}}}]}}]}}"#
+    );
+    render_library(&text)
+}
+
+#[test]
+fn a_filter_lock_closes_the_filter_for_its_note_alone() {
+    // The track has no filter (allpass): the lock turns a lowpass on, and the
+    // next note, unlocked, is the open strip again.
+    let wav = locked_kick("", r#","filterLock":0.2"#, "");
+    let open = locked_kick("", "", "");
+    let (locked, plain) = (brightness(span(&wav.left, 0.0, 0.1)), brightness(span(&open.left, 0.0, 0.1)));
+    assert!(locked < plain * 0.1, "the first note is dull: brightness {locked} from {plain}");
+    let (next, plain) = (brightness(span(&wav.left, 0.5, 0.6)), brightness(span(&open.left, 0.5, 0.6)));
+    assert!((next / plain - 1.0).abs() < 0.2, "the second note is as bright as ever: {next} from {plain}");
+}
+
+#[test]
+fn a_reverb_lock_gives_a_tail_to_its_note_alone() {
+    // The track has no reverb (none): the lock turns a room on, for the first note.
+    let wav = locked_kick("", r#","reverbLock":0.8"#, "");
+    let dry = locked_kick("", "", "");
+    let tail = |w: &Wav, from| energy(span(&w.left, from, from + 0.2));
+    let sound = energy(span(&dry.left, 0.0, 0.1));
+    assert!(tail(&wav, 0.06) > sound * 0.05, "a tail after the locked note: {} of {sound}", tail(&wav, 0.06));
+    assert!(tail(&dry, 0.06) < sound * 1e-4, "none without the lock");
+    // The second note (beat 1, at 0.5 s) is dry again: its own tail is the burst's alone.
+    assert!(tail(&wav, 0.56) < sound * 1e-4 + tail(&dry, 0.56), "none after the unlocked note");
+}
+
+#[test]
+fn a_delay_lock_repeats_its_note_alone() {
+    let settings = r#","delayType":"slap","delayBeats":0.5,"delayMix":0.0"#;
+    let wav = locked_kick(settings, r#","delayLock":0.8"#, "");
+    let plain = locked_kick(settings, "", "");
+    let echo = |w: &Wav, from| energy(span(&w.left, from, from + 0.05));
+    assert!(echo(&wav, 0.25) > echo(&plain, 0.25) * 10.0 + 1e-9, "the locked note echoes");
+    assert!(echo(&wav, 0.75) < 1e-6 + echo(&plain, 0.75) * 2.0, "the unlocked one does not");
 }
 
 #[test]

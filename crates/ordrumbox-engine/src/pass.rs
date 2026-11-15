@@ -14,7 +14,7 @@ use ordrumbox_dsp::{StripSettings, SynthPatch, VoiceStart};
 use crate::assign::TrackSound;
 use crate::kit::SampleBank;
 use crate::midi::{C3_KEY, KeyMap, MidiNote, Target, track_targets};
-use crate::strip_settings::{StripLfo, strip_lfo, strip_settings};
+use crate::strip_settings::{StripLfo, StripLock, strip_lfo, strip_settings};
 use crate::synth_preset::{SynthNote, SynthPresets, note_seconds, synth_patch};
 
 /// A synth note to start.
@@ -56,6 +56,8 @@ pub struct Event {
     pub note: Option<MidiNote>,
     /// How long that MIDI note lasts, in frames: the note's length.
     pub note_frames: u64,
+    /// What the note locks on its track's strip, if the track has locks.
+    pub lock: Option<StripLock>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -125,6 +127,13 @@ pub fn frames_per_tick(bpm: f64, sample_rate: f64) -> f64 {
 fn note_frames(note: &Hit, track: &Track, per_tick: f64) -> u64 {
     let step_ticks = f64::from(TICK) / f64::from(track.steps_per_beat.max(1));
     (note.length_steps * step_ticks * per_tick).round().max(1.0) as u64
+}
+
+/// What `hit` locks on its strip: the locks of its written note (a repeat or
+/// an arpeggio note has its source's), none for a note the variation layer
+/// added. `None` for a track without locks, which keeps its strip as set.
+fn hit_lock(hit: &Hit, track: &Track) -> Option<StripLock> {
+    track.has_locks().then(|| hit.source.and_then(|n| track.notes.get(n)).map(StripLock::of).unwrap_or_default())
 }
 
 /// The key of a track's pitch 0 with `assigned`: its sample's root note, else C3.
@@ -203,6 +212,7 @@ pub fn build_pass(pattern: &Pattern, number: u64, rng: &mut Rng, context: PassCo
                     velocity: note.velocity as f32,
                     note: midi,
                     note_frames: note_frames(note, track, per_tick),
+                    lock: hit_lock(note, track),
                 });
             }
         }
@@ -327,7 +337,7 @@ pub fn build_preview(pattern: &Pattern, t: usize, note: Option<&Note>, context: 
         .sounds
         .get(t)
         .and_then(|assigned| sound_for(pattern, &flat, assigned, voice, &context, &mut patches))
-        .map(|sound| Event { frame: 0, sound, mono: track.mono, velocity: 1.0, note: None, note_frames: 0 })
+        .map(|sound| Event { frame: 0, sound, mono: track.mono, velocity: 1.0, note: None, note_frames: 0, lock: None })
         .into_iter()
         .collect();
     let strips = pattern.tracks.iter().map(|t| strip_settings(t, bpm)).collect();
@@ -368,7 +378,15 @@ pub fn build_keymap(pattern: &Pattern, context: PassContext<'_>, bpm: f64) -> Ke
         let voice = Voice { strip: t, lfo_tick: context.first_tick, bpm };
         let sound = context.sounds.get(t).and_then(|a| sound_for(pattern, &hit, a, voice, &context, &mut patches));
         if let Some(sound) = sound {
-            events.push(Event { frame: 0, sound, mono: track.mono, velocity: 1.0, note: None, note_frames: 0 });
+            events.push(Event {
+                frame: 0,
+                sound,
+                mono: track.mono,
+                velocity: 1.0,
+                note: None,
+                note_frames: 0,
+                lock: None,
+            });
         }
     }
     let strips = (0..pattern.tracks.len())
@@ -500,6 +518,7 @@ pub fn build_song_pass_at(
                         velocity: note.velocity as f32,
                         note: midi,
                         note_frames: note_frames(note, track, per_tick),
+                        lock: hit_lock(note, track),
                     });
                 }
             }

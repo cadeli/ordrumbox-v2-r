@@ -625,6 +625,7 @@ impl Engine {
             while let Some(event) = pass.events.get(self.cursor).filter(|e| e.frame <= self.frame) {
                 self.start(event, &pass.patches, now, 1.0, 1.0);
                 self.send_note(event, now);
+                self.lock_strip(event, &pass);
                 self.cursor += 1;
             }
             let next_stop = pass.events.get(self.cursor).map_or(pass.frames, |e| e.frame);
@@ -633,6 +634,19 @@ impl Engine {
             self.current = Some(pass);
             return Some(frames_left);
         }
+    }
+
+    /// Set the strip of `event`'s track as its note locks it
+    /// ([`StripLock`]): at once, like a voice starting, not ramped.
+    fn lock_strip(&mut self, event: &Event, pass: &Pass) {
+        let track = event.sound.track();
+        let (Some(lock), Some(base), Some(channel)) =
+            (&event.lock, pass.strips.get(track), self.channels.get_mut(track))
+        else {
+            return;
+        };
+        lock.apply(base, &mut channel.target);
+        lock.apply(base, &mut channel.current);
     }
 
     /// Start the live notes due at `offset` in the quantum; frames until

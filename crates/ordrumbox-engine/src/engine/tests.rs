@@ -33,7 +33,7 @@ fn sample_event(frame: u64) -> Event {
         length: 0.0,
         shape: Default::default(),
     };
-    Event { frame, sound: Sound::Sample(voice), mono: true, velocity: 1.0, note: None, note_frames: 0 }
+    Event { frame, sound: Sound::Sample(voice), mono: true, velocity: 1.0, note: None, note_frames: 0, lock: None }
 }
 
 fn pass(number: u64, frames: &[u64], length: u64) -> Arc<Pass> {
@@ -280,6 +280,7 @@ fn synth_notes_play_for_their_length() {
         velocity: 1.0,
         note: None,
         note_frames: 0,
+        lock: None,
     };
     let pass = Pass {
         frames: 48_000,

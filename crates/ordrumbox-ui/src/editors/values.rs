@@ -214,6 +214,11 @@ pub fn note_tooltip(note: &Note, track_pitch: f64) -> String {
     if note.shift_steps != 0.0 {
         parts.push(format!("shift:{}", fmt(note.shift_steps)));
     }
+    for (label, lock) in [("filter", note.filter_lock), ("reverb", note.reverb_lock), ("delay", note.delay_lock)] {
+        if let Some(value) = lock {
+            parts.push(format!("{label}:{}", fmt(value)));
+        }
+    }
     parts.join("  ")
 }
 

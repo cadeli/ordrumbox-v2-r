@@ -8,6 +8,7 @@ use crate::json::{Object, Value};
 use crate::num::round2;
 use crate::record::{Issue, SetField, check_duplicate, json_record, past_max, refusal};
 use crate::steps::{MAX_LOADED_BEATS, MAX_LOADED_STEPS};
+use crate::track::{MAX_FILTER_FREQ, MIN_FILTER_FREQ};
 
 /// The most hits a file may give a note's retrigger: each one is a note played.
 pub const MAX_LOADED_RETRIGGER_COUNT: i32 = 64;
@@ -72,6 +73,16 @@ json_record! {
         /// How late the note plays, in steps of its track: a fraction of a
         /// step either side of its place on the grid (negative is early).
         shift_steps: f64 = 0.0 => "shiftSteps",
+        /// Filter lock: where the track's filter cutoff sits while the note
+        /// plays, 0 (20 Hz) to 1 (20 kHz) on a log scale ([`Note::lock_cutoff_hz`]).
+        /// `None`: the track's own cutoff.
+        filter_lock: Option<f64> = None => "filterLock",
+        /// Reverb lock: the track's reverb mix, 0–1, while the note plays.
+        /// `None`: the track's own mix.
+        reverb_lock: Option<f64> = None => "reverbLock",
+        /// Delay lock: the track's delay mix, 0–1, while the note plays.
+        /// `None`: the track's own mix.
+        delay_lock: Option<f64> = None => "delayLock",
     }
     other_fields {
         /// Position in the beat, percent (`stepPercent`), `0..100`: kept so
@@ -86,8 +97,18 @@ json_record! {
 const STEP_PERCENT_KEY: &str = "stepPercent";
 
 /// Keys written rounded to 2 decimals (`NOTE_ROUND_2D`).
-const ROUND_2D: [&str; 7] =
-    ["velocity", "pan", "probability", "retriggerRate", "retriggerFade", "lengthSteps", "shiftSteps"];
+const ROUND_2D: [&str; 10] = [
+    "velocity",
+    "pan",
+    "probability",
+    "retriggerRate",
+    "retriggerFade",
+    "lengthSteps",
+    "shiftSteps",
+    "filterLock",
+    "reverbLock",
+    "delayLock",
+];
 
 /// The shortest and the longest a note is held, in steps: what a length
 /// outside them plays as.
@@ -151,6 +172,32 @@ impl Note {
     #[must_use]
     pub fn late_steps(&self) -> f64 {
         if self.shift_steps.is_finite() { self.shift_steps.clamp(-MAX_SHIFT_STEPS, MAX_SHIFT_STEPS) } else { 0.0 }
+    }
+
+    /// The cutoff the filter lock sets, in Hz: `None` without a lock. The
+    /// position runs from [`MIN_FILTER_FREQ`] to [`MAX_FILTER_FREQ`] by octaves.
+    #[must_use]
+    pub fn lock_cutoff_hz(&self) -> Option<f64> {
+        let position = self.filter_lock.filter(|p| p.is_finite())?.clamp(0.0, 1.0);
+        Some(MIN_FILTER_FREQ * (MAX_FILTER_FREQ / MIN_FILTER_FREQ).powf(position))
+    }
+
+    /// The reverb mix the reverb lock sets (0–1); `None` without a lock.
+    #[must_use]
+    pub fn lock_reverb_mix(&self) -> Option<f64> {
+        self.reverb_lock.filter(|m| m.is_finite()).map(|m| m.clamp(0.0, 1.0))
+    }
+
+    /// The delay mix the delay lock sets (0–1); `None` without a lock.
+    #[must_use]
+    pub fn lock_delay_mix(&self) -> Option<f64> {
+        self.delay_lock.filter(|m| m.is_finite()).map(|m| m.clamp(0.0, 1.0))
+    }
+
+    /// Whether the note locks any parameter of its track.
+    #[must_use]
+    pub fn has_lock(&self) -> bool {
+        self.filter_lock.is_some() || self.reverb_lock.is_some() || self.delay_lock.is_some()
     }
 
     /// `stepPercent` at `steps_per_beat` steps per beat.
@@ -341,6 +388,9 @@ mod tests {
                 "arpDirection",
                 "lengthSteps",
                 "shiftSteps",
+                "filterLock",
+                "reverbLock",
+                "delayLock",
             ]
         );
     }

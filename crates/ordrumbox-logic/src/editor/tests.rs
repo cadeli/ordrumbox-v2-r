@@ -105,14 +105,21 @@ fn coalesced_drag_is_one_step() {
 #[test]
 fn a_painted_lane_is_one_step() {
     let mut e = editor();
-    assert!(e.set_note_values(0, 0, "velocity", &[(0, 0.5)], "Edit velocity", true));
+    assert!(e.set_note_values(0, 0, "velocity", &[(0, Some(0.5))], "Edit velocity", true));
     e.set_clock(Some(100.0));
-    assert!(e.set_note_values(0, 0, "velocity", &[(0, 0.4), (1, 0.3), (9, 1.0)], "Edit velocity", true));
-    assert!(e.set_note_values(0, 0, "retriggerCount", &[(1, 3.0)], "Edit retrigger", false));
+    assert!(e.set_note_values(
+        0,
+        0,
+        "velocity",
+        &[(0, Some(0.4)), (1, Some(0.3)), (9, Some(1.0))],
+        "Edit velocity",
+        true
+    ));
+    assert!(e.set_note_values(0, 0, "retriggerCount", &[(1, Some(3.0))], "Edit retrigger", false));
     let notes = &pattern(&e).tracks[0].notes;
     assert_eq!((notes[0].velocity, notes[1].velocity, notes[1].retrigger_count), (0.4, 0.3, 3));
     // The same values: no change, no step.
-    assert!(!e.set_note_values(0, 0, "velocity", &[(0, 0.4)], "Edit velocity", true));
+    assert!(!e.set_note_values(0, 0, "velocity", &[(0, Some(0.4))], "Edit velocity", true));
     assert_eq!(e.history().undo_len(), 2);
     e.undo();
     e.undo();

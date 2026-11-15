@@ -8,9 +8,9 @@
 //! `plate` have a pre-delay, and `allpass` skips the filter. A delay longer
 //! than the line plays at the longest halving of its beats that fits.
 
-use ordrumbox_core::Track;
 use ordrumbox_core::json::Object;
 use ordrumbox_core::lfo;
+use ordrumbox_core::{Note, Track};
 use ordrumbox_dsp::StripSettings;
 
 use crate::synth_preset::FILTER_TYPES;
@@ -218,6 +218,61 @@ pub fn saturation_amount(s: &StripSettings) -> f64 {
 
 fn finite_or(x: f64, fallback: f64) -> f64 {
     if x.is_finite() { x } else { fallback }
+}
+
+/// What a note's parameter locks set on its track's strip while it plays: a
+/// note of a track with locks gives all three, each either its lock or, with
+/// `None`, the strip's own value, so a lock lasts until the next note.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct StripLock {
+    /// Filter cutoff, Hz.
+    pub cutoff: Option<f32>,
+    pub reverb_mix: Option<f32>,
+    pub delay_mix: Option<f32>,
+}
+
+impl StripLock {
+    /// The locks of `note`.
+    #[must_use]
+    pub fn of(note: &Note) -> Self {
+        Self {
+            cutoff: note.lock_cutoff_hz().map(|hz| hz as f32),
+            reverb_mix: note.lock_reverb_mix().map(|mix| mix as f32),
+            delay_mix: note.lock_delay_mix().map(|mix| mix as f32),
+        }
+    }
+
+    /// Set the lockable values of `target` from this lock, `base` being the
+    /// strip as its track sets it. A lock switches on what the track has off:
+    /// the filter (a lowpass) and the reverb (a room); a delay of type
+    /// `none` stays off.
+    pub fn apply(&self, base: &StripSettings, target: &mut StripSettings) {
+        match self.cutoff {
+            Some(hz) => {
+                target.filter_on = 1.0;
+                target.cutoff = hz;
+            }
+            None => target.cutoff = base.cutoff,
+        }
+        match self.reverb_mix {
+            Some(mix) => {
+                if base.reverb_on < 0.5
+                    && let Some(room) = reverb_preset("room")
+                {
+                    target.reverb_on = 1.0;
+                    target.reverb_room = room.room;
+                    target.reverb_damping = room.damping;
+                    target.reverb_width = room.width;
+                }
+                target.reverb_mix = mix;
+            }
+            None => target.reverb_mix = base.reverb_mix,
+        }
+        target.delay_mix = match self.delay_mix {
+            Some(mix) if base.delay_on >= 0.5 => mix,
+            _ => base.delay_mix,
+        };
+    }
 }
 
 /// What a track's LFOs set on its strip at each tick of a pass (each list is
