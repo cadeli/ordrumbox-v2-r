@@ -171,6 +171,8 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
 - **F1–F7** (also **Ctrl 1–7**, for the keyboards whose F keys want Fn): the shortcut list,
   track editor, song panel, piano roll, grid, synth editor, note editor (shown or folded)
 - **Ctrl K**: kit editor, **Ctrl Shift M**: export MIDI (**Ctrl E**: export WAV)
+- **File > Export pattern stems / Export song stems**: one WAV per track in a folder of its own,
+  taken before the master bus (as the plugin's track outputs); tracks with no sound are left out
 - **Ctrl -** / **Ctrl =**: zoom out / in a quarter at a time (×1, ×1.25, ×1.5… up to ×4,
   the keypad's keys too), **Ctrl 0**: the display's scale, **View > Zoom: fit to
   window**: the biggest of these scales the window shows whole. The zoom does not depend

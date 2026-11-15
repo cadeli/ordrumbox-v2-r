@@ -53,9 +53,15 @@ impl AudioSide {
 
     /// Render one callback's worth of stereo frames.
     pub fn render(&mut self, left: &mut [f32], right: &mut [f32]) {
+        self.render_split(left, right, |_, _, _, _| {});
+    }
+
+    /// [`Self::render`], the tracks the mix splits given to `aux` instead of
+    /// the mix ([`Engine::render_split`]).
+    pub fn render_split(&mut self, left: &mut [f32], right: &mut [f32], aux: impl FnMut(usize, usize, &[f32], &[f32])) {
         (self.block_start, self.block_frames) = (self.engine.clock(), left.len().min(right.len()));
         self.take_inbox();
-        self.engine.render(left, right);
+        self.engine.render_split(left, right, aux);
         self.publish(left, right, None, false);
     }
 

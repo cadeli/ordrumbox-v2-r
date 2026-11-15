@@ -41,6 +41,10 @@ pub enum Purpose {
 pub enum Export {
     PatternWav,
     SongWav,
+    /// Each track of the pattern as a WAV, in a folder of its own made in the folder picked.
+    PatternStems,
+    /// Each track of the song as a WAV, in a folder of its own made in the folder picked.
+    SongStems,
     PatternMidi,
     PatternJson,
     Song,
@@ -71,6 +75,8 @@ impl Purpose {
             Self::UserFolder => "Use as the user data folder",
             Self::Export(Export::PatternWav) => "Export pattern as WAV to folder",
             Self::Export(Export::SongWav) => "Export song as WAV to folder",
+            Self::Export(Export::PatternStems) => "Export pattern stems to folder",
+            Self::Export(Export::SongStems) => "Export song stems to folder",
             Self::Export(Export::PatternMidi) => "Export pattern as MIDI to folder",
             Self::Export(Export::PatternJson) => "Export pattern as JSON to folder",
             Self::Export(Export::Song) => "Export song to folder",

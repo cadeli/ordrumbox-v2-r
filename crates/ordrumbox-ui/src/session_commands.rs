@@ -145,6 +145,8 @@ impl Session {
             C::ImportMidi => self.open_picker(Purpose::ImportMidi),
             C::ExportWav => self.open_export(Export::PatternWav),
             C::ExportSongWav => self.open_export(Export::SongWav),
+            C::ExportStems => self.open_export(Export::PatternStems),
+            C::ExportSongStems => self.open_export(Export::SongStems),
             C::ExportMidi => self.open_export(Export::PatternMidi),
             C::Quit => self.program.quit = true,
             C::Undo => self.undo(),

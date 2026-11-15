@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### New
+- **Stems export**: File > Export pattern stems and Export song stems write a folder with one WAV per track, as
+  long as the render, before the master bus (as the plugin's track outputs). Silent tracks are left out. MCP:
+  `exportPatternStems` and `exportArrangementStems`.
 - **Twelve demo patterns with chords, organ, strings, leads and pads** in the factory library: *Neo Soul Keys*,
   *Funk Clav Riff*, *Blues Organ 12 Bar*, *Reggae Organ Bubble*, *Disco Strings and Brass*, *Bossa Pizzicato*,
   *Synthwave Lead*, *Trance Supersaw*, *Ambient Pads*, *Chiptune Arp*, *Marimba Phasing* (two phrases of 12 and 11

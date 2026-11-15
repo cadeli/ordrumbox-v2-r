@@ -116,6 +116,8 @@ const TOOLS: &str = r#"[
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}}, "required": ["patternName"]}},
   {"name": "exportPatternWav", "description": "Renders a pattern once to a WAV file in the exports folder of the user data folder (as File > Export pattern as WAV).",
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}}, "required": ["patternName"]}},
+  {"name": "exportPatternStems", "description": "Renders each track of a pattern to a WAV file of its own, in a folder of the exports folder of the user data folder (as File > Export pattern stems). Tracks are taken before the master bus; silent ones are left out.",
+   "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}}, "required": ["patternName"]}},
   {"name": "exportPatternMidi", "description": "Exports a pattern as a MIDI file to the exports folder of the user data folder (as File > Export pattern as MIDI).",
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}}, "required": ["patternName"]}},
   {"name": "importMidi", "description": "New patterns from a MIDI file (as File > Import MIDI file); the last one is shown.",
@@ -197,6 +199,9 @@ const TOOLS: &str = r#"[
      "arrangement": {"type": ["string", "integer"], "description": "Arrangement name or index (default: the selected one)"}},
      "required": ["startMeasure", "toMeasure"]}},
   {"name": "exportArrangementWav", "description": "Renders an arrangement whole to a WAV file in the exports folder of the user data folder (as File > Export song as WAV).",
+   "inputSchema": {"type": "object", "properties": {
+     "arrangement": {"type": ["string", "integer"], "description": "Arrangement name or index (default: the selected one)"}}}},
+  {"name": "exportArrangementStems", "description": "Renders each track of an arrangement whole to a WAV file of its own, in a folder of the exports folder of the user data folder (as File > Export song stems). Tracks are taken before the master bus; silent ones are left out.",
    "inputSchema": {"type": "object", "properties": {
      "arrangement": {"type": ["string", "integer"], "description": "Arrangement name or index (default: the selected one)"}}}},
   {"name": "getMaster", "description": "The master bus settings: volume, pre-gain, compressor, low and high cut.",
@@ -525,7 +530,7 @@ mod tests {
     fn the_tool_list_parses_with_the_settings() {
         let tools = tools();
         let tools = tools.as_array().unwrap();
-        assert_eq!(tools.len(), 71);
+        assert_eq!(tools.len(), 73);
         let update = tools.iter().find(|t| t.get("name").and_then(Value::as_str) == Some("updateTrack")).unwrap();
         let updates = &update.get("inputSchema").unwrap().get("properties").unwrap().get("updates").unwrap();
         let properties = updates.get("properties").unwrap();
