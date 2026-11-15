@@ -251,4 +251,14 @@ now in two columns), the piano roll draws a note as wide as it is long and its r
 drags (`session_roll_length.rs`); Play > Record off the grid keeps a recorded note's timing as
 its shift (off by default). A MIDI import still reads neither lengths nor timing.
 
+A note has parameter locks: `filterLock` (0–1, 20 Hz to 20 kHz by octaves), `reverbLock` and
+`delayLock` (0–1, the track's mix), each an `Option`, absent by default. `build_pass` gives the
+events of a track that has any lock a `StripLock` (`strip_settings.rs`): all three values, each
+the note's lock or the strip's own, so a lock lasts until the track's next note. The engine
+applies it at the event's frame to the strip's target and to its current settings at once (a
+voice start, not a ramp); a lock switches on the lowpass filter or the room reverb a track has
+off, not a delay of type none. A cutoff LFO overrides the lock at the next quantum. The lane has
+three more tabs (FILTER, REVERB, DELAY): a note without a lock has no bar, and a bar painted to
+the bottom clears it. No snapshot changed.
+
 Quantize (Edit > Quantize, `ordrumbox-logic/src/quantize.rs`, `session_quantize.rs`) is a pure function of a pattern, a scope (zone, track, pattern), a grid and a strength; a note's place is its step plus `shiftSteps`, and what a strength leaves is kept as the shift. No snapshot changed.

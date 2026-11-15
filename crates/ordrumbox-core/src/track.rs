@@ -385,6 +385,12 @@ fn audible_signature(note: &Note, steps_per_beat: i32) -> String {
 }
 
 impl Track {
+    /// Whether a note of the track locks a parameter of its strip.
+    #[must_use]
+    pub fn has_locks(&self) -> bool {
+        self.notes.iter().any(Note::has_lock)
+    }
+
     /// Steps the track spans: its beats, widened to its last note.
     fn step_length(&self) -> i64 {
         let spb = i64::from(self.steps_per_beat);

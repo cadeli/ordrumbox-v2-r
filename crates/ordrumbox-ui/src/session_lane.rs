@@ -1,8 +1,9 @@
 //! The lane under the grid: one note setting of the track editor's track
-//! (velocity, chance, retriggers, pan: `editors::LANES`), a bar per step. A
-//! press on a bar sets the setting of the notes of its step to the height
-//! pressed; a drag paints the bars it crosses, the steps between two moves
-//! taking the values between, all of it one undo step.
+//! (velocity, chance, retriggers, pan, the parameter locks...:
+//! `editors::LANES`), a bar per step. A press on a bar sets the setting of
+//! the notes of its step to the height pressed; a drag paints the bars it
+//! crosses, the steps between two moves taking the values between, all of it
+//! one undo step. A parameter lock painted to the bottom is cleared.
 
 use crate::scale::Scale;
 use ordrumbox_core::steps::absolute_step;
@@ -64,13 +65,13 @@ impl Session {
         let spb = view::steps_per_beat(track);
         let start = i64::from(layout.start_beat()) * i64::from(spb);
         let (low, high) = (from.0.min(to.0), from.0.max(to.0));
-        let values: Vec<(usize, f64)> = track
+        let values: Vec<(usize, Option<f64>)> = track
             .notes
             .iter()
             .enumerate()
             .filter_map(|(n, note)| {
                 let step = absolute_step(note.beat, note.step, spb) - start;
-                (low..=high).contains(&step).then(|| (n, between(from, to, step, prop)))
+                (low..=high).contains(&step).then(|| (n, lane_setting(prop, between(from, to, step, prop))))
             })
             .collect();
         if values.is_empty() {
@@ -81,6 +82,12 @@ impl Session {
             self.edited();
         }
     }
+}
+
+/// What a note's `prop` is set to by a painted `value`: a parameter lock at
+/// the bottom of the lane is cleared (`None`).
+fn lane_setting(prop: &Prop, value: f64) -> Option<f64> {
+    (!(editors::is_lock(prop) && value <= prop.min)).then_some(value)
 }
 
 /// The value of setting `prop` at `fraction` of the lane's height, on its steps.
@@ -180,6 +187,26 @@ mod tests {
         s.mouse_up();
         assert_eq!(s.track(1).unwrap().notes[0].retrigger_count, 16);
         assert_eq!(s.track(0).unwrap().notes[1].retrigger_count, 1);
+    }
+
+    #[test]
+    fn a_lock_is_set_by_a_bar_and_cleared_at_the_bottom() {
+        let mut s = session();
+        s.editors.lane = LANES.iter().position(|(key, _)| *key == "filterLock").expect("a filter lane") as u8;
+        let locks = |s: &Session| s.track(0).unwrap().notes.iter().map(|n| n.filter_lock).collect::<Vec<_>>();
+        assert_eq!(locks(&s), [None; 4], "no lock to begin with");
+        let (x, y) = bar(&s, 1, 0.5);
+        assert!(s.lane_press(SIZE, x, y));
+        s.mouse_up();
+        let locked = locks(&s);
+        assert!(locked[1].is_some_and(|v| (v - 0.5).abs() <= 0.02), "half the lane's height: {locked:?}");
+        assert_eq!([locked[0], locked[2], locked[3]], [None; 3], "only the step pressed");
+        let (x, y) = bar(&s, 1, 0.0);
+        assert!(s.lane_press(SIZE, x, y));
+        s.mouse_up();
+        assert_eq!(locks(&s), [None; 4], "painted to the bottom, the lock is cleared");
+        s.undo();
+        assert!(locks(&s)[1].is_some(), "the clearing is one undo step");
     }
 
     #[test]

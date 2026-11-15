@@ -376,8 +376,9 @@ pub(super) fn draw_lane(canvas: &mut Canvas, pattern: &Pattern, view: &View, lay
         if !(0..steps).contains(&local) {
             continue;
         }
+        let Some(value) = editors::note_lane_value(note, prop) else { continue };
         let (x, w) = cell(local);
-        let y = y_of(editors::note_value(note, prop));
+        let y = y_of(value);
         let (top, h) = if y < base_y { (y, base_y - y) } else { (base_y, y - base_y) };
         let bar = Rect::new(x + gap, top.min(r.y + r.h - 2 * gap), (w - 2 * gap).max(1), h.max(2 * gap));
         // A selected note's bar is ringed in white, like the note in the grid.

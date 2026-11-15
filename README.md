@@ -135,6 +135,12 @@ track editor's track, a bar per note: **VELOCITY**, **CHANCE** (its probability)
 (how early or late it plays, off the grid), picked by the tabs on its left. Click a bar to set
 its value at that height, or drag across the bars to draw them; a drag is one undo step.
 
+The last three tabs are **parameter locks**: **FILTER** (the track's filter cutoff, 20 Hz to
+20 kHz), **REVERB** and **DELAY** (the track's reverb and delay mix) while the note plays. A note
+without a bar has no lock and leaves the track's own setting; a lock lasts until the track's next
+note. Paint a bar down to the bottom of the lane to clear it. A lock turns on what the track has
+off (a lowpass filter, a room reverb); a delay of type none stays off.
+
 The **note editor** (the selected note's velocity, pitch, pan, trigger, retrigger,
 euclidean, arpeggio and timing settings) is a strip under the grid and under the piano roll, the
 views that edit notes. The track editor, on the right, holds the track's settings only.

@@ -234,6 +234,11 @@ fn setting_help(key: &str) -> Option<Help> {
         "arpRange" => ["Range", "how many scale notes the arpeggio plays (0: off)"],
         "lengthSteps" => ["Length", "how long the note is held, in steps: a synth note, a MIDI note sent or exported"],
         "shiftSteps" => ["Shift", "the note off the grid, in % of a step: below 0 early, above late"],
+        "filterLock" => {
+            ["Filter lock", "the filter cutoff while the note plays, 20 Hz to 20 kHz: its own bar, none clears it"]
+        }
+        "reverbLock" => ["Reverb lock", "the track's reverb mix while the note plays: a room if the track has none"],
+        "delayLock" => ["Delay lock", "the track's delay mix while the note plays"],
         _ => return None,
     })
 }
