@@ -98,6 +98,8 @@ impl Session {
         match export {
             Export::PatternWav => self.export_wav(false, path),
             Export::SongWav => self.export_wav(true, path),
+            Export::PatternStems => self.export_stems(false, path),
+            Export::SongStems => self.export_stems(true, path),
             Export::PatternMidi => self.export_midi(path),
             Export::PatternJson => self.export_pattern_json(path),
             Export::Song => self.export_song(path),
@@ -183,16 +185,7 @@ impl Session {
                 offline::render_song(library, index, setup)
             }
             Mode::Pattern(p) => {
-                // Tracks in auto mode get their new lines loop after loop, on the render's copy.
-                let (scales, mut rng) = (&self.generators.scales, Rng::new(setup.seed));
-                let styles = compose::learn(&self.generators.styles, &library.patterns);
-                let mut loop_start = |library: &mut Library, p: usize, number: u64| {
-                    if let Some(pattern) = library.patterns.get_mut(p).filter(|p| generate::plays_auto(p)) {
-                        let mut rnd = || rng.next_f64();
-                        generate::run_loop(&mut AutoGenerator::new(scales, &styles, &mut rnd), pattern, number);
-                    }
-                };
-                offline::render_pattern(library, p, 1, setup, Some(&mut loop_start))
+                self.with_auto_loops(setup.seed, |hook| offline::render_pattern(library, p, 1, setup, Some(hook)))
             }
         };
         let (left, right) = rendered.ok_or("nothing to export (no playable clip)")?;
@@ -204,6 +197,20 @@ impl Session {
             left.len() as f64 / f64::from(setup.sample_rate),
             started.elapsed().as_secs_f64()
         ))
+    }
+
+    /// Run `render` with the hook that gives the tracks in auto mode their new
+    /// lines loop after loop, on the render's copy of the library.
+    pub(super) fn with_auto_loops<T>(&self, seed: u64, render: impl FnOnce(offline::BeforePass<'_>) -> T) -> T {
+        let (scales, mut rng) = (&self.generators.scales, Rng::new(seed));
+        let styles = compose::learn(&self.generators.styles, &self.editor.library().patterns);
+        let mut loop_start = |library: &mut Library, p: usize, number: u64| {
+            if let Some(pattern) = library.patterns.get_mut(p).filter(|p| generate::plays_auto(p)) {
+                let mut rnd = || rng.next_f64();
+                generate::run_loop(&mut AutoGenerator::new(scales, &styles, &mut rnd), pattern, number);
+            }
+        };
+        render(&mut loop_start)
     }
 
     /// Pattern `p` as a MIDI file at `path`; what was written.
@@ -242,7 +249,11 @@ impl Session {
     /// the exports folder. What cannot be exported is said at once.
     pub(super) fn open_export(&mut self, export: Export) {
         let refusal = match export {
-            Export::PatternWav | Export::SongWav if self.render.is_none() => Some(NOTHING_TO_RENDER),
+            Export::PatternWav | Export::SongWav | Export::PatternStems | Export::SongStems
+                if self.render.is_none() =>
+            {
+                Some(NOTHING_TO_RENDER)
+            }
             Export::Synths if self.synths.presets.is_empty() => Some(NO_SYNTHS),
             _ => None,
         };
@@ -263,6 +274,8 @@ impl Session {
         Some(match export {
             Export::PatternWav => format!("ordrumbox-{}.wav", store::safe_name(&pattern?.id)),
             Export::SongWav => format!("ordrumbox-song-{}.wav", store::safe_name(&library.songs.get(s)?.id)),
+            Export::PatternStems => format!("ordrumbox-{}-stems", store::safe_name(&pattern?.id)),
+            Export::SongStems => format!("ordrumbox-song-{}-stems", store::safe_name(&library.songs.get(s)?.id)),
             Export::PatternMidi => format!("ordrumbox-{}.mid", store::safe_name(&pattern?.id)),
             Export::PatternJson => pattern_json_file_name(pattern?),
             Export::Song | Export::SongSaveAs => self.song_file_name(),

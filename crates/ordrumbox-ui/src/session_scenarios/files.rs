@@ -4,6 +4,7 @@ use super::super::session_files::SYNTHS_FILE_NAME;
 use super::super::{OverlayKey, Session};
 use super::{RATE, demo_session, draw, run};
 use crate::menu::Command;
+use crate::picker::Export;
 use crate::picker::Outcome;
 use crate::store;
 use crate::test_support::scratch_dir;
@@ -224,5 +225,27 @@ fn a_song_saved_comes_back_from_the_load_menu() {
     assert!(s.message.starts_with("Save failed: "), "{}", s.message);
     s.run(Command::LoadSong);
     assert!(s.message.starts_with("Songs not listed: "), "{}", s.message);
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn stems_are_one_wav_per_audible_track_in_a_folder_of_their_own() {
+    let dir = scratch_dir("stems");
+    let (mut s, _audio) = demo_session(&dir.join("samples"));
+    let out = dir.join("out");
+    s.export_to(Export::PatternStems, &out);
+    assert!(s.message.starts_with("exported"), "{}", s.message);
+    let folder = out.join(s.export_file_name(Export::PatternStems).unwrap());
+    let mut names: Vec<String> =
+        std::fs::read_dir(&folder).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
+    names.sort();
+    assert!(!names.is_empty(), "{}", s.message);
+    let lengths: Vec<usize> =
+        names.iter().map(|n| wav::decode(&std::fs::read(folder.join(n)).unwrap()).unwrap().left.len()).collect();
+    assert!(lengths.iter().all(|&l| l == lengths[0] && l > 0), "all as long as the pattern: {lengths:?}");
+    assert!(names.iter().all(|n| n.len() > 7 && n.as_bytes()[2] == b'-' && n.ends_with(".wav")), "{names:?}");
+    // The mix is not among them, and a second export asks before it writes over the folder.
+    s.export_to(Export::PatternStems, &out);
+    assert!(s.overlay_open());
     std::fs::remove_dir_all(&dir).unwrap();
 }

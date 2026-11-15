@@ -89,6 +89,11 @@ impl Session {
                 let path = self.mcp_export_path(Export::PatternWav, p, 0)?;
                 exported(&path, self.write_wav(Mode::Pattern(p), &path)?)
             }
+            "exportPatternStems" => {
+                let p = self.mcp_pattern(text(args, "patternName")?)?;
+                let path = self.mcp_export_path(Export::PatternStems, p, 0)?;
+                exported(&path, self.write_stems(Mode::Pattern(p), &path)?)
+            }
             "exportPatternMidi" => {
                 let p = self.mcp_pattern(text(args, "patternName")?)?;
                 let path = self.mcp_export_path(Export::PatternMidi, p, 0)?;
@@ -98,6 +103,11 @@ impl Session {
                 let s = find_song(&self.editor, args)?;
                 let path = self.mcp_export_path(Export::SongWav, 0, s)?;
                 exported(&path, self.write_wav(Mode::Song(s), &path)?)
+            }
+            "exportArrangementStems" => {
+                let s = find_song(&self.editor, args)?;
+                let path = self.mcp_export_path(Export::SongStems, 0, s)?;
+                exported(&path, self.write_stems(Mode::Song(s), &path)?)
             }
             "importMidi" => self.mcp_import_midi(args),
             "getSynthPreset" => {

@@ -88,6 +88,8 @@ mod session_record;
 mod session_roll_length;
 #[path = "session_roll_zone.rs"]
 mod session_roll_zone;
+#[path = "session_stems.rs"]
+mod session_stems;
 #[path = "session_tempo.rs"]
 mod session_tempo;
 #[path = "session_toast.rs"]

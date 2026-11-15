@@ -32,6 +32,8 @@ pub enum Command {
     ImportMidi,
     ExportWav,
     ExportSongWav,
+    ExportStems,
+    ExportSongStems,
     ExportMidi,
     Quit,
     Undo,
@@ -194,7 +196,8 @@ impl Command {
             | Self::LoadSong
             | Self::ExportSong
             | Self::ImportSong
-            | Self::ExportSongWav => Some(SONGS_IN_THE_APP),
+            | Self::ExportSongWav
+            | Self::ExportSongStems => Some(SONGS_IN_THE_APP),
             _ => None,
         }
     }
@@ -387,6 +390,8 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
                 command("Export pattern as MIDI...", if MACOS { "Cmd+Shift+M" } else { "Ctrl+M" }, C::ExportMidi, p),
                 command("Export pattern as WAV...", "Ctrl+E", C::ExportWav, p && s.can_render),
                 command("Export song as WAV...", "Ctrl+Shift+E", C::ExportSongWav, s.has_songs && s.can_render),
+                command("Export pattern stems...", "", C::ExportStems, p && s.can_render),
+                command("Export song stems...", "", C::ExportSongStems, s.has_songs && s.can_render),
                 Item::Separator,
                 command("Back up user data...", "", C::BackUpUserData, s.user_folder),
                 command("Restore user data...", "", C::RestoreUserData, s.user_folder),
