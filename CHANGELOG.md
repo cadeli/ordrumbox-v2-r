@@ -45,6 +45,10 @@
   in the CLAP plugin.
 
 ### Changed
+- **The demo arrangement is one song**, a funk in E minor at 100 BPM, 52 measures: intro, verse, chorus, verse,
+  chorus, break, chorus and outro. It plays five new patterns of the factory library, 4 measures each, with the
+  same drums, slap bass (`BASS_TOUCH`), clavinet (`PIANO_CLAV`) and brass (`BRASS_STAB`): *Funk Song Intro*,
+  *Verse*, *Chorus*, *Break* and *Outro*. It was a chain of unrelated rock, breakbeat and funk patterns at 120 BPM.
 - The release ships the CLAP plugin: `orDrumbox.clap` in the Windows zip, next to
   `ordrumbox.exe`, and a zip of the macOS bundle.
 - The release has a Windows setup (`ordrumbox-<version>-windows-x64-setup.exe`): it
