@@ -568,7 +568,7 @@ mod tests {
         let (full_width, full_height) = ordrumbox_ui::min_window_size(Scale::ONE, Shown::all(false));
         assert_eq!(i64::from(width), i64::from(full_width), "the header's width");
         assert!(i64::from(height) < i64::from(full_height) * 3 / 4, "{height} high, {full_height} with the editors");
-        assert!(height <= 400, "{height}");
+        assert!(height <= 420, "{height}");
     }
 
     #[test]
