@@ -30,7 +30,8 @@ PrivilegesRequired=admin
 LicenseFile=dist\LICENSE
 OutputDir=setup
 OutputBaseFilename=ordrumbox-v{#AppVersion}-windows-x64-setup
-UninstallDisplayIcon={app}\ordrumbox.exe
+SetupIconFile=installer\ordrumbox-setup.ico
+UninstallDisplayIcon={app}\ordrumbox.ico
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -56,14 +57,15 @@ Type: filesandordirs; Name: "{commoncf64}\CLAP\orDrumbox\assets"; Components: cl
 [Files]
 Source: "dist\ordrumbox.exe"; DestDir: "{app}"; Components: app; Flags: ignoreversion
 Source: "dist\LICENSE"; DestDir: "{app}"; Components: app
+Source: "installer\ordrumbox.ico"; DestDir: "{app}"; Components: app; Flags: ignoreversion
 Source: "dist\assets\*"; DestDir: "{app}\assets"; Components: app; Flags: recursesubdirs ignoreversion
 Source: "dist\orDrumbox.clap"; DestDir: "{commoncf64}\CLAP\orDrumbox"; Components: clap; Flags: ignoreversion
 Source: "dist\assets\*"; DestDir: "{commoncf64}\CLAP\orDrumbox\assets"; Components: clap; Flags: recursesubdirs ignoreversion
 
 [Icons]
-Name: "{group}\orDrumbox"; Filename: "{app}\ordrumbox.exe"
+Name: "{group}\orDrumbox"; Filename: "{app}\ordrumbox.exe"; IconFilename: "{app}\ordrumbox.ico"
 Name: "{group}\Uninstall orDrumbox"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\orDrumbox"; Filename: "{app}\ordrumbox.exe"; Tasks: desktopicon
+Name: "{autodesktop}\orDrumbox"; Filename: "{app}\ordrumbox.exe"; IconFilename: "{app}\ordrumbox.ico"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\ordrumbox.exe"; Description: "Start orDrumbox"; Flags: nowait postinstall skipifsilent
