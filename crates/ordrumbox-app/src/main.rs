@@ -453,6 +453,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn open_window() -> Result<(), Box<dyn std::error::Error>> {
     // No text without it: stop with where it was looked for.
     ordrumbox_ui::load_font()?;
+    // One window per data folder: asked before anything is read or written.
+    let Some(instance) = ordrumbox_ui::enter_single_instance() else {
+        return Ok(());
+    };
     let event_loop = EventLoop::new()?;
     let mut session = Session::load(Box::new(audio::start));
     let proxy = event_loop.create_proxy();
@@ -460,6 +464,9 @@ fn open_window() -> Result<(), Box<dyn std::error::Error>> {
         // Closed: the app is quitting, there is nothing to wake.
         Ok(()) | Err(EventLoopClosed(())) => {}
     });
+    if let Some(notice) = &instance.notice {
+        session.say(notice);
+    }
     session.offer_devices(audio::devices);
     session.offer_midi_inputs(midi::ports);
     session.offer_midi_outputs(midi_out::ports);
@@ -489,6 +496,8 @@ fn open_window() -> Result<(), Box<dyn std::error::Error>> {
         App { gfx: None, ui: Ui::new(session), error: None, midi: None, events, events_sender, midi_out: None, waker };
     app.open_midi();
     event_loop.run_app(&mut app)?;
+    // Held until here, so the lock outlives the window.
+    drop(instance);
     match app.error {
         Some(error) => Err(error.into()),
         None => Ok(()),

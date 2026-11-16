@@ -249,6 +249,10 @@ The app writes `library.json`, `kits.json`, `settings.json`, `songs/`, `samples/
 `exports/` in the user data folder. Pattern and track settings use camelCase keys; old (JS)
 spellings are still read.
 
+The app holds `ordrumbox.lock` there while it runs. Started a second time, it warns that
+another orDrumbox is running and lets you quit or continue anyway (two windows can overwrite
+each other's library). The plugin and `ordrumbox --mcp` are not concerned.
+
 The synth presets edited (added, changed from the assets' ones, or deleted: `null`) are part
 of the library, under `synthPresets` in `library.json`, in File > Export library, and in a
 plugin's host project: each library, each project, has its own, and each change is an undo

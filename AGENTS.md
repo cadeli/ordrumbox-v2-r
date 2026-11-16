@@ -224,7 +224,7 @@ assets/           data/*.json and kits/**.wav, read at runtime
 
 ## Modern Rust
 
-- Edition 2024, `rust-version` 1.88: use what they give. `let … else`,
+- Edition 2024, `rust-version` 1.89: use what they give. `let … else`,
   `if let … && …` chains, `is_some_and`, `clamp`, `total_cmp`, `rem_euclid`
   (through `num::wrap`; `ordrumbox-dsp` has its own `wrap`), `div_euclid`,
   `checked_*`/`saturating_*`.
