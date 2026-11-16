@@ -415,6 +415,14 @@ fn knob_size(rect: Rect, scale: Scale) -> i32 {
     if rect.h >= 40 * scale { KNOB_SIZE * scale } else { (rect.h - 2 * scale).max(8 * scale) }
 }
 
+/// Rectangle outline, `t` wide, inside `r`.
+pub fn stroke(canvas: &mut Canvas, r: Rect, t: i32, color: Rgb) {
+    canvas.fill_rect(r.x, r.y, r.w, t, color);
+    canvas.fill_rect(r.x, r.y + r.h - t, r.w, t, color);
+    canvas.fill_rect(r.x, r.y, t, r.h, color);
+    canvas.fill_rect(r.x + r.w - t, r.y, t, r.h, color);
+}
+
 #[path = "panel/draw.rs"]
 mod draw;
 #[path = "panel/dropdown.rs"]

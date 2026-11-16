@@ -2,13 +2,6 @@
 
 use super::*;
 
-fn stroke(canvas: &mut Canvas, r: Rect, t: i32, color: Rgb) {
-    canvas.fill_rect(r.x, r.y, r.w, t, color);
-    canvas.fill_rect(r.x, r.y + r.h - t, r.w, t, color);
-    canvas.fill_rect(r.x, r.y, t, r.h, color);
-    canvas.fill_rect(r.x + r.w - t, r.y, t, r.h, color);
-}
-
 fn fill_circle(canvas: &mut Canvas, cx: i32, cy: i32, r: i32, color: Rgb) {
     for dy in -r..=r {
         let half = f64::from(r * r - dy * dy).sqrt() as i32;

@@ -382,6 +382,19 @@ impl Ui {
         self.input(|ui| ui.key_event(event))
     }
 
+    /// Alt plus the first letter of a menu's title opens it (Y: Play, the
+    /// Pattern's P taken). The app only: a plugin's Alt is the Ctrl the host
+    /// keeps. Whether `code` was such a letter.
+    fn open_menu_by_letter(&mut self, code: Key) -> bool {
+        let Some(i) = code.letter() else { return false };
+        let s = &mut self.session;
+        let menus = s.menus();
+        let Some(menu) = menus.iter().position(|m| menu_letter(m.title, i)) else { return false };
+        s.close_overlay();
+        s.set_menu(Some(menu::Open::new(&menus, menu, true)));
+        true
+    }
+
     fn key_event(&mut self, event: &KeyEvent) -> bool {
         let code = event.key;
         let is_alt = code == Key::Alt;
@@ -407,20 +420,8 @@ impl Ui {
         if let Some(open) = self.session.open_menu() {
             return self.menu_key(open, code);
         }
-        // Alt plus the first letter of a menu's title opens it (Y: Play, the
-        // Pattern's P taken). The app only: a plugin's Alt is the Ctrl the
-        // host keeps.
-        if alt
-            && !self.session.hosted()
-            && let Some(i) = code.letter()
-        {
-            let s = &mut self.session;
-            let menus = s.menus();
-            if let Some(menu) = menus.iter().position(|m| menu_letter(m.title, i)) {
-                s.close_overlay();
-                s.set_menu(Some(menu::Open::new(&menus, menu, true)));
-                return true;
-            }
+        if alt && !self.session.hosted() && self.open_menu_by_letter(code) {
+            return true;
         }
         if self.session.overlay_open() {
             return self.overlay_key(event);
@@ -487,67 +488,7 @@ impl Ui {
             s.rewind();
             return true;
         }
-        if s.kit_editor_open() {
-            match key {
-                Key::Escape => s.toggle_kit_editor(),
-                Key::ArrowUp => s.kit_select(-1),
-                Key::ArrowDown => s.kit_select(1),
-                Key::Enter | Key::NumpadEnter => s.kit_audition(),
-                Key::Delete | Key::Backspace => s.kit_remove(),
-                Key::Letter('N') => s.kit_normalize(),
-                Key::Letter('E') => s.run(Command::ExportMapping),
-                _ => return false,
-            }
-        } else if s.synth_open() {
-            match key {
-                Key::Escape => s.toggle_synth(),
-                _ => return false,
-            }
-        } else if s.piano_roll_open() {
-            match key {
-                Key::Escape => s.roll_escape(),
-                Key::ArrowLeft => s.roll_arrow(Move::Left, shift),
-                Key::ArrowRight => s.roll_arrow(Move::Right, shift),
-                Key::ArrowUp => s.roll_arrow(Move::Up, shift),
-                Key::ArrowDown => s.roll_arrow(Move::Down, shift),
-                Key::Enter | Key::NumpadEnter => s.roll_enter(),
-                Key::Delete | Key::Backspace => s.roll_delete(),
-                _ => return false,
-            }
-        } else if s.song_view_open() {
-            match key {
-                Key::Escape => s.toggle_song_view(),
-                Key::ArrowLeft => s.move_song_cursor(-1),
-                Key::ArrowRight => s.move_song_cursor(1),
-                Key::ArrowUp => s.step_pattern(-1),
-                Key::ArrowDown => s.step_pattern(1),
-                _ => return false,
-            }
-        } else {
-            let tempo = if shift { 10.0 } else { 1.0 };
-            let tempo_keys = !s.hosted();
-            match key {
-                Key::Minus | Key::NumpadSubtract if tempo_keys => s.step_tempo(-tempo),
-                Key::Equal | Key::NumpadAdd if tempo_keys => s.step_tempo(tempo),
-                Key::ArrowLeft if alt => s.nudge(Move::Left),
-                Key::ArrowRight if alt => s.nudge(Move::Right),
-                Key::ArrowUp if alt => s.nudge(Move::Up),
-                Key::ArrowDown if alt => s.nudge(Move::Down),
-                Key::ArrowLeft if shift => s.extend_zone(Move::Left),
-                Key::ArrowRight if shift => s.extend_zone(Move::Right),
-                Key::ArrowUp if shift => s.extend_zone(Move::Up),
-                Key::ArrowDown if shift => s.extend_zone(Move::Down),
-                Key::ArrowLeft => s.move_cursor(Move::Left),
-                Key::ArrowRight => s.move_cursor(Move::Right),
-                Key::ArrowUp => s.move_cursor(Move::Up),
-                Key::ArrowDown => s.move_cursor(Move::Down),
-                Key::Enter | Key::NumpadEnter => s.enter(),
-                Key::Delete | Key::Backspace => s.delete_step(),
-                Key::Escape => s.deselect(),
-                _ => return false,
-            }
-        }
-        true
+        view_key(s, key, shift, alt)
     }
 
     /// Keys for the editors' widgets: an open list or number entry takes
@@ -640,6 +581,96 @@ impl Ui {
 #[path = "ui/keys.rs"]
 mod keys;
 use keys::*;
+
+/// What `key` does in the view that is open (the kit editor, the synth, the
+/// piano roll, the song view, else the grid): whether it was one of its keys.
+fn view_key(s: &mut Session, key: Key, shift: bool, alt: bool) -> bool {
+    if s.kit_editor_open() {
+        kit_editor_key(s, key)
+    } else if s.synth_open() {
+        synth_key(s, key)
+    } else if s.piano_roll_open() {
+        piano_roll_key(s, key, shift)
+    } else if s.song_view_open() {
+        song_view_key(s, key)
+    } else {
+        grid_key(s, key, shift, alt)
+    }
+}
+
+fn kit_editor_key(s: &mut Session, key: Key) -> bool {
+    match key {
+        Key::Escape => s.toggle_kit_editor(),
+        Key::ArrowUp => s.kit_select(-1),
+        Key::ArrowDown => s.kit_select(1),
+        Key::Enter | Key::NumpadEnter => s.kit_audition(),
+        Key::Delete | Key::Backspace => s.kit_remove(),
+        Key::Letter('N') => s.kit_normalize(),
+        Key::Letter('E') => s.run(Command::ExportMapping),
+        _ => return false,
+    }
+    true
+}
+
+fn synth_key(s: &mut Session, key: Key) -> bool {
+    if key != Key::Escape {
+        return false;
+    }
+    s.toggle_synth();
+    true
+}
+
+fn piano_roll_key(s: &mut Session, key: Key, shift: bool) -> bool {
+    match key {
+        Key::Escape => s.roll_escape(),
+        Key::ArrowLeft => s.roll_arrow(Move::Left, shift),
+        Key::ArrowRight => s.roll_arrow(Move::Right, shift),
+        Key::ArrowUp => s.roll_arrow(Move::Up, shift),
+        Key::ArrowDown => s.roll_arrow(Move::Down, shift),
+        Key::Enter | Key::NumpadEnter => s.roll_enter(),
+        Key::Delete | Key::Backspace => s.roll_delete(),
+        _ => return false,
+    }
+    true
+}
+
+fn song_view_key(s: &mut Session, key: Key) -> bool {
+    match key {
+        Key::Escape => s.toggle_song_view(),
+        Key::ArrowLeft => s.move_song_cursor(-1),
+        Key::ArrowRight => s.move_song_cursor(1),
+        Key::ArrowUp => s.step_pattern(-1),
+        Key::ArrowDown => s.step_pattern(1),
+        _ => return false,
+    }
+    true
+}
+
+fn grid_key(s: &mut Session, key: Key, shift: bool, alt: bool) -> bool {
+    let tempo = if shift { 10.0 } else { 1.0 };
+    let tempo_keys = !s.hosted();
+    match key {
+        Key::Minus | Key::NumpadSubtract if tempo_keys => s.step_tempo(-tempo),
+        Key::Equal | Key::NumpadAdd if tempo_keys => s.step_tempo(tempo),
+        Key::ArrowLeft if alt => s.nudge(Move::Left),
+        Key::ArrowRight if alt => s.nudge(Move::Right),
+        Key::ArrowUp if alt => s.nudge(Move::Up),
+        Key::ArrowDown if alt => s.nudge(Move::Down),
+        Key::ArrowLeft if shift => s.extend_zone(Move::Left),
+        Key::ArrowRight if shift => s.extend_zone(Move::Right),
+        Key::ArrowUp if shift => s.extend_zone(Move::Up),
+        Key::ArrowDown if shift => s.extend_zone(Move::Down),
+        Key::ArrowLeft => s.move_cursor(Move::Left),
+        Key::ArrowRight => s.move_cursor(Move::Right),
+        Key::ArrowUp => s.move_cursor(Move::Up),
+        Key::ArrowDown => s.move_cursor(Move::Down),
+        Key::Enter | Key::NumpadEnter => s.enter(),
+        Key::Delete | Key::Backspace => s.delete_step(),
+        Key::Escape => s.deselect(),
+        _ => return false,
+    }
+    true
+}
 
 #[cfg(test)]
 #[path = "ui/tests.rs"]
