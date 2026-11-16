@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=orDrumbox
+Comment=Drum machine and step sequencer
+Exec=ordrumbox
+Icon=ordrumbox
+Categories=AudioVideo;Audio;Midi;Sequencer;
+Terminal=false
+StartupWMClass=ordrumbox

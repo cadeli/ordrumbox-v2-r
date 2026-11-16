@@ -13,6 +13,7 @@ mod audio;
 mod midi;
 mod midi_out;
 mod midi_sync;
+mod window_icon;
 
 use std::num::NonZeroU32;
 use std::rc::Rc;
@@ -301,10 +302,12 @@ impl ApplicationHandler for App {
         );
         let (min_width, min_height) = ordrumbox_ui::MIN_WINDOW;
         let min_size = LogicalSize::new(f64::from(min_width), f64::from(min_height));
-        let attributes = Window::default_attributes()
-            .with_title(format!("orDrumbox {}", ordrumbox_ui::BUILD))
-            .with_min_inner_size(min_size)
-            .with_inner_size(initial);
+        let attributes = window_icon::with_icon(
+            Window::default_attributes()
+                .with_title(format!("orDrumbox {}", ordrumbox_ui::BUILD))
+                .with_min_inner_size(min_size)
+                .with_inner_size(initial),
+        );
         let window = match event_loop.create_window(attributes) {
             Ok(window) => Rc::new(window),
             Err(e) => return self.fail(event_loop, "create window", e),

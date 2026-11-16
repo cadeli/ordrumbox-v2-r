@@ -51,8 +51,11 @@ A release is a `v<version>` tag matching `Cargo.toml`: CI then builds the releas
 `ordrumbox.exe` with `assets/` next to it, and the plugin bundles. The release
 holds the Windows zip (`ordrumbox.exe`, `orDrumbox.clap`, `assets/`, `LICENSE`),
 the Windows setup made from the same files, the Linux zip (the same files, the
-binary linked at run time against the system's ALSA and X11 libraries), and the
-macOS and Linux CLAPs, zipped. Both CLAPs are built without `vst3`, so they stay
+binary linked at run time against the system's ALSA and X11 libraries, plus the
+`.desktop` file and icon), the macOS `orDrumbox.app` (`installer/Info.plist` and
+`ordrumbox.icns`; the binary and `assets/` in `Contents/MacOS`), and the macOS and
+Linux CLAPs, zipped. The icon of the window comes from `installer/ordrumbox-setup.png`,
+decoded by `crates/ordrumbox-app/build.rs`; the `.exe` carries `ordrumbox.ico`. Both CLAPs are built without `vst3`, so they stay
 MIT; the VST3 bundles are only artifacts of the CI run.
 
 The setup is `installer/ordrumbox.iss`, built by Inno Setup 6 (Windows only), with

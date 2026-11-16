@@ -26,7 +26,13 @@ On Windows, a release holds a setup and a zip:
 - On Linux, `ordrumbox-<version>-linux-x64.zip` holds the same files as the Windows zip:
   unzip it anywhere and run `./ordrumbox`. The binary is built against the system's ALSA
   and X11 libraries; on a Debian-like distribution, `sudo apt install libasound2
-  libxkbcommon-x11-0 libxkbcommon0` installs what it links at run time.
+  libxkbcommon-x11-0 libxkbcommon0` installs what it links at run time. The window has
+  the orDrumbox icon on its own; for the launcher entry and the icon in the application
+  menu, copy `ordrumbox.desktop` to `~/.local/share/applications/` and `ordrumbox.png`
+  to `~/.local/share/icons/`, and put `Exec=` in the `.desktop` file on the full path of
+  `ordrumbox`.
+- On macOS, `ordrumbox-<version>-macos.zip` holds `orDrumbox.app`, with the icon: unzip it,
+  move it to Applications. It is not signed: the first time, right-click > Open.
 
 The CLAP plugin comes with each release:
 
