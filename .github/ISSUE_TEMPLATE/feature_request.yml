@@ -1,0 +1,15 @@
+name: Feature request
+description: An idea for orDrumbox
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What you want to do
+      description: The goal, not only the feature. How would you use it?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How you imagine it

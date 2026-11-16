@@ -1,0 +1,40 @@
+name: Bug report
+description: Something does not work, or sounds wrong
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens
+      description: What you did, what you expected, what you got.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Help > About, for example 0.1.2
+    validations:
+      required: true
+  - type: dropdown
+    id: form
+    attributes:
+      label: How you run it
+      options:
+        - ordrumbox.exe / app (Windows)
+        - app (macOS)
+        - app (Linux)
+        - CLAP plugin
+        - VST3 plugin
+    validations:
+      required: true
+  - type: input
+    id: host
+    attributes:
+      label: Plugin host (DAW) and its version
+      description: Only for the plugin.
+  - type: textarea
+    id: extra
+    attributes:
+      label: Pattern, song or kit
+      description: Attach the JSON file or the steps that show it, and any message the app displayed.
