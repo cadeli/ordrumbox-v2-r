@@ -108,6 +108,8 @@ mod session_kit;
 mod session_library_file;
 #[path = "session_mcp.rs"]
 mod session_mcp;
+#[path = "session_mcp_tools.rs"]
+mod session_mcp_tools;
 #[path = "session_output.rs"]
 mod session_output;
 #[path = "session_overlay.rs"]

@@ -317,7 +317,7 @@ impl Session {
     /// A kit knob: the kit changes now, the player and the disk shortly after.
     fn set_kit_sample_value(&mut self, kit: usize, sample: usize, field: Field, value: f64) {
         if let Some(message) = self.kits.set_value(kit, sample, field, value) {
-            self.not_undoable(message);
+            self.not_undoable(&message);
             self.saving.kits.touch();
         }
     }

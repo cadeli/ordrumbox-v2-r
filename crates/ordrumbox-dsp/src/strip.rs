@@ -12,10 +12,13 @@
 //! The reverb and delay memories are allocated by [`Strip::new`];
 //! [`Strip::process`] never allocates.
 
-use std::f64::consts::{PI, TAU};
+use crate::svf::Svf;
 
-use crate::slope::{self, FilterMode};
-use crate::svf::{Svf, SvfCoeffs, output};
+use blocks::{ClipBlock, CrushBlock, DelayBlock, FilterBlock, PanBlock, ReverbBlock, SaturationBlock};
+use stages::{mix_out, saturate};
+
+mod blocks;
+mod stages;
 
 const COMB_TUNINGS_L: [usize; 8] = [1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617];
 const COMB_TUNINGS_R: [usize; 8] = [1139, 1211, 1300, 1379, 1445, 1514, 1580, 1640];
@@ -522,213 +525,65 @@ impl Strip {
     ) {
         let s = settings.clamped();
         let sr = self.sample_rate;
-        let (cutoff, q) = (f64::from(s.cutoff), f64::from(s.q));
-        let mode = FilterMode::from_setting(f64::from(s.filter_mode));
-        let saturation = Saturation::from_setting(f64::from(s.saturation_type));
-        let (saturation_drive, saturation_mix, saturation_output) =
-            (f64::from(s.saturation_drive), f64::from(s.saturation_mix), f64::from(s.saturation_output));
-        let (reverb_room, reverb_damping, reverb_width, reverb_mix) =
-            (f64::from(s.reverb_room), f64::from(s.reverb_damping), f64::from(s.reverb_width), f64::from(s.reverb_mix));
-        let (delay_mix, delay_feedback, delay_mode) =
-            (f64::from(s.delay_mix), f64::from(s.delay_feedback), f64::from(s.delay_mode));
-        let (delay_time_l, delay_time_r) = (f64::from(s.delay_time_l), f64::from(s.delay_time_r));
-        let (delay_tone, delay_wow) = (f64::from(s.delay_tone), f64::from(s.delay_wow) * sr);
-        let delay_mono_in = s.delay_mono_in > 0.5;
-        let vol = f64::from(s.volume);
-        let filter_on = s.filter_on > 0.5;
-        let predelay = f64::from(s.reverb_predelay) * sr;
-        let dispersion = f64::from(s.reverb_dispersion);
-        let gate_frames = f64::from(s.reverb_gate) * sr;
-        let gate_open = 1.0 - (-1.0 / (GATE_OPEN_SECONDS * sr)).exp();
-        let gate_close = 1.0 - (-1.0 / (GATE_CLOSE_SECONDS * sr)).exp();
+        let filter = FilterBlock::new(&s, sr);
+        let saturation = SaturationBlock::new(&s);
+        let crush = CrushBlock::new(&s, sr);
+        let clip = ClipBlock::new(&s);
+        let reverb = ReverbBlock::new(&s, sr);
+        let delay = DelayBlock::new(&s, sr);
+        let pan = PanBlock::new(f64::from(s.pan));
+        let volume = f64::from(s.volume);
+        let comp = Compressor::new(&s, sr);
+        let duck = if KEYED { Ducker::new(&s, sr) } else { None };
 
-        let rm = reverb_room * 0.28 + 0.7;
-        let damp1 = reverb_damping * 0.4;
-        let damp2 = 1.0 - damp1;
-        let width1 = reverb_width * 0.5 + 0.5;
-        let width2 = (1.0 - reverb_width) * 0.5;
-        let has_reverb = s.reverb_on > 0.5 && reverb_mix > 0.001;
-        let has_delay = s.delay_on > 0.5 && delay_mix > 0.001;
-        let has_sat = saturation_mix > 0.0;
-        let crush = f64::from(s.crush);
-        let has_crush = crush > 0.0;
-        // Quantization levels on each side of 0, and the hold's phase step.
-        let crush_levels = (CRUSH_BITS_MAX - crush * (CRUSH_BITS_MAX - CRUSH_BITS_MIN) - 1.0).exp2();
-        let crush_step = (CRUSH_RATE_HZ * (-CRUSH_OCTAVES * crush).exp2() / sr).min(1.0);
-        let has_clip = s.clip > 0.0;
-        // Drive into the ceiling, as a gain over the ceiling (the clip is at ±1).
-        let clip_gain = 10_f64.powf(f64::from(s.clip) * CLIP_DRIVE_DB / 20.0) / CLIP_CEILING;
-        if !has_clip {
-            // Turned back on, the clipper starts from silence.
+        // A stage turned back on starts from silence, or released.
+        if clip.is_none() {
             self.clip_prev = [0.0; 2];
         }
-        let ping_pong = delay_mode > 1.5;
-        let comp = Compressor::new(&s, sr);
         if comp.is_none() {
-            // Turned back on, the compressor starts released.
             self.comp_reduction_db = 0.0;
         }
-        let duck = if KEYED { Ducker::new(&s, sr) } else { None };
         if duck.is_none() {
             self.duck_envelope = 0.0;
         }
-
-        let p = f64::from(s.pan);
-        let pan_l = ((p + 1.0) * PI / 4.0).cos();
-        let pan_r = ((p + 1.0) * PI / 4.0).sin();
-        let pan_max = if pan_l > pan_r { pan_l } else { pan_r };
-        let pan_comp = if pan_max > 0.001 { 1.0 / pan_max } else { 1.0 };
-
-        let g = (PI * cutoff / sr).tan();
-        let (stage_1, stage_2, gain_2) = if slope::is_steep(f64::from(s.filter_slope)) {
-            let (k1, k2, gain_2) = slope::stages(1.0 / q, mode);
-            (SvfCoeffs::new(g, k1), Some(SvfCoeffs::new(g, k2)), gain_2)
-        } else {
-            (SvfCoeffs::new(g, 1.0 / q), None, 1.0)
-        };
-        if stage_2.is_none() {
-            // A later switch to 24 dB/oct starts the second stage from silence.
+        if filter.stage_2.is_none() {
             self.filter_2 = [Svf::default(); 2];
         }
 
         let inputs = in_l.iter().zip(in_r);
         let outputs = out_l.iter_mut().zip(out_r.iter_mut());
         for (frame, ((&x_l, &x_r), (o_l, o_r))) in inputs.zip(outputs).enumerate() {
-            // 1. Filter.
-            let (mut dry_l, mut dry_r) = (f64::from(x_l), f64::from(x_r));
-            if filter_on {
-                dry_l = output(self.filter[0].step(dry_l, &stage_1), mode);
-                dry_r = output(self.filter[1].step(dry_r, &stage_1), mode);
-            }
-            if let (true, Some(stage_2)) = (filter_on, &stage_2) {
-                dry_l = output(self.filter_2[0].step(dry_l, stage_2), mode) * gain_2;
-                dry_r = output(self.filter_2[1].step(dry_r, stage_2), mode) * gain_2;
-            }
+            let (mut dry_l, mut dry_r) = self.filter_stage(&filter, f64::from(x_l), f64::from(x_r));
 
-            // 2. Compressor.
             if let Some(comp) = &comp {
                 let peak = if KEYED { f64::from(key[frame]) } else { dry_l.abs().max(dry_r.abs()) };
                 (dry_l, dry_r) = comp.process(&mut self.comp_reduction_db, peak, dry_l, dry_r);
             }
 
-            // 3. Saturation.
-            let mut sat_l = if has_sat {
-                shape(dry_l, saturation_drive, saturation, saturation_mix, saturation_output)
-            } else {
-                dry_l
-            };
-            let mut sat_r = if has_sat {
-                shape(dry_r, saturation_drive, saturation, saturation_mix, saturation_output)
-            } else {
-                dry_r
-            };
-
-            // 3b. Bitcrusher: a sample and hold, then fewer levels.
-            if has_crush {
-                if self.crush_phase >= 1.0 {
-                    self.crush_phase -= 1.0;
-                    self.crush_hold =
-                        [(sat_l * crush_levels).round() / crush_levels, (sat_r * crush_levels).round() / crush_levels];
-                }
-                self.crush_phase += crush_step;
-                [sat_l, sat_r] = self.crush_hold;
+            let mut sat_l = saturate(saturation.as_ref(), dry_l);
+            let mut sat_r = saturate(saturation.as_ref(), dry_r);
+            if let Some(crush) = &crush {
+                (sat_l, sat_r) = self.crush_stage(crush, sat_l, sat_r);
+            }
+            if let Some(clip) = &clip {
+                (sat_l, sat_r) = self.clip_stage(clip, sat_l, sat_r);
             }
 
-            // 3c. Hard clipper, last: its ceiling holds.
-            if has_clip {
-                let (u_l, u_r) = (sat_l * clip_gain, sat_r * clip_gain);
-                sat_l = clip_adaa(u_l, self.clip_prev[0]) * CLIP_CEILING;
-                sat_r = clip_adaa(u_r, self.clip_prev[1]) * CLIP_CEILING;
-                self.clip_prev = [u_l, u_r];
-            }
+            let rev = reverb.as_ref().map_or((0.0, 0.0), |reverb| self.reverb_stage(reverb, sat_l, sat_r));
+            let wet = self.delay_stage(&delay, sat_l, sat_r);
 
-            // 4. Reverb.
-            let (mut rev_l, mut rev_r) = (0.0, 0.0);
-            if has_reverb {
-                let mut input = (sat_l + sat_r) * 0.0075;
-                if predelay > 0.0 {
-                    self.predelay.write(input);
-                    input = self.predelay.read(predelay + 1.0);
-                }
-                if dispersion > 0.0 {
-                    for stage in &mut self.dispersion {
-                        input = stage.process(input, dispersion);
-                    }
-                }
-                let (mut comb_l, mut comb_r) = (0.0, 0.0);
-                for (left, right) in self.combs_l.iter_mut().zip(&mut self.combs_r) {
-                    comb_l += left.process(input, damp1, damp2, rm);
-                    comb_r += right.process(input, damp1, damp2, rm);
-                }
-                for (left, right) in self.allpass_l.iter_mut().zip(&mut self.allpass_r) {
-                    comb_l = left.process(comb_l);
-                    comb_r = right.process(comb_r);
-                }
-                rev_l = (comb_l * width1 + comb_r * width2) * reverb_mix;
-                rev_r = (comb_r * width1 + comb_l * width2) * reverb_mix;
-                if gate_frames > 0.0 {
-                    // Keyed by the dry input: open on a hit, closed once it
-                    // has stayed under the key for `reverb_gate`.
-                    if sat_l.abs() + sat_r.abs() > GATE_KEY {
-                        self.gate_hold = gate_frames;
-                    } else if self.gate_hold > 0.0 {
-                        self.gate_hold -= 1.0;
-                    }
-                    let (target, speed) = if self.gate_hold > 0.0 { (1.0, gate_open) } else { (0.0, gate_close) };
-                    self.gate_gain += speed * (target - self.gate_gain);
-                    flush(&mut self.gate_gain);
-                    rev_l *= self.gate_gain;
-                    rev_r *= self.gate_gain;
-                }
-            }
-
-            // 5. Delay.
-            let (mut wet_l, mut wet_r) = (0.0, 0.0);
-            let (send_l, send_r) = if delay_mono_in { ((sat_l + sat_r) * 0.5, 0.0) } else { (sat_l, sat_r) };
-            if has_delay {
-                let wow = if delay_wow > 0.0 {
-                    self.wow_phase = (self.wow_phase + WOW_HZ / sr).fract();
-                    delay_wow * (TAU * self.wow_phase).sin()
-                } else {
-                    0.0
-                };
-                let delayed_l = self.delay_l.read(delay_time_l * sr + wow);
-                let delayed_r = self.delay_r.read(delay_time_r * sr + wow);
-                self.delay_filter_l += delay_tone * (delayed_l - self.delay_filter_l);
-                self.delay_filter_r += delay_tone * (delayed_r - self.delay_filter_r);
-                flush(&mut self.delay_filter_l);
-                flush(&mut self.delay_filter_r);
-                let fb_l = shape(self.delay_filter_l * delay_feedback, 1.5, Saturation::Tanh, 0.5, 1.0);
-                let fb_r = shape(self.delay_filter_r * delay_feedback, 1.5, Saturation::Tanh, 0.5, 1.0);
-                if ping_pong {
-                    self.delay_l.write(send_l + fb_r);
-                    self.delay_r.write(send_r + fb_l);
-                } else {
-                    self.delay_l.write(send_l + fb_l);
-                    self.delay_r.write(send_r + fb_r);
-                }
-                wet_l = delayed_l * delay_mix;
-                wet_r = delayed_r * delay_mix;
-            } else {
-                self.delay_l.write(send_l);
-                self.delay_r.write(send_r);
-            }
-
-            // 6. Sidechain ducking, volume and pan.
             let duck_gain = duck.map_or(1.0, |duck| duck.gain(&mut self.duck_envelope, f64::from(key[frame])));
-            let volume = vol * duck_gain;
-            let mut left = (sat_l + rev_l + wet_l) * volume * pan_l * pan_comp;
-            let mut right = (sat_r + rev_r + wet_r) * volume * pan_r * pan_comp;
-            flush(&mut left);
-            flush(&mut right);
-            *o_l += left.clamp(-2.0, 2.0) as f32;
-            *o_r += right.clamp(-2.0, 2.0) as f32;
+            let (left, right) = mix_out(&pan, volume * duck_gain, (sat_l, sat_r), rev, wet);
+            *o_l += left;
+            *o_r += right;
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::f64::consts::TAU;
+
     use super::*;
 
     fn run(settings: &StripSettings, input: &[f32]) -> (Vec<f32>, Vec<f32>) {

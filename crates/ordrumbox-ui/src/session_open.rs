@@ -158,7 +158,7 @@ impl Session {
         if hosted {
             session.chrome.fold_editors();
         }
-        session.assets_dir = Some(dir.clone());
+        session.assets_dir = Some(dir);
         session.saving.songs_dir = store::songs_dir();
         session.generators.scales = assets.scales.clone();
         session.generators.styles = assets.styles.clone();
