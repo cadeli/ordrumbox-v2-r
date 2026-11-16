@@ -1,59 +1,22 @@
 # Changelog
 
-## Unreleased
+## 0.1.2
 
 ### New
-- **Stems export**: File > Export pattern stems and Export song stems write a folder with one WAV per track, as
-  long as the render, before the master bus (as the plugin's track outputs). Silent tracks are left out. MCP:
-  `exportPatternStems` and `exportArrangementStems`.
-- **Twelve demo patterns with chords, organ, strings, leads and pads** in the factory library: *Neo Soul Keys*,
-  *Funk Clav Riff*, *Blues Organ 12 Bar*, *Reggae Organ Bubble*, *Disco Strings and Brass*, *Bossa Pizzicato*,
-  *Synthwave Lead*, *Trance Supersaw*, *Ambient Pads*, *Chiptune Arp*, *Marimba Phasing* (two phrases of 12 and 11
-  steps) and *Arp Showcase*. Chords are notes on the same step of a synth track.
-- **Six demo patterns with a synth bass** in the factory library, each a drum groove of the library plus a `BASS`
-  track on a bass preset: *Reggae Sub Bass* (`BASS_SUB`), *Acid Squelch* (`BASS_ACID`), *House Pluck Bass*
-  (`BASS_PLUCK`), *DnB Wobble Bass* (`BASS_WOBBLE`), *Funk Slap Bass* (`BASS_TOUCH`) and *Electro FM Bass*
-  (`BASS_FM`).
-- **Synth modulation matrix**: a *Matrix* card on the synth editor's MOD tab holds 8 lines, each a source, a
-  target and an amount from -1 to 1 (a negative one inverts the source). The sources are LFO 1 and 2 (at their
-  own rate and wave, whatever they target), the envelope and the mod envelope, the note's velocity and pitch, and a
-  value drawn once per note; the targets are those of an LFO, with the same scale, and a line adds to what the
-  LFOs' own targets add. Choosing a source with no target aims it at the filter, at half. Saved as the preset's
-  `matrix` group (`source1`..`source8`, `target1`..`target8`, `amount1`..`amount8`); MCP: the same paths in
-  `createSynthPreset` and `updateSynthPreset`. A preset without a `matrix` group plays as before.
-- **Four factory presets that use the matrix**: `BASS_TOUCH` (velocity opens the filter and adds drive),
-  `BASS_WOBBLE` (one LFO on cutoff and detune), `SYNTHPAD_DRIFT` (a random draw per note) and `PIANO_KEYBELL` (FM
-  that follows velocity, pitch and the modulation envelope).
-- **Synth unison**: a *Unison* card on the synth editor's OSC tab makes each oscillator sound as 1 to 8 detuned
-  layers (*Layers*, *detune* in cents, stereo *spread*), each starting at its own phase: a supersaw is one saw
-  with 7 layers (the factory preset `SYNTHLEAD_SUPERSAW`). With a spread, the filter runs once per side. A preset
-  without a `unison` group plays as before; MCP: `unison.count`, `unison.detune` and `unison.spread` in
-  `createSynthPreset` and `updateSynthPreset`.
-- **Sample playback**: a sample has *Start*, *End*, *Attack*, *Hold*, *Reverse*, *Loop* and *Gate* (the sound holds for the note's
-  length, then the decay is its release),
-  next to its decay, in the kit editor and on the track editor's Sound tab. The waveform
-  shows them: the start and end lines, the direction, the loop and the level curve. They
-  are saved with the kit (`start`, `end`, `attack`, `hold`, `reverse`, `loop`, `gate`; times in ms); a
-  sample without them plays as before. A loop crossfades its two ends (10 ms at most) so
-  that it does not click.
-- **Per-track sidechain**: the FX tab has a *Sidechain* strip. Pick another track of the
-  pattern as the *Key*: its sound turns this track's volume down (*Duck*, with a *Release*
-  time) and, when the compressor is on, is what the compressor listens to. The key is the
-  track's sound before its own effects, so a muted or turned-down key still keys. MCP:
-  `sidechainSource`, `duckAmount` and `duckReleaseMs` in `updateTrack`.
-- **Plugin**: a MIDI program change chooses the pattern (program 1–128 → pattern 1–128),
-  in the CLAP plugin.
+- **Synth**: unison, modulation matrix, chip controls (pulse width, noise modes) and new factory presets.
+- **Samples**: start, end, attack, hold, reverse, loop and gate.
+- **Per-track sidechain**, and **parameter locks** (filter, reverb, delay) per note.
+- **Quantize** (Edit > Quantize...) and **zone selection** in the grid.
+- **MIDI**: input and output, MIDI learn, clock in and out, pattern choice by program change or note.
+- **Stems export** of a pattern or a song (File menu, MCP).
+- **Preferences** window (Ctrl ,), metronome, tap tempo.
+- About twenty new demo patterns and a full demo song.
+- Windows setup, CLAP plugin in the release, Linux build.
 
 ### Changed
-- **The demo arrangement is one song**, a funk in E minor at 100 BPM, 52 measures: intro, verse, chorus, verse,
-  chorus, break, chorus and outro. It plays five new patterns of the factory library, 4 measures each, with the
-  same drums, slap bass (`BASS_TOUCH`), clavinet (`PIANO_CLAV`) and brass (`BRASS_STAB`): *Funk Song Intro*,
-  *Verse*, *Chorus*, *Break* and *Outro*. It was a chain of unrelated rock, breakbeat and funk patterns at 120 BPM.
-- The release ships the CLAP plugin: `orDrumbox.clap` in the Windows zip, next to
-  `ordrumbox.exe`, and a zip of the macOS bundle.
-- The release has a Windows setup (`ordrumbox-<version>-windows-x64-setup.exe`): it
-  installs the app with a Start menu shortcut and, as an option, the CLAP plugin in
-  `Common Files\CLAP\orDrumbox\`. The zip stays, for use without setup.
+- New keyboard shortcuts (F1 lists them); PATTERN / SONG mode switch.
+- MIDI import and export keep note lengths.
+- The filter's highpass is now textbook: a little thinner and quieter.
 
 ## 0.1.1
 
