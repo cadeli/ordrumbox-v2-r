@@ -90,6 +90,7 @@ impl Session {
         let pattern = self.pattern();
         let song_layout = self.song_layout((canvas.width(), canvas.height(), scale));
         let rows = if self.workspace == Workspace::Song { self.song_rows() } else { Vec::new() };
+        let kit_first = self.kit_first(&self.kit_layout((canvas.width(), canvas.height(), scale)));
         let roll_layout = self.roll_layout((canvas.width(), canvas.height(), scale));
         let roll = self.piano_roll_open().then(|| Some((self.roll_view(&roll_layout)?, self.roll_title()))).flatten();
         let view = View {
@@ -99,7 +100,7 @@ impl Session {
             piano_roll: roll,
             output: self.output_view(),
             synth: self.synth_open(),
-            kit_view: self.kit_view(layout.details_top),
+            kit_view: self.kit_view(kit_first, layout.details_top),
             right: layout.right,
             current_page: self.chrome.current_page,
             lane: (self.editor_track(), usize::from(self.editors.lane)),

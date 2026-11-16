@@ -31,6 +31,8 @@ pub(super) struct KitEditor {
     /// Where the kit and the sample shown are read from (folder, file),
     /// found with the analysis: looking costs a file system call a sample.
     pub(super) files: (String, Option<PathBuf>),
+    /// How the table of samples is scrolled.
+    pub(super) list: super::session_kit_list::KitList,
 }
 
 impl KitEditor {
@@ -176,7 +178,7 @@ impl Session {
     /// and description (a click edits them), the instrument of each sample
     /// shown in the table.
     pub(super) fn kit_items(&self, layout: &KitLayout, scale: Scale) -> Vec<Item> {
-        let (Some(sample), Some(kit)) = (self.kit_editor.sample, self.kit()) else {
+        let (Some(_), Some(kit)) = (self.kit_editor.sample, self.kit()) else {
             return Vec::new();
         };
         let mut items = Vec::new();
@@ -206,7 +208,7 @@ impl Session {
         let played_by = Rect { w: text_width(PLAYED_BY, scale).min(column.w), ..column };
         let label = Kind::Text { text: fitted(PLAYED_BY, played_by), color: theme::muted() };
         items.push(Item::new(Some(Id::KitPlayedBy), played_by, label));
-        let first = layout.first(sample);
+        let first = self.kit_first(layout);
         for (row, (i, s)) in kit.samples.iter().enumerate().skip(first).take(layout.shown()).enumerate() {
             let choice = instrument_choice(&s.key);
             items.push(Item::new(Some(Id::KitSampleInstrument(i)), layout.instrument_rect(row), choice.kind()));
@@ -277,7 +279,7 @@ impl Session {
     }
 
     /// What the kit editor shows; its sample's details start at `details_top`.
-    pub(super) fn kit_view(&self, details_top: i32) -> Option<KitView<'_>> {
+    pub(super) fn kit_view(&self, first: usize, details_top: i32) -> Option<KitView<'_>> {
         let sample = self.kit_editor.sample?;
         let kit = self.kit()?;
         let samples = kit.samples.iter().map(|i| sample_file_name(&i.path)).collect();
@@ -308,6 +310,7 @@ impl Session {
             samples,
             users,
             selected: sample,
+            first,
             details_top,
             facts,
             envelope: analysis.map_or(&[][..], |a| &a.envelope),
@@ -480,9 +483,38 @@ mod tests {
     }
 
     #[test]
+    fn the_bar_and_the_wheel_scroll_a_long_table() {
+        let paths: Vec<String> = (0..40).map(|i| format!("real/s{i}.wav")).collect();
+        let samples: Vec<(&str, &str)> = paths.iter().map(|p| ("KICK", p.as_str())).collect();
+        let mut s = session_of(&samples);
+        s.toggle_kit_editor();
+        let layout = s.kit_layout(SIZE);
+        let shown = layout.shown();
+        assert!(40 > shown);
+        assert_eq!(s.kit_first(&layout), 0);
+        // The wheel moves the table, not the selection, and stops at the ends.
+        let bar = layout.scroll_bar();
+        let (x, y) = (bar.x - 40, bar.y + 5);
+        assert!(s.kit_wheel(SIZE, x, y, -3));
+        assert_eq!((s.kit_first(&layout), s.kit_list()), (3, Some((0, 40))));
+        assert!(s.kit_wheel(SIZE, x, y, -1000));
+        assert_eq!(s.kit_first(&layout), 40 - shown);
+        assert!(s.kit_wheel(SIZE, x, y, 1000));
+        assert_eq!(s.kit_first(&layout), 0);
+        // The bar held at its foot shows the last rows, at its head the first.
+        assert!(s.kit_bar_press(SIZE, bar.x + 1, bar.y + bar.h - 1));
+        assert_eq!(s.kit_first(&layout), 40 - shown);
+        assert!(s.kit_bar_to(SIZE, bar.y));
+        assert_eq!(s.kit_first(&layout), 0);
+        // A click beside the bar is the table's, one on the bar is not.
+        s.mouse_up();
+        assert!(!s.kit_bar_press(SIZE, x, y));
+    }
+
+    #[test]
     fn the_table_names_the_files_and_the_folder() {
         let s = session();
-        let view = s.kit_view(0).unwrap();
+        let view = s.kit_view(0, 0).unwrap();
         assert_eq!(view.samples, ["kick.wav", "x.wav"]);
         assert_eq!(view.folder, "real");
         assert_eq!(view.facts.iter().find(|(label, _)| *label == "File").unwrap().1, "real/kick.wav");

@@ -41,9 +41,7 @@ fn draw_list(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     }
     if total > shown {
         let bar = layout.scroll_bar(Axis::List);
-        canvas.fill_rect(bar.x, bar.y, bar.w, bar.h, cell_color());
-        let (start, len) = layout.thumb(Axis::List, first, shown, total);
-        canvas.fill_rect(bar.x + s.px(), start, bar.w - 2 * s, len, theme::muted());
+        scroll_thumb::draw(canvas, bar, layout.thumb(Axis::List, first, shown, total), s);
     }
 }
 

@@ -31,6 +31,7 @@ mod picker;
 mod sample_overlay;
 mod scale;
 mod scroll;
+mod scroll_thumb;
 mod session;
 mod song_view;
 mod spectrum;

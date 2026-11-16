@@ -103,6 +103,8 @@ mod session_zoom;
 
 #[path = "session_kit.rs"]
 mod session_kit;
+#[path = "session_kit_list.rs"]
+mod session_kit_list;
 #[cfg(test)]
 #[path = "session_library_file.rs"]
 mod session_library_file;

@@ -134,7 +134,7 @@ fn a_session_through_the_menus_draws_every_step() {
 
     // The kit editor names the tracks that play each sample.
     s.run(Command::KitEditor);
-    let users = s.kit_view(0).map(|k| k.users).unwrap_or_default();
+    let users = s.kit_view(0, 0).map(|k| k.users).unwrap_or_default();
     assert!(users.iter().any(|u| !u.is_empty()), "{users:?}");
     s.run(Command::KitEditor);
 

@@ -9,6 +9,7 @@
 //! [`SongLayout`] places everything; drawing and mouse hit-testing both use it.
 
 use crate::scale::Scale;
+use crate::scroll_thumb;
 use ordrumbox_core::{Pattern, Song};
 
 use crate::canvas::{Canvas, Rgb, fit, text_width};
@@ -291,26 +292,16 @@ impl SongLayout {
 
     /// Start and length of `axis`'s thumb: `shown` of `total` from `first`.
     fn thumb(&self, axis: Axis, first: usize, shown: usize, total: usize) -> (i32, i32) {
-        let (start, len) = self.track(axis);
-        let total = total.max(shown).max(1) as i64;
-        let thumb = ((i64::from(len) * shown as i64 / total) as i32).max(MIN_THUMB * self.scale).min(len);
-        let free = i64::from(len - thumb);
-        let room = (total - shown as i64).max(1);
-        (start + (free * first as i64 / room) as i32, thumb)
+        scroll_thumb::thumb(self.track(axis), first, shown, total, MIN_THUMB * self.scale)
     }
 
     /// The first measure or row that puts `axis`'s thumb centred on `(x, y)`.
     pub fn scroll_at(&self, axis: Axis, x: i32, y: i32, shown: usize, total: usize) -> usize {
-        let last = total.saturating_sub(shown);
-        let (start, len) = self.track(axis);
-        let (_, thumb) = self.thumb(axis, 0, shown, total);
         let pos = match axis {
             Axis::Measures => x,
             Axis::Rows | Axis::List => y,
         };
-        let free = i64::from((len - thumb).max(1));
-        let along = i64::from((pos - start - thumb / 2).clamp(0, len - thumb));
-        ((along * last as i64 + free / 2) / free) as usize
+        scroll_thumb::first_at(self.track(axis), pos, shown, total, MIN_THUMB * self.scale)
     }
 
     /// Patterns that fit down the list.

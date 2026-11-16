@@ -248,9 +248,12 @@ impl Ui {
             return if shift { s.roll_shift_press(size, x, y) } else { s.roll_click(size, x, y, Button::Left) };
         }
         let body = s.body(size);
-        if let Some((selected, count)) = s.kit_list() {
+        if let Some((_, count)) = s.kit_list() {
+            if s.kit_bar_press(size, x, y) {
+                return true;
+            }
             let layout = KitLayout::new(body.main_w, body.editor_h, size.2, s.status_lines());
-            let Some(hit) = layout.hit(selected, count, x, y) else { return false };
+            let Some(hit) = layout.hit(s.kit_first(&layout), count, x, y) else { return false };
             s.kit_click(hit);
             return true;
         }
@@ -343,7 +346,8 @@ impl Ui {
         let m = self.modifiers;
         let (fine, coarse) = (m.shift || m.alt, m.command());
         // What the pointer is over first; the view scrolls with what is left.
-        self.session.wheel(size, x, y, lines, fine, coarse)
+        self.session.kit_wheel(size, x, y, lines)
+            || self.session.wheel(size, x, y, lines, fine, coarse)
             || self.session.song_wheel(size, x, y, (columns, lines), m.shift)
             || self.session.roll_wheel(size, x, y, lines, m.shift)
             || self.scroll.wheel(&self.viewport(self.window), (columns, lines), self.display)

@@ -117,6 +117,45 @@ impl<'a> Canvas<'a> {
         pen
     }
 
+    /// One side of a waveform: `values` (0–1, `reach` pixels at 1) interpolated
+    /// to a column per pixel over `width`, growing from `baseline` upward
+    /// (`up`) or downward. The body fades from a bright core at the baseline
+    /// to the edge, and the outline is smoothed over its last pixel.
+    pub fn draw_profile(
+        &mut self,
+        (x, baseline, width): (i32, i32, i32),
+        reach: i32,
+        values: &[f64],
+        up: bool,
+        color: Rgb,
+    ) {
+        const CORE_OPACITY: f64 = 215.0;
+        const EDGE_OPACITY: f64 = 70.0;
+        let outline = crate::theme::mix(color, crate::theme::text(), 0.35);
+        let last = values.len().saturating_sub(1);
+        // The row `distance` pixels from the baseline.
+        let row = |distance: i32| if up { baseline - distance - 1 } else { baseline + distance };
+        for column in 0..width {
+            let position = if width > 1 { f64::from(column) / f64::from(width - 1) * last as f64 } else { 0.0 };
+            let below = (position.floor() as usize).min(last);
+            let above = (below + 1).min(last);
+            let fraction = position - below as f64;
+            let value = |i: usize| values.get(i).map_or(0.0, |v| v.clamp(0.0, 1.0));
+            let height = (value(below) * (1.0 - fraction) + value(above) * fraction) * f64::from(reach);
+            let whole = height.floor() as i32;
+            for distance in 0..whole {
+                let opacity =
+                    CORE_OPACITY + (EDGE_OPACITY - CORE_OPACITY) * f64::from(distance) / f64::from(reach.max(1));
+                self.blend(x + column, row(distance), color, opacity as u8);
+            }
+            if height > 0.0 {
+                let edge = ((height - f64::from(whole)) * 255.0) as u8;
+                self.blend(x + column, row(whole), color, edge.max(EDGE_OPACITY as u8));
+                self.blend(x + column, row(whole - 1), outline, 255);
+            }
+        }
+    }
+
     /// `color` over the pixel at `(x, y)` at `coverage` (0–255), if inside.
     fn blend(&mut self, x: i32, y: i32, color: Rgb, coverage: u8) {
         if coverage == 0 || !(0..self.width as i32).contains(&x) || !(0..self.height as i32).contains(&y) {

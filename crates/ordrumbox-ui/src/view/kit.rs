@@ -6,6 +6,7 @@ use crate::frame::{body_top, footer_top, margin};
 use crate::panel::{Rect, row_at};
 use crate::sample_overlay::Overlay;
 use crate::scale::Scale;
+use crate::scroll_thumb;
 use crate::theme;
 
 /// What the kit editor shows.
@@ -19,6 +20,8 @@ pub struct KitView<'a> {
     /// The pattern's tracks that play each sample, by name (empty: none).
     pub users: Vec<Vec<String>>,
     pub selected: usize,
+    /// The first sample of the table shown.
+    pub first: usize,
     /// Top of the sample's details, under its controls (selects and knobs).
     pub details_top: i32,
     /// The selected sample's measurements: label and value, always the same
@@ -81,6 +84,10 @@ pub(super) const KIT_LINE: i32 = 11;
 pub(super) const KIT_INSTRUMENT_W: i32 = 112;
 /// Width of a row's auto-assign button, per scale unit ("AUTO").
 pub(super) const KIT_AUTO_W: i32 = 40;
+/// Width of the table's scroll bar, per scale unit.
+pub(super) const KIT_BAR: i32 = 8;
+/// Shortest thumb of the table's scroll bar, per scale unit.
+pub(super) const KIT_MIN_THUMB: i32 = 12;
 /// The widest a sample name gets, in characters.
 pub(super) const KIT_NAME_CHARS: usize = 24;
 /// Labels of the measurements, in characters (their values after).
@@ -179,18 +186,51 @@ impl KitLayout {
         self.list_rows as usize
     }
 
-    /// First list row shown, so that `selected` is visible.
-    pub fn first(&self, selected: usize) -> usize {
-        selected.saturating_sub(self.shown().saturating_sub(1))
+    /// The largest first row of a list of `count` samples: the last ones at the bottom.
+    pub fn last_first(&self, count: usize) -> usize {
+        count.saturating_sub(self.shown())
     }
 
-    /// The sample of the list under `(x, y)`.
-    pub fn hit(&self, view_selected: usize, count: usize, x: i32, y: i32) -> Option<usize> {
-        let list = Rect::new(self.left, self.list_top, self.list_width, self.shown() as i32 * self.row);
+    /// The table's scroll bar, right of the rows.
+    pub fn scroll_bar(&self) -> Rect {
+        let w = KIT_BAR * self.scale;
+        Rect::new(self.left + self.list_width - w, self.list_top, w, self.shown() as i32 * self.row)
+    }
+
+    /// Start and length of the scroll bar's thumb: the `shown` rows of `count` from `first`.
+    pub fn thumb(&self, first: usize, count: usize) -> (i32, i32) {
+        scroll_thumb::thumb(self.bar_track(), first, self.shown(), count, KIT_MIN_THUMB * self.scale)
+    }
+
+    /// The first row that puts the thumb centred on height `y`.
+    pub fn first_at(&self, y: i32, count: usize) -> usize {
+        scroll_thumb::first_at(self.bar_track(), y, self.shown(), count, KIT_MIN_THUMB * self.scale)
+    }
+
+    fn bar_track(&self) -> (i32, i32) {
+        let bar = self.scroll_bar();
+        (bar.y, bar.h)
+    }
+
+    /// Whether `(x, y)` is over the table's rows, its bar included.
+    pub fn table_contains(&self, x: i32, y: i32) -> bool {
+        Rect::new(self.left, self.list_top, self.list_width, self.shown() as i32 * self.row).contains(x, y)
+    }
+
+    /// Right edge of the table's text: the scroll bar's left side when `count` samples need one.
+    pub fn text_right(&self, count: usize) -> i32 {
+        let right = self.left + self.list_width;
+        if count > self.shown() { right - (KIT_BAR + 4) * self.scale } else { right }
+    }
+
+    /// The sample of the list under `(x, y)`, the table shown from `first`.
+    pub fn hit(&self, first: usize, count: usize, x: i32, y: i32) -> Option<usize> {
+        let list =
+            Rect::new(self.left, self.list_top, self.text_right(count) - self.left, self.shown() as i32 * self.row);
         if !list.contains(x, y) {
             return None;
         }
-        let i = self.first(view_selected) + row_at(y, self.list_top, self.row)?;
+        let i = first + row_at(y, self.list_top, self.row)?;
         (i < count).then_some(i)
     }
 
@@ -251,7 +291,8 @@ pub(super) fn draw_kit(canvas: &mut Canvas, kit: &KitView, layout: &KitLayout) {
     if kit.samples.is_empty() {
         canvas.text(layout.name_x, layout.list_top + 3 * scale, "No samples in this kit", scale, theme::muted());
     }
-    let first = layout.first(kit.selected);
+    let first = kit.first;
+    let count = kit.samples.len();
     let name_w = layout.instrument_x - layout.name_x - 8 * scale;
     for (row, (i, name)) in kit.samples.iter().enumerate().skip(first).take(layout.shown()).enumerate() {
         let y = layout.list_top + row as i32 * layout.row;
@@ -266,7 +307,11 @@ pub(super) fn draw_kit(canvas: &mut Canvas, kit: &KitView, layout: &KitLayout) {
             Some(users) => (users.join(", "), theme::text()),
             None => ("-".to_owned(), theme::muted()),
         };
-        canvas.text(layout.users_x, text_y, &fitted(&users, right - layout.users_x), scale, color);
+        canvas.text(layout.users_x, text_y, &fitted(&users, layout.text_right(count) - layout.users_x), scale, color);
+    }
+
+    if count > layout.shown() {
+        scroll_thumb::draw(canvas, layout.scroll_bar(), layout.thumb(first, count), scale);
     }
 
     // The selected sample's measurements, right of its controls.
@@ -278,19 +323,13 @@ pub(super) fn draw_kit(canvas: &mut Canvas, kit: &KitView, layout: &KitLayout) {
         canvas.text(value_x, y, &fitted_end(value, right - value_x), scale, theme::text());
     }
 
-    // Envelope: one bar per point, the decay end as a line.
+    // Envelope: smoothed from the bottom, the decay end as a line.
     let Rect { x, y, w: width, h: height } = layout.envelope_rect(kit.details_top);
     if kit.envelope.is_empty() || width <= 0 || height <= 4 * scale {
         return;
     }
     canvas.fill_rect(x, y, width, height, cell_color());
-    let n = kit.envelope.len() as i32;
-    for (i, v) in kit.envelope.iter().enumerate() {
-        let bar_x = x + i as i32 * width / n;
-        let bar_w = ((i as i32 + 1) * width / n - i as i32 * width / n).max(1);
-        let bar_h = (v.clamp(0.0, 1.0) * f64::from(height)).round() as i32;
-        canvas.fill_rect(bar_x, y + height - bar_h, bar_w, bar_h, ENVELOPE);
-    }
+    canvas.draw_profile((x, y + height, width), height, kit.envelope, true, ENVELOPE);
     if let Some(overlay) = &kit.overlay {
         overlay.draw(canvas, (x, y, width, height), scale);
     }

@@ -227,6 +227,7 @@ fn kit_editor_draws_and_hits() {
             samples: samples.clone(),
             users: vec![vec!["KICK".into(), "CRASH".into()]],
             selected: 39,
+            first: 24,
             details_top: 200,
             facts: vec![("Pitch", "A4 0ct".into()); KIT_FACTS],
             envelope: &envelope,
