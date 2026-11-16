@@ -4,7 +4,7 @@
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_core::lfo;
 
-use super::{FM_DEVIATION, WAVES, lfo_scale, number, slope, text};
+use super::{EXTRA_METAS, FM_DEVIATION, WAVES, lfo_scale, number, slope, text};
 
 /// The LFOs playing (not bypassed): LFO1, LFO2.
 fn lfos(draft: &Object) -> [Option<&Object>; 2] {
@@ -81,8 +81,11 @@ pub fn scope(draft: &Object, time: f64, bpm: f64) -> Vec<f64> {
     let vco = |n: usize, key: &str, default: f64| number(draft, &format!("vco{n}.{key}")).unwrap_or(default);
     let waves: Vec<String> =
         (1..=3).map(|n| text(draft, &format!("vco{n}.wave")).unwrap_or("sine").to_owned()).collect();
-    let width: Vec<f64> = (1..=3).map(|n| vco(n, "width", 0.5)).collect();
     let modded = |path: &str| lfo_mod_on(draft, path, time, bpm);
+    let (width_min, width_max) = (EXTRA_METAS[0].min, EXTRA_METAS[0].max);
+    let width: Vec<f64> = (1..=3)
+        .map(|n| (vco(n, "width", 0.5) + modded(&format!("vco{n}.width"))).clamp(width_min, width_max))
+        .collect();
     let ratio: Vec<f64> = (1..=3)
         .map(|n| {
             let octave = vco(n, "octave", 0.0) + modded(&format!("vco{n}.octave"));

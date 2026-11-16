@@ -123,8 +123,10 @@ wrong sound or a wrong threshold.
 The synth has three chip controls, read from a preset when present and written only once set (like
 `filter.slope`): `vco1`..`vco3` `width` (the pulse width of a square wave, 0.5 the plain square) and, in
 `noise`, `mode` (`white`, `long`, `short`: the 15- and 7-bit shift registers of an 8-bit console) and `rate`
-(its clock, Hz). A preset without them plays as before, so no snapshot was rewritten. The factory presets
-`CHIP_*` use them; their names keep them out of the auto-assign, so no row of `assign_tests/data.rs` changed.
+(its clock, Hz). A preset without them plays as before: the audio snapshots are unchanged. The factory presets
+`CHIP_*` use them; `vco1`..`vco3` `width` and `noise.rate` are also LFO and matrix targets (`vcoN.width`, `noise.rate`,
+after the others in `LfoTarget::ALL`, so no code moved), which rewrote `synth_editor_rust.txt` (engine: more targets
+in the LFO lines; the audio renders are unchanged). Their names keep them out of the auto-assign, so no row of `assign_tests/data.rs` changed.
 
 The synth editor has a `matrix` group (`source1`..`source8`, `target1`..`target8`,
 `amount1`..`amount8`) in its defaults, so a hydrated preset holds it and the MOD tab has a
