@@ -1,10 +1,8 @@
 //! The TPT state-variable filter (12 dB/oct) of the channel strip and of the
 //! synth voice: one stage, its coefficients, and the output a mode takes.
 
+use crate::denormal::flush_finite;
 use crate::slope::FilterMode;
-
-/// A state below this is flushed to zero, against denormals.
-const FLUSH: f64 = 1e-15;
 
 /// How much of the lowpass, highpass and bandpass outputs `mode` lets
 /// through, for [`tap`].
@@ -71,21 +69,9 @@ impl Svf {
         let v2 = self.z2 + c.a2 * self.z1 + c.a3 * v3;
         self.z1 = 2.0 * v1 - self.z1;
         self.z2 = 2.0 * v2 - self.z2;
-        flush(&mut self.z1);
-        flush(&mut self.z2);
+        flush_finite(&mut self.z1);
+        flush_finite(&mut self.z2);
         [v2, x - c.k * v1 - v2, v1]
-    }
-}
-
-/// Zero a `state` that is tiny or not a number: a filter never stays stuck
-/// on a denormal, an infinity or a NaN.
-///
-/// A branch, not a selected value: it is almost never taken, and a select
-/// would sit on the filter's feedback path (measured: 2 ns a frame).
-#[inline]
-fn flush(state: &mut f64) {
-    if state.abs() < FLUSH || !state.is_finite() {
-        *state = 0.0;
     }
 }
 

@@ -8,7 +8,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::canvas::{Canvas, Rgb, text_width};
-use crate::panel::row_at;
+use crate::panel::{next_matching, row_at};
 use crate::theme;
 
 /// What the picked file is for.
@@ -283,13 +283,9 @@ impl Picker {
     /// A typed letter: the next entry whose name starts with it.
     pub fn jump(&mut self, letter: char) {
         let letter = letter.to_lowercase().next().unwrap_or(letter);
-        let n = self.entries.len();
-        for k in 1..=n {
-            let i = (self.selected + k) % n;
-            if self.entries[i].name().to_lowercase().starts_with(letter) {
-                self.selected = i;
-                return;
-            }
+        let starts = |i: usize| self.entries[i].name().to_lowercase().starts_with(letter);
+        if let Some(i) = next_matching(self.entries.len(), self.selected, starts) {
+            self.selected = i;
         }
     }
 

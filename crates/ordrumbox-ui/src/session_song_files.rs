@@ -81,19 +81,21 @@ impl Session {
 
     /// Save as: the song to `path`.
     pub(super) fn save_song_as(&mut self, path: &Path) {
-        let name = self.song_name();
-        self.message = match store::save_song(path, &self.song_record("savedAt")) {
-            Ok(()) => format!("Song \"{name}\" saved to {}", path.display()),
-            Err(e) => format!("Save failed: {}: {e}", path.display()),
-        };
+        self.write_song(path, "savedAt", ("saved", "Save failed"));
     }
 
     /// Export: the song to `path`.
     pub(super) fn export_song(&mut self, path: &Path) {
+        self.write_song(path, "exportedAt", ("exported", "not exported"));
+    }
+
+    /// The song to `path`, stamped under `stamp`; the message says it was
+    /// `done` or that `failure` happened.
+    fn write_song(&mut self, path: &Path, stamp: &str, (done, failure): (&str, &str)) {
         let name = self.song_name();
-        self.message = match store::save_song(path, &self.song_record("exportedAt")) {
-            Ok(()) => format!("Song \"{name}\" exported to {}", path.display()),
-            Err(e) => format!("not exported: {}: {e}", path.display()),
+        self.message = match store::save_song(path, &self.song_record(stamp)) {
+            Ok(()) => format!("Song \"{name}\" {done} to {}", path.display()),
+            Err(e) => format!("{failure}: {}: {e}", path.display()),
         };
     }
 

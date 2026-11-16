@@ -9,7 +9,7 @@
 use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 use std::sync::mpsc::Sender;
 
-use midir::{MidiInput, MidiInputConnection};
+use midir::{MidiIO, MidiInput, MidiInputConnection};
 use ordrumbox_engine::ClockMessage;
 use ordrumbox_ui::{MidiPort, Waker};
 
@@ -114,8 +114,12 @@ pub fn control(message: &[u8]) -> Option<Event> {
 
 /// The names of the MIDI input ports, for Edit > Preferences.
 pub fn ports() -> Vec<String> {
-    let Ok(input) = MidiInput::new("orDrumbox ports") else { return Vec::new() };
-    input.ports().iter().filter_map(|port| input.port_name(port).ok()).collect()
+    MidiInput::new("orDrumbox ports").map_or_else(|_| Vec::new(), |input| port_names(&input))
+}
+
+/// The names of the ports of `midi` (an input or an output).
+pub(crate) fn port_names(midi: &impl MidiIO) -> Vec<String> {
+    midi.ports().iter().filter_map(|port| midi.port_name(port).ok()).collect()
 }
 
 /// An open MIDI input; dropping it closes the port.

@@ -82,11 +82,17 @@ impl Session {
 
     /// The focused track locked or unlocked (the generation leaves a locked one as it is).
     pub fn toggle_lock(&mut self) {
-        let Some(t) = self.editor_track() else {
+        let track = self.editor_track();
+        self.toggle_track_flag(track, "composeLock");
+    }
+
+    /// Flip the flag `key` of `track`, or say that no track is selected.
+    fn toggle_track_flag(&mut self, track: Option<usize>, key: &str) {
+        let Some(t) = track else {
             self.message = "select a track first".into();
             return;
         };
-        if self.editor.toggle_track(self.pattern_index, t, "composeLock") {
+        if self.editor.toggle_track(self.pattern_index, t, key) {
             self.edited();
         }
     }
@@ -155,13 +161,8 @@ impl Session {
 
     /// Z: auto mode of the focused track (a new line every loop).
     pub fn toggle_auto(&mut self) {
-        let Some(t) = self.focus_track() else {
-            self.message = "select a track first".into();
-            return;
-        };
-        if self.editor.toggle_track(self.pattern_index, t, "autoMode") {
-            self.edited();
-        }
+        let track = self.focus_track();
+        self.toggle_track_flag(track, "autoMode");
     }
 
     /// X: random notes on the focused track.

@@ -5,9 +5,10 @@
 
 use std::f64::consts::{LN_10, PI};
 
+use crate::denormal::FLUSH;
+
 /// Decibels to a natural-log ratio.
 const LOG10_OVER_20: f64 = LN_10 / 20.0;
-const FLUSH: f64 = 1e-15;
 /// Level from which the output limit bends toward ±1.
 const LIMIT_KNEE: f64 = 0.9;
 

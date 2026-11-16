@@ -13,7 +13,7 @@ use super::{
 use crate::canvas::{Canvas, Rgb, chars_in, small_cell, small_char_width, text_width};
 use crate::frame::{body_top, content_top, footer_top, margin, status_line};
 use crate::output::OutputLayout;
-use crate::panel::Rect;
+use crate::panel::{Rect, stroke};
 use crate::piano_roll::RollLayout;
 use crate::scale::Scale;
 use crate::song_view::SongLayout;
@@ -44,7 +44,7 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: Scale) {
             continue;
         }
         canvas.fill_rect(group.x, group.y, group.w, group.h, theme::panel());
-        stroke(canvas, group.x, group.y, group.w, group.h, scale.px(), theme::line());
+        stroke(canvas, group, scale.px(), theme::line());
     }
     // Labels in a muted color: the values under them stand out.
     let label = |canvas: &mut Canvas, r: Rect, text: &str| {
@@ -65,15 +65,8 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: Scale) {
                 canvas.text(c.pattern.x, top, WAITING_LABEL, scale, color);
                 if on {
                     let r = c.pattern;
-                    stroke(
-                        canvas,
-                        r.x - scale.px(),
-                        r.y - scale.px(),
-                        r.w + 2 * scale,
-                        r.h + 2 * scale,
-                        scale.px(),
-                        PLAYING,
-                    );
+                    let outer = Rect::new(r.x - scale.px(), r.y - scale.px(), r.w + 2 * scale, r.h + 2 * scale);
+                    stroke(canvas, outer, scale.px(), PLAYING);
                 }
             }
             (None, _) => label(canvas, c.pattern, PATTERN_LABEL),
@@ -552,7 +545,7 @@ pub(super) fn draw_track_steps(canvas: &mut Canvas, track: &Track, index: usize,
     let outline = |canvas: &mut Canvas, step: i64, color: Rgb| {
         if (0..steps).contains(&step) {
             let (x, width) = cell(step);
-            stroke(canvas, x, y, width, height, (2 * layout.scale).max(1), color);
+            stroke(canvas, Rect::new(x, y, width, height), (2 * layout.scale).max(1), color);
         }
     };
     if let Some(c) = view.cursor.filter(|c| c.track == index) {
@@ -578,13 +571,5 @@ pub(super) fn draw_zone(canvas: &mut Canvas, zone: &Zone, layout: &Layout) {
     let top = layout.row_top(zone.first_track);
     let height = layout.row_top(last + 1) - top - layout.scale.px();
     canvas.shade_rect(left, top, right - left, height, ZONE, ZONE_OPACITY);
-    stroke(canvas, left, top, right - left, height, layout.scale.px(), ZONE);
-}
-
-/// Rectangle outline, `thickness` wide, inside `(x, y, width, height)`.
-pub(super) fn stroke(canvas: &mut Canvas, x: i32, y: i32, width: i32, height: i32, thickness: i32, color: Rgb) {
-    canvas.fill_rect(x, y, width, thickness, color);
-    canvas.fill_rect(x, y + height - thickness, width, thickness, color);
-    canvas.fill_rect(x, y, thickness, height, color);
-    canvas.fill_rect(x + width - thickness, y, thickness, height, color);
+    stroke(canvas, Rect::new(left, top, right - left, height), layout.scale.px(), ZONE);
 }

@@ -89,8 +89,7 @@ pub fn set_clock(on: bool) {
 
 /// The names of the MIDI output ports, for Edit > Preferences.
 pub fn ports() -> Vec<String> {
-    let Ok(output) = MidiOutput::new("orDrumbox ports") else { return Vec::new() };
-    output.ports().iter().filter_map(|port| output.port_name(port).ok()).collect()
+    MidiOutput::new("orDrumbox ports").map_or_else(|_| Vec::new(), |output| crate::midi::port_names(&output))
 }
 
 /// An open MIDI output; dropping it closes the port.
