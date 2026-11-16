@@ -293,3 +293,22 @@ fn toasts_stack_upwards_up_to_five_and_a_click_hides_one() {
     assert!(ui.session.toast_texts().is_empty());
     assert_eq!(ui.session.flash_until(), None);
 }
+
+#[test]
+fn a_toast_differing_only_by_a_number_goes_at_once() {
+    let library =
+        ordrumbox_core::Library::parse(r#"{"patterns":[{"name":"demo","tracks":[{"name":"KICK"}]}]}"#).unwrap().0;
+    let mut ui = standalone_ui(library);
+    let say = |ui: &mut Ui, text: &'static str| {
+        ui.input(|ui| {
+            ui.session.say(text);
+            false
+        })
+    };
+    say(&mut ui, "one");
+    say(&mut ui, "tempo 120");
+    say(&mut ui, "tempo 121.5");
+    assert_eq!(ui.session.toast_texts(), ["one", "tempo 121.5"]);
+    say(&mut ui, "tempo 121.5");
+    assert_eq!(ui.session.toast_texts(), ["one", "tempo 121.5", "tempo 121.5 (×2)"]);
+}
