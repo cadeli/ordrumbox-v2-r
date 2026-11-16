@@ -204,7 +204,7 @@ source = "git+https://github.com/RustAudio/baseview.git?rev=9a0b42c09d712777b2ed
 dependencies = [
  "cocoa",
  "core-foundation 0.9.4",
- "keyboard-types",
+ "keyboard-types 0.6.2",
  "nix",
  "objc",
  "raw-window-handle 0.5.2",
@@ -1093,6 +1093,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "keyboard-types"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0fbe853b403ae61a04233030ae8a79d94975281ed9770a1f9e246732b534b28d"
+dependencies = [
+ "bitflags 2.13.2",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.191"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1810,7 +1819,7 @@ name = "ordrumbox-plugin"
 version = "0.1.2"
 dependencies = [
  "baseview",
- "keyboard-types",
+ "keyboard-types 0.8.3",
  "nih_plug",
  "ordrumbox-core",
  "ordrumbox-engine",
