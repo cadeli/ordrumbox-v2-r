@@ -2,6 +2,7 @@
 //! start late, stray from the kit's level or from the note in their name.
 
 use crate::measure::{Measures, amplitude_db, median};
+use ordrumbox_engine::analysis::hz_to_midi_float;
 
 const NOTE_NAMES: [&str; 12] = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 pub const DC_LIMIT: f64 = 0.02;
@@ -33,7 +34,7 @@ pub fn declared_note(name: &str) -> Option<i32> {
 /// Cents from the pitch class of `midi` to `hz`, -600 to 600: the detector can
 /// land on another octave of the same note, which is no detuning.
 fn cents_from(midi: i32, hz: f64) -> f64 {
-    let semitones = 69.0 + 12.0 * (hz / 440.0).log2() - f64::from(midi);
+    let semitones = hz_to_midi_float(hz) - f64::from(midi);
     (semitones - (semitones / 12.0).round() * 12.0) * 100.0
 }
 

@@ -186,8 +186,8 @@ impl KitLayout {
 
     /// The sample of the list under `(x, y)`.
     pub fn hit(&self, view_selected: usize, count: usize, x: i32, y: i32) -> Option<usize> {
-        let list_bottom = self.list_top + self.shown() as i32 * self.row;
-        if y < self.list_top || y >= list_bottom || !(self.left..self.left + self.list_width).contains(&x) {
+        let list = Rect::new(self.left, self.list_top, self.list_width, self.shown() as i32 * self.row);
+        if !list.contains(x, y) {
             return None;
         }
         let i = self.first(view_selected) + row_at(y, self.list_top, self.row)?;

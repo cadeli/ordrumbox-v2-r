@@ -15,7 +15,7 @@ mod structure;
 use std::sync::OnceLock;
 
 use ordrumbox_core::json::{self, Object, Value};
-use ordrumbox_core::num::round2;
+use ordrumbox_core::num::{clamp, round2};
 use ordrumbox_core::{Note, Scales, Track};
 
 pub use auto::{
@@ -69,12 +69,6 @@ pub(crate) fn nums(value: &Value, key: &str) -> Option<Vec<f64>> {
 /// Item `i` of `items` taken cyclically, `None` for an empty list.
 pub(crate) fn cycle<T: Copy>(items: &[T], i: usize) -> Option<T> {
     if items.is_empty() { None } else { Some(items[i % items.len()]) }
-}
-
-/// `value` inside `min`–`max`, NaN kept; unlike [`f64::clamp`], `min > max`
-/// (bounds read from a table) gives `max` instead of a panic.
-pub(crate) fn clamp(value: f64, min: f64, max: f64) -> f64 {
-    if value.is_nan() { value } else { value.max(min).min(max) }
 }
 
 /// One item of `items` drawn with one call to `rnd`, none for an empty list.

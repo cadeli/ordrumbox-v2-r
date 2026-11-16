@@ -32,12 +32,18 @@ impl std::fmt::Display for NoteInfo {
     }
 }
 
+/// The (fractional) MIDI note of `hz`: A4 = 440 Hz = 69.
+#[must_use]
+pub fn hz_to_midi_float(hz: f64) -> f64 {
+    69.0 + 12.0 * (hz / 440.0).log2()
+}
+
 /// `hzToNote`.
 pub fn hz_to_note(hz: f64) -> Option<NoteInfo> {
     if !hz.is_finite() || hz <= 0.0 {
         return None;
     }
-    let midi_float = 69.0 + 12.0 * (hz / 440.0).log2();
+    let midi_float = hz_to_midi_float(hz);
     let midi = midi_float.round();
     let cents = ((midi_float - midi) * 100.0).round() as i32;
     let midi = midi as i32;

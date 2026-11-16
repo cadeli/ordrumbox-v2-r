@@ -11,6 +11,13 @@ pub fn round_to(x: f64, decimals: i32) -> f64 {
     if rounded == 0.0 { 0.0 } else { rounded }
 }
 
+/// `x` inside `min`–`max`, NaN kept. Unlike [`f64::clamp`], `min > max` (bounds
+/// read from a table or a file) gives `max` instead of a panic.
+#[must_use]
+pub fn clamp(x: f64, min: f64, max: f64) -> f64 {
+    if x.is_nan() { x } else { x.max(min).min(max) }
+}
+
 /// `x` to 2 decimals: the precision of velocities, probabilities and the
 /// other settings saved rounded.
 pub fn round2(x: f64) -> f64 {

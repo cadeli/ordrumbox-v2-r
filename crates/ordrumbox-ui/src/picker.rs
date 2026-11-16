@@ -8,7 +8,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::canvas::{Canvas, Rgb, text_width};
-use crate::panel::{next_matching, row_at};
+use crate::panel::{Rect, next_matching, row_at};
 use crate::theme;
 
 /// What the picked file is for.
@@ -322,10 +322,7 @@ const WARNING: Rgb = theme::ALERT;
 /// Where the picker's list is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PickerLayout {
-    x: i32,
-    y: i32,
-    width: i32,
-    height: i32,
+    panel: Rect,
     list_top: i32,
     row: i32,
     rows: usize,
@@ -340,7 +337,7 @@ impl PickerLayout {
         let row = 12 * scale;
         let list_top = y + 36 * scale;
         let rows = usize::try_from((y + h - 20 * scale - list_top) / row).unwrap_or(0).max(1);
-        Self { x, y, width: w, height: h, list_top, row, rows, scale }
+        Self { panel: Rect::new(x, y, w, h), list_top, row, rows, scale }
     }
 
     /// First entry shown so that `selected` is visible.
@@ -350,7 +347,7 @@ impl PickerLayout {
 
     /// The entry under `(x, y)`.
     pub fn hit(&self, picker: &Picker, x: i32, y: i32) -> Option<usize> {
-        if x < self.x || x >= self.x + self.width || y < self.list_top {
+        if y < self.list_top || x < self.panel.x || x >= self.panel.x + self.panel.w {
             return None;
         }
         let row = row_at(y, self.list_top, self.row)?;
@@ -360,24 +357,36 @@ impl PickerLayout {
 
     /// Inside the panel.
     pub fn contains(&self, x: i32, y: i32) -> bool {
-        (self.x..self.x + self.width).contains(&x) && (self.y..self.y + self.height).contains(&y)
+        self.panel.contains(x, y)
     }
 }
 
 pub fn draw(canvas: &mut Canvas, picker: &Picker, layout: &PickerLayout) {
     let s = layout.scale;
-    canvas.fill_rect(layout.x - 4 * s, layout.y - 4 * s, layout.width + 8 * s, layout.height + 8 * s, shade_color());
-    canvas.fill_rect(layout.x, layout.y, layout.width, layout.height, border_color());
-    canvas.fill_rect(layout.x + s.px(), layout.y + s.px(), layout.width - 2 * s, layout.height - 2 * s, panel_color());
-    let x = layout.x + 10 * s;
-    canvas.text(x, layout.y + 8 * s, picker.purpose.title(), s, ACCENT);
+    canvas.fill_rect(
+        layout.panel.x - 4 * s,
+        layout.panel.y - 4 * s,
+        layout.panel.w + 8 * s,
+        layout.panel.h + 8 * s,
+        shade_color(),
+    );
+    canvas.fill_rect(layout.panel.x, layout.panel.y, layout.panel.w, layout.panel.h, border_color());
+    canvas.fill_rect(
+        layout.panel.x + s.px(),
+        layout.panel.y + s.px(),
+        layout.panel.w - 2 * s,
+        layout.panel.h - 2 * s,
+        panel_color(),
+    );
+    let x = layout.panel.x + 10 * s;
+    canvas.text(x, layout.panel.y + 8 * s, picker.purpose.title(), s, ACCENT);
     let place = picker.dir.as_ref().map_or_else(|| "Drives".to_owned(), |d| d.display().to_string());
     // Keep the end of a long path visible.
-    let room = ((layout.width - 20 * s) / text_width("W", s)).max(4) as usize;
+    let room = ((layout.panel.w - 20 * s) / text_width("W", s)).max(4) as usize;
     let count = place.chars().count();
     let place =
         if count > room { format!("...{}", place.chars().skip(count - room + 3).collect::<String>()) } else { place };
-    canvas.text(x, layout.y + 20 * s, &place, s, theme::muted());
+    canvas.text(x, layout.panel.y + 20 * s, &place, s, theme::muted());
     if let Some(error) = &picker.error {
         canvas.text(x, layout.list_top, error, s, WARNING);
     } else if picker.entries.is_empty() {
@@ -388,7 +397,7 @@ pub fn draw(canvas: &mut Canvas, picker: &Picker, layout: &PickerLayout) {
         let y = layout.list_top + row as i32 * layout.row;
         let selected = i == picker.selected;
         if selected {
-            canvas.fill_rect(layout.x + 4 * s, y - 2 * s, layout.width - 8 * s, layout.row, highlight_color());
+            canvas.fill_rect(layout.panel.x + 4 * s, y - 2 * s, layout.panel.w - 8 * s, layout.row, highlight_color());
         }
         let color = match entry {
             _ if selected => ACCENT,
@@ -398,7 +407,7 @@ pub fn draw(canvas: &mut Canvas, picker: &Picker, layout: &PickerLayout) {
         canvas.text(x, y, &entry.label(), s, color);
     }
     let hint = "ENTER or click again: open / choose   BACKSPACE: up   a letter: jump   ESC: cancel";
-    canvas.text(x, layout.y + layout.height - 14 * s, hint, s, theme::muted());
+    canvas.text(x, layout.panel.y + layout.panel.h - 14 * s, hint, s, theme::muted());
 }
 
 #[cfg(test)]
@@ -439,7 +448,7 @@ mod tests {
         let layout = PickerLayout::new(800, 600, Scale::ONE);
         let mut pixels = vec![0; 800 * 600];
         draw(&mut Canvas::new(&mut pixels, 800, 600), &picker, &layout);
-        assert_eq!(layout.hit(&picker, layout.x + 20, layout.list_top + 1), Some(0));
+        assert_eq!(layout.hit(&picker, layout.panel.x + 20, layout.list_top + 1), Some(0));
         fs::remove_dir_all(dir).unwrap();
     }
 }

@@ -2,6 +2,7 @@
 //! which way it reads, whether it loops, and the level curve (attack, hold,
 //! decay) the voice follows. Shared by the kit editor and the track editor.
 
+use ordrumbox_core::steps::semitone_ratio;
 use ordrumbox_engine::kit::KitSample;
 
 use crate::canvas::Canvas;
@@ -72,7 +73,7 @@ impl Overlay {
         if shape.duration_ms <= 0.0 {
             return None;
         }
-        let speed = (shape.transpose / 12.0).exp2();
+        let speed = semitone_ratio(shape.transpose);
         let fraction = |ms: f64| (ms / shape.duration_ms).clamp(0.0, 1.0);
         let length = |ms: f64| ms * speed / shape.duration_ms;
         let start = fraction(shape.start_ms);

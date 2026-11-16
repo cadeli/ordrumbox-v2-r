@@ -5,7 +5,7 @@
 //! Built on the UI side (it allocates); the audio thread only reads it.
 
 use ordrumbox_core::song::clamp_bpm;
-use ordrumbox_core::steps::TICK;
+use ordrumbox_core::steps::{TICK, semitone_ratio};
 use std::collections::HashMap;
 
 use ordrumbox_core::{Hit, Hits, Note, Pattern, Rng, Scales, Song, Track, expand_hits, lfo};
@@ -146,7 +146,7 @@ fn root_key(assigned: Option<&TrackSound>, bank: &SampleBank) -> f64 {
 
 /// The pitch ratio the track's transpose LFO gives at transport tick `lfo_tick`: 1 without one.
 fn pitch_lfo_ratio(track: &Track, lfo_tick: u64) -> f64 {
-    track.transpose_lfo.as_ref().map_or(1.0, |l| (lfo::value(l, lfo_tick as f64) / 12.0).exp2())
+    track.transpose_lfo.as_ref().map_or(1.0, |l| semitone_ratio(lfo::value(l, lfo_tick as f64)))
 }
 
 /// The MIDI note `note` of `track` sends at transport tick `lfo_tick`, to
@@ -311,7 +311,7 @@ fn sound_for(
     let bank_sample = context.bank.get(sample)?;
     // The sample's tune and gain trim (`sample.tune`, `sample.gainDb`).
     let ratio =
-        note.playback_ratio(track) * (bank_sample.sample.transpose / 12.0).exp2() * pitch_lfo_ratio(track, lfo_tick);
+        note.playback_ratio(track) * semitone_ratio(bank_sample.sample.transpose) * pitch_lfo_ratio(track, lfo_tick);
     Some(Sound::Sample(VoiceStart {
         sample,
         track: strip,
