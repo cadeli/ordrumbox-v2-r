@@ -6,7 +6,6 @@ use crate::scale::Scale;
 use ordrumbox_core::song::measures_for_pattern;
 
 use super::Session;
-use super::session_panel::DOUBLE_CLICK;
 use super::session_song::{DRAG_START_PX, DragSource, SongDrag};
 use super::session_song_menu::clip_label;
 use super::session_types::Workspace;
@@ -15,7 +14,6 @@ use crate::panel::{Dropdown, Id, Rect};
 use crate::song_view::{Axis, Row, SongGhost, SongHit, SongLayout};
 use crate::ui_input::Button;
 use crate::view;
-use std::time::Instant;
 
 impl Session {
     /// A click on the song panel's list or arrangement; whether it was theirs.
@@ -25,17 +23,8 @@ impl Session {
         let Some(hit) = layout.hit(&self.song_view_data(&rows, &layout), x, y) else { return false };
         match (hit, button) {
             (SongHit::Pattern(p), Button::Left) => {
-                let id = Id::SongPattern(p);
-                let now = Instant::now();
-                let double =
-                    self.chrome.widgets.last_click.is_some_and(|(last, at)| last == id && now - at < DOUBLE_CLICK);
-                self.chrome.widgets.last_click = if double { None } else { Some((id, now)) };
-                if double {
-                    self.add_at_playhead(p);
-                } else {
-                    self.step_pattern(p as isize - self.pattern_index as isize);
-                    self.press_song_drag(DragSource::Pattern(p), x, y);
-                }
+                self.step_pattern(p as isize - self.pattern_index as isize);
+                self.press_song_drag(DragSource::Pattern(p), x, y);
             }
             (SongHit::Clip(clip), Button::Left) => {
                 let first = self.song_scroll(&layout, rows.len()).0;
@@ -50,12 +39,9 @@ impl Session {
                 self.song_panel.bar_drag = Some(axis);
                 self.song_bar_to(size, axis, x, y);
             }
-            (SongHit::Pattern(p), Button::Right) => self.list_menu(p, x, y),
             (SongHit::Description, Button::Left) => self.text_entry(Id::PatternDescription),
             (SongHit::Ruler(m), Button::Left) => self.set_song_cursor(m),
-            (SongHit::Clip(c), Button::Right) => self.clip_menu(c, x, y),
-            (SongHit::RowName(r), Button::Right) => self.row_menu(&rows, r, x, y),
-            (SongHit::Cell { row, measure }, Button::Right) => {
+            (SongHit::Cell { row, measure }, Button::Left) => {
                 let row = &rows[row];
                 let title = format!("Add \"{}\" at measure {}", row.name, measure + 1);
                 self.chrome.widgets.dropdown = Some(Dropdown::menu(
@@ -174,8 +160,21 @@ impl Session {
         drag.started
     }
 
-    /// The press released: a drag places or moves its clip; whether it was one.
+    /// The press released: a drag places or moves its clip, a click without a drag opens its menu; whether it was one.
     pub fn song_release(&mut self, size: (i32, i32, Scale)) -> bool {
+        // A press without a drag opens the menu of what was pressed.
+        if let Some(SongDrag { source, started: false, press: (x, y), .. }) = self.song_panel.drag {
+            self.song_panel.drag = None;
+            match source {
+                DragSource::Pattern(p) => self.list_menu(p, x, y),
+                DragSource::Clip { clip, .. } => self.clip_menu(clip, x, y),
+                DragSource::Row(r) => {
+                    let rows = self.song_rows();
+                    self.row_menu(&rows, r, x, y);
+                }
+            }
+            return true;
+        }
         let layout = self.song_layout(size);
         let rows = self.song_rows();
         let at = self.song_drag_at(&layout, rows.len());
@@ -393,10 +392,12 @@ mod tests {
         let row_y = |r: i32| l.grid.y + 14 + 18 + r * 22 + 11;
         let list = (l.list.x + 2, l.list.y + 2);
 
-        // A press and release that hardly moves is a click.
+        // A press and release that hardly moves is a click: it opens the pattern's menu.
         assert!(s.song_click(SIZE, list.0, list.1, Button::Left));
         s.mouse_move(SIZE, list.0 + 1, list.1, false);
-        assert!(!s.song_release(SIZE));
+        assert!(s.song_release(SIZE));
+        assert!(s.chrome.widgets.dropdown.is_some());
+        s.chrome.widgets.dropdown = None;
         assert_eq!(clips(&s).len(), 1);
 
         // Pattern a, not in the arrangement yet, dropped past its end.

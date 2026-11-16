@@ -1,12 +1,11 @@
 //! The session's side of the song panel (`song_panel.js` and its sections):
-//! the pattern list (a click selects, a double-click adds the pattern at the
-//! playhead, a right-click opens its menu: add at the playhead, move up or
+//! the pattern list (a click selects it and opens its menu: add at the playhead, move up or
 //! down, rename, delete; a drag drops it on the arrangement, the wheel or its
 //! scroll bar scrolls it; a drag moves it along the list, or drops it on the
 //! arrangement at the measure under the pointer), the
 //! arrangement (a click on the ruler aims the cursor, where play starts; a
 //! clip dragged sideways moves; a row dragged by its name moves up or down;
-//! the right-click menus of clips, row names and the bare grid), the selected pattern's description (a click edits it, the
+//! a click on a clip, a row name or the bare grid opens its menu), the selected pattern's description (a click edits it, the
 //! wheel scrolls it), the song's column (name, date, description, the
 //! arrangement select, Save, Load, Export, Import, and New and Delete for
 //! arrangements) — and Space plays the song while the panel is shown.
@@ -525,7 +524,8 @@ pub(super) mod tests {
         // Rename, in the menu of a pattern of the list.
         let l = s.song_layout(SIZE);
         let row = (l.list.x + 2, l.list.y + 12 + 2);
-        s.song_click(SIZE, row.0, row.1, Button::Right);
+        s.song_click(SIZE, row.0, row.1, Button::Left);
+        s.song_release(SIZE);
         let rename = menu(&s).iter().position(|v| v == "rename:1").unwrap();
         choose(&mut s, rename);
         assert_eq!(s.chrome.widgets.entry.as_ref().map(|e| (e.id, e.text.as_str())), Some((Id::SongPattern(1), "b")));
