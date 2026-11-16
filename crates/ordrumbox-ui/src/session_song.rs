@@ -274,22 +274,6 @@ impl Session {
         layout.items.push(Item::new(Some(Id::SongDescription), rect, Kind::Text { text, color }));
         y += line + 4 * s;
 
-        // The arrangement, under its label.
-        layout.items.push(Item::text(x, y, "Arrangement", panel::dim(), s));
-        y += 12 * s;
-        let select = Rect::new(x, y, area.w, 12 * s);
-        let songs = &self.editor.library().songs;
-        if songs.is_empty() {
-            let text = Kind::Text { text: "No arrangement".into(), color: panel::dim() };
-            layout.items.push(Item::new(None, select, text));
-        } else {
-            let labels = songs.iter().map(|s| s.name.clone()).collect();
-            let values = (0..songs.len()).map(|i| i.to_string()).collect();
-            let selected = self.editor.selected_song().min(songs.len() - 1);
-            layout.items.push(Item::new(Some(Id::SongList), select, Kind::Select { values, labels, selected }));
-        }
-        y += line + 8 * s;
-
         let gap = 4 * s;
         let w = (area.w - 2 * gap) / 3;
         for (i, (id, label)) in BUTTONS.iter().enumerate() {
@@ -301,6 +285,20 @@ impl Session {
                 Kind::Button { label: (*label).into(), on: false },
             ));
         }
+    }
+
+    /// The arrangement select in `rect`, in the header (or a text when there is none).
+    pub(super) fn arrangement_select(&self, layout: &mut PanelLayout, rect: Rect) {
+        let songs = &self.editor.library().songs;
+        if songs.is_empty() {
+            let text = Kind::Text { text: "No arrangement".into(), color: panel::dim() };
+            layout.items.push(Item::new(None, rect, text));
+            return;
+        }
+        let labels = songs.iter().map(|s| s.name.clone()).collect();
+        let values = (0..songs.len()).map(|i| i.to_string()).collect();
+        let selected = self.editor.selected_song().min(songs.len() - 1);
+        layout.items.push(Item::new(Some(Id::SongList), rect, Kind::Select { values, labels, selected }));
     }
 
     /// A column button pressed.

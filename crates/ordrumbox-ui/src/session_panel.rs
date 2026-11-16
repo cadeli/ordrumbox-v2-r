@@ -140,7 +140,9 @@ impl Session {
     fn header_selects(&self, layout: &mut PanelLayout, scale: Scale) {
         let c = self.header_controls(scale);
         let library = self.editor.library();
-        if !library.patterns.is_empty() {
+        if self.workspace == Workspace::Song {
+            self.arrangement_select(layout, c.arrangement());
+        } else if !library.patterns.is_empty() {
             let labels = library
                 .patterns
                 .iter()
@@ -272,6 +274,10 @@ impl Session {
             let text = num::text(bpm);
             let kind = Kind::Value { spec, value: bpm, label: None, text, lfo: false };
             layout.items.push(Item::new(Some(Id::Bpm), controls.bpm, kind));
+        }
+        // The song mode has no pattern settings nor generation: the arrangement list is in their place.
+        if self.workspace == Workspace::Song {
+            return;
         }
         let beats: Vec<String> = (1..=ordrumbox_logic::editor::MAX_BEATS).map(|b| b.to_string()).collect();
         let selected = usize::try_from(pattern.beat_count - 1).unwrap_or(0).min(beats.len() - 1);

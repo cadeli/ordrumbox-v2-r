@@ -4,8 +4,8 @@ use super::grid::draw_grid;
 use super::kit::{KitLayout, draw_kit};
 use super::layout::{Body, HeaderControls, HostState, Layout, MACROS, Transport, header_controls, header_text};
 use super::{
-    ACCENT, HELP, KIT_HELP, LOGO, PATTERN_LABEL, PLAYING, ROLL_HELP, SONG_HELP, SYNTH_HELP, View, WAITING_LABEL,
-    WARNING, background_color,
+    ACCENT, ARRANGEMENT_LABEL, HELP, KIT_HELP, LOGO, PATTERN_LABEL, PLAYING, ROLL_HELP, SONG_HELP, SYNTH_HELP, View,
+    WAITING_LABEL, WARNING, background_color,
 };
 use crate::canvas::{Canvas, chars_in};
 use crate::frame::{body_top, content_top, footer_top, margin, status_line};
@@ -72,9 +72,13 @@ fn draw_header(canvas: &mut Canvas, view: &View, scale: Scale) {
     };
     // The groups' frames, behind their widgets (panel items, drawn later).
     // The generation's only with a pattern: it has nothing to show without.
+    let song = view.arrangement.is_some();
     for (i, group) in c.groups(scale).into_iter().enumerate() {
-        // The mode switch is the app's: a plugin has no song.
-        if (view.pattern.is_none() && i != 4) || (i == 0 && matches!(view.transport, Transport::Host(_))) {
+        // The mode switch is the app's: a plugin has no song. The song mode has no generation.
+        if (view.pattern.is_none() && i != 4)
+            || (i == 0 && matches!(view.transport, Transport::Host(_)))
+            || (i == 3 && song)
+        {
             continue;
         }
         canvas.fill_rect(group.x, group.y, group.w, group.h, theme::panel());
@@ -103,6 +107,12 @@ fn draw_header_labels(canvas: &mut Canvas, view: &View, c: &HeaderControls, top:
     if let Transport::Host(host) = view.transport {
         label(canvas, c.play, "HOST");
         draw_host_state(canvas, c, host, scale);
+    }
+    if view.arrangement.is_some() {
+        label(canvas, c.pattern, ARRANGEMENT_LABEL);
+        label(canvas, c.kit, "KIT");
+        label(canvas, c.views[0], "VIEW");
+        return;
     }
     match view.waiting {
         Some(on) => {

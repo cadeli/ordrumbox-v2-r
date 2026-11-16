@@ -45,6 +45,7 @@ const AUTO: Rgb = theme::CHANCE;
 const WAITING_LABEL: &str = "NEXT";
 /// The label above the pattern list.
 const PATTERN_LABEL: &str = "PATTERN";
+const ARRANGEMENT_LABEL: &str = "ARRANGEMENT";
 const WARNING: Rgb = theme::ALERT;
 const PLAYHEAD: Rgb = theme::LIVE;
 const LOOP_MARK: Rgb = theme::VALUE;

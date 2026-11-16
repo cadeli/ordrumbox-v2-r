@@ -231,6 +231,13 @@ impl HeaderControls {
         self
     }
 
+    /// The arrangement list of the song mode, in the place of the pattern
+    /// list and the beats.
+    #[must_use]
+    pub fn arrangement(&self) -> Rect {
+        Rect::new(self.pattern.x, self.pattern.y, self.beats.x + self.beats.w - self.pattern.x, self.pattern.h)
+    }
+
     /// The frames of the header's groups: mode (pattern or song), transport
     /// (play, tempo), pattern (pattern, beats, kit), generation (style, ⟳,
     /// AUTO, macros) and views. Each covers its controls and their labels
