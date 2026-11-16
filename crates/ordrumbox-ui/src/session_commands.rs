@@ -1,5 +1,6 @@
 //! The menu bar: what each menu shows (checked, greyed out) and what each
 //! command runs.
+// audit: allow(function size): `run` is a flat `match`, a line a command, which the compiler checks is complete.
 
 use super::Session;
 use super::session_confirm::Pending;

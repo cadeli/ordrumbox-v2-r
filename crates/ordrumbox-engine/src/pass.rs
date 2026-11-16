@@ -156,6 +156,25 @@ fn midi_note(target: Option<Target>, note: &Hit, track: &Track, lfo_tick: u64) -
     Some(target?.note(note.pitch + track.transpose + lfo))
 }
 
+/// The frame of `note` at pass tick `tick`, its swing included: a note swung
+/// past the end still plays, on the last of the pass's `frames`.
+fn note_frame(tick: u32, note: &Hit, track: &Track, swing: f64, per_tick: f64, frames: u64) -> u64 {
+    (((f64::from(tick) + swing_ticks(note, track, swing)) * per_tick).round() as u64).min(frames - 1)
+}
+
+/// The event that plays `sound` for `note` on `frame`, with its MIDI note.
+fn event_for(frame: u64, sound: Sound, note: &Hit, track: &Track, midi: Option<MidiNote>, per_tick: f64) -> Event {
+    Event {
+        frame,
+        sound,
+        mono: track.mono,
+        velocity: note.velocity as f32,
+        note: midi,
+        note_frames: note_frames(note, track, per_tick),
+        lock: hit_lock(note, track),
+    }
+}
+
 /// Whether track `t` of `pattern` is silent: muted, or silenced by another
 /// track's solo (`shouldTrackPlay()`).
 fn is_silent(pattern: &Pattern, t: usize) -> bool {
@@ -197,23 +216,13 @@ pub fn build_pass(pattern: &Pattern, number: u64, rng: &mut Rng, context: PassCo
                 continue;
             }
             let track = &pattern.tracks[note.track];
-            // A note swung past the end still plays, on the last frame.
-            let frame = (((f64::from(tick) + swing_ticks(note, track, context.swing)) * per_tick).round() as u64)
-                .min(frames - 1);
+            let frame = note_frame(tick, note, track, context.swing, per_tick, frames);
             let lfo_tick = context.first_tick + u64::from(tick);
             let Some(assigned) = context.sounds.get(note.track) else { continue };
             let voice = Voice { strip: note.track, lfo_tick, bpm };
             if let Some(sound) = sound_for(pattern, note, assigned, voice, &context, &mut patches) {
                 let midi = midi_note(targets.get(note.track).copied().flatten(), note, track, lfo_tick);
-                events.push(Event {
-                    frame,
-                    sound,
-                    mono: track.mono,
-                    velocity: note.velocity as f32,
-                    note: midi,
-                    note_frames: note_frames(note, track, per_tick),
-                    lock: hit_lock(note, track),
-                });
+                events.push(event_for(frame, sound, note, track, midi, per_tick));
             }
         }
     }
@@ -469,15 +478,11 @@ pub fn build_song_pass_at(
     let frames = (f64::from(ticks) * per_tick).round().max(1.0) as u64;
     let first_tick = measure * u64::from(ticks);
     let strips = song_strips(song, context.patterns);
-    let strip_of = |p: usize, t: usize| {
-        let name = &context.patterns[p].tracks[t].name;
-        strips.iter().position(|&(sp, st)| context.patterns[sp].tracks[st].name == *name)
-    };
-    let silent = |p: usize, t: usize| is_silent(&context.patterns[p], t);
     let targets = track_targets(strips.iter().map(|&(p, t)| {
         let sounds = context.sounds.get(p).map_or(&[][..], Vec::as_slice);
         (context.patterns[p].tracks[t].name.as_str(), root_key(sounds.get(t), context.bank))
     }));
+    let shared = SongPassParts { context, strips: &strips, targets: &targets, per_tick, frames, first_tick, bpm };
 
     let mut events = Vec::new();
     let mut patches = Vec::new();
@@ -490,38 +495,7 @@ pub fn build_song_pass_at(
                 expand_hits(pattern, u32::try_from(source.loop_index).unwrap_or(u32::MAX), rng, context.scales)
             });
             let Some(notes) = u32::try_from(source.local_tick).ok().and_then(|s| flat.get(&s)) else { continue };
-            let sounds = context.sounds.get(p).map_or(&[][..], Vec::as_slice);
-            let pass_context = PassContext {
-                bank: context.bank,
-                sounds,
-                scales: context.scales,
-                synths: context.synths,
-                sample_rate: context.sample_rate,
-                first_tick,
-                swing: context.swing,
-            };
-            for note in notes {
-                if silent(p, note.track) {
-                    continue;
-                }
-                let (Some(strip), Some(assigned)) = (strip_of(p, note.track), sounds.get(note.track)) else { continue };
-                let track = &pattern.tracks[note.track];
-                let frame = (((f64::from(t) + swing_ticks(note, track, context.swing)) * per_tick).round() as u64)
-                    .min(frames - 1);
-                let voice = Voice { strip, lfo_tick: tick, bpm };
-                if let Some(sound) = sound_for(pattern, note, assigned, voice, &pass_context, &mut patches) {
-                    let midi = midi_note(targets.get(strip).copied().flatten(), note, track, tick);
-                    events.push(Event {
-                        frame,
-                        sound,
-                        mono: track.mono,
-                        velocity: note.velocity as f32,
-                        note: midi,
-                        note_frames: note_frames(note, track, per_tick),
-                        lock: hit_lock(note, track),
-                    });
-                }
-            }
+            shared.push_events(p, notes, t, &mut events, &mut patches);
         }
     }
     events.sort_by_key(|e| e.frame);
@@ -532,6 +506,7 @@ pub fn build_song_pass_at(
             .any(|s| s.pattern == p && s.loop_index <= loop_index)
     });
 
+    let silent = |p: usize, t: usize| is_silent(&context.patterns[p], t);
     let strip_settings_of = |&(p, t): &(usize, usize)| {
         let mut settings = strip_settings(&context.patterns[p].tracks[t], bpm);
         if silent(p, t) {
@@ -554,6 +529,59 @@ pub fn build_song_pass_at(
         keys: key_strips(strips.iter().map(|&(p, t)| &context.patterns[p].tracks[t])),
         lfos,
         patches,
+    }
+}
+
+/// What the notes of a song pass share: the context, the strips (a pattern
+/// and a track each), their MIDI targets, and the pass's timing.
+struct SongPassParts<'a> {
+    context: SongContext<'a>,
+    strips: &'a [(usize, usize)],
+    targets: &'a [Option<Target>],
+    per_tick: f64,
+    frames: u64,
+    first_tick: u64,
+    bpm: f64,
+}
+
+impl SongPassParts<'_> {
+    /// The strip that track `t` of pattern `p` plays on: the first one with its name.
+    fn strip_of(&self, p: usize, t: usize) -> Option<usize> {
+        let name = &self.context.patterns[p].tracks[t].name;
+        self.strips.iter().position(|&(sp, st)| self.context.patterns[sp].tracks[st].name == *name)
+    }
+
+    /// The events of `notes`, which pattern `p` plays on tick `t` of the
+    /// pass, and the synth patches they need.
+    fn push_events(&self, p: usize, notes: &[Hit], t: u32, events: &mut Vec<Event>, patches: &mut Vec<SynthPatch>) {
+        let context = &self.context;
+        let pattern = &context.patterns[p];
+        let sounds = context.sounds.get(p).map_or(&[][..], Vec::as_slice);
+        let pass_context = PassContext {
+            bank: context.bank,
+            sounds,
+            scales: context.scales,
+            synths: context.synths,
+            sample_rate: context.sample_rate,
+            first_tick: self.first_tick,
+            swing: context.swing,
+        };
+        let tick = self.first_tick + u64::from(t);
+        for note in notes {
+            if is_silent(pattern, note.track) {
+                continue;
+            }
+            let (Some(strip), Some(assigned)) = (self.strip_of(p, note.track), sounds.get(note.track)) else {
+                continue;
+            };
+            let track = &pattern.tracks[note.track];
+            let frame = note_frame(t, note, track, context.swing, self.per_tick, self.frames);
+            let voice = Voice { strip, lfo_tick: tick, bpm: self.bpm };
+            if let Some(sound) = sound_for(pattern, note, assigned, voice, &pass_context, patches) {
+                let midi = midi_note(self.targets.get(strip).copied().flatten(), note, track, tick);
+                events.push(event_for(frame, sound, note, track, midi, self.per_tick));
+            }
+        }
     }
 }
 

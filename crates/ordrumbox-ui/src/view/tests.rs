@@ -1,3 +1,4 @@
+use super::grid::draw_note_cell;
 use super::*;
 use crate::canvas::{Canvas, text_width};
 use crate::frame::{body_top, footer_top, margin, status_line};

@@ -1,6 +1,7 @@
 //! What a control of the track editor, the note editor, the kit editor or the
 //! header is, for its tooltip: its whole name, then what it does. The panels
 //! label their controls with a word or two; the tooltip says what they do.
+// audit: allow(function size): tables of tooltip texts, one line a control.
 
 use crate::kits::Field;
 use crate::panel::{Id, LfoParam};

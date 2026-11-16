@@ -185,8 +185,15 @@ impl HitOp {
     }
 }
 
+/// The track a variation works on: its place in the pattern, and whether it
+/// is a generated drum line, which keeps its sound and its accents.
+struct Line<'a> {
+    index: usize,
+    track: &'a Track,
+    drum: bool,
+}
+
 /// Apply the flat-notes layer of one track, loop by loop (`TrackVariation.apply`).
-#[expect(clippy::expect_used, reason = "the slots it changes were scanned from `flat`")]
 pub(crate) fn apply(
     flat: &mut Hits,
     track_index: usize,
@@ -207,8 +214,7 @@ pub(crate) fn apply(
     let loop_ticks = steps_in_loop as f64 * f64::from(crate::steps::TICK) / f64::from(spb);
     let loop_count = ((pattern_ticks as f64 / loop_ticks).ceil() as i64).max(1);
     let budget = loop_budget(budget, loop_count);
-    // A generated drum line keeps its sound and its accents.
-    let drum_line = track.auto_mode && instrument_family(&track.name).is_drum();
+    let line = Line { index: track_index, track, drum: track.auto_mode && instrument_family(&track.name).is_drum() };
 
     for lp in 0..loop_count {
         // Rounded from the step itself, as the engine places the repeats.
@@ -221,101 +227,134 @@ pub(crate) fn apply(
                 beat_step: beat_step as i32,
             })
         };
-
-        // Steps of this loop where the track plays, with its first note there.
-        let mut played: Vec<(i64, Slot)> = Vec::new();
-        for step in 0..steps_in_loop {
-            let Ok(tick) = u32::try_from(tick_of(step)) else { continue };
-            if i64::from(tick) >= pattern_ticks {
-                continue;
-            }
-            if let Some(index) = flat.get(&tick).and_then(|notes| notes.iter().position(|n| n.track == track_index)) {
-                played.push((step, (tick, index)));
-            }
-        }
+        let played = played_steps(flat, track_index, steps_in_loop, pattern_ticks, tick_of);
         if played.is_empty() {
             continue;
         }
-        let is_played = |step: i64| played.iter().any(|&(s, _)| s == step);
+        let ops = candidate_ops(&played, steps_in_loop, line.drum, target);
+        run_ops(flat, &line, ops, budget, rng, scales);
+    }
+}
 
-        let mut ops = Vec::new();
-        for &(step, slot) in &played {
-            let next = (step < steps_in_loop - 1).then_some(step + 1);
-            let has_prev = step > 0 && is_played(step - 1);
-            let next_free = next.filter(|&n| !is_played(n));
-            if let (false, Some(next)) = (has_prev, next_free)
-                && let Some(target) = target(next)
-            {
-                ops.push(HitOp::Anticipation(slot, target));
+/// The steps of a loop where the track plays, with its first note there
+/// (`tick_of` gives the tick of a step of the loop).
+fn played_steps(
+    flat: &Hits,
+    track_index: usize,
+    steps_in_loop: i64,
+    pattern_ticks: i64,
+    tick_of: impl Fn(i64) -> i64,
+) -> Vec<(i64, Slot)> {
+    let mut played = Vec::new();
+    for step in 0..steps_in_loop {
+        let Ok(tick) = u32::try_from(tick_of(step)) else { continue };
+        if i64::from(tick) >= pattern_ticks {
+            continue;
+        }
+        if let Some(index) = flat.get(&tick).and_then(|notes| notes.iter().position(|n| n.track == track_index)) {
+            played.push((step, (tick, index)));
+        }
+    }
+    played
+}
+
+/// What a loop could do to its `played` steps: silence one between two
+/// others, anticipate or double a hit onto the free step after it, accent
+/// and transpose, add a ghost in a gap of three steps or more.
+fn candidate_ops(
+    played: &[(i64, Slot)],
+    steps_in_loop: i64,
+    drum_line: bool,
+    target: impl Fn(i64) -> Option<Target>,
+) -> Vec<HitOp> {
+    let is_played = |step: i64| played.iter().any(|&(s, _)| s == step);
+    let mut ops = Vec::new();
+    for &(step, slot) in played {
+        let next = (step < steps_in_loop - 1).then_some(step + 1);
+        let has_prev = step > 0 && is_played(step - 1);
+        let next_free = next.filter(|&n| !is_played(n));
+        if let (false, Some(next)) = (has_prev, next_free)
+            && let Some(target) = target(next)
+        {
+            ops.push(HitOp::Anticipation(slot, target));
+        }
+        if has_prev && next.is_some_and(is_played) {
+            ops.push(HitOp::Silence(slot));
+        }
+        ops.push(HitOp::Velocity(slot));
+        if !drum_line {
+            ops.push(HitOp::Pitch(slot));
+        }
+        if let Some(next) = next_free
+            && let Some(target) = target(next)
+        {
+            ops.push(HitOp::Double(slot, target));
+        }
+    }
+    for pair in played.windows(2) {
+        let ((step, slot), (next_step, _)) = (pair[0], pair[1]);
+        let gap = next_step - step;
+        if gap >= 3
+            && let Some(target) = target(step + gap / 2)
+        {
+            ops.push(HitOp::Ghost(slot, target));
+        }
+    }
+    ops
+}
+
+/// Run the operations that `ops` selects, as long as the loop's `budget`
+/// pays for them; the notes they silence go last.
+#[expect(clippy::expect_used, reason = "the slots it changes were scanned from `flat`")]
+fn run_ops(flat: &mut Hits, line: &Line, ops: Vec<HitOp>, budget: i32, rng: &mut Rng, scales: &Scales) {
+    let mut silenced = Vec::new();
+    let mut remaining = budget;
+    for op in select(ops, |op| op.chance(line.track), rng) {
+        if op.cost() > remaining {
+            continue;
+        }
+        remaining -= op.cost();
+        let note_at = |flat: &Hits, (tick, index): Slot| flat[&tick][index].clone();
+        match op {
+            HitOp::Silence(slot) => silenced.push(slot),
+            HitOp::Velocity((tick, index)) => {
+                let note = &mut flat.get_mut(&tick).expect("scanned tick")[index];
+                note.velocity = if line.drum {
+                    round2(note.velocity * (DRUM_VELOCITY_FLOOR + rng.next_f64() * (1.0 - DRUM_VELOCITY_FLOOR)))
+                } else {
+                    round2(rng.next_f64())
+                };
             }
-            if has_prev && next.is_some_and(is_played) {
-                ops.push(HitOp::Silence(slot));
+            HitOp::Pitch((tick, index)) => {
+                let pitch = pick_pitch(line.track, rng, scales);
+                flat.get_mut(&tick).expect("scanned tick")[index].pitch = pitch;
             }
-            ops.push(HitOp::Velocity(slot));
-            if !drum_line {
-                ops.push(HitOp::Pitch(slot));
+            HitOp::Anticipation(slot, target) => {
+                let from = note_at(flat, slot);
+                add(flat, line.index, &from, target, round2((from.velocity * 0.7).max(0.2)));
             }
-            if let Some(next) = next_free
-                && let Some(target) = target(next)
-            {
-                ops.push(HitOp::Double(slot, target));
+            HitOp::Double(slot, target) => {
+                let from = note_at(flat, slot);
+                add(flat, line.index, &from, target, round2(from.velocity * 0.8));
+            }
+            HitOp::Ghost(slot, target) => {
+                let from = note_at(flat, slot);
+                add(flat, line.index, &from, target, round2(from.velocity * 0.5));
             }
         }
-        for pair in played.windows(2) {
-            let ((step, slot), (next_step, _)) = (pair[0], pair[1]);
-            let gap = next_step - step;
-            if gap >= 3
-                && let Some(target) = target(step + gap / 2)
-            {
-                ops.push(HitOp::Ghost(slot, target));
-            }
-        }
+    }
+    remove_silenced(flat, silenced);
+}
 
-        let mut silenced = Vec::new();
-        let mut remaining = budget;
-        for op in select(ops, |op| op.chance(track), rng) {
-            if op.cost() > remaining {
-                continue;
-            }
-            remaining -= op.cost();
-            let note_at = |flat: &Hits, (tick, index): Slot| flat[&tick][index].clone();
-            match op {
-                HitOp::Silence(slot) => silenced.push(slot),
-                HitOp::Velocity((tick, index)) => {
-                    let note = &mut flat.get_mut(&tick).expect("scanned tick")[index];
-                    note.velocity = if drum_line {
-                        round2(note.velocity * (DRUM_VELOCITY_FLOOR + rng.next_f64() * (1.0 - DRUM_VELOCITY_FLOOR)))
-                    } else {
-                        round2(rng.next_f64())
-                    };
-                }
-                HitOp::Pitch((tick, index)) => {
-                    let pitch = pick_pitch(track, rng, scales);
-                    flat.get_mut(&tick).expect("scanned tick")[index].pitch = pitch;
-                }
-                HitOp::Anticipation(slot, target) => {
-                    let from = note_at(flat, slot);
-                    add(flat, track_index, &from, target, round2((from.velocity * 0.7).max(0.2)));
-                }
-                HitOp::Double(slot, target) => {
-                    let from = note_at(flat, slot);
-                    add(flat, track_index, &from, target, round2(from.velocity * 0.8));
-                }
-                HitOp::Ghost(slot, target) => {
-                    let from = note_at(flat, slot);
-                    add(flat, track_index, &from, target, round2(from.velocity * 0.5));
-                }
-            }
-        }
-
-        silenced.sort_unstable_by(|a, b| b.cmp(a)); // highest index first in each tick
-        for (tick, index) in silenced {
-            if let Some(notes) = flat.get_mut(&tick) {
-                notes.remove(index);
-                if notes.is_empty() {
-                    flat.remove(&tick);
-                }
-            }
+/// Remove the silenced notes, the highest index first in each tick, and the
+/// ticks left empty.
+fn remove_silenced(flat: &mut Hits, mut silenced: Vec<Slot>) {
+    silenced.sort_unstable_by(|a, b| b.cmp(a));
+    for (tick, index) in silenced {
+        let Some(notes) = flat.get_mut(&tick) else { continue };
+        notes.remove(index);
+        if notes.is_empty() {
+            flat.remove(&tick);
         }
     }
 }

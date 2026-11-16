@@ -169,6 +169,7 @@ pub struct View<'a> {
 }
 
 mod draw;
+mod grid;
 mod kit;
 mod layout;
 mod notice;

@@ -8,7 +8,7 @@ use ordrumbox_core::num;
 use ordrumbox_logic::block::{Block, StepAt, Zone};
 
 use super::Session;
-use super::session_labels::notes_label;
+use super::session_labels::{copied_message, deleted_message, pasted_message};
 use super::session_selection::Clipboard;
 use super::session_song::DRAG_START_PX;
 use super::session_types::Move;
@@ -130,7 +130,7 @@ impl Session {
     pub(super) fn copy_zone(&mut self, zone: &Zone) {
         let Some(pattern) = self.pattern() else { return };
         let block = Block::copy(pattern, zone);
-        self.message = format!("copied {} — {}", notes_label(block.note_count()), zone_label(zone));
+        self.message = copied_message(block.note_count(), &zone_label(zone));
         self.selection.clipboard = Some(Clipboard::Block(block));
     }
 
@@ -163,7 +163,7 @@ impl Session {
             self.edited();
         }
         self.selection.selected = None;
-        self.message = format!("Deleted {} — {}", notes_label(removed), zone_label(zone));
+        self.message = deleted_message(removed, &zone_label(zone));
     }
 
     /// Ctrl+V with a zone copied: its rows from the cursor's track down, its
@@ -177,10 +177,7 @@ impl Session {
         }
         self.selection.put_cursor(c);
         self.selection.zone = pasted.zone;
-        self.message = match pasted.dropped {
-            0 => format!("pasted {}", notes_label(pasted.placed)),
-            dropped => format!("pasted {}, {dropped} past the pattern left out", notes_label(pasted.placed)),
-        };
+        self.message = pasted_message(pasted.placed, pasted.dropped, "past the pattern");
     }
 }
 

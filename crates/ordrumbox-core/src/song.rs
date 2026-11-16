@@ -2,6 +2,7 @@
 //! timeline of 4/4 measures. Clips may overlap and may last a fraction of a
 //! measure (a 3-beat pattern is 0.75 measure); only positions snap to whole
 //! measures.
+// audit: allow(function size): `from_json` reads and checks the song's fields one after the other.
 
 use std::collections::HashSet;
 

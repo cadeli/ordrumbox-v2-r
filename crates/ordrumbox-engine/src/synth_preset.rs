@@ -199,6 +199,61 @@ fn or_else<'a>(a: Option<&'a Value>, b: Option<&'a Value>) -> Option<&'a Value> 
     a.filter(|v| !v.is_null()).or(b)
 }
 
+/// The loudness of a note of `velocity` on a preset whose oscillators have
+/// `gains`: normalised by what the voice mixes, then the master volume, and
+/// accented above half.
+fn peak_velocity(preset: &Value, gains: [f64; 3], velocity: f64) -> f64 {
+    let at = |key: &str| get(Some(preset), key);
+    let total_gain = gains[0] + gains[1] + gains[2];
+    // The voice mixes oscillators and noise by `noise.mix`: both count, or a
+    // sound mostly made of noise would be raised by its quiet oscillators.
+    let noise_mix =
+        if at("bypassNoise").is_some_and(Value::is_true) { 0.0 } else { level(get(at("noise"), "mix"), 0.0) };
+    let mix_gain = total_gain * (1.0 - noise_mix) + noise_mix;
+    let mix_norm = if mix_gain > 0.001 { 1.0 / mix_gain } else { 1.0 };
+    let note_velo = velocity * mix_norm;
+    let accent = if note_velo > 0.5 { 1.0 + 0.5 * 0.5 } else { 1.0 };
+    let master_volume = level(at("masterVolume"), 0.8);
+    note_velo * master_volume * accent * 1.0
+}
+
+/// The frequency of each oscillator at `note_ratio` (1 is C3); 0 for a missing one.
+fn osc_frequencies(vcos: [Option<&Value>; 3], note_ratio: f64) -> [f64; 3] {
+    vcos.map(|vco| {
+        if !vco.is_some_and(|v| v.as_object().is_some()) {
+            return 0.0;
+        }
+        let octave = clamp(finite(get(vco, "octave"), 0.0), -4.0, 4.0);
+        C3_FREQ * note_ratio.max(MIN_NOTE_RATIO) * 2.0_f64.powf(octave + 0.0)
+    })
+}
+
+/// An envelope from `env`'s attack, decay, sustain (`sustain` when absent)
+/// and release.
+fn adsr(env: Option<&Value>, sustain: f64) -> Adsr {
+    Adsr {
+        attack: clamp(finite(get(env, "attack"), 0.01), 0.003, 0.5),
+        decay: finite(get(env, "decay"), 0.1).min(1.0),
+        sustain: finite(get(env, "sustain"), sustain),
+        release: clamp(finite(get(env, "release"), 0.1), 0.008, 0.5),
+    }
+}
+
+/// Which modules of the preset are bypassed.
+fn bypass_flags(preset: &Value) -> SynthBypass {
+    let flag = |key: &str| get(Some(preset), key).is_some_and(Value::is_true);
+    SynthBypass {
+        noise: flag("bypassNoise"),
+        filter: flag("bypassFilter"),
+        env: flag("bypassEnv"),
+        lfo1: flag("bypassLfo1"),
+        lfo2: flag("bypassLfo2"),
+        fm: flag("bypassFm"),
+        mod_env: flag("bypassModEnv"),
+        filter_env: flag("bypassFilterEnv"),
+    }
+}
+
 /// The `update` message `WorkletSynthVoice` sends for `note` with `preset`.
 pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
     let gs = Some(preset);
@@ -207,25 +262,9 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
 
     let vcos = [at("vco1"), at("vco2"), at("vco3")];
     let gains = vcos.map(|vco| level(get(vco, "gain"), 0.0));
-    let total_gain = gains[0] + gains[1] + gains[2];
-    // The voice mixes oscillators and noise by `noise.mix`: both count, or a
-    // sound mostly made of noise would be raised by its quiet oscillators.
-    let noise_mix =
-        if at("bypassNoise").is_some_and(Value::is_true) { 0.0 } else { level(get(at("noise"), "mix"), 0.0) };
-    let mix_gain = total_gain * (1.0 - noise_mix) + noise_mix;
-    let mix_norm = if mix_gain > 0.001 { 1.0 / mix_gain } else { 1.0 };
-    let note_velo = note.velocity * mix_norm;
-    let accent = if note_velo > 0.5 { 1.0 + 0.5 * 0.5 } else { 1.0 };
-    let master_volume = level(at("masterVolume"), 0.8);
-    let peak = note_velo * master_volume * accent * 1.0;
+    let peak = peak_velocity(preset, gains, note.velocity);
 
-    let osc_freq = vcos.map(|vco| {
-        if !vco.is_some_and(|v| v.as_object().is_some()) {
-            return 0.0;
-        }
-        let octave = clamp(finite(get(vco, "octave"), 0.0), -4.0, 4.0);
-        C3_FREQ * note_ratio.max(MIN_NOTE_RATIO) * 2.0_f64.powf(octave + 0.0)
-    });
+    let osc_freq = osc_frequencies(vcos, note_ratio);
 
     let noise = at("noise");
     let filter = at("filter");
@@ -243,7 +282,6 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
     let mod_target = get(mod_env, "target");
     let fm = at("fm");
     let unison = at("unison");
-    let flag = |key: &str| at(key).is_some_and(Value::is_true);
 
     SynthPatch {
         osc_freq,
@@ -261,12 +299,7 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
         drive: finite(get(filter, "drive"), 0.0),
         pitch_punch: finite(at("pitchPunch"), 0.0),
         sub_gain: level(at("subGain"), 0.0),
-        envelope: Adsr {
-            attack: clamp(finite(get(env, "attack"), 0.01), 0.003, 0.5),
-            decay: finite(get(env, "decay"), 0.1).min(1.0),
-            sustain: finite(get(env, "sustain"), 0.7),
-            release: clamp(finite(get(env, "release"), 0.1), 0.008, 0.5),
-        },
+        envelope: adsr(env, 0.7),
         volume: 1.0,
         pan: finite(Some(&Value::Number(note.pan)), 0.0),
         velocity: peak,
@@ -275,12 +308,7 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
         filter_env_amount: clamp(finite(get(or_else(at("filterEnv"), filter), "filterEnvelopeAmount"), 0.0), 0.0, 1.0),
         fm_amount: clamp(finite(get(fm, "amount"), 0.0), 0.0, 1.0),
         fm_algorithm: clamp(finite(get(fm, "algo"), 0.0).round(), 0.0, 4.0),
-        mod_envelope: Adsr {
-            attack: clamp(finite(get(mod_env, "attack"), 0.01), 0.003, 0.5),
-            decay: finite(get(mod_env, "decay"), 0.1).min(1.0),
-            sustain: finite(get(mod_env, "sustain"), 0.0),
-            release: clamp(finite(get(mod_env, "release"), 0.1), 0.008, 0.5),
-        },
+        mod_envelope: adsr(mod_env, 0.0),
         mod_env_target: choice(mod_target, &MOD_ENV_TARGETS, &ModEnvTarget::ALL),
         mod_env_depth: if mod_target.and_then(Value::as_str).is_some_and(|t| !t.is_empty() && t != "off") {
             1.0
@@ -294,16 +322,7 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
         note_velocity: clamp(finite(Some(&Value::Number(note.velocity)), 0.0), 0.0, 1.0),
         // Two octaves each way fill the source: ratio 1 is C3.
         note_key: clamp(note_ratio.log2() / 2.0, -1.0, 1.0),
-        bypass: SynthBypass {
-            noise: flag("bypassNoise"),
-            filter: flag("bypassFilter"),
-            env: flag("bypassEnv"),
-            lfo1: flag("bypassLfo1"),
-            lfo2: flag("bypassLfo2"),
-            fm: flag("bypassFm"),
-            mod_env: flag("bypassModEnv"),
-            filter_env: flag("bypassFilterEnv"),
-        },
+        bypass: bypass_flags(preset),
     }
 }
 

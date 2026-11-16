@@ -108,28 +108,17 @@ fn bass_groove(g: &mut Generator<'_>, track: &mut Track, scale: &[f64], config: 
                 continue;
             }
             let strong = step == 0;
-            // A strong step always plays; a NaN density keeps nothing else.
-            if !strong {
-                let plays = g.random() < note_density * density;
-                if !plays {
-                    continue;
-                }
+            if !step_plays(g, strong, note_density * density) {
+                continue;
             }
             let mut is_variation = false;
             let pitch = if strong || g.random() > variation {
                 let interval = if g.random() < weight { intervals.first() } else { intervals.get(1) };
                 root_pitch + interval.copied().unwrap_or(f64::NAN)
             } else {
-                // A scale with no degree gives the root.
-                let degree = g.pick(scale).copied().unwrap_or(0.0);
-                let pitch = root_pitch + degree;
-                is_variation = true;
-                if (pitch - last).abs() > max_leap {
-                    is_variation = false;
-                    root_pitch
-                } else {
-                    pitch
-                }
+                let (pitch, kept) = scale_step(g, scale, root_pitch, last, max_leap);
+                is_variation = kept;
+                pitch
             };
             last = pitch;
             let context = VelocitySpec { variation: is_variation, ..VelocitySpec::accent(strong, false) };
@@ -277,6 +266,20 @@ pub(crate) fn melody(
     apply_loop_point(track, config);
 }
 
+/// Whether a step plays: a strong one always does, the others by chance
+/// (`chance`; a NaN one keeps nothing).
+fn step_plays(g: &mut Generator<'_>, strong: bool, chance: f64) -> bool {
+    strong || g.random() < chance
+}
+
+/// A scale degree off `root_pitch`: the pitch (the root again when it
+/// leaps more than `max_leap` from `last`), and whether the degree was kept.
+/// A scale with no degree gives the root.
+fn scale_step(g: &mut Generator<'_>, scale: &[f64], root_pitch: f64, last: f64, max_leap: f64) -> (f64, bool) {
+    let pitch = root_pitch + g.pick(scale).copied().unwrap_or(0.0);
+    if (pitch - last).abs() > max_leap { (root_pitch, false) } else { (pitch, true) }
+}
+
 /// `generateMelodyGrooveVariant`: strong steps on chord intervals, the
 /// others by chance, sometimes a scale degree within `maxLeap`.
 fn melody_groove(g: &mut Generator<'_>, track: &mut Track, scale: &[f64], config: &Value, density: f64, bias: f64) {
@@ -293,18 +296,13 @@ fn melody_groove(g: &mut Generator<'_>, track: &mut Track, scale: &[f64], config
                 continue;
             }
             let strong = step == 0 || step == spb / 2;
-            // A strong step always plays; a NaN density keeps nothing else.
-            if !strong {
-                let plays = g.random() < note_density * density;
-                if !plays {
-                    continue;
-                }
+            if !step_plays(g, strong, note_density * density) {
+                continue;
             }
             let pitch = if strong || g.random() > variation {
                 bias + g.pick(&intervals).copied().unwrap_or(0.0)
             } else {
-                let pitch = bias + g.pick(scale).copied().unwrap_or(0.0);
-                if (pitch - last).abs() > max_leap { bias } else { pitch }
+                scale_step(g, scale, bias, last, max_leap).0
             };
             last = pitch;
             let context = VelocitySpec { variation: !strong, ..VelocitySpec::accent(strong, false) };

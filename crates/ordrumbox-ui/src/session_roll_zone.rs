@@ -11,7 +11,7 @@ use ordrumbox_logic::block::step_units;
 use ordrumbox_logic::roll_block::{RollBlock, RollZone, note_key};
 
 use super::Session;
-use super::session_labels::notes_label;
+use super::session_labels::{copied_message, deleted_message, pasted_message};
 use super::session_selection::Clipboard;
 use super::session_song::DRAG_START_PX;
 use super::session_zone::beats_label;
@@ -112,7 +112,7 @@ impl Session {
         };
         let Some(pattern) = self.pattern() else { return };
         let block = RollBlock::copy(pattern, &zone);
-        self.message = format!("copied {} — {}", notes_label(block.note_count()), self.roll_zone_label(&zone));
+        self.message = copied_message(block.note_count(), &self.roll_zone_label(&zone));
         self.selection.clipboard = Some(Clipboard::Roll(block));
     }
 
@@ -134,7 +134,7 @@ impl Session {
             self.edited();
         }
         self.selection.selected = None;
-        self.message = format!("Deleted {} — {}", notes_label(removed), self.roll_zone_label(zone));
+        self.message = deleted_message(removed, &self.roll_zone_label(zone));
     }
 
     /// Ctrl+V in the piano roll: `block` with its top left corner on the
@@ -158,12 +158,7 @@ impl Session {
         }
         self.selection.selected = None;
         self.selection.roll_zone = pasted.zone;
-        self.message = match pasted.dropped {
-            0 => format!("pasted {}", notes_label(pasted.placed)),
-            dropped => {
-                format!("pasted {}, {dropped} past the pattern or the keyboard left out", notes_label(pasted.placed))
-            }
-        };
+        self.message = pasted_message(pasted.placed, pasted.dropped, "past the pattern or the keyboard");
     }
 
     /// `BASS, beats 1-2, C2-G2`: the track, the time and the keys of a zone.
