@@ -1771,7 +1771,7 @@ dependencies = [
 
 [[package]]
 name = "ordrumbox-app"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "cpal",
  "midir",
@@ -1784,15 +1784,15 @@ dependencies = [
 
 [[package]]
 name = "ordrumbox-core"
-version = "0.1.1"
+version = "0.1.2"
 
 [[package]]
 name = "ordrumbox-dsp"
-version = "0.1.1"
+version = "0.1.2"
 
 [[package]]
 name = "ordrumbox-engine"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "ordrumbox-core",
  "ordrumbox-dsp",
@@ -1800,14 +1800,14 @@ dependencies = [
 
 [[package]]
 name = "ordrumbox-logic"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "ordrumbox-core",
 ]
 
 [[package]]
 name = "ordrumbox-plugin"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "baseview",
  "keyboard-types",
@@ -1824,7 +1824,7 @@ dependencies = [
 
 [[package]]
 name = "ordrumbox-probe"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "ordrumbox-core",
  "ordrumbox-dsp",
@@ -1833,7 +1833,7 @@ dependencies = [
 
 [[package]]
 name = "ordrumbox-ui"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "fontdue",
  "ordrumbox-core",
@@ -3294,7 +3294,7 @@ checksum = "b9cc00251562a284751c9973bace760d86c0276c471b4be569fe6b068ee97a56"
 
 [[package]]
 name = "xtask"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "nih_plug_xtask",
 ]
