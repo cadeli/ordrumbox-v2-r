@@ -239,6 +239,15 @@ jobs:
         with:
           name: ordrumbox-windows-setup
           path: setup
-      - run: gh release create "$GITHUB_REF_NAME" --title "orDrumbox $GITHUB_REF_NAME" --generate-notes ./*.zip ./setup/*.exe
+      # The notes are the version's section of CHANGELOG.md; a version without one fails the release.
+      - name: Release notes
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '/^## /{found = ($2 == v); next} found' CHANGELOG.md > notes.md
+          if ! grep -q '[^[:space:]]' notes.md; then
+            echo "CHANGELOG.md has no section '## $version'"
+            exit 1
+          fi
+      - run: gh release create "$GITHUB_REF_NAME" --title "orDrumbox $GITHUB_REF_NAME" --notes-file notes.md ./*.zip ./setup/*.exe
         env:
           GH_TOKEN: ${{ github.token }}
