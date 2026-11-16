@@ -1,3 +1,5 @@
+//! `cargo xtask audit`: the checks of AGENTS.md (`audit.rs`).
+//!
 //! `cargo xtask bundle ordrumbox-plugin --release [--features vst3]`: nih-plug's
 //! bundler, then `assets/` copied into each orDrumbox bundle of
 //! `target/bundled/` (`Contents/Resources/assets`, or next to a bundle that
@@ -10,11 +12,16 @@ use std::process::Command;
 
 use nih_plug_xtask::Result;
 
+mod audit;
+
 /// The bundle name `bundler.toml` gives the plugin.
 const BUNDLE_NAME: &str = "orDrumbox";
 
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().is_some_and(|command| command == "audit") {
+        return Ok(audit::run(&args[1..])?);
+    }
     let bundling = args.first().is_some_and(|command| command.starts_with("bundle"));
     let bundled =
         std::env::var_os("CARGO_TARGET_DIR").map_or_else(|| PathBuf::from("target"), PathBuf::from).join("bundled");

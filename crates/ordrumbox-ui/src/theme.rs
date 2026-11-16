@@ -149,6 +149,8 @@ pub const SCHEMES: [Scheme; 6] = [
     },
 ];
 
+// audit: allow(globals): the scheme in use is one value for every view, read
+// where it draws; passing it to each draw function would touch all of them.
 thread_local! {
     /// The index in [`SCHEMES`] of the scheme in use. The UI draws on one
     /// thread; each test thread has its own.

@@ -1,3 +1,4 @@
+use super::tabs::variant_options;
 use super::*;
 use crate::panel::{Id, Item, Rect};
 use crate::scale::Scale;

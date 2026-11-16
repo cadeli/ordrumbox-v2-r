@@ -15,6 +15,7 @@ cargo run -p ordrumbox-app              # the app; finds assets/ from anywhere i
 cargo test --workspace                  # all tests, snapshots included
 cargo clippy --workspace --all-targets  # must be clean: CI sets RUSTFLAGS=-D warnings
 cargo fmt --all                         # rustfmt.toml: max_width 120; CI checks it
+cargo xtask audit                       # the rules of this file that a tool checks (DEVELOPMENT.md)
 cargo xtask bundle ordrumbox-plugin --release --features vst3   # target/bundled/orDrumbox.{clap,vst3}
 ```
 

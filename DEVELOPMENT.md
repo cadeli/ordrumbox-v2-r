@@ -16,7 +16,7 @@ Building, testing and changing orDrumbox. The user documentation is
 | `ordrumbox-ui` | session, views, input, MCP link, update check | core, logic, engine, fontdue |
 | `ordrumbox-app` | window, input translation, audio output (`ordrumbox.exe`) | core, engine, ui, winit, softbuffer, cpal |
 | `ordrumbox-plugin` | CLAP and VST3 instrument | engine, ui, nih-plug, baseview, softbuffer |
-| `xtask` | plugin bundling | nih-plug's bundler |
+| `xtask` | plugin bundling; `audit`, the checks of `AGENTS.md` | nih-plug's bundler |
 
 The domain crates take no third-party dependency.
 
@@ -27,8 +27,20 @@ cargo run -p ordrumbox-app             # the app
 cargo test --workspace                 # all tests
 cargo clippy --workspace --all-targets # must be clean (CI: RUSTFLAGS=-D warnings)
 cargo fmt --all                        # rustfmt (max_width 120)
+cargo xtask audit                      # AGENTS.md's rules that a tool can check
 cargo build --release -p ordrumbox-app # target/release/ordrumbox(.exe)
 ```
+
+`cargo xtask audit` checks, over every crate: the dependencies against the
+table above, the banned names (`nb_`, `num_`, `_idx`, `get_`, `ctx`, `bar` for
+a measure…), `#[allow]`, `static mut` and `thread_local`, the size of files
+(about 500 lines of code, 800 at most), the nesting of `if`/`match`/loops
+(read from the indentation), duplicated blocks, and, through clippy, functions
+over 60 lines (`clippy.toml`) or too complex, a value taken by value and not
+used, a useless clone. Errors fail it (CI runs it with `--no-clippy`);
+warnings are measures with known exceptions, and fail it with `--strict`.
+`--all` lists every finding. A file exempt from a rule says why in a line
+`// audit: allow(<rule>): <why>`, the rule named as the report names it.
 
 The app reads its `assets/` folder (`data/*.json` and `kits/**.wav`) and looks
 for it in `$ORDRUMBOX_ASSETS`, next to the program, in the working folder, then
