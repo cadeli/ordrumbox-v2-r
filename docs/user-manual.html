@@ -278,13 +278,18 @@ use <kbd>←</kbd> <kbd>→</kbd> between menus, <kbd>↑</kbd> <kbd>↓</kbd> b
 <tr><th>Command</th><th>Shortcut</th><th>What it does</th></tr>
 <tr><td>Undo: &lt;step&gt;</td><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Undo the named step.</td></tr>
 <tr><td>Redo: &lt;step&gt;</td><td><kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Redo the named step.</td></tr>
-<tr><td>Copy step</td><td><kbd>Ctrl</kbd>+<kbd>C</kbd></td><td>Copy the notes of the cursor step.</td></tr>
+<tr><td>Copy step / zone</td><td><kbd>Ctrl</kbd>+<kbd>C</kbd></td><td>Copy the notes of the cursor step, or of the zone selected.</td></tr>
+<tr><td>Cut step / zone</td><td><kbd>Ctrl</kbd>+<kbd>X</kbd></td><td>Copy them, then remove them.</td></tr>
 <tr><td>Copy track</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd></td><td>Copy the focused track (settings and notes).</td></tr>
 <tr><td>Paste</td><td><kbd>Ctrl</kbd>+<kbd>V</kbd></td><td>Paste the copied step at the cursor.</td></tr>
 <tr><td>Paste track</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd></td><td>Paste the copied track into the pattern.</td></tr>
-<tr><td>Clear step</td><td><kbd>Delete</kbd></td><td>Remove the notes of the cursor step.</td></tr>
+<tr><td>Clear step / zone</td><td><kbd>Delete</kbd></td><td>Remove the notes of the cursor step, or of the zone selected.</td></tr>
 <tr><td>Accent on / off</td><td><kbd>L</kbd></td><td>Accent the notes of the cursor step (velocity 100 %), or take the accent off.</td></tr>
+<tr><td>Quantize...</td><td></td><td>Move the notes towards the lines of a grid (<a href="#quantize">see Quantize</a>).</td></tr>
+<tr><td>Select all</td><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>Select the whole pattern as a zone.</td></tr>
 <tr><td>Deselect</td><td><kbd>Esc</kbd></td><td>Drop the selection and the cursor.</td></tr>
+<tr><td>Preferences...</td><td><kbd>Ctrl</kbd>+<kbd>,</kbd></td><td>Sound output, MIDI input, MIDI output and clock, metronome, VU meters, toasts.</td></tr>
+<tr><td>MIDI controls...</td><td></td><td>Bind the knobs of a MIDI controller (Learn, then turn the knob).</td></tr>
 </table>
 
 <h3>View</h3>
@@ -485,6 +490,17 @@ type none stays off.</p>
 <tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd></td><td>Copy / paste the cursor step (<kbd>Shift</kbd>: the track).</td></tr>
 </table>
 
+<h3 id="quantize">Quantize</h3>
+<p><strong>Edit › Quantize...</strong> moves notes towards the nearest line of a grid. It works on the zone selected, else on the
+cursor's track, else on the whole pattern; the window says which. Two choices, then <strong>Apply</strong>:</p>
+<table>
+<tr><th>Choice</th><th>Values</th><th>What it does</th></tr>
+<tr><td><strong>Grid</strong></td><td>1/4, 1/8, 1/16, 1/32</td><td>The lines, to a beat. A grid finer than a track's steps is kept to what the track's step and its shift can hold.</td></tr>
+<tr><td><strong>Strength</strong></td><td>25, 50, 75, 100 %</td><td>How far each note goes towards its line: 100 % puts it on it, less keeps part of the feel.</td></tr>
+</table>
+<p>Notes recorded off the grid (their <strong>Shift</strong>) come back to their step at full strength. The whole operation is one undo step,
+and the status line says how many notes moved.</p>
+
 <!-- ───────────────────────────────────────────────────────────── -->
 <h2 id="track-editor">8. Track editor</h2>
 <p>Down the right edge (<kbd>F2</kbd> shows or folds it). It edits the track of the cursor or of the
@@ -493,7 +509,7 @@ Two cards: the sound card (the track's name, the sample bar, the knob bar), then
 <strong>FX</strong>, <strong>Sound</strong>, <strong>LFO</strong>, <strong>Loop</strong>, <strong>Generate</strong>.</p>
 <figure class="narrow">
   <img src="images/track-editor.png" alt="The track editor on the FX tab: reverb, delay, saturation, compressor and filter strips">
-  <figcaption>The track editor on the FX tab: the five effects, each with its power button on the left.</figcaption>
+  <figcaption>The track editor on the FX tab: the effects, each with its power button on the left.</figcaption>
 </figure>
 
 <h3>Sample bar</h3>
@@ -515,7 +531,7 @@ loops, and the level curve (attack, hold, decay). A synth track keeps the place 
 plays it follows them.</p>
 
 <h3>FX tab</h3>
-<p>The five effects one under the other, each a strip: its power button (named) on the left, then its knobs and
+<p>The six effects one under the other, each a strip: its power button (named) on the left, then its knobs and
 lists. Touching a control of an effect that is off switches it on.</p>
 <table>
 <tr><th>Effect</th><th>Control</th><th>Values</th><th>Notes</th></tr>
@@ -534,6 +550,9 @@ lists. Touching a control of an effect that is off switches it on.</p>
 <tr><td>Ratio</td><td>1–20 (default 4)</td><td>How hard it compresses.</td></tr>
 <tr><td>Attack</td><td>0.1–200 ms (default 10)</td><td>How fast it reacts.</td></tr>
 <tr><td>Release</td><td>10–2000 ms (default 100)</td><td>How fast it lets go.</td></tr>
+<tr><td rowspan="3"><strong>Sidechain</strong></td><td>Duck</td><td>0–1</td><td>How much of its volume the track gives up when the key is at full level (0: off). Another track's sound ducks this one and also feeds its compressor.</td></tr>
+<tr><td>Release</td><td>10–2000 ms (default 150)</td><td>How long the volume takes to come back once the key falls. The duck itself closes in 2 ms.</td></tr>
+<tr><td>Key</td><td>none, or a track of the pattern</td><td>The track whose sound keys the sidechain (a KICK pumping a BASS, for instance).</td></tr>
 <tr><td rowspan="4"><strong>Filter</strong></td><td>LP HP BP NT</td><td>lowpass, highpass, bandpass, notch</td><td>The type buttons under the power button. Off = bypass. Switched on from its 20 Hz default, the cutoff goes to 1 kHz.</td></tr>
 <tr><td>Cutoff</td><td>20 Hz – 20 kHz</td><td>LFO-capable.</td></tr>
 <tr><td>Q</td><td>0.707–18.707</td><td>Resonance (LFO-capable).</td></tr>
@@ -822,6 +841,9 @@ A knob an LFO moves is purple and follows it. The pills under the cards show the
 <tr><td>freq</td><td>0.01–5 Hz</td><td>Rate (when not synced).</td></tr>
 <tr><td>depth</td><td>0–1</td><td>Amount.</td></tr>
 <tr><td>sync</td><td>free, 1/1, 1/2, 1/4, 1/8, 1/16, 1/8T, 1/16T</td><td>Lock the rate to the tempo (T = triplet).</td></tr>
+<tr><td rowspan="3"><strong>Matrix</strong></td><td>source</td><td>off, lfo1, lfo2, env, modEnv, velocity, key, random</td><td>What drives the line: an LFO, the amplitude or the modulation envelope, the note's velocity, its key (pitch), or a random value per note. Eight lines.</td></tr>
+<tr><td>target</td><td>off, or any synth control</td><td>What the line moves, as an LFO's target does.</td></tr>
+<tr><td>amount</td><td>−1 to +1</td><td>How much of a full swing of the target the source is worth; below 0 it works the other way. A line with no source or a zero amount does nothing.</td></tr>
 <tr><td rowspan="6"><strong>noise</strong></td><td>mix</td><td>0–1</td><td>Noise level.</td></tr>
 <tr><td>mode</td><td>White, Long, Short</td><td>White is a new random value every sample. Long and Short are a console's shift register (15 and 7 bits): a grainy rumble, and a short loop that buzzes at a pitch.</td></tr>
 <tr><td>rate</td><td>100 Hz – 32 kHz</td><td>How fast the shift register steps: low is a rumble, high a hiss. Long and Short only.</td></tr>
@@ -1000,7 +1022,7 @@ In the plugin, <kbd>Alt</kbd> stands for <kbd>Ctrl</kbd> (<a href="#plugin">sect
 <tr><td><kbd>Shift</kbd>+click on the song ruler</td><td>Loop the song from the cursor's measure to the one clicked (Play &gt; Clear the loop ends it).</td></tr>
 <tr><td><kbd>F9</kbd> <kbd>F8</kbd></td><td>Metronome on / off; tap the tempo.</td></tr>
 <tr><td><kbd>Ctrl</kbd>+<kbd>R</kbd></td><td>Record: while the pattern plays, <kbd>Q</kbd>–<kbd>P</kbd> also put a note on the step that plays. With <strong>Play › Record off the grid</strong> on, the note keeps how early or late it was played, as its Shift.</td></tr>
-<tr><td><kbd>Ctrl</kbd>+<kbd>,</kbd></td><td>Preferences: sound output, MIDI input (a keyboard or pad plays the tracks, and is recorded with <kbd>Ctrl</kbd>+<kbd>R</kbd>), MIDI clock in (follow another machine), MIDI output and clock out, metronome, VU meters, toasts. <strong>Edit &gt; MIDI controls</strong> binds the knobs of a MIDI controller to the master volume or a track's volume, pan, cutoff or mute (Learn, then turn the knob).</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>,</kbd></td><td>Preferences: sound output, MIDI input (a keyboard or pad plays the tracks, and is recorded with <kbd>Ctrl</kbd>+<kbd>R</kbd>; a note on channel 16 chooses the pattern: key 0 the first, key 1 the second…, and a playing pattern switches at once), MIDI clock in (follow another machine), MIDI output and clock out, metronome, VU meters, toasts. <strong>Edit &gt; MIDI controls</strong> binds the knobs of a MIDI controller to the master volume or a track's volume, pan, cutoff or mute (Learn, then turn the knob).</td></tr>
 <tr><td><kbd>F11</kbd>, <kbd>Ctrl</kbd>+<kbd>W</kbd></td><td>Full screen; close the window.</td></tr>
 <tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>Previous / next pattern (<kbd>Shift</kbd>: arrangement; also <kbd>Page Up</kbd> <kbd>Page Down</kbd>)</td></tr>
 <tr><td><kbd>-</kbd> <kbd>=</kbd></td><td>Tempo −1 / +1 (<kbd>Shift</kbd>: ×10)</td></tr>
@@ -1065,7 +1087,9 @@ In the plugin, <kbd>Alt</kbd> stands for <kbd>Ctrl</kbd> (<a href="#plugin">sect
 <!-- ───────────────────────────────────────────────────────────── -->
 <h2 id="signal">18. Audio signal flow</h2>
 <h3>Each track</h3>
-<pre>Sample or synth voice → Filter → Compressor → Saturation → Bitcrusher → Hard clip → Reverb → Delay → Volume → Pan → Mix bus</pre>
+<pre>Sample or synth voice → Filter → Compressor → Saturation → Bitcrusher → Hard clip → Reverb → Delay → Volume × sidechain duck → Pan → Mix bus</pre>
+<p>A track with a sidechain <strong>Key</strong> listens to that track's sound: its compressor reacts to it, and the duck lowers the volume by the
+<strong>Duck</strong> amount while the key is loud.</p>
 <h3>Master bus</h3>
 <pre>Mix bus → Pre-gain → Compressor → Low cut → High cut → Volume → Soft limit → Output (and spectrum)</pre>
 <p>The soft limit leaves the signal unchanged under 0.9 and rounds it toward ±1 above, so loud mixes do not clip harshly.
@@ -1121,7 +1145,7 @@ plugin a single stereo output keeps every track in the mix; tracks past the 16th
 in track order), its notes on the key of their pitch (the track's pitch 0 is its sample's root note, C3 = 48 without one and for a
 synth). Past the 15 channels, the tracks left take keys of channel 10 from 84 up.</p>
 <ul>
-  <li><strong>In</strong>: a note on a track's channel plays that track at the note's pitch; a note on any other channel plays the drum
+  <li><strong>In</strong>: a note on channel 16 chooses the pattern (key 0 is the first), as does a MIDI program change (program 0 the first); a note on a track's channel plays that track at the note's pitch; a note on any other channel plays the drum
       track with that key, at its velocity, whether the host plays or not.</li>
   <li><strong>Out</strong>: the notes the pattern plays go out where they come in, with their pitch, as long as the note (a step of its track unless its Length says otherwise). Tracks the host mutes
       send nothing. A clip recorded from this output and played back into the plugin plays the same tracks at the same pitches.</li>
