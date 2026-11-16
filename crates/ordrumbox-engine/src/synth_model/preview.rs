@@ -55,12 +55,12 @@ pub fn lfo_targeted(draft: &Object, path: &str) -> bool {
 
 // ─── What the canvases plot ──────────────────────────────────────────────────
 
-/// A wave's value at phase `p` (0–1) of cycle `cycle`.
-fn wave_at(wave: &str, p: f64, cycle: f64) -> f64 {
+/// A wave's value at phase `p` (0–1) of cycle `cycle`; a square is high for `width` of it.
+fn wave_at(wave: &str, p: f64, cycle: f64, width: f64) -> f64 {
     use std::f64::consts::PI;
     match wave {
         "square" => {
-            if (2.0 * PI * p).sin() >= 0.0 {
+            if p < width {
                 1.0
             } else {
                 -1.0
@@ -81,6 +81,7 @@ pub fn scope(draft: &Object, time: f64, bpm: f64) -> Vec<f64> {
     let vco = |n: usize, key: &str, default: f64| number(draft, &format!("vco{n}.{key}")).unwrap_or(default);
     let waves: Vec<String> =
         (1..=3).map(|n| text(draft, &format!("vco{n}.wave")).unwrap_or("sine").to_owned()).collect();
+    let width: Vec<f64> = (1..=3).map(|n| vco(n, "width", 0.5)).collect();
     let modded = |path: &str| lfo_mod_on(draft, path, time, bpm);
     let ratio: Vec<f64> = (1..=3)
         .map(|n| {
@@ -102,8 +103,8 @@ pub fn scope(draft: &Object, time: f64, bpm: f64) -> Vec<f64> {
     let (mut phase, mut cycle) = ([0.0f64; 3], [0.0f64; 3]);
     let mut out = Vec::with_capacity(SAMPLES);
     for _ in 0..SAMPLES {
-        let o2 = wave_at(&waves[1], phase[1], cycle[1]);
-        let o3 = wave_at(&waves[2], phase[2], cycle[2]);
+        let o2 = wave_at(&waves[1], phase[1], cycle[1], width[1]);
+        let o3 = wave_at(&waves[2], phase[2], cycle[2], width[2]);
         let (mut f1, mut f2, f3) = (inc[0], inc[1], inc[2]);
         if fm_amount > 0.001 {
             match fm_algo as i64 {
@@ -115,7 +116,7 @@ pub fn scope(draft: &Object, time: f64, bpm: f64) -> Vec<f64> {
                 }
                 3 => f1 += (o2 + o3) * depth1,
                 4 => {
-                    let o1 = wave_at(&waves[0], phase[0], cycle[0]);
+                    let o1 = wave_at(&waves[0], phase[0], cycle[0], width[0]);
                     f1 += o2 * depth1;
                     f2 += o1 * depth2;
                 }
@@ -129,11 +130,11 @@ pub fn scope(draft: &Object, time: f64, bpm: f64) -> Vec<f64> {
             phase[i] -= whole;
         }
         let sub = if sub_gain > 0.0 {
-            wave_at("sine", (cycle[0].rem_euclid(2.0) + phase[0]) * 0.5, 0.0) * sub_gain
+            wave_at("sine", (cycle[0].rem_euclid(2.0) + phase[0]) * 0.5, 0.0, 0.5) * sub_gain
         } else {
             0.0
         };
-        let mut sample = (0..3).map(|i| wave_at(&waves[i], phase[i], cycle[i]) * gain[i]).sum::<f64>() + sub;
+        let mut sample = (0..3).map(|i| wave_at(&waves[i], phase[i], cycle[i], width[i]) * gain[i]).sum::<f64>() + sub;
         if drive > 0.0 {
             let driven = sample * (1.0 + drive * 3.0);
             sample = driven / (1.0 + driven.abs() * 0.5);
