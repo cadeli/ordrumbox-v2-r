@@ -24,10 +24,31 @@ pub(super) fn toast_text(text: &str, repeat_count: u32) -> String {
     if repeat_count > 1 { format!("{text} (×{repeat_count})") } else { text.to_owned() }
 }
 
+/// `text` with each run of digits (and a decimal part or a sign) taken for one
+/// number: two messages with the same shape differ only by a value.
+#[must_use]
+fn numberless(text: &str) -> String {
+    let mut shape = String::with_capacity(text.len());
+    let mut in_number = false;
+    for c in text.chars() {
+        let digit = c.is_ascii_digit() || (in_number && c == '.');
+        if digit && !in_number {
+            shape.push('#');
+        }
+        if !digit {
+            shape.push(c);
+        }
+        in_number = digit;
+    }
+    shape
+}
+
 /// A message shown as a toast, until a time.
 #[derive(Debug, Clone)]
 pub(super) struct Toast {
     pub(super) text: String,
+    /// The words without the repeat count, as sent.
+    words: String,
     pub(super) until: Instant,
 }
 
@@ -46,17 +67,21 @@ impl Flash {
     /// `text` is shown at `now`: it stands out for [`FLASH`] in a toast of
     /// its own, under the ones still there, or not at all when empty. The same
     /// words again get a toast of their own too, which counts the repeats.
+    /// A toast that differs from `text` by a number only goes at once.
     pub(super) fn shown(&mut self, text: &str, now: Instant) {
         self.repeat_count = if text == self.text { self.repeat_count.saturating_add(1) } else { 1 };
         self.text = text.to_owned();
         if text.is_empty() || self.hidden {
             return;
         }
+        let shape = numberless(text);
+        self.toasts.retain(|toast| toast.words == text || numberless(&toast.words) != shape);
         if self.toasts.len() == TOAST_LIMIT {
             self.toasts.remove(0);
         }
+        let text_words = text.to_owned();
         let text = toast_text(text, self.repeat_count);
-        self.toasts.push(Toast { text, until: now + FLASH });
+        self.toasts.push(Toast { text, words: text_words, until: now + FLASH });
     }
 
     /// Each toast with its rectangle in a window `width` × `height`: the
