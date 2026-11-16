@@ -61,6 +61,7 @@ pub(crate) fn wrap(x: f64, period: f64) -> f64 {
     if r == period { 0.0 } else { r }
 }
 
+mod denormal;
 pub mod lfo;
 pub mod master_bus;
 pub mod sample;

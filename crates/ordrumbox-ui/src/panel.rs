@@ -61,6 +61,12 @@ pub fn row_at(y: i32, top: i32, row_height: i32) -> Option<usize> {
     usize::try_from((y - top) / row_height).ok()
 }
 
+/// The first index after `from`, wrapping round the `count` of a list, that
+/// satisfies `matches` (a typed letter jumps to the next name that starts with it).
+pub fn next_matching(count: usize, from: usize, matches: impl Fn(usize) -> bool) -> Option<usize> {
+    (1..=count).map(|k| (from + k) % count).find(|&i| matches(i))
+}
+
 /// A rectangle of the window.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Rect {

@@ -12,6 +12,7 @@
 //! The reverb and delay memories are allocated by [`Strip::new`];
 //! [`Strip::process`] never allocates.
 
+use crate::denormal::flush;
 use crate::svf::Svf;
 
 use blocks::{ClipBlock, CrushBlock, DelayBlock, FilterBlock, PanBlock, ReverbBlock, SaturationBlock};
@@ -58,8 +59,6 @@ const CLIP_ADAA_EPSILON: f64 = 1e-6;
 const DELAY_SECONDS: f64 = 2.1;
 /// The JS delay line always holds 2.1 s at 48 kHz, whatever the rate.
 const DELAY_MIN_RATE: f64 = 48_000.0;
-/// Level below which states and outputs are flushed to zero.
-const FLUSH: f64 = 1e-15;
 /// Width of the compressor's soft knee, dB around the threshold.
 const COMP_KNEE_DB: f64 = 6.0;
 /// Share of the gain reduction at 0 dBFS the compressor makes up.
@@ -315,13 +314,6 @@ fn clip_adaa(x: f64, prev: f64) -> f64 {
         (0.5 * (x + prev)).clamp(-1.0, 1.0)
     } else {
         (clip_antiderivative(x) - clip_antiderivative(prev)) / dx
-    }
-}
-
-#[inline]
-fn flush(x: &mut f64) {
-    if x.abs() < FLUSH {
-        *x = 0.0;
     }
 }
 

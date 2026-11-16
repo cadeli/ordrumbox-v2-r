@@ -123,12 +123,9 @@ impl Dropdown {
 
     /// The next option starting with `letter` (case-insensitive), after the highlighted one.
     pub fn jump(&mut self, letter: char) {
-        let n = self.labels.len();
         let letter = letter.to_ascii_lowercase();
-        if let Some(i) = (1..=n)
-            .map(|k| (self.at + k) % n)
-            .find(|&i| self.labels[i].chars().next().is_some_and(|c| c.to_ascii_lowercase() == letter))
-        {
+        let starts = |i: usize| self.labels[i].chars().next().is_some_and(|c| c.to_ascii_lowercase() == letter);
+        if let Some(i) = next_matching(self.labels.len(), self.at, starts) {
             self.at = i;
             self.show_at();
         }
