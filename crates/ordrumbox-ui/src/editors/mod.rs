@@ -94,11 +94,14 @@ pub struct KitControls {
 }
 
 mod layout;
+mod note_kit;
 mod tables;
+mod tabs;
 #[cfg(test)]
 mod tests;
 mod values;
 
 pub use layout::*;
+pub use note_kit::*;
 pub use tables::*;
 pub use values::*;

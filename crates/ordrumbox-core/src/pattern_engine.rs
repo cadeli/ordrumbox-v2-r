@@ -95,10 +95,10 @@ pub fn expand_hits(pattern: &Pattern, pass: u32, rng: &mut Rng, scales: &Scales)
                 continue;
             }
             let late_ticks = position_to_tick(note.late_steps(), track.steps_per_beat);
-            let ctx = NoteContext { track_index, track, note, note_index, pattern_ticks, late_ticks };
+            let note_context = NoteContext { track_index, track, note, note_index, pattern_ticks, late_ticks };
             for at in loop_occurrences(step, loop_steps, track.steps_per_beat, pattern_ticks) {
-                ctx.add_sub_notes(&mut flat, at, rng);
-                ctx.add_euclidean_fill(&mut flat, at, &span_end, rng);
+                note_context.add_sub_notes(&mut flat, at, rng);
+                note_context.add_euclidean_fill(&mut flat, at, &span_end, rng);
             }
         }
         variation::apply(&mut flat, track_index, track, (loop_steps, pattern_ticks), macro_factor, rng, scales);

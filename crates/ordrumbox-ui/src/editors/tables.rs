@@ -1,6 +1,6 @@
 //! The tables the editors read: tabs, effects, settings, ranges and labels.
 
-use super::layout::note_default;
+use super::note_kit::note_default;
 use crate::control::Format;
 use crate::kits::{ATTACK_RANGE, DECAY_RANGE, Field, GAIN_RANGE, HOLD_RANGE, TRANSPOSE_RANGE};
 use ordrumbox_core::Note;

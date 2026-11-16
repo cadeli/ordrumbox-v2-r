@@ -1,2 +1,5 @@
 allow-unwrap-in-tests = true
 allow-expect-in-tests = true
+# `cargo xtask audit` asks for these lints; CI does not (AGENTS.md, "Structure").
+too-many-lines-threshold = 60
+cognitive-complexity-threshold = 25
