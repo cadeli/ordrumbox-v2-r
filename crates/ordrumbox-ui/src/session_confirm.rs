@@ -93,7 +93,7 @@ impl Session {
 
     /// Say that a change was made outside the library's history (the master,
     /// a synth preset, a kit), which Ctrl+Z leaves as it is.
-    pub(super) fn not_undoable(&mut self, what: String) {
+    pub(super) fn not_undoable(&mut self, what: &str) {
         self.message = format!("{what} ({NOT_UNDOABLE})");
     }
 

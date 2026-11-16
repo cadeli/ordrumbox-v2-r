@@ -161,7 +161,7 @@ impl Session {
             let pitch = a.note.map_or_else(|| "—".to_owned(), |n| format!("{}{}", n.name, n.octave));
             let duration = format!("{} ms", crate::control::to_fixed_text(a.duration_sec * 1000.0, 0));
             let peak = format!("{} dB", crate::control::to_fixed_text(a.peak_db, 1));
-            SampleBar { info: format!("{pitch} · {duration} · {peak}"), envelope: a.envelope.clone(), overlay }
+            SampleBar { info: format!("{pitch} · {duration} · {peak}"), envelope: a.envelope, overlay }
         });
 
         // Instruments that have samples, sorted; the current one.
@@ -193,7 +193,7 @@ impl Session {
         };
 
         // Samples of that instrument: the current kit's first.
-        let current_url = url.clone().unwrap_or_else(|| track.sample_path.clone());
+        let current_url = url.unwrap_or_else(|| track.sample_path.clone());
         let found = self.samples_for(&current_id);
         let samples = if found.is_empty() && !track.use_synth {
             Choice { values: vec![String::new()], labels: vec!["— no samples —".into()], selected: 0 }

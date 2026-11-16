@@ -8,8 +8,8 @@
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_engine::synth_model as model;
 use ordrumbox_logic::tools::{
-    Tools, count, find_pattern, find_song, find_track, list, object, optional_bool, optional_text, optional_whole,
-    pattern_name, pattern_summary, same_name, song_json, strings, text,
+    Tools, count, find_pattern, find_song, list, object, optional_bool, optional_text, optional_whole, pattern_name,
+    pattern_summary, same_name, strings, text,
 };
 
 use super::Session;
@@ -19,6 +19,9 @@ use crate::{master, output};
 use crate::{mcp_link, store, update};
 use ordrumbox_engine::{Mode, analysis};
 use std::path::{Path, PathBuf};
+
+/// A group of tools: its answer to tool `name`, or `None` when it has no such tool.
+type ToolGroup = fn(&mut Session, &str, &Value) -> Result<Option<Value>, String>;
 
 impl Session {
     /// Start the MCP link: its port goes to `mcp.json`. A failure is a
@@ -63,171 +66,17 @@ impl Session {
         if self.confirm_open() {
             return Err("A confirmation is open in the app: the user must answer it first".into());
         }
+        // These run their own bookkeeping: nothing to settle afterwards.
+        match name {
+            "undo" => self.undo(),
+            "redo" => self.redo(),
+            _ => {}
+        }
+        if matches!(name, "undo" | "redo") {
+            return Ok(object([("message", Value::from(self.message.as_str()))]));
+        }
         let revision = self.editor.revision();
-        let outcome = match name {
-            "listPatterns" => self.mcp_library_tool(name, args).map(|mut answer| {
-                if let Some(object) = answer.as_object_mut() {
-                    object.insert("shown", count(self.pattern_index));
-                }
-                answer
-            }),
-            "createArrangement" => {
-                let answer = self.mcp_library_tool(name, args)?;
-                self.song_panel.scroll_to_start();
-                Ok(answer)
-            }
-            "selectPattern" => self.mcp_select_pattern(args),
-            "removePattern" => self.mcp_remove_pattern(args),
-            "savePatternToJson" => {
-                let p = self.mcp_pattern(text(args, "patternName")?)?;
-                let path = self.mcp_export_path(Export::PatternJson, p, 0)?;
-                self.write_pattern_json(p, &path)?;
-                Ok(object([("filePath", Value::from(path.display().to_string()))]))
-            }
-            "exportPatternWav" => {
-                let p = self.mcp_pattern(text(args, "patternName")?)?;
-                let path = self.mcp_export_path(Export::PatternWav, p, 0)?;
-                exported(&path, self.write_wav(Mode::Pattern(p), &path)?)
-            }
-            "exportPatternStems" => {
-                let p = self.mcp_pattern(text(args, "patternName")?)?;
-                let path = self.mcp_export_path(Export::PatternStems, p, 0)?;
-                exported(&path, self.write_stems(Mode::Pattern(p), &path)?)
-            }
-            "exportPatternMidi" => {
-                let p = self.mcp_pattern(text(args, "patternName")?)?;
-                let path = self.mcp_export_path(Export::PatternMidi, p, 0)?;
-                exported(&path, self.write_midi(p, &path)?)
-            }
-            "exportArrangementWav" => {
-                let s = find_song(&self.editor, args)?;
-                let path = self.mcp_export_path(Export::SongWav, 0, s)?;
-                exported(&path, self.write_wav(Mode::Song(s), &path)?)
-            }
-            "exportArrangementStems" => {
-                let s = find_song(&self.editor, args)?;
-                let path = self.mcp_export_path(Export::SongStems, 0, s)?;
-                exported(&path, self.write_stems(Mode::Song(s), &path)?)
-            }
-            "importMidi" => self.mcp_import_midi(args),
-            "getSynthPreset" => {
-                let key = self.mcp_synth(text(args, "preset")?)?;
-                let mut draft = self.synths.presets.get(&key).and_then(Value::as_object).cloned().unwrap_or_default();
-                model::hydrate(&mut draft);
-                Ok(object([("preset", Value::from(key)), ("settings", Value::Object(draft))]))
-            }
-            "createSynthPreset" => self.mcp_create_synth(args),
-            "updateSynthPreset" => {
-                let key = self.mcp_synth(text(args, "preset")?)?;
-                let settings = synth_settings(args, true)?;
-                let draft = self.synths.presets.get(&key).and_then(Value::as_object).cloned().unwrap_or_default();
-                Ok(self.mcp_write_synth(&key, draft, &settings))
-            }
-            "removeSynthPreset" => self.mcp_remove_synth(args),
-            "listSynthPresets" => {
-                let keys = self.synths.presets.keys().into_iter().map(Value::from).collect::<Vec<_>>();
-                Ok(object([("count", count(keys.len())), ("presets", Value::Array(keys))]))
-            }
-            "listKitSamples" => Ok(self.mcp_kits()),
-            "selectKit" => {
-                let wanted = text(args, "kit")?;
-                let found = self.kits.kits().iter().position(|k| same_name(&k.name, wanted));
-                let index = found.ok_or_else(|| format!("No kit named \"{wanted}\" (listKitSamples gives them)"))?;
-                self.use_kit(index);
-                Ok(object([("kit", Value::from(self.kits.kits()[index].name.as_str()))]))
-            }
-            "analyzeSamples" => self.mcp_analyze(args),
-            "removeArrangement" => self.mcp_remove_arrangement(args),
-            "getMaster" => Ok(master::to_json(&self.output_panel.master())),
-            "setMaster" => self.mcp_set_master(args),
-            "play" => self.mcp_play(args),
-            "stop" => {
-                self.playback.stop();
-                self.message = "stopped".into();
-                Ok(object([("playing", Value::Bool(false))]))
-            }
-            "undo" => {
-                self.undo();
-                return Ok(object([("message", Value::from(self.message.as_str()))]));
-            }
-            "redo" => {
-                self.redo();
-                return Ok(object([("message", Value::from(self.message.as_str()))]));
-            }
-            "assignSounds" => self.mcp_assign_sounds(args),
-            "auditionTrack" => {
-                let (p, t) = find_track(self.editor.library(), args)?;
-                let controller = self.playback.controller_mut().ok_or(NO_AUDIO)?;
-                controller.preview(self.editor.library(), p, t, None);
-                Ok(object([("trackName", Value::from(self.editor.library().patterns[p].tracks[t].name.as_str()))]))
-            }
-            "getPlaybackState" => Ok(self.mcp_playback_state()),
-            "selectArrangement" => {
-                if args.get("arrangement").is_none_or(|a| *a == Value::Null) {
-                    return Err("arrangement is required".into());
-                }
-                let s = find_song(&self.editor, args)?;
-                self.select_song(s);
-                Ok(song_json(self.editor.library(), s))
-            }
-            "setSongInfo" => self.mcp_set_song_info(args),
-            "saveSong" => {
-                let dir = self.saving.songs_dir.as_ref().ok_or("no user data folder to save to")?;
-                let path = dir.join(self.song_file_name());
-                self.mcp_write_song(&path, "savedAt")
-            }
-            "exportSong" => {
-                let path = store::exports_dir().ok_or("no user data folder to export to")?.join(self.song_file_name());
-                self.mcp_write_song(&path, "exportedAt")
-            }
-            "listSavedSongs" => {
-                let names = self.mcp_saved_songs()?.into_iter().map(|(name, _)| Value::from(name)).collect();
-                Ok(object([("songs", Value::Array(names))]))
-            }
-            "loadSong" => self.mcp_load_song(args),
-            "normalizeKit" => {
-                let k = self.mcp_kit(args)?;
-                let n = self.kits.normalize(k)?;
-                self.kits_changed(format!("Normalized {n} sample(s)"));
-                Ok(object([("kit", Value::from(self.kits.kits()[k].name.as_str())), ("normalized", count(n))]))
-            }
-            "addSampleToKit" => {
-                let k = self.mcp_kit(args)?;
-                let (sample, message) = self.kits.add_sample(k, Path::new(text(args, "filePath")?.trim()))?;
-                self.kits_changed(message);
-                let added = &self.kits.kits()[k].samples[sample];
-                Ok(object([
-                    ("kit", Value::from(self.kits.kits()[k].name.as_str())),
-                    ("key", Value::from(added.key.as_str())),
-                    ("path", Value::from(added.path.as_str())),
-                ]))
-            }
-            "replaceKitSample" => {
-                let k = self.mcp_kit(args)?;
-                let path = text(args, "samplePath")?.trim();
-                let sample = self.kits.kits()[k].samples.iter().position(|s| s.path == path);
-                let sample =
-                    sample.ok_or_else(|| format!("No sample \"{path}\" in that kit (listKitSamples gives them)"))?;
-                let message = self.kits.replace_sample(k, sample, Path::new(text(args, "filePath")?.trim()))?;
-                self.kits_changed(message);
-                Ok(object([("message", Value::from(self.message.as_str()))]))
-            }
-            "importKitFolder" => {
-                let (k, message) = self.kits.import_folder(Path::new(text(args, "folderPath")?.trim()))?;
-                self.mcp_kit_added(k, message)
-            }
-            "loadKitMapping" => {
-                let (k, message) = self.kits.load_mapping(Path::new(text(args, "filePath")?.trim()))?;
-                self.mcp_kit_added(k, message)
-            }
-            "exportKitMapping" => {
-                let k = self.mcp_kit(args)?;
-                let name = self.kits.mapping_file_name(k).ok_or("nothing to export")?;
-                let path = store::exports_dir().ok_or("no user data folder to export to")?.join(name);
-                exported(&path, self.kits.export_mapping(k, &path)?)
-            }
-            _ => self.mcp_library_tool(name, args),
-        };
+        let outcome = self.mcp_dispatch(name, args);
         if self.editor.revision() != revision {
             self.edited();
             self.clamp_selection();
@@ -236,9 +85,28 @@ impl Session {
         outcome
     }
 
+    /// The groups of tools of `session_mcp_tools.rs`, in the order they are asked.
+    const TOOL_GROUPS: [ToolGroup; 5] = [
+        Session::mcp_arrangement_tool,
+        Session::mcp_files_tool,
+        Session::mcp_synth_tool,
+        Session::mcp_kit_tool,
+        Session::mcp_sound_tool,
+    ];
+
+    /// Run tool `name`: the group that has it, else a library tool.
+    pub(super) fn mcp_dispatch(&mut self, name: &str, args: &Value) -> Result<Value, String> {
+        for group in Self::TOOL_GROUPS {
+            if let Some(answer) = group(self, name, args)? {
+                return Ok(answer);
+            }
+        }
+        self.mcp_library_tool(name, args)
+    }
+
     /// Run library tool `name` (`ordrumbox_logic::tools`) on the editor and
     /// what the generators read.
-    fn mcp_library_tool(&mut self, name: &str, args: &Value) -> Result<Value, String> {
+    pub(super) fn mcp_library_tool(&mut self, name: &str, args: &Value) -> Result<Value, String> {
         let synth_presets = self.synths.presets.keys();
         let mut tools = Tools {
             editor: &mut self.editor,
@@ -253,17 +121,17 @@ impl Session {
         tools.call(name, args).unwrap_or_else(|| Err(format!("Unknown tool: {name}")))
     }
 
-    fn mcp_pattern(&self, reference: &str) -> Result<usize, String> {
+    pub(super) fn mcp_pattern(&self, reference: &str) -> Result<usize, String> {
         find_pattern(self.editor.library(), reference)
     }
 
-    fn mcp_remove_pattern(&mut self, args: &Value) -> Result<Value, String> {
+    pub(super) fn mcp_remove_pattern(&mut self, args: &Value) -> Result<Value, String> {
         let p = self.mcp_pattern(text(args, "patternName")?)?;
         let (name, clips) = self.remove_pattern_with_clips(p)?;
         Ok(object([("removed", Value::from(name)), ("clipsRemoved", count(clips))]))
     }
 
-    fn mcp_select_pattern(&mut self, args: &Value) -> Result<Value, String> {
+    pub(super) fn mcp_select_pattern(&mut self, args: &Value) -> Result<Value, String> {
         let count = self.editor.library().patterns.len();
         let target = match (optional_text(args, "patternName")?, optional_whole(args, "index")?) {
             (Some(name), _) if !name.trim().is_empty() => Some(self.mcp_pattern(name)?),
@@ -280,13 +148,13 @@ impl Session {
 
     /// Where a tool writes `export` of pattern `p` or arrangement `s`: the
     /// exports folder, under the name the window would give.
-    fn mcp_export_path(&self, export: Export, p: usize, s: usize) -> Result<PathBuf, String> {
+    pub(super) fn mcp_export_path(&self, export: Export, p: usize, s: usize) -> Result<PathBuf, String> {
         let dir = store::exports_dir().ok_or("no user data folder to export to")?;
         let name = self.export_file_name_of(export, p, s).ok_or("nothing to export")?;
         Ok(dir.join(name))
     }
 
-    fn mcp_import_midi(&mut self, args: &Value) -> Result<Value, String> {
+    pub(super) fn mcp_import_midi(&mut self, args: &Value) -> Result<Value, String> {
         let path = text(args, "filePath")?.trim();
         let before = self.editor.library().patterns.len();
         let message = self.import_midi_file(Path::new(path))?;
@@ -298,7 +166,7 @@ impl Session {
     }
 
     /// Master settings by key, each inside its knob's range.
-    fn mcp_set_master(&mut self, args: &Value) -> Result<Value, String> {
+    pub(super) fn mcp_set_master(&mut self, args: &Value) -> Result<Value, String> {
         let settings = args.get("settings").and_then(Value::as_object).ok_or("settings: not an object")?;
         let mut changed = self.output_panel.master();
         for (key, value) in settings.iter() {
@@ -322,7 +190,7 @@ impl Session {
     }
 
     /// A synth preset's key, by key (else in any case).
-    fn mcp_synth(&self, name: &str) -> Result<String, String> {
+    pub(super) fn mcp_synth(&self, name: &str) -> Result<String, String> {
         let keys = self.synths.presets.keys();
         let found = keys.iter().find(|k| **k == name.trim()).or_else(|| keys.iter().find(|k| same_name(k, name)));
         found
@@ -330,7 +198,7 @@ impl Session {
             .ok_or_else(|| format!("No synth preset \"{}\" (listSynthPresets gives them)", name.trim()))
     }
 
-    fn mcp_create_synth(&mut self, args: &Value) -> Result<Value, String> {
+    pub(super) fn mcp_create_synth(&mut self, args: &Value) -> Result<Value, String> {
         let key = text(args, "preset")?.trim();
         if key.is_empty() {
             return Err("preset is empty".into());
@@ -351,7 +219,7 @@ impl Session {
 
     /// Preset `key` as `draft` with `settings` set as the synth editor sets
     /// them, to the player and to the disk; what it is now.
-    fn mcp_write_synth(&mut self, key: &str, mut draft: Object, settings: &[(String, Value)]) -> Value {
+    pub(super) fn mcp_write_synth(&mut self, key: &str, mut draft: Object, settings: &[(String, Value)]) -> Value {
         model::hydrate(&mut draft);
         for (path, value) in settings {
             model::implicit_enable(&mut draft, path);
@@ -365,7 +233,7 @@ impl Session {
         object([("preset", Value::from(key)), ("settings", Value::Object(draft))])
     }
 
-    fn mcp_remove_synth(&mut self, args: &Value) -> Result<Value, String> {
+    pub(super) fn mcp_remove_synth(&mut self, args: &Value) -> Result<Value, String> {
         let key = self.mcp_synth(text(args, "preset")?)?;
         if self.synths.presets.len() <= 1 {
             return Err("The last synth preset stays".into());
@@ -385,7 +253,7 @@ impl Session {
         Ok(object([("removed", Value::from(key)), ("tracksUsing", strings(&using))]))
     }
 
-    fn mcp_kits(&self) -> Value {
+    pub(super) fn mcp_kits(&self) -> Value {
         let kits = self.kits.kits().iter().map(|kit| {
             let samples = kit.samples.iter().map(|s| {
                 object([
@@ -400,7 +268,7 @@ impl Session {
         object([("kit", current), ("kits", Value::Array(kits.collect()))])
     }
 
-    fn mcp_analyze(&self, args: &Value) -> Result<Value, String> {
+    pub(super) fn mcp_analyze(&self, args: &Value) -> Result<Value, String> {
         let mut results = Vec::new();
         for item in list(args, "samples")? {
             let path = item.as_str().ok_or_else(|| format!("samples: {item} is not a string"))?;
@@ -427,7 +295,7 @@ impl Session {
         Ok(object([("results", Value::Array(results))]))
     }
 
-    fn mcp_remove_arrangement(&mut self, args: &Value) -> Result<Value, String> {
+    pub(super) fn mcp_remove_arrangement(&mut self, args: &Value) -> Result<Value, String> {
         let s = find_song(&self.editor, args)?;
         if self.playback.plays(Mode::Song(s)) {
             self.playback.stop();
@@ -438,7 +306,7 @@ impl Session {
         Ok(object([("removed", Value::from(name)), ("arrangements", count(self.editor.library().songs.len()))]))
     }
 
-    fn mcp_play(&mut self, args: &Value) -> Result<Value, String> {
+    pub(super) fn mcp_play(&mut self, args: &Value) -> Result<Value, String> {
         let song = optional_bool(args, "song")?.unwrap_or(false);
         if self.playback.controller().is_none() {
             return Err(NO_AUDIO.into());
@@ -461,7 +329,7 @@ impl Session {
         self.message = format!("playing {}", playing.as_deref().unwrap_or_default());
         Ok(object([("playing", playing.map_or(Value::Null, Value::from))]))
     }
-    fn mcp_assign_sounds(&mut self, args: &Value) -> Result<Value, String> {
+    pub(super) fn mcp_assign_sounds(&mut self, args: &Value) -> Result<Value, String> {
         let p = self.mcp_pattern(text(args, "patternName")?)?;
         // What the window says in its message is refused here.
         match text(args, "sounds")? {
@@ -486,7 +354,7 @@ impl Session {
         Ok(object([("message", Value::from(message)), ("tracks", Value::Array(tracks.collect()))]))
     }
 
-    fn mcp_playback_state(&self) -> Value {
+    pub(super) fn mcp_playback_state(&self) -> Value {
         let library = self.editor.library();
         let Some(controller) = self.playback.controller().filter(|c| c.is_playing()) else {
             return object([("playing", Value::Bool(false))]);
@@ -517,7 +385,7 @@ impl Session {
         }
     }
 
-    fn mcp_set_song_info(&mut self, args: &Value) -> Result<Value, String> {
+    pub(super) fn mcp_set_song_info(&mut self, args: &Value) -> Result<Value, String> {
         let name = optional_text(args, "name")?.map(str::trim);
         let description = optional_text(args, "description")?.map(str::trim);
         if name.is_some_and(str::is_empty) {
@@ -536,20 +404,20 @@ impl Session {
     }
 
     /// The song written to `path`, stamped `stamp`.
-    fn mcp_write_song(&mut self, path: &Path, stamp: &str) -> Result<Value, String> {
+    pub(super) fn mcp_write_song(&mut self, path: &Path, stamp: &str) -> Result<Value, String> {
         store::save_song(path, &self.song_record(stamp)).map_err(|e| format!("{}: {e}", path.display()))?;
         self.message = format!("Song \"{}\" written to {}", self.song_name(), path.display());
         exported(path, self.message.clone())
     }
 
     /// The songs of the songs folder: name and file.
-    fn mcp_saved_songs(&self) -> Result<Vec<(String, PathBuf)>, String> {
+    pub(super) fn mcp_saved_songs(&self) -> Result<Vec<(String, PathBuf)>, String> {
         let dir = self.saving.songs_dir.as_ref().ok_or("no user data folder: no saved songs")?;
         let files = store::list_songs(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         Ok(files.into_iter().map(|f| (f.file_stem().unwrap_or_default().to_string_lossy().into_owned(), f)).collect())
     }
 
-    fn mcp_load_song(&mut self, args: &Value) -> Result<Value, String> {
+    pub(super) fn mcp_load_song(&mut self, args: &Value) -> Result<Value, String> {
         let path = match (optional_text(args, "name")?, optional_text(args, "filePath")?) {
             (Some(name), None) => {
                 let songs = self.mcp_saved_songs()?;
@@ -569,7 +437,7 @@ impl Session {
     }
 
     /// Argument `kit` (a kit name, any case), else the kit in use.
-    fn mcp_kit(&self, args: &Value) -> Result<usize, String> {
+    pub(super) fn mcp_kit(&self, args: &Value) -> Result<usize, String> {
         match optional_text(args, "kit")?.filter(|k| !k.trim().is_empty()) {
             Some(wanted) => self
                 .kits
@@ -582,7 +450,7 @@ impl Session {
     }
 
     /// Kit `k`, read from a folder or a mapping: the kits saved, its samples told.
-    fn mcp_kit_added(&mut self, k: usize, message: String) -> Result<Value, String> {
+    pub(super) fn mcp_kit_added(&mut self, k: usize, message: String) -> Result<Value, String> {
         self.kits_changed(message);
         let kit = &self.kits.kits()[k];
         let samples = kit
@@ -598,11 +466,11 @@ impl Session {
 }
 
 /// What a tool that plays answers without a sound device.
-const NO_AUDIO: &str = "no audio device: orDrumbox plays nothing";
+pub(super) const NO_AUDIO: &str = "no audio device: orDrumbox plays nothing";
 
 /// Argument `settings` (`required`, else it may be absent): synth preset
 /// settings by path, checked against the synth editor's controls.
-fn synth_settings(args: &Value, required: bool) -> Result<Vec<(String, Value)>, String> {
+pub(super) fn synth_settings(args: &Value, required: bool) -> Result<Vec<(String, Value)>, String> {
     let fields = match args.get("settings") {
         None | Some(Value::Null) if !required => return Ok(Vec::new()),
         Some(Value::Object(fields)) if !(required && fields.is_empty()) => fields,
@@ -638,7 +506,7 @@ fn synth_settings(args: &Value, required: bool) -> Result<Vec<(String, Value)>, 
 }
 
 /// The answer of a tool that wrote a file.
-fn exported(path: &Path, message: String) -> Result<Value, String> {
+pub(super) fn exported(path: &Path, message: String) -> Result<Value, String> {
     Ok(object([("filePath", Value::from(path.display().to_string())), ("message", Value::from(message))]))
 }
 

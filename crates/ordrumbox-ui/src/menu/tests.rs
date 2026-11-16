@@ -1,5 +1,6 @@
 //! Tests of menu.
 
+use super::build::CONTROL_PREFIX;
 use super::*;
 
 use crate::canvas::char_width;
