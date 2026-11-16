@@ -118,6 +118,32 @@ impl ModEnvTarget {
     }
 }
 
+/// The clock rate of the console noise a patch starts with, Hz.
+pub const NOISE_RATE_DEFAULT: f64 = 8000.0;
+
+/// What the noise generator draws its samples from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum NoiseMode {
+    /// A new random value every sample.
+    #[default]
+    White,
+    /// A 15-bit shift register clocked at [`SynthPatch::noise_rate`]: the console's rumble.
+    Long,
+    /// The same register cut to 7 bits: a short loop, a pitched, metallic buzz.
+    Short,
+}
+
+impl NoiseMode {
+    /// Every mode, each at its code.
+    pub const ALL: [Self; 3] = [Self::White, Self::Long, Self::Short];
+
+    /// Its code: its place in [`Self::ALL`].
+    #[must_use]
+    pub const fn code(self) -> u8 {
+        self as u8
+    }
+}
+
 /// What a matrix route reads: a value that moves while a note plays, or is
 /// fixed by it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -206,7 +232,12 @@ pub struct SynthPatch {
     /// Cents.
     pub osc_detune: [f64; 3],
     pub osc_wave: [Wave; 3],
+    /// Share of a cycle a square wave is high, 0–1 (0.5: the plain square).
+    pub osc_width: [f64; 3],
     pub noise_mix: f64,
+    pub noise_mode: NoiseMode,
+    /// Hz the shift register of a [`NoiseMode::Long`] or [`NoiseMode::Short`] noise is clocked at.
+    pub noise_rate: f64,
     pub noise_filter_type: FilterMode,
     pub noise_filter_freq: f64,
     pub noise_filter_q: f64,
@@ -257,7 +288,10 @@ impl Default for SynthPatch {
             osc_gain: [0.5; 3],
             osc_detune: [0.0; 3],
             osc_wave: [Wave::Sine; 3],
+            osc_width: [0.5; 3],
             noise_mix: 0.0,
+            noise_mode: NoiseMode::White,
+            noise_rate: NOISE_RATE_DEFAULT,
             noise_filter_type: FilterMode::Lowpass,
             noise_filter_freq: 1000.0,
             noise_filter_q: 0.7,
@@ -305,6 +339,9 @@ mod tests {
         }
         for (code, target) in ModEnvTarget::ALL.iter().enumerate() {
             assert_eq!(usize::from(target.code()), code);
+        }
+        for (code, mode) in NoiseMode::ALL.iter().enumerate() {
+            assert_eq!(usize::from(mode.code()), code);
         }
     }
 }

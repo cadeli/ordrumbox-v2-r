@@ -29,12 +29,13 @@ fn asset(name: &str) -> String {
 }
 
 /// The text settings a synth preset takes, beside its numeric controls.
-const PRESET_TEXTS: [(&str, &str); 11] = [
+const PRESET_TEXTS: [(&str, &str); 12] = [
     ("vco1.wave", "square"),
     ("vco2.wave", "triangle"),
     ("vco3.wave", "random"),
     ("filter.type", "bandpass"),
     ("noise.filterType", "lowpass"),
+    ("noise.mode", "short"),
     ("lfo.target", "filter.freq"),
     ("lfo.wave", "sawtooth"),
     ("lfo.sync", "1/8T"),
@@ -51,7 +52,9 @@ fn full_preset() -> (Object, Vec<(String, Value)>) {
     let mut draft = defaults.clone();
     let mut values = Vec::new();
     for meta in model::metas() {
-        let default = model::number(&defaults, meta.path).unwrap_or_else(|| panic!("{}: no default", meta.path));
+        let default = model::number(&defaults, meta.path)
+            .or_else(|| model::extra_default(meta.path))
+            .unwrap_or_else(|| panic!("{}: no default", meta.path));
         let value = if default == meta.max { meta.min } else { meta.max };
         values.push((meta.path.to_owned(), Value::from(value)));
     }

@@ -3,7 +3,7 @@
 
 use std::f64::consts::{PI, SQRT_2};
 
-use super::oscillator::{SineTable, sawtooth, sin_lookup, square, triangle};
+use super::oscillator::{SineTable, pulse, sawtooth, sin_lookup, triangle};
 use super::{cents_ratio, clamp};
 use crate::lfo::{self, Wave};
 
@@ -83,13 +83,14 @@ fn sum_layers(
     sum
 }
 
-/// The layers of an oscillator of `wave` moved on by a sample at `frequency`
+/// The layers of an oscillator of `wave` (and pulse `width`) moved on by a sample at `frequency`
 /// Hz: `phases` and `cycles` hold one entry per layer of `layers`. The wave
-/// is chosen once, and each choice runs its own tight loop.
+/// is chosen once, and each choice runs its own tight loop; a square is
+/// high for `width` of its cycle.
 #[inline]
 pub(super) fn unison_oscillator(
     table: &SineTable,
-    wave: Wave,
+    (wave, width): (Wave, f64),
     phases: &mut [f64],
     cycles: &mut [f64],
     layers: &[Layer],
@@ -100,7 +101,7 @@ pub(super) fn unison_oscillator(
         Wave::Sine => sum_layers(phases, cycles, layers, frequency, sample_rate, |p, _, _| sin_lookup(table, p)),
         Wave::Triangle => sum_layers(phases, cycles, layers, frequency, sample_rate, |p, _, _| triangle(p)),
         Wave::Sawtooth => sum_layers(phases, cycles, layers, frequency, sample_rate, |p, dt, _| sawtooth(p, dt)),
-        Wave::Square => sum_layers(phases, cycles, layers, frequency, sample_rate, |p, dt, _| square(p, dt)),
+        Wave::Square => sum_layers(phases, cycles, layers, frequency, sample_rate, |p, dt, _| pulse(p, dt, width)),
         Wave::Random => sum_layers(phases, cycles, layers, frequency, sample_rate, |_, _, c| lfo::sample_and_hold(c)),
     }
 }

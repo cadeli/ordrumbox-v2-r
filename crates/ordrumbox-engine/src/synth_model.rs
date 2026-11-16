@@ -11,13 +11,15 @@ use crate::slope;
 use crate::synth_preset::FM_DEVIATION;
 pub use ordrumbox_dsp::synth::patch::MATRIX_SIZE;
 
-pub use crate::synth_preset::{FILTER_TYPES, MATRIX_SOURCES, WAVES};
+pub use crate::synth_preset::{FILTER_TYPES, MATRIX_SOURCES, NOISE_MODES, WAVES};
 
 mod preview;
 pub use preview::*;
 /// The mod envelope's targets and the LFO syncs (value, label).
 pub const MOD_ENV_TARGETS: [(&str, &str); 5] =
     [("off", "Off"), ("filter", "Filter"), ("pitch", "Pitch"), ("fm", "FM"), ("shape", "Shape")];
+/// The labels of the noise's modes, in the order of [`NOISE_MODES`].
+pub const NOISE_MODE_LABELS: [&str; 3] = ["White", "Long", "Short"];
 /// Filter slopes, dB per octave, and their labels.
 pub const FILTER_SLOPES: [(&str, &str); 2] = [("12", "12 dB"), ("24", "24 dB")];
 pub const LFO_SYNCS: [(&str, &str); 8] = [
@@ -49,7 +51,14 @@ const DEFAULTS: &str = r#"{"masterVolume":0.8,"subGain":0,"pitchPunch":0,
 /// Fields the JS editor lacks, shown last in their card and written only once
 /// set (absent, the engine's default applies): kept out of [`DEFAULTS`] so a
 /// hydrated preset stays the JS one.
-const EXTRA_FIELDS: [(&str, &str); 1] = [("filter", "slope")];
+const EXTRA_FIELDS: [(&str, &str); 6] = [
+    ("filter", "slope"),
+    ("vco1", "width"),
+    ("vco2", "width"),
+    ("vco3", "width"),
+    ("noise", "mode"),
+    ("noise", "rate"),
+];
 
 #[expect(clippy::expect_used, reason = "a constant, read by the tests")]
 pub fn defaults() -> Object {
@@ -71,6 +80,8 @@ pub struct Meta {
     pub path: &'static str,
     pub min: f64,
     pub max: f64,
+    /// What a reset puts it back to, and what a preset that lacks it plays with.
+    pub default: f64,
     pub step: f64,
     pub unit: &'static str,
     pub label: Option<&'static str>,
@@ -78,7 +89,7 @@ pub struct Meta {
 }
 
 const fn meta(path: &'static str, min: f64, max: f64, step: f64, unit: &'static str) -> Meta {
-    Meta { path, min, max, step, unit, label: None, log: false }
+    Meta { path, min, max, default: min, step, unit, label: None, log: false }
 }
 
 /// Every numeric control, in the JS order (the LFO targets follow it).
@@ -142,8 +153,33 @@ pub const MATRIX_AMOUNTS: [Meta; MATRIX_SIZE] = [
     meta("matrix.amount8", -1.0, 1.0, 0.01, ""),
 ];
 
+/// The controls of [`EXTRA_FIELDS`] that are knobs: the pulse width of each
+/// oscillator and the clock of the console noise. Not LFO targets.
+pub const EXTRA_METAS: [Meta; 4] = [
+    Meta { default: 0.5, label: Some("Width"), ..meta("vco1.width", 0.02, 0.98, 0.01, "") },
+    Meta { default: 0.5, label: Some("Width"), ..meta("vco2.width", 0.02, 0.98, 0.01, "") },
+    Meta { default: 0.5, label: Some("Width"), ..meta("vco3.width", 0.02, 0.98, 0.01, "") },
+    Meta {
+        log: true,
+        default: ordrumbox_dsp::synth::patch::NOISE_RATE_DEFAULT,
+        label: Some("Rate"),
+        ..meta(
+            "noise.rate",
+            crate::synth_preset::NOISE_RATE_RANGE.0,
+            crate::synth_preset::NOISE_RATE_RANGE.1,
+            1.0,
+            "Hz",
+        )
+    },
+];
+
 pub fn metas() -> impl Iterator<Item = &'static Meta> {
-    METAS.iter().chain(std::iter::once(&MOD_RELEASE)).chain(&MATRIX_AMOUNTS)
+    METAS.iter().chain(std::iter::once(&MOD_RELEASE)).chain(&MATRIX_AMOUNTS).chain(&EXTRA_METAS)
+}
+
+/// The value of an extra control `draft` has not set, if `path` is one.
+pub fn extra_default(path: &str) -> Option<f64> {
+    EXTRA_METAS.iter().find(|m| m.path == path).map(|m| m.default)
 }
 
 pub fn find_meta(path: &str) -> Option<&'static Meta> {
@@ -157,13 +193,14 @@ pub fn lfo_targets() -> Vec<&'static str> {
         .chain(
             metas()
                 .map(|m| m.path)
-                .filter(|p| !["lfo.", "lfo2.", "unison.", "matrix."].iter().any(|group| p.starts_with(group))),
+                .filter(|p| !["lfo.", "lfo2.", "unison.", "matrix."].iter().any(|group| p.starts_with(group)))
+                .filter(|p| extra_default(p).is_none()),
         )
         .collect()
 }
 
 /// The controls set from a list (`filter.slope` holds numbers).
-pub const CHOICE_PATHS: [&str; 13 + 2 * MATRIX_SIZE] = [
+pub const CHOICE_PATHS: [&str; 14 + 2 * MATRIX_SIZE] = [
     "vco1.wave",
     "vco2.wave",
     "vco3.wave",
@@ -172,6 +209,7 @@ pub const CHOICE_PATHS: [&str; 13 + 2 * MATRIX_SIZE] = [
     "filter.type",
     "noise.filterType",
     "filter.slope",
+    "noise.mode",
     "modEnvelope.target",
     "lfo.target",
     "lfo2.target",
@@ -209,6 +247,7 @@ pub fn choices(path: &str) -> Option<Vec<&'static str>> {
         "vco1.wave" | "vco2.wave" | "vco3.wave" | "lfo.wave" | "lfo2.wave" => WAVES.to_vec(),
         "filter.type" | "noise.filterType" => FILTER_TYPES.to_vec(),
         "filter.slope" => values(&FILTER_SLOPES),
+        "noise.mode" => NOISE_MODES.to_vec(),
         "modEnvelope.target" => values(&MOD_ENV_TARGETS),
         "lfo.target" | "lfo2.target" => lfo_targets(),
         "lfo.sync" | "lfo2.sync" => values(&LFO_SYNCS),
@@ -457,7 +496,10 @@ pub fn implicit_enable(draft: &mut Object, path: &str) -> Vec<String> {
     let Some((group, key)) = path.split_once('.') else { return Vec::new() };
     let mut changed = Vec::new();
     let gain = |d: &Object, g: &str| number(d, &format!("{g}.gain")).unwrap_or(0.0);
-    if matches!(group, "vco2" | "vco3") && matches!(key, "octave" | "detune" | "wave") && gain(draft, group) == 0.0 {
+    if matches!(group, "vco2" | "vco3")
+        && matches!(key, "octave" | "detune" | "wave" | "width")
+        && gain(draft, group) == 0.0
+    {
         if let Some(Value::Object(vco)) = draft.get_mut(group) {
             vco.insert("gain", Value::from(0.5));
             vco.remove("_savedGain");
@@ -467,7 +509,10 @@ pub fn implicit_enable(draft: &mut Object, path: &str) -> Vec<String> {
         set(draft, "fm.amount", Value::from(0.3));
         draft.insert("bypassFm", Value::Bool(false));
         changed.push("fm.amount".into());
-    } else if group == "noise" && key.starts_with("filter") && number(draft, "noise.mix").unwrap_or(0.0) == 0.0 {
+    } else if group == "noise"
+        && (key.starts_with("filter") || matches!(key, "mode" | "rate"))
+        && number(draft, "noise.mix").unwrap_or(0.0) == 0.0
+    {
         set(draft, "noise.mix", Value::from(0.15));
         draft.insert("bypassNoise", Value::Bool(false));
         changed.push("noise.mix".into());

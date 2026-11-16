@@ -781,10 +781,11 @@ A knob an LFO moves is purple and follows it. The pills under the cards show the
 <table>
 <tr><th>Card</th><th>Control</th><th>Range</th><th>What it does</th></tr>
 <tr><td><strong>Scope</strong></td><td>—</td><td></td><td>Four cycles of the oscillators, with FM, sub and drive.</td></tr>
-<tr><td rowspan="4"><strong>VCO1</strong>, <strong>VCO2</strong>, <strong>VCO3</strong></td><td>wave</td><td>sin, tri, saw, sqr, rnd</td><td>Waveform.</td></tr>
+<tr><td rowspan="5"><strong>VCO1</strong>, <strong>VCO2</strong>, <strong>VCO3</strong></td><td>wave</td><td>sin, tri, saw, sqr, rnd</td><td>Waveform.</td></tr>
 <tr><td>gain</td><td>0–1</td><td>Level (VCO1 at 1, the others at 0 by default).</td></tr>
 <tr><td>octave</td><td>−4 to +4</td><td>Octave offset.</td></tr>
 <tr><td>detune</td><td>−100 to +100 cents</td><td>Fine tuning.</td></tr>
+<tr><td>width</td><td>0.02–0.98 (default 0.5)</td><td>How long a square wave stays high in a cycle: 0.5 is the plain square, 0.25 and 0.125 are the thin pulses of 8-bit consoles. Square wave only.</td></tr>
 <tr><td rowspan="3"><strong>Unison</strong></td><td>Layers</td><td>1–8</td><td>Each oscillator sounds as this many detuned layers, each starting at its own phase (1: off). The level stays that of one layer.</td></tr>
 <tr><td>detune</td><td>0–100 cents</td><td>How far the outermost layers are from the pitch, on each side.</td></tr>
 <tr><td>spread</td><td>0–1</td><td>How far the layers spread over the stereo field (0: all in the middle).</td></tr>
@@ -821,7 +822,9 @@ A knob an LFO moves is purple and follows it. The pills under the cards show the
 <tr><td>freq</td><td>0.01–5 Hz</td><td>Rate (when not synced).</td></tr>
 <tr><td>depth</td><td>0–1</td><td>Amount.</td></tr>
 <tr><td>sync</td><td>free, 1/1, 1/2, 1/4, 1/8, 1/16, 1/8T, 1/16T</td><td>Lock the rate to the tempo (T = triplet).</td></tr>
-<tr><td rowspan="4"><strong>noise</strong></td><td>mix</td><td>0–1</td><td>White noise level.</td></tr>
+<tr><td rowspan="6"><strong>noise</strong></td><td>mix</td><td>0–1</td><td>Noise level.</td></tr>
+<tr><td>mode</td><td>White, Long, Short</td><td>White is a new random value every sample. Long and Short are a console's shift register (15 and 7 bits): a grainy rumble, and a short loop that buzzes at a pitch.</td></tr>
+<tr><td>rate</td><td>100 Hz – 32 kHz</td><td>How fast the shift register steps: low is a rumble, high a hiss. Long and Short only.</td></tr>
 <tr><td>filterType</td><td>LP, HP, BP, NT</td><td>The noise's filter (default highpass).</td></tr>
 <tr><td>filterFreq</td><td>20 Hz – 20 kHz</td><td>Its cutoff.</td></tr>
 <tr><td>filterQ</td><td>0.1–24</td><td>Its resonance.</td></tr>

@@ -79,7 +79,7 @@ enum Field {
 
 /// The knob of a numeric control.
 fn knob_spec(meta: &model::Meta) -> Spec {
-    let spec = Spec::knob(meta.min, meta.max, meta.step, meta.min);
+    let spec = Spec::knob(meta.min, meta.max, meta.step, meta.default);
     if meta.log { spec.log_full_travel() } else { spec }
 }
 
@@ -97,6 +97,15 @@ fn field_kind(path: &str, value: Option<&Value>) -> Field {
     }
     if path == "filter.slope" {
         return list(&FILTER_SLOPES);
+    }
+    if path == "noise.mode" {
+        let labels = model::NOISE_MODE_LABELS;
+        return Field::List(
+            model::NOISE_MODES.iter().zip(labels).map(|(v, l)| ((*v).to_owned(), l.to_owned())).collect(),
+        );
+    }
+    if model::extra_default(path).is_some() {
+        return Field::Knob;
     }
     if is_lfo && key == "target" {
         let targets = model::lfo_targets();
@@ -330,7 +339,7 @@ fn push_fields(
         let label = meta.and_then(|m| m.label).unwrap_or(key).to_owned();
         match field_kind(&path, model::get(draft, &path)) {
             Field::Knob => {
-                let base = model::number(draft, &path).unwrap_or(0.0);
+                let base = model::number(draft, &path).or_else(|| model::extra_default(&path)).unwrap_or(0.0);
                 let moved = lfo(&path);
                 let spec = meta.map_or_else(|| Spec::knob(0.0, 1.0, 0.01, 0.0), knob_spec);
                 let value = moved.map_or(base, |m| m.clamp(spec.min, spec.max));

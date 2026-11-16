@@ -88,6 +88,25 @@ pub(super) fn xorshift32(mut state: u32) -> u32 {
     state
 }
 
+/// Initial state of the shift register of the console noise.
+pub(super) const LFSR_SEED: u16 = 1;
+
+/// The next state of the shift register of the console noise: the two lowest
+/// bits (`short`: bit 0 and bit 6, a loop of 93 steps) are combined and fed
+/// back in at the top (bit 14), as the NES's noise channel does.
+#[inline]
+pub(super) fn lfsr_step(state: u16, is_short: bool) -> u16 {
+    let tap = if is_short { 6 } else { 1 };
+    let feedback = (state ^ (state >> tap)) & 1;
+    (state >> 1) | (feedback << 14)
+}
+
+/// The sample of shift register state `state`: its lowest bit, as -1 or 1.
+#[inline]
+pub(super) fn lfsr_sample(state: u16) -> f64 {
+    if state & 1 == 0 { 1.0 } else { -1.0 }
+}
+
 /// The noise sample of generator state `state`, in [-1, 1).
 #[inline]
 pub(super) fn noise_sample(state: u32) -> f64 {
@@ -112,26 +131,33 @@ pub(super) fn sawtooth(phase: f64, dt: f64) -> f64 {
     phase * 2.0 - 1.0 - poly_blep(phase, dt)
 }
 
-/// The band-limited square at `phase`, moving by `dt` a sample.
+/// Narrowest and widest pulse, share of a cycle: the edges stay apart, so
+/// the band-limiting corrections of the two never overlap.
+pub(super) const WIDTH_MIN: f64 = 0.02;
+pub(super) const WIDTH_MAX: f64 = 0.98;
+
+/// The band-limited pulse at `phase`, high for the first `width` of the cycle
+/// (0.5: the square), moving by `dt` a sample. A width other than a half
+/// leaves a constant offset, as a console's pulse does.
 #[inline]
-pub(super) fn square(phase: f64, dt: f64) -> f64 {
-    let level = if phase < 0.5 { 1.0 } else { -1.0 };
-    level + poly_blep(phase, dt) - poly_blep((phase + 0.5) % 1.0, dt)
+pub(super) fn pulse(phase: f64, dt: f64, width: f64) -> f64 {
+    let level = if phase < width { 1.0 } else { -1.0 };
+    level + poly_blep(phase, dt) - poly_blep((phase + 1.0 - width) % 1.0, dt)
 }
 
 /// An oscillator of `wave` at `phase` (0–1) of its cycle number `cycle`,
-/// moving by `dt` a sample.
+/// moving by `dt` a sample; a square is high for `width` of the cycle.
 ///
 /// The `match` runs for every sample: three oscillators of five waves each
 /// are too many cases to give each its own loop, and the wave of a note never
 /// changes, so the branch is always the same one.
 #[inline]
-pub(super) fn oscillator(table: &SineTable, wave: Wave, phase: f64, dt: f64, cycle: f64) -> f64 {
+pub(super) fn oscillator(table: &SineTable, wave: Wave, phase: f64, dt: f64, cycle: f64, width: f64) -> f64 {
     match wave {
         Wave::Sine => sin_lookup(table, phase),
         Wave::Triangle => triangle(phase),
         Wave::Sawtooth => sawtooth(phase, dt),
-        Wave::Square => square(phase, dt),
+        Wave::Square => pulse(phase, dt, width),
         Wave::Random => lfo::sample_and_hold(cycle),
     }
 }
@@ -145,6 +171,34 @@ mod tests {
         let table = sine_table();
         assert!((sin_lookup(table, 0.25) - 1.0).abs() < 1e-6);
         assert!((sin_lookup(table, -0.25) + 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn a_pulse_is_high_for_its_width() {
+        let share = |width: f64| (0..1000).filter(|i| pulse(f64::from(*i) / 1000.0, 0.0, width) > 0.0).count();
+        assert_eq!([share(0.5), share(0.125), share(0.25)], [500, 125, 250]);
+        assert_eq!(pulse(0.3, 0.01, 0.5), square_half(0.3, 0.01));
+    }
+
+    /// The square as it was before the width: a pulse at a half.
+    fn square_half(phase: f64, dt: f64) -> f64 {
+        let level = if phase < 0.5 { 1.0 } else { -1.0 };
+        level + poly_blep(phase, dt) - poly_blep((phase + 0.5) % 1.0, dt)
+    }
+
+    #[test]
+    fn the_shift_register_loops_after_32767_or_93_steps() {
+        let period = |is_short: bool| {
+            let mut state = lfsr_step(LFSR_SEED, is_short);
+            let mut steps = 1;
+            while state != LFSR_SEED {
+                state = lfsr_step(state, is_short);
+                steps += 1;
+            }
+            steps
+        };
+        assert_eq!(period(false), 32_767);
+        assert_eq!(period(true), 93);
     }
 
     #[test]

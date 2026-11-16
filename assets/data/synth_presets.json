@@ -2409,5 +2409,505 @@
       "target8": "NOT",
       "amount8": 0
     }
+  },
+  "CHIP_LEAD": {
+    "masterVolume": 0.8,
+    "vco1": {
+      "gain": 1,
+      "octave": 0,
+      "detune": 0,
+      "wave": "square",
+      "width": 0.25
+    },
+    "vco2": {
+      "gain": 0,
+      "octave": 0,
+      "detune": 0,
+      "wave": "sine"
+    },
+    "vco3": {
+      "gain": 0,
+      "octave": 0,
+      "detune": 0,
+      "wave": "sine"
+    },
+    "subGain": 0,
+    "pitchPunch": 0,
+    "filter": {
+      "type": "lowpass",
+      "freq": 20000,
+      "Q": 0.7,
+      "drive": 0
+    },
+    "filterEnv": {
+      "filterEnvelopeAmount": 0
+    },
+    "fm": {
+      "amount": 0,
+      "algo": 0
+    },
+    "noise": {
+      "mix": 0,
+      "filterType": "highpass",
+      "filterFreq": 1000,
+      "filterQ": 1
+    },
+    "envelope": {
+      "attack": 0.001,
+      "decay": 0.1,
+      "sustain": 0.7,
+      "release": 0.03
+    },
+    "lfo": {
+      "target": "vco1.detune",
+      "wave": "sine",
+      "freq": 6,
+      "depth": 0.08,
+      "sync": "off"
+    },
+    "lfo2": {
+      "target": "NOT",
+      "wave": "sine",
+      "freq": 0,
+      "depth": 0,
+      "sync": "off"
+    },
+    "modEnvelope": {
+      "attack": 0.005,
+      "decay": 0.12,
+      "sustain": 0,
+      "release": 0.1,
+      "target": "off"
+    },
+    "bypassFilter": true
+  },
+  "CHIP_PULSE": {
+    "masterVolume": 0.8,
+    "vco1": {
+      "gain": 0.7,
+      "octave": 0,
+      "detune": 0,
+      "wave": "square",
+      "width": 0.125
+    },
+    "vco2": {
+      "gain": 0.25,
+      "octave": 1,
+      "detune": 5,
+      "wave": "square",
+      "width": 0.5
+    },
+    "vco3": {
+      "gain": 0,
+      "octave": 0,
+      "detune": 0,
+      "wave": "sine"
+    },
+    "subGain": 0,
+    "pitchPunch": 0,
+    "filter": {
+      "type": "lowpass",
+      "freq": 20000,
+      "Q": 0.7,
+      "drive": 0
+    },
+    "filterEnv": {
+      "filterEnvelopeAmount": 0
+    },
+    "fm": {
+      "amount": 0,
+      "algo": 0
+    },
+    "noise": {
+      "mix": 0,
+      "filterType": "highpass",
+      "filterFreq": 1000,
+      "filterQ": 1
+    },
+    "envelope": {
+      "attack": 0.001,
+      "decay": 0.15,
+      "sustain": 0.6,
+      "release": 0.04
+    },
+    "lfo": {
+      "target": "NOT",
+      "wave": "sine",
+      "freq": 0,
+      "depth": 0,
+      "sync": "off"
+    },
+    "lfo2": {
+      "target": "NOT",
+      "wave": "sine",
+      "freq": 0,
+      "depth": 0,
+      "sync": "off"
+    },
+    "modEnvelope": {
+      "attack": 0.005,
+      "decay": 0.12,
+      "sustain": 0,
+      "release": 0.1,
+      "target": "off"
+    },
+    "bypassFilter": true
+  },
+  "CHIP_BASS": {
+    "masterVolume": 0.8,
+    "vco1": {
+      "gain": 1,
+      "octave": -1,
+      "detune": 0,
+      "wave": "triangle"
+    },
+    "vco2": {
+      "gain": 0.25,
+      "octave": -2,
+      "detune": 0,
+      "wave": "square",
+      "width": 0.5
+    },
+    "vco3": {
+      "gain": 0,
+      "octave": 0,
+      "detune": 0,
+      "wave": "sine"
+    },
+    "subGain": 0,
+    "pitchPunch": 0,
+    "filter": {
+      "type": "lowpass",
+      "freq": 20000,
+      "Q": 0.7,
+      "drive": 0
+    },
+    "filterEnv": {
+      "filterEnvelopeAmount": 0
+    },
+    "fm": {
+      "amount": 0,
+      "algo": 0
+    },
+    "noise": {
+      "mix": 0,
+      "filterType": "highpass",
+      "filterFreq": 1000,
+      "filterQ": 1
+    },
+    "envelope": {
+      "attack": 0.001,
+      "decay": 0.2,
+      "sustain": 0.7,
+      "release": 0.02
+    },
+    "lfo": {
+      "target": "NOT",
+      "wave": "sine",
+      "freq": 0,
+      "depth": 0,
+      "sync": "off"
+    },
+    "lfo2": {
+      "target": "NOT",
+      "wave": "sine",
+      "freq": 0,
+      "depth": 0,
+      "sync": "off"
+    },
+    "modEnvelope": {
+      "attack": 0.005,
+      "decay": 0.12,
+      "sustain": 0,
+      "release": 0.1,
+      "target": "off"
+    },
+    "bypassFilter": true
+  },
+  "CHIP_KICK": {
+    "masterVolume": 1,
+    "vco1": {
+      "gain": 1,
+      "octave": -1,
+      "detune": -300,
+      "wave": "triangle"
+    },
+    "vco2": {
+      "gain": 0,
+      "octave": 0,
+      "detune": 0,
+      "wave": "sine"
+    },
+    "vco3": {
+      "gain": 0,
+      "octave": 0,
+      "detune": 0,
+      "wave": "sine"
+    },
+    "subGain": 0,
+    "pitchPunch": 1,
+    "filter": {
+      "type": "lowpass",
+      "freq": 3500,
+      "Q": 0.7,
+      "drive": 0.1
+    },
+    "filterEnv": {
+      "filterEnvelopeAmount": 0
+    },
+    "fm": {
+      "amount": 0,
+      "algo": 0
+    },
+    "noise": {
+      "mix": 0.12,
+      "mode": "long",
+      "rate": 3000,
+      "filterType": "highpass",
+      "filterFreq": 800,
+      "filterQ": 1
+    },
+    "envelope": {
+      "attack": 0.001,
+      "decay": 0.16,
+      "sustain": 0,
+      "release": 0.03
+    },
+    "lfo": {
+      "target": "NOT",
+      "wave": "sine",
+      "freq": 0,
+      "depth": 0,
+      "sync": "off"
+    },
+    "lfo2": {
+      "target": "NOT",
+      "wave": "sine",
+      "freq": 0,
+      "depth": 0,
+      "sync": "off"
+    },
+    "modEnvelope": {
+      "attack": 0.001,
+      "decay": 0.08,
+      "sustain": 0,
+      "release": 0.05,
+      "target": "pitch"
+    }
+  },
+  "CHIP_SNARE": {
+    "masterVolume": 0.75,
+    "vco1": {
+      "gain": 0.5,
+      "octave": 0,
+      "detune": 500,
+      "wave": "square",
+      "width": 0.5
+    },
+    "vco2": {
+      "gain": 0,
+      "octave": 0,
+      "detune": 0,
+      "wave": "sine"
+    },
+    "vco3": {
+      "gain": 0,
+      "octave": 0,
+      "detune": 0,
+      "wave": "sine"
+    },
+    "subGain": 0,
+    "pitchPunch": 0,
+    "filter": {
+      "type": "lowpass",
+      "freq": 20000,
+      "Q": 0.7,
+      "drive": 0
+    },
+    "filterEnv": {
+      "filterEnvelopeAmount": 0
+    },
+    "fm": {
+      "amount": 0,
+      "algo": 0
+    },
+    "noise": {
+      "mix": 0.7,
+      "mode": "long",
+      "rate": 16000,
+      "filterType": "highpass",
+      "filterFreq": 400,
+      "filterQ": 1
+    },
+    "envelope": {
+      "attack": 0.001,
+      "decay": 0.12,
+      "sustain": 0,
+      "release": 0.04
+    },
+    "lfo": {
+      "target": "NOT",
+      "wave": "sine",
+      "freq": 0,
+      "depth": 0,
+      "sync": "off"
+    },
+    "lfo2": {
+      "target": "NOT",
+      "wave": "sine",
+      "freq": 0,
+      "depth": 0,
+      "sync": "off"
+    },
+    "modEnvelope": {
+      "attack": 0.005,
+      "decay": 0.12,
+      "sustain": 0,
+      "release": 0.1,
+      "target": "off"
+    },
+    "bypassFilter": true
+  },
+  "CHIP_TOM": {
+    "masterVolume": 1,
+    "vco1": {
+      "gain": 1,
+      "octave": -1,
+      "detune": 200,
+      "wave": "triangle"
+    },
+    "vco2": {
+      "gain": 0,
+      "octave": 0,
+      "detune": 0,
+      "wave": "sine"
+    },
+    "vco3": {
+      "gain": 0,
+      "octave": 0,
+      "detune": 0,
+      "wave": "sine"
+    },
+    "subGain": 0,
+    "pitchPunch": 0.8,
+    "filter": {
+      "type": "lowpass",
+      "freq": 20000,
+      "Q": 0.7,
+      "drive": 0
+    },
+    "filterEnv": {
+      "filterEnvelopeAmount": 0
+    },
+    "fm": {
+      "amount": 0,
+      "algo": 0
+    },
+    "noise": {
+      "mix": 0,
+      "filterType": "highpass",
+      "filterFreq": 1000,
+      "filterQ": 1
+    },
+    "envelope": {
+      "attack": 0.001,
+      "decay": 0.2,
+      "sustain": 0,
+      "release": 0.04
+    },
+    "lfo": {
+      "target": "NOT",
+      "wave": "sine",
+      "freq": 0,
+      "depth": 0,
+      "sync": "off"
+    },
+    "lfo2": {
+      "target": "NOT",
+      "wave": "sine",
+      "freq": 0,
+      "depth": 0,
+      "sync": "off"
+    },
+    "modEnvelope": {
+      "attack": 0.001,
+      "decay": 0.1,
+      "sustain": 0,
+      "release": 0.05,
+      "target": "pitch"
+    },
+    "bypassFilter": true
+  },
+  "CHIP_HAT": {
+    "masterVolume": 0.7,
+    "vco1": {
+      "gain": 0,
+      "octave": 0,
+      "detune": 0,
+      "wave": "sine"
+    },
+    "vco2": {
+      "gain": 0,
+      "octave": 0,
+      "detune": 0,
+      "wave": "sine"
+    },
+    "vco3": {
+      "gain": 0,
+      "octave": 0,
+      "detune": 0,
+      "wave": "sine"
+    },
+    "subGain": 0,
+    "pitchPunch": 0,
+    "filter": {
+      "type": "lowpass",
+      "freq": 20000,
+      "Q": 0.7,
+      "drive": 0
+    },
+    "filterEnv": {
+      "filterEnvelopeAmount": 0
+    },
+    "fm": {
+      "amount": 0,
+      "algo": 0
+    },
+    "noise": {
+      "mix": 1,
+      "mode": "short",
+      "rate": 30000,
+      "filterType": "highpass",
+      "filterFreq": 4000,
+      "filterQ": 1
+    },
+    "envelope": {
+      "attack": 0.001,
+      "decay": 0.035,
+      "sustain": 0,
+      "release": 0.02
+    },
+    "lfo": {
+      "target": "NOT",
+      "wave": "sine",
+      "freq": 0,
+      "depth": 0,
+      "sync": "off"
+    },
+    "lfo2": {
+      "target": "NOT",
+      "wave": "sine",
+      "freq": 0,
+      "depth": 0,
+      "sync": "off"
+    },
+    "modEnvelope": {
+      "attack": 0.005,
+      "decay": 0.12,
+      "sustain": 0,
+      "release": 0.1,
+      "target": "off"
+    },
+    "bypassFilter": true
   }
 }

@@ -32,9 +32,10 @@ use modulation::{
 };
 pub use oscillator::FM_DEVIATION;
 use oscillator::{
-    NOISE_SEED, SineTable, fm_frequencies, noise_sample, noise_seed, oscillator, sin_lookup, sine_table, xorshift32,
+    LFSR_SEED, NOISE_SEED, SineTable, WIDTH_MAX, WIDTH_MIN, fm_frequencies, lfsr_sample, lfsr_step, noise_sample,
+    noise_seed, oscillator, sin_lookup, sine_table, xorshift32,
 };
-use patch::{Adsr, MatrixSource, ModEnvTarget, SynthLfo, SynthPatch};
+use patch::{Adsr, MatrixSource, ModEnvTarget, NoiseMode, SynthLfo, SynthPatch};
 pub use unison::MAX_UNISON;
 use unison::{Layer, layers, start_phases, unison_oscillator};
 
@@ -82,6 +83,11 @@ struct Block {
     q: f64,
     g: f64,
     k: f64,
+    /// Pulse width of each oscillator, within what the band-limiting allows.
+    widths: [f64; 3],
+    noise_mode: NoiseMode,
+    /// Shift register steps a sample, 0–1.
+    noise_step: f64,
     noise_weights: [f64; 3],
     noise_g: f64,
     noise_k: f64,
@@ -125,6 +131,9 @@ impl Block {
             q,
             g: cutoff_coefficient(p.filter_freq, sample_rate),
             k: 1.0 / q,
+            widths: p.osc_width.map(|width| clamp(width, WIDTH_MIN, WIDTH_MAX)),
+            noise_mode: p.noise_mode,
+            noise_step: clamp(p.noise_rate / sample_rate, 0.0, 1.0),
             noise_weights: tap_weights(p.noise_filter_type),
             noise_g: cutoff_coefficient(p.noise_filter_freq, sample_rate),
             noise_k: 1.0 / clamp(p.noise_filter_q, 0.1, 20.0),
@@ -151,6 +160,11 @@ pub struct SynthVoice {
     phase: [[f64; MAX_UNISON]; 3],
     osc_cycle: [[f64; MAX_UNISON]; 3],
     rng: u32,
+    /// The shift register of the console noise, and how far its next step is, 0–1.
+    lfsr: u16,
+    lfsr_phase: f64,
+    /// The last value the noise generator gave, held between two register steps.
+    noise_held: f64,
     /// What the matrix's sources read that a sample does not work out: the
     /// envelopes' last levels, and the value drawn for the note.
     sources: SourceValues,
@@ -181,6 +195,9 @@ impl Default for SynthVoice {
             phase: [[0.0; MAX_UNISON]; 3],
             osc_cycle: [[0.0; MAX_UNISON]; 3],
             rng: NOISE_SEED,
+            lfsr: LFSR_SEED,
+            lfsr_phase: 0.0,
+            noise_held: 0.0,
             sources: SourceValues::default(),
             lfo_phase: [0.0; 2],
             lfo_seeded: false,
@@ -449,7 +466,7 @@ impl SynthVoice {
         let mut raw = [0.0; 3];
         for (n, value) in raw.iter_mut().enumerate() {
             let dt = (frequencies[n] / b.sample_rate).min(0.49);
-            *value = oscillator(b.table, p.osc_wave[n], self.phase[n][0], dt, self.osc_cycle[n][0]);
+            *value = oscillator(b.table, p.osc_wave[n], self.phase[n][0], dt, self.osc_cycle[n][0], b.widths[n]);
         }
         raw
     }
@@ -475,7 +492,7 @@ impl SynthVoice {
                 let used = if gains[n] > 0.0 { b.layer_count } else { 1 };
                 let layered = unison_oscillator(
                     b.table,
-                    p.osc_wave[n],
+                    (p.osc_wave[n], b.widths[n]),
                     &mut self.phase[n][..used],
                     &mut self.osc_cycle[n][..used],
                     &b.layers[..used],
@@ -495,7 +512,8 @@ impl SynthVoice {
                 self.osc_cycle[n][0] += advanced.floor();
                 self.phase[n][0] = advanced.rem_euclid(1.0);
                 *output =
-                    oscillator(b.table, p.osc_wave[n], self.phase[n][0], dt.abs(), self.osc_cycle[n][0]) * gains[n];
+                    oscillator(b.table, p.osc_wave[n], self.phase[n][0], dt.abs(), self.osc_cycle[n][0], b.widths[n])
+                        * gains[n];
             }
             let mono = outputs[0] + outputs[1] + outputs[2];
             sum = [mono, mono];
@@ -508,6 +526,22 @@ impl SynthVoice {
         sum
     }
 
+    /// The next raw noise sample, -1 to 1: white, or the shift register's
+    /// output, held until its next step.
+    #[inline]
+    fn noise_source(&mut self, b: &Block) -> f64 {
+        if b.noise_mode == NoiseMode::White {
+            return noise_sample(self.rng);
+        }
+        self.lfsr_phase += b.noise_step;
+        if self.lfsr_phase >= 1.0 {
+            self.lfsr_phase -= 1.0;
+            self.lfsr = lfsr_step(self.lfsr, b.noise_mode == NoiseMode::Short);
+            self.noise_held = lfsr_sample(self.lfsr);
+        }
+        self.noise_held
+    }
+
     /// The next sample of filtered noise, at its level in the mix.
     #[inline]
     fn noise(&mut self, p: &SynthPatch, b: &Block, mods: &Mods) -> f64 {
@@ -516,7 +550,7 @@ impl SynthVoice {
             return 0.0;
         }
         let level = clamp(modulated(mods, p.noise_mix, Slot::NoiseMix), 0.0, 1.0);
-        let raw = noise_sample(self.rng) * level;
+        let raw = self.noise_source(b) * level;
         let freq = modulated(mods, p.noise_filter_freq, Slot::NoiseFreq);
         let q = clamp(modulated(mods, p.noise_filter_q, Slot::NoiseQ), 0.1, 20.0);
         let (g, k) = if freq != p.noise_filter_freq || q != p.noise_filter_q {
@@ -740,5 +774,29 @@ mod tests {
         // The envelope sits at 1 and the volume goes to 0, once the first sample has set it.
         let out = held(patch, 2_000);
         assert!(peak(&out[10..]) < 1e-3, "{}", peak(&out[10..]));
+    }
+
+    /// The console noise of `mode` at `rate` Hz, 48 kHz, `count` samples.
+    fn console_noise(mode: NoiseMode, rate: f64, count: usize) -> Vec<f64> {
+        let patch = SynthPatch { noise_mode: mode, noise_rate: rate, ..SynthPatch::default() };
+        let block = Block::new(&patch, 48_000.0);
+        let mut voice = SynthVoice::default();
+        (0..count).map(|_| voice.noise_source(&block)).collect()
+    }
+
+    #[test]
+    fn the_short_noise_loops_after_93_steps_and_the_long_one_does_not() {
+        let short = console_noise(NoiseMode::Short, 48_000.0, 400);
+        assert!(short.iter().all(|x| x.abs() == 1.0));
+        assert!((0..300).all(|i| short[i] == short[i + 93]));
+        let long = console_noise(NoiseMode::Long, 48_000.0, 400);
+        assert!((0..300).any(|i| long[i] != long[i + 93]));
+    }
+
+    #[test]
+    fn the_noise_register_holds_its_value_between_two_steps() {
+        // A clock at a sixth of the sample rate: each value lasts six samples.
+        let slow = console_noise(NoiseMode::Long, 8_000.0, 600);
+        assert!(slow[6..].chunks(6).all(|run| run.iter().all(|x| *x == run[0])));
     }
 }

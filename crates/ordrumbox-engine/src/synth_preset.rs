@@ -12,7 +12,7 @@ use ordrumbox_dsp::slope::FilterMode;
 pub use ordrumbox_dsp::synth::FM_DEVIATION;
 use ordrumbox_dsp::synth::MAX_UNISON;
 use ordrumbox_dsp::synth::patch::{
-    Adsr, LfoTarget, MATRIX_SIZE, MatrixRoute, MatrixSource, ModEnvTarget, SynthBypass, SynthLfo,
+    Adsr, LfoTarget, MATRIX_SIZE, MatrixRoute, MatrixSource, ModEnvTarget, NoiseMode, SynthBypass, SynthLfo,
 };
 
 /// `C3_FREQ`, Hz: the pitch of ratio 1.
@@ -24,6 +24,11 @@ const MIN_NOTE_RATIO: f64 = 0.0001;
 pub const WAVES: [&str; 5] = ordrumbox_dsp::lfo::WAVE_NAMES;
 /// The filter types, by code (a strip's and a synth voice's filter mode).
 pub const FILTER_TYPES: [&str; 4] = ["lowpass", "highpass", "bandpass", "notch"];
+/// The noise's modes, by code: white, the console's long and short shift register.
+pub const NOISE_MODES: [&str; 3] = ["white", "long", "short"];
+/// The clock rate of the console noise, Hz: its range, and what a preset without one gets.
+pub const NOISE_RATE_RANGE: (f64, f64) = (100.0, 32_000.0);
+pub use ordrumbox_dsp::synth::patch::NOISE_RATE_DEFAULT;
 /// What a line of a preset's `matrix` reads, by code.
 pub const MATRIX_SOURCES: [&str; 8] = ["off", "lfo1", "lfo2", "env", "modEnv", "velocity", "key", "random"];
 const MOD_ENV_TARGETS: [&str; 5] = ["off", "filter", "pitch", "fm", "shape"];
@@ -284,7 +289,10 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
         osc_gain: gains,
         osc_detune: vcos.map(|vco| finite(get(vco, "detune"), 0.0)),
         osc_wave: vcos.map(|vco| choice(get(vco, "wave"), &WAVES, &Wave::ALL)),
+        osc_width: vcos.map(|vco| level(get(vco, "width"), 0.5)),
         noise_mix: level(get(noise, "mix"), 0.0),
+        noise_mode: choice(get(noise, "mode"), &NOISE_MODES, &NoiseMode::ALL),
+        noise_rate: clamp(finite(get(noise, "rate"), NOISE_RATE_DEFAULT), NOISE_RATE_RANGE.0, NOISE_RATE_RANGE.1),
         noise_filter_type: choice(get(noise, "filterType"), &FILTER_TYPES, &FilterMode::ALL),
         noise_filter_freq: finite(get(noise, "filterFreq"), 1000.0),
         noise_filter_q: finite(get(noise, "filterQ"), 0.7),
@@ -364,6 +372,22 @@ mod tests {
         // 0.8 / 0.5 = 1.6, accented (×1.25), master volume 0.8.
         assert!((patch.velocity - 1.6 * 0.8 * 1.25).abs() < 1e-12);
         assert_eq!(patch.envelope, Adsr { attack: 0.01, decay: 0.1, sustain: 0.7, release: 0.1 });
+    }
+
+    #[test]
+    fn the_chip_controls_are_read_and_bounded() {
+        let note = SynthNote { ratio: 1.0, velocity: 0.5, pan: 0.0, bpm: 120.0 };
+        let patch = synth_patch(
+            &json::parse(
+                r#"{"vco1":{"wave":"square","width":0.125},"vco2":{"width":9},"noise":{"mode":"short","rate":1}}"#,
+            )
+            .unwrap(),
+            note,
+        );
+        assert_eq!(patch.osc_width, [0.125, 1.0, 0.5]);
+        assert_eq!((patch.noise_mode, patch.noise_rate), (NoiseMode::Short, NOISE_RATE_RANGE.0));
+        let plain = synth_patch(&json::parse("{}").unwrap(), note);
+        assert_eq!((plain.noise_mode, plain.noise_rate), (NoiseMode::White, NOISE_RATE_DEFAULT));
     }
 
     #[test]
