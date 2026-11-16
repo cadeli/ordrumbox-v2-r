@@ -133,6 +133,10 @@ impl Session {
     }
 
     /// Run a menu command (or its shortcut).
+    ///
+    /// One flat `match`, a line per command and no logic: it stays whole (past
+    /// the usual function size) so that the compiler flags a command added
+    /// without a handler, which groups with a `_` arm would hide.
     pub fn run(&mut self, command: Command) {
         use Command as C;
         self.chrome.menu = None;

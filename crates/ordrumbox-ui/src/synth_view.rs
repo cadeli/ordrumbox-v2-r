@@ -210,24 +210,7 @@ pub fn build(
 ) -> Built {
     let s = layout.scale;
     let mut built = Built::default();
-    let items = &mut built.items;
-    let values = presets.to_vec();
-    let selected = presets.iter().position(|p| p == current).unwrap_or(0);
-    items.push(Item::new(
-        Some(Id::SynthPreset),
-        layout.preset,
-        Kind::Select { values: values.clone(), labels: values, selected },
-    ));
-    for ((id, label, _), rect) in BUTTONS.iter().zip(layout.buttons) {
-        items.push(Item::new(Some(Id::SynthButton(id)), rect, Kind::Button { label: (*label).into(), on: false }));
-    }
-    for (i, (rect, label)) in layout.tabs.iter().zip(TABS).enumerate() {
-        items.push(Item::new(
-            Some(Id::SynthTab(i as u8)),
-            *rect,
-            Kind::Tab { label: label.into(), active: usize::from(tab) == i },
-        ));
-    }
+    push_header(&mut built.items, presets, current, tab, layout);
 
     let groups = model::groups(draft);
     let fields = all_fields(draft);
@@ -245,96 +228,19 @@ pub fn build(
         }
         let x = layout.area.x + column * (card_w + 10 * s);
         let inner = Rect::new(x + 6 * s, row_top + 4 * s, card_w - 12 * s, 0);
+        let items = &mut built.items;
         let mut y = inner.y;
-        // Title: the label, the choices, the power button.
-        let label = model::group_label(group);
-        items.push(Item::text(inner.x, y + 3 * s, label, theme::text(), s));
-        if let Some((path, options)) = icon_choices(group) {
-            let current = model::get(draft, &path);
-            for (k, (value, label)) in options.iter().enumerate() {
-                let rect = Rect::new(inner.x + 64 * s + k as i32 * 30 * s, y, 28 * s, 13 * s);
-                let on = current.is_some_and(|c| c == value);
-                items.push(Item::new(
-                    Some(Id::SynthIcon(gi as u8, k as u8)),
-                    rect,
-                    Kind::Button { label: (*label).into(), on },
-                ));
-            }
-        }
-        if model::has_power(group) {
-            let rect = Rect::new(inner.x + inner.w - 14 * s, y, 14 * s, 13 * s);
-            items.push(Item::new(
-                Some(Id::SynthPower(gi as u8)),
-                rect,
-                Kind::Led { on: !model::bypassed(draft, group) },
-            ));
-        }
+        push_card_title(items, draft, group, gi, inner, y, s);
         y += 18 * s;
-        let plot = match group.as_str() {
-            "scope" => Some((Plot::Scope, 60)),
-            "filter" => Some((Plot::Filter, 50)),
-            "envelope" => Some((Plot::Envelope, 40)),
-            _ => None,
-        }
-        .map(|(plot, h)| {
+        let plot = card_plot(group).map(|(plot, h)| {
             let rect = Rect::new(inner.x, y, inner.w, h * s);
             y += (h + 6) * s;
             (plot, rect)
         });
-        let is_matrix = group == "matrix";
-        if is_matrix {
+        if group == "matrix" {
             y = crate::synth_matrix::push_lines(items, draft, &fields, inner, y, s);
-        }
-        // Knobs, in rows.
-        let per_row = (inner.w / (KNOB_W * s)).max(1);
-        let mut knobs = 0;
-        let mut rows = Vec::new();
-        for path in model::fields(draft, group).into_iter().filter(|_| !is_matrix) {
-            let Some(fi) = fields.iter().position(|f| *f == path) else { continue };
-            let id = Some(Id::SynthField(fi as u16));
-            let key = path.rsplit('.').next().unwrap_or(&path);
-            let meta = model::find_meta(&path);
-            let label = meta.and_then(|m| m.label).unwrap_or(key).to_owned();
-            match field_kind(&path, model::get(draft, &path)) {
-                Field::Knob => {
-                    let base = model::number(draft, &path).unwrap_or(0.0);
-                    let moved = lfo(&path);
-                    let spec = meta.map_or_else(|| Spec::knob(0.0, 1.0, 0.01, 0.0), knob_spec);
-                    let value = moved.map_or(base, |m| m.clamp(spec.min, spec.max));
-                    let unit = meta.map_or("", |m| m.unit);
-                    let text = crate::control::Format::Fmt.value(value, unit);
-                    let lfo_on = model::lfo_targeted(draft, &path);
-                    let rect = Rect::new(
-                        inner.x + (knobs % per_row) * KNOB_W * s,
-                        y + (knobs / per_row) * (KNOB_H + 4) * s,
-                        KNOB_W * s,
-                        KNOB_H * s,
-                    );
-                    items.push(Item::new(id, rect, Kind::Value { spec, value, label: Some(label), text, lfo: lfo_on }));
-                    knobs += 1;
-                }
-                Field::List(options) => rows.push((id, label, Some(options), path)),
-                Field::Switch => rows.push((id, label, None, path)),
-                Field::None => {}
-            }
-        }
-        if knobs > 0 {
-            y += ((knobs + per_row - 1) / per_row) * (KNOB_H + 4) * s;
-        }
-        for (id, label, options, path) in rows {
-            items.push(Item::text(inner.x, y + 3 * s, label, theme::muted(), s));
-            let rect = Rect::new(inner.x + 80 * s, y, (inner.w - 80 * s).min(200 * s), 13 * s);
-            let kind = match options {
-                Some(options) => {
-                    let current = model::get(draft, &path).and_then(Value::to_text).unwrap_or_default();
-                    let selected = options.iter().position(|(v, _)| *v == current).unwrap_or(0);
-                    let (values, labels) = options.into_iter().unzip();
-                    Kind::Select { values, labels, selected }
-                }
-                None => Kind::Toggle { on: model::get(draft, &path).and_then(Value::as_bool).unwrap_or(false) },
-            };
-            items.push(Item::new(id, rect, kind));
-            y += (ROW_H + 2) * s;
+        } else {
+            y = push_fields(items, draft, group, &fields, Rect::new(inner.x, y, inner.w, 0), s, lfo);
         }
         let height = y - row_top + 4 * s;
         row_h = row_h.max(height);
@@ -347,6 +253,123 @@ pub fn build(
         column += 1;
     }
     built
+}
+
+/// The preset's select, the buttons and the tabs, above the cards.
+fn push_header(items: &mut Vec<Item>, presets: &[String], current: &str, tab: u8, layout: &SynthLayout) {
+    let values = presets.to_vec();
+    let selected = presets.iter().position(|p| p == current).unwrap_or(0);
+    items.push(Item::new(
+        Some(Id::SynthPreset),
+        layout.preset,
+        Kind::Select { values: values.clone(), labels: values, selected },
+    ));
+    for ((id, label, _), rect) in BUTTONS.iter().zip(layout.buttons) {
+        items.push(Item::new(Some(Id::SynthButton(id)), rect, Kind::Button { label: (*label).into(), on: false }));
+    }
+    for (i, (rect, label)) in layout.tabs.iter().zip(TABS).enumerate() {
+        items.push(Item::new(
+            Some(Id::SynthTab(i as u8)),
+            *rect,
+            Kind::Tab { label: label.into(), active: usize::from(tab) == i },
+        ));
+    }
+}
+
+/// A card's title row at `y`: the label, the choices, the power button.
+fn push_card_title(items: &mut Vec<Item>, draft: &Object, group: &str, gi: usize, inner: Rect, y: i32, s: Scale) {
+    items.push(Item::text(inner.x, y + 3 * s, model::group_label(group), theme::text(), s));
+    if let Some((path, options)) = icon_choices(group) {
+        let current = model::get(draft, &path);
+        for (k, (value, label)) in options.iter().enumerate() {
+            let rect = Rect::new(inner.x + 64 * s + k as i32 * 30 * s, y, 28 * s, 13 * s);
+            let on = current.is_some_and(|c| c == value);
+            items.push(Item::new(
+                Some(Id::SynthIcon(gi as u8, k as u8)),
+                rect,
+                Kind::Button { label: (*label).into(), on },
+            ));
+        }
+    }
+    if model::has_power(group) {
+        let rect = Rect::new(inner.x + inner.w - 14 * s, y, 14 * s, 13 * s);
+        items.push(Item::new(Some(Id::SynthPower(gi as u8)), rect, Kind::Led { on: !model::bypassed(draft, group) }));
+    }
+}
+
+/// The plot a card shows under its title, and its height (unscaled).
+fn card_plot(group: &str) -> Option<(Plot, i32)> {
+    match group {
+        "scope" => Some((Plot::Scope, 60)),
+        "filter" => Some((Plot::Filter, 50)),
+        "envelope" => Some((Plot::Envelope, 40)),
+        _ => None,
+    }
+}
+
+/// The controls of `group` from the top of `area`: knobs in rows, then lists
+/// and switches one per line; the y under them.
+fn push_fields(
+    items: &mut Vec<Item>,
+    draft: &Object,
+    group: &str,
+    fields: &[String],
+    area: Rect,
+    s: Scale,
+    lfo: &dyn Fn(&str) -> Option<f64>,
+) -> i32 {
+    let (inner, mut y) = (area, area.y);
+    let per_row = (inner.w / (KNOB_W * s)).max(1);
+    let mut knobs = 0;
+    let mut rows = Vec::new();
+    for path in model::fields(draft, group) {
+        let Some(fi) = fields.iter().position(|f| *f == path) else { continue };
+        let id = Some(Id::SynthField(fi as u16));
+        let key = path.rsplit('.').next().unwrap_or(&path);
+        let meta = model::find_meta(&path);
+        let label = meta.and_then(|m| m.label).unwrap_or(key).to_owned();
+        match field_kind(&path, model::get(draft, &path)) {
+            Field::Knob => {
+                let base = model::number(draft, &path).unwrap_or(0.0);
+                let moved = lfo(&path);
+                let spec = meta.map_or_else(|| Spec::knob(0.0, 1.0, 0.01, 0.0), knob_spec);
+                let value = moved.map_or(base, |m| m.clamp(spec.min, spec.max));
+                let unit = meta.map_or("", |m| m.unit);
+                let text = crate::control::Format::Fmt.value(value, unit);
+                let lfo_on = model::lfo_targeted(draft, &path);
+                let rect = Rect::new(
+                    inner.x + (knobs % per_row) * KNOB_W * s,
+                    y + (knobs / per_row) * (KNOB_H + 4) * s,
+                    KNOB_W * s,
+                    KNOB_H * s,
+                );
+                items.push(Item::new(id, rect, Kind::Value { spec, value, label: Some(label), text, lfo: lfo_on }));
+                knobs += 1;
+            }
+            Field::List(options) => rows.push((id, label, Some(options), path)),
+            Field::Switch => rows.push((id, label, None, path)),
+            Field::None => {}
+        }
+    }
+    if knobs > 0 {
+        y += ((knobs + per_row - 1) / per_row) * (KNOB_H + 4) * s;
+    }
+    for (id, label, options, path) in rows {
+        items.push(Item::text(inner.x, y + 3 * s, label, theme::muted(), s));
+        let rect = Rect::new(inner.x + 80 * s, y, (inner.w - 80 * s).min(200 * s), 13 * s);
+        let kind = match options {
+            Some(options) => {
+                let current = model::get(draft, &path).and_then(Value::to_text).unwrap_or_default();
+                let selected = options.iter().position(|(v, _)| *v == current).unwrap_or(0);
+                let (values, labels) = options.into_iter().unzip();
+                Kind::Select { values, labels, selected }
+            }
+            None => Kind::Toggle { on: model::get(draft, &path).and_then(Value::as_bool).unwrap_or(false) },
+        };
+        items.push(Item::new(id, rect, kind));
+        y += (ROW_H + 2) * s;
+    }
+    y
 }
 
 /// Paint the cards (under their items), their plots and the module pills.
