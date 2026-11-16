@@ -133,6 +133,73 @@ impl Session {
         Some(analysis)
     }
 
+    /// The other tracks of the pattern, which can key `track`, `none` first.
+    fn sidechain_choice(&self, track: &Track) -> Choice {
+        let source = track.sidechain_source.as_str();
+        let mut sidechain_values = vec![String::new()];
+        let tracks = self.pattern().map_or(&[][..], |p| p.tracks.as_slice());
+        sidechain_values.extend(tracks.iter().map(|other| other.name.clone()).filter(|name| *name != track.name));
+        if !source.is_empty() && !sidechain_values.iter().any(|name| name == source) {
+            // A key the pattern lacks (a song's other pattern has it): kept, shown.
+            sidechain_values.push(source.to_owned());
+        }
+        let sidechain_labels = sidechain_values.iter().map(|n| if n.is_empty() { "none".into() } else { n.clone() });
+        Choice {
+            selected: editors::index_of(&sidechain_values, source),
+            labels: sidechain_labels.collect(),
+            values: sidechain_values,
+        }
+    }
+
+    /// The samples of the instrument `current_id`, the current kit's first;
+    /// `current_url` is the one the track plays.
+    fn sample_choice(&self, track: &Track, current_id: &str, current_url: &str) -> Choice {
+        let found = self.samples_for(current_id);
+        if found.is_empty() && !track.use_synth {
+            return Choice { values: vec![String::new()], labels: vec!["— no samples —".into()], selected: 0 };
+        }
+        let mut values: Vec<String> = found.iter().map(|(_, url, _)| url.clone()).collect();
+        let mut labels: Vec<String> = found.iter().map(|(kit, _, name)| format!("{kit}/{name}")).collect();
+        if track.use_synth {
+            // A synth track plays no sample: `none` first, shown (its empty
+            // value is ignored when picked; a sample turns the synth off).
+            values.insert(0, String::new());
+            labels.insert(0, "none".into());
+            return Choice { selected: 0, values, labels };
+        }
+        Choice { selected: editors::index_of(&values, current_url), values, labels }
+    }
+
+    /// The synth presets, `none` first, the track's the one shown.
+    fn synth_choice(&self, track: &Track) -> Choice {
+        let keys = self.synths.presets.keys();
+        let current = if track.use_synth {
+            track.synth_preset.clone().unwrap_or_else(|| ordrumbox_logic::generate::BASS_PRESET.into())
+        } else {
+            "none".into()
+        };
+        let mut values: Vec<String> = std::iter::once("none").chain(keys.iter().copied()).map(str::to_owned).collect();
+        if track.use_synth && !keys.contains(&current.as_str()) {
+            values.push(current.clone());
+        }
+        Choice { selected: editors::index_of(&values, &current), values, labels: Vec::new() }
+    }
+
+    /// The values of the track's LFOs while playing (the LFO step watch).
+    fn lfo_now(&self, track: &Track) -> Vec<(&'static str, f64)> {
+        let tick = self.playback.tick();
+        match tick {
+            Some(tick) => LFO_TARGETS
+                .iter()
+                .filter_map(|target| {
+                    let object = track.field(target.lfo_key)?;
+                    Some((target.key, ordrumbox_core::lfo::value(object.as_object()?, tick as f64)))
+                })
+                .collect(),
+            None => Vec::new(),
+        }
+    }
+
     pub(super) fn track_view(&self, t: usize) -> Option<TrackView<'_>> {
         let track = self.track(t)?;
         let url = self.track_sample_path(t);
@@ -176,66 +243,14 @@ impl Session {
         };
         let instruments = Choice { selected: editors::index_of(&ids, &current_id), values: ids, labels: Vec::new() };
 
-        // The other tracks of the pattern, which can key this one.
-        let source = track.sidechain_source.as_str();
-        let mut sidechain_values = vec![String::new()];
-        let tracks = self.pattern().map_or(&[][..], |p| p.tracks.as_slice());
-        sidechain_values.extend(tracks.iter().map(|other| other.name.clone()).filter(|name| *name != track.name));
-        if !source.is_empty() && !sidechain_values.iter().any(|name| name == source) {
-            // A key the pattern lacks (a song's other pattern has it): kept, shown.
-            sidechain_values.push(source.to_owned());
-        }
-        let sidechain_labels = sidechain_values.iter().map(|n| if n.is_empty() { "none".into() } else { n.clone() });
-        let sidechains = Choice {
-            selected: editors::index_of(&sidechain_values, source),
-            labels: sidechain_labels.collect(),
-            values: sidechain_values,
-        };
+        let sidechains = self.sidechain_choice(track);
 
         // Samples of that instrument: the current kit's first.
-        let current_url = url.unwrap_or_else(|| track.sample_path.clone());
-        let found = self.samples_for(&current_id);
-        let samples = if found.is_empty() && !track.use_synth {
-            Choice { values: vec![String::new()], labels: vec!["— no samples —".into()], selected: 0 }
-        } else {
-            let mut values: Vec<String> = found.iter().map(|(_, url, _)| url.clone()).collect();
-            let mut labels: Vec<String> = found.iter().map(|(kit, _, name)| format!("{kit}/{name}")).collect();
-            if track.use_synth {
-                // A synth track plays no sample: `none` first, shown (its empty
-                // value is ignored when picked; a sample turns the synth off).
-                values.insert(0, String::new());
-                labels.insert(0, "none".into());
-                Choice { selected: 0, values, labels }
-            } else {
-                Choice { selected: editors::index_of(&values, &current_url), values, labels }
-            }
-        };
+        let samples = self.sample_choice(track, &current_id, &url.unwrap_or_else(|| track.sample_path.clone()));
 
-        // Synth presets.
-        let keys = self.synths.presets.keys();
-        let current = if track.use_synth {
-            track.synth_preset.clone().unwrap_or_else(|| ordrumbox_logic::generate::BASS_PRESET.into())
-        } else {
-            "none".into()
-        };
-        let mut values: Vec<String> = std::iter::once("none").chain(keys.iter().copied()).map(str::to_owned).collect();
-        if track.use_synth && !keys.contains(&current.as_str()) {
-            values.push(current.clone());
-        }
-        let synths = Choice { selected: editors::index_of(&values, &current), values, labels: Vec::new() };
+        let synths = self.synth_choice(track);
 
-        // LFO values while playing (the LFO step watch).
-        let tick = self.playback.tick();
-        let lfo = match tick {
-            Some(tick) => LFO_TARGETS
-                .iter()
-                .filter_map(|target| {
-                    let object = track.field(target.lfo_key)?;
-                    Some((target.key, ordrumbox_core::lfo::value(object.as_object()?, tick as f64)))
-                })
-                .collect(),
-            None => Vec::new(),
-        };
+        let lfo = self.lfo_now(track);
         let bpm = self.playing_bpm();
         let compose = self.compose_view(track);
         Some(TrackView {

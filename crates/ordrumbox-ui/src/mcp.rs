@@ -7,6 +7,7 @@
 //!
 //! Tool and parameter names are the JS server's; the track and note settings
 //! are named by their keys in the files this app writes (their `json_record!` tables).
+// audit: allow(duplicates): the tool schemas repeat their parameter shapes.
 
 use ordrumbox_core::json::{self, Object, Value};
 use ordrumbox_core::{Note, Track};

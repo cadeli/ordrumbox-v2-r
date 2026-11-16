@@ -30,19 +30,7 @@ impl Session {
         self.chrome.widgets.pointer = (x, y);
         let (width, height, scale) = size;
         if let Some(dropdown) = self.chrome.widgets.dropdown.take() {
-            let left = button == Button::Left;
-            if let Some(i) = dropdown.hit(width, height, scale, x, y) {
-                self.chrome.widgets.dropdown = Some(dropdown);
-                if left {
-                    self.pick(i);
-                }
-            } else if let Some((menu, i)) = dropdown.parent_at(width, height, scale, x, y) {
-                // Back to a menu above: its submenus close, a line of it is picked.
-                self.chrome.widgets.dropdown = Some(menu);
-                if let (true, Some(i)) = (left, i) {
-                    self.pick(i);
-                }
-            }
+            self.press_dropdown(dropdown, size, (x, y), button == Button::Left);
             return true;
         }
         if let Some(entry) = &self.chrome.widgets.entry {
@@ -70,48 +58,15 @@ impl Session {
         let double = self.chrome.widgets.last_click.is_some_and(|(last, at)| last == id && now - at < DOUBLE_CLICK);
         self.chrome.widgets.last_click = Some((id, now));
         match item.kind {
-            Kind::Value { spec, value, label, text, .. } => {
+            Kind::Value { spec, value, ref label, ref text, .. } => {
                 self.chrome.widgets.focus = Some(id);
-                if spec.style == Style::Stepper {
-                    let [down, field, up] = panel::stepper_parts(item.rect, label.is_some(), scale);
-                    if x < down.x - 2 * scale {
-                        self.select_row(id);
-                        return true;
-                    }
-                    // A button is one step a click, however fast the clicks.
-                    if let Some(up) = [(down, false), (up, true)].iter().find(|(r, _)| r.contains(x, y)).map(|p| p.1) {
-                        self.chrome.widgets.last_click = None;
-                        self.set_value(id, spec.nudge(value, up, false, false));
-                        return true;
-                    }
-                    if !field.contains(x, y) {
-                        return true;
-                    }
-                }
-                if double {
-                    // Double-click: the default value.
-                    self.chrome.widgets.last_click = None;
-                    self.set_value(id, spec.default);
-                    return true;
-                }
-                let mut drag = Drag { id, spec, start: value, x, y, bar: None, fine: false };
-                if spec.style == Style::Slider {
-                    let (left, w) = panel::slider_bar(item.rect, label.is_some(), !text.is_empty(), scale);
-                    if x < left - 2 * scale {
-                        // The label: selects the row.
-                        self.select_row(id);
-                        return true;
-                    }
-                    if shift {
-                        drag.fine = true;
-                    } else {
-                        drag.bar = Some((left, w));
-                        let v = spec.slider_at(f64::from(x - left) / f64::from(w));
-                        drag.start = v;
-                        self.set_value(id, v);
-                    }
-                }
-                self.chrome.widgets.drag = Some(drag);
+                self.press_value(
+                    &item,
+                    (id, spec, value),
+                    (label.is_some(), !text.is_empty()),
+                    (x, y),
+                    (scale, shift, double),
+                );
             }
             Kind::Select { values, labels, selected } => {
                 self.chrome.widgets.focus = Some(id);
@@ -120,6 +75,78 @@ impl Session {
             _ => self.activate(id),
         }
         true
+    }
+
+    /// A press at `at` while `dropdown` is open: on one of its lines, on a menu
+    /// above it, or elsewhere (it closes). A line is picked by a left click.
+    fn press_dropdown(&mut self, dropdown: Dropdown, size: (i32, i32, Scale), at: (i32, i32), left: bool) {
+        let (width, height, scale) = size;
+        let (x, y) = at;
+        if let Some(i) = dropdown.hit(width, height, scale, x, y) {
+            self.chrome.widgets.dropdown = Some(dropdown);
+            if left {
+                self.pick(i);
+            }
+        } else if let Some((menu, i)) = dropdown.parent_at(width, height, scale, x, y) {
+            // Back to a menu above: its submenus close, a line of it is picked.
+            self.chrome.widgets.dropdown = Some(menu);
+            if let (true, Some(i)) = (left, i) {
+                self.pick(i);
+            }
+        }
+    }
+
+    /// A press on a knob, slider or stepper `item` (`id`, its `spec` and its
+    /// `value`; `labelled`, `valued`: it has a label and a value text) at
+    /// `(x, y)`: a step, a reset on a double click, or the start of a drag.
+    fn press_value(
+        &mut self,
+        item: &Item,
+        (id, spec, value): (Id, Spec, f64),
+        (labelled, valued): (bool, bool),
+        (x, y): (i32, i32),
+        (scale, shift, double): (Scale, bool, bool),
+    ) {
+        if spec.style == Style::Stepper {
+            let [down, field, up] = panel::stepper_parts(item.rect, labelled, scale);
+            if x < down.x - 2 * scale {
+                self.select_row(id);
+                return;
+            }
+            // A button is one step a click, however fast the clicks.
+            if let Some(up) = [(down, false), (up, true)].iter().find(|(r, _)| r.contains(x, y)).map(|p| p.1) {
+                self.chrome.widgets.last_click = None;
+                self.set_value(id, spec.nudge(value, up, false, false));
+                return;
+            }
+            if !field.contains(x, y) {
+                return;
+            }
+        }
+        if double {
+            // Double-click: the default value.
+            self.chrome.widgets.last_click = None;
+            self.set_value(id, spec.default);
+            return;
+        }
+        let mut drag = Drag { id, spec, start: value, x, y, bar: None, fine: false };
+        if spec.style == Style::Slider {
+            let (left, w) = panel::slider_bar(item.rect, labelled, valued, scale);
+            if x < left - 2 * scale {
+                // The label: selects the row.
+                self.select_row(id);
+                return;
+            }
+            if shift {
+                drag.fine = true;
+            } else {
+                drag.bar = Some((left, w));
+                let v = spec.slider_at(f64::from(x - left) / f64::from(w));
+                drag.start = v;
+                self.set_value(id, v);
+            }
+        }
+        self.chrome.widgets.drag = Some(drag);
     }
 
     /// The mouse moved; whether to redraw.
@@ -391,45 +418,62 @@ impl Session {
     /// whether it was theirs.
     pub fn panel_key(&mut self, size: (i32, i32, Scale), key: PanelKey, shift: bool, ctrl: bool) -> bool {
         self.chrome.panel_size = size;
-        if let Some(entry) = &mut self.chrome.widgets.entry {
-            match key {
-                PanelKey::Enter => self.commit_entry(),
-                PanelKey::Escape => self.chrome.widgets.entry = None,
-                PanelKey::Backspace => {
-                    entry.text.pop();
-                }
-                PanelKey::Space if entry.spec.is_none() => entry.text.push(' '),
-                _ => {}
-            }
+        if self.chrome.widgets.entry.is_some() {
+            self.entry_key(key);
             return true;
         }
-        if let Some(dropdown) = &mut self.chrome.widgets.dropdown {
-            match key {
-                PanelKey::Up => dropdown.step(-1),
-                PanelKey::Down => dropdown.step(1),
-                PanelKey::PageUp => dropdown.step(-10),
-                PanelKey::PageDown => dropdown.step(10),
-                PanelKey::Home => dropdown.step(isize::MIN / 2),
-                PanelKey::End => dropdown.step(isize::MAX / 2),
-                PanelKey::Enter | PanelKey::Space => {
-                    let at = dropdown.at;
-                    self.pick(at);
-                }
-                PanelKey::Right if dropdown.opens_submenu() => {
-                    let at = dropdown.at;
-                    self.pick(at);
-                }
-                // Back to the menu above (Escape closes the last one).
-                PanelKey::Left | PanelKey::Backspace if dropdown.parent.is_some() => {
-                    self.chrome.widgets.dropdown = self.chrome.widgets.dropdown.take().and_then(Dropdown::back);
-                }
-                PanelKey::Escape => {
-                    self.chrome.widgets.dropdown = self.chrome.widgets.dropdown.take().and_then(Dropdown::back);
-                }
-                _ => {}
-            }
+        if self.chrome.widgets.dropdown.is_some() {
+            self.dropdown_key(key);
             return true;
         }
+        self.focused_key(size, key, shift, ctrl)
+    }
+
+    /// A key while the number or text entry is open: it takes them all.
+    fn entry_key(&mut self, key: PanelKey) {
+        let Some(entry) = &mut self.chrome.widgets.entry else { return };
+        match key {
+            PanelKey::Enter => self.commit_entry(),
+            PanelKey::Escape => self.chrome.widgets.entry = None,
+            PanelKey::Backspace => {
+                entry.text.pop();
+            }
+            PanelKey::Space if entry.spec.is_none() => entry.text.push(' '),
+            _ => {}
+        }
+    }
+
+    /// A key while a drop-down list is open: it takes them all.
+    fn dropdown_key(&mut self, key: PanelKey) {
+        let Some(dropdown) = &mut self.chrome.widgets.dropdown else { return };
+        match key {
+            PanelKey::Up => dropdown.step(-1),
+            PanelKey::Down => dropdown.step(1),
+            PanelKey::PageUp => dropdown.step(-10),
+            PanelKey::PageDown => dropdown.step(10),
+            PanelKey::Home => dropdown.step(isize::MIN / 2),
+            PanelKey::End => dropdown.step(isize::MAX / 2),
+            PanelKey::Enter | PanelKey::Space => {
+                let at = dropdown.at;
+                self.pick(at);
+            }
+            PanelKey::Right if dropdown.opens_submenu() => {
+                let at = dropdown.at;
+                self.pick(at);
+            }
+            // Back to the menu above (Escape closes the last one).
+            PanelKey::Left | PanelKey::Backspace if dropdown.parent.is_some() => {
+                self.chrome.widgets.dropdown = self.chrome.widgets.dropdown.take().and_then(Dropdown::back);
+            }
+            PanelKey::Escape => {
+                self.chrome.widgets.dropdown = self.chrome.widgets.dropdown.take().and_then(Dropdown::back);
+            }
+            _ => {}
+        }
+    }
+
+    /// A key for the focused widget; whether it was its.
+    fn focused_key(&mut self, size: (i32, i32, Scale), key: PanelKey, shift: bool, ctrl: bool) -> bool {
         let layout = self.panel_layout(size.0, size.1, size.2);
         let focusable: Vec<Item> =
             layout.items.into_iter().filter(|i| !matches!(i.id, Some(Id::TrackVolume(_)))).collect();

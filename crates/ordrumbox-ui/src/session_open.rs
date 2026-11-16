@@ -17,9 +17,10 @@ use crate::audio_output::StartOutput;
 use crate::editors::EditorState;
 use crate::kits::KitSet;
 use crate::{assets, store};
-use ordrumbox_core::{Library, LoadReport};
+use ordrumbox_core::{Library, LoadReport, Scales};
 use ordrumbox_engine::offline;
 use ordrumbox_engine::offline::RenderSetup;
+use ordrumbox_engine::{SampleBank, SynthPresets};
 use ordrumbox_logic::Editor;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -95,34 +96,13 @@ impl Session {
 
     /// The same, the assets searched in `first` before the usual folders (a
     /// plugin's bundle).
-    pub fn load_with_assets(mut start_output: StartOutput, source: LibrarySource, first: &[PathBuf]) -> Self {
-        let Some(dir) = assets::find(first) else {
-            let searched: Vec<String> = assets::candidates(first).iter().map(|d| d.display().to_string()).collect();
-            return Self::new(
-                Library::default(),
-                KitSet::empty(),
-                vec![
-                    format!(
-                        "assets folder not found: copy this repository's assets folder next to the program, or set {}",
-                        assets::ENV_VAR
-                    ),
-                    format!("searched: {}", searched.join(", ")),
-                ],
-            );
-        };
+    pub fn load_with_assets(start_output: StartOutput, source: LibrarySource, first: &[PathBuf]) -> Self {
+        let Some(dir) = assets::find(first) else { return Self::without_assets(first) };
         let assets = match assets::load(&dir) {
             Ok(assets) => assets,
             Err(e) => return Self::new(Library::default(), KitSet::empty(), vec![e]),
         };
-        let mut status: Vec<String> = assets.errors.iter().map(|e| format!("not loaded: {e}")).collect();
-        status.extend(assets.style_issues.iter().map(|i| format!("styles.json: {}: {}", i.at, i.message)));
-        let (kits_file, kit_issues) = &assets.kit_issues;
-        if let Some(first) = kit_issues.first() {
-            status.push(format!("{kits_file}: {} skipped, first: {}: {}", kit_issues.len(), first.at, first.message));
-        }
-        if let Some(first) = assets.sample_errors.first() {
-            status.push(format!("{} sample(s) not loaded, first: {first}", assets.sample_errors.len()));
-        }
+        let mut status = loading_status(&assets);
 
         let hosted = matches!(source, LibrarySource::Host(_));
         let Opened { mut library, file: library_path, on_disk, message, demo } = match source {
@@ -168,22 +148,7 @@ impl Session {
         session.saving.library_path = library_path;
         session.saving.on_disk = on_disk;
         session.message = message;
-        let bank = Arc::new(assets.bank);
-        if !bank.samples.is_empty() {
-            session.render = Some(RenderSetup {
-                bank: bank.clone(),
-                scales: assets.scales.clone(),
-                synths: synths.clone(),
-                kit: session.kits.kits().first().map(|k| k.name.clone()).unwrap_or_default(),
-                sample_rate: offline::EXPORT_RATE,
-                seed: 1,
-            });
-        }
-        match start_output(bank, assets.scales, synths) {
-            Ok((output, controller)) => session.playback = Playback::new(output, controller),
-            Err(e) => session.status.push(format!("no sound: {e}")),
-        }
-        session.playback.keep_start_output(start_output);
+        session.attach_sound(assets.bank, assets.scales, synths, start_output);
         // A plugin shows no master panel: the host mixes, the default master applies.
         if !hosted {
             session.load_master();
@@ -193,6 +158,44 @@ impl Session {
         session.load_controls();
         session.load_zoom(store::settings_path());
         session
+    }
+
+    /// The session of a program that found no assets folder: an empty
+    /// library, and what was searched.
+    fn without_assets(first: &[PathBuf]) -> Self {
+        let searched: Vec<String> = assets::candidates(first).iter().map(|d| d.display().to_string()).collect();
+        Self::new(
+            Library::default(),
+            KitSet::empty(),
+            vec![
+                format!(
+                    "assets folder not found: copy this repository's assets folder next to the program, or set {}",
+                    assets::ENV_VAR
+                ),
+                format!("searched: {}", searched.join(", ")),
+            ],
+        )
+    }
+
+    /// The sound output on `bank`, and the offline renders' setup (none
+    /// without a sample); a failure to start is a status line.
+    fn attach_sound(&mut self, bank: SampleBank, scales: Scales, synths: SynthPresets, mut start_output: StartOutput) {
+        let bank = Arc::new(bank);
+        if !bank.samples.is_empty() {
+            self.render = Some(RenderSetup {
+                bank: bank.clone(),
+                scales: scales.clone(),
+                synths: synths.clone(),
+                kit: self.kits.kits().first().map(|k| k.name.clone()).unwrap_or_default(),
+                sample_rate: offline::EXPORT_RATE,
+                seed: 1,
+            });
+        }
+        match start_output(bank, scales, synths) {
+            Ok((output, controller)) => self.playback = Playback::new(output, controller),
+            Err(e) => self.status.push(format!("no sound: {e}")),
+        }
+        self.playback.keep_start_output(start_output);
     }
 
     /// The library to start with: the user's file at `path` when there is
@@ -314,4 +317,18 @@ impl Session {
         session.host.hosted = hosted;
         session
     }
+}
+
+/// What the loaded assets say went wrong, a status line each.
+fn loading_status(assets: &assets::Assets) -> Vec<String> {
+    let mut status: Vec<String> = assets.errors.iter().map(|e| format!("not loaded: {e}")).collect();
+    status.extend(assets.style_issues.iter().map(|i| format!("styles.json: {}: {}", i.at, i.message)));
+    let (kits_file, kit_issues) = &assets.kit_issues;
+    if let Some(first) = kit_issues.first() {
+        status.push(format!("{kits_file}: {} skipped, first: {}: {}", kit_issues.len(), first.at, first.message));
+    }
+    if let Some(first) = assets.sample_errors.first() {
+        status.push(format!("{} sample(s) not loaded, first: {first}", assets.sample_errors.len()));
+    }
+    status
 }

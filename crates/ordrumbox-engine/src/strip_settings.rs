@@ -7,6 +7,7 @@
 //! two times, 2/3 apart), `spring` disperses, `gated` is gated, `hall` and
 //! `plate` have a pre-delay, and `allpass` skips the filter. A delay longer
 //! than the line plays at the longest halving of its beats that fits.
+// audit: allow(function size): `strip_settings` copies a track's fields to the strip's, one line each.
 
 use ordrumbox_core::json::Object;
 use ordrumbox_core::lfo;

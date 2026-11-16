@@ -6,6 +6,7 @@
 //! Everything the detection knows is data, in `data/instruments.json`, which is
 //! edited by hand (`DEVELOPMENT.md`, "Instrument catalog"); this module only reads it
 //! and applies its rules.
+// audit: allow(function size): `from_json` reads the catalog's fields one after the other.
 
 use std::sync::OnceLock;
 

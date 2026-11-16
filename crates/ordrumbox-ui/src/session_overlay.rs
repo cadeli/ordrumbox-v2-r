@@ -1,5 +1,6 @@
 //! The overlays drawn over the window: the keyboard shortcuts, the edit
 //! history, About, the factory reset, and the keys and clicks they take.
+// audit: allow(duplicates): the help text repeats its own layout lines.
 
 use super::session_confirm::Pending;
 use super::session_types::OverlayKey;

@@ -370,46 +370,43 @@ impl Session {
         }
     }
 
-    /// A select set to `value`.
-    pub(super) fn select(&mut self, id: Id, value: &str) {
+    /// A select whose value is not a track's or a note's setting: a list of
+    /// the header, the song view, the piano roll, the synth or the kits.
+    /// Whether `id` was one of them.
+    fn select_shared(&mut self, id: Id, value: &str) -> bool {
         match id {
             Id::PatternList => {
                 // `onPatternSelectChange`: that pattern.
                 if let Ok(index) = value.parse::<usize>() {
                     self.step_pattern(index as isize - self.pattern_index as isize);
                 }
-                return;
             }
             Id::KitList => {
                 if let Ok(index) = value.parse::<usize>() {
                     self.run(Command::Kit(index));
                 }
-                return;
             }
             Id::SongList => {
                 if let Ok(index) = value.parse::<usize>() {
                     self.select_song(index);
                 }
-                return;
             }
-            Id::SongMenu => return self.song_menu_pick(value),
-            Id::StyleList => return self.choose_style(value),
+            Id::SongMenu => self.song_menu_pick(value),
+            Id::StyleList => self.choose_style(value),
             Id::Beats => {
                 if let Ok(beats) = value.parse::<i32>() {
                     self.set_length(beats);
                 }
-                return;
             }
             Id::RollTrack => {
                 if let Ok(t) = value.parse::<usize>() {
                     self.select_roll_track(t);
                 }
-                return;
             }
-            Id::RollMenu => return self.roll_menu_pick(value),
+            Id::RollMenu => self.roll_menu_pick(value),
             // Picked with where they are (`pick`).
-            Id::GridMenu | Id::TrackNameMenu(_) | Id::KitInstrumentMenu(_) | Id::InstrumentMenu => return,
-            Id::SynthPreset | Id::SynthField(_) => return self.synth_select(id, value),
+            Id::GridMenu | Id::TrackNameMenu(_) | Id::KitInstrumentMenu(_) | Id::InstrumentMenu => {}
+            Id::SynthPreset | Id::SynthField(_) => self.synth_select(id, value),
             Id::KitKit => {
                 let target = self.kits.kits().iter().position(|k| k.name == value);
                 if let (Some(sample), Some(target)) = (self.kit_editor.sample, target)
@@ -417,10 +414,17 @@ impl Session {
                 {
                     self.kits_changed(message);
                 }
-                return;
             }
-            Id::KitSampleInstrument(sample) => return self.kit_set_instrument(sample, value),
-            _ => {}
+            Id::KitSampleInstrument(sample) => self.kit_set_instrument(sample, value),
+            _ => return false,
+        }
+        true
+    }
+
+    /// A select set to `value`.
+    pub(super) fn select(&mut self, id: Id, value: &str) {
+        if self.select_shared(id, value) {
+            return;
         }
         let Some(t) = self.editor_track() else { return };
         let name = self.track_name(t);
