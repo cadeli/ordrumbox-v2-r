@@ -4,7 +4,7 @@
 use crate::lfo::Wave;
 use crate::slope::FilterMode;
 
-/// What an LFO modulates, in the order of the preset files' codes (0 to 33).
+/// What an LFO modulates, in the order of the preset files' codes (0 to 37).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum LfoTarget {
     #[default]
@@ -44,11 +44,17 @@ pub enum LfoTarget {
     ModEnvDecay,
     ModEnvSustain,
     ModEnvRelease,
+    /// The pulse width of an oscillator's square wave (half a cycle at full depth).
+    Osc1Width,
+    Osc2Width,
+    Osc3Width,
+    /// The clock of the console noise (8 kHz at full depth).
+    NoiseRate,
 }
 
 impl LfoTarget {
     /// Every target, each at its code.
-    pub const ALL: [Self; 34] = [
+    pub const ALL: [Self; 38] = [
         Self::Off,
         Self::Filter,
         Self::Osc1,
@@ -83,6 +89,10 @@ impl LfoTarget {
         Self::ModEnvDecay,
         Self::ModEnvSustain,
         Self::ModEnvRelease,
+        Self::Osc1Width,
+        Self::Osc2Width,
+        Self::Osc3Width,
+        Self::NoiseRate,
     ];
 
     /// Its code: its place in [`Self::ALL`].

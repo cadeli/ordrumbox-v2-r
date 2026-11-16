@@ -35,12 +35,17 @@ pub(super) enum Slot {
     ModEnvDecay,
     ModEnvSustain,
     ModEnvRelease,
+    Width1,
+    Width2,
+    Width3,
+    NoiseRate,
 }
 
-const SLOT_COUNT: usize = Slot::ModEnvRelease as usize + 1;
+const SLOT_COUNT: usize = Slot::NoiseRate as usize + 1;
 
 pub(super) const DETUNE_SLOTS: [Slot; 3] = [Slot::Detune1, Slot::Detune2, Slot::Detune3];
 pub(super) const GAIN_SLOTS: [Slot; 3] = [Slot::Gain1, Slot::Gain2, Slot::Gain3];
+pub(super) const WIDTH_SLOTS: [Slot; 3] = [Slot::Width1, Slot::Width2, Slot::Width3];
 pub(super) const ENV_SLOTS: [Slot; 4] = [Slot::EnvAttack, Slot::EnvDecay, Slot::EnvSustain, Slot::EnvRelease];
 pub(super) const MOD_ENV_SLOTS: [Slot; 4] =
     [Slot::ModEnvAttack, Slot::ModEnvDecay, Slot::ModEnvSustain, Slot::ModEnvRelease];
@@ -217,6 +222,10 @@ fn destination(target: LfoTarget) -> Option<(Slot, f64)> {
         T::ModEnvDecay => (Slot::ModEnvDecay, 0.5),
         T::ModEnvSustain => (Slot::ModEnvSustain, 0.5),
         T::ModEnvRelease => (Slot::ModEnvRelease, 0.25),
+        T::Osc1Width => (Slot::Width1, 0.5),
+        T::Osc2Width => (Slot::Width2, 0.5),
+        T::Osc3Width => (Slot::Width3, 0.5),
+        T::NoiseRate => (Slot::NoiseRate, 8000.0),
     })
 }
 

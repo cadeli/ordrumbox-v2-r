@@ -2488,7 +2488,7 @@
       "octave": 0,
       "detune": 0,
       "wave": "square",
-      "width": 0.125
+      "width": 0.3
     },
     "vco2": {
       "gain": 0.25,
@@ -2531,10 +2531,10 @@
       "release": 0.04
     },
     "lfo": {
-      "target": "NOT",
+      "target": "vco1.width",
       "wave": "sine",
-      "freq": 0,
-      "depth": 0,
+      "freq": 1.5,
+      "depth": 0.3,
       "sync": "off"
     },
     "lfo2": {

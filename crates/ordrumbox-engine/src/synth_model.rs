@@ -154,7 +154,7 @@ pub const MATRIX_AMOUNTS: [Meta; MATRIX_SIZE] = [
 ];
 
 /// The controls of [`EXTRA_FIELDS`] that are knobs: the pulse width of each
-/// oscillator and the clock of the console noise. Not LFO targets.
+/// oscillator and the clock of the console noise.
 pub const EXTRA_METAS: [Meta; 4] = [
     Meta { default: 0.5, label: Some("Width"), ..meta("vco1.width", 0.02, 0.98, 0.01, "") },
     Meta { default: 0.5, label: Some("Width"), ..meta("vco2.width", 0.02, 0.98, 0.01, "") },
@@ -193,8 +193,7 @@ pub fn lfo_targets() -> Vec<&'static str> {
         .chain(
             metas()
                 .map(|m| m.path)
-                .filter(|p| !["lfo.", "lfo2.", "unison.", "matrix."].iter().any(|group| p.starts_with(group)))
-                .filter(|p| extra_default(p).is_none()),
+                .filter(|p| !["lfo.", "lfo2.", "unison.", "matrix."].iter().any(|group| p.starts_with(group))),
         )
         .collect()
 }
@@ -274,6 +273,8 @@ pub fn lfo_scale(target: &str) -> f64 {
         "filter.freq" => 1000.0,
         "filter.Q" | "noise.filterQ" => 24.0,
         "noise.filterFreq" => 10_000.0,
+        "vco1.width" | "vco2.width" | "vco3.width" => 0.5,
+        "noise.rate" => 8000.0,
         "envelope.attack" | "envelope.release" | "modEnvelope.attack" | "modEnvelope.release" => 0.25,
         "envelope.decay" | "envelope.sustain" | "modEnvelope.decay" | "modEnvelope.sustain" => 0.5,
         "NOT" => 0.0,

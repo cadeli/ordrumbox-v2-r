@@ -27,8 +27,8 @@ mod unison;
 use envelope::{Envelope, FilterEnvelope, Segment};
 use filter::{coefficients, cutoff_coefficient};
 use modulation::{
-    DETUNE_SLOTS, ENV_SLOTS, GAIN_SLOTS, LfoMods, LfoRoute, MOD_ENV_SLOTS, Matrix, Mods, Slot, SourceValues, is_moved,
-    modulated, modulated_adsr,
+    DETUNE_SLOTS, ENV_SLOTS, GAIN_SLOTS, LfoMods, LfoRoute, MOD_ENV_SLOTS, Matrix, Mods, Slot, SourceValues,
+    WIDTH_SLOTS, is_moved, modulated, modulated_adsr,
 };
 pub use oscillator::FM_DEVIATION;
 use oscillator::{
@@ -160,6 +160,8 @@ pub struct SynthVoice {
     phase: [[f64; MAX_UNISON]; 3],
     osc_cycle: [[f64; MAX_UNISON]; 3],
     rng: u32,
+    /// The pulse width of each oscillator for the sample being worked out.
+    width: [f64; 3],
     /// The shift register of the console noise, and how far its next step is, 0–1.
     lfsr: u16,
     lfsr_phase: f64,
@@ -195,6 +197,7 @@ impl Default for SynthVoice {
             phase: [[0.0; MAX_UNISON]; 3],
             osc_cycle: [[0.0; MAX_UNISON]; 3],
             rng: NOISE_SEED,
+            width: [0.5; 3],
             lfsr: LFSR_SEED,
             lfsr_phase: 0.0,
             noise_held: 0.0,
@@ -333,6 +336,7 @@ impl SynthVoice {
         for ((gain, base), slot) in gains.iter_mut().zip(p.osc_gain).zip(GAIN_SLOTS) {
             *gain = clamp(modulated(mods, base, slot), 0.0, 1.0);
         }
+        self.width = pulse_widths(b, mods, p.osc_width);
         let frequencies = self.frequencies(p, b, mods, &mut gains, mod_level, t);
         let oscillators = self.oscillators(p, b, mods, frequencies, gains);
         let noise = self.noise(p, b, mods);
@@ -466,7 +470,7 @@ impl SynthVoice {
         let mut raw = [0.0; 3];
         for (n, value) in raw.iter_mut().enumerate() {
             let dt = (frequencies[n] / b.sample_rate).min(0.49);
-            *value = oscillator(b.table, p.osc_wave[n], self.phase[n][0], dt, self.osc_cycle[n][0], b.widths[n]);
+            *value = oscillator(b.table, p.osc_wave[n], self.phase[n][0], dt, self.osc_cycle[n][0], self.width[n]);
         }
         raw
     }
@@ -492,7 +496,7 @@ impl SynthVoice {
                 let used = if gains[n] > 0.0 { b.layer_count } else { 1 };
                 let layered = unison_oscillator(
                     b.table,
-                    (p.osc_wave[n], b.widths[n]),
+                    (p.osc_wave[n], self.width[n]),
                     &mut self.phase[n][..used],
                     &mut self.osc_cycle[n][..used],
                     &b.layers[..used],
@@ -512,7 +516,7 @@ impl SynthVoice {
                 self.osc_cycle[n][0] += advanced.floor();
                 self.phase[n][0] = advanced.rem_euclid(1.0);
                 *output =
-                    oscillator(b.table, p.osc_wave[n], self.phase[n][0], dt.abs(), self.osc_cycle[n][0], b.widths[n])
+                    oscillator(b.table, p.osc_wave[n], self.phase[n][0], dt.abs(), self.osc_cycle[n][0], self.width[n])
                         * gains[n];
             }
             let mono = outputs[0] + outputs[1] + outputs[2];
@@ -529,11 +533,15 @@ impl SynthVoice {
     /// The next raw noise sample, -1 to 1: white, or the shift register's
     /// output, held until its next step.
     #[inline]
-    fn noise_source(&mut self, b: &Block) -> f64 {
+    fn noise_source(&mut self, p: &SynthPatch, b: &Block, mods: &Mods) -> f64 {
         if b.noise_mode == NoiseMode::White {
             return noise_sample(self.rng);
         }
-        self.lfsr_phase += b.noise_step;
+        self.lfsr_phase += if is_moved(mods, Slot::NoiseRate) {
+            clamp(modulated(mods, p.noise_rate, Slot::NoiseRate) / b.sample_rate, 0.0, 1.0)
+        } else {
+            b.noise_step
+        };
         if self.lfsr_phase >= 1.0 {
             self.lfsr_phase -= 1.0;
             self.lfsr = lfsr_step(self.lfsr, b.noise_mode == NoiseMode::Short);
@@ -550,7 +558,7 @@ impl SynthVoice {
             return 0.0;
         }
         let level = clamp(modulated(mods, p.noise_mix, Slot::NoiseMix), 0.0, 1.0);
-        let raw = self.noise_source(b) * level;
+        let raw = self.noise_source(p, b, mods) * level;
         let freq = modulated(mods, p.noise_filter_freq, Slot::NoiseFreq);
         let q = clamp(modulated(mods, p.noise_filter_q, Slot::NoiseQ), 0.1, 20.0);
         let (g, k) = if freq != p.noise_filter_freq || q != p.noise_filter_q {
@@ -582,6 +590,15 @@ impl SynthVoice {
         };
         [left, right]
     }
+}
+
+/// The pulse widths of this sample: the block's, unless an LFO or the matrix moves one.
+#[inline]
+fn pulse_widths(b: &Block, mods: &Mods, base: [f64; 3]) -> [f64; 3] {
+    if !WIDTH_SLOTS.iter().any(|&slot| is_moved(mods, slot)) {
+        return b.widths;
+    }
+    std::array::from_fn(|n| clamp(modulated(mods, base[n], WIDTH_SLOTS[n]), WIDTH_MIN, WIDTH_MAX))
 }
 
 /// `x` through the filter stages `first` and `second` (24 dB/oct only), at
@@ -780,8 +797,9 @@ mod tests {
     fn console_noise(mode: NoiseMode, rate: f64, count: usize) -> Vec<f64> {
         let patch = SynthPatch { noise_mode: mode, noise_rate: rate, ..SynthPatch::default() };
         let block = Block::new(&patch, 48_000.0);
+        let mods = [LfoMods::default(); 3];
         let mut voice = SynthVoice::default();
-        (0..count).map(|_| voice.noise_source(&block)).collect()
+        (0..count).map(|_| voice.noise_source(&patch, &block, &mods)).collect()
     }
 
     #[test]
@@ -791,6 +809,33 @@ mod tests {
         assert!((0..300).all(|i| short[i] == short[i + 93]));
         let long = console_noise(NoiseMode::Long, 48_000.0, 400);
         assert!((0..300).any(|i| long[i] != long[i + 93]));
+    }
+
+    #[test]
+    fn an_lfo_sweeps_the_pulse_width_and_the_noise_clock() {
+        let lfo = |target| SynthLfo { target, wave: Wave::Square, freq: 2.0, depth: 1.0 };
+        let held = |patch: SynthPatch| {
+            let mut voice = SynthVoice::default();
+            voice.start(&patch, 0, 0.0, 1);
+            let (mut l, mut r) = (vec![0.0; 24_000], vec![0.0; 24_000]);
+            voice.render(48_000.0, 0, &mut l, &mut r);
+            l
+        };
+        let base = SynthPatch {
+            osc_freq: [100.0; 3],
+            osc_gain: [1.0, 0.0, 0.0],
+            osc_wave: [Wave::Square; 3],
+            volume: 1.0,
+            bypass: SynthBypass { filter: true, env: true, ..SynthBypass::default() },
+            ..SynthPatch::default()
+        };
+        // Share of the samples above zero: the width follows a square LFO: its floor, then its ceiling.
+        let high = |out: &[f32]| out.iter().filter(|x| **x > 0.0).count() as f64 / out.len() as f64;
+        let swept = held(SynthPatch { lfo1: lfo(LfoTarget::Osc1Width), ..base });
+        // The LFO reads a quarter cycle late: low for the first 6000 samples, then high for 12000.
+        assert!(high(&swept[..5000]) < 0.05, "{}", high(&swept[..5000]));
+        assert!(high(&swept[8000..16_000]) > 0.9, "{}", high(&swept[8000..16_000]));
+        assert!((high(&held(base)) - 0.5).abs() < 0.02);
     }
 
     #[test]

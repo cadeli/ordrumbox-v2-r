@@ -33,7 +33,7 @@ pub use ordrumbox_dsp::synth::patch::NOISE_RATE_DEFAULT;
 pub const MATRIX_SOURCES: [&str; 8] = ["off", "lfo1", "lfo2", "env", "modEnv", "velocity", "key", "random"];
 const MOD_ENV_TARGETS: [&str; 5] = ["off", "filter", "pitch", "fm", "shape"];
 /// The LFO targets by their name in a preset (two names for the filter envelope amount).
-const LFO_TARGETS: [(&str, LfoTarget); 35] = [
+const LFO_TARGETS: [(&str, LfoTarget); 39] = [
     ("NOT", LfoTarget::Off),
     ("FLT", LfoTarget::Filter),
     ("VCO1", LfoTarget::Osc1),
@@ -69,6 +69,10 @@ const LFO_TARGETS: [(&str, LfoTarget); 35] = [
     ("modEnvelope.decay", LfoTarget::ModEnvDecay),
     ("modEnvelope.sustain", LfoTarget::ModEnvSustain),
     ("modEnvelope.release", LfoTarget::ModEnvRelease),
+    ("vco1.width", LfoTarget::Osc1Width),
+    ("vco2.width", LfoTarget::Osc2Width),
+    ("vco3.width", LfoTarget::Osc3Width),
+    ("noise.rate", LfoTarget::NoiseRate),
 ];
 /// `SYNC_NOTE_HZ`: LFO cycles per beat-second for each sync label.
 const SYNC_NOTE_HZ: [(&str, f64); 7] = [
