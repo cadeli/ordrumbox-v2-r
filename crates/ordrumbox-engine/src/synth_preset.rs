@@ -5,6 +5,7 @@
 //! else the default; a flag on only when `true`; an unknown enum name 0.
 
 use ordrumbox_core::json::{Object, Value};
+use ordrumbox_core::num::clamp;
 use ordrumbox_dsp::SynthPatch;
 use ordrumbox_dsp::lfo::Wave;
 use ordrumbox_dsp::slope::FilterMode;
@@ -147,11 +148,6 @@ fn finite(value: Option<&Value>, fallback: f64) -> f64 {
 /// its control is: a file's level outside would play louder than full scale.
 fn level(value: Option<&Value>, fallback: f64) -> f64 {
     clamp(finite(value, fallback), 0.0, 1.0)
-}
-
-/// `x` inside `min`–`max`; `min > max` gives `max` instead of a panic.
-fn clamp(x: f64, min: f64, max: f64) -> f64 {
-    x.max(min).min(max)
 }
 
 /// The choice of `choices` at the place `value` has in `names`; an unknown

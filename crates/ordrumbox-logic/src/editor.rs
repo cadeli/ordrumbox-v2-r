@@ -9,7 +9,7 @@
 use std::time::Instant;
 
 use ordrumbox_core::json::{Object, Value};
-use ordrumbox_core::num::round2;
+use ordrumbox_core::num::{clamp, round2};
 use ordrumbox_core::{Library, Pattern, SetField, Track};
 
 use crate::history::{Change, History, Target};
@@ -86,7 +86,7 @@ fn apply_updates(track: &mut Track, updates: &[(&str, Value)]) {
         }
         let value = match (value, Track::value_range(key)) {
             (Value::Number(n), _) if !n.is_finite() => continue,
-            (Value::Number(n), Some((min, max))) => Value::Number(n.max(min).min(max)),
+            (Value::Number(n), Some((min, max))) => Value::Number(clamp(*n, min, max)),
             _ => value.clone(),
         };
         // A value of the wrong type leaves the setting as it is.

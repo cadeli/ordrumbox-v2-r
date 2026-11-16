@@ -2,6 +2,7 @@
 
 use crate::strip_settings::{is_slap, saturation_amount, set_saturation};
 use ordrumbox_core::steps::TICK;
+use ordrumbox_core::steps::semitone_ratio;
 use ordrumbox_core::track::MAX_TRACKS;
 use ordrumbox_dsp::StripSettings;
 
@@ -127,7 +128,7 @@ impl HostRatios {
     pub(super) const NONE: Self = Self { cutoff: 1.0, pitch: 1.0 };
 
     pub(super) fn of(track: &HostTrack) -> Self {
-        Self { cutoff: track.cutoff_octaves.exp2(), pitch: (f64::from(track.transpose) / 12.0).exp2() }
+        Self { cutoff: track.cutoff_octaves.exp2(), pitch: semitone_ratio(f64::from(track.transpose)) }
     }
 }
 

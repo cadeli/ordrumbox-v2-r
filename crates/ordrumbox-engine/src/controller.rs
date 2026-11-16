@@ -10,6 +10,7 @@
 //! The controller keeps a reference to every pass and bank it posted until it
 //! holds the only one left, so the audio thread never drops a last reference.
 
+use ordrumbox_core::steps::semitone_ratio;
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex};
 
@@ -546,7 +547,7 @@ impl Controller {
         let voice = ordrumbox_dsp::VoiceStart {
             sample: index,
             track: 0,
-            ratio: (sample.sample.transpose / 12.0).exp2(),
+            ratio: semitone_ratio(sample.sample.transpose),
             peak: sample.sample.gain() as f32,
             // No decay envelope: one that outlasts any sample, but a loop, which only the decay ends.
             decay: if sample.sample.looping { (sample.sample.decay_ms() / 1000.0) as f32 } else { 600.0 },

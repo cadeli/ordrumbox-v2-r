@@ -1,6 +1,7 @@
 //! `ordrumbox-probe`: measures synth presets and WAV files, reviews and
 //! repairs kits (`AGENTS.md`, "Kits and samples").
 
+use ordrumbox_core::steps::semitone_ratio;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -88,7 +89,7 @@ fn number_in(key: &str, text: &str, range: std::ops::RangeInclusive<f64>) -> Res
 /// Pitch ratio of a note name such as `C3` or `F#2`.
 fn note_ratio(text: &str) -> Result<f64, String> {
     let midi = parse_note(text).map_err(|e| format!("--note: {e}"))?;
-    Ok(2f64.powf(f64::from(midi - C3_MIDI) / 12.0))
+    Ok(semitone_ratio(f64::from(midi - C3_MIDI)))
 }
 
 fn parse_options(arguments: &[String]) -> Result<Options, String> {

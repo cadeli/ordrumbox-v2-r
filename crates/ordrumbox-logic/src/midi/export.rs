@@ -205,13 +205,13 @@ pub fn export(
                 };
                 let mut velocity = note.velocity;
                 if let Some(l) = &track.volume_lfo {
-                    velocity = crate::generate::clamp(velocity * lfo::value(l, f64::from(tick)), 0.0, 1.0);
+                    velocity = ordrumbox_core::num::clamp(velocity * lfo::value(l, f64::from(tick)), 0.0, 1.0);
                 }
                 let mut pitch = note.pitch + track.transpose;
                 if let Some(l) = &track.transpose_lfo {
                     pitch += lfo::value(l, f64::from(tick));
                 }
-                let key = crate::generate::clamp(target.note + pitch, 0.0, 127.0);
+                let key = ordrumbox_core::num::clamp(target.note + pitch, 0.0, 127.0);
                 let velocity = (velocity * 127.0).round();
                 // A note-on at velocity 0 is a note-off: a silent note is left out.
                 if velocity.is_nan() || velocity < 1.0 {

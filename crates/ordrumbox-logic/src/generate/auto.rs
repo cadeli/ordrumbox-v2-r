@@ -12,11 +12,11 @@
 
 use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::json::Value;
-use ordrumbox_core::num::round2;
+use ordrumbox_core::num::{clamp, round2};
 use ordrumbox_core::{Macros, Note, Pattern, Scales, Style, Styles, Track};
 
 use super::structure::{SectionElement, Structure, random_key_offset, random_scale, section_harmony};
-use super::{clamp, melodic, table};
+use super::{melodic, table};
 use crate::compose;
 
 /// The pattern's style key (in `Pattern::extra`).

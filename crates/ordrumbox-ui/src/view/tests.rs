@@ -98,7 +98,7 @@ fn a_host_transport_is_shown_in_the_transport_group_and_nowhere_else() {
         draw_host_state(&mut Canvas::new(&mut pixels, w, h), &controls, host, scale);
         let inside = |i: usize| {
             let (x, y) = ((i % w) as i32, (i / w) as i32);
-            x >= group.x && x < group.x + group.w && y >= group.y && y < group.y + group.h
+            group.contains(x, y)
         };
         assert!(pixels.iter().enumerate().all(|(i, p)| *p == 0 || inside(i)), "{host:?}");
         let count = |color: Rgb| pixels.iter().filter(|p| **p == color).count();
