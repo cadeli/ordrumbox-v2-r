@@ -24,12 +24,13 @@ pub fn seconds() -> f64 {
     EPOCH.get_or_init(Instant::now).elapsed().as_secs_f64()
 }
 
-/// Follow the clock of the input, or do not any more.
+/// Follow the clock of the input, or do not any more; either way from a
+/// fresh follower. Changed under the follower's lock, so that no message
+/// checked before the change reaches the follower after it ([`input`]).
 pub fn set_following(on: bool) {
+    let mut follower = lock();
     FOLLOW.store(on, Ordering::Relaxed);
-    if !on {
-        *lock() = ClockFollower::new();
-    }
+    *follower = ClockFollower::new();
 }
 
 pub fn following() -> bool {
@@ -43,10 +44,12 @@ fn lock() -> MutexGuard<'static, ClockFollower> {
 /// A timing message came from the input (MIDI thread). `Some(true)` for a
 /// start, `Some(false)` for a stop: the UI is told; none when the clock is not followed.
 pub fn input(message: ClockMessage) -> Option<bool> {
+    let mut follower = lock();
     if !following() {
         return None;
     }
-    lock().message(message, seconds());
+    follower.message(message, seconds());
+    drop(follower);
     match message {
         ClockMessage::Start | ClockMessage::Continue => Some(true),
         ClockMessage::Stop => Some(false),

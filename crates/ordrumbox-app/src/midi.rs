@@ -113,13 +113,15 @@ pub fn control(message: &[u8]) -> Option<Event> {
 }
 
 /// The names of the MIDI input ports, for Edit > Preferences.
-pub fn ports() -> Vec<String> {
-    MidiInput::new("orDrumbox ports").map_or_else(|_| Vec::new(), |input| port_names(&input))
+pub fn ports() -> Result<Vec<String>, String> {
+    let input = MidiInput::new("orDrumbox ports").map_err(|e| format!("MIDI in: {e}"))?;
+    port_names(&input).map_err(|e| format!("MIDI in: {e}"))
 }
 
-/// The names of the ports of `midi` (an input or an output).
-pub(crate) fn port_names(midi: &impl MidiIO) -> Vec<String> {
-    midi.ports().iter().filter_map(|port| midi.port_name(port).ok()).collect()
+/// The names of the ports of `midi` (an input or an output); a name that
+/// cannot be read fails the list, since a port is chosen by its name.
+pub(crate) fn port_names(midi: &impl MidiIO) -> Result<Vec<String>, midir::PortInfoError> {
+    midi.ports().iter().map(|port| midi.port_name(port)).collect()
 }
 
 /// An open MIDI input; dropping it closes the port.

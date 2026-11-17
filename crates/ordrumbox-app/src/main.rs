@@ -475,12 +475,15 @@ fn open_window() -> Result<(), Box<dyn std::error::Error>> {
     session.offer_midi_outputs(midi_out::ports);
     session.start_updates(waker.clone());
     session.start_mcp(waker.clone());
-    // MIDI files given on the command line ("open with"): imported.
+    // MIDI files given on the command line ("open with"): imported; anything
+    // else is said, not ignored.
     for arg in std::env::args_os().skip(1) {
         let path = std::path::PathBuf::from(arg);
         let is_midi = path.extension().is_some_and(|e| e.eq_ignore_ascii_case("mid") || e.eq_ignore_ascii_case("midi"));
         if is_midi {
             session.import_midi(&path);
+        } else {
+            session.say(&format!("{}: not a MIDI file (.mid, .midi), not opened", path.display()));
         }
     }
     // `ORDRUMBOX_VIEW=roll|song|synth|kit|gen`: which view the window
@@ -492,7 +495,9 @@ fn open_window() -> Result<(), Box<dyn std::error::Error>> {
         Ok("kit") => session.toggle_kit_editor(),
         Ok("gen") => session.show_generation_tab(),
         Ok("reset") => session.run(Command::FactoryReset),
-        _ => {}
+        Ok(other) => session.say(&format!("ORDRUMBOX_VIEW={other}: not a view (roll, song, synth, kit, gen, reset)")),
+        Err(std::env::VarError::NotPresent) => {}
+        Err(e) => session.say(&format!("ORDRUMBOX_VIEW: {e}")),
     }
     let (events_sender, events) = std::sync::mpsc::channel();
     let mut app =

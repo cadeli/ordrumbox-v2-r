@@ -11,7 +11,7 @@ use super::Session;
 use super::session_overlay::Overlay;
 use super::session_types::OverlayKey;
 use super::session_user_data::NO_USER_FOLDER;
-use crate::audio_output::{DEVICE_KEY, chosen_device};
+use crate::audio_output::{DEVICE_KEY, OutputDevices, chosen_device};
 use crate::midi_settings::{
     CLOCK_IN_KEY, CLOCK_OUT_KEY, MIDI_KEY, MIDI_OUT_KEY, MidiPort, chosen_clock_in, chosen_clock_out,
     chosen_midi_input, chosen_midi_output,
@@ -146,11 +146,12 @@ impl Session {
     /// Edit > Preferences.
     pub fn open_preferences(&mut self) {
         let offers = self.playback.offers();
+        let mut unlisted = Vec::new();
         let chosen = (|| {
             Ok::<_, String>((
-                self.audio_choice()?,
-                self.midi_choice()?,
-                self.midi_out_choice()?,
+                self.audio_choice(&mut unlisted)?,
+                self.midi_choice(&mut unlisted)?,
+                self.midi_out_choice(&mut unlisted)?,
                 chosen_clock_in()?,
                 chosen_clock_out()?,
             ))
@@ -187,32 +188,32 @@ impl Session {
             vus: self.chrome.show_vus,
             toasts: !self.flash.hidden,
         }));
+        if !unlisted.is_empty() {
+            self.message = format!("preferences: {}", unlisted.join("; "));
+        }
     }
 
-    fn audio_choice(&self) -> Result<Choice, String> {
+    /// `unlisted` gets why the devices could not be listed, if they could not.
+    fn audio_choice(&self, unlisted: &mut Vec<String>) -> Result<Choice, String> {
         let mut options = vec![(String::new(), "System default".to_owned())];
-        if let Some(list) = self.playback.offers().devices {
-            options.extend(list().into_iter().map(|name| (name.clone(), name)));
-        }
+        options.extend(listed(self.playback.offers().devices, unlisted));
         Ok(Choice::new(options, chosen_device()?.as_deref().unwrap_or_default()))
     }
 
-    fn midi_choice(&self) -> Result<Choice, String> {
+    /// `unlisted` gets why the ports could not be listed, if they could not.
+    fn midi_choice(&self, unlisted: &mut Vec<String>) -> Result<Choice, String> {
         let mut options = vec![
             (MidiPort::First.setting().to_owned(), "First available".to_owned()),
             (MidiPort::Off.setting().to_owned(), "None".to_owned()),
         ];
-        if let Some(list) = self.playback.offers().midi_ports {
-            options.extend(list().into_iter().map(|name| (name.clone(), name)));
-        }
+        options.extend(listed(self.playback.offers().midi_ports, unlisted));
         Ok(Choice::new(options, chosen_midi_input()?.setting()))
     }
 
-    fn midi_out_choice(&self) -> Result<Choice, String> {
+    /// `unlisted` gets why the ports could not be listed, if they could not.
+    fn midi_out_choice(&self, unlisted: &mut Vec<String>) -> Result<Choice, String> {
         let mut options = vec![(MidiPort::Off.setting().to_owned(), "None".to_owned())];
-        if let Some(list) = self.playback.offers().midi_out_ports {
-            options.extend(list().into_iter().map(|name| (name.clone(), name)));
-        }
+        options.extend(listed(self.playback.offers().midi_out_ports, unlisted));
         Ok(Choice::new(options, chosen_midi_output()?.setting()))
     }
 
@@ -308,5 +309,18 @@ impl Session {
     fn save_choice(&self, key: &str, value: &str) -> Result<(), String> {
         let path = store::settings_path().ok_or(NO_USER_FOLDER)?;
         store::save_setting(&path, key, Value::from(value)).map_err(|e| e.to_string())
+    }
+}
+
+/// The names `list` gives, as choices (value and label); none when the
+/// program offers no list, or when it fails, the failure pushed on `unlisted`.
+fn listed(list: Option<OutputDevices>, unlisted: &mut Vec<String>) -> Vec<(String, String)> {
+    match list.map(|list| list()) {
+        Some(Ok(names)) => names.into_iter().map(|name| (name.clone(), name)).collect(),
+        Some(Err(e)) => {
+            unlisted.push(e);
+            Vec::new()
+        }
+        None => Vec::new(),
     }
 }

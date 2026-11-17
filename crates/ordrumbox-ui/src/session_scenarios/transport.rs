@@ -221,8 +221,8 @@ fn the_preferences_keep_what_ok_applies_and_esc_leaves() {
 fn the_preferences_list_the_devices_and_ports_the_program_offers() {
     use crate::session::OverlayKey;
     let (mut s, _audio) = session(LIBRARY);
-    s.offer_devices(|| vec!["Speakers".into()]);
-    s.offer_midi_inputs(|| vec!["Pad".into(), "Keys".into()]);
+    s.offer_devices(|| Ok(vec!["Speakers".into()]));
+    s.offer_midi_inputs(|| Ok(vec!["Pad".into(), "Keys".into()]));
     s.run(Command::Preferences);
     let lines = match &s.chrome.overlay {
         Some(crate::session::session_overlay::Overlay::Preferences(prefs)) => prefs.lines(),
@@ -294,4 +294,14 @@ fn quantize_takes_the_shift_off_the_notes_of_the_zone_or_track_and_undo_puts_it_
     assert_eq!(shifts(&s, 1), [0.05], "the other track is left");
     s.undo();
     assert_eq!(shifts(&s, 0), [0.07, -0.1]);
+}
+
+#[test]
+fn a_list_that_fails_is_said_and_the_preferences_still_open() {
+    let (mut s, _audio) = session(LIBRARY);
+    s.offer_devices(|| Err("audio devices: host gone".into()));
+    s.offer_midi_inputs(|| Ok(vec!["Pad".into()]));
+    s.run(Command::Preferences);
+    assert!(s.overlay_open());
+    assert_eq!(s.message, "preferences: audio devices: host gone");
 }

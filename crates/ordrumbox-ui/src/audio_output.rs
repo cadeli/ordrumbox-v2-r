@@ -26,8 +26,9 @@ pub type StartedOutput = Result<(Box<dyn AudioOutput>, Controller), String>;
 /// `Session::load`, and again when a factory reset reloads the session.
 pub type StartOutput = Box<dyn FnMut(Arc<SampleBank>, Scales, SynthPresets) -> StartedOutput + Send>;
 
-/// Lists the sound devices the program can play on, by name.
-pub type OutputDevices = fn() -> Vec<String>;
+/// Lists the sound devices (or MIDI ports) the program can use, by name, or
+/// says why it cannot.
+pub type OutputDevices = fn() -> Result<Vec<String>, String>;
 
 /// The `settings.json` key of the output device chosen (a name; absent: the system's default).
 pub const DEVICE_KEY: &str = "audioDevice";

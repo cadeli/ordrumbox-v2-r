@@ -48,6 +48,8 @@ impl Ring {
         Self { slots: [const { AtomicU64::new(0) }; RING], head: AtomicUsize::new(0), tail: AtomicUsize::new(0) }
     }
 
+    /// Queue `message`; false when the ring is full and it is lost.
+    #[must_use]
     fn push(&self, message: Timed) -> bool {
         let tail = self.tail.load(Ordering::Relaxed);
         if tail.wrapping_sub(self.head.load(Ordering::Acquire)) >= RING {
@@ -81,6 +83,15 @@ static MESSAGES: Ring = Ring::new();
 static OPEN: AtomicBool = AtomicBool::new(false);
 /// The clock goes to it too.
 static CLOCK: AtomicBool = AtomicBool::new(false);
+/// Messages lost to a full ring since the UI last asked.
+static LOST: AtomicUsize = AtomicUsize::new(0);
+
+/// Queue `message` (audio callback), counting it in [`LOST`] when the ring is full.
+fn queue(message: Timed) {
+    if !MESSAGES.push(message) {
+        LOST.fetch_add(1, Ordering::Relaxed);
+    }
+}
 
 /// Send the clock through the output, or not.
 pub fn set_clock(on: bool) {
@@ -88,8 +99,9 @@ pub fn set_clock(on: bool) {
 }
 
 /// The names of the MIDI output ports, for Edit > Preferences.
-pub fn ports() -> Vec<String> {
-    MidiOutput::new("orDrumbox ports").map_or_else(|_| Vec::new(), |output| crate::midi::port_names(&output))
+pub fn ports() -> Result<Vec<String>, String> {
+    let output = MidiOutput::new("orDrumbox ports").map_err(|e| format!("MIDI out: {e}"))?;
+    crate::midi::port_names(&output).map_err(|e| format!("MIDI out: {e}"))
 }
 
 /// An open MIDI output; dropping it closes the port.
@@ -108,9 +120,14 @@ impl std::fmt::Debug for Output {
 }
 
 impl Output {
-    /// The error that closed the port since the last call, if any.
+    /// The error that closed the port since the last call, if any, else the
+    /// messages lost to a full ring since then.
     pub fn take_error(&self) -> Option<String> {
-        self.error.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).take()
+        if let Some(error) = self.error.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).take() {
+            return Some(error);
+        }
+        let lost = LOST.swap(0, Ordering::Relaxed);
+        (lost > 0).then(|| format!("MIDI out: {lost} messages lost, too many at once"))
     }
 }
 
@@ -138,6 +155,9 @@ pub fn open(choice: &MidiPort) -> Result<Option<Output>, String> {
     let Some(port) = port else { return Ok(None) };
     let name = output.port_name(port).map_err(|e| format!("MIDI out: {e}"))?;
     let connection = output.connect(port, "orDrumbox out").map_err(|e| format!("MIDI out {name}: {e}"))?;
+    // What the engine queued while no port was open is not for this one.
+    // Emptied before the thread starts: the ring has one reader at a time.
+    while MESSAGES.pop().is_some() {}
     let (stop, error) = (Arc::new(AtomicBool::new(false)), Arc::new(Mutex::new(None)));
     let thread = {
         let (stop, error) = (stop.clone(), error.clone());
@@ -146,8 +166,6 @@ pub fn open(choice: &MidiPort) -> Result<Option<Output>, String> {
             .spawn(move || run(connection, &stop, &error))
             .map_err(|e| format!("MIDI out {name}: {e}"))?
     };
-    // What the engine queued while no port was open is not for this one.
-    while MESSAGES.pop().is_some() {}
     OPEN.store(true, Ordering::Relaxed);
     Ok(Some(Output { stop, thread: Some(thread), error, name }))
 }
@@ -193,12 +211,12 @@ pub fn send_block(audio: &mut AudioSide, offset: usize, rate: u32) {
             None => (0x80, 0),
         };
         let bytes = [status | (note.channel & 0x0F), note.key & 0x7F, velocity];
-        MESSAGES.push(Timed { micros: micros(note.timing), bytes, len: 3 });
+        queue(Timed { micros: micros(note.timing), bytes, len: 3 });
     });
     audio.take_clock(|event| {
         if open && clock {
             let (bytes, len) = event.message.bytes();
-            MESSAGES.push(Timed { micros: micros(event.timing), bytes, len });
+            queue(Timed { micros: micros(event.timing), bytes, len });
         }
     });
     audio.set_clock_out(open && clock);
@@ -231,7 +249,7 @@ mod tests {
     fn a_timing_message_keeps_its_length_through_the_ring() {
         let ring = Ring::new();
         let (bytes, len) = ClockMessage::Position(300).bytes();
-        ring.push(Timed { micros: u32::MAX, bytes, len });
+        assert!(ring.push(Timed { micros: u32::MAX, bytes, len }));
         let back = ring.pop().unwrap();
         assert_eq!((back.micros, back.len), (u32::MAX, 3));
         assert_eq!(ClockMessage::parse(&back.bytes[..back.len]), Some(ClockMessage::Position(300)));
