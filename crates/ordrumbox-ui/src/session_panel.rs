@@ -26,7 +26,7 @@ use crate::frame;
 use crate::panel::Id;
 use crate::panel::{self, Item, Kind, Rect};
 use crate::view;
-use crate::view::{KitLayout, Layout};
+use crate::view::Layout;
 use ordrumbox_core::{Pattern, Track};
 use ordrumbox_logic::generate;
 use std::time::Duration;
@@ -123,7 +123,7 @@ impl Session {
         // The main editor (top-left): exactly one of the kit editor, the song
         // panel, the piano roll, the synth editor, or the grid.
         if self.kit_editor.is_open() {
-            self.kit_editor_items(&mut layout, &body, scale);
+            self.kit_editor_items(&mut layout, (width, height, scale));
         } else if self.workspace == Workspace::Song {
             self.song_items(&mut layout, width, height, scale);
         } else if self.workspace == Workspace::PianoRoll {
@@ -218,8 +218,9 @@ impl Session {
     }
 
     /// The kit editor in the main region: its controls, and where its details start.
-    fn kit_editor_items(&self, layout: &mut PanelLayout, body: &view::Body, scale: Scale) {
-        let kit_layout = KitLayout::new(body.main_w, body.editor_h, scale, self.status.len());
+    fn kit_editor_items(&self, layout: &mut PanelLayout, size: (i32, i32, Scale)) {
+        let scale = size.2;
+        let kit_layout = self.kit_layout(size);
         let area = kit_layout.controls_area();
         layout.details_top = area.y;
         layout.items.extend(self.kit_items(&kit_layout, scale));

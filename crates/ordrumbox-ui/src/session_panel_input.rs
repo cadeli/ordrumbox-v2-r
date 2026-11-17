@@ -170,7 +170,7 @@ impl Session {
         if self.chrome.lane_drag.is_some() {
             return self.lane_drag_move(size, x, y);
         }
-        if self.kit_editor.list.bar_held {
+        if self.kit_editor.list.is_bar_held() {
             return self.kit_bar_to(size, y);
         }
         if let Some(axis) = self.song_panel.held_bar() {
@@ -300,7 +300,7 @@ impl Session {
     pub fn mouse_up(&mut self) {
         self.chrome.widgets.drag = None;
         self.song_panel.release_bar();
-        self.kit_editor.list.bar_held = false;
+        self.kit_editor.list.release_bar();
         self.chrome.track_drag = None;
         self.chrome.zone_drag = None;
         self.chrome.lane_drag = None;

@@ -218,7 +218,7 @@ impl Session {
         let layout = self.song_layout(size);
         if axis == Axis::List {
             let count = self.editor.library().patterns.len();
-            let first = layout.scroll_at(axis, x, y, layout.list_rows(), count);
+            let first = layout.first_at(axis, x, y, layout.list_rows(), count);
             let changed = first != self.list_scroll(&layout);
             self.song_panel.list_scroll = (self.pattern_index, first);
             return changed;
@@ -228,9 +228,9 @@ impl Session {
         match axis {
             Axis::Measures => {
                 let (shown, total) = (layout.visible_measures() as usize, self.song_measure_total(&layout) as usize);
-                sx = layout.scroll_at(axis, x, y, shown, total) as u32;
+                sx = layout.first_at(axis, x, y, shown, total) as u32;
             }
-            Axis::Rows | Axis::List => sy = layout.scroll_at(axis, x, y, layout.visible_rows(), rows),
+            Axis::Rows | Axis::List => sy = layout.first_at(axis, x, y, layout.visible_rows(), rows),
         }
         let changed = (sx, sy) != self.song_panel.scroll;
         self.song_panel.scroll = (sx, sy);

@@ -5,7 +5,7 @@
 //! hit-testing both use it. The open drop-down list and the number entry
 //! are drawn over everything.
 
-use crate::canvas::{Canvas, Rgb, fit, text_width};
+use crate::canvas::{Canvas, Direction, Rgb, fit, text_width};
 use crate::control::{Spec, Style};
 use crate::kits::Field;
 use crate::sample_overlay::Overlay;

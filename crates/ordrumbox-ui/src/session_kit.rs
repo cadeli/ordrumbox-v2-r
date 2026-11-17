@@ -50,8 +50,12 @@ impl Session {
 
     /// The kit editor's selected sample and the kit's sample count, when open.
     pub fn kit_list(&self) -> Option<(usize, usize)> {
-        let sample = self.kit_editor.sample?;
-        Some((sample, self.kit().map_or(0, |k| k.samples.len())))
+        Some((self.kit_editor.sample?, self.kit_sample_count()))
+    }
+
+    /// Samples in the kit of the pattern (0 without a kit).
+    pub(super) fn kit_sample_count(&self) -> usize {
+        self.kit().map_or(0, |k| k.samples.len())
     }
 
     /// Ctrl+K: the kit editor (the drumkit manager), open or closed.
@@ -117,7 +121,7 @@ impl Session {
     /// ↑↓: the previous / next sample of the kit.
     pub fn kit_select(&mut self, delta: isize) {
         let Some(sample) = self.kit_editor.sample else { return };
-        let count = self.kit().map_or(0, |k| k.samples.len());
+        let count = self.kit_sample_count();
         if count > 0 {
             self.kit_editor.sample = Some((sample as isize + delta).rem_euclid(count as isize) as usize);
             self.update_analysis();
@@ -178,9 +182,7 @@ impl Session {
     /// and description (a click edits them), the instrument of each sample
     /// shown in the table.
     pub(super) fn kit_items(&self, layout: &KitLayout, scale: Scale) -> Vec<Item> {
-        let (Some(_), Some(kit)) = (self.kit_editor.sample, self.kit()) else {
-            return Vec::new();
-        };
+        let Some(kit) = self.kit().filter(|_| self.kit_editor.is_open()) else { return Vec::new() };
         let mut items = Vec::new();
         let fitted = |text: &str, rect: Rect| -> String { text.chars().take(chars_in(rect.w, scale)).collect() };
         let text = |text: String| if text.is_empty() { None } else { Some(text) };

@@ -1,7 +1,7 @@
 //! The kit editor: its view, its layout and its drawing.
 
 use super::{ACCENT, ENVELOPE, cell_color, focus_row_color};
-use crate::canvas::{Canvas, chars_in, text_width};
+use crate::canvas::{Canvas, Direction, chars_in, text_width};
 use crate::frame::{body_top, footer_top, margin};
 use crate::panel::{Rect, row_at};
 use crate::sample_overlay::Overlay;
@@ -329,7 +329,7 @@ pub(super) fn draw_kit(canvas: &mut Canvas, kit: &KitView, layout: &KitLayout) {
         return;
     }
     canvas.fill_rect(x, y, width, height, cell_color());
-    canvas.draw_profile((x, y + height, width), height, kit.envelope, true, ENVELOPE);
+    canvas.draw_profile((x, y + height, width), height, (kit.envelope, 1.0), Direction::Up, ENVELOPE);
     if let Some(overlay) = &kit.overlay {
         overlay.draw(canvas, (x, y, width, height), scale);
     }

@@ -296,7 +296,7 @@ impl SongLayout {
     }
 
     /// The first measure or row that puts `axis`'s thumb centred on `(x, y)`.
-    pub fn scroll_at(&self, axis: Axis, x: i32, y: i32, shown: usize, total: usize) -> usize {
+    pub fn first_at(&self, axis: Axis, x: i32, y: i32, shown: usize, total: usize) -> usize {
         let pos = match axis {
             Axis::Measures => x,
             Axis::Rows | Axis::List => y,

@@ -13,7 +13,7 @@ use crate::menu::{self, Command};
 use crate::scroll::{Scroll, Viewport};
 use crate::session::{Move, OverlayKey, PanelKey, Session};
 use crate::ui_input::{Button, Key, KeyEvent, Modifiers, ScrollDelta};
-use crate::view::{self, KitLayout};
+use crate::view;
 
 /// Redraw interval while playing (the playhead moves).
 const FRAME: Duration = Duration::from_millis(16);
@@ -247,12 +247,11 @@ impl Ui {
         if s.piano_roll_open() {
             return if shift { s.roll_shift_press(size, x, y) } else { s.roll_click(size, x, y, Button::Left) };
         }
-        let body = s.body(size);
         if let Some((_, count)) = s.kit_list() {
             if s.kit_bar_press(size, x, y) {
                 return true;
             }
-            let layout = KitLayout::new(body.main_w, body.editor_h, size.2, s.status_lines());
+            let layout = s.kit_layout(size);
             let Some(hit) = layout.hit(s.kit_first(&layout), count, x, y) else { return false };
             s.kit_click(hit);
             return true;

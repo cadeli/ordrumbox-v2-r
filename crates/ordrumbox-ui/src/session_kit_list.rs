@@ -12,11 +12,29 @@ pub(super) struct KitList {
     /// shown then.
     scroll: (usize, usize),
     /// The scroll bar is held by the mouse.
-    pub(super) bar_held: bool,
+    bar_held: bool,
+}
+
+impl KitList {
+    /// Whether the scroll bar is held by the mouse.
+    pub(super) const fn is_bar_held(&self) -> bool {
+        self.bar_held
+    }
+
+    /// The mouse took the scroll bar.
+    const fn hold_bar(&mut self) {
+        self.bar_held = true;
+    }
+
+    /// The mouse let go of the scroll bar.
+    pub(super) const fn release_bar(&mut self) {
+        self.bar_held = false;
+    }
 }
 
 impl Session {
-    pub(super) fn kit_layout(&self, size: (i32, i32, Scale)) -> KitLayout {
+    /// Where the kit editor places its table and details in a window of `size`.
+    pub(crate) fn kit_layout(&self, size: (i32, i32, Scale)) -> KitLayout {
         let body = self.body(size);
         KitLayout::new(body.main_w, body.editor_h, size.2, self.status.len())
     }
@@ -29,18 +47,20 @@ impl Session {
         if at != selected {
             first = first.clamp(selected.saturating_sub(layout.shown().saturating_sub(1)), selected);
         }
-        first.min(layout.last_first(self.kit().map_or(0, |k| k.samples.len())))
+        first.min(layout.last_first(self.kit_sample_count()))
     }
 
     /// A press on the table's scroll bar, when there is one: the thumb goes
     /// to `y`, and follows the mouse until it is released.
     pub fn kit_bar_press(&mut self, size: (i32, i32, Scale), x: i32, y: i32) -> bool {
         let layout = self.kit_layout(size);
-        let count = self.kit().map_or(0, |k| k.samples.len());
-        if !self.kit_editor.is_open() || count <= layout.shown() || !layout.scroll_bar().contains(x, y) {
+        if !self.kit_editor.is_open()
+            || self.kit_sample_count() <= layout.shown()
+            || !layout.scroll_bar().contains(x, y)
+        {
             return false;
         }
-        self.kit_editor.list.bar_held = true;
+        self.kit_editor.list.hold_bar();
         self.kit_bar_to(size, y);
         true
     }
@@ -48,7 +68,7 @@ impl Session {
     /// The held bar moved to `y`; whether to redraw.
     pub(super) fn kit_bar_to(&mut self, size: (i32, i32, Scale), y: i32) -> bool {
         let layout = self.kit_layout(size);
-        let count = self.kit().map_or(0, |k| k.samples.len());
+        let count = self.kit_sample_count();
         let first = layout.first_at(y, count);
         let changed = first != self.kit_first(&layout);
         self.kit_editor.list.scroll = (self.kit_editor.sample.unwrap_or(0), first);
@@ -62,7 +82,7 @@ impl Session {
             return false;
         }
         let layout = self.kit_layout(size);
-        let count = self.kit().map_or(0, |k| k.samples.len());
+        let count = self.kit_sample_count();
         if !layout.table_contains(x, y) || count <= layout.shown() {
             return false;
         }

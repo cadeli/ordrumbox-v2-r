@@ -208,11 +208,11 @@ fn draw_envelope_item(canvas: &mut Canvas, r: Rect, points: &[f64], overlay: Opt
     canvas.fill_rect(r.x, r.y, r.w, r.h, field_color());
     let peak = points.iter().fold(0.0f64, |m, v| m.max(v.abs()));
     let gain = if peak > 0.0 { 1.0 / peak } else { 0.0 };
-    let values: Vec<f64> = points.iter().map(|v| v.abs() * gain).collect();
     let mid = r.y + r.h / 2;
     canvas.fill_rect(r.x, mid, r.w, scale.px(), theme::mix(field_color(), ENVELOPE, 0.4));
-    canvas.draw_profile((r.x, mid, r.w), r.h / 2, &values, true, ENVELOPE);
-    canvas.draw_profile((r.x, mid, r.w), r.h / 2, &values, false, ENVELOPE);
+    for direction in [Direction::Up, Direction::Down] {
+        canvas.draw_profile((r.x, mid, r.w), r.h / 2, (points, gain), direction, ENVELOPE);
+    }
     if let Some(overlay) = overlay {
         overlay.draw(canvas, (r.x, r.y, r.w, r.h), scale);
     }

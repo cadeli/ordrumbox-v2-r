@@ -9,6 +9,13 @@ use crate::scale::Scale;
 /// A pixel colour, `0x00RRGGBB` (the softbuffer format).
 pub type Rgb = u32;
 
+/// Which way a shape grows from its baseline on the screen.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Direction {
+    Up,
+    Down,
+}
+
 /// A borrowed frame to draw into, clipped to its bounds.
 #[derive(Debug)]
 pub struct Canvas<'a> {
@@ -117,16 +124,17 @@ impl<'a> Canvas<'a> {
         pen
     }
 
-    /// One side of a waveform: `values` (0–1, `reach` pixels at 1) interpolated
-    /// to a column per pixel over `width`, growing from `baseline` upward
-    /// (`up`) or downward. The body fades from a bright core at the baseline
-    /// to the edge, and the outline is smoothed over its last pixel.
+    /// One side of a waveform: the size of `values` times `gain` (0–1,
+    /// `reach` pixels at 1) interpolated to a column per pixel over `width`,
+    /// growing from `baseline` toward `direction`. The body fades from a bright
+    /// core at the baseline to the edge, and the outline is smoothed over its
+    /// last pixel.
     pub fn draw_profile(
         &mut self,
         (x, baseline, width): (i32, i32, i32),
         reach: i32,
-        values: &[f64],
-        up: bool,
+        (values, gain): (&[f64], f64),
+        direction: Direction,
         color: Rgb,
     ) {
         const CORE_OPACITY: f64 = 215.0;
@@ -134,13 +142,16 @@ impl<'a> Canvas<'a> {
         let outline = crate::theme::mix(color, crate::theme::text(), 0.35);
         let last = values.len().saturating_sub(1);
         // The row `distance` pixels from the baseline.
-        let row = |distance: i32| if up { baseline - distance - 1 } else { baseline + distance };
+        let row = |distance: i32| match direction {
+            Direction::Up => baseline - distance - 1,
+            Direction::Down => baseline + distance,
+        };
+        let value = |i: usize| values.get(i).map_or(0.0, |v| (v.abs() * gain).clamp(0.0, 1.0));
         for column in 0..width {
             let position = if width > 1 { f64::from(column) / f64::from(width - 1) * last as f64 } else { 0.0 };
             let below = (position.floor() as usize).min(last);
             let above = (below + 1).min(last);
             let fraction = position - below as f64;
-            let value = |i: usize| values.get(i).map_or(0.0, |v| v.clamp(0.0, 1.0));
             let height = (value(below) * (1.0 - fraction) + value(above) * fraction) * f64::from(reach);
             let whole = height.floor() as i32;
             for distance in 0..whole {
@@ -151,6 +162,9 @@ impl<'a> Canvas<'a> {
             if height > 0.0 {
                 let edge = ((height - f64::from(whole)) * 255.0) as u8;
                 self.blend(x + column, row(whole), color, edge.max(EDGE_OPACITY as u8));
+            }
+            // Under a pixel high there is no row to outline on this side.
+            if whole > 0 {
                 self.blend(x + column, row(whole - 1), outline, 255);
             }
         }
