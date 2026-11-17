@@ -19,6 +19,9 @@ use ordrumbox_dsp::synth::patch::{
 const C3_FREQ: f64 = 130.812_782_650_299_3;
 /// `MIN_NOTE_RATIO`.
 const MIN_NOTE_RATIO: f64 = 0.0001;
+/// The synth's level against a kit sample's: −3 dB, the peak a kit sample is
+/// normalised to, so a synth note at full velocity peaks where a sample does.
+const SYNTH_TRIM: f64 = 0.707_945_784_384_137_9;
 
 /// The oscillator and LFO waves, by code.
 pub const WAVES: [&str; 5] = ordrumbox_dsp::lfo::WAVE_NAMES;
@@ -205,8 +208,8 @@ fn or_else<'a>(a: Option<&'a Value>, b: Option<&'a Value>) -> Option<&'a Value> 
 }
 
 /// The loudness of a note of `velocity` on a preset whose oscillators have
-/// `gains`: normalised by what the voice mixes, then the master volume, and
-/// accented above half.
+/// `gains`: normalised by what the voice mixes, then the master volume,
+/// accented above half, and trimmed to the level of the kit samples.
 fn peak_velocity(preset: &Value, gains: [f64; 3], velocity: f64) -> f64 {
     let at = |key: &str| get(Some(preset), key);
     let total_gain = gains[0] + gains[1] + gains[2];
@@ -219,7 +222,7 @@ fn peak_velocity(preset: &Value, gains: [f64; 3], velocity: f64) -> f64 {
     let note_velo = velocity * mix_norm;
     let accent = if note_velo > 0.5 { 1.0 + 0.5 * 0.5 } else { 1.0 };
     let master_volume = level(at("masterVolume"), 0.8);
-    note_velo * master_volume * accent * 1.0
+    note_velo * master_volume * accent * SYNTH_TRIM
 }
 
 /// The frequency of each oscillator at `note_ratio` (1 is C3); 0 for a missing one.
@@ -361,8 +364,8 @@ mod tests {
             SynthNote { ratio: 1.0, velocity: 0.4, pan: 0.0, bpm: 120.0 },
         );
         assert_eq!((patch.osc_gain, patch.noise_mix, patch.sub_gain), ([1.0, 0.0, 0.0], 1.0, 0.0));
-        // All noise at full mix: the note's velocity at a master volume of 1.
-        assert_eq!(patch.velocity, 0.4);
+        // All noise at full mix: the note's velocity at a master volume of 1, trimmed.
+        assert!((patch.velocity - 0.4 * SYNTH_TRIM).abs() < 1e-12, "{}", patch.velocity);
     }
 
     #[test]
@@ -373,8 +376,8 @@ mod tests {
         );
         assert_eq!(patch.osc_freq, [C3_FREQ, 0.0, 0.0]);
         assert_eq!(patch.osc_wave, [Wave::Square, Wave::Sine, Wave::Sine]);
-        // 0.8 / 0.5 = 1.6, accented (×1.25), master volume 0.8.
-        assert!((patch.velocity - 1.6 * 0.8 * 1.25).abs() < 1e-12);
+        // 0.8 / 0.5 = 1.6, accented (×1.25), master volume 0.8, trimmed.
+        assert!((patch.velocity - 1.6 * 0.8 * 1.25 * SYNTH_TRIM).abs() < 1e-12);
         assert_eq!(patch.envelope, Adsr { attack: 0.01, decay: 0.1, sustain: 0.7, release: 0.1 });
     }
 
@@ -410,10 +413,10 @@ mod tests {
         };
         // Oscillators at 0.4 for 20% of the mix, noise for 80%: 0.88 in all.
         let noisy = velocity(r#"{"masterVolume":1,"vco1":{"gain":0.4},"noise":{"mix":0.8}}"#);
-        assert!((noisy - 0.8 / 0.88 * 1.25).abs() < 1e-12, "{noisy}");
+        assert!((noisy - 0.8 / 0.88 * 1.25 * SYNTH_TRIM).abs() < 1e-12, "{noisy}");
         // Bypassed, the noise is not in the mix.
         let bypassed = velocity(r#"{"masterVolume":1,"vco1":{"gain":0.4},"noise":{"mix":0.8},"bypassNoise":true}"#);
-        assert!((bypassed - 0.8 / 0.4 * 1.25).abs() < 1e-12, "{bypassed}");
+        assert!((bypassed - 0.8 / 0.4 * 1.25 * SYNTH_TRIM).abs() < 1e-12, "{bypassed}");
     }
 
     #[test]

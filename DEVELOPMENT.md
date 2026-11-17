@@ -123,6 +123,12 @@ wrong sound or a wrong threshold.
 
 ### Changes of behaviour
 
+A synth note is 3 dB quieter: its level (`peak_velocity`, `synth_preset.rs`) is trimmed by `SYNTH_TRIM`,
+−3 dB, the peak a kit sample is normalised to, so a synth at full velocity peaks where a sample does instead
+of 3 dB above it. Presets and patterns are unchanged. This rewrote `mapping_rust.txt` (engine: the `velocity` of
+each `synth` line, ×0.708, nothing else) and `pattern_renders.bin` (engine); `synth_renders.bin` (dsp) renders
+patches directly and is unchanged.
+
 The synth has three chip controls, read from a preset when present and written only once set (like
 `filter.slope`): `vco1`..`vco3` `width` (the pulse width of a square wave, 0.5 the plain square) and, in
 `noise`, `mode` (`white`, `long`, `short`: the 15- and 7-bit shift registers of an 8-bit console) and `rate`
