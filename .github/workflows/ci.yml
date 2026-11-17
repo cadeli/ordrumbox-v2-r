@@ -192,7 +192,8 @@ jobs:
         with:
           name: ordrumbox-clap-Linux
           path: clap
-      - run: mkdir -p dist && cp clap/orDrumbox.clap target/release/ordrumbox LICENSE dist/ && cp -r assets dist/
+      # The `.desktop` file and its icon: `install -D` them under `~/.local/share/` (README.md).
+      - run: mkdir -p dist && cp clap/orDrumbox.clap target/release/ordrumbox LICENSE installer/ordrumbox.desktop dist/ && cp installer/ordrumbox-setup.png dist/ordrumbox.png && cp -r assets dist/
       - uses: actions/upload-artifact@v7
         with:
           name: ordrumbox-linux-x64
@@ -200,7 +201,7 @@ jobs:
 
   release:
     name: GitHub release
-    needs: [windows-exe, linux-app, plugin]
+    needs: [windows-exe, linux-app, macos-app, plugin]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -227,6 +228,11 @@ jobs:
       - run: zip -r "ordrumbox-$GITHUB_REF_NAME-linux-x64.zip" ordrumbox-linux
       - uses: actions/download-artifact@v8
         with:
+          name: ordrumbox-macos
+          path: macos-app
+      - run: mv macos-app/orDrumbox-macos.zip "ordrumbox-$GITHUB_REF_NAME-macos.zip"
+      - uses: actions/download-artifact@v8
+        with:
           name: ordrumbox-clap-macOS
           path: clap-macos
       - run: mv clap-macos/orDrumbox.clap.zip "ordrumbox-$GITHUB_REF_NAME-macos-clap.zip"
@@ -251,3 +257,34 @@ jobs:
       - run: gh release create "$GITHUB_REF_NAME" --title "orDrumbox $GITHUB_REF_NAME" --notes-file notes.md ./*.zip ./setup/*.exe
         env:
           GH_TOKEN: ${{ github.token }}
+
+  # Built for a release tag only, or when the workflow is run by hand. The
+  # icon of a macOS program comes from its `.app` bundle (`installer/`).
+  macos-app:
+    name: orDrumbox.app
+    needs: [check, plugin]
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release -p ordrumbox-app
+      # The program reads `assets/` next to itself: both go in `Contents/MacOS`.
+      - name: Bundle
+        run: |
+          version=$(grep -m1 '^version = ' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+          app=dist/orDrumbox.app/Contents
+          mkdir -p $app/MacOS $app/Resources
+          cp target/release/ordrumbox $app/MacOS/
+          cp -r assets $app/MacOS/
+          cp installer/ordrumbox.icns $app/Resources/
+          sed "s/@VERSION@/$version/g" installer/Info.plist > $app/Info.plist
+          cp LICENSE dist/
+      - run: ditto -c -k --norsrc --noextattr --noacl --keepParent dist/orDrumbox.app orDrumbox-macos.zip
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ordrumbox-macos
+          path: orDrumbox-macos.zip
