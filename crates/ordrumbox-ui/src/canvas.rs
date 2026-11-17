@@ -4,6 +4,7 @@
 //! in the system's monospace font; lines and knob arcs come with the editors.
 
 use crate::font;
+use crate::image::Image;
 use crate::scale::Scale;
 
 /// A pixel colour, `0x00RRGGBB` (the softbuffer format).
@@ -171,6 +172,21 @@ impl<'a> Canvas<'a> {
     }
 
     /// `color` over the pixel at `(x, y)` at `coverage` (0–255), if inside.
+    /// Draw `image` with its top-left corner at `(x, y)`, each of its pixels
+    /// `scale` pixels wide (the nearest one), blended over what is there by
+    /// its opacity; parts outside the canvas are dropped.
+    pub fn draw_image(&mut self, x: i32, y: i32, image: &Image, scale: Scale) {
+        let quarters = scale.quarters();
+        let source = |at: i32| usize::try_from(at * Scale::ONE.quarters() / quarters).unwrap_or(0);
+        for row in 0..image.height_at(scale) {
+            for col in 0..image.width_at(scale) {
+                if let Some((color, alpha)) = image.pixel(source(col), source(row)) {
+                    self.blend(x + col, y + row, color, alpha);
+                }
+            }
+        }
+    }
+
     fn blend(&mut self, x: i32, y: i32, color: Rgb, coverage: u8) {
         if coverage == 0 || !(0..self.width as i32).contains(&x) || !(0..self.height as i32).contains(&y) {
             return;
@@ -266,6 +282,17 @@ mod tests {
         canvas.fill_rect(5, 5, 2, 2, 1);
         canvas.fill_rect(0, 0, 2, -3, 1);
         assert_eq!(pixels, [0; 4]);
+    }
+
+    #[test]
+    fn an_image_covers_its_size_at_the_scale() {
+        let mut pixels = vec![0x123456; 700 * 140];
+        let mut canvas = Canvas::new(&mut pixels, 700, 140);
+        canvas.draw_image(10, 5, &crate::image::LOGO, Scale::whole(2));
+        let changed: Vec<(usize, usize)> =
+            pixels.iter().enumerate().filter(|&(_, &p)| p != 0x123456).map(|(i, _)| (i % 700, i / 700)).collect();
+        assert!(!changed.is_empty());
+        assert!(changed.iter().all(|&(x, y)| (10..650).contains(&x) && (5..133).contains(&y)));
     }
 
     #[test]

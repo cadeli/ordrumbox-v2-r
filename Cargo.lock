@@ -1881,6 +1881,7 @@ dependencies = [
  "ordrumbox-core",
  "ordrumbox-engine",
  "ordrumbox-logic",
+ "png",
 ]
 
 [[package]]

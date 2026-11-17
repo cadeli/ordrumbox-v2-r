@@ -17,6 +17,7 @@ mod control_help;
 mod editors;
 mod font;
 mod frame;
+mod image;
 mod kits;
 mod master;
 mod mcp;

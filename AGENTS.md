@@ -53,7 +53,8 @@ assets/           data/*.json and kits/**.wav, read at runtime
   `Session`, the views drawn into a pixel buffer, and `Ui`, which takes the
   neutral input of `ui_input.rs` (keys, modifiers, pointer, wheel). Its only
   third-party dependency is `fontdue` (text in the system's monospace font,
-  read at start: nothing bundled). The program gives it its sound output
+  read at start: nothing bundled); `png` decodes the About logo at build
+  time only (`build.rs`, `image.rs`). The program gives it its sound output
   (`AudioOutput`, started by a `StartOutput`) and translates its window
   events; `main.rs` does nothing else.
 - The update check (`ordrumbox-ui/src/update.rs`) runs the system's `curl`

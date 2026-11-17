@@ -3,6 +3,7 @@
 use super::ACCENT;
 use crate::canvas::{Canvas, chars_in, text_width};
 use crate::frame::margin;
+use crate::image::Image;
 use crate::panel::Rect;
 use crate::scale::Scale;
 use crate::{font, menu, theme};
@@ -80,7 +81,12 @@ pub fn draw_toast(canvas: &mut Canvas, message: &str, bottom: i32, scale: Scale)
 
 /// A panel over the window: a title and lines of text (the key list, about).
 pub fn draw_notice(canvas: &mut Canvas, title: &str, lines: &[String], scale: Scale) {
-    draw_notice_part(canvas, title, lines, scale, None);
+    draw_notice_part(canvas, title, None, lines, scale, None);
+}
+
+/// A notice with `image` centred between its title and its lines (about).
+pub fn draw_notice_with_image(canvas: &mut Canvas, title: &str, image: &Image, lines: &[String], scale: Scale) {
+    draw_notice_part(canvas, title, Some(image), lines, scale, None);
 }
 
 /// A notice with two buttons under its lines: `buttons.0` is the default
@@ -94,7 +100,7 @@ pub fn draw_notice_choice(
     focus: usize,
     scale: Scale,
 ) {
-    draw_notice_part(canvas, title, lines, scale, Some((buttons, focus)));
+    draw_notice_part(canvas, title, None, lines, scale, Some((buttons, focus)));
 }
 
 /// Height of a notice's line, per scale unit.
@@ -115,15 +121,22 @@ pub fn draw_notice_scrolled(canvas: &mut Canvas, title: &str, lines: &[String], 
     }
     let first = scroll.min(lines.len() - rows);
     let title = format!("{title}  {}-{} of {}, wheel or arrows: more", first + 1, first + rows, lines.len());
-    draw_notice_part(canvas, &title, &lines[first..first + rows], scale, None);
+    draw_notice_part(canvas, &title, None, &lines[first..first + rows], scale, None);
+}
+
+/// The height an image takes in a notice, the gap under it included: none
+/// without one.
+fn image_room(image: Option<&Image>, scale: Scale) -> i32 {
+    image.map_or(0, |image| image.height_at(scale) + NOTICE_LINE * scale)
 }
 
 /// Where a notice of `lines` is in a window of `window` pixels: its left,
-/// top, width and height. `buttons_width` is the width of its line of
-/// buttons, when it has one.
+/// top, width and height. `image` goes above the lines; `buttons_width` is
+/// the width of its line of buttons, when it has one.
 pub fn notice_box(
     window: (i32, i32),
     title: &str,
+    image: Option<&Image>,
     lines: &[String],
     buttons_width: i32,
     has_buttons: bool,
@@ -134,8 +147,9 @@ pub fn notice_box(
     // The title shares its line with `close`.
     let title_width = text_width(title, scale.title()) + 16 * scale + text_width(close, scale);
     let lines_width = lines.iter().map(|l| text_width(l, scale)).max().unwrap_or(0).max(buttons_width);
-    let width = lines_width.max(title_width) + 32 * scale;
-    let height = (lines.len() as i32 + 3 + i32::from(has_buttons)) * line_h + 16 * scale;
+    let image_width = image.map_or(0, |image| image.width_at(scale));
+    let width = lines_width.max(title_width).max(image_width) + 32 * scale;
+    let height = (lines.len() as i32 + 3 + i32::from(has_buttons)) * line_h + 16 * scale + image_room(image, scale);
     let x = ((window.0 - width) / 2).max(0);
     let y = ((window.1 - height) / 2).max(menu::bar_height(scale));
     (x, y, width, height)
@@ -151,7 +165,7 @@ pub fn notice_line_at(
     px: i32,
     py: i32,
 ) -> Option<usize> {
-    let (x, y, width, height) = notice_box(window, title, lines, 0, false, scale);
+    let (x, y, width, height) = notice_box(window, title, None, lines, 0, false, scale);
     if px < x || px >= x + width || py < y || py >= y + height {
         return None;
     }
@@ -162,7 +176,7 @@ pub fn notice_line_at(
 
 /// Whether `(px, py)` is inside a notice of `lines`.
 pub fn notice_contains(window: (i32, i32), title: &str, lines: &[String], scale: Scale, px: i32, py: i32) -> bool {
-    let (x, y, width, height) = notice_box(window, title, lines, 0, false, scale);
+    let (x, y, width, height) = notice_box(window, title, None, lines, 0, false, scale);
     (x..x + width).contains(&px) && (y..y + height).contains(&py)
 }
 
@@ -187,7 +201,7 @@ pub fn notice_button_at(
     at: (i32, i32),
 ) -> Option<usize> {
     let (line, first, second) = button_texts(buttons, focus);
-    let (x, y, ..) = notice_box(window, title, lines, text_width(&line, scale), true, scale);
+    let (x, y, ..) = notice_box(window, title, None, lines, text_width(&line, scale), true, scale);
     let line_h = NOTICE_LINE * scale;
     let button_y = y + 10 * scale + (lines.len() as i32 + 2) * line_h;
     let first_w = text_width(&first, scale);
@@ -199,11 +213,12 @@ pub fn notice_button_at(
     .position(|rect| rect.contains(at.0, at.1))
 }
 
-/// A notice showing `lines`, as wide as the widest of them (`choice` adds
-/// its two buttons as one more line).
+/// A notice showing `image` (when there is one) then `lines`, as wide as the
+/// widest of them (`choice` adds its two buttons as one more line).
 pub(super) fn draw_notice_part(
     canvas: &mut Canvas,
     title: &str,
+    image: Option<&Image>,
     lines: &[String],
     scale: Scale,
     choice: Option<([&str; 2], usize)>,
@@ -217,16 +232,20 @@ pub(super) fn draw_notice_part(
     });
     let buttons_width = buttons.as_ref().map_or(0, |(line, ..)| text_width(line, scale));
     let (x, y, width, height) =
-        notice_box((canvas.width(), canvas.height()), title, lines, buttons_width, buttons.is_some(), scale);
+        notice_box((canvas.width(), canvas.height()), title, image, lines, buttons_width, buttons.is_some(), scale);
     canvas.fill_rect(x - 4 * scale, y - 4 * scale, width + 8 * scale, height + 8 * scale, theme::shade());
     canvas.fill_rect(x, y, width, height, theme::line());
     canvas.fill_rect(x + scale.px(), y + scale.px(), width - 2 * scale, height - 2 * scale, theme::panel());
     canvas.text(x + 16 * scale, y + 10 * scale, title, scale.title(), ACCENT);
+    if let Some(image) = image {
+        canvas.draw_image(x + (width - image.width_at(scale)) / 2, y + 10 * scale + 2 * line_h, image, scale);
+    }
+    let lines_y = y + 10 * scale + 2 * line_h + image_room(image, scale);
     for (i, line) in lines.iter().enumerate() {
-        canvas.text(x + 16 * scale, y + 10 * scale + (i as i32 + 2) * line_h, line, scale, theme::text());
+        canvas.text(x + 16 * scale, lines_y + i as i32 * line_h, line, scale, theme::text());
     }
     if let Some((_, first, second, focus)) = &buttons {
-        let y = y + 10 * scale + (lines.len() as i32 + 2) * line_h;
+        let y = lines_y + lines.len() as i32 * line_h;
         let (first_color, second_color) = if *focus == 0 { (ACCENT, theme::muted()) } else { (theme::muted(), ACCENT) };
         canvas.text(x + 16 * scale, y, first, scale, first_color);
         canvas.text(x + 16 * scale + text_width(first, scale) + 3 * scale, y, second, scale, second_color);

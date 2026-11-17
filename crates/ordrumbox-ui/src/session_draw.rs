@@ -8,7 +8,7 @@ use crate::canvas::Canvas;
 use crate::picker::PickerLayout;
 use crate::scale::Scale;
 use crate::view::View;
-use crate::{action_log, menu, picker, theme, view};
+use crate::{action_log, image, menu, picker, theme, view};
 use ordrumbox_core::{Library, Song};
 use ordrumbox_engine::{Mode, Position};
 
@@ -178,7 +178,9 @@ impl Session {
             Some(Overlay::Shortcuts { scroll }) => {
                 view::draw_notice_scrolled(canvas, "Keyboard shortcuts", &self.shortcut_lines(), *scroll, scale);
             }
-            Some(Overlay::About) => view::draw_notice(canvas, "About orDrumbox", &self.about(), scale),
+            Some(Overlay::About) => {
+                view::draw_notice_with_image(canvas, "About orDrumbox", &image::LOGO, &self.about(), scale);
+            }
             Some(Overlay::Preferences(prefs)) => {
                 view::draw_notice(canvas, "Preferences", &prefs.lines(), scale);
             }

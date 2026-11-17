@@ -2,9 +2,18 @@
 //! the commit tagged `v<version>` with no local change, else
 //! ` dev <commit>[+dirty] <commit date>`, read from git. Without git (a source
 //! archive), ` dev unknown build`: shown as is, never passed for a release.
+//! Also decodes the logo of Help > About into raw pixels (`image.rs`).
 
+use std::error::Error;
+use std::fs::{self, File};
+use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+/// The logo of Help > About, from the crate's folder.
+const LOGO_PNG: &str = "../../assets/images/logo2.png";
+/// Its size in pixels, which `image.rs` repeats.
+const LOGO_SIZE: (u32, u32) = (320, 64);
 
 /// The output of `git <args>` run in the workspace, trimmed, if it succeeded.
 fn git(root: &Path, args: &[&str]) -> Option<String> {
@@ -28,7 +37,25 @@ fn build_suffix(root: &Path, version: &str) -> String {
     format!(" dev {commit}{} {date}", if dirty { "+dirty" } else { "" })
 }
 
-fn main() {
+/// Decodes the logo PNG (8-bit RGBA) into `$OUT_DIR/logo.rgba`, which `image.rs` includes.
+fn logo_pixels() -> Result<(), Box<dyn Error>> {
+    println!("cargo:rerun-if-changed={LOGO_PNG}");
+    let mut reader = png::Decoder::new(BufReader::new(File::open(LOGO_PNG)?)).read_info()?;
+    let mut pixels = vec![0; reader.output_buffer_size().ok_or("the logo PNG is too large")?];
+    let info = reader.next_frame(&mut pixels)?;
+    if info.color_type != png::ColorType::Rgba
+        || info.bit_depth != png::BitDepth::Eight
+        || (info.width, info.height) != LOGO_SIZE
+    {
+        return Err(format!("{LOGO_PNG} must be {} x {}, 8-bit RGBA", LOGO_SIZE.0, LOGO_SIZE.1).into());
+    }
+    pixels.truncate(info.buffer_size());
+    fs::write(PathBuf::from(std::env::var("OUT_DIR")?).join("logo.rgba"), pixels)?;
+    Ok(())
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
+    logo_pixels()?;
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     println!("cargo:rustc-env=ORDRUMBOX_BUILD={}", build_suffix(&root, env!("CARGO_PKG_VERSION")));
     // Named again when the commit, the tags, the index or a source changes.
@@ -41,4 +68,5 @@ fn main() {
     for name in ["crates", "assets", "Cargo.toml"] {
         println!("cargo:rerun-if-changed={}", root.join(name).display());
     }
+    Ok(())
 }
