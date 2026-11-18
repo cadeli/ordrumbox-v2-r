@@ -45,6 +45,10 @@ fn row_white_color() -> Rgb {
 fn row_black_color() -> Rgb {
     theme::panel_2()
 }
+/// The row of a C: the white row tinted, so each octave stands out.
+fn row_c_color() -> Rgb {
+    theme::mix(theme::cell(), theme::FOCUS, 0.22)
+}
 fn column_beat_color() -> Rgb {
     theme::line()
 }
@@ -55,7 +59,7 @@ fn column_step_color() -> Rgb {
     theme::panel_2()
 }
 fn octave_color() -> Rgb {
-    theme::line()
+    theme::mix(theme::line(), theme::FOCUS, 0.6)
 }
 fn key_white_color() -> Rgb {
     theme::text()

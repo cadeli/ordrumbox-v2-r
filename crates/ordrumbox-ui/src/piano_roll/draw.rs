@@ -101,7 +101,13 @@ fn draw_rows(canvas: &mut Canvas, view: &RollView, layout: &RollLayout) {
             y,
             width,
             layout.row,
-            if black { row_black_color() } else { row_white_color() },
+            if black {
+                row_black_color()
+            } else if c {
+                row_c_color()
+            } else {
+                row_white_color()
+            },
         );
         if c {
             canvas.fill_rect(layout.grid.x, y + layout.row - s.px(), width, s.px(), octave_color());
