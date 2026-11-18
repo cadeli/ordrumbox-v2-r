@@ -76,6 +76,8 @@ mod session_host;
 mod session_labels;
 #[path = "session_lane.rs"]
 mod session_lane;
+#[path = "session_loop_export.rs"]
+mod session_loop_export;
 #[path = "session_note_tool.rs"]
 mod session_note_tool;
 #[path = "session_open.rs"]

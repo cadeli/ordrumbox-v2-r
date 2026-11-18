@@ -11,7 +11,7 @@ use crate::picker::{Export, Outcome, Picker, Purpose};
 use crate::store;
 use ordrumbox_core::{Library, Pattern, Rng};
 use ordrumbox_engine::offline;
-use ordrumbox_engine::{Mode, wav};
+use ordrumbox_engine::wav;
 use ordrumbox_logic::generate::{self, AutoGenerator};
 use ordrumbox_logic::{compose, midi};
 use std::path::{Path, PathBuf};
@@ -23,6 +23,15 @@ pub(super) const NOTHING_TO_RENDER: &str = "nothing to render with (no samples l
 /// Why the synth sounds cannot be exported.
 pub(super) const NO_SYNTHS: &str = "No synth sounds loaded";
 
+/// What a WAV export renders.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum WavSource {
+    /// Pattern `index`, `loop_count` times (from 1).
+    Pattern { index: usize, loop_count: u32 },
+    /// Song `index`, its whole arrangement once.
+    Song(usize),
+}
+
 /// The file the synth sounds are exported to.
 pub(super) const SYNTHS_FILE_NAME: &str = "ordrumbox-synth-sounds.json";
 
@@ -32,19 +41,23 @@ fn pattern_json_file_name(pattern: &Pattern) -> String {
 }
 
 impl Session {
-    /// Ctrl+E: the selected pattern (with Shift: the selected song) to a WAV
-    /// file at `path`.
+    /// Ctrl+E: the selected pattern, as many loops as chosen (with Shift: the
+    /// selected song) to a WAV file at `path`.
     fn export_wav(&mut self, song: bool, path: &Path) {
-        let mode = if song { Mode::Song(self.editor.selected_song()) } else { Mode::Pattern(self.pattern_index) };
-        self.message = self.write_wav(mode, path).unwrap_or_else(|e| e);
+        let source = if song {
+            WavSource::Song(self.editor.selected_song())
+        } else {
+            WavSource::Pattern { index: self.pattern_index, loop_count: self.chrome.export_loop_count }
+        };
+        self.message = self.write_wav(source, path).unwrap_or_else(|e| e);
     }
 
-    /// Ctrl+M: the selected pattern to a MIDI file at `path`.
+    /// Ctrl+Shift+M: the selected pattern, as many loops as chosen, to a MIDI file at `path`.
     fn export_midi(&mut self, path: &Path) {
         if self.pattern().is_none() {
             return;
         }
-        self.message = self.write_midi(self.pattern_index, path).unwrap_or_else(|e| e);
+        self.message = self.write_midi(self.pattern_index, self.chrome.export_loop_count, path).unwrap_or_else(|e| e);
     }
 
     /// Ctrl+Shift+S: the pattern as `Exporter.export()`
@@ -206,28 +219,32 @@ impl Session {
 }
 
 impl Session {
-    /// What `mode` plays (a pattern once, a song whole) as a WAV file at
-    /// `path`; what was written.
-    pub(super) fn write_wav(&self, mode: Mode, path: &Path) -> Result<String, String> {
+    /// What `source` plays as a WAV file at `path`; what was written.
+    pub(super) fn write_wav(&self, source: WavSource, path: &Path) -> Result<String, String> {
         let setup = self.render.as_ref().ok_or(NOTHING_TO_RENDER)?;
         let library = self.editor.library();
         let started = Instant::now();
-        let rendered = match mode {
-            Mode::Song(index) => {
+        let rendered = match source {
+            WavSource::Song(index) => {
                 if library.songs.get(index).is_none() {
                     return Err("no song in the library".into());
                 }
                 offline::render_song(library, index, setup)
             }
-            Mode::Pattern(p) => {
-                self.with_auto_loops(setup.seed, |hook| offline::render_pattern(library, p, 1, setup, Some(hook)))
-            }
+            WavSource::Pattern { index, loop_count } => self.with_auto_loops(setup.seed, |hook| {
+                offline::render_pattern(library, index, loop_count, setup, Some(hook))
+            }),
         };
         let (left, right) = rendered.ok_or("nothing to export (no playable clip)")?;
         let bytes = wav::encode(&left, &right, setup.sample_rate);
         store::write_atomic(path, bytes).map_err(|e| format!("not exported: {}: {e}", path.display()))?;
+        let loops = match source {
+            WavSource::Pattern { loop_count: 1, .. } => "1 loop, ".to_owned(),
+            WavSource::Pattern { loop_count, .. } => format!("{loop_count} loops, "),
+            WavSource::Song(_) => String::new(),
+        };
         Ok(format!(
-            "exported {} ({:.1} s of audio in {:.1} s)",
+            "exported {} ({loops}{:.1} s of audio in {:.1} s)",
             path.display(),
             left.len() as f64 / f64::from(setup.sample_rate),
             started.elapsed().as_secs_f64()
@@ -248,12 +265,12 @@ impl Session {
         render(&mut loop_start)
     }
 
-    /// Pattern `p` as a MIDI file at `path`; what was written.
-    pub(super) fn write_midi(&self, p: usize, path: &Path) -> Result<String, String> {
+    /// Pattern `p`, `loop_count` times, as a MIDI file at `path`; what was written.
+    pub(super) fn write_midi(&self, p: usize, loop_count: u32, path: &Path) -> Result<String, String> {
         let pattern = self.editor.library().patterns.get(p).ok_or("No pattern selected")?;
         let mut rng = Rng::new(1);
         let bpm = self.editor.library().bpm;
-        let bytes = midi::export(pattern, bpm, 1, &self.roots, &mut rng, &self.generators.scales);
+        let bytes = midi::export(pattern, bpm, loop_count, &self.roots, &mut rng, &self.generators.scales);
         store::write_atomic(path, &bytes).map_err(|e| format!("not exported: {}: {e}", path.display()))?;
         Ok(format!("exported {} ({} bytes)", path.display(), bytes.len()))
     }

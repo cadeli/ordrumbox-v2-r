@@ -4,7 +4,7 @@
 
 use super::session_confirm::Pending;
 use super::session_types::OverlayKey;
-use super::{Session, session_controls, session_note_tool, session_prefs};
+use super::{Session, session_controls, session_loop_export, session_note_tool, session_prefs};
 use crate::action_log::{LogLayout, Seen};
 use crate::picker::{Export, Picker};
 use crate::picker::{Outcome, PickerLayout};
@@ -27,6 +27,8 @@ pub(super) enum Overlay {
     Controls(session_controls::Draft),
     /// Edit > Quantize or Humanize: the tool's two settings being chosen.
     NoteTool(session_note_tool::Draft),
+    /// File > Export pattern as WAV or as MIDI: the loop count being chosen.
+    LoopExport(session_loop_export::Draft),
     /// Help > Factory reset, until the user says so: `yes` is the button
     /// ENTER would run, `false` (the default) keeps.
     FactoryReset {
@@ -279,6 +281,7 @@ impl Session {
             || self.prefs_key(&key)
             || self.controls_key(&key)
             || self.note_tool_key(&key)
+            || self.loop_export_key(&key)
         {
             return;
         }
@@ -339,6 +342,7 @@ impl Session {
         if self.prefs_click(width, height, scale, x, y)
             || self.controls_click(width, height, scale, x, y)
             || self.note_tool_click(width, height, scale, x, y)
+            || self.loop_export_click(width, height, scale, x, y)
         {
             return;
         }

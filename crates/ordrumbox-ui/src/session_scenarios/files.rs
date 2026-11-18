@@ -265,11 +265,21 @@ fn native_dialogs_replace_the_picker_and_a_save_names_the_file_itself() {
     s.file_chosen(&request, None);
     assert!(!s.overlay_open(), "a cancelled dialog changes nothing");
 
+    // The loop count first (2), then the file.
     s.run(Command::ExportMidi);
+    assert_eq!(s.take_file_request(), None, "the loop count is asked first");
+    for key in [OverlayKey::Side(1), OverlayKey::Move(1), OverlayKey::Enter] {
+        s.overlay_key(key);
+    }
+    assert!(!s.overlay_open());
     let request = s.take_file_request().unwrap();
     let FileKind::Save(name) = request.kind().clone() else { panic!("a file to write: {request:?}") };
     assert!(name.ends_with(".mid"), "{name}");
     let path = dir.join("my name.mid");
     s.file_chosen(&request, Some(path.clone()));
     assert!(path.is_file(), "written under the name chosen, not the suggested one");
+    let one_loop = dir.join("one loop.mid");
+    s.write_midi(s.pattern_index, 1, &one_loop).unwrap();
+    let size = |p: &std::path::Path| std::fs::metadata(p).unwrap().len();
+    assert!(size(&path) > size(&one_loop), "two loops are longer than one");
 }

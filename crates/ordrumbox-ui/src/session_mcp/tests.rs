@@ -121,8 +121,14 @@ fn lists_exports_and_imports() {
     assert!(get(&call(&mut s, "listScales", "{}").unwrap(), &["scales"]).as_array().is_some());
     assert!(get(&call(&mut s, "listStyles", "{}").unwrap(), &["styles"]).as_array().is_some());
     assert_eq!(call(&mut s, "exportPatternWav", r#"{"patternName":"rock"}"#), Err(NOTHING_TO_RENDER.into()));
+    for bad in ["0", "65", "1.5"] {
+        let args = format!(r#"{{"patternName":"rock","loopCount":{bad}}}"#);
+        for tool in ["exportPatternWav", "exportPatternMidi"] {
+            assert!(call(&mut s, tool, &args).is_err_and(|e| e.starts_with("loopCount")), "{tool} {bad}");
+        }
+    }
     let path = std::env::temp_dir().join(format!("ordrumbox_mcp_{}.mid", std::process::id()));
-    s.write_midi(0, &path).unwrap();
+    s.write_midi(0, 1, &path).unwrap();
     let args = object([("filePath", Value::from(path.display().to_string()))]);
     let imported = s.mcp_call("importMidi", &args).unwrap();
     std::fs::remove_file(&path).unwrap();

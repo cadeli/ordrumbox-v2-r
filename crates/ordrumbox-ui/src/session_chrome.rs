@@ -57,6 +57,8 @@ pub(super) struct Chrome {
     pub(super) overlay: Option<Overlay>,
     /// Folder the file picker last picked in.
     pub(super) last_dir: Option<PathBuf>,
+    /// The loops of the pattern File > Export pattern as WAV or as MIDI writes, from 1.
+    pub(super) export_loop_count: u32,
     /// What the mouse and the keyboard hold among the widgets.
     pub(super) widgets: Widgets,
     /// What of the grid is under the mouse, for its tooltip: a step (its
@@ -100,6 +102,7 @@ impl Default for Chrome {
             menu: None,
             overlay: None,
             last_dir: None,
+            export_loop_count: 1,
             widgets: Widgets::default(),
             hover: None,
             control_hover: None,

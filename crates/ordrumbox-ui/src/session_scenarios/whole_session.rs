@@ -183,6 +183,28 @@ fn a_session_through_the_menus_draws_every_step() {
         s.overlay_key(OverlayKey::Enter);
         assert!(!s.overlay_open());
     }
+    // Export pattern as WAV: 4 loops chosen in its modal, then the folder;
+    // the file is four times as long as one loop, and the count is kept.
+    let wav = exports.join(s.export_file_name(Export::PatternWav).unwrap());
+    let one_loop = std::fs::metadata(&wav).unwrap().len() - 44;
+    s.run(Command::ExportWav);
+    draw(&mut s);
+    for key in [OverlayKey::Side(1), OverlayKey::Side(1), OverlayKey::Side(1), OverlayKey::Move(1), OverlayKey::Enter] {
+        s.overlay_key(key);
+    }
+    assert!(matches!(s.chrome.overlay, Some(crate::session::session_overlay::Overlay::Picker(_))));
+    s.close_overlay();
+    std::fs::remove_file(&wav).unwrap();
+    s.export_to(Export::PatternWav, &exports);
+    assert!(s.message.contains("4 loops"), "{}", s.message);
+    let four_loops = std::fs::metadata(&wav).unwrap().len() - 44;
+    // Within rounding: the length is taken in frames of the four loops whole.
+    assert!(four_loops.abs_diff(4 * one_loop) <= one_loop / 1000, "{four_loops} bytes for 4 × {one_loop}");
+    s.run(Command::ExportWav);
+    assert!(s.overlay_open());
+    s.overlay_key(OverlayKey::Escape);
+    assert_eq!(s.chrome.export_loop_count, 4);
+
     // The MIDI file back in: a new pattern, shown.
     let count = s.editor.library().patterns.len();
     s.drop_path(&exports.join(s.export_file_name(Export::PatternMidi).unwrap()), false);

@@ -4,9 +4,11 @@
 
 use ordrumbox_core::json::Value;
 use ordrumbox_engine::synth_model as model;
-use ordrumbox_logic::tools::{count, find_song, find_track, object, same_name, song_json, text};
+use ordrumbox_logic::tools::{count, find_song, find_track, object, optional_whole, same_name, song_json, text};
 
 use super::Session;
+use super::session_files::WavSource;
+use super::session_loop_export::MAX_LOOP_COUNT;
 use super::session_mcp::{NO_AUDIO, exported, synth_settings};
 use crate::picker::Export;
 use crate::{master, store};
@@ -25,8 +27,9 @@ impl Session {
             }
             "exportPatternWav" => {
                 let p = self.mcp_pattern(text(args, "patternName")?)?;
+                let loop_count = loop_count(args)?;
                 let path = self.mcp_export_path(Export::PatternWav, p, 0)?;
-                exported(&path, self.write_wav(Mode::Pattern(p), &path)?)
+                exported(&path, self.write_wav(WavSource::Pattern { index: p, loop_count }, &path)?)
             }
             "exportPatternStems" => {
                 let p = self.mcp_pattern(text(args, "patternName")?)?;
@@ -35,13 +38,14 @@ impl Session {
             }
             "exportPatternMidi" => {
                 let p = self.mcp_pattern(text(args, "patternName")?)?;
+                let loop_count = loop_count(args)?;
                 let path = self.mcp_export_path(Export::PatternMidi, p, 0)?;
-                exported(&path, self.write_midi(p, &path)?)
+                exported(&path, self.write_midi(p, loop_count, &path)?)
             }
             "exportArrangementWav" => {
                 let s = find_song(&self.editor, args)?;
                 let path = self.mcp_export_path(Export::SongWav, 0, s)?;
-                exported(&path, self.write_wav(Mode::Song(s), &path)?)
+                exported(&path, self.write_wav(WavSource::Song(s), &path)?)
             }
             "exportArrangementStems" => {
                 let s = find_song(&self.editor, args)?;
@@ -205,5 +209,15 @@ impl Session {
             _ => return Ok(None),
         }
         .map(Some)
+    }
+}
+
+/// Argument `loopCount` of the pattern exports: from 1 to [`MAX_LOOP_COUNT`], 1 when not given.
+fn loop_count(args: &Value) -> Result<u32, String> {
+    let loop_count = optional_whole(args, "loopCount")?.unwrap_or(1);
+    if (1..=MAX_LOOP_COUNT).contains(&loop_count) {
+        Ok(loop_count)
+    } else {
+        Err(format!("loopCount: {loop_count} is not from 1 to {MAX_LOOP_COUNT}"))
     }
 }

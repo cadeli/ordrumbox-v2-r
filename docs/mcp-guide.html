@@ -289,9 +289,9 @@ play { "song": true }</code></pre>
 
 <div class="example">
 <h3>Example 8 — Export to share</h3>
-<p class="say">Export "First Beat" as a WAV file and as MIDI, and the song "Demo song" as WAV.</p>
-<pre><code>exportPatternWav     { "patternName": "First Beat" }
-exportPatternMidi    { "patternName": "First Beat" }
+<p class="say">Export "First Beat" as WAV and MIDI files of 4 loops, and the song "Demo song" as WAV.</p>
+<pre><code>exportPatternWav     { "patternName": "First Beat", "loopCount": 4 }
+exportPatternMidi    { "patternName": "First Beat", "loopCount": 4 }
 exportArrangementWav { "arrangement": "Demo song" }</code></pre>
 <p>The files go to the <code>exports</code> folder of your user data folder (see the
 <a href="user-manual.html#getting-started">user manual, section 1</a>); the assistant tells you their full path.</p>
