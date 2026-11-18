@@ -1,0 +1,15 @@
+orDrumbox VST3 plugin
+=====================
+
+This VST3 plugin links the GPLv3 VST3 bindings (vst3-sys), so orDrumbox.vst3 as
+a whole is distributed under the GNU General Public License, version 3: see
+LICENSE-GPL-3.0.
+
+The orDrumbox source code itself is MIT licensed: see LICENSE. MIT is
+compatible with the GPLv3. The CLAP plugin and the program are built without
+the VST3 bindings and stay MIT.
+
+Corresponding source code: https://github.com/cadeli/ordrumbox-v2-r, at the tag
+of this release (the version in the name of this zip, v<version>). Build it with:
+
+    cargo xtask bundle ordrumbox-plugin --release --features vst3

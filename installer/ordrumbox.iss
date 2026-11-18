@@ -57,9 +57,11 @@ Type: filesandordirs; Name: "{commoncf64}\CLAP\orDrumbox\assets"; Components: cl
 [Files]
 Source: "dist\ordrumbox.exe"; DestDir: "{app}"; Components: app; Flags: ignoreversion
 Source: "dist\LICENSE"; DestDir: "{app}"; Components: app
+Source: "dist\THIRD-PARTY-LICENSES.txt"; DestDir: "{app}"; Components: app
 Source: "installer\ordrumbox.ico"; DestDir: "{app}"; Components: app; Flags: ignoreversion
 Source: "dist\assets\*"; DestDir: "{app}\assets"; Components: app; Flags: recursesubdirs ignoreversion
 Source: "dist\orDrumbox.clap"; DestDir: "{commoncf64}\CLAP\orDrumbox"; Components: clap; Flags: ignoreversion
+Source: "dist\THIRD-PARTY-LICENSES.txt"; DestDir: "{commoncf64}\CLAP\orDrumbox"; Components: clap; Flags: ignoreversion
 Source: "dist\assets\*"; DestDir: "{commoncf64}\CLAP\orDrumbox\assets"; Components: clap; Flags: recursesubdirs ignoreversion
 
 [Icons]

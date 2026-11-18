@@ -1,0 +1,23 @@
+orDrumbox: third-party licenses
+===============================
+
+orDrumbox is MIT licensed (LICENSE). It includes the libraries below, each under
+its own license. A VST3 build is GPLv3 as a whole (vst3-NOTICE.txt).
+
+Licenses used:
+{{#each overview}}
+  {{{name}}} ({{count}} crates)
+{{/each}}
+
+{{#each licenses}}
+--------------------------------------------------------------------------------
+{{{name}}}
+
+Used by:
+{{#each used_by}}
+  {{{crate.name}}} {{crate.version}}{{#if crate.repository}} ({{crate.repository}}){{/if}}
+{{/each}}
+
+{{{text}}}
+
+{{/each}}

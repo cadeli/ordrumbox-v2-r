@@ -48,6 +48,12 @@ The CLAP plugin comes with each release:
   Unzip it into `~/Library/Audio/Plug-Ins/CLAP/`. It is not notarized: if the host refuses
   to load it, run `xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/CLAP/orDrumbox.clap`.
 
+The VST3 plugin is a separate download, `ordrumbox-<version>-<system>-vst3.zip` (GPLv3,
+see "License"). It is a folder, `orDrumbox.vst3`, with its assets inside: unzip it into
+`C:\Program Files\Common Files\VST3\` (Windows), `~/.vst3/` (Linux) or
+`~/Library/Audio/Plug-Ins/VST3/` (macOS). On macOS it is not notarized either: run
+`xattr -dr com.apple.quarantine` on it if the host refuses to load it.
+
 ## Documentation
 
 - User manual: [`docs/user-manual.html`](docs/user-manual.html), with its

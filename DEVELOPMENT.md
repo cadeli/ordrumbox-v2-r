@@ -54,9 +54,11 @@ the Windows setup made from the same files, the Linux zip (the same files, the
 binary linked at run time against the system's ALSA and X11 libraries, plus the
 `.desktop` file and icon), the macOS `orDrumbox.app` (`installer/Info.plist` and
 `ordrumbox.icns`; the binary and `assets/` in `Contents/MacOS`), and the macOS and
-Linux CLAPs, zipped. The icon of the window comes from `installer/ordrumbox-setup.png`,
+Linux CLAPs, zipped, and the VST3 bundles of the three systems, one zip each
+(`ordrumbox-<tag>-<os>-vst3.zip`, `assets/` inside, with `LICENSE`, `LICENSE-GPL-3.0` and `installer/vst3-NOTICE.txt`). The icon of the window comes from `installer/ordrumbox-setup.png`,
 decoded by `crates/ordrumbox-app/build.rs`; the `.exe` carries `ordrumbox.ico`. Both CLAPs are built without `vst3`, so they stay
-MIT; the VST3 bundles are only artifacts of the CI run.
+MIT; the VST3 bundles are built with `vst3`, so they are GPLv3, and shipped
+as separate zips: never ship the `.clap` that build leaves beside them.
 
 The setup is `installer/ordrumbox.iss`, built by Inno Setup 6 (Windows only), with
 the version of `Cargo.toml`:
@@ -86,6 +88,20 @@ cargo xtask bundle ordrumbox-plugin --release --features vst3 # and orDrumbox.vs
 
 Building with `vst3` links GPLv3 bindings; the CLAP build stays MIT (`README.md`,
 "License").
+
+## Licenses
+
+`THIRD-PARTY-LICENSES.txt` lists the licenses of every dependency, for every target and
+feature of the releases (`about.toml`, `about.hbs`). It is generated, committed, and shipped
+in each zip, the setup and the macOS app; CI fails when it is out of date. After a change to
+`Cargo.lock`:
+
+```sh
+cargo install --locked cargo-about --features cli   # once
+cargo about generate --all-features --workspace about.hbs -o THIRD-PARTY-LICENSES.txt
+```
+
+A new license must be added to `accepted` in `about.toml` on purpose.
 
 ## Instrument catalog
 

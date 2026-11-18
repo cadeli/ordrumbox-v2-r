@@ -12,6 +12,7 @@
 - **Preferences** window (Ctrl ,), metronome, tap tempo.
 - About twenty new demo patterns and a full demo song.
 - Windows setup, CLAP plugin in the release, Linux build.
+- VST3 plugin in the release, a separate GPLv3 zip for Windows, Linux and macOS.
 
 ### Changed
 - New keyboard shortcuts (F1 lists them); PATTERN / SONG mode switch.

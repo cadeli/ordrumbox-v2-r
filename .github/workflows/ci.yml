@@ -41,13 +41,21 @@ jobs:
       - run: cargo clippy --workspace --all-targets
       # The audit's errors (crate graph, names, `#[allow]`); its warnings are measures.
       - run: cargo xtask audit --no-clippy
+      # THIRD-PARTY-LICENSES.txt is generated and committed (DEVELOPMENT.md, "Licenses").
+      - name: Third-party licenses are up to date
+        if: runner.os == 'Linux'
+        run: |
+          cargo install --locked cargo-about --features cli
+          cargo about generate --all-features --workspace about.hbs -o /tmp/third-party.txt
+          diff THIRD-PARTY-LICENSES.txt /tmp/third-party.txt
       - run: cargo test --workspace
 
   # The plugin bundles (`assets/` inside), checked by the CLAP project's
   # validator. Built for a release tag only, or when the workflow is run by hand.
   # The CLAP is built first without `vst3`, so that the one shipped in the
-  # release stays MIT (README.md, "License"); the VST3 build, GPLv3, is only an
-  # artifact of the run.
+  # release stays MIT (README.md, "License"); the VST3 build is GPLv3: its bundle
+  # alone is zipped and shipped as a separate download, never the `.clap` that
+  # build also leaves in `target/bundled`.
   plugin:
     name: plugin (${{ matrix.os }})
     needs: check
@@ -98,6 +106,33 @@ jobs:
           name: ordrumbox-clap-${{ runner.os }}
           path: clap
       - run: cargo xtask bundle ordrumbox-plugin --release --features vst3
+      # The VST3 of the release (GPLv3): a bundle on every system, `assets/` inside.
+      # `ditto` on macOS keeps its signature and the binary's permissions.
+      - name: VST3 of the release (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory vst3 | Out-Null
+          Copy-Item LICENSE, LICENSE-GPL-3.0, THIRD-PARTY-LICENSES.txt, installer/vst3-NOTICE.txt target/bundled/
+          Compress-Archive -Path target/bundled/orDrumbox.vst3, target/bundled/LICENSE, target/bundled/LICENSE-GPL-3.0, target/bundled/THIRD-PARTY-LICENSES.txt, target/bundled/vst3-NOTICE.txt -DestinationPath vst3/orDrumbox.vst3.zip
+      - name: VST3 of the release (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir vst3
+          cp LICENSE LICENSE-GPL-3.0 THIRD-PARTY-LICENSES.txt installer/vst3-NOTICE.txt target/bundled/
+          (cd target/bundled && zip -r ../../vst3/orDrumbox.vst3.zip orDrumbox.vst3 LICENSE LICENSE-GPL-3.0 THIRD-PARTY-LICENSES.txt vst3-NOTICE.txt)
+      - name: VST3 of the release (macOS)
+        if: runner.os == 'macOS'
+        # The licenses go in a folder with the bundle, which `--keepParent` keeps whole.
+        run: |
+          mkdir -p vst3 stage
+          cp -R target/bundled/orDrumbox.vst3 stage/
+          cp LICENSE LICENSE-GPL-3.0 THIRD-PARTY-LICENSES.txt installer/vst3-NOTICE.txt stage/
+          ditto -c -k --norsrc --noextattr --noacl stage vst3/orDrumbox.vst3.zip
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ordrumbox-vst3-${{ runner.os }}
+          path: vst3
       - uses: actions/upload-artifact@v7
         with:
           name: ordrumbox-plugin-${{ runner.os }}
@@ -135,7 +170,7 @@ jobs:
           name: ordrumbox-clap-Windows
           path: dist
       - shell: bash
-        run: cp target/release/ordrumbox.exe LICENSE dist/ && cp -r assets dist/
+        run: cp target/release/ordrumbox.exe LICENSE THIRD-PARTY-LICENSES.txt dist/ && cp -r assets dist/
       - uses: actions/upload-artifact@v7
         with:
           name: ordrumbox-windows-x64
@@ -193,7 +228,7 @@ jobs:
           name: ordrumbox-clap-Linux
           path: clap
       # The `.desktop` file and its icon: `install -D` them under `~/.local/share/` (README.md).
-      - run: mkdir -p dist && cp clap/orDrumbox.clap target/release/ordrumbox LICENSE installer/ordrumbox.desktop dist/ && cp installer/ordrumbox-setup.png dist/ordrumbox.png && cp -r assets dist/
+      - run: mkdir -p dist && cp clap/orDrumbox.clap target/release/ordrumbox LICENSE THIRD-PARTY-LICENSES.txt installer/ordrumbox.desktop dist/ && cp installer/ordrumbox-setup.png dist/ordrumbox.png && cp -r assets dist/
       - uses: actions/upload-artifact@v7
         with:
           name: ordrumbox-linux-x64
@@ -236,11 +271,28 @@ jobs:
           name: ordrumbox-clap-macOS
           path: clap-macos
       - run: mv clap-macos/orDrumbox.clap.zip "ordrumbox-$GITHUB_REF_NAME-macos-clap.zip"
+      - run: zip -j "ordrumbox-$GITHUB_REF_NAME-macos-clap.zip" LICENSE THIRD-PARTY-LICENSES.txt
       - uses: actions/download-artifact@v8
         with:
           name: ordrumbox-clap-Linux
           path: clap-linux
-      - run: zip -j "ordrumbox-$GITHUB_REF_NAME-linux-clap.zip" clap-linux/orDrumbox.clap
+      - run: zip -j "ordrumbox-$GITHUB_REF_NAME-linux-clap.zip" clap-linux/orDrumbox.clap LICENSE THIRD-PARTY-LICENSES.txt
+      # The VST3 zips (GPLv3), one per system.
+      - uses: actions/download-artifact@v8
+        with:
+          name: ordrumbox-vst3-Windows
+          path: vst3-windows
+      - run: mv vst3-windows/orDrumbox.vst3.zip "ordrumbox-$GITHUB_REF_NAME-windows-vst3.zip"
+      - uses: actions/download-artifact@v8
+        with:
+          name: ordrumbox-vst3-Linux
+          path: vst3-linux
+      - run: mv vst3-linux/orDrumbox.vst3.zip "ordrumbox-$GITHUB_REF_NAME-linux-vst3.zip"
+      - uses: actions/download-artifact@v8
+        with:
+          name: ordrumbox-vst3-macOS
+          path: vst3-macos
+      - run: mv vst3-macos/orDrumbox.vst3.zip "ordrumbox-$GITHUB_REF_NAME-macos-vst3.zip"
       - uses: actions/download-artifact@v8
         with:
           name: ordrumbox-windows-setup
@@ -282,7 +334,7 @@ jobs:
           cp -r assets $app/MacOS/
           cp installer/ordrumbox.icns $app/Resources/
           sed "s/@VERSION@/$version/g" installer/Info.plist > $app/Info.plist
-          cp LICENSE dist/
+          cp LICENSE THIRD-PARTY-LICENSES.txt dist/
       - run: ditto -c -k --norsrc --noextattr --noacl --keepParent dist/orDrumbox.app orDrumbox-macos.zip
       - uses: actions/upload-artifact@v7
         with:
