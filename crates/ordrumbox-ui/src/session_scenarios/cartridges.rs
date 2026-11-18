@@ -141,3 +141,24 @@ fn the_filter_s_type_is_on_its_screen() {
     s.activate(Id::FxPower(5));
     assert_eq!(filter(&s).0, "notch");
 }
+
+#[test]
+fn an_arpeggio_s_arrows_step_through_its_directions() {
+    let text = r#"{"patterns":[{"name":"p","tracks":[{"name":"BASS","notes":[{"beat":0,"step":0}]}]}]}"#;
+    let (library, _) = Library::parse(text).unwrap();
+    let mut s = Session::new(library, KitSet::empty(), Vec::new());
+    let shown = |s: &Session| {
+        let view = s.note_view(0);
+        view.arp_direction.values[view.arp_direction.selected].clone()
+    };
+    let first = shown(&s);
+    s.activate(Id::NoteSelectStep("arpDirection", Step::Next));
+    let next = shown(&s);
+    assert_ne!(next, first);
+    assert_eq!(s.pattern().unwrap().tracks[0].notes[0].arp_direction.as_deref(), Some(next.as_str()));
+    s.activate(Id::NoteSelectStep("arpDirection", Step::Previous));
+    assert_eq!(shown(&s), first);
+    s.activate(Id::NoteSelectStep("arpDirection", Step::Previous));
+    let directions = s.note_view(0).arp_direction.values;
+    assert_eq!(shown(&s), directions[directions.len() - 1], "from the first, the previous is the last");
+}

@@ -59,10 +59,12 @@ pub fn note_editor(view: &NoteView, state: &EditorState, area: Rect, scale: Scal
                 rows.slider(Id::NoteSlider(p.key), spec, value, p.label, p.format.value(value, ""), false);
             }
             NoteRow::Select(key, label) => {
+                // A short screen between its arrows, lit while the arpeggio plays (a range).
                 let r = rows.row();
                 rows.label(r, label, None, false);
                 let choice = if *key == "arpScale" { &view.scales } else { &view.arp_direction };
-                rows.items.push(Item::new(Some(Id::NoteSelect(key)), rows.field(r, 140 * s), choice.kind()));
+                let screen = (Id::NoteSelect(key), choice.screen(view.arp_range > 0));
+                rows.screen_arrows(rows.field(r, 140 * s), screen, |step| Id::NoteSelectStep(key, step));
             }
         }
     }

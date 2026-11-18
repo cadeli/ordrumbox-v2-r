@@ -1,6 +1,7 @@
-//! The track editor's cartridges: the Sound tab's synth (its LED plays the
+//! The editors' cartridges: the Sound tab's synth (its LED plays the
 //! track's synth preset or its sample, its screen and its arrows choose the
-//! preset), an effect's LED and the arrows of its type.
+//! preset), an effect's LED and the arrows of its type, of an LFO's wave,
+//! of an arpeggio's scale and direction.
 
 use super::Session;
 use super::session_panel::{filter_on, number};
@@ -67,6 +68,16 @@ impl Session {
         let at = waves.iter().position(|w| *w == editors::lfo_wave(track, target)).unwrap_or(0);
         if let Some(wave) = step.from(at, waves.len()).and_then(|i| waves.get(i)) {
             self.select(Id::LfoType(i), wave);
+        }
+    }
+
+    /// The arrows of an arpeggio's scale or direction screen: the one before or
+    /// after the one shown, set as its list sets it.
+    pub(super) fn step_note_select(&mut self, t: usize, key: &'static str, step: Step) {
+        let view = self.note_view(t);
+        let choice = if key == "arpScale" { view.scales } else { view.arp_direction };
+        if let Some(value) = step.from(choice.selected, choice.values.len()).and_then(|i| choice.values.get(i)) {
+            self.select(Id::NoteSelect(key), value);
         }
     }
 

@@ -40,6 +40,8 @@ pub fn help(id: Id) -> Option<Help> {
         Id::LfoType(_) => ["LFO wave", "the shape the setting follows"],
         Id::LfoTypeStep(_, Step::Previous) => ["Previous wave", "the LFO's wave before the one shown"],
         Id::LfoTypeStep(_, Step::Next) => ["Next wave", "the LFO's wave after the one shown"],
+        Id::NoteSelectStep(_, Step::Previous) => ["Previous", "the arpeggio's scale or direction before the one shown"],
+        Id::NoteSelectStep(_, Step::Next) => ["Next", "the arpeggio's scale or direction after the one shown"],
         Id::Lfo(_, param) => match param {
             LfoParam::Freq => ["LFO rate", "how fast the setting moves, in Hz"],
             LfoParam::Min => ["LFO minimum", "the lowest value the setting reaches"],

@@ -535,6 +535,7 @@ impl Session {
             Id::SynthStep(step) => self.step_synth(t, step),
             Id::TrackSelectStep(key, step) => self.step_track_select(t, key, step),
             Id::LfoTypeStep(i, step) => self.step_lfo_wave(t, i, step),
+            Id::NoteSelectStep(key, step) => self.step_note_select(t, key, step),
             Id::AutoAssign => {
                 // `toggleAuto`: back on, the synth goes and the sample is picked by name.
                 let on = !track.auto_assign;

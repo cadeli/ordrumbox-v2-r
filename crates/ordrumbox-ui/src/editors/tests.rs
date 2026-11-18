@@ -277,6 +277,34 @@ fn the_compose_tab_shows_the_style_values_until_set() {
 }
 
 #[test]
+fn the_arpeggio_s_scale_and_direction_are_on_screens() {
+    let choice = |values: &[&str]| Choice {
+        values: values.iter().map(|v| (*v).to_owned()).collect(),
+        labels: Vec::new(),
+        selected: 0,
+    };
+    let state = EditorState { note_tab: 3, ..EditorState::default() };
+    for range in [0, 3] {
+        let view = NoteView {
+            title: "BASS [beat 1 step 1]".into(),
+            note: Some(Note::default()),
+            scales: choice(&["major", "minor"]),
+            arp_direction: choice(&["up", "down"]),
+            arp_range: range,
+            arp_octaves: 1,
+        };
+        let items = note_editor(&view, &state, Rect::new(0, 0, 360, 300), Scale::ONE);
+        for key in ["arpScale", "arpDirection"] {
+            let screen = items.iter().find(|item| item.id == Some(Id::NoteSelect(key))).map(|item| &item.kind);
+            assert!(matches!(screen, Some(Kind::Screen { lit, .. }) if *lit == (range > 0)), "{key} range {range}");
+            for step in [Step::Previous, Step::Next] {
+                assert!(items.iter().any(|item| item.id == Some(Id::NoteSelectStep(key, step))), "{key} {step:?}");
+            }
+        }
+    }
+}
+
+#[test]
 fn note_editor_hides_the_euclidean_prob() {
     let view = NoteView {
         title: "KICK [beat 1 step 1]".into(),

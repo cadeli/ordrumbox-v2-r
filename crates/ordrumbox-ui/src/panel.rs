@@ -195,6 +195,8 @@ pub enum Id {
     NoteSlider(&'static str),
     /// Arp scale / direction select.
     NoteSelect(&'static str),
+    /// An arrow of an arp scale / direction screen.
+    NoteSelectStep(&'static str, Step),
     // Kit editor.
     /// The kit to move the selected sample to.
     KitKit,
