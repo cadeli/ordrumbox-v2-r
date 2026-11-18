@@ -2,13 +2,14 @@
 
 use super::{Editor, Nudge, Played, nudge_pitch, nudge_velocity, pattern_name, step_percent};
 use crate::block::{Block, Pasted, StepAt, Zone};
+use crate::humanize::{self, Humanize};
 use crate::quantize::{self, Quantize, Scope};
 use crate::roll_block::{RollBlock, RollZone};
 use crate::{block, roll_block};
 use ordrumbox_core::json::Value;
 use ordrumbox_core::note::{ACCENT_VELOCITY, ACCENTED_VELOCITY, MAX_SHIFT_STEPS};
 use ordrumbox_core::num::round2;
-use ordrumbox_core::{Note, Track};
+use ordrumbox_core::{Note, Rng, Track};
 use std::ops::RangeInclusive;
 
 impl Editor {
@@ -237,6 +238,19 @@ impl Editor {
             |_| format!("Quantize notes in \"{pattern}\""),
             None,
             |pattern| quantize::quantize(pattern, scope, how),
+        )
+        .unwrap_or(0)
+    }
+
+    /// Humanize the notes of pattern `p` in `scope` ([`crate::humanize::humanize`]),
+    /// as one step; how many changed.
+    pub fn humanize(&mut self, p: usize, scope: Scope, how: Humanize, rng: &mut Rng) -> usize {
+        let Some(pattern) = self.library.patterns.get(p).map(|p| pattern_name(p).to_owned()) else { return 0 };
+        self.edit(
+            p,
+            |_| format!("Humanize notes in \"{pattern}\""),
+            None,
+            |pattern| humanize::humanize(pattern, scope, how, rng),
         )
         .unwrap_or(0)
     }

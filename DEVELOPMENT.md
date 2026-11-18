@@ -306,4 +306,6 @@ off, not a delay of type none. A cutoff LFO overrides the lock at the next quant
 three more tabs (FILTER, REVERB, DELAY): a note without a lock has no bar, and a bar painted to
 the bottom clears it. No snapshot changed.
 
-Quantize (Edit > Quantize, `ordrumbox-logic/src/quantize.rs`, `session_quantize.rs`) is a pure function of a pattern, a scope (zone, track, pattern), a grid and a strength; a note's place is its step plus `shiftSteps`, and what a strength leaves is kept as the shift. No snapshot changed.
+Quantize (Edit > Quantize, `ordrumbox-logic/src/quantize.rs`, `session_note_tool.rs`) is a pure function of a pattern, a scope (zone, track, pattern), a grid and a strength; a note's place is its step plus `shiftSteps`, and what a strength leaves is kept as the shift. No snapshot changed.
+
+Humanize (Edit > Humanize, `ordrumbox-logic/src/humanize.rs`, the same modal as Quantize in `session_note_tool.rs`) adds to each note of the scope a random shift (±0–30 % of a step, kept within half a step) and a random change of velocity (±0–30 % of it, at most 1), drawn from the session's generator `Rng`; the steps stay. The same seed gives the same notes (unit tests). No snapshot changed.

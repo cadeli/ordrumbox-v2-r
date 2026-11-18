@@ -20,7 +20,8 @@ pub enum Scope {
 }
 
 impl Scope {
-    fn holds(self, track: usize, note: &Note, steps_per_beat: i32) -> bool {
+    /// Whether note `note` of track `track` is one of them.
+    pub(crate) fn holds(self, track: usize, note: &Note, steps_per_beat: i32) -> bool {
         match self {
             Self::Zone(zone) => zone.holds(track, note_units(note, steps_per_beat)),
             Self::Track(t) => t == track,

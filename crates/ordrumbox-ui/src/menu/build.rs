@@ -146,6 +146,7 @@ fn edit_menu(s: &MenuState) -> Menu {
             command(if zone { "Clear zone" } else { "Clear step" }, "Delete", C::ClearStep, s.has_cursor || zone),
             command("Accent on / off", "L", C::ToggleAccent, s.has_cursor),
             command("Quantize...", "", C::Quantize, p),
+            command("Humanize...", "", C::Humanize, p),
             command("Select all", "Ctrl+A", C::SelectAll, p),
             command("Deselect", "Esc", C::Deselect, s.has_cursor || s.has_selection || zone),
             Item::Separator,

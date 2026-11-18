@@ -151,6 +151,8 @@ pub enum Command {
     MidiControls,
     /// Edit > Quantize: the notes onto a grid.
     Quantize,
+    /// Edit > Humanize: the notes a little off the grid and off their velocity.
+    Humanize,
     /// F11: the window full screen, or back.
     Fullscreen,
 }

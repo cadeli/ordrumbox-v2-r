@@ -76,12 +76,12 @@ mod session_host;
 mod session_labels;
 #[path = "session_lane.rs"]
 mod session_lane;
+#[path = "session_note_tool.rs"]
+mod session_note_tool;
 #[path = "session_open.rs"]
 mod session_open;
 #[path = "session_prefs.rs"]
 mod session_prefs;
-#[path = "session_quantize.rs"]
-mod session_quantize;
 #[path = "session_record.rs"]
 mod session_record;
 #[path = "session_roll_length.rs"]

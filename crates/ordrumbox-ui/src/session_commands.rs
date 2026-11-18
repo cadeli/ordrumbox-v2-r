@@ -4,6 +4,7 @@
 
 use super::Session;
 use super::session_confirm::Pending;
+use super::session_note_tool::Tool;
 use super::session_overlay::Overlay;
 use super::session_selection::Clipboard;
 use super::session_types::Workspace;
@@ -200,7 +201,8 @@ impl Session {
             C::RecordTiming => self.toggle_record_timing(),
             C::Preferences => self.open_preferences(),
             C::MidiControls => self.open_controls(),
-            C::Quantize => self.open_quantize(),
+            C::Quantize => self.open_note_tool(Tool::Quantize),
+            C::Humanize => self.open_note_tool(Tool::Humanize),
             C::Fullscreen => self.toggle_fullscreen(),
             C::TapTempo => self.tap_tempo(),
             C::Metronome => self.toggle_metronome(),

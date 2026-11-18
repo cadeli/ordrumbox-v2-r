@@ -10,6 +10,7 @@ pub mod composition;
 pub mod editor;
 pub mod generate;
 pub mod history;
+pub mod humanize;
 pub mod midi;
 pub mod quantize;
 pub mod roll_block;

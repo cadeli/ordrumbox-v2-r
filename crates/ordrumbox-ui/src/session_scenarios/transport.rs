@@ -297,6 +297,34 @@ fn quantize_takes_the_shift_off_the_notes_of_the_zone_or_track_and_undo_puts_it_
 }
 
 #[test]
+fn humanize_moves_the_cursor_track_within_its_ranges_and_undo_puts_it_back() {
+    use crate::session::OverlayKey;
+    let (mut s, _audio) = session(
+        r#"{"patterns":[{"name":"p","bpm":120,"tracks":[
+            {"name":"KICK","notes":[{"velocity":0.8},{"beat":1,"velocity":0.5},{"beat":2,"velocity":1}]},
+            {"name":"SNARE","notes":[{"step":2,"velocity":0.6}]}]}]}"#,
+    );
+    let notes = |s: &Session, t: usize| s.pattern().unwrap().tracks[t].notes.clone();
+    let (kick, snare) = (notes(&s, 0), notes(&s, 1));
+    s.selection.put_cursor(crate::view::Cursor { track: 0, beat: 0, step: 0 });
+    // The defaults, ±10 % and ±10 %: straight to the button.
+    s.run(Command::Humanize);
+    s.overlay_key(OverlayKey::Move(2));
+    s.overlay_key(OverlayKey::Enter);
+    assert!(!s.overlay_open());
+    assert!(s.message.contains("Humanized") && s.message.contains("track 1 KICK"), "{}", s.message);
+    for (after, before) in notes(&s, 0).iter().zip(&kick) {
+        assert_eq!((after.beat, after.step), (before.beat, before.step));
+        assert!(after.shift_steps.abs() <= 0.1, "{}", after.shift_steps);
+        assert!((after.velocity - before.velocity).abs() <= before.velocity * 0.1 + 0.005);
+    }
+    assert_ne!(notes(&s, 0), kick);
+    assert_eq!(notes(&s, 1), snare, "the other track is left");
+    s.undo();
+    assert_eq!(notes(&s, 0), kick);
+}
+
+#[test]
 fn a_list_that_fails_is_said_and_the_preferences_still_open() {
     let (mut s, _audio) = session(LIBRARY);
     s.offer_devices(|| Err("audio devices: host gone".into()));

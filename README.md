@@ -211,6 +211,11 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   notes recorded with *Record off the grid*; a coarser grid also moves their steps (a step
   halfway between two lines goes to the later one); a lower strength keeps what is left as a
   shift. A note pushed past the pattern's end or start wraps round it. One undo step.
+- **Edit > Humanize...** plays the same notes (the zone, else the track under the cursor, else
+  the whole pattern) a little early or late, and a little softer or louder, by a random amount:
+  **Timing** up to ±5, 10, 20 or 30 % of a step (a note stays within half a step of its own),
+  **Velocity** up to ±5, 10, 20 or 30 % of the note's (a ghost note stays a ghost); 0 leaves it as it is. Each run
+  draws again, on top of the last; one undo step each.
 - **Alt + arrows** on a selected note in the grid: up / down a semitone of pitch, left /
   right one step in time (in the piano roll, **Shift + arrows**, and its drag follows the
   same axes: up / down the pitch, sideways the velocity).

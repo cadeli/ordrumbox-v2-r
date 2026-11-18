@@ -36,10 +36,12 @@ fn keyboard_skips_what_cannot_run() {
     let edit = menus.iter().position(|m| m.title == "Edit").unwrap();
     let open = Open::new(&menus, edit, true);
     assert_eq!(open.command(&menus), Some(Command::Undo));
-    // Redo, copy and paste cannot run: Quantize is the next, then Select all, then Preferences, then MIDI controls, then Undo again.
+    // Redo, copy and paste cannot run: Quantize is the next, then Humanize, Select all, Preferences, MIDI controls, then Undo again.
     assert_eq!(open.step(&menus, 1).command(&menus), Some(Command::Quantize));
-    assert_eq!(open.step(&menus, 1).step(&menus, 1).command(&menus), Some(Command::SelectAll));
-    let preferences = open.step(&menus, 1).step(&menus, 1).step(&menus, 1);
+    let humanize = open.step(&menus, 1).step(&menus, 1);
+    assert_eq!(humanize.command(&menus), Some(Command::Humanize));
+    assert_eq!(humanize.step(&menus, 1).command(&menus), Some(Command::SelectAll));
+    let preferences = humanize.step(&menus, 1).step(&menus, 1);
     assert_eq!(preferences.command(&menus), Some(Command::Preferences));
     let controls = preferences.step(&menus, 1);
     assert_eq!(controls.command(&menus), Some(Command::MidiControls));

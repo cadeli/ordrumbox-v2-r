@@ -4,7 +4,7 @@
 
 use super::session_confirm::Pending;
 use super::session_types::OverlayKey;
-use super::{Session, session_controls, session_prefs, session_quantize};
+use super::{Session, session_controls, session_note_tool, session_prefs};
 use crate::action_log::{LogLayout, Seen};
 use crate::picker::{Export, Picker};
 use crate::picker::{Outcome, PickerLayout};
@@ -25,8 +25,8 @@ pub(super) enum Overlay {
     Preferences(session_prefs::Prefs),
     /// Edit > MIDI controls: the knob being bound.
     Controls(session_controls::Draft),
-    /// Edit > Quantize: the grid and the strength being chosen.
-    Quantize(session_quantize::Draft),
+    /// Edit > Quantize or Humanize: the tool's two settings being chosen.
+    NoteTool(session_note_tool::Draft),
     /// Help > Factory reset, until the user says so: `yes` is the button
     /// ENTER would run, `false` (the default) keeps.
     FactoryReset {
@@ -101,6 +101,7 @@ const SHORTCUTS: &[&str] = &[
     "  Ctrl+E, Ctrl+Shift+M   export WAV (Shift: the song), export MIDI",
     "  Ctrl+Z, Ctrl+Shift+Z   undo, redo (also Ctrl+Y)",
     "  (Edit menu)            Quantize: the zone, track or pattern onto a grid, fully or by a strength",
+    "  (Edit menu)            Humanize: the zone, track or pattern a little early or late, softer or louder",
     "  Ctrl+,                 preferences: sound output, MIDI ports and clock, metronome, VU meters, toasts",
     "  (Edit menu)            MIDI controls: bind the knobs of a MIDI controller to volumes, pans, cutoffs, mutes",
     "  Ctrl+C, Ctrl+X, Ctrl+V copy, cut, paste the zone or the step (Shift: the track)",
@@ -277,7 +278,7 @@ impl Session {
             || self.shortcuts_key(&key)
             || self.prefs_key(&key)
             || self.controls_key(&key)
-            || self.quantize_key(&key)
+            || self.note_tool_key(&key)
         {
             return;
         }
@@ -337,7 +338,7 @@ impl Session {
     pub fn overlay_click(&mut self, width: i32, height: i32, scale: Scale, x: i32, y: i32) {
         if self.prefs_click(width, height, scale, x, y)
             || self.controls_click(width, height, scale, x, y)
-            || self.quantize_click(width, height, scale, x, y)
+            || self.note_tool_click(width, height, scale, x, y)
         {
             return;
         }

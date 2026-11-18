@@ -185,7 +185,7 @@ impl Session {
                 view::draw_notice(canvas, "Preferences", &prefs.lines(), scale);
             }
             Some(Overlay::Controls(draft)) => self.draw_controls(canvas, draft, scale),
-            Some(Overlay::Quantize(draft)) => Self::draw_quantize(canvas, draft, scale),
+            Some(Overlay::NoteTool(draft)) => Self::draw_note_tool(canvas, draft, scale),
             Some(Overlay::History { scroll }) => {
                 let layout = LogLayout::new(canvas.width(), canvas.height(), scale);
                 action_log::draw(canvas, &self.action_log, *scroll, &layout);
