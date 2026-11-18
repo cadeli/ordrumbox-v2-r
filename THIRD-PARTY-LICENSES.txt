@@ -5,9 +5,9 @@ orDrumbox is MIT licensed (LICENSE). It includes the libraries below, each under
 its own license. A VST3 build is GPLv3 as a whole (vst3-NOTICE.txt).
 
 Licenses used:
-  MIT License (224 crates)
+  MIT License (229 crates)
   Apache License 2.0 (7 crates)
-  ISC License (5 crates)
+  ISC License (6 crates)
   BSD 3-Clause "New" or "Revised" License (2 crates)
   BSD 1-Clause License (1 crates)
   BSD 2-Clause "Simplified" License (1 crates)
@@ -844,6 +844,7 @@ You should have received a copy of the GNU General Public License along with thi
 ISC License
 
 Used by:
+  libloading 0.7.4 (https://github.com/nagisa/rust_libloading/)
   libloading 0.8.9 (https://github.com/nagisa/rust_libloading/)
 
 Copyright © 2015, Simonas Kazlauskas
@@ -1064,7 +1065,7 @@ DEALINGS IN THE SOFTWARE.
 MIT License
 
 Used by:
-  errno 0.3.14 (https://github.com/lambda-fairy/rust-errno)
+  errno 0.3.15 (https://github.com/lambda-fairy/rust-errno)
 
 Copyright (c) 2014 Chris Wong
 
@@ -1731,7 +1732,7 @@ SOFTWARE.
 MIT License
 
 Used by:
-  smallvec 1.16.4 (https://github.com/servo/rust-smallvec)
+  smallvec 1.16.6 (https://github.com/smallvec/smallvec)
 
 Copyright (c) 2018 The Servo Project Developers
 
@@ -2115,6 +2116,39 @@ Used by:
 
 Copyright (c) 2020 Yevhenii Reizner
 Copyright (c) 2015 Dan Burkert
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+
+--------------------------------------------------------------------------------
+MIT License
+
+Used by:
+  pollster 1.0.2 (https://github.com/zesterer/pollster)
+
+Copyright (c) 2020-2021 Joshua Barretto
 
 Permission is hereby granted, free of charge, to any
 person obtaining a copy of this software and associated
@@ -2820,6 +2854,35 @@ SOFTWARE.
 MIT License
 
 Used by:
+  rfd 0.18.0 (https://github.com/PolyMeilex/rfd)
+
+MIT License
+
+Copyright (c) 2020 Bilal Elmoussaoui
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+--------------------------------------------------------------------------------
+MIT License
+
+Used by:
   xcursor 0.3.11 (https://github.com/esposm03/xcursor-rs)
 
 MIT License
@@ -2849,6 +2912,7 @@ SOFTWARE.
 MIT License
 
 Used by:
+  rfd 0.18.0 (https://github.com/PolyMeilex/rfd)
   sctk-adwaita 0.10.1 (https://github.com/PolyMeilex/sctk-adwaita)
 
 MIT License
@@ -2989,6 +3053,7 @@ Used by:
   malloc_buf 0.0.6 (https://github.com/SSheldon/malloc_buf)
   objc-sys 0.3.5 (https://github.com/madsmtm/objc2)
   objc2-app-kit 0.2.2 (https://github.com/madsmtm/objc2)
+  objc2-app-kit 0.3.2 (https://github.com/madsmtm/objc2)
   objc2-audio-toolbox 0.3.2 (https://github.com/madsmtm/objc2)
   objc2-core-audio-types 0.3.2 (https://github.com/madsmtm/objc2)
   objc2-core-audio 0.3.2 (https://github.com/madsmtm/objc2)
@@ -2998,6 +3063,7 @@ Used by:
   objc2-foundation 0.2.2 (https://github.com/madsmtm/objc2)
   objc2-foundation 0.3.2 (https://github.com/madsmtm/objc2)
   objc2-quartz-core 0.3.2 (https://github.com/madsmtm/objc2)
+  objc2-uniform-type-identifiers 0.3.2 (https://github.com/madsmtm/objc2)
   objc2 0.5.3 (https://github.com/madsmtm/objc2)
   objc2 0.6.5 (https://github.com/madsmtm/objc2)
   windows-collections 0.3.2 (https://github.com/microsoft/windows-rs)
@@ -3205,7 +3271,7 @@ Used by:
   drm-sys 0.8.1 (https://github.com/Smithay/drm-rs)
   drm 0.14.1 (https://github.com/Smithay/drm-rs)
   fastrand 2.5.0 (https://github.com/smol-rs/fastrand)
-  itoa 1.0.18 (https://github.com/dtolnay/itoa)
+  itoa 1.0.19 (https://github.com/dtolnay/itoa)
   linux-raw-sys 0.12.1 (https://github.com/sunfishcode/linux-raw-sys)
   linux-raw-sys 0.4.15 (https://github.com/sunfishcode/linux-raw-sys)
   linux-raw-sys 0.9.4 (https://github.com/sunfishcode/linux-raw-sys)
@@ -3224,7 +3290,7 @@ Used by:
   smol_str 0.2.2 (https://github.com/rust-analyzer/smol_str)
   syn 1.0.109 (https://github.com/dtolnay/syn)
   syn 2.0.119 (https://github.com/dtolnay/syn)
-  syn 3.0.9 (https://github.com/dtolnay/syn)
+  syn 3.0.10 (https://github.com/dtolnay/syn)
   thiserror-impl 1.0.69 (https://github.com/dtolnay/thiserror)
   thiserror 1.0.69 (https://github.com/dtolnay/thiserror)
   unicode-ident 1.0.27 (https://github.com/dtolnay/unicode-ident)
