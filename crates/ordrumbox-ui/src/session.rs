@@ -103,6 +103,8 @@ mod session_zone;
 #[path = "session_zoom.rs"]
 mod session_zoom;
 
+#[path = "session_cartridge.rs"]
+mod session_cartridge;
 #[path = "session_kit.rs"]
 mod session_kit;
 #[path = "session_kit_list.rs"]
@@ -147,8 +149,6 @@ mod session_song_menu;
 mod session_song_mouse;
 #[path = "session_synth.rs"]
 mod session_synth;
-#[path = "session_synth_cartridge.rs"]
-mod session_synth_cartridge;
 #[path = "session_transport.rs"]
 mod session_transport;
 #[path = "session_types.rs"]

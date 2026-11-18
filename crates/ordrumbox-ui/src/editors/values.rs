@@ -1,6 +1,6 @@
 //! What a track or a note holds, read for the editors: values, arpeggio, tooltips, ordering.
 
-use super::tables::{ARP_DIRECTIONS, FxDef, lfo_key};
+use super::tables::{ARP_DIRECTIONS, FxDef, LfoTarget, fx_type_default, lfo_key, track_select_options};
 use ordrumbox_core::arp::MAX_OCTAVES;
 use ordrumbox_core::json::Value;
 use ordrumbox_core::{Note, ScaleList, Track, num};
@@ -35,7 +35,7 @@ pub(super) fn flag(track: &Track, key: &str) -> bool {
 }
 
 /// The text of setting `key`, as a select compares it (empty without one).
-pub(super) fn text_of(track: &Track, key: &str) -> String {
+pub fn text_of(track: &Track, key: &str) -> String {
     match track.field(key) {
         Some(Value::String(s)) => s,
         Some(Value::Number(n)) => ordrumbox_core::num::text(n),
@@ -48,11 +48,36 @@ pub(super) fn has_lfo(track: &Track, key: &str) -> bool {
 }
 
 /// `isFxOn`.
+/// An effect is on: its amount set, and a type (`none` plays nothing).
 pub fn fx_on(track: &Track, fx: &FxDef) -> bool {
     if fx.key == "filterType" {
         return track.filter_type != "allpass";
     }
-    number(track, fx.key) > 0.0
+    number(track, fx.key) > 0.0 && fx.type_key().is_none_or(|key| text_of(track, key) != "none")
+}
+
+/// The wave of `target`'s LFO on `track` (`sine` without one: the wave its LED turns on).
+pub fn lfo_wave(track: &Track, target: &LfoTarget) -> String {
+    let lfo = track.field(target.lfo_key);
+    let wave = lfo.as_ref().and_then(Value::as_object).and_then(|o| o.get("type")).and_then(Value::as_str);
+    wave.unwrap_or("sine").to_owned()
+}
+
+/// The value a select of setting `key` shows: the track's, or for an
+/// effect's type its list does not hold (`none`, the filter's `allpass`),
+/// the one its LED turns on: the filter's last, else its default.
+pub fn shown_value(track: &Track, key: &str, state: &EditorState) -> String {
+    let value = text_of(track, key);
+    let values = track_select_options(key).0;
+    if values.contains(&value) {
+        return value;
+    }
+    let last = state.prev_filter_type.as_ref().filter(|last| key == "filterType" && values.contains(last));
+    match (last, fx_type_default(key)) {
+        (Some(last), _) => last.clone(),
+        (None, Some(default)) => default.to_owned(),
+        (None, None) => value,
+    }
 }
 
 /// `getTrackLoopAtStep`: the loop length, else the track's length in steps.

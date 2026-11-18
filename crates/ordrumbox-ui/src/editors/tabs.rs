@@ -1,16 +1,15 @@
 //! The track editor's tabs (FX, sound, LFO, loop, generation) as rows.
 
-use super::tables::{COMPOSE_TAB, FILTER_ICONS, FILTER_TYPES, FX_DEFS, FX_KNOBS, FxDef, GENERATION_COMPOSE};
+use super::tables::{COMPOSE_TAB, FX_DEFS, FX_KNOBS, FxDef, GENERATION_COMPOSE};
 use super::tables::{
     GENERATION_ENGINE, GENERATION_GROOVE, GENERATION_MANUAL, GenerationRow, LFO_TARGETS, LOOP_PROPS, LfoTarget, Prop,
     STYLE_DEFAULT, WAVE_TYPES, fx_label, prop, track_select_options,
 };
-use super::values::{EditorState, flag, fx_on, has_lfo, index_of, loop_length, number, text_of};
+use super::values::{EditorState, flag, fx_on, has_lfo, index_of, lfo_wave, loop_length, number, shown_value, text_of};
 use super::{Choice, ComposeView, TrackView};
 use crate::control::{Format, Spec};
-use crate::panel::{Id, Item, KNOB_SIZE, Kind, LfoParam, Rect, Step, dim, label_width};
+use crate::panel::{Id, Item, Kind, LfoParam, Rect, dim, label_width};
 use crate::scale::Scale;
-use crate::theme;
 use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::json::Value;
 use ordrumbox_core::{Track, num};
@@ -20,46 +19,38 @@ use ordrumbox_logic::generate;
 use super::layout::*;
 use super::note_kit::shape_controls;
 
-/// The FX tab: the effects one under the other, each a strip of its own, as
-/// in the LFO tab: its on / off button (named) in the label column, level
-/// with its knobs and its choices.
-pub(super) fn fx_tab(rows: &mut Rows, view: &TrackView) {
+/// The FX tab: the effects one under the other, each a cartridge of its
+/// own, as in the LFO tab: its LED, its name and its type in the label
+/// column, then its knobs and its choices.
+pub(super) fn fx_tab(rows: &mut Rows, view: &TrackView, state: &EditorState) {
     for (i, fx) in FX_DEFS.iter().enumerate() {
-        fx_strip(rows, view, i as u8, fx);
+        fx_strip(rows, view, state, i as u8, fx);
     }
 }
 
 /// Slots of an effect strip's knob row: the most controls an effect has.
 pub(super) const FX_SLOTS: i32 = 5;
 
-/// Width of a filter type icon, and the step from one to the next (at scale 1):
-/// the four fit the label column.
-pub(super) const FILTER_ICON_W: i32 = 19;
-pub(super) const FILTER_ICON_STEP: i32 = 21;
-/// Height of a filter type icon (at scale 1).
-pub(super) const FILTER_ICON_H: i32 = 14;
+/// Height of a strip cartridge's lines, its name's and its type's (at scale 1).
+const CARTRIDGE_LINE_H: i32 = 14;
 
-pub(super) fn fx_strip(rows: &mut Rows, view: &TrackView, i: u8, fx: &FxDef) {
+pub(super) fn fx_strip(rows: &mut Rows, view: &TrackView, state: &EditorState, i: u8, fx: &FxDef) {
     let s = rows.scale;
     let track = view.track;
-    let button = Rect::new(rows.x, rows.y + (KNOB_SIZE * s - row_h(s)) / 2, label_width(s) - 4 * s, row_h(s));
-    let power = Kind::Button { label: fx.label.to_owned(), on: fx_on(track, fx) };
-    rows.items.push(Item::new(Some(Id::FxPower(i)), button, power));
-    if fx.key == "filterType" {
-        // The filter's types, under its button.
-        let y = button.y + button.h + 2 * s;
-        for (i, (icon, value)) in FILTER_ICONS.iter().zip(FILTER_TYPES).enumerate() {
-            let rect = Rect::new(rows.x + i as i32 * FILTER_ICON_STEP * s, y, FILTER_ICON_W * s, FILTER_ICON_H * s);
-            let kind = Kind::Button { label: (*icon).to_owned(), on: track.filter_type == value };
-            rows.items.push(Item::new(Some(Id::FilterIcon(i as u8)), rect, kind));
-        }
+    let on = fx_on(track, fx);
+    // Under its name: its type on a screen.
+    let line = strip_cartridge(rows, (Id::FxPower(i), on), fx.label);
+    let type_key = fx.type_key();
+    if let Some(key) = type_key {
+        let screen = (Id::TrackSelect(key), fx_choice(view, state, key).screen(on));
+        rows.screen_arrows(line, screen, |step| Id::TrackSelectStep(key, step));
     }
     let (x, w) = (rows.x, rows.w);
     rows.x += label_width(s);
     rows.w -= label_width(s);
     // The knobs first, then the choices: every strip reads the same way.
     let knobs = fx.controls.iter().filter_map(|&key| FX_KNOBS.iter().find(|p| p.key == key));
-    let choices = fx.controls.iter().filter(|&&key| key != "filterType" && !FX_KNOBS.iter().any(|p| p.key == key));
+    let choices = fx.controls.iter().filter(|&&key| Some(key) != type_key && !FX_KNOBS.iter().any(|p| p.key == key));
     let mut slot = 0;
     for p in knobs {
         let rect = rows.slot(slot, FX_SLOTS);
@@ -82,7 +73,7 @@ pub(super) fn fx_strip(rows: &mut Rows, view: &TrackView, i: u8, fx: &FxDef) {
     for &key in choices {
         let rect = rows.slot(slot, FX_SLOTS);
         slot += 1;
-        let choice = if key == "sidechainSource" { view.sidechains.clone() } else { fx_choice(view, key) };
+        let choice = if key == "sidechainSource" { view.sidechains.clone() } else { fx_choice(view, state, key) };
         rows.slot_choice(rect, fx_label(key), Some(key), Some(Id::TrackSelect(key)), choice.kind());
     }
     (rows.x, rows.w) = (x, w);
@@ -90,10 +81,10 @@ pub(super) fn fx_strip(rows: &mut Rows, view: &TrackView, i: u8, fx: &FxDef) {
 }
 
 /// The choice of the effect setting `key` (a select of fixed options).
-fn fx_choice(view: &TrackView, key: &str) -> Choice {
+fn fx_choice(view: &TrackView, state: &EditorState, key: &str) -> Choice {
     let track = view.track;
     let (values, mut labels) = track_select_options(key);
-    let selected = index_of(&values, &text_of(track, key));
+    let selected = index_of(&values, &shown_value(track, key, state));
     if key == "delayBeats" {
         // Too long a delay plays at fewer beats: shown on the choice.
         let used = delay_beats_used(track.delay_beats, view.bpm);
@@ -108,6 +99,22 @@ fn fx_choice(view: &TrackView, key: &str) -> Choice {
 
 /// Pixels between two effect strips (at scale 1).
 pub(super) const FX_STRIP_GAP: i32 = 4;
+
+/// How far a strip's cartridge reaches out of the column (at scale 1).
+const STRIP_FRAME_PAD: i32 = 3;
+
+/// A strip's cartridge (an effect's, an LFO's): its frame round the strip,
+/// in the gap between two strips, its LED (`led`, lit when `on`) and its name
+/// in the label column. Returns the line under the name, where the strip
+/// shows its type.
+fn strip_cartridge(rows: &mut Rows, (led, on): (Id, bool), name: &str) -> Rect {
+    let s = rows.scale;
+    let pad = STRIP_FRAME_PAD * s;
+    let frame = Rect::new(rows.x - pad, rows.y - s.px(), rows.w + 2 * pad, knob_row_h(s) + 2 * s);
+    let head = Rect::new(rows.x, rows.y + 2 * s, label_width(s) - 4 * s, CARTRIDGE_LINE_H * s);
+    rows.cartridge_head(frame, head, (led, on), name);
+    Rect::new(head.x, head.y + head.h + 4 * s, head.w, head.h)
+}
 
 pub(super) fn sound_tab(rows: &mut Rows, view: &TrackView) {
     let s = rows.scale;
@@ -144,9 +151,8 @@ pub(super) fn sound_tab(rows: &mut Rows, view: &TrackView) {
 /// Width of the Sound tab's File... button (at scale 1): its label and a margin.
 pub(super) const LOAD_W: i32 = 48;
 
-/// The synth cartridge's margin around its row, and the width of its arrows (at scale 1).
+/// The synth cartridge's margin around its row (at scale 1).
 const CARTRIDGE_PAD: i32 = 4;
-const ARROW_W: i32 = 14;
 
 /// The Sound tab's synth, a cartridge of its own: its LED (on: the track
 /// plays the synth instead of its sample), its name, then the preset on a
@@ -155,40 +161,27 @@ fn synth_cartridge(rows: &mut Rows, view: &TrackView) {
     let s = rows.scale;
     let pad = CARTRIDGE_PAD * s;
     let frame = Rect::new(rows.x, rows.y, rows.w, row_h(s) + 2 * pad);
-    rows.items.push(Item::new(None, frame, Kind::Card));
     let r = Rect::new(frame.x + pad, frame.y + pad, frame.w - 2 * pad, row_h(s));
     let on = view.track.use_synth;
-    rows.items.push(Item::new(Some(Id::SynthOn), Rect::new(r.x, r.y, 12 * s, r.h), Kind::Led { on }));
-    let color = if on { theme::text() } else { dim() };
-    rows.items.push(Item::text(r.x + 14 * s, r.y + (r.h - 8 * s) / 2, "SYNTH", color, s));
+    rows.cartridge_head(frame, r, (Id::SynthOn, on), "SYNTH");
     // The screen and its arrows line up with the fields of the rows above.
     let x = frame.x + label_width(s);
-    let (y, h, arrow) = (r.y + s.px(), r.h - 2 * s, ARROW_W * s);
-    let right = r.x + r.w;
-    let previous = Rect::new(x, y, arrow, h);
-    let next = Rect::new(right - arrow, y, arrow, h);
-    let screen = Rect::new(x + arrow + 2 * s, y, right - x - 2 * (arrow + 2 * s), h);
-    for (step, rect, glyph) in [(Step::Previous, previous, "\u{25c2}"), (Step::Next, next, "\u{25b8}")] {
-        let kind = Kind::Button { label: glyph.into(), on: false };
-        rows.items.push(Item::new(Some(Id::SynthStep(step)), rect, kind));
-    }
-    rows.items.push(Item::new(Some(Id::Synth), screen, view.synths.screen(on)));
+    let line = Rect::new(x, r.y + s.px(), r.x + r.w - x, r.h - 2 * s);
+    rows.screen_arrows(line, (Id::Synth, view.synths.screen(on)), Id::SynthStep);
     rows.y = frame.y + frame.h + 2 * s;
 }
 
-/// The LFO tab: the five targets one under the other, each a strip of its
-/// own, as in the FX tab: its on / off button (named) in the label column,
-/// then its wave and its knobs (five strips under a button row each would
-/// not fit the editor).
+/// The LFO tab: the five targets one under the other, each a cartridge of
+/// its own, as in the FX tab: its LED and its name, its wave on a screen
+/// under them, then its knobs.
 pub(super) fn lfo_tab(rows: &mut Rows, view: &TrackView) {
     for (i, target) in LFO_TARGETS.iter().enumerate() {
         lfo_strip(rows, view.track, i as u8, target);
     }
 }
 
-/// Slots of an LFO strip's knob row: the wave (two, its names are long),
-/// then frequency, min, max, phase.
-pub(super) const LFO_SLOTS: i32 = 6;
+/// Slots of an LFO strip's knob row: frequency, min, max, phase.
+pub(super) const LFO_SLOTS: i32 = 4;
 
 pub(super) fn lfo_strip(rows: &mut Rows, track: &Track, i: u8, target: &LfoTarget) {
     let s = rows.scale;
@@ -196,26 +189,18 @@ pub(super) fn lfo_strip(rows: &mut Rows, track: &Track, i: u8, target: &LfoTarge
     let get = |key: &str, fallback: f64| {
         lfo.as_ref().map_or(fallback, |o| o.get(key).and_then(Value::as_f64).unwrap_or(f64::NAN))
     };
-    let wave = lfo
-        .as_ref()
-        .map_or_else(|| "sine".to_owned(), |o| o.get("type").and_then(Value::as_str).unwrap_or("sine").to_owned());
+    let on = lfo.is_some();
+    let line = strip_cartridge(rows, (Id::LfoPower(i), on), target.label);
+    let values: Vec<String> = WAVE_TYPES.iter().map(|w| (*w).to_owned()).collect();
+    let selected = index_of(&values, &lfo_wave(track, target));
+    let choice = Choice { values, labels: Vec::new(), selected };
+    rows.screen_arrows(line, (Id::LfoType(i), choice.screen(on)), |step| Id::LfoTypeStep(i, step));
 
-    // The button level with the knobs, the knobs right of the label column.
-    let button = Rect::new(rows.x, rows.y + (KNOB_SIZE * s - row_h(s)) / 2, label_width(s) - 4 * s, row_h(s));
-    let power = Kind::Button { label: target.label.to_owned(), on: lfo.is_some() };
-    rows.items.push(Item::new(Some(Id::LfoPower(i)), button, power));
+    // The knobs right of the label column; min and max: the target's range,
+    // its own end the default of each.
     let (x, w) = (rows.x, rows.w);
     rows.x += label_width(s);
     rows.w -= label_width(s);
-
-    let values: Vec<String> = WAVE_TYPES.iter().map(|w| (*w).to_owned()).collect();
-    let selected = index_of(&values, &wave);
-    let choice = Choice { values, labels: Vec::new(), selected };
-    let (first, second) = (rows.slot(0, LFO_SLOTS), rows.slot(1, LFO_SLOTS));
-    let wave_slot = Rect::new(first.x, first.y, second.x + second.w - first.x, first.h);
-    rows.slot_choice(wave_slot, "Wave", None, Some(Id::LfoType(i)), choice.kind());
-
-    // Min and max: the target's range, its own end the default of each.
     let range = |default: f64| {
         let spec = Spec::knob(target.min, target.max, target.step, default);
         if target.key == "filterCutoff" { spec.log_full_travel() } else { spec }
@@ -226,7 +211,7 @@ pub(super) fn lfo_strip(rows: &mut Rows, track: &Track, i: u8, target: &LfoTarge
         (LfoParam::Max, range(target.max), get("max", target.max)),
         (LfoParam::Phase, Spec::knob(0.0, 1.0, 0.01, 0.0), get("phase", 0.0)),
     ];
-    for (slot, (param, spec, value)) in (2..).zip(knobs) {
+    for (slot, (param, spec, value)) in (0..).zip(knobs) {
         let text = crate::control::fmt(value);
         let kind = Kind::Value { spec, value, label: Some(param.label().to_owned()), text, lfo: false };
         rows.items.push(Item::new(Some(Id::Lfo(i, param)), rows.slot(slot, LFO_SLOTS), kind));

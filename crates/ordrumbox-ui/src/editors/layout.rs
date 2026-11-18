@@ -7,7 +7,7 @@ use super::tables::{TAB_FX, TAB_LFO, TAB_LOOP, TAB_SOUND};
 use super::tabs::{fx_tab, generation_tab, lfo_tab, loop_tab, sound_tab, tallest_tab_bottom};
 use super::values::{EditorState, has_lfo, number};
 use crate::control::{Format, Spec};
-use crate::panel::{Id, Item, KNOB_SIZE, Kind, Rect, dim, label_width};
+use crate::panel::{Id, Item, KNOB_SIZE, Kind, Rect, Step, dim, label_width};
 use crate::scale::Scale;
 use crate::theme;
 use ordrumbox_core::Track;
@@ -33,6 +33,10 @@ pub(super) const MAIN_TAB_H: i32 = 18;
 /// The gap between the track editor's two cards: its sound (the sample bar
 /// and the knob bar), then its tabs.
 pub(super) const CARD_GAP: i32 = 10;
+
+/// Width of a cartridge's LED, and of a screen's arrow (at scale 1).
+const LED_W: i32 = 10;
+const ARROW_W: i32 = 10;
 
 /// A tab: its id, its LED's id, its label, active, LED on.
 type TabSlot<'a> = (Id, Option<Id>, &'a str, bool, bool);
@@ -67,6 +71,31 @@ impl Rows {
                 last.kind = Kind::Text { text: String::new(), color: dim() };
             }
         }
+    }
+
+    /// A cartridge's head: its `frame`, then on `line` its LED (`led`, lit
+    /// when `on`) and its name, dimmed when it is off.
+    pub(super) fn cartridge_head(&mut self, frame: Rect, line: Rect, (led, on): (Id, bool), name: &str) {
+        let s = self.scale;
+        self.items.push(Item::new(None, frame, Kind::Card));
+        self.items.push(Item::new(Some(led), Rect::new(line.x, line.y, LED_W * s, line.h), Kind::Led { on }));
+        let color = if on { theme::text() } else { dim() };
+        self.items.push(Item::text(line.x + (LED_W + 2) * s, line.y + (line.h - 8 * s) / 2, name, color, s));
+    }
+
+    /// A one-line `screen` (its id and its kind) between the arrows that step
+    /// through its choice (`step`: an arrow's id), across `r`.
+    pub(super) fn screen_arrows(&mut self, r: Rect, (id, screen): (Id, Kind), step: impl Fn(Step) -> Id) {
+        let s = self.scale;
+        let arrow = ARROW_W * s;
+        let previous = Rect::new(r.x, r.y, arrow, r.h);
+        let next = Rect::new(r.x + r.w - arrow, r.y, arrow, r.h);
+        for (direction, rect, glyph) in [(Step::Previous, previous, "\u{25c2}"), (Step::Next, next, "\u{25b8}")] {
+            let kind = Kind::Button { label: glyph.into(), on: false };
+            self.items.push(Item::new(Some(step(direction)), rect, kind));
+        }
+        let rect = Rect::new(r.x + arrow + 2 * s, r.y, r.w - 2 * (arrow + 2 * s), r.h);
+        self.items.push(Item::new(Some(id), rect, screen));
     }
 
     /// The control part of a row (after its label).
@@ -241,7 +270,7 @@ pub fn track_editor(view: &TrackView, state: &EditorState, area: Rect, scale: Sc
 
     let bottom = tallest_tab_bottom(rows.y, s);
     match state.tab {
-        TAB_FX => fx_tab(&mut rows, view),
+        TAB_FX => fx_tab(&mut rows, view, state),
         TAB_SOUND => sound_tab(&mut rows, view),
         TAB_LFO => lfo_tab(&mut rows, view),
         TAB_LOOP => loop_tab(&mut rows, track),

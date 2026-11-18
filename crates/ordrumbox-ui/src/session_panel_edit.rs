@@ -9,7 +9,7 @@ use ordrumbox_engine::assign::synth_for;
 
 use super::session_panel::{NoteTarget, filter_on, history_label, number};
 use super::{Session, session_grid};
-use crate::editors::{self, FILTER_TYPES, FX_DEFS, KNOB_BAR, LFO_TARGETS, STYLE_DEFAULT};
+use crate::editors::{self, FX_DEFS, KNOB_BAR, LFO_TARGETS, STYLE_DEFAULT};
 use crate::kits::Field;
 use crate::menu::Command;
 use crate::panel::{Dropdown, Id, LfoParam};
@@ -414,6 +414,11 @@ impl Session {
         let Some(t) = self.editor_track() else { return };
         let name = self.track_name(t);
         match id {
+            Id::TrackSelect("filterType") => {
+                let Some(track) = self.track(t) else { return };
+                let updates = filter_on(track, value.to_owned());
+                self.update_track(t, &updates, &format!("Filter type on {name}"), false);
+            }
             Id::TrackSelect(key) => {
                 let v = if editors::NUMERIC_SELECTS.contains(&key) {
                     Value::from(value).to_number().map_or_else(|| Value::from(value), number)
@@ -510,30 +515,11 @@ impl Session {
             Id::FxPower(i) => {
                 // `toggleFxByKey`.
                 let fx = &FX_DEFS[usize::from(i).min(FX_DEFS.len() - 1)];
-                let updates = if fx.key == "filterType" {
-                    if editors::fx_on(&track, fx) {
-                        self.editors.prev_filter_type = Some(track.filter_type.clone());
-                        vec![("filterType", Value::String("allpass".into()))]
-                    } else {
-                        let back = self.editors.prev_filter_type.clone().unwrap_or_else(|| "lowpass".into());
-                        filter_on(&track, back)
-                    }
-                } else {
-                    let on = editors::number(&track, fx.key) > 0.0;
-                    vec![(fx.key, number(if on { 0.0 } else { fx.on_value }))]
-                };
+                if fx.key == "filterType" && editors::fx_on(&track, fx) {
+                    self.editors.prev_filter_type = Some(track.filter_type.clone());
+                }
+                let updates = super::session_cartridge::fx_switch(&track, fx, &self.editors);
                 self.update_track(t, &updates, &format!("Toggle {} on {name}", fx.label), false);
-            }
-            Id::FilterIcon(i) => {
-                let value = FILTER_TYPES[usize::from(i).min(FILTER_TYPES.len() - 1)];
-                let current = track.filter_type.clone();
-                let updates = if current == value {
-                    vec![("filterType", Value::String("allpass".into()))]
-                } else {
-                    filter_on(&track, value.to_owned())
-                };
-                self.editors.prev_filter_type = (current != value).then_some(current);
-                self.update_track(t, &updates, &format!("Filter type on {name}"), false);
             }
             Id::LfoPower(i) => {
                 let (object, lfo_key, created) = self.lfo_object(t, i, "sine");
@@ -547,6 +533,8 @@ impl Session {
             }
             Id::SynthOn => self.toggle_synth_on(t),
             Id::SynthStep(step) => self.step_synth(t, step),
+            Id::TrackSelectStep(key, step) => self.step_track_select(t, key, step),
+            Id::LfoTypeStep(i, step) => self.step_lfo_wave(t, i, step),
             Id::AutoAssign => {
                 // `toggleAuto`: back on, the synth goes and the sample is picked by name.
                 let on = !track.auto_assign;

@@ -30,6 +30,28 @@ pub struct FxDef {
     pub on_value: f64,
 }
 
+impl FxDef {
+    /// The setting of the effect's type, shown on its cartridge's screen
+    /// (the filter's is the one its LED reads).
+    #[must_use]
+    pub fn type_key(&self) -> Option<&'static str> {
+        self.controls.iter().copied().find(|key| key.ends_with("Type"))
+    }
+}
+
+/// The type an effect's LED turns it on at when it has none (`none`, or the
+/// filter's `allpass`, which its list does not offer: the LED switches the
+/// effect, not its type).
+#[must_use]
+pub fn fx_type_default(key: &str) -> Option<&'static str> {
+    match key {
+        "reverbType" => Some("room"),
+        "delayType" => Some("tape"),
+        "filterType" => Some("lowpass"),
+        _ => None,
+    }
+}
+
 pub const FX_DEFS: [FxDef; 6] = [
     FxDef { key: "reverbMix", label: "Reverb", controls: &["reverbMix", "reverbType"], on_value: 0.5 },
     FxDef {
@@ -92,10 +114,11 @@ pub const WAVE_TYPES: [&str; 5] = ["sine", "triangle", "sawtooth", "square", "ra
 pub fn track_select_options(key: &str) -> (Vec<String>, Vec<String>) {
     let list = |v: &[&str]| v.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
     match key {
-        "reverbType" => (list(&["none", "room", "hall", "plate", "spring", "gated"]), Vec::new()),
+        "reverbType" => (list(&["room", "hall", "plate", "spring", "gated"]), Vec::new()),
         "delayBeats" => (list(&DELAY_TIME_VALUES), list(&DELAY_TIME_LABELS)),
         "filterSlope" => (list(&FILTER_SLOPE_VALUES), list(&FILTER_SLOPE_LABELS)),
-        "delayType" => (list(&["none", "slap", "tape", "pingpong"]), Vec::new()),
+        "filterType" => (list(&FILTER_TYPES), Vec::new()),
+        "delayType" => (list(&["slap", "tape", "pingpong"]), Vec::new()),
         "saturationType" => (list(&["soft", "hard", "tape"]), Vec::new()),
         "autoVariant" => {
             // Every melodic variant (a bass track plays the bass ones, a chord track the others).

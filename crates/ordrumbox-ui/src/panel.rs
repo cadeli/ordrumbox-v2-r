@@ -168,12 +168,14 @@ pub enum Id {
     /// A setting of the LFO of a target (an index in `LFO_TARGETS`), and its wave.
     Lfo(u8, LfoParam),
     LfoType(u8),
+    /// An arrow of an LFO's wave screen.
+    LfoTypeStep(u8, Step),
     /// A select of a track setting (effect types, delay time, variant).
     TrackSelect(&'static str),
+    /// An arrow of a track setting's screen (an effect's type).
+    TrackSelectStep(&'static str, Step),
     /// An ON/OFF button of a track setting (mono, auto, scale lock).
     Toggle(&'static str),
-    /// Filter type button: lowpass, highpass, bandpass.
-    FilterIcon(u8),
     /// The sound tab's auto-assign LED.
     AutoAssign,
     Instrument,

@@ -531,16 +531,20 @@ loops, and the level curve (attack, hold, decay). A synth track keeps the place 
 plays it follows them.</p>
 
 <h3>FX tab</h3>
-<p>The six effects one under the other, each a strip: its power button (named) on the left, then its knobs and
-lists. Touching a control of an effect that is off switches it on.</p>
+<p>The six effects one under the other, each a cartridge: its LED and its name on the left (the LED switches it on
+or off), then its knobs and lists. Under the name, the reverb, the delay and the saturation show their type on a
+small screen: a click opens the list, ◂ and ▸ step to the type before or after. The filter's type is on its screen
+too. The LED switches the effect: a reverb or a delay without a type (<em>none</em>, from an older file
+or an MCP client) stays off, and its LED gives it the type its screen shows (<em>room</em>, <em>tape</em>). Touching a
+control of an effect that is off switches it on.</p>
 <table>
 <tr><th>Effect</th><th>Control</th><th>Values</th><th>Notes</th></tr>
 <tr><td rowspan="2"><strong>Reverb</strong></td><td>Mix</td><td>0–1</td><td>Wet amount.</td></tr>
-<tr><td>Type</td><td>none, room, hall, plate, spring, gated</td><td><em>hall</em> and <em>plate</em> have a pre-delay, <em>spring</em> a dispersion, <em>gated</em> a large room cut 250 ms after the hit.</td></tr>
+<tr><td>Type</td><td>room, hall, plate, spring, gated</td><td><em>hall</em> and <em>plate</em> have a pre-delay, <em>spring</em> a dispersion, <em>gated</em> a large room cut 250 ms after the hit.</td></tr>
 <tr><td rowspan="4"><strong>Delay</strong></td><td>Mix</td><td>0–1</td><td>Wet amount.</td></tr>
 <tr><td>Feedback</td><td>0–0.95 (default 0.4)</td><td>How many repeats. Greyed out for <em>slap</em> (one echo).</td></tr>
 <tr><td>Beats</td><td>1/16, 1/8, 1/4, 1/2, 1, 2, 4</td><td>Delay time in beats. Longer than 2 s at the tempo, it plays at the longest halving that fits (shown on the choice).</td></tr>
-<tr><td>Type</td><td>none, slap, tape, pingpong</td><td><em>slap</em>: one clean echo; <em>tape</em>: darker repeats with wow; <em>pingpong</em>: starts left, then alternates.</td></tr>
+<tr><td>Type</td><td>slap, tape, pingpong</td><td><em>slap</em>: one clean echo; <em>tape</em>: darker repeats with wow; <em>pingpong</em>: starts left, then alternates.</td></tr>
 <tr><td rowspan="4"><strong>Saturation</strong></td><td>Mix</td><td>0–1</td><td>Drive amount.</td></tr>
 <tr><td>Crush</td><td>0–1</td><td>Bitcrusher: fewer bits and a lower sample rate as it rises.</td></tr>
 <tr><td>Clip</td><td>0–1</td><td>Hard clipper driven into a −3 dB ceiling: density, not level.</td></tr>
@@ -553,7 +557,7 @@ lists. Touching a control of an effect that is off switches it on.</p>
 <tr><td rowspan="3"><strong>Sidechain</strong></td><td>Duck</td><td>0–1</td><td>How much of its volume the track gives up when the key is at full level (0: off). Another track's sound ducks this one and also feeds its compressor.</td></tr>
 <tr><td>Release</td><td>10–2000 ms (default 150)</td><td>How long the volume takes to come back once the key falls. The duck itself closes in 2 ms.</td></tr>
 <tr><td>Key</td><td>none, or a track of the pattern</td><td>The track whose sound keys the sidechain (a KICK pumping a BASS, for instance).</td></tr>
-<tr><td rowspan="4"><strong>Filter</strong></td><td>LP HP BP NT</td><td>lowpass, highpass, bandpass, notch</td><td>The type buttons under the power button. Off = bypass. Switched on from its 20 Hz default, the cutoff goes to 1 kHz.</td></tr>
+<tr><td rowspan="4"><strong>Filter</strong></td><td>Type</td><td>lowpass, highpass, bandpass, notch</td><td>On the screen under its LED. Off = bypass: the screen shows the type the LED turns it back on at, and choosing a type turns it on. Switched on from its 20 Hz default, the cutoff goes to 1 kHz.</td></tr>
 <tr><td>Cutoff</td><td>20 Hz – 20 kHz</td><td>LFO-capable.</td></tr>
 <tr><td>Q</td><td>0.707–18.707</td><td>Resonance (LFO-capable).</td></tr>
 <tr><td>Slope</td><td>12 dB, 24 dB</td><td>Per octave.</td></tr>
@@ -572,11 +576,13 @@ lists. Touching a control of an effect that is off switches it on.</p>
 
 <h3>LFO tab</h3>
 <p>One LFO per setting, the five one under the other: <strong>Cutoff</strong>, <strong>Q</strong>, <strong>Volume</strong>,
-<strong>Pan</strong>, <strong>Transpose</strong>. Each strip's power button switches its LFO on or off.</p>
+<strong>Pan</strong>, <strong>Transpose</strong>. Each is a cartridge, as in the FX tab: its LED switches its LFO on or
+off, and its wave shows on a small screen under its name (a click opens the list, ◂ and ▸ step to the wave before or
+after). An LFO that is off shows <em>sine</em>, the wave its LED turns it on at; choosing a wave turns it on.</p>
 <table>
 <tr><th>Control</th><th>Values</th><th>What it does</th></tr>
 <tr><td><strong>Wave</strong></td><td>sine, triangle, sawtooth, square, random</td><td>The waveform.</td></tr>
-<tr><td><strong>Freq</strong></td><td>0.1–2</td><td>The rate, in cycles per 4 beats.</td></tr>
+<tr><td><strong>Rate</strong></td><td>0.1–2</td><td>The rate, in cycles per 4 beats.</td></tr>
 <tr><td><strong>Min</strong>, <strong>Max</strong></td><td>the target's range</td><td>The span the LFO sweeps.</td></tr>
 <tr><td><strong>Phase</strong></td><td>0–1</td><td>Start offset within the cycle.</td></tr>
 </table>

@@ -1,6 +1,6 @@
 use super::tabs::variant_options;
 use super::*;
-use crate::panel::{Id, Item, Rect};
+use crate::panel::{Id, Item, Rect, Step};
 use crate::scale::Scale;
 use ordrumbox_core::drum_taxonomy::instrument_family;
 use ordrumbox_core::json::Value;
@@ -306,6 +306,7 @@ fn the_fx_tab_shows_every_effect_and_moves_nothing_when_one_goes_on() {
     let on = Track {
         name: "KICK".into(),
         reverb_mix: 0.5,
+        reverb_type: "room".into(),
         delay_mix: 0.5,
         delay_type: "slap".into(),
         saturation_mix: 0.5,
@@ -321,7 +322,15 @@ fn the_fx_tab_shows_every_effect_and_moves_nothing_when_one_goes_on() {
         assert_put(&mut places, &items, &format!("effects on {lit}"));
         for i in 0..FX_DEFS.len() as u8 {
             let power = items.iter().find(|item| item.id == Some(Id::FxPower(i))).map(|item| &item.kind);
-            assert!(matches!(power, Some(Kind::Button { on, .. }) if *on == lit), "effect {i} on {lit}");
+            assert!(matches!(power, Some(Kind::Led { on }) if *on == lit), "effect {i} on {lit}");
+        }
+        // An effect's type on its cartridge's screen, lit with the effect.
+        for key in ["reverbType", "delayType", "saturationType", "filterType"] {
+            let screen = items.iter().find(|item| item.id == Some(Id::TrackSelect(key))).map(|item| &item.kind);
+            assert!(matches!(screen, Some(Kind::Screen { lit: l, .. }) if *l == lit), "{key} lit {lit}");
+            for step in [Step::Previous, Step::Next] {
+                assert!(items.iter().any(|item| item.id == Some(Id::TrackSelectStep(key, step))), "{key} {step:?}");
+            }
         }
         // Every effect value is a knob of the knob bar's size, under the tab.
         let knobs = items.iter().filter(|item| matches!(item.id, Some(Id::Fx(_))));
@@ -353,8 +362,17 @@ fn the_lfo_tab_shows_every_target_and_moves_nothing_when_one_goes_on() {
         assert_put(&mut places, &items, &format!("LFOs on {lit}"));
         for i in 0..LFO_TARGETS.len() as u8 {
             let power = items.iter().find(|item| item.id == Some(Id::LfoPower(i))).map(|item| &item.kind);
-            assert!(matches!(power, Some(Kind::Button { on, .. }) if *on == lit), "LFO {i} on {lit}");
-            assert!(items.iter().any(|item| item.id == Some(Id::LfoType(i))), "LFO {i} wave");
+            assert!(matches!(power, Some(Kind::Led { on }) if *on == lit), "LFO {i} on {lit}");
+            // Its wave on its cartridge's screen, lit with the LFO, between its arrows.
+            let wave = items.iter().find(|item| item.id == Some(Id::LfoType(i))).map(|item| &item.kind);
+            let shown = if lit { "square" } else { "sine" };
+            assert!(
+                matches!(wave, Some(Kind::Screen { labels, selected, lit: l, .. }) if *l == lit && labels[*selected] == shown),
+                "LFO {i} wave lit {lit}"
+            );
+            for step in [Step::Previous, Step::Next] {
+                assert!(items.iter().any(|item| item.id == Some(Id::LfoTypeStep(i, step))), "LFO {i} {step:?}");
+            }
         }
         // Every LFO value is a knob of the knob bar's size, under the tab.
         let knobs: Vec<_> = items.iter().filter(|item| matches!(item.id, Some(Id::Lfo(..)))).collect();

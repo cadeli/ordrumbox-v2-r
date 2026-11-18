@@ -137,7 +137,7 @@ fn draw_screen(canvas: &mut Canvas, r: Rect, labels: &[String], selected: usize,
     let label = labels.get(selected).map_or("", String::as_str);
     let color = if lit { ON } else { dim() };
     let ty = r.y + (r.h - 8 * scale) / 2;
-    canvas.text(r.x + 5 * scale, ty, &fit(label, r.w - 10 * scale, scale), scale, color);
+    canvas.text(r.x + 3 * scale, ty, &fit(label, r.w - 6 * scale, scale), scale, color);
 }
 
 /// A knob with its value: under it in a tall item, beside it in a short one.
