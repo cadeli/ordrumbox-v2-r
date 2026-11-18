@@ -11,6 +11,7 @@
 
 use crate::scale::Scale;
 use ordrumbox_core::json::Value;
+use ordrumbox_core::steps::MAX_BEATS;
 use ordrumbox_core::style::{self, Macros};
 use ordrumbox_core::{num, song};
 
@@ -280,8 +281,8 @@ impl Session {
         if self.workspace == Workspace::Song {
             return;
         }
-        let beats: Vec<String> = (1..=ordrumbox_logic::editor::MAX_BEATS).map(|b| b.to_string()).collect();
-        let selected = usize::try_from(pattern.beat_count - 1).unwrap_or(0).min(beats.len() - 1);
+        let beats = beat_choices(pattern.beat_count);
+        let selected = beats.iter().position(|b| *b == pattern.beat_count.to_string()).unwrap_or(0);
         let kind = Kind::Select { values: beats.clone(), labels: beats, selected };
         layout.items.push(Item::new(Some(Id::Beats), controls.beats, kind));
         // The generation: the pattern's style, ⟳, AUTO, the macros.
@@ -411,6 +412,16 @@ pub(super) fn filter_on(track: &Track, filter_type: String) -> Vec<(&'static str
         updates.push(("filterCutoff", number(editors::FILTER_ON_CUTOFF)));
     }
     updates
+}
+
+/// The lengths the pattern list offers: every beat up to 16, then every fourth up to the longest,
+/// and the current one when it is none of these (set by the keys).
+fn beat_choices(current: i32) -> Vec<String> {
+    let mut beats: Vec<i32> = (1..=16).chain((20..=MAX_BEATS).step_by(4)).collect();
+    if let Err(at) = beats.binary_search(&current) {
+        beats.insert(at, current);
+    }
+    beats.iter().map(i32::to_string).collect()
 }
 
 /// What an edit of control `id` is called in the undo history: its label,

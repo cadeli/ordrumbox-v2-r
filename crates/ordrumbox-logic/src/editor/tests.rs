@@ -263,7 +263,7 @@ fn patterns() {
     assert!(e.set_pattern_beat_count(0, 2.0));
     assert!(pattern(&e).tracks.iter().all(|t| t.beat_count == 2));
     assert_eq!(pattern(&e).tracks[1].loop_length, Some(16));
-    assert!(e.set_pattern_beat_count(0, 40.0));
+    assert!(e.set_pattern_beat_count(0, 80.0));
     assert_eq!(pattern(&e).beat_count, 4);
     // The tempo is the library's, from the file's first pattern.
     assert_eq!(e.library().bpm, 100.0);

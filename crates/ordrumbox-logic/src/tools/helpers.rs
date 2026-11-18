@@ -2,7 +2,9 @@
 //! and the edits shared by several tools.
 
 use super::NOT_EDITED;
-use crate::editor::{Editor, MAX_BEATS};
+use ordrumbox_core::steps::MAX_BEATS;
+
+use crate::editor::Editor;
 use ordrumbox_core::instruments::catalog;
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_core::song::SongClip;

@@ -431,9 +431,9 @@ impl Session {
 }
 
 impl Session {
-    /// The pattern `beats` long (1–16).
+    /// The pattern `beats` long (1–64).
     pub(super) fn set_length(&mut self, beats: i32) {
-        let beats = beats.clamp(1, ordrumbox_logic::editor::MAX_BEATS);
+        let beats = beats.clamp(1, ordrumbox_core::steps::MAX_BEATS);
         if self.editor.set_pattern_beat_count(self.pattern_index, f64::from(beats)) {
             self.edited();
             self.clamp_cursor_to_grid();

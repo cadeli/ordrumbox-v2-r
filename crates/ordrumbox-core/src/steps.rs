@@ -8,6 +8,8 @@
 /// Ticks per **beat** (not per step). The JS app counted 32, which rounded
 /// triplets; MIDI files are written at the same 96 PPQN.
 pub const TICK: u32 = 96;
+/// Beats of the longest pattern or track an edit makes.
+pub const MAX_BEATS: i32 = 64;
 /// Beats of the longest pattern or track a file may hold (an edit stops well
 /// before): what plays a pattern works in memory with its length.
 pub const MAX_LOADED_BEATS: i32 = 1024;

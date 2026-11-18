@@ -1,6 +1,8 @@
 //! Editing patterns and the song settings: add, move, rename, tempo, length, tags.
 
-use super::{DEFAULT_BEAT_COUNT, Editor, MAX_BEATS, pattern_name};
+use ordrumbox_core::steps::MAX_BEATS;
+
+use super::{DEFAULT_BEAT_COUNT, Editor, pattern_name};
 use crate::history::Change;
 use ordrumbox_core::Pattern;
 use ordrumbox_core::ids::{slugify, unique_id};
@@ -104,7 +106,7 @@ impl Editor {
         true
     }
 
-    /// Length in beats, 1–16 (out of range: 4); every track follows and its
+    /// Length in beats, 1–64 (out of range: 4); every track follows and its
     /// loop point stays inside.
     pub fn set_pattern_beat_count(&mut self, p: usize, beats: f64) -> bool {
         let requested = beats.round();

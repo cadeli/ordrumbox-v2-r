@@ -319,7 +319,7 @@ use <kbd>←</kbd> <kbd>→</kbd> between menus, <kbd>↑</kbd> <kbd>↓</kbd> b
 <tr><td>Previous / Next pattern</td><td><kbd>[</kbd> <kbd>]</kbd></td><td>Step through the library's patterns (also <kbd>Page Up</kbd> / <kbd>Page Down</kbd>).</td></tr>
 <tr><td>Random pattern</td><td><kbd>F</kbd></td><td>Jump to a random pattern of the library.</td></tr>
 <tr><td>Tempo -1 / +1</td><td><kbd>-</kbd> <kbd>=</kbd></td><td>Change the tempo by 1 BPM (<kbd>Shift</kbd>: by 10).</td></tr>
-<tr><td>Length -1 / +1 beat</td><td><kbd>Ctrl</kbd>+<kbd>-</kbd> <kbd>Ctrl</kbd>+<kbd>=</kbd></td><td>Pattern length, 1 to 16 beats.</td></tr>
+<tr><td>Length -1 / +1 beat</td><td><kbd>Ctrl</kbd>+<kbd>-</kbd> <kbd>Ctrl</kbd>+<kbd>=</kbd></td><td>Pattern length, 1 to 64 beats.</td></tr>
 <tr><td>Add track...</td><td></td><td>Add a track (up to 64): pick an instrument category, then the instrument that names the track (also <b>+ NEW TRACK</b> under the rows and a track's right-click menu, whose <b>Rename track</b> offers the same menus plus <b>Free name...</b>). The categories stay shown beside the instruments: <kbd>Left</kbd>, <kbd>Backspace</kbd> or <kbd>Esc</kbd> goes back.</td></tr>
 <tr><td>Add KICK track</td><td><kbd>Ctrl</kbd>+<kbd>T</kbd></td><td>Add a track named KICK.</td></tr>
 <tr><td>Remove track</td><td><kbd>Ctrl</kbd>+<kbd>Backspace</kbd></td><td>Remove the focused track.</td></tr>
@@ -404,7 +404,7 @@ slip off the play keys changes nothing; pressed alone, they say so on the status
 <tr><td><strong>BPM</strong></td><td>Knob, 20–300</td><td>The session's tempo, which every pattern plays at; in the song panel, the selected song's.</td></tr>
 <tr><td><strong>MODE</strong></td><td><strong>PATTERN</strong> <strong>SONG</strong> (<kbd>F5</kbd>, <kbd>F3</kbd>)</td><td>What the window edits and what <strong>PLAY</strong> plays: one pattern in a loop, or the song, its patterns one after another. The mode shown is lit; the other button, or <strong>GRID</strong>, <strong>ROLL</strong>, <strong>SYNTH</strong>, switches to it. Not in the plugin: the host plays.</td></tr>
 <tr><td><strong>PATTERN</strong></td><td>List</td><td>Pick a pattern. While playing, the pattern picked waits for the one playing to end its loop: the label reads <strong>NEXT</strong> until it starts.</td></tr>
-<tr><td><strong>BEATS</strong></td><td>List, 1–16</td><td>The pattern's length in beats.</td></tr>
+<tr><td><strong>BEATS</strong></td><td>List, 1–16 then every 4th up to 64</td><td>The pattern's length in beats.</td></tr>
 <tr><td><strong>KIT</strong></td><td>List</td><td>The kit the tracks draw their samples from.</td></tr>
 <tr><td><strong>STYLE</strong></td><td>List</td><td>The 14 styles, the learned styles, or random. Picking one makes the pattern again in it.</td></tr>
 <tr><td><strong>↻</strong></td><td>Button (<kbd>B</kbd>)</td><td>Make the pattern again in its style: its tracks, meter and lines, and the session's tempo. A track the style names keeps its sound and settings; the others go. Draws a new seed.</td></tr>

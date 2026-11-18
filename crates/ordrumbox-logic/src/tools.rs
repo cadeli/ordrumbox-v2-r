@@ -12,7 +12,9 @@ use ordrumbox_core::track::MAX_TRACKS;
 use ordrumbox_core::{Library, Note, Rng, ScaleList, Scales, SetField, Styles, style};
 
 use crate::compose;
-use crate::editor::{Editor, MAX_BEATS};
+use ordrumbox_core::steps::MAX_BEATS;
+
+use crate::editor::Editor;
 use crate::generate::{self, MelodicKind};
 
 /// Track settings a tool does not set (`mcp.rs` does not offer them).

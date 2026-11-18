@@ -17,8 +17,6 @@ use crate::history::{Change, History, Target};
 #[path = "arrangement.rs"]
 mod arrangement;
 
-/// Longest pattern, beats (`MAX_BEATS`).
-pub const MAX_BEATS: i32 = 16;
 /// Default length of a pattern (`PATTERN_DEFAULTS`).
 const DEFAULT_BEAT_COUNT: i32 = 4;
 /// Step of a velocity nudge (`VELOCITY_STEP`).

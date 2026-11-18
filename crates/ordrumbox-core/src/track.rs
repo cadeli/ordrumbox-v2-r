@@ -8,7 +8,7 @@ use crate::json::{Object, Value};
 use crate::note::{Note, decode_notes, encode_notes};
 use crate::num::round2;
 use crate::record::{Issue, SetField, check_duplicate, json_record, past_max, refusal};
-use crate::steps::{MAX_LOADED_BEATS, MAX_LOADED_STEPS, MAX_LOADED_STEPS_PER_BEAT};
+use crate::steps::{MAX_BEATS, MAX_LOADED_BEATS, MAX_LOADED_STEPS, MAX_LOADED_STEPS_PER_BEAT};
 
 json_record! {
     /// One track. Table fields are saved only when they differ from their
@@ -150,7 +150,7 @@ const VALUE_RANGES: [(&str, f64, f64); 48] = [
     ("volume", 0.0, 1.0),
     ("pan", -1.0, 1.0),
     ("transpose", -24.0, 24.0),
-    ("beatCount", 1.0, 16.0),
+    ("beatCount", 1.0, MAX_BEATS as f64),
     ("stepsPerBeat", 1.0, MAX_STEPS_PER_BEAT as f64),
     ("loopLength", 0.0, 1024.0),
     ("swingResolution", 1.0, MAX_STEPS_PER_BEAT as f64),

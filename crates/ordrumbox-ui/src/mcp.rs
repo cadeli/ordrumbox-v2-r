@@ -67,7 +67,7 @@ const TOOLS: &str = r#"[
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string", "minLength": 1}}, "required": ["patternName"]}},
   {"name": "selectPattern", "description": "Shows a pattern in the window (by name or index; a playing pattern switches at once). With neither, tells which one is shown.",
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}, "index": {"type": "integer", "minimum": 0}}}},
-  {"name": "addNotesToPattern", "description": "Adds notes, or changes the note already at their step. A track missing from the pattern is added; a pattern too short grows to the next multiple of 4 beats (16 at most), and a track that looped over its whole length keeps doing so.",
+  {"name": "addNotesToPattern", "description": "Adds notes, or changes the note already at their step. A track missing from the pattern is added; a pattern too short grows to the next multiple of 4 beats (64 at most), and a track that looped over its whole length keeps doing so.",
    "inputSchema": {"type": "object", "properties": {
      "patternName": {"type": "string"},
      "notes": {"type": "array", "items": {"type": "object", "properties": {
@@ -102,7 +102,7 @@ const TOOLS: &str = r#"[
   {"name": "setBpm", "description": "The session tempo every pattern plays at, whole, 20 to 300 (an arrangement plays at its own: updateArrangement).",
    "inputSchema": {"type": "object", "properties": {"bpm": {"type": "number", "minimum": 20, "maximum": 300}}, "required": ["bpm"]}},
   {"name": "setPatternBeatCount", "description": "The length of a pattern in beats; every track follows.",
-   "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}, "beatCount": {"type": "integer", "minimum": 1, "maximum": 16}}, "required": ["patternName", "beatCount"]}},
+   "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}, "beatCount": {"type": "integer", "minimum": 1, "maximum": 64}}, "required": ["patternName", "beatCount"]}},
   {"name": "setPatternTags", "description": "The tags (genre, mood...) of a pattern.",
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}, "tags": {"type": "array", "items": {"type": "string"}}}, "required": ["patternName", "tags"]}},
   {"name": "setPatternDescription", "description": "The description of a pattern.",

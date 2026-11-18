@@ -22,7 +22,7 @@ pub struct Pattern {
     /// until the library assigns one (see `Library`).
     pub id: String,
     pub name: Option<String>,
-    /// Beats in the pattern (a measure is 4); 1–16.
+    /// Beats in the pattern (a measure is 4); 1–64.
     pub beat_count: i32,
     pub description: String,
     pub tags: Vec<String>,
