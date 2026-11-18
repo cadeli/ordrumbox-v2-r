@@ -21,7 +21,9 @@ ordrumbox-engine = { path = "crates/ordrumbox-engine" }
 ordrumbox-ui = { path = "crates/ordrumbox-ui" }
 rfd = "0.18"
 winit = "0.30.13"
-softbuffer = "0.4.8"
+# Without `kms` (direct rendering on a console, with no display server): the
+# windows are always X11 or Wayland ones.
+softbuffer = { version = "0.4.8", default-features = false, features = ["x11", "x11-dlopen", "wayland", "wayland-dlopen"] }
 cpal = "0.18.2"
 midir = "0.11.1"
 fontdue = "0.9.5"

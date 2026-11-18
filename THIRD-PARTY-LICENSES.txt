@@ -5,7 +5,7 @@ orDrumbox is MIT licensed (LICENSE). It includes the libraries below, each under
 its own license. A VST3 build is GPLv3 as a whole (vst3-NOTICE.txt).
 
 Licenses used:
-  MIT License (229 crates)
+  MIT License (223 crates)
   Apache License 2.0 (7 crates)
   ISC License (6 crates)
   BSD 3-Clause "New" or "Revised" License (2 crates)
@@ -2778,7 +2778,6 @@ MIT License
 
 Used by:
   bytemuck 1.25.2 (https://github.com/Lokathor/bytemuck)
-  bytemuck_derive 1.12.1 (https://github.com/Lokathor/bytemuck)
 
 MIT License
 
@@ -3048,7 +3047,6 @@ Used by:
   dispatch2 0.3.1 (https://github.com/madsmtm/objc2)
   dispatch 0.2.0 (http://github.com/SSheldon/rust-dispatch)
   dpi 0.1.2 (https://github.com/rust-windowing/winit)
-  drm-fourcc 2.2.0 (https://github.com/danielzfranklin/drm-fourcc-rs)
   libm 0.2.16 (https://github.com/rust-lang/compiler-builtins)
   malloc_buf 0.0.6 (https://github.com/SSheldon/malloc_buf)
   objc-sys 0.3.5 (https://github.com/madsmtm/objc2)
@@ -3267,14 +3265,10 @@ Used by:
   cargo-platform 0.1.9 (https://github.com/rust-lang/cargo)
   cargo_metadata 0.18.1 (https://github.com/oli-obk/cargo_metadata)
   concurrent-queue 2.5.0 (https://github.com/smol-rs/concurrent-queue)
-  drm-ffi 0.9.1 (https://github.com/Smithay/drm-rs)
-  drm-sys 0.8.1 (https://github.com/Smithay/drm-rs)
-  drm 0.14.1 (https://github.com/Smithay/drm-rs)
   fastrand 2.5.0 (https://github.com/smol-rs/fastrand)
   itoa 1.0.19 (https://github.com/dtolnay/itoa)
   linux-raw-sys 0.12.1 (https://github.com/sunfishcode/linux-raw-sys)
   linux-raw-sys 0.4.15 (https://github.com/sunfishcode/linux-raw-sys)
-  linux-raw-sys 0.9.4 (https://github.com/sunfishcode/linux-raw-sys)
   once_cell 1.21.4 (https://github.com/matklad/once_cell)
   pin-project-lite 0.2.17 (https://github.com/taiki-e/pin-project-lite)
   polling 3.11.0 (https://github.com/smol-rs/polling)
