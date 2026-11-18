@@ -30,8 +30,17 @@ pub struct Choice {
 
 impl Choice {
     pub fn kind(&self) -> Kind {
-        let labels = if self.labels.is_empty() { self.values.clone() } else { self.labels.clone() };
-        Kind::Select { values: self.values.clone(), labels, selected: self.selected }
+        Kind::Select { values: self.values.clone(), labels: self.shown_labels(), selected: self.selected }
+    }
+
+    /// The same choice on a one-line screen, lit or dimmed.
+    pub fn screen(&self, lit: bool) -> Kind {
+        Kind::Screen { values: self.values.clone(), labels: self.shown_labels(), selected: self.selected, lit }
+    }
+
+    /// The labels shown: the values when there are none.
+    fn shown_labels(&self) -> Vec<String> {
+        if self.labels.is_empty() { self.values.clone() } else { self.labels.clone() }
     }
 }
 

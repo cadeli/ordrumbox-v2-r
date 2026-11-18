@@ -8,8 +8,9 @@ use super::tables::{
 use super::values::{EditorState, flag, fx_on, has_lfo, index_of, loop_length, number, text_of};
 use super::{Choice, ComposeView, TrackView};
 use crate::control::{Format, Spec};
-use crate::panel::{Id, Item, KNOB_SIZE, Kind, LfoParam, Rect, dim, label_width};
+use crate::panel::{Id, Item, KNOB_SIZE, Kind, LfoParam, Rect, Step, dim, label_width};
 use crate::scale::Scale;
+use crate::theme;
 use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::json::Value;
 use ordrumbox_core::{Track, num};
@@ -125,29 +126,55 @@ pub(super) fn sound_tab(rows: &mut Rows, view: &TrackView) {
         Kind::Led { on: track.auto_assign },
     ));
     rows.items.push(Item::text(r.x + 14 * s, r.y + (r.h - 8 * s) / 2, "auto", dim(), s));
-    for (id, label, choice) in [
-        (Id::Instrument, "Instrument", &view.instruments),
-        (Id::Sample, "Sample", &view.samples),
-        (Id::Synth, "Synth", &view.synths),
-    ] {
-        let r = rows.row();
-        rows.label(r, label, None, false);
-        if id == Id::Sample {
-            // The sample's choice, then the button that loads one from a file.
-            let field = rows.field(r, r.w);
-            let load = Rect::new(field.x + field.w - LOAD_W * s, field.y, LOAD_W * s, field.h);
-            let choice_field = Rect::new(field.x, field.y, field.w - (LOAD_W + 4) * s, field.h);
-            rows.items.push(Item::new(Some(id), choice_field, choice.kind()));
-            let button = Kind::Button { label: "File...".into(), on: false };
-            rows.items.push(Item::new(Some(Id::LoadSample), load, button));
-        } else {
-            rows.items.push(Item::new(Some(id), rows.field(r, r.w), choice.kind()));
-        }
-    }
+    let r = rows.row();
+    rows.label(r, "Instrument", None, false);
+    rows.items.push(Item::new(Some(Id::Instrument), rows.field(r, r.w), view.instruments.kind()));
+    // The sample's choice, then the button that loads one from a file.
+    let r = rows.row();
+    rows.label(r, "Sample", None, false);
+    let field = rows.field(r, r.w);
+    let load = Rect::new(field.x + field.w - LOAD_W * s, field.y, LOAD_W * s, field.h);
+    let choice_field = Rect::new(field.x, field.y, field.w - (LOAD_W + 4) * s, field.h);
+    rows.items.push(Item::new(Some(Id::Sample), choice_field, view.samples.kind()));
+    let button = Kind::Button { label: "File...".into(), on: false };
+    rows.items.push(Item::new(Some(Id::LoadSample), load, button));
+    synth_cartridge(rows, view);
 }
 
 /// Width of the Sound tab's File... button (at scale 1): its label and a margin.
 pub(super) const LOAD_W: i32 = 48;
+
+/// The synth cartridge's margin around its row, and the width of its arrows (at scale 1).
+const CARTRIDGE_PAD: i32 = 4;
+const ARROW_W: i32 = 14;
+
+/// The Sound tab's synth, a cartridge of its own: its LED (on: the track
+/// plays the synth instead of its sample), its name, then the preset on a
+/// one-line screen between the arrows that step through the presets.
+fn synth_cartridge(rows: &mut Rows, view: &TrackView) {
+    let s = rows.scale;
+    let pad = CARTRIDGE_PAD * s;
+    let frame = Rect::new(rows.x, rows.y, rows.w, row_h(s) + 2 * pad);
+    rows.items.push(Item::new(None, frame, Kind::Card));
+    let r = Rect::new(frame.x + pad, frame.y + pad, frame.w - 2 * pad, row_h(s));
+    let on = view.track.use_synth;
+    rows.items.push(Item::new(Some(Id::SynthOn), Rect::new(r.x, r.y, 12 * s, r.h), Kind::Led { on }));
+    let color = if on { theme::text() } else { dim() };
+    rows.items.push(Item::text(r.x + 14 * s, r.y + (r.h - 8 * s) / 2, "SYNTH", color, s));
+    // The screen and its arrows line up with the fields of the rows above.
+    let x = frame.x + label_width(s);
+    let (y, h, arrow) = (r.y + s.px(), r.h - 2 * s, ARROW_W * s);
+    let right = r.x + r.w;
+    let previous = Rect::new(x, y, arrow, h);
+    let next = Rect::new(right - arrow, y, arrow, h);
+    let screen = Rect::new(x + arrow + 2 * s, y, right - x - 2 * (arrow + 2 * s), h);
+    for (step, rect, glyph) in [(Step::Previous, previous, "\u{25c2}"), (Step::Next, next, "\u{25b8}")] {
+        let kind = Kind::Button { label: glyph.into(), on: false };
+        rows.items.push(Item::new(Some(Id::SynthStep(step)), rect, kind));
+    }
+    rows.items.push(Item::new(Some(Id::Synth), screen, view.synths.screen(on)));
+    rows.y = frame.y + frame.h + 2 * s;
+}
 
 /// The LFO tab: the five targets one under the other, each a strip of its
 /// own, as in the FX tab: its on / off button (named) in the label column,

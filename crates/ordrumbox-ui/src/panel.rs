@@ -116,6 +116,27 @@ impl LfoParam {
     }
 }
 
+/// Which way an arrow goes through a list: to the item before, or after.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Step {
+    Previous,
+    Next,
+}
+
+impl Step {
+    /// The index one step from `from` in a list of `count`, wrapping round
+    /// (`None` in an empty list).
+    #[must_use]
+    pub fn from(self, from: usize, count: usize) -> Option<usize> {
+        let last = count.checked_sub(1)?;
+        Some(match self {
+            Self::Previous => from.min(last).checked_sub(1).unwrap_or(last),
+            Self::Next if from >= last => 0,
+            Self::Next => from + 1,
+        })
+    }
+}
+
 /// What a widget is (and does).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Id {
@@ -157,7 +178,11 @@ pub enum Id {
     AutoAssign,
     Instrument,
     Sample,
+    /// The sound tab's synth cartridge: its screen (the preset), its LED (the
+    /// synth on or off), its arrows (the preset before, the one after).
     Synth,
+    SynthOn,
+    SynthStep(Step),
     /// The sample bar's load button.
     LoadSample,
     /// A row's label: selects the row.
@@ -274,6 +299,14 @@ pub enum Kind {
         values: Vec<String>,
         labels: Vec<String>,
         selected: usize,
+    },
+    /// A one-line display of a choice (the synth cartridge's screen): it
+    /// opens its list as a [`Kind::Select`] does; dimmed when `lit` is off.
+    Screen {
+        values: Vec<String>,
+        labels: Vec<String>,
+        selected: usize,
+        lit: bool,
     },
     /// An ON/OFF button.
     Toggle {
@@ -445,6 +478,17 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_step_wraps_round_the_list() {
+        assert_eq!(Step::Next.from(0, 3), Some(1));
+        assert_eq!(Step::Next.from(2, 3), Some(0));
+        assert_eq!(Step::Previous.from(0, 3), Some(2));
+        assert_eq!(Step::Previous.from(2, 3), Some(1));
+        assert_eq!(Step::Previous.from(9, 3), Some(1));
+        assert_eq!(Step::Next.from(0, 1), Some(0));
+        assert_eq!(Step::Next.from(0, 0), None);
+    }
+
+    #[test]
     fn rows_start_at_the_top() {
         assert_eq!(row_at(9, 10, 16), None);
         assert_eq!(row_at(10, 10, 16), Some(0));
@@ -526,6 +570,11 @@ mod tests {
                 Some(Id::Sample),
                 Rect::new(0, 100, 120, 12),
                 Kind::Select { values: vec!["a".into()], labels: vec!["a".into()], selected: 0 },
+            ),
+            Item::new(
+                Some(Id::Synth),
+                Rect::new(130, 100, 120, 12),
+                Kind::Screen { values: vec!["bass".into()], labels: vec!["bass".into()], selected: 0, lit: true },
             ),
             Item::new(None, Rect::new(0, 120, 300, 40), Kind::Envelope { points: vec![0.0, 1.0], overlay: None }),
         ];

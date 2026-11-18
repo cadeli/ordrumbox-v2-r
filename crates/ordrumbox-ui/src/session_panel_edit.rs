@@ -130,7 +130,7 @@ impl Session {
     }
 
     /// `cmd.updateTrack` on the edited track; a step of history.
-    fn update_track(&mut self, t: usize, updates: &[(&str, Value)], desc: &str, coalesce: bool) {
+    pub(super) fn update_track(&mut self, t: usize, updates: &[(&str, Value)], desc: &str, coalesce: bool) {
         if self.editor.update_track(self.pattern_index, t, updates, Some(desc), coalesce) {
             self.edited();
         }
@@ -198,21 +198,6 @@ impl Session {
             Id::NoteKnob(key) | Id::NoteSlider(key) => self.note_value(t, key, value),
             _ => {}
         }
-    }
-
-    /// Track `t` on synth preset `key` ("none": back on its sample), one undo step.
-    pub(super) fn assign_synth(&mut self, t: usize, key: &str) {
-        let updates: Vec<(&str, Value)> = if key == "none" {
-            vec![("useSynth", Value::Bool(false))]
-        } else {
-            vec![
-                ("useSynth", Value::Bool(true)),
-                ("autoAssign", Value::Bool(false)),
-                ("synthPreset", Value::String(key.to_owned())),
-            ]
-        };
-        let name = self.track_name(t);
-        self.update_track(t, &updates, &format!("Synth on {name}"), false);
     }
 
     /// `onLoopSlider`.
@@ -455,7 +440,7 @@ impl Session {
                     self.edited();
                 }
             }
-            Id::Synth => self.assign_synth(t, value),
+            Id::Synth => self.pick_synth(t, value),
             Id::NoteSelect(key) => {
                 let Some(note) = self.shown_note(t) else { return };
                 let (field, arp) = if key == "arpScale" {
@@ -560,6 +545,8 @@ impl Session {
                 let on = track.field(key).and_then(|v| v.as_bool()).unwrap_or(false);
                 self.update_track(t, &[(key, Value::Bool(!on))], &format!("{} on {name}", history_label(id)), false);
             }
+            Id::SynthOn => self.toggle_synth_on(t),
+            Id::SynthStep(step) => self.step_synth(t, step),
             Id::AutoAssign => {
                 // `toggleAuto`: back on, the synth goes and the sample is picked by name.
                 let on = !track.auto_assign;

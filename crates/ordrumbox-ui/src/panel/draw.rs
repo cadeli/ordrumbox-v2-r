@@ -90,6 +90,7 @@ fn draw_item(canvas: &mut Canvas, item: &Item, scale: Scale) {
             canvas.text(r.x + 4 * scale, ty, &fit(label, r.w - 16 * scale, scale), scale, theme::text());
             canvas.text(r.x + r.w - 10 * scale, ty, "v", scale, dim());
         }
+        Kind::Screen { labels, selected, lit, .. } => draw_screen(canvas, r, labels, *selected, *lit, scale),
         Kind::Toggle { on } => {
             canvas.fill_rect(r.x, r.y, r.w, r.h, if *on { ON } else { field_color() });
             let text = if *on { "ON" } else { "OFF" };
@@ -126,6 +127,17 @@ fn draw_item(canvas: &mut Canvas, item: &Item, scale: Scale) {
         }
         Kind::Envelope { points, overlay } => draw_envelope_item(canvas, r, points, overlay.as_ref(), scale),
     }
+}
+
+/// A one-line screen: dark glass in a frame, the label of `selected` lit or dimmed.
+fn draw_screen(canvas: &mut Canvas, r: Rect, labels: &[String], selected: usize, lit: bool, scale: Scale) {
+    let t = scale.px();
+    canvas.fill_rect(r.x, r.y, r.w, r.h, border_color());
+    canvas.fill_rect(r.x + t, r.y + t, r.w - 2 * t, r.h - 2 * t, theme::screen());
+    let label = labels.get(selected).map_or("", String::as_str);
+    let color = if lit { ON } else { dim() };
+    let ty = r.y + (r.h - 8 * scale) / 2;
+    canvas.text(r.x + 5 * scale, ty, &fit(label, r.w - 10 * scale, scale), scale, color);
 }
 
 /// A knob with its value: under it in a tall item, beside it in a short one.

@@ -68,7 +68,7 @@ impl Session {
                     (scale, shift, double),
                 );
             }
-            Kind::Select { values, labels, selected } => {
+            Kind::Select { values, labels, selected } | Kind::Screen { values, labels, selected, .. } => {
                 self.chrome.widgets.focus = Some(id);
                 self.open_select(id, item.rect, values, labels, selected);
             }
@@ -385,7 +385,7 @@ impl Session {
                     self.set_value(id, v);
                 }
             }
-            Kind::Select { values, selected, .. } => {
+            Kind::Select { values, selected, .. } | Kind::Screen { values, selected, .. } => {
                 let at = (selected as isize + lines).clamp(0, values.len() as isize - 1) as usize;
                 if at != selected
                     && let Some(value) = values.get(at)
@@ -515,7 +515,7 @@ impl Session {
                 }
                 true
             }
-            Kind::Select { values, labels, selected } => {
+            Kind::Select { values, labels, selected } | Kind::Screen { values, labels, selected, .. } => {
                 let delta = match key {
                     PanelKey::Up | PanelKey::Left | PanelKey::Minus => -1,
                     PanelKey::Down | PanelKey::Right | PanelKey::Plus => 1,

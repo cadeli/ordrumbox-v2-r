@@ -4,7 +4,7 @@
 // audit: allow(function size): tables of tooltip texts, one line a control.
 
 use crate::kits::Field;
-use crate::panel::{Id, LfoParam};
+use crate::panel::{Id, LfoParam, Step};
 
 /// A control's tooltip: its whole name and what it does.
 pub type Help = [&'static str; 2];
@@ -49,6 +49,9 @@ pub fn help(id: Id) -> Option<Help> {
         Id::Instrument => ["Instrument", "the kind of sound the track asks the kit for (a click: by category)"],
         Id::Sample => ["Sample", "the audio file the track plays"],
         Id::Synth => ["Synth preset", "the soft-synth sound the track plays instead of a sample"],
+        Id::SynthOn => ["Synth", "on: the track plays its synth preset instead of its sample"],
+        Id::SynthStep(Step::Previous) => ["Previous synth preset", "the preset before the one shown"],
+        Id::SynthStep(Step::Next) => ["Next synth preset", "the preset after the one shown"],
         Id::LoadSample => ["Load sample", "replace the track's sample with a file"],
         Id::KitKnob(field) | Id::SampleKnob(field) | Id::KitToggle(field) | Id::SampleToggle(field) => match field {
             Field::Gain => ["Gain", "the sample's level, in dB"],

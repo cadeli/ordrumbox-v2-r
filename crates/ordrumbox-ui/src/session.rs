@@ -147,6 +147,8 @@ mod session_song_menu;
 mod session_song_mouse;
 #[path = "session_synth.rs"]
 mod session_synth;
+#[path = "session_synth_cartridge.rs"]
+mod session_synth_cartridge;
 #[path = "session_transport.rs"]
 mod session_transport;
 #[path = "session_types.rs"]

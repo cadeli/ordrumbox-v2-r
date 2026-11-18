@@ -170,16 +170,17 @@ impl Session {
         Choice { selected: editors::index_of(&values, current_url), values, labels }
     }
 
-    /// The synth presets, `none` first, the track's the one shown.
-    fn synth_choice(&self, track: &Track) -> Choice {
-        let keys = self.synths.presets.keys();
-        let current = if track.use_synth {
-            track.synth_preset.clone().unwrap_or_else(|| ordrumbox_logic::generate::BASS_PRESET.into())
-        } else {
-            "none".into()
+    /// The synth presets, the track's the one shown (the first when it has
+    /// none; whether it plays it is the cartridge's LED).
+    pub(super) fn synth_choice(&self, track: &Track) -> Choice {
+        let mut values: Vec<String> = self.synths.presets.keys().into_iter().map(str::to_owned).collect();
+        let current = match &track.synth_preset {
+            Some(preset) => Some(preset.clone()),
+            None if track.use_synth => Some(ordrumbox_logic::generate::BASS_PRESET.to_owned()),
+            None => None,
         };
-        let mut values: Vec<String> = std::iter::once("none").chain(keys.iter().copied()).map(str::to_owned).collect();
-        if track.use_synth && !keys.contains(&current.as_str()) {
+        let Some(current) = current else { return Choice { selected: 0, values, labels: Vec::new() } };
+        if !values.contains(&current) {
             values.push(current.clone());
         }
         Choice { selected: editors::index_of(&values, &current), values, labels: Vec::new() }
