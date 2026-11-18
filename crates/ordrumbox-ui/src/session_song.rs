@@ -86,6 +86,8 @@ pub(super) struct SongPanel {
     pub(super) drag: Option<SongDrag>,
     /// The arrangement's scroll bar held by the mouse.
     pub(super) bar_drag: Option<crate::song_view::Axis>,
+    /// The last clip pressed and when, for double-clicks.
+    pub(super) last_clip_click: Option<(usize, std::time::Instant)>,
 }
 
 impl SongPanel {

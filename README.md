@@ -173,6 +173,8 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   measure; **Home** (or the keypad's **Enter**) goes back to the first beat, or measure.
   **Shift + click** on the song panel's ruler loops the song from the cursor's measure to
   the one clicked (the ruler shows it; Play > Clear the loop ends it).
+  A **double-click** on a clip of the song panel opens its pattern in the grid, in
+  pattern mode.
 - **F9**: metronome (a click on every beat, the first of a measure higher), **F8**: tap
   the tempo (tap on the beat; a pause of 2 seconds starts the count again)
 - **Ctrl R**: record. While the pattern plays, **Q–P** also put a note on their track, on

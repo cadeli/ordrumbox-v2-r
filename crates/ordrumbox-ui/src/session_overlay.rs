@@ -130,6 +130,7 @@ const SHORTCUTS: &[&str] = &[
     "  Volume, Comp, Filter   the master volume and spectrum, the compressor, the filters (saved)",
     "SONG PANEL (F3)",
     "  click / right-click    the ruler: aim the cursor; a pattern, row, clip, the grid: menu",
+    "  double-click a clip    open its pattern in the grid (pattern mode)",
     "  Left Right, Up Down    the cursor a measure back / on, previous / next pattern",
     "  Space, wheel           play the song from the cursor; scroll (Shift: the rows), or drag the bars",
     "KIT EDITOR (Ctrl+K)",

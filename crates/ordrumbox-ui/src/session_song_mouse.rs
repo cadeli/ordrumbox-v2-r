@@ -1,11 +1,15 @@
 //! The song panel under the mouse: clicks on the pattern list and the
 //! arrangement, drags of patterns, clips and rows (one undo step on release),
-//! the scroll bars, the wheel, and the clip tooltip.
+//! the scroll bars, the wheel, the clip tooltip, and a double-click on a
+//! clip, which opens its pattern.
+
+use std::time::Instant;
 
 use crate::scale::Scale;
 use ordrumbox_core::song::measures_for_pattern;
 
 use super::Session;
+use super::session_panel::DOUBLE_CLICK;
 use super::session_song::{DRAG_START_PX, DragSource, SongDrag};
 use super::session_song_menu::clip_label;
 use super::session_types::Workspace;
@@ -27,6 +31,9 @@ impl Session {
                 self.press_song_drag(DragSource::Pattern(p), x, y);
             }
             (SongHit::Clip(clip), Button::Left) => {
+                if self.clip_double_click(clip) {
+                    return true;
+                }
                 let first = self.song_scroll(&layout, rows.len()).0;
                 let start = self.song().and_then(|s| s.clips.get(clip)).map_or(0, |c| c.start_measure);
                 let grab = layout.measure_at(x, first).saturating_sub(start);
@@ -68,6 +75,42 @@ impl Session {
             return true;
         }
         self.song_click(size, x, y, Button::Left)
+    }
+
+    /// A press at `(x, y)` while the menu of a clip just clicked is open:
+    /// when it is a second click on that clip, its pattern is opened (the
+    /// menu closed); whether it was one.
+    pub fn song_double_click(&mut self, size: (i32, i32, Scale), x: i32, y: i32) -> bool {
+        if !self.song_view_open() {
+            return false;
+        }
+        let layout = self.song_layout(size);
+        let rows = self.song_rows();
+        match layout.hit(&self.song_view_data(&rows, &layout), x, y) {
+            Some(SongHit::Clip(clip)) => self.clip_double_click(clip),
+            _ => false,
+        }
+    }
+
+    /// Clip `clip` pressed: on its second press soon enough, its pattern
+    /// shown in pattern mode; whether it was a double-click.
+    fn clip_double_click(&mut self, clip: usize) -> bool {
+        let now = Instant::now();
+        let last = self.song_panel.last_clip_click.replace((clip, now));
+        if !last.is_some_and(|(last, at)| last == clip && now - at < DOUBLE_CLICK) {
+            return false;
+        }
+        self.song_panel.last_clip_click = None;
+        let Some(id) = self.song().and_then(|s| s.clips.get(clip)).map(|c| c.pattern_id.clone()) else { return false };
+        self.chrome.widgets.dropdown = None;
+        match self.editor.library().patterns.iter().position(|p| p.id == id) {
+            Some(index) => {
+                self.show_pattern(index);
+                self.show_mode(false);
+            }
+            None => self.message = format!("\"{}\" is not in the library", self.pattern_label(&id)),
+        }
+        true
     }
 
     // ─── Dragging ────────────────────────────────────────────────────────────
@@ -451,5 +494,31 @@ mod tests {
         s.commit_text(Id::SongPattern(1), "renamed");
         assert!(!s.song_release(SIZE));
         assert_eq!(clips(&s), [("b".into(), 0, 2.0)]);
+    }
+
+    #[test]
+    fn a_double_click_on_a_clip_opens_its_pattern() {
+        let mut s = session();
+        let l = s.song_layout(SIZE);
+        let clip = (l.grid.x + song_view::LABEL_WIDTH + 12, l.grid.y + 14 + 18 + 11);
+        assert_eq!((s.pattern_index, s.workspace), (0, Workspace::Song));
+
+        // The first click opens the clip's menu; the second, on it, opens pattern b.
+        assert!(s.song_click(SIZE, clip.0, clip.1, Button::Left));
+        assert!(s.song_release(SIZE));
+        assert!(s.chrome.widgets.dropdown.is_some());
+        assert!(s.song_double_click(SIZE, clip.0, clip.1));
+        assert!(s.chrome.widgets.dropdown.is_none());
+        assert_eq!((s.pattern_index, s.workspace), (1, Workspace::Grid));
+
+        // Two clicks too far apart are two clicks.
+        s.toggle_song_view();
+        s.song_panel.last_clip_click = None;
+        s.pattern_index = 0;
+        assert!(s.song_click(SIZE, clip.0, clip.1, Button::Left));
+        s.song_release(SIZE);
+        s.song_panel.last_clip_click = s.song_panel.last_clip_click.map(|(c, at)| (c, at - DOUBLE_CLICK));
+        assert!(!s.song_double_click(SIZE, clip.0, clip.1));
+        assert_eq!((s.pattern_index, s.workspace), (0, Workspace::Song));
     }
 }

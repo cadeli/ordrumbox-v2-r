@@ -205,7 +205,9 @@ impl Ui {
         // An open list or number entry takes the click; the right button is the widgets'.
         if s.popup_open() || button == Button::Right {
             let menus_open = s.open_menu().is_some() || s.overlay_open();
-            return s.mouse_down(size, x, y, button, shift)
+            // A second click on a clip: its pattern, not what its menu would do.
+            return (button == Button::Left && s.song_double_click(size, x, y))
+                || s.mouse_down(size, x, y, button, shift)
                 || (button == Button::Right && !menus_open && s.song_view_open() && s.song_click(size, x, y, button))
                 || (button == Button::Right && !menus_open && s.piano_roll_open() && s.roll_click(size, x, y, button))
                 || (button == Button::Right && !menus_open && s.grid_menu(size, x, y));
