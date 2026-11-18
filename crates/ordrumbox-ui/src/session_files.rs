@@ -6,6 +6,7 @@ use super::Session;
 use super::session_confirm::Pending;
 use super::session_overlay::Overlay;
 use super::session_user_data;
+use crate::file_request::FileRequest;
 use crate::picker::{Export, Outcome, Picker, Purpose};
 use crate::store;
 use ordrumbox_core::{Library, Pattern, Rng};
@@ -68,7 +69,41 @@ impl Session {
     }
 
     pub(super) fn open_picker(&mut self, purpose: Purpose) {
-        self.chrome.overlay = Some(Overlay::Picker(Picker::new(purpose, self.chrome.last_dir.as_deref())));
+        let start = self.chrome.last_dir.clone();
+        self.ask_file(purpose, start.as_deref(), None);
+    }
+
+    /// Ask for a file or folder for `purpose`, opening in `start`: of the
+    /// program's dialog if it shows the system's, else of the picker drawn in
+    /// the window. `file_name` is what an export of a single file is called.
+    pub(super) fn ask_file(&mut self, purpose: Purpose, start: Option<&Path>, file_name: Option<String>) {
+        if self.program.native_files {
+            self.program.file_request = Some(FileRequest::new(purpose, start, file_name));
+        } else {
+            self.chrome.overlay = Some(Overlay::Picker(Picker::new(purpose, start)));
+        }
+    }
+
+    /// From now on files are asked of the program's dialogs
+    /// ([`Self::take_file_request`]), not of the picker in the window.
+    pub fn use_native_dialogs(&mut self) {
+        self.program.native_files = true;
+    }
+
+    /// The dialog asked for since the last call; its answer goes to [`Self::file_chosen`].
+    pub fn take_file_request(&mut self) -> Option<FileRequest> {
+        self.program.file_request.take()
+    }
+
+    /// The dialog of `request` is answered with `path`; `None`: it was cancelled.
+    /// A file to write was confirmed by the dialog if it replaces one.
+    pub fn file_chosen(&mut self, request: &FileRequest, path: Option<PathBuf>) {
+        let Some(path) = path else { return };
+        self.chrome.last_dir = if path.is_dir() { Some(path.clone()) } else { path.parent().map(Path::to_path_buf) };
+        match request.export_to_file() {
+            Some(export) => self.write_export(export, &path),
+            None => self.picked(request.purpose(), path),
+        }
     }
 
     /// The name of the file `export` writes; `None` when what it writes is gone.
@@ -262,7 +297,8 @@ impl Session {
             return;
         }
         let start = self.chrome.last_dir.clone().filter(|d| d.is_dir()).or_else(store::exports_dir);
-        self.chrome.overlay = Some(Overlay::Picker(Picker::new(Purpose::Export(export), start.as_deref())));
+        let file_name = self.export_file_name(export);
+        self.ask_file(Purpose::Export(export), start.as_deref(), file_name);
     }
 
     /// The name of the file `export` writes for pattern `p` or song `s`.

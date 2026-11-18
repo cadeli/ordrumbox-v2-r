@@ -34,7 +34,7 @@ const ALLOWED: [Allowed; 9] = [
     Allowed {
         name: "ordrumbox-app",
         internal: &["ordrumbox-core", "ordrumbox-engine", "ordrumbox-ui"],
-        external: &["winit", "softbuffer", "cpal", "midir"],
+        external: &["winit", "softbuffer", "cpal", "midir", "rfd"],
     },
     Allowed {
         name: "ordrumbox-plugin",

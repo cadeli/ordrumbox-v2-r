@@ -10,6 +10,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod audio;
+mod dialog;
 mod midi;
 mod midi_out;
 mod midi_sync;
@@ -47,6 +48,8 @@ struct App {
     /// The MIDI output open.
     midi_out: Option<midi_out::Output>,
     waker: ordrumbox_ui::Waker,
+    /// The file dialog open, if any.
+    dialog: Option<dialog::Open>,
 }
 
 impl App {
@@ -383,6 +386,7 @@ impl ApplicationHandler for App {
     }
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        self.serve_dialog();
         let midi = self.midi_idle();
         let idle = self.ui.idle();
         if idle.redraw || midi {
@@ -393,6 +397,28 @@ impl ApplicationHandler for App {
 }
 
 impl App {
+    /// Show the dialog the session asked for, and give it the answer of the
+    /// one open when it has one.
+    fn serve_dialog(&mut self) {
+        if let Some(open) = self.dialog.take() {
+            match open.poll() {
+                Ok(dialog::Answer::Done(request, path)) => self.ui.session.file_chosen(&request, path),
+                Ok(dialog::Answer::Lost) => self.ui.session.say("the file dialog closed without an answer"),
+                Err(open) => self.dialog = Some(open),
+            }
+        }
+        let Some(request) = self.ui.session.take_file_request() else { return };
+        if self.dialog.is_some() {
+            self.ui.session.say("a file dialog is already open");
+            return;
+        }
+        match dialog::Open::show(request, self.waker.clone()) {
+            Ok(open) => self.dialog = Some(open),
+            Err(e) => self.ui.session.say(&format!("file dialog not shown: {e}")),
+        }
+        self.request_redraw();
+    }
+
     /// After each window event: a quit asked from the menus or the keyboard.
     fn after_event(&mut self, event_loop: &ActiveEventLoop) {
         if let Some(on) = self.ui.session.take_fullscreen_request()
@@ -470,6 +496,7 @@ fn open_window() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(notice) = &instance.notice {
         session.say(notice);
     }
+    session.use_native_dialogs();
     session.offer_devices(audio::devices);
     session.offer_midi_inputs(midi::ports);
     session.offer_midi_outputs(midi_out::ports);
@@ -500,8 +527,17 @@ fn open_window() -> Result<(), Box<dyn std::error::Error>> {
         Err(e) => session.say(&format!("ORDRUMBOX_VIEW: {e}")),
     }
     let (events_sender, events) = std::sync::mpsc::channel();
-    let mut app =
-        App { gfx: None, ui: Ui::new(session), error: None, midi: None, events, events_sender, midi_out: None, waker };
+    let mut app = App {
+        gfx: None,
+        ui: Ui::new(session),
+        error: None,
+        midi: None,
+        events,
+        events_sender,
+        midi_out: None,
+        waker,
+        dialog: None,
+    };
     app.open_midi();
     event_loop.run_app(&mut app)?;
     // Held until here, so the lock outlives the window.

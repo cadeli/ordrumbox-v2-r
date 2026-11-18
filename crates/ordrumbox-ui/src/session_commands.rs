@@ -7,6 +7,7 @@ use super::session_confirm::Pending;
 use super::session_overlay::Overlay;
 use super::session_selection::Clipboard;
 use super::session_types::Workspace;
+use crate::file_request::FileRequest;
 use crate::menu::{Command, MenuState};
 use crate::panel::Id;
 use crate::picker::{Export, Purpose};
@@ -27,6 +28,10 @@ pub(super) struct Program {
     pub(super) fullscreen: bool,
     /// A change of the window's mode the program has not applied yet.
     pub(super) fullscreen_request: Option<bool>,
+    /// The program shows the system's file dialogs: no picker is drawn.
+    pub(super) native_files: bool,
+    /// A file dialog the program has not shown yet.
+    pub(super) file_request: Option<FileRequest>,
 }
 
 impl Session {

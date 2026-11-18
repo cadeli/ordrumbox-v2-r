@@ -15,6 +15,7 @@ mod canvas;
 mod control;
 mod control_help;
 mod editors;
+mod file_request;
 mod font;
 mod frame;
 mod image;
@@ -53,6 +54,7 @@ mod view;
 pub use audio_output::{
     AudioOutput, HostOutput, OutputDevices, StartOutput, StartedOutput, chosen_device, host_output,
 };
+pub use file_request::{FileKind, FileRequest};
 pub use font::load as load_font;
 pub use mcp_link::run_bridge as run_mcp_bridge;
 pub use menu::Command;

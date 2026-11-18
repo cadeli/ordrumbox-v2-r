@@ -5,7 +5,7 @@ members = ["crates/*"]
 [workspace.package]
 version = "0.1.2"
 edition = "2024"
-rust-version = "1.89"
+rust-version = "1.100"
 license = "MIT"
 repository = "https://github.com/cadeli/ordrumbox-v2-r"
 
@@ -19,6 +19,7 @@ ordrumbox-logic = { path = "crates/ordrumbox-logic" }
 ordrumbox-dsp = { path = "crates/ordrumbox-dsp" }
 ordrumbox-engine = { path = "crates/ordrumbox-engine" }
 ordrumbox-ui = { path = "crates/ordrumbox-ui" }
+rfd = "0.18"
 winit = "0.30.13"
 softbuffer = "0.4.8"
 cpal = "0.18.2"

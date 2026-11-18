@@ -59,8 +59,15 @@ pub enum Export {
     UserData,
 }
 
+impl Export {
+    /// What is written is one file, not a folder made in the folder picked.
+    pub(crate) fn writes_file(self) -> bool {
+        !matches!(self, Self::PatternStems | Self::SongStems | Self::KitFolder | Self::UserData)
+    }
+}
+
 impl Purpose {
-    pub fn title(self) -> &'static str {
+    pub(crate) fn title(self) -> &'static str {
         match self {
             Self::ImportMidi => "Import MIDI file",
             Self::AddSample => "Add sample to the kit",
@@ -90,12 +97,12 @@ impl Purpose {
     }
 
     /// The pick is a folder, not a file.
-    fn picks_folder(self) -> bool {
+    pub(crate) fn picks_folder(self) -> bool {
         matches!(self, Self::ImportFolder | Self::RestoreUserData | Self::UserFolder | Self::Export(_))
     }
 
     /// File extensions shown (lowercase); none for a folder.
-    fn extensions(self) -> &'static [&'static str] {
+    pub(crate) fn extensions(self) -> &'static [&'static str] {
         match self {
             Self::ImportMidi => &["mid", "midi"],
             Self::AddSample | Self::ReplaceSample | Self::ReplaceTrackSample => &["wav"],

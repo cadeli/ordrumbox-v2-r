@@ -34,7 +34,7 @@ ordrumbox-logic   editor with undo/redo, generators, MIDI files     → core
 ordrumbox-engine  kits, WAV, passes, engine, UI ↔ audio link        → core, dsp
 ordrumbox-probe   sound measurements (command line, not shipped)    → core, dsp, engine
 ordrumbox-ui      session, views, input, MCP link, update check     → core, logic, engine, fontdue
-ordrumbox-app     window, input translation, audio output, MIDI in  → core, engine, ui, winit, softbuffer, cpal, midir
+ordrumbox-app     window, input translation, audio output, MIDI in  → core, engine, ui, winit, softbuffer, cpal, midir, rfd
 ordrumbox-plugin  CLAP/VST3 instrument following the host           → core, engine, ui, nih-plug, baseview, softbuffer
 xtask             `cargo xtask bundle`: plugin bundles, assets in   → nih_plug_xtask
 assets/           data/*.json and kits/**.wav, read at runtime
@@ -43,8 +43,9 @@ assets/           data/*.json and kits/**.wav, read at runtime
 - The four domain crates (`core`, `dsp`, `logic`, `engine`) take **no
   third-party dependency** and touch no file, socket or process: what they
   read comes in as bytes, text or a `read` function. Only `ordrumbox-app`
-  opens a window, a sound device or a MIDI port, through `winit`,
-  `softbuffer`, `cpal` and `midir`. `ordrumbox-ui` reaches the OS for the
+  opens a window, a sound device, a MIDI port or a file dialog, through `winit`,
+  `softbuffer`, `cpal`, `midir` and `rfd` (`dialog.rs`; the window's own
+  picker stays for the plugin and the tests). `ordrumbox-ui` reaches the OS for the
   rest: files (`store.rs`), the MCP socket, the system font, `curl`.
   `ordrumbox-plugin` talks to a plugin host instead, through `nih-plug`
   (pinned git revision) and `baseview`; the `vst3` feature links GPLv3
@@ -225,7 +226,7 @@ assets/           data/*.json and kits/**.wav, read at runtime
 
 ## Modern Rust
 
-- Edition 2024, `rust-version` 1.89: use what they give. `let … else`,
+- Edition 2024, `rust-version` 1.100: use what they give. `let … else`,
   `if let … && …` chains, `is_some_and`, `clamp`, `total_cmp`, `rem_euclid`
   (through `num::wrap`; `ordrumbox-dsp` has its own `wrap`), `div_euclid`,
   `checked_*`/`saturating_*`.

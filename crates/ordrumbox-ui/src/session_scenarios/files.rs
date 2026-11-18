@@ -249,3 +249,27 @@ fn stems_are_one_wav_per_audible_track_in_a_folder_of_their_own() {
     assert!(s.overlay_open());
     std::fs::remove_dir_all(&dir).unwrap();
 }
+
+#[test]
+fn native_dialogs_replace_the_picker_and_a_save_names_the_file_itself() {
+    use crate::file_request::FileKind;
+    let dir = scratch_dir("native-dialogs");
+    let (mut s, _audio) = demo_session(&dir.join("samples"));
+    s.use_native_dialogs();
+
+    s.run(Command::ImportMidi);
+    assert!(!s.overlay_open(), "no picker is drawn");
+    let request = s.take_file_request().unwrap();
+    assert_eq!(request.kind(), &FileKind::Open(&["mid", "midi"]));
+    assert_eq!(s.take_file_request(), None, "asked once");
+    s.file_chosen(&request, None);
+    assert!(!s.overlay_open(), "a cancelled dialog changes nothing");
+
+    s.run(Command::ExportMidi);
+    let request = s.take_file_request().unwrap();
+    let FileKind::Save(name) = request.kind().clone() else { panic!("a file to write: {request:?}") };
+    assert!(name.ends_with(".mid"), "{name}");
+    let path = dir.join("my name.mid");
+    s.file_chosen(&request, Some(path.clone()));
+    assert!(path.is_file(), "written under the name chosen, not the suggested one");
+}

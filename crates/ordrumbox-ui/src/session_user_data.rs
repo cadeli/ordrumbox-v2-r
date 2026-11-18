@@ -7,10 +7,9 @@
 //! again from the files, as at start.
 
 use super::session_confirm::Pending;
-use super::session_overlay::Overlay;
 use super::{Session, no_output};
 use crate::menu::Command;
-use crate::picker::{Picker, Purpose};
+use crate::picker::Purpose;
 use crate::{assets, store, update, user_data};
 use ordrumbox_core::Library;
 use ordrumbox_core::json::Object;
@@ -148,7 +147,7 @@ impl Session {
     pub(super) fn open_restore(&mut self) {
         let backups = self.user_folder().map(|d| d.join(user_data::BACKUPS_DIR)).filter(|d| d.is_dir());
         let start = backups.or_else(|| self.chrome.last_dir.clone());
-        self.chrome.overlay = Some(Overlay::Picker(Picker::new(Purpose::RestoreUserData, start.as_deref())));
+        self.ask_file(Purpose::RestoreUserData, start.as_deref(), None);
     }
 
     /// The backup's folder is picked: asked, unless it holds nothing to restore.
@@ -197,7 +196,7 @@ impl Session {
             return;
         }
         let start = self.user_folder().and_then(|d| d.parent().map(Path::to_path_buf));
-        self.chrome.overlay = Some(Overlay::Picker(Picker::new(Purpose::UserFolder, start.as_deref())));
+        self.ask_file(Purpose::UserFolder, start.as_deref(), None);
     }
 
     /// File > Use the default user data folder.
