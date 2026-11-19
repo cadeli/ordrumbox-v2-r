@@ -16,12 +16,15 @@ env:
 
 jobs:
   check:
-    name: ${{ matrix.os }}
+    name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        include:
+          - { name: Windows, os: windows-latest }
+          - { name: macOS, os: macos-latest }
+          - { name: Linux, os: ubuntu-latest }
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
@@ -47,7 +50,8 @@ jobs:
         run: |
           cargo install --locked cargo-about --features cli
           cargo about generate --all-features --workspace about.hbs -o /tmp/third-party.txt
-          diff THIRD-PARTY-LICENSES.txt /tmp/third-party.txt
+          # The license files of some crates are CRLF: only the text counts, not the line endings.
+          diff --strip-trailing-cr THIRD-PARTY-LICENSES.txt /tmp/third-party.txt
       - run: cargo test --workspace
 
   # The plugin bundles (`assets/` inside), checked by the CLAP project's
@@ -57,14 +61,17 @@ jobs:
   # alone is zipped and shipped as a separate download, never the `.clap` that
   # build also leaves in `target/bundled`.
   plugin:
-    name: plugin (${{ matrix.os }})
+    name: plugin (${{ matrix.name }})
     needs: check
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        include:
+          - { name: Windows, os: windows-latest }
+          - { name: macOS, os: macos-latest }
+          - { name: Linux, os: ubuntu-latest }
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
