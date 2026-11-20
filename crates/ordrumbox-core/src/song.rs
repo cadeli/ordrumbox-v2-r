@@ -148,10 +148,10 @@ impl Song {
                 dropped.push(DroppedClip { pattern: reference.to_owned(), reason: "unknown pattern id" });
                 continue;
             }
-            let number = |key: &str| clip.get(key).and_then(Value::to_number).unwrap_or(f64::NAN);
-            let start = number("startMeasure");
-            let start = if start.is_nan() { 0.0 } else { start.floor().max(0.0) };
-            let count = number("measureCount");
+            let number = |key: &str| clip.get(key).and_then(Value::to_number).filter(|n| !n.is_nan());
+            // Without a start: the first measure; without a positive count: one measure.
+            let start = number("startMeasure").map_or(0.0, |n| n.floor().max(0.0));
+            let count = number("measureCount").filter(|&n| n > 0.0).unwrap_or(1.0);
             if start + count.max(1.0) > MAX_LOADED_MEASURES {
                 dropped.push(DroppedClip { pattern: reference.to_owned(), reason: "clip past the longest song" });
                 continue;
@@ -159,18 +159,17 @@ impl Song {
             clips.push(SongClip {
                 pattern_id: reference.to_owned(),
                 start_measure: start.min(f64::from(u32::MAX)) as u32,
-                measure_count: if count > 0.0 { count } else { 1.0 },
+                measure_count: count,
             });
         }
 
         let text = |key: &str| field(key).and_then(Value::to_text).unwrap_or_default();
         let bpm = field("bpm").map_or(DEFAULT_BPM, |raw| bpm_from_json(raw, &format!("{at}.bpm"), issues));
-        let loop_count = ["loopMeasures", "loopMeasureCount"]
-            .iter()
-            .find_map(|key| object.get(key))
-            .and_then(Value::to_number)
-            .unwrap_or(f64::NAN);
-        if loop_count > MAX_LOADED_MEASURES {
+        let loop_count =
+            ["loopMeasures", "loopMeasureCount"].iter().find_map(|key| object.get(key)).and_then(Value::to_number);
+        if let Some(loop_count) = loop_count
+            && loop_count > MAX_LOADED_MEASURES
+        {
             let message = format!("{loop_count} measures, over {MAX_LOADED_MEASURES}: no loop");
             issues.push(Issue::new(format!("{at}.loopMeasures"), message));
         }
@@ -184,7 +183,7 @@ impl Song {
             description: text("description"),
             bpm,
             // Whole measures; under one, no loop (not a loop of 0 measures).
-            loop_measures: Some(loop_count.floor()).filter(|count| *count > 0.0 && *count <= MAX_LOADED_MEASURES),
+            loop_measures: loop_count.map(f64::floor).filter(|count| *count > 0.0 && *count <= MAX_LOADED_MEASURES),
             clips,
         };
         Ok((song, dropped))

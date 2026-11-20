@@ -72,7 +72,7 @@ fn has_track(defs: &[TrackDef], name: &str) -> bool {
 /// One track per drum key the notes of `channel` resolve to an instrument,
 /// named apart from the tracks of `before`.
 fn drum_tracks(c: &Catalog, notes: &[NoteOn], channel: u8, before: &[TrackDef]) -> Option<Vec<TrackDef>> {
-    let mut groups: Vec<(Option<u8>, Vec<NoteOn>)> = Vec::new();
+    let mut groups: Vec<(u8, Vec<NoteOn>)> = Vec::new();
     for note in notes {
         match groups.iter_mut().find(|(n, _)| *n == note.note) {
             Some((_, group)) => group.push(*note),
@@ -83,7 +83,6 @@ fn drum_tracks(c: &Catalog, notes: &[NoteOn], channel: u8, before: &[TrackDef]) 
     let resolved: Vec<(u8, Vec<NoteOn>, &Instrument, bool)> = groups
         .into_iter()
         .filter_map(|(key, group)| {
-            let key = key?;
             if let Some(mapped) = found(c.from_midi(i64::from(channel), i64::from(key))) {
                 return Some((key, group, mapped, true));
             }
@@ -240,7 +239,7 @@ fn patterns_from(defs: &[TrackDef], base_name: &str, division: f64) -> (Vec<Patt
                         }
                         let spb = i64::from(STEPS_PER_BEAT);
                         let (beat, beat_step) = ((step / spb) as i32, (step % spb) as i32);
-                        let pitch = note.note.map_or(f64::NAN, f64::from) - def.base_note;
+                        let pitch = f64::from(note.note) - def.base_note;
                         let step_percent = (f64::from(beat_step) * 100.0 / f64::from(STEPS_PER_BEAT)).round();
                         track.notes.push(Note {
                             velocity: smf::velocity_to_unit(note.velocity),
@@ -272,7 +271,7 @@ mod tests {
 
     fn def(ticks: &[i64]) -> TrackDef {
         let notes =
-            ticks.iter().map(|&tick| NoteOn { tick, channel: 9, note: Some(36), velocity: 100, track: 0, duration: 0 });
+            ticks.iter().map(|&tick| NoteOn { tick, channel: 9, note: 36, velocity: 100, track: 0, duration: 0 });
         TrackDef { name: "KICK".into(), notes: notes.collect(), base_note: 36.0 }
     }
 
@@ -335,8 +334,8 @@ mod tests {
             &[TrackDef {
                 name: "BASS".into(),
                 notes: vec![
-                    NoteOn { tick: 0, channel: 0, note: Some(36), velocity: 100, track: 0, duration: 144 },
-                    NoteOn { tick: 192, channel: 9, note: Some(36), velocity: 100, track: 0, duration: 0 },
+                    NoteOn { tick: 0, channel: 0, note: 36, velocity: 100, track: 0, duration: 144 },
+                    NoteOn { tick: 192, channel: 9, note: 36, velocity: 100, track: 0, duration: 0 },
                 ],
                 base_note: 36.0,
             }],
@@ -354,8 +353,8 @@ mod tests {
             &[TrackDef {
                 name: "BASS".into(),
                 notes: vec![
-                    NoteOn { tick: 0, channel: 0, note: Some(36), velocity: 100, track: 0, duration: 96 },
-                    NoteOn { tick: 48, channel: 0, note: Some(36), velocity: 100, track: 0, duration: 144 },
+                    NoteOn { tick: 0, channel: 0, note: 36, velocity: 100, track: 0, duration: 96 },
+                    NoteOn { tick: 48, channel: 0, note: 36, velocity: 100, track: 0, duration: 144 },
                 ],
                 base_note: 36.0,
             }],

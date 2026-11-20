@@ -9,6 +9,20 @@ use super::{
     Accent, Generator, Phrases, VelocitySpec, add_note, apply_loop_point, clamp, cycle, loop_point, num, nums, text,
 };
 
+/// What a groove variant (bass or melody) plays without its setting in the
+/// table: its step density, the chance of a scale degree instead of a chord
+/// interval, the widest such leap (semitones).
+const GROOVE_DENSITY: f64 = 0.5;
+const GROOVE_VARIATION: f64 = 0.3;
+const GROOVE_MAX_LEAP: f64 = 7.0;
+/// A bass groove without its settings: the chance its strong steps take the
+/// first interval, the intervals (root, fifth), the beats' roots (the key's).
+const BASS_STRONG_BEAT_WEIGHT: f64 = 0.75;
+const BASS_STRONG_BEAT_INTERVALS: [f64; 2] = [0.0, 7.0];
+const ROOT_PATTERN: [f64; 1] = [0.0];
+/// A step-grid bass without its probabilities: each step's chance.
+const STEP_GRID_PROBABILITIES: [f64; 4] = [0.7, 0.7, 0.6, 0.7];
+
 fn is_true(value: &Value, key: &str) -> bool {
     value.get(key) == Some(&Value::Bool(true))
 }
@@ -61,15 +75,17 @@ fn bass_step_grid(g: &mut Generator<'_>, track: &mut Track, tones: &[f64], confi
     let loop_point = loop_point(track, config, 2.0);
     let spb = track.steps_per_beat;
     let beat = num(config, "beat").unwrap_or(0.0) as i32;
-    let probabilities: Vec<f64> = match super::list(config, "probabilitySets") {
-        Some(sets) => g
-            .pick(sets)
-            .and_then(Value::as_array)
-            .map(|row| row.iter().map(|v| v.as_f64().unwrap_or(f64::NAN)).collect())
-            .unwrap_or_default(),
-        None => nums(config, "probabilities").unwrap_or_else(|| vec![0.7, 0.7, 0.6, 0.7]),
-    };
-    let mut pitches = vec![tones.first().copied().unwrap_or(f64::NAN) + root];
+    // A row of the sets drawn (one draw, as the sets' own order), else the
+    // single list, else the default; a row with a non-number is no row.
+    let row = super::list(config, "probabilitySets")
+        .and_then(|sets| g.pick(sets))
+        .and_then(Value::as_array)
+        .and_then(|row| row.iter().map(Value::as_f64).collect::<Option<Vec<f64>>>());
+    let probabilities = row
+        .or_else(|| nums(config, "probabilities"))
+        .filter(|p| !p.is_empty())
+        .unwrap_or_else(|| STEP_GRID_PROBABILITIES.to_vec());
+    let mut pitches = vec![tones.first().copied().unwrap_or(0.0) + root];
     for _ in 1..spb {
         let tone = g.random_tone(tones);
         pitches.push(tone + root);
@@ -79,7 +95,7 @@ fn bass_step_grid(g: &mut Generator<'_>, track: &mut Track, tones: &[f64], confi
         if beat * spb + step >= loop_point {
             continue;
         }
-        let probability = cycle(&probabilities, step as usize).unwrap_or(f64::NAN);
+        let probability = cycle(&probabilities, step as usize).unwrap_or(0.0);
         if g.random() < probability * density {
             let accent = accents.as_deref().and_then(|a| cycle(a, step as usize)).unwrap_or(0.0);
             let context = VelocitySpec { accent: Accent::By(accent), fixed: false, ..VelocitySpec::default() };
@@ -94,14 +110,14 @@ fn bass_step_grid(g: &mut Generator<'_>, track: &mut Track, tones: &[f64], confi
 fn bass_groove(g: &mut Generator<'_>, track: &mut Track, scale: &[f64], config: &Value, density: f64, root: f64) {
     let loop_point = loop_point(track, config, 2.0);
     let spb = track.steps_per_beat;
-    let roots = nums(config, "rootPattern").unwrap_or_default();
-    let note_density = num(config, "density").unwrap_or(f64::NAN);
-    let variation = num(config, "variation").unwrap_or(f64::NAN);
-    let weight = num(config, "strongBeatWeight").unwrap_or(f64::NAN);
-    let intervals = nums(config, "strongBeatIntervals").unwrap_or_default();
-    let max_leap = num(config, "maxLeap").unwrap_or(f64::NAN);
+    let roots = nums(config, "rootPattern").unwrap_or_else(|| ROOT_PATTERN.to_vec());
+    let note_density = num(config, "density").unwrap_or(GROOVE_DENSITY);
+    let variation = num(config, "variation").unwrap_or(GROOVE_VARIATION);
+    let weight = num(config, "strongBeatWeight").unwrap_or(BASS_STRONG_BEAT_WEIGHT);
+    let intervals = nums(config, "strongBeatIntervals").unwrap_or_else(|| BASS_STRONG_BEAT_INTERVALS.to_vec());
+    let max_leap = num(config, "maxLeap").unwrap_or(GROOVE_MAX_LEAP);
     for beat in 0..track.beat_count {
-        let root_pitch = cycle(&roots, beat as usize).unwrap_or(f64::NAN) + root;
+        let root_pitch = cycle(&roots, beat as usize).unwrap_or(0.0) + root;
         let mut last = root_pitch;
         for step in 0..spb {
             if beat * spb + step >= loop_point {
@@ -114,7 +130,8 @@ fn bass_groove(g: &mut Generator<'_>, track: &mut Track, scale: &[f64], config: 
             let mut is_variation = false;
             let pitch = if strong || g.random() > variation {
                 let interval = if g.random() < weight { intervals.first() } else { intervals.get(1) };
-                root_pitch + interval.copied().unwrap_or(f64::NAN)
+                // A list of one interval: the second is the root.
+                root_pitch + interval.copied().unwrap_or(0.0)
             } else {
                 let (pitch, kept) = scale_step(g, scale, root_pitch, last, max_leap);
                 is_variation = kept;
@@ -133,7 +150,7 @@ fn bass_groove(g: &mut Generator<'_>, track: &mut Track, scale: &[f64], config: 
 fn bass_arpeggio(g: &mut Generator<'_>, track: &mut Track, scale: &[f64], config: &Value, density: f64, root: f64) {
     let loop_point = loop_point(track, config, 2.0);
     let spb = track.steps_per_beat;
-    let roots = nums(config, "rootPattern").unwrap_or_else(|| vec![0.0]);
+    let roots = nums(config, "rootPattern").unwrap_or_else(|| ROOT_PATTERN.to_vec());
     let length = num(config, "phraseLength").unwrap_or(scale.len() as f64).max(2.0) as usize;
     let contour = text(config, "contour").unwrap_or("updown");
     let start = num(config, "startDegree").unwrap_or(0.0);
@@ -143,7 +160,7 @@ fn bass_arpeggio(g: &mut Generator<'_>, track: &mut Track, scale: &[f64], config
     let rest_chance = clamp(num(config, "restChance").unwrap_or(0.15), 0.0, 1.0);
     let decay = clamp(num(config, "phraseDecay").unwrap_or(0.2), 0.0, 1.0);
     for beat in 0..track.beat_count {
-        let root_pitch = cycle(&roots, beat as usize).unwrap_or(f64::NAN) + root;
+        let root_pitch = cycle(&roots, beat as usize).unwrap_or(0.0) + root;
         let (mut step, mut index) = (0, 0usize);
         while step < spb {
             if beat * spb + step >= loop_point {
@@ -286,9 +303,9 @@ fn melody_groove(g: &mut Generator<'_>, track: &mut Track, scale: &[f64], config
     let loop_point = loop_point(track, config, 2.0);
     let spb = track.steps_per_beat;
     let intervals = nums(config, "strongBeatIntervals").unwrap_or_else(|| vec![0.0, 4.0, 7.0]);
-    let note_density = num(config, "density").unwrap_or(0.5);
-    let variation = num(config, "variation").unwrap_or(0.3);
-    let max_leap = num(config, "maxLeap").unwrap_or(7.0);
+    let note_density = num(config, "density").unwrap_or(GROOVE_DENSITY);
+    let variation = num(config, "variation").unwrap_or(GROOVE_VARIATION);
+    let max_leap = num(config, "maxLeap").unwrap_or(GROOVE_MAX_LEAP);
     for beat in 0..track.beat_count {
         let mut last = bias;
         for step in 0..spb {
@@ -348,5 +365,57 @@ fn melody_arpeggio(g: &mut Generator<'_>, track: &mut Track, scale: &[f64], conf
             index += 1;
             step += g.step_advance(average, jitter);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::{list, nums, table};
+    use ordrumbox_core::json::Value;
+
+    /// The numbers each bass mode reads: the table holds them all, so its
+    /// defaults never stand in for a typing mistake in `generators.json`.
+    #[test]
+    fn the_bass_table_holds_what_each_mode_reads() {
+        let numbers: [(&str, &[&str]); 2] =
+            [("groove", &["density", "variation", "strongBeatWeight", "maxLeap"]), ("arpeggio", &[])];
+        let lists: [(&str, &[&str]); 3] = [
+            ("groove", &["rootPattern", "strongBeatIntervals"]),
+            ("arpeggio", &["rootPattern"]),
+            ("stepGrid", &["probabilities"]),
+        ];
+        for (name, config) in table("bass").iter() {
+            let mode = config.get("mode").and_then(Value::as_str).unwrap_or("phrases");
+            for (_, keys) in numbers.iter().filter(|(m, _)| *m == mode) {
+                for key in *keys {
+                    assert!(config.get(key).and_then(Value::as_f64).is_some(), "bass.{name}.{key}");
+                }
+            }
+            for (_, keys) in lists.iter().filter(|(m, _)| *m == mode) {
+                for key in *keys {
+                    assert!(nums(config, key).is_some_and(|v| !v.is_empty()), "bass.{name}.{key}");
+                }
+            }
+            for row in list(config, "probabilitySets").unwrap_or_default() {
+                assert!(row.as_array().is_some_and(|r| r.iter().all(|v| v.as_f64().is_some())), "bass.{name}");
+            }
+        }
+    }
+
+    #[test]
+    fn the_random_table_holds_its_numbers() {
+        let config = table("random");
+        for key in ["densityMin", "densitySpread", "pitchMin", "pitchRange", "velocityMin", "velocitySpread"] {
+            assert!(config.get(key).and_then(Value::as_f64).is_some(), "random.{key}");
+        }
+    }
+
+    #[test]
+    fn a_list_with_a_non_number_is_no_list() {
+        let config = ordrumbox_core::json::parse(r#"{"a":[1,2],"b":[1,"x"],"c":3}"#).unwrap();
+        assert_eq!(nums(&config, "a"), Some(vec![1.0, 2.0]));
+        assert_eq!(nums(&config, "b"), None);
+        assert_eq!(nums(&config, "c"), None);
+        assert_eq!(nums(&config, "d"), None);
     }
 }

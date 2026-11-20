@@ -50,7 +50,7 @@ pub struct Midi {
 pub struct NoteOn {
     pub tick: i64,
     pub channel: u8,
-    pub note: Option<u8>,
+    pub note: u8,
     pub velocity: u8,
     pub track: usize,
     /// Ticks from the note-on to the matching note-off, 0 without one.
@@ -208,7 +208,7 @@ impl Midi {
                 let slot = usize::from(channel) * 128 + usize::from(note & 0x7f);
                 let is_off = status == 0x80 || (status == 0x90 && velocity == 0);
                 if status == 0x90 && velocity > 0 {
-                    notes.push(NoteOn { tick: event.tick, channel, note: Some(note), velocity, track, duration: 0 });
+                    notes.push(NoteOn { tick: event.tick, channel, note, velocity, track, duration: 0 });
                     open[slot].push((notes.len() - 1, event.tick));
                 } else if is_off && let Some(&(index, on_tick)) = open[slot].first() {
                     open[slot].remove(0);
@@ -281,7 +281,7 @@ mod tests {
             ],
         );
         let notes: Vec<_> = parse(&bytes).note_ons().iter().map(|n| (n.tick, n.note)).collect();
-        assert_eq!(notes, [(0, Some(36)), (96, Some(38))]);
+        assert_eq!(notes, [(0, 36), (96, 38)]);
     }
 
     #[test]

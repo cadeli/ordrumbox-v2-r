@@ -676,7 +676,18 @@ pub fn toggle_melodic(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, kind: Me
 /// pitches (±6) and velocities (0.5–1), the track looping over its length.
 pub fn random_track(track: &mut Track, rnd: &mut dyn FnMut() -> f64) {
     let config = table("random");
-    let get = |key: &str| config.get(key).and_then(Value::as_f64).unwrap_or(f64::NAN);
+    // Without the table's value, the one this function's doc gives.
+    let get = |key: &str| {
+        let default = match key {
+            "densityMin" => 0.15,
+            "densitySpread" => 0.2,
+            "pitchMin" => -6.0,
+            "pitchRange" => 13.0,
+            "velocityMin" | "velocitySpread" => 0.5,
+            _ => 0.0,
+        };
+        config.get(key).and_then(Value::as_f64).unwrap_or(default)
+    };
     track.notes.clear();
     let spb = track.steps_per_beat;
     track.loop_length = Some(track.beat_count * spb);

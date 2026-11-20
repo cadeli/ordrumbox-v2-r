@@ -61,9 +61,10 @@ pub(crate) fn list<'a>(value: &'a Value, key: &str) -> Option<&'a [Value]> {
     value.get(key).and_then(Value::as_array)
 }
 
-/// The numbers of `value[key]` (non-numbers as NaN, like an arithmetic on them).
+/// The numbers of `value[key]`; `None` without the list, or when an item is
+/// not a number (the reader then takes its default, as for a missing list).
 pub(crate) fn nums(value: &Value, key: &str) -> Option<Vec<f64>> {
-    list(value, key).map(|items| items.iter().map(|v| v.as_f64().unwrap_or(f64::NAN)).collect())
+    list(value, key)?.iter().map(Value::as_f64).collect()
 }
 
 /// Item `i` of `items` taken cyclically, `None` for an empty list.
@@ -319,7 +320,8 @@ impl<'a> Generator<'a> {
             {
                 continue;
             }
-            let beat_value = num(phrase, "beat").unwrap_or(f64::NAN);
+            // A phrase without its beat or its step plays on the first.
+            let beat_value = num(phrase, "beat").unwrap_or(0.0);
             let step = if text(phrase, "step") == Some("random") {
                 let taken: &[i32] = occupied.iter().find(|(b, _)| *b == beat_value).map_or(&[], |(_, s)| s);
                 let free: Vec<i32> = (0..spb).filter(|s| !taken.contains(s)).collect();
@@ -328,7 +330,7 @@ impl<'a> Generator<'a> {
                     None => continue,
                 }
             } else {
-                num(phrase, "step").unwrap_or(f64::NAN) as i32
+                num(phrase, "step").unwrap_or(0.0) as i32
             };
             let beat = beat_value as i32;
             if !opts.stacking && beat * spb + step >= loop_point {

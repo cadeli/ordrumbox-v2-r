@@ -113,9 +113,7 @@ fn parsed(bytes: &[u8]) -> Value {
             let mut o = Object::new();
             o.insert("absTick", num(n.tick as f64));
             o.insert("channel", num(n.channel));
-            if let Some(note) = n.note {
-                o.insert("note", num(note));
-            }
+            o.insert("note", num(n.note));
             o.insert("velocity", num(n.velocity));
             o.insert("trackIdx", num(n.track as f64));
             Value::Object(o)
