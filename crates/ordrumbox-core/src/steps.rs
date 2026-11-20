@@ -10,6 +10,8 @@
 pub const TICK: u32 = 96;
 /// Beats of the longest pattern or track an edit makes.
 pub const MAX_BEATS: i32 = 64;
+/// Loops of a pattern an export (WAV, MIDI) holds at most.
+pub const MAX_LOOP_COUNT: u32 = 64;
 /// Beats of the longest pattern or track a file may hold (an edit stops well
 /// before): what plays a pattern works in memory with its length.
 pub const MAX_LOADED_BEATS: i32 = 1024;

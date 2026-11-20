@@ -127,7 +127,7 @@ impl Step {
     /// The index one step from `from` in a list of `count`, wrapping round
     /// (`None` in an empty list).
     #[must_use]
-    pub fn from(self, from: usize, count: usize) -> Option<usize> {
+    pub fn target_index(self, from: usize, count: usize) -> Option<usize> {
         let last = count.checked_sub(1)?;
         Some(match self {
             Self::Previous => from.min(last).checked_sub(1).unwrap_or(last),
@@ -483,13 +483,13 @@ mod tests {
 
     #[test]
     fn a_step_wraps_round_the_list() {
-        assert_eq!(Step::Next.from(0, 3), Some(1));
-        assert_eq!(Step::Next.from(2, 3), Some(0));
-        assert_eq!(Step::Previous.from(0, 3), Some(2));
-        assert_eq!(Step::Previous.from(2, 3), Some(1));
-        assert_eq!(Step::Previous.from(9, 3), Some(1));
-        assert_eq!(Step::Next.from(0, 1), Some(0));
-        assert_eq!(Step::Next.from(0, 0), None);
+        assert_eq!(Step::Next.target_index(0, 3), Some(1));
+        assert_eq!(Step::Next.target_index(2, 3), Some(0));
+        assert_eq!(Step::Previous.target_index(0, 3), Some(2));
+        assert_eq!(Step::Previous.target_index(2, 3), Some(1));
+        assert_eq!(Step::Previous.target_index(9, 3), Some(1));
+        assert_eq!(Step::Next.target_index(0, 1), Some(0));
+        assert_eq!(Step::Next.target_index(0, 0), None);
     }
 
     #[test]

@@ -281,8 +281,7 @@ impl Session {
         if self.workspace == Workspace::Song {
             return;
         }
-        let beats = beat_choices(pattern.beat_count);
-        let selected = beats.iter().position(|b| *b == pattern.beat_count.to_string()).unwrap_or(0);
+        let (beats, selected) = beat_choices(pattern.beat_count);
         let kind = Kind::Select { values: beats.clone(), labels: beats, selected };
         layout.items.push(Item::new(Some(Id::Beats), controls.beats, kind));
         // The generation: the pattern's style, ⟳, AUTO, the macros.
@@ -414,14 +413,21 @@ pub(super) fn filter_on(track: &Track, filter_type: String) -> Vec<(&'static str
     updates
 }
 
-/// The lengths the pattern list offers: every beat up to 16, then every fourth up to the longest,
-/// and the current one when it is none of these (set by the keys).
-fn beat_choices(current: i32) -> Vec<String> {
-    let mut beats: Vec<i32> = (1..=16).chain((20..=MAX_BEATS).step_by(4)).collect();
-    if let Err(at) = beats.binary_search(&current) {
+/// The pattern list offers every length up to this one, in beats...
+const EVERY_BEAT_UP_TO: i32 = 16;
+/// ...then every length this many beats apart, up to the longest.
+const LONG_BEAT_STEP: usize = 4;
+
+/// The lengths the pattern list offers, and the index of `current`, added when it
+/// is none of them (set by the keys).
+fn beat_choices(current: i32) -> (Vec<String>, usize) {
+    let long = (EVERY_BEAT_UP_TO..=MAX_BEATS).step_by(LONG_BEAT_STEP).skip(1);
+    let mut beats: Vec<i32> = (1..=EVERY_BEAT_UP_TO).chain(long).collect();
+    let selected = beats.binary_search(&current).unwrap_or_else(|at| {
         beats.insert(at, current);
-    }
-    beats.iter().map(i32::to_string).collect()
+        at
+    });
+    (beats.iter().map(i32::to_string).collect(), selected)
 }
 
 /// What an edit of control `id` is called in the undo history: its label,

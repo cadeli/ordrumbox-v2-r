@@ -1,8 +1,10 @@
 //! What a track or a note holds, read for the editors: values, arpeggio, tooltips, ordering.
 
-use super::tables::{ARP_DIRECTIONS, FxDef, LfoTarget, fx_type_default, lfo_key, track_select_options};
+use super::Choice;
+use super::tables::{ARP_DIRECTIONS, FxDef, LfoTarget, fx_of_type, lfo_key, track_select_options};
 use ordrumbox_core::arp::MAX_OCTAVES;
 use ordrumbox_core::json::Value;
+use ordrumbox_core::lfo::WAVE_TYPES;
 use ordrumbox_core::{Note, ScaleList, Track, num};
 
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -35,7 +37,7 @@ pub(super) fn flag(track: &Track, key: &str) -> bool {
 }
 
 /// The text of setting `key`, as a select compares it (empty without one).
-pub fn text_of(track: &Track, key: &str) -> String {
+pub(crate) fn text_of(track: &Track, key: &str) -> String {
     match track.field(key) {
         Some(Value::String(s)) => s,
         Some(Value::Number(n)) => ordrumbox_core::num::text(n),
@@ -47,10 +49,9 @@ pub(super) fn has_lfo(track: &Track, key: &str) -> bool {
     lfo_key(key).is_some_and(|k| track.field(k).is_some_and(|v| !v.is_null()))
 }
 
-/// `isFxOn`.
 /// An effect is on: its amount set, and a type (`none` plays nothing).
 pub fn fx_on(track: &Track, fx: &FxDef) -> bool {
-    if fx.key == "filterType" {
+    if fx.is_filter() {
         return track.filter_type != "allpass";
     }
     number(track, fx.key) > 0.0 && fx.type_key().is_none_or(|key| text_of(track, key) != "none")
@@ -63,6 +64,22 @@ pub fn lfo_wave(track: &Track, target: &LfoTarget) -> String {
     wave.unwrap_or("sine").to_owned()
 }
 
+/// The waves of `target`'s LFO on `track`, the one it plays (or its LED turns on) shown.
+#[must_use]
+pub fn lfo_wave_choice(track: &Track, target: &LfoTarget) -> Choice {
+    let values: Vec<String> = WAVE_TYPES.iter().map(|w| (*w).to_owned()).collect();
+    let selected = index_of(&values, &lfo_wave(track, target));
+    Choice { values, labels: Vec::new(), selected }
+}
+
+/// The options of the select of setting `key` on `track`, the one it shows selected.
+#[must_use]
+pub fn select_choice(track: &Track, key: &str, state: &EditorState) -> Choice {
+    let (values, labels) = track_select_options(key);
+    let selected = index_of(&values, &shown_value(track, key, state));
+    Choice { values, labels, selected }
+}
+
 /// The value a select of setting `key` shows: the track's, or for an
 /// effect's type its list does not hold (`none`, the filter's `allpass`),
 /// the one its LED turns on: the filter's last, else its default.
@@ -73,7 +90,8 @@ pub fn shown_value(track: &Track, key: &str, state: &EditorState) -> String {
         return value;
     }
     let last = state.prev_filter_type.as_ref().filter(|last| key == "filterType" && values.contains(last));
-    match (last, fx_type_default(key)) {
+    let default = fx_of_type(key).and_then(|fx| fx.fx_type).map(|t| t.default);
+    match (last, default) {
         (Some(last), _) => last.clone(),
         (None, Some(default)) => default.to_owned(),
         (None, None) => value,
@@ -120,10 +138,11 @@ pub fn arp_state(note: &Note, scales: &ScaleList) -> ArpState {
     };
     let mode = arp.get("direction").and_then(Value::as_str).map(str::to_lowercase).unwrap_or_else(|| "up".into());
     let direction = if ARP_DIRECTIONS.contains(&mode.as_str()) { mode } else { "up".into() };
-    let intervals: Vec<f64> = arp
+    // An interval that is not a number matches no scale.
+    let intervals: Vec<Option<f64>> = arp
         .get("intervals")
         .and_then(Value::as_array)
-        .map(|a| a.iter().map(|v| v.as_f64().unwrap_or(f64::NAN)).collect())
+        .map(|a| a.iter().map(Value::as_f64).collect())
         .unwrap_or_default();
     let mut scale = scales.names.first().cloned().unwrap_or_else(|| "major".into());
     for (name, steps) in scales.names.iter().zip(&scales.steps) {
@@ -132,7 +151,7 @@ pub fn arp_state(note: &Note, scales: &ScaleList) -> ArpState {
             continue;
         }
         let n = steps.len();
-        if intervals.iter().enumerate().all(|(i, &iv)| f64::from(steps[i % n] + (i / n) as i32 * 12) == iv) {
+        if intervals.iter().enumerate().all(|(i, &iv)| Some(f64::from(steps[i % n] + (i / n) as i32 * 12)) == iv) {
             scale = name.clone();
             break;
         }

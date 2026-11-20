@@ -386,10 +386,7 @@ impl Session {
                 }
             }
             Kind::Select { values, selected, .. } | Kind::Screen { values, selected, .. } => {
-                let at = (selected as isize + lines).clamp(0, values.len() as isize - 1) as usize;
-                if at != selected
-                    && let Some(value) = values.get(at)
-                {
+                if let Some(value) = moved_value(&values, selected, lines) {
                     self.select(id, value);
                 }
             }
@@ -525,10 +522,7 @@ impl Session {
                     }
                     _ => return false,
                 };
-                let at = (selected as isize + delta).clamp(0, values.len() as isize - 1) as usize;
-                if at != selected
-                    && let Some(value) = values.get(at)
-                {
+                if let Some(value) = moved_value(&values, selected, delta) {
                     self.select(id, value);
                 }
                 true
@@ -604,5 +598,28 @@ impl Session {
             Some(number) => self.set_value(entry.id, spec.typed(spec.typed_shown(number))),
             None => self.tell(format!("\"{}\" is not a number", entry.text.trim())),
         }
+    }
+}
+
+/// The value of a select `delta` lines from `selected`, held at its ends;
+/// `None` when that is the one selected, or the select is empty.
+fn moved_value(values: &[String], selected: usize, delta: isize) -> Option<&String> {
+    let last = values.len().checked_sub(1)?;
+    let at = selected.saturating_add_signed(delta).min(last);
+    if at == selected { None } else { values.get(at) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::moved_value;
+
+    #[test]
+    fn a_select_moves_and_stops_at_its_ends() {
+        let values: Vec<String> = ["a", "b", "c"].map(String::from).to_vec();
+        assert_eq!(moved_value(&values, 0, 1).map(String::as_str), Some("b"));
+        assert_eq!(moved_value(&values, 1, 5).map(String::as_str), Some("c"));
+        assert_eq!(moved_value(&values, 1, -5).map(String::as_str), Some("a"));
+        assert_eq!(moved_value(&values, 2, 1), None, "held at its end");
+        assert_eq!(moved_value(&[], 0, 1), None, "an empty select (no synth preset) does not panic");
     }
 }

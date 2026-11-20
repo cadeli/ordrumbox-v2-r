@@ -17,13 +17,21 @@ fn lenient(value: Option<&Value>, fallback: f64) -> f64 {
     value.and_then(Value::to_number).unwrap_or(fallback)
 }
 
+/// Setting `key` of `lfo` (`freq`, `min`, `max`, `phase`) as it plays: its
+/// number, else its default (1 for `freq` and `max`, else 0).
+#[must_use]
+pub fn setting(lfo: &Object, key: &str) -> f64 {
+    let default = if matches!(key, "freq" | "max") { 1.0 } else { 0.0 };
+    lenient(lfo.get(key), default)
+}
+
 /// Value of `lfo` at transport tick `tick`, rounded to 2 decimals, between
 /// its `min` and `max`.
 pub fn value(lfo: &Object, tick: f64) -> f64 {
-    let freq = lenient(lfo.get("freq"), 1.0);
-    let min = lenient(lfo.get("min"), 0.0);
-    let max = lenient(lfo.get("max"), 1.0);
-    let phase = lenient(lfo.get("phase"), 0.0);
+    let freq = setting(lfo, "freq");
+    let min = setting(lfo, "min");
+    let max = setting(lfo, "max");
+    let phase = setting(lfo, "phase");
     let present = |key: &str| lfo.get(key).filter(|v| !v.is_null());
     let wave = match present("type").or_else(|| present("waveform")) {
         None => 0.0,

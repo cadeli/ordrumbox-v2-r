@@ -139,6 +139,15 @@ wrong sound or a wrong threshold.
 
 ### Changes of behaviour
 
+Choosing an effect's type (its screen's list or its ◂ ▸ arrows) switches the effect on, as it already did for
+the filter and an LFO's wave: a reverb or a delay without an amount goes on at its `on_value`, one without a
+type (`none`) at the type chosen. The type arrows of a reverb or a delay that was off used to leave it off.
+Scenario tests only (`session_scenarios/cartridges.rs`); no snapshot changed.
+
+An LFO knob shows what the LFO plays for a setting its object lacks or holds as a numeric string
+(`lfo::setting`: `freq` and `max` 1, `min` and `phase` 0), where it showed NaN. The synth cartridge's
+screen no longer panics on the wheel or an arrow key with no preset loaded. No snapshot changed.
+
 A synth note is 3 dB quieter: its level (`peak_velocity`, `synth_preset.rs`) is trimmed by `SYNTH_TRIM`,
 −3 dB, the peak a kit sample is normalised to, so a synth at full velocity peaks where a sample does instead
 of 3 dB above it. Presets and patterns are unchanged. This rewrote `mapping_rust.txt` (engine: the `velocity` of

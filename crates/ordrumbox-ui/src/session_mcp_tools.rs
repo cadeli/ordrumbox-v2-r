@@ -8,10 +8,10 @@ use ordrumbox_logic::tools::{count, find_song, find_track, object, optional_whol
 
 use super::Session;
 use super::session_files::WavSource;
-use super::session_loop_export::MAX_LOOP_COUNT;
 use super::session_mcp::{NO_AUDIO, exported, synth_settings};
 use crate::picker::Export;
 use crate::{master, store};
+use ordrumbox_core::steps::MAX_LOOP_COUNT;
 use ordrumbox_engine::Mode;
 use std::path::Path;
 

@@ -6,12 +6,12 @@ use super::Session;
 use super::session_files::NOTHING_TO_RENDER;
 use super::session_overlay::Overlay;
 use super::session_types::OverlayKey;
+use crate::panel::Step;
 use crate::picker::Export;
 use crate::scale::Scale;
 use crate::view;
 
-/// The most loops a pattern export holds.
-pub(super) const MAX_LOOP_COUNT: u32 = 64;
+use ordrumbox_core::steps::MAX_LOOP_COUNT;
 
 /// The lines a key reaches: the loop count, then the button.
 const ROW_COUNT: usize = 2;
@@ -48,14 +48,16 @@ impl Draft {
         line.checked_sub(1).filter(|&row| row < ROW_COUNT)
     }
 
-    /// The loop count `delta` away, from 1 to [`MAX_LOOP_COUNT`] and round.
-    fn change(&mut self, delta: isize) {
+    /// The loop count one `step` away, from 1 to [`MAX_LOOP_COUNT`] and round.
+    fn change(&mut self, step: Step) {
         if self.row != 0 {
             return;
         }
-        let max = i64::from(MAX_LOOP_COUNT);
-        let next = (i64::from(self.loop_count) - 1 + delta as i64).rem_euclid(max) + 1;
-        self.loop_count = u32::try_from(next).unwrap_or(1);
+        let max = MAX_LOOP_COUNT;
+        self.loop_count = match step {
+            Step::Next => self.loop_count % max + 1,
+            Step::Previous => (self.loop_count + max - 2) % max + 1,
+        };
     }
 }
 
@@ -85,9 +87,9 @@ impl Session {
                 draft.row = (draft.row as isize + delta).clamp(0, ROW_COUNT as isize - 1) as usize
             }
             OverlayKey::Edge(end) => draft.row = if *end { EXPORT_ROW } else { 0 },
-            OverlayKey::Side(delta) => draft.change(*delta),
+            OverlayKey::Side(delta) => draft.change(if *delta < 0 { Step::Previous } else { Step::Next }),
             OverlayKey::Enter if draft.row == EXPORT_ROW => self.confirm_loop_export(),
-            OverlayKey::Enter => draft.change(1),
+            OverlayKey::Enter => draft.change(Step::Next),
             OverlayKey::Back | OverlayKey::Letter(_) => {}
         }
         true
@@ -107,7 +109,7 @@ impl Session {
             if row == EXPORT_ROW {
                 self.confirm_loop_export();
             } else {
-                draft.change(1);
+                draft.change(Step::Next);
             }
         }
         true
@@ -138,14 +140,19 @@ mod tests {
     fn the_loop_count_goes_round_from_1_to_the_most() {
         let mut d = draft(1);
         // ← from 1 goes to the most.
-        d.change(-1);
+        d.change(Step::Previous);
         assert_eq!(d.loop_count, MAX_LOOP_COUNT);
-        d.change(1);
+        d.change(Step::Previous);
+        assert_eq!(d.loop_count, MAX_LOOP_COUNT - 1);
+        d.change(Step::Next);
+        d.change(Step::Next);
         assert_eq!(d.loop_count, 1);
-        d.change(3);
+        for _ in 0..3 {
+            d.change(Step::Next);
+        }
         assert_eq!(d.loop_count, 4);
         d.row = EXPORT_ROW;
-        d.change(1);
+        d.change(Step::Next);
         assert_eq!(d.loop_count, 4, "the button changes nothing");
     }
 

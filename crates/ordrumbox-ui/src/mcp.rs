@@ -549,6 +549,24 @@ mod tests {
     }
 
     #[test]
+    fn the_length_limits_are_the_program_s() {
+        let tools = tools();
+        let tools = tools.as_array().unwrap();
+        let tool = |name: &str| tools.iter().find(|t| t.get("name").and_then(Value::as_str) == Some(name)).unwrap();
+        let maximum = |name: &str, key: &str| {
+            let properties = tool(name).get("inputSchema").unwrap().get("properties").unwrap();
+            properties.get(key).unwrap().get("maximum").and_then(Value::as_f64).unwrap()
+        };
+        let max_beats = f64::from(ordrumbox_core::steps::MAX_BEATS);
+        assert_eq!(maximum("setPatternBeatCount", "beatCount"), max_beats);
+        let grows = tool("addNotesToPattern").get("description").and_then(Value::as_str).unwrap();
+        assert!(grows.contains(&format!("({max_beats} at most)")), "{grows}");
+        let max_loops = f64::from(ordrumbox_core::steps::MAX_LOOP_COUNT);
+        assert_eq!(maximum("exportPatternWav", "loopCount"), max_loops);
+        assert_eq!(maximum("exportPatternMidi", "loopCount"), max_loops);
+    }
+
+    #[test]
     fn generation_is_only_for_when_the_user_asks_for_it() {
         let tools = tools();
         let tools = tools.as_array().unwrap();

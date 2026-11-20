@@ -3,15 +3,16 @@
 use super::tables::{COMPOSE_TAB, FX_DEFS, FX_KNOBS, FxDef, GENERATION_COMPOSE};
 use super::tables::{
     GENERATION_ENGINE, GENERATION_GROOVE, GENERATION_MANUAL, GenerationRow, LFO_TARGETS, LOOP_PROPS, LfoTarget, Prop,
-    STYLE_DEFAULT, WAVE_TYPES, fx_label, prop, track_select_options,
+    STYLE_DEFAULT, fx_label, prop, track_select_options,
 };
-use super::values::{EditorState, flag, fx_on, has_lfo, index_of, lfo_wave, loop_length, number, shown_value, text_of};
+use super::values::{
+    EditorState, flag, fx_on, has_lfo, index_of, lfo_wave_choice, loop_length, number, select_choice, text_of,
+};
 use super::{Choice, ComposeView, TrackView};
 use crate::control::{Format, Spec};
 use crate::panel::{Id, Item, Kind, LfoParam, Rect, dim, label_width};
 use crate::scale::Scale;
 use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
-use ordrumbox_core::json::Value;
 use ordrumbox_core::{Track, num};
 use ordrumbox_engine::strip_settings::delay_beats_used;
 use ordrumbox_logic::generate;
@@ -83,18 +84,17 @@ pub(super) fn fx_strip(rows: &mut Rows, view: &TrackView, state: &EditorState, i
 /// The choice of the effect setting `key` (a select of fixed options).
 fn fx_choice(view: &TrackView, state: &EditorState, key: &str) -> Choice {
     let track = view.track;
-    let (values, mut labels) = track_select_options(key);
-    let selected = index_of(&values, &shown_value(track, key, state));
+    let mut choice = select_choice(track, key, state);
     if key == "delayBeats" {
         // Too long a delay plays at fewer beats: shown on the choice.
         let used = delay_beats_used(track.delay_beats, view.bpm);
         if used != track.delay_beats
-            && let Some(label) = labels.get_mut(selected)
+            && let Some(label) = choice.labels.get_mut(choice.selected)
         {
             *label = format!("{label} ({} used)", num::text(used));
         }
     }
-    Choice { values, labels, selected }
+    choice
 }
 
 /// Pixels between two effect strips (at scale 1).
@@ -186,14 +186,11 @@ pub(super) const LFO_SLOTS: i32 = 4;
 pub(super) fn lfo_strip(rows: &mut Rows, track: &Track, i: u8, target: &LfoTarget) {
     let s = rows.scale;
     let lfo = track.field(target.lfo_key).and_then(|v| v.as_object().cloned());
-    let get = |key: &str, fallback: f64| {
-        lfo.as_ref().map_or(fallback, |o| o.get(key).and_then(Value::as_f64).unwrap_or(f64::NAN))
-    };
+    // Off: the target's own defaults; on: what the LFO plays.
+    let get = |key: &str, fallback: f64| lfo.as_ref().map_or(fallback, |o| ordrumbox_core::lfo::setting(o, key));
     let on = lfo.is_some();
     let line = strip_cartridge(rows, (Id::LfoPower(i), on), target.label);
-    let values: Vec<String> = WAVE_TYPES.iter().map(|w| (*w).to_owned()).collect();
-    let selected = index_of(&values, &lfo_wave(track, target));
-    let choice = Choice { values, labels: Vec::new(), selected };
+    let choice = lfo_wave_choice(track, target);
     rows.screen_arrows(line, (Id::LfoType(i), choice.screen(on)), |step| Id::LfoTypeStep(i, step));
 
     // The knobs right of the label column; min and max: the target's range,

@@ -22,48 +22,73 @@ pub const TAB_LFO: u8 = 2;
 pub const TAB_LOOP: u8 = 3;
 
 /// An effect: the setting its on / off button reads and writes, its name,
-/// its controls, and the value its button turns it on at.
+/// its controls, its type, and the value its button turns it on at.
+#[derive(Debug)]
 pub struct FxDef {
     pub key: &'static str,
     pub label: &'static str,
     pub controls: &'static [&'static str],
+    /// The setting of the effect's type, shown on its cartridge's screen
+    /// (the filter's is the one its LED reads).
+    pub fx_type: Option<FxType>,
     pub on_value: f64,
 }
 
+/// An effect's type: its setting, and the type its LED turns it on at when
+/// it has none (`none`, or the filter's `allpass`, which its list does not
+/// offer: the LED switches the effect, not its type).
+#[derive(Debug, Clone, Copy)]
+pub struct FxType {
+    pub key: &'static str,
+    pub default: &'static str,
+}
+
 impl FxDef {
-    /// The setting of the effect's type, shown on its cartridge's screen
-    /// (the filter's is the one its LED reads).
+    /// The setting of the effect's type.
     #[must_use]
     pub fn type_key(&self) -> Option<&'static str> {
-        self.controls.iter().copied().find(|key| key.ends_with("Type"))
+        self.fx_type.map(|t| t.key)
+    }
+
+    /// The filter: on when its type is not the allpass bypass.
+    #[must_use]
+    pub fn is_filter(&self) -> bool {
+        self.key == "filterType"
     }
 }
 
-/// The type an effect's LED turns it on at when it has none (`none`, or the
-/// filter's `allpass`, which its list does not offer: the LED switches the
-/// effect, not its type).
+/// Effect `i` of [`FX_DEFS`] (a widget's index).
 #[must_use]
-pub fn fx_type_default(key: &str) -> Option<&'static str> {
-    match key {
-        "reverbType" => Some("room"),
-        "delayType" => Some("tape"),
-        "filterType" => Some("lowpass"),
-        _ => None,
-    }
+pub fn fx_def(i: u8) -> Option<&'static FxDef> {
+    FX_DEFS.get(usize::from(i))
 }
 
-pub const FX_DEFS: [FxDef; 6] = [
-    FxDef { key: "reverbMix", label: "Reverb", controls: &["reverbMix", "reverbType"], on_value: 0.5 },
+/// The effect whose type is setting `key`.
+#[must_use]
+pub fn fx_of_type(key: &str) -> Option<&'static FxDef> {
+    FX_DEFS.iter().find(|fx| fx.type_key() == Some(key))
+}
+
+pub static FX_DEFS: [FxDef; 6] = [
+    FxDef {
+        key: "reverbMix",
+        label: "Reverb",
+        controls: &["reverbMix", "reverbType"],
+        fx_type: Some(FxType { key: "reverbType", default: "room" }),
+        on_value: 0.5,
+    },
     FxDef {
         key: "delayMix",
         label: "Delay",
         controls: &["delayMix", "delayBeats", "delayFeedback", "delayType"],
+        fx_type: Some(FxType { key: "delayType", default: "tape" }),
         on_value: 0.5,
     },
     FxDef {
         key: "saturationMix",
         label: "Saturation",
         controls: &["saturationMix", "saturationType", "bitcrush", "hardClip"],
+        fx_type: Some(FxType { key: "saturationType", default: "soft" }),
         on_value: 0.5,
     },
     // On at full mix: a plain compressor; less mixes it in parallel.
@@ -71,6 +96,7 @@ pub const FX_DEFS: [FxDef; 6] = [
         key: "compMix",
         label: "Compressor",
         controls: &["compMix", "compThresholdDb", "compRatio", "compAttackMs", "compReleaseMs"],
+        fx_type: None,
         on_value: 1.0,
     },
     // Another track's sound ducks this one's volume and keys its compressor.
@@ -78,6 +104,7 @@ pub const FX_DEFS: [FxDef; 6] = [
         key: "duckAmount",
         label: "Sidechain",
         controls: &["duckAmount", "duckReleaseMs", "sidechainSource"],
+        fx_type: None,
         on_value: 0.5,
     },
     // The filter is on when its type is not the allpass bypass.
@@ -85,6 +112,7 @@ pub const FX_DEFS: [FxDef; 6] = [
         key: "filterType",
         label: "Filter",
         controls: &["filterType", "filterSlope", "filterCutoff", "filterQ"],
+        fx_type: Some(FxType { key: "filterType", default: "lowpass" }),
         on_value: 0.0,
     },
 ];
@@ -106,9 +134,6 @@ pub(super) const FILTER_SLOPE_LABELS: [&str; 2] = ["12 dB", "24 dB"];
 
 /// Selects of a track setting whose values are numbers (written as numbers).
 pub const NUMERIC_SELECTS: [&str; 2] = ["delayBeats", "filterSlope"];
-
-/// LFO waveforms (`WAVE_TYPES`).
-pub const WAVE_TYPES: [&str; 5] = ["sine", "triangle", "sawtooth", "square", "random"];
 
 /// What a select of a track setting offers: values and labels.
 pub fn track_select_options(key: &str) -> (Vec<String>, Vec<String>) {
@@ -136,6 +161,7 @@ pub fn track_select_options(key: &str) -> (Vec<String>, Vec<String>) {
 
 /// A target of the modulation tab: the setting, its label, its LFO's key,
 /// its range and step.
+#[derive(Debug)]
 pub struct LfoTarget {
     pub key: &'static str,
     pub label: &'static str,
@@ -146,7 +172,13 @@ pub struct LfoTarget {
 }
 
 /// The settings that take an LFO, in the JS order (track props, then the knob bar's).
-pub const LFO_TARGETS: [LfoTarget; 5] = [
+/// Target `i` of [`LFO_TARGETS`] (a widget's index).
+#[must_use]
+pub fn lfo_target(i: u8) -> Option<&'static LfoTarget> {
+    LFO_TARGETS.get(usize::from(i))
+}
+
+pub static LFO_TARGETS: [LfoTarget; 5] = [
     LfoTarget { key: "filterCutoff", label: "Cutoff", lfo_key: "filterCutoffLfo", min: 20.0, max: 20_000.0, step: 1.0 },
     LfoTarget { key: "filterQ", label: "Q", lfo_key: "filterQLfo", min: 0.707, max: 18.707, step: 0.01 },
     LfoTarget { key: "volume", label: "Volume", lfo_key: "volumeLfo", min: 0.0, max: 1.0, step: 0.01 },

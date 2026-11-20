@@ -72,13 +72,34 @@ fn an_effect_s_arrows_step_through_its_types() {
         let track = &s.pattern().unwrap().tracks[0];
         (track.reverb_type.clone(), track.reverb_mix)
     };
-    // A new track's reverb has no type: its screen shows the one its LED turns on.
+    // A new track's reverb has no type: its screen shows the one its LED
+    // turns on; an arrow turns it on at the next type, as the filter's and an LFO's do.
     assert_eq!(reverb(&s), ("none".into(), 0.0));
     s.activate(Id::TrackSelectStep("reverbType", Step::Next));
-    assert_eq!(reverb(&s), ("hall".into(), 0.0));
+    assert_eq!(reverb(&s), ("hall".into(), 0.5));
     s.activate(Id::TrackSelectStep("reverbType", Step::Previous));
     s.activate(Id::TrackSelectStep("reverbType", Step::Previous));
     assert_eq!(reverb(&s).0, "gated", "from the first type, the previous is the last");
+    // Off, a type chosen turns it back on at its amount.
+    s.activate(Id::FxPower(0));
+    assert_eq!(reverb(&s), ("gated".into(), 0.0));
+    s.select(Id::TrackSelect("reverbType"), "plate");
+    assert_eq!(reverb(&s), ("plate".into(), 0.5));
+}
+
+#[test]
+fn a_type_turns_on_an_effect_with_an_amount_but_no_type() {
+    let mut s = session();
+    let p = s.pattern_index;
+    let updates = [("delayMix", json::Value::from(0.25)), ("delayType", json::Value::from("none"))];
+    assert!(s.editor.update_track(p, 0, &updates, None, false));
+    let delay = |s: &Session| {
+        let track = &s.pattern().unwrap().tracks[0];
+        (track.delay_type.clone(), track.delay_mix)
+    };
+    assert_eq!(delay(&s), ("none".into(), 0.25));
+    s.activate(Id::TrackSelectStep("delayType", Step::Next));
+    assert_eq!(delay(&s), ("pingpong".into(), 0.25), "the screen showed tape; its amount is kept");
 }
 
 #[test]

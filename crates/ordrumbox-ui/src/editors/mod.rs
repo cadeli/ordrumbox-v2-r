@@ -6,7 +6,7 @@
 
 use ordrumbox_core::{Note, Track};
 
-use crate::panel::Kind;
+use crate::panel::{Kind, Step};
 pub use crate::sample_overlay::{Overlay, Shape};
 
 // ─── Views ───────────────────────────────────────────────────────────────────
@@ -36,6 +36,13 @@ impl Choice {
     /// The same choice on a one-line screen, lit or dimmed.
     pub fn screen(&self, lit: bool) -> Kind {
         Kind::Screen { values: self.values.clone(), labels: self.shown_labels(), selected: self.selected, lit }
+    }
+
+    /// The value an arrow steps to from the one shown (`None` when empty).
+    #[must_use]
+    pub fn stepped(&self, step: Step) -> Option<&str> {
+        let at = step.target_index(self.selected, self.values.len())?;
+        self.values.get(at).map(String::as_str)
     }
 
     /// The labels shown: the values when there are none.

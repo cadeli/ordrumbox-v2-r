@@ -1,7 +1,8 @@
 //! The editors' cartridges: the Sound tab's synth (its LED plays the
 //! track's synth preset or its sample, its screen and its arrows choose the
-//! preset), an effect's LED and the arrows of its type, of an LFO's wave,
-//! of an arpeggio's scale and direction.
+//! preset), an effect's LED and its type, and the arrows of every screen
+//! (a preset, an effect's type, an LFO's wave, an arpeggio's scale and
+//! direction).
 
 use super::Session;
 use super::session_panel::{filter_on, number};
@@ -44,74 +45,73 @@ impl Session {
         let choice = self.synth_choice(track);
         match choice.values.get(choice.selected).cloned() {
             Some(key) => self.assign_synth(t, &key),
-            None => self.message = "No synth presets loaded.".into(),
+            None => self.message = NO_SYNTH_PRESETS.into(),
         }
     }
 
-    /// The synth cartridge's arrows: the preset before or after the one shown.
-    pub(super) fn step_synth(&mut self, t: usize, step: Step) {
-        let Some(track) = self.track(t) else { return };
-        let choice = self.synth_choice(track);
-        let key = step.from(choice.selected, choice.values.len()).and_then(|i| choice.values.get(i)).cloned();
-        match key {
-            Some(key) => self.pick_synth(t, &key),
-            None => self.message = "No synth presets loaded.".into(),
+    /// A screen's arrows: the value before or after the one screen `id`
+    /// shows, set as its list sets it (`Id::Synth`, `Id::LfoType`,
+    /// `Id::TrackSelect`, `Id::NoteSelect`).
+    pub(super) fn step_screen(&mut self, t: usize, id: Id, step: Step) {
+        let Some(choice) = self.screen_choice(t, id) else { return };
+        match choice.stepped(step) {
+            Some(value) => self.select(id, value),
+            None if id == Id::Synth => self.message = NO_SYNTH_PRESETS.into(),
+            None => self.message = "Nothing to choose from.".into(),
         }
     }
 
-    /// An LFO cartridge's arrows: the wave before or after the one shown, set
-    /// as its screen's list sets it (an LFO off goes on at it).
-    pub(super) fn step_lfo_wave(&mut self, t: usize, i: u8, step: Step) {
-        let Some(track) = self.track(t) else { return };
-        let target = &editors::LFO_TARGETS[usize::from(i).min(editors::LFO_TARGETS.len() - 1)];
-        let waves = editors::WAVE_TYPES;
-        let at = waves.iter().position(|w| *w == editors::lfo_wave(track, target)).unwrap_or(0);
-        if let Some(wave) = step.from(at, waves.len()).and_then(|i| waves.get(i)) {
-            self.select(Id::LfoType(i), wave);
-        }
-    }
-
-    /// The arrows of an arpeggio's scale or direction screen: the one before or
-    /// after the one shown, set as its list sets it.
-    pub(super) fn step_note_select(&mut self, t: usize, key: &'static str, step: Step) {
-        let view = self.note_view(t);
-        let choice = if key == "arpScale" { view.scales } else { view.arp_direction };
-        if let Some(value) = step.from(choice.selected, choice.values.len()).and_then(|i| choice.values.get(i)) {
-            self.select(Id::NoteSelect(key), value);
-        }
-    }
-
-    /// An effect cartridge's arrows: the type before or after the one shown,
-    /// set as its screen's list sets it.
-    pub(super) fn step_track_select(&mut self, t: usize, key: &'static str, step: Step) {
-        let Some(track) = self.track(t) else { return };
-        let values = editors::track_select_options(key).0;
-        let at = editors::index_of(&values, &editors::shown_value(track, key, &self.editors));
-        if let Some(value) = step.from(at, values.len()).and_then(|i| values.get(i)).cloned() {
-            self.select(Id::TrackSelect(key), &value);
+    /// What screen `id` shows on track `t`; `None` when it is no screen.
+    fn screen_choice(&self, t: usize, id: Id) -> Option<editors::Choice> {
+        let track = self.track(t)?;
+        match id {
+            Id::Synth => Some(self.synth_choice(track)),
+            Id::LfoType(i) => editors::lfo_target(i).map(|target| editors::lfo_wave_choice(track, target)),
+            Id::TrackSelect(key) => Some(editors::select_choice(track, key, &self.editors)),
+            Id::NoteSelect(key) => {
+                let view = self.note_view(t);
+                Some(if key == "arpScale" { view.scales } else { view.arp_direction })
+            }
+            _ => None,
         }
     }
 }
 
+/// Why the synth cartridge has nothing to play.
+const NO_SYNTH_PRESETS: &str = "No synth presets loaded.";
+
 /// What an effect's LED writes: off, its amount at 0 (the filter, its
-/// bypass); on, its amount back (`on_value` when it had none) and, when it
-/// had none, the type it shows.
-pub(super) fn fx_switch(track: &Track, fx: &FxDef, state: &EditorState) -> Vec<(&'static str, Value)> {
-    let is_filter = fx.key == "filterType";
+/// bypass, its type kept in `state` for the way back); on, the type it shows
+/// when it has none, else its amount at `on_value`.
+pub(super) fn fx_switch(track: &Track, fx: &FxDef, state: &mut EditorState) -> Vec<(&'static str, Value)> {
     if editors::fx_on(track, fx) {
-        let off = if is_filter { Value::String("allpass".into()) } else { number(0.0) };
-        return vec![(fx.key, off)];
+        if fx.is_filter() {
+            state.prev_filter_type = Some(track.filter_type.clone());
+            return vec![(fx.key, Value::String("allpass".into()))];
+        }
+        return vec![(fx.key, number(0.0))];
     }
-    if is_filter {
-        return filter_on(track, editors::shown_value(track, fx.key, state));
-    }
-    let amount = editors::number(track, fx.key);
-    let mut updates = vec![(fx.key, number(if amount > 0.0 { amount } else { fx.on_value }))];
     if let Some(key) = fx.type_key() {
         let shown = editors::shown_value(track, key, state);
-        if shown != editors::text_of(track, key) {
-            updates.push((key, Value::String(shown)));
+        if fx.is_filter() || shown != editors::text_of(track, key) {
+            return fx_type_updates(track, fx, &shown);
         }
+    }
+    vec![(fx.key, number(fx.on_value))]
+}
+
+/// What choosing type `value` of effect `fx` writes: the type and, for a
+/// type its list offers, the effect on (the filter out of its bypass, an
+/// effect without an amount at its `on_value`), as an LFO goes on at a wave.
+pub(super) fn fx_type_updates(track: &Track, fx: &FxDef, value: &str) -> Vec<(&'static str, Value)> {
+    if fx.is_filter() {
+        return filter_on(track, value.to_owned());
+    }
+    let Some(key) = fx.type_key() else { return Vec::new() };
+    let mut updates = vec![(key, Value::String(value.to_owned()))];
+    let offered = editors::track_select_options(key).0.iter().any(|v| v == value);
+    if offered && editors::number(track, fx.key) <= 0.0 {
+        updates.push((fx.key, number(fx.on_value)));
     }
     updates
 }

@@ -7,9 +7,10 @@ use ordrumbox_core::SetField;
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_engine::assign::synth_for;
 
-use super::session_panel::{NoteTarget, filter_on, history_label, number};
+use super::session_cartridge::{fx_switch, fx_type_updates};
+use super::session_panel::{NoteTarget, history_label, number};
 use super::{Session, session_grid};
-use crate::editors::{self, FX_DEFS, KNOB_BAR, LFO_TARGETS, STYLE_DEFAULT};
+use crate::editors::{self, KNOB_BAR, STYLE_DEFAULT};
 use crate::kits::Field;
 use crate::menu::Command;
 use crate::panel::{Dropdown, Id, LfoParam};
@@ -129,7 +130,7 @@ impl Session {
         self.track(t).map_or_else(String::new, |tr| tr.name.clone())
     }
 
-    /// `cmd.updateTrack` on the edited track; a step of history.
+    /// Settings of track `t` updated, one step of history named `desc`.
     pub(super) fn update_track(&mut self, t: usize, updates: &[(&str, Value)], desc: &str, coalesce: bool) {
         if self.editor.update_track(self.pattern_index, t, updates, Some(desc), coalesce) {
             self.edited();
@@ -200,7 +201,7 @@ impl Session {
         }
     }
 
-    /// `onLoopSlider`.
+    /// A loop setting of track `t` set to `value` (the loop length held to the track's length).
     fn loop_slider(&mut self, t: usize, key: &'static str, value: f64) {
         let Some(track) = self.track(t) else { return };
         let desc = format!("{} on {}", history_label(Id::Loop(key)), track.name);
@@ -216,9 +217,9 @@ impl Session {
         }
     }
 
-    /// The LFO object of target `i` (a default one first).
-    fn lfo_object(&self, t: usize, i: u8, kind: &str) -> (Object, &'static str, bool) {
-        let target = &LFO_TARGETS[usize::from(i).min(LFO_TARGETS.len() - 1)];
+    /// The LFO object of target `i` (a default one first); `None` for no target.
+    fn lfo_object(&self, t: usize, i: u8, kind: &str) -> Option<(Object, &'static editors::LfoTarget, bool)> {
+        let target = editors::lfo_target(i)?;
         let current = self.track(t).and_then(|tr| tr.field(target.lfo_key)).and_then(|v| v.as_object().cloned());
         let created = current.is_none();
         let object = current.unwrap_or_else(|| {
@@ -230,14 +231,14 @@ impl Session {
             o.insert("phase", number(0.0));
             o
         });
-        (object, target.lfo_key, created)
+        Some((object, target, created))
     }
 
     fn lfo_value(&mut self, t: usize, i: u8, param: LfoParam, value: f64) {
-        let (mut object, lfo_key, _) = self.lfo_object(t, i, "sine");
+        let Some((mut object, target, _)) = self.lfo_object(t, i, "sine") else { return };
         object.insert(param.key(), number(value));
         let desc = format!("LFO {} on {}", param.key(), self.track_name(t));
-        self.update_track(t, &[(lfo_key, Value::Object(object))], &desc, true);
+        self.update_track(t, &[(target.lfo_key, Value::Object(object))], &desc, true);
     }
 
     fn note_value(&mut self, t: usize, key: &'static str, value: f64) {
@@ -414,23 +415,23 @@ impl Session {
         let Some(t) = self.editor_track() else { return };
         let name = self.track_name(t);
         match id {
-            Id::TrackSelect("filterType") => {
-                let Some(track) = self.track(t) else { return };
-                let updates = filter_on(track, value.to_owned());
-                self.update_track(t, &updates, &format!("Filter type on {name}"), false);
-            }
             Id::TrackSelect(key) => {
-                let v = if editors::NUMERIC_SELECTS.contains(&key) {
-                    Value::from(value).to_number().map_or_else(|| Value::from(value), number)
-                } else {
-                    Value::String(value.to_owned())
+                // An effect's type turns the effect on, as a wave turns its LFO on.
+                let Some(track) = self.track(t) else { return };
+                let updates = match editors::fx_of_type(key) {
+                    Some(fx) => fx_type_updates(track, fx, value),
+                    None if editors::NUMERIC_SELECTS.contains(&key) => {
+                        vec![(key, Value::from(value).to_number().map_or_else(|| Value::from(value), number))]
+                    }
+                    None => vec![(key, Value::String(value.to_owned()))],
                 };
-                self.update_track(t, &[(key, v)], &format!("{} on {name}", history_label(id)), false);
+                self.update_track(t, &updates, &format!("{} on {name}", history_label(id)), false);
             }
             Id::LfoType(i) => {
-                let (mut object, lfo_key, _) = self.lfo_object(t, i, value);
+                let Some((mut object, target, _)) = self.lfo_object(t, i, value) else { return };
                 object.insert("type", Value::String(value.to_owned()));
-                self.update_track(t, &[(lfo_key, Value::Object(object))], &format!("LFO type on {name}"), false);
+                let updates = [(target.lfo_key, Value::Object(object))];
+                self.update_track(t, &updates, &format!("LFO type on {name}"), false);
             }
             Id::Instrument => {
                 // The instrument's first sample (the current kit's first).
@@ -513,29 +514,24 @@ impl Session {
         match id {
             Id::Regenerate => self.regenerate_track(t),
             Id::FxPower(i) => {
-                // `toggleFxByKey`.
-                let fx = &FX_DEFS[usize::from(i).min(FX_DEFS.len() - 1)];
-                if fx.key == "filterType" && editors::fx_on(&track, fx) {
-                    self.editors.prev_filter_type = Some(track.filter_type.clone());
-                }
-                let updates = super::session_cartridge::fx_switch(&track, fx, &self.editors);
+                let Some(fx) = editors::fx_def(i) else { return };
+                let updates = fx_switch(&track, fx, &mut self.editors);
                 self.update_track(t, &updates, &format!("Toggle {} on {name}", fx.label), false);
             }
             Id::LfoPower(i) => {
-                let (object, lfo_key, created) = self.lfo_object(t, i, "sine");
-                let target = &LFO_TARGETS[usize::from(i).min(LFO_TARGETS.len() - 1)];
+                let Some((object, target, created)) = self.lfo_object(t, i, "sine") else { return };
                 let value = if created { Value::Object(object) } else { Value::Null };
-                self.update_track(t, &[(lfo_key, value)], &format!("LFO {} on {name}", target.label), false);
+                self.update_track(t, &[(target.lfo_key, value)], &format!("LFO {} on {name}", target.label), false);
             }
             Id::Toggle(key) => {
                 let on = track.field(key).and_then(|v| v.as_bool()).unwrap_or(false);
                 self.update_track(t, &[(key, Value::Bool(!on))], &format!("{} on {name}", history_label(id)), false);
             }
             Id::SynthOn => self.toggle_synth_on(t),
-            Id::SynthStep(step) => self.step_synth(t, step),
-            Id::TrackSelectStep(key, step) => self.step_track_select(t, key, step),
-            Id::LfoTypeStep(i, step) => self.step_lfo_wave(t, i, step),
-            Id::NoteSelectStep(key, step) => self.step_note_select(t, key, step),
+            Id::SynthStep(step) => self.step_screen(t, Id::Synth, step),
+            Id::TrackSelectStep(key, step) => self.step_screen(t, Id::TrackSelect(key), step),
+            Id::LfoTypeStep(i, step) => self.step_screen(t, Id::LfoType(i), step),
+            Id::NoteSelectStep(key, step) => self.step_screen(t, Id::NoteSelect(key), step),
             Id::AutoAssign => {
                 // `toggleAuto`: back on, the synth goes and the sample is picked by name.
                 let on = !track.auto_assign;
