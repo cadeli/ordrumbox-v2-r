@@ -4,7 +4,7 @@
 use super::layout::{ADD_TRACK_LABEL, Layout, RULER_HEIGHT, steps_per_beat};
 use super::{
     ACCENT, AUTO, CURSOR, LABEL_CHARS, LOOP_MARK, MUTE_ON, PAGE_STEPS_PER_BEAT, PLAYHEAD, PLAYING, SELECTED, SOLO_ON,
-    View, background_color, box_off_color, cell_beat_color, cell_color, focus_row_color, mute_host_color,
+    VOLUME_WIDTH, View, background_color, box_off_color, cell_beat_color, cell_color, focus_row_color, mute_host_color,
 };
 use crate::canvas::{Canvas, Rgb, small_cell, small_char_width, text_width};
 use crate::panel::{Rect, stroke};
@@ -105,6 +105,7 @@ fn draw_track_row(canvas: &mut Canvas, track: &Track, i: usize, view: &View, lay
         canvas.fill_rect(band.x, band.y, band.w, band.h, focus_row_color());
     }
     draw_vu_stripe(canvas, i, y, view, layout);
+    draw_host_marks(canvas, i, y, view, layout);
     let mute = draw_mute_solo(canvas, track, i, y, view, layout);
     let color = if mute {
         theme::muted()
@@ -135,6 +136,21 @@ fn draw_vu_stripe(canvas: &mut Canvas, i: usize, y: i32, view: &View, layout: &L
     let fill_h = (f64::from(stripe_h) * f64::from(level)).round() as i32;
     if fill_h > 0 {
         canvas.fill_rect(stripe_x, stripe_top + stripe_h - fill_h, stripe_w, fill_h, theme::track(i));
+    }
+}
+
+/// What a plugin host does to row `i`, in the gap right of its volume slider:
+/// a stripe when it moves the track's settings, a square at its top when it
+/// plays the track on an output of its own. Nothing is drawn otherwise.
+fn draw_host_marks(canvas: &mut Canvas, i: usize, y: i32, view: &View, layout: &Layout) {
+    let gap = layout.scale.px();
+    let x = layout.volume_x + VOLUME_WIDTH * layout.scale + 3 * layout.scale;
+    let (width, top, height) = (3 * layout.scale, y + gap, layout.row - 3 * gap);
+    if ordrumbox_engine::host_muted(view.host_moved, i) {
+        canvas.fill_rect(x, top, width, height, theme::ACCENT);
+    }
+    if ordrumbox_engine::host_muted(view.host_split, i) {
+        canvas.fill_rect(x, top, width, width, theme::VALUE);
     }
 }
 

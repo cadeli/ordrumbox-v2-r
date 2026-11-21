@@ -113,7 +113,7 @@ impl Player {
 
     /// One step of the UI side: the host's pattern and kit applied when
     /// they changed (or when a refused one can be), then its MIDI program
-    /// change, its mutes and its transport shown, its swing applied, the
+    /// change, its mutes, the tracks it moves and its transport shown, its swing applied, the
     /// controller fed, the names the host shows updated, the library saved
     /// into the project when it changed.
     pub fn tick(&mut self, state: &LibraryState, host: HostControls, names: &Names) {
@@ -141,6 +141,7 @@ impl Player {
             self.redraw = true;
         }
         self.redraw |= session.set_host_muted(host.muted);
+        self.redraw |= session.set_host_tracks(host.moved, host.split);
         session.set_host_swing(host.swing);
         session.update();
         self.redraw |= session.watch_host();
@@ -278,8 +279,16 @@ mod tests {
     use super::*;
     use crate::state::LibraryText;
 
-    const FIRST: HostControls =
-        HostControls { program: None, now: false, pattern: 0, kit: 0, muted: 0, swing: STRAIGHT_SWING };
+    const FIRST: HostControls = HostControls {
+        program: None,
+        now: false,
+        pattern: 0,
+        kit: 0,
+        muted: 0,
+        moved: 0,
+        split: 0,
+        swing: STRAIGHT_SWING,
+    };
 
     fn audio(started: Started) -> Box<AudioSide> {
         match started {
@@ -460,6 +469,22 @@ mod tests {
         assert!(player.take_redraw());
         player.tick(&state, HostControls { muted: 0b1, ..FIRST }, &Names::default());
         assert!(!player.take_redraw());
+    }
+
+    #[test]
+    fn host_moved_and_split_tracks_are_marked() {
+        let state = Arc::new(LibraryState::default());
+        let mut player = Player::default();
+        let _audio = audio(player.start(48_000.0, &state));
+        player.tick(&state, FIRST, &Names::default());
+        player.take_redraw();
+        let marked = HostControls { moved: 0b10, split: 0b1, ..FIRST };
+        player.tick(&state, marked, &Names::default());
+        assert!(player.take_redraw());
+        player.tick(&state, marked, &Names::default());
+        assert!(!player.take_redraw());
+        player.tick(&state, FIRST, &Names::default());
+        assert!(player.take_redraw(), "marks go when the host moves nothing");
     }
 
     #[test]

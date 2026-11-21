@@ -243,6 +243,8 @@ impl OrdrumboxParams {
             pattern: choice_index(&self.pattern),
             kit: choice_index(&self.kit),
             muted: self.muted_tracks(),
+            moved: self.mix().moved_tracks(),
+            split: self.track_mask(|track| track.output.value()),
             swing: f64::from(self.swing.value()),
         }
     }
@@ -289,6 +291,10 @@ pub struct HostControls {
     pub kit: usize,
     /// The tracks muted, bit `t` for track `t`.
     pub muted: u64,
+    /// The tracks whose settings the host moves off their defaults, bit `t` for track `t`.
+    pub moved: u64,
+    /// The tracks the host leaves the mix for an output of their own, bit `t` for track `t`.
+    pub split: u64,
     /// Where the second step of each pair starts ([`STRAIGHT_SWING`]: straight).
     pub swing: f64,
 }
@@ -432,7 +438,16 @@ mod tests {
     #[test]
     fn the_defaults_choose_the_first_pattern_and_kit_and_change_nothing() {
         let params = OrdrumboxParams::default();
-        let controls = HostControls { program: None, now: false, pattern: 0, kit: 0, muted: 0, swing: STRAIGHT_SWING };
+        let controls = HostControls {
+            program: None,
+            now: false,
+            pattern: 0,
+            kit: 0,
+            muted: 0,
+            moved: 0,
+            split: 0,
+            swing: STRAIGHT_SWING,
+        };
         assert_eq!(params.controls(), controls);
         assert_eq!(params.muted_tracks(), 0);
         assert_eq!(params.mix(), HostMix::default());

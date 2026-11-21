@@ -12,6 +12,10 @@ pub(super) struct Host {
     pub(super) hosted: bool,
     /// The tracks the host mutes, bit `t` for track `t`.
     pub(super) muted: u64,
+    /// The tracks whose settings the host moves, bit `t` for track `t`.
+    pub(super) moved: u64,
+    /// The tracks the host plays on an output of their own, bit `t` for track `t`.
+    pub(super) split: u64,
     /// The host's tempo last said to be outside the tempo bounds
     /// (`report_host_tempo`), so the message is given once.
     tempo_outside: Option<f64>,
@@ -40,6 +44,14 @@ impl Session {
     /// mute boxes; true when they changed.
     pub fn set_host_muted(&mut self, muted: u64) -> bool {
         std::mem::replace(&mut self.host.muted, muted) != muted
+    }
+
+    /// The tracks a plugin host moves off their settings, and those it plays
+    /// on an output of their own, marked in their rows; true when they changed.
+    pub fn set_host_tracks(&mut self, moved: u64, split: u64) -> bool {
+        let before = (self.host.moved, self.host.split);
+        (self.host.moved, self.host.split) = (moved, split);
+        before != (moved, split)
     }
 
     /// Take what the plugin host's transport does now, for the header:

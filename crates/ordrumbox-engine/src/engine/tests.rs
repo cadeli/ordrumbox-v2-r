@@ -396,6 +396,14 @@ fn a_note_struck_again_ends_first_and_a_muted_track_sends_none() {
     assert_eq!(notes(&mut engine, 0, 128), [(3, 36, Some(1.0)), (50, 36, None), (50, 36, Some(1.0))]);
 
     let mut muted = self::engine();
+    assert_eq!(
+        HostMix { muted: 0b1, split: 0b1, ..HostMix::default() }.moved_tracks(),
+        0,
+        "mute and output are not moves"
+    );
+    let mut moved = HostMix::default();
+    moved.tracks[2].pan = 0.5;
+    assert_eq!(moved.moved_tracks(), 0b100);
     muted.set_host_mix(HostMix { muted: 0b1, ..HostMix::default() });
     muted.play(played);
     render(&mut muted, 128);

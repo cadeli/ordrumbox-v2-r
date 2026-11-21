@@ -103,6 +103,10 @@ to 0.95; a slap delay keeps its single echo) and **Transpose** (±24 semitones o
 MIDI input included, not on the MIDI notes sent out). At their defaults they change
 nothing. A filter of type `allpass`, and a reverb or delay of type `none`, stay off.
 They change what plays, not the library.
+In the grid, a track's row shows what the host does to it, right of its volume slider: a
+stripe when the host moves any of the track's settings away from their defaults, and a square
+at the top of it when the track plays on its own output. A mute from the host lights the
+track's **M** box, dimmed.
 
 The plugin has 17 stereo outputs: **Mix**, and **Track 1** to **Track 16**. Every track plays
 in the mix until its **Output** parameter is set to *Own*: track 3 then leaves the mix and

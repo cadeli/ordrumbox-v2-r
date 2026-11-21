@@ -133,6 +133,14 @@ impl HostRatios {
 }
 
 impl HostMix {
+    /// The tracks whose settings the host moves off their defaults (not the
+    /// mute, which the window shows on its own): bit `t` for track `t`.
+    #[must_use]
+    pub fn moved_tracks(&self) -> u64 {
+        let default = HostTrack::default();
+        self.tracks.iter().enumerate().fold(0, |mask, (t, track)| mask | u64::from(*track != default) << t)
+    }
+
     /// The volume the strip of `track`, at `volume`, goes to: none when
     /// muted, else scaled by the track's gain.
     #[must_use]
