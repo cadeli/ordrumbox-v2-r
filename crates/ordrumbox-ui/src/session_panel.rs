@@ -241,7 +241,15 @@ impl Session {
         }
         let spec = Spec::slider(0.0, 1.0, 0.01, 1.0);
         for (t, track) in pattern.tracks.iter().enumerate().take(grid.tracks()) {
-            let kind = Kind::Value { spec, value: track.volume, label: None, text: String::new(), lfo: false };
+            // A host that automates the track's volume moves the slider, in the
+            // colour of a modulated value; the track's own volume stays what is saved.
+            let host_gain = self.host.mix.tracks.get(t).map_or(1.0, |host| f64::from(host.gain));
+            let (value, lfo) = if host_gain == 1.0 {
+                (track.volume, false)
+            } else {
+                ((track.volume * host_gain).clamp(spec.min, spec.max), true)
+            };
+            let kind = Kind::Value { spec, value, label: None, text: String::new(), lfo };
             layout.items.push(Item::new(Some(Id::TrackVolume(t)), grid.volume_rect(t), kind));
         }
     }
@@ -810,6 +818,27 @@ mod tests {
         let layout = s.panel_layout(SIZE.0, SIZE.1, SIZE.2);
         strip(s.body(SIZE).output, &layout);
         assert!(layout.right > 0);
+    }
+
+    #[test]
+    fn a_host_gain_moves_the_track_volume_slider() {
+        let slider = |s: &Session| {
+            let layout = s.panel_layout(SIZE.0, SIZE.1, SIZE.2);
+            layout.items.into_iter().find_map(|item| match (item.id, item.kind) {
+                (Some(Id::TrackVolume(0)), Kind::Value { value, lfo, .. }) => Some((value, lfo)),
+                _ => None,
+            })
+        };
+        let mut s = session();
+        let (own, lfo) = slider(&s).expect("the first track has a volume slider");
+        assert!(!lfo);
+        let mut mix = ordrumbox_engine::HostMix::default();
+        mix.tracks[0].gain = 0.5;
+        s.set_host_mix(&mix);
+        assert_eq!(slider(&s), Some((own * 0.5, true)), "the slider follows the host, in the modulated colour");
+        mix.tracks[0].gain = 1.0;
+        s.set_host_mix(&mix);
+        assert_eq!(slider(&s), Some((own, false)));
     }
 
     #[test]

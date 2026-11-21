@@ -106,7 +106,7 @@ impl Session {
             Some(Hit::Mute(t) | Hit::Solo(t) | Hit::Name(t)) => self.track_menu(t, x, y),
             Some(Hit::Cell { track, beat, step }) => self.step_menu(track, beat, step, x, y),
             Some(Hit::AddTrack) => self.add_track_menu(x, y),
-            None => return false,
+            Some(Hit::Host(_)) | None => return false,
         }
         true
     }

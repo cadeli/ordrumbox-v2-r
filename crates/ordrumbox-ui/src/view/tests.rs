@@ -266,6 +266,9 @@ fn hit_testing_matches_the_drawing() {
     assert_eq!(layout.hit(pattern, layout.name_x + 2, y), Some(Hit::Name(2)));
     assert_eq!(layout.hit(pattern, layout.volume_x + 2, y), None);
     assert!(layout.volume_rect(2).contains(layout.volume_x + 2, y));
+    let mark = layout.host_mark_rect(2);
+    assert_eq!(layout.hit(pattern, mark.x + 1, y), Some(Hit::Host(2)));
+    assert_eq!(layout.hit(pattern, mark.x + mark.w, y), Some(Hit::Cell { track: 2, beat: 0, step: 0 }));
     // Track H: 2 steps per beat; the middle of beat 1's second step.
     let x = layout.step_x(3, 2) + 2;
     assert_eq!(layout.hit(pattern, x, y), Some(Hit::Cell { track: 2, beat: 1, step: 1 }));

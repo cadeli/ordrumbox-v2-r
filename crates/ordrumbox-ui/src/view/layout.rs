@@ -21,6 +21,8 @@ pub enum Hit {
         beat: i32,
         step: i32,
     },
+    /// The mark of what a plugin host does to a track, beside its volume slider.
+    Host(usize),
     /// The button under the track list that adds a track.
     AddTrack,
 }
@@ -529,7 +531,7 @@ impl Layout {
         let x = x.clamp(self.grid_left, self.grid_left + self.grid_width - 1);
         match self.hit(pattern, x, y)? {
             Hit::Cell { track, beat, step } => Some((track, beat, step)),
-            Hit::Mute(_) | Hit::Solo(_) | Hit::Name(_) | Hit::AddTrack => None,
+            Hit::Mute(_) | Hit::Solo(_) | Hit::Name(_) | Hit::Host(_) | Hit::AddTrack => None,
         }
     }
 
@@ -582,6 +584,17 @@ impl Layout {
         self.step_x(i64::from(beat), 1)
     }
 
+    /// The left edge of the host's mark: the gap right of the volume slider.
+    pub(super) fn host_mark_x(&self) -> i32 {
+        self.volume_x + VOLUME_WIDTH * self.scale
+    }
+
+    /// The gap right of track `track`'s volume slider, where the mark of what a plugin host does to it goes.
+    #[must_use]
+    pub fn host_mark_rect(&self, track: usize) -> Rect {
+        Rect::new(self.host_mark_x(), self.row_top(track), self.grid_left - self.host_mark_x(), self.row)
+    }
+
     /// What is at `(x, y)`.
     pub fn hit(&self, pattern: &Pattern, x: i32, y: i32) -> Option<Hit> {
         if y < self.top || x < self.left {
@@ -603,6 +616,9 @@ impl Layout {
             return Some(Hit::Solo(track));
         }
         if x < self.grid_left {
+            if x >= self.host_mark_x() {
+                return Some(Hit::Host(track));
+            }
             return (x >= self.name_x && x < self.volume_x).then_some(Hit::Name(track));
         }
         let spb = steps_per_beat(&pattern.tracks[track]);

@@ -4,7 +4,7 @@
 use super::layout::{ADD_TRACK_LABEL, Layout, RULER_HEIGHT, steps_per_beat};
 use super::{
     ACCENT, AUTO, CURSOR, LABEL_CHARS, LOOP_MARK, MUTE_ON, PAGE_STEPS_PER_BEAT, PLAYHEAD, PLAYING, SELECTED, SOLO_ON,
-    VOLUME_WIDTH, View, background_color, box_off_color, cell_beat_color, cell_color, focus_row_color, mute_host_color,
+    View, background_color, box_off_color, cell_beat_color, cell_color, focus_row_color, mute_host_color,
 };
 use crate::canvas::{Canvas, Rgb, small_cell, small_char_width, text_width};
 use crate::panel::{Rect, stroke};
@@ -144,7 +144,7 @@ fn draw_vu_stripe(canvas: &mut Canvas, i: usize, y: i32, view: &View, layout: &L
 /// plays the track on an output of its own. Nothing is drawn otherwise.
 fn draw_host_marks(canvas: &mut Canvas, i: usize, y: i32, view: &View, layout: &Layout) {
     let gap = layout.scale.px();
-    let x = layout.volume_x + VOLUME_WIDTH * layout.scale + 3 * layout.scale;
+    let x = layout.host_mark_x() + 3 * layout.scale;
     let (width, top, height) = (3 * layout.scale, y + gap, layout.row - 3 * gap);
     if ordrumbox_engine::host_muted(view.host_moved, i) {
         canvas.fill_rect(x, top, width, height, theme::ACCENT);

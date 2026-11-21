@@ -105,7 +105,7 @@ nothing. A filter of type `allpass`, and a reverb or delay of type `none`, stay 
 They change what plays, not the library.
 In the grid, a track's row shows what the host does to it, right of its volume slider: a
 stripe when the host moves any of the track's settings away from their defaults, and a square
-at the top of it when the track plays on its own output. A mute from the host lights the
+at the top of it when the track plays on its own output. Hover the mark for what the host does to the track, setting by setting. A host that automates a track's **Volume** moves its slider in the grid, in the colour of a modulated value; the track's own volume, the one saved, is left as it was. A mute from the host lights the
 track's **M** box, dimmed.
 
 The plugin has 17 stereo outputs: **Mix**, and **Track 1** to **Track 16**. Every track plays

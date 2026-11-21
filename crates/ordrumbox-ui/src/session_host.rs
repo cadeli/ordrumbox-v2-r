@@ -3,7 +3,8 @@
 //! another machine, followed as a host's transport is.
 
 use super::Session;
-use crate::view;
+use crate::{host_tip, view};
+use ordrumbox_engine::HostMix;
 
 /// What the session knows of its plugin host.
 #[derive(Debug, Default)]
@@ -12,10 +13,8 @@ pub(super) struct Host {
     pub(super) hosted: bool,
     /// The tracks the host mutes, bit `t` for track `t`.
     pub(super) muted: u64,
-    /// The tracks whose settings the host moves, bit `t` for track `t`.
-    pub(super) moved: u64,
-    /// The tracks the host plays on an output of their own, bit `t` for track `t`.
-    pub(super) split: u64,
+    /// What the host does to the tracks, shown in their rows.
+    pub(super) mix: HostMix,
     /// The host's tempo last said to be outside the tempo bounds
     /// (`report_host_tempo`), so the message is given once.
     tempo_outside: Option<f64>,
@@ -46,12 +45,18 @@ impl Session {
         std::mem::replace(&mut self.host.muted, muted) != muted
     }
 
-    /// The tracks a plugin host moves off their settings, and those it plays
-    /// on an output of their own, marked in their rows; true when they changed.
-    pub fn set_host_tracks(&mut self, moved: u64, split: u64) -> bool {
-        let before = (self.host.moved, self.host.split);
-        (self.host.moved, self.host.split) = (moved, split);
-        before != (moved, split)
+    /// What a plugin host does to the tracks (their settings, their output),
+    /// marked in their rows; true when it changed.
+    pub fn set_host_mix(&mut self, mix: &HostMix) -> bool {
+        std::mem::replace(&mut self.host.mix, *mix) != *mix
+    }
+
+    /// The tooltip of the host mark of track `t`: what the host does to it.
+    /// Empty when it does nothing.
+    pub(super) fn host_track_lines(&self, t: usize) -> Vec<String> {
+        let mix = &self.host.mix;
+        let (Some(track), Some(host)) = (self.track(t), mix.tracks.get(t)) else { return Vec::new() };
+        host_tip::host_track_lines(&track.name, t, host, ordrumbox_engine::host_muted(mix.split, t))
     }
 
     /// Take what the plugin host's transport does now, for the header:

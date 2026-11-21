@@ -109,8 +109,8 @@ impl Session {
             show_vus: self.chrome.show_vus,
             transport: self.transport_shown(),
             host_muted: self.host.muted,
-            host_moved: self.host.moved,
-            host_split: self.host.split,
+            host_moved: self.host.mix.moved_tracks(),
+            host_split: self.host.mix.split,
             track_drop: self.track_drop((canvas.width(), canvas.height(), scale)),
             waiting,
             playhead: if song_mode.is_some() || waiting.is_some() {

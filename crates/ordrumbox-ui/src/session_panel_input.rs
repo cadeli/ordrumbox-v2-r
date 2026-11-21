@@ -224,7 +224,7 @@ impl Session {
                 )
                 .hit(pattern, x, y)
                 {
-                    hit @ Some(view::Hit::Cell { .. } | view::Hit::Name(_)) => hit,
+                    hit @ Some(view::Hit::Cell { .. } | view::Hit::Name(_) | view::Hit::Host(_)) => hit,
                     _ => None,
                 }
             }
@@ -292,6 +292,12 @@ impl Session {
                 let Some(track) = pattern.tracks.get(t) else { return };
                 let lines = editors::track_tooltip(track, &self.track_sound_label(t));
                 view::draw_tooltip_lines(canvas, &lines, layout.name_rect(t), scale);
+            }
+            view::Hit::Host(t) => {
+                let lines = self.host_track_lines(t);
+                if !lines.is_empty() {
+                    view::draw_tooltip_lines(canvas, &lines, layout.host_mark_rect(t), scale);
+                }
             }
             view::Hit::Mute(_) | view::Hit::Solo(_) | view::Hit::AddTrack => {}
         }

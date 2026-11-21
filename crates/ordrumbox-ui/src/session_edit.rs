@@ -45,6 +45,7 @@ impl Session {
                 self.selection.zone = None;
                 self.toggle_note(track, beat, step);
             }
+            Hit::Host(_) => {}
             Hit::AddTrack => self.add_track_menu_at_button(),
         }
     }

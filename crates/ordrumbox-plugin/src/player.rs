@@ -141,7 +141,7 @@ impl Player {
             self.redraw = true;
         }
         self.redraw |= session.set_host_muted(host.muted);
-        self.redraw |= session.set_host_tracks(host.moved, host.split);
+        self.redraw |= session.set_host_mix(&host.mix);
         session.set_host_swing(host.swing);
         session.update();
         self.redraw |= session.watch_host();
@@ -274,21 +274,23 @@ impl Drop for Ticker {
 mod tests {
     use nih_plug::params::persist::PersistentField;
     use ordrumbox_core::track::STRAIGHT_SWING;
-    use ordrumbox_engine::HostTransport;
+    use ordrumbox_engine::{HostMix, HostTransport};
 
     use super::*;
     use crate::state::LibraryText;
 
-    const FIRST: HostControls = HostControls {
-        program: None,
-        now: false,
-        pattern: 0,
-        kit: 0,
-        muted: 0,
-        moved: 0,
-        split: 0,
-        swing: STRAIGHT_SWING,
-    };
+    /// The host's first controls: the first pattern and kit, nothing moved.
+    fn first() -> HostControls {
+        HostControls {
+            program: None,
+            now: false,
+            pattern: 0,
+            kit: 0,
+            muted: 0,
+            mix: HostMix::default(),
+            swing: STRAIGHT_SWING,
+        }
+    }
 
     fn audio(started: Started) -> Box<AudioSide> {
         match started {
@@ -320,17 +322,17 @@ mod tests {
         let host = HostTransport { playing: true, bpm: 100.0, beat: 0.0 };
         let (mut left, mut right) = (vec![0.0; 512], vec![0.0; 512]);
         for _ in 0..4 {
-            player.tick(&state, FIRST, &Names::default());
+            player.tick(&state, first(), &Names::default());
             audio.render_synced(&mut left, &mut right, host);
         }
         assert!(player.ui().is_some_and(|ui| ui.session.playing()));
 
         // The window shows the host's transport when it changes, not at every tick.
         player.take_redraw();
-        player.tick(&state, FIRST, &Names::default());
+        player.tick(&state, first(), &Names::default());
         assert!(!player.take_redraw());
         audio.render_synced(&mut left, &mut right, HostTransport { playing: false, ..host });
-        player.tick(&state, FIRST, &Names::default());
+        player.tick(&state, first(), &Names::default());
         assert!(player.take_redraw(), "the host stopped");
 
         assert!(matches!(player.start(48_000.0, &state), Started::Kept));
@@ -346,13 +348,13 @@ mod tests {
         // A text the session cannot read: the project keeps it.
         state.set(LibraryText("{".into()));
         let _audio = audio(player.start(48_000.0, &state));
-        player.tick(&state, FIRST, &Names::default());
+        player.tick(&state, first(), &Names::default());
         assert_eq!(state.map(|t| t.0.clone()), "{");
 
         let text = r#"{"patterns":[{"name":"mine","tracks":[]}]}"#;
         state.set(LibraryText(text.into()));
         let _audio = audio(player.start(48_000.0, &state));
-        player.tick(&state, FIRST, &Names::default());
+        player.tick(&state, first(), &Names::default());
         assert!(player.ui().is_some_and(|ui| ui.session.library_text().contains("mine")));
     }
 
@@ -364,7 +366,7 @@ mod tests {
         let (mut left, mut right) = (vec![0.0; 512], vec![0.0; 512]);
         let mut play_at = |player: &mut Player, bpm| {
             audio.render_synced(&mut left, &mut right, HostTransport { playing: true, bpm, beat: 0.0 });
-            player.tick(&state, FIRST, &Names::default());
+            player.tick(&state, first(), &Names::default());
             player.ui().map(|ui| ui.session.message().to_owned()).unwrap_or_default()
         };
         assert_eq!(play_at(&mut player, 400.0), "host tempo 400 outside 20–300: plays at 300");
@@ -387,7 +389,7 @@ mod tests {
         let _audio = audio(player.start(48_000.0, &state));
         let shown = |player: &mut Player| player.ui().and_then(|ui| ui.session.pattern()?.name.clone());
 
-        let b = HostControls { pattern: 1, ..FIRST };
+        let b = HostControls { pattern: 1, ..first() };
         player.tick(&state, b, &names);
         assert_eq!(shown(&mut player).as_deref(), Some("b"));
         assert!(player.take_redraw() && !player.take_redraw());
@@ -402,7 +404,7 @@ mod tests {
         assert_eq!(player.take_window_choices(), WindowChoices::default());
 
         // Refused, then applied once the library has it.
-        let third = HostControls { pattern: 2, ..FIRST };
+        let third = HostControls { pattern: 2, ..first() };
         player.tick(&state, third, &names);
         assert_eq!(shown(&mut player).as_deref(), Some("a"));
         assert_eq!(player.ui().unwrap().session.message(), "host: no pattern 3 (the library has 2)");
@@ -423,25 +425,25 @@ mod tests {
         let _audio = audio(player.start(48_000.0, &state));
         let shown = |player: &mut Player| player.ui().map(|ui| ui.session.pattern_index());
 
-        player.tick(&state, FIRST, &names);
+        player.tick(&state, first(), &names);
         player.take_redraw();
-        player.tick(&state, HostControls { program: Some(1), ..FIRST }, &names);
+        player.tick(&state, HostControls { program: Some(1), ..first() }, &names);
         assert_eq!(shown(&mut player), Some(1));
         assert!(player.take_redraw());
         assert_eq!(player.take_window_choices(), WindowChoices::default(), "not given back to the host");
 
         // The unchanged parameter leaves it alone.
-        player.tick(&state, FIRST, &names);
+        player.tick(&state, first(), &names);
         assert_eq!(shown(&mut player), Some(1));
 
         // The same program again undoes a choice made in the window.
         player.ui().unwrap().session.step_pattern(-1);
-        player.tick(&state, FIRST, &names);
-        player.tick(&state, HostControls { program: Some(1), ..FIRST }, &names);
+        player.tick(&state, first(), &names);
+        player.tick(&state, HostControls { program: Some(1), ..first() }, &names);
         assert_eq!(shown(&mut player), Some(1));
 
         // A program past the library is refused with a message.
-        player.tick(&state, HostControls { program: Some(5), ..FIRST }, &names);
+        player.tick(&state, HostControls { program: Some(5), ..first() }, &names);
         assert_eq!(shown(&mut player), Some(1));
         assert_eq!(player.ui().unwrap().session.message(), "host: no pattern 6 (the library has 2)");
     }
@@ -453,8 +455,8 @@ mod tests {
         let text = r#"{"patterns":[{"name":"a","tracks":[]},{"name":"b","tracks":[]}]}"#;
         state.set(LibraryText(text.into()));
         let _audio = audio(player.start(48_000.0, &state));
-        player.tick(&state, FIRST, &Names::default());
-        player.tick(&state, HostControls { program: Some(1), now: true, ..FIRST }, &Names::default());
+        player.tick(&state, first(), &Names::default());
+        player.tick(&state, HostControls { program: Some(1), now: true, ..first() }, &Names::default());
         assert_eq!(player.ui().map(|ui| ui.session.pattern_index()), Some(1));
     }
 
@@ -463,11 +465,11 @@ mod tests {
         let state = Arc::new(LibraryState::default());
         let mut player = Player::default();
         let _audio = audio(player.start(48_000.0, &state));
-        player.tick(&state, FIRST, &Names::default());
+        player.tick(&state, first(), &Names::default());
         player.take_redraw();
-        player.tick(&state, HostControls { muted: 0b1, ..FIRST }, &Names::default());
+        player.tick(&state, HostControls { muted: 0b1, ..first() }, &Names::default());
         assert!(player.take_redraw());
-        player.tick(&state, HostControls { muted: 0b1, ..FIRST }, &Names::default());
+        player.tick(&state, HostControls { muted: 0b1, ..first() }, &Names::default());
         assert!(!player.take_redraw());
     }
 
@@ -476,14 +478,16 @@ mod tests {
         let state = Arc::new(LibraryState::default());
         let mut player = Player::default();
         let _audio = audio(player.start(48_000.0, &state));
-        player.tick(&state, FIRST, &Names::default());
+        player.tick(&state, first(), &Names::default());
         player.take_redraw();
-        let marked = HostControls { moved: 0b10, split: 0b1, ..FIRST };
+        let mut mix = HostMix { split: 0b1, ..HostMix::default() };
+        mix.tracks[1].pan = 0.5;
+        let marked = HostControls { mix, ..first() };
         player.tick(&state, marked, &Names::default());
         assert!(player.take_redraw());
         player.tick(&state, marked, &Names::default());
         assert!(!player.take_redraw());
-        player.tick(&state, FIRST, &Names::default());
+        player.tick(&state, first(), &Names::default());
         assert!(player.take_redraw(), "marks go when the host moves nothing");
     }
 

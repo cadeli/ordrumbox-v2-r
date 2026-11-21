@@ -18,6 +18,7 @@ mod editors;
 mod file_request;
 mod font;
 mod frame;
+mod host_tip;
 mod image;
 mod kits;
 mod master;
