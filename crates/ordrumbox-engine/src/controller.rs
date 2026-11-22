@@ -17,7 +17,7 @@ use std::sync::{Arc, Mutex};
 use ordrumbox_core::song::clamp_bpm;
 use ordrumbox_core::track::STRAIGHT_SWING;
 use ordrumbox_core::{Library, Rng, Scales, Track};
-use ordrumbox_dsp::MasterSettings;
+use ordrumbox_dsp::{MasterSettings, ReturnSettings};
 
 use crate::assign::{TrackSound, assign_track};
 use crate::engine::{Engine, HostMix, HostTransport, MAX_TRACKS, Position, host_pass};
@@ -66,6 +66,7 @@ pub struct Controller {
     scales: Scales,
     synths: SynthPresets,
     master: MasterSettings,
+    returns: ReturnSettings,
     kit: String,
     rng: Rng,
     mode: Mode,
@@ -179,6 +180,7 @@ impl Controller {
             scales,
             synths,
             master: MasterSettings::default(),
+            returns: ReturnSettings::default(),
             kit,
             rng,
             mode: Mode::Pattern(0),
@@ -265,6 +267,16 @@ impl Controller {
     pub fn set_master(&mut self, master: MasterSettings) {
         self.master = master;
         lock(&self.link.inbox).master = Some(master);
+    }
+
+    /// The shared echo and reverb returns' settings.
+    pub fn returns(&self) -> ReturnSettings {
+        self.returns
+    }
+
+    pub fn set_returns(&mut self, returns: ReturnSettings) {
+        self.returns = returns;
+        lock(&self.link.inbox).returns = Some(returns);
     }
 
     /// A live mix on top of the tracks' settings (a MIDI controller's

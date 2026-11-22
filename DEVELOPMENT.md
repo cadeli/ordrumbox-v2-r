@@ -10,7 +10,7 @@ Building, testing and changing orDrumbox. The user documentation is
 |---|---|---|
 | `ordrumbox-core` | data model, `library.json` codec, pattern engine, song clips, instrument catalog, JSON, RNG, decimal rounding | none |
 | `ordrumbox-logic` | library being edited: commands with undo/redo; pattern generators; Standard MIDI Files | core |
-| `ordrumbox-dsp` | sample voice, synth voice, channel strip, master bus | none |
+| `ordrumbox-dsp` | sample voice, synth voice, channel strip, shared returns, master bus | none |
 | `ordrumbox-engine` | WAV, kits, sample analysis, synth presets, passes, engine, UI link, offline renders | core, dsp |
 | `ordrumbox-probe` | sound measurements, command-line only | core, dsp, engine |
 | `ordrumbox-ui` | session, views, input, MCP link, update check | core, logic, engine, fontdue |
@@ -138,6 +138,13 @@ whatever the size of the blocks it is rendered in. No fixture, nothing to rewrit
 wrong sound or a wrong threshold.
 
 ### Changes of behaviour
+
+Tracks can send to two shared returns, a tape echo and a spring reverb (`ordrumbox-dsp/src/returns.rs`,
+`ordrumbox-engine/src/engine/returns.rs`): `echoSend` and `reverbSend`, 0 by default, taken after the strip's volume
+and pan; each return is a `Strip` with a `dry` level of 0 (a new strip setting, 1 by default: the strips play as
+before). The returns' settings are `settings.returns` (`ReturnSettings`), the echo's time in beats at the tempo of the
+pass playing. With every send at 0 the returns stay silent: no snapshot changed. The MIDI controls list has the echo's
+feedback after the master volume, then six controls a track (`session_scenarios/midi_sync.rs` moved its indices).
 
 Choosing an effect's type (its screen's list or its ◂ ▸ arrows) switches the effect on, as it already did for
 the filter and an LFO's wave: a reverb or a delay without an amount goes on at its `on_value`, one without a

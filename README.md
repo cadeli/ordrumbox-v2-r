@@ -99,8 +99,10 @@ cutoff by up to ±4 octaves), **Q** (added to the filter's), **Reverb**, **Delay
 **Saturation** and **Compressor** (added to the effect's amount, kept within 0 to 1; with
 the effect's button off, the track's amount counts as 0), **Threshold** (dB added to the
 compressor's threshold, kept within -60 to 0 dBFS), **Feedback** (added to the delay's, up
-to 0.95; a slap delay keeps its single echo) and **Transpose** (±24 semitones on the notes played,
-MIDI input included, not on the MIDI notes sent out). At their defaults they change
+to 0.95; a slap delay keeps its single echo), **Echo send** and **Reverb send** (added to the
+track's sends to the shared echo and reverb, kept within 0 to 1) and **Transpose** (±24 semitones on the notes played,
+MIDI input included, not on the MIDI notes sent out), and **Echo feedback** (added to the shared
+echo's, up to 0.99; the plugin plays the echo and the reverb at their default settings). At their defaults they change
 nothing. A filter of type `allpass`, and a reverb or delay of type `none`, stay off.
 They change what plays, not the library.
 In the grid, a track's row shows what the host does to it, right of its volume slider: a
@@ -255,8 +257,10 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   nothing while following: choose *ignore* to play on its own again. A master that stops
   sending pulses for a second stops the transport.
 - **Edit > MIDI controls...** binds the knobs of a MIDI controller (the app; a plugin has its
-  host's parameters). Choose a control with Left / Right (the master volume, then each track
-  of the pattern shown: **volume**, **pan**, **cutoff**, **mute**; the first 16 tracks),
+  host's parameters). Choose a control with Left / Right (the master volume, the shared echo's
+  **feedback** (from the one set up to 0.99: a knob to make the echo build up), then each track
+  of the pattern shown: **volume**, **pan**, **cutoff**, **mute**, **echo send**, **reverb send**
+  (from the one set up to full: a knob to throw a sound into the echo); the first 16 tracks),
   go to **Learn**, press Enter and turn the knob: its control change (number and channel) is
   bound to it. One knob has one control and a control one knob; **Clear** lets it go. The
   bindings are kept in `settings.json` (`midiControls`). A knob moves its control on top of

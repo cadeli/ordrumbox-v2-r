@@ -1,8 +1,9 @@
 //! The parameters a host shows and automates: the pattern and the kit
 //! played, the master volume, the swing, and per track a mute, a volume, a
 //! pan, the filter's cutoff and Q, the reverb, delay and saturation amounts,
-//! the delay feedback, the compressor's mix and threshold, a transpose and the output it plays on (the mix, or
-//! one of its own). The pattern, the kit and the swing
+//! the delay feedback, the sends to the shared echo and reverb, the
+//! compressor's mix and threshold, a transpose and the output it plays on (the mix, or
+//! one of its own), and the echo's feedback. The pattern, the kit and the swing
 //! are applied by the player thread, which also shows the mutes in the
 //! window; the track parameters are applied by the audio thread, every
 //! block, on top of the pattern's own (the library is not edited).
@@ -67,6 +68,9 @@ pub struct OrdrumboxParams {
     /// of each pair starts, 50 % (straight) to 75 %.
     #[id = "swing"]
     pub swing: FloatParam,
+    /// Added to the shared echo's feedback.
+    #[id = "echo_feedback"]
+    pub echo_feedback: FloatParam,
     /// Track `t + 1`'s parameters; ids `mute_1`, `track_volume_1`,
     /// `track_pan_1`, `track_cutoff_1`… to `_16`.
     #[nested(array, group = "Track")]
@@ -103,6 +107,12 @@ pub struct TrackParams {
     /// Added to the delay feedback.
     #[id = "track_feedback"]
     pub feedback: FloatParam,
+    /// Added to the send to the shared echo.
+    #[id = "track_echo_send"]
+    pub echo_send: FloatParam,
+    /// Added to the send to the shared reverb.
+    #[id = "track_reverb_send"]
+    pub reverb_send: FloatParam,
     /// Added to the saturation amount.
     #[id = "track_saturation"]
     pub saturation: FloatParam,
@@ -134,6 +144,8 @@ impl TrackParams {
             reverb: offset_param(format!("Reverb track {number}"), 1.0),
             delay: offset_param(format!("Delay track {number}"), 1.0),
             feedback: offset_param(format!("Feedback track {number}"), 1.0),
+            echo_send: offset_param(format!("Echo send track {number}"), 1.0),
+            reverb_send: offset_param(format!("Reverb send track {number}"), 1.0),
             saturation: offset_param(format!("Saturation track {number}"), 1.0),
             compressor: offset_param(format!("Compressor track {number}"), 1.0),
             threshold: FloatParam::new(
@@ -170,6 +182,8 @@ impl TrackParams {
             reverb: self.reverb.value(),
             delay: self.delay.value(),
             feedback: self.feedback.value(),
+            echo_send: self.echo_send.value(),
+            reverb_send: self.reverb_send.value(),
             saturation: self.saturation.value(),
             compressor: self.compressor.value(),
             threshold_db: self.threshold.value(),
@@ -224,6 +238,7 @@ impl Default for OrdrumboxParams {
             .with_unit(" %")
             .with_value_to_string(formatters::v2s_f32_percentage(1))
             .with_string_to_value(formatters::s2v_f32_percentage()),
+            echo_feedback: offset_param("Echo feedback", 1.0),
             tracks: std::array::from_fn(|t| TrackParams::new(t + 1)),
             names,
             midi_program: MidiProgram::default(),
@@ -249,12 +264,13 @@ impl OrdrumboxParams {
     }
 
     /// What the audio thread applies: the master volume, the mutes, the
-    /// tracks on an output of their own and the track parameters.
+    /// tracks on an output of their own, the echo's feedback and the track parameters.
     pub fn mix(&self) -> HostMix {
         HostMix {
             gain: self.volume.value(),
             muted: self.muted_tracks(),
             split: self.track_mask(|track| track.output.value()),
+            echo_feedback: self.echo_feedback.value(),
             tracks: self.tracks.each_ref().map(TrackParams::host_track),
         }
     }

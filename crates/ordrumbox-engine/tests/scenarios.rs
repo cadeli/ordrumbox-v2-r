@@ -72,6 +72,7 @@ fn setup(seed: u64) -> RenderSetup {
         kit: "a".into(),
         sample_rate: EXPORT_RATE,
         seed,
+        returns: Default::default(),
     }
 }
 

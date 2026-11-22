@@ -73,14 +73,14 @@ pub static FX_DEFS: [FxDef; 6] = [
     FxDef {
         key: "reverbMix",
         label: "Reverb",
-        controls: &["reverbMix", "reverbType"],
+        controls: &["reverbMix", "reverbSend", "reverbType"],
         fx_type: Some(FxType { key: "reverbType", default: "room" }),
         on_value: 0.5,
     },
     FxDef {
         key: "delayMix",
         label: "Delay",
-        controls: &["delayMix", "delayBeats", "delayFeedback", "delayType"],
+        controls: &["delayMix", "delayBeats", "delayFeedback", "echoSend", "delayType"],
         fx_type: Some(FxType { key: "delayType", default: "tape" }),
         on_value: 0.5,
     },
@@ -221,10 +221,12 @@ pub(super) const fn count(key: &'static str, label: &'static str, min: f64, max:
 }
 
 /// The effect knobs.
-pub const FX_KNOBS: [Prop; 15] = [
+pub const FX_KNOBS: [Prop; 17] = [
     prop("reverbMix", "Mix", 0.0, 1.0, 0.01, Format::Plain),
+    prop("reverbSend", "Send", 0.0, 1.0, 0.01, Format::Plain),
     prop("delayMix", "Mix", 0.0, 1.0, 0.01, Format::Plain),
     prop("delayFeedback", "Feedback", 0.0, 0.95, 0.01, Format::Plain),
+    prop("echoSend", "Send", 0.0, 1.0, 0.01, Format::Plain),
     prop("saturationMix", "Mix", 0.0, 1.0, 0.01, Format::Plain),
     prop("bitcrush", "Crush", 0.0, 1.0, 0.01, Format::Plain),
     prop("hardClip", "Clip", 0.0, 1.0, 0.01, Format::Plain),

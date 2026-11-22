@@ -267,7 +267,7 @@ mod tests {
         s.set_master_value("volume", 0.5);
         assert_eq!(s.message, "master: volume 0.5 (not undoable)");
         s.undo();
-        assert_eq!(crate::master::get(&s.output_panel.master(), "volume"), 0.5);
+        assert_eq!(crate::master::SECTION.get(&s.output_panel.master(), "volume"), 0.5);
     }
 
     #[test]

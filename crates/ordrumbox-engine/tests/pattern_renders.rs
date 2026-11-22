@@ -162,6 +162,7 @@ fn render(case: &Case) -> (Vec<f32>, Vec<f32>) {
         kit: "kit".into(),
         sample_rate: case.sample_rate,
         seed: SEED,
+        returns: Default::default(),
     };
     let rendered = match case.what {
         What::Pattern(loops) => offline::render_pattern(&library, 0, loops, &setup, None),

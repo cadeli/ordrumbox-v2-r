@@ -99,6 +99,10 @@ json_record! {
         delay_mix: f64 = 0.0 => "delayMix" | "delayDepth",
         /// Share of each repeat fed back, 0–0.95 (not for `slap`: one echo).
         delay_feedback: f64 = 0.4 => "delayFeedback",
+        /// Send to the shared echo return, 0–1, after volume and pan.
+        echo_send: f64 = 0.0 => "echoSend",
+        /// Send to the shared reverb return, 0–1, after volume and pan.
+        reverb_send: f64 = 0.0 => "reverbSend",
         saturation_type: String = "soft".to_owned() => "saturationType",
         saturation_mix: f64 = 0.0 => "saturationMix" | "saturationAmount",
         saturation_on: bool = true => "saturationOn" | "sat",
@@ -146,7 +150,7 @@ json_record! {
 }
 
 /// `TRACK_VALUE_RANGES`: bounds of the numeric settings an edit clamps to.
-const VALUE_RANGES: [(&str, f64, f64); 48] = [
+const VALUE_RANGES: [(&str, f64, f64); 50] = [
     ("volume", 0.0, 1.0),
     ("pan", -1.0, 1.0),
     ("transpose", -24.0, 24.0),
@@ -162,6 +166,8 @@ const VALUE_RANGES: [(&str, f64, f64); 48] = [
     ("delayBeats", 0.0, 4.0),
     ("delayMix", 0.0, 1.0),
     ("delayFeedback", 0.0, 0.95),
+    ("echoSend", 0.0, 1.0),
+    ("reverbSend", 0.0, 1.0),
     ("saturationMix", 0.0, 1.0),
     ("bitcrush", 0.0, 1.0),
     ("hardClip", 0.0, 1.0),
@@ -215,13 +221,15 @@ const AUTO_HIT_VARIATION_FALLBACK: f64 = 60.0;
 const AUTO_NOTE_VARIATION_FALLBACK: f64 = 40.0;
 
 /// Keys written rounded to 2 decimals (`ROUND_2D` in exporter.js).
-const ROUND_2D: [&str; 15] = [
+const ROUND_2D: [&str; 17] = [
     "volume",
     "pan",
     "reverbMix",
     "delayMix",
     "delayFeedback",
     "delayBeats",
+    "echoSend",
+    "reverbSend",
     "saturationMix",
     "bitcrush",
     "hardClip",

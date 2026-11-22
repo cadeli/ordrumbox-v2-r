@@ -179,6 +179,7 @@ fn a_damaged_synth_preset_plays_numbers_or_is_refused_never_a_panic() {
                     kit: String::new(),
                     sample_rate: 8000,
                     seed: 1,
+                    returns: Default::default(),
                 };
                 let (left, right) = offline::render_pattern(&library, 0, 1, &setup, None).expect("a pattern");
                 left.iter().chain(&right).all(|sample| sample.is_finite())

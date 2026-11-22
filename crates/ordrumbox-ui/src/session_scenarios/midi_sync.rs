@@ -9,7 +9,7 @@ use crate::session::OverlayKey;
 use crate::test_support::scratch_dir;
 
 /// Bind controller `controller` (channel 1) to the control `moves` choices
-/// along the modal's list (the master is the first).
+/// along the modal's list (the master is the first, the echo's feedback next).
 fn learn(s: &mut Session, moves: isize, controller: u8) {
     s.run(Command::MidiControls);
     assert!(s.overlay_open());
@@ -45,8 +45,8 @@ fn a_mute_knob_shows_on_the_track_and_the_bindings_are_kept_in_the_settings() {
     let dir = scratch_dir("controls-mute");
     let (mut s, mut audio) = session(LIBRARY);
     s.saving.settings_file = Some(dir.join("settings.json"));
-    // Master, then the first track's volume, pan, cutoff, mute.
-    learn(&mut s, 4, 22);
+    // Master, the echo's feedback, then the first track's volume, pan, cutoff, mute.
+    learn(&mut s, 5, 22);
     s.toggle_play();
     assert!(s.midi_control(0, 22, 127), "the mute box shows it");
     assert_eq!(s.host.muted, 1);
@@ -67,11 +67,11 @@ fn clear_lets_a_knob_go_and_a_bad_setting_is_reported() {
     let dir = scratch_dir("controls-clear");
     let (mut s, _audio) = session(LIBRARY);
     s.saving.settings_file = Some(dir.join("settings.json"));
-    learn(&mut s, 4, 22);
+    learn(&mut s, 5, 22);
     s.midi_control(0, 22, 127);
     assert_eq!(s.host.muted, 1);
     s.run(Command::MidiControls);
-    s.overlay_key(OverlayKey::Side(4));
+    s.overlay_key(OverlayKey::Side(5));
     s.overlay_key(OverlayKey::Move(2));
     s.overlay_key(OverlayKey::Enter);
     assert!(s.message.ends_with("knob let go"), "{}", s.message);

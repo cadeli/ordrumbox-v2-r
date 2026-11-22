@@ -11,13 +11,16 @@
 
 use std::sync::Arc;
 
-use ordrumbox_dsp::{MasterBus, MasterSettings, SampleVoice, Strip, StripSettings, SynthPatch, SynthVoice, VoiceStart};
+use ordrumbox_dsp::{
+    MasterBus, MasterSettings, ReturnSettings, SampleVoice, Strip, StripSettings, SynthPatch, SynthVoice, VoiceStart,
+};
 
 use crate::kit::SampleBank;
 use crate::midi::{BlockClock, BlockNote, CHANNEL_COUNT, KEY_COUNT, KeyMap, MidiNote, NoteOut};
 use crate::pass::{Event, Pass, Sound};
 
 use clock_out::ClockSender;
+use returns::Returns;
 
 /// Sample voices playing at once; the oldest is cut when a new one needs a slot.
 pub const MAX_VOICES: usize = 64;
@@ -120,6 +123,8 @@ pub struct Engine {
     strip_count: usize,
     input_left: Vec<f32>,
     input_right: Vec<f32>,
+    /// The echo and reverb every strip can send to.
+    returns: Returns,
     master: MasterBus,
     master_current: MasterSettings,
     master_target: MasterSettings,
@@ -172,6 +177,7 @@ impl Engine {
             strip_count: 0,
             input_left: vec![0.0; MAX_TRACKS * QUANTUM],
             input_right: vec![0.0; MAX_TRACKS * QUANTUM],
+            returns: Returns::new(sample_rate),
             master: MasterBus::new(sample_rate),
             master_current: MasterSettings::default(),
             master_target: MasterSettings::default(),
@@ -206,6 +212,15 @@ impl Engine {
 
     pub fn master(&self) -> MasterSettings {
         self.master_target
+    }
+
+    /// The shared returns' settings (reached through a 20 ms ramp).
+    pub fn set_returns(&mut self, settings: ReturnSettings) {
+        self.returns.set_settings(settings);
+    }
+
+    pub fn returns(&self) -> ReturnSettings {
+        self.returns.settings()
     }
 
     /// A plugin host's mix, for the blocks to come.
@@ -474,6 +489,7 @@ impl Engine {
             self.channels[lfo.track].lfo =
                 [!lfo.volume.is_empty(), !lfo.pan.is_empty(), !lfo.cutoff.is_empty(), !lfo.q.is_empty()];
         }
+        self.returns.follow_tempo(pass.frames, pass.ticks);
         self.frame = 0;
         self.cursor = 0;
         self.clock_out.restart();
@@ -487,6 +503,8 @@ mod clock_out;
 mod host;
 #[path = "engine/render.rs"]
 mod render;
+#[path = "engine/returns.rs"]
+mod returns;
 #[cfg(test)]
 #[path = "engine/tests.rs"]
 mod tests;

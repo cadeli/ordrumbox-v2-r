@@ -5,7 +5,7 @@ use crate::engine::{HostMix, HostTransport, Position};
 use crate::kit::SampleBank;
 use crate::midi::KeyMap;
 use crate::pass::Pass;
-use ordrumbox_dsp::MasterSettings;
+use ordrumbox_dsp::{MasterSettings, ReturnSettings};
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering, fence};
 use std::sync::{Arc, Mutex, MutexGuard, TryLockError};
@@ -24,6 +24,7 @@ pub(super) struct Inbox {
     pub(super) next: Option<Arc<Pass>>,
     pub(super) bank: Option<Arc<SampleBank>>,
     pub(super) master: Option<MasterSettings>,
+    pub(super) returns: Option<ReturnSettings>,
     /// A live mix on top of the tracks' (a MIDI controller's knobs).
     pub(super) mix: Option<HostMix>,
     pub(super) preview: Option<Arc<Pass>>,

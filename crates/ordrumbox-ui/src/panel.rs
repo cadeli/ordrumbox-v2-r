@@ -249,6 +249,10 @@ pub enum Id {
     // Output panel.
     /// A master bus setting, by its `settings.master` key.
     Master(&'static str),
+    /// A setting of the shared returns, by its `settings.returns` key.
+    Returns(&'static str),
+    /// A page tab of the output strip: an index in `output::OutputPage::ALL`.
+    OutputPage(u8),
     // Synth editor.
     SynthPreset,
     SynthButton(&'static str),

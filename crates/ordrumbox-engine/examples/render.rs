@@ -44,6 +44,7 @@ fn main() {
         kit: kits.first().map(|k| k.name.clone()).unwrap_or_default(),
         sample_rate: EXPORT_RATE,
         seed: 1,
+        returns: Default::default(),
     };
 
     let started = Instant::now();

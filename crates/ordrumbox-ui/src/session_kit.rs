@@ -107,6 +107,7 @@ impl Session {
             kit,
             sample_rate: offline::EXPORT_RATE,
             seed: 1,
+            returns: Default::default(),
         });
         self.message = match (self.kits.save(), errors.first()) {
             (Err(e), _) => e,

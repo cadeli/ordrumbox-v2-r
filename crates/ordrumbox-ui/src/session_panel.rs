@@ -351,6 +351,7 @@ pub(super) fn control_name(id: Id) -> (&'static str, &'static str) {
         Id::Decay => ("Decay", ""),
         Id::Bpm => ("BPM", ""),
         Id::Master(key) => crate::output::find(key).map_or(("", ""), |p| (p.label, p.unit)),
+        Id::Returns(key) => crate::output::find_return(key).map_or(("", ""), |p| (p.label, p.unit)),
         Id::SynthField(_) => ("value", ""),
         Id::Fx(key) => (prop(&FX_KNOBS, key), ""),
         Id::Generation(key) => {

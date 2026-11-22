@@ -1,5 +1,5 @@
 //! Audio processing of orDrumbox: sample voice, synth voice, channel strip,
-//! master bus.
+//! the shared returns, master bus.
 //!
 //! Rule for the whole crate: nothing in a render path allocates, locks or
 //! blocks. Ported from `src/audio/voices/` and `src/audio/worklets/processors/`
@@ -64,6 +64,7 @@ pub(crate) fn wrap(x: f64, period: f64) -> f64 {
 mod denormal;
 pub mod lfo;
 pub mod master_bus;
+pub mod returns;
 pub mod sample;
 pub mod slope;
 pub mod strip;
@@ -72,6 +73,7 @@ pub mod synth;
 pub mod voice;
 
 pub use master_bus::{MasterBus, MasterSettings, gain_reduction};
+pub use returns::ReturnSettings;
 pub use sample::SampleBuffer;
 pub use strip::{Strip, StripSettings};
 pub use synth::SynthVoice;

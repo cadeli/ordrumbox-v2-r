@@ -155,6 +155,9 @@ impl Session {
         if let Id::Master(key) = id {
             return self.set_master_value(key, value);
         }
+        if let Id::Returns(key) = id {
+            return self.set_returns_value(key, value);
+        }
         if let Id::SynthField(fi) = id {
             return self.synth_value(fi, value);
         }
@@ -478,7 +481,7 @@ impl Session {
             Id::Transport => self.toggle_play(),
             Id::View(i) => self.show_view(i),
             Id::Mode(i) => self.show_mode(i == 1),
-            Id::Master(_) => self.output_activate(id),
+            Id::Master(_) | Id::OutputPage(_) => self.output_activate(id),
             Id::SynthTab(_) | Id::SynthButton(_) | Id::SynthPower(_) | Id::SynthIcon(..) | Id::SynthField(_) => {
                 self.synth_activate(id);
             }

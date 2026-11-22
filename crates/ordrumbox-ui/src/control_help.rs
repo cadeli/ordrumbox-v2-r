@@ -169,6 +169,8 @@ fn setting_help(key: &str) -> Option<Help> {
         "reverbType" => ["Reverb type", "the kind of room"],
         "delayBeats" => ["Delay time", "the time between echoes, in beats"],
         "delayFeedback" => ["Feedback", "how much of each echo comes back"],
+        "echoSend" => ["Echo send", "how much goes to the shared echo, which plays on when the send closes"],
+        "reverbSend" => ["Reverb send", "how much goes to the shared spring reverb"],
         "delayType" => ["Delay type", "slap: one echo; tape; pingpong: left and right"],
         "saturationType" => ["Saturation type", "soft, hard or tape drive"],
         "bitcrush" => ["Bitcrush", "fewer bits and a lower sample rate: lo-fi grit"],

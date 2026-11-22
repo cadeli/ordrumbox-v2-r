@@ -102,12 +102,15 @@ fn full_master() -> MasterSettings {
     let defaults = MasterSettings::default();
     let mut settings = MasterSettings { bypass: 1.0, ..defaults };
     for key in master::KEYS {
-        let default = master::get(&defaults, key);
-        let up = master::get(&master::set(defaults, key, default + 1.0).clamped(), key);
-        let value =
-            if up != default { up } else { master::get(&master::set(defaults, key, default - 1.0).clamped(), key) };
+        let default = master::SECTION.get(&defaults, key);
+        let up = master::SECTION.get(&master::SECTION.set(defaults, key, default + 1.0).clamped(), key);
+        let value = if up != default {
+            up
+        } else {
+            master::SECTION.get(&master::SECTION.set(defaults, key, default - 1.0).clamped(), key)
+        };
         assert_ne!(value, default, "{key}");
-        settings = master::set(settings, key, value);
+        settings = master::SECTION.set(settings, key, value);
     }
     settings
 }
@@ -123,11 +126,12 @@ fn every_setting_survives_saving() {
     let updates = update::Settings { check: false, last_check: Some(1_761_000_000) };
 
     let save = |master: &MasterSettings, updates: update::Settings| {
-        store::save_setting(&path, "master", master::to_json(master)).unwrap();
+        store::save_setting(&path, "master", master::SECTION.to_json(master)).unwrap();
         store::save_setting(&path, "updates", updates.to_json()).unwrap();
     };
     let load = || {
-        let (master, issues) = master::from_json(&store::load_setting(&path, "master").unwrap().expect("master"));
+        let (master, issues) =
+            master::SECTION.read_json(&store::load_setting(&path, "master").unwrap().expect("master"));
         assert!(issues.is_empty(), "{issues:?}");
         let (updates, issues) =
             update::Settings::from_json(&store::load_setting(&path, "updates").unwrap().expect("updates"));
@@ -139,7 +143,7 @@ fn every_setting_survives_saving() {
     let (read_master, read_updates) = load();
     assert_eq!((read_master, read_updates), (master, updates));
     for key in master::KEYS {
-        assert_eq!(master::get(&read_master, key), master::get(&master, key), "{key}");
+        assert_eq!(master::SECTION.get(&read_master, key), master::SECTION.get(&master, key), "{key}");
     }
     save(&read_master, read_updates);
     assert_eq!(fs::read_to_string(&path).unwrap(), first, "a second save changes the file");

@@ -60,9 +60,10 @@ impl Engine {
             offset = until;
         }
 
-        // Strips into the bus.
+        // Strips into the bus, and into the returns by their sends.
         out_left.fill(0.0);
         out_right.fill(0.0);
+        self.returns.clear();
         let [keep_fx, keep_mix, keep_lfo] = self.keep;
         let (host, ratios) = (&self.host, &self.host_ratios);
         for (track, channel) in self.channels[..strips].iter_mut().enumerate() {
@@ -101,6 +102,7 @@ impl Engine {
                 &key[..n]
             });
             channel.strip.process(&channel.current, key, in_l, in_r, &mut strip_l[..n], &mut strip_r[..n]);
+            self.returns.send(&channel.current, &strip_l[..n], &strip_r[..n]);
             let mut peak = 0.0_f32;
             if host_muted(host.split, track) {
                 // On an output of its own: not in the mix.
@@ -115,6 +117,8 @@ impl Engine {
             channel.idle = if silent_input && peak < IDLE_LEVEL { channel.idle.saturating_add(1) } else { 0 };
             self.peaks[track] = peak;
         }
+
+        self.returns.render(out_left, out_right, host.echo_feedback, keep_fx, self.idle_quanta);
 
         // Master bus.
         let target = MasterSettings { master: self.master_target.master * self.host.gain, ..self.master_target };

@@ -54,6 +54,7 @@ fn setup(bank: &Arc<SampleBank>, kit: &str) -> RenderSetup {
         kit: kit.to_owned(),
         sample_rate: EXPORT_RATE,
         seed: 1,
+        returns: Default::default(),
     }
 }
 

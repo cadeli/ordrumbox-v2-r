@@ -273,6 +273,7 @@ fn a_pattern_built_in_the_grid_is_saved_reloaded_and_exported() {
         kit: "x".into(),
         sample_rate: EXPORT_RATE,
         seed: 1,
+        returns: Default::default(),
     };
     let (left, _) = offline::render_pattern(s.editor.library(), 1, 1, &setup, None).expect("renders");
     // floor(rate × 8 beats × 60 / 100 bpm), as the JS sizes its OfflineAudioContext.

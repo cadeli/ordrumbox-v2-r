@@ -93,6 +93,7 @@ fn setup() -> RenderSetup {
         kit: "t".into(),
         sample_rate: EXPORT_RATE,
         seed: 1,
+        returns: Default::default(),
     }
 }
 

@@ -188,6 +188,9 @@ pub fn strip_settings(track: &Track, bpm: f64) -> StripSettings {
         }
     }
 
+    s.echo_send = finite_or(track.echo_send, 0.0).clamp(0.0, 1.0) as f32;
+    s.reverb_send = finite_or(track.reverb_send, 0.0).clamp(0.0, 1.0) as f32;
+
     if track.volume_lfo.is_none() {
         s.volume = track.volume as f32;
     }

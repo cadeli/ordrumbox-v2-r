@@ -11,7 +11,7 @@
 
 use ordrumbox_core::json::{self, Object, Value};
 use ordrumbox_core::{Note, Track};
-use ordrumbox_engine::synth_model;
+use ordrumbox_engine::{ReturnSettings, synth_model};
 use ordrumbox_logic::tools::object;
 
 use crate::editors::track_select_options;
@@ -211,6 +211,12 @@ const TOOLS: &str = r#"[
    "inputSchema": {"type": "object", "properties": {
      "settings": {"type": "object", "properties": {"compBypass": {"type": "boolean", "description": "Skips pre-gain, compressor and filters"}}, "additionalProperties": false}},
      "required": ["settings"]}},
+  {"name": "getReturns", "description": "The shared returns every track sends to (a track's echoSend and reverbSend, after its volume and pan): the tape echo (time in beats, feedback, tone, wow, share sent on to the reverb, level) and the spring reverb (room, damping, spring, level). A send closed lets the echo play on: a dub throw.",
+   "inputSchema": {"type": "object", "properties": {}}},
+  {"name": "setReturns", "description": "Changes settings of the shared echo and reverb returns; what is not given stays. Saved with the settings, not an undo step.",
+   "inputSchema": {"type": "object", "properties": {
+     "settings": {"type": "object", "properties": {}, "additionalProperties": false}},
+     "required": ["settings"]}},
   {"name": "play", "description": "Plays the pattern shown, or with song true the selected arrangement from its start.",
    "inputSchema": {"type": "object", "properties": {"song": {"type": "boolean"}}}},
   {"name": "stop", "description": "Stops playing.",
@@ -379,6 +385,19 @@ fn master_properties() -> Value {
     }))
 }
 
+/// The returns' settings, with their ranges.
+fn returns_properties() -> Value {
+    let section = &crate::returns::SECTION;
+    object(crate::returns::KEYS.iter().map(|&key| {
+        let schema = object([
+            ("type", Value::from("number")),
+            ("minimum", Value::from(section.get(&ReturnSettings::MIN, key))),
+            ("maximum", Value::from(section.get(&ReturnSettings::MAX, key))),
+        ]);
+        (key, schema)
+    }))
+}
+
 /// The synth preset settings a tool may set, by path: the knobs with their
 /// ranges, the lists with their values, the bypass flags.
 fn synth_properties() -> Value {
@@ -432,6 +451,9 @@ pub fn tools() -> Value {
             }
             "setMaster" => {
                 add_properties(tool, &[schema[0], schema[1], "settings", "properties"], &master_properties())
+            }
+            "setReturns" => {
+                add_properties(tool, &[schema[0], schema[1], "settings", "properties"], &returns_properties())
             }
             name if GENERATION_TOOLS.contains(&name) => mark_generation(tool),
             _ => {}
@@ -531,12 +553,17 @@ mod tests {
     fn the_tool_list_parses_with_the_settings() {
         let tools = tools();
         let tools = tools.as_array().unwrap();
-        assert_eq!(tools.len(), 73);
+        assert_eq!(tools.len(), 75);
         let update = tools.iter().find(|t| t.get("name").and_then(Value::as_str) == Some("updateTrack")).unwrap();
         let updates = &update.get("inputSchema").unwrap().get("properties").unwrap().get("updates").unwrap();
         let properties = updates.get("properties").unwrap();
         let volume = properties.get("volume").unwrap();
         assert_eq!(volume.to_json(), r#"{"type":"number","minimum":0,"maximum":1}"#);
+        assert_eq!(properties.get("echoSend").unwrap().to_json(), r#"{"type":"number","minimum":0,"maximum":1}"#);
+        let returns = tools.iter().find(|t| t.get("name").and_then(Value::as_str) == Some("setReturns")).unwrap();
+        let settings = returns.get("inputSchema").unwrap().get("properties").unwrap().get("settings").unwrap();
+        let beats = settings.get("properties").unwrap().get("echoBeats").unwrap();
+        assert_eq!(beats.to_json(), r#"{"type":"number","minimum":0.25,"maximum":4}"#);
         assert_eq!(properties.get("mute").unwrap().to_json(), r#"{"type":"boolean"}"#);
         assert_eq!(properties.get("volumeLfo").unwrap().to_json(), r#"{"type":["object","null"]}"#);
         assert!(properties.get("delayType").unwrap().get("enum").is_some());

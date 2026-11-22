@@ -13,6 +13,7 @@ use crate::controller::{Controller, Mode};
 use crate::engine::{HostMix, MAX_TRACKS};
 use crate::kit::SampleBank;
 use crate::synth_preset::SynthPresets;
+use ordrumbox_dsp::ReturnSettings;
 
 /// Sample rate of the exports.
 pub const EXPORT_RATE: u32 = 44_100;
@@ -30,6 +31,8 @@ pub struct RenderSetup {
     pub sample_rate: u32,
     /// Seed of the random choices (sound assignment, probabilities, variations).
     pub seed: u64,
+    /// The shared echo and reverb the tracks send to.
+    pub returns: ReturnSettings,
 }
 
 /// Frames of `ticks` ticks at `bpm`: `floor(rate × duration)` for a pattern,
@@ -80,6 +83,7 @@ fn render(
         Rng::new(setup.seed),
     );
     controller.set_kit(&setup.kit);
+    controller.set_returns(setup.returns);
     let track_count = match output {
         Output::Mix => 0,
         Output::Stems { track_count } => track_count.min(MAX_TRACKS),
@@ -197,6 +201,7 @@ mod tests {
             kit: "x".into(),
             sample_rate: EXPORT_RATE,
             seed: 7,
+            returns: Default::default(),
         }
     }
 

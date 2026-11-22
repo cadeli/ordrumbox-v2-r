@@ -77,7 +77,7 @@ pub(super) struct Saving {
     pub(super) library: Settle,
     /// Kit knob edits not yet applied to the bank and saved.
     pub(super) kits: Settle,
-    /// Master bus changes not yet saved.
+    /// Output panel changes (the master bus, the returns) not yet saved.
     pub(super) master: Settle,
     /// The settings file the colour scheme and the zoom are saved to (`None`: not saved).
     pub(super) settings_file: Option<PathBuf>,

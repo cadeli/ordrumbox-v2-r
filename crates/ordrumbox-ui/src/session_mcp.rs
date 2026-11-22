@@ -173,7 +173,7 @@ impl Session {
             let at = format!("settings.{key}");
             if key == "compBypass" {
                 let bypass = value.as_bool().ok_or_else(|| format!("{at}: not true or false ({value})"))?;
-                changed = master::set(changed, key, if bypass { 1.0 } else { 0.0 });
+                changed = master::SECTION.set(changed, key, if bypass { 1.0 } else { 0.0 });
                 continue;
             }
             let param = output::find(key).ok_or_else(|| format!("{at}: not a master setting"))?;
@@ -182,11 +182,11 @@ impl Session {
             if !(min..=max).contains(&number) {
                 return Err(format!("{at}: {number} is outside {min} to {max}"));
             }
-            changed = master::set(changed, key, number);
+            changed = master::SECTION.set(changed, key, number);
         }
         self.set_master(changed, true);
         self.message = "master settings changed".into();
-        Ok(master::to_json(&self.output_panel.master()))
+        Ok(master::SECTION.to_json(&self.output_panel.master()))
     }
 
     /// A synth preset's key, by key (else in any case).

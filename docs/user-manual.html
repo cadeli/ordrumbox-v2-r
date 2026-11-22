@@ -539,10 +539,12 @@ or an MCP client) stays off, and its LED gives it the type its screen shows (<em
 control of an effect that is off switches it on, and so does choosing its type, on the screen or with ◂ ▸.</p>
 <table>
 <tr><th>Effect</th><th>Control</th><th>Values</th><th>Notes</th></tr>
-<tr><td rowspan="2"><strong>Reverb</strong></td><td>Mix</td><td>0–1</td><td>Wet amount.</td></tr>
+<tr><td rowspan="3"><strong>Reverb</strong></td><td>Mix</td><td>0–1</td><td>Wet amount.</td></tr>
+<tr><td>Send</td><td>0–1 (default 0)</td><td>How much of the track goes to the shared spring reverb (master strip, <strong>Echo</strong> page), after its volume and pan. Works with the reverb's LED off.</td></tr>
 <tr><td>Type</td><td>room, hall, plate, spring, gated</td><td><em>hall</em> and <em>plate</em> have a pre-delay, <em>spring</em> a dispersion, <em>gated</em> a large room cut 250 ms after the hit.</td></tr>
-<tr><td rowspan="4"><strong>Delay</strong></td><td>Mix</td><td>0–1</td><td>Wet amount.</td></tr>
+<tr><td rowspan="5"><strong>Delay</strong></td><td>Mix</td><td>0–1</td><td>Wet amount.</td></tr>
 <tr><td>Feedback</td><td>0–0.95 (default 0.4)</td><td>How many repeats. Greyed out for <em>slap</em> (one echo).</td></tr>
+<tr><td>Send</td><td>0–1 (default 0)</td><td>How much of the track goes to the shared tape echo (master strip, <strong>Echo</strong> page), after its volume and pan. Unlike the track's own delay, the shared echo plays on when the send closes: open it for one hit and the hit keeps repeating (a dub "throw"). Works with the delay's LED off.</td></tr>
 <tr><td>Beats</td><td>1/16, 1/8, 1/4, 1/2, 1, 2, 4</td><td>Delay time in beats. Longer than 2 s at the tempo, it plays at the longest halving that fits (shown on the choice).</td></tr>
 <tr><td>Type</td><td>slap, tape, pingpong</td><td><em>slap</em>: one clean echo; <em>tape</em>: darker repeats with wow; <em>pingpong</em>: starts left, then alternates.</td></tr>
 <tr><td rowspan="4"><strong>Saturation</strong></td><td>Mix</td><td>0–1</td><td>Drive amount.</td></tr>
@@ -910,9 +912,10 @@ Kits are saved to <code>kits.json</code>; new sample audio to <code>samples/</co
 
 <!-- ───────────────────────────────────────────────────────────── -->
 <h2 id="output">14. Master strip</h2>
-<p>The strip along the bottom (<strong>View › Master</strong> shows or folds it): the master bus, in one row.
-Settings play at once and are saved to <code>settings.json</code>; they are not undo steps. The plugin has no
-master strip: the host mixes.</p>
+<p>The strip along the bottom (<strong>View › Master</strong> shows or folds it), in two pages chosen by the
+tabs on its left: <strong>Master</strong>, the master bus, and <strong>Echo</strong>, the shared returns. Both keep
+the volume and the spectrum. Settings play at once and are saved to <code>settings.json</code>; they are not undo
+steps. The plugin has no master strip: the host mixes, and the returns play at their defaults.</p>
 <figure>
   <img src="images/output.png" alt="The master strip: volume and spectrum, pre-gain and compressor knobs with the ON button and transfer curve, low cut and high cut sliders">
   <figcaption>The master strip: the volume and the spectrum; the compressor's knobs, its ON button and its transfer curve (the threshold is the dashed vertical line); the low cut and the high cut.</figcaption>
@@ -933,6 +936,29 @@ master strip: the host mixes.</p>
 <tr><td rowspan="2"><strong>Filters</strong></td><td>Low Cut</td><td>10–500 Hz</td><td>35</td><td>Removes the lowest frequencies.</td></tr>
 <tr><td>High Cut</td><td>1–22 kHz</td><td>18 500</td><td>Removes the highest frequencies.</td></tr>
 </table>
+
+<h3>The Echo page: shared returns</h3>
+<p>Every track can send to a tape echo and a spring reverb that all the tracks share (the <strong>Send</strong>
+knobs of its Delay and Reverb strips). The returns play into the mix before the master bus. A sound sent for a
+moment keeps echoing after its send closes, the way a dub mix throws a snare or a chord into the echo: bind a
+track's <strong>echo send</strong> to a MIDI knob (<strong>Edit › MIDI controls</strong>) and turn it up on one hit,
+or turn up the echo's <strong>feedback</strong> knob to make the repeats build up. A muted track sends nothing,
+and what it sent goes on echoing.</p>
+<table>
+<tr><th>Group</th><th>Control</th><th>Range</th><th>Default</th><th>What it does</th></tr>
+<tr><td rowspan="5"><strong>Echo</strong></td><td>Time</td><td>0.25–4 beats</td><td>0.75</td><td>Time between repeats, in beats (0.75: a dotted eighth). Longer than 2 s at the tempo, it plays at the longest halving that fits (shown on the knob). Turning it while it plays bends the repeats, as a tape does.</td></tr>
+<tr><td>Feedback</td><td>0–0.99</td><td>0.55</td><td>How much of each repeat comes back: near the top, the echo builds up, held by its saturation.</td></tr>
+<tr><td>Tone</td><td>0.05–1</td><td>0.35</td><td>Lower makes each repeat darker. The repeats are also cut under 120 Hz.</td></tr>
+<tr><td>To Rev</td><td>0–1</td><td>0.25</td><td>How much of the echo goes on to the reverb.</td></tr>
+<tr><td>Echo</td><td>0–1</td><td>1</td><td>The echo's level in the mix.</td></tr>
+<tr><td rowspan="4"><strong>Reverb</strong></td><td>Size</td><td>0–1</td><td>0.8</td><td>The room's size: how long it rings.</td></tr>
+<tr><td>Damp</td><td>0–1</td><td>0.4</td><td>Higher makes the tail darker.</td></tr>
+<tr><td>Spring</td><td>0–0.9</td><td>0.6</td><td>The spread of a spring: its drip.</td></tr>
+<tr><td>Reverb</td><td>0–1</td><td>1</td><td>The reverb's level in the mix.</td></tr>
+</table>
+<p>The tape wow of the echo (<code>echoWow</code>, 0–0.005 s, default 0.0015) is set in <code>settings.json</code>
+(<code>returns</code>) or by an AI client (<code>setReturns</code>). WAV exports play the returns as set; a stem,
+taken before the master bus, has the track's own sound without the returns.</p>
 
 <!-- ───────────────────────────────────────────────────────────── -->
 <h2 id="generation">15. Generation, styles and auto mode</h2>

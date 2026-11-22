@@ -113,6 +113,22 @@ fn the_master_is_read_and_set() {
 }
 
 #[test]
+fn the_returns_are_read_and_set() {
+    let mut s = session();
+    let returns = call(&mut s, "setReturns", r#"{"settings":{"echoFeedback":0.8,"echoBeats":1.5}}"#).unwrap();
+    assert_eq!(get(&returns, &["echoBeats"]).as_f64(), Some(1.5));
+    assert!((get(&returns, &["echoFeedback"]).as_f64().unwrap() - 0.8).abs() < 1e-6);
+    assert_eq!((s.output_panel.returns().echo_beats, s.output_panel.returns().reverb_level), (1.5, 1.0));
+    for refused in
+        [r#"{"settings":{"echoFeedback":1.5}}"#, r#"{"settings":{"dub":1}}"#, r#"{"settings":{"echoTone":"x"}}"#]
+    {
+        assert!(call(&mut s, "setReturns", refused).is_err(), "{refused}");
+    }
+    assert_eq!(call(&mut s, "getReturns", "{}").unwrap(), returns);
+    assert_eq!(s.editor.history().undo_len(), 0);
+}
+
+#[test]
 fn lists_exports_and_imports() {
     let mut s = session();
     assert_eq!(call(&mut s, "listSynthPresets", "{}").unwrap().to_json(), r#"{"count":0,"presets":[]}"#);

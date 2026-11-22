@@ -531,6 +531,7 @@ fn an_exported_pattern_plays_its_notes_at_their_pitch_and_time() {
         kit: "none".into(),
         sample_rate: 44_100,
         seed: 1,
+        returns: Default::default(),
     };
     // A note a beat (0.5 s) long on each of the first three beats, none on the fourth.
     let text = r#"{"patterns":[{"id":"p","name":"p","bpm":120,"beatCount":4,"tracks":[

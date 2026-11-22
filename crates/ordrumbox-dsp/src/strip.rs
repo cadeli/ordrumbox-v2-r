@@ -140,8 +140,16 @@ audio_params! {
         duck_amount = 0.0, 0.0, 1.0;
         /// Seconds the gain takes to come back once the key falls.
         duck_release_seconds = 0.15, 0.01, 2.0;
+        /// Level of the strip's own signal in its output: 0 for a return,
+        /// which plays only its reverb and delay.
+        dry = 1.0, 0.0, 1.0;
         volume = 1.0, 0.0, 2.0;
         pan = 0.0, -1.0, 1.0;
+        /// Sends of the strip's output (after volume and pan) to the shared
+        /// echo and reverb returns. The strip does not read them: the engine
+        /// feeds the returns with them ([`crate::returns`]).
+        echo_send = 0.0, 0.0, 1.0;
+        reverb_send = 0.0, 0.0, 1.0;
     }
 }
 
@@ -525,6 +533,7 @@ impl Strip {
         let delay = DelayBlock::new(&s, sr);
         let pan = PanBlock::new(f64::from(s.pan));
         let volume = f64::from(s.volume);
+        let dry_level = f64::from(s.dry);
         let comp = Compressor::new(&s, sr);
         let duck = if KEYED { Ducker::new(&s, sr) } else { None };
 
@@ -565,7 +574,7 @@ impl Strip {
             let wet = self.delay_stage(&delay, sat_l, sat_r);
 
             let duck_gain = duck.map_or(1.0, |duck| duck.gain(&mut self.duck_envelope, f64::from(key[frame])));
-            let (left, right) = mix_out(&pan, volume * duck_gain, (sat_l, sat_r), rev, wet);
+            let (left, right) = mix_out(&pan, volume * duck_gain, (sat_l * dry_level, sat_r * dry_level), rev, wet);
             *o_l += left;
             *o_r += right;
         }

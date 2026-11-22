@@ -163,6 +163,9 @@ pub(super) fn take(engine: &mut Engine, inbox: &mut Inbox, host: Option<HostTran
     if let Some(master) = inbox.master.take() {
         engine.set_master(master);
     }
+    if let Some(returns) = inbox.returns.take() {
+        engine.set_returns(returns);
+    }
     if let Some(mix) = inbox.mix.take() {
         engine.set_host_mix(mix);
     }

@@ -10,9 +10,9 @@ use super::Session;
 use super::session_files::WavSource;
 use super::session_mcp::{NO_AUDIO, exported, synth_settings};
 use crate::picker::Export;
-use crate::{master, store};
+use crate::{master, returns, store};
 use ordrumbox_core::steps::MAX_LOOP_COUNT;
-use ordrumbox_engine::Mode;
+use ordrumbox_engine::{Mode, ReturnSettings};
 use std::path::Path;
 
 impl Session {
@@ -187,11 +187,13 @@ impl Session {
         .map(Some)
     }
 
-    /// Playback, the master and the sounds of the tracks. `Ok(None)` when `name` is not one of them.
+    /// Playback, the master, the returns and the sounds of the tracks. `Ok(None)` when `name` is not one of them.
     pub(super) fn mcp_sound_tool(&mut self, name: &str, args: &Value) -> Result<Option<Value>, String> {
         match name {
-            "getMaster" => Ok(master::to_json(&self.output_panel.master())),
+            "getMaster" => Ok(master::SECTION.to_json(&self.output_panel.master())),
             "setMaster" => self.mcp_set_master(args),
+            "getReturns" => Ok(returns::SECTION.to_json(&self.output_panel.returns())),
+            "setReturns" => self.mcp_set_returns(args),
             "play" => self.mcp_play(args),
             "stop" => {
                 self.playback.stop();
@@ -209,6 +211,27 @@ impl Session {
             _ => return Ok(None),
         }
         .map(Some)
+    }
+
+    /// The returns' settings given in `args.settings`, each within its range.
+    fn mcp_set_returns(&mut self, args: &Value) -> Result<Value, String> {
+        let settings = args.get("settings").and_then(Value::as_object).ok_or("settings: not an object")?;
+        let section = &returns::SECTION;
+        let mut changed = self.output_panel.returns();
+        for (key, value) in settings.iter() {
+            let at = format!("settings.{key}");
+            let key =
+                returns::KEYS.iter().find(|k| **k == key).ok_or_else(|| format!("{at}: not a returns setting"))?;
+            let number = value.as_f64().ok_or_else(|| format!("{at}: not a number ({value})"))?;
+            let (min, max) = (section.get(&ReturnSettings::MIN, key), section.get(&ReturnSettings::MAX, key));
+            if !(min..=max).contains(&number) {
+                return Err(format!("{at}: {number} is outside {min} to {max}"));
+            }
+            changed = section.set(changed, key, number);
+        }
+        self.set_returns(changed, true);
+        self.message = "returns settings changed".into();
+        Ok(section.to_json(&self.output_panel.returns()))
     }
 }
 

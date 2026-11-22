@@ -1,6 +1,6 @@
 //! What a MIDI controller's knobs do: each control change (a channel and a
 //! controller number) is bound to one control (the master volume, a track's
-//! volume, pan, filter cutoff or mute), and moves it on top of the settings
+//! volume, pan, filter cutoff, mute or sends, the echo's feedback), and moves it on top of the settings
 //! the tracks have, as a plugin host's mix does ([`HostMix`]). Nothing here
 //! is saved with the library or an undo step: it is how the set is played.
 
@@ -33,16 +33,24 @@ pub enum Control {
     Cutoff(usize),
     /// A track muted from the middle of the knob up.
     Mute(usize),
+    /// A track's send to the shared echo, raised from the one set (knob
+    /// down) to full (knob up): a knob to throw a sound into the echo.
+    EchoSend(usize),
+    /// A track's send to the shared reverb, the same way.
+    ReverbSend(usize),
+    /// The echo's feedback, raised from the one set to the top.
+    EchoFeedback,
 }
 
 impl Control {
     /// Every control of a pattern of `track_count` tracks (those past the
-    /// first [`HOST_TRACKS`] have none), the master first.
+    /// first [`HOST_TRACKS`] have none), the master and the echo first.
     #[must_use]
     pub fn all(track_count: usize) -> Vec<Self> {
-        let tracks = (0..track_count.min(HOST_TRACKS))
-            .flat_map(|t| [Self::Volume(t), Self::Pan(t), Self::Cutoff(t), Self::Mute(t)]);
-        std::iter::once(Self::Master).chain(tracks).collect()
+        let tracks = (0..track_count.min(HOST_TRACKS)).flat_map(|t| {
+            [Self::Volume(t), Self::Pan(t), Self::Cutoff(t), Self::Mute(t), Self::EchoSend(t), Self::ReverbSend(t)]
+        });
+        [Self::Master, Self::EchoFeedback].into_iter().chain(tracks).collect()
     }
 
     /// What it moves, for a list.
@@ -54,6 +62,9 @@ impl Control {
             Self::Pan(_) => "pan",
             Self::Cutoff(_) => "cutoff",
             Self::Mute(_) => "mute",
+            Self::EchoSend(_) => "echo send",
+            Self::ReverbSend(_) => "reverb send",
+            Self::EchoFeedback => "echo feedback",
         }
     }
 
@@ -61,8 +72,13 @@ impl Control {
     #[must_use]
     pub const fn track(self) -> Option<usize> {
         match self {
-            Self::Master => None,
-            Self::Volume(t) | Self::Pan(t) | Self::Cutoff(t) | Self::Mute(t) => Some(t),
+            Self::Master | Self::EchoFeedback => None,
+            Self::Volume(t)
+            | Self::Pan(t)
+            | Self::Cutoff(t)
+            | Self::Mute(t)
+            | Self::EchoSend(t)
+            | Self::ReverbSend(t) => Some(t),
         }
     }
 
@@ -70,10 +86,13 @@ impl Control {
         let track = track.filter(|&t| t < HOST_TRACKS);
         match (what, track) {
             ("master", _) => Some(Self::Master),
+            ("echoFeedback", _) => Some(Self::EchoFeedback),
             ("volume", Some(t)) => Some(Self::Volume(t)),
             ("pan", Some(t)) => Some(Self::Pan(t)),
             ("cutoff", Some(t)) => Some(Self::Cutoff(t)),
             ("mute", Some(t)) => Some(Self::Mute(t)),
+            ("echoSend", Some(t)) => Some(Self::EchoSend(t)),
+            ("reverbSend", Some(t)) => Some(Self::ReverbSend(t)),
             _ => None,
         }
     }
@@ -82,6 +101,9 @@ impl Control {
     const fn key(self) -> &'static str {
         match self {
             Self::Master => "master",
+            Self::EchoSend(_) => "echoSend",
+            Self::ReverbSend(_) => "reverbSend",
+            Self::EchoFeedback => "echoFeedback",
             other => other.what(),
         }
     }
@@ -151,6 +173,9 @@ impl ControlMap {
                 let bit = 1u64 << t;
                 mix.muted = if value >= MIDDLE { mix.muted | bit } else { mix.muted & !bit };
             }
+            Control::EchoSend(t) => mix.tracks[t].echo_send = unit,
+            Control::ReverbSend(t) => mix.tracks[t].reverb_send = unit,
+            Control::EchoFeedback => mix.echo_feedback = unit,
         }
     }
 
@@ -163,6 +188,9 @@ impl ControlMap {
             Control::Pan(t) => self.mix.tracks[t].pan = none.tracks[t].pan,
             Control::Cutoff(t) => self.mix.tracks[t].cutoff_octaves = none.tracks[t].cutoff_octaves,
             Control::Mute(t) => self.mix.muted &= !(1u64 << t),
+            Control::EchoSend(t) => self.mix.tracks[t].echo_send = none.tracks[t].echo_send,
+            Control::ReverbSend(t) => self.mix.tracks[t].reverb_send = none.tracks[t].reverb_send,
+            Control::EchoFeedback => self.mix.echo_feedback = none.echo_feedback,
         }
     }
 
@@ -293,9 +321,29 @@ mod tests {
     }
 
     #[test]
-    fn a_pattern_has_the_master_and_four_controls_a_track_up_to_the_host_s_sixteen() {
-        assert_eq!(Control::all(0), [Control::Master]);
-        assert_eq!(Control::all(2).len(), 1 + 8);
-        assert_eq!(Control::all(40).len(), 1 + 4 * HOST_TRACKS);
+    fn a_pattern_has_the_master_the_echo_and_six_controls_a_track_up_to_the_host_s_sixteen() {
+        assert_eq!(Control::all(0), [Control::Master, Control::EchoFeedback]);
+        assert_eq!(Control::all(2).len(), 2 + 12);
+        assert_eq!(Control::all(40).len(), 2 + 6 * HOST_TRACKS);
+    }
+
+    #[test]
+    fn a_send_knob_raises_the_send_and_the_feedback_knob_the_echo() {
+        let mut map = ControlMap::new();
+        map.bind(Knob { controller: 1, ..KNOB }, Control::EchoSend(2));
+        map.bind(Knob { controller: 2, ..KNOB }, Control::ReverbSend(2));
+        map.bind(Knob { controller: 3, ..KNOB }, Control::EchoFeedback);
+        map.turn(Knob { controller: 1, ..KNOB }, 127);
+        map.turn(Knob { controller: 2, ..KNOB }, 0);
+        map.turn(Knob { controller: 3, ..KNOB }, 127);
+        let mix = map.mix();
+        assert_eq!((mix.tracks[2].echo_send, mix.tracks[2].reverb_send, mix.echo_feedback), (1.0, 0.0, 1.0));
+        let (back, issues) = ControlMap::from_json(&map.to_json());
+        assert!(issues.is_empty(), "{issues:?}");
+        for control in [Control::EchoSend(2), Control::ReverbSend(2), Control::EchoFeedback] {
+            assert_eq!(back.knob_of(control), map.knob_of(control), "{control:?}");
+        }
+        map.unbind(Control::EchoFeedback);
+        assert_eq!(map.mix().echo_feedback, 0.0, "back where it was");
     }
 }

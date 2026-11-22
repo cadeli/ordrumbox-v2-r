@@ -56,13 +56,15 @@ pub struct HostMix {
     /// The tracks left out of the mix and given apart, each on an output of
     /// its own ([`Engine::render_split`]): bit `t` for track `t`.
     pub split: u64,
+    /// Added to the echo return's feedback, the sum kept within its range.
+    pub echo_feedback: f32,
     /// The changes to each of the first tracks.
     pub tracks: [HostTrack; HOST_TRACKS],
 }
 
 impl Default for HostMix {
     fn default() -> Self {
-        Self { gain: 1.0, muted: 0, split: 0, tracks: [HostTrack::default(); HOST_TRACKS] }
+        Self { gain: 1.0, muted: 0, split: 0, echo_feedback: 0.0, tracks: [HostTrack::default(); HOST_TRACKS] }
     }
 }
 
@@ -86,6 +88,9 @@ pub struct HostTrack {
     pub delay: f32,
     /// Added to the delay feedback (kept within 0 to 0.95; a slap delay has none).
     pub feedback: f32,
+    /// Added to the sends to the echo and reverb returns.
+    pub echo_send: f32,
+    pub reverb_send: f32,
     /// Added to the saturation amount.
     pub saturation: f32,
     /// Added to the compressor's mix (0: off, 1: fully compressed).
@@ -106,6 +111,8 @@ impl Default for HostTrack {
             reverb: 0.0,
             delay: 0.0,
             feedback: 0.0,
+            echo_send: 0.0,
+            reverb_send: 0.0,
             saturation: 0.0,
             compressor: 0.0,
             threshold_db: 0.0,
@@ -171,6 +178,12 @@ impl HostMix {
         }
         if host.feedback != 0.0 && !is_slap(&s) {
             s.delay_feedback = add(s.delay_feedback, host.feedback, HOST_FEEDBACK_MAX);
+        }
+        if host.echo_send != 0.0 {
+            s.echo_send = add(s.echo_send, host.echo_send, 1.0);
+        }
+        if host.reverb_send != 0.0 {
+            s.reverb_send = add(s.reverb_send, host.reverb_send, 1.0);
         }
         if host.saturation != 0.0 {
             let amount = (saturation_amount(&s) + f64::from(host.saturation)).clamp(0.0, 1.0);

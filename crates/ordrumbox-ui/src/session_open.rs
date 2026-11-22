@@ -189,6 +189,7 @@ impl Session {
                 kit: self.kits.kits().first().map(|k| k.name.clone()).unwrap_or_default(),
                 sample_rate: offline::EXPORT_RATE,
                 seed: 1,
+                returns: Default::default(),
             });
         }
         match start_output(bank, scales, synths) {

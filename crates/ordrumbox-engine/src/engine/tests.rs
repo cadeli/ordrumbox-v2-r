@@ -535,3 +535,53 @@ fn a_seek_skips_the_pulses_before_it_and_a_later_pass_continues_from_its_positio
     let sent = clock(&mut engine, 100, 10);
     assert_eq!(&sent[..2], [(0, ClockMessage::Position(16)), (0, ClockMessage::Continue)], "4 beats on: 16 sixteenths");
 }
+
+/// One hit at frame 0 of passes a beat of 4800 frames long (the echo's
+/// 0.75 beat is 3600 frames), its strip sending `echo_send` to the echo.
+fn echo_pass(echo_send: f32) -> Arc<Pass> {
+    let mut pass = Arc::unwrap_or_clone(pass(0, &[0], 4_800));
+    pass.strips[0].echo_send = echo_send;
+    Arc::new(pass)
+}
+
+/// The loudest sample of `signal` within `range`.
+fn loudest_in(signal: &[f32], range: std::ops::Range<usize>) -> f32 {
+    signal[range].iter().fold(0.0_f32, |m, s| m.max(s.abs()))
+}
+
+/// Where the echo of the hit at frame 0 sounds, before the next pass.
+const ECHO_WINDOW: std::ops::Range<usize> = 3_500..4_700;
+
+#[test]
+fn a_send_plays_the_echo_of_a_hit_and_none_without_it() {
+    let mut dry = engine();
+    dry.play(echo_pass(0.0));
+    assert!(loudest_in(&render(&mut dry, 4_700), ECHO_WINDOW) < 1e-4, "no send, no echo");
+    let mut sent = engine();
+    sent.play(echo_pass(1.0));
+    let signal = render(&mut sent, 4_700);
+    assert!(loudest_in(&signal, ECHO_WINDOW) > 1e-2, "an echo 0.75 beat later");
+    assert!(loudest_in(&signal, 3_000..3_500) < 1e-4, "not before");
+}
+
+#[test]
+fn a_send_opened_for_a_moment_lets_the_echo_play_on() {
+    let mut engine = engine();
+    engine.play(echo_pass(0.0));
+    // A throw: the host opens the send on the hit only.
+    let mut throw = HostMix::default();
+    throw.tracks[0].echo_send = 1.0;
+    engine.set_host_mix(throw);
+    let mut signal = render(&mut engine, 1_024);
+    engine.set_host_mix(HostMix::default());
+    signal.extend(render(&mut engine, 4_700 - 1_024));
+    assert!(loudest_in(&signal, ECHO_WINDOW) > 1e-2, "the echo plays after the send closed");
+}
+
+#[test]
+fn a_muted_track_sends_nothing() {
+    let mut engine = engine();
+    engine.set_host_mix(HostMix { muted: 1, ..HostMix::default() });
+    engine.play(echo_pass(1.0));
+    assert!(loudest_in(&render(&mut engine, 4_700), 0..4_700) < 1e-4);
+}
