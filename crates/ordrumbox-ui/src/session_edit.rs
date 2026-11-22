@@ -29,8 +29,8 @@ impl Session {
 
     pub fn click(&mut self, hit: Hit) {
         match hit {
-            Hit::Mute(t) => self.toggle_row(t, "mute"),
-            Hit::Solo(t) => self.toggle_row(t, "solo"),
+            Hit::Mute(t) => self.switch_track(t, "mute"),
+            Hit::Solo(t) => self.switch_track(t, "solo"),
             Hit::Name(t) => {
                 self.selection.put_cursor(Cursor {
                     track: t,

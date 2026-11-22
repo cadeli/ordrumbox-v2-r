@@ -202,7 +202,10 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   you press at is the level, as on a fader: the top is 0 dB, the middle about −15 dB, the
   bottom silent; a drag draws a line from it to the pointer's height, which plays as a
   smooth glide. While you draw, and when the mouse is over a lane, a tooltip gives the
-  value under it (`KICK Volume -4.5 dB at 2.3`). With the **right button**, the selection is erased, back to
+  value under it (`KICK Volume -4.5 dB at 2.3`). A press on the line of a level already
+  drawn grabs its segment (from its change to the next): drag up or down to move it as one.
+  A lane can be one to four rows tall: drag its bottom edge in the names column, or use
+  **Taller** / **Shorter** in its menu (saved with the song). With the **right button**, the selection is erased, back to
   what the patterns say. The selection is made of whole measures, beats or steps, as fine
   as the ruler is marked at that zoom; hold **Shift** to select steps at any zoom. Only
   the steps selected change. Where a lane sets nothing, the instrument plays as its
@@ -211,7 +214,8 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   right, on a lane's name opens its menu: clear all its points, delete the lane, or
   delete every lane. Lanes are saved with the song.
 - **Automation and the mixer** while a song plays: the mixer shows what the lanes set (a
-  fader moves with its Volume lane, M and S light with their lanes). Moving a control that
+  fader moves with its Volume lane, M and S light with their lanes), and so do the grid's
+  volume sliders and M S boxes and the track editor's Volume knob. Moving a control that
   has a lane takes it back: the lane is no longer played for that instrument, and the
   control keeps the value you gave it, until **Play > Re-enable automation**. With **REC**
   (beside PLAY in song mode) or **Play > Record automation** on, moving a mixer control while the song plays writes its lane

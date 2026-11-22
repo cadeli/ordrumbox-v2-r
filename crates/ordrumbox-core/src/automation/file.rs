@@ -1,6 +1,6 @@
-//! Automation lanes in a song file: `{instrument, target, points}`, each
-//! point `{step, value}`, a `null` value giving the control back to the
-//! pattern.
+//! Automation lanes in a song file: `{instrument, target, rows, points}`,
+//! each point `{step, value}`, a `null` value giving the control back to
+//! the pattern; `rows` (how tall it is drawn) only when more than one.
 
 use super::{AutomationLane, AutomationPoint, AutomationTarget, kept};
 use crate::json::{Object, Value};
@@ -27,6 +27,14 @@ impl AutomationLane {
             return None;
         };
         let mut lane = Self::new(instrument, target);
+        if let Some(raw) = object.get("rows").filter(|v| !v.is_null()) {
+            let range = 1.0..=f64::from(Self::MAX_ROWS);
+            match raw.to_number().filter(|r| r.fract() == 0.0 && range.contains(r)) {
+                Some(rows) => lane.set_row_count(rows as u32),
+                None => issues
+                    .push(Issue::new(format!("{at}.rows"), format!("not 1 to {} ({raw}), kept at 1", Self::MAX_ROWS))),
+            }
+        }
         let points = match object.get("points").filter(|v| !v.is_null()) {
             None => &[][..],
             Some(Value::Array(items)) => items.as_slice(),
@@ -60,6 +68,9 @@ impl AutomationLane {
             object.insert("value", point.value.map_or(Value::Null, Value::from));
             Value::Object(object)
         });
+        if self.row_count > 1 {
+            object.insert("rows", Value::from(self.row_count));
+        }
         object.insert("points", Value::Array(points.collect()));
         Value::Object(object)
     }

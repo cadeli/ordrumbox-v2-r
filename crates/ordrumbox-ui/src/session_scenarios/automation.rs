@@ -81,3 +81,39 @@ fn a_control_moved_over_its_lane_takes_it_back_until_re_enabled() {
     assert_eq!(s.automated_now(0, AutomationTarget::Volume), Some(lane_gain));
     assert_eq!(s.message, "its lane plays again");
 }
+
+#[test]
+fn the_grid_and_the_track_editor_show_the_lanes_too() {
+    use crate::panel::Kind;
+    use crate::test_support::SIZE;
+    let (mut s, mut audio) = session(LIBRARY);
+    s.show_mode(true);
+    for (target, value) in [(AutomationTarget::Volume, 0.5), (AutomationTarget::Mute, 1.0)] {
+        let lane = s.editor.add_automation_lane(None, "KICK", target).unwrap();
+        let base = s.song().unwrap().automations[lane].clone();
+        let stroke = ordrumbox_core::AutomationStroke::Fill(Some(value));
+        s.editor.paint_automation(None, lane, &base, (0, 1000), stroke, "a").unwrap();
+    }
+    assert!(s.shown_switches().is_empty(), "stopped: the tracks' own");
+    s.toggle_play();
+    run(&mut s, &mut audio, 2 * STEP);
+    let gain = ordrumbox_core::automation::volume_gain(0.5);
+
+    // The grid's slider, moved as by an LFO; its M lit.
+    s.run(Command::Grid);
+    let slider = s.panel_layout(SIZE.0, SIZE.1, SIZE.2).items.into_iter().find_map(|item| match (item.id, item.kind) {
+        (Some(Id::TrackVolume(0)), Kind::Value { value, lfo, .. }) => Some((value, lfo)),
+        _ => None,
+    });
+    assert_eq!(slider, Some((gain, true)));
+    assert_eq!(s.shown_switches(), [(true, false)]);
+    // The track editor's knob.
+    assert!(s.track_view(0).unwrap().lfo.contains(&("volume", gain)));
+
+    // Its knob moved: the lane taken back, as from the mixer.
+    s.set_value(Id::KnobBar("volume"), 0.7);
+    assert_eq!((s.track(0).unwrap().volume, s.automated_now(0, AutomationTarget::Volume)), (0.7, None));
+    // M in the grid: the mute lane taken back, the track left playing.
+    s.switch_track(0, "mute");
+    assert_eq!((s.shown_switches(), s.track(0).unwrap().mute), (vec![(false, false)], false));
+}

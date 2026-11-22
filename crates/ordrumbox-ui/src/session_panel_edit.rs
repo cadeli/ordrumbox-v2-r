@@ -166,6 +166,8 @@ impl Session {
         let Some(t) = self.editor_track() else { return };
         let name = self.track_name(t);
         match id {
+            // The track editor's volume: the mixer's fader's, lanes included.
+            Id::KnobBar("volume") => self.set_track_volume(t, value),
             Id::KnobBar(key) => {
                 let label = KNOB_BAR.iter().find(|(p, _)| p.key == key).map_or(key, |(p, _)| p.label);
                 self.update_track(t, &[(key, number(value))], &format!("{label} on {name}"), true);

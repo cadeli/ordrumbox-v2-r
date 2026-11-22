@@ -255,7 +255,8 @@ pub fn track_editor(view: &TrackView, state: &EditorState, area: Rect, scale: Sc
             } else {
                 let value = lfo_now(p.key).unwrap_or_else(|| number(track, p.key));
                 let spec = value_spec(p, default_of(p.key, p.min), true);
-                (Id::KnobBar(p.key), spec, value, p.label, p.format.value(value, unit), has_lfo(track, p.key))
+                let moved = has_lfo(track, p.key) || lfo_now(p.key).is_some();
+                (Id::KnobBar(p.key), spec, value, p.label, p.format.value(value, unit), moved)
             }
         })
         .collect();

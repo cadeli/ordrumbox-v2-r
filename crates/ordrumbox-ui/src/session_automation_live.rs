@@ -82,6 +82,43 @@ impl Session {
         })
     }
 
+    /// Mute and solo of track `t` as shown: what the song's lanes set while
+    /// it plays, else the track's own.
+    pub(super) fn shown_switch(&self, t: usize) -> (bool, bool) {
+        let Some(track) = self.track(t) else { return (false, false) };
+        let shown = |target, own| self.automated_now(t, target).map_or(own, is_on);
+        (shown(AutomationTarget::Mute, track.mute), shown(AutomationTarget::Solo, track.solo))
+    }
+
+    /// Every track's [`Self::shown_switch`] while the song plays; empty
+    /// otherwise (the views show the tracks' own).
+    pub(super) fn shown_switches(&self) -> Vec<(bool, bool)> {
+        if self.playing_position().is_none() {
+            return Vec::new();
+        }
+        let count = self.pattern().map_or(0, |pattern| pattern.tracks.len());
+        (0..count).map(|t| self.shown_switch(t)).collect()
+    }
+
+    /// Mute or solo (`key`) of track `t` switched from what is shown (the
+    /// mixer, the grid, M, S, 1-9): written to its lane while the song plays
+    /// and records automation, else its lane taken back.
+    pub fn switch_track(&mut self, t: usize, key: &str) {
+        let target = if key == "mute" { AutomationTarget::Mute } else { AutomationTarget::Solo };
+        let Some(own) = self.track(t).map(|track| if key == "mute" { track.mute } else { track.solo }) else { return };
+        let is_on = !self.automated_now(t, target).map_or(own, is_on);
+        let moved = self.automate_from_mixer(t, target, switch_value(is_on));
+        if moved == MixerMove::Written {
+            return;
+        }
+        if is_on != own {
+            self.toggle_row(t, key);
+        }
+        if moved == MixerMove::TakenBack {
+            self.say_taken_back(t, target);
+        }
+    }
+
     /// Track `t`'s `target` set to `value` from the mixer (a fader's gain, a
     /// button's 0 or 1) while the song plays: written to its lane when
     /// recording, else its lane taken back.

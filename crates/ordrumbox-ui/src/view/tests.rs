@@ -137,6 +137,7 @@ fn draws_without_panicking_at_any_size() {
             transport: Transport::Own,
             track_drop: None,
             host_muted: 0b10,
+            switches: vec![(true, false)],
             host_moved: 0b01,
             host_split: 0b10,
             cursor: Some(Cursor { track: 0, beat: 1, step: 2 }),

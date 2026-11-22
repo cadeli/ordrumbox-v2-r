@@ -52,7 +52,7 @@ impl Session {
             (SongHit::Ruler(m), Button::Left) => self.press_ruler(size, x, m),
             (SongHit::LoopEnd(edge), Button::Left) => self.press_loop_end(edge),
             (SongHit::Ruler(_) | SongHit::LoopEnd(_), Button::Right) => self.loop_menu(x, y),
-            (SongHit::AddAutomation | SongHit::LaneName(_) | SongHit::LaneStep { .. }, _) => {
+            (SongHit::AddAutomation | SongHit::LaneName(_) | SongHit::LaneEdge(_) | SongHit::LaneStep { .. }, _) => {
                 self.automation_click(size, hit, (x, y), button);
             }
             (SongHit::Cell { row, measure }, Button::Left) => {
@@ -177,7 +177,7 @@ impl Session {
         let drag = self.live_song_drag()?;
         let DragSource::Row(from) = drag.source else { return None };
         let movable = rows.iter().filter(|r| !r.orphan).count();
-        let first = self.song_scroll(layout, rows.len() + self.song_lane_count()).1;
+        let first = self.song_scroll(layout, rows.len() + self.song_lane_rows()).1;
         Some((from, layout.drop_row(drag.y, first).min(movable.saturating_sub(1))))
     }
 
@@ -217,6 +217,9 @@ impl Session {
         if self.song_panel.paint.is_some() {
             return self.lane_paint_move(size, (x, y), shift);
         }
+        if self.song_panel.lane_resize.is_some() {
+            return self.lane_resize_move(size, y);
+        }
         let Some(drag) = &mut self.song_panel.drag else { return false };
         (drag.x, drag.y) = (x, y);
         let (dx, dy) = (x - drag.press.0, y - drag.press.1);
@@ -231,6 +234,9 @@ impl Session {
         }
         if self.song_panel.loop_drag.is_some() {
             return self.loop_drag_release();
+        }
+        if self.song_panel.lane_resize.take().is_some() {
+            return true;
         }
         // A press without a drag opens the menu of what was pressed.
         if let Some(SongDrag { source, started: false, press: (x, y), .. }) = self.song_panel.drag {
@@ -293,7 +299,7 @@ impl Session {
             self.song_panel.list_scroll = (self.pattern_index, first);
             return changed;
         }
-        let rows = self.song_rows().len() + self.song_lane_count();
+        let rows = self.song_rows().len() + self.song_lane_rows();
         let (mut sx, mut sy) = self.song_scroll(&layout, rows);
         match axis {
             Axis::Measures => {
@@ -330,7 +336,7 @@ impl Session {
         if self.song().is_none() || self.workspace != Workspace::Song || lines == 0 || !layout.grid.contains(x, y) {
             return false;
         }
-        let rows = self.song_rows().len() + self.song_lane_count();
+        let rows = self.song_rows().len() + self.song_lane_rows();
         let (mut sx, mut sy) = self.song_scroll(&layout, rows);
         if shift {
             let last = rows.saturating_sub(layout.visible_rows());

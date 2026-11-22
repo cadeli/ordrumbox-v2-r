@@ -71,6 +71,22 @@ impl Editor {
         Ok(())
     }
 
+    /// Lane `lane` drawn over `rows` rows (1 to [`AutomationLane::MAX_ROWS`]);
+    /// whether that changed it. The edits under one `coalesce` key are one
+    /// undo step (a drag of its edge).
+    pub fn set_automation_lane_rows(&mut self, song: Option<usize>, lane: usize, rows: u32, coalesce: &str) -> bool {
+        let Some(s) = self.song_index(song) else { return false };
+        let rows = rows.clamp(1, AutomationLane::MAX_ROWS);
+        let Some(current) = self.library.songs[s].automations.get(lane).filter(|l| l.row_count() != rows) else {
+            return false;
+        };
+        let desc = format!("{} {} lane {rows} row(s) tall", current.instrument, current.target.label());
+        self.edit_songs_coalesced(desc, None, Some(coalesce.to_owned()), |songs| {
+            songs[s].automations[lane].set_row_count(rows);
+        });
+        true
+    }
+
     /// Every point of lane `lane` removed; whether it had some.
     pub fn clear_automation_lane(&mut self, song: Option<usize>, lane: usize) -> bool {
         let Some(s) = self.song_index(song) else { return false };
@@ -200,5 +216,17 @@ mod tests {
         let flat = AutomationStroke::Line((3, 0.8), (3, 0.8));
         e.paint_automation(None, 0, &base, (3, 3), flat, "click").unwrap();
         assert_eq!(e.undo().as_deref(), Some("KICK Volume -2.4 dB at 1.4"));
+    }
+
+    #[test]
+    fn a_lane_is_made_taller_in_one_step() {
+        let mut e = editor();
+        e.add_automation_lane(None, "KICK", AutomationTarget::Volume).unwrap();
+        assert!(e.set_automation_lane_rows(None, 0, 2, "drag"));
+        assert!(e.set_automation_lane_rows(None, 0, 9, "drag"));
+        assert!(!e.set_automation_lane_rows(None, 0, 4, "drag"), "already 4, the most");
+        assert_eq!(lanes(&e)[0].row_count(), 4);
+        assert_eq!(e.undo().as_deref(), Some("KICK Volume lane 4 row(s) tall"));
+        assert_eq!(lanes(&e)[0].row_count(), 1, "the drag, one step");
     }
 }

@@ -26,7 +26,7 @@ impl Session {
     /// A press on the ruler at `x`, on measure `measure`: a new loop or, a click, none.
     pub(super) fn press_ruler(&mut self, size: (i32, i32, Scale), x: i32, measure: u32) {
         let layout = self.song_layout(size);
-        let first = self.song_scroll(&layout, self.song_rows().len() + self.song_lane_count()).0;
+        let first = self.song_scroll(&layout, self.song_rows().len() + self.song_lane_rows()).0;
         let anchor = layout.step_at(x, first);
         self.song_panel.loop_drag = Some(LoopDrag::New { anchor, press_x: x, measure, started: false });
     }
@@ -41,7 +41,7 @@ impl Session {
     pub(super) fn loop_drag_move(&mut self, size: (i32, i32, Scale), x: i32) -> bool {
         let Some(drag) = self.song_panel.loop_drag else { return false };
         let layout = self.song_layout(size);
-        let first = self.song_scroll(&layout, self.song_rows().len() + self.song_lane_count()).0;
+        let first = self.song_scroll(&layout, self.song_rows().len() + self.song_lane_rows()).0;
         let snap = layout.snap_steps();
         let total = self.song().map_or(1, |song| song.length_measures().max(1.0).ceil() as u32) * STEPS_PER_MEASURE;
         let before = self.song_loop_marks();

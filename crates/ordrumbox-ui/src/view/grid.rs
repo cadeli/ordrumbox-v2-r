@@ -160,8 +160,10 @@ fn draw_mute_solo(canvas: &mut Canvas, track: &Track, i: usize, y: i32, view: &V
     let box_y = y + (layout.row - layout.box_size) / 2;
     // A mute from the host is lit in its own colour: the track's own stays off.
     let host_mute = ordrumbox_engine::host_muted(view.host_muted, i);
-    let (mute, mute_color) = if track.mute { (true, MUTE_ON) } else { (host_mute, mute_host_color()) };
-    for (solo, on, color, letter) in [(false, mute, mute_color, "M"), (true, track.solo, SOLO_ON, "S")] {
+    // The song's lanes, while it plays, else the track's own.
+    let (own_mute, solo) = view.switches.get(i).copied().unwrap_or((track.mute, track.solo));
+    let (mute, mute_color) = if own_mute { (true, MUTE_ON) } else { (host_mute, mute_host_color()) };
+    for (solo, on, color, letter) in [(false, mute, mute_color, "M"), (true, solo, SOLO_ON, "S")] {
         let x = layout.box_x(solo);
         canvas.fill_rect(x, box_y, layout.box_size, layout.box_size, if on { color } else { box_off_color() });
         let letter_scale = Scale::whole((layout.box_size / 10).max(1));

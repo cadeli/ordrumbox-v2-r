@@ -103,6 +103,7 @@ impl Session {
             show_vus: self.chrome.show_vus,
             transport: self.transport_shown(),
             host_muted: self.host.muted,
+            switches: self.shown_switches(),
             host_moved: self.host.mix.moved_tracks(),
             host_split: self.host.mix.split,
             track_drop: self.track_drop((canvas.width(), canvas.height(), scale)),

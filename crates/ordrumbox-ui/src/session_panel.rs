@@ -244,10 +244,14 @@ impl Session {
         }
     }
 
-    /// The volume a slider or a fader of track `t` shows, and whether a host
-    /// moves it: a host that automates it moves the control, in the colour of
-    /// a modulated value; the track's own `volume` stays what is saved.
+    /// The volume a slider or a fader of track `t` shows, and whether
+    /// something else moves it: the song's volume lane while it plays, or a
+    /// plugin host that automates it, move the control, in the colour of a
+    /// modulated value; the track's own `volume` stays what is saved.
     pub(super) fn shown_track_volume(&self, t: usize, volume: f64, spec: Spec) -> (f64, bool) {
+        if let Some(gain) = self.automated_now(t, ordrumbox_core::AutomationTarget::Volume) {
+            return (gain.clamp(spec.min, spec.max), true);
+        }
         let host_gain = self.host.mix.tracks.get(t).map_or(1.0, |host| f64::from(host.gain));
         if host_gain == 1.0 { (volume, false) } else { ((volume * host_gain).clamp(spec.min, spec.max), true) }
     }

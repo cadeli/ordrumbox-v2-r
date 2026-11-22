@@ -99,12 +99,14 @@ pub(super) struct SongPanel {
     pub(super) paint: Option<LanePaint>,
     /// The ruler pressed: the song's loop set or moved (`session_song_loop.rs`).
     pub(super) loop_drag: Option<LoopDrag>,
+    /// An automation lane's bottom edge held, and the undo key of the drag.
+    pub(super) lane_resize: Option<(usize, String)>,
 }
 
 impl SongPanel {
     /// A pattern, a clip or a row is held by the mouse, a lane painted or the ruler pressed.
     pub(super) fn dragging(&self) -> bool {
-        self.drag.is_some() || self.paint.is_some() || self.loop_drag.is_some()
+        self.drag.is_some() || self.paint.is_some() || self.loop_drag.is_some() || self.lane_resize.is_some()
     }
 
     /// The scroll bar held by the mouse, if any.
@@ -244,7 +246,7 @@ impl Session {
             rows,
             cursor: self.song_cursor_measure(),
             playing: self.song_playing(),
-            scroll: self.song_scroll(layout, rows.len() + self.song_lane_count()),
+            scroll: self.song_scroll(layout, rows.len() + self.song_lane_rows()),
             dragged_clip: self.song_dragged_clip(layout, rows.len()),
             ghost: self.song_ghost(layout, rows),
             row_drop: self.song_row_drop(layout, rows),

@@ -26,6 +26,8 @@ const LANE_VALUE: &str = "lane:";
 const REMOVE_VALUE: &str = "remove:";
 const CLEAR_VALUE: &str = "clear:";
 const REMOVE_ALL_VALUE: &str = "remove-all";
+const TALLER_VALUE: &str = "taller:";
+const SHORTER_VALUE: &str = "shorter:";
 
 /// A press on a lane's step, which a drag turns into a painted zone.
 #[derive(Debug, Clone, PartialEq)]
@@ -55,6 +57,9 @@ enum Brush {
     /// A level's lane: a line from the level pressed to the pointer's, over
     /// the lane's band `(top, height)`.
     Line { band: (i32, i32), from: f64, to: f64 },
+    /// A level's segment grabbed on its line: steps `zone`, at `level` when
+    /// pressed at `grab_y`, moved up or down as one with the pointer at `y`.
+    Segment { band: (i32, i32), zone: (u32, u32), level: f64, grab_y: i32, y: i32 },
 }
 
 impl LanePaint {
@@ -63,14 +68,17 @@ impl LanePaint {
         match self.brush {
             Brush::Fill(value) => AutomationStroke::Fill(value),
             Brush::Line { from, to, .. } => AutomationStroke::Line((self.from, from), (self.to, to)),
+            Brush::Segment { band: (_, height), level, grab_y, y, .. } => {
+                AutomationStroke::Fill(Some(level + f64::from(grab_y - y) / f64::from(height.max(1))))
+            }
         }
     }
 }
 
 impl Session {
-    /// The automation lanes of the arrangement shown.
-    pub(super) fn song_lane_count(&self) -> usize {
-        self.song().map_or(0, |song| song.automations.len())
+    /// The rows the automation lanes of the arrangement shown take.
+    pub(super) fn song_lane_rows(&self) -> usize {
+        self.song().map_or(0, |song| song.automations.iter().map(|lane| lane.row_count() as usize).sum())
     }
 
     /// A click at `(x, y)` on the add-automation button, a lane's name or one of its steps.
@@ -83,8 +91,11 @@ impl Session {
     ) {
         match (hit, button) {
             (SongHit::AddAutomation, Button::Left) => self.automation_menu(x, y),
-            (SongHit::LaneName(lane), _) => self.lane_menu(lane, x, y),
+            (SongHit::LaneName(lane), _) | (SongHit::LaneEdge(lane), Button::Right) => self.lane_menu(lane, x, y),
             (SongHit::LaneStep { lane, step }, _) => self.press_lane(size, lane, (step, y), button, false),
+            (SongHit::LaneEdge(lane), _) => {
+                self.song_panel.lane_resize = Some((lane, format!("lane-rows:{lane}:{}", self.editor.revision())));
+            }
             _ => {}
         }
     }
@@ -101,14 +112,20 @@ impl Session {
     ) {
         let Some(base) = self.song().and_then(|song| song.automations.get(lane)).cloned() else { return };
         let layout = self.song_layout(size);
+        let rows = self.song_rows();
+        let Some(band) = layout.lane_band(&self.song_view_data(&rows, &layout), lane) else { return };
         let brush = match (button, base.target.kind()) {
             (Button::Right, _) => Brush::Fill(None),
             (_, AutomationKind::Switch) => Brush::Fill(Some(switch_value(base.is_on_at(step) != Some(true)))),
-            (_, AutomationKind::Level) => {
-                let band = layout.lane_band_at(y);
-                let level = layout.level_at(band, y);
-                Brush::Line { band, from: level, to: level }
-            }
+            (_, AutomationKind::Level) => match base.value_at(step) {
+                Some(level) if layout.is_on_level_line(band, level, y) => {
+                    Brush::Segment { band, zone: self.segment_at(&base, step), level, grab_y: y, y }
+                }
+                _ => {
+                    let level = layout.level_at(band, y);
+                    Brush::Line { band, from: level, to: level }
+                }
+            },
         };
         let paint = LanePaint {
             lane,
@@ -129,11 +146,12 @@ impl Session {
     /// lane, to the level at `y`); whether it changed.
     pub(super) fn lane_paint_move(&mut self, size: (i32, i32, Scale), (x, y): (i32, i32), shift: bool) -> bool {
         let layout = self.song_layout(size);
-        let first = self.song_scroll(&layout, self.song_rows().len() + self.song_lane_count()).0;
+        let first = self.song_scroll(&layout, self.song_rows().len() + self.song_lane_rows()).0;
         let step = layout.step_at(x, first).min(self.song_step_count() - 1);
         let Some(paint) = &mut self.song_panel.paint else { return false };
         let brush = match paint.brush {
             Brush::Line { band, from, .. } => Brush::Line { band, from, to: layout.level_at(band, y) },
+            Brush::Segment { band, zone, level, grab_y, .. } => Brush::Segment { band, zone, level, grab_y, y },
             fill @ Brush::Fill(_) => fill,
         };
         if (step, shift, brush) == (paint.to, paint.is_fine, paint.brush) {
@@ -145,6 +163,30 @@ impl Session {
         true
     }
 
+    /// The segment of `lane` at `step`: from its point at or before it to
+    /// the step before its next point (or the song's end).
+    fn segment_at(&self, lane: &AutomationLane, step: u32) -> (u32, u32) {
+        let points = lane.points();
+        let after = points.partition_point(|point| point.step <= step);
+        let first = after.checked_sub(1).map_or(0, |i| points[i].step);
+        let end = points.get(after).map_or(self.song_step_count(), |point| point.step);
+        (first, end.saturating_sub(1).max(first))
+    }
+
+    /// The bottom edge of the lane held moved to `y`: the lane as many
+    /// rows tall as the edge is near; whether that changed it.
+    pub(super) fn lane_resize_move(&mut self, size: (i32, i32, Scale), y: i32) -> bool {
+        let Some((lane, key)) = self.song_panel.lane_resize.clone() else { return false };
+        let layout = self.song_layout(size);
+        let rows = self.song_rows();
+        let count = layout.lane_rows_at(&self.song_view_data(&rows, &layout), lane, y);
+        let changed = self.editor.set_automation_lane_rows(None, lane, count, &key);
+        if changed {
+            self.edited();
+        }
+        changed
+    }
+
     /// The steps of the arrangement shown, a measure at least.
     fn song_step_count(&self) -> u32 {
         self.song().map_or(1, |song| song.length_measures().max(1.0).ceil() as u32) * STEPS_PER_MEASURE
@@ -154,7 +196,10 @@ impl Session {
     fn paint_lane(&mut self, paint: &LanePaint) {
         let snap = if paint.is_fine { 1 } else { paint.snap.max(1) };
         let (first, last) = (paint.from.min(paint.to), paint.from.max(paint.to));
-        let zone = (first / snap * snap, (last / snap * snap + snap - 1).min(self.song_step_count() - 1));
+        let zone = match paint.brush {
+            Brush::Segment { zone, .. } => zone,
+            _ => (first / snap * snap, (last / snap * snap + snap - 1).min(self.song_step_count() - 1)),
+        };
         match self.editor.paint_automation(None, paint.lane, &paint.base, zone, paint.stroke(), &paint.key) {
             Ok(()) => self.edited(),
             Err(message) => self.message = message,
@@ -199,8 +244,15 @@ impl Session {
     fn lane_menu(&mut self, lane: usize, x: i32, y: i32) {
         let Some(lane_shown) = self.song().and_then(|song| song.automations.get(lane)) else { return };
         let title = format!("{} {}", lane_shown.target.label(), lane_shown.instrument);
-        let values = vec![format!("{CLEAR_VALUE}{lane}"), format!("{REMOVE_VALUE}{lane}"), REMOVE_ALL_VALUE.into()];
-        let labels = vec!["Clear all points".into(), "Delete lane".into(), "Delete all lanes".into()];
+        let values = vec![
+            format!("{TALLER_VALUE}{lane}"),
+            format!("{SHORTER_VALUE}{lane}"),
+            format!("{CLEAR_VALUE}{lane}"),
+            format!("{REMOVE_VALUE}{lane}"),
+            REMOVE_ALL_VALUE.into(),
+        ];
+        let labels = ["Taller", "Shorter", "Clear all points", "Delete lane", "Delete all lanes"];
+        let labels = labels.map(str::to_owned).into();
         let menu = Dropdown::menu(Id::AutomationMenu, x, y, title, values, labels);
         self.chrome.widgets.dropdown = Some(menu);
     }
@@ -240,6 +292,19 @@ impl Session {
                     s.edited();
                 }
             });
+        } else if let Some((lane, delta)) = value
+            .strip_prefix(TALLER_VALUE)
+            .map(|l| (l, 1))
+            .or_else(|| value.strip_prefix(SHORTER_VALUE).map(|l| (l, -1)))
+            .and_then(|(l, delta)| Some((l.parse::<usize>().ok()?, delta)))
+        {
+            let Some(rows) = self.song().and_then(|song| song.automations.get(lane)).map(|l| l.row_count()) else {
+                return;
+            };
+            let key = format!("lane-rows:{lane}:{}", self.editor.revision());
+            if self.editor.set_automation_lane_rows(None, lane, rows.saturating_add_signed(delta), &key) {
+                self.edited();
+            }
         } else if value == REMOVE_ALL_VALUE {
             self.undoable(|s| {
                 if s.editor.remove_automation_lanes(None) {
@@ -276,6 +341,13 @@ mod tests {
         assert!(s.song_click(SIZE, from, y, button));
         assert!(s.mouse_move(SIZE, to, y + 30, false), "the row under the pointer does not matter");
         assert!(s.lane_paint_release());
+    }
+
+    /// The band the first lane is drawn in.
+    fn band(s: &Session) -> (i32, i32) {
+        let layout = s.song_layout(SIZE);
+        let rows = s.song_rows();
+        layout.lane_band(&s.song_view_data(&rows, &layout), 0).expect("a lane")
     }
 
     /// A session whose song has a lane of KICK's `target`.
@@ -346,8 +418,8 @@ mod tests {
         // A right-click on its name opens its menu: clear it, delete it, delete every lane.
         let (nx, ny) = find(&s, |hit| hit == SongHit::LaneName(0));
         assert!(s.song_click(SIZE, nx, ny, Button::Right));
-        assert_eq!(menu(&s), ["clear:0", "remove:0", "remove-all"]);
-        choose(&mut s, 1);
+        assert_eq!(menu(&s), ["taller:0", "shorter:0", "clear:0", "remove:0", "remove-all"]);
+        choose(&mut s, 3);
         assert!(s.song().unwrap().automations.is_empty());
     }
 
@@ -375,8 +447,8 @@ mod tests {
     #[test]
     fn a_drag_on_a_volume_lane_draws_a_line_by_height() {
         let mut s = with_lane(AutomationTarget::Volume);
-        let ((from, y), (to, _)) = (step_at(&s, 0), step_at(&s, 4));
-        let (top, height) = s.song_layout(SIZE).lane_band_at(y);
+        let ((from, _), (to, _)) = (step_at(&s, 0), step_at(&s, 4));
+        let (top, height) = band(&s);
         assert!(s.song_click(SIZE, from, top + height, Button::Left));
         assert_eq!(points(&s), [(0, OFF), (1, None)], "pressed at the bottom of the band: 0");
         assert_eq!(s.lane_tooltip().as_deref(), Some("KICK Volume silent at 1.1"));
@@ -393,5 +465,43 @@ mod tests {
         assert_eq!(points(&s), expected, "up to the top, and above it: the whole level");
         s.undo();
         assert!(points(&s).is_empty(), "the whole line, one undo step");
+    }
+
+    #[test]
+    fn a_lane_s_edge_makes_it_taller_and_its_segments_move_as_one() {
+        let mut s = with_lane(AutomationTarget::Volume);
+        let (_, height) = band(&s);
+        // Its bottom edge, dragged two rows down: three rows tall, in one undo step.
+        let (x, y) = find(&s, |hit| hit == SongHit::LaneEdge(0));
+        assert!(s.song_click(SIZE, x, y, Button::Left));
+        let row = s.song_layout(SIZE).row_height();
+        assert!(s.mouse_move(SIZE, x, y + row, false));
+        assert!(s.mouse_move(SIZE, x, y + 2 * row, false));
+        assert!(s.song_release(SIZE));
+        assert_eq!(s.song().unwrap().automations[0].row_count(), 3);
+        let (top, tall) = band(&s);
+        assert_eq!(tall, height + 2 * row, "drawn over three rows");
+        s.undo();
+        assert_eq!(s.song().unwrap().automations[0].row_count(), 1, "the drag, one step");
+        s.redo();
+
+        // A segment at half, grabbed on its line, moved up a quarter of the band.
+        let base = s.song().unwrap().automations[0].clone();
+        s.editor
+            .paint_automation(None, 0, &base, (4, 7), ordrumbox_core::AutomationStroke::Fill(Some(0.5)), "a")
+            .unwrap();
+        let (x, _) = step_at(&s, 5);
+        let line = top + tall / 2;
+        assert!(s.song_click(SIZE, x, line, Button::Left));
+        assert!(s.mouse_move(SIZE, x + 40, line - tall / 4, false), "the pointer's steps do not matter");
+        assert!(s.lane_paint_release());
+        let moved = points(&s);
+        assert_eq!((moved.len(), moved[0].0, moved[1]), (2, 4, (8, None)), "the whole segment, nothing else");
+        // A quarter of the band up, to a pixel.
+        assert!(moved[0].1.is_some_and(|level| (level - 0.75).abs() <= 1.0 / f64::from(tall)), "{moved:?}");
+        // Off its line, a press draws.
+        assert!(s.song_click(SIZE, x, top + tall, Button::Left));
+        assert!(s.lane_paint_release());
+        assert_eq!(points(&s)[1], (5, Some(0.0)), "at the bottom: silent");
     }
 }

@@ -191,12 +191,29 @@ pub struct AutomationLane {
     pub target: AutomationTarget,
     /// Sorted by step, one per step at most.
     points: Vec<AutomationPoint>,
+    /// How many of the arrangement's rows it is drawn over,
+    /// 1..=[`AutomationLane::MAX_ROWS`].
+    row_count: u32,
 }
 
 impl AutomationLane {
+    /// The most rows a lane is drawn over.
+    pub const MAX_ROWS: u32 = 4;
+
     #[must_use]
     pub fn new(instrument: &str, target: AutomationTarget) -> Self {
-        Self { instrument: instrument.to_owned(), target, points: Vec::new() }
+        Self { instrument: instrument.to_owned(), target, points: Vec::new(), row_count: 1 }
+    }
+
+    /// How many of the arrangement's rows it is drawn over.
+    #[must_use]
+    pub fn row_count(&self) -> u32 {
+        self.row_count
+    }
+
+    /// Drawn over `rows` rows, kept within 1..=[`Self::MAX_ROWS`].
+    pub fn set_row_count(&mut self, rows: u32) {
+        self.row_count = rows.clamp(1, Self::MAX_ROWS);
     }
 
     /// Its points, by step.
@@ -419,6 +436,14 @@ mod tests {
         assert_eq!(at, [&expected[..], &["a.points[8].value"]].concat());
         let again = AutomationLane::from_json(&lane.to_json(), "a", &mut Vec::new()).unwrap();
         assert_eq!(again, lane);
+        let mut tall = lane.clone();
+        tall.set_row_count(9);
+        assert_eq!(tall.row_count(), AutomationLane::MAX_ROWS);
+        assert_eq!(AutomationLane::from_json(&tall.to_json(), "a", &mut Vec::new()).unwrap(), tall);
+        let mut issues = Vec::new();
+        let odd = json::parse(r#"{"instrument":"KICK","target":"mute","rows":2.5}"#).unwrap();
+        assert_eq!(AutomationLane::from_json(&odd, "a", &mut issues).unwrap().row_count(), 1);
+        assert_eq!(issues.iter().map(|i| i.at.as_str()).collect::<Vec<_>>(), ["a.rows"]);
 
         let mut issues = Vec::new();
         let bad = json::parse(r#"[{"instrument":"KICK","target":"pan"},{"target":"mute"},1]"#).unwrap();

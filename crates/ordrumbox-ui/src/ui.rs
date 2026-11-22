@@ -477,7 +477,7 @@ impl Ui {
         }
         let s = &mut self.session;
         if let Some(row) = ROW_DIGITS.iter().position(|&k| k == code).filter(|_| row_key) {
-            s.toggle_row(row, if shift { "solo" } else { "mute" });
+            s.switch_track(row, if shift { "solo" } else { "mute" });
             return true;
         }
         if let Some(row) = ROW_LETTERS.iter().position(|&k| k == code).filter(|_| row_key) {

@@ -134,7 +134,7 @@ impl SongView<'_> {
     /// The arrangement's rows: one per pattern, then one per automation lane.
     #[must_use]
     pub fn row_count(&self) -> usize {
-        self.rows.len() + self.song.map_or(0, |song| song.automations.len())
+        self.rows.len() + self.song.map_or(0, automation::lanes_row_count)
     }
 }
 
@@ -193,6 +193,9 @@ pub enum SongHit {
     AddAutomation,
     /// An automation lane's name (its index in the song's lanes).
     LaneName(usize),
+    /// The bottom edge of an automation lane, in the frozen column: a drag
+    /// sets how many rows it takes.
+    LaneEdge(usize),
     /// A step of an automation lane, from the start of the song.
     LaneStep { lane: usize, step: u32 },
 }
@@ -261,7 +264,7 @@ impl SongLayout {
         (self.zoom.units() * self.scale).max(1)
     }
 
-    fn row_height(&self) -> i32 {
+    pub(crate) fn row_height(&self) -> i32 {
         ROW_HEIGHT * self.scale
     }
 

@@ -2,7 +2,8 @@
 //! does. Every scroll bar follows one rule (`scroll_thumb::hover_shape`):
 //! the open hand on a thumb, the closed hand while one is held (the song
 //! panel's, the kit table's, the mixer's); the ends of
-//! the song panel's measures' thumb, which zoom, show the sideways arrows.
+//! the song panel's measures' thumb, which zoom, show the sideways arrows,
+//! an automation lane's bottom edge, which sets its height, the up-down ones.
 
 use super::Session;
 use super::session_song_zoom::BarDrag;
@@ -19,6 +20,9 @@ impl Session {
             Some(BarDrag::Zoom { .. }) => return PointerShape::ResizeHorizontal,
             Some(BarDrag::Scroll(_)) => return HELD_SHAPE,
             None => {}
+        }
+        if self.song_panel.lane_resize.is_some() {
+            return PointerShape::ResizeVertical;
         }
         if self.kit_editor.list.is_bar_held() || self.is_mixer_bar_held() {
             return HELD_SHAPE;
@@ -55,6 +59,7 @@ impl Session {
         let view = self.song_view_data(&rows, &layout);
         match layout.hit(&view, x, y) {
             Some(SongHit::ZoomHandle(_)) => PointerShape::ResizeHorizontal,
+            Some(SongHit::LaneEdge(_)) => PointerShape::ResizeVertical,
             Some(SongHit::ScrollBar(axis)) => {
                 scroll_thumb::hover_shape(layout.bar_thumb(&view, axis), Axis::along(axis, (x, y)))
             }
@@ -105,6 +110,32 @@ mod tests {
         assert!(s.song_click(SIZE, start + len - 1, y, Button::Left));
         assert_eq!(s.pointer_shape(SIZE, 0, 0), PointerShape::ResizeHorizontal);
         s.mouse_up();
+        assert_eq!(s.pointer_shape(SIZE, 0, 0), PointerShape::Arrow);
+    }
+
+    #[test]
+    fn a_lane_s_bottom_edge_shows_the_up_down_arrows() {
+        let mut s = crate::session::session_song::tests::session();
+        s.editor.add_track(1, "KICK", 4);
+        s.editor.add_automation_lane(None, "KICK", ordrumbox_core::AutomationTarget::Volume).unwrap();
+        s.set_size(SIZE);
+        let layout = s.song_layout(SIZE);
+        let rows = s.song_rows();
+        let view = s.song_view_data(&rows, &layout);
+        let g = layout.grid;
+        let at = |wanted: SongHit| {
+            (g.y..g.y + g.h)
+                .flat_map(|y| (g.x..g.x + g.w).map(move |x| (x, y)))
+                .find(|&(x, y)| layout.hit(&view, x, y) == Some(wanted))
+                .expect("on the panel")
+        };
+        let ((ex, ey), (nx, ny)) = (at(SongHit::LaneEdge(0)), at(SongHit::LaneName(0)));
+        assert_eq!(s.pointer_shape(SIZE, ex, ey), PointerShape::ResizeVertical);
+        assert_eq!(s.pointer_shape(SIZE, nx, ny), PointerShape::Arrow, "the name: its menu");
+        // Held, the arrows stay wherever the pointer goes.
+        assert!(s.song_click(SIZE, ex, ey, Button::Left));
+        assert_eq!(s.pointer_shape(SIZE, 0, 0), PointerShape::ResizeVertical);
+        assert!(s.song_release(SIZE));
         assert_eq!(s.pointer_shape(SIZE, 0, 0), PointerShape::Arrow);
     }
 }

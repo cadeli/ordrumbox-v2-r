@@ -217,7 +217,7 @@ impl Session {
             C::NextSong => self.step_song(1),
             C::Mute | C::Solo => {
                 if let Some(t) = self.focus_track() {
-                    self.toggle_row(t, if command == C::Mute { "mute" } else { "solo" });
+                    self.switch_track(t, if command == C::Mute { "mute" } else { "solo" });
                 }
             }
             C::NewGeneratedPattern => self.generate_pattern(),
