@@ -93,12 +93,12 @@ pub(super) struct Page {
     pub(super) shown_measures: u32,
     pub(super) shown_rows: usize,
     /// Measures of the song and the room to add clips after them.
-    grid_total: u32,
+    pub(super) grid_total: u32,
     pub(super) body_w: i32,
     body_h: i32,
     cursor_measure: f64,
     /// The measure the cursor is in.
-    current: u32,
+    pub(super) current: u32,
 }
 
 impl Page {
@@ -142,7 +142,7 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     }
 
     let page = Page::new(view, layout, total);
-    draw_measure_ruler(canvas, view, layout, &page);
+    super::ruler::draw(canvas, view, layout, &page);
     draw_row_names(canvas, view, layout, &page);
     super::automation::draw_lanes(canvas, song, layout, view.rows.len(), &page);
     draw_measure_lines(canvas, layout, &page);
@@ -159,46 +159,6 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     }
     draw_scroll_bars(canvas, view, layout, &page);
     super::automation::draw_add_button(canvas, view, layout);
-}
-
-/// The ruler: one cell per measure, every fourth marked, numbered as often
-/// as the numbers fit.
-fn draw_measure_ruler(canvas: &mut Canvas, view: &SongView, layout: &SongLayout, page: &Page) {
-    let s = layout.scale;
-    let measures = page.first_measure..page.first_measure + page.shown_measures;
-    for m in measures.clone() {
-        let x = layout.measure_x(f64::from(m), page.first_measure);
-        let looped = view.loop_region.is_some_and(|(first, end)| (first..end).contains(&m));
-        let color = if m == page.current {
-            CURRENT
-        } else if looped {
-            loop_color()
-        } else if m % 4 == 0 {
-            major_color()
-        } else {
-            cell_color()
-        };
-        canvas.fill_rect(x, layout.ruler_top(), layout.measure_width() - s.px(), HEADER_HEIGHT * s - s.px(), color);
-    }
-    // The numbers over the cells: one wider than its measure runs over the next ones.
-    let label_step = layout.label_step(page.grid_total);
-    let end = layout.body_left() + page.body_w;
-    for m in measures.filter(|m| m % label_step == 0) {
-        let x = layout.measure_x(f64::from(m), page.first_measure);
-        let label = (m + 1).to_string();
-        let tx = x + ((layout.measure_width() - text_width(&label, s)) / 2).max(s.px());
-        if tx + text_width(&label, s) > end {
-            break;
-        }
-        let text = if m == page.current && label_step == 1 {
-            background_color()
-        } else if m % 4 == 0 {
-            theme::text()
-        } else {
-            theme::muted()
-        };
-        canvas.text(tx, layout.ruler_top() + (HEADER_HEIGHT * s - 8 * s) / 2, &label, s, text);
-    }
 }
 
 /// The rows: the name in the frozen column, a line under each.

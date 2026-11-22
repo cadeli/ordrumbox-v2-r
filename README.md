@@ -188,11 +188,14 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   pattern mode.
 - **Automation lanes** in the song panel: **+ NEW AUTOMATION**, under the arrangement's
   rows, lists the instruments the song's patterns play; pick one, then **Mute** or
-  **Solo**, and a lane for it appears under the patterns. A click on one of its steps (a
-  sixteenth note: zoom in to reach each one) switches the control on there, or off where
-  it is on; a click on a point removes it. A point holds until the next one; before the
-  first, the instrument plays as its patterns say. A solo that is on silences every other
-  instrument of the song. A click on a lane's name deletes it. Lanes are saved with the song.
+  **Solo**, and a lane for it appears under the patterns. The panel opens zoomed in far
+  enough to show each step (a sixteenth note). Press a step and **drag** along the lane to
+  select steps: from a step that is not on, the selection is switched on; from a step that
+  is on, it is switched off. Only the steps selected change (a click changes its step
+  alone). Where a lane sets nothing, the instrument plays as its patterns say. A solo that
+  is on silences every other instrument of the song. A click, left or right, on a lane's
+  name opens its menu: clear all its points, delete the lane, or delete every lane. Lanes
+  are saved with the song.
 - **Song panel zoom**, as on a DAW timeline: drag an end of the thumb of the
   arrangement's horizontal scroll bar (its light handles) to show more or fewer measures,
   the other end staying where it is; drag its middle to scroll. **Ctrl + wheel** over the

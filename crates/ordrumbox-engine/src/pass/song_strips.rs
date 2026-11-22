@@ -82,7 +82,7 @@ mod tests {
         )
         .unwrap();
         let mut lane = AutomationLane::new("KICK", AutomationTarget::Mute);
-        lane.toggle_at(8); // the middle of the first measure
+        lane.paint(8, u32::MAX, true); // from the middle of the first measure on
         library.songs[0].automations.push(lane);
         let (song, patterns) = (&library.songs[0], &library.patterns);
         let strips = [(0, 0), (0, 1)];

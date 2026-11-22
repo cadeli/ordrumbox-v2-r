@@ -245,6 +245,8 @@ mod tests {
     #[test]
     fn the_mouse_places_repeats_and_removes_clips() {
         let mut s = session();
+        // Measures 24 px wide, whatever the zoom the panel opens at.
+        s.song_panel.zoom = song_view::MeasureZoom::new(24);
         let l = s.song_layout(SIZE);
         // The ruler aims the cursor; a pattern of the list is added there.
         let ruler_y = l.grid.y + 14 + 4;

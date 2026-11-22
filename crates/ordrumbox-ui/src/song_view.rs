@@ -21,7 +21,6 @@ use crate::theme;
 /// for the frozen column: wide enough for a 16-character pattern name (8 px
 /// a glyph) and its 6 px margin, where the JS one holds 8.
 pub const LABEL_WIDTH: i32 = 134;
-const MEASURE_WIDTH: i32 = 24;
 const ROW_HEIGHT: i32 = 22;
 const HEADER_HEIGHT: i32 = 18;
 /// Gap a clip leaves to its neighbours (1 px on each side).
@@ -473,6 +472,7 @@ impl SongLayout {
 
 mod automation;
 mod draw;
+mod ruler;
 mod zoom;
 pub use draw::draw;
 pub use zoom::{Edge, MeasureZoom};
@@ -601,7 +601,7 @@ mod tests {
         let rows = rows(&library.songs[0], &library.patterns);
         let empty = Library::parse(r#"{"songs":[{"name":"e"}]}"#).unwrap().0;
         let long = "a long description of the pattern ".repeat(20);
-        let zooms = [MeasureZoom::MIN, MEASURE_WIDTH, MeasureZoom::MAX].map(MeasureZoom::new);
+        let zooms = [MeasureZoom::MIN, MeasureZoom::STEPS, MeasureZoom::MAX].map(MeasureZoom::new);
         for ((w, h), zoom) in [(1, 1), (40, 30), (1100, 680)].into_iter().flat_map(|size| zooms.map(|z| (size, z))) {
             let mut pixels = vec![0; w * h];
             let mut canvas = Canvas::new(&mut pixels, w, h);

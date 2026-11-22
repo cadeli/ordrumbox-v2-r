@@ -2,24 +2,33 @@
 //! drawn, the handles at the ends of the measures' thumb that set it, and
 //! which measures the ruler numbers at that width.
 
-use super::{Axis, MEASURE_WIDTH, SongLayout};
+use super::{Axis, SongLayout};
 use crate::canvas::text_width;
+use ordrumbox_core::automation::STEPS_PER_MEASURE;
 
-/// How wide a measure is drawn, in scale units: the arrangement's zoom.
+/// How wide a measure is drawn, in scale units: the arrangement's zoom. It
+/// starts at [`MeasureZoom::STEPS`], where each step of an automation lane
+/// can be clicked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MeasureZoom(i32);
 
 impl Default for MeasureZoom {
     fn default() -> Self {
-        Self(MEASURE_WIDTH)
+        Self(Self::STEPS)
     }
 }
 
 impl MeasureZoom {
     /// The narrowest measure: a long song shown whole.
     pub const MIN: i32 = 2;
-    /// The widest measure: a few measures across the window.
-    pub const MAX: i32 = 160;
+    /// The widest measure: [`Self::STEP_UNITS`] for each step of an automation lane,
+    /// whose points are placed step by step.
+    pub const MAX: i32 = Self::STEP_UNITS * STEPS_PER_MEASURE as i32;
+    /// The narrowest measure that shows each step of an automation lane,
+    /// [`Self::STEP_UNITS`] / 3 a step: the zoom the panel opens at.
+    pub const STEPS: i32 = Self::STEP_UNITS / 3 * STEPS_PER_MEASURE as i32;
+    /// A step's width at the widest zoom, a step of the grid's.
+    const STEP_UNITS: i32 = 24;
 
     /// A measure `units` wide, kept within [`Self::MIN`]..=[`Self::MAX`].
     #[must_use]

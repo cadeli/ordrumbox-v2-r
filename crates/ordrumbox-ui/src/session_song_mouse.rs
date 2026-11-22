@@ -50,9 +50,8 @@ impl Session {
             (SongHit::ZoomHandle(edge), Button::Left) => self.press_zoom_handle(size, edge),
             (SongHit::Description, Button::Left) => self.text_entry(Id::PatternDescription),
             (SongHit::Ruler(m), Button::Left) => self.set_song_cursor(m),
-            (SongHit::AddAutomation | SongHit::LaneName(_) | SongHit::LaneStep { .. }, Button::Left) => {
-                self.automation_click(hit, x, y);
-            }
+            (SongHit::AddAutomation | SongHit::LaneName(_) | SongHit::LaneStep { .. }, Button::Left)
+            | (SongHit::LaneName(_), Button::Right) => self.automation_click(hit, x, y),
             (SongHit::Cell { row, measure }, Button::Left) => {
                 let row = &rows[row];
                 let title = format!("Add \"{}\" at measure {}", row.name, measure + 1);
@@ -210,6 +209,9 @@ impl Session {
 
     /// The press released: a drag places or moves its clip, a click without a drag opens its menu; whether it was one.
     pub fn song_release(&mut self, size: (i32, i32, Scale)) -> bool {
+        if self.song_panel.paint.is_some() {
+            return self.lane_paint_release();
+        }
         // A press without a drag opens the menu of what was pressed.
         if let Some(SongDrag { source, started: false, press: (x, y), .. }) = self.song_panel.drag {
             self.song_panel.drag = None;
@@ -384,6 +386,8 @@ mod tests {
         );
         let mut s = Session::new(Library::parse(&json).unwrap().0, KitSet::empty(), Vec::new());
         s.toggle_song_view();
+        // Measures 24 px wide, whatever the zoom the panel opens at.
+        s.song_panel.zoom = song_view::MeasureZoom::new(24);
         let l = s.song_layout(SIZE);
         let rows = s.song_rows();
         assert!(rows.len() > l.visible_rows());
@@ -437,6 +441,8 @@ mod tests {
     #[test]
     fn a_drag_adds_a_pattern_and_moves_a_clip() {
         let mut s = session();
+        // Measures 24 px wide, whatever the zoom the panel opens at.
+        s.song_panel.zoom = song_view::MeasureZoom::new(24);
         let l = s.song_layout(SIZE);
         let measure_x = |m: i32| l.grid.x + song_view::LABEL_WIDTH + m * 24 + 12;
         let row_y = |r: i32| l.grid.y + 14 + 18 + r * 22 + 11;

@@ -23,6 +23,7 @@ use ordrumbox_core::steps::TICK;
 
 use super::Session;
 use super::session_panel::PanelLayout;
+use super::session_song_automation::LanePaint;
 use super::session_song_zoom::BarDrag;
 use super::session_types::Workspace;
 use crate::panel::Id;
@@ -91,12 +92,14 @@ pub(super) struct SongPanel {
     pub(super) zoom: MeasureZoom,
     /// The last clip pressed and when, for double-clicks.
     pub(super) last_clip_click: Option<(usize, std::time::Instant)>,
+    /// An automation lane being painted (`session_song_automation.rs`).
+    pub(super) paint: Option<LanePaint>,
 }
 
 impl SongPanel {
-    /// A pattern, a clip or a row is held by the mouse.
+    /// A pattern, a clip or a row is held by the mouse, or a lane painted.
     pub(super) fn dragging(&self) -> bool {
-        self.drag.is_some()
+        self.drag.is_some() || self.paint.is_some()
     }
 
     /// The scroll bar held by the mouse, if any.

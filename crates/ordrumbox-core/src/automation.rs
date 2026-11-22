@@ -93,20 +93,27 @@ impl AutomationLane {
         after.checked_sub(1).map(|i| self.points[i].is_on)
     }
 
-    /// A click on `step`: the point there removed, else a point that turns
-    /// the control the other way from what it is there (on when the lane
-    /// does not set it yet). The value the lane sets at `step` after it.
-    pub fn toggle_at(&mut self, step: u32) -> Option<bool> {
-        match self.points.binary_search_by_key(&step, |point| point.step) {
-            Ok(i) => {
-                self.points.remove(i);
-            }
-            Err(i) => {
-                let is_on = !self.value_at(step).unwrap_or(false);
-                self.points.insert(i, AutomationPoint { step, is_on });
-            }
+    /// The steps `from` to `to` (either way round) set `is_on`, the lane
+    /// going back after them to what it set there before (off where it set
+    /// nothing). No point is left that repeats the value before it.
+    pub fn paint(&mut self, from: u32, to: u32, is_on: bool) {
+        let (from, to) = (from.min(to), from.max(to));
+        let resume = to.checked_add(1).map(|next| (next, self.value_at(next).unwrap_or(false)));
+        let before = from.checked_sub(1).and_then(|step| self.value_at(step));
+        let end = resume.map_or(to, |(next, _)| next);
+        self.points.retain(|point| point.step < from || point.step > end);
+        if before != Some(is_on) {
+            self.points.push(AutomationPoint { step: from, is_on });
         }
-        self.value_at(step)
+        if let Some((next, resume)) = resume.filter(|&(_, resume)| resume != is_on) {
+            self.points.push(AutomationPoint { step: next, is_on: resume });
+        }
+        self.points.sort_by_key(|point| point.step);
+    }
+
+    /// Every point removed: the lane sets nothing.
+    pub fn clear(&mut self) {
+        self.points.clear();
     }
 
     /// A lane read from a file (`at` its JSON path): points with no usable
@@ -229,17 +236,25 @@ mod tests {
     }
 
     #[test]
-    fn a_click_turns_the_control_the_other_way_or_removes_the_point() {
-        let mut lane = AutomationLane::new("KICK", AutomationTarget::Mute);
-        assert_eq!(lane.toggle_at(4), Some(true), "on first");
-        assert_eq!(lane.toggle_at(12), Some(false), "then off where it is on");
-        assert_eq!(lane.toggle_at(8), Some(false), "off inside the on span");
-        assert_eq!(
-            lane.points.iter().map(|p| (p.step, p.is_on)).collect::<Vec<_>>(),
-            [(4, true), (8, false), (12, false)]
-        );
-        assert_eq!(lane.toggle_at(8), Some(true), "a point clicked again goes");
-        assert_eq!(lane.points.len(), 2);
+    fn a_painted_zone_is_set_and_the_lane_goes_back_after_it() {
+        let steps = |lane: &AutomationLane| lane.points.iter().map(|p| (p.step, p.is_on)).collect::<Vec<_>>();
+        let mut lane = lane(&[]);
+        lane.paint(7, 4, true);
+        assert_eq!(steps(&lane), [(4, true), (8, false)], "either way round, no further");
+        lane.paint(5, 5, false);
+        assert_eq!(steps(&lane), [(4, true), (5, false), (6, true), (8, false)], "one step off inside");
+        lane.paint(5, 5, true);
+        assert_eq!(steps(&lane), [(4, true), (8, false)], "and on again");
+        lane.paint(6, 12, true);
+        assert_eq!(steps(&lane), [(4, true), (13, false)], "joined to the zone before");
+        lane.paint(8, 9, false);
+        assert_eq!(steps(&lane), [(4, true), (8, false), (10, true), (13, false)]);
+        lane.paint(0, 20, false);
+        assert_eq!(steps(&lane), [(0, false)]);
+        lane.paint(u32::MAX - 1, u32::MAX, true);
+        assert_eq!(steps(&lane), [(0, false), (u32::MAX - 1, true)]);
+        lane.clear();
+        assert!(lane.points.is_empty());
     }
 
     #[test]
@@ -275,7 +290,7 @@ mod tests {
         assert_eq!(silent(&[], 0), [false, true], "the pattern's own mute");
 
         let mut mute = AutomationLane::new("KICK", AutomationTarget::Mute);
-        mute.toggle_at(4);
+        mute.paint(4, u32::MAX, true);
         let mut unmute = AutomationLane::new("SNARE", AutomationTarget::Mute);
         unmute.points = vec![AutomationPoint { step: 0, is_on: false }];
         let lanes = [mute, unmute];
@@ -284,7 +299,7 @@ mod tests {
 
         // A solo of an instrument this pattern lacks silences all of it.
         let mut solo = AutomationLane::new("HAT", AutomationTarget::Solo);
-        solo.toggle_at(8);
+        solo.paint(8, u32::MAX, true);
         let lanes = [solo];
         assert_eq!(silent(&lanes, 7), [false, true]);
         assert_eq!(silent(&lanes, 8), [true, true]);

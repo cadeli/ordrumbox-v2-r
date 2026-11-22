@@ -38,12 +38,13 @@ impl SongLayout {
     }
 
     /// X of `step` (from the start of the song), with `first` the first measure shown.
-    fn step_x(&self, step: u32, first: u32) -> i32 {
+    pub(super) fn step_x(&self, step: u32, first: u32) -> i32 {
         self.measure_x(f64::from(step) / f64::from(STEPS_PER_MEASURE), first)
     }
 
     /// The step shown at `x`, past the frozen column; `first` is the first measure shown.
-    fn step_at(&self, x: i32, first: u32) -> u32 {
+    #[must_use]
+    pub fn step_at(&self, x: i32, first: u32) -> u32 {
         let across = f64::from((x - self.body_left()).max(0)) / f64::from(self.measure_width());
         ((f64::from(first) + across) * f64::from(STEPS_PER_MEASURE)).floor() as u32
     }
@@ -98,6 +99,12 @@ fn draw_lane(canvas: &mut Canvas, lane: &AutomationLane, layout: &SongLayout, y:
         let (from, to) = (x_of(point.step), x_of(end));
         if to > from {
             canvas.fill_rect(from, band_y, to - from, band_h, theme::mix(theme::panel(), color, 0.6));
+        }
+    }
+    if layout.measure_width() >= MeasureZoom::STEPS * s {
+        let tick_h = band_h / 4;
+        for step in (first_step..end_step).filter(|s| s % STEPS_PER_BEAT != 0) {
+            canvas.fill_rect(x_of(step) - s.px(), band_y + band_h - tick_h, s.px(), tick_h, cell_color());
         }
     }
     if layout.measure_width() >= BEAT_LINES * s {
