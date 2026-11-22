@@ -24,7 +24,7 @@ pub mod wav;
 
 pub use assign::TrackSound;
 pub use clock_in::ClockFollower;
-pub use controller::{AudioSide, Controller, Mode, SCOPE_SIZE};
+pub use controller::{AudioSide, Controller, Mode, SCOPE_SIZE, SongLoop};
 pub use controls::{Control, ControlMap, Knob};
 pub use engine::{Engine, HOST_TRACKS, HostMix, HostTrack, HostTransport, Position, host_muted, host_pass};
 pub use kit::{Kit, KitSample, KitsRead, SampleBank, kits_from_json, kits_to_json};

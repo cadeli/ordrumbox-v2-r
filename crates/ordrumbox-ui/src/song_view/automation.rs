@@ -1,11 +1,13 @@
 //! The automation lanes of the arrangement: rows under the patterns' rows,
 //! each named by its control and instrument in the frozen column, its on
-//! spans drawn step by step, and under the last row the button that adds a
+//! and off spans drawn step by step (none where it leaves the pattern's), and under the last row the button that adds a
 //! lane.
 
 use super::draw::Page;
 use super::*;
-use ordrumbox_core::automation::{AutomationLane, AutomationTarget, STEPS_PER_BEAT, STEPS_PER_MEASURE};
+use ordrumbox_core::automation::{
+    AutomationKind, AutomationLane, AutomationTarget, STEPS_PER_BEAT, STEPS_PER_MEASURE, is_on,
+};
 
 /// The add-automation button, as the grid's add-track button.
 const ADD_AUTOMATION_HEIGHT: i32 = 14;
@@ -19,6 +21,7 @@ const fn target_color(target: AutomationTarget) -> Rgb {
     match target {
         AutomationTarget::Mute => theme::ALERT,
         AutomationTarget::Solo => theme::VALUE,
+        AutomationTarget::Volume => theme::FOCUS,
     }
 }
 
@@ -40,6 +43,26 @@ impl SongLayout {
     /// X of `step` (from the start of the song), with `first` the first measure shown.
     pub(super) fn step_x(&self, step: u32, first: u32) -> i32 {
         self.measure_x(f64::from(step) / f64::from(STEPS_PER_MEASURE), first)
+    }
+
+    /// The band a lane's values are drawn in, in its row at `row_y`: its top and height.
+    fn lane_band(&self, row_y: i32) -> (i32, i32) {
+        let s = self.scale;
+        (row_y + CLIP_INSET * s / 2, self.row_height() - 2 * CLIP_INSET * s)
+    }
+
+    /// The band of the lane whose row is under `y`.
+    #[must_use]
+    pub fn lane_band_at(&self, y: i32) -> (i32, i32) {
+        let rh = self.row_height().max(1);
+        self.lane_band(self.body_top() + (y - self.body_top()).div_euclid(rh) * rh)
+    }
+
+    /// The level `y` points at over a lane's band `(top, height)`: 1 at its
+    /// top, 0 at its bottom, kept within them.
+    #[must_use]
+    pub fn level_at(&self, (top, height): (i32, i32), y: i32) -> f64 {
+        (1.0 - f64::from(y - top) / f64::from(height.max(1))).clamp(0.0, 1.0)
     }
 
     /// The step shown at `x`, past the frozen column; `first` is the first measure shown.
@@ -76,8 +99,8 @@ pub(super) fn draw_lanes(canvas: &mut Canvas, song: &Song, layout: &SongLayout, 
     }
 }
 
-/// One lane, its row at `y`: its name, a band under its steps, its on spans
-/// and a mark on each point.
+/// One lane, its row at `y`: its name, a band under its steps, its values
+/// and the step and beat lines over them.
 fn draw_lane(canvas: &mut Canvas, lane: &AutomationLane, layout: &SongLayout, y: i32, page: &Page) {
     let s = layout.scale;
     let (rh, left) = (layout.row_height(), layout.body_left());
@@ -88,19 +111,12 @@ fn draw_lane(canvas: &mut Canvas, lane: &AutomationLane, layout: &SongLayout, y:
     let name = fit(&lane.instrument, layout.grid.x + layout.label_width() - 6 * s - x, s);
     canvas.text(x, text_y, &name, s, theme::text());
 
-    let (band_y, band_h) = (y + CLIP_INSET * s / 2, rh - 2 * CLIP_INSET * s);
+    let (band_y, band_h) = layout.lane_band(y);
     canvas.fill_rect(left, band_y, page.body_w, band_h, theme::panel());
+    draw_values(canvas, lane, layout, (band_y, band_h), page);
     let first_step = page.first_measure * STEPS_PER_MEASURE;
     let end_step = (page.first_measure + page.shown_measures) * STEPS_PER_MEASURE;
     let x_of = |step: u32| layout.step_x(step.clamp(first_step, end_step), page.first_measure);
-    let points = lane.points();
-    for (i, point) in points.iter().enumerate().filter(|(_, point)| point.is_on) {
-        let end = points.get(i + 1).map_or(end_step, |next| next.step);
-        let (from, to) = (x_of(point.step), x_of(end));
-        if to > from {
-            canvas.fill_rect(from, band_y, to - from, band_h, theme::mix(theme::panel(), color, 0.6));
-        }
-    }
     if layout.measure_width() >= MeasureZoom::STEPS * s {
         let tick_h = band_h / 4;
         for step in (first_step..end_step).filter(|s| s % STEPS_PER_BEAT != 0) {
@@ -112,9 +128,54 @@ fn draw_lane(canvas: &mut Canvas, lane: &AutomationLane, layout: &SongLayout, y:
             canvas.fill_rect(x_of(step) - s.px(), band_y, s.px(), band_h, cell_color());
         }
     }
-    for point in points.iter().filter(|point| (first_step..end_step).contains(&point.step)) {
-        let mark = if point.is_on { color } else { theme::muted() };
-        canvas.fill_rect(x_of(point.step), band_y, 2 * s, band_h, mark);
+}
+
+/// A lane's values over its band `(top, height)`, each from its point to the
+/// next: a switch on full and in its colour, off full and faint, with a mark
+/// where it changes; a level as high as it is, its top drawn. Nothing where
+/// the lane leaves the pattern's.
+fn draw_values(
+    canvas: &mut Canvas,
+    lane: &AutomationLane,
+    layout: &SongLayout,
+    (top, height): (i32, i32),
+    page: &Page,
+) {
+    let s = layout.scale;
+    let color = target_color(lane.target);
+    let first_step = page.first_measure * STEPS_PER_MEASURE;
+    let end_step = (page.first_measure + page.shown_measures) * STEPS_PER_MEASURE;
+    let x_of = |step: u32| layout.step_x(step.clamp(first_step, end_step), page.first_measure);
+    let points = lane.points();
+    for (i, point) in points.iter().enumerate() {
+        let end = points.get(i + 1).map_or(end_step, |next| next.step);
+        let (from, to) = (x_of(point.step), x_of(end));
+        let Some(value) = point.value.filter(|_| to > from) else { continue };
+        match lane.target.kind() {
+            AutomationKind::Switch => {
+                let fill = if is_on(value) {
+                    theme::mix(theme::panel(), color, 0.6)
+                } else {
+                    theme::mix(theme::panel(), theme::muted(), 0.25)
+                };
+                canvas.fill_rect(from, top, to - from, height, fill);
+            }
+            AutomationKind::Level => {
+                let h = (f64::from(height) * value).round() as i32;
+                canvas.fill_rect(from, top + height - h, to - from, h, theme::mix(theme::panel(), color, 0.45));
+                canvas.fill_rect(from, top + height - h, to - from, s.px().min(h.max(1)), color);
+            }
+        }
+    }
+    if lane.target.kind() == AutomationKind::Switch {
+        for point in points.iter().filter(|point| (first_step..end_step).contains(&point.step)) {
+            let mark = match point.value.map(is_on) {
+                Some(true) => color,
+                Some(false) => theme::muted(),
+                None => line_color(),
+            };
+            canvas.fill_rect(x_of(point.step), top, 2 * s, height, mark);
+        }
     }
 }
 

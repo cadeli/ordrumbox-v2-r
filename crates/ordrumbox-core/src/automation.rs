@@ -1,29 +1,47 @@
-//! Song automation: lanes that switch a control of an instrument on and off
-//! along an arrangement, at the resolution of a step (a sixteenth note).
+//! Song automation: lanes that set a control of an instrument along an
+//! arrangement, at the resolution of a step (a sixteenth note): switch it on
+//! and off (mute, solo) or set its level (volume).
 //!
-//! A lane holds points, each turning its control on or off from its step
-//! until the next point. Before its first point a lane leaves the control
-//! as the pattern has it. An instrument is named as its tracks are (KICK,
-//! SNARE...), so a lane follows it through every pattern of the song.
+//! Every lane holds values from 0 to 1: a switch is off below one half and
+//! on from it, a level is the level itself. A point sets its value from its
+//! step until the next point, or gives the control back to the pattern.
+//! Before its first point a lane leaves the control as the pattern has it.
+//! An instrument is named as its tracks are (KICK, SNARE...), so a lane
+//! follows it through every pattern of the song.
 
-use crate::json::{Object, Value};
-use crate::record::Issue;
+mod file;
+
 use crate::{Pattern, Song, Track};
 
 /// Steps of a beat on an automation lane.
 pub const STEPS_PER_BEAT: u32 = 4;
 /// Steps of a 4/4 measure on an automation lane.
 pub const STEPS_PER_MEASURE: u32 = STEPS_PER_BEAT * 4;
+/// Ticks of a step of an automation lane (or of a song loop's end).
+pub const STEP_TICKS: u32 = crate::steps::TICK / STEPS_PER_BEAT;
+/// The values a lane keeps apart: finer ones are rounded to it, so that a
+/// drawn line does not leave a point on each step for nothing.
+const VALUE_RESOLUTION: f64 = 1000.0;
 
-/// The control a lane switches.
+/// The control a lane sets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AutomationTarget {
     Mute,
     Solo,
+    Volume,
+}
+
+/// How a lane's values act on its control.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AutomationKind {
+    /// Off below one half, on from it.
+    Switch,
+    /// The control's level, 0 to 1.
+    Level,
 }
 
 impl AutomationTarget {
-    pub const ALL: [Self; 2] = [Self::Mute, Self::Solo];
+    pub const ALL: [Self; 3] = [Self::Mute, Self::Solo, Self::Volume];
 
     /// Its key in a file.
     #[must_use]
@@ -31,6 +49,7 @@ impl AutomationTarget {
         match self {
             Self::Mute => "mute",
             Self::Solo => "solo",
+            Self::Volume => "volume",
         }
     }
 
@@ -40,6 +59,15 @@ impl AutomationTarget {
         match self {
             Self::Mute => "Mute",
             Self::Solo => "Solo",
+            Self::Volume => "Volume",
+        }
+    }
+
+    #[must_use]
+    pub const fn kind(self) -> AutomationKind {
+        match self {
+            Self::Mute | Self::Solo => AutomationKind::Switch,
+            Self::Volume => AutomationKind::Level,
         }
     }
 
@@ -49,16 +77,67 @@ impl AutomationTarget {
     }
 }
 
-/// A point of a lane: from `step` on, the control is on or off.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Whether a switch's `value` is on.
+#[must_use]
+pub fn is_on(value: f64) -> bool {
+    value >= 0.5
+}
+
+/// The value a switch has when `is_on`.
+#[must_use]
+pub fn switch_value(is_on: bool) -> f64 {
+    if is_on { 1.0 } else { 0.0 }
+}
+
+/// `value` as a lane keeps it: 0 to 1, rounded to [`VALUE_RESOLUTION`].
+fn kept(value: f64) -> f64 {
+    (value.clamp(0.0, 1.0) * VALUE_RESOLUTION).round() / VALUE_RESOLUTION
+}
+
+/// A point of a lane: from `step` on, the control has `value`, or is as the
+/// pattern has it (`None`).
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AutomationPoint {
     /// Steps from the start of the song.
     pub step: u32,
-    pub is_on: bool,
+    pub value: Option<f64>,
 }
 
-/// One lane: a control of an instrument, switched by its points.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// What a press paints over a zone of a lane.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum AutomationStroke {
+    /// One value over the whole zone; `None` erases it (as the pattern has it).
+    Fill(Option<f64>),
+    /// A line from a step's value to another's, held level past its ends.
+    Line((u32, f64), (u32, f64)),
+}
+
+impl AutomationStroke {
+    /// The value it paints at `step`.
+    #[must_use]
+    pub fn value_at(self, step: u32) -> Option<f64> {
+        match self {
+            Self::Fill(value) => value,
+            Self::Line((a, from), (b, to)) => {
+                let ((a, from), (b, to)) = if a <= b { ((a, from), (b, to)) } else { ((b, to), (a, from)) };
+                let share = if b == a { 1.0 } else { f64::from(step.clamp(a, b) - a) / f64::from(b - a) };
+                Some(from + (to - from) * share)
+            }
+        }
+    }
+
+    /// The last step where what it paints can change: past it, it paints
+    /// the same value.
+    fn last_change(self) -> u32 {
+        match self {
+            Self::Fill(_) => 0,
+            Self::Line((a, _), (b, _)) => a.max(b),
+        }
+    }
+}
+
+/// One lane: a control of an instrument, set by its points.
+#[derive(Debug, Clone, PartialEq)]
 pub struct AutomationLane {
     /// The track name it acts on, in every pattern of the song.
     pub instrument: String,
@@ -79,34 +158,47 @@ impl AutomationLane {
         &self.points
     }
 
-    /// Whether this lane switches `target` of `instrument`.
+    /// Whether this lane sets `target` of `instrument`.
     #[must_use]
     pub fn is_for(&self, instrument: &str, target: AutomationTarget) -> bool {
         self.target == target && self.instrument == instrument
     }
 
-    /// What the lane sets at `step`: the last point at or before it, `None`
-    /// before the first one.
+    /// What the lane sets at `step`: the last point at or before it; `None`
+    /// before the first one, or where a point gives the control back to the
+    /// pattern.
     #[must_use]
-    pub fn value_at(&self, step: u32) -> Option<bool> {
+    pub fn value_at(&self, step: u32) -> Option<f64> {
         let after = self.points.partition_point(|point| point.step <= step);
-        after.checked_sub(1).map(|i| self.points[i].is_on)
+        after.checked_sub(1).and_then(|i| self.points[i].value)
     }
 
-    /// The steps `from` to `to` (either way round) set `is_on`, the lane
-    /// going back after them to what it set there before (off where it set
-    /// nothing). No point is left that repeats the value before it.
-    pub fn paint(&mut self, from: u32, to: u32, is_on: bool) {
+    /// Whether the lane switches its control on at `step`; `None` where it
+    /// leaves it to the pattern.
+    #[must_use]
+    pub fn is_on_at(&self, step: u32) -> Option<bool> {
+        self.value_at(step).map(is_on)
+    }
+
+    /// The steps `from` to `to` (either way round) painted with `stroke`,
+    /// the lane going back after them to what it set there before. No point
+    /// is left that repeats the value before it.
+    pub fn paint(&mut self, from: u32, to: u32, stroke: AutomationStroke) {
         let (from, to) = (from.min(to), from.max(to));
-        let resume = to.checked_add(1).map(|next| (next, self.value_at(next).unwrap_or(false)));
-        let before = from.checked_sub(1).and_then(|step| self.value_at(step));
+        let resume = to.checked_add(1).map(|next| (next, self.value_at(next)));
+        let mut previous = from.checked_sub(1).and_then(|step| self.value_at(step));
         let end = resume.map_or(to, |(next, _)| next);
         self.points.retain(|point| point.step < from || point.step > end);
-        if before != Some(is_on) {
-            self.points.push(AutomationPoint { step: from, is_on });
+        // Past its last change the stroke paints one value: one point at most.
+        for step in from..=stroke.last_change().clamp(from, to) {
+            let value = stroke.value_at(step).map(kept);
+            if value != previous {
+                self.points.push(AutomationPoint { step, value });
+                previous = value;
+            }
         }
-        if let Some((next, resume)) = resume.filter(|&(_, resume)| resume != is_on) {
-            self.points.push(AutomationPoint { step: next, is_on: resume });
+        if let Some((next, resume)) = resume.filter(|&(_, resume)| resume != previous) {
+            self.points.push(AutomationPoint { step: next, value: resume });
         }
         self.points.sort_by_key(|point| point.step);
     }
@@ -115,74 +207,12 @@ impl AutomationLane {
     pub fn clear(&mut self) {
         self.points.clear();
     }
-
-    /// A lane read from a file (`at` its JSON path): points with no usable
-    /// step left out, a repeated step kept once (the last one), all reported.
-    pub fn from_json(raw: &Value, at: &str, issues: &mut Vec<Issue>) -> Option<Self> {
-        let Some(object) = raw.as_object() else {
-            issues.push(Issue::new(at, "an automation lane must be an object, skipped"));
-            return None;
-        };
-        let instrument = object.get("instrument").and_then(Value::to_text).unwrap_or_default();
-        let instrument = instrument.trim();
-        if instrument.is_empty() {
-            issues.push(Issue::new(format!("{at}.instrument"), "no instrument, lane skipped"));
-            return None;
-        }
-        let key = object.get("target").and_then(Value::to_text).unwrap_or_default();
-        let Some(target) = AutomationTarget::from_key(&key) else {
-            issues.push(Issue::new(format!("{at}.target"), format!("unknown target \"{key}\", lane skipped")));
-            return None;
-        };
-        let mut lane = Self::new(instrument, target);
-        let points = match object.get("points").filter(|v| !v.is_null()) {
-            None => &[][..],
-            Some(Value::Array(items)) => items.as_slice(),
-            Some(other) => {
-                issues.push(Issue::new(format!("{at}.points"), format!("not an array ({other}), no points")));
-                &[][..]
-            }
-        };
-        for (i, raw_point) in points.iter().enumerate() {
-            let point_at = format!("{at}.points[{i}]");
-            let step = raw_point.as_object().and_then(|p| p.get("step")).and_then(Value::to_number);
-            let Some(step) = step.filter(|s| s.is_finite() && *s >= 0.0 && *s <= f64::from(u32::MAX)) else {
-                issues.push(Issue::new(point_at, "no usable step, point skipped"));
-                continue;
-            };
-            let is_on = raw_point.as_object().and_then(|p| p.get("on")).and_then(Value::as_bool).unwrap_or(false);
-            let step = step.floor() as u32;
-            match lane.points.binary_search_by_key(&step, |point| point.step) {
-                Ok(index) => {
-                    issues.push(Issue::new(point_at, format!("step {step} repeated, the last point kept")));
-                    lane.points[index].is_on = is_on;
-                }
-                Err(index) => lane.points.insert(index, AutomationPoint { step, is_on }),
-            }
-        }
-        Some(lane)
-    }
-
-    #[must_use]
-    pub fn to_json(&self) -> Value {
-        let mut object = Object::new();
-        object.insert("instrument", Value::from(self.instrument.as_str()));
-        object.insert("target", Value::from(self.target.key()));
-        let points = self.points.iter().map(|point| {
-            let mut object = Object::new();
-            object.insert("step", Value::from(point.step));
-            object.insert("on", Value::from(point.is_on));
-            Value::Object(object)
-        });
-        object.insert("points", Value::Array(points.collect()));
-        Value::Object(object)
-    }
 }
 
 /// What `lanes` set `target` of `instrument` to at `step`: the first lane
 /// for it that sets it, `None` when none does.
 #[must_use]
-pub fn automated(lanes: &[AutomationLane], instrument: &str, target: AutomationTarget, step: u32) -> Option<bool> {
+pub fn automated(lanes: &[AutomationLane], instrument: &str, target: AutomationTarget, step: u32) -> Option<f64> {
     lanes.iter().filter(|lane| lane.is_for(instrument, target)).find_map(|lane| lane.value_at(step))
 }
 
@@ -193,12 +223,13 @@ pub fn automated(lanes: &[AutomationLane], instrument: &str, target: AutomationT
 #[must_use]
 pub fn is_silent(tracks: &[Track], t: usize, lanes: &[AutomationLane], step: u32) -> bool {
     let Some(track) = tracks.get(t) else { return true };
-    let solo = |track: &Track| automated(lanes, &track.name, AutomationTarget::Solo, step).unwrap_or(track.solo);
-    let song_solo = lanes.iter().any(|lane| lane.target == AutomationTarget::Solo && lane.value_at(step) == Some(true));
+    let switch = |track: &Track, target| automated(lanes, &track.name, target, step).map(is_on);
+    let solo = |track: &Track| switch(track, AutomationTarget::Solo).unwrap_or(track.solo);
+    let song_solo = lanes.iter().any(|lane| lane.target == AutomationTarget::Solo && lane.is_on_at(step) == Some(true));
     if song_solo || tracks.iter().any(solo) {
         !solo(track)
     } else {
-        automated(lanes, &track.name, AutomationTarget::Mute, step).unwrap_or(track.mute)
+        switch(track, AutomationTarget::Mute).unwrap_or(track.mute)
     }
 }
 
@@ -222,59 +253,98 @@ mod tests {
     use super::*;
     use crate::json;
 
-    fn lane(points: &[(u32, bool)]) -> AutomationLane {
+    const ON: Option<f64> = Some(1.0);
+    const OFF: Option<f64> = Some(0.0);
+
+    fn lane(points: &[(u32, Option<f64>)]) -> AutomationLane {
         let mut lane = AutomationLane::new("KICK", AutomationTarget::Mute);
-        lane.points = points.iter().map(|&(step, is_on)| AutomationPoint { step, is_on }).collect();
+        lane.points = points.iter().map(|&(step, value)| AutomationPoint { step, value }).collect();
         lane
+    }
+
+    fn steps(lane: &AutomationLane) -> Vec<(u32, Option<f64>)> {
+        lane.points.iter().map(|p| (p.step, p.value)).collect()
+    }
+
+    fn fill(value: Option<f64>) -> AutomationStroke {
+        AutomationStroke::Fill(value)
     }
 
     #[test]
     fn a_point_holds_until_the_next_one() {
-        let lane = lane(&[(4, true), (8, false)]);
-        let values: Vec<_> = [0, 3, 4, 7, 8, 100].map(|s| lane.value_at(s)).into();
+        let lane = lane(&[(4, ON), (8, Some(0.2))]);
+        let values: Vec<_> = [0, 3, 4, 7, 8, 100].map(|s| lane.is_on_at(s)).into();
         assert_eq!(values, [None, None, Some(true), Some(true), Some(false), Some(false)]);
+        assert_eq!(lane.value_at(9), Some(0.2));
     }
 
     #[test]
     fn a_painted_zone_is_set_and_the_lane_goes_back_after_it() {
-        let steps = |lane: &AutomationLane| lane.points.iter().map(|p| (p.step, p.is_on)).collect::<Vec<_>>();
         let mut lane = lane(&[]);
-        lane.paint(7, 4, true);
-        assert_eq!(steps(&lane), [(4, true), (8, false)], "either way round, no further");
-        lane.paint(5, 5, false);
-        assert_eq!(steps(&lane), [(4, true), (5, false), (6, true), (8, false)], "one step off inside");
-        lane.paint(5, 5, true);
-        assert_eq!(steps(&lane), [(4, true), (8, false)], "and on again");
-        lane.paint(6, 12, true);
-        assert_eq!(steps(&lane), [(4, true), (13, false)], "joined to the zone before");
-        lane.paint(8, 9, false);
-        assert_eq!(steps(&lane), [(4, true), (8, false), (10, true), (13, false)]);
-        lane.paint(0, 20, false);
-        assert_eq!(steps(&lane), [(0, false)]);
-        lane.paint(u32::MAX - 1, u32::MAX, true);
-        assert_eq!(steps(&lane), [(0, false), (u32::MAX - 1, true)]);
+        lane.paint(7, 4, fill(ON));
+        assert_eq!(steps(&lane), [(4, ON), (8, None)], "either way round, no further, then the pattern's");
+        lane.paint(5, 5, fill(OFF));
+        assert_eq!(steps(&lane), [(4, ON), (5, OFF), (6, ON), (8, None)], "one step off inside");
+        lane.paint(5, 5, fill(ON));
+        assert_eq!(steps(&lane), [(4, ON), (8, None)], "and on again");
+        lane.paint(6, 12, fill(ON));
+        assert_eq!(steps(&lane), [(4, ON), (13, None)], "joined to the zone before");
+        lane.paint(8, 9, fill(OFF));
+        assert_eq!(steps(&lane), [(4, ON), (8, OFF), (10, ON), (13, None)]);
+        lane.paint(0, 20, fill(OFF));
+        assert_eq!(steps(&lane), [(0, OFF), (21, None)]);
+        lane.paint(u32::MAX - 1, u32::MAX, fill(ON));
+        assert_eq!(steps(&lane), [(0, OFF), (21, None), (u32::MAX - 1, ON)]);
         lane.clear();
         assert!(lane.points.is_empty());
     }
 
     #[test]
+    fn an_erased_zone_goes_back_to_the_pattern() {
+        let mut lane = lane(&[(0, ON), (8, OFF)]);
+        lane.paint(2, 5, fill(None));
+        assert_eq!(steps(&lane), [(0, ON), (2, None), (6, ON), (8, OFF)]);
+        assert_eq!([1, 2, 5, 6].map(|s| lane.is_on_at(s)), [Some(true), None, None, Some(true)]);
+        lane.paint(0, 7, fill(None));
+        assert_eq!(steps(&lane), [(8, OFF)], "nothing left to repeat the pattern's");
+        lane.paint(8, 100, fill(None));
+        assert_eq!(steps(&lane), [(101, OFF)], "the off held on resumes after the zone");
+        lane.paint(0, u32::MAX, fill(None));
+        assert!(lane.points.is_empty(), "erased whole");
+    }
+
+    #[test]
+    fn a_line_sets_a_value_on_each_step_it_crosses() {
+        let mut lane = AutomationLane::new("KICK", AutomationTarget::Volume);
+        lane.paint(2, 8, AutomationStroke::Line((6, 0.0), (2, 1.0)));
+        let expected = [(2, Some(1.0)), (3, Some(0.75)), (4, Some(0.5)), (5, Some(0.25)), (6, Some(0.0)), (9, None)];
+        assert_eq!(steps(&lane), expected, "held level past its end, to the zone's");
+        lane.paint(3, 3, AutomationStroke::Line((3, 1.0 / 3.0), (3, 1.0 / 3.0)));
+        assert_eq!(lane.value_at(3), Some(0.333), "rounded");
+        lane.paint(0, u32::MAX, AutomationStroke::Line((0, 2.0), (0, 2.0)));
+        assert_eq!(steps(&lane), [(0, Some(1.0))], "kept within 0 to 1, one point for a level zone");
+    }
+
+    #[test]
     fn reads_and_writes_lanes() {
         let raw = json::parse(
-            r#"{"instrument":" KICK ","target":"solo","points":[{"step":16,"on":false},{"step":4.5,"on":true},
-                {"step":-1},{"on":true},{"step":16,"on":true}]}"#,
+            r#"{"instrument":" KICK ","target":"solo","points":[{"step":16,"value":0},{"step":4.5,"value":1},
+                {"step":-1},{"value":1},{"step":16,"value":1},{"step":20,"value":null},{"step":24,"value":true},
+                {"step":28,"on":true},{"step":32,"value":1.5}]}"#,
         )
         .unwrap();
         let mut issues = Vec::new();
         let lane = AutomationLane::from_json(&raw, "a", &mut issues).unwrap();
         assert_eq!((lane.instrument.as_str(), lane.target), ("KICK", AutomationTarget::Solo));
-        assert_eq!(lane.points.iter().map(|p| (p.step, p.is_on)).collect::<Vec<_>>(), [(4, true), (16, true)]);
+        assert_eq!(steps(&lane), [(4, ON), (16, ON), (20, None), (32, ON)]);
         let at: Vec<_> = issues.iter().map(|i| i.at.as_str()).collect();
-        assert_eq!(at, ["a.points[2]", "a.points[3]", "a.points[4]"]);
+        let expected = ["a.points[2]", "a.points[3]", "a.points[4]", "a.points[6].value", "a.points[7].value"];
+        assert_eq!(at, [&expected[..], &["a.points[8].value"]].concat());
         let again = AutomationLane::from_json(&lane.to_json(), "a", &mut Vec::new()).unwrap();
         assert_eq!(again, lane);
 
         let mut issues = Vec::new();
-        let bad = json::parse(r#"[{"instrument":"KICK","target":"volume"},{"target":"mute"},1]"#).unwrap();
+        let bad = json::parse(r#"[{"instrument":"KICK","target":"pan"},{"target":"mute"},1]"#).unwrap();
         for (i, raw) in bad.as_array().unwrap().iter().enumerate() {
             assert_eq!(AutomationLane::from_json(raw, &format!("l[{i}]"), &mut issues), None);
         }
@@ -290,16 +360,16 @@ mod tests {
         assert_eq!(silent(&[], 0), [false, true], "the pattern's own mute");
 
         let mut mute = AutomationLane::new("KICK", AutomationTarget::Mute);
-        mute.paint(4, u32::MAX, true);
+        mute.paint(4, u32::MAX, fill(ON));
         let mut unmute = AutomationLane::new("SNARE", AutomationTarget::Mute);
-        unmute.points = vec![AutomationPoint { step: 0, is_on: false }];
+        unmute.points = vec![AutomationPoint { step: 0, value: OFF }];
         let lanes = [mute, unmute];
         assert_eq!(silent(&lanes, 0), [false, false]);
         assert_eq!(silent(&lanes, 4), [true, false]);
 
         // A solo of an instrument this pattern lacks silences all of it.
         let mut solo = AutomationLane::new("HAT", AutomationTarget::Solo);
-        solo.paint(8, u32::MAX, true);
+        solo.paint(8, u32::MAX, fill(ON));
         let lanes = [solo];
         assert_eq!(silent(&lanes, 7), [false, true]);
         assert_eq!(silent(&lanes, 8), [true, true]);

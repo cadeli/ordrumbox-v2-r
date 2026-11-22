@@ -97,8 +97,6 @@ pub(super) struct Page {
     pub(super) body_w: i32,
     body_h: i32,
     cursor_measure: f64,
-    /// The measure the cursor is in.
-    pub(super) current: u32,
 }
 
 impl Page {
@@ -117,7 +115,6 @@ impl Page {
             body_w: shown_measures as i32 * layout.measure_width(),
             body_h: shown_rows as i32 * layout.row_height(),
             cursor_measure,
-            current: cursor_measure.floor() as u32,
         }
     }
 }
@@ -149,13 +146,15 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     draw_clips(canvas, view, song, layout);
     draw_dragged_pattern(canvas, view, layout, &page);
     draw_row_drop(canvas, view, layout, &page);
-    // The cursor: where the song plays, else (dimmer) where play starts.
+    // The cursor, from the ruler down: where the song plays, else (dimmer)
+    // where play starts.
     if (f64::from(page.first_measure)..f64::from(page.first_measure + page.shown_measures))
         .contains(&page.cursor_measure)
     {
         let x = layout.measure_x(page.cursor_measure, page.first_measure);
         let color = if view.playing { CURSOR } else { CURSOR_IDLE };
-        canvas.fill_rect(x - s.px(), layout.body_top(), 2 * s, page.body_h, color);
+        let top = layout.ruler_top();
+        canvas.fill_rect(x - s.px(), top, 2 * s, layout.body_top() - top + page.body_h, color);
     }
     draw_scroll_bars(canvas, view, layout, &page);
     super::automation::draw_add_button(canvas, view, layout);

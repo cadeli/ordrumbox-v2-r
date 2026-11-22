@@ -182,20 +182,29 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   song to the pattern, the pattern keeps the song's tempo.
 - **Space**: play / stop. A song stops where it is and **Space** goes on from that
   measure; **Home** (or the keypad's **Enter**) goes back to the first beat, or measure.
-  **Shift + click** on the song panel's ruler loops the song from the cursor's measure to
-  the one clicked (the ruler shows it; Play > Clear the loop ends it).
+  A **drag** on the song panel's ruler selects the part of the song that plays in a loop:
+  whole measures, beats or steps, as fine as the ruler is marked at that zoom. The ruler
+  tints it green, with a mark at each end; drag a mark to move that end (on the same
+  lines). Another drag selects a new loop; a **click** on the ruler ends the loop and puts
+  the cursor on the measure clicked (Play > Clear the loop also ends it). **Shift + click**
+  on the ruler loops the song from the cursor's measure to the one clicked.
   A **double-click** on a clip of the song panel opens its pattern in the grid, in
   pattern mode.
 - **Automation lanes** in the song panel: **+ NEW AUTOMATION**, under the arrangement's
-  rows, lists the instruments the song's patterns play; pick one, then **Mute** or
-  **Solo**, and a lane for it appears under the patterns. The panel opens zoomed in far
-  enough to show each step (a sixteenth note). Press a step and **drag** along the lane to
-  select steps: from a step that is not on, the selection is switched on; from a step that
-  is on, it is switched off. Only the steps selected change (a click changes its step
-  alone). Where a lane sets nothing, the instrument plays as its patterns say. A solo that
-  is on silences every other instrument of the song. A click, left or right, on a lane's
-  name opens its menu: clear all its points, delete the lane, or delete every lane. Lanes
-  are saved with the song.
+  rows, lists the instruments the song's patterns play; pick one, then **Mute**, **Solo**
+  or **Volume**, and a lane for it appears under the patterns. The panel opens zoomed in
+  far enough to show each step (a sixteenth note). Press a step and **drag** along the
+  lane to select steps. On a Mute or Solo lane, from a step that is not on, the selection
+  is switched on; from a step that is on, it is switched off. On a Volume lane, the height
+  you press at is the level (top: full, bottom: silent), and a drag draws a line from it
+  to the pointer's height. With the **right button**, the selection is erased, back to
+  what the patterns say. The selection is made of whole measures, beats or steps, as fine
+  as the ruler is marked at that zoom; hold **Shift** to select steps at any zoom. Only
+  the steps selected change. Where a lane sets nothing, the instrument plays as its
+  patterns say. A solo that is on silences every other instrument of the song; a volume
+  lane replaces the track's volume (and its volume LFO) where it is set. A click, left or
+  right, on a lane's name opens its menu: clear all its points, delete the lane, or
+  delete every lane. Lanes are saved with the song.
 - **Song panel zoom**, as on a DAW timeline: drag an end of the thumb of the
   arrangement's horizontal scroll bar (its light handles) to show more or fewer measures,
   the other end staying where it is; drag its middle to scroll. **Ctrl + wheel** over the

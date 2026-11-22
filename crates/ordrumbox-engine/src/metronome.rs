@@ -42,11 +42,12 @@ pub fn add_clicks(pass: &mut Pass) {
     let patch_base = pass.patches.len();
     pass.patches.extend([click_patch(ACCENT_HZ), click_patch(BEAT_HZ)]);
     let tick = u64::from(TICK);
-    let beats = (u64::from(pass.ticks) / tick).max(1);
-    let first_beat = pass.first_tick / tick;
-    for beat in 0..beats {
-        let accent = (first_beat + beat).is_multiple_of(BEATS_PER_MEASURE);
-        let frame = u128::from(beat * tick) * u128::from(pass.frames) / u128::from(pass.ticks);
+    // A pass of a song loop can start and end between beats.
+    let end = pass.first_tick + u64::from(pass.ticks);
+    for beat in pass.first_tick.div_ceil(tick)..end.div_ceil(tick) {
+        let accent = beat.is_multiple_of(BEATS_PER_MEASURE);
+        let offset = beat * tick - pass.first_tick;
+        let frame = u128::from(offset) * u128::from(pass.frames) / u128::from(pass.ticks);
         pass.events.push(Event {
             frame: u64::try_from(frame).unwrap_or(u64::MAX),
             sound: Sound::Synth(SynthStart {

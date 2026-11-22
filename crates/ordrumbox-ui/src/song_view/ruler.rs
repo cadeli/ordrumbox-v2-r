@@ -46,6 +46,18 @@ impl SongLayout {
             RulerDetail::Measures
         }
     }
+
+    /// How many steps a selection is made of at this zoom (a painted zone of
+    /// a lane, the song's loop): a measure, a beat or a step, as fine as the
+    /// ruler is marked.
+    #[must_use]
+    pub fn snap_steps(&self) -> u32 {
+        match self.ruler_detail() {
+            RulerDetail::Measures => STEPS_PER_MEASURE,
+            RulerDetail::BeatTicks => STEPS_PER_BEAT,
+            RulerDetail::StepTicks | RulerDetail::BeatNumbers => 1,
+        }
+    }
 }
 
 /// The ruler of `page`: its cells, their ticks and their numbers.
@@ -53,18 +65,10 @@ pub(super) fn draw(canvas: &mut Canvas, view: &SongView, layout: &SongLayout, pa
     let s = layout.scale;
     for m in page.first_measure..page.first_measure + page.shown_measures {
         let x = layout.measure_x(f64::from(m), page.first_measure);
-        let looped = view.loop_region.is_some_and(|(first, end)| (first..end).contains(&m));
-        let color = if m == page.current {
-            CURRENT
-        } else if looped {
-            loop_color()
-        } else if m % 4 == 0 {
-            major_color()
-        } else {
-            cell_color()
-        };
+        let color = if m % 4 == 0 { major_color() } else { cell_color() };
         canvas.fill_rect(x, layout.ruler_top(), layout.measure_width() - s.px(), HEADER_HEIGHT * s - s.px(), color);
     }
+    super::song_loop::draw(canvas, view, layout, page);
     let detail = layout.ruler_detail();
     draw_ticks(canvas, layout, page, detail);
     draw_numbers(canvas, layout, page, detail);
@@ -86,9 +90,7 @@ fn draw_ticks(canvas: &mut Canvas, layout: &SongLayout, page: &Page, detail: Rul
             (false, false) => continue,
         };
         let x = layout.step_x(step, page.first_measure);
-        // Dark over the current measure's lit cell, light over the others.
-        let color = if step / STEPS_PER_MEASURE == page.current { background_color() } else { theme::muted() };
-        canvas.fill_rect(x - s.px(), bottom - height * s, s.px(), height * s, color);
+        canvas.fill_rect(x - s.px(), bottom - height * s, s.px(), height * s, theme::muted());
     }
 }
 
@@ -109,19 +111,10 @@ fn draw_numbers(canvas: &mut Canvas, layout: &SongLayout, page: &Page, detail: R
         let x = layout.step_x(step, page.first_measure);
         let (label, color) = match beat {
             0 if m % label_step == 0 => {
-                let color = if m == page.current && label_step == 1 {
-                    background_color()
-                } else if m % 4 == 0 {
-                    theme::text()
-                } else {
-                    theme::muted()
-                };
+                let color = if m % 4 == 0 { theme::text() } else { theme::muted() };
                 ((m + 1).to_string(), color)
             }
-            1.. if detail >= RulerDetail::BeatNumbers => {
-                let color = if m == page.current { background_color() } else { theme::muted() };
-                (format!("{}.{}", m + 1, beat + 1), color)
-            }
+            1.. if detail >= RulerDetail::BeatNumbers => (format!("{}.{}", m + 1, beat + 1), theme::muted()),
             _ => continue,
         };
         let width = text_width(&label, s);

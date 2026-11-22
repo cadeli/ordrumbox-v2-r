@@ -33,6 +33,8 @@ use crate::synth_preset::SynthPresets;
 mod audio;
 #[path = "controller/link.rs"]
 mod link;
+#[path = "controller/song_loop.rs"]
+mod song_loop;
 #[cfg(test)]
 #[path = "controller/tests.rs"]
 mod tests;
@@ -40,6 +42,8 @@ mod tests;
 pub use audio::AudioSide;
 pub use link::SCOPE_SIZE;
 use link::*;
+pub use song_loop::SongLoop;
+use song_loop::song_span;
 
 /// A host tempo change smaller than this is not one (passes are not rebuilt).
 const TEMPO_EPSILON: f64 = 1e-6;
@@ -93,8 +97,8 @@ pub struct Controller {
     swing: f64,
     /// What the cue posted was built from; `None`: none posted, or one to build again.
     cue: Option<CueKey>,
-    /// The measures a song plays in a loop, `first..end` (`end` excluded).
-    song_loop: Option<(u64, u64)>,
+    /// The ticks a song plays in a loop.
+    song_loop: Option<SongLoop>,
     /// A click on every beat of the passes built.
     metronome: bool,
     /// A MIDI input is open: the pattern's key map is posted for its notes, as under a host.
@@ -371,11 +375,10 @@ impl Controller {
         self.tempo.unwrap_or_else(|| clamp_bpm(own))
     }
 
-    /// The measures of a song that play in a loop, `first..end`, or `None`
-    /// to play on to the end. The pass playing is rebuilt, the next ones
-    /// follow the region: a song that reaches `end` goes back to `first`.
-    pub fn set_song_loop(&mut self, library: &Library, region: Option<(u64, u64)>) {
-        let region = region.filter(|(first, end)| first < end);
+    /// The ticks of a song that play in a loop, or `None` to play on to the
+    /// end. The pass playing is rebuilt, the next ones follow the loop: a
+    /// song that reaches its end goes back to its first tick.
+    pub fn set_song_loop(&mut self, library: &Library, region: Option<SongLoop>) {
         if self.song_loop != region {
             self.song_loop = region;
             self.refresh(library);
@@ -423,16 +426,6 @@ impl Controller {
         self.metronome
     }
 
-    /// The song measure the pass of sequence `number` plays: the pass numbers
-    /// only count up (the engine takes them in order), so the loop is made
-    /// here, in what each pass holds.
-    fn song_measure(&self, number: u64) -> u64 {
-        match self.song_loop {
-            Some((first, end)) if number >= end => first + (number - first) % (end - first),
-            _ => number,
-        }
-    }
-
     /// Pass `number` of `mode`.
     fn build_of(&mut self, library: &Library, number: u64, mode: Mode) -> Option<Arc<Pass>> {
         let pass = match mode {
@@ -475,8 +468,8 @@ impl Controller {
                     swing: self.swing,
                 };
                 let bpm = self.bpm_of(library, mode);
-                let measure = self.song_measure(number);
-                let mut pass = build_song_pass_at(song, measure, &mut self.rng, &mut self.song_notes, context, bpm);
+                let span = song_span(number, self.song_loop);
+                let mut pass = build_song_pass_at(song, span, &mut self.rng, &mut self.song_notes, context, bpm);
                 pass.number = number;
                 pass
             }

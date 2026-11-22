@@ -287,7 +287,8 @@ impl Ui {
 
     fn released(&mut self, button: Button) -> bool {
         if button != Button::Left {
-            return false;
+            // A lane erased with the right button.
+            return button == Button::Right && self.session.lane_paint_release();
         }
         if self.scroll.release() {
             return true;

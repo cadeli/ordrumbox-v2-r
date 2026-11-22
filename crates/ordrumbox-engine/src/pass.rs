@@ -463,22 +463,22 @@ pub fn build_song_pass(
     cache: &mut HitsCache,
     context: SongContext<'_>,
 ) -> Pass {
-    build_song_pass_at(song, measure, rng, cache, context, clamp_bpm(song.bpm))
+    let span = (measure * u64::from(SONG_PASS_TICKS), SONG_PASS_TICKS);
+    build_song_pass_at(song, span, rng, cache, context, clamp_bpm(song.bpm))
 }
 
-/// [`build_song_pass`] at tempo `bpm` instead of the song's (a plugin host's tempo).
+/// The ticks `(first_tick, ticks)` of `song` as a pass, at tempo `bpm`: a
+/// measure, or the part of one that a song loop plays.
 pub fn build_song_pass_at(
     song: &Song,
-    measure: u64,
+    (first_tick, ticks): (u64, u32),
     rng: &mut Rng,
     cache: &mut HitsCache,
     context: SongContext<'_>,
     bpm: f64,
 ) -> Pass {
     let per_tick = frames_per_tick(bpm, context.sample_rate);
-    let ticks = SONG_PASS_TICKS;
     let frames = (f64::from(ticks) * per_tick).round().max(1.0) as u64;
-    let first_tick = measure * u64::from(ticks);
     let strips = song_strips(song, context.patterns);
     let targets = track_targets(strips.iter().map(|&(p, t)| {
         let sounds = context.sounds.get(p).map_or(&[][..], Vec::as_slice);
@@ -511,7 +511,7 @@ pub fn build_song_pass_at(
     let span = song_strips::Span { first_tick, ticks, bpm };
     let (strip_settings, lfos) = song_strips::settings_and_lfos(song, context.patterns, &strips, span);
     Pass {
-        number: measure,
+        number: first_tick / u64::from(SONG_PASS_TICKS),
         first_tick,
         frames,
         ticks,

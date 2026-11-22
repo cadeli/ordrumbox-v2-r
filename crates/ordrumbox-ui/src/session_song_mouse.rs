@@ -49,9 +49,11 @@ impl Session {
             }
             (SongHit::ZoomHandle(edge), Button::Left) => self.press_zoom_handle(size, edge),
             (SongHit::Description, Button::Left) => self.text_entry(Id::PatternDescription),
-            (SongHit::Ruler(m), Button::Left) => self.set_song_cursor(m),
-            (SongHit::AddAutomation | SongHit::LaneName(_) | SongHit::LaneStep { .. }, Button::Left)
-            | (SongHit::LaneName(_), Button::Right) => self.automation_click(hit, x, y),
+            (SongHit::Ruler(m), Button::Left) => self.press_ruler(size, x, m),
+            (SongHit::LoopEnd(edge), Button::Left) => self.press_loop_end(edge),
+            (SongHit::AddAutomation | SongHit::LaneName(_) | SongHit::LaneStep { .. }, _) => {
+                self.automation_click(size, hit, (x, y), button);
+            }
             (SongHit::Cell { row, measure }, Button::Left) => {
                 let row = &rows[row];
                 let title = format!("Add \"{}\" at measure {}", row.name, measure + 1);
@@ -74,9 +76,16 @@ impl Session {
     pub fn song_shift_click(&mut self, size: (i32, i32, Scale), x: i32, y: i32) -> bool {
         let layout = self.song_layout(size);
         let rows = self.song_rows();
-        if let Some(SongHit::Ruler(measure)) = layout.hit(&self.song_view_data(&rows, &layout), x, y) {
-            self.loop_to(measure);
-            return true;
+        match layout.hit(&self.song_view_data(&rows, &layout), x, y) {
+            Some(SongHit::Ruler(measure)) => {
+                self.loop_to(measure);
+                return true;
+            }
+            Some(SongHit::LaneStep { lane, step }) => {
+                self.press_lane(size, lane, (step, y), Button::Left, true);
+                return true;
+            }
+            _ => {}
         }
         self.song_click(size, x, y, Button::Left)
     }
@@ -198,8 +207,15 @@ impl Session {
         })
     }
 
-    /// The mouse moved with a press held; whether to redraw.
-    pub(super) fn song_drag_move(&mut self, x: i32, y: i32) -> bool {
+    /// The mouse moved to `(x, y)` with a press held (`shift` held): the
+    /// ruler's loop, a lane's paint or a held clip follows; whether to redraw.
+    pub(super) fn song_drag_move(&mut self, size: (i32, i32, Scale), (x, y): (i32, i32), shift: bool) -> bool {
+        if self.song_panel.loop_drag.is_some() {
+            return self.loop_drag_move(size, x);
+        }
+        if self.song_panel.paint.is_some() {
+            return self.lane_paint_move(size, (x, y), shift);
+        }
         let Some(drag) = &mut self.song_panel.drag else { return false };
         (drag.x, drag.y) = (x, y);
         let (dx, dy) = (x - drag.press.0, y - drag.press.1);
@@ -211,6 +227,9 @@ impl Session {
     pub fn song_release(&mut self, size: (i32, i32, Scale)) -> bool {
         if self.song_panel.paint.is_some() {
             return self.lane_paint_release();
+        }
+        if self.song_panel.loop_drag.is_some() {
+            return self.loop_drag_release();
         }
         // A press without a drag opens the menu of what was pressed.
         if let Some(SongDrag { source, started: false, press: (x, y), .. }) = self.song_panel.drag {

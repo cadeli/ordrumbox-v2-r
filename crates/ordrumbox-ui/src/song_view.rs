@@ -48,9 +48,6 @@ const LOWER_HEIGHT: i32 = 138;
 /// Gap between the arrangement and what is under it, and between the list and the column.
 const GAP: i32 = 12;
 
-fn background_color() -> Rgb {
-    theme::bg()
-}
 fn cell_color() -> Rgb {
     theme::panel_2()
 }
@@ -68,12 +65,6 @@ fn selected_color() -> Rgb {
 /// The song cursor: where it plays, else where it will start.
 const CURSOR: Rgb = theme::LIVE;
 const CURSOR_IDLE: Rgb = theme::FOCUS;
-const CURRENT: Rgb = theme::LIVE;
-
-/// The ruler's measures that play in a loop.
-fn loop_color() -> Rgb {
-    theme::mix(cell_color(), theme::LIVE, 0.45)
-}
 
 /// One row of the arrangement: a pattern it uses.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -131,7 +122,7 @@ pub struct SongView<'a> {
     /// its first line shown.
     pub description: Option<&'a str>,
     pub description_scroll: usize,
-    /// The measures that play in a loop, `first..end`.
+    /// The steps that play in a loop, `first..end`.
     pub loop_region: Option<(u32, u32)>,
     /// How wide a measure is drawn.
     pub zoom: MeasureZoom,
@@ -184,6 +175,8 @@ pub enum SongHit {
     Description,
     /// A measure of the ruler.
     Ruler(u32),
+    /// An end of the song's loop, on the ruler: a drag moves it.
+    LoopEnd(Edge),
     /// A clip (its index in the arrangement).
     Clip(usize),
     /// A row's pattern name.
@@ -434,6 +427,9 @@ impl SongLayout {
         if !self.grid.contains(x, y) || y < self.ruler_top() {
             return None;
         }
+        if let Some(edge) = self.loop_end_at(view, x, y) {
+            return Some(SongHit::LoopEnd(edge));
+        }
         // The grid is as wide as the arrangement.
         let total = song.length_measures().max(1.0).ceil() as u32;
         if self.scroll_bar(Axis::Measures).contains(x, y) {
@@ -473,6 +469,7 @@ impl SongLayout {
 mod automation;
 mod draw;
 mod ruler;
+mod song_loop;
 mod zoom;
 pub use draw::draw;
 pub use zoom::{Edge, MeasureZoom};
@@ -622,7 +619,7 @@ mod tests {
                     list_drop: Some((39, 31)),
                     room: 8,
                     description: song.map(|_| long.as_str()),
-                    loop_region: Some((1, 3)),
+                    loop_region: Some((20, 45)),
                     zoom,
                     description_scroll: 3,
                 };

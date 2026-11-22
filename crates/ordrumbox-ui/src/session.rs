@@ -29,10 +29,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use ordrumbox_core::{Pattern, Scales, Track};
-use ordrumbox_engine::SynthPresets;
 use ordrumbox_engine::analysis::Analysis;
 use ordrumbox_engine::kit::Kit;
 use ordrumbox_engine::offline::RenderSetup;
+use ordrumbox_engine::{SongLoop, SynthPresets};
 use ordrumbox_logic::Editor;
 
 use crate::action_log::ActionLog;
@@ -151,6 +151,8 @@ mod session_song;
 mod session_song_automation;
 #[path = "session_song_files.rs"]
 mod session_song_files;
+#[path = "session_song_loop.rs"]
+mod session_song_loop;
 #[path = "session_song_menu.rs"]
 mod session_song_menu;
 #[path = "session_song_mouse.rs"]
@@ -316,7 +318,8 @@ impl Session {
         // What the library's tags teach, learned again after an edit (the header and menus read it).
         self.generators.learn(&self.editor);
         self.refresh_synths();
-        let region = self.song_loop_region().map(|(first, end)| (u64::from(first), u64::from(end)));
+        let ticks = |step: u32| u64::from(step) * u64::from(ordrumbox_core::automation::STEP_TICKS);
+        let region = self.song_loop_region().and_then(|(first, end)| SongLoop::new(ticks(first), ticks(end)));
         self.playback.set_song_loop(&self.editor, region);
         self.playback.set_metronome(&self.editor, self.transport.metronome);
         let midi_open = self.playback.offers().midi_open;

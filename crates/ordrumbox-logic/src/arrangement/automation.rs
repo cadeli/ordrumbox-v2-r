@@ -1,13 +1,28 @@
 //! The automation lanes of an arrangement: added, removed, and their on and
 //! off points placed step by step, each edit one undo step.
 
-use ordrumbox_core::automation::{AutomationLane, AutomationTarget, STEPS_PER_MEASURE};
+use ordrumbox_core::automation::{
+    AutomationKind, AutomationLane, AutomationStroke, AutomationTarget, STEPS_PER_MEASURE, is_on,
+};
 
 use crate::editor::Editor;
 
 /// `step` as shown: `measure.step`, both from 1.
 fn step_label(step: u32) -> String {
     format!("{}.{}", step / STEPS_PER_MEASURE + 1, step % STEPS_PER_MEASURE + 1)
+}
+
+/// What `stroke` does to a lane of `target`, as an undo step says it.
+fn stroke_label(target: AutomationTarget, stroke: AutomationStroke) -> String {
+    match (stroke, target.kind()) {
+        (AutomationStroke::Fill(None), _) => "erased".to_owned(),
+        (AutomationStroke::Fill(Some(value)), AutomationKind::Switch) => {
+            (if is_on(value) { "on" } else { "off" }).into()
+        }
+        (AutomationStroke::Fill(Some(value)), AutomationKind::Level) => format!("{:.0}%", value * 100.0),
+        (AutomationStroke::Line((_, from), (_, to)), _) if from == to => format!("{:.0}%", from * 100.0),
+        (AutomationStroke::Line(..), _) => "drawn".to_owned(),
+    }
 }
 
 impl Editor {
@@ -35,8 +50,8 @@ impl Editor {
         Ok(index)
     }
 
-    /// Lane `lane` set to `base` with steps `from` to `to` painted `is_on`
-    /// ([`AutomationLane::paint`]): a click paints one step, a drag over a
+    /// Lane `lane` set to `base` with steps `from` to `to` painted with
+    /// `stroke` ([`AutomationLane::paint`]): a click paints one step, a drag over a
     /// lane paints from the lane as it was pressed, the edits under one
     /// `coalesce` key one undo step.
     pub fn paint_automation(
@@ -45,7 +60,7 @@ impl Editor {
         lane: usize,
         base: &AutomationLane,
         (from, to): (u32, u32),
-        is_on: bool,
+        stroke: AutomationStroke,
         coalesce: &str,
     ) -> Result<(), String> {
         let s = self.require_song(song)?;
@@ -53,8 +68,8 @@ impl Editor {
             return Err("No such automation lane".to_owned());
         }
         let mut painted = base.clone();
-        painted.paint(from, to, is_on);
-        let state = if is_on { "on" } else { "off" };
+        painted.paint(from, to, stroke);
+        let state = stroke_label(base.target, stroke);
         let (first, last) = (from.min(to), from.max(to));
         let zone = if first == last {
             format!("at {}", step_label(first))
@@ -114,6 +129,8 @@ mod tests {
         editor
     }
 
+    const ON: AutomationStroke = AutomationStroke::Fill(Some(1.0));
+
     fn lanes(e: &Editor) -> &[AutomationLane] {
         &e.library().songs[0].automations
     }
@@ -128,12 +145,12 @@ mod tests {
         );
         assert_eq!(e.add_automation_lane(None, "KICK", AutomationTarget::Solo), Ok(1));
         let base = lanes(&e)[0].clone();
-        e.paint_automation(None, 0, &base, (20, 20), true, "click").unwrap();
+        e.paint_automation(None, 0, &base, (20, 20), ON, "click").unwrap();
         assert_eq!(e.undo().as_deref(), Some("KICK Mute on at 2.5"));
         assert!(lanes(&e)[0].points().is_empty());
         assert!(e.redo().is_some());
         assert_eq!(lanes(&e)[0].points().len(), 2, "on for one step, then back");
-        assert!(e.paint_automation(None, 5, &base, (0, 0), true, "click").is_err());
+        assert!(e.paint_automation(None, 5, &base, (0, 0), ON, "click").is_err());
 
         assert!(e.remove_automation_lane(None, 0));
         assert_eq!(lanes(&e).iter().map(|l| l.target).collect::<Vec<_>>(), [AutomationTarget::Solo]);
@@ -149,12 +166,16 @@ mod tests {
         e.add_automation_lane(None, "KICK", AutomationTarget::Solo).unwrap();
         let base = lanes(&e)[0].clone();
         for to in [6, 9, 7] {
-            e.paint_automation(None, 0, &base, (4, to), true, "drag").unwrap();
+            e.paint_automation(None, 0, &base, (4, to), ON, "drag").unwrap();
         }
-        let steps: Vec<_> = lanes(&e)[0].points().iter().map(|p| (p.step, p.is_on)).collect();
-        assert_eq!(steps, [(4, true), (8, false)], "painted from the lane as pressed");
+        let steps: Vec<_> = lanes(&e)[0].points().iter().map(|p| (p.step, p.value)).collect();
+        assert_eq!(steps, [(4, Some(1.0)), (8, None)], "painted from the lane as pressed");
         assert_eq!(e.undo().as_deref(), Some("KICK Mute on from 1.5 to 1.8"));
         assert!(lanes(&e)[0].points().is_empty(), "the whole drag, one step");
+        assert!(e.redo().is_some());
+        let base = lanes(&e)[0].clone();
+        e.paint_automation(None, 0, &base, (6, 4), AutomationStroke::Fill(None), "erase").unwrap();
+        assert_eq!(e.undo().as_deref(), Some("KICK Mute erased from 1.5 to 1.7"));
         assert!(e.redo().is_some());
 
         assert!(e.clear_automation_lane(None, 0));
@@ -171,9 +192,23 @@ mod tests {
         let mut e = editor();
         e.add_automation_lane(None, "KICK", AutomationTarget::Solo).unwrap();
         let base = lanes(&e)[0].clone();
-        e.paint_automation(None, 0, &base, (3, 6), true, "drag").unwrap();
+        e.paint_automation(None, 0, &base, (3, 6), ON, "drag").unwrap();
         let (library, report) = Library::parse(&e.library().to_file_text()).unwrap();
         assert!(report.issues.is_empty(), "{:?}", report.issues);
         assert_eq!(library.songs[0].automations, lanes(&e));
+    }
+
+    #[test]
+    fn a_volume_lane_is_drawn_and_said_in_percent() {
+        let mut e = editor();
+        e.add_automation_lane(None, "KICK", AutomationTarget::Volume).unwrap();
+        let base = lanes(&e)[0].clone();
+        let line = AutomationStroke::Line((0, 1.0), (4, 0.0));
+        e.paint_automation(None, 0, &base, (0, 4), line, "draw").unwrap();
+        assert_eq!(lanes(&e)[0].value_at(2), Some(0.5));
+        assert_eq!(e.undo().as_deref(), Some("KICK Volume drawn from 1.1 to 1.5"));
+        let flat = AutomationStroke::Line((3, 0.8), (3, 0.8));
+        e.paint_automation(None, 0, &base, (3, 3), flat, "click").unwrap();
+        assert_eq!(e.undo().as_deref(), Some("KICK Volume 80% at 1.4"));
     }
 }

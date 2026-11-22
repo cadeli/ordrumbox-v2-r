@@ -54,8 +54,8 @@ fn a_loop_keeps_the_song_in_its_measures_and_playing_on() {
     s.show_mode(true);
     s.set_song_cursor(1);
     s.loop_to(2);
-    assert_eq!(s.song_loop_region(), Some((1, 3)));
-    assert!(s.message.starts_with("loop: measures 2-3"), "{}", s.message);
+    assert_eq!(s.song_loop_region(), Some((16, 48)));
+    assert!(s.message.starts_with("loop: 2 to 4"), "{}", s.message);
     s.toggle_play();
     let mut heard = 0.0;
     let mut seen = std::collections::BTreeSet::new();
@@ -78,6 +78,23 @@ fn a_loop_keeps_the_song_in_its_measures_and_playing_on() {
     s.editor.add_song("other");
     s.select_song(1);
     assert_eq!(s.song_loop_region(), None);
+}
+
+#[test]
+fn a_loop_between_measures_plays_only_its_steps() {
+    let (mut s, mut audio) = session(LIBRARY);
+    s.show_mode(true);
+    // From the fifth step of measure 1 to the ninth of measure 2.
+    s.set_song_loop(4, 24);
+    s.toggle_play();
+    let step_ticks = u64::from(ordrumbox_core::automation::STEP_TICKS);
+    let mut steps = std::collections::BTreeSet::new();
+    for _ in 0..(MEASURE * 4 / 1000) {
+        run(&mut s, &mut audio, 1000);
+        steps.insert(s.playback.tick().expect("playing") / step_ticks);
+    }
+    assert!(steps.iter().all(|step| (0..24).contains(step)), "{steps:?}");
+    assert!(steps.contains(&23) && steps.contains(&4), "round the loop: {steps:?}");
 }
 
 #[test]

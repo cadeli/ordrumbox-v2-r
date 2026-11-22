@@ -225,17 +225,6 @@ fn a_midi_key_finds_the_track_that_plays_it_and_its_pitch() {
 }
 
 #[test]
-fn a_song_loop_wraps_the_measures_but_not_the_pass_numbers() {
-    let (mut controller, _audio) = Controller::new(8000.0, bank(), Scales::default(), SynthPresets::default());
-    let library = Library::default();
-    assert_eq!((0..5).map(|n| controller.song_measure(n)).collect::<Vec<_>>(), [0, 1, 2, 3, 4], "no loop");
-    controller.set_song_loop(&library, Some((2, 4)));
-    assert_eq!((0..8).map(|n| controller.song_measure(n)).collect::<Vec<_>>(), [0, 1, 2, 3, 2, 3, 2, 3]);
-    controller.set_song_loop(&library, Some((3, 3)));
-    assert_eq!(controller.song_measure(9), 9, "an empty region is no loop");
-}
-
-#[test]
 fn the_scope_keeps_the_last_samples_in_order() {
     let (controller, mut audio) = Controller::new(8000.0, bank(), Scales::default(), SynthPresets::default());
     let mut out = [1.0; SCOPE_SIZE];

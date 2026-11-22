@@ -4,7 +4,7 @@
 //! only through it.
 
 use ordrumbox_core::Track;
-use ordrumbox_engine::{Controller, HostMix, HostTransport, Mode, Position};
+use ordrumbox_engine::{Controller, HostMix, HostTransport, Mode, Position, SongLoop};
 use ordrumbox_logic::Editor;
 
 use crate::audio_output::{AudioOutput, OutputDevices, StartOutput};
@@ -196,8 +196,8 @@ impl Playback {
         self.played_revision = editor.revision();
     }
 
-    /// The measures a song plays in a loop (`None`: on to its end).
-    pub(super) fn set_song_loop(&mut self, editor: &Editor, region: Option<(u64, u64)>) {
+    /// The ticks a song plays in a loop (`None`: on to its end).
+    pub(super) fn set_song_loop(&mut self, editor: &Editor, region: Option<SongLoop>) {
         if let Some(controller) = &mut self.controller {
             controller.set_song_loop(editor.library(), region);
         }

@@ -4,6 +4,7 @@
 
 use super::Session;
 use crate::menu;
+use ordrumbox_core::automation::STEPS_PER_MEASURE;
 use ordrumbox_engine::Mode;
 
 /// Where and how the session plays, beside the engine's own state.
@@ -11,7 +12,7 @@ use ordrumbox_engine::Mode;
 pub(super) struct Transport {
     /// The measure the song plays from.
     pub(super) song_cursor: u32,
-    /// The measures a song plays in a loop: its index, first measure, end (excluded).
+    /// The steps a song plays in a loop: its index, first step, end (excluded).
     pub(super) song_loop: Option<(usize, u32, u32)>,
     /// A click on every beat.
     pub(super) metronome: bool,
@@ -78,7 +79,7 @@ impl Session {
     /// first beat again if it plays.
     pub fn rewind(&mut self) {
         if self.is_song_mode() {
-            let first = self.song_loop_region().map_or(0, |(first, _)| first);
+            let first = self.song_loop_region().map_or(0, |(first, _)| first / STEPS_PER_MEASURE);
             self.set_song_cursor(first);
             self.message = format!("back to measure {}", first + 1);
         } else if self.playback.is_playing() {
@@ -89,7 +90,7 @@ impl Session {
         }
     }
 
-    /// The measures the selected song plays in a loop, `first..end`.
+    /// The steps the selected song plays in a loop, `first..end`.
     pub(super) fn song_loop_region(&self) -> Option<(u32, u32)> {
         let (song, first, end) = self.transport.song_loop?;
         (song == self.editor.selected_song() && first < end).then_some((first, end))
@@ -100,12 +101,18 @@ impl Session {
     pub(super) fn loop_to(&mut self, measure: u32) {
         let from = self.playhead_measure();
         let (first, last) = (from.min(measure), from.max(measure));
-        self.transport.song_loop = Some((self.editor.selected_song(), first, last + 1));
-        self.message = if first == last {
-            format!("loop: measure {}, Play > Clear the loop ends it", first + 1)
-        } else {
-            format!("loop: measures {}-{}, Play > Clear the loop ends it", first + 1, last + 1)
+        self.set_song_loop(first * STEPS_PER_MEASURE, (last + 1) * STEPS_PER_MEASURE);
+    }
+
+    /// The selected song loops over steps `first..end`, said as measures
+    /// and steps (`2` for a measure's start, `2.5` for its fifth step).
+    pub(super) fn set_song_loop(&mut self, first: u32, end: u32) {
+        self.transport.song_loop = Some((self.editor.selected_song(), first, end));
+        let at = |step: u32| match step % STEPS_PER_MEASURE {
+            0 => (step / STEPS_PER_MEASURE + 1).to_string(),
+            in_measure => format!("{}.{}", step / STEPS_PER_MEASURE + 1, in_measure + 1),
         };
+        self.message = format!("loop: {} to {}, a click on the ruler ends it", at(first), at(end));
     }
 
     /// Play > Clear the loop: the song plays on to its end.
@@ -113,7 +120,7 @@ impl Session {
         if self.transport.song_loop.take().is_some() {
             self.message = "loop cleared".into();
         } else {
-            self.message = "no loop: Shift+click the song's ruler sets one".into();
+            self.message = "no loop: a drag on the song's ruler sets one".into();
         }
     }
 

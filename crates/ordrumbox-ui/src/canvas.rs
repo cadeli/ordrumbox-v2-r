@@ -44,6 +44,16 @@ impl<'a> Canvas<'a> {
         self.pixels.fill(color);
     }
 
+    /// Cover the rectangle at `(x, y)` of size `w × h` with `color`, `alpha`
+    /// of 255 opaque, letting what is under it show through the rest.
+    pub fn tint_rect(&mut self, x: i32, y: i32, w: i32, h: i32, color: Rgb, alpha: u8) {
+        for row in y.max(0)..y.saturating_add(h).min(self.height as i32) {
+            for col in x.max(0)..x.saturating_add(w).min(self.width as i32) {
+                self.blend(col, row, color, alpha);
+            }
+        }
+    }
+
     /// Fill the rectangle at `(x, y)` of size `w × h`; parts outside the
     /// canvas are dropped.
     pub fn fill_rect(&mut self, x: i32, y: i32, w: i32, h: i32, color: Rgb) {

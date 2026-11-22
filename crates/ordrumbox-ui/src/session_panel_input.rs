@@ -169,11 +169,8 @@ impl Session {
         if self.roll.zone_drag.is_some() {
             return self.roll_zone_move(size, x, y);
         }
-        if self.song_panel.paint.is_some() {
-            return self.lane_paint_move(size, x);
-        }
         if self.song_panel.dragging() {
-            return self.song_drag_move(x, y);
+            return self.song_drag_move(size, (x, y), shift);
         }
         if self.chrome.track_drag.is_some() {
             return self.track_drag_move(x, y);
