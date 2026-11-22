@@ -25,8 +25,15 @@ impl Hit {
     /// `swing_resolution` steps (1 = straight), the note on the second step of
     /// each group is pushed late by `swing_amount` beats (0.33 is a triplet feel).
     pub fn swing_beats(&self, track: &Track) -> f64 {
-        let grid = track.swing_resolution.max(1);
-        if grid == 1 || self.step % grid != 1 { 0.0 } else { track.swing_amount }
+        self.swing_beats_with(track.swing_resolution, track.swing_amount)
+    }
+
+    /// Swing delay, in beats, with a swing grid of `resolution` steps
+    /// pushing late by `amount` beats ([`Self::swing_beats`]).
+    #[must_use]
+    pub fn swing_beats_with(&self, resolution: i32, amount: f64) -> f64 {
+        let grid = resolution.max(1);
+        if grid == 1 || self.step % grid != 1 { 0.0 } else { amount }
     }
 
     /// Delay of a swing set for every track (a plugin host's), in beats:

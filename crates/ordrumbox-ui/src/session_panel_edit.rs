@@ -165,8 +165,8 @@ impl Session {
         }
         let Some(t) = self.editor_track() else { return };
         let name = self.track_name(t);
-        // The track editor's volume, pan, cutoff and Q: the mixer's, lanes included.
-        if let Id::KnobBar(key) | Id::Fx(key) = id
+        // The track editor's controls a lane can set: the mixer's, lanes included.
+        if let Id::KnobBar(key) | Id::Fx(key) | Id::Generation(key) | Id::Loop(key) = id
             && let Some(target) = ordrumbox_core::AutomationTarget::from_track_key(key)
         {
             return self.set_track_control(t, target, value);

@@ -274,8 +274,8 @@ pub fn track_editor(view: &TrackView, state: &EditorState, area: Rect, scale: Sc
         TAB_FX => fx_tab(&mut rows, view, state),
         TAB_SOUND => sound_tab(&mut rows, view),
         TAB_LFO => lfo_tab(&mut rows, view),
-        TAB_LOOP => loop_tab(&mut rows, track),
-        _ => generation_tab(&mut rows, track, view.compose.as_ref(), state),
+        TAB_LOOP => loop_tab(&mut rows, track, &view.lfo),
+        _ => generation_tab(&mut rows, (track, &view.lfo), view.compose.as_ref(), state),
     }
     TrackEditor { items: rows.items, sound_bottom, tabs_top, bottom }
 }

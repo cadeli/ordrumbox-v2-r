@@ -343,3 +343,17 @@ LFO where they change in a pass (`song_strips.rs`, `set_per_tick`); a cutoff lan
 whose filter is off. The mixer's pan knob and the track editor's pan, cutoff and Q knobs write or take back their
 lanes as the fader does; any control held while recording writes on (only the grid's volume slider did). Without
 lanes nothing changes: no snapshot changed.
+
+Lanes also set a track's sends and effect amounts (`EchoSend`, `ReverbSend`, `ReverbMix`, `DelayMix`, `DelayFeedback`,
+`Saturation`, `Bitcrush`, `HardClip`, `CompMix`), linear over the track field's range (`Track::value_range`). What each
+target is moved to `ordrumbox-core/src/automation/target.rs`. The engine carries them tick by tick in
+`StripLfo::controls` (`strip_control`, `set_strip_control`), which the strip approaches once a quantum as it does a
+host's change: the render path is unchanged. Without lanes nothing changes: no snapshot changed.
+
+Lanes also set a track's transpose (whole semitones), probability and swing amount (`Transpose`, `Probability`,
+`Swing`). They act on each note of a song pass as it starts, at the lane's value on its step
+(`ordrumbox-engine/src/pass/song_notes.rs`): a track with a probability lane is expanded with its probability at 1
+(`lane_pattern`) and each hit is then drawn against the lane's (or the track's), from the pass's `Rng`; a swing lane on
+a straight track swings pairs of steps. `note_frame` takes the swing in ticks (`swing_ticks`, with the note's own swing
+in beats). The track editor's Generation and Loop sliders show what a lane sets, as the knob bar does. Without these
+lanes nothing is drawn and nothing moves: no snapshot changed.

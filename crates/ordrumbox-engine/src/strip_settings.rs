@@ -11,7 +11,7 @@
 
 use ordrumbox_core::json::Object;
 use ordrumbox_core::lfo;
-use ordrumbox_core::{Note, Track};
+use ordrumbox_core::{AutomationTarget, Note, Track};
 use ordrumbox_dsp::StripSettings;
 
 use crate::synth_preset::FILTER_TYPES;
@@ -220,6 +220,42 @@ pub fn saturation_amount(s: &StripSettings) -> f64 {
     }
 }
 
+/// What `s` sets the send or the effect amount `target` to, in the
+/// control's unit; `None` for a control the strip's LFOs carry (volume,
+/// pan, cutoff, Q) or a switch.
+#[must_use]
+pub fn strip_control(s: &StripSettings, target: AutomationTarget) -> Option<f32> {
+    Some(match target {
+        AutomationTarget::EchoSend => s.echo_send,
+        AutomationTarget::ReverbSend => s.reverb_send,
+        AutomationTarget::ReverbMix => s.reverb_mix,
+        AutomationTarget::DelayMix => s.delay_mix,
+        AutomationTarget::DelayFeedback => s.delay_feedback,
+        AutomationTarget::Saturation => saturation_amount(s) as f32,
+        AutomationTarget::Bitcrush => s.crush,
+        AutomationTarget::HardClip => s.clip,
+        AutomationTarget::CompMix => s.comp_mix,
+        _ => return None,
+    })
+}
+
+/// `s` with the send or the effect amount `target` at `value` (the
+/// inverse of [`strip_control`]); a control it does not carry is left.
+pub fn set_strip_control(s: &mut StripSettings, target: AutomationTarget, value: f32) {
+    match target {
+        AutomationTarget::EchoSend => s.echo_send = value,
+        AutomationTarget::ReverbSend => s.reverb_send = value,
+        AutomationTarget::ReverbMix => s.reverb_mix = value,
+        AutomationTarget::DelayMix => s.delay_mix = value,
+        AutomationTarget::DelayFeedback => s.delay_feedback = value,
+        AutomationTarget::Saturation => set_saturation(s, f64::from(value)),
+        AutomationTarget::Bitcrush => s.crush = value,
+        AutomationTarget::HardClip => s.clip = value,
+        AutomationTarget::CompMix => s.comp_mix = value,
+        _ => {}
+    }
+}
+
 fn finite_or(x: f64, fallback: f64) -> f64 {
     if x.is_finite() { x } else { fallback }
 }
@@ -288,13 +324,20 @@ pub struct StripLfo {
     pub pan: Vec<f32>,
     pub cutoff: Vec<f32>,
     pub q: Vec<f32>,
+    /// The sends and effect amounts the song's lanes set ([`strip_control`]),
+    /// one value per tick each.
+    pub controls: Vec<(AutomationTarget, Vec<f32>)>,
 }
 
 impl StripLfo {
     /// Whether it sets nothing: every LFO off.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.volume.is_empty() && self.pan.is_empty() && self.cutoff.is_empty() && self.q.is_empty()
+        self.volume.is_empty()
+            && self.pan.is_empty()
+            && self.cutoff.is_empty()
+            && self.q.is_empty()
+            && self.controls.is_empty()
     }
 
     /// Apply the values of `tick` to `settings`.
@@ -311,6 +354,11 @@ impl StripLfo {
         }
         if let Some(v) = at(&self.q) {
             settings.q = v;
+        }
+        for (target, values) in &self.controls {
+            if let Some(v) = at(values) {
+                set_strip_control(settings, *target, v);
+            }
         }
     }
 }
@@ -332,6 +380,7 @@ pub fn strip_lfo(index: usize, track: &Track, silent: bool, first_tick: u64, tic
             (track.filter_cutoff + v).clamp(ordrumbox_dsp::MIN_FILTER_FREQ, ordrumbox_dsp::MAX_FILTER_FREQ)
         }),
         q: values(&track.filter_q_lfo, &|v| (track.filter_q + v).clamp(0.707, 18.707)),
+        controls: Vec::new(),
     };
     (!result.is_empty()).then_some(result)
 }

@@ -1,5 +1,6 @@
 //! The strips of a song pass: each instrument's settings and LFOs, its
-//! volume, pan and filter set by the song's automation lanes (silent where
+//! volume, pan, filter, sends and effect amounts set by the song's
+//! automation lanes (silent where
 //! its pattern's mute and solo, or the lanes, say so; at a volume lane's
 //! level, in decibels). A value that changes inside the pass is set tick by
 //! tick (as its LFO), so a mute cuts the sound at its step, tails included,
@@ -10,7 +11,7 @@ use ordrumbox_core::steps::TICK;
 use ordrumbox_core::{Pattern, Song};
 use ordrumbox_dsp::StripSettings;
 
-use crate::strip_settings::{StripLfo, strip_lfo, strip_settings};
+use crate::strip_settings::{StripLfo, is_slap, set_strip_control, strip_control, strip_lfo, strip_settings};
 
 /// The ticks a pass spans, and its tempo.
 #[derive(Debug, Clone, Copy)]
@@ -54,21 +55,44 @@ pub(super) fn settings_and_lfos(
         }
         let mut lfo = strip_lfo(i, track, false, span.first_tick, span.ticks)
             .unwrap_or(StripLfo { track: i, ..StripLfo::default() });
-        let cutoffs = lane_values(song, &track.name, AutomationTarget::Cutoff, span);
-        // A cutoff lane filters a track whose filter is off, as a note's lock does.
-        if cutoffs.iter().any(Option::is_some) {
-            strip.filter_on = 1.0;
-        }
         set_per_tick(&mut strip.volume, &mut lfo.volume, &volumes);
-        let pans = lane_values(song, &track.name, AutomationTarget::Pan, span);
-        set_per_tick(&mut strip.pan, &mut lfo.pan, &pans);
-        set_per_tick(&mut strip.cutoff, &mut lfo.cutoff, &cutoffs);
-        let qs = lane_values(song, &track.name, AutomationTarget::Q, span);
-        set_per_tick(&mut strip.q, &mut lfo.q, &qs);
+        if !song.automations.is_empty() {
+            set_lanes(song, &track.name, span, &mut strip, &mut lfo);
+        }
         settings.push(strip);
         lfos.extend((!lfo.is_empty()).then_some(lfo));
     }
     (settings, lfos)
+}
+
+/// `strip` and `lfo` with the lanes of `instrument` other than its volume,
+/// mute and solo set over them.
+fn set_lanes(song: &Song, instrument: &str, span: Span, strip: &mut StripSettings, lfo: &mut StripLfo) {
+    let cutoffs = lane_values(song, instrument, AutomationTarget::Cutoff, span);
+    // A cutoff lane filters a track whose filter is off, as a note's lock does.
+    if cutoffs.iter().any(Option::is_some) {
+        strip.filter_on = 1.0;
+    }
+    set_per_tick(&mut strip.cutoff, &mut lfo.cutoff, &cutoffs);
+    set_per_tick(&mut strip.pan, &mut lfo.pan, &lane_values(song, instrument, AutomationTarget::Pan, span));
+    set_per_tick(&mut strip.q, &mut lfo.q, &lane_values(song, instrument, AutomationTarget::Q, span));
+    for target in AutomationTarget::ALL {
+        // A slap is one echo: no feedback to set.
+        if target == AutomationTarget::DelayFeedback && is_slap(strip) {
+            continue;
+        }
+        let Some(mut value) = strip_control(strip, target) else { continue };
+        let levels = lane_values(song, instrument, target, span);
+        if levels.is_empty() {
+            continue;
+        }
+        let mut ticks = Vec::new();
+        set_per_tick(&mut value, &mut ticks, &levels);
+        set_strip_control(strip, target, value);
+        if !ticks.is_empty() {
+            lfo.controls.push((target, ticks));
+        }
+    }
 }
 
 /// What the lanes of `song` set `target` of `instrument` to at each tick of
@@ -210,5 +234,41 @@ mod tests {
         let (settings, lfos) = settings_and_lfos(song, patterns, &[(0, 0), (0, 1)], span(1));
         assert_eq!((settings[0].pan, settings[1].q), (-1.0, 18.707), "held for the whole pass");
         assert!(lfos.is_empty());
+    }
+
+    #[test]
+    fn send_and_effect_lanes_set_their_strip() {
+        let (mut library, _) = Library::parse(
+            r#"{"patterns":[{"id":"a","name":"a","tracks":[{"name":"SNARE","echoSend":0.1},{"name":"HAT","delayType":"slap"}]}],
+                "songs":[{"name":"s","clips":[{"pattern":"a","startMeasure":0,"measureCount":2}]}]}"#,
+        )
+        .unwrap();
+        let lanes = [
+            (AutomationTarget::EchoSend, "SNARE", 12, AutomationStroke::Fill(Some(1.0))),
+            (AutomationTarget::Saturation, "SNARE", 0, AutomationStroke::Fill(Some(0.5))),
+            (AutomationTarget::DelayFeedback, "HAT", 0, AutomationStroke::Fill(Some(1.0))),
+        ];
+        for (target, instrument, from, stroke) in lanes {
+            let mut lane = AutomationLane::new(instrument, target);
+            lane.paint(from, u32::MAX, stroke);
+            library.songs[0].automations.push(lane);
+        }
+        let (song, patterns) = (&library.songs[0], &library.patterns);
+        let ticks = TICK * 4;
+        let span = Span { first_tick: 0, ticks, bpm: 120.0 };
+
+        let (settings, lfos) = settings_and_lfos(song, patterns, &[(0, 0), (0, 1)], span);
+        let saturation = crate::strip_settings::saturation_amount(&settings[0]);
+        assert!((saturation - 0.5).abs() < 1e-6, "held for the pass: {saturation}");
+        assert_eq!(settings[1].delay_feedback, 0.0, "a slap stays one echo");
+        assert_eq!(lfos.len(), 1, "only the send changes inside the pass");
+        let [(target, echo)] = lfos[0].controls.as_slice() else { panic!("one control") };
+        let last_beat = (3 * ticks / 4) as usize;
+        assert_eq!(*target, AutomationTarget::EchoSend);
+        assert!(echo[..last_beat].iter().all(|&v| v == 0.1) && echo[last_beat..].iter().all(|&v| v == 1.0));
+
+        let mut strip = settings[0];
+        lfos[0].apply(last_beat, &mut strip);
+        assert_eq!(strip.echo_send, 1.0, "set on the strip on its tick");
     }
 }

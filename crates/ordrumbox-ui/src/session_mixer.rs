@@ -82,11 +82,14 @@ impl Session {
             let name = Kind::Text { text: fit(&track.name, strip.name.w, scale), color };
             items.push(Item::new(Some(Id::MixerName(t)), strip.name, name));
             for (&(key, label), &rect) in TRACK_KNOBS.iter().zip(&strip.knobs) {
-                let (spec, value) = match key {
-                    "pan" => (PAN, self.automated_now(t, AutomationTarget::Pan).unwrap_or(track.pan)),
+                let (spec, own) = match key {
+                    "pan" => (PAN, track.pan),
                     "echoSend" => (SEND, track.echo_send),
                     _ => (SEND, track.reverb_send),
                 };
+                // While the song plays, the knob shows what its lane sets.
+                let lane = AutomationTarget::from_track_key(key).and_then(|target| self.automated_now(t, target));
+                let value = lane.unwrap_or(own);
                 items.push(Item::new(
                     Some(Id::MixerKnob(t, key)),
                     rect,

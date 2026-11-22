@@ -161,3 +161,56 @@ fn pan_cutoff_and_q_knobs_write_show_and_take_back_their_lanes() {
     assert_eq!((s.track(0).unwrap().filter_cutoff, s.automated_now(0, AutomationTarget::Cutoff)), (1000.0, None));
     assert!(s.message.contains("Cutoff taken back"), "{}", s.message);
 }
+
+#[test]
+fn send_and_effect_knobs_write_show_and_take_back_their_lanes() {
+    let (mut s, mut audio) = session(LIBRARY);
+    s.show_mode(true);
+    s.run(Command::RecordAutomation);
+    s.toggle_play();
+    run(&mut s, &mut audio, 4 * STEP);
+
+    // The mixer's echo send: its lane written, the track left, the knob showing it.
+    let send = s.track(0).unwrap().echo_send;
+    s.set_value(Id::MixerKnob(0, "echoSend"), 0.8);
+    assert_eq!(lane_points(&s, AutomationTarget::EchoSend)[0].1, Some(0.8));
+    assert_eq!(s.track(0).unwrap().echo_send, send, "the track is not edited");
+    assert_eq!(s.automated_now(0, AutomationTarget::EchoSend), Some(0.8));
+
+    // The track editor's saturation knob, its field `saturationMix`.
+    s.set_value(Id::Fx("saturationMix"), 0.4);
+    assert_eq!(lane_points(&s, AutomationTarget::Saturation)[0].1, Some(0.4));
+    assert!(s.track_view(0).unwrap().lfo.contains(&("saturationMix", 0.4)), "the knob shows its lane");
+
+    // Not recording: the knob takes its lane back.
+    s.run(Command::RecordAutomation);
+    s.set_value(Id::Fx("saturationMix"), 0.2);
+    let track = s.track(0).unwrap();
+    assert_eq!((track.saturation_mix, s.automated_now(0, AutomationTarget::Saturation)), (0.2, None));
+    assert!(s.message.contains("Saturation taken back"), "{}", s.message);
+}
+
+#[test]
+fn transpose_probability_and_swing_controls_write_and_show_their_lanes() {
+    let (mut s, mut audio) = session(LIBRARY);
+    s.show_mode(true);
+    s.run(Command::RecordAutomation);
+    s.toggle_play();
+    run(&mut s, &mut audio, 4 * STEP);
+
+    // The knob bar's transpose, in whole semitones.
+    s.set_value(Id::KnobBar("transpose"), 7.0);
+    let transpose = AutomationTarget::Transpose;
+    let value = lane_points(&s, transpose)[0].1.expect("a value");
+    assert_eq!(transpose.to_control(value), 7.0, "kept to a thousandth, played as +7");
+    assert!(s.track_view(0).unwrap().lfo.contains(&("transpose", 7.0)), "the knob shows its lane");
+    // The generation tab's probability and the loop tab's swing.
+    s.set_value(Id::Generation("probability"), 0.25);
+    s.set_value(Id::Loop("swingAmount"), 0.5);
+    assert_eq!(lane_points(&s, AutomationTarget::Probability)[0].1, Some(0.25));
+    assert_eq!(lane_points(&s, AutomationTarget::Swing)[0].1, Some(0.5));
+    let track = s.track(0).unwrap();
+    assert_eq!((track.transpose, track.probability, track.swing_amount), (0.0, 1.0, 0.0), "the track is not edited");
+    let lfo = &s.track_view(0).unwrap().lfo;
+    assert!(lfo.contains(&("probability", 0.25)) && lfo.contains(&("swingAmount", 0.5)));
+}

@@ -62,6 +62,17 @@ const fn target_color(target: AutomationTarget) -> Rgb {
         AutomationTarget::Volume => theme::FOCUS,
         AutomationTarget::Pan => theme::LIVE,
         AutomationTarget::Cutoff | AutomationTarget::Q => theme::CHANCE,
+        AutomationTarget::EchoSend
+        | AutomationTarget::ReverbSend
+        | AutomationTarget::ReverbMix
+        | AutomationTarget::DelayMix
+        | AutomationTarget::DelayFeedback => theme::GENERATED,
+        AutomationTarget::Saturation
+        | AutomationTarget::Bitcrush
+        | AutomationTarget::HardClip
+        | AutomationTarget::CompMix => theme::ACCENT,
+        AutomationTarget::Transpose | AutomationTarget::Swing => theme::LIVE,
+        AutomationTarget::Probability => theme::CHANCE,
     }
 }
 
@@ -178,8 +189,11 @@ fn draw_lane(canvas: &mut Rows, lane: &AutomationLane, layout: &SongLayout, (y, 
     let hidden = ((canvas.top - y).max(0) + rh - 1) / rh.max(1);
     let text_y = y + hidden * rh + (rh - 8 * s) / 2;
     if text_y + 8 * s <= canvas.bottom.min(bottom) {
-        let x = canvas.canvas.text(layout.grid.x, text_y, lane.target.label(), s, color) + 4 * s;
-        let name = fit(&lane.instrument, layout.grid.x + layout.label_width() - 6 * s - x, s);
+        // The control's name first, fitted to the column; the instrument's in what is left.
+        let column_end = layout.grid.x + layout.label_width() - 6 * s;
+        let label = fit(lane.target.label(), column_end - layout.grid.x, s);
+        let x = canvas.canvas.text(layout.grid.x, text_y, &label, s, color) + 4 * s;
+        let name = fit(&lane.instrument, column_end - x, s);
         canvas.canvas.text(x, text_y, &name, s, theme::text());
     }
 

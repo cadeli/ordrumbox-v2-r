@@ -217,7 +217,9 @@ pub(super) fn lfo_strip(rows: &mut Rows, track: &Track, i: u8, target: &LfoTarge
     rows.y += knob_row_h(s) + FX_STRIP_GAP * s;
 }
 
-pub(super) fn loop_tab(rows: &mut Rows, track: &Track) {
+/// The loop tab of `track`, its swing at the value `moved` gives it (a song
+/// lane's, while it plays) when it gives one.
+pub(super) fn loop_tab(rows: &mut Rows, track: &Track, moved: &[(&'static str, f64)]) {
     let spb = track.steps_per_beat;
     let max_steps = f64::from(track.beat_count * spb);
     for p in &LOOP_PROPS {
@@ -230,13 +232,20 @@ pub(super) fn loop_tab(rows: &mut Rows, track: &Track) {
                 value_spec(&Prop { max: max_steps, ..*p }, p.min, false),
                 Format::LoopLength(spb),
             ),
-            _ => (track.swing_amount, value_spec(p, default, false), p.format),
+            key => (moved_value(moved, key).unwrap_or(track.swing_amount), value_spec(p, default, false), p.format),
         };
-        rows.slider(Id::Loop(p.key), spec, value, p.label, format.value(value, ""), false);
+        let is_moved = moved_value(moved, p.key).is_some();
+        rows.slider(Id::Loop(p.key), spec, value, p.label, format.value(value, ""), is_moved);
     }
 }
 
-pub(super) fn generation_tab(rows: &mut Rows, track: &Track, compose: Option<&ComposeView>, state: &EditorState) {
+/// The generation tab of a track (`moved`: values a song lane gives its sliders while it plays).
+pub(super) fn generation_tab(
+    rows: &mut Rows,
+    (track, moved): (&Track, &[(&'static str, f64)]),
+    compose: Option<&ComposeView>,
+    state: &EditorState,
+) {
     let s = rows.scale;
     // The simple view: auto, lock, a new line, three settings.
     let toggle = |rows: &mut Rows, key: &'static str, label: &str, on: bool| {
@@ -263,7 +272,7 @@ pub(super) fn generation_tab(rows: &mut Rows, track: &Track, compose: Option<&Co
         }
         None if melodic => {
             variant_select(rows, track, state);
-            generation_slider(rows, track, &GENERATION_DENSITY, state);
+            generation_slider(rows, (track, moved), &GENERATION_DENSITY, state);
         }
         None => rows.text("no part for this track in the pattern's style", dim()),
     }
@@ -298,7 +307,7 @@ pub(super) fn generation_tab(rows: &mut Rows, track: &Track, compose: Option<&Co
     }
     if !track.auto_mode {
         for p in &GENERATION_MANUAL {
-            generation_slider(rows, track, p, state);
+            generation_slider(rows, (track, moved), p, state);
         }
         return;
     }
@@ -306,7 +315,7 @@ pub(super) fn generation_tab(rows: &mut Rows, track: &Track, compose: Option<&Co
         match row {
             // A drum line comes from its style (Compose); a melodic one has them above.
             GenerationRow::Select("autoVariant", _) | GenerationRow::Slider(Prop { key: "autoDensity", .. }) => {}
-            GenerationRow::Slider(p) => generation_slider(rows, track, p, state),
+            GenerationRow::Slider(p) => generation_slider(rows, (track, moved), p, state),
             GenerationRow::Toggle(key, label) => toggle(rows, key, label, flag(track, key)),
             GenerationRow::Select(key, label) => {
                 let r = rows.row();
@@ -372,22 +381,35 @@ pub(super) const SIMPLE_COMPOSE: [&str; 3] = ["composeHitsPerMeasure", "composeC
 /// A melodic track's density (the simple view).
 pub(super) const GENERATION_DENSITY: Prop = prop("autoDensity", "Density", -1.0, 1.0, 0.01, Format::Density);
 
-pub(super) fn generation_slider(rows: &mut Rows, track: &Track, p: &Prop, state: &EditorState) {
+pub(super) fn generation_slider(
+    rows: &mut Rows,
+    (track, moved): (&Track, &[(&'static str, f64)]),
+    p: &Prop,
+    state: &EditorState,
+) {
     let s = rows.scale;
-    let value = match p.key {
+    let shown = moved_value(moved, p.key);
+    let is_moved = shown.is_some();
+    let value = match (shown, p.key) {
+        (Some(value), _) => value,
         // Unset until the generator picks them: the amounts used meanwhile.
-        "autoHitVariation" => track.auto_hit_amount(),
-        "autoNoteVariation" => track.auto_note_amount(),
-        key => number(track, key),
+        (None, "autoHitVariation") => track.auto_hit_amount(),
+        (None, "autoNoteVariation") => track.auto_note_amount(),
+        (None, key) => number(track, key),
     };
     let spec = value_spec(p, default_of(p.key, p.min), false);
     let r = rows.row();
     if state.selected_prop == Some(p.key) {
         rows.items.push(Item::new(None, Rect::new(r.x - 2 * s, r.y, r.w + 4 * s, r.h), Kind::Highlight));
     }
-    let kind =
-        Kind::Value { spec, value, label: Some(p.label.to_owned()), text: p.format.value(value, ""), lfo: false };
+    let text = p.format.value(value, "");
+    let kind = Kind::Value { spec, value, label: Some(p.label.to_owned()), text, lfo: is_moved };
     rows.items.push(Item::new(Some(Id::Generation(p.key)), r, kind));
+}
+
+/// The value `moved` gives the setting `key`, if it gives one.
+fn moved_value(moved: &[(&'static str, f64)], key: &str) -> Option<f64> {
+    moved.iter().find(|(k, _)| *k == key).map(|&(_, value)| value)
 }
 
 /// The variant a melodic track plays (`""`: its style's).

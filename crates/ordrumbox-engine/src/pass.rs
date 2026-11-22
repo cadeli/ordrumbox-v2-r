@@ -112,10 +112,11 @@ pub struct PassContext<'a> {
     pub swing: f64,
 }
 
-/// How late `note` of `track` plays, in ticks: its track's swing, and the
-/// pair swing `swing` set for every track.
-fn swing_ticks(note: &Hit, track: &Track, swing: f64) -> f64 {
-    (note.swing_beats(track) + note.pair_swing_beats(track, swing)) * f64::from(TICK)
+/// How late `note` of `track` plays, in ticks: its own swing, `own_beats`
+/// (its track's, or a song lane's), and the pair swing `swing` set for
+/// every track.
+fn swing_ticks(own_beats: f64, note: &Hit, track: &Track, swing: f64) -> f64 {
+    (own_beats + note.pair_swing_beats(track, swing)) * f64::from(TICK)
 }
 
 /// Frames in one tick at `bpm`.
@@ -157,10 +158,10 @@ fn midi_note(target: Option<Target>, note: &Hit, track: &Track, lfo_tick: u64) -
     Some(target?.note(note.pitch + track.transpose + lfo))
 }
 
-/// The frame of `note` at pass tick `tick`, its swing included: a note swung
-/// past the end still plays, on the last of the pass's `frames`.
-fn note_frame(tick: u32, note: &Hit, track: &Track, swing: f64, per_tick: f64, frames: u64) -> u64 {
-    (((f64::from(tick) + swing_ticks(note, track, swing)) * per_tick).round() as u64).min(frames - 1)
+/// The frame of a note at pass tick `tick`, swung `swing_ticks` late: a note
+/// swung past the end still plays, on the last of the pass's `frames`.
+fn note_frame(tick: u32, swing_ticks: f64, per_tick: f64, frames: u64) -> u64 {
+    (((f64::from(tick) + swing_ticks) * per_tick).round() as u64).min(frames - 1)
 }
 
 /// The event that plays `sound` for `note` on `frame`, with its MIDI note.
@@ -216,7 +217,8 @@ pub fn build_pass(pattern: &Pattern, number: u64, rng: &mut Rng, context: PassCo
                 continue;
             }
             let track = &pattern.tracks[note.track];
-            let frame = note_frame(tick, note, track, context.swing, per_tick, frames);
+            let frame =
+                note_frame(tick, swing_ticks(note.swing_beats(track), note, track, context.swing), per_tick, frames);
             let lfo_tick = context.first_tick + u64::from(tick);
             let Some(assigned) = context.sounds.get(note.track) else { continue };
             let voice = Voice { strip: note.track, lfo_tick, bpm };
@@ -412,6 +414,7 @@ pub fn build_keymap(pattern: &Pattern, context: PassContext<'_>, bpm: f64) -> Ke
     KeyMap::new(Pass { frames: 1, ticks: 1, events, strips, keys, patches, ..Pass::default() }, &targets)
 }
 
+mod song_notes;
 mod song_strips;
 
 /// Hits of a pattern repetition, kept between song passes so a
@@ -494,10 +497,11 @@ pub fn build_song_pass_at(
             let p = source.pattern;
             let pattern = &context.patterns[p];
             let flat = cache.entry((p, source.loop_index)).or_insert_with(|| {
-                expand_hits(pattern, u32::try_from(source.loop_index).unwrap_or(u32::MAX), rng, context.scales)
+                let pattern = song_notes::lane_pattern(&song.automations, pattern);
+                expand_hits(&pattern, u32::try_from(source.loop_index).unwrap_or(u32::MAX), rng, context.scales)
             });
             let Some(notes) = u32::try_from(source.local_tick).ok().and_then(|s| flat.get(&s)) else { continue };
-            shared.push_events(p, notes, t, &mut events, &mut patches);
+            shared.push_events(p, notes, t, rng, (&mut events, &mut patches));
         }
     }
     events.sort_by_key(|e| e.frame);
@@ -545,8 +549,16 @@ impl SongPassParts<'_> {
     }
 
     /// The events of `notes`, which pattern `p` plays on tick `t` of the
-    /// pass, and the synth patches they need.
-    fn push_events(&self, p: usize, notes: &[Hit], t: u32, events: &mut Vec<Event>, patches: &mut Vec<SynthPatch>) {
+    /// pass, and the synth patches they need; `rng` draws what the song's
+    /// probability lanes leave to chance.
+    fn push_events(
+        &self,
+        p: usize,
+        notes: &[Hit],
+        t: u32,
+        rng: &mut Rng,
+        (events, patches): (&mut Vec<Event>, &mut Vec<SynthPatch>),
+    ) {
         let context = &self.context;
         let pattern = &context.patterns[p];
         let sounds = context.sounds.get(p).map_or(&[][..], Vec::as_slice);
@@ -569,7 +581,13 @@ impl SongPassParts<'_> {
                 continue;
             };
             let track = &pattern.tracks[note.track];
-            let frame = note_frame(t, note, track, context.swing, self.per_tick, self.frames);
+            let lanes = song_notes::NoteLanes::at(&self.song.automations, track, step);
+            if !lanes.plays(rng) {
+                continue;
+            }
+            let note = &lanes.apply(note, track);
+            let swing = swing_ticks(lanes.swing_beats(note, track), note, track, context.swing);
+            let frame = note_frame(t, swing, self.per_tick, self.frames);
             let voice = Voice { strip, lfo_tick: tick, bpm: self.bpm };
             if let Some(sound) = sound_for(pattern, note, assigned, voice, &pass_context, patches) {
                 let midi = midi_note(self.targets.get(strip).copied().flatten(), note, track, tick);
