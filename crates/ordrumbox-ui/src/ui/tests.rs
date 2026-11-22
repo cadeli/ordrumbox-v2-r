@@ -76,7 +76,7 @@ fn a_zoom_bigger_than_the_window_scrolls_it() {
     let library =
         ordrumbox_core::Library::parse(r#"{"patterns":[{"name":"demo","tracks":[{"name":"KICK"}]}]}"#).unwrap().0;
     let mut ui = standalone_ui(library);
-    let (w, h) = view::min_window_size(Scale::ONE, view::Shown::all(true));
+    let (w, h) = view::min_window_size(Scale::ONE, view::Shown::all());
     ui.set_size(w, h, Scale::ONE);
     ui.session.run(Command::ZoomIn);
     ui.session.run(Command::ZoomIn);

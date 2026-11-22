@@ -4,17 +4,16 @@ use super::grid::draw_grid;
 use super::kit::{KitLayout, draw_kit};
 use super::layout::{Body, HeaderControls, HostState, Layout, MACROS, Transport, header_controls, header_text};
 use super::{
-    ACCENT, ARRANGEMENT_LABEL, HELP, KIT_HELP, LOGO, PATTERN_LABEL, PLAYING, ROLL_HELP, SONG_HELP, SYNTH_HELP, View,
-    WAITING_LABEL, WARNING, background_color,
+    ACCENT, ARRANGEMENT_LABEL, HELP, KIT_HELP, LOGO, MIXER_HELP, PATTERN_LABEL, PLAYING, ROLL_HELP, SONG_HELP,
+    SYNTH_HELP, View, WAITING_LABEL, WARNING, background_color,
 };
 use crate::canvas::{Canvas, chars_in};
 use crate::frame::{body_top, content_top, footer_top, margin, status_line};
-use crate::output::OutputLayout;
 use crate::panel::{Rect, stroke};
 use crate::piano_roll::RollLayout;
 use crate::scale::Scale;
 use crate::song_view::SongLayout;
-use crate::{output, piano_roll, song_view, theme};
+use crate::{piano_roll, song_view, theme};
 
 /// Draw `view`; `scale` is the integer UI scale (1 on a standard display, 2 on HiDPI).
 pub fn draw(canvas: &mut Canvas, view: &View, scale: Scale) {
@@ -22,17 +21,8 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: Scale) {
     draw_header(canvas, view, scale);
     draw_footer(canvas, view, scale);
 
-    // The window split: one main editor top-left, the track editor down the
-    // right, the output strip along the bottom.
-    let body = Body::new(
-        canvas.width(),
-        canvas.height(),
-        scale,
-        view.right,
-        view.status.len(),
-        view.output.is_some(),
-        view.note_editor,
-    );
+    // The window split: one main editor top-left, the track editor down the right.
+    let body = Body::new(canvas.width(), canvas.height(), scale, view.right, view.status.len(), view.note_editor);
 
     // The main editor (top-left): exactly one of the song panel, the kit
     // editor, the synth editor (painted by the session), the piano roll, the grid.
@@ -42,8 +32,8 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: Scale) {
     } else if let Some(kit) = &view.kit_view {
         let layout = KitLayout::new(body.main_w, body.editor_h, scale, view.status.len());
         draw_kit(canvas, kit, &layout);
-    } else if view.synth {
-        // Painted by the session (`draw_synth`).
+    } else if view.synth || view.mixer {
+        // Painted by the session (`draw_synth`, `draw_mixer`).
     } else if let Some((roll, title)) = &view.piano_roll {
         let spb = piano_roll::steps_per_beat(roll.track);
         let layout = RollLayout::new(body.main_w, body.editor_h, scale, view.status.len(), spb);
@@ -51,11 +41,6 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: Scale) {
     } else if let Some(pattern) = view.pattern {
         let layout = Layout::new(body.main_w, body.editor_h, scale, pattern, view.status.len(), view.current_page);
         draw_grid(canvas, pattern, view, &layout);
-    }
-
-    // The output panel, always shown as a strip along the bottom.
-    if let Some(out) = &view.output {
-        output::draw(canvas, out, &OutputLayout::strip(canvas.width(), body.output, scale));
     }
 }
 
@@ -172,6 +157,8 @@ fn draw_footer(canvas: &mut Canvas, view: &View, scale: Scale) {
         ROLL_HELP
     } else if view.synth {
         SYNTH_HELP
+    } else if view.mixer {
+        MIXER_HELP
     } else {
         HELP
     };

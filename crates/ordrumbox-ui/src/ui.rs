@@ -272,7 +272,7 @@ impl Ui {
             _ => s.click(hit),
         }
         if let view::Hit::Name(t) = hit {
-            s.press_track_drag(t, x, y);
+            s.press_track_name(t, x, y);
         }
         true
     }
@@ -588,12 +588,14 @@ mod keys;
 use keys::*;
 
 /// What `key` does in the view that is open (the kit editor, the synth, the
-/// piano roll, the song view, else the grid): whether it was one of its keys.
+/// mixer, the piano roll, the song view, else the grid): whether it was one of its keys.
 fn view_key(s: &mut Session, key: Key, shift: bool, alt: bool) -> bool {
     if s.kit_editor_open() {
         kit_editor_key(s, key)
     } else if s.synth_open() {
         synth_key(s, key)
+    } else if s.mixer_open() {
+        mixer_key(s, key)
     } else if s.piano_roll_open() {
         piano_roll_key(s, key, shift)
     } else if s.song_view_open() {
@@ -622,6 +624,16 @@ fn synth_key(s: &mut Session, key: Key) -> bool {
         return false;
     }
     s.toggle_synth();
+    true
+}
+
+fn mixer_key(s: &mut Session, key: Key) -> bool {
+    match key {
+        Key::Escape => s.toggle_mixer(),
+        Key::ArrowLeft => s.mixer_select(-1),
+        Key::ArrowRight => s.mixer_select(1),
+        _ => return false,
+    }
     true
 }
 

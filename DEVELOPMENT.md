@@ -139,14 +139,22 @@ wrong sound or a wrong threshold.
 
 ### Changes of behaviour
 
+A double-click on a track's name in the grid opens the piano roll on that track (`press_track_name`,
+`session_grid.rs`); a single press still selects the track and may drag it. No snapshot changed.
+
 Tracks can send to two shared returns, a tape echo and a spring reverb (`ordrumbox-dsp/src/returns.rs`,
 `ordrumbox-engine/src/engine/returns.rs`): `echoSend` and `reverbSend`, 0 by default, taken after the strip's volume
 and pan; each return is a `Strip` with a `dry` level of 0 (a new strip setting, 1 by default: the strips play as
 before). The returns' settings are `settings.returns` (`ReturnSettings`), the echo's time in beats at the tempo of the
 pass playing. With every send at 0 the returns stay silent: no snapshot changed. The MIDI controls list has the echo's
 feedback after the master volume, then six controls a track (`session_scenarios/midi_sync.rs` moved its indices).
-The sends are a seventh effect strip, **Sends**, last in the FX tab, which is now the tallest tab:
-`TRACK_EDITOR_HEIGHT` went from 455 to 507, so the smallest window is 52 pixels taller (at scale 1).
+The sends, the returns and the master bus are set in a main view of their own, the mixer (F12, View > Mixer, the
+**MIX** button: `mixer.rs`, `session_mixer.rs`): a strip a track (sends, pan, mute, solo, a fader and a meter),
+the echo's and the reverb's, the master's. It replaces the master strip along the bottom of the window (gone,
+with View > Master and its Echo page) and keeps the track editor at 455 (`TRACK_EDITOR_HEIGHT`): at scale 1 the
+smallest window is 64 pixels shorter (the strip) and 38 wider (the MIX button). A fader is a new control style
+(`Style::Fader`); the master's low and high cut are knobs, no longer sliders. In a plugin the mixer shows the track
+strips only: the host mixes and the returns and the master play at their defaults, as before.
 
 Choosing an effect's type (its screen's list or its ◂ ▸ arrows) switches the effect on, as it already did for
 the filter and an LFO's wave: a reverb or a delay without an amount goes on at its `on_value`, one without a

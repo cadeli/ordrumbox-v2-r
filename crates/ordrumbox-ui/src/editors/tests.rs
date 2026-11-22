@@ -342,7 +342,6 @@ fn the_fx_tab_shows_every_effect_and_moves_nothing_when_one_goes_on() {
         duck_amount: 0.5,
         sidechain_source: "SNARE".into(),
         filter_type: "lowpass".into(),
-        reverb_send: 0.3,
         ..Track::default()
     };
     let mut places = Vec::new();

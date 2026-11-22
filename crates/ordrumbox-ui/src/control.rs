@@ -14,12 +14,14 @@ use ordrumbox_core::num::{self, round_to};
 const DRAG_RANGE_PX: f64 = 200.0;
 
 /// How a value is shown: a knob for a sound, a slider for an amount, a
-/// stepper (- 4 +) for a count.
+/// stepper (- 4 +) for a count, a fader (a slider standing up) for a
+/// mixer's level.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Style {
     Knob,
     Slider,
     Stepper,
+    Fader,
 }
 
 /// A fraction as a percentage: 0.5 is 50 %.
@@ -46,6 +48,11 @@ impl Spec {
 
     pub const fn slider(min: f64, max: f64, step: f64, default: f64) -> Self {
         Self { style: Style::Slider, min, max, step, default, log: false, full_travel: false, percent: false }
+    }
+
+    /// A mixer's level: a slider standing up, the top its maximum.
+    pub const fn fader(min: f64, max: f64, step: f64, default: f64) -> Self {
+        Self { style: Style::Fader, min, max, step, default, log: false, full_travel: false, percent: false }
     }
 
     /// A count: whole steps only, one per click on its - and + buttons.
@@ -150,7 +157,7 @@ impl Spec {
             Style::Knob | Style::Stepper => {
                 self.clamp_step(value + delta, if fine { self.step * 0.1 } else { self.step })
             }
-            Style::Slider => self.clamp(value + delta),
+            Style::Slider | Style::Fader => self.clamp(value + delta),
         }
     }
 
@@ -177,7 +184,7 @@ impl Spec {
     pub fn typed(&self, number: f64) -> f64 {
         match self.style {
             Style::Knob | Style::Stepper => self.clamp_step(number, self.step),
-            Style::Slider => self.clamp(number),
+            Style::Slider | Style::Fader => self.clamp(number),
         }
     }
 }

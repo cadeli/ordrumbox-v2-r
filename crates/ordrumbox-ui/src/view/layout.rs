@@ -2,10 +2,10 @@
 
 use super::{BEATS_PER_PAGE, LABEL_CHARS, MIN_STEP_WIDTH, PAGE_BEATS, PAGE_STEPS_PER_BEAT, VOLUME_WIDTH};
 use crate::canvas::text_width;
+use crate::editors;
 use crate::frame::{body_top, content_top, footer_top, margin};
 use crate::panel::{Rect, row_at};
 use crate::scale::Scale;
-use crate::{editors, output};
 use ordrumbox_core::track::MAX_STEPS_PER_BEAT;
 use ordrumbox_core::{Pattern, Track};
 use ordrumbox_logic::block::BEAT_UNITS;
@@ -154,7 +154,7 @@ pub struct HeaderControls {
     pub generate: Rect,
     pub auto: Rect,
     pub macros: [Rect; 3],
-    pub views: [Rect; 5],
+    pub views: [Rect; 6],
 }
 
 /// The header's macro knobs: their pattern key and label.
@@ -167,10 +167,13 @@ pub const MACROS: [(&str, &str); 3] = [
 /// The mode switch's labels: what the window edits and plays.
 pub const MODES: [&str; 2] = ["PATT", "SONG"];
 
-/// The view buttons' labels: the main editor (grid, piano roll, song, synth)
-/// and the kit editor. The song has no button of its own: it is the mode
-/// switch's (its slot has no width).
-pub const VIEWS: [&str; 5] = ["GRID", "ROLL", "SONG", "SYNTH", "KIT"];
+/// The view buttons' labels: the main editor (grid, piano roll, song, synth,
+/// mixer) and the kit editor. The song has no button of its own: it is the
+/// mode switch's (its slot has no width).
+pub const VIEWS: [&str; 6] = ["GRID", "ROLL", "SONG", "SYNTH", "MIX", "KIT"];
+
+/// The kit editor's view button, the last: it opens over the main editor.
+pub const KIT_VIEW: u8 = 5;
 
 pub fn header_controls(scale: Scale) -> HeaderControls {
     let s = scale;
@@ -197,7 +200,7 @@ pub fn header_controls(scale: Scale) -> HeaderControls {
     let (grid, roll) = (next(40, 2), next(40, 2));
     // The song's slot, closed: the mode switch is its button.
     let song = next(0, 0);
-    let views = [grid, roll, song, next(48, 2), next(40, 0)];
+    let views = [grid, roll, song, next(48, 2), next(36, 2), next(40, 0)];
     HeaderControls { mode, play, bpm, pattern, beats, kit, style, generate, auto, macros, views }
 }
 
@@ -256,7 +259,7 @@ impl HeaderControls {
             frame(self.play, self.bpm),
             frame(self.pattern, self.kit),
             frame(self.style, self.macros[2]),
-            frame(self.views[0], self.views[4]),
+            frame(self.views[0], self.views[5]),
         ]
     }
 }
@@ -264,16 +267,11 @@ impl HeaderControls {
 /// The room between the main editor and the note editor under it, per scale unit.
 pub(super) const NOTE_GAP: i32 = 14;
 
-/// Height of the output strip always shown along the bottom of the window.
-pub fn output_height(scale: Scale) -> i32 {
-    output::STRIP_HEIGHT * scale
-}
-
-/// The height the track editor takes at most, at scale 1: the FX tab's seven
-/// effects (the sends last), one strip each, under the sample bar (kept even without a
+/// The height the track editor takes at most, at scale 1: the FX tab's six
+/// effects, one strip each, under the sample bar (kept even without a
 /// sample). The note editor is under the grid and the piano roll, not here.
 /// A test checks that every tab fits in it.
-pub const TRACK_EDITOR_HEIGHT: i32 = 507;
+pub const TRACK_EDITOR_HEIGHT: i32 = 455;
 
 /// The pixels the track editor's rows add up to beyond `TRACK_EDITOR_HEIGHT *
 /// scale` at a scale of an odd number of quarters (×1.25, ×1.75…): each row
@@ -303,8 +301,6 @@ pub(super) fn compact_grid_height(scale: Scale) -> i32 {
 /// What the window shows that sets the room the layout needs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Shown {
-    /// The output strip along the bottom (the app's; a plugin has none).
-    pub output: bool,
     /// The track editor down the right edge.
     pub track_editor: bool,
     /// The main editor is the grid (another one keeps the track editor's height).
@@ -314,29 +310,29 @@ pub struct Shown {
 }
 
 impl Shown {
-    /// Everything, the tallest state: with the output strip when `output`.
+    /// Everything, the tallest state.
     #[must_use]
-    pub const fn all(output: bool) -> Self {
-        Self { output, track_editor: true, grid: true, note_editor: true }
+    pub const fn all() -> Self {
+        Self { track_editor: true, grid: true, note_editor: true }
     }
 
-    /// The compact view: the grid alone, with the output strip when `output`.
+    /// The compact view: the grid alone.
     #[must_use]
-    pub const fn grid_alone(output: bool) -> Self {
-        Self { output, track_editor: false, grid: true, note_editor: false }
+    pub const fn grid_alone() -> Self {
+        Self { track_editor: false, grid: true, note_editor: false }
     }
 }
 
 /// The smallest window, in physical pixels, that the layout fits at `scale`
 /// with what `shown` shows: the header's controls across; down, the header,
 /// the tallest track editor (or, the grid without it, the grid and its note
-/// editor), the output strip and a footer of one status line.
+/// editor) and a footer of one status line.
 pub fn min_window_size(scale: Scale, shown: Shown) -> (i32, i32) {
     let views = header_controls(scale).views;
-    let width = views[4].x + views[4].w + margin(scale);
+    let width = views[5].x + views[5].w + margin(scale);
     // `Body::new` places the editors' bottom at a fixed distance above the
     // window's bottom edge: at a height of 0 it is minus that distance.
-    let below = -Body::new(0, 0, scale, 0, MIN_STATUS_LINES, shown.output, false).main_bottom;
+    let below = -Body::new(0, 0, scale, 0, MIN_STATUS_LINES, false).main_bottom;
     let main = if shown.track_editor || !shown.grid {
         let rounding = if scale.quarters() % 2 == 1 { TRACK_EDITOR_ROUNDING } else { 0 };
         TRACK_EDITOR_HEIGHT * scale + rounding
@@ -347,48 +343,33 @@ pub fn min_window_size(scale: Scale, shown: Shown) -> (i32, i32) {
     (width, body_top(scale) + main + below)
 }
 
-/// How the window is split: one main editor (grid, piano roll, song, synth or
-/// the kit editor) in the top-left, under the grid and the piano roll the
-/// note editor, the track editor down the right edge (shown or hidden), and
-/// the output panel as a full-width strip along the bottom (in the app; a
-/// plugin has none).
+/// How the window is split: one main editor (grid, piano roll, song, synth,
+/// mixer or the kit editor) in the top-left, under the grid and the piano
+/// roll the note editor, the track editor down the right edge (shown or hidden).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Body {
     /// The main editor's width (the window minus the track editor).
     pub main_w: i32,
     /// The height to hand the main-editor layouts (grid, roll, song, synth,
     /// kit). They place their bottom edge at `footer_top(height, …)`, so this
-    /// is the height whose `footer_top` lands just above the output strip —
-    /// `height - margin/2 - output_height` — not the region's literal height.
+    /// is the height whose `footer_top` lands just above the editors' bottom
+    /// — `height - margin/2` — not the region's literal height.
     pub editor_h: i32,
     /// The real bottom edge (y) shared by the main editor (its note editor
     /// included) and the track editor.
     pub main_bottom: i32,
     /// The note editor, under the main editor and as wide (0 high: none).
     pub note: Rect,
-    /// The output strip's bounds (full width).
-    pub output: Rect,
 }
 
 impl Body {
     /// The split of a `width` × `height` window at `scale`, `right` pixels
     /// wide on the right for the track editor, with `status_lines` footer
-    /// lines; `output`: with the output strip (else it is 0 high); `note`:
-    /// with the note editor under the main editor (the grid's, the piano roll's).
-    pub fn new(
-        width: i32,
-        height: i32,
-        scale: Scale,
-        right: i32,
-        status_lines: usize,
-        output: bool,
-        note: bool,
-    ) -> Self {
+    /// lines; `note`: with the note editor under the main editor (the
+    /// grid's, the piano roll's).
+    pub fn new(width: i32, height: i32, scale: Scale, right: i32, status_lines: usize, note: bool) -> Self {
         let margin = margin(scale);
-        let output_h = if output { output_height(scale) } else { 0 };
-        let output_bottom = footer_top(height, scale, status_lines) - margin / 2;
-        let output_top = output_bottom - output_h;
-        let main_bottom = output_top - margin / 2;
+        let main_bottom = footer_top(height, scale, status_lines) - margin;
         let main_w = (width - right).max(1);
         // The note editor's card reaches a few pixels around it, as the
         // track editor's do: the room above it keeps them apart.
@@ -397,10 +378,9 @@ impl Body {
         let note_top = main_bottom - note_h;
         Self {
             main_w,
-            editor_h: height - margin / 2 - output_h - note_h - above_note,
+            editor_h: height - margin / 2 - note_h - above_note,
             main_bottom,
             note: Rect::new(margin, note_top, (main_w - 2 * margin).max(1), note_h),
-            output: Rect::new(0, output_top, width, output_h),
         }
     }
 }

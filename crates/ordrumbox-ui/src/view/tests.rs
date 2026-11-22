@@ -26,10 +26,10 @@ fn the_compact_grid_shows_a_full_drum_pattern() {
     for quarters in 4..=Scale::MAX.quarters() {
         let scale = Scale::from_quarters(quarters);
         for note_editor in [false, true] {
-            let shown = Shown { note_editor, ..Shown::grid_alone(false) };
+            let shown = Shown { note_editor, ..Shown::grid_alone() };
             let (width, height) = min_window_size(scale, shown);
-            assert!(height < min_window_size(scale, Shown::all(false)).1, "scale {scale}");
-            let body = Body::new(width, height, scale, 0, MIN_STATUS_LINES, false, note_editor);
+            assert!(height < min_window_size(scale, Shown::all()).1, "scale {scale}");
+            let body = Body::new(width, height, scale, 0, MIN_STATUS_LINES, note_editor);
             let layout = Layout::new(body.main_w, body.editor_h, scale, pattern, MIN_STATUS_LINES, 0);
             assert_eq!(layout.tracks, pattern.tracks.len(), "scale {scale}, note editor {note_editor}");
             assert!(layout.bottom <= body.note.y.min(body.main_bottom) || !note_editor, "scale {scale}");
@@ -39,10 +39,8 @@ fn the_compact_grid_shows_a_full_drum_pattern() {
 
 #[test]
 fn whole_scales_need_whole_multiples_of_the_smallest_window() {
-    let (w, h) = min_window_size(Scale::ONE, Shown::all(true));
-    assert_eq!(min_window_size(Scale::whole(2), Shown::all(true)), (2 * w, 2 * h));
-    // Without the output strip (a plugin) the layout needs less height.
-    assert!(min_window_size(Scale::ONE, Shown::all(false)).1 < h);
+    let (w, h) = min_window_size(Scale::ONE, Shown::all());
+    assert_eq!(min_window_size(Scale::whole(2), Shown::all()), (2 * w, 2 * h));
 }
 
 #[test]
@@ -51,7 +49,7 @@ fn the_header_groups_are_apart_and_inside_the_header() {
         let scale = Scale::from_quarters(quarters);
         let c = header_controls(scale);
         let groups = c.groups(scale);
-        let (width, _) = min_window_size(scale, Shown::all(true));
+        let (width, _) = min_window_size(scale, Shown::all());
         let logo_end = margin(scale) + text_width("orDrumbox", header_text(scale));
         assert!(groups[0].x > logo_end, "scale {scale}: the logo");
         assert!(groups[4].x + groups[4].w <= width, "scale {scale}: the window's edge");
@@ -128,8 +126,8 @@ fn draws_without_panicking_at_any_size() {
             ],
             arrangement: None,
             piano_roll: None,
-            output: None,
             synth: false,
+            mixer: false,
             right: 300,
             current_page: 0,
             lane: (None, 0),
@@ -184,32 +182,25 @@ fn the_ruler_sits_above_the_rows_and_its_beats_start_their_cells() {
 }
 
 #[test]
-fn body_splits_the_window_above_the_output_strip() {
+fn body_splits_the_window_above_the_footer() {
     let library = library();
     let pattern = library.patterns.first().unwrap();
     for scale in [Scale::ONE, Scale::from_quarters(6), Scale::whole(2)] {
         for (w, h) in [(1100, 680), (1280, 800)] {
             for status in [0, 1, 3] {
                 for right in [0, 300 * scale] {
-                    let body = Body::new(w, h, scale, right, status, true, true);
+                    let body = Body::new(w, h, scale, right, status, true);
                     assert_eq!(body.main_w, w - right);
-                    // The strip's bottom edge is the footer's top, less a margin.
-                    assert_eq!(body.output.y + body.output.h, footer_top(h, scale, status) - margin(scale) / 2);
-                    // The main editor stops above the strip, with a gap.
-                    assert!(body.main_bottom < body.output.y);
+                    // The editors stop a margin above the footer.
+                    assert_eq!(body.main_bottom, footer_top(h, scale, status) - margin(scale));
                     // The editor height is virtual: a layout built with it
                     // (and the real status count) ends exactly at main_bottom.
                     let grid = Layout::new(body.main_w, body.editor_h, scale, pattern, status, 0);
                     assert_eq!(grid.bottom, body.note.y - NOTE_GAP * scale);
                     assert_eq!(body.note.y + body.note.h, body.main_bottom);
-                    let alone = Body::new(w, h, scale, right, status, true, false);
+                    let alone = Body::new(w, h, scale, right, status, false);
                     let grid = Layout::new(alone.main_w, alone.editor_h, scale, pattern, status, 0);
                     assert_eq!((grid.bottom, alone.note.h), (body.main_bottom, 0));
-                    // Without the strip (a plugin), the same down to where it was.
-                    let bare = Body::new(w, h, scale, right, status, false, true);
-                    assert_eq!((bare.output.h, bare.main_bottom), (0, body.main_bottom + body.output.h));
-                    let grid = Layout::new(bare.main_w, bare.editor_h, scale, pattern, status, 0);
-                    assert_eq!(grid.bottom, bare.note.y - NOTE_GAP * scale);
                 }
             }
         }

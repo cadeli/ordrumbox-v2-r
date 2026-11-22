@@ -130,7 +130,7 @@ mod tests {
     #[test]
     fn every_quarter_scale_needs_a_window_at_least_as_big_as_the_one_below() {
         let sizes: Vec<_> = (Scale::ONE.quarters()..=Scale::MAX.quarters())
-            .map(|q| view::min_window_size(Scale::from_quarters(q), view::Shown::all(true)))
+            .map(|q| view::min_window_size(Scale::from_quarters(q), view::Shown::all()))
             .collect();
         for pair in sizes.windows(2) {
             assert!(pair[0].0 <= pair[1].0 && pair[0].1 <= pair[1].1, "{pair:?}");
@@ -151,11 +151,11 @@ mod tests {
     #[test]
     fn fit_to_window_picks_the_biggest_scale_the_window_shows_whole() {
         let mut s = session(Scale::ONE);
-        let (w, h) = view::min_window_size(Scale::from_quarters(6), view::Shown::all(true));
+        let (w, h) = view::min_window_size(Scale::from_quarters(6), view::Shown::all());
         s.set_window_size(w + 1, h + 1);
         s.run(Command::ZoomToFit);
         assert_eq!((s.message.as_str(), s.wanted_scale()), ("zoom x1.5, fit to the window", Scale::from_quarters(6)));
-        let (big_w, big_h) = view::min_window_size(Scale::MAX, view::Shown::all(true));
+        let (big_w, big_h) = view::min_window_size(Scale::MAX, view::Shown::all());
         s.set_window_size(big_w * 2, big_h * 2);
         s.run(Command::ZoomToFit);
         assert_eq!(s.wanted_scale(), Scale::MAX, "never over the biggest scale");

@@ -71,6 +71,7 @@ pub(super) fn shortcut(code: Key, shift: bool, control: bool) -> Option<Command>
             Key::F(7) => C::NoteEditor,
             Key::F(8) => C::TapTempo,
             Key::F(11) => C::Fullscreen,
+            Key::F(12) => C::Mixer,
             Key::F(9) => C::Metronome,
             Key::BracketLeft if shift => C::PreviousSong,
             Key::BracketRight if shift => C::NextSong,

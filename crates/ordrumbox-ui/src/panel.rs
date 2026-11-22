@@ -246,13 +246,19 @@ pub enum Id {
     PatternDescription,
     /// The right-click menu of the song panel.
     SongMenu,
-    // Output panel.
+    // Mixer.
     /// A master bus setting, by its `settings.master` key.
     Master(&'static str),
     /// A setting of the shared returns, by its `settings.returns` key.
     Returns(&'static str),
-    /// A page tab of the output strip: an index in `output::OutputPage::ALL`.
-    OutputPage(u8),
+    /// A track strip's name: the track editor edits that track.
+    MixerName(usize),
+    /// A track strip's knob (a send, the pan), by its track key.
+    MixerKnob(usize, &'static str),
+    /// A track strip's mute or solo button, by its track key.
+    MixerToggle(usize, &'static str),
+    /// An arrow of the scroll row: the track strips before, after.
+    MixerScroll(Step),
     // Synth editor.
     SynthPreset,
     SynthButton(&'static str),
@@ -442,6 +448,13 @@ pub fn slider_bar(rect: Rect, labelled: bool, valued: bool, scale: Scale) -> (i3
     let left = rect.x + if labelled { label_width(scale) } else { 0 } + 4 * scale;
     let right = rect.x + rect.w - if valued { value_width(scale) + 6 * scale } else { 2 * scale };
     (left, (right - left).max(8 * scale))
+}
+
+/// The groove of a fader item: its top and its height, over the value text
+/// at the item's foot.
+pub fn fader_bar(rect: Rect, scale: Scale) -> (i32, i32) {
+    let top = rect.y + 6 * scale;
+    (top, (rect.y + rect.h - 18 * scale - top).max(8 * scale))
 }
 
 /// The parts of a stepper item (with a label): its minus button, its value,

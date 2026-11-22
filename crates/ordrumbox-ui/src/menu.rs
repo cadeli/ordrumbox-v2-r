@@ -13,11 +13,11 @@ use std::borrow::Cow;
 pub enum Command {
     TrackEditor,
     NoteEditor,
-    MasterStrip,
     Grid,
     SongView,
     PianoRoll,
     SynthEditor,
+    Mixer,
     NewSong,
     RemoveSong,
     RenameSong,
@@ -176,7 +176,6 @@ impl Command {
             Self::TapTempo => Some("the tempo is the host's"),
             Self::CheckUpdates | Self::DownloadPage => Some("update check: in the app only, not in a plugin"),
             Self::FactoryReset => Some("factory reset: in the app only, not in a plugin"),
-            Self::MasterStrip => Some("the master strip: in the app only, not in a plugin"),
             Self::Fullscreen => Some("the host owns the window"),
             Self::BackUpUserData
             | Self::RestoreUserData
@@ -277,8 +276,6 @@ pub struct MenuState {
     pub kit_editor: bool,
     pub track_editor: bool,
     pub note_editor: bool,
-    /// The master strip along the bottom (View > Master).
-    pub master_strip: bool,
     pub grid: bool,
     /// VU meters on the track stripes (V).
     pub show_vus: bool,
@@ -287,6 +284,7 @@ pub struct MenuState {
     pub song_view: bool,
     pub piano_roll: bool,
     pub synth: bool,
+    pub mixer: bool,
     /// A folder to save songs in (Save song).
     pub can_save_song: bool,
     /// Song files saved (Load song).

@@ -163,12 +163,12 @@ fn view_menu(s: &MenuState) -> Menu {
         items: vec![
             check("Track editor", "F2, Ctrl+2", C::TrackEditor, true, s.track_editor),
             check("Note editor", "F7, Ctrl+7", C::NoteEditor, true, s.note_editor),
-            check("Master", "", C::MasterStrip, true, s.master_strip),
             Item::Separator,
             check("Grid", "F5, Ctrl+5", C::Grid, true, s.grid),
             check("Piano roll", "F4, Ctrl+4", C::PianoRoll, true, s.piano_roll),
             check("Song", "F3, Ctrl+3", C::SongView, true, s.song_view),
             check("Synth", "F6, Ctrl+6", C::SynthEditor, true, s.synth),
+            check("Mixer", "F12", C::Mixer, true, s.mixer),
             check("Kit editor", "Ctrl+K", C::KitEditor, true, s.kit_editor),
             Item::Separator,
             check("VU meters", "Shift+V", C::ToggleVus, true, s.show_vus),

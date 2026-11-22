@@ -77,7 +77,7 @@ impl Editor for OrdrumboxEditor {
 /// alone, whole at scale 1.
 #[must_use]
 pub fn default_size() -> (u32, u32) {
-    let (width, height) = ordrumbox_ui::min_window_size(Scale::ONE, Shown::grid_alone(false));
+    let (width, height) = ordrumbox_ui::min_window_size(Scale::ONE, Shown::grid_alone());
     fitted((width.unsigned_abs(), height.unsigned_abs()))
 }
 
@@ -565,7 +565,7 @@ mod tests {
     #[test]
     fn the_window_opens_compact() {
         let (width, height) = default_size();
-        let (full_width, full_height) = ordrumbox_ui::min_window_size(Scale::ONE, Shown::all(false));
+        let (full_width, full_height) = ordrumbox_ui::min_window_size(Scale::ONE, Shown::all());
         assert_eq!(i64::from(width), i64::from(full_width), "the header's width");
         assert!(i64::from(height) < i64::from(full_height) * 3 / 4, "{height} high, {full_height} with the editors");
         assert!(height <= 420, "{height}");

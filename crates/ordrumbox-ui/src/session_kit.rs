@@ -477,7 +477,7 @@ mod tests {
         for quarters in 4..=Scale::MAX.quarters() {
             let scale = Scale::from_quarters(quarters);
             let mut s = session();
-            let (w, h) = view::min_window_size(scale, view::Shown::all(false));
+            let (w, h) = view::min_window_size(scale, view::Shown::all());
             s.set_size((w, h, scale));
             let layout = s.panel_layout(w, h, scale);
             let room = view::KitLayout::new(w, h, scale, 1).envelope_rect(layout.details_top).h;

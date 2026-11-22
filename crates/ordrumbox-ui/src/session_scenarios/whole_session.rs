@@ -94,7 +94,7 @@ fn a_session_through_the_menus_draws_every_step() {
         Command::Grid,
         Command::TrackEditor,
         Command::NoteEditor,
-        Command::MasterStrip,
+        Command::Mixer,
     ] {
         s.run(command);
         run(&mut s, &mut audio, CALLBACK);

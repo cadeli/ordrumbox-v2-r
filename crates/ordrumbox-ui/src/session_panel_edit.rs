@@ -33,13 +33,6 @@ impl Session {
         self.chrome.widgets.dropdown = None;
     }
 
-    /// View > Master: the master strip along the bottom, shown or folded.
-    pub fn toggle_master_strip(&mut self) {
-        self.chrome.show_master_strip = !self.chrome.show_master_strip;
-        self.chrome.widgets.focus = None;
-        self.chrome.widgets.dropdown = None;
-    }
-
     /// H: every track of pattern `p` on the synth patch that matches its name, written to the
     /// track; a random patch for a name nothing matches.
     pub fn convert_to_generated_sounds(&mut self, p: usize) {
@@ -163,6 +156,9 @@ impl Session {
         }
         if let Id::KitKnob(field) = id {
             return self.set_kit_value(field, value);
+        }
+        if let Id::MixerKnob(t, key) = id {
+            return self.set_mixer_knob(t, key, value);
         }
         if let Id::TrackVolume(t) = id {
             let desc = format!("Volume on {}", self.track_name(t));
@@ -481,7 +477,7 @@ impl Session {
             Id::Transport => self.toggle_play(),
             Id::View(i) => self.show_view(i),
             Id::Mode(i) => self.show_mode(i == 1),
-            Id::Master(_) | Id::OutputPage(_) => self.output_activate(id),
+            Id::Master(_) | Id::MixerName(_) | Id::MixerToggle(..) | Id::MixerScroll(_) => self.mixer_activate(id),
             Id::SynthTab(_) | Id::SynthButton(_) | Id::SynthPower(_) | Id::SynthIcon(..) | Id::SynthField(_) => {
                 self.synth_activate(id);
             }

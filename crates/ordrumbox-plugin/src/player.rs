@@ -305,7 +305,7 @@ mod tests {
         let mut player = Player::default();
         let _audio = player.start(48_000.0, &state);
         let ui = player.ui().unwrap();
-        assert_eq!(ui.session.shown(), ordrumbox_ui::Shown::grid_alone(false), "the grid alone");
+        assert_eq!(ui.session.shown(), ordrumbox_ui::Shown::grid_alone(), "the grid alone");
         let (width, height) = crate::editor::default_size();
         assert_eq!(ui.needed_size(), (i32::try_from(width).unwrap(), i32::try_from(height).unwrap()));
         ui.session.run(ordrumbox_ui::Command::NoteEditor);

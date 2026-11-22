@@ -81,6 +81,7 @@ fn draw_item(canvas: &mut Canvas, item: &Item, scale: Scale) {
                 Style::Stepper => {
                     draw_stepper_item(canvas, r, (*value > spec.min, *value < spec.max), label.as_deref(), text, scale)
                 }
+                Style::Fader => draw_fader_item(canvas, r, fraction, color, text, scale),
             }
         }
         Kind::Select { labels, selected, .. } => {
@@ -193,6 +194,21 @@ fn draw_slider_item(
     canvas.fill_rect(thumb, r.y + r.h / 2 - 4 * scale, 8 * scale, 8 * scale, handle_color());
     let x = left + width + 6 * scale;
     canvas.text(x, ty, &fit(text, r.x + r.w - x, scale), scale, value_color());
+}
+
+/// A fader: a groove lit from the foot up to the value, a wide handle, the
+/// value text under it.
+fn draw_fader_item(canvas: &mut Canvas, r: Rect, fraction: f64, color: Rgb, text: &str, scale: Scale) {
+    let t = scale.px();
+    let (top, height) = fader_bar(r, scale);
+    let cx = r.x + r.w / 2;
+    canvas.fill_rect(cx - t, top, 2 * t, height, border_color());
+    let filled = (fraction * f64::from(height)) as i32;
+    canvas.fill_rect(cx - t, top + height - filled, 2 * t, filled, color);
+    let (handle_w, handle_h) = ((r.w - 4 * scale).min(24 * scale), 8 * scale);
+    canvas.fill_rect(cx - handle_w / 2, top + height - filled - handle_h / 2, handle_w, handle_h, handle_color());
+    let text = fit(text, r.w, scale);
+    canvas.text(cx - text_width(&text, scale) / 2, top + height + 8 * scale, &text, scale, value_color());
 }
 
 /// A stepper: minus and plus buttons around the value; a button is greyed

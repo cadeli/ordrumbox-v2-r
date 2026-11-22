@@ -96,6 +96,12 @@ pub fn help(id: Id) -> Option<Help> {
         Id::Mode(0) => ["Pattern (F5)", "edit and play one pattern, over and over"],
         Id::Mode(_) => ["Song (F3)", "edit and play the song: patterns arranged one after another"],
         Id::TrackVolume(_) => ["Volume", "the track's level: the track editor's Volume knob too"],
+        Id::MixerKnob(_, key) => setting_help(key)?,
+        Id::MixerName(_) => ["Track", "a click: the track editor edits it (Left, Right: the track before, after)"],
+        Id::MixerToggle(_, "mute") => ["Mute (M)", "the track plays nothing"],
+        Id::MixerToggle(..) => ["Solo (S)", "only the soloed tracks play"],
+        Id::MixerScroll(Step::Previous) => ["Strips before", "the track strips scroll back (the wheel on a strip too)"],
+        Id::MixerScroll(_) => ["Strips after", "the track strips scroll on (the wheel on a strip too)"],
         Id::Decay => setting_help("decay")?,
         Id::KnobBar(key)
         | Id::Fx(key)
@@ -131,7 +137,6 @@ fn fx_help(fx: u8) -> Option<Help> {
         3 => ["Compressor", "turns loud parts down, lit when on"],
         4 => ["Sidechain", "another track's sound turns this one down, lit when on"],
         5 => ["Filter", "cuts lows or highs, lit when on"],
-        6 => ["Sends", "to the shared echo and reverb (master strip, Echo page), lit when either is open"],
         _ => return None,
     })
 }
@@ -152,7 +157,8 @@ fn view_help(view: u8) -> Option<Help> {
         1 => ["Piano roll (F4)", "the focused track's notes by pitch"],
         2 => ["Song (F3)", "patterns arranged into a song"],
         3 => ["Synth (F6)", "the soft-synth presets"],
-        4 => ["Kit editor (Ctrl+K)", "the kit's samples and their settings"],
+        4 => ["Mixer (F12)", "every track's level, pan and sends, the shared echo and reverb, the master bus"],
+        5 => ["Kit editor (Ctrl+K)", "the kit's samples and their settings"],
         _ => return None,
     })
 }

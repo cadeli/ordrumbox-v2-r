@@ -26,6 +26,7 @@ mod mcp;
 mod mcp_link;
 mod menu;
 mod midi_settings;
+mod mixer;
 mod note_drag;
 mod output;
 mod panel;

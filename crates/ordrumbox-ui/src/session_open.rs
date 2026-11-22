@@ -11,7 +11,7 @@ use super::session_selection::Selection;
 use super::session_toast::Flash;
 use super::session_transport::Transport;
 use super::session_types::Workspace;
-use super::{Session, session_output, session_roll, session_song, session_synth, session_update};
+use super::{Session, session_mixer, session_output, session_roll, session_song, session_synth, session_update};
 use crate::action_log::ActionLog;
 use crate::audio_output::StartOutput;
 use crate::editors::EditorState;
@@ -302,6 +302,7 @@ impl Session {
             host: Host::default(),
             controls: ordrumbox_engine::ControlMap::new(),
             output_panel: session_output::OutputPanel::default(),
+            mixer: session_mixer::Mixer::default(),
             updates: session_update::Updates::default(),
             mcp: None,
             synth_editor: session_synth::SynthEditor::new(),

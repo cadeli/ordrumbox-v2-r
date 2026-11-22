@@ -12,6 +12,9 @@ pub enum Workspace {
     Song,
     /// The synth editor (F6): the track editor's track's preset.
     Synth,
+    /// The mixer (F12): every track's level, pan and sends, the shared
+    /// returns and the master bus.
+    Mixer,
 }
 
 /// A direction (arrow key).

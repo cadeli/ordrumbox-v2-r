@@ -19,11 +19,11 @@ impl Session {
     }
 
     /// The window split for `size` (a real window size): the main editor
-    /// region (top-left) and the output strip (bottom).
+    /// region (top-left) and the note editor under it.
     pub(crate) fn body(&self, size: (i32, i32, Scale)) -> view::Body {
         let (width, height, scale) = size;
         let right = self.track_editor_width(width, scale);
-        view::Body::new(width, height, scale, right, self.status.len(), self.output_shown(), self.note_editor_shown())
+        view::Body::new(width, height, scale, right, self.status.len(), self.note_editor_shown())
     }
 
     /// The note editor is shown, under the grid or the piano roll: the
@@ -34,16 +34,9 @@ impl Session {
             && matches!(self.workspace, Workspace::Grid | Workspace::PianoRoll)
     }
 
-    /// The master strip (the output panel) is shown along the bottom: in
-    /// the app, unless View > Master folded it.
-    pub(crate) fn output_shown(&self) -> bool {
-        !self.host.hosted && self.chrome.show_master_strip
-    }
-
     /// What the window shows that sets the room the layout needs.
     pub fn shown(&self) -> view::Shown {
         view::Shown {
-            output: self.output_shown(),
             track_editor: self.chrome.show_track_editor,
             grid: !self.kit_editor.is_open() && self.workspace == Workspace::Grid,
             note_editor: self.chrome.show_note_editor,
@@ -98,14 +91,14 @@ impl Session {
             sounds: pattern.map_or_else(Vec::new, |p| (0..p.tracks.len()).map(|t| self.track_sound_lines(t)).collect()),
             arrangement: self.song_view_open().then(|| self.song_view_data(&rows, &song_layout)),
             piano_roll: roll,
-            output: self.output_view(),
             synth: self.synth_open(),
+            mixer: self.mixer_open(),
             kit_view: self.kit_view(kit_first, layout.details_top),
             right: layout.right,
             current_page: self.chrome.current_page,
             lane: (self.editor_track(), usize::from(self.editors.lane)),
             note_editor: self.note_editor_shown(),
-            levels,
+            levels: levels.clone(),
             show_vus: self.chrome.show_vus,
             transport: self.transport_shown(),
             host_muted: self.host.muted,
@@ -132,6 +125,7 @@ impl Session {
         };
         view::draw(canvas, &view, scale);
         self.draw_synth(canvas, scale);
+        self.draw_mixer(canvas, scale, &levels);
         crate::panel::draw(canvas, &layout.items, self.chrome.widgets.focus, scale);
         self.draw_tooltip(canvas, scale);
         let menus = self.menus();

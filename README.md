@@ -190,6 +190,10 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
 - **F11**: full screen, **Ctrl W**: close the window (as **Ctrl Q**)
 - **F1–F7** (also **Ctrl 1–7**, for the keyboards whose F keys want Fn): the shortcut list,
   track editor, song panel, piano roll, grid, synth editor, note editor (shown or folded)
+- **F12**: the mixer (View > Mixer, the **MIX** button): a strip a track with its echo and
+  reverb sends, pan, mute, solo and fader, then the shared echo and reverb, then the master
+  bus. **Left**/**Right** go from track to track, the wheel on a strip scrolls the strips,
+  **Esc** goes back to the grid
 - **Ctrl K**: kit editor, **Ctrl Shift M**: export MIDI (**Ctrl E**: export WAV)
 - **File > Export pattern as WAV** (**Ctrl E**) and **as MIDI** (**Ctrl Shift M**) first ask how
   many loops of the pattern the file holds (1 to 64, **Left**/**Right**); the count is kept for

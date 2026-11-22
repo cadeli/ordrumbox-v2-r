@@ -104,8 +104,7 @@ impl Session {
             self.header_items(&mut layout, pattern, scale);
         }
         self.view_buttons(&mut layout, scale);
-        // The window split: the main editor top-left, the track editor down the
-        // right, the output strip along the bottom (always shown).
+        // The window split: the main editor top-left, the track editor down the right.
         let right = self.track_editor_width(width, scale);
         let body = self.body((width, height, scale));
         layout.right = right;
@@ -117,10 +116,6 @@ impl Session {
         if body.note.h > 0 {
             self.note_editor_items(&mut layout, body.note, scale);
         }
-        // The output strip along the bottom, in the app only, unless folded.
-        if self.output_shown() {
-            self.output_items(&mut layout, width, body.output, scale);
-        }
         // The main editor (top-left): exactly one of the kit editor, the song
         // panel, the piano roll, the synth editor, or the grid.
         if self.kit_editor.is_open() {
@@ -131,6 +126,8 @@ impl Session {
             self.roll_items(&mut layout, (width, height, scale));
         } else if self.workspace == Workspace::Synth {
             self.synth_items(&mut layout, (width, height, scale));
+        } else if self.workspace == Workspace::Mixer {
+            self.mixer_items(&mut layout, (width, height, scale));
         } else if let Some(pattern) = self.pattern() {
             self.grid_items(&mut layout, pattern, &body, scale);
         }
@@ -164,7 +161,7 @@ impl Session {
 
     /// The view buttons (the main editor, then the kit editor): the one shown lit.
     fn view_buttons(&self, layout: &mut PanelLayout, scale: Scale) {
-        let shown = [Workspace::Grid, Workspace::PianoRoll, Workspace::Song, Workspace::Synth];
+        let shown = [Workspace::Grid, Workspace::PianoRoll, Workspace::Song, Workspace::Synth, Workspace::Mixer];
         let views = self.header_controls(scale).views;
         let kit_open = self.kit_editor.is_open();
         for (i, (rect, label)) in views.iter().zip(view::VIEWS).enumerate() {
@@ -172,7 +169,7 @@ impl Session {
             if shown.get(i) == Some(&Workspace::Song) {
                 continue;
             }
-            let on = if i == 4 { kit_open } else { !kit_open && self.workspace == shown[i] };
+            let on = if i == usize::from(view::KIT_VIEW) { kit_open } else { !kit_open && self.workspace == shown[i] };
             layout.items.push(Item::new(Some(Id::View(i as u8)), *rect, Kind::Button { label: label.into(), on }));
         }
     }
@@ -241,17 +238,18 @@ impl Session {
         }
         let spec = Spec::slider(0.0, 1.0, 0.01, 1.0);
         for (t, track) in pattern.tracks.iter().enumerate().take(grid.tracks()) {
-            // A host that automates the track's volume moves the slider, in the
-            // colour of a modulated value; the track's own volume stays what is saved.
-            let host_gain = self.host.mix.tracks.get(t).map_or(1.0, |host| f64::from(host.gain));
-            let (value, lfo) = if host_gain == 1.0 {
-                (track.volume, false)
-            } else {
-                ((track.volume * host_gain).clamp(spec.min, spec.max), true)
-            };
+            let (value, lfo) = self.shown_track_volume(t, track.volume, spec);
             let kind = Kind::Value { spec, value, label: None, text: String::new(), lfo };
             layout.items.push(Item::new(Some(Id::TrackVolume(t)), grid.volume_rect(t), kind));
         }
+    }
+
+    /// The volume a slider or a fader of track `t` shows, and whether a host
+    /// moves it: a host that automates it moves the control, in the colour of
+    /// a modulated value; the track's own `volume` stays what is saved.
+    pub(super) fn shown_track_volume(&self, t: usize, volume: f64, spec: Spec) -> (f64, bool) {
+        let host_gain = self.host.mix.tracks.get(t).map_or(1.0, |host| f64::from(host.gain));
+        if host_gain == 1.0 { (volume, false) } else { ((volume * host_gain).clamp(spec.min, spec.max), true) }
     }
 
     /// The header's controls: a plugin's without the song view button.
@@ -408,6 +406,9 @@ pub(super) fn control_name(id: Id) -> (&'static str, &'static str) {
             (label.unwrap_or(""), "")
         }
         Id::TrackVolume(_) => ("Volume", ""),
+        Id::MixerKnob(_, key) => {
+            crate::mixer::TRACK_KNOBS.iter().find(|(k, _)| *k == key).map_or(("", ""), |(_, label)| (*label, ""))
+        }
         _ => ("", ""),
     }
 }
@@ -573,8 +574,8 @@ mod tests {
         s.status = vec!["a status line".into()];
         let mut tallest = 0;
         for scale in (Scale::ONE.quarters()..=Scale::MAX.quarters()).map(Scale::from_quarters) {
-            let (width, height) = view::min_window_size(scale, view::Shown::all(true));
-            let body = view::Body::new(width, height, scale, s.track_editor_width(width, scale), 1, true, true);
+            let (width, height) = view::min_window_size(scale, view::Shown::all());
+            let body = view::Body::new(width, height, scale, s.track_editor_width(width, scale), 1, true);
             for (track, tab, sub, note_tab, advanced) in (0..2).flat_map(|t| {
                 (0..6u8).flat_map(move |tab| {
                     (0..5u8).flat_map(move |sub| (0..5u8).flat_map(move |n| [false, true].map(|a| (t, tab, sub, n, a))))
@@ -587,7 +588,7 @@ mod tests {
                 s.selection.cursor = Some(view::Cursor { track, beat: 0, step: 0 });
                 let layout = s.panel_layout(width, height, scale);
                 let bottom = (layout.items.iter())
-                    .filter(|i| i.rect.x >= width - layout.right && i.rect.y < body.output.y)
+                    .filter(|i| i.rect.x >= width - layout.right)
                     .filter(|i| !matches!(i.kind, Kind::Panel | Kind::Card))
                     .map(|i| i.rect.y + i.rect.h)
                     .max()
@@ -599,7 +600,7 @@ mod tests {
                 // The note editor, under the grid: inside its strip.
                 let strip = body.note;
                 for item in layout.items.iter().filter(|i| i.rect.x < width - layout.right && i.rect.y >= strip.y) {
-                    if matches!(item.kind, Kind::Panel | Kind::Card) || item.rect.y >= body.output.y {
+                    if matches!(item.kind, Kind::Panel | Kind::Card) {
                         continue;
                     }
                     let r = item.rect;
@@ -608,7 +609,7 @@ mod tests {
                 }
             }
             let views = view::header_controls(scale).views;
-            assert!(views[4].x + views[4].w <= width);
+            assert!(views[5].x + views[5].w <= width);
         }
         // The constant is the tallest tab, not more: the window is no taller than it needs.
         assert_eq!(tallest, view::TRACK_EDITOR_HEIGHT);
@@ -789,35 +790,28 @@ mod tests {
     }
 
     #[test]
-    fn the_output_strip_and_the_track_editor_stay_with_every_main_editor() {
-        /// The strip's knobs are there, all inside the bottom band.
-        fn strip(band: Rect, layout: &PanelLayout) {
-            let items: Vec<&Item> = layout.items.iter().filter(|i| matches!(i.id, Some(Id::Master(_)))).collect();
-            assert!(items.len() >= 2, "the strip's controls are missing");
-            for item in items {
-                assert!(
-                    item.rect.y >= band.y && item.rect.y + item.rect.h <= band.y + band.h,
-                    "a strip control is outside the band"
-                );
-            }
-        }
+    fn the_track_editor_stays_with_every_main_editor() {
         let mut s = session();
-        // The grid: its volume sliders, the strip and the track editor together.
+        // The grid: its volume sliders and the track editor together; the master is the mixer's.
         let layout = s.panel_layout(SIZE.0, SIZE.1, SIZE.2);
-        strip(s.body(SIZE).output, &layout);
         assert!(layout.items.iter().any(|i| matches!(i.id, Some(Id::TrackVolume(_)))));
+        assert!(!layout.items.iter().any(|i| matches!(i.id, Some(Id::Master(_)))));
         assert!(layout.right > 0);
-        // The song panel keeps both.
+        // The song panel keeps it.
         s.toggle_song_view();
         let layout = s.panel_layout(SIZE.0, SIZE.1, SIZE.2);
-        strip(s.body(SIZE).output, &layout);
         assert!(layout.items.iter().any(|i| matches!(i.id, Some(Id::SongName))));
         assert!(layout.right > 0);
-        // The kit editor opens over the main editor; the strip stays below.
+        // The mixer too.
         s.toggle_song_view();
+        s.toggle_mixer();
+        let layout = s.panel_layout(SIZE.0, SIZE.1, SIZE.2);
+        assert!(layout.items.iter().any(|i| matches!(i.id, Some(Id::Master(_)))));
+        assert!(layout.right > 0);
+        // The kit editor opens over the main editor.
         s.toggle_kit_editor();
         let layout = s.panel_layout(SIZE.0, SIZE.1, SIZE.2);
-        strip(s.body(SIZE).output, &layout);
+        assert!(!layout.items.iter().any(|i| matches!(i.id, Some(Id::Master(_)))));
         assert!(layout.right > 0);
     }
 

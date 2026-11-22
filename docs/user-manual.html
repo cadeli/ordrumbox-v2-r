@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>orDrumbox User Manual</title>
-<meta name="description" content="orDrumbox user manual (native program and CLAP / VST3 plugin): window, menus, header, pattern grid and lane, track and note editors, piano roll, song panel, synth editor, kit editor, master strip, generation, files and backups, keyboard shortcuts, the plugin and AI clients.">
+<meta name="description" content="orDrumbox user manual (native program and CLAP / VST3 plugin): window, menus, header, pattern grid and lane, track and note editors, piano roll, song panel, synth editor, kit editor, mixer, generation, files and backups, keyboard shortcuts, the plugin and AI clients.">
 <style>
 :root {
   --bg: #f7f6fb; --fg: #1d1b2e; --muted: #5b5873; --line: #d9d6e8;
@@ -71,7 +71,7 @@ is a demo of it and does less: files here are saved on disk, not in the browser.
   <li><a href="#song">Song panel</a></li>
   <li><a href="#synth">Synth editor</a></li>
   <li><a href="#kit">Kit editor</a></li>
-  <li><a href="#output">Master strip</a></li>
+  <li><a href="#output">Mixer</a></li>
   <li><a href="#generation">Generation, styles and auto mode</a></li>
   <li><a href="#files">Files: save, import, export, back up</a></li>
   <li><a href="#shortcuts">Keyboard shortcuts</a></li>
@@ -144,8 +144,8 @@ presets of its own and takes those. To start again from the demo, use <strong>He
 <!-- ───────────────────────────────────────────────────────────── -->
 <h2 id="window">2. The window</h2>
 <figure>
-  <img src="images/window-grid.png" alt="The orDrumbox window: menu bar, header, pattern grid, track editor on the right, master strip at the bottom">
-  <figcaption>The window on the demo library: the grid as main editor, the track editor on the right, the master strip at the bottom.</figcaption>
+  <img src="images/window-grid.png" alt="The orDrumbox window: menu bar, header, pattern grid, track editor on the right">
+  <figcaption>The window on the demo library: the grid as main editor, the track editor on the right (this picture still shows the master strip of earlier versions, now the mixer's).</figcaption>
 </figure>
 <p>The window always keeps the same parts, whatever is being edited:</p>
 <pre class="layout">┌──────────────────────────────────────────────────────────────┐
@@ -155,26 +155,24 @@ presets of its own and takes those. To start again from the demo, use <strong>He
 │ Status line: last action · undo / redo · song                │
 ├─────────────────────────────────────────────┬────────────────┤
 │  Main editor (one of):                      │  Track editor  │
-│   grid · piano roll · song · synth          │  (F2)          │
+│   grid · piano roll · song · synth · mixer  │  (F2)          │
 │   (or the kit editor over them)             │                │
 ├─────────────────────────────────────────────┤                │
 │  Note editor (F7, under the grid and roll)  │                │
-├─────────────────────────────────────────────┴────────────────┤
-│ Master strip: volume · spectrum · compressor · filters       │
-└──────────────────────────────────────────────────────────────┘</pre>
+└─────────────────────────────────────────────┴────────────────┘</pre>
 <table>
 <tr><th>Part</th><th>How to show it</th></tr>
 <tr><td>Grid (pattern editor)</td><td><kbd>F5</kbd>, <strong>View › Grid</strong>, header <strong>GRID</strong></td></tr>
 <tr><td>Piano roll</td><td><kbd>F4</kbd>, <strong>View › Piano roll</strong>, header <strong>ROLL</strong></td></tr>
 <tr><td>Song panel</td><td><kbd>F3</kbd>, <strong>View › Song</strong>, <strong>Song › Song view</strong>, header <strong>SONG</strong></td></tr>
 <tr><td>Synth editor</td><td><kbd>F6</kbd>, <strong>View › Synth</strong>, header <strong>SYNTH</strong></td></tr>
+<tr><td>Mixer</td><td><kbd>F12</kbd>, <strong>View › Mixer</strong>, header <strong>MIX</strong></td></tr>
 <tr><td>Kit editor (over the main editor)</td><td><kbd>Ctrl</kbd>+<kbd>K</kbd>, <strong>View › Kit editor</strong>, <strong>Kit › Kit editor</strong>, header <strong>KIT</strong></td></tr>
 <tr><td>Track editor (right edge)</td><td><kbd>F2</kbd> or <strong>View › Track editor</strong> shows or folds it</td></tr>
 <tr><td>Note editor (under the grid and the piano roll)</td><td><kbd>F7</kbd> or <strong>View › Note editor</strong> shows or folds it</td></tr>
-<tr><td>Master strip (bottom)</td><td><strong>View › Master</strong> shows or folds it</td></tr>
 </table>
-<p><kbd>F3</kbd>, <kbd>F4</kbd> and <kbd>F6</kbd> toggle: pressed again, they go back to the grid.
-In the song panel, piano roll and synth editor, <kbd>Esc</kbd> also goes back to the grid.
+<p><kbd>F3</kbd>, <kbd>F4</kbd>, <kbd>F6</kbd> and <kbd>F12</kbd> toggle: pressed again, they go back to the grid.
+In the song panel, piano roll, synth editor and mixer, <kbd>Esc</kbd> also goes back to the grid.
 Nothing moves when a state changes (a sample replaced by a synth, a value that appears, playback that starts):
 an empty part keeps its place.</p>
 
@@ -226,7 +224,7 @@ out most). The choice is saved.</p>
 <p>Every edit of the library is one undo step: <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes, <kbd>Ctrl</kbd>+<kbd>Y</kbd> (or
 <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>) redoes, up to 50 steps. The <strong>Edit</strong> menu names
 the step it will undo or redo. This includes the synth presets, which are part of the library (a knob turned is
-one step). Kit edits and the master strip are saved directly and are not undo steps.</p>
+one step). Kit edits and the mixer's returns and master are saved directly and are not undo steps (a track's sends, pan and volume are).</p>
 <p>What can be undone is done at once — deleting a track, a clip, an arrangement, clearing notes, random notes,
 compacting tracks… — and its message on the status line ends with <em>(Ctrl+Z: undo)</em>. What cannot be undone
 asks first, <kbd>Enter</kbd> goes on, <kbd>Esc</kbd> or a click cancels: removing a kit's sample or a synth preset,
@@ -297,11 +295,11 @@ use <kbd>←</kbd> <kbd>→</kbd> between menus, <kbd>↑</kbd> <kbd>↓</kbd> b
 <tr><th>Command</th><th>Shortcut</th><th>What it does</th></tr>
 <tr><td>Track editor</td><td><kbd>F2</kbd></td><td>Show / fold the track editor on the right.</td></tr>
 <tr><td>Note editor</td><td><kbd>F7</kbd></td><td>Show / fold the note editor under the grid and the piano roll.</td></tr>
-<tr><td>Master</td><td></td><td>Show / fold the master strip at the bottom.</td></tr>
 <tr><td>Grid</td><td><kbd>F5</kbd></td><td>The pattern grid as main editor.</td></tr>
 <tr><td>Piano roll</td><td><kbd>F4</kbd></td><td>The piano roll as main editor.</td></tr>
 <tr><td>Song</td><td><kbd>F3</kbd></td><td>The song panel as main editor.</td></tr>
 <tr><td>Synth</td><td><kbd>F6</kbd></td><td>The synth editor as main editor.</td></tr>
+<tr><td>Mixer</td><td><kbd>F12</kbd></td><td>The mixer as main editor.</td></tr>
 <tr><td>Kit editor</td><td><kbd>Ctrl</kbd>+<kbd>K</kbd></td><td>Open / close the kit editor.</td></tr>
 <tr><td>VU meters</td><td><kbd>V</kbd></td><td>Level meters on the track stripes of the grid.</td></tr>
 <tr><td>Toasts</td><td></td><td>Show / hide the messages that pop up at the bottom of the window; they still go on the status line.</td></tr>
@@ -463,6 +461,7 @@ type none stays off.</p>
 <tr><td>Click a step with notes</td><td>Switch it off: remove all its notes (one undo step).</td></tr>
 <tr><td><kbd>Shift</kbd>+click a step</td><td>Select its note (and hear it); the note editor shows it.</td></tr>
 <tr><td>Click a track's name</td><td>Select the track (and hear it); the track editor shows it.</td></tr>
+<tr><td>Double-click a track's name</td><td>Open the piano roll on that track.</td></tr>
 <tr><td>Drag a track's name up or down</td><td>Move the track to another row (one undo step).</td></tr>
 <tr><td>Hover a note</td><td>A bubble shows its pitch, MIDI number and the settings that differ from the defaults.</td></tr>
 <tr><td>Hover a track's name</td><td>A bubble shows its states, its sound, its mix and length, and its generator settings away from the defaults.</td></tr>
@@ -531,7 +530,7 @@ loops, and the level curve (attack, hold, decay). A synth track keeps the place 
 plays it follows them.</p>
 
 <h3>FX tab</h3>
-<p>The seven effects one under the other (the sends last), each a cartridge: its LED and its name on the left (the LED switches it on
+<p>The six effects one under the other, each a cartridge: its LED and its name on the left (the LED switches it on
 or off), then its knobs and lists. Under the name, the reverb, the delay and the saturation show their type on a
 small screen: a click opens the list, ◂ and ▸ step to the type before or after. The filter's type is on its screen
 too. The LED switches the effect: a reverb or a delay without a type (<em>none</em>, from an older file
@@ -561,8 +560,6 @@ control of an effect that is off switches it on, and so does choosing its type, 
 <tr><td>Cutoff</td><td>20 Hz – 20 kHz</td><td>LFO-capable.</td></tr>
 <tr><td>Q</td><td>0.707–18.707</td><td>Resonance (LFO-capable).</td></tr>
 <tr><td>Slope</td><td>12 dB, 24 dB</td><td>Per octave.</td></tr>
-<tr><td rowspan="2"><strong>Sends</strong></td><td>Echo</td><td>0–1 (default 0)</td><td>How much of the track goes to the shared tape echo (master strip, <strong>Echo</strong> page), after its volume and pan. Unlike the Delay above, the shared echo plays on when the send closes: open it for one hit and the hit keeps repeating (a dub "throw"). Its time is set on the Echo page, for every track.</td></tr>
-<tr><td>Reverb</td><td>0–1 (default 0)</td><td>How much of the track goes to the shared spring reverb, after its volume and pan. The LED is lit when either send is open; it closes both, or opens the echo send at 0.5.</td></tr>
 </table>
 
 <h3>Sound tab</h3>
@@ -911,19 +908,30 @@ Kits are saved to <code>kits.json</code>; new sample audio to <code>samples/</co
 (tracks 3 and 4), which are kept for the kit editor. Built-in kits: real, matt, electro, open, ropen, generated, human, 8bits, delagrange, vintage, punchy.</p>
 
 <!-- ───────────────────────────────────────────────────────────── -->
-<h2 id="output">14. Master strip</h2>
-<p>The strip along the bottom (<strong>View › Master</strong> shows or folds it), in two pages chosen by the
-tabs on its left: <strong>Master</strong>, the master bus, and <strong>Echo</strong>, the shared returns. Both keep
-the volume and the spectrum. Settings play at once and are saved to <code>settings.json</code>; they are not undo
-steps. The plugin has no master strip: the host mixes, and the returns play at their defaults.</p>
-<figure>
-  <img src="images/output.png" alt="The master strip: volume and spectrum, pre-gain and compressor knobs with the ON button and transfer curve, low cut and high cut sliders">
-  <figcaption>The master strip: the volume and the spectrum; the compressor's knobs, its ON button and its transfer curve (the threshold is the dashed vertical line); the low cut and the high cut.</figcaption>
-</figure>
+<h2 id="output">14. Mixer</h2>
+<p>A main view as the grid is (<kbd>F12</kbd>, <strong>View › Mixer</strong>, the header's <strong>MIX</strong>):
+a strip for each track of the pattern, then the shared <strong>Echo</strong> and <strong>Reverb</strong> returns,
+then the <strong>Master</strong> bus. The track editor stays on the right.</p>
+<ul>
+  <li><strong>A track's strip</strong>: its name (a click, or <kbd>Left</kbd> / <kbd>Right</kbd>, and the track editor
+      edits that track; its strip is lit), its <strong>Echo</strong> and <strong>Reverb</strong> sends (0–1, default 0:
+      how much of the track goes to the shared returns, after its volume and pan), its <strong>Pan</strong>,
+      <strong>M</strong> (mute) and <strong>S</strong> (solo), its fader (the track's volume, the grid's slider too)
+      and its level meter. These are track settings, saved with the pattern, each change an undo step.</li>
+  <li><strong>The strips that do not fit</strong> scroll: the wheel on a strip, or the <strong>&lt;</strong>
+      <strong>&gt;</strong> arrows under them. The returns and the master keep their place.</li>
+  <li><strong>The returns and the master</strong> play at once and are saved to <code>settings.json</code>; they are
+      not undo steps.</li>
+</ul>
+<p>A fader moves with a drag (<kbd>Shift</kbd>: finely), the wheel or the arrow keys; a click on its groove puts it
+there, a double-click back to its default, a right-click types a value. The plugin shows the track strips only: the host
+mixes, and the returns and the master play at their defaults.</p>
+<h3>The master</h3>
 <table>
 <tr><th>Group</th><th>Control</th><th>Range</th><th>Default</th><th>What it does</th></tr>
-<tr><td rowspan="2"><strong>Volume</strong></td><td>Volume</td><td>0–2</td><td>1</td><td>Master volume.</td></tr>
-<tr><td>Spectrum</td><td></td><td></td><td>The spectrum of what plays (−100 to −30 dB).</td></tr>
+<tr><td rowspan="3"><strong>Volume</strong></td><td>Fader</td><td>0–2</td><td>1</td><td>Master volume, with the level meter beside it.</td></tr>
+<tr><td>Spectrum</td><td></td><td></td><td>The spectrum of what plays (−100 to −30 dB), under the transfer curve.</td></tr>
+<tr><td>Comp button</td><td></td><td></td><td>See the compressor.</td></tr>
 <tr><td rowspan="9"><strong>Compressor</strong></td><td>Pre-Gain</td><td>−20 to +20 dB</td><td>0</td><td>Gain before the compressor.</td></tr>
 <tr><td>Threshold</td><td>−60 to 0 dB</td><td>−18</td><td>Where compression starts.</td></tr>
 <tr><td>Ratio</td><td>1–20</td><td>8</td><td>How hard it compresses.</td></tr>
@@ -937,9 +945,8 @@ steps. The plugin has no master strip: the host mixes, and the returns play at t
 <tr><td>High Cut</td><td>1–22 kHz</td><td>18 500</td><td>Removes the highest frequencies.</td></tr>
 </table>
 
-<h3>The Echo page: shared returns</h3>
-<p>Every track can send to a tape echo and a spring reverb that all the tracks share (the knobs of its
-<strong>Sends</strong> strip). They are not the track's own Delay and Reverb, which each track has apart and which
+<h3>The returns: shared echo and reverb</h3>
+<p>Every track can send to a tape echo and a spring reverb that all the tracks share (the sends of its strip). They are not the track's own Delay and Reverb, which each track has apart and which
 stop when their mix goes down. The returns play into the mix before the master bus. A sound sent for a
 moment keeps echoing after its send closes, the way a dub mix throws a snare or a chord into the echo: bind a
 track's <strong>echo send</strong> to a MIDI knob (<strong>Edit › MIDI controls</strong>) and turn it up on one hit,
@@ -951,11 +958,11 @@ and what it sent goes on echoing.</p>
 <tr><td>Feedback</td><td>0–0.99</td><td>0.55</td><td>How much of each repeat comes back: near the top, the echo builds up, held by its saturation.</td></tr>
 <tr><td>Tone</td><td>0.05–1</td><td>0.35</td><td>Lower makes each repeat darker. The repeats are also cut under 120 Hz.</td></tr>
 <tr><td>To Rev</td><td>0–1</td><td>0.25</td><td>How much of the echo goes on to the reverb.</td></tr>
-<tr><td>Echo</td><td>0–1</td><td>1</td><td>The echo's level in the mix.</td></tr>
+<tr><td>Fader</td><td>0–1</td><td>1</td><td>The echo's level in the mix.</td></tr>
 <tr><td rowspan="4"><strong>Reverb</strong></td><td>Size</td><td>0–1</td><td>0.8</td><td>The room's size: how long it rings.</td></tr>
 <tr><td>Damp</td><td>0–1</td><td>0.4</td><td>Higher makes the tail darker.</td></tr>
 <tr><td>Spring</td><td>0–0.9</td><td>0.6</td><td>The spread of a spring: its drip.</td></tr>
-<tr><td>Reverb</td><td>0–1</td><td>1</td><td>The reverb's level in the mix.</td></tr>
+<tr><td>Fader</td><td>0–1</td><td>1</td><td>The reverb's level in the mix.</td></tr>
 </table>
 <p>The tape wow of the echo (<code>echoWow</code>, 0–0.005 s, default 0.0015) is set in <code>settings.json</code>
 (<code>returns</code>) or by an AI client (<code>setReturns</code>). WAV exports play the returns as set; a stem,
@@ -1113,6 +1120,7 @@ In the plugin, <kbd>Alt</kbd> stands for <kbd>Ctrl</kbd> (<a href="#plugin">sect
 <tr><td><kbd>F5</kbd></td><td>Grid</td></tr>
 <tr><td><kbd>F6</kbd></td><td>Synth editor</td></tr>
 <tr><td><kbd>F7</kbd></td><td>Note editor shown / folded</td></tr>
+<tr><td><kbd>F12</kbd></td><td>Mixer</td></tr>
 <tr><td><kbd>Tab</kbd>, <kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Focus the next / previous control of the editors</td></tr>
 </table>
 
@@ -1140,7 +1148,7 @@ plugin folder. Its window is the app's, without what the host does.</p>
       time, every note in its place.</li>
   <li><strong>The library</strong> is saved in the host's project: each project has its own, synth presets included.</li>
   <li><strong>The menus</strong> leave out what the host or the app does: save, quit, play, tempo, songs, the user data folder,
-      updates, factory reset, the master strip.</li>
+      updates, factory reset.</li>
   <li><strong>Keys</strong>: <kbd>Space</kbd> and every <kbd>Ctrl</kbd>/<kbd>Cmd</kbd> key are the host's. orDrumbox's
       <kbd>Ctrl</kbd> keys take <kbd>Alt</kbd> instead (<kbd>Alt</kbd>+<kbd>Z</kbd> undo, <kbd>Alt</kbd>+<kbd>K</kbd> kit editor…);
       the menus show them.</li>

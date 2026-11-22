@@ -9,7 +9,6 @@ use ordrumbox_core::Pattern;
 use ordrumbox_logic::block::Zone;
 
 use crate::canvas::Rgb;
-use crate::output::OutputView;
 
 /// The fewest beats a page of the pattern grid shows; a wide grid shows 8
 /// or 16 ([`page_beats`]).
@@ -75,6 +74,9 @@ const ROLL_HELP: &str =
     "PIANO ROLL   click: add / select / delete   drag: velocity / pitch   right-click: menu   F4 or ESC: grid";
 /// The same in the synth editor.
 const SYNTH_HELP: &str = "SYNTH   TAB: controls   drag, wheel: knobs   click: waves, lists, power   F6 or ESC: grid";
+/// The same in the mixer.
+const MIXER_HELP: &str =
+    "MIXER   drag, wheel: knobs and faders   wheel on a strip: scroll   click a name: track editor   F12 or ESC: grid";
 /// The same in the kit editor.
 const KIT_HELP: &str =
     "KIT EDITOR   UP DOWN: sample   TAB: controls   ENTER: hear   DEL: remove   N: normalize   ESC: close";
@@ -142,10 +144,10 @@ pub struct View<'a> {
     pub arrangement: Option<SongView<'a>>,
     /// The piano roll and its title, when shown (it takes the place of the grid).
     pub piano_roll: Option<(RollView<'a>, String)>,
-    /// The output panel, always shown (the bottom strip).
-    pub output: Option<OutputView>,
     /// The synth editor is shown (the session paints it).
     pub synth: bool,
+    /// The mixer is shown (the session paints it).
+    pub mixer: bool,
     /// What each track plays (its sample, its synth preset), under its name.
     pub sounds: Vec<SoundLabel>,
     /// Width kept on the right (for the track editor).

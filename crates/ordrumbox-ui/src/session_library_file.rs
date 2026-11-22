@@ -223,10 +223,10 @@ fn a_plugin_leaves_to_the_host_what_the_host_does() {
     assert_eq!(views[3].x, app.views[3].x - (app.play.x - app.mode[0].x));
     assert_eq!(views[3].x, views[1].x + views[1].w + 2);
     assert_eq!(panel::find(&layout.items, Id::View(3)).map(|i| i.rect), Some(views[3]));
-    assert_eq!(panel::find(&layout.items, Id::View(4)).map(|i| i.rect), Some(views[4]));
-    let after = views[4].x + views[4].w;
-    assert!(panel::hit(&layout.items, after + 2, views[4].y + 2).is_none());
-    s.mouse_down(size, after + 2, views[4].y + 2, Button::Left, false);
+    assert_eq!(panel::find(&layout.items, Id::View(5)).map(|i| i.rect), Some(views[5]));
+    let after = views[5].x + views[5].w;
+    assert!(panel::hit(&layout.items, after + 2, views[5].y + 2).is_none());
+    s.mouse_down(size, after + 2, views[5].y + 2, Button::Left, false);
     s.mouse_up();
     assert!(!s.song_view_open());
     // No transport: the host plays, at its tempo, both only shown; nothing under the mouse there.
@@ -236,17 +236,15 @@ fn a_plugin_leaves_to_the_host_what_the_host_does() {
     s.control_hover(size, bpm.x + 2, bpm.y + 2);
     assert!(s.chrome.control_hover.is_none());
     // Tooltips give the plugin's shortcuts: Alt in place of Ctrl.
-    let kit = views[4];
+    let kit = views[5];
     s.control_hover(size, kit.x + 2, kit.y + 2);
     let tip = s.chrome.control_hover.and_then(|(id, _)| s.control_tip(id)).map(|[title, _]| title);
     assert_eq!(tip.as_deref(), Some("Kit editor (Alt+K)"));
-    // No master strip: the editors reach down to where it was.
-    assert!(!layout.items.iter().any(|i| matches!(i.id, Some(Id::Master(_)))));
-    assert!(s.output_view().is_none());
-    let body = s.body((1100, 680, Scale::ONE));
-    assert_eq!(body.output.h, 0);
-    s.host.hosted = false;
-    assert!(s.body((1100, 680, Scale::ONE)).main_bottom < body.main_bottom);
+    // The mixer: the track strips, not the returns nor the master (the host mixes).
+    s.toggle_mixer();
+    let layout = s.panel_layout(size.0, size.1, size.2);
+    assert!(layout.items.iter().any(|i| matches!(i.id, Some(Id::MixerKnob(..)))));
+    assert!(!layout.items.iter().any(|i| matches!(i.id, Some(Id::Master(_) | Id::Returns(_)))));
 }
 
 #[test]

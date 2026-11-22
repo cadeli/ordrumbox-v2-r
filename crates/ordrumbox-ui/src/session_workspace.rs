@@ -3,6 +3,7 @@
 
 use super::Session;
 use super::session_types::Workspace;
+use crate::view;
 use ordrumbox_engine::Mode;
 
 impl Session {
@@ -15,11 +16,11 @@ impl Session {
     /// A view button (`view::VIEWS`): show that view, unless it is shown.
     /// The last button (KIT) toggles the kit editor over the main editor.
     pub(super) fn show_view(&mut self, i: u8) {
-        if i == 4 {
+        if i == view::KIT_VIEW {
             self.toggle_kit_editor();
             return;
         }
-        let target = [Workspace::Grid, Workspace::PianoRoll, Workspace::Song, Workspace::Synth];
+        let target = [Workspace::Grid, Workspace::PianoRoll, Workspace::Song, Workspace::Synth, Workspace::Mixer];
         let Some(&target) = target.get(usize::from(i)) else { return };
         if self.workspace == target && !self.kit_editor.is_open() {
             return;
@@ -34,6 +35,7 @@ impl Session {
                 Workspace::PianoRoll => self.toggle_piano_roll(),
                 Workspace::Song => self.toggle_song_view(),
                 Workspace::Synth => self.toggle_synth(),
+                Workspace::Mixer => self.toggle_mixer(),
             }
         }
     }

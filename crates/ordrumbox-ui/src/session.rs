@@ -116,6 +116,8 @@ mod session_library_file;
 mod session_mcp;
 #[path = "session_mcp_tools.rs"]
 mod session_mcp_tools;
+#[path = "session_mixer.rs"]
+mod session_mixer;
 #[path = "session_output.rs"]
 mod session_output;
 #[path = "session_overlay.rs"]
@@ -210,8 +212,10 @@ pub struct Session {
     host: session_host::Host,
     /// The knobs of a MIDI controller and what they move (`session_controls.rs`).
     controls: ordrumbox_engine::ControlMap,
-    /// The output panel: the master bus, its tab, the spectrum.
+    /// The master bus and the shared returns' settings.
     output_panel: session_output::OutputPanel,
+    /// The mixer's strips scrolled to, its meter and spectrum (`session_mixer.rs`).
+    mixer: session_mixer::Mixer,
     /// The update check (`session_update.rs`).
     updates: session_update::Updates,
     /// The MCP link (`mcp_link.rs`): the calls of `ordrumbox --mcp`.

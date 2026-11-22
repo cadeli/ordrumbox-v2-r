@@ -146,6 +146,17 @@ impl Session {
                 self.set_value(id, v);
             }
         }
+        if spec.style == Style::Fader {
+            let (top, h) = panel::fader_bar(item.rect, scale);
+            if shift {
+                drag.fine = true;
+            } else {
+                drag.bar = Some((top, h));
+                let v = spec.slider_at(fader_fraction(y, top, h));
+                drag.start = v;
+                self.set_value(id, v);
+            }
+        }
         self.chrome.widgets.drag = Some(drag);
     }
 
@@ -190,8 +201,13 @@ impl Session {
             (Style::Stepper, _) => drag.spec.drag(drag.start, f64::from(drag.y - y), false),
             (Style::Slider, Some((left, w))) => drag.spec.slider_at(f64::from(x - left) / f64::from(w.max(1))),
             (Style::Slider, None) => {
-                let w = self.slider_width(size, drag.id).max(1);
+                let w = self.bar_length(size, drag.id).max(1);
                 drag.spec.slider_fine(drag.start, f64::from(x - drag.x) / f64::from(w))
+            }
+            (Style::Fader, Some((top, h))) => drag.spec.slider_at(fader_fraction(y, top, h)),
+            (Style::Fader, None) => {
+                let h = self.bar_length(size, drag.id).max(1);
+                drag.spec.slider_fine(drag.start, f64::from(drag.y - y) / f64::from(h))
             }
         };
         // `commitValue`: only a value that moved.
@@ -378,7 +394,7 @@ impl Session {
         let (width, height, scale) = size;
         let layout = self.panel_layout(width, height, scale);
         let Some(item) = panel::hit(&layout.items, x, y).cloned() else {
-            return false;
+            return self.mixer_wheel(size, x, y, lines);
         };
         let Some(id) = item.id else { return false };
         match item.kind {
@@ -409,9 +425,13 @@ impl Session {
         }
     }
 
-    fn slider_width(&self, size: (i32, i32, Scale), id: Id) -> i32 {
+    /// The length of a slider's bar, or of a fader's groove.
+    fn bar_length(&self, size: (i32, i32, Scale), id: Id) -> i32 {
         let layout = self.panel_layout(size.0, size.1, size.2);
         match panel::find(&layout.items, id) {
+            Some(Item { rect, kind: Kind::Value { spec, .. }, .. }) if spec.style == Style::Fader => {
+                panel::fader_bar(*rect, size.2).1
+            }
             Some(Item { rect, kind: Kind::Value { label, text, .. }, .. }) => {
                 panel::slider_bar(*rect, label.is_some(), !text.is_empty(), size.2).1
             }
@@ -615,9 +635,21 @@ fn moved_value(values: &[String], selected: usize, delta: isize) -> Option<&Stri
     if at == selected { None } else { values.get(at) }
 }
 
+/// Where `y` is up a fader's groove `height` high from `top`, 0 at its foot to 1 at its top.
+fn fader_fraction(y: i32, top: i32, height: i32) -> f64 {
+    1.0 - f64::from(y - top) / f64::from(height.max(1))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::moved_value;
+    use super::{fader_fraction, moved_value};
+
+    #[test]
+    fn a_fader_is_full_at_its_top_and_empty_at_its_foot() {
+        assert_eq!(fader_fraction(10, 10, 100), 1.0);
+        assert_eq!(fader_fraction(110, 10, 100), 0.0);
+        assert_eq!(fader_fraction(60, 10, 100), 0.5);
+    }
 
     #[test]
     fn a_select_moves_and_stops_at_its_ends() {

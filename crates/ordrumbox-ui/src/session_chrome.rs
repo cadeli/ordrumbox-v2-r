@@ -19,7 +19,8 @@ pub(super) struct Drag {
     pub(super) start: f64,
     pub(super) x: i32,
     pub(super) y: i32,
-    /// A slider's bar (left, width), when it follows the mouse.
+    /// A slider's bar (left, width), or a fader's groove (top, height),
+    /// when it follows the mouse.
     pub(super) bar: Option<(i32, i32)>,
     /// A slider dragged finely: from where.
     pub(super) fine: bool,
@@ -68,6 +69,8 @@ pub(super) struct Chrome {
     pub(super) control_hover: Option<(crate::panel::Id, crate::panel::Rect)>,
     /// A track pressed by its name, that may be dragged to another row.
     pub(super) track_drag: Option<session_grid::TrackDrag>,
+    /// The last press on a track's name and when: a second one soon after opens the piano roll.
+    pub(super) last_name_press: Option<(usize, std::time::Instant)>,
     /// A step Shift+pressed, that may be dragged into a zone.
     pub(super) zone_drag: Option<session_zone::ZoneDrag>,
     /// The lane under the grid, pressed and painted.
@@ -80,8 +83,6 @@ pub(super) struct Chrome {
     pub(super) show_track_editor: bool,
     /// The note editor shown under the grid and the piano roll.
     pub(super) show_note_editor: bool,
-    /// The master strip shown along the bottom (in the app: a plugin has none).
-    pub(super) show_master_strip: bool,
     /// Whether the VU meter stripe is shown.
     pub(super) show_vus: bool,
     /// The display's scale factor (at least ×1), to the nearest quarter.
@@ -107,13 +108,13 @@ impl Default for Chrome {
             hover: None,
             control_hover: None,
             track_drag: None,
+            last_name_press: None,
             zone_drag: None,
             lane_drag: None,
             panel_size: (0, 0, Scale::ONE),
             current_page: 0,
             show_track_editor: true,
             show_note_editor: true,
-            show_master_strip: true,
             show_vus: true,
             display_scale: Scale::ONE,
             zoom: 0,

@@ -11,6 +11,7 @@ use crate::panel::SUBMENU_MARK;
 
 use super::Session;
 use super::session_labels::beat_label;
+use super::session_panel::DOUBLE_CLICK;
 use super::session_selection::Clipboard;
 use super::session_song::DRAG_START_PX;
 use super::session_types::Workspace;
@@ -20,6 +21,7 @@ use crate::view::{Cursor, Hit};
 use crate::{menu, view};
 use ordrumbox_core::track::MAX_TRACKS;
 use ordrumbox_logic::block::step_start_units;
+use std::time::Instant;
 
 /// A press on a track's name that may become a drag. Nothing is edited before
 /// the release, so the move is one undo step.
@@ -323,8 +325,24 @@ impl Session {
 
     // ─── Dragging a track ────────────────────────────────────────────────────
 
+    /// A press on the name of track `t` (already clicked: the cursor is on
+    /// it): on the second press soon enough, the piano roll opens on the
+    /// track; else the press may become a drag.
+    pub fn press_track_name(&mut self, t: usize, x: i32, y: i32) {
+        let now = Instant::now();
+        let last = self.chrome.last_name_press.replace((t, now));
+        if last.is_some_and(|(last, at)| last == t && now - at < DOUBLE_CLICK) {
+            self.chrome.last_name_press = None;
+            if !self.piano_roll_open() {
+                self.toggle_piano_roll();
+            }
+            return;
+        }
+        self.press_track_drag(t, x, y);
+    }
+
     /// A press on the name of track `t`.
-    pub fn press_track_drag(&mut self, t: usize, x: i32, y: i32) {
+    fn press_track_drag(&mut self, t: usize, x: i32, y: i32) {
         self.chrome.track_drag =
             Some(TrackDrag { track: t, press: (x, y), y, started: false, revision: self.editor.revision() });
     }
@@ -639,6 +657,24 @@ mod tests {
         assert_eq!(s.selection.cursor.map(|c| c.track), Some(before), "the cursor goes to the new track");
         let rect = s.grid_layout(SIZE).unwrap().add_track_rect();
         assert_eq!(s.grid_hit(SIZE, rect.x + 1, rect.y + 1), Some(Hit::AddTrack), "it moves down with the rows");
+    }
+
+    #[test]
+    fn a_double_click_on_a_track_name_opens_the_piano_roll_on_it() {
+        let mut s = session();
+        // Two presses on two names: no double-click.
+        for t in [0, 1] {
+            s.click(Hit::Name(t));
+            s.press_track_name(t, 10, 10);
+            s.track_release(SIZE);
+        }
+        assert!(!s.piano_roll_open());
+        // The second press on the same name, soon after.
+        s.click(Hit::Name(1));
+        s.press_track_name(1, 10, 10);
+        assert!(s.piano_roll_open());
+        assert_eq!(s.roll_track(), Some(1));
+        assert!(s.chrome.track_drag.is_none(), "no drag starts");
     }
 
     #[test]
