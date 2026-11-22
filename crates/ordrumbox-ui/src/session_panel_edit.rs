@@ -161,21 +161,22 @@ impl Session {
             return self.set_mixer_knob(t, key, value);
         }
         if let Id::TrackVolume(t) = id {
-            return self.set_track_volume(t, value);
+            return self.set_track_control(t, ordrumbox_core::AutomationTarget::Volume, value);
         }
         let Some(t) = self.editor_track() else { return };
         let name = self.track_name(t);
+        // The track editor's volume, pan, cutoff and Q: the mixer's, lanes included.
+        if let Id::KnobBar(key) | Id::Fx(key) = id
+            && let Some(target) = ordrumbox_core::AutomationTarget::from_track_key(key)
+        {
+            return self.set_track_control(t, target, value);
+        }
         match id {
-            // The track editor's volume: the mixer's fader's, lanes included.
-            Id::KnobBar("volume") => self.set_track_volume(t, value),
             Id::KnobBar(key) => {
                 let label = KNOB_BAR.iter().find(|(p, _)| p.key == key).map_or(key, |(p, _)| p.label);
                 self.update_track(t, &[(key, number(value))], &format!("{label} on {name}"), true);
             }
-            Id::Fx(key) => {
-                self.update_track(t, &[(key, number(value))], &format!("{} on {name}", history_label(id)), true)
-            }
-            Id::Generation(key) => {
+            Id::Fx(key) | Id::Generation(key) => {
                 self.update_track(t, &[(key, number(value))], &format!("{} on {name}", history_label(id)), true)
             }
             Id::Compose(key) => {

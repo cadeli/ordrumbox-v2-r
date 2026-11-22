@@ -252,11 +252,7 @@ impl Session {
         let synths = self.synth_choice(track);
 
         let mut lfo = self.lfo_now(track);
-        // While the song plays, its volume lane moves the knob as an LFO would.
-        if let Some(gain) = self.automated_now(t, ordrumbox_core::AutomationTarget::Volume) {
-            lfo.retain(|&(key, _)| key != "volume");
-            lfo.push(("volume", gain));
-        }
+        self.show_lanes_on_knobs(t, &mut lfo);
         let bpm = self.playing_bpm();
         let compose = self.compose_view(track);
         Some(TrackView {

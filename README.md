@@ -194,14 +194,16 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   A **double-click** on a clip of the song panel opens its pattern in the grid, in
   pattern mode.
 - **Automation lanes** in the song panel: **+ NEW AUTOMATION**, under the arrangement's
-  rows, lists the instruments the song's patterns play; pick one, then **Mute**, **Solo**
-  or **Volume**, and a lane for it appears under the patterns. The panel opens zoomed in
+  rows, lists the instruments the song's patterns play; pick one, then **Mute**, **Solo**,
+  **Volume**, **Pan**, **Cutoff** or **Q**, and a lane for it appears under the patterns. The panel opens zoomed in
   far enough to show each step (a sixteenth note). Press a step and **drag** along the
   lane to select steps. On a Mute or Solo lane, from a step that is not on, the selection
   is switched on; from a step that is on, it is switched off. On a Volume lane, the height
   you press at is the level, as on a fader: the top is 0 dB, the middle about −15 dB, the
-  bottom silent; a drag draws a line from it to the pointer's height, which plays as a
-  smooth glide. While you draw, and when the mouse is over a lane, a tooltip gives the
+  bottom silent. On a Pan lane the top is right, the middle the center, the bottom left; on a
+  Cutoff lane the top is 20 kHz and the bottom 20 Hz, the middle about 630 Hz; on a Q lane the
+  bottom is 0.71 and the top 18.7. A drag draws a line from it to the pointer's height, which
+  plays as a smooth glide. While you draw, and when the mouse is over a lane, a tooltip gives the
   value under it (`KICK Volume -4.5 dB at 2.3`). A press on the line of a level already
   drawn grabs its segment (from its change to the next): drag up or down to move it as one.
   A lane can be one to four rows tall: drag its bottom edge in the names column, or use
@@ -209,18 +211,21 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   what the patterns say. The selection is made of whole measures, beats or steps, as fine
   as the ruler is marked at that zoom; hold **Shift** to select steps at any zoom. Only
   the steps selected change. Where a lane sets nothing, the instrument plays as its
-  patterns say. A solo that is on silences every other instrument of the song; a volume
-  lane replaces the track's volume (and its volume LFO) where it is set. A click, left or
+  patterns say. A solo that is on silences every other instrument of the song; a volume,
+  pan, cutoff or Q lane replaces the track's value (and its LFO) where it is set. A cutoff
+  lane filters a track whose filter is off, as a lowpass. A click, left or
   right, on a lane's name opens its menu: clear all its points, delete the lane, or
   delete every lane. Lanes are saved with the song.
 - **Automation and the mixer** while a song plays: the mixer shows what the lanes set (a
-  fader moves with its Volume lane, M and S light with their lanes), and so do the grid's
-  volume sliders and M S boxes and the track editor's Volume knob. Moving a control that
+  fader moves with its Volume lane, a Pan knob with its Pan lane, M and S light with their
+  lanes), and so do the grid's volume sliders and M S boxes and the track editor's Volume,
+  Pan, Cutoff and Q knobs. Moving a control that
   has a lane takes it back: the lane is no longer played for that instrument, and the
   control keeps the value you gave it, until **Play > Re-enable automation**. With **REC**
   (beside PLAY in song mode) or **Play > Record automation** on, moving a mixer control while the song plays writes its lane
   instead (the lane is made if there is none; the track itself is left as it is): a fader
-  writes its level on every step under the playhead for as long as you hold it; M or S
+  or a knob (Volume, Pan, the track editor's Cutoff and Q) writes its level on every step
+  under the playhead for as long as you hold it; M or S
   writes its new state from the playhead's step to the lane's next change. Each gesture is
   one undo step.
 - **Song panel zoom**, as on a DAW timeline: drag an end of the thumb of the

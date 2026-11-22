@@ -3,15 +3,14 @@
 //! A control of the mixer moved over a lane takes it back: the lane is no
 //! longer played for that instrument, until Play > Re-enable automation.
 //! With Play > Record automation on, moving the control writes its lane
-//! instead (made if there is none): a fader as long as it is held, from
+//! instead (made if there is none): a fader or a knob (volume, pan,
+//! cutoff, Q) as long as it is held, from
 //! step to step under the playhead; a button from the playhead's step to
 //! the lane's next point. A gesture is one undo step.
 
 use super::Session;
-use crate::panel::Id;
 use ordrumbox_core::automation::{
-    AutomationKind, AutomationStroke, AutomationTarget, STEPS_PER_MEASURE, is_on, switch_value, volume_gain,
-    volume_level,
+    AutomationKind, AutomationStroke, AutomationTarget, STEPS_PER_MEASURE, is_on, switch_value,
 };
 use ordrumbox_core::steps::TICK;
 
@@ -76,10 +75,20 @@ impl Session {
         }
         let lanes = &self.song()?.automations;
         let value = ordrumbox_core::automation::automated_at(lanes, name, target, position)?;
-        Some(match target.kind() {
-            AutomationKind::Level => volume_gain(value),
-            AutomationKind::Switch => switch_value(is_on(value)),
-        })
+        Some(target.to_control(value))
+    }
+
+    /// The track editor's knobs of track `t` (`lfo`: a key and the value
+    /// shown) moved by the song's level lanes while it plays, as an LFO
+    /// would move them.
+    pub(super) fn show_lanes_on_knobs(&self, t: usize, lfo: &mut Vec<(&'static str, f64)>) {
+        let levels = AutomationTarget::ALL.into_iter().filter(|target| target.kind() == AutomationKind::Level);
+        for target in levels {
+            if let Some(value) = self.automated_now(t, target) {
+                lfo.retain(|&(key, _)| key != target.track_key());
+                lfo.push((target.track_key(), value));
+            }
+        }
     }
 
     /// Mute and solo of track `t` as shown: what the song's lanes set while
@@ -145,7 +154,7 @@ impl Session {
         };
         let step = position.floor() as u32;
         match target.kind() {
-            AutomationKind::Level => self.write_level(lane, step, volume_level(value)),
+            AutomationKind::Level => self.write_level(lane, step, target.from_control(value)),
             AutomationKind::Switch => self.write_switch(lane, step, value),
         }
         MixerMove::Written
@@ -246,11 +255,12 @@ impl Session {
         }
     }
 
-    /// Every frame: a fader held while recording writes on under the
-    /// playhead; released, or the song stopped, its gesture ends. The
-    /// lanes taken back reach the engine.
+    /// Every frame: a control held while recording (a fader, a knob)
+    /// writes on under the playhead; released, or the song stopped, its
+    /// gesture ends. The lanes taken back reach the engine.
     pub(super) fn update_live_automation(&mut self) {
-        let held = matches!(self.chrome.widgets.drag.as_ref().map(|drag| drag.id), Some(Id::TrackVolume(_)));
+        // Only a level written by a control sets `writing`: the drag is its.
+        let held = self.chrome.widgets.drag.is_some();
         match self.playing_position() {
             Some(position) if held && self.automation_live.writing.is_some() => {
                 self.write_held(position.floor() as u32)

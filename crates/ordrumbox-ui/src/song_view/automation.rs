@@ -60,6 +60,8 @@ const fn target_color(target: AutomationTarget) -> Rgb {
         AutomationTarget::Mute => theme::ALERT,
         AutomationTarget::Solo => theme::VALUE,
         AutomationTarget::Volume => theme::FOCUS,
+        AutomationTarget::Pan => theme::LIVE,
+        AutomationTarget::Cutoff | AutomationTarget::Q => theme::CHANCE,
     }
 }
 

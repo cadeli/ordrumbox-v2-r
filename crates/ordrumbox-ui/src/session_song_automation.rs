@@ -382,7 +382,8 @@ mod tests {
         assert!(s.song_click(SIZE, x, y, Button::Left));
         assert_eq!(menu(&s), ["instrument:KICK", "instrument:SNARE"], "the song's instruments, once each");
         choose(&mut s, 1);
-        assert_eq!(menu(&s), ["lane:mute:SNARE", "lane:solo:SNARE", "lane:volume:SNARE"]);
+        let targets = ["mute", "solo", "volume", "pan", "cutoff", "q"].map(|t| format!("lane:{t}:SNARE"));
+        assert_eq!(menu(&s), targets);
         choose(&mut s, 1);
         let lanes = &s.song().unwrap().automations;
         assert_eq!((lanes[0].instrument.as_str(), lanes[0].target), ("SNARE", AutomationTarget::Solo));

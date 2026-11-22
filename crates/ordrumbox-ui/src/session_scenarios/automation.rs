@@ -117,3 +117,47 @@ fn the_grid_and_the_track_editor_show_the_lanes_too() {
     s.switch_track(0, "mute");
     assert_eq!((s.shown_switches(), s.track(0).unwrap().mute), (vec![(false, false)], false));
 }
+
+#[test]
+fn pan_cutoff_and_q_knobs_write_show_and_take_back_their_lanes() {
+    let (mut s, mut audio) = session(LIBRARY);
+    s.show_mode(true);
+    s.run(Command::RecordAutomation);
+    s.toggle_play();
+    run(&mut s, &mut audio, 4 * STEP);
+
+    // The mixer's pan knob held: its lane written, left, while held.
+    let pan = s.track(0).unwrap().pan;
+    let drag = Drag {
+        id: Id::MixerKnob(0, "pan"),
+        spec: Spec::knob(-1.0, 1.0, 0.01, 0.0),
+        start: 0.0,
+        x: 0,
+        y: 0,
+        bar: None,
+        fine: false,
+    };
+    s.chrome.widgets.drag = Some(drag);
+    s.set_value(Id::MixerKnob(0, "pan"), -1.0);
+    let first = step(&s);
+    run(&mut s, &mut audio, 2 * STEP);
+    s.chrome.widgets.drag = None;
+    let points = lane_points(&s, AutomationTarget::Pan);
+    assert_eq!(points[0], (first, Some(0.0)), "{points:?}");
+    assert!(points[1].0 >= first + 2, "written while held: {points:?}");
+    assert_eq!(s.track(0).unwrap().pan, pan, "the track is not edited");
+
+    // The track editor's cutoff knob: a lane in hertz.
+    s.set_value(Id::Fx("filterCutoff"), 632.456);
+    let cutoff = lane_points(&s, AutomationTarget::Cutoff);
+    assert_eq!(cutoff[0].1, Some(0.5), "{cutoff:?}");
+    // Moved, not held: written on the playhead's step, which the knob shows.
+    let shown = s.track_view(0).unwrap().lfo.iter().find(|(key, _)| *key == "filterCutoff").map(|&(_, hz)| hz);
+    assert!(shown.is_some_and(|hz| (hz - 632.456).abs() < 1.0), "the knob shows its lane: {shown:?}");
+
+    // Not recording: the knob takes its lane back, the track takes the value.
+    s.run(Command::RecordAutomation);
+    s.set_value(Id::Fx("filterCutoff"), 1000.0);
+    assert_eq!((s.track(0).unwrap().filter_cutoff, s.automated_now(0, AutomationTarget::Cutoff)), (1000.0, None));
+    assert!(s.message.contains("Cutoff taken back"), "{}", s.message);
+}

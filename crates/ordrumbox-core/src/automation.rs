@@ -1,9 +1,10 @@
 //! Song automation: lanes that set a control of an instrument along an
 //! arrangement, at the resolution of a step (a sixteenth note): switch it on
-//! and off (mute, solo) or set its level (volume).
+//! and off (mute, solo) or set its level (volume, pan, filter cutoff and Q).
 //!
 //! Every lane holds values from 0 to 1: a switch is off below one half and
-//! on from it, a level is a fader's position (a volume's top is 0 dB). A
+//! on from it, a level is a control's position (a volume's top is 0 dB, a
+//! pan's middle is the center, a cutoff's travel is logarithmic). A
 //! point sets its value from its step until the next point, or gives the
 //! control back to the pattern; a level glides over a point's step to the
 //! next point when that point is on the next step, so a drawn line is
@@ -14,6 +15,7 @@
 
 mod file;
 
+use crate::track::{MAX_FILTER_FREQ, MIN_FILTER_FREQ};
 use crate::{Pattern, Song, Track};
 
 /// Steps of a beat on an automation lane.
@@ -24,6 +26,8 @@ pub const STEPS_PER_MEASURE: u32 = STEPS_PER_BEAT * 4;
 pub const STEP_TICKS: u32 = crate::steps::TICK / STEPS_PER_BEAT;
 /// The quietest a volume lane's level sets above silence, at its bottom.
 const VOLUME_FLOOR_DB: f64 = -60.0;
+/// The filter Q a Q lane sets at its bottom and at its top (the track's knob).
+const Q_RANGE: (f64, f64) = (0.707, 18.707);
 
 /// The values a lane keeps apart: finer ones are rounded to it, so that a
 /// drawn line does not leave a point on each step for nothing.
@@ -35,6 +39,11 @@ pub enum AutomationTarget {
     Mute,
     Solo,
     Volume,
+    Pan,
+    /// The filter's cutoff.
+    Cutoff,
+    /// The filter's Q (resonance).
+    Q,
 }
 
 /// How a lane's values act on its control.
@@ -47,7 +56,7 @@ pub enum AutomationKind {
 }
 
 impl AutomationTarget {
-    pub const ALL: [Self; 3] = [Self::Mute, Self::Solo, Self::Volume];
+    pub const ALL: [Self; 6] = [Self::Mute, Self::Solo, Self::Volume, Self::Pan, Self::Cutoff, Self::Q];
 
     /// Its key in a file.
     #[must_use]
@@ -56,6 +65,9 @@ impl AutomationTarget {
             Self::Mute => "mute",
             Self::Solo => "solo",
             Self::Volume => "volume",
+            Self::Pan => "pan",
+            Self::Cutoff => "cutoff",
+            Self::Q => "q",
         }
     }
 
@@ -66,6 +78,9 @@ impl AutomationTarget {
             Self::Mute => "Mute",
             Self::Solo => "Solo",
             Self::Volume => "Volume",
+            Self::Pan => "Pan",
+            Self::Cutoff => "Cutoff",
+            Self::Q => "Q",
         }
     }
 
@@ -73,22 +88,84 @@ impl AutomationTarget {
     pub const fn kind(self) -> AutomationKind {
         match self {
             Self::Mute | Self::Solo => AutomationKind::Switch,
-            Self::Volume => AutomationKind::Level,
+            Self::Volume | Self::Pan | Self::Cutoff | Self::Q => AutomationKind::Level,
         }
     }
 
-    /// `value` as shown: `on` or `off` for a switch, decibels for a volume.
+    /// `value` as shown: `on` or `off` for a switch, decibels for a volume,
+    /// a side for a pan, hertz for a cutoff.
     #[must_use]
     pub fn value_label(self, value: f64) -> String {
         match self {
             Self::Mute | Self::Solo => (if is_on(value) { "on" } else { "off" }).to_owned(),
             Self::Volume => volume_db(value).map_or_else(|| "silent".to_owned(), |db| format!("{db:.1} dB")),
+            Self::Pan => match self.to_control(value) {
+                pan if pan.abs() < 0.005 => "center".to_owned(),
+                pan if pan < 0.0 => format!("left {:.0}%", -pan * 100.0),
+                pan => format!("right {:.0}%", pan * 100.0),
+            },
+            Self::Cutoff => match self.to_control(value) {
+                hz if hz >= 1000.0 => format!("{:.2} kHz", hz / 1000.0),
+                hz => format!("{hz:.0} Hz"),
+            },
+            Self::Q => format!("{:.2}", self.to_control(value)),
         }
+    }
+
+    /// The control's own value a lane's `value` (0 to 1) sets: a switch's 0
+    /// or 1, a volume's gain ([`volume_gain`]), a pan from -1 (left) to 1
+    /// (right), a cutoff in hertz (logarithmic), a Q.
+    #[must_use]
+    pub fn to_control(self, value: f64) -> f64 {
+        let value = value.clamp(0.0, 1.0);
+        match self {
+            Self::Mute | Self::Solo => switch_value(is_on(value)),
+            Self::Volume => volume_gain(value),
+            Self::Pan => value * 2.0 - 1.0,
+            Self::Cutoff => MIN_FILTER_FREQ * (MAX_FILTER_FREQ / MIN_FILTER_FREQ).powf(value),
+            Self::Q => Q_RANGE.0 + value * (Q_RANGE.1 - Q_RANGE.0),
+        }
+    }
+
+    /// The lane's value (0 to 1) that sets the control to `control`: the
+    /// inverse of [`Self::to_control`], held within the lane's range.
+    #[must_use]
+    pub fn from_control(self, control: f64) -> f64 {
+        let value = match self {
+            Self::Mute | Self::Solo => switch_value(is_on(control)),
+            Self::Volume => volume_level(control),
+            Self::Pan => (control + 1.0) / 2.0,
+            Self::Cutoff => {
+                let hz = control.clamp(MIN_FILTER_FREQ, MAX_FILTER_FREQ);
+                (hz / MIN_FILTER_FREQ).ln() / (MAX_FILTER_FREQ / MIN_FILTER_FREQ).ln()
+            }
+            Self::Q => (control - Q_RANGE.0) / (Q_RANGE.1 - Q_RANGE.0),
+        };
+        value.clamp(0.0, 1.0)
     }
 
     #[must_use]
     pub fn from_key(key: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|target| target.key() == key)
+    }
+
+    /// The key of the track's field it sets in place of the pattern's.
+    #[must_use]
+    pub const fn track_key(self) -> &'static str {
+        match self {
+            Self::Mute => "mute",
+            Self::Solo => "solo",
+            Self::Volume => "volume",
+            Self::Pan => "pan",
+            Self::Cutoff => "filterCutoff",
+            Self::Q => "filterQ",
+        }
+    }
+
+    /// The target that sets the track's field `key`, if one does.
+    #[must_use]
+    pub fn from_track_key(key: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|target| target.track_key() == key)
     }
 }
 
@@ -446,7 +523,7 @@ mod tests {
         assert_eq!(issues.iter().map(|i| i.at.as_str()).collect::<Vec<_>>(), ["a.rows"]);
 
         let mut issues = Vec::new();
-        let bad = json::parse(r#"[{"instrument":"KICK","target":"pan"},{"target":"mute"},1]"#).unwrap();
+        let bad = json::parse(r#"[{"instrument":"KICK","target":"tilt"},{"target":"mute"},1]"#).unwrap();
         for (i, raw) in bad.as_array().unwrap().iter().enumerate() {
             assert_eq!(AutomationLane::from_json(raw, &format!("l[{i}]"), &mut issues), None);
         }
@@ -505,5 +582,31 @@ mod tests {
         let mut mute = lane.clone();
         mute.target = AutomationTarget::Mute;
         assert_eq!(mute.level_at(0.75), Some(0.0), "a switch holds");
+    }
+
+    #[test]
+    fn a_level_lane_sets_its_control_in_its_own_unit() {
+        use AutomationTarget::{Cutoff, Pan, Q};
+        assert_eq!([0.0, 0.5, 1.0].map(|v| Pan.to_control(v)), [-1.0, 0.0, 1.0]);
+        assert_eq!(
+            [0.0, 0.25, 0.5, 1.0].map(|v| Pan.value_label(v)),
+            ["left 100%", "left 50%", "center", "right 100%"]
+        );
+        let hz = [0.0, 0.5, 1.0].map(|v| Cutoff.to_control(v));
+        assert!((hz[0] - 20.0).abs() < 1e-9 && (hz[1] - 632.456).abs() < 1e-3 && (hz[2] - 20_000.0).abs() < 1e-6);
+        assert_eq!([Cutoff.value_label(0.5), Cutoff.value_label(1.0)], ["632 Hz", "20.00 kHz"]);
+        assert_eq!([Q.to_control(0.0), Q.to_control(1.0)], [0.707, 18.707]);
+        assert_eq!(Q.value_label(0.5), "9.71");
+        for target in AutomationTarget::ALL {
+            for value in [0.0, 0.25, 0.5, 1.0] {
+                let back = target.from_control(target.to_control(value));
+                let expected = if target.kind() == AutomationKind::Switch { switch_value(is_on(value)) } else { value };
+                assert!((back - expected).abs() < 1e-9, "{target:?} {value}");
+            }
+        }
+        assert_eq!([Cutoff.from_control(5.0), Q.from_control(40.0), Pan.from_control(-3.0)], [0.0, 1.0, 0.0]);
+        assert_eq!(AutomationTarget::from_key("q"), Some(Q));
+        assert_eq!(AutomationTarget::from_track_key("filterCutoff"), Some(Cutoff));
+        assert_eq!(AutomationTarget::from_track_key("transpose"), None);
     }
 }

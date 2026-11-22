@@ -335,3 +335,11 @@ the bottom clears it. No snapshot changed.
 Quantize (Edit > Quantize, `ordrumbox-logic/src/quantize.rs`, `session_note_tool.rs`) is a pure function of a pattern, a scope (zone, track, pattern), a grid and a strength; a note's place is its step plus `shiftSteps`, and what a strength leaves is kept as the shift. No snapshot changed.
 
 Humanize (Edit > Humanize, `ordrumbox-logic/src/humanize.rs`, the same modal as Quantize in `session_note_tool.rs`) adds to each note of the scope a random shift (±0–30 % of a step, kept within half a step) and a random change of velocity (±0–30 % of it, at most 1), drawn from the session's generator `Rng`; the steps stay. The same seed gives the same notes (unit tests). No snapshot changed.
+
+A song's automation lanes can set a track's pan, filter cutoff and Q (`AutomationTarget::Pan`, `Cutoff`, `Q`,
+keys `pan`, `cutoff`, `q`), as its volume: `AutomationTarget::to_control` and `from_control` convert a lane's 0 to 1
+to the control's unit (the cutoff logarithmic, 20 Hz to 20 kHz). The engine sets them tick by tick over the track's
+LFO where they change in a pass (`song_strips.rs`, `set_per_tick`); a cutoff lane switches on the filter of a track
+whose filter is off. The mixer's pan knob and the track editor's pan, cutoff and Q knobs write or take back their
+lanes as the fader does; any control held while recording writes on (only the grid's volume slider did). Without
+lanes nothing changes: no snapshot changed.

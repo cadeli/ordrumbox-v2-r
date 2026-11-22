@@ -291,6 +291,12 @@ pub struct StripLfo {
 }
 
 impl StripLfo {
+    /// Whether it sets nothing: every LFO off.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.volume.is_empty() && self.pan.is_empty() && self.cutoff.is_empty() && self.q.is_empty()
+    }
+
     /// Apply the values of `tick` to `settings`.
     pub fn apply(&self, tick: usize, settings: &mut StripSettings) {
         let at = |values: &[f32]| values.get(tick).or(values.last()).copied();
@@ -327,8 +333,7 @@ pub fn strip_lfo(index: usize, track: &Track, silent: bool, first_tick: u64, tic
         }),
         q: values(&track.filter_q_lfo, &|v| (track.filter_q + v).clamp(0.707, 18.707)),
     };
-    let any = !(result.volume.is_empty() && result.pan.is_empty() && result.cutoff.is_empty() && result.q.is_empty());
-    any.then_some(result)
+    (!result.is_empty()).then_some(result)
 }
 
 #[cfg(test)]

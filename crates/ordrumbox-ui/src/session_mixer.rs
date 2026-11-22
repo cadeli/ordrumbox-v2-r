@@ -83,7 +83,7 @@ impl Session {
             items.push(Item::new(Some(Id::MixerName(t)), strip.name, name));
             for (&(key, label), &rect) in TRACK_KNOBS.iter().zip(&strip.knobs) {
                 let (spec, value) = match key {
-                    "pan" => (PAN, track.pan),
+                    "pan" => (PAN, self.automated_now(t, AutomationTarget::Pan).unwrap_or(track.pan)),
                     "echoSend" => (SEND, track.echo_send),
                     _ => (SEND, track.reverb_send),
                 };
@@ -167,22 +167,27 @@ impl Session {
         }
     }
 
-    /// Track `t`'s volume (its fader, or the track editor's knob) at
-    /// `value`: written to its lane while the song plays and records automation.
-    pub(super) fn set_track_volume(&mut self, t: usize, value: f64) {
-        let moved = self.automate_from_mixer(t, AutomationTarget::Volume, value);
+    /// A control of track `t` that a lane can set (its fader, its pan, the
+    /// track editor's volume, pan, cutoff and Q) at `value`, in the
+    /// control's unit: written to its lane while the song plays and records
+    /// automation, else set on the track (its lane taken back).
+    pub(super) fn set_track_control(&mut self, t: usize, target: AutomationTarget, value: f64) {
+        let moved = self.automate_from_mixer(t, target, value);
         if moved == MixerMove::Written {
             return;
         }
-        let desc = format!("Volume on {}", self.track_name(t));
-        self.update_track(t, &[("volume", number(value))], &desc, true);
+        let desc = format!("{} on {}", target.label(), self.track_name(t));
+        self.update_track(t, &[(target.track_key(), number(value))], &desc, true);
         if moved == MixerMove::TakenBack {
-            self.say_taken_back(t, AutomationTarget::Volume);
+            self.say_taken_back(t, target);
         }
     }
 
     /// A send or the pan of track `t` at `value`.
     pub(super) fn set_mixer_knob(&mut self, t: usize, key: &'static str, value: f64) {
+        if let Some(target) = AutomationTarget::from_track_key(key) {
+            return self.set_track_control(t, target, value);
+        }
         let label = TRACK_KNOBS.iter().find(|(k, _)| *k == key).map_or(key, |(_, label)| label);
         let description = format!("{label} on {}", self.track_name(t));
         self.update_track(t, &[(key, number(value))], &description, true);
