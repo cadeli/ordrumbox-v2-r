@@ -402,3 +402,16 @@ repeats). The demo library's tags are cleaned: `default`, `song` and `sends` rem
 two `polyrhythm` patterns given `experimental` as genre. The song screen shows the tags on a line under the description
 (`SongLayout::tags_line`, `SongHit::Tags`), always there, so the description keeps its place; its frame shows one line
 less. No snapshot changed.
+
+The help line follows the pointer (`session_hints.rs`: `Session::hint_hover`, `View::hint`): a text by `SongHit`, by the
+grid's `Hit` and by panel control kind, else the view's keys as before. In the song panel the left button acts and the
+right one opens the menus (`song_menu_click`): a click on an empty cell adds the row's pattern there, a click on a
+clip selects it (`session_song_clip.rs`, known by its pattern and first measure; Delete removes it, Ctrl+D repeats it,
+the menu's Next too), a click on a pattern of the list or a row's name shows that pattern. The song panel's tests were
+changed to these clicks. No snapshot changed.
+
+What has a menu shows it under the pointer: `SongPanel::hovered` (`SongView::hovered`) and the grid's hovered name
+(`View::hovered_track`) draw the name lighter (`theme::highlight`, as a menu's line) with `panel::MENU_MARK` at its
+end, whose room is kept so that a name never shortens under the pointer; a hovered clip is drawn lighter. A context
+menu shows the key of its lines (`Dropdown::shortcuts`, `menu::shown_shortcuts`: Cmd on macOS, Alt in a plugin): the
+grid's track and step menus, the clip's and the loop's. No snapshot changed.

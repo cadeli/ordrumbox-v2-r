@@ -199,6 +199,13 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   the one clicked.
   A **double-click** on a clip of the song panel opens its pattern in the grid, in
   pattern mode.
+- **Song panel clicks**: the left button acts, a **right-click** opens the menu of what is
+  under it. A click on an empty cell adds the row's pattern there; on a clip, selects it
+  (**Delete** removes it, **Ctrl + D** repeats it right after itself); on a pattern of the
+  list or a row's name, shows that pattern. The help line at the bottom of the window says
+  what the mouse does on what is under the pointer, in every view. A name that has a menu
+  is drawn lighter under the pointer, with a **v** at its end, and a menu line that has a
+  key shows it at its right end.
 - **Automation lanes** in the song panel: **+ NEW AUTOMATION**, under the arrangement's
   rows, lists the instruments the song's patterns play; pick one, then the control: **Mute**,
   **Solo**, **Volume**, **Pan**, **Cutoff**, **Q**, **Echo send**, **Reverb send**, **Reverb mix**,

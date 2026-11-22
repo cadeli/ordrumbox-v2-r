@@ -105,6 +105,11 @@ impl Session {
             host_muted: self.host.muted,
             switches: self.shown_switches(),
             switches_taken_back: self.switches_taken_back(),
+            hint: self.hint(),
+            hovered_track: match self.chrome.hover {
+                Some(crate::view::Hit::Name(t)) => Some(t),
+                _ => None,
+            },
             host_moved: self.host.mix.moved_tracks(),
             host_split: self.host.mix.split,
             track_drop: self.track_drop((canvas.width(), canvas.height(), scale)),

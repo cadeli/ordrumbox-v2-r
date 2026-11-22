@@ -101,6 +101,10 @@ pub(super) struct SongPanel {
     pub(super) loop_drag: Option<LoopDrag>,
     /// An automation lane's bottom edge held, and the undo key of the drag.
     pub(super) lane_resize: Option<(usize, String)>,
+    /// What of the panel is under the pointer: drawn lighter, with the mark of its menu.
+    pub(super) hovered: Option<crate::song_view::SongHit>,
+    /// The clip selected, by its pattern and its first measure (`session_song_clip.rs`).
+    pub(super) selected_clip: Option<(String, u32)>,
 }
 
 impl SongPanel {
@@ -259,6 +263,8 @@ impl Session {
             is_loop_on: self.song_loop_region().is_some(),
             zoom: self.song_panel.zoom,
             taken_back: self.taken_back_lanes(),
+            selected_clip: self.selected_clip(),
+            hovered: self.song_panel.hovered,
         }
     }
 
@@ -555,8 +561,7 @@ pub(super) mod tests {
         // Rename, in the menu of a pattern of the list.
         let l = s.song_layout(SIZE);
         let row = (l.list.x + 2, l.list.y + 12 + 2);
-        s.song_click(SIZE, row.0, row.1, Button::Left);
-        s.song_release(SIZE);
+        s.song_click(SIZE, row.0, row.1, Button::Right);
         let rename = menu(&s).iter().position(|v| v == "rename:1").unwrap();
         choose(&mut s, rename);
         assert_eq!(s.chrome.widgets.entry.as_ref().map(|e| (e.id, e.text.as_str())), Some((Id::SongPattern(1), "b")));

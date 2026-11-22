@@ -139,6 +139,8 @@ fn draws_without_panicking_at_any_size() {
             host_muted: 0b10,
             switches: vec![(true, false)],
             switches_taken_back: Vec::new(),
+            hint: None,
+            hovered_track: Some(0),
             host_moved: 0b01,
             host_split: 0b10,
             cursor: Some(Cursor { track: 0, beat: 1, step: 2 }),

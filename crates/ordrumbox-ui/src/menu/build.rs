@@ -28,6 +28,18 @@ fn shown(shortcut: &'static str) -> Cow<'static, str> {
     shortcut.into()
 }
 
+/// The keys of a context menu's lines (as the sources write them, empty for
+/// none) as the window shows them: Cmd for Ctrl on macOS, Alt in a plugin.
+#[must_use]
+pub fn shown_shortcuts(keys: &[&'static str], hosted: bool) -> Vec<String> {
+    keys.iter()
+        .map(|&key| {
+            let key = shown(key);
+            if hosted { hosted_shortcuts(&key).into_owned() } else { key.into_owned() }
+        })
+        .collect()
+}
+
 /// What the panels say the Ctrl/Cmd key is: Cmd on macOS.
 #[must_use]
 pub fn command_label() -> &'static str {

@@ -207,26 +207,28 @@ impl Session {
         let Some(track) = self.track(t) else { return };
         let title = track.name.clone();
         let count = self.pattern().map_or(0, |p| p.tracks.len());
-        let mut items = vec![("rename", "Rename track >"), ("copy", "Copy track")];
+        let mut items = vec![("rename", "Rename track >", ""), ("copy", "Copy track", "Ctrl+Shift+C")];
         if matches!(self.selection.clipboard, Some(Clipboard::Track(_))) {
-            items.push(("paste", "Paste track"));
+            items.push(("paste", "Paste track", "Ctrl+Shift+V"));
         }
         if t > 0 {
-            items.push(("up", "Move up"));
+            items.push(("up", "Move up", ""));
         }
         if t + 1 < count {
-            items.push(("down", "Move down"));
+            items.push(("down", "Move down", ""));
         }
         items.extend([
-            ("duplicate", "Duplicate track"),
-            ("delete", "Delete track"),
-            ("randomize", "Randomize"),
-            ("clear", "Clear notes"),
-            ("add-track", "Add track >"),
+            ("duplicate", "Duplicate track", ""),
+            ("delete", "Delete track", "Ctrl+Backspace"),
+            ("randomize", "Randomize", "Shift+X"),
+            ("clear", "Clear notes", ""),
+            ("add-track", "Add track >", ""),
         ]);
-        let values = items.iter().map(|(action, _)| format!("{action}:{t}")).collect();
-        let labels = items.iter().map(|(_, label)| (*label).to_owned()).collect();
-        self.chrome.widgets.dropdown = Some(Dropdown::menu(Id::GridMenu, x, y, title, values, labels));
+        self.open_grid_menu(
+            title,
+            items.iter().map(|&(action, label, key)| (format!("{action}:{t}"), label, key)),
+            (x, y),
+        );
     }
 
     /// A step: copy its notes, paste on it, delete them, add a random note.
@@ -240,9 +242,13 @@ impl Session {
         let mut items = match zone {
             Some(zone) => {
                 title = format!("Zone — {}", zone_label(&zone));
-                vec![("copy-zone", "Copy zone"), ("cut-zone", "Cut zone"), ("delete-zone", "Delete zone")]
+                vec![
+                    ("copy-zone", "Copy zone", "Ctrl+C"),
+                    ("cut-zone", "Cut zone", "Ctrl+X"),
+                    ("delete-zone", "Delete zone", "Delete"),
+                ]
             }
-            None => vec![("copy-notes", "Copy notes")],
+            None => vec![("copy-notes", "Copy notes", "Ctrl+C")],
         };
         let pasteable = match &self.selection.clipboard {
             Some(Clipboard::Step(notes)) => !notes.is_empty(),
@@ -250,15 +256,33 @@ impl Session {
             Some(Clipboard::Track(_) | Clipboard::Roll(_)) | None => false,
         };
         if pasteable {
-            items.push(("paste-notes", "Paste notes"));
+            items.push(("paste-notes", "Paste notes", "Ctrl+V"));
         }
         if has_notes && zone.is_none() {
-            items.push(("delete-notes", "Delete notes"));
+            items.push(("delete-notes", "Delete notes", "Delete"));
         }
-        items.push(("random-note", "Add random note"));
-        let values = items.iter().map(|(action, _)| format!("{action}:{t}:{beat}:{step}")).collect();
-        let labels = items.iter().map(|(_, label)| (*label).to_owned()).collect();
-        self.chrome.widgets.dropdown = Some(Dropdown::menu(Id::GridMenu, x, y, title, values, labels));
+        items.push(("random-note", "Add random note", ""));
+        let lines = items.iter().map(|&(action, label, key)| (format!("{action}:{t}:{beat}:{step}"), label, key));
+        self.open_grid_menu(title, lines, (x, y));
+    }
+
+    /// A grid menu under `title` at `(x, y)`: its lines, each a value, a
+    /// label and the key that does the same (empty: none).
+    fn open_grid_menu(
+        &mut self,
+        title: String,
+        lines: impl Iterator<Item = (String, &'static str, &'static str)>,
+        (x, y): (i32, i32),
+    ) {
+        let (mut values, mut labels, mut keys) = (Vec::new(), Vec::new(), Vec::new());
+        for (value, label, key) in lines {
+            values.push(value);
+            labels.push(label.to_owned());
+            keys.push(key);
+        }
+        let shortcuts = crate::menu::shown_shortcuts(&keys, self.host.hosted);
+        let menu = Dropdown::menu(Id::GridMenu, x, y, title, values, labels).with_shortcuts(shortcuts);
+        self.chrome.widgets.dropdown = Some(menu);
     }
 
     /// An action of a grid menu: the cursor goes to its track or step, and

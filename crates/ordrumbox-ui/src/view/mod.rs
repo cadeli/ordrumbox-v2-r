@@ -68,7 +68,7 @@ fn box_off_color() -> Rgb {
 /// its shortcut; Help > Keyboard shortcuts lists them all).
 const HELP: &str = "F10 or ALT: menus   ARROWS: cursor   ENTER or click: step on/off   SHIFT+ARROWS: select   ALT+ARROWS: nudge note   TAB: track editor   F1: all keys";
 /// The same in the song panel.
-const SONG_HELP: &str = "SONG   click the ruler: cursor   right-click: add / repeat / remove   SPACE: play from the cursor   F3 or ESC: grid";
+const SONG_HELP: &str = "SONG   click: act   right-click: menu   SPACE: play   ARROWS: cursor, pattern   DELETE: the clip selected   F3 or ESC: grid";
 /// The same in the piano roll.
 const ROLL_HELP: &str =
     "PIANO ROLL   click: add / select / delete   drag: velocity / pitch   right-click: menu   F4 or ESC: grid";
@@ -172,6 +172,10 @@ pub struct View<'a> {
     /// Mute and solo as shown, by track: while the song plays, what its
     /// automation lanes set; empty, or past its end, the tracks' own.
     pub switches: Vec<(bool, bool)>,
+    /// The help line for what is under the pointer; `None`: the view's keys.
+    pub hint: Option<&'a str>,
+    /// The track whose name is under the pointer: drawn lighter, with the mark of its menu.
+    pub hovered_track: Option<usize>,
     /// Mute and solo taken back from their lanes, by track: marked on their boxes.
     pub switches_taken_back: Vec<(bool, bool)>,
     /// The tracks a plugin host moves off their settings, bit `t` for track `t`.

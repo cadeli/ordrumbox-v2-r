@@ -14,7 +14,7 @@ use ordrumbox_core::{Pattern, Song};
 
 use crate::canvas::{Canvas, Rgb, fit, text_width};
 use crate::frame;
-use crate::panel::{Rect, row_at};
+use crate::panel::{MENU_MARK, Rect, row_at};
 use crate::theme;
 
 /// The JS grid geometry (`song_panel/layout.js`), in px per scale unit, but
@@ -135,6 +135,10 @@ pub struct SongView<'a> {
     /// For each automation lane, whether a control took it back: drawn dim,
     /// with a badge that re-enables it.
     pub taken_back: Vec<bool>,
+    /// The clip selected: drawn with an outline.
+    pub selected_clip: Option<usize>,
+    /// What is under the pointer: drawn lighter, a name with the mark of its menu.
+    pub hovered: Option<SongHit>,
 }
 
 impl SongView<'_> {
@@ -578,6 +582,8 @@ mod tests {
             list_drop: None,
             room: 0,
             taken_back: Vec::new(),
+            selected_clip: None,
+            hovered: None,
             description: Some("x"),
             description_scroll: 0,
             tags: Some(&[]),
@@ -660,6 +666,8 @@ mod tests {
                     description_scroll: 3,
                     tags: song.map(|_| long_tags.as_slice()),
                     taken_back: vec![true; 4],
+                    selected_clip: Some(0),
+                    hovered: Some(SongHit::Pattern(31)),
                 };
                 draw(&mut canvas, &view, &layout);
             }

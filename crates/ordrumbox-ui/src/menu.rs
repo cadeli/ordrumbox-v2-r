@@ -387,7 +387,7 @@ fn first_runnable(menu: &Menu) -> Option<usize> {
 mod build;
 #[path = "menu/draw.rs"]
 mod draw;
-pub use build::{command_label, hosted_shortcuts, menus, platform_shortcuts};
+pub use build::{command_label, hosted_shortcuts, menus, platform_shortcuts, shown_shortcuts};
 pub use draw::*;
 
 #[cfg(test)]

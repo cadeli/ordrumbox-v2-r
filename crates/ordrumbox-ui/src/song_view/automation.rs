@@ -5,7 +5,7 @@
 //! button that adds a lane. A lane a control took back is drawn dim, with
 //! a badge beside its name that re-enables it.
 
-use super::draw::Page;
+use super::draw::{Page, draw_hovered_name};
 use super::*;
 use ordrumbox_core::automation::{
     AutomationKind, AutomationLane, AutomationTarget, STEPS_PER_BEAT, STEPS_PER_MEASURE, is_on,
@@ -184,15 +184,14 @@ impl SongLayout {
     }
 }
 
-/// The lanes shown on `page`, rows after the `pattern_rows` of the
-/// patterns; `taken_back` tells, lane by lane, which a control took back.
-pub(super) fn draw_lanes(
-    canvas: &mut Canvas,
-    song: &Song,
-    layout: &SongLayout,
-    (pattern_rows, taken_back): (usize, &[bool]),
-    page: &Page,
-) {
+/// The lanes shown on `page`, rows after the patterns' rows of `view`,
+/// those a control took back dim, the one under the pointer lighter.
+pub(super) fn draw_lanes(canvas: &mut Canvas, song: &Song, layout: &SongLayout, view: &SongView, page: &Page) {
+    let pattern_rows = view.rows.len();
+    let hovered = match view.hovered {
+        Some(SongHit::LaneName(lane) | SongHit::LaneEdge(lane) | SongHit::LaneBadge(lane)) => Some(lane),
+        _ => None,
+    };
     let top = layout.body_top();
     let mut canvas = Rows { canvas, top, bottom: top + page.shown_rows as i32 * layout.row_height() };
     let shown = page.first_row..page.first_row + page.shown_rows;
@@ -201,16 +200,18 @@ pub(super) fn draw_lanes(
         if row + rows <= shown.start || row >= shown.end {
             continue;
         }
-        let is_taken_back = taken_back.get(i).copied().unwrap_or(false);
-        let lane = LaneShown { lane: &song.automations[i], is_taken_back };
+        let is_taken_back = view.taken_back.get(i).copied().unwrap_or(false);
+        let lane = LaneShown { lane: &song.automations[i], is_taken_back, is_hovered: hovered == Some(i) };
         draw_lane(&mut canvas, &lane, layout, (layout.row_y(row, page.first_row), rows), page);
     }
 }
 
-/// A lane as drawn: its points, and whether a control took it back.
+/// A lane as drawn: its points, whether a control took it back, whether
+/// its name is under the pointer.
 struct LaneShown<'a> {
     lane: &'a AutomationLane,
     is_taken_back: bool,
+    is_hovered: bool,
 }
 
 impl LaneShown<'_> {
@@ -235,6 +236,9 @@ fn draw_lane(canvas: &mut Rows, shown: &LaneShown, layout: &SongLayout, (y, rows
     let hidden = ((canvas.top - y).max(0) + rh - 1) / rh.max(1);
     let text_y = y + hidden * rh + (rh - 8 * s) / 2;
     if text_y + 8 * s <= canvas.bottom.min(bottom) {
+        if shown.is_hovered {
+            draw_hovered_name(canvas.canvas, layout, (text_y - (rh - 8 * s) / 2, rh - s.px()), text_y);
+        }
         // The control's name first, fitted to the column; the instrument's in what is left.
         let column_end = layout.lane_badge_x() - 2 * s;
         let label = fit(lane.target().label(), column_end - layout.grid.x, s);

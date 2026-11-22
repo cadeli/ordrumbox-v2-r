@@ -68,6 +68,8 @@ mod session_generate;
 mod session_generators;
 #[path = "session_grid.rs"]
 mod session_grid;
+#[path = "session_hints.rs"]
+mod session_hints;
 #[path = "session_history.rs"]
 mod session_history;
 #[path = "session_host.rs"]
@@ -155,6 +157,8 @@ mod session_selection;
 mod session_song;
 #[path = "session_song_automation.rs"]
 mod session_song_automation;
+#[path = "session_song_clip.rs"]
+mod session_song_clip;
 #[path = "session_song_loop.rs"]
 mod session_song_loop;
 #[path = "session_song_menu.rs"]

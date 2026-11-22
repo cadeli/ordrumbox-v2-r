@@ -90,7 +90,7 @@ fn draw_item(canvas: &mut Canvas, item: &Item, scale: Scale) {
             let label = labels.get(*selected).map_or("", String::as_str);
             let ty = r.y + (r.h - 8 * scale) / 2;
             canvas.text(r.x + 4 * scale, ty, &fit(label, r.w - 16 * scale, scale), scale, theme::text());
-            canvas.text(r.x + r.w - 10 * scale, ty, "v", scale, dim());
+            canvas.text(r.x + r.w - 10 * scale, ty, MENU_MARK, scale, dim());
         }
         Kind::Screen { labels, selected, lit, .. } => draw_screen(canvas, r, labels, *selected, *lit, scale),
         Kind::Toggle { on } => {

@@ -26,6 +26,9 @@ impl Session {
         let layout = self.song_layout(size);
         let rows = self.song_rows();
         let Some(hit) = layout.hit(&self.song_view_data(&rows, &layout), x, y) else { return false };
+        if button == Button::Right && self.song_menu_click(hit, &rows, x, y) {
+            return true;
+        }
         match (hit, button) {
             (SongHit::Pattern(p), Button::Left) => {
                 self.step_pattern(p as isize - self.pattern_index as isize);
@@ -52,7 +55,6 @@ impl Session {
             (SongHit::Tags, Button::Left) => self.pattern_tags_entry(),
             (SongHit::Ruler(m), Button::Left) => self.press_ruler(size, x, m),
             (SongHit::LoopEnd(edge), Button::Left) => self.press_loop_end(edge),
-            (SongHit::Ruler(_) | SongHit::LoopEnd(_), Button::Right) => self.loop_menu(x, y),
             (
                 SongHit::AddAutomation
                 | SongHit::LaneName(_)
@@ -64,16 +66,35 @@ impl Session {
                 self.automation_click(size, hit, (x, y), button);
             }
             (SongHit::Cell { row, measure }, Button::Left) => {
+                let id = rows[row].id.clone();
+                self.song_menu_pick(&format!("add:{measure}:{id}"));
+                self.song_panel.selected_clip = Some((id, measure));
+            }
+            _ => return false,
+        }
+        true
+    }
+
+    /// A right-click on `hit`: the menu of what is under it (the left button
+    /// acts instead); whether `hit` has one here. The lanes' are in `automation_click`.
+    fn song_menu_click(&mut self, hit: SongHit, rows: &[Row], x: i32, y: i32) -> bool {
+        match hit {
+            SongHit::Pattern(p) => {
+                self.step_pattern(p as isize - self.pattern_index as isize);
+                self.list_menu(p, x, y);
+            }
+            SongHit::Clip(clip) => {
+                self.select_clip(Some(clip));
+                self.clip_menu(clip, x, y);
+            }
+            SongHit::RowName(r) => self.row_menu(rows, r, x, y),
+            SongHit::Ruler(_) | SongHit::LoopEnd(_) => self.loop_menu(x, y),
+            SongHit::Cell { row, measure } => {
                 let row = &rows[row];
                 let title = format!("Add \"{}\" at measure {}", row.name, measure + 1);
-                self.chrome.widgets.dropdown = Some(Dropdown::menu(
-                    Id::SongMenu,
-                    x,
-                    y,
-                    title,
-                    vec![format!("add:{measure}:{}", row.id)],
-                    vec!["Add here".into()],
-                ));
+                let value = format!("add:{measure}:{}", row.id);
+                let menu = Dropdown::menu(Id::SongMenu, x, y, title, vec![value], vec!["Add here".into()]);
+                self.chrome.widgets.dropdown = Some(menu);
             }
             _ => return false,
         }
@@ -133,6 +154,14 @@ impl Session {
             None => self.message = format!("\"{}\" is not in the library", self.pattern_label(&id)),
         }
         true
+    }
+
+    /// Row `r` of the arrangement clicked: its pattern shown.
+    fn show_row_pattern(&mut self, r: usize) {
+        let Some(id) = self.song_rows().get(r).map(|row| row.id.clone()) else { return };
+        if let Some(index) = self.editor.library().patterns.iter().position(|p| p.id == id) {
+            self.show_pattern(index);
+        }
     }
 
     // ─── Dragging ────────────────────────────────────────────────────────────
@@ -246,16 +275,14 @@ impl Session {
         if self.song_panel.lane_resize.take().is_some() {
             return true;
         }
-        // A press without a drag opens the menu of what was pressed.
-        if let Some(SongDrag { source, started: false, press: (x, y), .. }) = self.song_panel.drag {
+        // A press without a drag: the pattern is shown (on the press), the clip
+        // selected, the row's pattern shown. The right button opens the menus.
+        if let Some(SongDrag { source, started: false, .. }) = self.song_panel.drag {
             self.song_panel.drag = None;
             match source {
-                DragSource::Pattern(p) => self.list_menu(p, x, y),
-                DragSource::Clip { clip, .. } => self.clip_menu(clip, x, y),
-                DragSource::Row(r) => {
-                    let rows = self.song_rows();
-                    self.row_menu(&rows, r, x, y);
-                }
+                DragSource::Pattern(_) => {}
+                DragSource::Clip { clip, .. } => self.select_clip(Some(clip)),
+                DragSource::Row(r) => self.show_row_pattern(r),
             }
             return true;
         }
@@ -283,6 +310,7 @@ impl Session {
                 let start = measure.saturating_sub(grab);
                 if self.editor.move_song_clip(None, clip, start) {
                     self.edited();
+                    self.select_clip(Some(clip));
                     let id = self.song().and_then(|s| s.clips.get(clip)).map(|c| c.pattern_id.clone());
                     let label = self.pattern_label(&id.unwrap_or_default());
                     self.message = format!("\"{label}\" moved to measure {}", start + 1);
@@ -378,8 +406,9 @@ impl Session {
             Some(SongHit::LaneStep { lane, step }) => Some((lane, step)),
             _ => None,
         };
-        let changed = (clip, lane) != (self.song_panel.hovered_clip, self.song_panel.hovered_lane);
-        (self.song_panel.hovered_clip, self.song_panel.hovered_lane) = (clip, lane);
+        let changed = (clip, lane, hover)
+            != (self.song_panel.hovered_clip, self.song_panel.hovered_lane, self.song_panel.hovered);
+        (self.song_panel.hovered_clip, self.song_panel.hovered_lane, self.song_panel.hovered) = (clip, lane, hover);
         changed
     }
 
@@ -491,12 +520,12 @@ mod tests {
         let row_y = |r: i32| l.grid.y + 14 + 18 + r * 22 + 11;
         let list = (l.list.x + 2, l.list.y + 2);
 
-        // A press and release that hardly moves is a click: it opens the pattern's menu.
+        // A press and release that hardly moves is a click: it shows the pattern, no menu.
         assert!(s.song_click(SIZE, list.0, list.1, Button::Left));
         s.mouse_move(SIZE, list.0 + 1, list.1, false);
         assert!(s.song_release(SIZE));
-        assert!(s.chrome.widgets.dropdown.is_some());
-        s.chrome.widgets.dropdown = None;
+        assert!(s.chrome.widgets.dropdown.is_none());
+        assert_eq!(s.pattern_index, 0);
         assert_eq!(clips(&s).len(), 1);
 
         // Pattern a, not in the arrangement yet, dropped past its end.
@@ -559,11 +588,11 @@ mod tests {
         let clip = (l.grid.x + song_view::LABEL_WIDTH + 12, l.grid.y + 14 + 18 + 11);
         assert_eq!((s.pattern_index, s.workspace), (0, Workspace::Song));
 
-        // The first click opens the clip's menu; the second, on it, opens pattern b.
+        // The first click selects the clip; the second, on it, opens pattern b.
         assert!(s.song_click(SIZE, clip.0, clip.1, Button::Left));
         assert!(s.song_release(SIZE));
-        assert!(s.chrome.widgets.dropdown.is_some());
-        assert!(s.song_double_click(SIZE, clip.0, clip.1));
+        assert_eq!(s.selected_clip(), Some(0));
+        assert!(s.song_click(SIZE, clip.0, clip.1, Button::Left));
         assert!(s.chrome.widgets.dropdown.is_none());
         assert_eq!((s.pattern_index, s.workspace), (1, Workspace::Grid));
 

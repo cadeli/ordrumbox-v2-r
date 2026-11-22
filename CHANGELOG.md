@@ -12,6 +12,12 @@
   song screen (the Tags line under its description) or with Pattern > Tags...
 - Tags are genres or features (bass, chords, synth…): only genres become learned styles. The demo
   library's tags are cleaned (`default`, `song` and `sends` gone, `exp` now `experimental`).
+- The help line at the bottom of the window follows the pointer: what a click, a drag and a
+  right-click do on what is under it.
+- Song panel: the left button acts, the right one opens the menus. A click on an empty cell adds
+  the row's pattern; a click on a clip selects it (Delete removes it, Ctrl D repeats it).
+- Under the pointer, a name that has a menu is drawn lighter with a `v` at its end, and a clip
+  lighter; the context menus show the key of each line that has one.
 - MCP: `saveProject`, `openProject`, `exportProject`, `listSavedProjects` (its list under `projects`)
   and `setProjectInfo`; the earlier `*Song*` names still work.
 

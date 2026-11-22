@@ -24,15 +24,32 @@ pub struct Dropdown {
     pub parent: Option<Box<Dropdown>>,
     /// The control a `ControlMenu` is for.
     pub control: Option<Id>,
+    /// The key of each line that has one, shown at its right end (a menu's
+    /// lines only; empty: none).
+    pub shortcuts: Vec<String>,
 }
 
 /// The label end of a line that opens a submenu.
 pub const SUBMENU_MARK: &str = " >";
 
+/// The mark of what opens a list or a menu: a select's, and a name's under
+/// the pointer when a right-click opens its menu.
+pub const MENU_MARK: &str = "v";
+
 impl Dropdown {
     pub fn new(id: Id, anchor: Rect, values: Vec<String>, labels: Vec<String>, selected: usize) -> Self {
-        let mut d =
-            Self { id, title: None, anchor, values, labels, at: selected, first: 0, parent: None, control: None };
+        let mut d = Self {
+            id,
+            title: None,
+            anchor,
+            values,
+            labels,
+            at: selected,
+            first: 0,
+            parent: None,
+            control: None,
+            shortcuts: Vec::new(),
+        };
         d.show_at();
         d
     }
@@ -40,6 +57,19 @@ impl Dropdown {
     /// A menu of actions at `(x, y)`, under `title`.
     pub fn menu(id: Id, x: i32, y: i32, title: String, values: Vec<String>, labels: Vec<String>) -> Self {
         Self { title: Some(title), ..Self::new(id, Rect::new(x, y, 0, 0), values, labels, 0) }
+    }
+
+    /// The menu with `shortcuts`, the key of each line (empty: none), shown
+    /// at the right end of its line.
+    #[must_use]
+    pub fn with_shortcuts(self, shortcuts: Vec<String>) -> Self {
+        Self { shortcuts, ..self }
+    }
+
+    /// The width of the widest shortcut, with the gap before it; 0 without one.
+    fn shortcut_width(&self, scale: Scale) -> i32 {
+        let widest = self.shortcuts.iter().map(|s| text_width(s, scale)).max().unwrap_or(0);
+        if widest > 0 { widest + 16 * scale } else { 0 }
     }
 
     /// A menu opened by the highlighted line of `parent`, beside it (on its
@@ -140,7 +170,8 @@ impl Dropdown {
     /// The list's place in a `width` × `height` window.
     pub fn rect(&self, width: i32, height: i32, scale: Scale) -> Rect {
         let row = row_height(scale);
-        let longest = self.labels.iter().chain(&self.title).map(|l| text_width(l, scale)).max().unwrap_or(0);
+        let label = self.labels.iter().map(|l| text_width(l, scale)).max().unwrap_or(0) + self.shortcut_width(scale);
+        let longest = self.title.iter().map(|t| text_width(t, scale)).fold(label, i32::max);
         let w = (longest + 20 * scale).max(self.anchor.w).min(width);
         let h = (self.shown() + self.head()) as i32 * row + 4 * scale;
         let x = self.anchor.x.min(width - w).max(0);
@@ -180,7 +211,14 @@ impl Dropdown {
                 canvas.fill_rect(r.x + scale.px(), y, r.w - 2 * scale, row, selected_row_color());
             }
             let color = if k == self.at { TITLE } else { theme::text() };
-            canvas.text(r.x + 6 * scale, y + (row - 8 * scale) / 2, &fit(label, r.w - 12 * scale, scale), scale, color);
+            let text_y = y + (row - 8 * scale) / 2;
+            let shortcut = self.shortcuts.get(k).filter(|s| !s.is_empty());
+            let room = r.w - 12 * scale - shortcut.map_or(0, |_| self.shortcut_width(scale));
+            canvas.text(r.x + 6 * scale, text_y, &fit(label, room, scale), scale, color);
+            if let Some(shortcut) = shortcut {
+                let x = r.x + r.w - 6 * scale - text_width(shortcut, scale);
+                canvas.text(x, text_y, shortcut, scale, dim());
+            }
         }
         if self.labels.len() > self.shown() {
             // Scroll bar.

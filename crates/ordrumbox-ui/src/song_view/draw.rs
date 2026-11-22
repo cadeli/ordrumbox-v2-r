@@ -23,13 +23,20 @@ fn draw_list(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     for (i, name) in view.patterns.iter().enumerate().skip(first).take(shown) {
         let y = r.y + (i - first) as i32 * LIST_ROW * s;
         let selected = i == view.selected_pattern;
-        if selected {
-            canvas.fill_rect(r.x - 2 * s, y - 2 * s, r.w, LIST_ROW * s, selected_color());
+        let hovered = view.hovered == Some(SongHit::Pattern(i));
+        if selected || hovered {
+            let color = if selected { selected_color() } else { theme::highlight() };
+            canvas.fill_rect(r.x - 2 * s, y - 2 * s, r.w, LIST_ROW * s, color);
+        }
+        if hovered {
+            canvas.text(names_right - text_width(MENU_MARK, s), y, MENU_MARK, s, theme::muted());
         }
         let number = format!("{}.", i + 1);
         let x = r.x + (LIST_NUMBER_CHARS * crate::font::WIDTH * s - text_width(&number, s)).max(0);
         let x = canvas.text(x, y, &number, s, theme::muted()) + 4 * s;
-        canvas.text(x, y, &fit(name, names_right - x, s), s, if selected { ACCENT } else { theme::text() });
+        // The room of the mark is kept, so that a name keeps its length under the pointer.
+        let room = names_right - x - text_width(MENU_MARK, s) - 2 * s;
+        canvas.text(x, y, &fit(name, room, s), s, if selected { ACCENT } else { theme::text() });
     }
     // A pattern dragged along the list: a line where it would go, above or below the one it takes.
     if let Some((from, to)) = view.list_drop.filter(|&(from, to)| from != to) {
@@ -167,7 +174,7 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     let page = Page::new(view, layout, total);
     super::ruler::draw(canvas, view, layout, &page);
     draw_row_names(canvas, view, layout, &page);
-    super::automation::draw_lanes(canvas, song, layout, (view.rows.len(), &view.taken_back), &page);
+    super::automation::draw_lanes(canvas, song, layout, view, &page);
     draw_measure_lines(canvas, layout, &page);
     draw_clips(canvas, view, song, layout);
     draw_dragged_pattern(canvas, view, layout, &page);
@@ -193,10 +200,23 @@ fn draw_row_names(canvas: &mut Canvas, view: &SongView, layout: &SongLayout, pag
         let y = layout.row_y(k, page.first_row);
         let line_w = layout.label_width() + page.body_w;
         canvas.fill_rect(layout.grid.x, y + layout.row_height() - s.px(), line_w, s.px(), line_color());
-        let name = fit(&row.name, layout.label_width() - 6 * s, s);
+        let text_y = y + (layout.row_height() - 8 * s) / 2;
+        if view.hovered == Some(SongHit::RowName(k)) {
+            draw_hovered_name(canvas, layout, (y, layout.row_height() - s.px()), text_y);
+        }
+        let name = fit(&row.name, layout.label_width() - 6 * s - text_width(MENU_MARK, s), s);
         let color = if row.orphan { ORPHAN } else { theme::text() };
-        canvas.text(layout.grid.x, y + (layout.row_height() - 8 * s) / 2, &name, s, color);
+        canvas.text(layout.grid.x, text_y, &name, s, color);
     }
+}
+
+/// A name of the frozen column under the pointer, its row at `(top, height)`:
+/// a lighter cell and, at its right end, the mark of its menu.
+pub(super) fn draw_hovered_name(canvas: &mut Canvas, layout: &SongLayout, (top, height): (i32, i32), text_y: i32) {
+    let s = layout.scale;
+    let w = layout.label_width() - 4 * s;
+    canvas.fill_rect(layout.grid.x - 2 * s, top, w, height, theme::highlight());
+    canvas.text(layout.grid.x + w - 4 * s - text_width(MENU_MARK, s), text_y, MENU_MARK, s, theme::muted());
 }
 
 /// The narrowest measure (scale units) that keeps its line: narrower, only every fourth is drawn.
@@ -222,9 +242,24 @@ fn draw_clips(canvas: &mut Canvas, view: &SongView, song: &Song, layout: &SongLa
     for i in (0..song.clips.len()).filter(|&i| Some(i) != dragged).chain(dragged) {
         if let Some(r) = layout.clip_rect(view, i) {
             let row = view.rows.iter().position(|row| row.id == song.clips[i].pattern_id).unwrap_or(0);
-            canvas.fill_rect(r.x, r.y, r.w, r.h, theme::track(row));
+            let color = theme::track(row);
+            let color =
+                if view.hovered == Some(SongHit::Clip(i)) { theme::mix(color, theme::WHITE, 0.25) } else { color };
+            canvas.fill_rect(r.x, r.y, r.w, r.h, color);
+            if view.selected_clip == Some(i) {
+                draw_outline(canvas, r, 2 * layout.scale.px(), ACCENT);
+            }
         }
     }
+}
+
+/// A frame `thickness` thick inside `r`, in `color`.
+fn draw_outline(canvas: &mut Canvas, r: Rect, thickness: i32, color: Rgb) {
+    let t = thickness.min(r.w / 2).min(r.h / 2).max(1);
+    canvas.fill_rect(r.x, r.y, r.w, t, color);
+    canvas.fill_rect(r.x, r.y + r.h - t, r.w, t, color);
+    canvas.fill_rect(r.x, r.y, t, r.h, color);
+    canvas.fill_rect(r.x + r.w - t, r.y, t, r.h, color);
 }
 
 /// A pattern dragged from the list: on its row, kept on the rows shown.

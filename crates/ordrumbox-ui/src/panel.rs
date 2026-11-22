@@ -504,7 +504,7 @@ mod dropdown;
 #[path = "panel/entry.rs"]
 mod entry;
 pub use draw::draw;
-pub use dropdown::{Dropdown, SUBMENU_MARK};
+pub use dropdown::{Dropdown, MENU_MARK, SUBMENU_MARK};
 pub use entry::Entry;
 
 #[cfg(test)]

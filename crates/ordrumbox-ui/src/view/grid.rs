@@ -7,7 +7,7 @@ use super::{
     View, background_color, box_off_color, cell_beat_color, cell_color, focus_row_color, mute_host_color,
 };
 use crate::canvas::{Canvas, Rgb, small_cell, small_char_width, text_width};
-use crate::panel::{Rect, stroke};
+use crate::panel::{MENU_MARK, Rect, stroke};
 use crate::scale::Scale;
 use crate::theme::{ZONE, ZONE_OPACITY};
 use crate::{editors, piano_roll, theme};
@@ -201,6 +201,18 @@ fn draw_track_name(canvas: &mut Canvas, track: &Track, i: usize, y: i32, color: 
         }
     }
     let label: String = track.name.chars().take(LABEL_CHARS).collect();
+    if view.hovered_track == Some(i) {
+        // Under the pointer: a lighter name, the mark of its menu at the end of the name's room.
+        let end = layout.volume_x - 4 * scale;
+        canvas.fill_rect(
+            layout.name_x - 2 * scale,
+            label_y - 2 * scale,
+            end - layout.name_x + 2 * scale,
+            12 * scale,
+            theme::highlight(),
+        );
+        canvas.text(end - text_width(MENU_MARK, layout.scale), label_y, MENU_MARK, layout.scale, theme::muted());
+    }
     canvas.text(layout.name_x, label_y, &label, layout.scale, color);
 }
 

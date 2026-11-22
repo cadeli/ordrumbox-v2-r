@@ -311,7 +311,8 @@ impl Ui {
         let hovered = self.session.grid_hover(size, x, y)
             | self.session.control_hover(size, x, y)
             | self.session.song_hover(size, x, y)
-            | self.session.roll_hover(size, x, y);
+            | self.session.roll_hover(size, x, y)
+            | self.session.hint_hover(size, x, y);
         hovered_menu || hovered || moved
     }
 
@@ -485,6 +486,10 @@ impl Ui {
             if !event.repeat {
                 s.record_note(row);
             }
+            return true;
+        }
+        // Ctrl+D on a clip selected in the song panel repeats it; else it duplicates the pattern.
+        if command_key && !shift && key == Key::Letter('D') && s.song_view_open() && s.repeat_selected_clip() {
             return true;
         }
         if let Some(command) = shortcut(key, shift, command_key) {
@@ -675,6 +680,7 @@ fn song_view_key(s: &mut Session, key: Key) -> bool {
         Key::ArrowRight => s.move_song_cursor(1),
         Key::ArrowUp => s.step_pattern(-1),
         Key::ArrowDown => s.step_pattern(1),
+        Key::Delete | Key::Backspace => return s.remove_selected_clip(),
         _ => return false,
     }
     true

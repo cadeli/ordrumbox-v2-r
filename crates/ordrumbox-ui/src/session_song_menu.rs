@@ -41,8 +41,9 @@ impl Session {
         let Some(clip) = self.song().and_then(|s| s.clips.get(c)).cloned() else { return };
         let title = clip_label(&self.pattern_label(&clip.pattern_id), &clip);
         let values = vec![format!("next:{c}"), format!("delete:{c}")];
-        self.chrome.widgets.dropdown =
-            Some(Dropdown::menu(Id::SongMenu, x, y, title, values, vec!["Next".into(), "Delete".into()]));
+        let shortcuts = crate::menu::shown_shortcuts(&["Ctrl+D", "Delete"], self.host.hosted);
+        let menu = Dropdown::menu(Id::SongMenu, x, y, title, values, vec!["Next".into(), "Delete".into()]);
+        self.chrome.widgets.dropdown = Some(menu.with_shortcuts(shortcuts));
     }
 
     /// Row `r`'s name: add its pattern at the playhead, move the row up or
@@ -90,12 +91,10 @@ impl Session {
                     .map(|_| format!("\"{label}\" added at measure {}", measure + 1))
             }
             ("next", None) => {
-                let Some(clip) = a.parse().ok().and_then(|c: usize| self.song()?.clips.get(c).cloned()) else { return };
-                let label = self.pattern_label(&clip.pattern_id);
-                self.editor.repeat_pattern_at_measure(clip.start_measure, None).map(|_| {
-                    let at = f64::from(clip.start_measure) + clip.measure_count + 1.0;
-                    format!("\"{label}\" repeated at measure {}", num::text(at))
-                })
+                if let Ok(clip) = a.parse() {
+                    self.repeat_clip(clip);
+                }
+                return;
             }
             ("delete", None) => {
                 if let Some(c) = a.parse().ok().filter(|&c: &usize| self.song().is_some_and(|s| c < s.clips.len())) {
@@ -214,7 +213,7 @@ impl Session {
     }
 
     /// What an arrangement edit gave: its message, and the edit taken into account.
-    fn song_edit_result(&mut self, result: Result<String, String>) {
+    pub(super) fn song_edit_result(&mut self, result: Result<String, String>) {
         match result {
             Ok(message) => {
                 self.edited();
@@ -255,27 +254,31 @@ mod tests {
         assert!(s.song_click(SIZE, measure_x(1), ruler_y, Button::Left));
         assert!(s.song_release(SIZE), "a click on the ruler: on its release");
         assert_eq!(s.transport.song_cursor, 1);
-        click_and_release(&mut s, l.list.x + 2, l.list.y + 2);
+        right_click(&mut s, l.list.x + 2, l.list.y + 2);
         assert_eq!(menu(&s), ["add:1:a", "pattern-down:0", "rename:0", "pattern-delete:0"]);
         choose(&mut s, 0);
         assert_eq!(s.message, "\"a\" added at measure 2");
         assert_eq!(clips(&s), [("b".into(), 0, 2.0), ("a".into(), 1, 0.75)]);
         // Rows: a, b (library order). The clip of a: repeat it.
         let row_y = |r: i32| l.grid.y + 14 + 18 + r * 22 + 11;
-        assert!(click_and_release(&mut s, measure_x(1) - 4, row_y(0)));
+        assert!(right_click(&mut s, measure_x(1) - 4, row_y(0)));
         assert_eq!(menu(&s), ["next:1", "delete:1"]);
         choose(&mut s, 0);
         assert_eq!(s.message, "\"a\" repeated at measure 2.75");
         assert_eq!(clips(&s)[2], ("a".into(), 1, 0.75));
-        // The bare grid of row a, measure 0: add a there.
-        assert!(click_and_release(&mut s, measure_x(0), row_y(0)));
+        // The bare grid of row a, measure 0: a click adds a there at once,
+        // selected; a right-click offers it in a menu.
+        assert!(right_click(&mut s, measure_x(0), row_y(0)));
         assert_eq!(menu(&s), ["add:0:a"]);
-        choose(&mut s, 0);
+        s.chrome.widgets.dropdown = None;
+        assert!(click_and_release(&mut s, measure_x(0), row_y(0)));
+        assert!(menu(&s).is_empty());
         assert_eq!(clips(&s)[3], ("a".into(), 0, 0.75));
+        assert_eq!(s.selected_clip(), Some(3));
         // Nothing past the arrangement's 2 measures.
         assert!(!click_and_release(&mut s, measure_x(2), row_y(1)));
         // Row a's name: delete the row.
-        assert!(click_and_release(&mut s, l.grid.x + 2, row_y(0)));
+        assert!(right_click(&mut s, l.grid.x + 2, row_y(0)));
         assert_eq!(menu(&s), ["add:1:a", "down:0", "row:a"]);
         choose(&mut s, 2);
         assert_eq!(s.message, format!("Removed \"a\" from the arrangement ({}+Z: undo)", crate::menu::command_label()));
@@ -284,7 +287,12 @@ mod tests {
         assert_eq!(clips(&s).len(), 4);
     }
 
-    /// A click without a drag (press and release), which opens the menu of what is under it.
+    /// A right-click, which opens the menu of what is under it.
+    fn right_click(s: &mut Session, x: i32, y: i32) -> bool {
+        s.song_click(SIZE, x, y, Button::Right)
+    }
+
+    /// A left click without a drag (press and release), which acts on what is under it.
     fn click_and_release(s: &mut Session, x: i32, y: i32) -> bool {
         let hit = s.song_click(SIZE, x, y, Button::Left);
         s.song_release(SIZE);
@@ -299,22 +307,24 @@ mod tests {
         // Add it at the playhead from its menu.
         let (x, y) = row(0);
         click_and_release(&mut s, x, y);
+        assert!(menu(&s).is_empty(), "a left click shows the pattern, no menu");
+        right_click(&mut s, x, y);
         choose(&mut s, 0);
         assert_eq!(s.message, "\"a\" added at measure 1");
         assert_eq!(clips(&s), [("b".into(), 0, 2.0), ("a".into(), 0, 0.75)]);
         // Move down, then up: the pattern shown follows.
-        click_and_release(&mut s, x, y);
+        right_click(&mut s, x, y);
         choose(&mut s, 1);
         assert_eq!(s.editor.library().patterns[1].name.as_deref(), Some("a"));
         assert_eq!(s.pattern_index, 1);
         let (x, y) = row(1);
-        click_and_release(&mut s, x, y);
+        right_click(&mut s, x, y);
         assert_eq!(menu(&s), ["add:0:a", "pattern-up:1", "rename:1", "pattern-delete:1"]);
         choose(&mut s, 1);
         assert_eq!(s.editor.library().patterns[0].name.as_deref(), Some("a"));
         // Delete is done at once, takes the clips along, and is one undo step.
         let (x, y) = row(1);
-        click_and_release(&mut s, x, y);
+        right_click(&mut s, x, y);
         choose(&mut s, 3);
         assert!(!s.confirm_open());
         assert_eq!(
@@ -342,10 +352,10 @@ mod tests {
         let row_y = |r: i32| l.grid.y + 14 + 18 + r * 22 + 11;
 
         // The first row moves down only, the last one up only.
-        assert!(click_and_release(&mut s, name_x, row_y(0)));
+        assert!(right_click(&mut s, name_x, row_y(0)));
         assert!(menu(&s).contains(&"down:0".to_owned()) && !menu(&s).iter().any(|v| v.starts_with("up:")));
         s.chrome.widgets.dropdown = None;
-        assert!(click_and_release(&mut s, name_x, row_y(1)));
+        assert!(right_click(&mut s, name_x, row_y(1)));
         assert!(menu(&s).contains(&"up:1".to_owned()) && !menu(&s).iter().any(|v| v.starts_with("down:")));
         s.chrome.widgets.dropdown = None;
 
@@ -358,12 +368,13 @@ mod tests {
         assert_eq!(names(&s), ["a", "b"]);
         assert_eq!(s.pattern().unwrap().id, "a");
 
-        // A press that hardly moves is a click, which opens the menu; a drag moves the row on release, in one step.
+        // A press that hardly moves is a click, which shows the row's pattern;
+        // a drag moves the row on release, in one step.
         assert!(s.song_click(SIZE, name_x, row_y(1), Button::Left));
         s.mouse_move(SIZE, name_x, row_y(1) + 1, false);
         assert!(s.song_release(SIZE));
-        assert!(s.chrome.widgets.dropdown.is_some());
-        s.chrome.widgets.dropdown = None;
+        assert!(s.chrome.widgets.dropdown.is_none());
+        assert_eq!(s.pattern().unwrap().id, "b");
         assert_eq!(names(&s), ["a", "b"]);
         s.song_click(SIZE, name_x, row_y(1), Button::Left);
         s.mouse_move(SIZE, name_x, row_y(0), false);

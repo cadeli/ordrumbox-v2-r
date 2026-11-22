@@ -91,8 +91,10 @@ impl Session {
         }
         let toggle = if self.transport.is_loop_on { "Turn the loop off" } else { "Turn the loop on" };
         let values = vec!["loop:toggle".into(), "loop:clear".into()];
-        let labels = vec![format!("{toggle}  Ctrl+L"), "Remove the loop".into()];
-        self.chrome.widgets.dropdown = Some(Dropdown::menu(Id::SongMenu, x, y, "Loop".into(), values, labels));
+        let labels = vec![toggle.into(), "Remove the loop".into()];
+        let shortcuts = crate::menu::shown_shortcuts(&["Ctrl+L", ""], self.host.hosted);
+        let menu = Dropdown::menu(Id::SongMenu, x, y, "Loop".into(), values, labels);
+        self.chrome.widgets.dropdown = Some(menu.with_shortcuts(shortcuts));
     }
 
     /// A line of the loop's menu: `toggle` or `clear`.

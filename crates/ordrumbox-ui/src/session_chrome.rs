@@ -65,6 +65,8 @@ pub(super) struct Chrome {
     /// What of the grid is under the mouse, for its tooltip: a step (its
     /// note's) or a track's name (the track's).
     pub(super) hover: Option<crate::view::Hit>,
+    /// What the help line says for what is under the pointer (`session_hints.rs`); `None`: the view's keys.
+    pub(super) hint: Option<&'static str>,
     /// The control of a panel under the mouse that has a tooltip, and where it is.
     pub(super) control_hover: Option<(crate::panel::Id, crate::panel::Rect)>,
     /// A track pressed by its name, that may be dragged to another row.
@@ -106,6 +108,7 @@ impl Default for Chrome {
             export_loop_count: 1,
             widgets: Widgets::default(),
             hover: None,
+            hint: None,
             control_hover: None,
             track_drag: None,
             last_name_press: None,

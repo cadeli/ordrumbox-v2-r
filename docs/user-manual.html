@@ -438,6 +438,8 @@ position while a song plays. Errors (a file that cannot be read, a value that wa
 a problem found at start stays in a band of its own at the bottom of the window until you quit.
 A click on the status line opens the <strong>action log</strong>: everything done since the app started,
 newest first. Scroll it with the wheel, the arrows, <kbd>Page Up</kbd>/<kbd>Page Down</kbd>, <kbd>Home</kbd>/<kbd>End</kbd>.</p>
+<p>The <strong>help line</strong> at the very bottom of the window follows the pointer: over a clip, a step, a track's name, a
+lane, the ruler, a knob or a list, it says what a click, a drag and a right-click do there; elsewhere, the keys of the view.</p>
 
 <!-- ───────────────────────────────────────────────────────────── -->
 <h2 id="grid">7. Pattern grid</h2>
@@ -773,7 +775,10 @@ on a timeline of measures. The song panel is the app's only: the plugin plays pa
 <tr><th>Action</th><th>Result</th></tr>
 <tr><td>Click the ruler</td><td>Set the song cursor (where the song plays from). While playing, playback jumps there. A click leaves the loop as it is.</td></tr>
 <tr><td>Drag along the ruler</td><td>Select the song's loop (<a href="#song-loop">see The song's loop</a>).</td></tr>
-<tr><td>Click a pattern of the list</td><td>Select it and open its menu (<strong>Add at measure n</strong>, at the playhead's measure, <strong>Move up</strong>, <strong>Move down</strong>, <strong>Rename</strong>, <strong>Delete</strong>).</td></tr>
+<tr><td>Click a pattern of the list</td><td>Show it.</td></tr>
+<tr><td>Click an empty cell of the arrangement</td><td>Add the row's pattern at that measure, selected (one undo step).</td></tr>
+<tr><td>Click a clip</td><td>Select it (a pink outline): <kbd>Delete</kbd> removes it, <kbd>Ctrl</kbd>+<kbd>D</kbd> repeats it right after itself, the copy then selected.</td></tr>
+<tr><td>Click a row's name</td><td>Show its pattern.</td></tr>
 <tr><td>Drag a pattern along the list</td><td>Move it in the list.</td></tr>
 <tr><td>Drag a pattern onto the arrangement</td><td>Add it at that measure, on its own row (a tooltip shows the measure).</td></tr>
 <tr><td>Drag a clip sideways</td><td>Move it, whole measures at a time (the wheel scrolls during the drag; there is a page past the end to drop on).</td></tr>
@@ -784,16 +789,21 @@ on a timeline of measures. The song panel is the app's only: the plugin plays pa
 <tr><td><kbd>Ctrl</kbd> + wheel over the arrangement</td><td>Zoom around the measure under the pointer.</td></tr>
 </table>
 <p>The pointer tells what a drag does: a hand over the thumb of a scroll bar (closed while held), sideways arrows over the
-zoom handles.</p>
+zoom handles. The help line at the bottom of the window says what the mouse does on what is under it.</p>
 
 <h3>Menus</h3>
-<p>A click (without a drag) opens the menu of what is under it.</p>
+<p>The left button acts; a <strong>right-click</strong> opens the menu of what is under it. An automation lane's name, which
+has no action of its own, opens its menu with either button. Under the pointer, a name that has a menu (a pattern of the list,
+a row's, a lane's, and a track's in the grid) is drawn lighter, with a <strong>v</strong> at its end; a clip is drawn lighter.
+A menu line that has a key shows it at its right end (<strong>Next</strong> <kbd>Ctrl</kbd>+<kbd>D</kbd>,
+<strong>Delete</strong> <kbd>Delete</kbd>…), in the grid's menus too.</p>
 <table>
 <tr><th>On</th><th>Items</th></tr>
+<tr><td>A pattern of the list</td><td><strong>Add at measure n</strong> (the playhead's), <strong>Move up</strong>, <strong>Move down</strong>, <strong>Rename</strong>, <strong>Delete</strong></td></tr>
 <tr><td>A row's name</td><td><strong>Add at measure n</strong> (the playhead's), <strong>Move up</strong>, <strong>Move down</strong>, <strong>Delete row</strong></td></tr>
-<tr><td>A clip</td><td><strong>Next</strong> (the same clip right after it), <strong>Delete</strong></td></tr>
+<tr><td>A clip</td><td><strong>Next</strong> (the same clip right after it, as <kbd>Ctrl</kbd>+<kbd>D</kbd>), <strong>Delete</strong></td></tr>
 <tr><td>An empty cell</td><td><strong>Add here</strong> (the row's pattern at that measure)</td></tr>
-<tr><td>The ruler (right-click)</td><td><strong>Turn the loop on / off</strong>, <strong>Remove the loop</strong></td></tr>
+<tr><td>The ruler</td><td><strong>Turn the loop on / off</strong>, <strong>Remove the loop</strong></td></tr>
 <tr><td>An automation lane's name (left or right click)</td><td><strong>Re-enable lane</strong> (when taken back), <strong>Taller</strong>, <strong>Shorter</strong>, <strong>Clear all points</strong>, <strong>Delete lane</strong>, <strong>Delete all lanes</strong></td></tr>
 </table>
 
@@ -805,6 +815,8 @@ zoom handles.</p>
 <tr><td><kbd>Ctrl</kbd>+<kbd>L</kbd></td><td>Turn the song's loop off, or on again.</td></tr>
 <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Cursor one measure back / on.</td></tr>
 <tr><td><kbd>↑</kbd> <kbd>↓</kbd></td><td>Previous / next pattern of the list.</td></tr>
+<tr><td><kbd>Delete</kbd>, <kbd>Backspace</kbd></td><td>Remove the clip selected.</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>D</kbd></td><td>Repeat the clip selected right after itself (with no clip selected: duplicate the pattern).</td></tr>
 <tr><td><kbd>Esc</kbd></td><td>Back to the grid.</td></tr>
 </table>
 <p>While the song plays, the grid follows it page by page. Each edit of the arrangement is an undo step.</p>

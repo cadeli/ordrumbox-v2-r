@@ -149,7 +149,9 @@ fn draw_footer(canvas: &mut Canvas, view: &View, scale: Scale) {
         canvas.text(margin, footer_y, &text, scale, background_color());
         footer_y += 10 * scale;
     }
-    let help = if view.kit_view.is_some() {
+    let help = if let Some(hint) = view.hint {
+        hint
+    } else if view.kit_view.is_some() {
         KIT_HELP
     } else if view.arrangement.is_some() {
         SONG_HELP
@@ -162,7 +164,8 @@ fn draw_footer(canvas: &mut Canvas, view: &View, scale: Scale) {
     } else {
         HELP
     };
-    canvas.text(margin, footer_y, help, scale, theme::muted());
+    let help: String = help.chars().take(chars_in(canvas.width() - 2 * margin, scale)).collect();
+    canvas.text(margin, footer_y, &help, scale, theme::muted());
 }
 
 /// A plugin host's transport, where the app has its play button and tempo
