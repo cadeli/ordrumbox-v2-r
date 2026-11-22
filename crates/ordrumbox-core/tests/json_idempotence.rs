@@ -456,3 +456,39 @@ fn the_demo_library_is_saved_as_it_was_read() {
     // Its own tempo, not its first pattern's (Blues 12/8, 60 BPM).
     assert_eq!(saved_twice(&parse(&text)).bpm, 120.0);
 }
+
+#[test]
+fn every_automation_lane_survives_saving() {
+    use ordrumbox_core::AutomationTarget;
+    // One lane per control, each with a value, a line on adjacent steps, a
+    // point giving the control back to the pattern (null) and a value held after it.
+    let lanes: Vec<String> = AutomationTarget::ALL
+        .iter()
+        .enumerate()
+        .map(|(i, target)| {
+            format!(
+                r#"{{"instrument":"KICK","target":"{}","rows":{},"points":[{{"step":{i},"value":0.125}},
+                    {{"step":32,"value":0.25}},{{"step":33,"value":0.5}},{{"step":34,"value":0.75}},
+                    {{"step":40,"value":null}},{{"step":56,"value":1}}]}}"#,
+                target.key(),
+                i % 4 + 1
+            )
+        })
+        .collect();
+    let value = parse(&format!(
+        r#"{{"songs":[{{"id":"s","name":"S","clips":[{{"patternId":"a","startMeasure":0,"measureCount":4}}],
+            "automations":[{}]}}],"patterns":[{{"id":"a","tracks":[{{"name":"KICK"}}]}}]}}"#,
+        lanes.join(",")
+    ));
+    let library = saved_twice(&value);
+    let read = &library.songs[0].automations;
+    assert_eq!(read.iter().map(|lane| lane.target).collect::<Vec<_>>(), AutomationTarget::ALL, "every lane, in order");
+    for (i, lane) in read.iter().enumerate() {
+        let points: Vec<(u32, Option<f64>)> = lane.points().iter().map(|p| (p.step, p.value)).collect();
+        let i = i as u32;
+        let expected =
+            [(i, Some(0.125)), (32, Some(0.25)), (33, Some(0.5)), (34, Some(0.75)), (40, None), (56, Some(1.0))];
+        assert_eq!(points, expected, "{:?}", lane.target);
+        assert_eq!(lane.row_count(), i % 4 + 1, "{:?}", lane.target);
+    }
+}

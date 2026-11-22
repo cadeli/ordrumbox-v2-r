@@ -490,4 +490,34 @@ mod tests {
         mute.target = AutomationTarget::Mute;
         assert_eq!(mute.level_at(0.75), Some(0.0), "a switch holds");
     }
+
+    #[test]
+    fn painting_is_idempotent_and_repainting_a_lane_s_own_values_changes_nothing() {
+        let mut base = AutomationLane::new("KICK", AutomationTarget::Volume);
+        base.paint(0, 40, fill(Some(0.5)));
+        base.paint(8, 12, AutomationStroke::Line((8, 0.0), (12, 1.0)));
+        base.paint(20, 23, fill(None));
+        let strokes = [
+            (4, 30, fill(Some(0.25))),
+            (10, 10, fill(None)),
+            (0, u32::MAX, fill(Some(1.0))),
+            (30, 2, AutomationStroke::Line((30, 0.9), (2, 0.1))),
+            (u32::MAX - 3, u32::MAX, AutomationStroke::Line((u32::MAX - 3, 0.0), (u32::MAX, 1.0))),
+        ];
+        for (from, to, stroke) in strokes {
+            let mut once = base.clone();
+            once.paint(from, to, stroke);
+            let mut twice = once.clone();
+            twice.paint(from, to, stroke);
+            assert_eq!(twice, once, "painted twice from {from} to {to}: {stroke:?}");
+        }
+        // Each step painted with the value the lane already has there: the same points.
+        for (from, to) in [(0, 40), (9, 11), (19, 25), (0, 100)] {
+            let mut same = base.clone();
+            for step in from..=to {
+                same.paint(step, step, fill(base.value_at(step)));
+            }
+            assert_eq!(same, base, "its own values repainted from {from} to {to}");
+        }
+    }
 }

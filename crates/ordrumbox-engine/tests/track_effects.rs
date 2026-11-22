@@ -16,9 +16,10 @@ use std::sync::Arc;
 use ordrumbox_core::{Library, Scales};
 use ordrumbox_engine::kit::{BankSample, KitSample};
 use ordrumbox_engine::offline::{self, EXPORT_RATE, RenderSetup};
-use ordrumbox_engine::{SampleBank, SampleBuffer, SynthPresets, wav};
+use ordrumbox_engine::{SampleBank, SampleBuffer, SynthPresets};
 
-const RATE: f64 = EXPORT_RATE as f64;
+mod signals;
+use signals::{RATE, Wav, amplitude_at, brightness, db, edge, energy, frame, rms, span, through_wav};
 /// Length of the KICK burst.
 const BURST_SECONDS: f64 = 0.05;
 /// Length of each level of the SNARE and TOM tones, their frequency, and the
@@ -30,15 +31,6 @@ const TONE_LEVEL: f64 = 0.02;
 const LOUD_LEVEL: f64 = 0.5;
 /// The SNARE and the TOM play on beat 2: 1 s into the 2 s pattern at 120 bpm.
 const TONE_START: f64 = 1.0;
-
-fn frame(seconds: f64) -> usize {
-    (seconds * RATE).round() as usize
-}
-
-/// A linear fade in and out of `fade` frames over `frames`, at frame `i`.
-fn edge(i: usize, frames: usize, fade: usize) -> f64 {
-    (i.min(frames - 1 - i) as f64 / fade as f64).min(1.0)
-}
 
 /// White noise from a fixed linear congruential generator, with 1 ms fades
 /// so that the burst itself has no click.
@@ -97,24 +89,17 @@ fn setup() -> RenderSetup {
     }
 }
 
-/// The stereo channels of a WAV file.
-struct Wav {
-    left: Vec<f32>,
-    right: Vec<f32>,
-}
-
 #[derive(Debug, Clone, Copy)]
 enum Side {
     Left,
     Right,
 }
 
-impl Wav {
-    fn channel(&self, side: Side) -> &[f32] {
-        match side {
-            Side::Left => &self.left,
-            Side::Right => &self.right,
-        }
+/// The channel `side` of `wav`.
+fn channel(wav: &Wav, side: Side) -> &[f32] {
+    match side {
+        Side::Left => &wav.left,
+        Side::Right => &wav.right,
     }
 }
 
@@ -145,11 +130,7 @@ fn render_library(text: &str) -> Wav {
     assert!(report.issues.is_empty(), "{:?}", report.issues);
     let (left, right) = offline::render_pattern(&library, 0, 1, &setup(), None).expect("renders");
     assert_eq!(left.len(), 2 * EXPORT_RATE as usize, "4 beats at 120 bpm");
-    let file = wav::decode(&wav::encode(&left, &right, EXPORT_RATE)).expect("reads back");
-    assert_eq!(file.sample_rate, EXPORT_RATE);
-    let right = file.right.expect("a stereo file");
-    assert!(file.left.iter().chain(&right).all(|s| s.abs() < 1.0), "no clipping");
-    Wav { left: file.left, right }
+    through_wav(&left, &right)
 }
 
 const MUTED: &str = r#","mute":true"#;
@@ -172,42 +153,6 @@ fn tom(settings: &str) -> Wav {
 /// Whether two files hold the same samples.
 fn same(a: &Wav, b: &Wav) -> bool {
     a.left == b.left && a.right == b.right
-}
-
-fn energy(signal: &[f32]) -> f64 {
-    signal.iter().map(|&s| f64::from(s).powi(2)).sum()
-}
-
-fn rms(signal: &[f32]) -> f64 {
-    (energy(signal) / signal.len().max(1) as f64).sqrt()
-}
-
-fn db(ratio: f64) -> f64 {
-    20.0 * ratio.log10()
-}
-
-/// The signal between two times, seconds.
-fn span(signal: &[f32], from: f64, to: f64) -> &[f32] {
-    &signal[frame(from)..frame(to)]
-}
-
-/// Energy of the first difference over energy: about 2 for white noise,
-/// near 0 for a signal without highs.
-fn brightness(signal: &[f32]) -> f64 {
-    let diff: f64 = signal.windows(2).map(|w| f64::from(w[1] - w[0]).powi(2)).sum();
-    diff / energy(signal)
-}
-
-/// Amplitude of the `hz` component of `signal` (a Goertzel filter).
-fn amplitude_at(signal: &[f32], hz: f64) -> f64 {
-    let coefficient = 2.0 * (std::f64::consts::TAU * hz / RATE).cos();
-    let (mut s1, mut s2) = (0.0, 0.0);
-    for &x in signal {
-        let s = f64::from(x) + coefficient * s1 - s2;
-        s2 = s1;
-        s1 = s;
-    }
-    (s1 * s1 + s2 * s2 - coefficient * s1 * s2).sqrt() * 2.0 / signal.len() as f64
 }
 
 /// Normalized correlation of two signals of the same length.
@@ -388,8 +333,8 @@ fn the_effects_of_one_track_stay_on_its_strip() {
     let (alone_dry, alone_wet) = (kick(""), kick(everything));
     let difference = |a: &[f32], b: &[f32]| -> Vec<f32> { a.iter().zip(b).map(|(x, y)| x - y).collect() };
     for side in [Side::Left, Side::Right] {
-        let in_mix = difference(mix_wet.channel(side), mix_dry.channel(side));
-        let alone = difference(alone_wet.channel(side), alone_dry.channel(side));
+        let in_mix = difference(channel(&mix_wet, side), channel(&mix_dry, side));
+        let alone = difference(channel(&alone_wet, side), channel(&alone_dry, side));
         let residual = energy(&difference(&in_mix, &alone));
         assert!(residual < energy(&alone) * 1e-4, "{side:?}: residual {residual} of {}", energy(&alone));
     }

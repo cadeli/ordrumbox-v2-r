@@ -229,4 +229,33 @@ mod tests {
         assert_eq!(e.undo().as_deref(), Some("KICK Volume lane 4 row(s) tall"));
         assert_eq!(lanes(&e)[0].row_count(), 1, "the drag, one step");
     }
+
+    #[test]
+    fn lane_edits_undone_then_redone_give_the_same_library_each_time() {
+        let mut e = editor();
+        let start = e.library().clone();
+        // One edit of each kind, each its own undo step.
+        let volume = e.add_automation_lane(None, "KICK", AutomationTarget::Volume).unwrap();
+        let mute = e.add_automation_lane(None, "KICK", AutomationTarget::Mute).unwrap();
+        let base = lanes(&e)[volume].clone();
+        e.paint_automation(None, volume, &base, (0, 8), AutomationStroke::Line((0, 0.0), (8, 1.0)), "a").unwrap();
+        let base = lanes(&e)[mute].clone();
+        e.paint_automation(None, mute, &base, (4, 12), ON, "b").unwrap();
+        assert!(e.set_automation_lane_rows(None, volume, 3, "c"));
+        assert!(e.clear_automation_lane(None, mute));
+        assert!(e.remove_automation_lane(None, mute));
+        let end = e.library().clone();
+        const STEPS: usize = 7;
+        for round in 0..2 {
+            for _ in 0..STEPS {
+                assert!(e.undo().is_some(), "round {round}");
+            }
+            assert_eq!(*e.library(), start, "round {round}: undone to the start");
+            for _ in 0..STEPS {
+                assert!(e.redo().is_some(), "round {round}");
+            }
+            assert_eq!(*e.library(), end, "round {round}: redone to the end");
+        }
+        assert!(e.redo().is_none(), "nothing past the end");
+    }
 }

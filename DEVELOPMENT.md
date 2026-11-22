@@ -137,6 +137,20 @@ factory preset also plays a finite, silent-ended note at three pitches, the same
 whatever the size of the blocks it is rendered in. No fixture, nothing to rewrite: a failure is a
 wrong sound or a wrong threshold.
 
+### Automation, measured
+
+`ordrumbox-engine/tests/automation_renders.rs` renders songs whose lanes are read from their JSON as the WAV
+export does (`offline::render_song`), through a 16-bit WAV file and back, and measures the measure where each
+lane starts against the one before it: a mute and a probability of 0 silence, a solo silences the others,
+a volume of 0.5 is −15 dB, a pan of 0 leaves the right side silent, a cutoff takes the highs off a noise, a
+transpose of 0.75 plays a 440 Hz sine at 880 Hz, a swing of 0.25 beat moves an off-beat 0.125 s late, an echo
+send feeds the echo, a saturation adds a third harmonic; lanes of an instrument the song lacks leave the file
+the same, sample for sample. The sources are synthetic; the measures (`tests/signals/`) are shared with
+`track_effects.rs`. Idempotence: `ordrumbox-core/tests/json_idempotence.rs` saves a song with a lane of every
+control twice (the same text, the same lanes); `automation.rs` paints the same stroke twice (the same lane)
+and repaints a lane's own values (no change); `ordrumbox-logic/src/arrangement/automation.rs` undoes and redoes
+every kind of lane edit, twice over (the same library each time). No fixture, nothing to rewrite.
+
 ### Changes of behaviour
 
 A double-click on a track's name in the grid opens the piano roll on that track (`press_track_name`,
