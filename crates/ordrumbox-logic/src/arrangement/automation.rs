@@ -1,27 +1,17 @@
 //! The automation lanes of an arrangement: added, removed, and their on and
 //! off points placed step by step, each edit one undo step.
 
-use ordrumbox_core::automation::{
-    AutomationKind, AutomationLane, AutomationStroke, AutomationTarget, STEPS_PER_MEASURE, is_on,
-};
+use ordrumbox_core::automation::{AutomationLane, AutomationStroke, AutomationTarget, step_label};
 
 use crate::editor::Editor;
 
-/// `step` as shown: `measure.step`, both from 1.
-fn step_label(step: u32) -> String {
-    format!("{}.{}", step / STEPS_PER_MEASURE + 1, step % STEPS_PER_MEASURE + 1)
-}
-
 /// What `stroke` does to a lane of `target`, as an undo step says it.
 fn stroke_label(target: AutomationTarget, stroke: AutomationStroke) -> String {
-    match (stroke, target.kind()) {
-        (AutomationStroke::Fill(None), _) => "erased".to_owned(),
-        (AutomationStroke::Fill(Some(value)), AutomationKind::Switch) => {
-            (if is_on(value) { "on" } else { "off" }).into()
-        }
-        (AutomationStroke::Fill(Some(value)), AutomationKind::Level) => format!("{:.0}%", value * 100.0),
-        (AutomationStroke::Line((_, from), (_, to)), _) if from == to => format!("{:.0}%", from * 100.0),
-        (AutomationStroke::Line(..), _) => "drawn".to_owned(),
+    match stroke {
+        AutomationStroke::Fill(None) => "erased".to_owned(),
+        AutomationStroke::Fill(Some(value)) => target.value_label(value),
+        AutomationStroke::Line((_, from), (_, to)) if from == to => target.value_label(from),
+        AutomationStroke::Line(..) => "drawn".to_owned(),
     }
 }
 
@@ -199,7 +189,7 @@ mod tests {
     }
 
     #[test]
-    fn a_volume_lane_is_drawn_and_said_in_percent() {
+    fn a_volume_lane_is_drawn_and_said_in_decibels() {
         let mut e = editor();
         e.add_automation_lane(None, "KICK", AutomationTarget::Volume).unwrap();
         let base = lanes(&e)[0].clone();
@@ -209,6 +199,6 @@ mod tests {
         assert_eq!(e.undo().as_deref(), Some("KICK Volume drawn from 1.1 to 1.5"));
         let flat = AutomationStroke::Line((3, 0.8), (3, 0.8));
         e.paint_automation(None, 0, &base, (3, 3), flat, "click").unwrap();
-        assert_eq!(e.undo().as_deref(), Some("KICK Volume 80% at 1.4"));
+        assert_eq!(e.undo().as_deref(), Some("KICK Volume -2.4 dB at 1.4"));
     }
 }

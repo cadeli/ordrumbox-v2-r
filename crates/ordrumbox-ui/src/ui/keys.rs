@@ -43,6 +43,7 @@ pub(super) fn shortcut(code: Key, shift: bool, control: bool) -> Option<Command>
             // Cmd+M is the Mac's "minimize the window": the export takes Shift there.
             Key::Letter('M') if shift || !MACOS => C::ExportMidi,
             Key::Letter('K') => C::KitEditor,
+            Key::Letter('L') => C::ToggleLoop,
             Key::Letter('N') => C::NewPattern,
             Key::Letter('D') => C::DuplicatePattern,
             Key::Letter('T') if shift => C::ToggleToasts,

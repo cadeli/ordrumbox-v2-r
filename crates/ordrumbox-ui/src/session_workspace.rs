@@ -93,6 +93,7 @@ impl Session {
         self.chrome.widgets.focus = None;
         self.chrome.widgets.dropdown = None;
         self.song_panel.hovered_clip = None;
+        self.song_panel.hovered_lane = None;
         self.song_panel.drag = None;
         self.song_panel.bar_drag = None;
         self.roll.release();

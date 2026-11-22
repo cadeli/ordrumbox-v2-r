@@ -1,10 +1,11 @@
 //! The strips of a song pass: each instrument's settings and LFOs, its
 //! volume set by the song's automation lanes (silent where its pattern's
-//! mute and solo, or the lanes, say so; at a volume lane's level). A level
-//! that changes inside the pass is set tick by tick (a volume LFO), so a mute
-//! cuts the sound at its step, tails included.
+//! mute and solo, or the lanes, say so; at a volume lane's level, in
+//! decibels). A level that changes inside the pass is set tick by tick (a
+//! volume LFO), so a mute cuts the sound at its step, tails included, and a
+//! drawn volume glides.
 
-use ordrumbox_core::automation::{AutomationTarget, automated, is_silent};
+use ordrumbox_core::automation::{AutomationTarget, automated_at, is_silent, volume_gain};
 use ordrumbox_core::steps::TICK;
 use ordrumbox_core::{Pattern, Song, Track};
 use ordrumbox_dsp::StripSettings;
@@ -34,11 +35,12 @@ pub(super) fn settings_and_lfos(
         // The volume the song sets at `tick`: 0 where silent, a lane's level,
         // `None` where it leaves the track's own.
         let level_at = |tick: u32| {
-            let step = song.automation_step_at(span.first_tick + u64::from(tick), TICK);
-            if is_silent(tracks, t, &song.automations, step) {
+            let position = song.automation_position_at(span.first_tick + u64::from(tick), TICK);
+            if is_silent(tracks, t, &song.automations, position.floor() as u32) {
                 Some(0.0)
             } else {
-                automated(&song.automations, &tracks[t].name, AutomationTarget::Volume, step).map(|v| v as f32)
+                let level = automated_at(&song.automations, &tracks[t].name, AutomationTarget::Volume, position);
+                level.map(|level| volume_gain(level) as f32)
             }
         };
         let first = level_at(0);
@@ -122,8 +124,9 @@ mod tests {
         )
         .unwrap();
         let mut lane = AutomationLane::new("KICK", AutomationTarget::Volume);
-        lane.paint(4, 7, AutomationStroke::Fill(Some(0.25))); // the second beat
-        lane.paint(16, u32::MAX, AutomationStroke::Fill(Some(0.5)));
+        lane.paint(4, 7, AutomationStroke::Fill(Some(0.75))); // the second beat
+        lane.paint(16, u32::MAX, AutomationStroke::Fill(Some(1.0)));
+        lane.paint(10, 12, AutomationStroke::Line((10, 0.5), (12, 1.0))); // a line on the third beat
         library.songs[0].automations.push(lane);
         let mut unmute = AutomationLane::new("SNARE", AutomationTarget::Mute);
         unmute.paint(0, u32::MAX, AutomationStroke::Fill(Some(0.0)));
@@ -136,11 +139,15 @@ mod tests {
         assert_eq!(settings[0].volume, 0.8, "the track's own at first");
         assert_eq!(settings[1].volume, 0.6, "muted in its pattern, switched back on by its lane");
         let volume = &lfos[0].volume;
-        let beat = (ticks / 4) as usize;
-        assert_eq!([volume[0], volume[beat], volume[2 * beat]], [0.8, 0.25, 0.8], "the lane's on its beat");
+        let (beat, step) = ((ticks / 4) as usize, (ticks / 16) as usize);
+        let at = |level: f64| volume_gain(level) as f32;
+        assert_eq!([volume[0], volume[beat], volume[2 * beat]], [0.8, at(0.75), 0.8], "the lane's, in dB, on its beat");
+        let line = &volume[10 * step..12 * step];
+        assert_eq!((line[0], line[step]), (at(0.5), at(0.75)), "each step of the line");
+        assert!(line.windows(2).all(|pair| pair[0] < pair[1]), "gliding from tick to tick");
 
         let (settings, lfos) = settings_and_lfos(song, patterns, &[(0, 0)], span(1));
-        assert_eq!(settings[0].volume, 0.5, "the whole pass at the lane's level");
+        assert_eq!(settings[0].volume, 1.0, "the whole pass at the lane's level");
         assert!(lfos.is_empty());
     }
 }

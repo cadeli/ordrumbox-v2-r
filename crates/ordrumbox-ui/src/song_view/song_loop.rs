@@ -1,5 +1,6 @@
-//! The song's loop on the ruler: its steps tinted green and a mark at each
-//! of its ends, which a drag moves, on the lines of the zoom.
+//! The song's loop on the ruler: its steps tinted green (grey while it is
+//! off) and a mark at each of its ends, which a drag moves, on the lines of
+//! the zoom.
 
 use super::draw::Page;
 use super::*;
@@ -47,12 +48,13 @@ pub(super) fn draw(canvas: &mut Canvas, view: &SongView, layout: &SongLayout, pa
     let x_of = |step: u32| layout.step_x(step.clamp(*shown.start(), *shown.end()), page.first_measure);
     let (from, to) = (x_of(first), x_of(end));
     let (top, height) = (layout.ruler_top(), HEADER_HEIGHT * s - s.px());
+    let color = if view.is_loop_on { LOOP } else { theme::muted() };
     if to > from {
-        canvas.tint_rect(from, top, to - from, height, LOOP, LOOP_ALPHA);
+        canvas.tint_rect(from, top, to - from, height, color, LOOP_ALPHA);
     }
     for (step, x) in [(first, from), (end, to - END_WIDTH * s)] {
         if shown.contains(&step) {
-            canvas.fill_rect(x, top, END_WIDTH * s, height, LOOP);
+            canvas.fill_rect(x, top, END_WIDTH * s, height, color);
         }
     }
 }

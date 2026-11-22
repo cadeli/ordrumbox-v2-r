@@ -70,6 +70,7 @@ impl Session {
             has_selection: self.selection.selected.is_some(),
             playing: self.playing(),
             metronome: self.transport.metronome,
+            is_loop_on: self.song_loop_region().is_some(),
             recording: self.transport.recording,
             record_timing: self.transport.record_timing,
             fullscreen: self.program.fullscreen,
@@ -207,6 +208,7 @@ impl Session {
             C::TapTempo => self.tap_tempo(),
             C::Metronome => self.toggle_metronome(),
             C::ClearLoop => self.clear_loop(),
+            C::ToggleLoop => self.toggle_loop(),
             C::PreviousSong => self.step_song(-1),
             C::NextSong => self.step_song(1),
             C::Mute | C::Solo => {

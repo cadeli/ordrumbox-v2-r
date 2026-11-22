@@ -130,11 +130,18 @@ fn draw_lane(canvas: &mut Canvas, lane: &AutomationLane, layout: &SongLayout, y:
     }
 }
 
-/// A lane's values over its band `(top, height)`, each from its point to the
-/// next: a switch on full and in its colour, off full and faint, with a mark
-/// where it changes; a level as high as it is, its top drawn. Nothing where
-/// the lane leaves the pattern's.
-fn draw_values(
+/// A lane's values over its band `(top, height)`. A switch: each from its
+/// point to the next, on full and in its colour, off full and faint, with a
+/// mark where it changes. A level: column by column, as high as it is where
+/// it glides too, its top drawn. Nothing where the lane leaves the pattern's.
+fn draw_values(canvas: &mut Canvas, lane: &AutomationLane, layout: &SongLayout, band: (i32, i32), page: &Page) {
+    match lane.target.kind() {
+        AutomationKind::Switch => draw_switch(canvas, lane, layout, band, page),
+        AutomationKind::Level => draw_level(canvas, lane, layout, band, page),
+    }
+}
+
+fn draw_switch(
     canvas: &mut Canvas,
     lane: &AutomationLane,
     layout: &SongLayout,
@@ -151,31 +158,36 @@ fn draw_values(
         let end = points.get(i + 1).map_or(end_step, |next| next.step);
         let (from, to) = (x_of(point.step), x_of(end));
         let Some(value) = point.value.filter(|_| to > from) else { continue };
-        match lane.target.kind() {
-            AutomationKind::Switch => {
-                let fill = if is_on(value) {
-                    theme::mix(theme::panel(), color, 0.6)
-                } else {
-                    theme::mix(theme::panel(), theme::muted(), 0.25)
-                };
-                canvas.fill_rect(from, top, to - from, height, fill);
-            }
-            AutomationKind::Level => {
-                let h = (f64::from(height) * value).round() as i32;
-                canvas.fill_rect(from, top + height - h, to - from, h, theme::mix(theme::panel(), color, 0.45));
-                canvas.fill_rect(from, top + height - h, to - from, s.px().min(h.max(1)), color);
-            }
-        }
+        let fill = if is_on(value) {
+            theme::mix(theme::panel(), color, 0.6)
+        } else {
+            theme::mix(theme::panel(), theme::muted(), 0.25)
+        };
+        canvas.fill_rect(from, top, to - from, height, fill);
     }
-    if lane.target.kind() == AutomationKind::Switch {
-        for point in points.iter().filter(|point| (first_step..end_step).contains(&point.step)) {
-            let mark = match point.value.map(is_on) {
-                Some(true) => color,
-                Some(false) => theme::muted(),
-                None => line_color(),
-            };
-            canvas.fill_rect(x_of(point.step), top, 2 * s, height, mark);
-        }
+    for point in points.iter().filter(|point| (first_step..end_step).contains(&point.step)) {
+        let mark = match point.value.map(is_on) {
+            Some(true) => color,
+            Some(false) => theme::muted(),
+            None => line_color(),
+        };
+        canvas.fill_rect(x_of(point.step), top, 2 * s, height, mark);
+    }
+}
+
+fn draw_level(canvas: &mut Canvas, lane: &AutomationLane, layout: &SongLayout, (top, height): (i32, i32), page: &Page) {
+    let s = layout.scale;
+    let color = target_color(lane.target);
+    let fill = theme::mix(theme::panel(), color, 0.45);
+    let left = layout.body_left();
+    for x in left..left + page.body_w {
+        // The middle of the pixel's column.
+        let position = (layout.measure_under(x, page.first_measure) + 0.5 / f64::from(layout.measure_width().max(1)))
+            * f64::from(STEPS_PER_MEASURE);
+        let Some(level) = lane.level_at(position) else { continue };
+        let h = (f64::from(height) * level).round() as i32;
+        canvas.fill_rect(x, top + height - h, 1, h, fill);
+        canvas.fill_rect(x, top + height - h, 1, s.px().min(h.max(1)), color);
     }
 }
 

@@ -12,7 +12,7 @@
 use crate::scale::Scale;
 use ordrumbox_core::automation::{
     AutomationKind, AutomationLane, AutomationStroke, AutomationTarget, STEPS_PER_MEASURE, song_instruments,
-    switch_value,
+    step_label, switch_value,
 };
 
 use super::Session;
@@ -159,6 +159,21 @@ impl Session {
             Ok(()) => self.edited(),
             Err(message) => self.message = message,
         }
+    }
+
+    /// What the lane painted, else the one under the mouse, sets at the
+    /// pointer's step: `KICK Volume -4.5 dB at 2.3`.
+    pub(super) fn lane_tooltip(&self) -> Option<String> {
+        let (lane, step, value) = match &self.song_panel.paint {
+            Some(paint) => (&paint.base, paint.to, paint.stroke().value_at(paint.to)),
+            None => {
+                let (lane, step) = self.song_panel.hovered_lane?;
+                let lane = self.song()?.automations.get(lane)?;
+                (lane, step, lane.value_at(step))
+            }
+        };
+        let value = value.map_or_else(|| "as the pattern".to_owned(), |value| lane.target.value_label(value));
+        Some(format!("{} {} {value} at {}", lane.instrument, lane.target.label(), step_label(step)))
     }
 
     /// The lane released: the zone stays as painted; whether one was pressed.
@@ -364,8 +379,16 @@ mod tests {
         let (top, height) = s.song_layout(SIZE).lane_band_at(y);
         assert!(s.song_click(SIZE, from, top + height, Button::Left));
         assert_eq!(points(&s), [(0, OFF), (1, None)], "pressed at the bottom of the band: 0");
+        assert_eq!(s.lane_tooltip().as_deref(), Some("KICK Volume silent at 1.1"));
         assert!(s.mouse_move(SIZE, to, top - 40, false));
+        assert_eq!(s.lane_tooltip().as_deref(), Some("KICK Volume 0.0 dB at 1.5"), "said as it is drawn");
         assert!(s.lane_paint_release());
+        let (x, _) = step_at(&s, 2);
+        assert!(s.song_hover(SIZE, x, top + 1));
+        assert_eq!(s.lane_tooltip().as_deref(), Some("KICK Volume -15.0 dB at 1.3"), "and under the mouse");
+        let (x, _) = step_at(&s, 9);
+        assert!(s.song_hover(SIZE, x, top + 1));
+        assert_eq!(s.lane_tooltip().as_deref(), Some("KICK Volume as the pattern at 1.10"));
         let expected = [(0, OFF), (1, Some(0.25)), (2, Some(0.5)), (3, Some(0.75)), (4, ON), (5, None)];
         assert_eq!(points(&s), expected, "up to the top, and above it: the whole level");
         s.undo();

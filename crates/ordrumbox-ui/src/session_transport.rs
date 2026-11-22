@@ -5,6 +5,9 @@
 use super::Session;
 use crate::menu;
 use ordrumbox_core::automation::STEPS_PER_MEASURE;
+
+/// What a loop command says without a loop.
+const NO_LOOP: &str = "no loop: a drag on the song's ruler sets one";
 use ordrumbox_engine::Mode;
 
 /// Where and how the session plays, beside the engine's own state.
@@ -14,6 +17,8 @@ pub(super) struct Transport {
     pub(super) song_cursor: u32,
     /// The steps a song plays in a loop: its index, first step, end (excluded).
     pub(super) song_loop: Option<(usize, u32, u32)>,
+    /// The loop plays; off, its ends stay on the ruler, for Ctrl+L to turn it on again.
+    pub(super) is_loop_on: bool,
     /// A click on every beat.
     pub(super) metronome: bool,
     /// The row keys put notes on the step the pattern plays (`session_record.rs`).
@@ -90,8 +95,14 @@ impl Session {
         }
     }
 
-    /// The steps the selected song plays in a loop, `first..end`.
+    /// The steps the selected song plays in a loop, `first..end`; `None`
+    /// without a loop or with it off.
     pub(super) fn song_loop_region(&self) -> Option<(u32, u32)> {
+        self.song_loop_marks().filter(|_| self.transport.is_loop_on)
+    }
+
+    /// The selected song's loop, `first..end`, on or off.
+    pub(super) fn song_loop_marks(&self) -> Option<(u32, u32)> {
         let (song, first, end) = self.transport.song_loop?;
         (song == self.editor.selected_song() && first < end).then_some((first, end))
     }
@@ -104,23 +115,41 @@ impl Session {
         self.set_song_loop(first * STEPS_PER_MEASURE, (last + 1) * STEPS_PER_MEASURE);
     }
 
-    /// The selected song loops over steps `first..end`, said as measures
-    /// and steps (`2` for a measure's start, `2.5` for its fifth step).
+    /// The selected song loops over steps `first..end`, the loop on, said
+    /// as measures and steps (`2` for a measure's start, `2.5` for its
+    /// fifth step).
     pub(super) fn set_song_loop(&mut self, first: u32, end: u32) {
+        self.transport.is_loop_on = true;
+        self.move_song_loop(first, end);
+    }
+
+    /// The selected song's loop moved to steps `first..end`, on or off as it was.
+    pub(super) fn move_song_loop(&mut self, first: u32, end: u32) {
         self.transport.song_loop = Some((self.editor.selected_song(), first, end));
         let at = |step: u32| match step % STEPS_PER_MEASURE {
             0 => (step / STEPS_PER_MEASURE + 1).to_string(),
             in_measure => format!("{}.{}", step / STEPS_PER_MEASURE + 1, in_measure + 1),
         };
-        self.message = format!("loop: {} to {}, a click on the ruler ends it", at(first), at(end));
+        let state = if self.transport.is_loop_on { "Ctrl+L turns it off" } else { "off, Ctrl+L turns it on" };
+        self.message = format!("loop: {} to {}, {state}", at(first), at(end));
     }
 
-    /// Play > Clear the loop: the song plays on to its end.
+    /// Ctrl+L: the song's loop on or off, its ends kept.
+    pub fn toggle_loop(&mut self) {
+        if self.song_loop_marks().is_none() {
+            self.message = NO_LOOP.into();
+            return;
+        }
+        self.transport.is_loop_on = !self.transport.is_loop_on;
+        self.message = (if self.transport.is_loop_on { "loop on" } else { "loop off" }).into();
+    }
+
+    /// Play > Clear the loop: the song plays on to its end, the loop's ends removed.
     pub fn clear_loop(&mut self) {
         if self.transport.song_loop.take().is_some() {
             self.message = "loop cleared".into();
         } else {
-            self.message = "no loop: a drag on the song's ruler sets one".into();
+            self.message = NO_LOOP.into();
         }
     }
 

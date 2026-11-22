@@ -81,6 +81,7 @@ impl Session {
         let mut parts = value.splitn(3, ':');
         let (action, a, b) = (parts.next().unwrap_or_default(), parts.next().unwrap_or_default(), parts.next());
         let result = match (action, b) {
+            ("loop", None) => return self.loop_menu_pick(a),
             ("add", Some(id)) => {
                 let measure = a.parse().unwrap_or(0);
                 let label = self.pattern_label(id);

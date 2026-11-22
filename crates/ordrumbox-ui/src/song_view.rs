@@ -122,8 +122,10 @@ pub struct SongView<'a> {
     /// its first line shown.
     pub description: Option<&'a str>,
     pub description_scroll: usize,
-    /// The steps that play in a loop, `first..end`.
+    /// The steps of the song's loop, `first..end`, on or off.
     pub loop_region: Option<(u32, u32)>,
+    /// The loop plays (off, it is drawn dim).
+    pub is_loop_on: bool,
     /// How wide a measure is drawn.
     pub zoom: MeasureZoom,
 }
@@ -552,6 +554,7 @@ mod tests {
             description_scroll: 0,
             zoom: MeasureZoom::default(),
             loop_region: None,
+            is_loop_on: false,
         };
         let layout = SongLayout::new(1100, 680, Scale::ONE, 0, MeasureZoom::default());
         let (mw, rh) = (layout.measure_width(), layout.row_height());
@@ -620,6 +623,7 @@ mod tests {
                     room: 8,
                     description: song.map(|_| long.as_str()),
                     loop_region: Some((20, 45)),
+                    is_loop_on: playing,
                     zoom,
                     description_scroll: 3,
                 };

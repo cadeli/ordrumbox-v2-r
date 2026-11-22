@@ -85,6 +85,8 @@ pub enum Command {
     Record,
     /// Recorded notes keep the timing played, or go on the step.
     RecordTiming,
+    /// Ctrl+L: the song's loop on or off, its ends kept.
+    ToggleLoop,
     /// The song's loop region removed.
     ClearLoop,
     PreviousSong,
@@ -185,6 +187,7 @@ impl Command {
             Self::SongView
             | Self::PlaySong
             | Self::ClearLoop
+            | Self::ToggleLoop
             | Self::PreviousSong
             | Self::NextSong
             | Self::NewSong
@@ -261,6 +264,8 @@ pub struct MenuState {
     pub has_selection: bool,
     pub playing: bool,
     pub metronome: bool,
+    /// The song's loop plays.
+    pub is_loop_on: bool,
     pub recording: bool,
     pub record_timing: bool,
     pub fullscreen: bool,

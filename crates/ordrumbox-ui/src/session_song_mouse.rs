@@ -51,6 +51,7 @@ impl Session {
             (SongHit::Description, Button::Left) => self.text_entry(Id::PatternDescription),
             (SongHit::Ruler(m), Button::Left) => self.press_ruler(size, x, m),
             (SongHit::LoopEnd(edge), Button::Left) => self.press_loop_end(edge),
+            (SongHit::Ruler(_) | SongHit::LoopEnd(_), Button::Right) => self.loop_menu(x, y),
             (SongHit::AddAutomation | SongHit::LaneName(_) | SongHit::LaneStep { .. }, _) => {
                 self.automation_click(size, hit, (x, y), button);
             }
@@ -342,8 +343,8 @@ impl Session {
         true
     }
 
-    /// The mouse over the arrangement: the clip it is on, for its tooltip;
-    /// whether it changed.
+    /// The mouse over the arrangement: the clip or the lane's step it is
+    /// on, for its tooltip; whether it changed.
     pub fn song_hover(&mut self, size: (i32, i32, Scale), x: i32, y: i32) -> bool {
         let hover = if self.workspace == Workspace::Song
             && self.chrome.widgets.drag.is_none()
@@ -351,21 +352,26 @@ impl Session {
         {
             let layout = self.song_layout(size);
             let rows = self.song_rows();
-            match layout.hit(&self.song_view_data(&rows, &layout), x, y) {
-                Some(SongHit::Clip(c)) => Some(c),
-                _ => None,
-            }
+            layout.hit(&self.song_view_data(&rows, &layout), x, y)
         } else {
             None
         };
-        let changed = hover != self.song_panel.hovered_clip;
-        self.song_panel.hovered_clip = hover;
+        let clip = match hover {
+            Some(SongHit::Clip(c)) => Some(c),
+            _ => None,
+        };
+        let lane = match hover {
+            Some(SongHit::LaneStep { lane, step }) => Some((lane, step)),
+            _ => None,
+        };
+        let changed = (clip, lane) != (self.song_panel.hovered_clip, self.song_panel.hovered_lane);
+        (self.song_panel.hovered_clip, self.song_panel.hovered_lane) = (clip, lane);
         changed
     }
 
-    /// The tooltip of the clip under the mouse (the clip's `title`).
     /// The tooltip of the clip under the mouse, or, while a pattern is
-    /// dragged over the arrangement, the measure it would be added at.
+    /// dragged over the arrangement, the measure it would be added at, or
+    /// the value of the lane's step painted or under the mouse.
     pub(super) fn draw_song_tooltip(&self, canvas: &mut Canvas, scale: Scale) {
         if self.chrome.covered() {
             return;
@@ -375,6 +381,10 @@ impl Session {
         if let (Some(ghost), Some(drag)) = (self.song_ghost(&layout, &rows), self.live_song_drag()) {
             let at = Rect::new(drag.x, drag.y, 0, 0);
             return view::draw_tooltip(canvas, &format!("Add at measure {}", ghost.measure + 1), at, scale);
+        }
+        if let Some(text) = self.lane_tooltip() {
+            let (x, y) = self.chrome.widgets.pointer;
+            return view::draw_tooltip(canvas, &text, Rect::new(x, y, 0, 0), scale);
         }
         let Some(c) = self.song_panel.hovered_clip else { return };
         let Some(clip) = self.song().and_then(|s| s.clips.get(c)) else { return };

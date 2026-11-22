@@ -1,10 +1,13 @@
-//! The song's loop set on the ruler: a drag selects the steps it plays,
-//! whole measures, beats or steps as fine as the zoom shows them; a drag on
-//! one of its ends moves that end; a click without a drag clears it (and
-//! puts the cursor on the measure clicked).
+//! The song's loop set on the ruler: a drag selects the steps it plays (and
+//! turns it on), whole measures, beats or steps as fine as the zoom shows
+//! them; a drag on one of its ends moves that end, on or off as it is. A
+//! click without a drag only puts the cursor on the measure clicked: the
+//! loop is turned off with Ctrl+L, not lost to a click. A right-click opens
+//! the loop's menu: turn it on or off, remove it.
 
 use super::Session;
 use super::session_song::DRAG_START_PX;
+use crate::panel::{Dropdown, Id};
 use crate::scale::Scale;
 use crate::song_view::Edge;
 use ordrumbox_core::automation::STEPS_PER_MEASURE;
@@ -41,7 +44,7 @@ impl Session {
         let first = self.song_scroll(&layout, self.song_rows().len() + self.song_lane_count()).0;
         let snap = layout.snap_steps();
         let total = self.song().map_or(1, |song| song.length_measures().max(1.0).ceil() as u32) * STEPS_PER_MEASURE;
-        let before = self.song_loop_region();
+        let before = self.song_loop_marks();
         let region = match drag {
             LoopDrag::New { anchor, press_x, measure, started } => {
                 let started = started || (x - press_x).abs() >= DRAG_START_PX;
@@ -66,23 +69,46 @@ impl Session {
                 (start < end).then_some((start, end))
             }),
         };
-        match region {
-            Some((start, end)) if region != before => {
+        match (region, drag) {
+            (Some(_), _) if region == before => false,
+            (Some((start, end)), LoopDrag::New { .. }) => {
                 self.set_song_loop(start, end);
                 true
             }
-            _ => false,
+            (Some((start, end)), LoopDrag::End(_)) => {
+                self.move_song_loop(start, end);
+                true
+            }
+            (None, _) => false,
         }
     }
 
-    /// The ruler released: a click without a drag clears the loop and puts
-    /// the cursor on its measure; whether the ruler was pressed.
+    /// A right-click on the ruler at `(x, y)`: the loop's menu.
+    pub(super) fn loop_menu(&mut self, x: i32, y: i32) {
+        if self.song_loop_marks().is_none() {
+            self.message = "no loop: a drag on the song's ruler sets one".into();
+            return;
+        }
+        let toggle = if self.transport.is_loop_on { "Turn the loop off" } else { "Turn the loop on" };
+        let values = vec!["loop:toggle".into(), "loop:clear".into()];
+        let labels = vec![format!("{toggle}  Ctrl+L"), "Remove the loop".into()];
+        self.chrome.widgets.dropdown = Some(Dropdown::menu(Id::SongMenu, x, y, "Loop".into(), values, labels));
+    }
+
+    /// A line of the loop's menu: `toggle` or `clear`.
+    pub(super) fn loop_menu_pick(&mut self, action: &str) {
+        match action {
+            "toggle" => self.toggle_loop(),
+            "clear" => self.clear_loop(),
+            _ => {}
+        }
+    }
+
+    /// The ruler released: a click without a drag puts the cursor on its
+    /// measure; whether the ruler was pressed.
     pub(super) fn loop_drag_release(&mut self) -> bool {
         let Some(drag) = self.song_panel.loop_drag.take() else { return false };
         if let LoopDrag::New { measure, started: false, .. } = drag {
-            if self.transport.song_loop.take().is_some() {
-                self.message = "loop cleared".into();
-            }
             self.set_song_cursor(measure);
         }
         true
@@ -91,7 +117,7 @@ impl Session {
 
 #[cfg(test)]
 mod tests {
-    use super::super::session_song::tests::{SIZE, session};
+    use super::super::session_song::tests::{SIZE, choose, menu, session};
     use super::Session;
     use crate::song_view::{MeasureZoom, SongHit};
     use crate::ui_input::Button;
@@ -141,7 +167,7 @@ mod tests {
         let ((from, y), (to, _)) = (step_x(&s, 5), step_x(&s, 10));
         drag(&mut s, (from, y), to);
         assert_eq!(s.song_loop_region(), Some((5, 11)));
-        assert_eq!(s.message, "loop: 1.6 to 1.12, a click on the ruler ends it");
+        assert_eq!(s.message, "loop: 1.6 to 1.12, Ctrl+L turns it off");
 
         // Its end, dragged to step 14's line; its start past it: they swap.
         let end = on_ruler(&s, |_, hit| hit == SongHit::LoopEnd(crate::song_view::Edge::End));
@@ -153,11 +179,34 @@ mod tests {
         drag(&mut s, (start, y), to);
         assert_eq!(s.song_loop_region(), Some((14, 20)));
 
-        // A click: no loop, the cursor on that measure.
+        // A click: the cursor on that measure, the loop kept.
+        s.set_song_cursor(1);
         let (x, y) = step_x(&s, 3);
         assert!(s.song_click(SIZE, x, y, Button::Left));
         assert!(s.song_release(SIZE));
-        assert_eq!((s.song_loop_region(), s.message.as_str()), (None, "loop cleared"));
+        assert_eq!((s.song_loop_region(), s.transport.song_cursor), (Some((14, 20)), 0));
+
+        // Off: its ends stay, and move; on again where they are.
+        s.toggle_loop();
+        assert_eq!((s.song_loop_region(), s.song_loop_marks()), (None, Some((14, 20))));
+        let end = on_ruler(&s, |_, hit| hit == SongHit::LoopEnd(crate::song_view::Edge::End));
+        let to = step_x(&s, 24).0 - 2;
+        drag(&mut s, (end, y), to);
+        assert_eq!((s.song_loop_region(), s.song_loop_marks()), (None, Some((14, 24))));
+        assert_eq!(s.message, "loop: 1.15 to 2.9, off, Ctrl+L turns it on");
+        s.toggle_loop();
+        assert_eq!((s.song_loop_region(), s.message.as_str()), (Some((14, 24)), "loop on"));
+
+        // A right-click: turn it off or remove it.
+        assert!(s.song_click(SIZE, x, y, Button::Right));
+        assert_eq!(menu(&s), ["loop:toggle", "loop:clear"]);
+        choose(&mut s, 0);
+        assert_eq!((s.song_loop_region(), s.song_loop_marks()), (None, Some((14, 24))));
+        assert!(s.song_click(SIZE, x, y, Button::Right));
+        choose(&mut s, 1);
+        assert_eq!((s.song_loop_marks(), s.message.as_str()), (None, "loop cleared"));
+        assert!(s.song_click(SIZE, x, y, Button::Right));
+        assert!(s.message.starts_with("no loop"), "no menu without a loop");
 
         // Zoomed out: whole measures.
         s.song_panel.zoom = MeasureZoom::new(24);

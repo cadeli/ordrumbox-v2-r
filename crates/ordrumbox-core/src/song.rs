@@ -239,13 +239,19 @@ impl Song {
     /// beat), wrapped on the arrangement as [`Song::active_clips_at`] wraps it.
     #[must_use]
     pub fn automation_step_at(&self, tick: u64, ticks_per_beat: u32) -> u32 {
+        self.automation_position_at(tick, ticks_per_beat).floor() as u32
+    }
+
+    /// [`Song::automation_step_at`] with the fraction of the step `tick` is past.
+    #[must_use]
+    pub fn automation_position_at(&self, tick: u64, ticks_per_beat: u32) -> f64 {
         let per_measure = f64::from(ticks_per_beat) * BEATS_PER_MEASURE;
         let total = self.length_measures();
         if per_measure <= 0.0 || total <= 0.0 {
-            return 0;
+            return 0.0;
         }
         let measures = (tick as f64 / per_measure) % total;
-        (measures * f64::from(STEPS_PER_MEASURE)).floor() as u32
+        measures * f64::from(STEPS_PER_MEASURE)
     }
 }
 

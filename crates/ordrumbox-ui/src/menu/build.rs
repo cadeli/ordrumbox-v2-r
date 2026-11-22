@@ -251,6 +251,7 @@ fn play_menu(s: &MenuState) -> Menu {
             check("Play pattern", "Space", C::PlayPattern, p, s.playing),
             command("Play song", "Shift+Space", C::PlaySong, s.has_songs),
             command("Rewind", "Home", C::Rewind, true),
+            check("Loop the song", "Ctrl+L", C::ToggleLoop, s.has_songs, s.is_loop_on),
             command("Clear the loop", "", C::ClearLoop, s.has_songs),
             Item::Separator,
             check("Record notes", "Ctrl+R", C::Record, p, s.recording),

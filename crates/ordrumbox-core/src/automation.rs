@@ -3,8 +3,11 @@
 //! and off (mute, solo) or set its level (volume).
 //!
 //! Every lane holds values from 0 to 1: a switch is off below one half and
-//! on from it, a level is the level itself. A point sets its value from its
-//! step until the next point, or gives the control back to the pattern.
+//! on from it, a level is a fader's position (a volume's top is 0 dB). A
+//! point sets its value from its step until the next point, or gives the
+//! control back to the pattern; a level glides over a point's step to the
+//! next point when that point is on the next step, so a drawn line is
+//! smooth while a level held then changed still jumps on its step.
 //! Before its first point a lane leaves the control as the pattern has it.
 //! An instrument is named as its tracks are (KICK, SNARE...), so a lane
 //! follows it through every pattern of the song.
@@ -19,6 +22,9 @@ pub const STEPS_PER_BEAT: u32 = 4;
 pub const STEPS_PER_MEASURE: u32 = STEPS_PER_BEAT * 4;
 /// Ticks of a step of an automation lane (or of a song loop's end).
 pub const STEP_TICKS: u32 = crate::steps::TICK / STEPS_PER_BEAT;
+/// The quietest a volume lane's level sets above silence, at its bottom.
+const VOLUME_FLOOR_DB: f64 = -60.0;
+
 /// The values a lane keeps apart: finer ones are rounded to it, so that a
 /// drawn line does not leave a point on each step for nothing.
 const VALUE_RESOLUTION: f64 = 1000.0;
@@ -71,10 +77,40 @@ impl AutomationTarget {
         }
     }
 
+    /// `value` as shown: `on` or `off` for a switch, decibels for a volume.
+    #[must_use]
+    pub fn value_label(self, value: f64) -> String {
+        match self {
+            Self::Mute | Self::Solo => (if is_on(value) { "on" } else { "off" }).to_owned(),
+            Self::Volume => volume_db(value).map_or_else(|| "silent".to_owned(), |db| format!("{db:.1} dB")),
+        }
+    }
+
     #[must_use]
     pub fn from_key(key: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|target| target.key() == key)
     }
+}
+
+/// `step` as shown: `measure.step`, both from 1.
+#[must_use]
+pub fn step_label(step: u32) -> String {
+    format!("{}.{}", step / STEPS_PER_MEASURE + 1, step % STEPS_PER_MEASURE + 1)
+}
+
+/// The decibels a volume lane's `level` sets, as a fader's curve has them:
+/// 0 dB at the top, finer near it, [`VOLUME_FLOOR_DB`] just above the
+/// bottom; `None` (silent) at the bottom.
+#[must_use]
+pub fn volume_db(level: f64) -> Option<f64> {
+    // Plus zero: the top is 0 dB, not -0 dB.
+    (level > 0.0).then(|| VOLUME_FLOOR_DB * (1.0 - level.min(1.0)).powi(2) + 0.0)
+}
+
+/// The gain a volume lane's `level` sets ([`volume_db`]).
+#[must_use]
+pub fn volume_gain(level: f64) -> f64 {
+    volume_db(level).map_or(0.0, |db| 10f64.powf(db / 20.0))
 }
 
 /// Whether a switch's `value` is on.
@@ -173,6 +209,24 @@ impl AutomationLane {
         after.checked_sub(1).and_then(|i| self.points[i].value)
     }
 
+    /// What the lane sets at `position` (steps from the start of the song,
+    /// with their fractions): a level glides from a point to the next one
+    /// when they are on adjacent steps; a switch holds.
+    #[must_use]
+    pub fn level_at(&self, position: f64) -> Option<f64> {
+        let step = position.max(0.0).floor().min(f64::from(u32::MAX)) as u32;
+        let value = self.value_at(step)?;
+        let at = self.points.partition_point(|point| point.step < step);
+        let next = match self.points.get(at..) {
+            Some([here, next, ..]) if here.step == step && step.checked_add(1) == Some(next.step) => next.value,
+            _ => None,
+        };
+        match (self.target.kind(), next) {
+            (AutomationKind::Level, Some(to)) => Some(value + (to - value) * (position - f64::from(step))),
+            _ => Some(value),
+        }
+    }
+
     /// Whether the lane switches its control on at `step`; `None` where it
     /// leaves it to the pattern.
     #[must_use]
@@ -214,6 +268,18 @@ impl AutomationLane {
 #[must_use]
 pub fn automated(lanes: &[AutomationLane], instrument: &str, target: AutomationTarget, step: u32) -> Option<f64> {
     lanes.iter().filter(|lane| lane.is_for(instrument, target)).find_map(|lane| lane.value_at(step))
+}
+
+/// What `lanes` set `target` of `instrument` to at `position` (steps, with
+/// their fractions: [`AutomationLane::level_at`]).
+#[must_use]
+pub fn automated_at(
+    lanes: &[AutomationLane],
+    instrument: &str,
+    target: AutomationTarget,
+    position: f64,
+) -> Option<f64> {
+    lanes.iter().filter(|lane| lane.is_for(instrument, target)).find_map(|lane| lane.level_at(position))
 }
 
 /// Whether track `t` of `tracks` is silent at `step` of a song with
@@ -374,5 +440,31 @@ mod tests {
         assert_eq!(silent(&lanes, 7), [false, true]);
         assert_eq!(silent(&lanes, 8), [true, true]);
         assert!(is_silent(&tracks, 5, &[], 0), "no such track");
+    }
+
+    #[test]
+    fn a_volume_is_a_fader_in_decibels_and_glides_to_the_next_step() {
+        assert_eq!([0.0, 0.5, 1.0].map(volume_db), [None, Some(-15.0), Some(0.0)]);
+        assert_eq!((volume_gain(0.0), volume_gain(1.0)), (0.0, 1.0));
+        assert!((volume_gain(0.5) - 0.1778).abs() < 1e-4, "-15 dB");
+        let label = |v| AutomationTarget::Volume.value_label(v);
+        assert_eq!([label(0.0), label(0.75), label(1.0)], ["silent", "-3.8 dB", "0.0 dB"]);
+        assert_eq!(AutomationTarget::Mute.value_label(0.7), "on");
+        assert_eq!(step_label(21), "2.6");
+
+        let mut lane = AutomationLane::new("KICK", AutomationTarget::Volume);
+        lane.points = vec![
+            AutomationPoint { step: 0, value: Some(0.0) },
+            AutomationPoint { step: 1, value: Some(1.0) },
+            AutomationPoint { step: 4, value: Some(0.5) },
+            AutomationPoint { step: 5, value: None },
+        ];
+        assert_eq!(lane.level_at(0.25), Some(0.25), "to the next step's point");
+        assert_eq!(lane.level_at(2.5), Some(1.0), "held: no point on the next step");
+        assert_eq!(lane.level_at(3.5), Some(1.0), "a jump, not a glide over the hold");
+        assert_eq!(lane.level_at(4.5), Some(0.5), "no glide into the pattern's");
+        let mut mute = lane.clone();
+        mute.target = AutomationTarget::Mute;
+        assert_eq!(mute.level_at(0.75), Some(0.0), "a switch holds");
     }
 }

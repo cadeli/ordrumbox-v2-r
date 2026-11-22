@@ -185,9 +185,12 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   A **drag** on the song panel's ruler selects the part of the song that plays in a loop:
   whole measures, beats or steps, as fine as the ruler is marked at that zoom. The ruler
   tints it green, with a mark at each end; drag a mark to move that end (on the same
-  lines). Another drag selects a new loop; a **click** on the ruler ends the loop and puts
-  the cursor on the measure clicked (Play > Clear the loop also ends it). **Shift + click**
-  on the ruler loops the song from the cursor's measure to the one clicked.
+  lines). Another drag selects a new loop. **Ctrl + L** (Play > Loop the song) turns the
+  loop off and on again: off, it stays on the ruler in grey, its ends still movable. A
+  **click** on the ruler only puts the cursor on the measure clicked. A **right-click** on
+  the ruler opens the loop's menu: turn it on or off, or remove it (as Play > Clear the
+  loop). **Shift + click** on the ruler loops the song from the cursor's measure to
+  the one clicked.
   A **double-click** on a clip of the song panel opens its pattern in the grid, in
   pattern mode.
 - **Automation lanes** in the song panel: **+ NEW AUTOMATION**, under the arrangement's
@@ -196,8 +199,10 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   far enough to show each step (a sixteenth note). Press a step and **drag** along the
   lane to select steps. On a Mute or Solo lane, from a step that is not on, the selection
   is switched on; from a step that is on, it is switched off. On a Volume lane, the height
-  you press at is the level (top: full, bottom: silent), and a drag draws a line from it
-  to the pointer's height. With the **right button**, the selection is erased, back to
+  you press at is the level, as on a fader: the top is 0 dB, the middle about −15 dB, the
+  bottom silent; a drag draws a line from it to the pointer's height, which plays as a
+  smooth glide. While you draw, and when the mouse is over a lane, a tooltip gives the
+  value under it (`KICK Volume -4.5 dB at 2.3`). With the **right button**, the selection is erased, back to
   what the patterns say. The selection is made of whole measures, beats or steps, as fine
   as the ruler is marked at that zoom; hold **Shift** to select steps at any zoom. Only
   the steps selected change. Where a lane sets nothing, the instrument plays as its
