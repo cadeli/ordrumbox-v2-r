@@ -73,6 +73,8 @@ mod tests {
         s.run(Command::NextColorScheme);
         assert_eq!(s.message, "colour scheme 6: Graphite");
         s.run(Command::NextColorScheme);
+        assert_eq!(s.message, "colour scheme 7: High contrast");
+        s.run(Command::NextColorScheme);
         assert_eq!(theme::scheme_number(), 1);
         assert_eq!(store::load_setting(&path, KEY), Ok(Some(json::Value::from(1))));
         assert!(store::load_setting(&path, "master").unwrap().is_some(), "the other settings are kept");
@@ -87,7 +89,7 @@ mod tests {
         let mut s = Session::new(Library::default(), KitSet::empty(), Vec::new());
         s.load_color_scheme(Some(path));
         assert_eq!(theme::scheme_number(), 1);
-        assert_eq!(s.status, ["settings.json: colorScheme: 9 is not a colour scheme (1 to 6), Indigo used"]);
+        assert_eq!(s.status, ["settings.json: colorScheme: 9 is not a colour scheme (1 to 7), Indigo used"]);
         std::fs::remove_dir_all(dir).unwrap();
     }
 }

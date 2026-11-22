@@ -415,3 +415,8 @@ What has a menu shows it under the pointer: `SongPanel::hovered` (`SongView::hov
 end, whose room is kept so that a name never shortens under the pointer; a hovered clip is drawn lighter. A context
 menu shows the key of its lines (`Dropdown::shortcuts`, `menu::shown_shortcuts`: Cmd on macOS, Alt in a plugin): the
 grid's track and step menus, the clip's and the loop's. No snapshot changed.
+
+A seventh colour scheme, High contrast (`theme::SCHEMES`, `colorScheme` 7): its ground and text only, the accents
+being shared. `the_high_contrast_scheme_reads_everywhere` checks its WCAG ratios: 7:1 for text and labels on every
+ground, 4.5:1 for what is greyed out, for a button's label on the line colour and for each accent on the window,
+3:1 for borders. No snapshot changed.

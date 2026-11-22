@@ -18,6 +18,8 @@
   the row's pattern; a click on a clip selects it (Delete removes it, Ctrl D repeats it).
 - Under the pointer, a name that has a menu is drawn lighter with a `v` at its end, and a clip
   lighter; the context menus show the key of each line that has one.
+- A seventh colour scheme, **High contrast** (Shift C): white text on black, every text at least
+  7:1 against its ground.
 - MCP: `saveProject`, `openProject`, `exportProject`, `listSavedProjects` (its list under `projects`)
   and `setProjectInfo`; the earlier `*Song*` names still work.
 

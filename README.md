@@ -289,6 +289,9 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   display's, such as `0.5`; whole numbers from earlier versions still read). A
   display at 150 % shows at ×1.5. In the plugin, Alt stands for Ctrl (the host
   keeps Ctrl).
+- **Shift + C** (View > Next colour scheme): the next of seven colour schemes, the last one
+  **High contrast** (white on black, every text at least 7:1 against its ground), for low
+  vision or a bright room. Kept in `settings.json` (`colorScheme`, 7 for high contrast).
 - **Where you left off**: the app starts on the pattern and the arrangement you had
   chosen, in the mode and the view you had open (grid, piano roll, song panel, synth,
   mixer), with the track editor, the note editor, the VU meters and the kit editor shown

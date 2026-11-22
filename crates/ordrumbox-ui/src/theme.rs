@@ -43,9 +43,9 @@ pub struct Scheme {
 
 /// The colour schemes, numbered from 1 as in `settings.json`
 /// (`colorScheme`): indigo, amber, deep sea (the web version's three), then
-/// crimson and toxic, saturated grounds of this version only, and graphite,
-/// a neutral one.
-pub const SCHEMES: [Scheme; 6] = [
+/// crimson and toxic, saturated grounds of this version only, graphite,
+/// a neutral one, and high contrast, for low vision and bright rooms.
+pub const SCHEMES: [Scheme; 7] = [
     Scheme {
         name: "Indigo",
         bg: 0x0010_112F,
@@ -146,6 +146,26 @@ pub const SCHEMES: [Scheme; 6] = [
         text: 0x00EC_EEF2,
         muted: 0x008C_919C,
         disabled: 0x0050_545C,
+    },
+    // High contrast: white text on black, labels nearly as bright, borders
+    // and steps that stand out; at least 7:1 for every text on every ground
+    // (WCAG AAA), 4.5:1 for what is greyed out and for a button's label on
+    // the line colour that fills it, 3:1 for borders (a test checks it).
+    Scheme {
+        name: "High contrast",
+        bg: 0x0000_0000,
+        panel: 0x000A_0A0A,
+        panel_2: 0x0014_1414,
+        cell: 0x0024_2424,
+        cell_beat: 0x003C_3C3C,
+        line: 0x0076_7676,
+        screen: 0x0000_0000,
+        shade: 0x0000_0000,
+        selected_row: 0x0038_2C66,
+        highlight: 0x0038_3838,
+        text: 0x00FF_FFFF,
+        muted: 0x00D6_D6D6,
+        disabled: 0x00B4_B4B4,
     },
 ];
 
@@ -324,6 +344,36 @@ mod tests {
         assert_eq!(note(PINK, 1.0), PINK);
         assert_eq!(mix(0x000000, 0xFF8040, 0.5), 0x804020);
         assert_ne!(note(PINK, 0.0), cell());
+    }
+
+    /// The WCAG contrast ratio of `a` over `b`, 1 to 21.
+    fn contrast(a: Rgb, b: Rgb) -> f64 {
+        let luminance = |c: Rgb| {
+            let channel = |shift: u32| {
+                let v = f64::from((c >> shift) & 0xFF) / 255.0;
+                if v <= 0.039_28 { v / 12.92 } else { ((v + 0.055) / 1.055).powf(2.4) }
+            };
+            0.2126 * channel(16) + 0.7152 * channel(8) + 0.0722 * channel(0)
+        };
+        let (la, lb) = (luminance(a), luminance(b));
+        (la.max(lb) + 0.05) / (la.min(lb) + 0.05)
+    }
+
+    #[test]
+    fn the_high_contrast_scheme_reads_everywhere() {
+        let high = SCHEMES.iter().find(|s| s.name == "High contrast").expect("the scheme");
+        let grounds = [high.bg, high.panel, high.panel_2, high.cell, high.cell_beat, high.selected_row, high.highlight];
+        for ground in grounds {
+            assert!(contrast(high.text, ground) >= 7.0, "text on {ground:06X}");
+            assert!(contrast(high.muted, ground) >= 7.0, "labels on {ground:06X}");
+            assert!(contrast(high.disabled, ground) >= 4.5, "greyed out on {ground:06X}");
+        }
+        assert!(contrast(high.line, high.panel) >= 3.0, "borders stand out (WCAG non-text)");
+        assert!(contrast(high.text, high.line) >= 4.5, "a button's label on its ground (lines fill buttons)");
+        assert!(contrast(high.cell_beat, high.cell) >= 1.3, "a beat's first step stands out");
+        for accent in [ACCENT, FOCUS, LIVE, VALUE, CHANCE, GENERATED, ALERT] {
+            assert!(contrast(accent, high.bg) >= 4.5, "accent {accent:06X} on the window");
+        }
     }
 
     #[test]
