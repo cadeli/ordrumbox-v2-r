@@ -3,6 +3,7 @@
 //! returns), what they do, and the meters and the spectrum it draws.
 
 use super::Session;
+use super::Switch;
 use super::session_automation_live::MixerMove;
 use super::session_panel::{PanelLayout, number};
 use super::session_types::Workspace;
@@ -161,7 +162,11 @@ impl Session {
     pub(super) fn mixer_activate(&mut self, id: Id) {
         match id {
             Id::MixerName(t) => self.click(Hit::Name(t)),
-            Id::MixerToggle(t, key) => self.switch_track(t, key),
+            Id::MixerToggle(t, key) => {
+                if let Some(switch) = Switch::from_key(key) {
+                    self.switch_track(t, switch);
+                }
+            }
             Id::Master("compBypass") => {
                 let bypass = if self.output_panel.master().bypass >= 0.5 { 0.0 } else { 1.0 };
                 self.set_master_value("compBypass", bypass);
@@ -176,7 +181,7 @@ impl Session {
     /// automation, else set on the track (its lane taken back).
     pub(super) fn set_track_control(&mut self, t: usize, target: AutomationTarget, value: f64) {
         let moved = self.automate_from_mixer(t, target, value);
-        if moved == MixerMove::Written {
+        if moved.is_handled() {
             return;
         }
         let desc = format!("{} on {}", target.label(), self.track_name(t));

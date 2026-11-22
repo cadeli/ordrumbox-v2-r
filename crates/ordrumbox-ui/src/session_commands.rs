@@ -2,12 +2,12 @@
 //! command runs.
 // audit: allow(function size): `run` is a flat `match`, a line a command, which the compiler checks is complete.
 
-use super::Session;
 use super::session_confirm::Pending;
 use super::session_note_tool::Tool;
 use super::session_overlay::Overlay;
 use super::session_selection::Clipboard;
 use super::session_types::Workspace;
+use super::{Session, Switch};
 use crate::file_request::FileRequest;
 use crate::menu::{Command, MenuState};
 use crate::panel::Id;
@@ -217,7 +217,7 @@ impl Session {
             C::NextSong => self.step_song(1),
             C::Mute | C::Solo => {
                 if let Some(t) = self.focus_track() {
-                    self.switch_track(t, if command == C::Mute { "mute" } else { "solo" });
+                    self.switch_track(t, if command == C::Mute { Switch::Mute } else { Switch::Solo });
                 }
             }
             C::NewGeneratedPattern => self.generate_pattern(),

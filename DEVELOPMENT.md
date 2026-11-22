@@ -371,3 +371,12 @@ Lanes also set a track's transpose (whole semitones), probability and swing amou
 a straight track swings pairs of steps. `note_frame` takes the swing in ticks (`swing_ticks`, with the note's own swing
 in beats). The track editor's Generation and Loop sliders show what a lane sets, as the knob bar does. Without these
 lanes nothing is drawn and nothing moves: no snapshot changed.
+
+A level lane glides from a point to the next one on the next step only when they are part of a run of three
+points or more on adjacent steps (a drawn line: `AutomationLane::value_at_position`); a level set on one step
+alone, which leaves a point on that step and one on the next (where the lane goes back), now holds for its step
+instead of gliding into the next value. A file's point with a fractional step is reported (`a.points[i].step`)
+as well as rounded down. Painting a lane checks that the lane at its index is still the instrument and control
+pressed (`Editor::paint_automation`), and a control held while recording finds its lane by them each time, so an
+undo or an MCP edit during a drag no longer paints another lane. The lanes taken back are forgotten when another
+song is selected. The automation renders keep their snapshots: no snapshot changed.

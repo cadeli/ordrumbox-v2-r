@@ -119,16 +119,7 @@ mod tests {
         s.editor.add_track(1, "KICK", 4);
         s.editor.add_automation_lane(None, "KICK", ordrumbox_core::AutomationTarget::Volume).unwrap();
         s.set_size(SIZE);
-        let layout = s.song_layout(SIZE);
-        let rows = s.song_rows();
-        let view = s.song_view_data(&rows, &layout);
-        let g = layout.grid;
-        let at = |wanted: SongHit| {
-            (g.y..g.y + g.h)
-                .flat_map(|y| (g.x..g.x + g.w).map(move |x| (x, y)))
-                .find(|&(x, y)| layout.hit(&view, x, y) == Some(wanted))
-                .expect("on the panel")
-        };
+        let at = |wanted: SongHit| crate::session::session_song::tests::find_hit(&s, |hit| hit == wanted);
         let ((ex, ey), (nx, ny)) = (at(SongHit::LaneEdge(0)), at(SongHit::LaneName(0)));
         assert_eq!(s.pointer_shape(SIZE, ex, ey), PointerShape::ResizeVertical);
         assert_eq!(s.pointer_shape(SIZE, nx, ny), PointerShape::Arrow, "the name: its menu");

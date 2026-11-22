@@ -132,7 +132,7 @@ impl SongLayout {
     /// The level `y` points at over a lane's band `(top, height)`: 1 at its
     /// top, 0 at its bottom, kept within them.
     #[must_use]
-    pub fn level_at(&self, (top, height): (i32, i32), y: i32) -> f64 {
+    pub fn level_at_y(&self, (top, height): (i32, i32), y: i32) -> f64 {
         (1.0 - f64::from(y - top) / f64::from(height.max(1))).clamp(0.0, 1.0)
     }
 
@@ -182,7 +182,7 @@ pub(super) fn draw_lanes(canvas: &mut Canvas, song: &Song, layout: &SongLayout, 
 fn draw_lane(canvas: &mut Rows, lane: &AutomationLane, layout: &SongLayout, (y, rows): (i32, usize), page: &Page) {
     let s = layout.scale;
     let (rh, left) = (layout.row_height(), layout.body_left());
-    let color = target_color(lane.target);
+    let color = target_color(lane.target());
     let bottom = y + rows as i32 * rh;
     canvas.fill_rect(layout.grid.x, bottom - s.px(), layout.label_width() + page.body_w, s.px(), line_color());
     // Its name in the first of its rows shown.
@@ -191,9 +191,9 @@ fn draw_lane(canvas: &mut Rows, lane: &AutomationLane, layout: &SongLayout, (y, 
     if text_y + 8 * s <= canvas.bottom.min(bottom) {
         // The control's name first, fitted to the column; the instrument's in what is left.
         let column_end = layout.grid.x + layout.label_width() - 6 * s;
-        let label = fit(lane.target.label(), column_end - layout.grid.x, s);
+        let label = fit(lane.target().label(), column_end - layout.grid.x, s);
         let x = canvas.canvas.text(layout.grid.x, text_y, &label, s, color) + 4 * s;
-        let name = fit(&lane.instrument, column_end - x, s);
+        let name = fit(lane.instrument(), column_end - x, s);
         canvas.canvas.text(x, text_y, &name, s, theme::text());
     }
 
@@ -221,7 +221,7 @@ fn draw_lane(canvas: &mut Rows, lane: &AutomationLane, layout: &SongLayout, (y, 
 /// mark where it changes. A level: column by column, as high as it is where
 /// it glides too, its top drawn. Nothing where the lane leaves the pattern's.
 fn draw_values(canvas: &mut Rows, lane: &AutomationLane, layout: &SongLayout, band: (i32, i32), page: &Page) {
-    match lane.target.kind() {
+    match lane.target().kind() {
         AutomationKind::Switch => draw_switch(canvas, lane, layout, band, page),
         AutomationKind::Level => draw_level(canvas, lane, layout, band, page),
     }
@@ -229,7 +229,7 @@ fn draw_values(canvas: &mut Rows, lane: &AutomationLane, layout: &SongLayout, ba
 
 fn draw_switch(canvas: &mut Rows, lane: &AutomationLane, layout: &SongLayout, (top, height): (i32, i32), page: &Page) {
     let s = layout.scale;
-    let color = target_color(lane.target);
+    let color = target_color(lane.target());
     let first_step = page.first_measure * STEPS_PER_MEASURE;
     let end_step = (page.first_measure + page.shown_measures) * STEPS_PER_MEASURE;
     let x_of = |step: u32| layout.step_x(step.clamp(first_step, end_step), page.first_measure);
@@ -257,14 +257,14 @@ fn draw_switch(canvas: &mut Rows, lane: &AutomationLane, layout: &SongLayout, (t
 
 fn draw_level(canvas: &mut Rows, lane: &AutomationLane, layout: &SongLayout, (top, height): (i32, i32), page: &Page) {
     let s = layout.scale;
-    let color = target_color(lane.target);
+    let color = target_color(lane.target());
     let fill = theme::mix(theme::panel(), color, 0.45);
     let left = layout.body_left();
     for x in left..left + page.body_w {
         // The middle of the pixel's column.
         let position = (layout.measure_under(x, page.first_measure) + 0.5 / f64::from(layout.measure_width().max(1)))
             * f64::from(STEPS_PER_MEASURE);
-        let Some(level) = lane.level_at(position) else { continue };
+        let Some(level) = lane.value_at_position(position) else { continue };
         let h = (f64::from(height) * level).round() as i32;
         canvas.fill_rect(x, top + height - h, 1, h, fill);
         canvas.fill_rect(x, top + height - h, 1, s.px().min(h.max(1)), color);

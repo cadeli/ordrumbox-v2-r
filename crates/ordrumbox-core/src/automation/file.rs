@@ -97,6 +97,9 @@ fn point_from_json(raw: &Value, at: &str, issues: &mut Vec<Issue>) -> Option<Aut
             return None;
         }
     };
+    if step.fract() != 0.0 {
+        issues.push(Issue::new(format!("{at}.step"), format!("{step} is not a whole step, kept as {}", step.floor())));
+    }
     if let Some(raw) = value.filter(|&v| kept(v) != v) {
         issues.push(Issue::new(format!("{at}.value"), format!("{raw} kept as {}", kept(raw))));
     }

@@ -207,7 +207,7 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   bottom is 0.71 and the top 18.7. On the other lanes the bottom is 0 and the top the knob's
   most (100 %, 95 % for the delay's feedback); a Transpose lane goes from −24 to +24
   semitones, in whole semitones. A drag draws a line from it to the pointer's height, which
-  plays as a smooth glide. While you draw, and when the mouse is over a lane, a tooltip gives the
+  plays as a smooth glide; a level set on one step alone (a click) holds for its step. While you draw, and when the mouse is over a lane, a tooltip gives the
   value under it (`KICK Volume -4.5 dB at 2.3`). A press on the line of a level already
   drawn grabs its segment (from its change to the next): drag up or down to move it as one.
   A lane can be one to four rows tall: drag its bottom edge in the names column, or use

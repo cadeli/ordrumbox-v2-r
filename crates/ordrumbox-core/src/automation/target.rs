@@ -168,6 +168,40 @@ impl AutomationTarget {
 mod tests {
     use super::*;
 
+    /// Its place in [`AutomationTarget::ALL`]: a match without a wildcard,
+    /// so a new target fails to build here until it is listed.
+    fn position(target: AutomationTarget) -> usize {
+        use AutomationTarget::*;
+        match target {
+            Mute => 0,
+            Solo => 1,
+            Volume => 2,
+            Pan => 3,
+            Cutoff => 4,
+            Q => 5,
+            EchoSend => 6,
+            ReverbSend => 7,
+            ReverbMix => 8,
+            DelayMix => 9,
+            DelayFeedback => 10,
+            Saturation => 11,
+            Bitcrush => 12,
+            HardClip => 13,
+            CompMix => 14,
+            Transpose => 15,
+            Probability => 16,
+            Swing => 17,
+        }
+    }
+
+    #[test]
+    fn every_target_is_listed_once_and_read_back_from_its_key() {
+        for (i, target) in AutomationTarget::ALL.into_iter().enumerate() {
+            assert_eq!(position(target), i, "{target:?}");
+            assert_eq!(AutomationTarget::from_key(target.key()), Some(target));
+        }
+    }
+
     #[test]
     fn a_level_lane_sets_its_control_in_its_own_unit() {
         use AutomationTarget::{Cutoff, DelayFeedback, EchoSend, Pan, Q, Saturation};

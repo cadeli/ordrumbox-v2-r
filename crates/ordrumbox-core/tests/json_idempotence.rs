@@ -482,13 +482,17 @@ fn every_automation_lane_survives_saving() {
     ));
     let library = saved_twice(&value);
     let read = &library.songs[0].automations;
-    assert_eq!(read.iter().map(|lane| lane.target).collect::<Vec<_>>(), AutomationTarget::ALL, "every lane, in order");
+    assert_eq!(
+        read.iter().map(|lane| lane.target()).collect::<Vec<_>>(),
+        AutomationTarget::ALL,
+        "every lane, in order"
+    );
     for (i, lane) in read.iter().enumerate() {
         let points: Vec<(u32, Option<f64>)> = lane.points().iter().map(|p| (p.step, p.value)).collect();
         let i = i as u32;
         let expected =
             [(i, Some(0.125)), (32, Some(0.25)), (33, Some(0.5)), (34, Some(0.75)), (40, None), (56, Some(1.0))];
-        assert_eq!(points, expected, "{:?}", lane.target);
-        assert_eq!(lane.row_count(), i % 4 + 1, "{:?}", lane.target);
+        assert_eq!(points, expected, "{:?}", lane.target());
+        assert_eq!(lane.row_count(), i % 4 + 1, "{:?}", lane.target());
     }
 }

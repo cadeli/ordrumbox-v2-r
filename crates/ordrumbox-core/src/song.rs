@@ -96,6 +96,12 @@ impl Song {
         }
     }
 
+    /// The automation steps it spans: its length in whole measures, one at least.
+    #[must_use]
+    pub fn step_count(&self) -> u32 {
+        self.length_measures().max(1.0).ceil() as u32 * STEPS_PER_MEASURE
+    }
+
     /// Where transport `tick` is in the arrangement, in measures, fractional
     ///: wrapped on `loop_measure_count` as it is (not
     /// floored), else on [`Song::length_measures`]; 0 before the start.

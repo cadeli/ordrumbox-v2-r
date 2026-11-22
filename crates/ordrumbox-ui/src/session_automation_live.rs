@@ -10,7 +10,7 @@
 
 use super::Session;
 use ordrumbox_core::automation::{
-    AutomationKind, AutomationStroke, AutomationTarget, STEPS_PER_MEASURE, is_on, switch_value,
+    AutomationKind, AutomationStroke, AutomationTarget, is_on, lanes_value_at_position, switch_value,
 };
 use ordrumbox_core::steps::TICK;
 
@@ -23,6 +23,43 @@ pub(super) enum MixerMove {
     TakenBack,
     /// No lane to take back, or the song does not play.
     Untouched,
+    /// Its lane could not be made: the track is left as it is, the message says why.
+    Refused,
+}
+
+impl MixerMove {
+    /// Whether the move is done with: the track is not to take the value.
+    pub(super) fn is_handled(self) -> bool {
+        matches!(self, Self::Written | Self::Refused)
+    }
+}
+
+/// A switch of a track that a lane can set.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Switch {
+    Mute,
+    Solo,
+}
+
+impl Switch {
+    /// The lane's control it is.
+    #[must_use]
+    pub(crate) fn target(self) -> AutomationTarget {
+        match self {
+            Self::Mute => AutomationTarget::Mute,
+            Self::Solo => AutomationTarget::Solo,
+        }
+    }
+
+    /// The switch whose key (in a track, in the mixer's ids) is `key`.
+    #[must_use]
+    pub(crate) fn from_key(key: &str) -> Option<Self> {
+        match key {
+            "mute" => Some(Self::Mute),
+            "solo" => Some(Self::Solo),
+            _ => None,
+        }
+    }
 }
 
 /// The live state of the song's automation.
@@ -40,7 +77,10 @@ pub(super) struct LiveAutomation {
 /// A fader writing its lane while it is held.
 #[derive(Debug, Clone, PartialEq)]
 struct Writing {
-    lane: usize,
+    /// Its lane's instrument and control: the lane is found by them on each
+    /// write, since lanes may be removed or added meanwhile.
+    instrument: String,
+    target: AutomationTarget,
     /// The lane's value it writes.
     value: f64,
     /// The last step written.
@@ -65,6 +105,16 @@ impl Session {
         if live.song == self.editor.selected_song() { &live.overridden } else { &[] }
     }
 
+    /// The live state made the selected song's: the lanes taken back from
+    /// another song are forgotten, not kept for when it is selected again.
+    fn follow_selected_song(&mut self) {
+        let song = self.editor.selected_song();
+        let live = &mut self.automation_live;
+        if live.song != song {
+            (live.song, live.overridden) = (song, Vec::new());
+        }
+    }
+
     /// What the song's lanes set `target` of track `t` to now, the song
     /// playing and the lane not taken back: a fader's gain, a button's 0 or 1.
     pub(super) fn automated_now(&self, t: usize, target: AutomationTarget) -> Option<f64> {
@@ -74,7 +124,7 @@ impl Session {
             return None;
         }
         let lanes = &self.song()?.automations;
-        let value = ordrumbox_core::automation::automated_at(lanes, name, target, position)?;
+        let value = lanes_value_at_position(lanes, name, target, position)?;
         Some(target.to_control(value))
     }
 
@@ -109,19 +159,24 @@ impl Session {
         (0..count).map(|t| self.shown_switch(t)).collect()
     }
 
-    /// Mute or solo (`key`) of track `t` switched from what is shown (the
-    /// mixer, the grid, M, S, 1-9): written to its lane while the song plays
-    /// and records automation, else its lane taken back.
-    pub fn switch_track(&mut self, t: usize, key: &str) {
-        let target = if key == "mute" { AutomationTarget::Mute } else { AutomationTarget::Solo };
-        let Some(own) = self.track(t).map(|track| if key == "mute" { track.mute } else { track.solo }) else { return };
+    /// A switch (mute or solo: `target`) of track `t` switched from what
+    /// is shown (the mixer, the grid, M, S, 1-9): written to its lane while
+    /// the song plays and records automation, else its lane taken back.
+    pub(crate) fn switch_track(&mut self, t: usize, switch: Switch) {
+        let target = switch.target();
+        let Some(own) = self.track(t).map(|track| match switch {
+            Switch::Mute => track.mute,
+            Switch::Solo => track.solo,
+        }) else {
+            return;
+        };
         let is_on = !self.automated_now(t, target).map_or(own, is_on);
         let moved = self.automate_from_mixer(t, target, switch_value(is_on));
-        if moved == MixerMove::Written {
+        if moved.is_handled() {
             return;
         }
         if is_on != own {
-            self.toggle_row(t, key);
+            self.toggle_row(t, target.key());
         }
         if moved == MixerMove::TakenBack {
             self.say_taken_back(t, target);
@@ -148,13 +203,13 @@ impl Session {
                 Ok(lane) => lane,
                 Err(message) => {
                     self.message = message;
-                    return MixerMove::Written;
+                    return MixerMove::Refused;
                 }
             },
         };
         let step = position.floor() as u32;
         match target.kind() {
-            AutomationKind::Level => self.write_level(lane, step, target.from_control(value)),
+            AutomationKind::Level => self.write_level(&name, target, step, target.from_control(value)),
             AutomationKind::Switch => self.write_switch(lane, step, value),
         }
         MixerMove::Written
@@ -162,12 +217,8 @@ impl Session {
 
     /// The lane of `name`'s `target` taken back: played no more until re-enabled.
     fn take_back(&mut self, name: String, target: AutomationTarget) {
-        let song = self.editor.selected_song();
-        let live = &mut self.automation_live;
-        if live.song != song {
-            (live.song, live.overridden) = (song, Vec::new());
-        }
-        live.overridden.push((name, target));
+        self.follow_selected_song();
+        self.automation_live.overridden.push((name, target));
     }
 
     /// What the mixer says once a control took its lane back.
@@ -204,24 +255,26 @@ impl Session {
 
     /// A button written at `step` of lane `lane`: `value` up to the lane's next point.
     fn write_switch(&mut self, lane: usize, step: u32, value: f64) {
-        let Some(base) = self.song().and_then(|song| song.automations.get(lane)).cloned() else { return };
-        let total = self.song().map_or(1, |song| song.length_measures().max(1.0).ceil() as u32) * STEPS_PER_MEASURE;
-        let next = base.points().iter().find(|point| point.step > step).map_or(total, |point| point.step);
+        let Some(song) = self.song() else { return };
+        let Some(base) = song.automations.get(lane).cloned() else { return };
+        let (_, end) = base.segment_at(step, song.step_count());
         let key = format!("automation-write:{lane}:{}", self.editor.revision());
         let stroke = AutomationStroke::Fill(Some(value));
-        self.paint_written(lane, &base, (step, next.saturating_sub(1).max(step)), stroke, &key);
+        self.paint_written(lane, &base, (step, end), stroke, &key);
     }
 
-    /// A fader's `level` written at `step` of lane `lane`, its gesture
-    /// begun or carried on.
-    fn write_level(&mut self, lane: usize, step: u32, level: f64) {
-        let writing = match self.automation_live.writing.take().filter(|w| w.lane == lane) {
+    /// A fader's `level` written at `step` of the lane of `instrument`'s
+    /// `target`, its gesture begun or carried on.
+    fn write_level(&mut self, instrument: &str, target: AutomationTarget, step: u32, level: f64) {
+        let writing = self.automation_live.writing.take().filter(|w| w.instrument == instrument && w.target == target);
+        let writing = match writing {
             Some(writing) => Writing { value: level, ..writing },
             None => Writing {
-                lane,
+                instrument: instrument.to_owned(),
+                target,
                 value: level,
                 last_step: step,
-                key: format!("automation-write:{lane}:{}", self.editor.revision()),
+                key: format!("automation-write:{instrument}:{}:{}", target.key(), self.editor.revision()),
             },
         };
         self.automation_live.writing = Some(writing);
@@ -232,10 +285,16 @@ impl Session {
     /// written (or `step` itself when the playhead went back, a loop).
     fn write_held(&mut self, step: u32) {
         let Some(writing) = self.automation_live.writing.clone() else { return };
-        let Some(base) = self.song().and_then(|song| song.automations.get(writing.lane)).cloned() else { return };
+        let lanes = self.song().map_or(&[][..], |song| song.automations.as_slice());
+        let Some(lane) = lanes.iter().position(|lane| lane.is_for(&writing.instrument, writing.target)) else {
+            // Its lane removed meanwhile (an undo, an MCP edit): the gesture ends.
+            self.automation_live.writing = None;
+            return;
+        };
+        let base = lanes[lane].clone();
         let from = if step > writing.last_step { writing.last_step + 1 } else { step };
         let stroke = AutomationStroke::Fill(Some(writing.value));
-        self.paint_written(writing.lane, &base, (from, step), stroke, &writing.key);
+        self.paint_written(lane, &base, (from, step), stroke, &writing.key);
         if let Some(writing) = &mut self.automation_live.writing {
             writing.last_step = step;
         }
@@ -267,7 +326,7 @@ impl Session {
             }
             _ => self.automation_live.writing = None,
         }
-        let overridden = self.overridden_lanes().to_vec();
-        self.playback.set_overridden(&self.editor, &overridden);
+        self.follow_selected_song();
+        self.playback.set_overridden(&self.editor, &self.automation_live.overridden);
     }
 }

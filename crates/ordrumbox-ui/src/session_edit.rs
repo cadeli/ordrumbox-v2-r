@@ -2,10 +2,10 @@
 //! cursor, the tracks added, removed and compacted, the pattern's length,
 //! new patterns, and copy and paste.
 
-use super::Session;
 use super::session_labels::{beat_label, notes_label};
 use super::session_selection::{Clipboard, NoteFocus};
 use super::session_types::Move;
+use super::{Session, Switch};
 use crate::view::{Cursor, Hit};
 use ordrumbox_core::track::MAX_TRACKS;
 use ordrumbox_core::{Note, Track};
@@ -29,8 +29,8 @@ impl Session {
 
     pub fn click(&mut self, hit: Hit) {
         match hit {
-            Hit::Mute(t) => self.switch_track(t, "mute"),
-            Hit::Solo(t) => self.switch_track(t, "solo"),
+            Hit::Mute(t) => self.switch_track(t, Switch::Mute),
+            Hit::Solo(t) => self.switch_track(t, Switch::Solo),
             Hit::Name(t) => {
                 self.selection.put_cursor(Cursor {
                     track: t,

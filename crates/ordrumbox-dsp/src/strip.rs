@@ -79,7 +79,7 @@ audio_params! {
         filter_on = 1.0, 0.0, 1.0;
         /// Filter cutoff, Hz.
         cutoff = crate::MAX_FILTER_FREQ as f32, crate::MIN_FILTER_FREQ as f32, crate::MAX_FILTER_FREQ as f32;
-        q = 0.707, 0.707, 18.707;
+        q = crate::MIN_FILTER_Q as f32, crate::MIN_FILTER_Q as f32, crate::MAX_FILTER_Q as f32;
         /// 0 lowpass, 1 highpass, 2 bandpass, 3 notch.
         filter_mode = 0.0, 0.0, 3.0;
         /// dB per octave: 12 (one stage) or 24 (two stages).

@@ -11,7 +11,7 @@ use crate::canvas::Canvas;
 use crate::frame;
 use crate::menu::{self, Command};
 use crate::scroll::{Scroll, Viewport};
-use crate::session::{Move, OverlayKey, PanelKey, Session};
+use crate::session::{Move, OverlayKey, PanelKey, Session, Switch};
 use crate::ui_input::{Button, Key, KeyEvent, Modifiers, PointerShape, ScrollDelta};
 use crate::view;
 
@@ -477,7 +477,7 @@ impl Ui {
         }
         let s = &mut self.session;
         if let Some(row) = ROW_DIGITS.iter().position(|&k| k == code).filter(|_| row_key) {
-            s.switch_track(row, if shift { "solo" } else { "mute" });
+            s.switch_track(row, if shift { Switch::Solo } else { Switch::Mute });
             return true;
         }
         if let Some(row) = ROW_LETTERS.iter().position(|&k| k == code).filter(|_| row_key) {

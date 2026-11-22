@@ -84,3 +84,7 @@ pub use voice::{SampleShape, SampleVoice, VoiceStart};
 pub const MIN_FILTER_FREQ: f64 = 20.0;
 /// Highest frequency a filter cutoff can take, in Hz.
 pub const MAX_FILTER_FREQ: f64 = 20_000.0;
+/// Lowest Q (resonance) a filter can take.
+pub const MIN_FILTER_Q: f64 = 0.707;
+/// Highest Q (resonance) a filter can take.
+pub const MAX_FILTER_Q: f64 = 18.707;

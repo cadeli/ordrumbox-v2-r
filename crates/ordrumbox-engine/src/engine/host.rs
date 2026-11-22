@@ -202,8 +202,8 @@ impl HostMix {
 /// The filter's range, as the strip takes it.
 pub(super) const MIN_CUTOFF: f32 = ordrumbox_dsp::MIN_FILTER_FREQ as f32;
 pub(super) const MAX_CUTOFF: f32 = ordrumbox_dsp::MAX_FILTER_FREQ as f32;
-pub(super) const MIN_Q: f32 = 0.707;
-pub(super) const MAX_Q: f32 = 18.707;
+pub(super) const MIN_Q: f32 = ordrumbox_dsp::MIN_FILTER_Q as f32;
+pub(super) const MAX_Q: f32 = ordrumbox_dsp::MAX_FILTER_Q as f32;
 /// The compressor's threshold range, as the strip takes it.
 pub(super) const MIN_THRESHOLD_DB: f32 = StripSettings::MIN.comp_threshold_db;
 pub(super) const MAX_THRESHOLD_DB: f32 = StripSettings::MAX.comp_threshold_db;

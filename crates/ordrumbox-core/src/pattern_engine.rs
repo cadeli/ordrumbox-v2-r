@@ -81,8 +81,8 @@ pub fn expand_hits(pattern: &Pattern, pass: u32, rng: &mut Rng, scales: &Scales)
         let loop_steps = track_loop_steps(track);
         let varied = variation::vary_notes(track, macro_factor, rng);
         let span_end = SpanResolver::new(track);
-        // Probability is a manual-mode control: in auto mode only note.probability gates.
-        let track_probability = if track.auto_mode { 1.0 } else { track.probability };
+        // In auto mode only note.probability gates.
+        let track_probability = track.effective_probability();
 
         for (note_index, source) in track.notes.iter().enumerate() {
             let note = varied.get(&note_index).unwrap_or(source);

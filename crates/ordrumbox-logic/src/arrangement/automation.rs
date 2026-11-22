@@ -43,7 +43,8 @@ impl Editor {
     /// Lane `lane` set to `base` with steps `from` to `to` painted with
     /// `stroke` ([`AutomationLane::paint`]): a click paints one step, a drag over a
     /// lane paints from the lane as it was pressed, the edits under one
-    /// `coalesce` key one undo step.
+    /// `coalesce` key one undo step. Refused when lane `lane` is no longer
+    /// `base`'s instrument and control (lanes removed meanwhile).
     pub fn paint_automation(
         &mut self,
         song: Option<usize>,
@@ -54,19 +55,22 @@ impl Editor {
         coalesce: &str,
     ) -> Result<(), String> {
         let s = self.require_song(song)?;
-        if lane >= self.library.songs[s].automations.len() {
+        let Some(current) = self.library.songs[s].automations.get(lane) else {
             return Err("No such automation lane".to_owned());
+        };
+        if !current.is_for(base.instrument(), base.target()) {
+            return Err(format!("The {} {} lane has moved: not painted", base.instrument(), base.target().label()));
         }
         let mut painted = base.clone();
         painted.paint(from, to, stroke);
-        let state = stroke_label(base.target, stroke);
+        let state = stroke_label(base.target(), stroke);
         let (first, last) = (from.min(to), from.max(to));
         let zone = if first == last {
             format!("at {}", step_label(first))
         } else {
             format!("from {} to {}", step_label(first), step_label(last))
         };
-        let desc = format!("{} {} {state} {zone}", base.instrument, base.target.label());
+        let desc = format!("{} {} {state} {zone}", base.instrument(), base.target().label());
         self.edit_songs_coalesced(desc, None, Some(coalesce.to_owned()), |songs| songs[s].automations[lane] = painted);
         Ok(())
     }
@@ -80,7 +84,7 @@ impl Editor {
         let Some(current) = self.library.songs[s].automations.get(lane).filter(|l| l.row_count() != rows) else {
             return false;
         };
-        let desc = format!("{} {} lane {rows} row(s) tall", current.instrument, current.target.label());
+        let desc = format!("{} {} lane {rows} row(s) tall", current.instrument(), current.target().label());
         self.edit_songs_coalesced(desc, None, Some(coalesce.to_owned()), |songs| {
             songs[s].automations[lane].set_row_count(rows);
         });
@@ -93,7 +97,7 @@ impl Editor {
         let Some(current) = self.library.songs[s].automations.get(lane).filter(|l| !l.points().is_empty()) else {
             return false;
         };
-        let desc = format!("Clear {} automation of {}", current.target.label().to_lowercase(), current.instrument);
+        let desc = format!("Clear {} automation of {}", current.target().label().to_lowercase(), current.instrument());
         self.edit_songs(desc, None, |songs| songs[s].automations[lane].clear());
         true
     }
@@ -113,7 +117,7 @@ impl Editor {
     pub fn remove_automation_lane(&mut self, song: Option<usize>, lane: usize) -> bool {
         let Some(s) = self.song_index(song) else { return false };
         let Some(current) = self.library.songs[s].automations.get(lane) else { return false };
-        let desc = format!("Remove {} automation of {}", current.target.label().to_lowercase(), current.instrument);
+        let desc = format!("Remove {} automation of {}", current.target().label().to_lowercase(), current.instrument());
         self.edit_songs(desc, None, |songs| songs[s].automations.remove(lane));
         true
     }
@@ -157,9 +161,11 @@ mod tests {
         assert!(e.redo().is_some());
         assert_eq!(lanes(&e)[0].points().len(), 2, "on for one step, then back");
         assert!(e.paint_automation(None, 5, &base, (0, 0), ON, "click").is_err());
+        let solo = lanes(&e)[1].clone();
+        assert!(e.paint_automation(None, 0, &solo, (0, 0), ON, "click").is_err(), "lane 0 is not the solo lane");
 
         assert!(e.remove_automation_lane(None, 0));
-        assert_eq!(lanes(&e).iter().map(|l| l.target).collect::<Vec<_>>(), [AutomationTarget::Solo]);
+        assert_eq!(lanes(&e).iter().map(|l| l.target()).collect::<Vec<_>>(), [AutomationTarget::Solo]);
         assert_eq!(e.undo().as_deref(), Some("Remove mute automation of KICK"));
         assert_eq!(lanes(&e).len(), 2);
         assert!(!e.remove_automation_lane(None, 9));

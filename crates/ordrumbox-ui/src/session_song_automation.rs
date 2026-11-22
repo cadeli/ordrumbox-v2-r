@@ -1,6 +1,6 @@
 //! The song panel's automation lanes: the add-automation button opens the
-//! instruments the song plays, each opening the controls a lane can switch
-//! (Mute, Solo, Volume); the one picked adds its lane. A press on a lane's
+//! instruments the song plays, each opening the controls a lane can set
+//! ([`AutomationTarget::ALL`]); the one picked adds its lane. A press on a lane's
 //! step and a drag along it paint the steps selected, and no other: on a
 //! switch's lane, on where the step pressed was not on, off where it was; on
 //! a level's lane, a line from the level pressed to the one the pointer is
@@ -11,8 +11,7 @@
 
 use crate::scale::Scale;
 use ordrumbox_core::automation::{
-    AutomationKind, AutomationLane, AutomationStroke, AutomationTarget, STEPS_PER_MEASURE, song_instruments,
-    step_label, switch_value,
+    AutomationKind, AutomationLane, AutomationStroke, AutomationTarget, song_instruments, step_label, switch_value,
 };
 
 use super::Session;
@@ -114,15 +113,15 @@ impl Session {
         let layout = self.song_layout(size);
         let rows = self.song_rows();
         let Some(band) = layout.lane_band(&self.song_view_data(&rows, &layout), lane) else { return };
-        let brush = match (button, base.target.kind()) {
+        let brush = match (button, base.target().kind()) {
             (Button::Right, _) => Brush::Fill(None),
             (_, AutomationKind::Switch) => Brush::Fill(Some(switch_value(base.is_on_at(step) != Some(true)))),
             (_, AutomationKind::Level) => match base.value_at(step) {
                 Some(level) if layout.is_on_level_line(band, level, y) => {
-                    Brush::Segment { band, zone: self.segment_at(&base, step), level, grab_y: y, y }
+                    Brush::Segment { band, zone: base.segment_at(step, self.song_step_count()), level, grab_y: y, y }
                 }
                 _ => {
-                    let level = layout.level_at(band, y);
+                    let level = layout.level_at_y(band, y);
                     Brush::Line { band, from: level, to: level }
                 }
             },
@@ -150,7 +149,7 @@ impl Session {
         let step = layout.step_at(x, first).min(self.song_step_count() - 1);
         let Some(paint) = &mut self.song_panel.paint else { return false };
         let brush = match paint.brush {
-            Brush::Line { band, from, .. } => Brush::Line { band, from, to: layout.level_at(band, y) },
+            Brush::Line { band, from, .. } => Brush::Line { band, from, to: layout.level_at_y(band, y) },
             Brush::Segment { band, zone, level, grab_y, .. } => Brush::Segment { band, zone, level, grab_y, y },
             fill @ Brush::Fill(_) => fill,
         };
@@ -161,16 +160,6 @@ impl Session {
         let paint = paint.clone();
         self.paint_lane(&paint);
         true
-    }
-
-    /// The segment of `lane` at `step`: from its point at or before it to
-    /// the step before its next point (or the song's end).
-    fn segment_at(&self, lane: &AutomationLane, step: u32) -> (u32, u32) {
-        let points = lane.points();
-        let after = points.partition_point(|point| point.step <= step);
-        let first = after.checked_sub(1).map_or(0, |i| points[i].step);
-        let end = points.get(after).map_or(self.song_step_count(), |point| point.step);
-        (first, end.saturating_sub(1).max(first))
     }
 
     /// The bottom edge of the lane held moved to `y`: the lane as many
@@ -189,7 +178,7 @@ impl Session {
 
     /// The steps of the arrangement shown, a measure at least.
     fn song_step_count(&self) -> u32 {
-        self.song().map_or(1, |song| song.length_measures().max(1.0).ceil() as u32) * STEPS_PER_MEASURE
+        self.song().map_or(ordrumbox_core::automation::STEPS_PER_MEASURE, ordrumbox_core::Song::step_count)
     }
 
     /// The zone of `paint`, widened to whole snaps, painted on its lane as it was pressed.
@@ -217,8 +206,8 @@ impl Session {
                 (lane, step, lane.value_at(step))
             }
         };
-        let value = value.map_or_else(|| "as the pattern".to_owned(), |value| lane.target.value_label(value));
-        Some(format!("{} {} {value} at {}", lane.instrument, lane.target.label(), step_label(step)))
+        let value = value.map_or_else(|| "as the pattern".to_owned(), |value| lane.target().value_label(value));
+        Some(format!("{} {} {value} at {}", lane.instrument(), lane.target().label(), step_label(step)))
     }
 
     /// The lane released: the zone stays as painted; whether one was pressed.
@@ -243,7 +232,7 @@ impl Session {
     /// Lane `lane`'s menu at `(x, y)`: clear its points, delete it, delete every lane.
     fn lane_menu(&mut self, lane: usize, x: i32, y: i32) {
         let Some(lane_shown) = self.song().and_then(|song| song.automations.get(lane)) else { return };
-        let title = format!("{} {}", lane_shown.target.label(), lane_shown.instrument);
+        let title = format!("{} {}", lane_shown.target().label(), lane_shown.instrument());
         let values = vec![
             format!("{TALLER_VALUE}{lane}"),
             format!("{SHORTER_VALUE}{lane}"),
@@ -317,7 +306,7 @@ impl Session {
 
 #[cfg(test)]
 mod tests {
-    use super::super::session_song::tests::{SIZE, choose, menu, session};
+    use super::super::session_song::tests::{SIZE, choose, find_hit, menu, session};
     use super::Session;
     use crate::song_view::{MeasureZoom, SongHit};
     use crate::ui_input::Button;
@@ -332,7 +321,7 @@ mod tests {
 
     /// X of `step` of the first lane, and Y of its row.
     fn step_at(s: &Session, step: u32) -> (i32, i32) {
-        find(s, |hit| matches!(hit, SongHit::LaneStep { lane: 0, step: at } if at == step))
+        find_hit(s, |hit| matches!(hit, SongHit::LaneStep { lane: 0, step: at } if at == step))
     }
 
     /// A press on step `from` of the first lane with `button`, dragged to step `to`.
@@ -359,18 +348,6 @@ mod tests {
         s
     }
 
-    /// Where `hit` is on the song panel, scanning it.
-    fn find(s: &Session, wanted: impl Fn(SongHit) -> bool) -> (i32, i32) {
-        let layout = s.song_layout(SIZE);
-        let rows = s.song_rows();
-        let view = s.song_view_data(&rows, &layout);
-        let g = layout.grid;
-        (g.y..g.y + g.h)
-            .flat_map(|y| (g.x..g.x + g.w).map(move |x| (x, y)))
-            .find(|&(x, y)| layout.hit(&view, x, y).is_some_and(&wanted))
-            .expect("on the panel")
-    }
-
     #[test]
     fn the_button_adds_a_lane_whose_steps_switch_on_and_off() {
         let mut s = session();
@@ -378,7 +355,7 @@ mod tests {
             s.editor.add_track(1, name, 4);
         }
         s.set_size(SIZE);
-        let (x, y) = find(&s, |hit| hit == SongHit::AddAutomation);
+        let (x, y) = find_hit(&s, |hit| hit == SongHit::AddAutomation);
         assert!(s.song_click(SIZE, x, y, Button::Left));
         assert_eq!(menu(&s), ["instrument:KICK", "instrument:SNARE"], "the song's instruments, once each");
         choose(&mut s, 1);
@@ -386,12 +363,12 @@ mod tests {
         assert_eq!(menu(&s), targets);
         choose(&mut s, 1);
         let lanes = &s.song().unwrap().automations;
-        assert_eq!((lanes[0].instrument.as_str(), lanes[0].target), ("SNARE", AutomationTarget::Solo));
+        assert_eq!((lanes[0].instrument(), lanes[0].target()), ("SNARE", AutomationTarget::Solo));
 
         // The lane's row is under the patterns', the button under it.
-        let (lx, ly) = find(&s, |hit| matches!(hit, SongHit::LaneStep { lane: 0, step: 0 }));
+        let (lx, ly) = find_hit(&s, |hit| matches!(hit, SongHit::LaneStep { lane: 0, step: 0 }));
         assert!(ly > y - 20, "after the pattern rows");
-        assert!(find(&s, |hit| hit == SongHit::AddAutomation).1 > ly);
+        assert!(find_hit(&s, |hit| hit == SongHit::AddAutomation).1 > ly);
         assert!(s.song_click(SIZE, lx, ly, Button::Left));
         assert!(s.song_release(SIZE));
         assert_eq!(points(&s), [(0, ON), (1, None)], "a click: that step on, no more");
@@ -417,7 +394,7 @@ mod tests {
         assert!(points(&s).is_empty());
 
         // A right-click on its name opens its menu: clear it, delete it, delete every lane.
-        let (nx, ny) = find(&s, |hit| hit == SongHit::LaneName(0));
+        let (nx, ny) = find_hit(&s, |hit| hit == SongHit::LaneName(0));
         assert!(s.song_click(SIZE, nx, ny, Button::Right));
         assert_eq!(menu(&s), ["taller:0", "shorter:0", "clear:0", "remove:0", "remove-all"]);
         choose(&mut s, 3);
@@ -473,7 +450,7 @@ mod tests {
         let mut s = with_lane(AutomationTarget::Volume);
         let (_, height) = band(&s);
         // Its bottom edge, dragged two rows down: three rows tall, in one undo step.
-        let (x, y) = find(&s, |hit| hit == SongHit::LaneEdge(0));
+        let (x, y) = find_hit(&s, |hit| hit == SongHit::LaneEdge(0));
         assert!(s.song_click(SIZE, x, y, Button::Left));
         let row = s.song_layout(SIZE).row_height();
         assert!(s.mouse_move(SIZE, x, y + row, false));

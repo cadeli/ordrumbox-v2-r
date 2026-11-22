@@ -488,6 +488,18 @@ pub(super) mod tests {
         session
     }
 
+    /// Where `wanted` is on the song panel, scanning it.
+    pub(crate) fn find_hit(s: &Session, wanted: impl Fn(crate::song_view::SongHit) -> bool) -> (i32, i32) {
+        let layout = s.song_layout(SIZE);
+        let rows = s.song_rows();
+        let view = s.song_view_data(&rows, &layout);
+        let g = layout.grid;
+        (g.y..g.y + g.h)
+            .flat_map(|y| (g.x..g.x + g.w).map(move |x| (x, y)))
+            .find(|&(x, y)| layout.hit(&view, x, y).is_some_and(&wanted))
+            .expect("on the panel")
+    }
+
     /// The menu open: its values.
     pub(crate) fn menu(session: &Session) -> Vec<String> {
         session.chrome.widgets.dropdown.as_ref().map(|d| d.values.clone()).unwrap_or_default()

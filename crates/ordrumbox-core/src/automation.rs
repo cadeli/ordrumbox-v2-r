@@ -9,8 +9,10 @@
 //! pan's middle is the center, a cutoff's travel is logarithmic). A
 //! point sets its value from its step until the next point, or gives the
 //! control back to the pattern; a level glides over a point's step to the
-//! next point when that point is on the next step, so a drawn line is
-//! smooth while a level held then changed still jumps on its step.
+//! next point when that point is on the next step and the two are part of a
+//! run of three points or more on adjacent steps (a drawn line), so a drawn
+//! line is smooth while a level held then changed, or set on one step alone,
+//! holds for its step.
 //! Before its first point a lane leaves the control as the pattern has it.
 //! An instrument is named as its tracks are (KICK, SNARE...), so a lane
 //! follows it through every pattern of the song.
@@ -171,8 +173,8 @@ impl AutomationStroke {
 #[derive(Debug, Clone, PartialEq)]
 pub struct AutomationLane {
     /// The track name it acts on, in every pattern of the song.
-    pub instrument: String,
-    pub target: AutomationTarget,
+    instrument: String,
+    target: AutomationTarget,
     /// Sorted by step, one per step at most.
     points: Vec<AutomationPoint>,
     /// How many of the arrangement's rows it is drawn over,
@@ -187,6 +189,18 @@ impl AutomationLane {
     #[must_use]
     pub fn new(instrument: &str, target: AutomationTarget) -> Self {
         Self { instrument: instrument.to_owned(), target, points: Vec::new(), row_count: 1 }
+    }
+
+    /// The track name it acts on, in every pattern of the song.
+    #[must_use]
+    pub fn instrument(&self) -> &str {
+        &self.instrument
+    }
+
+    /// The control it sets.
+    #[must_use]
+    pub fn target(&self) -> AutomationTarget {
+        self.target
     }
 
     /// How many of the arrangement's rows it is drawn over.
@@ -223,14 +237,19 @@ impl AutomationLane {
 
     /// What the lane sets at `position` (steps from the start of the song,
     /// with their fractions): a level glides from a point to the next one
-    /// when they are on adjacent steps; a switch holds.
+    /// when they are on adjacent steps of a run of three points or more (a
+    /// drawn line); a switch, or a level set on one step alone, holds.
     #[must_use]
-    pub fn level_at(&self, position: f64) -> Option<f64> {
+    pub fn value_at_position(&self, position: f64) -> Option<f64> {
         let step = position.max(0.0).floor().min(f64::from(u32::MAX)) as u32;
         let value = self.value_at(step)?;
         let at = self.points.partition_point(|point| point.step < step);
         let next = match self.points.get(at..) {
-            Some([here, next, ..]) if here.step == step && step.checked_add(1) == Some(next.step) => next.value,
+            Some([here, next, rest @ ..]) if here.step == step && step.checked_add(1) == Some(next.step) => {
+                let is_after_one = at.checked_sub(1).is_some_and(|i| step.checked_sub(1) == Some(self.points[i].step));
+                let is_before_one = rest.first().is_some_and(|after| next.step.checked_add(1) == Some(after.step));
+                if is_after_one || is_before_one { next.value } else { None }
+            }
             _ => None,
         };
         match (self.target.kind(), next) {
@@ -269,6 +288,17 @@ impl AutomationLane {
         self.points.sort_by_key(|point| point.step);
     }
 
+    /// The segment at `step`: from the point at or before it (else the
+    /// song's start) to the step before the next point (else the last of
+    /// the song's `step_count` steps).
+    #[must_use]
+    pub fn segment_at(&self, step: u32, step_count: u32) -> (u32, u32) {
+        let after = self.points.partition_point(|point| point.step <= step);
+        let first = after.checked_sub(1).map_or(0, |i| self.points[i].step);
+        let end = self.points.get(after).map_or(step_count, |point| point.step);
+        (first, end.saturating_sub(1).max(step))
+    }
+
     /// Every point removed: the lane sets nothing.
     pub fn clear(&mut self) {
         self.points.clear();
@@ -278,30 +308,30 @@ impl AutomationLane {
 /// What `lanes` set `target` of `instrument` to at `step`: the first lane
 /// for it that sets it, `None` when none does.
 #[must_use]
-pub fn automated(lanes: &[AutomationLane], instrument: &str, target: AutomationTarget, step: u32) -> Option<f64> {
+pub fn lanes_value_at(lanes: &[AutomationLane], instrument: &str, target: AutomationTarget, step: u32) -> Option<f64> {
     lanes.iter().filter(|lane| lane.is_for(instrument, target)).find_map(|lane| lane.value_at(step))
 }
 
 /// What `lanes` set `target` of `instrument` to at `position` (steps, with
-/// their fractions: [`AutomationLane::level_at`]).
+/// their fractions: [`AutomationLane::value_at_position`]).
 #[must_use]
-pub fn automated_at(
+pub fn lanes_value_at_position(
     lanes: &[AutomationLane],
     instrument: &str,
     target: AutomationTarget,
     position: f64,
 ) -> Option<f64> {
-    lanes.iter().filter(|lane| lane.is_for(instrument, target)).find_map(|lane| lane.level_at(position))
+    lanes.iter().filter(|lane| lane.is_for(instrument, target)).find_map(|lane| lane.value_at_position(position))
 }
 
 /// Whether track `t` of `tracks` is silent at `step` of a song with
 /// `lanes`: muted, or silenced by a solo. A solo lane that is on silences
 /// every instrument not soloed, in every pattern; without lanes this is the
-/// pattern's own mute and solo (`shouldTrackPlay()`).
+/// pattern's own mute and solo: with a track soloed, only the soloed ones play.
 #[must_use]
 pub fn is_silent(tracks: &[Track], t: usize, lanes: &[AutomationLane], step: u32) -> bool {
     let Some(track) = tracks.get(t) else { return true };
-    let switch = |track: &Track, target| automated(lanes, &track.name, target, step).map(is_on);
+    let switch = |track: &Track, target| lanes_value_at(lanes, &track.name, target, step).map(is_on);
     let solo = |track: &Track| switch(track, AutomationTarget::Solo).unwrap_or(track.solo);
     let song_solo = lanes.iter().any(|lane| lane.target == AutomationTarget::Solo && lane.is_on_at(step) == Some(true));
     if song_solo || tracks.iter().any(solo) {
@@ -378,6 +408,13 @@ mod tests {
     }
 
     #[test]
+    fn a_segment_runs_from_its_point_to_the_next() {
+        let lane = lane(&[(4, ON), (8, OFF)]);
+        assert_eq!([0, 4, 6, 8, 20].map(|s| lane.segment_at(s, 32)), [(0, 3), (4, 7), (4, 7), (8, 31), (8, 31)]);
+        assert_eq!(lane.segment_at(40, 32), (8, 40), "past the song's end: the step itself at least");
+    }
+
+    #[test]
     fn an_erased_zone_goes_back_to_the_pattern() {
         let mut lane = lane(&[(0, ON), (8, OFF)]);
         lane.paint(2, 5, fill(None));
@@ -416,7 +453,8 @@ mod tests {
         assert_eq!((lane.instrument.as_str(), lane.target), ("KICK", AutomationTarget::Solo));
         assert_eq!(steps(&lane), [(4, ON), (16, ON), (20, None), (32, ON)]);
         let at: Vec<_> = issues.iter().map(|i| i.at.as_str()).collect();
-        let expected = ["a.points[2]", "a.points[3]", "a.points[4]", "a.points[6].value", "a.points[7].value"];
+        let expected =
+            ["a.points[1].step", "a.points[2]", "a.points[3]", "a.points[4]", "a.points[6].value", "a.points[7].value"];
         assert_eq!(at, [&expected[..], &["a.points[8].value"]].concat());
         let again = AutomationLane::from_json(&lane.to_json(), "a", &mut Vec::new()).unwrap();
         assert_eq!(again, lane);
@@ -482,13 +520,21 @@ mod tests {
             AutomationPoint { step: 4, value: Some(0.5) },
             AutomationPoint { step: 5, value: None },
         ];
-        assert_eq!(lane.level_at(0.25), Some(0.25), "to the next step's point");
-        assert_eq!(lane.level_at(2.5), Some(1.0), "held: no point on the next step");
-        assert_eq!(lane.level_at(3.5), Some(1.0), "a jump, not a glide over the hold");
-        assert_eq!(lane.level_at(4.5), Some(0.5), "no glide into the pattern's");
+        lane.points.insert(2, AutomationPoint { step: 2, value: Some(0.5) });
+        assert_eq!(lane.value_at_position(0.25), Some(0.25), "to the next step's point, in a line");
+        assert_eq!(lane.value_at_position(1.5), Some(0.75), "on along the line");
+        assert_eq!(lane.value_at_position(2.5), Some(0.5), "held: no point on the next step");
+        assert_eq!(lane.value_at_position(3.5), Some(0.5), "a jump, not a glide over the hold");
+        assert_eq!(lane.value_at_position(4.5), Some(0.5), "no glide into the pattern's");
+        let mut click = AutomationLane::new("KICK", AutomationTarget::Volume);
+        click.paint(6, 6, fill(Some(1.0)));
+        click.paint(0, 5, fill(Some(0.2)));
+        assert_eq!(steps(&click), [(0, Some(0.2)), (6, Some(1.0)), (7, None)]);
+        click.paint(7, 9, fill(Some(0.2)));
+        assert_eq!(click.value_at_position(6.5), Some(1.0), "a step set alone holds for its step");
         let mut mute = lane.clone();
         mute.target = AutomationTarget::Mute;
-        assert_eq!(mute.level_at(0.75), Some(0.0), "a switch holds");
+        assert_eq!(mute.value_at_position(0.75), Some(0.0), "a switch holds");
     }
 
     #[test]

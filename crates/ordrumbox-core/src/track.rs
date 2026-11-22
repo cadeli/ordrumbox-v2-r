@@ -160,7 +160,7 @@ const VALUE_RANGES: [(&str, f64, f64); 50] = [
     ("swingResolution", 1.0, MAX_STEPS_PER_BEAT as f64),
     ("swingAmount", 0.0, 1.0),
     ("filterCutoff", MIN_FILTER_FREQ, MAX_FILTER_FREQ),
-    ("filterQ", 0.707, 18.707),
+    ("filterQ", MIN_FILTER_Q, MAX_FILTER_Q),
     ("filterSlope", 12.0, 24.0),
     ("reverbMix", 0.0, 1.0),
     ("delayBeats", 0.0, 4.0),
@@ -257,6 +257,10 @@ pub const MAX_STEPS_PER_BEAT: i32 = 8;
 pub const MIN_FILTER_FREQ: f64 = 20.0;
 /// Highest frequency a filter cutoff can take, in Hz.
 pub const MAX_FILTER_FREQ: f64 = 20_000.0;
+/// Lowest Q (resonance) a filter can take.
+pub const MIN_FILTER_Q: f64 = 0.707;
+/// Highest Q (resonance) a filter can take.
+pub const MAX_FILTER_Q: f64 = 18.707;
 
 impl Track {
     /// A new track: `beat_count` beats at `steps_per_beat` (1 to
@@ -289,6 +293,13 @@ impl Track {
 
     pub fn is_setting(key: &str) -> bool {
         Self::canonical_key(key).is_some_and(|key| !NOT_SETTINGS.contains(&key))
+    }
+
+    /// The chance each of its notes plays, before the note's own: its
+    /// probability, a manual-mode control (1 in auto mode).
+    #[must_use]
+    pub fn effective_probability(&self) -> f64 {
+        if self.auto_mode { 1.0 } else { self.probability }
     }
 
     /// Bounds an edit clamps the numeric setting `key` to (`TRACK_VALUE_RANGES`).

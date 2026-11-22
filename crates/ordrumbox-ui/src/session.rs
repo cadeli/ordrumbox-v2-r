@@ -171,6 +171,7 @@ mod session_types;
 mod session_update;
 #[path = "session_user_data.rs"]
 mod session_user_data;
+pub(crate) use session_automation_live::Switch;
 pub use session_open::LibrarySource;
 pub use session_panel::PanelKey;
 pub use session_types::{Move, OverlayKey, PlayMode, Workspace};

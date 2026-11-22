@@ -6,9 +6,9 @@
 //! tick (as its LFO), so a mute cuts the sound at its step, tails included,
 //! and a drawn level glides.
 
-use ordrumbox_core::automation::{AutomationTarget, automated_at, is_silent, volume_gain};
+use ordrumbox_core::automation::{AutomationTarget, is_silent, lanes_value_at_position, volume_gain};
 use ordrumbox_core::steps::TICK;
-use ordrumbox_core::{Pattern, Song};
+use ordrumbox_core::{Pattern, Song, Track};
 use ordrumbox_dsp::StripSettings;
 
 use crate::strip_settings::{StripLfo, is_slap, set_strip_control, strip_control, strip_lfo, strip_settings};
@@ -29,25 +29,17 @@ pub(super) fn settings_and_lfos(
     strips: &[(usize, usize)],
     span: Span,
 ) -> (Vec<StripSettings>, Vec<StripLfo>) {
+    // Without lanes nothing changes inside a pass: the pattern's mute and
+    // solo hold, read on its first tick.
+    let tick_count = if song.automations.is_empty() { 1 } else { span.ticks };
+    let positions: Vec<f64> =
+        (0..tick_count).map(|tick| song.automation_position_at(span.first_tick + u64::from(tick), TICK)).collect();
     let mut settings = Vec::with_capacity(strips.len());
     let mut lfos = Vec::new();
     for (i, &(p, t)) in strips.iter().enumerate() {
         let tracks = &patterns[p].tracks;
         let track = &tracks[t];
-        // The volume the song sets at `tick`: 0 where silent, a lane's level,
-        // `None` where it leaves the track's own.
-        let volume_at = |tick: u32| {
-            let position = song.automation_position_at(span.first_tick + u64::from(tick), TICK);
-            if is_silent(tracks, t, &song.automations, position.floor() as u32) {
-                Some(0.0)
-            } else {
-                let level = automated_at(&song.automations, &track.name, AutomationTarget::Volume, position);
-                level.map(|level| volume_gain(level) as f32)
-            }
-        };
-        // Without lanes nothing changes inside a pass: the pattern's mute and solo hold.
-        let volumes: Vec<Option<f32>> =
-            if song.automations.is_empty() { vec![volume_at(0)] } else { (0..span.ticks).map(volume_at).collect() };
+        let volumes = volumes(song, tracks, t, &positions);
         let mut strip = strip_settings(track, span.bpm);
         // The track's mute is `volume_at`'s: a lane can switch it off.
         if track.mute && track.volume_lfo.is_none() {
@@ -57,7 +49,7 @@ pub(super) fn settings_and_lfos(
             .unwrap_or(StripLfo { track: i, ..StripLfo::default() });
         set_per_tick(&mut strip.volume, &mut lfo.volume, &volumes);
         if !song.automations.is_empty() {
-            set_lanes(song, &track.name, span, &mut strip, &mut lfo);
+            set_lanes(song, &track.name, &positions, &mut strip, &mut lfo);
         }
         settings.push(strip);
         lfos.extend((!lfo.is_empty()).then_some(lfo));
@@ -65,24 +57,53 @@ pub(super) fn settings_and_lfos(
     (settings, lfos)
 }
 
+/// The volume the song sets track `t` of `tracks` to at each of
+/// `positions`: 0 where silent, a lane's level, `None` where it leaves the
+/// track's own. Silence only changes from step to step: it is read once a step.
+fn volumes(song: &Song, tracks: &[Track], t: usize, positions: &[f64]) -> Vec<Option<f32>> {
+    let name = &tracks[t].name;
+    let mut silence: Option<(u32, bool)> = None;
+    let mut volumes = Vec::with_capacity(positions.len());
+    for &position in positions {
+        let step = position.floor() as u32;
+        let is_silent = match silence {
+            Some((at, is_silent)) if at == step => is_silent,
+            _ => {
+                let is_silent = is_silent(tracks, t, &song.automations, step);
+                silence = Some((step, is_silent));
+                is_silent
+            }
+        };
+        volumes.push(if is_silent {
+            Some(0.0)
+        } else {
+            lanes_value_at_position(&song.automations, name, AutomationTarget::Volume, position)
+                .map(|level| volume_gain(level) as f32)
+        });
+    }
+    volumes
+}
+
 /// `strip` and `lfo` with the lanes of `instrument` other than its volume,
-/// mute and solo set over them.
-fn set_lanes(song: &Song, instrument: &str, span: Span, strip: &mut StripSettings, lfo: &mut StripLfo) {
-    let cutoffs = lane_values(song, instrument, AutomationTarget::Cutoff, span);
-    // A cutoff lane filters a track whose filter is off, as a note's lock does.
+/// mute and solo set over them, at each of `positions`.
+fn set_lanes(song: &Song, instrument: &str, positions: &[f64], strip: &mut StripSettings, lfo: &mut StripLfo) {
+    let cutoffs = lane_values(song, instrument, AutomationTarget::Cutoff, positions);
+    // A cutoff lane filters a track whose filter is off, as a note's lock
+    // does. Such a track's strip has its cutoff open (`allpass`), so where
+    // the lane sets nothing it passes everything as before.
     if cutoffs.iter().any(Option::is_some) {
         strip.filter_on = 1.0;
     }
     set_per_tick(&mut strip.cutoff, &mut lfo.cutoff, &cutoffs);
-    set_per_tick(&mut strip.pan, &mut lfo.pan, &lane_values(song, instrument, AutomationTarget::Pan, span));
-    set_per_tick(&mut strip.q, &mut lfo.q, &lane_values(song, instrument, AutomationTarget::Q, span));
+    set_per_tick(&mut strip.pan, &mut lfo.pan, &lane_values(song, instrument, AutomationTarget::Pan, positions));
+    set_per_tick(&mut strip.q, &mut lfo.q, &lane_values(song, instrument, AutomationTarget::Q, positions));
     for target in AutomationTarget::ALL {
         // A slap is one echo: no feedback to set.
         if target == AutomationTarget::DelayFeedback && is_slap(strip) {
             continue;
         }
         let Some(mut value) = strip_control(strip, target) else { continue };
-        let levels = lane_values(song, instrument, target, span);
+        let levels = lane_values(song, instrument, target, positions);
         if levels.is_empty() {
             continue;
         }
@@ -95,17 +116,17 @@ fn set_lanes(song: &Song, instrument: &str, span: Span, strip: &mut StripSetting
     }
 }
 
-/// What the lanes of `song` set `target` of `instrument` to at each tick of
-/// `span`, in the control's unit; empty when no lane is for it.
-fn lane_values(song: &Song, instrument: &str, target: AutomationTarget, span: Span) -> Vec<Option<f32>> {
+/// What the lanes of `song` set `target` of `instrument` to at each of
+/// `positions`, in the control's unit; empty when no lane is for it.
+fn lane_values(song: &Song, instrument: &str, target: AutomationTarget, positions: &[f64]) -> Vec<Option<f32>> {
     if !song.automations.iter().any(|lane| lane.is_for(instrument, target)) {
         return Vec::new();
     }
-    let value_at = |tick: u32| {
-        let position = song.automation_position_at(span.first_tick + u64::from(tick), TICK);
-        automated_at(&song.automations, instrument, target, position).map(|value| target.to_control(value) as f32)
+    let value_at = |&position: &f64| {
+        lanes_value_at_position(&song.automations, instrument, target, position)
+            .map(|value| target.to_control(value) as f32)
     };
-    (0..span.ticks).map(value_at).collect()
+    positions.iter().map(value_at).collect()
 }
 
 /// A strip's value and its LFO's ticks with `levels` (one per tick, or one

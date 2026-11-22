@@ -178,7 +178,7 @@ fn event_for(frame: u64, sound: Sound, note: &Hit, track: &Track, midi: Option<M
 }
 
 /// Whether track `t` of `pattern` is silent: muted, or silenced by another
-/// track's solo (`shouldTrackPlay()`).
+/// track's solo.
 fn is_silent(pattern: &Pattern, t: usize) -> bool {
     ordrumbox_core::automation::is_silent(&pattern.tracks, t, &[], 0)
 }
@@ -193,7 +193,7 @@ pub fn pattern_pass_ticks(pattern: &Pattern) -> u32 {
 
 /// Build pass `number` of `pattern` at tempo `bpm` (the library's, or a
 /// plugin host's). Notes of muted tracks (or of tracks another track's solo
-/// silences) are left out, as `shouldTrackPlay()` does.
+/// silences) are left out.
 pub fn build_pass(pattern: &Pattern, number: u64, rng: &mut Rng, context: PassContext<'_>, bpm: f64) -> Pass {
     let per_tick = frames_per_tick(bpm, context.sample_rate);
     let ticks = pattern_pass_ticks(pattern);

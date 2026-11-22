@@ -115,7 +115,7 @@ pub fn strip_settings(track: &Track, bpm: f64) -> StripSettings {
             s.cutoff = finite_or(track.filter_cutoff, ordrumbox_dsp::MIN_FILTER_FREQ) as f32;
         }
         if track.filter_q_lfo.is_none() {
-            s.q = finite_or(track.filter_q, 0.707) as f32;
+            s.q = finite_or(track.filter_q, ordrumbox_dsp::MIN_FILTER_Q) as f32;
         }
         s.filter_slope = filter_slope(track.filter_slope);
     }
@@ -379,7 +379,9 @@ pub fn strip_lfo(index: usize, track: &Track, silent: bool, first_tick: u64, tic
         cutoff: values(&track.filter_cutoff_lfo, &|v| {
             (track.filter_cutoff + v).clamp(ordrumbox_dsp::MIN_FILTER_FREQ, ordrumbox_dsp::MAX_FILTER_FREQ)
         }),
-        q: values(&track.filter_q_lfo, &|v| (track.filter_q + v).clamp(0.707, 18.707)),
+        q: values(&track.filter_q_lfo, &|v| {
+            (track.filter_q + v).clamp(ordrumbox_dsp::MIN_FILTER_Q, ordrumbox_dsp::MAX_FILTER_Q)
+        }),
         controls: Vec::new(),
     };
     (!result.is_empty()).then_some(result)

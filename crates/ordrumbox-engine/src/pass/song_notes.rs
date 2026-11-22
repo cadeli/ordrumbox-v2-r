@@ -5,7 +5,7 @@
 
 use std::borrow::Cow;
 
-use ordrumbox_core::automation::{AutomationLane, AutomationTarget, automated};
+use ordrumbox_core::automation::{AutomationLane, AutomationTarget, lanes_value_at};
 use ordrumbox_core::{Hit, Pattern, Rng, Track};
 
 /// The steps of a swing pair: the grid a swing lane swings a straight track on.
@@ -40,11 +40,10 @@ impl NoteLanes {
     /// The lanes of `lanes` for `track`, at `step` of the song.
     pub(super) fn at(lanes: &[AutomationLane], track: &Track, step: u32) -> Self {
         let value = |target: AutomationTarget| {
-            automated(lanes, &track.name, target, step).map(|value| target.to_control(value))
+            lanes_value_at(lanes, &track.name, target, step).map(|value| target.to_control(value))
         };
         let has_probability = lanes.iter().any(|lane| lane.is_for(&track.name, AutomationTarget::Probability));
-        // Probability is a manual-mode control: in auto mode the track's is 1.
-        let own_probability = if track.auto_mode { 1.0 } else { track.probability };
+        let own_probability = track.effective_probability();
         Self {
             transpose: value(AutomationTarget::Transpose),
             probability: has_probability.then(|| value(AutomationTarget::Probability).unwrap_or(own_probability)),

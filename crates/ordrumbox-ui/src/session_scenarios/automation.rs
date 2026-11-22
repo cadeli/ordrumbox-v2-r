@@ -58,8 +58,8 @@ fn the_mixer_writes_the_lanes_while_recording_and_shows_them() {
     assert_eq!(s.automated_now(0, AutomationTarget::Mute), Some(1.0));
 }
 
-#[test]
-fn a_control_moved_over_its_lane_takes_it_back_until_re_enabled() {
+/// The song playing, two steps in, with KICK's volume lane at half all along.
+fn playing_with_a_volume_lane() -> (Session, ordrumbox_engine::AudioSide) {
     let (mut s, mut audio) = session(LIBRARY);
     s.show_mode(true);
     s.editor.add_automation_lane(None, "KICK", AutomationTarget::Volume).unwrap();
@@ -68,6 +68,12 @@ fn a_control_moved_over_its_lane_takes_it_back_until_re_enabled() {
     s.editor.paint_automation(None, 0, &base, (0, 1000), stroke, "a").unwrap();
     s.toggle_play();
     run(&mut s, &mut audio, 2 * STEP);
+    (s, audio)
+}
+
+#[test]
+fn a_control_moved_over_its_lane_takes_it_back_until_re_enabled() {
+    let (mut s, _audio) = playing_with_a_volume_lane();
     let lane_gain = ordrumbox_core::automation::volume_gain(0.5);
     assert_eq!(s.automated_now(0, AutomationTarget::Volume), Some(lane_gain), "the fader shows its lane");
 
@@ -80,6 +86,21 @@ fn a_control_moved_over_its_lane_takes_it_back_until_re_enabled() {
     s.run(Command::ReenableAutomation);
     assert_eq!(s.automated_now(0, AutomationTarget::Volume), Some(lane_gain));
     assert_eq!(s.message, "its lane plays again");
+}
+
+#[test]
+fn the_lanes_taken_back_are_forgotten_with_their_song() {
+    let (mut s, mut audio) = playing_with_a_volume_lane();
+    s.set_value(Id::TrackVolume(0), 0.8);
+    assert!(s.menu_state().has_overridden);
+
+    let first = s.editor.selected_song();
+    let other = s.editor.add_song("other");
+    s.editor.set_selected_song(other);
+    run(&mut s, &mut audio, STEP);
+    s.editor.set_selected_song(first);
+    run(&mut s, &mut audio, STEP);
+    assert!(!s.menu_state().has_overridden, "not taken back again by selecting its song");
 }
 
 #[test]
@@ -114,7 +135,7 @@ fn the_grid_and_the_track_editor_show_the_lanes_too() {
     s.set_value(Id::KnobBar("volume"), 0.7);
     assert_eq!((s.track(0).unwrap().volume, s.automated_now(0, AutomationTarget::Volume)), (0.7, None));
     // M in the grid: the mute lane taken back, the track left playing.
-    s.switch_track(0, "mute");
+    s.switch_track(0, crate::session::Switch::Mute);
     assert_eq!((s.shown_switches(), s.track(0).unwrap().mute), (vec![(false, false)], false));
 }
 
