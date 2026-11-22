@@ -36,6 +36,8 @@ const MASTER_COLUMNS: i32 = 3;
 const METER_WIDTH: i32 = 6;
 /// The compressor's on/off button.
 const BYPASS_SIZE: (i32, i32) = (36, 14);
+/// The compressor's curve, beside its button; the spectrum takes the rest under them.
+const CURVE_SIZE: (i32, i32) = (96, 72);
 /// The quietest level a meter shows, dB.
 const METER_FLOOR_DB: f64 = -48.0;
 
@@ -205,14 +207,15 @@ fn master_strip(back: Rect, s: Scale) -> MasterStrip {
     let row3 = knob_row(back.y, 3, s);
     let (bw, bh) = (BYPASS_SIZE.0 * s, BYPASS_SIZE.1 * s);
     let bypass = Rect::new(back.x + 6 * s, row3 + 14 * s, bw, bh);
-    // The curve and the spectrum under the knobs, side by side from the button on.
-    let plots_x = bypass.x + bw + 8 * s;
-    let plots_w = back.x + MASTER_COLUMNS * column - 4 * s - plots_x;
-    let plots_top = row3 + 2 * s;
-    let plots_h = back.y + back.h - 4 * s - plots_top;
-    let curve_h = (plots_h / 2 - 2 * s).max(0);
-    let curve = Rect::new(plots_x, plots_top, plots_w.max(0), curve_h);
-    let spectrum = Rect::new(plots_x, plots_top + curve_h + 4 * s, plots_w.max(0), (plots_h - curve_h - 4 * s).max(0));
+    // Under the knobs: the curve, small, beside the button, then the spectrum across the three columns.
+    let plots_left = back.x + 4 * s;
+    let plots_right = back.x + MASTER_COLUMNS * column - 4 * s;
+    let curve_x = bypass.x + bw + 8 * s;
+    let curve =
+        Rect::new(curve_x, row3 + 2 * s, (CURVE_SIZE.0 * s).min(plots_right - curve_x).max(0), CURVE_SIZE.1 * s);
+    let spectrum_top = curve.y + curve.h + 6 * s;
+    let spectrum =
+        Rect::new(plots_left, spectrum_top, plots_right - plots_left, (back.y + back.h - 4 * s - spectrum_top).max(0));
     let fader_x = back.x + MASTER_COLUMNS * column + 2 * s;
     let fader = fader_rect(fader_x, column - 4 * s - (METER_WIDTH + 6) * s, back.y, back.y + back.h, s);
     MasterStrip {
@@ -352,6 +355,8 @@ mod tests {
         assert_eq!(layout.returns[1].knobs.len(), 3, "size, damping, spring");
         let m = layout.master;
         assert!(m.curve.w > 40 && m.curve.h > 40 && m.spectrum.h > 40, "{m:?}");
+        assert!(m.spectrum.w > m.curve.w && m.spectrum.h > m.curve.h, "the spectrum is the big plot: {m:?}");
+        assert!(m.curve.y + m.curve.h <= m.spectrum.y, "the curve over the spectrum");
         assert!(m.knobs.iter().all(|k| k.y + k.h <= m.curve.y), "the plots under the knobs");
     }
 
