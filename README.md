@@ -186,6 +186,13 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   the one clicked (the ruler shows it; Play > Clear the loop ends it).
   A **double-click** on a clip of the song panel opens its pattern in the grid, in
   pattern mode.
+- **Song panel zoom**, as on a DAW timeline: drag an end of the thumb of the
+  arrangement's horizontal scroll bar (its light handles) to show more or fewer measures,
+  the other end staying where it is; drag its middle to scroll. **Ctrl + wheel** over the
+  arrangement zooms around the measure under the pointer.
+- **The pointer** tells what a drag does: a hand over the thumb of any scroll bar (a
+  drag scrolls; it closes while held), sideways arrows over the song panel's zoom
+  handles. The plugin on macOS keeps the arrow.
 - **F9**: metronome (a click on every beat, the first of a measure higher), **F8**: tap
   the tempo (tap on the beat; a pause of 2 seconds starts the count again)
 - **Ctrl R**: record. While the pattern plays, **Q–P** also put a note on their track, on
@@ -197,8 +204,8 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   track editor, song panel, piano roll, grid, synth editor, note editor (shown or folded)
 - **F12**: the mixer (View > Mixer, the **MIX** button): a strip a track with its echo and
   reverb sends, pan, mute, solo and fader, then the shared echo and reverb, then the master
-  bus. **Left**/**Right** go from track to track, the wheel on a strip scrolls the strips,
-  **Esc** goes back to the grid
+  bus. **Left**/**Right** go from track to track; when the strips do not all fit, a scroll
+  bar under them scrolls them (the wheel on a strip too). **Esc** goes back to the grid
 - **Ctrl K**: kit editor, **Ctrl Shift M**: export MIDI (**Ctrl E**: export WAV)
 - **File > Export pattern as WAV** (**Ctrl E**) and **as MIDI** (**Ctrl Shift M**) first ask how
   many loops of the pattern the file holds (1 to 64, **Left**/**Right**); the count is kept for

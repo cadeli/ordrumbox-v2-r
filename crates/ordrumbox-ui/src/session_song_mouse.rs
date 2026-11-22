@@ -12,6 +12,7 @@ use super::Session;
 use super::session_panel::DOUBLE_CLICK;
 use super::session_song::{DRAG_START_PX, DragSource, SongDrag};
 use super::session_song_menu::clip_label;
+use super::session_song_zoom::BarDrag;
 use super::session_types::Workspace;
 use crate::canvas::Canvas;
 use crate::panel::{Dropdown, Id, Rect};
@@ -43,9 +44,10 @@ impl Session {
                 self.press_song_drag(DragSource::Row(r), x, y);
             }
             (SongHit::ScrollBar(axis), Button::Left) => {
-                self.song_panel.bar_drag = Some(axis);
+                self.song_panel.bar_drag = Some(BarDrag::Scroll(axis));
                 self.song_bar_to(size, axis, x, y);
             }
+            (SongHit::ZoomHandle(edge), Button::Left) => self.press_zoom_handle(size, edge),
             (SongHit::Description, Button::Left) => self.text_entry(Id::PatternDescription),
             (SongHit::Ruler(m), Button::Left) => self.set_song_cursor(m),
             (SongHit::Cell { row, measure }, Button::Left) => {
@@ -386,8 +388,10 @@ mod tests {
         let (last_measure, last_row) = (201 - l.visible_measures(), rows.len() - l.visible_rows());
 
         // The measures' bar, dragged to its right end and back.
+        // (Its thumb is held in the middle: its ends zoom, `session_song_zoom.rs`.)
         let bar = l.scroll_bar(Axis::Measures);
-        assert!(s.song_click(SIZE, bar.x + 1, bar.y + 1, Button::Left));
+        let (start, len) = l.thumb(Axis::Measures, 0, l.visible_measures() as usize, 201);
+        assert!(s.song_click(SIZE, start + len / 2, bar.y + 1, Button::Left));
         assert!(s.mouse_move(SIZE, bar.x + bar.w + 50, bar.y, false));
         assert_eq!(scroll(&s), (last_measure, 0));
         s.mouse_move(SIZE, bar.x - 50, bar.y, false);

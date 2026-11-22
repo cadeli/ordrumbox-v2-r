@@ -5,7 +5,9 @@
 
 use crate::canvas::Canvas;
 use crate::scale::Scale;
+use crate::scroll_thumb;
 use crate::theme;
+use crate::ui_input::PointerShape;
 
 /// The smallest window, in logical pixels (scale units at the display's
 /// scale), app or plugin: what the layout needs past it scrolls.
@@ -212,6 +214,20 @@ impl Scroll {
         let travel = viewport.track(drag.axis) - length;
         let moved = (drag.axis.of(at) - drag.from) * viewport.range(drag.axis);
         self.set(viewport, drag.axis, drag.offset + moved.checked_div(travel).unwrap_or(0))
+    }
+
+    /// The pointer's shape at the window's `(x, y)` when the bars decide it:
+    /// a thumb held or under the pointer, or a place off the view; `None`
+    /// over the UI.
+    #[must_use]
+    pub fn pointer_shape(&self, viewport: &Viewport, at: (i32, i32)) -> Option<PointerShape> {
+        if self.dragging() {
+            return Some(scroll_thumb::HELD_SHAPE);
+        }
+        match viewport.bar_at(at) {
+            Some((axis, along)) => Some(scroll_thumb::hover_shape(viewport.thumb(axis, axis.of(self.offset)), along)),
+            None => viewport.off_view(at).then_some(PointerShape::Arrow),
+        }
     }
 
     /// The left button released: the thumb is let go; whether one was held.

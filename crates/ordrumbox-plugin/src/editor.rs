@@ -167,6 +167,9 @@ struct View {
     layout: Option<(Shown, (u32, u32))>,
     /// The size to ask the host for: the layout changed.
     follow: Option<(u32, u32)>,
+    /// The cursor the window shows (`update_cursor`).
+    #[cfg(not(target_os = "macos"))]
+    cursor: baseview::MouseCursor,
 }
 
 /// A drag of the resize grip: where it started, and the size then.
@@ -208,6 +211,8 @@ impl View {
             drag: None,
             layout: None,
             follow: None,
+            #[cfg(not(target_os = "macos"))]
+            cursor: baseview::MouseCursor::Default,
         };
         match surface {
             Ok(surface) => view.surface = Some(surface),
@@ -379,7 +384,32 @@ impl View {
             }
             _ => return EventStatus::Ignored,
         }
+        // baseview has no cursor on macOS yet (its call panics there): the arrow stays.
+        #[cfg(not(target_os = "macos"))]
+        self.update_cursor(window);
         EventStatus::Captured
+    }
+
+    /// The window's cursor: the grip's diagonal arrows over it or while it
+    /// is dragged, else the shape the UI asks for where the pointer is.
+    #[cfg(not(target_os = "macos"))]
+    fn update_cursor(&mut self, window: &mut baseview::Window<'_>) {
+        use baseview::MouseCursor;
+        use ui_input::PointerShape;
+        let cursor = if self.drag.is_some() || self.on_grip() {
+            MouseCursor::NwseResize
+        } else {
+            match lock(&self.player).ui().map_or(PointerShape::Arrow, |ui| ui.pointer_shape()) {
+                PointerShape::Arrow => MouseCursor::Default,
+                PointerShape::Grab => MouseCursor::Hand,
+                PointerShape::Grabbing => MouseCursor::HandGrabbing,
+                PointerShape::ResizeHorizontal => MouseCursor::EwResize,
+            }
+        };
+        if cursor != self.cursor {
+            self.cursor = cursor;
+            window.set_mouse_cursor(cursor);
+        }
     }
 
     /// A key for the UI. A key it does not take, and every release, go on to

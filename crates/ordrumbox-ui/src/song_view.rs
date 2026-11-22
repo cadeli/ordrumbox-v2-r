@@ -38,8 +38,10 @@ const LIST_WIDTH: i32 = (LIST_NUMBER_CHARS + LIST_NAME_CHARS) * crate::font::WID
 const DESCRIPTION_PAD: i32 = 4;
 /// Width of the description's scroll bar.
 const SCROLL_BAR: i32 = 3;
-/// Thickness of the arrangement's scroll bars.
+/// Thickness of the arrangement's rows' scroll bar.
 const GRID_BAR: i32 = 8;
+/// Thickness of the measures' scroll bar, whose thumb's ends zoom (`zoom.rs`).
+const MEASURE_BAR: i32 = 14;
 /// Shortest thumb of a scroll bar.
 const MIN_THUMB: i32 = 12;
 /// Height of what is under the arrangement: all the song column's widgets.
@@ -132,6 +134,8 @@ pub struct SongView<'a> {
     pub description_scroll: usize,
     /// The measures that play in a loop, `first..end`.
     pub loop_region: Option<(u32, u32)>,
+    /// How wide a measure is drawn.
+    pub zoom: MeasureZoom,
 }
 
 /// Where a pattern dragged from the list would land.
@@ -153,6 +157,17 @@ pub enum Axis {
     List,
 }
 
+impl Axis {
+    /// The part of `(x, y)` along this bar.
+    #[must_use]
+    pub const fn along(self, (x, y): (i32, i32)) -> i32 {
+        match self {
+            Self::Measures => x,
+            Self::Rows | Self::List => y,
+        }
+    }
+}
+
 /// What is under the mouse.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SongHit {
@@ -170,6 +185,8 @@ pub enum SongHit {
     Cell { row: usize, measure: u32 },
     /// A scroll bar.
     ScrollBar(Axis),
+    /// A handle at an end of the measures' thumb: a drag zooms.
+    ZoomHandle(Edge),
 }
 
 /// Where the song panel's parts are.
@@ -184,10 +201,12 @@ pub struct SongLayout {
     pub grid: Rect,
     /// The song's column (its widgets).
     pub column: Rect,
+    /// How wide a measure is drawn.
+    zoom: MeasureZoom,
 }
 
 impl SongLayout {
-    pub fn new(width: i32, height: i32, scale: Scale, status_lines: usize) -> Self {
+    pub fn new(width: i32, height: i32, scale: Scale, status_lines: usize, zoom: MeasureZoom) -> Self {
         let s = scale;
         let margin = 16 * s;
         let top = frame::body_top(scale);
@@ -203,7 +222,7 @@ impl SongLayout {
         let list = Rect::new(margin, lower_y, (LIST_WIDTH * s).min(full_w / 4), lower_h);
         let description_x = list.x + list.w + GAP * s;
         let description = Rect::new(description_x, lower_y, (column.x - GAP * s - description_x).max(0), lower_h);
-        Self { scale, list, description, grid, column }
+        Self { scale, list, description, grid, column, zoom }
     }
 
     /// The description's frame, under its title line.
@@ -231,7 +250,7 @@ impl SongLayout {
     }
 
     fn measure_width(&self) -> i32 {
-        MEASURE_WIDTH * self.scale
+        (self.zoom.units() * self.scale).max(1)
     }
 
     fn row_height(&self) -> i32 {
@@ -257,15 +276,18 @@ impl SongLayout {
         GRID_BAR * self.scale
     }
 
+    fn measure_bar(&self) -> i32 {
+        MEASURE_BAR * self.scale
+    }
+
     /// Measures that fit across, left of the rows' scroll bar.
     pub fn visible_measures(&self) -> u32 {
-        let w = self.grid.w - self.label_width() - self.grid_bar();
-        u32::try_from(w.max(0) / self.measure_width()).unwrap_or(0).max(1)
+        u32::try_from(self.measures_width() / self.measure_width()).unwrap_or(0).max(1)
     }
 
     /// Rows that fit down, over the measures' scroll bar.
     pub fn visible_rows(&self) -> usize {
-        let h = self.grid.y + self.grid.h - self.grid_bar() - self.body_top();
+        let h = self.grid.y + self.grid.h - self.measure_bar() - self.body_top();
         usize::try_from(h.max(0) / self.row_height()).unwrap_or(0).max(1)
     }
 
@@ -273,9 +295,11 @@ impl SongLayout {
     /// or right of the list.
     pub fn scroll_bar(&self, axis: Axis) -> Rect {
         let (g, l, bar) = (self.grid, self.list, self.grid_bar());
-        let bottom = g.y + g.h - bar;
+        let bottom = g.y + g.h - self.measure_bar();
         match axis {
-            Axis::Measures => Rect::new(self.body_left(), bottom, (g.x + g.w - bar - self.body_left()).max(0), bar),
+            Axis::Measures => {
+                Rect::new(self.body_left(), bottom, (g.x + g.w - bar - self.body_left()).max(0), self.measure_bar())
+            }
             Axis::Rows => Rect::new(g.x + g.w - bar, self.body_top(), bar, (bottom - self.body_top()).max(0)),
             Axis::List => Rect::new(l.x + l.w - bar, l.y, bar, l.h),
         }
@@ -284,23 +308,38 @@ impl SongLayout {
     /// Start and length of `axis`'s track, along it.
     fn track(&self, axis: Axis) -> (i32, i32) {
         let r = self.scroll_bar(axis);
-        match axis {
-            Axis::Measures => (r.x, r.w),
-            Axis::Rows | Axis::List => (r.y, r.h),
-        }
+        (
+            axis.along((r.x, r.y)),
+            match axis {
+                Axis::Measures => r.w,
+                Axis::Rows | Axis::List => r.h,
+            },
+        )
     }
 
     /// Start and length of `axis`'s thumb: `shown` of `total` from `first`.
-    fn thumb(&self, axis: Axis, first: usize, shown: usize, total: usize) -> (i32, i32) {
+    pub fn thumb(&self, axis: Axis, first: usize, shown: usize, total: usize) -> (i32, i32) {
         scroll_thumb::thumb(self.track(axis), first, shown, total, MIN_THUMB * self.scale)
+    }
+
+    /// `axis`'s thumb for what `view` shows: its first measure, row or
+    /// pattern, of all of them.
+    #[must_use]
+    pub fn bar_thumb(&self, view: &SongView, axis: Axis) -> (i32, i32) {
+        let (first, shown, total) = match axis {
+            Axis::Measures => {
+                let total = view.song.map_or(0, |song| song.length_measures().max(1.0).ceil() as u32) + view.room;
+                (view.scroll.0 as usize, self.visible_measures() as usize, total as usize)
+            }
+            Axis::Rows => (view.scroll.1, self.visible_rows(), view.rows.len()),
+            Axis::List => (view.list_scroll, self.list_rows(), view.patterns.len()),
+        };
+        self.thumb(axis, first, shown, total)
     }
 
     /// The first measure or row that puts `axis`'s thumb centred on `(x, y)`.
     pub fn first_at(&self, axis: Axis, x: i32, y: i32, shown: usize, total: usize) -> usize {
-        let pos = match axis {
-            Axis::Measures => x,
-            Axis::Rows | Axis::List => y,
-        };
+        let pos = axis.along((x, y));
         scroll_thumb::first_at(self.track(axis), pos, shown, total, MIN_THUMB * self.scale)
     }
 
@@ -382,8 +421,14 @@ impl SongLayout {
         if !self.grid.contains(x, y) || y < self.ruler_top() {
             return None;
         }
-        if let Some(axis) = [Axis::Measures, Axis::Rows].into_iter().find(|&a| self.scroll_bar(a).contains(x, y)) {
-            return Some(SongHit::ScrollBar(axis));
+        // The grid is as wide as the arrangement.
+        let total = song.length_measures().max(1.0).ceil() as u32;
+        if self.scroll_bar(Axis::Measures).contains(x, y) {
+            let handle = self.zoom_handle(x, self.bar_thumb(view, Axis::Measures));
+            return Some(handle.map_or(SongHit::ScrollBar(Axis::Measures), SongHit::ZoomHandle));
+        }
+        if self.scroll_bar(Axis::Rows).contains(x, y) {
+            return Some(SongHit::ScrollBar(Axis::Rows));
         }
         let row = row_at(y, self.body_top(), self.row_height())
             .map(|row| view.scroll.1 + row)
@@ -391,8 +436,6 @@ impl SongLayout {
         if x < self.body_left() {
             return row.map(SongHit::RowName);
         }
-        // The grid is as wide as the arrangement.
-        let total = song.length_measures().max(1.0).ceil() as u32;
         let measure = view.scroll.0 + u32::try_from((x - self.body_left()) / self.measure_width()).ok()?;
         if measure >= total {
             return None;
@@ -412,7 +455,9 @@ impl SongLayout {
 }
 
 mod draw;
+mod zoom;
 pub use draw::draw;
+pub use zoom::{Edge, MeasureZoom};
 
 /// `text` in lines of at most `chars` characters, cut at spaces (a word longer
 /// than a line is cut in it) and at line breaks.
@@ -490,9 +535,10 @@ mod tests {
             room: 0,
             description: Some("x"),
             description_scroll: 0,
+            zoom: MeasureZoom::default(),
             loop_region: None,
         };
-        let layout = SongLayout::new(1100, 680, Scale::ONE, 0);
+        let layout = SongLayout::new(1100, 680, Scale::ONE, 0, MeasureZoom::default());
         let (mw, rh) = (layout.measure_width(), layout.row_height());
         let in_row = |row: usize| layout.body_top() + row as i32 * rh + rh / 2;
         let at_measure = |m: i32| layout.body_left() + m * mw + mw / 2;
@@ -537,10 +583,11 @@ mod tests {
         let rows = rows(&library.songs[0], &library.patterns);
         let empty = Library::parse(r#"{"songs":[{"name":"e"}]}"#).unwrap().0;
         let long = "a long description of the pattern ".repeat(20);
-        for (w, h) in [(1, 1), (40, 30), (1100, 680)] {
+        let zooms = [MeasureZoom::MIN, MEASURE_WIDTH, MeasureZoom::MAX].map(MeasureZoom::new);
+        for ((w, h), zoom) in [(1, 1), (40, 30), (1100, 680)].into_iter().flat_map(|size| zooms.map(|z| (size, z))) {
             let mut pixels = vec![0; w * h];
             let mut canvas = Canvas::new(&mut pixels, w, h);
-            let layout = SongLayout::new(w as i32, h as i32, Scale::ONE, 1);
+            let layout = SongLayout::new(w as i32, h as i32, Scale::ONE, 1, zoom);
             for (song, playing) in [(library.songs.first(), true), (empty.songs.first(), false), (None, false)] {
                 let view = SongView {
                     patterns: vec!["a".into(); 40],
@@ -558,6 +605,7 @@ mod tests {
                     room: 8,
                     description: song.map(|_| long.as_str()),
                     loop_region: Some((1, 3)),
+                    zoom,
                     description_scroll: 3,
                 };
                 draw(&mut canvas, &view, &layout);

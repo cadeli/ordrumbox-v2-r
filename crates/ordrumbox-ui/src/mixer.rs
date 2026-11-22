@@ -3,8 +3,8 @@
 //! level meter), then the shared echo and reverb returns, then the master
 //! bus (its compressor and filters, the compressor's curve, its fader and
 //! meter). The spectrum runs under them all, the master's fader beside it.
-//! The track strips that do not fit scroll sideways; the returns and the
-//! master keep their place at the right.
+//! The track strips that do not fit scroll sideways, along a scroll bar
+//! under them; the returns and the master keep their place at the right.
 //!
 //! [`MixerLayout`] places everything; the controls are panel items, the
 //! strips' backgrounds, the meters, the curve and the spectrum are drawn here.
@@ -13,7 +13,7 @@ use crate::canvas::{Canvas, Rgb, fit, text_width};
 use crate::output;
 use crate::panel::Rect;
 use crate::scale::Scale;
-use crate::theme;
+use crate::{scroll_thumb, theme};
 use ordrumbox_engine::MasterSettings;
 
 /// Width of a strip, and the gap between two, at scale 1.
@@ -28,9 +28,11 @@ const KNOB_HEIGHT: i32 = 50;
 const KNOB_ROWS: i32 = 4;
 /// The mute and solo buttons.
 const BUTTON_SIZE: (i32, i32) = (24, 16);
-/// The scroll row under the strips: the strips shown, the arrows.
+/// The row of the track strips' scroll bar, under them, and the bar's thickness in it.
 const SCROLL_HEIGHT: i32 = 18;
-const ARROW_WIDTH: i32 = 20;
+const SCROLL_BAR: i32 = 12;
+/// The shortest thumb of the scroll bar.
+const MIN_THUMB: i32 = 16;
 /// The master's columns: its controls three abreast (its fader is beside the spectrum).
 const MASTER_COLUMNS: i32 = 3;
 /// A meter beside a fader.
@@ -96,9 +98,11 @@ pub struct MixerLayout {
     pub tracks: Vec<TrackStrip>,
     /// How many track strips fit across.
     pub fits: usize,
-    /// The scroll row: its text, its arrows (the strips before, after).
-    pub scroll_text: Rect,
-    pub scroll: [Rect; 2],
+    /// The track strips' scroll bar, under them (drawn when they do not all fit).
+    pub scroll_bar: Rect,
+    /// The first track strip shown, and the tracks.
+    first: usize,
+    track_count: usize,
     /// The echo's strip, then the reverb's.
     pub returns: [ReturnStrip; 2],
     pub master: MasterStrip,
@@ -135,18 +139,11 @@ impl MixerLayout {
                 track_strip(track, Rect::new(x, area.y, strip_w, strips_bottom - area.y), s)
             })
             .collect();
-        let arrow_w = ARROW_WIDTH * s;
-        let scroll_y = strips_bottom + 2 * s;
-        let scroll_h = SCROLL_HEIGHT * s - 4 * s;
-        let scroll = [
-            Rect::new(area.x, scroll_y, arrow_w, scroll_h),
-            Rect::new((tracks_right - arrow_w).max(area.x + arrow_w), scroll_y, arrow_w, scroll_h),
-        ];
-        let scroll_text = Rect::new(
-            scroll[0].x + arrow_w + 6 * s,
-            scroll_y,
-            (scroll[1].x - scroll[0].x - arrow_w - 12 * s).max(0),
-            scroll_h,
+        let scroll_bar = Rect::new(
+            area.x,
+            strips_bottom + (SCROLL_HEIGHT - SCROLL_BAR) * s / 2,
+            (tracks_right - area.x).max(0),
+            SCROLL_BAR * s,
         );
         let returns = [
             return_strip(Rect::new(echo_x, area.y, strip_w, strips_bottom - area.y), output::ECHO_CONTROLS - 1, s),
@@ -165,8 +162,9 @@ impl MixerLayout {
             scale,
             tracks,
             fits,
-            scroll_text,
-            scroll,
+            scroll_bar,
+            first,
+            track_count,
             returns,
             master,
             spectrum,
@@ -174,6 +172,30 @@ impl MixerLayout {
             top: area.y,
             bottom: strips_bottom,
         }
+    }
+}
+
+impl MixerLayout {
+    /// More track strips than fit: the scroll bar is there.
+    #[must_use]
+    pub const fn scrolls(&self) -> bool {
+        self.track_count > self.fits
+    }
+
+    /// Start and length of the scroll bar's thumb, across.
+    #[must_use]
+    pub fn thumb(&self) -> (i32, i32) {
+        scroll_thumb::thumb(self.track(), self.first, self.fits, self.track_count, MIN_THUMB * self.scale)
+    }
+
+    /// The first track strip that puts the thumb centred on `x`.
+    #[must_use]
+    pub fn first_at(&self, x: i32) -> usize {
+        scroll_thumb::first_at(self.track(), x, self.fits, self.track_count, MIN_THUMB * self.scale)
+    }
+
+    fn track(&self) -> (i32, i32) {
+        (self.scroll_bar.x, self.scroll_bar.w)
     }
 }
 
@@ -297,6 +319,9 @@ pub fn draw(canvas: &mut Canvas, view: &MixerView, layout: &MixerLayout) {
     for x in layout.dividers {
         canvas.fill_rect(x, layout.top, s.px(), layout.bottom - layout.top, theme::line());
     }
+    if layout.scrolls() {
+        scroll_thumb::draw_across(canvas, layout.scroll_bar, layout.thumb(), s);
+    }
     match &view.master {
         Some((settings, level, spectrum)) => {
             draw_meter(canvas, layout.master.meter, *level);
@@ -377,7 +402,9 @@ mod tests {
         assert!(m.curve.y + m.curve.h <= m.back.y + m.back.h, "the curve in the master strip");
         // The spectrum under every strip and the scroll row, the master's fader beside it.
         assert_eq!(spectrum.x, AREA.x);
-        assert!(backs.iter().all(|b| b.y + b.h <= spectrum.y) && layout.scroll[0].y + layout.scroll[0].h <= spectrum.y);
+        let bar = layout.scroll_bar;
+        assert!(backs.iter().all(|b| b.y + b.h <= bar.y) && bar.y + bar.h <= spectrum.y);
+        assert_eq!((bar.x, bar.x + bar.w), (AREA.x, layout.dividers[0] - SECTION_GAP / 2), "under the track strips");
         assert!(spectrum.x + spectrum.w <= m.fader.x && m.fader.y + m.fader.h > spectrum.y, "{m:?}");
         assert_eq!((m.fader.y, m.fader.h), (spectrum.y, spectrum.h), "the master's fader as high as the spectrum");
         assert_eq!(m.fader_back.x + m.fader_back.w, AREA.x + AREA.w);
@@ -392,7 +419,8 @@ mod tests {
         let many = MixerLayout::new(AREA, 40, 7, Scale::ONE);
         assert_eq!(few.returns, many.returns);
         assert_eq!(few.master, many.master);
-        assert_eq!(few.scroll, many.scroll);
+        assert_eq!(few.scroll_bar, many.scroll_bar);
+        assert!(!few.scrolls() && many.scrolls());
         assert_eq!(many.tracks[0].track, 7);
         assert_eq!(many.tracks[0].back, few.tracks[0].back, "the first strip shown is where the first is");
         // Scrolled past the end: the last strips fill the row.

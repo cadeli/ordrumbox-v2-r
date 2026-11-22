@@ -12,7 +12,7 @@ use crate::frame;
 use crate::menu::{self, Command};
 use crate::scroll::{Scroll, Viewport};
 use crate::session::{Move, OverlayKey, PanelKey, Session};
-use crate::ui_input::{Button, Key, KeyEvent, Modifiers, ScrollDelta};
+use crate::ui_input::{Button, Key, KeyEvent, Modifiers, PointerShape, ScrollDelta};
 use crate::view;
 
 /// Redraw interval while playing (the playhead moves).
@@ -249,6 +249,9 @@ impl Ui {
         if s.piano_roll_open() {
             return if shift { s.roll_shift_press(size, x, y) } else { s.roll_click(size, x, y, Button::Left) };
         }
+        if s.mixer_bar_press(size, x, y) {
+            return true;
+        }
         if let Some((_, count)) = s.kit_list() {
             if s.kit_bar_press(size, x, y) {
                 return true;
@@ -311,6 +314,18 @@ impl Ui {
         hovered_menu || hovered || moved
     }
 
+    /// The pointer's shape where it is, for the window's cursor: the
+    /// window's scrollbars first, then the views under them.
+    #[must_use]
+    pub fn pointer_shape(&self) -> PointerShape {
+        let window = (self.pointer.0 as i32, self.pointer.1 as i32);
+        if let Some(shape) = self.scroll.pointer_shape(&self.viewport(self.window), window) {
+            return shape;
+        }
+        let (x, y) = self.at();
+        self.session.pointer_shape(self.size(), x, y)
+    }
+
     /// The pointer moved: an open menu follows it.
     fn hover(&mut self) -> bool {
         let scale = self.size().2;
@@ -349,6 +364,7 @@ impl Ui {
         // What the pointer is over first; the view scrolls with what is left.
         self.session.kit_wheel(size, x, y, lines)
             || self.session.wheel(size, x, y, lines, fine, coarse)
+            || (m.command() && self.session.song_zoom_wheel(size, x, y, lines))
             || self.session.song_wheel(size, x, y, (columns, lines), m.shift)
             || self.session.roll_wheel(size, x, y, lines, m.shift)
             || self.scroll.wheel(&self.viewport(self.window), (columns, lines), self.display)

@@ -20,7 +20,7 @@ use std::num::NonZeroU32;
 use std::rc::Rc;
 use std::sync::mpsc::{Receiver, Sender};
 
-use ordrumbox_ui::ui_input::{Button, Key, KeyEvent, Modifiers, ScrollDelta, single_char};
+use ordrumbox_ui::ui_input::{Button, Key, KeyEvent, Modifiers, PointerShape, ScrollDelta, single_char};
 use ordrumbox_ui::{Command, Scale, Session, Ui};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
@@ -28,7 +28,7 @@ use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopClosed};
 use winit::keyboard::{KeyCode, ModifiersState, PhysicalKey};
 use winit::platform::modifier_supplement::KeyEventExtModifierSupplement;
-use winit::window::{Fullscreen, Window, WindowId};
+use winit::window::{CursorIcon, Fullscreen, Window, WindowId};
 
 const INITIAL_SIZE: LogicalSize<f64> = LogicalSize::new(1100.0, 680.0);
 
@@ -50,6 +50,8 @@ struct App {
     waker: ordrumbox_ui::Waker,
     /// The file dialog open, if any.
     dialog: Option<dialog::Open>,
+    /// The cursor the window shows, as the UI last asked for it.
+    pointer_shape: PointerShape,
 }
 
 impl App {
@@ -422,6 +424,7 @@ impl App {
 
     /// After each window event: a quit asked from the menus or the keyboard.
     fn after_event(&mut self, event_loop: &ActiveEventLoop) {
+        self.update_cursor();
         if let Some(on) = self.ui.session.take_fullscreen_request()
             && let Some(gfx) = &self.gfx
         {
@@ -431,6 +434,28 @@ impl App {
         if self.ui.session.quit_requested() {
             self.quit(event_loop);
         }
+    }
+
+    /// The window's cursor: the pointer's shape where it is now.
+    fn update_cursor(&mut self) {
+        let shape = self.ui.pointer_shape();
+        if shape == self.pointer_shape {
+            return;
+        }
+        self.pointer_shape = shape;
+        if let Some(gfx) = &self.gfx {
+            gfx.window.set_cursor(cursor_icon(shape));
+        }
+    }
+}
+
+/// The system cursor that shows `shape`.
+const fn cursor_icon(shape: PointerShape) -> CursorIcon {
+    match shape {
+        PointerShape::Arrow => CursorIcon::Default,
+        PointerShape::Grab => CursorIcon::Grab,
+        PointerShape::Grabbing => CursorIcon::Grabbing,
+        PointerShape::ResizeHorizontal => CursorIcon::EwResize,
     }
 }
 
@@ -538,6 +563,7 @@ fn open_window() -> Result<(), Box<dyn std::error::Error>> {
         midi_out: None,
         waker,
         dialog: None,
+        pointer_shape: PointerShape::Arrow,
     };
     app.open_midi();
     event_loop.run_app(&mut app)?;

@@ -100,8 +100,6 @@ pub fn help(id: Id) -> Option<Help> {
         Id::MixerName(_) => ["Track", "a click: the track editor edits it (Left, Right: the track before, after)"],
         Id::MixerToggle(_, "mute") => ["Mute (M)", "the track plays nothing"],
         Id::MixerToggle(..) => ["Solo (S)", "only the soloed tracks play"],
-        Id::MixerScroll(Step::Previous) => ["Strips before", "the track strips scroll back (the wheel on a strip too)"],
-        Id::MixerScroll(_) => ["Strips after", "the track strips scroll on (the wheel on a strip too)"],
         Id::Decay => setting_help("decay")?,
         Id::KnobBar(key)
         | Id::Fx(key)

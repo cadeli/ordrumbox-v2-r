@@ -134,6 +134,8 @@ mod session_panel_input;
 mod session_panel_views;
 #[path = "session_playback.rs"]
 mod session_playback;
+#[path = "session_pointer.rs"]
+mod session_pointer;
 #[path = "session_roll.rs"]
 mod session_roll;
 #[path = "session_saving.rs"]
@@ -151,6 +153,8 @@ mod session_song_files;
 mod session_song_menu;
 #[path = "session_song_mouse.rs"]
 mod session_song_mouse;
+#[path = "session_song_zoom.rs"]
+mod session_song_zoom;
 #[path = "session_synth.rs"]
 mod session_synth;
 #[path = "session_transport.rs"]

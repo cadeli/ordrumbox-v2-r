@@ -185,6 +185,21 @@ impl Modifiers {
     }
 }
 
+/// The pointer's shape, which tells what a drag where it is does; the
+/// program shows it as its window's cursor.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum PointerShape {
+    #[default]
+    Arrow,
+    /// Over a scroll bar's thumb: a drag scrolls.
+    Grab,
+    /// A scroll bar's thumb held.
+    Grabbing,
+    /// Over or holding an end of a thumb that zooms: a drag shows more or
+    /// fewer of what it scrolls through.
+    ResizeHorizontal,
+}
+
 /// A turn of the mouse wheel or a swipe on a touchpad (positive: up, left).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ScrollDelta {

@@ -41,7 +41,7 @@ fn draw_list(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     }
     if total > shown {
         let bar = layout.scroll_bar(Axis::List);
-        scroll_thumb::draw(canvas, bar, layout.thumb(Axis::List, first, shown, total), s);
+        scroll_thumb::draw(canvas, bar, layout.bar_thumb(view, Axis::List), s);
     }
 }
 
@@ -159,10 +159,12 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     draw_scroll_bars(canvas, view, layout, &page);
 }
 
-/// The ruler: one numbered cell per measure, every fourth marked.
+/// The ruler: one cell per measure, every fourth marked, numbered as often
+/// as the numbers fit.
 fn draw_measure_ruler(canvas: &mut Canvas, view: &SongView, layout: &SongLayout, page: &Page) {
     let s = layout.scale;
-    for m in page.first_measure..page.first_measure + page.shown_measures {
+    let measures = page.first_measure..page.first_measure + page.shown_measures;
+    for m in measures.clone() {
         let x = layout.measure_x(f64::from(m), page.first_measure);
         let looped = view.loop_region.is_some_and(|(first, end)| (first..end).contains(&m));
         let color = if m == page.current {
@@ -175,9 +177,18 @@ fn draw_measure_ruler(canvas: &mut Canvas, view: &SongView, layout: &SongLayout,
             cell_color()
         };
         canvas.fill_rect(x, layout.ruler_top(), layout.measure_width() - s.px(), HEADER_HEIGHT * s - s.px(), color);
+    }
+    // The numbers over the cells: one wider than its measure runs over the next ones.
+    let label_step = layout.label_step(page.grid_total);
+    let end = layout.body_left() + page.body_w;
+    for m in measures.filter(|m| m % label_step == 0) {
+        let x = layout.measure_x(f64::from(m), page.first_measure);
         let label = (m + 1).to_string();
-        let tx = x + (layout.measure_width() - text_width(&label, s)) / 2;
-        let text = if m == page.current {
+        let tx = x + ((layout.measure_width() - text_width(&label, s)) / 2).max(s.px());
+        if tx + text_width(&label, s) > end {
+            break;
+        }
+        let text = if m == page.current && label_step == 1 {
             background_color()
         } else if m % 4 == 0 {
             theme::text()
@@ -201,10 +212,17 @@ fn draw_row_names(canvas: &mut Canvas, view: &SongView, layout: &SongLayout, pag
     }
 }
 
-/// The measure lines, every fourth brighter.
+/// The narrowest measure (scale units) that keeps its line: narrower, only every fourth is drawn.
+const MINOR_LINES: i32 = 6;
+
+/// The measure lines, every fourth brighter; only those when they are too close.
 fn draw_measure_lines(canvas: &mut Canvas, layout: &SongLayout, page: &Page) {
     let s = layout.scale;
+    let minor = layout.measure_width() >= MINOR_LINES * s;
     for m in page.first_measure..=page.first_measure + page.shown_measures {
+        if !minor && m % 4 != 0 {
+            continue;
+        }
         let x = layout.measure_x(f64::from(m), page.first_measure);
         let color = if m % 4 == 0 { major_color() } else { cell_color() };
         canvas.fill_rect(x - s.px(), layout.body_top(), s.px(), page.body_h, color);
@@ -252,17 +270,30 @@ fn draw_row_drop(canvas: &mut Canvas, view: &SongView, layout: &SongLayout, page
 fn draw_scroll_bars(canvas: &mut Canvas, view: &SongView, layout: &SongLayout, page: &Page) {
     let s = layout.scale;
     let bars = [
-        (Axis::Measures, page.first_measure as usize, layout.visible_measures() as usize, page.grid_total as usize),
-        (Axis::Rows, page.first_row, layout.visible_rows(), view.rows.len()),
+        (Axis::Measures, layout.visible_measures() as usize, page.grid_total as usize),
+        (Axis::Rows, layout.visible_rows(), view.rows.len()),
     ];
-    for (axis, first, shown, total) in bars {
+    for (axis, shown, total) in bars {
         let r = layout.scroll_bar(axis);
         canvas.fill_rect(r.x, r.y, r.w, r.h, cell_color());
-        let (start, len) = layout.thumb(axis, first, shown, total);
+        let (start, len) = layout.bar_thumb(view, axis);
         let color = if total > shown { theme::muted() } else { line_color() };
         match axis {
             Axis::Measures => canvas.fill_rect(start, r.y + s.px(), len, r.h - 2 * s, color),
             Axis::Rows | Axis::List => canvas.fill_rect(r.x + s.px(), start, r.w - 2 * s, len, color),
         }
+    }
+    draw_zoom_handles(canvas, view, layout);
+}
+
+/// The handles at the ends of the measures' thumb, which zoom: each a
+/// lighter end with a grip line.
+fn draw_zoom_handles(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
+    let s = layout.scale;
+    let r = layout.scroll_bar(Axis::Measures);
+    let (start_handle, end_handle) = layout.handle_spans(layout.bar_thumb(view, Axis::Measures));
+    for (x, w) in start_handle.into_iter().chain([end_handle]) {
+        canvas.fill_rect(x, r.y + s.px(), w, r.h - 2 * s, theme::text());
+        canvas.fill_rect(x + w / 2 - s.px() / 2, r.y + 4 * s, s.px(), r.h - 8 * s, theme::muted());
     }
 }

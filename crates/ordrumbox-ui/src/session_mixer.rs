@@ -9,7 +9,7 @@ use crate::canvas::{Canvas, fit};
 use crate::control::{Format, Spec};
 use crate::mixer::{self, MixerLayout, MixerView, TRACK_KNOBS};
 use crate::output::{self, Param};
-use crate::panel::{self, Id, Item, Kind, Rect, Step};
+use crate::panel::{self, Id, Item, Kind, Rect};
 use crate::scale::Scale;
 use crate::view::Hit;
 use crate::{frame, master, returns, theme};
@@ -26,11 +26,12 @@ const TRACK_FADER: Spec = Spec::fader(0.0, 1.0, 0.01, 1.0);
 /// How much of the master's meter is kept from one frame to the next.
 const METER_DECAY: f32 = 0.88;
 
-/// The mixer's state: the first track strip shown; the master's meter, the
-/// spectrum's analyser and its last bins.
+/// The mixer's state: the first track strip shown, its scroll bar held or
+/// not; the master's meter, the spectrum's analyser and its last bins.
 #[derive(Debug, Default)]
 pub(super) struct Mixer {
     first: usize,
+    bar_held: bool,
     level: Cell<f32>,
     analyser: RefCell<crate::spectrum::Analyser>,
     spectrum: RefCell<Vec<u8>>,
@@ -58,12 +59,11 @@ impl Session {
         MixerLayout::new(area, track_count, self.mixer.first, scale)
     }
 
-    /// The mixer's controls: every strip's, then the scroll row's.
+    /// The mixer's controls: every strip's (its scroll bar is drawn by `mixer.rs`).
     pub(super) fn mixer_items(&self, layout: &mut PanelLayout, size: (i32, i32, Scale)) {
         let mixer = self.mixer_layout(size);
         let scale = size.2;
         self.track_strip_items(&mixer, scale, &mut layout.items);
-        self.scroll_items(&mixer, scale, &mut layout.items);
         // A plugin's host mixes: its returns and master stay at their defaults.
         if !self.host.hosted {
             self.return_items(&mixer, scale, &mut layout.items);
@@ -101,29 +101,6 @@ impl Session {
                 Kind::Value { spec: TRACK_FADER, value, label: None, text: Format::Fixed2.value(value, ""), lfo };
             items.push(Item::new(Some(Id::TrackVolume(t)), strip.fader, kind));
         }
-    }
-
-    /// The scroll row: an arrow each way (greyed out at an end), the strips shown.
-    fn scroll_items(&self, mixer: &MixerLayout, scale: Scale, items: &mut Vec<Item>) {
-        let count = self.pattern().map_or(0, |p| p.tracks.len());
-        let first = mixer.tracks.first().map_or(0, |t| t.track);
-        let last = mixer.tracks.last().map_or(0, |t| t.track + 1);
-        for (step, label, live, rect) in
-            [(Step::Previous, "<", first > 0, mixer.scroll[0]), (Step::Next, ">", last < count, mixer.scroll[1])]
-        {
-            let kind = if live {
-                Kind::Button { label: label.into(), on: false }
-            } else {
-                Kind::Disabled { label: label.into() }
-            };
-            items.push(Item::new(live.then_some(Id::MixerScroll(step)), rect, kind));
-        }
-        let text = match count {
-            0 => "no track".to_owned(),
-            _ => format!("tracks {}-{last} of {count}", first + 1),
-        };
-        let text = fit(&text, mixer.scroll_text.w, scale);
-        items.push(Item::new(None, mixer.scroll_text, Kind::Text { text, color: panel::dim() }));
     }
 
     fn return_items(&self, mixer: &MixerLayout, scale: Scale, items: &mut Vec<Item>) {
@@ -176,12 +153,11 @@ impl Session {
         if used == value { text } else { format!("{} used", num::text(used)) }
     }
 
-    /// A mixer's button, name or arrow clicked.
+    /// A mixer's button or name clicked.
     pub(super) fn mixer_activate(&mut self, id: Id) {
         match id {
             Id::MixerName(t) => self.click(Hit::Name(t)),
             Id::MixerToggle(t, key) => self.toggle_row(t, key),
-            Id::MixerScroll(step) => self.scroll_mixer(step == Step::Next),
             Id::Master("compBypass") => {
                 let bypass = if self.output_panel.master().bypass >= 0.5 { 0.0 } else { 1.0 };
                 self.set_master_value("compBypass", bypass);
@@ -204,6 +180,37 @@ impl Session {
         let last_first = count.saturating_sub(fits);
         let first = self.mixer.first.min(last_first);
         self.mixer.first = if later { (first + 1).min(last_first) } else { first.saturating_sub(1) };
+    }
+
+    /// A press on the track strips' scroll bar, when there is one: the thumb
+    /// goes to `x`, and follows the mouse until it is released; whether it
+    /// was the bar's.
+    pub fn mixer_bar_press(&mut self, size: (i32, i32, Scale), x: i32, y: i32) -> bool {
+        let mixer = self.mixer_layout(size);
+        if !self.mixer_open() || !mixer.scrolls() || !mixer.scroll_bar.contains(x, y) {
+            return false;
+        }
+        self.mixer.bar_held = true;
+        self.mixer_bar_to(size, x);
+        true
+    }
+
+    /// The held scroll bar moved to `x`; whether to redraw.
+    pub(super) fn mixer_bar_to(&mut self, size: (i32, i32, Scale), x: i32) -> bool {
+        let first = self.mixer_layout(size).first_at(x);
+        let changed = first != self.mixer.first;
+        self.mixer.first = first;
+        changed
+    }
+
+    /// The track strips' scroll bar is held by the mouse.
+    pub(super) const fn is_mixer_bar_held(&self) -> bool {
+        self.mixer.bar_held
+    }
+
+    /// The mouse let go of the track strips' scroll bar.
+    pub(super) const fn release_mixer_bar(&mut self) {
+        self.mixer.bar_held = false;
     }
 
     /// Left, Right in the mixer: the track editor edits the track before or
@@ -348,16 +355,25 @@ mod tests {
         assert!(fits < 20);
         let master = rect_of(&s, Id::Master("volume"));
         let first = rect_of(&s, Id::MixerName(0));
-        // The left arrow is greyed out at the start: nothing there to click.
-        let back = s.mixer_layout(SIZE).scroll[0];
-        assert!(
-            panel::hit(&s.panel_layout(SIZE.0, SIZE.1, SIZE.2).items, back.x + 2, back.y + 2)
-                .and_then(|i| i.id)
-                .is_none()
-        );
-        let next = rect_of(&s, Id::MixerScroll(Step::Next));
-        click(&mut s, next.x + 2, next.y + 2);
-        assert_eq!(rect_of(&s, Id::MixerName(1)), first, "strip 1 where strip 0 was");
+        // The scroll bar: its thumb dragged to the end and back, a press off it jumps there.
+        let layout = s.mixer_layout(SIZE);
+        let (bar, (start, len)) = (layout.scroll_bar, layout.thumb());
+        assert!(layout.scrolls());
+        assert!(s.mixer_bar_press(SIZE, start + len / 2, bar.y + 2));
+        assert_eq!(s.pointer_shape(SIZE, 0, 0), crate::ui_input::PointerShape::Grabbing);
+        assert!(s.mouse_move(SIZE, bar.x + bar.w + 50, bar.y, false));
+        assert_eq!(s.mixer_layout(SIZE).tracks.last().map(|t| t.track), Some(19));
+        s.mouse_move(SIZE, bar.x - 50, bar.y, false);
+        s.mouse_up();
+        assert!(!s.is_mixer_bar_held());
+        assert_eq!(rect_of(&s, Id::MixerName(0)), first);
+        assert_eq!(s.pointer_shape(SIZE, start + len / 2, bar.y + 2), crate::ui_input::PointerShape::Grab);
+        assert!(s.mixer_bar_press(SIZE, bar.x + bar.w - 1, bar.y + 2));
+        s.mouse_up();
+        assert_eq!(s.mixer_layout(SIZE).tracks.last().map(|t| t.track), Some(19));
+        // Not past the bar, nor with every strip shown.
+        assert!(!s.mixer_bar_press(SIZE, bar.x + 2, bar.y - 4));
+        s.mixer.first = 0;
         // The wheel on a strip's background scrolls on, held at the end.
         let strip = s.mixer_layout(SIZE).tracks[0].back;
         assert!(s.wheel(SIZE, strip.x + 2, strip.y + strip.h - 2, -100, false, false));

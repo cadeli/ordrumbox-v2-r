@@ -258,7 +258,6 @@ pub enum Id {
     /// A track strip's mute or solo button, by its track key.
     MixerToggle(usize, &'static str),
     /// An arrow of the scroll row: the track strips before, after.
-    MixerScroll(Step),
     // Synth editor.
     SynthPreset,
     SynthButton(&'static str),

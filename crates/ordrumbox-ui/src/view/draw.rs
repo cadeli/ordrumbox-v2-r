@@ -27,7 +27,7 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: Scale) {
     // The main editor (top-left): exactly one of the song panel, the kit
     // editor, the synth editor (painted by the session), the piano roll, the grid.
     if let Some(arrangement) = &view.arrangement {
-        let layout = SongLayout::new(body.main_w, body.editor_h, scale, view.status.len());
+        let layout = SongLayout::new(body.main_w, body.editor_h, scale, view.status.len(), arrangement.zoom);
         song_view::draw(canvas, arrangement, &layout);
     } else if let Some(kit) = &view.kit_view {
         let layout = KitLayout::new(body.main_w, body.editor_h, scale, view.status.len());

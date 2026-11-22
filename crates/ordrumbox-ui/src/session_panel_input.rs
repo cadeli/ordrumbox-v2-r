@@ -184,8 +184,11 @@ impl Session {
         if self.kit_editor.list.is_bar_held() {
             return self.kit_bar_to(size, y);
         }
-        if let Some(axis) = self.song_panel.held_bar() {
-            return self.song_bar_to(size, axis, x, y);
+        if self.is_mixer_bar_held() {
+            return self.mixer_bar_to(size, x);
+        }
+        if let Some(drag) = self.song_panel.held_bar() {
+            return self.song_bar_held(size, drag, x, y);
         }
         let (width, height, scale) = size;
         if let Some(dropdown) = &mut self.chrome.widgets.dropdown {
@@ -323,6 +326,7 @@ impl Session {
         self.chrome.widgets.drag = None;
         self.song_panel.release_bar();
         self.kit_editor.list.release_bar();
+        self.release_mixer_bar();
         self.chrome.track_drag = None;
         self.chrome.zone_drag = None;
         self.chrome.lane_drag = None;

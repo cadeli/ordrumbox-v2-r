@@ -23,11 +23,12 @@ use ordrumbox_core::steps::TICK;
 
 use super::Session;
 use super::session_panel::PanelLayout;
+use super::session_song_zoom::BarDrag;
 use super::session_types::Workspace;
 use crate::panel::Id;
 use crate::panel::{self, Item, Kind, Rect};
 use crate::picker::{Export, Purpose};
-use crate::song_view::{self, Row, SongLayout, SongView};
+use crate::song_view::{self, MeasureZoom, Row, SongLayout, SongView};
 use crate::theme;
 use ordrumbox_engine::Mode;
 
@@ -85,7 +86,9 @@ pub(super) struct SongPanel {
     pub(super) hovered_clip: Option<usize>,
     pub(super) drag: Option<SongDrag>,
     /// The arrangement's scroll bar held by the mouse.
-    pub(super) bar_drag: Option<crate::song_view::Axis>,
+    pub(super) bar_drag: Option<BarDrag>,
+    /// How wide a measure is drawn (`session_song_zoom.rs`).
+    pub(super) zoom: MeasureZoom,
     /// The last clip pressed and when, for double-clicks.
     pub(super) last_clip_click: Option<(usize, std::time::Instant)>,
 }
@@ -97,7 +100,7 @@ impl SongPanel {
     }
 
     /// The scroll bar held by the mouse, if any.
-    pub(super) fn held_bar(&self) -> Option<crate::song_view::Axis> {
+    pub(super) fn held_bar(&self) -> Option<BarDrag> {
         self.bar_drag
     }
 
@@ -213,7 +216,7 @@ impl Session {
 
     pub(super) fn song_layout(&self, size: (i32, i32, Scale)) -> SongLayout {
         let body = self.body(size);
-        SongLayout::new(body.main_w, body.editor_h, size.2, self.status.len())
+        SongLayout::new(body.main_w, body.editor_h, size.2, self.status.len(), self.song_panel.zoom)
     }
 
     /// What the song panel shows (its rows are `rows`).
@@ -241,6 +244,7 @@ impl Session {
             description: self.pattern().map(|p| p.description.as_str()),
             description_scroll: self.description_scroll(layout),
             loop_region: self.song_loop_region(),
+            zoom: self.song_panel.zoom,
         }
     }
 

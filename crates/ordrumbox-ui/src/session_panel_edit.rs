@@ -477,7 +477,7 @@ impl Session {
             Id::Transport => self.toggle_play(),
             Id::View(i) => self.show_view(i),
             Id::Mode(i) => self.show_mode(i == 1),
-            Id::Master(_) | Id::MixerName(_) | Id::MixerToggle(..) | Id::MixerScroll(_) => self.mixer_activate(id),
+            Id::Master(_) | Id::MixerName(_) | Id::MixerToggle(..) => self.mixer_activate(id),
             Id::SynthTab(_) | Id::SynthButton(_) | Id::SynthPower(_) | Id::SynthIcon(..) | Id::SynthField(_) => {
                 self.synth_activate(id);
             }
