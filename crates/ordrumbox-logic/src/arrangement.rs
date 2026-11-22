@@ -18,6 +18,9 @@ use std::collections::HashSet;
 use ordrumbox_core::song::{DEFAULT_BPM, clamp_bpm, measures_for_pattern};
 use ordrumbox_core::{Song, SongClip};
 
+#[path = "arrangement/automation.rs"]
+mod automation;
+
 /// The loop length after a clip edit: the end of the last clip, none
 /// without clips.
 fn follow_content(song: &mut Song) {
@@ -244,6 +247,7 @@ impl Editor {
             bpm: DEFAULT_BPM,
             loop_measures: None,
             clips: Vec::new(),
+            automations: Vec::new(),
         };
         let index = self.library.songs.len();
         let previous = self.selected_song.min(index.saturating_sub(1));

@@ -6,6 +6,7 @@
 //! checked against files produced by the JS app (`tests/fixtures/`).
 
 pub mod arp;
+pub mod automation;
 pub mod drum_taxonomy;
 pub mod euclidean;
 pub mod ids;
@@ -28,6 +29,7 @@ pub mod style;
 pub mod track;
 mod variation;
 
+pub use automation::{AutomationLane, AutomationPoint, AutomationTarget};
 pub use library::{Library, LoadReport, SongRecord};
 pub use note::Note;
 pub use pattern::Pattern;

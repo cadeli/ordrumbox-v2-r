@@ -329,6 +329,7 @@ impl Session {
             Id::KitInstrumentMenu(sample) => self.kit_instrument_menu_pick(sample, &value, dropdown),
             Id::InstrumentMenu => self.instrument_menu_pick(&value, dropdown),
             Id::ControlMenu => self.control_menu_pick(&value, dropdown.control),
+            Id::AutomationMenu => self.automation_menu_pick(&value, dropdown),
             id => self.select(id, &value),
         }
     }

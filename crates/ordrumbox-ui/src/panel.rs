@@ -290,6 +290,9 @@ pub enum Id {
     /// The instrument menus of the track editor's Sound tab: the categories,
     /// then a category's instruments, those that have samples only.
     InstrumentMenu,
+    /// The song panel's automation menus: the instruments of the song, then
+    /// the controls of one; or a lane's menu.
+    AutomationMenu,
     /// The right-click menu of a knob or a slider: the control it is for is
     /// the dropdown's `control`.
     ControlMenu,

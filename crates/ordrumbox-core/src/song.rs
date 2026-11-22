@@ -6,6 +6,7 @@
 
 use std::collections::HashSet;
 
+use crate::automation::{AutomationLane, STEPS_PER_MEASURE};
 use crate::ids::{slugify, unique_id};
 use crate::json::{Object, Value};
 use crate::record::Issue;
@@ -62,6 +63,8 @@ pub struct Song {
     /// last clip, which may be fractional (as in the JS).
     pub loop_measures: Option<f64>,
     pub clips: Vec<SongClip>,
+    /// Lanes that switch controls of its instruments along it (`automation.rs`).
+    pub automations: Vec<AutomationLane>,
 }
 
 /// A clip left out on load because its pattern reference is unusable, kept so
@@ -185,6 +188,7 @@ impl Song {
             // Whole measures; under one, no loop (not a loop of 0 measures).
             loop_measures: loop_count.map(f64::floor).filter(|count| *count > 0.0 && *count <= MAX_LOADED_MEASURES),
             clips,
+            automations: automations_from_json(field("automations"), &format!("{at}.automations"), issues),
         };
         Ok((song, dropped))
     }
@@ -206,7 +210,42 @@ impl Song {
             Value::Object(object)
         });
         object.insert("clips", Value::Array(clips.collect()));
+        // Only a song with lanes has the key: songs without them are saved as before.
+        if !self.automations.is_empty() {
+            object.insert("automations", Value::Array(self.automations.iter().map(AutomationLane::to_json).collect()));
+        }
         Value::Object(object)
+    }
+}
+
+/// The lanes of a song's `automations` (`at`), those that cannot be read left out and reported.
+fn automations_from_json(raw: Option<&Value>, at: &str, issues: &mut Vec<Issue>) -> Vec<AutomationLane> {
+    match raw {
+        None => Vec::new(),
+        Some(Value::Array(items)) => items
+            .iter()
+            .enumerate()
+            .filter_map(|(i, raw)| AutomationLane::from_json(raw, &format!("{at}[{i}]"), issues))
+            .collect(),
+        Some(other) => {
+            issues.push(Issue::new(at, format!("not an array ({other}), no automation loaded")));
+            Vec::new()
+        }
+    }
+}
+
+impl Song {
+    /// The automation step transport `tick` is on (`ticks_per_beat` per
+    /// beat), wrapped on the arrangement as [`Song::active_clips_at`] wraps it.
+    #[must_use]
+    pub fn automation_step_at(&self, tick: u64, ticks_per_beat: u32) -> u32 {
+        let per_measure = f64::from(ticks_per_beat) * BEATS_PER_MEASURE;
+        let total = self.length_measures();
+        if per_measure <= 0.0 || total <= 0.0 {
+            return 0;
+        }
+        let measures = (tick as f64 / per_measure) % total;
+        (measures * f64::from(STEPS_PER_MEASURE)).floor() as u32
     }
 }
 

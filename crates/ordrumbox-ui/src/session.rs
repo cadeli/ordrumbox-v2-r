@@ -147,6 +147,8 @@ mod session_scenarios;
 mod session_selection;
 #[path = "session_song.rs"]
 mod session_song;
+#[path = "session_song_automation.rs"]
+mod session_song_automation;
 #[path = "session_song_files.rs"]
 mod session_song_files;
 #[path = "session_song_menu.rs"]

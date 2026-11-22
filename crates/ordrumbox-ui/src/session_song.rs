@@ -174,8 +174,9 @@ impl Session {
         self.song_cursor_measure().floor() as u32
     }
 
-    /// First measure and first row shown: while the song plays, the page
-    /// the cursor is on; else where the wheel left them.
+    /// First measure and first row shown (of `rows`, the patterns' and the
+    /// lanes'): while the song plays, the page the cursor is on; else where
+    /// the wheel left them.
     pub(super) fn song_scroll(&self, layout: &SongLayout, rows: usize) -> (u32, usize) {
         if self.song().is_none() {
             return (0, 0);
@@ -235,7 +236,7 @@ impl Session {
             rows,
             cursor: self.song_cursor_measure(),
             playing: self.song_playing(),
-            scroll: self.song_scroll(layout, rows.len()),
+            scroll: self.song_scroll(layout, rows.len() + self.song_lane_count()),
             dragged_clip: self.song_dragged_clip(layout, rows.len()),
             ghost: self.song_ghost(layout, rows),
             row_drop: self.song_row_drop(layout, rows),

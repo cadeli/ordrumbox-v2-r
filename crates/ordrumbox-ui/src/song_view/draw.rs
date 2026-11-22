@@ -87,14 +87,14 @@ fn draw_description(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
 
 /// What of the arrangement is on the page: the first measure and row shown,
 /// how many of each, the size of the body and where the cursor is.
-struct Page {
-    first_measure: u32,
-    first_row: usize,
-    shown_measures: u32,
-    shown_rows: usize,
+pub(super) struct Page {
+    pub(super) first_measure: u32,
+    pub(super) first_row: usize,
+    pub(super) shown_measures: u32,
+    pub(super) shown_rows: usize,
     /// Measures of the song and the room to add clips after them.
     grid_total: u32,
-    body_w: i32,
+    pub(super) body_w: i32,
     body_h: i32,
     cursor_measure: f64,
     /// The measure the cursor is in.
@@ -106,7 +106,7 @@ impl Page {
         let (first_measure, first_row) = view.scroll;
         let grid_total = total + view.room;
         let shown_measures = layout.visible_measures().min(grid_total.saturating_sub(first_measure));
-        let shown_rows = layout.visible_rows().min(view.rows.len().saturating_sub(first_row));
+        let shown_rows = layout.visible_rows().min(view.row_count().saturating_sub(first_row));
         let cursor_measure = view.cursor.min(f64::from(total.saturating_sub(1))).max(0.0);
         Self {
             first_measure,
@@ -144,6 +144,7 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     let page = Page::new(view, layout, total);
     draw_measure_ruler(canvas, view, layout, &page);
     draw_row_names(canvas, view, layout, &page);
+    super::automation::draw_lanes(canvas, song, layout, view.rows.len(), &page);
     draw_measure_lines(canvas, layout, &page);
     draw_clips(canvas, view, song, layout);
     draw_dragged_pattern(canvas, view, layout, &page);
@@ -157,6 +158,7 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
         canvas.fill_rect(x - s.px(), layout.body_top(), 2 * s, page.body_h, color);
     }
     draw_scroll_bars(canvas, view, layout, &page);
+    super::automation::draw_add_button(canvas, view, layout);
 }
 
 /// The ruler: one cell per measure, every fourth marked, numbered as often
@@ -271,7 +273,7 @@ fn draw_scroll_bars(canvas: &mut Canvas, view: &SongView, layout: &SongLayout, p
     let s = layout.scale;
     let bars = [
         (Axis::Measures, layout.visible_measures() as usize, page.grid_total as usize),
-        (Axis::Rows, layout.visible_rows(), view.rows.len()),
+        (Axis::Rows, layout.visible_rows(), view.row_count()),
     ];
     for (axis, shown, total) in bars {
         let r = layout.scroll_bar(axis);

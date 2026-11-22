@@ -50,6 +50,9 @@ impl Session {
             (SongHit::ZoomHandle(edge), Button::Left) => self.press_zoom_handle(size, edge),
             (SongHit::Description, Button::Left) => self.text_entry(Id::PatternDescription),
             (SongHit::Ruler(m), Button::Left) => self.set_song_cursor(m),
+            (SongHit::AddAutomation | SongHit::LaneName(_) | SongHit::LaneStep { .. }, Button::Left) => {
+                self.automation_click(hit, x, y);
+            }
             (SongHit::Cell { row, measure }, Button::Left) => {
                 let row = &rows[row];
                 let title = format!("Add \"{}\" at measure {}", row.name, measure + 1);
@@ -165,7 +168,7 @@ impl Session {
         let drag = self.live_song_drag()?;
         let DragSource::Row(from) = drag.source else { return None };
         let movable = rows.iter().filter(|r| !r.orphan).count();
-        let first = self.song_scroll(layout, rows.len()).1;
+        let first = self.song_scroll(layout, rows.len() + self.song_lane_count()).1;
         Some((from, layout.drop_row(drag.y, first).min(movable.saturating_sub(1))))
     }
 
@@ -268,7 +271,7 @@ impl Session {
             self.song_panel.list_scroll = (self.pattern_index, first);
             return changed;
         }
-        let rows = self.song_rows().len();
+        let rows = self.song_rows().len() + self.song_lane_count();
         let (mut sx, mut sy) = self.song_scroll(&layout, rows);
         match axis {
             Axis::Measures => {
@@ -305,7 +308,7 @@ impl Session {
         if self.song().is_none() || self.workspace != Workspace::Song || lines == 0 || !layout.grid.contains(x, y) {
             return false;
         }
-        let rows = self.song_rows().len();
+        let rows = self.song_rows().len() + self.song_lane_count();
         let (mut sx, mut sy) = self.song_scroll(&layout, rows);
         if shift {
             let last = rows.saturating_sub(layout.visible_rows());

@@ -138,6 +138,14 @@ pub struct SongView<'a> {
     pub zoom: MeasureZoom,
 }
 
+impl SongView<'_> {
+    /// The arrangement's rows: one per pattern, then one per automation lane.
+    #[must_use]
+    pub fn row_count(&self) -> usize {
+        self.rows.len() + self.song.map_or(0, |song| song.automations.len())
+    }
+}
+
 /// Where a pattern dragged from the list would land.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SongGhost {
@@ -187,6 +195,12 @@ pub enum SongHit {
     ScrollBar(Axis),
     /// A handle at an end of the measures' thumb: a drag zooms.
     ZoomHandle(Edge),
+    /// The button under the rows that adds an automation lane.
+    AddAutomation,
+    /// An automation lane's name (its index in the song's lanes).
+    LaneName(usize),
+    /// A step of an automation lane, from the start of the song.
+    LaneStep { lane: usize, step: u32 },
 }
 
 /// Where the song panel's parts are.
@@ -287,7 +301,7 @@ impl SongLayout {
 
     /// Rows that fit down, over the measures' scroll bar.
     pub fn visible_rows(&self) -> usize {
-        let h = self.grid.y + self.grid.h - self.measure_bar() - self.body_top();
+        let h = self.grid.y + self.grid.h - self.measure_bar() - self.body_top() - self.add_automation_height();
         usize::try_from(h.max(0) / self.row_height()).unwrap_or(0).max(1)
     }
 
@@ -331,7 +345,7 @@ impl SongLayout {
                 let total = view.song.map_or(0, |song| song.length_measures().max(1.0).ceil() as u32) + view.room;
                 (view.scroll.0 as usize, self.visible_measures() as usize, total as usize)
             }
-            Axis::Rows => (view.scroll.1, self.visible_rows(), view.rows.len()),
+            Axis::Rows => (view.scroll.1, self.visible_rows(), view.row_count()),
             Axis::List => (view.list_scroll, self.list_rows(), view.patterns.len()),
         };
         self.thumb(axis, first, shown, total)
@@ -430,6 +444,9 @@ impl SongLayout {
         if self.scroll_bar(Axis::Rows).contains(x, y) {
             return Some(SongHit::ScrollBar(Axis::Rows));
         }
+        if let Some(hit) = self.automation_hit(view, x, y, total) {
+            return Some(hit);
+        }
         let row = row_at(y, self.body_top(), self.row_height())
             .map(|row| view.scroll.1 + row)
             .filter(|&row| row < view.rows.len());
@@ -454,6 +471,7 @@ impl SongLayout {
     }
 }
 
+mod automation;
 mod draw;
 mod zoom;
 pub use draw::draw;

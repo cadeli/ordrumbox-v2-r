@@ -8,6 +8,7 @@ use ordrumbox_core::song::clamp_bpm;
 use ordrumbox_core::steps::{TICK, semitone_ratio};
 use std::collections::HashMap;
 
+use ordrumbox_core::automation;
 use ordrumbox_core::{Hit, Hits, Note, Pattern, Rng, Scales, Song, Track, expand_hits, lfo};
 use ordrumbox_dsp::{StripSettings, SynthPatch, VoiceStart};
 
@@ -178,8 +179,7 @@ fn event_for(frame: u64, sound: Sound, note: &Hit, track: &Track, midi: Option<M
 /// Whether track `t` of `pattern` is silent: muted, or silenced by another
 /// track's solo (`shouldTrackPlay()`).
 fn is_silent(pattern: &Pattern, t: usize) -> bool {
-    let tracks = &pattern.tracks;
-    if tracks.iter().any(|t| t.solo) { !tracks[t].solo } else { tracks[t].mute }
+    ordrumbox_core::automation::is_silent(&pattern.tracks, t, &[], 0)
 }
 
 /// Ticks in one song pass: a measure of four beats.
@@ -412,6 +412,8 @@ pub fn build_keymap(pattern: &Pattern, context: PassContext<'_>, bpm: f64) -> Ke
     KeyMap::new(Pass { frames: 1, ticks: 1, events, strips, keys, patches, ..Pass::default() }, &targets)
 }
 
+mod song_strips;
+
 /// Hits of a pattern repetition, kept between song passes so a
 /// pattern longer than a measure is drawn once per repetition.
 pub type HitsCache = HashMap<(usize, u64), Hits>;
@@ -482,7 +484,7 @@ pub fn build_song_pass_at(
         let sounds = context.sounds.get(p).map_or(&[][..], Vec::as_slice);
         (context.patterns[p].tracks[t].name.as_str(), root_key(sounds.get(t), context.bank))
     }));
-    let shared = SongPassParts { context, strips: &strips, targets: &targets, per_tick, frames, first_tick, bpm };
+    let shared = SongPassParts { song, context, strips: &strips, targets: &targets, per_tick, frames, first_tick, bpm };
 
     let mut events = Vec::new();
     let mut patches = Vec::new();
@@ -506,26 +508,15 @@ pub fn build_song_pass_at(
             .any(|s| s.pattern == p && s.loop_index <= loop_index)
     });
 
-    let silent = |p: usize, t: usize| is_silent(&context.patterns[p], t);
-    let strip_settings_of = |&(p, t): &(usize, usize)| {
-        let mut settings = strip_settings(&context.patterns[p].tracks[t], bpm);
-        if silent(p, t) {
-            settings.volume = 0.0;
-        }
-        settings
-    };
-    let lfos = strips
-        .iter()
-        .enumerate()
-        .filter_map(|(i, &(p, t))| strip_lfo(i, &context.patterns[p].tracks[t], silent(p, t), first_tick, ticks))
-        .collect();
+    let span = song_strips::Span { first_tick, ticks, bpm };
+    let (strip_settings, lfos) = song_strips::settings_and_lfos(song, context.patterns, &strips, span);
     Pass {
         number: measure,
         first_tick,
         frames,
         ticks,
         events,
-        strips: strips.iter().map(strip_settings_of).collect(),
+        strips: strip_settings,
         keys: key_strips(strips.iter().map(|&(p, t)| &context.patterns[p].tracks[t])),
         lfos,
         patches,
@@ -535,6 +526,8 @@ pub fn build_song_pass_at(
 /// What the notes of a song pass share: the context, the strips (a pattern
 /// and a track each), their MIDI targets, and the pass's timing.
 struct SongPassParts<'a> {
+    /// Its automation lanes silence notes step by step.
+    song: &'a Song,
     context: SongContext<'a>,
     strips: &'a [(usize, usize)],
     targets: &'a [Option<Target>],
@@ -567,8 +560,9 @@ impl SongPassParts<'_> {
             swing: context.swing,
         };
         let tick = self.first_tick + u64::from(t);
+        let step = self.song.automation_step_at(tick, TICK);
         for note in notes {
-            if is_silent(pattern, note.track) {
+            if automation::is_silent(&pattern.tracks, note.track, &self.song.automations, step) {
                 continue;
             }
             let (Some(strip), Some(assigned)) = (self.strip_of(p, note.track), sounds.get(note.track)) else {
