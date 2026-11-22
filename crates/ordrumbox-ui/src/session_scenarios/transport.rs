@@ -12,7 +12,7 @@ const MEASURE: usize = 16_000;
 #[test]
 fn a_song_pauses_where_it_is_and_home_goes_back() {
     let (mut s, mut audio) = session(LIBRARY);
-    s.toggle_song_view();
+    s.show_mode(true);
     s.toggle_play();
     run(&mut s, &mut audio, MEASURE * 5 / 2);
     s.toggle_play();
@@ -51,7 +51,7 @@ fn a_pattern_plays_again_from_its_first_beat_on_home() {
 #[test]
 fn a_loop_keeps_the_song_in_its_measures_and_playing_on() {
     let (mut s, mut audio) = session(LIBRARY);
-    s.toggle_song_view();
+    s.show_mode(true);
     s.set_song_cursor(1);
     s.loop_to(2);
     assert_eq!(s.song_loop_region(), Some((1, 3)));

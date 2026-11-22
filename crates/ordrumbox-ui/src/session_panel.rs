@@ -265,7 +265,7 @@ impl Session {
         // A plugin has no song (no mode switch) and no transport: the host plays, at its own tempo. The
         // view shows the host's there (`view::Transport::Host`).
         if !self.host.hosted {
-            let song = self.workspace == Workspace::Song;
+            let song = self.is_song_mode();
             for (i, (rect, label)) in controls.mode.iter().zip(view::MODES).enumerate() {
                 let kind = Kind::Button { label: label.into(), on: song == (i == 1) };
                 layout.items.push(Item::new(Some(Id::Mode(i as u8)), *rect, kind));
@@ -639,18 +639,23 @@ mod tests {
         s.mouse_up();
         assert!(!s.song_view_open());
         assert_eq!(lit(&s), [true, false]);
-        // The view buttons leave the song too, and the switch follows.
+        // The views leave the mode as it is: only the switch changes it.
         s.run(crate::menu::Command::SongView);
-        assert_eq!(lit(&s), [false, true]);
-        s.run(crate::menu::Command::SongView);
+        assert!(s.song_view_open());
         assert_eq!(lit(&s), [true, false]);
+        click(&mut s, c.mode[1].x + 2, c.mode[1].y + 2);
+        s.mouse_up();
+        for view in [0, 1, 3, 4, 2] {
+            s.show_view(view);
+            assert_eq!(lit(&s), [false, true], "view {view}");
+        }
     }
 
     #[test]
-    fn the_tempo_knob_is_the_songs_in_the_song_panel_else_the_sessions() {
+    fn the_tempo_knob_is_the_songs_in_song_mode_else_the_sessions() {
         let mut s = session();
         let (x, y) = center(view::header_controls(Scale::ONE).bpm);
-        s.run(crate::menu::Command::SongView);
+        s.show_mode(true);
         s.run(crate::menu::Command::NewSong);
         s.chrome.widgets.entry.as_mut().unwrap().text = "verse".into();
         s.panel_key(SIZE, PanelKey::Enter, false, false);
@@ -658,10 +663,16 @@ mod tests {
         let song_bpm = s.song().unwrap().bpm;
         assert!(s.wheel(SIZE, x, y, 2, false, false));
         assert_eq!((s.song().unwrap().bpm, s.editor.library().bpm), (song_bpm + 2.0, 100.0));
+        // The grid in song mode: still the song's.
         s.run(crate::menu::Command::SongView);
         assert!(!s.song_view_open());
+        assert!(s.wheel(SIZE, x, y, 1, false, false));
+        assert_eq!((s.song().unwrap().bpm, s.editor.library().bpm), (song_bpm + 3.0, 100.0));
+        // The pattern mode takes the song's tempo on, and turns its own.
+        s.show_mode(false);
+        assert_eq!(s.editor.library().bpm, song_bpm + 3.0);
         assert!(s.wheel(SIZE, x, y, 3, false, false));
-        assert_eq!((s.song().unwrap().bpm, s.editor.library().bpm), (song_bpm + 2.0, 103.0));
+        assert_eq!((s.song().unwrap().bpm, s.editor.library().bpm), (song_bpm + 3.0, song_bpm + 6.0));
     }
 
     #[test]

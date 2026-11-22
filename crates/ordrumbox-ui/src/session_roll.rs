@@ -137,14 +137,16 @@ impl Session {
         RollLayout::new(body.main_w, body.editor_h, size.2, self.status.len(), spb)
     }
 
-    /// The step playing on the roll's track, while the pattern plays.
+    /// The step playing on the roll's track, while the pattern plays (alone
+    /// or in a song's clip).
     fn roll_playhead(&self) -> Option<i64> {
-        if !self.playback.plays(Mode::Pattern(self.pattern_index)) {
-            return None;
-        }
         let (pattern, track) = (self.pattern()?, self.track(self.roll_track()?)?);
-        let ticks = u64::from(TICK) * u64::try_from(pattern.beat_count.max(1)).ok()?;
-        let tick = self.playback.tick()? % ticks;
+        let tick = if self.playback.plays(Mode::Pattern(self.pattern_index)) {
+            let ticks = u64::from(TICK) * u64::try_from(pattern.beat_count.max(1)).ok()?;
+            self.playback.tick()? % ticks
+        } else {
+            self.song_clip_playing().filter(|clip| clip.pattern == self.pattern_index)?.local_tick
+        };
         let spb = steps_per_beat(track);
         let in_beat = (tick % u64::from(TICK)) as f64 / (f64::from(TICK) / f64::from(spb));
         Some((tick / u64::from(TICK)) as i64 * i64::from(spb) + in_beat.floor() as i64)

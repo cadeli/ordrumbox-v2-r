@@ -1,12 +1,11 @@
 //! Where the user left off: the pattern shown, the arrangement selected, the
-//! view under the header (the song panel is song mode) and the panels shown
-//! or folded. They are kept in `settings.json` (`resume`) at quit, and before
+//! view under the header, the play mode and the panels shown or folded. They are kept in `settings.json` (`resume`) at quit, and before
 //! the session is loaded again, and are read back at start. The pattern and
 //! the arrangement are kept by id, so they are found again after a reorder.
 //! A plugin keeps none: the host's project holds its state.
 
 use super::Session;
-use super::session_types::Workspace;
+use super::session_types::{PlayMode, Workspace};
 use crate::store;
 use ordrumbox_core::json::{Object, Value};
 
@@ -42,6 +41,10 @@ impl Workspace {
     }
 }
 
+/// The play modes, as `resume` names them.
+const PATTERN_MODE: &str = "pattern";
+const SONG_MODE: &str = "song";
+
 /// The panels that are shown or folded, by their key in `resume`.
 const PANELS: [&str; 4] = ["trackEditor", "noteEditor", "vuMeters", "kitEditor"];
 
@@ -62,6 +65,7 @@ impl Session {
         self.resume_song(place, &mut wrong);
         self.resume_panels(place, &mut wrong);
         self.resume_view(place, &mut wrong);
+        self.resume_mode(place, &mut wrong);
         self.message = message;
         if !wrong.is_empty() {
             self.status.push(format!("settings.json: {KEY}: {}", wrong.join("; ")));
@@ -120,6 +124,22 @@ impl Session {
         }
     }
 
+    /// The play mode; a file kept before the mode had a key of its own was
+    /// in song mode in the song panel.
+    fn resume_mode(&mut self, place: &Object, wrong: &mut Vec<String>) {
+        let Some(value) = place.get("mode") else {
+            if self.workspace == Workspace::Song {
+                self.mode = PlayMode::Song;
+            }
+            return;
+        };
+        match value.as_str() {
+            Some(SONG_MODE) if !self.host.hosted => self.mode = PlayMode::Song,
+            Some(SONG_MODE | PATTERN_MODE) => self.mode = PlayMode::Pattern,
+            _ => wrong.push(format!("mode: {} is not a mode, the pattern mode used", value.to_json())),
+        }
+    }
+
     /// Panel `key` of [`PANELS`] is shown.
     fn panel_shown(&self, key: &str) -> bool {
         match key {
@@ -140,6 +160,7 @@ impl Session {
             place.insert("song", Value::from(song.id.as_str()));
         }
         place.insert("view", Value::from(self.workspace.setting()));
+        place.insert("mode", Value::from(if self.is_song_mode() { SONG_MODE } else { PATTERN_MODE }));
         for key in PANELS {
             place.insert(key, Value::from(self.panel_shown(key)));
         }
@@ -187,7 +208,8 @@ mod tests {
         let mut s = session(&path);
         s.show_pattern(2);
         s.select_song(1);
-        s.toggle_song_view();
+        s.show_mode(true);
+        s.show_view(0);
         s.toggle_note_editor();
         s.toggle_vus();
         s.save_resume();
@@ -197,7 +219,7 @@ mod tests {
         again.load_resume();
         assert_eq!(again.status, Vec::<String>::new());
         assert_eq!((again.pattern_index, again.editor.selected_song()), (2, 1));
-        assert_eq!(again.workspace, Workspace::Song);
+        assert_eq!((again.workspace, again.mode), (Workspace::Grid, PlayMode::Song));
         let panels = PANELS.map(|key| again.panel_shown(key));
         assert_eq!(panels, [true, false, false, false]);
         std::fs::remove_dir_all(dir).unwrap();
@@ -225,7 +247,7 @@ mod tests {
         let path = dir.join("settings.json");
         std::fs::write(
             &path,
-            r#"{"resume":{"pattern":"gone","song":3,"view":"tape","noteEditor":"no","vuMeters":false}}"#,
+            r#"{"resume":{"pattern":"gone","song":3,"view":"tape","mode":"tape","noteEditor":"no","vuMeters":false}}"#,
         )
         .unwrap();
         let mut s = session(&path);
@@ -233,7 +255,7 @@ mod tests {
         assert_eq!(
             s.status,
             [
-                r#"settings.json: resume: no pattern "gone", the first one shown; no arrangement 3, the first one selected; noteEditor: "no" is not true or false, left as it was; view: "tape" is not a view, the grid shown"#
+                r#"settings.json: resume: no pattern "gone", the first one shown; no arrangement 3, the first one selected; noteEditor: "no" is not true or false, left as it was; view: "tape" is not a view, the grid shown; mode: "tape" is not a mode, the pattern mode used"#
             ]
         );
         assert_eq!((s.pattern_index, s.editor.selected_song(), s.workspace), (0, 0, Workspace::Grid));

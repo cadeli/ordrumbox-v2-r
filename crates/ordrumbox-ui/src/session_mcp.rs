@@ -13,6 +13,7 @@ use ordrumbox_logic::tools::{
 };
 
 use super::Session;
+use super::session_types::PlayMode;
 use crate::editors::note_range;
 use crate::picker::Export;
 use crate::{master, output};
@@ -317,8 +318,10 @@ impl Session {
                 return Err("No arrangement to play: createArrangement".into());
             }
             self.transport.song_cursor = 0;
+            self.mode = PlayMode::Song;
             self.toggle(Mode::Song(self.editor.selected_song()), 0);
         } else {
+            self.mode = PlayMode::Pattern;
             self.toggle(Mode::Pattern(self.pattern_index), 0);
         }
         let library = self.editor.library();

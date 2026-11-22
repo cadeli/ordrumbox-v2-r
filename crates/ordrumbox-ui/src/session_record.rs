@@ -6,7 +6,6 @@
 
 use super::Session;
 use super::session_labels::beat_label;
-use super::session_types::Workspace;
 use ordrumbox_engine::Mode;
 use ordrumbox_logic::Played;
 
@@ -60,8 +59,8 @@ impl Session {
         if !self.transport.recording {
             return;
         }
-        if self.workspace == Workspace::Song || !matches!(self.playback.mode(), Some(Mode::Pattern(_))) {
-            self.message = "recording: the pattern must play, in the grid or the piano roll".into();
+        if self.is_song_mode() || !matches!(self.playback.mode(), Some(Mode::Pattern(_))) {
+            self.message = "recording: the pattern must play, in pattern mode".into();
             return;
         }
         let Some(position) = self.playback.position().filter(|_| self.playing()) else {

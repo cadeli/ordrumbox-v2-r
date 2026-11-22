@@ -163,7 +163,7 @@ mod session_update;
 mod session_user_data;
 pub use session_open::LibrarySource;
 pub use session_panel::PanelKey;
-pub use session_types::{Move, OverlayKey, Workspace};
+pub use session_types::{Move, OverlayKey, PlayMode, Workspace};
 
 pub struct Session {
     /// What the window shows around the library (`session_chrome.rs`).
@@ -186,6 +186,8 @@ pub struct Session {
     pattern_index: usize,
     /// What is shown under the header.
     workspace: Workspace,
+    /// What Space plays (`session_workspace.rs`).
+    mode: PlayMode,
     /// Where and how the session plays (`session_transport.rs`).
     transport: session_transport::Transport,
     /// The song panel's scrolls and what the mouse holds in it.
@@ -315,6 +317,7 @@ impl Session {
         self.playback.set_live_midi(midi_open);
         self.playback
             .update(&mut self.editor, self.pattern_index, |editor, p, pass| self.generators.auto_loop(editor, p, pass));
+        self.follow_song_pattern();
         self.report_host_tempo();
     }
 }

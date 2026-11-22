@@ -1,9 +1,12 @@
-//! Which view is shown under the header: the grid, the piano roll, the song
-//! panel or the synth editor, and the playback mode that follows it.
+//! Which view is shown under the header (the grid, the piano roll, the song
+//! panel, the synth editor, the mixer) and, apart from it, the play mode the
+//! mode switch chose.
 
 use super::Session;
-use super::session_types::Workspace;
+use super::session_types::{PlayMode, Workspace};
 use crate::view;
+use ordrumbox_core::ActiveClip;
+use ordrumbox_core::steps::TICK;
 use ordrumbox_engine::Mode;
 
 impl Session {
@@ -40,13 +43,41 @@ impl Session {
         }
     }
 
-    /// A mode button: the song panel, or the grid in its place (what is
-    /// shown is left as it is when it already is the mode).
+    /// A mode button: the pattern or the song mode, and the view of that
+    /// mode: the song panel, or the grid in its place (another view is left
+    /// as it is for the pattern mode).
     pub(super) fn show_mode(&mut self, song: bool) {
-        if song == (self.workspace == Workspace::Song) && !self.kit_editor.is_open() {
+        if song && self.host.hosted {
+            self.message = crate::menu::SONGS_IN_THE_APP.into();
             return;
         }
-        self.show_view(if song { 2 } else { 0 });
+        self.set_mode(if song { PlayMode::Song } else { PlayMode::Pattern });
+        if song != (self.workspace == Workspace::Song) || self.kit_editor.is_open() {
+            self.show_view(if song { 2 } else { 0 });
+        }
+    }
+
+    /// The play mode is `mode`. From the song to the pattern, the pattern
+    /// plays on at the song's tempo. While playing, a change of mode plays
+    /// the new one from its start.
+    pub(super) fn set_mode(&mut self, mode: PlayMode) {
+        if self.mode == mode {
+            return;
+        }
+        let song_tempo = self.tempo_song().map(|_| self.tempo());
+        self.mode = mode;
+        if let (PlayMode::Pattern, Some(bpm)) = (mode, song_tempo) {
+            self.set_tempo(bpm);
+        }
+        if self.playing() {
+            let mode = self.play_mode();
+            self.playback.play(&self.editor, mode);
+        }
+    }
+
+    /// The song mode is chosen (the mode switch), whatever the view.
+    pub(super) fn is_song_mode(&self) -> bool {
+        self.mode == PlayMode::Song
     }
 
     /// Show the grid (View > Grid, F5).
@@ -55,11 +86,8 @@ impl Session {
         self.set_workspace(Workspace::Grid);
     }
 
-    /// Show `workspace`. While playing, a switch to or from the song panel
-    /// switches the playback to the view's mode, from its start
-    ///; the grid and the piano roll share one mode.
+    /// Show `workspace`. What plays goes on: the view does not change the mode.
     pub(super) fn set_workspace(&mut self, workspace: Workspace) {
-        let was_song = self.workspace == Workspace::Song;
         self.workspace = workspace;
         self.kit_editor.sample = None;
         self.chrome.widgets.focus = None;
@@ -68,17 +96,36 @@ impl Session {
         self.song_panel.drag = None;
         self.song_panel.bar_drag = None;
         self.roll.release();
-        if self.playing() && was_song != (workspace == Workspace::Song) {
-            let mode = self.play_mode();
-            self.playback.play(&self.editor, mode);
+    }
+
+    /// What Space plays: the selected song in song mode, else the pattern.
+    fn play_mode(&self) -> Mode {
+        match self.mode {
+            PlayMode::Song => Mode::Song(self.editor.selected_song()),
+            PlayMode::Pattern => Mode::Pattern(self.pattern_index),
         }
     }
 
-    /// What Space plays: the song in the song panel, else the pattern.
-    fn play_mode(&self) -> Mode {
-        match self.workspace {
-            Workspace::Song => Mode::Song(self.editor.selected_song()),
-            _ => Mode::Pattern(self.pattern_index),
+    /// The clip the song plays now, if a song plays: the first of the clips
+    /// sounding at the playhead (`None` when stopped or between clips).
+    pub(super) fn song_clip_playing(&self) -> Option<ActiveClip> {
+        let Some(Mode::Song(s)) = self.playback.mode().filter(|_| self.playing()) else {
+            return None;
+        };
+        let library = self.editor.library();
+        let tick = self.playback.tick()?;
+        library.songs.get(s)?.active_clips_at(&library.patterns, tick, TICK).into_iter().next()
+    }
+
+    /// While a song plays, the grid and the piano roll show the pattern it
+    /// plays now; called every frame (`Session::update`).
+    pub(super) fn follow_song_pattern(&mut self) {
+        if !matches!(self.workspace, Workspace::Grid | Workspace::PianoRoll) {
+            return;
         }
+        let Some(clip) = self.song_clip_playing().filter(|clip| clip.pattern != self.pattern_index) else { return };
+        self.pattern_index = clip.pattern;
+        self.deselect();
+        self.chrome.current_page = 0;
     }
 }

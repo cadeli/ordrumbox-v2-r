@@ -10,7 +10,7 @@ use super::session_saving::Saving;
 use super::session_selection::Selection;
 use super::session_toast::Flash;
 use super::session_transport::Transport;
-use super::session_types::Workspace;
+use super::session_types::{PlayMode, Workspace};
 use super::{Session, session_mixer, session_output, session_roll, session_song, session_synth, session_update};
 use crate::action_log::ActionLog;
 use crate::audio_output::StartOutput;
@@ -287,6 +287,7 @@ impl Session {
             synths: session_synth::Synths::default(),
             pattern_index: 0,
             workspace: Workspace::Grid,
+            mode: PlayMode::Pattern,
             transport: Transport::default(),
             song_panel: session_song::SongPanel::default(),
             roll: session_roll::RollState::default(),

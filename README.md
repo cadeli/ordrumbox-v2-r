@@ -175,6 +175,11 @@ Press **F1** in the app for the full keyboard shortcut list. Keys are the ones t
 keyboard's layout marks (Ctrl Z is the key marked Z on AZERTY too), except the two rows
 that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their place. Common keys:
 
+- **PATTERN** / **SONG** (the mode switch of the header): what **Space** plays, the
+  pattern in a loop or the song. Only the switch changes it: the views (grid, piano roll,
+  song panel, synth, mixer, and their keys) leave it as it is. In song mode the grid and
+  the piano roll show the pattern the song is playing, with its playhead. Back from the
+  song to the pattern, the pattern keeps the song's tempo.
 - **Space**: play / stop. A song stops where it is and **Space** goes on from that
   measure; **Home** (or the keypad's **Enter**) goes back to the first beat, or measure.
   **Shift + click** on the song panel's ruler loops the song from the cursor's measure to
@@ -211,10 +216,10 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   display at 150 % shows at ×1.5. In the plugin, Alt stands for Ctrl (the host
   keeps Ctrl).
 - **Where you left off**: the app starts on the pattern and the arrangement you had
-  chosen, in the view you had open (grid, piano roll, song mode, synth, mixer), with the
-  track editor, the note editor, the VU meters and the kit editor shown or hidden as you
-  left them. It is kept in `settings.json` (`resume`) when you quit. The plugin starts as
-  the host's project left it.
+  chosen, in the mode and the view you had open (grid, piano roll, song panel, synth,
+  mixer), with the track editor, the note editor, the VU meters and the kit editor shown
+  or hidden as you left them. It is kept in `settings.json` (`resume`) when you quit. The
+  plugin starts as the host's project left it.
 - **M** / **S**: mute / solo the track under the cursor. The letters that change
   every track want **Shift** (B: the pattern again in its style, C: the next colour
   scheme, D: drums in auto, G, H, J, K, V: the VU meters, X: random notes), so a

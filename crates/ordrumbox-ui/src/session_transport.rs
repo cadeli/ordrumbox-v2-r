@@ -3,7 +3,6 @@
 //! host makes.
 
 use super::Session;
-use super::session_types::Workspace;
 use crate::menu;
 use ordrumbox_engine::Mode;
 
@@ -31,9 +30,9 @@ impl Session {
 
     // ─── Transport ───────────────────────────────────────────────────────────
 
-    /// Space: play or stop the selected pattern (in the song panel: the song).
+    /// Space: play or stop the selected pattern (in song mode: the song).
     pub fn toggle_play(&mut self) {
-        if self.workspace == Workspace::Song {
+        if self.is_song_mode() {
             return self.toggle_play_song();
         }
         self.toggle(Mode::Pattern(self.pattern_index), 0);
@@ -78,7 +77,7 @@ impl Session {
     /// loop's, and goes on from there if it plays; a pattern plays from its
     /// first beat again if it plays.
     pub fn rewind(&mut self) {
-        if self.workspace == Workspace::Song {
+        if self.is_song_mode() {
             let first = self.song_loop_region().map_or(0, |(first, _)| first);
             self.set_song_cursor(first);
             self.message = format!("back to measure {}", first + 1);
@@ -276,14 +275,14 @@ impl Session {
         self.set_tempo(self.tempo() + delta);
     }
 
-    /// The song the header's tempo is: the selected one in the song panel
-    /// (what Space plays there), else none (the library's tempo).
+    /// The song the header's tempo is: the selected one in song mode
+    /// (what Space plays then), else none (the library's tempo).
     pub(super) fn tempo_song(&self) -> Option<usize> {
-        (self.workspace == Workspace::Song && self.song().is_some()).then(|| self.editor.selected_song())
+        (self.is_song_mode() && self.song().is_some()).then(|| self.editor.selected_song())
     }
 
-    /// The tempo the header shows and turns: the selected song's in the
-    /// song panel, else the library's, which every pattern plays at.
+    /// The tempo the header shows and turns: the selected song's in song
+    /// mode, else the library's, which every pattern plays at.
     pub fn tempo(&self) -> f64 {
         self.tempo_song()
             .and_then(|s| self.editor.library().songs.get(s))

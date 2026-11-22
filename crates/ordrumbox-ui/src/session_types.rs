@@ -8,13 +8,22 @@ pub enum Workspace {
     Grid,
     /// The piano roll (F4): the track editor's track.
     PianoRoll,
-    /// The song panel (F3): Space plays the song.
+    /// The song panel (F3): the arrangement, what plays in song mode.
     Song,
     /// The synth editor (F6): the track editor's track's preset.
     Synth,
     /// The mixer (F12): every track's level, pan and sends, the shared
     /// returns and the master bus.
     Mixer,
+}
+
+/// What the mode switch chose, and Space plays: the selected pattern, in a
+/// loop, or the selected song. Only the mode buttons change it; the views
+/// leave it as it is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlayMode {
+    Pattern,
+    Song,
 }
 
 /// A direction (arrow key).

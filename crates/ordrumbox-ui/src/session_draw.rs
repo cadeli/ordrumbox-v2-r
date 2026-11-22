@@ -70,7 +70,8 @@ impl Session {
         let position = self.playback.position();
         let size = (canvas.width(), canvas.height(), scale);
         let waiting = self.waiting_blink();
-        let page_beats = self.follow_page(size, position, waiting);
+        let played = self.played_fraction(position, waiting);
+        let page_beats = self.follow_page(size, played);
         let history = self.editor.history();
         let library = self.editor.library();
         let song_mode = match self.playback.mode() {
@@ -106,14 +107,10 @@ impl Session {
             host_split: self.host.mix.split,
             track_drop: self.track_drop((canvas.width(), canvas.height(), scale)),
             waiting,
-            playhead: if song_mode.is_some() || waiting.is_some() {
-                None
-            } else {
-                position.map(|p| {
-                    let total_beats = self.pattern().map_or(1, |pat| pat.beat_count.max(1));
-                    playhead_in_page(p, total_beats, self.chrome.current_page * page_beats, page_beats)
-                })
-            },
+            playhead: played.map(|played| {
+                let total_beats = self.pattern().map_or(1, |pat| pat.beat_count.max(1));
+                playhead_in_page(played, total_beats, self.chrome.current_page * page_beats, page_beats)
+            }),
             song: song.as_deref().filter(|_| !self.host.hosted),
             cursor: self.selection.cursor,
             selected: self.selection.selected,
@@ -144,21 +141,30 @@ impl Session {
         self.draw_overlay(canvas, scale);
     }
 
+    /// How far the pattern shown has played, from 0 to 1: the pattern's
+    /// pass, or the song's clip of it; `None` while it does not play (it
+    /// waits for another pattern, or the song plays another).
+    pub(super) fn played_fraction(&self, position: Option<Position>, waiting: Option<bool>) -> Option<f64> {
+        if !self.playing() || waiting.is_some() {
+            return None;
+        }
+        match self.playback.mode() {
+            Some(Mode::Song(_)) => self
+                .song_clip_playing()
+                .filter(|clip| clip.pattern == self.pattern_index)
+                .map(|clip| clip.local_tick as f64 / clip.pattern_ticks.max(1) as f64),
+            _ => position.map(|p| p.frame as f64 / p.frames.max(1) as f64),
+        }
+    }
+
     /// Keep the cursor, else the playhead, on the page shown (the one shown
     /// waits while another pattern plays); the beats a page holds.
-    fn follow_page(&mut self, size: (i32, i32, Scale), position: Option<Position>, waiting: Option<bool>) -> usize {
+    fn follow_page(&mut self, size: (i32, i32, Scale), played: Option<f64>) -> usize {
         let page_beats = view::page_beats(self.body(size).main_w, size.2) as usize;
         let beat_count = self.pattern().map_or(1, |p| p.beat_count.max(1));
         let page_count = (beat_count as usize).div_ceil(page_beats).max(1);
         let cursor_page = self.selection.cursor.map(|c| (c.beat.max(0) as usize) / page_beats);
-        let playhead_page = if self.playing() && waiting.is_none() {
-            position.map(|p| {
-                let frac = p.frame as f64 / p.frames.max(1) as f64;
-                (frac * beat_count as f64).floor() as usize / page_beats
-            })
-        } else {
-            None
-        };
+        let playhead_page = played.map(|played| (played * f64::from(beat_count)).floor() as usize / page_beats);
         let new_page = playhead_page.or(cursor_page).unwrap_or(self.chrome.current_page);
         self.chrome.current_page = new_page.min(page_count.saturating_sub(1));
         page_beats
@@ -219,10 +225,11 @@ fn song_text(library: &Library, playing: Option<&Song>, position: Option<Positio
     }
 }
 
-/// Where the playhead is on the page that starts at `start_beat` and holds
-/// `page_beats` of the pattern's `total_beats`, from 0 to 1.
-fn playhead_in_page(p: Position, total_beats: i32, start_beat: usize, page_beats: usize) -> f64 {
-    let global_beat = p.frame as f64 / p.frames.max(1) as f64 * f64::from(total_beats);
+/// Where the playhead, `played` (0 to 1) through the pattern, is on the page
+/// that starts at `start_beat` and holds `page_beats` of the pattern's
+/// `total_beats`, from 0 to 1.
+fn playhead_in_page(played: f64, total_beats: i32, start_beat: usize, page_beats: usize) -> f64 {
+    let global_beat = played * f64::from(total_beats);
     let start = start_beat as f64;
     let page_end = (start + page_beats as f64).min(f64::from(total_beats));
     ((global_beat - start) / (page_end - start).max(1.0)).clamp(0.0, 1.0)

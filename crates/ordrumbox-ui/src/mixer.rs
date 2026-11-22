@@ -1,9 +1,10 @@
 //! The mixer, a main view as the grid is: a strip for each track (its
 //! name, its echo and reverb sends, its pan, mute and solo, its fader and
 //! level meter), then the shared echo and reverb returns, then the master
-//! bus (its compressor and filters, the compressor's curve, the spectrum,
-//! its fader and meter). The track strips that do not fit scroll sideways;
-//! the returns and the master keep their place at the right.
+//! bus (its compressor and filters, the compressor's curve, its fader and
+//! meter). The spectrum runs under them all, the master's fader beside it.
+//! The track strips that do not fit scroll sideways; the returns and the
+//! master keep their place at the right.
 //!
 //! [`MixerLayout`] places everything; the controls are panel items, the
 //! strips' backgrounds, the meters, the curve and the spectrum are drawn here.
@@ -30,14 +31,17 @@ const BUTTON_SIZE: (i32, i32) = (24, 16);
 /// The scroll row under the strips: the strips shown, the arrows.
 const SCROLL_HEIGHT: i32 = 18;
 const ARROW_WIDTH: i32 = 20;
-/// The master's columns: its controls three abreast, then its fader.
+/// The master's columns: its controls three abreast (its fader is beside the spectrum).
 const MASTER_COLUMNS: i32 = 3;
 /// A meter beside a fader.
 const METER_WIDTH: i32 = 6;
 /// The compressor's on/off button.
 const BYPASS_SIZE: (i32, i32) = (36, 14);
-/// The compressor's curve, beside its button; the spectrum takes the rest under them.
+/// The compressor's curve, beside its button.
 const CURVE_SIZE: (i32, i32) = (96, 72);
+/// The spectrum, at the foot of the mixer, and the gap over it.
+const SPECTRUM_HEIGHT: i32 = 90;
+const SPECTRUM_GAP: i32 = 4;
 /// The quietest level a meter shows, dB.
 const METER_FLOOR_DB: f64 = -48.0;
 
@@ -71,13 +75,15 @@ pub struct ReturnStrip {
 /// Where the master's parts are.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MasterStrip {
+    /// The strip, down to the others' foot.
     pub back: Rect,
+    /// The fader's place at the mixer's foot, beside the spectrum and as high.
+    pub fader_back: Rect,
     pub name: Rect,
     /// Pre-gain, the compressor's six knobs, the two filters.
     pub knobs: [Rect; 9],
     pub bypass: Rect,
     pub curve: Rect,
-    pub spectrum: Rect,
     pub fader: Rect,
     pub meter: Rect,
 }
@@ -96,6 +102,8 @@ pub struct MixerLayout {
     /// The echo's strip, then the reverb's.
     pub returns: [ReturnStrip; 2],
     pub master: MasterStrip,
+    /// The master's spectrum, under every strip, left of the master's fader.
+    pub spectrum: Rect,
     /// The x of the dividers between the tracks, the returns and the master.
     dividers: [i32; 2],
     /// The region's top and bottom.
@@ -108,9 +116,11 @@ impl MixerLayout {
     pub fn new(area: Rect, track_count: usize, first: usize, scale: Scale) -> Self {
         let s = scale;
         let (strip_w, gap, section_gap) = (STRIP_WIDTH * s, STRIP_GAP * s, SECTION_GAP * s);
-        let strips_bottom = area.y + area.h - SCROLL_HEIGHT * s;
+        let area_bottom = area.y + area.h;
+        let spectrum_top = area_bottom - SPECTRUM_HEIGHT * s;
+        let strips_bottom = spectrum_top - SPECTRUM_GAP * s - SCROLL_HEIGHT * s;
         // From the right: the master, the reverb, the echo, then the tracks in what is left.
-        let master_w = (MASTER_COLUMNS + 1) * strip_w;
+        let master_w = MASTER_COLUMNS * strip_w;
         let master_x = area.x + area.w - master_w;
         let reverb_x = master_x - section_gap - strip_w;
         let echo_x = reverb_x - gap - strip_w;
@@ -146,9 +156,24 @@ impl MixerLayout {
                 s,
             ),
         ];
-        let master = master_strip(Rect::new(master_x, area.y, master_w, strips_bottom - area.y), s);
+        let fader_back = Rect::new(area.x + area.w - strip_w, spectrum_top, strip_w, area_bottom - spectrum_top);
+        let master = master_strip(Rect::new(master_x, area.y, master_w, strips_bottom - area.y), fader_back, s);
+        let spectrum_right = master.fader_back.x - gap;
+        let spectrum = Rect::new(area.x, spectrum_top, (spectrum_right - area.x).max(0), area_bottom - spectrum_top);
         let dividers = [tracks_right + section_gap / 2, reverb_x + strip_w + section_gap / 2];
-        Self { scale, tracks, fits, scroll_text, scroll, returns, master, dividers, top: area.y, bottom: strips_bottom }
+        Self {
+            scale,
+            tracks,
+            fits,
+            scroll_text,
+            scroll,
+            returns,
+            master,
+            spectrum,
+            dividers,
+            top: area.y,
+            bottom: strips_bottom,
+        }
     }
 }
 
@@ -198,7 +223,8 @@ fn return_strip(back: Rect, knob_count: usize, s: Scale) -> ReturnStrip {
     }
 }
 
-fn master_strip(back: Rect, s: Scale) -> MasterStrip {
+/// The master strip in `back`, its fader in `fader_back`.
+fn master_strip(back: Rect, fader_back: Rect, s: Scale) -> MasterStrip {
     let column = STRIP_WIDTH * s;
     let knobs = std::array::from_fn(|i| {
         let (col, row) = ((i as i32) % MASTER_COLUMNS, (i as i32) / MASTER_COLUMNS);
@@ -207,24 +233,19 @@ fn master_strip(back: Rect, s: Scale) -> MasterStrip {
     let row3 = knob_row(back.y, 3, s);
     let (bw, bh) = (BYPASS_SIZE.0 * s, BYPASS_SIZE.1 * s);
     let bypass = Rect::new(back.x + 6 * s, row3 + 14 * s, bw, bh);
-    // Under the knobs: the curve, small, beside the button, then the spectrum across the three columns.
-    let plots_left = back.x + 4 * s;
+    // Under the knobs, the curve beside the button.
     let plots_right = back.x + MASTER_COLUMNS * column - 4 * s;
     let curve_x = bypass.x + bw + 8 * s;
-    let curve =
-        Rect::new(curve_x, row3 + 2 * s, (CURVE_SIZE.0 * s).min(plots_right - curve_x).max(0), CURVE_SIZE.1 * s);
-    let spectrum_top = curve.y + curve.h + 6 * s;
-    let spectrum =
-        Rect::new(plots_left, spectrum_top, plots_right - plots_left, (back.y + back.h - 4 * s - spectrum_top).max(0));
-    let fader_x = back.x + MASTER_COLUMNS * column + 2 * s;
-    let fader = fader_rect(fader_x, column - 4 * s - (METER_WIDTH + 6) * s, back.y, back.y + back.h, s);
+    let curve_h = (CURVE_SIZE.1 * s).min(back.y + back.h - 4 * s - (row3 + 2 * s)).max(0);
+    let curve = Rect::new(curve_x, row3 + 2 * s, (CURVE_SIZE.0 * s).min(plots_right - curve_x).max(0), curve_h);
+    let fader = Rect::new(fader_back.x + 2 * s, fader_back.y, column - 4 * s - (METER_WIDTH + 6) * s, fader_back.h);
     MasterStrip {
         back,
+        fader_back,
         name: Rect::new(back.x + 4 * s, back.y + 5 * s, back.w - 8 * s, 10 * s),
         knobs,
         bypass,
         curve,
-        spectrum,
         fader,
         meter: meter_rect(fader, s),
     }
@@ -271,6 +292,8 @@ pub fn draw(canvas: &mut Canvas, view: &MixerView, layout: &MixerLayout) {
     }
     let master = layout.master.back;
     canvas.fill_rect(master.x, master.y, master.w, master.h, strip_color());
+    let column = layout.master.fader_back;
+    canvas.fill_rect(column.x, column.y, column.w, column.h, strip_color());
     for x in layout.dividers {
         canvas.fill_rect(x, layout.top, s.px(), layout.bottom - layout.top, theme::line());
     }
@@ -280,8 +303,8 @@ pub fn draw(canvas: &mut Canvas, view: &MixerView, layout: &MixerLayout) {
             if layout.master.curve.h > 8 * s {
                 output::draw_curve(canvas, settings, layout.master.curve, s);
             }
-            if layout.master.spectrum.h > 8 * s {
-                output::draw_spectrum(canvas, spectrum, layout.master.spectrum, s);
+            if layout.spectrum.h > 8 * s {
+                output::draw_spectrum(canvas, spectrum, layout.spectrum, s);
             }
         }
         None => {
@@ -342,21 +365,24 @@ mod tests {
         assert!(backs.windows(2).all(|w| w[0].x + w[0].w <= w[1].x), "no strip over another");
         assert!(backs.iter().all(|b| b.x >= AREA.x && b.x + b.w <= AREA.x + AREA.w && b.y + b.h <= AREA.y + AREA.h));
         // Every fader starts at the same height, and so does every knob row.
-        let faders: Vec<i32> = layout
-            .tracks
-            .iter()
-            .map(|t| t.fader.y)
-            .chain(layout.returns.iter().map(|r| r.fader.y))
-            .chain([layout.master.fader.y])
-            .collect();
+        let faders: Vec<i32> =
+            layout.tracks.iter().map(|t| t.fader.y).chain(layout.returns.iter().map(|r| r.fader.y)).collect();
         assert!(faders.iter().all(|&y| y == faders[0]));
         assert_eq!(layout.tracks[0].knobs[0].y, layout.returns[0].knobs[0].y);
         assert_eq!(layout.returns[0].knobs.len(), 4, "time, feedback, tone, to reverb");
         assert_eq!(layout.returns[1].knobs.len(), 3, "size, damping, spring");
         let m = layout.master;
-        assert!(m.curve.w > 40 && m.curve.h > 40 && m.spectrum.h > 40, "{m:?}");
-        assert!(m.spectrum.w > m.curve.w && m.spectrum.h > m.curve.h, "the spectrum is the big plot: {m:?}");
-        assert!(m.curve.y + m.curve.h <= m.spectrum.y, "the curve over the spectrum");
+        let spectrum = layout.spectrum;
+        assert!(m.curve.w > 40 && m.curve.h > 40 && spectrum.h > 40, "{m:?}");
+        assert!(m.curve.y + m.curve.h <= m.back.y + m.back.h, "the curve in the master strip");
+        // The spectrum under every strip and the scroll row, the master's fader beside it.
+        assert_eq!(spectrum.x, AREA.x);
+        assert!(backs.iter().all(|b| b.y + b.h <= spectrum.y) && layout.scroll[0].y + layout.scroll[0].h <= spectrum.y);
+        assert!(spectrum.x + spectrum.w <= m.fader.x && m.fader.y + m.fader.h > spectrum.y, "{m:?}");
+        assert_eq!((m.fader.y, m.fader.h), (spectrum.y, spectrum.h), "the master's fader as high as the spectrum");
+        assert_eq!(m.fader_back.x + m.fader_back.w, AREA.x + AREA.w);
+        assert!(m.knobs.iter().chain([&m.curve]).all(|r| r.x + r.w <= m.back.x + m.back.w));
+        assert_eq!(spectrum.y + spectrum.h, AREA.y + AREA.h);
         assert!(m.knobs.iter().all(|k| k.y + k.h <= m.curve.y), "the plots under the knobs");
     }
 

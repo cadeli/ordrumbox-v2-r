@@ -126,9 +126,9 @@ fn a_click_on_a_grid_cell_sounds_the_note() {
 // ─── the tempo, song playback ───────────────────────────────────────────────
 
 #[test]
-fn the_tempo_and_what_plays_follow_the_view() {
+fn the_tempo_and_what_plays_follow_the_mode_not_the_view() {
     let (mut s, mut audio) = session(LIBRARY);
-    // The grid plays the pattern at its own tempo.
+    // The pattern mode plays the pattern at its own tempo.
     s.toggle_play();
     run(&mut s, &mut audio, 1000);
     assert_eq!(mode(&s), Mode::Pattern(0));
@@ -139,9 +139,16 @@ fn the_tempo_and_what_plays_follow_the_view() {
     run(&mut s, &mut audio, CALLBACK);
     assert_pass_frames(&s, 4.0, 100.0);
 
-    // Grid → synth → piano roll: the same mode, neither the tempo nor the loop restarts.
-    // (`show_view` takes the index of a view button: grid, piano roll, song, synth.)
-    for (button, view) in [(3, Workspace::Synth), (1, Workspace::PianoRoll), (0, Workspace::Grid)] {
+    // Every view, the song panel too: the same mode, neither the tempo nor the loop restarts.
+    // (`show_view` takes the index of a view button: grid, piano roll, song, synth, mixer.)
+    let views = [
+        (3, Workspace::Synth),
+        (1, Workspace::PianoRoll),
+        (2, Workspace::Song),
+        (4, Workspace::Mixer),
+        (0, Workspace::Grid),
+    ];
+    for (button, view) in views {
         let before = position(&s).expect("playing");
         s.show_view(button);
         assert_eq!(s.workspace, view);
@@ -152,21 +159,52 @@ fn the_tempo_and_what_plays_follow_the_view() {
         assert_pass_frames(&s, 4.0, 100.0);
     }
 
-    // The song view plays the arrangement, from its start, at the song's tempo.
-    s.show_view(2);
+    // The song mode plays the arrangement, from its start, at the song's tempo.
+    s.show_mode(true);
     run(&mut s, &mut audio, CALLBACK);
-    assert_eq!(mode(&s), Mode::Song(0));
+    assert_eq!((mode(&s), s.workspace), (Mode::Song(0), Workspace::Song));
     assert_eq!(position(&s).expect("playing").pass, 0);
     assert_pass_frames(&s, 4.0, 120.0);
-    // ...and goes through it, measure after measure.
+    // ...and goes through it, measure after measure, whatever the view.
+    s.show_view(0);
     assert!(run(&mut s, &mut audio, 20_000) > 0.0);
+    assert_eq!((mode(&s), s.workspace), (Mode::Song(0), Workspace::Grid));
     assert_eq!(position(&s).expect("playing").pass, 1);
 
-    // Back to the grid: the pattern again, at its tempo.
-    s.show_view(0);
+    // Back to the pattern mode: the pattern again, in the grid, at the song's tempo.
+    s.show_mode(false);
     run(&mut s, &mut audio, CALLBACK);
-    assert_eq!(mode(&s), Mode::Pattern(0));
-    assert_pass_frames(&s, 4.0, 100.0);
+    assert_eq!((mode(&s), s.workspace), (Mode::Pattern(0), Workspace::Grid));
+    assert_pass_frames(&s, 4.0, 120.0);
+    assert_eq!(s.tempo(), 120.0);
+    s.toggle_play();
+}
+
+#[test]
+fn in_song_mode_the_grid_and_the_roll_show_the_pattern_playing() {
+    let (mut s, mut audio) = session(
+        r#"{"songs":[{"name":"s","bpm":120,"clips":[{"pattern":"a","startMeasure":0,"measureCount":1},
+                                                    {"pattern":"b","startMeasure":1,"measureCount":1}]}],
+            "patterns":[{"name":"a","tracks":[{"name":"KICK","notes":[{}]}]},
+                        {"name":"b","tracks":[{"name":"KICK","notes":[{"beat":1}]}]}]}"#,
+    );
+    let measure = pass_frames(4.0, 120.0) as usize;
+    s.show_mode(true);
+    s.show_view(0);
+    s.toggle_play();
+    run(&mut s, &mut audio, measure / 2);
+    assert_eq!((mode(&s), s.pattern_index), (Mode::Song(0), 0));
+    assert!(s.played_fraction(position(&s), None).is_some_and(|f| f > 0.4 && f < 0.6), "the playhead in a");
+    run(&mut s, &mut audio, measure);
+    assert_eq!(s.pattern_index, 1, "the grid follows the song into b");
+    // The piano roll follows it too.
+    s.show_view(1);
+    run(&mut s, &mut audio, measure);
+    assert_eq!((s.workspace, s.pattern_index), (Workspace::PianoRoll, 0));
+    // The song panel keeps the pattern chosen in it.
+    s.show_view(2);
+    run(&mut s, &mut audio, measure);
+    assert_eq!(s.pattern_index, 0);
     s.toggle_play();
 }
 
@@ -195,9 +233,16 @@ fn a_pattern_chosen_while_playing_waits_for_the_loop_to_end_and_says_so() {
 }
 
 #[test]
-fn space_in_the_song_view_plays_the_song() {
+fn space_in_song_mode_plays_the_song_and_the_song_view_alone_does_not() {
     let (mut s, mut audio) = session(LIBRARY);
     s.toggle_song_view();
+    s.toggle_play();
+    run(&mut s, &mut audio, 1000);
+    assert_eq!(mode(&s), Mode::Pattern(0));
+    s.toggle_play();
+    s.show_view(0);
+    s.show_mode(true);
+    s.show_view(0);
     s.toggle_play();
     run(&mut s, &mut audio, 1000);
     assert_eq!(mode(&s), Mode::Song(0));
