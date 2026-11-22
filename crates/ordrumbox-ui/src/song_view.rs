@@ -128,6 +128,9 @@ pub struct SongView<'a> {
     pub is_loop_on: bool,
     /// How wide a measure is drawn.
     pub zoom: MeasureZoom,
+    /// For each automation lane, whether a control took it back: drawn dim,
+    /// with a badge that re-enables it.
+    pub taken_back: Vec<bool>,
 }
 
 impl SongView<'_> {
@@ -193,6 +196,8 @@ pub enum SongHit {
     AddAutomation,
     /// An automation lane's name (its index in the song's lanes).
     LaneName(usize),
+    /// The badge of a lane taken back, beside its name: a click re-enables it.
+    LaneBadge(usize),
     /// The bottom edge of an automation lane, in the frozen column: a drag
     /// sets how many rows it takes.
     LaneEdge(usize),
@@ -553,6 +558,7 @@ mod tests {
             row_drop: None,
             list_drop: None,
             room: 0,
+            taken_back: Vec::new(),
             description: Some("x"),
             description_scroll: 0,
             zoom: MeasureZoom::default(),
@@ -629,6 +635,7 @@ mod tests {
                     is_loop_on: playing,
                     zoom,
                     description_scroll: 3,
+                    taken_back: vec![true; 4],
                 };
                 draw(&mut canvas, &view, &layout);
             }

@@ -103,11 +103,17 @@ impl Library {
         self.patterns.iter().find(|p| p.id == id)
     }
 
-    /// A song file (`SongService.buildSongData`, the record the song panel
+    /// A project file (`SongService.buildSongData`, the record the song panel
     /// saves and exports as `.odbox`): the header's description and date,
     /// the session tempo, the patterns, the arrangements, what is selected, and `stamp` (key
     /// and time in ms: `savedAt` or `exportedAt`).
-    pub fn song_record(&self, name: &str, selected_pattern: usize, selected_song: usize, stamp: (&str, f64)) -> Value {
+    pub fn project_record(
+        &self,
+        name: &str,
+        selected_pattern: usize,
+        selected_song: usize,
+        stamp: (&str, f64),
+    ) -> Value {
         let info = |key: &str| self.info.get(key).cloned().unwrap_or_else(|| Value::from(""));
         let mut object = Object::new();
         object.insert("name", Value::from(name));
@@ -122,10 +128,10 @@ impl Library {
         Value::Object(object)
     }
 
-    /// Read a song file (`parseImportedFile`, then `applyToAppState`):
+    /// Read a project file (`parseImportedFile`, then `applyToAppState`):
     /// `None` without a `patterns` array. Its name, description and date
     /// replace those of `info`, the header kept otherwise.
-    pub fn from_song_record(value: &Value, info: &Object) -> Option<SongRecord> {
+    pub fn from_project_record(value: &Value, info: &Object) -> Option<ProjectRecord> {
         value.get("patterns").and_then(Value::as_array)?;
         let (mut library, report) = Self::from_json(value);
         let text = |key: &str| value.get(key).and_then(Value::to_text);
@@ -139,7 +145,7 @@ impl Library {
             let v = keys.iter().find_map(|key| value.get(key)).and_then(Value::to_number).unwrap_or(0.0);
             if v > 0.0 { v as usize } else { 0 }
         };
-        Some(SongRecord {
+        Some(ProjectRecord {
             name,
             library,
             report,
@@ -149,9 +155,9 @@ impl Library {
     }
 }
 
-/// A song file read back ([`Library::from_song_record`]).
+/// A project file read back ([`Library::from_project_record`]).
 #[derive(Debug, Clone, PartialEq)]
-pub struct SongRecord {
+pub struct ProjectRecord {
     /// Its name, when it has one (else the file's).
     pub name: Option<String>,
     pub library: Library,
@@ -206,28 +212,28 @@ mod tests {
     }
 
     #[test]
-    fn song_records_round_trip() {
+    fn project_records_round_trip() {
         let (library, _) = Library::parse(
             r#"{"infos":{"name":"lib","date":"2026","url":"u"},"bpm":97,"songs":[{"name":"s","clips":[{"pattern":"b"}]}],
                 "patterns":[{"name":"a"},{"name":"b"}]}"#,
         )
         .unwrap();
-        let record = library.song_record("My song", 1, 0, ("savedAt", 5.0));
+        let record = library.project_record("My song", 1, 0, ("savedAt", 5.0));
         let keys: Vec<_> = record.as_object().unwrap().iter().map(|(k, _)| k.to_owned()).collect();
         assert_eq!(
             keys,
             ["name", "description", "date", "bpm", "patterns", "selectedPattern", "songs", "selectedSong", "savedAt"]
         );
-        let read = Library::from_song_record(&record, &library.info).unwrap();
+        let read = Library::from_project_record(&record, &library.info).unwrap();
         assert_eq!(read.name.as_deref(), Some("My song"));
         assert_eq!((read.selected_pattern, read.selected_song), (1, 0));
         assert_eq!(read.library.bpm, 97.0);
         assert_eq!(read.library.songs, library.songs);
         assert_eq!(read.library.patterns, library.patterns);
         assert_eq!(read.library.info.get("url").and_then(Value::as_str), Some("u"));
-        assert_eq!(read.library.synths, None, "a song file holds no synth presets");
+        assert_eq!(read.library.synths, None, "a project file holds no synth presets");
         assert_eq!(read.library.info.get("description").and_then(Value::as_str), Some(""));
-        assert!(Library::from_song_record(&json::parse(r#"{"songs":[]}"#).unwrap(), &Object::new()).is_none());
+        assert!(Library::from_project_record(&json::parse(r#"{"songs":[]}"#).unwrap(), &Object::new()).is_none());
     }
 
     #[test]

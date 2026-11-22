@@ -230,7 +230,10 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   their lanes), and so do the grid's volume sliders and M S boxes and the track editor's
   knobs that have a lane (Volume, Pan, Cutoff, Q, the effects' amounts). Moving a control that
   has a lane takes it back: the lane is no longer played for that instrument, and the
-  control keeps the value you gave it, until **Play > Re-enable automation**. With **REC**
+  control keeps the value you gave it. It shows: the control gets an orange mark in its
+  corner (the mixer's, the grid's, the track editor's), and the lane is drawn dim with an
+  orange **OFF** badge beside its name. A click on the badge (or **Re-enable lane** in the
+  lane's menu) plays that lane again; **Play > Re-enable automation** plays them all. With **REC**
   (beside PLAY in song mode) or **Play > Record automation** on, moving a mixer control while the song plays writes its lane
   instead (the lane is made if there is none; the track itself is left as it is): a fader
   or a knob that can have a lane writes its level on every step
@@ -348,7 +351,9 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
 ## Files
 
 The app writes `library.json`, `kits.json`, `settings.json`, `songs/`, `samples/` and
-`exports/` in the user data folder. Pattern and track settings use camelCase keys; old (JS)
+`exports/` in the user data folder. A **project** is the library saved under a name, as an
+`.odbox` file in `songs/` (File > Save project, Open project...); a song is one of its
+arrangements. Pattern and track settings use camelCase keys; old (JS)
 spellings are still read.
 
 The app holds `ordrumbox.lock` there while it runs. Started a second time, it warns that

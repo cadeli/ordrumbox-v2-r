@@ -66,6 +66,7 @@ fn draw_item(canvas: &mut Canvas, item: &Item, scale: Scale) {
             canvas.fill_rect(r.x, r.y, r.w, r.h, border_color());
             canvas.fill_rect(r.x + t, r.y + t, r.w - 2 * t, r.h - 2 * t, background_color());
         }
+        Kind::Mark { color } => canvas.fill_rect(r.x, r.y, r.w, r.h, *color),
         Kind::Title { text } => {
             canvas.text(r.x, r.y, text, scale.title(), TITLE);
         }

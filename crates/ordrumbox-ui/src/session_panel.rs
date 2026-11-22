@@ -131,6 +131,7 @@ impl Session {
         } else if let Some(pattern) = self.pattern() {
             self.grid_items(&mut layout, pattern, &body, scale);
         }
+        self.mark_taken_back(&mut layout.items, scale);
         layout
     }
 
@@ -821,7 +822,7 @@ mod tests {
         // The song panel keeps it.
         s.toggle_song_view();
         let layout = s.panel_layout(SIZE.0, SIZE.1, SIZE.2);
-        assert!(layout.items.iter().any(|i| matches!(i.id, Some(Id::SongName))));
+        assert!(layout.items.iter().any(|i| matches!(i.id, Some(Id::ProjectName))));
         assert!(layout.right > 0);
         // The mixer too.
         s.toggle_song_view();

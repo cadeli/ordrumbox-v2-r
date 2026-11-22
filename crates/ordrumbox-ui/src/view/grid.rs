@@ -162,14 +162,21 @@ fn draw_mute_solo(canvas: &mut Canvas, track: &Track, i: usize, y: i32, view: &V
     let host_mute = ordrumbox_engine::host_muted(view.host_muted, i);
     // The song's lanes, while it plays, else the track's own.
     let (own_mute, solo) = view.switches.get(i).copied().unwrap_or((track.mute, track.solo));
+    let (mute_taken, solo_taken) = view.switches_taken_back.get(i).copied().unwrap_or_default();
     let (mute, mute_color) = if own_mute { (true, MUTE_ON) } else { (host_mute, mute_host_color()) };
-    for (solo, on, color, letter) in [(false, mute, mute_color, "M"), (true, solo, SOLO_ON, "S")] {
+    let boxes = [(false, mute, mute_color, "M", mute_taken), (true, solo, SOLO_ON, "S", solo_taken)];
+    for (solo, on, color, letter, is_taken_back) in boxes {
         let x = layout.box_x(solo);
         canvas.fill_rect(x, box_y, layout.box_size, layout.box_size, if on { color } else { box_off_color() });
         let letter_scale = Scale::whole((layout.box_size / 10).max(1));
         let inset = (layout.box_size - 8 * letter_scale) / 2;
         let letter_color = if on { background_color() } else { theme::muted() };
         canvas.text(x + inset, box_y + inset, letter, letter_scale, letter_color);
+        if is_taken_back {
+            // Taken back from its lane: a corner mark, as on the panels' controls.
+            let mark = (layout.box_size / 3).max(1);
+            canvas.fill_rect(x + layout.box_size - mark, box_y, mark, mark, theme::TAKEN_BACK);
+        }
     }
     mute
 }

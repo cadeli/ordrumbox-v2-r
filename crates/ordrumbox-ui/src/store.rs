@@ -139,38 +139,38 @@ pub fn user_dir() -> Option<PathBuf> {
     Some(path()?.parent()?.to_path_buf())
 }
 
-/// Where the song panel saves songs (the JS IndexedDB `songs` store).
-pub fn songs_dir() -> Option<PathBuf> {
+/// Where projects are saved (`songs/`, the folder's name from the time they were called songs).
+pub fn projects_dir() -> Option<PathBuf> {
     Some(user_dir()?.join("songs"))
 }
 
-/// A song, pattern or kit name as a file or folder name: what is not an
+/// A project, pattern or kit name as a file or folder name: what is not an
 /// ASCII letter, a digit, `_` or `-` becomes `_`.
 pub fn safe_name(name: &str) -> String {
     name.chars().map(|c| if c.is_ascii_alphanumeric() || c == '_' || c == '-' { c } else { '_' }).collect()
 }
 
-/// The song files of `dir` (`.odbox`), by name; none when `dir` does not
+/// The project files of `dir` (`.odbox`), by name; none when `dir` does not
 /// exist yet.
-pub fn list_songs(dir: &Path) -> io::Result<Vec<PathBuf>> {
+pub fn list_projects(dir: &Path) -> io::Result<Vec<PathBuf>> {
     let entries = match fs::read_dir(dir) {
         Ok(entries) => entries,
         Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
         Err(e) => return Err(e),
     };
-    let mut songs = Vec::new();
+    let mut projects = Vec::new();
     for entry in entries {
         let path = entry?.path();
         if path.extension().is_some_and(|e| e.eq_ignore_ascii_case("odbox")) {
-            songs.push(path);
+            projects.push(path);
         }
     }
-    songs.sort();
-    Ok(songs)
+    projects.sort();
+    Ok(projects)
 }
 
-/// Write a song file (through a temporary file).
-pub fn save_song(path: &Path, record: &json::Value) -> io::Result<()> {
+/// Write a project file (through a temporary file).
+pub fn save_project(path: &Path, record: &json::Value) -> io::Result<()> {
     write_atomic(path, &(record.to_json_pretty(2) + "\n"))
 }
 
@@ -337,11 +337,11 @@ mod tests {
     fn song_files() {
         assert_eq!(safe_name("My song #1 é"), "My_song__1__");
         let dir = env::temp_dir().join(format!("ordrumbox-songs-{}", std::process::id()));
-        assert!(list_songs(&dir).unwrap().is_empty());
-        save_song(&dir.join("b.odbox"), &json::parse(r#"{"name":"b"}"#).unwrap()).unwrap();
-        save_song(&dir.join("a.odbox"), &json::parse(r#"{"name":"a"}"#).unwrap()).unwrap();
+        assert!(list_projects(&dir).unwrap().is_empty());
+        save_project(&dir.join("b.odbox"), &json::parse(r#"{"name":"b"}"#).unwrap()).unwrap();
+        save_project(&dir.join("a.odbox"), &json::parse(r#"{"name":"a"}"#).unwrap()).unwrap();
         fs::write(dir.join("c.json"), "{}").unwrap();
-        assert_eq!(list_songs(&dir).unwrap(), [dir.join("a.odbox"), dir.join("b.odbox")]);
+        assert_eq!(list_projects(&dir).unwrap(), [dir.join("a.odbox"), dir.join("b.odbox")]);
         fs::remove_dir_all(dir).unwrap();
     }
 

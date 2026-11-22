@@ -27,6 +27,7 @@ const CLEAR_VALUE: &str = "clear:";
 const REMOVE_ALL_VALUE: &str = "remove-all";
 const TALLER_VALUE: &str = "taller:";
 const SHORTER_VALUE: &str = "shorter:";
+const REENABLE_VALUE: &str = "reenable:";
 
 /// A press on a lane's step, which a drag turns into a painted zone.
 #[derive(Debug, Clone, PartialEq)]
@@ -90,7 +91,10 @@ impl Session {
     ) {
         match (hit, button) {
             (SongHit::AddAutomation, Button::Left) => self.automation_menu(x, y),
-            (SongHit::LaneName(lane), _) | (SongHit::LaneEdge(lane), Button::Right) => self.lane_menu(lane, x, y),
+            (SongHit::LaneBadge(lane), Button::Left) => self.reenable_lane(lane),
+            (SongHit::LaneName(lane) | SongHit::LaneBadge(lane), _) | (SongHit::LaneEdge(lane), Button::Right) => {
+                self.lane_menu(lane, x, y);
+            }
             (SongHit::LaneStep { lane, step }, _) => self.press_lane(size, lane, (step, y), button, false),
             (SongHit::LaneEdge(lane), _) => {
                 self.song_panel.lane_resize = Some((lane, format!("lane-rows:{lane}:{}", self.editor.revision())));
@@ -207,7 +211,9 @@ impl Session {
             }
         };
         let value = value.map_or_else(|| "as the pattern".to_owned(), |value| lane.target().value_label(value));
-        Some(format!("{} {} {value} at {}", lane.instrument(), lane.target().label(), step_label(step)))
+        let (instrument, target) = (lane.instrument(), lane.target());
+        let taken_back = if self.is_taken_back(instrument, target) { ", taken back: not played" } else { "" };
+        Some(format!("{instrument} {} {value} at {}{taken_back}", target.label(), step_label(step)))
     }
 
     /// The lane released: the zone stays as painted; whether one was pressed.
@@ -229,19 +235,23 @@ impl Session {
         self.chrome.widgets.dropdown = Some(menu);
     }
 
-    /// Lane `lane`'s menu at `(x, y)`: clear its points, delete it, delete every lane.
+    /// Lane `lane`'s menu at `(x, y)`: re-enable it when a control took it
+    /// back, make it taller or shorter, clear its points, delete it, delete
+    /// every lane.
     fn lane_menu(&mut self, lane: usize, x: i32, y: i32) {
         let Some(lane_shown) = self.song().and_then(|song| song.automations.get(lane)) else { return };
         let title = format!("{} {}", lane_shown.target().label(), lane_shown.instrument());
-        let values = vec![
-            format!("{TALLER_VALUE}{lane}"),
-            format!("{SHORTER_VALUE}{lane}"),
-            format!("{CLEAR_VALUE}{lane}"),
-            format!("{REMOVE_VALUE}{lane}"),
-            REMOVE_ALL_VALUE.into(),
+        let is_taken_back = self.is_taken_back(lane_shown.instrument(), lane_shown.target());
+        let reenable = is_taken_back.then(|| (format!("{REENABLE_VALUE}{lane}"), "Re-enable lane".to_owned()));
+        let lines = [
+            (format!("{TALLER_VALUE}{lane}"), "Taller"),
+            (format!("{SHORTER_VALUE}{lane}"), "Shorter"),
+            (format!("{CLEAR_VALUE}{lane}"), "Clear all points"),
+            (format!("{REMOVE_VALUE}{lane}"), "Delete lane"),
+            (REMOVE_ALL_VALUE.to_owned(), "Delete all lanes"),
         ];
-        let labels = ["Taller", "Shorter", "Clear all points", "Delete lane", "Delete all lanes"];
-        let labels = labels.map(str::to_owned).into();
+        let lines = reenable.into_iter().chain(lines.map(|(value, label)| (value, label.to_owned())));
+        let (values, labels) = lines.unzip();
         let menu = Dropdown::menu(Id::AutomationMenu, x, y, title, values, labels);
         self.chrome.widgets.dropdown = Some(menu);
     }
@@ -269,6 +279,8 @@ impl Session {
                 }
                 Err(message) => self.message = message,
             }
+        } else if let Some(lane) = value.strip_prefix(REENABLE_VALUE).and_then(|l| l.parse().ok()) {
+            self.reenable_lane(lane);
         } else if let Some(lane) = value.strip_prefix(REMOVE_VALUE).and_then(|l| l.parse().ok()) {
             self.undoable(|s| {
                 if s.editor.remove_automation_lane(None, lane) {

@@ -22,8 +22,8 @@ pub enum Purpose {
     LoadMapping,
     /// A folder, not a file.
     ImportFolder,
-    /// A song file (`.odbox`, `.json`), the song panel's Import.
-    ImportSong,
+    /// A project file (`.odbox`, `.json`), the song panel's Import.
+    ImportProject,
     /// Synth presets (`.json`), the synth editor's Import.
     ImportSynth,
     /// A library file (`.json`), File > Import library.
@@ -47,9 +47,9 @@ pub enum Export {
     SongStems,
     PatternMidi,
     PatternJson,
-    Song,
-    /// The song, as a save rather than an export (`savedAt`).
-    SongSaveAs,
+    Project,
+    /// The project, as a save rather than an export (`savedAt`).
+    ProjectSaveAs,
     Synths,
     KitMapping,
     /// The kit with its samples, in a folder of its own made in the folder picked.
@@ -75,7 +75,7 @@ impl Purpose {
             Self::ReplaceTrackSample => "Replace the track's sample",
             Self::LoadMapping => "Load kit mapping",
             Self::ImportFolder => "Import folder as kit",
-            Self::ImportSong => "Import song",
+            Self::ImportProject => "Import project",
             Self::ImportSynth => "Import synth sounds",
             Self::ImportLibrary => "Import library",
             Self::RestoreUserData => "Restore user data from a backup folder",
@@ -86,8 +86,8 @@ impl Purpose {
             Self::Export(Export::SongStems) => "Export song stems to folder",
             Self::Export(Export::PatternMidi) => "Export pattern as MIDI to folder",
             Self::Export(Export::PatternJson) => "Export pattern as JSON to folder",
-            Self::Export(Export::Song) => "Export song to folder",
-            Self::Export(Export::SongSaveAs) => "Save song to folder",
+            Self::Export(Export::Project) => "Export project to folder",
+            Self::Export(Export::ProjectSaveAs) => "Save project to folder",
             Self::Export(Export::Synths) => "Export synth sounds to folder",
             Self::Export(Export::KitMapping) => "Export kit mapping to folder",
             Self::Export(Export::KitFolder) => "Export kit with its samples to folder",
@@ -108,7 +108,7 @@ impl Purpose {
             Self::AddSample | Self::ReplaceSample | Self::ReplaceTrackSample => &["wav"],
             Self::LoadMapping => &["json"],
             Self::ImportFolder | Self::RestoreUserData | Self::UserFolder | Self::Export(_) => &[],
-            Self::ImportSong => &["odbox", "json"],
+            Self::ImportProject => &["odbox", "json"],
             Self::ImportSynth | Self::ImportLibrary => &["json"],
         }
     }
@@ -447,7 +447,7 @@ mod tests {
         assert!(folders.entries.iter().all(|e| !matches!(e, Entry::File(_))));
         assert_eq!(folders.activate(), Outcome::Picked(dir.clone()));
 
-        let mut destination = Picker::new(Purpose::Export(Export::SongSaveAs), Some(&dir));
+        let mut destination = Picker::new(Purpose::Export(Export::ProjectSaveAs), Some(&dir));
         assert_eq!(destination.entries[0], Entry::ThisFolder);
         assert!(destination.entries.iter().all(|e| !matches!(e, Entry::File(_))));
         assert_eq!(destination.activate(), Outcome::Picked(dir.clone()));

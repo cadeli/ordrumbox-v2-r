@@ -52,7 +52,14 @@ impl Session {
             (SongHit::Ruler(m), Button::Left) => self.press_ruler(size, x, m),
             (SongHit::LoopEnd(edge), Button::Left) => self.press_loop_end(edge),
             (SongHit::Ruler(_) | SongHit::LoopEnd(_), Button::Right) => self.loop_menu(x, y),
-            (SongHit::AddAutomation | SongHit::LaneName(_) | SongHit::LaneEdge(_) | SongHit::LaneStep { .. }, _) => {
+            (
+                SongHit::AddAutomation
+                | SongHit::LaneName(_)
+                | SongHit::LaneBadge(_)
+                | SongHit::LaneEdge(_)
+                | SongHit::LaneStep { .. },
+                _,
+            ) => {
                 self.automation_click(size, hit, (x, y), button);
             }
             (SongHit::Cell { row, measure }, Button::Left) => {

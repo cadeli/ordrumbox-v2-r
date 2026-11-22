@@ -2,7 +2,8 @@
 //! over one to four rows, named by its control and instrument in the frozen
 //! column (its bottom edge there sets how tall it is), its values drawn step
 //! by step (none where it leaves the pattern's); under the last row, the
-//! button that adds a lane.
+//! button that adds a lane. A lane a control took back is drawn dim, with
+//! a badge beside its name that re-enables it.
 
 use super::draw::Page;
 use super::*;
@@ -19,6 +20,11 @@ const BEAT_LINES: i32 = 32;
 /// How far (scale units) above a lane's bottom edge a press in the frozen
 /// column takes the edge.
 const EDGE_GRAB: i32 = 3;
+/// The badge of a lane taken back; its room is kept beside every lane's
+/// name, so that a name does not move when its lane is taken back.
+const LANE_BADGE: &str = "OFF";
+/// What a lane taken back keeps of its colours.
+const TAKEN_BACK_DIM: f64 = 0.35;
 
 /// Each lane of `song`: its index, its first row counted from the lanes'
 /// first, and how many rows it takes.
@@ -136,6 +142,16 @@ impl SongLayout {
         (1.0 - f64::from(y - top) / f64::from(height.max(1))).clamp(0.0, 1.0)
     }
 
+    /// The end of the room for a lane's name in the frozen column.
+    fn lane_name_end(&self) -> i32 {
+        self.grid.x + self.label_width() - 6 * self.scale
+    }
+
+    /// Where a lane's badge starts across: its name stops before it.
+    fn lane_badge_x(&self) -> i32 {
+        self.lane_name_end() - text_width(LANE_BADGE, self.scale) - 4 * self.scale
+    }
+
     /// The step shown at `x`, past the frozen column; `first` is the first measure shown.
     #[must_use]
     pub fn step_at(&self, x: i32, first: u32) -> u32 {
@@ -156,15 +172,27 @@ impl SongLayout {
         if x < self.body_left() {
             let bottom = self.row_y(view.rows.len() + first + rows, view.scroll.1);
             let at_edge = bottom - y <= EDGE_GRAB * self.scale;
-            return Some(if at_edge { SongHit::LaneEdge(lane) } else { SongHit::LaneName(lane) });
+            let on_badge = view.taken_back.get(lane).copied().unwrap_or(false) && x >= self.lane_badge_x();
+            return Some(match (at_edge, on_badge) {
+                (true, _) => SongHit::LaneEdge(lane),
+                (false, true) => SongHit::LaneBadge(lane),
+                (false, false) => SongHit::LaneName(lane),
+            });
         }
         let step = self.step_at(x, view.scroll.0);
         (step < total * STEPS_PER_MEASURE).then_some(SongHit::LaneStep { lane, step })
     }
 }
 
-/// The lanes shown on `page`, rows after the `pattern_rows` of the patterns.
-pub(super) fn draw_lanes(canvas: &mut Canvas, song: &Song, layout: &SongLayout, pattern_rows: usize, page: &Page) {
+/// The lanes shown on `page`, rows after the `pattern_rows` of the
+/// patterns; `taken_back` tells, lane by lane, which a control took back.
+pub(super) fn draw_lanes(
+    canvas: &mut Canvas,
+    song: &Song,
+    layout: &SongLayout,
+    (pattern_rows, taken_back): (usize, &[bool]),
+    page: &Page,
+) {
     let top = layout.body_top();
     let mut canvas = Rows { canvas, top, bottom: top + page.shown_rows as i32 * layout.row_height() };
     let shown = page.first_row..page.first_row + page.shown_rows;
@@ -173,16 +201,34 @@ pub(super) fn draw_lanes(canvas: &mut Canvas, song: &Song, layout: &SongLayout, 
         if row + rows <= shown.start || row >= shown.end {
             continue;
         }
-        draw_lane(&mut canvas, &song.automations[i], layout, (layout.row_y(row, page.first_row), rows), page);
+        let is_taken_back = taken_back.get(i).copied().unwrap_or(false);
+        let lane = LaneShown { lane: &song.automations[i], is_taken_back };
+        draw_lane(&mut canvas, &lane, layout, (layout.row_y(row, page.first_row), rows), page);
     }
 }
 
-/// One lane, its `rows` rows at `y`: its name (in the first of them shown),
-/// a band under its steps, its values and the step and beat lines over them.
-fn draw_lane(canvas: &mut Rows, lane: &AutomationLane, layout: &SongLayout, (y, rows): (i32, usize), page: &Page) {
+/// A lane as drawn: its points, and whether a control took it back.
+struct LaneShown<'a> {
+    lane: &'a AutomationLane,
+    is_taken_back: bool,
+}
+
+impl LaneShown<'_> {
+    /// The colour of its control, dimmed when it is taken back.
+    fn color(&self) -> Rgb {
+        let color = target_color(self.lane.target());
+        if self.is_taken_back { theme::mix(theme::panel(), color, TAKEN_BACK_DIM) } else { color }
+    }
+}
+
+/// One lane, its `rows` rows at `y`: its name (in the first of them shown)
+/// and its badge when taken back, a band under its steps, its values and
+/// the step and beat lines over them.
+fn draw_lane(canvas: &mut Rows, shown: &LaneShown, layout: &SongLayout, (y, rows): (i32, usize), page: &Page) {
     let s = layout.scale;
     let (rh, left) = (layout.row_height(), layout.body_left());
-    let color = target_color(lane.target());
+    let lane = shown.lane;
+    let color = shown.color();
     let bottom = y + rows as i32 * rh;
     canvas.fill_rect(layout.grid.x, bottom - s.px(), layout.label_width() + page.body_w, s.px(), line_color());
     // Its name in the first of its rows shown.
@@ -190,16 +236,23 @@ fn draw_lane(canvas: &mut Rows, lane: &AutomationLane, layout: &SongLayout, (y, 
     let text_y = y + hidden * rh + (rh - 8 * s) / 2;
     if text_y + 8 * s <= canvas.bottom.min(bottom) {
         // The control's name first, fitted to the column; the instrument's in what is left.
-        let column_end = layout.grid.x + layout.label_width() - 6 * s;
+        let column_end = layout.lane_badge_x() - 2 * s;
         let label = fit(lane.target().label(), column_end - layout.grid.x, s);
         let x = canvas.canvas.text(layout.grid.x, text_y, &label, s, color) + 4 * s;
         let name = fit(lane.instrument(), column_end - x, s);
-        canvas.canvas.text(x, text_y, &name, s, theme::text());
+        let name_color = if shown.is_taken_back { theme::muted() } else { theme::text() };
+        canvas.canvas.text(x, text_y, &name, s, name_color);
+        if shown.is_taken_back {
+            let badge_x = layout.lane_badge_x();
+            let badge_w = layout.lane_name_end() - badge_x;
+            canvas.canvas.fill_rect(badge_x, text_y - 2 * s, badge_w, 12 * s, theme::TAKEN_BACK);
+            canvas.canvas.text(badge_x + 2 * s, text_y, LANE_BADGE, s, theme::bg());
+        }
     }
 
     let (band_y, band_h) = layout.band(y, rows);
     canvas.fill_rect(left, band_y, page.body_w, band_h, theme::panel());
-    draw_values(canvas, lane, layout, (band_y, band_h), page);
+    draw_values(canvas, shown, layout, (band_y, band_h), page);
     let first_step = page.first_measure * STEPS_PER_MEASURE;
     let end_step = (page.first_measure + page.shown_measures) * STEPS_PER_MEASURE;
     let x_of = |step: u32| layout.step_x(step.clamp(first_step, end_step), page.first_measure);
@@ -220,16 +273,16 @@ fn draw_lane(canvas: &mut Rows, lane: &AutomationLane, layout: &SongLayout, (y, 
 /// point to the next, on full and in its colour, off full and faint, with a
 /// mark where it changes. A level: column by column, as high as it is where
 /// it glides too, its top drawn. Nothing where the lane leaves the pattern's.
-fn draw_values(canvas: &mut Rows, lane: &AutomationLane, layout: &SongLayout, band: (i32, i32), page: &Page) {
-    match lane.target().kind() {
-        AutomationKind::Switch => draw_switch(canvas, lane, layout, band, page),
-        AutomationKind::Level => draw_level(canvas, lane, layout, band, page),
+fn draw_values(canvas: &mut Rows, shown: &LaneShown, layout: &SongLayout, band: (i32, i32), page: &Page) {
+    match shown.lane.target().kind() {
+        AutomationKind::Switch => draw_switch(canvas, shown, layout, band, page),
+        AutomationKind::Level => draw_level(canvas, shown, layout, band, page),
     }
 }
 
-fn draw_switch(canvas: &mut Rows, lane: &AutomationLane, layout: &SongLayout, (top, height): (i32, i32), page: &Page) {
+fn draw_switch(canvas: &mut Rows, shown: &LaneShown, layout: &SongLayout, (top, height): (i32, i32), page: &Page) {
     let s = layout.scale;
-    let color = target_color(lane.target());
+    let (lane, color) = (shown.lane, shown.color());
     let first_step = page.first_measure * STEPS_PER_MEASURE;
     let end_step = (page.first_measure + page.shown_measures) * STEPS_PER_MEASURE;
     let x_of = |step: u32| layout.step_x(step.clamp(first_step, end_step), page.first_measure);
@@ -255,9 +308,9 @@ fn draw_switch(canvas: &mut Rows, lane: &AutomationLane, layout: &SongLayout, (t
     }
 }
 
-fn draw_level(canvas: &mut Rows, lane: &AutomationLane, layout: &SongLayout, (top, height): (i32, i32), page: &Page) {
+fn draw_level(canvas: &mut Rows, shown: &LaneShown, layout: &SongLayout, (top, height): (i32, i32), page: &Page) {
     let s = layout.scale;
-    let color = target_color(lane.target());
+    let (lane, color) = (shown.lane, shown.color());
     let fill = theme::mix(theme::panel(), color, 0.45);
     let left = layout.body_left();
     for x in left..left + page.body_w {

@@ -141,7 +141,7 @@ fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     let page = Page::new(view, layout, total);
     super::ruler::draw(canvas, view, layout, &page);
     draw_row_names(canvas, view, layout, &page);
-    super::automation::draw_lanes(canvas, song, layout, view.rows.len(), &page);
+    super::automation::draw_lanes(canvas, song, layout, (view.rows.len(), &view.taken_back), &page);
     draw_measure_lines(canvas, layout, &page);
     draw_clips(canvas, view, song, layout);
     draw_dragged_pattern(canvas, view, layout, &page);

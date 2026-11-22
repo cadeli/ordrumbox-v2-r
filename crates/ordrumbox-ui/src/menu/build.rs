@@ -95,11 +95,13 @@ fn file_menu(s: &MenuState) -> Menu {
         items: vec![
             command("Save", "Ctrl+S", C::Save, s.can_save),
             Item::Separator,
-            command("Save song", "", C::SaveSong, s.can_save_song),
-            command("Save song as...", "", C::SaveSongAs, true),
-            command("Load song...", "Ctrl+O", C::LoadSong, s.saved_songs),
-            command("Export song...", "", C::ExportSong, true),
-            command("Import song...", "", C::ImportSong, true),
+            command("Open project...", "Ctrl+O", C::LoadProject, s.saved_projects),
+            command("Save project", "", C::SaveProject, s.can_save_project),
+            command("Save project as...", "", C::SaveProjectAs, true),
+            command("Export project...", "", C::ExportProject, true),
+            command("Import project...", "", C::ImportProject, true),
+            command("Rename project...", "", C::RenameProject, true),
+            command("Project description...", "", C::ProjectDescription, true),
             Item::Separator,
             command("Export library...", "", C::ExportLibrary, true),
             command("Import library...", "", C::ImportLibrary, true),
@@ -279,9 +281,6 @@ fn song_menu(s: &MenuState) -> Menu {
             command("Remove arrangement", "", C::RemoveSong, s.has_songs),
             command("Previous arrangement", "Shift+[", C::PreviousSong, s.has_songs),
             command("Next arrangement", "Shift+]", C::NextSong, s.has_songs),
-            Item::Separator,
-            command("Rename song...", "", C::RenameSong, true),
-            command("Song description...", "", C::SongDescription, true),
         ],
     }
 }

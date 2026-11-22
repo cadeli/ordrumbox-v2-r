@@ -30,7 +30,7 @@ fn shortcuts_follow_the_command_modifier() {
     assert_eq!(shortcut(Key::Letter('S'), false, true), Some(Command::Save));
     assert_eq!(shortcut(Key::Letter('S'), true, true), Some(Command::ExportPatternJson));
     // Ctrl+O loads a song (O alone hears track 9); importing a MIDI file has no key.
-    assert_eq!(shortcut(Key::Letter('O'), false, true), Some(Command::LoadSong));
+    assert_eq!(shortcut(Key::Letter('O'), false, true), Some(Command::LoadProject));
     assert_eq!(shortcut(Key::Letter('O'), false, false), None);
     // Solo and mute of the focused track, as every DAW spells them.
     assert_eq!(shortcut(Key::Letter('S'), false, false), Some(Command::Solo));

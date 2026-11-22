@@ -52,6 +52,21 @@ const GENERATION_TOOLS: [&str; 7] = [
 const GENERATION_RULE: &str = "Automatic generation: call only when the user explicitly asks for generation, \
 auto mode or random notes, never to fulfil a request for a style, a groove or a song (write the notes instead).";
 
+/// Tools renamed when a song file became a project file: the old name, still
+/// called by clients written before, and the tool it stands for.
+const RENAMED_TOOLS: [(&str, &str); 5] = [
+    ("setSongInfo", "setProjectInfo"),
+    ("saveSong", "saveProject"),
+    ("exportSong", "exportProject"),
+    ("listSavedSongs", "listSavedProjects"),
+    ("loadSong", "openProject"),
+];
+
+/// The tool `name` stands for: itself, or the new name of a renamed tool.
+fn tool_name(name: &str) -> &str {
+    RENAMED_TOOLS.iter().find(|(old, _)| *old == name).map_or(name, |(_, new)| new)
+}
+
 /// Track settings a tool may not set: the track is named by `trackName`.
 const NOT_EDITED: [&str; 1] = ["name"];
 /// Note fields that are not settings: `step` gives the place.
@@ -270,15 +285,15 @@ const TOOLS: &str = r#"[
      "startMeasure": {"type": "integer", "minimum": 0},
      "arrangement": {"type": ["string", "integer"], "description": "Arrangement name or index (default: the selected one)"}},
      "required": ["startMeasure"]}},
-  {"name": "setSongInfo", "description": "The name and description of the song: the library as saveSong writes it. Not an undo step.",
+  {"name": "setProjectInfo", "description": "The name and description of the project: the library as saveProject writes it. Not an undo step.",
    "inputSchema": {"type": "object", "properties": {"name": {"type": "string", "minLength": 1}, "description": {"type": "string"}}}},
-  {"name": "saveSong", "description": "Saves the song (patterns, arrangements) to the songs folder of the user data folder as <name>.odbox (as Song > Save).",
+  {"name": "saveProject", "description": "Saves the project (patterns, arrangements) to the songs folder of the user data folder as <name>.odbox (as File > Save project).",
    "inputSchema": {"type": "object", "properties": {}}},
-  {"name": "exportSong", "description": "Exports the song as <name>.odbox to the exports folder of the user data folder (as Song > Export song).",
+  {"name": "exportProject", "description": "Exports the project as <name>.odbox to the exports folder of the user data folder (as File > Export project).",
    "inputSchema": {"type": "object", "properties": {}}},
-  {"name": "listSavedSongs", "description": "The songs saved in the songs folder, by name.",
+  {"name": "listSavedProjects", "description": "The projects saved in the songs folder, by name.",
    "inputSchema": {"type": "object", "properties": {}}},
-  {"name": "loadSong", "description": "Puts a song file in the place of the library, one undo step: a saved song by name (listSavedSongs), or an .odbox file by path.",
+  {"name": "openProject", "description": "Puts a project file in the place of the library, one undo step: a saved project by name (listSavedProjects), or an .odbox file by path.",
    "inputSchema": {"type": "object", "properties": {"name": {"type": "string"}, "filePath": {"type": "string"}}}},
   {"name": "normalizeKit", "description": "Brings every sample of a kit to a 0 dB peak, on disk. Not an undo step.",
    "inputSchema": {"type": "object", "properties": {"kit": {"type": "string", "description": "Kit name (default: the kit in use)"}}}},
@@ -525,7 +540,7 @@ pub fn answer(line: &str, call: &mut dyn FnMut(&str, &Value) -> Result<Value, St
                 let empty = Value::Object(Object::new());
                 let arguments = params.and_then(|p| p.get("arguments")).filter(|a| !a.is_null()).unwrap_or(&empty);
                 if arguments.as_object().is_some() {
-                    Ok(tool_result(call(name, arguments)))
+                    Ok(tool_result(call(tool_name(name), arguments)))
                 } else {
                     Err((INVALID_PARAMS, "arguments: not an object".into()))
                 }
@@ -610,6 +625,18 @@ mod tests {
         let updates = update.get("inputSchema").unwrap().get("properties").unwrap().get("updates").unwrap();
         let auto_mode = updates.get("properties").unwrap().get("autoMode").unwrap();
         assert!(description(auto_mode).starts_with(GENERATION_RULE));
+    }
+
+    #[test]
+    fn a_renamed_tool_answers_to_its_old_name() {
+        let tools = tools();
+        let tools = tools.as_array().unwrap();
+        let named = |name: &str| tools.iter().any(|t| t.get("name").and_then(Value::as_str) == Some(name));
+        for (old, new) in RENAMED_TOOLS {
+            assert_eq!(tool_name(old), new);
+            assert!(named(new) && !named(old), "{old} listed as {new} only");
+        }
+        assert_eq!(tool_name("play"), "play");
     }
 
     #[test]

@@ -167,37 +167,37 @@ fn synth_presets_exported_are_imported_and_saved_ones_read_at_start() {
 }
 
 #[test]
-fn a_song_saved_comes_back_from_the_load_menu() {
+fn a_project_saved_comes_back_from_the_open_menu() {
     let dir = scratch_dir("song-files");
     let songs = dir.join("songs");
     let (mut s, _audio) = demo_session(&dir.join("samples"));
 
     // No user data folder: nothing saved, nothing to load.
-    s.run(Command::SaveSong);
+    s.run(Command::SaveProject);
     assert_eq!(s.message, "Save failed: no user data folder");
-    s.run(Command::LoadSong);
-    assert_eq!(s.message, "No user data folder: no saved songs");
+    s.run(Command::LoadProject);
+    assert_eq!(s.message, "No user data folder: no saved projects");
 
-    s.saving.songs_dir = Some(songs.clone());
-    assert!(s.menu_state().can_save_song && !s.menu_state().saved_songs);
-    s.run(Command::LoadSong);
-    assert_eq!(s.message, "No saved songs found");
+    s.saving.projects_dir = Some(songs.clone());
+    assert!(s.menu_state().can_save_project && !s.menu_state().saved_projects);
+    s.run(Command::LoadProject);
+    assert_eq!(s.message, "No saved projects found");
 
     // Saved, in the songs folder (made at need).
     let saved = s.editor.library().to_file_text();
-    s.run(Command::SaveSong);
-    assert!(s.message.starts_with("Song \"") && s.message.ends_with("\" saved"), "{}", s.message);
-    let files = store::list_songs(&songs).unwrap();
+    s.run(Command::SaveProject);
+    assert!(s.message.starts_with("Project \"") && s.message.ends_with("\" saved"), "{}", s.message);
+    let files = store::list_projects(&songs).unwrap();
     assert_eq!(files.len(), 1);
-    assert!(s.menu_state().saved_songs);
+    assert!(s.menu_state().saved_projects);
 
     // Changed, then loaded back from the list, once confirmed: one undo step.
     let count = s.editor.library().patterns.len();
     s.run(Command::DuplicatePattern);
     s.run(Command::NewGeneratedPattern);
     assert_eq!(s.editor.library().patterns.len(), count + 2);
-    s.run(Command::LoadSong);
-    let menu = s.chrome.widgets.dropdown.as_ref().expect("the Load list");
+    s.run(Command::LoadProject);
+    let menu = s.chrome.widgets.dropdown.as_ref().expect("the Open list");
     assert_eq!(menu.values.len(), 1);
     let value = menu.values[0].clone();
     draw(&mut s);
@@ -206,25 +206,25 @@ fn a_song_saved_comes_back_from_the_load_menu() {
     draw(&mut s);
     s.overlay_key(OverlayKey::Move(1));
     s.overlay_key(OverlayKey::Enter);
-    assert!(s.message.starts_with("Song \"") && s.message.ends_with("\" loaded"), "{}", s.message);
+    assert!(s.message.starts_with("Project \"") && s.message.ends_with("\" opened"), "{}", s.message);
     assert_eq!(s.editor.library().patterns.len(), count);
     assert_eq!(s.editor.library().to_file_text(), saved);
-    assert_eq!(s.editor.history().next_undo(), Some("Load song"));
+    assert_eq!(s.editor.history().next_undo(), Some("Open project"));
     s.run(Command::Undo);
     assert_eq!(s.editor.library().patterns.len(), count + 2);
 
     // Saved again: the same file, written over.
-    s.run(Command::SaveSong);
-    assert_eq!(store::list_songs(&songs).unwrap(), files);
+    s.run(Command::SaveProject);
+    assert_eq!(store::list_projects(&songs).unwrap(), files);
 
-    // A songs folder that is a file: said, not listed nor written.
+    // A projects folder that is a file: said, not listed nor written.
     let blocked = dir.join("blocked");
     std::fs::write(&blocked, b"").unwrap();
-    s.saving.songs_dir = Some(blocked.clone());
-    s.run(Command::SaveSong);
+    s.saving.projects_dir = Some(blocked.clone());
+    s.run(Command::SaveProject);
     assert!(s.message.starts_with("Save failed: "), "{}", s.message);
-    s.run(Command::LoadSong);
-    assert!(s.message.starts_with("Songs not listed: "), "{}", s.message);
+    s.run(Command::LoadProject);
+    assert!(s.message.starts_with("Projects not listed: "), "{}", s.message);
     std::fs::remove_dir_all(&dir).unwrap();
 }
 

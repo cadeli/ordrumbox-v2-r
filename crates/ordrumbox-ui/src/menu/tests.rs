@@ -47,15 +47,15 @@ fn keyboard_skips_what_cannot_run() {
     assert_eq!(controls.command(&menus), Some(Command::MidiControls));
     assert_eq!(controls.step(&menus, 1).command(&menus), Some(Command::Undo));
     let file = Open::new(&menus, 0, true);
-    // Save, Save song and Load song are greyed out: the first item highlighted is Save song as.
-    assert_eq!(file.command(&menus), Some(Command::SaveSongAs));
-    assert_eq!(file.step(&menus, 1).command(&menus), Some(Command::ExportSong));
+    // Save, Open project and Save project are greyed out: the first item highlighted is Save project as.
+    assert_eq!(file.command(&menus), Some(Command::SaveProjectAs));
+    assert_eq!(file.step(&menus, 1).command(&menus), Some(Command::ExportProject));
     assert_eq!(file.switch(&menus, -1).menu, menus.len() - 1);
 }
 
 #[test]
-fn the_song_and_file_menus_have_the_song_panel_commands() {
-    let menus = menus(&MenuState { has_songs: true, can_save_song: true, ..state() });
+fn the_song_and_file_menus_have_the_song_panel_commands_and_the_project_ones() {
+    let menus = menus(&MenuState { has_songs: true, can_save_project: true, ..state() });
     let runnable = |title: &str| -> Vec<Command> {
         menus.iter().find(|m| m.title == title).unwrap().items.iter().filter_map(Item::runnable).collect()
     };
@@ -65,26 +65,27 @@ fn the_song_and_file_menus_have_the_song_panel_commands() {
     for command in [C::SongView, C::NewSong, C::RemoveSong, C::PreviousSong, C::NextSong] {
         assert!(song.contains(&command), "{command:?}");
     }
-    assert!(song.contains(&C::RenameSong) && song.contains(&C::SongDescription));
     assert!(!song.contains(&C::PlaySong) && runnable("Play").contains(&C::PlaySong));
-    for command in [C::SaveSong, C::SaveSongAs, C::ExportSong, C::ImportSong] {
+    for command in
+        [C::SaveProject, C::SaveProjectAs, C::ExportProject, C::ImportProject, C::RenameProject, C::ProjectDescription]
+    {
         assert!(file.contains(&command), "{command:?}");
     }
-    // Load needs saved songs.
-    assert!(!file.contains(&C::LoadSong));
+    // Open needs saved projects.
+    assert!(!file.contains(&C::LoadProject));
 }
 
 #[test]
 fn every_file_command_is_in_the_file_menu() {
-    let all = MenuState { can_save_song: true, saved_songs: true, kit_sample: true, ..state() };
+    let all = MenuState { can_save_project: true, saved_projects: true, kit_sample: true, ..state() };
     let menus = menus(&MenuState { has_demo: true, user_folder: true, ..all });
     use Command as C;
     let file_commands = [
-        C::SaveSong,
-        C::SaveSongAs,
-        C::LoadSong,
-        C::ExportSong,
-        C::ImportSong,
+        C::SaveProject,
+        C::SaveProjectAs,
+        C::LoadProject,
+        C::ExportProject,
+        C::ImportProject,
         C::ImportMidi,
         C::ExportMidi,
         C::ExportLibrary,

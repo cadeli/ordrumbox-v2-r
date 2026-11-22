@@ -20,13 +20,13 @@ pub enum Command {
     Mixer,
     NewSong,
     RemoveSong,
-    RenameSong,
-    SongDescription,
-    SaveSong,
-    SaveSongAs,
-    LoadSong,
-    ExportSong,
-    ImportSong,
+    RenameProject,
+    ProjectDescription,
+    SaveProject,
+    SaveProjectAs,
+    LoadProject,
+    ExportProject,
+    ImportProject,
     Save,
     ImportMidi,
     ExportWav,
@@ -169,6 +169,9 @@ pub const USER_DATA_IN_THE_APP: &str = "user data folder: in the app only, not i
 /// Why a plugin has no song commands.
 pub const SONGS_IN_THE_APP: &str = "songs: in the app only, a plugin plays patterns";
 
+/// Why a plugin has no project commands.
+pub const PROJECTS_IN_THE_APP: &str = "projects: in the app only, the host saves the library with its own project";
+
 impl Command {
     /// Why a plugin does not run this command (the host does it, or it is
     /// the app's), `None` when it does.
@@ -198,15 +201,15 @@ impl Command {
             | Self::NextSong
             | Self::NewSong
             | Self::RemoveSong
-            | Self::RenameSong
-            | Self::SongDescription
-            | Self::SaveSong
-            | Self::SaveSongAs
-            | Self::LoadSong
-            | Self::ExportSong
-            | Self::ImportSong
             | Self::ExportSongWav
             | Self::ExportSongStems => Some(SONGS_IN_THE_APP),
+            Self::RenameProject
+            | Self::ProjectDescription
+            | Self::SaveProject
+            | Self::SaveProjectAs
+            | Self::LoadProject
+            | Self::ExportProject
+            | Self::ImportProject => Some(PROJECTS_IN_THE_APP),
             _ => None,
         }
     }
@@ -300,10 +303,10 @@ pub struct MenuState {
     pub piano_roll: bool,
     pub synth: bool,
     pub mixer: bool,
-    /// A folder to save songs in (Save song).
-    pub can_save_song: bool,
-    /// Song files saved (Load song).
-    pub saved_songs: bool,
+    /// A folder to save projects in (Save project).
+    pub can_save_project: bool,
+    /// Project files saved (Open project).
+    pub saved_projects: bool,
     /// The kit editor has a sample selected.
     pub kit_sample: bool,
     /// An update check under way.

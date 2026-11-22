@@ -273,6 +273,9 @@ pub const VALUE: Rgb = YELLOW;
 pub const CHANCE: Rgb = VIOLET;
 /// The hits a note makes by itself: retriggers, euclidean pulses.
 pub const GENERATED: Rgb = ORANGE;
+/// A control taken back from its automation lane, and that lane: the lane
+/// plays no more until it is re-enabled, as a DAW marks it.
+pub const TAKEN_BACK: Rgb = ORANGE;
 /// Problems and mutes (a mute from a plugin host is dimmed).
 pub const ALERT: Rgb = RED;
 

@@ -17,8 +17,8 @@ pub(super) enum Pending {
         sample: usize,
     },
     RemoveSynth(String),
-    LoadSong(PathBuf),
-    ImportSong(PathBuf),
+    LoadProject(PathBuf),
+    ImportProject(PathBuf),
     ImportLibrary(PathBuf),
     DemoLibrary,
     /// A backup's folder.
@@ -82,8 +82,8 @@ impl Session {
         match pending {
             Pending::RemoveSample { kit, sample } => self.kit_remove_now(kit, sample),
             Pending::RemoveSynth(key) => self.remove_synth(&key),
-            Pending::LoadSong(path) => self.load_song_file(&path),
-            Pending::ImportSong(path) => self.import_song_now(&path),
+            Pending::LoadProject(path) => self.load_project_file(&path),
+            Pending::ImportProject(path) => self.import_project_now(&path),
             Pending::ImportLibrary(path) => self.import_library_now(&path),
             Pending::DemoLibrary => self.load_demo_library_now(),
             Pending::RestoreUserData(path) => self.restore_user_data_now(&path),
@@ -120,7 +120,7 @@ impl Session {
                 ("Remove the sample?", what, "remove")
             }
             Pending::RemoveSynth(key) => ("Delete the preset?", format!("\"{key}\". {NO_UNDO}"), "delete"),
-            Pending::LoadSong(path) | Pending::ImportSong(path) | Pending::ImportLibrary(path) => {
+            Pending::LoadProject(path) | Pending::ImportProject(path) | Pending::ImportLibrary(path) => {
                 let name = path.file_name().unwrap_or(path.as_os_str()).to_string_lossy();
                 ("Replace the library?", format!("{name} takes the place of every pattern and arrangement."), "replace")
             }

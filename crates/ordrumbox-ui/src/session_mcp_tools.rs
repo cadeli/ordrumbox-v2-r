@@ -16,7 +16,7 @@ use ordrumbox_engine::{Mode, ReturnSettings};
 use std::path::Path;
 
 impl Session {
-    /// Files: the exports, MIDI import and the songs saved. `Ok(None)` when `name` is not one of them.
+    /// Files: the exports, MIDI import and the projects saved. `Ok(None)` when `name` is not one of them.
     pub(super) fn mcp_files_tool(&mut self, name: &str, args: &Value) -> Result<Option<Value>, String> {
         match name {
             "savePatternToJson" => {
@@ -53,20 +53,21 @@ impl Session {
                 exported(&path, self.write_stems(Mode::Song(s), &path)?)
             }
             "importMidi" => self.mcp_import_midi(args),
-            "saveSong" => {
-                let dir = self.saving.songs_dir.as_ref().ok_or("no user data folder to save to")?;
-                let path = dir.join(self.song_file_name());
-                self.mcp_write_song(&path, "savedAt")
+            "saveProject" => {
+                let dir = self.saving.projects_dir.as_ref().ok_or("no user data folder to save to")?;
+                let path = dir.join(self.project_file_name());
+                self.mcp_write_project(&path, "savedAt")
             }
-            "exportSong" => {
-                let path = store::exports_dir().ok_or("no user data folder to export to")?.join(self.song_file_name());
-                self.mcp_write_song(&path, "exportedAt")
+            "exportProject" => {
+                let path =
+                    store::exports_dir().ok_or("no user data folder to export to")?.join(self.project_file_name());
+                self.mcp_write_project(&path, "exportedAt")
             }
-            "listSavedSongs" => {
-                let names = self.mcp_saved_songs()?.into_iter().map(|(name, _)| Value::from(name)).collect();
-                Ok(object([("songs", Value::Array(names))]))
+            "listSavedProjects" => {
+                let names = self.mcp_saved_projects()?.into_iter().map(|(name, _)| Value::from(name)).collect();
+                Ok(object([("projects", Value::Array(names))]))
             }
-            "loadSong" => self.mcp_load_song(args),
+            "openProject" => self.mcp_load_project(args),
             _ => return Ok(None),
         }
         .map(Some)
@@ -97,7 +98,7 @@ impl Session {
                 self.select_song(s);
                 Ok(song_json(self.editor.library(), s))
             }
-            "setSongInfo" => self.mcp_set_song_info(args),
+            "setProjectInfo" => self.mcp_set_project_info(args),
             _ => return Ok(None),
         }
         .map(Some)

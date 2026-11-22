@@ -76,7 +76,7 @@ impl Session {
     pub(super) fn song_menu_pick(&mut self, value: &str) {
         // A path may hold a `:` (`C:\…`): not split.
         if let Some(path) = value.strip_prefix("load:") {
-            return self.ask(Pending::LoadSong(PathBuf::from(path)));
+            return self.ask(Pending::LoadProject(PathBuf::from(path)));
         }
         let mut parts = value.splitn(3, ':');
         let (action, a, b) = (parts.next().unwrap_or_default(), parts.next().unwrap_or_default(), parts.next());

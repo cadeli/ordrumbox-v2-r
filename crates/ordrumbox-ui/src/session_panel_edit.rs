@@ -487,7 +487,7 @@ impl Session {
             }
             Id::GeneratePattern => self.run(Command::GeneratePattern),
             Id::AutoAll => self.run(Command::AutoAll),
-            Id::SongName | Id::SongDescription | Id::PatternDescription => self.text_entry(id),
+            Id::ProjectName | Id::ProjectDescription | Id::PatternDescription => self.text_entry(id),
             Id::KitText(key) => self.kit_text_entry(key),
             Id::KitAutoInstrument(sample) => self.kit_auto_instrument(sample),
             Id::KitToggle(field) => {

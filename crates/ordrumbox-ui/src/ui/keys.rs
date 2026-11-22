@@ -37,7 +37,7 @@ pub(super) fn shortcut(code: Key, shift: bool, control: bool) -> Option<Command>
             Key::Letter('V') => C::Paste,
             Key::Letter('S') if shift => C::ExportPatternJson,
             Key::Letter('S') => C::Save,
-            Key::Letter('O') => C::LoadSong,
+            Key::Letter('O') => C::LoadProject,
             Key::Letter('E') if shift => C::ExportSongWav,
             Key::Letter('E') => C::ExportWav,
             // Cmd+M is the Mac's "minimize the window": the export takes Shift there.

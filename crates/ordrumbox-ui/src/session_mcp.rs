@@ -388,7 +388,7 @@ impl Session {
         }
     }
 
-    pub(super) fn mcp_set_song_info(&mut self, args: &Value) -> Result<Value, String> {
+    pub(super) fn mcp_set_project_info(&mut self, args: &Value) -> Result<Value, String> {
         let name = optional_text(args, "name")?.map(str::trim);
         let description = optional_text(args, "description")?.map(str::trim);
         if name.is_some_and(str::is_empty) {
@@ -403,34 +403,34 @@ impl Session {
         if let Some(description) = description {
             self.editor.set_library_info("description", description);
         }
-        Ok(object([("name", Value::from(self.song_name())), ("description", Value::from(self.info("description")))]))
+        Ok(object([("name", Value::from(self.project_name())), ("description", Value::from(self.info("description")))]))
     }
 
-    /// The song written to `path`, stamped `stamp`.
-    pub(super) fn mcp_write_song(&mut self, path: &Path, stamp: &str) -> Result<Value, String> {
-        store::save_song(path, &self.song_record(stamp)).map_err(|e| format!("{}: {e}", path.display()))?;
-        self.message = format!("Song \"{}\" written to {}", self.song_name(), path.display());
+    /// The project written to `path`, stamped `stamp`.
+    pub(super) fn mcp_write_project(&mut self, path: &Path, stamp: &str) -> Result<Value, String> {
+        store::save_project(path, &self.project_record(stamp)).map_err(|e| format!("{}: {e}", path.display()))?;
+        self.message = format!("Project \"{}\" written to {}", self.project_name(), path.display());
         exported(path, self.message.clone())
     }
 
-    /// The songs of the songs folder: name and file.
-    pub(super) fn mcp_saved_songs(&self) -> Result<Vec<(String, PathBuf)>, String> {
-        let dir = self.saving.songs_dir.as_ref().ok_or("no user data folder: no saved songs")?;
-        let files = store::list_songs(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    /// The projects of the songs folder: name and file.
+    pub(super) fn mcp_saved_projects(&self) -> Result<Vec<(String, PathBuf)>, String> {
+        let dir = self.saving.projects_dir.as_ref().ok_or("no user data folder: no saved projects")?;
+        let files = store::list_projects(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         Ok(files.into_iter().map(|f| (f.file_stem().unwrap_or_default().to_string_lossy().into_owned(), f)).collect())
     }
 
-    pub(super) fn mcp_load_song(&mut self, args: &Value) -> Result<Value, String> {
+    pub(super) fn mcp_load_project(&mut self, args: &Value) -> Result<Value, String> {
         let path = match (optional_text(args, "name")?, optional_text(args, "filePath")?) {
             (Some(name), None) => {
-                let songs = self.mcp_saved_songs()?;
-                let found = songs.into_iter().find(|(saved, _)| same_name(saved, name)).map(|(_, path)| path);
-                found.ok_or_else(|| format!("No saved song \"{}\" (listSavedSongs gives them)", name.trim()))?
+                let projects = self.mcp_saved_projects()?;
+                let found = projects.into_iter().find(|(saved, _)| same_name(saved, name)).map(|(_, path)| path);
+                found.ok_or_else(|| format!("No saved project \"{}\" (listSavedProjects gives them)", name.trim()))?
             }
             (None, Some(path)) => PathBuf::from(path.trim()),
             _ => return Err("Give name or filePath".into()),
         };
-        let name = self.read_song_file(&path)?;
+        let name = self.read_project_file(&path)?;
         let library = self.editor.library();
         Ok(object([
             ("name", Value::from(name)),

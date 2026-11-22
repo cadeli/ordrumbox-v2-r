@@ -150,8 +150,8 @@ impl Session {
             Export::SongStems => self.export_stems(true, path),
             Export::PatternMidi => self.export_midi(path),
             Export::PatternJson => self.export_pattern_json(path),
-            Export::Song => self.export_song(path),
-            Export::SongSaveAs => self.save_song_as(path),
+            Export::Project => self.export_project(path),
+            Export::ProjectSaveAs => self.save_project_as(path),
             Export::Synths => self.export_synths(path),
             Export::KitMapping => self.kit_export(path),
             Export::KitFolder => self.message = self.kits.export_folder(self.kit_index, path).unwrap_or_else(|e| e),
@@ -171,7 +171,7 @@ impl Session {
     pub(super) fn picked(&mut self, purpose: Purpose, path: PathBuf) {
         match purpose {
             Purpose::ImportMidi => self.import_midi(&path),
-            Purpose::ImportSong => self.import_song(&path),
+            Purpose::ImportProject => self.import_project(&path),
             Purpose::ImportSynth => self.import_synths(&path),
             Purpose::ReplaceTrackSample => self.replace_track_sample(&path),
             Purpose::ReplaceSample => self.drop_path(&path, true),
@@ -192,7 +192,7 @@ impl Session {
         } else {
             match ext.as_str() {
                 "mid" | "midi" => return self.import_midi(path),
-                "odbox" => return self.import_song(path),
+                "odbox" => return self.import_project(path),
                 "json" => self.kits.load_mapping(path).map(|(kit, message)| (kit, 0, message)),
                 "wav" => match self.kit_editor.sample {
                     Some(sample) if shift => self
@@ -204,7 +204,7 @@ impl Session {
                         .add_sample(self.kit_index, path)
                         .map(|(sample, message)| (self.kit_index, sample, message)),
                 },
-                _ => Err(format!("{}: not a MIDI, WAV, song or kit file", path.display())),
+                _ => Err(format!("{}: not a MIDI, WAV, project or kit file", path.display())),
             }
         };
         match result {
@@ -331,7 +331,7 @@ impl Session {
             Export::SongStems => format!("ordrumbox-song-{}-stems", store::safe_name(&library.songs.get(s)?.id)),
             Export::PatternMidi => format!("ordrumbox-{}.mid", store::safe_name(&pattern?.id)),
             Export::PatternJson => pattern_json_file_name(pattern?),
-            Export::Song | Export::SongSaveAs => self.song_file_name(),
+            Export::Project | Export::ProjectSaveAs => self.project_file_name(),
             Export::Synths => SYNTHS_FILE_NAME.to_owned(),
             Export::KitMapping => self.kits.mapping_file_name(self.kit_index)?,
             Export::KitFolder => self.kits.folder_name(self.kit_index)?,

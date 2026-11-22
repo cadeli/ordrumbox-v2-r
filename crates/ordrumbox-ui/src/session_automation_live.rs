@@ -1,7 +1,9 @@
 //! The song's automation and the mixer while the song plays, as a DAW has
 //! them. The mixer shows what the lanes set (a fader moves with its lane).
 //! A control of the mixer moved over a lane takes it back: the lane is no
-//! longer played for that instrument, until Play > Re-enable automation.
+//! longer played for that instrument, until Play > Re-enable automation
+//! (every lane) or its lane's badge or menu (that lane alone); the lane and
+//! the control show it in [`theme::TAKEN_BACK`](crate::theme::TAKEN_BACK).
 //! With Play > Record automation on, moving the control writes its lane
 //! instead (made if there is none): a fader or a knob (volume, pan,
 //! cutoff, Q) as long as it is held, from
@@ -9,10 +11,16 @@
 //! the lane's next point. A gesture is one undo step.
 
 use super::Session;
+use crate::panel::{Id, Item, Kind, Rect};
+use crate::scale::Scale;
+use crate::theme::TAKEN_BACK;
 use ordrumbox_core::automation::{
     AutomationKind, AutomationStroke, AutomationTarget, is_on, lanes_value_at_position, switch_value,
 };
 use ordrumbox_core::steps::TICK;
+
+/// The side of the mark over a control taken back from its lane, in scale units.
+const TAKEN_BACK_MARK: i32 = 4;
 
 /// What a control of the mixer moved while the song plays did to its lane.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -105,6 +113,62 @@ impl Session {
         if live.song == self.editor.selected_song() { &live.overridden } else { &[] }
     }
 
+    /// Whether the lane of `name`'s `target` is taken back in the selected song.
+    pub(super) fn is_taken_back(&self, name: &str, target: AutomationTarget) -> bool {
+        self.overridden_lanes().iter().any(|(n, tg)| n == name && *tg == target)
+    }
+
+    /// Whether `target` of track `t` is taken back from its lane: its control
+    /// is marked so.
+    pub(super) fn is_track_taken_back(&self, t: usize, target: AutomationTarget) -> bool {
+        self.track(t).is_some_and(|track| self.is_taken_back(&track.name, target))
+    }
+
+    /// Mute and solo of each track of the pattern shown, whether taken back
+    /// from their lanes; empty when no lane is.
+    pub(super) fn switches_taken_back(&self) -> Vec<(bool, bool)> {
+        if self.overridden_lanes().is_empty() {
+            return Vec::new();
+        }
+        let count = self.pattern().map_or(0, |pattern| pattern.tracks.len());
+        let taken = |t, target| self.is_track_taken_back(t, target);
+        (0..count).map(|t| (taken(t, AutomationTarget::Mute), taken(t, AutomationTarget::Solo))).collect()
+    }
+
+    /// For each lane of the selected song, whether it is taken back.
+    pub(super) fn taken_back_lanes(&self) -> Vec<bool> {
+        let lanes = self.song().map_or(&[][..], |song| song.automations.as_slice());
+        lanes.iter().map(|lane| self.is_taken_back(lane.instrument(), lane.target())).collect()
+    }
+
+    /// A mark over each control of `items` taken back from its lane: the
+    /// mixer's knobs, faders and M S, the grid's volume sliders, and the
+    /// track editor's settings of its track.
+    pub(super) fn mark_taken_back(&self, items: &mut Vec<Item>, scale: Scale) {
+        if self.overridden_lanes().is_empty() {
+            return;
+        }
+        let edited = self.editor_track();
+        let size = TAKEN_BACK_MARK * scale;
+        let marks: Vec<Item> = items
+            .iter()
+            .filter_map(|item| {
+                let (t, key) = match item.id? {
+                    Id::MixerKnob(t, key) | Id::MixerToggle(t, key) => (t, key),
+                    Id::TrackVolume(t) => (t, "volume"),
+                    Id::KnobBar(key) | Id::Fx(key) | Id::Loop(key) | Id::Generation(key) => (edited?, key),
+                    _ => return None,
+                };
+                let target = AutomationTarget::from_track_key(key)?;
+                self.is_track_taken_back(t, target).then(|| {
+                    let r = item.rect;
+                    Item::new(None, Rect::new(r.x + r.w - size, r.y, size, size), Kind::Mark { color: TAKEN_BACK })
+                })
+            })
+            .collect();
+        items.extend(marks);
+    }
+
     /// The live state made the selected song's: the lanes taken back from
     /// another song are forgotten, not kept for when it is selected again.
     fn follow_selected_song(&mut self) {
@@ -120,7 +184,7 @@ impl Session {
     pub(super) fn automated_now(&self, t: usize, target: AutomationTarget) -> Option<f64> {
         let position = self.playing_position()?;
         let name = &self.track(t)?.name;
-        if self.overridden_lanes().iter().any(|(n, tg)| n == name && *tg == target) {
+        if self.is_taken_back(name, target) {
             return None;
         }
         let lanes = &self.song()?.automations;
@@ -191,7 +255,7 @@ impl Session {
         let Some(name) = self.track(t).map(|track| track.name.clone()) else { return MixerMove::Untouched };
         let lane = self.song().and_then(|song| song.automations.iter().position(|l| l.is_for(&name, target)));
         if !self.automation_live.is_recording {
-            if lane.is_none() || self.overridden_lanes().iter().any(|(n, tg)| *n == name && *tg == target) {
+            if lane.is_none() || self.is_taken_back(&name, target) {
                 return MixerMove::Untouched;
             }
             self.take_back(name, target);
@@ -224,7 +288,23 @@ impl Session {
     /// What the mixer says once a control took its lane back.
     pub(super) fn say_taken_back(&mut self, t: usize, target: AutomationTarget) {
         let name = self.track_name(t);
-        self.message = format!("{name} {} taken back from its lane: Play > Re-enable automation", target.label());
+        self.message =
+            format!("{name} {} taken back from its lane: its badge, or Play > Re-enable automation", target.label());
+    }
+
+    /// Lane `lane` of the selected song plays again, if it was taken back.
+    pub(super) fn reenable_lane(&mut self, lane: usize) {
+        let Some(lane) = self.song().and_then(|song| song.automations.get(lane)) else { return };
+        let (name, target) = (lane.instrument().to_owned(), lane.target());
+        self.follow_selected_song();
+        let overridden = &mut self.automation_live.overridden;
+        let count = overridden.len();
+        overridden.retain(|(n, tg)| !(*n == name && *tg == target));
+        self.message = if overridden.len() < count {
+            format!("{name} {} plays its lane again", target.label())
+        } else {
+            format!("{name} {} was not taken back", target.label())
+        };
     }
 
     /// Play > Re-enable automation: every lane taken back plays again.

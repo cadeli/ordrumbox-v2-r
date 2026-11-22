@@ -103,7 +103,7 @@ const SHORTCUTS: &[&str] = &[
     "FILE AND EDIT",
     "  Ctrl+S                 save the library now (it is also saved on its own)",
     "  Ctrl+Shift+S           export the pattern as JSON",
-    "  Ctrl+O, Ctrl+Q         load a song, quit (Ctrl+W too)       F11  full screen",
+    "  Ctrl+O, Ctrl+Q         open a project, quit (Ctrl+W too)       F11  full screen",
     "  Ctrl+E, Ctrl+Shift+M   export WAV (Shift: the song), export MIDI",
     "  Ctrl+Z, Ctrl+Shift+Z   undo, redo (also Ctrl+Y)",
     "  (Edit menu)            Quantize: the zone, track or pattern onto a grid, fully or by a strength",

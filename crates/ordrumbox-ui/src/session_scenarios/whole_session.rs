@@ -128,7 +128,7 @@ fn a_session_through_the_menus_draws_every_step() {
     s.overlay_key(OverlayKey::Enter);
     assert_eq!(s.kit_list(), Some((0, KIT_KEYS.len() - 1)));
     s.drop_path(Path::new("notes.txt"), false);
-    assert_eq!(s.message, "notes.txt: not a MIDI, WAV, song or kit file");
+    assert_eq!(s.message, "notes.txt: not a MIDI, WAV, project or kit file");
     s.run(Command::KitEditor);
     assert!(!s.kit_editor_open());
 

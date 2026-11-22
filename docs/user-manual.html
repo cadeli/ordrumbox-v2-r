@@ -132,7 +132,7 @@ noted in <code>location.json</code> in the default folder. <strong>Help › Abou
 <tr><td><code>kits.json</code></td><td>The kits and their sample settings, as edited in the kit editor.</td></tr>
 <tr><td><code>samples/</code></td><td>Audio of added, replaced, imported or normalized samples.</td></tr>
 <tr><td><code>settings.json</code></td><td>The master bus and the shared returns, the colour scheme, the zoom, the sound output, the MIDI ports, clock and controls, the update check, and where you left off (<code>resume</code>, below).</td></tr>
-<tr><td><code>songs/</code></td><td>Songs saved with <strong>File › Save song</strong> (<code>.odbox</code>).</td></tr>
+<tr><td><code>songs/</code></td><td>Projects saved with <strong>File › Save project</strong> (<code>.odbox</code>). The folder keeps the name it had when they were called songs.</td></tr>
 <tr><td><code>exports/</code></td><td>The first folder offered to exports.</td></tr>
 <tr><td><code>backups/</code></td><td>Files moved aside by a factory reset or a restore.</td></tr>
 <tr><td><code>mcp.json</code></td><td>The port and token of the AI client link.</td></tr>
@@ -195,7 +195,7 @@ nothing else takes it. The zoom is saved in <code>settings.json</code>.</p>
 <p>A deep ground with neon accents, each one meaning one thing: pink for the app itself (the logo,
 panel titles, the selection); cyan for the keyboard focus; lime for what sounds (play, what is on, the
 playhead); yellow for what is chosen (the active tab and view, a solo, loop marks); violet for what
-varies by itself; orange for retriggers and euclidean hits; red for problems and mutes. Labels are
+varies by itself; orange for retriggers and euclidean hits, and for a control taken back from its automation lane; red for problems and mutes. Labels are
 grey and values plain white, with their knobs and sliders: a colour marks a state, never a number.
 Each track has its own softer colour (sky, peach, mint, lavender, gold, orchid, then round again),
 used for its stripe in the grid, its velocity bars, its notes in the piano roll and its clips in the
@@ -247,11 +247,13 @@ use <kbd>←</kbd> <kbd>→</kbd> between menus, <kbd>↑</kbd> <kbd>↓</kbd> b
 <table>
 <tr><th>Command</th><th>Shortcut</th><th>What it does</th></tr>
 <tr><td>Save</td><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Save the library now (it is also saved on its own after each edit).</td></tr>
-<tr><td>Save song</td><td></td><td>Write the song (patterns, arrangements, selection) to <code>songs/&lt;name&gt;.odbox</code> in the user data folder.</td></tr>
-<tr><td>Save song as...</td><td></td><td>Write the song file to a folder you pick.</td></tr>
-<tr><td>Load song...</td><td><kbd>Ctrl</kbd>+<kbd>O</kbd></td><td>List the songs in <code>songs/</code> and load one (replaces the library; confirmed).</td></tr>
-<tr><td>Export song...</td><td></td><td>Write the <code>.odbox</code> song file to a folder you pick.</td></tr>
-<tr><td>Import song...</td><td></td><td>Read a <code>.odbox</code> file (replaces the library; confirmed).</td></tr>
+<tr><td>Open project...</td><td><kbd>Ctrl</kbd>+<kbd>O</kbd></td><td>List the projects in <code>songs/</code> and open one (replaces the library; confirmed).</td></tr>
+<tr><td>Save project</td><td></td><td>Write the project (patterns, arrangements, selection) to <code>songs/&lt;name&gt;.odbox</code> in the user data folder.</td></tr>
+<tr><td>Save project as...</td><td></td><td>Write the project file to a folder you pick.</td></tr>
+<tr><td>Export project...</td><td></td><td>Write the <code>.odbox</code> project file to a folder you pick.</td></tr>
+<tr><td>Import project...</td><td></td><td>Read a <code>.odbox</code> file (replaces the library; confirmed).</td></tr>
+<tr><td>Rename project...</td><td></td><td>Edit the project's name (the name of its file).</td></tr>
+<tr><td>Project description...</td><td></td><td>Edit the project's description.</td></tr>
 <tr><td>Export library...</td><td></td><td>Write the whole library, synth presets included, to <code>ordrumbox-library.json</code> in a folder you pick.</td></tr>
 <tr><td>Import library...</td><td></td><td>Read such a file in place of the library (one undo step; confirmed). Its synth presets replace those of the same name.</td></tr>
 <tr><td>Load the demo library...</td><td></td><td>The assets' demo library in place of yours (one undo step; confirmed).</td></tr>
@@ -369,8 +371,6 @@ use <kbd>←</kbd> <kbd>→</kbd> between menus, <kbd>↑</kbd> <kbd>↓</kbd> b
 <tr><td>New arrangement...</td><td></td><td>Add an arrangement.</td></tr>
 <tr><td>Remove arrangement</td><td></td><td>Remove the selected arrangement.</td></tr>
 <tr><td>Previous / Next arrangement</td><td><kbd>Shift</kbd>+<kbd>[</kbd> <kbd>Shift</kbd>+<kbd>]</kbd></td><td>Select another arrangement.</td></tr>
-<tr><td>Rename song...</td><td></td><td>Edit the song's name.</td></tr>
-<tr><td>Song description...</td><td></td><td>Edit the song's description.</td></tr>
 </table>
 
 <h3>Kit</h3>
@@ -733,12 +733,12 @@ The note editor stays under it.</p>
 
 <!-- ───────────────────────────────────────────────────────────── -->
 <h2 id="song">11. Song panel</h2>
-<p><kbd>F3</kbd>. A song is the library: its patterns and one or more <strong>arrangements</strong>.
-An arrangement places patterns as <strong>clips</strong> on a timeline of measures. The song panel is the app's
-only: the plugin plays patterns.</p>
+<p><kbd>F3</kbd>. A <strong>project</strong> is the library: its patterns and one or more <strong>arrangements</strong>,
+saved under a name as an <code>.odbox</code> file. An arrangement is a song: it places patterns as <strong>clips</strong>
+on a timeline of measures. The song panel is the app's only: the plugin plays patterns.</p>
 <figure>
   <img src="images/song-panel.png" alt="The song panel: arrangement grid, pattern list, description and song buttons">
-  <figcaption>The song panel: the arrangement on top (one row per pattern, one bar per clip), the pattern list, the selected pattern's description, the song's information and buttons.</figcaption>
+  <figcaption>The song panel: the arrangement on top (one row per pattern, one bar per clip), the pattern list, the selected pattern's description, the project's information and buttons.</figcaption>
 </figure>
 
 <h3>Layout</h3>
@@ -748,8 +748,8 @@ only: the plugin plays patterns.</p>
       Under the rows, the <strong>automation lanes</strong> and the <strong>+ NEW AUTOMATION</strong> button
       (<a href="#automation">see Automation lanes</a>).</li>
   <li><strong>Pattern list</strong> (bottom left): the library's patterns, and the selected pattern's description (click to edit).</li>
-  <li><strong>Song info</strong> (bottom right): the song's name and description (click to edit), its date, the arrangement list,
-      and the buttons <strong>Save</strong>, <strong>Save as</strong>, <strong>Load</strong>, <strong>Export</strong>, <strong>Import</strong>,
+  <li><strong>Project info</strong> (bottom right): the project's name and description (click to edit), its date, the arrangement list,
+      and the buttons <strong>Save</strong>, <strong>Save as</strong>, <strong>Open</strong>, <strong>Export</strong>, <strong>Import</strong>,
       <strong>New</strong>, <strong>Delete</strong>.</li>
 </ul>
 <p>The song panel is a view, not a mode: what <kbd>Space</kbd> plays is set by the header's <strong>PATTERN</strong> /
@@ -759,9 +759,9 @@ only: the plugin plays patterns.</p>
 <table>
 <tr><th>Button</th><th>What it does</th></tr>
 <tr><td>Save</td><td>Write <code>songs/&lt;name&gt;.odbox</code> in the user data folder.</td></tr>
-<tr><td>Save as</td><td>Write the song file to a folder you pick.</td></tr>
-<tr><td>Load</td><td>List the saved songs and load one (replaces the library; confirmed).</td></tr>
-<tr><td>Export</td><td>Write the song file to a folder you pick.</td></tr>
+<tr><td>Save as</td><td>Write the project file to a folder you pick.</td></tr>
+<tr><td>Open</td><td>List the saved projects and open one (replaces the library; confirmed).</td></tr>
+<tr><td>Export</td><td>Write the project file to a folder you pick.</td></tr>
 <tr><td>Import</td><td>Read a <code>.odbox</code> file (replaces the library; confirmed).</td></tr>
 <tr><td>New</td><td>Add an arrangement.</td></tr>
 <tr><td>Delete</td><td>Remove the selected arrangement.</td></tr>
@@ -793,7 +793,7 @@ zoom handles.</p>
 <tr><td>A clip</td><td><strong>Next</strong> (the same clip right after it), <strong>Delete</strong></td></tr>
 <tr><td>An empty cell</td><td><strong>Add here</strong> (the row's pattern at that measure)</td></tr>
 <tr><td>The ruler (right-click)</td><td><strong>Turn the loop on / off</strong>, <strong>Remove the loop</strong></td></tr>
-<tr><td>An automation lane's name (left or right click)</td><td><strong>Taller</strong>, <strong>Shorter</strong>, <strong>Clear all points</strong>, <strong>Delete lane</strong>, <strong>Delete all lanes</strong></td></tr>
+<tr><td>An automation lane's name (left or right click)</td><td><strong>Re-enable lane</strong> (when taken back), <strong>Taller</strong>, <strong>Shorter</strong>, <strong>Clear all points</strong>, <strong>Delete lane</strong>, <strong>Delete all lanes</strong></td></tr>
 </table>
 
 <h3>Keys</h3>
@@ -861,7 +861,11 @@ a send knob with its lane, <strong>M</strong> and <strong>S</strong> light with 
 and M S boxes, and the track editor's knobs that have a lane (Volume, Pan, Cutoff, Q, the effects' amounts).</p>
 <ul>
   <li><strong>Take a control back</strong>: moving a control that has a lane stops the lane for that instrument; the control
-      keeps the value you gave it until <strong>Play › Re-enable automation</strong>.</li>
+      keeps the value you gave it. The control then has an orange mark in its corner (in the mixer, the grid and the track
+      editor), and the lane is drawn dim, with an orange <strong>OFF</strong> badge beside its name; its tooltip ends with
+      <em>taken back: not played</em>.</li>
+  <li><strong>Re-enable</strong>: a click on a lane's <strong>OFF</strong> badge, or <strong>Re-enable lane</strong> in its menu,
+      plays that lane again; <strong>Play › Re-enable automation</strong> plays every lane taken back again.</li>
   <li><strong>Record</strong>: with <strong>REC</strong> (beside PLAY in song mode) or <strong>Play › Record automation</strong>
       on, moving a mixer control while the song plays writes its lane instead (the lane is made if there is none; the track
       itself is left as it is). A fader or a knob writes its level on every step under the playhead for as long as you hold
@@ -1111,7 +1115,7 @@ chord lines hold through the section. These lines are saved but are not undo ste
 <tr><td>Pattern as MIDI</td><td><kbd>Ctrl</kbd>+<kbd>M</kbd> (macOS: <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd>)</td><td>Type 1, 96 PPQN; drums on channel 10 at their GM keys, melodic instruments on their own channels at the sample's root note.</td></tr>
 <tr><td>Pattern as WAV</td><td><kbd>Ctrl</kbd>+<kbd>E</kbd></td><td>16-bit, 44.1 kHz, the pattern once, no tail.</td></tr>
 <tr><td>Song as WAV</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>The whole selected arrangement.</td></tr>
-<tr><td>Song file</td><td>File › Save song / Save song as / Export song</td><td><code>.odbox</code></td></tr>
+<tr><td>Project file</td><td>File › Save project / Save project as / Export project</td><td><code>.odbox</code></td></tr>
 <tr><td>Library</td><td>File › Export library</td><td><code>ordrumbox-library.json</code>, synth presets included</td></tr>
 <tr><td>Kit mapping</td><td>File › Export kit mapping, or <kbd>E</kbd> in the kit editor</td><td><code>.json</code></td></tr>
 <tr><td>Kit with its samples</td><td>File › Export kit with its samples</td><td>A folder named after the kit: <code>kit.json</code> (each sample's path the name of its file there) and the WAV files</td></tr>
@@ -1125,7 +1129,7 @@ replaced only once confirmed; a folder export never writes into a folder already
 <table>
 <tr><th>Drop on the window / command</th><th>Result</th></tr>
 <tr><td><code>.mid</code> file, <strong>File › Import MIDI file...</strong>, or a <code>.mid</code> given on the command line</td><td>New 32-beat patterns (up to 16), one track per instrument found (by GM program, drum key, then track name; a second track of one instrument is numbered: <code>PERC 2</code>), in one undo step. The file's tempo is not read (the session's stays).</td></tr>
-<tr><td><code>.odbox</code> file, File › Import song</td><td>The song replaces the library (confirmed).</td></tr>
+<tr><td><code>.odbox</code> file, File › Import project</td><td>The project replaces the library (confirmed).</td></tr>
 <tr><td>File › Import library</td><td>A library file replaces the library (confirmed, one undo step); its synth presets replace those of the same name.</td></tr>
 <tr><td><code>.wav</code> file, File › Add sample</td><td>Joins the current kit (<kbd>Shift</kbd> while dropping: replaces the kit editor's selected sample).</td></tr>
 <tr><td>Folder, Kit › Import folder as kit</td><td>A folder with a <code>kit.json</code> (made by Export kit with its samples) is read back: its samples are copied to <code>samples/imported/&lt;kit&gt;/</code> and the kit replaces the kit of its name. A folder of WAV files without one becomes a new kit, each sample's instrument guessed from its name.</td></tr>
@@ -1304,7 +1308,7 @@ The link is the app's: the plugin does not offer it.</p>
 <p>In the client's settings (use the program's path; <code>ordrumbox.exe</code> on Windows):</p>
 <pre>{ "mcpServers": { "ordrumbox": { "command": "/path/to/ordrumbox", "args": ["--mcp"] } } }</pre>
 <p>The tools cover patterns (list, create, select, rename, duplicate, remove, notes, tracks, tempo, length, tags, description),
-arrangements and clips, song files, kits and samples, synth presets, the master bus, exports (WAV, MIDI, JSON), MIDI import,
+arrangements and clips, project files, kits and samples, synth presets, the master bus, exports (WAV, MIDI, JSON), MIDI import,
 play, stop, undo and redo, and the playback state. The client writes the notes itself; orDrumbox's automatic generation
 (generate, regenerate, auto mode, macros, random notes) is used only when you ask for it in words.</p>
 <p>New to this? The <a href="mcp-guide.html">beginner's guide to the AI link</a> walks through the setup and worked examples.</p>

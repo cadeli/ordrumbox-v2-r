@@ -240,8 +240,8 @@ pub enum Id {
     SongList,
     /// Save, load, export, import, new, delete.
     SongButton(&'static str),
-    SongName,
-    SongDescription,
+    ProjectName,
+    ProjectDescription,
     /// A pattern of the song panel's list (its rename entry).
     SongPattern(usize),
     /// The selected pattern's description entry.
@@ -371,6 +371,11 @@ pub enum Kind {
     /// A card: a raised block with a border that groups one editor (the
     /// track's, the note's) apart from its neighbour.
     Card,
+    /// A small square over a control's corner: a state of the control (taken
+    /// back from its automation lane), in `color`.
+    Mark {
+        color: Rgb,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -410,6 +415,7 @@ impl Item {
                     | Kind::Highlight
                     | Kind::Panel
                     | Kind::Card
+                    | Kind::Mark { .. }
             )
             && !matches!(self.id, Some(Id::Row(_)))
     }

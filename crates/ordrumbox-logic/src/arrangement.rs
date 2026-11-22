@@ -312,14 +312,14 @@ impl Editor {
         true
     }
 
-    /// Replace the whole library (`applyToAppState`: a song loaded or
+    /// Replace the whole library (`applyToAppState`: a project opened or
     /// imported), arrangement `selected_song` selected (clamped); one undo step.
     pub fn load_library(&mut self, library: Library, selected_song: usize) {
-        self.replace_library(library, selected_song, "Load song");
+        self.replace_library(library, selected_song, "Open project");
     }
 
     /// The same, the undo step described as `description`. A library
-    /// without synth presets of its own (a song file) keeps those there were.
+    /// without synth presets of its own (a project file) keeps those there were.
     pub fn replace_library(&mut self, mut library: Library, selected_song: usize, description: &str) {
         if library.synths.is_none() {
             library.synths.clone_from(&self.library.synths);

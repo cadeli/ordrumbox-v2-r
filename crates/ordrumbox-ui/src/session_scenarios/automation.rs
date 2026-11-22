@@ -89,6 +89,46 @@ fn a_control_moved_over_its_lane_takes_it_back_until_re_enabled() {
 }
 
 #[test]
+fn a_lane_taken_back_is_shown_and_re_enabled_on_its_own() {
+    use crate::panel::Kind;
+    use crate::session::session_song::tests::{find_hit, menu};
+    use crate::song_view::SongHit;
+    use crate::test_support::SIZE;
+    use crate::theme::TAKEN_BACK;
+    let (mut s, _audio) = playing_with_a_volume_lane();
+    let marks = |s: &Session| {
+        let items = s.panel_layout(SIZE.0, SIZE.1, SIZE.2).items;
+        items.iter().filter(|item| item.kind == Kind::Mark { color: TAKEN_BACK }).count()
+    };
+    s.run(Command::Mixer);
+    assert_eq!((marks(&s), s.taken_back_lanes()), (0, vec![false]), "nothing taken back");
+
+    s.set_value(Id::TrackVolume(0), 0.8);
+    // The fader marked, and the track editor's Volume knob beside it; in the
+    // grid, its slider and the knob; the lane too.
+    assert_eq!(marks(&s), 2);
+    s.run(Command::Grid);
+    assert_eq!(marks(&s), 2);
+    assert_eq!(s.taken_back_lanes(), [true]);
+    assert!(s.message.contains("its badge"), "{}", s.message);
+
+    // The lane's menu offers to re-enable it; its badge does.
+    s.run(Command::SongView);
+    let (x, y) = find_hit(&s, |hit| hit == SongHit::LaneName(0));
+    s.song_click(SIZE, x, y, crate::ui_input::Button::Right);
+    assert_eq!(menu(&s).first().map(String::as_str), Some("reenable:0"));
+    s.chrome.widgets.dropdown = None;
+    let (x, y) = find_hit(&s, |hit| hit == SongHit::LaneBadge(0));
+    s.song_click(SIZE, x, y, crate::ui_input::Button::Left);
+    assert_eq!(s.taken_back_lanes(), [false]);
+    assert_eq!(s.message, "KICK Volume plays its lane again");
+    assert!(!s.menu_state().has_overridden);
+    let (x, y) = find_hit(&s, |hit| hit == SongHit::LaneName(0));
+    s.song_click(SIZE, x, y, crate::ui_input::Button::Right);
+    assert_eq!(menu(&s).first().map(String::as_str), Some("taller:0"), "nothing to re-enable");
+}
+
+#[test]
 fn the_lanes_taken_back_are_forgotten_with_their_song() {
     let (mut s, mut audio) = playing_with_a_volume_lane();
     s.set_value(Id::TrackVolume(0), 0.8);

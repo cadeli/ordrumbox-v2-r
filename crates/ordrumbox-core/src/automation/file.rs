@@ -1,4 +1,4 @@
-//! Automation lanes in a song file: `{instrument, target, rows, points}`,
+//! Automation lanes in a library or project file: `{instrument, target, rows, points}`,
 //! each point `{step, value}`, a `null` value giving the control back to
 //! the pattern; `rows` (how tall it is drawn) only when more than one.
 

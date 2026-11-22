@@ -172,6 +172,8 @@ pub struct View<'a> {
     /// Mute and solo as shown, by track: while the song plays, what its
     /// automation lanes set; empty, or past its end, the tracks' own.
     pub switches: Vec<(bool, bool)>,
+    /// Mute and solo taken back from their lanes, by track: marked on their boxes.
+    pub switches_taken_back: Vec<(bool, bool)>,
     /// The tracks a plugin host moves off their settings, bit `t` for track `t`.
     pub host_moved: u64,
     /// The tracks a plugin host plays on an output of their own, bit `t` for track `t`.

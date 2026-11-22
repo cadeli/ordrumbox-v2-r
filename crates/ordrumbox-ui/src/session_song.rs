@@ -6,15 +6,15 @@
 //! arrangement (a click on the ruler aims the cursor, where play starts; a
 //! clip dragged sideways moves; a row dragged by its name moves up or down;
 //! a click on a clip, a row name or the bare grid opens its menu), the selected pattern's description (a click edits it, the
-//! wheel scrolls it), the song's column (name, date, description, the
-//! arrangement select, Save, Load, Export, Import, and New and Delete for
+//! wheel scrolls it), the project's column (name, date, description, the
+//! arrangement select, Save, Open, Export, Import, and New and Delete for
 //! arrangements) — and Space plays the song while the panel is shown.
 //!
-//! Songs are saved to `songs/` in the user data folder (the JS IndexedDB
+//! Projects are saved to `songs/` in the user data folder (the JS IndexedDB
 //! store) and, with Save as and Export, to a folder picked, as `.odbox` files.
 //!
 //! The mouse is in `session_song_mouse.rs`, the menus and the edits they
-//! lead to in `session_song_menu.rs`, song files in `session_song_files.rs`.
+//! lead to in `session_song_menu.rs`, project files in `session_project_files.rs`.
 
 use crate::scale::Scale;
 use ordrumbox_core::Song;
@@ -38,7 +38,7 @@ use ordrumbox_engine::Mode;
 const BUTTONS: [(&str, &str); 7] = [
     ("save", "Save"),
     ("saveas", "Save as"),
-    ("load", "Load"),
+    ("load", "Open"),
     ("export", "Export"),
     ("import", "Import"),
     ("new", "New"),
@@ -149,7 +149,7 @@ impl Session {
     }
 
     /// The library header's name, else "Untitled".
-    pub(super) fn song_name(&self) -> String {
+    pub(super) fn project_name(&self) -> String {
         let name = self.editor.library().info.get("name").and_then(Value::as_str).unwrap_or_default();
         if name.is_empty() { UNTITLED.to_owned() } else { name.to_owned() }
     }
@@ -257,12 +257,13 @@ impl Session {
             loop_region: self.song_loop_marks(),
             is_loop_on: self.song_loop_region().is_some(),
             zoom: self.song_panel.zoom,
+            taken_back: self.taken_back_lanes(),
         }
     }
 
     // ─── The column ──────────────────────────────────────────────────────────
 
-    /// The song's column: name, date, description, arrangement, buttons.
+    /// The project's column: name, date, description, arrangement, buttons.
     pub(super) fn song_items(&self, layout: &mut PanelLayout, width: i32, height: i32, scale: Scale) {
         let s = scale;
         let area = self.song_layout((width, height, scale)).column;
@@ -274,7 +275,7 @@ impl Session {
         let field = |y: i32| Rect::new(x + label_w, y, area.w - label_w, 12 * s);
         // The name (a click renames it), the date.
         for (label, id, text, color) in [
-            ("Song", Some(Id::SongName), self.song_name(), theme::text()),
+            ("Project", Some(Id::ProjectName), self.project_name(), theme::text()),
             ("Date", None, self.info("date"), panel::dim()),
         ] {
             layout.items.push(Item::text(x, y + 2 * s, label, panel::dim(), s));
@@ -289,7 +290,7 @@ impl Session {
             (description, theme::text())
         };
         let rect = Rect::new(x, y, area.w, 12 * s);
-        layout.items.push(Item::new(Some(Id::SongDescription), rect, Kind::Text { text, color }));
+        layout.items.push(Item::new(Some(Id::ProjectDescription), rect, Kind::Text { text, color }));
         y += line + 4 * s;
 
         let gap = 4 * s;
@@ -322,11 +323,11 @@ impl Session {
     /// A column button pressed.
     pub(super) fn song_button(&mut self, id: &str) {
         match id {
-            "save" => self.save_song(),
-            "load" => self.load_song_menu(),
-            "saveas" => self.open_export(Export::SongSaveAs),
-            "export" => self.open_export(Export::Song),
-            "import" => self.open_picker(Purpose::ImportSong),
+            "save" => self.save_project(),
+            "load" => self.load_project_menu(),
+            "saveas" => self.open_export(Export::ProjectSaveAs),
+            "export" => self.open_export(Export::Project),
+            "import" => self.open_picker(Purpose::ImportProject),
             "new" => {
                 self.show_entry(Id::SongButton("new"), None, "New arrangement name:".into(), String::new());
             }
@@ -344,8 +345,8 @@ impl Session {
     /// The text entry of `id` (a song, pattern or track name, a description).
     pub(super) fn text_entry(&mut self, id: Id) {
         let (title, text) = match id {
-            Id::SongName => ("Song name:", self.song_name()),
-            Id::SongDescription => ("Song description:", self.info("description")),
+            Id::ProjectName => ("Project name:", self.project_name()),
+            Id::ProjectDescription => ("Project description:", self.info("description")),
             Id::SongPattern(p) => {
                 let Some(pattern) = self.editor.library().patterns.get(p) else { return };
                 ("Pattern name:", pattern.name.clone().unwrap_or_else(|| format!("Pattern {p}")))
@@ -368,12 +369,12 @@ impl Session {
         let text = text.trim();
         match id {
             // `renameSong`: an empty name keeps the old one.
-            Id::SongName if !text.is_empty() => {
+            Id::ProjectName if !text.is_empty() => {
                 if self.editor.set_library_info("name", text) {
                     self.saving.library.touch();
                 }
             }
-            Id::SongDescription => {
+            Id::ProjectDescription => {
                 if self.editor.set_library_info("description", text) {
                     self.saving.library.touch();
                 }
@@ -527,12 +528,12 @@ pub(super) mod tests {
     #[test]
     fn names_descriptions_and_arrangements() {
         let mut s = session();
-        assert_eq!(s.song_name(), "lib");
-        s.commit_text(Id::SongName, "   ");
-        assert_eq!(s.song_name(), "lib");
-        s.commit_text(Id::SongName, "  My song ");
-        s.commit_text(Id::SongDescription, " about ");
-        assert_eq!((s.song_name().as_str(), s.info("description").as_str()), ("My song", "about"));
+        assert_eq!(s.project_name(), "lib");
+        s.commit_text(Id::ProjectName, "   ");
+        assert_eq!(s.project_name(), "lib");
+        s.commit_text(Id::ProjectName, "  My song ");
+        s.commit_text(Id::ProjectDescription, " about ");
+        assert_eq!((s.project_name().as_str(), s.info("description").as_str()), ("My song", "about"));
         // A click on the pattern's description edits the selected pattern's.
         let d = s.song_layout(SIZE).description;
         let inside = (d.x + d.w / 2, d.y + d.h / 2);
@@ -585,10 +586,10 @@ pub(super) mod tests {
             s.song_button_rect("load"),
             panel::find(&s.panel_layout(SIZE.0, SIZE.1, Scale::ONE).items, Id::SongButton("load")).unwrap().rect
         );
-        s.run(Command::RenameSong);
-        assert_eq!(s.chrome.widgets.entry.as_ref().map(|e| e.id), Some(Id::SongName));
+        s.run(Command::RenameProject);
+        assert_eq!(s.chrome.widgets.entry.as_ref().map(|e| e.id), Some(Id::ProjectName));
         type_entry(&mut s, "From the menu");
-        assert_eq!(s.song_name(), "From the menu");
+        assert_eq!(s.project_name(), "From the menu");
         s.run(Command::NewSong);
         type_entry(&mut s, "Third");
         s.run(Command::PreviousSong);

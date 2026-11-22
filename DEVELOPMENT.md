@@ -380,3 +380,16 @@ as well as rounded down. Painting a lane checks that the lane at its index is st
 pressed (`Editor::paint_automation`), and a control held while recording finds its lane by them each time, so an
 undo or an MCP edit during a drag no longer paints another lane. The lanes taken back are forgotten when another
 song is selected. The automation renders keep their snapshots: no snapshot changed.
+
+A song file (`.odbox`) is now called a project, in the UI, the code (`Library::project_record`, `ProjectRecord`,
+`session_project_files.rs`, `Command::SaveProject`…) and the MCP tools (`saveProject`, `openProject`,
+`exportProject`, `listSavedProjects`, `setProjectInfo`; `mcp.rs`, `RENAMED_TOOLS`, keeps the earlier names working).
+A song is an arrangement, as before (`Song`, `library.songs`). The file format and the `songs/` folder are unchanged.
+`listSavedProjects` lists them under `projects` (`songs` before). No snapshot changed.
+
+A control taken back from its automation lane is marked, and each lane can be re-enabled on its own
+(`session_automation_live.rs`): `mark_taken_back` puts a `Kind::Mark` (`theme::TAKEN_BACK`) over the mixer's, the
+grid's and the track editor's controls whose lane is taken back, the grid's M S boxes get a corner mark
+(`View::switches_taken_back`), and the song panel draws such a lane dim with an **OFF** badge
+(`SongView::taken_back`, `SongHit::LaneBadge`) whose click, or the lane menu's **Re-enable lane**, calls
+`reenable_lane`. The room for the badge is kept beside every lane's name, so a name stays put. No snapshot changed.

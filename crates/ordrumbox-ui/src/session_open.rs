@@ -139,7 +139,7 @@ impl Session {
             session.chrome.fold_editors();
         }
         session.assets_dir = Some(dir);
-        session.saving.songs_dir = store::songs_dir();
+        session.saving.projects_dir = store::projects_dir();
         session.generators.scales = assets.scales.clone();
         session.generators.styles = assets.styles.clone();
         session.generators.scale_list = assets.scale_list.clone();

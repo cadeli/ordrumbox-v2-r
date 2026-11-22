@@ -30,7 +30,7 @@ pub mod track;
 mod variation;
 
 pub use automation::{AutomationKind, AutomationLane, AutomationPoint, AutomationStroke, AutomationTarget};
-pub use library::{Library, LoadReport, SongRecord};
+pub use library::{Library, LoadReport, ProjectRecord};
 pub use note::Note;
 pub use pattern::Pattern;
 pub use pattern_engine::{Hit, Hits, expand_hits};

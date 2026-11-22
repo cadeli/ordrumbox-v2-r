@@ -91,9 +91,9 @@ fn arrangements_are_selected_and_removed() {
     assert!(call(&mut s, "selectArrangement", "{}").is_err());
     let selected = call(&mut s, "selectArrangement", r#"{"arrangement":"a"}"#).unwrap();
     assert_eq!((s.editor.selected_song(), get(&selected, &["name"]).as_str()), (0, Some("A")));
-    let info = call(&mut s, "setSongInfo", r#"{"name":" Live set ","description":"two parts"}"#).unwrap();
+    let info = call(&mut s, "setProjectInfo", r#"{"name":" Live set ","description":"two parts"}"#).unwrap();
     assert_eq!(info.to_json(), r#"{"name":"Live set","description":"two parts"}"#);
-    assert!(call(&mut s, "setSongInfo", r#"{"name":""}"#).is_err());
+    assert!(call(&mut s, "setProjectInfo", r#"{"name":""}"#).is_err());
     let removed = call(&mut s, "removeArrangement", r#"{"arrangement":"B"}"#).unwrap();
     assert_eq!(removed.to_json(), r#"{"removed":"B","arrangements":1}"#);
 }
@@ -238,10 +238,10 @@ fn songs_kits_and_playback_without_files_or_sound() {
     assert_eq!(call(&mut s, "getPlaybackState", "{}").unwrap().to_json(), r#"{"playing":false}"#);
     assert_eq!(call(&mut s, "auditionTrack", r#"{"patternName":"rock","trackName":"KICK"}"#), Err(NO_AUDIO.into()));
     // A session of the tests has no user data folder and no kit.
-    assert!(call(&mut s, "saveSong", "{}").is_err());
-    assert!(call(&mut s, "listSavedSongs", "{}").is_err());
-    assert!(call(&mut s, "loadSong", "{}").is_err());
-    assert!(call(&mut s, "loadSong", r#"{"filePath":"/no/such/song.odbox"}"#).is_err());
+    assert!(call(&mut s, "saveProject", "{}").is_err());
+    assert!(call(&mut s, "listSavedProjects", "{}").is_err());
+    assert!(call(&mut s, "openProject", "{}").is_err());
+    assert!(call(&mut s, "openProject", r#"{"filePath":"/no/such/song.odbox"}"#).is_err());
     assert!(call(&mut s, "normalizeKit", "{}").is_err());
     assert!(call(&mut s, "exportKitMapping", r#"{"kit":"808"}"#).is_err());
     assert!(call(&mut s, "importKitFolder", r#"{"folderPath":"/no/such/folder"}"#).is_err());
@@ -256,10 +256,10 @@ fn songs_kits_and_playback_without_files_or_sound() {
 fn a_song_file_is_loaded_by_path() {
     let mut s = session();
     let path = std::env::temp_dir().join(format!("ordrumbox_mcp_{}.odbox", std::process::id()));
-    store::save_song(&path, &s.song_record("savedAt")).unwrap();
+    store::save_project(&path, &s.project_record("savedAt")).unwrap();
     call(&mut s, "removePattern", r#"{"patternName":"jazz"}"#).unwrap();
     let args = object([("filePath", Value::from(path.display().to_string()))]);
-    let loaded = s.mcp_call("loadSong", &args).unwrap();
+    let loaded = s.mcp_call("openProject", &args).unwrap();
     std::fs::remove_file(&path).unwrap();
     assert_eq!(get(&loaded, &["patterns"]).as_f64(), Some(2.0));
     assert_eq!(s.editor.library().patterns.len(), 2);
@@ -394,21 +394,21 @@ fn playback_is_started_followed_and_stopped() {
 fn songs_are_saved_listed_and_loaded_by_name() {
     let dir = scratch_dir("songs");
     let mut s = session();
-    s.saving.songs_dir = Some(dir.clone());
-    call(&mut s, "setSongInfo", r#"{"name":"Live set"}"#).unwrap();
-    let saved = call(&mut s, "saveSong", "{}").unwrap();
+    s.saving.projects_dir = Some(dir.clone());
+    call(&mut s, "setProjectInfo", r#"{"name":"Live set"}"#).unwrap();
+    let saved = call(&mut s, "saveProject", "{}").unwrap();
     assert!(get(&saved, &["filePath"]).as_str().is_some_and(|p| p.starts_with(&*dir.to_string_lossy())));
-    let listed = call(&mut s, "listSavedSongs", "{}").unwrap();
-    let names = get(&listed, &["songs"]).as_array().unwrap();
+    let listed = call(&mut s, "listSavedProjects", "{}").unwrap();
+    let names = get(&listed, &["projects"]).as_array().unwrap();
     assert_eq!(names.len(), 1);
     let name = names[0].as_str().unwrap().to_owned();
 
     call(&mut s, "removePattern", r#"{"patternName":"jazz"}"#).unwrap();
     let args = object([("name", Value::from(name.to_uppercase()))]);
-    let loaded = s.mcp_call("loadSong", &args).unwrap();
+    let loaded = s.mcp_call("openProject", &args).unwrap();
     assert_eq!(get(&loaded, &["patterns"]).as_f64(), Some(2.0));
-    assert!(call(&mut s, "loadSong", r#"{"name":"none"}"#).is_err());
-    assert!(call(&mut s, "loadSong", r#"{"name":"a","filePath":"b"}"#).is_err());
+    assert!(call(&mut s, "openProject", r#"{"name":"none"}"#).is_err());
+    assert!(call(&mut s, "openProject", r#"{"name":"a","filePath":"b"}"#).is_err());
     std::fs::remove_dir_all(dir).unwrap();
 }
 
@@ -421,7 +421,7 @@ fn arguments_and_states_that_refuse_a_call() {
 
     // No pattern named: the one shown.
     assert_eq!(get(&call(&mut s, "selectPattern", "{}").unwrap(), &["name"]).as_str(), Some("rock"));
-    assert!(call(&mut s, "setSongInfo", "{}").is_err());
+    assert!(call(&mut s, "setProjectInfo", "{}").is_err());
     assert!(call(&mut s, "createSynthPreset", r#"{"preset":" "}"#).is_err());
     assert!(call(&mut s, "createSynthPreset", r#"{"preset":"a","settings":3}"#).is_err());
     assert!(call(&mut s, "assignSounds", r#"{"patternName":"rock","sounds":"pads"}"#).is_err());

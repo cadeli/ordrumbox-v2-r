@@ -430,17 +430,17 @@ fn every_song_field_survives_saving() {
 
 #[test]
 fn a_song_file_is_saved_as_it_was_read() {
-    // A `.odbox` song file: the library, what is selected, when it was saved.
+    // A `.odbox` project file: the library, what is selected, when it was saved.
     let library = saved_twice(&parse(
         r#"{"info":{"description":"d","date":"2026"},"songs":[{"id":"s","name":"S","clips":[{"patternId":"b"}]}],
             "patterns":[{"id":"a"},{"id":"b","tracks":[{"name":"KICK","notes":[{"beat":1,"velocity":0.5}]}]}]}"#,
     ));
-    let first = library.song_record("My song", 1, 0, ("savedAt", 1_761_000_000_000.0));
+    let first = library.project_record("My song", 1, 0, ("savedAt", 1_761_000_000_000.0));
     let text = first.to_json_pretty(2);
-    let read = Library::from_song_record(&parse(&text), &library.info).expect("a song file");
+    let read = Library::from_project_record(&parse(&text), &library.info).expect("a project file");
     assert!(read.report.issues.is_empty(), "{:#?}", read.report.issues);
     assert_eq!((read.name.as_deref(), read.selected_pattern, read.selected_song), (Some("My song"), 1, 0));
-    let second = read.library.song_record(
+    let second = read.library.project_record(
         "My song",
         read.selected_pattern,
         read.selected_song,

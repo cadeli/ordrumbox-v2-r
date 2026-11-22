@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- A song file is now a **project**: File > Open project (Ctrl O), Save project, Save project as,
+  Export project, Import project, Rename project and Project description, all in the File menu.
+  A song is an arrangement, as before. The files stay `.odbox` in `songs/`: nothing to convert.
+- A control taken back from its automation lane shows it (an orange mark), and its lane too (dim, with an
+  orange OFF badge); a click on the badge, or Re-enable lane in the lane's menu, plays that lane alone again.
+- MCP: `saveProject`, `openProject`, `exportProject`, `listSavedProjects` (its list under `projects`)
+  and `setProjectInfo`; the earlier `*Song*` names still work.
+
 ## 0.1.2
 
 ### New

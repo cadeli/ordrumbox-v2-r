@@ -104,6 +104,7 @@ impl Session {
             transport: self.transport_shown(),
             host_muted: self.host.muted,
             switches: self.shown_switches(),
+            switches_taken_back: self.switches_taken_back(),
             host_moved: self.host.mix.moved_tracks(),
             host_split: self.host.mix.split,
             track_drop: self.track_drop((canvas.width(), canvas.height(), scale)),
@@ -129,7 +130,7 @@ impl Session {
         let menus = self.menus();
         menu::draw(canvas, &menus, self.chrome.menu, scale);
         // In the bar, which the open menu's panel hangs under.
-        menu::draw_library(canvas, &menus, &self.song_name(), self.library_state(), scale);
+        menu::draw_library(canvas, &menus, &self.project_name(), self.library_state(), scale);
         if let Some(dropdown) = &self.chrome.widgets.dropdown {
             dropdown.draw(canvas, scale);
         }

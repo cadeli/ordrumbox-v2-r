@@ -138,6 +138,8 @@ mod session_panel_views;
 mod session_playback;
 #[path = "session_pointer.rs"]
 mod session_pointer;
+#[path = "session_project_files.rs"]
+mod session_project_files;
 #[path = "session_roll.rs"]
 mod session_roll;
 #[path = "session_saving.rs"]
@@ -151,8 +153,6 @@ mod session_selection;
 mod session_song;
 #[path = "session_song_automation.rs"]
 mod session_song_automation;
-#[path = "session_song_files.rs"]
-mod session_song_files;
 #[path = "session_song_loop.rs"]
 mod session_song_loop;
 #[path = "session_song_menu.rs"]

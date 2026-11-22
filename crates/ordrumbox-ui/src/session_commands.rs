@@ -92,12 +92,12 @@ impl Session {
             piano_roll: self.piano_roll_open(),
             synth: self.synth_open(),
             mixer: self.mixer_open(),
-            can_save_song: self.saving.songs_dir.is_some(),
-            saved_songs: self
+            can_save_project: self.saving.projects_dir.is_some(),
+            saved_projects: self
                 .saving
-                .songs_dir
+                .projects_dir
                 .as_ref()
-                .is_some_and(|d| store::list_songs(d).is_ok_and(|s| !s.is_empty())),
+                .is_some_and(|d| store::list_projects(d).is_ok_and(|s| !s.is_empty())),
             kit_sample: self.kit_list().is_some_and(|(s, n)| s < n),
             checking_updates: self.updates.checking(),
             newer_release: self.updates.newer_release().map(|r| r.version.clone()),
@@ -236,13 +236,13 @@ impl Session {
             C::Mixer => self.toggle_mixer(),
             C::NewSong => self.song_button("new"),
             C::RemoveSong => self.song_button("delete"),
-            C::RenameSong => self.text_entry(Id::SongName),
-            C::SongDescription => self.text_entry(Id::SongDescription),
-            C::SaveSong => self.song_button("save"),
-            C::SaveSongAs => self.song_button("saveas"),
-            C::LoadSong => self.song_button("load"),
-            C::ExportSong => self.song_button("export"),
-            C::ImportSong => self.song_button("import"),
+            C::RenameProject => self.text_entry(Id::ProjectName),
+            C::ProjectDescription => self.text_entry(Id::ProjectDescription),
+            C::SaveProject => self.song_button("save"),
+            C::SaveProjectAs => self.song_button("saveas"),
+            C::LoadProject => self.song_button("load"),
+            C::ExportProject => self.song_button("export"),
+            C::ImportProject => self.song_button("import"),
             C::NormalizeKit => self.kit_normalize(),
             C::ExportMapping => self.open_export(Export::KitMapping),
             C::ExportKitFolder => self.open_export(Export::KitFolder),
