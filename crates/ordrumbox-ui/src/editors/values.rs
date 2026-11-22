@@ -1,7 +1,7 @@
 //! What a track or a note holds, read for the editors: values, arpeggio, tooltips, ordering.
 
 use super::Choice;
-use super::tables::{ARP_DIRECTIONS, FxDef, LfoTarget, fx_of_type, lfo_key, track_select_options};
+use super::tables::{ARP_DIRECTIONS, FxDef, LfoTarget, SENDS, fx_of_type, lfo_key, track_select_options};
 use ordrumbox_core::arp::MAX_OCTAVES;
 use ordrumbox_core::json::Value;
 use ordrumbox_core::lfo::WAVE_TYPES;
@@ -53,6 +53,9 @@ pub(super) fn has_lfo(track: &Track, key: &str) -> bool {
 pub fn fx_on(track: &Track, fx: &FxDef) -> bool {
     if fx.is_filter() {
         return track.filter_type != "allpass";
+    }
+    if fx.is_sends() {
+        return SENDS.iter().any(|key| number(track, key) > 0.0);
     }
     number(track, fx.key) > 0.0 && fx.type_key().is_none_or(|key| text_of(track, key) != "none")
 }

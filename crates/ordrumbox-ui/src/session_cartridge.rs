@@ -89,6 +89,9 @@ pub(super) fn fx_switch(track: &Track, fx: &FxDef, state: &mut EditorState) -> V
             state.prev_filter_type = Some(track.filter_type.clone());
             return vec![(fx.key, Value::String("allpass".into()))];
         }
+        if fx.is_sends() {
+            return editors::SENDS.iter().map(|&key| (key, number(0.0))).collect();
+        }
         return vec![(fx.key, number(0.0))];
     }
     if let Some(key) = fx.type_key() {

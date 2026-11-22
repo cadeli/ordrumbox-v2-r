@@ -145,6 +145,8 @@ and pan; each return is a `Strip` with a `dry` level of 0 (a new strip setting, 
 before). The returns' settings are `settings.returns` (`ReturnSettings`), the echo's time in beats at the tempo of the
 pass playing. With every send at 0 the returns stay silent: no snapshot changed. The MIDI controls list has the echo's
 feedback after the master volume, then six controls a track (`session_scenarios/midi_sync.rs` moved its indices).
+The sends are a seventh effect strip, **Sends**, last in the FX tab, which is now the tallest tab:
+`TRACK_EDITOR_HEIGHT` went from 455 to 507, so the smallest window is 52 pixels taller (at scale 1).
 
 Choosing an effect's type (its screen's list or its ◂ ▸ arrows) switches the effect on, as it already did for
 the filter and an LFO's wave: a reverb or a delay without an amount goes on at its `on_value`, one without a

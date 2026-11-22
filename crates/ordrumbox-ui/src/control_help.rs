@@ -131,6 +131,7 @@ fn fx_help(fx: u8) -> Option<Help> {
         3 => ["Compressor", "turns loud parts down, lit when on"],
         4 => ["Sidechain", "another track's sound turns this one down, lit when on"],
         5 => ["Filter", "cuts lows or highs, lit when on"],
+        6 => ["Sends", "to the shared echo and reverb (master strip, Echo page), lit when either is open"],
         _ => return None,
     })
 }

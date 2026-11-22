@@ -531,7 +531,7 @@ loops, and the level curve (attack, hold, decay). A synth track keeps the place 
 plays it follows them.</p>
 
 <h3>FX tab</h3>
-<p>The six effects one under the other, each a cartridge: its LED and its name on the left (the LED switches it on
+<p>The seven effects one under the other (the sends last), each a cartridge: its LED and its name on the left (the LED switches it on
 or off), then its knobs and lists. Under the name, the reverb, the delay and the saturation show their type on a
 small screen: a click opens the list, ◂ and ▸ step to the type before or after. The filter's type is on its screen
 too. The LED switches the effect: a reverb or a delay without a type (<em>none</em>, from an older file
@@ -539,12 +539,10 @@ or an MCP client) stays off, and its LED gives it the type its screen shows (<em
 control of an effect that is off switches it on, and so does choosing its type, on the screen or with ◂ ▸.</p>
 <table>
 <tr><th>Effect</th><th>Control</th><th>Values</th><th>Notes</th></tr>
-<tr><td rowspan="3"><strong>Reverb</strong></td><td>Mix</td><td>0–1</td><td>Wet amount.</td></tr>
-<tr><td>Send</td><td>0–1 (default 0)</td><td>How much of the track goes to the shared spring reverb (master strip, <strong>Echo</strong> page), after its volume and pan. Works with the reverb's LED off.</td></tr>
+<tr><td rowspan="2"><strong>Reverb</strong></td><td>Mix</td><td>0–1</td><td>Wet amount.</td></tr>
 <tr><td>Type</td><td>room, hall, plate, spring, gated</td><td><em>hall</em> and <em>plate</em> have a pre-delay, <em>spring</em> a dispersion, <em>gated</em> a large room cut 250 ms after the hit.</td></tr>
-<tr><td rowspan="5"><strong>Delay</strong></td><td>Mix</td><td>0–1</td><td>Wet amount.</td></tr>
+<tr><td rowspan="4"><strong>Delay</strong></td><td>Mix</td><td>0–1</td><td>Wet amount.</td></tr>
 <tr><td>Feedback</td><td>0–0.95 (default 0.4)</td><td>How many repeats. Greyed out for <em>slap</em> (one echo).</td></tr>
-<tr><td>Send</td><td>0–1 (default 0)</td><td>How much of the track goes to the shared tape echo (master strip, <strong>Echo</strong> page), after its volume and pan. Unlike the track's own delay, the shared echo plays on when the send closes: open it for one hit and the hit keeps repeating (a dub "throw"). Works with the delay's LED off.</td></tr>
 <tr><td>Beats</td><td>1/16, 1/8, 1/4, 1/2, 1, 2, 4</td><td>Delay time in beats. Longer than 2 s at the tempo, it plays at the longest halving that fits (shown on the choice).</td></tr>
 <tr><td>Type</td><td>slap, tape, pingpong</td><td><em>slap</em>: one clean echo; <em>tape</em>: darker repeats with wow; <em>pingpong</em>: starts left, then alternates.</td></tr>
 <tr><td rowspan="4"><strong>Saturation</strong></td><td>Mix</td><td>0–1</td><td>Drive amount.</td></tr>
@@ -563,6 +561,8 @@ control of an effect that is off switches it on, and so does choosing its type, 
 <tr><td>Cutoff</td><td>20 Hz – 20 kHz</td><td>LFO-capable.</td></tr>
 <tr><td>Q</td><td>0.707–18.707</td><td>Resonance (LFO-capable).</td></tr>
 <tr><td>Slope</td><td>12 dB, 24 dB</td><td>Per octave.</td></tr>
+<tr><td rowspan="2"><strong>Sends</strong></td><td>Echo</td><td>0–1 (default 0)</td><td>How much of the track goes to the shared tape echo (master strip, <strong>Echo</strong> page), after its volume and pan. Unlike the Delay above, the shared echo plays on when the send closes: open it for one hit and the hit keeps repeating (a dub "throw"). Its time is set on the Echo page, for every track.</td></tr>
+<tr><td>Reverb</td><td>0–1 (default 0)</td><td>How much of the track goes to the shared spring reverb, after its volume and pan. The LED is lit when either send is open; it closes both, or opens the echo send at 0.5.</td></tr>
 </table>
 
 <h3>Sound tab</h3>
@@ -938,8 +938,9 @@ steps. The plugin has no master strip: the host mixes, and the returns play at t
 </table>
 
 <h3>The Echo page: shared returns</h3>
-<p>Every track can send to a tape echo and a spring reverb that all the tracks share (the <strong>Send</strong>
-knobs of its Delay and Reverb strips). The returns play into the mix before the master bus. A sound sent for a
+<p>Every track can send to a tape echo and a spring reverb that all the tracks share (the knobs of its
+<strong>Sends</strong> strip). They are not the track's own Delay and Reverb, which each track has apart and which
+stop when their mix goes down. The returns play into the mix before the master bus. A sound sent for a
 moment keeps echoing after its send closes, the way a dub mix throws a snare or a chord into the echo: bind a
 track's <strong>echo send</strong> to a MIDI knob (<strong>Edit › MIDI controls</strong>) and turn it up on one hit,
 or turn up the echo's <strong>feedback</strong> knob to make the repeats build up. A muted track sends nothing,
