@@ -187,6 +187,7 @@ impl App {
     /// Finish: save, then leave.
     fn quit(&mut self, event_loop: &ActiveEventLoop) {
         self.ui.session.save_if_changed();
+        self.ui.session.save_resume();
         event_loop.exit();
     }
 }

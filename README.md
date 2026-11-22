@@ -210,6 +210,11 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   display's, such as `0.5`; whole numbers from earlier versions still read). A
   display at 150 % shows at ×1.5. In the plugin, Alt stands for Ctrl (the host
   keeps Ctrl).
+- **Where you left off**: the app starts on the pattern and the arrangement you had
+  chosen, in the view you had open (grid, piano roll, song mode, synth, mixer), with the
+  track editor, the note editor, the VU meters and the kit editor shown or hidden as you
+  left them. It is kept in `settings.json` (`resume`) when you quit. The plugin starts as
+  the host's project left it.
 - **M** / **S**: mute / solo the track under the cursor. The letters that change
   every track want **Shift** (B: the pattern again in its style, C: the next colour
   scheme, D: drums in auto, G, H, J, K, V: the VU meters, X: random notes), so a

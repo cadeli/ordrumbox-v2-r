@@ -96,11 +96,13 @@ impl Session {
     }
 
     /// Write now what waits to be written (library, kits, synth presets,
-    /// master), before the user's files are copied or moved.
+    /// master) and where the user is, before the user's files are copied or
+    /// moved, or the session loaded again.
     pub(super) fn write_pending(&mut self) {
         self.saving.expire_all();
         self.autosave();
         self.save_if_changed();
+        self.save_resume();
     }
 
     /// The session loaded again from the user's files, as at start: the

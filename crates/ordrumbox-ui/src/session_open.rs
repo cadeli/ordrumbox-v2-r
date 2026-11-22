@@ -157,6 +157,9 @@ impl Session {
         session.load_color_scheme(store::settings_path());
         session.load_controls();
         session.load_zoom(store::settings_path());
+        if !hosted {
+            session.load_resume();
+        }
         session
     }
 
