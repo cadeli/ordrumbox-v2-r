@@ -161,8 +161,7 @@ impl Session {
             return self.set_mixer_knob(t, key, value);
         }
         if let Id::TrackVolume(t) = id {
-            let desc = format!("Volume on {}", self.track_name(t));
-            return self.update_track(t, &[("volume", number(value))], &desc, true);
+            return self.set_track_volume(t, value);
         }
         let Some(t) = self.editor_track() else { return };
         let name = self.track_name(t);
@@ -476,6 +475,7 @@ impl Session {
             Id::LoadSample => self.open_picker(Purpose::ReplaceTrackSample),
             Id::SongButton(button) => self.song_button(button),
             Id::Transport => self.toggle_play(),
+            Id::RecordAutomation => self.toggle_automation_recording(),
             Id::View(i) => self.show_view(i),
             Id::Mode(i) => self.show_mode(i == 1),
             Id::Master(_) | Id::MixerName(_) | Id::MixerToggle(..) => self.mixer_activate(id),

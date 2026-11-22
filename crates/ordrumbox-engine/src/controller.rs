@@ -16,21 +16,22 @@ use std::sync::{Arc, Mutex};
 
 use ordrumbox_core::song::clamp_bpm;
 use ordrumbox_core::track::STRAIGHT_SWING;
-use ordrumbox_core::{Library, Rng, Scales, Track};
+use ordrumbox_core::{AutomationTarget, Library, Rng, Scales, Track};
 use ordrumbox_dsp::{MasterSettings, ReturnSettings};
 
 use crate::assign::{TrackSound, assign_track};
-use crate::engine::{Engine, HostMix, HostTransport, MAX_TRACKS, Position, host_pass};
+use crate::engine::{Engine, HostMix, MAX_TRACKS, Position};
 use crate::kit::SampleBank;
 use crate::midi::{KeyMap, Target};
 use crate::pass::{
-    HitsCache, Pass, PassContext, SONG_PASS_TICKS, SongContext, build_keymap, build_pass, build_preview,
-    build_song_pass_at, pattern_pass_ticks,
+    HitsCache, Pass, PassContext, SongContext, build_keymap, build_pass, build_preview, build_song_pass_at,
 };
 use crate::synth_preset::SynthPresets;
 
 #[path = "controller/audio.rs"]
 mod audio;
+#[path = "controller/host.rs"]
+mod host;
 #[path = "controller/link.rs"]
 mod link;
 #[path = "controller/song_loop.rs"]
@@ -97,6 +98,9 @@ pub struct Controller {
     swing: f64,
     /// What the cue posted was built from; `None`: none posted, or one to build again.
     cue: Option<CueKey>,
+    /// The song's automation lanes a control was taken back from: an
+    /// instrument and its control, played as if they had no lane.
+    overridden: Vec<(String, AutomationTarget)>,
     /// The ticks a song plays in a loop.
     song_loop: Option<SongLoop>,
     /// A click on every beat of the passes built.
@@ -199,6 +203,7 @@ impl Controller {
             swing: STRAIGHT_SWING,
             cue: None,
             song_loop: None,
+            overridden: Vec::new(),
             metronome: false,
             live_midi: false,
             host_left: false,
@@ -385,6 +390,15 @@ impl Controller {
         }
     }
 
+    /// The lanes a control was taken back from (an instrument and its
+    /// control), played without them: the pass playing is rebuilt.
+    pub fn set_overridden(&mut self, library: &Library, overridden: &[(String, AutomationTarget)]) {
+        if self.overridden != overridden {
+            self.overridden = overridden.to_vec();
+            self.refresh(library);
+        }
+    }
+
     /// The metronome on or off: the pass playing is rebuilt with it, the
     /// next ones follow.
     pub fn set_metronome(&mut self, library: &Library, on: bool) {
@@ -447,6 +461,13 @@ impl Controller {
             }
             Mode::Song(s) => {
                 let song = library.songs.get(s)?;
+                let unbound;
+                let song = if self.overridden.is_empty() {
+                    song
+                } else {
+                    unbound = song.without_lanes(&self.overridden);
+                    &unbound
+                };
                 let used: Vec<usize> = song
                     .clips
                     .iter()
@@ -724,99 +745,5 @@ impl Controller {
     /// Playback position, `None` when stopped.
     pub fn position(&self) -> Option<Position> {
         self.link.published.read().position
-    }
-
-    /// The plugin host's transport seen by the last callback, if it followed one.
-    pub fn host(&self) -> Option<HostTransport> {
-        self.link.published.read().host
-    }
-
-    /// Ticks in one pass of what plays.
-    fn pass_ticks(&self, library: &Library) -> Option<u32> {
-        match self.mode {
-            Mode::Pattern(p) => library.patterns.get(p).map(pattern_pass_ticks),
-            Mode::Song(s) => library.songs.get(s).map(|_| SONG_PASS_TICKS),
-        }
-    }
-
-    /// Follow the plugin host's transport: its tempo for every pass, start
-    /// and stop with it, and the pass it is in when it jumps (a loop, a
-    /// click on its timeline). Stopped, the host is given a cue: the pass it
-    /// would start in, which the engine starts on its own.
-    fn follow_host(&mut self, library: &Library, host: HostTransport, snapshot: Snapshot) {
-        let bpm = clamp_bpm(host.bpm);
-        let new_tempo = self.tempo.is_none_or(|tempo| (tempo - bpm).abs() > TEMPO_EPSILON);
-        if new_tempo {
-            self.tempo = Some(bpm);
-        }
-        if !host.rolling() {
-            if self.playing {
-                self.stop();
-                // The next play assigns the sounds afresh.
-                self.assigned.clear();
-                self.cue = None;
-            }
-            self.post_cue(library, host.beat);
-            return;
-        }
-        // A Play still waiting is the host's pass already.
-        if matches!(lock(&self.link.inbox).command, Some(Command::Play(_))) {
-            return;
-        }
-        let cued = self.cue.is_some_and(|cue| snapshot.position.is_some_and(|at| at.pass == cue.number));
-        if !self.playing && !snapshot.lost && cued {
-            // The engine started from the cue: it plays on, at the tempo now.
-            self.playing = true;
-            self.cue = None;
-            if new_tempo {
-                self.refresh(library);
-            }
-        } else if !self.playing || snapshot.lost {
-            let Some((number, _)) = self.pass_ticks(library).and_then(|ticks| host_pass(host.beat, ticks)) else {
-                return;
-            };
-            if !self.playing {
-                self.assigned.clear();
-            }
-            self.jump(library, number);
-        } else if new_tempo {
-            self.refresh(library);
-        }
-    }
-
-    /// The transport followed a clock outside (a MIDI clock) and does no
-    /// more: the library's tempo plays again, and the cue is dropped. The
-    /// blocks rendered while it was followed are not followed any more
-    /// ([`Self::follow_clock_again`] follows them again).
-    pub fn leave_host(&mut self, library: &Library) {
-        self.host_left = true;
-        self.release_host(library);
-    }
-
-    /// The transport follows a clock outside again ([`AudioSide::render_synced`]).
-    pub fn follow_clock_again(&mut self) {
-        self.host_left = false;
-    }
-
-    fn release_host(&mut self, library: &Library) {
-        self.tempo = None;
-        lock(&self.link.inbox).cue = None;
-        self.refresh(library);
-    }
-
-    /// Under a stopped host at `beat`: the pass it would start in posted as
-    /// the cue, unless the one posted is still there and built from the same.
-    fn post_cue(&mut self, library: &Library, beat: f64) {
-        let Some((number, _)) = self.pass_ticks(library).and_then(|ticks| host_pass(beat, ticks)) else { return };
-        let key = CueKey { number, mode: self.mode, tempo: self.tempo, swing: self.swing };
-        // The engine took a cue when the host started and stopped before this thread saw it.
-        if self.cue == Some(key) && lock(&self.link.inbox).cue.is_some() {
-            return;
-        }
-        self.song_notes.clear();
-        self.pass_patterns.clear();
-        let Some(pass) = self.build(library, number) else { return };
-        lock(&self.link.inbox).cue = Some(pass);
-        self.cue = Some(key);
     }
 }

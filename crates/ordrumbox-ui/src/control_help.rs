@@ -86,6 +86,9 @@ pub fn help(id: Id) -> Option<Help> {
         ],
         Id::KitText("info") => ["Kit title", "a click edits it; saved with the kits"],
         Id::KitText(_) => ["Kit notes", "what the kit is, where it comes from; a click edits them"],
+        Id::RecordAutomation => {
+            ["Record automation", "while the song plays, the mixer's faders, M and S write its automation lanes"]
+        }
         Id::Bpm => ["Tempo", "beats per minute: every pattern's; in the song panel, the song's"],
         Id::Beats => ["Beats", "the pattern's length, in beats"],
         Id::StyleList => ["Style", "picking one makes the pattern again in it"],

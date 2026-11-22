@@ -113,6 +113,17 @@ pub fn volume_gain(level: f64) -> f64 {
     volume_db(level).map_or(0.0, |db| 10f64.powf(db / 20.0))
 }
 
+/// The level of a volume lane that sets `gain` (the inverse of
+/// [`volume_gain`]); 0 for a gain at or under [`VOLUME_FLOOR_DB`].
+#[must_use]
+pub fn volume_level(gain: f64) -> f64 {
+    if gain <= 0.0 {
+        return 0.0;
+    }
+    let db = (20.0 * gain.log10()).clamp(VOLUME_FLOOR_DB, 0.0);
+    1.0 - (db / VOLUME_FLOOR_DB).sqrt()
+}
+
 /// Whether a switch's `value` is on.
 #[must_use]
 pub fn is_on(value: f64) -> bool {
@@ -450,6 +461,9 @@ mod tests {
         let label = |v| AutomationTarget::Volume.value_label(v);
         assert_eq!([label(0.0), label(0.75), label(1.0)], ["silent", "-3.8 dB", "0.0 dB"]);
         assert_eq!(AutomationTarget::Mute.value_label(0.7), "on");
+        for level in [0.0, 0.25, 0.5, 1.0] {
+            assert!((volume_level(volume_gain(level)) - level).abs() < 1e-9, "{level}");
+        }
         assert_eq!(step_label(21), "2.6");
 
         let mut lane = AutomationLane::new("KICK", AutomationTarget::Volume);

@@ -277,6 +277,12 @@ impl Session {
                 controls.play,
                 Kind::Button { label: label.into(), on: playing },
             ));
+            // REC in song mode; its slot stays empty in pattern mode.
+            if song {
+                let on = self.is_recording_automation();
+                let kind = Kind::Button { label: "REC".into(), on };
+                layout.items.push(Item::new(Some(Id::RecordAutomation), controls.record, kind));
+            }
             let spec = Spec::knob(song::MIN_BPM, song::MAX_BPM, 1.0, song::DEFAULT_BPM);
             let bpm = self.tempo();
             let text = num::text(bpm);

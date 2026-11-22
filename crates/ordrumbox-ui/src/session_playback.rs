@@ -3,7 +3,7 @@
 //! of a pattern in auto mode posted ahead. The session reaches the engine
 //! only through it.
 
-use ordrumbox_core::Track;
+use ordrumbox_core::{AutomationTarget, Track};
 use ordrumbox_engine::{Controller, HostMix, HostTransport, Mode, Position, SongLoop};
 use ordrumbox_logic::Editor;
 
@@ -194,6 +194,13 @@ impl Playback {
         self.upcoming_loop = None;
         controller.play(editor.library(), mode);
         self.played_revision = editor.revision();
+    }
+
+    /// The song's lanes taken back (an instrument and its control), played without them.
+    pub(super) fn set_overridden(&mut self, editor: &Editor, overridden: &[(String, AutomationTarget)]) {
+        if let Some(controller) = &mut self.controller {
+            controller.set_overridden(editor.library(), overridden);
+        }
     }
 
     /// The ticks a song plays in a loop (`None`: on to its end).

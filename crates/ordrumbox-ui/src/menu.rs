@@ -87,6 +87,10 @@ pub enum Command {
     RecordTiming,
     /// Ctrl+L: the song's loop on or off, its ends kept.
     ToggleLoop,
+    /// The mixer writes the song's automation lanes while it plays.
+    RecordAutomation,
+    /// Every automation lane a control was taken back from plays again.
+    ReenableAutomation,
     /// The song's loop region removed.
     ClearLoop,
     PreviousSong,
@@ -188,6 +192,8 @@ impl Command {
             | Self::PlaySong
             | Self::ClearLoop
             | Self::ToggleLoop
+            | Self::RecordAutomation
+            | Self::ReenableAutomation
             | Self::PreviousSong
             | Self::NextSong
             | Self::NewSong
@@ -266,6 +272,10 @@ pub struct MenuState {
     pub metronome: bool,
     /// The song's loop plays.
     pub is_loop_on: bool,
+    /// The mixer writes the song's automation while it plays.
+    pub is_recording_automation: bool,
+    /// Some automation lanes were taken back by a control.
+    pub has_overridden: bool,
     pub recording: bool,
     pub record_timing: bool,
     pub fullscreen: bool,

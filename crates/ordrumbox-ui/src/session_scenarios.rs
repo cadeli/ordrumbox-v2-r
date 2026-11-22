@@ -433,6 +433,8 @@ fn demo_session(samples_dir: &Path) -> (Session, AudioSide) {
     (session, audio)
 }
 
+#[path = "session_scenarios/automation.rs"]
+mod automation;
 #[path = "session_scenarios/cartridges.rs"]
 mod cartridges;
 #[path = "session_scenarios/files.rs"]

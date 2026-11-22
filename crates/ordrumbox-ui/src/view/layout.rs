@@ -144,6 +144,8 @@ pub struct HeaderControls {
     /// The mode switch: the pattern, the song.
     pub mode: [Rect; 2],
     pub play: Rect,
+    /// REC beside PLAY: in song mode, the mixer writes the song's automation.
+    pub record: Rect,
     pub bpm: Rect,
     pub pattern: Rect,
     pub beats: Rect,
@@ -189,6 +191,7 @@ pub fn header_controls(scale: Scale) -> HeaderControls {
     // when every gap was alike, so the window's minimum width is kept.
     let mode = [next(52, 2), next(52, HEADER_GROUP_GAP)];
     let play = next(36, 4);
+    let record = next(30, 4);
     let bpm = next(52, HEADER_GROUP_GAP);
     let pattern = next(104, 4);
     let beats = next(36, 4);
@@ -201,7 +204,7 @@ pub fn header_controls(scale: Scale) -> HeaderControls {
     // The song's slot, closed: the mode switch is its button.
     let song = next(0, 0);
     let views = [grid, roll, song, next(48, 2), next(36, 2), next(40, 0)];
-    HeaderControls { mode, play, bpm, pattern, beats, kit, style, generate, auto, macros, views }
+    HeaderControls { mode, play, record, bpm, pattern, beats, kit, style, generate, auto, macros, views }
 }
 
 /// The gap between two of the header's groups, at scale 1: room for both
@@ -218,6 +221,7 @@ impl HeaderControls {
         let shift = self.play.x - self.mode[0].x;
         let rects = [
             &mut self.play,
+            &mut self.record,
             &mut self.bpm,
             &mut self.pattern,
             &mut self.beats,

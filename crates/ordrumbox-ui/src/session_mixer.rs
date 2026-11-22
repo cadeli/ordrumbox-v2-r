@@ -3,6 +3,7 @@
 //! returns), what they do, and the meters and the spectrum it draws.
 
 use super::Session;
+use super::session_automation_live::MixerMove;
 use super::session_panel::{PanelLayout, number};
 use super::session_types::Workspace;
 use crate::canvas::{Canvas, fit};
@@ -13,7 +14,8 @@ use crate::panel::{self, Id, Item, Kind, Rect};
 use crate::scale::Scale;
 use crate::view::Hit;
 use crate::{frame, master, returns, theme};
-use ordrumbox_core::num;
+use ordrumbox_core::automation::{is_on, switch_value};
+use ordrumbox_core::{AutomationTarget, num};
 use ordrumbox_engine::SCOPE_SIZE;
 use ordrumbox_engine::strip_settings::delay_beats_used;
 use std::cell::{Cell, RefCell};
@@ -92,11 +94,17 @@ impl Session {
                     knob(spec, value, label, Format::Fixed2.value(value, "")),
                 ));
             }
-            for (key, label, on, rect) in [("mute", "M", track.mute, strip.mute), ("solo", "S", track.solo, strip.solo)]
-            {
+            // While the song plays, what its lanes set.
+            let shown = |target, own| self.automated_now(t, target).map_or(own, is_on);
+            let mute = shown(AutomationTarget::Mute, track.mute);
+            let solo = shown(AutomationTarget::Solo, track.solo);
+            for (key, label, on, rect) in [("mute", "M", mute, strip.mute), ("solo", "S", solo, strip.solo)] {
                 items.push(Item::new(Some(Id::MixerToggle(t, key)), rect, Kind::Button { label: label.into(), on }));
             }
-            let (value, lfo) = self.shown_track_volume(t, track.volume, TRACK_FADER);
+            let (value, lfo) = match self.automated_now(t, AutomationTarget::Volume) {
+                Some(gain) => (gain, true),
+                None => self.shown_track_volume(t, track.volume, TRACK_FADER),
+            };
             let kind =
                 Kind::Value { spec: TRACK_FADER, value, label: None, text: Format::Fixed2.value(value, ""), lfo };
             items.push(Item::new(Some(Id::TrackVolume(t)), strip.fader, kind));
@@ -157,12 +165,44 @@ impl Session {
     pub(super) fn mixer_activate(&mut self, id: Id) {
         match id {
             Id::MixerName(t) => self.click(Hit::Name(t)),
-            Id::MixerToggle(t, key) => self.toggle_row(t, key),
+            Id::MixerToggle(t, key) => self.mixer_toggle(t, key),
             Id::Master("compBypass") => {
                 let bypass = if self.output_panel.master().bypass >= 0.5 { 0.0 } else { 1.0 };
                 self.set_master_value("compBypass", bypass);
             }
             _ => {}
+        }
+    }
+
+    /// Track `t`'s volume (its fader, or the track editor's knob) at
+    /// `value`: written to its lane while the song plays and records automation.
+    pub(super) fn set_track_volume(&mut self, t: usize, value: f64) {
+        let moved = self.automate_from_mixer(t, AutomationTarget::Volume, value);
+        if moved == MixerMove::Written {
+            return;
+        }
+        let desc = format!("Volume on {}", self.track_name(t));
+        self.update_track(t, &[("volume", number(value))], &desc, true);
+        if moved == MixerMove::TakenBack {
+            self.say_taken_back(t, AutomationTarget::Volume);
+        }
+    }
+
+    /// Mute or solo (`key`) of track `t` switched from what the mixer shows:
+    /// written to its lane while the song plays and records automation.
+    fn mixer_toggle(&mut self, t: usize, key: &str) {
+        let target = if key == "mute" { AutomationTarget::Mute } else { AutomationTarget::Solo };
+        let Some(own) = self.track(t).map(|track| if key == "mute" { track.mute } else { track.solo }) else { return };
+        let is_on = !self.automated_now(t, target).map_or(own, is_on);
+        let moved = self.automate_from_mixer(t, target, switch_value(is_on));
+        if moved == MixerMove::Written {
+            return;
+        }
+        if is_on != own {
+            self.toggle_row(t, key);
+        }
+        if moved == MixerMove::TakenBack {
+            self.say_taken_back(t, target);
         }
     }
 

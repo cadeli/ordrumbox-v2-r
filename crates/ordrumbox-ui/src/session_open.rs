@@ -307,6 +307,7 @@ impl Session {
             controls: ordrumbox_engine::ControlMap::new(),
             output_panel: session_output::OutputPanel::default(),
             mixer: session_mixer::Mixer::default(),
+            automation_live: Default::default(),
             updates: session_update::Updates::default(),
             mcp: None,
             synth_editor: session_synth::SynthEditor::new(),

@@ -253,6 +253,8 @@ fn play_menu(s: &MenuState) -> Menu {
             command("Rewind", "Home", C::Rewind, true),
             check("Loop the song", "Ctrl+L", C::ToggleLoop, s.has_songs, s.is_loop_on),
             command("Clear the loop", "", C::ClearLoop, s.has_songs),
+            check("Record automation", "", C::RecordAutomation, s.has_songs, s.is_recording_automation),
+            command("Re-enable automation", "", C::ReenableAutomation, s.has_overridden),
             Item::Separator,
             check("Record notes", "Ctrl+R", C::Record, p, s.recording),
             check("Record off the grid", "", C::RecordTiming, p, s.record_timing),

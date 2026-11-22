@@ -1,4 +1,5 @@
 use super::*;
+use crate::engine::HostTransport;
 use ordrumbox_core::Library;
 use ordrumbox_dsp::SampleBuffer;
 

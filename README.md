@@ -210,6 +210,15 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   lane replaces the track's volume (and its volume LFO) where it is set. A click, left or
   right, on a lane's name opens its menu: clear all its points, delete the lane, or
   delete every lane. Lanes are saved with the song.
+- **Automation and the mixer** while a song plays: the mixer shows what the lanes set (a
+  fader moves with its Volume lane, M and S light with their lanes). Moving a control that
+  has a lane takes it back: the lane is no longer played for that instrument, and the
+  control keeps the value you gave it, until **Play > Re-enable automation**. With **REC**
+  (beside PLAY in song mode) or **Play > Record automation** on, moving a mixer control while the song plays writes its lane
+  instead (the lane is made if there is none; the track itself is left as it is): a fader
+  writes its level on every step under the playhead for as long as you hold it; M or S
+  writes its new state from the playhead's step to the lane's next change. Each gesture is
+  one undo step.
 - **Song panel zoom**, as on a DAW timeline: drag an end of the thumb of the
   arrangement's horizontal scroll bar (its light handles) to show more or fewer measures,
   the other end staying where it is; drag its middle to scroll. **Ctrl + wheel** over the

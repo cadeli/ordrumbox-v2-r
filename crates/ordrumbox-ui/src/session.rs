@@ -105,6 +105,8 @@ mod session_zone;
 #[path = "session_zoom.rs"]
 mod session_zoom;
 
+#[path = "session_automation_live.rs"]
+mod session_automation_live;
 #[path = "session_cartridge.rs"]
 mod session_cartridge;
 #[path = "session_kit.rs"]
@@ -228,6 +230,8 @@ pub struct Session {
     output_panel: session_output::OutputPanel,
     /// The mixer's strips scrolled to, its meter and spectrum (`session_mixer.rs`).
     mixer: session_mixer::Mixer,
+    /// The song's automation while it plays: taken back, recorded (`session_automation_live.rs`).
+    automation_live: session_automation_live::LiveAutomation,
     /// The update check (`session_update.rs`).
     updates: session_update::Updates,
     /// The MCP link (`mcp_link.rs`): the calls of `ordrumbox --mcp`.
@@ -322,6 +326,7 @@ impl Session {
         let region = self.song_loop_region().and_then(|(first, end)| SongLoop::new(ticks(first), ticks(end)));
         self.playback.set_song_loop(&self.editor, region);
         self.playback.set_metronome(&self.editor, self.transport.metronome);
+        self.update_live_automation();
         let midi_open = self.playback.offers().midi_open;
         self.playback.set_live_midi(midi_open);
         self.playback

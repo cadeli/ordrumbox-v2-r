@@ -220,6 +220,8 @@ pub enum Id {
     /// Play / stop, the tempo knob, the beats list, the generation
     /// buttons (drums, bass, chords).
     Transport,
+    /// REC: the mixer writes the song's automation while it plays.
+    RecordAutomation,
     Bpm,
     Beats,
     /// The style list, ⟳ (the pattern made again in it), AUTO (every track in

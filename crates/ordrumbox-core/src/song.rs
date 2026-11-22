@@ -6,7 +6,7 @@
 
 use std::collections::HashSet;
 
-use crate::automation::{AutomationLane, STEPS_PER_MEASURE};
+use crate::automation::{AutomationLane, AutomationTarget, STEPS_PER_MEASURE};
 use crate::ids::{slugify, unique_id};
 use crate::json::{Object, Value};
 use crate::record::Issue;
@@ -235,6 +235,15 @@ fn automations_from_json(raw: Option<&Value>, at: &str, issues: &mut Vec<Issue>)
 }
 
 impl Song {
+    /// This song without the lanes of `overridden` (an instrument and the
+    /// control taken back from its lane), as it plays while they are.
+    #[must_use]
+    pub fn without_lanes(&self, overridden: &[(String, AutomationTarget)]) -> Self {
+        let mut song = self.clone();
+        song.automations.retain(|lane| !overridden.iter().any(|(name, target)| lane.is_for(name, *target)));
+        song
+    }
+
     /// The automation step transport `tick` is on (`ticks_per_beat` per
     /// beat), wrapped on the arrangement as [`Song::active_clips_at`] wraps it.
     #[must_use]

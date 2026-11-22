@@ -71,6 +71,8 @@ impl Session {
             playing: self.playing(),
             metronome: self.transport.metronome,
             is_loop_on: self.song_loop_region().is_some(),
+            is_recording_automation: self.is_recording_automation(),
+            has_overridden: !self.overridden_lanes().is_empty(),
             recording: self.transport.recording,
             record_timing: self.transport.record_timing,
             fullscreen: self.program.fullscreen,
@@ -209,6 +211,8 @@ impl Session {
             C::Metronome => self.toggle_metronome(),
             C::ClearLoop => self.clear_loop(),
             C::ToggleLoop => self.toggle_loop(),
+            C::RecordAutomation => self.toggle_automation_recording(),
+            C::ReenableAutomation => self.reenable_automation(),
             C::PreviousSong => self.step_song(-1),
             C::NextSong => self.step_song(1),
             C::Mute | C::Solo => {
