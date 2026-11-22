@@ -133,9 +133,9 @@ impl Editor {
         .is_some()
     }
 
-    /// Tags (trimmed, empty ones left out).
+    /// Tags, as they are kept ([`ordrumbox_core::tags::normalize`]).
     pub fn set_pattern_tags(&mut self, p: usize, tags: &[String]) -> bool {
-        let tags: Vec<String> = tags.iter().map(|t| t.trim().to_owned()).filter(|t| !t.is_empty()).collect();
+        let tags = ordrumbox_core::tags::normalize(tags);
         self.edit(
             p,
             |pattern| format!("Set tags on \"{}\"", pattern_name(pattern)),

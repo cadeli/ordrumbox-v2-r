@@ -46,6 +46,13 @@ impl Default for Pattern {
 }
 
 impl Pattern {
+    /// Its genre: its first tag that is not a feature ([`crate::tags`]),
+    /// which groups it with the patterns of its genre.
+    #[must_use]
+    pub fn genre(&self) -> Option<&str> {
+        self.tags.iter().map(|tag| tag.trim()).find(|tag| !tag.is_empty() && !crate::tags::is_feature(tag))
+    }
+
     /// The current name of a pattern key (a web-version name read as its current one).
     pub fn canonical_key(key: &str) -> &str {
         WEB_KEYS.iter().find(|(web, _)| *web == key).map_or(key, |(_, current)| current)

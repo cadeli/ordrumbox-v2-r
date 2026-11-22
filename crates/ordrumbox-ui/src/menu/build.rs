@@ -197,6 +197,7 @@ fn pattern_menu(s: &MenuState) -> Menu {
             command("Duplicate pattern", "Ctrl+D", C::DuplicatePattern, p),
             command("Rename pattern...", "", C::RenamePattern, p),
             command("Pattern description...", "", C::PatternDescription, p),
+            command("Pattern tags...", "", C::PatternTags, p),
             Item::Separator,
             command("Previous pattern", "[", C::PreviousPattern, p),
             command("Next pattern", "]", C::NextPattern, p),

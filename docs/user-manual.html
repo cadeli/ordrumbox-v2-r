@@ -317,6 +317,7 @@ use <kbd>←</kbd> <kbd>→</kbd> between menus, <kbd>↑</kbd> <kbd>↓</kbd> b
 <tr><td>Duplicate pattern</td><td><kbd>Ctrl</kbd>+<kbd>D</kbd></td><td>Copy the current pattern.</td></tr>
 <tr><td>Rename pattern...</td><td></td><td>Edit the pattern's name.</td></tr>
 <tr><td>Pattern description...</td><td></td><td>Edit the pattern's description.</td></tr>
+<tr><td>Pattern tags...</td><td></td><td>Edit the pattern's tags, its genre first (<a href="#song-tags">see Tags</a>).</td></tr>
 <tr><td>Previous / Next pattern</td><td><kbd>[</kbd> <kbd>]</kbd></td><td>Step through the library's patterns (also <kbd>Page Up</kbd> / <kbd>Page Down</kbd>).</td></tr>
 <tr><td>Random pattern</td><td><kbd>F</kbd></td><td>Jump to a random pattern of the library.</td></tr>
 <tr><td>Tempo -1 / +1</td><td><kbd>-</kbd> <kbd>=</kbd></td><td>Change the tempo by 1 BPM (<kbd>Shift</kbd>: by 10).</td></tr>
@@ -417,7 +418,7 @@ slip off the play keys changes nothing; pressed alone, they say so on the status
 <tr><td><strong>REC</strong></td><td>Button, song mode</td><td>Record automation: while the song plays, the mixer's controls write their lanes (<a href="#automation">section 11</a>). Same as <strong>Play › Record automation</strong>.</td></tr>
 <tr><td><strong>BPM</strong></td><td>Knob, 20–300</td><td>The session's tempo, which every pattern plays at; in the song panel, the selected song's.</td></tr>
 <tr><td><strong>MODE</strong></td><td><strong>PATTERN</strong> <strong>SONG</strong> (<kbd>F5</kbd>, <kbd>F3</kbd>)</td><td>What <strong>PLAY</strong> and <kbd>Space</kbd> play: one pattern in a loop, or the song, its patterns one after another. The mode shown is lit. Only this switch changes it: the views and their keys leave it as it is. In song mode the grid and the piano roll show the pattern the song is playing, with its playhead; back from the song to the pattern, the pattern keeps the song's tempo. Not in the plugin: the host plays.</td></tr>
-<tr><td><strong>PATTERN</strong></td><td>List</td><td>Pick a pattern. While playing, the pattern picked waits for the one playing to end its loop: the label reads <strong>NEXT</strong> until it starts.</td></tr>
+<tr><td><strong>PATTERN</strong></td><td>List</td><td>Pick a pattern: the list opens on the genres (each with how many patterns it has, the one shown highlighted), and a genre opens its patterns beside it; the patterns without a genre are under <em>other</em> (<a href="#song-tags">see Tags</a>). <kbd>[</kbd> <kbd>]</kbd> still step through the whole library. While playing, the pattern picked waits for the one playing to end its loop: the label reads <strong>NEXT</strong> until it starts.</td></tr>
 <tr><td><strong>BEATS</strong></td><td>List, 1–16 then every 4th up to 64</td><td>The pattern's length in beats.</td></tr>
 <tr><td><strong>KIT</strong></td><td>List</td><td>The kit the tracks draw their samples from.</td></tr>
 <tr><td><strong>STYLE</strong></td><td>List</td><td>The 14 styles, the learned styles, or random. Picking one makes the pattern again in it.</td></tr>
@@ -747,7 +748,7 @@ on a timeline of measures. The song panel is the app's only: the plugin plays pa
       (a pattern gone from the library keeps its row, in red); each clip a bar over its measures, in the pattern's colour.
       Under the rows, the <strong>automation lanes</strong> and the <strong>+ NEW AUTOMATION</strong> button
       (<a href="#automation">see Automation lanes</a>).</li>
-  <li><strong>Pattern list</strong> (bottom left): the library's patterns, and the selected pattern's description (click to edit).</li>
+  <li><strong>Pattern list</strong> (bottom left): the library's patterns, and the selected pattern's tags and description (click either to edit).</li>
   <li><strong>Project info</strong> (bottom right): the project's name and description (click to edit), its date, the arrangement list,
       and the buttons <strong>Save</strong>, <strong>Save as</strong>, <strong>Open</strong>, <strong>Export</strong>, <strong>Import</strong>,
       <strong>New</strong>, <strong>Delete</strong>.</li>
@@ -807,6 +808,15 @@ zoom handles.</p>
 <tr><td><kbd>Esc</kbd></td><td>Back to the grid.</td></tr>
 </table>
 <p>While the song plays, the grid follows it page by page. Each edit of the arrangement is an undo step.</p>
+
+<h3 id="song-tags">Tags</h3>
+<p>Under the selected pattern's description, the <strong>Tags</strong> line: a click edits them, separated by commas
+(<code>funk, bass, chords</code>), as does <strong>Pattern › Tags...</strong>. They are kept in lower case, without repeats;
+a change is one undo step. A tag is a <strong>genre</strong> (rock, funk, reggae…) or a <strong>feature</strong>, what the
+pattern has: <code>bass</code>, <code>chords</code>, <code>lead</code>, <code>pad</code>, <code>synth</code>, <code>organ</code>,
+<code>strings</code>, <code>brass</code>, <code>piano</code>, <code>clavinet</code>, <code>arpeggio</code>, <code>polyrhythm</code>,
+<code>polymeter</code>. The first genre is the pattern's: it lists the pattern under it in the header's PATTERN list, and is drawn
+brighter than the other tags. Genres teach the styles (<a href="#generation">Learned styles</a>); features teach nothing.</p>
 
 <h3 id="song-loop">The song's loop</h3>
 <p>A <strong>drag</strong> along the ruler selects the part of the song that plays in a loop: whole measures, beats or steps,
@@ -1095,7 +1105,8 @@ complexity, syncopation, coupling to another part, variation, ghost notes and ro
 
 <h3>Learned styles</h3>
 <p>Tag patterns with a style's name (or alias) and the style moves toward what they play — each part's weights and hits, the
-required steps, the swing — in proportion to the measures seen. A tag that names no style becomes a style of its own. Fewer than
+required steps, the swing — in proportion to the measures seen. A genre tag that names no style becomes a style of its own;
+a feature tag (a bass, chords: <a href="#song-tags">see Tags</a>) teaches nothing. Fewer than
 4 measures teach nothing. The STYLE list shows them.</p>
 
 <h3>Auto mode</h3>

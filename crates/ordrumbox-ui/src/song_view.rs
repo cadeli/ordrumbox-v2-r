@@ -35,6 +35,8 @@ const LIST_NUMBER_CHARS: i32 = 3;
 const LIST_WIDTH: i32 = (LIST_NUMBER_CHARS + LIST_NAME_CHARS) * crate::font::WIDTH + 4;
 /// Space between the description's frame and its text.
 const DESCRIPTION_PAD: i32 = 4;
+/// Height of a line of text around the description's frame (its title, the tags).
+const TEXT_LINE: i32 = 12;
 /// Width of the description's scroll bar.
 const SCROLL_BAR: i32 = 3;
 /// Thickness of the arrangement's rows' scroll bar.
@@ -122,6 +124,8 @@ pub struct SongView<'a> {
     /// its first line shown.
     pub description: Option<&'a str>,
     pub description_scroll: usize,
+    /// The selected pattern's tags, its genre first (`None` without a pattern).
+    pub tags: Option<&'a [String]>,
     /// The steps of the song's loop, `first..end`, on or off.
     pub loop_region: Option<(u32, u32)>,
     /// The loop plays (off, it is drawn dim).
@@ -178,6 +182,8 @@ pub enum SongHit {
     Pattern(usize),
     /// The selected pattern's description.
     Description,
+    /// The selected pattern's tags line, under its description.
+    Tags,
     /// A measure of the ruler.
     Ruler(u32),
     /// An end of the song's loop, on the ruler: a drag moves it.
@@ -211,7 +217,7 @@ pub struct SongLayout {
     scale: Scale,
     /// The pattern list.
     pub list: Rect,
-    /// The selected pattern's description: its title line, then its frame.
+    /// The selected pattern's description's title line, its frame, then its tags line.
     pub description: Rect,
     /// The arrangement: its title line, then the ruler and the rows.
     pub grid: Rect,
@@ -241,11 +247,21 @@ impl SongLayout {
         Self { scale, list, description, grid, column, zoom }
     }
 
-    /// The description's frame, under its title line.
+    /// The tags line, at the bottom of the description's room, under its
+    /// frame: always there, so that the description stays put with or
+    /// without tags.
+    #[must_use]
+    pub fn tags_line(&self) -> Rect {
+        let d = self.description;
+        let h = TEXT_LINE * self.scale;
+        Rect::new(d.x, d.y + (d.h - h).max(0), d.w, h)
+    }
+
+    /// The description's frame, between its title line and the tags line.
     fn description_frame(&self) -> Rect {
         let d = self.description;
-        let title = 12 * self.scale;
-        Rect::new(d.x, d.y + title, d.w, (d.h - title).max(0))
+        let line = TEXT_LINE * self.scale;
+        Rect::new(d.x, d.y + line, d.w, (d.h - 2 * line).max(0))
     }
 
     /// `text` in the lines the description's frame shows.
@@ -430,6 +446,9 @@ impl SongLayout {
             let row = view.list_scroll + row_at(y, self.list.y, LIST_ROW * self.scale)?;
             return (row < view.patterns.len()).then_some(SongHit::Pattern(row));
         }
+        if self.tags_line().contains(x, y) {
+            return view.tags.map(|_| SongHit::Tags);
+        }
         if self.description.contains(x, y) {
             return view.description.map(|_| SongHit::Description);
         }
@@ -561,6 +580,7 @@ mod tests {
             taken_back: Vec::new(),
             description: Some("x"),
             description_scroll: 0,
+            tags: Some(&[]),
             zoom: MeasureZoom::default(),
             loop_region: None,
             is_loop_on: false,
@@ -573,7 +593,8 @@ mod tests {
         assert_eq!(layout.hit(&view, layout.list.x + 2, layout.list.y + 40), None);
         assert!(layout.list.w < layout.description.w);
         let d = layout.description;
-        assert_eq!(layout.hit(&view, d.x + 2, d.y + d.h - 2), Some(SongHit::Description));
+        assert_eq!(layout.hit(&view, d.x + 2, d.y + d.h / 2), Some(SongHit::Description));
+        assert_eq!(layout.hit(&view, d.x + 2, d.y + d.h - 2), Some(SongHit::Tags), "under the description");
         assert_eq!(layout.hit(&view, at_measure(3), layout.ruler_top() + 2), Some(SongHit::Ruler(3)));
         assert_eq!(layout.hit(&view, at_measure(5), layout.ruler_top() + 2), None); // past the end
         assert_eq!(layout.hit(&view, layout.grid.x + 2, in_row(1)), Some(SongHit::RowName(1)));
@@ -610,6 +631,8 @@ mod tests {
         let rows = rows(&library.songs[0], &library.patterns);
         let empty = Library::parse(r#"{"songs":[{"name":"e"}]}"#).unwrap().0;
         let long = "a long description of the pattern ".repeat(20);
+        let long_tags: Vec<String> =
+            ["funk", "bass", "chords"].iter().cycle().take(30).map(|t| (*t).to_owned()).collect();
         let zooms = [MeasureZoom::MIN, MeasureZoom::STEPS, MeasureZoom::MAX].map(MeasureZoom::new);
         for ((w, h), zoom) in [(1, 1), (40, 30), (1100, 680)].into_iter().flat_map(|size| zooms.map(|z| (size, z))) {
             let mut pixels = vec![0; w * h];
@@ -635,6 +658,7 @@ mod tests {
                     is_loop_on: playing,
                     zoom,
                     description_scroll: 3,
+                    tags: song.map(|_| long_tags.as_slice()),
                     taken_back: vec![true; 4],
                 };
                 draw(&mut canvas, &view, &layout);

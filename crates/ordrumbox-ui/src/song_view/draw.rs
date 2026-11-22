@@ -55,6 +55,7 @@ fn draw_description(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
         return;
     }
     canvas.text(d.x, d.y, &fit("Pattern description", d.w, s), s, theme::muted());
+    draw_tags(canvas, view.tags.unwrap_or_default(), layout);
     let f = layout.description_frame();
     for (x, y, w, h) in [
         (f.x, f.y, f.w, s.px()),
@@ -82,6 +83,31 @@ fn draw_description(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
         let thumb_h = (track_h * rows as i32 / lines.len() as i32).max(4 * s);
         canvas.fill_rect(bar_x, top, SCROLL_BAR * s, track_h, cell_color());
         canvas.fill_rect(bar_x, thumb_y.min(top + track_h - thumb_h), SCROLL_BAR * s, thumb_h, theme::muted());
+    }
+}
+
+/// The selected pattern's tags on their line: `Tags`, then its genre, then
+/// its features dimmer, as many as fit; a hint when it has none.
+fn draw_tags(canvas: &mut Canvas, tags: &[String], layout: &SongLayout) {
+    let s = layout.scale;
+    let line = layout.tags_line();
+    let end = line.x + line.w;
+    // Under the frame, as far below it as the title is above.
+    let y = line.y + line.h - 8 * s;
+    let mut x = canvas.text(line.x, y, "Tags", s, theme::muted()) + 8 * s;
+    if tags.is_empty() {
+        canvas.text(x, y, &fit("(click: genre first, then features)", end - x, s), s, theme::muted());
+        return;
+    }
+    let genre = tags.iter().position(|tag| !ordrumbox_core::tags::is_feature(tag));
+    for (i, tag) in tags.iter().enumerate() {
+        let text = if i + 1 < tags.len() { format!("{tag},") } else { tag.clone() };
+        let shown = fit(&text, end - x, s);
+        let color = if Some(i) == genre { theme::text() } else { theme::muted() };
+        x = canvas.text(x, y, &shown, s, color) + text_width(" ", s);
+        if shown != text {
+            break;
+        }
     }
 }
 

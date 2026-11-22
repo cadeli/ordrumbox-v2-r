@@ -180,6 +180,12 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   song panel, synth, mixer, and their keys) leave it as it is. In song mode the grid and
   the piano roll show the pattern the song is playing, with its playhead. Back from the
   song to the pattern, the pattern keeps the song's tempo.
+- **The PATTERN list** of the header opens on the genres, each with how many patterns it
+  has; a genre opens its patterns. A pattern's genre is its first tag that is not a feature
+  (bass, chords, lead, pad, synth, organ, strings, brass, piano, clavinet, arpeggio,
+  polyrhythm, polymeter). Its tags are edited on the song screen, under its description (a
+  click), or with Pattern > Tags...: `funk, bass, chords`, the genre first. Genres teach the
+  learned styles; features do not.
 - **Space**: play / stop. A song stops where it is and **Space** goes on from that
   measure; **Home** (or the keypad's **Enter**) goes back to the first beat, or measure.
   A **drag** on the song panel's ruler selects the part of the song that plays in a loop:

@@ -8,6 +8,10 @@
   A song is an arrangement, as before. The files stay `.odbox` in `songs/`: nothing to convert.
 - A control taken back from its automation lane shows it (an orange mark), and its lane too (dim, with an
   orange OFF badge); a click on the badge, or Re-enable lane in the lane's menu, plays that lane alone again.
+- The PATTERN list opens by genre, then the genre's patterns. A pattern's tags are edited on the
+  song screen (the Tags line under its description) or with Pattern > Tags...
+- Tags are genres or features (bass, chords, synth…): only genres become learned styles. The demo
+  library's tags are cleaned (`default`, `song` and `sends` gone, `exp` now `experimental`).
 - MCP: `saveProject`, `openProject`, `exportProject`, `listSavedProjects` (its list under `projects`)
   and `setProjectInfo`; the earlier `*Song*` names still work.
 

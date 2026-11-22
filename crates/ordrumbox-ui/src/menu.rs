@@ -52,6 +52,7 @@ pub enum Command {
     DuplicatePattern,
     RenamePattern,
     PatternDescription,
+    PatternTags,
     PreviousPattern,
     NextPattern,
     TempoDown,

@@ -246,6 +246,10 @@ pub enum Id {
     SongPattern(usize),
     /// The selected pattern's description entry.
     PatternDescription,
+    /// The selected pattern's tags, on the song screen (their entry).
+    PatternTags,
+    /// The header's PATTERN list, opened as genres and their patterns.
+    PatternMenu,
     /// The right-click menu of the song panel.
     SongMenu,
     // Mixer.

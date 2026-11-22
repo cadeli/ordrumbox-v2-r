@@ -118,7 +118,7 @@ const TOOLS: &str = r#"[
    "inputSchema": {"type": "object", "properties": {"bpm": {"type": "number", "minimum": 20, "maximum": 300}}, "required": ["bpm"]}},
   {"name": "setPatternBeatCount", "description": "The length of a pattern in beats; every track follows.",
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}, "beatCount": {"type": "integer", "minimum": 1, "maximum": 64}}, "required": ["patternName", "beatCount"]}},
-  {"name": "setPatternTags", "description": "The tags (genre, mood...) of a pattern.",
+  {"name": "setPatternTags", "description": "The tags of a pattern, kept in lower case without repeats: its genre first (it groups the pattern in the PATTERN list and teaches the styles), then features (bass, chords, lead, pad, synth, organ, strings, brass, piano, clavinet, arpeggio, polyrhythm, polymeter), which teach no style.",
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}, "tags": {"type": "array", "items": {"type": "string"}}}, "required": ["patternName", "tags"]}},
   {"name": "setPatternDescription", "description": "The description of a pattern.",
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}, "description": {"type": "string"}}, "required": ["patternName", "description"]}},

@@ -26,6 +26,7 @@ pub mod scales;
 pub mod song;
 pub mod steps;
 pub mod style;
+pub mod tags;
 pub mod track;
 mod variation;
 

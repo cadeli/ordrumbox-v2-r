@@ -98,6 +98,12 @@ impl Dropdown {
         self.labels.len().min(LIST_ROWS)
     }
 
+    /// Option `at` highlighted, and shown.
+    pub fn highlight(&mut self, at: usize) {
+        self.at = at.min(self.labels.len().saturating_sub(1));
+        self.show_at();
+    }
+
     fn show_at(&mut self) {
         if self.at < self.first {
             self.first = self.at;

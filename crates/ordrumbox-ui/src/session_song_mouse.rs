@@ -49,6 +49,7 @@ impl Session {
             }
             (SongHit::ZoomHandle(edge), Button::Left) => self.press_zoom_handle(size, edge),
             (SongHit::Description, Button::Left) => self.text_entry(Id::PatternDescription),
+            (SongHit::Tags, Button::Left) => self.pattern_tags_entry(),
             (SongHit::Ruler(m), Button::Left) => self.press_ruler(size, x, m),
             (SongHit::LoopEnd(edge), Button::Left) => self.press_loop_end(edge),
             (SongHit::Ruler(_) | SongHit::LoopEnd(_), Button::Right) => self.loop_menu(x, y),

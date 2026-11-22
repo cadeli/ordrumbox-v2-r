@@ -8,6 +8,7 @@
 //! measures teach nothing.
 
 use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
+use ordrumbox_core::tags;
 use ordrumbox_core::{Pattern, Style, StylePart, Styles, Track};
 
 /// Measures a learned style needs at least.
@@ -137,12 +138,13 @@ fn rank(name: &str) -> u8 {
     }
 }
 
-/// `written` with the library's lessons: each tag of `patterns` (its style
-/// through the aliases) blended into its written style, or a style of its own.
+/// `written` with the library's lessons: each genre tag of `patterns` (its
+/// style through the aliases) blended into its written style, or a style of
+/// its own. A feature tag (a bass, chords: [`tags::is_feature`]) is no style.
 pub fn learn(written: &Styles, patterns: &[Pattern]) -> Styles {
     let mut learned = written.clone();
     let mut tags: Vec<String> = Vec::new();
-    for tag in patterns.iter().flat_map(|p| &p.tags) {
+    for tag in patterns.iter().flat_map(|p| &p.tags).filter(|tag| !tags::is_feature(tag)) {
         let tag = tag.trim().to_lowercase();
         let name = written.get(&tag).map_or(tag, |s| s.name.clone());
         if !name.is_empty() && !tags.contains(&name) {
@@ -256,6 +258,15 @@ mod tests {
         assert_eq!(kick.required, [0, 6, 10]);
         assert_eq!(kick.hits_per_measure, 3.0);
         assert_eq!(kick.forbidden.len(), 13);
+    }
+
+    #[test]
+    fn a_feature_tag_teaches_no_style() {
+        let mut bass = pattern("bass", &[0, 6, 10], 8);
+        bass.tags.insert(0, "mine".into());
+        let styles = learn(&Styles::default(), &[bass.clone(), bass]);
+        assert!(styles.get("bass").is_none(), "a bass is no style");
+        assert_eq!(styles.get("mine").unwrap().learned, Some((2, 4)), "its genre is");
     }
 
     #[test]

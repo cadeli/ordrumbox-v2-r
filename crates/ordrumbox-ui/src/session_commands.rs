@@ -178,6 +178,7 @@ impl Session {
             C::DuplicatePattern => self.duplicate_pattern(),
             C::RenamePattern => self.text_entry(Id::SongPattern(self.pattern_index)),
             C::PatternDescription => self.text_entry(Id::PatternDescription),
+            C::PatternTags => self.pattern_tags_entry(),
             C::PreviousPattern => self.step_pattern(-1),
             C::NextPattern => self.step_pattern(1),
             C::TempoDown => self.step_tempo(-1.0),

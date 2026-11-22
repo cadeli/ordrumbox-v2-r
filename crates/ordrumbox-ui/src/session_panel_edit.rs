@@ -332,6 +332,7 @@ impl Session {
             Id::InstrumentMenu => self.instrument_menu_pick(&value, dropdown),
             Id::ControlMenu => self.control_menu_pick(&value, dropdown.control),
             Id::AutomationMenu => self.automation_menu_pick(&value, dropdown),
+            Id::PatternMenu => self.pattern_menu_pick(&value, dropdown),
             id => self.select(id, &value),
         }
     }
@@ -488,6 +489,7 @@ impl Session {
             Id::GeneratePattern => self.run(Command::GeneratePattern),
             Id::AutoAll => self.run(Command::AutoAll),
             Id::ProjectName | Id::ProjectDescription | Id::PatternDescription => self.text_entry(id),
+            Id::PatternTags => self.pattern_tags_entry(),
             Id::KitText(key) => self.kit_text_entry(key),
             Id::KitAutoInstrument(sample) => self.kit_auto_instrument(sample),
             Id::KitToggle(field) => {

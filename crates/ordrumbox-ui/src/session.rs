@@ -134,6 +134,8 @@ mod session_panel_edit;
 mod session_panel_input;
 #[path = "session_panel_views.rs"]
 mod session_panel_views;
+#[path = "session_pattern_tags.rs"]
+mod session_pattern_tags;
 #[path = "session_playback.rs"]
 mod session_playback;
 #[path = "session_pointer.rs"]

@@ -594,6 +594,7 @@ impl Session {
         match id {
             Id::KitSampleInstrument(sample) => self.kit_instrument_menu(sample, rect),
             Id::Instrument => self.instrument_menu(values.get(selected).map_or("", String::as_str), rect),
+            Id::PatternList => self.pattern_genre_menu(rect),
             _ => self.chrome.widgets.dropdown = Some(Dropdown::new(id, rect, values, labels, selected)),
         }
     }

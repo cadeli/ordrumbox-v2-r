@@ -254,6 +254,7 @@ impl Session {
             room: self.song_room(layout),
             description: self.pattern().map(|p| p.description.as_str()),
             description_scroll: self.description_scroll(layout),
+            tags: self.pattern().map(|p| p.tags.as_slice()),
             loop_region: self.song_loop_marks(),
             is_loop_on: self.song_loop_region().is_some(),
             zoom: self.song_panel.zoom,
@@ -385,6 +386,7 @@ impl Session {
                     self.edited();
                 }
             }
+            Id::PatternTags => self.commit_pattern_tags(text),
             Id::PatternDescription => {
                 let changed = self.pattern().is_some_and(|p| p.description != text);
                 if changed && self.editor.set_pattern_description(self.pattern_index, text) {

@@ -393,3 +393,12 @@ grid's and the track editor's controls whose lane is taken back, the grid's M S 
 (`View::switches_taken_back`), and the song panel draws such a lane dim with an **OFF** badge
 (`SongView::taken_back`, `SongHit::LaneBadge`) whose click, or the lane menu's **Re-enable lane**, calls
 `reenable_lane`. The room for the badge is kept beside every lane's name, so a name stays put. No snapshot changed.
+
+A pattern's tags are genres or features (`ordrumbox-core/src/tags.rs`, `FEATURE_TAGS`): `Pattern::genre` is its first
+genre, `tags::by_genre` groups the patterns for the header's PATTERN list, now a menu of genres opening their patterns
+(`session_pattern_tags.rs`, `Id::PatternMenu`). `compose::learn` learns a style from genre tags only, so the feature tags
+no longer show as learned styles; `Editor::set_pattern_tags` keeps tags normalized (`tags::normalize`: lower case, no
+repeats). The demo library's tags are cleaned: `default`, `song` and `sends` removed, `exp` renamed `experimental`, the
+two `polyrhythm` patterns given `experimental` as genre. The song screen shows the tags on a line under the description
+(`SongLayout::tags_line`, `SongHit::Tags`), always there, so the description keeps its place; its frame shows one line
+less. No snapshot changed.
