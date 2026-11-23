@@ -394,6 +394,7 @@ impl Session {
                 }
             }
             Id::RollMenu => self.roll_menu_pick(value),
+            Id::LaneMenu => self.lane_menu_pick(value),
             // Picked with where they are (`pick`).
             Id::GridMenu | Id::TrackNameMenu(_) | Id::KitInstrumentMenu(_) | Id::InstrumentMenu => {}
             Id::SynthPreset | Id::SynthField(_) => self.synth_select(id, value),

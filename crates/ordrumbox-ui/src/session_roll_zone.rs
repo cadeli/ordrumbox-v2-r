@@ -1,4 +1,4 @@
-//! A zone of the piano roll, drawn with Shift+drag from a cell: steps of the
+//! A zone of the piano roll, drawn by dragging from a cell (Shift+drag from a note too): steps of the
 //! page shown and keys, on the roll's track. Ctrl+C copies its notes (with
 //! no zone: the selected note), Ctrl+X cuts them, Delete clears them; Ctrl+V
 //! pastes them with the zone's top left corner on the roll's cursor,
@@ -27,6 +27,8 @@ pub(super) struct RollZoneDrag {
     press: (i32, i32),
     /// The pointer has really moved: this is no longer a Shift+click.
     started: bool,
+    /// An empty cell was pressed: let go without a drag, it adds a note.
+    adds_note: bool,
     /// What it was pressed on; another edit cancels the drag.
     revision: u64,
 }
@@ -61,9 +63,28 @@ impl Session {
         if let Some(n) = self.roll_note_at(t, step, row) {
             self.roll_select(t, n);
         }
-        let revision = self.editor.revision();
-        self.roll.zone_drag = Some(RollZoneDrag { anchor: (step, row), press: (x, y), started: false, revision });
+        self.roll_zone_press(step, row, (x, y), false);
         true
+    }
+
+    /// A press on the cell `step`, `row`, which may become a zone; `adds_note`:
+    /// let go without a drag, it adds a note there.
+    pub(super) fn roll_zone_press(&mut self, step: i64, row: i32, press: (i32, i32), adds_note: bool) {
+        let revision = self.editor.revision();
+        self.roll.zone_drag = Some(RollZoneDrag { anchor: (step, row), press, started: false, adds_note, revision });
+    }
+
+    /// The press ended: without a drag, an empty cell gets its note.
+    pub(super) fn roll_zone_release(&mut self) {
+        let Some(drag) = self.roll.zone_drag.take() else { return };
+        if !drag.adds_note || drag.started || drag.revision != self.editor.revision() {
+            return;
+        }
+        let Some(t) = self.roll_track() else { return };
+        let (step, row) = drag.anchor;
+        if let Some(n) = self.roll_add(t, step, row) {
+            self.audition(t, Some(n));
+        }
     }
 
     /// The mouse moved with a cell Shift+pressed: the zone from it to the
@@ -320,5 +341,37 @@ mod tests {
         assert_eq!((span.start_step, span.end_step, span.high_row), (0, 16, 40), "the page's last step");
         assert_eq!(span.low_row, view.top_row - layout.visible_rows() + 1, "the lowest row shown");
         assert_eq!(zone.end_units, 4 * ordrumbox_logic::block::BEAT_UNITS);
+    }
+
+    #[test]
+    fn a_plain_drag_from_an_empty_cell_draws_a_zone_and_a_click_adds_a_note() {
+        let mut s = session();
+        let (x0, y0) = cell(&s, 0, 35);
+        let (x1, y1) = cell(&s, 7, 44);
+        assert!(s.roll_click(SIZE, x0, y0, Button::Left));
+        s.mouse_move(SIZE, x1, y1, true);
+        s.mouse_up();
+        assert!(s.roll_zone().is_some());
+        assert_eq!(notes(&s).len(), 4, "a drag adds no note");
+        let (x, y) = cell(&s, 9, 45);
+        s.roll_click(SIZE, x, y, Button::Left);
+        s.mouse_up();
+        assert_eq!(s.roll_zone(), None);
+        assert_eq!(notes(&s).len(), 5, "a click adds one");
+    }
+
+    #[test]
+    fn dragging_a_note_of_the_zone_moves_all_its_notes_in_one_undo_step() {
+        let mut s = session();
+        draw_zone(&mut s, (0, 36), (3, 43));
+        let (x0, y0) = cell(&s, 0, 36);
+        let (x1, y1) = cell(&s, 4, 38);
+        assert!(s.roll_click(SIZE, x0, y0, Button::Left));
+        s.mouse_move(SIZE, x1, y1, true);
+        s.mouse_up();
+        // C, E, G a beat later and two semitones up, on top of D, which they replace.
+        assert_eq!(notes(&s), [(1, 0, -10), (1, 0, -6), (1, 2, -3)]);
+        s.run(Command::Undo);
+        assert_eq!(notes(&s), [(0, 0, -12), (0, 0, -8), (0, 2, -5), (1, 0, -10)]);
     }
 }

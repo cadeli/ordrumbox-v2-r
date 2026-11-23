@@ -3,13 +3,19 @@
 //! `editors::LANES`), a bar per step. A press on a bar sets the setting of
 //! the notes of its step to the height pressed; a drag paints the bars it
 //! crosses, the steps between two moves taking the values between, all of it
-//! one undo step. A parameter lock painted to the bottom is cleared.
+//! one undo step. A parameter lock painted to the bottom is cleared. A bubble
+//! gives the value being painted, or that of the bar under the pointer; the
+//! right button opens a menu to put a step's notes, or all the track's, back
+//! to the setting's default.
 
+use crate::canvas::Canvas;
 use crate::scale::Scale;
+use ordrumbox_core::Note;
 use ordrumbox_core::steps::absolute_step;
 
 use super::Session;
 use crate::editors::{self, LANES, Prop};
+use crate::panel::{Dropdown, Id, Rect};
 use crate::view;
 
 /// A press on the lane, held: the track and the setting it paints, and the
@@ -57,6 +63,79 @@ impl Session {
         true
     }
 
+    /// The bubble over the lane: the value being painted, else the value of
+    /// the bar under the pointer; whether one was drawn.
+    pub(super) fn draw_lane_tooltip(&self, canvas: &mut Canvas, scale: Scale) -> bool {
+        if self.chrome.covered() {
+            return false;
+        }
+        let Some(layout) = self.grid_layout((canvas.width(), canvas.height(), scale)) else { return false };
+        let (Some(t), Some(prop)) = (self.editor_track(), self.lane_prop()) else { return false };
+        let Some(track) = self.track(t) else { return false };
+        let (x, y) = self.chrome.widgets.pointer;
+        let spb = view::steps_per_beat(track);
+        let value = if let Some(drag) = self.chrome.lane_drag {
+            lane_setting(prop, drag.value)
+        } else {
+            let Some(step) = layout.lane_step(x, y, spb) else { return false };
+            let at = i64::from(layout.start_beat()) * i64::from(spb) + step;
+            let note = track.notes.iter().find(|n| absolute_step(n.beat, n.step, spb) == at);
+            let Some(note) = note else { return false };
+            editors::note_lane_value(note, prop)
+        };
+        let text = match value {
+            Some(value) => format!("{} {}", prop.label, prop.format.value(value, "")),
+            None => format!("{} off", prop.label),
+        };
+        let lane = layout.lane_rect();
+        view::draw_tooltip(canvas, &text, Rect::new(x, lane.y, 0, lane.h), scale);
+        true
+    }
+
+    /// A right press at `(x, y)` on the lane's bars: its menu opens; whether
+    /// it was the lane's.
+    pub fn grid_lane_menu(&mut self, size: (i32, i32, Scale), x: i32, y: i32) -> bool {
+        let Some(layout) = self.grid_layout(size) else { return false };
+        let (Some(t), Some(prop)) = (self.editor_track(), self.lane_prop()) else { return false };
+        let Some(track) = self.track(t) else { return false };
+        let spb = view::steps_per_beat(track);
+        let Some(step) = layout.lane_step(x, y, spb) else { return false };
+        let at = i64::from(layout.start_beat()) * i64::from(spb) + step;
+        let title = format!("{} - {}", track.name, prop.label);
+        let lines =
+            [(format!("step:{at}"), "Reset this step".to_owned()), ("all".to_owned(), "Reset all notes".to_owned())];
+        self.chrome.widgets.dropdown = Some(Dropdown::menu(Id::LaneMenu, x, y, title, lines));
+        true
+    }
+
+    /// An action of the lane's menu: `step:N` puts the notes of absolute
+    /// step `N`, `all` every note of the track, back to the default setting.
+    pub(super) fn lane_menu_pick(&mut self, value: &str) {
+        let (Some(t), Some(prop)) = (self.editor_track(), self.lane_prop()) else { return };
+        let Some(track) = self.track(t) else { return };
+        let spb = view::steps_per_beat(track);
+        let only = match value.split_once(':') {
+            Some(("step", at)) => match at.parse::<i64>() {
+                Ok(at) => Some(at),
+                Err(_) => return,
+            },
+            _ => None,
+        };
+        let default = lane_default(prop);
+        let values: Vec<(usize, Option<f64>)> = track
+            .notes
+            .iter()
+            .enumerate()
+            .filter(|(_, note)| only.is_none_or(|at| absolute_step(note.beat, note.step, spb) == at))
+            .map(|(n, _)| (n, default))
+            .collect();
+        let desc = format!("Reset note {} on {}", prop.label.to_lowercase(), track.name);
+        if self.editor.set_note_values(self.pattern_index, t, prop.key, &values, &desc, false) {
+            self.edited();
+        }
+        self.message = format!("{} reset on {}", prop.label.to_lowercase(), notes_count(values.len()));
+    }
+
     /// The notes of track `t` on the page's steps from `from` to `to` (each
     /// a step of the page and a value) take the values between, each its
     /// step's.
@@ -82,6 +161,20 @@ impl Session {
             self.edited();
         }
     }
+}
+
+/// The default of lane setting `prop`: a parameter lock has none (`None`).
+fn lane_default(prop: &Prop) -> Option<f64> {
+    if editors::is_lock(prop) {
+        None
+    } else {
+        Some(Note::default().field(prop.key).and_then(|v| v.as_f64()).unwrap_or(prop.min))
+    }
+}
+
+/// `1 note`, `3 notes`.
+fn notes_count(count: usize) -> String {
+    if count == 1 { "1 note".to_owned() } else { format!("{count} notes") }
 }
 
 /// What a note's `prop` is set to by a painted `value`: a parameter lock at
@@ -237,5 +330,86 @@ mod tests {
         assert_eq!(tabs, moved, "the tabs never move");
         assert!(after.lane_rect().h <= lane.h && after.lane_rect().h >= tabs[0].h * view::lane_tab_rows());
         assert!(after.lane_rect().y >= after.add_track_rect().y + after.add_track_rect().h);
+    }
+
+    /// Option `i` of the open menu.
+    fn choose(s: &mut Session, i: usize) {
+        use super::super::session_panel::PanelKey;
+        for _ in 0..i {
+            s.panel_key(SIZE, PanelKey::Down, false, false);
+        }
+        s.panel_key(SIZE, PanelKey::Enter, false, false);
+    }
+
+    #[test]
+    fn the_pitch_lane_sets_whole_semitones_around_the_middle() {
+        let mut s = session();
+        s.editors.lane = LANES.iter().position(|(key, _)| *key == "pitch").expect("a pitch lane") as u8;
+        let (x, y) = bar(&s, 1, 1.0);
+        assert!(s.lane_press(SIZE, x, y));
+        s.mouse_up();
+        let pitches: Vec<f64> = s.track(0).unwrap().notes.iter().map(|n| n.pitch).collect();
+        assert_eq!(pitches, [0.0, 24.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn the_menu_resets_a_step_or_all_the_notes_in_one_undo_step() {
+        let mut s = session();
+        for beat in [0, 1, 2] {
+            let (x, y) = bar(&s, beat, 0.2);
+            assert!(s.lane_press(SIZE, x, y));
+            s.mouse_up();
+            s.editor.set_clock(Some(1000.0 * f64::from(beat + 1)));
+        }
+        assert!(velocities(&s, 0)[..3].iter().all(|v| *v < 0.3));
+        let (x, y) = bar(&s, 1, 0.5);
+        assert!(s.grid_lane_menu(SIZE, x, y));
+        choose(&mut s, 0);
+        assert_eq!(velocities(&s, 0)[1], 0.8, "this step is back to the default");
+        assert!(velocities(&s, 0)[0] < 0.3, "the others stay");
+        assert!(s.grid_lane_menu(SIZE, x, y));
+        choose(&mut s, 1);
+        assert_eq!(velocities(&s, 0), [0.8; 4]);
+        s.undo();
+        assert_eq!(velocities(&s, 0)[1], 0.8);
+        assert!(velocities(&s, 0)[0] < 0.3, "one undo step for the whole reset");
+        assert!(!s.grid_lane_menu(SIZE, 1, 1), "outside the lane, no lane menu");
+    }
+
+    #[test]
+    fn a_reset_clears_a_lock() {
+        let mut s = session();
+        s.editors.lane = LANES.iter().position(|(key, _)| *key == "filterLock").expect("a filter lane") as u8;
+        let (x, y) = bar(&s, 1, 0.5);
+        assert!(s.lane_press(SIZE, x, y));
+        s.mouse_up();
+        assert!(s.track(0).unwrap().notes[1].filter_lock.is_some());
+        assert!(s.grid_lane_menu(SIZE, x, y));
+        choose(&mut s, 1);
+        assert!(s.track(0).unwrap().notes.iter().all(|n| n.filter_lock.is_none()));
+    }
+
+    /// Whether the lane's bubble was drawn, over an empty window.
+    fn bubble(s: &Session) -> bool {
+        let (w, h, scale) = SIZE;
+        let mut pixels = vec![0; (w * h) as usize];
+        let drawn = s.draw_lane_tooltip(&mut Canvas::new(&mut pixels, w as usize, h as usize), scale);
+        assert_eq!(drawn, pixels.iter().any(|p| *p != 0), "it draws what it says");
+        drawn
+    }
+
+    #[test]
+    fn a_bubble_gives_the_value_painted_or_under_the_pointer() {
+        let mut s = session();
+        let (x, y) = bar(&s, 1, 0.5);
+        s.chrome.widgets.pointer = (x, y);
+        assert!(bubble(&s), "over a bar");
+        // Over a step without a note: nothing.
+        let layout = s.grid_layout(SIZE).unwrap();
+        s.chrome.widgets.pointer = (layout.cell_rect(0, 1, 2, s.track(0).unwrap()).x + 2, y);
+        assert!(!bubble(&s));
+        // While painting, the value being set.
+        assert!(s.lane_press(SIZE, x, y));
+        assert!(bubble(&s));
     }
 }

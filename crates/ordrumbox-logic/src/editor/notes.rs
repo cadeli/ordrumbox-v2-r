@@ -282,6 +282,27 @@ impl Editor {
         .unwrap_or(0)
     }
 
+    /// Move the notes of the piano roll zone `zone` of pattern `p` by `delta`
+    /// (steps, keys) ([`roll_block::move_roll_zone`]), as one step.
+    pub fn move_roll_zone(
+        &mut self,
+        p: usize,
+        zone: &RollZone,
+        delta: (i64, i32),
+        keys: RangeInclusive<i32>,
+    ) -> Pasted<RollZone> {
+        let Some(pattern) = self.library.patterns.get(p).map(|p| pattern_name(p).to_owned()) else {
+            return Pasted::default();
+        };
+        self.edit(
+            p,
+            |_| format!("Move notes in \"{pattern}\""),
+            None,
+            |pattern| roll_block::move_roll_zone(pattern, zone, delta, keys),
+        )
+        .unwrap_or_default()
+    }
+
     /// Paste `block` on track `t` of pattern `p` from `step`, its top on
     /// `top_key` ([`roll_block::paste_roll_block`]), as one step.
     pub fn paste_roll_block(

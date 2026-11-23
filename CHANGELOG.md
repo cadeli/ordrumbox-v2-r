@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### New
+- **Piano roll zones**: press on an empty cell and drag to select a zone (a plain click still adds
+  a note). Ctrl+C, Ctrl+X, Ctrl+V and Delete take the zone's notes, and dragging one of them moves
+  the whole zone in time and pitch (one undo step). Shift+drag still works.
 - **Simple view** (View > Simple view): the grid alone, the track and note editors folded; again,
   both shown. The first start opens in it, saying how to show the rest; later starts open as
   the window was left.

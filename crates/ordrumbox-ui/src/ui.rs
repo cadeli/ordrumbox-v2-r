@@ -211,6 +211,7 @@ impl Ui {
                 || (button == Button::Right && !menus_open && s.song_view_open() && s.song_click(size, x, y, button))
                 || (button == Button::Right && !menus_open && s.piano_roll_open() && s.roll_click(size, x, y, button))
                 || (button == Button::Right && !menus_open && s.pattern_ruler_menu(size, x, y))
+                || (button == Button::Right && !menus_open && s.grid_lane_menu(size, x, y))
                 || (button == Button::Right && !menus_open && s.grid_menu(size, x, y));
         }
         let menus = s.menus();

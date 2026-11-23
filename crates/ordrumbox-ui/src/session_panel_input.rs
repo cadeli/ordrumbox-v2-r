@@ -172,6 +172,9 @@ impl Session {
         if self.roll.bar_drag.is_some() {
             return self.roll_bar_to(size, x);
         }
+        if self.roll.zone_move.is_some() {
+            return self.roll_zone_move_to(size, x, y);
+        }
         if self.roll.zone_drag.is_some() {
             return self.roll_zone_move(size, x, y);
         }
@@ -294,6 +297,9 @@ impl Session {
             && let Some(lines) = self.control_tip(id)
         {
             return view::draw_tooltip_lines(canvas, &lines, rect, scale);
+        }
+        if self.draw_lane_tooltip(canvas, scale) {
+            return;
         }
         if self.song_view_open() {
             return self.draw_song_tooltip(canvas, scale);

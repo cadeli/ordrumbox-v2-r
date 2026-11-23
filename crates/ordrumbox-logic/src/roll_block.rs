@@ -96,6 +96,25 @@ pub fn delete_roll_zone(pattern: &mut Pattern, zone: &RollZone) -> usize {
     count - track.notes.len()
 }
 
+/// Move the notes of `zone` by `step_delta` steps of the track and `key_delta`
+/// keys, replacing what they land on: the zone's notes are copied, cleared,
+/// and pasted again. The zone at its new place (cut to `keys`), `None` when
+/// it left them.
+pub fn move_roll_zone(
+    pattern: &mut Pattern,
+    zone: &RollZone,
+    (step_delta, key_delta): (i64, i32),
+    keys: RangeInclusive<i32>,
+) -> Pasted<RollZone> {
+    let Some(step_length) = pattern.tracks.get(zone.track).map(|t| step_units(t.steps_per_beat)) else {
+        return Pasted::default();
+    };
+    let block = RollBlock::copy(pattern, zone);
+    delete_roll_zone(pattern, zone);
+    let step = zone.start_units.div_euclid(step_length) + step_delta;
+    paste_roll_block(pattern, zone.track, step, zone.high_key + key_delta, &block, keys)
+}
+
 /// Paste `block` on track `t` with its start at the start of the track's
 /// (absolute) step `step` and its top on key `top_key`, replacing what the
 /// track had under it. A note between two steps of the track goes to the

@@ -29,6 +29,14 @@ pub fn pasted_message(placed: usize, dropped: usize, left_out: &str) -> String {
     }
 }
 
+/// `moved 3 notes`, or what was left out and why.
+pub fn moved_message(placed: usize, dropped: usize, left_out: &str) -> String {
+    match dropped {
+        0 => format!("moved {}", notes_label(placed)),
+        dropped => format!("moved {}, {dropped} {left_out} left out", notes_label(placed)),
+    }
+}
+
 /// A style's name in the menus: a learned one says from how many patterns.
 pub fn style_label(style: &ordrumbox_core::Style) -> String {
     match style.learned {

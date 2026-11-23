@@ -286,6 +286,8 @@ pub enum Id {
     RollMenu,
     // Grid.
     TrackVolume(usize),
+    /// The right-click menu of the lane under the grid.
+    LaneMenu,
     /// A tab of the lane under the grid: an index in `editors::LANES`.
     Lane(u8),
     /// A track's rename entry.

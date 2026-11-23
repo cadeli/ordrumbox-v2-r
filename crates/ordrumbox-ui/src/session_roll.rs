@@ -57,6 +57,8 @@ pub(super) struct RollState {
     hover: Option<usize>,
     /// A Shift+press on a cell, which may become a zone.
     pub(super) zone_drag: Option<super::session_roll_zone::RollZoneDrag>,
+    /// A press on a note of the zone, which may drag the zone's notes.
+    pub(super) zone_move: Option<super::session_roll_zone_move::RollZoneMove>,
     /// A press on the right edge of a note, which draws it out.
     pub(super) length_drag: Option<super::session_roll_length::RollLengthDrag>,
 }
@@ -268,7 +270,7 @@ impl Session {
     }
 
     /// Add a note at `step`, `row` and select it.
-    fn roll_add(&mut self, t: usize, step: i64, row: i32) -> Option<usize> {
+    pub(super) fn roll_add(&mut self, t: usize, step: i64, row: i32) -> Option<usize> {
         let (beat, beat_step) = self.roll_beat(t, step);
         let n = self.editor.add_note(self.pattern_index, t, beat, beat_step, self.roll_pitch(t, row))?;
         self.selection.selected = Some((t, n));
@@ -317,7 +319,12 @@ impl Session {
             _ => None,
         };
         self.roll.gauge = None;
-        if matches!(hit, RollHit::Cell { .. }) {
+        // A press on a note of the zone may drag it: the zone stays.
+        let on_zone_note = button == Button::Left
+            && matches!(hit, RollHit::Cell { step, row } if drawn
+                .or_else(|| self.roll_note_at(t, step, row).map(|n| (n, false)))
+                .is_some_and(|(n, edge)| !edge && self.roll_zone().is_some_and(|z| self.roll_zone_holds_note(&z, n))));
+        if matches!(hit, RollHit::Cell { .. }) && !on_zone_note {
             self.selection.roll_zone = None;
         }
         match (hit, button) {
@@ -332,12 +339,13 @@ impl Session {
                     // A press on the right edge of a note draws it out.
                     Some((n, true)) => self.roll_length_press(t, n, x, layout.cell),
                     // A press on a note: a drag, or a click when it does not move.
-                    Some((n, false)) => self.roll_note_press(t, n, (x, y), (layout.cell, layout.row)),
-                    None => {
-                        if let Some(n) = self.roll_add(t, step, row) {
-                            self.audition(t, Some(n));
+                    Some((n, false)) => {
+                        if !self.roll_zone_move_press(n, (step, row), (x, y)) {
+                            self.roll_note_press(t, n, (x, y), (layout.cell, layout.row));
                         }
                     }
+                    // A press on an empty cell: a click adds a note, a drag draws a zone.
+                    None => self.roll_zone_press(step, row, (x, y), true),
                 }
             }
             (RollHit::Cell { step, row }, Button::Right) => self.roll_grid_menu(t, step, row, x, y),
@@ -358,6 +366,8 @@ impl Session {
     /// (`session_roll_move.rs`).
     pub(super) fn roll_release(&mut self) {
         self.roll.bar_drag = None;
+        self.roll_zone_release();
+        self.roll_zone_move_release();
         if self.roll.length_drag.take().is_some() {
             self.roll.gauge = None;
             return;
@@ -722,6 +732,8 @@ mod tests {
         // An empty cell: a note there, selected.
         let (x, y) = cell(&s, 6, 41);
         s.roll_click(SIZE, x, y, Button::Left);
+        assert_eq!(notes(&s).len(), 1, "a note is added once the click is over");
+        s.mouse_up();
         assert_eq!(notes(&s)[1], (1, 2, 5.0, 0.8));
         assert_eq!(s.selection.selected, Some((1, 1)));
         // A click right after, on the note just added: it stays, selected.

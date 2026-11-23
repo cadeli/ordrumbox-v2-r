@@ -100,6 +100,8 @@ mod session_roll_length;
 mod session_roll_move;
 #[path = "session_roll_zone.rs"]
 mod session_roll_zone;
+#[path = "session_roll_zone_move.rs"]
+mod session_roll_zone_move;
 #[path = "session_stems.rs"]
 mod session_stems;
 #[path = "session_tempo.rs"]

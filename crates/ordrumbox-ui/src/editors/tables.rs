@@ -415,11 +415,12 @@ pub fn note_prop(key: &str) -> Option<&'static Prop> {
 
 /// The note settings the grid's lane shows, one bar per step: their keys
 /// (settings of the note editor) and the labels of their tabs.
-pub const LANES: [(&str, &str); 9] = [
+pub const LANES: [(&str, &str); 10] = [
     ("velocity", "VELOCITY"),
     ("probability", "CHANCE"),
     ("retriggerCount", "RETRIG"),
     ("pan", "PAN"),
+    ("pitch", "PITCH"),
     ("lengthSteps", "LENGTH"),
     ("shiftSteps", "SHIFT"),
     ("filterLock", "FILTER"),
