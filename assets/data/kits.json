@@ -1184,5 +1184,493 @@
         "decay": 5000
       }
     ]
+  },
+  {
+    "name": "latin_perc",
+    "info": "latin percussion",
+    "desc": "rendered from the synth presets LAT_* (ordrumbox-probe preset --wav): bongos, congas, timbales, wood blocks, and the small percussion",
+    "samples": [
+      {
+        "displayName": "HI_BONGOS",
+        "key": "HI_BONGOS",
+        "path": "latin_perc/hi_bongos.wav",
+        "peakDb": -3,
+        "rootMidi": 71,
+        "decay": 5000
+      },
+      {
+        "displayName": "LO_BONGOS",
+        "key": "LO_BONGOS",
+        "path": "latin_perc/lo_bongos.wav",
+        "peakDb": -3,
+        "rootMidi": 64,
+        "decay": 5000
+      },
+      {
+        "displayName": "OHI_CONGAS",
+        "key": "OHI_CONGAS",
+        "path": "latin_perc/ohi_congas.wav",
+        "peakDb": -3,
+        "rootMidi": 66,
+        "decay": 5000
+      },
+      {
+        "displayName": "HI_CONGAS",
+        "key": "HI_CONGAS",
+        "path": "latin_perc/hi_congas.wav",
+        "peakDb": -3,
+        "rootMidi": 66,
+        "decay": 5000
+      },
+      {
+        "displayName": "LO_CONGAS",
+        "key": "LO_CONGAS",
+        "path": "latin_perc/lo_congas.wav",
+        "peakDb": -3,
+        "rootMidi": 59,
+        "decay": 5000
+      },
+      {
+        "displayName": "HI_TIMBAL",
+        "key": "HI_TIMBAL",
+        "path": "latin_perc/hi_timbal.wav",
+        "peakDb": -3,
+        "rootMidi": 68,
+        "decay": 5000
+      },
+      {
+        "displayName": "LO_TIMBAL",
+        "key": "LO_TIMBAL",
+        "path": "latin_perc/lo_timbal.wav",
+        "peakDb": -3,
+        "rootMidi": 63,
+        "decay": 5000
+      },
+      {
+        "displayName": "HI_WOODBLOCK",
+        "key": "HI_WOODBLOCK",
+        "path": "latin_perc/hi_woodblock.wav",
+        "peakDb": -3,
+        "rootMidi": 88,
+        "decay": 5000
+      },
+      {
+        "displayName": "LO_WOODBLOCK",
+        "key": "LO_WOODBLOCK",
+        "path": "latin_perc/lo_woodblock.wav",
+        "peakDb": -3,
+        "rootMidi": 81,
+        "decay": 5000
+      },
+      {
+        "displayName": "CLAVES",
+        "key": "CLAVES",
+        "path": "latin_perc/claves.wav",
+        "peakDb": -3,
+        "rootMidi": 99,
+        "decay": 5000
+      },
+      {
+        "displayName": "COWBELL",
+        "key": "COWBELL",
+        "path": "latin_perc/cowbell.wav",
+        "peakDb": -3,
+        "rootMidi": 80,
+        "decay": 5000
+      },
+      {
+        "displayName": "TRIANGLE",
+        "key": "TRIANGLE",
+        "path": "latin_perc/triangle.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "MARACAS",
+        "key": "MARACAS",
+        "path": "latin_perc/maracas.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "CABA",
+        "key": "CABA",
+        "path": "latin_perc/caba.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "GUIRO",
+        "key": "GUIRO",
+        "path": "latin_perc/guiro.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "CASTENET",
+        "key": "CASTENET",
+        "path": "latin_perc/castenet.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "CUICA",
+        "key": "CUICA",
+        "path": "latin_perc/cuica.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "WHISTLE",
+        "key": "WHISTLE",
+        "path": "latin_perc/whistle.wav",
+        "peakDb": -3,
+        "rootMidi": 98,
+        "decay": 5000
+      }
+    ]
+  },
+  {
+    "name": "606_like",
+    "info": "606-like kit",
+    "desc": "rendered from the synth presets TR606_* (ordrumbox-probe preset --wav), in the manner of a TR-606: dry and bright",
+    "samples": [
+      {
+        "displayName": "KICK",
+        "key": "KICK",
+        "path": "606_like/kick.wav",
+        "peakDb": -3,
+        "rootMidi": 35,
+        "decay": 5000
+      },
+      {
+        "displayName": "SNARE",
+        "key": "SNARE",
+        "path": "606_like/snare.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "CHH",
+        "key": "CHH",
+        "path": "606_like/chh.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "OHH",
+        "key": "OHH",
+        "path": "606_like/ohh.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "CRASH",
+        "key": "CRASH",
+        "path": "606_like/crash.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "LO_TOM",
+        "key": "LO_TOM",
+        "path": "606_like/lo_tom.wav",
+        "peakDb": -3,
+        "rootMidi": 45,
+        "decay": 5000
+      },
+      {
+        "displayName": "HI_TOM",
+        "key": "HI_TOM",
+        "path": "606_like/hi_tom.wav",
+        "peakDb": -3,
+        "rootMidi": 51,
+        "decay": 5000
+      }
+    ]
+  },
+  {
+    "name": "cr78_like",
+    "info": "CR-78-like kit",
+    "desc": "rendered from the synth presets CR78_* (ordrumbox-probe preset --wav), in the manner of a CR-78: soft and round",
+    "samples": [
+      {
+        "displayName": "KICK",
+        "key": "KICK",
+        "path": "cr78_like/kick.wav",
+        "peakDb": -3,
+        "rootMidi": 36,
+        "decay": 5000
+      },
+      {
+        "displayName": "SNARE",
+        "key": "SNARE",
+        "path": "cr78_like/snare.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "RIMSHOT",
+        "key": "RIMSHOT",
+        "path": "cr78_like/rimshot.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "CHH",
+        "key": "CHH",
+        "path": "cr78_like/chh.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "OHH",
+        "key": "OHH",
+        "path": "cr78_like/ohh.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "TAMBOURINE",
+        "key": "TAMBOURINE",
+        "path": "cr78_like/tambourine.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "GUIRO",
+        "key": "GUIRO",
+        "path": "cr78_like/guiro.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "MARACAS",
+        "key": "MARACAS",
+        "path": "cr78_like/maracas.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "CLAVES",
+        "key": "CLAVES",
+        "path": "cr78_like/claves.wav",
+        "peakDb": -3,
+        "rootMidi": 98,
+        "decay": 5000
+      },
+      {
+        "displayName": "COWBELL",
+        "key": "COWBELL",
+        "path": "cr78_like/cowbell.wav",
+        "peakDb": -3,
+        "rootMidi": 79,
+        "decay": 5000
+      },
+      {
+        "displayName": "HI_BONGOS",
+        "key": "HI_BONGOS",
+        "path": "cr78_like/hi_bongos.wav",
+        "peakDb": -3,
+        "rootMidi": 71,
+        "decay": 5000
+      },
+      {
+        "displayName": "LO_BONGOS",
+        "key": "LO_BONGOS",
+        "path": "cr78_like/lo_bongos.wav",
+        "peakDb": -3,
+        "rootMidi": 65,
+        "decay": 5000
+      },
+      {
+        "displayName": "CONGAS",
+        "key": "CONGAS",
+        "path": "cr78_like/congas.wav",
+        "peakDb": -3,
+        "rootMidi": 60,
+        "decay": 5000
+      }
+    ]
+  },
+  {
+    "name": "simmons_like",
+    "info": "Simmons-like kit",
+    "desc": "rendered from the synth presets SDS_* (ordrumbox-probe preset --wav), in the manner of the 1980s electronic drums: toms that sweep down",
+    "samples": [
+      {
+        "displayName": "KICK",
+        "key": "KICK",
+        "path": "simmons_like/kick.wav",
+        "peakDb": -3,
+        "rootMidi": 33,
+        "decay": 5000
+      },
+      {
+        "displayName": "SNARE",
+        "key": "SNARE",
+        "path": "simmons_like/snare.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "LO_TOM",
+        "key": "LO_TOM",
+        "path": "simmons_like/lo_tom.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "MTOM",
+        "key": "MTOM",
+        "path": "simmons_like/mtom.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "TOM",
+        "key": "TOM",
+        "path": "simmons_like/tom.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "HI_TOM",
+        "key": "HI_TOM",
+        "path": "simmons_like/hi_tom.wav",
+        "peakDb": -3,
+        "decay": 5000
+      }
+    ]
+  },
+  {
+    "name": "trap_808",
+    "info": "trap kit",
+    "desc": "rendered from the synth presets TRAP_* (ordrumbox-probe preset --wav): a dry kick, a long 808 bass in E to play notes with, tight snare, clap and hats",
+    "samples": [
+      {
+        "displayName": "KICK",
+        "key": "KICK",
+        "path": "trap_808/kick.wav",
+        "peakDb": -3,
+        "rootMidi": 35,
+        "decay": 5000
+      },
+      {
+        "displayName": "BASS",
+        "key": "BASS",
+        "path": "trap_808/bass.wav",
+        "peakDb": -3,
+        "rootMidi": 28,
+        "decay": 5000
+      },
+      {
+        "displayName": "SNARE",
+        "key": "SNARE",
+        "path": "trap_808/snare.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "CLAP",
+        "key": "CLAP",
+        "path": "trap_808/clap.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "CHH",
+        "key": "CHH",
+        "path": "trap_808/chh.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "OHH",
+        "key": "OHH",
+        "path": "trap_808/ohh.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "RIMSHOT",
+        "key": "RIMSHOT",
+        "path": "trap_808/rimshot.wav",
+        "peakDb": -3,
+        "decay": 5000
+      }
+    ]
+  },
+  {
+    "name": "minimal",
+    "info": "minimal kit",
+    "desc": "rendered from the synth presets MIN_* (ordrumbox-probe preset --wav): clicks, ticks and short sounds",
+    "samples": [
+      {
+        "displayName": "KICK",
+        "key": "KICK",
+        "path": "minimal/kick.wav",
+        "peakDb": -3,
+        "rootMidi": 31,
+        "decay": 5000
+      },
+      {
+        "displayName": "RIMSHOT",
+        "key": "RIMSHOT",
+        "path": "minimal/rimshot.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "CHH",
+        "key": "CHH",
+        "path": "minimal/chh.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "OHH",
+        "key": "OHH",
+        "path": "minimal/ohh.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "CLAP",
+        "key": "CLAP",
+        "path": "minimal/clap.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "SNARE",
+        "key": "SNARE",
+        "path": "minimal/snare.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "PERC",
+        "key": "PERC",
+        "path": "minimal/perc.wav",
+        "peakDb": -3,
+        "rootMidi": 83,
+        "decay": 5000
+      },
+      {
+        "displayName": "HIT",
+        "key": "HIT",
+        "path": "minimal/hit.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "SHAKER",
+        "key": "SHAKER",
+        "path": "minimal/shaker.wav",
+        "peakDb": -3,
+        "decay": 5000
+      }
+    ]
   }
 ]

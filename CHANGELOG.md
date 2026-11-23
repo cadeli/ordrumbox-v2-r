@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### New
+- **Kits latin_perc, 606_like, cr78_like, simmons_like, trap_808 and minimal**, rendered from 60
+  new synth presets (`LAT_*`, `TR606_*`, `CR78_*`, `SDS_*`, `TRAP_*`, `MIN_*`, kept in the synth
+  editor): latin percussion (bongos, timbales, wood blocks, triangle, cabasa, guiro, castanets,
+  cuica, whistle…), a drier 606, a soft CR-78, sweeping Simmons toms, a trap kit with a long 808
+  bass in E, and minimal clicks. A sound a kit lacks may be borrowed from them.
 - **Kits 808_like and 909_like**, rendered from 31 new synth presets (`TR808_*`, `TR909_*`, kept
   in the synth editor), in the manner of the two drum machines: kick, snare, clap, rimshot, hats,
   crash, ride, three toms, and congas, claves, maracas, cowbell (808) or shaker, tambourine (909).

@@ -468,3 +468,9 @@ are heard as the kits' samples. Each was made with `ordrumbox-probe preset <name
 `ordrumbox-probe fix <folder> --write` (peak at −3 dB) and `fix <file> --length <end at −60 dB + 30 ms> --fade-out 20
 --write`. A sound another kit lacks may now be borrowed from them: `assign_tests/data.rs` rewritten, as a meant change
 (187 rows, the new kits' included).
+
+Six more kits rendered the same way: `latin_perc`, `606_like`, `cr78_like`, `simmons_like`, `trap_808`, `minimal`
+(presets `LAT_*`, `TR606_*`, `CR78_*`, `SDS_*`, `TRAP_*`, `MIN_*`; a prefix that names no instrument, as above). The
+whistle is rendered with `--gate 0.35` (it sustains), the others with `--gate 1`. `assign_tests/data.rs` rewritten, as
+a meant change (190 rows: the new kits' and what the others now borrow from them). The factory presets' checks of
+`ordrumbox-probe/tests/synth_audio.rs` cover the new presets.
