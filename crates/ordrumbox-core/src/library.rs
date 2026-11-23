@@ -16,6 +16,9 @@ pub struct Library {
     pub info: Object,
     /// The session's tempo: every pattern plays at it, a song at its own.
     pub bpm: f64,
+    /// The name of the kit the tracks draw their samples from; `None` for a
+    /// file saved before the kit was kept (the kit in use stays).
+    pub kit: Option<String>,
     pub songs: Vec<Song>,
     pub patterns: Vec<Pattern>,
     /// The synth presets saved with the library, by key, over the assets'
@@ -26,12 +29,25 @@ pub struct Library {
 
 impl Default for Library {
     fn default() -> Self {
-        Self { info: Object::new(), bpm: DEFAULT_BPM, songs: Vec::new(), patterns: Vec::new(), synths: None }
+        Self { info: Object::new(), bpm: DEFAULT_BPM, kit: None, songs: Vec::new(), patterns: Vec::new(), synths: None }
     }
 }
 
 /// The key of the synth presets in a library file.
 const SYNTHS_KEY: &str = "synthPresets";
+/// The key of the kit in a library or project file.
+const KIT_KEY: &str = "kit";
+
+/// The kit a library or project file names, if any: a value that is not a
+/// name is reported and left out.
+fn kit_from_json(value: &Value, issues: &mut Vec<Issue>) -> Option<String> {
+    let raw = value.get(KIT_KEY)?;
+    let name = raw.as_str().filter(|name| !name.is_empty());
+    if name.is_none() {
+        issues.push(Issue::new(KIT_KEY, format!("not a kit name ({}), the kit in use kept", raw.to_json())));
+    }
+    name.map(str::to_owned)
+}
 
 /// What a load had to repair or leave out.
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -79,13 +95,17 @@ impl Library {
             songs_from_json(value.get("songs").unwrap_or(&Value::Null), &known_ids, &mut report.issues);
         report.dropped_clips = dropped;
         let synths = value.get(SYNTHS_KEY).map(|raw| synths_from_json(raw, &mut report.issues));
-        (Self { info, bpm, songs, patterns, synths }, report)
+        let kit = kit_from_json(value, &mut report.issues);
+        (Self { info, bpm, kit, songs, patterns, synths }, report)
     }
 
     pub fn to_json(&self) -> Value {
         let mut object = Object::new();
         object.insert("info", Value::Object(self.info.clone()));
         object.insert("bpm", Value::from(self.bpm));
+        if let Some(kit) = &self.kit {
+            object.insert(KIT_KEY, Value::from(kit.as_str()));
+        }
         object.insert("songs", Value::Array(self.songs.iter().map(Song::to_json).collect()));
         object.insert("patterns", Value::Array(self.patterns.iter().map(Pattern::to_json).collect()));
         if let Some(synths) = &self.synths {
@@ -105,7 +125,7 @@ impl Library {
 
     /// A project file (`SongService.buildSongData`, the record the song panel
     /// saves and exports as `.odbox`): the header's description and date,
-    /// the session tempo, the patterns, the arrangements, what is selected, and `stamp` (key
+    /// the session tempo, the kit, the patterns, the arrangements, what is selected, and `stamp` (key
     /// and time in ms: `savedAt` or `exportedAt`).
     pub fn project_record(
         &self,
@@ -120,6 +140,9 @@ impl Library {
         object.insert("description", info("description"));
         object.insert("date", info("date"));
         object.insert("bpm", Value::from(self.bpm));
+        if let Some(kit) = &self.kit {
+            object.insert(KIT_KEY, Value::from(kit.as_str()));
+        }
         object.insert("patterns", Value::Array(self.patterns.iter().map(Pattern::to_json).collect()));
         object.insert("selectedPattern", Value::from(selected_pattern as f64));
         object.insert("songs", Value::Array(self.songs.iter().map(Song::to_json).collect()));
@@ -249,6 +272,21 @@ mod tests {
         let (library, report) = Library::parse(r#"{"synthPresets":[]}"#).unwrap();
         assert_eq!(library.synths, Some(Object::new()));
         assert_eq!(report.issues.len(), 1);
+    }
+
+    #[test]
+    fn the_kit_is_kept_in_a_library_and_a_project() {
+        let (library, report) = Library::parse(r#"{"kit":"human","patterns":[]}"#).unwrap();
+        assert_eq!((library.kit.as_deref(), report.issues.len()), (Some("human"), 0));
+        assert_eq!(library.to_json().get("kit").cloned(), Some(Value::from("human")));
+        let record = library.project_record("p", 0, 0, ("savedAt", 0.0));
+        let read = Library::from_project_record(&record, &Object::new()).unwrap();
+        assert_eq!(read.library.kit.as_deref(), Some("human"));
+        let (none, _) = Library::parse(r#"{"patterns":[]}"#).unwrap();
+        assert_eq!((none.kit.as_deref(), none.to_json().get("kit").cloned()), (None, None), "an older file: no kit");
+        let (wrong, report) = Library::parse(r#"{"kit":3,"patterns":[]}"#).unwrap();
+        assert_eq!(wrong.kit, None);
+        assert_eq!(report.issues, [Issue::new("kit", "not a kit name (3), the kit in use kept")]);
     }
 
     #[test]

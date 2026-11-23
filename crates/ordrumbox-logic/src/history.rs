@@ -38,6 +38,10 @@ pub enum Change {
     Library { before: Box<Library>, after: Box<Library>, select: (usize, usize) },
     /// The library's tempo, before and after.
     Tempo { before: f64, after: f64 },
+    /// The library's kit, before and after.
+    Kit { before: Option<String>, after: Option<String> },
+    /// The library's header (the project's name and description), before and after.
+    Info { before: Object, after: Object },
     /// The synth presets saved with the library, before and after.
     Synths { before: Option<Object>, after: Option<Object> },
 }
@@ -62,6 +66,8 @@ impl Change {
                 *target.selected_song = if undo { *on_undo } else { *on_redo };
             }
             Self::Tempo { before, after } => target.library.bpm = if undo { *before } else { *after },
+            Self::Kit { before, after } => target.library.kit = if undo { before } else { after }.clone(),
+            Self::Info { before, after } => target.library.info = if undo { before } else { after }.clone(),
             Self::Synths { before, after } => target.library.synths = if undo { before } else { after }.clone(),
         }
     }
@@ -74,6 +80,8 @@ impl Change {
             (Self::Songs { .. }, Self::Songs { .. })
             | (Self::Library { .. }, Self::Library { .. })
             | (Self::Tempo { .. }, Self::Tempo { .. })
+            | (Self::Kit { .. }, Self::Kit { .. })
+            | (Self::Info { .. }, Self::Info { .. })
             | (Self::Synths { .. }, Self::Synths { .. }) => true,
             _ => false,
         }
@@ -87,6 +95,8 @@ impl Change {
             (Self::Songs { after, .. }, Self::Songs { after: next_after, .. }) => *after = next_after,
             (Self::Library { after, .. }, Self::Library { after: next_after, .. }) => *after = next_after,
             (Self::Tempo { after, .. }, Self::Tempo { after: next_after, .. }) => *after = next_after,
+            (Self::Kit { after, .. }, Self::Kit { after: next_after, .. }) => *after = next_after,
+            (Self::Info { after, .. }, Self::Info { after: next_after, .. }) => *after = next_after,
             (Self::Synths { after, .. }, Self::Synths { after: next_after, .. }) => *after = next_after,
             _ => {}
         }

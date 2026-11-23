@@ -398,11 +398,13 @@ impl Session {
         if name.is_none() && description.is_none() {
             return Err("Give name, description, or both".into());
         }
-        if let Some(name) = name {
-            self.editor.set_library_info("name", name);
-        }
-        if let Some(description) = description {
-            self.editor.set_library_info("description", description);
+        let changed = self.editor.batch("Project info", |editor| {
+            let named = name.is_some_and(|name| editor.set_library_info("name", name));
+            let described = description.is_some_and(|text| editor.set_library_info("description", text));
+            named || described
+        });
+        if changed {
+            self.edited();
         }
         Ok(object([("name", Value::from(self.project_name())), ("description", Value::from(self.info("description")))]))
     }

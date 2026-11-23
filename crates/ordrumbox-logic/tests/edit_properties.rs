@@ -658,17 +658,34 @@ fn every_edit_undoes_and_redoes_exactly() {
 }
 
 /// The edits that are not undo steps, by design: the selected arrangement,
-/// the library header, the lines auto mode makes every loop.
+/// the lines auto mode makes every loop.
 #[test]
 fn some_changes_are_not_undo_steps() {
     let mut editor = Editor::new(library());
     assert_eq!(editor.set_selected_song(99), 1, "clamped to the list");
-    assert!(editor.set_library_info("name", "Demo"));
-    assert!(!editor.set_library_info("name", "Demo"));
     let mut tracks = vec![Track::new("KICK", 4, 4)];
     editor.swap_tracks(0, &mut tracks);
     assert_eq!(editor.library().patterns[0].tracks.len(), 1);
     assert_eq!(editor.history().undo_len(), 0);
+}
+
+/// The project's name and description and the kit are undo steps, as the tempo.
+#[test]
+fn the_project_header_and_the_kit_are_undo_steps() {
+    let mut editor = Editor::new(library());
+    let (name, kit) = (editor.library().info.get("name").cloned(), editor.library().kit.clone());
+    assert!(editor.set_library_info("name", "Demo"));
+    assert!(!editor.set_library_info("name", "Demo"), "the same name: no step");
+    assert!(editor.set_kit("human"));
+    assert!(!editor.set_kit("human"));
+    assert_eq!(editor.history().undo_len(), 2);
+    assert_eq!(editor.undo().as_deref(), Some("Kit → human"));
+    assert_eq!(editor.library().kit, kit);
+    assert_eq!(editor.undo().as_deref(), Some("Rename project → \"Demo\""));
+    assert_eq!(editor.library().info.get("name").cloned(), name);
+    editor.redo();
+    editor.redo();
+    assert_eq!(editor.library().kit.as_deref(), Some("human"));
 }
 
 // ─── Compact ─────────────────────────────────────────────────────────────────

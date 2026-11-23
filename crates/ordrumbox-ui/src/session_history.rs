@@ -10,6 +10,7 @@ impl Session {
     pub(super) fn edited(&mut self) {
         self.saving.library.touch();
         self.refresh_synths();
+        self.follow_kit();
         if let Some(desc) = self.editor.history().next_undo() {
             self.message = desc.to_owned();
         }
@@ -51,6 +52,7 @@ impl Session {
         self.clamp_selection();
         self.saving.library.touch();
         self.refresh_synths();
+        self.follow_kit();
     }
 
     /// File > Save: the library written now.

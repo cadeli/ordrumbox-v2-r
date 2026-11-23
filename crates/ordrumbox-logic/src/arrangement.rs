@@ -41,13 +41,20 @@ impl Editor {
         self.selected_song
     }
 
-    /// Set a field of the library header (`songInfos`: `name`,
-    /// `description`), as the song panel does: not an undo step.
+    /// Set a field of the library header (`songInfos`: the project's
+    /// `name`, `description`), one undo step. Whether it changed.
     pub fn set_library_info(&mut self, key: &str, value: &str) -> bool {
         if self.library.info.get(key).and_then(Value::as_str) == Some(value) {
             return false;
         }
+        let before = self.library.info.clone();
         self.library.info.insert(key, Value::from(value));
+        let desc = match key {
+            "name" => format!("Rename project → \"{value}\""),
+            "description" => "Project description".to_owned(),
+            _ => format!("Project {key}"),
+        };
+        self.record(desc, Change::Info { before, after: self.library.info.clone() }, None);
         self.revision += 1;
         true
     }

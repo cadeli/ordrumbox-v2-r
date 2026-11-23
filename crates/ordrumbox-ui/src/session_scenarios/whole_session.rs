@@ -25,12 +25,18 @@ fn a_session_through_the_menus_draws_every_step() {
 
     // Kits and patterns, by the menus.
     s.run(Command::NextKit);
-    assert_eq!((s.kit_index, s.message.as_str()), (1, "kit b"));
+    let undo = format!("kit b ({}+Z: undo)", crate::menu::command_label());
+    assert_eq!((s.kit_index, s.message.as_str()), (1, undo.as_str()));
+    assert_eq!(s.editor.library().kit.as_deref(), Some("b"), "kept with the library");
     s.run(Command::PreviousKit);
     assert_eq!(s.kit_index, 0);
+    s.undo();
+    s.update();
+    assert_eq!(s.kit_index, 1, "an undo plays the kit before");
+    s.run(Command::PreviousKit);
     s.run(Command::SelectRandomDrumkit);
     s.run(Command::Kit(0));
-    assert_eq!(s.message, "kit a");
+    assert!(s.message.starts_with("kit a"), "{}", s.message);
     s.run(Command::SelectRandomPattern);
     assert!(s.message.starts_with("pattern "));
     s.run(Command::ToggleVus);

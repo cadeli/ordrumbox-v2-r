@@ -233,12 +233,13 @@ for low vision or a bright room (every text at least 7:1 against its ground, WCA
 <p>Every edit of the library is one undo step: <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes, <kbd>Ctrl</kbd>+<kbd>Y</kbd> (or
 <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>) redoes, up to 50 steps. The <strong>Edit</strong> menu names
 the step it will undo or redo. This includes the synth presets, which are part of the library (a knob turned is
-one step). Kit edits and the mixer's returns and master are saved directly and are not undo steps (a track's sends, pan and volume are).</p>
+one step, a preset deleted one), the kit chosen, and the project's name and description. Kit edits and the mixer's returns and master are saved directly and are not undo steps (a track's sends, pan and volume are).</p>
 <p>What can be undone is done at once — deleting a track, a clip, an arrangement, clearing notes, random notes,
 compacting tracks… — and its message on the status line ends with <em>(Ctrl+Z: undo)</em>. What cannot be undone
-asks first, <kbd>Enter</kbd> goes on, <kbd>Esc</kbd> or a click cancels: removing a kit's sample or a synth preset,
-loading or importing a song or a library, loading the demo library, restoring user data, changing the user data
-folder, a factory reset, and an export that would replace a file.</p>
+asks first, <kbd>Enter</kbd> goes on, <kbd>Esc</kbd> or a click cancels: removing a kit's sample, restoring user
+data, changing the user data folder, a factory reset, and an export that would replace a file. Opening or importing a
+project or a library, and loading the demo library, also ask first, as they replace every pattern and arrangement,
+though each one is an undo step.</p>
 
 <!-- ───────────────────────────────────────────────────────────── -->
 <h2 id="menus">4. Menu bar</h2>
@@ -426,7 +427,7 @@ slip off the play keys changes nothing; pressed alone, they say so on the status
 <tr><td><strong>MODE</strong></td><td><strong>PATTERN</strong> <strong>SONG</strong> (<kbd>F5</kbd>, <kbd>F3</kbd>)</td><td>What <strong>PLAY</strong> and <kbd>Space</kbd> play: one pattern in a loop, or the song, its patterns one after another. The mode shown is lit. Only this switch changes it: the views and their keys leave it as it is. In song mode the grid and the piano roll show the pattern the song is playing, with its playhead; back from the song to the pattern, the pattern keeps the song's tempo. Not in the plugin: the host plays.</td></tr>
 <tr><td><strong>PATTERN</strong></td><td>List</td><td>Pick a pattern: the list opens on the genres (each with how many patterns it has, the one shown highlighted), and a genre opens its patterns beside it; the patterns without a genre are under <em>other</em> (<a href="#song-tags">see Tags</a>). <kbd>[</kbd> <kbd>]</kbd> still step through the whole library. While playing, the pattern picked waits for the one playing to end its loop: the label reads <strong>NEXT</strong> until it starts.</td></tr>
 <tr><td><strong>BEATS</strong></td><td>List, 1–16 then every 4th up to 64</td><td>The pattern's length in beats.</td></tr>
-<tr><td><strong>KIT</strong></td><td>List</td><td>The kit the tracks draw their samples from.</td></tr>
+<tr><td><strong>KIT</strong></td><td>List</td><td>The kit the tracks draw their samples from. It is kept with the library and its projects (one undo step), and comes back at the next start and with a project loaded. In the plugin, the host's <strong>Kit</strong> parameter chooses it.</td></tr>
 <tr><td><strong>STYLE</strong></td><td>List</td><td>The 14 styles, the learned styles, or random. Picking one makes the pattern again in it.</td></tr>
 <tr><td><strong>↻</strong></td><td>Button (<kbd>Shift</kbd>+<kbd>B</kbd>)</td><td>Make the pattern again in its style: its tracks, meter and lines, and the session's tempo. A track the style names keeps its sound and settings; the others go. Draws a new seed.</td></tr>
 <tr><td><strong>AUTO</strong></td><td>Button</td><td>Every track of the pattern in auto mode, or out of it.</td></tr>

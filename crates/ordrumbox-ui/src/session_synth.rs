@@ -15,7 +15,6 @@ use std::time::Instant;
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_engine::synth_model as model;
 
-use super::session_confirm::Pending;
 use super::session_files::NO_SYNTHS;
 use super::session_types::Workspace;
 use super::{Session, session_panel};
@@ -451,7 +450,8 @@ impl Session {
                     self.message = "Cannot delete the last preset".into();
                     return;
                 }
-                self.ask(Pending::RemoveSynth(key));
+                // An undo step: done at once, as every edit of the library.
+                self.undoable(|s| s.remove_synth(&key));
             }
             "new" => {
                 let keys = self.synth_keys();
@@ -553,7 +553,6 @@ pub(super) fn merged_synths(own: Option<&Object>, assets: &SynthPresets) -> Synt
 
 #[cfg(test)]
 mod tests {
-    use super::super::OverlayKey;
     use super::*;
     use crate::kits::KitSet;
     use crate::view::Cursor;
@@ -657,10 +656,13 @@ mod tests {
         assert_eq!(s.synth_editor.edit.as_ref().unwrap().key, "new_preset");
         s.synth_button("duplicate");
         assert_eq!(s.synth_keys(), ["a", "b", "new_preset", "new_preset_copy"]);
+        // Deleted at once, as an undo step: no confirmation.
         s.synth_button("delete");
-        s.overlay_key(OverlayKey::Move(1));
-        s.overlay_key(OverlayKey::Enter);
+        assert!(!s.overlay_open());
+        assert_eq!(s.synth_keys(), ["a", "b", "new_preset"]);
         assert_eq!(s.synth_editor.edit.as_ref().unwrap().key, "new_preset");
+        s.undo();
+        assert_eq!(s.synth_keys(), ["a", "b", "new_preset", "new_preset_copy"]);
         // The power button of the envelope (ENV tab).
         s.synth_activate(Id::SynthTab(3));
         let groups = model::groups(&s.synth_editor.edit.as_ref().unwrap().draft);

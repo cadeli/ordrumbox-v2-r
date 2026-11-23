@@ -12,6 +12,12 @@
   MCP: `chokeGroup` in `updateTrack`.
 
 ### Changed
+- The kit chosen is kept with the library and its projects, and comes back at the next start
+  and with a project opened; choosing one is an undo step. In the plugin, the host's Kit
+  parameter still chooses it.
+- The project's name and description are undo steps, as a pattern's or an arrangement's.
+- Deleting a synth preset is done at once: it was already an undo step, the confirmation said
+  otherwise.
 - Piano roll: dragging a note moves it, sideways in time and up / down in pitch, never onto
   another note (its velocity stays with the note editor and the grid's lane). A click on the
   selected note no longer deletes it: a double-click does, as Delete and the note's menu. The

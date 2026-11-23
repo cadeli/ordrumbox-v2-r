@@ -210,6 +210,8 @@ pub struct Session {
     roots: Vec<(String, f64)>,
     kits: KitSet,
     kit_index: usize,
+    /// The library revision the kit used last followed (`Session::follow_kit`).
+    kit_revision: Option<u64>,
     /// The kit editor (`session_kit.rs`).
     kit_editor: session_kit::KitEditor,
     /// The synth presets: those played, the assets' (`session_synth.rs`).
@@ -343,6 +345,7 @@ impl Session {
         // What the library's tags teach, learned again after an edit (the header and menus read it).
         self.generators.learn(&self.editor);
         self.refresh_synths();
+        self.follow_kit();
         let ticks = |step: u32| u64::from(step) * u64::from(ordrumbox_core::automation::STEP_TICKS);
         let region = self.song_loop_region().and_then(|(first, end)| SongLoop::new(ticks(first), ticks(end)));
         self.playback.set_song_loop(&self.editor, region);

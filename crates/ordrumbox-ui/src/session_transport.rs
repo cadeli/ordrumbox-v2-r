@@ -255,8 +255,10 @@ impl Session {
             self.message = format!("host: no kit {} (there are {count})", index + 1);
             return false;
         }
+        // What plays, not the library: the host's project keeps the parameter.
         if index != self.kit_index {
-            self.use_kit(index);
+            self.select_kit(index);
+            self.message = format!("kit {}", self.kits.kits()[index].name);
         }
         true
     }
@@ -285,11 +287,45 @@ impl Session {
         self.kits.kits().iter().map(|k| k.name.as_str())
     }
 
-    /// Use kit `index` and say so.
+    /// Use kit `index`, the library's from now on, and say so.
     pub(super) fn use_kit(&mut self, index: usize) {
+        let Some(name) = self.kits.kits().get(index).map(|kit| kit.name.clone()) else { return };
+        self.undoable(|s| {
+            s.choose_kit(index);
+            s.message = format!("kit {name}");
+        });
+    }
+
+    /// Use kit `index` and keep it in the library, one undo step.
+    pub(super) fn choose_kit(&mut self, index: usize) {
+        let Some(name) = self.kits.kits().get(index).map(|kit| kit.name.clone()) else { return };
         self.select_kit(index);
-        if let Some(kit) = self.kits.kits().get(index) {
-            self.message = format!("kit {}", kit.name);
+        if self.editor.set_kit(&name) {
+            self.kit_revision = Some(self.editor.revision());
+            self.saving.library.touch();
+        }
+    }
+
+    /// The kit used follows the library's when the library changed (an undo,
+    /// a project or a library loaded); a kit the library names that is not
+    /// there is said once, and the kit in use stays. A plugin plays the kit
+    /// of its host's parameter.
+    pub(super) fn follow_kit(&mut self) {
+        let revision = self.editor.revision();
+        if self.host.hosted || self.kit_revision == Some(revision) {
+            return;
+        }
+        self.kit_revision = Some(revision);
+        let Some(name) = self.editor.library().kit.clone() else { return };
+        if self.kits.kits().get(self.kit_index).is_some_and(|kit| kit.name == name) {
+            return;
+        }
+        match self.kits.kits().iter().position(|kit| kit.name == name) {
+            Some(index) => self.select_kit(index),
+            None => {
+                let used = self.kits.kits().get(self.kit_index).map_or("none", |kit| kit.name.as_str());
+                self.message = format!("no kit \"{name}\": kit {used} played");
+            }
         }
     }
 

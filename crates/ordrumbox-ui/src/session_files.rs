@@ -212,6 +212,7 @@ impl Session {
                 self.kit_index = kit;
                 self.kit_editor.sample = Some(sample);
                 self.kits_changed(message);
+                self.choose_kit(kit);
             }
             Err(e) => self.message = e,
         }

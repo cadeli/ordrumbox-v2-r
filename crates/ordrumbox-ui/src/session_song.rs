@@ -378,12 +378,12 @@ impl Session {
             // `renameSong`: an empty name keeps the old one.
             Id::ProjectName if !text.is_empty() => {
                 if self.editor.set_library_info("name", text) {
-                    self.saving.library.touch();
+                    self.edited();
                 }
             }
             Id::ProjectDescription => {
                 if self.editor.set_library_info("description", text) {
-                    self.saving.library.touch();
+                    self.edited();
                 }
             }
             Id::SongPattern(p) => {
@@ -543,6 +543,13 @@ pub(super) mod tests {
         s.commit_text(Id::ProjectName, "  My song ");
         s.commit_text(Id::ProjectDescription, " about ");
         assert_eq!((s.project_name().as_str(), s.info("description").as_str()), ("My song", "about"));
+        // Each one an undo step, as a pattern's or an arrangement's name.
+        s.undo();
+        assert_eq!((s.project_name().as_str(), s.info("description").as_str()), ("My song", ""));
+        s.undo();
+        assert_eq!(s.project_name(), "lib");
+        s.redo();
+        s.redo();
         // A click on the pattern's description edits the selected pattern's.
         let d = s.song_layout(SIZE).description;
         let inside = (d.x + d.w / 2, d.y + d.h / 2);

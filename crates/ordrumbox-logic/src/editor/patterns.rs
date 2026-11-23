@@ -106,6 +106,18 @@ impl Editor {
         true
     }
 
+    /// The library's kit, by name, one undo step. Whether it changed.
+    pub fn set_kit(&mut self, name: &str) -> bool {
+        let before = self.library.kit.clone();
+        if before.as_deref() == Some(name) {
+            return false;
+        }
+        self.library.kit = Some(name.to_owned());
+        self.record(format!("Kit → {name}"), Change::Kit { before, after: self.library.kit.clone() }, None);
+        self.revision += 1;
+        true
+    }
+
     /// Length in beats, 1–64 (out of range: 4); every track follows and its
     /// loop point stays inside.
     pub fn set_pattern_beat_count(&mut self, p: usize, beats: f64) -> bool {

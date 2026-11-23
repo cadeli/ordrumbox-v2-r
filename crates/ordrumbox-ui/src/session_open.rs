@@ -285,6 +285,7 @@ impl Session {
             roots: Vec::new(),
             kits,
             kit_index: 0,
+            kit_revision: None,
             kit_editor: KitEditor::default(),
             synths: session_synth::Synths::default(),
             pattern_index: 0,

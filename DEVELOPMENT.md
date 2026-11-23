@@ -442,3 +442,11 @@ The first start (no `settings.json` in the user data folder: `session_resume::is
 view, the grid alone (`Session::start_simple`, `Chrome::fold_editors`, as the plugin's compact view), with a message
 saying how to show the rest; `resume` keeps the panels from then on. View > Simple view (`Command::SimpleView`) folds
 both editors, or shows both when both are folded. No snapshot changed.
+
+The kit is part of the library (`Library::kit`, the key `kit` of a library and of a project file, written when set):
+`Editor::set_kit` is an undo step (`Change::Kit`). A kit chosen by the user (`Session::choose_kit`: the KIT list, the
+kit keys, a random kit, `selectKit`, a kit folder imported) is played and kept; after an undo, a library or a project
+loaded, `Session::follow_kit` plays the library's kit (once per library revision, as `refresh_synths`). A plugin
+plays the kit of its host's parameter (`host_select_kit` keeps nothing). The project's name and description are undo
+steps too (`set_library_info`, `Change::Info`; `setProjectInfo` one step for both). Deleting a synth preset, already
+an undo step, no longer asks first. A file without `kit` keeps the kit in use: no snapshot changed.
