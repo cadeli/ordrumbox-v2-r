@@ -306,10 +306,12 @@ mod tests {
         let _audio = player.start(48_000.0, &state);
         let ui = player.ui().unwrap();
         assert_eq!(ui.session.shown(), ordrumbox_ui::Shown::grid_alone(), "the grid alone");
-        let (width, height) = crate::editor::default_size();
-        assert_eq!(ui.needed_size(), (i32::try_from(width).unwrap(), i32::try_from(height).unwrap()));
+        // At the zoom of the user's settings, which the session reads: not
+        // necessarily ×1, the scale of `editor::default_size`.
+        let compact = ordrumbox_ui::min_window_size(ui.session.wanted_scale(), ordrumbox_ui::Shown::grid_alone());
+        assert_eq!(ui.needed_size(), compact);
         ui.session.run(ordrumbox_ui::Command::NoteEditor);
-        assert!(ui.needed_size().1 > i32::try_from(height).unwrap(), "the note editor unfolded: taller");
+        assert!(ui.needed_size().1 > compact.1, "the note editor unfolded: taller");
     }
 
     #[test]
