@@ -116,6 +116,8 @@ pub struct Engine {
     voices: Vec<SampleVoice>,
     synths: Vec<SynthVoice>,
     serial: u64,
+    /// The choke group of each track, as its last note gave it.
+    choke_groups: [Option<u8>; MAX_TRACKS],
     channels: Vec<Channel>,
     /// Per-track peak of the last rendered quantum (0–1), for VU meters.
     peaks: Vec<f32>,
@@ -172,6 +174,7 @@ impl Engine {
             voices: vec![SampleVoice::default(); MAX_VOICES],
             synths: vec![SynthVoice::default(); MAX_SYNTH_VOICES],
             serial: 0,
+            choke_groups: [None; MAX_TRACKS],
             channels: vec![channel; MAX_TRACKS],
             peaks: vec![0.0; MAX_TRACKS],
             strip_count: 0,

@@ -634,6 +634,7 @@ impl Controller {
                 frame: 0,
                 sound: crate::pass::Sound::Sample(voice),
                 mono: false,
+                choke_group: None,
                 velocity: 1.0,
                 note: None,
                 note_frames: 0,

@@ -8,7 +8,7 @@ use ordrumbox_core::arp::MAX_OCTAVES;
 use ordrumbox_core::note::{MAX_LENGTH_STEPS, MAX_SHIFT_STEPS};
 use ordrumbox_core::track::{
     COMP_ATTACK_MS_RANGE, COMP_RATIO_RANGE, COMP_RELEASE_MS_RANGE, COMP_THRESHOLD_DB_RANGE, DUCK_RELEASE_MS_RANGE,
-    MAX_STEPS_PER_BEAT,
+    MAX_CHOKE_GROUPS, MAX_STEPS_PER_BEAT,
 };
 use ordrumbox_logic::generate;
 
@@ -139,8 +139,9 @@ pub(super) const DELAY_TIME_LABELS: [&str; 7] = ["1/16", "1/8", "1/4", "1/2", "1
 pub(super) const FILTER_SLOPE_VALUES: [&str; 2] = ["12", "24"];
 pub(super) const FILTER_SLOPE_LABELS: [&str; 2] = ["12 dB", "24 dB"];
 
-/// Selects of a track setting whose values are numbers (written as numbers).
-pub const NUMERIC_SELECTS: [&str; 2] = ["delayBeats", "filterSlope"];
+/// Selects of a track setting whose values are numbers (written as numbers;
+/// an empty value is none).
+pub const NUMERIC_SELECTS: [&str; 3] = ["delayBeats", "filterSlope", "chokeGroup"];
 
 /// What a select of a track setting offers: values and labels.
 pub fn track_select_options(key: &str) -> (Vec<String>, Vec<String>) {
@@ -152,6 +153,11 @@ pub fn track_select_options(key: &str) -> (Vec<String>, Vec<String>) {
         "filterType" => (list(&FILTER_TYPES), Vec::new()),
         "delayType" => (list(&["slap", "tape", "pingpong"]), Vec::new()),
         "saturationType" => (list(&["soft", "hard", "tape"]), Vec::new()),
+        "chokeGroup" => {
+            let groups = (1..=MAX_CHOKE_GROUPS).map(|g| g.to_string());
+            let values = std::iter::once(String::new()).chain(groups.clone()).collect();
+            (values, std::iter::once("off".to_owned()).chain(groups).collect())
+        }
         "autoVariant" => {
             // Every melodic variant (a bass track plays the bass ones, a chord track the others).
             let mut names = vec![String::new()];
@@ -252,6 +258,7 @@ pub fn fx_label(key: &str) -> &'static str {
         "delayBeats" => "Beats",
         "filterSlope" => "Slope",
         "sidechainSource" => "Key",
+        "chokeGroup" => "Choke",
         _ => "Type",
     }
 }

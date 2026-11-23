@@ -65,6 +65,15 @@ pub fn mono_from_track_name(name: &str) -> bool {
     instrument_family(name) == InstrumentFamily::Bass
 }
 
+/// The choke group the hi-hats start in.
+pub const HAT_CHOKE_GROUP: i32 = 1;
+
+/// The choke group a track named `name` starts in: the hi-hats share one,
+/// so that a closed hat cuts an open one.
+pub fn choke_group_from_track_name(name: &str) -> Option<i32> {
+    (instrument_family(name) == InstrumentFamily::Hat).then_some(HAT_CHOKE_GROUP)
+}
+
 /// Coarse type of a track: the canonical names first, then substring rules for
 /// names like `"808 KICK"` or `"SYNTH BASS"`.
 pub fn instrument_family(name: &str) -> InstrumentFamily {

@@ -206,6 +206,24 @@ impl Engine {
         }
     }
 
+    /// Release the voices a note of `event` on `track` cuts: the track's own
+    /// when it is mono, and those of every track of its choke group.
+    fn release_cut(&mut self, track: usize, event: &Event, now_seconds: f64) {
+        let (mono, group) = (event.mono, event.choke_group);
+        if !mono && group.is_none() {
+            return;
+        }
+        let groups = &self.choke_groups;
+        let cuts = |t: usize| (mono && t == track) || group.is_some_and(|g| groups.get(t) == Some(&Some(g)));
+        let sample_rate = self.sample_rate;
+        for voice in self.voices.iter_mut().filter(|v| v.is_active() && cuts(v.track())) {
+            voice.release(sample_rate);
+        }
+        for synth in self.synths.iter_mut().filter(|v| v.is_active() && cuts(v.track())) {
+            synth.release_at(now_seconds);
+        }
+    }
+
     /// Start `event` at clock frame `now`, its level scaled by `velocity`
     /// and its pitch by `ratio` (1 for a note as built), its synth patch
     /// taken from `patches`.
@@ -216,14 +234,8 @@ impl Engine {
         }
         let ratio = ratio * self.host_pitch(track);
         let now_seconds = self.seconds(now);
-        if event.mono {
-            for voice in self.voices.iter_mut().filter(|v| v.is_active() && v.track() == track) {
-                voice.release(self.sample_rate);
-            }
-            for synth in self.synths.iter_mut().filter(|v| v.is_active() && v.track() == track) {
-                synth.release_at(now_seconds);
-            }
-        }
+        self.choke_groups[track] = event.choke_group;
+        self.release_cut(track, event, now_seconds);
         self.serial += 1;
         match event.sound {
             Sound::Sample(params) => {

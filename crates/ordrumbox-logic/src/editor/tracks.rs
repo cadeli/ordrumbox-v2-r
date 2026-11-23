@@ -2,7 +2,7 @@
 
 use super::{Editor, apply_updates, clean, pattern_name};
 use ordrumbox_core::Track;
-use ordrumbox_core::drum_taxonomy::mono_from_track_name;
+use ordrumbox_core::drum_taxonomy::{choke_group_from_track_name, mono_from_track_name};
 use ordrumbox_core::json::Value;
 use ordrumbox_core::track::{MAX_STEPS_PER_BEAT, MAX_TRACKS};
 use std::collections::HashSet;
@@ -13,7 +13,8 @@ impl Editor {
         self.library.patterns.get(p).is_some_and(|pattern| pattern.tracks.len() < MAX_TRACKS)
     }
 
-    /// Append a new track; its index. `None` when the pattern is full.
+    /// Append a new track, a hi-hat in the hats' choke group; its index.
+    /// `None` when the pattern is full.
     pub fn add_track(&mut self, p: usize, name: &str, steps_per_beat: i32) -> Option<usize> {
         if !self.has_track_room(p) {
             return None;
@@ -24,7 +25,8 @@ impl Editor {
             |_| desc,
             None,
             |pattern| {
-                pattern.tracks.push(Track::new(name, pattern.beat_count, steps_per_beat));
+                let track = Track::new(name, pattern.beat_count, steps_per_beat);
+                pattern.tracks.push(Track { choke_group: choke_group_from_track_name(name), ..track });
                 pattern.tracks.len() - 1
             },
         )
@@ -238,7 +240,8 @@ impl Editor {
         .is_some()
     }
 
-    /// Rename track `t`; a track renamed to a bass becomes mono. The tracks
+    /// Rename track `t`; a track renamed to a bass becomes mono, one renamed
+    /// to a hi-hat joins the hats' choke group unless it is in one. The tracks
     /// of the pattern that took it as their sidechain key follow its name, in
     /// the same undo step.
     pub fn change_track_name(&mut self, p: usize, t: usize, name: &str) -> bool {
@@ -261,6 +264,7 @@ impl Editor {
                     |track| {
                         track.name = name.to_owned();
                         track.mono |= mono_from_track_name(name);
+                        track.choke_group = track.choke_group.or(choke_group_from_track_name(name));
                     },
                 )
                 .is_some();

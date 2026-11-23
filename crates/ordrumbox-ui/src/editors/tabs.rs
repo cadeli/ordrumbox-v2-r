@@ -140,6 +140,7 @@ pub(super) fn sound_tab(rows: &mut Rows, view: &TrackView) {
         let field = rows.field(r, 36 * s);
         rows.items.push(Item::new(Some(Id::Toggle(key)), field, Kind::Toggle { on }));
     }
+    choke_select(rows, track);
     shape_controls(rows, &view.shape, (Id::SampleKnob, Id::SampleToggle));
     let r = rows.row();
     rows.items.push(Item::new(
@@ -161,6 +162,17 @@ pub(super) fn sound_tab(rows: &mut Rows, view: &TrackView) {
     let button = Kind::Button { label: "File...".into(), on: false };
     rows.items.push(Item::new(Some(Id::LoadSample), load, button));
     synth_cartridge(rows, view);
+}
+
+/// The Sound tab's choke group: off, or the group whose tracks cut each other.
+fn choke_select(rows: &mut Rows, track: &Track) {
+    let key = "chokeGroup";
+    let r = rows.row();
+    rows.label(r, "Choke", None, false);
+    let (values, labels) = track_select_options(key);
+    let selected = index_of(&values, &text_of(track, key));
+    let choice = Choice { values, labels, selected };
+    rows.items.push(Item::new(Some(Id::TrackSelect(key)), rows.field(r, 72 * rows.scale), choice.kind()));
 }
 
 /// Width of the Sound tab's File... button (at scale 1): its label and a margin.

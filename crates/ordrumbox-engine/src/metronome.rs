@@ -56,6 +56,7 @@ pub fn add_clicks(pass: &mut Pass) {
                 length: CLICK_SECONDS,
             }),
             mono: false,
+            choke_group: None,
             velocity: CLICK_LEVEL as f32,
             note: None,
             note_frames: 0,

@@ -33,7 +33,16 @@ fn sample_event(frame: u64) -> Event {
         length: 0.0,
         shape: Default::default(),
     };
-    Event { frame, sound: Sound::Sample(voice), mono: true, velocity: 1.0, note: None, note_frames: 0, lock: None }
+    Event {
+        frame,
+        sound: Sound::Sample(voice),
+        mono: true,
+        choke_group: None,
+        velocity: 1.0,
+        note: None,
+        note_frames: 0,
+        lock: None,
+    }
 }
 
 fn pass(number: u64, frames: &[u64], length: u64) -> Arc<Pass> {
@@ -150,6 +159,44 @@ fn ducked_level(playing: &[usize], keys: Vec<Option<usize>>) -> f32 {
     }));
     let signal = render(&mut engine, 9_600);
     signal[9_000..].iter().fold(0.0_f32, |peak, s| peak.max(s.abs()))
+}
+
+/// The tracks whose voices still sound once track 0 (in `first`'s choke group)
+/// started a long sample at frame 0 and track 1 (in `second`'s) another at frame 1000.
+fn sounding_after(first: Option<u8>, second: Option<u8>) -> Vec<usize> {
+    let mut engine = engine();
+    engine.bank = Arc::new(SampleBank {
+        samples: vec![crate::kit::BankSample {
+            buffer: SampleBuffer::mono(vec![1.0; 48_000], 48_000).into(),
+            ..engine.bank.samples[0].clone()
+        }],
+    });
+    let note = |frame, track, choke_group| {
+        let mut event = Event { mono: false, choke_group, ..sample_event(frame) };
+        if let Sound::Sample(voice) = &mut event.sound {
+            voice.track = track;
+        }
+        event
+    };
+    engine.play(Arc::new(Pass {
+        frames: 48_000,
+        ticks: TICK,
+        events: vec![note(0, 0, first), note(1000, 1, second)],
+        strips: vec![StripSettings::default(); 2],
+        ..Pass::default()
+    }));
+    render(&mut engine, 4000);
+    let mut tracks: Vec<usize> = engine.voices.iter().filter(|v| v.is_active()).map(SampleVoice::track).collect();
+    tracks.sort_unstable();
+    tracks
+}
+
+#[test]
+fn a_note_cuts_the_tracks_of_its_choke_group() {
+    assert_eq!(sounding_after(Some(1), Some(1)), [1], "the second track cuts the first");
+    assert_eq!(sounding_after(Some(1), Some(2)), [0, 1], "another group cuts nothing");
+    assert_eq!(sounding_after(None, Some(1)), [0, 1], "a track in no group is not cut");
+    assert_eq!(sounding_after(Some(1), None), [0, 1], "a track in no group cuts nothing");
 }
 
 #[test]
@@ -277,6 +324,7 @@ fn synth_notes_play_for_their_length() {
         frame: 64,
         sound: Sound::Synth(SynthStart { track: 0, patch: 0, length: 0.01 }),
         mono: false,
+        choke_group: None,
         velocity: 1.0,
         note: None,
         note_frames: 0,

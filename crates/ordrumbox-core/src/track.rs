@@ -46,6 +46,10 @@ json_record! {
         mono: bool = false => "mono",
         /// Each note lasts until the next one of the track starts (the last one, to the pass end).
         legato: bool = false => "legato",
+        /// Choke group, 1 to [`MAX_CHOKE_GROUPS`]: a note of a track of the
+        /// group cuts the sound of every track of it (an open hi-hat by a
+        /// closed one). `None`: the track cuts nothing.
+        choke_group: Option<i32> = None => "chokeGroup",
         /// Variation amounts, 0–100.
         hit_variation: f64 = 0.0 => "hitVariation" | "variation",
         note_variation: f64 = 0.0 => "noteVariation" | "variation2",
@@ -150,13 +154,14 @@ json_record! {
 }
 
 /// `TRACK_VALUE_RANGES`: bounds of the numeric settings an edit clamps to.
-const VALUE_RANGES: [(&str, f64, f64); 50] = [
+const VALUE_RANGES: [(&str, f64, f64); 51] = [
     ("volume", 0.0, 1.0),
     ("pan", -1.0, 1.0),
     ("transpose", -24.0, 24.0),
     ("beatCount", 1.0, MAX_BEATS as f64),
     ("stepsPerBeat", 1.0, MAX_STEPS_PER_BEAT as f64),
     ("loopLength", 0.0, 1024.0),
+    ("chokeGroup", 1.0, MAX_CHOKE_GROUPS as f64),
     ("swingResolution", 1.0, MAX_STEPS_PER_BEAT as f64),
     ("swingAmount", 0.0, 1.0),
     ("filterCutoff", MIN_FILTER_FREQ, MAX_FILTER_FREQ),
@@ -246,11 +251,17 @@ const ROUND_2D: [&str; 17] = [
 pub const MAX_TRACKS: usize = 64;
 /// The most a file may give for a track's lengths, by key; a value past it
 /// is reported and the default kept.
-const LOADED_MAX: [(&str, i32); 3] =
-    [("beatCount", MAX_LOADED_BEATS), ("stepsPerBeat", MAX_LOADED_STEPS_PER_BEAT), ("loopLength", MAX_LOADED_STEPS)];
+const LOADED_MAX: [(&str, i32); 4] = [
+    ("beatCount", MAX_LOADED_BEATS),
+    ("stepsPerBeat", MAX_LOADED_STEPS_PER_BEAT),
+    ("loopLength", MAX_LOADED_STEPS),
+    ("chokeGroup", MAX_CHOKE_GROUPS),
+];
 /// A pair swing that delays nothing: the second step of a pair at its
 /// middle ([`crate::Hit::pair_swing_beats`]).
 pub const STRAIGHT_SWING: f64 = 0.5;
+/// Choke groups a track can be in, numbered from 1.
+pub const MAX_CHOKE_GROUPS: i32 = 8;
 /// Steps a beat can be divided into.
 pub const MAX_STEPS_PER_BEAT: i32 = 8;
 /// Lowest frequency a filter cutoff can take, in Hz.
@@ -289,6 +300,12 @@ impl Track {
     /// The note variation amount (0–100) of a track in auto mode: its own, else the fallback.
     pub fn auto_note_amount(&self) -> f64 {
         self.auto_note_variation.unwrap_or(AUTO_NOTE_VARIATION_FALLBACK)
+    }
+
+    /// The track's choke group, when it is in one of 1 to [`MAX_CHOKE_GROUPS`].
+    #[must_use]
+    pub fn choke(&self) -> Option<u8> {
+        self.choke_group.filter(|g| (1..=MAX_CHOKE_GROUPS).contains(g)).and_then(|g| u8::try_from(g).ok())
     }
 
     pub fn is_setting(key: &str) -> bool {
@@ -490,6 +507,19 @@ mod tests {
         assert!(Track::new("Synth Bass", 4, 4).mono);
         assert!(!Track::new("KICK", 4, 4).mono);
         assert!(!load(r#"{"name":"BASS"}"#).0.mono, "a loaded track keeps its own setting");
+    }
+
+    #[test]
+    fn a_choke_group_is_read_written_and_bounded() {
+        let (track, issues) = load(r#"{"name":"OHH","chokeGroup":2}"#);
+        assert_eq!((track.choke(), issues.len()), (Some(2), 0));
+        assert_eq!(track.to_json().as_object().and_then(|o| o.get("chokeGroup").cloned()), Some(Value::Number(2.0)));
+        assert_eq!(Track::default().to_json().as_object().and_then(|o| o.get("chokeGroup").cloned()), None);
+        let (track, issues) = load(r#"{"name":"OHH","chokeGroup":9}"#);
+        assert_eq!(track.choke(), None);
+        assert_eq!(issues, [Issue::new("t.chokeGroup", "past 8 (9), default kept")]);
+        assert_eq!(Track { choke_group: Some(0), ..Track::default() }.choke(), None);
+        assert_eq!(Track::value_range("chokeGroup"), Some((1.0, 8.0)));
     }
 
     #[test]

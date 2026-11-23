@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### New
+- **Choke groups**: in the track editor's Sound tab, **Choke** puts a track in a group (1 to 8);
+  a note of a track of the group cuts the sound of every track of it, as a closed hi-hat cuts an
+  open one. A hi-hat track added or renamed joins group 1; the patterns already made are unchanged.
+  MCP: `chokeGroup` in `updateTrack`.
+
 ### Changed
 - Piano roll: the < > page buttons give way to a scroll bar under the grid, with the same thumb and
   zoom handles (Ctrl+wheel zooms, Shift+wheel scrolls). The roll opens on 4 beats as before.

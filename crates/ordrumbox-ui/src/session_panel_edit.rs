@@ -424,7 +424,7 @@ impl Session {
                 let updates = match editors::fx_of_type(key) {
                     Some(fx) => fx_type_updates(track, fx, value),
                     None if editors::NUMERIC_SELECTS.contains(&key) => {
-                        vec![(key, Value::from(value).to_number().map_or_else(|| Value::from(value), number))]
+                        vec![(key, Value::from(value).to_number().map_or(Value::Null, number))]
                     }
                     None => vec![(key, Value::String(value.to_owned()))],
                 };

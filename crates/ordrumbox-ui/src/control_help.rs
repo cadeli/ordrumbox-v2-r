@@ -202,6 +202,7 @@ fn setting_help(key: &str) -> Option<Help> {
         // Sound.
         "mono" => ["Mono", "one note at a time: a new one cuts the last"],
         "legato" => ["Legato", "each note lasts until the next one starts"],
+        "chokeGroup" => ["Choke group", "a note cuts the sound of every track of its group (open hat by closed)"],
         // Loop.
         "stepsPerBeat" => ["Steps per beat", "the grid of the track: 4 is 16ths, 3 triplets"],
         "loopLength" => ["Loop length", "the track loops after this many steps"],
@@ -298,6 +299,7 @@ mod tests {
             "reverbType",
             "delayType",
             "sidechainSource",
+            "chokeGroup",
         ]);
         for key in keys {
             assert!(help(Id::Fx(key)).is_some(), "{key}");

@@ -1,5 +1,6 @@
 use super::*;
 use crate::generate::MelodicKind;
+use ordrumbox_core::drum_taxonomy::HAT_CHOKE_GROUP;
 use ordrumbox_core::note::ACCENTED_VELOCITY;
 use ordrumbox_core::track::MAX_TRACKS;
 use ordrumbox_core::{Note, Scales, Styles};
@@ -31,6 +32,23 @@ fn a_track_added_or_renamed_as_a_bass_is_mono() {
     e.undo();
     e.undo();
     assert!(!pattern(&e).tracks[1].mono);
+}
+
+#[test]
+fn a_track_added_or_renamed_as_a_hat_joins_the_hats_choke_group() {
+    let mut e = editor();
+    let t = e.add_track(0, "OHH", 4).unwrap();
+    assert_eq!(pattern(&e).tracks[t].choke_group, Some(HAT_CHOKE_GROUP));
+    assert_eq!(pattern(&e).tracks[1].choke_group, None);
+    assert!(e.change_track_name(0, 1, "CHH"));
+    assert_eq!(pattern(&e).tracks[1].choke_group, Some(HAT_CHOKE_GROUP));
+    assert!(e.update_track(0, 0, &[("chokeGroup", Value::Number(3.0))], None, false));
+    assert!(e.change_track_name(0, 0, "PEDAL HAT"));
+    assert_eq!(pattern(&e).tracks[0].choke_group, Some(3), "a track in a group keeps it");
+    assert!(e.update_track(0, 0, &[("chokeGroup", Value::Number(12.0))], None, false));
+    assert_eq!(pattern(&e).tracks[0].choke_group, Some(8), "an edit stays within the groups");
+    assert!(e.update_track(0, 0, &[("chokeGroup", Value::Null)], None, false));
+    assert_eq!(pattern(&e).tracks[0].choke_group, None);
 }
 
 fn editor() -> Editor {

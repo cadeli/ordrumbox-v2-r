@@ -41,7 +41,7 @@ const NOTE_VALUES: [(&str, &str); 22] = [
 const LFO: &str = r#"{"freq":2,"min":0.2,"max":0.9,"phase":0.25,"type":"triangle"}"#;
 
 /// A non-default value of every track field, in `Track::KEYS` order.
-const TRACK_VALUES: [(&str, &str); 78] = [
+const TRACK_VALUES: [(&str, &str); 79] = [
     ("name", r#""SNARE""#),
     ("autoAssign", "false"),
     ("samplePath", r#""real/snare.wav""#),
@@ -62,6 +62,7 @@ const TRACK_VALUES: [(&str, &str); 78] = [
     ("useSynth", "true"),
     ("mono", "true"),
     ("legato", "true"),
+    ("chokeGroup", "3"),
     ("hitVariation", "40"),
     ("noteVariation", "60"),
     ("probability", "0.9"),

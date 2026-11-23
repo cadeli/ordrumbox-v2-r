@@ -51,6 +51,8 @@ pub struct Event {
     pub sound: Sound,
     /// The track plays one note at a time: starting this one releases the others.
     pub mono: bool,
+    /// The track's choke group: starting this note releases the sound of every track of it.
+    pub choke_group: Option<u8>,
     /// The note's velocity (0–1), for the MIDI note sent with it.
     pub velocity: f32,
     /// The MIDI note sent with it, if any ([`crate::midi`]).
@@ -173,6 +175,7 @@ fn event_for(frame: u64, sound: Sound, note: &Hit, track: &Track, midi: Option<M
         frame,
         sound,
         mono: track.mono,
+        choke_group: track.choke(),
         velocity: note.velocity as f32,
         note: midi,
         note_frames: note_frames(note, track, per_tick),
@@ -362,7 +365,16 @@ pub fn build_preview(pattern: &Pattern, t: usize, note: Option<&Note>, context: 
         .sounds
         .get(t)
         .and_then(|assigned| sound_for(pattern, &flat, assigned, voice, &context, &mut patches))
-        .map(|sound| Event { frame: 0, sound, mono: track.mono, velocity: 1.0, note: None, note_frames: 0, lock: None })
+        .map(|sound| Event {
+            frame: 0,
+            sound,
+            mono: track.mono,
+            choke_group: track.choke(),
+            velocity: 1.0,
+            note: None,
+            note_frames: 0,
+            lock: None,
+        })
         .into_iter()
         .collect();
     let strips = pattern.tracks.iter().map(|t| strip_settings(t, bpm)).collect();
@@ -407,6 +419,7 @@ pub fn build_keymap(pattern: &Pattern, context: PassContext<'_>, bpm: f64) -> Ke
                 frame: 0,
                 sound,
                 mono: track.mono,
+                choke_group: track.choke(),
                 velocity: 1.0,
                 note: None,
                 note_frames: 0,

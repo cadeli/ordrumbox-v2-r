@@ -122,6 +122,7 @@ mod tests {
             frame,
             sound: Sound::Synth(SynthStart { track: 0, patch: 0, length: 0.1 }),
             mono: false,
+            choke_group: None,
             velocity: 1.0,
             note: None,
             note_frames: 0,

@@ -423,3 +423,10 @@ A seventh colour scheme, High contrast (`theme::SCHEMES`, `colorScheme` 7): its 
 being shared. `the_high_contrast_scheme_reads_everywhere` checks its WCAG ratios: 7:1 for text and labels on every
 ground, 4.5:1 for what is greyed out, for a button's label on the line colour and for each accent on the window,
 3:1 for borders. No snapshot changed.
+
+Choke groups (`chokeGroup`, `Track::choke`, 1 to `MAX_CHOKE_GROUPS`): a pass's `Event` carries its track's group,
+and `Engine::release_cut` (`engine/render.rs`) releases, as `mono` does for the track's own voices, the voices of
+every track whose last note was in the same group (`Engine::choke_groups`, a fixed table: nothing allocated on the
+audio thread). A track has no group by default, so no snapshot changed. A hi-hat added or renamed in the editor
+(`Editor::add_track`, `change_track_name`) joins `HAT_CHOKE_GROUP`; `Track::new` gives none, so that the styles'
+generation and MIDI import (and their snapshots) stay as they were.
