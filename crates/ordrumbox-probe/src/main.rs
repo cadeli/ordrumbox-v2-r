@@ -37,6 +37,7 @@ options of preset:
   --steps-per-beat <n>    default 4; the app holds a synth note for one step
   --gate <seconds>        hold the note this long instead
   --rate <hz>             default 48000
+  --wav <folder>          also write each note there, <name>.wav in lower case: mono, 16-bit PCM
 options of kit:
   --kits <folder>         one folder per kit (default: assets/kits of this checkout)
 options of mix:
@@ -70,6 +71,8 @@ struct Options {
     bpm_given: bool,
     json: Option<PathBuf>,
     svg: Option<PathBuf>,
+    /// Given with `--wav`: where `preset` writes its notes.
+    wav: Option<PathBuf>,
     note_text: Option<String>,
     settings: NoteSettings,
     /// Given with `--write`: `fix` only lists its repairs unless asked.
@@ -115,6 +118,7 @@ fn parse_options(arguments: &[String]) -> Result<Options, String> {
             "--kits" => options.kits = Some(value.into()),
             "--json" => options.json = Some(value.into()),
             "--svg" => options.svg = Some(value.into()),
+            "--wav" => options.wav = Some(value.into()),
             "--note" => {
                 settings.ratio = note_ratio(value)?;
                 options.note_text = Some(value.clone());
@@ -137,6 +141,16 @@ fn parse_options(arguments: &[String]) -> Result<Options, String> {
         }
     }
     Ok(options)
+}
+
+/// `buffer` in one channel, its two summed at half level: a note at the
+/// middle of the field (pan 0) gives the same level in both.
+fn mono(buffer: &SampleBuffer) -> SampleBuffer {
+    let left = match &buffer.right {
+        Some(right) => buffer.left.iter().zip(right).map(|(l, r)| (l + r) * 0.5).collect(),
+        None => buffer.left.clone(),
+    };
+    SampleBuffer::mono(left, buffer.sample_rate)
 }
 
 /// `relative` in the checkout around the current folder.
@@ -244,6 +258,10 @@ fn run_presets(arguments: &[String]) -> Result<(), String> {
             .ok_or_else(|| format!("no preset {name}; {} holds: {}", path.display(), presets.keys().join(" ")))?;
         let buffer = render_note(preset, &settings).map_err(|e| format!("{name}: {e}"))?;
         let repeat = repeat_difference_db(preset, &settings, &buffer).map_err(|e| format!("{name}: {e}"))?;
+        if let Some(folder) = &options.wav {
+            let path = folder.join(format!("{}.{WAV_EXTENSION}", name.to_lowercase()));
+            fs::write(&path, wav::encode_pcm16(&mono(&buffer))).map_err(|e| format!("{}: {e}", path.display()))?;
+        }
         outputs.add(name, &measure(&buffer), Some(repeat), &options)?;
     }
     let mut described = Object::new();
@@ -430,6 +448,13 @@ mod tests {
         assert_eq!(note_ratio("c4").unwrap(), 2.0);
         assert!((note_ratio("F#2").unwrap() - 2f64.powf(-6.0 / 12.0)).abs() < 1e-12);
         assert!(note_ratio("H3").is_err() && note_ratio("C").is_err());
+    }
+
+    #[test]
+    fn a_note_is_written_in_one_channel() {
+        let stereo = SampleBuffer { left: vec![0.5, -1.0], right: Some(vec![0.5, 0.0]), sample_rate: 44_100 };
+        let one = mono(&stereo);
+        assert_eq!((one.left, one.right, one.sample_rate), (vec![0.5, -0.5], None, 44_100));
     }
 
     #[test]

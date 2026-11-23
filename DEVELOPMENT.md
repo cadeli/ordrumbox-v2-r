@@ -459,3 +459,12 @@ voice's output bit-identical and its speed the same in release (5.1 ns a looping
 (`session_wave_drag.rs`, `sample_overlay::Handle`) drag the start, the end, the loop's points and the end of the
 decay; the points snap to the nearest zero crossing within 3 ms (`SampleBuffer::nearest_zero_crossing`). The kit
 editor lays its nine knobs five a row (the track editor four), so that the waveform keeps its room.
+
+Two kits rendered from synth presets, `808_like` and `909_like` (`assets/kits/`, `kits.json`), from the presets
+`TR808_*` and `TR909_*` of `synth_presets.json`. Their names start with the machine so that auto-assign, which
+matches a preset by its name (`assign::preset_match_key`), does not take them for the instrument a kit lacks: they
+are heard as the kits' samples. Each was made with `ordrumbox-probe preset <names> --gate 1 --rate 44100 --velocity 1
+--wav <folder>` (the new `--wav` option: mono, 16-bit PCM), the files renamed after their instrument, then
+`ordrumbox-probe fix <folder> --write` (peak at −3 dB) and `fix <file> --length <end at −60 dB + 30 ms> --fade-out 20
+--write`. A sound another kit lacks may now be borrowed from them: `assign_tests/data.rs` rewritten, as a meant change
+(187 rows, the new kits' included).

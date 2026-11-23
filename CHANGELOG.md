@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### New
+- **Kits 808_like and 909_like**, rendered from 31 new synth presets (`TR808_*`, `TR909_*`, kept
+  in the synth editor), in the manner of the two drum machines: kick, snare, clap, rimshot, hats,
+  crash, ride, three toms, and congas, claves, maracas, cowbell (808) or shaker, tambourine (909).
+  A sound a kit lacks may now be borrowed from them.
 - **Sample editing**: the start, the end, the loop's points and the end of the decay are
   dragged on the waveform (kit editor and Sound tab), and land on the nearest zero crossing.
 - **Loop in / Loop out**: a loop of its own inside the sample's region; the sound plays its

@@ -939,5 +939,250 @@
         "decay": 5000
       }
     ]
+  },
+  {
+    "name": "808_like",
+    "info": "808-like kit",
+    "desc": "rendered from the synth presets TR808_* (ordrumbox-probe preset --wav), in the manner of a TR-808",
+    "samples": [
+      {
+        "displayName": "KICK",
+        "key": "KICK",
+        "path": "808_like/kick.wav",
+        "peakDb": -3,
+        "rootMidi": 31,
+        "decay": 5000
+      },
+      {
+        "displayName": "SNARE",
+        "key": "SNARE",
+        "path": "808_like/snare.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "CLAP",
+        "key": "CLAP",
+        "path": "808_like/clap.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "RIMSHOT",
+        "key": "RIMSHOT",
+        "path": "808_like/rimshot.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "CHH",
+        "key": "CHH",
+        "path": "808_like/chh.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "OHH",
+        "key": "OHH",
+        "path": "808_like/ohh.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "CRASH",
+        "key": "CRASH",
+        "path": "808_like/crash.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "RIDE",
+        "key": "RIDE",
+        "path": "808_like/ride.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "LO_TOM",
+        "key": "LO_TOM",
+        "path": "808_like/lo_tom.wav",
+        "peakDb": -3,
+        "rootMidi": 40,
+        "decay": 5000
+      },
+      {
+        "displayName": "TOM",
+        "key": "TOM",
+        "path": "808_like/tom.wav",
+        "peakDb": -3,
+        "rootMidi": 47,
+        "decay": 5000
+      },
+      {
+        "displayName": "HI_TOM",
+        "key": "HI_TOM",
+        "path": "808_like/hi_tom.wav",
+        "peakDb": -3,
+        "rootMidi": 52,
+        "decay": 5000
+      },
+      {
+        "displayName": "LO_CONGAS",
+        "key": "LO_CONGAS",
+        "path": "808_like/lo_congas.wav",
+        "peakDb": -3,
+        "rootMidi": 57,
+        "decay": 5000
+      },
+      {
+        "displayName": "CONGAS",
+        "key": "CONGAS",
+        "path": "808_like/congas.wav",
+        "peakDb": -3,
+        "rootMidi": 64,
+        "decay": 5000
+      },
+      {
+        "displayName": "HI_CONGAS",
+        "key": "HI_CONGAS",
+        "path": "808_like/hi_congas.wav",
+        "peakDb": -3,
+        "rootMidi": 69,
+        "decay": 5000
+      },
+      {
+        "displayName": "CLAVES",
+        "key": "CLAVES",
+        "path": "808_like/claves.wav",
+        "peakDb": -3,
+        "rootMidi": 99,
+        "decay": 5000
+      },
+      {
+        "displayName": "MARACAS",
+        "key": "MARACAS",
+        "path": "808_like/maracas.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "COWBELL",
+        "key": "COWBELL",
+        "path": "808_like/cowbell.wav",
+        "peakDb": -3,
+        "rootMidi": 73,
+        "decay": 5000
+      }
+    ]
+  },
+  {
+    "name": "909_like",
+    "info": "909-like kit",
+    "desc": "rendered from the synth presets TR909_* (ordrumbox-probe preset --wav), in the manner of a TR-909",
+    "samples": [
+      {
+        "displayName": "KICK",
+        "key": "KICK",
+        "path": "909_like/kick.wav",
+        "peakDb": -3,
+        "rootMidi": 33,
+        "decay": 5000
+      },
+      {
+        "displayName": "SNARE",
+        "key": "SNARE",
+        "path": "909_like/snare.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "CLAP",
+        "key": "CLAP",
+        "path": "909_like/clap.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "RIMSHOT",
+        "key": "RIMSHOT",
+        "path": "909_like/rimshot.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "CHH",
+        "key": "CHH",
+        "path": "909_like/chh.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "OHH",
+        "key": "OHH",
+        "path": "909_like/ohh.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "CRASH",
+        "key": "CRASH",
+        "path": "909_like/crash.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "RIDE",
+        "key": "RIDE",
+        "path": "909_like/ride.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "LO_TOM",
+        "key": "LO_TOM",
+        "path": "909_like/lo_tom.wav",
+        "peakDb": -3,
+        "rootMidi": 42,
+        "decay": 5000
+      },
+      {
+        "displayName": "TOM",
+        "key": "TOM",
+        "path": "909_like/tom.wav",
+        "peakDb": -3,
+        "rootMidi": 49,
+        "decay": 5000
+      },
+      {
+        "displayName": "HI_TOM",
+        "key": "HI_TOM",
+        "path": "909_like/hi_tom.wav",
+        "peakDb": -3,
+        "rootMidi": 54,
+        "decay": 5000
+      },
+      {
+        "displayName": "CONGAS",
+        "key": "CONGAS",
+        "path": "909_like/congas.wav",
+        "peakDb": -3,
+        "rootMidi": 65,
+        "decay": 5000
+      },
+      {
+        "displayName": "SHAKER",
+        "key": "SHAKER",
+        "path": "909_like/shaker.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "TAMBOURINE",
+        "key": "TAMBOURINE",
+        "path": "909_like/tambourine.wav",
+        "peakDb": -3,
+        "decay": 5000
+      }
+    ]
   }
 ]
