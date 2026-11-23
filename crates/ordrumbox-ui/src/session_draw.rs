@@ -102,6 +102,7 @@ impl Session {
             beat_window: self.chrome.beat_window,
             ruler_marks: self.ruler_marks(),
             lane: (self.editor_track(), usize::from(self.editors.lane)),
+            lane_height: self.chrome.lane_height,
             note_editor: self.note_editor_shown(),
             levels: levels.clone(),
             show_vus: self.chrome.show_vus,

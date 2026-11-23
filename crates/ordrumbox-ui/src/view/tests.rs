@@ -31,7 +31,7 @@ fn the_compact_grid_shows_a_full_drum_pattern() {
             assert!(height < min_window_size(scale, Shown::all()).1, "scale {scale}");
             let body = Body::new(width, height, scale, 0, MIN_STATUS_LINES, note_editor);
             let layout =
-                Layout::new(body.main_w, body.editor_h, scale, pattern, MIN_STATUS_LINES, BeatWindow::default());
+                Layout::new(body.main_w, body.editor_h, scale, pattern, MIN_STATUS_LINES, BeatWindow::default(), None);
             assert_eq!(layout.tracks, pattern.tracks.len(), "scale {scale}, note editor {note_editor}");
             assert!(layout.bottom <= body.note.y.min(body.main_bottom) || !note_editor, "scale {scale}");
         }
@@ -132,6 +132,7 @@ fn draws_without_panicking_at_any_size() {
             right: 300,
             beat_window: BeatWindow::default(),
             lane: (None, 0),
+            lane_height: None,
             note_editor: true,
             levels: vec![0.0; 2],
             show_vus: true,
@@ -177,7 +178,7 @@ fn the_ruler_sits_above_the_rows_and_its_beats_start_their_cells() {
     let library = library();
     let pattern = library.patterns.first().unwrap();
     for scale in [Scale::ONE, Scale::from_quarters(6), Scale::whole(2)] {
-        let layout = Layout::new(1100 * scale, 688 * scale, scale, pattern, 0, BeatWindow::default());
+        let layout = Layout::new(1100 * scale, 688 * scale, scale, pattern, 0, BeatWindow::default(), None);
         assert_eq!(layout.top, body_top(scale) + RULER_HEIGHT * scale);
         assert_eq!(layout.hit(pattern, layout.grid_left + 2, layout.top - 2), None, "the ruler is not a row");
         for beat in 0..layout.beats {
@@ -201,11 +202,13 @@ fn body_splits_the_window_above_the_footer() {
                     assert_eq!(body.main_bottom, footer_top(h, scale, status) - margin(scale));
                     // The editor height is virtual: a layout built with it
                     // (and the real status count) ends exactly at main_bottom.
-                    let grid = Layout::new(body.main_w, body.editor_h, scale, pattern, status, BeatWindow::default());
+                    let grid =
+                        Layout::new(body.main_w, body.editor_h, scale, pattern, status, BeatWindow::default(), None);
                     assert_eq!(grid.bottom, body.note.y - NOTE_GAP * scale);
                     assert_eq!(body.note.y + body.note.h, body.main_bottom);
                     let alone = Body::new(w, h, scale, right, status, false);
-                    let grid = Layout::new(alone.main_w, alone.editor_h, scale, pattern, status, BeatWindow::default());
+                    let grid =
+                        Layout::new(alone.main_w, alone.editor_h, scale, pattern, status, BeatWindow::default(), None);
                     assert_eq!((grid.bottom, alone.note.h), (body.main_bottom, 0));
                 }
             }
@@ -256,7 +259,7 @@ fn kit_editor_draws_and_hits() {
 fn hit_testing_matches_the_drawing() {
     let library = library();
     let pattern = &library.patterns[0];
-    let layout = Layout::new(1024, 640, Scale::ONE, pattern, 0, BeatWindow::default());
+    let layout = Layout::new(1024, 640, Scale::ONE, pattern, 0, BeatWindow::default(), None);
     let y = layout.row_top(2) + layout.row / 2;
     assert_eq!(layout.hit(pattern, layout.box_x(false) + 1, y), Some(Hit::Mute(2)));
     assert_eq!(layout.hit(pattern, layout.box_x(true) + 1, y), Some(Hit::Solo(2)));

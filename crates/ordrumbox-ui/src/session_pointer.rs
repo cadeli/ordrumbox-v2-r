@@ -30,7 +30,7 @@ impl Session {
             Some(BarHold::Scroll) => return HELD_SHAPE,
             None => {}
         }
-        if self.song_panel.lane_resize.is_some() {
+        if self.song_panel.lane_resize.is_some() || self.chrome.lane_resize.is_some() {
             return PointerShape::ResizeVertical;
         }
         if self.roll.length_drag.is_some() {
@@ -81,6 +81,9 @@ impl Session {
     /// Over the grid: its scroll bar's thumb and zoom handles.
     fn grid_pointer_shape(&self, size: (i32, i32, Scale), x: i32, y: i32) -> PointerShape {
         let Some(layout) = self.grid_layout(size) else { return PointerShape::Arrow };
+        if layout.lane_edge_rect().contains(x, y) {
+            return PointerShape::ResizeVertical;
+        }
         match layout.bar_hit(x, y) {
             Some(Some(_)) => PointerShape::ResizeHorizontal,
             Some(None) => scroll_thumb::hover_shape(layout.bar_thumb(), x),

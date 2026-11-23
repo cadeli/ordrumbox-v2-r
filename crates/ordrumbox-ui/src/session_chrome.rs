@@ -77,6 +77,11 @@ pub(super) struct Chrome {
     pub(super) zone_drag: Option<session_zone::ZoneDrag>,
     /// The lane under the grid, pressed and painted.
     pub(super) lane_drag: Option<session_lane::LaneDrag>,
+    /// The lane's height set by dragging its top edge, in scale units;
+    /// `None`: automatic.
+    pub(super) lane_height: Option<i32>,
+    /// The lane's top edge pressed: where, and how tall the lane was.
+    pub(super) lane_resize: Option<session_lane::LaneResize>,
     /// Window size and scale of the last mouse or key event on the widgets.
     pub(super) panel_size: (i32, i32, Scale),
     /// The beats of the pattern the grid shows.
@@ -116,6 +121,8 @@ impl Default for Chrome {
             last_name_press: None,
             zone_drag: None,
             lane_drag: None,
+            lane_height: None,
+            lane_resize: None,
             panel_size: (0, 0, Scale::ONE),
             beat_window: crate::view::BeatWindow::default(),
             grid_bar_drag: None,

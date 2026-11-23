@@ -263,7 +263,11 @@ impl Ui {
             s.kit_click(hit);
             return true;
         }
-        if s.lane_press(size, x, y) || s.grid_bar_press(size, x, y) || s.press_pattern_ruler(size, x, y) {
+        if s.grid_lane_resize_press(size, x, y)
+            || s.lane_press(size, x, y)
+            || s.grid_bar_press(size, x, y)
+            || s.press_pattern_ruler(size, x, y)
+        {
             return true;
         }
         let Some(hit) = s.grid_hit(size, x, y) else { return false };

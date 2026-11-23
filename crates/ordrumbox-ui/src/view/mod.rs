@@ -162,6 +162,8 @@ pub struct View<'a> {
     /// The track the lane under the grid shows, and the lane (an index in
     /// `editors::LANES`).
     pub lane: (Option<usize>, usize),
+    /// The lane's height the user set, in scale units; `None`: automatic.
+    pub lane_height: Option<i32>,
     /// Per-track levels (0–1) for the VU meter stripe, when playing.
     pub levels: Vec<f32>,
     /// Whether the VU meter stripe is shown.

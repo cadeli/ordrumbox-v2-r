@@ -28,7 +28,39 @@ pub(super) struct LaneDrag {
     value: f64,
 }
 
+/// The lane's top edge pressed: where, and how tall the lane was (scale units).
+#[derive(Debug, Clone, Copy)]
+pub(super) struct LaneResize {
+    y: i32,
+    height: i32,
+    scale: Scale,
+}
+
 impl Session {
+    /// A press at `(x, y)` on the strip above the lane takes its top edge,
+    /// which sets its height; whether it was there.
+    pub fn grid_lane_resize_press(&mut self, size: (i32, i32, Scale), x: i32, y: i32) -> bool {
+        let Some(layout) = self.grid_layout(size) else { return false };
+        if !layout.lane_edge_rect().contains(x, y) {
+            return false;
+        }
+        let scale = size.2;
+        let height = scale.units(layout.lane_rect().h);
+        self.chrome.lane_resize = Some(LaneResize { y, height, scale });
+        true
+    }
+
+    /// The mouse moved to `y` with the lane's top edge held: the lane as
+    /// much taller as the pointer went up; whether to redraw.
+    pub(super) fn grid_lane_resize_move(&mut self, y: i32) -> bool {
+        let Some(LaneResize { y: from, height, scale }) = self.chrome.lane_resize else { return false };
+        let moved = scale.units(from - y);
+        let wanted = Some((height + moved).clamp(view::lane_height(), view::MAX_LANE_SET));
+        let changed = wanted != self.chrome.lane_height;
+        self.chrome.lane_height = wanted;
+        changed
+    }
+
     /// The lane's setting (velocity, chance...).
     fn lane_prop(&self) -> Option<&'static Prop> {
         LANES.get(usize::from(self.editors.lane)).and_then(|(key, _)| editors::note_prop(key))
@@ -102,8 +134,11 @@ impl Session {
         let Some(step) = layout.lane_step(x, y, spb) else { return false };
         let at = i64::from(layout.start_beat()) * i64::from(spb) + step;
         let title = format!("{} - {}", track.name, prop.label);
-        let lines =
-            [(format!("step:{at}"), "Reset this step".to_owned()), ("all".to_owned(), "Reset all notes".to_owned())];
+        let lines = [
+            (format!("step:{at}"), "Reset this step".to_owned()),
+            ("all".to_owned(), "Reset all notes".to_owned()),
+            ("auto-height".to_owned(), "Automatic height".to_owned()),
+        ];
         self.chrome.widgets.dropdown = Some(Dropdown::menu(Id::LaneMenu, x, y, title, lines));
         true
     }
@@ -111,6 +146,10 @@ impl Session {
     /// An action of the lane's menu: `step:N` puts the notes of absolute
     /// step `N`, `all` every note of the track, back to the default setting.
     pub(super) fn lane_menu_pick(&mut self, value: &str) {
+        if value == "auto-height" {
+            self.chrome.lane_height = None;
+            return;
+        }
         let (Some(t), Some(prop)) = (self.editor_track(), self.lane_prop()) else { return };
         let Some(track) = self.track(t) else { return };
         let spb = view::steps_per_beat(track);
@@ -411,5 +450,32 @@ mod tests {
         // While painting, the value being set.
         assert!(s.lane_press(SIZE, x, y));
         assert!(bubble(&s));
+    }
+
+    #[test]
+    fn a_drag_of_the_top_edge_sets_the_lane_height_and_the_menu_resets_it() {
+        let mut s = session();
+        let before = s.grid_layout(SIZE).unwrap();
+        let edge = before.lane_edge_rect();
+        let (x, y) = (edge.x + edge.w / 2, edge.y + edge.h / 2);
+        assert!(s.grid_lane_resize_press(SIZE, x, y));
+        assert!(s.grid_lane_resize_move(y - 40), "going up makes it taller");
+        s.mouse_up();
+        let after = s.grid_layout(SIZE).unwrap();
+        let (b, a) = (before.lane_rect().h, after.lane_rect().h);
+        assert!(a > b || a == b && s.chrome.lane_height.is_some(), "taller, or already as tall as the room allows");
+        // Tabs keep their place whatever the bars' height.
+        assert_eq!(before.lane_tab_rect(3), after.lane_tab_rect(3));
+        // Down as far as it goes: the tabs' height.
+        assert!(s.grid_lane_resize_press(SIZE, x, after.lane_edge_rect().y + 1));
+        s.grid_lane_resize_move(5000);
+        s.mouse_up();
+        assert_eq!(s.chrome.lane_height, Some(view::lane_height()));
+        assert!(s.grid_layout(SIZE).unwrap().lane_rect().h <= view::lane_height() * SIZE.2);
+        let (x, y) = bar(&s, 1, 0.5);
+        assert!(s.grid_lane_menu(SIZE, x, y));
+        choose(&mut s, 2);
+        assert_eq!(s.chrome.lane_height, None, "automatic again");
+        assert_eq!(s.grid_layout(SIZE).unwrap().lane_rect(), before.lane_rect());
     }
 }

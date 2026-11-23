@@ -12,6 +12,12 @@ use ordrumbox_core::track::MAX_STEPS_PER_BEAT;
 use ordrumbox_core::{Pattern, Track};
 use ordrumbox_logic::block::BEAT_UNITS;
 
+mod lane;
+#[cfg(test)]
+pub use lane::lane_tab_rows;
+use lane::{LANE_GAP, MAX_LANE};
+pub use lane::{MAX_LANE_SET, lane_height};
+
 /// What is under the mouse.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Hit {
@@ -39,32 +45,8 @@ pub(super) const ADD_TRACK_GAP: i32 = 4;
 pub(super) const RULER_HEIGHT: i32 = 12;
 /// The add-track button's label.
 pub(super) const ADD_TRACK_LABEL: &str = "+ NEW TRACK";
-/// Height of a lane tab, the gap between two, per scale unit: the tabs stand
-/// in rows of [`LANE_TAB_COLUMNS`] left of the lane, which is as high as they are.
-pub(super) const LANE_TAB_HEIGHT: i32 = 14;
-pub(super) const LANE_TAB_GAP: i32 = 2;
-/// The lane tabs side by side in a row.
-pub(super) const LANE_TAB_COLUMNS: usize = 2;
-
-/// The rows the lane's tabs stand in.
-#[must_use]
-pub const fn lane_tab_rows() -> i32 {
-    editors::LANES.len().div_ceil(LANE_TAB_COLUMNS) as i32
-}
 /// The shortest thumb of the grid's scroll bar, per scale unit: room for its two handles and a grip.
 const BAR_MIN_THUMB: i32 = 3 * scroll_thumb::ZOOM_HANDLE;
-/// The gap between the add-track button and the lane, per scale unit.
-pub(super) const LANE_GAP: i32 = 8;
-/// The tallest the lane's bars get, per scale unit: they take the room the
-/// rows leave, up to this.
-pub(super) const MAX_LANE: i32 = 160;
-
-/// Height of the lane under the rows, per scale unit: the rows of its tabs.
-pub(super) const fn lane_height() -> i32 {
-    let rows = lane_tab_rows();
-    rows * LANE_TAB_HEIGHT + (rows - 1) * LANE_TAB_GAP
-}
-
 /// The left edge of the grid's steps, `box_size` the size of its mute and
 /// solo boxes; and the name's, the volume slider's.
 pub(super) fn grid_columns(left: i32, box_size: i32, scale: Scale) -> (i32, i32, i32) {
@@ -407,6 +389,7 @@ impl Layout {
         pattern: &Pattern,
         status_lines: usize,
         window: BeatWindow,
+        lane: Option<i32>,
     ) -> Self {
         let margin = margin(scale);
         let top = body_top(scale) + RULER_HEIGHT * scale;
@@ -416,7 +399,13 @@ impl Layout {
         // left above the add-track button, and the lane's bars take what
         // the rows leave (its tabs stay at the bottom).
         let tabs_top = bottom - lane_height() * scale;
-        let rows_h = tabs_top - LANE_GAP * scale - top - (ADD_TRACK_HEIGHT + ADD_TRACK_GAP) * scale;
+        let fixed = (ADD_TRACK_HEIGHT + ADD_TRACK_GAP + LANE_GAP) * scale;
+        // A lane set by the user (`lane`, in scale units) is as tall as it
+        // asks, within what leaves the rows their smallest size.
+        let tallest = (bottom - top - fixed - tracks.max(1) as i32 * MIN_ROW * scale).max(lane_height() * scale);
+        let set_height = lane.map(|h| (h.clamp(lane_height(), MAX_LANE_SET) * scale).min(tallest));
+        let lane_edge = set_height.map_or(tabs_top, |h| bottom - h);
+        let rows_h = lane_edge - top - fixed;
         let row = (rows_h / tracks.max(1) as i32).clamp(MIN_ROW * scale, MAX_ROW * scale);
         let box_size = (row - 4 * scale).clamp(6 * scale, MAX_BOX * scale);
         let left = margin;
@@ -426,8 +415,11 @@ impl Layout {
         let start_beat = window.first().clamp(0, total_beats - 1);
         let beats = (total_beats - start_beat).clamp(1, page_beats);
         let shown = usize::try_from(rows_h.max(0) / row.max(1)).unwrap_or(0).min(tracks);
-        let under_rows = top + shown as i32 * row + (ADD_TRACK_GAP + ADD_TRACK_HEIGHT + LANE_GAP) * scale;
-        let lane_top = under_rows.max(bottom - MAX_LANE * scale).min(tabs_top);
+        let under_rows = top + shown as i32 * row + fixed;
+        let lane_top = match set_height {
+            Some(h) => (bottom - h).max(under_rows).min(tabs_top),
+            None => under_rows.max(bottom - MAX_LANE * scale).min(tabs_top),
+        };
         Self {
             scale,
             top,
@@ -445,51 +437,6 @@ impl Layout {
             tracks: shown,
             lane_top,
         }
-    }
-
-    /// The lane's bars: under the steps, as wide as they are.
-    #[must_use]
-    pub fn lane_rect(&self) -> Rect {
-        Rect::new(self.grid_left, self.lane_top, self.grid_width, self.bottom - self.lane_top)
-    }
-
-    /// The tab of lane `lane`, left of the bars: the tabs stand in rows of
-    /// [`LANE_TAB_COLUMNS`], together as wide as the add-track button, and
-    /// keep the bottom of the grid, whatever the bars' height.
-    #[must_use]
-    pub fn lane_tab_rect(&self, lane: usize) -> Rect {
-        let (row, column) = ((lane / LANE_TAB_COLUMNS) as i32, (lane % LANE_TAB_COLUMNS) as i32);
-        let y = self.bottom - lane_height() * self.scale + row * (LANE_TAB_HEIGHT + LANE_TAB_GAP) * self.scale;
-        let gap = LANE_TAB_GAP * self.scale;
-        let columns = LANE_TAB_COLUMNS as i32;
-        let w = (self.volume_x + VOLUME_WIDTH * self.scale - self.left - (columns - 1) * gap) / columns;
-        Rect::new(self.left + column * (w + gap), y, w, LANE_TAB_HEIGHT * self.scale)
-    }
-
-    /// The step of the page (0: its first) of a track of `spb` steps per
-    /// beat whose bar is at `(x, y)`, if any.
-    #[must_use]
-    pub fn lane_step(&self, x: i32, y: i32, spb: i32) -> Option<i64> {
-        if !self.lane_rect().contains(x, y) {
-            return None;
-        }
-        let step = ((f64::from(x - self.grid_left) * f64::from(spb)) / self.beat_width()) as i64;
-        (step < i64::from(self.beats) * i64::from(spb)).then_some(step)
-    }
-
-    /// The step under `x` of a track of `spb` steps per beat, kept to the
-    /// page: where a drag along the lane is.
-    #[must_use]
-    pub fn lane_step_clamped(&self, x: i32, spb: i32) -> i64 {
-        let step = ((f64::from(x - self.grid_left) * f64::from(spb)) / self.beat_width()).floor() as i64;
-        step.clamp(0, (i64::from(self.beats) * i64::from(spb) - 1).max(0))
-    }
-
-    /// The fraction of the lane's height at `y`: 0 on its lowest pixel row, 1 on its top one.
-    #[must_use]
-    pub fn lane_fraction(&self, y: i32) -> f64 {
-        let h = (self.bottom - self.lane_top - 1).max(1);
-        (f64::from(self.bottom - 1 - y) / f64::from(h)).clamp(0.0, 1.0)
     }
 
     /// First beat shown.

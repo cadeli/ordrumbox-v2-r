@@ -153,9 +153,11 @@ enough for steps of a usable size. The bar beside **+ NEW TRACK** scrolls
 the beats: drag its thumb, or the wheel with Shift held. The two ends of the thumb zoom (drag
 one: the other stays), as does Ctrl+wheel around the pointer; down to one beat across. Under the rows, the **lane** shows one setting of the
 track editor's track, a bar per note: **VELOCITY**, **CHANCE** (its probability), **RETRIG**
-(how many times it plays), **PAN**, **LENGTH** (how long it is held, in steps) or **SHIFT**
+(how many times it plays), **PAN**, **PITCH** (whole semitones, the middle is no change), **LENGTH** (how long it is held, in steps) or **SHIFT**
 (how early or late it plays, off the grid), picked by the tabs on its left. Click a bar to set
-its value at that height, or drag across the bars to draw them; a drag is one undo step.
+its value at that height, or drag across the bars to draw them; a drag is one undo step. A bubble gives the
+value as you draw and when the pointer rests on a bar. Right-click a bar for a menu: **Reset this step** or
+**Reset all notes** puts the notes back to the setting's default (a lock is cleared). Drag the lane's top edge (the strip just above the bars) to set its height; **Automatic height** in the same menu gives back the default, which fills the room the rows leave.
 
 The last three tabs are **parameter locks**: **FILTER** (the track's filter cutoff, 20 Hz to
 20 kHz), **REVERB** and **DELAY** (the track's reverb and delay mix) while the note plays. A note

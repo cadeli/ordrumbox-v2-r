@@ -232,7 +232,15 @@ impl Session {
 
     /// The grid in the main region: the lane's tabs and the tracks' volume sliders.
     fn grid_items(&self, layout: &mut PanelLayout, pattern: &Pattern, body: &view::Body, scale: Scale) {
-        let grid = Layout::new(body.main_w, body.editor_h, scale, pattern, self.status.len(), self.chrome.beat_window);
+        let grid = Layout::new(
+            body.main_w,
+            body.editor_h,
+            scale,
+            pattern,
+            self.status.len(),
+            self.chrome.beat_window,
+            self.chrome.lane_height,
+        );
         for (i, (_, label)) in editors::LANES.iter().enumerate() {
             let kind = Kind::Tab { label: (*label).to_owned(), active: usize::from(self.editors.lane) == i };
             layout.items.push(Item::new(Some(Id::Lane(i as u8)), grid.lane_tab_rect(i), kind));

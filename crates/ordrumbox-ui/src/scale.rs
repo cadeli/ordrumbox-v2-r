@@ -40,6 +40,12 @@ impl Scale {
         Self(quarters.max(QUARTERS))
     }
 
+    /// `pixels` in scale units, rounded down: the inverse of `n * scale`.
+    #[must_use]
+    pub const fn units(self, pixels: i32) -> i32 {
+        pixels.saturating_mul(QUARTERS).div_euclid(self.0)
+    }
+
     /// The scale in quarters of a unit.
     #[must_use]
     pub const fn quarters(self) -> i32 {

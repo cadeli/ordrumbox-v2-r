@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### New
+- **Grid lane**: a **PITCH** tab, a bubble with the value being painted or under the pointer, and a
+  right-click menu to reset a step's notes, or all the track's, to the setting's default. Drag the
+  lane's top edge to set its height (the menu's **Automatic height** undoes it).
 - **Piano roll zones**: press on an empty cell and drag to select a zone (a plain click still adds
   a note). Ctrl+C, Ctrl+X, Ctrl+V and Delete take the zone's notes, and dragging one of them moves
   the whole zone in time and pitch (one undo step). Shift+drag still works.
