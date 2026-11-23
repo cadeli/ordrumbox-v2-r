@@ -286,3 +286,34 @@ fn preview_sounds_while_stopped() {
     assert!(l.iter().any(|s| s.abs() > 0.01));
     assert_eq!(controller.position(), None);
 }
+
+#[test]
+fn a_pattern_loop_cuts_the_passes_and_a_seek_starts_inside_them() {
+    let (library, _) = Library::parse(
+        r#"{"patterns":[{"name":"p","beatCount":4,"tracks":[{"name":"KICK","notes":[{"beat":0},{"beat":1},{"beat":2}]}]}]}"#,
+    )
+    .unwrap();
+    let (mut controller, _audio) = Controller::new(8000.0, bank(), Scales::default(), SynthPresets::default());
+    let last = |c: &Controller| c.sent.back().map(|p| (p.offset_ticks, p.ticks, p.events.len())).expect("a pass");
+    let tick = ordrumbox_core::steps::TICK;
+
+    controller.play(&library, Mode::Pattern(0));
+    assert_eq!(last(&controller), (0, 4 * tick, 3), "the whole pattern");
+
+    // Beats 2 and 3 only: the note of beat 1 is out, the pass starts at its beat.
+    controller.set_pattern_loop(&library, PatternLoop::new(0, tick, 3 * tick));
+    controller.play(&library, Mode::Pattern(0));
+    assert_eq!(last(&controller), (tick, 2 * tick, 2));
+
+    // A loop of another pattern is not this one's.
+    controller.set_pattern_loop(&library, PatternLoop::new(1, tick, 3 * tick));
+    controller.play(&library, Mode::Pattern(0));
+    assert_eq!(last(&controller), (0, 4 * tick, 3));
+
+    // A seek inside the loop: from there to its end, then the loop.
+    controller.set_pattern_loop(&library, PatternLoop::new(0, tick, 3 * tick));
+    controller.seek_pattern(&library, 2 * tick);
+    assert_eq!(last(&controller), (2 * tick, tick, 1));
+    controller.jump(&library, 0);
+    assert_eq!(last(&controller), (tick, 2 * tick, 2), "a jump forgets the seek");
+}

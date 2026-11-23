@@ -5,6 +5,7 @@ use crate::canvas::text_width;
 use crate::editors;
 use crate::frame::{body_top, content_top, footer_top, margin};
 use crate::panel::{Rect, row_at};
+use crate::pattern_ruler::PatternRuler;
 use crate::scale::Scale;
 use crate::scroll_thumb::{self, Edge};
 use ordrumbox_core::track::MAX_STEPS_PER_BEAT;
@@ -514,6 +515,15 @@ impl Layout {
     pub fn beats_area(&self) -> Rect {
         let top = self.top - RULER_HEIGHT * self.scale;
         Rect::new(self.grid_left, top, self.grid_width, self.bottom - top)
+    }
+
+    /// The ruler's beats and steps (those of a track of `steps_per_beat`),
+    /// above the rows.
+    #[must_use]
+    pub fn ruler(&self, steps_per_beat: i32) -> PatternRuler {
+        let rect =
+            Rect::new(self.grid_left, self.top - RULER_HEIGHT * self.scale, self.grid_width, RULER_HEIGHT * self.scale);
+        PatternRuler::new(rect, (f64::from(self.start_beat), self.beat_width()), steps_per_beat, self.scale)
     }
 
     /// The grid's scroll bar, on the add-track button's row, as wide as the steps.

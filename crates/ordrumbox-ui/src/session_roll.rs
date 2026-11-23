@@ -149,10 +149,9 @@ impl Session {
     /// The step playing on the roll's track, while the pattern plays (alone
     /// or in a song's clip).
     pub(super) fn roll_playhead(&self) -> Option<i64> {
-        let (pattern, track) = (self.pattern()?, self.track(self.roll_track()?)?);
+        let track = self.track(self.roll_track()?)?;
         let tick = if self.playback.plays(Mode::Pattern(self.pattern_index)) {
-            let ticks = u64::from(TICK) * u64::try_from(pattern.beat_count.max(1)).ok()?;
-            self.playback.tick()? % ticks
+            u64::from(self.playback.pattern_tick()?)
         } else {
             self.song_clip_playing().filter(|clip| clip.pattern == self.pattern_index)?.local_tick
         };
@@ -181,6 +180,7 @@ impl Session {
             playhead,
             subs: Vec::new(),
             zone: self.roll_zone().map(|zone| self.roll_span(&zone, track)),
+            ruler_marks: self.ruler_marks(),
         };
         let span = SpanResolver::new(track);
         let mut rng = Rng::new(1);
@@ -307,6 +307,11 @@ impl Session {
         // A note drawn out covers the cells after its own: the note under the pointer first.
         let drawn = layout.note_at(&view, x, y);
         let Some(t) = self.roll_track() else { return false };
+        match (hit, button) {
+            (RollHit::Ruler, Button::Left) => return self.press_pattern_ruler(size, x, y),
+            (RollHit::Ruler, Button::Right) => return self.pattern_ruler_menu(size, x, y),
+            _ => {}
+        }
         let bar = match hit {
             RollHit::ScrollBar(edge) => Some((bar_hold(&layout, &view, edge), bar_at(&layout, &view, x))),
             _ => None,

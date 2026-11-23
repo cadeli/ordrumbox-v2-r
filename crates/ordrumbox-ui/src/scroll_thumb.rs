@@ -15,6 +15,20 @@ pub enum Edge {
     End,
 }
 
+impl Edge {
+    /// The span `(start, end)` with this end of it moved to `line`, and the
+    /// end then held: an end dragged past the other becomes the other.
+    #[must_use]
+    pub fn moved_to(self, (start, end): (u32, u32), line: u32) -> (u32, u32, Edge) {
+        match self {
+            Edge::Start if line > end => (end, line, Edge::End),
+            Edge::Start => (line, end, Edge::Start),
+            Edge::End if line < start => (line, start, Edge::Start),
+            Edge::End => (start, line, Edge::End),
+        }
+    }
+}
+
 /// Width of a zoom handle at an end of a thumb, in scale units.
 pub const ZOOM_HANDLE: i32 = 6;
 

@@ -163,6 +163,9 @@ impl Session {
     /// The mouse moved; whether to redraw.
     pub fn mouse_move(&mut self, size: (i32, i32, Scale), x: i32, y: i32, shift: bool) -> bool {
         self.chrome.widgets.pointer = (x, y);
+        if self.transport.loop_drag.is_some() {
+            return self.pattern_loop_move(size, x);
+        }
         if self.roll.dragging() {
             return self.roll_drag_move(x, y);
         }

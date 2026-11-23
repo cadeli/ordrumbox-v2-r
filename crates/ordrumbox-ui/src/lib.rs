@@ -30,6 +30,7 @@ mod mixer;
 mod note_drag;
 mod output;
 mod panel;
+mod pattern_ruler;
 mod piano_roll;
 mod picker;
 mod returns;

@@ -24,30 +24,20 @@ pub(super) fn draw_ruler(canvas: &mut Canvas, pattern: &Pattern, view: &View, la
     let y = layout.top - RULER_HEIGHT * scale;
     let spb =
         view.cursor.and_then(|c| pattern.tracks.get(c.track)).or(pattern.tracks.first()).map_or(4, steps_per_beat);
-    let playing = view.playhead.map(|f| (f.clamp(0.0, 1.0) * f64::from(layout.beats)).floor() as i32);
-    // Every beat numbered when they fit, else every second, fourth...
-    let widest = text_width(&(layout.start_beat + layout.beats).to_string(), scale) + 4 * scale;
-    let mut every = 1;
-    while layout.beat_width() * f64::from(every) < f64::from(widest) && every < layout.beats {
-        every *= 2;
-    }
+    let ruler = layout.ruler(spb);
+    ruler.draw_marks(canvas, &view.ruler_marks);
+    let playing =
+        view.playhead.map(|f| layout.start_beat + (f.clamp(0.0, 1.0) * f64::from(layout.beats)).floor() as i32);
+    ruler.draw_beats(
+        canvas,
+        layout.start_beat..layout.start_beat + layout.beats,
+        layout.total_beats,
+        (playing, PLAYING),
+    );
     // The beats shown, left of the ruler, when the pattern has more.
     if layout.beats < layout.total_beats {
         let text = format!("{}-{}/{}", layout.start_beat + 1, layout.start_beat + layout.beats, layout.total_beats);
         canvas.text(layout.name_x, y, &text, scale, theme::muted());
-    }
-    let dot_y = layout.top - 3 * scale;
-    for beat in 0..layout.beats {
-        let x = layout.beat_x(beat);
-        canvas.fill_rect(x, y, scale.px(), RULER_HEIGHT * scale - 2 * scale, theme::muted());
-        for step in 1..spb {
-            let sx = layout.step_x(i64::from(beat) * i64::from(spb) + i64::from(step), spb);
-            canvas.fill_rect(sx, dot_y, scale.px(), scale.px(), theme::muted());
-        }
-        if beat % every == 0 {
-            let color = if playing == Some(beat) { PLAYING } else { theme::muted() };
-            canvas.text(x + 3 * scale, y, &(layout.start_beat + beat + 1).to_string(), scale, color);
-        }
     }
 }
 

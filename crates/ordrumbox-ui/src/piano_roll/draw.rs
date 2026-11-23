@@ -12,6 +12,7 @@ pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &s
     let (start, end) = view.page_steps();
     let first_row = layout.first_row(view);
     let grid_h = (view.top_row - first_row + 1) * layout.row;
+    draw_ruler(canvas, view, layout);
     draw_rows(canvas, view, layout);
     draw_columns(canvas, view, layout, grid_h);
     // The loop point.
@@ -61,6 +62,17 @@ fn draw_scroll_bar(canvas: &mut Canvas, view: &RollView, layout: &RollLayout) {
         let x = layout.title.x + layout.title.w - text_width(&info, s);
         canvas.text(x, layout.title.y, &info, s, theme::text());
     }
+}
+
+/// The ruler over the grid: the loop and the play cursor, then its beats.
+fn draw_ruler(canvas: &mut Canvas, view: &RollView, layout: &RollLayout) {
+    let ruler = layout.pattern_ruler(view);
+    ruler.draw_marks(canvas, &view.ruler_marks);
+    let spb = i64::from(steps_per_beat(view.track));
+    let (start, end) = view.page_steps();
+    let beats = (start / spb) as i32..((end + spb - 1) / spb) as i32;
+    let playing = view.playhead.map(|p| (p / spb) as i32);
+    ruler.draw_beats(canvas, beats, view.beat_count, (playing, PLAYHEAD));
 }
 
 /// The keys and the row backgrounds, an octave line under each C.

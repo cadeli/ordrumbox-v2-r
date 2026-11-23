@@ -58,13 +58,7 @@ impl Session {
             }
             LoopDrag::End(edge) => before.and_then(|(start, end)| {
                 let line = layout.loop_line_at(x, first, snap, total);
-                // An end dragged past the other becomes the other.
-                let (start, end, edge) = match edge {
-                    Edge::Start if line > end => (end, line, Edge::End),
-                    Edge::Start => (line, end, Edge::Start),
-                    Edge::End if line < start => (line, start, Edge::Start),
-                    Edge::End => (start, line, Edge::End),
-                };
+                let (start, end, edge) = edge.moved_to((start, end), line);
                 self.song_panel.loop_drag = Some(LoopDrag::End(edge));
                 (start < end).then_some((start, end))
             }),
@@ -85,8 +79,8 @@ impl Session {
 
     /// A right-click on the ruler at `(x, y)`: the loop's menu.
     pub(super) fn loop_menu(&mut self, x: i32, y: i32) {
-        if self.song_loop_marks().is_none() {
-            self.message = "no loop: a drag on the song's ruler sets one".into();
+        if !self.has_loop() {
+            self.message = super::session_transport::NO_LOOP.into();
             return;
         }
         let toggle = if self.transport.is_loop_on { "Turn the loop off" } else { "Turn the loop on" };

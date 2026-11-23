@@ -210,6 +210,7 @@ impl Ui {
                 || s.mouse_down(size, x, y, button, shift)
                 || (button == Button::Right && !menus_open && s.song_view_open() && s.song_click(size, x, y, button))
                 || (button == Button::Right && !menus_open && s.piano_roll_open() && s.roll_click(size, x, y, button))
+                || (button == Button::Right && !menus_open && s.pattern_ruler_menu(size, x, y))
                 || (button == Button::Right && !menus_open && s.grid_menu(size, x, y));
         }
         let menus = s.menus();
@@ -261,7 +262,7 @@ impl Ui {
             s.kit_click(hit);
             return true;
         }
-        if s.lane_press(size, x, y) || s.grid_bar_press(size, x, y) {
+        if s.lane_press(size, x, y) || s.grid_bar_press(size, x, y) || s.press_pattern_ruler(size, x, y) {
             return true;
         }
         let Some(hit) = s.grid_hit(size, x, y) else { return false };
@@ -293,7 +294,9 @@ impl Ui {
         if self.scroll.release() {
             return true;
         }
-        let redraw = self.session.song_release(self.size()) | self.session.track_release(self.size());
+        let redraw = self.session.song_release(self.size())
+            | self.session.track_release(self.size())
+            | self.session.pattern_loop_release(self.size());
         self.session.mouse_up();
         redraw
     }

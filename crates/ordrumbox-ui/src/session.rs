@@ -140,6 +140,8 @@ mod session_panel_edit;
 mod session_panel_input;
 #[path = "session_panel_views.rs"]
 mod session_panel_views;
+#[path = "session_pattern_loop.rs"]
+mod session_pattern_loop;
 #[path = "session_pattern_tags.rs"]
 mod session_pattern_tags;
 #[path = "session_playback.rs"]
@@ -336,6 +338,7 @@ impl Session {
         let ticks = |step: u32| u64::from(step) * u64::from(ordrumbox_core::automation::STEP_TICKS);
         let region = self.song_loop_region().and_then(|(first, end)| SongLoop::new(ticks(first), ticks(end)));
         self.playback.set_song_loop(&self.editor, region);
+        self.playback.set_pattern_loop(&self.editor, self.pattern_loop_region());
         self.playback.set_metronome(&self.editor, self.transport.metronome);
         self.update_live_automation();
         let midi_open = self.playback.offers().midi_open;

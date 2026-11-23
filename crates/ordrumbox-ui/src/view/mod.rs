@@ -21,6 +21,7 @@ const MIN_STEP_WIDTH: i32 = 16;
 /// The steps per beat a page's width is reckoned for (the default): the
 /// beats of a page depend on the window only, not on the tracks.
 const PAGE_STEPS_PER_BEAT: i32 = 4;
+use crate::pattern_ruler::RulerMarks;
 use crate::piano_roll::RollView;
 use crate::song_view::SongView;
 use crate::theme;
@@ -154,6 +155,8 @@ pub struct View<'a> {
     pub right: i32,
     /// The beats of the pattern the grid shows.
     pub beat_window: BeatWindow,
+    /// The loop and the play cursor on the ruler.
+    pub ruler_marks: RulerMarks,
     /// The note editor is under the main editor (the grid, the piano roll).
     pub note_editor: bool,
     /// The track the lane under the grid shows, and the lane (an index in

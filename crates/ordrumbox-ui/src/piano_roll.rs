@@ -18,6 +18,7 @@ use crate::canvas::{Canvas, Rgb, text_width};
 use crate::frame;
 use crate::note_drag::{MIDDLE_C, MIDI_MIN, midi_name};
 use crate::panel::{Rect, stroke};
+use crate::pattern_ruler::{PatternRuler, RulerMarks};
 use crate::theme;
 use crate::theme::{ZONE, ZONE_OPACITY};
 
@@ -25,6 +26,8 @@ use crate::theme::{ZONE, ZONE_OPACITY};
 const NOTE_HEIGHT: i32 = 14;
 /// Width of the keyboard (`KEYS_COLUMN_WIDTH`).
 const KEYS_WIDTH: i32 = 80;
+/// Height of the ruler over the grid, per scale unit.
+const RULER_HEIGHT: i32 = 12;
 /// Height of the scroll bar under the grid, and the gap above it, per scale unit.
 const BAR_HEIGHT: i32 = 12;
 const BAR_GAP: i32 = 4;
@@ -148,6 +151,8 @@ pub struct RollView<'a> {
     pub subs: Vec<Vec<SubPosition>>,
     /// The zone drawn with Shift+drag.
     pub zone: Option<RollSpan>,
+    /// The loop and the play cursor on the ruler.
+    pub ruler_marks: RulerMarks,
 }
 
 /// A zone of the roll: steps `start_step..end_step`, rows `low_row..=high_row`.
@@ -198,6 +203,8 @@ pub enum RollHit {
     Cell { step: i64, row: i32 },
     /// The scroll bar: a drag scrolls, or zooms at a handle (`Some`).
     ScrollBar(Option<Edge>),
+    /// The ruler above the grid: it sets the loop and the play cursor.
+    Ruler,
 }
 
 /// Where the piano roll's parts are.
@@ -206,6 +213,8 @@ pub struct RollLayout {
     scale: Scale,
     /// The title line.
     pub title: Rect,
+    /// The ruler of beats over the grid.
+    pub ruler: Rect,
     pub keys: Rect,
     pub grid: Rect,
     /// The beats' scroll bar, under the grid, whose ends zoom.
@@ -224,7 +233,8 @@ impl RollLayout {
         let top = frame::body_top(scale);
         let bottom = frame::footer_top(height, scale, status_lines) - margin / 2;
         let title = Rect::new(margin, top, (width - 2 * margin).max(0), 12 * s);
-        let grid_top = top + 18 * s;
+        let ruler_top = top + 18 * s;
+        let grid_top = ruler_top + RULER_HEIGHT * s;
         let bar_h = BAR_HEIGHT * s;
         let h = (bottom - grid_top - bar_h - BAR_GAP * s).max(0);
         let keys = Rect::new(margin, grid_top, KEYS_WIDTH * s, h);
@@ -234,6 +244,7 @@ impl RollLayout {
         Self {
             scale,
             title,
+            ruler: Rect::new(grid_x, ruler_top, grid_w, RULER_HEIGHT * s),
             keys,
             grid: Rect::new(grid_x, grid_top, grid_w, h),
             bar: Rect::new(grid_x, grid_top + h + BAR_GAP * s, grid_w, bar_h),
@@ -352,8 +363,19 @@ impl RollLayout {
         })
     }
 
+    /// The ruler's beats and steps: where the grid puts them.
+    #[must_use]
+    pub fn pattern_ruler(&self, view: &RollView) -> PatternRuler {
+        let spb = steps_per_beat(view.track);
+        let first_beat = view.page_steps().0 as f64 / f64::from(spb);
+        PatternRuler::new(self.ruler, (first_beat, f64::from(self.cell * spb)), spb, self.scale)
+    }
+
     /// What is at `(x, y)`.
     pub fn hit(&self, view: &RollView, x: i32, y: i32) -> Option<RollHit> {
+        if self.ruler.contains(x, y) {
+            return Some(RollHit::Ruler);
+        }
         if self.bar.contains(x, y) {
             let handle = scroll_thumb::ZOOM_HANDLE * self.scale;
             return Some(RollHit::ScrollBar(scroll_thumb::handle_at(x, self.bar_thumb(view), handle)));
@@ -407,6 +429,7 @@ mod tests {
             selected: Some(1),
             cursor: Some((3, 40)),
             playhead: Some(16),
+            ruler_marks: RulerMarks::default(),
             subs: vec![Vec::new(); 3],
             zone: Some(RollSpan { start_step: 2, end_step: 20, low_row: 30, high_row: 44 }),
         }

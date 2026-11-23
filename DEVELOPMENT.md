@@ -294,7 +294,10 @@ keypad's Enter rewind (the kit editor keeps its Enter). A song stopped keeps its
 cursor goes to the measure it was in, so Space goes on from there where it used to start over
 from the cursor set by hand. A song's loop (Shift+click on the ruler) is made in the controller
 (`Controller::set_song_loop`): a pass keeps the sequence number the engine counts and holds the
-measure of the loop. The metronome is built into the passes (`ordrumbox-engine/src/metronome.rs`),
+measure of the loop. A pattern's loop and play cursor (the rulers of the grid and of the piano roll) are
+made the same way (`Controller::set_pattern_loop`, `Controller::seek_pattern`): a pass is built whole, then cut
+to its ticks (`controller/pattern_loop.rs`), and `Pass::offset_ticks` says where in the pattern it starts, which
+`Controller::pattern_tick` and the playheads read. The metronome is built into the passes (`ordrumbox-engine/src/metronome.rs`),
 a synth click on a strip after the tracks' (none when the pattern has 64 tracks). The output
 device is a setting (`audioDevice`) read by `ordrumbox-app` each time it starts the sound; Edit >
 Preferences (`session_prefs.rs`) chooses it, and a new one reloads the session. The MIDI input

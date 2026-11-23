@@ -25,6 +25,7 @@ use crate::kit::SampleBank;
 use crate::midi::{KeyMap, Target};
 use crate::pass::{
     HitsCache, Pass, PassContext, SongContext, build_keymap, build_pass, build_preview, build_song_pass_at,
+    pattern_pass_ticks,
 };
 use crate::synth_preset::SynthPresets;
 
@@ -34,6 +35,8 @@ mod audio;
 mod host;
 #[path = "controller/link.rs"]
 mod link;
+#[path = "controller/pattern_loop.rs"]
+mod pattern_loop;
 #[path = "controller/song_loop.rs"]
 mod song_loop;
 #[cfg(test)]
@@ -43,6 +46,8 @@ mod tests;
 pub use audio::AudioSide;
 pub use link::SCOPE_SIZE;
 use link::*;
+pub use pattern_loop::PatternLoop;
+use pattern_loop::{Seek, pattern_span};
 pub use song_loop::SongLoop;
 use song_loop::song_span;
 
@@ -103,6 +108,10 @@ pub struct Controller {
     overridden: Vec<(String, AutomationTarget)>,
     /// The ticks a song plays in a loop.
     song_loop: Option<SongLoop>,
+    /// The ticks a pattern plays in a loop.
+    pattern_loop: Option<PatternLoop>,
+    /// Where the first pass after a seek starts in its pattern.
+    pattern_seek: Option<Seek>,
     /// A click on every beat of the passes built.
     metronome: bool,
     /// A MIDI input is open: the pattern's key map is posted for its notes, as under a host.
@@ -203,6 +212,8 @@ impl Controller {
             swing: STRAIGHT_SWING,
             cue: None,
             song_loop: None,
+            pattern_loop: None,
+            pattern_seek: None,
             overridden: Vec::new(),
             metronome: false,
             live_midi: false,
@@ -390,6 +401,31 @@ impl Controller {
         }
     }
 
+    /// The ticks of a pattern that play in a loop, or `None` to play it
+    /// whole. The pass playing is rebuilt, the next ones follow the loop.
+    pub fn set_pattern_loop(&mut self, library: &Library, region: Option<PatternLoop>) {
+        if self.pattern_loop != region {
+            self.pattern_loop = region;
+            self.refresh(library);
+        }
+    }
+
+    /// Go on from tick `tick` of the pattern playing at once, then back to
+    /// where the loop starts (the pattern's start without one).
+    pub fn seek_pattern(&mut self, library: &Library, tick: u32) {
+        self.pattern_seek = Some(Seek { number: 0, tick });
+        self.start_pass(library, 0);
+    }
+
+    /// The tick of its pattern the playing pass is at; `None` when stopped.
+    /// Only a pattern's passes are about this.
+    pub fn pattern_tick(&self) -> Option<u32> {
+        let position = self.position()?;
+        let pass = self.sent.iter().rev().find(|p| p.number == position.pass)?;
+        let in_pass = u128::from(position.frame) * u128::from(pass.ticks) / u128::from(position.frames.max(1));
+        Some(pass.offset_ticks + u32::try_from(in_pass).unwrap_or(u32::MAX).min(pass.ticks.saturating_sub(1)))
+    }
+
     /// The lanes a control was taken back from (an instrument and its
     /// control), played without them: the pass playing is rebuilt.
     pub fn set_overridden(&mut self, library: &Library, overridden: &[(String, AutomationTarget)]) {
@@ -440,25 +476,34 @@ impl Controller {
         self.metronome
     }
 
+    /// Pass `number` of pattern `p`: built whole, then cut to the ticks a loop or a seek keeps.
+    fn build_pattern_pass(&mut self, library: &Library, number: u64, p: usize) -> Option<Pass> {
+        self.pass_patterns.push_back((number, p));
+        let pattern = library.patterns.get(p)?;
+        let sounds = self.sounds(library, p);
+        let context = PassContext {
+            bank: &self.bank,
+            sounds: &sounds,
+            scales: &self.scales,
+            synths: &self.synths,
+            sample_rate: self.sample_rate,
+            first_tick: self.first_tick(number),
+            swing: self.swing,
+        };
+        let bpm = self.bpm_of(library, Mode::Pattern(p));
+        let own_loop = self.pattern_loop.filter(|l| l.pattern() == p);
+        let (first, end) = pattern_span(number, pattern_pass_ticks(pattern), own_loop, self.pattern_seek);
+        // Built whole, its LFOs from where the cut part starts, then cut.
+        let first_tick = context.first_tick.saturating_sub(u64::from(first));
+        let mut pass = build_pass(pattern, number, &mut self.rng, PassContext { first_tick, ..context }, bpm);
+        pass.cut(first, end);
+        Some(pass)
+    }
+
     /// Pass `number` of `mode`.
     fn build_of(&mut self, library: &Library, number: u64, mode: Mode) -> Option<Arc<Pass>> {
         let pass = match mode {
-            Mode::Pattern(p) => {
-                self.pass_patterns.push_back((number, p));
-                let pattern = library.patterns.get(p)?;
-                let sounds = self.sounds(library, p);
-                let context = PassContext {
-                    bank: &self.bank,
-                    sounds: &sounds,
-                    scales: &self.scales,
-                    synths: &self.synths,
-                    sample_rate: self.sample_rate,
-                    first_tick: self.first_tick(number),
-                    swing: self.swing,
-                };
-                let bpm = self.bpm_of(library, mode);
-                build_pass(pattern, number, &mut self.rng, context, bpm)
-            }
+            Mode::Pattern(p) => self.build_pattern_pass(library, number, p)?,
             Mode::Song(s) => {
                 let song = library.songs.get(s)?;
                 let unbound;
@@ -615,6 +660,12 @@ impl Controller {
     /// Go on from pass `first` at once (`setSongCursor` while playing: the
     /// measure clicked sounds right away), with the sounds already assigned.
     pub fn jump(&mut self, library: &Library, first: u64) {
+        self.pattern_seek = None;
+        self.start_pass(library, first);
+    }
+
+    /// Post pass `first` to play at once.
+    fn start_pass(&mut self, library: &Library, first: u64) {
         self.song_notes.clear();
         self.pass_patterns.clear();
         let Some(pass) = self.build(library, first) else { return };

@@ -200,6 +200,11 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   the ruler opens the loop's menu: turn it on or off, or remove it (as Play > Clear the
   loop). **Shift + click** on the ruler loops the song from the cursor's measure to
   the one clicked.
+  The rulers of the grid and of the piano roll work the same way for the pattern shown: a
+  **drag** selects the steps that loop (the steps of the track whose cursor is in the grid,
+  or of the roll's track), a **click** puts the play cursor on a step, which the pattern goes
+  on from at once when it plays, and from which it plays next time (**Home** brings it back to
+  the first beat), **Ctrl + L** and the **right-click** menu turn the loop off, on, or remove it.
   A **double-click** on a clip of the song panel opens its pattern in the grid, in
   pattern mode.
 - **Song panel clicks**: the left button acts, a **right-click** opens the menu of what is

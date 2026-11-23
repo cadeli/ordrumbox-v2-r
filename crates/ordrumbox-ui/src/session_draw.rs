@@ -70,7 +70,7 @@ impl Session {
         let position = self.playback.position();
         let size = (canvas.width(), canvas.height(), scale);
         let waiting = self.waiting_blink();
-        let played = self.played_fraction(position, waiting);
+        let played = self.played_fraction(waiting);
         let shown_beats = self.follow_beats(size, played);
         if self.piano_roll_open() {
             self.roll_follow_playhead();
@@ -100,6 +100,7 @@ impl Session {
             kit_view: self.kit_view(kit_first, layout.details_top),
             right: layout.right,
             beat_window: self.chrome.beat_window,
+            ruler_marks: self.ruler_marks(),
             lane: (self.editor_track(), usize::from(self.editors.lane)),
             note_editor: self.note_editor_shown(),
             levels: levels.clone(),
@@ -155,7 +156,7 @@ impl Session {
     /// How far the pattern shown has played, from 0 to 1: the pattern's
     /// pass, or the song's clip of it; `None` while it does not play (it
     /// waits for another pattern, or the song plays another).
-    pub(super) fn played_fraction(&self, position: Option<Position>, waiting: Option<bool>) -> Option<f64> {
+    pub(super) fn played_fraction(&self, waiting: Option<bool>) -> Option<f64> {
         if !self.playing() || waiting.is_some() {
             return None;
         }
@@ -164,7 +165,11 @@ impl Session {
                 .song_clip_playing()
                 .filter(|clip| clip.pattern == self.pattern_index)
                 .map(|clip| clip.local_tick as f64 / clip.pattern_ticks.max(1) as f64),
-            _ => position.map(|p| p.frame as f64 / p.frames.max(1) as f64),
+            _ => {
+                let beats = self.pattern().map_or(1, |p| p.beat_count.max(1));
+                let ticks = f64::from(beats) * f64::from(ordrumbox_core::steps::TICK);
+                self.playback.pattern_tick().map(|tick| f64::from(tick) / ticks)
+            }
         }
     }
 

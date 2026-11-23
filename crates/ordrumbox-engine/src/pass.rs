@@ -71,6 +71,9 @@ pub struct Pass {
     pub frames: u64,
     /// Length in ticks (a beat is [`TICK`]).
     pub ticks: u32,
+    /// The tick of its pattern the pass starts at: past 0 when a loop or a
+    /// seek cuts the pattern's start off.
+    pub offset_ticks: u32,
     /// Sorted by frame.
     pub events: Vec<Event>,
     /// Strip parameters, by track index (a silent track has volume 0).
@@ -249,7 +252,18 @@ pub fn build_pass(pattern: &Pattern, number: u64, rng: &mut Rng, context: PassCo
         .filter_map(|(i, t)| strip_lfo(i, t, silent(i), context.first_tick, ticks))
         .collect();
     let keys = key_strips(pattern.tracks.iter());
-    Pass { number, first_tick: context.first_tick, frames, ticks, events, strips, keys, lfos, patches }
+    Pass {
+        number,
+        first_tick: context.first_tick,
+        frames,
+        ticks,
+        events,
+        strips,
+        keys,
+        lfos,
+        patches,
+        ..Pass::default()
+    }
 }
 
 /// The strip each of `tracks` takes its sidechain key from: the one named by
@@ -524,6 +538,7 @@ pub fn build_song_pass_at(
         keys: key_strips(strips.iter().map(|&(p, t)| &context.patterns[p].tracks[t])),
         lfos,
         patches,
+        ..Pass::default()
     }
 }
 

@@ -7,7 +7,7 @@ use crate::menu;
 use ordrumbox_core::automation::STEPS_PER_MEASURE;
 
 /// What a loop command says without a loop.
-const NO_LOOP: &str = "no loop: a drag on the song's ruler sets one";
+pub(super) const NO_LOOP: &str = "no loop: a drag on the ruler sets one";
 use ordrumbox_engine::Mode;
 
 /// Where and how the session plays, beside the engine's own state.
@@ -17,6 +17,12 @@ pub(super) struct Transport {
     pub(super) song_cursor: u32,
     /// The steps a song plays in a loop: its index, first step, end (excluded).
     pub(super) song_loop: Option<(usize, u32, u32)>,
+    /// The ticks a pattern plays in a loop: its index, first tick, end (excluded).
+    pub(super) pattern_loop: Option<(usize, u32, u32)>,
+    /// The tick of the pattern the play cursor is at: where it plays from.
+    pub(super) pattern_cursor: u32,
+    /// A press on a pattern's ruler, held.
+    pub(super) loop_drag: Option<super::session_pattern_loop::PatternLoopDrag>,
     /// The loop plays; off, its ends stay on the ruler, for Ctrl+L to turn it on again.
     pub(super) is_loop_on: bool,
     /// A click on every beat.
@@ -76,6 +82,12 @@ impl Session {
                 self.generators.auto_loop(&mut self.editor, p, 0);
             }
             self.playback.play_from(&self.editor, mode, first);
+            // A pattern plays from its play cursor.
+            if let Mode::Pattern(_) = mode
+                && self.transport.pattern_cursor > 0
+            {
+                self.playback.seek_pattern(&self.editor, self.transport.pattern_cursor);
+            }
         }
     }
 
@@ -88,9 +100,11 @@ impl Session {
             self.set_song_cursor(first);
             self.message = format!("back to measure {}", first + 1);
         } else if self.playback.is_playing() {
+            self.transport.pattern_cursor = 0;
             self.playback.play_from(&self.editor, Mode::Pattern(self.pattern_index), 0);
             self.message = "back to the first beat".into();
         } else {
+            self.transport.pattern_cursor = 0;
             self.message = "stopped at the first beat".into();
         }
     }
@@ -134,9 +148,19 @@ impl Session {
         self.message = format!("loop: {} to {}, {state}", at(first), at(end));
     }
 
+    /// The loop commands are about the song's loop, not the pattern shown's.
+    fn loop_of_song(&self) -> bool {
+        self.is_song_mode() || self.song_view_open()
+    }
+
+    /// The loop of what the mode plays (the song's, or the pattern shown's) is set, on or off.
+    pub(super) fn has_loop(&self) -> bool {
+        if self.loop_of_song() { self.song_loop_marks().is_some() } else { self.pattern_loop_marks().is_some() }
+    }
+
     /// Ctrl+L: the song's loop on or off, its ends kept.
     pub fn toggle_loop(&mut self) {
-        if self.song_loop_marks().is_none() {
+        if !self.has_loop() {
             self.message = NO_LOOP.into();
             return;
         }
@@ -146,7 +170,12 @@ impl Session {
 
     /// Play > Clear the loop: the song plays on to its end, the loop's ends removed.
     pub fn clear_loop(&mut self) {
-        if self.transport.song_loop.take().is_some() {
+        let cleared = if self.loop_of_song() {
+            self.transport.song_loop.take().is_some()
+        } else {
+            self.transport.pattern_loop.take().is_some()
+        };
+        if cleared {
             self.message = "loop cleared".into();
         } else {
             self.message = NO_LOOP.into();
@@ -291,6 +320,7 @@ impl Session {
         }
         let index = self.generators.rng.below(count as u64) as usize;
         self.pattern_index = index;
+        self.transport.pattern_cursor = 0;
         self.deselect();
         self.edited();
         self.chrome.beat_window.rewind();

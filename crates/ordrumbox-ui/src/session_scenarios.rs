@@ -194,7 +194,7 @@ fn in_song_mode_the_grid_and_the_roll_show_the_pattern_playing() {
     s.toggle_play();
     run(&mut s, &mut audio, measure / 2);
     assert_eq!((mode(&s), s.pattern_index), (Mode::Song(0), 0));
-    assert!(s.played_fraction(position(&s), None).is_some_and(|f| f > 0.4 && f < 0.6), "the playhead in a");
+    assert!(s.played_fraction(None).is_some_and(|f| f > 0.4 && f < 0.6), "the playhead in a");
     run(&mut s, &mut audio, measure);
     assert_eq!(s.pattern_index, 1, "the grid follows the song into b");
     // The piano roll follows it too.

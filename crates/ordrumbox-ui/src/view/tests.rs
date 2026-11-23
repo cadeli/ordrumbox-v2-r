@@ -144,6 +144,7 @@ fn draws_without_panicking_at_any_size() {
             hovered_track: Some(0),
             host_moved: 0b01,
             host_split: 0b10,
+            ruler_marks: crate::pattern_ruler::RulerMarks::default(),
             cursor: Some(Cursor { track: 0, beat: 1, step: 2 }),
             selected: Some((0, 0)),
             zone: None,

@@ -4,7 +4,7 @@
 //! only through it.
 
 use ordrumbox_core::{AutomationTarget, Track};
-use ordrumbox_engine::{Controller, HostMix, HostTransport, Mode, Position, SongLoop};
+use ordrumbox_engine::{Controller, HostMix, HostTransport, Mode, PatternLoop, Position, SongLoop};
 use ordrumbox_logic::Editor;
 
 use crate::audio_output::{AudioOutput, OutputDevices, StartOutput};
@@ -208,6 +208,26 @@ impl Playback {
         if let Some(controller) = &mut self.controller {
             controller.set_song_loop(editor.library(), region);
         }
+    }
+
+    /// The ticks a pattern plays in a loop (`None`: all of it).
+    pub(super) fn set_pattern_loop(&mut self, editor: &Editor, region: Option<PatternLoop>) {
+        if let Some(controller) = &mut self.controller {
+            controller.set_pattern_loop(editor.library(), region);
+        }
+    }
+
+    /// The pattern playing goes on from tick `tick` at once.
+    pub(super) fn seek_pattern(&mut self, editor: &Editor, tick: u32) {
+        let Some(controller) = &mut self.controller else { return };
+        self.upcoming_loop = None;
+        controller.seek_pattern(editor.library(), tick);
+        self.played_revision = editor.revision();
+    }
+
+    /// The tick of its pattern the pass playing is at.
+    pub(super) fn pattern_tick(&self) -> Option<u32> {
+        self.controller.as_ref().and_then(Controller::pattern_tick)
     }
 
     /// The metronome on or off.
