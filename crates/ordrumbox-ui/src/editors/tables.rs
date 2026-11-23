@@ -22,12 +22,12 @@ pub const TAB_LFO: u8 = 2;
 pub const TAB_LOOP: u8 = 3;
 
 /// An effect: the setting its on / off button reads and writes, its name,
-/// its controls, its type, and the value its button turns it on at.
+/// its controls row by row, its type, and the value its button turns it on at.
 #[derive(Debug)]
 pub struct FxDef {
     pub key: &'static str,
     pub label: &'static str,
-    pub controls: &'static [&'static str],
+    pub controls: &'static [&'static [&'static str]],
     /// The setting of the effect's type, shown on its cartridge's screen
     /// (the filter's is the one its LED reads).
     pub fx_type: Option<FxType>,
@@ -44,6 +44,12 @@ pub struct FxType {
 }
 
 impl FxDef {
+    /// Whether `key` is one of the effect's controls.
+    #[must_use]
+    pub fn has_control(&self, key: &str) -> bool {
+        self.controls.iter().any(|row| row.contains(&key))
+    }
+
     /// The setting of the effect's type.
     #[must_use]
     pub fn type_key(&self) -> Option<&'static str> {
@@ -73,29 +79,30 @@ pub static FX_DEFS: [FxDef; 6] = [
     FxDef {
         key: "reverbMix",
         label: "Reverb",
-        controls: &["reverbMix", "reverbType"],
+        controls: &[&["reverbMix", "reverbType"]],
         fx_type: Some(FxType { key: "reverbType", default: "room" }),
         on_value: 0.5,
     },
     FxDef {
         key: "delayMix",
         label: "Delay",
-        controls: &["delayMix", "delayBeats", "delayFeedback", "delayType"],
+        controls: &[&["delayMix", "delayBeats", "delayFeedback", "delayType"]],
         fx_type: Some(FxType { key: "delayType", default: "tape" }),
         on_value: 0.5,
     },
     FxDef {
         key: "saturationMix",
         label: "Saturation",
-        controls: &["saturationMix", "saturationType", "bitcrush", "hardClip"],
+        controls: &[&["saturationMix", "saturationType", "bitcrush", "hardClip"]],
         fx_type: Some(FxType { key: "saturationType", default: "soft" }),
         on_value: 0.5,
     },
-    // On at full mix: a plain compressor; less mixes it in parallel.
+    // On at full mix: a plain compressor; less mixes it in parallel. Two rows,
+    // its levels then its times, so the strips need four slots, not five.
     FxDef {
         key: "compMix",
         label: "Compressor",
-        controls: &["compMix", "compThresholdDb", "compRatio", "compAttackMs", "compReleaseMs"],
+        controls: &[&["compMix", "compThresholdDb", "compRatio"], &["compAttackMs", "compReleaseMs"]],
         fx_type: None,
         on_value: 1.0,
     },
@@ -103,7 +110,7 @@ pub static FX_DEFS: [FxDef; 6] = [
     FxDef {
         key: "duckAmount",
         label: "Sidechain",
-        controls: &["duckAmount", "duckReleaseMs", "sidechainSource"],
+        controls: &[&["duckAmount", "duckReleaseMs", "sidechainSource"]],
         fx_type: None,
         on_value: 0.5,
     },
@@ -111,7 +118,7 @@ pub static FX_DEFS: [FxDef; 6] = [
     FxDef {
         key: "filterType",
         label: "Filter",
-        controls: &["filterType", "filterSlope", "filterCutoff", "filterQ"],
+        controls: &[&["filterType", "filterSlope", "filterCutoff", "filterQ"]],
         fx_type: Some(FxType { key: "filterType", default: "lowpass" }),
         on_value: 0.0,
     },

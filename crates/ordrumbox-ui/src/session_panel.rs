@@ -81,7 +81,7 @@ pub(super) enum NoteTarget {
 
 /// Width of the track editor on a `width`-wide window.
 fn panel_width(width: i32, scale: Scale) -> i32 {
-    (360 * scale).min(width / 2)
+    (view::TRACK_EDITOR_WIDTH * scale).min(width / 2)
 }
 
 pub(super) fn number(v: f64) -> Value {
@@ -232,7 +232,7 @@ impl Session {
 
     /// The grid in the main region: the lane's tabs and the tracks' volume sliders.
     fn grid_items(&self, layout: &mut PanelLayout, pattern: &Pattern, body: &view::Body, scale: Scale) {
-        let grid = Layout::new(body.main_w, body.editor_h, scale, pattern, self.status.len(), self.chrome.current_page);
+        let grid = Layout::new(body.main_w, body.editor_h, scale, pattern, self.status.len(), self.chrome.beat_window);
         for (i, (_, label)) in editors::LANES.iter().enumerate() {
             let kind = Kind::Tab { label: (*label).to_owned(), active: usize::from(self.editors.lane) == i };
             layout.items.push(Item::new(Some(Id::Lane(i as u8)), grid.lane_tab_rect(i), kind));
@@ -465,7 +465,7 @@ pub(super) fn history_label(id: Id) -> String {
         _ => "",
     };
     let label = Some(control_name(id).0).filter(|l| !l.is_empty()).unwrap_or(key);
-    match FX_DEFS.iter().find(|fx| fx.controls.contains(&key)) {
+    match FX_DEFS.iter().find(|fx| fx.has_control(key)) {
         Some(fx) => format!("{} {label}", fx.label),
         None => label.to_owned(),
     }

@@ -293,7 +293,7 @@ impl Session {
         self.pattern_index = index;
         self.deselect();
         self.edited();
-        self.chrome.current_page = 0;
+        self.chrome.beat_window.rewind();
         self.message = format!("pattern {}", self.pattern().and_then(|p| p.name.as_deref()).unwrap_or_default());
     }
 
@@ -331,7 +331,7 @@ impl Session {
     pub(super) fn show_pattern(&mut self, index: usize) {
         self.pattern_index = index;
         self.deselect();
-        self.chrome.current_page = 0;
+        self.chrome.beat_window.rewind();
         self.message = format!("pattern {}", self.pattern().and_then(|p| p.name.as_deref()).unwrap_or_default());
         // In pattern mode the new pattern plays once the one playing ends its loop.
         if let Some(controller) = self.playback.controller_mut()

@@ -68,6 +68,8 @@ mod session_generate;
 mod session_generators;
 #[path = "session_grid.rs"]
 mod session_grid;
+#[path = "session_grid_bar.rs"]
+mod session_grid_bar;
 #[path = "session_hints.rs"]
 mod session_hints;
 #[path = "session_history.rs"]

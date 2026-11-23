@@ -127,6 +127,6 @@ impl Session {
         let Some(clip) = self.song_clip_playing().filter(|clip| clip.pattern != self.pattern_index) else { return };
         self.pattern_index = clip.pattern;
         self.deselect();
-        self.chrome.current_page = 0;
+        self.chrome.beat_window.rewind();
     }
 }

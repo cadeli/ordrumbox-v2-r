@@ -9,7 +9,7 @@ use super::Session;
 use super::session_song::DRAG_START_PX;
 use crate::panel::{Dropdown, Id};
 use crate::scale::Scale;
-use crate::song_view::Edge;
+use crate::scroll_thumb::Edge;
 use ordrumbox_core::automation::STEPS_PER_MEASURE;
 
 /// A press on the ruler, held.
@@ -172,11 +172,11 @@ mod tests {
         assert_eq!(s.message, "loop: 1.6 to 1.12, Ctrl+L turns it off");
 
         // Its end, dragged to step 14's line; its start past it: they swap.
-        let end = on_ruler(&s, |_, hit| hit == SongHit::LoopEnd(crate::song_view::Edge::End));
+        let end = on_ruler(&s, |_, hit| hit == SongHit::LoopEnd(crate::scroll_thumb::Edge::End));
         let to = step_x(&s, 14).0 - 2;
         drag(&mut s, (end, y), to);
         assert_eq!(s.song_loop_region(), Some((5, 14)));
-        let start = on_ruler(&s, |_, hit| hit == SongHit::LoopEnd(crate::song_view::Edge::Start));
+        let start = on_ruler(&s, |_, hit| hit == SongHit::LoopEnd(crate::scroll_thumb::Edge::Start));
         let to = step_x(&s, 20).0 - 2;
         drag(&mut s, (start, y), to);
         assert_eq!(s.song_loop_region(), Some((14, 20)));
@@ -191,7 +191,7 @@ mod tests {
         // Off: its ends stay, and move; on again where they are.
         s.toggle_loop();
         assert_eq!((s.song_loop_region(), s.song_loop_marks()), (None, Some((14, 20))));
-        let end = on_ruler(&s, |_, hit| hit == SongHit::LoopEnd(crate::song_view::Edge::End));
+        let end = on_ruler(&s, |_, hit| hit == SongHit::LoopEnd(crate::scroll_thumb::Edge::End));
         let to = step_x(&s, 24).0 - 2;
         drag(&mut s, (end, y), to);
         assert_eq!((s.song_loop_region(), s.song_loop_marks()), (None, Some((14, 24))));

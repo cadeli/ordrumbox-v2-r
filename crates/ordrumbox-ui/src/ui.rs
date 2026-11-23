@@ -261,7 +261,7 @@ impl Ui {
             s.kit_click(hit);
             return true;
         }
-        if s.lane_press(size, x, y) {
+        if s.lane_press(size, x, y) || s.grid_bar_press(size, x, y) {
             return true;
         }
         let Some(hit) = s.grid_hit(size, x, y) else { return false };
@@ -367,6 +367,7 @@ impl Ui {
         self.session.kit_wheel(size, x, y, lines)
             || self.session.wheel(size, x, y, lines, fine, coarse)
             || (m.command() && self.session.song_zoom_wheel(size, x, y, lines))
+            || self.session.grid_wheel(size, (x, y), (columns, lines), (m.command(), m.shift))
             || self.session.song_wheel(size, x, y, (columns, lines), m.shift)
             || self.session.roll_wheel(size, x, y, lines, m.shift)
             || self.scroll.wheel(&self.viewport(self.window), (columns, lines), self.display)

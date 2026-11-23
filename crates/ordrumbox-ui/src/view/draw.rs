@@ -39,7 +39,7 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: Scale) {
         let layout = RollLayout::new(body.main_w, body.editor_h, scale, view.status.len(), spb);
         piano_roll::draw(canvas, roll, &layout, title);
     } else if let Some(pattern) = view.pattern {
-        let layout = Layout::new(body.main_w, body.editor_h, scale, pattern, view.status.len(), view.current_page);
+        let layout = Layout::new(body.main_w, body.editor_h, scale, pattern, view.status.len(), view.beat_window);
         draw_grid(canvas, pattern, view, &layout);
     }
 }

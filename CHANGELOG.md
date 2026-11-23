@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### Changed
+- Grid: a scroll bar beside + NEW TRACK scrolls the beats shown and zooms them (drag the ends of its
+  thumb, or Ctrl+wheel; Shift+wheel scrolls), in place of the fixed pages. The ruler says which beats
+  are shown (`5-8/16`) instead of `page 2/4`. The view still follows the playhead and the cursor.
+- The track editor is narrower (310 px instead of 360), leaving more room to the grid: the FX tab's
+  compressor lays its knobs on two rows (Mix, Thresh, Ratio, then Attack, Release).
 - A song file is now a **project**: File > Open project (Ctrl O), Save project, Save project as,
   Export project, Import project, Rename project and Project description, all in the File menu.
   A song is an arrangement, as before. The files stay `.odbox` in `songs/`: nothing to convert.

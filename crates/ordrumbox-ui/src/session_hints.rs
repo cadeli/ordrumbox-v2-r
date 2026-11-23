@@ -79,6 +79,12 @@ impl Session {
             let rows = self.song_rows();
             return layout.hit(&self.song_view_data(&rows, &layout), x, y).map(song_hint);
         }
+        if let Some(layout) = self.grid_layout(size).filter(|layout| layout.bar_hit(x, y).is_some()) {
+            return Some(match layout.bar_hit(x, y) {
+                Some(Some(_)) => "ZOOM   drag: show more or fewer beats   Ctrl+wheel: zoom around the pointer",
+                _ => "BEATS   drag: scroll   Shift+wheel: scroll   drag an end of the thumb: zoom",
+            });
+        }
         self.grid_hit(size, x, y).map(grid_hint)
     }
 

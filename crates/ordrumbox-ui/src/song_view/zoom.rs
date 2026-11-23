@@ -56,16 +56,6 @@ impl MeasureZoom {
     }
 }
 
-/// An end of the measures' thumb, held to zoom.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Edge {
-    Start,
-    End,
-}
-
-/// Width of a handle at an end of the measures' thumb.
-const HANDLE: i32 = 6;
-
 impl SongLayout {
     /// The zoom at which `measures` fill the arrangement's width.
     #[must_use]
@@ -83,32 +73,6 @@ impl SongLayout {
     /// The width the measures are drawn in, left of the rows' scroll bar.
     pub(super) fn measures_width(&self) -> i32 {
         (self.grid.w - self.label_width() - self.grid_bar()).max(0)
-    }
-
-    /// The handle at `x` of the measures' thumb `(start, len)`, if any. A
-    /// thumb too short for two handles and a middle keeps only its end handle.
-    #[must_use]
-    pub fn zoom_handle(&self, x: i32, (start, len): (i32, i32)) -> Option<Edge> {
-        let handle = HANDLE * self.scale;
-        if !(start..start + len).contains(&x) {
-            return None;
-        }
-        if x >= start + len - handle {
-            Some(Edge::End)
-        } else if x < start + handle && len >= 3 * handle {
-            Some(Edge::Start)
-        } else {
-            None
-        }
-    }
-
-    /// Where the handles of the measures' thumb `(start, len)` are along it,
-    /// and how wide (`None`: the start's, left out).
-    #[must_use]
-    pub(super) fn handle_spans(&self, (start, len): (i32, i32)) -> (Option<(i32, i32)>, (i32, i32)) {
-        let handle = HANDLE * self.scale;
-        let start_handle = (len >= 3 * handle).then_some((start, handle));
-        (start_handle, (start + len - handle.min(len), handle.min(len)))
     }
 
     /// The measure (fractional) the measures' track puts at `x` when it
@@ -143,6 +107,7 @@ impl SongLayout {
 mod tests {
     use super::*;
     use crate::scale::Scale;
+    use crate::scroll_thumb::{Edge, ZOOM_HANDLE, handle_at};
 
     #[test]
     fn the_zoom_stays_in_its_range_and_a_notch_always_moves_it() {
@@ -171,14 +136,15 @@ mod tests {
     #[test]
     fn the_thumb_has_a_handle_at_each_end_and_a_short_one_only_its_end() {
         let layout = SongLayout::new(1100, 680, Scale::ONE, 0, MeasureZoom::default());
+        let handle = ZOOM_HANDLE * layout.scale;
         let thumb @ (start, len) = layout.thumb(Axis::Measures, 0, 10, 40);
-        assert_eq!(layout.zoom_handle(start + 1, thumb), Some(Edge::Start));
-        assert_eq!(layout.zoom_handle(start + len - 1, thumb), Some(Edge::End));
-        assert_eq!(layout.zoom_handle(start + len / 2, thumb), None);
-        assert_eq!(layout.zoom_handle(start + len + 4, thumb), None);
+        assert_eq!(handle_at(start + 1, thumb, handle), Some(Edge::Start));
+        assert_eq!(handle_at(start + len - 1, thumb, handle), Some(Edge::End));
+        assert_eq!(handle_at(start + len / 2, thumb, handle), None);
+        assert_eq!(handle_at(start + len + 4, thumb, handle), None);
         let thumb @ (start, len) = layout.thumb(Axis::Measures, 0, 1, 10_000);
-        assert!(len < 3 * HANDLE);
-        assert_eq!(layout.zoom_handle(start + len - 1, thumb), Some(Edge::End));
-        assert_eq!(layout.zoom_handle(start, thumb), None, "the rest of it scrolls");
+        assert!(len < 3 * handle);
+        assert_eq!(handle_at(start + len - 1, thumb, handle), Some(Edge::End));
+        assert_eq!(handle_at(start, thumb, handle), None, "the rest of it scrolls");
     }
 }

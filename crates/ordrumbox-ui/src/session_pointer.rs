@@ -6,6 +6,7 @@
 //! an automation lane's bottom edge, which sets its height, the up-down ones.
 
 use super::Session;
+use super::session_grid_bar::GridBarDrag;
 use super::session_song_zoom::BarDrag;
 use crate::scale::Scale;
 use crate::scroll_thumb::{self, HELD_SHAPE};
@@ -19,6 +20,11 @@ impl Session {
         match self.song_panel.held_bar() {
             Some(BarDrag::Zoom { .. }) => return PointerShape::ResizeHorizontal,
             Some(BarDrag::Scroll(_)) => return HELD_SHAPE,
+            None => {}
+        }
+        match self.held_grid_bar() {
+            Some(GridBarDrag::Zoom { .. }) => return PointerShape::ResizeHorizontal,
+            Some(GridBarDrag::Scroll) => return HELD_SHAPE,
             None => {}
         }
         if self.song_panel.lane_resize.is_some() {
@@ -40,7 +46,17 @@ impl Session {
         if self.mixer_open() {
             return self.mixer_pointer_shape(size, x, y);
         }
-        PointerShape::Arrow
+        self.grid_pointer_shape(size, x, y)
+    }
+
+    /// Over the grid: its scroll bar's thumb and zoom handles.
+    fn grid_pointer_shape(&self, size: (i32, i32, Scale), x: i32, y: i32) -> PointerShape {
+        let Some(layout) = self.grid_layout(size) else { return PointerShape::Arrow };
+        match layout.bar_hit(x, y) {
+            Some(Some(_)) => PointerShape::ResizeHorizontal,
+            Some(None) => scroll_thumb::hover_shape(layout.bar_thumb(), x),
+            None => PointerShape::Arrow,
+        }
     }
 
     /// Over the mixer: its track strips' scroll bar, when it has one.

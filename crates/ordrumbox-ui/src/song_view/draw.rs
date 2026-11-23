@@ -305,17 +305,10 @@ fn draw_scroll_bars(canvas: &mut Canvas, view: &SongView, layout: &SongLayout, p
             Axis::Rows | Axis::List => canvas.fill_rect(r.x + s.px(), start, r.w - 2 * s, len, color),
         }
     }
-    draw_zoom_handles(canvas, view, layout);
-}
-
-/// The handles at the ends of the measures' thumb, which zoom: each a
-/// lighter end with a grip line.
-fn draw_zoom_handles(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
-    let s = layout.scale;
-    let r = layout.scroll_bar(Axis::Measures);
-    let (start_handle, end_handle) = layout.handle_spans(layout.bar_thumb(view, Axis::Measures));
-    for (x, w) in start_handle.into_iter().chain([end_handle]) {
-        canvas.fill_rect(x, r.y + s.px(), w, r.h - 2 * s, theme::text());
-        canvas.fill_rect(x + w / 2 - s.px() / 2, r.y + 4 * s, s.px(), r.h - 8 * s, theme::muted());
-    }
+    scroll_thumb::draw_handles(
+        canvas,
+        layout.scroll_bar(Axis::Measures),
+        layout.bar_thumb(view, Axis::Measures),
+        layout.scale,
+    );
 }

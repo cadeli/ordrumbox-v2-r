@@ -147,7 +147,9 @@ channels, the tracks left take keys of channel 10 from 84 up.
 ## The grid
 
 One row per track, a page of beats across: 4 beats, or 8 or 16 when the window is wide
-enough for steps of a usable size. Under the rows, the **lane** shows one setting of the
+enough for steps of a usable size. The bar beside **+ NEW TRACK** scrolls
+the beats: drag its thumb, or the wheel with Shift held. The two ends of the thumb zoom (drag
+one: the other stays), as does Ctrl+wheel around the pointer; down to one beat across. Under the rows, the **lane** shows one setting of the
 track editor's track, a bar per note: **VELOCITY**, **CHANCE** (its probability), **RETRIG**
 (how many times it plays), **PAN**, **LENGTH** (how long it is held, in steps) or **SHIFT**
 (how early or late it plays, off the grid), picked by the tabs on its left. Click a bar to set

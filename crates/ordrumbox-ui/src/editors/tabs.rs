@@ -29,29 +29,46 @@ pub(super) fn fx_tab(rows: &mut Rows, view: &TrackView, state: &EditorState) {
     }
 }
 
-/// Slots of an effect strip's knob row: the most controls an effect has.
-pub(super) const FX_SLOTS: i32 = 5;
+/// Slots of an effect strip's knob rows: the most controls a row has.
+pub(super) const FX_SLOTS: i32 = 4;
 
 /// Height of a strip cartridge's lines, its name's and its type's (at scale 1).
 const CARTRIDGE_LINE_H: i32 = 14;
 
+/// The y under the strip of effect `fx` started at `top`: its rows of knobs
+/// and the gap to the next strip.
+pub(super) fn fx_strip_bottom(top: i32, fx: &FxDef, scale: Scale) -> i32 {
+    top + fx.controls.len() as i32 * knob_row_h(scale) + FX_STRIP_GAP * scale
+}
+
 pub(super) fn fx_strip(rows: &mut Rows, view: &TrackView, state: &EditorState, i: u8, fx: &FxDef) {
     let s = rows.scale;
-    let track = view.track;
-    let on = fx_on(track, fx);
+    let on = fx_on(view.track, fx);
+    let bottom = fx_strip_bottom(rows.y, fx, s);
     // Under its name: its type on a screen.
-    let line = strip_cartridge(rows, (Id::FxPower(i), on), fx.label);
-    let type_key = fx.type_key();
-    if let Some(key) = type_key {
+    let line = strip_cartridge(rows, (Id::FxPower(i), on), fx.label, fx.controls.len() as i32);
+    if let Some(key) = fx.type_key() {
         let screen = (Id::TrackSelect(key), fx_choice(view, state, key).screen(on));
         rows.screen_arrows(line, screen, |step| Id::TrackSelectStep(key, step));
     }
     let (x, w) = (rows.x, rows.w);
     rows.x += label_width(s);
     rows.w -= label_width(s);
-    // The knobs first, then the choices: every strip reads the same way.
-    let knobs = fx.controls.iter().filter_map(|&key| FX_KNOBS.iter().find(|p| p.key == key));
-    let choices = fx.controls.iter().filter(|&&key| Some(key) != type_key && !FX_KNOBS.iter().any(|p| p.key == key));
+    for &row in fx.controls {
+        fx_knob_row(rows, view, state, fx, row);
+        rows.y += knob_row_h(s);
+    }
+    (rows.x, rows.w) = (x, w);
+    rows.y = bottom;
+}
+
+/// One row of an effect strip's controls, at the current y: the knobs first,
+/// then the choices, so every strip reads the same way.
+fn fx_knob_row(rows: &mut Rows, view: &TrackView, state: &EditorState, fx: &FxDef, row: &[&'static str]) {
+    let track = view.track;
+    let type_key = fx.type_key();
+    let knobs = row.iter().filter_map(|&key| FX_KNOBS.iter().find(|p| p.key == key));
+    let choices = row.iter().filter(|&&key| Some(key) != type_key && !FX_KNOBS.iter().any(|p| p.key == key));
     let mut slot = 0;
     for p in knobs {
         let rect = rows.slot(slot, FX_SLOTS);
@@ -77,8 +94,6 @@ pub(super) fn fx_strip(rows: &mut Rows, view: &TrackView, state: &EditorState, i
         let choice = if key == "sidechainSource" { view.sidechains.clone() } else { fx_choice(view, state, key) };
         rows.slot_choice(rect, fx_label(key), Some(key), Some(Id::TrackSelect(key)), choice.kind());
     }
-    (rows.x, rows.w) = (x, w);
-    rows.y += knob_row_h(s) + FX_STRIP_GAP * s;
 }
 
 /// The choice of the effect setting `key` (a select of fixed options).
@@ -103,14 +118,14 @@ pub(super) const FX_STRIP_GAP: i32 = 4;
 /// How far a strip's cartridge reaches out of the column (at scale 1).
 const STRIP_FRAME_PAD: i32 = 3;
 
-/// A strip's cartridge (an effect's, an LFO's): its frame round the strip,
-/// in the gap between two strips, its LED (`led`, lit when `on`) and its name
+/// A strip's cartridge (an effect's, an LFO's): its frame round the strip's
+/// `knob_rows` rows, in the gap between two strips, its LED (`led`, lit when `on`) and its name
 /// in the label column. Returns the line under the name, where the strip
 /// shows its type.
-fn strip_cartridge(rows: &mut Rows, (led, on): (Id, bool), name: &str) -> Rect {
+fn strip_cartridge(rows: &mut Rows, (led, on): (Id, bool), name: &str, knob_rows: i32) -> Rect {
     let s = rows.scale;
     let pad = STRIP_FRAME_PAD * s;
-    let frame = Rect::new(rows.x - pad, rows.y - s.px(), rows.w + 2 * pad, knob_row_h(s) + 2 * s);
+    let frame = Rect::new(rows.x - pad, rows.y - s.px(), rows.w + 2 * pad, knob_rows * knob_row_h(s) + 2 * s);
     let head = Rect::new(rows.x, rows.y + 2 * s, label_width(s) - 4 * s, CARTRIDGE_LINE_H * s);
     rows.cartridge_head(frame, head, (led, on), name);
     Rect::new(head.x, head.y + head.h + 4 * s, head.w, head.h)
@@ -189,7 +204,7 @@ pub(super) fn lfo_strip(rows: &mut Rows, track: &Track, i: u8, target: &LfoTarge
     // Off: the target's own defaults; on: what the LFO plays.
     let get = |key: &str, fallback: f64| lfo.as_ref().map_or(fallback, |o| ordrumbox_core::lfo::setting(o, key));
     let on = lfo.is_some();
-    let line = strip_cartridge(rows, (Id::LfoPower(i), on), target.label);
+    let line = strip_cartridge(rows, (Id::LfoPower(i), on), target.label, 1);
     let choice = lfo_wave_choice(track, target);
     rows.screen_arrows(line, (Id::LfoType(i), choice.screen(on)), |step| Id::LfoTypeStep(i, step));
 
@@ -371,7 +386,7 @@ pub(super) fn tallest_tab_bottom(top: i32, scale: Scale) -> i32 {
     for _ in 0..GENERATION_ROWS {
         rows.row();
     }
-    let fx_bottom = top + FX_DEFS.len() as i32 * (knob_row_h(scale) + FX_STRIP_GAP * scale);
+    let fx_bottom = FX_DEFS.iter().fold(top, |y, fx| fx_strip_bottom(y, fx, scale));
     rows.y.max(fx_bottom)
 }
 

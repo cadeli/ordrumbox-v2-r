@@ -9,7 +9,7 @@
 //! [`SongLayout`] places everything; drawing and mouse hit-testing both use it.
 
 use crate::scale::Scale;
-use crate::scroll_thumb;
+use crate::scroll_thumb::{self, Edge};
 use ordrumbox_core::{Pattern, Song};
 
 use crate::canvas::{Canvas, Rgb, fit, text_width};
@@ -466,7 +466,11 @@ impl SongLayout {
         // The grid is as wide as the arrangement.
         let total = song.length_measures().max(1.0).ceil() as u32;
         if self.scroll_bar(Axis::Measures).contains(x, y) {
-            let handle = self.zoom_handle(x, self.bar_thumb(view, Axis::Measures));
+            let handle = scroll_thumb::handle_at(
+                x,
+                self.bar_thumb(view, Axis::Measures),
+                scroll_thumb::ZOOM_HANDLE * self.scale,
+            );
             return Some(handle.map_or(SongHit::ScrollBar(Axis::Measures), SongHit::ZoomHandle));
         }
         if self.scroll_bar(Axis::Rows).contains(x, y) {
@@ -505,7 +509,7 @@ mod ruler;
 mod song_loop;
 mod zoom;
 pub use draw::draw;
-pub use zoom::{Edge, MeasureZoom};
+pub use zoom::MeasureZoom;
 
 /// `text` in lines of at most `chars` characters, cut at spaces (a word longer
 /// than a line is cut in it) and at line breaks.

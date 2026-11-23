@@ -1,11 +1,12 @@
 //! Where everything sits: the grid, the header, the body and what the mouse hits.
 
-use super::{BEATS_PER_PAGE, LABEL_CHARS, MIN_STEP_WIDTH, PAGE_BEATS, PAGE_STEPS_PER_BEAT, VOLUME_WIDTH};
+use super::{BEATS_PER_PAGE, BeatWindow, LABEL_CHARS, MIN_STEP_WIDTH, PAGE_BEATS, PAGE_STEPS_PER_BEAT, VOLUME_WIDTH};
 use crate::canvas::text_width;
 use crate::editors;
 use crate::frame::{body_top, content_top, footer_top, margin};
 use crate::panel::{Rect, row_at};
 use crate::scale::Scale;
+use crate::scroll_thumb::{self, Edge};
 use ordrumbox_core::track::MAX_STEPS_PER_BEAT;
 use ordrumbox_core::{Pattern, Track};
 use ordrumbox_logic::block::BEAT_UNITS;
@@ -49,6 +50,8 @@ pub(super) const LANE_TAB_COLUMNS: usize = 2;
 pub const fn lane_tab_rows() -> i32 {
     editors::LANES.len().div_ceil(LANE_TAB_COLUMNS) as i32
 }
+/// The shortest thumb of the grid's scroll bar, per scale unit: room for its two handles and a grip.
+const BAR_MIN_THUMB: i32 = 3 * scroll_thumb::ZOOM_HANDLE;
 /// The gap between the add-track button and the lane, per scale unit.
 pub(super) const LANE_GAP: i32 = 8;
 /// The tallest the lane's bars get, per scale unit: they take the room the
@@ -101,10 +104,10 @@ pub struct Layout {
     pub(super) grid_left: i32,
     pub(super) grid_width: i32,
     pub(super) beats: i32,
-    /// First beat shown on this page.
+    /// First beat shown.
     pub(super) start_beat: i32,
-    /// Beats a full page shows.
-    pub(super) page_beats: i32,
+    /// The pattern's beats, the scroll bar's track.
+    pub(super) total_beats: i32,
     pub(super) tracks: usize,
     /// Top of the lane's bars under the rows (their bottom is `bottom`), the
     /// tabs' top or higher.
@@ -271,11 +274,15 @@ impl HeaderControls {
 /// The room between the main editor and the note editor under it, per scale unit.
 pub(super) const NOTE_GAP: i32 = 14;
 
+/// The width of the track editor, at scale 1 (half the window at most): the
+/// label column and four knob slots, the FX and LFO strips' widest row.
+pub const TRACK_EDITOR_WIDTH: i32 = 310;
+
 /// The height the track editor takes at most, at scale 1: the FX tab's six
-/// effects, one strip each, under the sample bar (kept even without a
+/// effects, one strip each (the compressor's on two rows of knobs), under the sample bar (kept even without a
 /// sample). The note editor is under the grid and the piano roll, not here.
 /// A test checks that every tab fits in it.
-pub const TRACK_EDITOR_HEIGHT: i32 = 455;
+pub const TRACK_EDITOR_HEIGHT: i32 = 503;
 
 /// The pixels the track editor's rows add up to beyond `TRACK_EDITOR_HEIGHT *
 /// scale` at a scale of an odd number of quarters (×1.25, ×1.75…): each row
@@ -392,7 +399,14 @@ impl Body {
 impl Layout {
     /// The rows of `pattern` on a `width` × `height` screen, with
     /// `status_lines` message lines in the footer.
-    pub fn new(width: i32, height: i32, scale: Scale, pattern: &Pattern, status_lines: usize, page: usize) -> Self {
+    pub fn new(
+        width: i32,
+        height: i32,
+        scale: Scale,
+        pattern: &Pattern,
+        status_lines: usize,
+        window: BeatWindow,
+    ) -> Self {
         let margin = margin(scale);
         let top = body_top(scale) + RULER_HEIGHT * scale;
         let bottom = footer_top(height, scale, status_lines) - margin / 2;
@@ -406,9 +420,9 @@ impl Layout {
         let box_size = (row - 4 * scale).clamp(6 * scale, MAX_BOX * scale);
         let left = margin;
         let (name_x, volume_x, grid_left) = grid_columns(left, box_size, scale);
-        let page_beats = page_beats(width, scale);
         let total_beats = pattern.beat_count.max(1);
-        let start_beat = (page as i32 * page_beats).min(total_beats - 1).max(0);
+        let page_beats = window.shown(page_beats(width, scale), total_beats);
+        let start_beat = window.first().clamp(0, total_beats - 1);
         let beats = (total_beats - start_beat).clamp(1, page_beats);
         let shown = usize::try_from(rows_h.max(0) / row.max(1)).unwrap_or(0).min(tracks);
         let under_rows = top + shown as i32 * row + (ADD_TRACK_GAP + ADD_TRACK_HEIGHT + LANE_GAP) * scale;
@@ -426,7 +440,7 @@ impl Layout {
             grid_width: (width - margin - grid_left).max(1),
             beats,
             start_beat,
-            page_beats,
+            total_beats,
             tracks: shown,
             lane_top,
         }
@@ -477,10 +491,84 @@ impl Layout {
         (f64::from(self.bottom - 1 - y) / f64::from(h)).clamp(0.0, 1.0)
     }
 
-    /// First beat of the page.
+    /// First beat shown.
     #[must_use]
     pub const fn start_beat(&self) -> i32 {
         self.start_beat
+    }
+
+    /// The beats a full window shows.
+    #[must_use]
+    pub const fn beats(&self) -> i32 {
+        self.beats
+    }
+
+    /// The pattern's beats.
+    #[must_use]
+    pub const fn total_beats(&self) -> i32 {
+        self.total_beats
+    }
+
+    /// The steps' area: the ruler and the rows' width, down to the lane.
+    #[must_use]
+    pub fn beats_area(&self) -> Rect {
+        let top = self.top - RULER_HEIGHT * self.scale;
+        Rect::new(self.grid_left, top, self.grid_width, self.bottom - top)
+    }
+
+    /// The grid's scroll bar, on the add-track button's row, as wide as the steps.
+    #[must_use]
+    pub fn scroll_bar(&self) -> Rect {
+        let button = self.add_track_rect();
+        Rect::new(self.grid_left, button.y, self.grid_width, button.h)
+    }
+
+    /// The bar's track: where its thumb slides, along x.
+    #[must_use]
+    pub fn bar_track(&self) -> (i32, i32) {
+        (self.grid_left, self.grid_width)
+    }
+
+    /// The bar's thumb `(start, len)`: the beats shown, of the pattern's.
+    #[must_use]
+    pub fn bar_thumb(&self) -> (i32, i32) {
+        let (first, shown, total) = (self.start_beat, self.beats, self.total_beats);
+        scroll_thumb::thumb(
+            self.bar_track(),
+            first as usize,
+            shown as usize,
+            total as usize,
+            BAR_MIN_THUMB * self.scale,
+        )
+    }
+
+    /// The first beat that puts the thumb centred on `x`.
+    #[must_use]
+    pub fn first_beat_at(&self, x: i32) -> i32 {
+        let (shown, total) = (self.beats as usize, self.total_beats as usize);
+        scroll_thumb::first_at(self.bar_track(), x, shown, total, BAR_MIN_THUMB * self.scale) as i32
+    }
+
+    /// The beat (fractional) the bar's track puts at `x`.
+    #[must_use]
+    pub fn track_beat(&self, x: i32) -> f64 {
+        let (start, len) = self.bar_track();
+        f64::from(x - start) / f64::from(len.max(1)) * f64::from(self.total_beats)
+    }
+
+    /// The beat (fractional) the steps put at `x`.
+    #[must_use]
+    pub fn beat_under(&self, x: i32) -> f64 {
+        f64::from(self.start_beat) + f64::from(x - self.grid_left) / self.beat_width()
+    }
+
+    /// What of the scroll bar is at `(x, y)`: `Some(None)` its track or
+    /// thumb (a drag scrolls), `Some(Some(edge))` a zoom handle.
+    #[must_use]
+    pub fn bar_hit(&self, x: i32, y: i32) -> Option<Option<Edge>> {
+        self.scroll_bar()
+            .contains(x, y)
+            .then(|| scroll_thumb::handle_at(x, self.bar_thumb(), scroll_thumb::ZOOM_HANDLE * self.scale))
     }
 
     pub(crate) fn row_top(&self, track: usize) -> i32 {

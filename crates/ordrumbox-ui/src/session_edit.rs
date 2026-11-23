@@ -360,7 +360,7 @@ impl Session {
         });
         self.deselect();
         self.edited();
-        self.chrome.current_page = 0;
+        self.chrome.beat_window.rewind();
     }
 
     pub fn duplicate_pattern(&mut self) {
@@ -368,7 +368,7 @@ impl Session {
             self.pattern_index = index;
             self.deselect();
             self.edited();
-            self.chrome.current_page = 0;
+            self.chrome.beat_window.rewind();
         }
     }
 

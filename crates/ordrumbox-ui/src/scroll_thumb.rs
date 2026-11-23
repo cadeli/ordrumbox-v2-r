@@ -8,6 +8,50 @@ use crate::scale::Scale;
 use crate::theme;
 use crate::ui_input::PointerShape;
 
+/// An end of a thumb or of a loop.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Edge {
+    Start,
+    End,
+}
+
+/// Width of a zoom handle at an end of a thumb, in scale units.
+pub const ZOOM_HANDLE: i32 = 6;
+
+/// The zoom handle at `x` of the thumb `(start, len)`, `handle` pixels wide,
+/// if any. A thumb too short for two handles and a middle keeps only its end handle.
+#[must_use]
+pub fn handle_at(x: i32, (start, len): (i32, i32), handle: i32) -> Option<Edge> {
+    if !(start..start + len).contains(&x) {
+        return None;
+    }
+    if x >= start + len - handle {
+        Some(Edge::End)
+    } else if x < start + handle && len >= 3 * handle {
+        Some(Edge::Start)
+    } else {
+        None
+    }
+}
+
+/// Where the handles of the thumb `(start, len)` are along it, and how wide
+/// (`None`: the start's, left out), `handle` pixels at most.
+#[must_use]
+pub fn handle_spans((start, len): (i32, i32), handle: i32) -> (Option<(i32, i32)>, (i32, i32)) {
+    let start_handle = (len >= 3 * handle).then_some((start, handle));
+    (start_handle, (start + len - handle.min(len), handle.min(len)))
+}
+
+/// Paint the handles of the horizontal bar `bar`'s thumb `(start, len)`: each
+/// a lighter end with a grip line.
+pub fn draw_handles(canvas: &mut Canvas, bar: Rect, thumb: (i32, i32), scale: Scale) {
+    let (start_handle, end_handle) = handle_spans(thumb, ZOOM_HANDLE * scale);
+    for (x, w) in start_handle.into_iter().chain([end_handle]) {
+        canvas.fill_rect(x, bar.y + scale.px(), w, bar.h - 2 * scale.px(), theme::text());
+        canvas.fill_rect(x + w / 2 - scale.px() / 2, bar.y + 4 * scale, scale.px(), bar.h - 8 * scale, theme::muted());
+    }
+}
+
 /// Start and length of the thumb on a track `(start, len)`: `shown` rows of
 /// `total` from `first`, no shorter than `min_thumb`.
 pub fn thumb((start, len): (i32, i32), first: usize, shown: usize, total: usize, min_thumb: i32) -> (i32, i32) {

@@ -9,6 +9,7 @@ use super::{
 use crate::canvas::{Canvas, Rgb, small_cell, small_char_width, text_width};
 use crate::panel::{MENU_MARK, Rect, stroke};
 use crate::scale::Scale;
+use crate::scroll_thumb;
 use crate::theme::{ZONE, ZONE_OPACITY};
 use crate::{editors, piano_roll, theme};
 use ordrumbox_core::note_positions::SubKind;
@@ -30,10 +31,9 @@ pub(super) fn draw_ruler(canvas: &mut Canvas, pattern: &Pattern, view: &View, la
     while layout.beat_width() * f64::from(every) < f64::from(widest) && every < layout.beats {
         every *= 2;
     }
-    // The page, left of the ruler, when the pattern takes more than one.
-    let pages = (pattern.beat_count.max(1) as usize).div_ceil(layout.page_beats as usize);
-    if pages > 1 {
-        let text = format!("page {}/{pages}", view.current_page + 1);
+    // The beats shown, left of the ruler, when the pattern has more.
+    if layout.beats < layout.total_beats {
+        let text = format!("{}-{}/{}", layout.start_beat + 1, layout.start_beat + layout.beats, layout.total_beats);
         canvas.text(layout.name_x, y, &text, scale, theme::muted());
     }
     let dot_y = layout.top - 3 * scale;
@@ -70,6 +70,8 @@ pub(super) fn draw_grid(canvas: &mut Canvas, pattern: &Pattern, view: &View, lay
     canvas.fill_rect(add.x, add.y, add.w, add.h, box_off_color());
     let label_x = add.x + (add.w - text_width(ADD_TRACK_LABEL, scale)) / 2;
     canvas.text(label_x, add.y + (add.h - 8 * scale) / 2, ADD_TRACK_LABEL, scale, theme::text());
+
+    draw_scroll_bar(canvas, layout);
 
     if let Some(zone) = view.zone {
         draw_zone(canvas, &zone, layout);
@@ -214,6 +216,17 @@ fn draw_track_name(canvas: &mut Canvas, track: &Track, i: usize, y: i32, color: 
         canvas.text(end - text_width(MENU_MARK, layout.scale), label_y, MENU_MARK, layout.scale, theme::muted());
     }
     canvas.text(layout.name_x, label_y, &label, layout.scale, color);
+}
+
+/// The scroll bar of the beats shown, beside the add-track button: its
+/// thumb, whose ends are the handles that zoom.
+fn draw_scroll_bar(canvas: &mut Canvas, layout: &Layout) {
+    let bar = layout.scroll_bar();
+    let thumb = layout.bar_thumb();
+    canvas.fill_rect(bar.x, bar.y, bar.w, bar.h, cell_color());
+    let color = if layout.beats < layout.total_beats { theme::muted() } else { theme::line() };
+    canvas.fill_rect(thumb.0, bar.y + layout.scale.px(), thumb.1, bar.h - 2 * layout.scale.px(), color);
+    scroll_thumb::draw_handles(canvas, bar, thumb, layout.scale);
 }
 
 /// The lane under the rows: a cell per step of the lane's track on the

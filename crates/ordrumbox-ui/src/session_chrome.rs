@@ -7,7 +7,7 @@ use crate::scale::Scale;
 use std::path::PathBuf;
 
 use super::session_overlay::Overlay;
-use super::{menu, session_grid, session_lane, session_zone};
+use super::{menu, session_grid, session_grid_bar, session_lane, session_zone};
 use crate::panel::{Dropdown, Entry, Id};
 use std::time::Instant;
 
@@ -79,8 +79,10 @@ pub(super) struct Chrome {
     pub(super) lane_drag: Option<session_lane::LaneDrag>,
     /// Window size and scale of the last mouse or key event on the widgets.
     pub(super) panel_size: (i32, i32, Scale),
-    /// Current page of the pattern grid (`view::page_beats` beats).
-    pub(super) current_page: usize,
+    /// The beats of the pattern the grid shows.
+    pub(super) beat_window: crate::view::BeatWindow,
+    /// The grid's scroll bar, held by the mouse.
+    pub(super) grid_bar_drag: Option<session_grid_bar::GridBarDrag>,
     /// The track editor shown on the right.
     pub(super) show_track_editor: bool,
     /// The note editor shown under the grid and the piano roll.
@@ -115,7 +117,8 @@ impl Default for Chrome {
             zone_drag: None,
             lane_drag: None,
             panel_size: (0, 0, Scale::ONE),
-            current_page: 0,
+            beat_window: crate::view::BeatWindow::default(),
+            grid_bar_drag: None,
             show_track_editor: true,
             show_note_editor: true,
             show_vus: true,

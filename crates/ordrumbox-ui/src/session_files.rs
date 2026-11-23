@@ -293,7 +293,7 @@ impl Session {
         self.deselect();
         self.edited();
         self.message.clone_from(&message);
-        self.chrome.current_page = 0;
+        self.chrome.beat_window.rewind();
         Ok(message)
     }
 

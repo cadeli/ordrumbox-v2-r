@@ -87,14 +87,7 @@ impl Session {
         }
         let body = self.body(size);
         let pattern = self.pattern()?;
-        Some(view::Layout::new(
-            body.main_w,
-            body.editor_h,
-            size.2,
-            pattern,
-            self.status.len(),
-            self.chrome.current_page,
-        ))
+        Some(view::Layout::new(body.main_w, body.editor_h, size.2, pattern, self.status.len(), self.chrome.beat_window))
     }
 
     /// What of the grid is at `(x, y)`.

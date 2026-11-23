@@ -71,7 +71,7 @@ impl Session {
         let size = (canvas.width(), canvas.height(), scale);
         let waiting = self.waiting_blink();
         let played = self.played_fraction(position, waiting);
-        let page_beats = self.follow_page(size, played);
+        let shown_beats = self.follow_beats(size, played);
         let history = self.editor.history();
         let library = self.editor.library();
         let song_mode = match self.playback.mode() {
@@ -96,7 +96,7 @@ impl Session {
             mixer: self.mixer_open(),
             kit_view: self.kit_view(kit_first, layout.details_top),
             right: layout.right,
-            current_page: self.chrome.current_page,
+            beat_window: self.chrome.beat_window,
             lane: (self.editor_track(), usize::from(self.editors.lane)),
             note_editor: self.note_editor_shown(),
             levels: levels.clone(),
@@ -116,7 +116,8 @@ impl Session {
             waiting,
             playhead: played.map(|played| {
                 let total_beats = self.pattern().map_or(1, |pat| pat.beat_count.max(1));
-                playhead_in_page(played, total_beats, self.chrome.current_page * page_beats, page_beats)
+                let first = self.chrome.beat_window.first().clamp(0, total_beats - 1);
+                playhead_in_window(played, total_beats, first, shown_beats)
             }),
             song: song.as_deref().filter(|_| !self.host.hosted),
             cursor: self.selection.cursor,
@@ -164,17 +165,14 @@ impl Session {
         }
     }
 
-    /// Keep the cursor, else the playhead, on the page shown (the one shown
-    /// waits while another pattern plays); the beats a page holds.
-    fn follow_page(&mut self, size: (i32, i32, Scale), played: Option<f64>) -> usize {
-        let page_beats = view::page_beats(self.body(size).main_w, size.2) as usize;
-        let beat_count = self.pattern().map_or(1, |p| p.beat_count.max(1));
-        let page_count = (beat_count as usize).div_ceil(page_beats).max(1);
-        let cursor_page = self.selection.cursor.map(|c| (c.beat.max(0) as usize) / page_beats);
-        let playhead_page = played.map(|played| (played * f64::from(beat_count)).floor() as usize / page_beats);
-        let new_page = playhead_page.or(cursor_page).unwrap_or(self.chrome.current_page);
-        self.chrome.current_page = new_page.min(page_count.saturating_sub(1));
-        page_beats
+    /// Bring the playhead, else the cursor, in sight of the grid; the beats
+    /// a full window of it shows.
+    fn follow_beats(&mut self, size: (i32, i32, Scale), played: Option<f64>) -> i32 {
+        let total = self.pattern().map_or(1, |p| p.beat_count.max(1));
+        let shown = self.chrome.beat_window.shown(view::page_beats(self.body(size).main_w, size.2), total);
+        let playhead = played.map(|played| (played * f64::from(total)).floor() as i32);
+        self.chrome.beat_window.follow(shown, playhead, self.selection.cursor.map(|c| c.beat));
+        shown
     }
 
     /// The overlay open over the window, if any.
@@ -233,11 +231,11 @@ fn song_text(library: &Library, playing: Option<&Song>, position: Option<Positio
 }
 
 /// Where the playhead, `played` (0 to 1) through the pattern, is on the page
-/// that starts at `start_beat` and holds `page_beats` of the pattern's
+/// that starts at `start_beat` and holds `shown_beats` of the pattern's
 /// `total_beats`, from 0 to 1.
-fn playhead_in_page(played: f64, total_beats: i32, start_beat: usize, page_beats: usize) -> f64 {
+fn playhead_in_window(played: f64, total_beats: i32, start_beat: i32, shown_beats: i32) -> f64 {
     let global_beat = played * f64::from(total_beats);
-    let start = start_beat as f64;
-    let page_end = (start + page_beats as f64).min(f64::from(total_beats));
+    let start = f64::from(start_beat);
+    let page_end = (start + f64::from(shown_beats)).min(f64::from(total_beats));
     ((global_beat - start) / (page_end - start).max(1.0)).clamp(0.0, 1.0)
 }

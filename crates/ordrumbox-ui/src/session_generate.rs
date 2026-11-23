@@ -106,7 +106,7 @@ impl Session {
             self.editor.generate_pattern(&self.generators.scales, &styles, style, &mut || rng.next_f64());
         self.deselect();
         self.edited();
-        self.chrome.current_page = 0;
+        self.chrome.beat_window.rewind();
         if let Some(pattern) = self.pattern() {
             let genre = pattern.extra.get(generate::GENRE).and_then(|g| g.as_str()).unwrap_or_default();
             let label = styles.get(genre).map_or_else(|| genre.to_owned(), style_label);

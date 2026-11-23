@@ -181,6 +181,9 @@ impl Session {
         if self.chrome.lane_drag.is_some() {
             return self.lane_drag_move(size, x, y);
         }
+        if self.chrome.grid_bar_drag.is_some() {
+            return self.grid_bar_held(size, x);
+        }
         if self.kit_editor.list.is_bar_held() {
             return self.kit_bar_to(size, y);
         }
@@ -239,7 +242,7 @@ impl Session {
                     scale,
                     pattern,
                     self.status.len(),
-                    self.chrome.current_page,
+                    self.chrome.beat_window,
                 )
                 .hit(pattern, x, y)
                 {
@@ -299,7 +302,7 @@ impl Session {
         let Some(pattern) = self.pattern() else { return };
         let body = self.body((canvas.width(), canvas.height(), scale));
         let layout =
-            Layout::new(body.main_w, body.editor_h, scale, pattern, self.status.len(), self.chrome.current_page);
+            Layout::new(body.main_w, body.editor_h, scale, pattern, self.status.len(), self.chrome.beat_window);
         match hover {
             view::Hit::Cell { track: t, beat, step } => {
                 let Some(track) = pattern.tracks.get(t) else { return };
@@ -330,6 +333,7 @@ impl Session {
         self.chrome.track_drag = None;
         self.chrome.zone_drag = None;
         self.chrome.lane_drag = None;
+        self.release_grid_bar();
         self.roll_release();
     }
 

@@ -152,8 +152,8 @@ pub struct View<'a> {
     pub sounds: Vec<SoundLabel>,
     /// Width kept on the right (for the track editor).
     pub right: i32,
-    /// Current page of the pattern grid ([`page_beats`] beats).
-    pub current_page: usize,
+    /// The beats of the pattern the grid shows.
+    pub beat_window: BeatWindow,
     /// The note editor is under the main editor (the grid, the piano roll).
     pub note_editor: bool,
     /// The track the lane under the grid shows, and the lane (an index in
@@ -184,6 +184,7 @@ pub struct View<'a> {
     pub host_split: u64,
 }
 
+mod beat_window;
 mod draw;
 mod grid;
 mod kit;
@@ -192,6 +193,7 @@ mod notice;
 #[cfg(test)]
 mod tests;
 
+pub use beat_window::BeatWindow;
 pub use draw::*;
 pub use kit::*;
 pub use layout::*;

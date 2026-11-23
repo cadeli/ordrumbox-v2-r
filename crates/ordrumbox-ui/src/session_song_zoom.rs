@@ -5,7 +5,8 @@
 use super::Session;
 use super::session_types::Workspace;
 use crate::scale::Scale;
-use crate::song_view::{Axis, Edge};
+use crate::scroll_thumb::Edge;
+use crate::song_view::Axis;
 
 /// A notch of Ctrl+wheel: a measure this many times wider (or narrower).
 const ZOOM_STEP: f64 = 1.25;
