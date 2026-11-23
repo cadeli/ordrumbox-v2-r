@@ -4,9 +4,14 @@
 
 use super::Session;
 use crate::panel::{self, Kind};
+use crate::piano_roll::RollHit;
 use crate::scale::Scale;
 use crate::song_view::SongHit;
 use crate::view::Hit;
+
+/// What the mouse does on a beat scroll bar (the grid's, the piano roll's): its handles, the rest.
+const ZOOM_HINT: &str = "ZOOM   drag: show more or fewer beats   Ctrl+wheel: zoom around the pointer";
+const BEATS_HINT: &str = "BEATS   drag: scroll   Shift+wheel: scroll   drag an end of the thumb: zoom";
 
 /// What the mouse does on `hit`, in the song panel.
 const fn song_hint(hit: SongHit) -> &'static str {
@@ -79,11 +84,16 @@ impl Session {
             let rows = self.song_rows();
             return layout.hit(&self.song_view_data(&rows, &layout), x, y).map(song_hint);
         }
+        if self.piano_roll_open() {
+            let layout = self.roll_layout(size);
+            return match layout.hit(&self.roll_view(&layout)?, x, y)? {
+                RollHit::ScrollBar(Some(_)) => Some(ZOOM_HINT),
+                RollHit::ScrollBar(None) => Some(BEATS_HINT),
+                _ => None,
+            };
+        }
         if let Some(layout) = self.grid_layout(size).filter(|layout| layout.bar_hit(x, y).is_some()) {
-            return Some(match layout.bar_hit(x, y) {
-                Some(Some(_)) => "ZOOM   drag: show more or fewer beats   Ctrl+wheel: zoom around the pointer",
-                _ => "BEATS   drag: scroll   Shift+wheel: scroll   drag an end of the thumb: zoom",
-            });
+            return Some(if matches!(layout.bar_hit(x, y), Some(Some(_))) { ZOOM_HINT } else { BEATS_HINT });
         }
         self.grid_hit(size, x, y).map(grid_hint)
     }

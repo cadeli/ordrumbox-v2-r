@@ -369,7 +369,7 @@ impl Ui {
             || (m.command() && self.session.song_zoom_wheel(size, x, y, lines))
             || self.session.grid_wheel(size, (x, y), (columns, lines), (m.command(), m.shift))
             || self.session.song_wheel(size, x, y, (columns, lines), m.shift)
-            || self.session.roll_wheel(size, x, y, lines, m.shift)
+            || self.session.roll_wheel(size, (x, y), lines, (m.command(), m.shift))
             || self.scroll.wheel(&self.viewport(self.window), (columns, lines), self.display)
     }
 

@@ -92,6 +92,8 @@ mod session_prefs;
 mod session_record;
 #[path = "session_resume.rs"]
 mod session_resume;
+#[path = "session_roll_bar.rs"]
+mod session_roll_bar;
 #[path = "session_roll_length.rs"]
 mod session_roll_length;
 #[path = "session_roll_zone.rs"]

@@ -193,7 +193,7 @@ mod notice;
 #[cfg(test)]
 mod tests;
 
-pub use beat_window::BeatWindow;
+pub use beat_window::{BarHold, BeatWindow};
 pub use draw::*;
 pub use kit::*;
 pub use layout::*;

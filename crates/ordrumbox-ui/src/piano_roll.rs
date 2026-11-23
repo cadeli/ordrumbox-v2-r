@@ -1,6 +1,6 @@
 //! The piano roll (`piano_roll_panel.js` and its sections), in the place of
-//! the grid: one track's notes on a grid of steps (X, a page of 4 beats at a
-//! time) and pitches (Y, MIDI 12 to 108, a keyboard on the left), with the
+//! the grid: one track's notes on a grid of steps (X, 4 beats across, or as
+//! many as the scroll bar under it zooms to) and pitches (Y, MIDI 12 to 108, a keyboard on the left), with the
 //! notes' retriggers, arpeggio steps and euclidean fills as ghosts, the loop
 //! point, the cursor, the selected note, and while playing the playhead and
 //! the notes sounding.
@@ -8,6 +8,7 @@
 //! [`RollLayout`] places everything; drawing and mouse hit-testing both use it.
 
 use crate::scale::Scale;
+use crate::scroll_thumb::{self, Edge};
 use ordrumbox_core::note_positions::{SubKind, SubPosition};
 use ordrumbox_core::steps::absolute_step;
 use ordrumbox_core::track::MAX_STEPS_PER_BEAT;
@@ -22,14 +23,18 @@ use crate::theme::{ZONE, ZONE_OPACITY};
 
 /// Height of a key row, px per scale unit (`NOTE_HEIGHT`).
 const NOTE_HEIGHT: i32 = 14;
-/// Width of the keyboard, and the narrowest cell (`KEYS_COLUMN_WIDTH`, `MIN_CELL_WIDTH`).
+/// Width of the keyboard (`KEYS_COLUMN_WIDTH`).
 const KEYS_WIDTH: i32 = 80;
-const MIN_CELL_WIDTH: i32 = 16;
+/// Height of the scroll bar under the grid, and the gap above it, per scale unit.
+const BAR_HEIGHT: i32 = 12;
+const BAR_GAP: i32 = 4;
+/// The shortest thumb of the scroll bar, per scale unit: room for its two handles and a grip.
+const BAR_MIN_THUMB: i32 = 3 * scroll_thumb::ZOOM_HANDLE;
 /// The narrowest a note is drawn, and the width of its right edge, which a
 /// drag draws out, px per scale unit.
 const MIN_NOTE_WIDTH: i32 = 3;
 const NOTE_EDGE: i32 = 5;
-/// Beats a page shows (`BEATS_PER_PAGE`).
+/// Beats the grid shows across until the scroll bar zooms (`BEATS_PER_PAGE`).
 pub const BEATS_PER_PAGE: i32 = 4;
 /// Keys, MIDI 12 to 108 (`TOTAL_KEYS`).
 pub const TOTAL_KEYS: i32 = 97;
@@ -128,8 +133,9 @@ pub struct RollView<'a> {
     pub color: Rgb,
     /// The pattern's length, beats.
     pub beat_count: i32,
-    /// Page shown.
-    pub page: i32,
+    /// First beat shown, and how many beats are across.
+    pub first_beat: i32,
+    pub shown_beats: i32,
     /// Highest row shown.
     pub top_row: i32,
     /// The selected note (an index in the track's notes).
@@ -159,16 +165,11 @@ impl RollView<'_> {
         i64::from(self.beat_count) * i64::from(steps_per_beat(self.track))
     }
 
-    /// Pages of the pattern.
-    pub fn pages(&self) -> i32 {
-        ((self.beat_count + BEATS_PER_PAGE - 1) / BEATS_PER_PAGE).max(1)
-    }
-
-    /// First step of the page shown, and the step after its last.
+    /// First step shown, and the step after the last.
     pub fn page_steps(&self) -> (i64, i64) {
-        let per_page = i64::from(BEATS_PER_PAGE * steps_per_beat(self.track));
-        let start = i64::from(self.page) * per_page;
-        (start, (start + per_page).min(self.total_steps()))
+        let spb = i64::from(steps_per_beat(self.track));
+        let start = i64::from(self.first_beat.clamp(0, self.beat_count - 1)) * spb;
+        (start, (start + i64::from(self.shown_beats) * spb).min(self.total_steps()))
     }
 
     /// Where the track loops: its loop point, else its end.
@@ -194,12 +195,9 @@ pub enum RollHit {
     /// A key of the keyboard: its MIDI note.
     Key(i32),
     /// A cell of the grid: absolute step, row.
-    Cell {
-        step: i64,
-        row: i32,
-    },
-    PreviousPage,
-    NextPage,
+    Cell { step: i64, row: i32 },
+    /// The scroll bar: a drag scrolls, or zooms at a handle (`Some`).
+    ScrollBar(Option<Edge>),
 }
 
 /// Where the piano roll's parts are.
@@ -208,11 +206,10 @@ pub struct RollLayout {
     scale: Scale,
     /// The title line.
     pub title: Rect,
-    /// The page buttons.
-    pub previous: Rect,
-    pub next: Rect,
     pub keys: Rect,
     pub grid: Rect,
+    /// The beats' scroll bar, under the grid, whose ends zoom.
+    pub bar: Rect,
     /// Width of a step.
     pub cell: i32,
     pub row: i32,
@@ -220,29 +217,26 @@ pub struct RollLayout {
 
 impl RollLayout {
     /// The piano roll on a `width` × `height` window (`width` without the
-    /// track editor), for a track of `spb` steps per beat.
-    pub fn new(width: i32, height: i32, scale: Scale, status_lines: usize, spb: i32) -> Self {
+    /// track editor), for a track of `spb` steps per beat, `shown_beats` across.
+    pub fn new(width: i32, height: i32, scale: Scale, status_lines: usize, (spb, shown_beats): (i32, i32)) -> Self {
         let s = scale;
         let margin = 16 * s;
         let top = frame::body_top(scale);
         let bottom = frame::footer_top(height, scale, status_lines) - margin / 2;
         let title = Rect::new(margin, top, (width - 2 * margin).max(0), 12 * s);
-        let button = 14 * s;
-        let next = Rect::new(title.x + title.w - button, top - 2 * s, button, button);
-        let previous = Rect::new(next.x - 56 * s - button, top - 2 * s, button, button);
         let grid_top = top + 18 * s;
-        let h = (bottom - grid_top).max(0);
+        let bar_h = BAR_HEIGHT * s;
+        let h = (bottom - grid_top - bar_h - BAR_GAP * s).max(0);
         let keys = Rect::new(margin, grid_top, KEYS_WIDTH * s, h);
         let grid_x = keys.x + keys.w;
         let grid_w = (width - margin - grid_x).max(0);
-        let cell = (grid_w / (BEATS_PER_PAGE * spb.max(1))).max(MIN_CELL_WIDTH * s);
+        let cell = (grid_w / (shown_beats.max(1) * spb.max(1))).max(1);
         Self {
             scale,
             title,
-            previous,
-            next,
             keys,
             grid: Rect::new(grid_x, grid_top, grid_w, h),
+            bar: Rect::new(grid_x, grid_top + h + BAR_GAP * s, grid_w, bar_h),
             cell,
             row: NOTE_HEIGHT * s,
         }
@@ -261,6 +255,43 @@ impl RollLayout {
     /// `top` kept so that the keyboard fills the view.
     pub fn clamp_top(&self, top: i32) -> i32 {
         top.clamp((self.visible_rows() - 1).min(TOTAL_KEYS - 1), TOTAL_KEYS - 1)
+    }
+
+    /// The bar's thumb `(start, len)`: the beats shown, of the pattern's.
+    #[must_use]
+    pub fn bar_thumb(&self, view: &RollView) -> (i32, i32) {
+        let first = view.page_steps().0 / i64::from(steps_per_beat(view.track));
+        let min = BAR_MIN_THUMB * self.scale;
+        let track = (self.bar.x, self.bar.w);
+        scroll_thumb::thumb(track, first as usize, self.shown(view), view.beat_count as usize, min)
+    }
+
+    /// The beats across the grid, the last page's rest left out.
+    #[must_use]
+    pub fn shown(&self, view: &RollView) -> usize {
+        let (start, end) = view.page_steps();
+        let spb = i64::from(steps_per_beat(view.track));
+        ((end - start + spb - 1) / spb).max(1) as usize
+    }
+
+    /// The first beat that puts the thumb centred on `x`.
+    #[must_use]
+    pub fn first_beat_at(&self, view: &RollView, x: i32) -> i32 {
+        let min = BAR_MIN_THUMB * self.scale;
+        scroll_thumb::first_at((self.bar.x, self.bar.w), x, self.shown(view), view.beat_count as usize, min) as i32
+    }
+
+    /// The beat (fractional) the bar's track puts at `x`.
+    #[must_use]
+    pub fn track_beat(&self, view: &RollView, x: i32) -> f64 {
+        f64::from(x - self.bar.x) / f64::from(self.bar.w.max(1)) * f64::from(view.beat_count)
+    }
+
+    /// The beat (fractional) the grid puts at `x`.
+    #[must_use]
+    pub fn beat_under(&self, view: &RollView, x: i32) -> f64 {
+        let spb = f64::from(steps_per_beat(view.track));
+        view.page_steps().0 as f64 / spb + f64::from(x - self.grid.x) / (f64::from(self.cell) * spb)
     }
 
     fn row_y(&self, top_row: i32, row: i32) -> i32 {
@@ -323,13 +354,9 @@ impl RollLayout {
 
     /// What is at `(x, y)`.
     pub fn hit(&self, view: &RollView, x: i32, y: i32) -> Option<RollHit> {
-        if view.pages() > 1 {
-            if self.previous.contains(x, y) {
-                return Some(RollHit::PreviousPage);
-            }
-            if self.next.contains(x, y) {
-                return Some(RollHit::NextPage);
-            }
+        if self.bar.contains(x, y) {
+            let handle = scroll_thumb::ZOOM_HANDLE * self.scale;
+            return Some(RollHit::ScrollBar(scroll_thumb::handle_at(x, self.bar_thumb(view), handle)));
         }
         if y < self.grid.y || y >= self.grid.y + self.grid.h {
             return None;
@@ -369,12 +396,13 @@ mod tests {
         .0
     }
 
-    fn view(track: &Track, page: i32, top_row: i32) -> RollView<'_> {
+    fn view(track: &Track, first_beat: i32, top_row: i32) -> RollView<'_> {
         RollView {
             track,
             color: theme::track(0),
             beat_count: 6,
-            page,
+            first_beat,
+            shown_beats: 4,
             top_row,
             selected: Some(1),
             cursor: Some((3, 40)),
@@ -388,13 +416,13 @@ mod tests {
     fn hit_testing_matches_the_drawing() {
         let library = library();
         let track = &library.patterns[0].tracks[0];
-        let layout = RollLayout::new(1100, 680, Scale::ONE, 0, 4);
+        let layout = RollLayout::new(1100, 680, Scale::ONE, 0, (4, 4));
         // Track BASS is an octave down: its C is MIDI 48, row 36.
         let row = note_row(&track.notes[0], track);
         assert_eq!(row, 36);
         let top = layout.centered_top(row);
         let v = view(track, 0, top);
-        assert_eq!((v.pages(), v.page_steps()), (2, (0, 16)));
+        assert_eq!(v.page_steps(), (0, 16));
         let r = layout.note_rect(&v, 0).unwrap();
         assert_eq!(layout.hit(&v, r.x + 2, r.y + 2), Some(RollHit::Cell { step: 0, row: 36 }));
         let r = layout.note_rect(&v, 1).unwrap();
@@ -402,7 +430,7 @@ mod tests {
         assert_eq!(layout.hit(&v, layout.keys.x + 2, r.y + 2), Some(RollHit::Key(row_midi(43))));
         // Note 2 (beat 4) is on page 2.
         assert!(layout.note_rect(&v, 2).is_none());
-        let v2 = view(track, 1, top);
+        let v2 = view(track, 4, top);
         assert_eq!(v2.page_steps(), (16, 24));
         let r = layout.note_rect(&v2, 2).unwrap();
         assert_eq!(layout.hit(&v2, r.x + 2, r.y + 2), Some(RollHit::Cell { step: 16, row: 36 }));
@@ -412,13 +440,17 @@ mod tests {
         assert_eq!(layout.nearest_cell(&v2, 0, 0), Some((16, top)));
         // Past the last step of a short page: nothing.
         assert_eq!(layout.hit(&v2, layout.grid.x + 8 * layout.cell + 2, r.y + 2), None);
-        assert_eq!(layout.hit(&v2, layout.previous.x + 2, layout.previous.y + 2), Some(RollHit::PreviousPage));
-        assert_eq!(layout.hit(&v2, layout.next.x + 2, layout.next.y + 2), Some(RollHit::NextPage));
+        // The bar: the thumb under the last beats, its ends the handles.
+        let (start, len) = layout.bar_thumb(&v2);
+        let y = layout.bar.y + 2;
+        assert_eq!(layout.hit(&v2, start + len / 2, y), Some(RollHit::ScrollBar(None)));
+        assert_eq!(layout.hit(&v2, start + len - 1, y), Some(RollHit::ScrollBar(Some(Edge::End))));
+        assert!(start + len <= layout.bar.x + layout.bar.w);
     }
 
     #[test]
     fn scroll_stays_on_the_keyboard() {
-        let layout = RollLayout::new(1100, 680, Scale::ONE, 0, 4);
+        let layout = RollLayout::new(1100, 680, Scale::ONE, 0, (4, 4));
         let rows = layout.visible_rows();
         assert!(rows < TOTAL_KEYS);
         assert_eq!(layout.centered_top(0), rows - 1);
@@ -442,9 +474,9 @@ mod tests {
         for (w, h) in [(1, 1), (40, 30), (1100, 680)] {
             let mut pixels = vec![0; w * h];
             let mut canvas = Canvas::new(&mut pixels, w, h);
-            let layout = RollLayout::new(w as i32, h as i32, Scale::ONE, 1, 4);
-            for page in [0, 1] {
-                draw(&mut canvas, &view(track, page, layout.centered_top(40)), &layout, "Piano Roll - BASS");
+            let layout = RollLayout::new(w as i32, h as i32, Scale::ONE, 1, (4, 4));
+            for first_beat in [0, 4] {
+                draw(&mut canvas, &view(track, first_beat, layout.centered_top(40)), &layout, "Piano Roll - BASS");
             }
         }
     }

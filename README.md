@@ -168,7 +168,8 @@ views that edit notes. The track editor, on the right, holds the track's setting
 A note's **Length** (a knob beside Velocity, Pitch and Pan, 1 step by default, a quarter of a step at least) is how
 long a synth note is held before its release, and how long the MIDI note sent or exported
 lasts; a sample plays to its own end whatever the length. In the piano roll a note is as wide
-as it is long: drag its right edge to draw it out. Its **Shift** moves it off the grid, up
+as it is long: drag its right edge to draw it out. The bar under the piano roll scrolls and
+zooms its beats like the grid's. Its **Shift** moves it off the grid, up
 to half a step early or late, with its retriggers.
 
 ## Keys

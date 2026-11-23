@@ -19,6 +19,7 @@ use ordrumbox_core::steps::{TICK, absolute_step};
 use ordrumbox_logic::composition;
 
 use super::session_labels::{beat_label, notes_label};
+use super::session_roll_bar::{bar_at, bar_hold};
 use super::session_selection::NoteFocus;
 use super::session_types::{Move, Workspace};
 use super::{Session, session_panel};
@@ -45,8 +46,10 @@ pub(super) struct RollDrag {
 /// The piano roll's view and what the mouse holds in it.
 #[derive(Debug, Default)]
 pub(super) struct RollState {
-    /// The page shown.
-    page: i32,
+    /// The beats shown: where they start and how many.
+    pub(super) window: crate::view::BeatWindow,
+    /// The beats' scroll bar, held by the mouse.
+    pub(super) bar_drag: Option<crate::view::BarHold>,
     /// Highest row shown; `None`: centered on the track's pitch.
     top: Option<i32>,
     /// The keyboard cursor: step, row.
@@ -76,6 +79,7 @@ impl RollState {
         self.drag = None;
         self.zone_drag = None;
         self.length_drag = None;
+        self.bar_drag = None;
     }
 }
 
@@ -134,12 +138,17 @@ impl Session {
     pub(super) fn roll_layout(&self, size: (i32, i32, Scale)) -> RollLayout {
         let body = self.body(size);
         let spb = self.roll_track().and_then(|t| self.track(t)).map_or(4, steps_per_beat);
-        RollLayout::new(body.main_w, body.editor_h, size.2, self.status.len(), spb)
+        RollLayout::new(body.main_w, body.editor_h, size.2, self.status.len(), (spb, self.roll_shown_beats()))
+    }
+
+    /// The beats across the grid: four, or as many as the scroll bar zoomed to.
+    pub(super) fn roll_shown_beats(&self) -> i32 {
+        self.roll.window.shown(BEATS_PER_PAGE, self.pattern().map_or(1, |p| p.beat_count.max(1)))
     }
 
     /// The step playing on the roll's track, while the pattern plays (alone
     /// or in a song's clip).
-    fn roll_playhead(&self) -> Option<i64> {
+    pub(super) fn roll_playhead(&self) -> Option<i64> {
         let (pattern, track) = (self.pattern()?, self.track(self.roll_track()?)?);
         let tick = if self.playback.plays(Mode::Pattern(self.pattern_index)) {
             let ticks = u64::from(TICK) * u64::try_from(pattern.beat_count.max(1)).ok()?;
@@ -152,7 +161,7 @@ impl Session {
         Some((tick / u64::from(TICK)) as i64 * i64::from(spb) + in_beat.floor() as i64)
     }
 
-    /// What the piano roll shows: while playing, the page the playhead is on.
+    /// What the piano roll shows.
     pub(super) fn roll_view(&self, layout: &RollLayout) -> Option<RollView<'_>> {
         let t = self.roll_track()?;
         let (pattern, track) = (self.pattern()?, self.track(t)?);
@@ -161,7 +170,8 @@ impl Session {
             track,
             color: crate::theme::track(t),
             beat_count: pattern.beat_count.max(1),
-            page: 0,
+            first_beat: self.roll.window.first(),
+            shown_beats: self.roll_shown_beats(),
             top_row: self.roll.top.map_or_else(
                 || layout.centered_top((MIDDLE_C + track.transpose - MIDI_MIN).round() as i32),
                 |top| layout.clamp_top(top),
@@ -172,12 +182,6 @@ impl Session {
             subs: Vec::new(),
             zone: self.roll_zone().map(|zone| self.roll_span(&zone, track)),
         };
-        let per_page = i64::from(BEATS_PER_PAGE * steps_per_beat(track));
-        view.page = match playhead {
-            Some(step) => (step / per_page) as i32,
-            None => self.roll.page,
-        }
-        .clamp(0, view.pages() - 1);
         let span = SpanResolver::new(track);
         let mut rng = Rng::new(1);
         view.subs = track.notes.iter().map(|n| sub_positions(n, track, view.total_steps(), &span, &mut rng)).collect();
@@ -256,7 +260,13 @@ impl Session {
         let step = absolute_step(note.beat, note.step, spb);
         let row = note_row(note, track);
         self.roll.cursor = Some((step, row));
-        self.roll.page = (step / i64::from(BEATS_PER_PAGE * spb)) as i32;
+        self.roll_reveal(step, spb);
+    }
+
+    /// Bring `step` of a track of `spb` steps per beat in sight.
+    fn roll_reveal(&mut self, step: i64, spb: i32) {
+        let beat = (step / i64::from(spb)) as i32;
+        self.roll.window.reveal(self.roll_shown_beats(), beat);
     }
 
     /// Add a note at `step`, `row` and select it.
@@ -293,18 +303,23 @@ impl Session {
     pub fn roll_click(&mut self, size: (i32, i32, Scale), x: i32, y: i32, button: Button) -> bool {
         let layout = self.roll_layout(size);
         let Some(view) = self.roll_view(&layout) else { return false };
-        let (page, pages) = (view.page, view.pages());
         let Some(hit) = layout.hit(&view, x, y) else { return false };
         // A note drawn out covers the cells after its own: the note under the pointer first.
         let drawn = layout.note_at(&view, x, y);
         let Some(t) = self.roll_track() else { return false };
+        let bar = match hit {
+            RollHit::ScrollBar(edge) => Some((bar_hold(&layout, &view, edge), bar_at(&layout, &view, x))),
+            _ => None,
+        };
         self.roll.gauge = None;
         if matches!(hit, RollHit::Cell { .. }) {
             self.selection.roll_zone = None;
         }
         match (hit, button) {
-            (RollHit::PreviousPage, Button::Left) => self.roll.page = (page - 1).max(0),
-            (RollHit::NextPage, Button::Left) => self.roll.page = (page + 1).min(pages - 1),
+            (RollHit::ScrollBar(_), Button::Left) => {
+                self.roll.bar_drag = bar.map(|(hold, _)| hold);
+                self.roll_bar_held(bar.map_or((0, 0.0, 1), |(_, at)| at));
+            }
             (RollHit::Key(midi), Button::Left) => self.roll_play_key(t, midi),
             (RollHit::Key(midi), Button::Right) => self.roll_key_menu(t, midi, x, y),
             (RollHit::Cell { step, row }, Button::Left) => {
@@ -361,6 +376,7 @@ impl Session {
     /// The press ended: a press that did not drag is a click on its note —
     /// it selects it, or deletes it when it was selected.
     pub(super) fn roll_release(&mut self) {
+        self.roll.bar_drag = None;
         if self.roll.length_drag.take().is_some() {
             self.roll.gauge = None;
             return;
@@ -378,19 +394,29 @@ impl Session {
         }
     }
 
-    /// The wheel over the piano roll: the keyboard (Shift: the pages);
-    /// whether it was its.
-    pub fn roll_wheel(&mut self, size: (i32, i32, Scale), x: i32, y: i32, lines: isize, shift: bool) -> bool {
+    /// The wheel over the piano roll: the keyboard; Ctrl zooms the beats
+    /// around the pointer, Shift scrolls them; whether it was its.
+    pub fn roll_wheel(
+        &mut self,
+        size: (i32, i32, Scale),
+        (x, y): (i32, i32),
+        lines: isize,
+        (zoom, shift): (bool, bool),
+    ) -> bool {
         let layout = self.roll_layout(size);
         if self.workspace != Workspace::PianoRoll
             || lines == 0
-            || !(layout.grid.contains(x, y) || layout.keys.contains(x, y))
+            || !(layout.grid.contains(x, y) || layout.keys.contains(x, y) || layout.bar.contains(x, y))
         {
             return false;
         }
         let Some(view) = self.roll_view(&layout) else { return false };
-        if shift {
-            self.roll.page = (view.page - lines.signum() as i32).clamp(0, view.pages() - 1);
+        let shown = (layout.shown(&view) as i32, view.beat_count);
+        if zoom {
+            let across = f64::from(x - layout.bar.x) / f64::from(layout.bar.w.max(1));
+            self.roll.window.zoom_by(lines, shown, layout.beat_under(&view, x), across);
+        } else if shift {
+            self.roll.window.scroll_by(lines, shown.0, shown.1);
         } else {
             self.roll.top = Some(layout.clamp_top(view.top_row + lines as i32 * WHEEL_ROWS));
         }
@@ -479,7 +505,7 @@ impl Session {
         self.roll.gauge = None;
         let Some(spb) = self.track(t).map(steps_per_beat) else { return };
         let total = i64::from(self.pattern().map_or(4, |p| p.beat_count.max(1))) * i64::from(spb);
-        let page_start = i64::from(self.roll.page * BEATS_PER_PAGE * spb);
+        let page_start = i64::from(self.roll.window.first() * spb);
         let middle = TOTAL_KEYS - 1 - TOTAL_KEYS / 2;
         let (step, row) = match (direction, self.roll.cursor) {
             (Move::Left, None) => ((page_start - 1).rem_euclid(total), middle),
@@ -493,7 +519,7 @@ impl Session {
         };
         self.roll.cursor = Some((step, row));
         // `#syncCursor`: the page follows, the note there is selected.
-        self.roll.page = (step / i64::from(BEATS_PER_PAGE * spb)) as i32;
+        self.roll_reveal(step, spb);
         self.selection.selected = self.roll_note_at(t, step, row).map(|n| (t, n));
         self.roll_show_row(row);
         let (beat, beat_step) = self.roll_beat(t, step);
@@ -793,7 +819,7 @@ mod tests {
         // Left from step 0 wraps to the last step, on page 2.
         s.roll.cursor = Some((0, 40));
         s.roll_arrow(Move::Left, false);
-        assert_eq!((s.roll.cursor, s.roll.page), (Some((31, 40)), 1));
+        assert_eq!((s.roll.cursor, s.roll.window.first()), (Some((31, 40)), 4));
     }
 
     #[test]

@@ -166,6 +166,9 @@ impl Session {
         if self.roll.dragging() {
             return self.roll_drag_move(x, y);
         }
+        if self.roll.bar_drag.is_some() {
+            return self.roll_bar_to(size, x);
+        }
         if self.roll.zone_drag.is_some() {
             return self.roll_zone_move(size, x, y);
         }

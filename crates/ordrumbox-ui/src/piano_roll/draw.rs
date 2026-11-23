@@ -7,9 +7,7 @@ use super::*;
 pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &str) {
     let s = layout.scale;
     canvas.text(layout.title.x, layout.title.y, title, s, theme::text());
-    if view.pages() > 1 {
-        draw_pager(canvas, view, layout);
-    }
+    draw_scroll_bar(canvas, view, layout);
 
     let (start, end) = view.page_steps();
     let first_row = layout.first_row(view);
@@ -47,26 +45,22 @@ pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &s
     }
 }
 
-/// The buttons that turn the pages, and the page's number between them.
-fn draw_pager(canvas: &mut Canvas, view: &RollView, layout: &RollLayout) {
+/// The beats' scroll bar under the grid, its thumb ends the handles that
+/// zoom, and which beats are shown at the right of the title when not all.
+fn draw_scroll_bar(canvas: &mut Canvas, view: &RollView, layout: &RollLayout) {
     let s = layout.scale;
-    for (rect, label, enabled) in
-        [(layout.previous, "<", view.page > 0), (layout.next, ">", view.page < view.pages() - 1)]
-    {
-        canvas.fill_rect(rect.x, rect.y, rect.w, rect.h, if enabled { column_half_color() } else { row_black_color() });
-        canvas.text(
-            rect.x + (rect.w - 8 * s) / 2,
-            rect.y + 3 * s,
-            label,
-            s,
-            if enabled { theme::text() } else { theme::muted() },
-        );
+    let (bar, thumb) = (layout.bar, layout.bar_thumb(view));
+    canvas.fill_rect(bar.x, bar.y, bar.w, bar.h, column_half_color());
+    let shown = layout.shown(view) as i32;
+    let color = if shown < view.beat_count { theme::muted() } else { theme::line() };
+    canvas.fill_rect(thumb.0, bar.y + s.px(), thumb.1, bar.h - 2 * s.px(), color);
+    scroll_thumb::draw_handles(canvas, bar, thumb, s);
+    if shown < view.beat_count {
+        let first = view.page_steps().0 / i64::from(steps_per_beat(view.track)) + 1;
+        let info = format!("{first}-{}/{}", first - 1 + i64::from(shown), view.beat_count);
+        let x = layout.title.x + layout.title.w - text_width(&info, s);
+        canvas.text(x, layout.title.y, &info, s, theme::text());
     }
-    let info = format!("{}/{}", view.page + 1, view.pages());
-    let x = layout.previous.x
-        + layout.previous.w
-        + (layout.next.x - layout.previous.x - layout.previous.w - text_width(&info, s)) / 2;
-    canvas.text(x, layout.title.y, &info, s, theme::text());
 }
 
 /// The keys and the row backgrounds, an octave line under each C.

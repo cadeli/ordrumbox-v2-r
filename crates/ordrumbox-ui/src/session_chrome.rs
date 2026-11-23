@@ -7,7 +7,7 @@ use crate::scale::Scale;
 use std::path::PathBuf;
 
 use super::session_overlay::Overlay;
-use super::{menu, session_grid, session_grid_bar, session_lane, session_zone};
+use super::{menu, session_grid, session_lane, session_zone};
 use crate::panel::{Dropdown, Entry, Id};
 use std::time::Instant;
 
@@ -82,7 +82,7 @@ pub(super) struct Chrome {
     /// The beats of the pattern the grid shows.
     pub(super) beat_window: crate::view::BeatWindow,
     /// The grid's scroll bar, held by the mouse.
-    pub(super) grid_bar_drag: Option<session_grid_bar::GridBarDrag>,
+    pub(super) grid_bar_drag: Option<crate::view::BarHold>,
     /// The track editor shown on the right.
     pub(super) show_track_editor: bool,
     /// The note editor shown under the grid and the piano roll.

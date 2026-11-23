@@ -4,31 +4,19 @@
 
 use super::Session;
 use crate::scale::Scale;
-use crate::scroll_thumb::Edge;
+use crate::view::BarHold;
 
-/// A notch of Ctrl+wheel: this many times more (or fewer) beats shown.
-const ZOOM_STEP: f64 = 1.25;
 /// The beats a notch of Shift+wheel scrolls.
-const WHEEL_BEATS: i32 = 1;
-
-/// What the mouse holds on the grid's scroll bar.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum GridBarDrag {
-    /// The thumb, centred on the pointer.
-    Scroll,
-    /// An end of the thumb: the other end stays on beat `fixed`.
-    Zoom { edge: Edge, fixed: i32 },
-}
+const WHEEL_BEATS: isize = 1;
 
 impl Session {
     /// A press at `(x, y)` on the grid's scroll bar takes hold of it; whether it was on it.
     pub fn grid_bar_press(&mut self, size: (i32, i32, Scale), x: i32, y: i32) -> bool {
         let Some(layout) = self.grid_layout(size) else { return false };
         let Some(hit) = layout.bar_hit(x, y) else { return false };
-        let (first, shown) = (layout.start_beat(), layout.beats());
         self.chrome.grid_bar_drag = Some(match hit {
-            None => GridBarDrag::Scroll,
-            Some(edge) => GridBarDrag::Zoom { edge, fixed: if edge == Edge::Start { first + shown } else { first } },
+            None => BarHold::Scroll,
+            Some(edge) => BarHold::zoom(edge, layout.start_beat(), layout.beats()),
         });
         self.grid_bar_held(size, x);
         true
@@ -36,28 +24,15 @@ impl Session {
 
     /// The bar held, moved to `x`; whether to redraw.
     pub(super) fn grid_bar_held(&mut self, size: (i32, i32, Scale), x: i32) -> bool {
-        let (Some(drag), Some(layout)) = (self.chrome.grid_bar_drag, self.grid_layout(size)) else { return false };
+        let (Some(hold), Some(layout)) = (self.chrome.grid_bar_drag, self.grid_layout(size)) else { return false };
         let before = self.chrome.beat_window;
-        match drag {
-            GridBarDrag::Scroll => self.chrome.beat_window.scroll_to(layout.first_beat_at(x)),
-            GridBarDrag::Zoom { edge, fixed } => {
-                let at = layout.track_beat(x).max(0.0);
-                let beats = match edge {
-                    Edge::Start => f64::from(fixed) - at,
-                    Edge::End => at - f64::from(fixed),
-                };
-                let beats = (beats.round() as i32).clamp(1, layout.total_beats());
-                self.chrome.beat_window.zoom_to(beats);
-                if edge == Edge::Start {
-                    self.chrome.beat_window.scroll_to(fixed - beats);
-                }
-            }
-        }
+        let at = layout.track_beat(x).max(0.0);
+        self.chrome.beat_window.hold(hold, layout.first_beat_at(x), at, layout.total_beats());
         before != self.chrome.beat_window
     }
 
-    /// Whether the mouse holds the grid's scroll bar, and how.
-    pub(super) fn held_grid_bar(&self) -> Option<GridBarDrag> {
+    /// The bar the mouse holds, if any.
+    pub(super) fn held_grid_bar(&self) -> Option<BarHold> {
         self.chrome.grid_bar_drag
     }
 
@@ -79,20 +54,11 @@ impl Session {
         if !layout.beats_area().contains(x, y) {
             return false;
         }
-        let (first, shown, total) = (layout.start_beat(), layout.beats(), layout.total_beats());
+        let (shown, total) = (layout.beats(), layout.total_beats());
         if zoom && lines != 0 {
-            let anchor = layout.beat_under(x);
-            let mut beats = shown;
-            for _ in 0..lines.unsigned_abs() {
-                // A notch up shows fewer beats, whatever the rounding.
-                let next = f64::from(beats) * if lines > 0 { 1.0 / ZOOM_STEP } else { ZOOM_STEP };
-                beats =
-                    if lines > 0 { (next.round() as i32).min(beats - 1) } else { (next.round() as i32).max(beats + 1) };
-                beats = beats.clamp(1, total);
-            }
-            let across = f64::from(x - layout.bar_track().0) / f64::from(layout.bar_track().1.max(1));
-            self.chrome.beat_window.zoom_to(beats);
-            self.chrome.beat_window.scroll_to((anchor - across * f64::from(beats)).round() as i32);
+            let (start, len) = layout.bar_track();
+            let across = f64::from(x - start) / f64::from(len.max(1));
+            self.chrome.beat_window.zoom_by(lines, (shown, total), layout.beat_under(x), across);
             return true;
         }
         let notches = if columns != 0 {
@@ -105,10 +71,7 @@ impl Session {
         if notches == 0 {
             return false;
         }
-        // Content moves right for positive notches: they show what is before.
-        let last = (total - shown).max(0);
-        let moved = (i64::from(first) - notches as i64 * i64::from(WHEEL_BEATS)).clamp(0, i64::from(last));
-        self.chrome.beat_window.scroll_to(moved as i32);
+        self.chrome.beat_window.scroll_by(notches * WHEEL_BEATS, shown, total);
         true
     }
 }
@@ -117,6 +80,7 @@ impl Session {
 mod tests {
     use super::*;
     use crate::kits::KitSet;
+    use crate::scroll_thumb::Edge;
     use crate::test_support::SIZE;
     use ordrumbox_core::Library;
 
@@ -159,7 +123,7 @@ mod tests {
         let (start, len) = layout(&s).bar_thumb();
         let y = layout(&s).scroll_bar().y + 1;
         assert!(s.grid_bar_press(SIZE, start + len - 1, y));
-        assert!(matches!(s.held_grid_bar(), Some(GridBarDrag::Zoom { edge: Edge::End, .. })));
+        assert!(matches!(s.held_grid_bar(), Some(BarHold::Zoom { edge: Edge::End, .. })));
         // Twice as far along: twice the beats, from the same first one.
         assert!(s.mouse_move(SIZE, start + 2 * len - 1, y, false));
         assert_eq!((layout(&s).start_beat(), layout(&s).beats()), (0, 2 * shown));

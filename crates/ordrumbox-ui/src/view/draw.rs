@@ -36,7 +36,7 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: Scale) {
         // Painted by the session (`draw_synth`, `draw_mixer`).
     } else if let Some((roll, title)) = &view.piano_roll {
         let spb = piano_roll::steps_per_beat(roll.track);
-        let layout = RollLayout::new(body.main_w, body.editor_h, scale, view.status.len(), spb);
+        let layout = RollLayout::new(body.main_w, body.editor_h, scale, view.status.len(), (spb, roll.shown_beats));
         piano_roll::draw(canvas, roll, &layout, title);
     } else if let Some(pattern) = view.pattern {
         let layout = Layout::new(body.main_w, body.editor_h, scale, pattern, view.status.len(), view.beat_window);

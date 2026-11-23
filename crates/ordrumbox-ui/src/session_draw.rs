@@ -72,6 +72,9 @@ impl Session {
         let waiting = self.waiting_blink();
         let played = self.played_fraction(position, waiting);
         let shown_beats = self.follow_beats(size, played);
+        if self.piano_roll_open() {
+            self.roll_follow_playhead();
+        }
         let history = self.editor.history();
         let library = self.editor.library();
         let song_mode = match self.playback.mode() {

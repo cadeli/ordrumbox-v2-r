@@ -6,12 +6,13 @@
 //! an automation lane's bottom edge, which sets its height, the up-down ones.
 
 use super::Session;
-use super::session_grid_bar::GridBarDrag;
 use super::session_song_zoom::BarDrag;
+use crate::piano_roll::RollHit;
 use crate::scale::Scale;
 use crate::scroll_thumb::{self, HELD_SHAPE};
 use crate::song_view::{Axis, SongHit};
 use crate::ui_input::PointerShape;
+use crate::view::BarHold;
 
 impl Session {
     /// The pointer's shape at `(x, y)`.
@@ -22,9 +23,9 @@ impl Session {
             Some(BarDrag::Scroll(_)) => return HELD_SHAPE,
             None => {}
         }
-        match self.held_grid_bar() {
-            Some(GridBarDrag::Zoom { .. }) => return PointerShape::ResizeHorizontal,
-            Some(GridBarDrag::Scroll) => return HELD_SHAPE,
+        match self.roll.bar_drag.or(self.held_grid_bar()) {
+            Some(BarHold::Zoom { .. }) => return PointerShape::ResizeHorizontal,
+            Some(BarHold::Scroll) => return HELD_SHAPE,
             None => {}
         }
         if self.song_panel.lane_resize.is_some() {
@@ -40,6 +41,9 @@ impl Session {
         if self.song_view_open() {
             return self.song_pointer_shape(size, x, y);
         }
+        if self.piano_roll_open() {
+            return self.roll_pointer_shape(size, x, y);
+        }
         if self.kit_list().is_some() {
             return self.kit_pointer_shape(size, x, y);
         }
@@ -47,6 +51,17 @@ impl Session {
             return self.mixer_pointer_shape(size, x, y);
         }
         self.grid_pointer_shape(size, x, y)
+    }
+
+    /// Over the piano roll: its scroll bar's thumb and zoom handles.
+    fn roll_pointer_shape(&self, size: (i32, i32, Scale), x: i32, y: i32) -> PointerShape {
+        let layout = self.roll_layout(size);
+        let Some(view) = self.roll_view(&layout) else { return PointerShape::Arrow };
+        match layout.hit(&view, x, y) {
+            Some(RollHit::ScrollBar(Some(_))) => PointerShape::ResizeHorizontal,
+            Some(RollHit::ScrollBar(None)) => scroll_thumb::hover_shape(layout.bar_thumb(&view), x),
+            _ => PointerShape::Arrow,
+        }
     }
 
     /// Over the grid: its scroll bar's thumb and zoom handles.
