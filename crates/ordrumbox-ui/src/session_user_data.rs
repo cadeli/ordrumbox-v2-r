@@ -22,7 +22,7 @@ pub(super) const LIBRARY_FILE_NAME: &str = "ordrumbox-library.json";
 pub(super) const NO_USER_FOLDER: &str = "no user data folder";
 
 /// A library file read: the library, and how many values were repaired.
-fn read_library(path: &Path) -> Result<(Library, usize), String> {
+pub(super) fn read_library(path: &Path) -> Result<(Library, usize), String> {
     let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let (library, report) = Library::parse(&text).map_err(|e| format!("{}: {e}", path.display()))?;
     Ok((library, report.issues.len()))
@@ -40,7 +40,7 @@ impl Session {
     }
 
     /// The assets' library file (the demo).
-    fn demo_library_path(&self) -> Option<PathBuf> {
+    pub(super) fn demo_library_path(&self) -> Option<PathBuf> {
         Some(self.assets_dir.as_ref()?.join("data").join(assets::LIBRARY))
     }
 

@@ -17,7 +17,9 @@ On Windows, a release holds a setup and a zip:
 
 - `ordrumbox-<version>-windows-x64-setup.exe` installs orDrumbox in `Program Files`, with a
   Start menu shortcut, and the CLAP plugin in `C:\Program Files\Common Files\CLAP\orDrumbox\`
-  (an option, on by default). Running the setup of a newer version updates it. Uninstalling
+  (an option, on by default). Running the setup of a newer version updates it; your library is kept, and the new demos are
+  added to it at the first start. Help > Factory reset... restores all the demos as shipped,
+  updated ones included (your files are backed up first). Uninstalling
   (Windows settings, or the Start menu) removes what the setup installed, never your library
   and settings in the user data folder. The setup is not signed: Windows may warn about an
   unknown publisher (More info > Run anyway).

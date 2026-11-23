@@ -115,6 +115,8 @@ mod session_zoom;
 mod session_automation_live;
 #[path = "session_cartridge.rs"]
 mod session_cartridge;
+#[path = "session_demos.rs"]
+mod session_demos;
 #[path = "session_kit.rs"]
 mod session_kit;
 #[path = "session_kit_list.rs"]
@@ -181,6 +183,8 @@ mod session_transport;
 mod session_types;
 #[path = "session_update.rs"]
 mod session_update;
+#[path = "session_upgrade.rs"]
+mod session_upgrade;
 #[path = "session_user_data.rs"]
 mod session_user_data;
 pub(crate) use session_automation_live::Switch;

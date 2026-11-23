@@ -74,7 +74,7 @@ Filename: "{app}\ordrumbox.exe"; Description: "Start orDrumbox"; Flags: nowait p
 
 [Code]
 { On an upgrade only (the app is already installed through this setup), a note after the welcome
-  page: the new version brings new demos, which a factory reset restores. }
+  page: the new demos are added by the app, a factory reset restores all of them as shipped. }
 var
   UpgradeNotePage: TOutputMsgWizardPage;
 
@@ -87,11 +87,10 @@ end;
 procedure InitializeWizard();
 begin
   UpgradeNotePage := CreateOutputMsgPage(wpWelcome, 'Upgrading orDrumbox',
-    'To be safe and lose nothing, follow these steps.',
-    '1. Save your songs and sounds (File menu) before installing.' + #13#10 + #13#10 +
-    '2. Install the new version (this setup).' + #13#10 + #13#10 +
-    '3. Run Help > Factory reset... in the new version, to get the new demos.' + #13#10 + #13#10 +
-    '4. Load your songs back.');
+    'Your songs and sounds are kept.',
+    'The new demos are added at the first start of the new version. To get all the demos as ' +
+    'shipped, updated ones included, run Help > Factory reset... in orDrumbox: your files are ' +
+    'backed up first, and File > Restore user data brings them back.');
 end;
 
 function ShouldSkipPage(PageID: Integer): Boolean;

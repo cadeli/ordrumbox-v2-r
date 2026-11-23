@@ -7,6 +7,7 @@
 pub mod block;
 pub mod compose;
 pub mod composition;
+pub mod demos;
 pub mod editor;
 pub mod generate;
 pub mod history;

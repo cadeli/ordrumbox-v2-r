@@ -527,6 +527,8 @@ fn open_window() -> Result<(), Box<dyn std::error::Error>> {
     session.offer_devices(audio::devices);
     session.offer_midi_inputs(midi::ports);
     session.offer_midi_outputs(midi_out::ports);
+    session.note_upgrade();
+    session.add_new_demos();
     session.start_updates(waker.clone());
     session.start_mcp(waker.clone());
     // MIDI files given on the command line ("open with"): imported; anything
