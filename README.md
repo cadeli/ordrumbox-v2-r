@@ -279,6 +279,8 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
 - **F11**: full screen, **Ctrl W**: close the window (as **Ctrl Q**)
 - **F1–F7** (also **Ctrl 1–7**, for the keyboards whose F keys want Fn): the shortcut list,
   track editor, song panel, piano roll, grid, synth editor, note editor (shown or folded)
+- **View > Simple view**: the grid alone, both editors folded (again: both shown). The first
+  start opens in it; later starts open as the window was left.
 - **F12**: the mixer (View > Mixer, the **MIX** button): a strip a track with its echo and
   reverb sends, pan, mute, solo and fader, then the shared echo and reverb, then the master
   bus. **Left**/**Right** go from track to track; when the strips do not all fit, a scroll
@@ -328,7 +330,7 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   draws again, on top of the last; one undo step each.
 - **Alt + arrows** on a selected note in the grid: up / down a semitone of pitch, left /
   right one step in time (in the piano roll, **Shift + arrows**, and its drag follows the
-  same axes: up / down the pitch, sideways the velocity).
+  same axes: up / down the pitch, sideways the time).
 - **Edit > Preferences...** (**Ctrl ,**) gathers the sound output, the MIDI ports and clock,
   the metronome, the VU meters and the toasts in one window. Up / Down choose a line, Enter or
   Left / Right change it, **OK** applies and **Esc** leaves everything as it was. The sound

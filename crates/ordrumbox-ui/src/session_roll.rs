@@ -1,8 +1,8 @@
 //! The session's side of the piano roll (`piano_roll_panel.js` and its
 //! sections), on the track editor's track: a click on an empty cell adds a
-//! note there, on a note selects it (and plays it), on the selected note
-//! deletes it; dragging a note changes its pitch (up, down) or its velocity
-//! (sideways), one undo step per drag; a click on a key plays it. Right-click
+//! note there, on a note selects it (and plays it), a double-click on a note
+//! deletes it; dragging a note moves it in time and pitch
+//! (`session_roll_move.rs`), one undo step per drag; a click on a key plays it. Right-click
 //! menus: on the keyboard, clear the track or write a chord progression from
 //! that key; on the grid, add or delete the note, add a minor or major
 //! chord. Keys: arrows move the cursor (the page follows), Shift+arrows
@@ -11,7 +11,6 @@
 //! note. The wheel scrolls the keyboard (Shift: the pages).
 
 use crate::scale::Scale;
-use ordrumbox_core::json::Value;
 use ordrumbox_core::note_positions::sub_positions;
 use ordrumbox_core::num;
 use ordrumbox_core::pattern_engine::SpanResolver;
@@ -25,7 +24,7 @@ use super::session_types::{Move, Workspace};
 use super::{Session, session_panel};
 use crate::canvas::Canvas;
 use crate::editors;
-use crate::note_drag::{Axis, DragEvent, MIDDLE_C, MIDI_MIN, NoteDrag, midi_name};
+use crate::note_drag::{MIDDLE_C, MIDI_MIN, midi_name};
 use crate::panel::{Dropdown, Id};
 use crate::panel::{Item, Kind, Rect};
 use crate::piano_roll::{self, BEATS_PER_PAGE, RollHit, RollLayout, RollView, TOTAL_KEYS, note_row, steps_per_beat};
@@ -34,14 +33,6 @@ use crate::view;
 use crate::view::Cursor;
 use ordrumbox_core::{Note, Rng};
 use ordrumbox_engine::Mode;
-
-/// A note being dragged in the piano roll.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub(super) struct RollDrag {
-    track: usize,
-    note: usize,
-    drag: NoteDrag,
-}
 
 /// The piano roll's view and what the mouse holds in it.
 #[derive(Debug, Default)]
@@ -55,7 +46,9 @@ pub(super) struct RollState {
     /// The keyboard cursor: step, row.
     pub(super) cursor: Option<(i64, i32)>,
     /// The note pressed.
-    drag: Option<RollDrag>,
+    pub(super) drag: Option<super::session_roll_move::RollDrag>,
+    /// The note last clicked, and when: a second click soon after deletes it.
+    pub(super) last_note_click: Option<((usize, usize), std::time::Instant)>,
     /// The edited value shown over the note.
     pub(super) gauge: Option<String>,
     /// The next chord progression.
@@ -235,11 +228,11 @@ impl Session {
     }
 
     /// The pitch a row has on track `t`, relative to the track.
-    fn roll_pitch(&self, t: usize, row: i32) -> f64 {
+    pub(super) fn roll_pitch(&self, t: usize, row: i32) -> f64 {
         f64::from(piano_roll::row_midi(row)) - MIDDLE_C - self.track(t).map_or(0.0, |track| track.transpose)
     }
 
-    fn roll_beat(&self, t: usize, step: i64) -> (i32, i32) {
+    pub(super) fn roll_beat(&self, t: usize, step: i64) -> (i32, i32) {
         let spb = i64::from(self.track(t).map_or(4, steps_per_beat));
         ((step / spb) as i32, (step % spb) as i32)
     }
@@ -250,9 +243,14 @@ impl Session {
         self.roll_follow();
     }
 
+    /// The steps of the pattern, on a track of `spb` steps per beat.
+    pub(super) fn roll_step_count(&self, spb: i32) -> i64 {
+        i64::from(self.pattern().map_or(4, |p| p.beat_count.max(1))) * i64::from(spb)
+    }
+
     /// The cursor and the page on the selected note (it follows its
     /// transposition and its moves in time).
-    fn roll_follow(&mut self) {
+    pub(super) fn roll_follow(&mut self) {
         let Some((t, n)) = self.selection.selected else { return };
         let Some(track) = self.track(t) else { return };
         let Some(note) = track.notes.get(n) else { return };
@@ -275,12 +273,14 @@ impl Session {
         let n = self.editor.add_note(self.pattern_index, t, beat, beat_step, self.roll_pitch(t, row))?;
         self.selection.selected = Some((t, n));
         self.roll.cursor = Some((step, row));
+        // The click that adds a note is not the first of a double-click on it.
+        self.roll.last_note_click = None;
         self.edited();
         Some(n)
     }
 
     /// Delete note `n` of track `t`.
-    fn roll_delete_note(&mut self, t: usize, n: usize) -> bool {
+    pub(super) fn roll_delete_note(&mut self, t: usize, n: usize) -> bool {
         let Some(note) = self.track(t).and_then(|track| track.notes.get(n)).cloned() else { return false };
         let deleted = self.editor.delete_note(self.pattern_index, t, note.beat, note.step, note.pitch);
         if deleted {
@@ -332,10 +332,7 @@ impl Session {
                     // A press on the right edge of a note draws it out.
                     Some((n, true)) => self.roll_length_press(t, n, x, layout.cell),
                     // A press on a note: a drag, or a click when it does not move.
-                    Some((n, false)) => {
-                        let pitch = self.track(t).map_or(0.0, |track| track.transpose);
-                        self.roll.drag = Some(RollDrag { track: t, note: n, drag: NoteDrag::new(x, y, pitch) });
-                    }
+                    Some((n, false)) => self.roll_note_press(t, n, (x, y), (layout.cell, layout.row)),
                     None => {
                         if let Some(n) = self.roll_add(t, step, row) {
                             self.audition(t, Some(n));
@@ -354,49 +351,18 @@ impl Session {
         if self.roll.length_drag.is_some() {
             return self.roll_length_move(x);
         }
-        let Some(RollDrag { track: t, note: n, mut drag }) = self.roll.drag else { return false };
-        let Some(note) = self.track(t).and_then(|track| track.notes.get(n)).cloned() else { return false };
-        let events = drag.moved(x, y, &note);
-        self.roll.drag = Some(RollDrag { track: t, note: n, drag });
-        for event in &events {
-            match *event {
-                // A drag makes no click: the note is selected here.
-                DragEvent::Start(..) => self.roll_select(t, n),
-                DragEvent::Value(axis, value, _) => {
-                    let name = self.track(t).map(|track| track.name.clone()).unwrap_or_default();
-                    let desc = format!("Edit note {} on {name}", axis.key());
-                    let updates = [(axis.key(), Value::Number(value))];
-                    if self.editor.update_note(self.pattern_index, t, n, &updates, Some(&desc), true) {
-                        self.edited();
-                        self.audition(t, Some(n));
-                    }
-                    self.roll_follow();
-                    self.roll.gauge = Some(self.gauge_text(t, n, axis));
-                }
-            }
-        }
-        !events.is_empty()
+        self.roll_note_move(x, y)
     }
 
-    /// The press ended: a press that did not drag is a click on its note —
-    /// it selects it, or deletes it when it was selected.
+    /// The press ended: a press that did not drag is a click on its note
+    /// (`session_roll_move.rs`).
     pub(super) fn roll_release(&mut self) {
         self.roll.bar_drag = None;
         if self.roll.length_drag.take().is_some() {
             self.roll.gauge = None;
             return;
         }
-        let Some(RollDrag { track: t, note: n, drag }) = self.roll.drag.take() else { return };
-        self.roll.gauge = None;
-        if drag.axis().is_some() {
-            return;
-        }
-        if self.selection.selected == Some((t, n)) {
-            self.roll_delete_note(t, n);
-        } else if self.track(t).is_some_and(|track| n < track.notes.len()) {
-            self.roll_select(t, n);
-            self.audition(t, Some(n));
-        }
+        self.roll_note_release();
     }
 
     /// The wheel over the piano roll: the keyboard; Ctrl zooms the beats
@@ -464,17 +430,12 @@ impl Session {
         }
     }
 
-    /// What the gauge shows for note `n` edited along `axis`.
-    fn gauge_text(&self, t: usize, n: usize, axis: Axis) -> String {
+    /// What the gauge shows over note `n` while its pitch changes.
+    pub(super) fn pitch_gauge(&self, t: usize, n: usize) -> String {
         let Some(track) = self.track(t) else { return String::new() };
         let Some(note) = track.notes.get(n) else { return String::new() };
-        match axis {
-            Axis::Velocity => format!("velocity {}", num::text(note.velocity)),
-            Axis::Pitch => {
-                let midi = (MIDDLE_C + track.transpose + note.pitch).round() as i32;
-                format!("pitch {}", midi_name(midi))
-            }
-        }
+        let midi = (MIDDLE_C + track.transpose + note.pitch).round() as i32;
+        format!("pitch {}", midi_name(midi))
     }
 
     /// A key clicked: play that pitch on the track.
@@ -498,18 +459,15 @@ impl Session {
         if shift && self.selection.selected.is_some_and(|(st, _)| st == t) {
             self.nudge(direction);
             self.roll_follow();
-            let axis = match direction {
-                Move::Up | Move::Down => Some(Axis::Pitch),
-                _ => None,
-            };
+            let pitch = matches!(direction, Move::Up | Move::Down);
             if let Some((_, n)) = self.selection.selected {
-                self.roll.gauge = axis.map(|axis| self.gauge_text(t, n, axis));
+                self.roll.gauge = pitch.then(|| self.pitch_gauge(t, n));
             }
             return;
         }
         self.roll.gauge = None;
         let Some(spb) = self.track(t).map(steps_per_beat) else { return };
-        let total = i64::from(self.pattern().map_or(4, |p| p.beat_count.max(1))) * i64::from(spb);
+        let total = self.roll_step_count(spb);
         let page_start = i64::from(self.roll.window.first() * spb);
         let middle = TOTAL_KEYS - 1 - TOTAL_KEYS / 2;
         let (step, row) = match (direction, self.roll.cursor) {
@@ -753,7 +711,7 @@ mod tests {
     }
 
     #[test]
-    fn clicks_add_select_and_delete() {
+    fn clicks_add_and_select() {
         let mut s = session();
         assert_eq!(s.roll_title(), "Piano Roll - BASS");
         // BASS's note: beat 1 (step 4), pitch 3 on a track an octave down: MIDI 51, row 39.
@@ -766,37 +724,11 @@ mod tests {
         s.roll_click(SIZE, x, y, Button::Left);
         assert_eq!(notes(&s)[1], (1, 2, 5.0, 0.8));
         assert_eq!(s.selection.selected, Some((1, 1)));
-        // A click on the selected note deletes it.
+        // A click right after, on the note just added: it stays, selected.
+        s.mouse_up();
         s.roll_click(SIZE, x, y, Button::Left);
         s.mouse_up();
-        assert_eq!(notes(&s).len(), 1);
-        assert_eq!(s.selection.selected, None);
-    }
-
-    #[test]
-    fn a_drag_edits_one_parameter_in_one_undo_step() {
-        let mut s = session();
-        s.editor.set_clock(Some(0.0));
-        let (x, y) = cell(&s, 4, 39);
-        s.roll_click(SIZE, x, y, Button::Left);
-        // Up and down: the pitch, semitone by semitone (the roll's vertical axis).
-        for dy in [2, 10, 40, 41] {
-            s.roll_drag_move(x + 1, y - dy);
-        }
-        s.mouse_up();
-        assert_eq!(notes(&s), [(1, 0, 6.0, 0.8)]);
-        // Dragged, not clicked: still there and selected.
-        assert_eq!(s.selection.selected, Some((1, 0)));
-        // Sideways: the velocity, to the right louder (the note moved up: row 42).
-        let (x, y) = cell(&s, 4, 42);
-        s.roll_click(SIZE, x, y, Button::Left);
-        s.roll_drag_move(x + 30, y);
-        s.mouse_up();
-        assert_eq!(notes(&s), [(1, 0, 6.0, 0.95)]);
-        s.undo();
-        assert_eq!(notes(&s), [(1, 0, 6.0, 0.8)]);
-        s.undo();
-        assert_eq!(notes(&s), [(1, 0, 3.0, 0.8)]);
+        assert_eq!((notes(&s).len(), s.selection.selected), (2, Some((1, 1))));
     }
 
     #[test]

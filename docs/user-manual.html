@@ -95,7 +95,9 @@ synth presets and the generation styles. No installer is needed. The plugin come
 
 <h3>First steps</h3>
 <ol>
-  <li>Start <code>ordrumbox.exe</code>. The demo library opens on its first pattern.</li>
+  <li>Start <code>ordrumbox.exe</code>. The demo library opens on its first pattern, in the
+      <strong>simple view</strong> the first time: the grid alone. <kbd>F2</kbd> shows the track editor,
+      <kbd>F7</kbd> the note editor, <strong>View › Simple view</strong> both at once; the next start opens as you left it.</li>
   <li>Press <kbd>Space</kbd> (or click <strong>PLAY</strong>) to start and stop playback.</li>
   <li>Click a step of the grid to switch it on (a note); click it again to switch it off.
       <kbd>Shift</kbd>+click a note to select it: the <a href="#note-editor">note editor</a> under the grid shows it.</li>
@@ -174,6 +176,7 @@ editor, the VU meters and the kit editor shown or hidden as you left them. It is
 <tr><td>Kit editor (over the main editor)</td><td><kbd>Ctrl</kbd>+<kbd>K</kbd>, <strong>View › Kit editor</strong>, <strong>Kit › Kit editor</strong>, header <strong>KIT</strong></td></tr>
 <tr><td>Track editor (right edge)</td><td><kbd>F2</kbd> or <strong>View › Track editor</strong> shows or folds it</td></tr>
 <tr><td>Note editor (under the grid and the piano roll)</td><td><kbd>F7</kbd> or <strong>View › Note editor</strong> shows or folds it</td></tr>
+<tr><td>Simple view: the grid alone</td><td><strong>View › Simple view</strong> folds the track editor and the note editor, or shows them both. The program starts so the first time.</td></tr>
 </table>
 <p><kbd>F3</kbd>, <kbd>F4</kbd>, <kbd>F6</kbd> and <kbd>F12</kbd> toggle: pressed again, they go back to the grid.
 In the song panel, piano roll, synth editor and mixer, <kbd>Esc</kbd> also goes back to the grid.
@@ -299,6 +302,7 @@ use <kbd>←</kbd> <kbd>→</kbd> between menus, <kbd>↑</kbd> <kbd>↓</kbd> b
 <tr><th>Command</th><th>Shortcut</th><th>What it does</th></tr>
 <tr><td>Track editor</td><td><kbd>F2</kbd>, <kbd>Ctrl</kbd>+<kbd>2</kbd></td><td>Show / fold the track editor on the right.</td></tr>
 <tr><td>Note editor</td><td><kbd>F7</kbd>, <kbd>Ctrl</kbd>+<kbd>7</kbd></td><td>Show / fold the note editor under the grid and the piano roll.</td></tr>
+<tr><td>Simple view</td><td></td><td>The grid alone (both editors folded), or both editors shown again.</td></tr>
 <tr><td>Grid</td><td><kbd>F5</kbd>, <kbd>Ctrl</kbd>+<kbd>5</kbd></td><td>The pattern grid as main editor.</td></tr>
 <tr><td>Piano roll</td><td><kbd>F4</kbd>, <kbd>Ctrl</kbd>+<kbd>4</kbd></td><td>The piano roll as main editor.</td></tr>
 <tr><td>Song</td><td><kbd>F3</kbd>, <kbd>Ctrl</kbd>+<kbd>3</kbd></td><td>The song panel as main editor.</td></tr>
@@ -713,9 +717,10 @@ The note editor stays under it.</p>
 <tr><th>Action</th><th>Result</th></tr>
 <tr><td>Click an empty cell</td><td>Add a note.</td></tr>
 <tr><td>Click a note</td><td>Select it (and hear it).</td></tr>
-<tr><td>Click the selected note</td><td>Delete it.</td></tr>
-<tr><td>Drag a note</td><td>Up / down: velocity; sideways: pitch (a semitone every 12 px). The first movement chooses which; the value shows over the note; one undo step per drag.</td></tr>
+<tr><td>Double-click a note</td><td>Delete it (also <kbd>Delete</kbd>, or <b>Delete note</b> in its right-click menu).</td></tr>
+<tr><td>Drag a note</td><td>Move it: sideways in time, a step at a time, up / down in pitch, a semitone at a time. It does not go onto another note; its pitch shows over it; one undo step per drag. Its velocity is set in the note editor under the roll, or in the grid's VELOCITY lane.</td></tr>
 <tr><td>Drag the right edge of a note</td><td>Its length, by quarters of a step, up to the end of the pattern; one undo step per drag. A note is drawn as wide as it is long, and moved by its shift.</td></tr>
+<tr><td>The pointer over a note</td><td>Sideways arrows on its right edge (a drag sets its length), four arrows on its body (a drag moves it); it keeps that shape while the note is held.</td></tr>
 <tr><td>Click a key</td><td>Hear that pitch.</td></tr>
 <tr><td>Wheel</td><td>Scroll the pitches (<kbd>Shift</kbd>: the pages).</td></tr>
 <tr><td><strong>&lt;</strong> <strong>&gt;</strong></td><td>Previous / next page.</td></tr>

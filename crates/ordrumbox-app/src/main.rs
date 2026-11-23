@@ -457,6 +457,7 @@ const fn cursor_icon(shape: PointerShape) -> CursorIcon {
         PointerShape::Grabbing => CursorIcon::Grabbing,
         PointerShape::ResizeHorizontal => CursorIcon::EwResize,
         PointerShape::ResizeVertical => CursorIcon::NsResize,
+        PointerShape::Move => CursorIcon::Move,
     }
 }
 

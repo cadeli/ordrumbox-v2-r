@@ -230,6 +230,7 @@ impl Session {
             C::KitEditor => self.toggle_kit_editor(),
             C::TrackEditor => self.toggle_track_editor(),
             C::NoteEditor => self.toggle_note_editor(),
+            C::SimpleView => self.chrome.toggle_simple_view(),
             C::SongView => self.toggle_song_view(),
             C::PianoRoll => self.toggle_piano_roll(),
             C::Grid => self.show_grid(),

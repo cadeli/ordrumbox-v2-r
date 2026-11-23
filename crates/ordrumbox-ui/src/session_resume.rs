@@ -4,6 +4,8 @@
 //! the arrangement are kept by id, so they are found again after a reorder.
 //! A plugin keeps none: the host's project holds its state.
 
+use std::path::Path;
+
 use super::Session;
 use super::session_types::{PlayMode, Workspace};
 use crate::store;
@@ -45,13 +47,28 @@ impl Workspace {
 const PATTERN_MODE: &str = "pattern";
 const SONG_MODE: &str = "song";
 
+/// What the first start says, in the simple view.
+const SIMPLE_START: &str = "Simple view: F2 shows the track editor, F7 the note editor, View > Simple view both";
+
 /// The panels that are shown or folded, by their key in `resume`.
 const PANELS: [&str; 4] = ["trackEditor", "noteEditor", "vuMeters", "kitEditor"];
+
+/// Whether the program starts for the first time: it has a settings file
+/// `settings` to keep its place in, and the file is not there yet (a
+/// folder it cannot look into is no first start).
+pub(super) fn is_first_start(settings: Option<&Path>) -> bool {
+    settings.is_some_and(|path| matches!(path.try_exists(), Ok(false)))
+}
 
 impl Session {
     /// The place of the settings file's `resume`, if it has one, shown: what
     /// it names that is gone or wrong is a status line, and left as it is.
+    /// On the first start, the simple view instead.
     pub(super) fn load_resume(&mut self) {
+        if self.saving.first_start {
+            self.start_simple();
+            return;
+        }
         let Some(path) = self.saving.settings_file.clone() else { return };
         // `load_master` has reported a file that cannot be read.
         let Ok(Some(value)) = store::load_setting(&path, KEY) else { return };
@@ -138,6 +155,12 @@ impl Session {
             Some(SONG_MODE | PATTERN_MODE) => self.mode = PlayMode::Pattern,
             _ => wrong.push(format!("mode: {} is not a mode, the pattern mode used", value.to_json())),
         }
+    }
+
+    /// The first start: the simple view, the grid alone, and how to show the rest.
+    fn start_simple(&mut self) {
+        self.chrome.fold_editors();
+        self.message = SIMPLE_START.to_owned();
     }
 
     /// Panel `key` of [`PANELS`] is shown.
@@ -264,6 +287,31 @@ mod tests {
         let mut s = session(&path);
         s.load_resume();
         assert_eq!(s.status, ["settings.json: resume: 1 is not an object, not used"]);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn the_first_start_shows_the_simple_view_which_is_kept_after() {
+        let dir = scratch_dir("resume-simple");
+        let path = dir.join("settings.json");
+        assert!(is_first_start(Some(&path)));
+        assert!(!is_first_start(None), "nowhere to keep it: no first start");
+        let mut s = session(&path);
+        s.saving.first_start = true;
+        s.load_resume();
+        assert_eq!(s.shown(), crate::view::Shown::grid_alone());
+        assert_eq!(s.message, SIMPLE_START);
+        s.save_resume();
+        assert!(!is_first_start(Some(&path)));
+        let mut again = session(&path);
+        again.load_resume();
+        assert_eq!(again.shown(), crate::view::Shown::grid_alone(), "the next start where it was left");
+        // View > Simple view: both editors back, then both folded again.
+        again.chrome.toggle_simple_view();
+        assert_eq!(again.shown(), crate::view::Shown::all());
+        again.toggle_note_editor();
+        again.chrome.toggle_simple_view();
+        assert_eq!(again.shown(), crate::view::Shown::grid_alone(), "from one editor shown: the simple view");
         std::fs::remove_dir_all(dir).unwrap();
     }
 

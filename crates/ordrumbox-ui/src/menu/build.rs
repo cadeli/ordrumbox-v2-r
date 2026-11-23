@@ -177,6 +177,7 @@ fn view_menu(s: &MenuState) -> Menu {
         items: vec![
             check("Track editor", "F2, Ctrl+2", C::TrackEditor, true, s.track_editor),
             check("Note editor", "F7, Ctrl+7", C::NoteEditor, true, s.note_editor),
+            check("Simple view", "", C::SimpleView, true, !s.track_editor && !s.note_editor),
             Item::Separator,
             check("Grid", "F5, Ctrl+5", C::Grid, true, s.grid),
             check("Piano roll", "F4, Ctrl+4", C::PianoRoll, true, s.piano_roll),

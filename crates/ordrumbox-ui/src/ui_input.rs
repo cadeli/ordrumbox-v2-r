@@ -201,6 +201,8 @@ pub enum PointerShape {
     /// Over or holding an edge that sets a height: a drag makes it taller
     /// or shorter (an automation lane's bottom edge).
     ResizeVertical,
+    /// Over or holding something a drag moves around (a note of the piano roll).
+    Move,
 }
 
 /// A turn of the mouse wheel or a swipe on a touchpad (positive: up, left).

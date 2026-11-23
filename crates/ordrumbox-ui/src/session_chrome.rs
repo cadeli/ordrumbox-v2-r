@@ -140,6 +140,20 @@ impl Chrome {
         self.show_note_editor = false;
     }
 
+    /// View > Simple view: the grid alone, the track editor and the note
+    /// editor folded; again, both shown.
+    pub(super) fn toggle_simple_view(&mut self) {
+        let simple = !self.show_track_editor && !self.show_note_editor;
+        if simple {
+            self.show_track_editor = true;
+            self.show_note_editor = true;
+        } else {
+            self.fold_editors();
+        }
+        self.widgets.focus = None;
+        self.widgets.dropdown = None;
+    }
+
     /// A dropdown or an entry is open.
     pub(super) fn popup_open(&self) -> bool {
         self.widgets.dropdown.is_some() || self.widgets.entry.is_some()

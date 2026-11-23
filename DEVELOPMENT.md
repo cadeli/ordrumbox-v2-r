@@ -430,3 +430,15 @@ every track whose last note was in the same group (`Engine::choke_groups`, a fix
 audio thread). A track has no group by default, so no snapshot changed. A hi-hat added or renamed in the editor
 (`Editor::add_track`, `change_track_name`) joins `HAT_CHOKE_GROUP`; `Track::new` gives none, so that the styles'
 generation and MIDI import (and their snapshots) stay as they were.
+
+The piano roll's drag moves a note (`note_drag.rs`, `NoteMove`; `session_roll_move.rs`): the steps and rows the pointer
+crossed since the press, never onto another note, one undo step (`update_note` coalesced on beat, step and pitch); it
+no longer edits the velocity, which the note editor and the grid's lane set. A click on the selected note selects it;
+a second click on the same note within `DOUBLE_CLICK` deletes it (`RollState::last_note_click`, cleared by a click
+that adds a note). The pointer shows it (`PointerShape::Move` on a note's body, `ResizeHorizontal` on its right
+edge, `session_pointer.rs`), and keeps the shape while the note is held. No snapshot changed.
+
+The first start (no `settings.json` in the user data folder: `session_resume::is_first_start`) opens in the simple
+view, the grid alone (`Session::start_simple`, `Chrome::fold_editors`, as the plugin's compact view), with a message
+saying how to show the rest; `resume` keeps the panels from then on. View > Simple view (`Command::SimpleView`) folds
+both editors, or shows both when both are folded. No snapshot changed.

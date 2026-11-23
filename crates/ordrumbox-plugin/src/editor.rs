@@ -405,6 +405,7 @@ impl View {
                 PointerShape::Grabbing => MouseCursor::HandGrabbing,
                 PointerShape::ResizeHorizontal => MouseCursor::EwResize,
                 PointerShape::ResizeVertical => MouseCursor::NsResize,
+                PointerShape::Move => MouseCursor::Move,
             }
         };
         if cursor != self.cursor {

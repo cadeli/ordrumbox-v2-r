@@ -1,121 +1,49 @@
-//! Dragging a note edits it (`ui/components/note_drag.js`): up and down
-//! transposes it (12 px a semitone, inside the piano roll's range — the
-//! roll's own vertical axis), sideways moves its velocity (200 px for 0 to 1,
-//! to the right is louder), and the axis is claimed on the first real
-//! movement (3 px), so a sloppy diagonal changes one parameter only. A press
-//! that claims no axis is a click.
+//! Dragging a note of the piano roll moves it: sideways in time, by the
+//! steps the pointer crossed since the press, up and down in pitch, by the
+//! rows. A press that never takes the note off its cell is a click.
 
-use ordrumbox_core::Note;
-use ordrumbox_core::num::round2;
-
-/// Movement before the gesture claims an axis, px.
-const AXIS_LOCK_PX: f64 = 3.0;
-/// Velocity per pixel dragged right.
-const VELOCITY_PER_PX: f64 = 0.005;
-/// Pixels per semitone dragged up.
-const PITCH_PX_PER_SEMITONE: f64 = 12.0;
 /// The piano roll's range and middle C (`piano_roll_constants.js`).
 pub const MIDI_MIN: f64 = 12.0;
-pub const MIDI_MAX: f64 = 108.0;
 pub const MIDDLE_C: f64 = 60.0;
-/// A note's velocity when it has none (`NOTE_DEFAULTS`).
-const DEFAULT_VELOCITY: f64 = 0.8;
 
-/// What a drag edits.
+/// A note pressed in the piano roll, which a drag moves.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Axis {
-    Velocity,
-    Pitch,
+pub struct NoteMove {
+    /// Where the press was, px.
+    press: (i32, i32),
+    /// The note's cell at the press: step, row.
+    from: (i64, i32),
+    /// A step's width and a row's height, px.
+    cell: (i32, i32),
+    /// The note has left its cell since the press.
+    moved: bool,
 }
 
-impl Axis {
-    /// The note field it edits.
-    pub fn key(self) -> &'static str {
-        match self {
-            Self::Velocity => "velocity",
-            Self::Pitch => "pitch",
-        }
-    }
-}
-
-/// What a movement did.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum DragEvent {
-    /// The axis was claimed: the value it starts from.
-    Start(Axis, f64),
-    /// A new value for the note, and its direction from the start.
-    Value(Axis, f64, i32),
-}
-
-/// A note being dragged.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct NoteDrag {
-    /// Where the press was.
-    x: i32,
-    y: i32,
-    track_pitch: f64,
-    axis: Option<Axis>,
-    start: f64,
-}
-
-impl NoteDrag {
-    /// A press at `(x, y)` on a note of a track transposed by `track_pitch`.
-    pub fn new(x: i32, y: i32, track_pitch: f64) -> Self {
-        Self { x, y, track_pitch, axis: None, start: 0.0 }
+impl NoteMove {
+    /// A press at `press` on the note at cell `from` (step, row), a cell
+    /// being `cell` px (width, height).
+    #[must_use]
+    pub fn new(press: (i32, i32), from: (i64, i32), cell: (i32, i32)) -> Self {
+        Self { press, from, cell, moved: false }
     }
 
-    /// The axis claimed, `None` while the pointer has not really moved: a click.
-    pub fn axis(&self) -> Option<Axis> {
-        self.axis
+    /// The note has left its cell: the press is no click.
+    #[must_use]
+    pub fn has_moved(&self) -> bool {
+        self.moved
     }
 
-    /// The pointer at `(x, y)` over `note` as it is now; what to do.
-    pub fn moved(&mut self, x: i32, y: i32, note: &Note) -> Vec<DragEvent> {
-        let dx = f64::from(x - self.x);
-        let dy = f64::from(self.y - y); // dragging up is positive
-        let mut events = Vec::new();
-        let axis = match self.axis {
-            Some(axis) => axis,
-            None => {
-                if dx.abs() < AXIS_LOCK_PX && dy.abs() < AXIS_LOCK_PX {
-                    return events;
-                }
-                let axis = if dy.abs() >= dx.abs() { Axis::Pitch } else { Axis::Velocity };
-                self.start = match axis {
-                    Axis::Pitch => {
-                        if note.pitch.is_finite() {
-                            note.pitch.round()
-                        } else {
-                            0.0
-                        }
-                    }
-                    Axis::Velocity => {
-                        if note.velocity.is_finite() {
-                            note.velocity
-                        } else {
-                            DEFAULT_VELOCITY
-                        }
-                    }
-                };
-                self.axis = Some(axis);
-                events.push(DragEvent::Start(axis, self.start));
-                axis
-            }
-        };
-        let value = match axis {
-            Axis::Pitch => (self.start + (dy / PITCH_PX_PER_SEMITONE).round())
-                .clamp(MIDI_MIN - MIDDLE_C - self.track_pitch, MIDI_MAX - MIDDLE_C - self.track_pitch),
-            Axis::Velocity => round2((self.start + dx * VELOCITY_PER_PX).clamp(0.0, 1.0)),
-        };
-        let current = match axis {
-            Axis::Pitch => note.pitch,
-            Axis::Velocity => note.velocity,
-        };
-        // `Object.is`: -0 is not 0.
-        if current.to_bits() != value.to_bits() {
-            events.push(DragEvent::Value(axis, value, if value > self.start { 1 } else { -1 }));
-        }
-        events
+    /// The cell the note goes to with the pointer at `(x, y)`: as far from
+    /// its own as the pointer is from the press, rounded to whole steps and
+    /// rows (up is higher), within `step_count` steps and `row_count` rows.
+    pub fn target(&mut self, (x, y): (i32, i32), (step_count, row_count): (i64, i32)) -> (i64, i32) {
+        let cells = |delta: i32, size: i32| (f64::from(delta) / f64::from(size.max(1))).round() as i32;
+        let steps = i64::from(cells(x - self.press.0, self.cell.0));
+        let rows = cells(self.press.1 - y, self.cell.1);
+        let step = (self.from.0 + steps).clamp(0, (step_count - 1).max(0));
+        let row = (self.from.1 + rows).clamp(0, (row_count - 1).max(0));
+        self.moved |= (step, row) != self.from;
+        (step, row)
     }
 }
 
@@ -128,98 +56,20 @@ pub fn midi_name(midi: i32) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use Axis::{Pitch, Velocity};
-    use DragEvent::{Start, Value};
-
-    /// A note `(velocity, pitch)` on a track transposed by `track_pitch`,
-    /// dragged through `moves` from (0, 0): the events, and the axis claimed.
-    struct Case {
-        note: (f64, f64),
-        track_pitch: f64,
-        moves: &'static [(i32, i32)],
-        events: &'static [DragEvent],
-        axis: Option<Axis>,
-    }
-
-    const CASES: &[Case] = &[
-        // Up and down: the pitch, semitone by semitone, inside the roll's range.
-        Case {
-            note: (0.8, 0.0),
-            track_pitch: 0.0,
-            moves: &[(1, -1), (2, -2), (0, -3), (0, -10), (0, -100), (5, 40), (0, 300)],
-            events: &[
-                Start(Pitch, 0.0),
-                Value(Pitch, 1.0, 1),
-                Value(Pitch, 8.0, 1),
-                Value(Pitch, -3.0, -1),
-                Value(Pitch, -25.0, -1),
-            ],
-            axis: Some(Pitch),
-        },
-        // Sideways: the velocity, by hundredths, inside 0–1, to the right louder.
-        Case {
-            note: (0.5, 3.0),
-            track_pitch: 0.0,
-            moves: &[(4, 0), (40, 0), (200, 0), (-100, 0), (-900, 0), (900, 0)],
-            events: &[
-                Start(Velocity, 0.5),
-                Value(Velocity, 0.52, 1),
-                Value(Velocity, 0.7, 1),
-                Value(Velocity, 1.0, 1),
-                Value(Velocity, 0.0, -1),
-                Value(Velocity, 1.0, 1),
-            ],
-            axis: Some(Velocity),
-        },
-        // The track's transposition narrows the range.
-        Case {
-            note: (0.8, 0.0),
-            track_pitch: 40.0,
-            moves: &[(4, -4), (0, -200)],
-            events: &[Start(Pitch, 0.0), Value(Pitch, 8.0, 1)],
-            axis: Some(Pitch),
-        },
-        // A fractional pitch starts from its rounding.
-        Case {
-            note: (0.8, 2.6),
-            track_pitch: 0.0,
-            moves: &[(0, -3), (0, -13)],
-            events: &[Start(Pitch, 3.0), Value(Pitch, 3.0, -1), Value(Pitch, 4.0, 1)],
-            axis: Some(Pitch),
-        },
-        Case {
-            note: (0.333, 0.0),
-            track_pitch: 0.0,
-            moves: &[(-3, 2), (-5, 2)],
-            events: &[Start(Velocity, 0.333), Value(Velocity, 0.32, -1), Value(Velocity, 0.31, -1)],
-            axis: Some(Velocity),
-        },
-        // Less than 3 px, or no movement: a click.
-        Case { note: (0.8, 0.0), track_pitch: 0.0, moves: &[(1, 1), (2, -2)], events: &[], axis: None },
-        Case { note: (0.8, 0.0), track_pitch: 0.0, moves: &[], events: &[], axis: None },
-    ];
 
     #[test]
-    fn a_drag_gives_its_events() {
-        for case in CASES {
-            let mut note = Note { velocity: case.note.0, pitch: case.note.1, ..Note::default() };
-            let mut drag = NoteDrag::new(0, 0, case.track_pitch);
-            let mut events = Vec::new();
-            for &(x, y) in case.moves {
-                for event in drag.moved(x, y, &note) {
-                    // The surface writes the value.
-                    if let Value(axis, v, _) = event {
-                        match axis {
-                            Pitch => note.pitch = v,
-                            Velocity => note.velocity = v,
-                        }
-                    }
-                    events.push(event);
-                }
-            }
-            assert_eq!(events, case.events, "{:?} on {} by {:?}", case.note, case.track_pitch, case.moves);
-            assert_eq!(drag.axis(), case.axis);
-        }
+    fn a_drag_moves_the_note_by_whole_cells_within_the_roll() {
+        // Cells 20 px wide and 10 px high; the note at step 4, row 30, of 16 steps and 97 rows.
+        let mut drag = NoteMove::new((100, 100), (4, 30), (20, 10));
+        let bounds = (16, 97);
+        assert_eq!(drag.target((105, 97), bounds), (4, 30), "less than half a cell");
+        assert!(!drag.has_moved(), "still a click");
+        assert_eq!(drag.target((111, 100), bounds), (5, 30), "half a step to the right");
+        assert_eq!(drag.target((140, 75), bounds), (6, 33), "two steps later, three rows up");
+        assert_eq!(drag.target((20, 120), bounds), (0, 28), "earlier, down");
+        assert_eq!(drag.target((900, -2000), bounds), (15, 96), "kept within the roll");
+        assert_eq!(drag.target((100, 100), bounds), (4, 30), "back where it was");
+        assert!(drag.has_moved(), "it moved on the way: no click");
     }
 
     #[test]

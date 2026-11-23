@@ -72,7 +72,7 @@ const HELP: &str = "F10 or ALT: menus   ARROWS: cursor   ENTER or click: step on
 const SONG_HELP: &str = "SONG   click: act   right-click: menu   SPACE: play   ARROWS: cursor, pattern   DELETE: the clip selected   F3 or ESC: grid";
 /// The same in the piano roll.
 const ROLL_HELP: &str =
-    "PIANO ROLL   click: add / select / delete   drag: velocity / pitch   right-click: menu   F4 or ESC: grid";
+    "PIANO ROLL   click: add / select   double-click: delete   drag: move   right-click: menu   F4 or ESC: grid";
 /// The same in the synth editor.
 const SYNTH_HELP: &str = "SYNTH   TAB: controls   drag, wheel: knobs   click: waves, lists, power   F6 or ESC: grid";
 /// The same in the mixer.

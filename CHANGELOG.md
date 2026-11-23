@@ -3,12 +3,20 @@
 ## Unreleased
 
 ### New
+- **Simple view** (View > Simple view): the grid alone, the track and note editors folded; again,
+  both shown. The first start opens in it, saying how to show the rest; later starts open as
+  the window was left.
 - **Choke groups**: in the track editor's Sound tab, **Choke** puts a track in a group (1 to 8);
   a note of a track of the group cuts the sound of every track of it, as a closed hi-hat cuts an
   open one. A hi-hat track added or renamed joins group 1; the patterns already made are unchanged.
   MCP: `chokeGroup` in `updateTrack`.
 
 ### Changed
+- Piano roll: dragging a note moves it, sideways in time and up / down in pitch, never onto
+  another note (its velocity stays with the note editor and the grid's lane). A click on the
+  selected note no longer deletes it: a double-click does, as Delete and the note's menu. The
+  pointer shows what a drag does: sideways arrows on a note's right edge (its length), four
+  arrows on its body (a move).
 - Piano roll: the < > page buttons give way to a scroll bar under the grid, with the same thumb and
   zoom handles (Ctrl+wheel zooms, Shift+wheel scrolls). The roll opens on 4 beats as before.
 - Grid: a scroll bar beside + NEW TRACK scrolls the beats shown and zooms them (drag the ends of its

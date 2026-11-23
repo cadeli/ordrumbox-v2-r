@@ -6,6 +6,7 @@ use super::session_generators::Generators;
 use super::session_host::Host;
 use super::session_kit::KitEditor;
 use super::session_playback::Playback;
+use super::session_resume::is_first_start;
 use super::session_saving::Saving;
 use super::session_selection::Selection;
 use super::session_toast::Flash;
@@ -131,6 +132,7 @@ impl Session {
         }
         let synths = session_synth::merged_synths(library.synths.as_ref(), &assets.synths);
         let mut session = Self::new(library, kits, status);
+        session.saving.first_start = !hosted && is_first_start(store::settings_path().as_deref());
         session.synths.assets = assets.synths;
         session.synths.presets = synths.clone();
         session.synths.revision = Some(session.editor.revision());

@@ -3,7 +3,9 @@
 //! the open hand on a thumb, the closed hand while one is held (the song
 //! panel's, the kit table's, the mixer's); the ends of
 //! the song panel's measures' thumb, which zoom, show the sideways arrows,
-//! an automation lane's bottom edge, which sets its height, the up-down ones.
+//! an automation lane's bottom edge, which sets its height, the up-down ones;
+//! in the piano roll, a note's right edge, which sets its length, the
+//! sideways arrows, and its body, which a drag moves, the four arrows.
 
 use super::Session;
 use super::session_song_zoom::BarDrag;
@@ -31,6 +33,12 @@ impl Session {
         if self.song_panel.lane_resize.is_some() {
             return PointerShape::ResizeVertical;
         }
+        if self.roll.length_drag.is_some() {
+            return PointerShape::ResizeHorizontal;
+        }
+        if self.roll.drag.is_some() {
+            return PointerShape::Move;
+        }
         if self.kit_editor.list.is_bar_held() || self.is_mixer_bar_held() {
             return HELD_SHAPE;
         }
@@ -53,13 +61,19 @@ impl Session {
         self.grid_pointer_shape(size, x, y)
     }
 
-    /// Over the piano roll: its scroll bar's thumb and zoom handles.
+    /// Over the piano roll: its scroll bar's thumb and zoom handles, a
+    /// note's right edge (its length) and its body (a drag moves it).
     fn roll_pointer_shape(&self, size: (i32, i32, Scale), x: i32, y: i32) -> PointerShape {
         let layout = self.roll_layout(size);
         let Some(view) = self.roll_view(&layout) else { return PointerShape::Arrow };
         match layout.hit(&view, x, y) {
             Some(RollHit::ScrollBar(Some(_))) => PointerShape::ResizeHorizontal,
             Some(RollHit::ScrollBar(None)) => scroll_thumb::hover_shape(layout.bar_thumb(&view), x),
+            Some(RollHit::Cell { .. }) => match layout.note_at(&view, x, y) {
+                Some((_, true)) => PointerShape::ResizeHorizontal,
+                Some((_, false)) => PointerShape::Move,
+                None => PointerShape::Arrow,
+            },
             _ => PointerShape::Arrow,
         }
     }

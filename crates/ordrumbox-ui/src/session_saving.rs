@@ -81,6 +81,9 @@ pub(super) struct Saving {
     pub(super) master: Settle,
     /// The settings file the colour scheme and the zoom are saved to (`None`: not saved).
     pub(super) settings_file: Option<PathBuf>,
+    /// The program starts for the first time: there was no settings file
+    /// yet (looked for before anything at start writes one).
+    pub(super) first_start: bool,
     /// Where projects are saved (`songs/`); `None`: no user data folder.
     pub(super) projects_dir: Option<PathBuf>,
 }
@@ -96,6 +99,7 @@ impl Default for Saving {
             kits: Settle::new(KITS_DELAY),
             master: Settle::new(MASTER_DELAY),
             settings_file: None,
+            first_start: false,
             projects_dir: None,
         }
     }

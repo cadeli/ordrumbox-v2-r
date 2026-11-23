@@ -13,6 +13,7 @@ use std::borrow::Cow;
 pub enum Command {
     TrackEditor,
     NoteEditor,
+    SimpleView,
     Grid,
     SongView,
     PianoRoll,
