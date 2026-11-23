@@ -346,17 +346,15 @@ impl Session {
     /// The right-click menu of a knob or a slider: type a value, its
     /// default, copy it, paste one copied.
     fn control_menu(&mut self, id: Id, x: i32, y: i32) {
-        let (values, labels) = (
-            vec!["type".into(), "default".into(), "copy".into(), "paste".into()],
-            vec![
-                "Type a value...".to_owned(),
-                "Default value".to_owned(),
-                "Copy value".to_owned(),
-                "Paste value".to_owned(),
-            ],
-        );
+        let lines = [
+            ("type", "Type a value..."),
+            ("default", "Default value"),
+            ("copy", "Copy value"),
+            ("paste", "Paste value"),
+        ]
+        .map(|(value, label)| (value.to_owned(), label.to_owned()));
         let (label, _) = control_name(id);
-        let mut menu = Dropdown::menu(Id::ControlMenu, x, y, label.to_owned(), values, labels);
+        let mut menu = Dropdown::menu(Id::ControlMenu, x, y, label.to_owned(), lines);
         menu.control = Some(id);
         self.chrome.widgets.dropdown = Some(menu);
     }

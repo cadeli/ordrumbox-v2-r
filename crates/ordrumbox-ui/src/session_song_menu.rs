@@ -17,32 +17,31 @@ impl Session {
         let patterns = &self.editor.library().patterns;
         let Some(pattern) = patterns.get(p) else { return };
         let (title, id, count) = (self.pattern_label(&pattern.id), pattern.id.clone(), patterns.len());
-        let (mut values, mut labels) = (Vec::new(), Vec::new());
+        let mut lines = Vec::new();
         if self.song().is_some() {
             let measure = self.playhead_measure();
-            values.push(format!("add:{measure}:{id}"));
-            labels.push(format!("Add at measure {}", measure + 1));
+            lines.push((format!("add:{measure}:{id}"), format!("Add at measure {}", measure + 1)));
         }
         if p > 0 {
-            values.push(format!("pattern-up:{p}"));
-            labels.push("Move up".into());
+            lines.push((format!("pattern-up:{p}"), "Move up".to_owned()));
         }
         if p + 1 < count {
-            values.push(format!("pattern-down:{p}"));
-            labels.push("Move down".into());
+            lines.push((format!("pattern-down:{p}"), "Move down".to_owned()));
         }
-        values.extend([format!("rename:{p}"), format!("pattern-delete:{p}")]);
-        labels.extend(["Rename".into(), "Delete".into()]);
-        self.chrome.widgets.dropdown = Some(Dropdown::menu(Id::SongMenu, x, y, title, values, labels));
+        lines.extend([
+            (format!("rename:{p}"), "Rename".to_owned()),
+            (format!("pattern-delete:{p}"), "Delete".to_owned()),
+        ]);
+        self.chrome.widgets.dropdown = Some(Dropdown::menu(Id::SongMenu, x, y, title, lines));
     }
 
     /// A clip: repeat it after itself, or remove it.
     pub(super) fn clip_menu(&mut self, c: usize, x: i32, y: i32) {
         let Some(clip) = self.song().and_then(|s| s.clips.get(c)).cloned() else { return };
         let title = clip_label(&self.pattern_label(&clip.pattern_id), &clip);
-        let values = vec![format!("next:{c}"), format!("delete:{c}")];
+        let lines = [(format!("next:{c}"), "Next".to_owned()), (format!("delete:{c}"), "Delete".to_owned())];
         let shortcuts = crate::menu::shown_shortcuts(&["Ctrl+D", "Delete"], self.host.hosted);
-        let menu = Dropdown::menu(Id::SongMenu, x, y, title, values, vec!["Next".into(), "Delete".into()]);
+        let menu = Dropdown::menu(Id::SongMenu, x, y, title, lines);
         self.chrome.widgets.dropdown = Some(menu.with_shortcuts(shortcuts));
     }
 
@@ -53,19 +52,15 @@ impl Session {
         let count = self.song().map_or(0, |s| s.clips.iter().filter(|c| c.pattern_id == row.id).count());
         let measure = self.playhead_measure();
         let title = format!("{} - {count} clip(s)", row.name);
-        let mut values = vec![format!("add:{measure}:{}", row.id)];
-        let mut labels = vec![format!("Add at measure {}", measure + 1)];
+        let mut lines = vec![(format!("add:{measure}:{}", row.id), format!("Add at measure {}", measure + 1))];
         if !row.orphan && r > 0 {
-            values.push(format!("up:{r}"));
-            labels.push("Move up".into());
+            lines.push((format!("up:{r}"), "Move up".to_owned()));
         }
         if rows.get(r + 1).is_some_and(|next| !next.orphan) && !row.orphan {
-            values.push(format!("down:{r}"));
-            labels.push("Move down".into());
+            lines.push((format!("down:{r}"), "Move down".to_owned()));
         }
-        values.push(format!("row:{}", row.id));
-        labels.push("Delete row".into());
-        self.chrome.widgets.dropdown = Some(Dropdown::menu(Id::SongMenu, x, y, title, values, labels));
+        lines.push((format!("row:{}", row.id), "Delete row".to_owned()));
+        self.chrome.widgets.dropdown = Some(Dropdown::menu(Id::SongMenu, x, y, title, lines));
     }
 
     /// The name a clip's pattern is shown by (its id when it is gone).

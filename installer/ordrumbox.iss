@@ -71,3 +71,30 @@ Name: "{autodesktop}\orDrumbox"; Filename: "{app}\ordrumbox.exe"; IconFilename: 
 
 [Run]
 Filename: "{app}\ordrumbox.exe"; Description: "Start orDrumbox"; Flags: nowait postinstall skipifsilent
+
+[Code]
+{ On an upgrade only (the app is already installed through this setup), a note after the welcome
+  page: the new version brings new demos, which a factory reset restores. }
+var
+  UpgradeNotePage: TOutputMsgWizardPage;
+
+function IsUpgrade(): Boolean;
+begin
+  Result := RegKeyExists(HKLM, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#SetupSetting("AppId")}_is1')
+    or RegKeyExists(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#SetupSetting("AppId")}_is1');
+end;
+
+procedure InitializeWizard();
+begin
+  UpgradeNotePage := CreateOutputMsgPage(wpWelcome, 'Upgrading orDrumbox',
+    'To be safe and lose nothing, follow these steps.',
+    '1. Save your songs and sounds (File menu) before installing.' + #13#10 + #13#10 +
+    '2. Install the new version (this setup).' + #13#10 + #13#10 +
+    '3. Run Help > Factory reset... in the new version, to get the new demos.' + #13#10 + #13#10 +
+    '4. Load your songs back.');
+end;
+
+function ShouldSkipPage(PageID: Integer): Boolean;
+begin
+  Result := (PageID = UpgradeNotePage.ID) and not IsUpgrade();
+end;

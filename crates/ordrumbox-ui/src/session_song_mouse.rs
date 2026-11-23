@@ -93,7 +93,7 @@ impl Session {
                 let row = &rows[row];
                 let title = format!("Add \"{}\" at measure {}", row.name, measure + 1);
                 let value = format!("add:{measure}:{}", row.id);
-                let menu = Dropdown::menu(Id::SongMenu, x, y, title, vec![value], vec!["Add here".into()]);
+                let menu = Dropdown::menu(Id::SongMenu, x, y, title, [(value, "Add here".to_owned())]);
                 self.chrome.widgets.dropdown = Some(menu);
             }
             _ => return false,

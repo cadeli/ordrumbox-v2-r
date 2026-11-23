@@ -560,14 +560,8 @@ mod tests {
         d.jump('i');
         assert_eq!(d.at, LIST_ROWS);
         // A menu: its title row takes no click.
-        let m = Dropdown::menu(
-            Id::SongMenu,
-            10,
-            10,
-            "title".into(),
-            vec!["a".into(), "b".into()],
-            vec!["A".into(), "B".into()],
-        );
+        let m =
+            Dropdown::menu(Id::SongMenu, 10, 10, "title".into(), [("a".into(), "A".into()), ("b".into(), "B".into())]);
         let r = m.rect(800, 600, Scale::ONE);
         assert_eq!(m.hit(800, 600, Scale::ONE, r.x + 5, r.y + 3), None);
         assert_eq!(m.hit(800, 600, Scale::ONE, r.x + 5, r.y + 2 + 12 + 1), Some(0));
@@ -619,7 +613,7 @@ mod tests {
         let spec = Spec::knob(20.0, 5000.0, 10.0, 500.0);
         Entry { id: Id::Decay, spec: Some(spec), title: "Enter value".into(), text: "12".into(), at: (390, 290) }
             .draw(&mut canvas, Scale::ONE);
-        Dropdown::menu(Id::SongMenu, 390, 290, "rock".into(), vec!["a".into()], vec!["Add".into()])
+        Dropdown::menu(Id::SongMenu, 390, 290, "rock".into(), [("a".into(), "Add".into())])
             .draw(&mut canvas, Scale::ONE);
     }
 }

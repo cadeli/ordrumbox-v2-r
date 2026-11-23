@@ -54,8 +54,10 @@ impl Dropdown {
         d
     }
 
-    /// A menu of actions at `(x, y)`, under `title`.
-    pub fn menu(id: Id, x: i32, y: i32, title: String, values: Vec<String>, labels: Vec<String>) -> Self {
+    /// A menu of actions at `(x, y)`, under `title`: its `lines`, each a
+    /// value and the label shown.
+    pub fn menu(id: Id, x: i32, y: i32, title: String, lines: impl IntoIterator<Item = (String, String)>) -> Self {
+        let (values, labels) = lines.into_iter().unzip();
         Self { title: Some(title), ..Self::new(id, Rect::new(x, y, 0, 0), values, labels, 0) }
     }
 
@@ -79,11 +81,10 @@ impl Dropdown {
         size: (i32, i32, Scale),
         id: Id,
         title: String,
-        values: Vec<String>,
-        labels: Vec<String>,
+        lines: impl IntoIterator<Item = (String, String)>,
     ) -> Self {
         let (width, height, scale) = size;
-        let mut menu = Self::menu(id, 0, 0, title, values, labels);
+        let mut menu = Self::menu(id, 0, 0, title, lines);
         let beside = parent.rect(width, height, scale);
         let w = menu.rect(width, height, scale).w;
         let row = parent.at.saturating_sub(parent.first) + parent.head();

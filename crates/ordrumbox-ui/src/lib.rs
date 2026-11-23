@@ -21,6 +21,7 @@ mod frame;
 mod host_tip;
 mod image;
 mod kits;
+mod loop_marks;
 mod master;
 mod mcp;
 mod mcp_link;

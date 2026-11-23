@@ -56,9 +56,8 @@ impl Session {
         }
         let (shown, total) = (layout.beats(), layout.total_beats());
         if zoom && lines != 0 {
-            let (start, len) = layout.bar_track();
-            let across = f64::from(x - start) / f64::from(len.max(1));
-            self.chrome.beat_window.zoom_by(lines, (shown, total), layout.beat_under(x), across);
+            let window = &mut self.chrome.beat_window;
+            window.zoom_at(lines, (shown, total), (layout.beat_under(x), x), layout.bar_track());
             return true;
         }
         let notches = if columns != 0 {

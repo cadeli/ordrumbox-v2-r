@@ -4,15 +4,9 @@
 
 use super::draw::Page;
 use super::*;
+use crate::loop_marks;
+use crate::panel::Rect;
 use ordrumbox_core::automation::STEPS_PER_MEASURE;
-
-/// How far (scale units) from an end of the loop a press still takes it.
-const END_GRAB: i32 = 4;
-/// An end mark's width (scale units).
-const END_WIDTH: i32 = 2;
-/// The loop's colour, and how much of it covers the ruler's cells.
-const LOOP: Rgb = theme::LIVE;
-const LOOP_ALPHA: u8 = 90;
 
 impl SongLayout {
     /// The end of the view's loop at `(x, y)` on the ruler, the nearer one
@@ -22,10 +16,8 @@ impl SongLayout {
         if y >= self.body_top() || x < self.body_left() {
             return None;
         }
-        let distance = |step: u32| (self.step_x(step, view.scroll.0) - x).abs();
-        let grab = END_GRAB * self.scale;
-        let (to_first, to_end) = (distance(first), distance(end));
-        if to_end <= grab && to_end <= to_first { Some(Edge::End) } else { (to_first <= grab).then_some(Edge::Start) }
+        let at = |step: u32| self.step_x(step, view.scroll.0);
+        loop_marks::end_near((at(first), at(end)), x, self.scale)
     }
 
     /// The line between steps nearest to `x`, on the lines `snap` steps
@@ -43,18 +35,9 @@ impl SongLayout {
 /// The view's loop over the ruler of `page`.
 pub(super) fn draw(canvas: &mut Canvas, view: &SongView, layout: &SongLayout, page: &Page) {
     let Some((first, end)) = view.loop_region else { return };
-    let s = layout.scale;
     let shown = page.first_measure * STEPS_PER_MEASURE..=(page.first_measure + page.shown_measures) * STEPS_PER_MEASURE;
-    let x_of = |step: u32| layout.step_x(step.clamp(*shown.start(), *shown.end()), page.first_measure);
-    let (from, to) = (x_of(first), x_of(end));
-    let (top, height) = (layout.ruler_top(), HEADER_HEIGHT * s - s.px());
-    let color = if view.is_loop_on { LOOP } else { theme::muted() };
-    if to > from {
-        canvas.tint_rect(from, top, to - from, height, color, LOOP_ALPHA);
-    }
-    for (step, x) in [(first, from), (end, to - END_WIDTH * s)] {
-        if shown.contains(&step) {
-            canvas.fill_rect(x, top, END_WIDTH * s, height, color);
-        }
-    }
+    let x_of = |step: u32| layout.step_x(step, page.first_measure);
+    let (left, right) = (x_of(*shown.start()), x_of(*shown.end()));
+    let ruler = Rect::new(left, layout.ruler_top(), right - left, HEADER_HEIGHT * layout.scale - layout.scale.px());
+    loop_marks::draw(canvas, ruler, (x_of(first), x_of(end)), view.is_loop_on, layout.scale);
 }

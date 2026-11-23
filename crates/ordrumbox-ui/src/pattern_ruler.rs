@@ -3,6 +3,7 @@
 //! song's ruler shows the song's.
 
 use crate::canvas::{Canvas, Rgb, text_width};
+use crate::loop_marks;
 use crate::panel::Rect;
 use crate::scale::Scale;
 use crate::scroll_thumb::Edge;
@@ -10,13 +11,6 @@ use crate::theme;
 use ordrumbox_core::steps::TICK;
 use std::ops::Range;
 
-/// How far (scale units) from an end of the loop a press still takes it.
-const END_GRAB: i32 = 4;
-/// An end mark's width (scale units).
-const END_WIDTH: i32 = 2;
-/// The loop's colour, and how much of it covers the ruler.
-const LOOP: Rgb = theme::LIVE;
-const LOOP_ALPHA: u8 = 90;
 /// The play cursor's colour, and its width (scale units).
 const CURSOR: Rgb = theme::FOCUS;
 const CURSOR_WIDTH: i32 = 2;
@@ -95,9 +89,7 @@ impl PatternRuler {
         if !self.rect.contains(x, y) {
             return None;
         }
-        let grab = END_GRAB * self.scale;
-        let (to_first, to_end) = ((self.x_of(marks.first) - x).abs(), (self.x_of(marks.end) - x).abs());
-        if to_end <= grab && to_end <= to_first { Some(Edge::End) } else { (to_first <= grab).then_some(Edge::Start) }
+        loop_marks::end_near((self.x_of(marks.first), self.x_of(marks.end)), x, self.scale)
     }
 
     /// The beats `beats` (indexes from 0, of the `total_beats` of the
@@ -134,17 +126,7 @@ impl PatternRuler {
         let (r, s) = (self.rect, self.scale);
         let shown = r.x..=r.x + r.w;
         if let Some(LoopMarks { first, end, is_on }) = marks.marks {
-            let (from, to) = (self.x_of(first), self.x_of(end));
-            let color = if is_on { LOOP } else { theme::muted() };
-            let (left, right) = (from.clamp(*shown.start(), *shown.end()), to.clamp(*shown.start(), *shown.end()));
-            if right > left {
-                canvas.tint_rect(left, r.y, right - left, r.h, color, LOOP_ALPHA);
-            }
-            for x in [from, to - END_WIDTH * s] {
-                if shown.contains(&x) {
-                    canvas.fill_rect(x, r.y, END_WIDTH * s, r.h, color);
-                }
-            }
+            loop_marks::draw(canvas, r, (self.x_of(first), self.x_of(end)), is_on, s);
         }
         if let Some(x) = marks.cursor.map(|tick| self.x_of(tick)).filter(|x| shown.contains(x)) {
             canvas.fill_rect(x, r.y, CURSOR_WIDTH * s, r.h, CURSOR);

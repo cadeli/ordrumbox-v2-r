@@ -45,20 +45,20 @@ const FREE_NAME_VALUE: &str = "free-name";
 
 /// The lines of an instrument menu that open a category's instruments
 /// ([`Session::category_submenu`]): values and labels.
-pub(super) fn category_lines() -> (Vec<String>, Vec<String>) {
+pub(super) fn category_lines() -> Vec<(String, String)> {
     category_lines_where(|_| true)
 }
 
 /// The lines of an instrument menu whose categories hold an instrument that
 /// `keep` keeps; the others are left out.
-pub(super) fn category_lines_where(keep: impl Fn(&str) -> bool) -> (Vec<String>, Vec<String>) {
+pub(super) fn category_lines_where(keep: impl Fn(&str) -> bool) -> Vec<(String, String)> {
     catalog()
         .categories
         .iter()
         .enumerate()
         .filter(|(_, (_, ids))| ids.iter().any(|id| keep(id)))
         .map(|(i, (category, _))| (format!("{CATEGORY_VALUE}{i}"), format!("{category}{SUBMENU_MARK}")))
-        .unzip()
+        .collect()
 }
 
 /// The instrument a line of a category's list stands for.
@@ -110,7 +110,7 @@ impl Session {
 
     /// The "add track" menus at `(x, y)`: first the instrument categories.
     pub(super) fn add_track_menu(&mut self, x: i32, y: i32) {
-        self.track_name_menu(None, |id, title, values, labels| Dropdown::menu(id, x, y, title, values, labels));
+        self.track_name_menu(None, |id, title, lines| Dropdown::menu(id, x, y, title, lines));
     }
 
     /// The "add track" menus under the button that adds a track (a click on
@@ -131,7 +131,7 @@ impl Session {
     fn track_name_menu(
         &mut self,
         target: Option<usize>,
-        open: impl FnOnce(Id, String, Vec<String>, Vec<String>) -> Dropdown,
+        open: impl FnOnce(Id, String, Vec<(String, String)>) -> Dropdown,
     ) {
         if self.pattern().is_none() {
             return;
@@ -140,17 +140,16 @@ impl Session {
             self.message = format!("a pattern holds at most {MAX_TRACKS} tracks");
             return;
         }
-        let (mut values, mut labels) = category_lines();
+        let mut lines = category_lines();
         let title = match target {
             Some(t) => {
                 let Some(track) = self.track(t) else { return };
-                values.push(FREE_NAME_VALUE.to_owned());
-                labels.push("Free name...".to_owned());
+                lines.push((FREE_NAME_VALUE.to_owned(), "Free name...".to_owned()));
                 format!("Rename {}", track.name)
             }
             None => "Add track".to_owned(),
         };
-        self.chrome.widgets.dropdown = Some(open(Id::TrackNameMenu(target), title, values, labels));
+        self.chrome.widgets.dropdown = Some(open(Id::TrackNameMenu(target), title, lines));
     }
 
     /// A line of the instrument menus, picked in `menu`: a category opens the
@@ -186,10 +185,8 @@ impl Session {
             return false;
         };
         let Some((category, ids)) = catalog().categories.get(index) else { return true };
-        let ids: Vec<String> = ids.iter().filter(|id| keep(id)).cloned().collect();
-        let values = ids.iter().map(|id| format!("{INSTRUMENT_VALUE}{id}")).collect();
-        let labels = ids;
-        let submenu = Dropdown::submenu(menu, self.chrome.panel_size, id, (*category).to_owned(), values, labels);
+        let lines = ids.iter().filter(|id| keep(id)).map(|id| (format!("{INSTRUMENT_VALUE}{id}"), id.clone()));
+        let submenu = Dropdown::submenu(menu, self.chrome.panel_size, id, (*category).to_owned(), lines);
         self.chrome.widgets.dropdown = Some(submenu);
         true
     }
@@ -267,14 +264,9 @@ impl Session {
         lines: impl Iterator<Item = (String, &'static str, &'static str)>,
         (x, y): (i32, i32),
     ) {
-        let (mut values, mut labels, mut keys) = (Vec::new(), Vec::new(), Vec::new());
-        for (value, label, key) in lines {
-            values.push(value);
-            labels.push(label.to_owned());
-            keys.push(key);
-        }
+        let (lines, keys): (Vec<_>, Vec<_>) = lines.map(|(value, label, key)| ((value, label.to_owned()), key)).unzip();
         let shortcuts = crate::menu::shown_shortcuts(&keys, self.host.hosted);
-        let menu = Dropdown::menu(Id::GridMenu, x, y, title, values, labels).with_shortcuts(shortcuts);
+        let menu = Dropdown::menu(Id::GridMenu, x, y, title, lines).with_shortcuts(shortcuts);
         self.chrome.widgets.dropdown = Some(menu);
     }
 
@@ -323,9 +315,7 @@ impl Session {
     /// The instrument menus beside the grid menu `menu`.
     fn track_name_submenu(&mut self, target: Option<usize>, menu: Dropdown) {
         let size = self.chrome.panel_size;
-        self.track_name_menu(target, |id, title, values, labels| {
-            Dropdown::submenu(menu, size, id, title, values, labels)
-        });
+        self.track_name_menu(target, |id, title, lines| Dropdown::submenu(menu, size, id, title, lines));
     }
 
     /// Move track `from` to row `to`; the cursor and the selection follow

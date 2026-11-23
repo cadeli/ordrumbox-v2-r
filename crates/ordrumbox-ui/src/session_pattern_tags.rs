@@ -64,11 +64,11 @@ impl Session {
         let groups = tags::by_genre(patterns);
         let Some((genre, indices)) = groups.get(group) else { return };
         let title = genre.unwrap_or(NO_GENRE).to_owned();
-        let values = indices.iter().map(|i| format!("{PATTERN_VALUE}{i}")).collect();
-        let labels =
-            indices.iter().map(|&i| patterns[i].name.clone().unwrap_or_else(|| format!("Pattern {i}"))).collect();
+        let lines = indices.iter().map(|&i| {
+            (format!("{PATTERN_VALUE}{i}"), patterns[i].name.clone().unwrap_or_else(|| format!("Pattern {i}")))
+        });
         let at = indices.iter().position(|&i| i == self.pattern_index);
-        let mut submenu = Dropdown::submenu(menu, self.chrome.panel_size, Id::PatternMenu, title, values, labels);
+        let mut submenu = Dropdown::submenu(menu, self.chrome.panel_size, Id::PatternMenu, title, lines);
         if let Some(at) = at {
             submenu.highlight(at);
         }

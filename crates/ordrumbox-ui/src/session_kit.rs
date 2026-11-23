@@ -245,9 +245,9 @@ impl Session {
     /// categories, as the track's Rename menu has them.
     pub(super) fn kit_instrument_menu(&mut self, sample: usize, rect: Rect) {
         let Some(s) = self.kits.sample(self.kit_index, sample) else { return };
-        let (values, labels) = session_grid::category_lines();
+        let lines = session_grid::category_lines();
         let title = format!("{}: {}", sample_file_name(&s.path), s.key);
-        let menu = Dropdown::menu(Id::KitInstrumentMenu(sample), rect.x, rect.y + rect.h, title, values, labels);
+        let menu = Dropdown::menu(Id::KitInstrumentMenu(sample), rect.x, rect.y + rect.h, title, lines);
         self.chrome.widgets.dropdown = Some(menu);
     }
 

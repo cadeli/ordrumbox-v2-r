@@ -229,9 +229,8 @@ impl Session {
             self.message = "The song's patterns have no tracks to automate".into();
             return;
         }
-        let values = names.iter().map(|name| format!("{INSTRUMENT_VALUE}{name}")).collect();
-        let labels = names.iter().map(|name| format!("{name}{SUBMENU_MARK}")).collect();
-        let menu = Dropdown::menu(Id::AutomationMenu, x, y, "New automation".into(), values, labels);
+        let lines = names.iter().map(|name| (format!("{INSTRUMENT_VALUE}{name}"), format!("{name}{SUBMENU_MARK}")));
+        let menu = Dropdown::menu(Id::AutomationMenu, x, y, "New automation".into(), lines);
         self.chrome.widgets.dropdown = Some(menu);
     }
 
@@ -251,8 +250,7 @@ impl Session {
             (REMOVE_ALL_VALUE.to_owned(), "Delete all lanes"),
         ];
         let lines = reenable.into_iter().chain(lines.map(|(value, label)| (value, label.to_owned())));
-        let (values, labels) = lines.unzip();
-        let menu = Dropdown::menu(Id::AutomationMenu, x, y, title, values, labels);
+        let menu = Dropdown::menu(Id::AutomationMenu, x, y, title, lines);
         self.chrome.widgets.dropdown = Some(menu);
     }
 
@@ -261,10 +259,10 @@ impl Session {
     /// clears or removes it, or removes every lane.
     pub(super) fn automation_menu_pick(&mut self, value: &str, menu: Dropdown) {
         if let Some(instrument) = value.strip_prefix(INSTRUMENT_VALUE) {
-            let values = AutomationTarget::ALL.map(|t| format!("{LANE_VALUE}{}:{instrument}", t.key())).into();
-            let labels = AutomationTarget::ALL.map(|t| t.label().to_owned()).into();
+            let lines =
+                AutomationTarget::ALL.map(|t| (format!("{LANE_VALUE}{}:{instrument}", t.key()), t.label().to_owned()));
             let size = self.chrome.panel_size;
-            let submenu = Dropdown::submenu(menu, size, Id::AutomationMenu, instrument.to_owned(), values, labels);
+            let submenu = Dropdown::submenu(menu, size, Id::AutomationMenu, instrument.to_owned(), lines);
             self.chrome.widgets.dropdown = Some(submenu);
         } else if let Some((key, instrument)) = value.strip_prefix(LANE_VALUE).and_then(|v| v.split_once(':')) {
             let Some(target) = AutomationTarget::from_key(key) else { return };

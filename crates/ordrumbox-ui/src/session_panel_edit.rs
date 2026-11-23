@@ -341,9 +341,9 @@ impl Session {
     /// track's instrument): the categories of the instruments that have samples.
     pub(super) fn instrument_menu(&mut self, current: &str, rect: crate::panel::Rect) {
         let sampled = self.sampled_instruments();
-        let (values, labels) = session_grid::category_lines_where(|id| sampled.contains(id));
+        let lines = session_grid::category_lines_where(|id| sampled.contains(id));
         let title = format!("Instrument: {current}");
-        let menu = Dropdown::menu(Id::InstrumentMenu, rect.x, rect.y + rect.h, title, values, labels);
+        let menu = Dropdown::menu(Id::InstrumentMenu, rect.x, rect.y + rect.h, title, lines);
         self.chrome.widgets.dropdown = Some(menu);
     }
 

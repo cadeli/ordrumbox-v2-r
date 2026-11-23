@@ -418,8 +418,8 @@ impl Session {
         let Some(view) = self.roll_view(&layout) else { return false };
         let shown = (layout.shown(&view) as i32, view.beat_count);
         if zoom {
-            let across = f64::from(x - layout.bar.x) / f64::from(layout.bar.w.max(1));
-            self.roll.window.zoom_by(lines, shown, layout.beat_under(&view, x), across);
+            let bar = (layout.bar.x, layout.bar.w);
+            self.roll.window.zoom_at(lines, shown, (layout.beat_under(&view, x), x), bar);
         } else if shift {
             self.roll.window.scroll_by(lines, shown.0, shown.1);
         } else {
@@ -588,9 +588,9 @@ impl Session {
         let progression = composition::progression(self.roll.sequence);
         let title = format!("{} - {} {}", track.name, midi_name(midi), progression.name);
         let tonic = self.roll_pitch(t, midi - MIDI_MIN as i32);
-        let values = vec!["clear".into(), format!("sequence:{tonic}")];
-        let labels = vec!["Clear all".into(), "Add sequence".into()];
-        self.chrome.widgets.dropdown = Some(Dropdown::menu(Id::RollMenu, x, y, title, values, labels));
+        let lines =
+            [("clear".to_owned(), "Clear all".to_owned()), (format!("sequence:{tonic}"), "Add sequence".to_owned())];
+        self.chrome.widgets.dropdown = Some(Dropdown::menu(Id::RollMenu, x, y, title, lines));
     }
 
     /// A cell: add or delete its note, add a chord on it
@@ -601,22 +601,13 @@ impl Session {
         let title = format!("{} @ {}.{}", track.name, beat + 1, beat_step + 1);
         let pitch = self.roll_pitch(t, row);
         let at = format!("{step}:{pitch}");
-        let (mut values, mut labels) = (Vec::new(), Vec::new());
-        match self.roll_note_at(t, step, row) {
-            None => {
-                values.push(format!("add:{at}"));
-                labels.push("Add note".to_owned());
-            }
-            Some(n) => {
-                values.push(format!("delete:{n}"));
-                labels.push("Delete note".to_owned());
-            }
-        }
-        for chord in ROLL_CHORDS {
-            values.push(format!("{}:{at}", chord.key));
-            labels.push(chord.label.to_owned());
-        }
-        self.chrome.widgets.dropdown = Some(Dropdown::menu(Id::RollMenu, x, y, title, values, labels));
+        let note = match self.roll_note_at(t, step, row) {
+            None => (format!("add:{at}"), "Add note".to_owned()),
+            Some(n) => (format!("delete:{n}"), "Delete note".to_owned()),
+        };
+        let chords = ROLL_CHORDS.iter().map(|chord| (format!("{}:{at}", chord.key), chord.label.to_owned()));
+        let lines = std::iter::once(note).chain(chords);
+        self.chrome.widgets.dropdown = Some(Dropdown::menu(Id::RollMenu, x, y, title, lines));
     }
 
     /// An action of a piano roll menu.

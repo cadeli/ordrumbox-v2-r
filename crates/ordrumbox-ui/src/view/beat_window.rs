@@ -100,6 +100,14 @@ impl BeatWindow {
         self.scroll_to((anchor - across * f64::from(beats)).round() as i32);
     }
 
+    /// `notches` of Ctrl+wheel with the pointer at `x`, over the beat `beat`:
+    /// zoomed around it, the scroll bar's track `(start, len)` being what
+    /// the beats shown are of the `total`.
+    pub fn zoom_at(&mut self, notches: isize, (shown, total): (i32, i32), (beat, x): (f64, i32), bar: (i32, i32)) {
+        let across = f64::from(x - bar.0) / f64::from(bar.1.max(1));
+        self.zoom_by(notches, (shown, total), beat, across);
+    }
+
     /// `notches` of wheel, a beat each: positive ones show what is before.
     pub fn scroll_by(&mut self, notches: isize, shown: i32, total: i32) {
         let last = i64::from((total - shown).max(0));
