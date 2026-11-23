@@ -173,6 +173,21 @@ fn a_synth_preset_takes_unison_settings_even_copied_from_one_without() {
 }
 
 #[test]
+fn a_synth_preset_is_tagged_and_listed_with_its_tags() {
+    let mut s = session();
+    let args = r#"{"preset":"siren","settings":{"instrument":"synthEffect","style":" Dub "}}"#;
+    let made = call(&mut s, "createSynthPreset", args).unwrap();
+    assert_eq!(get(&made, &["settings", "instrument"]).as_str(), Some("SYNTHEFFECT"));
+    assert_eq!(get(&made, &["settings", "style"]).as_str(), Some("dub"));
+    let listed = call(&mut s, "listSynthPresets", "{}").unwrap().to_json();
+    assert_eq!(listed, r#"{"count":1,"presets":[{"preset":"siren","instrument":"SYNTHEFFECT","style":"dub"}]}"#);
+    for refused in [r#"{"instrument":"kazoo"}"#, r#"{"style":""}"#, r#"{"style":3}"#] {
+        let args = format!(r#"{{"preset":"siren","settings":{refused}}}"#);
+        assert!(call(&mut s, "updateSynthPreset", &args).is_err(), "{refused}");
+    }
+}
+
+#[test]
 fn a_synth_preset_takes_matrix_lines() {
     let mut s = session();
     let args = r#"{"preset":"wobble","settings":{"matrix.source1":"lfo1","matrix.target1":"filter.freq",

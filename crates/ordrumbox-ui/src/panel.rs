@@ -266,6 +266,11 @@ pub enum Id {
     /// An arrow of the scroll row: the track strips before, after.
     // Synth editor.
     SynthPreset,
+    /// The menus that choose a synth preset: its instruments and styles,
+    /// then a group's presets; the select they are for is the dropdown's `control`.
+    SynthPresetMenu,
+    /// The preset edited's tags (their entry).
+    SynthTags,
     SynthButton(&'static str),
     SynthTab(u8),
     /// A card's power button, its icon choices: by the card's index in

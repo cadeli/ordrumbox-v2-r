@@ -7,6 +7,7 @@
 
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_engine::synth_model as model;
+use ordrumbox_engine::synth_preset::tags::Facet;
 use ordrumbox_logic::tools::{
     Tools, count, find_pattern, find_song, list, object, optional_bool, optional_text, optional_whole, pattern_name,
     pattern_summary, same_name, strings, text,
@@ -500,6 +501,9 @@ pub(super) fn synth_settings(args: &Value, required: bool) -> Result<Vec<(String
             value.clone()
         } else if model::BYPASS_FLAGS.iter().any(|(_, flag)| *flag == path) {
             Value::Bool(value.as_bool().ok_or_else(|| format!("{at}: not true or false ({value})"))?)
+        } else if let Some(facet) = Facet::ALL.into_iter().find(|facet| facet.key() == path) {
+            let tag = value.as_str().ok_or_else(|| format!("{at}: not a text ({value})"))?;
+            Value::from(facet.parse(tag).map_err(|e| format!("{at}: {e}"))?.ok_or_else(|| format!("{at}: empty"))?)
         } else {
             return Err(format!("{at}: not a synth setting"));
         };

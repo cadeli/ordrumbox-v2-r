@@ -333,6 +333,7 @@ impl Session {
             Id::ControlMenu => self.control_menu_pick(&value, dropdown.control),
             Id::AutomationMenu => self.automation_menu_pick(&value, dropdown),
             Id::PatternMenu => self.pattern_menu_pick(&value, dropdown),
+            Id::SynthPresetMenu => self.synth_preset_menu_pick(&value, dropdown),
             id => self.select(id, &value),
         }
     }

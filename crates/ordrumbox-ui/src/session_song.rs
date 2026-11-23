@@ -393,6 +393,7 @@ impl Session {
                 }
             }
             Id::PatternTags => self.commit_pattern_tags(text),
+            Id::SynthTags => self.commit_synth_tags(text),
             Id::PatternDescription => {
                 let changed = self.pattern().is_some_and(|p| p.description != text);
                 if changed && self.editor.set_pattern_description(self.pattern_index, text) {

@@ -1,6 +1,6 @@
 //! The synth editor (`synth_editor.js` and its sections), in the place of
 //! the grid: the preset bar (the preset list, delete, new, duplicate,
-//! revert, export, import), the tabs (OSC, FLT, MOD, ENV), and the cards of
+//! revert, tags, export, import), the tabs (OSC, FLT, MOD, ENV), and the cards of
 //! the tab — each with its title, its wave, filter type or algorithm
 //! choices, its power button, its knobs, lists and switches — with the scope
 //! (four cycles of the oscillators), the filter curve and the envelope, and
@@ -24,11 +24,12 @@ use crate::panel::{Id, Item, Kind, Rect};
 use crate::theme;
 
 /// The preset bar's buttons: id, label, width (scale units).
-pub const BUTTONS: [(&str, &str, i32); 6] = [
+pub const BUTTONS: [(&str, &str, i32); 7] = [
     ("delete", "x", 20),
     ("new", "+", 20),
     ("duplicate", "Duplicate", 60),
     ("revert", "Revert", 56),
+    ("tags", "Tags", 44),
     ("export", "Export", 56),
     ("import", "Import", 56),
 ];
@@ -160,7 +161,7 @@ pub enum Plot {
 pub struct SynthLayout {
     scale: Scale,
     pub preset: Rect,
-    pub buttons: [Rect; 6],
+    pub buttons: [Rect; 7],
     pub tabs: [Rect; 4],
     pub area: Rect,
 }

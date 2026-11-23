@@ -394,6 +394,14 @@ it. A library saved before has none of its own: it takes those of `synth_presets
 `generated_sounds.json`), which earlier versions wrote and which is now only read. File >
 Import library adds its presets, replacing those of the same name; a song loaded keeps them.
 
+A synth preset has two tags: its **instrument** (an instrument name: BASS, SYNTHLEAD, KICK...)
+and its **style** (dub, chiptune, acid...). The lists that choose a preset (the synth
+editor's, the track editor's synth screen) open as the instruments, then the styles, each
+opening its presets; the arrows beside them still step through every preset. The synth
+editor's **Tags** button edits them as `BASS, dub` (the instrument first); a preset without
+an instrument is listed under `other`. A preset edited before the presets had tags takes
+those of the preset of the same name in `synth_presets.json`.
+
 File > Export kit with its samples makes a folder named after the kit, holding `kit.json`
 (the kit's mapping, each sample's path the name of its file there) and the samples' WAV
 files. Kit > Import folder as kit (or the folder dropped on the window) reads it back: the

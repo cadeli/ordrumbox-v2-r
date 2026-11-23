@@ -27,6 +27,7 @@ use crate::picker::{Export, Purpose};
 use crate::store;
 use crate::synth_view::{self, Built, SynthLayout};
 use ordrumbox_engine::SynthPresets;
+use ordrumbox_engine::synth_preset::tags::{self, Facet, inherit_tags};
 use std::path::{Path, PathBuf};
 
 /// The button that puts the track editor's track on the preset shown.
@@ -74,6 +75,26 @@ impl SynthEditor {
     /// No preset edited any more.
     pub(super) fn close(&mut self) {
         self.edit = None;
+    }
+
+    /// The key of the preset edited.
+    pub(super) fn key(&self) -> Option<&str> {
+        self.edit.as_ref().map(|edit| edit.key.as_str())
+    }
+
+    /// The tag of `facet` of the preset edited.
+    pub(super) fn tag(&self, facet: Facet) -> Option<&str> {
+        facet.in_object(&self.edit.as_ref()?.draft)
+    }
+
+    /// The draft's tag of `facet` set to `tag` (`None`: removed); whether it changed.
+    pub(super) fn set_tag(&mut self, facet: Facet, tag: Option<&str>) -> bool {
+        let Some(edit) = &mut self.edit else { return false };
+        if facet.in_object(&edit.draft) == tag {
+            return false;
+        }
+        tags::set_tag(&mut edit.draft, facet, tag);
+        true
     }
 }
 
@@ -263,7 +284,7 @@ impl Session {
     }
 
     /// The draft into its preset (`commit`): a knob turned is one undo step.
-    fn commit_synth(&mut self) {
+    pub(super) fn commit_synth(&mut self) {
         let Some(edit) = &self.synth_editor.edit else { return };
         let (key, preset) = (edit.key.clone(), Value::Object(edit.draft.clone()));
         let desc = format!("Edit synth preset \"{key}\"");
@@ -460,6 +481,7 @@ impl Session {
                 self.assign_synth(t, &key);
                 self.message = format!("{} plays \"{key}\"", self.track_name(t));
             }
+            "tags" => self.synth_tags_entry(),
             "export" => self.open_export(Export::Synths),
             "import" => self.open_picker(Purpose::ImportSynth),
             _ => {}
@@ -506,13 +528,17 @@ impl Session {
 }
 
 /// The presets played: `own`, a library's (`null`: one of the assets'
-/// deleted), then the assets' ones it does not name, so a new version's
-/// presets appear.
+/// deleted), with the tags it lacks taken from the asset of its key, then
+/// the assets' ones it does not name, so a new version's presets appear.
 pub(super) fn merged_synths(own: Option<&Object>, assets: &SynthPresets) -> SynthPresets {
     let mut merged = SynthPresets::default();
     for (key, preset) in own.into_iter().flat_map(Object::iter) {
         if !preset.is_null() {
-            merged.set(key, preset.clone());
+            let mut preset = preset.clone();
+            if let Some(factory) = assets.get(key) {
+                inherit_tags(&mut preset, factory);
+            }
+            merged.set(key, preset);
         }
     }
     for key in assets.keys() {

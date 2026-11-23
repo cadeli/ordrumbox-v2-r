@@ -15,6 +15,8 @@ use ordrumbox_dsp::synth::patch::{
     Adsr, LfoTarget, MATRIX_SIZE, MatrixRoute, MatrixSource, ModEnvTarget, NoiseMode, SynthBypass, SynthLfo,
 };
 
+pub mod tags;
+
 /// `C3_FREQ`, Hz: the pitch of ratio 1.
 const C3_FREQ: f64 = 130.812_782_650_299_3;
 /// `MIN_NOTE_RATIO`.

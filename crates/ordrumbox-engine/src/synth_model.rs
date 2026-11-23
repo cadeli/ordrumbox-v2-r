@@ -9,6 +9,7 @@ use ordrumbox_core::json::{self, Object, Value};
 
 use crate::slope;
 use crate::synth_preset::FM_DEVIATION;
+use crate::synth_preset::tags::TAG_KEYS;
 pub use ordrumbox_dsp::synth::patch::MATRIX_SIZE;
 
 pub use crate::synth_preset::{FILTER_TYPES, MATRIX_SOURCES, NOISE_MODES, WAVES};
@@ -427,11 +428,12 @@ pub fn has_power(group: &str) -> bool {
 }
 
 /// The cards of `draft`, in order: the known ones,
-/// then any other group it has (not a bypass flag), by name.
+/// then any other group it has (not a bypass flag nor a tag), by name.
 pub fn groups(draft: &Object) -> Vec<String> {
     let mut groups: Vec<String> = GROUP_ORDER.iter().map(|g| (*g).to_owned()).collect();
     for (key, _) in draft.iter() {
-        if !MASTER_KEYS.contains(&key) && !key.starts_with("bypass") && !groups.iter().any(|g| g == key) {
+        let is_card = !MASTER_KEYS.contains(&key) && !TAG_KEYS.contains(&key) && !key.starts_with("bypass");
+        if is_card && !groups.iter().any(|g| g == key) {
             groups.push(key.to_owned());
         }
     }

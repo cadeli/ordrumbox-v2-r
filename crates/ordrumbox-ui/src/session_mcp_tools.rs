@@ -4,6 +4,7 @@
 
 use ordrumbox_core::json::Value;
 use ordrumbox_engine::synth_model as model;
+use ordrumbox_engine::synth_preset::tags::Facet;
 use ordrumbox_logic::tools::{count, find_song, find_track, object, optional_whole, same_name, song_json, text};
 
 use super::Session;
@@ -122,8 +123,21 @@ impl Session {
             }
             "removeSynthPreset" => self.mcp_remove_synth(args),
             "listSynthPresets" => {
-                let keys = self.synths.presets.keys().into_iter().map(Value::from).collect::<Vec<_>>();
-                Ok(object([("count", count(keys.len())), ("presets", Value::Array(keys))]))
+                let presets = &self.synths.presets;
+                let listed = presets
+                    .keys()
+                    .into_iter()
+                    .map(|key| {
+                        let preset = presets.get(key);
+                        let tag = |facet: Facet| Value::from(preset.and_then(|p| facet.of(p)).unwrap_or_default());
+                        object([
+                            ("preset", Value::from(key)),
+                            ("instrument", tag(Facet::Instrument)),
+                            ("style", tag(Facet::Style)),
+                        ])
+                    })
+                    .collect::<Vec<_>>();
+                Ok(object([("count", count(listed.len())), ("presets", Value::Array(listed))]))
             }
             _ => return Ok(None),
         }

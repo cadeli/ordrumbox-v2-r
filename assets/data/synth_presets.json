@@ -1,5 +1,7 @@
 {
   "BASS_ANALOG": {
+    "instrument": "BASS",
+    "style": "funk",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.7,
@@ -70,6 +72,8 @@
     }
   },
   "BASS_SQUARE": {
+    "instrument": "BASS",
+    "style": "electro",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.8,
@@ -140,6 +144,8 @@
     }
   },
   "BASS_SUB": {
+    "instrument": "BASS",
+    "style": "hiphop",
     "masterVolume": 0.85,
     "vco1": {
       "gain": 0.85,
@@ -210,6 +216,8 @@
     }
   },
   "BASS_PLUCK": {
+    "instrument": "BASS",
+    "style": "house",
     "masterVolume": 0.95,
     "vco1": {
       "gain": 0.7,
@@ -280,6 +288,8 @@
     }
   },
   "BASS_ACID": {
+    "instrument": "BASS",
+    "style": "acid",
     "masterVolume": 0.6,
     "vco1": {
       "gain": 0.9,
@@ -350,6 +360,8 @@
     }
   },
   "BASS_FM": {
+    "instrument": "BASS",
+    "style": "pop",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.9,
@@ -420,6 +432,8 @@
     }
   },
   "SYNTHLEAD_SAW": {
+    "instrument": "SYNTHLEAD",
+    "style": "electro",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.6,
@@ -490,6 +504,8 @@
     }
   },
   "SYNTHLEAD_SQUARE": {
+    "instrument": "SYNTHLEAD",
+    "style": "pop",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.7,
@@ -560,6 +576,8 @@
     }
   },
   "SYNTHLEAD_SUPERSAW": {
+    "instrument": "SYNTHLEAD",
+    "style": "trance",
     "masterVolume": 0.7,
     "vco1": {
       "gain": 0.8,
@@ -635,6 +653,8 @@
     }
   },
   "SYNTHPAD_WARM": {
+    "instrument": "SYNTHPAD",
+    "style": "ambient",
     "masterVolume": 0.9,
     "vco1": {
       "gain": 0.5,
@@ -705,6 +725,8 @@
     }
   },
   "SYNTHPAD_SWEEP": {
+    "instrument": "SYNTHPAD",
+    "style": "trance",
     "masterVolume": 0.9,
     "vco1": {
       "gain": 0.5,
@@ -775,6 +797,8 @@
     }
   },
   "PIANO_EPIANO": {
+    "instrument": "PIANO",
+    "style": "soul",
     "masterVolume": 0.85,
     "vco1": {
       "gain": 0.7,
@@ -845,6 +869,8 @@
     }
   },
   "PIANO_CLAV": {
+    "instrument": "PIANO",
+    "style": "funk",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.7,
@@ -915,6 +941,8 @@
     }
   },
   "ORGAN_DRAWBAR": {
+    "instrument": "ORGAN",
+    "style": "jazz",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.6,
@@ -985,6 +1013,8 @@
     }
   },
   "ORGAN_PERC": {
+    "instrument": "ORGAN",
+    "style": "house",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.6,
@@ -1055,6 +1085,8 @@
     }
   },
   "BRASS_SYNTH": {
+    "instrument": "BRASS",
+    "style": "pop",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.6,
@@ -1125,6 +1157,8 @@
     }
   },
   "BRASS_STAB": {
+    "instrument": "BRASS",
+    "style": "funk",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.6,
@@ -1195,6 +1229,8 @@
     }
   },
   "STRINGS_ENSEMBLE": {
+    "instrument": "STRINGS",
+    "style": "disco",
     "masterVolume": 0.9,
     "vco1": {
       "gain": 0.5,
@@ -1265,6 +1301,8 @@
     }
   },
   "STRINGS_PIZZ": {
+    "instrument": "STRINGS",
+    "style": "pop",
     "masterVolume": 1.0,
     "vco1": {
       "gain": 0.9,
@@ -1335,6 +1373,8 @@
     }
   },
   "CROMAPERC_BELL": {
+    "instrument": "CROMAPERC",
+    "style": "ambient",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.8,
@@ -1405,6 +1445,8 @@
     }
   },
   "CROMAPERC_MARIMBA": {
+    "instrument": "CROMAPERC",
+    "style": "pop",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.8,
@@ -1475,6 +1517,8 @@
     }
   },
   "CHH_SYNTH": {
+    "instrument": "CHH",
+    "style": "electro",
     "masterVolume": 1,
     "vco1": {
       "gain": 0.2,
@@ -1544,6 +1588,8 @@
     }
   },
   "OHH_SYNTH": {
+    "instrument": "OHH",
+    "style": "electro",
     "masterVolume": 1,
     "vco1": {
       "gain": 0.2,
@@ -1613,6 +1659,8 @@
     }
   },
   "KICK_SYNTH": {
+    "instrument": "KICK",
+    "style": "electro",
     "masterVolume": 1,
     "vco1": {
       "gain": 1,
@@ -1682,6 +1730,8 @@
     }
   },
   "SNARE_SYNTH": {
+    "instrument": "SNARE",
+    "style": "electro",
     "masterVolume": 1,
     "vco1": {
       "gain": 1,
@@ -1751,6 +1801,8 @@
     }
   },
   "TOM_SYNTH": {
+    "instrument": "TOM",
+    "style": "electro",
     "masterVolume": 0.85,
     "vco1": {
       "gain": 1,
@@ -1820,6 +1872,8 @@
     }
   },
   "CLAP_SYNTH": {
+    "instrument": "CLAP",
+    "style": "electro",
     "masterVolume": 1,
     "vco1": {
       "gain": 0,
@@ -1889,6 +1943,8 @@
     }
   },
   "COWBELL_SYNTH": {
+    "instrument": "COWBELL",
+    "style": "electro",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.5,
@@ -1958,6 +2014,8 @@
     }
   },
   "CRASH_SYNTH": {
+    "instrument": "CRASH",
+    "style": "electro",
     "masterVolume": 1,
     "vco1": {
       "gain": 0.2,
@@ -2027,6 +2085,8 @@
     }
   },
   "BASS_TOUCH": {
+    "instrument": "BASS",
+    "style": "funk",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.7,
@@ -2123,6 +2183,8 @@
     }
   },
   "BASS_WOBBLE": {
+    "instrument": "BASS",
+    "style": "dubstep",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.7,
@@ -2219,6 +2281,8 @@
     }
   },
   "SYNTHPAD_DRIFT": {
+    "instrument": "SYNTHPAD",
+    "style": "ambient",
     "masterVolume": 0.9,
     "vco1": {
       "gain": 0.5,
@@ -2315,6 +2379,8 @@
     }
   },
   "PIANO_KEYBELL": {
+    "instrument": "PIANO",
+    "style": "pop",
     "masterVolume": 0.85,
     "vco1": {
       "gain": 0.7,
@@ -2411,6 +2477,8 @@
     }
   },
   "CHIP_LEAD": {
+    "instrument": "SYNTHLEAD",
+    "style": "chiptune",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 1,
@@ -2482,6 +2550,8 @@
     "bypassFilter": true
   },
   "CHIP_PULSE": {
+    "instrument": "SYNTHLEAD",
+    "style": "chiptune",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 0.7,
@@ -2554,6 +2624,8 @@
     "bypassFilter": true
   },
   "CHIP_BASS": {
+    "instrument": "BASS",
+    "style": "chiptune",
     "masterVolume": 0.8,
     "vco1": {
       "gain": 1,
@@ -2625,6 +2697,8 @@
     "bypassFilter": true
   },
   "CHIP_KICK": {
+    "instrument": "KICK",
+    "style": "chiptune",
     "masterVolume": 1,
     "vco1": {
       "gain": 1,
@@ -2696,6 +2770,8 @@
     }
   },
   "CHIP_SNARE": {
+    "instrument": "SNARE",
+    "style": "chiptune",
     "masterVolume": 0.75,
     "vco1": {
       "gain": 0.5,
@@ -2769,6 +2845,8 @@
     "bypassFilter": true
   },
   "CHIP_TOM": {
+    "instrument": "TOM",
+    "style": "chiptune",
     "masterVolume": 1,
     "vco1": {
       "gain": 1,
@@ -2839,6 +2917,8 @@
     "bypassFilter": true
   },
   "CHIP_HAT": {
+    "instrument": "CHH",
+    "style": "chiptune",
     "masterVolume": 0.7,
     "vco1": {
       "gain": 0,
@@ -2911,6 +2991,8 @@
     "bypassFilter": true
   },
   "DUB_SIREN": {
+    "instrument": "SYNTHEFFECT",
+    "style": "dub",
     "masterVolume": 0.55,
     "vco1": {
       "gain": 0.7,
@@ -2982,6 +3064,8 @@
     }
   },
   "DUB_MELODICA": {
+    "instrument": "REED",
+    "style": "dub",
     "masterVolume": 0.7,
     "vco1": {
       "gain": 0.55,
@@ -3053,6 +3137,8 @@
     }
   },
   "DUB_SKANK": {
+    "instrument": "ORGAN",
+    "style": "dub",
     "masterVolume": 0.75,
     "vco1": {
       "gain": 0.6,
