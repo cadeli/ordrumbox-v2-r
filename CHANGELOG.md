@@ -3,6 +3,12 @@
 ## Unreleased
 
 ### New
+- **Sample editing**: the start, the end, the loop's points and the end of the decay are
+  dragged on the waveform (kit editor and Sound tab), and land on the nearest zero crossing.
+- **Loop in / Loop out**: a loop of its own inside the sample's region; the sound plays its
+  way in (its attack once), then loops. Kept in `kits.json` (`loopStart`, `loopEnd`, ms).
+
+### New
 - **Grid lane**: a **PITCH** tab, a bubble with the value being painted or under the pointer, and a
   right-click menu to reset a step's notes, or all the track's, to the setting's default. Drag the
   lane's top edge to set its height (the menu's **Automatic height** undoes it).

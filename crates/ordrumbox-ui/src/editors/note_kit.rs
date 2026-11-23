@@ -2,7 +2,7 @@
 
 use super::tables::DEFAULT_ATTACK;
 use super::tables::{
-    KIT_KNOBS, NOTE_GROUPS, NOTE_KNOBS, NOTE_TABS, NoteRow, SHAPE_KNOBS, SHAPE_RANGES, SHAPE_SWITCHES,
+    KIT_KNOBS, NOTE_GROUPS, NOTE_KNOBS, NOTE_TABS, NoteRow, SHAPE_KNOBS, SHAPE_RANGES, SHAPE_SLOTS, SHAPE_SWITCHES,
 };
 use super::values::EditorState;
 use super::{KitControls, NoteView, Shape};
@@ -92,6 +92,9 @@ pub fn note_strip_height(scale: Scale) -> i32 {
 }
 
 /// The kit editor's selects and knobs at `area`; the y under them.
+/// Knobs in a row of the kit editor.
+const KIT_KNOB_SLOTS: usize = 5;
+
 pub fn kit_controls(view: &KitControls, area: Rect, scale: Scale) -> (Vec<Item>, i32) {
     let s = scale;
     let mut rows = Rows { x: area.x, w: area.w, y: area.y, scale: s, items: Vec::new() };
@@ -113,9 +116,11 @@ pub fn kit_controls(view: &KitControls, area: Rect, scale: Scale) -> (Vec<Item>,
             }
             (Id::KitKnob(*field), spec, value, p.label, p.format.value(value, unit), false)
         })
+        .chain(shape_knobs(&view.shape, Id::KitKnob))
         .collect();
-    rows.knob_bar(knobs, 4);
-    shape_controls(&mut rows, &view.shape, (Id::KitKnob, Id::KitToggle));
+    // The kit editor is wider than the track editor: its knobs go five a row.
+    knob_rows(&mut rows, knobs, KIT_KNOB_SLOTS);
+    shape_switches(&mut rows, &view.shape, Id::KitToggle);
     let bottom = rows.y;
     (rows.items, bottom)
 }
@@ -123,27 +128,51 @@ pub fn kit_controls(view: &KitControls, area: Rect, scale: Scale) -> (Vec<Item>,
 /// The id of a playback control, by its field.
 pub(super) type IdOf = fn(Field) -> Id;
 
-/// The playback controls of a sample (start, end, attack, hold, and the
-/// reverse and loop switches), whose ids the editor gives: the kit editor's
-/// and the track editor's act on the same settings, each on its sample.
-pub(super) fn shape_controls(rows: &mut Rows, shape: &Shape, (knob_id, toggle_id): (IdOf, IdOf)) {
-    let s = rows.scale;
-    // The length of the sample is the range of the start and the end; without
-    // one (a synth track) the knobs keep their place, at nothing.
+/// A knob of the knob bars: its id, range, value, label, text, and whether an LFO moves it.
+type Knob<'a> = (Id, Spec, f64, &'a str, String, bool);
+
+/// The playback knobs of a sample (start, end, attack, hold, the loop's
+/// points), whose ids `knob_id` gives.
+fn shape_knobs(shape: &Shape, knob_id: IdOf) -> Vec<Knob<'static>> {
+    // The length of the sample is the range of the start, the end and the
+    // loop's points; without one (a synth track) the knobs keep their place, at nothing.
     let length = shape.duration_ms.max(1.0);
-    let knobs = SHAPE_KNOBS
+    SHAPE_KNOBS
         .iter()
         .map(|&(field, label, step)| {
             let (value, spec) = match field {
                 Field::Start => (shape.start_ms, Spec::knob(0.0, length, step, 0.0)),
                 Field::End => (shape.end_ms, Spec::knob(0.0, length, step, length)),
+                Field::LoopStart => (shape.loop_start_ms, Spec::knob(0.0, length, step, 0.0)),
+                Field::LoopEnd => (shape.loop_end_ms, Spec::knob(0.0, length, step, length)),
                 Field::Attack => (shape.attack_ms, Spec::knob(0.0, SHAPE_RANGES.0, step, DEFAULT_ATTACK)),
                 _ => (shape.hold_ms, Spec::knob(0.0, SHAPE_RANGES.1, step, 0.0)),
             };
             (knob_id(field), spec, value, label, Format::Millis.value(value, ""), false)
         })
-        .collect();
-    rows.knob_bar(knobs, 4);
+        .collect()
+}
+
+/// `knobs` in rows of `slots`.
+fn knob_rows(rows: &mut Rows, knobs: Vec<Knob<'_>>, slots: usize) {
+    let mut knobs = knobs.into_iter().peekable();
+    while knobs.peek().is_some() {
+        rows.knob_bar(knobs.by_ref().take(slots).collect(), slots as i32);
+    }
+}
+
+/// The playback controls of a sample (start, end, attack, hold, the loop's
+/// points, and the reverse, loop and gate switches), whose ids the editor
+/// gives: the kit editor's and the track editor's act on the same settings,
+/// each on its sample.
+pub(super) fn shape_controls(rows: &mut Rows, shape: &Shape, (knob_id, toggle_id): (IdOf, IdOf)) {
+    knob_rows(rows, shape_knobs(shape, knob_id), SHAPE_SLOTS);
+    shape_switches(rows, shape, toggle_id);
+}
+
+/// The reverse, loop and gate switches of a sample, one a row.
+fn shape_switches(rows: &mut Rows, shape: &Shape, toggle_id: IdOf) {
+    let s = rows.scale;
     for (field, label) in SHAPE_SWITCHES {
         let on = match field {
             Field::Reverse => shape.reverse,

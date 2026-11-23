@@ -22,6 +22,35 @@ impl SampleBuffer {
         self.right.is_some()
     }
 
+    /// The duration, seconds (0 at a rate of 0).
+    #[must_use]
+    pub fn seconds(&self) -> f64 {
+        if self.sample_rate == 0 { 0.0 } else { self.frames() as f64 / f64::from(self.sample_rate) }
+    }
+
+    /// The zero crossing nearest to `seconds`, within `window` seconds either
+    /// side, in seconds: the frame where the signal (both channels summed)
+    /// changes sign or is 0. `seconds` itself when there is none in reach, so
+    /// that a point set there does not click as little as it can.
+    #[must_use]
+    pub fn nearest_zero_crossing(&self, seconds: f64, window: f64) -> f64 {
+        let rate = f64::from(self.sample_rate);
+        if rate <= 0.0 || self.frames() < 2 || !seconds.is_finite() {
+            return seconds;
+        }
+        let level = |i: usize| self.left[i] + self.right.as_ref().map_or(0.0, |r| r.get(i).copied().unwrap_or(0.0));
+        let last = self.frames() - 1;
+        // Whole frames, within the buffer: the casts only drop fractions.
+        let center = (seconds * rate).round().clamp(0.0, last as f64) as usize;
+        let reach = (window.max(0.0) * rate).round() as usize;
+        let crosses = |i: usize| i >= 1 && (level(i) == 0.0 || (level(i - 1) < 0.0) != (level(i) < 0.0));
+        (0..=reach)
+            .flat_map(|d| [center.checked_sub(d), center.checked_add(d).filter(|&i| i <= last)])
+            .flatten()
+            .find(|&i| crosses(i))
+            .map_or(seconds, |i| i as f64 / rate)
+    }
+
     /// Value at a fractional frame position, 4-point cubic (Catmull-Rom)
     /// interpolation; silence outside the buffer.
     #[inline]
@@ -43,6 +72,20 @@ impl SampleBuffer {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_nearest_zero_crossing_is_found_within_reach() {
+        // Positive up to frame 9, negative from 10 on, at 1000 frames a second.
+        let samples: Vec<f32> = (0..30).map(|i| if i < 10 { 0.5 } else { -0.5 }).collect();
+        let buffer = SampleBuffer::mono(samples, 1000);
+        assert_eq!(buffer.nearest_zero_crossing(0.012, 0.005), 0.010, "two frames before");
+        assert_eq!(buffer.nearest_zero_crossing(0.020, 0.005), 0.020, "none in reach: where it was");
+        assert_eq!(buffer.nearest_zero_crossing(0.5, 0.005), 0.5, "past the end: where it was");
+        assert_eq!(buffer.seconds(), 0.03);
+        // A silent frame counts as a crossing.
+        let buffer = SampleBuffer::mono(vec![0.3, 0.3, 0.0, 0.3, 0.3], 1000);
+        assert_eq!(buffer.nearest_zero_crossing(0.003, 0.002), 0.002);
+    }
 
     #[test]
     fn cubic_read_hits_the_samples_and_stays_smooth() {

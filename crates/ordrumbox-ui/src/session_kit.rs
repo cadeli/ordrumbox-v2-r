@@ -33,6 +33,8 @@ pub(super) struct KitEditor {
     pub(super) files: (String, Option<PathBuf>),
     /// How the table of samples is scrolled.
     pub(super) list: super::session_kit_list::KitList,
+    /// A handle of a sample's waveform held by the mouse (`session_wave_drag.rs`).
+    pub(super) wave_drag: Option<super::session_wave_drag::WaveDrag>,
 }
 
 impl KitEditor {

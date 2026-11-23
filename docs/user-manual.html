@@ -561,9 +561,9 @@ loops, and the level curve (attack, hold, decay). A synth track keeps the place 
 <tr><td><strong>Decay</strong></td><td>20–5000 ms (default 500)</td><td>The sample's decay: how long it sounds after the attack.</td></tr>
 </table>
 <p>The <strong>Sound</strong> tab has the same playback controls as the kit editor, on the track's sample: the
-<strong>Start</strong>, <strong>End</strong>, <strong>Attack</strong> and <strong>Hold</strong> knobs and the
-<strong>Reverse</strong>, <strong>Loop</strong> and <strong>Gate</strong> switches (see the kit editor). They are the sample's, so every track that
-plays it follows them.</p>
+<strong>Start</strong>, <strong>End</strong>, <strong>Attack</strong>, <strong>Hold</strong>, <strong>Loop in</strong> and
+<strong>Loop out</strong> knobs, the <strong>Reverse</strong>, <strong>Loop</strong> and <strong>Gate</strong> switches, and the handles of the
+waveform at the top (see the kit editor). They are the sample's, so every track that plays it follows them.</p>
 
 <h3>FX tab</h3>
 <p>The six effects one under the other, each a cartridge: its LED and its name on the left (the LED switches it on
@@ -1025,9 +1025,11 @@ Kits are saved to <code>kits.json</code>; new sample audio to <code>samples/</co
 <tr><td>Attack</td><td>0–500 ms (default 5)</td><td>The rise to full level.</td></tr>
 <tr><td>Hold</td><td>0–2000 ms</td><td>Time kept at full level before the decay starts.</td></tr>
 <tr><td>Reverse</td><td>on / off</td><td>Plays the region from its end to its start.</td></tr>
-<tr><td>Loop</td><td>on / off</td><td>Plays the region between Start and End over and over, until the decay ends the sound.</td></tr>
+<tr><td>Loop in, Loop out</td><td>within Start – End</td><td>The loop's points (lines on the waveform while Loop is on): the sound plays from Start into the loop, then loops it, so its attack is heard once. By default the whole region loops.</td></tr>
+<tr><td>Loop</td><td>on / off</td><td>Plays the loop (Loop in to Loop out) over and over, until the decay ends the sound.</td></tr>
 <tr><td>Gate</td><td>on / off</td><td>Holds the sound at full level for the note's length, then lets it decay: the decay becomes the release. With Loop, a note lasts as long as it is written. Only in a pattern (the audition has no note).</td></tr>
 <tr><td>Pitch … File</td><td></td><td>Detected pitch, length, peak and RMS levels, the instrument its name suggests, its full path; the envelope under them.</td></tr>
+<tr><td>Waveform handles</td><td></td><td>On the waveform (here and in the track editor's Sound tab), drag the line of the start, the end, a loop point (while Loop is on) or the end of the decay: the pointer turns to a sideways arrow over one. The start, the end and the loop's points land on the nearest zero crossing (within 3 ms), so that they do not click.</td></tr>
 </table>
 <table>
 <tr><th>Key / action</th><th>What it does</th></tr>

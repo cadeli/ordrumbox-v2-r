@@ -64,6 +64,8 @@ pub fn help(id: Id) -> Option<Help> {
             Field::Decay => ["Decay", "how long the sample rings, in ms"],
             Field::Start => ["Start", "where playback starts in the sample, in ms"],
             Field::End => ["End", "where playback ends in the sample, in ms"],
+            Field::LoopStart => ["Loop in", "where the loop starts, in ms: the sound plays its way in, then loops"],
+            Field::LoopEnd => ["Loop out", "where the loop ends, in ms"],
             Field::Attack => ["Attack", "the time the sound takes to reach its level, in ms"],
             Field::Hold => ["Hold", "the time the sound stays at its level before it decays, in ms"],
             Field::Reverse => ["Reverse", "play the sample backwards, from its end to its start"],
@@ -71,7 +73,7 @@ pub fn help(id: Id) -> Option<Help> {
                 "Gate",
                 "hold the sound for the note's length, then let it decay: with a loop, a note lasts as long as it is written",
             ],
-            Field::Loop => ["Loop", "play between start and end over and over, until the decay ends it"],
+            Field::Loop => ["Loop", "play between loop in and loop out over and over, until the decay ends it"],
         },
         Id::KitKit => ["Move to kit", "the selected sample, moved into another kit"],
         Id::KitSampleInstrument(_) => {

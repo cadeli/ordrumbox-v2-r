@@ -39,6 +39,9 @@ pub enum Field {
     /// Where reading starts and ends, ms into the sample.
     Start,
     End,
+    /// Where the loop starts and ends, ms into the sample.
+    LoopStart,
+    LoopEnd,
     Attack,
     Hold,
     /// On / off, set to 1 or 0.
@@ -189,7 +192,7 @@ impl KitSet {
         self.kits.iter().enumerate().find_map(|(k, kit)| Some((k, kit.samples.iter().position(|i| i.path == url)?)))
     }
 
-    /// Set gain (dB), tune (semitones), decay, start, end, attack or hold (ms)
+    /// Set gain (dB), tune (semitones), decay, start, end, loop start, loop end, attack or hold (ms)
     /// of a sample, from a knob, or its reverse or loop switch (1 or 0); the
     /// message when it changed.
     pub fn set_value(&mut self, kit: usize, sample: usize, field: Field, value: f64) -> Option<String> {
@@ -215,6 +218,14 @@ impl KitSet {
             Field::End if Some(value) != instrument.end => {
                 instrument.end = Some(value);
                 Some(format!("{name}: end {value} ms"))
+            }
+            Field::LoopStart if Some(value) != instrument.loop_start => {
+                instrument.loop_start = Some(value);
+                Some(format!("{name}: loop start {value} ms"))
+            }
+            Field::LoopEnd if Some(value) != instrument.loop_end => {
+                instrument.loop_end = Some(value);
+                Some(format!("{name}: loop end {value} ms"))
             }
             Field::Attack if Some(value) != instrument.attack => {
                 instrument.attack = Some(value);

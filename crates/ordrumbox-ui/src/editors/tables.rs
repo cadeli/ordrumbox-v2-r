@@ -468,14 +468,19 @@ pub const KIT_KNOBS: [(Field, Prop, &str, f64); 3] = [
     (Field::Decay, prop("decay", "Decay", DECAY_RANGE.0, DECAY_RANGE.1, 10.0, Format::Millis), "", DEFAULT_DECAY),
 ];
 
-/// The playback knobs of a sample, in a row of four: field, label, step, default (the
-/// end's is the sample's length, the range of the start and the end too).
-pub const SHAPE_KNOBS: [(Field, &str, f64); 4] = [
+/// The playback knobs of a sample, in rows of [`SHAPE_SLOTS`]: field, label, step (the
+/// sample's length is the range of the start, the end and the loop's points).
+pub const SHAPE_KNOBS: [(Field, &str, f64); 6] = [
     (Field::Start, "Start", 1.0),
     (Field::End, "End", 1.0),
     (Field::Attack, "Attack", 1.0),
     (Field::Hold, "Hold", 5.0),
+    (Field::LoopStart, "Loop in", 1.0),
+    (Field::LoopEnd, "Loop out", 1.0),
 ];
+
+/// Knobs in a row of the playback knobs.
+pub const SHAPE_SLOTS: usize = 4;
 
 /// The longest a knob sets the attack and the hold, ms.
 pub const SHAPE_RANGES: (f64, f64) = (ATTACK_RANGE.1, HOLD_RANGE.1);

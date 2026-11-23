@@ -38,6 +38,10 @@ pub struct KitSample {
     pub reverse: bool,
     /// Read the region over and over until the decay ends it (`loop`).
     pub looping: bool,
+    /// Where the loop starts and ends, ms into the sample, when the kit sets
+    /// them (`loopStart`, `loopEnd`): else the region's start and end.
+    pub loop_start: Option<f64>,
+    pub loop_end: Option<f64>,
     /// Attack, ms, when the kit sets one (see [`KitSample::attack_ms`]).
     pub attack: Option<f64>,
     /// Time kept at the peak before the decay, ms.
@@ -70,6 +74,8 @@ impl KitSample {
             end: self.end.map(|end| (end / 1000.0) as f32),
             reverse: self.reverse,
             looping: self.looping,
+            loop_start: self.loop_start.map(|ms| (ms / 1000.0) as f32),
+            loop_end: self.loop_end.map(|ms| (ms / 1000.0) as f32),
             attack: (self.attack_ms() / 1000.0) as f32,
             hold: (self.hold / 1000.0) as f32,
             gated: self.gated,
@@ -103,6 +109,8 @@ impl KitSample {
             end: number(&["end"]),
             reverse: flag("reverse"),
             looping: flag("loop"),
+            loop_start: number(&["loopStart"]),
+            loop_end: number(&["loopEnd"]),
             attack: number(&["attack"]),
             hold: number(&["hold"]).unwrap_or(0.0),
             gated: flag("gate"),
@@ -156,6 +164,12 @@ impl KitSample {
         if self.looping {
             o.insert("loop", Value::Bool(true));
         }
+        if let Some(start) = self.loop_start {
+            o.insert("loopStart", Value::Number(start));
+        }
+        if let Some(end) = self.loop_end {
+            o.insert("loopEnd", Value::Number(end));
+        }
         if let Some(attack) = self.attack {
             o.insert("attack", Value::Number(attack));
         }
@@ -186,7 +200,7 @@ impl KitSample {
 }
 
 /// `display_name`, `url`, `tune`: the keys of the JS app's drumkits.json and older saves.
-const KNOWN_KEYS: [&str; 18] = [
+const KNOWN_KEYS: [&str; 20] = [
     "key",
     "displayName",
     "display_name",
@@ -197,6 +211,8 @@ const KNOWN_KEYS: [&str; 18] = [
     "end",
     "reverse",
     "loop",
+    "loopStart",
+    "loopEnd",
     "attack",
     "hold",
     "gate",
@@ -477,6 +493,8 @@ mod tests {
             end: Some(300.0),
             reverse: true,
             looping: true,
+            loop_start: Some(100.0),
+            loop_end: Some(250.0),
             attack: Some(1.0),
             hold: 50.0,
             gated: true,
@@ -487,6 +505,7 @@ mod tests {
         let shape = back.shape();
         assert_eq!((shape.start, shape.end, shape.attack, shape.hold), (0.02, Some(0.3), 0.001, 0.05));
         assert!(shape.reverse && shape.looping);
+        assert_eq!((shape.loop_start, shape.loop_end), (Some(0.1), Some(0.25)));
         assert!(back.extra.get("loop").is_none(), "known keys are not kept as extra ones");
     }
 }

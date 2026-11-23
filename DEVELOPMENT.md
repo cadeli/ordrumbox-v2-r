@@ -450,3 +450,12 @@ loaded, `Session::follow_kit` plays the library's kit (once per library revision
 plays the kit of its host's parameter (`host_select_kit` keeps nothing). The project's name and description are undo
 steps too (`set_library_info`, `Change::Info`; `setProjectInfo` one step for both). Deleting a synth preset, already
 an undo step, no longer asks first. A file without `kit` keeps the kit in use: no snapshot changed.
+
+A sample's loop has points of its own (`SampleShape::loop_start`, `loop_end`; `loopStart`, `loopEnd` in `kits.json`,
+ms): the voice plays from the region's start (its end, reversed) into the loop, then wraps at the loop's edge ahead
+(`SampleVoice`: the stop bounds are the loop's edge ahead and the region's edge behind, so the test per frame is the
+same; `LoopSpan` wraps and crossfades). Without them the loop is the region, as before: no snapshot changed, the
+voice's output bit-identical and its speed the same in release (5.1 ns a looping frame). The waveform's handles
+(`session_wave_drag.rs`, `sample_overlay::Handle`) drag the start, the end, the loop's points and the end of the
+decay; the points snap to the nearest zero crossing within 3 ms (`SampleBuffer::nearest_zero_crossing`). The kit
+editor lays its nine knobs five a row (the track editor four), so that the waveform keeps its room.

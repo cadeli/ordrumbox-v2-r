@@ -33,7 +33,7 @@ impl Session {
         if self.song_panel.lane_resize.is_some() || self.chrome.lane_resize.is_some() {
             return PointerShape::ResizeVertical;
         }
-        if self.roll.length_drag.is_some() {
+        if self.roll.length_drag.is_some() || self.is_wave_dragging() {
             return PointerShape::ResizeHorizontal;
         }
         if self.roll.drag.is_some() {
@@ -45,6 +45,9 @@ impl Session {
         // A menu, a list or an overlay over the views: their bars are not under it.
         if self.popup_open() || self.open_menu().is_some() || self.overlay_open() {
             return PointerShape::Arrow;
+        }
+        if self.is_over_wave_handle(size, x, y) {
+            return PointerShape::ResizeHorizontal;
         }
         if self.song_view_open() {
             return self.song_pointer_shape(size, x, y);

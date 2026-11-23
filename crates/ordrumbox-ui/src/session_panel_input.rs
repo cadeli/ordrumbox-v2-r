@@ -39,6 +39,9 @@ impl Session {
             }
             return true;
         }
+        if button == Button::Left && self.press_wave_handle(size, x, y) {
+            return true;
+        }
         let layout = self.panel_layout(width, height, scale);
         let Some(item) = panel::hit(&layout.items, x, y).cloned() else {
             self.chrome.widgets.focus = None;
@@ -168,6 +171,9 @@ impl Session {
         }
         if self.roll.dragging() {
             return self.roll_drag_move(x, y);
+        }
+        if self.is_wave_dragging() {
+            return self.wave_drag_move(x);
         }
         if self.roll.bar_drag.is_some() {
             return self.roll_bar_to(size, x);
@@ -359,6 +365,7 @@ impl Session {
         self.chrome.lane_resize = None;
         self.release_grid_bar();
         self.roll_release();
+        self.release_wave_handle();
     }
 
     /// The right-click menu of a knob or a slider: type a value, its

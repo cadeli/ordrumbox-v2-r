@@ -108,6 +108,8 @@ mod session_stems;
 mod session_tempo;
 #[path = "session_toast.rs"]
 mod session_toast;
+#[path = "session_wave_drag.rs"]
+mod session_wave_drag;
 #[path = "session_workspace.rs"]
 mod session_workspace;
 #[path = "session_zone.rs"]

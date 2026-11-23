@@ -34,6 +34,11 @@ pub struct SampleShape {
     pub reverse: bool,
     /// Read the region over and over, until the decay ends the voice.
     pub looping: bool,
+    /// Where the loop starts and ends, seconds into the sample, within the
+    /// region; `None`: the region's own start or end. The voice plays from
+    /// the region's start (its end, reversed) into the loop, then loops it.
+    pub loop_start: Option<f32>,
+    pub loop_end: Option<f32>,
     /// Linear rise to the peak, seconds.
     pub attack: f32,
     /// Time kept at the peak before the decay, seconds.
@@ -44,7 +49,17 @@ pub struct SampleShape {
 
 impl Default for SampleShape {
     fn default() -> Self {
-        Self { start: 0.0, end: None, reverse: false, looping: false, attack: ATTACK_SECONDS, hold: 0.0, gated: false }
+        Self {
+            start: 0.0,
+            end: None,
+            reverse: false,
+            looping: false,
+            loop_start: None,
+            loop_end: None,
+            attack: ATTACK_SECONDS,
+            hold: 0.0,
+            gated: false,
+        }
     }
 }
 
@@ -88,9 +103,14 @@ pub struct SampleVoice {
     position: f64,
     /// Sample frames advanced per output frame (negative when reversed).
     step: f64,
-    /// The region read, `[low, high)`, in the sample's own frames.
+    /// Where the voice stops (or loops) on its way, in the sample's own
+    /// frames: below `low` or at `high`. Looping, the loop's edge ahead and
+    /// the region's edge behind (which a voice never crosses going away from it).
     low: f64,
     high: f64,
+    /// The loop, `[loop_low, loop_high)`, inside the region.
+    loop_low: f64,
+    loop_high: f64,
     looping: bool,
     /// Frames of the loop's crossfade (0: none).
     fade: f64,
@@ -120,6 +140,8 @@ impl Default for SampleVoice {
             step: 1.0,
             low: 0.0,
             high: 0.0,
+            loop_low: 0.0,
+            loop_high: 0.0,
             looping: false,
             fade: 0.0,
             gain: 0.0,
@@ -187,6 +209,15 @@ impl SampleVoice {
         let low = (f64::from(shape.start.max(0.0)) * per_second).min(frames - 1.0).floor();
         let high = shape.end.map_or(frames, |end| (f64::from(end) * per_second).min(frames).ceil()).max(low + 1.0);
         let step = params.ratio * per_second / f64::from(sample_rate);
+        let frame_of = |seconds: Option<f32>| seconds.map(|s| f64::from(s.max(0.0)) * per_second);
+        let loop_low = frame_of(shape.loop_start).map_or(low, |f| f.floor().clamp(low, high - 1.0));
+        let loop_high = frame_of(shape.loop_end).map_or(high, |f| f.ceil().clamp(loop_low + 1.0, high));
+        // Looping, the voice wraps at the loop's edge ahead of it.
+        let (stop_low, stop_high) = match (shape.looping, shape.reverse) {
+            (false, _) => (low, high),
+            (true, false) => (low, loop_high),
+            (true, true) => (loop_low, high),
+        };
         let decay_frames = (params.decay.max(MIN_DECAY_SECONDS) * sample_rate).round().max(1.0) as u32;
         *self = Self {
             stage: Stage::Attack,
@@ -194,10 +225,12 @@ impl SampleVoice {
             track: params.track,
             position: if shape.reverse { high - 1.0 } else { low },
             step: if shape.reverse { -step } else { step },
-            low,
-            high,
+            low: stop_low,
+            high: stop_high,
+            loop_low,
+            loop_high,
             looping: shape.looping,
-            fade: loop_fade(shape.looping, high - low, per_second),
+            fade: loop_fade(shape.looping, loop_high - loop_low, per_second),
             gain: 0.0,
             peak: params.peak,
             stage_left: attack_frames,
@@ -232,7 +265,8 @@ impl SampleVoice {
         self.delay -= start;
         let right_channel = buffer.right.as_deref().unwrap_or(&buffer.left);
         let [ll, rl, lr, rr] = self.pan;
-        let (low, high, fade) = (self.low, self.high, self.fade);
+        let (low, high) = (self.low, self.high);
+        let span = LoopSpan { low: self.loop_low, high: self.loop_high, fade: self.fade };
 
         let outputs = left[start..frames].iter_mut().zip(&mut right[start..frames]);
         for (out_l, out_r) in outputs {
@@ -244,24 +278,13 @@ impl SampleVoice {
                     self.stage = Stage::Idle;
                     return;
                 }
-                // The loop restarts `fade` frames in: its first frames were already heard in the crossfade.
-                self.position = if self.step > 0.0 {
-                    low + fade + (self.position - low - fade).rem_euclid(high - low - fade)
-                } else {
-                    high - fade - (high - fade - self.position).rem_euclid(high - low - fade)
-                };
+                self.position = span.wrap(self.position, self.step > 0.0);
             }
             let (mut in_l, mut in_r) =
                 (SampleBuffer::read(&buffer.left, self.position), SampleBuffer::read(right_channel, self.position));
-            if fade > 0.0 {
-                // Near the edge the voice is heading to, the loop's other end fades in.
-                let distance = if self.step > 0.0 { high - self.position } else { self.position - low };
-                if distance < fade {
-                    let mix = (1.0 - distance / fade) as f32;
-                    let partner = if self.step > 0.0 { low + fade - distance } else { high - fade + distance };
-                    in_l += (SampleBuffer::read(&buffer.left, partner) - in_l) * mix;
-                    in_r += (SampleBuffer::read(right_channel, partner) - in_r) * mix;
-                }
+            if let Some((partner, mix)) = span.crossfade(self.position, self.step > 0.0) {
+                in_l += (SampleBuffer::read(&buffer.left, partner) - in_l) * mix;
+                in_r += (SampleBuffer::read(right_channel, partner) - in_r) * mix;
             }
             let (in_l, in_r) = (in_l * self.gain, in_r * self.gain);
             *out_l += ll * in_l + rl * in_r;
@@ -295,6 +318,44 @@ impl SampleVoice {
                 _ => self.stage = Stage::Idle,
             }
         }
+    }
+}
+
+/// The loop a voice plays, in the sample's own frames: `[low, high)`, and
+/// the frames its two ends overlap (0: none).
+#[derive(Debug, Clone, Copy)]
+struct LoopSpan {
+    low: f64,
+    high: f64,
+    fade: f64,
+}
+
+impl LoopSpan {
+    /// Where a voice past the loop's edge goes on, `forward` or not: back
+    /// into it, `fade` frames in, as its first frames were already heard in the crossfade.
+    #[inline]
+    fn wrap(self, position: f64, forward: bool) -> f64 {
+        let length = self.high - self.low - self.fade;
+        if forward {
+            self.low + self.fade + (position - self.low - self.fade).rem_euclid(length)
+        } else {
+            self.high - self.fade - (self.high - self.fade - position).rem_euclid(length)
+        }
+    }
+
+    /// Near the edge the voice is heading to, the loop's other end fading
+    /// in: where to read it, and how much of it.
+    #[inline]
+    fn crossfade(self, position: f64, forward: bool) -> Option<(f64, f32)> {
+        if self.fade <= 0.0 {
+            return None;
+        }
+        let distance = if forward { self.high - position } else { position - self.low };
+        if distance >= self.fade {
+            return None;
+        }
+        let partner = if forward { self.low + self.fade - distance } else { self.high - self.fade + distance };
+        Some((partner, (1.0 - distance / self.fade) as f32))
     }
 }
 
@@ -425,6 +486,52 @@ mod tests {
         let (l, _) = render(&mut voice, &buffer, 5000);
         assert!(l[500] > 0.0 && l[900] > 0.0, "still playing long after the 10 frames");
         assert!(l[4900] > 0.0 && voice.is_active(), "the 10 s decay is far from over");
+    }
+
+    /// Where a voice of `shape` reads, frame by frame, over `frames` frames
+    /// of a 100-frame sample: a ramp's level over a flat one's.
+    fn read_positions(shape: SampleShape, frames: usize) -> Vec<f32> {
+        let (ramp, flat) = (ramp(100), ones(100));
+        let (mut a, mut b) = (SampleVoice::default(), SampleVoice::default());
+        a.start(&shaped(shape), &ramp, RATE, 1);
+        b.start(&shaped(shape), &flat, RATE, 1);
+        let (l, _) = render(&mut a, &ramp, frames);
+        let (gain, _) = render(&mut b, &flat, frames);
+        l.iter().zip(&gain).map(|(v, g)| if *g > 0.0 { v / g } else { -1.0 }).collect()
+    }
+
+    #[test]
+    fn a_loop_inside_the_region_plays_its_way_in_then_loops() {
+        let (loop_start, loop_end) = (Some(0.06), Some(0.08));
+        let shape = SampleShape { looping: true, loop_start, loop_end, ..SampleShape::default() };
+        let read = read_positions(shape, 600);
+        assert!((read[10] - 10.0).abs() < 1e-3 && (read[50] - 50.0).abs() < 1e-3, "from the start: {read:?}");
+        let looped = &read[100..];
+        assert!(looped.iter().all(|&p| (60.0..80.0).contains(&p)), "then frames 60 to 80 only");
+        // Backwards: from the region's end down into the loop, then the loop.
+        let read = read_positions(SampleShape { reverse: true, ..shape }, 600);
+        assert!((read[5] - 94.0).abs() < 1e-3, "from the end: {}", read[5]);
+        assert!(read[100..].iter().all(|&p| (60.0..80.0).contains(&p)));
+        // Without loop points, the whole region loops, as before.
+        let whole = read_positions(SampleShape { looping: true, ..SampleShape::default() }, 600);
+        assert!(whole[150..].iter().any(|&p| p < 20.0) && whole[150..].iter().any(|&p| p > 80.0));
+    }
+
+    #[test]
+    fn loop_points_are_kept_inside_the_region() {
+        // A loop end past the region's end, a loop start before its start.
+        let shape = SampleShape {
+            start: 0.02,
+            end: Some(0.05),
+            looping: true,
+            loop_start: Some(0.0),
+            loop_end: Some(0.09),
+            ..SampleShape::default()
+        };
+        let read = read_positions(shape, 400);
+        let outside: Vec<_> =
+            read.iter().enumerate().skip(1).filter(|(_, p)| !(20.0..50.0).contains(*p)).take(5).collect();
+        assert!(outside.is_empty(), "within frames 20 to 50: {outside:?}");
     }
 
     #[test]
