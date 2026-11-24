@@ -47,12 +47,25 @@ figcaption { color: var(--muted); font-size: .9em; margin-top: .4em; }
 <main>
 
 <h1>orDrumbox User Manual</h1>
-<p class="subtitle">Native version: the program (Windows <code>ordrumbox.exe</code>, also runs on macOS) and the CLAP / VST3 plugin — version 0.1.2</p>
+<p class="subtitle">Native version: the program (Windows <code>ordrumbox.exe</code>, also runs on macOS) and the CLAP / VST3 plugin — version 0.1.3</p>
 
 <div class="note">
 This manual describes the native orDrumbox: one program with a menu bar and one window, and the same
 window as an instrument plugin in a DAW (<a href="#plugin">section 19</a>). The web version (orDrumbox-v2)
 is a demo of it and does less: files here are saved on disk, not in the browser.
+</div>
+
+<div class="note">
+<strong>New in 0.1.3</strong>
+<ul>
+  <li>The <a href="#output">Mixer</a> (<kbd>F12</kbd>): a strip per track with echo and reverb sends, a tape echo, a spring reverb and the master bus.</li>
+  <li><a href="#song">Song</a> automation lanes, drawn or recorded, and a song loop on the ruler (<kbd>Ctrl</kbd>+<kbd>L</kbd>).</li>
+  <li>New kits rendered by the synth: 808, 909, 606, CR-78, Simmons, latin, trap, minimal, vintage 60s, punch.</li>
+  <li>Sample editing on the waveform (start, end, decay, an inner loop) and choke groups in the <a href="#track-editor">track editor</a>.</li>
+  <li>Zones in the <a href="#piano-roll">piano roll</a>, <strong>Edit › Humanize...</strong>, the simple view, and the app starts where you left off.</li>
+  <li>A song file is now a <a href="#files">project</a>; patterns are listed by genre; scroll bars with zoom in the grid and the piano roll.</li>
+  <li><a href="#synth">Synth</a>: the <strong>rnd</strong> wave of the oscillators reads the track's sample.</li>
+</ul>
 </div>
 
 <div class="toc">
@@ -939,7 +952,7 @@ A knob an LFO moves is purple and follows it. The pills under the cards show the
 <table>
 <tr><th>Card</th><th>Control</th><th>Range</th><th>What it does</th></tr>
 <tr><td><strong>Scope</strong></td><td>—</td><td></td><td>Four cycles of the oscillators, with FM, sub and drive.</td></tr>
-<tr><td rowspan="5"><strong>VCO1</strong>, <strong>VCO2</strong>, <strong>VCO3</strong></td><td>wave</td><td>sin, tri, saw, sqr, rnd</td><td>Waveform.</td></tr>
+<tr><td rowspan="5"><strong>VCO1</strong>, <strong>VCO2</strong>, <strong>VCO3</strong></td><td>wave</td><td>sin, tri, saw, sqr, rnd</td><td>Waveform. <strong>rnd</strong> holds one value a cycle, read in turn from the track's sample (the one it names, else its instrument's in the kit in use) from its start at every note; random values when the track has none.</td></tr>
 <tr><td>gain</td><td>0–1</td><td>Level (VCO1 at 1, the others at 0 by default).</td></tr>
 <tr><td>octave</td><td>−4 to +4</td><td>Octave offset.</td></tr>
 <tr><td>detune</td><td>−100 to +100 cents</td><td>Fine tuning.</td></tr>
@@ -1368,7 +1381,7 @@ at start, set <code>"check": false</code> under <code>updates</code> in <code>se
 <h3>About</h3>
 <p><strong>Help › About orDrumbox</strong> shows the build (also in the window title and with <code>ordrumbox --version</code>) and the
 paths in use: the library file, the user data folder (and whether it was chosen in the app), the exports folder and the assets.
-A release is named by its version alone (<code>0.1.2</code>); other builds add <code>dev</code>, the commit and its date.
+A release is named by its version alone (<code>0.1.3</code>); other builds add <code>dev</code>, the commit and its date.
 <strong>Help › User manual...</strong> opens this manual on the web site.</p>
 <h3>Factory reset</h3>
 <p><strong>Help › Factory reset...</strong> moves your files to <code>backups/</code> in the user data folder — <code>library.json</code>,

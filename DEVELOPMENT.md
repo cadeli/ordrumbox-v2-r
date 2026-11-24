@@ -64,7 +64,7 @@ The setup is `installer/ordrumbox.iss`, built by Inno Setup 6 (Windows only), wi
 the version of `Cargo.toml`:
 
 ```sh
-ISCC.exe /DAppVersion=0.1.2 installer\ordrumbox.iss   # dist\ → setup\ordrumbox-v0.1.2-windows-x64-setup.exe
+ISCC.exe /DAppVersion=0.1.3 installer\ordrumbox.iss   # dist\ → setup\ordrumbox-v0.1.3-windows-x64-setup.exe
 ```
 
 It reads `dist\` as CI makes it. Its `AppId` never changes: a new setup updates the
