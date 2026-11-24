@@ -166,7 +166,7 @@ fn in_blocks(preset: &Value, block: usize, frames: usize) -> Vec<f32> {
     let (mut out, mut right) = (vec![0.0; frames], vec![0.0; frames]);
     for from in (0..frames).step_by(block) {
         let to = (from + block).min(frames);
-        voice.render(RATE as f32, from as u64, &mut out[from..to], &mut right[from..to]);
+        voice.render(RATE as f32, from as u64, &[], &mut out[from..to], &mut right[from..to]);
     }
     out
 }
@@ -622,7 +622,7 @@ fn a_drifting_pad_is_not_the_same_on_every_note() {
         let note = SynthNote { ratio: 1.0, velocity: 0.8, pan: 0.0, bpm: 120.0 };
         voice.start(&synth_patch(&preset, note), 0, 0.0, serial);
         let (mut left, mut right) = (vec![0.0f32; 24_000], vec![0.0f32; 24_000]);
-        voice.render(RATE as f32, 0, &mut left, &mut right);
+        voice.render(RATE as f32, 0, &[], &mut left, &mut right);
         left.iter().map(|&s| f64::from(s)).collect::<Vec<f64>>()
     };
     assert!(correlation(&note(1), &note(2)) < 0.999, "two notes are alike");

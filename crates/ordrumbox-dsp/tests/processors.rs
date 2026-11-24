@@ -87,7 +87,7 @@ fn render_synth(case: &SynthCase) -> (Vec<f32>, Vec<f32>) {
     let (mut l, mut r) = (vec![0.0; frames], vec![0.0; frames]);
     for from in (0..frames).step_by(QUANTUM) {
         let to = (from + QUANTUM).min(frames);
-        voice.render(case.sample_rate, from as u64, &mut l[from..to], &mut r[from..to]);
+        voice.render(case.sample_rate, from as u64, &[], &mut l[from..to], &mut r[from..to]);
     }
     (l, r)
 }

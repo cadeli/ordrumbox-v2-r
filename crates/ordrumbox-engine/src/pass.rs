@@ -26,6 +26,8 @@ pub struct SynthStart {
     pub patch: usize,
     /// Seconds until the note is released.
     pub length: f64,
+    /// The sample of the bank the random wave of the oscillators reads.
+    pub sample: Option<usize>,
 }
 
 /// What an event starts.
@@ -310,7 +312,7 @@ fn sound_for(
     let track = &pattern.tracks[note.track];
     let sample = match assigned {
         TrackSound::None => return None,
-        TrackSound::Synth(key) => {
+        TrackSound::Synth { key, sample } => {
             let preset = context.synths.get(key)?;
             let synth_note = SynthNote {
                 ratio: note.playback_ratio(track) * pitch_lfo_ratio(track, lfo_tick),
@@ -323,6 +325,7 @@ fn sound_for(
                 track: strip,
                 patch: patches.len() - 1,
                 length: note_seconds(bpm, track.steps_per_beat) * note.length_steps,
+                sample: *sample,
             }));
         }
         TrackSound::Sample(sample) => *sample,
@@ -765,7 +768,9 @@ mod tests {
 
     #[test]
     fn a_transpose_lfo_moves_a_synth_as_it_moves_a_sample() {
-        for (name, sound) in [("sample", TrackSound::Sample(0)), ("synth", TrackSound::Synth("S".into()))] {
+        for (name, sound) in
+            [("sample", TrackSound::Sample(0)), ("synth", TrackSound::Synth { key: "S".into(), sample: None })]
+        {
             let flat = pitches_with_transpose_lfo("null", sound.clone());
             let up = pitches_with_transpose_lfo(OCTAVE_UP, sound);
             for (flat, up) in flat.iter().zip(&up) {
@@ -776,7 +781,7 @@ mod tests {
 
     #[test]
     fn a_transpose_lfo_changes_the_pitch_from_note_to_note() {
-        for sound in [TrackSound::Sample(0), TrackSound::Synth("S".into())] {
+        for sound in [TrackSound::Sample(0), TrackSound::Synth { key: "S".into(), sample: None }] {
             let pitches = pitches_with_transpose_lfo(SWEEP, sound);
             assert_eq!(pitches.len(), 2);
             assert!((pitches[0] - pitches[1]).abs() > 1e-6, "the LFO has moved between beats 0 and 2: {pitches:?}");

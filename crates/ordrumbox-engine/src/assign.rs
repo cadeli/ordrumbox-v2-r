@@ -26,8 +26,9 @@ pub enum TrackSound {
     None,
     /// A sample of the bank, by index.
     Sample(usize),
-    /// A synth preset, by key.
-    Synth(String),
+    /// A synth preset, by key, and the track's sample, by index: what the
+    /// random wave of its oscillators reads ([`track_sample`]).
+    Synth { key: String, sample: Option<usize> },
 }
 
 fn normalize(name: &str) -> String {
@@ -302,14 +303,41 @@ pub fn assign_track(
     synths: &SynthPresets,
     pick: &mut dyn FnMut(usize) -> usize,
 ) -> TrackSound {
+    match assign_sound(track, bank, kit, synths, pick) {
+        TrackSound::Synth { key, .. } => TrackSound::Synth { key, sample: track_sample(track, bank, kit) },
+        sound => sound,
+    }
+}
+
+/// The sample of `track` when it plays a synth: the one its `samplePath`
+/// names, else the first sample of its instrument in kit `kit`, as the
+/// auto-assignment finds it; `None` when there is none.
+pub fn track_sample(track: &Track, bank: &SampleBank, kit: &str) -> Option<usize> {
+    if !track.auto_assign
+        && let Some(i) = bank.find_path(&track.sample_path)
+    {
+        return Some(i);
+    }
+    // Its own draw: the assignment's picks stay as they were.
+    AutoAssign::new(bank, kit, &mut |_| 0).sample_for(&track.name)
+}
+
+/// What `track` plays, a synth's sample left out.
+fn assign_sound(
+    track: &Track,
+    bank: &SampleBank,
+    kit: &str,
+    synths: &SynthPresets,
+    pick: &mut dyn FnMut(usize) -> usize,
+) -> TrackSound {
     if track.use_synth {
         let key = track.synth_preset.as_deref().filter(|k| synths.get(k).is_some()).map(str::to_owned);
         return match key {
-            Some(key) => TrackSound::Synth(key),
+            Some(key) => synth(key),
             None if synths.is_empty() => TrackSound::None,
             None => {
                 let keys = synths.keys();
-                TrackSound::Synth(keys[pick(keys.len()).min(keys.len() - 1)].to_owned())
+                synth(keys[pick(keys.len()).min(keys.len() - 1)].to_owned())
             }
         };
     }
@@ -327,7 +355,7 @@ pub fn assign_track(
     }
     // A sound the selected kit lacks: the synth preset of its name, before another kit's sample.
     if let Some(key) = synth_named(&track.name, synths, pick) {
-        return TrackSound::Synth(key);
+        return synth(key);
     }
     let sample = AutoAssign::new(bank, kit, pick).sample_for(&track.name);
     let own = sample.filter(|&i| substitute_for(&track.name, &bank.samples[i].sample.key).is_none());
@@ -343,7 +371,12 @@ fn melodic_synth(track: &Track, synths: &SynthPresets, pick: &mut dyn FnMut(usiz
     if !is_melodic(&track.name) {
         return None;
     }
-    synth_for(&track.name, synths, pick).map(TrackSound::Synth)
+    synth_for(&track.name, synths, pick).map(synth)
+}
+
+/// The synth preset `key`, its sample not found yet.
+fn synth(key: String) -> TrackSound {
+    TrackSound::Synth { key, sample: None }
 }
 
 /// Whether a track named `name` plays a melodic instrument of the catalog (a lead, a pad, a piano).
@@ -417,7 +450,7 @@ mod tests {
         let track = |name: &str| Track { name: name.to_owned(), ..Track::default() };
         let mut first = |_: usize| 0;
         let pad = assign_track(&track("Pad"), &bank, "real", &presets, &mut first);
-        assert_eq!(pad, TrackSound::Synth("SYNTHPAD_WARM".into()));
+        assert_eq!(pad, synth("SYNTHPAD_WARM".into()));
         // A percussion track waits for a sample.
         assert_eq!(assign_track(&track("Perc"), &bank, "real", &presets, &mut first), TrackSound::None);
         assert!(is_melodic("Bass") && is_melodic("Bell") && !is_melodic("Kick") && !is_melodic("Loop"));
@@ -441,10 +474,41 @@ mod tests {
         assert_eq!(assign_track(&track("KICK"), &bank, "a", &presets, &mut first), TrackSound::Sample(0));
         assert_eq!(
             assign_track(&track("KICK"), &bank, "c", &presets, &mut first),
-            TrackSound::Synth("KICK_SYNTH".into())
+            TrackSound::Synth { key: "KICK_SYNTH".into(), sample: Some(0) }
         );
         // No preset of its name: the sample of another kit.
         assert_eq!(assign_track(&track("TOM"), &bank, "a", &presets, &mut first), TrackSound::Sample(2));
+    }
+
+    #[test]
+    fn a_synth_track_keeps_its_sample_for_the_random_wave() {
+        let sample = |kit: &str, key: &str| BankSample {
+            kit: kit.to_owned(),
+            sample: crate::kit::KitSample {
+                key: key.to_owned(),
+                path: format!("{kit}/{key}.wav"),
+                ..Default::default()
+            },
+            buffer: ordrumbox_dsp::SampleBuffer::mono(vec![0.0], 44_100).into(),
+        };
+        let bank = SampleBank { samples: vec![sample("a", "KICK"), sample("a", "SNARE"), sample("b", "SNARE")] };
+        let presets = synths(&["BASS_FM"]);
+        let synth_track = |name: &str| Track {
+            name: name.to_owned(),
+            use_synth: true,
+            synth_preset: Some("BASS_FM".into()),
+            ..Track::default()
+        };
+        // Auto-assigned: its instrument in the kit.
+        let auto = assign_track(&synth_track("SNARE"), &bank, "a", &presets, &mut |_| 0);
+        assert_eq!(auto, TrackSound::Synth { key: "BASS_FM".into(), sample: Some(1) });
+        // Its own sample, whatever its name.
+        let own = Track { auto_assign: false, sample_path: "b/SNARE.wav".into(), ..synth_track("KICK") };
+        assert_eq!(track_sample(&own, &bank, "a"), Some(2));
+        // A sample the bank lacks: back to its instrument.
+        let lost = Track { sample_path: "gone.wav".into(), ..own };
+        assert_eq!(track_sample(&lost, &bank, "a"), Some(0));
+        assert_eq!(track_sample(&lost, &bank, ""), None);
     }
 
     #[test]

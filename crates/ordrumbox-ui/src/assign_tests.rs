@@ -61,7 +61,7 @@ fn picked(bank: &SampleBank, synths: &SynthPresets, kit: &str, track: &str, pick
             (shown.to_owned(), substitute_for(&track.name, &sample.key).is_some())
         }
         TrackSound::None => ("-".to_owned(), false),
-        TrackSound::Synth(key) => (format!("synth {key}"), false),
+        TrackSound::Synth { key, .. } => (format!("synth {key}"), false),
     }
 }
 

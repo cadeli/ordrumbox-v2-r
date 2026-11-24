@@ -513,3 +513,11 @@ appear; a shipped sample the user removed before this change comes back once. No
 
 Ctrl+N makes a pattern with a track for each instrument of the kit in use (`Kit::track_names`), the eight usual drum
 tracks when it names none. No snapshot changed.
+
+The random wave (`rnd`) of the synth's oscillators no longer draws pseudo-random values: each cycle holds the next
+frame of the track's sample, looping over it, and reading it from the start at every note (`held_value`,
+`ordrumbox-dsp/src/synth/oscillator.rs`; `SynthVoice::render` takes the frames). The track's sample is the one its
+`samplePath` names, else the first sample of its instrument in the selected kit (`track_sample`,
+`ordrumbox-engine/src/assign.rs`); `TrackSound::Synth` and `SynthStart` carry it.
+With no sample (`ordrumbox-probe`, the DSP tests), it draws the pseudo-random values as before. The LFOs' random wave
+is unchanged. No snapshot changed: none plays an oscillator's random wave through the engine.

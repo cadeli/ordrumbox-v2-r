@@ -65,7 +65,7 @@ impl Session {
                 let wanted = substitute_for(&track.name, &sample.key).filter(|_| track.auto_assign);
                 Sounding::Sample { path: sample.path.clone(), wanted }
             }
-            TrackSound::Synth(key) => Sounding::Synth(Some(key)),
+            TrackSound::Synth { key, .. } => Sounding::Synth(Some(key)),
             TrackSound::None if track.use_synth => Sounding::Synth(track.synth_preset.clone()),
             TrackSound::None if !track.auto_assign && !track.sample_path.is_empty() => {
                 Sounding::Sample { path: track.sample_path.clone(), wanted: None }

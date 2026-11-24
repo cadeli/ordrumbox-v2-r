@@ -9,6 +9,29 @@ use crate::lfo::{self, Wave};
 pub(super) const SINE_TABLE_SIZE: usize = 4096;
 pub(super) type SineTable = [f32; SINE_TABLE_SIZE];
 
+/// What the oscillators read their waves from: the sine table, and the
+/// sample whose frames the random wave steps through, one a cycle.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct WaveTables<'a> {
+    pub sine: &'static SineTable,
+    /// Frames of the sample; empty when there is none.
+    pub source: &'a [f32],
+}
+
+/// The value the random wave holds for its cycle number `cycle`: the frame of
+/// that number of `source`, which loops (a cycle before the first, under
+/// through-zero FM, reads it from its end), or a pseudo-random value when
+/// there is no sample.
+#[inline]
+pub(super) fn held_value(source: &[f32], cycle: f64) -> f64 {
+    if source.is_empty() {
+        return lfo::sample_and_hold(cycle);
+    }
+    // `as` saturates and maps NaN to 0; `get` keeps a rounding at the end in bounds.
+    let index = cycle.rem_euclid(source.len() as f64) as usize;
+    source.get(index).map_or(0.0, |frame| f64::from(*frame))
+}
+
 /// Initial state of the noise generator.
 pub(super) const NOISE_SEED: u32 = 54_321;
 /// Frequency deviation of a full FM amount, as a multiple of the carrier's
@@ -152,19 +175,28 @@ pub(super) fn pulse(phase: f64, dt: f64, width: f64) -> f64 {
 /// are too many cases to give each its own loop, and the wave of a note never
 /// changes, so the branch is always the same one.
 #[inline]
-pub(super) fn oscillator(table: &SineTable, wave: Wave, phase: f64, dt: f64, cycle: f64, width: f64) -> f64 {
+pub(super) fn oscillator(tables: WaveTables, wave: Wave, phase: f64, dt: f64, cycle: f64, width: f64) -> f64 {
     match wave {
-        Wave::Sine => sin_lookup(table, phase),
+        Wave::Sine => sin_lookup(tables.sine, phase),
         Wave::Triangle => triangle(phase),
         Wave::Sawtooth => sawtooth(phase, dt),
         Wave::Square => pulse(phase, dt, width),
-        Wave::Random => lfo::sample_and_hold(cycle),
+        Wave::Random => held_value(tables.source, cycle),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_random_wave_steps_through_the_sample() {
+        let source = [0.5, -0.25, 0.125];
+        let held = |cycle: f64| held_value(&source, cycle);
+        assert_eq!([held(0.0), held(1.0), held(2.0), held(3.0), held(-1.0)], [0.5, -0.25, 0.125, 0.5, 0.125]);
+        assert_eq!(held(f64::NAN), 0.5);
+        assert_eq!(held_value(&[], 7.0), lfo::sample_and_hold(7.0));
+    }
 
     #[test]
     fn sine_table_lookup() {

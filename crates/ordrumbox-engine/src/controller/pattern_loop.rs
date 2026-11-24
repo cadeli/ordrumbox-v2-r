@@ -120,7 +120,7 @@ mod tests {
     fn a_cut_keeps_the_notes_and_the_lfo_values_of_its_ticks() {
         let event = |frame| Event {
             frame,
-            sound: Sound::Synth(SynthStart { track: 0, patch: 0, length: 0.1 }),
+            sound: Sound::Synth(SynthStart { track: 0, patch: 0, length: 0.1, sample: None }),
             mono: false,
             choke_group: None,
             velocity: 1.0,

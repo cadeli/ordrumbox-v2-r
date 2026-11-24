@@ -32,7 +32,7 @@ use modulation::{
 };
 pub use oscillator::FM_DEVIATION;
 use oscillator::{
-    LFSR_SEED, NOISE_SEED, SineTable, WIDTH_MAX, WIDTH_MIN, fm_frequencies, lfsr_sample, lfsr_step, noise_sample,
+    LFSR_SEED, NOISE_SEED, WIDTH_MAX, WIDTH_MIN, WaveTables, fm_frequencies, lfsr_sample, lfsr_step, noise_sample,
     noise_seed, oscillator, sin_lookup, sine_table, xorshift32,
 };
 use patch::{Adsr, MatrixSource, ModEnvTarget, NoiseMode, SynthLfo, SynthPatch};
@@ -63,8 +63,8 @@ fn cents_ratio(cents: f64) -> f64 {
 /// What a block of a note is rendered with: everything of the patch that no
 /// sample changes, worked out once.
 #[derive(Debug)]
-struct Block {
-    table: &'static SineTable,
+struct Block<'a> {
+    tables: WaveTables<'a>,
     sample_rate: f64,
     lfos: [Option<LfoRoute>; 2],
     /// Phase step of the two LFOs, cycles per sample.
@@ -101,8 +101,8 @@ struct Block {
     is_stereo: bool,
 }
 
-impl Block {
-    fn new(p: &SynthPatch, sample_rate: f64) -> Self {
+impl<'a> Block<'a> {
+    fn new(p: &SynthPatch, sample_rate: f64, source: &'a [f32]) -> Self {
         let pan = clamp(p.pan, -1.0, 1.0);
         let q = clamp(p.filter_q, 0.1, 20.0);
         let has_mod_env = !p.bypass.mod_env && p.mod_env_depth > SILENT;
@@ -116,7 +116,7 @@ impl Block {
             lfo_wave(&p.lfo2, p.bypass.lfo2, MatrixSource::Lfo2),
         ];
         Self {
-            table: sine_table(),
+            tables: WaveTables { sine: sine_table(), source },
             sample_rate,
             lfos: [LfoRoute::new(&p.lfo1, p.bypass.lfo1), LfoRoute::new(&p.lfo2, p.bypass.lfo2)],
             lfo_steps: [p.lfo1.freq / sample_rate, p.lfo2.freq / sample_rate],
@@ -269,12 +269,14 @@ impl SynthVoice {
 
     /// ADD the next `left.len()` frames to `left`/`right`; `first_frame` is
     /// the clock position of the first one (in frames at `sample_rate`).
-    pub fn render(&mut self, sample_rate: f32, first_frame: u64, left: &mut [f32], right: &mut [f32]) {
+    /// The random wave of the oscillators steps through the frames of
+    /// `source`, one a cycle; with no frame, it draws pseudo-random values.
+    pub fn render(&mut self, sample_rate: f32, first_frame: u64, source: &[f32], left: &mut [f32], right: &mut [f32]) {
         if !self.active {
             return;
         }
         let patch = self.patch;
-        let block = Block::new(&patch, f64::from(sample_rate));
+        let block = Block::new(&patch, f64::from(sample_rate), source);
         // Each LFO writes its one slot; the others stay 0 for the whole block.
         let mut mods = [LfoMods::default(); 3];
         let has_matrix = !block.matrix.is_empty();
@@ -470,7 +472,7 @@ impl SynthVoice {
         let mut raw = [0.0; 3];
         for (n, value) in raw.iter_mut().enumerate() {
             let dt = (frequencies[n] / b.sample_rate).min(0.49);
-            *value = oscillator(b.table, p.osc_wave[n], self.phase[n][0], dt, self.osc_cycle[n][0], self.width[n]);
+            *value = oscillator(b.tables, p.osc_wave[n], self.phase[n][0], dt, self.osc_cycle[n][0], self.width[n]);
         }
         raw
     }
@@ -495,7 +497,7 @@ impl SynthVoice {
                 // for FM and the sub.
                 let used = if gains[n] > 0.0 { b.layer_count } else { 1 };
                 let layered = unison_oscillator(
-                    b.table,
+                    b.tables,
                     (p.osc_wave[n], self.width[n]),
                     &mut self.phase[n][..used],
                     &mut self.osc_cycle[n][..used],
@@ -515,16 +517,22 @@ impl SynthVoice {
                 let advanced = self.phase[n][0] + dt;
                 self.osc_cycle[n][0] += advanced.floor();
                 self.phase[n][0] = advanced.rem_euclid(1.0);
-                *output =
-                    oscillator(b.table, p.osc_wave[n], self.phase[n][0], dt.abs(), self.osc_cycle[n][0], self.width[n])
-                        * gains[n];
+                *output = oscillator(
+                    b.tables,
+                    p.osc_wave[n],
+                    self.phase[n][0],
+                    dt.abs(),
+                    self.osc_cycle[n][0],
+                    self.width[n],
+                ) * gains[n];
             }
             let mono = outputs[0] + outputs[1] + outputs[2];
             sum = [mono, mono];
         }
         // One cycle over two of oscillator 1: an octave below it.
         if sub_gain > SILENT {
-            let sub = sin_lookup(b.table, (self.osc_cycle[0][0].rem_euclid(2.0) + self.phase[0][0]) * 0.5) * sub_gain;
+            let sub =
+                sin_lookup(b.tables.sine, (self.osc_cycle[0][0].rem_euclid(2.0) + self.phase[0][0]) * 0.5) * sub_gain;
             sum = sum.map(|side| side + sub);
         }
         sum
@@ -622,7 +630,7 @@ mod tests {
 
     fn render(voice: &mut SynthVoice, frames: usize) -> Vec<f32> {
         let (mut l, mut r) = (vec![0.0; frames], vec![0.0; frames]);
-        voice.render(48_000.0, 0, &mut l, &mut r);
+        voice.render(48_000.0, 0, &[], &mut l, &mut r);
         l
     }
 
@@ -796,7 +804,7 @@ mod tests {
     /// The console noise of `mode` at `rate` Hz, 48 kHz, `count` samples.
     fn console_noise(mode: NoiseMode, rate: f64, count: usize) -> Vec<f64> {
         let patch = SynthPatch { noise_mode: mode, noise_rate: rate, ..SynthPatch::default() };
-        let block = Block::new(&patch, 48_000.0);
+        let block = Block::new(&patch, 48_000.0, &[]);
         let mods = [LfoMods::default(); 3];
         let mut voice = SynthVoice::default();
         (0..count).map(|_| voice.noise_source(&patch, &block, &mods)).collect()
@@ -818,7 +826,7 @@ mod tests {
             let mut voice = SynthVoice::default();
             voice.start(&patch, 0, 0.0, 1);
             let (mut l, mut r) = (vec![0.0; 24_000], vec![0.0; 24_000]);
-            voice.render(48_000.0, 0, &mut l, &mut r);
+            voice.render(48_000.0, 0, &[], &mut l, &mut r);
             l
         };
         let base = SynthPatch {

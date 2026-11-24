@@ -67,7 +67,13 @@ fn render_from(preset: &Value, settings: &NoteSettings, start_frame: u64) -> Res
         let done = left.len();
         left.resize(done + BLOCK_FRAMES, 0.0);
         right.resize(done + BLOCK_FRAMES, 0.0);
-        voice.render(settings.sample_rate as f32, start_frame + done as u64, &mut left[done..], &mut right[done..]);
+        voice.render(
+            settings.sample_rate as f32,
+            start_frame + done as u64,
+            &[],
+            &mut left[done..],
+            &mut right[done..],
+        );
     }
     Ok(SampleBuffer { left, right: Some(right), sample_rate: settings.sample_rate })
 }

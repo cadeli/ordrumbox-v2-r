@@ -322,7 +322,7 @@ fn synth_notes_play_for_their_length() {
     let patch = SynthPatch { velocity: 0.5, volume: 1.0, ..SynthPatch::default() };
     let event = Event {
         frame: 64,
-        sound: Sound::Synth(SynthStart { track: 0, patch: 0, length: 0.01 }),
+        sound: Sound::Synth(SynthStart { track: 0, patch: 0, length: 0.01, sample: None }),
         mono: false,
         choke_group: None,
         velocity: 1.0,

@@ -54,6 +54,7 @@ pub fn add_clicks(pass: &mut Pass) {
                 track: strip,
                 patch: patch_base + usize::from(!accent),
                 length: CLICK_SECONDS,
+                sample: None,
             }),
             mono: false,
             choke_group: None,

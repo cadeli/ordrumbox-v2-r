@@ -3,9 +3,9 @@
 
 use std::f64::consts::{PI, SQRT_2};
 
-use super::oscillator::{SineTable, pulse, sawtooth, sin_lookup, triangle};
+use super::oscillator::{WaveTables, held_value, pulse, sawtooth, sin_lookup, triangle};
 use super::{cents_ratio, clamp};
-use crate::lfo::{self, Wave};
+use crate::lfo::Wave;
 
 /// The most layers one oscillator sounds as.
 pub const MAX_UNISON: usize = 8;
@@ -89,7 +89,7 @@ fn sum_layers(
 /// high for `width` of its cycle.
 #[inline]
 pub(super) fn unison_oscillator(
-    table: &SineTable,
+    tables: WaveTables,
     (wave, width): (Wave, f64),
     phases: &mut [f64],
     cycles: &mut [f64],
@@ -98,11 +98,13 @@ pub(super) fn unison_oscillator(
     sample_rate: f64,
 ) -> [f64; 2] {
     match wave {
-        Wave::Sine => sum_layers(phases, cycles, layers, frequency, sample_rate, |p, _, _| sin_lookup(table, p)),
+        Wave::Sine => sum_layers(phases, cycles, layers, frequency, sample_rate, |p, _, _| sin_lookup(tables.sine, p)),
         Wave::Triangle => sum_layers(phases, cycles, layers, frequency, sample_rate, |p, _, _| triangle(p)),
         Wave::Sawtooth => sum_layers(phases, cycles, layers, frequency, sample_rate, |p, dt, _| sawtooth(p, dt)),
         Wave::Square => sum_layers(phases, cycles, layers, frequency, sample_rate, |p, dt, _| pulse(p, dt, width)),
-        Wave::Random => sum_layers(phases, cycles, layers, frequency, sample_rate, |_, _, c| lfo::sample_and_hold(c)),
+        Wave::Random => {
+            sum_layers(phases, cycles, layers, frequency, sample_rate, |_, _, c| held_value(tables.source, c))
+        }
     }
 }
 
@@ -184,7 +186,7 @@ mod tests {
         let mut voice = SynthVoice::default();
         voice.start(&patch, 0, 0.0, 1);
         let (mut left, mut right) = (vec![0.0; 48_000], vec![0.0; 48_000]);
-        voice.render(48_000.0, 0, &mut left, &mut right);
+        voice.render(48_000.0, 0, &[], &mut left, &mut right);
         [left, right]
     }
 

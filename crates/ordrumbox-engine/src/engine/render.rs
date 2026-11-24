@@ -252,6 +252,7 @@ impl Engine {
                 let voice = &mut self.synths[slot];
                 voice.start(&patch, track, now_seconds, self.serial);
                 voice.release_at(now_seconds + synth.length);
+                self.synth_samples[slot] = synth.sample;
             }
         }
     }
@@ -273,11 +274,14 @@ impl Engine {
             );
         }
         let first_frame = self.clock + from as u64;
-        for synth in self.synths.iter_mut().filter(|v| v.is_active()) {
+        for (synth, sample) in self.synths.iter_mut().zip(&self.synth_samples).filter(|(v, _)| v.is_active()) {
             let base = synth.track() * QUANTUM;
+            // The random wave of the oscillators reads the track's sample.
+            let source = sample.and_then(|i| self.bank.get(i)).map_or(&[][..], |s| &s.buffer.left[..]);
             synth.render(
                 self.sample_rate,
                 first_frame,
+                source,
                 &mut self.input_left[base + from..base + to],
                 &mut self.input_right[base + from..base + to],
             );

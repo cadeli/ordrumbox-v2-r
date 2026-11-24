@@ -115,6 +115,8 @@ pub struct Engine {
     clock: u64,
     voices: Vec<SampleVoice>,
     synths: Vec<SynthVoice>,
+    /// The sample of the bank each synth voice's random wave reads.
+    synth_samples: Vec<Option<usize>>,
     serial: u64,
     /// The choke group of each track, as its last note gave it.
     choke_groups: [Option<u8>; MAX_TRACKS],
@@ -173,6 +175,7 @@ impl Engine {
             clock: 0,
             voices: vec![SampleVoice::default(); MAX_VOICES],
             synths: vec![SynthVoice::default(); MAX_SYNTH_VOICES],
+            synth_samples: vec![None; MAX_SYNTH_VOICES],
             serial: 0,
             choke_groups: [None; MAX_TRACKS],
             channels: vec![channel; MAX_TRACKS],
