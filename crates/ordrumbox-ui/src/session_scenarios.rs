@@ -252,6 +252,18 @@ fn space_in_song_mode_plays_the_song_and_the_song_view_alone_does_not() {
 // ─── the life of a pattern ──────────────────────────────────────────────────
 
 #[test]
+fn a_new_pattern_has_a_track_for_each_instrument_of_the_kit() {
+    let (mut s, _audio) = demo_session(&crate::test_support::scratch_dir("new-pattern-kit").join("samples"));
+    s.new_pattern();
+    let names: Vec<&str> = s.pattern().unwrap().tracks.iter().map(|t| t.name.as_str()).collect();
+    assert_eq!(names, KIT_KEYS);
+    // Without a kit, the usual drum tracks.
+    let (mut s, _audio) = session(r#"{"patterns":[]}"#);
+    s.new_pattern();
+    assert_eq!(s.pattern().unwrap().tracks.len(), 8);
+}
+
+#[test]
 fn a_pattern_built_in_the_grid_is_saved_reloaded_and_exported() {
     let (mut s, _audio) = session(r#"{"patterns":[{"name":"demo","tracks":[{"name":"KICK","notes":[{}]}]}]}"#);
 

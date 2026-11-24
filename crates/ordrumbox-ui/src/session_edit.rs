@@ -9,10 +9,13 @@ use super::{Session, Switch};
 use crate::view::{Cursor, Hit};
 use ordrumbox_core::track::MAX_TRACKS;
 use ordrumbox_core::{Note, Track};
+use ordrumbox_engine::kit::Kit;
 use ordrumbox_logic::Nudge;
 
 /// The name of the track Ctrl+T adds.
 const DEFAULT_TRACK_NAME: &str = "KICK";
+/// The tracks of a new pattern when the kit used names no instrument.
+const DEFAULT_TRACK_NAMES: [&str; 8] = ["KICK", "SNARE", "CHH", "OHH", "CYM", "HTOM", "LTOM", "CLAP"];
 
 impl Session {
     pub(super) fn audition(&mut self, t: usize, note: Option<usize>) {
@@ -347,13 +350,18 @@ impl Session {
         }
     }
 
+    /// Ctrl+N: a new pattern with a track for each instrument of the kit
+    /// used (the usual drum tracks when the kit has none).
     pub fn new_pattern(&mut self) {
-        let names = ["KICK", "SNARE", "CHH", "OHH", "CYM", "HTOM", "LTOM", "CLAP"];
+        let names: Vec<String> = match self.kit().map(Kit::track_names) {
+            Some(names) if !names.is_empty() => names.into_iter().map(str::to_owned).collect(),
+            _ => DEFAULT_TRACK_NAMES.map(str::to_owned).to_vec(),
+        };
         let next = self.editor.library().patterns.len();
         let name = format!("NewPat_{next}");
         self.pattern_index = self.editor.batch(&format!("Add pattern \"{}\"", name), |editor| {
             let p = editor.add_pattern(Some(&name));
-            for track in names {
+            for track in &names {
                 editor.add_track(p, track, 4);
             }
             p

@@ -4,6 +4,7 @@
 use std::sync::Arc;
 
 use ordrumbox_core::Issue;
+use ordrumbox_core::instruments::NOT_FOUND;
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_dsp::{SampleBuffer, SampleShape};
 
@@ -240,6 +241,21 @@ pub struct Kit {
 }
 
 impl Kit {
+    /// The instruments of the kit, in its order, each once: the tracks of a
+    /// new pattern played with it. A sample whose instrument is unknown
+    /// (`NOT_FOUND`) names none.
+    #[must_use]
+    pub fn track_names(&self) -> Vec<&str> {
+        let mut names: Vec<&str> = Vec::new();
+        for sample in &self.samples {
+            let key = sample.key.as_str();
+            if !key.is_empty() && key != NOT_FOUND && !names.contains(&key) {
+                names.push(key);
+            }
+        }
+        names
+    }
+
     /// The kit at `at` (`[2]`), `None` without a name; a sample without a
     /// path is skipped. What is skipped goes to `issues`.
     fn from_json(value: &Value, at: &str, issues: &mut Vec<Issue>) -> Option<Self> {
@@ -427,6 +443,13 @@ mod tests {
         let at: Vec<_> = issues.iter().map(|i| i.at.as_str()).collect();
         assert_eq!(at, ["[0].samples[0]", "[1]"]);
         assert_eq!(kits_from_json(&json::parse("{}").unwrap()), Err("not an array of kits".to_owned()));
+    }
+
+    #[test]
+    fn a_kit_names_each_of_its_instruments_once() {
+        let sample = |key: &str| KitSample { key: key.to_owned(), ..KitSample::default() };
+        let kit = Kit { samples: ["KICK", "SNARE", "KICK", NOT_FOUND, "CHH"].map(sample).to_vec(), ..Kit::default() };
+        assert_eq!(kit.track_names(), ["KICK", "SNARE", "CHH"]);
     }
 
     #[test]
