@@ -153,6 +153,10 @@ every kind of lane edit, twice over (the same library each time). No fixture, no
 
 ### Changes of behaviour
 
+The kits `real`, `open` and `ropen` are gone (their folders and their `kits.json` entries; `punchy` had already
+lost its folder). The tracks that borrowed one of their samples now borrow from the other kits: the table of
+`ordrumbox-ui/src/assign_tests/data.rs` is rewritten, and loses the rows of those kits.
+
 A double-click on a track's name in the grid opens the piano roll on that track (`press_track_name`,
 `session_grid.rs`); a single press still selects the track and may drag it. No snapshot changed.
 
