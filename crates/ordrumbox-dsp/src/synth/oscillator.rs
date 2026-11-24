@@ -10,7 +10,7 @@ pub(super) const SINE_TABLE_SIZE: usize = 4096;
 pub(super) type SineTable = [f32; SINE_TABLE_SIZE];
 
 /// What the oscillators read their waves from: the sine table, and the
-/// sample whose frames the random wave steps through, one a cycle.
+/// sample whose frames the random wave holds, one a cycle.
 #[derive(Debug, Clone, Copy)]
 pub(super) struct WaveTables<'a> {
     pub sine: &'static SineTable,
@@ -18,17 +18,25 @@ pub(super) struct WaveTables<'a> {
     pub source: &'a [f32],
 }
 
-/// The value the random wave holds for its cycle number `cycle`: the frame of
-/// that number of `source`, which loops (a cycle before the first, under
-/// through-zero FM, reads it from its end), or a pseudo-random value when
-/// there is no sample.
+/// Share of the sample the random wave moves on by a cycle: the golden
+/// ratio's, so the frames it reads spread evenly over the whole sample and
+/// two cycles in a row read frames far apart.
+const GOLDEN_STEP: f64 = 0.618_033_988_749_894_8;
+
+/// The value the random wave holds for its cycle number `cycle`: a frame of
+/// `source`, [`GOLDEN_STEP`] of it further on each cycle and looping over it
+/// (a cycle before the first, under through-zero FM, steps back), or a
+/// pseudo-random value when there is no sample. One frame on a cycle would
+/// read only the first milliseconds of the sample, mostly the silence before
+/// its sound, and frames so close that the wave hardly moves.
 #[inline]
 pub(super) fn held_value(source: &[f32], cycle: f64) -> f64 {
     if source.is_empty() {
         return lfo::sample_and_hold(cycle);
     }
+    let position = (cycle * GOLDEN_STEP).rem_euclid(1.0) * source.len() as f64;
     // `as` saturates and maps NaN to 0; `get` keeps a rounding at the end in bounds.
-    let index = cycle.rem_euclid(source.len() as f64) as usize;
+    let index = position as usize;
     source.get(index).map_or(0.0, |frame| f64::from(*frame))
 }
 
@@ -190,11 +198,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_random_wave_steps_through_the_sample() {
-        let source = [0.5, -0.25, 0.125];
+    fn the_random_wave_spreads_over_the_sample() {
+        // Each frame holds its own index.
+        let source: Vec<f32> = (0..100u8).map(f32::from).collect();
         let held = |cycle: f64| held_value(&source, cycle);
-        assert_eq!([held(0.0), held(1.0), held(2.0), held(3.0), held(-1.0)], [0.5, -0.25, 0.125, 0.5, 0.125]);
-        assert_eq!(held(f64::NAN), 0.5);
+        assert_eq!([0.0, 1.0, 2.0, 3.0, 4.0, -1.0].map(held), [0.0, 61.0, 23.0, 85.0, 47.0, 38.0]);
+        let mut frames: Vec<u8> = (0..100).map(|c| held(f64::from(c)) as u8).collect();
+        frames.sort_unstable();
+        frames.dedup();
+        assert!(frames.len() > 60, "{} frames of 100", frames.len());
+        assert_eq!(held(f64::NAN), 0.0);
         assert_eq!(held_value(&[], 7.0), lfo::sample_and_hold(7.0));
     }
 

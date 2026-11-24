@@ -99,12 +99,24 @@ is a demo of it and does less: files here are saved on disk, not in the browser.
 <h2 id="getting-started">1. Getting started</h2>
 
 <h3>Installing</h3>
-<p>Download the release zip (<code>ordrumbox-v&lt;version&gt;-windows-x64.zip</code>, from the
-<a href="https://www.ordrumbox.com/download/download.html">download page</a> or the GitHub releases) and unpack it.
-It holds <code>ordrumbox.exe</code> and an <code>assets</code> folder; keep them side by side.
-The <code>assets</code> folder holds the demo library, the kits and their samples, the scales, the
-synth presets and the generation styles. No installer is needed. The plugin comes as
-<code>orDrumbox.clap</code> and <code>orDrumbox.vst3</code> (<a href="#plugin">section 19</a>).</p>
+<p>Download orDrumbox from the <a href="https://www.ordrumbox.com/download/download.html">download page</a>
+or the GitHub releases:</p>
+<table>
+<tr><th>System</th><th>File</th><th>What to do</th></tr>
+<tr><td>Windows</td><td><code>ordrumbox-v&lt;version&gt;-windows-x64-setup.exe</code></td><td>Run it: it installs orDrumbox
+and its Start menu entry, and updates an earlier version in place.</td></tr>
+<tr><td>Windows, no setup</td><td><code>ordrumbox-v&lt;version&gt;-windows-x64.zip</code></td><td>Unpack it anywhere:
+<code>ordrumbox.exe</code> and the <code>assets</code> folder stay side by side.</td></tr>
+<tr><td>macOS</td><td><code>ordrumbox-v&lt;version&gt;-macos.zip</code></td><td>Unpack it and move <code>orDrumbox.app</code>
+to Applications.</td></tr>
+<tr><td>Linux</td><td><code>ordrumbox-v&lt;version&gt;-linux-x64.zip</code></td><td>Unpack it; the program uses the
+system's ALSA and X11 libraries.</td></tr>
+</table>
+<p>The <code>assets</code> folder holds the demo library, the kits and their samples, the scales, the
+synth presets and the generation styles. The plugin comes as <code>orDrumbox.clap</code> and
+<code>orDrumbox.vst3</code>, in zips of their own (<a href="#plugin">section 19</a>).</p>
+<p>One orDrumbox runs at a time: a second one started warns that another is already running, since two windows
+would overwrite each other's library. You may go on anyway or quit. The plugin is not concerned.</p>
 
 <h3>First steps</h3>
 <ol>

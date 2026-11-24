@@ -521,3 +521,9 @@ frame of the track's sample, looping over it, and reading it from the start at e
 `ordrumbox-engine/src/assign.rs`); `TrackSound::Synth` and `SynthStart` carry it.
 With no sample (`ordrumbox-probe`, the DSP tests), it draws the pseudo-random values as before. The LFOs' random wave
 is unchanged. No snapshot changed: none plays an oscillator's random wave through the engine.
+
+The random wave of the oscillators moves on by 0.618 of the track's sample a cycle (`GOLDEN_STEP`,
+`ordrumbox-dsp/src/synth/oscillator.rs`) instead of one frame. One frame a cycle read only the first milliseconds of
+the sample, mostly the silence before its sound: a note was 20 to 40 dB quieter than with no sample. The frames it
+reads now spread over the whole sample, and the wave sounds as the pseudo-random one does, 10 to 20 dB quieter (the
+level of the sample). No snapshot changed.

@@ -269,8 +269,8 @@ impl SynthVoice {
 
     /// ADD the next `left.len()` frames to `left`/`right`; `first_frame` is
     /// the clock position of the first one (in frames at `sample_rate`).
-    /// The random wave of the oscillators steps through the frames of
-    /// `source`, one a cycle; with no frame, it draws pseudo-random values.
+    /// The random wave of the oscillators holds frames of `source`, one a
+    /// cycle; with no frame, it draws pseudo-random values.
     pub fn render(&mut self, sample_rate: f32, first_frame: u64, source: &[f32], left: &mut [f32], right: &mut [f32]) {
         if !self.active {
             return;

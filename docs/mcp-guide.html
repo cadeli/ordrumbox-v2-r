@@ -239,6 +239,15 @@ lets the hit through before the compressor reacts.</p>
 sounds, <code>duckAmount</code> (0 to 1) of the track's volume is taken off, and it comes back over
 <code>duckReleaseMs</code> (10 to 2000 ms). With a key, the track's compressor listens to the key instead of the track's
 own sound. The key is heard before its own effects, so a turned-down key still keys.</p>
+<p class="say">Make the closed hi-hat cut the open one.</p>
+<pre><code>updateTrack { "patternName": "First Beat", "trackName": "CHH", "updates": { "chokeGroup": 1 } }
+updateTrack { "patternName": "First Beat", "trackName": "OHH", "updates": { "chokeGroup": 1 } }</code></pre>
+<p>Tracks of one choke group (1 to 8; <code>null</code> takes a track out of its group) cut each other: a note of one
+stops the sound of every track of the group, as on a real hi-hat. A hi-hat track added or renamed joins group 1 by itself.</p>
+<p class="say">Send the snare to the echo, and a little of everything to the reverb.</p>
+<pre><code>updateTrack { "patternName": "First Beat", "trackName": "SNARE", "updates": { "echoSend": 0.4 } }</code></pre>
+<p><code>echoSend</code> and <code>reverbSend</code> (0 to 1) feed the shared tape echo and spring reverb of the mixer;
+<code>setReturns</code> sets their time, feedback, room and level.</p>
 </div>
 
 <div class="example">
