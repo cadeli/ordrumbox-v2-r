@@ -4,7 +4,7 @@
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_core::lfo;
 
-use super::{EXTRA_METAS, FM_DEVIATION, WAVES, lfo_scale, number, slope, text};
+use super::{EXTRA_METAS, FM_DEVIATION, OSC2_SYNCS, WAVES, lfo_scale, number, slope, text};
 
 /// The LFOs playing (not bypassed): LFO1, LFO2.
 fn lfos(draft: &Object) -> [Option<&Object>; 2] {
@@ -73,8 +73,28 @@ fn wave_at(wave: &str, p: f64, cycle: f64, width: f64) -> f64 {
     }
 }
 
+/// Move the three oscillators of the scope on by their `steps` (cycles a
+/// point); oscillator 2 restarts with each cycle of oscillator 1 when `is_synced`.
+fn advance(phase: &mut [f64; 3], cycle: &mut [f64; 3], steps: [f64; 3], is_synced: bool) {
+    let mut osc1_began = false;
+    for (i, step) in steps.into_iter().enumerate() {
+        if i == 1 && is_synced && osc1_began && steps[0] > 0.0 {
+            // As far into its new cycle as it got since oscillator 1 began its own.
+            phase[1] = (phase[0] * step / steps[0]).rem_euclid(1.0);
+            cycle[1] += 1.0;
+            continue;
+        }
+        phase[i] += step;
+        let whole = phase[i].floor();
+        cycle[i] += whole;
+        phase[i] -= whole;
+        osc1_began = i == 0 && whole != 0.0;
+    }
+}
+
 /// Points of the scope: four cycles of the three
-/// oscillators with their gains, octaves, detunes, FM and sub, the drive's
+/// oscillators with their gains, octaves, detunes, FM, the sync and ring
+/// modulation of oscillator 2, and sub, the drive's
 /// saturation, scaled to the master volume. `time`: when (the LFOs).
 pub fn scope(draft: &Object, time: f64, bpm: f64) -> Vec<f64> {
     const SAMPLES: usize = 1024;
@@ -96,6 +116,8 @@ pub fn scope(draft: &Object, time: f64, bpm: f64) -> Vec<f64> {
     let gain: Vec<f64> = (1..=3)
         .map(|n| (vco(n, "gain", if n == 1 { 1.0 } else { 0.0 }) + modded(&format!("vco{n}.gain"))).clamp(0.0, 1.0))
         .collect();
+    let ring = (number(draft, "vco2.ring").unwrap_or(0.0) + modded("vco2.ring")).clamp(0.0, 1.0);
+    let is_synced = text(draft, "vco2.sync") == Some(OSC2_SYNCS[1]);
     let fm_amount = number(draft, "fm.amount").unwrap_or(0.0);
     let fm_algo = number(draft, "fm.algo").unwrap_or(0.0);
     let sub_gain = number(draft, "subGain").unwrap_or(0.0);
@@ -126,18 +148,15 @@ pub fn scope(draft: &Object, time: f64, bpm: f64) -> Vec<f64> {
                 _ => {}
             }
         }
-        for (i, f) in [f1, f2, f3].into_iter().enumerate() {
-            phase[i] += f;
-            let whole = phase[i].floor();
-            cycle[i] += whole;
-            phase[i] -= whole;
-        }
+        advance(&mut phase, &mut cycle, [f1, f2, f3], is_synced);
         let sub = if sub_gain > 0.0 {
             wave_at("sine", (cycle[0].rem_euclid(2.0) + phase[0]) * 0.5, 0.0, 0.5) * sub_gain
         } else {
             0.0
         };
-        let mut sample = (0..3).map(|i| wave_at(&waves[i], phase[i], cycle[i], width[i]) * gain[i]).sum::<f64>() + sub;
+        let [o1, o2, o3] = [0, 1, 2].map(|i| wave_at(&waves[i], phase[i], cycle[i], width[i]));
+        let o2 = o2 * (1.0 - ring + ring * o1);
+        let mut sample = o1 * gain[0] + o2 * gain[1] + o3 * gain[2] + sub;
         if drive > 0.0 {
             let driven = sample * (1.0 + drive * 3.0);
             sample = driven / (1.0 + driven.abs() * 0.5);

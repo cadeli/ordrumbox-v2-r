@@ -1,7 +1,8 @@
 //! One synth note: three oscillators with FM and unison, a sub-oscillator, filtered
 //! noise, drive, a TPT state-variable filter with its envelope, an ADSR, a
-//! modulation envelope and two LFOs routed to any of 33 targets, then
-//! equal-power pan.
+//! modulation envelope, a pitch envelope, ring modulation and hard sync of
+//! oscillator 2 by oscillator 1, and two LFOs routed to any of their
+//! targets, then equal-power pan.
 //!
 //! [`SynthVoice::start`] starts a note of a [`SynthPatch`] and
 //! [`SynthVoice::release_at`] releases it. Starting, releasing and rendering
@@ -17,25 +18,30 @@ use crate::lfo::{self, Wave};
 use crate::slope::{self, FilterMode};
 use crate::svf::{Svf, tap, tap_weights};
 
+mod cross_mod;
 mod envelope;
 mod filter;
 mod modulation;
 mod oscillator;
 pub mod patch;
+mod pitch_env;
 mod unison;
 
+use cross_mod::{Moved, cycle_starts, restart, ring};
 use envelope::{Envelope, FilterEnvelope, Segment};
 use filter::{coefficients, cutoff_coefficient};
 use modulation::{
     DETUNE_SLOTS, ENV_SLOTS, GAIN_SLOTS, LfoMods, LfoRoute, MOD_ENV_SLOTS, Matrix, Mods, Slot, SourceValues,
-    WIDTH_SLOTS, is_moved, modulated, modulated_adsr,
+    WIDTH_SLOTS, is_moved, is_targeted, modulated, modulated_adsr,
 };
 pub use oscillator::FM_DEVIATION;
 use oscillator::{
     LFSR_SEED, NOISE_SEED, WIDTH_MAX, WIDTH_MIN, WaveTables, fm_frequencies, lfsr_sample, lfsr_step, noise_sample,
-    noise_seed, oscillator, sin_lookup, sine_table, xorshift32,
+    noise_seed, oscillator, phase_step, sin_lookup, sine_table, xorshift32,
 };
-use patch::{Adsr, MatrixSource, ModEnvTarget, NoiseMode, SynthLfo, SynthPatch};
+use patch::{Adsr, LfoTarget, MatrixSource, ModEnvTarget, NoiseMode, SynthLfo, SynthPatch};
+pub use pitch_env::MAX_PITCH_ENV_SEMITONES;
+use pitch_env::{PitchFall, fall_per_sample};
 pub use unison::MAX_UNISON;
 use unison::{Layer, layers, start_phases, unison_oscillator};
 
@@ -85,6 +91,14 @@ struct Block<'a> {
     k: f64,
     /// Pulse width of each oscillator, within what the band-limiting allows.
     widths: [f64; 3],
+    /// Whether the pitch envelope runs: it has an offset, or something may give it one.
+    has_pitch_env: bool,
+    /// The share of the pitch envelope's offset a sample keeps, while nothing modulates its decay.
+    pitch_fall: f64,
+    /// Whether oscillator 2 may be ring-modulated: it is, or something may make it so.
+    has_ring: bool,
+    /// Whether oscillator 2 is hard-synced to oscillator 1.
+    is_synced: bool,
     noise_mode: NoiseMode,
     /// Shift register steps a sample, 0–1.
     noise_step: f64,
@@ -132,6 +146,10 @@ impl<'a> Block<'a> {
             g: cutoff_coefficient(p.filter_freq, sample_rate),
             k: 1.0 / q,
             widths: p.osc_width.map(|width| clamp(width, WIDTH_MIN, WIDTH_MAX)),
+            has_pitch_env: p.pitch_env.amount != 0.0 || is_targeted(p, LfoTarget::PitchEnvAmount),
+            pitch_fall: fall_per_sample(p.pitch_env.decay, sample_rate),
+            has_ring: p.ring > 0.0 || is_targeted(p, LfoTarget::Osc2Ring),
+            is_synced: p.is_osc2_synced,
             noise_mode: p.noise_mode,
             noise_step: clamp(p.noise_rate / sample_rate, 0.0, 1.0),
             noise_weights: tap_weights(p.noise_filter_type),
@@ -162,6 +180,7 @@ pub struct SynthVoice {
     rng: u32,
     /// The pulse width of each oscillator for the sample being worked out.
     width: [f64; 3],
+    pitch_fall: PitchFall,
     /// The shift register of the console noise, and how far its next step is, 0–1.
     lfsr: u16,
     lfsr_phase: f64,
@@ -198,6 +217,7 @@ impl Default for SynthVoice {
             osc_cycle: [[0.0; MAX_UNISON]; 3],
             rng: NOISE_SEED,
             width: [0.5; 3],
+            pitch_fall: PitchFall::START,
             lfsr: LFSR_SEED,
             lfsr_phase: 0.0,
             noise_held: 0.0,
@@ -339,7 +359,8 @@ impl SynthVoice {
             *gain = clamp(modulated(mods, base, slot), 0.0, 1.0);
         }
         self.width = pulse_widths(b, mods, p.osc_width);
-        let frequencies = self.frequencies(p, b, mods, &mut gains, mod_level, t);
+        let pitch_env = if b.has_pitch_env { self.pitch_env_ratio(p, b, mods) } else { 1.0 };
+        let frequencies = self.frequencies(p, b, mods, &mut gains, (mod_level, pitch_env), t);
         let oscillators = self.oscillators(p, b, mods, frequencies, gains);
         let noise = self.noise(p, b, mods);
         let mut dry = [oscillators[0] * (1.0 - p.noise_mix) + noise, oscillators[1] * (1.0 - p.noise_mix) + noise];
@@ -411,8 +432,8 @@ impl SynthVoice {
     }
 
     /// The frequencies of the three oscillators for this sample, Hz: detune,
-    /// pitch punch, FM and what the modulation envelope adds, which also
-    /// raises `gains` when it shapes.
+    /// pitch punch, the pitch envelope's ratio, FM and what the modulation
+    /// envelope at `mod_level` adds, which also raises `gains` when it shapes.
     #[inline]
     fn frequencies(
         &self,
@@ -420,7 +441,7 @@ impl SynthVoice {
         b: &Block,
         mods: &Mods,
         gains: &mut [f64; 3],
-        mod_level: f64,
+        (mod_level, pitch_env): (f64, f64),
         t: f64,
     ) -> [f64; 3] {
         let mut detuned = [0.0; 3];
@@ -431,6 +452,9 @@ impl SynthVoice {
         if pitch_punch > SILENT && t < PITCH_PUNCH_SECONDS {
             let punch = (((1.0 - t / PITCH_PUNCH_SECONDS) * pitch_punch * PITCH_PUNCH_CENTS) * LN2_OVER_1200).exp();
             detuned = detuned.map(|frequency| frequency * punch);
+        }
+        if b.has_pitch_env {
+            detuned = detuned.map(|frequency| frequency * pitch_env);
         }
 
         let fm_amount = clamp(modulated(mods, p.fm_amount, Slot::FmAmount), 0.0, 1.0);
@@ -465,6 +489,17 @@ impl SynthVoice {
         [f1, f2, f3]
     }
 
+    /// The frequency ratio of the pitch envelope this sample; it then moves on by a sample.
+    #[inline]
+    fn pitch_env_ratio(&mut self, p: &SynthPatch, b: &Block, mods: &Mods) -> f64 {
+        let fall = if is_moved(mods, Slot::PitchEnvDecay) {
+            fall_per_sample(modulated(mods, p.pitch_env.decay, Slot::PitchEnvDecay), b.sample_rate)
+        } else {
+            b.pitch_fall
+        };
+        self.pitch_fall.step(modulated(mods, p.pitch_env.amount, Slot::PitchEnvAmount), fall)
+    }
+
     /// The three oscillators where they stand, at full gain: what FM
     /// modulates with.
     #[inline]
@@ -479,7 +514,8 @@ impl SynthVoice {
 
     /// Move the oscillators on by a sample at `frequencies` and mix them,
     /// with the sub-oscillator, at `gains`: the left and right samples, the
-    /// same unless the layers of a unison are spread.
+    /// same unless the layers of a unison are spread. Oscillator 2 is
+    /// synced to oscillator 1 and ring-modulated by it, if the patch says so.
     #[inline]
     fn oscillators(
         &mut self,
@@ -490,45 +526,13 @@ impl SynthVoice {
         gains: [f64; 3],
     ) -> [f64; 2] {
         let sub_gain = clamp(modulated(mods, p.sub_gain, Slot::SubGain), 0.0, 1.0);
-        let mut sum = [0.0; 2];
-        if b.layer_count > 1 {
-            for n in 0..3 {
-                // An oscillator at no gain only keeps its first layer going,
-                // for FM and the sub.
-                let used = if gains[n] > 0.0 { b.layer_count } else { 1 };
-                let layered = unison_oscillator(
-                    b.tables,
-                    (p.osc_wave[n], self.width[n]),
-                    &mut self.phase[n][..used],
-                    &mut self.osc_cycle[n][..used],
-                    &b.layers[..used],
-                    frequencies[n],
-                    b.sample_rate,
-                );
-                sum[0] += layered[0] * gains[n];
-                sum[1] += layered[1] * gains[n];
-            }
+        let ring_amount = if b.has_ring { clamp(modulated(mods, p.ring, Slot::Ring), 0.0, 1.0) } else { 0.0 };
+        let mut sum = if b.layer_count > 1 {
+            self.layered_oscillators(p, b, frequencies, gains, ring_amount)
         } else {
-            let mut outputs = [0.0; 3];
-            for (n, output) in outputs.iter_mut().enumerate() {
-                // A negative frequency runs the phase backwards: through-zero FM
-                // keeps the note's pitch, where stopping at zero would raise it.
-                let dt = clamp(frequencies[n] / b.sample_rate, -0.49, 0.49);
-                let advanced = self.phase[n][0] + dt;
-                self.osc_cycle[n][0] += advanced.floor();
-                self.phase[n][0] = advanced.rem_euclid(1.0);
-                *output = oscillator(
-                    b.tables,
-                    p.osc_wave[n],
-                    self.phase[n][0],
-                    dt.abs(),
-                    self.osc_cycle[n][0],
-                    self.width[n],
-                ) * gains[n];
-            }
-            let mono = outputs[0] + outputs[1] + outputs[2];
-            sum = [mono, mono];
-        }
+            let mono = self.single_oscillators(p, b, frequencies, gains, ring_amount);
+            [mono, mono]
+        };
         // One cycle over two of oscillator 1: an octave below it.
         if sub_gain > SILENT {
             let sub =
@@ -536,6 +540,102 @@ impl SynthVoice {
             sum = sum.map(|side| side + sub);
         }
         sum
+    }
+
+    /// The oscillators of a unison, moved on by a sample and mixed at
+    /// `gains`, left and right; oscillator 2 ring-modulated at `ring_amount`.
+    #[inline]
+    fn layered_oscillators(
+        &mut self,
+        p: &SynthPatch,
+        b: &Block,
+        frequencies: [f64; 3],
+        gains: [f64; 3],
+        ring_amount: f64,
+    ) -> [f64; 2] {
+        let is_ringing = ring_amount > SILENT;
+        // Oscillator 1 moves on first: where it stood tells whether it began a cycle.
+        let osc1_cycles_before = self.osc_cycle[0];
+        // Each oscillator at full gain, left and right.
+        let mut layered = [[0.0; 2]; 3];
+        for (n, out) in layered.iter_mut().enumerate() {
+            // An oscillator at no gain only keeps its first layer going,
+            // for FM and the sub, unless oscillator 2 follows its layers.
+            let drives_osc2 = n == 0 && (is_ringing || b.is_synced);
+            let used = if gains[n] > 0.0 || drives_osc2 { b.layer_count } else { 1 };
+            if n == 1 && b.is_synced {
+                self.sync_osc2(b, &b.layers[..used], &osc1_cycles_before, frequencies);
+            }
+            *out = unison_oscillator(
+                b.tables,
+                (p.osc_wave[n], self.width[n]),
+                &mut self.phase[n][..used],
+                &mut self.osc_cycle[n][..used],
+                &b.layers[..used],
+                frequencies[n],
+                b.sample_rate,
+            );
+        }
+        if is_ringing {
+            layered[1] = [0, 1].map(|side| ring(layered[1][side], layered[0][side], ring_amount));
+        }
+        let mut sum = [0.0; 2];
+        for (out, gain) in layered.iter().zip(gains) {
+            sum[0] += out[0] * gain;
+            sum[1] += out[1] * gain;
+        }
+        sum
+    }
+
+    /// The three oscillators of one layer each, moved on by a sample and
+    /// mixed at `gains`; oscillator 2 ring-modulated at `ring_amount`.
+    #[inline]
+    fn single_oscillators(
+        &mut self,
+        p: &SynthPatch,
+        b: &Block,
+        frequencies: [f64; 3],
+        gains: [f64; 3],
+        ring_amount: f64,
+    ) -> f64 {
+        let osc1_cycles_before = [self.osc_cycle[0][0]];
+        let o1 = self.single_oscillator(p, b, 0, frequencies[0]);
+        if b.is_synced {
+            self.sync_osc2(b, &b.layers[..1], &osc1_cycles_before, frequencies);
+        }
+        let mut outputs =
+            [o1, self.single_oscillator(p, b, 1, frequencies[1]), self.single_oscillator(p, b, 2, frequencies[2])];
+        if ring_amount > SILENT {
+            outputs[1] = ring(outputs[1], outputs[0], ring_amount);
+        }
+        outputs[0] * gains[0] + outputs[1] * gains[1] + outputs[2] * gains[2]
+    }
+
+    /// Oscillator `n` of one layer moved on by a sample at `frequency` Hz, at full gain.
+    #[inline]
+    fn single_oscillator(&mut self, p: &SynthPatch, b: &Block, n: usize, frequency: f64) -> f64 {
+        let dt = phase_step(frequency, b.sample_rate);
+        let advanced = self.phase[n][0] + dt;
+        self.osc_cycle[n][0] += advanced.floor();
+        self.phase[n][0] = advanced.rem_euclid(1.0);
+        oscillator(b.tables, p.osc_wave[n], self.phase[n][0], dt.abs(), self.osc_cycle[n][0], self.width[n])
+    }
+
+    /// Restart the layers of oscillator 2 whose layer of oscillator 1 began
+    /// a cycle in this sample, which oscillator 1 has just been moved on by
+    /// from `osc1_cycles_before`.
+    #[inline]
+    fn sync_osc2(&mut self, b: &Block, layers: &[Layer], osc1_cycles_before: &[f64], [f1, f2, _]: [f64; 3]) {
+        let used = layers.len();
+        let osc1 = Moved {
+            phases: &self.phase[0][..used],
+            cycles: &self.osc_cycle[0][..used],
+            cycles_before: &osc1_cycles_before[..used],
+        };
+        let starts = cycle_starts(osc1, layers, f1, b.sample_rate);
+        let [_, osc2, _] = &mut self.phase;
+        let [_, cycles2, _] = &mut self.osc_cycle;
+        restart((&mut osc2[..used], &mut cycles2[..used]), &starts, layers, f2, b.sample_rate);
     }
 
     /// The next raw noise sample, -1 to 1: white, or the shift register's
@@ -668,6 +768,70 @@ mod tests {
             im += f64::from(x) * phase.sin();
         }
         (re * re + im * im).sqrt() / signal.len() as f64
+    }
+
+    /// Rising zero crossings of `signal`.
+    fn cycles(signal: &[f32]) -> usize {
+        signal.windows(2).filter(|pair| pair[0] < 0.0 && pair[1] >= 0.0).count()
+    }
+
+    #[test]
+    fn the_pitch_envelope_starts_off_the_note_and_falls_back_to_it() {
+        let swept = |amount: f64| {
+            let pitch_env = super::patch::PitchEnv { amount, decay: 0.05 };
+            held(SynthPatch { osc_gain: [1.0, 0.0, 0.0], pitch_env, ..SynthPatch::default() }, 24_000)
+        };
+        let (up, down, plain) = (swept(24.0), swept(-12.0), swept(0.0));
+        // The first cycle ends after 480 samples at 100 Hz, sooner from above, later from below.
+        let first_cycle = |out: &[f32]| out.windows(2).position(|pair| pair[0] < 0.0 && pair[1] >= 0.0);
+        let (up_end, down_end) = (first_cycle(&up).unwrap(), first_cycle(&down).unwrap());
+        assert!(up_end < 200 && down_end > 600 && first_cycle(&plain) == Some(479), "{up_end} {down_end}");
+        // Back on the note: 20 cycles in the last 0.2 s, one more or less by where its phase stands.
+        assert!(cycles(&up[14_400..]).abs_diff(cycles(&plain[14_400..])) <= 1);
+    }
+
+    /// Oscillator 2 alone, a sawtooth 17 semitones above oscillator 1 (100 Hz).
+    fn osc2_saw(is_osc2_synced: bool, unison_count: usize) -> Vec<f32> {
+        let patch = SynthPatch {
+            osc_gain: [0.0, 1.0, 0.0],
+            osc_wave: [Wave::Sine, Wave::Sawtooth, Wave::Sine],
+            osc_detune: [0.0, 1700.0, 0.0],
+            is_osc2_synced,
+            unison_count,
+            unison_detune: 20.0,
+            ..SynthPatch::default()
+        };
+        held(patch, 4800)
+    }
+
+    #[test]
+    fn a_synced_oscillator_2_repeats_with_oscillator_1() {
+        // One cycle of oscillator 1 at 100 Hz is 480 samples.
+        let largest_gap =
+            |out: &[f32]| out[480..4320].iter().zip(&out[960..]).map(|(a, b)| (a - b).abs()).fold(0.0, f32::max);
+        assert!(largest_gap(&osc2_saw(true, 1)) < 0.05, "{}", largest_gap(&osc2_saw(true, 1)));
+        assert!(largest_gap(&osc2_saw(false, 1)) > 0.5);
+        let layered = osc2_saw(true, 4);
+        assert!(layered.iter().all(|s| s.is_finite()) && layered.iter().any(|s| s.abs() > 0.1));
+    }
+
+    #[test]
+    fn ring_modulation_leaves_the_sum_and_difference() {
+        let ring_of = |ring: f64| {
+            let patch = SynthPatch {
+                osc_gain: [0.0, 1.0, 0.0],
+                // Oscillator 2 at 300 Hz.
+                osc_detune: [0.0, 1200.0 * 3.0_f64.log2(), 0.0],
+                ring,
+                ..SynthPatch::default()
+            };
+            let out = held(patch, 48_000);
+            [200.0, 300.0, 400.0].map(|freq| tone_level(&out, freq))
+        };
+        let (plain, ringed) = (ring_of(0.0), ring_of(1.0));
+        assert!(plain[1] > 0.3 && plain[0] < 0.01, "{plain:?}");
+        // sin(a) sin(b) = (cos(a - b) - cos(a + b)) / 2.
+        assert!(ringed[1] < 0.01 && ringed[0] > 0.08 && ringed[2] > 0.08, "{ringed:?}");
     }
 
     #[test]

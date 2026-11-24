@@ -230,6 +230,34 @@ The synth has three chip controls, read from a preset when present and written o
 after the others in `LfoTarget::ALL`, so no code moved), which rewrote `synth_editor_rust.txt` (engine: more targets
 in the LFO lines; the audio renders are unchanged). Their names keep them out of the auto-assign, so no row of `assign_tests/data.rs` changed.
 
+The synth has a pitch envelope and two links from oscillator 1 to oscillator 2
+(`ordrumbox-dsp/src/synth/pitch_env.rs`, `cross_mod.rs`). `pitchEnv` (`amount`, −48 to 48 semitones, and
+`decay`, 5 ms to 1 s, the time to fall to a hundredth) is a group of the editor's defaults (an ENV-tab card);
+`vco2` `ring` (0–1) and `sync` (`off`, `vco1`) are written only once set, like `width`. `pitchEnv.amount`,
+`pitchEnv.decay` and `vco2.ring` are LFO and matrix targets, after the others in `LfoTarget::ALL`. A preset
+without them plays as before: the audio snapshots are unchanged. This rewrote `synth_editor_rust.txt` (engine: the
+`pitchEnv` group in each hydrated preset and its card, the three targets in the LFO lines).
+
+The factory presets whose modulation envelope swept the pitch (attack of 5 ms at most: the kicks, toms and
+electronic snares of `TR808_*`, `TR909_*`, `TR606_*`, `SDS_*`, `TRAP_*`, `MIN_*`, `PUNCH_*`, `CHIP_*` and
+`KICK_SYNTH`) use the pitch envelope instead: 12 semitones, a decay of 1.37 × the old one (the same time to fall
+to half the sweep; the curve is exponential, not cubic), and the modulation envelope's target is `off`.
+`LAT_CUICA`, whose sweep rises first, keeps its modulation envelope. The kicks and toms also get a matrix line
+velocity → `pitchEnv.amount` (0.1): 10 semitones and the line give 12 at a velocity of 0.8, more on a harder hit.
+`LAT_COWBELL` and `COWBELL_SYNTH` have `vco2.ring` at 0.35. On the cymbals, ring modulation changed nothing
+the probe measures (their noise and band-pass make the sound), so they are as they were. The kit samples rendered
+from these presets (26 files of `808_like`, `909_like`, `606_like`, `simmons_like`, `trap_808`, `minimal`,
+`punch_synth`, `8bits`, `latin_perc`) were rendered again with the recipe of "Kits rendered by the synth", cut to
+their former length; the same recipe gives the former files back, bit for bit, from the former presets. Their
+note stays within a third of a semitone, their decay within 6 ms and their level within 0.7 dB; the measured
+sweep differs by its curve (`ordrumbox-probe compare`). No snapshot changed.
+
+The factory preset `SYNTHLEAD_SYNC` is a hard-sync lead: `vco2` a sawtooth an octave up, synced to `vco1`,
+swept 7 semitones down at each note by the modulation envelope through the matrix (whose own target is `off`),
+brighter with the velocity, drifting with LFO1. Added last, it is the second `SYNTHLEAD` the auto-assign picks
+(after `SYNTHLEAD_SAW`, in place of `SYNTHLEAD_SUPERSAW`), so the `SYNTHLEAD` rows of `assign_tests/data.rs`
+were rewritten.
+
 The synth editor has a `matrix` group (`source1`..`source8`, `target1`..`target8`,
 `amount1`..`amount8`) in its defaults, so a hydrated preset holds it and the MOD tab has a
 Matrix card. This rewrote `synth_editor_rust.txt` (engine); the audio renders are unchanged,

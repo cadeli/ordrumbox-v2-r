@@ -10,10 +10,10 @@ use ordrumbox_dsp::SynthPatch;
 use ordrumbox_dsp::lfo::Wave;
 use ordrumbox_dsp::slope::FilterMode;
 pub use ordrumbox_dsp::synth::FM_DEVIATION;
-use ordrumbox_dsp::synth::MAX_UNISON;
 use ordrumbox_dsp::synth::patch::{
-    Adsr, LfoTarget, MATRIX_SIZE, MatrixRoute, MatrixSource, ModEnvTarget, NoiseMode, SynthBypass, SynthLfo,
+    Adsr, LfoTarget, MATRIX_SIZE, MatrixRoute, MatrixSource, ModEnvTarget, NoiseMode, PitchEnv, SynthBypass, SynthLfo,
 };
+use ordrumbox_dsp::synth::{MAX_PITCH_ENV_SEMITONES, MAX_UNISON};
 
 pub mod tags;
 
@@ -34,11 +34,18 @@ pub const NOISE_MODES: [&str; 3] = ["white", "long", "short"];
 /// The clock rate of the console noise, Hz: its range, and what a preset without one gets.
 pub const NOISE_RATE_RANGE: (f64, f64) = (100.0, 32_000.0);
 pub use ordrumbox_dsp::synth::patch::NOISE_RATE_DEFAULT;
+/// What oscillator 2 restarts its cycle with (`vco2.sync`), by code: nothing, or oscillator 1.
+pub const OSC2_SYNCS: [&str; 2] = ["off", "vco1"];
+/// The pitch envelope's offset, semitones, and its decay, seconds: their ranges.
+pub const PITCH_ENV_AMOUNT_RANGE: (f64, f64) = (-MAX_PITCH_ENV_SEMITONES, MAX_PITCH_ENV_SEMITONES);
+pub const PITCH_ENV_DECAY_RANGE: (f64, f64) = (0.005, 1.0);
+/// The decay of a preset's pitch envelope when it gives none, seconds.
+pub const PITCH_ENV_DECAY_DEFAULT: f64 = 0.05;
 /// What a line of a preset's `matrix` reads, by code.
 pub const MATRIX_SOURCES: [&str; 8] = ["off", "lfo1", "lfo2", "env", "modEnv", "velocity", "key", "random"];
 const MOD_ENV_TARGETS: [&str; 5] = ["off", "filter", "pitch", "fm", "shape"];
 /// The LFO targets by their name in a preset (two names for the filter envelope amount).
-const LFO_TARGETS: [(&str, LfoTarget); 39] = [
+const LFO_TARGETS: [(&str, LfoTarget); 42] = [
     ("NOT", LfoTarget::Off),
     ("FLT", LfoTarget::Filter),
     ("VCO1", LfoTarget::Osc1),
@@ -78,6 +85,9 @@ const LFO_TARGETS: [(&str, LfoTarget); 39] = [
     ("vco2.width", LfoTarget::Osc2Width),
     ("vco3.width", LfoTarget::Osc3Width),
     ("noise.rate", LfoTarget::NoiseRate),
+    ("pitchEnv.amount", LfoTarget::PitchEnvAmount),
+    ("pitchEnv.decay", LfoTarget::PitchEnvDecay),
+    ("vco2.ring", LfoTarget::Osc2Ring),
 ];
 /// `SYNC_NOTE_HZ`: LFO cycles per beat-second for each sync label.
 const SYNC_NOTE_HZ: [(&str, f64); 7] = [
@@ -292,6 +302,7 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
     let mod_target = get(mod_env, "target");
     let fm = at("fm");
     let unison = at("unison");
+    let pitch_env = at("pitchEnv");
 
     SynthPatch {
         osc_freq,
@@ -299,6 +310,8 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
         osc_detune: vcos.map(|vco| finite(get(vco, "detune"), 0.0)),
         osc_wave: vcos.map(|vco| choice(get(vco, "wave"), &WAVES, &Wave::ALL)),
         osc_width: vcos.map(|vco| level(get(vco, "width"), 0.5)),
+        ring: level(get(vcos[1], "ring"), 0.0),
+        is_osc2_synced: get(vcos[1], "sync").and_then(Value::as_str) == Some(OSC2_SYNCS[1]),
         noise_mix: level(get(noise, "mix"), 0.0),
         noise_mode: choice(get(noise, "mode"), &NOISE_MODES, &NoiseMode::ALL),
         noise_rate: clamp(finite(get(noise, "rate"), NOISE_RATE_DEFAULT), NOISE_RATE_RANGE.0, NOISE_RATE_RANGE.1),
@@ -311,6 +324,14 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
         filter_slope: finite(get(filter, "slope"), 12.0),
         drive: finite(get(filter, "drive"), 0.0),
         pitch_punch: finite(at("pitchPunch"), 0.0),
+        pitch_env: PitchEnv {
+            amount: clamp(finite(get(pitch_env, "amount"), 0.0), PITCH_ENV_AMOUNT_RANGE.0, PITCH_ENV_AMOUNT_RANGE.1),
+            decay: clamp(
+                finite(get(pitch_env, "decay"), PITCH_ENV_DECAY_DEFAULT),
+                PITCH_ENV_DECAY_RANGE.0,
+                PITCH_ENV_DECAY_RANGE.1,
+            ),
+        },
         sub_gain: level(at("subGain"), 0.0),
         envelope: adsr(env, 0.7),
         volume: 1.0,
@@ -397,6 +418,20 @@ mod tests {
         assert_eq!((patch.noise_mode, patch.noise_rate), (NoiseMode::Short, NOISE_RATE_RANGE.0));
         let plain = synth_patch(&json::parse("{}").unwrap(), note);
         assert_eq!((plain.noise_mode, plain.noise_rate), (NoiseMode::White, NOISE_RATE_DEFAULT));
+    }
+
+    #[test]
+    fn the_pitch_envelope_ring_and_sync_are_read_and_bounded() {
+        let note = SynthNote { ratio: 1.0, velocity: 0.5, pan: 0.0, bpm: 120.0 };
+        let patch = synth_patch(
+            &json::parse(r#"{"pitchEnv":{"amount":-99,"decay":0},"vco2":{"ring":0.25,"sync":"vco1"}}"#).unwrap(),
+            note,
+        );
+        assert_eq!(patch.pitch_env, PitchEnv { amount: -MAX_PITCH_ENV_SEMITONES, decay: PITCH_ENV_DECAY_RANGE.0 });
+        assert_eq!((patch.ring, patch.is_osc2_synced), (0.25, true));
+        let plain = synth_patch(&json::parse(r#"{"vco2":{"sync":"nope"}}"#).unwrap(), note);
+        assert_eq!(plain.pitch_env, PitchEnv { amount: 0.0, decay: PITCH_ENV_DECAY_DEFAULT });
+        assert_eq!((plain.ring, plain.is_osc2_synced), (0.0, false));
     }
 
     #[test]

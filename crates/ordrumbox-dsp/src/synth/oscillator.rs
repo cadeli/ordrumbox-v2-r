@@ -176,6 +176,14 @@ pub(super) fn pulse(phase: f64, dt: f64, width: f64) -> f64 {
     level + poly_blep(phase, dt) - poly_blep((phase + 1.0 - width) % 1.0, dt)
 }
 
+/// How far an oscillator at `frequency` Hz moves a sample, in cycles: under
+/// half a cycle either way. A negative frequency runs the phase backwards:
+/// through-zero FM keeps the note's pitch, where stopping at zero would raise it.
+#[inline]
+pub(super) fn phase_step(frequency: f64, sample_rate: f64) -> f64 {
+    super::clamp(frequency / sample_rate, -0.49, 0.49)
+}
+
 /// An oscillator of `wave` at `phase` (0–1) of its cycle number `cycle`,
 /// moving by `dt` a sample; a square is high for `width` of the cycle.
 ///

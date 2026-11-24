@@ -12,28 +12,13 @@ use crate::synth_preset::FM_DEVIATION;
 use crate::synth_preset::tags::TAG_KEYS;
 pub use ordrumbox_dsp::synth::patch::MATRIX_SIZE;
 
-pub use crate::synth_preset::{FILTER_TYPES, MATRIX_SOURCES, NOISE_MODES, WAVES};
+pub use crate::synth_preset::{FILTER_TYPES, MATRIX_SOURCES, NOISE_MODES, OSC2_SYNCS, WAVES};
+use crate::synth_preset::{PITCH_ENV_AMOUNT_RANGE, PITCH_ENV_DECAY_DEFAULT, PITCH_ENV_DECAY_RANGE};
 
+mod choices;
+pub use choices::*;
 mod preview;
 pub use preview::*;
-/// The mod envelope's targets and the LFO syncs (value, label).
-pub const MOD_ENV_TARGETS: [(&str, &str); 5] =
-    [("off", "Off"), ("filter", "Filter"), ("pitch", "Pitch"), ("fm", "FM"), ("shape", "Shape")];
-/// The labels of the noise's modes, in the order of [`NOISE_MODES`].
-pub const NOISE_MODE_LABELS: [&str; 3] = ["White", "Long", "Short"];
-/// Filter slopes, dB per octave, and their labels.
-pub const FILTER_SLOPES: [(&str, &str); 2] = [("12", "12 dB"), ("24", "24 dB")];
-pub const LFO_SYNCS: [(&str, &str); 8] = [
-    ("off", "free"),
-    ("1/1", "1/1"),
-    ("1/2", "1/2"),
-    ("1/4", "1/4"),
-    ("1/8", "1/8"),
-    ("1/16", "1/16"),
-    ("1/8T", "1/8T"),
-    ("1/16T", "1/16T"),
-];
-
 /// A group's defaults (`SYNTH_GROUP_DEFAULTS`), in order.
 const DEFAULTS: &str = r#"{"masterVolume":0.8,"subGain":0,"pitchPunch":0,
     "vco1":{"gain":1,"octave":0,"detune":0,"wave":"sine"},
@@ -47,15 +32,18 @@ const DEFAULTS: &str = r#"{"masterVolume":0.8,"subGain":0,"pitchPunch":0,
     "lfo2":{"target":"NOT","wave":"sine","freq":0,"depth":0,"sync":"off"},
     "noise":{"mix":0,"filterType":"highpass","filterFreq":1000,"filterQ":1},
     "envelope":{"attack":0,"decay":0.12,"sustain":1,"release":0.05},
-    "modEnvelope":{"attack":0,"decay":0.12,"sustain":0,"release":0.1,"target":"off"}}"#;
+    "modEnvelope":{"attack":0,"decay":0.12,"sustain":0,"release":0.1,"target":"off"},
+    "pitchEnv":{"amount":0,"decay":0.05}}"#;
 
 /// Fields the JS editor lacks, shown last in their card and written only once
 /// set (absent, the engine's default applies): kept out of [`DEFAULTS`] so a
 /// hydrated preset stays the JS one.
-const EXTRA_FIELDS: [(&str, &str); 6] = [
+const EXTRA_FIELDS: [(&str, &str); 8] = [
     ("filter", "slope"),
     ("vco1", "width"),
     ("vco2", "width"),
+    ("vco2", "ring"),
+    ("vco2", "sync"),
     ("vco3", "width"),
     ("noise", "mode"),
     ("noise", "rate"),
@@ -154,12 +142,28 @@ pub const MATRIX_AMOUNTS: [Meta; MATRIX_SIZE] = [
     meta("matrix.amount8", -1.0, 1.0, 0.01, ""),
 ];
 
+/// The pitch envelope's controls: its offset and its decay.
+pub const PITCH_ENV_METAS: [Meta; 2] = [
+    Meta {
+        label: Some("Amount"),
+        ..meta("pitchEnv.amount", PITCH_ENV_AMOUNT_RANGE.0, PITCH_ENV_AMOUNT_RANGE.1, 1.0, "st")
+    },
+    Meta {
+        log: true,
+        default: PITCH_ENV_DECAY_DEFAULT,
+        label: Some("Decay"),
+        ..meta("pitchEnv.decay", PITCH_ENV_DECAY_RANGE.0, PITCH_ENV_DECAY_RANGE.1, 0.001, "s")
+    },
+];
+
 /// The controls of [`EXTRA_FIELDS`] that are knobs: the pulse width of each
-/// oscillator and the clock of the console noise.
-pub const EXTRA_METAS: [Meta; 4] = [
+/// oscillator, how far oscillator 1 ring-modulates oscillator 2, and the
+/// clock of the console noise.
+pub const EXTRA_METAS: [Meta; 5] = [
     Meta { default: 0.5, label: Some("Width"), ..meta("vco1.width", 0.02, 0.98, 0.01, "") },
     Meta { default: 0.5, label: Some("Width"), ..meta("vco2.width", 0.02, 0.98, 0.01, "") },
     Meta { default: 0.5, label: Some("Width"), ..meta("vco3.width", 0.02, 0.98, 0.01, "") },
+    Meta { label: Some("Ring"), ..meta("vco2.ring", 0.0, 1.0, 0.01, "") },
     Meta {
         log: true,
         default: ordrumbox_dsp::synth::patch::NOISE_RATE_DEFAULT,
@@ -175,7 +179,7 @@ pub const EXTRA_METAS: [Meta; 4] = [
 ];
 
 pub fn metas() -> impl Iterator<Item = &'static Meta> {
-    METAS.iter().chain(std::iter::once(&MOD_RELEASE)).chain(&MATRIX_AMOUNTS).chain(&EXTRA_METAS)
+    METAS.iter().chain(std::iter::once(&MOD_RELEASE)).chain(&MATRIX_AMOUNTS).chain(&EXTRA_METAS).chain(&PITCH_ENV_METAS)
 }
 
 /// The value of an extra control `draft` has not set, if `path` is one.
@@ -199,74 +203,6 @@ pub fn lfo_targets() -> Vec<&'static str> {
         .collect()
 }
 
-/// The controls set from a list (`filter.slope` holds numbers).
-pub const CHOICE_PATHS: [&str; 14 + 2 * MATRIX_SIZE] = [
-    "vco1.wave",
-    "vco2.wave",
-    "vco3.wave",
-    "lfo.wave",
-    "lfo2.wave",
-    "filter.type",
-    "noise.filterType",
-    "filter.slope",
-    "noise.mode",
-    "modEnvelope.target",
-    "lfo.target",
-    "lfo2.target",
-    "lfo.sync",
-    "lfo2.sync",
-    "matrix.source1",
-    "matrix.target1",
-    "matrix.source2",
-    "matrix.target2",
-    "matrix.source3",
-    "matrix.target3",
-    "matrix.source4",
-    "matrix.target4",
-    "matrix.source5",
-    "matrix.target5",
-    "matrix.source6",
-    "matrix.target6",
-    "matrix.source7",
-    "matrix.target7",
-    "matrix.source8",
-    "matrix.target8",
-];
-
-/// Whether `path` is `matrix.<name><n>` for a line `n` of the matrix.
-fn is_matrix_line(path: &str, name: &str) -> bool {
-    path.strip_prefix("matrix.")
-        .and_then(|rest| rest.strip_prefix(name))
-        .is_some_and(|n| (1..=MATRIX_SIZE).any(|line| line.to_string() == n))
-}
-
-/// The values control `path` takes from a list, if it is one of [`CHOICE_PATHS`].
-pub fn choices(path: &str) -> Option<Vec<&'static str>> {
-    let values = |list: &[(&'static str, &'static str)]| list.iter().map(|(value, _)| *value).collect();
-    Some(match path {
-        "vco1.wave" | "vco2.wave" | "vco3.wave" | "lfo.wave" | "lfo2.wave" => WAVES.to_vec(),
-        "filter.type" | "noise.filterType" => FILTER_TYPES.to_vec(),
-        "filter.slope" => values(&FILTER_SLOPES),
-        "noise.mode" => NOISE_MODES.to_vec(),
-        "modEnvelope.target" => values(&MOD_ENV_TARGETS),
-        "lfo.target" | "lfo2.target" => lfo_targets(),
-        "lfo.sync" | "lfo2.sync" => values(&LFO_SYNCS),
-        _ if is_matrix_line(path, "source") => MATRIX_SOURCES.to_vec(),
-        _ if is_matrix_line(path, "target") => lfo_targets(),
-        _ => return None,
-    })
-}
-
-/// Value `value` of list control `path` as a preset holds it: the slope
-/// list holds numbers.
-pub fn choice_value(path: &str, value: &str) -> Value {
-    if path == "filter.slope" {
-        Value::from(value).to_number().map_or_else(|| Value::from(value), Value::from)
-    } else {
-        Value::from(value)
-    }
-}
-
 /// What one unit of an LFO's wave is worth on a target (`LFO_TARGET_SCALE`).
 pub fn lfo_scale(target: &str) -> f64 {
     match target {
@@ -276,7 +212,10 @@ pub fn lfo_scale(target: &str) -> f64 {
         "noise.filterFreq" => 10_000.0,
         "vco1.width" | "vco2.width" | "vco3.width" => 0.5,
         "noise.rate" => 8000.0,
-        "envelope.attack" | "envelope.release" | "modEnvelope.attack" | "modEnvelope.release" => 0.25,
+        "pitchEnv.amount" => 24.0,
+        "envelope.attack" | "envelope.release" | "modEnvelope.attack" | "modEnvelope.release" | "pitchEnv.decay" => {
+            0.25
+        }
         "envelope.decay" | "envelope.sustain" | "modEnvelope.decay" | "modEnvelope.sustain" => 0.5,
         "NOT" => 0.0,
         t if find_meta(t).is_some() && !t.starts_with("lfo") => 1.0,
@@ -297,7 +236,7 @@ pub const BYPASS_FLAGS: [(&str, &str); 8] = [
 ];
 
 /// The cards in order (`SYNTH_GROUP_ORDER`), and the master card's controls.
-pub const GROUP_ORDER: [&str; 15] = [
+pub const GROUP_ORDER: [&str; 16] = [
     "scope",
     "vco1",
     "vco2",
@@ -312,6 +251,7 @@ pub const GROUP_ORDER: [&str; 15] = [
     "noise",
     "master",
     "envelope",
+    "pitchEnv",
     "modEnvelope",
 ];
 pub const MASTER_KEYS: [&str; 3] = ["masterVolume", "subGain", "pitchPunch"];
@@ -323,7 +263,7 @@ pub fn group_tab(group: &str) -> usize {
     match group {
         "filter" | "filterEnv" | "modEnvelope" => 1,
         "lfo" | "lfo2" | "matrix" | "noise" => 2,
-        "envelope" | "master" => 3,
+        "envelope" | "pitchEnv" | "master" => 3,
         _ => 0,
     }
 }
@@ -341,6 +281,7 @@ pub fn group_label(group: &str) -> String {
         "matrix" => "Matrix".into(),
         "envelope" => "Envelope".into(),
         "modEnvelope" => "Mod Env".into(),
+        "pitchEnv" => "Pitch Env".into(),
         g if g.len() > 3 && g[..3].eq_ignore_ascii_case("vco") && g[3..].chars().all(|c| c.is_ascii_digit()) => {
             g.to_uppercase()
         }
@@ -500,7 +441,7 @@ pub fn implicit_enable(draft: &mut Object, path: &str) -> Vec<String> {
     let mut changed = Vec::new();
     let gain = |d: &Object, g: &str| number(d, &format!("{g}.gain")).unwrap_or(0.0);
     if matches!(group, "vco2" | "vco3")
-        && matches!(key, "octave" | "detune" | "wave" | "width")
+        && matches!(key, "octave" | "detune" | "wave" | "width" | "ring" | "sync")
         && gain(draft, group) == 0.0
     {
         if let Some(Value::Object(vco)) = draft.get_mut(group) {
@@ -573,6 +514,7 @@ pub fn modules(draft: &Object) -> Vec<(&'static str, bool)> {
         ("Mod", !flag("bypassModEnv") && target("modEnvelope.target", "off")),
         ("Noise", !flag("bypassNoise") && n("noise.mix") > 0.001),
         ("Filter Env", !flag("bypassFilterEnv") && env_amount > 0.001),
+        ("Pitch Env", n("pitchEnv.amount") != 0.0),
     ]
 }
 
@@ -622,6 +564,19 @@ mod tests {
         assert!(bypassed(&d, "envelope"));
         toggle_card(&mut d, "envelope");
         assert_eq!(d.get("_resetEnv"), Some(&Value::Bool(true)));
+    }
+
+    #[test]
+    fn the_scope_shows_the_sync_and_the_ring() {
+        let mut d = defaults();
+        set(&mut d, "vco2.gain", Value::from(0.5));
+        set(&mut d, "vco2.detune", Value::from(50.0));
+        let plain = scope(&d, 0.0, 120.0);
+        set(&mut d, "vco2.sync", Value::from("vco1"));
+        let synced = scope(&d, 0.0, 120.0);
+        assert_ne!(synced, plain);
+        set(&mut d, "vco2.ring", Value::from(1.0));
+        assert_ne!(scope(&d, 0.0, 120.0), synced);
     }
 
     #[test]

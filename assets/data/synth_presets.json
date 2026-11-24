@@ -1726,7 +1726,16 @@
       "decay": 0.09,
       "sustain": 0,
       "release": 0.05,
-      "target": "pitch"
+      "target": "off"
+    },
+    "matrix": {
+      "source1": "velocity",
+      "target1": "pitchEnv.amount",
+      "amount1": 0.1
+    },
+    "pitchEnv": {
+      "amount": 10,
+      "decay": 0.123
     }
   },
   "SNARE_SYNTH": {
@@ -1956,7 +1965,8 @@
       "gain": 0.5,
       "octave": 2,
       "detune": 735,
-      "wave": "square"
+      "wave": "square",
+      "ring": 0.35
     },
     "vco3": {
       "gain": 0,
@@ -2766,7 +2776,16 @@
       "decay": 0.08,
       "sustain": 0,
       "release": 0.05,
-      "target": "pitch"
+      "target": "off"
+    },
+    "matrix": {
+      "source1": "velocity",
+      "target1": "pitchEnv.amount",
+      "amount1": 0.1
+    },
+    "pitchEnv": {
+      "amount": 10,
+      "decay": 0.11
     }
   },
   "CHIP_SNARE": {
@@ -2912,9 +2931,18 @@
       "decay": 0.1,
       "sustain": 0,
       "release": 0.05,
-      "target": "pitch"
+      "target": "off"
     },
-    "bypassFilter": true
+    "bypassFilter": true,
+    "matrix": {
+      "source1": "velocity",
+      "target1": "pitchEnv.amount",
+      "amount1": 0.1
+    },
+    "pitchEnv": {
+      "amount": 10,
+      "decay": 0.137
+    }
   },
   "CHIP_HAT": {
     "instrument": "CHH",
@@ -3277,7 +3305,16 @@
       "decay": 0.045,
       "sustain": 0,
       "release": 0.05,
-      "target": "pitch"
+      "target": "off"
+    },
+    "matrix": {
+      "source1": "velocity",
+      "target1": "pitchEnv.amount",
+      "amount1": 0.1
+    },
+    "pitchEnv": {
+      "amount": 10,
+      "decay": 0.062
     }
   },
   "TR808_SNARE": {
@@ -3845,7 +3882,16 @@
       "decay": 0.03,
       "sustain": 0,
       "release": 0.05,
-      "target": "pitch"
+      "target": "off"
+    },
+    "matrix": {
+      "source1": "velocity",
+      "target1": "pitchEnv.amount",
+      "amount1": 0.1
+    },
+    "pitchEnv": {
+      "amount": 10,
+      "decay": 0.041
     }
   },
   "TR808_TOM": {
@@ -3916,7 +3962,16 @@
       "decay": 0.03,
       "sustain": 0,
       "release": 0.05,
-      "target": "pitch"
+      "target": "off"
+    },
+    "matrix": {
+      "source1": "velocity",
+      "target1": "pitchEnv.amount",
+      "amount1": 0.1
+    },
+    "pitchEnv": {
+      "amount": 10,
+      "decay": 0.041
     }
   },
   "TR808_HI_TOM": {
@@ -3987,7 +4042,16 @@
       "decay": 0.03,
       "sustain": 0,
       "release": 0.05,
-      "target": "pitch"
+      "target": "off"
+    },
+    "matrix": {
+      "source1": "velocity",
+      "target1": "pitchEnv.amount",
+      "amount1": 0.1
+    },
+    "pitchEnv": {
+      "amount": 10,
+      "decay": 0.041
     }
   },
   "TR808_LO_CONGAS": {
@@ -4484,7 +4548,16 @@
       "decay": 0.02,
       "sustain": 0,
       "release": 0.05,
-      "target": "pitch"
+      "target": "off"
+    },
+    "matrix": {
+      "source1": "velocity",
+      "target1": "pitchEnv.amount",
+      "amount1": 0.1
+    },
+    "pitchEnv": {
+      "amount": 10,
+      "decay": 0.027
     }
   },
   "TR909_SNARE": {
@@ -5052,7 +5125,16 @@
       "decay": 0.09,
       "sustain": 0,
       "release": 0.05,
-      "target": "pitch"
+      "target": "off"
+    },
+    "matrix": {
+      "source1": "velocity",
+      "target1": "pitchEnv.amount",
+      "amount1": 0.1
+    },
+    "pitchEnv": {
+      "amount": 10,
+      "decay": 0.123
     }
   },
   "TR909_TOM": {
@@ -5123,7 +5205,16 @@
       "decay": 0.09,
       "sustain": 0,
       "release": 0.05,
-      "target": "pitch"
+      "target": "off"
+    },
+    "matrix": {
+      "source1": "velocity",
+      "target1": "pitchEnv.amount",
+      "amount1": 0.1
+    },
+    "pitchEnv": {
+      "amount": 10,
+      "decay": 0.123
     }
   },
   "TR909_HI_TOM": {
@@ -5194,7 +5285,16 @@
       "decay": 0.09,
       "sustain": 0,
       "release": 0.05,
-      "target": "pitch"
+      "target": "off"
+    },
+    "matrix": {
+      "source1": "velocity",
+      "target1": "pitchEnv.amount",
+      "amount1": 0.1
+    },
+    "pitchEnv": {
+      "amount": 10,
+      "decay": 0.123
     }
   },
   "TR909_CONGAS": {
@@ -6134,7 +6234,8 @@
       "gain": 0.5,
       "octave": 3,
       "detune": 335,
-      "wave": "triangle"
+      "wave": "triangle",
+      "ring": 0.35
     },
     "vco3": {
       "gain": 0,
@@ -6756,7 +6857,16 @@
       "decay": 0.02,
       "sustain": 0,
       "release": 0.05,
-      "target": "pitch"
+      "target": "off"
+    },
+    "matrix": {
+      "source1": "velocity",
+      "target1": "pitchEnv.amount",
+      "amount1": 0.1
+    },
+    "pitchEnv": {
+      "amount": 10,
+      "decay": 0.027
     }
   },
   "TR606_SNARE": {
@@ -7111,7 +7221,16 @@
       "decay": 0.02,
       "sustain": 0,
       "release": 0.05,
-      "target": "pitch"
+      "target": "off"
+    },
+    "matrix": {
+      "source1": "velocity",
+      "target1": "pitchEnv.amount",
+      "amount1": 0.1
+    },
+    "pitchEnv": {
+      "amount": 10,
+      "decay": 0.027
     }
   },
   "TR606_HI_TOM": {
@@ -7182,7 +7301,16 @@
       "decay": 0.02,
       "sustain": 0,
       "release": 0.05,
-      "target": "pitch"
+      "target": "off"
+    },
+    "matrix": {
+      "source1": "velocity",
+      "target1": "pitchEnv.amount",
+      "amount1": 0.1
+    },
+    "pitchEnv": {
+      "amount": 10,
+      "decay": 0.027
     }
   },
   "CR78_KICK": {
@@ -8176,7 +8304,16 @@
       "decay": 0.08,
       "sustain": 0,
       "release": 0.05,
-      "target": "pitch"
+      "target": "off"
+    },
+    "matrix": {
+      "source1": "velocity",
+      "target1": "pitchEnv.amount",
+      "amount1": 0.1
+    },
+    "pitchEnv": {
+      "amount": 10,
+      "decay": 0.11
     }
   },
   "SDS_SNARE": {
@@ -8247,7 +8384,11 @@
       "decay": 0.04,
       "sustain": 0,
       "release": 0.05,
-      "target": "pitch"
+      "target": "off"
+    },
+    "pitchEnv": {
+      "amount": 12,
+      "decay": 0.055
     }
   },
   "SDS_LO_TOM": {
@@ -8318,7 +8459,16 @@
       "decay": 0.35,
       "sustain": 0,
       "release": 0.05,
-      "target": "pitch"
+      "target": "off"
+    },
+    "matrix": {
+      "source1": "velocity",
+      "target1": "pitchEnv.amount",
+      "amount1": 0.1
+    },
+    "pitchEnv": {
+      "amount": 10,
+      "decay": 0.479
     }
   },
   "SDS_MTOM": {
@@ -8389,7 +8539,16 @@
       "decay": 0.32,
       "sustain": 0,
       "release": 0.05,
-      "target": "pitch"
+      "target": "off"
+    },
+    "matrix": {
+      "source1": "velocity",
+      "target1": "pitchEnv.amount",
+      "amount1": 0.1
+    },
+    "pitchEnv": {
+      "amount": 10,
+      "decay": 0.438
     }
   },
   "SDS_TOM": {
@@ -8460,7 +8619,16 @@
       "decay": 0.3,
       "sustain": 0,
       "release": 0.05,
-      "target": "pitch"
+      "target": "off"
+    },
+    "matrix": {
+      "source1": "velocity",
+      "target1": "pitchEnv.amount",
+      "amount1": 0.1
+    },
+    "pitchEnv": {
+      "amount": 10,
+      "decay": 0.411
     }
   },
   "SDS_HI_TOM": {
@@ -8531,7 +8699,16 @@
       "decay": 0.28,
       "sustain": 0,
       "release": 0.05,
-      "target": "pitch"
+      "target": "off"
+    },
+    "matrix": {
+      "source1": "velocity",
+      "target1": "pitchEnv.amount",
+      "amount1": 0.1
+    },
+    "pitchEnv": {
+      "amount": 10,
+      "decay": 0.384
     }
   },
   "TRAP_KICK": {
@@ -8602,7 +8779,16 @@
       "decay": 0.015,
       "sustain": 0,
       "release": 0.05,
-      "target": "pitch"
+      "target": "off"
+    },
+    "matrix": {
+      "source1": "velocity",
+      "target1": "pitchEnv.amount",
+      "amount1": 0.1
+    },
+    "pitchEnv": {
+      "amount": 10,
+      "decay": 0.021
     }
   },
   "TRAP_BASS": {
@@ -8673,7 +8859,11 @@
       "decay": 0.03,
       "sustain": 0,
       "release": 0.05,
-      "target": "pitch"
+      "target": "off"
+    },
+    "pitchEnv": {
+      "amount": 12,
+      "decay": 0.041
     }
   },
   "TRAP_SNARE": {
@@ -9099,7 +9289,16 @@
       "decay": 0.015,
       "sustain": 0,
       "release": 0.05,
-      "target": "pitch"
+      "target": "off"
+    },
+    "matrix": {
+      "source1": "velocity",
+      "target1": "pitchEnv.amount",
+      "amount1": 0.1
+    },
+    "pitchEnv": {
+      "amount": 10,
+      "decay": 0.021
     }
   },
   "MIN_RIMSHOT": {
@@ -9596,7 +9795,11 @@
       "decay": 0.05,
       "sustain": 0,
       "release": 0.05,
-      "target": "pitch"
+      "target": "off"
+    },
+    "pitchEnv": {
+      "amount": 12,
+      "decay": 0.069
     }
   },
   "MIN_SHAKER": {
@@ -11371,7 +11574,16 @@
       "decay": 0.05,
       "sustain": 0,
       "release": 0.05,
-      "target": "pitch"
+      "target": "off"
+    },
+    "matrix": {
+      "source1": "velocity",
+      "target1": "pitchEnv.amount",
+      "amount1": 0.1
+    },
+    "pitchEnv": {
+      "amount": 10,
+      "decay": 0.069
     }
   },
   "PUNCH_SNARE": {
@@ -11442,7 +11654,11 @@
       "decay": 0.03,
       "sustain": 0,
       "release": 0.05,
-      "target": "pitch"
+      "target": "off"
+    },
+    "pitchEnv": {
+      "amount": 12,
+      "decay": 0.041
     }
   },
   "PUNCH_TOM": {
@@ -11869,6 +12085,87 @@
       "sustain": 0,
       "release": 0.1,
       "target": "off"
+    }
+  },
+  "SYNTHLEAD_SYNC": {
+    "instrument": "SYNTHLEAD",
+    "style": "electro",
+    "masterVolume": 0.75,
+    "vco1": {
+      "gain": 0.25,
+      "octave": 0,
+      "detune": 0,
+      "wave": "sawtooth"
+    },
+    "vco2": {
+      "gain": 0.7,
+      "octave": 1,
+      "detune": 0,
+      "wave": "sawtooth",
+      "sync": "vco1"
+    },
+    "vco3": {
+      "gain": 0,
+      "octave": 0,
+      "detune": 0,
+      "wave": "sine"
+    },
+    "subGain": 0,
+    "pitchPunch": 0,
+    "filter": {
+      "type": "lowpass",
+      "freq": 5000,
+      "Q": 1,
+      "drive": 0.15,
+      "slope": 24
+    },
+    "filterEnv": {
+      "filterEnvelopeAmount": 0.2
+    },
+    "fm": {
+      "amount": 0,
+      "algo": 0
+    },
+    "noise": {
+      "mix": 0,
+      "filterType": "highpass",
+      "filterFreq": 2000,
+      "filterQ": 1
+    },
+    "envelope": {
+      "attack": 0.003,
+      "decay": 0.3,
+      "sustain": 0.8,
+      "release": 0.18
+    },
+    "lfo": {
+      "target": "vco2.octave",
+      "wave": "sine",
+      "freq": 0.6,
+      "depth": 0.08,
+      "sync": "off"
+    },
+    "lfo2": {
+      "target": "NOT",
+      "wave": "sine",
+      "freq": 0,
+      "depth": 0,
+      "sync": "off"
+    },
+    "modEnvelope": {
+      "attack": 0.002,
+      "decay": 0.35,
+      "sustain": 0.25,
+      "release": 0.2,
+      "target": "off"
+    },
+    "matrix": {
+      "source1": "modEnv",
+      "target1": "vco2.octave",
+      "amount1": 0.6,
+      "source2": "velocity",
+      "target2": "vco2.octave",
+      "amount2": 0.2
     }
   }
 }

@@ -105,6 +105,12 @@ fn field_kind(path: &str, value: Option<&Value>) -> Field {
             model::NOISE_MODES.iter().zip(labels).map(|(v, l)| ((*v).to_owned(), l.to_owned())).collect(),
         );
     }
+    if path == "vco2.sync" {
+        let labels = model::OSC2_SYNC_LABELS;
+        return Field::List(
+            model::OSC2_SYNCS.iter().zip(labels).map(|(v, l)| ((*v).to_owned(), l.to_owned())).collect(),
+        );
+    }
     if model::extra_default(path).is_some() {
         return Field::Knob;
     }

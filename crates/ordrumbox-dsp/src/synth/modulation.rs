@@ -3,7 +3,7 @@
 
 use std::ops::Index;
 
-use super::patch::{Adsr, LfoTarget, MATRIX_SIZE, MatrixRoute, MatrixSource, SynthLfo};
+use super::patch::{Adsr, LfoTarget, MATRIX_SIZE, MatrixRoute, MatrixSource, SynthLfo, SynthPatch};
 use crate::lfo::{self, Wave};
 
 /// A value an LFO can add to.
@@ -39,9 +39,12 @@ pub(super) enum Slot {
     Width2,
     Width3,
     NoiseRate,
+    PitchEnvAmount,
+    PitchEnvDecay,
+    Ring,
 }
 
-const SLOT_COUNT: usize = Slot::NoiseRate as usize + 1;
+const SLOT_COUNT: usize = Slot::Ring as usize + 1;
 
 pub(super) const DETUNE_SLOTS: [Slot; 3] = [Slot::Detune1, Slot::Detune2, Slot::Detune3];
 pub(super) const GAIN_SLOTS: [Slot; 3] = [Slot::Gain1, Slot::Gain2, Slot::Gain3];
@@ -51,8 +54,15 @@ pub(super) const MOD_ENV_SLOTS: [Slot; 4] =
     [Slot::ModEnvAttack, Slot::ModEnvDecay, Slot::ModEnvSustain, Slot::ModEnvRelease];
 
 /// What one LFO adds this sample: all zero but the slot of its route.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy)]
 pub(super) struct LfoMods([f64; SLOT_COUNT]);
+
+// By hand: `Default` is derived for arrays of up to 32 values only.
+impl Default for LfoMods {
+    fn default() -> Self {
+        Self([0.0; SLOT_COUNT])
+    }
+}
 
 impl Index<Slot> for LfoMods {
     type Output = f64;
@@ -115,6 +125,13 @@ impl LfoRoute {
     pub(super) fn apply(&self, phase: f64, mods: &mut LfoMods) {
         mods.0[self.slot as usize] = lfo::wave(phase, self.wave) * self.depth * self.scale;
     }
+}
+
+/// Whether an LFO or a line of the matrix of `p` may move `target`: a
+/// stage the patch leaves at rest is then still worked out.
+#[must_use]
+pub(super) fn is_targeted(p: &SynthPatch, target: LfoTarget) -> bool {
+    p.lfo1.target == target || p.lfo2.target == target || p.matrix.iter().any(|route| route.target == target)
 }
 
 /// The values the sources of the matrix have at one sample.
@@ -226,6 +243,9 @@ fn destination(target: LfoTarget) -> Option<(Slot, f64)> {
         T::Osc2Width => (Slot::Width2, 0.5),
         T::Osc3Width => (Slot::Width3, 0.5),
         T::NoiseRate => (Slot::NoiseRate, 8000.0),
+        T::PitchEnvAmount => (Slot::PitchEnvAmount, 24.0),
+        T::PitchEnvDecay => (Slot::PitchEnvDecay, 0.25),
+        T::Osc2Ring => (Slot::Ring, 1.0),
     })
 }
 

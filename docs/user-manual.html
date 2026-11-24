@@ -957,18 +957,20 @@ A built-in preset you have not changed plays as the assets hold it.</p>
 
 <h3>Cards</h3>
 <p>Four tabs of cards. Each card has a power button; touching a control of a card that is off switches it on
-(an oscillator to 0.5, FM to 0.3, the noise to 0.15, an LFO onto the filter, the mod envelope onto the filter).
+(an oscillator to 0.5, also when its ring or sync is touched, FM to 0.3, the noise to 0.15, an LFO onto the filter, the mod envelope onto the filter).
 A knob an LFO moves is purple and follows it. The pills under the cards show the modules in use.</p>
 
 <h4>OSC tab</h4>
 <table>
 <tr><th>Card</th><th>Control</th><th>Range</th><th>What it does</th></tr>
-<tr><td><strong>Scope</strong></td><td>—</td><td></td><td>Four cycles of the oscillators, with FM, sub and drive.</td></tr>
+<tr><td><strong>Scope</strong></td><td>—</td><td></td><td>Four cycles of the oscillators, with FM, VCO2's sync and ring, sub and drive.</td></tr>
 <tr><td rowspan="5"><strong>VCO1</strong>, <strong>VCO2</strong>, <strong>VCO3</strong></td><td>wave</td><td>sin, tri, saw, sqr, rnd</td><td>Waveform. <strong>rnd</strong> holds one value a cycle, read in turn from the track's sample (the one it names, else its instrument's in the kit in use) from its start at every note; random values when the track has none.</td></tr>
 <tr><td>gain</td><td>0–1</td><td>Level (VCO1 at 1, the others at 0 by default).</td></tr>
 <tr><td>octave</td><td>−4 to +4</td><td>Octave offset.</td></tr>
 <tr><td>detune</td><td>−100 to +100 cents</td><td>Fine tuning.</td></tr>
 <tr><td>width</td><td>0.02–0.98 (default 0.5)</td><td>How long a square wave stays high in a cycle: 0.5 is the plain square, 0.25 and 0.125 are the thin pulses of 8-bit consoles. Square wave only.</td></tr>
+<tr><td rowspan="2"><strong>VCO2</strong> only</td><td>Ring</td><td>0–1</td><td>Ring modulation: VCO2 multiplied by VCO1 (at 1, only the product sounds). Two oscillators at a ratio that is not a whole number give the metallic tones of cymbals, bells and cowbells. VCO1 drives it even at gain 0.</td></tr>
+<tr><td>sync</td><td>Off, VCO1</td><td>Hard sync: VCO2 restarts its cycle with each cycle of VCO1, so it sounds at VCO1's pitch with a timbre set by its own octave and detune (sweep them with an LFO or the matrix for the classic sync sweep).</td></tr>
 <tr><td rowspan="3"><strong>Unison</strong></td><td>Layers</td><td>1–8</td><td>Each oscillator sounds as this many detuned layers, each starting at its own phase (1: off). The level stays that of one layer.</td></tr>
 <tr><td>detune</td><td>0–100 cents</td><td>How far the outermost layers are from the pitch, on each side.</td></tr>
 <tr><td>spread</td><td>0–1</td><td>How far the layers spread over the stereo field (0: all in the middle).</td></tr>
@@ -1023,6 +1025,8 @@ A knob an LFO moves is purple and follows it. The pills under the cards show the
 <tr><td>subGain</td><td>0–1</td><td>Sub-oscillator, an octave below VCO1.</td></tr>
 <tr><td>pitchPunch</td><td>0–1</td><td>A pitch drop at the start of the note (up to two octaves): kicks and toms.</td></tr>
 <tr><td><strong>Env</strong></td><td>attack, decay, sustain, release</td><td>0–0.5 s, 0–1 s, 0–1, 0–0.5 s</td><td>The amplitude envelope, drawn with its shape.</td></tr>
+<tr><td rowspan="2"><strong>Pitch Env</strong></td><td>Amount</td><td>−48 to +48 semitones (default 0: off)</td><td>Where the note's pitch starts: above it (kicks, toms, zaps) or below it. It then falls back to the note exponentially, as an analog drum does. All three oscillators and the sub follow it.</td></tr>
+<tr><td>Decay</td><td>5 ms – 1 s (default 50 ms)</td><td>How long the offset takes to fall to a hundredth of itself. Short for a kick's click, longer for a tom's sweep. Both controls are LFO and matrix targets: velocity on Amount hits harder notes higher.</td></tr>
 </table>
 
 <!-- ───────────────────────────────────────────────────────────── -->

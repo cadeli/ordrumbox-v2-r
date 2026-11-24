@@ -3,7 +3,7 @@
 
 use std::f64::consts::{PI, SQRT_2};
 
-use super::oscillator::{WaveTables, held_value, pulse, sawtooth, sin_lookup, triangle};
+use super::oscillator::{WaveTables, held_value, phase_step, pulse, sawtooth, sin_lookup, triangle};
 use super::{cents_ratio, clamp};
 use crate::lfo::Wave;
 
@@ -71,8 +71,7 @@ fn sum_layers(
 ) -> [f64; 2] {
     let mut sum = [0.0; 2];
     for ((phase, cycle), layer) in phases.iter_mut().zip(cycles.iter_mut()).zip(layers) {
-        // A negative frequency runs the phase backwards, as for a single layer.
-        let dt = clamp(frequency * layer.ratio / sample_rate, -0.49, 0.49);
+        let dt = phase_step(frequency * layer.ratio, sample_rate);
         let advanced = *phase + dt;
         *cycle += advanced.floor();
         *phase = advanced.rem_euclid(1.0);

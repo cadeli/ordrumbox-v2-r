@@ -4,7 +4,7 @@
 use crate::lfo::Wave;
 use crate::slope::FilterMode;
 
-/// What an LFO modulates, in the order of the preset files' codes (0 to 37).
+/// What an LFO modulates, in the order of the preset files' codes (0 to 40).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum LfoTarget {
     #[default]
@@ -50,11 +50,16 @@ pub enum LfoTarget {
     Osc3Width,
     /// The clock of the console noise (8 kHz at full depth).
     NoiseRate,
+    /// The pitch envelope's offset (24 semitones at full depth) and its decay (0.25 s).
+    PitchEnvAmount,
+    PitchEnvDecay,
+    /// How far oscillator 1 ring-modulates oscillator 2.
+    Osc2Ring,
 }
 
 impl LfoTarget {
     /// Every target, each at its code.
-    pub const ALL: [Self; 38] = [
+    pub const ALL: [Self; 41] = [
         Self::Off,
         Self::Filter,
         Self::Osc1,
@@ -93,6 +98,9 @@ impl LfoTarget {
         Self::Osc2Width,
         Self::Osc3Width,
         Self::NoiseRate,
+        Self::PitchEnvAmount,
+        Self::PitchEnvDecay,
+        Self::Osc2Ring,
     ];
 
     /// Its code: its place in [`Self::ALL`].
@@ -220,6 +228,16 @@ pub struct Adsr {
     pub release: f64,
 }
 
+/// The pitch envelope: a note starts `amount` semitones off its pitch and
+/// falls back to it exponentially, as an analog drum's pitch does.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PitchEnv {
+    /// Semitones, up or down; 0 is off.
+    pub amount: f64,
+    /// Seconds the offset takes to fall to a hundredth of itself.
+    pub decay: f64,
+}
+
 /// Stages switched off (`bypass*` of the preset).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct SynthBypass {
@@ -244,6 +262,11 @@ pub struct SynthPatch {
     pub osc_wave: [Wave; 3],
     /// Share of a cycle a square wave is high, 0–1 (0.5: the plain square).
     pub osc_width: [f64; 3],
+    /// How far oscillator 1 ring-modulates oscillator 2, 0–1 (1: oscillator 2
+    /// sounds as the product of the two).
+    pub ring: f64,
+    /// Whether oscillator 2 restarts its cycle with each cycle of oscillator 1 (hard sync).
+    pub is_osc2_synced: bool,
     pub noise_mix: f64,
     pub noise_mode: NoiseMode,
     /// Hz the shift register of a [`NoiseMode::Long`] or [`NoiseMode::Short`] noise is clocked at.
@@ -258,6 +281,7 @@ pub struct SynthPatch {
     pub filter_slope: f64,
     pub drive: f64,
     pub pitch_punch: f64,
+    pub pitch_env: PitchEnv,
     pub sub_gain: f64,
     pub envelope: Adsr,
     pub volume: f64,
@@ -299,6 +323,8 @@ impl Default for SynthPatch {
             osc_detune: [0.0; 3],
             osc_wave: [Wave::Sine; 3],
             osc_width: [0.5; 3],
+            ring: 0.0,
+            is_osc2_synced: false,
             noise_mix: 0.0,
             noise_mode: NoiseMode::White,
             noise_rate: NOISE_RATE_DEFAULT,
@@ -311,6 +337,7 @@ impl Default for SynthPatch {
             filter_slope: 12.0,
             drive: 0.0,
             pitch_punch: 0.0,
+            pitch_env: PitchEnv { amount: 0.0, decay: 0.05 },
             sub_gain: 0.0,
             envelope: Adsr { attack: 0.01, decay: 0.1, sustain: 0.7, release: 0.1 },
             volume: 0.8,
