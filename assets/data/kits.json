@@ -847,77 +847,6 @@
     ]
   },
   {
-    "name": "vintage",
-    "info": "ordrumbox kit",
-    "desc": "vintage drums and percussions",
-    "samples": [
-      {
-        "displayName": "KICK",
-        "key": "KICK",
-        "path": "vintage/kick.wav",
-        "peakDb": -3,
-        "rootMidi": 31,
-        "decay": 5000
-      },
-      {
-        "displayName": "SNARE",
-        "key": "SNARE",
-        "path": "vintage/snare.wav",
-        "peakDb": -3,
-        "rootMidi": 67,
-        "decay": 5000
-      },
-      {
-        "displayName": "TOM",
-        "key": "TOM",
-        "path": "vintage/tom.wav",
-        "peakDb": -3,
-        "rootMidi": 60,
-        "decay": 5000
-      },
-      {
-        "displayName": "CLAP",
-        "key": "CLAP",
-        "path": "vintage/clap.wav",
-        "peakDb": -3,
-        "rootMidi": 48,
-        "decay": 5000
-      },
-      {
-        "displayName": "COWBELL",
-        "key": "COWBELL",
-        "path": "vintage/cow.wav",
-        "peakDb": -3,
-        "rootMidi": 48,
-        "decay": 5000
-      },
-      {
-        "displayName": "CHH",
-        "key": "CHH",
-        "path": "vintage/chh.wav",
-        "peakDb": -3,
-        "rootMidi": 48,
-        "decay": 5000
-      },
-      {
-        "displayName": "OHH",
-        "key": "OHH",
-        "path": "vintage/ohh.wav",
-        "peakDb": -3,
-        "rootMidi": 48,
-        "decay": 5000
-      },
-      {
-        "displayName": "CRASH",
-        "key": "CRASH",
-        "path": "vintage/crash.wav",
-        "peakDb": -3,
-        "rootMidi": 48,
-        "decay": 5000
-      }
-    ]
-  },
-  {
     "name": "punchy",
     "info": "ordrumbox kit",
     "desc": "Punchy drums and percussions",
@@ -1717,6 +1646,181 @@
         "key": "SHAKER",
         "path": "minimal/shaker.wav",
         "peakDb": -3,
+        "decay": 5000
+      }
+    ]
+  },
+  {
+    "name": "vintage60",
+    "info": "1960s rhythm-box kit",
+    "desc": "rendered from the synth presets SR601_* (ordrumbox-probe preset --wav), in the manner of the early 1960s rhythm boxes (Seeburg Select-A-Rhythm, Wurlitzer Sideman): ringing damped tones and soft, muffled noise, with an organ bass, a combo-organ lead and a drawbar-organ pad",
+    "samples": [
+      {
+        "displayName": "KICK",
+        "key": "KICK",
+        "path": "vintage60/kick.wav",
+        "peakDb": -3,
+        "rootMidi": 35,
+        "decay": 5000
+      },
+      {
+        "displayName": "SNARE",
+        "key": "SNARE",
+        "path": "vintage60/snare.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "CLAP",
+        "key": "CLAP",
+        "path": "vintage60/clap.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "RIMSHOT",
+        "key": "RIMSHOT",
+        "path": "vintage60/rimshot.wav",
+        "peakDb": -3,
+        "rootMidi": 92,
+        "decay": 5000
+      },
+      {
+        "displayName": "CHH",
+        "key": "CHH",
+        "path": "vintage60/chh.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "OHH",
+        "key": "OHH",
+        "path": "vintage60/ohh.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "RIDE",
+        "key": "RIDE",
+        "path": "vintage60/ride.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "CRASH",
+        "key": "CRASH",
+        "path": "vintage60/crash.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "LO_TOM",
+        "key": "LO_TOM",
+        "path": "vintage60/lo_tom.wav",
+        "peakDb": -3,
+        "rootMidi": 46,
+        "decay": 5000
+      },
+      {
+        "displayName": "TOM",
+        "key": "TOM",
+        "path": "vintage60/tom.wav",
+        "peakDb": -3,
+        "rootMidi": 52,
+        "decay": 5000
+      },
+      {
+        "displayName": "HI_TOM",
+        "key": "HI_TOM",
+        "path": "vintage60/hi_tom.wav",
+        "peakDb": -3,
+        "rootMidi": 57,
+        "decay": 5000
+      },
+      {
+        "displayName": "HI_BONGOS",
+        "key": "HI_BONGOS",
+        "path": "vintage60/hi_bongos.wav",
+        "peakDb": -3,
+        "rootMidi": 68,
+        "decay": 5000
+      },
+      {
+        "displayName": "LO_BONGOS",
+        "key": "LO_BONGOS",
+        "path": "vintage60/lo_bongos.wav",
+        "peakDb": -3,
+        "rootMidi": 61,
+        "decay": 5000
+      },
+      {
+        "displayName": "CONGAS",
+        "key": "CONGAS",
+        "path": "vintage60/congas.wav",
+        "peakDb": -3,
+        "rootMidi": 55,
+        "decay": 5000
+      },
+      {
+        "displayName": "CLAVES",
+        "key": "CLAVES",
+        "path": "vintage60/claves.wav",
+        "peakDb": -3,
+        "rootMidi": 99,
+        "decay": 5000
+      },
+      {
+        "displayName": "HI_WOODBLOCK",
+        "key": "HI_WOODBLOCK",
+        "path": "vintage60/woodblock.wav",
+        "peakDb": -3,
+        "rootMidi": 82,
+        "decay": 5000
+      },
+      {
+        "displayName": "MARACAS",
+        "key": "MARACAS",
+        "path": "vintage60/maracas.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "TAMBOURINE",
+        "key": "TAMBOURINE",
+        "path": "vintage60/tambourine.wav",
+        "peakDb": -3,
+        "decay": 5000
+      },
+      {
+        "displayName": "COWBELL",
+        "key": "COWBELL",
+        "path": "vintage60/cowbell.wav",
+        "peakDb": -3,
+        "rootMidi": 73,
+        "decay": 5000
+      },
+      {
+        "displayName": "BASS",
+        "key": "BASS",
+        "path": "vintage60/bass-c3.wav",
+        "peakDb": -3,
+        "rootMidi": 48,
+        "decay": 5000
+      },
+      {
+        "displayName": "SYNTHLEAD",
+        "key": "SYNTHLEAD",
+        "path": "vintage60/lead-c4.wav",
+        "peakDb": -3,
+        "rootMidi": 60,
+        "decay": 5000
+      },
+      {
+        "displayName": "SYNTHPAD",
+        "key": "SYNTHPAD",
+        "path": "vintage60/pad-c4.wav",
+        "peakDb": -3,
+        "rootMidi": 60,
         "decay": 5000
       }
     ]

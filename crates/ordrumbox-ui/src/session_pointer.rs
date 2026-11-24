@@ -1,7 +1,7 @@
 //! The pointer's shape over the session's views: what a drag where it is
 //! does. Every scroll bar follows one rule (`scroll_thumb::hover_shape`):
 //! the open hand on a thumb, the closed hand while one is held (the song
-//! panel's, the kit table's, the mixer's); the ends of
+//! panel's, the kit table's, the mixer's, an open list's); the ends of
 //! the song panel's measures' thumb, which zoom, show the sideways arrows,
 //! an automation lane's bottom edge, which sets its height, the up-down ones;
 //! in the piano roll, a note's right edge, which sets its length, the
@@ -41,6 +41,9 @@ impl Session {
         }
         if self.kit_editor.list.is_bar_held() || self.is_mixer_bar_held() {
             return HELD_SHAPE;
+        }
+        if let Some(shape) = self.dropdown_pointer_shape(size, x, y) {
+            return shape;
         }
         // A menu, a list or an overlay over the views: their bars are not under it.
         if self.popup_open() || self.open_menu().is_some() || self.overlay_open() {
@@ -116,6 +119,17 @@ impl Session {
             }
             _ => PointerShape::Arrow,
         }
+    }
+
+    /// Over an open list's scroll bar, or while its thumb is held.
+    fn dropdown_pointer_shape(&self, size: (i32, i32, Scale), x: i32, y: i32) -> Option<PointerShape> {
+        let dropdown = self.chrome.widgets.dropdown.as_ref()?;
+        if dropdown.bar_held {
+            return Some(HELD_SHAPE);
+        }
+        let (width, height, scale) = size;
+        let bar = dropdown.scroll_bar(width, height, scale).filter(|bar| bar.contains(x, y))?;
+        Some(scroll_thumb::hover_shape(dropdown.thumb(bar, scale), y))
     }
 
     /// Over the kit editor: its table's bar, when it has one.

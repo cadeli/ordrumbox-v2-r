@@ -1,9 +1,16 @@
 //! The open drop-down list (and the right-click menu), drawn over everything.
 
 use super::*;
+use crate::scroll_thumb;
 
 /// Rows a drop-down list shows at once.
 pub(super) const LIST_ROWS: usize = 14;
+
+/// The scroll bar's width, in scale units: the kit table's.
+const BAR: i32 = 8;
+
+/// The shortest thumb, in scale units.
+const MIN_THUMB: i32 = 12;
 
 /// An open drop-down list (or a right-click menu, with a title).
 #[derive(Debug, Clone, PartialEq)]
@@ -27,6 +34,8 @@ pub struct Dropdown {
     /// The key of each line that has one, shown at its right end (a menu's
     /// lines only; empty: none).
     pub shortcuts: Vec<String>,
+    /// The scroll bar's thumb is held by the mouse.
+    pub bar_held: bool,
 }
 
 /// The label end of a line that opens a submenu.
@@ -49,6 +58,7 @@ impl Dropdown {
             parent: None,
             control: None,
             shortcuts: Vec::new(),
+            bar_held: false,
         };
         d.show_at();
         d
@@ -129,6 +139,45 @@ impl Dropdown {
         self.labels.len().min(LIST_ROWS)
     }
 
+    /// Whether the options are more than the rows: the list has a scroll bar.
+    fn scrolls(&self) -> bool {
+        self.labels.len() > self.shown()
+    }
+
+    /// The width the scroll bar takes at the right of the rows; 0 without one.
+    fn bar_width(&self, scale: Scale) -> i32 {
+        if self.scrolls() { BAR * scale } else { 0 }
+    }
+
+    /// The scroll bar, right of the options, in a `width` × `height` window;
+    /// `None` when every option is shown.
+    pub fn scroll_bar(&self, width: i32, height: i32, scale: Scale) -> Option<Rect> {
+        if !self.scrolls() {
+            return None;
+        }
+        let r = self.rect(width, height, scale);
+        let row = row_height(scale);
+        let w = BAR * scale;
+        let top = r.y + 2 * scale + self.head() as i32 * row;
+        Some(Rect::new(r.x + r.w - scale.px() - w, top, w, self.shown() as i32 * row))
+    }
+
+    /// Start and length of the thumb on the scroll `bar`.
+    pub fn thumb(&self, bar: Rect, scale: Scale) -> (i32, i32) {
+        scroll_thumb::thumb((bar.y, bar.h), self.first, self.shown(), self.labels.len(), MIN_THUMB * scale)
+    }
+
+    /// The thumb centred on height `y`, the highlight kept in view; whether
+    /// the list moved.
+    pub fn bar_to(&mut self, size: (i32, i32, Scale), y: i32) -> bool {
+        let (width, height, scale) = size;
+        let Some(bar) = self.scroll_bar(width, height, scale) else { return false };
+        let first = scroll_thumb::first_at((bar.y, bar.h), y, self.shown(), self.labels.len(), MIN_THUMB * scale);
+        let moved = first != self.first;
+        self.scroll(first as isize - self.first as isize);
+        moved
+    }
+
     /// Option `at` highlighted, and shown.
     pub fn highlight(&mut self, at: usize) {
         self.at = at.min(self.labels.len().saturating_sub(1));
@@ -173,7 +222,7 @@ impl Dropdown {
         let row = row_height(scale);
         let label = self.labels.iter().map(|l| text_width(l, scale)).max().unwrap_or(0) + self.shortcut_width(scale);
         let longest = self.title.iter().map(|t| text_width(t, scale)).fold(label, i32::max);
-        let w = (longest + 20 * scale).max(self.anchor.w).min(width);
+        let w = (longest + 20 * scale + self.bar_width(scale)).max(self.anchor.w).min(width);
         let h = (self.shown() + self.head()) as i32 * row + 4 * scale;
         let x = self.anchor.x.min(width - w).max(0);
         let below = self.anchor.y + self.anchor.h;
@@ -184,7 +233,7 @@ impl Dropdown {
     /// The option under `(x, y)`.
     pub fn hit(&self, width: i32, height: i32, scale: Scale, x: i32, y: i32) -> Option<usize> {
         let r = self.rect(width, height, scale);
-        if !r.contains(x, y) {
+        if !r.contains(x, y) || self.scroll_bar(width, height, scale).is_some_and(|bar| x >= bar.x) {
             return None;
         }
         let row = row_at(y, r.y + 2 * scale, row_height(scale))?.checked_sub(self.head())?;
@@ -206,28 +255,24 @@ impl Dropdown {
             canvas.text(r.x + 6 * scale, y, &fit(title, r.w - 12 * scale, scale), scale, dim());
         }
         let top = r.y + 2 * scale + self.head() as i32 * row;
+        let rows_w = r.w - self.bar_width(scale);
         for (k, label) in self.labels.iter().enumerate().skip(self.first).take(self.shown()) {
             let y = top + (k - self.first) as i32 * row;
             if k == self.at {
-                canvas.fill_rect(r.x + scale.px(), y, r.w - 2 * scale, row, selected_row_color());
+                canvas.fill_rect(r.x + scale.px(), y, rows_w - 2 * scale, row, selected_row_color());
             }
             let color = if k == self.at { TITLE } else { theme::text() };
             let text_y = y + (row - 8 * scale) / 2;
             let shortcut = self.shortcuts.get(k).filter(|s| !s.is_empty());
-            let room = r.w - 12 * scale - shortcut.map_or(0, |_| self.shortcut_width(scale));
+            let room = rows_w - 12 * scale - shortcut.map_or(0, |_| self.shortcut_width(scale));
             canvas.text(r.x + 6 * scale, text_y, &fit(label, room, scale), scale, color);
             if let Some(shortcut) = shortcut {
-                let x = r.x + r.w - 6 * scale - text_width(shortcut, scale);
+                let x = r.x + rows_w - 6 * scale - text_width(shortcut, scale);
                 canvas.text(x, text_y, shortcut, scale, dim());
             }
         }
-        if self.labels.len() > self.shown() {
-            // Scroll bar.
-            let total = self.labels.len() as i32;
-            let track = r.h - 4 * scale - self.head() as i32 * row;
-            let top = top + track * self.first as i32 / total;
-            let len = (track * self.shown() as i32 / total).max(4 * scale);
-            canvas.fill_rect(r.x + r.w - 4 * scale, top, 2 * scale, len, dim());
+        if let Some(bar) = self.scroll_bar(canvas.width(), canvas.height(), scale) {
+            scroll_thumb::draw(canvas, bar, self.thumb(bar, scale), scale);
         }
     }
 }

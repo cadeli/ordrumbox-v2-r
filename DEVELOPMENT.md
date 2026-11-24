@@ -475,6 +475,13 @@ whistle is rendered with `--gate 0.35` (it sustains), the others with `--gate 1`
 a meant change (190 rows: the new kits' and what the others now borrow from them). The factory presets' checks of
 `ordrumbox-probe/tests/synth_audio.rs` cover the new presets.
 
+One more kit rendered the same way: `vintage60`, from the presets `SR601_*` (style `60s`), in the manner of the early
+1960s rhythm boxes: ringing damped sines and soft, muffled noise. Drums rendered with `--gate 1`; `bass-c3` at C3 with
+`--gate 0.5`, `lead-c4` and `pad-c4` at C4 with `--gate 0.6` and `--gate 1.2`, as for `8bits`. `SR601_BRUSH`, a second
+snare, stays a preset only (a kit holds one sample per instrument). The `vintage` kit is removed. `assign_tests/data.rs`
+rewritten, as a meant change (the `vintage60` rows, the `vintage` rows gone, and what the others now borrow from
+`vintage60`).
+
 The `8bits` kit is rendered again, from the chiptune presets: its drums and, new to it, melodic sounds (`BASS`,
 `SYNTHLEAD`, `PIANO`, `BRASS`, `ORGAN`, `SYNTHPAD`, named after the note they
 play, C3 or C4). `kick`, `snare`, `tom`, `chh`, `bass-c3`, `lead-c4` and `pulse-c4` are `CHIP_KICK`, `CHIP_SNARE`,

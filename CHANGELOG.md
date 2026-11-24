@@ -3,6 +3,12 @@
 ## Unreleased
 
 ### New
+- **Kit vintage60**, rendered from 23 new synth presets (`SR601_*`, kept in the synth editor), in
+  the manner of the early 1960s rhythm boxes (Seeburg Select-A-Rhythm, Wurlitzer Sideman): soft
+  kick, hissy snare, brush (preset only), clap, rimshot, hats, muffled ride and crash, three toms,
+  bongos, conga, claves, wood block, maracas, tambourine and cowbell, with an organ bass, a
+  combo-organ lead and a drawbar-organ pad that play notes.
+- **Kit vintage removed.**
 - **Kits latin_perc, 606_like, cr78_like, simmons_like, trap_808 and minimal**, rendered from 60
   new synth presets (`LAT_*`, `TR606_*`, `CR78_*`, `SDS_*`, `TRAP_*`, `MIN_*`, kept in the synth
   editor): latin percussion (bongos, timbales, wood blocks, triangle, cabasa, guiro, castanets,

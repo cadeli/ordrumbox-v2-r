@@ -576,6 +576,24 @@ mod tests {
     }
 
     #[test]
+    fn a_long_list_has_a_bar_whose_thumb_scrolls_it() {
+        let labels: Vec<String> = (0..40).map(|i| format!("item{i}")).collect();
+        let mut d = Dropdown::new(Id::PatternList, Rect::new(10, 10, 100, 12), labels.clone(), labels, 0);
+        let bar = d.scroll_bar(800, 600, Scale::ONE).expect("40 options: a bar");
+        assert_eq!(bar.w, 8);
+        let r = d.rect(800, 600, Scale::ONE);
+        assert_eq!(bar.x + bar.w, r.x + r.w - 1, "at the right of the rows");
+        assert_eq!(d.hit(800, 600, Scale::ONE, bar.x + 2, bar.y + 30), None, "the bar picks no option");
+        assert!(d.bar_to((800, 600, Scale::ONE), bar.y + bar.h));
+        assert_eq!(d.first, 40 - LIST_ROWS, "the thumb at the bottom: the last options");
+        assert!((d.first..d.first + LIST_ROWS).contains(&d.at), "the highlight kept in view");
+        let (start, len) = d.thumb(bar, Scale::ONE);
+        assert_eq!(start + len, bar.y + bar.h);
+        let short = Dropdown::new(Id::KitList, Rect::new(10, 10, 100, 12), vec!["x".into(); 3], vec!["x".into(); 3], 0);
+        assert_eq!(short.scroll_bar(800, 600, Scale::ONE), None);
+    }
+
+    #[test]
     fn draws_every_kind() {
         let mut pixels = vec![0; 400 * 300];
         let mut canvas = Canvas::new(&mut pixels, 400, 300);

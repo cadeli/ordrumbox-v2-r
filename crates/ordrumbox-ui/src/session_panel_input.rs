@@ -80,12 +80,19 @@ impl Session {
         true
     }
 
-    /// A press at `at` while `dropdown` is open: on one of its lines, on a menu
-    /// above it, or elsewhere (it closes). A line is picked by a left click.
-    fn press_dropdown(&mut self, dropdown: Dropdown, size: (i32, i32, Scale), at: (i32, i32), left: bool) {
+    /// A press at `at` while `dropdown` is open: on its scroll bar (its thumb
+    /// follows the mouse), on one of its lines, on a menu above it, or
+    /// elsewhere (it closes). A line is picked by a left click.
+    fn press_dropdown(&mut self, mut dropdown: Dropdown, size: (i32, i32, Scale), at: (i32, i32), left: bool) {
         let (width, height, scale) = size;
         let (x, y) = at;
-        if let Some(i) = dropdown.hit(width, height, scale, x, y) {
+        if dropdown.scroll_bar(width, height, scale).is_some_and(|bar| bar.contains(x, y)) {
+            if left {
+                dropdown.bar_held = true;
+                dropdown.bar_to(size, y);
+            }
+            self.chrome.widgets.dropdown = Some(dropdown);
+        } else if let Some(i) = dropdown.hit(width, height, scale, x, y) {
             self.chrome.widgets.dropdown = Some(dropdown);
             if left {
                 self.pick(i);
@@ -213,6 +220,9 @@ impl Session {
         }
         let (width, height, scale) = size;
         if let Some(dropdown) = &mut self.chrome.widgets.dropdown {
+            if dropdown.bar_held {
+                return dropdown.bar_to(size, y);
+            }
             if let Some(i) = dropdown.hit(width, height, scale, x, y).filter(|&i| i != dropdown.at) {
                 dropdown.at = i;
                 return true;
@@ -356,6 +366,9 @@ impl Session {
 
     pub fn mouse_up(&mut self) {
         self.chrome.widgets.drag = None;
+        if let Some(dropdown) = &mut self.chrome.widgets.dropdown {
+            dropdown.bar_held = false;
+        }
         self.song_panel.release_bar();
         self.kit_editor.list.release_bar();
         self.release_mixer_bar();
