@@ -75,6 +75,22 @@
         "peakDb": -3,
         "rootMidi": 40,
         "decay": 5000
+      },
+      {
+        "displayName": "BASS",
+        "key": "BASS",
+        "path": "matt/bass_c2.wav",
+        "peakDb": -3,
+        "rootMidi": 36,
+        "decay": 5000
+      },
+      {
+        "displayName": "GUITAR",
+        "key": "GUITAR",
+        "path": "matt/gtr_c3.wav",
+        "peakDb": -3,
+        "rootMidi": 48,
+        "decay": 5000
       }
     ]
   },

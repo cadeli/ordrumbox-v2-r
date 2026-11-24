@@ -503,6 +503,10 @@ The shipped kits were renewed (see "Kits"): `808_like`, `909_like`, `606_like`, 
 snare; `matt` has no crash (its `CRASH` tracks play `CRASH_SYNTH`); `real`, `open`, `ropen`, `punchy` and `vintage` are
 gone. Each change rewrote `assign_tests/data.rs`, as a meant change. No other snapshot changed.
 
+`matt` has a bass (`bass_c2.wav`, C2) and a guitar (`gtr_c3.wav`, C3), repaired by `ordrumbox-probe fix`: its `BASS`
+tracks play the bass instead of a synth preset, and every kit's `GUITAR` tracks borrow the guitar instead of playing
+`BASS_ANALOG`. `assign_tests/data.rs` rewritten, as a meant change (34 rows).
+
 The kit list is built from the folders of `assets/kits/` (`kits_from_folders`), `kits.json` only describing them.
 Before, the user's `kits.json`, once written, replaced the shipped one whole, so new shipped kits and samples did not
 appear; a shipped sample the user removed before this change comes back once. No snapshot changed.
