@@ -500,3 +500,7 @@ is left out and reported. A kit of the user's `kits.json` takes the place of the
 added to that kit's folder since still appear; a sample the user removes is kept in the kit's `removed` list so that it
 is not added back. Before this change the user's `kits.json`, once written, replaced the shipped one whole: new
 shipped kits and samples did not appear. A shipped sample removed before this change comes back once.
+
+The `matt` kit has no crash any more (`CRASH.wav` removed): its `CRASH` tracks play the synth preset `CRASH_SYNTH`, as
+its `COWBELL` tracks play `COWBELL_SYNTH`, and a track that only stands in for a crash borrows another kit's.
+`assign_tests/data.rs` rewritten, as a meant change (the `matt` crash rows).
