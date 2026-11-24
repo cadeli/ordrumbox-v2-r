@@ -505,6 +505,13 @@ The `matt` kit has no crash any more (`CRASH.wav` removed): its `CRASH` tracks p
 its `COWBELL` tracks play `COWBELL_SYNTH`, and a track that only stands in for a crash borrows another kit's.
 `assign_tests/data.rs` rewritten, as a meant change (the `matt` crash rows).
 
+One more kit rendered the same way: `punch_synth`, from the presets `PUNCH_*` (style `punchy`), an imitation of the
+`punchy` kit by the synth: each preset tuned until `ordrumbox-probe wav` measures it close to the `punchy` sample of its
+instrument (pitch, envelope, spectrum). Rendered at C3 with `--gate 1`, then `fix --write` and `fix <file> --length <end
+at −60 dB + 30 ms> --fade-out 20 --write`. Its `kits.json` entry follows `punchy`'s (instruments, root notes). Each of
+its tracks plays its own sample and no other kit borrows from it: `assign_tests/data.rs` gains the `punch_synth` rows,
+no other row changed.
+
 The `electro` kit is rendered by the synth (`ordrumbox-probe preset … --wav`, then `fix --write`), each sound at the
 `rootMidi` of `kits.json`, and has two rototoms, `lo_tom.wav` (`LO_TOM`, G3) and `hi_tom.wav` (`HI_TOM`, F4). Its
 `HI_TOM`, `LO_TOM` and their variants play them instead of `tom.wav`, and a kit with no high tom of its own

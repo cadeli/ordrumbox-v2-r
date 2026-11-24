@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### New
+- **Kit punch_synth**, rendered from 8 new synth presets (`PUNCH_*`, kept in the synth editor),
+  in the manner of the punchy kit: kick, snare, tom, clap, hit, hats and choked crash.
 - **Kit vintage60**, rendered from 23 new synth presets (`SR601_*`, kept in the synth editor), in
   the manner of the early 1960s rhythm boxes (Seeburg Select-A-Rhythm, Wurlitzer Sideman): soft
   kick, hissy snare, brush (preset only), clap, rimshot, hats, muffled ride and crash, three toms,

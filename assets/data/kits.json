@@ -855,14 +855,14 @@
     ]
   },
   {
-    "name": "punchy",
-    "info": "ordrumbox kit",
-    "desc": "Punchy drums and percussions",
+    "name": "punch_synth",
+    "info": "punchy-like kit",
+    "desc": "rendered from the synth presets PUNCH_* (ordrumbox-probe preset --wav), in the manner of the punchy kit",
     "samples": [
       {
         "displayName": "KICK",
         "key": "KICK",
-        "path": "punchy/kick.wav",
+        "path": "punch_synth/kick.wav",
         "peakDb": -3,
         "rootMidi": 35,
         "decay": 5000
@@ -870,7 +870,7 @@
       {
         "displayName": "SNARE",
         "key": "SNARE",
-        "path": "punchy/snare.wav",
+        "path": "punch_synth/snare.wav",
         "peakDb": -3,
         "rootMidi": 48,
         "decay": 5000
@@ -878,7 +878,7 @@
       {
         "displayName": "TOM",
         "key": "TOM",
-        "path": "punchy/tom.wav",
+        "path": "punch_synth/tom.wav",
         "peakDb": -3,
         "rootMidi": 60,
         "decay": 5000
@@ -886,7 +886,7 @@
       {
         "displayName": "CLAP",
         "key": "CLAP",
-        "path": "punchy/clap.wav",
+        "path": "punch_synth/clap.wav",
         "peakDb": -3,
         "rootMidi": 31,
         "decay": 5000
@@ -894,7 +894,7 @@
       {
         "displayName": "HIT",
         "key": "HIT",
-        "path": "punchy/hit.wav",
+        "path": "punch_synth/hit.wav",
         "peakDb": -3,
         "rootMidi": 36,
         "decay": 5000
@@ -902,7 +902,7 @@
       {
         "displayName": "CHH",
         "key": "CHH",
-        "path": "punchy/chh.wav",
+        "path": "punch_synth/chh.wav",
         "peakDb": -3,
         "rootMidi": 48,
         "decay": 5000
@@ -910,7 +910,7 @@
       {
         "displayName": "OHH",
         "key": "OHH",
-        "path": "punchy/ohh.wav",
+        "path": "punch_synth/ohh.wav",
         "peakDb": -3,
         "rootMidi": 48,
         "decay": 5000
@@ -918,7 +918,7 @@
       {
         "displayName": "CHOKED CRASH",
         "key": "CRASH",
-        "path": "punchy/crash.wav",
+        "path": "punch_synth/crash.wav",
         "peakDb": -3,
         "rootMidi": 48,
         "decay": 5000
