@@ -5,7 +5,7 @@
 ### New
 - **File > Demos...**: the demos by style, as tiles; a song or a pattern is copied into your library and plays.
 - Demo songs: Minimal House, Industrial Techno, Psytrance, Dubstep, Detroit Deep House, Amapiano, UK Garage,
-  Lo-fi Hip-Hop, Blues Shuffle, Afrobeat.
+  Lo-fi Hip-Hop, Blues Shuffle, Afrobeat, Electroclash, Electro-Punk.
 
 ### Changed
 - A new library starts with the **starter library** (a funk song and a few beats), not every demo;
