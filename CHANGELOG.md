@@ -3,29 +3,30 @@
 ## Unreleased
 
 ### New
-- **Kit punch_synth**, rendered from 8 new synth presets (`PUNCH_*`, kept in the synth editor),
-  in the manner of the punchy kit: kick, snare, tom, clap, hit, hats and choked crash.
-- **Kit vintage60**, rendered from 23 new synth presets (`SR601_*`, kept in the synth editor), in
-  the manner of the early 1960s rhythm boxes (Seeburg Select-A-Rhythm, Wurlitzer Sideman): soft
-  kick, hissy snare, brush (preset only), clap, rimshot, hats, muffled ride and crash, three toms,
-  bongos, conga, claves, wood block, maracas, tambourine and cowbell, with an organ bass, a
-  combo-organ lead and a drawbar-organ pad that play notes.
-- **Kit vintage removed.**
-- **Kits latin_perc, 606_like, cr78_like, simmons_like, trap_808 and minimal**, rendered from 60
-  new synth presets (`LAT_*`, `TR606_*`, `CR78_*`, `SDS_*`, `TRAP_*`, `MIN_*`, kept in the synth
-  editor): latin percussion (bongos, timbales, wood blocks, triangle, cabasa, guiro, castanets,
-  cuica, whistle…), a drier 606, a soft CR-78, sweeping Simmons toms, a trap kit with a long 808
-  bass in E, and minimal clicks. A sound a kit lacks may be borrowed from them.
-- **Kits 808_like and 909_like**, rendered from 31 new synth presets (`TR808_*`, `TR909_*`, kept
-  in the synth editor), in the manner of the two drum machines: kick, snare, clap, rimshot, hats,
-  crash, ride, three toms, and congas, claves, maracas, cowbell (808) or shaker, tambourine (909).
-  A sound a kit lacks may now be borrowed from them.
+- **New kits rendered by the synth**, from new factory presets kept in the synth editor:
+  `808_like`, `909_like` (`TR808_*`, `TR909_*`), `606_like`, `cr78_like`, `simmons_like`,
+  `latin_perc`, `trap_808`, `minimal` (`TR606_*`, `CR78_*`, `SDS_*`, `LAT_*`, `TRAP_*`, `MIN_*`),
+  `vintage60` (`SR601_*`, the early 1960s rhythm boxes, with organ bass, lead and pad) and
+  `punch_synth` (`PUNCH_*`). A sound a kit lacks may be borrowed from them.
+- **Kits 8bits and electro rendered again**: 8bits gains melodic sounds (bass, lead, piano, brass,
+  organ, pad), electro two rototoms (LO_TOM, HI_TOM). The human kit has a new kick and snare.
+- **Mixer** (F12, View > Mixer, the MIX button): a strip a track (echo and reverb sends, pan, mute,
+  solo, fader, meter), a shared tape echo and spring reverb, and the master bus, in place of the
+  master strip along the bottom.
+- **Song automation**: lanes under the song's patterns for a track's mute, solo, volume, pan,
+  cutoff, Q, sends, effects, transpose, probability and swing; drawn with the mouse or recorded
+  from the mixer (REC). A control moved by hand takes its lane back until re-enabled.
+- **Song loop**: drag on the song panel's ruler (Ctrl+L turns it off and on); the song panel zooms
+  like a DAW timeline.
+- **Edit > Humanize...**: notes a little early or late, softer or louder, at random.
+- **Export loops**: a pattern's WAV or MIDI export asks how many loops it holds (1 to 64).
+- **Where you left off**: the app starts on the pattern, arrangement, mode and view you left.
+- A second orDrumbox started warns that one is already running.
+- A double-click on a track's name opens the piano roll on it; on a song clip, its pattern.
 - **Sample editing**: the start, the end, the loop's points and the end of the decay are
   dragged on the waveform (kit editor and Sound tab), and land on the nearest zero crossing.
 - **Loop in / Loop out**: a loop of its own inside the sample's region; the sound plays its
   way in (its attack once), then loops. Kept in `kits.json` (`loopStart`, `loopEnd`, ms).
-
-### New
 - **Grid lane**: a **PITCH** tab, a bubble with the value being painted or under the pointer, and a
   right-click menu to reset a step's notes, or all the track's, to the setting's default. Drag the
   lane's top edge to set its height (the menu's **Automatic height** undoes it).
@@ -41,6 +42,11 @@
   MCP: `chokeGroup` in `updateTrack`.
 
 ### Changed
+- New pattern (Ctrl+N) has a track for each instrument of the kit in use.
+- The kits `real`, `open`, `ropen`, `punchy` and `vintage` are removed; the `matt` crash is now
+  played by the synth (`CRASH_SYNTH`).
+- The kit list follows the folders of `assets/kits/`: once you had edited a kit, new shipped kits
+  and samples no longer appeared; they do now.
 - The kit chosen is kept with the library and its projects, and comes back at the next start
   and with a project opened; choosing one is an undo step. In the plugin, the host's Kit
   parameter still chooses it.

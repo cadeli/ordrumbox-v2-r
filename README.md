@@ -287,8 +287,8 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   reverb sends, pan, mute, solo and fader, then the shared echo and reverb, then the master
   bus. **Left**/**Right** go from track to track; when the strips do not all fit, a scroll
   bar under them scrolls them (the wheel on a strip too). **Esc** goes back to the grid
-- **Ctrl K**: kit editor, **Ctrl Shift M**: export MIDI (**Ctrl E**: export WAV)
-- **File > Export pattern as WAV** (**Ctrl E**) and **as MIDI** (**Ctrl Shift M**) first ask how
+- **Ctrl K**: kit editor, **Ctrl M** (macOS: **Cmd Shift M**): export MIDI (**Ctrl E**: export WAV)
+- **File > Export pattern as WAV** (**Ctrl E**) and **as MIDI** (**Ctrl M**) first ask how
   many loops of the pattern the file holds (1 to 64, **Left**/**Right**); the count is kept for
   the next export, of either
 - **File > Export pattern stems / Export song stems**: one WAV per track in a folder of its own,

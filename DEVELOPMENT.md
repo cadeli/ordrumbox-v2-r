@@ -14,8 +14,8 @@ Building, testing and changing orDrumbox. The user documentation is
 | `ordrumbox-engine` | WAV, kits, sample analysis, synth presets, passes, engine, UI link, offline renders | core, dsp |
 | `ordrumbox-probe` | sound measurements, command-line only | core, dsp, engine |
 | `ordrumbox-ui` | session, views, input, MCP link, update check | core, logic, engine, fontdue |
-| `ordrumbox-app` | window, input translation, audio output (`ordrumbox.exe`) | core, engine, ui, winit, softbuffer, cpal |
-| `ordrumbox-plugin` | CLAP and VST3 instrument | engine, ui, nih-plug, baseview, softbuffer |
+| `ordrumbox-app` | window, input translation, audio output, MIDI ports, file dialogs (`ordrumbox.exe`) | core, engine, ui, winit, softbuffer, cpal, midir, rfd |
+| `ordrumbox-plugin` | CLAP and VST3 instrument | core, engine, ui, nih-plug, baseview, softbuffer |
 | `xtask` | plugin bundling; `audit`, the checks of `AGENTS.md` | nih-plug's bundler |
 
 The domain crates take no third-party dependency.
@@ -108,8 +108,45 @@ A new license must be added to `accepted` in `about.toml` on purpose.
 `ordrumbox-core/data/instruments.json`, built into the program, holds what the app knows of instruments: canonical ids
 (`KICK`, `OHH`, `CONGAS`…), their name patterns, words, substitutes, GM MIDI keys and
 default pan. It is edited by hand; `ordrumbox-core/src/instruments.rs` only reads it.
-The sample each track gets in each kit is the hand-written table of
-`ordrumbox-ui/src/assign_tests/data.rs`.
+
+## Kits
+
+- **A kit is a folder** of `assets/kits/`, each WAV file in it a sample (`ordrumbox-engine/src/kit_folders.rs`).
+  `assets/data/kits.json` only describes them (instrument, root note, decay, loop points, texts) and orders them; a
+  folder or a file it does not list comes after the others, its instrument guessed from its file name. The user's
+  `kits.json` overrides a shipped kit of the same name, but files added to the shipped folder since still appear (a
+  sample the user removed stays in the kit's `removed` list).
+- **The table** `ordrumbox-ui/src/assign_tests/data.rs` says which sample each track plays in each kit, borrowed
+  ones included. Adding, removing or renaming a sample changes it: rewrite it, as a meant change, and say so in one
+  line of "Changes of behaviour".
+- **Checking and repairing** a kit: `ordrumbox-probe kit <kit>`, then `ordrumbox-probe fix assets/kits/<kit> --write`
+  (`AGENTS.md`, "Kits and samples"; `--help` lists the options).
+- **Kits rendered by the synth.** Most shipped kits are rendered from factory presets of
+  `assets/data/synth_presets.json`, which stay in the synth editor. A preset's prefix names no instrument, so the
+  auto-assign (which matches a preset by its name) never plays it in place of a sample:
+
+  | Kit | Presets |
+  |---|---|
+  | `808_like`, `909_like`, `606_like` | `TR808_*`, `TR909_*`, `TR606_*` |
+  | `cr78_like`, `simmons_like`, `latin_perc` | `CR78_*`, `SDS_*`, `LAT_*` |
+  | `trap_808`, `minimal` | `TRAP_*`, `MIN_*` |
+  | `vintage60` | `SR601_*` (`SR601_BRUSH`, a second snare, is a preset only) |
+  | `punch_synth` | `PUNCH_*` (tuned with `ordrumbox-probe wav` against the former `punchy` samples) |
+  | `8bits` | `CHIP_*`, plus variants not kept as presets |
+  | `electro` | its presets, each played at the sample's `rootMidi` |
+
+  The recipe:
+
+  ```sh
+  cargo run -p ordrumbox-probe -- preset <names> --gate 1 --rate 44100 --velocity 1 --wav <folder>
+  # rename the files after their instrument (kick.wav, chh.wav, bass-c3.wav…)
+  cargo run -p ordrumbox-probe -- fix <folder> --write                       # peak at −3 dB
+  cargo run -p ordrumbox-probe -- fix <file> --length <ms> --fade-out 20 --write   # end at −60 dB + 30 ms
+  ```
+
+  Drums at C3 with `--gate 1` (a crash `0.3`, a whistle `0.35`); melodic sounds are named after their note: a bass
+  at C3 with `--gate 0.5`, a lead at C4 with `--gate 0.6`, a pad at C4 with `--gate 1.2`. Pulse waves carry DC:
+  add `--highpass 30` to `fix`. `ordrumbox-probe/tests/synth_audio.rs` checks every factory preset.
 
 ## Snapshots
 
@@ -152,10 +189,6 @@ and repaints a lane's own values (no change); `ordrumbox-logic/src/arrangement/a
 every kind of lane edit, twice over (the same library each time). No fixture, nothing to rewrite.
 
 ### Changes of behaviour
-
-The kits `real`, `open` and `ropen` are gone (their folders and their `kits.json` entries; `punchy` had already
-lost its folder). The tracks that borrowed one of their samples now borrow from the other kits: the table of
-`ordrumbox-ui/src/assign_tests/data.rs` is rewritten, and loses the rows of those kits.
 
 A double-click on a track's name in the grid opens the piano roll on that track (`press_track_name`,
 `session_grid.rs`); a single press still selects the track and may drag it. No snapshot changed.
@@ -464,60 +497,15 @@ voice's output bit-identical and its speed the same in release (5.1 ns a looping
 decay; the points snap to the nearest zero crossing within 3 ms (`SampleBuffer::nearest_zero_crossing`). The kit
 editor lays its nine knobs five a row (the track editor four), so that the waveform keeps its room.
 
-Two kits rendered from synth presets, `808_like` and `909_like` (`assets/kits/`, `kits.json`), from the presets
-`TR808_*` and `TR909_*` of `synth_presets.json`. Their names start with the machine so that auto-assign, which
-matches a preset by its name (`assign::preset_match_key`), does not take them for the instrument a kit lacks: they
-are heard as the kits' samples. Each was made with `ordrumbox-probe preset <names> --gate 1 --rate 44100 --velocity 1
---wav <folder>` (the new `--wav` option: mono, 16-bit PCM), the files renamed after their instrument, then
-`ordrumbox-probe fix <folder> --write` (peak at −3 dB) and `fix <file> --length <end at −60 dB + 30 ms> --fade-out 20
---write`. A sound another kit lacks may now be borrowed from them: `assign_tests/data.rs` rewritten, as a meant change
-(187 rows, the new kits' included).
+The shipped kits were renewed (see "Kits"): `808_like`, `909_like`, `606_like`, `cr78_like`, `simmons_like`,
+`latin_perc`, `trap_808`, `minimal`, `vintage60` and `punch_synth` are new, rendered from synth presets; `8bits` and
+`electro` are rendered again (`electro` with two rototoms, `lo_tom.wav` and `hi_tom.wav`); `human` has a new kick and
+snare; `matt` has no crash (its `CRASH` tracks play `CRASH_SYNTH`); `real`, `open`, `ropen`, `punchy` and `vintage` are
+gone. Each change rewrote `assign_tests/data.rs`, as a meant change. No other snapshot changed.
 
-Six more kits rendered the same way: `latin_perc`, `606_like`, `cr78_like`, `simmons_like`, `trap_808`, `minimal`
-(presets `LAT_*`, `TR606_*`, `CR78_*`, `SDS_*`, `TRAP_*`, `MIN_*`; a prefix that names no instrument, as above). The
-whistle is rendered with `--gate 0.35` (it sustains), the others with `--gate 1`. `assign_tests/data.rs` rewritten, as
-a meant change (190 rows: the new kits' and what the others now borrow from them). The factory presets' checks of
-`ordrumbox-probe/tests/synth_audio.rs` cover the new presets.
+The kit list is built from the folders of `assets/kits/` (`kits_from_folders`), `kits.json` only describing them.
+Before, the user's `kits.json`, once written, replaced the shipped one whole, so new shipped kits and samples did not
+appear; a shipped sample the user removed before this change comes back once. No snapshot changed.
 
-One more kit rendered the same way: `vintage60`, from the presets `SR601_*` (style `60s`), in the manner of the early
-1960s rhythm boxes: ringing damped sines and soft, muffled noise. Drums rendered with `--gate 1`; `bass-c3` at C3 with
-`--gate 0.5`, `lead-c4` and `pad-c4` at C4 with `--gate 0.6` and `--gate 1.2`, as for `8bits`. `SR601_BRUSH`, a second
-snare, stays a preset only (a kit holds one sample per instrument). The `vintage` kit is removed. `assign_tests/data.rs`
-rewritten, as a meant change (the `vintage60` rows, the `vintage` rows gone, and what the others now borrow from
-`vintage60`).
-
-The `8bits` kit is rendered again, from the chiptune presets: its drums and, new to it, melodic sounds (`BASS`,
-`SYNTHLEAD`, `PIANO`, `BRASS`, `ORGAN`, `SYNTHPAD`, named after the note they
-play, C3 or C4). `kick`, `snare`, `tom`, `chh`, `bass-c3`, `lead-c4` and `pulse-c4` are `CHIP_KICK`, `CHIP_SNARE`,
-`CHIP_TOM`, `CHIP_HAT`, `CHIP_BASS`, `CHIP_LEAD` and `CHIP_PULSE`; the others are variants of them (pulse waves and
-noise in long or short mode, no filter), not kept as presets. The melodic presets' release was lengthened (0.12 to
-0.7 s) so they fade out. Rendered with `ordrumbox-probe preset … --rate 44100 --wav <folder>`, drums at C3 with the
-default gate (`crash`: `--gate 0.3`), `bass-c3` at C3 with `--gate 0.5`, the C4 sounds with `--gate 0.6` (`pad-c4`: 1.2),
-then `ordrumbox-probe fix <folder> --write`, with `--highpass 30` for the pulse sounds (a narrow pulse carries DC).
-`assign_tests/data.rs` rewritten, as a meant change (the `8bits` rows).
-
-The kit list is built from the folders of `assets/kits/`: each folder is a kit, each WAV file in it a sample
-(`ordrumbox-engine/src/kit_folders.rs`, `kits_from_folders`). `kits.json`, the assets' and then the user's, only
-describes them (instrument, root note, decay, texts, the user's edits) and orders them; a folder or a file it does not
-list is added after the others, its instrument guessed from its file name. A kit or a sample it lists whose file is gone
-is left out and reported. A kit of the user's `kits.json` takes the place of the shipped kit of its name, but the files
-added to that kit's folder since still appear; a sample the user removes is kept in the kit's `removed` list so that it
-is not added back. Before this change the user's `kits.json`, once written, replaced the shipped one whole: new
-shipped kits and samples did not appear. A shipped sample removed before this change comes back once.
-
-The `matt` kit has no crash any more (`CRASH.wav` removed): its `CRASH` tracks play the synth preset `CRASH_SYNTH`, as
-its `COWBELL` tracks play `COWBELL_SYNTH`, and a track that only stands in for a crash borrows another kit's.
-`assign_tests/data.rs` rewritten, as a meant change (the `matt` crash rows).
-
-One more kit rendered the same way: `punch_synth`, from the presets `PUNCH_*` (style `punchy`), an imitation of the
-`punchy` kit by the synth: each preset tuned until `ordrumbox-probe wav` measures it close to the `punchy` sample of its
-instrument (pitch, envelope, spectrum). Rendered at C3 with `--gate 1`, then `fix --write` and `fix <file> --length <end
-at −60 dB + 30 ms> --fade-out 20 --write`. Its `kits.json` entry follows `punchy`'s (instruments, root notes). Each of
-its tracks plays its own sample and no other kit borrows from it: `assign_tests/data.rs` gains the `punch_synth` rows,
-no other row changed.
-
-The `electro` kit is rendered by the synth (`ordrumbox-probe preset … --wav`, then `fix --write`), each sound at the
-`rootMidi` of `kits.json`, and has two rototoms, `lo_tom.wav` (`LO_TOM`, G3) and `hi_tom.wav` (`HI_TOM`, F4). Its
-`HI_TOM`, `LO_TOM` and their variants play them instead of `tom.wav`, and a kit with no high tom of its own
-(`latin_perc`, `cr78_like`, `trap_808`, `minimal`) now borrows `electro/hi_tom.wav` instead of `human/HiTom.wav`.
-`assign_tests/data.rs` rewritten, as a meant change (those rows).
+Ctrl+N makes a pattern with a track for each instrument of the kit in use (`Kit::track_names`), the eight usual drum
+tracks when it names none. No snapshot changed.
