@@ -212,14 +212,6 @@
         "decay": 5000
       },
       {
-        "displayName": "CRASH",
-        "key": "CRASH",
-        "path": "matt/CRASH.wav",
-        "peakDb": -3,
-        "rootMidi": 48,
-        "decay": 5000
-      },
-      {
         "displayName": "SNARE",
         "key": "SNARE",
         "path": "matt/SNARE.wav",
