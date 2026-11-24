@@ -1,0 +1,8160 @@
+{
+  "info": {
+    "name": "Latin & Afro",
+    "description": "Clave, salsa, bossa nova, samba, latin house and an amapiano song."
+  },
+  "bpm": 120,
+  "songs": [
+    {
+      "id": "amapiano",
+      "name": "Amapiano",
+      "description": "An amapiano / afro house song in D minor at 113 BPM, all synth sounds: intro, groove, break, afro house and outro on the four Amapiano patterns, over Dm9, Gm9, B flat maj9 and Am7. The piano's filter opens over the intro and a beat of silence lets the log drum drop in; the log drum's climb at the end of each phrase is thrown into the echo; the afro house part brings the marimba in after four measures, and over the outro the piano fades away.",
+      "bpm": 113,
+      "loopMeasures": 56,
+      "clips": [
+        {
+          "patternId": "amapiano-intro",
+          "startMeasure": 0,
+          "measureCount": 8
+        },
+        {
+          "patternId": "amapiano-groove",
+          "startMeasure": 8,
+          "measureCount": 16
+        },
+        {
+          "patternId": "amapiano-break",
+          "startMeasure": 24,
+          "measureCount": 8
+        },
+        {
+          "patternId": "amapiano-afro",
+          "startMeasure": 32,
+          "measureCount": 16
+        },
+        {
+          "patternId": "amapiano-intro",
+          "startMeasure": 48,
+          "measureCount": 8
+        }
+      ],
+      "automations": [
+        {
+          "instrument": "PIANO",
+          "target": "cutoff",
+          "points": [
+            {
+              "step": 0,
+              "value": 0.4
+            },
+            {
+              "step": 1,
+              "value": 0.403
+            },
+            {
+              "step": 2,
+              "value": 0.405
+            },
+            {
+              "step": 3,
+              "value": 0.408
+            },
+            {
+              "step": 4,
+              "value": 0.41
+            },
+            {
+              "step": 5,
+              "value": 0.413
+            },
+            {
+              "step": 6,
+              "value": 0.416
+            },
+            {
+              "step": 7,
+              "value": 0.418
+            },
+            {
+              "step": 8,
+              "value": 0.421
+            },
+            {
+              "step": 9,
+              "value": 0.423
+            },
+            {
+              "step": 10,
+              "value": 0.426
+            },
+            {
+              "step": 11,
+              "value": 0.429
+            },
+            {
+              "step": 12,
+              "value": 0.431
+            },
+            {
+              "step": 13,
+              "value": 0.434
+            },
+            {
+              "step": 14,
+              "value": 0.436
+            },
+            {
+              "step": 15,
+              "value": 0.439
+            },
+            {
+              "step": 16,
+              "value": 0.442
+            },
+            {
+              "step": 17,
+              "value": 0.444
+            },
+            {
+              "step": 18,
+              "value": 0.447
+            },
+            {
+              "step": 19,
+              "value": 0.449
+            },
+            {
+              "step": 20,
+              "value": 0.452
+            },
+            {
+              "step": 21,
+              "value": 0.455
+            },
+            {
+              "step": 22,
+              "value": 0.457
+            },
+            {
+              "step": 23,
+              "value": 0.46
+            },
+            {
+              "step": 24,
+              "value": 0.462
+            },
+            {
+              "step": 25,
+              "value": 0.465
+            },
+            {
+              "step": 26,
+              "value": 0.468
+            },
+            {
+              "step": 27,
+              "value": 0.47
+            },
+            {
+              "step": 28,
+              "value": 0.473
+            },
+            {
+              "step": 29,
+              "value": 0.475
+            },
+            {
+              "step": 30,
+              "value": 0.478
+            },
+            {
+              "step": 31,
+              "value": 0.481
+            },
+            {
+              "step": 32,
+              "value": 0.483
+            },
+            {
+              "step": 33,
+              "value": 0.486
+            },
+            {
+              "step": 34,
+              "value": 0.488
+            },
+            {
+              "step": 35,
+              "value": 0.491
+            },
+            {
+              "step": 36,
+              "value": 0.494
+            },
+            {
+              "step": 37,
+              "value": 0.496
+            },
+            {
+              "step": 38,
+              "value": 0.499
+            },
+            {
+              "step": 39,
+              "value": 0.501
+            },
+            {
+              "step": 40,
+              "value": 0.504
+            },
+            {
+              "step": 41,
+              "value": 0.507
+            },
+            {
+              "step": 42,
+              "value": 0.509
+            },
+            {
+              "step": 43,
+              "value": 0.512
+            },
+            {
+              "step": 44,
+              "value": 0.514
+            },
+            {
+              "step": 45,
+              "value": 0.517
+            },
+            {
+              "step": 46,
+              "value": 0.52
+            },
+            {
+              "step": 47,
+              "value": 0.522
+            },
+            {
+              "step": 48,
+              "value": 0.525
+            },
+            {
+              "step": 49,
+              "value": 0.527
+            },
+            {
+              "step": 50,
+              "value": 0.53
+            },
+            {
+              "step": 51,
+              "value": 0.533
+            },
+            {
+              "step": 52,
+              "value": 0.535
+            },
+            {
+              "step": 53,
+              "value": 0.538
+            },
+            {
+              "step": 54,
+              "value": 0.54
+            },
+            {
+              "step": 55,
+              "value": 0.543
+            },
+            {
+              "step": 56,
+              "value": 0.546
+            },
+            {
+              "step": 57,
+              "value": 0.548
+            },
+            {
+              "step": 58,
+              "value": 0.551
+            },
+            {
+              "step": 59,
+              "value": 0.553
+            },
+            {
+              "step": 60,
+              "value": 0.556
+            },
+            {
+              "step": 61,
+              "value": 0.559
+            },
+            {
+              "step": 62,
+              "value": 0.561
+            },
+            {
+              "step": 63,
+              "value": 0.564
+            },
+            {
+              "step": 64,
+              "value": 0.566
+            },
+            {
+              "step": 65,
+              "value": 0.569
+            },
+            {
+              "step": 66,
+              "value": 0.571
+            },
+            {
+              "step": 67,
+              "value": 0.574
+            },
+            {
+              "step": 68,
+              "value": 0.577
+            },
+            {
+              "step": 69,
+              "value": 0.579
+            },
+            {
+              "step": 70,
+              "value": 0.582
+            },
+            {
+              "step": 71,
+              "value": 0.584
+            },
+            {
+              "step": 72,
+              "value": 0.587
+            },
+            {
+              "step": 73,
+              "value": 0.59
+            },
+            {
+              "step": 74,
+              "value": 0.592
+            },
+            {
+              "step": 75,
+              "value": 0.595
+            },
+            {
+              "step": 76,
+              "value": 0.597
+            },
+            {
+              "step": 77,
+              "value": 0.6
+            },
+            {
+              "step": 78,
+              "value": 0.603
+            },
+            {
+              "step": 79,
+              "value": 0.605
+            },
+            {
+              "step": 80,
+              "value": 0.608
+            },
+            {
+              "step": 81,
+              "value": 0.61
+            },
+            {
+              "step": 82,
+              "value": 0.613
+            },
+            {
+              "step": 83,
+              "value": 0.616
+            },
+            {
+              "step": 84,
+              "value": 0.618
+            },
+            {
+              "step": 85,
+              "value": 0.621
+            },
+            {
+              "step": 86,
+              "value": 0.623
+            },
+            {
+              "step": 87,
+              "value": 0.626
+            },
+            {
+              "step": 88,
+              "value": 0.629
+            },
+            {
+              "step": 89,
+              "value": 0.631
+            },
+            {
+              "step": 90,
+              "value": 0.634
+            },
+            {
+              "step": 91,
+              "value": 0.636
+            },
+            {
+              "step": 92,
+              "value": 0.639
+            },
+            {
+              "step": 93,
+              "value": 0.642
+            },
+            {
+              "step": 94,
+              "value": 0.644
+            },
+            {
+              "step": 95,
+              "value": 0.647
+            },
+            {
+              "step": 96,
+              "value": 0.649
+            },
+            {
+              "step": 97,
+              "value": 0.652
+            },
+            {
+              "step": 98,
+              "value": 0.655
+            },
+            {
+              "step": 99,
+              "value": 0.657
+            },
+            {
+              "step": 100,
+              "value": 0.66
+            },
+            {
+              "step": 101,
+              "value": 0.662
+            },
+            {
+              "step": 102,
+              "value": 0.665
+            },
+            {
+              "step": 103,
+              "value": 0.668
+            },
+            {
+              "step": 104,
+              "value": 0.67
+            },
+            {
+              "step": 105,
+              "value": 0.673
+            },
+            {
+              "step": 106,
+              "value": 0.675
+            },
+            {
+              "step": 107,
+              "value": 0.678
+            },
+            {
+              "step": 108,
+              "value": 0.681
+            },
+            {
+              "step": 109,
+              "value": 0.683
+            },
+            {
+              "step": 110,
+              "value": 0.686
+            },
+            {
+              "step": 111,
+              "value": 0.688
+            },
+            {
+              "step": 112,
+              "value": 0.691
+            },
+            {
+              "step": 113,
+              "value": 0.694
+            },
+            {
+              "step": 114,
+              "value": 0.696
+            },
+            {
+              "step": 115,
+              "value": 0.699
+            },
+            {
+              "step": 116,
+              "value": 0.701
+            },
+            {
+              "step": 117,
+              "value": 0.704
+            },
+            {
+              "step": 118,
+              "value": 0.707
+            },
+            {
+              "step": 119,
+              "value": 0.709
+            },
+            {
+              "step": 120,
+              "value": 0.712
+            },
+            {
+              "step": 121,
+              "value": 0.714
+            },
+            {
+              "step": 122,
+              "value": 0.717
+            },
+            {
+              "step": 123,
+              "value": 0.72
+            },
+            {
+              "step": 124,
+              "value": 0.722
+            },
+            {
+              "step": 125,
+              "value": 0.725
+            },
+            {
+              "step": 126,
+              "value": 0.727
+            },
+            {
+              "step": 127,
+              "value": 0.73
+            },
+            {
+              "step": 128,
+              "value": null
+            }
+          ]
+        },
+        {
+          "instrument": "PIANO",
+          "target": "mute",
+          "points": [
+            {
+              "step": 124,
+              "value": 1.0
+            },
+            {
+              "step": 128,
+              "value": null
+            }
+          ]
+        },
+        {
+          "instrument": "KICK",
+          "target": "mute",
+          "points": [
+            {
+              "step": 124,
+              "value": 1.0
+            },
+            {
+              "step": 128,
+              "value": null
+            }
+          ]
+        },
+        {
+          "instrument": "SHAKER",
+          "target": "mute",
+          "points": [
+            {
+              "step": 124,
+              "value": 1.0
+            },
+            {
+              "step": 128,
+              "value": null
+            }
+          ]
+        },
+        {
+          "instrument": "RIMSHOT",
+          "target": "mute",
+          "points": [
+            {
+              "step": 124,
+              "value": 1.0
+            },
+            {
+              "step": 128,
+              "value": null
+            }
+          ]
+        },
+        {
+          "instrument": "LO_TOM",
+          "target": "echoSend",
+          "points": [
+            {
+              "step": 188,
+              "value": 0.7
+            },
+            {
+              "step": 192,
+              "value": null
+            },
+            {
+              "step": 252,
+              "value": 0.7
+            },
+            {
+              "step": 256,
+              "value": null
+            },
+            {
+              "step": 316,
+              "value": 0.7
+            },
+            {
+              "step": 320,
+              "value": null
+            },
+            {
+              "step": 380,
+              "value": 0.7
+            },
+            {
+              "step": 384,
+              "value": null
+            }
+          ]
+        },
+        {
+          "instrument": "CROMAPERC",
+          "target": "mute",
+          "points": [
+            {
+              "step": 512,
+              "value": 1.0
+            },
+            {
+              "step": 576,
+              "value": null
+            }
+          ]
+        },
+        {
+          "instrument": "PIANO",
+          "target": "volume",
+          "points": [
+            {
+              "step": 832,
+              "value": 0.68
+            },
+            {
+              "step": 833,
+              "value": 0.669
+            },
+            {
+              "step": 834,
+              "value": 0.658
+            },
+            {
+              "step": 835,
+              "value": 0.648
+            },
+            {
+              "step": 836,
+              "value": 0.637
+            },
+            {
+              "step": 837,
+              "value": 0.626
+            },
+            {
+              "step": 838,
+              "value": 0.615
+            },
+            {
+              "step": 839,
+              "value": 0.604
+            },
+            {
+              "step": 840,
+              "value": 0.594
+            },
+            {
+              "step": 841,
+              "value": 0.583
+            },
+            {
+              "step": 842,
+              "value": 0.572
+            },
+            {
+              "step": 843,
+              "value": 0.561
+            },
+            {
+              "step": 844,
+              "value": 0.55
+            },
+            {
+              "step": 845,
+              "value": 0.54
+            },
+            {
+              "step": 846,
+              "value": 0.529
+            },
+            {
+              "step": 847,
+              "value": 0.518
+            },
+            {
+              "step": 848,
+              "value": 0.507
+            },
+            {
+              "step": 849,
+              "value": 0.497
+            },
+            {
+              "step": 850,
+              "value": 0.486
+            },
+            {
+              "step": 851,
+              "value": 0.475
+            },
+            {
+              "step": 852,
+              "value": 0.464
+            },
+            {
+              "step": 853,
+              "value": 0.453
+            },
+            {
+              "step": 854,
+              "value": 0.443
+            },
+            {
+              "step": 855,
+              "value": 0.432
+            },
+            {
+              "step": 856,
+              "value": 0.421
+            },
+            {
+              "step": 857,
+              "value": 0.41
+            },
+            {
+              "step": 858,
+              "value": 0.399
+            },
+            {
+              "step": 859,
+              "value": 0.389
+            },
+            {
+              "step": 860,
+              "value": 0.378
+            },
+            {
+              "step": 861,
+              "value": 0.367
+            },
+            {
+              "step": 862,
+              "value": 0.356
+            },
+            {
+              "step": 863,
+              "value": 0.345
+            },
+            {
+              "step": 864,
+              "value": 0.335
+            },
+            {
+              "step": 865,
+              "value": 0.324
+            },
+            {
+              "step": 866,
+              "value": 0.313
+            },
+            {
+              "step": 867,
+              "value": 0.302
+            },
+            {
+              "step": 868,
+              "value": 0.291
+            },
+            {
+              "step": 869,
+              "value": 0.281
+            },
+            {
+              "step": 870,
+              "value": 0.27
+            },
+            {
+              "step": 871,
+              "value": 0.259
+            },
+            {
+              "step": 872,
+              "value": 0.248
+            },
+            {
+              "step": 873,
+              "value": 0.237
+            },
+            {
+              "step": 874,
+              "value": 0.227
+            },
+            {
+              "step": 875,
+              "value": 0.216
+            },
+            {
+              "step": 876,
+              "value": 0.205
+            },
+            {
+              "step": 877,
+              "value": 0.194
+            },
+            {
+              "step": 878,
+              "value": 0.183
+            },
+            {
+              "step": 879,
+              "value": 0.173
+            },
+            {
+              "step": 880,
+              "value": 0.162
+            },
+            {
+              "step": 881,
+              "value": 0.151
+            },
+            {
+              "step": 882,
+              "value": 0.14
+            },
+            {
+              "step": 883,
+              "value": 0.13
+            },
+            {
+              "step": 884,
+              "value": 0.119
+            },
+            {
+              "step": 885,
+              "value": 0.108
+            },
+            {
+              "step": 886,
+              "value": 0.097
+            },
+            {
+              "step": 887,
+              "value": 0.086
+            },
+            {
+              "step": 888,
+              "value": 0.076
+            },
+            {
+              "step": 889,
+              "value": 0.065
+            },
+            {
+              "step": 890,
+              "value": 0.054
+            },
+            {
+              "step": 891,
+              "value": 0.043
+            },
+            {
+              "step": 892,
+              "value": 0.032
+            },
+            {
+              "step": 893,
+              "value": 0.022
+            },
+            {
+              "step": 894,
+              "value": 0.011
+            },
+            {
+              "step": 895,
+              "value": 0.0
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "patterns": [
+    {
+      "id": "mambofst",
+      "name": "Latin House",
+      "description": "Latin house, 1 measure: four-on-the-floor kick, snare on every & with a 4e-&-a run, syncopated clap over 2 beats, open hat on each &; low cowbell roll every 8 passes, pitched crash accents every 4.",
+      "tags": [
+        "latin"
+      ],
+      "tracks": [
+        {
+          "name": "KICK",
+          "loopLength": 4,
+          "volume": 0.5,
+          "noteKeys": [
+            "velocity"
+          ],
+          "notes": [
+            [
+              1
+            ]
+          ]
+        },
+        {
+          "name": "SNARE",
+          "loopLength": 4,
+          "swingAmount": 0.3,
+          "pan": 0.3,
+          "reverbType": "room",
+          "reverbMix": 0.5,
+          "noteKeys": [
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              3,
+              1
+            ],
+            [
+              3,
+              2
+            ],
+            [
+              3,
+              3
+            ],
+            [
+              0,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "TOM",
+          "loopLength": 16,
+          "pan": 0.5,
+          "reverbType": "room",
+          "reverbMix": 0.25
+        },
+        {
+          "name": "CLAP",
+          "loopLength": 8,
+          "swingAmount": 0.2,
+          "pan": -0.4,
+          "reverbType": "room",
+          "reverbMix": 0.25,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              1,
+              0,
+              2
+            ],
+            [
+              1,
+              0,
+              3
+            ],
+            [
+              1,
+              1,
+              2
+            ],
+            [
+              0.8,
+              3
+            ],
+            []
+          ]
+        },
+        {
+          "name": "COWBELL",
+          "loopLength": 4,
+          "swingAmount": 0.2,
+          "volume": 0.1,
+          "transpose": -12,
+          "pan": 0.4,
+          "reverbType": "room",
+          "reverbMix": 0.25,
+          "noteKeys": [
+            "step",
+            "cycle",
+            "retriggerRate",
+            "retriggerCount"
+          ],
+          "notes": [
+            [
+              1,
+              8,
+              8,
+              4
+            ]
+          ]
+        },
+        {
+          "name": "CHH",
+          "loopLength": 16,
+          "volume": 0.3,
+          "pan": -0.3,
+          "noteKeys": [
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              3,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "OHH",
+          "loopLength": 4,
+          "volume": 0.6,
+          "pan": -0.2,
+          "noteKeys": [
+            "velocity",
+            "step"
+          ],
+          "notes": [
+            [
+              1,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "CRASH",
+          "loopLength": 16,
+          "volume": 0.2,
+          "transpose": 10,
+          "pan": 1,
+          "reverbType": "hall",
+          "reverbMix": 0.85,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "pitch",
+            "cycle"
+          ],
+          "notes": [
+            [
+              1,
+              0,
+              0,
+              12,
+              4
+            ],
+            [
+              0.8,
+              1,
+              2
+            ],
+            [
+              0.8,
+              2,
+              2
+            ],
+            [
+              0.8,
+              3,
+              2
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "salsa",
+      "name": "Son Clave",
+      "bpm": 80,
+      "description": "Latin, 1 measure: 3-2 son clave on the clap over a four-on-the-floor kick, snare on 1&, 1a, 3e and 3&, closed hat on each &; pitched 16th toms on 4 every 6 passes.",
+      "tags": [
+        "latin",
+        "salsa"
+      ],
+      "tracks": [
+        {
+          "name": "KICK",
+          "loopLength": 4,
+          "volume": 0.5,
+          "noteKeys": [
+            "velocity"
+          ],
+          "notes": [
+            [
+              1
+            ]
+          ]
+        },
+        {
+          "name": "SNARE",
+          "loopLength": 16,
+          "volume": 0.6,
+          "transpose": 5,
+          "pan": 0.3,
+          "panLfo": {
+            "freq": 1,
+            "min": 0.1,
+            "max": 0.4,
+            "phase": 0,
+            "type": "triangle"
+          },
+          "reverbType": "room",
+          "reverbMix": 0.5,
+          "noteKeys": [
+            "beat",
+            "step",
+            "cycle"
+          ],
+          "notes": [
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              2,
+              2
+            ],
+            [
+              2,
+              1
+            ],
+            [
+              0,
+              0,
+              8
+            ]
+          ]
+        },
+        {
+          "name": "TOM",
+          "loopLength": 16,
+          "pan": 0.5,
+          "reverbType": "room",
+          "reverbMix": 0.25,
+          "noteKeys": [
+            "beat",
+            "step",
+            "pitch",
+            "cycle"
+          ],
+          "notes": [
+            [
+              3,
+              0,
+              5,
+              6
+            ],
+            [
+              3,
+              1,
+              0,
+              6
+            ],
+            [
+              3,
+              2,
+              -4,
+              6
+            ],
+            [
+              3,
+              3,
+              -5,
+              6
+            ]
+          ]
+        },
+        {
+          "name": "CLAP",
+          "loopLength": 16,
+          "pan": -0.4,
+          "reverbType": "room",
+          "reverbMix": 0.25,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              1
+            ],
+            [
+              1,
+              0,
+              3
+            ],
+            [
+              0.6,
+              1,
+              2
+            ],
+            [
+              1,
+              2,
+              2
+            ],
+            [
+              1,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "COWBELL",
+          "loopLength": 16,
+          "pan": 0.4,
+          "reverbType": "room",
+          "reverbMix": 0.25,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.6,
+              1,
+              2
+            ],
+            [
+              1,
+              3,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "CHH",
+          "loopLength": 4,
+          "volume": 0.3,
+          "pan": -0.3,
+          "noteKeys": [
+            "step"
+          ],
+          "notes": [
+            [
+              2
+            ]
+          ]
+        },
+        {
+          "name": "OHH",
+          "loopLength": 16,
+          "pan": -0.2,
+          "noteKeys": [
+            "beat",
+            "step",
+            "cycle"
+          ],
+          "notes": [
+            [
+              3,
+              3,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "CRASH",
+          "loopLength": 16,
+          "volume": 0.3,
+          "pan": 1,
+          "reverbType": "hall",
+          "reverbMix": 0.85,
+          "noteKeys": [
+            "beat",
+            "step",
+            "pan",
+            "cycle",
+            "cycleOffset"
+          ],
+          "notes": [
+            [
+              0,
+              0,
+              1,
+              8,
+              7
+            ],
+            [
+              3,
+              2,
+              -1,
+              4
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "salsagroovy",
+      "name": "Salsa",
+      "bpm": 79,
+      "description": "Salsa, 1 measure: congas and low congas in a tumbao, syncopated snare and cowbell, 16th tambourine, open hat pairs, kick on 1, 2&, 3 and 4&, mono bass on 1, 1a, 2&, 3, 3a and 4&.",
+      "tags": [
+        "latin",
+        "salsa"
+      ],
+      "tracks": [
+        {
+          "name": "KICK",
+          "loopLength": 16,
+          "volume": 0.7,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              1
+            ],
+            [
+              0.9,
+              1,
+              2
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              0.85,
+              3,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "SNARE",
+          "loopLength": 16,
+          "volume": 0.75,
+          "pan": 0.3,
+          "reverbType": "room",
+          "reverbMix": 0.2,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "cycle"
+          ],
+          "notes": [
+            [
+              0.7,
+              0,
+              1
+            ],
+            [
+              0.8,
+              0,
+              3
+            ],
+            [
+              0.65,
+              1,
+              1,
+              4
+            ],
+            [
+              0.75,
+              1,
+              3
+            ],
+            [
+              0.7,
+              2,
+              1
+            ],
+            [
+              0.8,
+              2,
+              2
+            ],
+            [
+              0.8,
+              2,
+              3,
+              4
+            ],
+            [
+              0.65,
+              3,
+              1,
+              4
+            ],
+            [
+              0.75,
+              3,
+              3,
+              4
+            ],
+            [
+              0.8,
+              0,
+              2
+            ],
+            [
+              0.65,
+              1,
+              0,
+              3
+            ],
+            [
+              0.8,
+              1,
+              2
+            ],
+            [
+              0.65,
+              3
+            ],
+            [
+              0.8,
+              3,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "CONGAS",
+          "loopLength": 16,
+          "volume": 0.8,
+          "pan": 0.5,
+          "panLfo": {
+            "freq": 2,
+            "min": 0,
+            "max": 1,
+            "phase": 0,
+            "type": "sine"
+          },
+          "reverbType": "room",
+          "reverbMix": 0.2,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "cycle"
+          ],
+          "notes": [
+            [
+              0.85,
+              0,
+              2
+            ],
+            [
+              0.9,
+              0,
+              3
+            ],
+            [
+              0.85,
+              1
+            ],
+            [
+              0.9,
+              1,
+              2,
+              7
+            ],
+            [
+              0.9,
+              1,
+              3,
+              5
+            ],
+            [
+              0.8,
+              2
+            ],
+            [
+              0.85,
+              2,
+              2
+            ],
+            [
+              0.9,
+              2,
+              3
+            ],
+            [
+              0.85,
+              3,
+              0,
+              4
+            ],
+            [
+              0.9,
+              3,
+              2,
+              8
+            ],
+            [
+              0.9,
+              3,
+              3
+            ],
+            [
+              0.75,
+              1,
+              1
+            ],
+            [
+              0.75,
+              3,
+              1
+            ]
+          ]
+        },
+        {
+          "name": "LO_CONGAS",
+          "loopLength": 16,
+          "volume": 0.85,
+          "pan": -0.4,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "cycle"
+          ],
+          "notes": [
+            [],
+            [
+              0.85,
+              0,
+              3,
+              4
+            ],
+            [
+              0.8,
+              1,
+              2,
+              5
+            ],
+            [
+              0.8,
+              2
+            ],
+            [
+              0.85,
+              2,
+              3
+            ],
+            [
+              0.75,
+              3
+            ],
+            [
+              0.8,
+              3,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "COWBELL",
+          "loopLength": 16,
+          "volume": 0.9,
+          "volumeLfo": {
+            "freq": 1,
+            "min": 0,
+            "max": 1,
+            "phase": 0.4,
+            "type": "sine"
+          },
+          "pan": 0.4,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "cycle"
+          ],
+          "notes": [
+            [
+              1
+            ],
+            [
+              0.85,
+              0,
+              3,
+              3
+            ],
+            [
+              1,
+              1,
+              2,
+              5
+            ],
+            [
+              0.85,
+              2,
+              1
+            ],
+            [
+              1,
+              2,
+              3
+            ],
+            [
+              0.85,
+              3,
+              2
+            ],
+            [
+              0.85,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "TAMBOURINE",
+          "loopLength": 1,
+          "volume": 0.25,
+          "transposeLfo": {
+            "freq": 1,
+            "min": -5,
+            "max": 6,
+            "phase": 0,
+            "type": "sine"
+          },
+          "pan": -0.3,
+          "noteKeys": [
+            "velocity"
+          ],
+          "notes": [
+            [
+              0.5
+            ]
+          ]
+        },
+        {
+          "name": "OHH",
+          "stepsPerBeat": 8,
+          "loopLength": 8,
+          "volume": 0.4,
+          "pan": -0.2,
+          "noteKeys": [
+            "velocity",
+            "step"
+          ],
+          "notes": [
+            [
+              0.55,
+              1
+            ],
+            [
+              0.6,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "BASS",
+          "loopLength": 16,
+          "volume": 0.2,
+          "pan": 1,
+          "panLfo": {
+            "freq": 1,
+            "min": 0,
+            "max": 1,
+            "phase": 0,
+            "type": "sine"
+          },
+          "mono": true,
+          "filterType": "lowpass",
+          "filterCutoffLfo": {
+            "freq": 0.5,
+            "min": -12,
+            "max": 20000,
+            "phase": 0,
+            "type": "sine"
+          },
+          "filterCutoff": 17659.04,
+          "filterQLfo": {
+            "freq": 0.3,
+            "min": 0.707,
+            "max": 18.707,
+            "phase": 0,
+            "type": "sine"
+          },
+          "filterQ": 17.64,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "pitch"
+          ],
+          "notes": [
+            [
+              0.9
+            ],
+            [
+              0.8,
+              0,
+              3,
+              5
+            ],
+            [
+              0.7,
+              1,
+              1,
+              7
+            ],
+            [
+              0.9,
+              1,
+              2,
+              7
+            ],
+            [
+              0.9,
+              2
+            ],
+            [
+              0.8,
+              2,
+              3,
+              5
+            ],
+            [
+              0.7,
+              3,
+              1,
+              7
+            ],
+            [
+              0.9,
+              3,
+              2,
+              7
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bossa",
+      "name": "Bossa Nova",
+      "bpm": 60,
+      "description": "Bossa nova, 1 measure: kick on 1, 2& and 3, snare on 2, 3& and 4&, cowbell on 1, 2&, 3 and 4, 8th hats, toms on 3& and 4&; 16th tom pickup on 1 every 4 passes.",
+      "tags": [
+        "latin",
+        "bossa"
+      ],
+      "tracks": [
+        {
+          "name": "KICK",
+          "loopLength": 16,
+          "volume": 0.7,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              1
+            ],
+            [
+              1,
+              1,
+              2
+            ],
+            [
+              1,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "SNARE",
+          "loopLength": 16,
+          "volumeLfo": {
+            "freq": 1,
+            "min": 0.5,
+            "max": 1,
+            "phase": 0,
+            "type": "triangle"
+          },
+          "pan": 0.3,
+          "reverbType": "room",
+          "reverbMix": 0.5,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.8,
+              1
+            ],
+            [
+              0.8,
+              2,
+              2
+            ],
+            [
+              1,
+              3,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "TOM",
+          "loopLength": 16,
+          "volumeLfo": {
+            "freq": 2,
+            "min": 0.5,
+            "max": 1,
+            "phase": 0,
+            "type": "triangle"
+          },
+          "pan": 0.5,
+          "reverbType": "room",
+          "reverbMix": 0.25,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "cycle"
+          ],
+          "notes": [
+            [
+              1,
+              2,
+              2
+            ],
+            [
+              1,
+              3,
+              2
+            ],
+            [
+              0.8,
+              0,
+              0,
+              4
+            ],
+            [
+              0.8,
+              0,
+              1,
+              4
+            ],
+            [
+              0.8,
+              0,
+              2,
+              4
+            ]
+          ]
+        },
+        {
+          "name": "CLAP",
+          "loopLength": 16,
+          "pan": -0.4,
+          "reverbType": "room",
+          "reverbMix": 0.25
+        },
+        {
+          "name": "COWBELL",
+          "loopLength": 16,
+          "pan": 0.4,
+          "reverbType": "room",
+          "reverbMix": 0.25,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              1
+            ],
+            [
+              1,
+              1,
+              2
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              1,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "CHH",
+          "loopLength": 2,
+          "volume": 0.3,
+          "volumeLfo": {
+            "freq": 8,
+            "min": 0.3,
+            "max": 1,
+            "phase": 0,
+            "type": "triangle"
+          },
+          "pan": -0.3,
+          "noteKeys": [
+            "velocity"
+          ],
+          "notes": [
+            [
+              1
+            ]
+          ]
+        },
+        {
+          "name": "OHH",
+          "loopLength": 16,
+          "pan": -0.2,
+          "noteKeys": [
+            "velocity",
+            "step"
+          ],
+          "notes": [
+            [
+              1,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "CRASH",
+          "loopLength": 16,
+          "pan": 1,
+          "reverbType": "hall",
+          "reverbMix": 0.85
+        }
+      ]
+    },
+    {
+      "id": "bossa-pizz",
+      "name": "Bossa Pizzicato",
+      "bpm": 60,
+      "description": "Bossa nova, 4 measures: plucked strings comping Cmaj7, Dm7, G7 and Cmaj7 on 1, 2& and 3&, the top note softer than the root.",
+      "tags": [
+        "latin",
+        "bossa",
+        "strings",
+        "chords",
+        "synth"
+      ],
+      "tracks": [
+        {
+          "name": "KICK",
+          "loopLength": 16,
+          "volume": 0.7,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              1
+            ],
+            [
+              1,
+              1,
+              2
+            ],
+            [
+              1,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "SNARE",
+          "loopLength": 16,
+          "volumeLfo": {
+            "freq": 1,
+            "min": 0.5,
+            "max": 1,
+            "phase": 0,
+            "type": "triangle"
+          },
+          "pan": 0.3,
+          "reverbType": "room",
+          "reverbMix": 0.5,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.8,
+              1
+            ],
+            [
+              0.8,
+              2,
+              2
+            ],
+            [
+              1,
+              3,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "TOM",
+          "loopLength": 16,
+          "volumeLfo": {
+            "freq": 2,
+            "min": 0.5,
+            "max": 1,
+            "phase": 0,
+            "type": "triangle"
+          },
+          "pan": 0.5,
+          "reverbType": "room",
+          "reverbMix": 0.25,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "cycle"
+          ],
+          "notes": [
+            [
+              1,
+              2,
+              2
+            ],
+            [
+              1,
+              3,
+              2
+            ],
+            [
+              0.8,
+              0,
+              0,
+              4
+            ],
+            [
+              0.8,
+              0,
+              1,
+              4
+            ],
+            [
+              0.8,
+              0,
+              2,
+              4
+            ]
+          ]
+        },
+        {
+          "name": "CLAP",
+          "loopLength": 16,
+          "pan": -0.4,
+          "reverbType": "room",
+          "reverbMix": 0.25
+        },
+        {
+          "name": "COWBELL",
+          "loopLength": 16,
+          "pan": 0.4,
+          "reverbType": "room",
+          "reverbMix": 0.25,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              1
+            ],
+            [
+              1,
+              1,
+              2
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              1,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "CHH",
+          "loopLength": 2,
+          "volume": 0.3,
+          "volumeLfo": {
+            "freq": 8,
+            "min": 0.3,
+            "max": 1,
+            "phase": 0,
+            "type": "triangle"
+          },
+          "pan": -0.3,
+          "noteKeys": [
+            "velocity"
+          ],
+          "notes": [
+            [
+              1
+            ]
+          ]
+        },
+        {
+          "name": "OHH",
+          "loopLength": 16,
+          "pan": -0.2,
+          "noteKeys": [
+            "velocity",
+            "step"
+          ],
+          "notes": [
+            [
+              1,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "CRASH",
+          "loopLength": 16,
+          "pan": 1,
+          "reverbType": "hall",
+          "reverbMix": 0.85
+        },
+        {
+          "name": "STRINGS",
+          "loopLength": 64,
+          "volume": 0.6,
+          "useSynth": true,
+          "synthPreset": "STRINGS_PIZZ",
+          "reverbType": "room",
+          "reverbMix": 0.15,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "pitch",
+            "lengthSteps"
+          ],
+          "notes": [
+            [
+              0.85,
+              0,
+              0,
+              0,
+              2
+            ],
+            [
+              0.83,
+              0,
+              0,
+              4,
+              2
+            ],
+            [
+              0.81,
+              0,
+              0,
+              7,
+              2
+            ],
+            [
+              0.79,
+              0,
+              0,
+              11,
+              2
+            ],
+            [
+              0.75,
+              1,
+              2,
+              0,
+              1.5
+            ],
+            [
+              0.73,
+              1,
+              2,
+              4,
+              1.5
+            ],
+            [
+              0.71,
+              1,
+              2,
+              7,
+              1.5
+            ],
+            [
+              0.69,
+              1,
+              2,
+              11,
+              1.5
+            ],
+            [
+              0.8,
+              2,
+              2,
+              0,
+              1.5
+            ],
+            [
+              0.78,
+              2,
+              2,
+              4,
+              1.5
+            ],
+            [
+              0.76,
+              2,
+              2,
+              7,
+              1.5
+            ],
+            [
+              0.74,
+              2,
+              2,
+              11,
+              1.5
+            ],
+            [
+              0.85,
+              4,
+              0,
+              2,
+              2
+            ],
+            [
+              0.83,
+              4,
+              0,
+              5,
+              2
+            ],
+            [
+              0.81,
+              4,
+              0,
+              9,
+              2
+            ],
+            [
+              0.79,
+              4,
+              0,
+              12,
+              2
+            ],
+            [
+              0.75,
+              5,
+              2,
+              2,
+              1.5
+            ],
+            [
+              0.73,
+              5,
+              2,
+              5,
+              1.5
+            ],
+            [
+              0.71,
+              5,
+              2,
+              9,
+              1.5
+            ],
+            [
+              0.69,
+              5,
+              2,
+              12,
+              1.5
+            ],
+            [
+              0.8,
+              6,
+              2,
+              2,
+              1.5
+            ],
+            [
+              0.78,
+              6,
+              2,
+              5,
+              1.5
+            ],
+            [
+              0.76,
+              6,
+              2,
+              9,
+              1.5
+            ],
+            [
+              0.74,
+              6,
+              2,
+              12,
+              1.5
+            ],
+            [
+              0.85,
+              8,
+              0,
+              -5,
+              2
+            ],
+            [
+              0.83,
+              8,
+              0,
+              -1,
+              2
+            ],
+            [
+              0.81,
+              8,
+              0,
+              2,
+              2
+            ],
+            [
+              0.79,
+              8,
+              0,
+              5,
+              2
+            ],
+            [
+              0.75,
+              9,
+              2,
+              -5,
+              1.5
+            ],
+            [
+              0.73,
+              9,
+              2,
+              -1,
+              1.5
+            ],
+            [
+              0.71,
+              9,
+              2,
+              2,
+              1.5
+            ],
+            [
+              0.69,
+              9,
+              2,
+              5,
+              1.5
+            ],
+            [
+              0.8,
+              10,
+              2,
+              -5,
+              1.5
+            ],
+            [
+              0.78,
+              10,
+              2,
+              -1,
+              1.5
+            ],
+            [
+              0.76,
+              10,
+              2,
+              2,
+              1.5
+            ],
+            [
+              0.74,
+              10,
+              2,
+              5,
+              1.5
+            ],
+            [
+              0.85,
+              12,
+              0,
+              0,
+              2
+            ],
+            [
+              0.83,
+              12,
+              0,
+              4,
+              2
+            ],
+            [
+              0.81,
+              12,
+              0,
+              7,
+              2
+            ],
+            [
+              0.79,
+              12,
+              0,
+              11,
+              2
+            ],
+            [
+              0.75,
+              13,
+              2,
+              0,
+              1.5
+            ],
+            [
+              0.73,
+              13,
+              2,
+              4,
+              1.5
+            ],
+            [
+              0.71,
+              13,
+              2,
+              7,
+              1.5
+            ],
+            [
+              0.69,
+              13,
+              2,
+              11,
+              1.5
+            ],
+            [
+              0.8,
+              14,
+              2,
+              0,
+              1.5
+            ],
+            [
+              0.78,
+              14,
+              2,
+              4,
+              1.5
+            ],
+            [
+              0.76,
+              14,
+              2,
+              7,
+              1.5
+            ],
+            [
+              0.74,
+              14,
+              2,
+              11,
+              1.5
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bossa-clave",
+      "name": "Bossa Nova Clave",
+      "bpm": 72,
+      "beatCount": 8,
+      "description": "Bossa nova, 2 measures: kick on 1, 2&, 3 and 4& (a dotted quarter and an eighth), cross-stick on the bossa clave 3-2 (1, 2&, 4 | 2, 3&), 8th hats with the off-beats soft, pedal hat on 2 and 4.",
+      "tags": [
+        "latin",
+        "bossa"
+      ],
+      "tracks": [
+        {
+          "name": "KICK",
+          "beatCount": 8,
+          "loopLength": 16,
+          "volume": 0.8,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.9,
+              0,
+              0
+            ],
+            [
+              0.55,
+              1,
+              2
+            ],
+            [
+              0.85,
+              2,
+              0
+            ],
+            [
+              0.55,
+              3,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "RIMSHOT",
+          "beatCount": 8,
+          "loopLength": 32,
+          "pan": 0.2,
+          "reverbType": "room",
+          "reverbMix": 0.2,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.85,
+              0,
+              0
+            ],
+            [
+              0.85,
+              1,
+              2
+            ],
+            [
+              0.85,
+              3,
+              0
+            ],
+            [
+              0.85,
+              5,
+              0
+            ],
+            [
+              0.85,
+              6,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "CHH",
+          "beatCount": 8,
+          "loopLength": 4,
+          "volume": 0.6,
+          "pan": -0.3,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.7,
+              0,
+              0
+            ],
+            [
+              0.4,
+              0,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "CHHK",
+          "beatCount": 8,
+          "loopLength": 16,
+          "volume": 0.6,
+          "pan": -0.3,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.55,
+              1,
+              0
+            ],
+            [
+              0.55,
+              3,
+              0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bossa-shaker",
+      "name": "Bossa Nova Shaker",
+      "bpm": 72,
+      "beatCount": 8,
+      "description": "Bossa nova, 2 measures: kick on 1, 2&, 3 and 4&, cross-stick on the bossa clave 2-3 (2, 3& | 1, 2&, 4), 16th shaker accented on the beat and its a, pedal hat on 2 and 4.",
+      "tags": [
+        "latin",
+        "bossa"
+      ],
+      "tracks": [
+        {
+          "name": "KICK",
+          "beatCount": 8,
+          "loopLength": 16,
+          "volume": 0.8,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.9,
+              0,
+              0
+            ],
+            [
+              0.55,
+              1,
+              2
+            ],
+            [
+              0.85,
+              2,
+              0
+            ],
+            [
+              0.55,
+              3,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "RIMSHOT",
+          "beatCount": 8,
+          "loopLength": 32,
+          "pan": 0.2,
+          "reverbType": "room",
+          "reverbMix": 0.2,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.85,
+              1,
+              0
+            ],
+            [
+              0.85,
+              2,
+              2
+            ],
+            [
+              0.85,
+              4,
+              0
+            ],
+            [
+              0.85,
+              5,
+              2
+            ],
+            [
+              0.85,
+              7,
+              0
+            ]
+          ]
+        },
+        {
+          "name": "SHAKER",
+          "beatCount": 8,
+          "loopLength": 4,
+          "volume": 0.55,
+          "pan": -0.2,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.8,
+              0,
+              0
+            ],
+            [
+              0.3,
+              0,
+              1
+            ],
+            [
+              0.45,
+              0,
+              2
+            ],
+            [
+              0.6,
+              0,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "CHHK",
+          "beatCount": 8,
+          "loopLength": 16,
+          "volume": 0.6,
+          "pan": -0.3,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.55,
+              1,
+              0
+            ],
+            [
+              0.55,
+              3,
+              0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "amapiano-intro",
+      "name": "Amapiano Intro",
+      "beatCount": 16,
+      "bpm": 113,
+      "description": "The intro and outro of the Amapiano demo, 4 measures in D minor at 113 BPM, all synth sounds: a soft kick, a heavily swung shaker and cabasa, the amapiano rimshot pushed around beats 2 and 4, and bell piano chords (Dm9, Gm9, B flat maj9, Am7) on syncopated hits.",
+      "tags": [
+        "amapiano",
+        "afrohouse",
+        "house",
+        "chords",
+        "piano",
+        "synth"
+      ],
+      "tracks": [
+        {
+          "name": "KICK",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "TR909_KICK",
+          "volume": 0.4,
+          "compMix": 0.3,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              1.0,
+              0,
+              0
+            ],
+            [
+              1.0,
+              1,
+              0
+            ],
+            [
+              1.0,
+              2,
+              0
+            ],
+            [
+              1.0,
+              3,
+              0
+            ],
+            [
+              1.0,
+              4,
+              0
+            ],
+            [
+              1.0,
+              5,
+              0
+            ],
+            [
+              1.0,
+              6,
+              0
+            ],
+            [
+              1.0,
+              7,
+              0
+            ],
+            [
+              1.0,
+              8,
+              0
+            ],
+            [
+              1.0,
+              9,
+              0
+            ],
+            [
+              1.0,
+              10,
+              0
+            ],
+            [
+              1.0,
+              11,
+              0
+            ],
+            [
+              1.0,
+              12,
+              0
+            ],
+            [
+              1.0,
+              13,
+              0
+            ],
+            [
+              1.0,
+              14,
+              0
+            ],
+            [
+              1.0,
+              15,
+              0
+            ]
+          ]
+        },
+        {
+          "name": "SHAKER",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "TR909_SHAKER",
+          "volume": 0.35,
+          "pan": 0.35,
+          "swingAmount": 0.35,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.45,
+              0,
+              0
+            ],
+            [
+              0.25,
+              0,
+              1
+            ],
+            [
+              0.5,
+              0,
+              2
+            ],
+            [
+              0.3,
+              0,
+              3
+            ],
+            [
+              0.45,
+              1,
+              0
+            ],
+            [
+              0.25,
+              1,
+              1
+            ],
+            [
+              0.5,
+              1,
+              2
+            ],
+            [
+              0.3,
+              1,
+              3
+            ],
+            [
+              0.45,
+              2,
+              0
+            ],
+            [
+              0.25,
+              2,
+              1
+            ],
+            [
+              0.5,
+              2,
+              2
+            ],
+            [
+              0.3,
+              2,
+              3
+            ],
+            [
+              0.45,
+              3,
+              0
+            ],
+            [
+              0.25,
+              3,
+              1
+            ],
+            [
+              0.5,
+              3,
+              2
+            ],
+            [
+              0.3,
+              3,
+              3
+            ],
+            [
+              0.45,
+              4,
+              0
+            ],
+            [
+              0.25,
+              4,
+              1
+            ],
+            [
+              0.5,
+              4,
+              2
+            ],
+            [
+              0.3,
+              4,
+              3
+            ],
+            [
+              0.45,
+              5,
+              0
+            ],
+            [
+              0.25,
+              5,
+              1
+            ],
+            [
+              0.5,
+              5,
+              2
+            ],
+            [
+              0.3,
+              5,
+              3
+            ],
+            [
+              0.45,
+              6,
+              0
+            ],
+            [
+              0.25,
+              6,
+              1
+            ],
+            [
+              0.5,
+              6,
+              2
+            ],
+            [
+              0.3,
+              6,
+              3
+            ],
+            [
+              0.45,
+              7,
+              0
+            ],
+            [
+              0.25,
+              7,
+              1
+            ],
+            [
+              0.5,
+              7,
+              2
+            ],
+            [
+              0.3,
+              7,
+              3
+            ],
+            [
+              0.45,
+              8,
+              0
+            ],
+            [
+              0.25,
+              8,
+              1
+            ],
+            [
+              0.5,
+              8,
+              2
+            ],
+            [
+              0.3,
+              8,
+              3
+            ],
+            [
+              0.45,
+              9,
+              0
+            ],
+            [
+              0.25,
+              9,
+              1
+            ],
+            [
+              0.5,
+              9,
+              2
+            ],
+            [
+              0.3,
+              9,
+              3
+            ],
+            [
+              0.45,
+              10,
+              0
+            ],
+            [
+              0.25,
+              10,
+              1
+            ],
+            [
+              0.5,
+              10,
+              2
+            ],
+            [
+              0.3,
+              10,
+              3
+            ],
+            [
+              0.45,
+              11,
+              0
+            ],
+            [
+              0.25,
+              11,
+              1
+            ],
+            [
+              0.5,
+              11,
+              2
+            ],
+            [
+              0.3,
+              11,
+              3
+            ],
+            [
+              0.45,
+              12,
+              0
+            ],
+            [
+              0.25,
+              12,
+              1
+            ],
+            [
+              0.5,
+              12,
+              2
+            ],
+            [
+              0.3,
+              12,
+              3
+            ],
+            [
+              0.45,
+              13,
+              0
+            ],
+            [
+              0.25,
+              13,
+              1
+            ],
+            [
+              0.5,
+              13,
+              2
+            ],
+            [
+              0.3,
+              13,
+              3
+            ],
+            [
+              0.45,
+              14,
+              0
+            ],
+            [
+              0.25,
+              14,
+              1
+            ],
+            [
+              0.5,
+              14,
+              2
+            ],
+            [
+              0.3,
+              14,
+              3
+            ],
+            [
+              0.45,
+              15,
+              0
+            ],
+            [
+              0.25,
+              15,
+              1
+            ],
+            [
+              0.5,
+              15,
+              2
+            ],
+            [
+              0.3,
+              15,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "CABA",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "LAT_CABA",
+          "volume": 0.35,
+          "pan": -0.3,
+          "swingAmount": 0.35,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.6,
+              0,
+              2
+            ],
+            [
+              0.6,
+              1,
+              2
+            ],
+            [
+              0.6,
+              2,
+              2
+            ],
+            [
+              0.6,
+              3,
+              2
+            ],
+            [
+              0.6,
+              4,
+              2
+            ],
+            [
+              0.6,
+              5,
+              2
+            ],
+            [
+              0.6,
+              6,
+              2
+            ],
+            [
+              0.6,
+              7,
+              2
+            ],
+            [
+              0.6,
+              8,
+              2
+            ],
+            [
+              0.6,
+              9,
+              2
+            ],
+            [
+              0.6,
+              10,
+              2
+            ],
+            [
+              0.6,
+              11,
+              2
+            ],
+            [
+              0.6,
+              12,
+              2
+            ],
+            [
+              0.6,
+              13,
+              2
+            ],
+            [
+              0.6,
+              14,
+              2
+            ],
+            [
+              0.6,
+              15,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "RIMSHOT",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "TR808_RIMSHOT",
+          "volume": 0.4,
+          "pan": 0.2,
+          "swingAmount": 0.35,
+          "reverbType": "room",
+          "reverbMix": 0.25,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.55,
+              0,
+              3
+            ],
+            [
+              0.7,
+              1,
+              2
+            ],
+            [
+              0.5,
+              2,
+              3
+            ],
+            [
+              0.6,
+              3,
+              1
+            ],
+            [
+              0.7,
+              3,
+              2
+            ],
+            [
+              0.55,
+              4,
+              3
+            ],
+            [
+              0.7,
+              5,
+              2
+            ],
+            [
+              0.5,
+              6,
+              3
+            ],
+            [
+              0.6,
+              7,
+              1
+            ],
+            [
+              0.7,
+              7,
+              2
+            ],
+            [
+              0.55,
+              8,
+              3
+            ],
+            [
+              0.7,
+              9,
+              2
+            ],
+            [
+              0.5,
+              10,
+              3
+            ],
+            [
+              0.6,
+              11,
+              1
+            ],
+            [
+              0.7,
+              11,
+              2
+            ],
+            [
+              0.55,
+              12,
+              3
+            ],
+            [
+              0.7,
+              13,
+              2
+            ],
+            [
+              0.5,
+              14,
+              3
+            ],
+            [
+              0.6,
+              15,
+              1
+            ],
+            [
+              0.7,
+              15,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "PIANO",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "PIANO_KEYBELL",
+          "volume": 0.45,
+          "pan": -0.15,
+          "filterType": "lowpass",
+          "filterCutoff": 3000,
+          "reverbType": "room",
+          "reverbMix": 0.3,
+          "delayType": "tape",
+          "delayBeats": 0.75,
+          "delayMix": 0.15,
+          "delayFeedback": 0.35,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "pitch",
+            "lengthSteps"
+          ],
+          "notes": [
+            [
+              0.7,
+              0,
+              2,
+              17,
+              3
+            ],
+            [
+              0.68,
+              0,
+              2,
+              21,
+              3
+            ],
+            [
+              0.66,
+              0,
+              2,
+              24,
+              3
+            ],
+            [
+              0.64,
+              0,
+              2,
+              28,
+              3
+            ],
+            [
+              0.7,
+              1,
+              3,
+              17,
+              2
+            ],
+            [
+              0.68,
+              1,
+              3,
+              21,
+              2
+            ],
+            [
+              0.66,
+              1,
+              3,
+              24,
+              2
+            ],
+            [
+              0.64,
+              1,
+              3,
+              28,
+              2
+            ],
+            [
+              0.7,
+              3,
+              0,
+              17,
+              3
+            ],
+            [
+              0.68,
+              3,
+              0,
+              21,
+              3
+            ],
+            [
+              0.66,
+              3,
+              0,
+              24,
+              3
+            ],
+            [
+              0.64,
+              3,
+              0,
+              28,
+              3
+            ],
+            [
+              0.7,
+              4,
+              2,
+              17,
+              3
+            ],
+            [
+              0.68,
+              4,
+              2,
+              21,
+              3
+            ],
+            [
+              0.66,
+              4,
+              2,
+              22,
+              3
+            ],
+            [
+              0.64,
+              4,
+              2,
+              26,
+              3
+            ],
+            [
+              0.7,
+              5,
+              3,
+              17,
+              2
+            ],
+            [
+              0.68,
+              5,
+              3,
+              21,
+              2
+            ],
+            [
+              0.66,
+              5,
+              3,
+              22,
+              2
+            ],
+            [
+              0.64,
+              5,
+              3,
+              26,
+              2
+            ],
+            [
+              0.7,
+              7,
+              0,
+              17,
+              3
+            ],
+            [
+              0.68,
+              7,
+              0,
+              21,
+              3
+            ],
+            [
+              0.66,
+              7,
+              0,
+              22,
+              3
+            ],
+            [
+              0.64,
+              7,
+              0,
+              26,
+              3
+            ],
+            [
+              0.7,
+              8,
+              2,
+              14,
+              3
+            ],
+            [
+              0.68,
+              8,
+              2,
+              17,
+              3
+            ],
+            [
+              0.66,
+              8,
+              2,
+              21,
+              3
+            ],
+            [
+              0.64,
+              8,
+              2,
+              24,
+              3
+            ],
+            [
+              0.7,
+              9,
+              3,
+              14,
+              2
+            ],
+            [
+              0.68,
+              9,
+              3,
+              17,
+              2
+            ],
+            [
+              0.66,
+              9,
+              3,
+              21,
+              2
+            ],
+            [
+              0.64,
+              9,
+              3,
+              24,
+              2
+            ],
+            [
+              0.7,
+              11,
+              0,
+              14,
+              3
+            ],
+            [
+              0.68,
+              11,
+              0,
+              17,
+              3
+            ],
+            [
+              0.66,
+              11,
+              0,
+              21,
+              3
+            ],
+            [
+              0.64,
+              11,
+              0,
+              24,
+              3
+            ],
+            [
+              0.7,
+              12,
+              2,
+              16,
+              3
+            ],
+            [
+              0.68,
+              12,
+              2,
+              19,
+              3
+            ],
+            [
+              0.66,
+              12,
+              2,
+              21,
+              3
+            ],
+            [
+              0.64,
+              12,
+              2,
+              24,
+              3
+            ],
+            [
+              0.7,
+              13,
+              3,
+              16,
+              2
+            ],
+            [
+              0.68,
+              13,
+              3,
+              19,
+              2
+            ],
+            [
+              0.66,
+              13,
+              3,
+              21,
+              2
+            ],
+            [
+              0.64,
+              13,
+              3,
+              24,
+              2
+            ],
+            [
+              0.7,
+              15,
+              0,
+              16,
+              3
+            ],
+            [
+              0.68,
+              15,
+              0,
+              19,
+              3
+            ],
+            [
+              0.66,
+              15,
+              0,
+              21,
+              3
+            ],
+            [
+              0.64,
+              15,
+              0,
+              24,
+              3
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "amapiano-groove",
+      "name": "Amapiano Groove",
+      "beatCount": 16,
+      "bpm": 113,
+      "description": "The groove of the Amapiano demo, 4 measures in D minor at 113 BPM: the intro with a clap on 2 and 4 and the log drum, an 808 low tom tuned and saturated, playing the bass line on syncopated 16ths and climbing at the end of measure 4.",
+      "tags": [
+        "amapiano",
+        "afrohouse",
+        "house",
+        "chords",
+        "piano",
+        "synth"
+      ],
+      "tracks": [
+        {
+          "name": "KICK",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "TR909_KICK",
+          "volume": 0.5,
+          "compMix": 0.3,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              1.0,
+              0,
+              0
+            ],
+            [
+              1.0,
+              1,
+              0
+            ],
+            [
+              1.0,
+              2,
+              0
+            ],
+            [
+              1.0,
+              3,
+              0
+            ],
+            [
+              1.0,
+              4,
+              0
+            ],
+            [
+              1.0,
+              5,
+              0
+            ],
+            [
+              1.0,
+              6,
+              0
+            ],
+            [
+              1.0,
+              7,
+              0
+            ],
+            [
+              1.0,
+              8,
+              0
+            ],
+            [
+              1.0,
+              9,
+              0
+            ],
+            [
+              1.0,
+              10,
+              0
+            ],
+            [
+              1.0,
+              11,
+              0
+            ],
+            [
+              1.0,
+              12,
+              0
+            ],
+            [
+              1.0,
+              13,
+              0
+            ],
+            [
+              1.0,
+              14,
+              0
+            ],
+            [
+              1.0,
+              15,
+              0
+            ]
+          ]
+        },
+        {
+          "name": "SHAKER",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "TR909_SHAKER",
+          "volume": 0.35,
+          "pan": 0.35,
+          "swingAmount": 0.35,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.45,
+              0,
+              0
+            ],
+            [
+              0.25,
+              0,
+              1
+            ],
+            [
+              0.5,
+              0,
+              2
+            ],
+            [
+              0.3,
+              0,
+              3
+            ],
+            [
+              0.45,
+              1,
+              0
+            ],
+            [
+              0.25,
+              1,
+              1
+            ],
+            [
+              0.5,
+              1,
+              2
+            ],
+            [
+              0.3,
+              1,
+              3
+            ],
+            [
+              0.45,
+              2,
+              0
+            ],
+            [
+              0.25,
+              2,
+              1
+            ],
+            [
+              0.5,
+              2,
+              2
+            ],
+            [
+              0.3,
+              2,
+              3
+            ],
+            [
+              0.45,
+              3,
+              0
+            ],
+            [
+              0.25,
+              3,
+              1
+            ],
+            [
+              0.5,
+              3,
+              2
+            ],
+            [
+              0.3,
+              3,
+              3
+            ],
+            [
+              0.45,
+              4,
+              0
+            ],
+            [
+              0.25,
+              4,
+              1
+            ],
+            [
+              0.5,
+              4,
+              2
+            ],
+            [
+              0.3,
+              4,
+              3
+            ],
+            [
+              0.45,
+              5,
+              0
+            ],
+            [
+              0.25,
+              5,
+              1
+            ],
+            [
+              0.5,
+              5,
+              2
+            ],
+            [
+              0.3,
+              5,
+              3
+            ],
+            [
+              0.45,
+              6,
+              0
+            ],
+            [
+              0.25,
+              6,
+              1
+            ],
+            [
+              0.5,
+              6,
+              2
+            ],
+            [
+              0.3,
+              6,
+              3
+            ],
+            [
+              0.45,
+              7,
+              0
+            ],
+            [
+              0.25,
+              7,
+              1
+            ],
+            [
+              0.5,
+              7,
+              2
+            ],
+            [
+              0.3,
+              7,
+              3
+            ],
+            [
+              0.45,
+              8,
+              0
+            ],
+            [
+              0.25,
+              8,
+              1
+            ],
+            [
+              0.5,
+              8,
+              2
+            ],
+            [
+              0.3,
+              8,
+              3
+            ],
+            [
+              0.45,
+              9,
+              0
+            ],
+            [
+              0.25,
+              9,
+              1
+            ],
+            [
+              0.5,
+              9,
+              2
+            ],
+            [
+              0.3,
+              9,
+              3
+            ],
+            [
+              0.45,
+              10,
+              0
+            ],
+            [
+              0.25,
+              10,
+              1
+            ],
+            [
+              0.5,
+              10,
+              2
+            ],
+            [
+              0.3,
+              10,
+              3
+            ],
+            [
+              0.45,
+              11,
+              0
+            ],
+            [
+              0.25,
+              11,
+              1
+            ],
+            [
+              0.5,
+              11,
+              2
+            ],
+            [
+              0.3,
+              11,
+              3
+            ],
+            [
+              0.45,
+              12,
+              0
+            ],
+            [
+              0.25,
+              12,
+              1
+            ],
+            [
+              0.5,
+              12,
+              2
+            ],
+            [
+              0.3,
+              12,
+              3
+            ],
+            [
+              0.45,
+              13,
+              0
+            ],
+            [
+              0.25,
+              13,
+              1
+            ],
+            [
+              0.5,
+              13,
+              2
+            ],
+            [
+              0.3,
+              13,
+              3
+            ],
+            [
+              0.45,
+              14,
+              0
+            ],
+            [
+              0.25,
+              14,
+              1
+            ],
+            [
+              0.5,
+              14,
+              2
+            ],
+            [
+              0.3,
+              14,
+              3
+            ],
+            [
+              0.45,
+              15,
+              0
+            ],
+            [
+              0.25,
+              15,
+              1
+            ],
+            [
+              0.5,
+              15,
+              2
+            ],
+            [
+              0.3,
+              15,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "CABA",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "LAT_CABA",
+          "volume": 0.35,
+          "pan": -0.3,
+          "swingAmount": 0.35,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.6,
+              0,
+              2
+            ],
+            [
+              0.6,
+              1,
+              2
+            ],
+            [
+              0.6,
+              2,
+              2
+            ],
+            [
+              0.6,
+              3,
+              2
+            ],
+            [
+              0.6,
+              4,
+              2
+            ],
+            [
+              0.6,
+              5,
+              2
+            ],
+            [
+              0.6,
+              6,
+              2
+            ],
+            [
+              0.6,
+              7,
+              2
+            ],
+            [
+              0.6,
+              8,
+              2
+            ],
+            [
+              0.6,
+              9,
+              2
+            ],
+            [
+              0.6,
+              10,
+              2
+            ],
+            [
+              0.6,
+              11,
+              2
+            ],
+            [
+              0.6,
+              12,
+              2
+            ],
+            [
+              0.6,
+              13,
+              2
+            ],
+            [
+              0.6,
+              14,
+              2
+            ],
+            [
+              0.6,
+              15,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "RIMSHOT",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "TR808_RIMSHOT",
+          "volume": 0.4,
+          "pan": 0.2,
+          "swingAmount": 0.35,
+          "reverbType": "room",
+          "reverbMix": 0.25,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.55,
+              0,
+              3
+            ],
+            [
+              0.7,
+              1,
+              2
+            ],
+            [
+              0.5,
+              2,
+              3
+            ],
+            [
+              0.6,
+              3,
+              1
+            ],
+            [
+              0.7,
+              3,
+              2
+            ],
+            [
+              0.55,
+              4,
+              3
+            ],
+            [
+              0.7,
+              5,
+              2
+            ],
+            [
+              0.5,
+              6,
+              3
+            ],
+            [
+              0.6,
+              7,
+              1
+            ],
+            [
+              0.7,
+              7,
+              2
+            ],
+            [
+              0.55,
+              8,
+              3
+            ],
+            [
+              0.7,
+              9,
+              2
+            ],
+            [
+              0.5,
+              10,
+              3
+            ],
+            [
+              0.6,
+              11,
+              1
+            ],
+            [
+              0.7,
+              11,
+              2
+            ],
+            [
+              0.55,
+              12,
+              3
+            ],
+            [
+              0.7,
+              13,
+              2
+            ],
+            [
+              0.5,
+              14,
+              3
+            ],
+            [
+              0.6,
+              15,
+              1
+            ],
+            [
+              0.7,
+              15,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "CLAP",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "TR808_CLAP",
+          "volume": 0.35,
+          "pan": -0.1,
+          "reverbType": "plate",
+          "reverbMix": 0.3,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.75,
+              1,
+              0
+            ],
+            [
+              0.75,
+              3,
+              0
+            ],
+            [
+              0.75,
+              5,
+              0
+            ],
+            [
+              0.75,
+              7,
+              0
+            ],
+            [
+              0.75,
+              9,
+              0
+            ],
+            [
+              0.75,
+              11,
+              0
+            ],
+            [
+              0.75,
+              13,
+              0
+            ],
+            [
+              0.75,
+              15,
+              0
+            ]
+          ]
+        },
+        {
+          "name": "LO_TOM",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "TR808_LO_TOM",
+          "volume": 0.55,
+          "mono": true,
+          "saturationType": "tape",
+          "saturationMix": 0.35,
+          "filterType": "lowpass",
+          "filterCutoff": 1200,
+          "filterQ": 2,
+          "sidechainSource": "KICK",
+          "duckAmount": 0.2,
+          "echoSend": 0.1,
+          "reverbType": "room",
+          "reverbMix": 0.15,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "pitch",
+            "lengthSteps"
+          ],
+          "notes": [
+            [
+              0.9,
+              0,
+              3,
+              0,
+              2
+            ],
+            [
+              0.9,
+              1,
+              2,
+              0,
+              2
+            ],
+            [
+              0.9,
+              2,
+              1,
+              3,
+              2
+            ],
+            [
+              0.9,
+              3,
+              0,
+              0,
+              2
+            ],
+            [
+              0.9,
+              3,
+              3,
+              -2,
+              2
+            ],
+            [
+              0.9,
+              4,
+              3,
+              0,
+              2
+            ],
+            [
+              0.9,
+              5,
+              2,
+              5,
+              2
+            ],
+            [
+              0.9,
+              6,
+              1,
+              3,
+              2
+            ],
+            [
+              0.9,
+              7,
+              2,
+              0,
+              2
+            ],
+            [
+              0.9,
+              8,
+              3,
+              0,
+              2
+            ],
+            [
+              0.9,
+              9,
+              2,
+              0,
+              2
+            ],
+            [
+              0.9,
+              10,
+              1,
+              3,
+              2
+            ],
+            [
+              0.9,
+              11,
+              0,
+              0,
+              2
+            ],
+            [
+              0.9,
+              11,
+              3,
+              -2,
+              2
+            ],
+            [
+              0.9,
+              12,
+              3,
+              -2,
+              2
+            ],
+            [
+              0.9,
+              13,
+              2,
+              -2,
+              2
+            ],
+            [
+              0.9,
+              14,
+              1,
+              0,
+              2
+            ],
+            [
+              0.9,
+              14,
+              3,
+              3,
+              2
+            ],
+            [
+              0.9,
+              15,
+              2,
+              5,
+              2
+            ],
+            [
+              0.9,
+              15,
+              3,
+              7,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "PIANO",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "PIANO_KEYBELL",
+          "volume": 0.45,
+          "pan": -0.15,
+          "filterType": "lowpass",
+          "filterCutoff": 3000,
+          "reverbType": "room",
+          "reverbMix": 0.3,
+          "delayType": "tape",
+          "delayBeats": 0.75,
+          "delayMix": 0.15,
+          "delayFeedback": 0.35,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "pitch",
+            "lengthSteps"
+          ],
+          "notes": [
+            [
+              0.7,
+              0,
+              2,
+              17,
+              3
+            ],
+            [
+              0.68,
+              0,
+              2,
+              21,
+              3
+            ],
+            [
+              0.66,
+              0,
+              2,
+              24,
+              3
+            ],
+            [
+              0.64,
+              0,
+              2,
+              28,
+              3
+            ],
+            [
+              0.7,
+              1,
+              3,
+              17,
+              2
+            ],
+            [
+              0.68,
+              1,
+              3,
+              21,
+              2
+            ],
+            [
+              0.66,
+              1,
+              3,
+              24,
+              2
+            ],
+            [
+              0.64,
+              1,
+              3,
+              28,
+              2
+            ],
+            [
+              0.7,
+              3,
+              0,
+              17,
+              3
+            ],
+            [
+              0.68,
+              3,
+              0,
+              21,
+              3
+            ],
+            [
+              0.66,
+              3,
+              0,
+              24,
+              3
+            ],
+            [
+              0.64,
+              3,
+              0,
+              28,
+              3
+            ],
+            [
+              0.7,
+              4,
+              2,
+              17,
+              3
+            ],
+            [
+              0.68,
+              4,
+              2,
+              21,
+              3
+            ],
+            [
+              0.66,
+              4,
+              2,
+              22,
+              3
+            ],
+            [
+              0.64,
+              4,
+              2,
+              26,
+              3
+            ],
+            [
+              0.7,
+              5,
+              3,
+              17,
+              2
+            ],
+            [
+              0.68,
+              5,
+              3,
+              21,
+              2
+            ],
+            [
+              0.66,
+              5,
+              3,
+              22,
+              2
+            ],
+            [
+              0.64,
+              5,
+              3,
+              26,
+              2
+            ],
+            [
+              0.7,
+              7,
+              0,
+              17,
+              3
+            ],
+            [
+              0.68,
+              7,
+              0,
+              21,
+              3
+            ],
+            [
+              0.66,
+              7,
+              0,
+              22,
+              3
+            ],
+            [
+              0.64,
+              7,
+              0,
+              26,
+              3
+            ],
+            [
+              0.7,
+              8,
+              2,
+              14,
+              3
+            ],
+            [
+              0.68,
+              8,
+              2,
+              17,
+              3
+            ],
+            [
+              0.66,
+              8,
+              2,
+              21,
+              3
+            ],
+            [
+              0.64,
+              8,
+              2,
+              24,
+              3
+            ],
+            [
+              0.7,
+              9,
+              3,
+              14,
+              2
+            ],
+            [
+              0.68,
+              9,
+              3,
+              17,
+              2
+            ],
+            [
+              0.66,
+              9,
+              3,
+              21,
+              2
+            ],
+            [
+              0.64,
+              9,
+              3,
+              24,
+              2
+            ],
+            [
+              0.7,
+              11,
+              0,
+              14,
+              3
+            ],
+            [
+              0.68,
+              11,
+              0,
+              17,
+              3
+            ],
+            [
+              0.66,
+              11,
+              0,
+              21,
+              3
+            ],
+            [
+              0.64,
+              11,
+              0,
+              24,
+              3
+            ],
+            [
+              0.7,
+              12,
+              2,
+              16,
+              3
+            ],
+            [
+              0.68,
+              12,
+              2,
+              19,
+              3
+            ],
+            [
+              0.66,
+              12,
+              2,
+              21,
+              3
+            ],
+            [
+              0.64,
+              12,
+              2,
+              24,
+              3
+            ],
+            [
+              0.7,
+              13,
+              3,
+              16,
+              2
+            ],
+            [
+              0.68,
+              13,
+              3,
+              19,
+              2
+            ],
+            [
+              0.66,
+              13,
+              3,
+              21,
+              2
+            ],
+            [
+              0.64,
+              13,
+              3,
+              24,
+              2
+            ],
+            [
+              0.7,
+              15,
+              0,
+              16,
+              3
+            ],
+            [
+              0.68,
+              15,
+              0,
+              19,
+              3
+            ],
+            [
+              0.66,
+              15,
+              0,
+              21,
+              3
+            ],
+            [
+              0.64,
+              15,
+              0,
+              24,
+              3
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "amapiano-break",
+      "name": "Amapiano Break",
+      "beatCount": 16,
+      "bpm": 113,
+      "description": "The break of the Amapiano demo, 4 measures in D minor: no kick, a warm pad under the piano, the shaker, and the log drum only in measures 2 and 4.",
+      "tags": [
+        "amapiano",
+        "afrohouse",
+        "house",
+        "chords",
+        "piano",
+        "synth"
+      ],
+      "tracks": [
+        {
+          "name": "SHAKER",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "TR909_SHAKER",
+          "volume": 0.35,
+          "pan": 0.35,
+          "swingAmount": 0.35,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.45,
+              0,
+              0
+            ],
+            [
+              0.25,
+              0,
+              1
+            ],
+            [
+              0.5,
+              0,
+              2
+            ],
+            [
+              0.3,
+              0,
+              3
+            ],
+            [
+              0.45,
+              1,
+              0
+            ],
+            [
+              0.25,
+              1,
+              1
+            ],
+            [
+              0.5,
+              1,
+              2
+            ],
+            [
+              0.3,
+              1,
+              3
+            ],
+            [
+              0.45,
+              2,
+              0
+            ],
+            [
+              0.25,
+              2,
+              1
+            ],
+            [
+              0.5,
+              2,
+              2
+            ],
+            [
+              0.3,
+              2,
+              3
+            ],
+            [
+              0.45,
+              3,
+              0
+            ],
+            [
+              0.25,
+              3,
+              1
+            ],
+            [
+              0.5,
+              3,
+              2
+            ],
+            [
+              0.3,
+              3,
+              3
+            ],
+            [
+              0.45,
+              4,
+              0
+            ],
+            [
+              0.25,
+              4,
+              1
+            ],
+            [
+              0.5,
+              4,
+              2
+            ],
+            [
+              0.3,
+              4,
+              3
+            ],
+            [
+              0.45,
+              5,
+              0
+            ],
+            [
+              0.25,
+              5,
+              1
+            ],
+            [
+              0.5,
+              5,
+              2
+            ],
+            [
+              0.3,
+              5,
+              3
+            ],
+            [
+              0.45,
+              6,
+              0
+            ],
+            [
+              0.25,
+              6,
+              1
+            ],
+            [
+              0.5,
+              6,
+              2
+            ],
+            [
+              0.3,
+              6,
+              3
+            ],
+            [
+              0.45,
+              7,
+              0
+            ],
+            [
+              0.25,
+              7,
+              1
+            ],
+            [
+              0.5,
+              7,
+              2
+            ],
+            [
+              0.3,
+              7,
+              3
+            ],
+            [
+              0.45,
+              8,
+              0
+            ],
+            [
+              0.25,
+              8,
+              1
+            ],
+            [
+              0.5,
+              8,
+              2
+            ],
+            [
+              0.3,
+              8,
+              3
+            ],
+            [
+              0.45,
+              9,
+              0
+            ],
+            [
+              0.25,
+              9,
+              1
+            ],
+            [
+              0.5,
+              9,
+              2
+            ],
+            [
+              0.3,
+              9,
+              3
+            ],
+            [
+              0.45,
+              10,
+              0
+            ],
+            [
+              0.25,
+              10,
+              1
+            ],
+            [
+              0.5,
+              10,
+              2
+            ],
+            [
+              0.3,
+              10,
+              3
+            ],
+            [
+              0.45,
+              11,
+              0
+            ],
+            [
+              0.25,
+              11,
+              1
+            ],
+            [
+              0.5,
+              11,
+              2
+            ],
+            [
+              0.3,
+              11,
+              3
+            ],
+            [
+              0.45,
+              12,
+              0
+            ],
+            [
+              0.25,
+              12,
+              1
+            ],
+            [
+              0.5,
+              12,
+              2
+            ],
+            [
+              0.3,
+              12,
+              3
+            ],
+            [
+              0.45,
+              13,
+              0
+            ],
+            [
+              0.25,
+              13,
+              1
+            ],
+            [
+              0.5,
+              13,
+              2
+            ],
+            [
+              0.3,
+              13,
+              3
+            ],
+            [
+              0.45,
+              14,
+              0
+            ],
+            [
+              0.25,
+              14,
+              1
+            ],
+            [
+              0.5,
+              14,
+              2
+            ],
+            [
+              0.3,
+              14,
+              3
+            ],
+            [
+              0.45,
+              15,
+              0
+            ],
+            [
+              0.25,
+              15,
+              1
+            ],
+            [
+              0.5,
+              15,
+              2
+            ],
+            [
+              0.3,
+              15,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "CABA",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "LAT_CABA",
+          "volume": 0.35,
+          "pan": -0.3,
+          "swingAmount": 0.35,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.6,
+              0,
+              2
+            ],
+            [
+              0.6,
+              1,
+              2
+            ],
+            [
+              0.6,
+              2,
+              2
+            ],
+            [
+              0.6,
+              3,
+              2
+            ],
+            [
+              0.6,
+              4,
+              2
+            ],
+            [
+              0.6,
+              5,
+              2
+            ],
+            [
+              0.6,
+              6,
+              2
+            ],
+            [
+              0.6,
+              7,
+              2
+            ],
+            [
+              0.6,
+              8,
+              2
+            ],
+            [
+              0.6,
+              9,
+              2
+            ],
+            [
+              0.6,
+              10,
+              2
+            ],
+            [
+              0.6,
+              11,
+              2
+            ],
+            [
+              0.6,
+              12,
+              2
+            ],
+            [
+              0.6,
+              13,
+              2
+            ],
+            [
+              0.6,
+              14,
+              2
+            ],
+            [
+              0.6,
+              15,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "SYNTHPAD",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "SYNTHPAD_WARM",
+          "volume": 0.35,
+          "pan": 0.2,
+          "reverbType": "hall",
+          "reverbMix": 0.5,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "pitch",
+            "lengthSteps"
+          ],
+          "notes": [
+            [
+              0.6,
+              0,
+              0,
+              17,
+              16
+            ],
+            [
+              0.58,
+              0,
+              0,
+              21,
+              16
+            ],
+            [
+              0.56,
+              0,
+              0,
+              24,
+              16
+            ],
+            [
+              0.54,
+              0,
+              0,
+              28,
+              16
+            ],
+            [
+              0.6,
+              4,
+              0,
+              17,
+              16
+            ],
+            [
+              0.58,
+              4,
+              0,
+              21,
+              16
+            ],
+            [
+              0.56,
+              4,
+              0,
+              22,
+              16
+            ],
+            [
+              0.54,
+              4,
+              0,
+              26,
+              16
+            ],
+            [
+              0.6,
+              8,
+              0,
+              14,
+              16
+            ],
+            [
+              0.58,
+              8,
+              0,
+              17,
+              16
+            ],
+            [
+              0.56,
+              8,
+              0,
+              21,
+              16
+            ],
+            [
+              0.54,
+              8,
+              0,
+              24,
+              16
+            ],
+            [
+              0.6,
+              12,
+              0,
+              16,
+              16
+            ],
+            [
+              0.58,
+              12,
+              0,
+              19,
+              16
+            ],
+            [
+              0.56,
+              12,
+              0,
+              21,
+              16
+            ],
+            [
+              0.54,
+              12,
+              0,
+              24,
+              16
+            ]
+          ]
+        },
+        {
+          "name": "PIANO",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "PIANO_KEYBELL",
+          "volume": 0.4,
+          "pan": -0.15,
+          "filterType": "lowpass",
+          "filterCutoff": 3000,
+          "reverbType": "room",
+          "reverbMix": 0.3,
+          "delayType": "tape",
+          "delayBeats": 0.75,
+          "delayMix": 0.15,
+          "delayFeedback": 0.35,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "pitch",
+            "lengthSteps"
+          ],
+          "notes": [
+            [
+              0.7,
+              0,
+              2,
+              17,
+              3
+            ],
+            [
+              0.68,
+              0,
+              2,
+              21,
+              3
+            ],
+            [
+              0.66,
+              0,
+              2,
+              24,
+              3
+            ],
+            [
+              0.64,
+              0,
+              2,
+              28,
+              3
+            ],
+            [
+              0.7,
+              1,
+              3,
+              17,
+              2
+            ],
+            [
+              0.68,
+              1,
+              3,
+              21,
+              2
+            ],
+            [
+              0.66,
+              1,
+              3,
+              24,
+              2
+            ],
+            [
+              0.64,
+              1,
+              3,
+              28,
+              2
+            ],
+            [
+              0.7,
+              3,
+              0,
+              17,
+              3
+            ],
+            [
+              0.68,
+              3,
+              0,
+              21,
+              3
+            ],
+            [
+              0.66,
+              3,
+              0,
+              24,
+              3
+            ],
+            [
+              0.64,
+              3,
+              0,
+              28,
+              3
+            ],
+            [
+              0.7,
+              4,
+              2,
+              17,
+              3
+            ],
+            [
+              0.68,
+              4,
+              2,
+              21,
+              3
+            ],
+            [
+              0.66,
+              4,
+              2,
+              22,
+              3
+            ],
+            [
+              0.64,
+              4,
+              2,
+              26,
+              3
+            ],
+            [
+              0.7,
+              5,
+              3,
+              17,
+              2
+            ],
+            [
+              0.68,
+              5,
+              3,
+              21,
+              2
+            ],
+            [
+              0.66,
+              5,
+              3,
+              22,
+              2
+            ],
+            [
+              0.64,
+              5,
+              3,
+              26,
+              2
+            ],
+            [
+              0.7,
+              7,
+              0,
+              17,
+              3
+            ],
+            [
+              0.68,
+              7,
+              0,
+              21,
+              3
+            ],
+            [
+              0.66,
+              7,
+              0,
+              22,
+              3
+            ],
+            [
+              0.64,
+              7,
+              0,
+              26,
+              3
+            ],
+            [
+              0.7,
+              8,
+              2,
+              14,
+              3
+            ],
+            [
+              0.68,
+              8,
+              2,
+              17,
+              3
+            ],
+            [
+              0.66,
+              8,
+              2,
+              21,
+              3
+            ],
+            [
+              0.64,
+              8,
+              2,
+              24,
+              3
+            ],
+            [
+              0.7,
+              9,
+              3,
+              14,
+              2
+            ],
+            [
+              0.68,
+              9,
+              3,
+              17,
+              2
+            ],
+            [
+              0.66,
+              9,
+              3,
+              21,
+              2
+            ],
+            [
+              0.64,
+              9,
+              3,
+              24,
+              2
+            ],
+            [
+              0.7,
+              11,
+              0,
+              14,
+              3
+            ],
+            [
+              0.68,
+              11,
+              0,
+              17,
+              3
+            ],
+            [
+              0.66,
+              11,
+              0,
+              21,
+              3
+            ],
+            [
+              0.64,
+              11,
+              0,
+              24,
+              3
+            ],
+            [
+              0.7,
+              12,
+              2,
+              16,
+              3
+            ],
+            [
+              0.68,
+              12,
+              2,
+              19,
+              3
+            ],
+            [
+              0.66,
+              12,
+              2,
+              21,
+              3
+            ],
+            [
+              0.64,
+              12,
+              2,
+              24,
+              3
+            ],
+            [
+              0.7,
+              13,
+              3,
+              16,
+              2
+            ],
+            [
+              0.68,
+              13,
+              3,
+              19,
+              2
+            ],
+            [
+              0.66,
+              13,
+              3,
+              21,
+              2
+            ],
+            [
+              0.64,
+              13,
+              3,
+              24,
+              2
+            ],
+            [
+              0.7,
+              15,
+              0,
+              16,
+              3
+            ],
+            [
+              0.68,
+              15,
+              0,
+              19,
+              3
+            ],
+            [
+              0.66,
+              15,
+              0,
+              21,
+              3
+            ],
+            [
+              0.64,
+              15,
+              0,
+              24,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "LO_TOM",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "TR808_LO_TOM",
+          "volume": 0.5,
+          "mono": true,
+          "saturationType": "tape",
+          "saturationMix": 0.35,
+          "filterType": "lowpass",
+          "filterCutoff": 1200,
+          "filterQ": 2,
+          "sidechainSource": "KICK",
+          "duckAmount": 0.2,
+          "echoSend": 0.1,
+          "reverbType": "room",
+          "reverbMix": 0.15,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "pitch",
+            "lengthSteps"
+          ],
+          "notes": [
+            [
+              0.9,
+              4,
+              3,
+              0,
+              2
+            ],
+            [
+              0.9,
+              5,
+              2,
+              5,
+              2
+            ],
+            [
+              0.9,
+              6,
+              1,
+              3,
+              2
+            ],
+            [
+              0.9,
+              7,
+              2,
+              0,
+              2
+            ],
+            [
+              0.9,
+              12,
+              3,
+              -2,
+              2
+            ],
+            [
+              0.9,
+              13,
+              2,
+              -2,
+              2
+            ],
+            [
+              0.9,
+              14,
+              1,
+              0,
+              2
+            ],
+            [
+              0.9,
+              14,
+              3,
+              3,
+              2
+            ],
+            [
+              0.9,
+              15,
+              2,
+              5,
+              2
+            ],
+            [
+              0.9,
+              15,
+              3,
+              7,
+              2
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "amapiano-afro",
+      "name": "Amapiano Afro House",
+      "beatCount": 16,
+      "bpm": 113,
+      "description": "The afro house part of the Amapiano demo, 4 measures in D minor at 113 BPM: a firmer kick, high and low congas in interlocking patterns, a marimba riff in ping-pong delay, the shaker, cabasa and clap, the log drum lower in the mix and the piano on the first hit of each measure.",
+      "tags": [
+        "amapiano",
+        "afrohouse",
+        "house",
+        "chords",
+        "piano",
+        "synth"
+      ],
+      "tracks": [
+        {
+          "name": "KICK",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "TR909_KICK",
+          "volume": 0.6,
+          "compMix": 0.3,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              1.0,
+              0,
+              0
+            ],
+            [
+              1.0,
+              1,
+              0
+            ],
+            [
+              1.0,
+              2,
+              0
+            ],
+            [
+              1.0,
+              3,
+              0
+            ],
+            [
+              1.0,
+              4,
+              0
+            ],
+            [
+              1.0,
+              5,
+              0
+            ],
+            [
+              1.0,
+              6,
+              0
+            ],
+            [
+              1.0,
+              7,
+              0
+            ],
+            [
+              1.0,
+              8,
+              0
+            ],
+            [
+              1.0,
+              9,
+              0
+            ],
+            [
+              1.0,
+              10,
+              0
+            ],
+            [
+              1.0,
+              11,
+              0
+            ],
+            [
+              1.0,
+              12,
+              0
+            ],
+            [
+              1.0,
+              13,
+              0
+            ],
+            [
+              1.0,
+              14,
+              0
+            ],
+            [
+              1.0,
+              15,
+              0
+            ]
+          ]
+        },
+        {
+          "name": "SHAKER",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "TR909_SHAKER",
+          "volume": 0.35,
+          "pan": 0.35,
+          "swingAmount": 0.35,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.45,
+              0,
+              0
+            ],
+            [
+              0.25,
+              0,
+              1
+            ],
+            [
+              0.5,
+              0,
+              2
+            ],
+            [
+              0.3,
+              0,
+              3
+            ],
+            [
+              0.45,
+              1,
+              0
+            ],
+            [
+              0.25,
+              1,
+              1
+            ],
+            [
+              0.5,
+              1,
+              2
+            ],
+            [
+              0.3,
+              1,
+              3
+            ],
+            [
+              0.45,
+              2,
+              0
+            ],
+            [
+              0.25,
+              2,
+              1
+            ],
+            [
+              0.5,
+              2,
+              2
+            ],
+            [
+              0.3,
+              2,
+              3
+            ],
+            [
+              0.45,
+              3,
+              0
+            ],
+            [
+              0.25,
+              3,
+              1
+            ],
+            [
+              0.5,
+              3,
+              2
+            ],
+            [
+              0.3,
+              3,
+              3
+            ],
+            [
+              0.45,
+              4,
+              0
+            ],
+            [
+              0.25,
+              4,
+              1
+            ],
+            [
+              0.5,
+              4,
+              2
+            ],
+            [
+              0.3,
+              4,
+              3
+            ],
+            [
+              0.45,
+              5,
+              0
+            ],
+            [
+              0.25,
+              5,
+              1
+            ],
+            [
+              0.5,
+              5,
+              2
+            ],
+            [
+              0.3,
+              5,
+              3
+            ],
+            [
+              0.45,
+              6,
+              0
+            ],
+            [
+              0.25,
+              6,
+              1
+            ],
+            [
+              0.5,
+              6,
+              2
+            ],
+            [
+              0.3,
+              6,
+              3
+            ],
+            [
+              0.45,
+              7,
+              0
+            ],
+            [
+              0.25,
+              7,
+              1
+            ],
+            [
+              0.5,
+              7,
+              2
+            ],
+            [
+              0.3,
+              7,
+              3
+            ],
+            [
+              0.45,
+              8,
+              0
+            ],
+            [
+              0.25,
+              8,
+              1
+            ],
+            [
+              0.5,
+              8,
+              2
+            ],
+            [
+              0.3,
+              8,
+              3
+            ],
+            [
+              0.45,
+              9,
+              0
+            ],
+            [
+              0.25,
+              9,
+              1
+            ],
+            [
+              0.5,
+              9,
+              2
+            ],
+            [
+              0.3,
+              9,
+              3
+            ],
+            [
+              0.45,
+              10,
+              0
+            ],
+            [
+              0.25,
+              10,
+              1
+            ],
+            [
+              0.5,
+              10,
+              2
+            ],
+            [
+              0.3,
+              10,
+              3
+            ],
+            [
+              0.45,
+              11,
+              0
+            ],
+            [
+              0.25,
+              11,
+              1
+            ],
+            [
+              0.5,
+              11,
+              2
+            ],
+            [
+              0.3,
+              11,
+              3
+            ],
+            [
+              0.45,
+              12,
+              0
+            ],
+            [
+              0.25,
+              12,
+              1
+            ],
+            [
+              0.5,
+              12,
+              2
+            ],
+            [
+              0.3,
+              12,
+              3
+            ],
+            [
+              0.45,
+              13,
+              0
+            ],
+            [
+              0.25,
+              13,
+              1
+            ],
+            [
+              0.5,
+              13,
+              2
+            ],
+            [
+              0.3,
+              13,
+              3
+            ],
+            [
+              0.45,
+              14,
+              0
+            ],
+            [
+              0.25,
+              14,
+              1
+            ],
+            [
+              0.5,
+              14,
+              2
+            ],
+            [
+              0.3,
+              14,
+              3
+            ],
+            [
+              0.45,
+              15,
+              0
+            ],
+            [
+              0.25,
+              15,
+              1
+            ],
+            [
+              0.5,
+              15,
+              2
+            ],
+            [
+              0.3,
+              15,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "CABA",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "LAT_CABA",
+          "volume": 0.35,
+          "pan": -0.3,
+          "swingAmount": 0.35,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.6,
+              0,
+              2
+            ],
+            [
+              0.6,
+              1,
+              2
+            ],
+            [
+              0.6,
+              2,
+              2
+            ],
+            [
+              0.6,
+              3,
+              2
+            ],
+            [
+              0.6,
+              4,
+              2
+            ],
+            [
+              0.6,
+              5,
+              2
+            ],
+            [
+              0.6,
+              6,
+              2
+            ],
+            [
+              0.6,
+              7,
+              2
+            ],
+            [
+              0.6,
+              8,
+              2
+            ],
+            [
+              0.6,
+              9,
+              2
+            ],
+            [
+              0.6,
+              10,
+              2
+            ],
+            [
+              0.6,
+              11,
+              2
+            ],
+            [
+              0.6,
+              12,
+              2
+            ],
+            [
+              0.6,
+              13,
+              2
+            ],
+            [
+              0.6,
+              14,
+              2
+            ],
+            [
+              0.6,
+              15,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "CLAP",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "TR808_CLAP",
+          "volume": 0.35,
+          "pan": -0.1,
+          "reverbType": "plate",
+          "reverbMix": 0.3,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.75,
+              1,
+              0
+            ],
+            [
+              0.75,
+              3,
+              0
+            ],
+            [
+              0.75,
+              5,
+              0
+            ],
+            [
+              0.75,
+              7,
+              0
+            ],
+            [
+              0.75,
+              9,
+              0
+            ],
+            [
+              0.75,
+              11,
+              0
+            ],
+            [
+              0.75,
+              13,
+              0
+            ],
+            [
+              0.75,
+              15,
+              0
+            ]
+          ]
+        },
+        {
+          "name": "HI_CONGAS",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "LAT_HI_CONGAS",
+          "volume": 0.4,
+          "pan": -0.45,
+          "swingAmount": 0.25,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "pitch",
+            "lengthSteps"
+          ],
+          "notes": [
+            [
+              0.7,
+              0,
+              2,
+              0,
+              1
+            ],
+            [
+              0.7,
+              1,
+              0,
+              0,
+              1
+            ],
+            [
+              0.7,
+              1,
+              3,
+              0,
+              1
+            ],
+            [
+              0.7,
+              2,
+              2,
+              0,
+              1
+            ],
+            [
+              0.7,
+              3,
+              1,
+              0,
+              1
+            ],
+            [
+              0.7,
+              3,
+              3,
+              0,
+              1
+            ],
+            [
+              0.7,
+              4,
+              2,
+              0,
+              1
+            ],
+            [
+              0.7,
+              5,
+              0,
+              0,
+              1
+            ],
+            [
+              0.7,
+              5,
+              3,
+              0,
+              1
+            ],
+            [
+              0.7,
+              6,
+              2,
+              0,
+              1
+            ],
+            [
+              0.7,
+              7,
+              1,
+              0,
+              1
+            ],
+            [
+              0.7,
+              7,
+              3,
+              0,
+              1
+            ],
+            [
+              0.7,
+              8,
+              2,
+              0,
+              1
+            ],
+            [
+              0.7,
+              9,
+              0,
+              0,
+              1
+            ],
+            [
+              0.7,
+              9,
+              3,
+              0,
+              1
+            ],
+            [
+              0.7,
+              10,
+              2,
+              0,
+              1
+            ],
+            [
+              0.7,
+              11,
+              1,
+              0,
+              1
+            ],
+            [
+              0.7,
+              11,
+              3,
+              0,
+              1
+            ],
+            [
+              0.7,
+              12,
+              2,
+              0,
+              1
+            ],
+            [
+              0.7,
+              13,
+              0,
+              0,
+              1
+            ],
+            [
+              0.7,
+              13,
+              3,
+              0,
+              1
+            ],
+            [
+              0.7,
+              14,
+              2,
+              0,
+              1
+            ],
+            [
+              0.7,
+              15,
+              1,
+              0,
+              1
+            ],
+            [
+              0.7,
+              15,
+              3,
+              0,
+              1
+            ]
+          ]
+        },
+        {
+          "name": "LO_CONGAS",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "LAT_LO_CONGAS",
+          "volume": 0.45,
+          "pan": 0.45,
+          "swingAmount": 0.25,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "pitch",
+            "lengthSteps"
+          ],
+          "notes": [
+            [
+              0.8,
+              0,
+              3,
+              0,
+              1
+            ],
+            [
+              0.8,
+              2,
+              0,
+              0,
+              1
+            ],
+            [
+              0.8,
+              2,
+              3,
+              0,
+              1
+            ],
+            [
+              0.8,
+              4,
+              3,
+              0,
+              1
+            ],
+            [
+              0.8,
+              6,
+              0,
+              0,
+              1
+            ],
+            [
+              0.8,
+              6,
+              3,
+              0,
+              1
+            ],
+            [
+              0.8,
+              8,
+              3,
+              0,
+              1
+            ],
+            [
+              0.8,
+              10,
+              0,
+              0,
+              1
+            ],
+            [
+              0.8,
+              10,
+              3,
+              0,
+              1
+            ],
+            [
+              0.8,
+              12,
+              3,
+              0,
+              1
+            ],
+            [
+              0.8,
+              14,
+              0,
+              0,
+              1
+            ],
+            [
+              0.8,
+              14,
+              3,
+              0,
+              1
+            ]
+          ]
+        },
+        {
+          "name": "CROMAPERC",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "CROMAPERC_MARIMBA",
+          "volume": 0.35,
+          "pan": 0.25,
+          "delayType": "pingpong",
+          "delayBeats": 0.75,
+          "delayMix": 0.3,
+          "delayFeedback": 0.4,
+          "reverbType": "room",
+          "reverbMix": 0.25,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "pitch",
+            "lengthSteps"
+          ],
+          "notes": [
+            [
+              0.7,
+              0,
+              0,
+              26,
+              2
+            ],
+            [
+              0.7,
+              0,
+              3,
+              29,
+              2
+            ],
+            [
+              0.7,
+              1,
+              2,
+              33,
+              2
+            ],
+            [
+              0.7,
+              2,
+              1,
+              31,
+              2
+            ],
+            [
+              0.7,
+              2,
+              3,
+              29,
+              2
+            ],
+            [
+              0.7,
+              3,
+              2,
+              26,
+              2
+            ],
+            [
+              0.7,
+              4,
+              0,
+              26,
+              2
+            ],
+            [
+              0.7,
+              4,
+              3,
+              29,
+              2
+            ],
+            [
+              0.7,
+              5,
+              2,
+              33,
+              2
+            ],
+            [
+              0.7,
+              6,
+              1,
+              31,
+              2
+            ],
+            [
+              0.7,
+              6,
+              3,
+              29,
+              2
+            ],
+            [
+              0.7,
+              7,
+              2,
+              26,
+              2
+            ],
+            [
+              0.7,
+              8,
+              0,
+              26,
+              2
+            ],
+            [
+              0.7,
+              8,
+              3,
+              29,
+              2
+            ],
+            [
+              0.7,
+              9,
+              2,
+              33,
+              2
+            ],
+            [
+              0.7,
+              10,
+              1,
+              31,
+              2
+            ],
+            [
+              0.7,
+              10,
+              3,
+              29,
+              2
+            ],
+            [
+              0.7,
+              11,
+              2,
+              26,
+              2
+            ],
+            [
+              0.7,
+              12,
+              0,
+              28,
+              2
+            ],
+            [
+              0.7,
+              12,
+              3,
+              31,
+              2
+            ],
+            [
+              0.7,
+              13,
+              2,
+              33,
+              2
+            ],
+            [
+              0.7,
+              14,
+              1,
+              36,
+              2
+            ],
+            [
+              0.7,
+              14,
+              3,
+              33,
+              2
+            ],
+            [
+              0.7,
+              15,
+              2,
+              31,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "LO_TOM",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "TR808_LO_TOM",
+          "volume": 0.4,
+          "mono": true,
+          "saturationType": "tape",
+          "saturationMix": 0.35,
+          "filterType": "lowpass",
+          "filterCutoff": 1200,
+          "filterQ": 2,
+          "sidechainSource": "KICK",
+          "duckAmount": 0.2,
+          "echoSend": 0.1,
+          "reverbType": "room",
+          "reverbMix": 0.15,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "pitch",
+            "lengthSteps"
+          ],
+          "notes": [
+            [
+              0.9,
+              0,
+              3,
+              0,
+              2
+            ],
+            [
+              0.9,
+              1,
+              2,
+              0,
+              2
+            ],
+            [
+              0.9,
+              2,
+              1,
+              3,
+              2
+            ],
+            [
+              0.9,
+              3,
+              0,
+              0,
+              2
+            ],
+            [
+              0.9,
+              3,
+              3,
+              -2,
+              2
+            ],
+            [
+              0.9,
+              4,
+              3,
+              0,
+              2
+            ],
+            [
+              0.9,
+              5,
+              2,
+              5,
+              2
+            ],
+            [
+              0.9,
+              6,
+              1,
+              3,
+              2
+            ],
+            [
+              0.9,
+              7,
+              2,
+              0,
+              2
+            ],
+            [
+              0.9,
+              8,
+              3,
+              0,
+              2
+            ],
+            [
+              0.9,
+              9,
+              2,
+              0,
+              2
+            ],
+            [
+              0.9,
+              10,
+              1,
+              3,
+              2
+            ],
+            [
+              0.9,
+              11,
+              0,
+              0,
+              2
+            ],
+            [
+              0.9,
+              11,
+              3,
+              -2,
+              2
+            ],
+            [
+              0.9,
+              12,
+              3,
+              -2,
+              2
+            ],
+            [
+              0.9,
+              13,
+              2,
+              -2,
+              2
+            ],
+            [
+              0.9,
+              14,
+              1,
+              0,
+              2
+            ],
+            [
+              0.9,
+              14,
+              3,
+              3,
+              2
+            ],
+            [
+              0.9,
+              15,
+              2,
+              5,
+              2
+            ],
+            [
+              0.9,
+              15,
+              3,
+              7,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "PIANO",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "PIANO_KEYBELL",
+          "volume": 0.35,
+          "pan": -0.15,
+          "filterType": "lowpass",
+          "filterCutoff": 3000,
+          "reverbType": "room",
+          "reverbMix": 0.3,
+          "delayType": "tape",
+          "delayBeats": 0.75,
+          "delayMix": 0.15,
+          "delayFeedback": 0.35,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "pitch",
+            "lengthSteps"
+          ],
+          "notes": [
+            [
+              0.7,
+              0,
+              2,
+              17,
+              3
+            ],
+            [
+              0.68,
+              0,
+              2,
+              21,
+              3
+            ],
+            [
+              0.66,
+              0,
+              2,
+              24,
+              3
+            ],
+            [
+              0.64,
+              0,
+              2,
+              28,
+              3
+            ],
+            [
+              0.7,
+              4,
+              2,
+              17,
+              3
+            ],
+            [
+              0.68,
+              4,
+              2,
+              21,
+              3
+            ],
+            [
+              0.66,
+              4,
+              2,
+              22,
+              3
+            ],
+            [
+              0.64,
+              4,
+              2,
+              26,
+              3
+            ],
+            [
+              0.7,
+              8,
+              2,
+              14,
+              3
+            ],
+            [
+              0.68,
+              8,
+              2,
+              17,
+              3
+            ],
+            [
+              0.66,
+              8,
+              2,
+              21,
+              3
+            ],
+            [
+              0.64,
+              8,
+              2,
+              24,
+              3
+            ],
+            [
+              0.7,
+              12,
+              2,
+              16,
+              3
+            ],
+            [
+              0.68,
+              12,
+              2,
+              19,
+              3
+            ],
+            [
+              0.66,
+              12,
+              2,
+              21,
+              3
+            ],
+            [
+              0.64,
+              12,
+              2,
+              24,
+              3
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "batuc",
+      "name": "Batucada",
+      "bpm": 100,
+      "description": "Samba batucada, 1 measure: kick on each beat and its a, snare and clap syncopations over 2 beats, 16th hats with a gap on 2 and 4, open hat on 2 and 4; cowbell pickup on 4 every 4 to 8 passes.",
+      "tags": [
+        "samba"
+      ],
+      "tracks": [
+        {
+          "name": "KICK",
+          "loopLength": 4,
+          "volume": 0.5,
+          "noteKeys": [
+            "step"
+          ],
+          "notes": [
+            [],
+            [
+              3
+            ]
+          ]
+        },
+        {
+          "name": "SNARE",
+          "loopLength": 8,
+          "pan": 0.3,
+          "reverbType": "room",
+          "reverbMix": 0.5,
+          "noteKeys": [
+            "beat",
+            "step",
+            "cycle"
+          ],
+          "notes": [
+            [
+              0,
+              2
+            ],
+            [
+              1,
+              0,
+              4
+            ]
+          ]
+        },
+        {
+          "name": "TOM",
+          "loopLength": 16,
+          "pan": 0.5,
+          "reverbType": "room",
+          "reverbMix": 0.25
+        },
+        {
+          "name": "CLAP",
+          "loopLength": 8,
+          "volume": 0.4,
+          "volumeLfo": {
+            "freq": 5,
+            "min": 0,
+            "max": 1,
+            "phase": 0,
+            "type": "triangle"
+          },
+          "pan": -0.4,
+          "reverbType": "room",
+          "reverbMix": 0.25,
+          "noteKeys": [
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              1,
+              3
+            ],
+            [
+              1
+            ],
+            [
+              0,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "COWBELL",
+          "loopLength": 16,
+          "transposeLfo": {
+            "freq": 1,
+            "min": 0,
+            "max": 1,
+            "phase": 0,
+            "type": "triangle"
+          },
+          "pan": 0.4,
+          "reverbType": "room",
+          "reverbMix": 0.25,
+          "noteKeys": [
+            "beat",
+            "step",
+            "cycle"
+          ],
+          "notes": [
+            [
+              3,
+              2,
+              6
+            ],
+            [
+              3,
+              3,
+              8
+            ],
+            [
+              3,
+              1,
+              4
+            ]
+          ]
+        },
+        {
+          "name": "CHH",
+          "loopLength": 8,
+          "volume": 0.5,
+          "pan": -0.3,
+          "noteKeys": [
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              1,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "OHH",
+          "loopLength": 8,
+          "transpose": 3,
+          "pan": -0.2,
+          "noteKeys": [
+            "beat"
+          ],
+          "notes": [
+            [
+              1
+            ]
+          ]
+        },
+        {
+          "name": "CRASH",
+          "loopLength": 16,
+          "pan": 1,
+          "reverbType": "hall",
+          "reverbMix": 0.85,
+          "noteKeys": [
+            "beat",
+            "cycle"
+          ],
+          "notes": [
+            [
+              3,
+              4
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "samba-groove",
+      "name": "Samba Groove",
+      "bpm": 100,
+      "description": "Samba on a drum kit, 1 measure: kick on each beat and its a, the beats 2 and 4 louder (the surdo), rimshot on the teleco-teco (1, 1&, 2e, 2a, 3e, 4, 4&), 16th hats accented on the beat.",
+      "tags": [
+        "samba"
+      ],
+      "tracks": [
+        {
+          "name": "KICK",
+          "beatCount": 4,
+          "loopLength": 8,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.55,
+              0,
+              0
+            ],
+            [
+              0.6,
+              0,
+              3
+            ],
+            [
+              1.0,
+              1,
+              0
+            ],
+            [
+              0.6,
+              1,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "RIMSHOT",
+          "beatCount": 4,
+          "loopLength": 16,
+          "pan": 0.2,
+          "reverbType": "room",
+          "reverbMix": 0.2,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.9,
+              0,
+              0
+            ],
+            [
+              0.75,
+              0,
+              2
+            ],
+            [
+              0.75,
+              1,
+              1
+            ],
+            [
+              0.75,
+              1,
+              3
+            ],
+            [
+              0.75,
+              2,
+              1
+            ],
+            [
+              0.9,
+              3,
+              0
+            ],
+            [
+              0.75,
+              3,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "CHH",
+          "beatCount": 4,
+          "loopLength": 4,
+          "volume": 0.55,
+          "pan": -0.3,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.75,
+              0,
+              0
+            ],
+            [
+              0.35,
+              0,
+              1
+            ],
+            [
+              0.5,
+              0,
+              2
+            ],
+            [
+              0.4,
+              0,
+              3
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "samba-escola",
+      "name": "Samba Escola",
+      "bpm": 100,
+      "beatCount": 8,
+      "description": "Samba school, 2 measures: low surdo on 2 and 4 with a soft pickup on the a before, higher surdo on 1 and 3, caixa in 16ths pushing on the a, tamborim on the teleco-teco, a two-tone agogo on it, 16th ganza accented on the beat.",
+      "tags": [
+        "samba"
+      ],
+      "tracks": [
+        {
+          "name": "KICK",
+          "beatCount": 8,
+          "loopLength": 16,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.35,
+              0,
+              3
+            ],
+            [
+              1.0,
+              1,
+              0
+            ],
+            [
+              0.35,
+              2,
+              3
+            ],
+            [
+              1.0,
+              3,
+              0
+            ]
+          ]
+        },
+        {
+          "name": "LO_TOM",
+          "beatCount": 8,
+          "loopLength": 16,
+          "volume": 0.8,
+          "pan": 0.3,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.75,
+              0,
+              0
+            ],
+            [
+              0.75,
+              2,
+              0
+            ]
+          ]
+        },
+        {
+          "name": "SNARE",
+          "beatCount": 8,
+          "loopLength": 4,
+          "volume": 0.5,
+          "pan": 0.1,
+          "reverbType": "room",
+          "reverbMix": 0.2,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.55,
+              0,
+              0
+            ],
+            [
+              0.25,
+              0,
+              1
+            ],
+            [
+              0.35,
+              0,
+              2
+            ],
+            [
+              0.7,
+              0,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "RIMSHOT",
+          "beatCount": 8,
+          "loopLength": 16,
+          "pan": -0.2,
+          "reverbType": "room",
+          "reverbMix": 0.2,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.9,
+              0,
+              0
+            ],
+            [
+              0.7,
+              0,
+              2
+            ],
+            [
+              0.7,
+              1,
+              1
+            ],
+            [
+              0.7,
+              1,
+              3
+            ],
+            [
+              0.7,
+              2,
+              1
+            ],
+            [
+              0.9,
+              3,
+              0
+            ],
+            [
+              0.7,
+              3,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "COWBELL",
+          "beatCount": 8,
+          "loopLength": 32,
+          "volume": 0.6,
+          "pan": 0.4,
+          "reverbType": "room",
+          "reverbMix": 0.2,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "pitch"
+          ],
+          "notes": [
+            [
+              0.75,
+              0,
+              0,
+              5
+            ],
+            [
+              0.75,
+              0,
+              2,
+              0
+            ],
+            [
+              0.75,
+              1,
+              1,
+              5
+            ],
+            [
+              0.75,
+              1,
+              3,
+              0
+            ],
+            [
+              0.75,
+              2,
+              1,
+              0
+            ],
+            [
+              0.75,
+              3,
+              0,
+              5
+            ],
+            [
+              0.75,
+              3,
+              2,
+              0
+            ],
+            [
+              0.75,
+              4,
+              0,
+              0
+            ],
+            [
+              0.75,
+              4,
+              3,
+              5
+            ],
+            [
+              0.75,
+              5,
+              2,
+              0
+            ],
+            [
+              0.75,
+              6,
+              0,
+              5
+            ],
+            [
+              0.75,
+              6,
+              3,
+              0
+            ],
+            [
+              0.75,
+              7,
+              2,
+              5
+            ]
+          ]
+        },
+        {
+          "name": "SHAKER",
+          "beatCount": 8,
+          "loopLength": 4,
+          "volume": 0.5,
+          "pan": -0.4,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.8,
+              0,
+              0
+            ],
+            [
+              0.3,
+              0,
+              1
+            ],
+            [
+              0.45,
+              0,
+              2
+            ],
+            [
+              0.6,
+              0,
+              3
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}

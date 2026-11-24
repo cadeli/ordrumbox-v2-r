@@ -63,10 +63,14 @@ pub(super) fn is_first_start(settings: Option<&Path>) -> bool {
 impl Session {
     /// The place of the settings file's `resume`, if it has one, shown: what
     /// it names that is gone or wrong is a status line, and left as it is.
-    /// On the first start, the simple view instead.
+    /// On the first start, the simple view instead, under the demos by
+    /// style (the library holds only the starter one).
     pub(super) fn load_resume(&mut self) {
         if self.saving.first_start {
             self.start_simple();
+            if !self.demo_styles.is_empty() {
+                self.open_demos();
+            }
             return;
         }
         let Some(path) = self.saving.settings_file.clone() else { return };

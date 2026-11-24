@@ -14,6 +14,7 @@ mod audio_output;
 mod canvas;
 mod control;
 mod control_help;
+mod demo_browser;
 mod editors;
 mod file_request;
 mod font;

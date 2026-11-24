@@ -78,7 +78,7 @@ fn the_song_and_file_menus_have_the_song_panel_commands_and_the_project_ones() {
 #[test]
 fn every_file_command_is_in_the_file_menu() {
     let all = MenuState { can_save_project: true, saved_projects: true, kit_sample: true, ..state() };
-    let menus = menus(&MenuState { has_demo: true, user_folder: true, ..all });
+    let menus = menus(&MenuState { has_starter: true, user_folder: true, ..all });
     use Command as C;
     let file_commands = [
         C::SaveProject,
@@ -90,7 +90,7 @@ fn every_file_command_is_in_the_file_menu() {
         C::ExportMidi,
         C::ExportLibrary,
         C::ImportLibrary,
-        C::DemoLibrary,
+        C::StarterLibrary,
         C::BackUpUserData,
         C::RestoreUserData,
         C::ChangeUserFolder,

@@ -29,10 +29,10 @@ use std::sync::Arc;
 /// Where a session's library comes from, and where its edits go.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LibrarySource {
-    /// The user's `library.json` (else the demo), saved a moment after each edit.
+    /// The user's `library.json` (else the starter library), saved a moment after each edit.
     UserFile,
     /// A plugin's: the text its host kept in the project (`None`: a new
-    /// instance, which starts from the user's library, else the demo). It is
+    /// instance, which starts from the user's library, else the starter library). It is
     /// never saved to a file: the host asks [`Session::library_text`].
     Host(Option<String>),
 }
@@ -47,19 +47,19 @@ pub(super) struct Opened {
     pub(super) on_disk: bool,
     /// The message to show.
     pub(super) message: String,
-    /// The library is the demo (its repairs are those of the assets' file).
-    pub(super) demo: bool,
+    /// The library is the starter library (its repairs are those of the assets' file).
+    pub(super) starter: bool,
 }
 
 impl Opened {
     /// `library`, not saved to any file.
     fn unsaved(library: Library, message: &str) -> Self {
-        Self { library, file: None, on_disk: false, message: message.to_owned(), demo: false }
+        Self { library, file: None, on_disk: false, message: message.to_owned(), starter: false }
     }
 
-    /// The demo library, not saved to any file.
-    fn demo(library: Library, message: &str) -> Self {
-        Self { demo: true, ..Self::unsaved(library, message) }
+    /// The starter library, not saved to any file.
+    fn starter(library: Library, message: &str) -> Self {
+        Self { starter: true, ..Self::unsaved(library, message) }
     }
 }
 
@@ -82,8 +82,13 @@ fn repaired_status(file: &str, report: &LoadReport) -> Option<String> {
     (!parts.is_empty()).then(|| format!("{file}: {}", parts.join("; ")))
 }
 
-/// The message of the demo library when no file keeps its edits.
-const DEMO_NOT_SAVED: &str = "demo library: edits are not saved";
+/// The root note of each sample of `bank` that has one (key, MIDI note), for MIDI files.
+fn root_notes(bank: &SampleBank) -> Vec<(String, f64)> {
+    bank.samples.iter().filter_map(|s| Some((s.sample.key.clone(), s.sample.root_midi?))).collect()
+}
+
+/// The message of the starter library when no file keeps its edits.
+const STARTER_NOT_SAVED: &str = "starter library: edits are not saved";
 
 impl Session {
     pub fn load(start_output: StartOutput) -> Self {
@@ -106,7 +111,7 @@ impl Session {
         let mut status = loading_status(&assets);
 
         let hosted = matches!(source, LibrarySource::Host(_));
-        let Opened { mut library, file: library_path, on_disk, message, demo } = match source {
+        let Opened { mut library, file: library_path, on_disk, message, starter } = match source {
             LibrarySource::UserFile => {
                 if let Some(problem) = store::location_problem() {
                     status.push(format!("{problem}: File > Change user data folder"));
@@ -115,7 +120,7 @@ impl Session {
             }
             LibrarySource::Host(text) => Self::open_host_library(text, assets.library, &mut status),
         };
-        if demo {
+        if starter {
             status.extend(repaired_status(assets::LIBRARY, &assets.report));
         }
 
@@ -141,12 +146,12 @@ impl Session {
             session.chrome.fold_editors();
         }
         session.assets_dir = Some(dir);
+        session.demo_styles = assets.demos;
         session.saving.projects_dir = store::projects_dir();
         session.generators.scales = assets.scales.clone();
         session.generators.styles = assets.styles.clone();
         session.generators.scale_list = assets.scale_list.clone();
-        session.roots =
-            assets.bank.samples.iter().filter_map(|s| Some((s.sample.key.clone(), s.sample.root_midi?))).collect();
+        session.roots = root_notes(&assets.bank);
         session.saving.library_path = library_path;
         session.saving.on_disk = on_disk;
         session.message = message;
@@ -205,12 +210,12 @@ impl Session {
     }
 
     /// The library to start with: the user's file at `path` when there is
-    /// one, else `demo`, written to that file at the first edit (no file: the
+    /// one, else `starter`, written to that file at the first edit (no file: the
     /// reason pushed on `status`).
-    pub(super) fn open_library(path: Option<PathBuf>, demo: Library, status: &mut Vec<String>) -> Opened {
+    pub(super) fn open_library(path: Option<PathBuf>, starter: Library, status: &mut Vec<String>) -> Opened {
         let Some(path) = path else {
             status.push("no user data folder: edits are not saved".into());
-            return Opened::demo(demo, DEMO_NOT_SAVED);
+            return Opened::starter(starter, STARTER_NOT_SAVED);
         };
         match store::load(&path) {
             Ok(Some((saved, report))) => {
@@ -220,24 +225,24 @@ impl Session {
                     file: Some(path),
                     on_disk: true,
                     message: "library loaded".into(),
-                    demo: false,
+                    starter: false,
                 }
             }
             Ok(None) => Opened {
                 file: Some(path),
-                ..Opened::demo(demo, "your library starts as a copy of the demo: edits are saved")
+                ..Opened::starter(starter, "your library starts as a copy of the starter library: edits are saved")
             },
             Err(e) => {
                 status.push(format!("library not loaded, not saved over: {e}"));
-                Opened::demo(demo, DEMO_NOT_SAVED)
+                Opened::starter(starter, STARTER_NOT_SAVED)
             }
         }
     }
 
     /// The library of a plugin: the host's `text` when it kept one, else the
-    /// user's file (read, never written), else `demo`; no file to save to.
-    pub(super) fn open_host_library(text: Option<String>, demo: Library, status: &mut Vec<String>) -> Opened {
-        const DEMO: &str = "demo library, saved with the host project";
+    /// user's file (read, never written), else `starter`; no file to save to.
+    pub(super) fn open_host_library(text: Option<String>, starter: Library, status: &mut Vec<String>) -> Opened {
+        const STARTER: &str = "starter library, saved with the host project";
         if let Some(text) = text {
             return match Library::parse(&text) {
                 Ok((library, report)) => {
@@ -246,12 +251,12 @@ impl Session {
                 }
                 Err(e) => {
                     status.push(format!("library of the host project not loaded: {e}"));
-                    Opened::demo(demo, DEMO)
+                    Opened::starter(starter, STARTER)
                 }
             };
         }
         let Some(path) = store::path() else {
-            return Opened::demo(demo, DEMO);
+            return Opened::starter(starter, STARTER);
         };
         match store::load(&path) {
             Ok(Some((saved, report))) => {
@@ -260,9 +265,9 @@ impl Session {
             }
             Err(e) => {
                 status.push(format!("library not loaded: {e}"));
-                Opened::demo(demo, DEMO)
+                Opened::starter(starter, STARTER)
             }
-            Ok(None) => Opened::demo(demo, DEMO),
+            Ok(None) => Opened::starter(starter, STARTER),
         }
     }
 
@@ -304,6 +309,7 @@ impl Session {
             flash: Flash::default(),
             action_log: ActionLog::default(),
             assets_dir: None,
+            demo_styles: Vec::new(),
             program: Program::default(),
             editors: EditorState::default(),
             host: Host::default(),

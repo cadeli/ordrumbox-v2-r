@@ -62,7 +62,7 @@ impl Session {
     /// At start of the program: add the demos the user's library has not been offered, and keep
     /// the ids of all those of the assets.
     pub fn add_new_demos(&mut self) {
-        let (Some(settings), Some(factory_path)) = (store::settings_path(), self.demo_library_path()) else {
+        let (Some(settings), Some(factory_path)) = (store::settings_path(), self.starter_library_path()) else {
             return;
         };
         let factory = match read_library(&factory_path) {

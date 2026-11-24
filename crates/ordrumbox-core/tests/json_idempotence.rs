@@ -451,11 +451,24 @@ fn a_song_file_is_saved_as_it_was_read() {
 }
 
 #[test]
-fn the_demo_library_is_saved_as_it_was_read() {
+fn the_starter_library_is_saved_as_it_was_read() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/data/library.json");
     let text = std::fs::read_to_string(&path).expect("assets/data/library.json");
-    // Its own tempo, not its first pattern's (Blues 12/8, 60 BPM).
+    // Its own tempo, not its song's (100 BPM).
     assert_eq!(saved_twice(&parse(&text)).bpm, 120.0);
+}
+
+#[test]
+fn every_demo_file_is_saved_as_it_was_read() {
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/data/demos");
+    let mut count = 0;
+    for entry in std::fs::read_dir(&folder).expect("assets/data/demos") {
+        let path = entry.expect("a demo file").path();
+        let text = std::fs::read_to_string(&path).expect("a demo file");
+        assert!(!saved_twice(&parse(&text)).patterns.is_empty(), "{}", path.display());
+        count += 1;
+    }
+    assert!(count > 0);
 }
 
 #[test]

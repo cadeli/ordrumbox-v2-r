@@ -430,7 +430,7 @@ fn songs_are_saved_listed_and_loaded_by_name() {
 #[test]
 fn arguments_and_states_that_refuse_a_call() {
     let mut s = session();
-    s.ask(Pending::DemoLibrary);
+    s.ask(Pending::StarterLibrary);
     assert!(call(&mut s, "listPatterns", "{}").unwrap_err().contains("confirmation"));
     s.chrome.overlay = None;
 

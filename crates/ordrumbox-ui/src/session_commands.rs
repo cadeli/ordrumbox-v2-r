@@ -102,7 +102,8 @@ impl Session {
             checking_updates: self.updates.checking(),
             newer_release: self.updates.newer_release().map(|r| r.version.clone()),
             hosted: self.host.hosted,
-            has_demo: self.has_demo(),
+            has_starter: self.has_starter(),
+            has_demos: !self.demo_styles.is_empty(),
             user_folder: self.user_folder().is_some(),
         }
     }
@@ -276,7 +277,8 @@ impl Session {
             C::FactoryReset => self.chrome.overlay = Some(Overlay::FactoryReset { yes: false }),
             C::ExportLibrary => self.open_export(Export::Library),
             C::ImportLibrary => self.open_picker(Purpose::ImportLibrary),
-            C::DemoLibrary => self.ask(Pending::DemoLibrary),
+            C::StarterLibrary => self.ask(Pending::StarterLibrary),
+            C::Demos => self.open_demos(),
             C::BackUpUserData => self.open_export(Export::UserData),
             C::RestoreUserData => self.open_restore(),
             C::ChangeUserFolder => self.open_user_folder_picker(),

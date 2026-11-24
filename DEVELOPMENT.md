@@ -75,7 +75,7 @@ artifact.
 Offline render:
 
 ```sh
-cargo run --release -p ordrumbox-engine --example render -- assets rock 2 rock.wav
+cargo run --release -p ordrumbox-engine --example render -- assets house 2 house.wav
 cargo run --release -p ordrumbox-engine --example render -- assets song:demo demo.wav
 ```
 
@@ -147,6 +147,20 @@ default pan. It is edited by hand; `ordrumbox-core/src/instruments.rs` only read
   Drums at C3 with `--gate 1` (a crash `0.3`, a whistle `0.35`); melodic sounds are named after their note: a bass
   at C3 with `--gate 0.5`, a lead at C4 with `--gate 0.6`, a pad at C4 with `--gate 1.2`. Pulse waves carry DC:
   add `--highpass 30` to `fix`. `ordrumbox-probe/tests/synth_audio.rs` checks every factory preset.
+
+## Demos
+
+- **`assets/data/library.json` is the starter library**: what a new user's library starts as (the Funk Song and a
+  few beats), what File > Load the starter library... and Help > Factory reset... bring back, and what an upgrade
+  offers once (`ordrumbox-logic/src/demos.rs`): a pattern or a song added to it reaches every user's library.
+- **`assets/data/demos/<nn>-<style>.json` hold the demos**, a style per file, in the library format; its `info`
+  gives the tile's name and description, `<nn>` its place. File > Demos... browses them
+  (`ordrumbox-ui/src/demo_browser.rs`) and copies a song with its patterns, or a pattern, into the user's library
+  (`ordrumbox-logic/src/demo_catalog.rs`). A new demo goes in the file of its style; a song and the patterns it
+  plays stay in one file.
+- **Each demo is in one file**, the starter library's again among them, ids unique across the files
+  (`ordrumbox-ui/src/assets.rs` tests). `json_idempotence.rs` saves every file as it was read, and
+  `ordrumbox-probe/tests/shipped.rs` renders every demo pattern with every kit and every demo song.
 
 ## Snapshots
 

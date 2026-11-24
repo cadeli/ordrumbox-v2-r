@@ -121,6 +121,8 @@ mod session_zoom;
 mod session_automation_live;
 #[path = "session_cartridge.rs"]
 mod session_cartridge;
+#[path = "session_demo_browser.rs"]
+mod session_demo_browser;
 #[path = "session_demos.rs"]
 mod session_demos;
 #[path = "session_kit.rs"]
@@ -245,6 +247,8 @@ pub struct Session {
     action_log: ActionLog,
     /// The assets folder in use.
     assets_dir: Option<PathBuf>,
+    /// The demos by style, from the assets (`session_demo_browser.rs`).
+    demo_styles: Vec<ordrumbox_logic::demo_catalog::DemoStyle>,
     /// What the session asks of the program that runs it (`session_commands.rs`).
     program: session_commands::Program,
     /// Tabs and selection of the track and note editors.

@@ -1,0 +1,1219 @@
+{
+  "info": {
+    "name": "Hip-Hop",
+    "description": "Boom bap, trap half time and neo soul keys."
+  },
+  "bpm": 120,
+  "patterns": [
+    {
+      "id": "rap",
+      "name": "Boom Bap",
+      "bpm": 100,
+      "description": "Boom bap, 1 measure: kick on 1, 1&, 2&, 3& and 3a, snare on 2, 2a, 3e and 4e, 8th hats with 32nd figures every 3 to 6 passes, open hat on each &; clap rolls on 2 and 4 every 2 and 4 passes.",
+      "tags": [
+        "hiphop"
+      ],
+      "tracks": [
+        {
+          "name": "KICK",
+          "loopLength": 16,
+          "volume": 0.4,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              1
+            ],
+            [
+              1,
+              0,
+              2
+            ],
+            [
+              1,
+              1,
+              2
+            ],
+            [
+              1,
+              2,
+              2
+            ],
+            [
+              1,
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "SNARE",
+          "loopLength": 16,
+          "transposeLfo": {
+            "freq": 1,
+            "min": 0.7,
+            "max": 1,
+            "phase": 0.5,
+            "type": "triangle"
+          },
+          "pan": 0.3,
+          "reverbType": "room",
+          "reverbMix": 0.5,
+          "noteKeys": [
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              1
+            ],
+            [
+              1,
+              3
+            ],
+            [
+              2,
+              1
+            ],
+            [
+              3,
+              1
+            ]
+          ]
+        },
+        {
+          "name": "TOM",
+          "loopLength": 16,
+          "pan": 0.5,
+          "reverbType": "room",
+          "reverbMix": 0.25
+        },
+        {
+          "name": "CLAP",
+          "loopLength": 16,
+          "pan": -0.4,
+          "reverbType": "room",
+          "reverbMix": 0.25,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "pitch",
+            "cycle",
+            "retriggerRate",
+            "retriggerCount"
+          ],
+          "notes": [
+            [
+              1,
+              1,
+              0,
+              2,
+              3,
+              4
+            ],
+            [
+              1,
+              3,
+              6,
+              4,
+              1,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "COWBELL",
+          "loopLength": 16,
+          "pan": 0.4,
+          "reverbType": "room",
+          "reverbMix": 0.25
+        },
+        {
+          "name": "CHH",
+          "stepsPerBeat": 8,
+          "loopLength": 8,
+          "volume": 0.3,
+          "pan": -0.3,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "cycle"
+          ],
+          "notes": [
+            [
+              1
+            ],
+            [
+              0.8,
+              0,
+              2,
+              3
+            ],
+            [
+              0.8,
+              0,
+              4,
+              6
+            ],
+            [
+              0.8,
+              0,
+              6,
+              4
+            ],
+            [
+              0.8,
+              3,
+              7,
+              3
+            ],
+            [
+              0.8,
+              3,
+              5,
+              4
+            ],
+            [
+              0.8,
+              3,
+              3,
+              6
+            ],
+            [
+              0.8,
+              3,
+              1,
+              4
+            ]
+          ]
+        },
+        {
+          "name": "OHH",
+          "loopLength": 16,
+          "pan": -0.2,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              1,
+              0,
+              2
+            ],
+            [
+              1,
+              1,
+              2
+            ],
+            [
+              1,
+              2,
+              2
+            ],
+            [
+              1,
+              3,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "CRASH",
+          "loopLength": 16,
+          "pan": 1,
+          "reverbType": "hall",
+          "reverbMix": 0.85
+        }
+      ]
+    },
+    {
+      "id": "soul-keys",
+      "name": "Neo Soul Keys",
+      "bpm": 84,
+      "description": "Neo soul over the boom bap drums, 4 measures: electric piano on Cmaj7, Am7, Dm7 and G7, a long chord on 1 and a pushed one on 2a and 3e with the top notes softer.",
+      "tags": [
+        "hiphop",
+        "soul",
+        "chords",
+        "synth"
+      ],
+      "tracks": [
+        {
+          "name": "KICK",
+          "loopLength": 16,
+          "volume": 0.4,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              1
+            ],
+            [
+              1,
+              0,
+              2
+            ],
+            [
+              1,
+              1,
+              2
+            ],
+            [
+              1,
+              2,
+              2
+            ],
+            [
+              1,
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "SNARE",
+          "loopLength": 16,
+          "transposeLfo": {
+            "freq": 1,
+            "min": 0.7,
+            "max": 1,
+            "phase": 0.5,
+            "type": "triangle"
+          },
+          "pan": 0.3,
+          "reverbType": "room",
+          "reverbMix": 0.5,
+          "noteKeys": [
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              1
+            ],
+            [
+              1,
+              3
+            ],
+            [
+              2,
+              1
+            ],
+            [
+              3,
+              1
+            ]
+          ]
+        },
+        {
+          "name": "TOM",
+          "loopLength": 16,
+          "pan": 0.5,
+          "reverbType": "room",
+          "reverbMix": 0.25
+        },
+        {
+          "name": "CLAP",
+          "loopLength": 16,
+          "pan": -0.4,
+          "reverbType": "room",
+          "reverbMix": 0.25,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "pitch",
+            "cycle",
+            "retriggerRate",
+            "retriggerCount"
+          ],
+          "notes": [
+            [
+              1,
+              1,
+              0,
+              2,
+              3,
+              4
+            ],
+            [
+              1,
+              3,
+              6,
+              4,
+              1,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "COWBELL",
+          "loopLength": 16,
+          "pan": 0.4,
+          "reverbType": "room",
+          "reverbMix": 0.25
+        },
+        {
+          "name": "CHH",
+          "stepsPerBeat": 8,
+          "loopLength": 8,
+          "volume": 0.3,
+          "pan": -0.3,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "cycle"
+          ],
+          "notes": [
+            [
+              1
+            ],
+            [
+              0.8,
+              0,
+              2,
+              3
+            ],
+            [
+              0.8,
+              0,
+              4,
+              6
+            ],
+            [
+              0.8,
+              0,
+              6,
+              4
+            ],
+            [
+              0.8,
+              3,
+              7,
+              3
+            ],
+            [
+              0.8,
+              3,
+              5,
+              4
+            ],
+            [
+              0.8,
+              3,
+              3,
+              6
+            ],
+            [
+              0.8,
+              3,
+              1,
+              4
+            ]
+          ]
+        },
+        {
+          "name": "OHH",
+          "loopLength": 16,
+          "pan": -0.2,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              1,
+              0,
+              2
+            ],
+            [
+              1,
+              1,
+              2
+            ],
+            [
+              1,
+              2,
+              2
+            ],
+            [
+              1,
+              3,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "CRASH",
+          "loopLength": 16,
+          "pan": 1,
+          "reverbType": "hall",
+          "reverbMix": 0.85
+        },
+        {
+          "name": "PIANO",
+          "loopLength": 64,
+          "volume": 0.55,
+          "useSynth": true,
+          "synthPreset": "PIANO_EPIANO",
+          "reverbType": "room",
+          "reverbMix": 0.15,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "pitch",
+            "lengthSteps"
+          ],
+          "notes": [
+            [
+              0.85,
+              0,
+              0,
+              0,
+              6
+            ],
+            [
+              0.83,
+              0,
+              0,
+              4,
+              6
+            ],
+            [
+              0.81,
+              0,
+              0,
+              7,
+              6
+            ],
+            [
+              0.79,
+              0,
+              0,
+              11,
+              6
+            ],
+            [
+              0.7,
+              1,
+              3,
+              0,
+              3
+            ],
+            [
+              0.68,
+              1,
+              3,
+              4,
+              3
+            ],
+            [
+              0.66,
+              1,
+              3,
+              7,
+              3
+            ],
+            [
+              0.64,
+              1,
+              3,
+              11,
+              3
+            ],
+            [
+              0.55,
+              2,
+              2,
+              0,
+              2
+            ],
+            [
+              0.53,
+              2,
+              2,
+              4,
+              2
+            ],
+            [
+              0.51,
+              2,
+              2,
+              7,
+              2
+            ],
+            [
+              0.49,
+              2,
+              2,
+              11,
+              2
+            ],
+            [
+              0.85,
+              4,
+              0,
+              -3,
+              6
+            ],
+            [
+              0.83,
+              4,
+              0,
+              0,
+              6
+            ],
+            [
+              0.81,
+              4,
+              0,
+              4,
+              6
+            ],
+            [
+              0.79,
+              4,
+              0,
+              7,
+              6
+            ],
+            [
+              0.7,
+              5,
+              3,
+              -3,
+              3
+            ],
+            [
+              0.68,
+              5,
+              3,
+              0,
+              3
+            ],
+            [
+              0.66,
+              5,
+              3,
+              4,
+              3
+            ],
+            [
+              0.64,
+              5,
+              3,
+              7,
+              3
+            ],
+            [
+              0.55,
+              6,
+              2,
+              -3,
+              2
+            ],
+            [
+              0.53,
+              6,
+              2,
+              0,
+              2
+            ],
+            [
+              0.51,
+              6,
+              2,
+              4,
+              2
+            ],
+            [
+              0.49,
+              6,
+              2,
+              7,
+              2
+            ],
+            [
+              0.85,
+              8,
+              0,
+              2,
+              6
+            ],
+            [
+              0.83,
+              8,
+              0,
+              5,
+              6
+            ],
+            [
+              0.81,
+              8,
+              0,
+              9,
+              6
+            ],
+            [
+              0.79,
+              8,
+              0,
+              12,
+              6
+            ],
+            [
+              0.7,
+              9,
+              3,
+              2,
+              3
+            ],
+            [
+              0.68,
+              9,
+              3,
+              5,
+              3
+            ],
+            [
+              0.66,
+              9,
+              3,
+              9,
+              3
+            ],
+            [
+              0.64,
+              9,
+              3,
+              12,
+              3
+            ],
+            [
+              0.55,
+              10,
+              2,
+              2,
+              2
+            ],
+            [
+              0.53,
+              10,
+              2,
+              5,
+              2
+            ],
+            [
+              0.51,
+              10,
+              2,
+              9,
+              2
+            ],
+            [
+              0.49,
+              10,
+              2,
+              12,
+              2
+            ],
+            [
+              0.85,
+              12,
+              0,
+              -5,
+              6
+            ],
+            [
+              0.83,
+              12,
+              0,
+              -1,
+              6
+            ],
+            [
+              0.81,
+              12,
+              0,
+              2,
+              6
+            ],
+            [
+              0.79,
+              12,
+              0,
+              5,
+              6
+            ],
+            [
+              0.7,
+              13,
+              3,
+              -5,
+              3
+            ],
+            [
+              0.68,
+              13,
+              3,
+              -1,
+              3
+            ],
+            [
+              0.66,
+              13,
+              3,
+              2,
+              3
+            ],
+            [
+              0.64,
+              13,
+              3,
+              5,
+              3
+            ],
+            [
+              0.55,
+              14,
+              2,
+              -5,
+              2
+            ],
+            [
+              0.53,
+              14,
+              2,
+              -1,
+              2
+            ],
+            [
+              0.51,
+              14,
+              2,
+              2,
+              2
+            ],
+            [
+              0.49,
+              14,
+              2,
+              5,
+              2
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hip",
+      "name": "Hip-Hop",
+      "beatCount": 8,
+      "bpm": 110,
+      "description": "Hip-hop, 2 measures: kick on 1a, 2& and 3&, snare on 2 and 4 with a 4& 4a pickup at the end, swung 16th hats, open hat on each a, clap on 2e and around 4.",
+      "tags": [
+        "hiphop"
+      ],
+      "tracks": [
+        {
+          "name": "KICK",
+          "beatCount": 8,
+          "loopLength": 32,
+          "volume": 0.5,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.6
+            ],
+            [
+              1,
+              0,
+              3
+            ],
+            [
+              1,
+              1,
+              2
+            ],
+            [
+              1,
+              2,
+              2
+            ],
+            [
+              0.6,
+              4
+            ],
+            [
+              1,
+              5,
+              2
+            ],
+            [
+              1,
+              6,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "SNARE",
+          "beatCount": 8,
+          "loopLength": 8,
+          "pan": 0.3,
+          "reverbType": "room",
+          "reverbMix": 0.5,
+          "noteKeys": [
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              1
+            ],
+            [
+              5
+            ],
+            [
+              7
+            ],
+            [
+              7,
+              2
+            ],
+            [
+              7,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "TOM",
+          "beatCount": 8,
+          "loopLength": 32,
+          "pan": 0.5,
+          "reverbType": "room",
+          "reverbMix": 0.25,
+          "noteKeys": [
+            "beat",
+            "step",
+            "pitch",
+            "cycle"
+          ],
+          "notes": [
+            [
+              3,
+              1,
+              3,
+              8
+            ],
+            [
+              3,
+              3,
+              0,
+              6
+            ]
+          ]
+        },
+        {
+          "name": "CLAP",
+          "beatCount": 8,
+          "loopLength": 8,
+          "pan": -0.4,
+          "reverbType": "room",
+          "reverbMix": 0.25,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "cycle"
+          ],
+          "notes": [
+            [
+              1,
+              5
+            ],
+            [
+              0.6,
+              7
+            ],
+            [
+              0.8,
+              1,
+              1
+            ],
+            [
+              0.8,
+              3,
+              0,
+              6
+            ],
+            [
+              0.8,
+              3,
+              2,
+              4
+            ]
+          ]
+        },
+        {
+          "name": "COWBELL",
+          "beatCount": 8,
+          "loopLength": 32,
+          "pan": 0.4,
+          "reverbType": "room",
+          "reverbMix": 0.25
+        },
+        {
+          "name": "CHH",
+          "beatCount": 8,
+          "loopLength": 4,
+          "swingAmount": 0.4,
+          "volume": 0.4,
+          "volumeLfo": {
+            "freq": 2,
+            "min": 0,
+            "max": 1,
+            "phase": 0,
+            "type": "triangle"
+          },
+          "pan": -0.3,
+          "noteKeys": [
+            "velocity",
+            "step"
+          ],
+          "notes": [
+            [
+              1
+            ],
+            [
+              0.1,
+              1
+            ],
+            [
+              1,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "OHH",
+          "beatCount": 8,
+          "loopLength": 4,
+          "volume": 0.2,
+          "pan": -0.2,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              1,
+              0,
+              3
+            ],
+            [
+              0.1,
+              6,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "CRASH",
+          "beatCount": 8,
+          "loopLength": 32,
+          "pan": 1,
+          "reverbType": "hall",
+          "reverbMix": 0.85,
+          "noteKeys": [
+            "velocity",
+            "cycle"
+          ],
+          "notes": [
+            [
+              1,
+              4
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "slowtrap",
+      "name": "Trap Half-Time",
+      "bpm": 100,
+      "description": "Trap with a half-time snare on 3, 1 measure: kick on 1 and 2& with a roll on 3& every 2 passes, clap with the snare, 8th hats with 16th rolls on 3 and 4, open hat and crash on 4&; tom roll every 8 passes.",
+      "tags": [
+        "hiphop",
+        "trap"
+      ],
+      "tracks": [
+        {
+          "name": "KICK",
+          "loopLength": 16,
+          "volume": 0.3,
+          "noteKeys": [
+            "beat",
+            "step",
+            "cycle",
+            "retriggerRate",
+            "retriggerCount"
+          ],
+          "notes": [
+            [],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              2,
+              2,
+              2,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "SNARE",
+          "loopLength": 16,
+          "volume": 0.2,
+          "pan": 0.3,
+          "reverbType": "room",
+          "reverbMix": 0.5,
+          "noteKeys": [
+            "beat"
+          ],
+          "notes": [
+            [
+              2
+            ]
+          ]
+        },
+        {
+          "name": "TOM",
+          "loopLength": 16,
+          "volume": 0.2,
+          "transpose": 7,
+          "pan": 0.5,
+          "reverbType": "room",
+          "reverbMix": 0.25,
+          "noteKeys": [
+            "beat",
+            "step",
+            "cycle",
+            "retriggerRate",
+            "retriggerCount"
+          ],
+          "notes": [
+            [
+              3,
+              2,
+              8,
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "CLAP",
+          "loopLength": 16,
+          "pan": -0.4,
+          "reverbType": "room",
+          "reverbMix": 0.25,
+          "noteKeys": [
+            "beat"
+          ],
+          "notes": [
+            [
+              2
+            ]
+          ]
+        },
+        {
+          "name": "COWBELL",
+          "loopLength": 16,
+          "pan": 0.4,
+          "reverbType": "room",
+          "reverbMix": 0.25
+        },
+        {
+          "name": "CHH",
+          "loopLength": 2,
+          "volume": 0.8,
+          "pan": -0.3,
+          "noteKeys": [
+            "beat",
+            "cycle",
+            "retriggerCount",
+            "cycleOffset"
+          ],
+          "notes": [
+            [],
+            [
+              2,
+              2,
+              4,
+              1
+            ],
+            [
+              3,
+              3,
+              4
+            ]
+          ]
+        },
+        {
+          "name": "OHH",
+          "loopLength": 16,
+          "pan": -0.2,
+          "noteKeys": [
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              3,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "CRASH",
+          "loopLength": 16,
+          "volume": 0.1,
+          "pan": 1,
+          "reverbType": "hall",
+          "reverbMix": 0.85,
+          "noteKeys": [
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              3,
+              2
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}

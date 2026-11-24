@@ -139,8 +139,10 @@ pub enum Command {
     ExportLibrary,
     /// A library file in the place of the library (one undo step).
     ImportLibrary,
-    /// The assets' library in the place of the library (one undo step).
-    DemoLibrary,
+    /// The assets' starter library in the place of the library (one undo step).
+    StarterLibrary,
+    /// The demos by style, a song or a pattern loaded from them (one undo step each).
+    Demos,
     /// The user's files copied to a folder of their own.
     BackUpUserData,
     /// A backup's files in the place of the user's (those moved aside).
@@ -317,8 +319,10 @@ pub struct MenuState {
     pub newer_release: Option<String>,
     /// Shown by a plugin: what it leaves to the host or the app is left out.
     pub hosted: bool,
-    /// The assets' library can be loaded (Load the demo library).
-    pub has_demo: bool,
+    /// The assets' starter library can be loaded (Load the starter library).
+    pub has_starter: bool,
+    /// Demo styles to browse (Demos).
+    pub has_demos: bool,
     /// A user data folder to back up, restore, change or open.
     pub user_folder: bool,
 }

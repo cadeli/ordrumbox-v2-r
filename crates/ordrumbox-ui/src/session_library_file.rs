@@ -29,7 +29,7 @@ fn library_file(name: &str) -> PathBuf {
     scratch_dir(&format!("library-{name}")).join("library.json")
 }
 
-/// A session started on the library file `path`, the demo library otherwise.
+/// A session started on the library file `path`, the starter library otherwise.
 fn start(path: &Path) -> Session {
     let mut status = Vec::new();
     let demo = Library::parse(DEMO).unwrap().0;
@@ -67,7 +67,7 @@ fn a_library_file_that_cannot_be_read_is_never_written_over() {
 
     let mut s = start(&path);
     assert!(s.status.iter().any(|line| line.starts_with("library not loaded, not saved over")), "{:?}", s.status);
-    assert_eq!(s.pattern().unwrap().name.as_deref(), Some("demo"), "the demo library instead");
+    assert_eq!(s.pattern().unwrap().name.as_deref(), Some("demo"), "the starter library instead");
     assert_eq!(s.saving.library_path, None);
     assert_eq!(s.library_state(), LibraryState::NotSaved);
 
@@ -87,13 +87,13 @@ fn a_library_file_that_cannot_be_read_is_never_written_over() {
 fn an_edit_is_saved_a_moment_later_and_read_at_the_next_start() {
     let path = library_file("lifecycle");
 
-    // First start: no file yet, the demo library, saved to that file.
+    // First start: no file yet, the starter library, saved to that file.
     let mut s = start(&path);
     assert!(s.status.is_empty(), "{:?}", s.status);
     assert_eq!(s.saving.library_path.as_deref(), Some(path.as_path()));
     assert!(!path.exists());
     assert_eq!(s.library_state(), LibraryState::New);
-    assert!(s.message.contains("copy of the demo"), "{}", s.message);
+    assert!(s.message.contains("copy of the starter library"), "{}", s.message);
 
     // An edit: saved once the delay has passed, not before.
     add_note(&mut s, 1);

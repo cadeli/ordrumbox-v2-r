@@ -1,5 +1,5 @@
 //! The user's files from the File menu (`user_data.rs`): the library
-//! exported to a file and imported from one, the demo library loaded again,
+//! exported to a file and imported from one, the starter library loaded again,
 //! the user data folder backed up, restored, changed and opened.
 //!
 //! What replaces the library is one undo step. What replaces the user's
@@ -39,13 +39,13 @@ impl Session {
         self.saving.library_path.as_ref().and_then(|p| p.parent().map(Path::to_path_buf)).or_else(store::user_dir)
     }
 
-    /// The assets' library file (the demo).
-    pub(super) fn demo_library_path(&self) -> Option<PathBuf> {
+    /// The assets' library file (the starter library).
+    pub(super) fn starter_library_path(&self) -> Option<PathBuf> {
         Some(self.assets_dir.as_ref()?.join("data").join(assets::LIBRARY))
     }
 
-    /// Whether the demo library can be loaded.
-    pub(super) fn has_demo(&self) -> bool {
+    /// Whether the starter library can be loaded.
+    pub(super) fn has_starter(&self) -> bool {
         self.assets_dir.is_some()
     }
 
@@ -80,18 +80,18 @@ impl Session {
         };
     }
 
-    /// File > Load the demo library, once confirmed.
-    pub(super) fn load_demo_library_now(&mut self) {
-        let Some(path) = self.demo_library_path() else {
-            self.message = "no assets folder: no demo library".into();
+    /// File > Load the starter library, once confirmed.
+    pub(super) fn load_starter_library_now(&mut self) {
+        let Some(path) = self.starter_library_path() else {
+            self.message = "no assets folder: no starter library".into();
             return;
         };
         self.message = match read_library(&path) {
             Ok((library, repaired)) => {
-                self.put_library(library, "Load the demo library");
-                with_repaired("demo library loaded (Edit > Undo brings yours back)".to_owned(), repaired)
+                self.put_library(library, "Load the starter library");
+                with_repaired("starter library loaded (Edit > Undo brings yours back)".to_owned(), repaired)
             }
-            Err(e) => format!("demo library not loaded: {e}"),
+            Err(e) => format!("starter library not loaded: {e}"),
         };
     }
 
@@ -345,25 +345,25 @@ mod tests {
         assert!(s.library_text().contains(r#""lead": {"#));
 
         // The demo in its place, after a yes; Undo brings mine back.
-        s.run(Command::DemoLibrary);
+        s.run(Command::StarterLibrary);
         assert!(s.confirm_open());
         // ENTER alone keeps: nothing ran, the library is mine.
         s.overlay_key(OverlayKey::Enter);
         assert!(!s.overlay_open());
         assert_eq!(first_pattern(&s), Some("mine"));
         // Asked again, the action is chosen with ← → and runs with ENTER.
-        s.run(Command::DemoLibrary);
+        s.run(Command::StarterLibrary);
         assert!(s.confirm_open());
         s.overlay_key(OverlayKey::Move(1));
         s.overlay_key(OverlayKey::Enter);
-        assert!(s.message.starts_with("demo library loaded"), "{}", s.message);
+        assert!(s.message.starts_with("starter library loaded"), "{}", s.message);
         assert_ne!(first_pattern(&s), Some("mine"));
-        assert_eq!(s.editor.history().next_undo(), Some("Load the demo library"));
+        assert_eq!(s.editor.history().next_undo(), Some("Load the starter library"));
         s.run(Command::Undo);
         assert_eq!(first_pattern(&s), Some("mine"));
 
         // The demo again, then the file exported: mine.
-        s.load_demo_library_now();
+        s.load_starter_library_now();
         s.put_synth("lead", Some(ordrumbox_core::json::parse("{}").unwrap()), "Other lead".into(), None);
         s.picked(Purpose::ImportLibrary, path.clone());
         assert!(s.confirm_open());

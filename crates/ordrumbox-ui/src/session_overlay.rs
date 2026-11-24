@@ -29,6 +29,8 @@ pub(super) enum Overlay {
     NoteTool(session_note_tool::Draft),
     /// File > Export pattern as WAV or as MIDI: the loop count being chosen.
     LoopExport(session_loop_export::Draft),
+    /// File > Demos: the style or the demo being chosen.
+    Demos(crate::demo_browser::DemoBrowser),
     /// Help > Factory reset, until the user says so: `yes` is the button
     /// ENTER would run, `false` (the default) keeps.
     FactoryReset {
@@ -295,6 +297,7 @@ impl Session {
             || self.controls_key(&key)
             || self.note_tool_key(&key)
             || self.loop_export_key(&key)
+            || self.demos_key(&key)
         {
             return;
         }
@@ -356,6 +359,7 @@ impl Session {
             || self.controls_click(width, height, scale, x, y)
             || self.note_tool_click(width, height, scale, x, y)
             || self.loop_export_click(width, height, scale, x, y)
+            || self.demos_click(width, height, scale, x, y)
         {
             return;
         }

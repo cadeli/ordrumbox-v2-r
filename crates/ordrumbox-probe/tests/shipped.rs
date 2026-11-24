@@ -1,10 +1,10 @@
 //! What the app ships with (`assets/`), end to end: every sample of every kit
 //! is in the format the kits are made in and needs no repair, and every
-//! pattern of the demo library, with every kit, plays notes that are well
-//! formed and renders audio that sounds and does not clip; so does the demo
-//! song.
+//! demo pattern (the starter library's and those of `demos/`), with every
+//! kit, plays notes that are well formed and renders audio that sounds and
+//! does not clip; so does every demo song.
 //!
-//! Nothing here is a snapshot: the demo library and the kits change without
+//! Nothing here is a snapshot: the demos and the kits change without
 //! the code changing.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
@@ -60,10 +60,32 @@ fn kits() -> Vec<Kit> {
     kits
 }
 
+/// Library file `name` of `data/`, read without a value repaired.
+fn library_file(name: &str) -> Library {
+    let (library, report) = Library::from_json(&data(name));
+    assert!(report.issues.is_empty(), "{name}: {:#?}", report.issues);
+    assert!(report.dropped_clips.is_empty(), "{name}: {:#?}", report.dropped_clips);
+    library
+}
+
+/// Every demo: the starter library's patterns and songs and those of each
+/// style of `demos/` (the starter's again among them), in one library.
 fn library() -> Library {
-    let (library, report) = Library::from_json(&data("library.json"));
-    assert!(report.issues.is_empty(), "library.json: {:#?}", report.issues);
-    assert!(report.dropped_clips.is_empty(), "library.json: {:#?}", report.dropped_clips);
+    let mut library = library_file("library.json");
+    let mut names: Vec<String> = std::fs::read_dir(assets().join("data").join("demos"))
+        .unwrap()
+        .map(|entry| format!("demos/{}", entry.unwrap().file_name().to_string_lossy()))
+        .collect();
+    names.sort();
+    assert!(!names.is_empty());
+    for name in names {
+        let style = library_file(&name);
+        let new_patterns: Vec<_> = style.patterns.into_iter().filter(|p| library.pattern(&p.id).is_none()).collect();
+        let new_songs: Vec<_> =
+            style.songs.into_iter().filter(|s| !library.songs.iter().any(|t| t.id == s.id)).collect();
+        library.patterns.extend(new_patterns);
+        library.songs.extend(new_songs);
+    }
     library
 }
 
@@ -190,7 +212,7 @@ fn every_demo_pattern_renders_clean_audio_with_every_kit() {
 }
 
 #[test]
-fn the_demo_song_renders_clean_audio() {
+fn every_demo_song_renders_clean_audio() {
     let library = library();
     let kits = kits();
     let bank = bank(&kits);

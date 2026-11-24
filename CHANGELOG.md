@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### New
+- **File > Demos...**: the demos by style, as tiles; a song or a pattern is copied into your library and plays.
+- Demo songs: Minimal House, Industrial Techno, Psytrance, Dubstep, Detroit Deep House, Amapiano.
+
+### Changed
+- A new library starts with the **starter library** (a funk song and a few beats), not every demo;
+  File > Load the demo library... is now File > Load the starter library...
+- The demo arrangement is named **Funk Song**.
+
 ## 0.1.3
 
 ### New

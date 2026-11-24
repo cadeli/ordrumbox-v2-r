@@ -19,7 +19,7 @@ pub(super) enum Pending {
     LoadProject(PathBuf),
     ImportProject(PathBuf),
     ImportLibrary(PathBuf),
-    DemoLibrary,
+    StarterLibrary,
     /// A backup's folder.
     RestoreUserData(PathBuf),
     /// The folder to use as the user data folder.
@@ -83,7 +83,7 @@ impl Session {
             Pending::LoadProject(path) => self.load_project_file(&path),
             Pending::ImportProject(path) => self.import_project_now(&path),
             Pending::ImportLibrary(path) => self.import_library_now(&path),
-            Pending::DemoLibrary => self.load_demo_library_now(),
+            Pending::StarterLibrary => self.load_starter_library_now(),
             Pending::RestoreUserData(path) => self.restore_user_data_now(&path),
             Pending::UserFolder(path) => self.change_user_folder_now(&path),
         }
@@ -121,9 +121,9 @@ impl Session {
                 let name = path.file_name().unwrap_or(path.as_os_str()).to_string_lossy();
                 ("Replace the library?", format!("{name} takes the place of every pattern and arrangement."), "replace")
             }
-            Pending::DemoLibrary => (
-                "Load the demo library?",
-                "The demo takes the place of every pattern and arrangement.".to_owned(),
+            Pending::StarterLibrary => (
+                "Load the starter library?",
+                "The starter library takes the place of every pattern and arrangement.".to_owned(),
                 "load",
             ),
             Pending::RestoreUserData(path) => {
@@ -207,7 +207,7 @@ mod tests {
     #[test]
     fn what_cannot_be_undone_waits_for_enter_and_a_click_cancels() {
         let mut s = session();
-        s.run(Command::DemoLibrary);
+        s.run(Command::StarterLibrary);
         assert!(s.confirm_open());
         s.overlay_click(800, 600, Scale::ONE, 10, 10);
         assert!(!s.confirm_open());
@@ -225,8 +225,10 @@ mod tests {
         // The Reset button runs what ENTER on the focused one would.
         let (x, y) = button_point(&s, 1);
         s.overlay_click(800, 600, Scale::ONE, x, y);
-        assert!(!s.overlay_open());
+        // Started again as the first time: the demos are shown.
+        assert!(matches!(s.chrome.overlay, Some(Overlay::Demos(_))));
         assert!(s.message.starts_with("factory settings restored"), "{}", s.message);
+        s.close_overlay();
         // The Keep button only closes.
         s.run(Command::FactoryReset);
         let (x, y) = button_point(&s, 0);
@@ -270,7 +272,7 @@ mod tests {
     #[test]
     fn the_mcp_tools_wait_for_the_answer() {
         let mut s = session();
-        s.ask(Pending::DemoLibrary);
+        s.ask(Pending::StarterLibrary);
         assert!(s.mcp_call("listPatterns", &Value::Null).is_err());
         s.overlay_key(OverlayKey::Escape);
         assert!(s.mcp_call("listPatterns", &Value::Null).is_ok());

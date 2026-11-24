@@ -17,9 +17,9 @@ On Windows, a release holds a setup and a zip:
 
 - `ordrumbox-<version>-windows-x64-setup.exe` installs orDrumbox in `Program Files`, with a
   Start menu shortcut, and the CLAP plugin in `C:\Program Files\Common Files\CLAP\orDrumbox\`
-  (an option, on by default). Running the setup of a newer version updates it; your library is kept, and the new demos are
-  added to it at the first start. Help > Factory reset... restores all the demos as shipped,
-  updated ones included (your files are backed up first). Uninstalling
+  (an option, on by default). Running the setup of a newer version updates it; your library is kept, and the new
+  demos are in File > Demos... Help > Factory reset... restores the starter library as shipped (your files are
+  backed up first). Uninstalling
   (Windows settings, or the Start menu) removes what the setup installed, never your library
   and settings in the user data folder. The setup is not signed: Windows may warn about an
   unknown publisher (More info > Run anyway).
@@ -65,13 +65,21 @@ see "License"). It is a folder, `orDrumbox.vst3`, with its assets inside: unzip 
 
 ## The library
 
+Your library starts with the starter library: a funk song and a few beats. The other demos
+are in **File > Demos...**, by style (house, techno, funk and disco, latin and afro…), shown
+at the first start: a style's tile lists its songs and patterns with their descriptions,
+and Enter or a click copies the one chosen into your library and plays it (a song brings
+the patterns it plays). Edit > Undo takes it out again. What your library already holds
+under the same name is kept, never replaced. File > Load the starter library... puts the
+starter library in the place of yours (one undo step).
+
 User data is saved under the OS user data folder
 (`%APPDATA%\orDrumbox` on Windows, `~/Library/Application Support/orDrumbox` on
 macOS, `~/.local/share/ordrumbox` elsewhere).
 
 The library's name and whether its edits are saved show at the right of the
 menu bar: *saved*, *modified* (saved a moment after the last edit), *new*
-(a copy of the demo, written at the first edit), *save failed*, *not saved*
+(a copy of the starter library, written at the first edit), *save failed*, *not saved*
 (no user data folder), or *in host project* (the plugin). Help > About gives
 the file's path.
 

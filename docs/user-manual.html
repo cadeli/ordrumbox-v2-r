@@ -112,7 +112,7 @@ to Applications.</td></tr>
 <tr><td>Linux</td><td><code>ordrumbox-v&lt;version&gt;-linux-x64.zip</code></td><td>Unpack it; the program uses the
 system's ALSA and X11 libraries.</td></tr>
 </table>
-<p>The <code>assets</code> folder holds the demo library, the kits and their samples, the scales, the
+<p>The <code>assets</code> folder holds the starter library, the demos by style, the kits and their samples, the scales, the
 synth presets and the generation styles. The plugin comes as <code>orDrumbox.clap</code> and
 <code>orDrumbox.vst3</code>, in zips of their own (<a href="#plugin">section 19</a>).</p>
 <p>One orDrumbox runs at a time: a second one started warns that another is already running, since two windows
@@ -120,8 +120,10 @@ would overwrite each other's library. You may go on anyway or quit. The plugin i
 
 <h3>First steps</h3>
 <ol>
-  <li>Start <code>ordrumbox.exe</code>. The demo library opens on its first pattern, in the
-      <strong>simple view</strong> the first time: the grid alone. <kbd>F2</kbd> shows the track editor,
+  <li>Start <code>ordrumbox.exe</code>. The first time, the <strong>Demos</strong> window shows the demos by
+      style: choose a tile, then a song or a pattern, and <kbd>Enter</kbd> copies it into your library and plays it
+      (<kbd>Esc</kbd> closes; <strong>File › Demos...</strong> opens it again). Your library starts as the starter
+      library, a funk song and a few beats, in the <strong>simple view</strong> the first time: the grid alone. <kbd>F2</kbd> shows the track editor,
       <kbd>F7</kbd> the note editor, <strong>View › Simple view</strong> both at once; the next start opens as you left it.</li>
   <li>Press <kbd>Space</kbd> (or click <strong>PLAY</strong>) to start and stop playback.</li>
   <li>Click a step of the grid to switch it on (a note); click it again to switch it off.
@@ -139,7 +141,7 @@ tells where the library stands:</p>
 <tr><th>Shown</th><th>Meaning</th></tr>
 <tr><td><em>saved</em></td><td>Every edit is on disk.</td></tr>
 <tr><td><em>modified</em></td><td>An edit is waiting: it is saved a moment after the last one.</td></tr>
-<tr><td><em>new</em></td><td>A copy of the demo, written at the first edit.</td></tr>
+<tr><td><em>new</em></td><td>A copy of the starter library, written at the first edit.</td></tr>
 <tr><td><em>save failed</em></td><td>The file could not be written; the status line says why.</td></tr>
 <tr><td><em>not saved</em></td><td>There is no user data folder to save in.</td></tr>
 <tr><td><em>in host project</em></td><td>The plugin: the host saves the library with its project.</td></tr>
@@ -165,8 +167,8 @@ noted in <code>location.json</code> in the default folder. <strong>Help › Abou
 <tr><td><code>mcp.json</code></td><td>The port and token of the AI client link.</td></tr>
 </table>
 <p><code>synth_presets.json</code>, written by earlier versions, is now only read: a library saved before has no
-presets of its own and takes those. To start again from the demo, use <strong>Help › Factory reset...</strong>
-(<a href="#updates">section 21</a>), or <strong>File › Load the demo library...</strong> for the library alone.</p>
+presets of its own and takes those. To start again from the starter library, use <strong>Help › Factory reset...</strong>
+(<a href="#updates">section 21</a>), or <strong>File › Load the starter library...</strong> for the library alone.</p>
 <p><strong>Where you left off.</strong> The app starts on the pattern and the arrangement you had chosen, in the mode
 (pattern or song) and the view you had open (grid, piano roll, song panel, synth, mixer), with the track editor, the note
 editor, the VU meters and the kit editor shown or hidden as you left them. It is written to <code>settings.json</code>
@@ -263,7 +265,7 @@ one step, a preset deleted one), the kit chosen, and the project's name and desc
 compacting tracks… — and its message on the status line ends with <em>(Ctrl+Z: undo)</em>. What cannot be undone
 asks first, <kbd>Enter</kbd> goes on, <kbd>Esc</kbd> or a click cancels: removing a kit's sample, restoring user
 data, changing the user data folder, a factory reset, and an export that would replace a file. Opening or importing a
-project or a library, and loading the demo library, also ask first, as they replace every pattern and arrangement,
+project or a library, and loading the starter library, also ask first, as they replace every pattern and arrangement,
 though each one is an undo step.</p>
 
 <!-- ───────────────────────────────────────────────────────────── -->
@@ -287,7 +289,8 @@ use <kbd>←</kbd> <kbd>→</kbd> between menus, <kbd>↑</kbd> <kbd>↓</kbd> b
 <tr><td>Project description...</td><td></td><td>Edit the project's description.</td></tr>
 <tr><td>Export library...</td><td></td><td>Write the whole library, synth presets included, to <code>ordrumbox-library.json</code> in a folder you pick.</td></tr>
 <tr><td>Import library...</td><td></td><td>Read such a file in place of the library (one undo step; confirmed). Its synth presets replace those of the same name.</td></tr>
-<tr><td>Load the demo library...</td><td></td><td>The assets' demo library in place of yours (one undo step; confirmed).</td></tr>
+<tr><td>Demos...</td><td></td><td>The demos by style, as tiles: a style lists its songs and patterns with their descriptions; <kbd>Enter</kbd> or a click copies the one chosen into your library and plays it (one undo step; a song brings the patterns it plays; what your library holds under the same name is kept). <kbd>Backspace</kbd> goes back to the styles.</td></tr>
+<tr><td>Load the starter library...</td><td></td><td>The starter library (a funk song and a few beats) in place of yours (one undo step; confirmed).</td></tr>
 <tr><td>Import MIDI file...</td><td></td><td>Turn a <code>.mid</code> file into new patterns (see <a href="#files">Files</a>).</td></tr>
 <tr><td>Export pattern as JSON...</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>Write <code>ordrumbox-&lt;name&gt;.json</code> to a folder you pick.</td></tr>
 <tr><td>Export pattern as MIDI...</td><td><kbd>Ctrl</kbd>+<kbd>M</kbd> (macOS: <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd>)</td><td>Write the pattern as a type 1 MIDI file, as many loops as chosen (1 to 64).</td></tr>
@@ -434,7 +437,7 @@ slip off the play keys changes nothing; pressed alone, they say so on the status
 <tr><td>User manual...</td><td></td><td>Open this manual on the web site.</td></tr>
 <tr><td>Check for updates</td><td></td><td>Ask now whether a newer release exists.</td></tr>
 <tr><td>Download orDrumbox &lt;version&gt;...</td><td></td><td>Open the page of the newer release (enabled when one was found).</td></tr>
-<tr><td>Factory reset...</td><td></td><td>Move your files aside and restart from the demo (confirmed).</td></tr>
+<tr><td>Factory reset...</td><td></td><td>Move your files aside and restart from the starter library (confirmed).</td></tr>
 </table>
 
 <!-- ───────────────────────────────────────────────────────────── -->

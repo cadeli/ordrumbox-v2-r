@@ -5,6 +5,7 @@ use super::session_overlay::Overlay;
 use super::session_types::Workspace;
 use crate::action_log::LogLayout;
 use crate::canvas::Canvas;
+use crate::demo_browser::{self, DemoLayout};
 use crate::picker::PickerLayout;
 use crate::scale::Scale;
 use crate::view::View;
@@ -203,6 +204,10 @@ impl Session {
             Some(Overlay::Controls(draft)) => self.draw_controls(canvas, draft, scale),
             Some(Overlay::NoteTool(draft)) => Self::draw_note_tool(canvas, draft, scale),
             Some(Overlay::LoopExport(draft)) => Self::draw_loop_export(canvas, draft, scale),
+            Some(Overlay::Demos(browser)) => {
+                let layout = DemoLayout::new(canvas.width(), canvas.height(), scale);
+                demo_browser::draw(canvas, browser, &self.demo_styles, &layout);
+            }
             Some(Overlay::History { scroll }) => {
                 let layout = LogLayout::new(canvas.width(), canvas.height(), scale);
                 action_log::draw(canvas, &self.action_log, *scroll, &layout);

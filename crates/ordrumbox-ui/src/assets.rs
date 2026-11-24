@@ -1,4 +1,4 @@
-//! The `assets` folder (`data/library.json`, `data/kits.json`,
+//! The `assets` folder (`data/library.json`, `data/demos/*.json`, `data/kits.json`,
 //! `data/scales.json`, `data/synth_presets.json`, `kits/**.wav`), found next
 //! to the program, in this repository or given by `ORDRUMBOX_ASSETS`, and
 //! loaded into the model.
@@ -9,6 +9,7 @@ use std::{env, fs, io};
 use ordrumbox_core::json;
 use ordrumbox_core::{Issue, Library, LoadReport, ScaleList, Scales, Styles};
 use ordrumbox_engine::{Kit, KitFolder, SampleBank, SynthPresets, kits_from_folders, kits_from_json};
+use ordrumbox_logic::demo_catalog::DemoStyle;
 
 use crate::kits::is_wav;
 use crate::store;
@@ -20,6 +21,8 @@ pub const ENV_VAR: &str = "ORDRUMBOX_ASSETS";
 pub struct Assets {
     pub library: Library,
     pub report: LoadReport,
+    /// The demos, a style per file of `data/demos/`, in file name order.
+    pub demos: Vec<DemoStyle>,
     pub kits: Vec<Kit>,
     pub scales: Scales,
     /// The scale names in file order (the note editor's arpeggio scales).
@@ -42,7 +45,8 @@ pub struct Assets {
     /// assets' (malformed), `kits/` (no such file, no folder).
     pub kit_issues: Vec<(String, Vec<Issue>)>,
     /// Asset files that could not be read (`kits.json`, `scales.json`,
-    /// `synth_presets.json`, `styles.json`): what they hold is missing.
+    /// `synth_presets.json`, `styles.json`, `demos/`): what they hold is
+    /// missing; a demo file with values repaired.
     pub errors: Vec<String>,
 }
 
@@ -119,8 +123,42 @@ fn read_asset<T>(
         .ok()
 }
 
-/// The demo library, the starting point of the user's.
+/// The starter library, the starting point of the user's.
 pub const LIBRARY: &str = "library.json";
+
+/// The folder of `data` holding the demos, a style per file.
+pub const DEMOS: &str = "demos";
+
+/// The demo styles of `data/demos/`, in file name order (the file names
+/// start with their place); what cannot be read is pushed on `errors`.
+fn load_demos(data: &Path, errors: &mut Vec<String>) -> Vec<DemoStyle> {
+    let folder = data.join(DEMOS);
+    let mut paths: Vec<PathBuf> = match fs::read_dir(&folder) {
+        Ok(entries) => entries
+            .filter_map(|entry| {
+                entry.map(|e| e.path()).map_err(|e| errors.push(format!("{}: {e}", folder.display()))).ok()
+            })
+            .filter(|path| path.extension().is_some_and(|ext| ext == "json"))
+            .collect(),
+        Err(e) => {
+            errors.push(format!("{}: {e}", folder.display()));
+            return Vec::new();
+        }
+    };
+    paths.sort();
+    let mut styles = Vec::new();
+    for path in paths {
+        let Ok(value) = read_json(&path).map_err(|e| errors.push(e)) else { continue };
+        let (library, report) = Library::from_json(&value);
+        let repaired = report.issues.len() + report.dropped_clips.len();
+        if repaired > 0 {
+            errors.push(format!("{}: {repaired} value(s) repaired", path.display()));
+        }
+        let stem = path.file_stem().map_or_else(String::new, |s| s.to_string_lossy().into_owned());
+        styles.push(DemoStyle::new(library, &stem));
+    }
+    styles
+}
 
 /// The kits as loaded, with what went wrong.
 struct LoadedKits {
@@ -198,6 +236,7 @@ fn load_with(dir: &Path, user_kits: Option<PathBuf>, user_samples: Option<PathBu
     let data = dir.join("data");
     let (library, report) = Library::from_json(&read_json(&data.join(LIBRARY))?);
     let mut errors = Vec::new();
+    let demos = load_demos(&data, &mut errors);
     let sources = SampleSources { assets: dir.join("kits"), user: user_samples };
     let LoadedKits { kits, kits_error, kit_issues } = load_kits(&data, user_kits, &sources, &mut errors);
     let scales_json = read_asset(&data, "scales.json", &mut errors, Ok);
@@ -211,6 +250,7 @@ fn load_with(dir: &Path, user_kits: Option<PathBuf>, user_samples: Option<PathBu
     Ok(Assets {
         library,
         report,
+        demos,
         kits,
         scales,
         scale_list,
@@ -249,7 +289,8 @@ mod tests {
         assert_eq!(assets.report.dropped_clips, Vec::new());
         assert_eq!(assets.style_issues, Vec::new());
         assert!(!assets.library.patterns.is_empty());
-        assert!(!assets.kits.is_empty());
+        assert!(assets.demos.iter().all(|style| !style.library().patterns.is_empty()));
+        assert!(!assets.demos.is_empty() && !assets.kits.is_empty());
         assert!(!assets.synths.is_empty());
         assert!(!assets.scale_list.names.is_empty());
     }
@@ -270,10 +311,38 @@ mod tests {
         let assets = repository_assets();
         // The kit the app starts with.
         let kit = &assets.kits[0].name;
-        for pattern in &assets.library.patterns {
+        let demos = assets.demos.iter().map(DemoStyle::library);
+        for pattern in std::iter::once(&assets.library).chain(demos).flat_map(|library| &library.patterns) {
             for track in &pattern.tracks {
                 let sound = assign_track(track, &assets.bank, kit, &assets.synths, &mut |_| 0);
                 assert_ne!(sound, TrackSound::None, "pattern {:?}, track {}", pattern.name, track.name);
+            }
+        }
+    }
+
+    #[test]
+    fn the_starter_library_is_among_the_demos() {
+        let assets = repository_assets();
+        let in_demos = |id: &str| assets.demos.iter().any(|style| style.library().pattern(id).is_some());
+        for pattern in &assets.library.patterns {
+            assert!(in_demos(&pattern.id), "starter pattern {} is in no demo style", pattern.id);
+        }
+        for song in &assets.library.songs {
+            assert!(
+                assets.demos.iter().any(|style| style.library().songs.iter().any(|s| s.id == song.id)),
+                "{}",
+                song.id
+            );
+        }
+    }
+
+    #[test]
+    fn no_two_demos_share_an_id() {
+        let assets = repository_assets();
+        let mut ids = std::collections::HashSet::new();
+        for library in assets.demos.iter().map(DemoStyle::library) {
+            for id in library.patterns.iter().map(|p| &p.id).chain(library.songs.iter().map(|s| &s.id)) {
+                assert!(ids.insert(id.clone()), "{id} is in two demo files");
             }
         }
     }
