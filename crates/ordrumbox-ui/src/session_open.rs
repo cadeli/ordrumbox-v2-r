@@ -333,9 +333,10 @@ impl Session {
 fn loading_status(assets: &assets::Assets) -> Vec<String> {
     let mut status: Vec<String> = assets.errors.iter().map(|e| format!("not loaded: {e}")).collect();
     status.extend(assets.style_issues.iter().map(|i| format!("styles.json: {}: {}", i.at, i.message)));
-    let (kits_file, kit_issues) = &assets.kit_issues;
-    if let Some(first) = kit_issues.first() {
-        status.push(format!("{kits_file}: {} skipped, first: {}: {}", kit_issues.len(), first.at, first.message));
+    for (source, kit_issues) in &assets.kit_issues {
+        if let Some(first) = kit_issues.first() {
+            status.push(format!("{source}: {} skipped, first: {}: {}", kit_issues.len(), first.at, first.message));
+        }
     }
     if let Some(first) = assets.sample_errors.first() {
         status.push(format!("{} sample(s) not loaded, first: {first}", assets.sample_errors.len()));

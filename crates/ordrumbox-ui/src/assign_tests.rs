@@ -9,8 +9,9 @@ use std::path::Path;
 use ordrumbox_core::{Track, json};
 use ordrumbox_engine::assign::{TrackSound, assign_track, substitute_for};
 use ordrumbox_engine::kit::BankSample;
-use ordrumbox_engine::{SampleBank, SampleBuffer, SynthPresets, kits_from_json, wav};
+use ordrumbox_engine::{SampleBank, SampleBuffer, SynthPresets, kits_from_folders, kits_from_json, wav};
 
+use crate::assets::kit_folders;
 use crate::kits::KitSet;
 
 #[path = "assign_tests/data.rs"]
@@ -26,9 +27,14 @@ fn asset(name: &str) -> json::Value {
     json::parse(&fs::read_to_string(path).unwrap()).unwrap()
 }
 
-/// The kits the app ships with, in one bank: a kit lacking an instrument borrows it from another.
+/// The kits the app ships with (its kit folders, as `kits.json` describes
+/// them), in one bank: a kit lacking an instrument borrows it from another.
 fn shipped() -> (SampleBank, Vec<String>) {
-    let kits = kits_from_json(&asset("kits.json")).unwrap().0;
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/kits");
+    let described = kits_from_json(&asset("kits.json")).unwrap().0;
+    let (kits, issues) =
+        kits_from_folders(&kit_folders(&folder).unwrap(), &described, &[], |path| folder.join(path).is_file());
+    assert!(issues.is_empty(), "{issues:#?}");
     let samples = kits
         .iter()
         .flat_map(|kit| {

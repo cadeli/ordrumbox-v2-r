@@ -13,6 +13,7 @@ pub mod controller;
 pub mod controls;
 pub mod engine;
 pub mod kit;
+pub mod kit_folders;
 pub mod metronome;
 pub mod midi;
 pub mod offline;
@@ -28,6 +29,7 @@ pub use controller::{AudioSide, Controller, Mode, PatternLoop, SCOPE_SIZE, SongL
 pub use controls::{Control, ControlMap, Knob};
 pub use engine::{Engine, HOST_TRACKS, HostMix, HostTrack, HostTransport, Position, host_muted, host_pass};
 pub use kit::{Kit, KitSample, KitsRead, SampleBank, kits_from_json, kits_to_json};
+pub use kit_folders::{KitFolder, kits_from_folders};
 pub use midi::{BlockClock, BlockNote, ClockMessage, DRUM_CHANNEL, KeyMap, PATTERN_CHANNEL, pattern_key};
 pub use ordrumbox_dsp::{MasterSettings, ReturnSettings, SampleBuffer, gain_reduction, slope};
 pub use pass::Pass;

@@ -17,6 +17,7 @@ use std::sync::Arc;
 
 use ordrumbox_core::instruments::{NOT_FOUND, catalog};
 use ordrumbox_engine::kit::{Kit, KitSample};
+use ordrumbox_engine::kit_folders::key_from_file_name;
 use ordrumbox_engine::{SampleBank, SampleBuffer, analysis, wav};
 
 use crate::assets::SampleSources;
@@ -62,11 +63,6 @@ pub struct KitSet {
     samples_dir: Option<PathBuf>,
 }
 
-/// `findInstrumentFromFileName(name).id` (`NOT_FOUND` when nothing matches).
-fn detect_key(file_name: &str) -> String {
-    catalog().from_file_name(file_name).map_or_else(|| NOT_FOUND.to_owned(), |i| i.id.clone())
-}
-
 /// The url of a file copied into kit `kit_name`: `imported/<kit>/<file>`.
 /// Kept apart per kit, so that two kits' files of the same name do not
 /// overwrite each other, and apart from the assets' folders, which the
@@ -110,7 +106,7 @@ fn file_name(path: &Path) -> String {
     path.file_name().map_or_else(String::new, |n| n.to_string_lossy().into_owned())
 }
 
-fn is_wav(path: &Path) -> bool {
+pub(crate) fn is_wav(path: &Path) -> bool {
     path.extension().is_some_and(|e| e.eq_ignore_ascii_case("wav"))
 }
 
@@ -265,7 +261,7 @@ impl KitSet {
     pub fn guess_instrument(&self, kit: usize, sample: usize) -> Result<String, String> {
         let Some(s) = self.sample(kit, sample) else { return Err("No such sample".into()) };
         let file = s.path.rsplit_once('/').map_or(s.path.as_str(), |(_, name)| name);
-        match detect_key(file) {
+        match key_from_file_name(file) {
             key if key == NOT_FOUND => Err(format!("No instrument in the name \"{file}\"")),
             key => Ok(key),
         }
@@ -298,10 +294,16 @@ impl KitSet {
         Some(message)
     }
 
-    /// `removeSample`.
+    /// `removeSample`; its path is kept as removed, so that a file of the
+    /// kit's folder is not added back when the folders are read.
     pub fn remove(&mut self, kit: usize, sample: usize) -> Option<String> {
-        let instruments = &mut self.kits.get_mut(kit)?.samples;
-        (sample < instruments.len()).then(|| format!("Removed \"{}\"", instruments.remove(sample).display_name))
+        let kit = self.kits.get_mut(kit)?;
+        (sample < kit.samples.len()).then(|| {
+            let removed = kit.samples.remove(sample);
+            let message = format!("Removed \"{}\"", removed.display_name);
+            kit.removed.push(removed.path);
+            message
+        })
     }
 
     /// `normalizeAll`: the samples of kit `kit` scaled to a 0 dB peak; how many.
@@ -341,8 +343,7 @@ impl KitSet {
         }
         let kit = self.kits.iter().position(|k| k.name == kit_name).unwrap_or(0);
         let instruments = &mut self.kits[kit].samples;
-        let entry =
-            KitSample { key: detect_key(&name), display_name: name.clone(), path: url.clone(), ..KitSample::default() };
+        let entry = KitSample::from_file(&url);
         let index = match instruments.iter().position(|i| i.path == url) {
             Some(i) => {
                 instruments[i] = entry;
@@ -409,12 +410,7 @@ impl KitSet {
                     let url = imported_url(&kit_name, &name);
                     self.store_bytes(&url, &bytes)?;
                     self.buffers.insert(url.clone(), Arc::new(buffer));
-                    instruments.push(KitSample {
-                        key: detect_key(&name),
-                        display_name: name,
-                        path: url,
-                        ..KitSample::default()
-                    });
+                    instruments.push(KitSample::from_file(&url));
                 }
                 Err(_) => failed += 1,
             }
@@ -628,7 +624,9 @@ mod tests {
         assert_eq!(kits.move_to_kit(0, 1, 1).as_deref(), Some("Moved \"SnareDrum.wav\" to kit \"b\""));
         assert_eq!(kits.move_to_kit(0, 0, 0), None);
         assert_eq!(kits.kits[1].samples.len(), 1);
+        let removed = kits.kits[1].samples[0].path.clone();
         assert!(kits.remove(1, 0).is_some());
+        assert_eq!(kits.kits[1].removed, [removed], "kept, so that the folder does not add it back");
 
         let mapping = dir.join(kits.mapping_file_name(0).unwrap());
         assert!(mapping.ends_with("ordrumbox-drumkit-a.json"));
@@ -637,7 +635,8 @@ mod tests {
         assert_eq!(kits.load_mapping(&mapping).unwrap().0, 0);
         assert_eq!(kits.kits[0].samples.len(), 1);
         kits.save().unwrap();
-        assert_eq!(store::load_kits(&dir.join("kits.json")).unwrap().unwrap().0[0].name, "a");
+        let saved = store::load_kits(&dir.join("kits.json")).unwrap().unwrap().0;
+        assert_eq!((saved[0].name.as_str(), &saved[1].removed), ("a", &kits.kits[1].removed));
         fs::remove_dir_all(dir).unwrap();
     }
 

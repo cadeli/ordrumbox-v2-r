@@ -15,7 +15,7 @@ use std::sync::Arc;
 use ordrumbox_core::json::{self, Value};
 use ordrumbox_core::{Library, Rng, Scales, expand_hits};
 use ordrumbox_engine::offline::{self, EXPORT_RATE, RenderSetup};
-use ordrumbox_engine::{Kit, SampleBank, SynthPresets, kits_from_json, wav};
+use ordrumbox_engine::{Kit, KitFolder, SampleBank, SynthPresets, kits_from_folders, kits_from_json, wav};
 use ordrumbox_probe::fix::{FixSettings, fix};
 
 /// The sample rate of a kit sample.
@@ -33,9 +33,30 @@ fn data(name: &str) -> Value {
     json::parse(&text).unwrap_or_else(|e| panic!("{name}: {e}"))
 }
 
+/// The kits as the app reads them: its kit folders, as `kits.json` describes them.
 fn kits() -> Vec<Kit> {
-    let (kits, issues) = kits_from_json(&data("kits.json")).unwrap();
+    let (described, issues) = kits_from_json(&data("kits.json")).unwrap();
     assert!(issues.is_empty(), "kits.json: {issues:#?}");
+    let root = assets().join("kits");
+    let mut folders: Vec<KitFolder> = std::fs::read_dir(&root)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| path.is_dir())
+        .map(|path| {
+            let name = path.file_name().unwrap().to_string_lossy().into_owned();
+            let mut paths: Vec<String> = std::fs::read_dir(&path)
+                .unwrap()
+                .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+                .filter(|file| file.to_ascii_lowercase().ends_with(".wav"))
+                .map(|file| format!("{name}/{file}"))
+                .collect();
+            paths.sort();
+            KitFolder { name, paths }
+        })
+        .collect();
+    folders.sort_by(|a, b| a.name.cmp(&b.name));
+    let (kits, issues) = kits_from_folders(&folders, &described, &[], |path| root.join(path).is_file());
+    assert!(issues.is_empty(), "kits/: {issues:#?}");
     kits
 }
 

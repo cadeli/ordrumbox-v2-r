@@ -27108,6 +27108,284 @@
       ]
     },
     {
+      "id": "bossa-clave",
+      "name": "Bossa Nova Clave",
+      "bpm": 72,
+      "beatCount": 8,
+      "description": "Bossa nova, 2 measures: kick on 1, 2&, 3 and 4& (a dotted quarter and an eighth), cross-stick on the bossa clave 3-2 (1, 2&, 4 | 2, 3&), 8th hats with the off-beats soft, pedal hat on 2 and 4.",
+      "tags": [
+        "latin",
+        "bossa"
+      ],
+      "tracks": [
+        {
+          "name": "KICK",
+          "beatCount": 8,
+          "loopLength": 16,
+          "volume": 0.8,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.9,
+              0,
+              0
+            ],
+            [
+              0.55,
+              1,
+              2
+            ],
+            [
+              0.85,
+              2,
+              0
+            ],
+            [
+              0.55,
+              3,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "RIMSHOT",
+          "beatCount": 8,
+          "loopLength": 32,
+          "pan": 0.2,
+          "reverbType": "room",
+          "reverbMix": 0.2,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.85,
+              0,
+              0
+            ],
+            [
+              0.85,
+              1,
+              2
+            ],
+            [
+              0.85,
+              3,
+              0
+            ],
+            [
+              0.85,
+              5,
+              0
+            ],
+            [
+              0.85,
+              6,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "CHH",
+          "beatCount": 8,
+          "loopLength": 4,
+          "volume": 0.6,
+          "pan": -0.3,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.7,
+              0,
+              0
+            ],
+            [
+              0.4,
+              0,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "CHHK",
+          "beatCount": 8,
+          "loopLength": 16,
+          "volume": 0.6,
+          "pan": -0.3,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.55,
+              1,
+              0
+            ],
+            [
+              0.55,
+              3,
+              0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bossa-shaker",
+      "name": "Bossa Nova Shaker",
+      "bpm": 72,
+      "beatCount": 8,
+      "description": "Bossa nova, 2 measures: kick on 1, 2&, 3 and 4&, cross-stick on the bossa clave 2-3 (2, 3& | 1, 2&, 4), 16th shaker accented on the beat and its a, pedal hat on 2 and 4.",
+      "tags": [
+        "latin",
+        "bossa"
+      ],
+      "tracks": [
+        {
+          "name": "KICK",
+          "beatCount": 8,
+          "loopLength": 16,
+          "volume": 0.8,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.9,
+              0,
+              0
+            ],
+            [
+              0.55,
+              1,
+              2
+            ],
+            [
+              0.85,
+              2,
+              0
+            ],
+            [
+              0.55,
+              3,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "RIMSHOT",
+          "beatCount": 8,
+          "loopLength": 32,
+          "pan": 0.2,
+          "reverbType": "room",
+          "reverbMix": 0.2,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.85,
+              1,
+              0
+            ],
+            [
+              0.85,
+              2,
+              2
+            ],
+            [
+              0.85,
+              4,
+              0
+            ],
+            [
+              0.85,
+              5,
+              2
+            ],
+            [
+              0.85,
+              7,
+              0
+            ]
+          ]
+        },
+        {
+          "name": "SHAKER",
+          "beatCount": 8,
+          "loopLength": 4,
+          "volume": 0.55,
+          "pan": -0.2,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.8,
+              0,
+              0
+            ],
+            [
+              0.3,
+              0,
+              1
+            ],
+            [
+              0.45,
+              0,
+              2
+            ],
+            [
+              0.6,
+              0,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "CHHK",
+          "beatCount": 8,
+          "loopLength": 16,
+          "volume": 0.6,
+          "pan": -0.3,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.55,
+              1,
+              0
+            ],
+            [
+              0.55,
+              3,
+              0
+            ]
+          ]
+        }
+      ]
+    },
+    {
       "id": "march",
       "name": "March",
       "bpm": 90,
@@ -32423,6 +32701,416 @@
             [
               3,
               4
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "samba-groove",
+      "name": "Samba Groove",
+      "bpm": 100,
+      "description": "Samba on a drum kit, 1 measure: kick on each beat and its a, the beats 2 and 4 louder (the surdo), rimshot on the teleco-teco (1, 1&, 2e, 2a, 3e, 4, 4&), 16th hats accented on the beat.",
+      "tags": [
+        "samba"
+      ],
+      "tracks": [
+        {
+          "name": "KICK",
+          "beatCount": 4,
+          "loopLength": 8,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.55,
+              0,
+              0
+            ],
+            [
+              0.6,
+              0,
+              3
+            ],
+            [
+              1.0,
+              1,
+              0
+            ],
+            [
+              0.6,
+              1,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "RIMSHOT",
+          "beatCount": 4,
+          "loopLength": 16,
+          "pan": 0.2,
+          "reverbType": "room",
+          "reverbMix": 0.2,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.9,
+              0,
+              0
+            ],
+            [
+              0.75,
+              0,
+              2
+            ],
+            [
+              0.75,
+              1,
+              1
+            ],
+            [
+              0.75,
+              1,
+              3
+            ],
+            [
+              0.75,
+              2,
+              1
+            ],
+            [
+              0.9,
+              3,
+              0
+            ],
+            [
+              0.75,
+              3,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "CHH",
+          "beatCount": 4,
+          "loopLength": 4,
+          "volume": 0.55,
+          "pan": -0.3,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.75,
+              0,
+              0
+            ],
+            [
+              0.35,
+              0,
+              1
+            ],
+            [
+              0.5,
+              0,
+              2
+            ],
+            [
+              0.4,
+              0,
+              3
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "samba-escola",
+      "name": "Samba Escola",
+      "bpm": 100,
+      "beatCount": 8,
+      "description": "Samba school, 2 measures: low surdo on 2 and 4 with a soft pickup on the a before, higher surdo on 1 and 3, caixa in 16ths pushing on the a, tamborim on the teleco-teco, a two-tone agogo on it, 16th ganza accented on the beat.",
+      "tags": [
+        "samba"
+      ],
+      "tracks": [
+        {
+          "name": "KICK",
+          "beatCount": 8,
+          "loopLength": 16,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.35,
+              0,
+              3
+            ],
+            [
+              1.0,
+              1,
+              0
+            ],
+            [
+              0.35,
+              2,
+              3
+            ],
+            [
+              1.0,
+              3,
+              0
+            ]
+          ]
+        },
+        {
+          "name": "LO_TOM",
+          "beatCount": 8,
+          "loopLength": 16,
+          "volume": 0.8,
+          "pan": 0.3,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.75,
+              0,
+              0
+            ],
+            [
+              0.75,
+              2,
+              0
+            ]
+          ]
+        },
+        {
+          "name": "SNARE",
+          "beatCount": 8,
+          "loopLength": 4,
+          "volume": 0.5,
+          "pan": 0.1,
+          "reverbType": "room",
+          "reverbMix": 0.2,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.55,
+              0,
+              0
+            ],
+            [
+              0.25,
+              0,
+              1
+            ],
+            [
+              0.35,
+              0,
+              2
+            ],
+            [
+              0.7,
+              0,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "RIMSHOT",
+          "beatCount": 8,
+          "loopLength": 16,
+          "pan": -0.2,
+          "reverbType": "room",
+          "reverbMix": 0.2,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.9,
+              0,
+              0
+            ],
+            [
+              0.7,
+              0,
+              2
+            ],
+            [
+              0.7,
+              1,
+              1
+            ],
+            [
+              0.7,
+              1,
+              3
+            ],
+            [
+              0.7,
+              2,
+              1
+            ],
+            [
+              0.9,
+              3,
+              0
+            ],
+            [
+              0.7,
+              3,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "COWBELL",
+          "beatCount": 8,
+          "loopLength": 32,
+          "volume": 0.6,
+          "pan": 0.4,
+          "reverbType": "room",
+          "reverbMix": 0.2,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "pitch"
+          ],
+          "notes": [
+            [
+              0.75,
+              0,
+              0,
+              5
+            ],
+            [
+              0.75,
+              0,
+              2,
+              0
+            ],
+            [
+              0.75,
+              1,
+              1,
+              5
+            ],
+            [
+              0.75,
+              1,
+              3,
+              0
+            ],
+            [
+              0.75,
+              2,
+              1,
+              0
+            ],
+            [
+              0.75,
+              3,
+              0,
+              5
+            ],
+            [
+              0.75,
+              3,
+              2,
+              0
+            ],
+            [
+              0.75,
+              4,
+              0,
+              0
+            ],
+            [
+              0.75,
+              4,
+              3,
+              5
+            ],
+            [
+              0.75,
+              5,
+              2,
+              0
+            ],
+            [
+              0.75,
+              6,
+              0,
+              5
+            ],
+            [
+              0.75,
+              6,
+              3,
+              0
+            ],
+            [
+              0.75,
+              7,
+              2,
+              5
+            ]
+          ]
+        },
+        {
+          "name": "SHAKER",
+          "beatCount": 8,
+          "loopLength": 4,
+          "volume": 0.5,
+          "pan": -0.4,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.8,
+              0,
+              0
+            ],
+            [
+              0.3,
+              0,
+              1
+            ],
+            [
+              0.45,
+              0,
+              2
+            ],
+            [
+              0.6,
+              0,
+              3
             ]
           ]
         }

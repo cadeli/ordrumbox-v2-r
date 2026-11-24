@@ -651,14 +651,14 @@
   {
     "name": "8bits",
     "info": "ordrumbox kit",
-    "desc": "Just for fun, generated with 8-bits tools",
+    "desc": "8-bit sounds rendered from the orDrumbox synth (chiptune presets), to compare with the 8bits kit",
     "samples": [
       {
         "displayName": "KICK",
         "key": "KICK",
         "path": "8bits/kick.wav",
         "peakDb": -3,
-        "rootMidi": 55,
+        "rootMidi": 48,
         "decay": 5000
       },
       {
@@ -666,7 +666,7 @@
         "key": "SNARE",
         "path": "8bits/snare.wav",
         "peakDb": -3,
-        "rootMidi": 36,
+        "rootMidi": 48,
         "decay": 5000
       },
       {
@@ -690,7 +690,7 @@
         "key": "COWBELL",
         "path": "8bits/cow.wav",
         "peakDb": -3,
-        "rootMidi": 67,
+        "rootMidi": 48,
         "decay": 5000
       },
       {
@@ -715,6 +715,54 @@
         "path": "8bits/crash.wav",
         "peakDb": -3,
         "rootMidi": 48,
+        "decay": 5000
+      },
+      {
+        "displayName": "CHIP BASS",
+        "key": "BASS",
+        "path": "8bits/bass-c3.wav",
+        "peakDb": -3,
+        "rootMidi": 48,
+        "decay": 5000
+      },
+      {
+        "displayName": "CHIP LEAD",
+        "key": "SYNTHLEAD",
+        "path": "8bits/lead-c4.wav",
+        "peakDb": -3,
+        "rootMidi": 60,
+        "decay": 5000
+      },
+      {
+        "displayName": "CHIP KEYS",
+        "key": "PIANO",
+        "path": "8bits/keys-c4.wav",
+        "peakDb": -3,
+        "rootMidi": 60,
+        "decay": 5000
+      },
+      {
+        "displayName": "PULSE BRASS",
+        "key": "BRASS",
+        "path": "8bits/brass-c4.wav",
+        "peakDb": -3,
+        "rootMidi": 60,
+        "decay": 5000
+      },
+      {
+        "displayName": "PULSE ORGAN",
+        "key": "ORGAN",
+        "path": "8bits/pulse-c4.wav",
+        "peakDb": -3,
+        "rootMidi": 60,
+        "decay": 5000
+      },
+      {
+        "displayName": "CHIP PAD",
+        "key": "SYNTHPAD",
+        "path": "8bits/pad-c4.wav",
+        "peakDb": -3,
+        "rootMidi": 60,
         "decay": 5000
       }
     ]

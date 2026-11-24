@@ -474,3 +474,22 @@ Six more kits rendered the same way: `latin_perc`, `606_like`, `cr78_like`, `sim
 whistle is rendered with `--gate 0.35` (it sustains), the others with `--gate 1`. `assign_tests/data.rs` rewritten, as
 a meant change (190 rows: the new kits' and what the others now borrow from them). The factory presets' checks of
 `ordrumbox-probe/tests/synth_audio.rs` cover the new presets.
+
+The `8bits` kit is rendered again, from the chiptune presets: its drums and, new to it, melodic sounds (`BASS`,
+`SYNTHLEAD`, `PIANO`, `BRASS`, `ORGAN`, `SYNTHPAD`, named after the note they
+play, C3 or C4). `kick`, `snare`, `tom`, `chh`, `bass-c3`, `lead-c4` and `pulse-c4` are `CHIP_KICK`, `CHIP_SNARE`,
+`CHIP_TOM`, `CHIP_HAT`, `CHIP_BASS`, `CHIP_LEAD` and `CHIP_PULSE`; the others are variants of them (pulse waves and
+noise in long or short mode, no filter), not kept as presets. The melodic presets' release was lengthened (0.12 to
+0.7 s) so they fade out. Rendered with `ordrumbox-probe preset … --rate 44100 --wav <folder>`, drums at C3 with the
+default gate (`crash`: `--gate 0.3`), `bass-c3` at C3 with `--gate 0.5`, the C4 sounds with `--gate 0.6` (`pad-c4`: 1.2),
+then `ordrumbox-probe fix <folder> --write`, with `--highpass 30` for the pulse sounds (a narrow pulse carries DC).
+`assign_tests/data.rs` rewritten, as a meant change (the `8bits` rows).
+
+The kit list is built from the folders of `assets/kits/`: each folder is a kit, each WAV file in it a sample
+(`ordrumbox-engine/src/kit_folders.rs`, `kits_from_folders`). `kits.json`, the assets' and then the user's, only
+describes them (instrument, root note, decay, texts, the user's edits) and orders them; a folder or a file it does not
+list is added after the others, its instrument guessed from its file name. A kit or a sample it lists whose file is gone
+is left out and reported. A kit of the user's `kits.json` takes the place of the shipped kit of its name, but the files
+added to that kit's folder since still appear; a sample the user removes is kept in the kit's `removed` list so that it
+is not added back. Before this change the user's `kits.json`, once written, replaced the shipped one whole: new
+shipped kits and samples did not appear. A shipped sample removed before this change comes back once.

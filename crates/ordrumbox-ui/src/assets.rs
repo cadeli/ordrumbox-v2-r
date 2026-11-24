@@ -4,12 +4,13 @@
 //! loaded into the model.
 
 use std::path::{Path, PathBuf};
-use std::{env, fs};
+use std::{env, fs, io};
 
 use ordrumbox_core::json;
 use ordrumbox_core::{Issue, Library, LoadReport, ScaleList, Scales, Styles};
-use ordrumbox_engine::{Kit, SampleBank, SynthPresets, kits_from_json};
+use ordrumbox_engine::{Kit, KitFolder, SampleBank, SynthPresets, kits_from_folders, kits_from_json};
 
+use crate::kits::is_wav;
 use crate::store;
 
 /// Environment variable naming the assets folder.
@@ -37,9 +38,9 @@ pub struct Assets {
     /// The user's `kits.json` could not be read: the assets' kits are used
     /// and kit edits are not saved (so as not to overwrite it).
     pub kits_error: Option<String>,
-    /// Kits and samples of the kits file read that were skipped (malformed),
-    /// with that file's name.
-    pub kit_issues: (String, Vec<Issue>),
+    /// Kits and samples left out, by source: the user's `kits.json` and the
+    /// assets' (malformed), `kits/` (no such file, no folder).
+    pub kit_issues: Vec<(String, Vec<Issue>)>,
     /// Asset files that could not be read (`kits.json`, `scales.json`,
     /// `synth_presets.json`, `styles.json`): what they hold is missing.
     pub errors: Vec<String>,
@@ -121,6 +122,70 @@ fn read_asset<T>(
 /// The demo library, the starting point of the user's.
 pub const LIBRARY: &str = "library.json";
 
+/// The kits as loaded, with what went wrong.
+struct LoadedKits {
+    kits: Vec<Kit>,
+    /// The user's `kits.json` could not be read.
+    kits_error: Option<String>,
+    /// What each source left out.
+    kit_issues: Vec<(String, Vec<Issue>)>,
+}
+
+/// The kits: the folders of `kits/` (`sources.assets`) described by
+/// `data/kits.json` and the user's `kits.json`
+/// ([`ordrumbox_engine::kits_from_folders`]).
+fn load_kits(data: &Path, user_kits: Option<PathBuf>, sources: &SampleSources, errors: &mut Vec<String>) -> LoadedKits {
+    let mut kit_issues = Vec::new();
+    let (edited, kits_error) = match user_kits.map(|p| (store::load_kits(&p), p)) {
+        Some((Ok(Some((kits, issues))), path)) => {
+            kit_issues.push((path.display().to_string(), issues));
+            (kits, None)
+        }
+        Some((Err(e), _)) => (Vec::new(), Some(e)),
+        _ => (Vec::new(), None),
+    };
+    let shipped =
+        read_asset(data, "kits.json", errors, |v| kits_from_json(&v)).map_or_else(Vec::new, |(kits, issues)| {
+            kit_issues.push(("kits.json".to_owned(), issues));
+            kits
+        });
+    let folders = kit_folders(&sources.assets).unwrap_or_else(|e| {
+        errors.push(format!("{}: {e}", sources.assets.display()));
+        Vec::new()
+    });
+    let exists = |url: &str| sources.file(url).is_some_and(|path| path.is_file());
+    let (kits, left_out) = kits_from_folders(&folders, &shipped, &edited, exists);
+    kit_issues.push(("kits/".to_owned(), left_out));
+    LoadedKits { kits, kits_error, kit_issues }
+}
+
+/// The folders of `kits` (hidden ones aside), by name, each with its WAV
+/// files as sample paths (`kit/file.wav`), by name.
+pub fn kit_folders(kits: &Path) -> io::Result<Vec<KitFolder>> {
+    let mut folders = Vec::new();
+    for entry in fs::read_dir(kits)? {
+        let path = entry?.path();
+        let name = path.file_name().map_or_else(String::new, |n| n.to_string_lossy().into_owned());
+        if !path.is_dir() || name.starts_with('.') {
+            continue;
+        }
+        let mut paths = Vec::new();
+        for file in fs::read_dir(&path)? {
+            let file = file?.path();
+            if file.is_file()
+                && is_wav(&file)
+                && let Some(file_name) = file.file_name()
+            {
+                paths.push(format!("{name}/{}", file_name.to_string_lossy()));
+            }
+        }
+        paths.sort();
+        folders.push(KitFolder { name, paths });
+    }
+    folders.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(folders)
+}
+
 /// Load everything, the user's kits and samples first; only an unreadable
 /// `library.json` is fatal.
 pub fn load(dir: &Path) -> Result<Assets, String> {
@@ -133,19 +198,8 @@ fn load_with(dir: &Path, user_kits: Option<PathBuf>, user_samples: Option<PathBu
     let data = dir.join("data");
     let (library, report) = Library::from_json(&read_json(&data.join(LIBRARY))?);
     let mut errors = Vec::new();
-    let saved = user_kits.map(|p| (store::load_kits(&p), p));
-    let (kits, kits_error) = match saved {
-        Some((Ok(Some((kits, issues))), path)) => (Some((kits, (path.display().to_string(), issues))), None),
-        Some((Err(e), _)) => (None, Some(e)),
-        _ => (None, None),
-    };
-    // The assets' kits, when the user has none.
-    let (kits, kit_issues) = kits
-        .or_else(|| {
-            let kits = read_asset(&data, "kits.json", &mut errors, |v| kits_from_json(&v))?;
-            Some((kits.0, ("kits.json".to_owned(), kits.1)))
-        })
-        .unwrap_or_default();
+    let sources = SampleSources { assets: dir.join("kits"), user: user_samples };
+    let LoadedKits { kits, kits_error, kit_issues } = load_kits(&data, user_kits, &sources, &mut errors);
     let scales_json = read_asset(&data, "scales.json", &mut errors, Ok);
     let synths =
         read_asset(&data, "synth_presets.json", &mut errors, |v| SynthPresets::from_json(&v)).unwrap_or_default();
@@ -153,7 +207,6 @@ fn load_with(dir: &Path, user_kits: Option<PathBuf>, user_samples: Option<PathBu
     let scale_list = scales_json.as_ref().map(ScaleList::from_json).unwrap_or_default();
     let (styles, style_issues) =
         read_asset(&data, "styles.json", &mut errors, |v| Ok(Styles::from_json(&v))).unwrap_or_default();
-    let sources = SampleSources { assets: dir.join("kits"), user: user_samples };
     let (bank, sample_errors) = SampleBank::load(&kits, |url| sources.read(url));
     Ok(Assets {
         library,
@@ -191,7 +244,7 @@ mod tests {
         let assets = repository_assets();
         assert_eq!(assets.errors, Vec::<String>::new());
         assert_eq!(assets.kits_error, None);
-        assert_eq!(assets.kit_issues.1, Vec::new());
+        assert!(assets.kit_issues.iter().all(|(_, issues)| issues.is_empty()), "{:#?}", assets.kit_issues);
         assert_eq!(assets.report.issues, Vec::new());
         assert_eq!(assets.report.dropped_clips, Vec::new());
         assert_eq!(assets.style_issues, Vec::new());

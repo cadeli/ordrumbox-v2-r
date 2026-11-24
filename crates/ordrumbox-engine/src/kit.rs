@@ -1,4 +1,4 @@
-//! Drum kits (`assets/data/drumkits.json`), their decoded samples, and which
+//! Drum kits (`assets/data/kits.json`), their decoded samples, and which
 //! sample each track plays.
 
 use std::sync::Arc;
@@ -232,6 +232,9 @@ fn sample_entries(value: &Value) -> Option<&[Value]> {
 pub struct Kit {
     pub name: String,
     pub samples: Vec<KitSample>,
+    /// Files of the kit's folder the user removed (`removed`): not added
+    /// back when the folder is read (`kit_folders`).
+    pub removed: Vec<String>,
     /// Other keys (`info`, `desc`…), written back as they came.
     pub extra: Object,
 }
@@ -258,15 +261,25 @@ impl Kit {
                 sample
             })
             .collect();
+        let removed = match value.get("removed").map(Value::as_array) {
+            None => Vec::new(),
+            Some(Some(paths)) if paths.iter().all(|p| p.as_str().is_some()) => {
+                paths.iter().filter_map(Value::as_str).map(str::to_owned).collect()
+            }
+            Some(_) => {
+                issues.push(Issue::new(format!("{at}.removed"), "not an array of paths: ignored"));
+                Vec::new()
+            }
+        };
         let mut extra = Object::new();
         for (key, value) in object.iter() {
             match key {
-                "name" | "samples" | "instruments" => {}
+                "name" | "samples" | "instruments" | "removed" => {}
                 "infos" => _ = extra.insert("info", value.clone()), // the JS key
                 _ => _ = extra.insert(key, value.clone()),
             }
         }
-        Some(Self { name, samples, extra })
+        Some(Self { name, samples, removed, extra })
     }
 
     pub fn to_json(&self) -> Value {
@@ -274,6 +287,9 @@ impl Kit {
         o.insert("name", Value::from(self.name.as_str()));
         for (key, value) in self.extra.iter() {
             o.insert(key, value.clone());
+        }
+        if !self.removed.is_empty() {
+            o.insert("removed", Value::Array(self.removed.iter().map(|p| Value::from(p.as_str())).collect()));
         }
         o.insert("samples", Value::Array(self.samples.iter().map(KitSample::to_json).collect()));
         Value::Object(o)
@@ -309,7 +325,7 @@ impl Kit {
         if samples.is_empty() {
             return Err("No valid samples".into());
         }
-        Ok(Self { name: name.to_owned(), samples, extra: Object::new() })
+        Ok(Self { name: name.to_owned(), samples, ..Self::default() })
     }
 }
 
@@ -444,7 +460,7 @@ mod tests {
                 decay: Some(1.0),
                 ..Default::default()
             }],
-            extra: Object::new(),
+            ..Kit::default()
         }];
         let (bank, errors) = SampleBank::load(&kits, |_| Ok(b"garbage".to_vec()));
         assert!(bank.samples.is_empty());
