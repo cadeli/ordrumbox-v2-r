@@ -232,7 +232,7 @@
   {
     "name": "electro",
     "info": "electro kit",
-    "desc": "by mweb: layered classic electro drums, acid bass, acid synth and Rhodes",
+    "desc": "rendered by the orDrumbox synth: electro drums, rototoms, acid bass, acid synth and Rhodes",
     "samples": [
       {
         "displayName": "CHH",
@@ -296,6 +296,22 @@
         "path": "electro/tom.wav",
         "peakDb": -3,
         "rootMidi": 55,
+        "decay": 5000
+      },
+      {
+        "displayName": "LO ROTOTOM",
+        "key": "LO_TOM",
+        "path": "electro/lo_tom.wav",
+        "peakDb": -3,
+        "rootMidi": 55,
+        "decay": 5000
+      },
+      {
+        "displayName": "HI ROTOTOM",
+        "key": "HI_TOM",
+        "path": "electro/hi_tom.wav",
+        "peakDb": -3,
+        "rootMidi": 65,
         "decay": 5000
       },
       {

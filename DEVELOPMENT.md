@@ -504,3 +504,9 @@ shipped kits and samples did not appear. A shipped sample removed before this ch
 The `matt` kit has no crash any more (`CRASH.wav` removed): its `CRASH` tracks play the synth preset `CRASH_SYNTH`, as
 its `COWBELL` tracks play `COWBELL_SYNTH`, and a track that only stands in for a crash borrows another kit's.
 `assign_tests/data.rs` rewritten, as a meant change (the `matt` crash rows).
+
+The `electro` kit is rendered by the synth (`ordrumbox-probe preset … --wav`, then `fix --write`), each sound at the
+`rootMidi` of `kits.json`, and has two rototoms, `lo_tom.wav` (`LO_TOM`, G3) and `hi_tom.wav` (`HI_TOM`, F4). Its
+`HI_TOM`, `LO_TOM` and their variants play them instead of `tom.wav`, and a kit with no high tom of its own
+(`latin_perc`, `cr78_like`, `trap_808`, `minimal`) now borrows `electro/hi_tom.wav` instead of `human/HiTom.wav`.
+`assign_tests/data.rs` rewritten, as a meant change (those rows).
