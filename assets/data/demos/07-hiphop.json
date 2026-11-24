@@ -1,9 +1,670 @@
 {
   "info": {
     "name": "Hip-Hop",
-    "description": "Boom bap, trap half time and neo soul keys."
+    "description": "Boom bap, trap half time, neo soul keys and a lo-fi hip-hop song."
   },
   "bpm": 120,
+  "songs": [
+    {
+      "id": "lofi-hiphop",
+      "name": "Lo-fi Hip-Hop",
+      "description": "A lo-fi hip-hop song in C at 84 BPM, all synth sounds, swung: intro, verse, hook, verse, hook, bridge, hook and outro on the four Lo-fi Hip-Hop patterns, over Dm9, G13, Cmaj9 and Am7. The piano's filter opens over the intro; the drums drop out for the last beat before each hook; the bell throws into the echo at the end of the last hook, and over the outro the piano fades into the dust.",
+      "bpm": 84,
+      "loopMeasures": 52,
+      "clips": [
+        {
+          "patternId": "lofi-hiphop-intro",
+          "startMeasure": 0,
+          "measureCount": 4
+        },
+        {
+          "patternId": "lofi-hiphop-verse",
+          "startMeasure": 4,
+          "measureCount": 8
+        },
+        {
+          "patternId": "lofi-hiphop-hook",
+          "startMeasure": 12,
+          "measureCount": 8
+        },
+        {
+          "patternId": "lofi-hiphop-verse",
+          "startMeasure": 20,
+          "measureCount": 8
+        },
+        {
+          "patternId": "lofi-hiphop-hook",
+          "startMeasure": 28,
+          "measureCount": 8
+        },
+        {
+          "patternId": "lofi-hiphop-bridge",
+          "startMeasure": 36,
+          "measureCount": 4
+        },
+        {
+          "patternId": "lofi-hiphop-hook",
+          "startMeasure": 40,
+          "measureCount": 8
+        },
+        {
+          "patternId": "lofi-hiphop-intro",
+          "startMeasure": 48,
+          "measureCount": 4
+        }
+      ],
+      "automations": [
+        {
+          "instrument": "PIANO",
+          "target": "cutoff",
+          "points": [
+            {
+              "step": 0,
+              "value": 0.42
+            },
+            {
+              "step": 1,
+              "value": 0.424
+            },
+            {
+              "step": 2,
+              "value": 0.428
+            },
+            {
+              "step": 3,
+              "value": 0.432
+            },
+            {
+              "step": 4,
+              "value": 0.437
+            },
+            {
+              "step": 5,
+              "value": 0.441
+            },
+            {
+              "step": 6,
+              "value": 0.445
+            },
+            {
+              "step": 7,
+              "value": 0.449
+            },
+            {
+              "step": 8,
+              "value": 0.453
+            },
+            {
+              "step": 9,
+              "value": 0.457
+            },
+            {
+              "step": 10,
+              "value": 0.461
+            },
+            {
+              "step": 11,
+              "value": 0.465
+            },
+            {
+              "step": 12,
+              "value": 0.47
+            },
+            {
+              "step": 13,
+              "value": 0.474
+            },
+            {
+              "step": 14,
+              "value": 0.478
+            },
+            {
+              "step": 15,
+              "value": 0.482
+            },
+            {
+              "step": 16,
+              "value": 0.486
+            },
+            {
+              "step": 17,
+              "value": 0.49
+            },
+            {
+              "step": 18,
+              "value": 0.494
+            },
+            {
+              "step": 19,
+              "value": 0.498
+            },
+            {
+              "step": 20,
+              "value": 0.503
+            },
+            {
+              "step": 21,
+              "value": 0.507
+            },
+            {
+              "step": 22,
+              "value": 0.511
+            },
+            {
+              "step": 23,
+              "value": 0.515
+            },
+            {
+              "step": 24,
+              "value": 0.519
+            },
+            {
+              "step": 25,
+              "value": 0.523
+            },
+            {
+              "step": 26,
+              "value": 0.527
+            },
+            {
+              "step": 27,
+              "value": 0.531
+            },
+            {
+              "step": 28,
+              "value": 0.536
+            },
+            {
+              "step": 29,
+              "value": 0.54
+            },
+            {
+              "step": 30,
+              "value": 0.544
+            },
+            {
+              "step": 31,
+              "value": 0.548
+            },
+            {
+              "step": 32,
+              "value": 0.552
+            },
+            {
+              "step": 33,
+              "value": 0.556
+            },
+            {
+              "step": 34,
+              "value": 0.56
+            },
+            {
+              "step": 35,
+              "value": 0.564
+            },
+            {
+              "step": 36,
+              "value": 0.569
+            },
+            {
+              "step": 37,
+              "value": 0.573
+            },
+            {
+              "step": 38,
+              "value": 0.577
+            },
+            {
+              "step": 39,
+              "value": 0.581
+            },
+            {
+              "step": 40,
+              "value": 0.585
+            },
+            {
+              "step": 41,
+              "value": 0.589
+            },
+            {
+              "step": 42,
+              "value": 0.593
+            },
+            {
+              "step": 43,
+              "value": 0.597
+            },
+            {
+              "step": 44,
+              "value": 0.602
+            },
+            {
+              "step": 45,
+              "value": 0.606
+            },
+            {
+              "step": 46,
+              "value": 0.61
+            },
+            {
+              "step": 47,
+              "value": 0.614
+            },
+            {
+              "step": 48,
+              "value": 0.618
+            },
+            {
+              "step": 49,
+              "value": 0.622
+            },
+            {
+              "step": 50,
+              "value": 0.626
+            },
+            {
+              "step": 51,
+              "value": 0.63
+            },
+            {
+              "step": 52,
+              "value": 0.635
+            },
+            {
+              "step": 53,
+              "value": 0.639
+            },
+            {
+              "step": 54,
+              "value": 0.643
+            },
+            {
+              "step": 55,
+              "value": 0.647
+            },
+            {
+              "step": 56,
+              "value": 0.651
+            },
+            {
+              "step": 57,
+              "value": 0.655
+            },
+            {
+              "step": 58,
+              "value": 0.659
+            },
+            {
+              "step": 59,
+              "value": 0.663
+            },
+            {
+              "step": 60,
+              "value": 0.668
+            },
+            {
+              "step": 61,
+              "value": 0.672
+            },
+            {
+              "step": 62,
+              "value": 0.676
+            },
+            {
+              "step": 63,
+              "value": 0.68
+            },
+            {
+              "step": 64,
+              "value": null
+            }
+          ]
+        },
+        {
+          "instrument": "KICK",
+          "target": "mute",
+          "points": [
+            {
+              "step": 188,
+              "value": 1.0
+            },
+            {
+              "step": 192,
+              "value": null
+            },
+            {
+              "step": 444,
+              "value": 1.0
+            },
+            {
+              "step": 448,
+              "value": null
+            }
+          ]
+        },
+        {
+          "instrument": "SNARE",
+          "target": "mute",
+          "points": [
+            {
+              "step": 188,
+              "value": 1.0
+            },
+            {
+              "step": 192,
+              "value": null
+            },
+            {
+              "step": 444,
+              "value": 1.0
+            },
+            {
+              "step": 448,
+              "value": null
+            }
+          ]
+        },
+        {
+          "instrument": "CHH",
+          "target": "mute",
+          "points": [
+            {
+              "step": 188,
+              "value": 1.0
+            },
+            {
+              "step": 192,
+              "value": null
+            },
+            {
+              "step": 444,
+              "value": 1.0
+            },
+            {
+              "step": 448,
+              "value": null
+            }
+          ]
+        },
+        {
+          "instrument": "CROMAPERC",
+          "target": "echoSend",
+          "points": [
+            {
+              "step": 752,
+              "value": 0.7
+            },
+            {
+              "step": 768,
+              "value": null
+            }
+          ]
+        },
+        {
+          "instrument": "PIANO",
+          "target": "volume",
+          "points": [
+            {
+              "step": 768,
+              "value": 0.68
+            },
+            {
+              "step": 769,
+              "value": 0.669
+            },
+            {
+              "step": 770,
+              "value": 0.658
+            },
+            {
+              "step": 771,
+              "value": 0.648
+            },
+            {
+              "step": 772,
+              "value": 0.637
+            },
+            {
+              "step": 773,
+              "value": 0.626
+            },
+            {
+              "step": 774,
+              "value": 0.615
+            },
+            {
+              "step": 775,
+              "value": 0.604
+            },
+            {
+              "step": 776,
+              "value": 0.594
+            },
+            {
+              "step": 777,
+              "value": 0.583
+            },
+            {
+              "step": 778,
+              "value": 0.572
+            },
+            {
+              "step": 779,
+              "value": 0.561
+            },
+            {
+              "step": 780,
+              "value": 0.55
+            },
+            {
+              "step": 781,
+              "value": 0.54
+            },
+            {
+              "step": 782,
+              "value": 0.529
+            },
+            {
+              "step": 783,
+              "value": 0.518
+            },
+            {
+              "step": 784,
+              "value": 0.507
+            },
+            {
+              "step": 785,
+              "value": 0.497
+            },
+            {
+              "step": 786,
+              "value": 0.486
+            },
+            {
+              "step": 787,
+              "value": 0.475
+            },
+            {
+              "step": 788,
+              "value": 0.464
+            },
+            {
+              "step": 789,
+              "value": 0.453
+            },
+            {
+              "step": 790,
+              "value": 0.443
+            },
+            {
+              "step": 791,
+              "value": 0.432
+            },
+            {
+              "step": 792,
+              "value": 0.421
+            },
+            {
+              "step": 793,
+              "value": 0.41
+            },
+            {
+              "step": 794,
+              "value": 0.399
+            },
+            {
+              "step": 795,
+              "value": 0.389
+            },
+            {
+              "step": 796,
+              "value": 0.378
+            },
+            {
+              "step": 797,
+              "value": 0.367
+            },
+            {
+              "step": 798,
+              "value": 0.356
+            },
+            {
+              "step": 799,
+              "value": 0.345
+            },
+            {
+              "step": 800,
+              "value": 0.335
+            },
+            {
+              "step": 801,
+              "value": 0.324
+            },
+            {
+              "step": 802,
+              "value": 0.313
+            },
+            {
+              "step": 803,
+              "value": 0.302
+            },
+            {
+              "step": 804,
+              "value": 0.291
+            },
+            {
+              "step": 805,
+              "value": 0.281
+            },
+            {
+              "step": 806,
+              "value": 0.27
+            },
+            {
+              "step": 807,
+              "value": 0.259
+            },
+            {
+              "step": 808,
+              "value": 0.248
+            },
+            {
+              "step": 809,
+              "value": 0.237
+            },
+            {
+              "step": 810,
+              "value": 0.227
+            },
+            {
+              "step": 811,
+              "value": 0.216
+            },
+            {
+              "step": 812,
+              "value": 0.205
+            },
+            {
+              "step": 813,
+              "value": 0.194
+            },
+            {
+              "step": 814,
+              "value": 0.183
+            },
+            {
+              "step": 815,
+              "value": 0.173
+            },
+            {
+              "step": 816,
+              "value": 0.162
+            },
+            {
+              "step": 817,
+              "value": 0.151
+            },
+            {
+              "step": 818,
+              "value": 0.14
+            },
+            {
+              "step": 819,
+              "value": 0.13
+            },
+            {
+              "step": 820,
+              "value": 0.119
+            },
+            {
+              "step": 821,
+              "value": 0.108
+            },
+            {
+              "step": 822,
+              "value": 0.097
+            },
+            {
+              "step": 823,
+              "value": 0.086
+            },
+            {
+              "step": 824,
+              "value": 0.076
+            },
+            {
+              "step": 825,
+              "value": 0.065
+            },
+            {
+              "step": 826,
+              "value": 0.054
+            },
+            {
+              "step": 827,
+              "value": 0.043
+            },
+            {
+              "step": 828,
+              "value": 0.032
+            },
+            {
+              "step": 829,
+              "value": 0.022
+            },
+            {
+              "step": 830,
+              "value": 0.011
+            },
+            {
+              "step": 831,
+              "value": 0.0
+            }
+          ]
+        }
+      ]
+    }
+  ],
   "patterns": [
     {
       "id": "rap",
@@ -1210,6 +1871,4619 @@
             [
               3,
               2
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lofi-hiphop-intro",
+      "name": "Lo-fi Hip-Hop Intro",
+      "beatCount": 16,
+      "bpm": 84,
+      "description": "The intro and outro of the Lo-fi Hip-Hop demo, 4 measures in C at 84 BPM, all synth sounds: lazy electric piano chords (Dm9, G13, Cmaj9, Am7), low-passed, saturated and gently wobbling, over vinyl dust.",
+      "tags": [
+        "hiphop",
+        "lofi",
+        "chords",
+        "piano",
+        "synth"
+      ],
+      "tracks": [
+        {
+          "name": "SHAKER",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "TR909_SHAKER",
+          "volume": 0.12,
+          "pan": 0.2,
+          "filterType": "highpass",
+          "filterCutoff": 4000,
+          "bitcrush": 0.5,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "probability"
+          ],
+          "notes": [
+            [
+              0.25,
+              0,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              0,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              0,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              0,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              1,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              1,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              1,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              1,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              2,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              2,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              2,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              2,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              3,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              3,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              3,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              3,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              4,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              4,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              4,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              4,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              5,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              5,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              5,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              5,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              6,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              6,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              6,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              6,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              7,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              7,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              7,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              7,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              8,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              8,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              8,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              8,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              9,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              9,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              9,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              9,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              10,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              10,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              10,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              10,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              11,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              11,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              11,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              11,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              12,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              12,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              12,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              12,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              13,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              13,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              13,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              13,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              14,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              14,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              14,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              14,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              15,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              15,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              15,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              15,
+              3,
+              0.3
+            ]
+          ]
+        },
+        {
+          "name": "PIANO",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "PIANO_EPIANO",
+          "volume": 0.45,
+          "pan": -0.15,
+          "swingAmount": 0.3,
+          "filterType": "lowpass",
+          "filterCutoff": 2200,
+          "saturationType": "tape",
+          "saturationMix": 0.3,
+          "volumeLfo": {
+            "freq": 0.5,
+            "min": 0.8,
+            "max": 1,
+            "phase": 0,
+            "type": "sine"
+          },
+          "reverbType": "room",
+          "reverbMix": 0.3,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "pitch",
+            "lengthSteps"
+          ],
+          "notes": [
+            [
+              0.65,
+              0,
+              0,
+              17,
+              8
+            ],
+            [
+              0.63,
+              0,
+              0,
+              21,
+              8
+            ],
+            [
+              0.61,
+              0,
+              0,
+              24,
+              8
+            ],
+            [
+              0.59,
+              0,
+              0,
+              28,
+              8
+            ],
+            [
+              0.65,
+              2,
+              3,
+              17,
+              5
+            ],
+            [
+              0.63,
+              2,
+              3,
+              21,
+              5
+            ],
+            [
+              0.61,
+              2,
+              3,
+              24,
+              5
+            ],
+            [
+              0.59,
+              2,
+              3,
+              28,
+              5
+            ],
+            [
+              0.65,
+              4,
+              0,
+              17,
+              8
+            ],
+            [
+              0.63,
+              4,
+              0,
+              23,
+              8
+            ],
+            [
+              0.61,
+              4,
+              0,
+              28,
+              8
+            ],
+            [
+              0.65,
+              6,
+              3,
+              17,
+              5
+            ],
+            [
+              0.63,
+              6,
+              3,
+              23,
+              5
+            ],
+            [
+              0.61,
+              6,
+              3,
+              28,
+              5
+            ],
+            [
+              0.65,
+              8,
+              0,
+              16,
+              8
+            ],
+            [
+              0.63,
+              8,
+              0,
+              19,
+              8
+            ],
+            [
+              0.61,
+              8,
+              0,
+              23,
+              8
+            ],
+            [
+              0.59,
+              8,
+              0,
+              26,
+              8
+            ],
+            [
+              0.65,
+              10,
+              3,
+              16,
+              5
+            ],
+            [
+              0.63,
+              10,
+              3,
+              19,
+              5
+            ],
+            [
+              0.61,
+              10,
+              3,
+              23,
+              5
+            ],
+            [
+              0.59,
+              10,
+              3,
+              26,
+              5
+            ],
+            [
+              0.65,
+              12,
+              0,
+              19,
+              8
+            ],
+            [
+              0.63,
+              12,
+              0,
+              24,
+              8
+            ],
+            [
+              0.61,
+              12,
+              0,
+              28,
+              8
+            ],
+            [
+              0.65,
+              14,
+              3,
+              19,
+              5
+            ],
+            [
+              0.63,
+              14,
+              3,
+              24,
+              5
+            ],
+            [
+              0.61,
+              14,
+              3,
+              28,
+              5
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lofi-hiphop-verse",
+      "name": "Lo-fi Hip-Hop Verse",
+      "beatCount": 16,
+      "bpm": 84,
+      "description": "The verse of the Lo-fi Hip-Hop demo, 4 measures in C at 84 BPM, swung: a dusty boom bap kick and snare with ghost notes, crushed hats, a round sub bass on the roots and the lazy piano chords.",
+      "tags": [
+        "hiphop",
+        "lofi",
+        "chords",
+        "piano",
+        "synth"
+      ],
+      "tracks": [
+        {
+          "name": "KICK",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "SR601_KICK",
+          "volume": 0.6,
+          "swingAmount": 0.3,
+          "compMix": 0.4,
+          "saturationType": "tape",
+          "saturationMix": 0.3,
+          "bitcrush": 0.25,
+          "filterType": "lowpass",
+          "filterCutoff": 6000,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              1.0,
+              0,
+              0
+            ],
+            [
+              0.7,
+              1,
+              3
+            ],
+            [
+              0.85,
+              2,
+              2
+            ],
+            [
+              1.0,
+              4,
+              0
+            ],
+            [
+              0.7,
+              5,
+              3
+            ],
+            [
+              0.85,
+              6,
+              2
+            ],
+            [
+              1.0,
+              8,
+              0
+            ],
+            [
+              0.7,
+              9,
+              3
+            ],
+            [
+              0.85,
+              10,
+              2
+            ],
+            [
+              1.0,
+              12,
+              0
+            ],
+            [
+              0.6,
+              12,
+              2
+            ],
+            [
+              0.7,
+              13,
+              3
+            ],
+            [
+              0.85,
+              14,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "SNARE",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "SR601_SNARE",
+          "volume": 0.5,
+          "pan": 0.1,
+          "swingAmount": 0.3,
+          "reverbType": "room",
+          "reverbMix": 0.25,
+          "bitcrush": 0.25,
+          "filterType": "lowpass",
+          "filterCutoff": 6000,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.9,
+              1,
+              0
+            ],
+            [
+              0.9,
+              3,
+              0
+            ],
+            [
+              0.9,
+              5,
+              0
+            ],
+            [
+              0.9,
+              7,
+              0
+            ],
+            [
+              0.25,
+              7,
+              3
+            ],
+            [
+              0.9,
+              9,
+              0
+            ],
+            [
+              0.9,
+              11,
+              0
+            ],
+            [
+              0.9,
+              13,
+              0
+            ],
+            [
+              0.9,
+              15,
+              0
+            ],
+            [
+              0.25,
+              15,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "CHH",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "SR601_CHH",
+          "volume": 0.3,
+          "pan": -0.3,
+          "swingAmount": 0.3,
+          "bitcrush": 0.25,
+          "filterType": "lowpass",
+          "filterCutoff": 6000,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "probability"
+          ],
+          "notes": [
+            [
+              0.55,
+              0,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              0,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              0,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              1,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              1,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              1,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              2,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              2,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              2,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              3,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              3,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              3,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              4,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              4,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              4,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              5,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              5,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              5,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              6,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              6,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              6,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              7,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              7,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              7,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              8,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              8,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              8,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              9,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              9,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              9,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              10,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              10,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              10,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              11,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              11,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              11,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              12,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              12,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              12,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              13,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              13,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              13,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              14,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              14,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              14,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              15,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              15,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              15,
+              3,
+              0.5
+            ]
+          ]
+        },
+        {
+          "name": "SHAKER",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "TR909_SHAKER",
+          "volume": 0.12,
+          "pan": 0.2,
+          "filterType": "highpass",
+          "filterCutoff": 4000,
+          "bitcrush": 0.5,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "probability"
+          ],
+          "notes": [
+            [
+              0.25,
+              0,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              0,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              0,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              0,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              1,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              1,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              1,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              1,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              2,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              2,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              2,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              2,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              3,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              3,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              3,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              3,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              4,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              4,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              4,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              4,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              5,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              5,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              5,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              5,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              6,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              6,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              6,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              6,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              7,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              7,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              7,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              7,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              8,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              8,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              8,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              8,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              9,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              9,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              9,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              9,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              10,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              10,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              10,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              10,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              11,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              11,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              11,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              11,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              12,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              12,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              12,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              12,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              13,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              13,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              13,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              13,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              14,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              14,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              14,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              14,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              15,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              15,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              15,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              15,
+              3,
+              0.3
+            ]
+          ]
+        },
+        {
+          "name": "BASS",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "BASS_SUB",
+          "volume": 0.5,
+          "mono": true,
+          "swingAmount": 0.3,
+          "filterType": "lowpass",
+          "filterCutoff": 500,
+          "saturationType": "tape",
+          "saturationMix": 0.2,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "pitch",
+            "lengthSteps"
+          ],
+          "notes": [
+            [
+              0.9,
+              0,
+              0,
+              -10,
+              6
+            ],
+            [
+              0.75,
+              2,
+              2,
+              -10,
+              2
+            ],
+            [
+              0.7,
+              3,
+              2,
+              -3,
+              2
+            ],
+            [
+              0.9,
+              4,
+              0,
+              -5,
+              6
+            ],
+            [
+              0.75,
+              6,
+              2,
+              -5,
+              2
+            ],
+            [
+              0.7,
+              7,
+              2,
+              2,
+              2
+            ],
+            [
+              0.9,
+              8,
+              0,
+              -12,
+              6
+            ],
+            [
+              0.75,
+              10,
+              2,
+              -12,
+              2
+            ],
+            [
+              0.7,
+              11,
+              2,
+              -5,
+              2
+            ],
+            [
+              0.9,
+              12,
+              0,
+              -15,
+              6
+            ],
+            [
+              0.75,
+              14,
+              2,
+              -15,
+              2
+            ],
+            [
+              0.7,
+              15,
+              2,
+              -8,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "PIANO",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "PIANO_EPIANO",
+          "volume": 0.45,
+          "pan": -0.15,
+          "swingAmount": 0.3,
+          "filterType": "lowpass",
+          "filterCutoff": 2200,
+          "saturationType": "tape",
+          "saturationMix": 0.3,
+          "volumeLfo": {
+            "freq": 0.5,
+            "min": 0.8,
+            "max": 1,
+            "phase": 0,
+            "type": "sine"
+          },
+          "reverbType": "room",
+          "reverbMix": 0.3,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "pitch",
+            "lengthSteps"
+          ],
+          "notes": [
+            [
+              0.65,
+              0,
+              0,
+              17,
+              8
+            ],
+            [
+              0.63,
+              0,
+              0,
+              21,
+              8
+            ],
+            [
+              0.61,
+              0,
+              0,
+              24,
+              8
+            ],
+            [
+              0.59,
+              0,
+              0,
+              28,
+              8
+            ],
+            [
+              0.65,
+              2,
+              3,
+              17,
+              5
+            ],
+            [
+              0.63,
+              2,
+              3,
+              21,
+              5
+            ],
+            [
+              0.61,
+              2,
+              3,
+              24,
+              5
+            ],
+            [
+              0.59,
+              2,
+              3,
+              28,
+              5
+            ],
+            [
+              0.65,
+              4,
+              0,
+              17,
+              8
+            ],
+            [
+              0.63,
+              4,
+              0,
+              23,
+              8
+            ],
+            [
+              0.61,
+              4,
+              0,
+              28,
+              8
+            ],
+            [
+              0.65,
+              6,
+              3,
+              17,
+              5
+            ],
+            [
+              0.63,
+              6,
+              3,
+              23,
+              5
+            ],
+            [
+              0.61,
+              6,
+              3,
+              28,
+              5
+            ],
+            [
+              0.65,
+              8,
+              0,
+              16,
+              8
+            ],
+            [
+              0.63,
+              8,
+              0,
+              19,
+              8
+            ],
+            [
+              0.61,
+              8,
+              0,
+              23,
+              8
+            ],
+            [
+              0.59,
+              8,
+              0,
+              26,
+              8
+            ],
+            [
+              0.65,
+              10,
+              3,
+              16,
+              5
+            ],
+            [
+              0.63,
+              10,
+              3,
+              19,
+              5
+            ],
+            [
+              0.61,
+              10,
+              3,
+              23,
+              5
+            ],
+            [
+              0.59,
+              10,
+              3,
+              26,
+              5
+            ],
+            [
+              0.65,
+              12,
+              0,
+              19,
+              8
+            ],
+            [
+              0.63,
+              12,
+              0,
+              24,
+              8
+            ],
+            [
+              0.61,
+              12,
+              0,
+              28,
+              8
+            ],
+            [
+              0.65,
+              14,
+              3,
+              19,
+              5
+            ],
+            [
+              0.63,
+              14,
+              3,
+              24,
+              5
+            ],
+            [
+              0.61,
+              14,
+              3,
+              28,
+              5
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lofi-hiphop-hook",
+      "name": "Lo-fi Hip-Hop Hook",
+      "beatCount": 16,
+      "bpm": 84,
+      "description": "The hook of the Lo-fi Hip-Hop demo, 4 measures in C at 84 BPM: the verse with a pentatonic bell line in tape echo and a warm pad under the chords.",
+      "tags": [
+        "hiphop",
+        "lofi",
+        "chords",
+        "piano",
+        "synth"
+      ],
+      "tracks": [
+        {
+          "name": "KICK",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "SR601_KICK",
+          "volume": 0.6,
+          "swingAmount": 0.3,
+          "compMix": 0.4,
+          "saturationType": "tape",
+          "saturationMix": 0.3,
+          "bitcrush": 0.25,
+          "filterType": "lowpass",
+          "filterCutoff": 6000,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              1.0,
+              0,
+              0
+            ],
+            [
+              0.7,
+              1,
+              3
+            ],
+            [
+              0.85,
+              2,
+              2
+            ],
+            [
+              1.0,
+              4,
+              0
+            ],
+            [
+              0.7,
+              5,
+              3
+            ],
+            [
+              0.85,
+              6,
+              2
+            ],
+            [
+              1.0,
+              8,
+              0
+            ],
+            [
+              0.7,
+              9,
+              3
+            ],
+            [
+              0.85,
+              10,
+              2
+            ],
+            [
+              1.0,
+              12,
+              0
+            ],
+            [
+              0.6,
+              12,
+              2
+            ],
+            [
+              0.7,
+              13,
+              3
+            ],
+            [
+              0.85,
+              14,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "SNARE",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "SR601_SNARE",
+          "volume": 0.5,
+          "pan": 0.1,
+          "swingAmount": 0.3,
+          "reverbType": "room",
+          "reverbMix": 0.25,
+          "bitcrush": 0.25,
+          "filterType": "lowpass",
+          "filterCutoff": 6000,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.9,
+              1,
+              0
+            ],
+            [
+              0.9,
+              3,
+              0
+            ],
+            [
+              0.9,
+              5,
+              0
+            ],
+            [
+              0.9,
+              7,
+              0
+            ],
+            [
+              0.25,
+              7,
+              3
+            ],
+            [
+              0.9,
+              9,
+              0
+            ],
+            [
+              0.9,
+              11,
+              0
+            ],
+            [
+              0.9,
+              13,
+              0
+            ],
+            [
+              0.9,
+              15,
+              0
+            ],
+            [
+              0.25,
+              15,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "CHH",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "SR601_CHH",
+          "volume": 0.3,
+          "pan": -0.3,
+          "swingAmount": 0.3,
+          "bitcrush": 0.25,
+          "filterType": "lowpass",
+          "filterCutoff": 6000,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "probability"
+          ],
+          "notes": [
+            [
+              0.55,
+              0,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              0,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              0,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              1,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              1,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              1,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              2,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              2,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              2,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              3,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              3,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              3,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              4,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              4,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              4,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              5,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              5,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              5,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              6,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              6,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              6,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              7,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              7,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              7,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              8,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              8,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              8,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              9,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              9,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              9,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              10,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              10,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              10,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              11,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              11,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              11,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              12,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              12,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              12,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              13,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              13,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              13,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              14,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              14,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              14,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              15,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              15,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              15,
+              3,
+              0.5
+            ]
+          ]
+        },
+        {
+          "name": "SHAKER",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "TR909_SHAKER",
+          "volume": 0.12,
+          "pan": 0.2,
+          "filterType": "highpass",
+          "filterCutoff": 4000,
+          "bitcrush": 0.5,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "probability"
+          ],
+          "notes": [
+            [
+              0.25,
+              0,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              0,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              0,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              0,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              1,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              1,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              1,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              1,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              2,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              2,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              2,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              2,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              3,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              3,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              3,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              3,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              4,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              4,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              4,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              4,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              5,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              5,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              5,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              5,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              6,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              6,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              6,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              6,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              7,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              7,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              7,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              7,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              8,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              8,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              8,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              8,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              9,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              9,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              9,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              9,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              10,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              10,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              10,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              10,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              11,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              11,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              11,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              11,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              12,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              12,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              12,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              12,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              13,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              13,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              13,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              13,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              14,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              14,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              14,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              14,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              15,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              15,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              15,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              15,
+              3,
+              0.3
+            ]
+          ]
+        },
+        {
+          "name": "BASS",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "BASS_SUB",
+          "volume": 0.5,
+          "mono": true,
+          "swingAmount": 0.3,
+          "filterType": "lowpass",
+          "filterCutoff": 500,
+          "saturationType": "tape",
+          "saturationMix": 0.2,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "pitch",
+            "lengthSteps"
+          ],
+          "notes": [
+            [
+              0.9,
+              0,
+              0,
+              -10,
+              6
+            ],
+            [
+              0.75,
+              2,
+              2,
+              -10,
+              2
+            ],
+            [
+              0.7,
+              3,
+              2,
+              -3,
+              2
+            ],
+            [
+              0.9,
+              4,
+              0,
+              -5,
+              6
+            ],
+            [
+              0.75,
+              6,
+              2,
+              -5,
+              2
+            ],
+            [
+              0.7,
+              7,
+              2,
+              2,
+              2
+            ],
+            [
+              0.9,
+              8,
+              0,
+              -12,
+              6
+            ],
+            [
+              0.75,
+              10,
+              2,
+              -12,
+              2
+            ],
+            [
+              0.7,
+              11,
+              2,
+              -5,
+              2
+            ],
+            [
+              0.9,
+              12,
+              0,
+              -15,
+              6
+            ],
+            [
+              0.75,
+              14,
+              2,
+              -15,
+              2
+            ],
+            [
+              0.7,
+              15,
+              2,
+              -8,
+              2
+            ]
+          ]
+        },
+        {
+          "name": "PIANO",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "PIANO_EPIANO",
+          "volume": 0.45,
+          "pan": -0.15,
+          "swingAmount": 0.3,
+          "filterType": "lowpass",
+          "filterCutoff": 2200,
+          "saturationType": "tape",
+          "saturationMix": 0.3,
+          "volumeLfo": {
+            "freq": 0.5,
+            "min": 0.8,
+            "max": 1,
+            "phase": 0,
+            "type": "sine"
+          },
+          "reverbType": "room",
+          "reverbMix": 0.3,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "pitch",
+            "lengthSteps"
+          ],
+          "notes": [
+            [
+              0.65,
+              0,
+              0,
+              17,
+              8
+            ],
+            [
+              0.63,
+              0,
+              0,
+              21,
+              8
+            ],
+            [
+              0.61,
+              0,
+              0,
+              24,
+              8
+            ],
+            [
+              0.59,
+              0,
+              0,
+              28,
+              8
+            ],
+            [
+              0.65,
+              2,
+              3,
+              17,
+              5
+            ],
+            [
+              0.63,
+              2,
+              3,
+              21,
+              5
+            ],
+            [
+              0.61,
+              2,
+              3,
+              24,
+              5
+            ],
+            [
+              0.59,
+              2,
+              3,
+              28,
+              5
+            ],
+            [
+              0.65,
+              4,
+              0,
+              17,
+              8
+            ],
+            [
+              0.63,
+              4,
+              0,
+              23,
+              8
+            ],
+            [
+              0.61,
+              4,
+              0,
+              28,
+              8
+            ],
+            [
+              0.65,
+              6,
+              3,
+              17,
+              5
+            ],
+            [
+              0.63,
+              6,
+              3,
+              23,
+              5
+            ],
+            [
+              0.61,
+              6,
+              3,
+              28,
+              5
+            ],
+            [
+              0.65,
+              8,
+              0,
+              16,
+              8
+            ],
+            [
+              0.63,
+              8,
+              0,
+              19,
+              8
+            ],
+            [
+              0.61,
+              8,
+              0,
+              23,
+              8
+            ],
+            [
+              0.59,
+              8,
+              0,
+              26,
+              8
+            ],
+            [
+              0.65,
+              10,
+              3,
+              16,
+              5
+            ],
+            [
+              0.63,
+              10,
+              3,
+              19,
+              5
+            ],
+            [
+              0.61,
+              10,
+              3,
+              23,
+              5
+            ],
+            [
+              0.59,
+              10,
+              3,
+              26,
+              5
+            ],
+            [
+              0.65,
+              12,
+              0,
+              19,
+              8
+            ],
+            [
+              0.63,
+              12,
+              0,
+              24,
+              8
+            ],
+            [
+              0.61,
+              12,
+              0,
+              28,
+              8
+            ],
+            [
+              0.65,
+              14,
+              3,
+              19,
+              5
+            ],
+            [
+              0.63,
+              14,
+              3,
+              24,
+              5
+            ],
+            [
+              0.61,
+              14,
+              3,
+              28,
+              5
+            ]
+          ]
+        },
+        {
+          "name": "CROMAPERC",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "CROMAPERC_BELL",
+          "volume": 0.28,
+          "pan": 0.3,
+          "swingAmount": 0.3,
+          "filterType": "lowpass",
+          "filterCutoff": 3500,
+          "delayType": "tape",
+          "delayBeats": 0.75,
+          "delayMix": 0.3,
+          "delayFeedback": 0.4,
+          "reverbType": "hall",
+          "reverbMix": 0.3,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "pitch",
+            "lengthSteps"
+          ],
+          "notes": [
+            [
+              0.55,
+              0,
+              2,
+              33,
+              3
+            ],
+            [
+              0.55,
+              1,
+              0,
+              31,
+              3
+            ],
+            [
+              0.55,
+              1,
+              2,
+              28,
+              3
+            ],
+            [
+              0.55,
+              2,
+              2,
+              26,
+              3
+            ],
+            [
+              0.55,
+              4,
+              2,
+              31,
+              3
+            ],
+            [
+              0.55,
+              5,
+              2,
+              28,
+              3
+            ],
+            [
+              0.55,
+              6,
+              0,
+              26,
+              3
+            ],
+            [
+              0.55,
+              8,
+              2,
+              28,
+              3
+            ],
+            [
+              0.55,
+              9,
+              0,
+              31,
+              3
+            ],
+            [
+              0.55,
+              9,
+              2,
+              33,
+              3
+            ],
+            [
+              0.55,
+              10,
+              2,
+              35,
+              3
+            ],
+            [
+              0.55,
+              12,
+              2,
+              33,
+              3
+            ],
+            [
+              0.55,
+              13,
+              2,
+              31,
+              3
+            ],
+            [
+              0.55,
+              14,
+              0,
+              28,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "SYNTHPAD",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "SYNTHPAD_WARM",
+          "volume": 0.22,
+          "pan": 0.2,
+          "filterType": "lowpass",
+          "filterCutoff": 1500,
+          "reverbType": "hall",
+          "reverbMix": 0.5,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "pitch",
+            "lengthSteps"
+          ],
+          "notes": [
+            [
+              0.55,
+              0,
+              0,
+              17,
+              16
+            ],
+            [
+              0.53,
+              0,
+              0,
+              21,
+              16
+            ],
+            [
+              0.51,
+              0,
+              0,
+              24,
+              16
+            ],
+            [
+              0.49,
+              0,
+              0,
+              28,
+              16
+            ],
+            [
+              0.55,
+              4,
+              0,
+              17,
+              16
+            ],
+            [
+              0.53,
+              4,
+              0,
+              23,
+              16
+            ],
+            [
+              0.51,
+              4,
+              0,
+              28,
+              16
+            ],
+            [
+              0.55,
+              8,
+              0,
+              16,
+              16
+            ],
+            [
+              0.53,
+              8,
+              0,
+              19,
+              16
+            ],
+            [
+              0.51,
+              8,
+              0,
+              23,
+              16
+            ],
+            [
+              0.49,
+              8,
+              0,
+              26,
+              16
+            ],
+            [
+              0.55,
+              12,
+              0,
+              19,
+              16
+            ],
+            [
+              0.53,
+              12,
+              0,
+              24,
+              16
+            ],
+            [
+              0.51,
+              12,
+              0,
+              28,
+              16
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lofi-hiphop-bridge",
+      "name": "Lo-fi Hip-Hop Bridge",
+      "beatCount": 16,
+      "bpm": 84,
+      "description": "The bridge of the Lo-fi Hip-Hop demo, 4 measures in C: no kick, the snare and the hats alone with the pad, the piano and the bell.",
+      "tags": [
+        "hiphop",
+        "lofi",
+        "chords",
+        "piano",
+        "synth"
+      ],
+      "tracks": [
+        {
+          "name": "SNARE",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "SR601_SNARE",
+          "volume": 0.5,
+          "pan": 0.1,
+          "swingAmount": 0.3,
+          "reverbType": "room",
+          "reverbMix": 0.25,
+          "bitcrush": 0.25,
+          "filterType": "lowpass",
+          "filterCutoff": 6000,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step"
+          ],
+          "notes": [
+            [
+              0.9,
+              1,
+              0
+            ],
+            [
+              0.9,
+              3,
+              0
+            ],
+            [
+              0.9,
+              5,
+              0
+            ],
+            [
+              0.9,
+              7,
+              0
+            ],
+            [
+              0.25,
+              7,
+              3
+            ],
+            [
+              0.9,
+              9,
+              0
+            ],
+            [
+              0.9,
+              11,
+              0
+            ],
+            [
+              0.9,
+              13,
+              0
+            ],
+            [
+              0.9,
+              15,
+              0
+            ],
+            [
+              0.25,
+              15,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "CHH",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "SR601_CHH",
+          "volume": 0.3,
+          "pan": -0.3,
+          "swingAmount": 0.3,
+          "bitcrush": 0.25,
+          "filterType": "lowpass",
+          "filterCutoff": 6000,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "probability"
+          ],
+          "notes": [
+            [
+              0.55,
+              0,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              0,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              0,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              1,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              1,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              1,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              2,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              2,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              2,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              3,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              3,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              3,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              4,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              4,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              4,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              5,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              5,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              5,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              6,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              6,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              6,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              7,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              7,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              7,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              8,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              8,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              8,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              9,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              9,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              9,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              10,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              10,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              10,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              11,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              11,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              11,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              12,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              12,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              12,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              13,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              13,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              13,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              14,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              14,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              14,
+              3,
+              0.5
+            ],
+            [
+              0.55,
+              15,
+              0,
+              1.0
+            ],
+            [
+              0.4,
+              15,
+              2,
+              1.0
+            ],
+            [
+              0.2,
+              15,
+              3,
+              0.5
+            ]
+          ]
+        },
+        {
+          "name": "SHAKER",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "TR909_SHAKER",
+          "volume": 0.12,
+          "pan": 0.2,
+          "filterType": "highpass",
+          "filterCutoff": 4000,
+          "bitcrush": 0.5,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "probability"
+          ],
+          "notes": [
+            [
+              0.25,
+              0,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              0,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              0,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              0,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              1,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              1,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              1,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              1,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              2,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              2,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              2,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              2,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              3,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              3,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              3,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              3,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              4,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              4,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              4,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              4,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              5,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              5,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              5,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              5,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              6,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              6,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              6,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              6,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              7,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              7,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              7,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              7,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              8,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              8,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              8,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              8,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              9,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              9,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              9,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              9,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              10,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              10,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              10,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              10,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              11,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              11,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              11,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              11,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              12,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              12,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              12,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              12,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              13,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              13,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              13,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              13,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              14,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              14,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              14,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              14,
+              3,
+              0.3
+            ],
+            [
+              0.25,
+              15,
+              0,
+              0.3
+            ],
+            [
+              0.25,
+              15,
+              1,
+              0.3
+            ],
+            [
+              0.25,
+              15,
+              2,
+              0.3
+            ],
+            [
+              0.25,
+              15,
+              3,
+              0.3
+            ]
+          ]
+        },
+        {
+          "name": "PIANO",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "PIANO_EPIANO",
+          "volume": 0.4,
+          "pan": -0.15,
+          "swingAmount": 0.3,
+          "filterType": "lowpass",
+          "filterCutoff": 2200,
+          "saturationType": "tape",
+          "saturationMix": 0.3,
+          "volumeLfo": {
+            "freq": 0.5,
+            "min": 0.8,
+            "max": 1,
+            "phase": 0,
+            "type": "sine"
+          },
+          "reverbType": "room",
+          "reverbMix": 0.3,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "pitch",
+            "lengthSteps"
+          ],
+          "notes": [
+            [
+              0.65,
+              0,
+              0,
+              17,
+              8
+            ],
+            [
+              0.63,
+              0,
+              0,
+              21,
+              8
+            ],
+            [
+              0.61,
+              0,
+              0,
+              24,
+              8
+            ],
+            [
+              0.59,
+              0,
+              0,
+              28,
+              8
+            ],
+            [
+              0.65,
+              2,
+              3,
+              17,
+              5
+            ],
+            [
+              0.63,
+              2,
+              3,
+              21,
+              5
+            ],
+            [
+              0.61,
+              2,
+              3,
+              24,
+              5
+            ],
+            [
+              0.59,
+              2,
+              3,
+              28,
+              5
+            ],
+            [
+              0.65,
+              4,
+              0,
+              17,
+              8
+            ],
+            [
+              0.63,
+              4,
+              0,
+              23,
+              8
+            ],
+            [
+              0.61,
+              4,
+              0,
+              28,
+              8
+            ],
+            [
+              0.65,
+              6,
+              3,
+              17,
+              5
+            ],
+            [
+              0.63,
+              6,
+              3,
+              23,
+              5
+            ],
+            [
+              0.61,
+              6,
+              3,
+              28,
+              5
+            ],
+            [
+              0.65,
+              8,
+              0,
+              16,
+              8
+            ],
+            [
+              0.63,
+              8,
+              0,
+              19,
+              8
+            ],
+            [
+              0.61,
+              8,
+              0,
+              23,
+              8
+            ],
+            [
+              0.59,
+              8,
+              0,
+              26,
+              8
+            ],
+            [
+              0.65,
+              10,
+              3,
+              16,
+              5
+            ],
+            [
+              0.63,
+              10,
+              3,
+              19,
+              5
+            ],
+            [
+              0.61,
+              10,
+              3,
+              23,
+              5
+            ],
+            [
+              0.59,
+              10,
+              3,
+              26,
+              5
+            ],
+            [
+              0.65,
+              12,
+              0,
+              19,
+              8
+            ],
+            [
+              0.63,
+              12,
+              0,
+              24,
+              8
+            ],
+            [
+              0.61,
+              12,
+              0,
+              28,
+              8
+            ],
+            [
+              0.65,
+              14,
+              3,
+              19,
+              5
+            ],
+            [
+              0.63,
+              14,
+              3,
+              24,
+              5
+            ],
+            [
+              0.61,
+              14,
+              3,
+              28,
+              5
+            ]
+          ]
+        },
+        {
+          "name": "CROMAPERC",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "CROMAPERC_BELL",
+          "volume": 0.28,
+          "pan": 0.3,
+          "swingAmount": 0.3,
+          "filterType": "lowpass",
+          "filterCutoff": 3500,
+          "delayType": "tape",
+          "delayBeats": 0.75,
+          "delayMix": 0.3,
+          "delayFeedback": 0.4,
+          "reverbType": "hall",
+          "reverbMix": 0.3,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "pitch",
+            "lengthSteps"
+          ],
+          "notes": [
+            [
+              0.55,
+              0,
+              2,
+              33,
+              3
+            ],
+            [
+              0.55,
+              1,
+              0,
+              31,
+              3
+            ],
+            [
+              0.55,
+              1,
+              2,
+              28,
+              3
+            ],
+            [
+              0.55,
+              2,
+              2,
+              26,
+              3
+            ],
+            [
+              0.55,
+              4,
+              2,
+              31,
+              3
+            ],
+            [
+              0.55,
+              5,
+              2,
+              28,
+              3
+            ],
+            [
+              0.55,
+              6,
+              0,
+              26,
+              3
+            ],
+            [
+              0.55,
+              8,
+              2,
+              28,
+              3
+            ],
+            [
+              0.55,
+              9,
+              0,
+              31,
+              3
+            ],
+            [
+              0.55,
+              9,
+              2,
+              33,
+              3
+            ],
+            [
+              0.55,
+              10,
+              2,
+              35,
+              3
+            ],
+            [
+              0.55,
+              12,
+              2,
+              33,
+              3
+            ],
+            [
+              0.55,
+              13,
+              2,
+              31,
+              3
+            ],
+            [
+              0.55,
+              14,
+              0,
+              28,
+              3
+            ]
+          ]
+        },
+        {
+          "name": "SYNTHPAD",
+          "beatCount": 16,
+          "loopLength": 64,
+          "useSynth": true,
+          "synthPreset": "SYNTHPAD_WARM",
+          "volume": 0.22,
+          "pan": 0.2,
+          "filterType": "lowpass",
+          "filterCutoff": 1500,
+          "reverbType": "hall",
+          "reverbMix": 0.5,
+          "noteKeys": [
+            "velocity",
+            "beat",
+            "step",
+            "pitch",
+            "lengthSteps"
+          ],
+          "notes": [
+            [
+              0.55,
+              0,
+              0,
+              17,
+              16
+            ],
+            [
+              0.53,
+              0,
+              0,
+              21,
+              16
+            ],
+            [
+              0.51,
+              0,
+              0,
+              24,
+              16
+            ],
+            [
+              0.49,
+              0,
+              0,
+              28,
+              16
+            ],
+            [
+              0.55,
+              4,
+              0,
+              17,
+              16
+            ],
+            [
+              0.53,
+              4,
+              0,
+              23,
+              16
+            ],
+            [
+              0.51,
+              4,
+              0,
+              28,
+              16
+            ],
+            [
+              0.55,
+              8,
+              0,
+              16,
+              16
+            ],
+            [
+              0.53,
+              8,
+              0,
+              19,
+              16
+            ],
+            [
+              0.51,
+              8,
+              0,
+              23,
+              16
+            ],
+            [
+              0.49,
+              8,
+              0,
+              26,
+              16
+            ],
+            [
+              0.55,
+              12,
+              0,
+              19,
+              16
+            ],
+            [
+              0.53,
+              12,
+              0,
+              24,
+              16
+            ],
+            [
+              0.51,
+              12,
+              0,
+              28,
+              16
             ]
           ]
         }

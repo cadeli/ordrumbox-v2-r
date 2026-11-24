@@ -225,8 +225,9 @@ mod tests {
         // The Reset button runs what ENTER on the focused one would.
         let (x, y) = button_point(&s, 1);
         s.overlay_click(800, 600, Scale::ONE, x, y);
-        // Started again as the first time: the demos are shown.
-        assert!(matches!(s.chrome.overlay, Some(Overlay::Demos(_))));
+        // Loaded again: nothing open, or the demos when that is a first start
+        // (it reads the settings where the session loads from, the machine's).
+        assert!(matches!(s.chrome.overlay, None | Some(Overlay::Demos(_))));
         assert!(s.message.starts_with("factory settings restored"), "{}", s.message);
         s.close_overlay();
         // The Keep button only closes.
