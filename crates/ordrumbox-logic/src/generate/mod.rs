@@ -9,6 +9,7 @@
 //! with the same stream, the same notes (`tests/generators.rs`).
 
 mod auto;
+mod auto_mode;
 mod melodic;
 mod structure;
 
@@ -19,9 +20,11 @@ use ordrumbox_core::num::{clamp, round2};
 use ordrumbox_core::{Note, Scales, Track};
 
 pub use auto::{
-    AutoGenerator, BASS_PRESET, GENRE, Harmony, MelodicKind, Options, change_track, generate_pattern, generate_track,
-    instrument_line, is_auto_on, plays_auto, random_track, recompose, regenerate_track, restyle_pattern, run_loop,
-    toggle_auto, toggle_drums, toggle_melodic,
+    AutoGenerator, BASS_PRESET, GENRE, Harmony, Options, change_track, generate_pattern, generate_track,
+    instrument_line, plays_auto, recompose, restyle_pattern, run_loop,
+};
+pub use auto_mode::{
+    MelodicKind, is_auto_on, random_track, regenerate_track, toggle_auto, toggle_drums, toggle_melodic,
 };
 pub use structure::{SectionElement, Structure};
 

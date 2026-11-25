@@ -13,9 +13,9 @@
 //! struck while it sounds. The tempo track carries a signature, a text event.
 
 use ordrumbox_core::instruments::catalog;
-use ordrumbox_core::pattern_engine::expand_hits;
+use ordrumbox_core::pattern_engine::{Hit, expand_hits};
 use ordrumbox_core::steps::TICK;
-use ordrumbox_core::{Pattern, Rng, Scales, lfo};
+use ordrumbox_core::{Pattern, Rng, Scales, Track, lfo};
 
 use super::import::C3_MIDI_NOTE;
 use super::smf::encode_vlq;
@@ -166,6 +166,32 @@ fn instrument_track(name: &str, target: Target, mut events: Vec<NoteEvent>) -> V
     track_chunk(bytes)
 }
 
+/// The MIDI note `hit` of `track` plays at pattern tick `tick` (`midi_tick`
+/// in the file), keyed for `target`; `None` for a silent one, since a note-on
+/// at velocity 0 is a note-off.
+fn note_event(hit: &Hit, track: &Track, target: &Target, tick: u32, midi_tick: f64) -> Option<NoteEvent> {
+    let mut velocity = hit.velocity;
+    if let Some(l) = &track.volume_lfo {
+        velocity = ordrumbox_core::num::clamp(velocity * lfo::value(l, f64::from(tick)), 0.0, 1.0);
+    }
+    let mut pitch = hit.pitch + track.transpose;
+    if let Some(l) = &track.transpose_lfo {
+        pitch += lfo::value(l, f64::from(tick));
+    }
+    let key = ordrumbox_core::num::clamp(target.note + pitch, 0.0, 127.0);
+    let velocity = (velocity * 127.0).round();
+    if velocity.is_nan() || velocity < 1.0 {
+        return None;
+    }
+    let step_ticks = f64::from(PPQN) / f64::from(track.steps_per_beat.max(1));
+    Some(NoteEvent {
+        tick: midi_tick,
+        length_ticks: hit.length_steps * step_ticks,
+        key: data_byte(key),
+        velocity: data_byte(velocity),
+    })
+}
+
 /// `MidiExporter.export`: pattern `pattern` played `loops` times at `bpm`
 /// (the library's tempo). `roots`
 /// are the samples' root notes (key, MIDI note); `rng` and `scales` feed
@@ -203,27 +229,7 @@ pub fn export(
                 let Some((_, target, events)) = tracks.iter_mut().find(|(n, _, _)| *n == track.name) else {
                     continue;
                 };
-                let mut velocity = note.velocity;
-                if let Some(l) = &track.volume_lfo {
-                    velocity = ordrumbox_core::num::clamp(velocity * lfo::value(l, f64::from(tick)), 0.0, 1.0);
-                }
-                let mut pitch = note.pitch + track.transpose;
-                if let Some(l) = &track.transpose_lfo {
-                    pitch += lfo::value(l, f64::from(tick));
-                }
-                let key = ordrumbox_core::num::clamp(target.note + pitch, 0.0, 127.0);
-                let velocity = (velocity * 127.0).round();
-                // A note-on at velocity 0 is a note-off: a silent note is left out.
-                if velocity.is_nan() || velocity < 1.0 {
-                    continue;
-                }
-                let step_ticks = f64::from(PPQN) / f64::from(track.steps_per_beat.max(1));
-                events.push(NoteEvent {
-                    tick: midi_tick,
-                    length_ticks: note.length_steps * step_ticks,
-                    key: data_byte(key),
-                    velocity: data_byte(velocity),
-                });
+                events.extend(note_event(note, track, target, tick, midi_tick));
             }
         }
     }

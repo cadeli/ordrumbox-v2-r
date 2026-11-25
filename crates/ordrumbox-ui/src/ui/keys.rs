@@ -21,84 +21,91 @@ pub(super) fn shift_hint(code: Key) -> Option<&'static str> {
 
 /// The command a key runs, when the menus list it (`view::HELP`).
 pub(super) fn shortcut(code: Key, shift: bool, control: bool) -> Option<Command> {
+    if control { control_shortcut(code, shift) } else { plain_shortcut(code, shift) }
+}
+
+/// The command Ctrl (Cmd on macOS) plus a key runs.
+fn control_shortcut(code: Key, shift: bool) -> Option<Command> {
     use Command as C;
-    Some(if control {
-        match code {
-            Key::Letter('Z') if shift => C::Redo,
-            Key::Letter('Z') => C::Undo,
-            Key::Letter('Y') => C::Redo,
-            Key::Letter('C') if shift => C::CopyTrack,
-            Key::Letter('C') => C::CopyStep,
-            Key::Letter('X') => C::Cut,
-            Key::Letter('R') => C::Record,
-            Key::Comma => C::Preferences,
-            Key::Letter('A') => C::SelectAll,
-            Key::Letter('V') if shift => C::PasteTrack,
-            Key::Letter('V') => C::Paste,
-            Key::Letter('S') if shift => C::ExportPatternJson,
-            Key::Letter('S') => C::Save,
-            Key::Letter('O') => C::LoadProject,
-            Key::Letter('E') if shift => C::ExportSongWav,
-            Key::Letter('E') => C::ExportWav,
-            // Cmd+M is the Mac's "minimize the window": the export takes Shift there.
-            Key::Letter('M') if shift || !MACOS => C::ExportMidi,
-            Key::Letter('K') => C::KitEditor,
-            Key::Letter('L') => C::ToggleLoop,
-            Key::Letter('N') => C::NewPattern,
-            Key::Letter('D') => C::DuplicatePattern,
-            Key::Letter('T') if shift => C::ToggleToasts,
-            Key::Letter('T') => C::AddTrack,
-            Key::Backspace | Key::Delete => C::RemoveTrack,
-            Key::Letter('G') => C::NextGrid,
-            // The zoom of everywhere else, the keypad's keys included; the
-            // pattern length has no key (the menus and the song panel).
-            Key::Minus | Key::NumpadSubtract => C::ZoomOut,
-            Key::Equal | Key::NumpadAdd => C::ZoomIn,
-            Key::Digit(0) => C::ZoomReset,
-            // The views F1–F7 switch, on the keyboards whose F keys want Fn.
-            Key::Digit(n @ 1..=7) => view_command(n),
-            Key::Letter('B') if shift => C::NewGeneratedPattern,
-            Key::Letter('Q') | Key::Letter('W') => C::Quit,
-            _ => return None,
-        }
-    } else {
-        match code {
-            Key::F(1) => C::Shortcuts,
-            Key::F(2) => C::TrackEditor,
-            Key::F(3) => C::SongView,
-            Key::F(4) => C::PianoRoll,
-            Key::F(5) => C::Grid,
-            Key::F(6) => C::SynthEditor,
-            Key::F(7) => C::NoteEditor,
-            Key::F(8) => C::TapTempo,
-            Key::F(11) => C::Fullscreen,
-            Key::F(12) => C::Mixer,
-            Key::F(9) => C::Metronome,
-            Key::BracketLeft if shift => C::PreviousSong,
-            Key::BracketRight if shift => C::NextSong,
-            Key::BracketLeft | Key::PageUp => C::PreviousPattern,
-            Key::BracketRight | Key::PageDown => C::NextPattern,
-            Key::Comma => C::PreviousKit,
-            Key::Period => C::NextKit,
-            Key::Letter('B') if shift => C::GeneratePattern,
-            Key::Letter('F') => C::SelectRandomPattern,
-            // What changes every track wants Shift: a slip off the play keys (Q-P, 1-9) does nothing.
-            // No letter that some layout puts on the play keys (A and Z on AZERTY).
-            Key::Letter('G') if shift => C::SelectRandomDrumkit,
-            Key::Letter('V') if shift => C::ToggleVus,
-            Key::Letter('C') if shift => C::NextColorScheme,
-            Key::Letter('H') if shift => C::ConvertToSynth,
-            Key::Letter('J') if shift => C::AutoAssignAll,
-            Key::Letter('K') if shift => C::RandomSamples,
-            Key::Letter('D') if shift => C::GenerateDrums,
-            // Solo and mute of the track under the cursor, as every DAW spells them.
-            Key::Letter('S') if shift => C::GenerateBass,
-            Key::Letter('S') => C::Solo,
-            Key::Letter('M') => C::Mute,
-            Key::Letter('X') if shift => C::RandomTrack,
-            Key::Letter('L') => C::ToggleAccent,
-            _ => return None,
-        }
+    Some(match code {
+        Key::Letter('Z') if shift => C::Redo,
+        Key::Letter('Z') => C::Undo,
+        Key::Letter('Y') => C::Redo,
+        Key::Letter('C') if shift => C::CopyTrack,
+        Key::Letter('C') => C::CopyStep,
+        Key::Letter('X') => C::Cut,
+        Key::Letter('R') => C::Record,
+        Key::Comma => C::Preferences,
+        Key::Letter('A') => C::SelectAll,
+        Key::Letter('V') if shift => C::PasteTrack,
+        Key::Letter('V') => C::Paste,
+        Key::Letter('S') if shift => C::ExportPatternJson,
+        Key::Letter('S') => C::Save,
+        Key::Letter('O') => C::LoadProject,
+        Key::Letter('E') if shift => C::ExportSongWav,
+        Key::Letter('E') => C::ExportWav,
+        // Cmd+M is the Mac's "minimize the window": the export takes Shift there.
+        Key::Letter('M') if shift || !MACOS => C::ExportMidi,
+        Key::Letter('K') => C::KitEditor,
+        Key::Letter('L') => C::ToggleLoop,
+        Key::Letter('N') => C::NewPattern,
+        Key::Letter('D') => C::DuplicatePattern,
+        Key::Letter('T') if shift => C::ToggleToasts,
+        Key::Letter('T') => C::AddTrack,
+        Key::Backspace | Key::Delete => C::RemoveTrack,
+        Key::Letter('G') => C::NextGrid,
+        // The zoom of everywhere else, the keypad's keys included; the
+        // pattern length has no key (the menus and the song panel).
+        Key::Minus | Key::NumpadSubtract => C::ZoomOut,
+        Key::Equal | Key::NumpadAdd => C::ZoomIn,
+        Key::Digit(0) => C::ZoomReset,
+        // The views F1–F7 switch, on the keyboards whose F keys want Fn.
+        Key::Digit(n @ 1..=7) => view_command(n),
+        Key::Letter('B') if shift => C::NewGeneratedPattern,
+        Key::Letter('Q') | Key::Letter('W') => C::Quit,
+        _ => return None,
+    })
+}
+
+/// The command a key alone (or with Shift) runs.
+fn plain_shortcut(code: Key, shift: bool) -> Option<Command> {
+    use Command as C;
+    Some(match code {
+        Key::F(1) => C::Shortcuts,
+        Key::F(2) => C::TrackEditor,
+        Key::F(3) => C::SongView,
+        Key::F(4) => C::PianoRoll,
+        Key::F(5) => C::Grid,
+        Key::F(6) => C::SynthEditor,
+        Key::F(7) => C::NoteEditor,
+        Key::F(8) => C::TapTempo,
+        Key::F(11) => C::Fullscreen,
+        Key::F(12) => C::Mixer,
+        Key::F(9) => C::Metronome,
+        Key::BracketLeft if shift => C::PreviousSong,
+        Key::BracketRight if shift => C::NextSong,
+        Key::BracketLeft | Key::PageUp => C::PreviousPattern,
+        Key::BracketRight | Key::PageDown => C::NextPattern,
+        Key::Comma => C::PreviousKit,
+        Key::Period => C::NextKit,
+        Key::Letter('B') if shift => C::GeneratePattern,
+        Key::Letter('F') => C::SelectRandomPattern,
+        // What changes every track wants Shift: a slip off the play keys (Q-P, 1-9) does nothing.
+        // No letter that some layout puts on the play keys (A and Z on AZERTY).
+        Key::Letter('G') if shift => C::SelectRandomDrumkit,
+        Key::Letter('V') if shift => C::ToggleVus,
+        Key::Letter('C') if shift => C::NextColorScheme,
+        Key::Letter('H') if shift => C::ConvertToSynth,
+        Key::Letter('J') if shift => C::AutoAssignAll,
+        Key::Letter('K') if shift => C::RandomSamples,
+        Key::Letter('D') if shift => C::GenerateDrums,
+        // Solo and mute of the track under the cursor, as every DAW spells them.
+        Key::Letter('S') if shift => C::GenerateBass,
+        Key::Letter('S') => C::Solo,
+        Key::Letter('M') => C::Mute,
+        Key::Letter('X') if shift => C::RandomTrack,
+        Key::Letter('L') => C::ToggleAccent,
+        _ => return None,
     })
 }
 

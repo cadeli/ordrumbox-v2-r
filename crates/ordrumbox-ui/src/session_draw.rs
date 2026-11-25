@@ -6,6 +6,7 @@ use super::session_types::Workspace;
 use crate::action_log::LogLayout;
 use crate::canvas::Canvas;
 use crate::demo_browser::{self, DemoLayout};
+use crate::panel::Item;
 use crate::picker::PickerLayout;
 use crate::scale::Scale;
 use crate::view::View;
@@ -73,11 +74,7 @@ impl Session {
         }
         let history = self.editor.history();
         let library = self.editor.library();
-        let song_mode = match self.playback.mode() {
-            Some(Mode::Song(s)) => library.songs.get(s),
-            _ => None,
-        };
-        let song = song_text(library, song_mode, position, self.editor.selected_song());
+        let song = song_text(library, self.playing_song(library), position, self.editor.selected_song());
         // Smoothed per-track levels for the VU meter stripe (peak-hold + decay).
         let levels = self.chrome.smooth_levels(&self.playback.levels()).to_vec();
         let pattern = self.pattern();
@@ -106,17 +103,10 @@ impl Session {
             switches: self.shown_switches(),
             switches_taken_back: self.switches_taken_back(),
             hint: self.hint(),
-            hovered_track: match self.chrome.hover {
-                Some(crate::view::Hit::Name(t)) => Some(t),
-                _ => None,
-            },
+            hovered_track: self.hovered_track(),
             track_drop: self.track_drop((canvas.width(), canvas.height(), scale)),
             waiting,
-            playhead: played.map(|played| {
-                let total_beats = self.pattern().map_or(1, |pat| pat.beat_count.max(1));
-                let first = self.chrome.beat_window.first().clamp(0, total_beats - 1);
-                playhead_in_window(played, total_beats, first, shown_beats)
-            }),
+            playhead: played.map(|played| self.playhead(played, shown_beats)),
             song: song.as_deref(),
             cursor: self.selection.cursor,
             selected: self.selection.selected,
@@ -127,9 +117,39 @@ impl Session {
             status: &self.status,
         };
         view::draw(canvas, &view, scale);
+        self.draw_over_view(canvas, scale, &layout.items, &levels);
+    }
+
+    /// The song of `library` playing, if one is.
+    fn playing_song<'a>(&self, library: &'a Library) -> Option<&'a Song> {
+        match self.playback.mode() {
+            Some(Mode::Song(s)) => library.songs.get(s),
+            _ => None,
+        }
+    }
+
+    /// The track whose name the mouse is over.
+    fn hovered_track(&self) -> Option<usize> {
+        match self.chrome.hover {
+            Some(crate::view::Hit::Name(t)) => Some(t),
+            _ => None,
+        }
+    }
+
+    /// Where the playhead is in the beats shown (`shown_beats` from the
+    /// window's first), the pattern `played` that far.
+    fn playhead(&self, played: f64, shown_beats: i32) -> f64 {
+        let total_beats = self.pattern().map_or(1, |pat| pat.beat_count.max(1));
+        let first = self.chrome.beat_window.first().clamp(0, total_beats - 1);
+        playhead_in_window(played, total_beats, first, shown_beats)
+    }
+
+    /// What goes over the view: the synth, the mixer, the panel's controls,
+    /// the menus, the open list or entry, the toasts and the overlay.
+    fn draw_over_view(&self, canvas: &mut Canvas, scale: Scale, items: &[Item], levels: &[f32]) {
         self.draw_synth(canvas, scale);
-        self.draw_mixer(canvas, scale, &levels);
-        crate::panel::draw(canvas, &layout.items, self.chrome.widgets.focus, scale);
+        self.draw_mixer(canvas, scale, levels);
+        crate::panel::draw(canvas, items, self.chrome.widgets.focus, scale);
         self.draw_tooltip(canvas, scale);
         let menus = self.menus();
         menu::draw(canvas, &menus, self.chrome.menu, scale);

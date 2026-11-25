@@ -74,24 +74,9 @@ fn draw_item(canvas: &mut Canvas, item: &Item, scale: Scale) {
             canvas.text(r.x, r.y, &fit(text, r.w.max(text_width(text, scale)), scale), scale, *color);
         }
         Kind::Value { spec, value, label, text, lfo } => {
-            let fraction = spec.fraction(*value);
-            let color = if *lfo { LFO } else { arc_color() };
-            match spec.style {
-                Style::Knob => draw_knob_item(canvas, r, fraction, color, label.as_deref(), text, scale),
-                Style::Slider => draw_slider_item(canvas, r, fraction, color, label.as_deref(), text, scale),
-                Style::Stepper => {
-                    draw_stepper_item(canvas, r, (*value > spec.min, *value < spec.max), label.as_deref(), text, scale)
-                }
-                Style::Fader => draw_fader_item(canvas, r, fraction, color, text, scale),
-            }
+            draw_value_item(canvas, r, (spec, *value, *lfo), (label.as_deref(), text), scale);
         }
-        Kind::Select { labels, selected, .. } => {
-            canvas.fill_rect(r.x, r.y, r.w, r.h, field_color());
-            let label = labels.get(*selected).map_or("", String::as_str);
-            let ty = r.y + (r.h - 8 * scale) / 2;
-            canvas.text(r.x + 4 * scale, ty, &fit(label, r.w - 16 * scale, scale), scale, theme::text());
-            canvas.text(r.x + r.w - 10 * scale, ty, MENU_MARK, scale, dim());
-        }
+        Kind::Select { labels, selected, .. } => draw_select_item(canvas, r, labels, *selected, scale),
         Kind::Screen { labels, selected, lit, .. } => draw_screen(canvas, r, labels, *selected, *lit, scale),
         Kind::Toggle { on } => {
             canvas.fill_rect(r.x, r.y, r.w, r.h, if *on { ON } else { field_color() });
@@ -129,6 +114,34 @@ fn draw_item(canvas: &mut Canvas, item: &Item, scale: Scale) {
         }
         Kind::Envelope { points, overlay } => draw_envelope_item(canvas, r, points, overlay.as_ref(), scale),
     }
+}
+
+/// A knob, slider, stepper or fader (by the style of `spec`) at `value`, in
+/// the LFO's color when `lfo` drives it, with its `label` and `text`.
+fn draw_value_item(
+    canvas: &mut Canvas,
+    r: Rect,
+    (spec, value, lfo): (&Spec, f64, bool),
+    (label, text): (Option<&str>, &str),
+    scale: Scale,
+) {
+    let fraction = spec.fraction(value);
+    let color = if lfo { LFO } else { arc_color() };
+    match spec.style {
+        Style::Knob => draw_knob_item(canvas, r, fraction, color, label, text, scale),
+        Style::Slider => draw_slider_item(canvas, r, fraction, color, label, text, scale),
+        Style::Stepper => draw_stepper_item(canvas, r, (value > spec.min, value < spec.max), label, text, scale),
+        Style::Fader => draw_fader_item(canvas, r, fraction, color, text, scale),
+    }
+}
+
+/// A drop-down list showing the label of option `selected`, and its mark.
+fn draw_select_item(canvas: &mut Canvas, r: Rect, labels: &[String], selected: usize, scale: Scale) {
+    canvas.fill_rect(r.x, r.y, r.w, r.h, field_color());
+    let label = labels.get(selected).map_or("", String::as_str);
+    let ty = r.y + (r.h - 8 * scale) / 2;
+    canvas.text(r.x + 4 * scale, ty, &fit(label, r.w - 16 * scale, scale), scale, theme::text());
+    canvas.text(r.x + r.w - 10 * scale, ty, MENU_MARK, scale, dim());
 }
 
 /// A one-line screen: dark glass in a frame, the label of `selected` lit or dimmed.

@@ -48,27 +48,28 @@ pub enum Change {
 
 impl Change {
     fn apply(&self, target: Target<'_>, undo: bool) {
+        let Target { library, selected_song } = target;
         match self {
             Self::Pattern { index, before, after } => {
-                if let Some(slot) = target.library.patterns.get_mut(*index) {
+                if let Some(slot) = library.patterns.get_mut(*index) {
                     *slot = if undo { before } else { after }.as_ref().clone();
                 }
             }
-            Self::Patterns { before, after } => target.library.patterns = if undo { before } else { after }.clone(),
+            Self::Patterns { before, after } => library.patterns = if undo { before } else { after }.clone(),
             Self::Songs { before, after, select } => {
-                target.library.songs = if undo { before } else { after }.clone();
+                library.songs = if undo { before } else { after }.clone();
                 if let Some((on_undo, on_redo)) = select {
-                    *target.selected_song = if undo { *on_undo } else { *on_redo };
+                    *selected_song = if undo { *on_undo } else { *on_redo };
                 }
             }
             Self::Library { before, after, select: (on_undo, on_redo) } => {
-                *target.library = if undo { before } else { after }.as_ref().clone();
-                *target.selected_song = if undo { *on_undo } else { *on_redo };
+                *library = if undo { before } else { after }.as_ref().clone();
+                *selected_song = if undo { *on_undo } else { *on_redo };
             }
-            Self::Tempo { before, after } => target.library.bpm = if undo { *before } else { *after },
-            Self::Kit { before, after } => target.library.kit = if undo { before } else { after }.clone(),
-            Self::Info { before, after } => target.library.info = if undo { before } else { after }.clone(),
-            Self::Synths { before, after } => target.library.synths = if undo { before } else { after }.clone(),
+            Self::Tempo { before, after } => library.bpm = if undo { *before } else { *after },
+            Self::Kit { before, after } => library.kit = if undo { before } else { after }.clone(),
+            Self::Info { before, after } => library.info = if undo { before } else { after }.clone(),
+            Self::Synths { before, after } => library.synths = if undo { before } else { after }.clone(),
         }
     }
 

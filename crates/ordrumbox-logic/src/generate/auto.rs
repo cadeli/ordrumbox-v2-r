@@ -13,10 +13,10 @@
 use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::json::Value;
 use ordrumbox_core::num::{clamp, round2};
-use ordrumbox_core::{Macros, Note, Pattern, Scales, Style, Styles, Track};
+use ordrumbox_core::{Macros, Pattern, Scales, Style, Styles, Track};
 
+use super::melodic;
 use super::structure::{SectionElement, Structure, random_key_offset, random_scale, section_harmony};
-use super::{melodic, table};
 use crate::compose;
 
 /// The pattern's style key (in `Pattern::extra`).
@@ -31,7 +31,7 @@ const PATTERN_SEED: &str = "composeSeed";
 const SEED_RANGE: f64 = 4_294_967_296.0;
 /// The ↻ buttons' own auto flag: it can stay on while `auto_mode` is off
 /// (the button lit, the track not regenerating).
-const TOOLBAR_AUTO: &str = "_toolbarAuto";
+pub(super) const TOOLBAR_AUTO: &str = "_toolbarAuto";
 /// The variant a melodic track plays when its style names none.
 const BASS_VARIANT: &str = "basic";
 const CHORD_VARIANT: &str = "chordStab";
@@ -71,7 +71,12 @@ impl<'a> AutoGenerator<'a> {
         Self { scales, styles, rnd, structure: Structure::default(), tempo: None }
     }
 
-    fn random(&mut self) -> f64 {
+    /// The song structure the generator plays through.
+    pub(super) fn structure(&self) -> &Structure {
+        &self.structure
+    }
+
+    pub(super) fn random(&mut self) -> f64 {
         (self.rnd)()
     }
 
@@ -104,12 +109,12 @@ fn pattern_value<'p>(pattern: &'p Pattern, key: &str) -> Option<&'p Value> {
     pattern.extra.get(key).filter(|v| !v.is_null())
 }
 
-fn genre_of(pattern: &Pattern) -> Option<String> {
+pub(super) fn genre_of(pattern: &Pattern) -> Option<String> {
     pattern_value(pattern, GENRE).and_then(Value::to_text).filter(|g| !g.is_empty())
 }
 
 /// The style of `pattern`: its own, else a drawn one (written to it).
-fn pattern_style(g: &mut AutoGenerator<'_>, pattern: &mut Pattern) -> Style {
+pub(super) fn pattern_style(g: &mut AutoGenerator<'_>, pattern: &mut Pattern) -> Style {
     let name = match genre_of(pattern) {
         Some(name) => name,
         None => {
@@ -122,7 +127,7 @@ fn pattern_style(g: &mut AutoGenerator<'_>, pattern: &mut Pattern) -> Style {
 }
 
 /// `#resolveHarmony`: the section harmony moved to the pattern's key, in its scale.
-fn pattern_harmony(pattern: &Pattern, style: &Style, section: &str, loop_in_element: u64) -> Harmony {
+pub(super) fn pattern_harmony(pattern: &Pattern, style: &Style, section: &str, loop_in_element: u64) -> Harmony {
     let (root, scale) = section_harmony(&style.progression, section, loop_in_element);
     let offset = pattern_value(pattern, KEY_OFFSET).and_then(Value::to_number).unwrap_or(0.0);
     let scale = pattern_value(pattern, SCALE).and_then(Value::to_text).unwrap_or(scale);
@@ -130,7 +135,7 @@ fn pattern_harmony(pattern: &Pattern, style: &Style, section: &str, loop_in_elem
 }
 
 /// `#randomDensity` of a melodic line: bass near full, chords vary more.
-fn random_density(g: &mut AutoGenerator<'_>, track: &Track) -> f64 {
+pub(super) fn random_density(g: &mut AutoGenerator<'_>, track: &Track) -> f64 {
     let core = instrument_family(&track.name) == InstrumentFamily::Bass;
     let (min, max) = if core { (0.85, 1.05) } else { (0.6, 1.2) };
     round2(min + g.random() * (max - min))
@@ -148,7 +153,7 @@ fn apply_style_swing(g: &mut AutoGenerator<'_>, track: &mut Track, style: &Style
 /// none yet; once set they are the track's (Var Hits, Var Notes). A drum line
 /// is a written rhythm, its variation an ornament; a bass or chord line plays
 /// as written until its section ends.
-fn apply_variation(g: &mut AutoGenerator<'_>, track: &mut Track, kind: InstrumentFamily) {
+pub(super) fn apply_variation(g: &mut AutoGenerator<'_>, track: &mut Track, kind: InstrumentFamily) {
     // A drum track draws its amount every time, so the lines after it draw
     // the same whether it had one or not.
     let draw = if kind.is_melodic() { 0.0 } else { g.random() };
@@ -164,7 +169,7 @@ fn apply_variation(g: &mut AutoGenerator<'_>, track: &mut Track, kind: Instrumen
 /// The variant a melodic track of `style` plays: its own `auto_variant`, else
 /// one of the style's (the first when `draw` is off, so a line keeps its
 /// character through the loops).
-fn melodic_variant(g: &mut AutoGenerator<'_>, style: &Style, track: &Track, draw: bool) -> String {
+pub(super) fn melodic_variant(g: &mut AutoGenerator<'_>, style: &Style, track: &Track, draw: bool) -> String {
     if !track.auto_variant.is_empty() {
         return track.auto_variant.clone();
     }
@@ -268,7 +273,13 @@ fn generation_order(pattern: &Pattern, style: &Style, tracks: &[usize]) -> Vec<u
 /// New lines on the drum tracks `tracks` of `pattern` for `style` under the
 /// pattern's macros, their hits scaled by `factor`; a track the style has no
 /// part for is left empty, a locked track as it is.
-fn drum_tracks(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, style: &Style, tracks: &[usize], factor: f64) {
+pub(super) fn drum_tracks(
+    g: &mut AutoGenerator<'_>,
+    pattern: &mut Pattern,
+    style: &Style,
+    tracks: &[usize],
+    factor: f64,
+) {
     let macros = Macros::of(pattern);
     for t in generation_order(pattern, style, tracks) {
         if pattern.tracks[t].compose_lock {
@@ -526,184 +537,4 @@ fn seeded_lines(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, options: &Opti
     let mut rng = ordrumbox_core::Rng::new(seed);
     let mut rnd = || rng.next_f64();
     generate_pattern(&mut AutoGenerator::new(g.scales, g.styles, &mut rnd), pattern, options);
-}
-
-/// AUTO: every unlocked track of `pattern` in auto mode, or, when one is,
-/// all of them out of it. Whether auto mode is now on.
-pub fn toggle_auto(pattern: &mut Pattern) -> bool {
-    let on = !pattern.tracks.iter().any(|t| !t.compose_lock && is_auto_on(t));
-    for track in pattern.tracks.iter_mut().filter(|t| !t.compose_lock) {
-        set_auto(track, on);
-    }
-    on
-}
-
-/// ↻ on one track: a new line for track `t` of `pattern` (in its style; a
-/// new seed first when it has one); nothing on a locked track. A melodic
-/// track plays one of its style's variants.
-pub fn regenerate_track(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, t: usize) {
-    let Some(seeded) = pattern.tracks.get(t).filter(|t| !t.compose_lock).map(|track| track.compose_seed >= 1.0) else {
-        return;
-    };
-    if seeded {
-        let draw = g.random();
-        pattern.tracks[t].compose_seed = 1.0 + (draw * 9998.0).floor();
-    }
-    let style = pattern_style(g, pattern);
-    if instrument_family(&pattern.tracks[t].name).is_drum() {
-        drum_tracks(g, pattern, &style, &[t], 1.0);
-    } else {
-        let first = g.structure.element(0);
-        let harmony = pattern_harmony(pattern, &style, &first.name, first.loop_in_element);
-        let variant = melodic_variant(g, &style, &pattern.tracks[t], true);
-        let density = random_density(g, &pattern.tracks[t]);
-        generate_track(g, pattern, t, &variant, density, &harmony);
-    }
-}
-
-// ─── The ↻ buttons ───────────────────────────────────────────────────────────
-
-/// Auto mode as the ↻ buttons show it (`auto_mode` or their own flag).
-pub fn is_auto_on(track: &Track) -> bool {
-    track.auto_mode || track.extra.get(TOOLBAR_AUTO).is_some_and(Value::is_true)
-}
-
-fn set_auto(track: &mut Track, on: bool) {
-    track.auto_mode = on;
-    track.extra.insert(TOOLBAR_AUTO, Value::Bool(on));
-}
-
-/// `toggleAutoGeneration`: when a track of `kinds` is in auto mode, all of
-/// them leave it (`false`); otherwise `generate` runs (`true`).
-fn toggle(
-    pattern: &mut Pattern,
-    kinds: impl Fn(InstrumentFamily) -> bool,
-    generate: impl FnOnce(&mut Pattern),
-) -> bool {
-    let of_kind = |t: &Track| kinds(instrument_family(&t.name));
-    if pattern.tracks.iter().any(|t| is_auto_on(t) && of_kind(t)) {
-        for track in pattern.tracks.iter_mut().filter(|t| of_kind(t)) {
-            set_auto(track, false);
-        }
-        false
-    } else {
-        generate(pattern);
-        true
-    }
-}
-
-/// ↻ Drum: new lines over the existing tracks in the style of `options`
-/// (else the pattern's, else a drawn one), the drum tracks the style plays
-/// in auto mode, empty melodic tracks removed; or, when drums are in auto
-/// mode, auto mode off. Whether generation is now on.
-pub fn toggle_drums(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, options: &Options) -> bool {
-    toggle(pattern, InstrumentFamily::is_drum, |pattern| {
-        generate_pattern(g, pattern, options);
-        pattern.tracks.retain(|t| !instrument_family(&t.name).is_melodic() || !t.notes.is_empty());
-        let style = g.style(&genre_of(pattern).unwrap_or_default());
-        for track in pattern.tracks.iter_mut().filter(|t| instrument_family(&t.name).is_drum()) {
-            let plays = style.part_for(&track.name).is_some();
-            set_auto(track, plays);
-        }
-    })
-}
-
-/// The melodic parts a ↻ button drives.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MelodicKind {
-    /// ↻ Bass.
-    Bass,
-    /// ↻ Chords.
-    Chords,
-}
-
-impl MelodicKind {
-    fn track_type(self) -> InstrumentFamily {
-        match self {
-            Self::Bass => InstrumentFamily::Bass,
-            Self::Chords => InstrumentFamily::Piano,
-        }
-    }
-
-    /// `MELODIC_GEN_PRESETS`: the synth preset.
-    fn preset(self) -> &'static str {
-        match self {
-            Self::Bass => BASS_PRESET,
-            Self::Chords => "PIANO",
-        }
-    }
-}
-
-/// ↻ Bass / ↻ Chords: the first BASS (PIANO) track in auto mode — created
-/// on the pattern's synth, with a first line in the pattern's style, when
-/// there is none; or auto mode off. Whether generation is now on.
-pub fn toggle_melodic(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, kind: MelodicKind) -> bool {
-    let wanted = kind.track_type();
-    toggle(
-        pattern,
-        |k| k == wanted,
-        |pattern| {
-            let found = pattern.tracks.iter().position(|t| instrument_family(&t.name) == wanted);
-            let t = match found {
-                Some(t) => t,
-                None => {
-                    let style = pattern_style(g, pattern);
-                    let first = g.structure.element(0);
-                    let (root, scale) = section_harmony(&style.progression, &first.name, first.loop_in_element);
-                    let mut track = Track::new(wanted.name(), pattern.beat_count, 4);
-                    track.use_synth = true;
-                    track.auto_assign = false;
-                    track.synth_preset = Some(kind.preset().to_owned());
-                    track.volume = 0.8;
-                    let variant = melodic_variant(g, &style, &track, false);
-                    pattern.tracks.push(track);
-                    let t = pattern.tracks.len() - 1;
-                    generate_track(g, pattern, t, &variant, 1.0, &Harmony { root, scale: Some(scale) });
-                    t
-                }
-            };
-            let track = &mut pattern.tracks[t];
-            set_auto(track, true);
-            // A line holds as written unless the track's amounts say otherwise.
-            apply_variation(g, track, wanted);
-        },
-    )
-}
-
-// ─── Random track ────────────────────────────────────────────────────────────
-
-/// `RandomGenerator.generateRandom`: 15–35 % of the steps, at random
-/// pitches (±6) and velocities (0.5–1), the track looping over its length.
-pub fn random_track(track: &mut Track, rnd: &mut dyn FnMut() -> f64) {
-    let config = table("random");
-    // Without the table's value, the one this function's doc gives.
-    let get = |key: &str| {
-        let default = match key {
-            "densityMin" => 0.15,
-            "densitySpread" => 0.2,
-            "pitchMin" => -6.0,
-            "pitchRange" => 13.0,
-            "velocityMin" | "velocitySpread" => 0.5,
-            _ => 0.0,
-        };
-        config.get(key).and_then(Value::as_f64).unwrap_or(default)
-    };
-    track.notes.clear();
-    let spb = track.steps_per_beat;
-    track.loop_length = Some(track.beat_count * spb);
-    let total = track.beat_count * spb;
-    let count = ((f64::from(total) * (get("densityMin") + rnd() * get("densitySpread"))).floor() as i32).max(1);
-    let mut used: Vec<i32> = Vec::new();
-    for _ in 0..count.min(total) {
-        let step = loop {
-            let step = (rnd() * f64::from(total)).floor() as i32;
-            if !used.contains(&step) {
-                break step;
-            }
-        };
-        used.push(step);
-        let pitch = (rnd() * get("pitchRange")).floor() + get("pitchMin");
-        let velocity = get("velocityMin") + rnd() * get("velocitySpread");
-        track.notes.push(Note { beat: step / spb, step: step % spb, pitch, velocity, ..Note::default() });
-    }
 }

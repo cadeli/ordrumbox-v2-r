@@ -81,6 +81,89 @@ fn rise(frame: usize, length: usize) -> f64 {
     0.5 - 0.5 * (std::f64::consts::PI * frame as f64 / length as f64).cos()
 }
 
+/// A start later than [`LEAD_IN_LIMIT_MS`] trimmed to [`PRE_ROLL_MS`] before
+/// it, faded in, on `channels` and the fades' `shape`; what was done.
+fn trim_start(channels: &mut [Vec<f64>], shape: &mut Vec<f64>, rate: f64) -> Option<String> {
+    let samples = mono(channels);
+    let mono_peak = peak(&samples);
+    let onset = samples.iter().position(|s| s.abs() >= LEAD_IN_LEVEL * mono_peak).unwrap_or(0);
+    let lead_in_ms = onset as f64 * 1000.0 / rate;
+    let is_late = lead_in_ms > LEAD_IN_LIMIT_MS;
+    if !is_late {
+        return None;
+    }
+    let pre_roll = frames_of(PRE_ROLL_MS, rate).min(onset);
+    let start = onset - pre_roll;
+    for track in channels.iter_mut().chain(std::iter::once(shape)) {
+        track.drain(..start);
+        for (frame, sample) in track[..pre_roll].iter_mut().enumerate() {
+            *sample *= rise(frame, pre_roll);
+        }
+    }
+    Some(format!("started {lead_in_ms:.0} ms late: trimmed to {PRE_ROLL_MS:.0} ms before its start"))
+}
+
+/// An end still loud (or `cut`) faded out over `fade_out_ms` at most, on
+/// `channels` and the fades' `shape`; what was done.
+fn fade_end(
+    channels: &mut [Vec<f64>],
+    shape: &mut [f64],
+    (fade_out_ms, rate): (f64, f64),
+    cut: bool,
+) -> Option<String> {
+    let samples = mono(channels);
+    let frames = samples.len();
+    let window = frames_of(END_WINDOW_MS, rate).clamp(1, frames);
+    let end_level_db = amplitude_db(rms(&samples[frames - window..]) / peak(&samples));
+    let is_fading = cut || end_level_db > END_LEVEL_LIMIT_DB;
+    if !is_fading {
+        return None;
+    }
+    let fade = frames_of(fade_out_ms, rate).min((frames as f64 * MAX_FADE_OUT_SHARE) as usize).max(1);
+    for track in channels.iter_mut().map(Vec::as_mut_slice).chain(std::iter::once(shape)) {
+        for (frame, sample) in track[frames - fade..].iter_mut().enumerate() {
+            *sample *= rise(fade - frame, fade).powi(2);
+        }
+    }
+    let fade_ms = fade as f64 * 1000.0 / rate;
+    Some(if cut {
+        format!("faded out over its last {fade_ms:.0} ms")
+    } else {
+        format!("still loud at its end ({end_level_db:.0} dB): faded out over {fade_ms:.0} ms")
+    })
+}
+
+/// A DC offset over [`DC_LIMIT`] taken out of `channels` along the fades'
+/// `shape`, so a faded start or end stays at zero; what was done.
+fn remove_dc(channels: &mut [Vec<f64>], shape: &[f64]) -> Option<String> {
+    let mean = |track: &[f64]| track.iter().sum::<f64>() / track.len() as f64;
+    let dc = mean(&mono(channels));
+    let shape_mean = mean(shape);
+    let has_dc = dc.abs() > DC_LIMIT && shape_mean > 0.0;
+    if !has_dc {
+        return None;
+    }
+    for channel in channels.iter_mut() {
+        let offset = mean(channel) / shape_mean;
+        channel.iter_mut().zip(shape).for_each(|(s, gain)| *s -= offset * gain);
+    }
+    Some(format!("DC {dc:.3} removed"))
+}
+
+/// The peak of `channels` set to `target_db`, unless it is within
+/// [`PEAK_TOLERANCE_DB`]; what was done.
+fn set_peak(channels: &mut [Vec<f64>], target_db: f64) -> Option<String> {
+    let level = channels.iter().map(|channel| peak(channel)).fold(0.0, f64::max);
+    let level_db = amplitude_db(level);
+    let is_off = (level_db - target_db).abs() > PEAK_TOLERANCE_DB;
+    if !is_off {
+        return None;
+    }
+    let gain = 10f64.powf(target_db / 20.0) / level;
+    channels.iter_mut().flatten().for_each(|s| *s *= gain);
+    Some(format!("peak {level_db:.1} dB set to {target_db:.1} dB"))
+}
+
 /// Repair `buffer` as `settings` say.
 pub fn fix(buffer: &SampleBuffer, settings: &FixSettings) -> Fixed {
     let rate = f64::from(buffer.sample_rate);
@@ -106,21 +189,7 @@ pub fn fix(buffer: &SampleBuffer, settings: &FixSettings) -> Fixed {
     // The gain of the fades applied, frame by frame: DC is taken out along it,
     // so that a faded start or end stays at zero.
     let mut shape = vec![1.0; channels[0].len()];
-    let samples = mono(&channels);
-    let mono_peak = peak(&samples);
-    let onset = samples.iter().position(|s| s.abs() >= LEAD_IN_LEVEL * mono_peak).unwrap_or(0);
-    let lead_in_ms = onset as f64 * 1000.0 / rate;
-    if lead_in_ms > LEAD_IN_LIMIT_MS {
-        let pre_roll = frames_of(PRE_ROLL_MS, rate).min(onset);
-        let start = onset - pre_roll;
-        for track in channels.iter_mut().chain(std::iter::once(&mut shape)) {
-            track.drain(..start);
-            for (frame, sample) in track[..pre_roll].iter_mut().enumerate() {
-                *sample *= rise(frame, pre_roll);
-            }
-        }
-        changes.push(format!("started {lead_in_ms:.0} ms late: trimmed to {PRE_ROLL_MS:.0} ms before its start"));
-    }
+    changes.extend(trim_start(&mut channels, &mut shape, rate));
 
     let mut cut = false;
     if let Some(length_ms) = settings.length_ms {
@@ -132,44 +201,10 @@ pub fn fix(buffer: &SampleBuffer, settings: &FixSettings) -> Fixed {
         }
     }
 
-    let samples = mono(&channels);
-    let frames = samples.len();
-    let window = frames_of(END_WINDOW_MS, rate).clamp(1, frames);
-    let end_level_db = amplitude_db(rms(&samples[frames - window..]) / peak(&samples));
-    if cut || end_level_db > END_LEVEL_LIMIT_DB {
-        let fade = frames_of(settings.fade_out_ms, rate).min((frames as f64 * MAX_FADE_OUT_SHARE) as usize).max(1);
-        for track in channels.iter_mut().chain(std::iter::once(&mut shape)) {
-            for (frame, sample) in track[frames - fade..].iter_mut().enumerate() {
-                *sample *= rise(fade - frame, fade).powi(2);
-            }
-        }
-        let fade_ms = fade as f64 * 1000.0 / rate;
-        if cut {
-            changes.push(format!("faded out over its last {fade_ms:.0} ms"));
-        } else {
-            changes.push(format!("still loud at its end ({end_level_db:.0} dB): faded out over {fade_ms:.0} ms"));
-        }
-    }
-
-    let mean = |track: &[f64]| track.iter().sum::<f64>() / track.len() as f64;
-    let dc = mean(&mono(&channels));
-    let shape_mean = mean(&shape);
-    if dc.abs() > DC_LIMIT && shape_mean > 0.0 {
-        for channel in &mut channels {
-            let offset = mean(channel) / shape_mean;
-            channel.iter_mut().zip(&shape).for_each(|(s, gain)| *s -= offset * gain);
-        }
-        changes.push(format!("DC {dc:.3} removed"));
-    }
-
+    changes.extend(fade_end(&mut channels, &mut shape, (settings.fade_out_ms, rate), cut));
+    changes.extend(remove_dc(&mut channels, &shape));
     if let Some(target_db) = settings.peak_db {
-        let level = channels.iter().map(|channel| peak(channel)).fold(0.0, f64::max);
-        let level_db = amplitude_db(level);
-        if (level_db - target_db).abs() > PEAK_TOLERANCE_DB {
-            let gain = 10f64.powf(target_db / 20.0) / level;
-            channels.iter_mut().flatten().for_each(|s| *s *= gain);
-            changes.push(format!("peak {level_db:.1} dB set to {target_db:.1} dB"));
-        }
+        changes.extend(set_peak(&mut channels, target_db));
     }
 
     let narrow = |channel: &[f64]| channel.iter().map(|&s| s as f32).collect::<Vec<f32>>();

@@ -10,7 +10,7 @@ use ordrumbox_logic::block::{Block, StepAt, Zone};
 use super::Session;
 use super::session_labels::{copied_message, deleted_message, pasted_message};
 use super::session_selection::Clipboard;
-use super::session_song::DRAG_START_PX;
+use super::session_song::is_drag_start;
 use super::session_types::Move;
 use crate::view::Cursor;
 
@@ -43,8 +43,7 @@ impl Session {
             self.chrome.zone_drag = None;
             return false;
         }
-        let (dx, dy) = (x - drag.press.0, y - drag.press.1);
-        drag.started |= dx.abs() >= DRAG_START_PX || dy.abs() >= DRAG_START_PX;
+        drag.started |= is_drag_start(drag.press, x, y);
         let drag = *drag;
         if !drag.started {
             return false;

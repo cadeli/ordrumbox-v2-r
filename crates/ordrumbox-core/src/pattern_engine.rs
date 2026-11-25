@@ -224,11 +224,9 @@ impl NoteContext<'_> {
         let trigger = note.retrigger_probability;
         if let Some(sequence) = arp::sequence(&note.arp, rng) {
             for i in 0..arp::note_count(note.retrigger_count) {
-                if rng.chance(trigger) {
-                    let tick = self.repeat_tick(at, i);
-                    if tick < self.pattern_ticks {
-                        self.push(flat, tick, sequence[i % sequence.len()]);
-                    }
+                let tick = self.repeat_tick(at, i);
+                if rng.chance(trigger) && tick < self.pattern_ticks {
+                    self.push(flat, tick, sequence[i % sequence.len()]);
                 }
             }
         } else {

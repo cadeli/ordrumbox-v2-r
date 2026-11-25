@@ -13,7 +13,7 @@ use ordrumbox_logic::roll_block::{RollBlock, RollZone, note_key};
 use super::Session;
 use super::session_labels::{copied_message, deleted_message, pasted_message};
 use super::session_selection::Clipboard;
-use super::session_song::DRAG_START_PX;
+use super::session_song::is_drag_start;
 use super::session_zone::beats_label;
 use crate::note_drag::{MIDDLE_C, midi_name};
 use crate::piano_roll::{RollHit, RollSpan, TOTAL_KEYS, key_row, row_key, steps_per_beat};
@@ -95,8 +95,7 @@ impl Session {
             self.roll.zone_drag = None;
             return false;
         }
-        let (dx, dy) = (x - drag.press.0, y - drag.press.1);
-        drag.started |= dx.abs() >= DRAG_START_PX || dy.abs() >= DRAG_START_PX;
+        drag.started |= is_drag_start(drag.press, x, y);
         let drag = *drag;
         if !drag.started {
             return false;

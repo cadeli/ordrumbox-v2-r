@@ -2,7 +2,7 @@
 
 use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::json::Value;
-use ordrumbox_core::{Pattern, Scales, Track};
+use ordrumbox_core::{Note, Pattern, Scales, Track};
 
 use super::auto::Harmony;
 use super::{
@@ -329,6 +329,14 @@ fn melody_groove(g: &mut Generator<'_>, track: &mut Track, scale: &[f64], config
     }
 }
 
+/// Make `note` an arpeggio of `count` notes at `rate` when there is an `arp`.
+fn arpeggiate(note: &mut Note, arp: Option<&Value>, count: i32, rate: f64) {
+    let Some(arp) = arp else { return };
+    note.arp = arp.clone();
+    note.retrigger_count = count;
+    note.retrigger_rate = rate;
+}
+
 /// `generateMelodyArpeggioVariant`: a contour over the scale, every
 /// `noteSpacing` steps, each note an arpeggio when the variant has one.
 fn melody_arpeggio(g: &mut Generator<'_>, track: &mut Track, scale: &[f64], config: &Value, density: f64, bias: f64) {
@@ -355,12 +363,7 @@ fn melody_arpeggio(g: &mut Generator<'_>, track: &mut Track, scale: &[f64], conf
                     ..VelocitySpec::accent(step % 4 == 0, false)
                 };
                 let velocity = g.velocity(config.get("velocity"), context);
-                let note = add_note(track, beat, step, bias + degree, velocity);
-                if let Some(arp) = arp {
-                    note.arp = arp.clone();
-                    note.retrigger_count = count as i32;
-                    note.retrigger_rate = rate;
-                }
+                arpeggiate(add_note(track, beat, step, bias + degree, velocity), arp, count as i32, rate);
             }
             index += 1;
             step += g.step_advance(average, jitter);

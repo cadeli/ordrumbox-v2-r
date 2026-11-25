@@ -48,6 +48,13 @@ const BUTTONS: [(&str, &str); 7] = [
 /// Movement before a press becomes a drag, px.
 pub(super) const DRAG_START_PX: i32 = 3;
 
+/// Whether the mouse at (`x`, `y`) is far enough from `press` for the press to
+/// become a drag.
+#[must_use]
+pub(super) fn is_drag_start(press: (i32, i32), x: i32, y: i32) -> bool {
+    (x - press.0).abs() >= DRAG_START_PX || (y - press.1).abs() >= DRAG_START_PX
+}
+
 /// What a drag on the song panel carries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum DragSource {

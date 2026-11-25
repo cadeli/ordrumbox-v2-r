@@ -99,9 +99,7 @@ fn stats(patterns: &[&Pattern], steps_per_beat: usize, beat_count: usize) -> Vec
             if m < measures && !played[m][reference % measure] {
                 played[m][reference % measure] = true;
                 stats.hits += 1;
-                if note.velocity < GHOST_VELOCITY {
-                    stats.ghosts += 1;
-                }
+                stats.ghosts += usize::from(note.velocity < GHOST_VELOCITY);
             }
         }
         for measure_played in played {

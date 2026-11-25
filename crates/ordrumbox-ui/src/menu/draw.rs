@@ -184,6 +184,22 @@ pub fn draw_library(canvas: &mut Canvas, menus: &[Menu], name: &str, state: Libr
 
 // ─── Drawing ─────────────────────────────────────────────────────────────────
 
+/// The check box of a command at (`x`, `y`): filled when `on`, an outline
+/// when off; greyed out when the command is not enabled.
+fn draw_check(canvas: &mut Canvas, (x, y): (i32, i32), on: bool, enabled: bool, scale: Scale) {
+    let b = 6 * scale;
+    if on {
+        canvas.fill_rect(x, y, b, b, if enabled { ACCENT } else { disabled_color() });
+        return;
+    }
+    let line = scale.px();
+    let c = if enabled { dim() } else { disabled_color() };
+    canvas.fill_rect(x, y, b, line, c);
+    canvas.fill_rect(x, y + b - line, b, line, c);
+    canvas.fill_rect(x, y, line, b, c);
+    canvas.fill_rect(x + b - line, y, line, b, c);
+}
+
 /// The bar, and the open menu over everything.
 pub fn draw(canvas: &mut Canvas, menus: &[Menu], open: Option<Open>, scale: Scale) {
     let bar = bar_height(scale);
@@ -221,17 +237,7 @@ pub fn draw(canvas: &mut Canvas, menus: &[Menu], open: Option<Open>, scale: Scal
                 }
                 let ty = top + (h - 8 * scale) / 2;
                 if let Some(on) = checked {
-                    let (bx, by, b) = (px + 5 * scale, ty + scale.px(), 6 * scale);
-                    if *on {
-                        canvas.fill_rect(bx, by, b, b, if *enabled { ACCENT } else { disabled_color() });
-                    } else {
-                        let line = scale.px();
-                        let c = if *enabled { dim() } else { disabled_color() };
-                        canvas.fill_rect(bx, by, b, line, c);
-                        canvas.fill_rect(bx, by + b - line, b, line, c);
-                        canvas.fill_rect(bx, by, line, b, c);
-                        canvas.fill_rect(bx + b - line, by, line, b, c);
-                    }
+                    draw_check(canvas, (px + 5 * scale, ty + scale.px()), *on, *enabled, scale);
                 }
                 let color = if !enabled {
                     disabled_color()

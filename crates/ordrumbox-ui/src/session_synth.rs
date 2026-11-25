@@ -188,13 +188,9 @@ impl Session {
         match store::load_synths(&path) {
             Ok(saved) => {
                 let mut own = Object::new();
-                if let Some(saved) = &saved {
-                    for key in saved.keys() {
-                        if let Some(preset) = saved.get(key)
-                            && assets.get(key) != Some(preset)
-                        {
-                            own.insert(key, preset.clone());
-                        }
+                for (key, preset) in saved.iter().flat_map(|saved| saved.iter()) {
+                    if assets.get(key) != Some(preset) {
+                        own.insert(key, preset.clone());
                     }
                 }
                 Some(own)

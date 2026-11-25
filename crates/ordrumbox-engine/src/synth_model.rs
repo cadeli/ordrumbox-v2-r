@@ -283,10 +283,6 @@ pub fn group_label(group: &str) -> String {
     }
 }
 
-fn is_object(value: Option<&Value>) -> bool {
-    matches!(value, Some(Value::Object(_)))
-}
-
 /// The value at a dotted `path` of `draft`.
 pub fn get<'a>(draft: &'a Object, path: &str) -> Option<&'a Value> {
     let mut parts = path.split('.');
@@ -325,24 +321,19 @@ pub fn set(draft: &mut Object, path: &str, value: Value) -> bool {
 /// Fill what `draft` lacks with the group defaults (`hydrate`).
 pub fn hydrate(draft: &mut Object) {
     for (key, default) in defaults().iter() {
-        match default {
-            Value::Object(children) => {
-                if !is_object(draft.get(key)) {
-                    draft.insert(key, default.clone());
-                    continue;
-                }
-                if let Some(Value::Object(group)) = draft.get_mut(key) {
-                    for (child, value) in children.iter() {
-                        if group.get(child).is_none() {
-                            group.insert(child, value.clone());
-                        }
-                    }
-                }
+        let Value::Object(children) = default else {
+            if draft.get(key).is_none() {
+                draft.insert(key, default.clone());
             }
-            _ => {
-                if draft.get(key).is_none() {
-                    draft.insert(key, default.clone());
-                }
+            continue;
+        };
+        let Some(Value::Object(group)) = draft.get_mut(key) else {
+            draft.insert(key, default.clone());
+            continue;
+        };
+        for (child, value) in children.iter() {
+            if group.get(child).is_none() {
+                group.insert(child, value.clone());
             }
         }
     }

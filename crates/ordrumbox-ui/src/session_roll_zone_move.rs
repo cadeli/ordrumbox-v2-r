@@ -9,7 +9,7 @@ use ordrumbox_logic::roll_block::{RollZone, note_key};
 
 use super::Session;
 use super::session_labels::moved_message;
-use super::session_song::DRAG_START_PX;
+use super::session_song::is_drag_start;
 use crate::piano_roll::{TOTAL_KEYS, row_key, steps_per_beat};
 
 /// A press on a note inside the roll's zone, which may drag the zone.
@@ -54,7 +54,7 @@ impl Session {
             self.roll.zone_move = None;
             return false;
         }
-        drag.started |= (x - drag.press.0).abs() >= DRAG_START_PX || (y - drag.press.1).abs() >= DRAG_START_PX;
+        drag.started |= is_drag_start(drag.press, x, y);
         let layout = self.roll_layout(size);
         let cell = drag.started.then(|| self.roll_view(&layout).and_then(|v| layout.nearest_cell(&v, x, y))).flatten();
         let Some((step, row)) = cell else {

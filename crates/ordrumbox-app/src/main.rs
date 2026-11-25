@@ -11,6 +11,7 @@
 
 mod audio;
 mod dialog;
+mod input;
 mod midi;
 mod midi_out;
 mod midi_sync;
@@ -20,15 +21,15 @@ use std::num::NonZeroU32;
 use std::rc::Rc;
 use std::sync::mpsc::{Receiver, Sender};
 
-use ordrumbox_ui::ui_input::{Button, Key, KeyEvent, Modifiers, PointerShape, ScrollDelta, single_char};
+use ordrumbox_ui::ui_input::{Button, KeyEvent, PointerShape, ScrollDelta, single_char};
 use ordrumbox_ui::{Command, Scale, Session, Ui};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopClosed};
-use winit::keyboard::{KeyCode, ModifiersState, PhysicalKey};
+use winit::keyboard::PhysicalKey;
 use winit::platform::modifier_supplement::KeyEventExtModifierSupplement;
-use winit::window::{CursorIcon, Fullscreen, Window, WindowId};
+use winit::window::{Fullscreen, Window, WindowId};
 
 const INITIAL_SIZE: LogicalSize<f64> = LogicalSize::new(1100.0, 680.0);
 
@@ -194,105 +195,6 @@ impl App {
     }
 }
 
-/// The UI's name for a physical key.
-fn key(code: KeyCode) -> Key {
-    use KeyCode as K;
-    match code {
-        K::KeyA => Key::Letter('A'),
-        K::KeyB => Key::Letter('B'),
-        K::KeyC => Key::Letter('C'),
-        K::KeyD => Key::Letter('D'),
-        K::KeyE => Key::Letter('E'),
-        K::KeyF => Key::Letter('F'),
-        K::KeyG => Key::Letter('G'),
-        K::KeyH => Key::Letter('H'),
-        K::KeyI => Key::Letter('I'),
-        K::KeyJ => Key::Letter('J'),
-        K::KeyK => Key::Letter('K'),
-        K::KeyL => Key::Letter('L'),
-        K::KeyM => Key::Letter('M'),
-        K::KeyN => Key::Letter('N'),
-        K::KeyO => Key::Letter('O'),
-        K::KeyP => Key::Letter('P'),
-        K::KeyQ => Key::Letter('Q'),
-        K::KeyR => Key::Letter('R'),
-        K::KeyS => Key::Letter('S'),
-        K::KeyT => Key::Letter('T'),
-        K::KeyU => Key::Letter('U'),
-        K::KeyV => Key::Letter('V'),
-        K::KeyW => Key::Letter('W'),
-        K::KeyX => Key::Letter('X'),
-        K::KeyY => Key::Letter('Y'),
-        K::KeyZ => Key::Letter('Z'),
-        K::Digit0 => Key::Digit(0),
-        K::Digit1 => Key::Digit(1),
-        K::Digit2 => Key::Digit(2),
-        K::Digit3 => Key::Digit(3),
-        K::Digit4 => Key::Digit(4),
-        K::Digit5 => Key::Digit(5),
-        K::Digit6 => Key::Digit(6),
-        K::Digit7 => Key::Digit(7),
-        K::Digit8 => Key::Digit(8),
-        K::Digit9 => Key::Digit(9),
-        K::F1 => Key::F(1),
-        K::F2 => Key::F(2),
-        K::F3 => Key::F(3),
-        K::F4 => Key::F(4),
-        K::F5 => Key::F(5),
-        K::F6 => Key::F(6),
-        K::F7 => Key::F(7),
-        K::F8 => Key::F(8),
-        K::F9 => Key::F(9),
-        K::F10 => Key::F(10),
-        K::F11 => Key::F(11),
-        K::F12 => Key::F(12),
-        K::AltLeft | K::AltRight => Key::Alt,
-        K::Escape => Key::Escape,
-        K::Enter => Key::Enter,
-        K::NumpadEnter => Key::NumpadEnter,
-        K::Space => Key::Space,
-        K::Tab => Key::Tab,
-        K::Backspace => Key::Backspace,
-        K::Delete => Key::Delete,
-        K::ArrowUp => Key::ArrowUp,
-        K::ArrowDown => Key::ArrowDown,
-        K::ArrowLeft => Key::ArrowLeft,
-        K::ArrowRight => Key::ArrowRight,
-        K::PageUp => Key::PageUp,
-        K::PageDown => Key::PageDown,
-        K::Home => Key::Home,
-        K::End => Key::End,
-        K::Minus => Key::Minus,
-        K::Equal => Key::Equal,
-        K::NumpadSubtract => Key::NumpadSubtract,
-        K::NumpadAdd => Key::NumpadAdd,
-        K::BracketLeft => Key::BracketLeft,
-        K::BracketRight => Key::BracketRight,
-        K::Comma => Key::Comma,
-        K::Period => Key::Period,
-        K::Numpad0
-        | K::Numpad1
-        | K::Numpad2
-        | K::Numpad3
-        | K::Numpad4
-        | K::Numpad5
-        | K::Numpad6
-        | K::Numpad7
-        | K::Numpad8
-        | K::Numpad9
-        | K::NumpadDecimal
-        | K::NumpadComma
-        | K::NumpadDivide
-        | K::NumpadMultiply
-        | K::NumpadEqual => Key::Numpad,
-        _ => Key::Other,
-    }
-}
-
-fn modifiers(state: ModifiersState) -> Modifiers {
-    Modifiers { shift: state.shift_key(), control: state.control_key(), alt: state.alt_key(), logo: state.super_key() }
-}
-
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if self.gfx.is_some() {
@@ -350,12 +252,12 @@ impl ApplicationHandler for App {
             }
             WindowEvent::ScaleFactorChanged { .. } => true,
             WindowEvent::ModifiersChanged(state) => {
-                self.ui.set_modifiers(modifiers(state.state()));
+                self.ui.set_modifiers(input::modifiers(state.state()));
                 false
             }
             WindowEvent::KeyboardInput { event, .. } => match event.physical_key {
                 PhysicalKey::Code(code) => self.ui.key(&KeyEvent {
-                    key: key(code),
+                    key: input::key(code),
                     pressed: event.state == ElementState::Pressed,
                     repeat: event.repeat,
                     unmodified: event.key_without_modifiers().to_text().and_then(single_char),
@@ -444,20 +346,8 @@ impl App {
         }
         self.pointer_shape = shape;
         if let Some(gfx) = &self.gfx {
-            gfx.window.set_cursor(cursor_icon(shape));
+            gfx.window.set_cursor(input::cursor_icon(shape));
         }
-    }
-}
-
-/// The system cursor that shows `shape`.
-const fn cursor_icon(shape: PointerShape) -> CursorIcon {
-    match shape {
-        PointerShape::Arrow => CursorIcon::Default,
-        PointerShape::Grab => CursorIcon::Grab,
-        PointerShape::Grabbing => CursorIcon::Grabbing,
-        PointerShape::ResizeHorizontal => CursorIcon::EwResize,
-        PointerShape::ResizeVertical => CursorIcon::NsResize,
-        PointerShape::Move => CursorIcon::Move,
     }
 }
 
@@ -506,6 +396,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     open_window().map_err(|e| ordrumbox_ui::report_startup_error(&e.to_string()).into())
 }
 
+/// The MIDI files given on the command line ("open with"), imported;
+/// anything else is said, not ignored.
+fn open_arguments(session: &mut Session) {
+    for arg in std::env::args_os().skip(1) {
+        let path = std::path::PathBuf::from(arg);
+        let is_midi = path.extension().is_some_and(|e| e.eq_ignore_ascii_case("mid") || e.eq_ignore_ascii_case("midi"));
+        if is_midi {
+            session.import_midi(&path);
+        } else {
+            session.say(&format!("{}: not a MIDI file (.mid, .midi), not opened", path.display()));
+        }
+    }
+}
+
+/// `ORDRUMBOX_VIEW=roll|song|synth|kit|gen`: which view the window starts on
+/// (with `ORDRUMBOX_SCREENSHOT`, to capture that layout); `reset` starts from
+/// the factory library.
+fn show_start_view(session: &mut Session) {
+    match std::env::var("ORDRUMBOX_VIEW").as_deref() {
+        Ok("roll") => session.toggle_piano_roll(),
+        Ok("song") => session.toggle_song_view(),
+        Ok("synth") => session.toggle_synth(),
+        Ok("kit") => session.toggle_kit_editor(),
+        Ok("gen") => session.show_generation_tab(),
+        Ok("reset") => session.run(Command::FactoryReset),
+        Ok(other) => session.say(&format!("ORDRUMBOX_VIEW={other}: not a view (roll, song, synth, kit, gen, reset)")),
+        Err(std::env::VarError::NotPresent) => {}
+        Err(e) => session.say(&format!("ORDRUMBOX_VIEW: {e}")),
+    }
+}
+
 /// The window, until the user quits it.
 fn open_window() -> Result<(), Box<dyn std::error::Error>> {
     // No text without it: stop with where it was looked for.
@@ -532,30 +453,8 @@ fn open_window() -> Result<(), Box<dyn std::error::Error>> {
     session.add_new_demos();
     session.start_updates(waker.clone());
     session.start_mcp(waker.clone());
-    // MIDI files given on the command line ("open with"): imported; anything
-    // else is said, not ignored.
-    for arg in std::env::args_os().skip(1) {
-        let path = std::path::PathBuf::from(arg);
-        let is_midi = path.extension().is_some_and(|e| e.eq_ignore_ascii_case("mid") || e.eq_ignore_ascii_case("midi"));
-        if is_midi {
-            session.import_midi(&path);
-        } else {
-            session.say(&format!("{}: not a MIDI file (.mid, .midi), not opened", path.display()));
-        }
-    }
-    // `ORDRUMBOX_VIEW=roll|song|synth|kit|gen`: which view the window
-    // starts on (with `ORDRUMBOX_SCREENSHOT`, to capture that layout).
-    match std::env::var("ORDRUMBOX_VIEW").as_deref() {
-        Ok("roll") => session.toggle_piano_roll(),
-        Ok("song") => session.toggle_song_view(),
-        Ok("synth") => session.toggle_synth(),
-        Ok("kit") => session.toggle_kit_editor(),
-        Ok("gen") => session.show_generation_tab(),
-        Ok("reset") => session.run(Command::FactoryReset),
-        Ok(other) => session.say(&format!("ORDRUMBOX_VIEW={other}: not a view (roll, song, synth, kit, gen, reset)")),
-        Err(std::env::VarError::NotPresent) => {}
-        Err(e) => session.say(&format!("ORDRUMBOX_VIEW: {e}")),
-    }
+    open_arguments(&mut session);
+    show_start_view(&mut session);
     let (events_sender, events) = std::sync::mpsc::channel();
     let mut app = App {
         gfx: None,

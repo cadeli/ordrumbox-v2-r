@@ -100,6 +100,29 @@ struct Channel {
     key: Option<usize>,
 }
 
+impl Channel {
+    /// Move the values in use one quantum toward `target`, each kept by its
+    /// factor of `keep` (effects, mix, LFO): volume and pan at the mix's pace,
+    /// or the LFO's while one drives them; cutoff and Q at the effects' pace,
+    /// or the LFO's.
+    #[inline]
+    fn approach(&mut self, target: &StripSettings, [keep_fx, keep_mix, keep_lfo]: [f32; 3]) {
+        let before = self.current;
+        self.current.approach(target, keep_fx);
+        let ramp = |from: f32, to: f32, keep: f32| to + (from - to) * keep;
+        let [lfo_volume, lfo_pan, lfo_cutoff, lfo_q] = self.lfo;
+        let mix_or_lfo = |lfo: bool| if lfo { keep_lfo } else { keep_mix };
+        self.current.volume = ramp(before.volume, target.volume, mix_or_lfo(lfo_volume));
+        self.current.pan = ramp(before.pan, target.pan, mix_or_lfo(lfo_pan));
+        if lfo_cutoff {
+            self.current.cutoff = ramp(before.cutoff, target.cutoff, keep_lfo);
+        }
+        if lfo_q {
+            self.current.q = ramp(before.q, target.q, keep_lfo);
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Engine {
     sample_rate: f32,
@@ -281,9 +304,9 @@ impl Engine {
 
     /// Start the events of `pass` now, outside the transport (auditioning a
     /// track or a note). When stopped, its strip settings apply at once.
-    /// The caller keeps a reference to `pass` (this drops its own).
-    pub fn preview(&mut self, pass: Arc<Pass>) {
-        self.take_strips_when_stopped(&pass);
+    /// The caller keeps a reference to `pass`, so none is dropped here.
+    pub fn preview(&mut self, pass: &Pass) {
+        self.take_strips_when_stopped(pass);
         for event in &pass.events {
             self.start(event, &pass.patches, self.clock, 1.0, 1.0);
         }

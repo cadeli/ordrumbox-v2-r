@@ -148,6 +148,8 @@ mod session_panel;
 mod session_panel_edit;
 #[path = "session_panel_input.rs"]
 mod session_panel_input;
+#[path = "session_panel_keys.rs"]
+mod session_panel_keys;
 #[path = "session_panel_views.rs"]
 mod session_panel_views;
 #[path = "session_pattern_loop.rs"]
@@ -162,6 +164,8 @@ mod session_pointer;
 mod session_project_files;
 #[path = "session_roll.rs"]
 mod session_roll;
+#[path = "session_roll_menu.rs"]
+mod session_roll_menu;
 #[path = "session_saving.rs"]
 mod session_saving;
 #[cfg(test)]

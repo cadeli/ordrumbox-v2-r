@@ -405,6 +405,46 @@ fn spectrogram(samples: &[f64], rate: f64) -> Vec<Vec<f64>> {
     powers.iter().map(|column| column.iter().map(|&p| power_db(p, strongest)).collect()).collect()
 }
 
+/// The spectrum of `samples` and what is read from it: centroid, rolloff,
+/// flatness, peaks, pitch and its harmonics, band levels.
+fn measure_spectrum(samples: &[f64], rate: f64, result: &mut Measures) {
+    let power = average_spectrum(samples);
+    let bin_hz = rate / SPECTRUM_SIZE as f64;
+    result.spectrum_bin_hz = bin_hz;
+    let first_bin = (MIN_SPECTRUM_HZ / bin_hz).ceil() as usize;
+    let strongest = power[first_bin..].iter().copied().fold(0.0, f64::max);
+    let db: Vec<f64> = power.iter().map(|&p| power_db(p, strongest)).collect();
+    result.centroid_hz = centroid(&power, bin_hz, first_bin);
+    let energy: f64 = power[first_bin..].iter().sum();
+    let mut running = 0.0;
+    result.rolloff_hz = power.iter().enumerate().skip(first_bin).find_map(|(i, p)| {
+        running += p;
+        (energy > 0.0 && running >= energy * ROLLOFF_ENERGY).then_some(i as f64 * bin_hz)
+    });
+    let count = (power.len() - first_bin) as f64;
+    if energy > 0.0 {
+        let log_mean = power[first_bin..].iter().map(|p| p.max(1e-30).ln()).sum::<f64>() / count;
+        result.flatness = Some(log_mean.exp() / (energy / count));
+    }
+    result.peaks = spectral_peaks(&db, bin_hz, first_bin);
+
+    (result.fundamental_hz, result.pitch_confidence) = detect_pitch(loudest_frame(samples), rate);
+    if let Some(f0) = result.fundamental_hz {
+        result.note = hz_to_note(f0).map(|note| note.to_string());
+        if let Some(reference) = level_at(&db, bin_hz, f0) {
+            result.harmonics_db = (1..=HARMONIC_COUNT)
+                .map_while(|k| level_at(&db, bin_hz, f0 * k as f64))
+                .map(|level| level - reference)
+                .collect();
+            if f0 / 2.0 >= MIN_SPECTRUM_HZ {
+                result.sub_octave_db = level_at(&db, bin_hz, f0 / 2.0).map(|level| level - reference);
+            }
+        }
+    }
+    result.spectrum_db = db;
+    result.bands = band_levels(&power, bin_hz);
+}
+
 /// Measure `buffer`.
 pub fn measure(buffer: &SampleBuffer) -> Measures {
     let rate = f64::from(buffer.sample_rate);
@@ -444,41 +484,7 @@ pub fn measure(buffer: &SampleBuffer) -> Measures {
         result.end_level_db = Some(amplitude_db(rms(&samples[frames - window..]) / mono_peak));
     }
 
-    let power = average_spectrum(&samples);
-    let bin_hz = rate / SPECTRUM_SIZE as f64;
-    result.spectrum_bin_hz = bin_hz;
-    let first_bin = (MIN_SPECTRUM_HZ / bin_hz).ceil() as usize;
-    let strongest = power[first_bin..].iter().copied().fold(0.0, f64::max);
-    let db: Vec<f64> = power.iter().map(|&p| power_db(p, strongest)).collect();
-    result.centroid_hz = centroid(&power, bin_hz, first_bin);
-    let energy: f64 = power[first_bin..].iter().sum();
-    let mut running = 0.0;
-    result.rolloff_hz = power.iter().enumerate().skip(first_bin).find_map(|(i, p)| {
-        running += p;
-        (energy > 0.0 && running >= energy * ROLLOFF_ENERGY).then_some(i as f64 * bin_hz)
-    });
-    let count = (power.len() - first_bin) as f64;
-    if energy > 0.0 {
-        let log_mean = power[first_bin..].iter().map(|p| p.max(1e-30).ln()).sum::<f64>() / count;
-        result.flatness = Some(log_mean.exp() / (energy / count));
-    }
-    result.peaks = spectral_peaks(&db, bin_hz, first_bin);
-
-    (result.fundamental_hz, result.pitch_confidence) = detect_pitch(loudest_frame(&samples), rate);
-    if let Some(f0) = result.fundamental_hz {
-        result.note = hz_to_note(f0).map(|note| note.to_string());
-        if let Some(reference) = level_at(&db, bin_hz, f0) {
-            result.harmonics_db = (1..=HARMONIC_COUNT)
-                .map_while(|k| level_at(&db, bin_hz, f0 * k as f64))
-                .map(|level| level - reference)
-                .collect();
-            if f0 / 2.0 >= MIN_SPECTRUM_HZ {
-                result.sub_octave_db = level_at(&db, bin_hz, f0 / 2.0).map(|level| level - reference);
-            }
-        }
-    }
-    result.spectrum_db = db;
-    result.bands = band_levels(&power, bin_hz);
+    measure_spectrum(&samples, rate, &mut result);
 
     (result.pitch_track, result.centroid_track) = tracks(&samples, buffer.sample_rate);
     result.pitch_range_cents = track_range(&result.pitch_track, |ratio| 1200.0 * ratio.log2());

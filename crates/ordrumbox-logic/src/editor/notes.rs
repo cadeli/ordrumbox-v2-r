@@ -9,7 +9,7 @@ use crate::{block, roll_block};
 use ordrumbox_core::json::Value;
 use ordrumbox_core::note::{ACCENT_VELOCITY, ACCENTED_VELOCITY, MAX_SHIFT_STEPS};
 use ordrumbox_core::num::round2;
-use ordrumbox_core::{Note, Rng, Track};
+use ordrumbox_core::{Note, Pattern, Rng, Track};
 use std::ops::RangeInclusive;
 
 impl Editor {
@@ -224,62 +224,30 @@ impl Editor {
 
     /// Remove the notes inside `zone` of pattern `p`, as one step; how many.
     pub fn delete_zone(&mut self, p: usize, zone: &Zone) -> usize {
-        let Some(pattern) = self.library.patterns.get(p).map(|p| pattern_name(p).to_owned()) else { return 0 };
-        self.edit(p, |_| format!("Delete notes in \"{pattern}\""), None, |pattern| block::delete_zone(pattern, zone))
-            .unwrap_or(0)
+        self.edit_notes(p, "Delete", |pattern| block::delete_zone(pattern, zone)).unwrap_or(0)
     }
 
     /// Quantize the notes of pattern `p` in `scope` ([`crate::quantize::quantize`]),
     /// as one step; how many moved.
     pub fn quantize(&mut self, p: usize, scope: Scope, how: Quantize) -> usize {
-        let Some(pattern) = self.library.patterns.get(p).map(|p| pattern_name(p).to_owned()) else { return 0 };
-        self.edit(
-            p,
-            |_| format!("Quantize notes in \"{pattern}\""),
-            None,
-            |pattern| quantize::quantize(pattern, scope, how),
-        )
-        .unwrap_or(0)
+        self.edit_notes(p, "Quantize", |pattern| quantize::quantize(pattern, scope, how)).unwrap_or(0)
     }
 
     /// Humanize the notes of pattern `p` in `scope` ([`crate::humanize::humanize`]),
     /// as one step; how many changed.
     pub fn humanize(&mut self, p: usize, scope: Scope, how: Humanize, rng: &mut Rng) -> usize {
-        let Some(pattern) = self.library.patterns.get(p).map(|p| pattern_name(p).to_owned()) else { return 0 };
-        self.edit(
-            p,
-            |_| format!("Humanize notes in \"{pattern}\""),
-            None,
-            |pattern| humanize::humanize(pattern, scope, how, rng),
-        )
-        .unwrap_or(0)
+        self.edit_notes(p, "Humanize", |pattern| humanize::humanize(pattern, scope, how, rng)).unwrap_or(0)
     }
 
     /// Paste `block` at step `at` of pattern `p` ([`block::paste_block`]), as one step.
     pub fn paste_block(&mut self, p: usize, at: StepAt, block: &Block) -> Pasted {
-        let Some(pattern) = self.library.patterns.get(p).map(|p| pattern_name(p).to_owned()) else {
-            return Pasted::default();
-        };
-        self.edit(
-            p,
-            |_| format!("Paste notes in \"{pattern}\""),
-            None,
-            |pattern| block::paste_block(pattern, at, block),
-        )
-        .unwrap_or_default()
+        self.edit_notes(p, "Paste", |pattern| block::paste_block(pattern, at, block)).unwrap_or_default()
     }
 
     /// Remove the notes of pattern `p` inside the piano roll zone `zone`
     /// ([`roll_block::delete_roll_zone`]), as one step; how many.
     pub fn delete_roll_zone(&mut self, p: usize, zone: &RollZone) -> usize {
-        let Some(pattern) = self.library.patterns.get(p).map(|p| pattern_name(p).to_owned()) else { return 0 };
-        self.edit(
-            p,
-            |_| format!("Delete notes in \"{pattern}\""),
-            None,
-            |pattern| roll_block::delete_roll_zone(pattern, zone),
-        )
-        .unwrap_or(0)
+        self.edit_notes(p, "Delete", |pattern| roll_block::delete_roll_zone(pattern, zone)).unwrap_or(0)
     }
 
     /// Move the notes of the piano roll zone `zone` of pattern `p` by `delta`
@@ -291,16 +259,7 @@ impl Editor {
         delta: (i64, i32),
         keys: RangeInclusive<i32>,
     ) -> Pasted<RollZone> {
-        let Some(pattern) = self.library.patterns.get(p).map(|p| pattern_name(p).to_owned()) else {
-            return Pasted::default();
-        };
-        self.edit(
-            p,
-            |_| format!("Move notes in \"{pattern}\""),
-            None,
-            |pattern| roll_block::move_roll_zone(pattern, zone, delta, keys),
-        )
-        .unwrap_or_default()
+        self.edit_notes(p, "Move", |pattern| roll_block::move_roll_zone(pattern, zone, delta, keys)).unwrap_or_default()
     }
 
     /// Paste `block` on track `t` of pattern `p` from `step`, its top on
@@ -313,15 +272,13 @@ impl Editor {
         block: &RollBlock,
         keys: RangeInclusive<i32>,
     ) -> Pasted<RollZone> {
-        let Some(pattern) = self.library.patterns.get(p).map(|p| pattern_name(p).to_owned()) else {
-            return Pasted::default();
-        };
-        self.edit(
-            p,
-            |_| format!("Paste notes in \"{pattern}\""),
-            None,
-            |pattern| roll_block::paste_roll_block(pattern, t, step, top_key, block, keys),
-        )
-        .unwrap_or_default()
+        self.edit_notes(p, "Paste", |pattern| roll_block::paste_roll_block(pattern, t, step, top_key, block, keys))
+            .unwrap_or_default()
+    }
+
+    /// Edit the notes of pattern `p` as one step, described as "`verb` notes
+    /// in" the pattern; `None` when there is no such pattern.
+    fn edit_notes<R>(&mut self, p: usize, verb: &str, edit: impl FnOnce(&mut Pattern) -> R) -> Option<R> {
+        self.edit(p, |pattern| format!("{verb} notes in \"{}\"", pattern_name(pattern)), None, edit)
     }
 }

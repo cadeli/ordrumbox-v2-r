@@ -186,6 +186,20 @@ fn is_silent(pattern: &Pattern, t: usize) -> bool {
     ordrumbox_core::automation::is_silent(&pattern.tracks, t, &[], 0)
 }
 
+/// The strip settings of each track of `pattern` at tempo `bpm`, a silent
+/// track's at volume 0.
+fn heard_strips(pattern: &Pattern, bpm: f64) -> Vec<StripSettings> {
+    (0..pattern.tracks.len())
+        .map(|t| {
+            let mut settings = strip_settings(&pattern.tracks[t], bpm);
+            if is_silent(pattern, t) {
+                settings.volume = 0.0;
+            }
+            settings
+        })
+        .collect()
+}
+
 /// Ticks in one song pass: a measure of four beats.
 pub const SONG_PASS_TICKS: u32 = TICK * 4;
 
@@ -232,18 +246,7 @@ pub fn build_pass(pattern: &Pattern, number: u64, rng: &mut Rng, context: PassCo
     }
     events.sort_by_key(|e| e.frame); // stable: keeps the engine order within a frame
 
-    let strips = pattern
-        .tracks
-        .iter()
-        .enumerate()
-        .map(|(i, t)| {
-            let mut settings = strip_settings(t, bpm);
-            if silent(i) {
-                settings.volume = 0.0;
-            }
-            settings
-        })
-        .collect();
+    let strips = heard_strips(pattern, bpm);
     let lfos = pattern
         .tracks
         .iter()
@@ -269,15 +272,16 @@ pub fn build_pass(pattern: &Pattern, number: u64, rng: &mut Rng, context: PassCo
 /// its `sidechain_source`, none when the name is empty, unknown, or its own.
 /// A track is named by its instrument, so a key follows its track through a
 /// reorder, a removal or another pattern of a song.
-pub fn key_strips<'a>(tracks: impl Iterator<Item = &'a Track> + Clone) -> Vec<Option<usize>> {
+pub fn key_strips<'a>(tracks: impl Iterator<Item = &'a Track>) -> Vec<Option<usize>> {
+    let tracks: Vec<&Track> = tracks.collect();
     tracks
-        .clone()
+        .iter()
         .enumerate()
         .map(|(i, track)| {
             if track.sidechain_source.is_empty() {
                 return None;
             }
-            tracks.clone().position(|key| key.name == track.sidechain_source).filter(|&key| key != i)
+            tracks.iter().position(|key| key.name == track.sidechain_source).filter(|&key| key != i)
         })
         .collect()
 }
@@ -424,15 +428,7 @@ pub fn build_keymap(pattern: &Pattern, context: PassContext<'_>, bpm: f64) -> Ke
             });
         }
     }
-    let strips = (0..pattern.tracks.len())
-        .map(|t| {
-            let mut settings = strip_settings(&pattern.tracks[t], bpm);
-            if is_silent(pattern, t) {
-                settings.volume = 0.0;
-            }
-            settings
-        })
-        .collect();
+    let strips = heard_strips(pattern, bpm);
     let targets = keymap_targets(pattern, context.sounds, context.bank);
     let keys = key_strips(pattern.tracks.iter());
     KeyMap::new(Pass { frames: 1, ticks: 1, events, strips, keys, patches, ..Pass::default() }, &targets)

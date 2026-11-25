@@ -225,11 +225,10 @@ impl Midi {
         let mut programs: Vec<(u8, Option<u8>)> = Vec::new();
         for (_, events) in self.music_tracks() {
             for event in events {
-                if let EventKind::Program { status: 0xc0, channel, program } = event.kind {
-                    match programs.iter_mut().find(|(c, _)| *c == channel) {
-                        Some(slot) => slot.1 = program,
-                        None => programs.push((channel, program)),
-                    }
+                let EventKind::Program { status: 0xc0, channel, program } = event.kind else { continue };
+                match programs.iter_mut().find(|(c, _)| *c == channel) {
+                    Some(slot) => slot.1 = program,
+                    None => programs.push((channel, program)),
                 }
             }
         }

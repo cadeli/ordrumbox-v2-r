@@ -249,39 +249,27 @@ impl KitLayout {
     }
 }
 
-/// The kit editor: the kit's samples on the left, the selected one on the
-/// right (fields, analysis, envelope with the decay marked).
-pub(super) fn draw_kit(canvas: &mut Canvas, kit: &KitView, layout: &KitLayout) {
-    let scale = layout.scale;
-    let fitted = |text: &str, width: i32| -> String { text.chars().take(chars_in(width, scale)).collect() };
-    let right = layout.left + layout.list_width;
-    // A path too long keeps its end, the file and the folders nearest to it.
-    let fitted_end = |text: &str, width: i32| -> String {
-        let room = chars_in(width, scale);
-        let count = text.chars().count();
-        if count <= room {
-            return text.to_owned();
-        }
-        let tail: String = text.chars().skip(count - room.saturating_sub(3)).collect();
-        format!("...{tail}")
-    };
+/// The start of `text` that fits `width`.
+fn fit_start(text: &str, width: i32, scale: Scale) -> String {
+    text.chars().take(chars_in(width, scale)).collect()
+}
 
-    // The kit: its name and counts, then the labels of its title and
-    // description (their texts are the panel's, a click edits them).
-    let used = kit.users.iter().filter(|u| !u.is_empty()).count();
-    let counts = format!("{} samples, {used} played by the pattern's tracks", kit.samples.len());
-    let counts_x = right - text_width(&counts, scale);
-    canvas.text(layout.left, layout.top + 2 * scale, "KIT", scale, theme::muted());
-    let name = fitted(kit.kit, counts_x - layout.head_x - 8 * scale);
-    canvas.text(layout.head_x, layout.top + 2 * scale, &name, scale, ACCENT);
-    canvas.text(counts_x.max(layout.head_x), layout.top + 2 * scale, &counts, scale, theme::muted());
-    for (label, y) in [("Folder", layout.folder_y), ("Title", layout.title_y), ("Notes", layout.desc_y)] {
-        canvas.text(layout.left, y, label, scale, theme::muted());
+/// `text` fitted to `width` by its end: a path too long keeps the file and
+/// the folders nearest to it.
+fn fit_end(text: &str, width: i32, scale: Scale) -> String {
+    let room = chars_in(width, scale);
+    let count = text.chars().count();
+    if count <= room {
+        return text.to_owned();
     }
-    let folder = fitted_end(&kit.folder, right - layout.head_x);
-    canvas.text(layout.head_x, layout.folder_y, &folder, scale, theme::text());
+    let tail: String = text.chars().skip(count - room.saturating_sub(3)).collect();
+    format!("...{tail}")
+}
 
-    // The table: column titles, then a row per sample.
+/// The kit editor's table: column titles, then a row per sample shown, its
+/// number, file and the tracks that play it; the scroll bar when they do not fit.
+fn draw_kit_samples(canvas: &mut Canvas, kit: &KitView, layout: &KitLayout) {
+    let scale = layout.scale;
     let columns_y = layout.columns_y;
     canvas.text(layout.left, columns_y, "#", scale, theme::muted());
     canvas.text(layout.name_x, columns_y, "File", scale, theme::muted());
@@ -302,17 +290,55 @@ pub(super) fn draw_kit(canvas: &mut Canvas, kit: &KitView, layout: &KitLayout) {
             canvas.fill_rect(layout.left - 2 * scale, y, layout.list_width + 4 * scale, layout.row, focus_row_color());
         }
         canvas.text(layout.left, text_y, &(i + 1).to_string(), scale, theme::muted());
-        canvas.text(layout.name_x, text_y, &fitted(name, name_w), scale, if selected { ACCENT } else { theme::text() });
+        canvas.text(
+            layout.name_x,
+            text_y,
+            &fit_start(name, name_w, scale),
+            scale,
+            if selected { ACCENT } else { theme::text() },
+        );
         let (users, color) = match kit.users.get(i).filter(|u| !u.is_empty()) {
             Some(users) => (users.join(", "), theme::text()),
             None => ("-".to_owned(), theme::muted()),
         };
-        canvas.text(layout.users_x, text_y, &fitted(&users, layout.text_right(count) - layout.users_x), scale, color);
+        canvas.text(
+            layout.users_x,
+            text_y,
+            &fit_start(&users, layout.text_right(count) - layout.users_x, scale),
+            scale,
+            color,
+        );
     }
 
     if count > layout.shown() {
         scroll_thumb::draw(canvas, layout.scroll_bar(), layout.thumb(first, count), scale);
     }
+}
+
+/// The kit editor: the kit's samples on the left, the selected one on the
+/// right (fields, analysis, envelope with the decay marked).
+pub(super) fn draw_kit(canvas: &mut Canvas, kit: &KitView, layout: &KitLayout) {
+    let scale = layout.scale;
+    let fitted = |text: &str, width: i32| fit_start(text, width, scale);
+    let fitted_end = |text: &str, width: i32| fit_end(text, width, scale);
+    let right = layout.left + layout.list_width;
+
+    // The kit: its name and counts, then the labels of its title and
+    // description (their texts are the panel's, a click edits them).
+    let used = kit.users.iter().filter(|u| !u.is_empty()).count();
+    let counts = format!("{} samples, {used} played by the pattern's tracks", kit.samples.len());
+    let counts_x = right - text_width(&counts, scale);
+    canvas.text(layout.left, layout.top + 2 * scale, "KIT", scale, theme::muted());
+    let name = fitted(kit.kit, counts_x - layout.head_x - 8 * scale);
+    canvas.text(layout.head_x, layout.top + 2 * scale, &name, scale, ACCENT);
+    canvas.text(counts_x.max(layout.head_x), layout.top + 2 * scale, &counts, scale, theme::muted());
+    for (label, y) in [("Folder", layout.folder_y), ("Title", layout.title_y), ("Notes", layout.desc_y)] {
+        canvas.text(layout.left, y, label, scale, theme::muted());
+    }
+    let folder = fitted_end(&kit.folder, right - layout.head_x);
+    canvas.text(layout.head_x, layout.folder_y, &folder, scale, theme::text());
+
+    draw_kit_samples(canvas, kit, layout);
 
     // The selected sample's measurements, right of its controls.
     let label_w = text_width(&"m".repeat(KIT_FACT_LABEL), scale);

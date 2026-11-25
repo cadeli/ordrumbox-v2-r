@@ -149,7 +149,7 @@ pub(super) fn take(engine: &mut Engine, inbox: &mut Inbox, host: Option<HostTran
         engine.queue(next);
     }
     if let Some(preview) = inbox.preview.take() {
-        engine.preview(preview);
+        engine.preview(&preview);
     }
     if let Some(keymap) = inbox.keymap.take() {
         engine.set_keymap(keymap);

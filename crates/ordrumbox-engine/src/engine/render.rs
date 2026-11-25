@@ -64,23 +64,10 @@ impl Engine {
         out_left.fill(0.0);
         out_right.fill(0.0);
         self.returns.clear();
-        let [keep_fx, keep_mix, keep_lfo] = self.keep;
+        let [keep_fx, ..] = self.keep;
         let (host, ratios) = (&self.host, &self.cutoff_ratios);
         for (track, channel) in self.channels[..strips].iter_mut().enumerate() {
-            let target = Self::host_target(host, ratios, channel, track);
-            let before = channel.current;
-            channel.current.approach(&target, keep_fx);
-            let ramp = |from: f32, to: f32, keep: f32| to + (from - to) * keep;
-            let [lfo_volume, lfo_pan, lfo_cutoff, lfo_q] = channel.lfo;
-            let mix_or_lfo = |lfo: bool| if lfo { keep_lfo } else { keep_mix };
-            channel.current.volume = ramp(before.volume, target.volume, mix_or_lfo(lfo_volume));
-            channel.current.pan = ramp(before.pan, target.pan, mix_or_lfo(lfo_pan));
-            if lfo_cutoff {
-                channel.current.cutoff = ramp(before.cutoff, target.cutoff, keep_lfo);
-            }
-            if lfo_q {
-                channel.current.q = ramp(before.q, target.q, keep_lfo);
-            }
+            channel.approach(&Self::host_target(host, ratios, channel, track), self.keep);
 
             let range = track * QUANTUM..track * QUANTUM + n;
             let (in_l, in_r) = (&self.input_left[range.clone()], &self.input_right[range]);

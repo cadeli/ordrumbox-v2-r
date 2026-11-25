@@ -58,6 +58,68 @@ fn escape(text: &str) -> String {
     text.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
 }
 
+/// Where time `ms` is across the plots, `duration_ms` long.
+fn time_to_x(ms: f64, duration_ms: f64) -> f64 {
+    LEFT + (ms / duration_ms).clamp(0.0, 1.0) * PLOT_WIDTH
+}
+
+/// Where level `db` is in a plot from `top`, `height` high: 0 dB at the top.
+fn db_y(db: f64, top: f64, height: f64) -> f64 {
+    top + (-db / RANGE_DB).clamp(0.0, 1.0) * height
+}
+
+/// How far `hz` is, on a log scale, from [`SPECTROGRAM_MIN_HZ`] to `nyquist`.
+fn log_share(hz: f64, nyquist: f64) -> f64 {
+    (hz.max(SPECTROGRAM_MIN_HZ) / SPECTROGRAM_MIN_HZ).ln() / (nyquist / SPECTROGRAM_MIN_HZ).ln()
+}
+
+/// The envelope of `m`, 0 dB at the top, over a time axis in ms.
+fn plot_envelope(svg: &mut String, m: &Measures) {
+    let duration = m.duration_ms.max(1.0);
+    let time_x = |ms: f64| time_to_x(ms, duration);
+
+    label(svg, 4.0, ENVELOPE_TOP + 10.0, "0 dB");
+    label(svg, 4.0, ENVELOPE_TOP + ENVELOPE_HEIGHT, "-80");
+    line(svg, (LEFT, ENVELOPE_TOP), (LEFT + PLOT_WIDTH, ENVELOPE_TOP));
+    line(svg, (LEFT, ENVELOPE_TOP + ENVELOPE_HEIGHT), (LEFT + PLOT_WIDTH, ENVELOPE_TOP + ENVELOPE_HEIGHT));
+    let envelope: Vec<(f64, f64)> = m
+        .envelope_db
+        .iter()
+        .step_by((m.envelope_db.len() / ENVELOPE_POINTS).max(1))
+        .map(|p| (time_x(p.ms), db_y(p.value.max(-RANGE_DB), ENVELOPE_TOP, ENVELOPE_HEIGHT)))
+        .collect();
+    polyline(svg, &envelope, ENVELOPE_COLOR);
+    let tick_count = 8;
+    for tick in 0..=tick_count {
+        let ms = duration * f64::from(tick) / f64::from(tick_count);
+        label(svg, time_x(ms) - 10.0, ENVELOPE_TOP + ENVELOPE_HEIGHT + 14.0, &format!("{ms:.0}"));
+    }
+    label(svg, LEFT + PLOT_WIDTH - 20.0, ENVELOPE_TOP - 4.0, "ms");
+}
+
+/// The average spectrum of `m`, log frequency.
+fn plot_spectrum(svg: &mut String, m: &Measures) {
+    let nyquist = f64::from(m.sample_rate) / 2.0;
+    let spectrum_x = |hz: f64| LEFT + log_share(hz, nyquist).clamp(0.0, 1.0) * PLOT_WIDTH;
+    line(svg, (LEFT, SPECTRUM_TOP), (LEFT + PLOT_WIDTH, SPECTRUM_TOP));
+    line(svg, (LEFT, SPECTRUM_TOP + SPECTRUM_HEIGHT), (LEFT + PLOT_WIDTH, SPECTRUM_TOP + SPECTRUM_HEIGHT));
+    label(svg, 4.0, SPECTRUM_TOP + 10.0, "0 dB");
+    label(svg, 4.0, SPECTRUM_TOP + SPECTRUM_HEIGHT, "-80");
+    let spectrum: Vec<(f64, f64)> = m
+        .spectrum_db
+        .iter()
+        .enumerate()
+        .map(|(i, &db)| (i as f64 * m.spectrum_bin_hz, db))
+        .filter(|(hz, _)| *hz >= SPECTROGRAM_MIN_HZ)
+        .map(|(hz, db)| (spectrum_x(hz), db_y(db.max(-RANGE_DB), SPECTRUM_TOP, SPECTRUM_HEIGHT)))
+        .collect();
+    polyline(svg, &spectrum, SPECTRUM_COLOR);
+    for hz in FREQUENCY_TICKS.iter().filter(|&&hz| hz < nyquist) {
+        label(svg, spectrum_x(*hz) - 10.0, SPECTRUM_TOP + SPECTRUM_HEIGHT + 14.0, &format!("{hz:.0}"));
+    }
+    label(svg, LEFT + PLOT_WIDTH - 20.0, SPECTRUM_TOP - 4.0, "Hz");
+}
+
 /// The picture of `m`, titled `name`.
 pub fn to_svg(name: &str, m: &Measures) -> String {
     let mut svg = format!(
@@ -70,34 +132,13 @@ pub fn to_svg(name: &str, m: &Measures) -> String {
         escape(name),
         m.peak
     );
+    plot_envelope(&mut svg, m);
     let duration = m.duration_ms.max(1.0);
-    let time_x = |ms: f64| LEFT + (ms / duration).clamp(0.0, 1.0) * PLOT_WIDTH;
-
-    // Envelope, 0 dB at the top.
-    label(&mut svg, 4.0, ENVELOPE_TOP + 10.0, "0 dB");
-    label(&mut svg, 4.0, ENVELOPE_TOP + ENVELOPE_HEIGHT, "-80");
-    line(&mut svg, (LEFT, ENVELOPE_TOP), (LEFT + PLOT_WIDTH, ENVELOPE_TOP));
-    line(&mut svg, (LEFT, ENVELOPE_TOP + ENVELOPE_HEIGHT), (LEFT + PLOT_WIDTH, ENVELOPE_TOP + ENVELOPE_HEIGHT));
-    let db_y = |db: f64, top: f64, height: f64| top + (-db / RANGE_DB).clamp(0.0, 1.0) * height;
-    let envelope: Vec<(f64, f64)> = m
-        .envelope_db
-        .iter()
-        .step_by((m.envelope_db.len() / ENVELOPE_POINTS).max(1))
-        .map(|p| (time_x(p.ms), db_y(p.value.max(-RANGE_DB), ENVELOPE_TOP, ENVELOPE_HEIGHT)))
-        .collect();
-    polyline(&mut svg, &envelope, ENVELOPE_COLOR);
-    let tick_count = 8;
-    for tick in 0..=tick_count {
-        let ms = duration * f64::from(tick) / f64::from(tick_count);
-        label(&mut svg, time_x(ms) - 10.0, ENVELOPE_TOP + ENVELOPE_HEIGHT + 14.0, &format!("{ms:.0}"));
-    }
-    label(&mut svg, LEFT + PLOT_WIDTH - 20.0, ENVELOPE_TOP - 4.0, "ms");
+    let time_x = |ms: f64| time_to_x(ms, duration);
 
     // Spectrogram, log frequency.
     let nyquist = f64::from(m.sample_rate) / 2.0;
-    let log_share =
-        |hz: f64| (hz.max(SPECTROGRAM_MIN_HZ) / SPECTROGRAM_MIN_HZ).ln() / (nyquist / SPECTROGRAM_MIN_HZ).ln();
-    let gram_y = |hz: f64| SPECTROGRAM_TOP + SPECTROGRAM_HEIGHT * (1.0 - log_share(hz).clamp(0.0, 1.0));
+    let gram_y = |hz: f64| SPECTROGRAM_TOP + SPECTROGRAM_HEIGHT * (1.0 - log_share(hz, nyquist).clamp(0.0, 1.0));
     let columns = m.spectrogram_db.len().max(1) as f64;
     let cell_width = PLOT_WIDTH / columns;
     for (c, column) in m.spectrogram_db.iter().enumerate() {
@@ -121,25 +162,7 @@ pub fn to_svg(name: &str, m: &Measures) -> String {
     polyline(&mut svg, &track_points(&m.pitch_track), PITCH_COLOR);
     label(&mut svg, LEFT, SPECTROGRAM_TOP - 6.0, "Hz | white: pitch | orange: centroid");
 
-    // Average spectrum, log frequency.
-    let spectrum_x = |hz: f64| LEFT + log_share(hz).clamp(0.0, 1.0) * PLOT_WIDTH;
-    line(&mut svg, (LEFT, SPECTRUM_TOP), (LEFT + PLOT_WIDTH, SPECTRUM_TOP));
-    line(&mut svg, (LEFT, SPECTRUM_TOP + SPECTRUM_HEIGHT), (LEFT + PLOT_WIDTH, SPECTRUM_TOP + SPECTRUM_HEIGHT));
-    label(&mut svg, 4.0, SPECTRUM_TOP + 10.0, "0 dB");
-    label(&mut svg, 4.0, SPECTRUM_TOP + SPECTRUM_HEIGHT, "-80");
-    let spectrum: Vec<(f64, f64)> = m
-        .spectrum_db
-        .iter()
-        .enumerate()
-        .map(|(i, &db)| (i as f64 * m.spectrum_bin_hz, db))
-        .filter(|(hz, _)| *hz >= SPECTROGRAM_MIN_HZ)
-        .map(|(hz, db)| (spectrum_x(hz), db_y(db.max(-RANGE_DB), SPECTRUM_TOP, SPECTRUM_HEIGHT)))
-        .collect();
-    polyline(&mut svg, &spectrum, SPECTRUM_COLOR);
-    for hz in FREQUENCY_TICKS.iter().filter(|&&hz| hz < nyquist) {
-        label(&mut svg, spectrum_x(*hz) - 10.0, SPECTRUM_TOP + SPECTRUM_HEIGHT + 14.0, &format!("{hz:.0}"));
-    }
-    label(&mut svg, LEFT + PLOT_WIDTH - 20.0, SPECTRUM_TOP - 4.0, "Hz");
+    plot_spectrum(&mut svg, m);
     svg + "</svg>\n"
 }
 

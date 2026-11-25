@@ -118,6 +118,11 @@ impl SynthPresets {
         self.0.len()
     }
 
+    /// Each preset with its key, in file order.
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &Value)> {
+        self.0.iter()
+    }
+
     /// Preset keys, in file order.
     pub fn keys(&self) -> Vec<&str> {
         self.0.iter().map(|(k, _)| k).collect()
@@ -279,6 +284,28 @@ fn bypass_flags(preset: &Value) -> SynthBypass {
     }
 }
 
+/// The LFO an `lfo` object of a preset describes, its sync read at `bpm`.
+fn synth_lfo(lfo: Option<&Value>, bpm: f64) -> SynthLfo {
+    SynthLfo {
+        target: lfo_target(get(lfo, "target")),
+        wave: choice(get(lfo, "wave"), &WAVES, &Wave::ALL),
+        freq: sync_to_hz(get(lfo, "sync"), bpm).unwrap_or_else(|| finite(get(lfo, "freq"), 0.0)),
+        depth: finite(get(lfo, "depth"), 0.0),
+    }
+}
+
+/// The pitch envelope a `pitchEnv` object of a preset describes, in range.
+fn pitch_env(pitch_env: Option<&Value>) -> PitchEnv {
+    PitchEnv {
+        amount: clamp(finite(get(pitch_env, "amount"), 0.0), PITCH_ENV_AMOUNT_RANGE.0, PITCH_ENV_AMOUNT_RANGE.1),
+        decay: clamp(
+            finite(get(pitch_env, "decay"), PITCH_ENV_DECAY_DEFAULT),
+            PITCH_ENV_DECAY_RANGE.0,
+            PITCH_ENV_DECAY_RANGE.1,
+        ),
+    }
+}
+
 /// The `update` message `WorkletSynthVoice` sends for `note` with `preset`.
 pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
     let gs = Some(preset);
@@ -294,20 +321,11 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
     let noise = at("noise");
     let filter = at("filter");
     let env = at("envelope");
-    let lfo = |key: &str| {
-        let l = at(key);
-        SynthLfo {
-            target: lfo_target(get(l, "target")),
-            wave: choice(get(l, "wave"), &WAVES, &Wave::ALL),
-            freq: sync_to_hz(get(l, "sync"), note.bpm).unwrap_or_else(|| finite(get(l, "freq"), 0.0)),
-            depth: finite(get(l, "depth"), 0.0),
-        }
-    };
     let mod_env = at("modEnvelope");
     let mod_target = get(mod_env, "target");
+    let is_mod_env_on = mod_target.and_then(Value::as_str).is_some_and(|t| !t.is_empty() && t != "off");
     let fm = at("fm");
     let unison = at("unison");
-    let pitch_env = at("pitchEnv");
 
     SynthPatch {
         osc_freq,
@@ -329,31 +347,20 @@ pub fn synth_patch(preset: &Value, note: SynthNote) -> SynthPatch {
         filter_slope: finite(get(filter, "slope"), 12.0),
         drive: finite(get(filter, "drive"), 0.0),
         pitch_punch: finite(at("pitchPunch"), 0.0),
-        pitch_env: PitchEnv {
-            amount: clamp(finite(get(pitch_env, "amount"), 0.0), PITCH_ENV_AMOUNT_RANGE.0, PITCH_ENV_AMOUNT_RANGE.1),
-            decay: clamp(
-                finite(get(pitch_env, "decay"), PITCH_ENV_DECAY_DEFAULT),
-                PITCH_ENV_DECAY_RANGE.0,
-                PITCH_ENV_DECAY_RANGE.1,
-            ),
-        },
+        pitch_env: pitch_env(at("pitchEnv")),
         sub_gain: level(at("subGain"), 0.0),
         envelope: adsr(env, 0.7),
         volume: 1.0,
         pan: finite(Some(&Value::Number(note.pan)), 0.0),
         velocity: peak,
-        lfo1: lfo("lfo"),
-        lfo2: lfo("lfo2"),
+        lfo1: synth_lfo(at("lfo"), note.bpm),
+        lfo2: synth_lfo(at("lfo2"), note.bpm),
         filter_env_amount: clamp(finite(get(or_else(at("filterEnv"), filter), "filterEnvelopeAmount"), 0.0), 0.0, 1.0),
         fm_amount: clamp(finite(get(fm, "amount"), 0.0), 0.0, 1.0),
         fm_algorithm: clamp(finite(get(fm, "algo"), 0.0).round(), 0.0, 4.0),
         mod_envelope: adsr(mod_env, 0.0),
         mod_env_target: choice(mod_target, &MOD_ENV_TARGETS, &ModEnvTarget::ALL),
-        mod_env_depth: if mod_target.and_then(Value::as_str).is_some_and(|t| !t.is_empty() && t != "off") {
-            1.0
-        } else {
-            0.0
-        },
+        mod_env_depth: if is_mod_env_on { 1.0 } else { 0.0 },
         unison_count: unison_count(get(unison, "count")),
         unison_detune: clamp(finite(get(unison, "detune"), 0.0), 0.0, 100.0),
         unison_spread: clamp(finite(get(unison, "spread"), 0.0), 0.0, 1.0),

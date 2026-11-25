@@ -93,6 +93,28 @@ fn advance(phase: &mut [f64; 3], cycle: &mut [f64; 3], steps: [f64; 3], is_synce
     }
 }
 
+/// The phase increments `inc` of the three oscillators, frequency modulated
+/// by FM algorithm `algo` at depths (`depth1`, `depth2`); `wave` gives each
+/// oscillator's value now.
+fn fm_increments(algo: i64, inc: [f64; 3], (depth1, depth2): (f64, f64), wave: impl Fn(usize) -> f64) -> [f64; 3] {
+    let [mut f1, mut f2, f3] = inc;
+    match algo {
+        0 => f1 += wave(1) * depth1,
+        1 => f1 += wave(2) * depth1,
+        2 => {
+            f1 += wave(1) * depth1;
+            f2 += wave(2) * depth2;
+        }
+        3 => f1 += (wave(1) + wave(2)) * depth1,
+        4 => {
+            f1 += wave(1) * depth1;
+            f2 += wave(0) * depth2;
+        }
+        _ => {}
+    }
+    [f1, f2, f3]
+}
+
 /// Points of the scope: four cycles of the three
 /// oscillators with their gains, octaves, detunes, FM, the sync and ring
 /// modulation of oscillator 2, and sub, the drive's
@@ -129,27 +151,13 @@ pub fn scope(draft: &Object, time: f64, bpm: f64) -> Vec<f64> {
     let (mut phase, mut cycle) = ([0.0f64; 3], [0.0f64; 3]);
     let mut out = Vec::with_capacity(SAMPLES);
     for _ in 0..SAMPLES {
-        let o2 = wave_at(&waves[1], phase[1], cycle[1], width[1]);
-        let o3 = wave_at(&waves[2], phase[2], cycle[2], width[2]);
-        let (mut f1, mut f2, f3) = (inc[0], inc[1], inc[2]);
-        if fm_amount > 0.001 {
-            match fm_algo as i64 {
-                0 => f1 += o2 * depth1,
-                1 => f1 += o3 * depth1,
-                2 => {
-                    f1 += o2 * depth1;
-                    f2 += o3 * depth2;
-                }
-                3 => f1 += (o2 + o3) * depth1,
-                4 => {
-                    let o1 = wave_at(&waves[0], phase[0], cycle[0], width[0]);
-                    f1 += o2 * depth1;
-                    f2 += o1 * depth2;
-                }
-                _ => {}
-            }
-        }
-        advance(&mut phase, &mut cycle, [f1, f2, f3], is_synced);
+        let wave = |i: usize| wave_at(&waves[i], phase[i], cycle[i], width[i]);
+        let increments = if fm_amount > 0.001 {
+            fm_increments(fm_algo as i64, [inc[0], inc[1], inc[2]], (depth1, depth2), wave)
+        } else {
+            [inc[0], inc[1], inc[2]]
+        };
+        advance(&mut phase, &mut cycle, increments, is_synced);
         let sub = if sub_gain > 0.0 {
             wave_at("sine", (cycle[0].rem_euclid(2.0) + phase[0]) * 0.5, 0.0, 0.5) * sub_gain
         } else {

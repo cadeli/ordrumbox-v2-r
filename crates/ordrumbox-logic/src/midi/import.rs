@@ -121,18 +121,7 @@ pub fn import(file_name: &str, bytes: &[u8], roots: &[(String, f64)]) -> Result<
     let programs = midi.program_changes();
     let c = catalog();
 
-    // Notes by channel, in the order channels first play; a channel's name is
-    // the name of the track its first note is in.
-    let mut channels: Vec<(u8, Vec<NoteOn>, String)> = Vec::new();
-    for note in &notes {
-        match channels.iter_mut().find(|(ch, _, _)| *ch == note.channel) {
-            Some((_, list, _)) => list.push(*note),
-            None => {
-                let name = midi.track_names.get(note.track).cloned().unwrap_or_default();
-                channels.push((note.channel, vec![*note], name));
-            }
-        }
-    }
+    let channels = channel_notes(&notes, &midi.track_names);
 
     let root_or_c3 = |name: &str| root_note(roots, name).unwrap_or(C3_MIDI_NOTE);
     let mut defs: Vec<TrackDef> = Vec::new();
@@ -177,10 +166,34 @@ pub fn import(file_name: &str, bytes: &[u8], roots: &[(String, f64)]) -> Result<
 
     let base_name = strip_midi_extension(file_name);
     let (patterns, cut) = patterns_from(&defs, base_name, f64::from(division));
-    let mut message = if patterns.len() > 1 {
-        format!("MIDI imported: {} track(s) into {} patterns", defs.len(), patterns.len())
+    let message = import_message(defs.len(), patterns.len(), cut, unplaced);
+    Ok(Imported { patterns, track_count: defs.len(), message })
+}
+
+/// `notes` by channel, in the order channels first play, each with its name:
+/// the name in `track_names` of the track its first note is in.
+fn channel_notes(notes: &[NoteOn], track_names: &[String]) -> Vec<(u8, Vec<NoteOn>, String)> {
+    let mut channels: Vec<(u8, Vec<NoteOn>, String)> = Vec::new();
+    for note in notes {
+        match channels.iter_mut().find(|(ch, _, _)| *ch == note.channel) {
+            Some((_, list, _)) => list.push(*note),
+            None => {
+                let name = track_names.get(note.track).cloned().unwrap_or_default();
+                channels.push((note.channel, vec![*note], name));
+            }
+        }
+    }
+    channels
+}
+
+/// What an import says: how many tracks into how many patterns, and the
+/// notes left out (past the last pattern when `cut`, `unplaced` without an
+/// instrument).
+fn import_message(track_count: usize, pattern_count: usize, cut: bool, unplaced: usize) -> String {
+    let mut message = if pattern_count > 1 {
+        format!("MIDI imported: {track_count} track(s) into {pattern_count} patterns")
     } else {
-        format!("MIDI imported: {} track(s)", defs.len())
+        format!("MIDI imported: {track_count} track(s)")
     };
     if cut {
         message.push_str(&format!(", notes past beat {} left out", MAX_PATTERNS * i64::from(PATTERN_BEATS)));
@@ -188,7 +201,7 @@ pub fn import(file_name: &str, bytes: &[u8], roots: &[(String, f64)]) -> Result<
     if unplaced > 0 {
         message.push_str(&format!(", {unplaced} note(s) left out: no instrument left for their channel"));
     }
-    Ok(Imported { patterns, track_count: defs.len(), message })
+    message
 }
 
 /// `file.name.replace(/\.midi?$/i, '')`.

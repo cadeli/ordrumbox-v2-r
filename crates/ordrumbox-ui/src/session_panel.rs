@@ -359,32 +359,12 @@ pub(super) fn control_name(id: Id) -> (&'static str, &'static str) {
         Id::Returns(key) => crate::output::find_return(key).map_or(("", ""), |p| (p.label, p.unit)),
         Id::SynthField(_) => ("value", ""),
         Id::Fx(key) => (prop(&FX_KNOBS, key), ""),
-        Id::Generation(key) => {
-            let rows = GENERATION_GROOVE.iter().chain(GENERATION_ENGINE.iter());
-            let label = rows
-                .filter_map(|r| match r {
-                    GenerationRow::Slider(p) if p.key == key => Some(p.label),
-                    _ => None,
-                })
-                .next()
-                .unwrap_or_else(|| prop(&GENERATION_MANUAL, key));
-            (label, "")
-        }
+        Id::Generation(key) => (generation_slider_label(key).unwrap_or_else(|| prop(&GENERATION_MANUAL, key)), ""),
         Id::Compose(key) => (prop(&GENERATION_COMPOSE, key), ""),
         Id::Loop(key) => (prop(&LOOP_PROPS, key), ""),
         Id::Lfo(_, param) => (param.label(), ""),
         Id::NoteKnob(key) => NOTE_KNOBS.iter().find(|(p, _)| p.key == key).map_or(("", ""), |(p, u)| (p.label, *u)),
-        Id::NoteSlider(key) => {
-            let label = NOTE_GROUPS
-                .iter()
-                .flat_map(|g| g.iter())
-                .find_map(|r| match r {
-                    NoteRow::Slider(p) if p.key == key => Some(p.label),
-                    _ => None,
-                })
-                .unwrap_or("");
-            (label, "")
-        }
+        Id::NoteSlider(key) => (note_slider_label(key).unwrap_or(""), ""),
         Id::KitKnob(field) | Id::SampleKnob(field) => KIT_KNOBS
             .iter()
             .find(|(f, ..)| *f == field)
@@ -418,6 +398,22 @@ pub(super) fn control_name(id: Id) -> (&'static str, &'static str) {
         }
         _ => ("", ""),
     }
+}
+
+/// The label of the Groove or Engine slider `key`.
+fn generation_slider_label(key: &str) -> Option<&'static str> {
+    GENERATION_GROOVE.iter().chain(GENERATION_ENGINE.iter()).find_map(|r| match r {
+        GenerationRow::Slider(p) if p.key == key => Some(p.label),
+        _ => None,
+    })
+}
+
+/// The label of the note editor's slider `key`.
+fn note_slider_label(key: &str) -> Option<&'static str> {
+    NOTE_GROUPS.iter().flat_map(|g| g.iter()).find_map(|r| match r {
+        NoteRow::Slider(p) if p.key == key => Some(p.label),
+        _ => None,
+    })
 }
 
 /// The edits that set the filter of `track` to `filter_type`: from the bypass,

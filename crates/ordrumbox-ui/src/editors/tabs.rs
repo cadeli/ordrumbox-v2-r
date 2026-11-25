@@ -275,13 +275,8 @@ pub(super) fn generation_tab(
 ) {
     let s = rows.scale;
     // The simple view: auto, lock, a new line, three settings.
-    let toggle = |rows: &mut Rows, key: &'static str, label: &str, on: bool| {
-        let r = rows.row();
-        rows.label(r, label, Some(key), state.selected_prop == Some(key));
-        rows.items.push(Item::new(Some(Id::Toggle(key)), rows.field(r, 36 * s), Kind::Toggle { on }));
-    };
-    toggle(rows, "autoMode", "Auto", track.auto_mode);
-    toggle(rows, "composeLock", "Lock", track.compose_lock);
+    generation_toggle(rows, ("autoMode", "Auto"), track.auto_mode, state);
+    generation_toggle(rows, ("composeLock", "Lock"), track.compose_lock, state);
     let r = rows.row();
     rows.label(r, "New line", None, false);
     let button = Kind::Button { label: "\u{21bb}".into(), on: false };
@@ -309,9 +304,27 @@ pub(super) fn generation_tab(
     let label = if state.generation_advanced { "Advanced \u{25be}" } else { "Advanced \u{25b8}" };
     let button = Kind::Button { label: label.into(), on: state.generation_advanced };
     rows.items.push(Item::new(Some(Id::GenerationAdvanced), Rect::new(r.x, r.y + 2 * s, 120 * s, r.h - 4 * s), button));
-    if !state.generation_advanced {
-        return;
+    if state.generation_advanced {
+        advanced_generation(rows, (track, moved), compose, state);
     }
+}
+
+/// A yes/no setting `key` of the generation tab, shown as `label`.
+fn generation_toggle(rows: &mut Rows, (key, label): (&'static str, &str), on: bool, state: &EditorState) {
+    let r = rows.row();
+    rows.label(r, label, Some(key), state.selected_prop == Some(key));
+    rows.items.push(Item::new(Some(Id::Toggle(key)), rows.field(r, 36 * rows.scale), Kind::Toggle { on }));
+}
+
+/// The unfolded Advanced part of the generation tab: its tabs (Groove and
+/// Engine, or Manual; Compose) and the settings of the one shown.
+fn advanced_generation(
+    rows: &mut Rows,
+    (track, moved): (&Track, &[(&'static str, f64)]),
+    compose: Option<&ComposeView>,
+    state: &EditorState,
+) {
+    let s = rows.scale;
     let compose_tab = compose.is_some() && state.generation_tab == COMPOSE_TAB;
     // Three slots whatever shows: Compose stays put when Auto turns Engine off.
     let tabs = if track.auto_mode {
@@ -343,7 +356,7 @@ pub(super) fn generation_tab(
             // A drum line comes from its style (Compose); a melodic one has them above.
             GenerationRow::Select("autoVariant", _) | GenerationRow::Slider(Prop { key: "autoDensity", .. }) => {}
             GenerationRow::Slider(p) => generation_slider(rows, (track, moved), p, state),
-            GenerationRow::Toggle(key, label) => toggle(rows, key, label, flag(track, key)),
+            GenerationRow::Toggle(key, label) => generation_toggle(rows, (key, label), flag(track, key), state),
             GenerationRow::Select(key, label) => {
                 let r = rows.row();
                 rows.label(r, label, Some(key), state.selected_prop == Some(key));

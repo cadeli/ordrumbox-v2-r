@@ -1,6 +1,9 @@
 //! Tests of ui.
 
+use super::keys::*;
 use super::*;
+use crate::menu::Command;
+use crate::ui_input::KeyEvent;
 
 /// A `Ui` on `library`.
 fn standalone_ui(library: ordrumbox_core::Library) -> Ui {
