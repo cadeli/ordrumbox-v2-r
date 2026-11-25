@@ -117,6 +117,13 @@ pub struct Cursor {
     pub step: i32,
 }
 
+/// A track's mute and solo switches, as shown or as taken back from their lanes.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct MuteSolo {
+    pub mute: bool,
+    pub solo: bool,
+}
+
 /// What to show.
 #[derive(Debug)]
 pub struct View<'a> {
@@ -174,13 +181,13 @@ pub struct View<'a> {
     pub live_muted: u64,
     /// Mute and solo as shown, by track: while the song plays, what its
     /// automation lanes set; empty, or past its end, the tracks' own.
-    pub switches: Vec<(bool, bool)>,
+    pub switches: Vec<MuteSolo>,
     /// The help line for what is under the pointer; `None`: the view's keys.
     pub hint: Option<&'a str>,
     /// The track whose name is under the pointer: drawn lighter, with the mark of its menu.
     pub hovered_track: Option<usize>,
     /// Mute and solo taken back from their lanes, by track: marked on their boxes.
-    pub switches_taken_back: Vec<(bool, bool)>,
+    pub switches_taken_back: Vec<MuteSolo>,
 }
 
 mod beat_window;

@@ -204,6 +204,14 @@ pub struct Menu {
     pub items: Vec<Item>,
 }
 
+/// The switches of the track the menus act on, as their check marks show them.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct FocusTrack {
+    pub auto_mode: bool,
+    pub mute: bool,
+    pub solo: bool,
+}
+
 /// What the menus depend on.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct MenuState {
@@ -213,8 +221,8 @@ pub struct MenuState {
     pub undo: Option<String>,
     pub redo: Option<String>,
     pub has_cursor: bool,
-    /// The track the cursor or selection is on: (auto, mute, solo).
-    pub focus_track: Option<(bool, bool, bool)>,
+    /// The track the cursor or selection is on.
+    pub focus_track: Option<FocusTrack>,
     pub can_remove_track: bool,
     pub clipboard_step: bool,
     pub clipboard_track: bool,

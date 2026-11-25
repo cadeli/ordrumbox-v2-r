@@ -14,6 +14,7 @@ use super::Session;
 use crate::panel::{Id, Item, Kind, Rect};
 use crate::scale::Scale;
 use crate::theme::TAKEN_BACK;
+use crate::view::MuteSolo;
 use ordrumbox_core::automation::{
     AutomationKind, AutomationStroke, AutomationTarget, is_on, lanes_value_at_position, switch_value,
 };
@@ -126,13 +127,15 @@ impl Session {
 
     /// Mute and solo of each track of the pattern shown, whether taken back
     /// from their lanes; empty when no lane is.
-    pub(super) fn switches_taken_back(&self) -> Vec<(bool, bool)> {
+    pub(super) fn switches_taken_back(&self) -> Vec<MuteSolo> {
         if self.overridden_lanes().is_empty() {
             return Vec::new();
         }
         let count = self.pattern().map_or(0, |pattern| pattern.tracks.len());
         let taken = |t, target| self.is_track_taken_back(t, target);
-        (0..count).map(|t| (taken(t, AutomationTarget::Mute), taken(t, AutomationTarget::Solo))).collect()
+        (0..count)
+            .map(|t| MuteSolo { mute: taken(t, AutomationTarget::Mute), solo: taken(t, AutomationTarget::Solo) })
+            .collect()
     }
 
     /// For each lane of the selected song, whether it is taken back.
@@ -207,15 +210,15 @@ impl Session {
 
     /// Mute and solo of track `t` as shown: what the song's lanes set while
     /// it plays, else the track's own.
-    pub(super) fn shown_switch(&self, t: usize) -> (bool, bool) {
-        let Some(track) = self.track(t) else { return (false, false) };
+    pub(super) fn shown_switch(&self, t: usize) -> MuteSolo {
+        let Some(track) = self.track(t) else { return MuteSolo::default() };
         let shown = |target, own| self.automated_now(t, target).map_or(own, is_on);
-        (shown(AutomationTarget::Mute, track.mute), shown(AutomationTarget::Solo, track.solo))
+        MuteSolo { mute: shown(AutomationTarget::Mute, track.mute), solo: shown(AutomationTarget::Solo, track.solo) }
     }
 
     /// Every track's [`Self::shown_switch`] while the song plays; empty
     /// otherwise (the views show the tracks' own).
-    pub(super) fn shown_switches(&self) -> Vec<(bool, bool)> {
+    pub(super) fn shown_switches(&self) -> Vec<MuteSolo> {
         if self.playing_position().is_none() {
             return Vec::new();
         }

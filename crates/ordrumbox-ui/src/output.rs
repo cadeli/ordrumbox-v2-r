@@ -224,7 +224,7 @@ mod tests {
     #[test]
     fn every_control_spans_the_range_the_bus_uses() {
         for p in params() {
-            let (min, max, default) = (p.spec.min as f32, p.spec.max as f32, p.spec.default as f32);
+            let (min, max, default) = (p.spec.min as f32, p.spec.max as f32, p.spec.default.unwrap() as f32);
             assert_eq!(min, setting(&MasterSettings::MIN, p.key), "{} min", p.key);
             assert_eq!(max, setting(&MasterSettings::MAX, p.key), "{} max", p.key);
             assert_eq!(default, setting(&MasterSettings::default(), p.key), "{} default", p.key);
@@ -239,7 +239,7 @@ mod tests {
             let at = |settings: &ReturnSettings| section.get(settings, p.key) as f32;
             assert_eq!(p.spec.min as f32, at(&ReturnSettings::MIN), "{} min", p.key);
             assert_eq!(p.spec.max as f32, at(&ReturnSettings::MAX), "{} max", p.key);
-            assert_eq!(p.spec.default as f32, at(&ReturnSettings::default()), "{} default", p.key);
+            assert_eq!(p.spec.default.unwrap() as f32, at(&ReturnSettings::default()), "{} default", p.key);
         }
     }
 

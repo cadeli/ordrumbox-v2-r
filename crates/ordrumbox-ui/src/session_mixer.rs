@@ -13,7 +13,7 @@ use crate::mixer::{self, MixerLayout, MixerView, TRACK_KNOBS};
 use crate::output::{self, Param};
 use crate::panel::{self, Id, Item, Kind, Rect, Step};
 use crate::scale::Scale;
-use crate::view::Spot;
+use crate::view::{MuteSolo, Spot};
 use crate::{frame, master, returns, theme};
 use ordrumbox_core::{AutomationTarget, num};
 use ordrumbox_engine::strip_settings::delay_beats_used;
@@ -94,7 +94,7 @@ impl Session {
                     knob(spec, value, label, Format::Fixed2.value(value, "")),
                 ));
             }
-            let (mute, solo) = self.shown_switch(t);
+            let MuteSolo { mute, solo } = self.shown_switch(t);
             for (key, label, on, rect) in [("mute", "M", mute, strip.mute), ("solo", "S", solo, strip.solo)] {
                 items.push(Item::new(Some(Id::MixerToggle(t, key)), rect, Kind::Button { label: label.into(), on }));
             }

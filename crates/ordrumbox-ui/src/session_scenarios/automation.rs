@@ -8,6 +8,7 @@ use crate::control::Spec;
 use crate::menu::Command;
 use crate::panel::Id;
 use crate::session::session_types::PlayMode;
+use crate::view::MuteSolo;
 use ordrumbox_core::automation::{AutomationTarget, volume_level};
 use ordrumbox_core::steps::TICK;
 
@@ -168,7 +169,7 @@ fn the_grid_and_the_track_editor_show_the_lanes_too() {
         _ => None,
     });
     assert_eq!(slider, Some((gain, true)));
-    assert_eq!(s.shown_switches(), [(true, false)]);
+    assert_eq!(s.shown_switches(), [MuteSolo { mute: true, solo: false }]);
     // The track editor's knob.
     assert!(s.track_view(0).unwrap().lfo.contains(&("volume", gain)));
 
@@ -177,7 +178,7 @@ fn the_grid_and_the_track_editor_show_the_lanes_too() {
     assert_eq!((s.track(0).unwrap().volume, s.automated_now(0, AutomationTarget::Volume)), (0.7, None));
     // M in the grid: the mute lane taken back, the track left playing.
     s.switch_track(0, crate::session::Switch::Mute);
-    assert_eq!((s.shown_switches(), s.track(0).unwrap().mute), (vec![(false, false)], false));
+    assert_eq!((s.shown_switches(), s.track(0).unwrap().mute), (vec![MuteSolo::default()], false));
 }
 
 #[test]

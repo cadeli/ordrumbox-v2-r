@@ -16,6 +16,7 @@ use crate::midi_settings::{
     CLOCK_IN_KEY, CLOCK_OUT_KEY, MIDI_KEY, MIDI_OUT_KEY, MidiPort, chosen_clock_in, chosen_clock_out,
     chosen_midi_input, chosen_midi_output,
 };
+use crate::panel::Step;
 use crate::scale::Scale;
 use crate::{store, view};
 
@@ -126,8 +127,8 @@ impl Prefs {
         lines
     }
 
-    fn change(&mut self, delta: isize) {
-        let wrap = |at: usize, len: usize| (at as isize + delta).rem_euclid(len as isize) as usize;
+    fn change(&mut self, step: Step) {
+        let wrap = |at: usize, len: usize| step.target_index(at, len).unwrap_or(at);
         match self.rows[self.row] {
             Row::Audio => self.audio.at = wrap(self.audio.at, self.audio.options.len()),
             Row::Midi => self.midi.at = wrap(self.midi.at, self.midi.options.len()),
@@ -225,9 +226,9 @@ impl Session {
             OverlayKey::Escape => self.chrome.overlay = None,
             OverlayKey::Move(delta) => prefs.row = (prefs.row as isize + delta).clamp(0, count as isize - 1) as usize,
             OverlayKey::Edge(end) => prefs.row = if *end { count - 1 } else { 0 },
-            OverlayKey::Side(delta) => prefs.change(*delta),
+            OverlayKey::Side(step) => prefs.change(*step),
             OverlayKey::Enter if prefs.rows[prefs.row] == Row::Ok => self.apply_preferences(),
-            OverlayKey::Enter => prefs.change(1),
+            OverlayKey::Enter => prefs.change(Step::Next),
             OverlayKey::Back | OverlayKey::Letter(_) => {}
         }
         true
@@ -248,7 +249,7 @@ impl Session {
             if prefs.rows[i] == Row::Ok {
                 self.apply_preferences();
             } else {
-                prefs.change(1);
+                prefs.change(Step::Next);
             }
         }
         true

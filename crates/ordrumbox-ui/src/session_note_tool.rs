@@ -10,8 +10,9 @@ use ordrumbox_logic::quantize::{Quantize, Scope};
 use super::Session;
 use super::session_labels::notes_label;
 use super::session_overlay::Overlay;
-use super::session_types::OverlayKey;
+use super::session_types::{OverlayKey, RowClick, RowKey};
 use super::session_zone::zone_label;
+use crate::panel::Step;
 use crate::scale::Scale;
 use crate::view;
 
@@ -106,15 +107,11 @@ impl Draft {
         ]
     }
 
-    /// The draft's line `line` (the Notes line, which no key reaches, is not one).
-    fn row_of_line(line: usize) -> Option<usize> {
-        line.checked_sub(1).filter(|&row| row < ROW_COUNT)
-    }
-
-    fn change(&mut self, delta: isize) {
+    /// The value of the chosen line one `step` away, round its choices.
+    fn change(&mut self, step: Step) {
         let Some(count) = self.tool.value_counts().get(self.row).copied() else { return };
         let value = &mut self.values[self.row];
-        *value = (*value as isize + delta).rem_euclid(count as isize) as usize;
+        *value = step.target_index(*value, count).unwrap_or(*value);
     }
 }
 
@@ -140,16 +137,12 @@ impl Session {
     /// A key while the modal is open; whether it was.
     pub(super) fn note_tool_key(&mut self, key: &OverlayKey) -> bool {
         let Some(Overlay::NoteTool(draft)) = &mut self.chrome.overlay else { return false };
-        match key {
-            OverlayKey::Escape => self.chrome.overlay = None,
-            OverlayKey::Move(delta) => {
-                draft.row = (draft.row as isize + delta).clamp(0, ROW_COUNT as isize - 1) as usize
-            }
-            OverlayKey::Edge(end) => draft.row = if *end { APPLY_ROW } else { 0 },
-            OverlayKey::Side(delta) => draft.change(*delta),
-            OverlayKey::Enter if draft.row == APPLY_ROW => self.apply_note_tool(),
-            OverlayKey::Enter => draft.change(1),
-            OverlayKey::Back | OverlayKey::Letter(_) => {}
+        match key.row_key(draft.row, APPLY_ROW) {
+            RowKey::Close => self.chrome.overlay = None,
+            RowKey::Row(row) => draft.row = row,
+            RowKey::Change(step) => draft.change(step),
+            RowKey::Run => self.apply_note_tool(),
+            RowKey::Ignored => {}
         }
         true
     }
@@ -158,18 +151,14 @@ impl Session {
     /// chooses it and changes it; whether it was open.
     pub(super) fn note_tool_click(&mut self, width: i32, height: i32, scale: Scale, x: i32, y: i32) -> bool {
         let Some(Overlay::NoteTool(draft)) = &mut self.chrome.overlay else { return false };
-        let (title, lines) = (draft.tool.title(), draft.lines());
-        let window = (width, height);
-        if !view::notice_contains(window, title, &lines, scale, x, y) {
-            self.chrome.overlay = None;
-        } else if let Some(row) = view::notice_line_at(window, title, &lines, scale, x, y).and_then(Draft::row_of_line)
-        {
-            draft.row = row;
-            if row == APPLY_ROW {
-                self.apply_note_tool();
-            } else {
-                draft.change(1);
+        match RowClick::at((width, height), (draft.tool.title(), &draft.lines()), scale, (x, y), ROW_COUNT) {
+            RowClick::Outside => self.chrome.overlay = None,
+            // A click on a row is Enter on it.
+            RowClick::Row(row) => {
+                draft.row = row;
+                self.note_tool_key(&OverlayKey::Enter);
             }
+            RowClick::Elsewhere => {}
         }
         true
     }

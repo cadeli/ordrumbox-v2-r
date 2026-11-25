@@ -2,12 +2,13 @@
 //! a drag, a hover, a key or a typed number on them does, and the tooltip.
 
 use crate::scale::Scale;
+use ordrumbox_core::json::Value;
 use ordrumbox_core::num;
 use std::borrow::Cow;
 
 use super::Session;
 use super::session_chrome::{Drag, GridHold};
-use super::session_panel::{DOUBLE_CLICK, control_name};
+use super::session_panel::{DOUBLE_CLICK, control_name, history_label};
 use super::session_panel_keys::moved_value;
 use super::session_types::Workspace;
 use crate::canvas::Canvas;
@@ -19,6 +20,13 @@ use crate::view;
 use crate::view::Layout;
 use crate::{control_help, editors};
 use std::time::Instant;
+
+/// Which texts a value control shows beside it: a label, a value.
+#[derive(Debug, Clone, Copy)]
+struct Captions {
+    labelled: bool,
+    valued: bool,
+}
 
 impl Session {
     // ─── The mouse ───────────────────────────────────────────────────────────
@@ -65,7 +73,7 @@ impl Session {
                 self.press_value(
                     &item,
                     (id, spec, value),
-                    (label.is_some(), !text.is_empty()),
+                    Captions { labelled: label.is_some(), valued: !text.is_empty() },
                     (x, y),
                     (scale, shift, double),
                 );
@@ -105,14 +113,25 @@ impl Session {
         }
     }
 
-    /// A press on a knob, slider or stepper `item` (`id`, its `spec` and its
-    /// `value`; `labelled`, `valued`: it has a label and a value text) at
-    /// `(x, y)`: a step, a reset on a double click, or the start of a drag.
+    /// Control `id` given back its default: `None` unsets its setting (a
+    /// compose setting follows its style again).
+    pub(super) fn reset_value(&mut self, id: Id, default: Option<f64>) {
+        if let Some(value) = default {
+            return self.set_value(id, value);
+        }
+        let (Id::Compose(key), Some(t)) = (id, self.editor_track()) else { return };
+        let name = self.track_name(t);
+        self.update_track(t, &[(key, Value::Null)], &format!("{} on {name}", history_label(id)), true);
+    }
+
+    /// A press on a knob, slider or stepper `item` (`id`, its `spec`, its
+    /// `value` and its captions) at `(x, y)`: a step, a reset on a double
+    /// click, or the start of a drag.
     fn press_value(
         &mut self,
         item: &Item,
         (id, spec, value): (Id, Spec, f64),
-        (labelled, valued): (bool, bool),
+        Captions { labelled, valued }: Captions,
         (x, y): (i32, i32),
         (scale, shift, double): (Scale, bool, bool),
     ) {
@@ -135,7 +154,7 @@ impl Session {
         if double {
             // Double-click: the default value.
             self.chrome.widgets.last_click = None;
-            self.set_value(id, spec.default);
+            self.reset_value(id, spec.default);
             return;
         }
         let mut drag = Drag { id, spec, start: value, x, y, bar: None, fine: false };
@@ -395,7 +414,7 @@ impl Session {
                 self.chrome.widgets.focus = Some(id);
                 self.open_entry(id, spec, current);
             }
-            "default" => self.set_value(id, spec.default),
+            "default" => self.reset_value(id, spec.default),
             "copy" => {
                 self.chrome.widgets.copied_value = Some(current);
                 self.message = format!("value {} copied", num::text(spec.shown(current)));

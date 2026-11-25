@@ -4,6 +4,7 @@
 
 use super::Session;
 use super::session_chrome::GridHold;
+use super::session_types::WheelMode;
 use crate::scale::Scale;
 use crate::view::BarHold;
 
@@ -47,21 +48,21 @@ impl Session {
         size: (i32, i32, Scale),
         (x, y): (i32, i32),
         (columns, lines): (isize, isize),
-        (zoom, scroll): (bool, bool),
+        mode: WheelMode,
     ) -> bool {
         let Some(layout) = self.grid_layout(size) else { return false };
         if !layout.beats_area().contains(x, y) {
             return false;
         }
         let (shown, total) = (layout.beats(), layout.total_beats());
-        if zoom && lines != 0 {
+        if mode == WheelMode::Zoom && lines != 0 {
             let window = &mut self.chrome.beat_window;
             window.zoom_at(lines, (shown, total), (layout.beat_under(x), x), layout.bar_track());
             return true;
         }
         let notches = if columns != 0 {
             columns
-        } else if scroll {
+        } else if mode == WheelMode::Scroll {
             lines
         } else {
             0
@@ -143,18 +144,18 @@ mod tests {
         let (x, y) = (area.x + area.w / 2, area.y + 2);
         let shown = layout(&s).beats();
         let under = layout(&s).beat_under(x);
-        assert!(s.grid_wheel(SIZE, (x, y), (0, -2), (true, false)), "two notches out");
+        assert!(s.grid_wheel(SIZE, (x, y), (0, -2), WheelMode::Zoom), "two notches out");
         assert!(layout(&s).beats() > shown);
         assert!((layout(&s).beat_under(x) - under).abs() <= 1.0, "the beat under the pointer stays");
-        assert!(s.grid_wheel(SIZE, (x, y), (0, 40), (true, false)), "in");
+        assert!(s.grid_wheel(SIZE, (x, y), (0, 40), WheelMode::Zoom), "in");
         assert_eq!(layout(&s).beats(), 1, "no fewer than a beat");
         // One beat to the right, then back to the start (the wheel stops there).
-        assert!(s.grid_wheel(SIZE, (x, y), (0, -1), (false, true)));
+        assert!(s.grid_wheel(SIZE, (x, y), (0, -1), WheelMode::Scroll));
         let first = layout(&s).start_beat();
-        assert!(s.grid_wheel(SIZE, (x, y), (0, 1), (false, true)));
+        assert!(s.grid_wheel(SIZE, (x, y), (0, 1), WheelMode::Scroll));
         assert_eq!(layout(&s).start_beat(), first - 1);
-        assert!(!s.grid_wheel(SIZE, (x, y), (0, 1), (false, false)), "a plain wheel is not the grid's");
-        assert!(!s.grid_wheel(SIZE, (area.x - 5, y), (0, 1), (false, true)), "nor beside the steps");
+        assert!(!s.grid_wheel(SIZE, (x, y), (0, 1), WheelMode::Plain), "a plain wheel is not the grid's");
+        assert!(!s.grid_wheel(SIZE, (area.x - 5, y), (0, 1), WheelMode::Scroll), "nor beside the steps");
     }
 
     #[test]

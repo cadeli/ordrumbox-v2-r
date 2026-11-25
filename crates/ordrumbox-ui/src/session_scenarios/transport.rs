@@ -3,6 +3,7 @@
 use super::super::Session;
 use super::{CALLBACK, LIBRARY, position, run, session};
 use crate::menu::Command;
+use crate::panel::Step;
 use crate::session::session_types::PlayMode;
 
 // ─── pause, rewind, loop, metronome, recording ─────────────────────────────
@@ -220,7 +221,7 @@ fn the_preferences_keep_what_ok_applies_and_esc_leaves() {
     s.overlay_key(OverlayKey::Enter);
     assert!(!s.transport.metronome, "a draft: nothing changes before OK");
     s.overlay_key(OverlayKey::Move(1));
-    s.overlay_key(OverlayKey::Side(1));
+    s.overlay_key(OverlayKey::Side(Step::Next));
     s.overlay_key(OverlayKey::Escape);
     assert!(!s.overlay_open() && !s.transport.metronome && s.chrome.panes.vus(), "Esc leaves everything");
 
@@ -258,7 +259,7 @@ fn the_preferences_list_the_devices_and_ports_the_program_offers() {
     let before = width(&s);
     s.overlay_key(OverlayKey::Move(1));
     for _ in 0..4 {
-        s.overlay_key(OverlayKey::Side(1));
+        s.overlay_key(OverlayKey::Side(Step::Next));
         assert_eq!(width(&s), before, "no layout shift");
     }
     s.overlay_key(OverlayKey::Escape);
@@ -297,7 +298,7 @@ fn quantize_takes_the_shift_off_the_notes_of_the_zone_or_track_and_undo_puts_it_
     // No cursor, no zone: the pattern. Half the way first: Strength is the second line.
     s.run(Command::Quantize);
     s.overlay_key(OverlayKey::Move(1));
-    s.overlay_key(OverlayKey::Side(-1));
+    s.overlay_key(OverlayKey::Side(Step::Previous));
     s.overlay_key(OverlayKey::Move(1));
     s.overlay_key(OverlayKey::Enter);
     assert!(!s.overlay_open());

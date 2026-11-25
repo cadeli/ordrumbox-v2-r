@@ -469,7 +469,6 @@ mod tests {
     use super::super::{OverlayKey, PlayMode};
     use super::*;
     use crate::canvas::Canvas;
-    use crate::editors::STYLE_DEFAULT;
     use crate::kits::KitSet;
     use crate::menu::Command;
     use crate::panel::GenerationTab;
@@ -744,7 +743,7 @@ mod tests {
         assert!(kick.notes.iter().any(|n| (n.beat, n.step) == (2, 0)));
         assert!(kick.notes.iter().all(|n| (n.beat, n.step) != (0, 0)), "one drop: never the downbeat");
         // A double-click gives the setting back to the style.
-        s.set_value(Id::Compose("composeHitsPerMeasure"), STYLE_DEFAULT);
+        s.reset_value(Id::Compose("composeHitsPerMeasure"), None);
         assert_eq!(s.track(0).unwrap().compose_hits_per_measure, None);
 
         // The ENERGY knob: the one-drop's single kick played twice, its third beat kept.

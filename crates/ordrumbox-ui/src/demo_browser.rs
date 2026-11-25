@@ -8,7 +8,7 @@
 use ordrumbox_logic::demo_catalog::{DemoItem, DemoStyle};
 
 use crate::canvas::{Canvas, fit};
-use crate::panel::Rect;
+use crate::panel::{Rect, Step};
 use crate::scale::Scale;
 use crate::session::OverlayKey;
 use crate::song_view::wrap;
@@ -70,7 +70,13 @@ impl DemoBrowser {
         match (self.style, key) {
             (_, OverlayKey::Escape) => return Outcome::Close,
             (None, OverlayKey::Enter) if self.tile < styles.len() => self.open(self.tile),
-            (None, OverlayKey::Side(delta)) => self.tile = moved(self.tile, *delta, styles.len()),
+            (None, OverlayKey::Side(step)) => {
+                let delta = match step {
+                    Step::Previous => -1,
+                    Step::Next => 1,
+                };
+                self.tile = moved(self.tile, delta, styles.len());
+            }
             (None, OverlayKey::Move(delta)) => {
                 let delta = delta.signum() * COLUMNS as isize;
                 let to = self.tile.saturating_add_signed(delta);
@@ -85,7 +91,7 @@ impl DemoBrowser {
                     return Outcome::Load { style: s, item };
                 }
             }
-            (Some(_), OverlayKey::Back | OverlayKey::Side(-1)) => self.back(),
+            (Some(_), OverlayKey::Back | OverlayKey::Side(Step::Previous)) => self.back(),
             (Some(s), OverlayKey::Move(delta)) => {
                 self.row = moved(self.row, *delta, item_count(styles, s));
             }
@@ -348,7 +354,7 @@ mod tests {
     fn the_keys_open_a_style_and_load_an_item() {
         let styles = styles();
         let mut b = DemoBrowser::new();
-        assert_eq!(b.key(&OverlayKey::Side(1), &styles), Outcome::Browsing);
+        assert_eq!(b.key(&OverlayKey::Side(Step::Next), &styles), Outcome::Browsing);
         assert_eq!(b.key(&OverlayKey::Enter, &styles), Outcome::Browsing);
         assert_eq!(b.style, Some(1));
         assert_eq!(b.key(&OverlayKey::Enter, &styles), Outcome::Load { style: 1, item: DemoItem::Song(0) });

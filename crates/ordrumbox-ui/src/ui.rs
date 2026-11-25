@@ -11,7 +11,7 @@ use crate::canvas::Canvas;
 use crate::frame;
 use crate::menu;
 use crate::scroll::{Scroll, Viewport};
-use crate::session::{OverlayKey, Session};
+use crate::session::{OverlayKey, Session, WheelMode};
 use crate::ui_input::{Button, Key, Modifiers, PointerShape, ScrollDelta};
 use crate::view;
 
@@ -361,13 +361,20 @@ impl Ui {
         let (x, y) = self.at();
         let m = self.modifiers;
         let (fine, coarse) = (m.shift || m.alt, m.command());
+        let wheel_mode = if m.command() {
+            WheelMode::Zoom
+        } else if m.shift {
+            WheelMode::Scroll
+        } else {
+            WheelMode::Plain
+        };
         // What the pointer is over first; the view scrolls with what is left.
         self.session.kit_wheel(size, x, y, lines)
             || self.session.wheel(size, x, y, lines, fine, coarse)
             || (m.command() && self.session.song_zoom_wheel(size, x, y, lines))
-            || self.session.grid_wheel(size, (x, y), (columns, lines), (m.command(), m.shift))
+            || self.session.grid_wheel(size, (x, y), (columns, lines), wheel_mode)
             || self.session.song_wheel(size, x, y, (columns, lines), m.shift)
-            || self.session.roll_wheel(size, (x, y), lines, (m.command(), m.shift))
+            || self.session.roll_wheel(size, (x, y), lines, wheel_mode)
             || self.scroll.wheel(&self.viewport(self.window), (columns, lines), self.display)
     }
 

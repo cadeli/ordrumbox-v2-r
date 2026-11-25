@@ -3,7 +3,7 @@
 use super::tables::{FX_DEFS, FX_KNOBS, FxDef, GENERATION_COMPOSE};
 use super::tables::{
     GENERATION_ENGINE, GENERATION_GROOVE, GENERATION_MANUAL, GenerationRow, LFO_TARGETS, LOOP_PROPS, LfoTarget, Prop,
-    STYLE_DEFAULT, fx_label, prop, track_select_options,
+    fx_label, prop, track_select_options,
 };
 use super::values::{
     EditorState, flag, fx_on, has_lfo, index_of, lfo_wave_choice, loop_steps, number, select_choice, text_of,
@@ -516,12 +516,12 @@ pub(super) fn compose_slider(rows: &mut Rows, track: &Track, view: &ComposeView,
             text.push('*');
         }
     }
-    let default = if own_key { default_of(p.key, p.min) } else { STYLE_DEFAULT };
     let r = rows.row();
     if state.selected_prop == Some(p.key) {
         rows.items.push(Item::new(None, Rect::new(r.x - 2 * s, r.y, r.w + 4 * s, r.h), Kind::Highlight));
     }
-    let spec = value_spec(p, default, false);
+    let spec = value_spec(p, default_of(p.key, p.min), false);
+    let spec = if own_key { spec } else { spec.unset_by_default() };
     let kind = Kind::Value { spec, value, label: Some(p.label.to_owned()), text, lfo: false };
     rows.items.push(Item::new(Some(Id::Compose(p.key)), r, kind));
 }

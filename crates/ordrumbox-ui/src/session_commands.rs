@@ -9,7 +9,7 @@ use super::session_selection::Clipboard;
 use super::session_types::Workspace;
 use super::{Session, Switch};
 use crate::file_request::FileRequest;
-use crate::menu::{Command, MenuState};
+use crate::menu::{Command, FocusTrack, MenuState};
 use crate::panel::Id;
 use crate::picker::{Export, Purpose};
 use crate::{menu, store};
@@ -53,7 +53,11 @@ impl Session {
     pub(super) fn menu_state(&self) -> MenuState {
         let history = self.editor.history();
         let pattern = self.pattern();
-        let focus = self.focus_track().and_then(|t| self.track(t)).map(|t| (t.auto_mode, t.mute, t.solo));
+        let focus = (self.focus_track().and_then(|t| self.track(t))).map(|t| FocusTrack {
+            auto_mode: t.auto_mode,
+            mute: t.mute,
+            solo: t.solo,
+        });
         MenuState {
             can_save: self.saving.library_path.is_some(),
             can_render: self.render.is_some(),

@@ -130,7 +130,10 @@ fn draw_value_item(
     match spec.style {
         Style::Knob => draw_knob_item(canvas, r, fraction, color, label, text, scale),
         Style::Slider => draw_slider_item(canvas, r, fraction, color, label, text, scale),
-        Style::Stepper => draw_stepper_item(canvas, r, (value > spec.min, value < spec.max), label, text, scale),
+        Style::Stepper => {
+            let room = StepperRoom { down: value > spec.min, up: value < spec.max };
+            draw_stepper_item(canvas, r, room, label, text, scale);
+        }
         Style::Fader => draw_fader_item(canvas, r, fraction, color, text, scale),
     }
 }
@@ -225,16 +228,23 @@ fn draw_fader_item(canvas: &mut Canvas, r: Rect, fraction: f64, color: Rgb, text
     canvas.text(cx - text_width(&text, scale) / 2, top + height + 8 * scale, &text, scale, value_color());
 }
 
+/// Which buttons of a stepper can still move its value: the minus, the plus.
+#[derive(Debug, Clone, Copy)]
+struct StepperRoom {
+    down: bool,
+    up: bool,
+}
+
 /// A stepper: minus and plus buttons around the value; a button is greyed
-/// out at its end of the range (`live`: the minus can go, the plus can go).
-fn draw_stepper_item(canvas: &mut Canvas, r: Rect, live: (bool, bool), label: Option<&str>, text: &str, scale: Scale) {
+/// out at its end of the range.
+fn draw_stepper_item(canvas: &mut Canvas, r: Rect, room: StepperRoom, label: Option<&str>, text: &str, scale: Scale) {
     let t = scale.px();
     let ty = r.y + (r.h - 8 * scale) / 2;
     if let Some(label) = label {
         canvas.text(r.x, ty, &fit(label, label_width(scale) - 4 * scale, scale), scale, dim());
     }
     let [down, field, up] = stepper_parts(r, label.is_some(), scale);
-    for (button, glyph, live) in [(down, "-", live.0), (up, "+", live.1)] {
+    for (button, glyph, live) in [(down, "-", room.down), (up, "+", room.up)] {
         canvas.fill_rect(button.x + t, button.y + t, button.w - 2 * t, button.h - 2 * t, field_color());
         let x = button.x + (button.w - text_width(glyph, scale)) / 2;
         canvas.text(x, ty, glyph, scale, if live { theme::text() } else { dim() });

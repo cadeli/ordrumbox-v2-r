@@ -17,7 +17,7 @@ use ordrumbox_core::steps::{TICK, absolute_step};
 use super::session_labels::beat_label;
 use super::session_roll_bar::{bar_at, bar_hold};
 use super::session_selection::NoteFocus;
-use super::session_types::{Move, Workspace};
+use super::session_types::{Move, WheelMode, Workspace};
 use super::{Session, session_panel};
 use crate::canvas::Canvas;
 use crate::editors;
@@ -350,13 +350,7 @@ impl Session {
 
     /// The wheel over the piano roll: the keyboard; Ctrl zooms the beats
     /// around the pointer, Shift scrolls them; whether it was its.
-    pub fn roll_wheel(
-        &mut self,
-        size: (i32, i32, Scale),
-        (x, y): (i32, i32),
-        lines: isize,
-        (zoom, shift): (bool, bool),
-    ) -> bool {
+    pub fn roll_wheel(&mut self, size: (i32, i32, Scale), (x, y): (i32, i32), lines: isize, mode: WheelMode) -> bool {
         let layout = self.roll_layout(size);
         if self.workspace != Workspace::PianoRoll
             || lines == 0
@@ -366,13 +360,13 @@ impl Session {
         }
         let Some(view) = self.roll_view(&layout) else { return false };
         let shown = (layout.shown(&view) as i32, view.beat_count);
-        if zoom {
-            let bar = (layout.bar.x, layout.bar.w);
-            self.roll.window.zoom_at(lines, shown, (layout.beat_under(&view, x), x), bar);
-        } else if shift {
-            self.roll.window.scroll_by(lines, shown.0, shown.1);
-        } else {
-            self.roll.top = Some(layout.clamp_top(view.top_row + lines as i32 * WHEEL_ROWS));
+        match mode {
+            WheelMode::Zoom => {
+                let bar = (layout.bar.x, layout.bar.w);
+                self.roll.window.zoom_at(lines, shown, (layout.beat_under(&view, x), x), bar);
+            }
+            WheelMode::Scroll => self.roll.window.scroll_by(lines, shown.0, shown.1),
+            WheelMode::Plain => self.roll.top = Some(layout.clamp_top(view.top_row + lines as i32 * WHEEL_ROWS)),
         }
         true
     }

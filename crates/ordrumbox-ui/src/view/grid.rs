@@ -3,8 +3,8 @@
 
 use super::layout::{ADD_TRACK_LABEL, Layout, RULER_HEIGHT, steps_per_beat};
 use super::{
-    ACCENT, AUTO, CURSOR, LABEL_CHARS, LOOP_MARK, MUTE_ON, PAGE_STEPS_PER_BEAT, PLAYHEAD, PLAYING, SELECTED, SOLO_ON,
-    View, background_color, box_off_color, cell_beat_color, cell_color, focus_row_color, mute_live_color,
+    ACCENT, AUTO, CURSOR, LABEL_CHARS, LOOP_MARK, MUTE_ON, MuteSolo, PAGE_STEPS_PER_BEAT, PLAYHEAD, PLAYING, SELECTED,
+    SOLO_ON, View, background_color, box_off_color, cell_beat_color, cell_color, focus_row_color, mute_live_color,
 };
 use crate::canvas::{Canvas, Rgb, small_cell, small_char_width, text_width};
 use crate::panel::{MENU_MARK, Rect, stroke};
@@ -137,8 +137,10 @@ fn draw_mute_solo(canvas: &mut Canvas, track: &Track, i: usize, y: i32, view: &V
     // A mute from the MIDI controls is lit in its own colour: the track's own stays off.
     let live_mute = ordrumbox_engine::host_muted(view.live_muted, i);
     // The song's lanes, while it plays, else the track's own.
-    let (own_mute, solo) = view.switches.get(i).copied().unwrap_or((track.mute, track.solo));
-    let (mute_taken, solo_taken) = view.switches_taken_back.get(i).copied().unwrap_or_default();
+    let shown = view.switches.get(i).copied().unwrap_or(MuteSolo { mute: track.mute, solo: track.solo });
+    let (own_mute, solo) = (shown.mute, shown.solo);
+    let taken = view.switches_taken_back.get(i).copied().unwrap_or_default();
+    let (mute_taken, solo_taken) = (taken.mute, taken.solo);
     let (mute, mute_color) = if own_mute { (true, MUTE_ON) } else { (live_mute, mute_live_color()) };
     let boxes = [(false, mute, mute_color, "M", mute_taken), (true, solo, SOLO_ON, "S", solo_taken)];
     for (solo, on, color, letter, is_taken_back) in boxes {

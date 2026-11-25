@@ -57,6 +57,7 @@ mod tests {
     use super::*;
     use crate::kits::KitSet;
     use crate::piano_roll::RollSpot;
+    use crate::session::WheelMode;
     use crate::test_support::SIZE;
     use ordrumbox_core::Library;
 
@@ -117,12 +118,12 @@ mod tests {
         let mut s = long_roll();
         let grid = s.roll_layout(SIZE).grid;
         let at = (grid.x + grid.w / 2, grid.y + 5);
-        assert!(s.roll_wheel(SIZE, at, -2, (true, false)), "out");
+        assert!(s.roll_wheel(SIZE, at, -2, WheelMode::Zoom), "out");
         assert!(state(&s).1 > 4);
-        assert!(s.roll_wheel(SIZE, at, 40, (true, false)), "in");
+        assert!(s.roll_wheel(SIZE, at, 40, WheelMode::Zoom), "in");
         assert_eq!(state(&s).1, 1);
         let first = state(&s).0;
-        assert!(s.roll_wheel(SIZE, at, -3, (false, true)));
+        assert!(s.roll_wheel(SIZE, at, -3, WheelMode::Scroll));
         assert_eq!(state(&s).0, first + 3);
     }
 

@@ -115,7 +115,7 @@ fn draws_without_panicking_at_any_size() {
             show_vus: true,
             track_drop: None,
             live_muted: 0b10,
-            switches: vec![(true, false)],
+            switches: vec![MuteSolo { mute: true, solo: false }],
             switches_taken_back: Vec::new(),
             hint: None,
             hovered_track: Some(0),

@@ -4,6 +4,7 @@ use super::super::session_files::SYNTHS_FILE_NAME;
 use super::super::{OverlayKey, Session};
 use super::{RATE, demo_session, draw, run};
 use crate::menu::Command;
+use crate::panel::Step;
 use crate::picker::Export;
 use crate::picker::Outcome;
 use crate::store;
@@ -268,7 +269,7 @@ fn native_dialogs_replace_the_picker_and_a_save_names_the_file_itself() {
     // The loop count first (2), then the file.
     s.run(Command::ExportMidi);
     assert_eq!(s.take_file_request(), None, "the loop count is asked first");
-    for key in [OverlayKey::Side(1), OverlayKey::Move(1), OverlayKey::Enter] {
+    for key in [OverlayKey::Side(Step::Next), OverlayKey::Move(1), OverlayKey::Enter] {
         s.overlay_key(key);
     }
     assert!(!s.overlay_open());

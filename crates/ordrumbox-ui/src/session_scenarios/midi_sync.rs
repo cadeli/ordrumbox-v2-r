@@ -5,15 +5,18 @@ use ordrumbox_engine::{AudioSide, HostTransport};
 use super::super::Session;
 use super::{CALLBACK, LIBRARY, RATE, assert_pass_frames, position, run, session};
 use crate::menu::Command;
+use crate::panel::Step;
 use crate::session::OverlayKey;
 use crate::test_support::scratch_dir;
 
 /// Bind controller `controller` (channel 1) to the control `moves` choices
 /// along the modal's list (the master is the first, the echo's feedback next).
-fn learn(s: &mut Session, moves: isize, controller: u8) {
+fn learn(s: &mut Session, moves: usize, controller: u8) {
     s.run(Command::MidiControls);
     assert!(s.overlay_open());
-    s.overlay_key(OverlayKey::Side(moves));
+    for _ in 0..moves {
+        s.overlay_key(OverlayKey::Side(Step::Next));
+    }
     s.overlay_key(OverlayKey::Move(1));
     s.overlay_key(OverlayKey::Enter);
     assert!(s.midi_control(0, controller, 99), "learning shows");
@@ -71,7 +74,9 @@ fn clear_lets_a_knob_go_and_a_bad_setting_is_reported() {
     s.midi_control(0, 22, 127);
     assert_eq!(s.followed.muted, 1);
     s.run(Command::MidiControls);
-    s.overlay_key(OverlayKey::Side(5));
+    for _ in 0..5 {
+        s.overlay_key(OverlayKey::Side(Step::Next));
+    }
     s.overlay_key(OverlayKey::Move(2));
     s.overlay_key(OverlayKey::Enter);
     assert!(s.message.ends_with("knob let go"), "{}", s.message);

@@ -4,7 +4,7 @@ use super::super::{Move, OverlayKey, Session};
 use super::{CALLBACK, KIT_KEYS, WINDOW, demo_session, draw, run};
 use crate::menu::Command;
 use crate::panel;
-use crate::panel::{EditorTab, GenerationTab, Id, Kind, Rect};
+use crate::panel::{EditorTab, GenerationTab, Id, Kind, Rect, Step};
 use crate::picker::Export;
 use crate::test_support::scratch_dir;
 use crate::ui_input::Button;
@@ -195,7 +195,13 @@ fn a_session_through_the_menus_draws_every_step() {
     let one_loop = std::fs::metadata(&wav).unwrap().len() - 44;
     s.run(Command::ExportWav);
     draw(&mut s);
-    for key in [OverlayKey::Side(1), OverlayKey::Side(1), OverlayKey::Side(1), OverlayKey::Move(1), OverlayKey::Enter] {
+    for key in [
+        OverlayKey::Side(Step::Next),
+        OverlayKey::Side(Step::Next),
+        OverlayKey::Side(Step::Next),
+        OverlayKey::Move(1),
+        OverlayKey::Enter,
+    ] {
         s.overlay_key(key);
     }
     assert!(matches!(s.chrome.overlay, Some(crate::session::session_overlay::Overlay::Picker(_))));

@@ -23,16 +23,25 @@ pub struct Seen<'a> {
     pub dragging: bool,
 }
 
+/// What the last line of the log is, which says whether the next one replaces it.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+enum LastLine {
+    /// A message or an undo: the next line comes after it.
+    #[default]
+    Done,
+    /// The open undo step, which later edits may extend.
+    Step,
+    /// The outcome of the drag going on.
+    Drag,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct ActionLog {
     lines: Vec<String>,
     message: String,
     revision: u64,
     steps: usize,
-    /// The last line is the open undo step, which later edits may extend.
-    last_is_step: bool,
-    /// The last line is the outcome of the drag going on.
-    last_is_drag: bool,
+    last: LastLine,
 }
 
 impl ActionLog {
@@ -42,24 +51,21 @@ impl ActionLog {
         if seen.message != self.message {
             self.message = seen.message.to_owned();
             if !seen.message.is_empty() {
-                self.put(seen.message, seen.dragging && self.last_is_drag);
-                self.last_is_drag = seen.dragging;
-                self.last_is_step = false;
+                self.put(seen.message, seen.dragging && self.last == LastLine::Drag);
+                self.last = if seen.dragging { LastLine::Drag } else { LastLine::Done };
             }
         } else if seen.revision != self.revision {
             match (seen.steps.cmp(&self.steps), seen.undo) {
                 (std::cmp::Ordering::Greater, Some(undo)) => {
                     self.put(undo, false);
-                    self.last_is_step = true;
-                    self.last_is_drag = false;
+                    self.last = LastLine::Step;
                 }
                 // A coalesced edit: the same step, its description the newest one.
-                (std::cmp::Ordering::Equal, Some(undo)) if self.last_is_step => self.put(undo, true),
+                (std::cmp::Ordering::Equal, Some(undo)) if self.last == LastLine::Step => self.put(undo, true),
                 // A second undo with the same description: the message did not change.
                 (std::cmp::Ordering::Less, _) => {
                     self.put(seen.message, false);
-                    self.last_is_step = false;
-                    self.last_is_drag = false;
+                    self.last = LastLine::Done;
                 }
                 _ => {}
             }

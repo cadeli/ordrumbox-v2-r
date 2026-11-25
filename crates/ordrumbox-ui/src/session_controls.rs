@@ -176,8 +176,8 @@ impl Session {
                 draft.learning = false;
             }
             OverlayKey::Edge(end) => draft.row = if *end { ROWS.len() - 1 } else { 0 },
-            OverlayKey::Side(delta) => {
-                draft.at = (draft.at as isize + delta).rem_euclid(count as isize) as usize;
+            OverlayKey::Side(step) => {
+                draft.at = step.target_index(draft.at, count).unwrap_or(draft.at);
                 draft.learning = false;
             }
             OverlayKey::Enter => self.run_controls_row(),

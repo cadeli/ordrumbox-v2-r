@@ -1,7 +1,7 @@
 //! The menus' content: which items each menu holds and how they read the
 //! state.
 
-use super::{Command, Item, Menu, MenuState};
+use super::{Command, FocusTrack, Item, Menu, MenuState};
 use crate::ui_input::MACOS;
 use std::borrow::Cow;
 
@@ -198,7 +198,7 @@ fn generate_menu(s: &MenuState) -> Menu {
     use Command as C;
     let p = s.has_pattern;
     let track = s.focus_track.is_some();
-    let (auto, _, _) = s.focus_track.unwrap_or_default();
+    let auto = s.focus_track.unwrap_or_default().auto_mode;
     Menu {
         title: "Generate",
         items: vec![
@@ -221,7 +221,7 @@ fn play_menu(s: &MenuState) -> Menu {
     use Command as C;
     let p = s.has_pattern;
     let track = s.focus_track.is_some();
-    let (_, mute, solo) = s.focus_track.unwrap_or_default();
+    let FocusTrack { mute, solo, .. } = s.focus_track.unwrap_or_default();
     Menu {
         title: "Play",
         items: vec![

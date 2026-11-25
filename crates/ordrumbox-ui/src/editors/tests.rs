@@ -275,9 +275,9 @@ fn the_compose_tab_shows_the_style_values_until_set() {
         })
     };
     // The pattern's energy makes the 4 hits of the style 6.
-    assert_eq!(shown("composeHitsPerMeasure"), Some((4.0, "4\u{2192}6*".to_owned(), STYLE_DEFAULT)));
-    assert_eq!(shown("composeSyncopation"), Some((70.0, "70".to_owned(), STYLE_DEFAULT)));
-    assert_eq!(shown("composeSeed"), Some((0.0, "new".to_owned(), 0.0)));
+    assert_eq!(shown("composeHitsPerMeasure"), Some((4.0, "4\u{2192}6*".to_owned(), None)));
+    assert_eq!(shown("composeSyncopation"), Some((70.0, "70".to_owned(), None)));
+    assert_eq!(shown("composeSeed"), Some((0.0, "new".to_owned(), Some(0.0))));
     assert!(items.iter().any(|i| i.id == Some(Id::Regenerate)));
     // A melodic track has no Compose tab: the manual sliders show.
     let mut bass = view(&track);

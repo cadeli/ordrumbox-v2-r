@@ -27,14 +27,14 @@ pub enum Style {
 const PERCENT: f64 = 100.0;
 
 /// A control's range: `min`–`max` by `step`, `default` restored by a
-/// double-click, logarithmic when asked and possible.
+/// double-click (`None`: the setting unset), logarithmic when asked and possible.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Spec {
     pub style: Style,
     pub min: f64,
     pub max: f64,
     pub step: f64,
-    pub default: f64,
+    pub default: Option<f64>,
     log: bool,
     full_travel: bool,
     percent: bool,
@@ -42,21 +42,63 @@ pub struct Spec {
 
 impl Spec {
     pub const fn knob(min: f64, max: f64, step: f64, default: f64) -> Self {
-        Self { style: Style::Knob, min, max, step, default, log: false, full_travel: false, percent: false }
+        Self {
+            style: Style::Knob,
+            min,
+            max,
+            step,
+            default: Some(default),
+            log: false,
+            full_travel: false,
+            percent: false,
+        }
     }
 
     pub const fn slider(min: f64, max: f64, step: f64, default: f64) -> Self {
-        Self { style: Style::Slider, min, max, step, default, log: false, full_travel: false, percent: false }
+        Self {
+            style: Style::Slider,
+            min,
+            max,
+            step,
+            default: Some(default),
+            log: false,
+            full_travel: false,
+            percent: false,
+        }
     }
 
     /// A mixer's level: a slider standing up, the top its maximum.
     pub const fn fader(min: f64, max: f64, step: f64, default: f64) -> Self {
-        Self { style: Style::Fader, min, max, step, default, log: false, full_travel: false, percent: false }
+        Self {
+            style: Style::Fader,
+            min,
+            max,
+            step,
+            default: Some(default),
+            log: false,
+            full_travel: false,
+            percent: false,
+        }
     }
 
     /// A count: whole steps only, one per click on its - and + buttons.
     pub const fn stepper(min: f64, max: f64, step: f64, default: f64) -> Self {
-        Self { style: Style::Stepper, min, max, step, default, log: false, full_travel: false, percent: false }
+        Self {
+            style: Style::Stepper,
+            min,
+            max,
+            step,
+            default: Some(default),
+            log: false,
+            full_travel: false,
+            percent: false,
+        }
+    }
+
+    /// No default: a double-click unsets the setting (a compose setting
+    /// then follows its style).
+    pub const fn unset_by_default(self) -> Self {
+        Self { default: None, ..self }
     }
 
     /// `scale: 'log'`; ignored (linear) unless `0 < min < max`.

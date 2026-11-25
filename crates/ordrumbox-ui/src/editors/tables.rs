@@ -315,10 +315,6 @@ pub const GENERATION_COMPOSE: [Prop; 7] = [
     count("composeSeed", "Seed", 0.0, 9999.0, Format::Seed),
 ];
 
-/// What a double-click on a compose slider sets: the setting given back to
-/// the style (`None`). Below every range.
-pub const STYLE_DEFAULT: f64 = -1.0e9;
-
 /// The loop tab.
 pub const LOOP_PROPS: [Prop; 3] = [
     count("stepsPerBeat", "Steps per Beat", 1.0, MAX_STEPS_PER_BEAT as f64, Format::Plain),

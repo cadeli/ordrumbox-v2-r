@@ -4,8 +4,9 @@
 use super::keys::*;
 use super::{PAGE, ROW_DIGITS, ROW_LETTERS, Ui};
 use crate::menu::{self, Command};
+use crate::panel::Step;
 use crate::session::{Move, OverlayKey, PanelKey, Session, Switch};
-use crate::ui_input::{Key, KeyEvent};
+use crate::ui_input::{Key, KeyEvent, Modifiers};
 
 impl Ui {
     /// Open the first menu from the keyboard, or close the open one.
@@ -81,7 +82,7 @@ impl Ui {
         if self.widget_key(event, key, shift || alt, control) {
             return true;
         }
-        session_key(&mut self.session, event, (code, key, row_key), (shift, control, alt))
+        session_key(&mut self.session, event, (code, key, row_key), self.modifiers)
     }
 
     /// Keys for the editors' widgets: an open list or number entry takes
@@ -155,8 +156,8 @@ impl Ui {
             Key::Backspace => OverlayKey::Back,
             Key::ArrowUp => OverlayKey::Move(-1),
             Key::ArrowDown => OverlayKey::Move(1),
-            Key::ArrowLeft => OverlayKey::Side(-1),
-            Key::ArrowRight => OverlayKey::Side(1),
+            Key::ArrowLeft => OverlayKey::Side(Step::Previous),
+            Key::ArrowRight => OverlayKey::Side(Step::Next),
             Key::PageUp => OverlayKey::Move(-PAGE),
             Key::PageDown => OverlayKey::Move(PAGE),
             Key::Home => OverlayKey::Edge(false),
@@ -179,8 +180,9 @@ fn session_key(
     s: &mut Session,
     event: &KeyEvent,
     (code, key, row_key): (Key, Key, bool),
-    (shift, control, alt): (bool, bool, bool),
+    modifiers: Modifiers,
 ) -> bool {
+    let (shift, control, alt) = (modifiers.shift, modifiers.command(), modifiers.alt);
     if let Some(row) = ROW_DIGITS.iter().position(|&k| k == code).filter(|_| row_key) {
         s.switch_track(row, if shift { Switch::Solo } else { Switch::Mute });
         return true;

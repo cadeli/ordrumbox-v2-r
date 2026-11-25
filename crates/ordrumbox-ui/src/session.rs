@@ -203,7 +203,7 @@ mod session_user_data;
 pub(crate) use session_automation_live::Switch;
 pub use session_open::LibrarySource;
 pub use session_panel::PanelKey;
-pub use session_types::{Move, OverlayKey, PlayMode, Workspace};
+pub use session_types::{Move, OverlayKey, PlayMode, WheelMode, Workspace};
 
 pub struct Session {
     /// What the window shows around the library (`session_chrome.rs`).

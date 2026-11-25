@@ -11,7 +11,7 @@ use ordrumbox_engine::assign::synth_for;
 use super::session_cartridge::{fx_switch, fx_type_updates};
 use super::session_panel::{NoteTarget, history_label, number};
 use super::{Session, session_grid};
-use crate::editors::{self, KNOB_BAR, STYLE_DEFAULT};
+use crate::editors::{self, KNOB_BAR};
 use crate::menu::Command;
 use crate::panel::{Dropdown, Id, LfoParam};
 use crate::picker::Purpose;
@@ -181,9 +181,7 @@ impl Session {
                 self.update_track(t, &[(key, number(value))], &format!("{} on {name}", history_label(id)), true)
             }
             Id::Compose(key) => {
-                // A double-click gives the setting back to the style.
-                let value = if value <= STYLE_DEFAULT { Value::Null } else { number(value) };
-                self.update_track(t, &[(key, value)], &format!("{} on {name}", history_label(id)), true)
+                self.update_track(t, &[(key, number(value))], &format!("{} on {name}", history_label(id)), true)
             }
             Id::Loop(key) => self.loop_slider(t, key, value),
             Id::SampleKnob(field) => {

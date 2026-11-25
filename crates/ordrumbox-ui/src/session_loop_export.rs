@@ -5,7 +5,7 @@
 use super::Session;
 use super::session_files::NOTHING_TO_RENDER;
 use super::session_overlay::Overlay;
-use super::session_types::OverlayKey;
+use super::session_types::{OverlayKey, RowClick, RowKey};
 use crate::panel::Step;
 use crate::picker::Export;
 use crate::scale::Scale;
@@ -43,11 +43,6 @@ impl Draft {
         ]
     }
 
-    /// The draft's line `line` (the Pattern line, which no key reaches, is not one).
-    fn row_of_line(line: usize) -> Option<usize> {
-        line.checked_sub(1).filter(|&row| row < ROW_COUNT)
-    }
-
     /// The loop count one `step` away, from 1 to [`MAX_LOOP_COUNT`] and round.
     fn change(&mut self, step: Step) {
         if self.row != 0 {
@@ -81,16 +76,12 @@ impl Session {
     /// A key while the modal is open; whether it was.
     pub(super) fn loop_export_key(&mut self, key: &OverlayKey) -> bool {
         let Some(Overlay::LoopExport(draft)) = &mut self.chrome.overlay else { return false };
-        match key {
-            OverlayKey::Escape => self.chrome.overlay = None,
-            OverlayKey::Move(delta) => {
-                draft.row = (draft.row as isize + delta).clamp(0, ROW_COUNT as isize - 1) as usize
-            }
-            OverlayKey::Edge(end) => draft.row = if *end { EXPORT_ROW } else { 0 },
-            OverlayKey::Side(delta) => draft.change(if *delta < 0 { Step::Previous } else { Step::Next }),
-            OverlayKey::Enter if draft.row == EXPORT_ROW => self.confirm_loop_export(),
-            OverlayKey::Enter => draft.change(Step::Next),
-            OverlayKey::Back | OverlayKey::Letter(_) => {}
+        match key.row_key(draft.row, EXPORT_ROW) {
+            RowKey::Close => self.chrome.overlay = None,
+            RowKey::Row(row) => draft.row = row,
+            RowKey::Change(step) => draft.change(step),
+            RowKey::Run => self.confirm_loop_export(),
+            RowKey::Ignored => {}
         }
         true
     }
@@ -99,18 +90,14 @@ impl Session {
     /// chooses it and changes it; whether it was open.
     pub(super) fn loop_export_click(&mut self, width: i32, height: i32, scale: Scale, x: i32, y: i32) -> bool {
         let Some(Overlay::LoopExport(draft)) = &mut self.chrome.overlay else { return false };
-        let (title, lines) = (draft.title(), draft.lines());
-        let window = (width, height);
-        if !view::notice_contains(window, title, &lines, scale, x, y) {
-            self.chrome.overlay = None;
-        } else if let Some(row) = view::notice_line_at(window, title, &lines, scale, x, y).and_then(Draft::row_of_line)
-        {
-            draft.row = row;
-            if row == EXPORT_ROW {
-                self.confirm_loop_export();
-            } else {
-                draft.change(Step::Next);
+        match RowClick::at((width, height), (draft.title(), &draft.lines()), scale, (x, y), ROW_COUNT) {
+            RowClick::Outside => self.chrome.overlay = None,
+            // A click on a row is Enter on it.
+            RowClick::Row(row) => {
+                draft.row = row;
+                self.loop_export_key(&OverlayKey::Enter);
             }
+            RowClick::Elsewhere => {}
         }
         true
     }
