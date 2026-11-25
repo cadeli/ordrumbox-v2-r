@@ -5,7 +5,7 @@
 //! on the left, the selected pattern's description (wrapped, scrolled by the
 //! wheel) and the song's column on the right (its widgets are panel items).
 //!
-//! [`SongLayout`] places everything; drawing and mouse hit-testing both use it.
+//! [`SongLayout`] places everything; drawing and mouse spot-testing both use it.
 
 use crate::scale::Scale;
 use crate::scroll_thumb::{self, Edge};
@@ -135,7 +135,7 @@ pub struct SongView<'a> {
     /// The clip selected: drawn with an outline.
     pub selected_clip: Option<usize>,
     /// What is under the pointer: drawn lighter, a name with the mark of its menu.
-    pub hovered: Option<SongHit>,
+    pub hovered: Option<SongSpot>,
 }
 
 impl SongView<'_> {
@@ -178,7 +178,7 @@ impl Axis {
 
 /// What is under the mouse.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SongHit {
+pub enum SongSpot {
     /// A pattern of the list.
     Pattern(usize),
     /// The selected pattern's description.
@@ -439,26 +439,26 @@ impl SongLayout {
     }
 
     /// What is at `(x, y)`.
-    pub fn hit(&self, view: &SongView, x: i32, y: i32) -> Option<SongHit> {
+    pub fn spot_at(&self, view: &SongView, x: i32, y: i32) -> Option<SongSpot> {
         if self.list.contains(x, y) {
             if view.patterns.len() > self.list_rows() && self.scroll_bar(Axis::List).contains(x, y) {
-                return Some(SongHit::ScrollBar(Axis::List));
+                return Some(SongSpot::ScrollBar(Axis::List));
             }
             let row = view.list_scroll + row_at(y, self.list.y, LIST_ROW * self.scale)?;
-            return (row < view.patterns.len()).then_some(SongHit::Pattern(row));
+            return (row < view.patterns.len()).then_some(SongSpot::Pattern(row));
         }
         if self.tags_line().contains(x, y) {
-            return view.tags.map(|_| SongHit::Tags);
+            return view.tags.map(|_| SongSpot::Tags);
         }
         if self.description.contains(x, y) {
-            return view.description.map(|_| SongHit::Description);
+            return view.description.map(|_| SongSpot::Description);
         }
         let song = view.song?;
         if !self.grid.contains(x, y) || y < self.ruler_top() {
             return None;
         }
         if let Some(edge) = self.loop_end_at(view, x, y) {
-            return Some(SongHit::LoopEnd(edge));
+            return Some(SongSpot::LoopEnd(edge));
         }
         // The grid is as wide as the song.
         let total = song.length_measures().max(1.0).ceil() as u32;
@@ -468,35 +468,35 @@ impl SongLayout {
                 self.bar_thumb(view, Axis::Measures),
                 scroll_thumb::ZOOM_HANDLE * self.scale,
             );
-            return Some(handle.map_or(SongHit::ScrollBar(Axis::Measures), SongHit::ZoomHandle));
+            return Some(handle.map_or(SongSpot::ScrollBar(Axis::Measures), SongSpot::ZoomHandle));
         }
         if self.scroll_bar(Axis::Rows).contains(x, y) {
-            return Some(SongHit::ScrollBar(Axis::Rows));
+            return Some(SongSpot::ScrollBar(Axis::Rows));
         }
-        if let Some(hit) = self.automation_hit(view, x, y, total) {
-            return Some(hit);
+        if let Some(spot) = self.automation_spot_at(view, x, y, total) {
+            return Some(spot);
         }
         let row = row_at(y, self.body_top(), self.row_height())
             .map(|row| view.scroll.1 + row)
             .filter(|&row| row < view.rows.len());
         if x < self.body_left() {
-            return row.map(SongHit::RowName);
+            return row.map(SongSpot::RowName);
         }
         let measure = view.scroll.0 + u32::try_from((x - self.body_left()) / self.measure_width()).ok()?;
         if measure >= total {
             return None;
         }
         if y < self.body_top() {
-            return Some(SongHit::Ruler(measure));
+            return Some(SongSpot::Ruler(measure));
         }
         let row = row?;
         // The last clip drawn is on top.
         if let Some(clip) =
             (0..song.clips.len()).rev().find(|&i| self.clip_rect(view, i).is_some_and(|r| r.contains(x, y)))
         {
-            return Some(SongHit::Clip(clip));
+            return Some(SongSpot::Clip(clip));
         }
-        Some(SongHit::Cell { row, measure })
+        Some(SongSpot::Cell { row, measure })
     }
 }
 
@@ -565,7 +565,7 @@ mod tests {
     }
 
     #[test]
-    fn hit_testing_matches_the_drawing() {
+    fn spots_match_the_drawing() {
         let library = library();
         let rows = rows(&library.songs[0], &library.patterns);
         let view = SongView {
@@ -596,28 +596,28 @@ mod tests {
         let (mw, rh) = (layout.measure_width(), layout.row_height());
         let in_row = |row: usize| layout.body_top() + row as i32 * rh + rh / 2;
         let at_measure = |m: i32| layout.body_left() + m * mw + mw / 2;
-        assert_eq!(layout.hit(&view, layout.list.x + 2, layout.list.y + 13), Some(SongHit::Pattern(1)));
-        assert_eq!(layout.hit(&view, layout.list.x + 2, layout.list.y + 40), None);
+        assert_eq!(layout.spot_at(&view, layout.list.x + 2, layout.list.y + 13), Some(SongSpot::Pattern(1)));
+        assert_eq!(layout.spot_at(&view, layout.list.x + 2, layout.list.y + 40), None);
         assert!(layout.list.w < layout.description.w);
         let d = layout.description;
-        assert_eq!(layout.hit(&view, d.x + 2, d.y + d.h / 2), Some(SongHit::Description));
-        assert_eq!(layout.hit(&view, d.x + 2, d.y + d.h - 2), Some(SongHit::Tags), "under the description");
-        assert_eq!(layout.hit(&view, at_measure(3), layout.ruler_top() + 2), Some(SongHit::Ruler(3)));
-        assert_eq!(layout.hit(&view, at_measure(5), layout.ruler_top() + 2), None); // past the end
-        assert_eq!(layout.hit(&view, layout.grid.x + 2, in_row(1)), Some(SongHit::RowName(1)));
-        assert_eq!(layout.hit(&view, at_measure(1), in_row(1)), Some(SongHit::Clip(0)));
-        assert_eq!(layout.hit(&view, at_measure(4), in_row(1)), Some(SongHit::Clip(2)));
+        assert_eq!(layout.spot_at(&view, d.x + 2, d.y + d.h / 2), Some(SongSpot::Description));
+        assert_eq!(layout.spot_at(&view, d.x + 2, d.y + d.h - 2), Some(SongSpot::Tags), "under the description");
+        assert_eq!(layout.spot_at(&view, at_measure(3), layout.ruler_top() + 2), Some(SongSpot::Ruler(3)));
+        assert_eq!(layout.spot_at(&view, at_measure(5), layout.ruler_top() + 2), None); // past the end
+        assert_eq!(layout.spot_at(&view, layout.grid.x + 2, in_row(1)), Some(SongSpot::RowName(1)));
+        assert_eq!(layout.spot_at(&view, at_measure(1), in_row(1)), Some(SongSpot::Clip(0)));
+        assert_eq!(layout.spot_at(&view, at_measure(4), in_row(1)), Some(SongSpot::Clip(2)));
         // A 0.75-measure clip: its last quarter is bare grid.
-        assert_eq!(layout.hit(&view, layout.body_left() + 2 * mw + 4, in_row(0)), Some(SongHit::Clip(1)));
+        assert_eq!(layout.spot_at(&view, layout.body_left() + 2 * mw + 4, in_row(0)), Some(SongSpot::Clip(1)));
         assert_eq!(
-            layout.hit(&view, layout.body_left() + 3 * mw - 2, in_row(0)),
-            Some(SongHit::Cell { row: 0, measure: 2 })
+            layout.spot_at(&view, layout.body_left() + 3 * mw - 2, in_row(0)),
+            Some(SongSpot::Cell { row: 0, measure: 2 })
         );
-        assert_eq!(layout.hit(&view, at_measure(1), in_row(2)), None);
+        assert_eq!(layout.spot_at(&view, at_measure(1), in_row(2)), None);
         // Scrolled by 2 measures and a row.
         let scrolled = SongView { scroll: (2, 1), ..view };
-        assert_eq!(layout.hit(&scrolled, at_measure(2), in_row(0)), Some(SongHit::Clip(2)));
-        assert_eq!(layout.hit(&scrolled, at_measure(0), layout.ruler_top() + 2), Some(SongHit::Ruler(2)));
+        assert_eq!(layout.spot_at(&scrolled, at_measure(2), in_row(0)), Some(SongSpot::Clip(2)));
+        assert_eq!(layout.spot_at(&scrolled, at_measure(0), layout.ruler_top() + 2), Some(SongSpot::Ruler(2)));
         // The measure under the pointer stays on the page.
         assert_eq!(layout.measure_at(at_measure(3), 2), 5);
         assert_eq!(layout.measure_at(0, 2), 2);
@@ -668,7 +668,7 @@ mod tests {
                     tags: song.map(|_| long_tags.as_slice()),
                     taken_back: vec![true; 4],
                     selected_clip: Some(0),
-                    hovered: Some(SongHit::Pattern(31)),
+                    hovered: Some(SongSpot::Pattern(31)),
                 };
                 draw(&mut canvas, &view, &layout);
             }

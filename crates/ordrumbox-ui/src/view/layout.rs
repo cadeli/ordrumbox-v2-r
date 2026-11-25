@@ -1,4 +1,4 @@
-//! Where everything sits: the grid, the header, the body and what the mouse hits.
+//! Where everything sits: the grid, the header, the body and what is under the mouse.
 
 use super::{BEATS_PER_PAGE, BeatWindow, LABEL_CHARS, MIN_STEP_WIDTH, PAGE_BEATS, PAGE_STEPS_PER_BEAT, VOLUME_WIDTH};
 use crate::canvas::text_width;
@@ -20,7 +20,7 @@ pub use lane::{MAX_LANE_SET, lane_height};
 
 /// What is under the mouse.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Hit {
+pub enum Spot {
     Mute(usize),
     Solo(usize),
     Name(usize),
@@ -476,7 +476,7 @@ impl Layout {
     /// What of the scroll bar is at `(x, y)`: `Some(None)` its track or
     /// thumb (a drag scrolls), `Some(Some(edge))` a zoom handle.
     #[must_use]
-    pub fn bar_hit(&self, x: i32, y: i32) -> Option<Option<Edge>> {
+    pub fn bar_at(&self, x: i32, y: i32) -> Option<Option<Edge>> {
         self.scroll_bar()
             .contains(x, y)
             .then(|| scroll_thumb::handle_at(x, self.bar_thumb(), scroll_thumb::ZOOM_HANDLE * self.scale))
@@ -512,9 +512,9 @@ impl Layout {
         let rows = i32::try_from(self.tracks.min(pattern.tracks.len())).ok().filter(|&r| r > 0)?;
         let y = y.clamp(self.top, self.top + rows * self.row - 1);
         let x = x.clamp(self.grid_left, self.grid_left + self.grid_width - 1);
-        match self.hit(pattern, x, y)? {
-            Hit::Cell { track, beat, step } => Some((track, beat, step)),
-            Hit::Mute(_) | Hit::Solo(_) | Hit::Name(_) | Hit::AddTrack => None,
+        match self.spot_at(pattern, x, y)? {
+            Spot::Cell { track, beat, step } => Some((track, beat, step)),
+            Spot::Mute(_) | Spot::Solo(_) | Spot::Name(_) | Spot::AddTrack => None,
         }
     }
 
@@ -568,12 +568,12 @@ impl Layout {
     }
 
     /// What is at `(x, y)`.
-    pub fn hit(&self, pattern: &Pattern, x: i32, y: i32) -> Option<Hit> {
+    pub fn spot_at(&self, pattern: &Pattern, x: i32, y: i32) -> Option<Spot> {
         if y < self.top || x < self.left {
             return None;
         }
         if self.add_track_rect().contains(x, y) {
-            return Some(Hit::AddTrack);
+            return Some(Spot::AddTrack);
         }
         let track = row_at(y, self.top, self.row).filter(|&t| t < self.tracks)?;
         let in_box = |solo: bool| {
@@ -582,18 +582,18 @@ impl Layout {
             (bx..bx + self.box_size).contains(&x) && (by..by + self.box_size).contains(&y)
         };
         if in_box(false) {
-            return Some(Hit::Mute(track));
+            return Some(Spot::Mute(track));
         }
         if in_box(true) {
-            return Some(Hit::Solo(track));
+            return Some(Spot::Solo(track));
         }
         if x < self.grid_left {
-            return (x >= self.name_x && x < self.volume_x).then_some(Hit::Name(track));
+            return (x >= self.name_x && x < self.volume_x).then_some(Spot::Name(track));
         }
         let spb = steps_per_beat(&pattern.tracks[track]);
         let step = ((f64::from(x - self.grid_left) * f64::from(spb)) / self.beat_width()) as i64;
         let steps = i64::from(self.beats) * i64::from(spb);
-        (step < steps).then(|| Hit::Cell {
+        (step < steps).then(|| Spot::Cell {
             track,
             beat: self.start_beat + (step / i64::from(spb)) as i32,
             step: (step % i64::from(spb)) as i32,

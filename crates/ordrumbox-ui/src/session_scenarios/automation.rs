@@ -92,8 +92,8 @@ fn a_control_moved_over_its_lane_takes_it_back_until_re_enabled() {
 #[test]
 fn a_lane_taken_back_is_shown_and_re_enabled_on_its_own() {
     use crate::panel::Kind;
-    use crate::session::session_song::tests::{find_hit, menu};
-    use crate::song_view::SongHit;
+    use crate::session::session_song::tests::{find_spot, menu};
+    use crate::song_view::SongSpot;
     use crate::test_support::SIZE;
     use crate::theme::TAKEN_BACK;
     let (mut s, _audio) = playing_with_a_volume_lane();
@@ -115,16 +115,16 @@ fn a_lane_taken_back_is_shown_and_re_enabled_on_its_own() {
 
     // The lane's menu offers to re-enable it; its badge does.
     s.run(Command::SongView);
-    let (x, y) = find_hit(&s, |hit| hit == SongHit::LaneName(0));
+    let (x, y) = find_spot(&s, |spot| spot == SongSpot::LaneName(0));
     s.song_click(SIZE, x, y, crate::ui_input::Button::Right);
     assert_eq!(menu(&s).first().map(String::as_str), Some("reenable:0"));
     s.chrome.widgets.close_dropdown();
-    let (x, y) = find_hit(&s, |hit| hit == SongHit::LaneBadge(0));
+    let (x, y) = find_spot(&s, |spot| spot == SongSpot::LaneBadge(0));
     s.song_click(SIZE, x, y, crate::ui_input::Button::Left);
     assert_eq!(s.taken_back_lanes(), [false]);
     assert_eq!(s.message, "KICK Volume plays its lane again");
     assert!(!s.menu_state().has_overridden);
-    let (x, y) = find_hit(&s, |hit| hit == SongHit::LaneName(0));
+    let (x, y) = find_spot(&s, |spot| spot == SongSpot::LaneName(0));
     s.song_click(SIZE, x, y, crate::ui_input::Button::Right);
     assert_eq!(menu(&s).first().map(String::as_str), Some("taller:0"), "nothing to re-enable");
 }

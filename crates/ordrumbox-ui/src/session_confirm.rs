@@ -235,7 +235,7 @@ mod tests {
         let choice = s.notice_choice().unwrap();
         for x in (0..800).step_by(2) {
             for y in (0..600).step_by(2) {
-                let hit = view::notice_button_at(
+                let pressed = view::notice_button_at(
                     (800, 600),
                     &choice.title,
                     &choice.lines,
@@ -244,7 +244,7 @@ mod tests {
                     Scale::ONE,
                     (x, y),
                 );
-                if hit == Some(button) {
+                if pressed == Some(button) {
                     return (x, y);
                 }
             }

@@ -13,7 +13,7 @@ use crate::mixer::{self, MixerLayout, MixerView, TRACK_KNOBS};
 use crate::output::{self, Param};
 use crate::panel::{self, Id, Item, Kind, Rect, Step};
 use crate::scale::Scale;
-use crate::view::Hit;
+use crate::view::Spot;
 use crate::{frame, master, returns, theme};
 use ordrumbox_core::{AutomationTarget, num};
 use ordrumbox_engine::strip_settings::delay_beats_used;
@@ -137,7 +137,7 @@ impl Session {
     /// A mixer's button or name clicked.
     pub(super) fn mixer_activate(&mut self, id: Id) {
         match id {
-            Id::MixerName(t) => self.click(Hit::Name(t)),
+            Id::MixerName(t) => self.click(Spot::Name(t)),
             Id::MixerToggle(t, key) => {
                 if let Some(switch) = Switch::from_key(key) {
                     self.switch_track(t, switch);
@@ -226,7 +226,7 @@ impl Session {
         let count = self.pattern().map_or(0, |p| p.tracks.len());
         let Some(last) = count.checked_sub(1) else { return };
         let t = self.editor_track().map_or(0, |t| t.saturating_add_signed(delta).min(last));
-        self.click(Hit::Name(t));
+        self.click(Spot::Name(t));
         let fits = self.mixer_layout(self.chrome.panel_size).fits;
         self.mixer.first = self.mixer.first.clamp((t + 1).saturating_sub(fits), t);
     }
@@ -423,7 +423,7 @@ mod tests {
         };
         let before = rects(&s);
         s.toggle_row(1, "mute");
-        s.click(Hit::Name(3));
+        s.click(Spot::Name(3));
         s.set_value(Id::MixerKnob(0, "pan"), 1.0);
         assert_eq!(rects(&s), before);
     }

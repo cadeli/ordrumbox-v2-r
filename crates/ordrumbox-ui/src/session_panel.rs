@@ -478,7 +478,7 @@ mod tests {
         assert_eq!(history_label(Id::TrackSelect("delayBeats")), "Delay Beats");
         assert_eq!(history_label(Id::TrackSelect("autoVariant")), "Variant");
         assert_eq!(history_label(Id::Generation("autoPitchChance")), "Pitch");
-        assert_eq!(history_label(Id::Generation("hitVariation")), "Hit Variation");
+        assert_eq!(history_label(Id::Generation("hitVariation")), "Spot Variation");
         assert_eq!(history_label(Id::Compose("composeSyncopation")), "Syncopation");
         assert_eq!(history_label(Id::Loop("loopLength")), "Loop Length");
         assert_eq!(history_label(Id::Toggle("pitchScaleLock")), "Scale Lock");

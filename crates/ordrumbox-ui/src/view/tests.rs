@@ -154,7 +154,7 @@ fn the_ruler_sits_above_the_rows_and_its_beats_start_their_cells() {
     for scale in [Scale::ONE, Scale::from_quarters(6), Scale::whole(2)] {
         let layout = Layout::new(1100 * scale, 688 * scale, scale, pattern, 0, BeatWindow::default(), None);
         assert_eq!(layout.top, body_top(scale) + RULER_HEIGHT * scale);
-        assert_eq!(layout.hit(pattern, layout.grid_left + 2, layout.top - 2), None, "the ruler is not a row");
+        assert_eq!(layout.spot_at(pattern, layout.grid_left + 2, layout.top - 2), None, "the ruler is not a row");
         for beat in 0..layout.beats {
             let cell = layout.cell_rect(0, layout.start_beat + beat, 0, &pattern.tracks[0]);
             assert_eq!(layout.beat_x(beat), cell.x, "beat {beat}");
@@ -191,7 +191,7 @@ fn body_splits_the_window_above_the_footer() {
 }
 
 #[test]
-fn kit_editor_draws_and_hits() {
+fn kit_editor_draws_and_finds_samples() {
     let samples: Vec<&str> = (0..40).map(|_| "kick.wav").collect();
     let envelope = [0.0, 1.0, 0.5, 0.25];
     for (w, h) in [(1, 1), (40, 30), (1024, 640)] {
@@ -224,28 +224,28 @@ fn kit_editor_draws_and_hits() {
     let controls = layout.controls_area();
     assert!(controls.x + controls.w < layout.facts_x);
     assert!(layout.facts_bottom() < layout.bottom);
-    assert_eq!(layout.hit(0, 40, layout.left + 2, layout.list_top + 1), Some(0));
-    assert_eq!(layout.hit(0, 1, layout.left + 2, layout.list_top + layout.row + 1), None);
-    assert_eq!(layout.hit(0, 40, layout.left + 2, layout.detail_y), None);
+    assert_eq!(layout.sample_at(0, 40, layout.left + 2, layout.list_top + 1), Some(0));
+    assert_eq!(layout.sample_at(0, 1, layout.left + 2, layout.list_top + layout.row + 1), None);
+    assert_eq!(layout.sample_at(0, 40, layout.left + 2, layout.detail_y), None);
 }
 
 #[test]
-fn hit_testing_matches_the_drawing() {
+fn spots_match_the_drawing() {
     let library = library();
     let pattern = &library.patterns[0];
     let layout = Layout::new(1024, 640, Scale::ONE, pattern, 0, BeatWindow::default(), None);
     let y = layout.row_top(2) + layout.row / 2;
-    assert_eq!(layout.hit(pattern, layout.box_x(false) + 1, y), Some(Hit::Mute(2)));
-    assert_eq!(layout.hit(pattern, layout.box_x(true) + 1, y), Some(Hit::Solo(2)));
-    assert_eq!(layout.hit(pattern, layout.name_x + 2, y), Some(Hit::Name(2)));
-    assert_eq!(layout.hit(pattern, layout.volume_x + 2, y), None);
+    assert_eq!(layout.spot_at(pattern, layout.box_x(false) + 1, y), Some(Spot::Mute(2)));
+    assert_eq!(layout.spot_at(pattern, layout.box_x(true) + 1, y), Some(Spot::Solo(2)));
+    assert_eq!(layout.spot_at(pattern, layout.name_x + 2, y), Some(Spot::Name(2)));
+    assert_eq!(layout.spot_at(pattern, layout.volume_x + 2, y), None);
     assert!(layout.volume_rect(2).contains(layout.volume_x + 2, y));
-    assert_eq!(layout.hit(pattern, layout.grid_left - 1, y), None);
-    assert_eq!(layout.hit(pattern, layout.grid_left, y), Some(Hit::Cell { track: 2, beat: 0, step: 0 }));
+    assert_eq!(layout.spot_at(pattern, layout.grid_left - 1, y), None);
+    assert_eq!(layout.spot_at(pattern, layout.grid_left, y), Some(Spot::Cell { track: 2, beat: 0, step: 0 }));
     // Track H: 2 steps per beat; the middle of beat 1's second step.
     let x = layout.step_x(3, 2) + 2;
-    assert_eq!(layout.hit(pattern, x, y), Some(Hit::Cell { track: 2, beat: 1, step: 1 }));
-    assert_eq!(layout.hit(pattern, layout.grid_left + layout.grid_width + 5, y), None);
-    assert_eq!(layout.hit(pattern, x, layout.row_top(3) + 1), None);
-    assert_eq!(layout.hit(pattern, x, layout.top - 1), None);
+    assert_eq!(layout.spot_at(pattern, x, y), Some(Spot::Cell { track: 2, beat: 1, step: 1 }));
+    assert_eq!(layout.spot_at(pattern, layout.grid_left + layout.grid_width + 5, y), None);
+    assert_eq!(layout.spot_at(pattern, x, layout.row_top(3) + 1), None);
+    assert_eq!(layout.spot_at(pattern, x, layout.top - 1), None);
 }

@@ -6,7 +6,7 @@ use super::session_labels::{beat_label, notes_label};
 use super::session_selection::{Clipboard, NoteFocus};
 use super::session_types::Move;
 use super::{Session, Switch};
-use crate::view::{Cursor, Hit};
+use crate::view::{Cursor, Spot};
 use ordrumbox_core::track::MAX_TRACKS;
 use ordrumbox_core::{Note, Track};
 use ordrumbox_engine::kit::Kit;
@@ -30,11 +30,11 @@ impl Session {
         }
     }
 
-    pub fn click(&mut self, hit: Hit) {
-        match hit {
-            Hit::Mute(t) => self.switch_track(t, Switch::Mute),
-            Hit::Solo(t) => self.switch_track(t, Switch::Solo),
-            Hit::Name(t) => {
+    pub fn click(&mut self, spot: Spot) {
+        match spot {
+            Spot::Mute(t) => self.switch_track(t, Switch::Mute),
+            Spot::Solo(t) => self.switch_track(t, Switch::Solo),
+            Spot::Name(t) => {
                 self.selection.put_cursor(Cursor {
                     track: t,
                     beat: self.selection.cursor.map_or(0, |c| c.beat),
@@ -43,12 +43,12 @@ impl Session {
                 self.selection.note_focus = Some(NoteFocus::Track(t));
                 self.audition(t, None);
             }
-            Hit::Cell { track, beat, step } => {
+            Spot::Cell { track, beat, step } => {
                 self.selection.cursor = Some(Cursor { track, beat, step });
                 self.selection.zone = None;
                 self.toggle_note(track, beat, step);
             }
-            Hit::AddTrack => self.add_track_menu_at_button(),
+            Spot::AddTrack => self.add_track_menu_at_button(),
         }
     }
 

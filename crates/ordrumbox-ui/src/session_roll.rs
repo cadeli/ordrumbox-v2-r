@@ -24,7 +24,7 @@ use crate::editors;
 use crate::note_drag::{MIDDLE_C, MIDI_MIN, midi_name};
 use crate::panel::Id;
 use crate::panel::{Item, Kind, Rect};
-use crate::piano_roll::{self, BEATS_PER_PAGE, RollHit, RollLayout, RollView, TOTAL_KEYS, note_row, steps_per_beat};
+use crate::piano_roll::{self, BEATS_PER_PAGE, RollLayout, RollSpot, RollView, TOTAL_KEYS, note_row, steps_per_beat};
 use crate::ui_input::Button;
 use crate::view;
 use crate::view::Cursor;
@@ -278,36 +278,36 @@ impl Session {
     pub fn roll_click(&mut self, size: (i32, i32, Scale), x: i32, y: i32, button: Button) -> bool {
         let layout = self.roll_layout(size);
         let Some(view) = self.roll_view(&layout) else { return false };
-        let Some(hit) = layout.hit(&view, x, y) else { return false };
+        let Some(spot) = layout.spot_at(&view, x, y) else { return false };
         // A note drawn out covers the cells after its own: the note under the pointer first.
         let drawn = layout.note_at(&view, x, y);
         let Some(t) = self.roll_track() else { return false };
-        match (hit, button) {
-            (RollHit::Ruler, Button::Left) => return self.press_pattern_ruler(size, x, y),
-            (RollHit::Ruler, Button::Right) => return self.pattern_ruler_menu(size, x, y),
+        match (spot, button) {
+            (RollSpot::Ruler, Button::Left) => return self.press_pattern_ruler(size, x, y),
+            (RollSpot::Ruler, Button::Right) => return self.pattern_ruler_menu(size, x, y),
             _ => {}
         }
-        let bar = match hit {
-            RollHit::ScrollBar(edge) => Some((bar_hold(&layout, &view, edge), bar_at(&layout, &view, x))),
+        let bar = match spot {
+            RollSpot::ScrollBar(edge) => Some((bar_hold(&layout, &view, edge), bar_at(&layout, &view, x))),
             _ => None,
         };
         self.roll.gauge = None;
         // A press on a note of the zone may drag it: the zone stays.
         let on_zone_note = button == Button::Left
-            && matches!(hit, RollHit::Cell { step, row } if drawn
+            && matches!(spot, RollSpot::Cell { step, row } if drawn
                 .or_else(|| self.roll_note_at(t, step, row).map(|n| (n, false)))
                 .is_some_and(|(n, edge)| !edge && self.roll_zone().is_some_and(|z| self.roll_zone_holds_note(&z, n))));
-        if matches!(hit, RollHit::Cell { .. }) && !on_zone_note {
+        if matches!(spot, RollSpot::Cell { .. }) && !on_zone_note {
             self.selection.roll_zone = None;
         }
-        match (hit, button) {
-            (RollHit::ScrollBar(_), Button::Left) => {
+        match (spot, button) {
+            (RollSpot::ScrollBar(_), Button::Left) => {
                 self.roll.bar_drag = bar.map(|(hold, _)| hold);
                 self.roll_bar_held(bar.map_or((0, 0.0, 1), |(_, at)| at));
             }
-            (RollHit::Key(midi), Button::Left) => self.roll_play_key(t, midi),
-            (RollHit::Key(midi), Button::Right) => self.roll_key_menu(t, midi, x, y),
-            (RollHit::Cell { step, row }, Button::Left) => {
+            (RollSpot::Key(midi), Button::Left) => self.roll_play_key(t, midi),
+            (RollSpot::Key(midi), Button::Right) => self.roll_key_menu(t, midi, x, y),
+            (RollSpot::Cell { step, row }, Button::Left) => {
                 match drawn.or_else(|| self.roll_note_at(t, step, row).map(|n| (n, false))) {
                     // A press on the right edge of a note draws it out.
                     Some((n, true)) => self.roll_length_press(t, n, x, layout.cell),
@@ -321,7 +321,7 @@ impl Session {
                     None => self.roll_zone_press(step, row, (x, y), true),
                 }
             }
-            (RollHit::Cell { step, row }, Button::Right) => self.roll_grid_menu(t, step, row, x, y),
+            (RollSpot::Cell { step, row }, Button::Right) => self.roll_grid_menu(t, step, row, x, y),
             _ => return false,
         }
         true

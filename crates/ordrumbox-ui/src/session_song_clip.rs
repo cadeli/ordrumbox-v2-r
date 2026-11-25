@@ -53,14 +53,14 @@ impl Session {
 
 #[cfg(test)]
 mod tests {
-    use super::super::session_song::tests::{SIZE, clips, find_hit, menu, session};
-    use crate::song_view::SongHit;
+    use super::super::session_song::tests::{SIZE, clips, find_spot, menu, session};
+    use crate::song_view::SongSpot;
     use crate::ui_input::Button;
 
     #[test]
     fn a_clip_clicked_is_selected_then_removed_or_repeated_by_its_keys() {
         let mut s = session();
-        let (x, y) = find_hit(&s, |hit| hit == SongHit::Clip(0));
+        let (x, y) = find_spot(&s, |spot| spot == SongSpot::Clip(0));
         s.song_click(SIZE, x, y, Button::Left);
         s.song_release(SIZE);
         assert_eq!(s.selected_clip(), Some(0));
@@ -87,11 +87,11 @@ mod tests {
     #[test]
     fn the_name_under_the_pointer_is_marked() {
         let mut s = session();
-        let (x, y) = find_hit(&s, |hit| hit == SongHit::RowName(0));
+        let (x, y) = find_spot(&s, |spot| spot == SongSpot::RowName(0));
         assert!(s.song_hover(SIZE, x, y));
         let layout = s.song_layout(SIZE);
         let rows = s.song_rows();
-        assert_eq!(s.song_view_data(&rows, &layout).hovered, Some(SongHit::RowName(0)));
+        assert_eq!(s.song_view_data(&rows, &layout).hovered, Some(SongSpot::RowName(0)));
         assert!(!s.song_hover(SIZE, x, y), "the same: nothing to redraw");
     }
 }

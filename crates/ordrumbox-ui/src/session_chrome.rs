@@ -247,7 +247,7 @@ pub(super) struct Chrome {
     pub(super) widgets: Widgets,
     /// What of the grid is under the mouse, for its tooltip: a step (its
     /// note's) or a track's name (the track's).
-    pub(super) hover: Option<crate::view::Hit>,
+    pub(super) hover: Option<crate::view::Spot>,
     /// What the help line says for what is under the pointer (`session_hints.rs`); `None`: the view's keys.
     pub(super) hint: Option<&'static str>,
     /// The control of a panel under the mouse that has a tooltip, and where it is.

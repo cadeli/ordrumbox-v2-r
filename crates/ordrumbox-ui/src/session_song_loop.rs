@@ -115,7 +115,7 @@ impl Session {
 mod tests {
     use super::super::session_song::tests::{SIZE, choose, menu, session};
     use super::Session;
-    use crate::song_view::{MeasureZoom, SongHit};
+    use crate::song_view::{MeasureZoom, SongSpot};
     use crate::ui_input::Button;
 
     /// The middle of the ruler's height.
@@ -124,19 +124,19 @@ mod tests {
         let rows = s.song_rows();
         let view = s.song_view_data(&rows, &layout);
         let g = layout.grid;
-        let on = |y: i32| (g.x..g.x + g.w).any(|x| matches!(layout.hit(&view, x, y), Some(SongHit::Ruler(_))));
+        let on = |y: i32| (g.x..g.x + g.w).any(|x| matches!(layout.spot_at(&view, x, y), Some(SongSpot::Ruler(_))));
         let top = (g.y..g.y + g.h).find(|&y| on(y)).expect("a ruler");
         top + (top..g.y + g.h).take_while(|&y| on(y)).count() as i32 / 2
     }
 
     /// Where `wanted` is on the ruler, scanning it from the left.
-    fn on_ruler(s: &Session, wanted: impl Fn(i32, SongHit) -> bool) -> i32 {
+    fn on_ruler(s: &Session, wanted: impl Fn(i32, SongSpot) -> bool) -> i32 {
         let layout = s.song_layout(SIZE);
         let rows = s.song_rows();
         let view = s.song_view_data(&rows, &layout);
         let y = ruler_y(s);
         (layout.grid.x..layout.grid.x + layout.grid.w)
-            .find(|&x| layout.hit(&view, x, y).is_some_and(|hit| wanted(x, hit)))
+            .find(|&x| layout.spot_at(&view, x, y).is_some_and(|spot| wanted(x, spot)))
             .expect("on the ruler")
     }
 
@@ -144,7 +144,7 @@ mod tests {
     fn step_x(s: &Session, step: u32) -> (i32, i32) {
         let layout = s.song_layout(SIZE);
         let first = s.song_scroll(&layout, s.song_rows().len()).0;
-        let x = on_ruler(s, |x, hit| matches!(hit, SongHit::Ruler(_)) && layout.step_at(x, first) == step);
+        let x = on_ruler(s, |x, spot| matches!(spot, SongSpot::Ruler(_)) && layout.step_at(x, first) == step);
         (x + 2, ruler_y(s))
     }
 
@@ -166,11 +166,11 @@ mod tests {
         assert_eq!(s.message, "loop: 1.6 to 1.12, Ctrl+L turns it off");
 
         // Its end, dragged to step 14's line; its start past it: they swap.
-        let end = on_ruler(&s, |_, hit| hit == SongHit::LoopEnd(crate::scroll_thumb::Edge::End));
+        let end = on_ruler(&s, |_, spot| spot == SongSpot::LoopEnd(crate::scroll_thumb::Edge::End));
         let to = step_x(&s, 14).0 - 2;
         drag(&mut s, (end, y), to);
         assert_eq!(s.song_loop_region(), Some((5, 14)));
-        let start = on_ruler(&s, |_, hit| hit == SongHit::LoopEnd(crate::scroll_thumb::Edge::Start));
+        let start = on_ruler(&s, |_, spot| spot == SongSpot::LoopEnd(crate::scroll_thumb::Edge::Start));
         let to = step_x(&s, 20).0 - 2;
         drag(&mut s, (start, y), to);
         assert_eq!(s.song_loop_region(), Some((14, 20)));
@@ -185,7 +185,7 @@ mod tests {
         // Off: its ends stay, and move; on again where they are.
         s.toggle_loop();
         assert_eq!((s.song_loop_region(), s.song_loop_marks()), (None, Some((14, 20))));
-        let end = on_ruler(&s, |_, hit| hit == SongHit::LoopEnd(crate::scroll_thumb::Edge::End));
+        let end = on_ruler(&s, |_, spot| spot == SongSpot::LoopEnd(crate::scroll_thumb::Edge::End));
         let to = step_x(&s, 24).0 - 2;
         drag(&mut s, (end, y), to);
         assert_eq!((s.song_loop_region(), s.song_loop_marks()), (None, Some((14, 24))));

@@ -7,7 +7,7 @@ use crate::panel::{Id, Kind, Rect};
 use crate::picker::Export;
 use crate::test_support::scratch_dir;
 use crate::ui_input::Button;
-use crate::view::Hit;
+use crate::view::Spot;
 use crate::{editors, panel};
 use ordrumbox_core::{Library, json};
 use ordrumbox_logic::history::MAX_STEPS;
@@ -243,7 +243,7 @@ fn every_knob_of_the_editors_is_undone() {
     // A note selected: the note editor's knobs are shown too.
     s.select_step_note(0, 0, 0);
     if s.selection.selected.is_none() {
-        s.click(Hit::Cell { track: 0, beat: 0, step: 0 });
+        s.click(Spot::Cell { track: 0, beat: 0, step: 0 });
     }
     let start = s.editor.library().to_file_text();
     let (width, height, scale) = WINDOW;

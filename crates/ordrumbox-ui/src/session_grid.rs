@@ -18,7 +18,7 @@ use super::session_song::DRAG_START_PX;
 use super::session_types::Workspace;
 use super::session_zone::zone_label;
 use crate::panel::{Dropdown, Id};
-use crate::view::{Cursor, Hit};
+use crate::view::{Cursor, Spot};
 use crate::{menu, view};
 use ordrumbox_core::track::MAX_TRACKS;
 use ordrumbox_logic::block::step_start_units;
@@ -100,16 +100,16 @@ impl Session {
     }
 
     /// What of the grid is at `(x, y)`.
-    pub fn grid_hit(&self, size: (i32, i32, Scale), x: i32, y: i32) -> Option<Hit> {
-        self.grid_layout(size)?.hit(self.pattern()?, x, y)
+    pub fn grid_spot_at(&self, size: (i32, i32, Scale), x: i32, y: i32) -> Option<Spot> {
+        self.grid_layout(size)?.spot_at(self.pattern()?, x, y)
     }
 
     /// A right-click on the grid opens its menu; whether it was the grid's.
     pub fn grid_menu(&mut self, size: (i32, i32, Scale), x: i32, y: i32) -> bool {
-        match self.grid_hit(size, x, y) {
-            Some(Hit::Mute(t) | Hit::Solo(t) | Hit::Name(t)) => self.track_menu(t, x, y),
-            Some(Hit::Cell { track, beat, step }) => self.step_menu(track, beat, step, x, y),
-            Some(Hit::AddTrack) => self.add_track_menu(x, y),
+        match self.grid_spot_at(size, x, y) {
+            Some(Spot::Mute(t) | Spot::Solo(t) | Spot::Name(t)) => self.track_menu(t, x, y),
+            Some(Spot::Cell { track, beat, step }) => self.step_menu(track, beat, step, x, y),
+            Some(Spot::AddTrack) => self.add_track_menu(x, y),
             None => return false,
         }
         true
@@ -481,7 +481,7 @@ mod tests {
         for y in y..y + 10 * scale {
             assert!(crate::frame::on_status_line(y, scale));
             for x in 0..width {
-                assert!(crate::panel::hit(&layout.items, x, y).is_none(), "a control at {x}, {y}");
+                assert!(crate::panel::item_at(&layout.items, x, y).is_none(), "a control at {x}, {y}");
             }
         }
     }
@@ -634,7 +634,7 @@ mod tests {
     fn a_click_switches_a_step_on_and_off_and_shift_click_selects() {
         let mut s = session();
         let count = |s: &Session| s.pattern().unwrap().tracks[0].notes.iter().filter(|n| n.beat == 3).count();
-        let cell = Hit::Cell { track: 0, beat: 3, step: 0 };
+        let cell = Spot::Cell { track: 0, beat: 3, step: 0 };
         s.click(cell);
         assert_eq!(count(&s), 1, "on");
         s.click(cell);
@@ -663,16 +663,16 @@ mod tests {
         let rect = s.grid_layout(SIZE).expect("the grid is shown").add_track_rect();
         let last = s.grid_layout(SIZE).unwrap().row_top(before - 1);
         assert!(rect.y > last, "under the last row");
-        let hit = s.grid_hit(SIZE, rect.x + rect.w / 2, rect.y + rect.h / 2);
-        assert_eq!(hit, Some(Hit::AddTrack));
-        s.click(Hit::AddTrack);
+        let spot = s.grid_spot_at(SIZE, rect.x + rect.w / 2, rect.y + rect.h / 2);
+        assert_eq!(spot, Some(Spot::AddTrack));
+        s.click(Spot::AddTrack);
         assert_eq!(s.pattern().unwrap().tracks.len(), before, "it asks for the instrument first");
         pick(&mut s, "Kick & snare >");
         pick(&mut s, "SNARE");
         assert_eq!(s.pattern().unwrap().tracks.len(), before + 1);
         assert_eq!(s.selection.cursor.map(|c| c.track), Some(before), "the cursor goes to the new track");
         let rect = s.grid_layout(SIZE).unwrap().add_track_rect();
-        assert_eq!(s.grid_hit(SIZE, rect.x + 1, rect.y + 1), Some(Hit::AddTrack), "it moves down with the rows");
+        assert_eq!(s.grid_spot_at(SIZE, rect.x + 1, rect.y + 1), Some(Spot::AddTrack), "it moves down with the rows");
     }
 
     #[test]
@@ -680,13 +680,13 @@ mod tests {
         let mut s = session();
         // Two presses on two names: no double-click.
         for t in [0, 1] {
-            s.click(Hit::Name(t));
+            s.click(Spot::Name(t));
             s.press_track_name(t, 10, 10);
             s.track_release(SIZE);
         }
         assert!(!s.piano_roll_open());
         // The second press on the same name, soon after.
-        s.click(Hit::Name(1));
+        s.click(Spot::Name(1));
         s.press_track_name(1, 10, 10);
         assert!(s.piano_roll_open());
         assert_eq!(s.roll_track(), Some(1));
@@ -701,11 +701,11 @@ mod tests {
         let at = |t: usize| {
             (0..SIZE.1)
                 .flat_map(|y| (0..SIZE.0).map(move |x| (x, y)))
-                .find(|&(x, y)| layout.hit(&pattern, x, y) == Some(Hit::Name(t)))
+                .find(|&(x, y)| layout.spot_at(&pattern, x, y) == Some(Spot::Name(t)))
                 .expect("a track name")
         };
         let ((x0, y0), (x1, y1)) = (at(0), at(1));
-        s.click(Hit::Name(0));
+        s.click(Spot::Name(0));
         s.press_track_drag(0, x0, y0);
         assert!(!s.track_drag_move(x0, y0 + 1), "a small move is still a click");
         assert!(s.track_drag_move(x1, y1));
@@ -750,9 +750,9 @@ mod tests {
         let (mut name, mut cell) = (None, None);
         for y in 0..SIZE.1 {
             for x in 0..SIZE.0 {
-                match layout.hit(&pattern, x, y) {
-                    Some(Hit::Name(0)) if name.is_none() => name = Some((x, y)),
-                    Some(Hit::Cell { track: 0, .. }) if cell.is_none() => cell = Some((x, y)),
+                match layout.spot_at(&pattern, x, y) {
+                    Some(Spot::Name(0)) if name.is_none() => name = Some((x, y)),
+                    Some(Spot::Cell { track: 0, .. }) if cell.is_none() => cell = Some((x, y)),
                     _ => {}
                 }
             }

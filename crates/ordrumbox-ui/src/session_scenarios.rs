@@ -22,7 +22,7 @@ use super::session_types::{PlayMode, Workspace};
 use crate::canvas::Canvas;
 use crate::kits::KitSet;
 use crate::store;
-use crate::view::Hit;
+use crate::view::Spot;
 
 const RATE: f32 = 8000.0;
 /// Frames per audio callback.
@@ -107,7 +107,7 @@ fn space_plays_the_playhead_advances_and_space_stops() {
 fn a_click_on_a_grid_cell_sounds_the_note() {
     let (mut s, mut audio) = session(LIBRARY);
     // An empty step: a note is added and heard, while stopped.
-    s.click(Hit::Cell { track: 0, beat: 1, step: 0 });
+    s.click(Spot::Cell { track: 0, beat: 1, step: 0 });
     assert_eq!(s.pattern().unwrap().tracks[0].notes.len(), 3);
     assert!(run(&mut s, &mut audio, 512) > 0.0);
     assert!(!s.playing());
@@ -119,7 +119,7 @@ fn a_click_on_a_grid_cell_sounds_the_note() {
     assert!(run(&mut s, &mut audio, 512) > 0.0);
     // The track name: heard too.
     run(&mut s, &mut audio, 4000);
-    s.click(Hit::Name(0));
+    s.click(Spot::Name(0));
     assert!(run(&mut s, &mut audio, 512) > 0.0);
 }
 
@@ -275,10 +275,10 @@ fn a_pattern_built_in_the_grid_is_saved_reloaded_and_exported() {
     let notes: [(usize, &[i32]); 3] = [(0, &[0, 2, 4, 6]), (1, &[1, 5]), (2, &[3])];
     for (track, beats) in notes {
         for &beat in beats {
-            s.click(Hit::Cell { track, beat, step: 0 });
+            s.click(Spot::Cell { track, beat, step: 0 });
         }
     }
-    s.click(Hit::Solo(1));
+    s.click(Spot::Solo(1));
     let pattern = s.pattern().unwrap().clone();
     assert_eq!((pattern.beat_count, s.editor.library().bpm), (8, 100.0));
     let names: Vec<&str> = pattern.tracks.iter().map(|t| t.name.as_str()).collect();
@@ -383,7 +383,7 @@ fn an_edit_in_auto_mode_goes_on_the_loop_being_heard_and_stays() {
     run(&mut s, &mut audio, 1000);
     let lines = s.pattern().unwrap().tracks[0].notes.clone();
     // On a track not in auto mode, before the next loop starts.
-    s.click(Hit::Cell { track: 1, beat: 1, step: 0 });
+    s.click(Spot::Cell { track: 1, beat: 1, step: 0 });
     run(&mut s, &mut audio, 1000);
     assert_eq!(s.pattern().unwrap().tracks[0].notes, lines, "the lines of this loop stay");
     run(&mut s, &mut audio, 16_000);

@@ -205,7 +205,7 @@ mod tests {
     use crate::menu::Command;
     use crate::ui::Ui;
     use crate::ui_input::{Button, Key, KeyEvent, Modifiers};
-    use crate::view::Hit;
+    use crate::view::Spot;
     use ordrumbox_core::Library;
 
     use crate::test_support::SIZE;
@@ -319,7 +319,7 @@ mod tests {
         s.run(Command::CopyStep);
         assert!(matches!(&s.selection.clipboard, Some(Clipboard::Block(b)) if b.note_count() == 3));
         // Pasted from SNARE's beat 3: the KICK row on SNARE, the SNARE row on HAT.
-        s.click(Hit::Name(1));
+        s.click(Spot::Name(1));
         s.selection.put_cursor(Cursor { track: 1, beat: 2, step: 0 });
         s.run(Command::Paste);
         assert_eq!(beats(&s, 0), [0, 1, 2, 3], "KICK unchanged");
@@ -357,7 +357,7 @@ mod tests {
         s.deselect();
         assert_eq!(s.selection.zone, None);
         draw_zone(&mut s, (0, 0, 0), (1, 1, 0));
-        s.click(Hit::Cell { track: 2, beat: 0, step: 0 });
+        s.click(Spot::Cell { track: 2, beat: 0, step: 0 });
         assert_eq!(s.selection.zone, None);
     }
 
@@ -498,7 +498,7 @@ mod tests {
     #[test]
     fn shift_arrows_grow_the_zone_from_the_cursor_and_back_to_it() {
         let (mut ui, _) = ui();
-        ui.session.click(crate::view::Hit::Cell { track: 0, beat: 1, step: 0 });
+        ui.session.click(crate::view::Spot::Cell { track: 0, beat: 1, step: 0 });
         press(&mut ui, SHIFT, Key::ArrowRight);
         let one = zone_tracks_and_beats(&ui.session).expect("a zone");
         assert_eq!((one.0, one.1), (0, 0));

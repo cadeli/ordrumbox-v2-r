@@ -153,11 +153,11 @@ impl Session {
     /// one there.
     pub(crate) fn toast_click(&mut self, size: (i32, i32, Scale), x: i32, y: i32) -> bool {
         let (width, height, scale) = size;
-        let hit = self.flash.rects(width, height, scale).iter().position(|(rect, _)| rect.contains(x, y));
-        if let Some(index) = hit {
+        let under = self.flash.rects(width, height, scale).iter().position(|(rect, _)| rect.contains(x, y));
+        if let Some(index) = under {
             self.flash.toasts.remove(index);
         }
-        hit.is_some()
+        under.is_some()
     }
 
     /// The toasts whose time is over go; whether one did.

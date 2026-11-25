@@ -10,10 +10,10 @@
 use super::Session;
 use super::session_chrome::GridHold;
 use super::session_song_zoom::BarDrag;
-use crate::piano_roll::RollHit;
+use crate::piano_roll::RollSpot;
 use crate::scale::Scale;
 use crate::scroll_thumb::{self, HELD_SHAPE};
-use crate::song_view::{Axis, SongHit};
+use crate::song_view::{Axis, SongSpot};
 use crate::ui_input::PointerShape;
 use crate::view::BarHold;
 
@@ -73,10 +73,10 @@ impl Session {
     fn roll_pointer_shape(&self, size: (i32, i32, Scale), x: i32, y: i32) -> PointerShape {
         let layout = self.roll_layout(size);
         let Some(view) = self.roll_view(&layout) else { return PointerShape::Arrow };
-        match layout.hit(&view, x, y) {
-            Some(RollHit::ScrollBar(Some(_))) => PointerShape::ResizeHorizontal,
-            Some(RollHit::ScrollBar(None)) => scroll_thumb::hover_shape(layout.bar_thumb(&view), x),
-            Some(RollHit::Cell { .. }) => match layout.note_at(&view, x, y) {
+        match layout.spot_at(&view, x, y) {
+            Some(RollSpot::ScrollBar(Some(_))) => PointerShape::ResizeHorizontal,
+            Some(RollSpot::ScrollBar(None)) => scroll_thumb::hover_shape(layout.bar_thumb(&view), x),
+            Some(RollSpot::Cell { .. }) => match layout.note_at(&view, x, y) {
                 Some((_, true)) => PointerShape::ResizeHorizontal,
                 Some((_, false)) => PointerShape::Move,
                 None => PointerShape::Arrow,
@@ -91,7 +91,7 @@ impl Session {
         if layout.lane_edge_rect().contains(x, y) {
             return PointerShape::ResizeVertical;
         }
-        match layout.bar_hit(x, y) {
+        match layout.bar_at(x, y) {
             Some(Some(_)) => PointerShape::ResizeHorizontal,
             Some(None) => scroll_thumb::hover_shape(layout.bar_thumb(), x),
             None => PointerShape::Arrow,
@@ -112,10 +112,10 @@ impl Session {
         let layout = self.song_layout(size);
         let rows = self.song_rows();
         let view = self.song_view_data(&rows, &layout);
-        match layout.hit(&view, x, y) {
-            Some(SongHit::ZoomHandle(_)) => PointerShape::ResizeHorizontal,
-            Some(SongHit::LaneEdge(_)) => PointerShape::ResizeVertical,
-            Some(SongHit::ScrollBar(axis)) => {
+        match layout.spot_at(&view, x, y) {
+            Some(SongSpot::ZoomHandle(_)) => PointerShape::ResizeHorizontal,
+            Some(SongSpot::LaneEdge(_)) => PointerShape::ResizeVertical,
+            Some(SongSpot::ScrollBar(axis)) => {
                 scroll_thumb::hover_shape(layout.bar_thumb(&view, axis), Axis::along(axis, (x, y)))
             }
             _ => PointerShape::Arrow,
@@ -185,8 +185,8 @@ mod tests {
         s.editor.add_track(1, "KICK", 4);
         s.editor.add_automation_lane(None, "KICK", ordrumbox_core::AutomationTarget::Volume).unwrap();
         s.set_size(SIZE);
-        let at = |wanted: SongHit| crate::session::session_song::tests::find_hit(&s, |hit| hit == wanted);
-        let ((ex, ey), (nx, ny)) = (at(SongHit::LaneEdge(0)), at(SongHit::LaneName(0)));
+        let at = |wanted: SongSpot| crate::session::session_song::tests::find_spot(&s, |spot| spot == wanted);
+        let ((ex, ey), (nx, ny)) = (at(SongSpot::LaneEdge(0)), at(SongSpot::LaneName(0)));
         assert_eq!(s.pointer_shape(SIZE, ex, ey), PointerShape::ResizeVertical);
         assert_eq!(s.pointer_shape(SIZE, nx, ny), PointerShape::Arrow, "the name: its menu");
         // Held, the arrows stay wherever the pointer goes.

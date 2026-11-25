@@ -16,7 +16,7 @@ use super::session_selection::Clipboard;
 use super::session_song::is_drag_start;
 use super::session_zone::beats_label;
 use crate::note_drag::{MIDDLE_C, midi_name};
-use crate::piano_roll::{RollHit, RollSpan, TOTAL_KEYS, key_row, row_key, steps_per_beat};
+use crate::piano_roll::{RollSpan, RollSpot, TOTAL_KEYS, key_row, row_key, steps_per_beat};
 use crate::ui_input::Button;
 
 /// A Shift+press on a cell of the piano roll that may become a zone.
@@ -55,7 +55,7 @@ impl Session {
     pub fn roll_shift_press(&mut self, size: (i32, i32, Scale), x: i32, y: i32) -> bool {
         let layout = self.roll_layout(size);
         let Some(view) = self.roll_view(&layout) else { return false };
-        let Some(RollHit::Cell { step, row }) = layout.hit(&view, x, y) else {
+        let Some(RollSpot::Cell { step, row }) = layout.spot_at(&view, x, y) else {
             return self.roll_click(size, x, y, Button::Left);
         };
         let Some(t) = self.roll_track() else { return false };

@@ -291,7 +291,7 @@ impl Session {
         // A choice notice: its buttons take the click as ENTER takes the
         // focused one, the rest of it closes as its title says.
         if let Some(choice) = self.notice_choice() {
-            let hit = view::notice_button_at(
+            let pressed = view::notice_button_at(
                 (width, height),
                 &choice.title,
                 &choice.lines,
@@ -300,7 +300,7 @@ impl Session {
                 scale,
                 (x, y),
             );
-            if hit == Some(1) {
+            if pressed == Some(1) {
                 self.run_confirm();
             } else {
                 self.chrome.overlay = None;
@@ -322,7 +322,7 @@ impl Session {
             self.chrome.overlay = None;
             return;
         }
-        if let Some(i) = layout.hit(picker, x, y) {
+        if let Some(i) = layout.entry_at(picker, x, y) {
             let outcome = picker.click(i);
             self.picker_outcome(outcome);
         }

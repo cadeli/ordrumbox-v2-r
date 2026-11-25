@@ -122,7 +122,7 @@ impl Dropdown {
         let mut menu = self.back();
         while let Some(m) = menu {
             if m.rect(width, height, scale).contains(x, y) {
-                let i = m.hit(width, height, scale, x, y);
+                let i = m.option_at(width, height, scale, x, y);
                 return Some((m, i));
             }
             menu = m.back();
@@ -231,7 +231,7 @@ impl Dropdown {
     }
 
     /// The option under `(x, y)`.
-    pub fn hit(&self, width: i32, height: i32, scale: Scale, x: i32, y: i32) -> Option<usize> {
+    pub fn option_at(&self, width: i32, height: i32, scale: Scale, x: i32, y: i32) -> Option<usize> {
         let r = self.rect(width, height, scale);
         if !r.contains(x, y) || self.scroll_bar(width, height, scale).is_some_and(|bar| x >= bar.x) {
             return None;

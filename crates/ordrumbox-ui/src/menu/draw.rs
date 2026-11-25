@@ -82,7 +82,7 @@ pub(super) fn panel(menus: &[Menu], open: Open, scale: Scale) -> (i32, i32, i32,
 
 /// What the mouse is over.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Hit {
+pub enum Spot {
     Title(usize),
     /// An item of the open menu.
     Item(usize),
@@ -91,10 +91,10 @@ pub enum Hit {
     Bar,
 }
 
-pub fn hit(menus: &[Menu], open: Option<Open>, scale: Scale, x: i32, y: i32) -> Option<Hit> {
+pub fn spot_at(menus: &[Menu], open: Option<Open>, scale: Scale, x: i32, y: i32) -> Option<Spot> {
     if (0..bar_height(scale)).contains(&y) {
         let title = titles(menus, scale).iter().position(|&(tx, w)| (tx..tx + w).contains(&x));
-        return Some(title.map_or(Hit::Bar, Hit::Title));
+        return Some(title.map_or(Spot::Bar, Spot::Title));
     }
     let open = open?;
     let (px, py, width, tops) = panel(menus, open, scale);
@@ -107,7 +107,7 @@ pub fn hit(menus: &[Menu], open: Option<Open>, scale: Scale, x: i32, y: i32) -> 
         let h = if matches!(item, Item::Separator) { separator_height(scale) } else { item_height(scale) };
         (top..top + h).contains(&y)
     });
-    Some(found.filter(|&i| !matches!(items[i], Item::Separator)).map_or(Hit::Panel, Hit::Item))
+    Some(found.filter(|&i| !matches!(items[i], Item::Separator)).map_or(Spot::Panel, Spot::Item))
 }
 
 // ─── The library ─────────────────────────────────────────────────────────────

@@ -161,10 +161,10 @@ impl SongLayout {
 
     /// The add-automation button, a lane's name or one of its steps at
     /// `(x, y)`, in a song of `total` measures with clips.
-    pub(super) fn automation_hit(&self, view: &SongView, x: i32, y: i32, total: u32) -> Option<SongHit> {
+    pub(super) fn automation_spot_at(&self, view: &SongView, x: i32, y: i32, total: u32) -> Option<SongSpot> {
         let song = view.song.filter(|song| !song.clips.is_empty())?;
         if self.add_automation_rect(view).contains(x, y) {
-            return Some(SongHit::AddAutomation);
+            return Some(SongSpot::AddAutomation);
         }
         let shown = row_at(y, self.body_top(), self.row_height()).filter(|&row| row < self.visible_rows())?;
         let offset = (view.scroll.1 + shown).checked_sub(view.rows.len())?;
@@ -174,13 +174,13 @@ impl SongLayout {
             let at_edge = bottom - y <= EDGE_GRAB * self.scale;
             let on_badge = view.taken_back.get(lane).copied().unwrap_or(false) && x >= self.lane_badge_x();
             return Some(match (at_edge, on_badge) {
-                (true, _) => SongHit::LaneEdge(lane),
-                (false, true) => SongHit::LaneBadge(lane),
-                (false, false) => SongHit::LaneName(lane),
+                (true, _) => SongSpot::LaneEdge(lane),
+                (false, true) => SongSpot::LaneBadge(lane),
+                (false, false) => SongSpot::LaneName(lane),
             });
         }
         let step = self.step_at(x, view.scroll.0);
-        (step < total * STEPS_PER_MEASURE).then_some(SongHit::LaneStep { lane, step })
+        (step < total * STEPS_PER_MEASURE).then_some(SongSpot::LaneStep { lane, step })
     }
 }
 
@@ -189,7 +189,7 @@ impl SongLayout {
 pub(super) fn draw_lanes(canvas: &mut Canvas, song: &Song, layout: &SongLayout, view: &SongView, page: &Page) {
     let pattern_rows = view.rows.len();
     let hovered = match view.hovered {
-        Some(SongHit::LaneName(lane) | SongHit::LaneEdge(lane) | SongHit::LaneBadge(lane)) => Some(lane),
+        Some(SongSpot::LaneName(lane) | SongSpot::LaneEdge(lane) | SongSpot::LaneBadge(lane)) => Some(lane),
         _ => None,
     };
     let top = layout.body_top();

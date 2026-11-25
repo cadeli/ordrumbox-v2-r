@@ -224,7 +224,7 @@ impl KitLayout {
     }
 
     /// The sample of the list under `(x, y)`, the table shown from `first`.
-    pub fn hit(&self, first: usize, count: usize, x: i32, y: i32) -> Option<usize> {
+    pub fn sample_at(&self, first: usize, count: usize, x: i32, y: i32) -> Option<usize> {
         let list =
             Rect::new(self.left, self.list_top, self.text_right(count) - self.left, self.shown() as i32 * self.row);
         if !list.contains(x, y) {

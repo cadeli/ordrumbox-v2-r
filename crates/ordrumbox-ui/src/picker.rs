@@ -353,7 +353,7 @@ impl PickerLayout {
     }
 
     /// The entry under `(x, y)`.
-    pub fn hit(&self, picker: &Picker, x: i32, y: i32) -> Option<usize> {
+    pub fn entry_at(&self, picker: &Picker, x: i32, y: i32) -> Option<usize> {
         if y < self.list_top || x < self.panel.x || x >= self.panel.x + self.panel.w {
             return None;
         }
@@ -455,7 +455,7 @@ mod tests {
         let layout = PickerLayout::new(800, 600, Scale::ONE);
         let mut pixels = vec![0; 800 * 600];
         draw(&mut Canvas::new(&mut pixels, 800, 600), &picker, &layout);
-        assert_eq!(layout.hit(&picker, layout.panel.x + 20, layout.list_top + 1), Some(0));
+        assert_eq!(layout.entry_at(&picker, layout.panel.x + 20, layout.list_top + 1), Some(0));
         fs::remove_dir_all(dir).unwrap();
     }
 }

@@ -286,9 +286,9 @@ mod tests {
 
     /// A left click without a drag (press and release), which acts on what is under it.
     fn click_and_release(s: &mut Session, x: i32, y: i32) -> bool {
-        let hit = s.song_click(SIZE, x, y, Button::Left);
+        let handled = s.song_click(SIZE, x, y, Button::Left);
         s.song_release(SIZE);
-        hit
+        handled
     }
 
     #[test]

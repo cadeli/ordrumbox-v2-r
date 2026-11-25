@@ -5,7 +5,7 @@
 //! point, the cursor, the selected note, and while playing the playhead and
 //! the notes sounding.
 //!
-//! [`RollLayout`] places everything; drawing and mouse hit-testing both use it.
+//! [`RollLayout`] places everything; drawing and finding what is under the mouse both use it.
 
 use crate::scale::Scale;
 use crate::scroll_thumb::{self, Edge};
@@ -196,7 +196,7 @@ impl RollView<'_> {
 
 /// What is under the mouse.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RollHit {
+pub enum RollSpot {
     /// A key of the keyboard: its MIDI note.
     Key(i32),
     /// A cell of the grid: absolute step, row.
@@ -372,13 +372,13 @@ impl RollLayout {
     }
 
     /// What is at `(x, y)`.
-    pub fn hit(&self, view: &RollView, x: i32, y: i32) -> Option<RollHit> {
+    pub fn spot_at(&self, view: &RollView, x: i32, y: i32) -> Option<RollSpot> {
         if self.ruler.contains(x, y) {
-            return Some(RollHit::Ruler);
+            return Some(RollSpot::Ruler);
         }
         if self.bar.contains(x, y) {
             let handle = scroll_thumb::ZOOM_HANDLE * self.scale;
-            return Some(RollHit::ScrollBar(scroll_thumb::handle_at(x, self.bar_thumb(view), handle)));
+            return Some(RollSpot::ScrollBar(scroll_thumb::handle_at(x, self.bar_thumb(view), handle)));
         }
         if y < self.grid.y || y >= self.grid.y + self.grid.h {
             return None;
@@ -388,14 +388,14 @@ impl RollLayout {
             return None;
         }
         if self.keys.contains(x, y) {
-            return Some(RollHit::Key(row_midi(row)));
+            return Some(RollSpot::Key(row_midi(row)));
         }
         if x < self.grid.x {
             return None;
         }
         let (start, end) = view.page_steps();
         let step = start + i64::from((x - self.grid.x) / self.cell);
-        (step < end).then_some(RollHit::Cell { step, row })
+        (step < end).then_some(RollSpot::Cell { step, row })
     }
 }
 
@@ -436,7 +436,7 @@ mod tests {
     }
 
     #[test]
-    fn hit_testing_matches_the_drawing() {
+    fn spots_match_the_drawing() {
         let library = library();
         let track = &library.patterns[0].tracks[0];
         let layout = RollLayout::new(1100, 680, Scale::ONE, 0, (4, 4));
@@ -447,27 +447,27 @@ mod tests {
         let v = view(track, 0, top);
         assert_eq!(v.page_steps(), (0, 16));
         let r = layout.note_rect(&v, 0).unwrap();
-        assert_eq!(layout.hit(&v, r.x + 2, r.y + 2), Some(RollHit::Cell { step: 0, row: 36 }));
+        assert_eq!(layout.spot_at(&v, r.x + 2, r.y + 2), Some(RollSpot::Cell { step: 0, row: 36 }));
         let r = layout.note_rect(&v, 1).unwrap();
-        assert_eq!(layout.hit(&v, r.x + 2, r.y + 2), Some(RollHit::Cell { step: 6, row: 43 }));
-        assert_eq!(layout.hit(&v, layout.keys.x + 2, r.y + 2), Some(RollHit::Key(row_midi(43))));
+        assert_eq!(layout.spot_at(&v, r.x + 2, r.y + 2), Some(RollSpot::Cell { step: 6, row: 43 }));
+        assert_eq!(layout.spot_at(&v, layout.keys.x + 2, r.y + 2), Some(RollSpot::Key(row_midi(43))));
         // Note 2 (beat 4) is on page 2.
         assert!(layout.note_rect(&v, 2).is_none());
         let v2 = view(track, 4, top);
         assert_eq!(v2.page_steps(), (16, 24));
         let r = layout.note_rect(&v2, 2).unwrap();
-        assert_eq!(layout.hit(&v2, r.x + 2, r.y + 2), Some(RollHit::Cell { step: 16, row: 36 }));
+        assert_eq!(layout.spot_at(&v2, r.x + 2, r.y + 2), Some(RollSpot::Cell { step: 16, row: 36 }));
         // A drag past the grid stops at the page's last step and the lowest row shown.
         let lowest = layout.first_row(&v2);
         assert_eq!(layout.nearest_cell(&v2, 5000, 5000), Some((23, lowest)));
         assert_eq!(layout.nearest_cell(&v2, 0, 0), Some((16, top)));
         // Past the last step of a short page: nothing.
-        assert_eq!(layout.hit(&v2, layout.grid.x + 8 * layout.cell + 2, r.y + 2), None);
+        assert_eq!(layout.spot_at(&v2, layout.grid.x + 8 * layout.cell + 2, r.y + 2), None);
         // The bar: the thumb under the last beats, its ends the handles.
         let (start, len) = layout.bar_thumb(&v2);
         let y = layout.bar.y + 2;
-        assert_eq!(layout.hit(&v2, start + len / 2, y), Some(RollHit::ScrollBar(None)));
-        assert_eq!(layout.hit(&v2, start + len - 1, y), Some(RollHit::ScrollBar(Some(Edge::End))));
+        assert_eq!(layout.spot_at(&v2, start + len / 2, y), Some(RollSpot::ScrollBar(None)));
+        assert_eq!(layout.spot_at(&v2, start + len - 1, y), Some(RollSpot::ScrollBar(Some(Edge::End))));
         assert!(start + len <= layout.bar.x + layout.bar.w);
     }
 

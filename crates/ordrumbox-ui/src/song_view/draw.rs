@@ -23,7 +23,7 @@ fn draw_list(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     for (i, name) in view.patterns.iter().enumerate().skip(first).take(shown) {
         let y = r.y + (i - first) as i32 * LIST_ROW * s;
         let selected = i == view.selected_pattern;
-        let hovered = view.hovered == Some(SongHit::Pattern(i));
+        let hovered = view.hovered == Some(SongSpot::Pattern(i));
         if selected || hovered {
             let color = if selected { selected_color() } else { theme::highlight() };
             canvas.fill_rect(r.x - 2 * s, y - 2 * s, r.w, LIST_ROW * s, color);
@@ -201,7 +201,7 @@ fn draw_row_names(canvas: &mut Canvas, view: &SongView, layout: &SongLayout, pag
         let line_w = layout.label_width() + page.body_w;
         canvas.fill_rect(layout.grid.x, y + layout.row_height() - s.px(), line_w, s.px(), line_color());
         let text_y = y + (layout.row_height() - 8 * s) / 2;
-        if view.hovered == Some(SongHit::RowName(k)) {
+        if view.hovered == Some(SongSpot::RowName(k)) {
             draw_hovered_name(canvas, layout, (y, layout.row_height() - s.px()), text_y);
         }
         let name = fit(&row.name, layout.label_width() - 6 * s - text_width(MENU_MARK, s), s);
@@ -244,7 +244,7 @@ fn draw_clips(canvas: &mut Canvas, view: &SongView, song: &Song, layout: &SongLa
             let row = view.rows.iter().position(|row| row.id == song.clips[i].pattern_id).unwrap_or(0);
             let color = theme::track(row);
             let color =
-                if view.hovered == Some(SongHit::Clip(i)) { theme::mix(color, theme::WHITE, 0.25) } else { color };
+                if view.hovered == Some(SongSpot::Clip(i)) { theme::mix(color, theme::WHITE, 0.25) } else { color };
             canvas.fill_rect(r.x, r.y, r.w, r.h, color);
             if view.selected_clip == Some(i) {
                 draw_outline(canvas, r, 2 * layout.scale.px(), ACCENT);

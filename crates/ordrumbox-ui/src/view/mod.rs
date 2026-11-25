@@ -3,7 +3,7 @@
 //! steps with their notes), the grid cursor, the selected note, the playhead,
 //! the messages and the key help.
 //!
-//! [`Layout`] places everything; drawing and mouse hit-testing both use it.
+//! [`Layout`] places everything; drawing and finding what is under the mouse both use it.
 
 use ordrumbox_core::Pattern;
 use ordrumbox_logic::block::Zone;

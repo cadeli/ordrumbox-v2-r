@@ -16,7 +16,7 @@ use super::Session;
 use crate::kits::KitSet;
 use crate::menu::LibraryState;
 use crate::test_support::scratch_dir;
-use crate::view::Hit;
+use crate::view::Spot;
 
 const DEMO: &str = r#"{"patterns":[{"name":"demo","tracks":[{"name":"KICK","notes":[{}]}]}]}"#;
 
@@ -40,7 +40,7 @@ fn start(path: &Path) -> Session {
 /// A note added by a click on the grid: an edit.
 fn add_note(session: &mut Session, beat: i32) {
     let before = session.pattern().unwrap().tracks[0].notes.len();
-    session.click(Hit::Cell { track: 0, beat, step: 0 });
+    session.click(Spot::Cell { track: 0, beat, step: 0 });
     assert_eq!(session.pattern().unwrap().tracks[0].notes.len(), before + 1);
 }
 

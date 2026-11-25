@@ -16,7 +16,7 @@ use ordrumbox_core::automation::{
 
 use super::Session;
 use crate::panel::{Dropdown, Id, SUBMENU_MARK};
-use crate::song_view::SongHit;
+use crate::song_view::SongSpot;
 use crate::ui_input::Button;
 
 /// The values of the automation menus' lines.
@@ -85,18 +85,18 @@ impl Session {
     pub(super) fn automation_click(
         &mut self,
         size: (i32, i32, Scale),
-        hit: SongHit,
+        spot: SongSpot,
         (x, y): (i32, i32),
         button: Button,
     ) {
-        match (hit, button) {
-            (SongHit::AddAutomation, Button::Left) => self.automation_menu(x, y),
-            (SongHit::LaneBadge(lane), Button::Left) => self.reenable_lane(lane),
-            (SongHit::LaneName(lane) | SongHit::LaneBadge(lane), _) | (SongHit::LaneEdge(lane), Button::Right) => {
+        match (spot, button) {
+            (SongSpot::AddAutomation, Button::Left) => self.automation_menu(x, y),
+            (SongSpot::LaneBadge(lane), Button::Left) => self.reenable_lane(lane),
+            (SongSpot::LaneName(lane) | SongSpot::LaneBadge(lane), _) | (SongSpot::LaneEdge(lane), Button::Right) => {
                 self.lane_menu(lane, x, y);
             }
-            (SongHit::LaneStep { lane, step }, _) => self.press_lane(size, lane, (step, y), button, false),
-            (SongHit::LaneEdge(lane), _) => {
+            (SongSpot::LaneStep { lane, step }, _) => self.press_lane(size, lane, (step, y), button, false),
+            (SongSpot::LaneEdge(lane), _) => {
                 self.song_panel.lane_resize = Some((lane, format!("lane-rows:{lane}:{}", self.editor.revision())));
             }
             _ => {}
@@ -316,9 +316,9 @@ impl Session {
 
 #[cfg(test)]
 mod tests {
-    use super::super::session_song::tests::{SIZE, choose, find_hit, menu, session};
+    use super::super::session_song::tests::{SIZE, choose, find_spot, menu, session};
     use super::Session;
-    use crate::song_view::{MeasureZoom, SongHit};
+    use crate::song_view::{MeasureZoom, SongSpot};
     use crate::ui_input::Button;
     use ordrumbox_core::automation::AutomationTarget;
 
@@ -331,7 +331,7 @@ mod tests {
 
     /// X of `step` of the first lane, and Y of its row.
     fn step_at(s: &Session, step: u32) -> (i32, i32) {
-        find_hit(s, |hit| matches!(hit, SongHit::LaneStep { lane: 0, step: at } if at == step))
+        find_spot(s, |spot| matches!(spot, SongSpot::LaneStep { lane: 0, step: at } if at == step))
     }
 
     /// A press on step `from` of the first lane with `button`, dragged to step `to`.
@@ -365,7 +365,7 @@ mod tests {
             s.editor.add_track(1, name, 4);
         }
         s.set_size(SIZE);
-        let (x, y) = find_hit(&s, |hit| hit == SongHit::AddAutomation);
+        let (x, y) = find_spot(&s, |spot| spot == SongSpot::AddAutomation);
         assert!(s.song_click(SIZE, x, y, Button::Left));
         assert_eq!(menu(&s), ["instrument:KICK", "instrument:SNARE"], "the song's instruments, once each");
         choose(&mut s, 1);
@@ -376,9 +376,9 @@ mod tests {
         assert_eq!((lanes[0].instrument(), lanes[0].target()), ("SNARE", AutomationTarget::Solo));
 
         // The lane's row is under the patterns', the button under it.
-        let (lx, ly) = find_hit(&s, |hit| matches!(hit, SongHit::LaneStep { lane: 0, step: 0 }));
+        let (lx, ly) = find_spot(&s, |spot| matches!(spot, SongSpot::LaneStep { lane: 0, step: 0 }));
         assert!(ly > y - 20, "after the pattern rows");
-        assert!(find_hit(&s, |hit| hit == SongHit::AddAutomation).1 > ly);
+        assert!(find_spot(&s, |spot| spot == SongSpot::AddAutomation).1 > ly);
         assert!(s.song_click(SIZE, lx, ly, Button::Left));
         assert!(s.song_release(SIZE));
         assert_eq!(points(&s), [(0, ON), (1, None)], "a click: that step on, no more");
@@ -404,7 +404,7 @@ mod tests {
         assert!(points(&s).is_empty());
 
         // A right-click on its name opens its menu: clear it, delete it, delete every lane.
-        let (nx, ny) = find_hit(&s, |hit| hit == SongHit::LaneName(0));
+        let (nx, ny) = find_spot(&s, |spot| spot == SongSpot::LaneName(0));
         assert!(s.song_click(SIZE, nx, ny, Button::Right));
         assert_eq!(menu(&s), ["taller:0", "shorter:0", "clear:0", "remove:0", "remove-all"]);
         choose(&mut s, 3);
@@ -460,7 +460,7 @@ mod tests {
         let mut s = with_lane(AutomationTarget::Volume);
         let (_, height) = band(&s);
         // Its bottom edge, dragged two rows down: three rows tall, in one undo step.
-        let (x, y) = find_hit(&s, |hit| hit == SongHit::LaneEdge(0));
+        let (x, y) = find_spot(&s, |spot| spot == SongSpot::LaneEdge(0));
         assert!(s.song_click(SIZE, x, y, Button::Left));
         let row = s.song_layout(SIZE).row_height();
         assert!(s.mouse_move(SIZE, x, y + row, false));

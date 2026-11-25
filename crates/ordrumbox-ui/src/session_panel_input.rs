@@ -42,7 +42,7 @@ impl Session {
             return true;
         }
         let layout = self.panel_layout(width, height, scale);
-        let Some(item) = panel::hit(&layout.items, x, y).cloned() else {
+        let Some(item) = panel::item_at(&layout.items, x, y).cloned() else {
             self.chrome.widgets.focus = None;
             // A click on the track editor's background is its own.
             return layout.right > 0 && x >= width - layout.right;
@@ -91,7 +91,7 @@ impl Session {
                 dropdown.bar_to(size, y);
             }
             self.chrome.widgets.open_dropdown(dropdown);
-        } else if let Some(i) = dropdown.hit(width, height, scale, x, y) {
+        } else if let Some(i) = dropdown.option_at(width, height, scale, x, y) {
             self.chrome.widgets.open_dropdown(dropdown);
             if left {
                 self.pick(i);
@@ -216,7 +216,7 @@ impl Session {
             if dropdown.bar_held {
                 return dropdown.bar_to(size, y);
             }
-            if let Some(i) = dropdown.hit(width, height, scale, x, y).filter(|&i| i != dropdown.at) {
+            if let Some(i) = dropdown.option_at(width, height, scale, x, y).filter(|&i| i != dropdown.at) {
                 dropdown.at = i;
                 return true;
             }
@@ -271,9 +271,9 @@ impl Session {
                     self.chrome.beat_window,
                     self.chrome.lane_height,
                 )
-                .hit(pattern, x, y)
+                .spot_at(pattern, x, y)
                 {
-                    hit @ Some(view::Hit::Cell { .. } | view::Hit::Name(_)) => hit,
+                    spot @ Some(view::Spot::Cell { .. } | view::Spot::Name(_)) => spot,
                     _ => None,
                 }
             }
@@ -292,7 +292,7 @@ impl Session {
             None
         } else {
             let layout = self.panel_layout(width, height, scale);
-            panel::hit(&layout.items, x, y)
+            panel::item_at(&layout.items, x, y)
                 .and_then(|item| Some((item.id?, item.rect)))
                 .filter(|(id, _)| self.control_tip(*id).is_some())
         };
@@ -339,18 +339,18 @@ impl Session {
             self.chrome.lane_height,
         );
         match hover {
-            view::Hit::Cell { track: t, beat, step } => {
+            view::Spot::Cell { track: t, beat, step } => {
                 let Some(track) = pattern.tracks.get(t) else { return };
                 let Some(note) = track.notes.iter().find(|n| n.beat == beat && n.step == step) else { return };
                 let cell = layout.cell_rect(t, beat, step, track);
                 view::draw_tooltip(canvas, &editors::note_tooltip(note, track.transpose), cell, scale);
             }
-            view::Hit::Name(t) => {
+            view::Spot::Name(t) => {
                 let Some(track) = pattern.tracks.get(t) else { return };
                 let lines = editors::track_tooltip(track, &self.track_sound_label(t));
                 view::draw_tooltip_lines(canvas, &lines, layout.name_rect(t), scale);
             }
-            view::Hit::Mute(_) | view::Hit::Solo(_) | view::Hit::AddTrack => {}
+            view::Spot::Mute(_) | view::Spot::Solo(_) | view::Spot::AddTrack => {}
         }
     }
 
@@ -429,7 +429,7 @@ impl Session {
         }
         let (width, height, scale) = size;
         let layout = self.panel_layout(width, height, scale);
-        let Some(item) = panel::hit(&layout.items, x, y).cloned() else {
+        let Some(item) = panel::item_at(&layout.items, x, y).cloned() else {
             return self.mixer_wheel(size, x, y, lines);
         };
         let Some(id) = item.id else { return false };

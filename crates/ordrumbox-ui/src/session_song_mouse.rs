@@ -16,7 +16,7 @@ use super::session_song_zoom::BarDrag;
 use super::session_types::{PlayMode, Workspace};
 use crate::canvas::Canvas;
 use crate::panel::{Dropdown, Id, Rect};
-use crate::song_view::{Axis, Row, SongGhost, SongHit, SongLayout};
+use crate::song_view::{Axis, Row, SongGhost, SongLayout, SongSpot};
 use crate::ui_input::Button;
 use crate::view;
 
@@ -25,16 +25,16 @@ impl Session {
     pub fn song_click(&mut self, size: (i32, i32, Scale), x: i32, y: i32, button: Button) -> bool {
         let layout = self.song_layout(size);
         let rows = self.song_rows();
-        let Some(hit) = layout.hit(&self.song_view_data(&rows, &layout), x, y) else { return false };
-        if button == Button::Right && self.song_menu_click(hit, &rows, x, y) {
+        let Some(spot) = layout.spot_at(&self.song_view_data(&rows, &layout), x, y) else { return false };
+        if button == Button::Right && self.song_menu_click(spot, &rows, x, y) {
             return true;
         }
-        match (hit, button) {
-            (SongHit::Pattern(p), Button::Left) => {
+        match (spot, button) {
+            (SongSpot::Pattern(p), Button::Left) => {
                 self.step_pattern(p as isize - self.pattern_index as isize);
                 self.press_song_drag(DragSource::Pattern(p), x, y);
             }
-            (SongHit::Clip(clip), Button::Left) => {
+            (SongSpot::Clip(clip), Button::Left) => {
                 if self.clip_double_click(clip) {
                     return true;
                 }
@@ -43,29 +43,29 @@ impl Session {
                 let grab = layout.measure_at(x, first).saturating_sub(start);
                 self.press_song_drag(DragSource::Clip { clip, grab }, x, y);
             }
-            (SongHit::RowName(r), Button::Left) if !rows[r].orphan => {
+            (SongSpot::RowName(r), Button::Left) if !rows[r].orphan => {
                 self.press_song_drag(DragSource::Row(r), x, y);
             }
-            (SongHit::ScrollBar(axis), Button::Left) => {
+            (SongSpot::ScrollBar(axis), Button::Left) => {
                 self.song_panel.bar_drag = Some(BarDrag::Scroll(axis));
                 self.song_bar_to(size, axis, x, y);
             }
-            (SongHit::ZoomHandle(edge), Button::Left) => self.press_zoom_handle(size, edge),
-            (SongHit::Description, Button::Left) => self.text_entry(Id::PatternDescription),
-            (SongHit::Tags, Button::Left) => self.pattern_tags_entry(),
-            (SongHit::Ruler(m), Button::Left) => self.press_ruler(size, x, m),
-            (SongHit::LoopEnd(edge), Button::Left) => self.press_loop_end(edge),
+            (SongSpot::ZoomHandle(edge), Button::Left) => self.press_zoom_handle(size, edge),
+            (SongSpot::Description, Button::Left) => self.text_entry(Id::PatternDescription),
+            (SongSpot::Tags, Button::Left) => self.pattern_tags_entry(),
+            (SongSpot::Ruler(m), Button::Left) => self.press_ruler(size, x, m),
+            (SongSpot::LoopEnd(edge), Button::Left) => self.press_loop_end(edge),
             (
-                SongHit::AddAutomation
-                | SongHit::LaneName(_)
-                | SongHit::LaneBadge(_)
-                | SongHit::LaneEdge(_)
-                | SongHit::LaneStep { .. },
+                SongSpot::AddAutomation
+                | SongSpot::LaneName(_)
+                | SongSpot::LaneBadge(_)
+                | SongSpot::LaneEdge(_)
+                | SongSpot::LaneStep { .. },
                 _,
             ) => {
-                self.automation_click(size, hit, (x, y), button);
+                self.automation_click(size, spot, (x, y), button);
             }
-            (SongHit::Cell { row, measure }, Button::Left) => {
+            (SongSpot::Cell { row, measure }, Button::Left) => {
                 let id = rows[row].id.clone();
                 self.song_menu_pick(&format!("add:{measure}:{id}"));
                 self.song_panel.selected_clip = Some((id, measure));
@@ -75,21 +75,21 @@ impl Session {
         true
     }
 
-    /// A right-click on `hit`: the menu of what is under it (the left button
-    /// acts instead); whether `hit` has one here. The lanes' are in `automation_click`.
-    fn song_menu_click(&mut self, hit: SongHit, rows: &[Row], x: i32, y: i32) -> bool {
-        match hit {
-            SongHit::Pattern(p) => {
+    /// A right-click on `spot`: the menu of what is under it (the left button
+    /// acts instead); whether `spot` has one here. The lanes' are in `automation_click`.
+    fn song_menu_click(&mut self, spot: SongSpot, rows: &[Row], x: i32, y: i32) -> bool {
+        match spot {
+            SongSpot::Pattern(p) => {
                 self.step_pattern(p as isize - self.pattern_index as isize);
                 self.list_menu(p, x, y);
             }
-            SongHit::Clip(clip) => {
+            SongSpot::Clip(clip) => {
                 self.select_clip(Some(clip));
                 self.clip_menu(clip, x, y);
             }
-            SongHit::RowName(r) => self.row_menu(rows, r, x, y),
-            SongHit::Ruler(_) | SongHit::LoopEnd(_) => self.loop_menu(x, y),
-            SongHit::Cell { row, measure } => {
+            SongSpot::RowName(r) => self.row_menu(rows, r, x, y),
+            SongSpot::Ruler(_) | SongSpot::LoopEnd(_) => self.loop_menu(x, y),
+            SongSpot::Cell { row, measure } => {
                 let row = &rows[row];
                 let title = format!("Add \"{}\" at measure {}", row.name, measure + 1);
                 let value = format!("add:{measure}:{}", row.id);
@@ -106,12 +106,12 @@ impl Session {
     pub fn song_shift_click(&mut self, size: (i32, i32, Scale), x: i32, y: i32) -> bool {
         let layout = self.song_layout(size);
         let rows = self.song_rows();
-        match layout.hit(&self.song_view_data(&rows, &layout), x, y) {
-            Some(SongHit::Ruler(measure)) => {
+        match layout.spot_at(&self.song_view_data(&rows, &layout), x, y) {
+            Some(SongSpot::Ruler(measure)) => {
                 self.loop_to(measure);
                 return true;
             }
-            Some(SongHit::LaneStep { lane, step }) => {
+            Some(SongSpot::LaneStep { lane, step }) => {
                 self.press_lane(size, lane, (step, y), Button::Left, true);
                 return true;
             }
@@ -129,8 +129,8 @@ impl Session {
         }
         let layout = self.song_layout(size);
         let rows = self.song_rows();
-        match layout.hit(&self.song_view_data(&rows, &layout), x, y) {
-            Some(SongHit::Clip(clip)) => self.clip_double_click(clip),
+        match layout.spot_at(&self.song_view_data(&rows, &layout), x, y) {
+            Some(SongSpot::Clip(clip)) => self.clip_double_click(clip),
             _ => false,
         }
     }
@@ -394,16 +394,16 @@ impl Session {
         {
             let layout = self.song_layout(size);
             let rows = self.song_rows();
-            layout.hit(&self.song_view_data(&rows, &layout), x, y)
+            layout.spot_at(&self.song_view_data(&rows, &layout), x, y)
         } else {
             None
         };
         let clip = match hover {
-            Some(SongHit::Clip(c)) => Some(c),
+            Some(SongSpot::Clip(c)) => Some(c),
             _ => None,
         };
         let lane = match hover {
-            Some(SongHit::LaneStep { lane, step }) => Some((lane, step)),
+            Some(SongSpot::LaneStep { lane, step }) => Some((lane, step)),
             _ => None,
         };
         let changed = (clip, lane, hover)

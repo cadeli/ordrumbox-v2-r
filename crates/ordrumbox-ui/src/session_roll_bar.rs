@@ -56,7 +56,7 @@ impl Session {
 mod tests {
     use super::*;
     use crate::kits::KitSet;
-    use crate::piano_roll::RollHit;
+    use crate::piano_roll::RollSpot;
     use crate::test_support::SIZE;
     use ordrumbox_core::Library;
 
@@ -84,7 +84,7 @@ mod tests {
         assert!(layout.bar.y >= layout.grid.y + layout.grid.h, "under the rows");
         let view = s.roll_view(&layout).unwrap();
         let (start, len) = layout.bar_thumb(&view);
-        assert_eq!(layout.hit(&view, start + len / 2, layout.bar.y + 1), Some(RollHit::ScrollBar(None)));
+        assert_eq!(layout.spot_at(&view, start + len / 2, layout.bar.y + 1), Some(RollSpot::ScrollBar(None)));
     }
 
     #[test]

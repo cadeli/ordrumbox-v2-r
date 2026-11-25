@@ -14,8 +14,8 @@ impl Session {
     /// A press at `(x, y)` on the grid's scroll bar takes hold of it; whether it was on it.
     pub fn grid_bar_press(&mut self, size: (i32, i32, Scale), x: i32, y: i32) -> bool {
         let Some(layout) = self.grid_layout(size) else { return false };
-        let Some(hit) = layout.bar_hit(x, y) else { return false };
-        self.chrome.grid_hold = Some(GridHold::Bar(match hit {
+        let Some(spot) = layout.bar_at(x, y) else { return false };
+        self.chrome.grid_hold = Some(GridHold::Bar(match spot {
             None => BarHold::Scroll,
             Some(edge) => BarHold::zoom(edge, layout.start_beat(), layout.beats()),
         }));
@@ -111,7 +111,7 @@ mod tests {
         assert!((20..=40).contains(&first), "about the middle of 64 beats: {first}");
         s.mouse_up();
         assert_eq!(s.held_grid_bar(), None);
-        assert_eq!(layout(&s).bar_hit(0, 0), None);
+        assert_eq!(layout(&s).bar_at(0, 0), None);
     }
 
     #[test]

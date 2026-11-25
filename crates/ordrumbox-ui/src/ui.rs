@@ -206,19 +206,19 @@ impl Ui {
         }
         let menus = s.menus();
         // The menu bar first: it is over everything.
-        match menu::hit(&menus, s.open_menu(), scale, x, y) {
-            Some(menu::Hit::Title(i)) => {
+        match menu::spot_at(&menus, s.open_menu(), scale, x, y) {
+            Some(menu::Spot::Title(i)) => {
                 let same = s.open_menu().is_some_and(|o| o.menu == i);
                 s.close_overlay();
                 s.set_menu((!same).then(|| menu::Open::new(&menus, i, false)));
             }
-            Some(menu::Hit::Item(i)) => {
+            Some(menu::Spot::Item(i)) => {
                 if let Some(command) = s.open_menu().and_then(|o| menu::Open { item: Some(i), ..o }.command(&menus)) {
                     s.run(command);
                 }
             }
-            Some(menu::Hit::Panel) => {}
-            Some(menu::Hit::Bar) => s.set_menu(None),
+            Some(menu::Spot::Panel) => {}
+            Some(menu::Spot::Bar) => s.set_menu(None),
             None if s.open_menu().is_some() => s.set_menu(None),
             None if s.overlay_open() => s.overlay_click(width, height, scale, x, y),
             // Before the panel's: with the track editor open, its side claims the whole column.
@@ -249,8 +249,8 @@ impl Ui {
                 return true;
             }
             let layout = s.kit_layout(size);
-            let Some(hit) = layout.hit(s.kit_first(&layout), count, x, y) else { return false };
-            s.kit_click(hit);
+            let Some(sample) = layout.sample_at(s.kit_first(&layout), count, x, y) else { return false };
+            s.kit_click(sample);
             return true;
         }
         if s.grid_lane_resize_press(size, x, y)
@@ -260,17 +260,17 @@ impl Ui {
         {
             return true;
         }
-        let Some(hit) = s.grid_hit(size, x, y) else { return false };
-        match hit {
-            view::Hit::Cell { track, beat, step } if shift => {
+        let Some(spot) = s.grid_spot_at(size, x, y) else { return false };
+        match spot {
+            view::Spot::Cell { track, beat, step } if shift => {
                 s.select_step_note(track, beat, step);
                 s.press_zone_drag(track, beat, step, x, y);
             }
             // Ctrl+click: the zone grows to take the step in.
-            view::Hit::Cell { track, beat, step } if control => s.extend_zone_to(track, beat, step),
-            _ => s.click(hit),
+            view::Spot::Cell { track, beat, step } if control => s.extend_zone_to(track, beat, step),
+            _ => s.click(spot),
         }
-        if let view::Hit::Name(t) = hit {
+        if let view::Spot::Name(t) = spot {
             s.press_track_name(t, x, y);
         }
         true
@@ -333,10 +333,10 @@ impl Ui {
         let s = &mut self.session;
         let Some(open) = s.open_menu() else { return false };
         let menus = s.menus();
-        let next = match menu::hit(&menus, Some(open), scale, x, y) {
-            Some(menu::Hit::Title(i)) if i != open.menu => menu::Open::new(&menus, i, false),
-            Some(menu::Hit::Item(i)) => menu::Open { item: Some(i), ..open },
-            Some(menu::Hit::Title(_)) => open,
+        let next = match menu::spot_at(&menus, Some(open), scale, x, y) {
+            Some(menu::Spot::Title(i)) if i != open.menu => menu::Open::new(&menus, i, false),
+            Some(menu::Spot::Item(i)) => menu::Open { item: Some(i), ..open },
+            Some(menu::Spot::Title(_)) => open,
             _ => menu::Open { item: None, ..open },
         };
         if next == open {

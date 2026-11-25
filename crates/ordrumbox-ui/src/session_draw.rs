@@ -131,7 +131,7 @@ impl Session {
     /// The track whose name the mouse is over.
     fn hovered_track(&self) -> Option<usize> {
         match self.chrome.hover {
-            Some(crate::view::Hit::Name(t)) => Some(t),
+            Some(crate::view::Spot::Name(t)) => Some(t),
             _ => None,
         }
     }

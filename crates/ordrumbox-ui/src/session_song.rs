@@ -108,7 +108,7 @@ pub(super) struct SongPanel {
     /// An automation lane's bottom edge held, and the undo key of the drag.
     pub(super) lane_resize: Option<(usize, String)>,
     /// What of the panel is under the pointer: drawn lighter, with the mark of its menu.
-    pub(super) hovered: Option<crate::song_view::SongHit>,
+    pub(super) hovered: Option<crate::song_view::SongSpot>,
     /// The clip selected, by its pattern and its first measure (`session_song_clip.rs`).
     pub(super) selected_clip: Option<(String, u32)>,
 }
@@ -501,14 +501,14 @@ pub(super) mod tests {
     }
 
     /// Where `wanted` is on the song panel, scanning it.
-    pub(crate) fn find_hit(s: &Session, wanted: impl Fn(crate::song_view::SongHit) -> bool) -> (i32, i32) {
+    pub(crate) fn find_spot(s: &Session, wanted: impl Fn(crate::song_view::SongSpot) -> bool) -> (i32, i32) {
         let layout = s.song_layout(SIZE);
         let rows = s.song_rows();
         let view = s.song_view_data(&rows, &layout);
         let g = layout.grid;
         (g.y..g.y + g.h)
             .flat_map(|y| (g.x..g.x + g.w).map(move |x| (x, y)))
-            .find(|&(x, y)| layout.hit(&view, x, y).is_some_and(&wanted))
+            .find(|&(x, y)| layout.spot_at(&view, x, y).is_some_and(&wanted))
             .expect("on the panel")
     }
 

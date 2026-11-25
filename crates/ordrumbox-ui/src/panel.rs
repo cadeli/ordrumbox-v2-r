@@ -2,7 +2,7 @@
 //! grid's volume sliders, the song panel's column): a flat list of [`Item`]s, each with its place, an
 //! [`Id`] when it reacts to the mouse or the keyboard, and what it shows.
 //! The list is rebuilt from the state at every frame; drawing and
-//! hit-testing both use it. The open drop-down list and the number entry
+//! finding what is under the mouse both use it. The open drop-down list and the number entry
 //! are drawn over everything.
 
 use crate::canvas::{Canvas, Direction, Rgb, fit, text_width};
@@ -433,7 +433,7 @@ impl Item {
 }
 
 /// The topmost item with an id under `(x, y)`.
-pub fn hit(items: &[Item], x: i32, y: i32) -> Option<&Item> {
+pub fn item_at(items: &[Item], x: i32, y: i32) -> Option<&Item> {
     items.iter().rev().find(|i| i.id.is_some() && i.rect.contains(x, y))
 }
 
@@ -549,11 +549,11 @@ mod tests {
         assert_eq!(next_focus(&items, None, 1), Some(Id::Tab(0)));
         assert_eq!(next_focus(&items, Some(Id::Tab(0)), 1), Some(Id::Toggle("mono")));
         assert_eq!(next_focus(&items, Some(Id::Tab(0)), -1), Some(Id::Toggle("mono")));
-        assert_eq!(hit(&items, 5, 5).and_then(|i| i.id), Some(Id::Toggle("mono")));
+        assert_eq!(item_at(&items, 5, 5).and_then(|i| i.id), Some(Id::Toggle("mono")));
     }
 
     #[test]
-    fn dropdown_scrolls_and_hits() {
+    fn dropdown_scrolls_and_finds_options() {
         let labels: Vec<String> = (0..40).map(|i| format!("item{i}")).collect();
         let mut d = Dropdown::new(Id::Sample, Rect::new(10, 10, 100, 12), labels.clone(), labels, 30);
         assert!(d.first <= 30 && 30 < d.first + LIST_ROWS);
@@ -563,16 +563,16 @@ mod tests {
         assert_eq!(d.first, 0);
         assert_eq!(d.at, LIST_ROWS - 1);
         let r = d.rect(800, 600, Scale::ONE);
-        assert_eq!(d.hit(800, 600, Scale::ONE, r.x + 5, r.y + 2 + 12 * 3 + 1), Some(3));
+        assert_eq!(d.option_at(800, 600, Scale::ONE, r.x + 5, r.y + 2 + 12 * 3 + 1), Some(3));
         d.jump('i');
         assert_eq!(d.at, LIST_ROWS);
         // A menu: its title row takes no click.
         let m =
             Dropdown::menu(Id::SongMenu, 10, 10, "title".into(), [("a".into(), "A".into()), ("b".into(), "B".into())]);
         let r = m.rect(800, 600, Scale::ONE);
-        assert_eq!(m.hit(800, 600, Scale::ONE, r.x + 5, r.y + 3), None);
-        assert_eq!(m.hit(800, 600, Scale::ONE, r.x + 5, r.y + 2 + 12 + 1), Some(0));
-        assert_eq!(m.hit(800, 600, Scale::ONE, r.x + 5, r.y + 2 + 24 + 1), Some(1));
+        assert_eq!(m.option_at(800, 600, Scale::ONE, r.x + 5, r.y + 3), None);
+        assert_eq!(m.option_at(800, 600, Scale::ONE, r.x + 5, r.y + 2 + 12 + 1), Some(0));
+        assert_eq!(m.option_at(800, 600, Scale::ONE, r.x + 5, r.y + 2 + 24 + 1), Some(1));
     }
 
     #[test]
@@ -583,7 +583,7 @@ mod tests {
         assert_eq!(bar.w, 8);
         let r = d.rect(800, 600, Scale::ONE);
         assert_eq!(bar.x + bar.w, r.x + r.w - 1, "at the right of the rows");
-        assert_eq!(d.hit(800, 600, Scale::ONE, bar.x + 2, bar.y + 30), None, "the bar picks no option");
+        assert_eq!(d.option_at(800, 600, Scale::ONE, bar.x + 2, bar.y + 30), None, "the bar picks no option");
         assert!(d.bar_to((800, 600, Scale::ONE), bar.y + bar.h));
         assert_eq!(d.first, 40 - LIST_ROWS, "the thumb at the bottom: the last options");
         assert!((d.first..d.first + LIST_ROWS).contains(&d.at), "the highlight kept in view");
@@ -615,7 +615,7 @@ mod tests {
                 Kind::Value {
                     spec: Spec::slider(0.0, 100.0, 1.0, 0.0),
                     value: 30.0,
-                    label: Some("Hit Variation".into()),
+                    label: Some("Spot Variation".into()),
                     text: "30".into(),
                     lfo: false,
                 },

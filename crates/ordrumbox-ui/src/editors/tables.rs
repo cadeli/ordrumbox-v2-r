@@ -278,7 +278,7 @@ pub const DEFAULT_DECAY: f64 = 500.0;
 
 /// Generation tab, shown while auto is off.
 pub const GENERATION_MANUAL: [Prop; 3] = [
-    prop("hitVariation", "Hit Variation", 0.0, 100.0, 1.0, Format::Chance),
+    prop("hitVariation", "Spot Variation", 0.0, 100.0, 1.0, Format::Chance),
     prop("noteVariation", "Note Variation", 0.0, 100.0, 1.0, Format::Chance),
     prop("probability", "Probability", 0.0, 1.0, 0.01, Format::Percent),
 ];
@@ -292,7 +292,7 @@ pub enum GenerationRow {
 }
 
 pub const GENERATION_GROOVE: [GenerationRow; 8] = [
-    GenerationRow::Slider(prop("autoHitVariation", "Hit Variation", 0.0, 100.0, 1.0, Format::Chance)),
+    GenerationRow::Slider(prop("autoHitVariation", "Spot Variation", 0.0, 100.0, 1.0, Format::Chance)),
     GenerationRow::Slider(prop("autoPitchChance", "Pitch", 0.0, 100.0, 1.0, Format::Chance)),
     GenerationRow::Slider(prop("autoVelocityChance", "Velocity", 0.0, 100.0, 1.0, Format::Chance)),
     GenerationRow::Slider(prop("autoSilenceChance", "Silence", 0.0, 100.0, 1.0, Format::Chance)),
