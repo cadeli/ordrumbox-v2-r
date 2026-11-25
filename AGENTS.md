@@ -35,7 +35,7 @@ ordrumbox-logic   editor with undo/redo, generators, MIDI format    → core
 ordrumbox-engine  kits, WAV format, passes, engine, UI ↔ audio link → core, dsp
 ordrumbox-probe   sound measurements (command line, not shipped)    → core, dsp, engine
 ordrumbox-ui      session, views, input, MCP link, update check     → core, logic, engine, fontdue
-ordrumbox-app     window, input translation, audio output, MIDI in  → core, engine, ui, winit, softbuffer, cpal, midir, rfd
+ordrumbox-app     window, input translation, audio output, MIDI     → core, engine, ui, winit, softbuffer, cpal, midir, rfd
 ordrumbox-plugin  CLAP/VST3 instrument following the host           → core, engine, ui, nih-plug, baseview, softbuffer
 xtask             `cargo xtask bundle` (plugin bundles, assets in)  → nih_plug_xtask
                   and `cargo xtask audit` (rules of this file)
@@ -59,8 +59,9 @@ assets/           data/*.json and kits/**.wav, read at runtime
   third-party dependency is `fontdue` (text in the system's monospace font,
   read at start: nothing bundled); `png` decodes the About logo at build
   time only (`build.rs`, `image.rs`). The program gives it its sound output
-  (`AudioOutput`, started by a `StartOutput`) and translates its window
-  events; `main.rs` does nothing else.
+  (`AudioOutput`, started by a `StartOutput`), its MIDI ports (`midi.rs`,
+  `midi_out.rs`, `midi_sync.rs`) and its file dialogs (`dialog.rs`), and
+  translates its window events; it holds no logic of its own.
 - The update check (`ordrumbox-ui/src/update.rs`) runs the system's `curl`
   on a thread of its own, never on the UI or audio thread; it only tells,
   never downloads. A release is a `v<version>` tag matching `Cargo.toml`
@@ -91,7 +92,7 @@ assets/           data/*.json and kits/**.wav, read at runtime
 
 - Kits are folders of `assets/kits/`, each WAV file in one a sample; the kit
   list is built from them (`kit_folders.rs`). `assets/data/kits.json` only
-  describes them (instrument, root note, decay, texts) and orders them.
+  describes them (instrument, root note, decay, loop points, texts) and orders them.
   A kit sample is 16- or 24-bit PCM, mono, 44.1 kHz, peak at −3 dB, starting at
   once and fading out to silence.
 - `ordrumbox-probe` (not shipped) checks and repairs them:
@@ -220,8 +221,8 @@ assets/           data/*.json and kits/**.wav, read at runtime
 
 - The `tests/fixtures/` of each crate are committed; tests need nothing outside
   this repository. `DEVELOPMENT.md`, "Snapshots", lists them.
-- Expected outputs are Rust snapshots (`*_rust.txt`, a suffix kept from the
-  time there were JS ones, and `*_renders.bin`), which
+- Expected outputs are Rust snapshots (`*_rust.txt` and `*_rust.json`, a
+  suffix kept from the time there were JS ones, and `*_renders.bin`), which
   each test writes with its `--ignored` test, tables in unit tests, and
   property tests. The JS app (ordrumbox-v2) is not the reference for
   behaviour: "the JS app does it" is no reason to keep or change one. Add no

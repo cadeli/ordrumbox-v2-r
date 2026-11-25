@@ -14,7 +14,7 @@ Building, testing and changing orDrumbox. The user documentation is
 | `ordrumbox-engine` | WAV, kits, sample analysis, synth presets, passes, engine, UI link, offline renders | core, dsp |
 | `ordrumbox-probe` | sound measurements, command-line only | core, dsp, engine |
 | `ordrumbox-ui` | session, views, input, MCP link, update check | core, logic, engine, fontdue |
-| `ordrumbox-app` | window, input translation, audio output, MIDI ports, file dialogs (`ordrumbox.exe`) | core, engine, ui, winit, softbuffer, cpal, midir, rfd |
+| `ordrumbox-app` | window, input translation, audio output, MIDI ports, file dialogs (`ordrumbox(.exe)`) | core, engine, ui, winit, softbuffer, cpal, midir, rfd |
 | `ordrumbox-plugin` | CLAP and VST3 instrument | core, engine, ui, nih-plug, baseview, softbuffer |
 | `xtask` | plugin bundling; `audit`, the checks of `AGENTS.md` | nih-plug's bundler |
 
@@ -48,7 +48,8 @@ in this repository's `assets/`. `$ORDRUMBOX_LIBRARY` names a library file to use
 instead of the one in the user data folder.
 
 A release is a `v<version>` tag matching `Cargo.toml`: CI then builds the release
-`ordrumbox.exe` with `assets/` next to it, and the plugin bundles. The release
+program of each system with `assets/` next to it, and the plugin bundles. Its files are
+named after the tag (`ordrumbox-v0.1.3-windows-x64.zip`, `<tag>` below). The release
 holds the Windows zip (`ordrumbox.exe`, `orDrumbox.clap`, `assets/`, `LICENSE`),
 the Windows setup made from the same files, the Linux zip (the same files, the
 binary linked at run time against the system's ALSA and X11 libraries, plus the
@@ -158,8 +159,9 @@ default pan. It is edited by hand; `ordrumbox-core/src/instruments.rs` only read
   (`ordrumbox-ui/src/demo_browser.rs`) and copies a song with its patterns, or a pattern, into the user's library
   (`ordrumbox-logic/src/demo_catalog.rs`). A new demo goes in the file of its style; a song and the patterns it
   plays stay in one file.
-- **Each demo is in one file**, the starter library's again among them, ids unique across the files
-  (`ordrumbox-ui/src/assets.rs` tests). `json_idempotence.rs` saves every file as it was read, and
+- **Each demo is in one file of `demos/`**, ids unique across those files. The patterns and songs of the starter
+  library are copies of demos, with the same ids, so that File > Demos... has them too (`ordrumbox-ui/src/assets.rs`
+  tests: `no_two_demos_share_an_id`, `the_starter_library_is_among_the_demos`). `json_idempotence.rs` saves every file as it was read, and
   `ordrumbox-probe/tests/shipped.rs` renders every demo pattern with every kit and every demo song.
 
 ## Snapshots
@@ -203,6 +205,10 @@ and repaints a lane's own values (no change); `ordrumbox-logic/src/arrangement/a
 every kind of lane edit, twice over (the same library each time). No fixture, nothing to rewrite.
 
 ### Changes of behaviour
+
+Each change of behaviour, with the snapshots it rewrote, or "No snapshot changed" when it rewrote none. An entry
+says what was true when it was written; when a later change undoes part of it, that part is taken out of it, so that
+no two entries contradict each other.
 
 A double-click on a track's name in the grid opens the piano roll on that track (`press_track_name`,
 `session_grid.rs`); a single press still selects the track and may drag it. No snapshot changed.
@@ -357,10 +363,9 @@ The keys change: Ctrl+- / Ctrl+= (and the keypad's) zoom, as everywhere else, wh
 they used to change the pattern's length — the length has no key any more, the Song
 panel and the menus change it. The letters that change every track (B, C, D, G, H, J,
 K, V, X) now want Shift, as G H J K already did; S alone solos and M alone mutes the
-track under the cursor, and Ctrl+1–7 run what F1–F7 do. Shift+arrows on a selected
-note are up / down the pitch and left / right one step in time (they used to be up /
-down the velocity and left / right the pitch), and dragging a note follows the piano
-roll's axes: up / down the pitch, sideways the velocity. On macOS the menus show
+track under the cursor, and Ctrl+1–7 run what F1–F7 do. The arrows that nudge a
+selected note are up / down the pitch and left / right one step in time (they used to be
+up / down the velocity and left / right the pitch). On macOS the menus show
 Cmd+ (the key that runs them), redo is Cmd+Shift+Z, and export MIDI needs Shift
 (Cmd+M minimizes the window). No snapshot changed; the unit tests of the keys and
 the drags were rewritten with them.
@@ -416,7 +421,7 @@ of tracks that are not 4 steps a beat changed length. This rewrote the export li
 editor has a Timing tab (Length, Shift), the lane two more settings (LENGTH, SHIFT, its tabs
 now in two columns), the piano roll draws a note as wide as it is long and its right edge
 drags (`session_roll_length.rs`); Play > Record off the grid keeps a recorded note's timing as
-its shift (off by default). A MIDI import still reads neither lengths nor timing.
+its shift (off by default). A MIDI import reads no shift.
 
 A note has parameter locks: `filterLock` (0–1, 20 Hz to 20 kHz by octaves), `reverbLock` and
 `delayLock` (0–1, the track's mix), each an `Option`, absent by default. `build_pass` gives the
@@ -556,16 +561,12 @@ appear; a shipped sample the user removed before this change comes back once. No
 Ctrl+N makes a pattern with a track for each instrument of the kit in use (`Kit::track_names`), the eight usual drum
 tracks when it names none. No snapshot changed.
 
-The random wave (`rnd`) of the synth's oscillators no longer draws pseudo-random values: each cycle holds the next
-frame of the track's sample, looping over it, and reading it from the start at every note (`held_value`,
-`ordrumbox-dsp/src/synth/oscillator.rs`; `SynthVoice::render` takes the frames). The track's sample is the one its
-`samplePath` names, else the first sample of its instrument in the selected kit (`track_sample`,
-`ordrumbox-engine/src/assign.rs`); `TrackSound::Synth` and `SynthStart` carry it.
+The random wave (`rnd`) of the synth's oscillators no longer draws pseudo-random values: each cycle holds a frame
+of the track's sample, reading it from the start at every note and moving on by 0.618 of the sample a cycle
+(`GOLDEN_STEP`), looping over it (`held_value`, `ordrumbox-dsp/src/synth/oscillator.rs`; `SynthVoice::render` takes
+the frames). The step spreads the frames read over the whole sample; one frame a cycle, tried first, read only the
+silence before its sound. The wave sounds as the pseudo-random one does, 10 to 20 dB quieter (the level of the
+sample). The track's sample is the one its `samplePath` names, else the first sample of its instrument in the
+selected kit (`track_sample`, `ordrumbox-engine/src/assign.rs`); `TrackSound::Synth` and `SynthStart` carry it.
 With no sample (`ordrumbox-probe`, the DSP tests), it draws the pseudo-random values as before. The LFOs' random wave
 is unchanged. No snapshot changed: none plays an oscillator's random wave through the engine.
-
-The random wave of the oscillators moves on by 0.618 of the track's sample a cycle (`GOLDEN_STEP`,
-`ordrumbox-dsp/src/synth/oscillator.rs`) instead of one frame. One frame a cycle read only the first milliseconds of
-the sample, mostly the silence before its sound: a note was 20 to 40 dB quieter than with no sample. The frames it
-reads now spread over the whole sample, and the wave sounds as the pseudo-random one does, 10 to 20 dB quieter (the
-level of the sample). No snapshot changed.

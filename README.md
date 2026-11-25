@@ -1,24 +1,23 @@
 # orDrumbox v2 (Rust)
 
-Note: the legacy orDrumbox V1, the old Java drum machine, has been largely
-improved upon and superseded; it is no longer current. This Rust port is the
-active version.
-
-The JavaScript/web version (<https://github.com/cadeli/ordrumbox-v2>) is a web demo of this Rust version: it is less complete than the downloadable (native) version.
+This native version is the current orDrumbox. It replaces orDrumbox V1, the old Java drum
+machine, and the earlier JavaScript/web version (<https://github.com/cadeli/ordrumbox-v2>),
+which still runs in a browser but does less; the files it saved open here.
 
 ## Download
 
 - Download page: <https://www.ordrumbox.com/download/download.html>
 - GitHub releases: <https://github.com/cadeli/ordrumbox-v2-r/releases>
 
-The app is a single executable with its `assets/` folder next to it.
+The app is a single program with its `assets/` folder next to it (on macOS, both inside
+`orDrumbox.app`). In the file names below, `<version>` is the release's tag, such as `v0.1.3`.
 
 On Windows, a release holds a setup and a zip:
 
 - `ordrumbox-<version>-windows-x64-setup.exe` installs orDrumbox in `Program Files`, with a
   Start menu shortcut, and the CLAP plugin in `C:\Program Files\Common Files\CLAP\orDrumbox\`
-  (an option, on by default). Running the setup of a newer version updates it; your library is kept, and the new
-  demos are in File > Demos... Help > Factory reset... restores the starter library as shipped (your files are
+  (an option, on by default). Running the setup of a newer version updates it; your library is kept, and File > Demos...
+  has the new demos. Help > Factory reset... restores the starter library as shipped (your files are
   backed up first). Uninstalling
   (Windows settings, or the Start menu) removes what the setup installed, never your library
   and settings in the user data folder. The setup is not signed: Windows may warn about an
