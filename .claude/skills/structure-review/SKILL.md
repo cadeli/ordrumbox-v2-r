@@ -1,12 +1,12 @@
 ---
 name: structure-review
-description: Whole-codebase review of structure against AGENTS.md (decoupling, reuse, naming, errors and idioms, file size), written up as docs/revue-AAAA-MM.md in French with findings and proposed lots, then fixed lot by lot on the user's go-ahead. Use when the user asks for a structure, architecture or clean-code review of the whole repository (« revue », « revue de structure »), or to carry out a lot of an existing review. Not for a diff or a PR: that is /code-review.
+description: Review of structure against AGENTS.md (decoupling, reuse, naming, errors and idioms, file size), of the whole workspace, of some crates, or of what changed since a commit, written up as docs/revue-AAAA-MM.md in French with findings and proposed lots, then fixed lot by lot on the user's go-ahead. Use when the user asks for a structure, architecture or clean-code review of the whole repository (« revue », « revue de structure »), or to carry out a lot of an existing review. Not for a diff or a PR: that is /code-review.
 disable-model-invocation: true
 ---
 
 # Structure review
 
-A review of the whole workspace against the rules of `AGENTS.md`, done the
+A review of the workspace (or of the scope below) against the rules of `AGENTS.md`, done the
 way `docs/revue-2026-11.md` was done. Reply to the user in French; the report
 is in French; code, comments and names stay in English.
 
@@ -27,11 +27,43 @@ is in French; code, comments and names stay in English.
   « laissé tel quel, voulu » is not raised again unless the code changed
   since in a way that reopens it; then say what changed.
 
+## Scope
+
+The argument picks what is reviewed; the header of the report names it.
+
+| Argument | Scope |
+|---|---|
+| none | the whole workspace |
+| `depuis <commit>` | the files changed since that commit |
+| `depuis la dernière revue` | the same, from the base commit of the latest review in `docs/revue-*.md` |
+| one or more crate names (`ordrumbox-engine`, `engine`) | those crates only |
+| `lot <n>` | carry out that lot of the latest review (section 4), no review |
+
+The two can combine (`engine depuis a1b2c3d`). Anything else: ask.
+
+In a partial scope (by commit or by crate):
+
+- The files in scope are the ones read and inventoried: for a commit,
+  `git diff --name-only <commit>..HEAD -- crates/` without the test files
+  (`tests/`, `*_tests*`, `tests.rs`); for a crate, its `src/`.
+- A rule that spans files is still checked against the whole workspace, from
+  what is in scope: a name or a function defined in scope is looked for
+  everywhere (`rg`), a duplicate may have its other copy outside, a field
+  made wider in scope is checked against all its readers. A finding may
+  then name a file out of scope.
+- A finding of an earlier review that is still open and lies in scope is
+  listed again only by its number and status (« toujours ouvert »,
+  « aggravé : … »), not rewritten.
+- The **Limite** of the header says what was not looked at: the other
+  crates, or the files not changed.
+
 ## 1. Start
 
 1. `git rev-parse --short HEAD` and `git status --short`: the base of the
    review, and whether the tree is clean (if not, say so and ask whether to
-   review it as it is).
+   review it as it is). For `depuis …`, check that the commit exists and
+   list the files in scope with their changed line counts
+   (`git diff --stat`); if none, say so and stop.
 2. Read `AGENTS.md`, sections "Layout", "Structure: do and do not", "Code
    conventions", "Errors", "Modern Rust".
 3. Read every earlier `docs/revue-*.md`: its findings, its decisions, its
@@ -41,8 +73,43 @@ is in French; code, comments and names stay in English.
 
 ## 2. Mechanical inventory
 
-Gather leads with `rg`, scripts in the scratchpad, or an Explore subagent
-per crate. Leads, not findings:
+Leads, not findings. The inventory is split into parts, one Explore
+subagent per part, all started in the same message so they run in
+parallel. For the whole workspace, these parts (at `940a706`,
+`ordrumbox-ui` alone is about 46 000 lines, too much for one):
+
+| Part | Files |
+|---|---|
+| core + dsp | `crates/ordrumbox-core/src`, `crates/ordrumbox-dsp/src` |
+| logic | `crates/ordrumbox-logic/src` |
+| engine | `crates/ordrumbox-engine/src` |
+| ui — session | `crates/ordrumbox-ui/src/session*.rs`, `session_mcp/` |
+| ui — views | `view/`, `editors/`, `menu/`, `panel/`, `piano_roll/`, `song_view/`, `ui/`, `kits/` of `crates/ordrumbox-ui/src` |
+| ui — rest | the other files of `crates/ordrumbox-ui/src` (`store.rs`, `mcp*`, `update.rs`…) |
+| app + tools | `crates/ordrumbox-app/src`, `crates/ordrumbox-probe/src`, `crates/xtask/src` |
+
+Test folders (`assign_tests/`, `session_scenarios/`, `tests/`) are not
+inventoried. A part past about 15 000 lines of code is split again along
+its folders. If the layout changed (a new crate, a moved folder), adapt
+the table and say so in the header. In a partial scope, keep only the parts
+with files in scope; fewer than about 3 000 lines in all, do the inventory
+in this session without subagents.
+
+Each subagent gets: its files, the list below, the sections of `AGENTS.md`
+it applies, and the earlier findings already decided (not to raise again).
+It reads code only where a lead needs it, edits nothing, and returns its
+leads one per line, in this form, and nothing else:
+
+```
+<family A|B|N|E|T> | <path:line> | <rule of AGENTS.md, by section> | <what is there, with counts> | <cross-part: names to look for elsewhere, or ->
+```
+
+The cross-part column carries what one part cannot judge alone (a function
+name also defined elsewhere, a field read from another crate, a synonym):
+this session checks those across the workspace with `rg`, then reads the
+code at every lead it keeps before writing it as a finding.
+
+What to look for:
 
 - **Decoupling**
   - For each `impl Session` file: which fields of `Session` it touches.
@@ -89,7 +156,8 @@ file (after N9 comes N10), lots from the highest lot (after lot 9 comes lot
 10). A number is never reused within a file, so « voir B5 » or « Lot 3 »
 always points to one place. Same shape as `docs/revue-2026-11.md`:
 
-1. **Title and header**: base commit, size of the code, the audit's counts,
+1. **Title and header**: scope (whole, `depuis <commit>`, crates), base
+   commit, size of the code in scope, the audit's counts,
    the method (what was inventoried, what was read), and the limit (what
    was not read line by line).
 2. **Ce qui est sain**: what holds and should stay so, briefly.
@@ -115,7 +183,8 @@ first lot proposed. Offer the report as an artifact only if they ask.
 
 ## 4. Carrying out a lot
 
-Only on the user's go-ahead, one lot at a time:
+Only on the user's go-ahead (`lot <n>` as the argument is one), one lot at
+a time:
 
 1. Make the change. Follow `AGENTS.md` for everything touched (no internal
    `pub use`, visibility as narrow as works, file doc lines kept true).
