@@ -6,6 +6,7 @@ use ordrumbox_core::instruments::catalog;
 use ordrumbox_core::style::Macros;
 use ordrumbox_engine::TrackSound;
 use ordrumbox_engine::assign::{assign_track, substitute_for};
+use ordrumbox_engine::kit::edit::find_path;
 
 use super::Session;
 use super::session_panel::NoteTarget;
@@ -124,6 +125,11 @@ impl Session {
         }
     }
 
+    /// Where the sample track `t` plays is in the kits: kit and index.
+    pub(super) fn track_kit_sample(&self, t: usize) -> Option<(usize, usize)> {
+        find_path(self.kits.kits(), &self.track_sample_path(t)?)
+    }
+
     fn analysis_of(&self, url: &str) -> Option<Analysis> {
         if let Some(a) = self.track_analysis.borrow().get(url) {
             return Some(a.clone());
@@ -204,7 +210,7 @@ impl Session {
     pub(super) fn track_view(&self, t: usize) -> Option<TrackView<'_>> {
         let track = self.track(t)?;
         let url = self.track_sample_path(t);
-        let place = url.as_deref().and_then(|u| self.kits.find_path(u));
+        let place = url.as_deref().and_then(|u| find_path(self.kits.kits(), u));
         let instrument = place.and_then(|(k, i)| self.kits.sample(k, i));
         let kit_name = place.and_then(|(k, _)| self.kits.kits().get(k)).map(|k| k.name.as_str());
 

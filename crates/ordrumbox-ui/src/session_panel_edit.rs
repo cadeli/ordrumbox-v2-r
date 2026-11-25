@@ -12,10 +12,10 @@ use super::session_cartridge::{fx_switch, fx_type_updates};
 use super::session_panel::{NoteTarget, history_label, number};
 use super::{Session, session_grid};
 use crate::editors::{self, KNOB_BAR, STYLE_DEFAULT};
-use crate::kits::Field;
 use crate::menu::Command;
 use crate::panel::{Dropdown, Id, LfoParam};
 use crate::picker::Purpose;
+use ordrumbox_engine::kit::edit::{SampleField, move_sample};
 use std::path::Path;
 use std::time::Instant;
 
@@ -187,14 +187,14 @@ impl Session {
             }
             Id::Loop(key) => self.loop_slider(t, key, value),
             Id::SampleKnob(field) => {
-                if let Some((kit, sample)) = self.track_sample_path(t).and_then(|u| self.kits.find_path(&u)) {
+                if let Some((kit, sample)) = self.track_kit_sample(t) {
                     self.set_kit_sample_value(kit, sample, field, value);
                 }
             }
             Id::Decay => {
                 // The sample's decay, a setting of the kit: not undoable.
-                if let Some((kit, sample)) = self.track_sample_path(t).and_then(|u| self.kits.find_path(&u)) {
-                    self.set_kit_sample_value(kit, sample, Field::Decay, value);
+                if let Some((kit, sample)) = self.track_kit_sample(t) {
+                    self.set_kit_sample_value(kit, sample, SampleField::Decay, value);
                 }
             }
             Id::Lfo(i, param) => self.lfo_value(t, i, param, value),
@@ -286,25 +286,25 @@ impl Session {
         }
     }
 
-    fn set_kit_value(&mut self, field: Field, value: f64) {
+    fn set_kit_value(&mut self, field: SampleField, value: f64) {
         let Some(sample) = self.kit_editor.sample else { return };
         self.set_kit_sample_value(self.kit_index, sample, field, value);
     }
 
     /// The reverse or loop switch of a sample turned over.
-    fn toggle_sample_switch(&mut self, kit: usize, sample: usize, field: Field) {
+    fn toggle_sample_switch(&mut self, kit: usize, sample: usize, field: SampleField) {
         let Some(s) = self.kits.sample(kit, sample) else { return };
         let on = match field {
-            Field::Reverse => s.reverse,
-            Field::Loop => s.looping,
+            SampleField::Reverse => s.reverse,
+            SampleField::Loop => s.looping,
             _ => s.gated,
         };
         self.set_kit_sample_value(kit, sample, field, if on { 0.0 } else { 1.0 });
     }
 
     /// A kit knob: the kit changes now, the player and the disk shortly after.
-    pub(super) fn set_kit_sample_value(&mut self, kit: usize, sample: usize, field: Field, value: f64) {
-        if let Some(message) = self.kits.set_value(kit, sample, field, value) {
+    pub(super) fn set_kit_sample_value(&mut self, kit: usize, sample: usize, field: SampleField, value: f64) {
+        if let Some(message) = self.kits.sample_mut(kit, sample).and_then(|s| s.set_value(field, value)) {
             self.not_undoable(&message);
             self.saving.kits.touch();
         }
@@ -402,7 +402,7 @@ impl Session {
             Id::KitKit => {
                 let target = self.kits.kits().iter().position(|k| k.name == value);
                 if let (Some(sample), Some(target)) = (self.kit_editor.sample, target)
-                    && let Some(message) = self.kits.move_to_kit(self.kit_index, sample, target)
+                    && let Some(message) = move_sample(self.kits.kits_mut(), self.kit_index, sample, target)
                 {
                     self.kits_changed(message);
                 }
@@ -501,8 +501,7 @@ impl Session {
                 }
             }
             Id::SampleToggle(field) => {
-                let place =
-                    self.editor_track().and_then(|t| self.track_sample_path(t)).and_then(|u| self.kits.find_path(&u));
+                let place = self.editor_track().and_then(|t| self.track_kit_sample(t));
                 if let Some((kit, sample)) = place {
                     self.toggle_sample_switch(kit, sample, field);
                 }
@@ -557,7 +556,7 @@ impl Session {
     /// The load button's file: the track's sample replaced.
     pub(super) fn replace_track_sample(&mut self, path: &Path) {
         let Some(t) = self.editor_track() else { return };
-        let Some((kit, sample)) = self.track_sample_path(t).and_then(|u| self.kits.find_path(&u)) else {
+        let Some((kit, sample)) = self.track_kit_sample(t) else {
             self.message = "this track plays no sample of the kits".into();
             return;
         };

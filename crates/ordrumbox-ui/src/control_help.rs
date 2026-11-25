@@ -3,8 +3,8 @@
 //! label their controls with a word or two; the tooltip says what they do.
 // audit: allow(function size): tables of tooltip texts, one line a control.
 
-use crate::kits::Field;
 use crate::panel::{Id, LfoParam, Step};
+use ordrumbox_engine::kit::edit::SampleField;
 
 /// A control's tooltip: its whole name and what it does.
 pub type Help = [&'static str; 2];
@@ -59,21 +59,23 @@ pub fn help(id: Id) -> Option<Help> {
         Id::TrackSelectStep(_, Step::Next) => ["Next type", "the effect's type after the one shown"],
         Id::LoadSample => ["Load sample", "replace the track's sample with a file"],
         Id::KitKnob(field) | Id::SampleKnob(field) | Id::KitToggle(field) | Id::SampleToggle(field) => match field {
-            Field::Gain => ["Gain", "the sample's level, in dB"],
-            Field::Transpose => ["Transpose", "the sample's pitch, in semitones"],
-            Field::Decay => ["Decay", "how long the sample rings, in ms"],
-            Field::Start => ["Start", "where playback starts in the sample, in ms"],
-            Field::End => ["End", "where playback ends in the sample, in ms"],
-            Field::LoopStart => ["Loop in", "where the loop starts, in ms: the sound plays its way in, then loops"],
-            Field::LoopEnd => ["Loop out", "where the loop ends, in ms"],
-            Field::Attack => ["Attack", "the time the sound takes to reach its level, in ms"],
-            Field::Hold => ["Hold", "the time the sound stays at its level before it decays, in ms"],
-            Field::Reverse => ["Reverse", "play the sample backwards, from its end to its start"],
-            Field::Gate => [
+            SampleField::Gain => ["Gain", "the sample's level, in dB"],
+            SampleField::Transpose => ["Transpose", "the sample's pitch, in semitones"],
+            SampleField::Decay => ["Decay", "how long the sample rings, in ms"],
+            SampleField::Start => ["Start", "where playback starts in the sample, in ms"],
+            SampleField::End => ["End", "where playback ends in the sample, in ms"],
+            SampleField::LoopStart => {
+                ["Loop in", "where the loop starts, in ms: the sound plays its way in, then loops"]
+            }
+            SampleField::LoopEnd => ["Loop out", "where the loop ends, in ms"],
+            SampleField::Attack => ["Attack", "the time the sound takes to reach its level, in ms"],
+            SampleField::Hold => ["Hold", "the time the sound stays at its level before it decays, in ms"],
+            SampleField::Reverse => ["Reverse", "play the sample backwards, from its end to its start"],
+            SampleField::Gate => [
                 "Gate",
                 "hold the sound for the note's length, then let it decay: with a loop, a note lasts as long as it is written",
             ],
-            Field::Loop => ["Loop", "play between loop in and loop out over and over, until the decay ends it"],
+            SampleField::Loop => ["Loop", "play between loop in and loop out over and over, until the decay ends it"],
         },
         Id::KitKit => ["Move to kit", "the selected sample, moved into another kit"],
         Id::KitSampleInstrument(_) => {

@@ -7,10 +7,10 @@
 
 use crate::canvas::{Canvas, Direction, Rgb, fit, text_width};
 use crate::control::{Spec, Style};
-use crate::kits::Field;
 use crate::sample_overlay::Overlay;
 use crate::scale::Scale;
 use crate::theme;
+use ordrumbox_engine::kit::edit::SampleField;
 
 pub fn background_color() -> Rgb {
     theme::panel()
@@ -204,12 +204,12 @@ pub enum Id {
     KitSampleInstrument(usize),
     /// The auto-assign button of a sample's row: its instrument from its file name.
     KitAutoInstrument(usize),
-    KitKnob(Field),
+    KitKnob(SampleField),
     /// A sample's reverse or loop switch in the kit editor.
-    KitToggle(Field),
+    KitToggle(SampleField),
     /// The same settings in the track editor, on the track's sample.
-    SampleKnob(Field),
-    SampleToggle(Field),
+    SampleKnob(SampleField),
+    SampleToggle(SampleField),
     /// The kit's title or description, by its `kits.json` key.
     KitText(&'static str),
     /// The title of the table's column of tracks playing each sample.

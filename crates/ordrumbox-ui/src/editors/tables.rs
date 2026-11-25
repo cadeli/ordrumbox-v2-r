@@ -2,7 +2,9 @@
 
 use super::note_kit::note_default;
 use crate::control::Format;
-use crate::kits::{ATTACK_RANGE, DECAY_RANGE, Field, GAIN_RANGE, HOLD_RANGE, TRANSPOSE_RANGE};
+use ordrumbox_engine::kit::edit::SampleField;
+
+use crate::kits::{ATTACK_RANGE, DECAY_RANGE, GAIN_RANGE, HOLD_RANGE, TRANSPOSE_RANGE};
 use ordrumbox_core::Note;
 use ordrumbox_core::arp::MAX_OCTAVES;
 use ordrumbox_core::note::{MAX_LENGTH_STEPS, MAX_SHIFT_STEPS};
@@ -457,26 +459,26 @@ pub fn note_value(note: &Note, prop: &Prop) -> f64 {
 pub const ARP_DIRECTIONS: [&str; 4] = ["up", "down", "updown", "random"];
 
 /// Kit editor knobs: field, label, range, step, format, unit, default.
-pub const KIT_KNOBS: [(Field, Prop, &str, f64); 3] = [
-    (Field::Gain, prop("gain", "Gain", GAIN_RANGE.0, GAIN_RANGE.1, 0.1, Format::Fixed1), "dB", 0.0),
+pub const KIT_KNOBS: [(SampleField, Prop, &str, f64); 3] = [
+    (SampleField::Gain, prop("gain", "Gain", GAIN_RANGE.0, GAIN_RANGE.1, 0.1, Format::Fixed1), "dB", 0.0),
     (
-        Field::Transpose,
+        SampleField::Transpose,
         prop("transpose", "Transpose", TRANSPOSE_RANGE.0, TRANSPOSE_RANGE.1, 0.1, Format::SignedFixed1),
         "st",
         0.0,
     ),
-    (Field::Decay, prop("decay", "Decay", DECAY_RANGE.0, DECAY_RANGE.1, 10.0, Format::Millis), "", DEFAULT_DECAY),
+    (SampleField::Decay, prop("decay", "Decay", DECAY_RANGE.0, DECAY_RANGE.1, 10.0, Format::Millis), "", DEFAULT_DECAY),
 ];
 
 /// The playback knobs of a sample, in rows of [`SHAPE_SLOTS`]: field, label, step (the
 /// sample's length is the range of the start, the end and the loop's points).
-pub const SHAPE_KNOBS: [(Field, &str, f64); 6] = [
-    (Field::Start, "Start", 1.0),
-    (Field::End, "End", 1.0),
-    (Field::Attack, "Attack", 1.0),
-    (Field::Hold, "Hold", 5.0),
-    (Field::LoopStart, "Loop in", 1.0),
-    (Field::LoopEnd, "Loop out", 1.0),
+pub const SHAPE_KNOBS: [(SampleField, &str, f64); 6] = [
+    (SampleField::Start, "Start", 1.0),
+    (SampleField::End, "End", 1.0),
+    (SampleField::Attack, "Attack", 1.0),
+    (SampleField::Hold, "Hold", 5.0),
+    (SampleField::LoopStart, "Loop in", 1.0),
+    (SampleField::LoopEnd, "Loop out", 1.0),
 ];
 
 /// Knobs in a row of the playback knobs.
@@ -489,5 +491,5 @@ pub const SHAPE_RANGES: (f64, f64) = (ATTACK_RANGE.1, HOLD_RANGE.1);
 pub const DEFAULT_ATTACK: f64 = ordrumbox_engine::kit::DEFAULT_ATTACK_MS;
 
 /// The playback switches of a sample: field, label.
-pub const SHAPE_SWITCHES: [(Field, &str); 3] =
-    [(Field::Reverse, "Reverse"), (Field::Loop, "Loop"), (Field::Gate, "Gate")];
+pub const SHAPE_SWITCHES: [(SampleField, &str); 3] =
+    [(SampleField::Reverse, "Reverse"), (SampleField::Loop, "Loop"), (SampleField::Gate, "Gate")];

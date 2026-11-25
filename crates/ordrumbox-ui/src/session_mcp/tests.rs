@@ -352,7 +352,7 @@ fn kits_are_listed_chosen_and_changed() {
 
     let mapping = dir.join("mapping.json");
     s.kits.export_mapping(0, &mapping).unwrap();
-    while s.kits.remove(0, 0).is_some() {}
+    while s.kits.kit_mut(0).and_then(|k| k.remove_sample(0)).is_some() {}
     let args = object([("filePath", Value::from(mapping.display().to_string()))]);
     let loaded = s.mcp_call("loadKitMapping", &args).unwrap();
     assert_eq!((get(&loaded, &["kit"]).as_str(), s.kits.kits()[0].samples.len()), (Some("a"), 2));

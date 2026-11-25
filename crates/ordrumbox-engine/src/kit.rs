@@ -11,6 +11,8 @@ use ordrumbox_dsp::{SampleBuffer, SampleShape};
 
 use crate::wav;
 
+pub mod edit;
+
 /// Decay used when a kit gives none, ms.
 pub const DEFAULT_DECAY_MS: f64 = 500.0;
 /// Attack used when a kit gives none, ms.

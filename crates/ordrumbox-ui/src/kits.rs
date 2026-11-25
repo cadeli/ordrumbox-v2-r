@@ -12,9 +12,8 @@ use std::path::Component;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use ordrumbox_core::instruments::catalog;
+use ordrumbox_engine::kit::edit::{put_kit, set_instruments_from_names};
 use ordrumbox_engine::kit::{Kit, KitSample};
-use ordrumbox_engine::kit_folders::key_from_file_name;
 use ordrumbox_engine::{SampleBank, SampleBuffer, analysis, wav};
 
 use crate::assets::SampleSources;
@@ -27,26 +26,6 @@ pub const DECAY_RANGE: (f64, f64) = (20.0, 5000.0);
 /// Longest attack and hold a knob sets, ms.
 pub const ATTACK_RANGE: (f64, f64) = (0.0, 500.0);
 pub const HOLD_RANGE: (f64, f64) = (0.0, 2000.0);
-
-/// What a kit knob changes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Field {
-    Gain,
-    Transpose,
-    Decay,
-    /// Where reading starts and ends, ms into the sample.
-    Start,
-    End,
-    /// Where the loop starts and ends, ms into the sample.
-    LoopStart,
-    LoopEnd,
-    Attack,
-    Hold,
-    /// On / off, set to 1 or 0.
-    Reverse,
-    Loop,
-    Gate,
-}
 
 /// The kits, the decoded audio of their samples, and where they are saved.
 #[derive(Debug)]
@@ -178,127 +157,19 @@ impl KitSet {
         store::write_atomic(&path, bytes).map_err(|e| format!("{}: {e}", path.display()))
     }
 
-    // ─── Sample settings ─────────────────────────────────────────────────────
-
-    /// Where the sample of `url` is: kit and index.
-    pub fn find_path(&self, url: &str) -> Option<(usize, usize)> {
-        self.kits.iter().enumerate().find_map(|(k, kit)| Some((k, kit.samples.iter().position(|i| i.path == url)?)))
+    /// Kit `kit`, to edit its texts and samples (`kit::edit`).
+    pub fn kit_mut(&mut self, kit: usize) -> Option<&mut Kit> {
+        self.kits.get_mut(kit)
     }
 
-    /// Set gain (dB), tune (semitones), decay, start, end, loop start, loop end, attack or hold (ms)
-    /// of a sample, from a knob, or its reverse or loop switch (1 or 0); the
-    /// message when it changed.
-    pub fn set_value(&mut self, kit: usize, sample: usize, field: Field, value: f64) -> Option<String> {
-        let instrument = self.kits.get_mut(kit)?.samples.get_mut(sample)?;
-        let name = instrument.display_name.clone();
-        match field {
-            Field::Gain if value != instrument.gain_db => {
-                instrument.gain_db = value;
-                Some(format!("{name}: gain {value:+.1} dB"))
-            }
-            Field::Transpose if value != instrument.transpose => {
-                instrument.transpose = value;
-                Some(format!("{name}: tune {value:+.1} st"))
-            }
-            Field::Decay if Some(value) != instrument.decay_ms => {
-                instrument.decay_ms = Some(value);
-                Some(format!("{name}: decay {value} ms"))
-            }
-            Field::Start if value != instrument.start_ms => {
-                instrument.start_ms = value;
-                Some(format!("{name}: start {value} ms"))
-            }
-            Field::End if Some(value) != instrument.end_ms => {
-                instrument.end_ms = Some(value);
-                Some(format!("{name}: end {value} ms"))
-            }
-            Field::LoopStart if Some(value) != instrument.loop_start_ms => {
-                instrument.loop_start_ms = Some(value);
-                Some(format!("{name}: loop start {value} ms"))
-            }
-            Field::LoopEnd if Some(value) != instrument.loop_end_ms => {
-                instrument.loop_end_ms = Some(value);
-                Some(format!("{name}: loop end {value} ms"))
-            }
-            Field::Attack if Some(value) != instrument.attack_ms => {
-                instrument.attack_ms = Some(value);
-                Some(format!("{name}: attack {value} ms"))
-            }
-            Field::Hold if value != instrument.hold_ms => {
-                instrument.hold_ms = value;
-                Some(format!("{name}: hold {value} ms"))
-            }
-            Field::Reverse if (value >= 0.5) != instrument.reverse => {
-                instrument.reverse = value >= 0.5;
-                Some(format!("{name}: reverse {}", if instrument.reverse { "on" } else { "off" }))
-            }
-            Field::Gate if (value >= 0.5) != instrument.gated => {
-                instrument.gated = value >= 0.5;
-                Some(format!("{name}: follow note length {}", if instrument.gated { "on" } else { "off" }))
-            }
-            Field::Loop if (value >= 0.5) != instrument.looping => {
-                instrument.looping = value >= 0.5;
-                Some(format!("{name}: loop {}", if instrument.looping { "on" } else { "off" }))
-            }
-            _ => None,
-        }
+    /// The kits, to move samples between them (`kit::edit`).
+    pub fn kits_mut(&mut self) -> &mut [Kit] {
+        &mut self.kits
     }
 
-    /// Set the instrument a sample is, an id of the catalog (another is no change).
-    pub fn set_instrument(&mut self, kit: usize, sample: usize, id: &str) -> Option<String> {
-        catalog().by_exact_id(id)?;
-        let instrument = self.kits.get_mut(kit)?.samples.get_mut(sample)?;
-        (instrument.key.as_deref() != Some(id)).then(|| {
-            instrument.key = Some(id.to_owned());
-            format!("Set \"{}\" to instrument \"{id}\"", instrument.display_name)
-        })
-    }
-
-    /// The instrument of sample `sample` of kit `kit` guessed from its file
-    /// name; `Err` when the name gives none.
-    pub fn guess_instrument(&self, kit: usize, sample: usize) -> Result<String, String> {
-        let Some(s) = self.sample(kit, sample) else { return Err("No such sample".into()) };
-        let file = s.path.rsplit_once('/').map_or(s.path.as_str(), |(_, name)| name);
-        key_from_file_name(file).ok_or_else(|| format!("No instrument in the name \"{file}\""))
-    }
-
-    /// A text of kit `kit` (its title, its description) by its `kits.json`
-    /// key; empty, the key goes. The message when it changed.
-    pub fn set_text(&mut self, kit: usize, key: &str, text: &str) -> Option<String> {
-        let kit = self.kits.get_mut(kit)?;
-        let before = kit.extra.get(key).and_then(|v| v.as_str()).unwrap_or_default();
-        if before == text {
-            return None;
-        }
-        if text.is_empty() {
-            kit.extra.remove(key);
-        } else {
-            kit.extra.insert(key, ordrumbox_core::json::Value::from(text));
-        }
-        Some(format!("Kit \"{}\": {key} changed", kit.name))
-    }
-
-    /// A sample into kit `target`.
-    pub fn move_to_kit(&mut self, kit: usize, sample: usize, target: usize) -> Option<String> {
-        if target == kit || target >= self.kits.len() || sample >= self.kits.get(kit)?.samples.len() {
-            return None;
-        }
-        let moved = self.kits[kit].samples.remove(sample);
-        let message = format!("Moved \"{}\" to kit \"{}\"", moved.display_name, self.kits[target].name);
-        self.kits[target].samples.push(moved);
-        Some(message)
-    }
-
-    /// Its path is kept as removed, so that a file of the
-    /// kit's folder is not added back when the folders are read.
-    pub fn remove(&mut self, kit: usize, sample: usize) -> Option<String> {
-        let kit = self.kits.get_mut(kit)?;
-        (sample < kit.samples.len()).then(|| {
-            let removed = kit.samples.remove(sample);
-            let message = format!("Removed \"{}\"", removed.display_name);
-            kit.removed.push(removed.path);
-            message
-        })
+    /// Sample `sample` of kit `kit`, to edit its settings (`kit::edit`).
+    pub fn sample_mut(&mut self, kit: usize, sample: usize) -> Option<&mut KitSample> {
+        self.kits.get_mut(kit)?.samples.get_mut(sample)
     }
 
     /// The samples of kit `kit` scaled to a 0 dB peak; how many.
@@ -337,18 +208,7 @@ impl KitSet {
             self.kits.push(Kit { name: kit_name.clone(), ..Kit::default() });
         }
         let kit = self.kits.iter().position(|k| k.name == kit_name).unwrap_or(0);
-        let instruments = &mut self.kits[kit].samples;
-        let entry = KitSample::from_file(&url);
-        let index = match instruments.iter().position(|i| i.path == url) {
-            Some(i) => {
-                instruments[i] = entry;
-                i
-            }
-            None => {
-                instruments.push(entry);
-                instruments.len() - 1
-            }
-        };
+        let index = self.kits[kit].put_sample(KitSample::from_file(&url));
         Ok((index, format!("Added \"{name}\" to kit \"{kit_name}\"")))
     }
 
@@ -363,20 +223,6 @@ impl KitSet {
             instrument.display_name.clone_from(&name);
         }
         Ok(format!("Replaced with \"{name}\""))
-    }
-
-    /// `kit` in the place of the kit of its name, else added; its index.
-    fn put_kit(&mut self, kit: Kit) -> usize {
-        match self.kits.iter().position(|k| k.name == kit.name) {
-            Some(i) => {
-                self.kits[i] = kit;
-                i
-            }
-            None => {
-                self.kits.push(kit);
-                self.kits.len() - 1
-            }
-        }
     }
 
     /// The WAV files of a folder as a kit named after it
@@ -410,15 +256,9 @@ impl KitSet {
                 Err(_) => failed += 1,
             }
         }
-        // Each file is read beside the others: a Roland CL is the claves next to its RS.
-        let names: Vec<&str> = instruments.iter().map(|i: &KitSample| i.display_name.as_str()).collect();
-        let keys: Vec<Option<String>> =
-            catalog().from_kit_file_names(&names).iter().map(|i| i.map(|i| i.id.clone())).collect();
-        for (instrument, key) in instruments.iter_mut().zip(keys) {
-            instrument.key = key;
-        }
+        set_instruments_from_names(&mut instruments);
         let count = instruments.len();
-        let index = self.put_kit(Kit { name: kit_name.clone(), samples: instruments, ..Kit::default() });
+        let index = put_kit(&mut self.kits, Kit { name: kit_name.clone(), samples: instruments, ..Kit::default() });
         let skipped = if failed > 0 { format!(" ({failed} not decoded)") } else { String::new() };
         Ok((index, format!("Imported {count} files into kit \"{kit_name}\"{skipped}")))
     }
@@ -429,7 +269,7 @@ impl KitSet {
         let value = ordrumbox_core::json::parse(&text).map_err(|_| "Invalid drumkit JSON".to_owned())?;
         let kit = Kit::from_mapping_json(&value).map_err(|_| "Invalid drumkit JSON".to_owned())?;
         let name = kit.name.clone();
-        let index = self.put_kit(kit);
+        let index = put_kit(&mut self.kits, kit);
         Ok((index, format!("Loaded drumkit \"{name}\"")))
     }
 
@@ -472,7 +312,7 @@ impl KitSet {
         }
         kit.samples = samples;
         let (name, count) = (kit.name.clone(), kit.samples.len());
-        let index = self.put_kit(kit);
+        let index = put_kit(&mut self.kits, kit);
         let left_out =
             if left_out.is_empty() { String::new() } else { format!(" (not read: {})", left_out.join(", ")) };
         Ok((index, format!("Imported kit \"{name}\" with {count} sample(s){left_out}")))
@@ -549,6 +389,8 @@ impl KitSet {
 
 #[cfg(test)]
 mod tests {
+    use ordrumbox_engine::kit::edit::{SampleField, move_sample};
+
     use super::*;
 
     fn set(dir: &Path) -> KitSet {
@@ -582,21 +424,9 @@ mod tests {
             fs::remove_dir_all(&dir).unwrap();
         }
         let mut kits = set(&dir);
-        assert_eq!(kits.set_value(0, 0, Field::Gain, -3.0).as_deref(), Some("kick: gain -3.0 dB"));
-        assert_eq!(kits.set_value(0, 0, Field::Gain, -3.0), None); // no change
-        kits.set_value(0, 0, Field::Transpose, 0.3);
-        assert_eq!(kits.kits[0].samples[0].transpose, 0.3);
-        kits.set_value(0, 0, Field::Decay, 630.0);
-        assert_eq!(kits.kits[0].samples[0].decay_ms, Some(630.0));
-        assert!(kits.set_instrument(0, 0, "SNARE").is_some());
-        assert_eq!(kits.kits[0].samples[0].key.as_deref(), Some("SNARE"));
-        assert_eq!(kits.find_path("k.wav"), Some((0, 0)));
-        // The kit's texts: set, unchanged, then gone when empty.
-        assert!(kits.set_text(0, "desc", "dry, close-miked").is_some());
-        assert_eq!(kits.set_text(0, "desc", "dry, close-miked"), None);
-        assert_eq!(kits.kits[0].to_json().as_object().unwrap().get("desc").unwrap().as_str(), Some("dry, close-miked"));
-        assert!(kits.set_text(0, "desc", "").is_some());
-        assert!(kits.kits[0].extra.get("desc").is_none());
+        // The edits themselves are `kit::edit`'s; here, that they reach the saved kits.
+        assert!(kits.sample_mut(0, 0).unwrap().set_value(SampleField::Gain, -3.0).is_some());
+        assert!(kits.kit_mut(0).unwrap().set_text("desc", "dry, close-miked").is_some());
 
         assert_eq!(kits.normalize(0), Ok(1));
         // The gain comes from the peak in dB to 3 decimals: about 0 dB.
@@ -613,12 +443,8 @@ mod tests {
         assert!(errors.is_empty());
         assert_eq!(bank.samples.len(), 2);
 
-        assert_eq!(kits.move_to_kit(0, 1, 1).as_deref(), Some("Moved \"SnareDrum.wav\" to kit \"b\""));
-        assert_eq!(kits.move_to_kit(0, 0, 0), None);
-        assert_eq!(kits.kits[1].samples.len(), 1);
-        let removed = kits.kits[1].samples[0].path.clone();
-        assert!(kits.remove(1, 0).is_some());
-        assert_eq!(kits.kits[1].removed, [removed], "kept, so that the folder does not add it back");
+        assert!(move_sample(kits.kits_mut(), 0, 1, 1).is_some());
+        assert!(kits.kit_mut(1).unwrap().remove_sample(0).is_some());
 
         let mapping = dir.join(kits.mapping_file_name(0).unwrap());
         assert!(mapping.ends_with("ordrumbox-drumkit-a.json"));
@@ -628,7 +454,8 @@ mod tests {
         assert_eq!(kits.kits[0].samples.len(), 1);
         kits.save().unwrap();
         let saved = store::load_kits(&dir.join("kits.json")).unwrap().unwrap().0;
-        assert_eq!((saved[0].name.as_str(), &saved[1].removed), ("a", &kits.kits[1].removed));
+        assert_eq!((saved[0].name.as_str(), saved[0].samples[0].gain_db), ("a", -3.0));
+        assert_eq!(saved[1].removed, ["imported/a/SnareDrum.wav"], "kept, so that the folder does not add it back");
         fs::remove_dir_all(dir).unwrap();
     }
 

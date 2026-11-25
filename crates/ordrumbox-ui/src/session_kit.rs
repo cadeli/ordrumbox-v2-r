@@ -162,7 +162,7 @@ impl Session {
     }
 
     pub(super) fn kit_remove_now(&mut self, kit: usize, sample: usize) {
-        if let Some(message) = self.kits.remove(kit, sample) {
+        if let Some(message) = self.kits.kit_mut(kit).and_then(|k| k.remove_sample(sample)) {
             self.kits_changed(message);
         }
     }
@@ -218,7 +218,7 @@ impl Session {
             let choice = instrument_choice(s.key.as_deref());
             items.push(Item::new(Some(Id::KitSampleInstrument(i)), layout.instrument_rect(row), choice.kind()));
             // Lit while the instrument is the one its file name gives.
-            let on = self.kits.guess_instrument(self.kit_index, i).is_ok_and(|key| s.key.as_ref() == Some(&key));
+            let on = s.instrument_from_file_name().is_ok_and(|key| s.key.as_ref() == Some(&key));
             let auto = Kind::Button { label: "AUTO".into(), on };
             items.push(Item::new(Some(Id::KitAutoInstrument(i)), layout.auto_rect(row), auto));
         }
@@ -235,7 +235,7 @@ impl Session {
 
     /// The kit's title or description confirmed: saved with the kits.
     pub(super) fn commit_kit_text(&mut self, key: &str, text: &str) {
-        if let Some(message) = self.kits.set_text(self.kit_index, key, text.trim()) {
+        if let Some(message) = self.kits.kit_mut(self.kit_index).and_then(|k| k.set_text(key, text.trim())) {
             self.message = match self.kits.save() {
                 Ok(()) => message,
                 Err(e) => e,
@@ -266,7 +266,7 @@ impl Session {
 
     /// The instrument select of sample `sample`'s row: that instrument.
     pub(super) fn kit_set_instrument(&mut self, sample: usize, id: &str) {
-        if let Some(message) = self.kits.set_instrument(self.kit_index, sample, id) {
+        if let Some(message) = self.kits.sample_mut(self.kit_index, sample).and_then(|s| s.set_instrument(id)) {
             self.kits_changed(message);
         }
     }
@@ -274,8 +274,9 @@ impl Session {
     /// The auto-assign button of sample `sample`'s row: the instrument its
     /// file name gives, else a message saying it gives none.
     pub(super) fn kit_auto_instrument(&mut self, sample: usize) {
-        match self.kits.guess_instrument(self.kit_index, sample) {
-            Ok(id) => match self.kits.set_instrument(self.kit_index, sample, &id) {
+        let Some(s) = self.kits.sample_mut(self.kit_index, sample) else { return };
+        match s.instrument_from_file_name() {
+            Ok(id) => match s.set_instrument(&id) {
                 Some(message) => self.kits_changed(message),
                 None => self.message = format!("Already {id}"),
             },
@@ -417,7 +418,9 @@ fn instrument_choice(key: Option<&str>) -> Choice {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::kits::{Field, KitSet};
+    use ordrumbox_engine::kit::edit::SampleField;
+
+    use crate::kits::KitSet;
     use ordrumbox_core::Library;
     use ordrumbox_engine::kit::{BankSample, Kit};
     use ordrumbox_engine::{SampleBank, SampleBuffer};
@@ -468,16 +471,16 @@ mod tests {
     #[test]
     fn the_playback_controls_set_the_samples_start_reverse_and_loop() {
         let mut s = session();
-        s.set_value(Id::KitKnob(Field::Start), 20.0);
-        s.set_value(Id::KitKnob(Field::Hold), 50.0);
-        s.activate(Id::KitToggle(Field::Reverse));
-        s.activate(Id::KitToggle(Field::Loop));
+        s.set_value(Id::KitKnob(SampleField::Start), 20.0);
+        s.set_value(Id::KitKnob(SampleField::Hold), 50.0);
+        s.activate(Id::KitToggle(SampleField::Reverse));
+        s.activate(Id::KitToggle(SampleField::Loop));
         let sample = s.kits.sample(0, 0).unwrap();
         assert_eq!((sample.start_ms, sample.hold_ms, sample.reverse, sample.looping), (20.0, 50.0, true, true));
-        s.activate(Id::KitToggle(Field::Loop));
+        s.activate(Id::KitToggle(SampleField::Loop));
         assert!(!s.kits.sample(0, 0).unwrap().looping, "a second click turns it off");
         // The track editor's controls act on the same sample.
-        s.set_value(Id::SampleKnob(Field::Attack), 30.0);
+        s.set_value(Id::SampleKnob(SampleField::Attack), 30.0);
         assert_eq!(s.kits.sample(0, 0).unwrap().attack_ms, Some(30.0));
     }
 

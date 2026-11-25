@@ -5,7 +5,9 @@
 //! click. Kit edits, as the knobs: not undo steps.
 
 use super::Session;
-use crate::kits::{DECAY_RANGE, Field};
+use ordrumbox_engine::kit::edit::SampleField;
+
+use crate::kits::DECAY_RANGE;
 use crate::panel::{Kind, Rect};
 use crate::sample_overlay::{Handle, Overlay, Shape};
 use crate::scale::Scale;
@@ -35,13 +37,13 @@ struct Wave {
 
 impl Handle {
     /// The setting it moves.
-    const fn field(self) -> Field {
+    const fn field(self) -> SampleField {
         match self {
-            Self::Start => Field::Start,
-            Self::End => Field::End,
-            Self::LoopStart => Field::LoopStart,
-            Self::LoopEnd => Field::LoopEnd,
-            Self::DecayEnd => Field::Decay,
+            Self::Start => SampleField::Start,
+            Self::End => SampleField::End,
+            Self::LoopStart => SampleField::LoopStart,
+            Self::LoopEnd => SampleField::LoopEnd,
+            Self::DecayEnd => SampleField::Decay,
         }
     }
 }
@@ -58,8 +60,7 @@ impl Session {
             }
         }
         let item = layout.items.iter().find(|i| matches!(i.kind, Kind::Envelope { .. }) && i.rect.contains(x, y))?;
-        let url = self.editor_track().and_then(|t| self.track_sample_path(t))?;
-        let (kit, sample) = self.kits.find_path(&url)?;
+        let (kit, sample) = self.editor_track().and_then(|t| self.track_kit_sample(t))?;
         Some(Wave { kit, sample, rect: item.rect })
     }
 
@@ -107,7 +108,7 @@ impl Session {
             value = shape.dragged(handle, snapped / shape.duration_ms);
         }
         let field = handle.field();
-        let value = if field == Field::Decay { value.clamp(DECAY_RANGE.0, DECAY_RANGE.1).round() } else { value };
+        let value = if field == SampleField::Decay { value.clamp(DECAY_RANGE.0, DECAY_RANGE.1).round() } else { value };
         self.set_kit_sample_value(kit, sample, field, value);
         true
     }
@@ -174,10 +175,10 @@ mod tests {
     #[test]
     fn the_loop_points_have_handles_only_while_it_loops() {
         let mut s = session();
-        s.set_kit_sample_value(0, 0, Field::LoopStart, 300.0);
+        s.set_kit_sample_value(0, 0, SampleField::LoopStart, 300.0);
         let (x, y) = at(&s, 0.3);
         assert!(!s.is_over_wave_handle(SIZE, x, y), "no loop");
-        s.set_kit_sample_value(0, 0, Field::Loop, 1.0);
+        s.set_kit_sample_value(0, 0, SampleField::Loop, 1.0);
         assert!(s.is_over_wave_handle(SIZE, x, y));
         assert!(s.mouse_down(SIZE, x, y, Button::Left, false));
         let (x, _) = at(&s, 0.41);

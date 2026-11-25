@@ -7,10 +7,10 @@ use super::tables::{
 use super::values::EditorState;
 use super::{KitControls, NoteView, Shape};
 use crate::control::{Format, Spec};
-use crate::kits::Field;
 use crate::panel::{Id, Item, Kind, Rect};
 use crate::scale::Scale;
 use ordrumbox_core::Note;
+use ordrumbox_engine::kit::edit::SampleField;
 
 use super::layout::*;
 
@@ -106,12 +106,12 @@ pub fn kit_controls(view: &KitControls, area: Rect, scale: Scale) -> (Vec<Item>,
         .iter()
         .map(|(field, p, unit, default)| {
             let value = match field {
-                Field::Gain => view.gain,
-                Field::Transpose => view.transpose,
+                SampleField::Gain => view.gain,
+                SampleField::Transpose => view.transpose,
                 _ => view.decay,
             };
             let mut spec = value_spec(p, *default, true);
-            if *field == Field::Decay {
+            if *field == SampleField::Decay {
                 spec = spec.log();
             }
             (Id::KitKnob(*field), spec, value, p.label, p.format.value(value, unit), false)
@@ -126,7 +126,7 @@ pub fn kit_controls(view: &KitControls, area: Rect, scale: Scale) -> (Vec<Item>,
 }
 
 /// The id of a playback control, by its field.
-pub(super) type IdOf = fn(Field) -> Id;
+pub(super) type IdOf = fn(SampleField) -> Id;
 
 /// A knob of the knob bars: its id, range, value, label, text, and whether an LFO moves it.
 type Knob<'a> = (Id, Spec, f64, &'a str, String, bool);
@@ -141,11 +141,11 @@ fn shape_knobs(shape: &Shape, knob_id: IdOf) -> Vec<Knob<'static>> {
         .iter()
         .map(|&(field, label, step)| {
             let (value, spec) = match field {
-                Field::Start => (shape.start_ms, Spec::knob(0.0, length, step, 0.0)),
-                Field::End => (shape.end_ms, Spec::knob(0.0, length, step, length)),
-                Field::LoopStart => (shape.loop_start_ms, Spec::knob(0.0, length, step, 0.0)),
-                Field::LoopEnd => (shape.loop_end_ms, Spec::knob(0.0, length, step, length)),
-                Field::Attack => (shape.attack_ms, Spec::knob(0.0, SHAPE_RANGES.0, step, DEFAULT_ATTACK)),
+                SampleField::Start => (shape.start_ms, Spec::knob(0.0, length, step, 0.0)),
+                SampleField::End => (shape.end_ms, Spec::knob(0.0, length, step, length)),
+                SampleField::LoopStart => (shape.loop_start_ms, Spec::knob(0.0, length, step, 0.0)),
+                SampleField::LoopEnd => (shape.loop_end_ms, Spec::knob(0.0, length, step, length)),
+                SampleField::Attack => (shape.attack_ms, Spec::knob(0.0, SHAPE_RANGES.0, step, DEFAULT_ATTACK)),
                 _ => (shape.hold_ms, Spec::knob(0.0, SHAPE_RANGES.1, step, 0.0)),
             };
             (knob_id(field), spec, value, label, Format::Millis.value(value, ""), false)
@@ -175,8 +175,8 @@ fn shape_switches(rows: &mut Rows, shape: &Shape, toggle_id: IdOf) {
     let s = rows.scale;
     for (field, label) in SHAPE_SWITCHES {
         let on = match field {
-            Field::Reverse => shape.reverse,
-            Field::Loop => shape.looping,
+            SampleField::Reverse => shape.reverse,
+            SampleField::Loop => shape.looping,
             _ => shape.gated,
         };
         let r = rows.row();
