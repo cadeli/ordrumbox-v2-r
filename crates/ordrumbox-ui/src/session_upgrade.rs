@@ -1,5 +1,5 @@
 //! The reminder after an upgrade: the first start of a version other than the one that last ran
-//! says that Help > Factory reset... restores the demos as shipped (the new ones are added by `session_demos.rs`). The version that ran is the `version`
+//! says that Help > Factory reset... restores the demos as shipped (the new ones are added by `session_new_demos.rs`). The version that ran is the `version`
 //! setting of `settings.json`.
 
 use ordrumbox_core::json::Value;

@@ -80,7 +80,7 @@ impl DemoBrowser {
             }
             (None, OverlayKey::Edge(end)) => self.tile = if *end { styles.len().saturating_sub(1) } else { 0 },
             (Some(s), OverlayKey::Enter) => {
-                let item = styles.get(s).and_then(|style| style.items().get(self.row).copied());
+                let item = styles.get(s).and_then(|style| style.item(self.row));
                 if let Some(item) = item {
                     return Outcome::Load { style: s, item };
                 }
@@ -113,7 +113,7 @@ impl DemoBrowser {
                 if layout.back_line().contains(x, y) {
                     self.back();
                 } else if let Some(row) = layout.row_at(self.first_row, x, y) {
-                    let item = styles.get(s).and_then(|style| style.items().get(row).copied());
+                    let item = styles.get(s).and_then(|style| style.item(row));
                     if let Some(item) = item {
                         self.row = row;
                         return Outcome::Load { style: s, item };
@@ -145,7 +145,7 @@ fn scrolled_to(first: usize, at: usize, shown: usize) -> usize {
 }
 
 fn item_count(styles: &[DemoStyle], s: usize) -> usize {
-    styles.get(s).map_or(0, |style| style.items().len())
+    styles.get(s).map_or(0, DemoStyle::item_count)
 }
 
 /// Where the panel's parts are in a window.
@@ -230,7 +230,7 @@ pub fn draw(canvas: &mut Canvas, browser: &DemoBrowser, styles: &[DemoStyle], la
         Some(style) => {
             canvas.text(x, layout.back_line().y, "< all styles", s, theme::muted());
             draw_items(canvas, browser, style, layout);
-            style.items().get(browser.row).map_or("", |&item| style.item_description(item))
+            style.item(browser.row).map_or("", |item| style.item_description(item))
         }
     };
     draw_description(canvas, description, layout);
@@ -290,9 +290,8 @@ fn item_line(style: &DemoStyle, item: DemoItem, chars: usize) -> String {
 fn draw_items(canvas: &mut Canvas, browser: &DemoBrowser, style: &DemoStyle, layout: &DemoLayout) {
     let s = layout.scale;
     let chars = crate::canvas::chars_in(layout.area.w - 8 * s, s);
-    for (row, (index, item)) in
-        style.items().into_iter().enumerate().skip(browser.first_row).take(layout.list_rows).enumerate()
-    {
+    let shown = (browser.first_row..style.item_count()).take(layout.list_rows);
+    for (row, (index, item)) in shown.filter_map(|index| style.item(index).map(|item| (index, item))).enumerate() {
         let y = layout.area.y + row as i32 * layout.line;
         let chosen = index == browser.row;
         if chosen {
@@ -413,7 +412,7 @@ mod tests {
     fn an_item_line_keeps_its_width() {
         let style = style("x", 2, true);
         let chars = 60;
-        for item in style.items() {
+        for item in (0..style.item_count()).filter_map(|i| style.item(i)) {
             assert_eq!(item_line(&style, item, chars).chars().count(), chars, "{item:?}");
         }
     }

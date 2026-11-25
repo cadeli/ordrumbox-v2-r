@@ -140,8 +140,6 @@ impl Session {
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
-
     use ordrumbox_core::json::Value;
 
     use super::*;
@@ -151,8 +149,6 @@ mod tests {
     use crate::menu::Command;
 
     use crate::scale::Scale;
-
-    use crate::test_support::scratch_dir;
 
     use crate::view;
 
@@ -216,26 +212,26 @@ mod tests {
 
     #[test]
     fn a_click_on_the_notice_buttons_takes_the_choice() {
-        // A user data folder of its own: the reset touches nothing of the user's.
-        let dir = scratch_dir("confirm-reset");
+        // A reset that ran would load the session again from the machine's
+        // user data folder, not this test's: hosted once the notice is open,
+        // the reset only refuses, which tells that the button ran it.
         let mut s = session();
-        s.saving.library_path = Some(dir.join("library.json"));
         s.run(Command::FactoryReset);
         assert!(s.overlay_open());
+        s.host.hosted = true;
         // The Reset button runs what ENTER on the focused one would.
         let (x, y) = button_point(&s, 1);
         s.overlay_click(800, 600, Scale::ONE, x, y);
-        // Loaded again: nothing open, or the demos when that is a first start
-        // (it reads the settings where the session loads from, the machine's).
-        assert!(matches!(s.chrome.overlay, None | Some(Overlay::Demos(_))));
-        assert!(s.message.starts_with("factory settings restored"), "{}", s.message);
-        s.close_overlay();
+        assert!(!s.overlay_open());
+        assert_eq!(Some(s.message.as_str()), Command::FactoryReset.hosted_refusal());
         // The Keep button only closes.
+        s.message.clear();
+        s.host.hosted = false;
         s.run(Command::FactoryReset);
         let (x, y) = button_point(&s, 0);
         s.overlay_click(800, 600, Scale::ONE, x, y);
         assert!(!s.overlay_open());
-        fs::remove_dir_all(dir).unwrap();
+        assert!(s.message.is_empty(), "{}", s.message);
     }
 
     /// A point on `button` of the notice open (the layout is the view's:

@@ -123,6 +123,21 @@ impl Library {
         self.patterns.iter().find(|p| p.id == id)
     }
 
+    /// Add `song`, with the patterns of `source` it plays that this library
+    /// lacks (those it holds under the same id are kept); the patterns added.
+    pub fn add_song_from(&mut self, song: &Song, source: &Self) -> &[Pattern] {
+        let before = self.patterns.len();
+        for clip in &song.clips {
+            if self.pattern(&clip.pattern_id).is_none()
+                && let Some(pattern) = source.pattern(&clip.pattern_id)
+            {
+                self.patterns.push(pattern.clone());
+            }
+        }
+        self.songs.push(song.clone());
+        &self.patterns[before..]
+    }
+
     /// A project file (`SongService.buildSongData`, the record the song panel
     /// saves and exports as `.odbox`): the header's description and date,
     /// the session tempo, the kit, the patterns, the arrangements, what is selected, and `stamp` (key
@@ -298,6 +313,21 @@ mod tests {
         assert_eq!(library.songs[0].clips.len(), 1);
         assert_eq!(report.dropped_clips, [DroppedClip { pattern: "jazz".into(), reason: "unknown pattern id" }]);
         assert!(library.pattern("rock").is_some());
+    }
+
+    #[test]
+    fn a_song_brings_the_patterns_it_plays_that_are_missing() {
+        let (source, _) = Library::parse(
+            r#"{"patterns":[{"id":"a","name":"A"},{"id":"b","name":"B"},{"id":"c"}],
+            "songs":[{"id":"s","clips":[{"patternId":"a","startMeasure":0,"measureCount":1},
+                {"patternId":"b","startMeasure":1,"measureCount":1},{"patternId":"a","startMeasure":2,"measureCount":1}]}]}"#,
+        )
+        .unwrap();
+        let (mut mine, _) = Library::parse(r#"{"patterns":[{"id":"b","name":"My B"}]}"#).unwrap();
+        let added: Vec<&str> = mine.add_song_from(&source.songs[0], &source).iter().map(|p| p.id.as_str()).collect();
+        assert_eq!(added, ["a"], "b is kept as the user's, a added once, c not played");
+        assert_eq!(mine.pattern("b").and_then(|p| p.name.as_deref()), Some("My B"));
+        assert_eq!(mine.songs.len(), 1);
     }
 
     #[test]

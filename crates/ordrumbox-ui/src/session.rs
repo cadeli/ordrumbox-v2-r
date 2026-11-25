@@ -123,8 +123,6 @@ mod session_automation_live;
 mod session_cartridge;
 #[path = "session_demo_browser.rs"]
 mod session_demo_browser;
-#[path = "session_demos.rs"]
-mod session_demos;
 #[path = "session_kit.rs"]
 mod session_kit;
 #[path = "session_kit_list.rs"]
@@ -138,6 +136,8 @@ mod session_mcp;
 mod session_mcp_tools;
 #[path = "session_mixer.rs"]
 mod session_mixer;
+#[path = "session_new_demos.rs"]
+mod session_new_demos;
 #[path = "session_output.rs"]
 mod session_output;
 #[path = "session_overlay.rs"]

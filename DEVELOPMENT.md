@@ -152,7 +152,7 @@ default pan. It is edited by hand; `ordrumbox-core/src/instruments.rs` only read
 
 - **`assets/data/library.json` is the starter library**: what a new user's library starts as (the Funk Song and a
   few beats), what File > Load the starter library... and Help > Factory reset... bring back, and what an upgrade
-  offers once (`ordrumbox-logic/src/demos.rs`): a pattern or a song added to it reaches every user's library.
+  offers once (`ordrumbox-logic/src/new_demos.rs`): a pattern or a song added to it reaches every user's library.
 - **`assets/data/demos/<nn>-<style>.json` hold the demos**, a style per file, in the library format; its `info`
   gives the tile's name and description, `<nn>` its place. File > Demos... browses them
   (`ordrumbox-ui/src/demo_browser.rs`) and copies a song with its patterns, or a pattern, into the user's library

@@ -57,11 +57,21 @@ impl DemoStyle {
         &self.library
     }
 
-    /// Its demos as the browser lists them: the songs, then the patterns.
+    /// How many demos it has: its songs and its patterns.
     #[must_use]
-    pub fn items(&self) -> Vec<DemoItem> {
-        let songs = (0..self.library.songs.len()).map(DemoItem::Song);
-        songs.chain((0..self.library.patterns.len()).map(DemoItem::Pattern)).collect()
+    pub fn item_count(&self) -> usize {
+        self.library.songs.len() + self.library.patterns.len()
+    }
+
+    /// Its demo at `index` as the browser lists them: the songs, then the
+    /// patterns; `None` past the last.
+    #[must_use]
+    pub fn item(&self, index: usize) -> Option<DemoItem> {
+        let song_count = self.library.songs.len();
+        match index.checked_sub(song_count) {
+            None => Some(DemoItem::Song(index)),
+            Some(p) => (p < self.library.patterns.len()).then_some(DemoItem::Pattern(p)),
+        }
     }
 
     /// The name of `item`; empty for an item it does not have.
@@ -98,17 +108,9 @@ pub fn copy_demo(library: &mut Library, style: &Library, item: DemoItem) -> Opti
             if let Some(index) = library.songs.iter().position(|mine| mine.id == song.id) {
                 return Some(Copied { item: DemoItem::Song(index), added_pattern_count: 0, was_there: true });
             }
-            let before = library.patterns.len();
-            for clip in &song.clips {
-                if library.pattern(&clip.pattern_id).is_none()
-                    && let Some(pattern) = style.pattern(&clip.pattern_id)
-                {
-                    library.patterns.push(pattern.clone());
-                }
-            }
-            library.songs.push(song.clone());
+            let added_pattern_count = library.add_song_from(song, style).len();
             let item = DemoItem::Song(library.songs.len() - 1);
-            Some(Copied { item, added_pattern_count: library.patterns.len() - before, was_there: false })
+            Some(Copied { item, added_pattern_count, was_there: false })
         }
         DemoItem::Pattern(p) => {
             let pattern = style.patterns.get(p)?;
@@ -140,9 +142,10 @@ mod tests {
     fn a_style_lists_its_songs_then_its_patterns() {
         let style = DemoStyle::new(library(STYLE), "funk");
         assert_eq!((style.name(), style.description()), ("Funk", "Grooves."));
-        let items = style.items();
-        assert_eq!(items[0], DemoItem::Song(0));
-        let names: Vec<&str> = items.iter().map(|&i| style.item_name(i)).collect();
+        assert_eq!(style.item_count(), 4);
+        assert_eq!((style.item(0), style.item(1)), (Some(DemoItem::Song(0)), Some(DemoItem::Pattern(0))));
+        assert_eq!(style.item(4), None);
+        let names: Vec<&str> = (0..4).filter_map(|i| style.item(i)).map(|i| style.item_name(i)).collect();
         assert_eq!(names, ["S", "A", "B", "c"], "a pattern without a name shows its id");
         assert_eq!(style.item_description(DemoItem::Song(0)), "The song.");
         assert_eq!(style.item_description(DemoItem::Pattern(0)), "The A.");

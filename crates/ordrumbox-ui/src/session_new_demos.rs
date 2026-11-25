@@ -1,10 +1,10 @@
 //! The new demos of an upgrade: at the start of the program, the patterns and songs of the assets'
-//! library that the user's library has not been offered yet are added to it (one undo step). The
+//! starter library that the user's library has not been offered yet are added to it (one undo step). The
 //! ids offered so far are the `demos` setting of `settings.json`; the first start only records
 //! them. A demo that changed or went away in the assets is not touched: Help > Factory reset... does.
 
 use ordrumbox_core::json::{Object, Value};
-use ordrumbox_logic::demos::{self, KnownDemos};
+use ordrumbox_logic::new_demos::{self, KnownDemos};
 
 use super::Session;
 use super::session_user_data::read_library;
@@ -49,7 +49,7 @@ fn known_to_json(known: &KnownDemos) -> Value {
 }
 
 /// "3 new demos added: A, B, C" (the names of the first few).
-fn added_line(added: &demos::AddedDemos) -> String {
+fn added_line(added: &new_demos::AddedDemos) -> String {
     const SHOWN: usize = 4;
     let names: Vec<&str> = added.song_names.iter().chain(&added.pattern_names).map(String::as_str).collect();
     let more = names.len().saturating_sub(SHOWN);
@@ -62,11 +62,11 @@ impl Session {
     /// At start of the program: add the demos the user's library has not been offered, and keep
     /// the ids of all those of the assets.
     pub fn add_new_demos(&mut self) {
-        let (Some(settings), Some(factory_path)) = (store::settings_path(), self.starter_library_path()) else {
+        let (Some(settings), Some(starter_path)) = (store::settings_path(), self.starter_library_path()) else {
             return;
         };
-        let factory = match read_library(&factory_path) {
-            Ok((factory, _)) => factory,
+        let starter = match read_library(&starter_path) {
+            Ok((starter, _)) => starter,
             Err(e) => {
                 self.status.push(format!("new demos not looked for: {e}"));
                 return;
@@ -74,13 +74,13 @@ impl Session {
         };
         // An unreadable file has been reported by `load_master`.
         let Ok(saved) = store::load_setting(&settings, DEMOS_KEY) else { return };
-        let all = KnownDemos::of(&factory);
+        let all = KnownDemos::of(&starter);
         if let Some(saved) = &saved {
             let mut issues = Vec::new();
             let known = known_from_json(saved, &mut issues);
             self.status.extend(issues);
             let mut library = self.editor.library().clone();
-            let added = demos::add_new_demos(&mut library, &factory, &known);
+            let added = new_demos::add_new_demos(&mut library, &starter, &known);
             if !added.is_empty() {
                 self.put_library(library, "Add the new demos");
                 let line = added_line(&added);
@@ -118,7 +118,7 @@ mod tests {
 
     #[test]
     fn the_line_names_the_first_demos_and_counts_the_rest() {
-        let added = demos::AddedDemos {
+        let added = new_demos::AddedDemos {
             pattern_names: (1..=5).map(|i| format!("P{i}")).collect(),
             song_names: vec!["S".into()],
         };
