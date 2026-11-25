@@ -2,7 +2,8 @@
 //! leniency: chunks are walked by their declared lengths, reads past the end
 //! of the file give `None`, sysex events are skipped by their length, and only
 //! meta, program and note events are known (any other status is read as a
-//! two-byte event).
+//! two-byte event). What the leniency reads past or leaves out is counted
+//! (`Faults`).
 
 /// Bytes read past the end of a track the file does not hold: beyond this,
 /// a declared length is taken as garbage.
@@ -35,17 +36,29 @@ pub struct Event {
     pub kind: EventKind,
 }
 
+/// The events a lenient reading did not read whole, over all tracks.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Faults {
+    /// Events with a byte past the end of the file (read as 0, or as
+    /// missing), the events of a track declared longer than the file included.
+    pub truncated_count: usize,
+    /// Data bytes with no running status to read them by, skipped as
+    /// two-byte events.
+    pub ignored_count: usize,
+}
+
 /// A parsed file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Midi {
     pub header: Header,
     pub tracks: Vec<Vec<Event>>,
-    /// Each track's first name event (`FF 03`), as Latin-1, or empty.
-    pub track_names: Vec<String>,
+    /// Each track's first name event (`FF 03`), as UTF-8 or Latin-1, if it has one.
+    pub track_names: Vec<Option<String>>,
+    pub faults: Faults,
 }
 
 /// A note-on with a velocity and, when the file pairs it with a note-off,
-/// how long it lasts in ticks (0: no note-off found).
+/// how long it lasts in ticks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NoteOn {
     pub tick: i64,
@@ -53,8 +66,8 @@ pub struct NoteOn {
     pub note: u8,
     pub velocity: u8,
     pub track: usize,
-    /// Ticks from the note-on to the matching note-off, 0 without one.
-    pub duration: i64,
+    /// Ticks from the note-on to the matching note-off, `None` without one.
+    pub duration: Option<i64>,
 }
 
 fn byte(bytes: &[u8], at: usize) -> Option<u8> {
@@ -94,60 +107,83 @@ fn read_u16(bytes: &[u8], at: usize) -> u16 {
     (u16::from(byte(bytes, at).unwrap_or(0)) << 8) | u16::from(byte(bytes, at + 1).unwrap_or(0))
 }
 
-/// The events of a track chunk's `length` bytes.
-fn parse_track(bytes: &[u8], start: usize, length: usize) -> Vec<Event> {
+/// The events of a track chunk's `length` bytes, with what they leave
+/// unread added to `faults`.
+fn parse_track(bytes: &[u8], start: usize, length: usize, faults: &mut Faults) -> Vec<Event> {
     let end = (start + length).min(bytes.len().max(start) + MAX_PHANTOM_BYTES);
     let mut events = Vec::new();
-    let (mut pos, mut tick, mut running) = (start, 0i64, 0u8);
+    let (mut pos, mut tick, mut running) = (start, 0i64, None);
     while pos < end {
         let (delta, read) = decode_vlq(bytes, pos);
         pos += read;
         tick += i64::from(delta);
-        let mut status = byte(bytes, pos);
-        if status.is_some_and(|b| b & 0x80 != 0) {
-            running = status.unwrap_or(0);
-            pos += 1;
-        } else {
-            status = Some(running);
-        }
-        let status = status.unwrap_or(0);
-        if status == 0xff {
-            let meta_type = byte(bytes, pos);
-            let (len, read) = decode_vlq(bytes, pos + 1);
-            let from = pos + 1 + read;
-            let to = from.saturating_add(len as usize);
-            let data = bytes.get(from.min(bytes.len())..to.min(bytes.len())).unwrap_or_default().to_vec();
-            events.push(Event { tick, kind: EventKind::Meta { meta_type, data } });
-            pos = to;
-            running = 0;
-        } else if status == 0xf0 || status == 0xf7 {
-            // A sysex: `F0 length data` (or `F7 length data`, a continued or
-            // escaped packet), skipped by its length. Like a meta event, it
-            // cancels running status.
-            let (len, read) = decode_vlq(bytes, pos);
-            pos = (pos + read).saturating_add(len as usize);
-            running = 0;
-        } else {
-            let (hi, channel) = (status & 0xf0, status & 0x0f);
-            if hi == 0xc0 || hi == 0xd0 {
-                let program = byte(bytes, pos);
-                events.push(Event { tick, kind: EventKind::Program { status: hi, channel, program } });
+        let status = match byte(bytes, pos) {
+            Some(b) if b & 0x80 != 0 => {
                 pos += 1;
-            } else {
-                let note = byte(bytes, pos);
-                let velocity = byte(bytes, pos + 1).unwrap_or(0);
-                events.push(Event { tick, kind: EventKind::Note { status: hi, channel, note, velocity } });
-                pos += 2;
+                running = Some(b);
+                b
             }
+            _ => match running {
+                Some(status) => status,
+                None => {
+                    // A data byte with no status to read it by.
+                    pos += 2;
+                    if pos > bytes.len() {
+                        faults.truncated_count += 1;
+                    } else {
+                        faults.ignored_count += 1;
+                    }
+                    continue;
+                }
+            },
+        };
+        let (kind, next) = event_body(bytes, pos, status);
+        if matches!(kind, Some(EventKind::Meta { .. }) | None) {
+            // Meta and sysex events cancel running status.
+            running = None;
+        }
+        events.extend(kind.map(|kind| Event { tick, kind }));
+        pos = next;
+        if pos > bytes.len() {
+            faults.truncated_count += 1;
         }
     }
     events
+}
+
+/// The event of `status` whose data starts at `pos`, `None` for a sysex
+/// (skipped by its length), and the position past it.
+fn event_body(bytes: &[u8], pos: usize, status: u8) -> (Option<EventKind>, usize) {
+    if status == 0xff {
+        let meta_type = byte(bytes, pos);
+        let (len, read) = decode_vlq(bytes, pos + 1);
+        let from = pos + 1 + read;
+        let to = from.saturating_add(len as usize);
+        let data = bytes.get(from.min(bytes.len())..to.min(bytes.len())).unwrap_or_default().to_vec();
+        return (Some(EventKind::Meta { meta_type, data }), to);
+    }
+    if status == 0xf0 || status == 0xf7 {
+        // A sysex: `F0 length data` (or `F7 length data`, a continued or
+        // escaped packet).
+        let (len, read) = decode_vlq(bytes, pos);
+        return (None, (pos + read).saturating_add(len as usize));
+    }
+    let (hi, channel) = (status & 0xf0, status & 0x0f);
+    if hi == 0xc0 || hi == 0xd0 {
+        let program = byte(bytes, pos);
+        return (Some(EventKind::Program { status: hi, channel, program }), pos + 1);
+    }
+    let note = byte(bytes, pos);
+    // A missing velocity reads as 0; the event is counted as truncated.
+    let velocity = byte(bytes, pos + 1).unwrap_or(0);
+    (Some(EventKind::Note { status: hi, channel, note, velocity }), pos + 2)
 }
 
 /// The header and the tracks, chunk by chunk.
 pub fn parse(bytes: &[u8]) -> Midi {
     let mut header = Header { format: 0, track_count: 0, division: 96 };
     let mut tracks = Vec::new();
+    let mut faults = Faults::default();
     let mut i = 0usize;
     while i + 8 <= bytes.len() {
         let tag = &bytes[i..i + 4];
@@ -159,23 +195,20 @@ pub fn parse(bytes: &[u8]) -> Midi {
                 division: read_u16(bytes, i + 12),
             };
         } else if tag == b"MTrk" {
-            tracks.push(parse_track(bytes, i + 8, length));
+            tracks.push(parse_track(bytes, i + 8, length, &mut faults));
         }
         i = i.saturating_add(8).saturating_add(length);
     }
     let track_names = tracks
         .iter()
         .map(|events: &Vec<Event>| {
-            events
-                .iter()
-                .find_map(|e| match &e.kind {
-                    EventKind::Meta { meta_type: Some(0x03), data } => Some(text(data)),
-                    _ => None,
-                })
-                .unwrap_or_default()
+            events.iter().find_map(|e| match &e.kind {
+                EventKind::Meta { meta_type: Some(0x03), data } => Some(text(data)),
+                _ => None,
+            })
         })
         .collect();
-    Midi { header, tracks, track_names }
+    Midi { header, tracks, track_names, faults }
 }
 
 /// A text event: UTF-8, as this app writes it, else Latin-1, as older files
@@ -208,11 +241,11 @@ impl Midi {
                 let slot = usize::from(channel) * 128 + usize::from(note & 0x7f);
                 let is_off = status == 0x80 || (status == 0x90 && velocity == 0);
                 if status == 0x90 && velocity > 0 {
-                    notes.push(NoteOn { tick: event.tick, channel, note, velocity, track, duration: 0 });
+                    notes.push(NoteOn { tick: event.tick, channel, note, velocity, track, duration: None });
                     open[slot].push((notes.len() - 1, event.tick));
                 } else if is_off && let Some(&(index, on_tick)) = open[slot].first() {
                     open[slot].remove(0);
-                    notes[index].duration = (event.tick - on_tick).max(0);
+                    notes[index].duration = Some((event.tick - on_tick).max(0));
                 }
             }
         }
@@ -287,5 +320,33 @@ mod tests {
     fn the_programs_of_a_format_0_file_are_read() {
         let events = [0x00, 0xc1, 33, 0x00, 0x91, 40, 100, 0x00, 0xff, 0x2f, 0x00];
         assert_eq!(parse(&file(0, &events)).program_changes(), [(1, Some(33))]);
+    }
+
+    #[test]
+    fn a_data_byte_with_no_running_status_is_ignored_and_counted() {
+        // 24 64 before any status, then a kick.
+        let midi = parse(&file(0, &[0x00, 36, 100, 0x00, 0x99, 36, 100, 0x00, 0xff, 0x2f, 0x00]));
+        assert_eq!(midi.tracks[0].len(), 2, "{:?}", midi.tracks[0]);
+        assert_eq!(midi.faults, Faults { truncated_count: 0, ignored_count: 1 });
+        // A meta event cancels running status: 26 64 after it is ignored too.
+        let midi = parse(&file(0, &[0x00, 0x99, 36, 100, 0x00, 0xff, 0x01, 0x00, 0x00, 38, 100]));
+        assert_eq!(midi.faults.ignored_count, 1);
+    }
+
+    #[test]
+    fn an_event_cut_by_the_end_of_the_file_is_counted() {
+        // A kick, then a note-on missing its velocity.
+        let midi = parse(&file(0, &[0x00, 0x99, 36, 100, 0x00, 0x99, 38]));
+        assert_eq!(midi.faults, Faults { truncated_count: 1, ignored_count: 0 });
+        let notes: Vec<_> = midi.note_ons().iter().map(|n| (n.note, n.duration)).collect();
+        assert_eq!(notes, [(36, None)]);
+    }
+
+    #[test]
+    fn a_sound_file_has_no_faults_and_its_unnamed_track_no_name() {
+        let midi = parse(&file(0, &[0x00, 0x99, 36, 100, 0x60, 0x89, 36, 0, 0x00, 0xff, 0x2f, 0x00]));
+        assert_eq!(midi.faults, Faults::default());
+        assert_eq!(midi.track_names, [None]);
+        assert_eq!(midi.note_ons()[0].duration, Some(96));
     }
 }

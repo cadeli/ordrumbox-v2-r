@@ -84,7 +84,9 @@ fn track_settings_are_set_clamped_and_undone() {
     // The muted track is left out of what plays (here, its MIDI file).
     let bytes =
         midi::export(&editor.library().patterns[p], editor.library().bpm, 1, &[], &mut Rng::new(1), &Scales::default());
-    assert_eq!(smf::parse(&bytes).track_names[1..], ["SNARE", "HIHAT", "BASS2"]);
+    let file = smf::parse(&bytes);
+    let names: Vec<Option<&str>> = file.track_names.iter().map(Option::as_deref).collect();
+    assert_eq!(names[1..], [Some("SNARE"), Some("HIHAT"), Some("BASS2")]);
     for _ in 0..4 {
         editor.undo().expect("an undo step");
     }

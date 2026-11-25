@@ -13,7 +13,9 @@
 //! channel left with no instrument at all is left out, and the message says
 //! so, as it says when notes fall past the 16th pattern. A note lasts until
 //! the note-off its file pairs it with (2 decimals of a step); a note with
-//! no note-off plays one step. The tempo meta event
+//! no note-off plays one step. A channel with no program change plays
+//! program 0, as General MIDI has it. The message counts the events the
+//! reading could not take whole (`smf::Faults`). The tempo meta event
 //! is never read (the library's tempo stays); every pattern is 32 beats long,
 //! up to 16 patterns. A file timed in SMPTE frames or with a 0 division is
 //! refused.
@@ -21,7 +23,7 @@
 use ordrumbox_core::instruments::{Catalog, Instrument, catalog};
 use ordrumbox_core::{Note, Pattern, Track};
 
-use super::smf::{self, NoteOn};
+use super::smf::{self, Faults, NoteOn};
 
 /// `C3_MIDI_NOTE`: the MIDI note of pitch 0.
 pub const C3_MIDI_NOTE: f64 = 48.0;
@@ -30,6 +32,8 @@ const PATTERN_BEATS: i32 = 32;
 const MAX_PATTERNS: i64 = 16;
 /// Grid of the imported tracks.
 const STEPS_PER_BEAT: i32 = 4;
+/// The program of a channel that sets none (General MIDI).
+const DEFAULT_PROGRAM: u8 = 0;
 
 /// What an import made.
 #[derive(Debug, Clone, PartialEq)]
@@ -123,7 +127,7 @@ pub fn import(file_name: &str, bytes: &[u8], roots: &[(String, f64)]) -> Result<
     let mut defs: Vec<TrackDef> = Vec::new();
     let mut skipped: Vec<u8> = Vec::new();
     for (channel, list, track_name) in &channels {
-        let program = programs.iter().find(|(ch, _)| ch == channel).and_then(|(_, p)| *p).unwrap_or(0);
+        let program = programs.iter().find(|(ch, _)| ch == channel).and_then(|(_, p)| *p).unwrap_or(DEFAULT_PROGRAM);
         if *channel != 9
             && let Some(instrument) = c.from_midi_program(i64::from(program)).filter(|i| !i.drum)
         {
@@ -135,7 +139,7 @@ pub fn import(file_name: &str, bytes: &[u8], roots: &[(String, f64)]) -> Result<
             defs.extend(drums);
             continue;
         }
-        if !track_name.is_empty()
+        if let Some(track_name) = track_name
             && let Some(instrument) = c.by_name(track_name).filter(|i| !i.drum)
         {
             let name = free_name(&instrument.id, |name| has_track(&defs, name));
@@ -162,19 +166,19 @@ pub fn import(file_name: &str, bytes: &[u8], roots: &[(String, f64)]) -> Result<
 
     let base_name = strip_midi_extension(file_name);
     let (patterns, cut) = patterns_from(&defs, base_name, f64::from(division));
-    let message = import_message(defs.len(), patterns.len(), cut, unplaced);
+    let message = import_message(defs.len(), patterns.len(), cut, unplaced, midi.faults);
     Ok(Imported { patterns, track_count: defs.len(), message })
 }
 
 /// `notes` by channel, in the order channels first play, each with its name:
-/// the name in `track_names` of the track its first note is in.
-fn channel_notes(notes: &[NoteOn], track_names: &[String]) -> Vec<(u8, Vec<NoteOn>, String)> {
-    let mut channels: Vec<(u8, Vec<NoteOn>, String)> = Vec::new();
+/// the name in `track_names` of the track its first note is in, if it has one.
+fn channel_notes(notes: &[NoteOn], track_names: &[Option<String>]) -> Vec<(u8, Vec<NoteOn>, Option<String>)> {
+    let mut channels: Vec<(u8, Vec<NoteOn>, Option<String>)> = Vec::new();
     for note in notes {
         match channels.iter_mut().find(|(ch, _, _)| *ch == note.channel) {
             Some((_, list, _)) => list.push(*note),
             None => {
-                let name = track_names.get(note.track).cloned().unwrap_or_default();
+                let name = track_names.get(note.track).cloned().flatten();
                 channels.push((note.channel, vec![*note], name));
             }
         }
@@ -182,10 +186,10 @@ fn channel_notes(notes: &[NoteOn], track_names: &[String]) -> Vec<(u8, Vec<NoteO
     channels
 }
 
-/// What an import says: how many tracks into how many patterns, and the
-/// notes left out (past the last pattern when `cut`, `unplaced` without an
-/// instrument).
-fn import_message(track_count: usize, pattern_count: usize, cut: bool, unplaced: usize) -> String {
+/// What an import says: how many tracks into how many patterns, the notes
+/// left out (past the last pattern when `cut`, `unplaced` without an
+/// instrument), and the events the file did not hold whole (`faults`).
+fn import_message(track_count: usize, pattern_count: usize, cut: bool, unplaced: usize, faults: Faults) -> String {
     let mut message = if pattern_count > 1 {
         format!("MIDI imported: {track_count} track(s) into {pattern_count} patterns")
     } else {
@@ -196,6 +200,12 @@ fn import_message(track_count: usize, pattern_count: usize, cut: bool, unplaced:
     }
     if unplaced > 0 {
         message.push_str(&format!(", {unplaced} note(s) left out: no instrument left for their channel"));
+    }
+    if faults.truncated_count > 0 {
+        message.push_str(&format!(", {} event(s) cut short by the end of the file", faults.truncated_count));
+    }
+    if faults.ignored_count > 0 {
+        message.push_str(&format!(", {} event(s) without a status ignored", faults.ignored_count));
     }
     message
 }
@@ -212,11 +222,12 @@ fn strip_midi_extension(name: &str) -> &str {
 }
 
 /// The steps a note held `ticks` lasts, at the file's `division`, as the
-/// file writes lengths (2 decimals); a note with no note-off plays one step.
-fn note_length(ticks: i64, division: f64) -> f64 {
-    if ticks <= 0 {
+/// file writes lengths (2 decimals); a note with no note-off, or ended on
+/// its own tick, plays one step.
+fn note_length(ticks: Option<i64>, division: f64) -> f64 {
+    let Some(ticks) = ticks.filter(|&t| t > 0) else {
         return 1.0;
-    }
+    };
     let steps = ticks as f64 * f64::from(STEPS_PER_BEAT) / division;
     ordrumbox_core::num::round2(steps.max(0.01))
 }
@@ -280,7 +291,7 @@ mod tests {
 
     fn def(ticks: &[i64]) -> TrackDef {
         let notes =
-            ticks.iter().map(|&tick| NoteOn { tick, channel: 9, note: 36, velocity: 100, track: 0, duration: 0 });
+            ticks.iter().map(|&tick| NoteOn { tick, channel: 9, note: 36, velocity: 100, track: 0, duration: None });
         TrackDef { name: "KICK".into(), notes: notes.collect(), base_note: 36.0 }
     }
 
@@ -343,8 +354,8 @@ mod tests {
             &[TrackDef {
                 name: "BASS".into(),
                 notes: vec![
-                    NoteOn { tick: 0, channel: 0, note: 36, velocity: 100, track: 0, duration: 144 },
-                    NoteOn { tick: 192, channel: 9, note: 36, velocity: 100, track: 0, duration: 0 },
+                    NoteOn { tick: 0, channel: 0, note: 36, velocity: 100, track: 0, duration: Some(144) },
+                    NoteOn { tick: 192, channel: 9, note: 36, velocity: 100, track: 0, duration: None },
                 ],
                 base_note: 36.0,
             }],
@@ -362,8 +373,8 @@ mod tests {
             &[TrackDef {
                 name: "BASS".into(),
                 notes: vec![
-                    NoteOn { tick: 0, channel: 0, note: 36, velocity: 100, track: 0, duration: 96 },
-                    NoteOn { tick: 48, channel: 0, note: 36, velocity: 100, track: 0, duration: 144 },
+                    NoteOn { tick: 0, channel: 0, note: 36, velocity: 100, track: 0, duration: Some(96) },
+                    NoteOn { tick: 48, channel: 0, note: 36, velocity: 100, track: 0, duration: Some(144) },
                 ],
                 base_note: 36.0,
             }],

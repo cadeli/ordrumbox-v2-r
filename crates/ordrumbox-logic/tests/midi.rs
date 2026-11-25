@@ -105,7 +105,8 @@ fn parsed(bytes: &[u8]) -> Value {
     header.insert("trackCount", num(midi.header.track_count));
     header.insert("division", num(midi.header.division));
     let tracks = midi.tracks.iter().map(|events| Value::Array(events.iter().map(event_out).collect())).collect();
-    let names = midi.track_names.iter().map(|n| Value::from(n.as_str())).collect();
+    // A track with no name is written "", as the snapshot has it.
+    let names = midi.track_names.iter().map(|n| Value::from(n.as_deref().unwrap_or(""))).collect();
     let notes = midi
         .note_ons()
         .iter()
@@ -447,12 +448,12 @@ fn track_names_are_written_in_utf8_and_read_in_utf8_or_latin1() {
     let (library, _) =
         Library::parse(r#"{"patterns":[{"tracks":[{"name":"Caisse claire é ☃","notes":[{}]}]}]}"#).unwrap();
     let bytes = midi::export(&library.patterns[0], library.bpm, 1, &[], &mut Rng::new(1), &Scales::default());
-    assert_eq!(smf::parse(&bytes).track_names[1], "Caisse claire é ☃");
+    assert_eq!(smf::parse(&bytes).track_names[1].as_deref(), Some("Caisse claire é ☃"));
     // An older file's Latin-1 name: 0xe9 alone is not UTF-8.
     let mut latin1 = b"MThd\0\0\0\x06\0\0\0\x01\0\x60MTrk\0\0\0\x0b\0\xff\x03\x03\x63\x61\xe9\0\xff\x2f\0".to_vec();
-    assert_eq!(smf::parse(&latin1).track_names, ["caé"]);
+    assert_eq!(smf::parse(&latin1).track_names, [Some("caé".to_owned())]);
     latin1[28] = b'f';
-    assert_eq!(smf::parse(&latin1).track_names, ["caf"]);
+    assert_eq!(smf::parse(&latin1).track_names, [Some("caf".to_owned())]);
 }
 
 /// The import message says so when notes past beat 512 are left out.

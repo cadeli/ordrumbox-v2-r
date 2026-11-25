@@ -219,6 +219,11 @@ non-number as 0), and is said at start. An MCP `createSynthPreset` from a preset
 that starts at −3; `tests/flat_notes.rs` (core) expects the issue of the `"x"` interval of `engine_cases.json`.
 No snapshot changed.
 
+A MIDI import says what the file did not hold whole: the message counts the events cut short by the end of the
+file and the data bytes with no running status, which are skipped (they used to be read as a note of status 0, which
+nothing played). `midi_rust.txt` rewrote one line, the message of `truncated.mid`; its events and patterns are
+unchanged.
+
 A double-click on a track's name in the grid opens the piano roll on that track (`press_track_name`,
 `session_grid.rs`); a single press still selects the track and may drag it. No snapshot changed.
 

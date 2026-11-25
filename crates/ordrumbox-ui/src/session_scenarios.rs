@@ -301,7 +301,8 @@ fn a_pattern_built_in_the_grid_is_saved_reloaded_and_exported() {
     let bytes = midi::export(&pattern, s.editor.library().bpm, 1, &[], &mut Rng::new(1), &Scales::default());
     let file = smf::parse(&bytes);
     assert_eq!((file.header.format, file.header.track_count, file.header.division), (1, 2, PPQN as u16));
-    assert_eq!(file.track_names, ["orDrumbox Pattern", "SNARE"]);
+    let names: Vec<Option<&str>> = file.track_names.iter().map(Option::as_deref).collect();
+    assert_eq!(names, [Some("orDrumbox Pattern"), Some("SNARE")]);
     let meta = |kind: u8| {
         file.tracks[0].iter().find_map(|e| match &e.kind {
             smf::EventKind::Meta { meta_type: Some(t), data } if *t == kind => Some(data.clone()),
