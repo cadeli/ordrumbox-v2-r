@@ -43,6 +43,12 @@ warnings are measures with known exceptions, and fail it with `--strict`.
 `--all` lists every finding. A file exempt from a rule says why in a line
 `// audit: allow(<rule>): <why>`, the rule named as the report names it.
 
+What the audit cannot judge (a file holding two ideas, one concept under two
+names, a function given all of `Session` for two fields) is the job of a
+structure review: in Claude Code, `/structure-review`
+(`.claude/skills/structure-review/SKILL.md`) writes it up as
+`docs/revue-<year>-<month>.md`, then fixes it lot by lot on request.
+
 The app reads its `assets/` folder (`data/*.json` and `kits/**.wav`) and looks
 for it in `$ORDRUMBOX_ASSETS`, next to the program, in the working folder, then
 in this repository's `assets/`. `$ORDRUMBOX_LIBRARY` names a library file to use
