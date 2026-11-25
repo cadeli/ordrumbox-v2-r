@@ -4,6 +4,7 @@
 
 use ordrumbox_core::instruments::catalog;
 use ordrumbox_core::style::Macros;
+use ordrumbox_engine::SynthPresets;
 use ordrumbox_engine::TrackSound;
 use ordrumbox_engine::assign::{assign_track, substitute_for};
 use ordrumbox_engine::kit::edit::find_path;
@@ -176,37 +177,6 @@ impl Session {
         Choice { selected: editors::index_of(&values, current_url), values, labels }
     }
 
-    /// The synth presets, the track's the one shown (the first when it has
-    /// none; whether it plays it is the cartridge's LED).
-    pub(super) fn synth_choice(&self, track: &Track) -> Choice {
-        let mut values: Vec<String> = self.synths.presets.keys().into_iter().map(str::to_owned).collect();
-        let current = match &track.synth_preset {
-            Some(preset) => Some(preset.clone()),
-            None if track.use_synth => Some(ordrumbox_logic::generate::BASS_PRESET.to_owned()),
-            None => None,
-        };
-        let Some(current) = current else { return Choice { selected: 0, values, labels: Vec::new() } };
-        if !values.contains(&current) {
-            values.push(current.clone());
-        }
-        Choice { selected: editors::index_of(&values, &current), values, labels: Vec::new() }
-    }
-
-    /// The values of the track's LFOs while playing (the LFO step watch).
-    fn lfo_now(&self, track: &Track) -> Vec<(&'static str, f64)> {
-        let tick = self.playback.tick();
-        match tick {
-            Some(tick) => LFO_TARGETS
-                .iter()
-                .filter_map(|target| {
-                    let object = track.field(target.lfo_key)?;
-                    Some((target.key, ordrumbox_core::lfo::value(object.as_object()?, tick as f64)))
-                })
-                .collect(),
-            None => Vec::new(),
-        }
-    }
-
     pub(super) fn track_view(&self, t: usize) -> Option<TrackView<'_>> {
         let track = self.track(t)?;
         let url = self.track_sample_path(t);
@@ -256,9 +226,9 @@ impl Session {
         let samples =
             self.sample_choice(track, &current_id, &url.or_else(|| track.sample_path.clone()).unwrap_or_default());
 
-        let synths = self.synth_choice(track);
+        let synths = synth_choice(&self.synths.presets, track);
 
-        let mut lfo = self.lfo_now(track);
+        let mut lfo = lfo_now(track, self.playback.tick());
         self.show_lanes_on_knobs(t, &mut lfo);
         let bpm = self.playing_bpm();
         let compose = self.compose_view(track);
@@ -406,5 +376,36 @@ impl Session {
             decay: instrument.decay_ms.unwrap_or(0.0),
             shape: Shape::of(instrument, duration_ms),
         })
+    }
+}
+
+/// The synth presets, the track's the one shown (the first when it has
+/// none; whether it plays it is the cartridge's LED).
+pub(super) fn synth_choice(presets: &SynthPresets, track: &Track) -> Choice {
+    let mut values: Vec<String> = presets.keys().into_iter().map(str::to_owned).collect();
+    let current = match &track.synth_preset {
+        Some(preset) => Some(preset.clone()),
+        None if track.use_synth => Some(ordrumbox_logic::generate::BASS_PRESET.to_owned()),
+        None => None,
+    };
+    let Some(current) = current else { return Choice { selected: 0, values, labels: Vec::new() } };
+    if !values.contains(&current) {
+        values.push(current.clone());
+    }
+    Choice { selected: editors::index_of(&values, &current), values, labels: Vec::new() }
+}
+
+/// The values of the track's LFOs at `tick`, the playback's (the LFO step
+/// watch); none while stopped.
+fn lfo_now(track: &Track, tick: Option<u64>) -> Vec<(&'static str, f64)> {
+    match tick {
+        Some(tick) => LFO_TARGETS
+            .iter()
+            .filter_map(|target| {
+                let object = track.field(target.lfo_key)?;
+                Some((target.key, ordrumbox_core::lfo::value(object.as_object()?, tick as f64)))
+            })
+            .collect(),
+        None => Vec::new(),
     }
 }

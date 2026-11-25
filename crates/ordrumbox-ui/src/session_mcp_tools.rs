@@ -9,7 +9,7 @@ use ordrumbox_logic::tools::{count, find_song, find_track, object, optional_whol
 
 use super::Session;
 use super::session_files::WavSource;
-use super::session_mcp::{NO_AUDIO, exported, synth_settings};
+use super::session_mcp::{NO_AUDIO, exported, mcp_analyze, synth_settings};
 use crate::picker::Export;
 use crate::{master, returns, store};
 use ordrumbox_core::steps::MAX_LOOP_COUNT;
@@ -155,7 +155,7 @@ impl Session {
                 self.use_kit(index);
                 Ok(object([("kit", Value::from(self.kits.kits()[index].name.as_str()))]))
             }
-            "analyzeSamples" => self.mcp_analyze(args),
+            "analyzeSamples" => mcp_analyze(&self.kits, args),
             "normalizeKit" => {
                 let k = self.mcp_kit(args)?;
                 let n = self.kits.normalize(k)?;

@@ -16,6 +16,7 @@ use ordrumbox_logic::tools::{
 use super::Session;
 use super::session_types::PlayMode;
 use crate::editors::note_range;
+use crate::kits::KitSet;
 use crate::picker::Export;
 use crate::{master, output};
 use crate::{mcp_link, store, update};
@@ -270,33 +271,6 @@ impl Session {
         object([("kit", current), ("kits", Value::Array(kits.collect()))])
     }
 
-    pub(super) fn mcp_analyze(&self, args: &Value) -> Result<Value, String> {
-        let mut results = Vec::new();
-        for item in list(args, "samples")? {
-            let path = item.as_str().ok_or_else(|| format!("samples: {item} is not a string"))?;
-            let result = match self.kits.buffer(path) {
-                Some(buffer) => {
-                    let a = analysis::analyze(buffer);
-                    object([
-                        ("samplePath", Value::from(path)),
-                        ("durationSec", Value::from(a.duration_sec)),
-                        ("peakDb", Value::from(a.peak_db)),
-                        ("rmsDb", Value::from(a.rms_db)),
-                        ("fundamentalHz", a.fundamental_hz.map_or(Value::Null, Value::from)),
-                        ("pitchConfidence", Value::from(a.pitch_confidence)),
-                        ("note", a.note.map_or(Value::Null, |n| Value::from(n.to_string()))),
-                    ])
-                }
-                None => object([
-                    ("samplePath", Value::from(path)),
-                    ("error", Value::from("no sample of the kits has this path (listKitSamples gives them)")),
-                ]),
-            };
-            results.push(result);
-        }
-        Ok(object([("results", Value::Array(results))]))
-    }
-
     pub(super) fn mcp_remove_song(&mut self, args: &Value) -> Result<Value, String> {
         let s = find_song(&self.editor, args)?;
         if self.playback.plays(Mode::Song(s)) {
@@ -516,6 +490,34 @@ pub(super) fn synth_settings(args: &Value, required: bool) -> Result<Vec<(String
 /// The answer of a tool that wrote a file.
 pub(super) fn exported(path: &Path, message: String) -> Result<Value, String> {
     Ok(object([("filePath", Value::from(path.display().to_string())), ("message", Value::from(message))]))
+}
+
+/// analyzeSamples: the measures of each sample of `args`, found in `kits`.
+pub(super) fn mcp_analyze(kits: &KitSet, args: &Value) -> Result<Value, String> {
+    let mut results = Vec::new();
+    for item in list(args, "samples")? {
+        let path = item.as_str().ok_or_else(|| format!("samples: {item} is not a string"))?;
+        let result = match kits.buffer(path) {
+            Some(buffer) => {
+                let a = analysis::analyze(buffer);
+                object([
+                    ("samplePath", Value::from(path)),
+                    ("durationSec", Value::from(a.duration_sec)),
+                    ("peakDb", Value::from(a.peak_db)),
+                    ("rmsDb", Value::from(a.rms_db)),
+                    ("fundamentalHz", a.fundamental_hz.map_or(Value::Null, Value::from)),
+                    ("pitchConfidence", Value::from(a.pitch_confidence)),
+                    ("note", a.note.map_or(Value::Null, |n| Value::from(n.to_string()))),
+                ])
+            }
+            None => object([
+                ("samplePath", Value::from(path)),
+                ("error", Value::from("no sample of the kits has this path (listKitSamples gives them)")),
+            ]),
+        };
+        results.push(result);
+    }
+    Ok(object([("results", Value::Array(results))]))
 }
 
 #[cfg(test)]

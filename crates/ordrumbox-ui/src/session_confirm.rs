@@ -4,6 +4,7 @@
 
 use super::Session;
 use super::session_overlay::Overlay;
+use crate::kits::KitSet;
 use std::path::PathBuf;
 
 /// What the message of a change outside the library's history ends with.
@@ -24,6 +25,39 @@ pub(super) enum Pending {
     RestoreUserData(PathBuf),
     /// The folder to use as the user data folder.
     UserFolder(PathBuf),
+}
+
+impl Pending {
+    /// The title, the lines and the action button of its notice, the names
+    /// read in `kits` (the other button, the default, keeps).
+    pub(super) fn confirm_text(&self, kits: &KitSet) -> (&'static str, Vec<String>, String) {
+        const NO_UNDO: &str = "This cannot be undone.";
+        let (title, what, verb) = match self {
+            Pending::RemoveSample { kit, sample } => {
+                let kit = kits.kits().get(*kit);
+                let name = kit.and_then(|k| k.samples.get(*sample)).map_or("", |s| s.display_name.as_str());
+                let what = format!("\"{name}\" from kit \"{}\". {NO_UNDO}", kit.map_or("", |k| k.name.as_str()));
+                ("Remove the sample?", what, "remove")
+            }
+            Pending::LoadProject(path) | Pending::ImportProject(path) | Pending::ImportLibrary(path) => {
+                let name = path.file_name().unwrap_or(path.as_os_str()).to_string_lossy();
+                ("Replace the library?", format!("{name} takes the place of every pattern and song."), "replace")
+            }
+            Pending::StarterLibrary => (
+                "Load the starter library?",
+                "The starter library takes the place of every pattern and song.".to_owned(),
+                "load",
+            ),
+            Pending::RestoreUserData(path) => {
+                let what = format!("{} takes the place of the user files; they go to backups/ first.", path.display());
+                ("Restore the backup?", what, "restore")
+            }
+            Pending::UserFolder(path) => ("Change the user data folder?", Session::user_folder_text(path), "change"),
+        };
+        // The default is to keep: ← → moves the buttons, ENTER runs the chosen.
+        let action = format!("{} it", verb[..1].to_uppercase() + &verb[1..]);
+        (title, vec![what, String::new(), "← →: choose   ENTER: the chosen".into()], action)
+    }
 }
 
 impl Session {
@@ -104,37 +138,6 @@ impl Session {
             let key = format!("{}+Z", crate::menu::command_label());
             self.message = format!("{} ({key}: undo)", self.message);
         }
-    }
-
-    /// The title, the lines and the action button of the notice of `pending`
-    /// (the other button, the default, keeps).
-    pub(super) fn confirm_text(&self, pending: &Pending) -> (&'static str, Vec<String>, String) {
-        const NO_UNDO: &str = "This cannot be undone.";
-        let (title, what, verb) = match pending {
-            Pending::RemoveSample { kit, sample } => {
-                let kit = self.kits.kits().get(*kit);
-                let name = kit.and_then(|k| k.samples.get(*sample)).map_or("", |s| s.display_name.as_str());
-                let what = format!("\"{name}\" from kit \"{}\". {NO_UNDO}", kit.map_or("", |k| k.name.as_str()));
-                ("Remove the sample?", what, "remove")
-            }
-            Pending::LoadProject(path) | Pending::ImportProject(path) | Pending::ImportLibrary(path) => {
-                let name = path.file_name().unwrap_or(path.as_os_str()).to_string_lossy();
-                ("Replace the library?", format!("{name} takes the place of every pattern and song."), "replace")
-            }
-            Pending::StarterLibrary => (
-                "Load the starter library?",
-                "The starter library takes the place of every pattern and song.".to_owned(),
-                "load",
-            ),
-            Pending::RestoreUserData(path) => {
-                let what = format!("{} takes the place of the user files; they go to backups/ first.", path.display());
-                ("Restore the backup?", what, "restore")
-            }
-            Pending::UserFolder(path) => ("Change the user data folder?", Self::user_folder_text(path), "change"),
-        };
-        // The default is to keep: ← → moves the buttons, ENTER runs the chosen.
-        let action = format!("{} it", verb[..1].to_uppercase() + &verb[1..]);
-        (title, vec![what, String::new(), "← →: choose   ENTER: the chosen".into()], action)
     }
 }
 

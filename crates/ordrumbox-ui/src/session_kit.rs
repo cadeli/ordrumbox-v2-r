@@ -3,6 +3,7 @@
 
 use super::session_confirm::Pending;
 use super::{Session, session_grid};
+use crate::kits::KitSet;
 use crate::panel::{Dropdown, Id};
 use crate::scale::Scale;
 use crate::view::KitView;
@@ -83,7 +84,7 @@ impl Session {
         }
         self.kit_editor.files = match (self.kit_editor.sample, self.kit()) {
             (Some(sample), Some(kit)) => {
-                (self.kit_folder(kit), kit.samples.get(sample).and_then(|s| self.kits.file(&s.path)))
+                (kit_folder(&self.kits, kit), kit.samples.get(sample).and_then(|s| self.kits.file(&s.path)))
             }
             _ => (String::new(), None),
         };
@@ -325,31 +326,7 @@ impl Session {
     }
 }
 
-impl Session {
-    /// The folder kit `kit`'s samples are read from: the one most of them
-    /// are in, with how many other folders hold the rest; `-` without
-    /// samples. Without sample folders (tests), the folder of their paths.
-    fn kit_folder(&self, kit: &ordrumbox_engine::kit::Kit) -> String {
-        let mut folders: Vec<(String, usize)> = Vec::new();
-        for sample in &kit.samples {
-            let folder = match self.kits.file(&sample.path) {
-                Some(file) => file.parent().map_or_else(String::new, |p| p.display().to_string()),
-                None => sample.path.rsplit_once('/').map_or_else(String::new, |(dir, _)| dir.to_owned()),
-            };
-            match folders.iter_mut().find(|(f, _)| *f == folder) {
-                Some((_, count)) => *count += 1,
-                None => folders.push((folder, 1)),
-            }
-        }
-        // The first of the most used, in the kit's order.
-        let Some(most) = folders.iter().map(|(_, count)| *count).max() else { return "-".to_owned() };
-        let Some((main, _)) = folders.iter().find(|(_, count)| *count == most) else { return "-".to_owned() };
-        match folders.len() - 1 {
-            0 => main.clone(),
-            others => format!("{main} (and {others} other folder{})", if others == 1 { "" } else { "s" }),
-        }
-    }
-}
+impl Session {}
 
 /// The file name of sample path `path` (`real/kick.wav`: `kick.wav`).
 fn sample_file_name(path: &str) -> &str {
@@ -413,6 +390,30 @@ fn instrument_choice(key: Option<&str>) -> Choice {
         0
     });
     Choice { values, labels: Vec::new(), selected }
+}
+
+/// The folder kit `kit`'s samples are read from: the one most of them
+/// are in, with how many other folders hold the rest; `-` without
+/// samples. Without sample folders (tests), the folder of their paths.
+fn kit_folder(kits: &KitSet, kit: &ordrumbox_engine::kit::Kit) -> String {
+    let mut folders: Vec<(String, usize)> = Vec::new();
+    for sample in &kit.samples {
+        let folder = match kits.file(&sample.path) {
+            Some(file) => file.parent().map_or_else(String::new, |p| p.display().to_string()),
+            None => sample.path.rsplit_once('/').map_or_else(String::new, |(dir, _)| dir.to_owned()),
+        };
+        match folders.iter_mut().find(|(f, _)| *f == folder) {
+            Some((_, count)) => *count += 1,
+            None => folders.push((folder, 1)),
+        }
+    }
+    // The first of the most used, in the kit's order.
+    let Some(most) = folders.iter().map(|(_, count)| *count).max() else { return "-".to_owned() };
+    let Some((main, _)) = folders.iter().find(|(_, count)| *count == most) else { return "-".to_owned() };
+    match folders.len() - 1 {
+        0 => main.clone(),
+        others => format!("{main} (and {others} other folder{})", if others == 1 { "" } else { "s" }),
+    }
 }
 
 #[cfg(test)]

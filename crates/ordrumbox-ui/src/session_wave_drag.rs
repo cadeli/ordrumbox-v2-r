@@ -7,7 +7,7 @@
 use super::Session;
 use ordrumbox_engine::kit::edit::SampleField;
 
-use crate::kits::DECAY_RANGE;
+use crate::kits::{DECAY_RANGE, KitSet};
 use crate::panel::{Kind, Rect};
 use crate::sample_overlay::{Handle, Overlay, Shape};
 use crate::scale::Scale;
@@ -64,17 +64,10 @@ impl Session {
         Some(Wave { kit, sample, rect: item.rect })
     }
 
-    /// The playback settings of sample `sample` of kit `kit`, its length known.
-    fn wave_shape(&self, kit: usize, sample: usize) -> Option<Shape> {
-        let instrument = self.kits.sample(kit, sample)?;
-        let duration_ms = self.kits.buffer(&instrument.path)?.seconds() * 1000.0;
-        Some(Shape::of(instrument, duration_ms)).filter(|shape| shape.duration_ms > 0.0)
-    }
-
     /// The handle at `(x, y)`, and the waveform it is on.
     fn wave_handle_at(&self, size: (i32, i32, Scale), x: i32, y: i32) -> Option<(Wave, Handle)> {
         let wave = self.wave_at(size, x, y)?;
-        let overlay = Overlay::new(&self.wave_shape(wave.kit, wave.sample)?)?;
+        let overlay = Overlay::new(&wave_shape(&self.kits, wave.kit, wave.sample)?)?;
         let span = f64::from((wave.rect.w - 1).max(1));
         let reach = f64::from(HANDLE_REACH * size.2) / span;
         let handle = overlay.handle_at(f64::from(x - wave.rect.x) / span, reach)?;
@@ -97,7 +90,7 @@ impl Session {
     /// the nearest zero crossing; whether to redraw.
     pub(super) fn wave_drag_move(&mut self, x: i32) -> bool {
         let Some(WaveDrag { kit, sample, handle, wave }) = self.kit_editor.wave_drag else { return false };
-        let Some(shape) = self.wave_shape(kit, sample) else { return false };
+        let Some(shape) = wave_shape(&self.kits, kit, sample) else { return false };
         let fraction = f64::from(x - wave.x) / f64::from((wave.w - 1).max(1));
         let mut value = shape.dragged(handle, fraction);
         if handle != Handle::DecayEnd
@@ -122,6 +115,13 @@ impl Session {
     pub(super) fn release_wave_handle(&mut self) {
         self.kit_editor.wave_drag = None;
     }
+}
+
+/// The playback settings of sample `sample` of kit `kit`, its length known.
+fn wave_shape(kits: &KitSet, kit: usize, sample: usize) -> Option<Shape> {
+    let instrument = kits.sample(kit, sample)?;
+    let duration_ms = kits.buffer(&instrument.path)?.seconds() * 1000.0;
+    Some(Shape::of(instrument, duration_ms)).filter(|shape| shape.duration_ms > 0.0)
 }
 
 #[cfg(test)]

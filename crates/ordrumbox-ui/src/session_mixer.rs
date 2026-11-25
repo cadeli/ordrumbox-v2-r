@@ -16,8 +16,8 @@ use crate::scale::Scale;
 use crate::view::Hit;
 use crate::{frame, master, returns, theme};
 use ordrumbox_core::{AutomationTarget, num};
-use ordrumbox_engine::SCOPE_SIZE;
 use ordrumbox_engine::strip_settings::delay_beats_used;
+use ordrumbox_engine::{MasterSettings, SCOPE_SIZE};
 use std::cell::{Cell, RefCell};
 
 /// A send's knob, and a track's pan.
@@ -67,7 +67,7 @@ impl Session {
         let scale = size.2;
         self.track_strip_items(&mixer, scale, &mut layout.items);
         self.return_items(&mixer, scale, &mut layout.items);
-        self.master_items(&mixer, scale, &mut layout.items);
+        master_items(&self.output_panel.master(), &mixer, scale, &mut layout.items);
     }
 
     fn track_strip_items(&self, mixer: &MixerLayout, scale: Scale, items: &mut Vec<Item>) {
@@ -121,27 +121,6 @@ impl Session {
         let value = returns::SECTION.get(&self.output_panel.returns(), param.key);
         let kind = knob(param.spec, value, param.label, self.return_text(param, value));
         Item::new(Some(Id::Returns(param.key)), rect, kind)
-    }
-
-    fn master_items(&self, mixer: &MixerLayout, scale: Scale, items: &mut Vec<Item>) {
-        let strip = &mixer.master;
-        let settings = self.output_panel.master();
-        items.push(Item::text(strip.name.x, strip.name.y, "MASTER", theme::ACCENT, scale));
-        let item = |param: &Param, rect: Rect| {
-            let value = master::SECTION.get(&settings, param.key);
-            Item::new(
-                Some(Id::Master(param.key)),
-                rect,
-                knob(param.spec, value, param.label, param.format.value(value, param.unit)),
-            )
-        };
-        let knobs = [&output::PRE_GAIN].into_iter().chain(&output::COMPRESSOR).chain(&output::FILTERS);
-        items.extend(knobs.zip(strip.knobs).map(|(param, rect)| item(param, rect)));
-        items.push(item(&output::VOLUME, strip.fader));
-        // The compressor's on/off button (lit: on), named above it.
-        items.push(Item::text(strip.bypass.x, strip.bypass.y - 11 * scale, "Comp", panel::dim(), scale));
-        let kind = Kind::Toggle { on: settings.bypass < 0.5 };
-        items.push(Item::new(Some(Id::Master("compBypass")), strip.bypass, kind));
     }
 
     /// What a return's knob shows: its value, and for the echo's time the
@@ -298,6 +277,27 @@ impl Session {
 /// A tall knob of the mixer: its label and value under it.
 fn knob(spec: Spec, value: f64, label: &str, text: String) -> Kind {
     Kind::Value { spec, value, label: Some(label.into()), text, lfo: false }
+}
+
+/// The master strip's items, its knobs set as `settings`.
+fn master_items(settings: &MasterSettings, mixer: &MixerLayout, scale: Scale, items: &mut Vec<Item>) {
+    let strip = &mixer.master;
+    items.push(Item::text(strip.name.x, strip.name.y, "MASTER", theme::ACCENT, scale));
+    let item = |param: &Param, rect: Rect| {
+        let value = master::SECTION.get(settings, param.key);
+        Item::new(
+            Some(Id::Master(param.key)),
+            rect,
+            knob(param.spec, value, param.label, param.format.value(value, param.unit)),
+        )
+    };
+    let knobs = [&output::PRE_GAIN].into_iter().chain(&output::COMPRESSOR).chain(&output::FILTERS);
+    items.extend(knobs.zip(strip.knobs).map(|(param, rect)| item(param, rect)));
+    items.push(item(&output::VOLUME, strip.fader));
+    // The compressor's on/off button (lit: on), named above it.
+    items.push(Item::text(strip.bypass.x, strip.bypass.y - 11 * scale, "Comp", panel::dim(), scale));
+    let kind = Kind::Toggle { on: settings.bypass < 0.5 };
+    items.push(Item::new(Some(Id::Master("compBypass")), strip.bypass, kind));
 }
 
 #[cfg(test)]

@@ -4,6 +4,7 @@
 //! editor's entry of the tags, `BASS, dub` (the instrument first).
 
 use super::Session;
+use super::session_panel_views::synth_choice;
 use crate::panel::{Dropdown, Id, Rect, SUBMENU_MARK};
 use ordrumbox_engine::synth_preset::tags::Facet;
 
@@ -78,7 +79,7 @@ impl Session {
         match control {
             Id::SynthPreset => self.synth_editor.key().map(str::to_owned),
             _ => {
-                let choice = self.synth_choice(self.track(self.editor_track()?)?);
+                let choice = synth_choice(&self.synths.presets, self.track(self.editor_track()?)?);
                 choice.values.get(choice.selected).cloned()
             }
         }

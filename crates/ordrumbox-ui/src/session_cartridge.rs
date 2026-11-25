@@ -6,6 +6,7 @@
 
 use super::Session;
 use super::session_panel::{filter_on, number};
+use super::session_panel_views::synth_choice;
 use crate::editors::{self, EditorState, FxDef};
 use crate::panel::{Id, Step};
 use ordrumbox_core::Track;
@@ -42,7 +43,7 @@ impl Session {
             let name = self.track_name(t);
             return self.update_track(t, &[("useSynth", Value::Bool(false))], &format!("Synth off on {name}"), false);
         }
-        let choice = self.synth_choice(track);
+        let choice = synth_choice(&self.synths.presets, track);
         match choice.values.get(choice.selected).cloned() {
             Some(key) => self.assign_synth(t, &key),
             None => self.message = NO_SYNTH_PRESETS.into(),
@@ -65,7 +66,7 @@ impl Session {
     fn screen_choice(&self, t: usize, id: Id) -> Option<editors::Choice> {
         let track = self.track(t)?;
         match id {
-            Id::Synth => Some(self.synth_choice(track)),
+            Id::Synth => Some(synth_choice(&self.synths.presets, track)),
             Id::LfoType(i) => editors::lfo_target(i).map(|target| editors::lfo_wave_choice(track, target)),
             Id::TrackSelect(key) => Some(editors::select_choice(track, key, &self.editors)),
             Id::NoteSelect(key) => {

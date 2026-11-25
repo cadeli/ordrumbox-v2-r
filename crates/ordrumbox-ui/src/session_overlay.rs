@@ -389,7 +389,7 @@ impl Session {
                 })
             }
             Some(Overlay::Confirm { pending, yes }) => {
-                let (title, lines, action) = self.confirm_text(pending);
+                let (title, lines, action) = pending.confirm_text(&self.kits);
                 Some(NoticeChoice {
                     title: title.into(),
                     lines,
