@@ -6,6 +6,6 @@ rustflags = ["-C", "target-feature=+crt-static"]
 [target.aarch64-pc-windows-msvc]
 rustflags = ["-C", "target-feature=+crt-static"]
 
-# `cargo xtask bundle ordrumbox-plugin --release` (crates/xtask).
+# `cargo xtask audit` (crates/xtask).
 [alias]
 xtask = "run --package xtask --release --"

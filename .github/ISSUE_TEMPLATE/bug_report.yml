@@ -19,20 +19,13 @@ body:
   - type: dropdown
     id: form
     attributes:
-      label: How you run it
+      label: System
       options:
-        - ordrumbox.exe / app (Windows)
-        - app (macOS)
-        - app (Linux)
-        - CLAP plugin
-        - VST3 plugin
+        - Windows
+        - macOS
+        - Linux
     validations:
       required: true
-  - type: input
-    id: host
-    attributes:
-      label: Plugin host (DAW) and its version
-      description: Only for the plugin.
   - type: textarea
     id: extra
     attributes:
