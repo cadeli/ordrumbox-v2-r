@@ -6,6 +6,7 @@
 
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_core::num::clamp;
+use ordrumbox_core::{Issue, refusal};
 use ordrumbox_dsp::SynthPatch;
 use ordrumbox_dsp::lfo::Wave;
 use ordrumbox_dsp::slope::FilterMode;
@@ -109,6 +110,30 @@ impl SynthPresets {
         value.as_object().cloned().map(Self).ok_or_else(|| "not an object of presets".to_owned())
     }
 
+    /// What of the presets a patch cannot read, and plays as its default
+    /// instead: a preset that is not an object, a group of one that is not
+    /// an object, a value in a group that is not a number, text or yes/no,
+    /// a level that is not a number.
+    #[must_use]
+    pub fn issues(&self) -> Vec<Issue> {
+        let mut issues = Vec::new();
+        for (key, preset) in self.iter() {
+            let Some(preset) = preset.as_object() else {
+                issues.push(Issue::new(key, format!("not an object ({}), plays as the defaults", preset.to_json())));
+                continue;
+            };
+            for (name, value) in preset.iter() {
+                let at = format!("{key}.{name}");
+                if PRESET_GROUPS.contains(&name) {
+                    group_issues(value, &at, &mut issues);
+                } else if PRESET_NUMBERS.contains(&name) && value.to_number().is_none() {
+                    issues.push(Issue::new(at, refusal(value)));
+                }
+            }
+        }
+        issues
+    }
+
     pub fn get(&self, key: &str) -> Option<&Value> {
         self.0.get(key)
     }
@@ -154,6 +179,40 @@ impl SynthPresets {
     /// The presets as `generated_sounds.json` holds them.
     pub fn to_json(&self) -> Value {
         Value::Object(self.0.clone())
+    }
+}
+
+/// The keys of a preset that hold a group of settings (an object).
+const PRESET_GROUPS: [&str; 14] = [
+    "vco1",
+    "vco2",
+    "vco3",
+    "noise",
+    "filter",
+    "filterEnv",
+    "envelope",
+    "modEnvelope",
+    "pitchEnv",
+    "fm",
+    "unison",
+    "lfo",
+    "lfo2",
+    "matrix",
+];
+/// The keys of a preset that hold one number.
+const PRESET_NUMBERS: [&str; 3] = ["pitchPunch", "subGain", "masterVolume"];
+
+/// Report group `value` of a preset at `at` when it is not an object, or a
+/// value of it no setting reads (a list, an object, `null`).
+fn group_issues(value: &Value, at: &str, issues: &mut Vec<Issue>) {
+    let Some(group) = value.as_object() else {
+        issues.push(Issue::new(at, refusal(value)));
+        return;
+    };
+    for (name, value) in group.iter() {
+        if matches!(value, Value::Array(_) | Value::Object(_) | Value::Null) {
+            issues.push(Issue::new(format!("{at}.{name}"), refusal(value)));
+        }
     }
 }
 
@@ -443,6 +502,15 @@ mod tests {
         let plain = synth_patch(&json::parse(r#"{"vco2":{"sync":"nope"}}"#).unwrap(), note);
         assert_eq!(plain.pitch_env, PitchEnv { amount: 0.0, decay: PITCH_ENV_DECAY_DEFAULT });
         assert_eq!((plain.ring, plain.is_osc2_synced), (0.0, false));
+    }
+
+    #[test]
+    fn what_a_patch_cannot_read_is_said() {
+        let text = r#"{"ok":{"vco1":{"wave":"saw","gain":0.5},"subGain":"0.2"},"flat":3,
+            "odd":{"filter":[1],"noise":{"mix":null},"masterVolume":"loud","style":"x"}}"#;
+        let presets = SynthPresets::from_json(&json::parse(text).unwrap()).unwrap();
+        let at: Vec<String> = presets.issues().into_iter().map(|i| i.at).collect();
+        assert_eq!(at, ["flat", "odd.filter", "odd.noise.mix", "odd.masterVolume"]);
     }
 
     #[test]

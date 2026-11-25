@@ -37,9 +37,13 @@ fn main() {
     if !errors.is_empty() {
         eprintln!("{} sample(s) not loaded, first: {}", errors.len(), errors[0]);
     }
+    let (scales, scale_issues) = Scales::from_json(&read_json(&data.join("scales.json")));
+    for issue in &scale_issues {
+        eprintln!("scales.json: {}: {}", issue.at, issue.message);
+    }
     let setup = RenderSetup {
         bank: Arc::new(bank),
-        scales: Scales::from_json(&read_json(&data.join("scales.json"))),
+        scales,
         synths: SynthPresets::from_json(&read_json(&data.join("synth_presets.json"))).expect("synth_presets.json"),
         kit: kits.first().map(|k| k.name.clone()).unwrap_or_default(),
         sample_rate: EXPORT_RATE,

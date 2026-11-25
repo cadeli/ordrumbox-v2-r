@@ -216,7 +216,8 @@ impl Session {
         let draft = match optional_text(args, "from")?.filter(|f| !f.trim().is_empty()) {
             Some(from) => {
                 let from = self.mcp_synth(from)?;
-                self.synths.presets.get(&from).and_then(Value::as_object).cloned().unwrap_or_default()
+                let preset = self.synths.presets.get(&from).and_then(Value::as_object).cloned();
+                preset.ok_or_else(|| format!("Synth preset \"{from}\" is not an object: nothing to copy"))?
             }
             None => model::defaults(),
         };

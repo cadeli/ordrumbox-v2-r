@@ -111,6 +111,7 @@ fn edge_cases_repair_and_report() {
             "patterns[0].tracks[4].pan: not a number (\"left\"), pan taken from the track name",
             "patterns[0].tracks[4].mono: wrong type (\"yes\"), default kept",
             "patterns[0].tracks[4].notes[0]: more values than noteKeys, extra values ignored",
+            "songs[0].clips[1].startMeasure: out of range (-3), default kept",
             "songs[1].bpm: 10 outside 20–300, 120 used",
             "songs[2].bpm: 301 outside 20–300, 120 used",
             "songs[3]: \"clips\" must be an array, skipped",

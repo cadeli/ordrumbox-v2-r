@@ -88,10 +88,17 @@ fn library() -> Library {
     library
 }
 
+/// The shipped scales, every one read.
+fn scales() -> Scales {
+    let (scales, issues) = Scales::from_json(&data("scales.json"));
+    assert!(issues.is_empty(), "{issues:#?}");
+    scales
+}
+
 fn setup(bank: &Arc<SampleBank>, kit: &str) -> RenderSetup {
     RenderSetup {
         bank: bank.clone(),
-        scales: Scales::from_json(&data("scales.json")),
+        scales: scales(),
         synths: SynthPresets::from_json(&data("synth_presets.json")).unwrap(),
         kit: kit.to_owned(),
         sample_rate: EXPORT_RATE,
@@ -163,7 +170,7 @@ fn every_kit_sample_is_mono_16_or_24_bit_pcm_at_44_1_khz_and_needs_no_repair() {
 #[test]
 fn every_demo_pattern_plays_well_formed_notes() {
     let library = library();
-    let scales = Scales::from_json(&data("scales.json"));
+    let scales = scales();
     for pattern in &library.patterns {
         let ticks = u32::try_from(pattern.beat_count).unwrap() * ordrumbox_core::steps::TICK;
         let mut played = 0;

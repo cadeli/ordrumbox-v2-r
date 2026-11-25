@@ -66,6 +66,29 @@ pub fn sequence(arp: &Value, rng: &mut Rng) -> Option<Vec<f64>> {
     Some(steps)
 }
 
+/// What an arpeggio [`sequence`] leaves out of `arp`, for the load report:
+/// `intervals` that are not a list, or intervals that are not numbers.
+/// `None` when it reads `arp` whole (or `arp` is no arpeggio at all).
+#[must_use]
+pub fn problem(arp: &Value) -> Option<String> {
+    let unreadable = |items: &mut dyn Iterator<Item = Value>| {
+        let count = items.filter(|v| v.to_number().is_none_or(|n| !n.is_finite())).count();
+        (count > 0).then(|| format!("{count} interval(s) not a number, left out"))
+    };
+    match arp {
+        Value::Array(items) => unreadable(&mut items.iter().cloned()),
+        Value::String(text) if text.contains(|c: char| c.is_ascii_digit()) => {
+            unreadable(&mut text.split(',').map(Value::from))
+        }
+        Value::Object(object) => match object.get("intervals") {
+            None => None,
+            Some(Value::Array(items)) => unreadable(&mut items.iter().cloned()),
+            Some(other) => Some(format!("intervals: not a list ({}), no arpeggio", other.to_json())),
+        },
+        _ => None,
+    }
+}
+
 /// An `octaves` value as a count, 1–[`MAX_OCTAVES`].
 fn octave_count(octaves: f64) -> usize {
     octaves.round().clamp(1.0, MAX_OCTAVES as f64) as usize
@@ -108,6 +131,16 @@ mod tests {
         assert_eq!(seq(r#"{"intervals":[0,4,7,12],"direction":"updown"}"#), Some(vec![0.0, 4.0, 7.0, 12.0, 7.0, 4.0]));
         assert_eq!(seq(r#"{"intervals":["4","7","x"]}"#), Some(vec![0.0, 4.0, 7.0]));
         assert_eq!(seq(r#"{"intervals":[3],"direction":"UP"}"#), Some(vec![0.0, 3.0]));
+    }
+
+    #[test]
+    fn what_a_sequence_leaves_out_is_said() {
+        let problem = |text: &str| problem(&json::parse(text).unwrap());
+        assert_eq!(problem("[0, 4, 7]"), None);
+        assert_eq!(problem(r#""up""#), None);
+        assert_eq!(problem(r#"{"intervals":["4","7","x"]}"#).as_deref(), Some("1 interval(s) not a number, left out"));
+        assert_eq!(problem(r#""0,x,7""#).as_deref(), Some("1 interval(s) not a number, left out"));
+        assert_eq!(problem(r#"{"intervals":"0,4"}"#).as_deref(), Some(r#"intervals: not a list ("0,4"), no arpeggio"#));
     }
 
     #[test]

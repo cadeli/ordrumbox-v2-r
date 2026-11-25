@@ -287,6 +287,8 @@ impl Session {
 /// What the loaded assets say went wrong, a status line each.
 fn loading_status(assets: &assets::Assets) -> Vec<String> {
     let mut status: Vec<String> = assets.errors.iter().map(|e| format!("not loaded: {e}")).collect();
+    status.extend(assets.synth_issues.iter().map(|i| format!("synth_presets.json: {}: {}", i.at, i.message)));
+    status.extend(assets.scale_issues.iter().map(|i| format!("scales.json: {}: {}", i.at, i.message)));
     status.extend(assets.style_issues.iter().map(|i| format!("styles.json: {}: {}", i.at, i.message)));
     for (source, kit_issues) in &assets.kit_issues {
         if let Some(first) = kit_issues.first() {

@@ -27,8 +27,12 @@ pub struct Assets {
     pub scales: Scales,
     /// The scale names in file order (the note editor's arpeggio scales).
     pub scale_list: ScaleList,
+    /// Scales of `scales.json` that could not be read (not used).
+    pub scale_issues: Vec<Issue>,
     /// Synth presets (`synth_presets.json`).
     pub synths: SynthPresets,
+    /// Values of `synth_presets.json` a patch cannot read (their defaults played).
+    pub synth_issues: Vec<Issue>,
     /// The styles the drum generation follows (`styles.json`).
     pub styles: Styles,
     /// Values of `styles.json` that could not be read (their defaults used).
@@ -239,8 +243,9 @@ fn load_with(dir: &Path, user_kits: Option<PathBuf>, user_samples: Option<PathBu
     let scales_json = read_asset(&data, "scales.json", &mut errors, Ok);
     let synths =
         read_asset(&data, "synth_presets.json", &mut errors, |v| SynthPresets::from_json(&v)).unwrap_or_default();
-    let scales = scales_json.as_ref().map(Scales::from_json).unwrap_or_default();
-    let scale_list = scales_json.as_ref().map(ScaleList::from_json).unwrap_or_default();
+    let synth_issues = synths.issues();
+    let (scale_list, scale_issues) = scales_json.as_ref().map(ScaleList::from_json).unwrap_or_default();
+    let scales = Scales::from(&scale_list);
     let (styles, style_issues) =
         read_asset(&data, "styles.json", &mut errors, |v| Ok(Styles::from_json(&v))).unwrap_or_default();
     let (bank, sample_errors) = SampleBank::load(&kits, |url| sources.read(url));
@@ -252,6 +257,8 @@ fn load_with(dir: &Path, user_kits: Option<PathBuf>, user_samples: Option<PathBu
         scales,
         scale_list,
         synths,
+        synth_issues,
+        scale_issues,
         styles,
         style_issues,
         bank,
@@ -285,6 +292,8 @@ mod tests {
         assert_eq!(assets.report.issues, Vec::new());
         assert_eq!(assets.report.dropped_clips, Vec::new());
         assert_eq!(assets.style_issues, Vec::new());
+        assert_eq!(assets.scale_issues, Vec::new());
+        assert_eq!(assets.synth_issues, Vec::new());
         assert!(!assets.library.patterns.is_empty());
         assert!(assets.demos.iter().all(|style| !style.library().patterns.is_empty()));
         assert!(!assets.demos.is_empty() && !assets.kits.is_empty());

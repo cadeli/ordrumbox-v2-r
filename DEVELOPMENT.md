@@ -204,6 +204,21 @@ Each change of behaviour, with the snapshots it rewrote, or "No snapshot changed
 says what was true when it was written; when a later change undoes part of it, that part is taken out of it, so that
 no two entries contradict each other.
 
+Loading says more of what it cannot read (`Issue`s, `AGENTS.md` "Errors"); a value read from a sound file is
+unchanged, but for the scales. Newly reported, the default kept: a library's `info` or `patterns` of the wrong type;
+a project's `selectedPattern` or `selectedSong` that is not a whole number from 0 (a fraction used to be cut,
+a negative to become 0 unsaid); a song clip's `startMeasure` or `measureCount` that is not a number, a negative
+start or a count of 0 or less; a pattern `id` that is not text; arpeggio intervals that are not numbers, or an
+`intervals` that is not a list (`arp::problem`: the arpeggio plays as before); a kit with no `samples` list, and
+a sample's values of the wrong type (`kits.json` and mapping files: the message of Load and Import says the
+first); a synth preset, a group of one or a value of a group no patch can read (`SynthPresets::issues`, at
+start). `scales.json` has one reader, `ScaleList::from_json`, and `Scales` is built from its list: a scale whose
+`scaleSteps` is not a list of whole numbers is not used (the note editor's arpeggio scales used to read a
+non-number as 0), and is said at start. An MCP `createSynthPreset` from a preset that is not an object is refused
+(it used to start from nothing). `tests/library.rs` (core) expects one more line, the clip of `edge_library.json`
+that starts at −3; `tests/flat_notes.rs` (core) expects the issue of the `"x"` interval of `engine_cases.json`.
+No snapshot changed.
+
 A double-click on a track's name in the grid opens the piano roll on that track (`press_track_name`,
 `session_grid.rs`); a single press still selects the track and may drag it. No snapshot changed.
 

@@ -36,7 +36,7 @@ pub use library::{Library, LoadReport, ProjectRecord};
 pub use note::Note;
 pub use pattern::Pattern;
 pub use pattern_engine::{Hit, Hits, expand_hits};
-pub use record::{Issue, JsonField, SetField};
+pub use record::{Issue, JsonField, SetField, refusal};
 pub use retrigger_spacing::RetriggerSpacing;
 pub use rng::Rng;
 pub use scales::{ScaleList, Scales};

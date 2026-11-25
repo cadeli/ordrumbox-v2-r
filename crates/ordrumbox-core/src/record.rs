@@ -115,7 +115,7 @@ impl Issue {
 }
 
 /// Why a record did not take `value` for a field: a number it cannot hold, or another type.
-pub(crate) fn refusal(value: &Value) -> String {
+pub fn refusal(value: &Value) -> String {
     let what = if value.as_f64().is_some() { "out of range" } else { "wrong type" };
     format!("{what} ({}), default kept", value.to_json())
 }

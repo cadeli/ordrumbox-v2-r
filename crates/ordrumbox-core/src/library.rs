@@ -7,7 +7,7 @@ use std::collections::HashSet;
 use crate::ids::{slugify, unique_id};
 use crate::json::{self, Object, ParseError, Value};
 use crate::pattern::Pattern;
-use crate::record::Issue;
+use crate::record::{Issue, refusal};
 use crate::song::{DEFAULT_BPM, DroppedClip, Song, bpm_from_json, songs_from_json};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -91,14 +91,15 @@ impl Library {
     /// checked against those ids.
     pub fn from_json(value: &Value) -> (Self, LoadReport) {
         let mut report = LoadReport::default();
-        // `infos` in files from the web version and older saves.
-        let info = ["info", "infos"]
-            .into_iter()
-            .find_map(|key| value.get(key).and_then(Value::as_object))
-            .cloned()
-            .unwrap_or_default();
+        let info = info_from_json(value, &mut report.issues);
 
-        let raw_patterns = value.get("patterns").and_then(Value::as_array).unwrap_or_default();
+        let raw_patterns = match value.get("patterns") {
+            None => &[][..],
+            Some(raw) => raw.as_array().unwrap_or_else(|| {
+                report.issues.push(Issue::new("patterns", refusal(raw)));
+                &[]
+            }),
+        };
         // A file older than the session tempo has one per pattern: the first plays on.
         let bpm = match (value.get("bpm"), raw_patterns.first().and_then(|p| p.get("bpm"))) {
             (Some(raw), _) => bpm_from_json(raw, "bpm", &mut report.issues),
@@ -205,7 +206,7 @@ impl Library {
     /// replace those of `info`, the header kept otherwise.
     pub fn from_project_record(value: &Value, info: &Object) -> Option<ProjectRecord> {
         value.get("patterns").and_then(Value::as_array)?;
-        let (mut library, report) = Self::from_json(value);
+        let (mut library, mut report) = Self::from_json(value);
         let text = |key: &str| value.get(key).and_then(Value::to_text);
         let name = text("name");
         library.info = info.clone();
@@ -213,18 +214,37 @@ impl Library {
             library.info.insert(key, Value::from(v.unwrap_or_default().as_str()));
         }
         // `selectedPatternIdx`, `selectedSongIdx`: the web version's keys, older saves.
-        let index = |keys: [&str; 2]| {
-            let v = keys.iter().find_map(|key| value.get(key)).and_then(Value::to_number).unwrap_or(0.0);
-            if v > 0.0 { v as usize } else { 0 }
-        };
-        Some(ProjectRecord {
-            name,
-            library,
-            report,
-            selected_pattern: index(["selectedPattern", "selectedPatternIdx"]),
-            selected_song: index(["selectedSong", "selectedSongIdx"]),
-        })
+        let selected_pattern = selected_index(value, ["selectedPattern", "selectedPatternIdx"], &mut report.issues);
+        let selected_song = selected_index(value, ["selectedSong", "selectedSongIdx"], &mut report.issues);
+        Some(ProjectRecord { name, library, report, selected_pattern, selected_song })
     }
+}
+
+/// A library's header: `info`, or `infos` in files from the web version and
+/// older saves; empty (and said) when the one found is not an object.
+fn info_from_json(value: &Value, issues: &mut Vec<Issue>) -> Object {
+    let Some((key, raw)) = ["info", "infos"].into_iter().find_map(|key| value.get(key).map(|raw| (key, raw))) else {
+        return Object::new();
+    };
+    raw.as_object().cloned().unwrap_or_else(|| {
+        issues.push(Issue::new(key, refusal(raw)));
+        Object::new()
+    })
+}
+
+/// The pattern or song a project file selects, under the first of `keys` it
+/// has: a whole number from 0, else 0 (and said).
+fn selected_index(value: &Value, keys: [&str; 2], issues: &mut Vec<Issue>) -> usize {
+    let Some((key, raw)) = keys.into_iter().find_map(|key| value.get(key).map(|raw| (key, raw))) else { return 0 };
+    // Past `u32::MAX` is no list's index: refused like a fraction.
+    let index = raw.to_number().filter(|n| n.fract() == 0.0 && (0.0..=f64::from(u32::MAX)).contains(n));
+    index.map_or_else(
+        || {
+            issues.push(Issue::new(key, refusal(raw)));
+            0
+        },
+        |n| n as usize,
+    )
 }
 
 /// A project file read back ([`Library::from_project_record`]).
@@ -273,6 +293,30 @@ fn assign_pattern_ids(patterns: &mut [Pattern]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn issue_paths(report: &LoadReport) -> Vec<&str> {
+        report.issues.iter().map(|i| i.at.as_str()).collect()
+    }
+
+    #[test]
+    fn a_header_or_pattern_list_of_the_wrong_type_is_said() {
+        let (library, report) = Library::parse(r#"{"info":[1],"patterns":{"a":1}}"#).unwrap();
+        assert!(library.info.is_empty() && library.patterns.is_empty());
+        assert_eq!(issue_paths(&report), ["info", "patterns"]);
+        let (_, report) = Library::parse("{}").unwrap();
+        assert!(report.issues.is_empty());
+    }
+
+    #[test]
+    fn a_selection_that_is_no_index_is_said() {
+        let read = |text: &str| Library::from_project_record(&json::parse(text).unwrap(), &Object::new()).unwrap();
+        let record = read(r#"{"patterns":[],"selectedPattern":"2","selectedSongIdx":1}"#);
+        assert_eq!((record.selected_pattern, record.selected_song), (2, 1));
+        assert!(record.report.issues.is_empty());
+        let record = read(r#"{"patterns":[],"selectedPattern":1.5,"selectedSong":-1}"#);
+        assert_eq!((record.selected_pattern, record.selected_song), (0, 0));
+        assert_eq!(issue_paths(&record.report), ["selectedPattern", "selectedSong"]);
+    }
 
     #[test]
     fn assigns_missing_ids_from_names() {

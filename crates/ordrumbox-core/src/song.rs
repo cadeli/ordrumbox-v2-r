@@ -10,7 +10,7 @@ use crate::automation::{AutomationLane, AutomationTarget, STEPS_PER_MEASURE};
 use crate::ids::{slugify, unique_id};
 use crate::json::{Object, Value};
 use crate::num::floor_u32;
-use crate::record::Issue;
+use crate::record::{Issue, refusal};
 
 /// Beats in one 4/4 measure.
 pub const BEATS_PER_MEASURE: u32 = 4;
@@ -157,10 +157,10 @@ impl Song {
                 dropped.push(DroppedClip { pattern: reference.to_owned(), reason: "unknown pattern id" });
                 continue;
             }
-            let number = |key: &str| clip.get(key).and_then(Value::to_number).filter(|n| !n.is_nan());
+            let at = format!("{at}.clips[{index}]");
             // Without a start: the first measure; without a positive count: one measure.
-            let start = number("startMeasure").map_or(0.0, |n| n.floor().max(0.0));
-            let count = number("measureCount").filter(|&n| n > 0.0).unwrap_or(1.0);
+            let start = clip_number(clip, "startMeasure", &at, |n| n >= 0.0, issues).map_or(0.0, f64::floor);
+            let count = clip_number(clip, "measureCount", &at, |n| n > 0.0, issues).unwrap_or(1.0);
             if start + count.max(1.0) > MAX_LOADED_MEASURES {
                 dropped.push(DroppedClip { pattern: reference.to_owned(), reason: "clip past the longest song" });
                 continue;
@@ -355,6 +355,17 @@ pub fn songs_from_json(
         songs.push(song);
     }
     (songs, dropped)
+}
+
+/// The number `key` of a song clip, when it is one `valid` takes; `None`
+/// when the clip has none, and also (said at `at.key`) when it is not one.
+fn clip_number(clip: &Object, key: &str, at: &str, valid: fn(f64) -> bool, issues: &mut Vec<Issue>) -> Option<f64> {
+    let raw = clip.get(key).filter(|v| !v.is_null())?;
+    let number = raw.to_number().filter(|&n| valid(n));
+    if number.is_none() {
+        issues.push(Issue::new(format!("{at}.{key}"), refusal(raw)));
+    }
+    number
 }
 
 #[cfg(test)]

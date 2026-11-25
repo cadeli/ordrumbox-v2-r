@@ -7,6 +7,7 @@ use std::fs;
 use std::path::{Component, Path};
 use std::sync::Arc;
 
+use ordrumbox_core::Issue;
 use ordrumbox_engine::kit::edit::{put_kit, set_instruments_from_names};
 use ordrumbox_engine::kit::{Kit, KitSample};
 use ordrumbox_engine::wav;
@@ -25,6 +26,18 @@ fn plain_file_name(path: &str) -> Option<&str> {
     match (components.next(), components.next()) {
         (Some(Component::Normal(_)), None) => Some(path),
         _ => None,
+    }
+}
+
+/// What a message adds for the values of a kit file that could not be read
+/// (their defaults used): the first, and how many.
+fn unread_values(issues: &[Issue]) -> String {
+    match issues {
+        [] => String::new(),
+        [only] => format!(" (default used for {}: {})", only.at, only.message),
+        [first, rest @ ..] => {
+            format!(" (defaults used for {} values, first {}: {})", rest.len() + 1, first.at, first.message)
+        }
     }
 }
 
@@ -88,10 +101,10 @@ impl KitSet {
     pub fn load_mapping(&mut self, path: &Path) -> Result<(usize, String), String> {
         let text = fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
         let value = ordrumbox_core::json::parse(&text).map_err(|_| "Invalid drumkit JSON".to_owned())?;
-        let kit = Kit::from_mapping_json(&value).map_err(|_| "Invalid drumkit JSON".to_owned())?;
+        let (kit, issues) = Kit::from_mapping_json(&value).map_err(|_| "Invalid drumkit JSON".to_owned())?;
         let name = kit.name.clone();
         let index = put_kit(&mut self.kits, kit);
-        Ok((index, format!("Loaded drumkit \"{name}\"")))
+        Ok((index, format!("Loaded drumkit \"{name}\"{}", unread_values(&issues))))
     }
 
     /// A kit folder ([`Self::export_folder`]): the kit of its [`KIT_FILE`],
@@ -102,7 +115,7 @@ impl KitSet {
         let file = dir.join(KIT_FILE);
         let text = fs::read_to_string(&file).map_err(|e| format!("{}: {e}", file.display()))?;
         let value = ordrumbox_core::json::parse(&text).map_err(|e| format!("{}: {e}", file.display()))?;
-        let mut kit = Kit::from_mapping_json(&value).map_err(|e| format!("{}: {e}", file.display()))?;
+        let (mut kit, issues) = Kit::from_mapping_json(&value).map_err(|e| format!("{}: {e}", file.display()))?;
         let mut stored = HashSet::new();
         let mut left_out = Vec::new();
         let mut samples = Vec::new();
@@ -136,7 +149,7 @@ impl KitSet {
         let index = put_kit(&mut self.kits, kit);
         let left_out =
             if left_out.is_empty() { String::new() } else { format!(" (not read: {})", left_out.join(", ")) };
-        Ok((index, format!("Imported kit \"{name}\" with {count} sample(s){left_out}")))
+        Ok((index, format!("Imported kit \"{name}\" with {count} sample(s){left_out}{}", unread_values(&issues))))
     }
 
     /// The folder kit `kit` is exported to, with its samples.

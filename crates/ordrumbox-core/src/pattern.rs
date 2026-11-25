@@ -72,7 +72,10 @@ impl Pattern {
         for (key, value) in object.iter() {
             match key {
                 // A blank or non-string id is replaced by one made from the name.
-                "id" => pattern.id = value.as_str().map(str::trim).unwrap_or_default().to_owned(),
+                "id" => match value.as_str() {
+                    Some(id) => pattern.id = id.trim().to_owned(),
+                    None => wrong_type(key, value),
+                },
                 "name" => match value.as_str() {
                     Some(name) => pattern.name = Some(name.to_owned()),
                     None => wrong_type(key, value),

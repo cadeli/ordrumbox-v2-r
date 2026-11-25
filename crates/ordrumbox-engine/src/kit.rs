@@ -3,10 +3,10 @@
 
 use std::sync::Arc;
 
-use ordrumbox_core::Issue;
 use ordrumbox_core::instruments::NOT_FOUND;
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_core::num::db_to_gain;
+use ordrumbox_core::{Issue, refusal};
 use ordrumbox_dsp::{SampleBuffer, SampleShape};
 
 use crate::wav;
@@ -92,13 +92,12 @@ impl KitSample {
         db_to_gain(self.gain_db)
     }
 
-    fn from_json(value: &Value) -> Option<Self> {
+    /// The sample entry at `at`, `None` without a string `path`. A value of
+    /// the wrong type takes its default and goes to `issues`.
+    fn from_json(value: &Value, at: &str, issues: &mut Vec<Issue>) -> Option<Self> {
         let object = value.as_object()?;
-        let text =
-            |keys: &[&str]| keys.iter().find_map(|key| object.get(key).and_then(Value::as_str)).map(str::to_owned);
-        let number = |keys: &[&str]| keys.iter().find_map(|key| object.get(key).and_then(Value::as_f64));
-        let flag = |key: &str| object.get(key).and_then(Value::as_bool).unwrap_or(false);
-        let path = text(&["path", "url"])?;
+        let mut read = EntryReader { object, at, issues };
+        let path = object.get("path").or_else(|| object.get("url")).and_then(Value::as_str)?.to_owned();
         let mut extra = Object::new();
         for (key, value) in object.iter() {
             if !KNOWN_KEYS.contains(&key) {
@@ -106,23 +105,23 @@ impl KitSample {
             }
         }
         Some(Self {
-            key: text(&["key"]).filter(|key| !key.is_empty() && key != NOT_FOUND),
-            display_name: text(&["displayName", "display_name"]).unwrap_or_default(),
+            key: read.text(&["key"]).filter(|key| !key.is_empty() && key != NOT_FOUND),
+            display_name: read.text(&["displayName", "display_name"]).unwrap_or_default(),
             path,
-            decay_ms: number(&["decay"]),
-            start_ms: number(&["start"]).unwrap_or(0.0),
-            end_ms: number(&["end"]),
-            reverse: flag("reverse"),
-            looping: flag("loop"),
-            loop_start_ms: number(&["loopStart"]),
-            loop_end_ms: number(&["loopEnd"]),
-            attack_ms: number(&["attack"]),
-            hold_ms: number(&["hold"]).unwrap_or(0.0),
-            gated: flag("gate"),
-            root_midi: number(&["rootMidi"]),
-            peak_db: number(&["peakDb"]),
-            gain_db: number(&["gainDb"]).unwrap_or(0.0),
-            transpose: number(&["transpose", "tune"]).unwrap_or(0.0),
+            decay_ms: read.number(&["decay"]),
+            start_ms: read.number(&["start"]).unwrap_or(0.0),
+            end_ms: read.number(&["end"]),
+            reverse: read.flag("reverse"),
+            looping: read.flag("loop"),
+            loop_start_ms: read.number(&["loopStart"]),
+            loop_end_ms: read.number(&["loopEnd"]),
+            attack_ms: read.number(&["attack"]),
+            hold_ms: read.number(&["hold"]).unwrap_or(0.0),
+            gated: read.flag("gate"),
+            root_midi: read.number(&["rootMidi"]),
+            peak_db: read.number(&["peakDb"]),
+            gain_db: read.number(&["gainDb"]).unwrap_or(0.0),
+            transpose: read.number(&["transpose", "tune"]).unwrap_or(0.0),
             extra,
         })
     }
@@ -228,6 +227,40 @@ const KNOWN_KEYS: [&str; 20] = [
     "tune",
 ];
 
+/// Reads the values of one sample entry at `at`, reporting the ones of the
+/// wrong type to `issues`.
+struct EntryReader<'a> {
+    object: &'a Object,
+    at: &'a str,
+    issues: &'a mut Vec<Issue>,
+}
+
+impl EntryReader<'_> {
+    /// The value under the first of `keys` the entry has (`null` is none),
+    /// as `read` takes it; `None`, and an issue, when it does not.
+    fn value<T>(&mut self, keys: &[&str], read: impl Fn(&Value) -> Option<T>) -> Option<T> {
+        let (key, raw) = keys.iter().find_map(|key| self.object.get(key).filter(|v| !v.is_null()).map(|v| (key, v)))?;
+        let value = read(raw);
+        if value.is_none() {
+            self.issues.push(Issue::new(format!("{}.{key}", self.at), refusal(raw)));
+        }
+        value
+    }
+
+    fn text(&mut self, keys: &[&str]) -> Option<String> {
+        self.value(keys, |v| v.as_str().map(str::to_owned))
+    }
+
+    fn number(&mut self, keys: &[&str]) -> Option<f64> {
+        self.value(keys, Value::as_f64)
+    }
+
+    /// A yes/no, `false` when the entry has none.
+    fn flag(&mut self, key: &str) -> bool {
+        self.value(&[key], Value::as_bool).unwrap_or(false)
+    }
+}
+
 /// A kit's samples: `instruments` in the web version's drumkits.json and older saves.
 fn sample_entries(value: &Value) -> Option<&[Value]> {
     ["samples", "instruments"].iter().find_map(|key| value.get(key).and_then(Value::as_array))
@@ -269,14 +302,18 @@ impl Kit {
         };
         let object = value.as_object()?;
         let name = name.to_owned();
-        let samples = sample_entries(value)
-            .unwrap_or_default()
+        let entries = sample_entries(value).unwrap_or_else(|| {
+            issues.push(Issue::new(format!("{at}.samples"), "no list of samples: an empty kit"));
+            &[]
+        });
+        let samples = entries
             .iter()
             .enumerate()
             .filter_map(|(index, entry)| {
-                let sample = KitSample::from_json(entry);
+                let sample_at = format!("{at}.samples[{index}]");
+                let sample = KitSample::from_json(entry, &sample_at, issues);
                 if sample.is_none() {
-                    issues.push(Issue::new(format!("{at}.samples[{index}]"), "sample without a path: skipped"));
+                    issues.push(Issue::new(sample_at, "sample without a path: skipped"));
                 }
                 sample
             })
@@ -325,16 +362,19 @@ impl Kit {
 
     /// A kit from a mapping file: a name and at least one
     /// entry with a string `path` and `key`; the display name defaults to the path.
-    pub fn from_mapping_json(value: &Value) -> Result<Self, String> {
+    /// Values of the wrong type take their default and go to the issues.
+    pub fn from_mapping_json(value: &Value) -> Result<(Self, Vec<Issue>), String> {
         let name = value.get("name").and_then(Value::as_str);
         let (Some(name), Some(entries)) = (name, sample_entries(value)) else {
             return Err("Missing kit name or samples".into());
         };
+        let mut issues = Vec::new();
         let samples: Vec<KitSample> = entries
             .iter()
-            .filter(|e| e.get("key").and_then(Value::as_str).is_some())
-            .filter_map(|e| {
-                let mut sample = KitSample::from_json(e)?;
+            .enumerate()
+            .filter(|(_, e)| e.get("key").and_then(Value::as_str).is_some())
+            .filter_map(|(index, e)| {
+                let mut sample = KitSample::from_json(e, &format!("samples[{index}]"), &mut issues)?;
                 if ["displayName", "display_name"].iter().all(|key| e.get(key).is_none_or(Value::is_null)) {
                     sample.display_name.clone_from(&sample.path);
                 }
@@ -345,7 +385,7 @@ impl Kit {
         if samples.is_empty() {
             return Err("No valid samples".into());
         }
-        Ok(Self { name: name.to_owned(), samples, ..Self::default() })
+        Ok((Self { name: name.to_owned(), samples, ..Self::default() }, issues))
     }
 }
 
@@ -440,6 +480,16 @@ mod tests {
     use ordrumbox_core::json;
 
     #[test]
+    fn a_sample_value_of_the_wrong_type_takes_its_default_and_is_said() {
+        let text = r#"[{"name":"k","samples":[{"path":"a.wav","decay":"abc","loop":"yes","gainDb":2}]},{"name":"e"}]"#;
+        let (kits, issues) = kits_from_json(&json::parse(text).unwrap()).unwrap();
+        let sample = &kits[0].samples[0];
+        assert_eq!((sample.decay_ms, sample.looping, sample.gain_db), (None, false, 2.0));
+        let at: Vec<&str> = issues.iter().map(|i| i.at.as_str()).collect();
+        assert_eq!(at, ["[0].samples[0].decay", "[0].samples[0].loop", "[1].samples"]);
+    }
+
+    #[test]
     fn what_is_skipped_is_told() {
         let value = json::parse(r#"[{"name":"a","samples":[{"key":"k"},{"path":"a.wav"}]},{"samples":[]}]"#).unwrap();
         let (kits, issues) = kits_from_json(&value).unwrap();
@@ -515,7 +565,7 @@ mod tests {
             kits[0].to_mapping_json().to_json(),
             r#"{"name":"real","samples":[{"path":"real/kick.wav","displayName":"kick","key":"KICK","rootMidi":72,"peakDb":-3,"decay":5000,"gainDb":0,"transpose":0},{"path":"s.wav","displayName":"s","key":"SNARE","rootMidi":null,"peakDb":null,"decay":null,"gainDb":-2.5,"transpose":1}]}"#
         );
-        let restored = Kit::from_mapping_json(&kits[0].to_mapping_json()).unwrap();
+        let (restored, _) = Kit::from_mapping_json(&kits[0].to_mapping_json()).unwrap();
         assert_eq!(restored.samples[0].decay_ms, Some(5000.0));
         assert_eq!(restored.samples[1].gain_db, -2.5);
         let missing = json::parse(r#"{"name":"n","instruments":[{"url":"a.wav"}]}"#).unwrap();
@@ -523,7 +573,7 @@ mod tests {
         let unnamed = json::parse(r#"{"instruments":[{"url":"a.wav","key":"K"}]}"#).unwrap();
         assert_eq!(Kit::from_mapping_json(&unnamed), Err("Missing kit name or samples".into()));
         let defaults = json::parse(r#"{"name":"n","instruments":[{"url":"a.wav","key":"K"}]}"#).unwrap();
-        assert_eq!(Kit::from_mapping_json(&defaults).unwrap().samples[0].display_name, "a.wav");
+        assert_eq!(Kit::from_mapping_json(&defaults).unwrap().0.samples[0].display_name, "a.wav");
     }
 
     #[test]
@@ -543,7 +593,7 @@ mod tests {
             gated: true,
             ..plain
         };
-        let back = KitSample::from_json(&shaped.to_json()).unwrap();
+        let back = KitSample::from_json(&shaped.to_json(), "", &mut Vec::new()).unwrap();
         assert_eq!(back, shaped);
         let shape = back.shape();
         assert_eq!((shape.start, shape.end, shape.attack, shape.hold), (0.02, Some(0.3), 0.001, 0.05));

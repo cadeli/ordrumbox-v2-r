@@ -321,7 +321,7 @@ mod tests {
         assert_eq!(files, ["2-k.wav", "k.wav", KIT_FILE]);
         let mapping = ordrumbox_core::json::parse(&fs::read_to_string(out.join(KIT_FILE)).unwrap()).unwrap();
         let paths: Vec<String> =
-            Kit::from_mapping_json(&mapping).unwrap().samples.into_iter().map(|s| s.path).collect();
+            Kit::from_mapping_json(&mapping).unwrap().0.samples.into_iter().map(|s| s.path).collect();
         assert_eq!(paths, ["k.wav", "2-k.wav", "k.wav"]);
         assert_eq!(kits.export_folder(0, &out), Err(format!("{} already exists", out.display())));
 

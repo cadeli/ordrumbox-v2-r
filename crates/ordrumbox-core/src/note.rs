@@ -4,6 +4,7 @@
 //! header (`noteKeys: ["velocity", "beat"]`, `notes: [[0.4], [0.9, 1]]`);
 //! trailing values at their default are left out.
 
+use crate::arp;
 use crate::json::{Object, Value};
 use crate::num::round2;
 use crate::record::{Issue, SetField, check_duplicate, json_record, past_max, refusal};
@@ -239,7 +240,11 @@ pub(crate) fn decode_notes(notes: &[Value], note_keys: Option<&Value>, at: &str,
     for (i, item) in notes.iter().enumerate() {
         let note_at = format!("{at}.notes[{i}]");
         match (item, &header) {
-            (Value::Object(object), _) => decoded.push(Note::from_object(object, &note_at, issues)),
+            (Value::Object(object), _) => {
+                let mut note = Note::from_object(object, &note_at, issues);
+                finish_arp(&mut note, &note_at, issues);
+                decoded.push(note);
+            }
             (Value::Array(values), Some(Some(keys))) => {
                 if values.len() > keys.len() {
                     issues.push(Issue::new(&note_at, "more values than noteKeys, extra values ignored"));
@@ -248,6 +253,7 @@ pub(crate) fn decode_notes(notes: &[Value], note_keys: Option<&Value>, at: &str,
                 for (key, value) in keys.iter().zip(values) {
                     note.set_or_report(key, value, &note_at, issues);
                 }
+                finish_arp(&mut note, &note_at, issues);
                 decoded.push(note);
             }
             (Value::Array(_), Some(None)) => {} // header already reported
@@ -257,10 +263,16 @@ pub(crate) fn decode_notes(notes: &[Value], note_keys: Option<&Value>, at: &str,
             _ => issues.push(Issue::new(note_at, "note is neither an object nor an array, skipped")),
         }
     }
-    for note in &mut decoded {
-        upgrade_arp(&mut note.arp);
-    }
     decoded
+}
+
+/// Bring a decoded note's arpeggio up to date, and report what of it
+/// cannot be played.
+fn finish_arp(note: &mut Note, at: &str, issues: &mut Vec<Issue>) {
+    upgrade_arp(&mut note.arp);
+    if let Some(problem) = arp::problem(&note.arp) {
+        issues.push(Issue::new(format!("{at}.arp"), problem));
+    }
 }
 
 /// An arpeggio object's `mode` (the web version's key, older saves) is its `direction`.

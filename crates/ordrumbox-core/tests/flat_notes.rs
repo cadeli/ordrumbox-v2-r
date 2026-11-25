@@ -37,7 +37,11 @@ fn patterns() -> Vec<Pattern> {
         .iter()
         .flat_map(|name| {
             let (library, report) = Library::from_json(&read_json(&fixtures().join(name)));
-            assert!(report.issues.is_empty(), "{name}: {:#?}", report.issues);
+            // engine_cases.json plays an arpeggio with an interval "x", left out on purpose.
+            let expected: &[&str] =
+                if *name == "engine_cases.json" { &["patterns[0].tracks[0].notes[4].arp"] } else { &[] };
+            let at: Vec<&str> = report.issues.iter().map(|i| i.at.as_str()).collect();
+            assert_eq!(at, expected, "{name}: {:#?}", report.issues);
             library.patterns
         })
         .collect()

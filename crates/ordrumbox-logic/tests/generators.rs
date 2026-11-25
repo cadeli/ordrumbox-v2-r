@@ -56,7 +56,9 @@ fn data(file: &str) -> Value {
 }
 
 fn scales() -> Scales {
-    Scales::from_json(&data("scales.json"))
+    let (scales, issues) = Scales::from_json(&data("scales.json"));
+    assert!(issues.is_empty(), "{issues:#?}");
+    scales
 }
 
 fn styles() -> Styles {

@@ -422,7 +422,8 @@ mod tests {
             scale_name: Some("dorian".into()),
             ..Track::default()
         };
-        let scales = Scales::from_json(&crate::json::parse(r#"{"dorian":{"scaleSteps":[0,2,3,5,7,9,10]}}"#).unwrap());
+        let (scales, _) =
+            Scales::from_json(&crate::json::parse(r#"{"dorian":{"scaleSteps":[0,2,3,5,7,9,10]}}"#).unwrap());
         let mut rng = Rng::new(3);
         for _ in 0..500 {
             let pitch = pick_pitch(&track, &mut rng, &scales);
