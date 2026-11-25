@@ -67,7 +67,7 @@ assets/           data/*.json and kits/**.wav, read at runtime
 - An MCP client writes notes itself; it uses the automatic generation only
   when the user asks for it explicitly. The server says so in `INSTRUCTIONS`
   (`mcp.rs`), and starts the description of every tool of `GENERATION_TOOLS`
-  with `GENERATION_RULE`: a new tool that generates, regenerates or
+  with `GENERATION_RULE` (`mcp/catalog.rs`): a new tool that generates, regenerates or
   randomizes notes joins that list.
 - Dependencies only point down the table. Nothing depends on `ordrumbox-app`.
 - Workspace lints (`Cargo.toml`): `unsafe_code = "forbid"`,

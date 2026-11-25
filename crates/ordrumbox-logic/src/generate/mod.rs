@@ -19,11 +19,12 @@ use ordrumbox_core::num::{clamp, round2};
 use ordrumbox_core::{Note, RetriggerSpacing, Scales, Track};
 
 pub use auto::{
-    AutoGenerator, BASS_PRESET, Harmony, Options, STYLE_KEY, change_track, generate_pattern, generate_track,
-    instrument_line, plays_auto, recompose, restyle_pattern, run_loop,
+    AutoGenerator, BASS_PRESET, Harmony, Options, STYLE_KEY, generate_pattern, generate_track, instrument_line,
+    recompose, restyle_pattern,
 };
 pub use auto_mode::{
-    MelodicKind, is_auto_on, random_track, regenerate_track, toggle_auto, toggle_drums, toggle_melodic,
+    MelodicKind, change_track, is_auto_on, plays_auto, random_track, regenerate_track, run_loop, toggle_auto,
+    toggle_drums, toggle_melodic,
 };
 pub use structure::{SectionElement, Structure};
 
