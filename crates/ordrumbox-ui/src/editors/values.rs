@@ -2,6 +2,7 @@
 
 use super::Choice;
 use super::tables::{ARP_DIRECTIONS, FxDef, LfoTarget, fx_of_type, lfo_key, track_select_options};
+use crate::panel::{EditorTab, GenerationTab};
 use ordrumbox_core::arp::MAX_OCTAVES;
 use ordrumbox_core::json::Value;
 use ordrumbox_core::lfo::WAVE_TYPES;
@@ -13,8 +14,8 @@ use ordrumbox_core::{Note, RetriggerSpacing, ScaleList, Track, num};
 /// setting, the filter type an effect button turns back on.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct EditorState {
-    pub tab: u8,
-    pub generation_tab: u8,
+    pub tab: EditorTab,
+    pub generation_tab: GenerationTab,
     pub note_tab: u8,
     /// The lane under the grid: an index in [`LANES`].
     pub lane: u8,

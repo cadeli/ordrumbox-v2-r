@@ -20,7 +20,7 @@ use super::session_types::Workspace;
 use super::{Session, session_panel};
 use crate::canvas::{Canvas, text_width};
 use crate::frame;
-use crate::panel::Id;
+use crate::panel::{Id, SynthTab};
 use crate::panel::{Item, Kind, Rect, dim};
 use crate::picker::{Export, Purpose};
 use crate::store;
@@ -57,13 +57,13 @@ pub(super) struct Synths {
 #[derive(Debug)]
 pub(super) struct SynthEditor {
     edit: Option<SynthEdit>,
-    tab: u8,
+    tab: SynthTab,
     started: Instant,
 }
 
 impl SynthEditor {
     pub(super) fn new() -> Self {
-        Self { edit: None, tab: 0, started: Instant::now() }
+        Self { edit: None, tab: SynthTab::default(), started: Instant::now() }
     }
 
     /// Preset `key` is the one edited.
@@ -390,7 +390,7 @@ impl Session {
     /// A tab, a power button, a choice, a switch or a preset button pressed.
     pub(super) fn synth_activate(&mut self, id: Id) {
         match id {
-            Id::SynthTab(i) => self.synth_editor.tab = i.min(3),
+            Id::SynthTab(tab) => self.synth_editor.tab = tab,
             Id::SynthButton(button) => self.synth_button(button),
             Id::SynthPower(gi) => {
                 let Some(edit) = &mut self.synth_editor.edit else { return };
@@ -660,7 +660,7 @@ mod tests {
         s.undo();
         assert_eq!(s.synth_keys(), ["a", "b", "new_preset", "new_preset_copy"]);
         // The power button of the envelope (ENV tab).
-        s.synth_activate(Id::SynthTab(3));
+        s.synth_activate(Id::SynthTab(SynthTab::Envelopes));
         let groups = model::groups(&s.synth_editor.edit.as_ref().unwrap().draft);
         let env = groups.iter().position(|g| g == "envelope").unwrap() as u8;
         s.synth_activate(Id::SynthPower(env));

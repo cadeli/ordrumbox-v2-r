@@ -1,6 +1,6 @@
 use super::tabs::variant_options;
 use super::*;
-use crate::panel::{Id, Item, Rect, Step};
+use crate::panel::{EditorTab, GenerationTab, Id, Item, Rect, Step};
 use crate::scale::Scale;
 use ordrumbox_core::drum_taxonomy::instrument_family;
 use ordrumbox_core::json::Value;
@@ -187,7 +187,7 @@ fn the_rows_stay_put_without_a_sample() {
         }
         let TrackEditor { items, bottom, .. } =
             track_editor(&view, &EditorState::default(), Rect::new(0, 0, 360, 600), Scale::ONE);
-        (items.into_iter().find(|i| i.id == Some(Id::Tab(0))).map(|i| i.rect), bottom)
+        (items.into_iter().find(|i| i.id == Some(Id::Tab(EditorTab::Fx))).map(|i| i.rect), bottom)
     };
     assert_eq!(tab_rect(true), tab_rect(false));
 }
@@ -197,11 +197,11 @@ fn every_tab_builds() {
     let mut track = Track { name: "KICK".into(), ..Track::default() };
     for auto in [false, true] {
         track.auto_mode = auto;
-        for tab in 0..5 {
+        for tab in EditorTab::ALL {
             for sub in 0..6 {
                 let state = EditorState {
                     tab,
-                    generation_tab: sub % 3,
+                    generation_tab: GenerationTab::ALL[sub % 3],
                     generation_advanced: sub >= 3,
                     ..EditorState::default()
                 };
@@ -212,7 +212,7 @@ fn every_tab_builds() {
         }
     }
     // Folded: the simple view only.
-    let state = EditorState { tab: 4, ..EditorState::default() };
+    let state = EditorState { tab: EditorTab::Generate, ..EditorState::default() };
     let TrackEditor { items, .. } = track_editor(&view(&track), &state, Rect::new(0, 0, 360, 600), Scale::ONE);
     assert!(items.iter().any(|i| i.id == Some(Id::Toggle("composeLock"))));
     assert!(items.iter().any(|i| i.id == Some(Id::GenerationAdvanced)));
@@ -225,8 +225,13 @@ fn every_tab_builds() {
 
 #[test]
 fn the_engine_tab_shows_the_amounts_and_the_variants_a_track_can_use() {
-    let ids = |track: &Track, tab: u8| {
-        let state = EditorState { tab: 4, generation_tab: tab, generation_advanced: true, ..EditorState::default() };
+    let ids = |track: &Track, tab: GenerationTab| {
+        let state = EditorState {
+            tab: EditorTab::Generate,
+            generation_tab: tab,
+            generation_advanced: true,
+            ..EditorState::default()
+        };
         let mut view = view(track);
         if instrument_family(&track.name).is_melodic() {
             view.compose = None;
@@ -234,19 +239,19 @@ fn the_engine_tab_shows_the_amounts_and_the_variants_a_track_can_use() {
         track_editor(&view, &state, Rect::new(0, 0, 360, 600), Scale::ONE).items
     };
     let kick = Track { name: "KICK".into(), auto_mode: true, auto_hit_variation: Some(20.0), ..Track::default() };
-    let groove = ids(&kick, 0);
+    let groove = ids(&kick, GenerationTab::Groove);
     let hits = groove.iter().find(|i| i.id == Some(Id::Generation("autoHitVariation"))).unwrap();
     assert!(matches!(&hits.kind, Kind::Value { value, .. } if *value == 20.0));
     // A drum line: no variant, no density; the note amount unset shows the one used.
-    let engine = ids(&kick, 1);
+    let engine = ids(&kick, GenerationTab::Engine);
     assert!(!engine.iter().any(|i| i.id == Some(Id::TrackSelect("autoVariant"))));
     assert!(!engine.iter().any(|i| i.id == Some(Id::Generation("autoDensity"))));
     let notes = engine.iter().find(|i| i.id == Some(Id::Generation("autoNoteVariation"))).unwrap();
     assert!(matches!(&notes.kind, Kind::Value { value, .. } if *value == kick.auto_note_amount()));
     // A bass line: its own variants, in the simple view.
     let bass = Track { name: "BASS".into(), auto_mode: true, ..Track::default() };
-    assert!(ids(&bass, 1).iter().any(|i| i.id == Some(Id::TrackSelect("autoVariant"))));
-    assert!(ids(&bass, 1).iter().any(|i| i.id == Some(Id::Generation("autoDensity"))));
+    assert!(ids(&bass, GenerationTab::Engine).iter().any(|i| i.id == Some(Id::TrackSelect("autoVariant"))));
+    assert!(ids(&bass, GenerationTab::Engine).iter().any(|i| i.id == Some(Id::Generation("autoDensity"))));
     let variants = variant_options(&bass);
     assert!(variants.contains(&"groove".to_owned()) && !variants.contains(&"chordStab".to_owned()));
     assert!(variant_options(&Track { name: "PIANO".into(), ..Track::default() }).contains(&"chordStab".to_owned()));
@@ -256,8 +261,12 @@ fn the_engine_tab_shows_the_amounts_and_the_variants_a_track_can_use() {
 fn the_compose_tab_shows_the_style_values_until_set() {
     let mut track = Track { name: "KICK".into(), ..Track::default() };
     track.compose_syncopation = Some(70.0);
-    let state =
-        EditorState { tab: 4, generation_tab: COMPOSE_TAB, generation_advanced: true, ..EditorState::default() };
+    let state = EditorState {
+        tab: EditorTab::Generate,
+        generation_tab: GenerationTab::Compose,
+        generation_advanced: true,
+        ..EditorState::default()
+    };
     let TrackEditor { items, .. } = track_editor(&view(&track), &state, Rect::new(0, 0, 360, 600), Scale::ONE);
     let shown = |key: &'static str| {
         items.iter().find(|i| i.id == Some(Id::Compose(key))).and_then(|i| match &i.kind {
@@ -330,7 +339,7 @@ fn note_editor_hides_the_euclidean_prob() {
 #[test]
 fn the_fx_tab_shows_every_effect_and_moves_nothing_when_one_goes_on() {
     let area = Rect::new(700, 30, 360, 600);
-    let state = EditorState { tab: TAB_FX, ..EditorState::default() };
+    let state = EditorState { tab: EditorTab::Fx, ..EditorState::default() };
     let off = Track { name: "KICK".into(), filter_type: "allpass".into(), ..Track::default() };
     let on = Track {
         name: "KICK".into(),
@@ -373,7 +382,7 @@ fn the_fx_tab_shows_every_effect_and_moves_nothing_when_one_goes_on() {
 #[test]
 fn the_lfo_tab_shows_every_target_and_moves_nothing_when_one_goes_on() {
     let area = Rect::new(700, 30, 360, 600);
-    let state = EditorState { tab: TAB_LFO, ..EditorState::default() };
+    let state = EditorState { tab: EditorTab::Lfo, ..EditorState::default() };
     let off = Track { name: "KICK".into(), ..Track::default() };
     let lfo = ordrumbox_core::json::parse(r#"{"type":"square","freq":1.5,"min":0.2,"max":0.8,"phase":0}"#).unwrap();
     let on = Track {
@@ -449,14 +458,14 @@ fn no_control_moves_whatever_the_tab_and_the_settings() {
             if !sample {
                 view.sample = None;
             }
-            for (tab, sub, advanced, selected) in (0..5u8).flat_map(|tab| {
-                (0..5u8).flat_map(move |sub| {
+            for (tab, sub, advanced, selected) in EditorTab::ALL.into_iter().flat_map(|tab| {
+                (0..5).flat_map(move |sub| {
                     [false, true].into_iter().flat_map(move |a| [None, Some("autoMode")].map(|p| (tab, sub, a, p)))
                 })
             }) {
                 let state = EditorState {
                     tab,
-                    generation_tab: sub % 3,
+                    generation_tab: GenerationTab::ALL[sub % 3],
                     generation_advanced: advanced,
                     selected_prop: selected,
                     ..EditorState::default()

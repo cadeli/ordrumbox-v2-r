@@ -3,7 +3,7 @@
 //! label their controls with a word or two; the tooltip says what they do.
 // audit: allow(function size): tables of tooltip texts, one line a control.
 
-use crate::panel::{Id, LfoParam, Step};
+use crate::panel::{EditorTab, GenerationTab, Id, LfoParam, Step, ViewButton};
 use ordrumbox_engine::kit::edit::SampleField;
 
 /// A control's tooltip: its whole name and what it does.
@@ -12,12 +12,12 @@ pub type Help = [&'static str; 2];
 /// The tooltip of control `id` (or of the row label of a setting), if it has one.
 pub fn help(id: Id) -> Option<Help> {
     Some(match id {
-        Id::Tab(tab) => tab_help(tab)?,
+        Id::Tab(tab) => tab_help(tab),
         Id::FxPower(fx) => fx_help(fx)?,
         Id::GenerationTab(tab) => match tab {
-            0 => ["Groove (Manual out of auto mode)", "how the hits vary from loop to loop"],
-            1 => ["Engine", "what the auto engine adds to the notes"],
-            _ => ["Compose", "how a drum line is written: hits, complexity, style"],
+            GenerationTab::Groove => ["Groove (Manual out of auto mode)", "how the hits vary from loop to loop"],
+            GenerationTab::Engine => ["Engine", "what the auto engine adds to the notes"],
+            GenerationTab::Compose => ["Compose", "how a drum line is written: hits, complexity, style"],
         },
         Id::GenerationAdvanced => ["Advanced settings", "the manual, Groove, Engine and Compose settings"],
         Id::Regenerate => ["New line", "write this track's line again, in its style"],
@@ -99,7 +99,7 @@ pub fn help(id: Id) -> Option<Help> {
         Id::GeneratePattern => ["Make again (B)", "the pattern made again in its style"],
         Id::AutoAll => ["Auto, every track", "every track in auto mode, or out of it"],
         Id::Macro(key) => macro_help(key)?,
-        Id::View(view) => view_help(view)?,
+        Id::View(view) => view_help(view),
         Id::Mode(0) => ["Pattern", "Space plays one pattern, over and over, whatever the view"],
         Id::Mode(_) => ["Song", "Space plays the song, whatever the view: the grid shows the pattern playing"],
         Id::TrackVolume(_) => ["Volume", "the track's level: the track editor's Volume knob too"],
@@ -123,15 +123,14 @@ pub fn help(id: Id) -> Option<Help> {
     })
 }
 
-fn tab_help(tab: u8) -> Option<Help> {
-    Some(match tab {
-        0 => ["Effects", "reverb, delay, saturation, filter"],
-        1 => ["Sound", "the sample or synth the track plays"],
-        2 => ["LFO", "a setting moved up and down as it plays"],
-        3 => ["Loop", "steps per beat, loop length, swing"],
-        4 => ["Generation", "auto mode and how the line is written"],
-        _ => return None,
-    })
+const fn tab_help(tab: EditorTab) -> Help {
+    match tab {
+        EditorTab::Fx => ["Effects", "reverb, delay, saturation, filter"],
+        EditorTab::Sound => ["Sound", "the sample or synth the track plays"],
+        EditorTab::Lfo => ["LFO", "a setting moved up and down as it plays"],
+        EditorTab::Loop => ["Loop", "steps per beat, loop length, swing"],
+        EditorTab::Generate => ["Generation", "auto mode and how the line is written"],
+    }
 }
 
 fn fx_help(fx: u8) -> Option<Help> {
@@ -156,16 +155,17 @@ fn macro_help(key: &str) -> Option<Help> {
     })
 }
 
-fn view_help(view: u8) -> Option<Help> {
-    Some(match view {
-        0 => ["Grid (F5)", "the step grid"],
-        1 => ["Piano roll (F4)", "the focused track's notes by pitch"],
-        2 => ["Song (F3)", "patterns arranged into a song"],
-        3 => ["Synth (F6)", "the soft-synth presets"],
-        4 => ["Mixer (F12)", "every track's level, pan and sends, the shared echo and reverb, the master bus"],
-        5 => ["Kit editor (Ctrl+K)", "the kit's samples and their settings"],
-        _ => return None,
-    })
+const fn view_help(view: ViewButton) -> Help {
+    match view {
+        ViewButton::Grid => ["Grid (F5)", "the step grid"],
+        ViewButton::PianoRoll => ["Piano roll (F4)", "the focused track's notes by pitch"],
+        ViewButton::Song => ["Song (F3)", "patterns arranged into a song"],
+        ViewButton::Synth => ["Synth (F6)", "the soft-synth presets"],
+        ViewButton::Mixer => {
+            ["Mixer (F12)", "every track's level, pan and sends, the shared echo and reverb, the master bus"]
+        }
+        ViewButton::Kit => ["Kit editor (Ctrl+K)", "the kit's samples and their settings"],
+    }
 }
 
 /// A track or note setting, by its key in the library file.
@@ -272,7 +272,7 @@ mod tests {
     use super::*;
     use crate::editors::{
         FX_DEFS, FX_KNOBS, GENERATION_COMPOSE, GENERATION_ENGINE, GENERATION_GROOVE, GENERATION_MANUAL, GenerationRow,
-        KNOB_BAR, LOOP_PROPS, NOTE_GROUPS, NOTE_TABS, NoteRow, TABS,
+        KNOB_BAR, LOOP_PROPS, NOTE_GROUPS, NOTE_TABS, NoteRow,
     };
 
     #[test]
@@ -309,17 +309,11 @@ mod tests {
             assert!(help(Id::Fx(key)).is_some(), "{key}");
             assert!(help(Id::Row(key)).is_some(), "the label of {key}");
         }
-        for tab in 0..TABS.len() as u8 {
-            assert!(help(Id::Tab(tab)).is_some(), "tab {tab}");
-        }
         for tab in 0..NOTE_TABS.len() as u8 {
             assert!(help(Id::NoteTab(tab)).is_some(), "note tab {tab}");
         }
         for fx in 0..FX_DEFS.len() as u8 {
             assert!(help(Id::FxPower(fx)).is_some(), "effect {fx}");
-        }
-        for view in 0..crate::view::VIEWS.len() as u8 {
-            assert!(help(Id::View(view)).is_some(), "view {view}");
         }
         for (key, _) in crate::view::MACROS {
             assert!(help(Id::Macro(key)).is_some(), "{key}");

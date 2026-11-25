@@ -19,7 +19,7 @@ use crate::canvas::{Canvas, Rgb, text_width};
 use crate::control::Spec;
 use crate::editors::FILTER_ICONS;
 use crate::frame;
-use crate::panel::{Id, Item, Kind, Rect};
+use crate::panel::{Id, Item, Kind, Rect, SynthTab};
 use crate::theme;
 
 /// The preset bar's buttons: id, label, width (scale units).
@@ -163,7 +163,7 @@ pub struct SynthLayout {
     scale: Scale,
     pub preset: Rect,
     pub buttons: [Rect; 7],
-    pub tabs: [Rect; 4],
+    pub tabs: [Rect; SynthTab::ALL.len()],
     pub area: Rect,
 }
 
@@ -202,6 +202,9 @@ pub struct Card {
     pub plot: Option<(Plot, Rect)>,
 }
 
+// A synth tab for each of the engine's tabs.
+const _: () = assert!(TABS.len() == SynthTab::ALL.len());
+
 /// What the editor shows, as built: the panel items, the cards.
 #[derive(Debug, Default)]
 pub struct Built {
@@ -215,7 +218,7 @@ pub fn build(
     draft: &Object,
     presets: &[String],
     current: &str,
-    tab: u8,
+    tab: SynthTab,
     layout: &SynthLayout,
     lfo: &dyn Fn(&str) -> Option<f64>,
 ) -> Built {
@@ -229,7 +232,7 @@ pub fn build(
     let columns = ((layout.area.w + 10 * s) / (card_w + 10 * s)).max(1);
     let (mut column, mut row_top, mut row_h) = (0, layout.area.y, 0);
     for (gi, group) in groups.iter().enumerate() {
-        if model::group_tab(group) != usize::from(tab) {
+        if SynthTab::ALL.get(model::group_tab(group)) != Some(&tab) {
             continue;
         }
         if column == columns {
@@ -267,7 +270,7 @@ pub fn build(
 }
 
 /// The preset's select, the buttons and the tabs, above the cards.
-fn push_header(items: &mut Vec<Item>, presets: &[String], current: &str, tab: u8, layout: &SynthLayout) {
+fn push_header(items: &mut Vec<Item>, presets: &[String], current: &str, tab: SynthTab, layout: &SynthLayout) {
     let values = presets.to_vec();
     let selected = presets.iter().position(|p| p == current).unwrap_or(0);
     items.push(Item::new(
@@ -278,12 +281,8 @@ fn push_header(items: &mut Vec<Item>, presets: &[String], current: &str, tab: u8
     for ((id, label, _), rect) in BUTTONS.iter().zip(layout.buttons) {
         items.push(Item::new(Some(Id::SynthButton(id)), rect, Kind::Button { label: (*label).into(), on: false }));
     }
-    for (i, (rect, label)) in layout.tabs.iter().zip(TABS).enumerate() {
-        items.push(Item::new(
-            Some(Id::SynthTab(i as u8)),
-            *rect,
-            Kind::Tab { label: label.into(), active: usize::from(tab) == i },
-        ));
+    for ((rect, label), each) in layout.tabs.iter().zip(TABS).zip(SynthTab::ALL) {
+        items.push(Item::new(Some(Id::SynthTab(each)), *rect, Kind::Tab { label: label.into(), active: tab == each }));
     }
 }
 
@@ -511,7 +510,7 @@ mod tests {
         let layout = SynthLayout::new(740, 680, Scale::ONE, 0);
         let fields = all_fields(&d);
         let mut knobs = 0;
-        for tab in 0..4 {
+        for tab in SynthTab::ALL {
             let built = build(&d, &["a".into(), "b".into()], "b", tab, &layout, &|_| None);
             for item in &built.items {
                 if let (Some(Id::SynthField(fi)), Kind::Value { .. }) = (item.id, &item.kind) {
@@ -524,7 +523,7 @@ mod tests {
         }
         // Every numeric control but the algorithm (an icon row) is a knob.
         assert_eq!(knobs, model::metas().count() - 1);
-        let built = build(&d, &["a".into(), "b".into()], "b", 0, &layout, &|_| None);
+        let built = build(&d, &["a".into(), "b".into()], "b", SynthTab::Oscillators, &layout, &|_| None);
         assert!(matches!(built.items[0].kind, Kind::Select { selected: 1, .. }));
         // OSC: the scope, the oscillators (vco2, vco3 off: gain 0), the unison, FM (its flag unset).
         let groups: Vec<_> = built.cards.iter().map(|c| (c.group.as_str(), c.bypassed)).collect();
@@ -539,7 +538,7 @@ mod tests {
         let layout = SynthLayout::new(740, 680, Scale::ONE, 0);
         let names = ["presets".to_owned()];
         let rects = |d: &Object| {
-            let built = build(d, &names, "presets", 2, &layout, &|_| None);
+            let built = build(d, &names, "presets", SynthTab::Modulation, &layout, &|_| None);
             let card = built.cards.iter().find(|c| c.group == "matrix").expect("the matrix card").rect;
             let fields: Vec<_> = built
                 .items
@@ -568,7 +567,7 @@ mod tests {
             let mut pixels = vec![0; w * h];
             let mut canvas = Canvas::new(&mut pixels, w, h);
             let layout = SynthLayout::new(w as i32, h as i32, Scale::ONE, 0);
-            for tab in 0..4 {
+            for tab in SynthTab::ALL {
                 let built = build(&d, &[], "", tab, &layout, &|_| None);
                 draw(&mut canvas, &d, &built, &layout, 0.3, 120.0);
             }

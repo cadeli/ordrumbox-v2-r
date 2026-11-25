@@ -4,7 +4,7 @@ use super::{BEATS_PER_PAGE, BeatWindow, LABEL_CHARS, MIN_STEP_WIDTH, PAGE_BEATS,
 use crate::canvas::text_width;
 use crate::editors;
 use crate::frame::{body_top, content_top, footer_top, margin};
-use crate::panel::{Rect, row_at};
+use crate::panel::{Rect, ViewButton, row_at};
 use crate::pattern_ruler::PatternRuler;
 use crate::scale::Scale;
 use crate::scroll_thumb::{self, Edge};
@@ -122,7 +122,8 @@ pub struct HeaderControls {
     pub generate: Rect,
     pub auto: Rect,
     pub macros: [Rect; 3],
-    pub views: [Rect; 6],
+    /// The view buttons, as [`ViewButton::ALL`] lists them.
+    pub views: [Rect; ViewButton::ALL.len()],
 }
 
 /// The header's macro knobs: their pattern key and label.
@@ -134,14 +135,6 @@ pub const MACROS: [(&str, &str); 3] = [
 
 /// The mode switch's labels: what the window edits and plays.
 pub const MODES: [&str; 2] = ["PATT", "SONG"];
-
-/// The view buttons' labels: the main editor (grid, piano roll, song, synth,
-/// mixer) and the kit editor. The song has no button of its own: it is the
-/// mode switch's (its slot has no width).
-pub const VIEWS: [&str; 6] = ["GRID", "ROLL", "SONG", "SYNTH", "MIX", "KIT"];
-
-/// The kit editor's view button, the last: it opens over the main editor.
-pub const KIT_VIEW: u8 = 5;
 
 pub fn header_controls(scale: Scale) -> HeaderControls {
     let s = scale;

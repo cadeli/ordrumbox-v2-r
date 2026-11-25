@@ -553,7 +553,7 @@ mod tests {
     fn the_sound_tab_picks_the_instrument_by_category_among_the_sampled_ones() {
         let mut s = session_of(&[("KICK", "real/kick.wav"), ("COWBELL", "real/bell.wav"), ("SNARE", "real/sn.wav")]);
         s.selection.cursor = Some(view::Cursor { track: 0, beat: 0, step: 0 });
-        s.editors.tab = crate::editors::TAB_SOUND;
+        s.editors.tab = crate::panel::EditorTab::Sound;
         let (x, y) = item_at(&s, Id::Instrument);
         assert!(click(&mut s, x, y));
         let menu = s.chrome.widgets.dropdown().expect("a menu");

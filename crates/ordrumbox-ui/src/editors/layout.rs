@@ -2,12 +2,11 @@
 
 use super::TrackView;
 use super::tables::DEFAULT_DECAY;
-use super::tables::{KNOB_BAR, Prop, TABS};
-use super::tables::{TAB_FX, TAB_LFO, TAB_LOOP, TAB_SOUND};
+use super::tables::{KNOB_BAR, Prop};
 use super::tabs::{fx_tab, generation_tab, lfo_tab, loop_tab, sound_tab, tallest_tab_bottom};
 use super::values::{EditorState, has_lfo, number};
 use crate::control::{Format, Spec};
-use crate::panel::{Id, Item, KNOB_SIZE, Kind, Rect, Step, dim, label_width};
+use crate::panel::{EditorTab, Id, Item, KNOB_SIZE, Kind, Rect, Step, dim, label_width};
 use crate::scale::Scale;
 use crate::theme;
 use ordrumbox_core::Track;
@@ -266,16 +265,16 @@ pub fn track_editor(view: &TrackView, state: &EditorState, area: Rect, scale: Sc
     rows.y += CARD_GAP * s;
     let tabs_top = rows.y;
     let tabs: Vec<_> =
-        TABS.iter().enumerate().map(|(i, l)| Some((Id::Tab(i as u8), None, *l, state.tab == i as u8, false))).collect();
+        EditorTab::ALL.iter().map(|&tab| Some((Id::Tab(tab), None, tab.label(), state.tab == tab, false))).collect();
     rows.main_tabs(&tabs);
 
     let bottom = tallest_tab_bottom(rows.y, s);
     match state.tab {
-        TAB_FX => fx_tab(&mut rows, view, state),
-        TAB_SOUND => sound_tab(&mut rows, view),
-        TAB_LFO => lfo_tab(&mut rows, view),
-        TAB_LOOP => loop_tab(&mut rows, track, &view.lfo),
-        _ => generation_tab(&mut rows, (track, &view.lfo), view.compose.as_ref(), state),
+        EditorTab::Fx => fx_tab(&mut rows, view, state),
+        EditorTab::Sound => sound_tab(&mut rows, view),
+        EditorTab::Lfo => lfo_tab(&mut rows, view),
+        EditorTab::Loop => loop_tab(&mut rows, track, &view.lfo),
+        EditorTab::Generate => generation_tab(&mut rows, (track, &view.lfo), view.compose.as_ref(), state),
     }
     TrackEditor { items: rows.items, sound_bottom, tabs_top, bottom }
 }

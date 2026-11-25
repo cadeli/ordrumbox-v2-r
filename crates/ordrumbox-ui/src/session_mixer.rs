@@ -442,7 +442,7 @@ mod tests {
         let mut s = mixer_session(1);
         s.run(crate::menu::Command::Mixer);
         assert_eq!(s.workspace, Workspace::Grid);
-        s.show_view(4);
+        s.show_view(crate::panel::ViewButton::Mixer);
         assert!(s.mixer_open());
     }
 }

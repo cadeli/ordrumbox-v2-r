@@ -4,10 +4,23 @@
 
 use super::Session;
 use super::session_types::{PlayMode, Workspace};
-use crate::view;
+use crate::panel::ViewButton;
 use ordrumbox_core::ActiveClip;
 use ordrumbox_core::steps::TICK;
 use ordrumbox_engine::Mode;
+
+impl Workspace {
+    /// The view button that shows it.
+    pub(super) const fn view_button(self) -> ViewButton {
+        match self {
+            Self::Grid => ViewButton::Grid,
+            Self::PianoRoll => ViewButton::PianoRoll,
+            Self::Song => ViewButton::Song,
+            Self::Synth => ViewButton::Synth,
+            Self::Mixer => ViewButton::Mixer,
+        }
+    }
+}
 
 impl Session {
     /// V: show/hide the VU meters on the track stripes.
@@ -16,15 +29,20 @@ impl Session {
         self.message = if self.chrome.panes.vus() { "VU meters on".into() } else { "VU meters off".into() };
     }
 
-    /// A view button (`view::VIEWS`): show that view, unless it is shown.
-    /// The last button (KIT) toggles the kit editor over the main editor.
-    pub(super) fn show_view(&mut self, i: u8) {
-        if i == view::KIT_VIEW {
-            self.toggle_kit_editor();
-            return;
-        }
-        let target = [Workspace::Grid, Workspace::PianoRoll, Workspace::Song, Workspace::Synth, Workspace::Mixer];
-        let Some(&target) = target.get(usize::from(i)) else { return };
+    /// A view button: show that view, unless it is shown. KIT toggles the
+    /// kit editor over the main editor.
+    pub(super) fn show_view(&mut self, button: ViewButton) {
+        let target = match button {
+            ViewButton::Grid => Workspace::Grid,
+            ViewButton::PianoRoll => Workspace::PianoRoll,
+            ViewButton::Song => Workspace::Song,
+            ViewButton::Synth => Workspace::Synth,
+            ViewButton::Mixer => Workspace::Mixer,
+            ViewButton::Kit => {
+                self.toggle_kit_editor();
+                return;
+            }
+        };
         if self.workspace == target && !self.kit_editor.is_open() {
             return;
         }
@@ -50,7 +68,7 @@ impl Session {
         self.set_mode(mode);
         let song = mode == PlayMode::Song;
         if song != (self.workspace == Workspace::Song) || self.kit_editor.is_open() {
-            self.show_view(if song { 2 } else { 0 });
+            self.show_view(if song { ViewButton::Song } else { ViewButton::Grid });
         }
     }
 

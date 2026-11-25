@@ -1,6 +1,6 @@
 //! The track editor's tabs (FX, sound, LFO, loop, generation) as rows.
 
-use super::tables::{COMPOSE_TAB, FX_DEFS, FX_KNOBS, FxDef, GENERATION_COMPOSE};
+use super::tables::{FX_DEFS, FX_KNOBS, FxDef, GENERATION_COMPOSE};
 use super::tables::{
     GENERATION_ENGINE, GENERATION_GROOVE, GENERATION_MANUAL, GenerationRow, LFO_TARGETS, LOOP_PROPS, LfoTarget, Prop,
     STYLE_DEFAULT, fx_label, prop, track_select_options,
@@ -10,7 +10,7 @@ use super::values::{
 };
 use super::{Choice, ComposeView, TrackView};
 use crate::control::{Format, Spec};
-use crate::panel::{Id, Item, Kind, LfoParam, Rect, dim, label_width};
+use crate::panel::{GenerationTab, Id, Item, Kind, LfoParam, Rect, dim, label_width};
 use crate::scale::Scale;
 use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::{Track, num};
@@ -325,19 +325,32 @@ fn advanced_generation(
     state: &EditorState,
 ) {
     let s = rows.scale;
-    let compose_tab = compose.is_some() && state.generation_tab == COMPOSE_TAB;
+    let compose_tab = compose.is_some() && state.generation_tab == GenerationTab::Compose;
     // Three slots whatever shows: Compose stays put when Auto turns Engine off.
     let tabs = if track.auto_mode {
         [
-            Some((Id::GenerationTab(0), None, "Groove", !compose_tab && state.generation_tab == 0, false)),
-            Some((Id::GenerationTab(1), None, "Engine", !compose_tab && state.generation_tab == 1, false)),
+            Some((
+                Id::GenerationTab(GenerationTab::Groove),
+                None,
+                "Groove",
+                !compose_tab && state.generation_tab == GenerationTab::Groove,
+                false,
+            )),
+            Some((
+                Id::GenerationTab(GenerationTab::Engine),
+                None,
+                "Engine",
+                !compose_tab && state.generation_tab == GenerationTab::Engine,
+                false,
+            )),
             None,
         ]
     } else {
-        [Some((Id::GenerationTab(0), None, "Manual", !compose_tab, false)), None, None]
+        [Some((Id::GenerationTab(GenerationTab::Groove), None, "Manual", !compose_tab, false)), None, None]
     };
     let [first, second, _] = tabs;
-    let compose_slot = compose.map(|_| (Id::GenerationTab(COMPOSE_TAB), None, "Compose", compose_tab, false));
+    let compose_slot =
+        compose.map(|_| (Id::GenerationTab(GenerationTab::Compose), None, "Compose", compose_tab, false));
     rows.tabs(&[first, second, compose_slot]);
     if let (true, Some(view)) = (compose_tab, compose) {
         for p in &GENERATION_COMPOSE {
@@ -351,7 +364,7 @@ fn advanced_generation(
         }
         return;
     }
-    for row in if state.generation_tab == 0 { &GENERATION_GROOVE } else { &GENERATION_ENGINE } {
+    for row in if state.generation_tab == GenerationTab::Groove { &GENERATION_GROOVE } else { &GENERATION_ENGINE } {
         match row {
             // A drum line comes from its style (Compose); a melodic one has them above.
             GenerationRow::Select("autoVariant", _) | GenerationRow::Slider(Prop { key: "autoDensity", .. }) => {}

@@ -21,6 +21,7 @@ use super::session_playback::Playback;
 use super::session_types::{PlayMode, Workspace};
 use crate::canvas::Canvas;
 use crate::kits::KitSet;
+use crate::panel::ViewButton;
 use crate::store;
 use crate::view::Spot;
 
@@ -140,17 +141,10 @@ fn the_tempo_and_what_plays_follow_the_mode_not_the_view() {
     assert_pass_frames(&s, 4.0, 100.0);
 
     // Every view, the song panel too: the same mode, neither the tempo nor the loop restarts.
-    // (`show_view` takes the index of a view button: grid, piano roll, song, synth, mixer.)
-    let views = [
-        (3, Workspace::Synth),
-        (1, Workspace::PianoRoll),
-        (2, Workspace::Song),
-        (4, Workspace::Mixer),
-        (0, Workspace::Grid),
-    ];
-    for (button, view) in views {
+    let views = [Workspace::Synth, Workspace::PianoRoll, Workspace::Song, Workspace::Mixer, Workspace::Grid];
+    for view in views {
         let before = position(&s).expect("playing");
-        s.show_view(button);
+        s.show_view(view.view_button());
         assert_eq!(s.workspace, view);
         run(&mut s, &mut audio, CALLBACK);
         let after = position(&s).expect("playing");
@@ -166,7 +160,7 @@ fn the_tempo_and_what_plays_follow_the_mode_not_the_view() {
     assert_eq!(position(&s).expect("playing").pass, 0);
     assert_pass_frames(&s, 4.0, 120.0);
     // ...and goes through it, measure after measure, whatever the view.
-    s.show_view(0);
+    s.show_view(ViewButton::Grid);
     assert!(run(&mut s, &mut audio, 20_000) > 0.0);
     assert_eq!((mode(&s), s.workspace), (Mode::Song(0), Workspace::Grid));
     assert_eq!(position(&s).expect("playing").pass, 1);
@@ -190,7 +184,7 @@ fn in_song_mode_the_grid_and_the_roll_show_the_pattern_playing() {
     );
     let measure = pass_frames(4.0, 120.0) as usize;
     s.show_mode(PlayMode::Song);
-    s.show_view(0);
+    s.show_view(ViewButton::Grid);
     s.toggle_play();
     run(&mut s, &mut audio, measure / 2);
     assert_eq!((mode(&s), s.pattern_index), (Mode::Song(0), 0));
@@ -198,11 +192,11 @@ fn in_song_mode_the_grid_and_the_roll_show_the_pattern_playing() {
     run(&mut s, &mut audio, measure);
     assert_eq!(s.pattern_index, 1, "the grid follows the song into b");
     // The piano roll follows it too.
-    s.show_view(1);
+    s.show_view(ViewButton::PianoRoll);
     run(&mut s, &mut audio, measure);
     assert_eq!((s.workspace, s.pattern_index), (Workspace::PianoRoll, 0));
     // The song panel keeps the pattern chosen in it.
-    s.show_view(2);
+    s.show_view(ViewButton::Song);
     run(&mut s, &mut audio, measure);
     assert_eq!(s.pattern_index, 0);
     s.toggle_play();
@@ -240,9 +234,9 @@ fn space_in_song_mode_plays_the_song_and_the_song_view_alone_does_not() {
     run(&mut s, &mut audio, 1000);
     assert_eq!(mode(&s), Mode::Pattern(0));
     s.toggle_play();
-    s.show_view(0);
+    s.show_view(ViewButton::Grid);
     s.show_mode(PlayMode::Song);
-    s.show_view(0);
+    s.show_view(ViewButton::Grid);
     s.toggle_play();
     run(&mut s, &mut audio, 1000);
     assert_eq!(mode(&s), Mode::Song(0));

@@ -14,15 +14,6 @@ use ordrumbox_core::track::{
 };
 use ordrumbox_logic::generate;
 
-/// Main tabs.
-pub const TABS: [&str; 5] = ["FX", "Sound", "LFO", "Loop", "Generate"];
-/// The index of the Generate tab in [`TABS`].
-pub const GEN_TAB: u8 = 4;
-pub const TAB_FX: u8 = 0;
-pub const TAB_SOUND: u8 = 1;
-pub const TAB_LFO: u8 = 2;
-pub const TAB_LOOP: u8 = 3;
-
 /// An effect: the setting its on / off button reads and writes, its name,
 /// its controls row by row, its type, and the value its button turns it on at.
 #[derive(Debug)]
@@ -327,9 +318,6 @@ pub const GENERATION_COMPOSE: [Prop; 7] = [
 /// What a double-click on a compose slider sets: the setting given back to
 /// the style (`None`). Below every range.
 pub const STYLE_DEFAULT: f64 = -1.0e9;
-
-/// The sub-tab index of Compose.
-pub const COMPOSE_TAB: u8 = 2;
 
 /// The loop tab.
 pub const LOOP_PROPS: [Prop; 3] = [

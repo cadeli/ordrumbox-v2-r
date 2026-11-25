@@ -3,12 +3,12 @@
 use super::super::{Move, OverlayKey, Session};
 use super::{CALLBACK, KIT_KEYS, WINDOW, demo_session, draw, run};
 use crate::menu::Command;
-use crate::panel::{Id, Kind, Rect};
+use crate::panel;
+use crate::panel::{EditorTab, GenerationTab, Id, Kind, Rect};
 use crate::picker::Export;
 use crate::test_support::scratch_dir;
 use crate::ui_input::Button;
 use crate::view::Spot;
-use crate::{editors, panel};
 use ordrumbox_core::{Library, json};
 use ordrumbox_logic::history::MAX_STEPS;
 use std::path::Path;
@@ -248,10 +248,10 @@ fn every_knob_of_the_editors_is_undone() {
     let start = s.editor.library().to_file_text();
     let (width, height, scale) = WINDOW;
     let mut turned = 0;
-    for tab in 0..editors::TABS.len() as u8 {
+    for tab in EditorTab::ALL {
         for sub_tab in 0..4 {
             s.editors.tab = tab;
-            (s.editors.generation_tab, s.editors.note_tab) = (sub_tab % 3, sub_tab);
+            (s.editors.generation_tab, s.editors.note_tab) = (GenerationTab::ALL[usize::from(sub_tab) % 3], sub_tab);
             let knobs: Vec<Id> = s
                 .panel_layout(width, height, scale)
                 .items
@@ -281,7 +281,7 @@ fn every_knob_of_the_editors_is_undone() {
             while s.editor.history().next_undo().is_some() {
                 s.run(Command::Undo);
             }
-            assert_eq!(s.editor.library().to_file_text(), start, "tab {tab}, sub-tab {sub_tab}");
+            assert_eq!(s.editor.library().to_file_text(), start, "tab {tab:?}, sub-tab {sub_tab}");
         }
     }
     assert!(turned > 40, "only {turned} knobs shown");

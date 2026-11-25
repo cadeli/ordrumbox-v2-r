@@ -22,8 +22,8 @@ use crate::editors::{
     GenerationRow, KIT_KNOBS, KNOB_BAR, LOOP_PROPS, NOTE_GROUPS, NOTE_KNOBS, NoteRow,
 };
 use crate::frame;
-use crate::panel::Id;
 use crate::panel::{self, Item, Kind, Rect};
+use crate::panel::{EditorTab, Id, ViewButton};
 use crate::view;
 use crate::view::Layout;
 use ordrumbox_core::{Pattern, Track};
@@ -160,16 +160,20 @@ impl Session {
 
     /// The view buttons (the main editor, then the kit editor): the one shown lit.
     fn view_buttons(&self, layout: &mut PanelLayout, scale: Scale) {
-        let shown = [Workspace::Grid, Workspace::PianoRoll, Workspace::Song, Workspace::Synth, Workspace::Mixer];
         let views = view::header_controls(scale).views;
         let kit_open = self.kit_editor.is_open();
-        for (i, (rect, label)) in views.iter().zip(view::VIEWS).enumerate() {
-            // The song's slot has no button: the mode switch is its own.
-            if shown.get(i) == Some(&Workspace::Song) {
-                continue;
-            }
-            let on = if i == usize::from(view::KIT_VIEW) { kit_open } else { !kit_open && self.workspace == shown[i] };
-            layout.items.push(Item::new(Some(Id::View(i as u8)), *rect, Kind::Button { label: label.into(), on }));
+        for (button, rect) in ViewButton::ALL.into_iter().zip(views) {
+            let on = match button {
+                // The song's slot has no button: the mode switch is its own.
+                ViewButton::Song => continue,
+                ViewButton::Kit => kit_open,
+                _ => !kit_open && self.workspace.view_button() == button,
+            };
+            layout.items.push(Item::new(
+                Some(Id::View(button)),
+                rect,
+                Kind::Button { label: button.label().into(), on },
+            ));
         }
     }
 
@@ -341,7 +345,7 @@ impl Session {
     /// The track editor on its Generate tab.
     pub fn show_generation_tab(&mut self) {
         self.chrome.panes.show_track_editor();
-        self.editors.tab = editors::GEN_TAB;
+        self.editors.tab = EditorTab::Generate;
     }
 }
 
@@ -468,6 +472,7 @@ mod tests {
     use crate::editors::STYLE_DEFAULT;
     use crate::kits::KitSet;
     use crate::menu::Command;
+    use crate::panel::GenerationTab;
     use crate::ui_input::Button;
     use ordrumbox_core::{Library, Styles};
     use ordrumbox_engine::SynthPresets;
@@ -497,9 +502,9 @@ mod tests {
             let item = panel::find(&s.panel_layout(width, height, scale).items, id).cloned().expect("shown");
             (item.rect.x + item.rect.w / 2, item.rect.y + item.rect.h / 2)
         };
-        let (x, y) = center(&s, Id::Tab(editors::TAB_LOOP));
+        let (x, y) = center(&s, Id::Tab(EditorTab::Loop));
         assert!(s.control_hover(SIZE, x, y));
-        assert_eq!(s.chrome.control_hover.map(|(id, _)| id), Some(Id::Tab(editors::TAB_LOOP)));
+        assert_eq!(s.chrome.control_hover.map(|(id, _)| id), Some(Id::Tab(EditorTab::Loop)));
         assert!(!s.control_hover(SIZE, x, y), "unchanged");
         let (x, y) = center(&s, Id::KnobBar("transpose"));
         assert!(s.control_hover(SIZE, x, y));
@@ -577,8 +582,10 @@ mod tests {
             let (width, height) = view::min_window_size(scale, view::Shown::all());
             let body = view::Body::new(width, height, scale, s.track_editor_width(width, scale), 1, true);
             for (track, tab, sub, note_tab, advanced) in (0..2).flat_map(|t| {
-                (0..6u8).flat_map(move |tab| {
-                    (0..5u8).flat_map(move |sub| (0..5u8).flat_map(move |n| [false, true].map(|a| (t, tab, sub, n, a))))
+                EditorTab::ALL.into_iter().flat_map(move |tab| {
+                    GenerationTab::ALL
+                        .into_iter()
+                        .flat_map(move |sub| (0..5u8).flat_map(move |n| [false, true].map(|a| (t, tab, sub, n, a))))
                 })
             }) {
                 s.editors.tab = tab;
@@ -593,7 +600,7 @@ mod tests {
                     .map(|i| i.rect.y + i.rect.h)
                     .max()
                     .unwrap();
-                assert!(bottom <= body.main_bottom, "scale {scale} tab {tab}/{sub} note tab {note_tab}: {bottom}");
+                assert!(bottom <= body.main_bottom, "scale {scale} tab {tab:?}/{sub:?} note tab {note_tab}: {bottom}");
                 if scale == Scale::ONE {
                     tallest = tallest.max(bottom - frame::body_top(scale));
                 }
@@ -645,9 +652,9 @@ mod tests {
         assert_eq!(lit(&s), [true, false]);
         click(&mut s, c.mode[1].x + 2, c.mode[1].y + 2);
         s.mouse_up();
-        for view in [0, 1, 3, 4, 2] {
+        for view in [ViewButton::Grid, ViewButton::PianoRoll, ViewButton::Synth, ViewButton::Mixer, ViewButton::Song] {
             s.show_view(view);
-            assert_eq!(lit(&s), [false, true], "view {view}");
+            assert_eq!(lit(&s), [false, true], "view {view:?}");
         }
     }
 
@@ -721,7 +728,7 @@ mod tests {
         assert!(pattern.tracks.iter().all(|t| t.name != "TOM"));
 
         // The Generate tab of the KICK: the style's hits, then the track's own.
-        s.editors.tab = editors::GEN_TAB;
+        s.editors.tab = EditorTab::Generate;
         let layout = s.panel_layout(SIZE.0, SIZE.1, Scale::ONE);
         let hits = panel::find(&layout.items, Id::Compose("composeHitsPerMeasure")).unwrap();
         assert!(matches!(&hits.kind, Kind::Value { value, text, .. } if *value == 1.0 && text == "1*"));

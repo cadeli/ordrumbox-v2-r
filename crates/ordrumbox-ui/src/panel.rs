@@ -141,12 +141,12 @@ impl Step {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Id {
     // Track editor.
-    /// Main tab: fx, sound, mod, loop, gen.
-    Tab(u8),
+    /// A main tab of the track editor.
+    Tab(EditorTab),
     /// An effect's on / off button, named after it.
     FxPower(u8),
-    /// Groove / Engine / Compose sub-tab.
-    GenerationTab(u8),
+    /// A sub-tab of the Generate tab.
+    GenerationTab(GenerationTab),
     /// A compose setting of a drum track (its style's value when unset).
     Compose(&'static str),
     /// ↻: a new line on the edited track.
@@ -230,9 +230,8 @@ pub enum Id {
     GeneratePattern,
     AutoAll,
     Macro(&'static str),
-    /// A view button: grid, piano roll, synth, kit editor (the song's slot,
-    /// 2, has no button).
-    View(u8),
+    /// A view button (the song's slot has no button).
+    View(ViewButton),
     /// The mode switch: 0 the pattern, 1 the song.
     Mode(u8),
     // Song panel.
@@ -272,7 +271,7 @@ pub enum Id {
     /// The preset edited's tags (their entry).
     SynthTags,
     SynthButton(&'static str),
-    SynthTab(u8),
+    SynthTab(SynthTab),
     /// A card's power button, its icon choices: by the card's index in
     /// `ordrumbox_engine::synth_model::groups`.
     SynthPower(u8),
@@ -510,9 +509,12 @@ mod draw;
 mod dropdown;
 #[path = "panel/entry.rs"]
 mod entry;
+#[path = "panel/tabs.rs"]
+mod tabs;
 pub use draw::draw;
 pub use dropdown::{Dropdown, MENU_MARK, SUBMENU_MARK};
 pub use entry::Entry;
+pub use tabs::{EditorTab, GenerationTab, SynthTab, ViewButton};
 
 #[cfg(test)]
 mod tests {
@@ -541,14 +543,14 @@ mod tests {
     fn focus_cycles_over_focusable_items() {
         let r = Rect::new(0, 0, 10, 10);
         let items = vec![
-            Item::new(Some(Id::Tab(0)), r, Kind::Tab { label: "FX".into(), active: true }),
+            Item::new(Some(Id::Tab(EditorTab::Fx)), r, Kind::Tab { label: "FX".into(), active: true }),
             Item::new(None, r, Kind::Card),
             Item::new(Some(Id::Row("x")), r, Kind::Highlight),
             Item::new(Some(Id::Toggle("mono")), r, Kind::Toggle { on: false }),
         ];
-        assert_eq!(next_focus(&items, None, 1), Some(Id::Tab(0)));
-        assert_eq!(next_focus(&items, Some(Id::Tab(0)), 1), Some(Id::Toggle("mono")));
-        assert_eq!(next_focus(&items, Some(Id::Tab(0)), -1), Some(Id::Toggle("mono")));
+        assert_eq!(next_focus(&items, None, 1), Some(Id::Tab(EditorTab::Fx)));
+        assert_eq!(next_focus(&items, Some(Id::Tab(EditorTab::Fx)), 1), Some(Id::Toggle("mono")));
+        assert_eq!(next_focus(&items, Some(Id::Tab(EditorTab::Fx)), -1), Some(Id::Toggle("mono")));
         assert_eq!(item_at(&items, 5, 5).and_then(|i| i.id), Some(Id::Toggle("mono")));
     }
 

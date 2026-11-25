@@ -29,17 +29,6 @@ impl Workspace {
     fn from_setting(name: &str) -> Option<Self> {
         [Self::Grid, Self::PianoRoll, Self::Song, Self::Synth, Self::Mixer].into_iter().find(|w| w.setting() == name)
     }
-
-    /// Its button among `view::VIEWS`.
-    const fn view_button(self) -> u8 {
-        match self {
-            Self::Grid => 0,
-            Self::PianoRoll => 1,
-            Self::Song => 2,
-            Self::Synth => 3,
-            Self::Mixer => 4,
-        }
-    }
 }
 
 /// The play modes, as `resume` names them.
@@ -232,7 +221,7 @@ mod tests {
         s.show_pattern(2);
         s.select_song(1);
         s.show_mode(PlayMode::Song);
-        s.show_view(0);
+        s.show_view(crate::panel::ViewButton::Grid);
         s.toggle_note_editor();
         s.toggle_vus();
         s.save_resume();
@@ -318,7 +307,7 @@ mod tests {
     #[test]
     fn each_view_has_its_button() {
         let labels = [Workspace::Grid, Workspace::PianoRoll, Workspace::Song, Workspace::Synth, Workspace::Mixer]
-            .map(|w| crate::view::VIEWS[usize::from(w.view_button())]);
+            .map(|w| w.view_button().label());
         assert_eq!(labels, ["GRID", "ROLL", "SONG", "SYNTH", "MIX"]);
     }
 }
