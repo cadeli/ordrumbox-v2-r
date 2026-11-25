@@ -13,6 +13,7 @@ use super::session_panel_keys::moved_value;
 use super::session_types::Workspace;
 use crate::canvas::Canvas;
 use crate::control::{Spec, Style};
+use crate::menu_action::ControlAction;
 use crate::panel::{self, Item, Kind};
 use crate::panel::{Dropdown, Id};
 use crate::ui_input::Button;
@@ -390,12 +391,12 @@ impl Session {
     /// default, copy it, paste one copied.
     fn control_menu(&mut self, id: Id, x: i32, y: i32) {
         let lines = [
-            ("type", "Type a value..."),
-            ("default", "Default value"),
-            ("copy", "Copy value"),
-            ("paste", "Paste value"),
+            (ControlAction::Type, "Type a value..."),
+            (ControlAction::Default, "Default value"),
+            (ControlAction::Copy, "Copy value"),
+            (ControlAction::Paste, "Paste value"),
         ]
-        .map(|(value, label)| (value.to_owned(), label.to_owned()));
+        .map(|(action, label)| (action, label.to_owned()));
         let (label, _) = control_name(id);
         let mut menu = Dropdown::menu(Id::ControlMenu, x, y, label.to_owned(), lines);
         menu.control = Some(id);
@@ -403,23 +404,23 @@ impl Session {
     }
 
     /// A line of a control's right-click menu picked (`control`: whose).
-    pub(super) fn control_menu_pick(&mut self, value: &str, control: Option<Id>) {
+    pub(super) fn control_menu_pick(&mut self, action: ControlAction, control: Option<Id>) {
         let Some(id) = control else { return };
         let size = self.chrome.panel_size;
         let layout = self.panel_layout(size.0, size.1, size.2);
         let Some(item) = panel::find(&layout.items, id) else { return };
         let Kind::Value { spec, value: current, .. } = item.kind else { return };
-        match value {
-            "type" => {
+        match action {
+            ControlAction::Type => {
                 self.chrome.widgets.focus = Some(id);
                 self.open_entry(id, spec, current);
             }
-            "default" => self.reset_value(id, spec.default),
-            "copy" => {
+            ControlAction::Default => self.reset_value(id, spec.default),
+            ControlAction::Copy => {
                 self.chrome.widgets.copied_value = Some(current);
                 self.message = format!("value {} copied", num::text(spec.shown(current)));
             }
-            "paste" => match self.chrome.widgets.copied_value {
+            ControlAction::Paste => match self.chrome.widgets.copied_value {
                 Some(copied) if (spec.min..=spec.max).contains(&copied) => self.set_value(id, copied),
                 Some(copied) => {
                     self.message = format!(
@@ -431,7 +432,6 @@ impl Session {
                 }
                 None => self.message = "no value copied".into(),
             },
-            _ => {}
         }
     }
 

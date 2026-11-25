@@ -484,6 +484,7 @@ pub(super) mod tests {
     use super::*;
     use crate::kits::KitSet;
     use crate::menu::Command;
+    use crate::menu_action::{MenuAction, SongAction};
     use crate::ui_input::Button;
     use ordrumbox_core::Library;
 
@@ -512,9 +513,9 @@ pub(super) mod tests {
             .expect("on the panel")
     }
 
-    /// The menu open: its values.
-    pub(crate) fn menu(session: &Session) -> Vec<String> {
-        session.chrome.widgets.dropdown().map(|d| d.values.clone()).unwrap_or_default()
+    /// The menu open: its actions.
+    pub(crate) fn menu(session: &Session) -> Vec<MenuAction> {
+        session.chrome.widgets.dropdown().map(|d| d.actions().to_vec()).unwrap_or_default()
     }
 
     /// Option `i` of the open menu chosen with the keys.
@@ -572,7 +573,7 @@ pub(super) mod tests {
         let l = s.song_layout(SIZE);
         let row = (l.list.x + 2, l.list.y + 12 + 2);
         s.song_click(SIZE, row.0, row.1, Button::Right);
-        let rename = menu(&s).iter().position(|v| v == "rename:1").unwrap();
+        let rename = menu(&s).iter().position(|a| *a == SongAction::RenamePattern(1).into()).unwrap();
         choose(&mut s, rename);
         assert_eq!(s.chrome.widgets.entry().map(|e| (e.id, e.text.as_str())), Some((Id::SongPattern(1), "b")));
         type_entry(&mut s, "B two");

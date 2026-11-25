@@ -54,6 +54,7 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use super::super::session_song::tests::{SIZE, clips, find_spot, menu, session};
+    use crate::menu_action::SongAction;
     use crate::song_view::SongSpot;
     use crate::ui_input::Button;
 
@@ -78,7 +79,7 @@ mod tests {
 
         // The right button opens its menu, and selects it; the menu shows the keys.
         s.song_click(SIZE, x, y, Button::Right);
-        assert_eq!(menu(&s), ["next:0", "delete:0"]);
+        assert_eq!(menu(&s), [SongAction::RepeatClip(0).into(), SongAction::RemoveClip(0).into()]);
         let shortcuts = s.chrome.widgets.dropdown().map(|d| d.shortcuts.clone()).unwrap_or_default();
         assert_eq!(shortcuts, crate::menu::shown_shortcuts(&["Ctrl+D", "Delete"]));
         assert_eq!(s.selected_clip(), Some(0));

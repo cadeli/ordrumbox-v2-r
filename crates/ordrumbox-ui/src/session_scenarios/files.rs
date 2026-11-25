@@ -199,10 +199,9 @@ fn a_project_saved_comes_back_from_the_open_menu() {
     assert_eq!(s.editor.library().patterns.len(), count + 2);
     s.run(Command::LoadProject);
     let menu = s.chrome.widgets.dropdown().expect("the Open list");
-    assert_eq!(menu.values.len(), 1);
-    let value = menu.values[0].clone();
+    assert_eq!(menu.labels.len(), 1);
     draw(&mut s);
-    s.song_menu_pick(&value);
+    s.pick(0);
     assert!(s.confirm_open(), "loading replaces the library: asked first");
     draw(&mut s);
     s.overlay_key(OverlayKey::Move(1));

@@ -16,6 +16,7 @@ use ordrumbox_core::steps::absolute_step;
 use super::Session;
 use super::session_chrome::GridHold;
 use crate::editors::{self, LANES, Prop};
+use crate::menu_action::LaneAction;
 use crate::panel::{Dropdown, Id, Rect};
 use crate::view;
 
@@ -138,31 +139,28 @@ impl Session {
         let at = i64::from(layout.start_beat()) * i64::from(spb) + step;
         let title = format!("{} - {}", track.name, prop.label);
         let lines = [
-            (format!("step:{at}"), "Reset this step".to_owned()),
-            ("all".to_owned(), "Reset all notes".to_owned()),
-            ("auto-height".to_owned(), "Automatic height".to_owned()),
+            (LaneAction::ResetStep(at), "Reset this step".to_owned()),
+            (LaneAction::ResetAll, "Reset all notes".to_owned()),
+            (LaneAction::AutoHeight, "Automatic height".to_owned()),
         ];
         self.chrome.widgets.open_dropdown(Dropdown::menu(Id::LaneMenu, x, y, title, lines));
         true
     }
 
-    /// An action of the lane's menu: `step:N` puts the notes of absolute
-    /// step `N`, `all` every note of the track, back to the default setting.
-    pub(super) fn lane_menu_pick(&mut self, value: &str) {
-        if value == "auto-height" {
-            self.chrome.lane_height = None;
-            return;
-        }
+    /// An action of the lane's menu: the notes of a step, or every note of
+    /// the track, back to the default setting; or the lane's height automatic.
+    pub(super) fn lane_menu_pick(&mut self, action: LaneAction) {
+        let only = match action {
+            LaneAction::AutoHeight => {
+                self.chrome.lane_height = None;
+                return;
+            }
+            LaneAction::ResetStep(at) => Some(at),
+            LaneAction::ResetAll => None,
+        };
         let (Some(t), Some(prop)) = (self.editor_track(), self.lane_prop()) else { return };
         let Some(track) = self.track(t) else { return };
         let spb = view::steps_per_beat(track);
-        let only = match value.split_once(':') {
-            Some(("step", at)) => match at.parse::<i64>() {
-                Ok(at) => Some(at),
-                Err(_) => return,
-            },
-            _ => None,
-        };
         let default = lane_default(prop);
         let values: Vec<(usize, Option<f64>)> = track
             .notes

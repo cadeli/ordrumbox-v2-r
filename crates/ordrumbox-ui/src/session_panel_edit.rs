@@ -13,6 +13,7 @@ use super::session_panel::{NoteTarget, history_label, number};
 use super::{Session, session_grid};
 use crate::editors::{self, KNOB_BAR};
 use crate::menu::Command;
+use crate::menu_action::InstrumentAction;
 use crate::panel::{Dropdown, Id, LfoParam};
 use crate::picker::Purpose;
 use ordrumbox_engine::kit::edit::{SampleField, move_sample};
@@ -318,25 +319,6 @@ impl Session {
         None
     }
 
-    /// An option picked in the open list.
-    pub(super) fn pick(&mut self, index: usize) {
-        let Some(mut dropdown) = self.chrome.widgets.take_dropdown() else { return };
-        let Some(value) = dropdown.values.get(index).cloned() else { return };
-        // A menu that opens another stays shown beside it, this line highlighted.
-        dropdown.at = index;
-        match dropdown.id {
-            Id::GridMenu => self.grid_menu_pick(&value, dropdown),
-            Id::TrackNameMenu(target) => self.track_name_menu_pick(target, &value, dropdown),
-            Id::KitInstrumentMenu(sample) => self.kit_instrument_menu_pick(sample, &value, dropdown),
-            Id::InstrumentMenu => self.instrument_menu_pick(&value, dropdown),
-            Id::ControlMenu => self.control_menu_pick(&value, dropdown.control),
-            Id::AutomationMenu => self.automation_menu_pick(&value, dropdown),
-            Id::PatternMenu => self.pattern_menu_pick(&value, dropdown),
-            Id::SynthPresetMenu => self.synth_preset_menu_pick(&value, dropdown),
-            id => self.select(id, &value),
-        }
-    }
-
     /// The Sound tab's instrument menus under `rect` (`current` is the
     /// track's instrument): the categories of the instruments that have samples.
     pub(super) fn instrument_menu(&mut self, current: &str, rect: crate::panel::Rect) {
@@ -349,13 +331,14 @@ impl Session {
 
     /// A line of the Sound tab's instrument menus, picked in `menu`: a
     /// category opens its instruments beside it, an instrument is the track's.
-    fn instrument_menu_pick(&mut self, value: &str, menu: Dropdown) {
-        let sampled = self.sampled_instruments();
-        if self.category_submenu_where(Id::InstrumentMenu, value, menu, |id| sampled.contains(id)) {
-            return;
-        }
-        if let Some(id) = session_grid::picked_instrument(value) {
-            self.select(Id::Instrument, id);
+    pub(super) fn instrument_menu_pick(&mut self, action: InstrumentAction, menu: Dropdown) {
+        match action {
+            InstrumentAction::Category(index) => {
+                let sampled = self.sampled_instruments();
+                self.category_submenu(Id::InstrumentMenu, index, menu, |id| sampled.contains(id));
+            }
+            InstrumentAction::Instrument(id) => self.select(Id::Instrument, &id),
+            InstrumentAction::FreeName => {}
         }
     }
 
@@ -380,7 +363,6 @@ impl Session {
                     self.select_song(index);
                 }
             }
-            Id::SongMenu => self.song_menu_pick(value),
             Id::StyleList => self.choose_style(value),
             Id::Beats => {
                 if let Ok(beats) = value.parse::<i32>() {
@@ -392,10 +374,6 @@ impl Session {
                     self.select_roll_track(t);
                 }
             }
-            Id::RollMenu => self.roll_menu_pick(value),
-            Id::LaneMenu => self.lane_menu_pick(value),
-            // Picked with where they are (`pick`).
-            Id::GridMenu | Id::TrackNameMenu(_) | Id::KitInstrumentMenu(_) | Id::InstrumentMenu => {}
             Id::SynthPreset | Id::SynthField(_) => self.synth_select(id, value),
             Id::KitKit => {
                 let target = self.kits.kits().iter().position(|k| k.name == value);

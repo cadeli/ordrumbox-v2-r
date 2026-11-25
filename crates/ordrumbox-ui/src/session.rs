@@ -133,6 +133,8 @@ mod session_library_file;
 mod session_mcp;
 #[path = "session_mcp_tools.rs"]
 mod session_mcp_tools;
+#[path = "session_menu_pick.rs"]
+mod session_menu_pick;
 #[path = "session_mixer.rs"]
 mod session_mixer;
 #[path = "session_new_demos.rs"]

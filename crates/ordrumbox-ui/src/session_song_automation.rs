@@ -15,19 +15,10 @@ use ordrumbox_core::automation::{
 };
 
 use super::Session;
+use crate::menu_action::AutomationAction;
 use crate::panel::{Dropdown, Id, SUBMENU_MARK};
 use crate::song_view::SongSpot;
 use crate::ui_input::Button;
-
-/// The values of the automation menus' lines.
-const INSTRUMENT_VALUE: &str = "instrument:";
-const LANE_VALUE: &str = "lane:";
-const REMOVE_VALUE: &str = "remove:";
-const CLEAR_VALUE: &str = "clear:";
-const REMOVE_ALL_VALUE: &str = "remove-all";
-const TALLER_VALUE: &str = "taller:";
-const SHORTER_VALUE: &str = "shorter:";
-const REENABLE_VALUE: &str = "reenable:";
 
 /// A press on a lane's step, which a drag turns into a painted zone.
 #[derive(Debug, Clone, PartialEq)]
@@ -229,7 +220,8 @@ impl Session {
             self.message = "The song's patterns have no tracks to automate".into();
             return;
         }
-        let lines = names.iter().map(|name| (format!("{INSTRUMENT_VALUE}{name}"), format!("{name}{SUBMENU_MARK}")));
+        let lines =
+            names.iter().map(|name| (AutomationAction::Instrument(name.clone()), format!("{name}{SUBMENU_MARK}")));
         let menu = Dropdown::menu(Id::AutomationMenu, x, y, "New automation".into(), lines);
         self.chrome.widgets.open_dropdown(menu);
     }
@@ -241,15 +233,15 @@ impl Session {
         let Some(lane_shown) = self.song().and_then(|song| song.automations.get(lane)) else { return };
         let title = format!("{} {}", lane_shown.target().label(), lane_shown.instrument());
         let is_taken_back = self.is_taken_back(lane_shown.instrument(), lane_shown.target());
-        let reenable = is_taken_back.then(|| (format!("{REENABLE_VALUE}{lane}"), "Re-enable lane".to_owned()));
+        let reenable = is_taken_back.then_some((AutomationAction::Reenable(lane), "Re-enable lane"));
         let lines = [
-            (format!("{TALLER_VALUE}{lane}"), "Taller"),
-            (format!("{SHORTER_VALUE}{lane}"), "Shorter"),
-            (format!("{CLEAR_VALUE}{lane}"), "Clear all points"),
-            (format!("{REMOVE_VALUE}{lane}"), "Delete lane"),
-            (REMOVE_ALL_VALUE.to_owned(), "Delete all lanes"),
+            (AutomationAction::Taller(lane), "Taller"),
+            (AutomationAction::Shorter(lane), "Shorter"),
+            (AutomationAction::Clear(lane), "Clear all points"),
+            (AutomationAction::Remove(lane), "Delete lane"),
+            (AutomationAction::RemoveAll, "Delete all lanes"),
         ];
-        let lines = reenable.into_iter().chain(lines.map(|(value, label)| (value, label.to_owned())));
+        let lines = reenable.into_iter().chain(lines).map(|(action, label)| (action, label.to_owned()));
         let menu = Dropdown::menu(Id::AutomationMenu, x, y, title, lines);
         self.chrome.widgets.open_dropdown(menu);
     }
@@ -257,59 +249,61 @@ impl Session {
     /// A line of the automation menus, picked in `menu`: an instrument opens
     /// its controls beside it, a control adds its lane, the lane's menu
     /// clears or removes it, or removes every lane.
-    pub(super) fn automation_menu_pick(&mut self, value: &str, menu: Dropdown) {
-        if let Some(instrument) = value.strip_prefix(INSTRUMENT_VALUE) {
-            let lines =
-                AutomationTarget::ALL.map(|t| (format!("{LANE_VALUE}{}:{instrument}", t.key()), t.label().to_owned()));
-            let size = self.chrome.panel_size;
-            let submenu = Dropdown::submenu(menu, size, Id::AutomationMenu, instrument.to_owned(), lines);
-            self.chrome.widgets.open_dropdown(submenu);
-        } else if let Some((key, instrument)) = value.strip_prefix(LANE_VALUE).and_then(|v| v.split_once(':')) {
-            let Some(target) = AutomationTarget::from_key(key) else { return };
-            match self.editor.add_automation_lane(None, instrument, target) {
-                Ok(_) => {
-                    self.edited();
-                    let how = match target.kind() {
-                        AutomationKind::Switch => "drag on it to switch it on or off",
-                        AutomationKind::Level => "drag on it to draw its level",
-                    };
-                    self.message = format!("{} lane of {instrument} added: {how}, right-drag to erase", target.label());
-                }
-                Err(message) => self.message = message,
+    pub(super) fn automation_menu_pick(&mut self, action: AutomationAction, menu: Dropdown) {
+        match action {
+            AutomationAction::Instrument(instrument) => {
+                let lines = AutomationTarget::ALL.map(|target| {
+                    (AutomationAction::AddLane { target, instrument: instrument.clone() }, target.label().to_owned())
+                });
+                let size = self.chrome.panel_size;
+                let submenu = Dropdown::submenu(menu, size, Id::AutomationMenu, instrument, lines);
+                self.chrome.widgets.open_dropdown(submenu);
             }
-        } else if let Some(lane) = value.strip_prefix(REENABLE_VALUE).and_then(|l| l.parse().ok()) {
-            self.reenable_lane(lane);
-        } else if let Some(lane) = value.strip_prefix(REMOVE_VALUE).and_then(|l| l.parse().ok()) {
-            self.undoable(|s| {
+            AutomationAction::AddLane { target, instrument } => self.add_lane(target, &instrument),
+            AutomationAction::Reenable(lane) => self.reenable_lane(lane),
+            AutomationAction::Remove(lane) => self.undoable(|s| {
                 if s.editor.remove_automation_lane(None, lane) {
                     s.edited();
                 }
-            });
-        } else if let Some(lane) = value.strip_prefix(CLEAR_VALUE).and_then(|l| l.parse().ok()) {
-            self.undoable(|s| {
+            }),
+            AutomationAction::Clear(lane) => self.undoable(|s| {
                 if s.editor.clear_automation_lane(None, lane) {
                     s.edited();
                 }
-            });
-        } else if let Some((lane, delta)) = value
-            .strip_prefix(TALLER_VALUE)
-            .map(|l| (l, 1))
-            .or_else(|| value.strip_prefix(SHORTER_VALUE).map(|l| (l, -1)))
-            .and_then(|(l, delta)| Some((l.parse::<usize>().ok()?, delta)))
-        {
-            let Some(rows) = self.song().and_then(|song| song.automations.get(lane)).map(|l| l.row_count()) else {
-                return;
-            };
-            let key = format!("lane-rows:{lane}:{}", self.editor.revision());
-            if self.editor.set_automation_lane_rows(None, lane, rows.saturating_add_signed(delta), &key) {
-                self.edited();
-            }
-        } else if value == REMOVE_ALL_VALUE {
-            self.undoable(|s| {
+            }),
+            AutomationAction::Taller(lane) => self.resize_lane(lane, 1),
+            AutomationAction::Shorter(lane) => self.resize_lane(lane, -1),
+            AutomationAction::RemoveAll => self.undoable(|s| {
                 if s.editor.remove_automation_lanes(None) {
                     s.edited();
                 }
-            });
+            }),
+        }
+    }
+
+    /// A lane of `target` for `instrument` added to the song.
+    fn add_lane(&mut self, target: AutomationTarget, instrument: &str) {
+        match self.editor.add_automation_lane(None, instrument, target) {
+            Ok(_) => {
+                self.edited();
+                let how = match target.kind() {
+                    AutomationKind::Switch => "drag on it to switch it on or off",
+                    AutomationKind::Level => "drag on it to draw its level",
+                };
+                self.message = format!("{} lane of {instrument} added: {how}, right-drag to erase", target.label());
+            }
+            Err(message) => self.message = message,
+        }
+    }
+
+    /// Lane `lane` made `delta` rows taller (shorter below 0).
+    fn resize_lane(&mut self, lane: usize, delta: i32) {
+        let Some(rows) = self.song().and_then(|song| song.automations.get(lane)).map(|l| l.row_count()) else {
+            return;
+        };
+        let key = format!("lane-rows:{lane}:{}", self.editor.revision());
+        if self.editor.set_automation_lane_rows(None, lane, rows.saturating_add_signed(delta), &key) {
+            self.edited();
         }
     }
 }
@@ -318,9 +312,15 @@ impl Session {
 mod tests {
     use super::super::session_song::tests::{SIZE, choose, find_spot, menu, session};
     use super::Session;
+    use crate::menu_action::{AutomationAction, MenuAction};
     use crate::song_view::{MeasureZoom, SongSpot};
     use crate::ui_input::Button;
     use ordrumbox_core::automation::AutomationTarget;
+
+    /// The lines of an automation menu.
+    fn lines(actions: impl IntoIterator<Item = AutomationAction>) -> Vec<MenuAction> {
+        actions.into_iter().map(MenuAction::from).collect()
+    }
 
     const ON: Option<f64> = Some(1.0);
     const OFF: Option<f64> = Some(0.0);
@@ -367,10 +367,12 @@ mod tests {
         s.set_size(SIZE);
         let (x, y) = find_spot(&s, |spot| spot == SongSpot::AddAutomation);
         assert!(s.song_click(SIZE, x, y, Button::Left));
-        assert_eq!(menu(&s), ["instrument:KICK", "instrument:SNARE"], "the song's instruments, once each");
+        let instruments = ["KICK", "SNARE"].map(|name| AutomationAction::Instrument(name.into()));
+        assert_eq!(menu(&s), lines(instruments), "the song's instruments, once each");
         choose(&mut s, 1);
-        let targets = AutomationTarget::ALL.map(|t| format!("lane:{}:SNARE", t.key()));
-        assert_eq!(menu(&s), targets);
+        let targets =
+            AutomationTarget::ALL.map(|target| AutomationAction::AddLane { target, instrument: "SNARE".into() });
+        assert_eq!(menu(&s), lines(targets));
         choose(&mut s, 1);
         let lanes = &s.song().unwrap().automations;
         assert_eq!((lanes[0].instrument(), lanes[0].target()), ("SNARE", AutomationTarget::Solo));
@@ -406,7 +408,16 @@ mod tests {
         // A right-click on its name opens its menu: clear it, delete it, delete every lane.
         let (nx, ny) = find_spot(&s, |spot| spot == SongSpot::LaneName(0));
         assert!(s.song_click(SIZE, nx, ny, Button::Right));
-        assert_eq!(menu(&s), ["taller:0", "shorter:0", "clear:0", "remove:0", "remove-all"]);
+        assert_eq!(
+            menu(&s),
+            lines([
+                AutomationAction::Taller(0),
+                AutomationAction::Shorter(0),
+                AutomationAction::Clear(0),
+                AutomationAction::Remove(0),
+                AutomationAction::RemoveAll
+            ])
+        );
         choose(&mut s, 3);
         assert!(s.song().unwrap().automations.is_empty());
     }

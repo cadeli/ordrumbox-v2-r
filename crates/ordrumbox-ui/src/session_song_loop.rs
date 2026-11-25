@@ -7,6 +7,7 @@
 
 use super::Session;
 use super::session_song::DRAG_START_PX;
+use crate::menu_action::LoopAction;
 use crate::panel::{Dropdown, Id};
 use crate::scale::Scale;
 use crate::scroll_thumb::Edge;
@@ -84,19 +85,17 @@ impl Session {
             return;
         }
         let toggle = if self.transport.is_loop_on { "Turn the loop off" } else { "Turn the loop on" };
-        let lines =
-            [("loop:toggle".to_owned(), toggle.to_owned()), ("loop:clear".to_owned(), "Remove the loop".to_owned())];
+        let lines = [(LoopAction::Toggle, toggle.to_owned()), (LoopAction::Clear, "Remove the loop".to_owned())];
         let shortcuts = crate::menu::shown_shortcuts(&["Ctrl+L", ""]);
         let menu = Dropdown::menu(Id::SongMenu, x, y, "Loop".into(), lines);
         self.chrome.widgets.open_dropdown(menu.with_shortcuts(shortcuts));
     }
 
-    /// A line of the loop's menu: `toggle` or `clear`.
-    pub(super) fn loop_menu_pick(&mut self, action: &str) {
+    /// A line of the loop's menu.
+    pub(super) fn loop_menu_pick(&mut self, action: LoopAction) {
         match action {
-            "toggle" => self.toggle_loop(),
-            "clear" => self.clear_loop(),
-            _ => {}
+            LoopAction::Toggle => self.toggle_loop(),
+            LoopAction::Clear => self.clear_loop(),
         }
     }
 
@@ -115,6 +114,7 @@ impl Session {
 mod tests {
     use super::super::session_song::tests::{SIZE, choose, menu, session};
     use super::Session;
+    use crate::menu_action::LoopAction;
     use crate::song_view::{MeasureZoom, SongSpot};
     use crate::ui_input::Button;
 
@@ -195,7 +195,7 @@ mod tests {
 
         // A right-click: turn it off or remove it.
         assert!(s.song_click(SIZE, x, y, Button::Right));
-        assert_eq!(menu(&s), ["loop:toggle", "loop:clear"]);
+        assert_eq!(menu(&s), [LoopAction::Toggle.into(), LoopAction::Clear.into()]);
         choose(&mut s, 0);
         assert_eq!((s.song_loop_region(), s.song_loop_marks()), (None, Some((14, 24))));
         assert!(s.song_click(SIZE, x, y, Button::Right));

@@ -4,6 +4,7 @@
 use super::session_confirm::Pending;
 use super::{Session, session_grid};
 use crate::kits::KitSet;
+use crate::menu_action::InstrumentAction;
 use crate::panel::{Dropdown, Id};
 use crate::scale::Scale;
 use crate::view::KitView;
@@ -257,12 +258,13 @@ impl Session {
 
     /// A line of sample `sample`'s instrument menus, picked in `menu`: a
     /// category opens its instruments beside it, an instrument is the sample's.
-    pub(super) fn kit_instrument_menu_pick(&mut self, sample: usize, value: &str, menu: Dropdown) {
-        if self.category_submenu(Id::KitInstrumentMenu(sample), value, menu) {
-            return;
-        }
-        if let Some(id) = session_grid::picked_instrument(value) {
-            self.kit_set_instrument(sample, id);
+    pub(super) fn kit_instrument_menu_pick(&mut self, sample: usize, action: InstrumentAction, menu: Dropdown) {
+        match action {
+            InstrumentAction::Category(index) => {
+                self.category_submenu(Id::KitInstrumentMenu(sample), index, menu, |_| true);
+            }
+            InstrumentAction::Instrument(id) => self.kit_set_instrument(sample, &id),
+            InstrumentAction::FreeName => {}
         }
     }
 

@@ -512,7 +512,7 @@ mod entry;
 #[path = "panel/tabs.rs"]
 mod tabs;
 pub use draw::draw;
-pub use dropdown::{Dropdown, MENU_MARK, SUBMENU_MARK};
+pub use dropdown::{Choices, Dropdown, MENU_MARK, SUBMENU_MARK};
 pub use entry::Entry;
 pub use tabs::{EditorTab, GenerationTab, SynthTab, ViewButton};
 
@@ -520,6 +520,7 @@ pub use tabs::{EditorTab, GenerationTab, SynthTab, ViewButton};
 mod tests {
     use super::dropdown::LIST_ROWS;
     use super::*;
+    use crate::menu_action::LoopAction;
 
     #[test]
     fn a_step_wraps_round_the_list() {
@@ -569,8 +570,8 @@ mod tests {
         d.jump('i');
         assert_eq!(d.at, LIST_ROWS);
         // A menu: its title row takes no click.
-        let m =
-            Dropdown::menu(Id::SongMenu, 10, 10, "title".into(), [("a".into(), "A".into()), ("b".into(), "B".into())]);
+        let lines = [LoopAction::Toggle, LoopAction::Clear].map(|a| (a, format!("{a:?}")));
+        let m = Dropdown::menu(Id::SongMenu, 10, 10, "title".into(), lines);
         let r = m.rect(800, 600, Scale::ONE);
         assert_eq!(m.option_at(800, 600, Scale::ONE, r.x + 5, r.y + 3), None);
         assert_eq!(m.option_at(800, 600, Scale::ONE, r.x + 5, r.y + 2 + 12 + 1), Some(0));
@@ -640,7 +641,7 @@ mod tests {
         let spec = Spec::knob(20.0, 5000.0, 10.0, 500.0);
         Entry { id: Id::Decay, spec: Some(spec), title: "Enter value".into(), text: "12".into(), at: (390, 290) }
             .draw(&mut canvas, Scale::ONE);
-        Dropdown::menu(Id::SongMenu, 390, 290, "rock".into(), [("a".into(), "Add".into())])
+        Dropdown::menu(Id::SongMenu, 390, 290, "Loop".into(), [(LoopAction::Clear, "Clear".into())])
             .draw(&mut canvas, Scale::ONE);
     }
 }

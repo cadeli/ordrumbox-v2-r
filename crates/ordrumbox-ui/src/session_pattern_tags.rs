@@ -3,13 +3,10 @@
 //! a menu of styles, each opening its patterns.
 
 use super::Session;
+use crate::menu_action::PatternAction;
 use crate::panel::{Dropdown, Id, Rect, SUBMENU_MARK};
 use ordrumbox_core::tags;
 
-/// Value prefix of a style in the PATTERN menu (its index in the groups follows).
-const STYLE_VALUE: &str = "style:";
-/// Value prefix of a pattern in a style's list (its index in the library follows).
-const PATTERN_VALUE: &str = "pattern:";
 /// What the patterns without a style are listed under.
 const NO_STYLE: &str = "other";
 
@@ -41,32 +38,27 @@ impl Session {
     pub(super) fn pattern_style_menu(&mut self, rect: Rect) {
         let groups = tags::by_style(&self.editor.library().patterns);
         let at = groups.iter().position(|(_, indices)| indices.contains(&self.pattern_index)).unwrap_or(0);
-        let (values, labels) = groups
-            .iter()
-            .enumerate()
-            .map(|(i, (style, indices))| {
-                let label = format!("{} ({}){SUBMENU_MARK}", style.unwrap_or(NO_STYLE), indices.len());
-                (format!("{STYLE_VALUE}{i}"), label)
-            })
-            .unzip();
-        self.chrome.widgets.open_dropdown(Dropdown::new(Id::PatternMenu, rect, values, labels, at));
+        let lines = groups.iter().enumerate().map(|(i, (style, indices))| {
+            let label = format!("{} ({}){SUBMENU_MARK}", style.unwrap_or(NO_STYLE), indices.len());
+            (PatternAction::Style(i), label)
+        });
+        self.chrome.widgets.open_dropdown(Dropdown::from_actions(Id::PatternMenu, rect, lines, at));
     }
 
     /// A line of the PATTERN menus picked in `menu`: a style opens its
     /// patterns beside it, a pattern is shown (as the list did).
-    pub(super) fn pattern_menu_pick(&mut self, value: &str, menu: Dropdown) {
-        if let Some(index) = value.strip_prefix(PATTERN_VALUE).and_then(|i| i.parse::<usize>().ok()) {
-            self.show_pattern(index);
-            return;
-        }
-        let Some(group) = value.strip_prefix(STYLE_VALUE).and_then(|i| i.parse::<usize>().ok()) else { return };
+    pub(super) fn pattern_menu_pick(&mut self, action: PatternAction, menu: Dropdown) {
+        let group = match action {
+            PatternAction::Pattern(index) => return self.show_pattern(index),
+            PatternAction::Style(group) => group,
+        };
         let patterns = &self.editor.library().patterns;
         let groups = tags::by_style(patterns);
         let Some((style, indices)) = groups.get(group) else { return };
         let title = style.unwrap_or(NO_STYLE).to_owned();
-        let lines = indices.iter().map(|&i| {
-            (format!("{PATTERN_VALUE}{i}"), patterns[i].name.clone().unwrap_or_else(|| format!("Pattern {i}")))
-        });
+        let lines = indices
+            .iter()
+            .map(|&i| (PatternAction::Pattern(i), patterns[i].name.clone().unwrap_or_else(|| format!("Pattern {i}"))));
         let at = indices.iter().position(|&i| i == self.pattern_index);
         let mut submenu = Dropdown::submenu(menu, self.chrome.panel_size, Id::PatternMenu, title, lines);
         if let Some(at) = at {
@@ -125,7 +117,7 @@ mod tests {
         assert_eq!(open.at, 0, "the style of the pattern shown");
         // rock, then its pattern: `a` shown.
         choose(&mut s, 1);
-        assert_eq!(menu(&s), ["pattern:0"]);
+        assert_eq!(menu(&s), [PatternAction::Pattern(0).into()]);
         choose(&mut s, 0);
         assert_eq!(s.pattern_index, 0);
     }

@@ -8,6 +8,7 @@ use ordrumbox_core::json::{self, Value};
 use super::Session;
 use super::session_confirm::Pending;
 use crate::frame;
+use crate::menu_action::MenuAction;
 use crate::panel::{self, Rect};
 use crate::panel::{Dropdown, Id};
 use crate::store;
@@ -56,12 +57,14 @@ impl Session {
             self.message = "No saved projects found".into();
             return;
         }
-        let labels = files.iter().map(|f| f.file_stem().unwrap_or_default().to_string_lossy().into_owned()).collect();
-        let values = files.iter().map(|f| format!("load:{}", f.display())).collect();
+        let lines = files.into_iter().map(|f| {
+            let label = f.file_stem().unwrap_or_default().to_string_lossy().into_owned();
+            (MenuAction::LoadProject(f), label)
+        });
         let anchor = self.song_button_rect("load");
         self.chrome.widgets.open_dropdown(Dropdown {
             title: Some("Open Project".into()),
-            ..Dropdown::new(Id::SongMenu, anchor, values, labels, 0)
+            ..Dropdown::from_actions(Id::SongMenu, anchor, lines, 0)
         });
     }
 

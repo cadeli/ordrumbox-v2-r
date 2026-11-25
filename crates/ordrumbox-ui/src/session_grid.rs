@@ -17,6 +17,7 @@ use super::session_selection::Clipboard;
 use super::session_song::DRAG_START_PX;
 use super::session_types::Workspace;
 use super::session_zone::zone_label;
+use crate::menu_action::{GridAction, InstrumentAction, StepAction, TrackAction};
 use crate::panel::{Dropdown, Id};
 use crate::view::{Cursor, Spot};
 use crate::{menu, view};
@@ -37,34 +38,22 @@ pub(super) struct TrackDrag {
     revision: u64,
 }
 
-/// Value prefix of a category in the "add track" menus (its index follows).
-const CATEGORY_VALUE: &str = "category:";
-/// Value prefix of an instrument in the "add track" menus (its id follows).
-const INSTRUMENT_VALUE: &str = "instrument:";
-/// Value of the line of the rename menus that asks for any name.
-const FREE_NAME_VALUE: &str = "free-name";
-
 /// The lines of an instrument menu that open a category's instruments
-/// ([`Session::category_submenu`]): values and labels.
-pub(super) fn category_lines() -> Vec<(String, String)> {
+/// ([`Session::category_submenu`]): actions and labels.
+pub(super) fn category_lines() -> Vec<(InstrumentAction, String)> {
     category_lines_where(|_| true)
 }
 
 /// The lines of an instrument menu whose categories hold an instrument that
 /// `keep` keeps; the others are left out.
-pub(super) fn category_lines_where(keep: impl Fn(&str) -> bool) -> Vec<(String, String)> {
+pub(super) fn category_lines_where(keep: impl Fn(&str) -> bool) -> Vec<(InstrumentAction, String)> {
     catalog()
         .categories
         .iter()
         .enumerate()
         .filter(|(_, (_, ids))| ids.iter().any(|id| keep(id)))
-        .map(|(i, (category, _))| (format!("{CATEGORY_VALUE}{i}"), format!("{category}{SUBMENU_MARK}")))
+        .map(|(i, (category, _))| (InstrumentAction::Category(i), format!("{category}{SUBMENU_MARK}")))
         .collect()
-}
-
-/// The instrument a line of a category's list stands for.
-pub(super) fn picked_instrument(value: &str) -> Option<&str> {
-    value.strip_prefix(INSTRUMENT_VALUE)
 }
 
 /// Where item `t` of a list is once the item `from` moved to `to`.
@@ -140,7 +129,7 @@ impl Session {
     fn track_name_menu(
         &mut self,
         target: Option<usize>,
-        open: impl FnOnce(Id, String, Vec<(String, String)>) -> Dropdown,
+        open: impl FnOnce(Id, String, Vec<(InstrumentAction, String)>) -> Dropdown,
     ) {
         if self.pattern().is_none() {
             return;
@@ -153,7 +142,7 @@ impl Session {
         let title = match target {
             Some(t) => {
                 let Some(track) = self.track(t) else { return };
-                lines.push((FREE_NAME_VALUE.to_owned(), "Free name...".to_owned()));
+                lines.push((InstrumentAction::FreeName, "Free name...".to_owned()));
                 format!("Rename {}", track.name)
             }
             None => "Add track".to_owned(),
@@ -164,40 +153,25 @@ impl Session {
     /// A line of the instrument menus, picked in `menu`: a category opens the
     /// list of its instruments beside it, an instrument names the track,
     /// "Free name" asks for the name.
-    pub(super) fn track_name_menu_pick(&mut self, target: Option<usize>, value: &str, menu: Dropdown) {
-        if self.category_submenu(Id::TrackNameMenu(target), value, menu) {
-            return;
-        }
-        match (target, picked_instrument(value)) {
-            (None, Some(name)) => self.add_track_named(name),
-            (Some(t), Some(name)) => self.commit_text(Id::TrackName(t), name),
-            (Some(t), None) if value == FREE_NAME_VALUE => self.text_entry(Id::TrackName(t)),
-            _ => {}
+    pub(super) fn track_name_menu_pick(&mut self, target: Option<usize>, action: InstrumentAction, menu: Dropdown) {
+        match (action, target) {
+            (InstrumentAction::Category(index), _) => {
+                self.category_submenu(Id::TrackNameMenu(target), index, menu, |_| true);
+            }
+            (InstrumentAction::Instrument(name), None) => self.add_track_named(&name),
+            (InstrumentAction::Instrument(name), Some(t)) => self.commit_text(Id::TrackName(t), &name),
+            (InstrumentAction::FreeName, Some(t)) => self.text_entry(Id::TrackName(t)),
+            (InstrumentAction::FreeName, None) => {}
         }
     }
 
-    /// `value`, picked in the instrument menu `menu` (of id `id`), when it is
-    /// a category: the list of its instruments beside it. Whether it was one.
-    pub(super) fn category_submenu(&mut self, id: Id, value: &str, menu: Dropdown) -> bool {
-        self.category_submenu_where(id, value, menu, |_| true)
-    }
-
-    /// [`Session::category_submenu`], listing only the instruments `keep` keeps.
-    pub(super) fn category_submenu_where(
-        &mut self,
-        id: Id,
-        value: &str,
-        menu: Dropdown,
-        keep: impl Fn(&str) -> bool,
-    ) -> bool {
-        let Some(index) = value.strip_prefix(CATEGORY_VALUE).and_then(|i| i.parse::<usize>().ok()) else {
-            return false;
-        };
-        let Some((category, ids)) = catalog().categories.get(index) else { return true };
-        let lines = ids.iter().filter(|id| keep(id)).map(|id| (format!("{INSTRUMENT_VALUE}{id}"), id.clone()));
+    /// The list of the instruments of category `index` that `keep` keeps,
+    /// beside the instrument menu `menu` (of id `id`).
+    pub(super) fn category_submenu(&mut self, id: Id, index: usize, menu: Dropdown, keep: impl Fn(&str) -> bool) {
+        let Some((category, ids)) = catalog().categories.get(index) else { return };
+        let lines = ids.iter().filter(|id| keep(id)).map(|id| (InstrumentAction::Instrument(id.clone()), id.clone()));
         let submenu = Dropdown::submenu(menu, self.chrome.panel_size, id, (*category).to_owned(), lines);
         self.chrome.widgets.open_dropdown(submenu);
-        true
     }
 
     /// A track: rename, copy, paste after it, move up or down, duplicate,
@@ -206,28 +180,26 @@ impl Session {
         let Some(track) = self.track(t) else { return };
         let title = track.name.clone();
         let count = self.pattern().map_or(0, |p| p.tracks.len());
-        let mut items = vec![("rename", "Rename track >", ""), ("copy", "Copy track", "Ctrl+Shift+C")];
+        let mut items =
+            vec![(TrackAction::Rename, "Rename track >", ""), (TrackAction::Copy, "Copy track", "Ctrl+Shift+C")];
         if matches!(self.selection.clipboard, Some(Clipboard::Track(_))) {
-            items.push(("paste", "Paste track", "Ctrl+Shift+V"));
+            items.push((TrackAction::Paste, "Paste track", "Ctrl+Shift+V"));
         }
         if t > 0 {
-            items.push(("up", "Move up", ""));
+            items.push((TrackAction::MoveUp, "Move up", ""));
         }
         if t + 1 < count {
-            items.push(("down", "Move down", ""));
+            items.push((TrackAction::MoveDown, "Move down", ""));
         }
         items.extend([
-            ("duplicate", "Duplicate track", ""),
-            ("delete", "Delete track", "Ctrl+Backspace"),
-            ("randomize", "Randomize", "Shift+X"),
-            ("clear", "Clear notes", ""),
-            ("add-track", "Add track >", ""),
+            (TrackAction::Duplicate, "Duplicate track", ""),
+            (TrackAction::Delete, "Delete track", "Ctrl+Backspace"),
+            (TrackAction::Randomize, "Randomize", "Shift+X"),
+            (TrackAction::Clear, "Clear notes", ""),
+            (TrackAction::AddTrack, "Add track >", ""),
         ]);
-        self.open_grid_menu(
-            title,
-            items.iter().map(|&(action, label, key)| (format!("{action}:{t}"), label, key)),
-            (x, y),
-        );
+        let lines = items.into_iter().map(|(action, label, key)| (GridAction::Track(t, action), label, key));
+        self.open_grid_menu(title, lines, (x, y));
     }
 
     /// A step: copy its notes, paste on it, delete them, add a random note.
@@ -242,12 +214,12 @@ impl Session {
             Some(zone) => {
                 title = format!("Zone — {}", zone_label(&zone));
                 vec![
-                    ("copy-zone", "Copy zone", "Ctrl+C"),
-                    ("cut-zone", "Cut zone", "Ctrl+X"),
-                    ("delete-zone", "Delete zone", "Delete"),
+                    (StepAction::CopyZone, "Copy zone", "Ctrl+C"),
+                    (StepAction::CutZone, "Cut zone", "Ctrl+X"),
+                    (StepAction::DeleteZone, "Delete zone", "Delete"),
                 ]
             }
-            None => vec![("copy-notes", "Copy notes", "Ctrl+C")],
+            None => vec![(StepAction::CopyNotes, "Copy notes", "Ctrl+C")],
         };
         let pasteable = match &self.selection.clipboard {
             Some(Clipboard::Step(notes)) => !notes.is_empty(),
@@ -255,25 +227,27 @@ impl Session {
             Some(Clipboard::Track(_) | Clipboard::Roll(_)) | None => false,
         };
         if pasteable {
-            items.push(("paste-notes", "Paste notes", "Ctrl+V"));
+            items.push((StepAction::PasteNotes, "Paste notes", "Ctrl+V"));
         }
         if has_notes && zone.is_none() {
-            items.push(("delete-notes", "Delete notes", "Delete"));
+            items.push((StepAction::DeleteNotes, "Delete notes", "Delete"));
         }
-        items.push(("random-note", "Add random note", ""));
-        let lines = items.iter().map(|&(action, label, key)| (format!("{action}:{t}:{beat}:{step}"), label, key));
+        items.push((StepAction::RandomNote, "Add random note", ""));
+        let at = Cursor { track: t, beat, step };
+        let lines = items.into_iter().map(|(action, label, key)| (GridAction::Step(at, action), label, key));
         self.open_grid_menu(title, lines, (x, y));
     }
 
-    /// A grid menu under `title` at `(x, y)`: its lines, each a value, a
+    /// A grid menu under `title` at `(x, y)`: its lines, each an action, a
     /// label and the key that does the same (empty: none).
     fn open_grid_menu(
         &mut self,
         title: String,
-        lines: impl Iterator<Item = (String, &'static str, &'static str)>,
+        lines: impl Iterator<Item = (GridAction, &'static str, &'static str)>,
         (x, y): (i32, i32),
     ) {
-        let (lines, keys): (Vec<_>, Vec<_>) = lines.map(|(value, label, key)| ((value, label.to_owned()), key)).unzip();
+        let (lines, keys): (Vec<_>, Vec<_>) =
+            lines.map(|(action, label, key)| ((action, label.to_owned()), key)).unzip();
         let shortcuts = crate::menu::shown_shortcuts(&keys);
         let menu = Dropdown::menu(Id::GridMenu, x, y, title, lines).with_shortcuts(shortcuts);
         self.chrome.widgets.open_dropdown(menu);
@@ -281,43 +255,47 @@ impl Session {
 
     /// An action of a grid menu: the cursor goes to its track or step, and
     /// the action runs as its key would there. A menu it opens opens beside `menu`.
-    pub(super) fn grid_menu_pick(&mut self, value: &str, menu: Dropdown) {
-        let mut parts = value.split(':');
-        let action = parts.next().unwrap_or_default();
-        let mut number = || parts.next().and_then(|v| v.parse::<i32>().ok());
-        let Some(t) = number().and_then(|t| usize::try_from(t).ok()) else { return };
+    pub(super) fn grid_menu_pick(&mut self, action: GridAction, menu: Dropdown) {
+        let cursor = action.cursor();
+        let t = cursor.track;
         if self.track(t).is_none() {
             return;
         }
-        let (beat, step) = (number().unwrap_or(0), number().unwrap_or(0));
         // The zone's actions keep it, and the cursor where it was.
-        if let Some(zone) = self.selection.zone {
-            match action {
-                "copy-zone" => return self.copy_zone(&zone),
-                "cut-zone" => return self.cut_zone(&zone),
-                "delete-zone" => return self.delete_zone(&zone),
+        if let (GridAction::Step(_, step_action), Some(zone)) = (action, self.selection.zone) {
+            match step_action {
+                StepAction::CopyZone => return self.copy_zone(&zone),
+                StepAction::CutZone => return self.cut_zone(&zone),
+                StepAction::DeleteZone => return self.delete_zone(&zone),
                 _ => {}
             }
         }
         // The menu's step or track, not a zone drawn before.
         self.selection.zone = None;
-        self.selection.cursor = Some(Cursor { track: t, beat, step });
+        self.selection.cursor = Some(cursor);
         match action {
-            "rename" => self.track_name_submenu(Some(t), menu),
-            "copy" => self.copy(true),
-            "paste" => self.paste(true),
-            "up" => self.move_track(t, t.saturating_sub(1)),
-            "down" => self.move_track(t, t + 1),
-            "duplicate" => self.duplicate_track(t),
-            "delete" => self.remove_track(),
-            "randomize" => self.randomize_track(),
-            "clear" => self.clear_track(t),
-            "copy-notes" => self.copy(false),
-            "paste-notes" => self.paste(false),
-            "delete-notes" => self.delete_step(),
-            "random-note" => self.add_random_note(t, beat, step),
-            "add-track" => self.track_name_submenu(None, menu),
-            _ => {}
+            GridAction::Track(_, track_action) => self.track_menu_pick(t, track_action, menu),
+            GridAction::Step(_, StepAction::CopyNotes) => self.copy(false),
+            GridAction::Step(_, StepAction::PasteNotes) => self.paste(false),
+            GridAction::Step(_, StepAction::DeleteNotes) => self.delete_step(),
+            GridAction::Step(_, StepAction::RandomNote) => self.add_random_note(t, cursor.beat, cursor.step),
+            GridAction::Step(_, StepAction::CopyZone | StepAction::CutZone | StepAction::DeleteZone) => {}
+        }
+    }
+
+    /// An action of track `t`'s menu, the cursor on it.
+    fn track_menu_pick(&mut self, t: usize, action: TrackAction, menu: Dropdown) {
+        match action {
+            TrackAction::Rename => self.track_name_submenu(Some(t), menu),
+            TrackAction::Copy => self.copy(true),
+            TrackAction::Paste => self.paste(true),
+            TrackAction::MoveUp => self.move_track(t, t.saturating_sub(1)),
+            TrackAction::MoveDown => self.move_track(t, t + 1),
+            TrackAction::Duplicate => self.duplicate_track(t),
+            TrackAction::Delete => self.remove_track(),
+            TrackAction::Randomize => self.randomize_track(),
+            TrackAction::Clear => self.clear_track(t),
+            TrackAction::AddTrack => self.track_name_submenu(None, menu),
         }
     }
 

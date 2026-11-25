@@ -5,26 +5,12 @@
 
 use super::Session;
 use super::session_panel_views::synth_choice;
+use crate::menu_action::SynthPresetAction;
 use crate::panel::{Dropdown, Id, Rect, SUBMENU_MARK};
 use ordrumbox_engine::synth_preset::tags::Facet;
 
-/// Value prefix of an instrument in the preset menu (its index in the groups follows).
-const INSTRUMENT_VALUE: &str = "instrument:";
-/// Value prefix of a style in the preset menu (its index in the groups follows).
-const STYLE_VALUE: &str = "style:";
-/// Value prefix of a preset in a group's list (its key follows).
-const PRESET_VALUE: &str = "preset:";
 /// What the presets without an instrument are listed under.
 const NO_INSTRUMENT: &str = "other";
-
-/// The facet and the index of the group a line of the preset menu opens.
-fn picked_group(value: &str) -> Option<(Facet, usize)> {
-    let (facet, index) = match value.strip_prefix(INSTRUMENT_VALUE) {
-        Some(index) => (Facet::Instrument, index),
-        None => (Facet::Style, value.strip_prefix(STYLE_VALUE)?),
-    };
-    Some((facet, index.parse().ok()?))
-}
 
 impl Session {
     /// The preset menu of select `control` (`Id::Synth`, `Id::SynthPreset`)
@@ -36,35 +22,34 @@ impl Session {
         let at = instruments.iter().position(|(_, keys)| keys.contains(&current)).unwrap_or(0);
         let instrument_lines = instruments.iter().enumerate().map(|(i, (tag, keys))| {
             let label = format!("{} ({}){SUBMENU_MARK}", tag.unwrap_or(NO_INSTRUMENT), keys.len());
-            (format!("{INSTRUMENT_VALUE}{i}"), label)
+            (SynthPresetAction::Group(Facet::Instrument, i), label)
         });
         // The presets without a style are all under their instrument already.
         let styles = presets.groups(Facet::Style);
         let style_lines = styles.iter().enumerate().filter_map(|(i, (tag, keys))| {
             let label = format!("style: {} ({}){SUBMENU_MARK}", (*tag)?, keys.len());
-            Some((format!("{STYLE_VALUE}{i}"), label))
+            Some((SynthPresetAction::Group(Facet::Style, i), label))
         });
-        let (values, labels) = instrument_lines.chain(style_lines).unzip();
-        let mut menu = Dropdown::new(Id::SynthPresetMenu, rect, values, labels, at);
+        let lines = instrument_lines.chain(style_lines);
+        let mut menu = Dropdown::from_actions(Id::SynthPresetMenu, rect, lines, at);
         menu.control = Some(control);
         self.chrome.widgets.open_dropdown(menu);
     }
 
     /// A line of the preset menus picked in `menu`: a group opens its
     /// presets beside it, a preset is set as its select sets it.
-    pub(super) fn synth_preset_menu_pick(&mut self, value: &str, menu: Dropdown) {
+    pub(super) fn synth_preset_menu_pick(&mut self, action: SynthPresetAction, menu: Dropdown) {
         let Some(control) = menu.control else { return };
-        if let Some(key) = value.strip_prefix(PRESET_VALUE) {
-            self.select(control, key);
-            return;
-        }
-        let Some((facet, index)) = picked_group(value) else { return };
+        let (facet, index) = match action {
+            SynthPresetAction::Preset(key) => return self.select(control, &key),
+            SynthPresetAction::Group(facet, index) => (facet, index),
+        };
         let groups = self.synths.presets.groups(facet);
         let Some((tag, keys)) = groups.get(index) else { return };
         let title = tag.unwrap_or(NO_INSTRUMENT).to_owned();
         let current = self.synth_preset_shown(control);
         let at = keys.iter().position(|key| Some(*key) == current.as_deref());
-        let lines = keys.iter().map(|key| (format!("{PRESET_VALUE}{key}"), (*key).to_owned()));
+        let lines = keys.iter().map(|key| (SynthPresetAction::Preset((*key).to_owned()), (*key).to_owned()));
         let size = self.chrome.panel_size;
         let mut submenu = Dropdown::submenu(menu, size, Id::SynthPresetMenu, title, lines);
         submenu.control = Some(control);
@@ -121,11 +106,17 @@ mod tests {
     use super::super::session_song::tests::{SIZE, choose, menu, type_entry};
     use super::*;
     use crate::kits::KitSet;
+    use crate::menu_action::MenuAction;
     use crate::panel;
     use crate::ui_input::Button;
     use crate::view::Cursor;
     use ordrumbox_core::{Library, json};
     use ordrumbox_engine::SynthPresets;
+
+    /// The lines of a group's list of presets: these keys.
+    fn presets(keys: &[&str]) -> Vec<MenuAction> {
+        keys.iter().map(|key| SynthPresetAction::Preset((*key).into()).into()).collect()
+    }
 
     /// Three presets: two basses, one dub; a lead without a style.
     fn session() -> Session {
@@ -149,7 +140,7 @@ mod tests {
         assert_eq!(open.at, 0, "the instrument of the preset edited");
         // BASS, then its presets, the one edited highlighted: ACID picked.
         choose(&mut s, 0);
-        assert_eq!(menu(&s), ["preset:ACID", "preset:SUB"]);
+        assert_eq!(menu(&s), presets(&["ACID", "SUB"]));
         assert_eq!(s.chrome.widgets.dropdown().map(|d| d.at), Some(1));
         s.pick(0);
         assert_eq!(s.synth_editor.key(), Some("ACID"));
@@ -163,7 +154,7 @@ mod tests {
         s.selection.cursor = Some(Cursor { track: 0, beat: 0, step: 0 });
         s.synth_preset_menu(Id::Synth, "SUB", Rect::new(0, 0, 100, 14));
         s.pick(3);
-        assert_eq!(menu(&s), ["preset:SUB"], "the dub presets");
+        assert_eq!(menu(&s), presets(&["SUB"]), "the dub presets");
         s.pick(0);
         s.synth_preset_menu(Id::Synth, "SUB", Rect::new(0, 0, 100, 14));
         s.pick(0);

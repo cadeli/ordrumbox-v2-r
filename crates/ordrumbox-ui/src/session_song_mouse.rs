@@ -15,7 +15,8 @@ use super::session_song_menu::clip_label;
 use super::session_song_zoom::BarDrag;
 use super::session_types::{PlayMode, Workspace};
 use crate::canvas::Canvas;
-use crate::panel::{Dropdown, Id, Rect};
+use crate::menu_action::SongAction;
+use crate::panel::{Id, Rect};
 use crate::song_view::{Axis, Row, SongGhost, SongLayout, SongSpot};
 use crate::ui_input::Button;
 use crate::view;
@@ -67,7 +68,7 @@ impl Session {
             }
             (SongSpot::Cell { row, measure }, Button::Left) => {
                 let id = rows[row].id.clone();
-                self.song_menu_pick(&format!("add:{measure}:{id}"));
+                self.song_menu_pick(SongAction::Add { measure, pattern_id: id.clone() });
                 self.song_panel.selected_clip = Some((id, measure));
             }
             _ => return false,
@@ -89,13 +90,7 @@ impl Session {
             }
             SongSpot::RowName(r) => self.row_menu(rows, r, x, y),
             SongSpot::Ruler(_) | SongSpot::LoopEnd(_) => self.loop_menu(x, y),
-            SongSpot::Cell { row, measure } => {
-                let row = &rows[row];
-                let title = format!("Add \"{}\" at measure {}", row.name, measure + 1);
-                let value = format!("add:{measure}:{}", row.id);
-                let menu = Dropdown::menu(Id::SongMenu, x, y, title, [(value, "Add here".to_owned())]);
-                self.chrome.widgets.open_dropdown(menu);
-            }
+            SongSpot::Cell { row, measure } => self.cell_menu(&rows[row], measure, x, y),
             _ => return false,
         }
         true
@@ -302,8 +297,8 @@ impl Session {
                 } else if self.song().is_none() && over_grid {
                     self.message = "No song to add to".into();
                 } else if let (Some(ghost), Some(pattern)) = (ghost, self.editor.library().patterns.get(p)) {
-                    let value = format!("add:{}:{}", ghost.measure, pattern.id);
-                    self.song_menu_pick(&value);
+                    let pattern_id = pattern.id.clone();
+                    self.song_menu_pick(SongAction::Add { measure: ghost.measure, pattern_id });
                 }
             }
             DragSource::Clip { clip, grab } => {

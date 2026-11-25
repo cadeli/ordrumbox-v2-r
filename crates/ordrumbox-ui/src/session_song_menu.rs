@@ -4,11 +4,10 @@
 use ordrumbox_core::{SongClip, num};
 
 use super::Session;
-use super::session_confirm::Pending;
 use super::session_grid::moved_index;
+use crate::menu_action::SongAction;
 use crate::panel::{Dropdown, Id};
 use crate::song_view::Row;
-use std::path::PathBuf;
 
 impl Session {
     /// A pattern of the list: add it at the playhead (when there is a song),
@@ -20,17 +19,17 @@ impl Session {
         let mut lines = Vec::new();
         if self.song().is_some() {
             let measure = self.playhead_measure();
-            lines.push((format!("add:{measure}:{id}"), format!("Add at measure {}", measure + 1)));
+            lines.push((SongAction::Add { measure, pattern_id: id }, format!("Add at measure {}", measure + 1)));
         }
         if p > 0 {
-            lines.push((format!("pattern-up:{p}"), "Move up".to_owned()));
+            lines.push((SongAction::MovePatternUp(p), "Move up".to_owned()));
         }
         if p + 1 < count {
-            lines.push((format!("pattern-down:{p}"), "Move down".to_owned()));
+            lines.push((SongAction::MovePatternDown(p), "Move down".to_owned()));
         }
         lines.extend([
-            (format!("rename:{p}"), "Rename".to_owned()),
-            (format!("pattern-delete:{p}"), "Delete".to_owned()),
+            (SongAction::RenamePattern(p), "Rename".to_owned()),
+            (SongAction::RemovePattern(p), "Delete".to_owned()),
         ]);
         self.chrome.widgets.open_dropdown(Dropdown::menu(Id::SongMenu, x, y, title, lines));
     }
@@ -39,7 +38,7 @@ impl Session {
     pub(super) fn clip_menu(&mut self, c: usize, x: i32, y: i32) {
         let Some(clip) = self.song().and_then(|s| s.clips.get(c)).cloned() else { return };
         let title = clip_label(&self.pattern_label(&clip.pattern_id), &clip);
-        let lines = [(format!("next:{c}"), "Next".to_owned()), (format!("delete:{c}"), "Delete".to_owned())];
+        let lines = [(SongAction::RepeatClip(c), "Next".to_owned()), (SongAction::RemoveClip(c), "Delete".to_owned())];
         let shortcuts = crate::menu::shown_shortcuts(&["Ctrl+D", "Delete"]);
         let menu = Dropdown::menu(Id::SongMenu, x, y, title, lines);
         self.chrome.widgets.open_dropdown(menu.with_shortcuts(shortcuts));
@@ -52,15 +51,23 @@ impl Session {
         let count = self.song().map_or(0, |s| s.clips.iter().filter(|c| c.pattern_id == row.id).count());
         let measure = self.playhead_measure();
         let title = format!("{} - {count} clip(s)", row.name);
-        let mut lines = vec![(format!("add:{measure}:{}", row.id), format!("Add at measure {}", measure + 1))];
+        let add = SongAction::Add { measure, pattern_id: row.id.clone() };
+        let mut lines = vec![(add, format!("Add at measure {}", measure + 1))];
         if !row.orphan && r > 0 {
-            lines.push((format!("up:{r}"), "Move up".to_owned()));
+            lines.push((SongAction::MoveRowUp(r), "Move up".to_owned()));
         }
         if rows.get(r + 1).is_some_and(|next| !next.orphan) && !row.orphan {
-            lines.push((format!("down:{r}"), "Move down".to_owned()));
+            lines.push((SongAction::MoveRowDown(r), "Move down".to_owned()));
         }
-        lines.push((format!("row:{}", row.id), "Delete row".to_owned()));
+        lines.push((SongAction::RemoveRow(row.id.clone()), "Delete row".to_owned()));
         self.chrome.widgets.open_dropdown(Dropdown::menu(Id::SongMenu, x, y, title, lines));
+    }
+
+    /// A bare cell of the grid, row `row` at `measure`: add its pattern there.
+    pub(super) fn cell_menu(&mut self, row: &Row, measure: u32, x: i32, y: i32) {
+        let title = format!("Add \"{}\" at measure {}", row.name, measure + 1);
+        let add = SongAction::Add { measure, pattern_id: row.id.clone() };
+        self.chrome.widgets.open_dropdown(Dropdown::menu(Id::SongMenu, x, y, title, [(add, "Add here".to_owned())]));
     }
 
     /// The name a clip's pattern is shown by (its id when it is gone).
@@ -68,63 +75,36 @@ impl Session {
         self.editor.library().pattern(id).and_then(|p| p.name.clone()).unwrap_or_else(|| id.to_owned())
     }
 
-    /// An action of a song panel menu (see the menus above, and Load).
-    pub(super) fn song_menu_pick(&mut self, value: &str) {
-        // A path may hold a `:` (`C:\…`): not split.
-        if let Some(path) = value.strip_prefix("load:") {
-            return self.ask(Pending::LoadProject(PathBuf::from(path)));
-        }
-        let mut parts = value.splitn(3, ':');
-        let (action, a, b) = (parts.next().unwrap_or_default(), parts.next().unwrap_or_default(), parts.next());
-        let result = match (action, b) {
-            ("loop", None) => return self.loop_menu_pick(a),
-            ("add", Some(id)) => {
-                let measure = a.parse().unwrap_or(0);
-                let label = self.pattern_label(id);
-                self.editor
-                    .add_pattern_at_measure(id, measure, None, None)
-                    .map(|_| format!("\"{label}\" added at measure {}", measure + 1))
+    /// An action of a song panel menu (see the menus above).
+    pub(super) fn song_menu_pick(&mut self, action: SongAction) {
+        let patterns = self.editor.library().patterns.len();
+        match action {
+            SongAction::Add { measure, pattern_id } => {
+                let label = self.pattern_label(&pattern_id);
+                let result = self
+                    .editor
+                    .add_pattern_at_measure(&pattern_id, measure, None, None)
+                    .map(|_| format!("\"{label}\" added at measure {}", measure + 1));
+                self.song_edit_result(result);
             }
-            ("next", None) => {
-                if let Ok(clip) = a.parse() {
-                    self.repeat_clip(clip);
-                }
-                return;
-            }
-            ("delete", None) => {
-                if let Some(c) = a.parse().ok().filter(|&c: &usize| self.song().is_some_and(|s| c < s.clips.len())) {
+            SongAction::RepeatClip(c) => self.repeat_clip(c),
+            SongAction::RemoveClip(c) => {
+                if self.song().is_some_and(|s| c < s.clips.len()) {
                     self.undoable(|s| s.remove_clip(c));
                 }
-                return;
             }
-            ("up", None) => {
-                if let Ok(r) = a.parse::<usize>() {
-                    self.move_row(r, r.saturating_sub(1));
-                }
-                return;
-            }
-            ("down", None) => {
-                if let Ok(r) = a.parse::<usize>() {
-                    self.move_row(r, r + 1);
-                }
-                return;
-            }
-            ("row", None) => return self.undoable(|s| s.remove_row(a)),
-            ("pattern-up" | "pattern-down" | "rename" | "pattern-delete", None) => {
-                let Some(p) = a.parse().ok().filter(|&p: &usize| p < self.editor.library().patterns.len()) else {
-                    return;
-                };
-                match action {
-                    "pattern-up" => self.move_pattern(p, p.saturating_sub(1)),
-                    "pattern-down" => self.move_pattern(p, p + 1),
-                    "rename" => self.text_entry(Id::SongPattern(p)),
-                    _ => self.undoable(|s| s.remove_pattern_now(p)),
-                }
-                return;
-            }
-            _ => return,
-        };
-        self.song_edit_result(result);
+            SongAction::MoveRowUp(r) => self.move_row(r, r.saturating_sub(1)),
+            SongAction::MoveRowDown(r) => self.move_row(r, r + 1),
+            SongAction::RemoveRow(id) => self.undoable(|s| s.remove_row(&id)),
+            SongAction::MovePatternUp(p) if p < patterns => self.move_pattern(p, p.saturating_sub(1)),
+            SongAction::MovePatternDown(p) if p < patterns => self.move_pattern(p, p + 1),
+            SongAction::RenamePattern(p) if p < patterns => self.text_entry(Id::SongPattern(p)),
+            SongAction::RemovePattern(p) if p < patterns => self.undoable(|s| s.remove_pattern_now(p)),
+            SongAction::MovePatternUp(_)
+            | SongAction::MovePatternDown(_)
+            | SongAction::RenamePattern(_)
+            | SongAction::RemovePattern(_) => {}
+        }
     }
 
     /// Move row `from` of the song to the place of row `to`. Rows
@@ -224,9 +204,20 @@ pub(super) fn clip_label(label: &str, clip: &SongClip) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::menu_action::MenuAction;
     use crate::session::session_song::tests::{SIZE, choose, clips, menu, session};
     use crate::song_view;
     use crate::ui_input::Button;
+
+    /// The lines of a song menu.
+    fn song(actions: impl IntoIterator<Item = SongAction>) -> Vec<MenuAction> {
+        actions.into_iter().map(MenuAction::from).collect()
+    }
+
+    /// Adding pattern `id` at `measure`.
+    fn add(measure: u32, id: &str) -> SongAction {
+        SongAction::Add { measure, pattern_id: id.into() }
+    }
 
     #[test]
     fn clip_labels() {
@@ -247,21 +238,29 @@ mod tests {
         assert!(s.song_release(SIZE), "a click on the ruler: on its release");
         assert_eq!(s.transport.song_cursor, 1);
         right_click(&mut s, l.list.x + 2, l.list.y + 2);
-        assert_eq!(menu(&s), ["add:1:a", "pattern-down:0", "rename:0", "pattern-delete:0"]);
+        assert_eq!(
+            menu(&s),
+            song([
+                add(1, "a"),
+                SongAction::MovePatternDown(0),
+                SongAction::RenamePattern(0),
+                SongAction::RemovePattern(0)
+            ])
+        );
         choose(&mut s, 0);
         assert_eq!(s.message, "\"a\" added at measure 2");
         assert_eq!(clips(&s), [("b".into(), 0, 2.0), ("a".into(), 1, 0.75)]);
         // Rows: a, b (library order). The clip of a: repeat it.
         let row_y = |r: i32| l.grid.y + 14 + 18 + r * 22 + 11;
         assert!(right_click(&mut s, measure_x(1) - 4, row_y(0)));
-        assert_eq!(menu(&s), ["next:1", "delete:1"]);
+        assert_eq!(menu(&s), song([SongAction::RepeatClip(1), SongAction::RemoveClip(1)]));
         choose(&mut s, 0);
         assert_eq!(s.message, "\"a\" repeated at measure 2.75");
         assert_eq!(clips(&s)[2], ("a".into(), 1, 0.75));
         // The bare grid of row a, measure 0: a click adds a there at once,
         // selected; a right-click offers it in a menu.
         assert!(right_click(&mut s, measure_x(0), row_y(0)));
-        assert_eq!(menu(&s), ["add:0:a"]);
+        assert_eq!(menu(&s), song([add(0, "a")]));
         s.chrome.widgets.close_dropdown();
         assert!(click_and_release(&mut s, measure_x(0), row_y(0)));
         assert!(menu(&s).is_empty());
@@ -271,7 +270,7 @@ mod tests {
         assert!(!click_and_release(&mut s, measure_x(2), row_y(1)));
         // Row a's name: delete the row.
         assert!(right_click(&mut s, l.grid.x + 2, row_y(0)));
-        assert_eq!(menu(&s), ["add:1:a", "down:0", "row:a"]);
+        assert_eq!(menu(&s), song([add(1, "a"), SongAction::MoveRowDown(0), SongAction::RemoveRow("a".into())]));
         choose(&mut s, 2);
         assert_eq!(s.message, format!("Removed \"a\" from the song ({}+Z: undo)", crate::menu::command_label()));
         assert_eq!(clips(&s), [("b".into(), 0, 2.0)]);
@@ -311,7 +310,15 @@ mod tests {
         assert_eq!(s.pattern_index, 1);
         let (x, y) = row(1);
         right_click(&mut s, x, y);
-        assert_eq!(menu(&s), ["add:0:a", "pattern-up:1", "rename:1", "pattern-delete:1"]);
+        assert_eq!(
+            menu(&s),
+            song([
+                add(0, "a"),
+                SongAction::MovePatternUp(1),
+                SongAction::RenamePattern(1),
+                SongAction::RemovePattern(1)
+            ])
+        );
         choose(&mut s, 1);
         assert_eq!(s.editor.library().patterns[0].name.as_deref(), Some("a"));
         // Delete is done at once, takes the clips along, and is one undo step.
@@ -326,7 +333,7 @@ mod tests {
         assert_eq!(s.editor.library().patterns.len(), 1);
         assert_eq!(clips(&s), [("a".into(), 0, 0.75)]);
         // The last pattern stays.
-        s.song_menu_pick("pattern-delete:0");
+        s.song_menu_pick(SongAction::RemovePattern(0));
         assert_eq!(s.message, "The last pattern of the library stays");
         s.undo();
         assert_eq!(s.editor.library().patterns.len(), 2);
@@ -336,7 +343,7 @@ mod tests {
     #[test]
     fn rows_move_by_their_menu_and_by_a_drag() {
         let mut s = session();
-        s.song_menu_pick("add:4:a");
+        s.song_menu_pick(add(4, "a"));
         let names = |s: &Session| s.song_rows().iter().map(|r| r.name.clone()).collect::<Vec<_>>();
         assert_eq!(names(&s), ["a", "b"]);
         let l = s.song_layout(SIZE);
@@ -345,14 +352,16 @@ mod tests {
 
         // The first row moves down only, the last one up only.
         assert!(right_click(&mut s, name_x, row_y(0)));
-        assert!(menu(&s).contains(&"down:0".to_owned()) && !menu(&s).iter().any(|v| v.starts_with("up:")));
+        let is_up = |a: &MenuAction| matches!(a, MenuAction::Song(SongAction::MoveRowUp(_)));
+        let is_down = |a: &MenuAction| matches!(a, MenuAction::Song(SongAction::MoveRowDown(_)));
+        assert!(menu(&s).contains(&SongAction::MoveRowDown(0).into()) && !menu(&s).iter().any(is_up));
         s.chrome.widgets.close_dropdown();
         assert!(right_click(&mut s, name_x, row_y(1)));
-        assert!(menu(&s).contains(&"up:1".to_owned()) && !menu(&s).iter().any(|v| v.starts_with("down:")));
+        assert!(menu(&s).contains(&SongAction::MoveRowUp(1).into()) && !menu(&s).iter().any(is_down));
         s.chrome.widgets.close_dropdown();
 
         // The pattern shown follows its row, through the undo too.
-        s.song_menu_pick("down:0");
+        s.song_menu_pick(SongAction::MoveRowDown(0));
         assert_eq!(names(&s), ["b", "a"]);
         assert_eq!(s.message, "Move pattern \"a\"");
         assert_eq!(s.pattern().unwrap().id, "a");

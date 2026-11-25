@@ -1,6 +1,7 @@
 //! The open drop-down list (and the right-click menu), drawn over everything.
 
 use super::*;
+use crate::menu_action::MenuAction;
 use crate::scroll_thumb;
 
 /// Rows a drop-down list shows at once.
@@ -20,7 +21,7 @@ pub struct Dropdown {
     pub title: Option<String>,
     /// The select's place: the list opens under it (or over it near the bottom).
     pub anchor: Rect,
-    pub values: Vec<String>,
+    pub choices: Choices,
     pub labels: Vec<String>,
     /// Highlighted option.
     pub at: usize,
@@ -38,6 +39,15 @@ pub struct Dropdown {
     pub bar_held: bool,
 }
 
+/// What the options of an open list stand for, one each.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Choices {
+    /// A select's values, set as the select sets them.
+    Values(Vec<String>),
+    /// A menu's actions.
+    Actions(Vec<MenuAction>),
+}
+
 /// The label end of a line that opens a submenu.
 pub const SUBMENU_MARK: &str = " >";
 
@@ -46,12 +56,30 @@ pub const SUBMENU_MARK: &str = " >";
 pub const MENU_MARK: &str = "v";
 
 impl Dropdown {
+    /// The list of select `id` under `anchor`: its `values`, each shown by
+    /// its label, `selected` highlighted.
     pub fn new(id: Id, anchor: Rect, values: Vec<String>, labels: Vec<String>, selected: usize) -> Self {
+        Self::with_choices(id, anchor, Choices::Values(values), labels, selected)
+    }
+
+    /// A menu of actions under `anchor`, opened as a list: its `lines`, each
+    /// an action and the label shown, `selected` highlighted.
+    pub fn from_actions(
+        id: Id,
+        anchor: Rect,
+        lines: impl IntoIterator<Item = (impl Into<MenuAction>, String)>,
+        selected: usize,
+    ) -> Self {
+        let (actions, labels) = lines.into_iter().map(|(action, label)| (action.into(), label)).unzip();
+        Self::with_choices(id, anchor, Choices::Actions(actions), labels, selected)
+    }
+
+    fn with_choices(id: Id, anchor: Rect, choices: Choices, labels: Vec<String>, selected: usize) -> Self {
         let mut d = Self {
             id,
             title: None,
             anchor,
-            values,
+            choices,
             labels,
             at: selected,
             first: 0,
@@ -64,11 +92,26 @@ impl Dropdown {
         d
     }
 
-    /// A menu of actions at `(x, y)`, under `title`: its `lines`, each a
-    /// value and the label shown.
-    pub fn menu(id: Id, x: i32, y: i32, title: String, lines: impl IntoIterator<Item = (String, String)>) -> Self {
-        let (values, labels) = lines.into_iter().unzip();
-        Self { title: Some(title), ..Self::new(id, Rect::new(x, y, 0, 0), values, labels, 0) }
+    /// A menu of actions at `(x, y)`, under `title`: its `lines`, each an
+    /// action and the label shown.
+    pub fn menu(
+        id: Id,
+        x: i32,
+        y: i32,
+        title: String,
+        lines: impl IntoIterator<Item = (impl Into<MenuAction>, String)>,
+    ) -> Self {
+        Self { title: Some(title), ..Self::from_actions(id, Rect::new(x, y, 0, 0), lines, 0) }
+    }
+
+    /// The actions of a menu's lines; none for a select's list.
+    #[cfg(test)]
+    #[must_use]
+    pub fn actions(&self) -> &[MenuAction] {
+        match &self.choices {
+            Choices::Actions(actions) => actions,
+            Choices::Values(_) => &[],
+        }
     }
 
     /// The menu with `shortcuts`, the key of each line (empty: none), shown
@@ -91,7 +134,7 @@ impl Dropdown {
         size: (i32, i32, Scale),
         id: Id,
         title: String,
-        lines: impl IntoIterator<Item = (String, String)>,
+        lines: impl IntoIterator<Item = (impl Into<MenuAction>, String)>,
     ) -> Self {
         let (width, height, scale) = size;
         let mut menu = Self::menu(id, 0, 0, title, lines);
