@@ -14,7 +14,7 @@ use crate::theme::{ZONE, ZONE_OPACITY};
 use crate::{editors, piano_roll, theme};
 use ordrumbox_core::note_positions::SubKind;
 use ordrumbox_core::steps::absolute_step;
-use ordrumbox_core::{Note, Pattern, Track};
+use ordrumbox_core::{Note, Pattern, RetriggerSpacing, Track};
 use ordrumbox_logic::block::Zone;
 
 /// The beat ruler above the rows: each beat's number (the one playing lit),
@@ -282,7 +282,8 @@ pub(super) fn note_gradient(color: Rgb, lit: bool) -> (Rgb, Rgb) {
 /// is [`theme::GENERATED`], one that may not play (probability, every Nth
 /// loop) [`theme::CHANCE`], a plain one [`theme::LIVE`].
 pub(super) fn note_color(note: &Note) -> Rgb {
-    let generated = note.euclidean_pulses > 0 || note.retrigger_count > 1 || (note.retrigger_rate - 1.0).abs() > 1e-9;
+    let generated =
+        note.euclidean_pulses > 0 || note.retrigger_count > 1 || note.retrigger_spacing != RetriggerSpacing::default();
     if generated {
         theme::GENERATED
     } else if note.probability < 1.0 || note.cycle > 1 {

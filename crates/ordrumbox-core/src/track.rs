@@ -20,8 +20,9 @@ json_record! {
         name: String = String::new() => "name",
         /// Pick the sample from the track name.
         auto_assign: bool = true => "autoAssign" | "useAutoAssignSound",
-        /// The sample this track plays (a key of the sound registry).
-        sample_path: String = "NOT_DEFINED".to_owned() => "samplePath" | "sampleId",
+        /// The sample this track plays when it is not auto-assigned: its
+        /// path in the kits (`real/kick.wav`); `None` for none.
+        sample_path: Option<String> = None => "samplePath" | "sampleId",
         /// Beats in the track (independent of the pattern's).
         beat_count: i32 = 4 => "beatCount",
         /// Grid subdivision: steps per beat, 1–8.
@@ -218,6 +219,9 @@ pub const COMP_RELEASE_MS_RANGE: (f64, f64) = (10.0, 2000.0);
 /// Range of the sidechain ducking's release, ms.
 pub const DUCK_RELEASE_MS_RANGE: (f64, f64) = (10.0, 2000.0);
 
+/// The `samplePath` the web version writes for "no sample": read as `None`.
+const WEB_NO_SAMPLE: &str = "NOT_DEFINED";
+
 /// Table keys that are not track settings (`TRACK_DEFAULTS` lacks them):
 /// an edit never sets them.
 const NOT_SETTINGS: [&str; 1] = ["scaleName"];
@@ -363,6 +367,9 @@ impl Track {
         if track.use_synth {
             track.auto_assign = false;
         }
+        if track.sample_path.as_deref().is_some_and(|path| path.is_empty() || path == WEB_NO_SAMPLE) {
+            track.sample_path = None;
+        }
         match object.get("notes") {
             Some(Value::Array(notes)) => track.notes = decode_notes(notes, object.get("noteKeys"), at, issues),
             Some(Value::Null) | None => {}
@@ -496,6 +503,14 @@ mod tests {
         let mut issues = Vec::new();
         let track = Track::from_json(&json::parse(text).unwrap(), "t", &mut issues).unwrap();
         (track, issues)
+    }
+
+    #[test]
+    fn the_web_no_sample_is_no_sample() {
+        assert_eq!(load(r#"{"sampleId":"NOT_DEFINED"}"#).0.sample_path, None);
+        assert_eq!(load(r#"{"samplePath":""}"#).0.sample_path, None);
+        assert_eq!(load(r#"{"samplePath":"real/kick.wav"}"#).0.sample_path.as_deref(), Some("real/kick.wav"));
+        assert_eq!(load(r#"{"sampleId":"NOT_DEFINED"}"#).0.to_json().get("samplePath"), None);
     }
 
     #[test]

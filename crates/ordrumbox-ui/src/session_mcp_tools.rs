@@ -169,7 +169,7 @@ impl Session {
                 let added = &self.kits.kits()[k].samples[sample];
                 Ok(object([
                     ("kit", Value::from(self.kits.kits()[k].name.as_str())),
-                    ("key", Value::from(added.key.as_str())),
+                    ("key", added.key.as_deref().map_or(Value::Null, Value::from)),
                     ("path", Value::from(added.path.as_str())),
                 ]))
             }

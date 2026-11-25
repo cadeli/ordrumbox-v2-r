@@ -52,7 +52,7 @@ fn every_kit_field_survives_saving() {
     }
     let kick = &kit.samples[0];
     let expected = KitSample {
-        key: "KICK".into(),
+        key: Some("KICK".into()),
         display_name: "kick".into(),
         path: "studio/kick.wav".into(),
         decay_ms: Some(800.0),

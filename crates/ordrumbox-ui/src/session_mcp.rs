@@ -259,7 +259,7 @@ impl Session {
         let kits = self.kits.kits().iter().map(|kit| {
             let samples = kit.samples.iter().map(|s| {
                 object([
-                    ("key", Value::from(s.key.as_str())),
+                    ("key", s.key.as_deref().map_or(Value::Null, Value::from)),
                     ("name", Value::from(s.display_name.as_str())),
                     ("path", Value::from(s.path.as_str())),
                 ])
@@ -351,7 +351,7 @@ impl Session {
             let sound = match (track.use_synth, track.auto_assign) {
                 (true, _) => track.synth_preset.as_deref().map_or(Value::Null, |k| Value::from(format!("synth:{k}"))),
                 (false, true) => Value::from("kit"),
-                (false, false) => Value::from(track.sample_path.as_str()),
+                (false, false) => track.sample_path.as_deref().map_or(Value::Null, Value::from),
             };
             object([("trackName", Value::from(track.name.as_str())), ("sound", sound)])
         });
@@ -459,10 +459,9 @@ impl Session {
     pub(super) fn mcp_kit_added(&mut self, k: usize, message: String) -> Result<Value, String> {
         self.kits_changed(message);
         let kit = &self.kits.kits()[k];
-        let samples = kit
-            .samples
-            .iter()
-            .map(|s| object([("key", Value::from(s.key.as_str())), ("path", Value::from(s.path.as_str()))]));
+        let samples = kit.samples.iter().map(|s| {
+            object([("key", s.key.as_deref().map_or(Value::Null, Value::from)), ("path", Value::from(s.path.as_str()))])
+        });
         Ok(object([
             ("kit", Value::from(kit.name.as_str())),
             ("samples", Value::Array(samples.collect())),

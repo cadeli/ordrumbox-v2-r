@@ -4,7 +4,7 @@ use crate::panel::{Id, Item, Rect, Step};
 use crate::scale::Scale;
 use ordrumbox_core::drum_taxonomy::instrument_family;
 use ordrumbox_core::json::Value;
-use ordrumbox_core::{ScaleList, json};
+use ordrumbox_core::{RetriggerSpacing, ScaleList, json};
 
 fn scales() -> ScaleList {
     ScaleList::from_json(
@@ -74,7 +74,7 @@ fn note_tooltips() {
         retrigger_probability: 0.5,
         euclidean_pulses: 5,
         euclidean_rotation: 2,
-        retrigger_rate: 12.0,
+        retrigger_spacing: RetriggerSpacing::Steps(5.0),
         pan: -0.333,
         ..Note::default()
     };

@@ -79,7 +79,7 @@ fn track_settings_are_set_clamped_and_undone() {
     let tracks = &editor.library().patterns[p].tracks;
     assert!(tracks[0].mute);
     assert_eq!((tracks[1].volume, tracks[1].pan), (1.0, -0.4), "the velocity clamped to 1");
-    assert_eq!((tracks[2].sample_path.as_str(), tracks[2].auto_assign), ("kits/chh.wav", false));
+    assert_eq!((tracks[2].sample_path.as_deref(), tracks[2].auto_assign), (Some("kits/chh.wav"), false));
     assert_eq!(tracks[3].name, "BASS2");
     // The muted track is left out of what plays (here, its MIDI file).
     let bytes =

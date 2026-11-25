@@ -62,15 +62,15 @@ impl Session {
                     .or_else(|| self.render.as_ref().map(|r| r.bank.clone()));
                 let sample = &bank.as_ref().and_then(|b| b.get(i))?.sample;
                 // A sample picked for want of the track's own instrument says so.
-                let wanted = substitute_for(&track.name, &sample.key).filter(|_| track.auto_assign);
+                let wanted = substitute_for(&track.name, sample.key.as_deref()).filter(|_| track.auto_assign);
                 Sounding::Sample { path: sample.path.clone(), wanted }
             }
             TrackSound::Synth { key, .. } => Sounding::Synth(Some(key)),
             TrackSound::None if track.use_synth => Sounding::Synth(track.synth_preset.clone()),
-            TrackSound::None if !track.auto_assign && !track.sample_path.is_empty() => {
-                Sounding::Sample { path: track.sample_path.clone(), wanted: None }
-            }
-            TrackSound::None => Sounding::Nothing,
+            TrackSound::None => match &track.sample_path {
+                Some(path) if !track.auto_assign => Sounding::Sample { path: path.clone(), wanted: None },
+                _ => Sounding::Nothing,
+            },
         })
     }
 
@@ -120,7 +120,7 @@ impl Session {
             .or_else(|| self.render.as_ref().map(|r| r.bank.clone()));
         match sound {
             TrackSound::Sample(i) => bank.and_then(|b| b.get(i).map(|s| s.sample.path.clone())),
-            _ => (!track.auto_assign).then(|| track.sample_path.clone()),
+            _ => track.sample_path.clone().filter(|_| !track.auto_assign),
         }
     }
 
@@ -213,7 +213,7 @@ impl Session {
             track.synth_preset.clone()
         } else {
             instrument.map(|i| {
-                let name = if i.display_name.is_empty() { &i.key } else { &i.display_name };
+                let name = if i.display_name.is_empty() { i.key.as_ref().unwrap_or(&i.path) } else { &i.display_name };
                 kit_name.map_or_else(|| name.clone(), |k| format!("{k}/{name}"))
             })
         };
@@ -237,7 +237,7 @@ impl Session {
         let mut ids: Vec<String> =
             catalog().instruments.iter().map(|i| i.id.clone()).filter(|id| keys.contains(id.as_str())).collect();
         ids.sort();
-        let current_id = match instrument.map(|i| i.key.as_str()) {
+        let current_id = match instrument.and_then(|i| i.key.as_deref()) {
             Some(key) if keys.contains(key) => key.to_owned(),
             _ if keys.contains(track.name.as_str()) => track.name.clone(),
             _ => ids.first().cloned().unwrap_or_else(|| "KICK".into()),
@@ -247,7 +247,8 @@ impl Session {
         let sidechains = self.sidechain_choice(track);
 
         // Samples of that instrument: the current kit's first.
-        let samples = self.sample_choice(track, &current_id, &url.unwrap_or_else(|| track.sample_path.clone()));
+        let samples =
+            self.sample_choice(track, &current_id, &url.or_else(|| track.sample_path.clone()).unwrap_or_default());
 
         let synths = self.synth_choice(track);
 
@@ -292,7 +293,7 @@ impl Session {
 
     /// The instruments some kit has a sample of.
     pub(super) fn sampled_instruments(&self) -> std::collections::HashSet<String> {
-        self.kits.kits().iter().flat_map(|k| k.samples.iter().map(|i| i.key.clone())).collect()
+        self.kits.kits().iter().flat_map(|k| k.samples.iter().filter_map(|i| i.key.clone())).collect()
     }
 
     /// Every sample of instrument `id`: (kit, url, name), the current kit's
@@ -304,7 +305,7 @@ impl Session {
             .kits()
             .iter()
             .flat_map(|kit| {
-                kit.samples.iter().filter(|i| i.key == id).map(|i| {
+                kit.samples.iter().filter(|i| i.key.as_deref() == Some(id)).map(|i| {
                     let name = if i.display_name.is_empty() { i.path.clone() } else { i.display_name.clone() };
                     (kit.name.clone(), i.path.clone(), name)
                 })

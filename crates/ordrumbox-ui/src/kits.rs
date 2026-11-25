@@ -12,7 +12,7 @@ use std::path::Component;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use ordrumbox_core::instruments::{NOT_FOUND, catalog};
+use ordrumbox_core::instruments::catalog;
 use ordrumbox_engine::kit::{Kit, KitSample};
 use ordrumbox_engine::kit_folders::key_from_file_name;
 use ordrumbox_engine::{SampleBank, SampleBuffer, analysis, wav};
@@ -244,11 +244,12 @@ impl KitSet {
         }
     }
 
-    /// Set the instrument a sample is.
+    /// Set the instrument a sample is, an id of the catalog (another is no change).
     pub fn set_instrument(&mut self, kit: usize, sample: usize, id: &str) -> Option<String> {
+        catalog().by_exact_id(id)?;
         let instrument = self.kits.get_mut(kit)?.samples.get_mut(sample)?;
-        (instrument.key != id).then(|| {
-            instrument.key = id.to_owned();
+        (instrument.key.as_deref() != Some(id)).then(|| {
+            instrument.key = Some(id.to_owned());
             format!("Set \"{}\" to instrument \"{id}\"", instrument.display_name)
         })
     }
@@ -258,10 +259,7 @@ impl KitSet {
     pub fn guess_instrument(&self, kit: usize, sample: usize) -> Result<String, String> {
         let Some(s) = self.sample(kit, sample) else { return Err("No such sample".into()) };
         let file = s.path.rsplit_once('/').map_or(s.path.as_str(), |(_, name)| name);
-        match key_from_file_name(file) {
-            key if key == NOT_FOUND => Err(format!("No instrument in the name \"{file}\"")),
-            key => Ok(key),
-        }
+        key_from_file_name(file).ok_or_else(|| format!("No instrument in the name \"{file}\""))
     }
 
     /// A text of kit `kit` (its title, its description) by its `kits.json`
@@ -414,11 +412,8 @@ impl KitSet {
         }
         // Each file is read beside the others: a Roland CL is the claves next to its RS.
         let names: Vec<&str> = instruments.iter().map(|i: &KitSample| i.display_name.as_str()).collect();
-        let keys: Vec<String> = catalog()
-            .from_kit_file_names(&names)
-            .iter()
-            .map(|i| i.map_or_else(|| NOT_FOUND.to_owned(), |i| i.id.clone()))
-            .collect();
+        let keys: Vec<Option<String>> =
+            catalog().from_kit_file_names(&names).iter().map(|i| i.map(|i| i.id.clone())).collect();
         for (instrument, key) in instruments.iter_mut().zip(keys) {
             instrument.key = key;
         }
@@ -561,7 +556,7 @@ mod tests {
             Kit {
                 name: "a".into(),
                 samples: vec![KitSample {
-                    key: "KICK".into(),
+                    key: Some("KICK".into()),
                     display_name: "kick".into(),
                     path: "k.wav".into(),
                     ..KitSample::default()
@@ -594,7 +589,7 @@ mod tests {
         kits.set_value(0, 0, Field::Decay, 630.0);
         assert_eq!(kits.kits[0].samples[0].decay_ms, Some(630.0));
         assert!(kits.set_instrument(0, 0, "SNARE").is_some());
-        assert_eq!(kits.kits[0].samples[0].key, "SNARE");
+        assert_eq!(kits.kits[0].samples[0].key.as_deref(), Some("SNARE"));
         assert_eq!(kits.find_path("k.wav"), Some((0, 0)));
         // The kit's texts: set, unchanged, then gone when empty.
         assert!(kits.set_text(0, "desc", "dry, close-miked").is_some());
@@ -613,7 +608,7 @@ mod tests {
         let file = dir.join("SnareDrum.wav");
         fs::write(&file, wav::encode_float(&SampleBuffer::mono(vec![0.3; 10], 8000))).unwrap();
         assert_eq!(kits.add_sample(0, &file).unwrap().0, 1);
-        assert_eq!(kits.kits[0].samples[1].key, "SNARE");
+        assert_eq!(kits.kits[0].samples[1].key.as_deref(), Some("SNARE"));
         let (bank, errors) = kits.bank();
         assert!(errors.is_empty());
         assert_eq!(bank.samples.len(), 2);
@@ -674,8 +669,8 @@ mod tests {
         let snare = Arc::new(SampleBuffer::mono(vec![0.5, -0.25], 8000));
         kits.buffers.insert("other/k.wav".into(), snare.clone());
         let mut second = kits.kits[0].samples[0].clone();
-        (second.key, second.path, second.gain_db) = ("SNARE".into(), "other/k.wav".into(), -6.0);
-        let again = KitSample { key: "RIM".into(), ..kits.kits[0].samples[0].clone() };
+        (second.key, second.path, second.gain_db) = (Some("SNARE".into()), "other/k.wav".into(), -6.0);
+        let again = KitSample { key: Some("RIM".into()), ..kits.kits[0].samples[0].clone() };
         kits.kits[0].samples.extend([second, again]);
         let kick = kits.buffer("k.wav").unwrap().clone();
 
@@ -699,7 +694,7 @@ mod tests {
         let kit = &kits.kits[0];
         let paths: Vec<&str> = kit.samples.iter().map(|s| s.path.as_str()).collect();
         assert_eq!(paths, ["imported/a/k.wav", "imported/a/2-k.wav", "imported/a/k.wav"]);
-        assert_eq!((kit.samples[1].key.as_str(), kit.samples[1].gain_db), ("SNARE", -6.0));
+        assert_eq!((kit.samples[1].key.as_deref(), kit.samples[1].gain_db), (Some("SNARE"), -6.0));
         assert_eq!(kits.buffer("imported/a/2-k.wav").unwrap().left, snare.left);
         assert_eq!(kits.buffer("imported/a/k.wav").unwrap().left, kick.left);
         assert!(dir.join("samples").join("imported").join("a").join("2-k.wav").is_file());

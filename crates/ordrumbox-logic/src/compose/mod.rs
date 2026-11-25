@@ -20,7 +20,7 @@ pub use mutate::{fill, vary_line};
 pub use score::syncopation;
 
 use ordrumbox_core::num::round2;
-use ordrumbox_core::{Macros, Rng, Style, StylePart, Track};
+use ordrumbox_core::{Macros, RetriggerSpacing, Rng, Style, StylePart, Track};
 
 use crate::generate::add_note;
 
@@ -34,7 +34,7 @@ const STYLE_FLOOR: f64 = 0.01;
 const AVOIDED: f64 = 0.0;
 /// Rolls: the hits of a rolled note, and their spacing (half a step).
 const ROLL_COUNTS: [i32; 3] = [2, 3, 4];
-const ROLL_RATE: f64 = 4.0;
+const ROLL_SPACING: RetriggerSpacing = RetriggerSpacing::Eighths(4.0);
 
 /// A track's compose settings as they apply: its own, else its part's (in
 /// the units of the sliders: hits, then 0–100, the coupling -100–100).
@@ -235,7 +235,7 @@ pub(crate) fn add_hit(track: &mut Track, a: usize, step: &Step, part: &StylePart
     let note = add_note(track, (a / spb) as i32, (a % spb) as i32, 0.0, velocity);
     if roll {
         note.retrigger_count = ROLL_COUNTS[(a + note.beat as usize) % ROLL_COUNTS.len()];
-        note.retrigger_rate = ROLL_RATE;
+        note.retrigger_spacing = ROLL_SPACING;
     }
 }
 

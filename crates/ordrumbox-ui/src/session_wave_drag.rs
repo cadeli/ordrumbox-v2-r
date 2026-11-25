@@ -138,7 +138,7 @@ mod tests {
     /// on the track editor's track; the kit editor open.
     fn session() -> Session {
         let (library, _) = Library::parse(r#"{"patterns":[{"name":"p","tracks":[{"name":"KICK"}]}]}"#).unwrap();
-        let sample = KitSample { key: "KICK".into(), path: "k/kick.wav".into(), ..KitSample::default() };
+        let sample = KitSample { key: Some("KICK".into()), path: "k/kick.wav".into(), ..KitSample::default() };
         let kit = Kit { name: "k".into(), samples: vec![sample], ..Kit::default() };
         let square: Vec<f32> = (0..1000).map(|i| if (i / 10) % 2 == 0 { 0.5 } else { -0.5 }).collect();
         let buffer = Arc::new(SampleBuffer::mono(square, 1000));

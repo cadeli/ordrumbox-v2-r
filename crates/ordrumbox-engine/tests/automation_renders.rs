@@ -60,7 +60,7 @@ fn setup() -> RenderSetup {
     let sample = |key: &str, buffer: Vec<f32>| BankSample {
         kit: "t".into(),
         sample: KitSample {
-            key: key.into(),
+            key: Some(key.into()),
             display_name: key.to_lowercase(),
             path: format!("t/{key}.wav"),
             // To -60 dB in 100 s: flat over a measure.

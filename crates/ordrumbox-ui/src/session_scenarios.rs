@@ -30,7 +30,7 @@ const CALLBACK: usize = 256;
 
 fn bank(rate: u32) -> Arc<SampleBank> {
     let instrument = KitSample {
-        key: "KICK".into(),
+        key: Some("KICK".into()),
         display_name: "k".into(),
         path: "k".into(),
         decay_ms: Some(100.0),
@@ -416,7 +416,7 @@ fn demo_session(samples_dir: &Path) -> (Session, AudioSide) {
     for (kit, level) in [("a", 0.5), ("b", 0.25)] {
         for key in KIT_KEYS {
             let instrument = KitSample {
-                key: key.into(),
+                key: Some(key.into()),
                 display_name: key.to_lowercase(),
                 path: format!("{kit}/{key}.wav"),
                 decay_ms: Some(100.0),

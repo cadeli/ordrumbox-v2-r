@@ -5,7 +5,7 @@
 use std::collections::HashSet;
 
 use ordrumbox_core::Issue;
-use ordrumbox_core::instruments::{NOT_FOUND, catalog};
+use ordrumbox_core::instruments::catalog;
 
 use crate::kit::{Kit, KitSample, KitsRead};
 
@@ -17,11 +17,10 @@ pub struct KitFolder {
     pub paths: Vec<String>,
 }
 
-/// The instrument a file name gives (`findInstrumentFromFileName(name).id`),
-/// `NOT_FOUND` when it gives none.
+/// The instrument a file name gives; `None` when it gives none.
 #[must_use]
-pub fn key_from_file_name(file_name: &str) -> String {
-    catalog().from_file_name(file_name).map_or_else(|| NOT_FOUND.to_owned(), |i| i.id.clone())
+pub fn key_from_file_name(file_name: &str) -> Option<String> {
+    catalog().from_file_name(file_name).map(|i| i.id.clone())
 }
 
 impl KitSample {
@@ -103,7 +102,7 @@ mod tests {
 
     fn sample(path: &str, key: &str) -> KitSample {
         KitSample {
-            key: key.into(),
+            key: Some(key.into()),
             display_name: key.into(),
             path: path.into(),
             decay_ms: Some(5000.0),
@@ -127,7 +126,10 @@ mod tests {
         let names: Vec<_> = kits.iter().map(|k| k.name.as_str()).collect();
         assert_eq!(names, ["a", "b"]);
         assert_eq!(paths(&kits[0]), ["a/kick.wav", "a/snare.wav"]);
-        assert_eq!((kits[0].samples[0].key.as_str(), kits[0].samples[0].display_name.as_str()), ("KICK", "kick.wav"));
+        assert_eq!(
+            (kits[0].samples[0].key.as_deref(), kits[0].samples[0].display_name.as_str()),
+            (Some("KICK"), "kick.wav")
+        );
         assert_eq!(kits[0].samples[0].decay_ms, None);
     }
 
@@ -142,7 +144,7 @@ mod tests {
         let names: Vec<_> = kits.iter().map(|k| k.name.as_str()).collect();
         assert_eq!(names, ["z", "y"]);
         assert_eq!(paths(&kits[0]), ["z/kick.wav", "z/a.wav", "z/new.wav"]);
-        assert_eq!((kits[0].samples[1].key.as_str(), kits[0].samples[1].decay_ms), ("SNARE", Some(5000.0)));
+        assert_eq!((kits[0].samples[1].key.as_deref(), kits[0].samples[1].decay_ms), (Some("SNARE"), Some(5000.0)));
         let told: Vec<_> = issues.iter().map(|i| format!("{}: {}", i.at, i.message)).collect();
         assert_eq!(told, ["gone: gone/kick.wav: no such file, left out", "gone: no folder and no sample: left out"]);
     }

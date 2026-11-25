@@ -46,8 +46,8 @@ fn a_folder_dropped_becomes_a_kit_and_a_wav_dropped_with_shift_replaces_a_sample
     assert_eq!(s.message, "Imported 2 files into kit \"my kit\" (1 not decoded)");
     assert_eq!(s.kits.kits().len(), kit_count + 1);
     assert_eq!(s.kit_index, kit_count);
-    let keys: Vec<&str> = s.kits.kits()[kit_count].samples.iter().map(|i| i.key.as_str()).collect();
-    assert_eq!(keys, ["KICK", "SNARE"]);
+    let keys: Vec<Option<&str>> = s.kits.kits()[kit_count].samples.iter().map(|i| i.key.as_deref()).collect();
+    assert_eq!(keys, [Some("KICK"), Some("SNARE")]);
     assert_eq!(s.kit_list(), Some((0, 2)), "the kit editor is on its first sample");
     // The audio is kept in the user's samples folder, as it came, in a folder of the kit's.
     assert_eq!(std::fs::read(samples.join("imported/my_kit/Kick01.wav")).unwrap(), kick);
@@ -63,8 +63,8 @@ fn a_folder_dropped_becomes_a_kit_and_a_wav_dropped_with_shift_replaces_a_sample
     assert_eq!(s.message, "Replaced with \"quiet.wav\"");
     let sample = &s.kits.kits()[kit_count].samples[0];
     assert_eq!(
-        (sample.path.as_str(), sample.display_name.as_str(), sample.key.as_str()),
-        ("imported/my_kit/Kick01.wav", "quiet.wav", "KICK")
+        (sample.path.as_str(), sample.display_name.as_str(), sample.key.as_deref()),
+        ("imported/my_kit/Kick01.wav", "quiet.wav", Some("KICK"))
     );
     let saved = wav::decode(&std::fs::read(samples.join("imported/my_kit/Kick01.wav")).unwrap()).unwrap();
     assert_eq!(saved.left, wav::decode(&std::fs::read(&quiet).unwrap()).unwrap().left);

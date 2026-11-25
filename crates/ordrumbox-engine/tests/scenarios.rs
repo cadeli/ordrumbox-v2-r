@@ -42,7 +42,7 @@ fn bank() -> Arc<SampleBank> {
             samples.push(BankSample {
                 kit: kit.into(),
                 sample: KitSample {
-                    key: key.into(),
+                    key: Some(key.into()),
                     display_name: key.to_lowercase(),
                     path: format!("{kit}/{key}.wav"),
                     decay_ms: Some(5000.0),
@@ -241,7 +241,7 @@ fn the_song_export_follows_the_song_loop() {
 /// The sample of `sound`, as (kit, key).
 fn sample_of(bank: &SampleBank, sound: &TrackSound) -> Option<(String, String)> {
     match sound {
-        TrackSound::Sample(i) => bank.get(*i).map(|s| (s.kit.clone(), s.sample.key.clone())),
+        TrackSound::Sample(i) => bank.get(*i).map(|s| (s.kit.clone(), s.sample.key.clone().unwrap_or_default())),
         _ => None,
     }
 }
@@ -338,7 +338,7 @@ fn silent_bank() -> Arc<SampleBank> {
         .iter()
         .map(|key| BankSample {
             kit: "a".into(),
-            sample: KitSample { key: (*key).into(), path: format!("silent/{key}.wav"), ..Default::default() },
+            sample: KitSample { key: Some((*key).into()), path: format!("silent/{key}.wav"), ..Default::default() },
             buffer: SampleBuffer::mono(vec![0.0; 400], 8000).into(),
         })
         .collect();

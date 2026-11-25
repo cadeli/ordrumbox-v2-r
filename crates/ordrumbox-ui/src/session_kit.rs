@@ -95,7 +95,7 @@ impl Session {
         self.saving.kits.clear();
         self.track_analysis.borrow_mut().clear();
         let (bank, errors) = self.kits.bank();
-        self.roots = bank.samples.iter().filter_map(|s| Some((s.sample.key.clone(), s.sample.root_midi?))).collect();
+        self.roots = bank.samples.iter().filter_map(|s| Some((s.sample.key.clone()?, s.sample.root_midi?))).collect();
         let bank = Arc::new(bank);
         if let Some(controller) = self.playback.controller_mut() {
             controller.set_bank(bank.clone());
@@ -215,10 +215,10 @@ impl Session {
         items.push(Item::new(Some(Id::KitPlayedBy), played_by, label));
         let first = self.kit_first(layout);
         for (row, (i, s)) in kit.samples.iter().enumerate().skip(first).take(layout.shown()).enumerate() {
-            let choice = instrument_choice(&s.key);
+            let choice = instrument_choice(s.key.as_deref());
             items.push(Item::new(Some(Id::KitSampleInstrument(i)), layout.instrument_rect(row), choice.kind()));
             // Lit while the instrument is the one its file name gives.
-            let on = self.kits.guess_instrument(self.kit_index, i).is_ok_and(|key| key == s.key);
+            let on = self.kits.guess_instrument(self.kit_index, i).is_ok_and(|key| s.key.as_ref() == Some(&key));
             let auto = Kind::Button { label: "AUTO".into(), on };
             items.push(Item::new(Some(Id::KitAutoInstrument(i)), layout.auto_rect(row), auto));
         }
@@ -248,7 +248,7 @@ impl Session {
     pub(super) fn kit_instrument_menu(&mut self, sample: usize, rect: Rect) {
         let Some(s) = self.kits.sample(self.kit_index, sample) else { return };
         let lines = session_grid::category_lines();
-        let title = format!("{}: {}", sample_file_name(&s.path), s.key);
+        let title = format!("{}: {}", sample_file_name(&s.path), s.key.as_deref().unwrap_or(NO_INSTRUMENT));
         let menu = Dropdown::menu(Id::KitInstrumentMenu(sample), rect.x, rect.y + rect.h, title, lines);
         self.chrome.widgets.dropdown = Some(menu);
     }
@@ -399,7 +399,13 @@ fn kit_text(kit: &ordrumbox_engine::kit::Kit, key: &str) -> String {
 /// The instruments to choose from for a sample of instrument `key`: the
 /// catalog's, and `key` first when the catalog has no such instrument (a
 /// sample nothing was detected for), so that the select shows what it is.
-fn instrument_choice(key: &str) -> Choice {
+/// What a sample of no known instrument shows as its instrument.
+const NO_INSTRUMENT: &str = "—";
+
+/// The instrument menu of a sample of instrument `key`. A key the catalog
+/// lacks, or none, is shown first; choosing it changes nothing.
+fn instrument_choice(key: Option<&str>) -> Choice {
+    let key = key.unwrap_or(NO_INSTRUMENT);
     let mut values: Vec<String> = catalog().instruments.iter().map(|i| i.id.clone()).collect();
     let selected = values.iter().position(|v| v == key).unwrap_or_else(|| {
         values.insert(0, key.to_owned());
@@ -429,7 +435,8 @@ mod tests {
     /// A session of a KICK track on kit `real`, of `samples` (instrument, path).
     fn session_of(samples: &[(&str, &str)]) -> Session {
         let (library, _) = Library::parse(r#"{"patterns":[{"name":"p","tracks":[{"name":"KICK"}]}]}"#).unwrap();
-        let sample = |key: &str, path: &str| KitSample { key: key.into(), path: path.into(), ..Default::default() };
+        let sample =
+            |key: &str, path: &str| KitSample { key: Some(key.into()), path: path.into(), ..Default::default() };
         let samples: Vec<_> = samples.iter().map(|&(key, path)| sample(key, path)).collect();
         let buffer = Arc::new(SampleBuffer::mono(vec![0.25, -0.5, 0.1], 44_100));
         let bank = SampleBank {
@@ -533,8 +540,8 @@ mod tests {
         assert_eq!(s.chrome.widgets.dropdown.as_ref().map(|d| d.id), Some(Id::KitInstrumentMenu(1)));
         pick(&mut s, "Percussion >");
         pick(&mut s, "COWBELL");
-        assert_eq!(s.kits.sample(0, 1).map(|i| i.key.as_str()), Some("COWBELL"));
-        assert_eq!(s.kits.sample(0, 0).map(|i| i.key.as_str()), Some("KICK"), "only that sample");
+        assert_eq!(s.kits.sample(0, 1).and_then(|i| i.key.as_deref()), Some("COWBELL"));
+        assert_eq!(s.kits.sample(0, 0).and_then(|i| i.key.as_deref()), Some("KICK"), "only that sample");
     }
 
     #[test]
@@ -553,7 +560,7 @@ mod tests {
         assert_eq!(labels, &["COWBELL"], "only the sampled ones");
         pick(&mut s, "COWBELL");
         assert!(s.chrome.widgets.dropdown.is_none());
-        assert_eq!(s.pattern().unwrap().tracks[0].sample_path, "real/bell.wav");
+        assert_eq!(s.pattern().unwrap().tracks[0].sample_path.as_deref(), Some("real/bell.wav"));
     }
 
     #[test]
@@ -583,14 +590,14 @@ mod tests {
         );
         assert!(!auto_lit(&s, 0), "SNARE is not what kick.wav gives");
         click(&mut s, x, y);
-        assert_eq!(s.kits.sample(0, 0).map(|k| k.key.as_str()), Some("KICK"), "kick.wav");
+        assert_eq!(s.kits.sample(0, 0).and_then(|k| k.key.as_deref()), Some("KICK"), "kick.wav");
         assert!(auto_lit(&s, 0), "KICK is");
         click(&mut s, x, y);
         assert_eq!(s.message, "Already KICK");
         // x.wav names no instrument: the sample keeps its own.
         let (x, y) = item_at(&s, Id::KitAutoInstrument(1));
         click(&mut s, x, y);
-        assert_eq!(s.kits.sample(0, 1).map(|k| k.key.as_str()), Some("WEIRD"));
+        assert_eq!(s.kits.sample(0, 1).and_then(|k| k.key.as_deref()), Some("WEIRD"));
         assert!(s.message.contains("x.wav"), "{}", s.message);
         assert!(!auto_lit(&s, 1), "no guess, never lit");
     }

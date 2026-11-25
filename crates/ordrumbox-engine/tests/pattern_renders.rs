@@ -131,7 +131,7 @@ fn bank() -> Arc<SampleBank> {
         .map(|(key, buffer)| BankSample {
             kit: "kit".into(),
             sample: KitSample {
-                key: key.into(),
+                key: Some(key.into()),
                 display_name: key.to_lowercase(),
                 path: format!("kit/{key}.wav"),
                 ..Default::default()

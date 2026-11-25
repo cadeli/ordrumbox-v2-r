@@ -19,8 +19,9 @@ pub const DEFAULT_ATTACK_MS: f64 = 5.0;
 /// One sample of a kit, as listed in drumkits.json.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct KitSample {
-    /// Matching key: `KICK`, `SNARE`, `CHH`…
-    pub key: String,
+    /// Matching key, the instrument the sample is: `KICK`, `SNARE`,
+    /// `CHH`…; `None` when it is none the catalog knows.
+    pub key: Option<String>,
     pub display_name: String,
     /// Path under `assets/kits/` (or the user's samples folder), also the
     /// sample id tracks refer to.
@@ -103,7 +104,7 @@ impl KitSample {
             }
         }
         Some(Self {
-            key: text(&["key"]).unwrap_or_default(),
+            key: text(&["key"]).filter(|key| !key.is_empty() && key != NOT_FOUND),
             display_name: text(&["displayName", "display_name"]).unwrap_or_default(),
             path,
             decay_ms: number(&["decay"]),
@@ -128,7 +129,7 @@ impl KitSample {
     pub fn to_json(&self) -> Value {
         let mut o = Object::new();
         o.insert("displayName", Value::from(self.display_name.as_str()));
-        o.insert("key", Value::from(self.key.as_str()));
+        o.insert("key", Value::from(self.key.as_deref().unwrap_or(NOT_FOUND)));
         o.insert("path", Value::from(self.path.as_str()));
         if let Some(peak) = self.peak_db {
             o.insert("peakDb", Value::Number(peak));
@@ -190,7 +191,7 @@ impl KitSample {
         let opt = |v: Option<f64>| v.map_or(Value::Null, Value::Number);
         o.insert("path", Value::from(self.path.as_str()));
         o.insert("displayName", Value::from(self.display_name.as_str()));
-        o.insert("key", Value::from(self.key.as_str()));
+        o.insert("key", Value::from(self.key.as_deref().unwrap_or(NOT_FOUND)));
         o.insert("rootMidi", opt(self.root_midi));
         o.insert("peakDb", opt(self.peak_db));
         o.insert("decay", opt(self.decay_ms));
@@ -243,14 +244,14 @@ pub struct Kit {
 
 impl Kit {
     /// The instruments of the kit, in its order, each once: the tracks of a
-    /// new pattern played with it. A sample whose instrument is unknown
-    /// (`NOT_FOUND`) names none.
+    /// new pattern played with it. A sample whose instrument is unknown names none.
     #[must_use]
     pub fn track_names(&self) -> Vec<&str> {
         let mut names: Vec<&str> = Vec::new();
         for sample in &self.samples {
-            let key = sample.key.as_str();
-            if !key.is_empty() && key != NOT_FOUND && !names.contains(&key) {
+            if let Some(key) = sample.key.as_deref()
+                && !names.contains(&key)
+            {
                 names.push(key);
             }
         }
@@ -448,8 +449,9 @@ mod tests {
 
     #[test]
     fn a_kit_names_each_of_its_instruments_once() {
-        let sample = |key: &str| KitSample { key: key.to_owned(), ..KitSample::default() };
-        let kit = Kit { samples: ["KICK", "SNARE", "KICK", NOT_FOUND, "CHH"].map(sample).to_vec(), ..Kit::default() };
+        let sample = |key: Option<&str>| KitSample { key: key.map(str::to_owned), ..KitSample::default() };
+        let keys = [Some("KICK"), Some("SNARE"), Some("KICK"), None, Some("CHH")];
+        let kit = Kit { samples: keys.map(sample).to_vec(), ..Kit::default() };
         assert_eq!(kit.track_names(), ["KICK", "SNARE", "CHH"]);
     }
 
@@ -478,7 +480,7 @@ mod tests {
         let kits = vec![Kit {
             name: "x".into(),
             samples: vec![KitSample {
-                key: "K".into(),
+                key: Some("K".into()),
                 display_name: "k".into(),
                 path: "x.wav".into(),
                 decay_ms: Some(1.0),
@@ -525,7 +527,7 @@ mod tests {
     #[test]
     fn playback_settings_round_trip_and_stay_out_of_the_file_when_default() {
         let plain = KitSample { path: "a.wav".into(), ..KitSample::default() };
-        assert_eq!(plain.to_json().to_json(), r#"{"displayName":"","key":"","path":"a.wav"}"#);
+        assert_eq!(plain.to_json().to_json(), r#"{"displayName":"","key":"NOT_FOUND","path":"a.wav"}"#);
         assert_eq!(plain.shape(), SampleShape::default());
         let shaped = KitSample {
             start_ms: 20.0,

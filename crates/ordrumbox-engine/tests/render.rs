@@ -32,7 +32,7 @@ fn bank() -> SampleBank {
         .map(|key| BankSample {
             kit: "test".into(),
             sample: KitSample {
-                key: (*key).into(),
+                key: Some((*key).into()),
                 display_name: key.to_lowercase(),
                 path: format!("{key}.wav"),
                 decay_ms: Some(5000.0),

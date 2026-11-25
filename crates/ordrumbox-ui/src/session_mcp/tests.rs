@@ -290,7 +290,7 @@ fn write_wav(path: &Path, level: f32) {
 /// empty kit `b`, kept in `dir`.
 fn session_with_kits(dir: &Path) -> Session {
     let sample =
-        KitSample { key: "KICK".into(), display_name: "kick".into(), path: "k.wav".into(), ..Default::default() };
+        KitSample { key: Some("KICK".into()), display_name: "kick".into(), path: "k.wav".into(), ..Default::default() };
     let kits = vec![
         Kit { name: "a".into(), samples: vec![sample.clone()], ..Kit::default() },
         Kit { name: "b".into(), ..Kit::default() },
@@ -366,7 +366,7 @@ fn kits_are_listed_chosen_and_changed() {
 #[test]
 fn playback_is_started_followed_and_stopped() {
     let mut s = session();
-    let sample = KitSample { key: "KICK".into(), path: "k".into(), decay_ms: Some(100.0), ..Default::default() };
+    let sample = KitSample { key: Some("KICK".into()), path: "k".into(), decay_ms: Some(100.0), ..Default::default() };
     let buffer = SampleBuffer::mono(vec![0.5; 400], RATE as u32).into();
     let bank = Arc::new(SampleBank { samples: vec![BankSample { kit: "x".into(), sample, buffer }] });
     let (controller, mut audio) =

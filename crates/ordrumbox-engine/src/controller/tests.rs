@@ -5,7 +5,7 @@ use ordrumbox_dsp::SampleBuffer;
 
 fn bank() -> Arc<SampleBank> {
     let instrument = crate::kit::KitSample {
-        key: "KICK".into(),
+        key: Some("KICK".into()),
         display_name: "k".into(),
         path: "k".into(),
         decay_ms: Some(100.0),

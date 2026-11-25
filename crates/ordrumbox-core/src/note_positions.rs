@@ -5,7 +5,7 @@
 use crate::euclidean;
 use crate::pattern_engine::SpanResolver;
 use crate::rng::Rng;
-use crate::steps::{absolute_step, step_spacing};
+use crate::steps::absolute_step;
 use crate::{Note, Track, arp};
 
 /// What a sub-event comes from.
@@ -48,7 +48,7 @@ pub fn sub_positions(
         return Vec::new();
     }
     let offset = |i: i64| sequence.as_ref().map_or(0.0, |s| s[(i as usize) % s.len()]);
-    let spacing = step_spacing(note.retrigger_rate);
+    let spacing = note.retrigger_spacing.steps();
     let mut positions: Vec<SubPosition> = (1..count)
         .map(|i| SubPosition {
             step: (base as f64 + i as f64 * spacing).round() as i64,

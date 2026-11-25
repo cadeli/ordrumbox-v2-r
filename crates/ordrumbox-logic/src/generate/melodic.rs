@@ -2,7 +2,7 @@
 
 use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::json::Value;
-use ordrumbox_core::{Note, Pattern, Scales, Track};
+use ordrumbox_core::{Note, Pattern, RetriggerSpacing, Scales, Track};
 
 use super::auto::Harmony;
 use super::{
@@ -334,7 +334,7 @@ fn arpeggiate(note: &mut Note, arp: Option<&Value>, count: i32, rate: f64) {
     let Some(arp) = arp else { return };
     note.arp = arp.clone();
     note.retrigger_count = count;
-    note.retrigger_rate = rate;
+    note.retrigger_spacing = RetriggerSpacing::from_code(rate);
 }
 
 /// A contour over the scale, every

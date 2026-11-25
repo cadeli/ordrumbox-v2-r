@@ -16,7 +16,7 @@ const BLOCK: usize = 256;
 
 fn bank() -> Arc<SampleBank> {
     let sample = KitSample {
-        key: "KICK".into(),
+        key: Some("KICK".into()),
         display_name: "k".into(),
         path: "k".into(),
         decay_ms: Some(100.0),

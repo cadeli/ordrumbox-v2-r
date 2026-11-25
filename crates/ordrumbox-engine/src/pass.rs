@@ -662,7 +662,7 @@ mod tests {
         )
         .unwrap();
         let instrument = KitSample {
-            key: "X".into(),
+            key: Some("X".into()),
             display_name: "x".into(),
             path: "x".into(),
             decay_ms: Some(100.0),
@@ -717,7 +717,7 @@ mod tests {
         );
         let (library, _) = Library::parse(&text).unwrap();
         let instrument =
-            KitSample { key: "X".into(), display_name: "x".into(), path: "x".into(), ..Default::default() };
+            KitSample { key: Some("X".into()), display_name: "x".into(), path: "x".into(), ..Default::default() };
         let bank = SampleBank {
             samples: vec![BankSample {
                 kit: "k".into(),

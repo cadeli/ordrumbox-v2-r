@@ -16,7 +16,7 @@ use std::sync::OnceLock;
 
 use ordrumbox_core::json::{self, Object, Value};
 use ordrumbox_core::num::{clamp, round2};
-use ordrumbox_core::{Note, Scales, Track};
+use ordrumbox_core::{Note, RetriggerSpacing, Scales, Track};
 
 pub use auto::{
     AutoGenerator, BASS_PRESET, Harmony, Options, STYLE_KEY, change_track, generate_pattern, generate_track,
@@ -105,7 +105,7 @@ pub(crate) fn apply_note_properties(note: &mut Note, source: &Value) {
         note.retrigger_count = n as i32;
     }
     if let Some(n) = num(source, "retriggerRate") {
-        note.retrigger_rate = n;
+        note.retrigger_spacing = RetriggerSpacing::from_code(n);
     }
     if let Some(n) = num(source, "euclideanPulses") {
         note.euclidean_pulses = n as i32;

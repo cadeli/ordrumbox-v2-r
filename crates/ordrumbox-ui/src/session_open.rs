@@ -66,7 +66,7 @@ impl Opened {
 
 /// The root note of each sample of `bank` that has one (key, MIDI note), for MIDI files.
 fn root_notes(bank: &SampleBank) -> Vec<(String, f64)> {
-    bank.samples.iter().filter_map(|s| Some((s.sample.key.clone(), s.sample.root_midi?))).collect()
+    bank.samples.iter().filter_map(|s| Some((s.sample.key.clone()?, s.sample.root_midi?))).collect()
 }
 
 /// The message of the starter library when no file keeps its edits.

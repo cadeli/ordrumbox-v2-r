@@ -54,10 +54,6 @@ struct TrackDef {
     base_note: f64,
 }
 
-fn found(instrument: Option<&Instrument>) -> Option<&Instrument> {
-    instrument.filter(|i| i.id != ordrumbox_core::instruments::NOT_FOUND)
-}
-
 /// The track name of instrument `id`: `id`, else the first of `id 2`,
 /// `id 3`… that `taken` leaves free.
 fn free_name(id: &str, taken: impl Fn(&str) -> bool) -> String {
@@ -83,11 +79,11 @@ fn drum_tracks(c: &Catalog, notes: &[NoteOn], channel: u8, before: &[TrackDef]) 
     let resolved: Vec<(u8, Vec<NoteOn>, &Instrument, bool)> = groups
         .into_iter()
         .filter_map(|(key, group)| {
-            if let Some(mapped) = found(c.from_midi(i64::from(channel), i64::from(key))) {
+            if let Some(mapped) = c.from_midi(i64::from(channel), i64::from(key)) {
                 return Some((key, group, mapped, true));
             }
             let (_, gm) = c.drum_names.iter().find(|(k, _)| *k == i64::from(key))?;
-            Some((key, group, found(c.from_file_name(gm))?, false))
+            Some((key, group, c.from_file_name(gm)?, false))
         })
         .collect();
     let mut defs: Vec<TrackDef> = Vec::new();
@@ -129,7 +125,7 @@ pub fn import(file_name: &str, bytes: &[u8], roots: &[(String, f64)]) -> Result<
     for (channel, list, track_name) in &channels {
         let program = programs.iter().find(|(ch, _)| ch == channel).and_then(|(_, p)| *p).unwrap_or(0);
         if *channel != 9
-            && let Some(instrument) = found(c.from_midi_program(i64::from(program))).filter(|i| !i.drum)
+            && let Some(instrument) = c.from_midi_program(i64::from(program)).filter(|i| !i.drum)
         {
             let name = free_name(&instrument.id, |name| has_track(&defs, name));
             defs.push(TrackDef { name, notes: list.clone(), base_note: root_or_c3(&instrument.id) });
@@ -140,7 +136,7 @@ pub fn import(file_name: &str, bytes: &[u8], roots: &[(String, f64)]) -> Result<
             continue;
         }
         if !track_name.is_empty()
-            && let Some(instrument) = found(c.by_name(track_name)).filter(|i| !i.drum)
+            && let Some(instrument) = c.by_name(track_name).filter(|i| !i.drum)
         {
             let name = free_name(&instrument.id, |name| has_track(&defs, name));
             defs.push(TrackDef { name, notes: list.clone(), base_note: root_or_c3(&instrument.id) });

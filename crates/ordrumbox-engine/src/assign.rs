@@ -38,7 +38,8 @@ fn normalize(name: &str) -> String {
 #[derive(Debug, Clone, Copy)]
 struct Candidate<'a> {
     kit: &'a str,
-    key: &'a str,
+    /// The sample's instrument; `None` when the catalog knows none.
+    key: Option<&'a str>,
 }
 
 /// Kit name the synth presets are matched under.
@@ -76,7 +77,8 @@ impl std::fmt::Debug for AutoAssign<'_> {
 
 impl<'a> AutoAssign<'a> {
     pub fn new(bank: &'a SampleBank, kit: &'a str, pick: &'a mut dyn FnMut(usize) -> usize) -> Self {
-        let candidates = bank.samples.iter().map(|s: &'a BankSample| Candidate { kit: &s.kit, key: &s.sample.key });
+        let candidates =
+            bank.samples.iter().map(|s: &'a BankSample| Candidate { kit: &s.kit, key: s.sample.key.as_deref() });
         Self { candidates: candidates.collect(), kit, kit_only: false, catalog: instruments::catalog(), pick }
     }
 
@@ -88,7 +90,8 @@ impl<'a> AutoAssign<'a> {
 
     /// The matching over the synth presets, all in one kit.
     fn over_synths(synths: &'a SynthPresets, pick: &'a mut dyn FnMut(usize) -> usize) -> Self {
-        let candidates = synths.keys().into_iter().map(|key| Candidate { kit: SYNTH_KIT, key: preset_match_key(key) });
+        let candidates =
+            synths.keys().into_iter().map(|key| Candidate { kit: SYNTH_KIT, key: Some(preset_match_key(key)) });
         Self {
             candidates: candidates.collect(),
             kit: SYNTH_KIT,
@@ -116,7 +119,11 @@ impl<'a> AutoAssign<'a> {
 
     /// Candidates whose key is one of `names` (normalized).
     fn exact(&self, names: &[String], kit: Option<&str>, exclude: Option<&str>) -> Vec<usize> {
-        self.in_scope(kit, exclude).iter().filter(|(_, c)| names.contains(&normalize(c.key))).map(|(i, _)| *i).collect()
+        self.in_scope(kit, exclude)
+            .iter()
+            .filter(|(_, c)| c.key.is_some_and(|key| names.contains(&normalize(key))))
+            .map(|(i, _)| *i)
+            .collect()
     }
 
     /// A catalog id for the track name, else the name.
@@ -212,7 +219,7 @@ impl<'a> AutoAssign<'a> {
         let ids: Vec<usize> = self
             .in_scope(kit, None)
             .iter()
-            .filter(|(_, c)| c.key.to_uppercase().contains(&search))
+            .filter(|(_, c)| c.key.is_some_and(|key| key.to_uppercase().contains(&search)))
             .map(|(i, _)| *i)
             .collect();
         self.pick_from(&ids)
@@ -233,7 +240,7 @@ impl<'a> AutoAssign<'a> {
         let is_drum_sound = |key: &str| self.catalog.by_id(key).is_none_or(|i| i.drum);
         let (mut exact, mut same_type) = (Vec::new(), Vec::new());
         for (i, candidate) in self.in_scope(kit, None) {
-            let key = candidate.key;
+            let Some(key) = candidate.key else { continue };
             if normalize(key) == wanted {
                 exact.push(i);
             } else if same_kind(key) && (!drums_only || is_drum_sound(key)) {
@@ -248,8 +255,9 @@ impl<'a> AutoAssign<'a> {
 /// The instrument a sample stands in for, when the auto-assignment gave a track
 /// named `track_name` a sample of key `sample_key` for want of its own: a tom
 /// for a conga track is `Some("CONGAS")`; `None` when the key is what the name
-/// asks, or a variant of it (`HI_CONGAS` for a conga track).
-pub fn substitute_for(track_name: &str, sample_key: &str) -> Option<String> {
+/// asks, or a variant of it (`HI_CONGAS` for a conga track). A sample of no
+/// known instrument (`sample_key` `None`) always stands in.
+pub fn substitute_for(track_name: &str, sample_key: Option<&str>) -> Option<String> {
     let mut pick = |_: usize| 0;
     let wanted = AutoAssign {
         candidates: Vec::new(),
@@ -259,7 +267,7 @@ pub fn substitute_for(track_name: &str, sample_key: &str) -> Option<String> {
         pick: &mut pick,
     }
     .resolve_instrument_id(track_name);
-    let key = normalize(sample_key);
+    let Some(key) = sample_key.map(normalize) else { return Some(normalize(&wanted)) };
     // A variant of the instrument is not a stand-in: a high conga plays a conga track.
     let catalog = instruments::catalog();
     let group = |id: &str| catalog.by_exact_id(id).map(|i| i.variant_of.clone().unwrap_or_else(|| i.id.clone()));
@@ -313,7 +321,7 @@ pub fn assign_track(
 /// auto-assignment finds it; `None` when there is none.
 pub fn track_sample(track: &Track, bank: &SampleBank, kit: &str) -> Option<usize> {
     if !track.auto_assign
-        && let Some(i) = bank.find_path(&track.sample_path)
+        && let Some(i) = track.sample_path.as_deref().and_then(|path| bank.find_path(path))
     {
         return Some(i);
     }
@@ -341,7 +349,11 @@ fn assign_sound(
         };
     }
     if !track.auto_assign {
-        return bank.find_path(&track.sample_path).map_or(TrackSound::None, TrackSound::Sample);
+        return track
+            .sample_path
+            .as_deref()
+            .and_then(|path| bank.find_path(path))
+            .map_or(TrackSound::None, TrackSound::Sample);
     }
     if bank.samples.is_empty() || kit.is_empty() {
         // No kit to play: only a melodic track gets its preset (below).
@@ -349,7 +361,7 @@ fn assign_sound(
     }
     // The instrument, or a variant of it, in the selected kit.
     let own = AutoAssign::new(bank, kit, pick).kit_only().matching(&track.name);
-    if let Some(i) = own.filter(|&i| substitute_for(&track.name, &bank.samples[i].sample.key).is_none()) {
+    if let Some(i) = own.filter(|&i| substitute_for(&track.name, bank.samples[i].sample.key.as_deref()).is_none()) {
         return TrackSound::Sample(i);
     }
     // A sound the selected kit lacks: the synth preset of its name, before another kit's sample.
@@ -357,7 +369,7 @@ fn assign_sound(
         return synth(key);
     }
     let sample = AutoAssign::new(bank, kit, pick).sample_for(&track.name);
-    let own = sample.filter(|&i| substitute_for(&track.name, &bank.samples[i].sample.key).is_none());
+    let own = sample.filter(|&i| substitute_for(&track.name, bank.samples[i].sample.key.as_deref()).is_none());
     if let Some(i) = own {
         return TrackSound::Sample(i);
     }
@@ -435,11 +447,11 @@ mod tests {
 
     #[test]
     fn a_substitute_names_what_it_stands_for() {
-        assert_eq!(substitute_for("Conga", "TOM").as_deref(), Some("CONGAS"));
-        assert_eq!(substitute_for("Conga", "CONGAS"), None);
-        assert_eq!(substitute_for("CONGAS", "HI_CONGAS"), None);
-        assert_eq!(substitute_for("HI_TOM", "TOM"), None);
-        assert_eq!(substitute_for("KICK", "kick"), None);
+        assert_eq!(substitute_for("Conga", Some("TOM")).as_deref(), Some("CONGAS"));
+        assert_eq!(substitute_for("Conga", Some("CONGAS")), None);
+        assert_eq!(substitute_for("CONGAS", Some("HI_CONGAS")), None);
+        assert_eq!(substitute_for("HI_TOM", Some("TOM")), None);
+        assert_eq!(substitute_for("KICK", Some("kick")), None);
     }
 
     #[test]
@@ -460,7 +472,7 @@ mod tests {
         let sample = |kit: &str, key: &str| BankSample {
             kit: kit.to_owned(),
             sample: crate::kit::KitSample {
-                key: key.to_owned(),
+                key: Some(key.to_owned()),
                 path: format!("{kit}/{key}.wav"),
                 ..Default::default()
             },
@@ -484,7 +496,7 @@ mod tests {
         let sample = |kit: &str, key: &str| BankSample {
             kit: kit.to_owned(),
             sample: crate::kit::KitSample {
-                key: key.to_owned(),
+                key: Some(key.to_owned()),
                 path: format!("{kit}/{key}.wav"),
                 ..Default::default()
             },
@@ -502,10 +514,10 @@ mod tests {
         let auto = assign_track(&synth_track("SNARE"), &bank, "a", &presets, &mut |_| 0);
         assert_eq!(auto, TrackSound::Synth { key: "BASS_FM".into(), sample: Some(1) });
         // Its own sample, whatever its name.
-        let own = Track { auto_assign: false, sample_path: "b/SNARE.wav".into(), ..synth_track("KICK") };
+        let own = Track { auto_assign: false, sample_path: Some("b/SNARE.wav".into()), ..synth_track("KICK") };
         assert_eq!(track_sample(&own, &bank, "a"), Some(2));
         // A sample the bank lacks: back to its instrument.
-        let lost = Track { sample_path: "gone.wav".into(), ..own };
+        let lost = Track { sample_path: Some("gone.wav".into()), ..own };
         assert_eq!(track_sample(&lost, &bank, "a"), Some(0));
         assert_eq!(track_sample(&lost, &bank, ""), None);
     }

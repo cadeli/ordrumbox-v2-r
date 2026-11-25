@@ -5,7 +5,7 @@ use super::tables::{ARP_DIRECTIONS, FxDef, LfoTarget, fx_of_type, lfo_key, track
 use ordrumbox_core::arp::MAX_OCTAVES;
 use ordrumbox_core::json::Value;
 use ordrumbox_core::lfo::WAVE_TYPES;
-use ordrumbox_core::{Note, ScaleList, Track, num};
+use ordrumbox_core::{Note, RetriggerSpacing, ScaleList, Track, num};
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -243,8 +243,8 @@ pub fn note_tooltip(note: &Note, track_pitch: f64) -> String {
             format!("eucl:{}", note.euclidean_pulses)
         });
     }
-    if note.retrigger_rate != 1.0 {
-        parts.push(format!("rate:{}", fmt(note.retrigger_rate)));
+    if note.retrigger_spacing != RetriggerSpacing::default() {
+        parts.push(format!("rate:{}", fmt(note.retrigger_spacing.code())));
     }
     if note.retrigger_fade != Note::default().retrigger_fade {
         parts.push(format!("fade:{}", fmt(note.retrigger_fade)));

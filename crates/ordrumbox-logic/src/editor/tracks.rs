@@ -231,7 +231,7 @@ impl Editor {
             |track| format!("Sound on {}", track.name),
             None,
             |track| {
-                track.sample_path = sample_id.to_owned();
+                track.sample_path = Some(sample_id.to_owned());
                 track.auto_assign = false;
                 track.use_synth = false;
             },

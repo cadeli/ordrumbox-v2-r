@@ -45,12 +45,6 @@ pub fn position_to_tick(steps: f64, steps_per_beat: i32) -> i64 {
     (steps * f64::from(TICK) / f64::from(steps_per_beat)).round() as i64
 }
 
-/// Spacing, in steps, of a `rate` code: below 8 it is `rate / 8` of a step,
-/// from 8 up `rate - 7` steps.
-pub fn step_spacing(rate: f64) -> f64 {
-    if rate < 8.0 { rate / 8.0 } else { rate - 7.0 }
-}
-
 /// Playback-rate ratio of a transposition in semitones.
 pub fn semitone_ratio(semitones: f64) -> f64 {
     (semitones / 12.0).exp2()
@@ -76,13 +70,5 @@ mod tests {
         }
         assert_eq!(step_to_tick(1, 3), 32);
         assert_eq!(step_to_tick(4, 6), 64);
-    }
-
-    #[test]
-    fn spacing_codes() {
-        assert_eq!(step_spacing(1.0), 0.125);
-        assert_eq!(step_spacing(4.0), 0.5);
-        assert_eq!(step_spacing(8.0), 1.0);
-        assert_eq!(step_spacing(12.0), 5.0);
     }
 }

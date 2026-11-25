@@ -9,7 +9,7 @@ const RATE: f32 = 48_000.0;
 fn bank() -> Arc<SampleBank> {
     let buffer = SampleBuffer::mono(vec![1.0; 100], 48_000);
     let instrument = crate::kit::KitSample {
-        key: "K".into(),
+        key: Some("K".into()),
         display_name: "k".into(),
         path: "k".into(),
         decay_ms: Some(10_000.0),

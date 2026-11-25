@@ -18,6 +18,7 @@ use crate::json::Value;
 use crate::note::Note;
 use crate::num::round2;
 use crate::pattern_engine::{Hit, Hits};
+use crate::retrigger_spacing::RetriggerSpacing;
 use crate::rng::Rng;
 use crate::scales::Scales;
 use crate::steps::{step_to_beat, step_to_tick};
@@ -123,7 +124,7 @@ pub(crate) fn vary_notes(track: &Track, macro_factor: f64, rng: &mut Rng) -> Has
         match op {
             NoteOp::RetrigRate { retrigger_count, rate } => {
                 note.retrigger_count = retrigger_count;
-                note.retrigger_rate = rate;
+                note.retrigger_spacing = RetriggerSpacing::Eighths(rate);
             }
             NoteOp::EuclideanFill(fill) => note.euclidean_pulses = fill,
             NoteOp::Prob(prob) => note.probability = prob,

@@ -129,7 +129,7 @@ struct CueKey {
 struct SoundKey {
     name: String,
     auto_assign: bool,
-    sample_path: String,
+    sample_path: Option<String>,
     use_synth: bool,
     synth_preset: Option<String>,
 }

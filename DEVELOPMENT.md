@@ -472,6 +472,18 @@ feature is its style tag (`Pattern::style_tag`, `tags::by_style`), the header's 
 the generation's style is `Options::style` and `generate::STYLE_KEY`. The file key stays `autoGenre`. No snapshot
 changed.
 
+The generator's per-kind chances are fractions, 0–1, like every probability of the model: the `auto_*_chance` fields
+of `Track` are `Chance` (`chance.rs`), which reads and writes the `auto*Chance` keys as percentages, 0–100, and rounds
+them to 9 decimals when written. A repeat spacing is `RetriggerSpacing` (`retrigger_spacing.rs`): eighths of a step
+or whole steps, read and written as the `retriggerRate` code. Neither changed a file or a snapshot.
+
+No sample and no instrument are `None`, no longer a word. A track's `sample_path` is an `Option`: the web version's
+`"NOT_DEFINED"` and an empty `samplePath` are read as none, and not written (an empty one was written back before). A
+kit sample's `key` is an `Option`: an empty or `"NOT_FOUND"` key is read as none and written as `"NOT_FOUND"` (an
+empty one was written back before). MCP answers give such a key, or a track's missing sample, as `null`; the kit's
+instrument menu shows it as `—`, and only an id of the catalog can be chosen. A catalog entry without an id is left
+out. No snapshot changed.
+
 A control taken back from its automation lane is marked, and each lane can be re-enabled on its own
 (`session_automation_live.rs`): `mark_taken_back` puts a `Kind::Mark` (`theme::TAKEN_BACK`) over the mixer's, the
 grid's and the track editor's controls whose lane is taken back, the grid's M S boxes get a corner mark

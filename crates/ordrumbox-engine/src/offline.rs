@@ -183,7 +183,7 @@ mod tests {
 
     fn setup() -> RenderSetup {
         let instrument = KitSample {
-            key: "KICK".into(),
+            key: Some("KICK".into()),
             display_name: "k".into(),
             path: "k".into(),
             decay_ms: Some(200.0),

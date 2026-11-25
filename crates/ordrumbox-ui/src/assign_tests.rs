@@ -58,7 +58,7 @@ fn picked(bank: &SampleBank, synths: &SynthPresets, kit: &str, track: &str, pick
             let sample = &bank.samples[i].sample;
             let own = bank.samples[i].kit == kit;
             let shown = if own { sample.path.rsplit('/').next().unwrap_or_default() } else { &sample.path };
-            (shown.to_owned(), substitute_for(&track.name, &sample.key).is_some())
+            (shown.to_owned(), substitute_for(&track.name, sample.key.as_deref()).is_some())
         }
         TrackSound::None => ("-".to_owned(), false),
         TrackSound::Synth { key, .. } => (format!("synth {key}"), false),

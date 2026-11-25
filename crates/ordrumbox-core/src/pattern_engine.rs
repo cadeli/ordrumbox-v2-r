@@ -14,7 +14,7 @@ use crate::note::{MIN_LENGTH_STEPS, Note};
 use crate::pattern::Pattern;
 use crate::rng::Rng;
 use crate::scales::Scales;
-use crate::steps::{TICK, absolute_step, position_to_tick, step_spacing, step_to_tick};
+use crate::steps::{TICK, absolute_step, position_to_tick, step_to_tick};
 use crate::style::Macros;
 use crate::track::Track;
 use crate::variation;
@@ -211,7 +211,7 @@ impl NoteContext<'_> {
     /// absolute step `at`: rounded from its exact place, so the repeats keep
     /// their spacing where a step is a fractional number of ticks.
     fn repeat_tick(&self, at: i64, i: usize) -> i64 {
-        let offset = i as f64 * step_spacing(self.note.retrigger_rate);
+        let offset = i as f64 * self.note.retrigger_spacing.steps();
         position_to_tick(at as f64 + offset, self.track.steps_per_beat)
     }
 

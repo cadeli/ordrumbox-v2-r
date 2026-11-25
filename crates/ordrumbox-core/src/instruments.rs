@@ -12,7 +12,8 @@ use std::sync::OnceLock;
 
 use crate::json::{self, Value};
 
-/// Id of "no instrument" (`NOT_FOUND`).
+/// What a kit file writes as the instrument (`key`) of a sample of none
+/// the catalog knows; read back as no instrument.
 pub const NOT_FOUND: &str = "NOT_FOUND";
 
 /// One MIDI mapping of an instrument.
@@ -214,32 +215,35 @@ impl Catalog {
             .and_then(Value::as_array)
             .unwrap_or_default()
             .iter()
-            .map(|i| Instrument {
-                id: str_of(i, "id").unwrap_or_else(|| NOT_FOUND.to_owned()),
-                drum: i.get("drum").and_then(Value::as_bool) == Some(true),
-                melodic: i.get("melodic").and_then(Value::as_bool) == Some(true),
-                pan: str_of(i, "pan").unwrap_or_else(|| "0".to_owned()),
-                variant_of: str_of(i, "variantOf"),
-                qualifier: str_of(i, "qualifier"),
-                synonyms: strings(i.get("synonyms")),
-                words: strings(i.get("words")),
-                weak_words: strings(i.get("weakWords")),
-                articulations: strings(i.get("articulations")),
-                patch_prefixes: strings(i.get("patchPrefixes")),
-                subst: strings(i.get("subst")),
-                midi: i
-                    .get("midi")
-                    .and_then(Value::as_array)
-                    .unwrap_or_default()
-                    .iter()
-                    .map(|m| MidiMapping {
-                        channel: m.get("channel").and_then(Value::as_f64).map_or(9, |c| c as i64),
-                        name: str_of(m, "name").unwrap_or_default(),
-                        key: m.get("key").and_then(Value::as_f64).map(|k| k as i64),
-                        program: m.get("program").and_then(Value::as_f64).map(|p| p as i64),
-                        key_based: m.get("keyBased").and_then(Value::as_bool),
-                    })
-                    .collect(),
+            // An entry without an id names no instrument: left out.
+            .filter_map(|i| {
+                Some(Instrument {
+                    id: str_of(i, "id")?,
+                    drum: i.get("drum").and_then(Value::as_bool) == Some(true),
+                    melodic: i.get("melodic").and_then(Value::as_bool) == Some(true),
+                    pan: str_of(i, "pan").unwrap_or_else(|| "0".to_owned()),
+                    variant_of: str_of(i, "variantOf"),
+                    qualifier: str_of(i, "qualifier"),
+                    synonyms: strings(i.get("synonyms")),
+                    words: strings(i.get("words")),
+                    weak_words: strings(i.get("weakWords")),
+                    articulations: strings(i.get("articulations")),
+                    patch_prefixes: strings(i.get("patchPrefixes")),
+                    subst: strings(i.get("subst")),
+                    midi: i
+                        .get("midi")
+                        .and_then(Value::as_array)
+                        .unwrap_or_default()
+                        .iter()
+                        .map(|m| MidiMapping {
+                            channel: m.get("channel").and_then(Value::as_f64).map_or(9, |c| c as i64),
+                            name: str_of(m, "name").unwrap_or_default(),
+                            key: m.get("key").and_then(Value::as_f64).map(|k| k as i64),
+                            program: m.get("program").and_then(Value::as_f64).map(|p| p as i64),
+                            key_based: m.get("keyBased").and_then(Value::as_bool),
+                        })
+                        .collect(),
+                })
             })
             .collect();
         let list = |key: &str| value.get(key).and_then(Value::as_array).unwrap_or_default();
@@ -587,7 +591,7 @@ mod tests {
     }
 
     fn detected(name: &str) -> &str {
-        catalog().from_file_name(name).map_or(NOT_FOUND, |i| i.id.as_str())
+        catalog().from_file_name(name).map_or("", |i| i.id.as_str())
     }
 
     #[test]
@@ -652,7 +656,7 @@ mod tests {
         // CH is the closed hat's pattern: no prefix.
         assert_eq!(detected("CH 909"), "CHH");
         // A prefix alone is a name, not a category.
-        assert_eq!(detected("BA"), NOT_FOUND);
+        assert_eq!(detected("BA"), "");
     }
 
     #[test]
@@ -708,11 +712,7 @@ mod tests {
     #[test]
     fn a_kit_reads_cl_beside_rs_as_the_claves() {
         let ids = |names: &[&str]| -> Vec<String> {
-            catalog()
-                .from_kit_file_names(names)
-                .iter()
-                .map(|i| i.map_or(NOT_FOUND, |i| i.id.as_str()).to_owned())
-                .collect()
+            catalog().from_kit_file_names(names).iter().map(|i| i.map_or("", |i| i.id.as_str()).to_owned()).collect()
         };
         assert_eq!(ids(&["RS.wav", "CL.wav", "BD.wav"]), ["RIMSHOT", "CLAVES", "KICK"]);
         assert_eq!(ids(&["CL.wav", "BD.wav"]), ["RIMSHOT", "KICK"]);

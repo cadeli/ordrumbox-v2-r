@@ -7,6 +7,7 @@
 use crate::json::{Object, Value};
 use crate::num::round2;
 use crate::record::{Issue, SetField, check_duplicate, json_record, past_max, refusal};
+use crate::retrigger_spacing::RetriggerSpacing;
 use crate::steps::{MAX_LOADED_BEATS, MAX_LOADED_STEPS};
 use crate::track::{MAX_FILTER_FREQ, MIN_FILTER_FREQ};
 
@@ -41,9 +42,8 @@ json_record! {
         cycle: i32 = 1 => "cycle" | "every",
         /// Trigger probability, 0–1.
         probability: f64 = 1.0 => "probability" | "prob",
-        /// Ghost/retrigger spacing code: `< 8` is `rate / 8` step, `>= 8` is
-        /// `rate - 7` steps. 1 is the tightest, not "normal".
-        retrigger_rate: f64 = 1.0 => "retriggerRate" | "rate",
+        /// How far apart the repeats fall (written as its `retriggerRate` code).
+        retrigger_spacing: RetriggerSpacing = RetriggerSpacing::default() => "retriggerRate" | "rate",
         /// Hits: the note plus its repeats (with an arpeggio, the arp notes).
         retrigger_count: i32 = 1 => "retriggerCount",
         /// Arpeggio as written in the file: interval array, `"0,4,7"`, a
@@ -438,14 +438,14 @@ mod tests {
         assert!(issues.is_empty());
         let expected = Note {
             probability: 0.5,
-            retrigger_rate: 4.0,
+            retrigger_spacing: RetriggerSpacing::Eighths(4.0),
             euclidean_pulses: 3,
             cycle_offset: 2,
             arp_direction: Some("up".into()),
             ..Note::default()
         };
         assert_eq!(notes[0], expected);
-        assert_eq!(notes[1].retrigger_rate, 2.0);
+        assert_eq!(notes[1].retrigger_spacing, RetriggerSpacing::Eighths(2.0));
         assert_eq!(
             encode(&notes[..1]),
             r#"["probability","retriggerRate","euclideanPulses","cycleOffset","arpDirection"] [[0.5,4,3,2,"up"]]"#
