@@ -78,11 +78,11 @@ impl SampleSources {
     }
 }
 
-/// Folders searched, in order: `first`, `$ORDRUMBOX_ASSETS`, `assets/` next
+/// Folders searched, in order: `$ORDRUMBOX_ASSETS`, `assets/` next
 /// to the program, `assets/` in the working folder, and this repository's
 /// `assets/` (for `cargo run` from anywhere in the checkout).
-pub fn candidates(first: &[PathBuf]) -> Vec<PathBuf> {
-    let mut dirs = first.to_vec();
+pub fn candidates() -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
     if let Some(dir) = env::var_os(ENV_VAR) {
         dirs.push(PathBuf::from(dir));
     }
@@ -99,8 +99,8 @@ pub fn candidates(first: &[PathBuf]) -> Vec<PathBuf> {
 }
 
 /// The first candidate holding `data/library.json`.
-pub fn find(first: &[PathBuf]) -> Option<PathBuf> {
-    candidates(first).into_iter().find(|dir| dir.join("data").join(LIBRARY).is_file())
+pub fn find() -> Option<PathBuf> {
+    candidates().into_iter().find(|dir| dir.join("data").join(LIBRARY).is_file())
 }
 
 fn read_json(path: &Path) -> Result<json::Value, String> {

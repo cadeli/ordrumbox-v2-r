@@ -257,9 +257,6 @@ const LOADED_MAX: [(&str, i32); 4] = [
     ("loopLength", MAX_LOADED_STEPS),
     ("chokeGroup", MAX_CHOKE_GROUPS),
 ];
-/// A pair swing that delays nothing: the second step of a pair at its
-/// middle ([`crate::Hit::pair_swing_beats`]).
-pub const STRAIGHT_SWING: f64 = 0.5;
 /// Choke groups a track can be in, numbered from 1.
 pub const MAX_CHOKE_GROUPS: i32 = 8;
 /// Steps a beat can be divided into.

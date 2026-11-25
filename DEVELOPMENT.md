@@ -15,7 +15,6 @@ Building, testing and changing orDrumbox. The user documentation is
 | `ordrumbox-probe` | sound measurements, command-line only | core, dsp, engine |
 | `ordrumbox-ui` | session, views, input, MCP link, update check | core, logic, engine, fontdue |
 | `ordrumbox-app` | window, input translation, audio output, MIDI ports, file dialogs (`ordrumbox(.exe)`) | core, engine, ui, winit, softbuffer, cpal, midir, rfd |
-| `ordrumbox-plugin` | CLAP and VST3 instrument, set aside: out of the workspace (`exclude`), built by nothing | core, engine, ui, nih-plug, baseview, softbuffer |
 | `xtask` | `audit`, the checks of `AGENTS.md` | none |
 
 The domain crates take no third-party dependency.
@@ -557,3 +556,12 @@ sample). The track's sample is the one its `samplePath` names, else the first sa
 selected kit (`track_sample`, `ordrumbox-engine/src/assign.rs`); `TrackSound::Synth` and `SynthStart` carry it.
 With no sample (`ordrumbox-probe`, the DSP tests), it draws the pseudo-random values as before. The LFOs' random wave
 is unchanged. No snapshot changed: none plays an oscillator's random wave through the engine.
+
+The CLAP/VST3 plugin is gone: the crate `ordrumbox-plugin`, and what only it used. The session has no hosted mode any
+more (no host transport in the header, no host marks on the tracks, no Alt shortcuts, no menus cut down, no resize
+grip); the engine no longer takes a swing on every track (`PassContext::swing`, `Controller::set_host_swing`), a
+transpose or an effect amount from a host (`HostTrack` keeps the gain, pan, cutoff and sends the MIDI controls move),
+nor a block rendered ahead of real time (`AudioSide::announce`, `receive`). `HostTransport`, `render_synced` and
+`HostMix` stay: the MIDI clock, the MIDI controls and the stems use them. A session that never saves, for the MCP
+tests, opens a library given as text (`LibrarySource::Text`) on an output with no device (`handed_output`). No
+snapshot changed.

@@ -8,7 +8,6 @@
 
 use super::session_confirm::Pending;
 use super::{Session, no_output};
-use crate::menu::Command;
 use crate::picker::Purpose;
 use crate::{assets, store, update, user_data};
 use ordrumbox_core::Library;
@@ -279,10 +278,6 @@ impl Session {
     /// Help > Factory reset, once confirmed: the user's files moved to
     /// `backups/`, the session loaded again from the assets, as at first start.
     pub fn factory_reset(&mut self) {
-        if let Some(refusal) = Command::FactoryReset.hosted_refusal().filter(|_| self.host.hosted) {
-            self.message = refusal.into();
-            return;
-        }
         self.chrome.close_popups();
         let Some(dir) = self.user_folder() else {
             self.message = format!("factory reset: {NO_USER_FOLDER}");
@@ -311,7 +306,7 @@ mod tests {
 
     use crate::kits::KitSet;
 
-    use crate::menu;
+    use crate::menu::Command;
 
     use crate::picker::Export;
 
@@ -398,23 +393,6 @@ mod tests {
         s.picked(Purpose::RestoreUserData, dir.clone());
         assert!(s.confirm_open());
         fs::remove_dir_all(dir).unwrap();
-    }
-
-    #[test]
-    fn a_plugin_leaves_the_user_data_folder_alone() {
-        let mut s = session();
-        s.host.hosted = true;
-        for command in [
-            Command::BackUpUserData,
-            Command::RestoreUserData,
-            Command::ChangeUserFolder,
-            Command::DefaultUserFolder,
-            Command::OpenUserFolder,
-        ] {
-            s.run(command);
-            assert_eq!(s.message, menu::USER_DATA_IN_THE_APP, "{command:?}");
-            assert!(!s.overlay_open());
-        }
     }
 
     #[test]

@@ -101,7 +101,7 @@ impl Session {
         let revision = self.editor.revision();
         action(self);
         if self.editor.revision() != revision {
-            let key = if self.host.hosted { "Alt+Z".to_owned() } else { format!("{}+Z", crate::menu::command_label()) };
+            let key = format!("{}+Z", crate::menu::command_label());
             self.message = format!("{} ({key}: undo)", self.message);
         }
     }
@@ -194,10 +194,6 @@ mod tests {
         // Nothing done, nothing to undo.
         s.clear_track(0);
         assert_eq!(s.message, "No notes to clear");
-        // A plugin's undo key is Alt+Z.
-        s.host.hosted = true;
-        s.randomize_track();
-        assert!(s.message.ends_with("(Alt+Z: undo)"), "{}", s.message);
     }
 
     #[test]
@@ -212,21 +208,17 @@ mod tests {
 
     #[test]
     fn a_click_on_the_notice_buttons_takes_the_choice() {
-        // A reset that ran would load the session again from the machine's
-        // user data folder, not this test's: hosted once the notice is open,
-        // the reset only refuses, which tells that the button ran it.
+        // The starter library, which this session has no assets for: loading
+        // it only says so, which tells that the button ran it.
         let mut s = session();
-        s.run(Command::FactoryReset);
-        assert!(s.overlay_open());
-        s.host.hosted = true;
-        // The Reset button runs what ENTER on the focused one would.
+        s.run(Command::StarterLibrary);
+        assert!(s.confirm_open());
         let (x, y) = button_point(&s, 1);
         s.overlay_click(800, 600, Scale::ONE, x, y);
         assert!(!s.overlay_open());
-        assert_eq!(Some(s.message.as_str()), Command::FactoryReset.hosted_refusal());
-        // The Keep button only closes.
+        assert!(!s.message.is_empty(), "the action ran");
+        // The Keep button only closes: a reset is never run here.
         s.message.clear();
-        s.host.hosted = false;
         s.run(Command::FactoryReset);
         let (x, y) = button_point(&s, 0);
         s.overlay_click(800, 600, Scale::ONE, x, y);

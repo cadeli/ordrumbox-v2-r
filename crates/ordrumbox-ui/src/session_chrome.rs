@@ -140,8 +140,7 @@ impl Default for Chrome {
 
 impl Chrome {
     /// The compact view: the grid alone, the track editor and the note
-    /// editor folded away (a plugin's window starts so, small over the
-    /// host's arrangement).
+    /// editor folded away.
     pub(super) fn fold_editors(&mut self) {
         self.show_track_editor = false;
         self.show_note_editor = false;

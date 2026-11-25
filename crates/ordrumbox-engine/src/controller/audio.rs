@@ -1,6 +1,6 @@
 //! The audio-callback side of playback.
 
-use super::link::{Command, Inbox, Link, SCOPE_SIZE, Scope, Snapshot, lock, try_lock};
+use super::link::{Command, Inbox, Link, SCOPE_SIZE, Scope, Snapshot, try_lock};
 use crate::engine::{Engine, HostMix, HostTransport, host_pass};
 use crate::midi::{BlockClock, BlockNote};
 use std::sync::Arc;
@@ -23,7 +23,7 @@ impl AudioSide {
         self.engine.sample_rate()
     }
 
-    /// A plugin host's mix for the blocks to come ([`Engine::set_host_mix`]).
+    /// The live mix for the blocks to come ([`Engine::set_host_mix`]).
     pub fn set_host_mix(&mut self, mix: HostMix) {
         self.engine.set_host_mix(mix);
     }
@@ -65,52 +65,22 @@ impl AudioSide {
         self.publish(left, right, None, false);
     }
 
-    /// Render one block of a plugin host, following its transport: the
-    /// engine stops when the host stops, and keeps to the host's position
-    /// inside the pass it plays. When the host is in another pass, it says
-    /// so, and the controller posts that pass ([`Controller::update`]).
+    /// Render one block following a transport (a MIDI clock's): the engine
+    /// stops when it stops, and keeps to its position inside the pass it
+    /// plays. When the transport is in another pass, it says so, and the
+    /// controller posts that pass ([`Controller::update`]).
     pub fn render_synced(&mut self, left: &mut [f32], right: &mut [f32], host: HostTransport) {
-        self.render_synced_split(left, right, host, |_, _, _, _| {});
-    }
-
-    /// [`Self::render_synced`], the tracks the host's mix splits given to
-    /// `aux` instead of the mix ([`Engine::render_split`]).
-    pub fn render_synced_split(
-        &mut self,
-        left: &mut [f32],
-        right: &mut [f32],
-        host: HostTransport,
-        aux: impl FnMut(usize, usize, &[f32], &[f32]),
-    ) {
         (self.block_start, self.block_frames) = (self.engine.clock(), left.len().min(right.len()));
         if let Some(mut inbox) = try_lock(&self.link.inbox) {
             take(&mut self.engine, &mut inbox, Some(host));
         }
         let lost = self.follow(host);
-        self.engine.render_split(left, right, aux);
+        self.engine.render_split(left, right, |_, _, _, _| {});
         self.publish(left, right, Some(host), lost);
     }
 
-    /// Ready the block a plugin host is about to render, for a host that
-    /// renders ahead of real time (a bounce): what the controller posted is
-    /// taken, the host's transport followed and published, so that a
-    /// [`Controller::update`] made now posts what this very block needs.
-    /// [`Self::receive`] then takes it, and [`Self::render_synced`] renders.
-    pub fn announce(&mut self, host: HostTransport) {
-        self.receive(host);
-        let lost = self.follow(host);
-        self.link.published.write(self.snapshot(Some(host), lost));
-    }
-
-    /// Take what the controller posted, waiting for the lock: for a block
-    /// rendered ahead of real time, which can wait ([`Self::announce`]).
-    pub fn receive(&mut self, host: HostTransport) {
-        let mut inbox = lock(&self.link.inbox);
-        take(&mut self.engine, &mut inbox, Some(host));
-    }
-
-    /// Keep to the host's transport: stop with it, or move to its position
-    /// in the pass playing. True when the host is in another pass (or none plays).
+    /// Keep to the transport followed: stop with it, or move to its position
+    /// in the pass playing. True when it is in another pass (or none plays).
     pub(super) fn follow(&mut self, host: HostTransport) -> bool {
         if host.rolling() {
             return !self.engine.follow(host.beat);
@@ -155,7 +125,7 @@ impl AudioSide {
 }
 
 /// What the controller posted into `inbox`, taken by `engine`; under a
-/// plugin host that starts, the cue it posted when the host is at its pass.
+/// transport followed that starts, the cue it posted when it is at its pass.
 pub(super) fn take(engine: &mut Engine, inbox: &mut Inbox, host: Option<HostTransport>) {
     if let Some(bank) = inbox.bank.take() {
         engine.set_bank(bank);

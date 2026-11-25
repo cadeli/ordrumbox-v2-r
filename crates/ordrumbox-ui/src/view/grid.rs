@@ -4,7 +4,7 @@
 use super::layout::{ADD_TRACK_LABEL, Layout, RULER_HEIGHT, steps_per_beat};
 use super::{
     ACCENT, AUTO, CURSOR, LABEL_CHARS, LOOP_MARK, MUTE_ON, PAGE_STEPS_PER_BEAT, PLAYHEAD, PLAYING, SELECTED, SOLO_ON,
-    View, background_color, box_off_color, cell_beat_color, cell_color, focus_row_color, mute_host_color,
+    View, background_color, box_off_color, cell_beat_color, cell_color, focus_row_color, mute_live_color,
 };
 use crate::canvas::{Canvas, Rgb, small_cell, small_char_width, text_width};
 use crate::panel::{MENU_MARK, Rect, stroke};
@@ -97,7 +97,6 @@ fn draw_track_row(canvas: &mut Canvas, track: &Track, i: usize, view: &View, lay
         canvas.fill_rect(band.x, band.y, band.w, band.h, focus_row_color());
     }
     draw_vu_stripe(canvas, i, y, view, layout);
-    draw_host_marks(canvas, i, y, view, layout);
     let mute = draw_mute_solo(canvas, track, i, y, view, layout);
     let color = if mute {
         theme::muted()
@@ -131,31 +130,16 @@ fn draw_vu_stripe(canvas: &mut Canvas, i: usize, y: i32, view: &View, layout: &L
     }
 }
 
-/// What a plugin host does to row `i`, in the gap right of its volume slider:
-/// a stripe when it moves the track's settings, a square at its top when it
-/// plays the track on an output of its own. Nothing is drawn otherwise.
-fn draw_host_marks(canvas: &mut Canvas, i: usize, y: i32, view: &View, layout: &Layout) {
-    let gap = layout.scale.px();
-    let x = layout.host_mark_x() + 3 * layout.scale;
-    let (width, top, height) = (3 * layout.scale, y + gap, layout.row - 3 * gap);
-    if ordrumbox_engine::host_muted(view.host_moved, i) {
-        canvas.fill_rect(x, top, width, height, theme::ACCENT);
-    }
-    if ordrumbox_engine::host_muted(view.host_split, i) {
-        canvas.fill_rect(x, top, width, width, theme::VALUE);
-    }
-}
-
 /// The mute and solo boxes of row `i`; whether the track is muted (by itself
-/// or by the host).
+/// or by the MIDI controls).
 fn draw_mute_solo(canvas: &mut Canvas, track: &Track, i: usize, y: i32, view: &View, layout: &Layout) -> bool {
     let box_y = y + (layout.row - layout.box_size) / 2;
-    // A mute from the host is lit in its own colour: the track's own stays off.
-    let host_mute = ordrumbox_engine::host_muted(view.host_muted, i);
+    // A mute from the MIDI controls is lit in its own colour: the track's own stays off.
+    let live_mute = ordrumbox_engine::host_muted(view.live_muted, i);
     // The song's lanes, while it plays, else the track's own.
     let (own_mute, solo) = view.switches.get(i).copied().unwrap_or((track.mute, track.solo));
     let (mute_taken, solo_taken) = view.switches_taken_back.get(i).copied().unwrap_or_default();
-    let (mute, mute_color) = if own_mute { (true, MUTE_ON) } else { (host_mute, mute_host_color()) };
+    let (mute, mute_color) = if own_mute { (true, MUTE_ON) } else { (live_mute, mute_live_color()) };
     let boxes = [(false, mute, mute_color, "M", mute_taken), (true, solo, SOLO_ON, "S", solo_taken)];
     for (solo, on, color, letter, is_taken_back) in boxes {
         let x = layout.box_x(solo);

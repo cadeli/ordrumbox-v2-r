@@ -9,7 +9,6 @@ use super::Session;
 use super::session_overlay::Overlay;
 use super::session_types::OverlayKey;
 use crate::demo_browser::{DemoBrowser, DemoLayout, Outcome};
-use crate::menu;
 use crate::scale::Scale;
 
 impl Session {
@@ -88,18 +87,12 @@ impl Session {
             self.playback.stop();
         }
         self.show_pattern(index);
-        if self.host.hosted {
-            return ": the host's transport plays it".into();
-        }
         self.toggle(Mode::Pattern(index), 0);
         self.playing_text()
     }
 
     /// Song `index` selected, shown and played from its start; what to say of it.
     fn play_loaded_song(&mut self, index: usize) -> String {
-        if self.host.hosted {
-            return format!(" ({})", menu::SONGS_IN_THE_APP);
-        }
         if self.playing() {
             self.playback.stop();
         }

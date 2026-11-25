@@ -9,7 +9,7 @@
 //! [`MixerLayout`] places everything; the controls are panel items, the
 //! strips' backgrounds, the meters, the curve and the spectrum are drawn here.
 
-use crate::canvas::{Canvas, Rgb, fit, text_width};
+use crate::canvas::{Canvas, Rgb};
 use crate::output;
 use crate::panel::Rect;
 use crate::scale::Scale;
@@ -281,8 +281,8 @@ pub struct MixerView {
     /// The track the track editor edits: its strip is lit.
     pub edited: Option<usize>,
     /// The master's settings, its level (linear peak) and the spectrum's
-    /// bytes, one a bin; `None` in a plugin, whose host mixes.
-    pub master: Option<(MasterSettings, f32, Vec<u8>)>,
+    /// bytes, one a bin.
+    pub master: (MasterSettings, f32, Vec<u8>),
 }
 
 fn strip_color() -> Rgb {
@@ -322,27 +322,13 @@ pub fn draw(canvas: &mut Canvas, view: &MixerView, layout: &MixerLayout) {
     if layout.scrolls() {
         scroll_thumb::draw_across(canvas, layout.scroll_bar, layout.thumb(), s);
     }
-    match &view.master {
-        Some((settings, level, spectrum)) => {
-            draw_meter(canvas, layout.master.meter, *level);
-            if layout.master.curve.h > 8 * s {
-                output::draw_curve(canvas, settings, layout.master.curve, s);
-            }
-            if layout.spectrum.h > 8 * s {
-                output::draw_spectrum(canvas, spectrum, layout.spectrum, s);
-            }
-        }
-        None => {
-            // A plugin: the host mixes; its returns and master are the defaults.
-            let lines =
-                ["The host mixes:", "the returns and", "the master play", "at their defaults,", "set in the app."];
-            let r = Rect::new(layout.returns[0].back.x, layout.top, master.x + master.w - layout.returns[0].back.x, 0);
-            for (i, line) in lines.iter().enumerate() {
-                let y = r.y + (40 + 12 * i as i32) * s;
-                let text = fit(line, r.w - 8 * s, s);
-                canvas.text(r.x + (r.w - text_width(&text, s)) / 2, y, &text, s, theme::muted());
-            }
-        }
+    let (settings, level, spectrum) = &view.master;
+    draw_meter(canvas, layout.master.meter, *level);
+    if layout.master.curve.h > 8 * s {
+        output::draw_curve(canvas, settings, layout.master.curve, s);
+    }
+    if layout.spectrum.h > 8 * s {
+        output::draw_spectrum(canvas, spectrum, layout.spectrum, s);
     }
 }
 
@@ -444,10 +430,9 @@ mod tests {
             let mut pixels = vec![0; w * h];
             let mut canvas = Canvas::new(&mut pixels, w, h);
             let layout = MixerLayout::new(Rect::new(0, 0, w as i32, h as i32), 12, 3, Scale::ONE);
-            for master in [None, Some((MasterSettings::default(), 0.9, vec![128; 256]))] {
-                let view = MixerView { levels: vec![0.5; 12], edited: Some(4), master };
-                draw(&mut canvas, &view, &layout);
-            }
+            let master = (MasterSettings::default(), 0.9, vec![128; 256]);
+            let view = MixerView { levels: vec![0.5; 12], edited: Some(4), master };
+            draw(&mut canvas, &view, &layout);
         }
     }
 }

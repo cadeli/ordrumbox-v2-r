@@ -1,9 +1,8 @@
 //! What plays and what is shown: play and stop, the pattern, kit and song
-//! stepped through or picked at random, the tempo, and the choices a plugin
-//! host makes.
+//! stepped through or picked at random, the tempo, and the pattern a MIDI
+//! note chooses.
 
 use super::Session;
-use crate::menu;
 use ordrumbox_core::automation::STEPS_PER_MEASURE;
 
 /// What a loop command says without a loop.
@@ -52,10 +51,6 @@ impl Session {
 
     /// Shift+Space: play or stop the selected song (its arrangement), from the cursor.
     pub fn toggle_play_song(&mut self) {
-        if self.host.hosted {
-            self.message = menu::SONGS_IN_THE_APP.into();
-            return;
-        }
         if self.editor.library().songs.is_empty() {
             self.message = "no song in the library".into();
             return;
@@ -218,73 +213,29 @@ impl Session {
         self.kit_index
     }
 
-    /// Pattern `index` (from 0) shown, and played in pattern mode, as a
-    /// plugin host's parameter asks. False, with a message, when the library
-    /// has no such pattern. In song mode the song plays on, and the message says so.
-    pub fn host_select_pattern(&mut self, index: usize) -> bool {
+    /// Pattern `index` (from 0) chosen by a MIDI note: shown, and a pattern
+    /// playing is left at once for the new one, from its first beat. False,
+    /// with a message, when the library has no such pattern. In song mode the
+    /// song plays on, and the message says so.
+    pub fn select_pattern_now(&mut self, index: usize) -> bool {
         let count = self.editor.library().patterns.len();
         if index >= count {
-            self.message = format!("host: no pattern {} (the library has {count})", index + 1);
+            self.message = format!("MIDI: no pattern {} (the library has {count})", index + 1);
             return false;
         }
         if index != self.pattern_index {
             self.show_pattern(index);
             if matches!(self.playback.mode(), Some(Mode::Song(_))) {
-                self.message = format!("host: {}, shown only: a song plays", self.message);
+                self.message = format!("MIDI: {}, shown only: a song plays", self.message);
             }
         }
+        self.playback.restart_pattern(&self.editor, index);
         true
-    }
-
-    /// Pattern `index` (from 0) chosen by a MIDI note: as [`Self::host_select_pattern`],
-    /// and a pattern playing is left at once for the new one, from its first
-    /// beat (under a plugin host, from the host's place in the pass).
-    pub fn select_pattern_now(&mut self, index: usize) -> bool {
-        let chosen = self.host_select_pattern(index);
-        if chosen {
-            self.playback.restart_pattern(&self.editor, index);
-        }
-        chosen
-    }
-
-    /// Kit `index` (from 0) used, as a plugin host's parameter asks. False,
-    /// with a message, when there is no such kit.
-    pub fn host_select_kit(&mut self, index: usize) -> bool {
-        let count = self.kits.kits().len();
-        if index >= count {
-            self.message = format!("host: no kit {} (there are {count})", index + 1);
-            return false;
-        }
-        // What plays, not the library: the host's project keeps the parameter.
-        if index != self.kit_index {
-            self.select_kit(index);
-            self.message = format!("kit {}", self.kits.kits()[index].name);
-        }
-        true
-    }
-
-    /// A plugin host's swing on every track: where the second step of each
-    /// pair starts (`ordrumbox_core::track::STRAIGHT_SWING`: none). The pass
-    /// playing is rebuilt when it changes.
-    pub fn set_host_swing(&mut self, swing: f64) {
-        if let Some(controller) = self.playback.controller_mut() {
-            controller.set_host_swing(self.editor.library(), swing);
-        }
     }
 
     /// Show `message` as the outcome of the last action.
     pub fn tell(&mut self, message: String) {
         self.message = message;
-    }
-
-    /// The names of the library's patterns, in order (`None`: no name).
-    pub fn pattern_names(&self) -> impl Iterator<Item = Option<&str>> + Clone {
-        self.editor.library().patterns.iter().map(|p| p.name.as_deref())
-    }
-
-    /// The names of the kits, in order.
-    pub fn kit_names(&self) -> impl Iterator<Item = &str> + Clone {
-        self.kits.kits().iter().map(|k| k.name.as_str())
     }
 
     /// Use kit `index`, the library's from now on, and say so.
@@ -308,11 +259,10 @@ impl Session {
 
     /// The kit used follows the library's when the library changed (an undo,
     /// a project or a library loaded); a kit the library names that is not
-    /// there is said once, and the kit in use stays. A plugin plays the kit
-    /// of its host's parameter.
+    /// there is said once, and the kit in use stays.
     pub(super) fn follow_kit(&mut self) {
         let revision = self.editor.revision();
-        if self.host.hosted || self.kit_revision == Some(revision) {
+        if self.kit_revision == Some(revision) {
             return;
         }
         self.kit_revision = Some(revision);

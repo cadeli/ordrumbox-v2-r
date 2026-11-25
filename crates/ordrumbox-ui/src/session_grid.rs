@@ -109,7 +109,7 @@ impl Session {
             Some(Hit::Mute(t) | Hit::Solo(t) | Hit::Name(t)) => self.track_menu(t, x, y),
             Some(Hit::Cell { track, beat, step }) => self.step_menu(track, beat, step, x, y),
             Some(Hit::AddTrack) => self.add_track_menu(x, y),
-            Some(Hit::Host(_)) | None => return false,
+            None => return false,
         }
         true
     }
@@ -273,7 +273,7 @@ impl Session {
         (x, y): (i32, i32),
     ) {
         let (lines, keys): (Vec<_>, Vec<_>) = lines.map(|(value, label, key)| ((value, label.to_owned()), key)).unzip();
-        let shortcuts = crate::menu::shown_shortcuts(&keys, self.host.hosted);
+        let shortcuts = crate::menu::shown_shortcuts(&keys);
         let menu = Dropdown::menu(Id::GridMenu, x, y, title, lines).with_shortcuts(shortcuts);
         self.chrome.widgets.dropdown = Some(menu);
     }

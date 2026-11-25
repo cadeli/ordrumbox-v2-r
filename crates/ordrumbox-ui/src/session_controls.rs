@@ -2,7 +2,7 @@
 //! (a knob of the controller) to the master volume or to a track's volume,
 //! pan, filter cutoff or mute (choose the control, press Learn, turn the
 //! knob); and a knob turned then moves what it is bound to, on top of the
-//! tracks' settings, as a plugin host's mix does. The bindings are a setting
+//! tracks' settings. The bindings are a setting
 //! (`midiControls`); the knobs' places are not saved, nor an undo step.
 
 use ordrumbox_engine::{Control, ControlMap, Knob};
@@ -137,7 +137,7 @@ impl Session {
     fn post_controls(&mut self) {
         let mix = *self.controls.mix();
         self.playback.set_live_mix(mix);
-        self.set_host_muted(mix.muted);
+        self.set_live_muted(mix.muted);
     }
 
     /// A MIDI control change: `value` (0–127) of controller `controller` on
@@ -157,12 +157,12 @@ impl Session {
             self.post_controls();
             return true;
         }
-        let muted = self.host.muted;
+        let muted = self.followed.muted;
         if self.controls.turn(knob, value).is_none() {
             return false;
         }
         self.post_controls();
-        self.host.muted != muted
+        self.followed.muted != muted
     }
 
     /// A key while the modal is open; whether it was.

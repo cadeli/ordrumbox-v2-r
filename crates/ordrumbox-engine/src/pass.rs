@@ -113,17 +113,12 @@ pub struct PassContext<'a> {
     pub sample_rate: f64,
     /// Transport tick the pass starts at.
     pub first_tick: u64,
-    /// A swing on every track, on top of their own: where the second step
-    /// of each pair starts ([`ordrumbox_core::track::STRAIGHT_SWING`]: none;
-    /// a plugin host's).
-    pub swing: f64,
 }
 
-/// How late `note` of `track` plays, in ticks: its own swing, `own_beats`
-/// (its track's, or a song lane's), and the pair swing `swing` set for
-/// every track.
-fn swing_ticks(own_beats: f64, note: &Hit, track: &Track, swing: f64) -> f64 {
-    (own_beats + note.pair_swing_beats(track, swing)) * f64::from(TICK)
+/// How late a note plays, in ticks, at its swing `own_beats` (its track's,
+/// or a song lane's).
+fn swing_ticks(own_beats: f64) -> f64 {
+    own_beats * f64::from(TICK)
 }
 
 /// Frames in one tick at `bpm`.
@@ -200,7 +195,7 @@ pub fn pattern_pass_ticks(pattern: &Pattern) -> u32 {
 }
 
 /// Build pass `number` of `pattern` at tempo `bpm` (the library's, or a
-/// plugin host's). Notes of muted tracks (or of tracks another track's solo
+/// followed clock's). Notes of muted tracks (or of tracks another track's solo
 /// silences) are left out.
 pub fn build_pass(pattern: &Pattern, number: u64, rng: &mut Rng, context: PassContext<'_>, bpm: f64) -> Pass {
     let per_tick = frames_per_tick(bpm, context.sample_rate);
@@ -225,8 +220,7 @@ pub fn build_pass(pattern: &Pattern, number: u64, rng: &mut Rng, context: PassCo
                 continue;
             }
             let track = &pattern.tracks[note.track];
-            let frame =
-                note_frame(tick, swing_ticks(note.swing_beats(track), note, track, context.swing), per_tick, frames);
+            let frame = note_frame(tick, swing_ticks(note.swing_beats(track)), per_tick, frames);
             let lfo_tick = context.first_tick + u64::from(tick);
             let Some(assigned) = context.sounds.get(note.track) else { continue };
             let voice = Voice { strip: note.track, lfo_tick, bpm };
@@ -462,8 +456,6 @@ pub struct SongContext<'a> {
     pub scales: &'a Scales,
     pub synths: &'a SynthPresets,
     pub sample_rate: f64,
-    /// A swing on every track ([`PassContext::swing`]).
-    pub swing: f64,
 }
 
 /// One strip per track name over the song's patterns, in song order
@@ -600,7 +592,6 @@ impl SongPassParts<'_> {
             synths: context.synths,
             sample_rate: context.sample_rate,
             first_tick: self.first_tick,
-            swing: context.swing,
         };
         let tick = self.first_tick + u64::from(t);
         let step = self.song.automation_step_at(tick, TICK);
@@ -617,7 +608,7 @@ impl SongPassParts<'_> {
                 continue;
             }
             let note = &lanes.apply(note, track);
-            let swing = swing_ticks(lanes.swing_beats(note, track), note, track, context.swing);
+            let swing = swing_ticks(lanes.swing_beats(note, track));
             let frame = note_frame(t, swing, self.per_tick, self.frames);
             let voice = Voice { strip, lfo_tick: tick, bpm: self.bpm };
             if let Some(sound) = sound_for(pattern, note, assigned, voice, &pass_context, patches) {
@@ -662,7 +653,6 @@ mod tests {
     }
     use crate::kit::{BankSample, KitSample};
     use ordrumbox_core::Library;
-    use ordrumbox_core::track::STRAIGHT_SWING;
     use ordrumbox_dsp::SampleBuffer;
 
     #[test]
@@ -698,7 +688,6 @@ mod tests {
             scales: &scales,
             synths: &synths,
             sample_rate: 48_000.0,
-            swing: STRAIGHT_SWING,
         };
         let song = &library.songs[0];
         let strips = song_strips(song, &library.patterns);
@@ -751,7 +740,6 @@ mod tests {
             synths: &synths,
             sample_rate: 48_000.0,
             first_tick: 0,
-            swing: STRAIGHT_SWING,
         };
         let pass = build_pass(&library.patterns[0], 0, &mut Rng::new(1), context, 120.0);
         pass.events

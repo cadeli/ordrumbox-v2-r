@@ -29,8 +29,6 @@ pub enum Hit {
         beat: i32,
         step: i32,
     },
-    /// The mark of what a plugin host does to a track, beside its volume slider.
-    Host(usize),
     /// The button under the track list that adds a track.
     AddTrack,
 }
@@ -100,24 +98,6 @@ pub struct Layout {
 /// Text scale of the header (the 8 px font at 16 px per scale unit).
 pub(super) fn header_text(scale: Scale) -> Scale {
     scale.times(2)
-}
-
-/// The header's first group: the app's transport, or a plugin host's.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Transport {
-    /// Play and the tempo knob (panel items).
-    Own,
-    /// What the host's transport does, only shown: whether it plays and the
-    /// tempo the pattern plays at (`None` before the host's first block).
-    Host(Option<HostState>),
-}
-
-/// A plugin host's transport, as the header shows it.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct HostState {
-    pub playing: bool,
-    /// The tempo played: the host's, inside the tempo bounds, to a tenth.
-    pub bpm: f64,
 }
 
 /// The header (the JS toolbar and its pattern settings panel), a row of
@@ -200,32 +180,6 @@ pub(super) const HEADER_GROUP_GAP: i32 = 14;
 pub(super) const HEADER_GROUP_PAD: i32 = 4;
 
 impl HeaderControls {
-    /// The header of a plugin, which has no song: no mode switch, the
-    /// controls after it move into its place.
-    #[must_use]
-    pub fn hosted(mut self) -> Self {
-        let shift = self.play.x - self.mode[0].x;
-        let rects = [
-            &mut self.play,
-            &mut self.record,
-            &mut self.bpm,
-            &mut self.pattern,
-            &mut self.beats,
-            &mut self.kit,
-            &mut self.style,
-            &mut self.generate,
-            &mut self.auto,
-        ];
-        for rect in rects.into_iter().chain(&mut self.macros).chain(&mut self.views) {
-            rect.x -= shift;
-        }
-        for rect in &mut self.mode {
-            rect.w = 0;
-        }
-        self.mode[1].x = self.mode[0].x;
-        self
-    }
-
     /// The arrangement list of the song mode, in the place of the pattern
     /// list and the beats.
     #[must_use]
@@ -277,8 +231,8 @@ pub(super) const TRACK_EDITOR_ROUNDING: i32 = 9;
 pub(super) const MIN_STATUS_LINES: usize = 1;
 
 /// The track rows the grid has room for without the track editor, at their
-/// smallest: a compact window (a plugin's, over the host's arrangement)
-/// still shows a full drum pattern.
+/// smallest: a compact window (the grid alone) still shows
+/// a full drum pattern.
 pub(super) const COMPACT_ROWS: i32 = 16;
 
 /// The smallest row the grid draws, per scale unit.
@@ -560,7 +514,7 @@ impl Layout {
         let x = x.clamp(self.grid_left, self.grid_left + self.grid_width - 1);
         match self.hit(pattern, x, y)? {
             Hit::Cell { track, beat, step } => Some((track, beat, step)),
-            Hit::Mute(_) | Hit::Solo(_) | Hit::Name(_) | Hit::Host(_) | Hit::AddTrack => None,
+            Hit::Mute(_) | Hit::Solo(_) | Hit::Name(_) | Hit::AddTrack => None,
         }
     }
 
@@ -613,17 +567,6 @@ impl Layout {
         self.step_x(i64::from(beat), 1)
     }
 
-    /// The left edge of the host's mark: the gap right of the volume slider.
-    pub(super) fn host_mark_x(&self) -> i32 {
-        self.volume_x + VOLUME_WIDTH * self.scale
-    }
-
-    /// The gap right of track `track`'s volume slider, where the mark of what a plugin host does to it goes.
-    #[must_use]
-    pub fn host_mark_rect(&self, track: usize) -> Rect {
-        Rect::new(self.host_mark_x(), self.row_top(track), self.grid_left - self.host_mark_x(), self.row)
-    }
-
     /// What is at `(x, y)`.
     pub fn hit(&self, pattern: &Pattern, x: i32, y: i32) -> Option<Hit> {
         if y < self.top || x < self.left {
@@ -645,9 +588,6 @@ impl Layout {
             return Some(Hit::Solo(track));
         }
         if x < self.grid_left {
-            if x >= self.host_mark_x() {
-                return Some(Hit::Host(track));
-            }
             return (x >= self.name_x && x < self.volume_x).then_some(Hit::Name(track));
         }
         let spb = steps_per_beat(&pattern.tracks[track]);

@@ -1,7 +1,6 @@
 //! Input as the UI reads it, whatever window delivers it: the physical keys
 //! it knows, the modifiers held, the pointer and its wheel. The program
-//! translates its window events into these (winit in the app, the plugin
-//! window later).
+//! translates its window events into these (winit in the app).
 
 /// A mouse button.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1,6 +1,5 @@
 //! Tests of menu.
 
-use super::build::CONTROL_PREFIX;
 use super::*;
 
 use crate::canvas::char_width;
@@ -135,45 +134,6 @@ fn the_kit_menu_has_the_sample_and_mapping_commands() {
     // Not in the File menu any more.
     let file: Vec<Command> = menus(&all)[0].items.iter().filter_map(Item::runnable).collect();
     assert!(!file.contains(&C::AddSample));
-}
-
-#[test]
-fn a_plugin_menu_drops_what_it_leaves_to_the_host_or_the_app() {
-    let state = MenuState { can_save: true, has_songs: true, hosted: true, ..state() };
-    let menus = menus(&state);
-    let app = super::menus(&MenuState { hosted: false, ..state.clone() });
-    // A whole menu whose every command is refused is dropped (the Song menu).
-    assert!(!menus.iter().any(|m| m.title == "Song"), "the Song menu too");
-    assert_eq!(menus.len(), app.len() - 1);
-    for menu in &menus {
-        let app_menu = app.iter().find(|m| m.title == menu.title).unwrap();
-        for item in &menu.items {
-            let Item::Command { shortcut, command, .. } = item else { continue };
-            // Nothing a plugin refuses is left in the menus.
-            assert!(command.hosted_refusal().is_none(), "{command:?}");
-            assert!(!shortcut.starts_with(CONTROL_PREFIX) && !shortcut.contains("Space"));
-            // The item existed in the app's menu.
-            assert!(
-                app_menu.items.iter().any(|i| matches!(i, Item::Command { command: c, .. } if *c == *command)),
-                "{command:?}"
-            );
-        }
-    }
-    let item = |command| {
-        menus.iter().flat_map(|m| &m.items).find_map(|i| match i {
-            Item::Command { shortcut, command: c, enabled, .. } if *c == command => Some((shortcut.as_ref(), *enabled)),
-            _ => None,
-        })
-    };
-    // Kept commands show their Alt shortcut.
-    assert_eq!(item(Command::KitEditor), Some(("Alt+K", true)));
-    assert_eq!(item(Command::Undo), Some(("Alt+Z", true)));
-    assert_eq!(item(Command::Shortcuts), Some(("F1", true)));
-    // Dropped commands are nowhere to be found.
-    assert!(item(Command::Save).is_none());
-    assert!(item(Command::SongView).is_none());
-    assert!(item(Command::PlayPattern).is_none(), "the host's transport plays");
-    assert!(item(Command::TempoUp).is_none());
 }
 
 #[test]

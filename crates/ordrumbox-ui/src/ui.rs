@@ -70,9 +70,6 @@ pub struct Ui {
     scroll: Scroll,
     /// Alt is down and no other key, click or wheel turn came since.
     alt_alone: bool,
-    /// The window has a resize grip in its bottom-right corner (a
-    /// plugin's): the scrollbars leave it free.
-    grip: bool,
 }
 
 impl Ui {
@@ -85,14 +82,7 @@ impl Ui {
             display: Scale::ONE,
             scroll: Scroll::default(),
             alt_alone: false,
-            grip: false,
         }
-    }
-
-    /// The window has a resize grip of [`crate::grip_side`] in its
-    /// bottom-right corner, which the scrollbars leave free.
-    pub fn set_grip(&mut self, grip: bool) {
-        self.grip = grip;
     }
 
     /// The smallest window, in physical pixels, that shows the whole UI at
@@ -114,7 +104,7 @@ impl Ui {
     /// How a window of `window` pixels shows the UI at its zoom: whole, or
     /// a part with scrollbars.
     fn viewport(&self, window: (i32, i32)) -> Viewport {
-        Viewport::new(window, self.needed_size(), self.display, self.grip)
+        Viewport::new(window, self.needed_size(), self.display)
     }
 
     /// The UI's size in physical pixels (the window's, or the layout's when
@@ -415,8 +405,7 @@ impl Ui {
     }
 
     /// Alt plus the first letter of a menu's title opens it (Y: Play, the
-    /// Pattern's P taken). The app only: a plugin's Alt is the Ctrl the host
-    /// keeps. Whether `code` was such a letter.
+    /// Pattern's P taken). Whether `code` was such a letter.
     fn open_menu_by_letter(&mut self, code: Key) -> bool {
         let Some(i) = code.letter() else { return false };
         let s = &mut self.session;
@@ -444,23 +433,14 @@ impl Ui {
         let shift = self.modifiers.shift;
         let control = self.modifiers.command();
         let alt = self.modifiers.alt;
-        // In a plugin, Ctrl/Cmd keys are the host's (save, undo, zoom…),
-        // whatever is open: the key is left to the host.
-        if self.session.hosted() && control {
-            return false;
-        }
         if let Some(open) = self.session.open_menu() {
             return self.menu_key(open, code);
         }
-        if alt && !self.session.hosted() && self.open_menu_by_letter(code) {
+        if alt && self.open_menu_by_letter(code) {
             return true;
         }
         if self.session.overlay_open() {
             return self.overlay_key(event);
-        }
-        // Space too, its transport, unless an entry types it.
-        if self.session.hosted() && code == Key::Space && !self.session.entry_open() {
-            return false;
         }
         // Space plays or stops wherever the focus is (a button, a knob, an open
         // list…), except while writing text: an open entry keeps it (it types a
@@ -473,14 +453,12 @@ impl Ui {
             }
             return true;
         }
-        // A plugin's Alt stands for the Ctrl/Cmd the host keeps (the menus say Alt+…).
-        let command_key = control || (alt && self.session.hosted());
         // The keys of the rows (1-9 mute, Q-P hear) are read by their place, a
         // keyboard of its own on every layout; every other key is the one the
         // layout marks. The kit editor keeps its own letters (N, R, E).
         let layout = event.layout_key();
         let kit_letter = self.session.kit_editor_open() && matches!(layout, Key::Letter('N' | 'R' | 'E'));
-        let row_key = !command_key && !kit_letter && (ROW_DIGITS.contains(&code) || ROW_LETTERS.contains(&code));
+        let row_key = !control && !kit_letter && (ROW_DIGITS.contains(&code) || ROW_LETTERS.contains(&code));
         let key = if row_key { code } else { layout };
         if self.widget_key(event, key, shift || alt, control) {
             return true;
@@ -498,21 +476,14 @@ impl Ui {
             return true;
         }
         // Ctrl+D on a clip selected in the song panel repeats it; else it duplicates the pattern.
-        if command_key && !shift && key == Key::Letter('D') && s.song_view_open() && s.repeat_selected_clip() {
+        if control && !shift && key == Key::Letter('D') && s.song_view_open() && s.repeat_selected_clip() {
             return true;
         }
-        if let Some(command) = shortcut(key, shift, command_key) {
-            // A command a plugin leaves to the host leaves it its key too.
-            if s.hosted() && command.hosted_refusal().is_some() {
-                return false;
-            }
+        if let Some(command) = shortcut(key, shift, control) {
             s.run(command);
             return true;
         }
-        // Alt+arrows nudge the selected note, in a plugin too, where Alt is the host's Ctrl.
-        let nudge_key =
-            alt && !control && matches!(key, Key::ArrowLeft | Key::ArrowRight | Key::ArrowUp | Key::ArrowDown);
-        if command_key && !nudge_key {
+        if control {
             return false;
         }
         if let Some(hint) = shift_hint(key).filter(|_| !shift && !s.kit_editor_open()) {
@@ -520,7 +491,7 @@ impl Ui {
             return true;
         }
         // Home and the keypad's Enter rewind the transport (the kit editor's Enter hears a sample).
-        if matches!(key, Key::Home | Key::NumpadEnter) && !s.hosted() && !s.kit_editor_open() && !s.synth_open() {
+        if matches!(key, Key::Home | Key::NumpadEnter) && !s.kit_editor_open() && !s.synth_open() {
             s.rewind();
             return true;
         }
@@ -697,10 +668,9 @@ fn song_view_key(s: &mut Session, key: Key) -> bool {
 
 fn grid_key(s: &mut Session, key: Key, shift: bool, alt: bool) -> bool {
     let tempo = if shift { 10.0 } else { 1.0 };
-    let tempo_keys = !s.hosted();
     match key {
-        Key::Minus | Key::NumpadSubtract if tempo_keys => s.step_tempo(-tempo),
-        Key::Equal | Key::NumpadAdd if tempo_keys => s.step_tempo(tempo),
+        Key::Minus | Key::NumpadSubtract => s.step_tempo(-tempo),
+        Key::Equal | Key::NumpadAdd => s.step_tempo(tempo),
         Key::ArrowLeft if alt => s.nudge(Move::Left),
         Key::ArrowRight if alt => s.nudge(Move::Right),
         Key::ArrowUp if alt => s.nudge(Move::Up),

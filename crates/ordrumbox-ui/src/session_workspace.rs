@@ -47,10 +47,6 @@ impl Session {
     /// mode: the song panel, or the grid in its place (another view is left
     /// as it is for the pattern mode).
     pub(super) fn show_mode(&mut self, song: bool) {
-        if song && self.host.hosted {
-            self.message = crate::menu::SONGS_IN_THE_APP.into();
-            return;
-        }
         self.set_mode(if song { PlayMode::Song } else { PlayMode::Pattern });
         if song != (self.workspace == Workspace::Song) || self.kit_editor.is_open() {
             self.show_view(if song { 2 } else { 0 });

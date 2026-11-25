@@ -170,7 +170,7 @@ impl Playback {
         self.controller.as_ref().and_then(Controller::tick)
     }
 
-    /// The plugin host's transport, once seen.
+    /// The transport of the MIDI clock followed, once seen.
     pub(super) fn host(&self) -> Option<HostTransport> {
         self.controller.as_ref().and_then(Controller::host)
     }

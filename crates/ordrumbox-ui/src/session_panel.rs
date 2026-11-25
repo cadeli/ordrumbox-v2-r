@@ -137,7 +137,7 @@ impl Session {
 
     /// The header's pattern and kit lists (`rebuildPatternSelect`, `rebuildDrumkitSelect`).
     fn header_selects(&self, layout: &mut PanelLayout, scale: Scale) {
-        let c = self.header_controls(scale);
+        let c = view::header_controls(scale);
         let library = self.editor.library();
         if self.workspace == Workspace::Song {
             self.arrangement_select(layout, c.arrangement());
@@ -163,7 +163,7 @@ impl Session {
     /// The view buttons (the main editor, then the kit editor): the one shown lit.
     fn view_buttons(&self, layout: &mut PanelLayout, scale: Scale) {
         let shown = [Workspace::Grid, Workspace::PianoRoll, Workspace::Song, Workspace::Synth, Workspace::Mixer];
-        let views = self.header_controls(scale).views;
+        let views = view::header_controls(scale).views;
         let kit_open = self.kit_editor.is_open();
         for (i, (rect, label)) in views.iter().zip(view::VIEWS).enumerate() {
             // The song's slot has no button: the mode switch is its own.
@@ -254,54 +254,42 @@ impl Session {
     }
 
     /// The volume a slider or a fader of track `t` shows, and whether
-    /// something else moves it: the song's volume lane while it plays, or a
-    /// plugin host that automates it, move the control, in the colour of a
-    /// modulated value; the track's own `volume` stays what is saved.
+    /// something else moves it: the song's volume lane while it plays moves
+    /// the control, in the colour of a modulated value; the track's own `volume` stays what is saved.
     pub(super) fn shown_track_volume(&self, t: usize, volume: f64, spec: Spec) -> (f64, bool) {
         if let Some(gain) = self.automated_now(t, ordrumbox_core::AutomationTarget::Volume) {
             return (gain.clamp(spec.min, spec.max), true);
         }
-        let host_gain = self.host.mix.tracks.get(t).map_or(1.0, |host| f64::from(host.gain));
-        if host_gain == 1.0 { (volume, false) } else { ((volume * host_gain).clamp(spec.min, spec.max), true) }
-    }
-
-    /// The header's controls: a plugin's without the song view button.
-    pub(super) fn header_controls(&self, scale: Scale) -> view::HeaderControls {
-        let controls = view::header_controls(scale);
-        if self.host.hosted { controls.hosted() } else { controls }
+        (volume, false)
     }
 
     /// The header's transport and generation controls (the toolbar's
     /// transport and the pattern settings panel of the JS).
     fn header_items(&self, layout: &mut PanelLayout, pattern: &Pattern, scale: Scale) {
-        let controls = self.header_controls(scale);
-        // A plugin has no song (no mode switch) and no transport: the host plays, at its own tempo. The
-        // view shows the host's there (`view::Transport::Host`).
-        if !self.host.hosted {
-            let song = self.is_song_mode();
-            for (i, (rect, label)) in controls.mode.iter().zip(view::MODES).enumerate() {
-                let kind = Kind::Button { label: label.into(), on: song == (i == 1) };
-                layout.items.push(Item::new(Some(Id::Mode(i as u8)), *rect, kind));
-            }
-            let playing = self.playing();
-            let label = if playing { "STOP" } else { "PLAY" };
-            layout.items.push(Item::new(
-                Some(Id::Transport),
-                controls.play,
-                Kind::Button { label: label.into(), on: playing },
-            ));
-            // REC in song mode; its slot stays empty in pattern mode.
-            if song {
-                let on = self.is_recording_automation();
-                let kind = Kind::Button { label: "REC".into(), on };
-                layout.items.push(Item::new(Some(Id::RecordAutomation), controls.record, kind));
-            }
-            let spec = Spec::knob(song::MIN_BPM, song::MAX_BPM, 1.0, song::DEFAULT_BPM);
-            let bpm = self.tempo();
-            let text = num::text(bpm);
-            let kind = Kind::Value { spec, value: bpm, label: None, text, lfo: false };
-            layout.items.push(Item::new(Some(Id::Bpm), controls.bpm, kind));
+        let controls = view::header_controls(scale);
+        let song = self.is_song_mode();
+        for (i, (rect, label)) in controls.mode.iter().zip(view::MODES).enumerate() {
+            let kind = Kind::Button { label: label.into(), on: song == (i == 1) };
+            layout.items.push(Item::new(Some(Id::Mode(i as u8)), *rect, kind));
         }
+        let playing = self.playing();
+        let label = if playing { "STOP" } else { "PLAY" };
+        layout.items.push(Item::new(
+            Some(Id::Transport),
+            controls.play,
+            Kind::Button { label: label.into(), on: playing },
+        ));
+        // REC in song mode; its slot stays empty in pattern mode.
+        if song {
+            let on = self.is_recording_automation();
+            let kind = Kind::Button { label: "REC".into(), on };
+            layout.items.push(Item::new(Some(Id::RecordAutomation), controls.record, kind));
+        }
+        let spec = Spec::knob(song::MIN_BPM, song::MAX_BPM, 1.0, song::DEFAULT_BPM);
+        let bpm = self.tempo();
+        let text = num::text(bpm);
+        let kind = Kind::Value { spec, value: bpm, label: None, text, lfo: false };
+        layout.items.push(Item::new(Some(Id::Bpm), controls.bpm, kind));
         // The song mode has no pattern settings nor generation: the arrangement list is in their place.
         if self.workspace == Workspace::Song {
             return;
@@ -843,27 +831,6 @@ mod tests {
         let layout = s.panel_layout(SIZE.0, SIZE.1, SIZE.2);
         assert!(!layout.items.iter().any(|i| matches!(i.id, Some(Id::Master(_)))));
         assert!(layout.right > 0);
-    }
-
-    #[test]
-    fn a_host_gain_moves_the_track_volume_slider() {
-        let slider = |s: &Session| {
-            let layout = s.panel_layout(SIZE.0, SIZE.1, SIZE.2);
-            layout.items.into_iter().find_map(|item| match (item.id, item.kind) {
-                (Some(Id::TrackVolume(0)), Kind::Value { value, lfo, .. }) => Some((value, lfo)),
-                _ => None,
-            })
-        };
-        let mut s = session();
-        let (own, lfo) = slider(&s).expect("the first track has a volume slider");
-        assert!(!lfo);
-        let mut mix = ordrumbox_engine::HostMix::default();
-        mix.tracks[0].gain = 0.5;
-        s.set_host_mix(&mix);
-        assert_eq!(slider(&s), Some((own * 0.5, true)), "the slider follows the host, in the modulated colour");
-        mix.tracks[0].gain = 1.0;
-        s.set_host_mix(&mix);
-        assert_eq!(slider(&s), Some((own, false)));
     }
 
     #[test]

@@ -55,8 +55,8 @@ fn focus_row_color() -> Rgb {
     theme::selected_row()
 }
 const MUTE_ON: Rgb = theme::ALERT;
-/// A track a plugin host mutes: a mute, dimmed.
-fn mute_host_color() -> Rgb {
+/// A track the MIDI controls mute: a mute, dimmed.
+fn mute_live_color() -> Rgb {
     theme::mix(theme::ALERT, theme::bg(), 0.5)
 }
 const LOGO: Rgb = theme::ACCENT;
@@ -168,12 +168,10 @@ pub struct View<'a> {
     pub levels: Vec<f32>,
     /// Whether the VU meter stripe is shown.
     pub show_vus: bool,
-    /// What the header's first group shows.
-    pub transport: Transport,
     /// A track being dragged by its name: from which row to which.
     pub track_drop: Option<(usize, usize)>,
-    /// The tracks a plugin host mutes, bit `t` for track `t`.
-    pub host_muted: u64,
+    /// The tracks the MIDI controls mute, bit `t` for track `t`.
+    pub live_muted: u64,
     /// Mute and solo as shown, by track: while the song plays, what its
     /// automation lanes set; empty, or past its end, the tracks' own.
     pub switches: Vec<(bool, bool)>,
@@ -183,10 +181,6 @@ pub struct View<'a> {
     pub hovered_track: Option<usize>,
     /// Mute and solo taken back from their lanes, by track: marked on their boxes.
     pub switches_taken_back: Vec<(bool, bool)>,
-    /// The tracks a plugin host moves off their settings, bit `t` for track `t`.
-    pub host_moved: u64,
-    /// The tracks a plugin host plays on an output of their own, bit `t` for track `t`.
-    pub host_split: u64,
 }
 
 mod beat_window;

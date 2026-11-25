@@ -49,11 +49,11 @@ fn a_mute_knob_shows_on_the_track_and_the_bindings_are_kept_in_the_settings() {
     learn(&mut s, 5, 22);
     s.toggle_play();
     assert!(s.midi_control(0, 22, 127), "the mute box shows it");
-    assert_eq!(s.host.muted, 1);
+    assert_eq!(s.followed.muted, 1);
     run(&mut s, &mut audio, 2000);
     assert!(run(&mut s, &mut audio, 14_000) < 1e-9, "muted");
     assert!(s.midi_control(0, 22, 0));
-    assert_eq!(s.host.muted, 0);
+    assert_eq!(s.followed.muted, 0);
 
     let (mut again, _audio) = session(LIBRARY);
     again.saving.settings_file = Some(dir.join("settings.json"));
@@ -69,13 +69,13 @@ fn clear_lets_a_knob_go_and_a_bad_setting_is_reported() {
     s.saving.settings_file = Some(dir.join("settings.json"));
     learn(&mut s, 5, 22);
     s.midi_control(0, 22, 127);
-    assert_eq!(s.host.muted, 1);
+    assert_eq!(s.followed.muted, 1);
     s.run(Command::MidiControls);
     s.overlay_key(OverlayKey::Side(5));
     s.overlay_key(OverlayKey::Move(2));
     s.overlay_key(OverlayKey::Enter);
     assert!(s.message.ends_with("knob let go"), "{}", s.message);
-    assert_eq!(s.host.muted, 0, "unmuted with it");
+    assert_eq!(s.followed.muted, 0, "unmuted with it");
     assert!(!s.midi_control(0, 22, 127), "bound to nothing");
 
     std::fs::write(dir.join("settings.json"), r#"{"midiControls":[{"channel":99}]}"#).unwrap();

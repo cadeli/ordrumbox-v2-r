@@ -4,7 +4,7 @@
 //!
 //! A program gives it a sound output ([`AudioOutput`]), translates its window
 //! events into [`ui_input`] and hands [`Ui`] a pixel buffer to draw in. The
-//! app does it with winit, softbuffer and cpal; a plugin with its host's.
+//! app does it with winit, softbuffer and cpal.
 
 mod action_log;
 mod assets;
@@ -19,7 +19,6 @@ mod editors;
 mod file_request;
 mod font;
 mod frame;
-mod host_tip;
 mod image;
 mod kits;
 mod loop_marks;
@@ -59,7 +58,7 @@ mod user_data;
 mod view;
 
 pub use audio_output::{
-    AudioOutput, HostOutput, OutputDevices, StartOutput, StartedOutput, chosen_device, host_output,
+    AudioOutput, HandedOutput, OutputDevices, StartOutput, StartedOutput, chosen_device, handed_output,
 };
 pub use file_request::{FileKind, FileRequest};
 pub use font::load as load_font;
@@ -68,7 +67,7 @@ pub use menu::Command;
 pub use midi_settings::{MidiPort, chosen_clock_in, chosen_clock_out, chosen_midi_input, chosen_midi_output};
 pub use panel::Id as PanelId;
 pub use scale::Scale;
-pub use scroll::{MIN_WINDOW, grip_side};
+pub use scroll::MIN_WINDOW;
 pub use session::{LibrarySource, Session};
 pub use single_instance::{Entry as InstanceEntry, enter as enter_single_instance};
 pub use startup_error::report as report_startup_error;

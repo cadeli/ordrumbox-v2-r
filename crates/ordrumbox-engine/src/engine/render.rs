@@ -9,7 +9,7 @@ impl Engine {
         self.render_split(left, right, |_, _, _, _| {});
     }
 
-    /// [`Self::render`], the tracks a plugin host splits ([`HostMix::split`])
+    /// [`Self::render`], the tracks the live mix splits ([`HostMix::split`])
     /// left out of the mix and given to `aux` instead: the track, the frame
     /// of the block its samples start at, and its strip's output, left and
     /// right, which the master bus has not touched. A track whose strip is
@@ -65,7 +65,7 @@ impl Engine {
         out_right.fill(0.0);
         self.returns.clear();
         let [keep_fx, keep_mix, keep_lfo] = self.keep;
-        let (host, ratios) = (&self.host, &self.host_ratios);
+        let (host, ratios) = (&self.host, &self.cutoff_ratios);
         for (track, channel) in self.channels[..strips].iter_mut().enumerate() {
             let target = Self::host_target(host, ratios, channel, track);
             let before = channel.current;
@@ -232,7 +232,6 @@ impl Engine {
         if track >= MAX_TRACKS {
             return;
         }
-        let ratio = ratio * self.host_pitch(track);
         let now_seconds = self.seconds(now);
         self.choke_groups[track] = event.choke_group;
         self.release_cut(track, event, now_seconds);

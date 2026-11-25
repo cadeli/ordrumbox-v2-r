@@ -1,7 +1,7 @@
 //! One window per user data folder: a lock file held while the app runs, and
 //! the question asked when another orDrumbox already holds it. Two windows
 //! would write the same library, and the second would take over the MCP link.
-//! The plugin and `ordrumbox --mcp` never come here.
+//! `ordrumbox --mcp` never comes here.
 
 use std::fs::{self, File, OpenOptions, TryLockError};
 use std::io;

@@ -16,7 +16,7 @@ struct Allowed {
     external: &'static [&'static str],
 }
 
-const ALLOWED: [Allowed; 9] = [
+const ALLOWED: [Allowed; 8] = [
     Allowed { name: "ordrumbox-core", internal: &[], external: &[] },
     Allowed { name: "ordrumbox-dsp", internal: &[], external: &[] },
     Allowed { name: "ordrumbox-logic", internal: &["ordrumbox-core"], external: &[] },
@@ -35,20 +35,6 @@ const ALLOWED: [Allowed; 9] = [
         name: "ordrumbox-app",
         internal: &["ordrumbox-core", "ordrumbox-engine", "ordrumbox-ui"],
         external: &["winit", "softbuffer", "cpal", "midir", "rfd"],
-    },
-    Allowed {
-        name: "ordrumbox-plugin",
-        internal: &["ordrumbox-core", "ordrumbox-engine", "ordrumbox-ui"],
-        external: &[
-            "nih_plug",
-            "baseview",
-            "softbuffer",
-            "raw-window-handle",
-            "raw-window-handle-06",
-            "keyboard-types",
-            "process_path",
-            "serde",
-        ],
     },
     Allowed { name: "xtask", internal: &[], external: &[] },
 ];

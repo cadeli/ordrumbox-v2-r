@@ -163,7 +163,7 @@ pub fn strip_settings(track: &Track, bpm: f64) -> StripSettings {
     }
 
     // Delay: 'none' skips it. Without an amount it is still set up, silent,
-    // for a plugin host to raise.
+    // for an automation lane to raise.
     let amount = if track.delay_on { finite_or(track.delay_mix, 0.0).clamp(0.0, 1.0) } else { 0.0 };
     if track.delay_type == "none" {
         s.delay_on = 0.0;

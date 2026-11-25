@@ -15,7 +15,6 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex};
 
 use ordrumbox_core::song::clamp_bpm;
-use ordrumbox_core::track::STRAIGHT_SWING;
 use ordrumbox_core::{AutomationTarget, Library, Rng, Scales, Track};
 use ordrumbox_dsp::{MasterSettings, ReturnSettings};
 
@@ -51,10 +50,8 @@ use pattern_loop::{Seek, pattern_span};
 pub use song_loop::SongLoop;
 use song_loop::song_span;
 
-/// A host tempo change smaller than this is not one (passes are not rebuilt).
+/// A clock tempo change smaller than this is not one (passes are not rebuilt).
 const TEMPO_EPSILON: f64 = 1e-6;
-/// A host swing change smaller than this is not one (the pass is not rebuilt).
-const SWING_EPSILON: f64 = 1e-4;
 
 /// What plays.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -97,10 +94,8 @@ pub struct Controller {
     /// hold them (and the newest: the engine plays with it).
     keymaps: VecDeque<Arc<KeyMap>>,
     playing: bool,
-    /// The plugin host's tempo the passes are built at, once a host transport was seen.
+    /// The followed clock's tempo the passes are built at, once its transport was seen.
     tempo: Option<f64>,
-    /// A plugin host's swing on every track ([`PassContext::swing`]).
-    swing: f64,
     /// What the cue posted was built from; `None`: none posted, or one to build again.
     cue: Option<CueKey>,
     /// The song's automation lanes a control was taken back from: an
@@ -127,7 +122,6 @@ struct CueKey {
     number: u64,
     mode: Mode,
     tempo: Option<f64>,
-    swing: f64,
 }
 
 /// What a track's sound depends on.
@@ -209,7 +203,6 @@ impl Controller {
             keymaps: VecDeque::new(),
             playing: false,
             tempo: None,
-            swing: STRAIGHT_SWING,
             cue: None,
             song_loop: None,
             pattern_loop: None,
@@ -300,8 +293,7 @@ impl Controller {
     }
 
     /// A live mix on top of the tracks' settings (a MIDI controller's
-    /// knobs): the engine takes it with the next block. Not for a plugin,
-    /// whose host mixes ([`AudioSide::set_host_mix`]).
+    /// knobs): the engine takes it with the next block.
     pub fn set_live_mix(&mut self, mix: HostMix) {
         lock(&self.link.inbox).mix = Some(mix);
     }
@@ -381,7 +373,7 @@ impl Controller {
         self.build_of(library, number, self.mode)
     }
 
-    /// The tempo `mode` plays at: the plugin host's, else the library's for
+    /// The tempo `mode` plays at: the followed clock's, else the library's for
     /// a pattern and the song's own for a song.
     fn bpm_of(&self, library: &Library, mode: Mode) -> f64 {
         let own = match mode {
@@ -488,7 +480,6 @@ impl Controller {
             synths: &self.synths,
             sample_rate: self.sample_rate,
             first_tick: self.first_tick(number),
-            swing: self.swing,
         };
         let bpm = self.bpm_of(library, Mode::Pattern(p));
         let own_loop = self.pattern_loop.filter(|l| l.pattern() == p);
@@ -531,7 +522,6 @@ impl Controller {
                     scales: &self.scales,
                     synths: &self.synths,
                     sample_rate: self.sample_rate,
-                    swing: self.swing,
                 };
                 let bpm = self.bpm_of(library, mode);
                 let span = song_span(number, self.song_loop);
@@ -568,7 +558,6 @@ impl Controller {
             synths: &self.synths,
             sample_rate: self.sample_rate,
             first_tick: 0,
-            swing: self.swing,
         };
         let pass = build_preview(pattern, t, note, context, self.bpm_of(library, self.mode));
         if !pass.events.is_empty() {
@@ -591,7 +580,6 @@ impl Controller {
             synths: &self.synths,
             sample_rate: self.sample_rate,
             first_tick: 0,
-            swing: self.swing,
         };
         let keymap = build_keymap(pattern, context, self.bpm_of(library, self.mode));
         if self.keymaps.back().is_some_and(|posted| **posted == keymap) {
@@ -736,9 +724,9 @@ impl Controller {
 
     /// Call regularly (every UI frame) while playing: posts the next pass
     /// when the engine needs it, so tempo, kit and pattern changes take
-    /// effect at the next pass boundary. Under a plugin host
+    /// effect at the next pass boundary. Following a MIDI clock
     /// ([`AudioSide::render_synced`]), call it even while stopped: it starts,
-    /// stops and moves playback with the host.
+    /// stops and moves playback with the clock.
     pub fn update(&mut self, library: &Library) {
         let snapshot = self.link.published.read();
         match snapshot.host {
@@ -768,15 +756,6 @@ impl Controller {
         release(&mut self.previews, false);
         release(&mut self.keymaps, true);
         self.old_banks.retain(|bank| Arc::strong_count(bank) > 1);
-    }
-
-    /// A plugin host's swing on every track ([`PassContext::swing`]): when
-    /// it changes, the pass playing is rebuilt with it.
-    pub fn set_host_swing(&mut self, library: &Library, swing: f64) {
-        if (self.swing - swing).abs() > SWING_EPSILON {
-            self.swing = swing;
-            self.refresh(library);
-        }
     }
 
     /// Replace the synth presets (an edit in the synth editor): the pass

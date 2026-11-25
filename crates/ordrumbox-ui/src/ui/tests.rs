@@ -2,9 +2,9 @@
 
 use super::*;
 
-/// A `Ui` on `library`, not hosted by a plugin.
+/// A `Ui` on `library`.
 fn standalone_ui(library: ordrumbox_core::Library) -> Ui {
-    Ui::new(Session::for_tests(library, false))
+    Ui::new(Session::for_tests(library))
 }
 
 #[test]
@@ -93,50 +93,6 @@ fn a_zoom_bigger_than_the_window_scrolls_it() {
     assert!(ui.pointer_released(Button::Left));
     ui.pointer_moved(0.0, 0.0);
     assert_eq!(ui.at().1, viewport.content.1 - viewport.view.1);
-}
-
-#[test]
-fn a_plugin_leaves_the_host_its_keys() {
-    let library =
-        ordrumbox_core::Library::parse(r#"{"patterns":[{"name":"demo","tracks":[{"name":"KICK"}]}]}"#).unwrap().0;
-    let session = |hosted| Session::for_tests(library.clone(), hosted);
-    let press = |key| KeyEvent { key, pressed: true, repeat: false, text: None, unmodified: None };
-    let command = Modifiers { logo: true, ..Modifiers::default() };
-
-    let mut app = Ui::new(session(false));
-    assert!(app.key(&press(Key::Space)));
-    app.set_modifiers(command);
-    assert!(app.key(&press(Key::Letter('Z'))));
-
-    let mut plugin = Ui::new(session(true));
-    let bpm = plugin.session.tempo();
-    // The host's: its transport, Ctrl/Cmd keys, what a plugin leaves out.
-    for key in [Key::Space, Key::F(3), Key::Minus, Key::Equal, Key::BracketLeft] {
-        let shift = key == Key::BracketLeft;
-        plugin.set_modifiers(Modifiers { shift, ..Modifiers::default() });
-        assert!(!plugin.key(&press(key)), "{key:?}");
-    }
-    plugin.set_modifiers(command);
-    for key in [Key::Letter('S'), Key::Letter('Z'), Key::Letter('N'), Key::Minus] {
-        assert!(!plugin.key(&press(key)), "Cmd+{key:?}");
-    }
-    assert!(!plugin.session.playing() && !plugin.session.song_view_open());
-    assert_eq!(plugin.session.tempo(), bpm);
-    assert_eq!(plugin.session.pattern().unwrap().beat_count, session(false).pattern().unwrap().beat_count);
-    // The plugin's own keys stay its own.
-    plugin.set_modifiers(Modifiers::default());
-    assert!(plugin.key(&press(Key::Digit(1))));
-    assert!(plugin.key(&press(Key::ArrowRight)));
-    assert!(plugin.key(&press(Key::F(4))));
-    // Alt stands for the Ctrl the host keeps, but not for what the host does.
-    plugin.set_modifiers(Modifiers { alt: true, ..Modifiers::default() });
-    let revision = plugin.session.library_revision();
-    assert!(plugin.key(&press(Key::Letter('N'))));
-    assert_ne!(plugin.session.library_revision(), revision, "a new pattern");
-    assert!(plugin.key(&press(Key::Letter('K'))));
-    assert!(plugin.session.kit_editor_open());
-    assert!(!plugin.key(&press(Key::Letter('S'))), "the host saves");
-    assert!(!plugin.key(&press(Key::Letter('Q'))), "the host closes");
 }
 
 #[test]

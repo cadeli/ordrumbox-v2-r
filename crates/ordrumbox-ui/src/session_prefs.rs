@@ -164,13 +164,13 @@ impl Session {
             }
         };
         let mut rows = Vec::new();
-        if !self.host.hosted && offers.devices.is_some() {
+        if offers.devices.is_some() {
             rows.push(Row::Audio);
         }
-        if !self.host.hosted && offers.midi_ports.is_some() {
+        if offers.midi_ports.is_some() {
             rows.extend([Row::Midi, Row::ClockIn]);
         }
-        if !self.host.hosted && offers.midi_out_ports.is_some() {
+        if offers.midi_out_ports.is_some() {
             rows.extend([Row::MidiOut, Row::ClockOut]);
         }
         rows.extend([Row::Metronome, Row::Vus, Row::Toasts, Row::Ok]);

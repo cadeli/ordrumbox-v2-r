@@ -56,8 +56,7 @@ pub type Stereo = (Vec<f32>, Vec<f32>);
 enum Output {
     /// The mix, through the master bus.
     Mix,
-    /// Each track apart, as its strip leaves it: before the master bus, as the
-    /// plugin's track outputs.
+    /// Each track apart, as its strip leaves it: before the master bus.
     Stems { track_count: usize },
 }
 

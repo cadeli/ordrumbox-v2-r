@@ -1,7 +1,6 @@
 use super::*;
 use crate::midi::{ClockMessage, DRUM_CHANNEL, Target};
 use crate::pass::SynthStart;
-use crate::strip_settings::saturation_amount;
 use ordrumbox_core::steps::TICK;
 use ordrumbox_dsp::{SampleBuffer, SynthPatch, VoiceStart};
 
@@ -271,49 +270,17 @@ fn a_split_track_leaves_the_mix_for_an_output_of_its_own() {
 }
 
 #[test]
-fn the_host_moves_the_effects_of_its_tracks_and_leaves_the_rest() {
-    let ratios = |host: &HostMix, t: usize| HostRatios::of(&host.tracks[t]);
-    let target = StripSettings { cutoff: 1000.0, delay_mode: 1.0, ..StripSettings::default() };
+fn the_live_mix_moves_the_cutoff_and_sends_of_its_tracks_and_leaves_the_rest() {
+    let target = StripSettings { cutoff: 1000.0, echo_send: 0.5, ..StripSettings::default() };
     let none = HostMix::default();
-    assert_eq!(none.strip(&target, 0, &ratios(&none, 0)), target, "the defaults change nothing");
-    let mut host = HostMix::default();
-    host.tracks[0] = HostTrack {
-        cutoff_octaves: 1.0,
-        q: 2.0,
-        reverb: 0.5,
-        delay: 2.0,
-        feedback: 0.25,
-        saturation: 0.5,
-        compressor: 0.8,
-        threshold_db: -100.0,
-        ..HostTrack::default()
-    };
-    let s = host.strip(&target, 0, &ratios(&host, 0));
-    assert_eq!((s.cutoff, s.q), (2000.0, 2.707));
-    assert_eq!((s.reverb_mix, s.delay_mix, s.delay_feedback), (0.5, 1.0, 0.65), "amounts kept within 0 to 1");
-    assert_eq!((s.saturation_drive, s.saturation_mix), (4.0, 1.0));
-    assert_eq!(saturation_amount(&s), 0.5);
-    assert_eq!((s.comp_mix, s.comp_threshold_db), (0.8, MIN_THRESHOLD_DB), "the threshold kept in its range");
-    assert_eq!(host.strip(&target, 1, &ratios(&host, 1)), target, "another track changes nothing");
-    let slap = StripSettings { delay_mode: 0.0, delay_feedback: 0.0, ..target };
-    assert_eq!(host.strip(&slap, 0, &ratios(&host, 0)).delay_feedback, 0.0, "a slap has one echo");
-    host.tracks[0].cutoff_octaves = 8.0;
-    assert_eq!(host.strip(&target, 0, &ratios(&host, 0)).cutoff, MAX_CUTOFF);
-}
-
-#[test]
-fn the_host_transposes_the_notes_of_its_tracks() {
-    // Frames a 100-frame sample sounds, at a host transpose of `semitones`.
-    let sounding = |semitones: i32| {
-        let mut engine = engine();
-        let mut host = HostMix::default();
-        host.tracks[0].transpose = semitones;
-        engine.set_host_mix(host);
-        engine.play(pass(0, &[0], 48_000));
-        render(&mut engine, 400).iter().filter(|s| s.abs() > 0.01).count()
-    };
-    let (straight, octave_up) = (sounding(0), sounding(12));
-    assert!(straight >= 95 && octave_up.abs_diff(straight / 2) <= 4, "{straight} then {octave_up} frames");
+    assert_eq!(none.strip(&target, 0, 1.0), target, "the defaults change nothing");
+    let mut live = HostMix::default();
+    live.tracks[0] = HostTrack { cutoff_octaves: 1.0, echo_send: 0.75, reverb_send: 0.25, ..HostTrack::default() };
+    let s = live.strip(&target, 0, live.tracks[0].cutoff_octaves.exp2());
+    assert_eq!(s.cutoff, 2000.0);
+    assert_eq!((s.echo_send, s.reverb_send), (1.0, 0.25), "sends kept within 0 to 1");
+    assert_eq!(live.strip(&target, 1, 1.0), target, "another track changes nothing");
+    assert_eq!(live.strip(&target, 0, 8.0_f32.exp2()).cutoff, MAX_CUTOFF);
 }
 
 #[test]
@@ -444,14 +411,6 @@ fn a_note_struck_again_ends_first_and_a_muted_track_sends_none() {
     assert_eq!(notes(&mut engine, 0, 128), [(3, 36, Some(1.0)), (50, 36, None), (50, 36, Some(1.0))]);
 
     let mut muted = self::engine();
-    assert_eq!(
-        HostMix { muted: 0b1, split: 0b1, ..HostMix::default() }.moved_tracks(),
-        0,
-        "mute and output are not moves"
-    );
-    let mut moved = HostMix::default();
-    moved.tracks[2].pan = 0.5;
-    assert_eq!(moved.moved_tracks(), 0b100);
     muted.set_host_mix(HostMix { muted: 0b1, ..HostMix::default() });
     muted.play(played);
     render(&mut muted, 128);

@@ -53,7 +53,6 @@ const fn grid_hint(hit: Hit) -> &'static str {
         Hit::Cell { .. } => {
             "STEP   click: on / off   Shift+click: select its note   Shift+drag: a zone   right-click: step menu"
         }
-        Hit::Host(_) => "HOST   what the plugin host does to this track (hover for each setting)",
         Hit::AddTrack => "click: add a track (a category, then its instrument)",
     }
 }

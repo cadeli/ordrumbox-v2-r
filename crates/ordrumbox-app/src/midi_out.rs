@@ -1,6 +1,6 @@
 //! The MIDI output: the port the user chose (Edit > Preferences) through
 //! `midir`. The notes the pattern plays go out on their channel and key (the
-//! engine's `take_notes`, as under a plugin host), and, when asked for, the
+//! engine's `take_notes`), and, when asked for, the
 //! MIDI clock (`take_clock`): pulses, Start, Continue and Stop.
 //!
 //! The audio callback writes each message with its place in the block to a

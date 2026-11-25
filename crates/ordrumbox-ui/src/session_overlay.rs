@@ -152,69 +152,6 @@ const SHORTCUTS: &[&str] = &[
     "                         becomes a kit, a .json mapping loads, a .mid imports",
 ];
 
-/// Every key of a plugin, which leaves Space, the Ctrl/Cmd keys and the songs
-/// to the host (`Ui::key`).
-const PLUGIN_SHORTCUTS: &[&str] = &[
-    "THE HOST'S KEYS",
-    "  Space, every Ctrl/Cmd key   the host's: its transport, its save, undo, zoom...",
-    "  Alt + the app's Ctrl key    orDrumbox's: Alt+Z undo, Alt+C copy, Alt+K kit editor...",
-    "                              (the menus show them)",
-    "MENUS",
-    "  F10 or Alt             open the menus: Arrows move, Enter runs, Esc closes",
-    "  F1 F2 F4 F5 F6 F7 F12  this list, track editor, piano roll, grid, synth, note editor, mixer",
-    "  F2, F7                 the track editor, the note editor: shown or folded (the window follows)",
-    "  songs, tempo, saving   the app's or the host's: no F3, no - = (the tempo is HOST's)",
-    "GRID",
-    "  Arrows                 move the cursor",
-    "  Enter / click          switch the step on (a note) or off (all its notes)",
-    "  Shift+click            select the step's note for the note editor, and hear it",
-    "  Shift+drag             draw a zone: Alt+C, Alt+X, Delete take its notes",
-    "  Shift+Arrows           grow a zone from the cursor     Ctrl+click  take a step into it",
-    "  Ctrl+A                 select the whole pattern as a zone",
-    "  Alt+Arrows             pitch (up/down) of the selected note, one step in time (left/right)",
-    "  Delete                 clear the zone or the step   Esc  deselect",
-    "  L                      accent the cursor step's notes, or take the accent off",
-    "  right-click            a track's name: track menu   a step: notes menu",
-    "  double-click a name    the piano roll on that track",
-    "  bar under the tracks   drag: scroll the beats; its ends zoom   Ctrl+wheel: zoom   Shift+wheel: scroll",
-    "  F, Shift+G             random pattern, random drumkit",
-    "  Shift+V, Shift+C       VU meters on/off, next colour scheme",
-    "  Shift+H, J, K          every track: synth sounds, auto-assigned, random samples",
-    "PLAY",
-    "  M, S                   mute / solo the track under the cursor",
-    "  1-9 / Shift+1-9        mute / solo track 1-9        Q-P  hear track 1-10 (any view)",
-    "                         (these two rows by their place; other keys as the layout marks them)",
-    "  [ ]                    previous / next pattern (also PageUp PageDown)",
-    "  , .                    previous / next kit",
-    "GENERATE",
-    "  Shift+B                the pattern again in its style (Alt+Shift+B: a new one)",
-    "  Shift+D, Shift+S       drums, bass in auto mode (again: off)",
-    "  Shift+X                random notes on the track",
-    "KNOBS, SLIDERS, LISTS (track editor, note editor, kit editor, volumes)",
-    "  Tab / Shift+Tab        focus the next / previous control      Esc  back to the grid",
-    "  Arrows, - =, wheel     change (Shift or Alt: finely); a list: next option",
-    "  drag                   a knob up / down, a slider along (Shift: finely)",
-    "  double-click           default value     right-click or Enter: type a value",
-    "  Enter                  open a list, press a button",
-    "PIANO ROLL (F4)",
-    "  click / double-click / drag / right-click a cell: add or select, delete, move the note; menu",
-    "  drag a note's right edge                its length, by quarters of a step",
-    "  Arrows, Shift+Arrows   the cursor; the note's pitch (up/down), time (left/right)   Enter, Delete",
-    "  Shift+drag             a zone of steps and keys: copy, cut, Delete; paste at the cursor",
-    "  a key: hear it, right-click: clear, chord progression     wheel (Shift: beats, Ctrl: zoom)",
-    "SYNTH EDITOR (F6)",
-    "  OSC, FLT, MOD, ENV     the track's preset: knobs, waves, lists, power buttons (saved)",
-    "MIXER (F12)",
-    "  Left Right             the track before / after (the track editor's)",
-    "  drag, wheel            sends, pan, faders; the wheel on a strip scrolls the strips",
-    "  M S, a name            mute, solo; the track editor edits it      Esc  the grid",
-    "KIT EDITOR (Alt+K)",
-    "  Up Down                sample      Enter  hear      Delete  remove",
-    "  N, E                   normalize, export the mapping",
-    "  drop files             a .wav joins the kit (Shift: replaces the sample), a folder",
-    "                         becomes a kit, a .json mapping loads, a .mid imports",
-];
-
 impl Session {
     /// A panel (file picker, key list, about) is over the window.
     pub fn overlay_open(&self) -> bool {
@@ -244,21 +181,9 @@ impl Session {
     }
 
     /// The lines of the keyboard shortcuts panel, as the platform shows them
-    /// (Cmd in place of Ctrl on macOS; a plugin's say Alt, as its menus do).
+    /// (Cmd in place of Ctrl on macOS).
     pub(super) fn shortcut_lines(&self) -> Vec<String> {
-        let table: &[&str] = if self.host.hosted { PLUGIN_SHORTCUTS } else { SHORTCUTS };
-        table
-            .iter()
-            .map(
-                |line| {
-                    if self.host.hosted {
-                        (*line).to_owned()
-                    } else {
-                        crate::menu::platform_shortcuts(line).into_owned()
-                    }
-                },
-            )
-            .collect()
+        SHORTCUTS.iter().map(|line| crate::menu::platform_shortcuts(line).into_owned()).collect()
     }
 
     /// Scroll the shortcuts panel, if open, for `key`; whether it was.

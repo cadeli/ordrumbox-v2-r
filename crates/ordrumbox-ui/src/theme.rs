@@ -296,7 +296,7 @@ pub const GENERATED: Rgb = ORANGE;
 /// A control taken back from its automation lane, and that lane: the lane
 /// plays no more until it is re-enabled, as a DAW marks it.
 pub const TAKEN_BACK: Rgb = ORANGE;
-/// Problems and mutes (a mute from a plugin host is dimmed).
+/// Problems and mutes (a mute from the MIDI controls is dimmed).
 pub const ALERT: Rgb = RED;
 
 /// The track colours: softer than the accents and none of them, so a track

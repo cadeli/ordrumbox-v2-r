@@ -1,6 +1,5 @@
 //! The MIDI input: the port the user chose (Edit > Preferences) through
-//! `midir`. A note on plays the pattern's tracks (the engine's key map, as
-//! under a plugin host) and, when recording, is written to the pattern. The
+//! `midir`. A note on plays the pattern's tracks (the engine's key map) and, when recording, is written to the pattern. The
 //! notes cross two ways: a ring the audio callback empties without locking
 //! or allocating, and a channel the UI thread reads between frames. A
 //! control change goes to the UI thread (the knobs, `Session::midi_control`);

@@ -1,9 +1,9 @@
 //! Opening the session: its library and assets found, its first state built.
 
 use super::session_chrome::Chrome;
+use super::session_clock::Followed;
 use super::session_commands::Program;
 use super::session_generators::Generators;
-use super::session_host::Host;
 use super::session_kit::KitEditor;
 use super::session_playback::Playback;
 use super::session_resume::is_first_start;
@@ -31,10 +31,11 @@ use std::sync::Arc;
 pub enum LibrarySource {
     /// The user's `library.json` (else the starter library), saved a moment after each edit.
     UserFile,
-    /// A plugin's: the text its host kept in the project (`None`: a new
-    /// instance, which starts from the user's library, else the starter library). It is
-    /// never saved to a file: the host asks [`Session::library_text`].
-    Host(Option<String>),
+    /// A library given as text (the starter library when it cannot be
+    /// parsed), held in memory: never saved to a file, and the user's
+    /// settings (master, where the user was) left alone. For tests and tools,
+    /// which read it back with [`Session::library_text`].
+    Text(String),
 }
 
 /// A library opened at start.
@@ -78,20 +79,14 @@ impl Session {
 
     /// The same with its library from `source`.
     pub fn load_from(start_output: StartOutput, source: LibrarySource) -> Self {
-        Self::load_with_assets(start_output, source, &[])
-    }
-
-    /// The same, the assets searched in `first` before the usual folders (a
-    /// plugin's bundle).
-    pub fn load_with_assets(start_output: StartOutput, source: LibrarySource, first: &[PathBuf]) -> Self {
-        let Some(dir) = assets::find(first) else { return Self::without_assets(first) };
+        let Some(dir) = assets::find() else { return Self::without_assets() };
         let assets = match assets::load(&dir) {
             Ok(assets) => assets,
             Err(e) => return Self::new(Library::default(), KitSet::empty(), vec![e]),
         };
         let mut status = loading_status(&assets);
 
-        let hosted = matches!(source, LibrarySource::Host(_));
+        let in_memory = matches!(source, LibrarySource::Text(_));
         let Opened { mut library, file: library_path, on_disk, message, starter } = match source {
             LibrarySource::UserFile => {
                 if let Some(problem) = store::location_problem() {
@@ -99,7 +94,7 @@ impl Session {
                 }
                 Self::open_library(store::path(), assets.library, &mut status)
             }
-            LibrarySource::Host(text) => Self::open_host_library(text, assets.library, &mut status),
+            LibrarySource::Text(text) => Self::open_text_library(&text, assets.library, &mut status),
         };
         if starter {
             status.extend(assets.report.summary(assets::LIBRARY));
@@ -118,14 +113,10 @@ impl Session {
         }
         let synths = session_synth::merged_synths(library.synths.as_ref(), &assets.synths);
         let mut session = Self::new(library, kits, status);
-        session.saving.first_start = !hosted && is_first_start(store::settings_path().as_deref());
+        session.saving.first_start = !in_memory && is_first_start(store::settings_path().as_deref());
         session.synths.assets = assets.synths;
         session.synths.presets = synths.clone();
         session.synths.revision = Some(session.editor.revision());
-        session.host.hosted = hosted;
-        if hosted {
-            session.chrome.fold_editors();
-        }
         session.assets_dir = Some(dir);
         session.demo_styles = assets.demos;
         session.saving.projects_dir = store::projects_dir();
@@ -137,15 +128,14 @@ impl Session {
         session.saving.on_disk = on_disk;
         session.message = message;
         session.attach_sound(assets.bank, assets.scales, synths, start_output);
-        // A plugin shows no master panel: the host mixes, the default master applies.
-        if !hosted {
+        if !in_memory {
             session.load_master();
         }
         session.load_update_settings();
         session.load_color_scheme(store::settings_path());
         session.load_controls();
         session.load_zoom(store::settings_path());
-        if !hosted {
+        if !in_memory {
             session.load_resume();
         }
         session
@@ -153,8 +143,8 @@ impl Session {
 
     /// The session of a program that found no assets folder: an empty
     /// library, and what was searched.
-    fn without_assets(first: &[PathBuf]) -> Self {
-        let searched: Vec<String> = assets::candidates(first).iter().map(|d| d.display().to_string()).collect();
+    fn without_assets() -> Self {
+        let searched: Vec<String> = assets::candidates().iter().map(|d| d.display().to_string()).collect();
         Self::new(
             Library::default(),
             KitSet::empty(),
@@ -220,42 +210,22 @@ impl Session {
         }
     }
 
-    /// The library of a plugin: the host's `text` when it kept one, else the
-    /// user's file (read, never written), else `starter`; no file to save to.
-    pub(super) fn open_host_library(text: Option<String>, starter: Library, status: &mut Vec<String>) -> Opened {
-        const STARTER: &str = "starter library, saved with the host project";
-        if let Some(text) = text {
-            return match Library::parse(&text) {
-                Ok((library, report)) => {
-                    status.extend(report.summary("library of the host project"));
-                    Opened::unsaved(library, "library from the host project")
-                }
-                Err(e) => {
-                    status.push(format!("library of the host project not loaded: {e}"));
-                    Opened::starter(starter, STARTER)
-                }
-            };
-        }
-        let Some(path) = store::path() else {
-            return Opened::starter(starter, STARTER);
-        };
-        match store::load(&path) {
-            Ok(Some((saved, report))) => {
-                status.extend(report.summary(&path.display().to_string()));
-                Opened::unsaved(saved, "your library, copied into the host project")
+    /// The library of `text`, else `starter`; no file to save to.
+    pub(super) fn open_text_library(text: &str, starter: Library, status: &mut Vec<String>) -> Opened {
+        match Library::parse(text) {
+            Ok((library, report)) => {
+                status.extend(report.summary("library given"));
+                Opened::unsaved(library, "library given, not saved")
             }
             Err(e) => {
-                status.push(format!("library not loaded: {e}"));
-                Opened::starter(starter, STARTER)
+                status.push(format!("library given not loaded: {e}"));
+                Opened::starter(starter, STARTER_NOT_SAVED)
             }
-            Ok(None) => Opened::starter(starter, STARTER),
         }
     }
 
-    /// The library as its file holds it, for a plugin host to keep in its project.
-    /// Changes made to the library so far: compare to know when to ask
-    /// [`library_text`](Self::library_text) again.
-    pub fn library_revision(&self) -> u64 {
+    /// Changes made to the library so far: compare to know whether it changed.
+    pub(crate) fn library_revision(&self) -> u64 {
         self.editor.revision()
     }
 
@@ -293,7 +263,7 @@ impl Session {
             demo_styles: Vec::new(),
             program: Program::default(),
             editors: EditorState::default(),
-            host: Host::default(),
+            followed: Followed::default(),
             controls: ordrumbox_engine::ControlMap::new(),
             output_panel: session_output::OutputPanel::default(),
             mixer: session_mixer::Mixer::default(),
@@ -307,12 +277,10 @@ impl Session {
 }
 
 impl Session {
-    /// A session of `library` with no kit, a plugin's when `hosted`.
+    /// A session of `library` with no kit.
     #[cfg(test)]
-    pub(crate) fn for_tests(library: Library, hosted: bool) -> Self {
-        let mut session = Self::new(library, KitSet::empty(), Vec::new());
-        session.host.hosted = hosted;
-        session
+    pub(crate) fn for_tests(library: Library) -> Self {
+        Self::new(library, KitSet::empty(), Vec::new())
     }
 }
 

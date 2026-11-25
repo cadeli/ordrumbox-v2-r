@@ -1,5 +1,5 @@
-//! Playback under a plugin host: the controller and the audio side driven
-//! block by block with a host transport that starts, plays at its own tempo,
+//! Playback following a transport (a MIDI clock's): the controller and the
+//! audio side driven block by block with a transport that starts, plays at its own tempo,
 //! jumps, changes tempo and stops.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
@@ -26,7 +26,7 @@ fn bank() -> Arc<SampleBank> {
     Arc::new(SampleBank { samples: vec![BankSample { kit: "x".into(), sample, buffer: buffer.into() }] })
 }
 
-/// A host and the plugin it drives.
+/// A transport and the playback that follows it.
 struct Session {
     library: Library,
     controller: Controller,
@@ -161,40 +161,4 @@ fn the_first_rolling_block_plays_the_pass_from_its_first_frame() {
     let position = session.controller.position().expect("playing");
     assert_eq!((position.pass, position.frame), (0, 2 * BLOCK as u64));
     session.assert_in_step();
-}
-
-#[test]
-fn the_host_swing_moves_the_off_sixteenths_and_keeps_the_place() {
-    // A kick on the second sixteenth; at the host's 60 bpm a sixteenth is 2000 frames.
-    const SIXTEENTH: usize = 2000;
-    let onset_at = |swing: Option<f64>| {
-        let mut session = Session::with_notes(r#"[{"step":1}]"#);
-        if let Some(swing) = swing {
-            session.controller.set_host_swing(&session.library, swing);
-        }
-        session.blocks(2);
-        session.host.playing = true;
-        onset(&session.audio_of(20))
-    };
-    let straight = onset_at(None);
-    assert_eq!(straight, SIXTEENTH);
-    // On the last third of its pair of sixteenths.
-    let swung = onset_at(Some(2.0 / 3.0));
-    assert!(swung.abs_diff(2 * SIXTEENTH * 2 / 3) <= 1, "swung to frame {swung}");
-
-    // A swing set while playing rebuilds the pass where it is.
-    let mut session = Session::with_notes(r#"[{"step":1}]"#);
-    session.host.playing = true;
-    session.blocks(40);
-    let before = session.controller.position().expect("playing");
-    session.controller.set_host_swing(&session.library, 2.0 / 3.0);
-    session.blocks(1);
-    let after = session.controller.position().expect("playing");
-    assert_eq!((after.pass, after.frame), (before.pass, before.frame + BLOCK as u64));
-    session.assert_in_step();
-    // The next pass plays swung.
-    let pass_frames = after.frames as usize;
-    let rest = session.audio_of((2 * pass_frames - after.frame as usize) / BLOCK);
-    let next_pass = &rest[pass_frames - after.frame as usize..];
-    assert!(onset(next_pass).abs_diff(2 * SIXTEENTH * 2 / 3) <= 1, "frame {}", onset(next_pass));
 }

@@ -167,58 +167,6 @@ pub enum Command {
     Fullscreen,
 }
 
-/// Why a plugin leaves the user data folder alone.
-pub const USER_DATA_IN_THE_APP: &str = "user data folder: in the app only, not in a plugin";
-
-/// Why a plugin has no song commands.
-pub const SONGS_IN_THE_APP: &str = "songs: in the app only, a plugin plays patterns";
-
-/// Why a plugin has no project commands.
-pub const PROJECTS_IN_THE_APP: &str = "projects: in the app only, the host saves the library with its own project";
-
-impl Command {
-    /// Why a plugin does not run this command (the host does it, or it is
-    /// the app's), `None` when it does.
-    pub fn hosted_refusal(self) -> Option<&'static str> {
-        match self {
-            Self::Save => Some("the host saves the library with its project"),
-            Self::Quit => Some("the host closes the plugin's window"),
-            Self::TempoDown | Self::TempoUp => Some("the tempo is the host's"),
-            Self::PlayPattern => Some("the host's transport plays the pattern"),
-            Self::Rewind => Some("the host's transport rewinds"),
-            Self::TapTempo => Some("the tempo is the host's"),
-            Self::CheckUpdates | Self::DownloadPage => Some("update check: in the app only, not in a plugin"),
-            Self::FactoryReset => Some("factory reset: in the app only, not in a plugin"),
-            Self::Fullscreen => Some("the host owns the window"),
-            Self::BackUpUserData
-            | Self::RestoreUserData
-            | Self::ChangeUserFolder
-            | Self::DefaultUserFolder
-            | Self::OpenUserFolder => Some(USER_DATA_IN_THE_APP),
-            Self::SongView
-            | Self::PlaySong
-            | Self::ClearLoop
-            | Self::ToggleLoop
-            | Self::RecordAutomation
-            | Self::ReenableAutomation
-            | Self::PreviousSong
-            | Self::NextSong
-            | Self::NewSong
-            | Self::RemoveSong
-            | Self::ExportSongWav
-            | Self::ExportSongStems => Some(SONGS_IN_THE_APP),
-            Self::RenameProject
-            | Self::ProjectDescription
-            | Self::SaveProject
-            | Self::SaveProjectAs
-            | Self::LoadProject
-            | Self::ExportProject
-            | Self::ImportProject => Some(PROJECTS_IN_THE_APP),
-            _ => None,
-        }
-    }
-}
-
 /// One line of a menu.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Item {
@@ -317,8 +265,6 @@ pub struct MenuState {
     pub checking_updates: bool,
     /// The version of a newer release found.
     pub newer_release: Option<String>,
-    /// Shown by a plugin: what it leaves to the host or the app is left out.
-    pub hosted: bool,
     /// The assets' starter library can be loaded (Load the starter library).
     pub has_starter: bool,
     /// Demo styles to browse (Demos).
@@ -392,7 +338,7 @@ fn first_runnable(menu: &Menu) -> Option<usize> {
 mod build;
 #[path = "menu/draw.rs"]
 mod draw;
-pub use build::{command_label, hosted_shortcuts, menus, platform_shortcuts, shown_shortcuts};
+pub use build::{command_label, menus, platform_shortcuts, shown_shortcuts};
 pub use draw::*;
 
 #[cfg(test)]

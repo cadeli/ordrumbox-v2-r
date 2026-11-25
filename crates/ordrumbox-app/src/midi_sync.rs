@@ -1,7 +1,6 @@
 //! The MIDI clock followed: the MIDI thread feeds a [`ClockFollower`] with the
 //! pulses, starts and stops of the input; the audio callback asks it where
-//! the transport is and renders to it ([`AudioSide::render_synced`]), as under
-//! a plugin host. Shared through statics like the notes ([`crate::midi::NOTES`]):
+//! the transport is and renders to it ([`AudioSide::render_synced`]). Shared through statics like the notes ([`crate::midi::NOTES`]):
 //! the audio callback has no way to be handed them. The callback only
 //! `try_lock`s: a pulse being written is a block that keeps the last transport.
 

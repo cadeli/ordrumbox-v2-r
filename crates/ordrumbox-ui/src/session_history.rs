@@ -1,7 +1,6 @@
 //! The edits' undo steps and the library's saving.
 
 use super::Session;
-use crate::menu::Command;
 use crate::{menu, store};
 use std::time::Instant;
 
@@ -58,11 +57,7 @@ impl Session {
     /// File > Save: the library written now.
     pub fn save(&mut self) {
         if self.saving.library_path.is_none() {
-            self.message = if let Some(refusal) = Command::Save.hosted_refusal().filter(|_| self.host.hosted) {
-                refusal.into()
-            } else {
-                "not saved: no library file (see the messages below)".into()
-            };
+            self.message = "not saved: no library file (see the messages below)".into();
             return;
         }
         if self.write_library() {
@@ -89,7 +84,7 @@ impl Session {
 
     /// Where the library's edits stand, as the menu bar shows it.
     pub(crate) fn library_state(&self) -> menu::LibraryState {
-        self.saving.library_state(self.library_revision(), self.host.hosted)
+        self.saving.library_state(self.library_revision())
     }
 
     pub fn save_if_changed(&mut self) {

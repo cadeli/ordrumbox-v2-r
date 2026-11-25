@@ -132,10 +132,10 @@ pub struct Engine {
     master: MasterBus,
     master_current: MasterSettings,
     master_target: MasterSettings,
-    /// A plugin host's mix.
+    /// The live mix (the MIDI controls' knobs, the stems' split).
     host: HostMix,
-    /// What its tracks' changes multiply.
-    host_ratios: [HostRatios; HOST_TRACKS],
+    /// The cutoff ratio of each track of the live mix.
+    cutoff_ratios: [f32; HOST_TRACKS],
     /// `exp(-quantum / τ)` for each ramp.
     keep: [f32; 3],
     idle_quanta: u32,
@@ -188,7 +188,7 @@ impl Engine {
             master_current: MasterSettings::default(),
             master_target: MasterSettings::default(),
             host: HostMix::default(),
-            host_ratios: [HostRatios::NONE; HOST_TRACKS],
+            cutoff_ratios: [1.0; HOST_TRACKS],
             keep: [RAMP_FX, RAMP_MIX, RAMP_LFO].map(|tau| (-quantum_seconds / tau).exp()),
             idle_quanta: (IDLE_SECONDS / quantum_seconds).ceil() as u32,
             keymap: None,
@@ -229,31 +229,26 @@ impl Engine {
         self.returns.settings()
     }
 
-    /// A plugin host's mix, for the blocks to come.
+    /// The live mix, for the blocks to come.
     pub fn set_host_mix(&mut self, mix: HostMix) {
-        // The ratios cost an `exp2` each: computed only for a track that changed.
-        for ((ratios, new), old) in self.host_ratios.iter_mut().zip(&mix.tracks).zip(&self.host.tracks) {
-            if new != old {
-                *ratios = HostRatios::of(new);
+        // A ratio costs an `exp2`: computed only for a track that changed.
+        for ((ratio, new), old) in self.cutoff_ratios.iter_mut().zip(&mix.tracks).zip(&self.host.tracks) {
+            if new.cutoff_octaves != old.cutoff_octaves {
+                *ratio = new.cutoff_octaves.exp2();
             }
         }
         self.host = mix;
     }
 
-    /// The pitch ratio a plugin host gives the notes of `track`.
-    fn host_pitch(&self, track: usize) -> f64 {
-        self.host_ratios.get(track).map_or(1.0, |r| r.pitch)
-    }
-
-    /// The settings the strip of `track` goes to, the host's changes on top
-    /// of the track's.
+    /// The settings the strip of `track` goes to, the live mix's changes on
+    /// top of the track's.
     fn host_target(
         host: &HostMix,
-        ratios: &[HostRatios; HOST_TRACKS],
+        cutoff_ratios: &[f32; HOST_TRACKS],
         channel: &Channel,
         track: usize,
     ) -> StripSettings {
-        host.strip(&channel.target, track, ratios.get(track).unwrap_or(&HostRatios::NONE))
+        host.strip(&channel.target, track, cutoff_ratios.get(track).copied().unwrap_or(1.0))
     }
 
     /// Start playing `pass` from its first frame; its strip settings apply at once.
@@ -267,10 +262,10 @@ impl Engine {
         self.settle_strips(self.strip_count);
     }
 
-    /// The first `count` strips at their targets at once, as the host mixes them.
+    /// The first `count` strips at their targets at once, as the live mix sets them.
     fn settle_strips(&mut self, count: usize) {
         for (track, channel) in self.channels[..count].iter_mut().enumerate() {
-            channel.current = Self::host_target(&self.host, &self.host_ratios, channel, track);
+            channel.current = Self::host_target(&self.host, &self.cutoff_ratios, channel, track);
         }
     }
 

@@ -21,9 +21,9 @@ use std::time::{Duration, Instant};
 
 use ordrumbox_core::json::{self, Value};
 use ordrumbox_core::{Library, Pattern};
-use ordrumbox_ui::{LibrarySource, Session, Waker, host_output};
+use ordrumbox_ui::{LibrarySource, Session, Waker, handed_output};
 
-/// The library the session starts with: never saved, as a plugin's.
+/// The library the session starts with: held in memory, never saved.
 const LIBRARY: &str = r#"{"patterns":[{"name":"rock","bpm":100,"tracks":[{"name":"KICK","notes":[{"beat":0}]}]}]}"#;
 /// How long one answer may take.
 const DEADLINE: Duration = Duration::from_secs(30);
@@ -271,8 +271,8 @@ fn sounding_tracks(pattern: &Pattern) -> BTreeSet<&str> {
 #[test]
 fn a_client_composes_an_afrobeat_song_of_64_measures() {
     let dir = scratch_dir("mcp-afrobeat");
-    let (start, _audio) = host_output(48_000.0);
-    let mut session = Session::load_from(start, LibrarySource::Host(Some(LIBRARY.into())));
+    let (start, _audio) = handed_output(48_000.0);
+    let mut session = Session::load_from(start, LibrarySource::Text(LIBRARY.into()));
     // The bridge finds the window by the file next to the library.
     session.start_mcp_at(&dir.join("mcp.json"), Waker::new(|| {}));
     let mut client = Client::start(&dir);

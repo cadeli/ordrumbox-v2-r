@@ -86,7 +86,7 @@ impl Session {
         let toggle = if self.transport.is_loop_on { "Turn the loop off" } else { "Turn the loop on" };
         let lines =
             [("loop:toggle".to_owned(), toggle.to_owned()), ("loop:clear".to_owned(), "Remove the loop".to_owned())];
-        let shortcuts = crate::menu::shown_shortcuts(&["Ctrl+L", ""], self.host.hosted);
+        let shortcuts = crate::menu::shown_shortcuts(&["Ctrl+L", ""]);
         let menu = Dropdown::menu(Id::SongMenu, x, y, "Loop".into(), lines);
         self.chrome.widgets.dropdown = Some(menu.with_shortcuts(shortcuts));
     }

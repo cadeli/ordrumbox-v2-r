@@ -2,7 +2,6 @@
 //! view under the header, the play mode and the panels shown or folded. They are kept in `settings.json` (`resume`) at quit, and before
 //! the session is loaded again, and are read back at start. The pattern and
 //! the arrangement are kept by id, so they are found again after a reorder.
-//! A plugin keeps none: the host's project holds its state.
 
 use std::path::Path;
 
@@ -155,8 +154,8 @@ impl Session {
             return;
         };
         match value.as_str() {
-            Some(SONG_MODE) if !self.host.hosted => self.mode = PlayMode::Song,
-            Some(SONG_MODE | PATTERN_MODE) => self.mode = PlayMode::Pattern,
+            Some(SONG_MODE) => self.mode = PlayMode::Song,
+            Some(PATTERN_MODE) => self.mode = PlayMode::Pattern,
             _ => wrong.push(format!("mode: {} is not a mode, the pattern mode used", value.to_json())),
         }
     }
@@ -195,11 +194,8 @@ impl Session {
     }
 
     /// Keep where the user is in the settings file, to start there next
-    /// time (at quit, before a reload); a plugin keeps nothing.
+    /// time (at quit, before a reload).
     pub fn save_resume(&mut self) {
-        if self.host.hosted {
-            return;
-        }
         let Some(path) = &self.saving.settings_file else { return };
         if let Err(e) = store::save_setting(path, KEY, self.resume_record()) {
             self.message = format!("place not kept for next time: {}: {e}", path.display());
@@ -324,16 +320,5 @@ mod tests {
         let labels = [Workspace::Grid, Workspace::PianoRoll, Workspace::Song, Workspace::Synth, Workspace::Mixer]
             .map(|w| crate::view::VIEWS[usize::from(w.view_button())]);
         assert_eq!(labels, ["GRID", "ROLL", "SONG", "SYNTH", "MIX"]);
-    }
-
-    #[test]
-    fn a_plugin_keeps_no_place() {
-        let dir = scratch_dir("resume-hosted");
-        let path = dir.join("settings.json");
-        let mut s = session(&path);
-        s.host.hosted = true;
-        s.save_resume();
-        assert!(!path.exists());
-        std::fs::remove_dir_all(dir).unwrap();
     }
 }

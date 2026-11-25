@@ -29,8 +29,8 @@ pub(super) struct Inbox {
     pub(super) mix: Option<HostMix>,
     pub(super) preview: Option<Arc<Pass>>,
     pub(super) keymap: Option<Arc<KeyMap>>,
-    /// Under a stopped plugin host: the pass it would start in, for the
-    /// engine to start on the block the host starts ([`Controller::update`]).
+    /// Under a stopped transport followed: the pass it would start in, for the
+    /// engine to start on the block it starts ([`Controller::update`]).
     pub(super) cue: Option<Arc<Pass>>,
 }
 
@@ -63,7 +63,7 @@ pub(super) struct Published {
     pub(super) frames: AtomicU64,
     /// Pass index the engine needs, plus one (0: none).
     pub(super) wants: AtomicU64,
-    /// Whether the last callback followed a plugin host's transport, and that transport.
+    /// Whether the last callback followed a transport (a MIDI clock's), and that transport.
     pub(super) synced: AtomicBool,
     pub(super) host_playing: AtomicBool,
     pub(super) host_bpm: AtomicU64,

@@ -277,7 +277,7 @@ fn strict_tracks(bytes: &[u8]) -> Result<Vec<Vec<RawEvent>>, String> {
 }
 
 /// Where the notes of track name `name` go, by the rules of `README.md`
-/// ("Plugin"): a drum on channel 10 at its GM key; a melodic instrument on
+/// ("MIDI"): a drum on channel 10 at its GM key; a melodic instrument on
 /// the next channel but 10 (the 16th melodic one shares channel 1 again) at
 /// the sample's root note, else its mapping's key, else C3; an unknown name a
 /// bass drum. Channel (0-based), base note.

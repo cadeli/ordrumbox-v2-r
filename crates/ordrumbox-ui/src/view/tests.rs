@@ -87,29 +87,6 @@ fn a_sample_label_puts_the_kit_above_the_name_without_its_extension() {
 }
 
 #[test]
-fn a_host_transport_is_shown_in_the_transport_group_and_nowhere_else() {
-    let scale = Scale::ONE;
-    let controls = header_controls(scale);
-    let group = controls.groups(scale)[1];
-    let (w, h) = (400usize, 80usize);
-    let drawn = |host: Option<HostState>| {
-        let mut pixels = vec![0; w * h];
-        draw_host_state(&mut Canvas::new(&mut pixels, w, h), &controls, host, scale);
-        let inside = |i: usize| {
-            let (x, y) = ((i % w) as i32, (i / w) as i32);
-            group.contains(x, y)
-        };
-        assert!(pixels.iter().enumerate().all(|(i, p)| *p == 0 || inside(i)), "{host:?}");
-        let count = |color: Rgb| pixels.iter().filter(|p| **p == color).count();
-        (count(PLAYING), count(theme::muted()))
-    };
-    let (playing, stopped) = (drawn(Some(HostState { playing: true, bpm: 97.5 })).0, drawn(None).1);
-    assert!(playing > 0, "a triangle while the host plays");
-    assert!(stopped >= 64, "a square before the host was seen");
-    assert_eq!(drawn(Some(HostState { playing: false, bpm: 300.0 })).0, 0, "nothing lit while stopped");
-}
-
-#[test]
 fn draws_without_panicking_at_any_size() {
     let library = library();
     for (w, h) in [(1, 1), (40, 30), (1024, 640)] {
@@ -136,15 +113,12 @@ fn draws_without_panicking_at_any_size() {
             note_editor: true,
             levels: vec![0.0; 2],
             show_vus: true,
-            transport: Transport::Own,
             track_drop: None,
-            host_muted: 0b10,
+            live_muted: 0b10,
             switches: vec![(true, false)],
             switches_taken_back: Vec::new(),
             hint: None,
             hovered_track: Some(0),
-            host_moved: 0b01,
-            host_split: 0b10,
             ruler_marks: crate::pattern_ruler::RulerMarks::default(),
             cursor: Some(Cursor { track: 0, beat: 1, step: 2 }),
             selected: Some((0, 0)),
@@ -266,9 +240,8 @@ fn hit_testing_matches_the_drawing() {
     assert_eq!(layout.hit(pattern, layout.name_x + 2, y), Some(Hit::Name(2)));
     assert_eq!(layout.hit(pattern, layout.volume_x + 2, y), None);
     assert!(layout.volume_rect(2).contains(layout.volume_x + 2, y));
-    let mark = layout.host_mark_rect(2);
-    assert_eq!(layout.hit(pattern, mark.x + 1, y), Some(Hit::Host(2)));
-    assert_eq!(layout.hit(pattern, mark.x + mark.w, y), Some(Hit::Cell { track: 2, beat: 0, step: 0 }));
+    assert_eq!(layout.hit(pattern, layout.grid_left - 1, y), None);
+    assert_eq!(layout.hit(pattern, layout.grid_left, y), Some(Hit::Cell { track: 2, beat: 0, step: 0 }));
     // Track H: 2 steps per beat; the middle of beat 1's second step.
     let x = layout.step_x(3, 2) + 2;
     assert_eq!(layout.hit(pattern, x, y), Some(Hit::Cell { track: 2, beat: 1, step: 1 }));

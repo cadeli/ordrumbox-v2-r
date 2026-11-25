@@ -1,6 +1,6 @@
 //! Following a MIDI clock: the pulses, Start, Continue, Stop and song
-//! positions of another machine, as the [`HostTransport`] the engine follows
-//! under a plugin host. A pure state machine: whoever reads the MIDI port
+//! positions of another machine, as the [`HostTransport`] the engine follows.
+//! A pure state machine: whoever reads the MIDI port
 //! says when each message came (seconds on any clock), and the audio callback
 //! asks where the transport is now.
 

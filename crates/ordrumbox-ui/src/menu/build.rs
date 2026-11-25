@@ -1,5 +1,5 @@
-//! The menus' content: which items each menu holds, how they read the
-//! state, and what a plugin keeps of them.
+//! The menus' content: which items each menu holds and how they read the
+//! state.
 
 use super::{Command, Item, Menu, MenuState};
 use crate::ui_input::MACOS;
@@ -16,10 +16,6 @@ fn check(label: &str, shortcut: &'static str, command: Command, enabled: bool, o
 /// The prefix of the shortcuts as the sources write them.
 const WRITTEN_PREFIX: &str = "Ctrl+";
 
-/// The prefix of a shortcut whose key a plugin leaves to the host: the
-/// platform's Ctrl/Cmd key, which Alt replaces there (`Ui::key`).
-pub(super) const CONTROL_PREFIX: &str = if MACOS { "Cmd+" } else { "Ctrl+" };
-
 /// The shortcut as the platform shows it: Cmd in place of Ctrl on macOS.
 fn shown(shortcut: &'static str) -> Cow<'static, str> {
     if MACOS && let Some(rest) = shortcut.strip_prefix(WRITTEN_PREFIX) {
@@ -29,15 +25,10 @@ fn shown(shortcut: &'static str) -> Cow<'static, str> {
 }
 
 /// The keys of a context menu's lines (as the sources write them, empty for
-/// none) as the window shows them: Cmd for Ctrl on macOS, Alt in a plugin.
+/// none) as the window shows them: Cmd for Ctrl on macOS.
 #[must_use]
-pub fn shown_shortcuts(keys: &[&'static str], hosted: bool) -> Vec<String> {
-    keys.iter()
-        .map(|&key| {
-            let key = shown(key);
-            if hosted { hosted_shortcuts(&key).into_owned() } else { key.into_owned() }
-        })
-        .collect()
+pub fn shown_shortcuts(keys: &[&'static str]) -> Vec<String> {
+    keys.iter().map(|&key| shown(key).into_owned()).collect()
 }
 
 /// What the panels say the Ctrl/Cmd key is: Cmd on macOS.
@@ -55,7 +46,7 @@ pub fn platform_shortcuts(text: &str) -> Cow<'_, str> {
 
 /// The menus, as they stand.
 pub fn menus(s: &MenuState) -> Vec<Menu> {
-    let mut menus = vec![
+    vec![
         file_menu(s),
         edit_menu(s),
         view_menu(s),
@@ -65,38 +56,7 @@ pub fn menus(s: &MenuState) -> Vec<Menu> {
         song_menu(s),
         kit_menu(s),
         help_menu(s),
-    ];
-    if s.hosted {
-        keep_hosted(&mut menus);
-    }
-    menus
-}
-
-/// A plugin does not show what it cannot run: drop those entries instead of
-/// greying them out. Clean up the separators they leave behind, and the menus
-/// that end up empty.
-fn keep_hosted(menus: &mut Vec<Menu>) {
-    for menu in menus.iter_mut() {
-        menu.items.retain(|item| match item {
-            Item::Command { command, .. } => command.hosted_refusal().is_none(),
-            Item::Separator => true,
-        });
-        let mut cleaned: Vec<Item> = Vec::with_capacity(menu.items.len());
-        for item in std::mem::take(&mut menu.items) {
-            let after_item = matches!(cleaned.last(), Some(Item::Command { .. }));
-            if after_item || matches!(item, Item::Command { .. }) {
-                cleaned.push(item);
-            }
-        }
-        while matches!(cleaned.last(), Some(Item::Separator)) {
-            cleaned.pop();
-        }
-        menu.items = cleaned;
-    }
-    menus.retain(|menu| !menu.items.is_empty());
-    for item in menus.iter_mut().flat_map(|menu| &mut menu.items) {
-        host_item(item);
-    }
+    ]
 }
 
 fn file_menu(s: &MenuState) -> Menu {
@@ -344,22 +304,5 @@ fn kit_menu(s: &MenuState) -> Menu {
             Item::Separator,
             command("Import folder as kit...", "", C::ImportFolder, true),
         ],
-    }
-}
-
-/// `text` (a shortcut, a tooltip) as a plugin shows it: Alt in place of Ctrl.
-/// A menu's shortcut arrives as the platform shows it (Cmd+ on macOS), a
-/// panel's tooltip as the sources write it (Ctrl+): both become Alt+.
-#[must_use]
-pub fn hosted_shortcuts(text: &str) -> Cow<'_, str> {
-    let prefix = if text.contains(CONTROL_PREFIX) { CONTROL_PREFIX } else { WRITTEN_PREFIX };
-    if text.contains(prefix) { text.replace(prefix, "Alt+").into() } else { text.into() }
-}
-
-/// What a plugin shows of the shortcut of `item`: Alt in place of Ctrl.
-fn host_item(item: &mut Item) {
-    let Item::Command { shortcut, .. } = item else { return };
-    if let Cow::Owned(alt) = hosted_shortcuts(shortcut) {
-        *shortcut = alt.into();
     }
 }

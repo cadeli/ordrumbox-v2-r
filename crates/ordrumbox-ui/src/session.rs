@@ -14,7 +14,7 @@
 //! The state is held in groups, each declared with the code that owns it:
 //! `Chrome`, `Selection`, `Saving`, `Playback`, `Transport`
 //! (`session_transport.rs`), `Generators` (`session_generators.rs`), `Synths`
-//! (`session_synth.rs`), `Host` (`session_host.rs`), `Program`
+//! (`session_synth.rs`), `Followed` (`session_clock.rs`), `Program`
 //! (`session_commands.rs`), `KitEditor` (`session_kit.rs`) and `Flash`
 //! (`session_toast.rs`).
 //!
@@ -48,6 +48,8 @@ use session_selection::Selection;
 
 #[path = "session_chrome.rs"]
 mod session_chrome;
+#[path = "session_clock.rs"]
+mod session_clock;
 #[path = "session_color.rs"]
 mod session_color;
 #[path = "session_commands.rs"]
@@ -74,8 +76,6 @@ mod session_grid_bar;
 mod session_hints;
 #[path = "session_history.rs"]
 mod session_history;
-#[path = "session_host.rs"]
-mod session_host;
 #[path = "session_labels.rs"]
 mod session_labels;
 #[path = "session_lane.rs"]
@@ -253,8 +253,8 @@ pub struct Session {
     program: session_commands::Program,
     /// Tabs and selection of the track and note editors.
     editors: EditorState,
-    /// The plugin host the session follows, if any (`session_host.rs`).
-    host: session_host::Host,
+    /// The MIDI clock followed and the MIDI controls' mutes (`session_clock.rs`).
+    followed: session_clock::Followed,
     /// The knobs of a MIDI controller and what they move (`session_controls.rs`).
     controls: ordrumbox_engine::ControlMap,
     /// The master bus and the shared returns' settings.
@@ -277,12 +277,6 @@ pub struct Session {
 fn no_output(_: Arc<ordrumbox_engine::SampleBank>, _: Scales, _: SynthPresets) -> crate::audio_output::StartedOutput {
     Err("no audio output given".into())
 }
-
-// A plugin shares its session between the editor and a timer thread.
-const _: fn() = || {
-    fn send<T: Send>() {}
-    send::<Session>();
-};
 
 impl std::fmt::Debug for Session {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -365,6 +359,6 @@ impl Session {
         self.playback
             .update(&mut self.editor, self.pattern_index, |editor, p, pass| self.generators.auto_loop(editor, p, pass));
         self.follow_song_pattern();
-        self.report_host_tempo();
+        self.report_clock_tempo();
     }
 }

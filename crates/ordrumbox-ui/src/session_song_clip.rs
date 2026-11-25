@@ -80,7 +80,7 @@ mod tests {
         s.song_click(SIZE, x, y, Button::Right);
         assert_eq!(menu(&s), ["next:0", "delete:0"]);
         let shortcuts = s.chrome.widgets.dropdown.as_ref().map(|d| d.shortcuts.clone()).unwrap_or_default();
-        assert_eq!(shortcuts, crate::menu::shown_shortcuts(&["Ctrl+D", "Delete"], false));
+        assert_eq!(shortcuts, crate::menu::shown_shortcuts(&["Ctrl+D", "Delete"]));
         assert_eq!(s.selected_clip(), Some(0));
     }
 

@@ -40,7 +40,7 @@ impl Session {
         let Some(clip) = self.song().and_then(|s| s.clips.get(c)).cloned() else { return };
         let title = clip_label(&self.pattern_label(&clip.pattern_id), &clip);
         let lines = [(format!("next:{c}"), "Next".to_owned()), (format!("delete:{c}"), "Delete".to_owned())];
-        let shortcuts = crate::menu::shown_shortcuts(&["Ctrl+D", "Delete"], self.host.hosted);
+        let shortcuts = crate::menu::shown_shortcuts(&["Ctrl+D", "Delete"]);
         let menu = Dropdown::menu(Id::SongMenu, x, y, title, lines);
         self.chrome.widgets.dropdown = Some(menu.with_shortcuts(shortcuts));
     }

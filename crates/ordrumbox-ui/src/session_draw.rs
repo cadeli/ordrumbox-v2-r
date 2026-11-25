@@ -14,11 +14,6 @@ use ordrumbox_core::{Library, Song};
 use ordrumbox_engine::{Mode, Position};
 
 impl Session {
-    /// The header's first group: a plugin shows its host's transport there.
-    pub(super) fn transport_shown(&self) -> view::Transport {
-        if self.host.hosted { view::Transport::Host(self.host.shown) } else { view::Transport::Own }
-    }
-
     /// The window split for `size` (a real window size): the main editor
     /// region (top-left) and the note editor under it.
     pub(crate) fn body(&self, size: (i32, i32, Scale)) -> view::Body {
@@ -63,7 +58,7 @@ impl Session {
     }
 
     pub fn draw(&mut self, canvas: &mut Canvas, scale: Scale) {
-        // The scheme is per thread: a plugin draws on another than it loads on.
+        // The scheme is per thread (`theme.rs`): set where the frame is drawn.
         theme::set_scheme(self.chrome.color_scheme);
         self.note_actions();
         self.note_message();
@@ -107,8 +102,7 @@ impl Session {
             note_editor: self.note_editor_shown(),
             levels: levels.clone(),
             show_vus: self.chrome.show_vus,
-            transport: self.transport_shown(),
-            host_muted: self.host.muted,
+            live_muted: self.followed.muted,
             switches: self.shown_switches(),
             switches_taken_back: self.switches_taken_back(),
             hint: self.hint(),
@@ -116,8 +110,6 @@ impl Session {
                 Some(crate::view::Hit::Name(t)) => Some(t),
                 _ => None,
             },
-            host_moved: self.host.mix.moved_tracks(),
-            host_split: self.host.mix.split,
             track_drop: self.track_drop((canvas.width(), canvas.height(), scale)),
             waiting,
             playhead: played.map(|played| {
@@ -125,7 +117,7 @@ impl Session {
                 let first = self.chrome.beat_window.first().clamp(0, total_beats - 1);
                 playhead_in_window(played, total_beats, first, shown_beats)
             }),
-            song: song.as_deref().filter(|_| !self.host.hosted),
+            song: song.as_deref(),
             cursor: self.selection.cursor,
             selected: self.selection.selected,
             zone: self.selection.zone,

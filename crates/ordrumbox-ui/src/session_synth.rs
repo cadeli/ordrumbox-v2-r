@@ -685,7 +685,7 @@ mod tests {
             .unwrap() as u16;
         s.synth_value(fi, 0.3);
         assert_eq!(gain(&s), Some(0.3));
-        assert_ne!(s.library_revision(), revision, "a plugin gives the host the library again");
+        assert_ne!(s.library_revision(), revision, "a library edit, saved with it");
         assert!(s.library_text().contains("\"synthPresets\""));
         // Undo: as the assets hold it, the editor showing it.
         s.undo();

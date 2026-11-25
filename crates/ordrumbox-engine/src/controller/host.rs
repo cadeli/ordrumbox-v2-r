@@ -1,4 +1,4 @@
-//! The controller following a plugin host's transport (or a MIDI clock):
+//! The controller following a transport (a MIDI clock's):
 //! its tempo, its start and stop, the pass it jumps to, and the cue it is
 //! given while stopped.
 
@@ -11,7 +11,7 @@ use crate::engine::{HostTransport, host_pass};
 use crate::pass::{SONG_PASS_TICKS, pattern_pass_ticks};
 
 impl Controller {
-    /// The plugin host's transport seen by the last callback, if it followed one.
+    /// The transport seen by the last callback, if it followed one.
     pub fn host(&self) -> Option<HostTransport> {
         self.link.published.read().host
     }
@@ -24,9 +24,9 @@ impl Controller {
         }
     }
 
-    /// Follow the plugin host's transport: its tempo for every pass, start
+    /// Follow the transport: its tempo for every pass, start
     /// and stop with it, and the pass it is in when it jumps (a loop, a
-    /// click on its timeline). Stopped, the host is given a cue: the pass it
+    /// Song Position Pointer). Stopped, it is given a cue: the pass it
     /// would start in, which the engine starts on its own.
     pub(super) fn follow_host(&mut self, library: &Library, host: HostTransport, snapshot: Snapshot) {
         let bpm = clamp_bpm(host.bpm);
@@ -93,7 +93,7 @@ impl Controller {
     /// the cue, unless the one posted is still there and built from the same.
     fn post_cue(&mut self, library: &Library, beat: f64) {
         let Some((number, _)) = self.pass_ticks(library).and_then(|ticks| host_pass(beat, ticks)) else { return };
-        let key = CueKey { number, mode: self.mode, tempo: self.tempo, swing: self.swing };
+        let key = CueKey { number, mode: self.mode, tempo: self.tempo };
         // The engine took a cue when the host started and stopped before this thread saw it.
         if self.cue == Some(key) && lock(&self.link.inbox).cue.is_some() {
             return;

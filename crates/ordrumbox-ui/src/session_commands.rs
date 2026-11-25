@@ -101,7 +101,6 @@ impl Session {
             kit_sample: self.kit_list().is_some_and(|(s, n)| s < n),
             checking_updates: self.updates.checking(),
             newer_release: self.updates.newer_release().map(|r| r.version.clone()),
-            hosted: self.host.hosted,
             has_starter: self.has_starter(),
             has_demos: !self.demo_styles.is_empty(),
             user_folder: self.user_folder().is_some(),
@@ -151,10 +150,6 @@ impl Session {
     pub fn run(&mut self, command: Command) {
         use Command as C;
         self.chrome.menu = None;
-        if let Some(refusal) = command.hosted_refusal().filter(|_| self.host.hosted) {
-            self.message = refusal.into();
-            return;
-        }
         match command {
             C::Save => self.save(),
             C::ImportMidi => self.open_picker(Purpose::ImportMidi),

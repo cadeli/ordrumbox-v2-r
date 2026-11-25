@@ -14,12 +14,8 @@ use ordrumbox_core::Library;
 
 use super::Session;
 use crate::kits::KitSet;
-use crate::menu::{Command, LibraryState};
-use crate::panel::{self, Id};
-use crate::scale::Scale;
+use crate::menu::LibraryState;
 use crate::test_support::scratch_dir;
-use crate::ui_input::Button;
-use crate::view;
 use crate::view::Hit;
 
 const DEMO: &str = r#"{"patterns":[{"name":"demo","tracks":[{"name":"KICK","notes":[{}]}]}]}"#;
@@ -161,93 +157,6 @@ fn a_save_that_fails_is_reported_and_done_later() {
 }
 
 #[test]
-fn a_host_library_comes_back_as_text_and_is_never_saved() {
-    let demo = Library::parse(DEMO).unwrap().0;
-    let saved = r#"{"patterns":[{"name":"kept","tracks":[{"name":"SNARE","notes":[{},{}]}]}]}"#;
-    let mut status = Vec::new();
-    let opened = Session::open_host_library(Some(saved.to_owned()), demo.clone(), &mut status);
-    assert_eq!((opened.file, opened.message.as_str(), status.len()), (None, "library from the host project", 0));
-    let mut s = Session::new(opened.library, KitSet::empty(), status);
-    s.host.hosted = true;
-    assert_eq!(s.library_state(), LibraryState::Host);
-    assert_eq!(s.pattern().unwrap().name.as_deref(), Some("kept"));
-    s.save();
-    assert_eq!(s.message, "the host saves the library with its project");
-    let again = Session::open_host_library(Some(s.library_text()), demo.clone(), &mut Vec::new()).library;
-    assert_eq!(again.to_file_text(), s.library_text());
-
-    let mut status = Vec::new();
-    let opened = Session::open_host_library(Some("{".to_owned()), demo, &mut status);
-    assert_eq!((opened.library.patterns[0].name.as_deref(), opened.file), (Some("demo"), None));
-    assert!(status[0].starts_with("library of the host project not loaded: "), "{status:?}");
-}
-
-#[test]
-fn a_plugin_leaves_to_the_host_what_the_host_does() {
-    let library = Library::parse(DEMO).unwrap().0;
-    let mut s = Session::new(library, KitSet::empty(), Vec::new());
-    s.host.hosted = true;
-    let bpm = s.editor.library().bpm;
-    let refused = [
-        Command::Save,
-        Command::Quit,
-        Command::TempoUp,
-        Command::PlayPattern,
-        Command::CheckUpdates,
-        Command::FactoryReset,
-        Command::SongView,
-        Command::PlaySong,
-        Command::NewSong,
-    ];
-    for command in refused {
-        s.run(command);
-        assert_eq!(Some(s.message.as_str()), command.hosted_refusal(), "{command:?}");
-    }
-    assert!(!s.quit_requested());
-    assert_eq!(s.editor.library().bpm, bpm);
-    assert_eq!(s.editor.history().next_undo(), None);
-    assert!(!s.song_view_open() && !s.playing());
-    s.toggle_play_song();
-    assert_eq!(s.message, crate::menu::SONGS_IN_THE_APP);
-    // Left out of the menus (`menu.rs` tests), and no tempo knob: the host's tempo plays.
-    let runnable = s.menus().into_iter().flat_map(|m| m.items).filter_map(|i| i.runnable());
-    assert!(runnable.into_iter().all(|c| c.hosted_refusal().is_none()));
-    let size = (1100, 680, Scale::ONE);
-    let layout = s.panel_layout(size.0, size.1, size.2);
-    assert!(!layout.items.iter().any(|i| i.id == Some(Id::Bpm)));
-    // No song: no mode switch, no SONG view button; everything else moves left into its place.
-    assert!(panel::find(&layout.items, Id::View(2)).is_none());
-    assert!(!layout.items.iter().any(|i| matches!(i.id, Some(Id::Mode(_)))));
-    let app = view::header_controls(Scale::ONE);
-    let views = app.hosted().views;
-    assert_eq!(views[3].x, app.views[3].x - (app.play.x - app.mode[0].x));
-    assert_eq!(views[3].x, views[1].x + views[1].w + 2);
-    assert_eq!(panel::find(&layout.items, Id::View(3)).map(|i| i.rect), Some(views[3]));
-    assert_eq!(panel::find(&layout.items, Id::View(5)).map(|i| i.rect), Some(views[5]));
-    let after = views[5].x + views[5].w;
-    assert!(panel::hit(&layout.items, after + 2, views[5].y + 2).is_none());
-    s.mouse_down(size, after + 2, views[5].y + 2, Button::Left, false);
-    s.mouse_up();
-    assert!(!s.song_view_open());
-    // No transport: the host plays, at its tempo, both only shown; nothing under the mouse there.
-    assert!(!layout.items.iter().any(|i| i.id == Some(Id::Transport)));
-    let bpm = view::header_controls(Scale::ONE).hosted().bpm;
-    assert!(panel::hit(&layout.items, bpm.x + 2, bpm.y + 2).is_none());
-    s.control_hover(size, bpm.x + 2, bpm.y + 2);
-    assert!(s.chrome.control_hover.is_none());
-    // Tooltips give the plugin's shortcuts: Alt in place of Ctrl.
-    let kit = views[5];
-    s.control_hover(size, kit.x + 2, kit.y + 2);
-    let tip = s.chrome.control_hover.and_then(|(id, _)| s.control_tip(id)).map(|[title, _]| title);
-    assert_eq!(tip.as_deref(), Some("Kit editor (Alt+K)"));
-    // The mixer: the track strips, not the returns nor the master (the host mixes).
-    s.toggle_mixer();
-    let layout = s.panel_layout(size.0, size.1, size.2);
-    assert!(layout.items.iter().any(|i| matches!(i.id, Some(Id::MixerKnob(..)))));
-    assert!(!layout.items.iter().any(|i| matches!(i.id, Some(Id::Master(_) | Id::Returns(_)))));
-}
-
-#[test]
 fn the_values_repaired_in_the_library_are_shown() {
     let path = library_file("repaired");
     fs::write(&path, r#"{"bpm":"fast","patterns":[{"name":"p"}]}"#).unwrap();
@@ -261,7 +170,11 @@ fn the_values_repaired_in_the_library_are_shown() {
 
     let mut status = Vec::new();
     let demo = Library::parse(DEMO).unwrap().0;
-    Session::open_host_library(Some(r#"{"bpm":"fast"}"#.to_owned()), demo, &mut status);
-    assert!(status[0].starts_with("library of the host project: 1 value(s) repaired"), "{status:?}");
+    Session::open_text_library(r#"{"bpm":"fast"}"#, demo.clone(), &mut status);
+    assert!(status[0].starts_with("library given: 1 value(s) repaired"), "{status:?}");
+    let mut status = Vec::new();
+    let opened = Session::open_text_library("{", demo, &mut status);
+    assert_eq!((opened.library.patterns[0].name.as_deref(), opened.file), (Some("demo"), None));
+    assert!(status[0].starts_with("library given not loaded: "), "{status:?}");
     fs::remove_dir_all(path.parent().unwrap()).unwrap();
 }

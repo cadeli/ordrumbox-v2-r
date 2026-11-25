@@ -125,13 +125,11 @@ pub enum LibraryState {
     Failed,
     /// No file: edits are lost on quit (the footer says why).
     NotSaved,
-    /// A plugin's: the host saves it with its project.
-    Host,
 }
 
 impl LibraryState {
     /// Every state, the longest label setting the column's width.
-    const ALL: [Self; 6] = [Self::Saved, Self::New, Self::Modified, Self::Failed, Self::NotSaved, Self::Host];
+    const ALL: [Self; 5] = [Self::Saved, Self::New, Self::Modified, Self::Failed, Self::NotSaved];
 
     #[must_use]
     pub const fn label(self) -> &'static str {
@@ -141,7 +139,6 @@ impl LibraryState {
             Self::Modified => "modified",
             Self::Failed => "save failed",
             Self::NotSaved => "not saved",
-            Self::Host => "in host project",
         }
     }
 
@@ -150,7 +147,7 @@ impl LibraryState {
             Self::Saved => theme::LIVE,
             Self::Modified => theme::VALUE,
             Self::Failed | Self::NotSaved => theme::ALERT,
-            Self::New | Self::Host => dim(),
+            Self::New => dim(),
         }
     }
 }

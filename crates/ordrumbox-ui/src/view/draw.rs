@@ -2,7 +2,7 @@
 
 use super::grid::draw_grid;
 use super::kit::{KitLayout, draw_kit};
-use super::layout::{Body, HeaderControls, HostState, Layout, MACROS, Transport, header_controls, header_text};
+use super::layout::{Body, HeaderControls, Layout, MACROS, header_controls, header_text};
 use super::{
     ACCENT, ARRANGEMENT_LABEL, HELP, KIT_HELP, LOGO, MIXER_HELP, PATTERN_LABEL, PLAYING, ROLL_HELP, SONG_HELP,
     SYNTH_HELP, View, WAITING_LABEL, WARNING, background_color,
@@ -59,19 +59,13 @@ fn draw_header(canvas: &mut Canvas, view: &View, scale: Scale) {
     let margin = margin(scale);
     let top = content_top(scale);
     canvas.text(margin, top + 9 * scale, "orDrumbox", text, LOGO);
-    let c = match view.transport {
-        Transport::Own => header_controls(scale),
-        Transport::Host(_) => header_controls(scale).hosted(),
-    };
+    let c = header_controls(scale);
     // The groups' frames, behind their widgets (panel items, drawn later).
     // The generation's only with a pattern: it has nothing to show without.
     let song = view.arrangement.is_some();
     for (i, group) in c.groups(scale).into_iter().enumerate() {
-        // The mode switch is the app's: a plugin has no song. The song mode has no generation.
-        if (view.pattern.is_none() && i != 4)
-            || (i == 0 && matches!(view.transport, Transport::Host(_)))
-            || (i == 3 && song)
-        {
+        // The song mode has no generation.
+        if (view.pattern.is_none() && i != 4) || (i == 3 && song) {
             continue;
         }
         canvas.fill_rect(group.x, group.y, group.w, group.h, theme::panel());
@@ -93,14 +87,8 @@ fn draw_header_labels(canvas: &mut Canvas, view: &View, c: &HeaderControls, top:
         label(canvas, c.views[0], "VIEW");
         return;
     }
-    if matches!(view.transport, Transport::Own) {
-        label(canvas, c.mode[0], "MODE");
-    }
+    label(canvas, c.mode[0], "MODE");
     label(canvas, c.bpm, "BPM");
-    if let Transport::Host(host) = view.transport {
-        label(canvas, c.play, "HOST");
-        draw_host_state(canvas, c, host, scale);
-    }
     if view.arrangement.is_some() {
         label(canvas, c.pattern, ARRANGEMENT_LABEL);
         label(canvas, c.kit, "KIT");
@@ -174,26 +162,4 @@ fn draw_footer(canvas: &mut Canvas, view: &View, scale: Scale) {
     };
     let help: String = help.chars().take(chars_in(canvas.width() - 2 * margin, scale)).collect();
     canvas.text(margin, footer_y, &help, scale, theme::muted());
-}
-
-/// A plugin host's transport, where the app has its play button and tempo
-/// knob: a triangle while it plays, a square while stopped, and the tempo
-/// played. Both keep their place before the host was seen, the tempo a dash.
-pub(super) fn draw_host_state(canvas: &mut Canvas, c: &HeaderControls, host: Option<HostState>, scale: Scale) {
-    let size = 8 * scale;
-    let (x, y) = (c.play.x + 2 * scale, c.play.y + (c.play.h - size) / 2);
-    if host.is_some_and(|host| host.playing) {
-        // Pointing right: each column shorter by a pixel at both ends.
-        for col in 0..size {
-            let inset = col / 2;
-            canvas.fill_rect(x + col, y + inset, 1, size - 2 * inset, PLAYING);
-        }
-    } else {
-        canvas.fill_rect(x, y, size, size, theme::muted());
-    }
-    let (tempo, color) = match host {
-        Some(host) => (ordrumbox_core::num::text(host.bpm), theme::text()),
-        None => ("-".to_owned(), theme::muted()),
-    };
-    canvas.text(c.bpm.x, c.bpm.y + 4 * scale, &tempo, scale, color);
 }

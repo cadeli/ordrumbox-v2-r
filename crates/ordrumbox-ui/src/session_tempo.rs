@@ -19,10 +19,6 @@ impl Session {
     }
 
     pub(super) fn tap_tempo_at(&mut self, now: Instant) {
-        if self.host.hosted {
-            self.message = "the tempo is the host's".into();
-            return;
-        }
         if self.transport.taps.last().is_some_and(|&last| now.duration_since(last) > TAP_RESET) {
             self.transport.taps.clear();
         }
@@ -58,14 +54,14 @@ impl Session {
 }
 
 impl Session {
-    /// The tempo a plugin plays at: the host's, inside the tempo bounds
-    /// (`None` before the host's transport was seen).
-    pub(super) fn host_bpm(&self) -> Option<f64> {
+    /// The tempo a followed MIDI clock plays at, inside the tempo bounds
+    /// (`None` when no clock is followed, or before it was seen).
+    pub(super) fn clock_bpm(&self) -> Option<f64> {
         let host = self.playback.host()?;
         Some(ordrumbox_core::song::clamp_bpm(host.bpm.round()))
     }
 
-    /// The tempo the tracks play at: the host's in a plugin, else what
+    /// The tempo the tracks play at: the followed clock's, else what
     /// plays (the song's, the library's), else the header's.
     pub(super) fn playing_bpm(&self) -> f64 {
         let library = self.editor.library();
@@ -74,7 +70,7 @@ impl Session {
             Some(Mode::Pattern(_)) => Some(library.bpm),
             None => None,
         };
-        self.host_bpm().or(own).unwrap_or_else(|| self.tempo())
+        self.clock_bpm().or(own).unwrap_or_else(|| self.tempo())
     }
 
     /// That tempo at `bpm` (whole, inside the tempo bounds), a run of
@@ -97,7 +93,7 @@ mod tests {
 
     #[test]
     fn the_taps_set_the_tempo_and_a_pause_starts_over() {
-        let mut s = Session::for_tests(ordrumbox_core::Library::default(), false);
+        let mut s = Session::for_tests(ordrumbox_core::Library::default());
         let start = Instant::now();
         let beat = Duration::from_millis(500);
         s.tap_tempo_at(start);

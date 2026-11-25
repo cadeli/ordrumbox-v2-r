@@ -3,11 +3,7 @@
 Drum machine and step sequencer: patterns of tracks of notes, songs arranged
 from patterns, sample kits and a soft synth, played live or rendered to WAV
 and MIDI. A native program (`ordrumbox.exe` on Windows, `ordrumbox` on macOS
-and Linux) with a software-rendered UI. A CLAP/VST3 plugin of the same UI
-(`ordrumbox-plugin`) is set aside for now, its development postponed: out of
-the workspace (`exclude` in `Cargo.toml`), built by nothing, never released,
-and named in no user documentation. `README.md`
-is the user documentation: the app, its keys, and where it reads and writes
+and Linux) with a software-rendered UI. `README.md` is the user documentation: the app, its keys, and where it reads and writes
 its files. Everything for developers (building, tests, snapshots) is in
 `DEVELOPMENT.md`, never in `README.md`.
 
@@ -37,7 +33,6 @@ ordrumbox-engine  kits, WAV format, passes, engine, UI ↔ audio link → core, 
 ordrumbox-probe   sound measurements (command line, not shipped)    → core, dsp, engine
 ordrumbox-ui      session, views, input, MCP link, update check     → core, logic, engine, fontdue
 ordrumbox-app     window, input translation, audio output, MIDI     → core, engine, ui, winit, softbuffer, cpal, midir, rfd
-ordrumbox-plugin  CLAP/VST3 instrument (set aside, out of the workspace) → core, engine, ui, nih-plug, baseview, softbuffer
 xtask             `cargo xtask audit` (rules of this file)          no deps
 assets/           data/*.json and kits/**.wav, read at runtime
 ```
@@ -47,12 +42,8 @@ assets/           data/*.json and kits/**.wav, read at runtime
   read comes in as bytes, text or a `read` function. In the program, only
   `ordrumbox-app` opens a window, a sound device, a MIDI port or a file dialog,
   through `winit`, `softbuffer`, `cpal`, `midir` and `rfd` (`dialog.rs`; the
-  window's own picker stays for the plugin and the tests); in the plugin,
-  `ordrumbox-plugin` does (below). `ordrumbox-ui` reaches the OS for the
-  rest: files (`store.rs`), the MCP socket, the system font, `curl`.
-  `ordrumbox-plugin` talks to a plugin host instead, through `nih-plug`
-  (pinned git revision) and `baseview`, which gives it its window; the `vst3` feature links GPLv3
-  bindings, which make a build with it GPLv3 as a whole, so it stays off by default.
+  window's own picker stays for the tests). `ordrumbox-ui` reaches the OS for
+  the rest: files (`store.rs`), the MCP socket, the system font, `curl`.
 - `ordrumbox-ui` is the whole UI without a window or a sound device:
   `Session`, the views drawn into a pixel buffer, and `Ui`, which takes the
   neutral input of `ui_input.rs` (keys, modifiers, pointer, wheel). Its only
@@ -82,11 +73,7 @@ assets/           data/*.json and kits/**.wav, read at runtime
 - Workspace lints (`Cargo.toml`): `unsafe_code = "forbid"`,
   `missing_debug_implementations = "warn"`, clippy `all` (`float_cmp`
   allowed) and the four lints of "Errors"; CI turns every warning into an
-  error (`-D warnings`), so `warn` there means "never merged". `ordrumbox-plugin`
-  repeats them with `unsafe_code = "deny"`: only the window handle adapters
-  (`editor.rs`) take an `#[expect(unsafe_code)]`, each with a `SAFETY`
-  comment (the export macros' `unsafe` comes from nih-plug, which the lint
-  does not see).
+  error (`-D warnings`), so `warn` there means "never merged".
 
 ## Kits and samples
 
@@ -121,25 +108,15 @@ assets/           data/*.json and kits/**.wav, read at runtime
     them ahead of time;
   - `AudioSide`, in the cpal callback, takes them with `try_lock`, renders,
     and publishes its position.
-- Under a plugin host, `AudioSide::render_synced` follows the host's
-  transport (`HostTransport`): it stops with the host, and seeks inside the pass it
-  plays. `Controller::update`, called even while stopped, starts playback,
-  moves it to the host's pass and rebuilds passes at the host's tempo.
-  While the host is stopped, it posts a cue (the pass the host would start
-  in), which the engine starts on the host's first rolling block by itself.
-  In the plugin, a thread of its own (`player.rs`, `Ticker`) calls it, through `Session::update`, every
-  10 ms, editor open or not; `process()` only calls `render_synced` and
-  never takes the player's lock. Engines are made and dropped in
-  `initialize()`, on the host's main thread.
+- Following a MIDI clock, `AudioSide::render_synced` follows its transport
+  (`HostTransport`, `midi_sync.rs`): it stops with it, and seeks inside the
+  pass it plays. `Controller::update`, called even while stopped, starts
+  playback, moves it to the clock's pass and rebuilds passes at its tempo.
+  While the clock is stopped, it posts a cue (the pass it would start in),
+  which the engine starts on the first rolling block by itself.
 - **Nothing reached from the audio callback allocates, frees, takes a
   blocking lock, or does I/O.** This covers `Engine::render` and every
   render path of `ordrumbox-dsp`. Buffers are sized before the stream starts.
-  One exception, in the plugin only: when the host renders ahead of real
-  time (a bounce, `ProcessMode::Offline`, or a measured lead of 250 ms:
-  `lockstep.rs`, `Pace`), `process()` asks the `Ticker` for a tick and waits
-  for it (`Steps`, with a timeout) before it renders, so the passes of the
-  block are there however fast the host goes. It still never allocates. In
-  real time it never waits.
 - The render path is written for speed first, then for elegance; a modern
   idiom that costs a cycle per sample stays out. Concretely:
   - Work per block, not per sample. Coefficients that depend on parameters
@@ -251,7 +228,7 @@ assets/           data/*.json and kits/**.wav, read at runtime
   `windows`, `split_at_mut`); an index is for when the position itself
   matters.
 - Generics and `impl Trait` over `dyn Trait`; `dyn` only where the set of
-  types is open (plugin host, UI widgets), never on a render path.
+  types is open (UI widgets, the sound output), never on a render path.
 - `#[expect(lint, reason = "…")]`, never a bare `#[allow]`; the one exception
   is the `#![allow(…)]` at the top of each file in `tests/` ("Errors").
 - `#[must_use]` on functions that only compute a value; `const fn` and
@@ -276,7 +253,7 @@ saying why (`// audit: allow(<rule>): <why>` for the audit).
   domain crates (`core`, `dsp`, `logic`, `engine`), where it is tested without the app.
   The UI calls it; it does not re-implement it.
 - **Do** use a trait or a generic only at a seam that already exists (an
-  open set of types, "Modern Rust": the plugin host, the UI widgets); otherwise a plain function and a struct.
+  open set of types, "Modern Rust": the UI widgets, the sound output); otherwise a plain function and a struct.
 - **Do not** reach into another module's fields. Give the type a method or a
   getter instead; keep fields private (`pub(crate)` at most, never `pub` by
   habit).

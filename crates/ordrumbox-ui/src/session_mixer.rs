@@ -66,11 +66,8 @@ impl Session {
         let mixer = self.mixer_layout(size);
         let scale = size.2;
         self.track_strip_items(&mixer, scale, &mut layout.items);
-        // A plugin's host mixes: its returns and master stay at their defaults.
-        if !self.host.hosted {
-            self.return_items(&mixer, scale, &mut layout.items);
-            self.master_items(&mixer, scale, &mut layout.items);
-        }
+        self.return_items(&mixer, scale, &mut layout.items);
+        self.master_items(&mixer, scale, &mut layout.items);
     }
 
     fn track_strip_items(&self, mixer: &MixerLayout, scale: Scale, items: &mut Vec<Item>) {
@@ -274,7 +271,7 @@ impl Session {
             return;
         }
         let layout = self.mixer_layout((canvas.width(), canvas.height(), scale));
-        let master = (!self.host.hosted).then(|| self.master_meter());
+        let master = self.master_meter();
         let view = MixerView { levels: levels.to_vec(), edited: self.editor_track(), master };
         mixer::draw(canvas, &view, &layout);
     }

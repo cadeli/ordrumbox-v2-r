@@ -1,6 +1,6 @@
 //! The MIDI clock an engine sends: Start, Continue or Stop with the
-//! transport, and 24 pulses a beat while a pass plays. Off unless asked for
-//! (a plugin host has its own clock). Every message is timed in engine clock
+//! transport, and 24 pulses a beat while a pass plays. Off unless asked for.
+//! Every message is timed in engine clock
 //! frames; [`ClockSender::take`] gives them to the audio callback block by block.
 
 use ordrumbox_core::steps::TICK;

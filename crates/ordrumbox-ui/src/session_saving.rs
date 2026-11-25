@@ -126,12 +126,9 @@ impl Saving {
         self.library.clear();
     }
 
-    /// Where the library's edits stand at editor revision `revision`, a
-    /// plugin's when `hosted`.
-    pub(super) fn library_state(&self, revision: u64, hosted: bool) -> LibraryState {
-        if hosted {
-            LibraryState::Host
-        } else if self.library_path.is_none() {
+    /// Where the library's edits stand at editor revision `revision`.
+    pub(super) fn library_state(&self, revision: u64) -> LibraryState {
+        if self.library_path.is_none() {
             LibraryState::NotSaved
         } else if self.failed {
             LibraryState::Failed

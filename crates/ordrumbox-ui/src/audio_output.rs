@@ -1,5 +1,5 @@
 //! The sound output the program gives the session: the default device in the
-//! app, the plugin host later. The session renders nothing itself: it drives
+//! app, or none in a test that renders itself. The session renders nothing itself: it drives
 //! the [`Controller`] the output was started with and shows its errors.
 
 use std::sync::Arc;
@@ -41,15 +41,15 @@ pub fn chosen_device() -> Result<Option<String>, String> {
     Ok(value.and_then(|v| v.as_str().map(str::to_owned)).filter(|name| !name.is_empty()))
 }
 
-/// The output of a plugin: its host plays what the engine renders.
+/// An output with no device: whoever takes the [`AudioSide`] renders.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct HostOutput {
+pub struct HandedOutput {
     pub sample_rate: u32,
 }
 
-impl AudioOutput for HostOutput {
+impl AudioOutput for HandedOutput {
     fn device(&self) -> &str {
-        "host"
+        "none"
     }
 
     fn sample_rate(&self) -> u32 {
@@ -61,16 +61,15 @@ impl AudioOutput for HostOutput {
     }
 }
 
-/// A [`StartOutput`] for a plugin at the host's `sample_rate`: each start
-/// builds the engine's controller for the session and sends its
-/// [`AudioSide`] on the channel returned, for the plugin to take before
-/// processing (never on the audio thread: an old side is dropped there).
-pub fn host_output(sample_rate: f32) -> (StartOutput, Receiver<AudioSide>) {
+/// A [`StartOutput`] at `sample_rate` with no device (a test, a tool):
+/// each start builds the engine's controller for the session and sends its
+/// [`AudioSide`] on the channel returned, for the one that renders to take.
+pub fn handed_output(sample_rate: f32) -> (StartOutput, Receiver<AudioSide>) {
     let (sender, receiver) = mpsc::channel();
     let start: StartOutput = Box::new(move |bank, scales, synths| {
         let (controller, audio) = Controller::new(sample_rate, bank, scales, synths);
-        sender.send(audio).map_err(|_| "the plugin no longer takes its audio side".to_owned())?;
-        Ok((Box::new(HostOutput { sample_rate: sample_rate as u32 }) as Box<dyn AudioOutput>, controller))
+        sender.send(audio).map_err(|_| "no one takes the audio side any more".to_owned())?;
+        Ok((Box::new(HandedOutput { sample_rate: sample_rate as u32 }) as Box<dyn AudioOutput>, controller))
     });
     (start, receiver)
 }
@@ -80,11 +79,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn host_output_hands_over_the_audio_side() {
-        let (mut start, sides) = host_output(48_000.0);
+    fn handed_output_hands_over_the_audio_side() {
+        let (mut start, sides) = handed_output(48_000.0);
         let (output, _controller) =
             start(Arc::new(SampleBank::default()), Scales::default(), SynthPresets::default()).unwrap();
-        assert_eq!((output.device(), output.sample_rate(), output.take_error()), ("host", 48_000, None));
+        assert_eq!((output.device(), output.sample_rate(), output.take_error()), ("none", 48_000, None));
         assert!(sides.try_recv().is_ok());
         drop(sides);
         assert!(start(Arc::new(SampleBank::default()), Scales::default(), SynthPresets::default()).is_err());

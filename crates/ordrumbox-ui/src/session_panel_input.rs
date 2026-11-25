@@ -18,7 +18,7 @@ use crate::panel::{Dropdown, Entry, Id};
 use crate::ui_input::Button;
 use crate::view;
 use crate::view::Layout;
-use crate::{control_help, editors, menu};
+use crate::{control_help, editors};
 use std::time::Instant;
 
 impl Session {
@@ -275,7 +275,7 @@ impl Session {
                 )
                 .hit(pattern, x, y)
                 {
-                    hit @ Some(view::Hit::Cell { .. } | view::Hit::Name(_) | view::Hit::Host(_)) => hit,
+                    hit @ Some(view::Hit::Cell { .. } | view::Hit::Name(_)) => hit,
                     _ => None,
                 }
             }
@@ -303,11 +303,9 @@ impl Session {
         changed
     }
 
-    /// What a control is, said in its tooltip; a plugin's gives its own
-    /// shortcuts (Alt for Ctrl).
+    /// What a control is, said in its tooltip.
     pub(super) fn control_tip(&self, id: Id) -> Option<[Cow<'static, str>; 2]> {
-        let lines = control_help::help(id)?;
-        Some(lines.map(|line| if self.host.hosted { menu::hosted_shortcuts(line) } else { line.into() }))
+        control_help::help(id).map(|lines| lines.map(Into::into))
     }
 
     /// The tooltip of the note under the mouse (the first of its step), as
@@ -353,12 +351,6 @@ impl Session {
                 let Some(track) = pattern.tracks.get(t) else { return };
                 let lines = editors::track_tooltip(track, &self.track_sound_label(t));
                 view::draw_tooltip_lines(canvas, &lines, layout.name_rect(t), scale);
-            }
-            view::Hit::Host(t) => {
-                let lines = self.host_track_lines(t);
-                if !lines.is_empty() {
-                    view::draw_tooltip_lines(canvas, &lines, layout.host_mark_rect(t), scale);
-                }
             }
             view::Hit::Mute(_) | view::Hit::Solo(_) | view::Hit::AddTrack => {}
         }

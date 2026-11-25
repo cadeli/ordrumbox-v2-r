@@ -44,7 +44,7 @@ impl Session {
     }
 
     /// What `mode` plays as one WAV per track in the folder `dir`, before the
-    /// master bus, as the plugin's track outputs; the tracks that stay silent
+    /// master bus; the tracks that stay silent
     /// are left out. What was written.
     pub(super) fn write_stems(&self, mode: Mode, dir: &Path) -> Result<String, String> {
         let setup = self.render.as_ref().ok_or(NOTHING_TO_RENDER)?;
