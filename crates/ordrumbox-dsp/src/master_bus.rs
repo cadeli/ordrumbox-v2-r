@@ -87,69 +87,101 @@ impl MasterBus {
     /// Process the stereo bus in place.
     pub fn process(&mut self, settings: &MasterSettings, left: &mut [f32], right: &mut [f32]) {
         let s = settings.clamped();
-        let sr = self.sample_rate;
-        let threshold = f64::from(s.threshold);
-        let ratio = f64::from(s.ratio).max(1.0);
-        let knee = f64::from(s.knee).max(0.0);
+        let master = f64::from(s.master);
+        let frames = left.iter_mut().zip(right.iter_mut());
+        // Bypassed or not, decided once for the block: one loop per case.
+        if s.bypass < 0.5 {
+            let chain = Chain::new(&s, self.sample_rate);
+            for (l, r) in frames {
+                let (x_l, x_r) = self.chain(&chain, f64::from(*l), f64::from(*r));
+                self.output(x_l, x_r, master, l, r);
+            }
+        } else {
+            for (l, r) in frames {
+                self.output(f64::from(*l), f64::from(*r), master, l, r);
+            }
+        }
+    }
+
+    /// Pre-gain, compressor, low cut and high cut on one frame.
+    #[inline]
+    fn chain(&mut self, c: &Chain, mut x_l: f64, mut x_r: f64) -> (f64, f64) {
+        x_l *= c.pre_gain;
+        x_r *= c.pre_gain;
+
+        let peak = if x_l.abs() > x_r.abs() { x_l.abs() } else { x_r.abs() };
+        let peak_db = if peak > 1e-10 { 20.0 * (peak.ln() / LN_10) } else { -100.0 };
+        let target = -gain_reduction(peak_db, c.threshold, c.ratio, c.knee);
+        let coeff = if target < self.env_db { c.att_coeff } else { c.rel_coeff };
+        self.env_db = coeff * self.env_db + (1.0 - coeff) * target;
+        let comp = (self.env_db * LOG10_OVER_20).exp();
+        x_l *= comp * c.makeup;
+        x_r *= comp * c.makeup;
+
+        self.hp_y_l = c.hp_a * (self.hp_y_l + x_l - self.hp_x_prev_l);
+        self.hp_x_prev_l = x_l;
+        x_l = self.hp_y_l;
+        self.hp_y_r = c.hp_a * (self.hp_y_r + x_r - self.hp_x_prev_r);
+        self.hp_x_prev_r = x_r;
+        x_r = self.hp_y_r;
+
+        self.lp_y_l = c.lp_a * x_l + (1.0 - c.lp_a) * self.lp_y_l;
+        self.lp_y_r = c.lp_a * x_r + (1.0 - c.lp_a) * self.lp_y_r;
+        (self.lp_y_l, self.lp_y_r)
+    }
+
+    /// The end of every frame, bypassed or not: denormals flushed, the
+    /// master gain, the soft limit.
+    #[inline]
+    fn output(&mut self, mut x_l: f64, mut x_r: f64, master: f64, l: &mut f32, r: &mut f32) {
+        if x_l.abs() < FLUSH {
+            x_l = 0.0;
+            self.hp_y_l = 0.0;
+            self.lp_y_l = 0.0;
+        }
+        if x_r.abs() < FLUSH {
+            x_r = 0.0;
+            self.hp_y_r = 0.0;
+            self.lp_y_r = 0.0;
+        }
+        *l = soft_limit(x_l * master) as f32;
+        *r = soft_limit(x_r * master) as f32;
+    }
+}
+
+/// What the bus works out once per block for its chain (all but the master
+/// gain and the limit), so that the sample loop only reads it.
+#[derive(Debug, Clone, Copy)]
+struct Chain {
+    threshold: f64,
+    ratio: f64,
+    knee: f64,
+    makeup: f64,
+    pre_gain: f64,
+    hp_a: f64,
+    lp_a: f64,
+    att_coeff: f64,
+    rel_coeff: f64,
+}
+
+impl Chain {
+    fn new(s: &MasterSettings, sr: f64) -> Self {
         let attack = f64::from(s.attack).max(0.0001);
         let release = f64::from(s.release).max(0.001);
-        let bypass = f64::from(s.bypass);
-        let makeup = (f64::from(s.makeup) * LOG10_OVER_20).exp();
-        let pre_gain = (f64::from(s.pre_gain) * LOG10_OVER_20).exp();
-        let master = f64::from(s.master);
-
         let lowcut = f64::from(s.lowcut).min(sr * 0.45).max(0.1);
         let hp_rc = 1.0 / (2.0 * PI * lowcut);
-        let hp_a = hp_rc / (hp_rc + 1.0 / sr);
         let hicut = f64::from(s.hicut).min(sr * 0.45).max(0.1);
         let lp_rc = 1.0 / (2.0 * PI * hicut);
-        let lp_a = (1.0 / sr) / (lp_rc + 1.0 / sr);
-
-        let att_coeff = (-1.0 / (attack * sr)).exp();
-        let rel_coeff = (-1.0 / (release * sr)).exp();
-
-        for (l, r) in left.iter_mut().zip(right.iter_mut()) {
-            let mut x_l = f64::from(*l);
-            let mut x_r = f64::from(*r);
-
-            if bypass < 0.5 {
-                x_l *= pre_gain;
-                x_r *= pre_gain;
-
-                let peak = if x_l.abs() > x_r.abs() { x_l.abs() } else { x_r.abs() };
-                let peak_db = if peak > 1e-10 { 20.0 * (peak.ln() / LN_10) } else { -100.0 };
-                let target = -gain_reduction(peak_db, threshold, ratio, knee);
-                let coeff = if target < self.env_db { att_coeff } else { rel_coeff };
-                self.env_db = coeff * self.env_db + (1.0 - coeff) * target;
-                let comp = (self.env_db * LOG10_OVER_20).exp();
-                x_l *= comp * makeup;
-                x_r *= comp * makeup;
-
-                self.hp_y_l = hp_a * (self.hp_y_l + x_l - self.hp_x_prev_l);
-                self.hp_x_prev_l = x_l;
-                x_l = self.hp_y_l;
-                self.hp_y_r = hp_a * (self.hp_y_r + x_r - self.hp_x_prev_r);
-                self.hp_x_prev_r = x_r;
-                x_r = self.hp_y_r;
-
-                self.lp_y_l = lp_a * x_l + (1.0 - lp_a) * self.lp_y_l;
-                x_l = self.lp_y_l;
-                self.lp_y_r = lp_a * x_r + (1.0 - lp_a) * self.lp_y_r;
-                x_r = self.lp_y_r;
-            }
-
-            if x_l.abs() < FLUSH {
-                x_l = 0.0;
-                self.hp_y_l = 0.0;
-                self.lp_y_l = 0.0;
-            }
-            if x_r.abs() < FLUSH {
-                x_r = 0.0;
-                self.hp_y_r = 0.0;
-                self.lp_y_r = 0.0;
-            }
-            *l = soft_limit(x_l * master) as f32;
-            *r = soft_limit(x_r * master) as f32;
+        Self {
+            threshold: f64::from(s.threshold),
+            ratio: f64::from(s.ratio).max(1.0),
+            knee: f64::from(s.knee).max(0.0),
+            makeup: (f64::from(s.makeup) * LOG10_OVER_20).exp(),
+            pre_gain: (f64::from(s.pre_gain) * LOG10_OVER_20).exp(),
+            hp_a: hp_rc / (hp_rc + 1.0 / sr),
+            lp_a: (1.0 / sr) / (lp_rc + 1.0 / sr),
+            att_coeff: (-1.0 / (attack * sr)).exp(),
+            rel_coeff: (-1.0 / (release * sr)).exp(),
         }
     }
 }

@@ -1,12 +1,15 @@
 //! What a strip works out once per block from its settings (coefficients,
-//! which stages are on), so that the sample loop only reads it.
+//! which stages are on), so that the sample loop only reads it. The
+//! compressor and the ducker carry their own step for one frame.
 
 use std::f64::consts::PI;
 
+use super::curves::Saturation;
 use super::{
     CLIP_CEILING, CLIP_DRIVE_DB, CRUSH_BITS_MAX, CRUSH_BITS_MIN, CRUSH_OCTAVES, CRUSH_RATE_HZ, GATE_CLOSE_SECONDS,
-    GATE_OPEN_SECONDS, Saturation, StripSettings,
+    GATE_OPEN_SECONDS, StripSettings,
 };
+use crate::denormal::flush;
 use crate::slope::{self, FilterMode};
 use crate::svf::SvfCoeffs;
 
@@ -177,5 +180,118 @@ impl PanBlock {
         let right = ((pan + 1.0) * PI / 4.0).sin();
         let max = if left > right { left } else { right };
         Self { left, right, compensation: if max > 0.001 { 1.0 / max } else { 1.0 } }
+    }
+}
+
+/// Width of the compressor's soft knee, dB around the threshold.
+const COMP_KNEE_DB: f64 = 6.0;
+/// Share of the gain reduction at 0 dBFS the compressor makes up.
+pub(super) const COMP_MAKEUP_SHARE: f64 = 0.5;
+/// Level the compressor's detector reads as silence, dB.
+const COMP_FLOOR_DB: f64 = -120.0;
+/// Seconds the sidechain's ducking takes to close on a key.
+const DUCK_ATTACK_SECONDS: f64 = 0.002;
+/// Level of the key, linear, at which the ducking is at its full amount.
+const DUCK_FULL_LEVEL: f64 = 0.5;
+/// dB per neper: `20 / ln 10`.
+const DB_PER_NEPER: f64 = 8.685_889_638_065_037;
+
+/// The compressor's settings for one block: a feed-forward, stereo-linked
+/// peak compressor with a soft knee, an automatic make-up gain and a dry/wet
+/// mix.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct Compressor {
+    threshold_db: f64,
+    /// `1 - 1 / ratio`: the share of the excess over the threshold taken off.
+    slope: f64,
+    attack: f64,
+    release: f64,
+    makeup: f64,
+    mix: f64,
+}
+
+impl Compressor {
+    /// The compressor of `s` at `sr`, `None` when it is off.
+    pub(super) fn new(s: &StripSettings, sr: f64) -> Option<Self> {
+        let mix = f64::from(s.comp_mix);
+        if mix <= 0.0 {
+            return None;
+        }
+        let threshold_db = f64::from(s.comp_threshold_db);
+        let slope = 1.0 - 1.0 / f64::from(s.comp_ratio);
+        // One-pole coefficients: the share of the way to the target per sample.
+        let coefficient = |seconds: f32| 1.0 - (-1.0 / (f64::from(seconds) * sr)).exp();
+        let makeup_db = -threshold_db * slope * COMP_MAKEUP_SHARE;
+        Some(Self {
+            threshold_db,
+            slope,
+            attack: coefficient(s.comp_attack_seconds),
+            release: coefficient(s.comp_release_seconds),
+            makeup: (makeup_db / DB_PER_NEPER).exp(),
+            mix,
+        })
+    }
+
+    /// The gain reduction, dB, the gain computer asks for at `level_db`.
+    #[inline]
+    pub(super) fn target_db(&self, level_db: f64) -> f64 {
+        let over = level_db - self.threshold_db;
+        if over <= -COMP_KNEE_DB / 2.0 {
+            0.0
+        } else if over >= COMP_KNEE_DB / 2.0 {
+            -self.slope * over
+        } else {
+            let x = over + COMP_KNEE_DB / 2.0;
+            -self.slope * x * x / (2.0 * COMP_KNEE_DB)
+        }
+    }
+
+    /// Compress one frame, moving the gain reduction `reduction_db` toward
+    /// what the level `peak` asks for: the frame's own, or a sidechain key's.
+    #[inline]
+    pub(super) fn process(&self, reduction_db: &mut f64, peak: f64, l: f64, r: f64) -> (f64, f64) {
+        let level_db = if peak > 0.0 { (peak.ln() * DB_PER_NEPER).max(COMP_FLOOR_DB) } else { COMP_FLOOR_DB };
+        let target = self.target_db(level_db);
+        // Deeper reduction is the attack, less is the release.
+        let speed = if target < *reduction_db { self.attack } else { self.release };
+        *reduction_db += speed * (target - *reduction_db);
+        flush(reduction_db);
+        let gain = (*reduction_db / DB_PER_NEPER).exp() * self.makeup;
+        let wet = self.mix * gain + (1.0 - self.mix);
+        (l * wet, r * wet)
+    }
+}
+
+/// The sidechain ducking's settings for one block: an envelope follower on
+/// the key, and the gain it takes off.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct Ducker {
+    amount: f64,
+    attack: f64,
+    release: f64,
+}
+
+impl Ducker {
+    /// The ducker of `s` at `sr`, `None` when it is off.
+    pub(super) fn new(s: &StripSettings, sr: f64) -> Option<Self> {
+        let amount = f64::from(s.duck_amount);
+        if amount <= 0.0 {
+            return None;
+        }
+        let coefficient = |seconds: f64| 1.0 - (-1.0 / (seconds * sr)).exp();
+        Some(Self {
+            amount,
+            attack: coefficient(DUCK_ATTACK_SECONDS),
+            release: coefficient(f64::from(s.duck_release_seconds)),
+        })
+    }
+
+    /// The gain for one frame, `envelope` following the key's level `peak`.
+    #[inline]
+    pub(super) fn gain(&self, envelope: &mut f64, peak: f64) -> f64 {
+        let speed = if peak > *envelope { self.attack } else { self.release };
+        *envelope += speed * (peak - *envelope);
+        flush(envelope);
+        1.0 - self.amount * (*envelope / DUCK_FULL_LEVEL).min(1.0)
     }
 }

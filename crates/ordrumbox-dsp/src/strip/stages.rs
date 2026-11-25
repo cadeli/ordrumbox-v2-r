@@ -3,7 +3,8 @@
 use std::f64::consts::TAU;
 
 use super::blocks::{ClipBlock, CrushBlock, DelayBlock, FilterBlock, PanBlock, ReverbBlock, SaturationBlock};
-use super::{CLIP_CEILING, GATE_KEY, Saturation, Strip, WOW_HZ, clip_adaa, flush, shape};
+use super::curves::{Saturation, clip_adaa, shape};
+use super::{CLIP_CEILING, GATE_KEY, Strip, WOW_HZ, flush};
 use crate::svf::output;
 
 impl Strip {

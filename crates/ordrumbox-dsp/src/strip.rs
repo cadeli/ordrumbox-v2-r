@@ -14,10 +14,15 @@
 use crate::denormal::flush;
 use crate::svf::Svf;
 
-use blocks::{ClipBlock, CrushBlock, DelayBlock, FilterBlock, PanBlock, ReverbBlock, SaturationBlock};
+use blocks::{
+    ClipBlock, Compressor, CrushBlock, DelayBlock, Ducker, FilterBlock, PanBlock, ReverbBlock, SaturationBlock,
+};
+use lines::{Allpass, Comb, DelayLine, Dispersion};
 use stages::{mix_out, saturate};
 
 mod blocks;
+mod curves;
+mod lines;
 mod stages;
 
 const COMB_TUNINGS_L: [usize; 8] = [1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617];
@@ -37,8 +42,6 @@ const GATE_OPEN_SECONDS: f64 = 0.001;
 const GATE_CLOSE_SECONDS: f64 = 0.01;
 /// Rate of the tape delay's wow, Hz.
 const WOW_HZ: f64 = 0.6;
-/// Bias of the tape saturation: the curve is asymmetric (even harmonics).
-const TAPE_BIAS: f64 = 0.25;
 /// Bit depth of the bitcrusher at the smallest amount, and at full amount.
 const CRUSH_BITS_MAX: f64 = 16.0;
 const CRUSH_BITS_MIN: f64 = 4.0;
@@ -51,25 +54,10 @@ const CLIP_DRIVE_DB: f64 = 18.0;
 /// The hard clipper's ceiling: −3 dBFS, the peak of a kit sample, so the
 /// clipper adds density, not peak level.
 const CLIP_CEILING: f64 = 0.707_945_784_384_137_9;
-/// Below this step between two samples, the clipper's anti-aliasing takes
-/// the clip of their midpoint (the divided difference would lose precision).
-const CLIP_ADAA_EPSILON: f64 = 1e-6;
 /// Longest delay, seconds (the `dlyTime*` parameters stop at 2).
 const DELAY_SECONDS: f64 = 2.1;
 /// The delay line is sized for 2.1 s at 48 kHz at least, whatever the rate.
 const DELAY_MIN_RATE: f64 = 48_000.0;
-/// Width of the compressor's soft knee, dB around the threshold.
-const COMP_KNEE_DB: f64 = 6.0;
-/// Share of the gain reduction at 0 dBFS the compressor makes up.
-const COMP_MAKEUP_SHARE: f64 = 0.5;
-/// Level the compressor's detector reads as silence, dB.
-const COMP_FLOOR_DB: f64 = -120.0;
-/// Seconds the sidechain's ducking takes to close on a key.
-const DUCK_ATTACK_SECONDS: f64 = 0.002;
-/// Level of the key, linear, at which the ducking is at its full amount.
-const DUCK_FULL_LEVEL: f64 = 0.5;
-/// dB per neper: `20 / ln 10`.
-const DB_PER_NEPER: f64 = 8.685_889_638_065_037;
 
 audio_params! {
     /// The strip processor's parameters (its `parameterDescriptors`).
@@ -149,278 +137,6 @@ audio_params! {
         /// feeds the returns with them ([`crate::returns`]).
         echo_send = 0.0, 0.0, 1.0;
         reverb_send = 0.0, 0.0, 1.0;
-    }
-}
-
-#[derive(Debug, Clone)]
-struct Comb {
-    buf: Vec<f32>,
-    index: usize,
-    store: f64,
-}
-
-impl Comb {
-    fn new(len: usize) -> Self {
-        Self { buf: vec![0.0; len], index: 0, store: 0.0 }
-    }
-
-    #[inline]
-    fn process(&mut self, input: f64, d1: f64, d2: f64, feedback: f64) -> f64 {
-        let out = f64::from(self.buf[self.index]);
-        self.store = out * d2 + self.store * d1;
-        flush(&mut self.store);
-        let mut write = input + self.store * feedback;
-        flush(&mut write);
-        self.buf[self.index] = write as f32;
-        self.index += 1;
-        if self.index >= self.buf.len() {
-            self.index = 0;
-        }
-        out
-    }
-}
-
-#[derive(Debug, Clone)]
-struct Allpass {
-    buf: Vec<f32>,
-    index: usize,
-}
-
-impl Allpass {
-    fn new(len: usize) -> Self {
-        Self { buf: vec![0.0; len], index: 0 }
-    }
-
-    #[inline]
-    fn process(&mut self, input: f64) -> f64 {
-        let bout = f64::from(self.buf[self.index]);
-        let out = -input + bout;
-        let mut write = input + bout * 0.5;
-        flush(&mut write);
-        self.buf[self.index] = write as f32;
-        self.index += 1;
-        if self.index >= self.buf.len() {
-            self.index = 0;
-        }
-        out
-    }
-}
-
-#[derive(Debug, Clone)]
-struct DelayLine {
-    buf: Vec<f32>,
-    index: usize,
-}
-
-impl DelayLine {
-    fn new(len: usize) -> Self {
-        Self { buf: vec![0.0; len], index: 0 }
-    }
-
-    /// The sample `delay` frames ago, linearly interpolated.
-    #[inline]
-    fn read(&self, delay: f64) -> f64 {
-        let len = self.buf.len() as f64;
-        let position = crate::wrap(self.index as f64 - delay, len);
-        let i = position as usize;
-        let fraction = position - i as f64;
-        let next = if i + 1 >= self.buf.len() { 0 } else { i + 1 };
-        f64::from(self.buf[i]) * (1.0 - fraction) + f64::from(self.buf[next]) * fraction
-    }
-
-    /// Push `value`, flushed to 0 when it is tiny: a line that feeds back
-    /// would otherwise fade into denormals.
-    #[inline]
-    fn write(&mut self, mut value: f64) {
-        flush(&mut value);
-        self.buf[self.index] = value as f32;
-        self.index += 1;
-        if self.index >= self.buf.len() {
-            self.index = 0;
-        }
-    }
-}
-
-/// First-order allpass: `y = -a x + x[n-1] + a y[n-1]`.
-#[derive(Debug, Clone, Copy, Default)]
-struct Dispersion {
-    x1: f64,
-    y1: f64,
-}
-
-impl Dispersion {
-    #[inline]
-    fn process(&mut self, x: f64, a: f64) -> f64 {
-        let mut y = -a * x + self.x1 + a * self.y1;
-        flush(&mut y);
-        self.x1 = x;
-        self.y1 = y;
-        y
-    }
-}
-
-/// The curve of the saturation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Saturation {
-    Tanh,
-    HardClip,
-    /// An asymmetric tanh.
-    Tape,
-}
-
-impl Saturation {
-    /// The curve a `saturation_type` setting stands for: the nearest code,
-    /// the tape above the last.
-    fn from_setting(setting: f64) -> Self {
-        if setting < 0.5 {
-            Self::Tanh
-        } else if setting < 1.5 {
-            Self::HardClip
-        } else {
-            Self::Tape
-        }
-    }
-}
-
-/// `#shape`: drive, waveshape, dry/wet, output gain.
-///
-/// The `match` runs for every sample: the curve of a block never changes, so
-/// the branch is always the same one, and a loop per curve would triple the
-/// strip's loop.
-#[inline]
-fn shape(x: f64, drive: f64, curve: Saturation, mix: f64, out: f64) -> f64 {
-    if mix <= 0.0 {
-        return x;
-    }
-    let d = x * drive;
-    let s = match curve {
-        Saturation::Tanh => d.tanh(),
-        Saturation::HardClip => d.clamp(-1.0, 1.0),
-        Saturation::Tape => {
-            // Biased and re-centred (0 stays 0), unity slope at 0.
-            let bias = TAPE_BIAS.tanh();
-            ((d + TAPE_BIAS).tanh() - bias) / (1.0 - bias * bias)
-        }
-    };
-    (x * (1.0 - mix) + s * mix) * out
-}
-
-/// Antiderivative of the hard clip at ±1.
-#[inline]
-fn clip_antiderivative(x: f64) -> f64 {
-    if x.abs() <= 1.0 { 0.5 * x * x } else { x.abs() - 0.5 }
-}
-
-/// Hard clip at ±1 with first-order antiderivative anti-aliasing (ADAA):
-/// the clip's mean over the segment from `prev` to `x`, which cuts the
-/// aliasing of a plain clip, at the cost of half a sample of delay.
-#[inline]
-fn clip_adaa(x: f64, prev: f64) -> f64 {
-    let dx = x - prev;
-    if dx.abs() < CLIP_ADAA_EPSILON {
-        (0.5 * (x + prev)).clamp(-1.0, 1.0)
-    } else {
-        (clip_antiderivative(x) - clip_antiderivative(prev)) / dx
-    }
-}
-
-/// The compressor's settings for one block: a feed-forward, stereo-linked
-/// peak compressor with a soft knee, an automatic make-up gain and a dry/wet
-/// mix.
-#[derive(Debug, Clone, Copy)]
-struct Compressor {
-    threshold_db: f64,
-    /// `1 - 1 / ratio`: the share of the excess over the threshold taken off.
-    slope: f64,
-    attack: f64,
-    release: f64,
-    makeup: f64,
-    mix: f64,
-}
-
-impl Compressor {
-    /// The compressor of `s` at `sr`, `None` when it is off.
-    fn new(s: &StripSettings, sr: f64) -> Option<Self> {
-        let mix = f64::from(s.comp_mix);
-        if mix <= 0.0 {
-            return None;
-        }
-        let threshold_db = f64::from(s.comp_threshold_db);
-        let slope = 1.0 - 1.0 / f64::from(s.comp_ratio);
-        // One-pole coefficients: the share of the way to the target per sample.
-        let coefficient = |seconds: f32| 1.0 - (-1.0 / (f64::from(seconds) * sr)).exp();
-        let makeup_db = -threshold_db * slope * COMP_MAKEUP_SHARE;
-        Some(Self {
-            threshold_db,
-            slope,
-            attack: coefficient(s.comp_attack_seconds),
-            release: coefficient(s.comp_release_seconds),
-            makeup: (makeup_db / DB_PER_NEPER).exp(),
-            mix,
-        })
-    }
-
-    /// The gain reduction, dB, the gain computer asks for at `level_db`.
-    #[inline]
-    fn target_db(&self, level_db: f64) -> f64 {
-        let over = level_db - self.threshold_db;
-        if over <= -COMP_KNEE_DB / 2.0 {
-            0.0
-        } else if over >= COMP_KNEE_DB / 2.0 {
-            -self.slope * over
-        } else {
-            let x = over + COMP_KNEE_DB / 2.0;
-            -self.slope * x * x / (2.0 * COMP_KNEE_DB)
-        }
-    }
-
-    /// Compress one frame, moving the gain reduction `reduction_db` toward
-    /// what the level `peak` asks for: the frame's own, or a sidechain key's.
-    #[inline]
-    fn process(&self, reduction_db: &mut f64, peak: f64, l: f64, r: f64) -> (f64, f64) {
-        let level_db = if peak > 0.0 { (peak.ln() * DB_PER_NEPER).max(COMP_FLOOR_DB) } else { COMP_FLOOR_DB };
-        let target = self.target_db(level_db);
-        // Deeper reduction is the attack, less is the release.
-        let speed = if target < *reduction_db { self.attack } else { self.release };
-        *reduction_db += speed * (target - *reduction_db);
-        flush(reduction_db);
-        let gain = (*reduction_db / DB_PER_NEPER).exp() * self.makeup;
-        let wet = self.mix * gain + (1.0 - self.mix);
-        (l * wet, r * wet)
-    }
-}
-
-/// The sidechain ducking's settings for one block: an envelope follower on
-/// the key, and the gain it takes off.
-#[derive(Debug, Clone, Copy)]
-struct Ducker {
-    amount: f64,
-    attack: f64,
-    release: f64,
-}
-
-impl Ducker {
-    /// The ducker of `s` at `sr`, `None` when it is off.
-    fn new(s: &StripSettings, sr: f64) -> Option<Self> {
-        let amount = f64::from(s.duck_amount);
-        if amount <= 0.0 {
-            return None;
-        }
-        let coefficient = |seconds: f64| 1.0 - (-1.0 / (seconds * sr)).exp();
-        Some(Self {
-            amount,
-            attack: coefficient(DUCK_ATTACK_SECONDS),
-            release: coefficient(f64::from(s.duck_release_seconds)),
-        })
-    }
-
-    /// The gain for one frame, `envelope` following the key's level `peak`.
-    #[inline]
-    fn gain(&self, envelope: &mut f64, peak: f64) -> f64 {
-        let speed = if peak > *envelope { self.attack } else { self.release };
-        *envelope += speed * (peak - *envelope);
-        flush(envelope);
-        1.0 - self.amount * (*envelope / DUCK_FULL_LEVEL).min(1.0)
     }
 }
 
@@ -584,6 +300,7 @@ impl Strip {
 mod tests {
     use std::f64::consts::TAU;
 
+    use super::blocks::COMP_MAKEUP_SHARE;
     use super::*;
 
     fn run(settings: &StripSettings, input: &[f32]) -> (Vec<f32>, Vec<f32>) {
@@ -665,13 +382,6 @@ mod tests {
     }
 
     #[test]
-    fn tape_saturation_keeps_silence_and_bends_one_side_more() {
-        assert_eq!(shape(0.0, 4.0, Saturation::Tape, 1.0, 1.0), 0.0);
-        let (up, down) = (shape(0.5, 4.0, Saturation::Tape, 1.0, 1.0), shape(-0.5, 4.0, Saturation::Tape, 1.0, 1.0));
-        assert!(up > 0.0 && down < 0.0 && (up + down).abs() > 0.05, "{up} {down}");
-    }
-
-    #[test]
     fn full_crush_holds_samples_on_4_bit_levels() {
         let input: Vec<f32> = (0..480).map(|i| (f64::from(i) / 480.0 - 0.5) as f32).collect();
         let crushed = StripSettings { filter_on: 0.0, crush: 1.0, ..StripSettings::default() };
@@ -726,7 +436,7 @@ mod tests {
 
     #[test]
     fn reverb_times_follow_the_sample_rate() {
-        let at = |rate: f32| Strip::new(rate).combs_l[0].buf.len();
+        let at = |rate: f32| Strip::new(rate).combs_l[0].len();
         assert_eq!(at(44_100.0), COMB_TUNINGS_L[0]);
         assert_eq!(at(88_200.0), 2 * COMB_TUNINGS_L[0]);
     }
