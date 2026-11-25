@@ -11,6 +11,8 @@
 - A new library starts with the **starter library** (a funk song and a few beats), not every demo;
   File > Load the demo library... is now File > Load the starter library...
 - The demo arrangement is named **Funk Song**.
+- The CLAP and VST3 plugins are no longer released: their development is postponed to a later
+  date. The Windows setup installs the app only.
 
 ## 0.1.3
 

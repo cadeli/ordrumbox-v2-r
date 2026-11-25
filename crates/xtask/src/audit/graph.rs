@@ -50,7 +50,7 @@ const ALLOWED: [Allowed; 9] = [
             "serde",
         ],
     },
-    Allowed { name: "xtask", internal: &[], external: &["nih_plug_xtask"] },
+    Allowed { name: "xtask", internal: &[], external: &[] },
 ];
 
 /// The `[dependencies]` of every crate that is in the table, and every crate

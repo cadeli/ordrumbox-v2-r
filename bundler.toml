@@ -1,3 +1,0 @@
-# Names of the bundles `cargo xtask bundle` writes in target/bundled/.
-[ordrumbox-plugin]
-name = "orDrumbox"

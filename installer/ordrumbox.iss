@@ -3,10 +3,9 @@
 ;
 ;   ISCC.exe /DAppVersion=<version> installer\ordrumbox.iss
 ;
-; It installs the app, and the CLAP plugin as an option, each with its own `assets/`: both
-; read the folder next to them. The plugin goes in a folder of its own under the CLAP folder,
-; so that its `assets/` sits beside no other plugin. Uninstalling removes what the setup
-; installed only: the user data folder (%APPDATA%\orDrumbox) stays.
+; It installs the app with its `assets/`, which it reads from the folder next to it.
+; Uninstalling removes what the setup installed only: the user data folder
+; (%APPDATA%\orDrumbox) stays.
 
 #ifndef AppVersion
   #error Pass the version: ISCC.exe /DAppVersion=<version> installer\ordrumbox.iss
@@ -36,15 +35,6 @@ Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 
-[Types]
-Name: "full"; Description: "orDrumbox and its CLAP plugin"
-Name: "app"; Description: "orDrumbox only"
-Name: "custom"; Description: "Custom"; Flags: iscustom
-
-[Components]
-Name: "app"; Description: "orDrumbox"; Types: full app custom; Flags: fixed
-Name: "clap"; Description: "CLAP plugin (in Common Files\CLAP\orDrumbox)"; Types: full
-
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
 
@@ -52,17 +42,13 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
 ; The `assets/` of a previous version goes first: a sample or a file it no longer has must
 ; not stay behind. Nothing writes there (the user's files are in the user data folder).
 Type: filesandordirs; Name: "{app}\assets"
-Type: filesandordirs; Name: "{commoncf64}\CLAP\orDrumbox\assets"; Components: clap
 
 [Files]
-Source: "dist\ordrumbox.exe"; DestDir: "{app}"; Components: app; Flags: ignoreversion
-Source: "dist\LICENSE"; DestDir: "{app}"; Components: app
-Source: "dist\THIRD-PARTY-LICENSES.txt"; DestDir: "{app}"; Components: app
-Source: "installer\ordrumbox.ico"; DestDir: "{app}"; Components: app; Flags: ignoreversion
-Source: "dist\assets\*"; DestDir: "{app}\assets"; Components: app; Flags: recursesubdirs ignoreversion
-Source: "dist\orDrumbox.clap"; DestDir: "{commoncf64}\CLAP\orDrumbox"; Components: clap; Flags: ignoreversion
-Source: "dist\THIRD-PARTY-LICENSES.txt"; DestDir: "{commoncf64}\CLAP\orDrumbox"; Components: clap; Flags: ignoreversion
-Source: "dist\assets\*"; DestDir: "{commoncf64}\CLAP\orDrumbox\assets"; Components: clap; Flags: recursesubdirs ignoreversion
+Source: "dist\ordrumbox.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist\LICENSE"; DestDir: "{app}"
+Source: "dist\THIRD-PARTY-LICENSES.txt"; DestDir: "{app}"
+Source: "installer\ordrumbox.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist\assets\*"; DestDir: "{app}\assets"; Flags: recursesubdirs ignoreversion
 
 [Icons]
 Name: "{group}\orDrumbox"; Filename: "{app}\ordrumbox.exe"; IconFilename: "{app}\ordrumbox.ico"

@@ -15,8 +15,8 @@ Building, testing and changing orDrumbox. The user documentation is
 | `ordrumbox-probe` | sound measurements, command-line only | core, dsp, engine |
 | `ordrumbox-ui` | session, views, input, MCP link, update check | core, logic, engine, fontdue |
 | `ordrumbox-app` | window, input translation, audio output, MIDI ports, file dialogs (`ordrumbox(.exe)`) | core, engine, ui, winit, softbuffer, cpal, midir, rfd |
-| `ordrumbox-plugin` | CLAP and VST3 instrument | core, engine, ui, nih-plug, baseview, softbuffer |
-| `xtask` | plugin bundling; `audit`, the checks of `AGENTS.md` | nih-plug's bundler |
+| `ordrumbox-plugin` | CLAP and VST3 instrument, set aside: out of the workspace (`exclude`), built by nothing | core, engine, ui, nih-plug, baseview, softbuffer |
+| `xtask` | `audit`, the checks of `AGENTS.md` | none |
 
 The domain crates take no third-party dependency.
 
@@ -48,18 +48,15 @@ in this repository's `assets/`. `$ORDRUMBOX_LIBRARY` names a library file to use
 instead of the one in the user data folder.
 
 A release is a `v<version>` tag matching `Cargo.toml`: CI then builds the release
-program of each system with `assets/` next to it, and the plugin bundles. Its files are
-named after the tag (`ordrumbox-v0.1.3-windows-x64.zip`, `<tag>` below). The release
-holds the Windows zip (`ordrumbox.exe`, `orDrumbox.clap`, `assets/`, `LICENSE`),
-the Windows setup made from the same files, the Linux zip (the same files, the
-binary linked at run time against the system's ALSA and X11 libraries, plus the
-`.desktop` file and icon), the macOS `orDrumbox.app` (`installer/Info.plist` and
-`ordrumbox.icns`; the binary and `assets/` in `Contents/MacOS`), and the macOS and
-Linux CLAPs, zipped, and the VST3 bundles of the three systems, one zip each
-(`ordrumbox-<tag>-<os>-vst3.zip`, `assets/` inside, with `LICENSE`, `LICENSE-GPL-3.0` and `installer/vst3-NOTICE.txt`). The icon of the window comes from `installer/ordrumbox-setup.png`,
-decoded by `crates/ordrumbox-app/build.rs`; the `.exe` carries `ordrumbox.ico`. Both CLAPs are built without `vst3`, so they stay
-MIT; the VST3 bundles are built with `vst3`, so they are GPLv3, and shipped
-as separate zips: never ship the `.clap` that build leaves beside them.
+program of each system with `assets/` next to it. Its files are named after the tag
+(`ordrumbox-v0.1.3-windows-x64.zip`, `<tag>` below). The release holds the Windows zip
+(`ordrumbox.exe`, `assets/`, `LICENSE`, `THIRD-PARTY-LICENSES.txt`), the Windows setup
+made from the same files, the Linux zip (the same files, the binary linked at run time
+against the system's ALSA and X11 libraries, plus the `.desktop` file and icon), and the
+macOS `orDrumbox.app` (`installer/Info.plist` and `ordrumbox.icns`; the binary and
+`assets/` in `Contents/MacOS`). The icon of the window comes from
+`installer/ordrumbox-setup.png`, decoded by `crates/ordrumbox-app/build.rs`; the `.exe`
+carries `ordrumbox.ico`.
 
 The setup is `installer/ordrumbox.iss`, built by Inno Setup 6 (Windows only), with
 the version of `Cargo.toml`:
@@ -80,26 +77,16 @@ cargo run --release -p ordrumbox-engine --example render -- assets house 2 house
 cargo run --release -p ordrumbox-engine --example render -- assets song:demo demo.wav
 ```
 
-## Plugin
-
-```sh
-cargo xtask bundle ordrumbox-plugin --release                 # target/bundled/orDrumbox.clap
-cargo xtask bundle ordrumbox-plugin --release --features vst3 # and orDrumbox.vst3
-```
-
-Building with `vst3` links GPLv3 bindings; the CLAP build stays MIT (`README.md`,
-"License").
-
 ## Licenses
 
-`THIRD-PARTY-LICENSES.txt` lists the licenses of every dependency, for every target and
-feature of the releases (`about.toml`, `about.hbs`). It is generated, committed, and shipped
+`THIRD-PARTY-LICENSES.txt` lists the licenses of every dependency of the program, for every
+target and feature of the releases (`about.toml`, `about.hbs`). It is generated, committed, and shipped
 in each zip, the setup and the macOS app; CI fails when it is out of date. After a change to
 `Cargo.lock`:
 
 ```sh
 cargo install --locked cargo-about --features cli   # once
-cargo about generate --all-features --workspace about.hbs -o THIRD-PARTY-LICENSES.txt
+cargo about generate --all-features --manifest-path crates/ordrumbox-app/Cargo.toml about.hbs -o THIRD-PARTY-LICENSES.txt
 ```
 
 A new license must be added to `accepted` in `about.toml` on purpose.

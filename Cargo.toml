@@ -1,6 +1,8 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
+# Set aside for now (AGENTS.md): kept in the repository, built by nothing.
+exclude = ["crates/ordrumbox-plugin"]
 
 [workspace.package]
 version = "0.1.3"

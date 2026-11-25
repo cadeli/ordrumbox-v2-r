@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>orDrumbox User Manual</title>
-<meta name="description" content="orDrumbox user manual (native program and CLAP / VST3 plugin): window, menus, header, pattern grid and lane, track and note editors, piano roll, song panel, synth editor, kit editor, mixer, generation, files and backups, keyboard shortcuts, the plugin and AI clients.">
+<meta name="description" content="orDrumbox user manual (native program): window, menus, header, pattern grid and lane, track and note editors, piano roll, song panel, synth editor, kit editor, mixer, generation, files and backups, keyboard shortcuts, MIDI and AI clients.">
 <style>
 :root {
   --bg: #f7f6fb; --fg: #1d1b2e; --muted: #5b5873; --line: #d9d6e8;
@@ -47,11 +47,10 @@ figcaption { color: var(--muted); font-size: .9em; margin-top: .4em; }
 <main>
 
 <h1>orDrumbox User Manual</h1>
-<p class="subtitle">Native version: the program (Windows <code>ordrumbox.exe</code>, also runs on macOS) and the CLAP / VST3 plugin — version 0.1.3</p>
+<p class="subtitle">Native version: the program (Windows <code>ordrumbox.exe</code>, also runs on macOS and Linux) — version 0.1.3</p>
 
 <div class="note">
-This manual describes the native orDrumbox: one program with a menu bar and one window, and the same
-window as an instrument plugin in a DAW (<a href="#plugin">section 19</a>). The web version (orDrumbox-v2)
+This manual describes the native orDrumbox: one program with a menu bar and one window. The web version (orDrumbox-v2)
 is a demo of it and does less: files here are saved on disk, not in the browser.
 </div>
 
@@ -89,7 +88,7 @@ is a demo of it and does less: files here are saved on disk, not in the browser.
   <li><a href="#files">Files: save, import, export, back up</a></li>
   <li><a href="#shortcuts">Keyboard shortcuts</a></li>
   <li><a href="#signal">Audio signal flow</a></li>
-  <li><a href="#plugin">The plugin (CLAP / VST3)</a></li>
+  <li><a href="#midi">MIDI in and out</a></li>
   <li><a href="#mcp">AI clients (MCP)</a></li>
   <li><a href="#updates">Updates, About, factory reset</a></li>
 </ol>
@@ -113,10 +112,9 @@ to Applications.</td></tr>
 system's ALSA and X11 libraries.</td></tr>
 </table>
 <p>The <code>assets</code> folder holds the starter library, the demos by style, the kits and their samples, the scales, the
-synth presets and the generation styles. The plugin comes as <code>orDrumbox.clap</code> and
-<code>orDrumbox.vst3</code>, in zips of their own (<a href="#plugin">section 19</a>).</p>
+synth presets and the generation styles.</p>
 <p>One orDrumbox runs at a time: a second one started warns that another is already running, since two windows
-would overwrite each other's library. You may go on anyway or quit. The plugin is not concerned.</p>
+would overwrite each other's library. You may go on anyway or quit.</p>
 
 <h3>First steps</h3>
 <ol>
@@ -144,7 +142,6 @@ tells where the library stands:</p>
 <tr><td><em>new</em></td><td>A copy of the starter library, written at the first edit.</td></tr>
 <tr><td><em>save failed</em></td><td>The file could not be written; the status line says why.</td></tr>
 <tr><td><em>not saved</em></td><td>There is no user data folder to save in.</td></tr>
-<tr><td><em>in host project</em></td><td>The plugin: the host saves the library with its project.</td></tr>
 </table>
 <p>The files are in the user data folder:</p>
 <table>
@@ -172,7 +169,7 @@ presets of its own and takes those. To start again from the starter library, use
 <p><strong>Where you left off.</strong> The app starts on the pattern and the arrangement you had chosen, in the mode
 (pattern or song) and the view you had open (grid, piano roll, song panel, synth, mixer), with the track editor, the note
 editor, the VU meters and the kit editor shown or hidden as you left them. It is written to <code>settings.json</code>
-(<code>resume</code>) when you quit. The plugin starts as the host's project left it.</p>
+(<code>resume</code>) when you quit.</p>
 
 <!-- ───────────────────────────────────────────────────────────── -->
 <h2 id="window">2. The window</h2>
@@ -296,7 +293,7 @@ use <kbd>←</kbd> <kbd>→</kbd> between menus, <kbd>↑</kbd> <kbd>↓</kbd> b
 <tr><td>Export pattern as MIDI...</td><td><kbd>Ctrl</kbd>+<kbd>M</kbd> (macOS: <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd>)</td><td>Write the pattern as a type 1 MIDI file, as many loops as chosen (1 to 64).</td></tr>
 <tr><td>Export pattern as WAV...</td><td><kbd>Ctrl</kbd>+<kbd>E</kbd></td><td>Render the pattern to a 16-bit 44.1 kHz WAV, as many loops as chosen (1 to 64).</td></tr>
 <tr><td>Export song as WAV...</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Render the whole selected arrangement to WAV.</td></tr>
-<tr><td>Export pattern stems...</td><td></td><td>Write a folder <code>ordrumbox-&lt;name&gt;-stems</code> in the folder you pick, with one WAV per track (<code>01-KICK.wav</code>, <code>02-SNARE.wav</code>...), all as long as the pattern. Each track comes as its strip leaves it (volume, pan, filter, effects), before the master bus, like the plugin's track outputs; a track with no sound is left out.</td></tr>
+<tr><td>Export pattern stems...</td><td></td><td>Write a folder <code>ordrumbox-&lt;name&gt;-stems</code> in the folder you pick, with one WAV per track (<code>01-KICK.wav</code>, <code>02-SNARE.wav</code>...), all as long as the pattern. Each track comes as its strip leaves it (volume, pan, filter, effects), before the master bus; a track with no sound is left out.</td></tr>
 <tr><td>Export song stems...</td><td></td><td>The same for the whole selected arrangement: a track is the one at that position in each pattern played.</td></tr>
 <tr><td>Back up user data...</td><td></td><td>Copy all your files to a folder <code>orDrumbox-backup-&lt;date&gt;-&lt;time&gt;</code> (UTC).</td></tr>
 <tr><td>Restore user data...</td><td></td><td>Put such a backup back; the files there are moved to <code>backups/</code> first (confirmed).</td></tr>
@@ -449,13 +446,13 @@ slip off the play keys changes nothing; pressed alone, they say so on the status
 <p>Under the menu bar, after the logo, a row of labelled groups:</p>
 <table>
 <tr><th>Group</th><th>Control</th><th>What it does</th></tr>
-<tr><td><strong>PLAY / STOP</strong></td><td>Button</td><td>Start / stop the pattern, or the song in song mode (lit while playing). In the plugin, <strong>HOST</strong> shows the host's transport instead (<a href="#plugin">section 19</a>).</td></tr>
+<tr><td><strong>PLAY / STOP</strong></td><td>Button</td><td>Start / stop the pattern, or the song in song mode (lit while playing).</td></tr>
 <tr><td><strong>REC</strong></td><td>Button, song mode</td><td>Record automation: while the song plays, the mixer's controls write their lanes (<a href="#automation">section 11</a>). Same as <strong>Play › Record automation</strong>.</td></tr>
 <tr><td><strong>BPM</strong></td><td>Knob, 20–300</td><td>The session's tempo, which every pattern plays at; in the song panel, the selected song's.</td></tr>
-<tr><td><strong>MODE</strong></td><td><strong>PATTERN</strong> <strong>SONG</strong> (<kbd>F5</kbd>, <kbd>F3</kbd>)</td><td>What <strong>PLAY</strong> and <kbd>Space</kbd> play: one pattern in a loop, or the song, its patterns one after another. The mode shown is lit. Only this switch changes it: the views and their keys leave it as it is. In song mode the grid and the piano roll show the pattern the song is playing, with its playhead; back from the song to the pattern, the pattern keeps the song's tempo. Not in the plugin: the host plays.</td></tr>
+<tr><td><strong>MODE</strong></td><td><strong>PATTERN</strong> <strong>SONG</strong> (<kbd>F5</kbd>, <kbd>F3</kbd>)</td><td>What <strong>PLAY</strong> and <kbd>Space</kbd> play: one pattern in a loop, or the song, its patterns one after another. The mode shown is lit. Only this switch changes it: the views and their keys leave it as it is. In song mode the grid and the piano roll show the pattern the song is playing, with its playhead; back from the song to the pattern, the pattern keeps the song's tempo.</td></tr>
 <tr><td><strong>PATTERN</strong></td><td>List</td><td>Pick a pattern: the list opens on the genres (each with how many patterns it has, the one shown highlighted), and a genre opens its patterns beside it; the patterns without a genre are under <em>other</em> (<a href="#song-tags">see Tags</a>). <kbd>[</kbd> <kbd>]</kbd> still step through the whole library. While playing, the pattern picked waits for the one playing to end its loop: the label reads <strong>NEXT</strong> until it starts.</td></tr>
 <tr><td><strong>BEATS</strong></td><td>List, 1–16 then every 4th up to 64</td><td>The pattern's length in beats.</td></tr>
-<tr><td><strong>KIT</strong></td><td>List</td><td>The kit the tracks draw their samples from. It is kept with the library and its projects (one undo step), and comes back at the next start and with a project loaded. In the plugin, the host's <strong>Kit</strong> parameter chooses it.</td></tr>
+<tr><td><strong>KIT</strong></td><td>List</td><td>The kit the tracks draw their samples from. It is kept with the library and its projects (one undo step), and comes back at the next start and with a project loaded.</td></tr>
 <tr><td><strong>STYLE</strong></td><td>List</td><td>The 14 styles, the learned styles, or random. Picking one makes the pattern again in it.</td></tr>
 <tr><td><strong>↻</strong></td><td>Button (<kbd>Shift</kbd>+<kbd>B</kbd>)</td><td>Make the pattern again in its style: its tracks, meter and lines, and the session's tempo. A track the style names keeps its sound and settings; the others go. Draws a new seed.</td></tr>
 <tr><td><strong>AUTO</strong></td><td>Button</td><td>Every track of the pattern in auto mode, or out of it.</td></tr>
@@ -775,7 +772,7 @@ The note editor stays under it.</p>
 <h2 id="song">11. Song panel</h2>
 <p><kbd>F3</kbd>. A <strong>project</strong> is the library: its patterns and one or more <strong>arrangements</strong>,
 saved under a name as an <code>.odbox</code> file. An arrangement is a song: it places patterns as <strong>clips</strong>
-on a timeline of measures. The song panel is the app's only: the plugin plays patterns.</p>
+on a timeline of measures.</p>
 <figure>
   <img src="images/song-panel.png" alt="The song panel: arrangement grid, pattern list, description and song buttons">
   <figcaption>The song panel: the arrangement on top (one row per pattern, one bar per clip), the pattern list, the selected pattern's description, the project's information and buttons.</figcaption>
@@ -934,8 +931,7 @@ and M S boxes, and the track editor's knobs that have a lane (Volume, Pan, Cutof
 <!-- ───────────────────────────────────────────────────────────── -->
 <h2 id="synth">12. Synth editor</h2>
 <p><kbd>F6</kbd>. Edits the synth preset of the track editor's track (else the first preset). Every change plays
-at once. The presets you add, change or delete are part of the library: saved with it (and in a plugin's host
-project), exported with File › Export library, and each change is an undo step (a knob turned is one).
+at once. The presets you add, change or delete are part of the library: saved with it, exported with File › Export library, and each change is an undo step (a knob turned is one).
 A built-in preset you have not changed plays as the assets hold it.</p>
 <figure>
   <img src="images/synth-editor.png" alt="The synth editor on the OSC tab: scope, VCO1 to VCO3 and FM cards">
@@ -1106,8 +1102,7 @@ then the <strong>Master</strong> bus. The track editor stays on the right.</p>
       not undo steps.</li>
 </ul>
 <p>A fader moves with a drag (<kbd>Shift</kbd>: finely), the wheel or the arrow keys; a click on its groove puts it
-there, a double-click back to its default, a right-click types a value. The plugin shows the track strips only: the host
-mixes, and the returns and the master play at their defaults.</p>
+there, a double-click back to its default, a right-click types a value.</p>
 <h3>The master</h3>
 <table>
 <tr><th>Group</th><th>Control</th><th>Range</th><th>Default</th><th>What it does</th></tr>
@@ -1233,8 +1228,7 @@ the drives are listed above a drive's root. It starts in the home folder, then w
 <h2 id="shortcuts">17. Keyboard shortcuts</h2>
 <p>Keys are the ones the keyboard's layout marks (<kbd>Ctrl</kbd>+<kbd>Z</kbd> is the key marked Z on AZERTY too), except the
 two rows that play, read by their place: <kbd>1</kbd>–<kbd>9</kbd> (mute, <kbd>Shift</kbd>: solo) and <kbd>Q</kbd>–<kbd>P</kbd>
-(hear a track), which on AZERTY start at <kbd>&amp;</kbd> and <kbd>A</kbd>. On macOS, <kbd>Cmd</kbd> works for <kbd>Ctrl</kbd>.
-In the plugin, <kbd>Alt</kbd> stands for <kbd>Ctrl</kbd> (<a href="#plugin">section 19</a>). <kbd>F1</kbd> lists every key.</p>
+(hear a track), which on AZERTY start at <kbd>&amp;</kbd> and <kbd>A</kbd>. On macOS, <kbd>Cmd</kbd> works for <kbd>Ctrl</kbd>. <kbd>F1</kbd> lists every key.</p>
 
 <h3>Play</h3>
 <table>
@@ -1316,63 +1310,22 @@ In the plugin, <kbd>Alt</kbd> stands for <kbd>Ctrl</kbd> (<a href="#plugin">sect
 <strong>Duck</strong> amount while the key is loud.</p>
 <h3>Master bus</h3>
 <pre>Mix bus → Pre-gain → Compressor → Low cut → High cut → Volume → Soft limit → Output (and spectrum)</pre>
-<p>The soft limit leaves the signal unchanged under 0.9 and rounds it toward ±1 above, so loud mixes do not clip harshly.
-In the plugin, a track sent to its own output (<a href="#plugin">section 19</a>) leaves the mix bus after its pan: the master acts on the mix only.</p>
+<p>The soft limit leaves the signal unchanged under 0.9 and rounds it toward ±1 above, so loud mixes do not clip harshly.</p>
 
 <!-- ───────────────────────────────────────────────────────────── -->
-<h2 id="plugin">19. The plugin (CLAP / VST3)</h2>
-<p>orDrumbox also runs as an instrument in a DAW: copy <code>orDrumbox.clap</code> or <code>orDrumbox.vst3</code> to the host's
-plugin folder. Its window is the app's, without what the host does.</p>
-
-<h3>What differs from the app</h3>
+<h2 id="midi">19. MIDI in and out</h2>
+<p>MIDI goes both ways, one place per track of the pattern playing (or selected). A drum track is on channel 10 at its
+instrument's GM key (KICK 36, SNARE 38…), whatever the note's pitch. Any other track (melodic, unknown name, a second track of
+one drum) has a channel of its own (1–9, 11–15, in track order), its notes on the key of their pitch (the track's pitch 0 is
+its sample's root note, C3 = 48 without one and for a synth). Past the 14 channels, the tracks left take keys of channel 10
+from 84 up. The ports and the clock are chosen in <strong>Edit › Preferences</strong>.</p>
 <ul>
-  <li><strong>Transport and tempo</strong> are the host's. In place of PLAY, <strong>HOST</strong> shows whether the host plays
-      (a triangle) or is stopped (a square), and the tempo played. A host tempo outside 20–300 BPM plays at the nearest bound,
-      and the status line says so. Playback starts on the host's first block. An offline render (a bounce) plays as in real
-      time, every note in its place.</li>
-  <li><strong>The library</strong> is saved in the host's project: each project has its own, synth presets included.</li>
-  <li><strong>The menus</strong> leave out what the host or the app does: save, quit, play, tempo, songs, the user data folder,
-      updates, factory reset.</li>
-  <li><strong>Keys</strong>: <kbd>Space</kbd> and every <kbd>Ctrl</kbd>/<kbd>Cmd</kbd> key are the host's. orDrumbox's
-      <kbd>Ctrl</kbd> keys take <kbd>Alt</kbd> instead (<kbd>Alt</kbd>+<kbd>Z</kbd> undo, <kbd>Alt</kbd>+<kbd>K</kbd> kit editor…);
-      the menus show them.</li>
-  <li><strong>The window</strong> opens compact, the grid alone (1072×388 at scale 1), to leave the host's arrangement in view.
-      <kbd>F2</kbd> shows or folds the track editor, <kbd>F7</kbd> the note editor, and the window grows or shrinks with them.
-      The grip in its bottom-right corner resizes it (down to 320×200); the project keeps the size.</li>
-</ul>
-
-<h3>Automatable parameters</h3>
-<table>
-<tr><th>Parameter</th><th>What it does</th></tr>
-<tr><td><strong>Pattern</strong>, <strong>Kit</strong></td><td>The pattern and the kit played, by number from 1.</td></tr>
-<tr><td><strong>Volume</strong></td><td>Master volume, −60 to +6 dB.</td></tr>
-<tr><td><strong>Swing</strong></td><td>50 % (straight) to 75 %: where the second step of each pair starts, on every track with an even number of steps per beat, on top of the track's own swing.</td></tr>
-<tr><td>For tracks 1–16: <strong>Mute</strong>, <strong>Volume</strong>, <strong>Pan</strong></td><td>A gain on the track's own volume (−60 to +6 dB), a pan added to its own.</td></tr>
-<tr><td><strong>Cutoff</strong>, <strong>Q</strong></td><td>Moves the filter's cutoff by up to ±4 octaves; adds to its Q.</td></tr>
-<tr><td><strong>Reverb</strong>, <strong>Delay</strong>, <strong>Saturation</strong>, <strong>Compressor</strong></td><td>Added to the effect's amount, kept within 0 to 1; with the effect's button off, the track's amount counts as 0.</td></tr>
-<tr><td><strong>Threshold</strong>, <strong>Feedback</strong></td><td>dB added to the compressor's threshold (kept within −60 to 0); added to the delay's feedback (up to 0.95; a slap keeps its single echo).</td></tr>
-<tr><td><strong>Transpose</strong></td><td>±24 semitones on the notes played, MIDI input included.</td></tr>
-<tr><td><strong>Output</strong></td><td><em>Mix</em> or <em>Own</em>: see below.</td></tr>
-</table>
-<p>At their defaults they change nothing. They change what plays, not the library. A filter off, and a reverb or delay of
-type <em>none</em>, stay off.</p>
-
-<h3>Outputs</h3>
-<p>17 stereo outputs: <strong>Mix</strong>, and <strong>Track 1</strong> to <strong>Track 16</strong>. Every track plays in the mix
-until its <strong>Output</strong> parameter is set to <em>Own</em>: it then leaves the mix and plays on its own output, with its own
-volume, pan, filter and effects, for the host to mix and process apart. An output with no track on it is silent. A host that gives the
-plugin a single stereo output keeps every track in the mix; tracks past the 16th always are.</p>
-
-<h3>MIDI</h3>
-<p>MIDI goes both ways, one place per track of the pattern playing. A drum track is on channel 10 at its instrument's GM key
-(KICK 36, SNARE 38…). Any other track (melodic, unknown name, a second track of one drum) has a channel of its own (1–9, 11–16,
-in track order), its notes on the key of their pitch (the track's pitch 0 is its sample's root note, C3 = 48 without one and for a
-synth). Past the 15 channels, the tracks left take keys of channel 10 from 84 up.</p>
-<ul>
-  <li><strong>In</strong>: a note on channel 16 chooses the pattern (key 0 is the first), as does a MIDI program change (program 0 the first); a note on a track's channel plays that track at the note's pitch; a note on any other channel plays the drum
-      track with that key, at its velocity, whether the host plays or not.</li>
-  <li><strong>Out</strong>: the notes the pattern plays go out where they come in, with their pitch, as long as the note (a step of its track unless its Length says otherwise). Tracks the host mutes
-      send nothing. A clip recorded from this output and played back into the plugin plays the same tracks at the same pitches.</li>
+  <li><strong>In</strong>: a note on a track's channel plays that track at the note's pitch; a note on any other channel plays
+      the drum track with that key, at its velocity, whether the pattern plays or not. A note on channel 16 chooses the pattern
+      (key 0 is the first, up to 128): a pattern playing is left for the new one from its first beat.</li>
+  <li><strong>Out</strong>: the notes the pattern plays go out where they come in, with their pitch, as long as the note (a step
+      of its track unless its Length says otherwise). Muted tracks send nothing. A clip recorded from this output and played back
+      into the input plays the same tracks at the same pitches.</li>
 </ul>
 
 <!-- ───────────────────────────────────────────────────────────── -->
@@ -1380,8 +1333,7 @@ synth). Past the 15 channels, the tracks left take keys of channel 10 from 84 up
 <p>Any MCP client (Claude Desktop, Claude Code, OpenCode, Antigravity, Cursor…) can drive the running app. The client starts <code>ordrumbox --mcp</code>,
 which passes each tool call to the open window: the edit shows at once, is one step of <strong>Edit › Undo</strong>, and is saved
 with the library. The window listens on <code>127.0.0.1</code> only, with a token written to <code>mcp.json</code>. With the window
-closed, a call answers that orDrumbox is not running. While a confirmation is open in the window, the tools are refused.
-The link is the app's: the plugin does not offer it.</p>
+closed, a call answers that orDrumbox is not running. While a confirmation is open in the window, the tools are refused.</p>
 <p>In the client's settings (use the program's path; <code>ordrumbox.exe</code> on Windows):</p>
 <pre>{ "mcpServers": { "ordrumbox": { "command": "/path/to/ordrumbox", "args": ["--mcp"] } } }</pre>
 <p>The tools cover patterns (list, create, select, rename, duplicate, remove, notes, tracks, tempo, length, tags, description),
@@ -1396,7 +1348,7 @@ play, stop, undo and redo, and the playback state. The client writes the notes i
 <p>At start, at most once a day, the app asks GitHub whether a newer release exists (with the system's <code>curl</code>; the request
 carries only the program's name and version). A newer one is shown on the status line and <strong>Help › Download orDrumbox …</strong>
 opens its page. Nothing is downloaded or installed by the app. <strong>Help › Check for updates</strong> checks now. To stop the check
-at start, set <code>"check": false</code> under <code>updates</code> in <code>settings.json</code>. The plugin does not check.</p>
+at start, set <code>"check": false</code> under <code>updates</code> in <code>settings.json</code>.</p>
 <h3>About</h3>
 <p><strong>Help › About orDrumbox</strong> shows the build (also in the window title and with <code>ordrumbox --version</code>) and the
 paths in use: the library file, the user data folder (and whether it was chosen in the app), the exports folder and the assets.

@@ -3,7 +3,10 @@
 Drum machine and step sequencer: patterns of tracks of notes, songs arranged
 from patterns, sample kits and a soft synth, played live or rendered to WAV
 and MIDI. A native program (`ordrumbox.exe` on Windows, `ordrumbox` on macOS
-and Linux) and a CLAP/VST3 plugin, both with the same software-rendered UI. `README.md`
+and Linux) with a software-rendered UI. A CLAP/VST3 plugin of the same UI
+(`ordrumbox-plugin`) is set aside for now, its development postponed: out of
+the workspace (`exclude` in `Cargo.toml`), built by nothing, never released,
+and named in no user documentation. `README.md`
 is the user documentation: the app, its keys, and where it reads and writes
 its files. Everything for developers (building, tests, snapshots) is in
 `DEVELOPMENT.md`, never in `README.md`.
@@ -16,15 +19,13 @@ cargo test --workspace                  # all tests, snapshots included
 cargo clippy --workspace --all-targets  # must be clean: CI sets RUSTFLAGS=-D warnings
 cargo fmt --all                         # rustfmt.toml: max_width 120; CI checks it
 cargo xtask audit                       # the rules of this file that a tool checks (DEVELOPMENT.md)
-cargo xtask bundle ordrumbox-plugin --release --features vst3   # target/bundled/orDrumbox.{clap,vst3}
 ```
 
 CI (`.github/workflows/ci.yml`) runs fmt, clippy, `cargo xtask audit
 --no-clippy` and tests on Windows, macOS and Linux. For a `v*` tag or a
 manual run (`workflow_dispatch`) only, it then builds the release program of
-each system with `assets/` next to it (`DEVELOPMENT.md`), its Windows setup
-(`installer/ordrumbox.iss`, Inno Setup), and the plugin bundles, checked by
-`clap-validator`.
+each system with `assets/` next to it (`DEVELOPMENT.md`) and its Windows setup
+(`installer/ordrumbox.iss`, Inno Setup).
 
 ## Layout
 
@@ -36,9 +37,8 @@ ordrumbox-engine  kits, WAV format, passes, engine, UI ↔ audio link → core, 
 ordrumbox-probe   sound measurements (command line, not shipped)    → core, dsp, engine
 ordrumbox-ui      session, views, input, MCP link, update check     → core, logic, engine, fontdue
 ordrumbox-app     window, input translation, audio output, MIDI     → core, engine, ui, winit, softbuffer, cpal, midir, rfd
-ordrumbox-plugin  CLAP/VST3 instrument following the host           → core, engine, ui, nih-plug, baseview, softbuffer
-xtask             `cargo xtask bundle` (plugin bundles, assets in)  → nih_plug_xtask
-                  and `cargo xtask audit` (rules of this file)
+ordrumbox-plugin  CLAP/VST3 instrument (set aside, out of the workspace) → core, engine, ui, nih-plug, baseview, softbuffer
+xtask             `cargo xtask audit` (rules of this file)          no deps
 assets/           data/*.json and kits/**.wav, read at runtime
 ```
 
@@ -52,7 +52,7 @@ assets/           data/*.json and kits/**.wav, read at runtime
   rest: files (`store.rs`), the MCP socket, the system font, `curl`.
   `ordrumbox-plugin` talks to a plugin host instead, through `nih-plug`
   (pinned git revision) and `baseview`, which gives it its window; the `vst3` feature links GPLv3
-  bindings (`README.md`, "License"), so it stays off by default.
+  bindings, which make a build with it GPLv3 as a whole, so it stays off by default.
 - `ordrumbox-ui` is the whole UI without a window or a sound device:
   `Session`, the views drawn into a pixel buffer, and `Ui`, which takes the
   neutral input of `ui_input.rs` (keys, modifiers, pointer, wheel). Its only
