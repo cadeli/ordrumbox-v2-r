@@ -157,6 +157,9 @@ default pan. It is edited by hand; `ordrumbox-core/src/instruments.rs` only read
   library are copies of demos, with the same ids, so that File > Demos... has them too (`ordrumbox-ui/src/assets.rs`
   tests: `no_two_demos_share_an_id`, `the_starter_library_is_among_the_demos`). `json_idempotence.rs` saves every file as it was read, and
   `ordrumbox-probe/tests/shipped.rs` renders every demo pattern with every kit and every demo song.
+- **A demo's drum tracks follow the kit**: auto-assigned, no `samplePath`, no `useSynth`, so that changing the kit
+  while a demo plays changes its drums. Only a melodic track (a bass, a pad, a piano) and a sound no kit holds (a
+  dub siren, a `SYNTHEFFECT`) keep a forced sound (`shipped.rs`: `every_drum_track_of_the_demos_follows_the_kit`).
 
 ## Snapshots
 

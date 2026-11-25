@@ -367,7 +367,6 @@
       "tracks": [
         {
           "name": "KICK",
-          "samplePath": "electro/kick.wav",
           "loopLength": 4,
           "volume": 0.3,
           "hitVariation": 7,
@@ -385,7 +384,6 @@
         },
         {
           "name": "SNARE",
-          "samplePath": "electro/snare.wav",
           "loopLength": 4,
           "transpose": 2,
           "pan": 0.3,
@@ -413,7 +411,6 @@
         },
         {
           "name": "TOM",
-          "samplePath": "electro/tom.wav",
           "loopLength": 16,
           "pan": 0.5,
           "hitVariation": 100,
@@ -469,7 +466,6 @@
         },
         {
           "name": "CLAP",
-          "samplePath": "electro/clap.wav",
           "loopLength": 16,
           "pan": -0.4,
           "reverbType": "room",
@@ -499,7 +495,6 @@
         },
         {
           "name": "COWBELL",
-          "samplePath": "electro/cow.wav",
           "loopLength": 16,
           "swingResolution": 4,
           "swingAmount": 0.05,
@@ -604,7 +599,6 @@
         },
         {
           "name": "CHH",
-          "samplePath": "electro/chh.wav",
           "loopLength": 4,
           "volume": 0.3,
           "volumeLfo": {
@@ -635,7 +629,6 @@
         },
         {
           "name": "OHH",
-          "samplePath": "electro/ohh.wav",
           "loopLength": 4,
           "volume": 0.6,
           "pan": -0.2,
@@ -1843,8 +1836,6 @@
           "loopLength": 64,
           "volume": 0.9,
           "pan": 0,
-          "useSynth": true,
-          "synthPreset": "CHIP_KICK",
           "noteKeys": [
             "velocity",
             "beat",
@@ -1928,8 +1919,6 @@
           "loopLength": 64,
           "volume": 0.7,
           "pan": 0.1,
-          "useSynth": true,
-          "synthPreset": "CHIP_SNARE",
           "noteKeys": [
             "velocity",
             "beat",
@@ -2003,8 +1992,6 @@
           "loopLength": 64,
           "volume": 0.45,
           "pan": -0.3,
-          "useSynth": true,
-          "synthPreset": "CHIP_HAT",
           "noteKeys": [
             "velocity",
             "beat",
@@ -2218,8 +2205,6 @@
           "loopLength": 64,
           "volume": 0.7,
           "pan": 0.4,
-          "useSynth": true,
-          "synthPreset": "CHIP_TOM",
           "noteKeys": [
             "velocity",
             "beat",

@@ -194,6 +194,32 @@ fn every_demo_pattern_plays_well_formed_notes() {
 }
 
 #[test]
+fn every_drum_track_of_the_demos_follows_the_kit() {
+    // Changing the kit while a demo plays changes its drums: no fixed sample, no synth preset.
+    // A melodic track (a bass, a pad) keeps its synth preset, which no drum kit replaces; so
+    // does a sound no kit holds (a dub siren), which the kit could only give a stand-in for.
+    let catalog = ordrumbox_core::instruments::catalog();
+    let group = |name: &str| {
+        catalog.by_id(name).or_else(|| catalog.by_name(name)).map(|i| i.variant_of.clone().unwrap_or(i.id.clone()))
+    };
+    let kits = kits();
+    let in_a_kit = |name: &str| {
+        let wanted = group(name);
+        kits.iter().flat_map(|kit| &kit.samples).any(|s| s.key.as_deref().is_some_and(|key| group(key) == wanted))
+    };
+    let fixed: Vec<String> = library()
+        .patterns
+        .iter()
+        .flat_map(|p| p.tracks.iter().map(move |t| (p, t)))
+        .filter(|(_, t)| t.use_synth || !t.auto_assign)
+        .filter(|(_, t)| !catalog.by_id(&t.name).or_else(|| catalog.by_name(&t.name)).is_some_and(|i| i.melodic))
+        .filter(|(_, t)| in_a_kit(&t.name))
+        .map(|(p, t)| format!("{} {}", p.id, t.name))
+        .collect();
+    assert!(fixed.is_empty(), "{} drum tracks with a fixed sound:\n{}", fixed.len(), fixed.join("\n"));
+}
+
+#[test]
 fn every_demo_pattern_renders_clean_audio_with_every_kit() {
     let library = library();
     let kits = kits();

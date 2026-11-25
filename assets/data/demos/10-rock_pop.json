@@ -3694,8 +3694,6 @@
           "stepsPerBeat": 6,
           "loopLength": 96,
           "pan": 0.2,
-          "useSynth": true,
-          "synthPreset": "TOM_SYNTH",
           "transpose": -12,
           "noteKeys": [
             "velocity",
