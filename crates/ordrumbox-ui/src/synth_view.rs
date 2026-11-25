@@ -12,9 +12,8 @@
 
 use crate::scale::Scale;
 use ordrumbox_core::json::{Object, Value};
-use ordrumbox_engine::synth_model::{
-    self as model, FILTER_SLOPES, FILTER_TYPES, LFO_SYNCS, MOD_ENV_TARGETS, TABS, WAVES,
-};
+use ordrumbox_engine::synth_model::{self as model, FILTER_SLOPES, LFO_SYNCS, MOD_ENV_TARGETS, TABS};
+use ordrumbox_engine::synth_preset::{FILTER_TYPES, NOISE_MODES, OSC2_SYNCS, WAVES};
 
 use crate::canvas::{Canvas, Rgb, text_width};
 use crate::control::Spec;
@@ -101,15 +100,11 @@ fn field_kind(path: &str, value: Option<&Value>) -> Field {
     }
     if path == "noise.mode" {
         let labels = model::NOISE_MODE_LABELS;
-        return Field::List(
-            model::NOISE_MODES.iter().zip(labels).map(|(v, l)| ((*v).to_owned(), l.to_owned())).collect(),
-        );
+        return Field::List(NOISE_MODES.iter().zip(labels).map(|(v, l)| ((*v).to_owned(), l.to_owned())).collect());
     }
     if path == "vco2.sync" {
         let labels = model::OSC2_SYNC_LABELS;
-        return Field::List(
-            model::OSC2_SYNCS.iter().zip(labels).map(|(v, l)| ((*v).to_owned(), l.to_owned())).collect(),
-        );
+        return Field::List(OSC2_SYNCS.iter().zip(labels).map(|(v, l)| ((*v).to_owned(), l.to_owned())).collect());
     }
     if model::extra_default(path).is_some() {
         return Field::Knob;
@@ -556,7 +551,7 @@ mod tests {
         };
         let plain = draft();
         let (card, fields) = rects(&plain);
-        assert_eq!(fields.len(), 3 * model::MATRIX_SIZE);
+        assert_eq!(fields.len(), 3 * ordrumbox_engine::MATRIX_SIZE);
         assert!(fields.iter().all(|r| r.x >= card.x && r.x + r.w <= card.x + card.w && r.y + r.h <= card.y + card.h));
         // A line set changes no place.
         let mut set = draft();

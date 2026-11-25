@@ -19,7 +19,7 @@ use ordrumbox_core::{AutomationTarget, Library, Rng, Scales, Track};
 use ordrumbox_dsp::{MasterSettings, ReturnSettings};
 
 use crate::assign::{TrackSound, assign_track};
-use crate::engine::{Engine, HostMix, MAX_TRACKS, Position};
+use crate::engine::{Engine, HostMix, Position};
 use crate::kit::SampleBank;
 use crate::midi::{KeyMap, Target};
 use crate::pass::{
@@ -27,6 +27,7 @@ use crate::pass::{
     pattern_pass_ticks,
 };
 use crate::synth_preset::SynthPresets;
+use ordrumbox_core::track::MAX_TRACKS;
 
 #[path = "controller/audio.rs"]
 mod audio;

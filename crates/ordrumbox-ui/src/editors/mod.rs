@@ -6,7 +6,7 @@
 use ordrumbox_core::{Note, Track};
 
 use crate::panel::{Kind, Step};
-pub use crate::sample_overlay::{Overlay, Shape};
+use crate::sample_overlay::{Overlay, Shape};
 
 // ─── Views ───────────────────────────────────────────────────────────────────
 

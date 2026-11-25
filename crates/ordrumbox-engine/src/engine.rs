@@ -26,7 +26,7 @@ use returns::Returns;
 pub const MAX_VOICES: usize = 64;
 /// Synth voices playing at once.
 pub const MAX_SYNTH_VOICES: usize = 16;
-pub use ordrumbox_core::track::MAX_TRACKS;
+use ordrumbox_core::track::MAX_TRACKS;
 /// Frames per render quantum (Web Audio's).
 pub const QUANTUM: usize = 128;
 /// Time constants of parameter changes (`setTargetAtTime`), seconds: effect

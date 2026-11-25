@@ -6,12 +6,12 @@
 use ordrumbox_core::json::{self, Object, Value};
 
 use crate::slope;
-use crate::synth_preset::FM_DEVIATION;
 use crate::synth_preset::tags::TAG_KEYS;
+use ordrumbox_dsp::synth::FM_DEVIATION;
 use ordrumbox_dsp::synth::patch::LfoTarget;
-pub use ordrumbox_dsp::synth::patch::MATRIX_SIZE;
+use ordrumbox_dsp::synth::patch::MATRIX_SIZE;
 
-pub use crate::synth_preset::{FILTER_TYPES, MATRIX_SOURCES, NOISE_MODES, OSC2_SYNCS, WAVES};
+use crate::synth_preset::{FILTER_TYPES, MATRIX_SOURCES, NOISE_MODES, OSC2_SYNCS, WAVES};
 use crate::synth_preset::{PITCH_ENV_AMOUNT_RANGE, PITCH_ENV_DECAY_DEFAULT, PITCH_ENV_DECAY_RANGE};
 
 mod choices;

@@ -13,6 +13,7 @@ use std::time::Instant;
 
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_engine::synth_model as model;
+use ordrumbox_engine::synth_preset::{FILTER_TYPES, WAVES};
 
 use super::session_files::NO_SYNTHS;
 use super::session_types::Workspace;
@@ -401,10 +402,10 @@ impl Session {
                 let Some(edit) = &self.synth_editor.edit else { return };
                 let Some(group) = model::groups(&edit.draft).into_iter().nth(usize::from(gi)) else { return };
                 let (path, value) = if group.starts_with("vco") || group.starts_with("lfo") {
-                    (format!("{group}.wave"), model::WAVES.get(usize::from(oi)).map(|w| Value::from(*w)))
+                    (format!("{group}.wave"), WAVES.get(usize::from(oi)).map(|w| Value::from(*w)))
                 } else if group == "filter" || group == "noise" {
                     let key = if group == "filter" { "type" } else { "filterType" };
-                    (format!("{group}.{key}"), model::FILTER_TYPES.get(usize::from(oi)).map(|t| Value::from(*t)))
+                    (format!("{group}.{key}"), FILTER_TYPES.get(usize::from(oi)).map(|t| Value::from(*t)))
                 } else {
                     ("fm.algo".to_owned(), Some(Value::from(f64::from(oi))))
                 };

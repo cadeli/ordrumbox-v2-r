@@ -1,6 +1,7 @@
 //! The rules of AGENTS.md that a line of code can break: names (of files
-//! too), `#[allow]`, globals, references to the web version's sources, and the
-//! depth of nesting (a heuristic from the indentation).
+//! too), `#[allow]`, globals, re-exports that alias another module,
+//! references to the web version's sources, and the depth of nesting (a
+//! heuristic from the indentation).
 // audit: allow(js reference): this file holds the rule, and names what it looks for.
 
 use super::sources::Source;
@@ -30,9 +31,56 @@ pub(super) fn check(files: &[Source]) -> Vec<Finding> {
             names(file, &code, &place, &mut findings);
             attributes(&code, &place, &mut findings);
         }
+        re_exports(file, &mut findings);
         nesting(file, &mut findings);
     }
     findings
+}
+
+/// A `pub use` outside `lib.rs` that gives a second home to something of
+/// another module or crate. A parent re-exporting its own parts (`mod draw;`
+/// then `pub use draw::draw;`, a folder module's public surface) and a
+/// `macro_rules!` made importable by path are fine.
+fn re_exports(file: &Source, findings: &mut Vec<Finding>) {
+    if file.path.ends_with("/lib.rs") {
+        return;
+    }
+    let code: Vec<String> = file.code().iter().map(|line| strip(line)).collect();
+    let declared = |keyword: &str| -> Vec<String> {
+        let names = code.iter().filter_map(|line| {
+            let line = line.trim_start();
+            let line = line.strip_prefix("pub ").or_else(|| line.strip_prefix("pub(crate) ")).unwrap_or(line);
+            let line = line.strip_prefix("pub(super) ").unwrap_or(line);
+            line.strip_prefix(keyword).and_then(|rest| identifiers(rest).next()).map(str::to_owned)
+        });
+        names.collect()
+    };
+    let (modules, macros) = (declared("mod "), declared("macro_rules! "));
+    for (index, line) in code.iter().enumerate() {
+        let Some(path) = re_exported_path(line) else { continue };
+        let mut segments = path.trim_start_matches("::").split("::").map(str::trim);
+        let first = match segments.next() {
+            Some("self") => segments.next().unwrap_or_default(),
+            first => first.unwrap_or_default(),
+        };
+        let first = first.trim_matches(|c: char| c == '{' || c == ';' || c.is_whitespace());
+        if modules.iter().chain(&macros).any(|name| name == first) {
+            continue;
+        }
+        let place = format!("{}:{}", file.path, index + 1);
+        let message = format!("`{}`: one thing, one home; import it from where it is", shorten(line.trim()));
+        findings.push(Finding::new(Level::Error, "re-export", place, message));
+    }
+}
+
+/// The path of a `pub use` (any visibility but private) on `line`.
+fn re_exported_path(line: &str) -> Option<&str> {
+    let rest = line.trim_start().strip_prefix("pub")?;
+    let rest = match rest.strip_prefix('(') {
+        Some(inside) => &inside[inside.find(')')? + 1..],
+        None => rest,
+    };
+    rest.trim_start().strip_prefix("use ")
 }
 
 /// A file named after a word that says nothing (`helpers.rs`, `misc_*.rs`).

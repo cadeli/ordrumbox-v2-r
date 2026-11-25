@@ -9,9 +9,10 @@ use ordrumbox_core::steps::TICK;
 use ordrumbox_core::{Library, Rng, Scales, song::BEATS_PER_MEASURE, song::clamp_bpm};
 
 use crate::controller::{Controller, Mode};
-use crate::engine::{HostMix, MAX_TRACKS};
+use crate::engine::HostMix;
 use crate::kit::SampleBank;
 use crate::synth_preset::SynthPresets;
+use ordrumbox_core::track::MAX_TRACKS;
 use ordrumbox_dsp::ReturnSettings;
 
 /// Sample rate of the exports.

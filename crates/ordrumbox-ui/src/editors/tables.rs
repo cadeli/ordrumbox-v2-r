@@ -126,7 +126,7 @@ pub static FX_DEFS: [FxDef; 6] = [
     },
 ];
 
-pub use ordrumbox_engine::synth_preset::FILTER_TYPES;
+use ordrumbox_engine::synth_preset::FILTER_TYPES;
 /// The filter types as their buttons are labelled (the font has no curves).
 pub const FILTER_ICONS: [&str; 4] = ["LP", "HP", "BP", "NT"];
 /// Cutoff a filter gets when switched on from its 20 Hz default, Hz (a

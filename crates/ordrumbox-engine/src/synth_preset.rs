@@ -9,7 +9,6 @@ use ordrumbox_core::num::clamp;
 use ordrumbox_dsp::SynthPatch;
 use ordrumbox_dsp::lfo::Wave;
 use ordrumbox_dsp::slope::FilterMode;
-pub use ordrumbox_dsp::synth::FM_DEVIATION;
 use ordrumbox_dsp::synth::patch::{
     Adsr, LfoTarget, MATRIX_SIZE, MatrixRoute, MatrixSource, ModEnvTarget, NoiseMode, PitchEnv, SynthBypass, SynthLfo,
 };
@@ -33,7 +32,7 @@ pub const FILTER_TYPES: [&str; 4] = ["lowpass", "highpass", "bandpass", "notch"]
 pub const NOISE_MODES: [&str; 3] = ["white", "long", "short"];
 /// The clock rate of the console noise, Hz: its range, and what a preset without one gets.
 pub const NOISE_RATE_RANGE: (f64, f64) = (100.0, 32_000.0);
-pub use ordrumbox_dsp::synth::patch::NOISE_RATE_DEFAULT;
+use ordrumbox_dsp::synth::patch::NOISE_RATE_DEFAULT;
 /// What oscillator 2 restarts its cycle with (`vco2.sync`), by code: nothing, or oscillator 1.
 pub const OSC2_SYNCS: [&str; 2] = ["off", "vco1"];
 /// The pitch envelope's offset, semitones, and its decay, seconds: their ranges.

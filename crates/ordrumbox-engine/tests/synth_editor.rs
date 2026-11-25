@@ -13,7 +13,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use ordrumbox_core::json::{self, Object, Value};
-use ordrumbox_engine::synth_model::{WAVES, bypassed, groups, has_power, hydrate, lfo_mod, lfo_scale, lfo_targets};
+use ordrumbox_engine::synth_model::{bypassed, groups, has_power, hydrate, lfo_mod, lfo_scale, lfo_targets};
+use ordrumbox_engine::synth_preset::WAVES;
 
 /// Presets the web version does not have: empty, partial and broken, bypassed.
 const HAND_PRESETS: [(&str, &str); 3] = [

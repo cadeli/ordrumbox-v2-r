@@ -258,9 +258,10 @@ saying why (`// audit: allow(<rule>): <why>` for the audit).
   getter instead; keep fields private (`pub(crate)` at most, never `pub` by
   habit).
 - **Do not** add a dependency that points up the table of "Layout", or a
-  cycle between modules of a crate. **Do** re-export (`pub use`) only once,
-  to shape a crate's public surface in `lib.rs`; **do not** create internal
-  aliases: one type, one home.
+  cycle between modules of a crate. **Do** re-export (`pub use`) only to
+  shape a crate's public surface in `lib.rs`, or a folder module's in its
+  parent (`mod draw;` then `pub use draw::draw;`); **do not** re-export
+  what another module or crate holds: one type, one home.
 - **Do not** let a view mutate the model directly. A view reads state and
   returns a command; `Session` applies it as one undo step.
 - **Do not** use a global, a `static mut`, a `thread_local` or a singleton to

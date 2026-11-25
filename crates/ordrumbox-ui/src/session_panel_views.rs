@@ -13,8 +13,9 @@ use super::Session;
 use super::session_panel::NoteTarget;
 use super::session_selection::NoteFocus;
 use crate::editors::{
-    self, ARP_DIRECTIONS, Choice, ComposeView, KitControls, LFO_TARGETS, NoteView, Overlay, SampleBar, Shape, TrackView,
+    self, ARP_DIRECTIONS, Choice, ComposeView, KitControls, LFO_TARGETS, NoteView, SampleBar, TrackView,
 };
+use crate::sample_overlay::{Overlay, Shape};
 use crate::view::SoundLabel;
 use ordrumbox_core::drum_taxonomy::instrument_family;
 use ordrumbox_core::{Note, Styles, Track};

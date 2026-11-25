@@ -2,7 +2,9 @@
 //! and an amount, each a field of the preset's `matrix` group.
 
 use ordrumbox_core::json::{Object, Value};
-use ordrumbox_engine::synth_model::{self as model, MATRIX_SIZE, MATRIX_SOURCES};
+use ordrumbox_engine::MATRIX_SIZE;
+use ordrumbox_engine::synth_model as model;
+use ordrumbox_engine::synth_preset::MATRIX_SOURCES;
 
 use crate::control::{Format, Spec};
 use crate::panel::{Id, Item, Kind, Rect};

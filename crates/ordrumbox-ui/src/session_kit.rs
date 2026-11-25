@@ -17,8 +17,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::canvas::{chars_in, text_width};
-use crate::editors::{Choice, Overlay, Shape};
+use crate::editors::Choice;
 use crate::panel::{self, Item, Kind, Rect};
+use crate::sample_overlay::{Overlay, Shape};
 use crate::song_view;
 use crate::view::KitLayout;
 
