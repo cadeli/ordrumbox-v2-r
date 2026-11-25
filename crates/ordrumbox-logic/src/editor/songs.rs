@@ -1,9 +1,9 @@
-//! The song (arrangement) commands: clips placed and
-//! removed, arrangements added, removed and selected, each edit one undo
+//! The song commands: clips placed and
+//! removed, songs added, removed and selected, each edit one undo
 //! step.
 //!
 //! Clips reference a pattern by its id; the placement commands take an id or
-//! a name and report what they could not do. Every clip edit moves the arrangement's loop onto the end of
+//! a name and report what they could not do. Every clip edit moves the song's loop onto the end of
 //! its last clip, so the grid and the playback never show
 //! or play measures nothing is placed on.
 
@@ -17,7 +17,6 @@ use std::collections::HashSet;
 use ordrumbox_core::song::{DEFAULT_BPM, clamp_bpm, measures_for_pattern};
 use ordrumbox_core::{Song, SongClip};
 
-#[path = "arrangement/automation.rs"]
 mod automation;
 
 /// The loop length after a clip edit: the end of the last clip, none
@@ -28,12 +27,12 @@ fn follow_content(song: &mut Song) {
 }
 
 impl Editor {
-    /// The arrangement the song panel edits.
+    /// The song the song panel edits.
     pub fn selected_song(&self) -> usize {
         self.selected_song
     }
 
-    /// Select arrangement `index`, clamped to the list (not an
+    /// Select song `index`, clamped to the list (not an
     /// undo step); the index selected.
     pub fn set_selected_song(&mut self, index: usize) -> usize {
         self.selected_song = index.min(self.library.songs.len().saturating_sub(1));
@@ -58,15 +57,15 @@ impl Editor {
         true
     }
 
-    /// Arrangement `song`, else the selected one, if it exists.
+    /// Song `song`, else the selected one, if it exists.
     fn song_index(&self, song: Option<usize>) -> Option<usize> {
         let index = song.unwrap_or(self.selected_song);
         (index < self.library.songs.len()).then_some(index)
     }
 
-    /// The arrangement to edit, or what to tell the user.
+    /// The song to edit, or what to tell the user.
     fn require_song(&self, song: Option<usize>) -> Result<usize, String> {
-        self.song_index(song).ok_or_else(|| "No arrangement to edit — create a song first".to_owned())
+        self.song_index(song).ok_or_else(|| "No song to edit — create a song first".to_owned())
     }
 
     /// A pattern by id, else by name (trimmed, any case).
@@ -82,8 +81,8 @@ impl Editor {
         })
     }
 
-    /// Run `edit` on the arrangements and record it when it changed
-    /// something; `select`: the arrangement undo and redo select.
+    /// Run `edit` on the songs and record it when it changed
+    /// something; `select`: the song undo and redo select.
     fn edit_songs<R>(
         &mut self,
         desc: String,
@@ -113,15 +112,15 @@ impl Editor {
 
     // ─── Clips ───────────────────────────────────────────────────────────────
 
-    /// Place `clip` in arrangement `song` (else the selected one): a length
-    /// of 0 or less is 1. Whether there was an arrangement.
+    /// Place `clip` in song `song` (else the selected one): a length
+    /// of 0 or less is 1. Whether there was a song.
     pub fn add_song_clip(&mut self, song: Option<usize>, clip: SongClip) -> bool {
         let Some(s) = self.song_index(song) else { return false };
         if clip.pattern_id.is_empty() {
             return false;
         }
-        let measure_count = if clip.measure_count > 0.0 { clip.measure_count } else { 1.0 };
-        let clip = SongClip { measure_count, ..clip };
+        let length_measures = if clip.length_measures > 0.0 { clip.length_measures } else { 1.0 };
+        let clip = SongClip { length_measures, ..clip };
         let desc = format!("Add \"{}\" at measure {}", clip.pattern_id, u64::from(clip.start_measure) + 1);
         self.edit_songs(desc, None, |songs| {
             songs[s].clips.push(clip);
@@ -168,23 +167,23 @@ impl Editor {
     }
 
     /// Place a pattern (an id or a name) at `start` (0-based measure), for
-    /// `measure_count` measures, else the pattern's own length; the clip added.
+    /// `length_measures` measures, else the pattern's own length; the clip added.
     pub fn add_pattern_at_measure(
         &mut self,
         reference: &str,
         start: u32,
-        measure_count: Option<f64>,
+        length_measures: Option<f64>,
         song: Option<usize>,
     ) -> Result<SongClip, String> {
         let s = self.require_song(song)?;
         let Some(pattern) = self.pattern_by_ref(reference) else {
             return Err(format!("No pattern named \"{}\" in the library", reference.trim()));
         };
-        let duration = match measure_count {
+        let duration = match length_measures {
             Some(count) if count.is_finite() && count > 0.0 => count,
             _ => measures_for_pattern(pattern.beat_count),
         };
-        let clip = SongClip { pattern_id: pattern.id.clone(), start_measure: start, measure_count: duration };
+        let clip = SongClip { pattern_id: pattern.id.clone(), start_measure: start, length_measures: duration };
         self.add_song_clip(Some(s), clip.clone());
         Ok(clip)
     }
@@ -196,8 +195,8 @@ impl Editor {
             return Err(format!("No clip at measure {}", u64::from(start) + 1));
         };
         // `startMeasure + measureCount`, floored as a clip placed.
-        let next = (f64::from(clip.start_measure) + clip.measure_count).floor().min(f64::from(u32::MAX)) as u32;
-        self.add_pattern_at_measure(&clip.pattern_id, next, Some(clip.measure_count), Some(s))
+        let next = (f64::from(clip.start_measure) + clip.length_measures).floor().min(f64::from(u32::MAX)) as u32;
+        self.add_pattern_at_measure(&clip.pattern_id, next, Some(clip.length_measures), Some(s))
     }
 
     /// Remove every clip starting at `start`, in one undo step; the clips removed.
@@ -231,9 +230,9 @@ impl Editor {
         Ok(removed)
     }
 
-    // ─── Arrangements ────────────────────────────────────────────────────────
+    // ─── Songs ────────────────────────────────────────────────────────
 
-    /// Append an empty arrangement named `name` (trimmed; empty: "Untitled")
+    /// Append an empty song named `name` (trimmed; empty: "Untitled")
     /// with a unique id, and select it; its index.
     pub fn add_song(&mut self, name: &str) -> usize {
         let name = match name.trim() {
@@ -253,13 +252,13 @@ impl Editor {
         };
         let index = self.library.songs.len();
         let previous = self.selected_song.min(index.saturating_sub(1));
-        let desc = format!("Add arrangement \"{name}\"");
+        let desc = format!("Add song \"{name}\"");
         self.edit_songs(desc, Some((previous, index)), |songs| songs.push(song));
         self.selected_song = index;
         index
     }
 
-    /// Rename arrangement `song`, else the selected one (trimmed; an empty
+    /// Rename song `song`, else the selected one (trimmed; an empty
     /// name keeps the old one). Its id stays. Whether the name changed.
     pub fn rename_song(&mut self, song: Option<usize>, name: &str) -> Result<bool, String> {
         let s = self.require_song(song)?;
@@ -267,14 +266,14 @@ impl Editor {
         if name.is_empty() || self.library.songs[s].name == name {
             return Ok(false);
         }
-        let desc = format!("Rename arrangement → \"{name}\"");
+        let desc = format!("Rename song → \"{name}\"");
         self.edit_songs(desc, None, |songs| name.clone_into(&mut songs[s].name));
         Ok(true)
     }
 
     /// Set the tempo (brought inside the tempo bounds), the description and the
-    /// loop length (0: the arrangement loops at the end of its last clip) of
-    /// arrangement `song`, else the selected one; what is `None` stays.
+    /// loop length (0: the song loops at the end of its last clip) of
+    /// song `song`, else the selected one; what is `None` stays.
     pub fn set_song_settings(
         &mut self,
         song: Option<usize>,
@@ -299,7 +298,7 @@ impl Editor {
         Ok(())
     }
 
-    /// The tempo of arrangement `s` (brought inside the tempo bounds; not a
+    /// The tempo of song `s` (brought inside the tempo bounds; not a
     /// number: unchanged); with `coalesce`, a run of changes is one step.
     /// Whether it changed.
     pub fn set_song_bpm(&mut self, s: usize, bpm: f64, coalesce: bool) -> bool {
@@ -315,7 +314,7 @@ impl Editor {
     }
 
     /// Replace the whole library (a project opened or
-    /// imported), arrangement `selected_song` selected (clamped); one undo step.
+    /// imported), song `selected_song` selected (clamped); one undo step.
     pub fn load_library(&mut self, library: Library, selected_song: usize) {
         self.replace_library(library, selected_song, "Open project");
     }
@@ -335,12 +334,12 @@ impl Editor {
         self.revision += 1;
     }
 
-    /// Remove arrangement `index` (else the selected one); the selection
+    /// Remove song `index` (else the selected one); the selection
     /// stays where it was, inside the list. Whether one was removed.
     pub fn remove_song(&mut self, index: Option<usize>) -> bool {
         let index = index.unwrap_or(self.selected_song);
         let Some(song) = self.library.songs.get(index) else { return false };
-        let desc = format!("Remove arrangement \"{}\"", song.name);
+        let desc = format!("Remove song \"{}\"", song.name);
         let after = self.selected_song.min(self.library.songs.len().saturating_sub(2));
         self.edit_songs(desc, Some((index, after)), |songs| songs.remove(index));
         self.selected_song = after;

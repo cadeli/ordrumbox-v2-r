@@ -200,32 +200,32 @@ impl KitSet {
                 instrument.transpose = value;
                 Some(format!("{name}: tune {value:+.1} st"))
             }
-            Field::Decay if Some(value) != instrument.decay => {
-                instrument.decay = Some(value);
+            Field::Decay if Some(value) != instrument.decay_ms => {
+                instrument.decay_ms = Some(value);
                 Some(format!("{name}: decay {value} ms"))
             }
-            Field::Start if value != instrument.start => {
-                instrument.start = value;
+            Field::Start if value != instrument.start_ms => {
+                instrument.start_ms = value;
                 Some(format!("{name}: start {value} ms"))
             }
-            Field::End if Some(value) != instrument.end => {
-                instrument.end = Some(value);
+            Field::End if Some(value) != instrument.end_ms => {
+                instrument.end_ms = Some(value);
                 Some(format!("{name}: end {value} ms"))
             }
-            Field::LoopStart if Some(value) != instrument.loop_start => {
-                instrument.loop_start = Some(value);
+            Field::LoopStart if Some(value) != instrument.loop_start_ms => {
+                instrument.loop_start_ms = Some(value);
                 Some(format!("{name}: loop start {value} ms"))
             }
-            Field::LoopEnd if Some(value) != instrument.loop_end => {
-                instrument.loop_end = Some(value);
+            Field::LoopEnd if Some(value) != instrument.loop_end_ms => {
+                instrument.loop_end_ms = Some(value);
                 Some(format!("{name}: loop end {value} ms"))
             }
-            Field::Attack if Some(value) != instrument.attack => {
-                instrument.attack = Some(value);
+            Field::Attack if Some(value) != instrument.attack_ms => {
+                instrument.attack_ms = Some(value);
                 Some(format!("{name}: attack {value} ms"))
             }
-            Field::Hold if value != instrument.hold => {
-                instrument.hold = value;
+            Field::Hold if value != instrument.hold_ms => {
+                instrument.hold_ms = value;
                 Some(format!("{name}: hold {value} ms"))
             }
             Field::Reverse if (value >= 0.5) != instrument.reverse => {
@@ -592,7 +592,7 @@ mod tests {
         kits.set_value(0, 0, Field::Transpose, 0.3);
         assert_eq!(kits.kits[0].samples[0].transpose, 0.3);
         kits.set_value(0, 0, Field::Decay, 630.0);
-        assert_eq!(kits.kits[0].samples[0].decay, Some(630.0));
+        assert_eq!(kits.kits[0].samples[0].decay_ms, Some(630.0));
         assert!(kits.set_instrument(0, 0, "SNARE").is_some());
         assert_eq!(kits.kits[0].samples[0].key, "SNARE");
         assert_eq!(kits.find_path("k.wav"), Some((0, 0)));

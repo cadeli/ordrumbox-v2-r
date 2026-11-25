@@ -1,14 +1,14 @@
 //! The session's side of the song panel:
 //! the pattern list (a click selects it and opens its menu: add at the playhead, move up or
-//! down, rename, delete; a drag drops it on the arrangement, the wheel or its
+//! down, rename, delete; a drag drops it on the song, the wheel or its
 //! scroll bar scrolls it; a drag moves it along the list, or drops it on the
-//! arrangement at the measure under the pointer), the
-//! arrangement (a click on the ruler aims the cursor, where play starts; a
+//! song at the measure under the pointer), the
+//! song (a click on the ruler aims the cursor, where play starts; a
 //! clip dragged sideways moves; a row dragged by its name moves up or down;
 //! a click on a clip, a row name or the bare grid opens its menu), the selected pattern's description (a click edits it, the
 //! wheel scrolls it), the project's column (name, date, description, the
-//! arrangement select, Save, Open, Export, Import, and New and Delete for
-//! arrangements) — and Space plays the song while the panel is shown.
+//! song select, Save, Open, Export, Import, and New and Delete for
+//! songs) — and Space plays the song while the panel is shown.
 //!
 //! Projects are saved to `songs/` in the user data folder and, with Save as and Export, to a folder picked, as `.odbox` files.
 //!
@@ -61,7 +61,7 @@ pub(super) enum DragSource {
     Pattern(usize),
     /// A clip, held `grab` measures after its start.
     Clip { clip: usize, grab: u32 },
-    /// A row of the arrangement, held by its name.
+    /// A row of the song, held by its name.
     Row(usize),
 }
 
@@ -76,7 +76,7 @@ pub(super) struct SongDrag {
     pub(super) y: i32,
     /// The pointer has really moved: this is no longer a click.
     pub(super) started: bool,
-    /// What it was pressed on; another edit or arrangement cancels the drag.
+    /// What it was pressed on; another edit or song cancels the drag.
     pub(super) revision: u64,
     pub(super) song: usize,
 }
@@ -84,7 +84,7 @@ pub(super) struct SongDrag {
 /// The song panel's scrolls and what the mouse holds in it.
 #[derive(Debug, Default)]
 pub(super) struct SongPanel {
-    /// First measure and first row of the arrangement shown.
+    /// First measure and first row of the song shown.
     pub(super) scroll: (u32, usize),
     /// The pattern whose description is scrolled, and its first line shown.
     pub(super) description_scroll: (usize, usize),
@@ -95,7 +95,7 @@ pub(super) struct SongPanel {
     /// The step of an automation lane under the mouse, `(lane, step)` (its tooltip).
     pub(super) hovered_lane: Option<(usize, u32)>,
     pub(super) drag: Option<SongDrag>,
-    /// The arrangement's scroll bar held by the mouse.
+    /// The song's scroll bar held by the mouse.
     pub(super) bar_drag: Option<BarDrag>,
     /// How wide a measure is drawn (`session_song_zoom.rs`).
     pub(super) zoom: MeasureZoom,
@@ -128,7 +128,7 @@ impl SongPanel {
         self.bar_drag = None;
     }
 
-    /// The arrangement shown from its first measure and row.
+    /// The song shown from its first measure and row.
     pub(super) fn scroll_to_start(&mut self) {
         self.scroll = (0, 0);
     }
@@ -207,7 +207,7 @@ impl Session {
         (x, self.song_panel.scroll.1.min(rows.saturating_sub(layout.visible_rows())))
     }
 
-    /// Measures the arrangement's grid spans: the song, and the room to drop on.
+    /// Measures the song's grid spans: the song, and the room to drop on.
     pub(super) fn song_measure_total(&self, layout: &SongLayout) -> u32 {
         self.song().map_or(0, |song| song.length_measures().max(1.0).ceil() as u32 + self.song_room(layout))
     }
@@ -272,7 +272,7 @@ impl Session {
 
     // ─── The column ──────────────────────────────────────────────────────────
 
-    /// The project's column: name, date, description, arrangement, buttons.
+    /// The project's column: name, date, description, song, buttons.
     pub(super) fn song_items(&self, layout: &mut PanelLayout, width: i32, height: i32, scale: Scale) {
         let s = scale;
         let area = self.song_layout((width, height, scale)).column;
@@ -315,11 +315,11 @@ impl Session {
         }
     }
 
-    /// The arrangement select in `rect`, in the header (or a text when there is none).
-    pub(super) fn arrangement_select(&self, layout: &mut PanelLayout, rect: Rect) {
+    /// The song select in `rect`, in the header (or a text when there is none).
+    pub(super) fn song_select(&self, layout: &mut PanelLayout, rect: Rect) {
         let songs = &self.editor.library().songs;
         if songs.is_empty() {
-            let text = Kind::Text { text: "No arrangement".into(), color: panel::dim() };
+            let text = Kind::Text { text: "No song".into(), color: panel::dim() };
             layout.items.push(Item::new(None, rect, text));
             return;
         }
@@ -338,13 +338,13 @@ impl Session {
             "export" => self.open_export(Export::Project),
             "import" => self.open_picker(Purpose::ImportProject),
             "new" => {
-                self.show_entry(Id::SongButton("new"), None, "New arrangement name:".into(), String::new());
+                self.show_entry(Id::SongButton("new"), None, "New song name:".into(), String::new());
             }
             "delete" => {
                 if self.song().is_some() {
                     self.undoable(Self::remove_song);
                 } else {
-                    self.message = "no arrangement to remove".into();
+                    self.message = "no song to remove".into();
                 }
             }
             _ => {}
@@ -416,7 +416,7 @@ impl Session {
         }
     }
 
-    /// The arrangement select: arrangement `index`.
+    /// The song select: song `index`.
     /// A song playing switches to it, from the cursor.
     pub(super) fn select_song(&mut self, index: usize) {
         let playing = self.song_playing();
@@ -444,9 +444,9 @@ impl Session {
         if self.editor.remove_song(None) {
             self.song_panel.scroll = (0, 0);
             self.edited();
-            self.message = format!("Removed the arrangement \"{name}\"");
+            self.message = format!("Removed the song \"{name}\"");
         } else {
-            self.message = "no arrangement to remove".into();
+            self.message = "no song to remove".into();
         }
     }
 
@@ -463,7 +463,7 @@ impl Session {
         }
     }
 
-    /// ← →: the cursor a measure back or on, inside the arrangement.
+    /// ← →: the cursor a measure back or on, inside the song.
     pub fn move_song_cursor(&mut self, delta: i64) {
         let Some(song) = self.song() else { return };
         let last = (song.length_measures().ceil() as i64 - 1).max(0);
@@ -533,11 +533,11 @@ pub(super) mod tests {
 
     pub(crate) fn clips(session: &Session) -> Vec<(String, u32, f64)> {
         let song = session.song().unwrap();
-        song.clips.iter().map(|c| (c.pattern_id.clone(), c.start_measure, c.measure_count)).collect()
+        song.clips.iter().map(|c| (c.pattern_id.clone(), c.start_measure, c.length_measures)).collect()
     }
 
     #[test]
-    fn names_descriptions_and_arrangements() {
+    fn names_descriptions_and_songs() {
         let mut s = session();
         assert_eq!(s.project_name(), "lib");
         s.commit_text(Id::ProjectName, "   ");
@@ -545,7 +545,7 @@ pub(super) mod tests {
         s.commit_text(Id::ProjectName, "  My song ");
         s.commit_text(Id::ProjectDescription, " about ");
         assert_eq!((s.project_name().as_str(), s.info("description").as_str()), ("My song", "about"));
-        // Each one an undo step, as a pattern's or an arrangement's name.
+        // Each one an undo step, as a pattern's or a song's name.
         s.undo();
         assert_eq!((s.project_name().as_str(), s.info("description").as_str()), ("My song", ""));
         s.undo();
@@ -583,7 +583,7 @@ pub(super) mod tests {
         assert_eq!((s.editor.selected_song(), s.song().unwrap().name.as_str()), (1, "Second"));
         s.select_song(0);
         s.song_button("delete");
-        assert_eq!(s.message, format!("Removed the arrangement \"s\" ({}+Z: undo)", crate::menu::command_label()));
+        assert_eq!(s.message, format!("Removed the song \"s\" ({}+Z: undo)", crate::menu::command_label()));
         assert_eq!(s.editor.library().songs.len(), 1);
         assert_eq!(s.song().unwrap().name, "Second");
         s.undo();

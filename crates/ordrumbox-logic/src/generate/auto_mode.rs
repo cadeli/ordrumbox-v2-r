@@ -3,7 +3,7 @@
 
 use super::auto::{
     AutoGenerator, BASS_PRESET, Harmony, Options, TOOLBAR_AUTO, apply_variation, drum_tracks, generate_pattern,
-    generate_track, genre_of, melodic_variant, pattern_harmony, pattern_style, random_density,
+    generate_track, melodic_variant, pattern_harmony, pattern_style, random_density, style_name_of,
 };
 use super::structure::section_harmony;
 use super::table;
@@ -83,7 +83,7 @@ pub fn toggle_drums(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, options: &
     toggle(pattern, InstrumentFamily::is_drum, |pattern| {
         generate_pattern(g, pattern, options);
         pattern.tracks.retain(|t| !instrument_family(&t.name).is_melodic() || !t.notes.is_empty());
-        let style = g.style(&genre_of(pattern).unwrap_or_default());
+        let style = g.style(&style_name_of(pattern).unwrap_or_default());
         for track in pattern.tracks.iter_mut().filter(|t| instrument_family(&t.name).is_drum()) {
             let plays = style.part_for(&track.name).is_some();
             set_auto(track, plays);
@@ -173,7 +173,7 @@ pub fn random_track(track: &mut Track, rnd: &mut dyn FnMut() -> f64) {
     };
     track.notes.clear();
     let spb = track.steps_per_beat;
-    track.loop_length = Some(track.beat_count * spb);
+    track.loop_steps = Some(track.beat_count * spb);
     let total = track.beat_count * spb;
     let count = ((f64::from(total) * (get("densityMin") + rnd() * get("densitySpread"))).floor() as i32).max(1);
     let mut used: Vec<i32> = Vec::new();

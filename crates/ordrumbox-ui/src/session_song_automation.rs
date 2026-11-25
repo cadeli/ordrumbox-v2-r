@@ -76,7 +76,7 @@ impl LanePaint {
 }
 
 impl Session {
-    /// The rows the automation lanes of the arrangement shown take.
+    /// The rows the automation lanes of the song shown take.
     pub(super) fn song_lane_rows(&self) -> usize {
         self.song().map_or(0, |song| song.automations.iter().map(|lane| lane.row_count() as usize).sum())
     }
@@ -180,7 +180,7 @@ impl Session {
         changed
     }
 
-    /// The steps of the arrangement shown, a measure at least.
+    /// The steps of the song shown, a measure at least.
     fn song_step_count(&self) -> u32 {
         self.song().map_or(ordrumbox_core::automation::STEPS_PER_MEASURE, ordrumbox_core::Song::step_count)
     }

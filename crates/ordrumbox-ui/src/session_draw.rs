@@ -86,7 +86,7 @@ impl Session {
         let view = View {
             pattern,
             sounds: pattern.map_or_else(Vec::new, |p| (0..p.tracks.len()).map(|t| self.track_sound_lines(t)).collect()),
-            arrangement: self.song_view_open().then(|| self.song_view_data(&rows, &song_layout)),
+            song_view: self.song_view_open().then(|| self.song_view_data(&rows, &song_layout)),
             piano_roll: roll,
             synth: self.synth_open(),
             mixer: self.mixer_open(),

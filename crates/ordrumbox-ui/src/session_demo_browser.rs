@@ -7,7 +7,7 @@ use ordrumbox_logic::demo_catalog::{DemoItem, copy_demo};
 
 use super::Session;
 use super::session_overlay::Overlay;
-use super::session_types::OverlayKey;
+use super::session_types::{OverlayKey, PlayMode};
 use crate::demo_browser::{DemoBrowser, DemoLayout, Outcome};
 use crate::scale::Scale;
 
@@ -82,7 +82,7 @@ impl Session {
 
     /// Pattern `index` shown and played from its start; what to say of it.
     fn play_loaded_pattern(&mut self, index: usize) -> String {
-        self.show_mode(false);
+        self.show_mode(PlayMode::Pattern);
         if self.playing() {
             self.playback.stop();
         }
@@ -97,7 +97,7 @@ impl Session {
             self.playback.stop();
         }
         self.editor.set_selected_song(index);
-        self.show_mode(true);
+        self.show_mode(PlayMode::Song);
         self.transport.song_cursor = 0;
         self.toggle_play_song();
         self.playing_text()

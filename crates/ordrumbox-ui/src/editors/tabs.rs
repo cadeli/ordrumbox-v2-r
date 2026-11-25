@@ -6,7 +6,7 @@ use super::tables::{
     STYLE_DEFAULT, fx_label, prop, track_select_options,
 };
 use super::values::{
-    EditorState, flag, fx_on, has_lfo, index_of, lfo_wave_choice, loop_length, number, select_choice, text_of,
+    EditorState, flag, fx_on, has_lfo, index_of, lfo_wave_choice, loop_steps, number, select_choice, text_of,
 };
 use super::{Choice, ComposeView, TrackView};
 use crate::control::{Format, Spec};
@@ -255,7 +255,7 @@ pub(super) fn loop_tab(rows: &mut Rows, track: &Track, moved: &[(&'static str, f
             "stepsPerBeat" => (f64::from(spb), value_spec(p, default, false), p.format),
             // The loop length ends at the track's length.
             "loopLength" => (
-                loop_length(track).min(max_steps),
+                loop_steps(track).min(max_steps),
                 value_spec(&Prop { max: max_steps, ..*p }, p.min, false),
                 Format::LoopLength(spb),
             ),

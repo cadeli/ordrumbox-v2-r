@@ -146,7 +146,7 @@ fn snapshot() -> Vec<String> {
         let mut pattern = pattern_in(case.get("pattern").unwrap());
         let options = match case.get("options").filter(|o| !o.is_null()) {
             Some(o) => Options {
-                genre: o.get("genre").and_then(Value::as_str).map(str::to_owned),
+                style: o.get("style").and_then(Value::as_str).map(str::to_owned),
                 key_offset: o.get("keyOffset").and_then(Value::as_f64),
                 scale: o.get("scale").and_then(Value::as_str).map(str::to_owned),
             },
@@ -218,10 +218,10 @@ fn the_generators_match_their_snapshot() {
 
 // ─── Patterns in a style ─────────────────────────────────────────────────────
 
-/// A new pattern made in `genre`, and the tempo the style drew for it.
-fn generated(genre: &str, scales: &Scales, styles: &Styles, stream: &mut Stream) -> (Pattern, Option<f64>) {
+/// A new pattern made in `style`, and the tempo the style drew for it.
+fn generated(style: &str, scales: &Scales, styles: &Styles, stream: &mut Stream) -> (Pattern, Option<f64>) {
     let mut pattern = Pattern { beat_count: 4, ..Pattern::default() };
-    let options = Options { genre: Some(genre.to_owned()), ..Options::default() };
+    let options = Options { style: Some(style.to_owned()), ..Options::default() };
     let mut rnd = || stream.next();
     let mut g = AutoGenerator::new(scales, styles, &mut rnd);
     generate_pattern(&mut g, &mut pattern, &options);
@@ -266,7 +266,7 @@ fn drums_on_a_full_pattern_play_the_style_parts_and_leave_the_others_empty_out_o
         let mut pattern = Pattern { beat_count: 4, tracks, ..Pattern::default() };
         let mut stream = Stream::new(f64::from(seed));
         let mut rnd = || stream.next();
-        let options = Options { genre: Some("reggae".into()), ..Options::default() };
+        let options = Options { style: Some("reggae".into()), ..Options::default() };
         assert!(toggle_drums(&mut AutoGenerator::new(&scales, &styles, &mut rnd), &mut pattern, &options));
         let reggae = styles.get("reggae").unwrap();
         for track in pattern.tracks.iter().filter(|t| instrument_family(&t.name).is_drum()) {
@@ -288,7 +288,7 @@ fn a_drum_line_varies_through_its_section_and_holds_with_no_variation() {
     let mut track = Track::new("KICK", 4, 4);
     track.auto_mode = true;
     let mut pattern = Pattern { tracks: vec![track], beat_count: 4, ..Pattern::default() };
-    pattern.extra.insert(ordrumbox_logic::generate::GENRE, Value::from("funk"));
+    pattern.extra.insert(ordrumbox_logic::generate::STYLE_KEY, Value::from("funk"));
     let mut rnd = || stream.next();
     let mut g = AutoGenerator::new(&scales, &styles, &mut rnd);
     assert!(run_loop(&mut g, &mut pattern, 0));
@@ -312,7 +312,7 @@ fn bass_and_chords_hold_through_their_section_with_no_variation() {
     let mut tracks = vec![Track::new("BASS", 4, 4), Track::new("PIANO", 4, 4)];
     tracks.iter_mut().for_each(|t| t.auto_mode = true);
     let mut pattern = Pattern { tracks, beat_count: 4, ..Pattern::default() };
-    pattern.extra.insert(ordrumbox_logic::generate::GENRE, Value::from("house"));
+    pattern.extra.insert(ordrumbox_logic::generate::STYLE_KEY, Value::from("house"));
     let mut rnd = || stream.next();
     let mut g = AutoGenerator::new(&scales, &styles, &mut rnd);
     // 4 loops of intro, then the chorus: only its first loop is new.
@@ -345,7 +345,7 @@ fn a_pattern_made_again_in_a_style_takes_its_tracks_and_keeps_the_locked_one() {
     let kick_volume = 0.6;
     pattern.tracks[0].volume = kick_volume;
     let mut rnd = || stream.next();
-    let options = Options { genre: Some("salsa".into()), ..Options::default() };
+    let options = Options { style: Some("salsa".into()), ..Options::default() };
     restyle_pattern(&mut AutoGenerator::new(&scales, &styles, &mut rnd), &mut pattern, &options);
     let salsa = styles.get("salsa").unwrap();
     assert_eq!(pattern.beat_count, salsa.beat_count);
@@ -362,7 +362,7 @@ fn the_macros_move_every_line_and_the_same_values_make_the_same_lines() {
     let mut stream = Stream::new(29.0);
     let mut pattern = Pattern { beat_count: 4, ..Pattern::default() };
     let mut rnd = || stream.next();
-    let options = Options { genre: Some("funk".into()), ..Options::default() };
+    let options = Options { style: Some("funk".into()), ..Options::default() };
     restyle_pattern(&mut AutoGenerator::new(&scales, &styles, &mut rnd), &mut pattern, &options);
     let hits = |p: &Pattern| {
         p.tracks.iter().filter(|t| instrument_family(&t.name).is_drum()).map(|t| t.notes.len()).sum::<usize>()

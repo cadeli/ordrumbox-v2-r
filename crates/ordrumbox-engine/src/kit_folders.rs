@@ -106,7 +106,7 @@ mod tests {
             key: key.into(),
             display_name: key.into(),
             path: path.into(),
-            decay: Some(5000.0),
+            decay_ms: Some(5000.0),
             ..KitSample::default()
         }
     }
@@ -128,7 +128,7 @@ mod tests {
         assert_eq!(names, ["a", "b"]);
         assert_eq!(paths(&kits[0]), ["a/kick.wav", "a/snare.wav"]);
         assert_eq!((kits[0].samples[0].key.as_str(), kits[0].samples[0].display_name.as_str()), ("KICK", "kick.wav"));
-        assert_eq!(kits[0].samples[0].decay, None);
+        assert_eq!(kits[0].samples[0].decay_ms, None);
     }
 
     #[test]
@@ -142,7 +142,7 @@ mod tests {
         let names: Vec<_> = kits.iter().map(|k| k.name.as_str()).collect();
         assert_eq!(names, ["z", "y"]);
         assert_eq!(paths(&kits[0]), ["z/kick.wav", "z/a.wav", "z/new.wav"]);
-        assert_eq!((kits[0].samples[1].key.as_str(), kits[0].samples[1].decay), ("SNARE", Some(5000.0)));
+        assert_eq!((kits[0].samples[1].key.as_str(), kits[0].samples[1].decay_ms), ("SNARE", Some(5000.0)));
         let told: Vec<_> = issues.iter().map(|i| format!("{}: {}", i.at, i.message)).collect();
         assert_eq!(told, ["gone: gone/kick.wav: no such file, left out", "gone: no folder and no sample: left out"]);
     }

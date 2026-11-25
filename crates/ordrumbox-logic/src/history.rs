@@ -2,7 +2,7 @@
 //! holding what it changed as it was before and after it.
 //!
 //! A step keeps copies of what changed (one pattern, the pattern list, the
-//! arrangements, or the whole library), which needs no per-command inverse
+//! songs, or the whole library), which needs no per-command inverse
 //! and cannot drift from the state.
 
 use ordrumbox_core::json::Object;
@@ -12,7 +12,7 @@ use ordrumbox_core::{Library, Pattern, Song};
 #[derive(Debug)]
 pub struct Target<'a> {
     pub library: &'a mut Library,
-    /// The selected arrangement.
+    /// The selected song.
     pub selected_song: &'a mut usize,
 }
 
@@ -29,10 +29,10 @@ pub enum Change {
     Pattern { index: usize, before: Box<Pattern>, after: Box<Pattern> },
     /// The whole pattern list (patterns added or removed).
     Patterns { before: Vec<Pattern>, after: Vec<Pattern> },
-    /// The arrangements; `select` is the arrangement undo and redo select
+    /// The songs; `select` is the song undo and redo select
     /// (adding or removing one), `None` when they leave the selection.
     Songs { before: Vec<Song>, after: Vec<Song>, select: Option<(usize, usize)> },
-    /// The whole library (a song loaded or imported), and the arrangement
+    /// The whole library (a song loaded or imported), and the song
     /// undo and redo select.
     Library { before: Box<Library>, after: Box<Library>, select: (usize, usize) },
     /// The library's tempo, before and after.

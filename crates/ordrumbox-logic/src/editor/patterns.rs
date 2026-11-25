@@ -59,7 +59,7 @@ impl Editor {
 
     /// Move pattern `from` so that it ends at index `to` (clamped), the others
     /// keeping their order; whether it moved. Songs name patterns by id, so
-    /// only the order of the list and of the arrangement rows changes.
+    /// only the order of the list and of the song rows changes.
     pub fn move_pattern(&mut self, from: usize, to: usize) -> bool {
         let Some(pattern) = self.library.patterns.get(from) else { return false };
         let to = to.min(self.library.patterns.len() - 1);
@@ -134,8 +134,8 @@ impl Editor {
             |pattern| {
                 for track in &mut pattern.tracks {
                     let max_steps = applied * track.steps_per_beat;
-                    if track.loop_length.is_some_and(|l| l > max_steps) {
-                        track.loop_length = Some(max_steps);
+                    if track.loop_steps.is_some_and(|l| l > max_steps) {
+                        track.loop_steps = Some(max_steps);
                     }
                     track.beat_count = applied;
                 }

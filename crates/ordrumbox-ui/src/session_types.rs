@@ -8,7 +8,7 @@ pub enum Workspace {
     Grid,
     /// The piano roll (F4): the track editor's track.
     PianoRoll,
-    /// The song panel (F3): the arrangement, what plays in song mode.
+    /// The song panel (F3): the song, what plays in song mode.
     Song,
     /// The synth editor (F6): the track editor's track's preset.
     Synth,

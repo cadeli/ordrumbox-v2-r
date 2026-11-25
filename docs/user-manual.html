@@ -62,7 +62,7 @@ is a demo of it and does less: files here are saved on disk, not in the browser.
   <li>New kits rendered by the synth: 808, 909, 606, CR-78, Simmons, latin, trap, minimal, vintage 60s, punch.</li>
   <li>Sample editing on the waveform (start, end, decay, an inner loop) and choke groups in the <a href="#track-editor">track editor</a>.</li>
   <li>Zones in the <a href="#piano-roll">piano roll</a>, <strong>Edit › Humanize...</strong>, the simple view, and the app starts where you left off.</li>
-  <li>A song file is now a <a href="#files">project</a>; patterns are listed by genre; scroll bars with zoom in the grid and the piano roll.</li>
+  <li>A song file is now a <a href="#files">project</a>; patterns are listed by style; scroll bars with zoom in the grid and the piano roll.</li>
   <li><a href="#synth">Synth</a>: the <strong>rnd</strong> wave of the oscillators reads the track's sample.</li>
 </ul>
 </div>
@@ -154,7 +154,7 @@ tells where the library stands:</p>
 noted in <code>location.json</code> in the default folder. <strong>Help › About</strong> gives the paths in use.</p>
 <table>
 <tr><th>File</th><th>Holds</th></tr>
-<tr><td><code>library.json</code></td><td>Patterns, arrangements (the song) and the synth presets edited.</td></tr>
+<tr><td><code>library.json</code></td><td>Patterns, songs and the synth presets edited.</td></tr>
 <tr><td><code>kits.json</code></td><td>The kits and their sample settings, as edited in the kit editor.</td></tr>
 <tr><td><code>samples/</code></td><td>Audio of added, replaced, imported or normalized samples.</td></tr>
 <tr><td><code>settings.json</code></td><td>The master bus and the shared returns, the colour scheme, the zoom, the sound output, the MIDI ports, clock and controls, the update check, and where you left off (<code>resume</code>, below).</td></tr>
@@ -166,7 +166,7 @@ noted in <code>location.json</code> in the default folder. <strong>Help › Abou
 <p><code>synth_presets.json</code>, written by earlier versions, is now only read: a library saved before has no
 presets of its own and takes those. To start again from the starter library, use <strong>Help › Factory reset...</strong>
 (<a href="#updates">section 21</a>), or <strong>File › Load the starter library...</strong> for the library alone.</p>
-<p><strong>Where you left off.</strong> The app starts on the pattern and the arrangement you had chosen, in the mode
+<p><strong>Where you left off.</strong> The app starts on the pattern and the song you had chosen, in the mode
 (pattern or song) and the view you had open (grid, piano roll, song panel, synth, mixer), with the track editor, the note
 editor, the VU meters and the kit editor shown or hidden as you left them. It is written to <code>settings.json</code>
 (<code>resume</code>) when you quit.</p>
@@ -258,11 +258,11 @@ for low vision or a bright room (every text at least 7:1 against its ground, WCA
 <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>) redoes, up to 50 steps. The <strong>Edit</strong> menu names
 the step it will undo or redo. This includes the synth presets, which are part of the library (a knob turned is
 one step, a preset deleted one), the kit chosen, and the project's name and description. Kit edits and the mixer's returns and master are saved directly and are not undo steps (a track's sends, pan and volume are).</p>
-<p>What can be undone is done at once — deleting a track, a clip, an arrangement, clearing notes, random notes,
+<p>What can be undone is done at once — deleting a track, a clip, a song, clearing notes, random notes,
 compacting tracks… — and its message on the status line ends with <em>(Ctrl+Z: undo)</em>. What cannot be undone
 asks first, <kbd>Enter</kbd> goes on, <kbd>Esc</kbd> or a click cancels: removing a kit's sample, restoring user
 data, changing the user data folder, a factory reset, and an export that would replace a file. Opening or importing a
-project or a library, and loading the starter library, also ask first, as they replace every pattern and arrangement,
+project or a library, and loading the starter library, also ask first, as they replace every pattern and song,
 though each one is an undo step.</p>
 
 <!-- ───────────────────────────────────────────────────────────── -->
@@ -278,7 +278,7 @@ use <kbd>←</kbd> <kbd>→</kbd> between menus, <kbd>↑</kbd> <kbd>↓</kbd> b
 <tr><th>Command</th><th>Shortcut</th><th>What it does</th></tr>
 <tr><td>Save</td><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Save the library now (it is also saved on its own after each edit).</td></tr>
 <tr><td>Open project...</td><td><kbd>Ctrl</kbd>+<kbd>O</kbd></td><td>List the projects in <code>songs/</code> and open one (replaces the library; confirmed).</td></tr>
-<tr><td>Save project</td><td></td><td>Write the project (patterns, arrangements, selection) to <code>songs/&lt;name&gt;.odbox</code> in the user data folder.</td></tr>
+<tr><td>Save project</td><td></td><td>Write the project (patterns, songs, selection) to <code>songs/&lt;name&gt;.odbox</code> in the user data folder.</td></tr>
 <tr><td>Save project as...</td><td></td><td>Write the project file to a folder you pick.</td></tr>
 <tr><td>Export project...</td><td></td><td>Write the <code>.odbox</code> project file to a folder you pick.</td></tr>
 <tr><td>Import project...</td><td></td><td>Read a <code>.odbox</code> file (replaces the library; confirmed).</td></tr>
@@ -292,9 +292,9 @@ use <kbd>←</kbd> <kbd>→</kbd> between menus, <kbd>↑</kbd> <kbd>↓</kbd> b
 <tr><td>Export pattern as JSON...</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>Write <code>ordrumbox-&lt;name&gt;.json</code> to a folder you pick.</td></tr>
 <tr><td>Export pattern as MIDI...</td><td><kbd>Ctrl</kbd>+<kbd>M</kbd> (macOS: <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd>)</td><td>Write the pattern as a type 1 MIDI file, as many loops as chosen (1 to 64).</td></tr>
 <tr><td>Export pattern as WAV...</td><td><kbd>Ctrl</kbd>+<kbd>E</kbd></td><td>Render the pattern to a 16-bit 44.1 kHz WAV, as many loops as chosen (1 to 64).</td></tr>
-<tr><td>Export song as WAV...</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Render the whole selected arrangement to WAV.</td></tr>
+<tr><td>Export song as WAV...</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>Render the whole selected song to WAV.</td></tr>
 <tr><td>Export pattern stems...</td><td></td><td>Write a folder <code>ordrumbox-&lt;name&gt;-stems</code> in the folder you pick, with one WAV per track (<code>01-KICK.wav</code>, <code>02-SNARE.wav</code>...), all as long as the pattern. Each track comes as its strip leaves it (volume, pan, filter, effects), before the master bus; a track with no sound is left out.</td></tr>
-<tr><td>Export song stems...</td><td></td><td>The same for the whole selected arrangement: a track is the one at that position in each pattern played.</td></tr>
+<tr><td>Export song stems...</td><td></td><td>The same for the whole selected song: a track is the one at that position in each pattern played.</td></tr>
 <tr><td>Back up user data...</td><td></td><td>Copy all your files to a folder <code>orDrumbox-backup-&lt;date&gt;-&lt;time&gt;</code> (UTC).</td></tr>
 <tr><td>Restore user data...</td><td></td><td>Put such a backup back; the files there are moved to <code>backups/</code> first (confirmed).</td></tr>
 <tr><td>Change user data folder...</td><td></td><td>Use another folder from now on; your files are copied there (confirmed).</td></tr>
@@ -349,7 +349,7 @@ use <kbd>←</kbd> <kbd>→</kbd> between menus, <kbd>↑</kbd> <kbd>↓</kbd> b
 <tr><td>Duplicate pattern</td><td><kbd>Ctrl</kbd>+<kbd>D</kbd></td><td>Copy the current pattern.</td></tr>
 <tr><td>Rename pattern...</td><td></td><td>Edit the pattern's name.</td></tr>
 <tr><td>Pattern description...</td><td></td><td>Edit the pattern's description.</td></tr>
-<tr><td>Pattern tags...</td><td></td><td>Edit the pattern's tags, its genre first (<a href="#song-tags">see Tags</a>).</td></tr>
+<tr><td>Pattern tags...</td><td></td><td>Edit the pattern's tags, its style first (<a href="#song-tags">see Tags</a>).</td></tr>
 <tr><td>Previous / Next pattern</td><td><kbd>[</kbd> <kbd>]</kbd></td><td>Step through the library's patterns (also <kbd>Page Up</kbd> / <kbd>Page Down</kbd>).</td></tr>
 <tr><td>Random pattern</td><td><kbd>F</kbd></td><td>Jump to a random pattern of the library.</td></tr>
 <tr><td>Tempo -1 / +1</td><td><kbd>-</kbd> <kbd>=</kbd></td><td>Change the tempo by 1 BPM (<kbd>Shift</kbd>: by 10).</td></tr>
@@ -381,7 +381,7 @@ use <kbd>←</kbd> <kbd>→</kbd> between menus, <kbd>↑</kbd> <kbd>↓</kbd> b
 <table>
 <tr><th>Command</th><th>Shortcut</th><th>What it does</th></tr>
 <tr><td>Play pattern</td><td><kbd>Space</kbd></td><td>Play / stop the current pattern in a loop.</td></tr>
-<tr><td>Play song</td><td><kbd>Shift</kbd>+<kbd>Space</kbd></td><td>Play the selected arrangement from the song cursor.</td></tr>
+<tr><td>Play song</td><td><kbd>Shift</kbd>+<kbd>Space</kbd></td><td>Play the selected song from the song cursor.</td></tr>
 <tr><td>Rewind</td><td><kbd>Home</kbd></td><td>Back to the first beat, or the first measure of the song.</td></tr>
 <tr><td>Loop the song</td><td><kbd>Ctrl</kbd>+<kbd>L</kbd></td><td>Turn the song's loop (drawn on the song ruler) off, or on again (<a href="#song-loop">see the song panel</a>).</td></tr>
 <tr><td>Clear the loop</td><td></td><td>Remove the song's loop.</td></tr>
@@ -400,10 +400,10 @@ use <kbd>←</kbd> <kbd>→</kbd> between menus, <kbd>↑</kbd> <kbd>↓</kbd> b
 <table>
 <tr><th>Command</th><th>Shortcut</th><th>What it does</th></tr>
 <tr><td>Song view</td><td><kbd>F3</kbd></td><td>Show / hide the song panel.</td></tr>
-<tr><td>Play song</td><td><kbd>Shift</kbd>+<kbd>Space</kbd></td><td>Play the selected arrangement.</td></tr>
-<tr><td>New arrangement...</td><td></td><td>Add an arrangement.</td></tr>
-<tr><td>Remove arrangement</td><td></td><td>Remove the selected arrangement.</td></tr>
-<tr><td>Previous / Next arrangement</td><td><kbd>Shift</kbd>+<kbd>[</kbd> <kbd>Shift</kbd>+<kbd>]</kbd></td><td>Select another arrangement.</td></tr>
+<tr><td>Play song</td><td><kbd>Shift</kbd>+<kbd>Space</kbd></td><td>Play the selected song.</td></tr>
+<tr><td>New song...</td><td></td><td>Add a song.</td></tr>
+<tr><td>Remove song</td><td></td><td>Remove the selected song.</td></tr>
+<tr><td>Previous / Next song</td><td><kbd>Shift</kbd>+<kbd>[</kbd> <kbd>Shift</kbd>+<kbd>]</kbd></td><td>Select another song.</td></tr>
 </table>
 
 <h3>Kit</h3>
@@ -450,7 +450,7 @@ slip off the play keys changes nothing; pressed alone, they say so on the status
 <tr><td><strong>REC</strong></td><td>Button, song mode</td><td>Record automation: while the song plays, the mixer's controls write their lanes (<a href="#automation">section 11</a>). Same as <strong>Play › Record automation</strong>.</td></tr>
 <tr><td><strong>BPM</strong></td><td>Knob, 20–300</td><td>The session's tempo, which every pattern plays at; in the song panel, the selected song's.</td></tr>
 <tr><td><strong>MODE</strong></td><td><strong>PATTERN</strong> <strong>SONG</strong> (<kbd>F5</kbd>, <kbd>F3</kbd>)</td><td>What <strong>PLAY</strong> and <kbd>Space</kbd> play: one pattern in a loop, or the song, its patterns one after another. The mode shown is lit. Only this switch changes it: the views and their keys leave it as it is. In song mode the grid and the piano roll show the pattern the song is playing, with its playhead; back from the song to the pattern, the pattern keeps the song's tempo.</td></tr>
-<tr><td><strong>PATTERN</strong></td><td>List</td><td>Pick a pattern: the list opens on the genres (each with how many patterns it has, the one shown highlighted), and a genre opens its patterns beside it; the patterns without a genre are under <em>other</em> (<a href="#song-tags">see Tags</a>). <kbd>[</kbd> <kbd>]</kbd> still step through the whole library. While playing, the pattern picked waits for the one playing to end its loop: the label reads <strong>NEXT</strong> until it starts.</td></tr>
+<tr><td><strong>PATTERN</strong></td><td>List</td><td>Pick a pattern: the list opens on the styles (each with how many patterns it has, the one shown highlighted), and a style opens its patterns beside it; the patterns without a style are under <em>other</em> (<a href="#song-tags">see Tags</a>). <kbd>[</kbd> <kbd>]</kbd> still step through the whole library. While playing, the pattern picked waits for the one playing to end its loop: the label reads <strong>NEXT</strong> until it starts.</td></tr>
 <tr><td><strong>BEATS</strong></td><td>List, 1–16 then every 4th up to 64</td><td>The pattern's length in beats.</td></tr>
 <tr><td><strong>KIT</strong></td><td>List</td><td>The kit the tracks draw their samples from. It is kept with the library and its projects (one undo step), and comes back at the next start and with a project loaded.</td></tr>
 <tr><td><strong>STYLE</strong></td><td>List</td><td>The 14 styles, the learned styles, or random. Picking one makes the pattern again in it.</td></tr>
@@ -770,22 +770,22 @@ The note editor stays under it.</p>
 
 <!-- ───────────────────────────────────────────────────────────── -->
 <h2 id="song">11. Song panel</h2>
-<p><kbd>F3</kbd>. A <strong>project</strong> is the library: its patterns and one or more <strong>arrangements</strong>,
-saved under a name as an <code>.odbox</code> file. An arrangement is a song: it places patterns as <strong>clips</strong>
+<p><kbd>F3</kbd>. A <strong>project</strong> is the library: its patterns and one or more <strong>songs</strong>,
+saved under a name as an <code>.odbox</code> file. A song places patterns as <strong>clips</strong>
 on a timeline of measures.</p>
 <figure>
-  <img src="images/song-panel.png" alt="The song panel: arrangement grid, pattern list, description and song buttons">
-  <figcaption>The song panel: the arrangement on top (one row per pattern, one bar per clip), the pattern list, the selected pattern's description, the project's information and buttons.</figcaption>
+  <img src="images/song-panel.png" alt="The song panel: song grid, pattern list, description and song buttons">
+  <figcaption>The song panel: the song on top (one row per pattern, one bar per clip), the pattern list, the selected pattern's description, the project's information and buttons.</figcaption>
 </figure>
 
 <h3>Layout</h3>
 <ul>
-  <li><strong>Arrangement grid</strong> (top, full width): a ruler of measures; one row per pattern used, named on the left
+  <li><strong>Song grid</strong> (top, full width): a ruler of measures; one row per pattern used, named on the left
       (a pattern gone from the library keeps its row, in red); each clip a bar over its measures, in the pattern's colour.
       Under the rows, the <strong>automation lanes</strong> and the <strong>+ NEW AUTOMATION</strong> button
       (<a href="#automation">see Automation lanes</a>).</li>
   <li><strong>Pattern list</strong> (bottom left): the library's patterns, and the selected pattern's tags and description (click either to edit).</li>
-  <li><strong>Project info</strong> (bottom right): the project's name and description (click to edit), its date, the arrangement list,
+  <li><strong>Project info</strong> (bottom right): the project's name and description (click to edit), its date, the song list,
       and the buttons <strong>Save</strong>, <strong>Save as</strong>, <strong>Open</strong>, <strong>Export</strong>, <strong>Import</strong>,
       <strong>New</strong>, <strong>Delete</strong>.</li>
 </ul>
@@ -800,8 +800,8 @@ on a timeline of measures.</p>
 <tr><td>Open</td><td>List the saved projects and open one (replaces the library; confirmed).</td></tr>
 <tr><td>Export</td><td>Write the project file to a folder you pick.</td></tr>
 <tr><td>Import</td><td>Read a <code>.odbox</code> file (replaces the library; confirmed).</td></tr>
-<tr><td>New</td><td>Add an arrangement.</td></tr>
-<tr><td>Delete</td><td>Remove the selected arrangement.</td></tr>
+<tr><td>New</td><td>Add a song.</td></tr>
+<tr><td>Delete</td><td>Remove the selected song.</td></tr>
 </table>
 
 <h3>Mouse</h3>
@@ -810,17 +810,17 @@ on a timeline of measures.</p>
 <tr><td>Click the ruler</td><td>Set the song cursor (where the song plays from). While playing, playback jumps there. A click leaves the loop as it is.</td></tr>
 <tr><td>Drag along the ruler</td><td>Select the song's loop (<a href="#song-loop">see The song's loop</a>).</td></tr>
 <tr><td>Click a pattern of the list</td><td>Show it.</td></tr>
-<tr><td>Click an empty cell of the arrangement</td><td>Add the row's pattern at that measure, selected (one undo step).</td></tr>
+<tr><td>Click an empty cell of the song</td><td>Add the row's pattern at that measure, selected (one undo step).</td></tr>
 <tr><td>Click a clip</td><td>Select it (a pink outline): <kbd>Delete</kbd> removes it, <kbd>Ctrl</kbd>+<kbd>D</kbd> repeats it right after itself, the copy then selected.</td></tr>
 <tr><td>Click a row's name</td><td>Show its pattern.</td></tr>
 <tr><td>Drag a pattern along the list</td><td>Move it in the list.</td></tr>
-<tr><td>Drag a pattern onto the arrangement</td><td>Add it at that measure, on its own row (a tooltip shows the measure).</td></tr>
+<tr><td>Drag a pattern onto the song</td><td>Add it at that measure, on its own row (a tooltip shows the measure).</td></tr>
 <tr><td>Drag a clip sideways</td><td>Move it, whole measures at a time (the wheel scrolls during the drag; there is a page past the end to drop on).</td></tr>
 <tr><td>Double-click a clip</td><td>Open its pattern in the grid, in pattern mode.</td></tr>
 <tr><td>Drag a row by its name</td><td>Move the row up or down (its pattern moves in the list too).</td></tr>
 <tr><td>Wheel</td><td>Scroll the list, the description, or the measures (<kbd>Shift</kbd>: the rows). The scroll bars can be clicked or dragged.</td></tr>
 <tr><td>Drag an end of the horizontal scroll bar's thumb (its light handles)</td><td>Zoom, as on a DAW timeline: show more or fewer measures, the other end staying where it is. Drag the thumb's middle to scroll.</td></tr>
-<tr><td><kbd>Ctrl</kbd> + wheel over the arrangement</td><td>Zoom around the measure under the pointer.</td></tr>
+<tr><td><kbd>Ctrl</kbd> + wheel over the song</td><td>Zoom around the measure under the pointer.</td></tr>
 </table>
 <p>The pointer tells what a drag does: a hand over the thumb of a scroll bar (closed while held), sideways arrows over the
 zoom handles. The help line at the bottom of the window says what the mouse does on what is under it.</p>
@@ -853,16 +853,16 @@ A menu line that has a key shows it at its right end (<strong>Next</strong> <kbd
 <tr><td><kbd>Ctrl</kbd>+<kbd>D</kbd></td><td>Repeat the clip selected right after itself (with no clip selected: duplicate the pattern).</td></tr>
 <tr><td><kbd>Esc</kbd></td><td>Back to the grid.</td></tr>
 </table>
-<p>While the song plays, the grid follows it page by page. Each edit of the arrangement is an undo step.</p>
+<p>While the song plays, the grid follows it page by page. Each edit of the song is an undo step.</p>
 
 <h3 id="song-tags">Tags</h3>
 <p>Under the selected pattern's description, the <strong>Tags</strong> line: a click edits them, separated by commas
 (<code>funk, bass, chords</code>), as does <strong>Pattern › Tags...</strong>. They are kept in lower case, without repeats;
-a change is one undo step. A tag is a <strong>genre</strong> (rock, funk, reggae…) or a <strong>feature</strong>, what the
+a change is one undo step. A tag is a <strong>style</strong> (rock, funk, reggae…) or a <strong>feature</strong>, what the
 pattern has: <code>bass</code>, <code>chords</code>, <code>lead</code>, <code>pad</code>, <code>synth</code>, <code>organ</code>,
 <code>strings</code>, <code>brass</code>, <code>piano</code>, <code>clavinet</code>, <code>arpeggio</code>, <code>polyrhythm</code>,
-<code>polymeter</code>. The first genre is the pattern's: it lists the pattern under it in the header's PATTERN list, and is drawn
-brighter than the other tags. Genres teach the styles (<a href="#generation">Learned styles</a>); features teach nothing.</p>
+<code>polymeter</code>. The first style is the pattern's: it lists the pattern under it in the header's PATTERN list, and is drawn
+brighter than the other tags. Style tags teach the styles (<a href="#generation">Learned styles</a>); features teach nothing.</p>
 
 <h3 id="song-loop">The song's loop</h3>
 <p>A <strong>drag</strong> along the ruler selects the part of the song that plays in a loop: whole measures, beats or steps,
@@ -874,7 +874,7 @@ the ruler loops the song from the cursor's measure to the one clicked.</p>
 
 <h3 id="automation">Automation lanes</h3>
 <p>A lane changes one setting of one instrument along the song, step by step, over what its patterns say.
-<strong>+ NEW AUTOMATION</strong>, under the arrangement's rows, lists the instruments the song's patterns play; pick one,
+<strong>+ NEW AUTOMATION</strong>, under the song's rows, lists the instruments the song's patterns play; pick one,
 then the control, and its lane appears under the patterns. The panel opens zoomed in far enough to show each step
 (a sixteenth note). Lanes are saved with the song.</p>
 <table>
@@ -1166,7 +1166,7 @@ complexity, syncopation, coupling to another part, variation, ghost notes and ro
 
 <h3>Learned styles</h3>
 <p>Tag patterns with a style's name (or alias) and the style moves toward what they play — each part's weights and hits, the
-required steps, the swing — in proportion to the measures seen. A genre tag that names no style becomes a style of its own;
+required steps, the swing — in proportion to the measures seen. A style tag that names no known style becomes a style of its own;
 a feature tag (a bass, chords: <a href="#song-tags">see Tags</a>) teaches nothing. Fewer than
 4 measures teach nothing. The STYLE list shows them.</p>
 
@@ -1186,7 +1186,7 @@ chord lines hold through the section. These lines are saved but are not undo ste
 <tr><td>Pattern as JSON</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td><code>ordrumbox-&lt;name&gt;.json</code></td></tr>
 <tr><td>Pattern as MIDI</td><td><kbd>Ctrl</kbd>+<kbd>M</kbd> (macOS: <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd>)</td><td>Type 1, 96 PPQN; drums on channel 10 at their GM keys, melodic instruments on their own channels at the sample's root note.</td></tr>
 <tr><td>Pattern as WAV</td><td><kbd>Ctrl</kbd>+<kbd>E</kbd></td><td>16-bit, 44.1 kHz, the pattern once, no tail.</td></tr>
-<tr><td>Song as WAV</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>The whole selected arrangement.</td></tr>
+<tr><td>Song as WAV</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>The whole selected song.</td></tr>
 <tr><td>Project file</td><td>File › Save project / Save project as / Export project</td><td><code>.odbox</code></td></tr>
 <tr><td>Library</td><td>File › Export library</td><td><code>ordrumbox-library.json</code>, synth presets included</td></tr>
 <tr><td>Kit mapping</td><td>File › Export kit mapping, or <kbd>E</kbd> in the kit editor</td><td><code>.json</code></td></tr>
@@ -1240,7 +1240,7 @@ two rows that play, read by their place: <kbd>1</kbd>–<kbd>9</kbd> (mute, <kbd
 <tr><td><kbd>Ctrl</kbd>+<kbd>R</kbd></td><td>Record: while the pattern plays, <kbd>Q</kbd>–<kbd>P</kbd> also put a note on the step that plays. With <strong>Play › Record off the grid</strong> on, the note keeps how early or late it was played, as its Shift.</td></tr>
 <tr><td><kbd>Ctrl</kbd>+<kbd>,</kbd></td><td>Preferences: sound output, MIDI input (a keyboard or pad plays the tracks, and is recorded with <kbd>Ctrl</kbd>+<kbd>R</kbd>; a note on channel 16 chooses the pattern: key 0 the first, key 1 the second…, and a playing pattern switches at once), MIDI clock in (follow another machine), MIDI output and clock out, metronome, VU meters, toasts. <strong>Edit &gt; MIDI controls</strong> binds the knobs of a MIDI controller to the master volume or a track's volume, pan, cutoff or mute (Learn, then turn the knob).</td></tr>
 <tr><td><kbd>F11</kbd>, <kbd>Ctrl</kbd>+<kbd>W</kbd></td><td>Full screen; close the window.</td></tr>
-<tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>Previous / next pattern (<kbd>Shift</kbd>: arrangement; also <kbd>Page Up</kbd> <kbd>Page Down</kbd>)</td></tr>
+<tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>Previous / next pattern (<kbd>Shift</kbd>: song; also <kbd>Page Up</kbd> <kbd>Page Down</kbd>)</td></tr>
 <tr><td><kbd>-</kbd> <kbd>=</kbd></td><td>Tempo −1 / +1 (<kbd>Shift</kbd>: ×10)</td></tr>
 <tr><td><kbd>,</kbd> <kbd>.</kbd></td><td>Previous / next kit</td></tr>
 <tr><td><kbd>1</kbd>–<kbd>9</kbd></td><td>Mute track 1–9 (<kbd>Shift</kbd>: solo), in every view</td></tr>
@@ -1337,7 +1337,7 @@ closed, a call answers that orDrumbox is not running. While a confirmation is op
 <p>In the client's settings (use the program's path; <code>ordrumbox.exe</code> on Windows):</p>
 <pre>{ "mcpServers": { "ordrumbox": { "command": "/path/to/ordrumbox", "args": ["--mcp"] } } }</pre>
 <p>The tools cover patterns (list, create, select, rename, duplicate, remove, notes, tracks, tempo, length, tags, description),
-arrangements and clips, project files, kits and samples, synth presets, the master bus, exports (WAV, MIDI, JSON), MIDI import,
+songs and clips, project files, kits and samples, synth presets, the master bus, exports (WAV, MIDI, JSON), MIDI import,
 play, stop, undo and redo, and the playback state. The client writes the notes itself; orDrumbox's automatic generation
 (generate, regenerate, auto mode, macros, random notes) is used only when you ask for it in words.</p>
 <p>New to this? The <a href="mcp-guide.html">beginner's guide to the AI link</a> walks through the setup and worked examples.</p>

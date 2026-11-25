@@ -70,8 +70,7 @@ fn patterns_are_shown_and_removed() {
     assert_eq!(s.pattern_index, 1);
     assert!(call(&mut s, "selectPattern", r#"{"index":3}"#).is_err());
     assert_eq!(get(&call(&mut s, "listPatterns", "{}").unwrap(), &["shown"]).as_f64(), Some(1.0));
-    call(&mut s, "createArrangement", r#"{"name":"song","clips":[{"patternName":"jazz"},{"patternName":"rock"}]}"#)
-        .unwrap();
+    call(&mut s, "createSong", r#"{"name":"song","clips":[{"patternName":"jazz"},{"patternName":"rock"}]}"#).unwrap();
     call(&mut s, "selectPattern", r#"{"patternName":"house"}"#).unwrap();
     let removed = call(&mut s, "removePattern", r#"{"patternName":"jazz"}"#).unwrap();
     assert_eq!(removed.to_json(), r#"{"removed":"jazz","clipsRemoved":1}"#);
@@ -83,19 +82,19 @@ fn patterns_are_shown_and_removed() {
 }
 
 #[test]
-fn arrangements_are_selected_and_removed() {
+fn songs_are_selected_and_removed() {
     let mut s = session();
-    call(&mut s, "createArrangement", r#"{"name":"A","clips":[{"patternName":"rock","measureCount":2}]}"#).unwrap();
-    call(&mut s, "createArrangement", r#"{"name":"B"}"#).unwrap();
+    call(&mut s, "createSong", r#"{"name":"A","clips":[{"patternName":"rock","measureCount":2}]}"#).unwrap();
+    call(&mut s, "createSong", r#"{"name":"B"}"#).unwrap();
     assert_eq!(s.editor.selected_song(), 1);
-    assert!(call(&mut s, "selectArrangement", "{}").is_err());
-    let selected = call(&mut s, "selectArrangement", r#"{"arrangement":"a"}"#).unwrap();
+    assert!(call(&mut s, "selectSong", "{}").is_err());
+    let selected = call(&mut s, "selectSong", r#"{"song":"a"}"#).unwrap();
     assert_eq!((s.editor.selected_song(), get(&selected, &["name"]).as_str()), (0, Some("A")));
     let info = call(&mut s, "setProjectInfo", r#"{"name":" Live set ","description":"two parts"}"#).unwrap();
     assert_eq!(info.to_json(), r#"{"name":"Live set","description":"two parts"}"#);
     assert!(call(&mut s, "setProjectInfo", r#"{"name":""}"#).is_err());
-    let removed = call(&mut s, "removeArrangement", r#"{"arrangement":"B"}"#).unwrap();
-    assert_eq!(removed.to_json(), r#"{"removed":"B","arrangements":1}"#);
+    let removed = call(&mut s, "removeSong", r#"{"song":"B"}"#).unwrap();
+    assert_eq!(removed.to_json(), r#"{"removed":"B","songs":1}"#);
 }
 
 #[test]
@@ -367,7 +366,7 @@ fn kits_are_listed_chosen_and_changed() {
 #[test]
 fn playback_is_started_followed_and_stopped() {
     let mut s = session();
-    let sample = KitSample { key: "KICK".into(), path: "k".into(), decay: Some(100.0), ..Default::default() };
+    let sample = KitSample { key: "KICK".into(), path: "k".into(), decay_ms: Some(100.0), ..Default::default() };
     let buffer = SampleBuffer::mono(vec![0.5; 400], RATE as u32).into();
     let bank = Arc::new(SampleBank { samples: vec![BankSample { kit: "x".into(), sample, buffer }] });
     let (controller, mut audio) =
@@ -389,15 +388,15 @@ fn playback_is_started_followed_and_stopped() {
     let auditioned = call(&mut s, "auditionTrack", r#"{"patternName":"rock","trackName":"kick"}"#).unwrap();
     assert_eq!(auditioned.to_json(), r#"{"trackName":"KICK"}"#);
 
-    assert_eq!(call(&mut s, "play", r#"{"song":true}"#), Err("No arrangement to play: createArrangement".into()));
-    call(&mut s, "createArrangement", r#"{"name":"A","clips":[{"patternName":"rock"}]}"#).unwrap();
+    assert_eq!(call(&mut s, "play", r#"{"song":true}"#), Err("No song to play: createSong".into()));
+    call(&mut s, "createSong", r#"{"name":"A","clips":[{"patternName":"rock"}]}"#).unwrap();
     assert_eq!(call(&mut s, "play", r#"{"song":true}"#).unwrap().to_json(), r#"{"playing":"A"}"#);
     render(&mut s);
     let state = call(&mut s, "getPlaybackState", "{}").unwrap();
-    assert_eq!(get(&state, &["arrangement"]).as_str(), Some("A"));
+    assert_eq!(get(&state, &["song"]).as_str(), Some("A"));
     assert!(get(&state, &["measure"]).as_f64().is_some(), "{state}");
-    // An arrangement removed while it plays stops it.
-    call(&mut s, "removeArrangement", r#"{"arrangement":"A"}"#).unwrap();
+    // A song removed while it plays stops it.
+    call(&mut s, "removeSong", r#"{"song":"A"}"#).unwrap();
     assert_eq!(call(&mut s, "getPlaybackState", "{}").unwrap().to_json(), r#"{"playing":false}"#);
 
     call(&mut s, "play", "{}").unwrap();

@@ -167,7 +167,7 @@ mod tests {
         let (x, _) = at(&s, 0.62);
         s.mouse_move(SIZE, x, y, false);
         s.mouse_up();
-        assert_eq!(s.kits.sample(0, 0).unwrap().end, Some(620.0), "on the crossing at 620 ms");
+        assert_eq!(s.kits.sample(0, 0).unwrap().end_ms, Some(620.0), "on the crossing at 620 ms");
         assert!(s.kit_editor.wave_drag.is_none());
     }
 
@@ -183,7 +183,7 @@ mod tests {
         let (x, _) = at(&s, 0.41);
         s.mouse_move(SIZE, x, y, false);
         s.mouse_up();
-        assert_eq!(s.kits.sample(0, 0).unwrap().loop_start, Some(410.0), "on the crossing at 410 ms");
+        assert_eq!(s.kits.sample(0, 0).unwrap().loop_start_ms, Some(410.0), "on the crossing at 410 ms");
     }
 
     #[test]

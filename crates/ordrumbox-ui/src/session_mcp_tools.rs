@@ -43,12 +43,12 @@ impl Session {
                 let path = self.mcp_export_path(Export::PatternMidi, p, 0)?;
                 exported(&path, self.write_midi(p, loop_count, &path)?)
             }
-            "exportArrangementWav" => {
+            "exportSongWav" => {
                 let s = find_song(&self.editor, args)?;
                 let path = self.mcp_export_path(Export::SongWav, 0, s)?;
                 exported(&path, self.write_wav(WavSource::Song(s), &path)?)
             }
-            "exportArrangementStems" => {
+            "exportSongStems" => {
                 let s = find_song(&self.editor, args)?;
                 let path = self.mcp_export_path(Export::SongStems, 0, s)?;
                 exported(&path, self.write_stems(Mode::Song(s), &path)?)
@@ -74,8 +74,8 @@ impl Session {
         .map(Some)
     }
 
-    /// Which pattern or arrangement is shown, and the arrangements. `Ok(None)` when `name` is not one of them.
-    pub(super) fn mcp_arrangement_tool(&mut self, name: &str, args: &Value) -> Result<Option<Value>, String> {
+    /// Which pattern or song is shown, and the songs. `Ok(None)` when `name` is not one of them.
+    pub(super) fn mcp_song_tool(&mut self, name: &str, args: &Value) -> Result<Option<Value>, String> {
         match name {
             "listPatterns" => self.mcp_library_tool(name, args).map(|mut answer| {
                 if let Some(object) = answer.as_object_mut() {
@@ -83,17 +83,17 @@ impl Session {
                 }
                 answer
             }),
-            "createArrangement" => {
+            "createSong" => {
                 let answer = self.mcp_library_tool(name, args)?;
                 self.song_panel.scroll_to_start();
                 Ok(answer)
             }
             "selectPattern" => self.mcp_select_pattern(args),
             "removePattern" => self.mcp_remove_pattern(args),
-            "removeArrangement" => self.mcp_remove_arrangement(args),
-            "selectArrangement" => {
-                if args.get("arrangement").is_none_or(|a| *a == Value::Null) {
-                    return Err("arrangement is required".into());
+            "removeSong" => self.mcp_remove_song(args),
+            "selectSong" => {
+                if args.get("song").is_none_or(|a| *a == Value::Null) {
+                    return Err("song is required".into());
                 }
                 let s = find_song(&self.editor, args)?;
                 self.select_song(s);

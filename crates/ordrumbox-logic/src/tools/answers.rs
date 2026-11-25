@@ -60,7 +60,7 @@ pub fn pattern_summary(index: usize, pattern: &Pattern) -> Value {
     ])
 }
 
-/// Arrangement `s` as a tool shows it: its settings and its clips.
+/// Song `s` as a tool shows it: its settings and its clips.
 pub fn song_json(library: &Library, s: usize) -> Value {
     let song = &library.songs[s];
     let clips = song.clips.iter().map(|clip| {
@@ -69,7 +69,7 @@ pub fn song_json(library: &Library, s: usize) -> Value {
             ("patternId", Value::from(clip.pattern_id.as_str())),
             ("patternName", name.map_or(Value::Null, Value::from)),
             ("startMeasure", Value::from(clip.start_measure)),
-            ("measureCount", Value::from(clip.measure_count)),
+            ("measureCount", Value::from(clip.length_measures)),
         ])
     });
     object([
@@ -88,7 +88,7 @@ pub(super) fn clip_json(clip: &SongClip) -> Value {
     object([
         ("patternId", Value::from(clip.pattern_id.as_str())),
         ("startMeasure", Value::from(clip.start_measure)),
-        ("measureCount", Value::from(clip.measure_count)),
+        ("measureCount", Value::from(clip.length_measures)),
     ])
 }
 

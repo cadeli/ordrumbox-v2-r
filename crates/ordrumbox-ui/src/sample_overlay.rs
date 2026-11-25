@@ -57,15 +57,15 @@ impl Shape {
     /// The playback settings of `sample`, whose length is `duration_ms`.
     #[must_use]
     pub fn of(sample: &KitSample, duration_ms: f64) -> Self {
-        let end_ms = sample.end.unwrap_or(duration_ms);
+        let end_ms = sample.end_ms.unwrap_or(duration_ms);
         Self {
             duration_ms,
-            start_ms: sample.start,
+            start_ms: sample.start_ms,
             end_ms,
-            loop_start_ms: sample.loop_start.unwrap_or(sample.start),
-            loop_end_ms: sample.loop_end.unwrap_or(end_ms),
+            loop_start_ms: sample.loop_start_ms.unwrap_or(sample.start_ms),
+            loop_end_ms: sample.loop_end_ms.unwrap_or(end_ms),
             attack_ms: sample.attack_ms(),
-            hold_ms: sample.hold,
+            hold_ms: sample.hold_ms,
             decay_ms: sample.decay_ms(),
             transpose: sample.transpose,
             reverse: sample.reverse,

@@ -1,13 +1,13 @@
 //! Drawing the song view: the list of patterns, the description and the
-//! arrangement.
+//! song.
 
 use super::*;
 
-/// Draw the list and the arrangement (the column is panel items).
+/// Draw the list and the song (the column is panel items).
 pub fn draw(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     draw_list(canvas, view, layout);
     draw_description(canvas, view, layout);
-    draw_arrangement(canvas, view, layout);
+    draw_song(canvas, view, layout);
 }
 
 fn draw_list(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
@@ -93,7 +93,7 @@ fn draw_description(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     }
 }
 
-/// The selected pattern's tags on their line: `Tags`, then its genre, then
+/// The selected pattern's tags on their line: `Tags`, then its style, then
 /// its features dimmer, as many as fit; a hint when it has none.
 fn draw_tags(canvas: &mut Canvas, tags: &[String], layout: &SongLayout) {
     let s = layout.scale;
@@ -103,14 +103,14 @@ fn draw_tags(canvas: &mut Canvas, tags: &[String], layout: &SongLayout) {
     let y = line.y + line.h - 8 * s;
     let mut x = canvas.text(line.x, y, "Tags", s, theme::muted()) + 8 * s;
     if tags.is_empty() {
-        canvas.text(x, y, &fit("(click: genre first, then features)", end - x, s), s, theme::muted());
+        canvas.text(x, y, &fit("(click: style first, then features)", end - x, s), s, theme::muted());
         return;
     }
-    let genre = tags.iter().position(|tag| !ordrumbox_core::tags::is_feature(tag));
+    let style = tags.iter().position(|tag| !ordrumbox_core::tags::is_feature(tag));
     for (i, tag) in tags.iter().enumerate() {
         let text = if i + 1 < tags.len() { format!("{tag},") } else { tag.clone() };
         let shown = fit(&text, end - x, s);
-        let color = if Some(i) == genre { theme::text() } else { theme::muted() };
+        let color = if Some(i) == style { theme::text() } else { theme::muted() };
         x = canvas.text(x, y, &shown, s, color) + text_width(" ", s);
         if shown != text {
             break;
@@ -118,7 +118,7 @@ fn draw_tags(canvas: &mut Canvas, tags: &[String], layout: &SongLayout) {
     }
 }
 
-/// What of the arrangement is on the page: the first measure and row shown,
+/// What of the song is on the page: the first measure and row shown,
 /// how many of each, the size of the body and where the cursor is.
 pub(super) struct Page {
     pub(super) first_measure: u32,
@@ -152,16 +152,16 @@ impl Page {
     }
 }
 
-fn draw_arrangement(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
+fn draw_song(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     let s = layout.scale;
     let g = layout.grid;
     let Some(song) = view.song else {
-        canvas.text(g.x, g.y, "No arrangement - Song > New arrangement makes one.", s, theme::muted());
+        canvas.text(g.x, g.y, "No song - Song > New song makes one.", s, theme::muted());
         return;
     };
-    let title = canvas.text(g.x, g.y, "Arrangement", s, theme::muted()) + 8 * s;
+    let title = canvas.text(g.x, g.y, "Song", s, theme::muted()) + 8 * s;
     let total = song.length_measures().max(1.0).ceil() as u32;
-    // The arrangement's own tempo, which it plays at (the header's knob in this panel).
+    // The song's own tempo, which it plays at (the header's knob in this panel).
     let bpm = ordrumbox_core::num::text(song.bpm);
     let meta = format!("{}  {} measures  plays at {bpm} BPM", song.name, total);
     canvas.text(title, g.y, &fit(&meta, g.x + g.w - title, s), s, theme::text());
@@ -267,7 +267,7 @@ fn draw_dragged_pattern(canvas: &mut Canvas, view: &SongView, layout: &SongLayou
     let Some(ghost) = &view.ghost else { return };
     let s = layout.scale;
     let row = ghost.row.clamp(page.first_row, page.first_row + layout.visible_rows() - 1);
-    if let Some(r) = layout.span_rect(row, ghost.measure, ghost.measure_count, view.scroll) {
+    if let Some(r) = layout.span_rect(row, ghost.measure, ghost.length_measures, view.scroll) {
         canvas.fill_rect(r.x, r.y, r.w, r.h, ACCENT);
     }
     if ghost.row >= view.rows.len() {
@@ -288,7 +288,7 @@ fn draw_row_drop(canvas: &mut Canvas, view: &SongView, layout: &SongLayout, page
     }
 }
 
-/// The scroll bars: what is shown, over the whole arrangement.
+/// The scroll bars: what is shown, over the whole song.
 fn draw_scroll_bars(canvas: &mut Canvas, view: &SongView, layout: &SongLayout, page: &Page) {
     let s = layout.scale;
     let bars = [

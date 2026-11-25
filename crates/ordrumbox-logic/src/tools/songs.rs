@@ -1,4 +1,4 @@
-//! The tools on arrangements: list, create, rename and update one, and add,
+//! The tools on songs: list, create, rename and update one, and add,
 //! remove, move or repeat its clips.
 
 use super::Tools;
@@ -7,13 +7,13 @@ use super::arguments::*;
 use ordrumbox_core::json::Value;
 
 impl Tools<'_> {
-    pub(super) fn list_arrangements(&self) -> Value {
+    pub(super) fn list_songs(&self) -> Value {
         let library = self.library();
         let songs = (0..library.songs.len()).map(|s| song_json(library, s));
-        object([("arrangements", Value::Array(songs.collect())), ("selected", count(self.editor.selected_song()))])
+        object([("songs", Value::Array(songs.collect())), ("selected", count(self.editor.selected_song()))])
     }
 
-    /// A clip of `createArrangement`: its pattern, start and length.
+    /// A clip of `createSong`: its pattern, start and length.
     pub(super) fn clip(&self, item: &Value, at: &str) -> Result<(String, u32, Option<f64>), String> {
         let p = self.pattern(text(item, "patternName").map_err(|e| format!("{at}.{e}"))?)?;
         let start = optional_whole(item, "startMeasure").map_err(|e| format!("{at}.{e}"))?.unwrap_or(0);
@@ -24,7 +24,7 @@ impl Tools<'_> {
         Ok((self.library().patterns[p].id.clone(), start, length))
     }
 
-    pub(super) fn create_arrangement(&mut self, args: &Value) -> Result<Value, String> {
+    pub(super) fn create_song(&mut self, args: &Value) -> Result<Value, String> {
         let name = text(args, "name")?.trim();
         if name.is_empty() {
             return Err("name is empty".into());
@@ -37,7 +37,7 @@ impl Tools<'_> {
                 items.map(|(i, item)| self.clip(item, &format!("clips[{i}]"))).collect::<Result<_, _>>()?
             }
         };
-        let s = self.editor.batch(&format!("Add arrangement \"{name}\""), |editor| {
+        let s = self.editor.batch(&format!("Add song \"{name}\""), |editor| {
             let s = editor.add_song(name);
             for (id, start, length) in &clips {
                 editor.add_pattern_at_measure(id, *start, *length, Some(s))?;
@@ -62,7 +62,7 @@ impl Tools<'_> {
         let s = find_song(self.editor, args)?;
         let (id, start, length) = self.clip(args, "arguments")?;
         let clip = self.editor.add_pattern_at_measure(&id, start, length, Some(s))?;
-        Ok(object([("clip", clip_json(&clip)), ("arrangement", song_json(self.library(), s))]))
+        Ok(object([("clip", clip_json(&clip)), ("song", song_json(self.library(), s))]))
     }
 
     pub(super) fn remove_clips(&mut self, args: &Value) -> Result<Value, String> {
@@ -88,10 +88,10 @@ impl Tools<'_> {
         if removed == 0 {
             return Err("No matching clip to remove".into());
         }
-        Ok(object([("removed", count(removed)), ("arrangement", song_json(self.library(), s))]))
+        Ok(object([("removed", count(removed)), ("song", song_json(self.library(), s))]))
     }
 
-    pub(super) fn update_arrangement(&mut self, args: &Value) -> Result<Value, String> {
+    pub(super) fn update_song(&mut self, args: &Value) -> Result<Value, String> {
         let s = find_song(self.editor, args)?;
         let (description, bpm, loop_measures) = song_settings(args)?;
         if description.is_none() && bpm.is_none() && loop_measures.is_none() {
@@ -101,7 +101,7 @@ impl Tools<'_> {
         Ok(self.song_json_with_bpm(s, bpm))
     }
 
-    pub(super) fn rename_arrangement(&mut self, args: &Value) -> Result<Value, String> {
+    pub(super) fn rename_song(&mut self, args: &Value) -> Result<Value, String> {
         let s = find_song(self.editor, args)?;
         let name = text(args, "newName")?.trim();
         if name.is_empty() {
@@ -109,7 +109,7 @@ impl Tools<'_> {
         }
         let songs = &self.library().songs;
         if songs.iter().enumerate().any(|(other, song)| other != s && same_name(&song.name, name)) {
-            return Err(format!("The library has an arrangement named \"{name}\" already"));
+            return Err(format!("The library has a song named \"{name}\" already"));
         }
         self.editor.rename_song(Some(s), name)?;
         Ok(song_json(self.library(), s))
@@ -139,6 +139,6 @@ impl Tools<'_> {
         let s = find_song(self.editor, args)?;
         let start = optional_whole(args, "startMeasure")?.ok_or("startMeasure is required")?;
         let clip = self.editor.repeat_pattern_at_measure(start, Some(s))?;
-        Ok(object([("clip", clip_json(&clip)), ("arrangement", song_json(self.library(), s))]))
+        Ok(object([("clip", clip_json(&clip)), ("song", song_json(self.library(), s))]))
     }
 }

@@ -46,8 +46,9 @@ impl Session {
     /// A mode button: the pattern or the song mode, and the view of that
     /// mode: the song panel, or the grid in its place (another view is left
     /// as it is for the pattern mode).
-    pub(super) fn show_mode(&mut self, song: bool) {
-        self.set_mode(if song { PlayMode::Song } else { PlayMode::Pattern });
+    pub(super) fn show_mode(&mut self, mode: PlayMode) {
+        self.set_mode(mode);
+        let song = mode == PlayMode::Song;
         if song != (self.workspace == Workspace::Song) || self.kit_editor.is_open() {
             self.show_view(if song { 2 } else { 0 });
         }
@@ -97,7 +98,12 @@ impl Session {
 
     /// What Space plays: the selected song in song mode, else the pattern.
     fn play_mode(&self) -> Mode {
-        match self.mode {
+        self.mode_of(self.mode)
+    }
+
+    /// What `mode` plays: the selected song, or the selected pattern.
+    pub(super) fn mode_of(&self, mode: PlayMode) -> Mode {
+        match mode {
             PlayMode::Song => Mode::Song(self.editor.selected_song()),
             PlayMode::Pattern => Mode::Pattern(self.pattern_index),
         }

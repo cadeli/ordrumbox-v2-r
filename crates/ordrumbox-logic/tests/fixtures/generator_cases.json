@@ -2858,7 +2858,7 @@
   {
    "seed": 611,
    "options": {
-    "genre": "reggae",
+    "style": "reggae",
     "keyOffset": 2,
     "scale": "major"
    },
@@ -2867,7 +2867,7 @@
   {
    "seed": 612,
    "options": {
-    "genre": "reggae",
+    "style": "reggae",
     "keyOffset": 2,
     "scale": "major"
    },

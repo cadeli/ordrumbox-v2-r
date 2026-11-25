@@ -12,7 +12,7 @@ fn bank() -> Arc<SampleBank> {
         key: "K".into(),
         display_name: "k".into(),
         path: "k".into(),
-        decay: Some(10_000.0),
+        decay_ms: Some(10_000.0),
         ..Default::default()
     };
     Arc::new(SampleBank {

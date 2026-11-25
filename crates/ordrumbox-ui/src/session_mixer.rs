@@ -11,7 +11,7 @@ use crate::canvas::{Canvas, fit};
 use crate::control::{Format, Spec};
 use crate::mixer::{self, MixerLayout, MixerView, TRACK_KNOBS};
 use crate::output::{self, Param};
-use crate::panel::{self, Id, Item, Kind, Rect};
+use crate::panel::{self, Id, Item, Kind, Rect, Step};
 use crate::scale::Scale;
 use crate::view::Hit;
 use crate::{frame, master, returns, theme};
@@ -198,13 +198,16 @@ impl Session {
         self.update_track(t, &[(key, number(value))], &description, true);
     }
 
-    /// The track strips one further on (`later`) or back, held at the ends.
-    fn scroll_mixer(&mut self, later: bool) {
+    /// The track strips one further on or back, held at the ends.
+    fn scroll_mixer(&mut self, step: Step) {
         let count = self.pattern().map_or(0, |p| p.tracks.len());
         let fits = self.mixer_layout(self.chrome.panel_size).fits;
         let last_first = count.saturating_sub(fits);
         let first = self.mixer.first.min(last_first);
-        self.mixer.first = if later { (first + 1).min(last_first) } else { first.saturating_sub(1) };
+        self.mixer.first = match step {
+            Step::Next => (first + 1).min(last_first),
+            Step::Previous => first.saturating_sub(1),
+        };
     }
 
     /// A press on the track strips' scroll bar, when there is one: the thumb
@@ -259,7 +262,7 @@ impl Session {
         if over {
             self.chrome.panel_size = size;
             for _ in 0..lines.unsigned_abs() {
-                self.scroll_mixer(lines < 0);
+                self.scroll_mixer(if lines < 0 { Step::Next } else { Step::Previous });
             }
         }
         over

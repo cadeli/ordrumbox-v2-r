@@ -49,7 +49,7 @@ impl Session {
         self.toggle(Mode::Pattern(self.pattern_index), 0);
     }
 
-    /// Shift+Space: play or stop the selected song (its arrangement), from the cursor.
+    /// Shift+Space: play or stop the selected song, from the cursor.
     pub fn toggle_play_song(&mut self) {
         if self.editor.library().songs.is_empty() {
             self.message = "no song in the library".into();

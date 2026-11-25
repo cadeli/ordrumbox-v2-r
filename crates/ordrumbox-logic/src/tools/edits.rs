@@ -21,7 +21,7 @@ pub(super) fn grow_pattern(editor: &mut Editor, p: usize, beats: i32) {
     let whole: Vec<usize> = (0..pattern.tracks.len())
         .filter(|&t| {
             let track = &pattern.tracks[t];
-            track.loop_length == Some(track.beat_count * track.steps_per_beat)
+            track.loop_steps == Some(track.beat_count * track.steps_per_beat)
         })
         .collect();
     let beats = ((beats + 3) / 4 * 4).min(MAX_BEATS);

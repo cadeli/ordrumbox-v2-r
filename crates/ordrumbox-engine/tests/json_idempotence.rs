@@ -55,7 +55,7 @@ fn every_kit_field_survives_saving() {
         key: "KICK".into(),
         display_name: "kick".into(),
         path: "studio/kick.wav".into(),
-        decay: Some(800.0),
+        decay_ms: Some(800.0),
         root_midi: Some(36.0),
         peak_db: Some(-3.5),
         gain_db: -2.5,
@@ -68,7 +68,7 @@ fn every_kit_field_survives_saving() {
     // Fields left unset stay unset: no `null`, no 0 written for them.
     let snare = &kit.samples[1];
     assert_eq!(
-        (snare.decay, snare.root_midi, snare.peak_db, snare.gain_db, snare.transpose),
+        (snare.decay_ms, snare.root_midi, snare.peak_db, snare.gain_db, snare.transpose),
         (None, None, None, 0.0, 0.0)
     );
 }

@@ -19,7 +19,7 @@ fn bank() -> Arc<SampleBank> {
         key: "KICK".into(),
         display_name: "k".into(),
         path: "k".into(),
-        decay: Some(100.0),
+        decay_ms: Some(100.0),
         ..Default::default()
     };
     let buffer = SampleBuffer::mono(vec![0.5; 400], 8000);

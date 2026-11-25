@@ -1,19 +1,19 @@
 //! The clip selected in the song panel: a click selects it (drawn with an
 //! outline), DELETE removes it and Ctrl+D repeats it right after itself,
 //! the copy then selected. It is known by its pattern and its first
-//! measure, so that an edit, an undo or another arrangement never leaves
+//! measure, so that an edit, an undo or another song never leaves
 //! another clip selected in its place.
 
 use super::Session;
 
 impl Session {
-    /// The index of the clip selected in the arrangement shown, if it is still there.
+    /// The index of the clip selected in the song shown, if it is still there.
     pub(super) fn selected_clip(&self) -> Option<usize> {
         let (id, start) = self.song_panel.selected_clip.as_ref()?;
         self.song()?.clips.iter().position(|c| c.pattern_id == *id && c.start_measure == *start)
     }
 
-    /// Clip `clip` of the arrangement shown selected (`None`: none).
+    /// Clip `clip` of the song shown selected (`None`: none).
     pub(super) fn select_clip(&mut self, clip: Option<usize>) {
         let picked = clip.and_then(|c| self.song()?.clips.get(c)).map(|c| (c.pattern_id.clone(), c.start_measure));
         self.song_panel.selected_clip = picked;
@@ -44,7 +44,7 @@ impl Session {
             self.song_panel.selected_clip = Some((copy.pattern_id.clone(), copy.start_measure));
         }
         let result = repeated.map(|_| {
-            let at = f64::from(clip.start_measure) + clip.measure_count + 1.0;
+            let at = f64::from(clip.start_measure) + clip.length_measures + 1.0;
             format!("\"{label}\" repeated at measure {}", ordrumbox_core::num::text(at))
         });
         self.song_edit_result(result);

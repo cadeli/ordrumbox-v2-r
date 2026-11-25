@@ -3,6 +3,7 @@
 use super::super::Session;
 use super::{CALLBACK, LIBRARY, position, run, session};
 use crate::menu::Command;
+use crate::session::session_types::PlayMode;
 
 // ─── pause, rewind, loop, metronome, recording ─────────────────────────────
 
@@ -12,7 +13,7 @@ const MEASURE: usize = 16_000;
 #[test]
 fn a_song_pauses_where_it_is_and_home_goes_back() {
     let (mut s, mut audio) = session(LIBRARY);
-    s.show_mode(true);
+    s.show_mode(PlayMode::Song);
     s.toggle_play();
     run(&mut s, &mut audio, MEASURE * 5 / 2);
     s.toggle_play();
@@ -51,7 +52,7 @@ fn a_pattern_plays_again_from_its_first_beat_on_home() {
 #[test]
 fn a_loop_keeps_the_song_in_its_measures_and_playing_on() {
     let (mut s, mut audio) = session(LIBRARY);
-    s.show_mode(true);
+    s.show_mode(PlayMode::Song);
     s.set_song_cursor(1);
     s.loop_to(2);
     assert_eq!(s.song_loop_region(), Some((16, 48)));
@@ -83,7 +84,7 @@ fn a_loop_keeps_the_song_in_its_measures_and_playing_on() {
 #[test]
 fn a_loop_between_measures_plays_only_its_steps() {
     let (mut s, mut audio) = session(LIBRARY);
-    s.show_mode(true);
+    s.show_mode(PlayMode::Song);
     // From the fifth step of measure 1 to the ninth of measure 2.
     s.set_song_loop(4, 24);
     s.toggle_play();

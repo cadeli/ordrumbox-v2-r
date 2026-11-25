@@ -174,7 +174,7 @@ fn rust_snapshot() -> Vec<String> {
             let mut rng = Rng::new(seed);
             let mut rnd = || rng.next_f64();
             let mut pattern = Pattern { beat_count: 4, ..Pattern::default() };
-            let options = Options { genre: Some(style.name.clone()), ..Options::default() };
+            let options = Options { style: Some(style.name.clone()), ..Options::default() };
             let mut g = AutoGenerator::new(&scales, &styles, &mut rnd);
             generate_pattern(&mut g, &mut pattern, &options);
             let bpm = g.tempo.map_or_else(|| "-".to_owned(), |bpm| bpm.to_string());

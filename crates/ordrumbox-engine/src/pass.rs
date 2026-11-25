@@ -665,7 +665,7 @@ mod tests {
             key: "X".into(),
             display_name: "x".into(),
             path: "x".into(),
-            decay: Some(100.0),
+            decay_ms: Some(100.0),
             ..Default::default()
         };
         let bank = SampleBank {

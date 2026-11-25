@@ -252,10 +252,10 @@ fn song_menu(s: &MenuState) -> Menu {
         items: vec![
             check("Song view", "F3", C::SongView, true, s.song_view),
             Item::Separator,
-            command("New arrangement...", "", C::NewSong, true),
-            command("Remove arrangement", "", C::RemoveSong, s.has_songs),
-            command("Previous arrangement", "Shift+[", C::PreviousSong, s.has_songs),
-            command("Next arrangement", "Shift+]", C::NextSong, s.has_songs),
+            command("New song...", "", C::NewSong, true),
+            command("Remove song", "", C::RemoveSong, s.has_songs),
+            command("Previous song", "Shift+[", C::PreviousSong, s.has_songs),
+            command("Next song", "Shift+]", C::NextSong, s.has_songs),
         ],
     }
 }

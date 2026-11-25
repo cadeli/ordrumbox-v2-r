@@ -466,12 +466,12 @@ mod tests {
         s.activate(Id::KitToggle(Field::Reverse));
         s.activate(Id::KitToggle(Field::Loop));
         let sample = s.kits.sample(0, 0).unwrap();
-        assert_eq!((sample.start, sample.hold, sample.reverse, sample.looping), (20.0, 50.0, true, true));
+        assert_eq!((sample.start_ms, sample.hold_ms, sample.reverse, sample.looping), (20.0, 50.0, true, true));
         s.activate(Id::KitToggle(Field::Loop));
         assert!(!s.kits.sample(0, 0).unwrap().looping, "a second click turns it off");
         // The track editor's controls act on the same sample.
         s.set_value(Id::SampleKnob(Field::Attack), 30.0);
-        assert_eq!(s.kits.sample(0, 0).unwrap().attack, Some(30.0));
+        assert_eq!(s.kits.sample(0, 0).unwrap().attack_ms, Some(30.0));
     }
 
     #[test]

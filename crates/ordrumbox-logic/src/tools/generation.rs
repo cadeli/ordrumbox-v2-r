@@ -59,7 +59,7 @@ impl Tools<'_> {
     pub(super) fn generated_json(&self, p: usize) -> Value {
         let pattern = &self.library().patterns[p];
         let mut json = pattern_summary(p, pattern);
-        let style = pattern.extra.get(generate::GENRE).and_then(Value::as_str);
+        let style = pattern.extra.get(generate::STYLE_KEY).and_then(Value::as_str);
         if let Some(object) = json.as_object_mut() {
             object.insert("style", style.map_or(Value::Null, Value::from));
         }

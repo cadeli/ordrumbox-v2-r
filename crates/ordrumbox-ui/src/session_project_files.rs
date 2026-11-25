@@ -19,7 +19,7 @@ fn now_ms() -> f64 {
 }
 
 impl Session {
-    /// The project file of the library: its patterns, its arrangements, what is selected.
+    /// The project file of the library: its patterns, its songs, what is selected.
     pub(super) fn project_record(&self, stamp: &str) -> Value {
         let library = self.editor.library();
         library.project_record(&self.project_name(), self.pattern_index, self.editor.selected_song(), (stamp, now_ms()))

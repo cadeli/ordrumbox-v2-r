@@ -46,10 +46,10 @@ impl Default for Pattern {
 }
 
 impl Pattern {
-    /// Its genre: its first tag that is not a feature ([`crate::tags`]),
-    /// which groups it with the patterns of its genre.
+    /// Its style tag: its first tag that is not a feature ([`crate::tags`]),
+    /// which groups it with the patterns of that style and teaches the style.
     #[must_use]
-    pub fn genre(&self) -> Option<&str> {
+    pub fn style_tag(&self) -> Option<&str> {
         self.tags.iter().map(|tag| tag.trim()).find(|tag| !tag.is_empty() && !crate::tags::is_feature(tag))
     }
 
@@ -191,7 +191,7 @@ mod tests {
                 "notes":[{"beat":-1025,"step":98305,"retriggerCount":65,"velocity":1e308}]}]}"#,
         );
         let (track, note) = (&pattern.tracks[0], &pattern.tracks[0].notes[0]);
-        assert_eq!((pattern.beat_count, track.beat_count, track.steps_per_beat, track.loop_length), (4, 4, 4, None));
+        assert_eq!((pattern.beat_count, track.beat_count, track.steps_per_beat, track.loop_steps), (4, 4, 4, None));
         assert_eq!((note.beat, note.step, note.retrigger_count, note.velocity), (0, 0, 1, Note::default().velocity));
         let issues: Vec<_> = issues.iter().map(|issue| format!("{}: {}", issue.at, issue.message)).collect();
         assert_eq!(
@@ -211,7 +211,7 @@ mod tests {
         let (pattern, issues) =
             load(r#"{"beatCount":1024,"tracks":[{"beatCount":1024,"stepsPerBeat":96,"loopLength":98304}]}"#);
         assert!(issues.is_empty(), "{issues:#?}");
-        assert_eq!((pattern.beat_count, pattern.tracks[0].loop_length), (1024, Some(98304)));
+        assert_eq!((pattern.beat_count, pattern.tracks[0].loop_steps), (1024, Some(98304)));
     }
 
     #[test]

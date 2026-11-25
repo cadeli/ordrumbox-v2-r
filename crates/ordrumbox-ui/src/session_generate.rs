@@ -33,7 +33,7 @@ impl Session {
     /// has none); no pattern: a new one.
     pub fn regenerate_pattern(&mut self) {
         let has_style =
-            self.pattern().is_some_and(|p| p.extra.get(generate::GENRE).is_some_and(|g| g.as_str().is_some()));
+            self.pattern().is_some_and(|p| p.extra.get(generate::STYLE_KEY).is_some_and(|g| g.as_str().is_some()));
         let style = if has_style { None } else { self.generators.style.clone() };
         self.regenerate_pattern_in(style.as_deref());
     }
@@ -54,8 +54,8 @@ impl Session {
 
     /// The pattern's style as the messages name it.
     fn pattern_style_label(&self, styles: &Styles) -> String {
-        let genre = self.pattern().and_then(|p| p.extra.get(generate::GENRE)?.as_str()).unwrap_or_default();
-        styles.get(genre).map_or_else(|| genre.to_owned(), style_label)
+        let style = self.pattern().and_then(|p| p.extra.get(generate::STYLE_KEY)?.as_str()).unwrap_or_default();
+        styles.get(style).map_or_else(|| style.to_owned(), style_label)
     }
 
     /// A header macro (`composeEnergy`…) of the pattern set to `value`.
@@ -108,8 +108,8 @@ impl Session {
         self.edited();
         self.chrome.beat_window.rewind();
         if let Some(pattern) = self.pattern() {
-            let genre = pattern.extra.get(generate::GENRE).and_then(|g| g.as_str()).unwrap_or_default();
-            let label = styles.get(genre).map_or_else(|| genre.to_owned(), style_label);
+            let style = pattern.extra.get(generate::STYLE_KEY).and_then(|g| g.as_str()).unwrap_or_default();
+            let label = styles.get(style).map_or_else(|| style.to_owned(), style_label);
             self.message = format!("generated {} ({label})", pattern.name.as_deref().unwrap_or_default());
         }
     }
@@ -135,8 +135,8 @@ impl Session {
             Some(MelodicKind::Chords) => "chords",
         };
         self.message = if on {
-            let genre = self.pattern().and_then(|p| p.extra.get(generate::GENRE)?.as_str()).unwrap_or_default();
-            let label = styles.get(genre).map_or_else(|| genre.to_owned(), style_label);
+            let style = self.pattern().and_then(|p| p.extra.get(generate::STYLE_KEY)?.as_str()).unwrap_or_default();
+            let label = styles.get(style).map_or_else(|| style.to_owned(), style_label);
             format!("{name}: generated, new lines every loop ({label})")
         } else {
             format!("{name}: auto off")

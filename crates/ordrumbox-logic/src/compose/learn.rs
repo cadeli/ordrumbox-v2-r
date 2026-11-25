@@ -136,7 +136,7 @@ fn rank(name: &str) -> u8 {
     }
 }
 
-/// `written` with the library's lessons: each genre tag of `patterns` (its
+/// `written` with the library's lessons: each style tag of `patterns` (its
 /// style through the aliases) blended into its written style, or a style of
 /// its own. A feature tag (a bass, chords: [`tags::is_feature`]) is no style.
 pub fn learn(written: &Styles, patterns: &[Pattern]) -> Styles {
@@ -264,7 +264,7 @@ mod tests {
         bass.tags.insert(0, "mine".into());
         let styles = learn(&Styles::default(), &[bass.clone(), bass]);
         assert!(styles.get("bass").is_none(), "a bass is no style");
-        assert_eq!(styles.get("mine").unwrap().learned, Some((2, 4)), "its genre is");
+        assert_eq!(styles.get("mine").unwrap().learned, Some((2, 4)), "its style is");
     }
 
     #[test]

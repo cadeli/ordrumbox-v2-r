@@ -138,7 +138,7 @@ impl Session {
         let c = view::header_controls(scale);
         let library = self.editor.library();
         if self.workspace == Workspace::Song {
-            self.arrangement_select(layout, c.arrangement());
+            self.song_select(layout, c.song());
         } else if !library.patterns.is_empty() {
             let labels = library
                 .patterns
@@ -287,7 +287,7 @@ impl Session {
         let text = num::text(bpm);
         let kind = Kind::Value { spec, value: bpm, label: None, text, lfo: false };
         layout.items.push(Item::new(Some(Id::Bpm), controls.bpm, kind));
-        // The song mode has no pattern settings nor generation: the arrangement list is in their place.
+        // The song mode has no pattern settings nor generation: the song list is in their place.
         if self.workspace == Workspace::Song {
             return;
         }
@@ -296,12 +296,12 @@ impl Session {
         layout.items.push(Item::new(Some(Id::Beats), controls.beats, kind));
         // The generation: the pattern's style, ⟳, AUTO, the macros.
         let styles = self.shown_styles();
-        let genre = pattern.extra.get(generate::GENRE).and_then(|g| g.as_str()).unwrap_or_default();
+        let style = pattern.extra.get(generate::STYLE_KEY).and_then(|g| g.as_str()).unwrap_or_default();
         let values: Vec<String> =
             std::iter::once(String::new()).chain(styles.list.iter().map(|s| s.name.clone())).collect();
         let labels: Vec<String> =
             std::iter::once("random".to_owned()).chain(styles.list.iter().map(style_label)).collect();
-        let selected = styles.get(genre).and_then(|st| values.iter().position(|v| *v == st.name)).unwrap_or(0);
+        let selected = styles.get(style).and_then(|st| values.iter().position(|v| *v == st.name)).unwrap_or(0);
         layout.items.push(Item::new(Some(Id::StyleList), controls.style, Kind::Select { values, labels, selected }));
         let button = Kind::Button { label: GENERATE_LABEL.into(), on: false };
         layout.items.push(Item::new(Some(Id::GeneratePattern), controls.generate, button));
@@ -462,7 +462,7 @@ pub(super) fn history_label(id: Id) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::super::OverlayKey;
+    use super::super::{OverlayKey, PlayMode};
     use super::*;
     use crate::canvas::Canvas;
     use crate::editors::STYLE_DEFAULT;
@@ -655,7 +655,7 @@ mod tests {
     fn the_tempo_knob_is_the_songs_in_song_mode_else_the_sessions() {
         let mut s = session();
         let (x, y) = center(view::header_controls(Scale::ONE).bpm);
-        s.show_mode(true);
+        s.show_mode(PlayMode::Song);
         s.run(crate::menu::Command::NewSong);
         s.chrome.widgets.entry.as_mut().unwrap().text = "verse".into();
         s.panel_key(SIZE, PanelKey::Enter, false, false);
@@ -669,7 +669,7 @@ mod tests {
         assert!(s.wheel(SIZE, x, y, 1, false, false));
         assert_eq!((s.song().unwrap().bpm, s.editor.library().bpm), (song_bpm + 3.0, 100.0));
         // The pattern mode takes the song's tempo on, and turns its own.
-        s.show_mode(false);
+        s.show_mode(PlayMode::Pattern);
         assert_eq!(s.editor.library().bpm, song_bpm + 3.0);
         assert!(s.wheel(SIZE, x, y, 3, false, false));
         assert_eq!((s.song().unwrap().bpm, s.editor.library().bpm), (song_bpm + 3.0, song_bpm + 6.0));
@@ -715,7 +715,7 @@ mod tests {
         s.select(Id::StyleList, "reggae");
         assert_eq!(s.message, "generated in reggae");
         let pattern = s.pattern().unwrap();
-        assert_eq!(pattern.extra.get(generate::GENRE).and_then(|g| g.as_str()), Some("reggae"));
+        assert_eq!(pattern.extra.get(generate::STYLE_KEY).and_then(|g| g.as_str()), Some("reggae"));
         assert_eq!(pattern.tracks[0].name, "KICK");
         assert_eq!(pattern.tracks[0].notes.iter().map(|n| (n.beat, n.step)).collect::<Vec<_>>(), [(2, 0)]);
         assert!(pattern.tracks.iter().all(|t| t.name != "TOM"));

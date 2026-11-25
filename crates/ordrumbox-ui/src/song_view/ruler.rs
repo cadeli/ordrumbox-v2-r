@@ -1,4 +1,4 @@
-//! The arrangement's ruler: a cell per measure, every fourth marked,
+//! The song's ruler: a cell per measure, every fourth marked,
 //! numbered as often as the numbers fit, and, as the zoom widens the
 //! measures, ticks on their beats and steps, then the beats' numbers, so
 //! that the ruler is as precise as the lanes under it.

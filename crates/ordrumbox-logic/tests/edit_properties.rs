@@ -414,7 +414,8 @@ impl Fuzz {
             41 => {
                 let (song, measure, count) = (self.song(), self.measure(), self.pick(&[0.0, -1.0, 0.75, 2.0]));
                 let pattern_id = if self.below(10) == 0 { String::new() } else { self.reference() };
-                self.editor.add_song_clip(song, SongClip { pattern_id, start_measure: measure, measure_count: count });
+                self.editor
+                    .add_song_clip(song, SongClip { pattern_id, start_measure: measure, length_measures: count });
                 Outcome::new("add_song_clip", false)
             }
             42 => {
@@ -657,7 +658,7 @@ fn every_edit_undoes_and_redoes_exactly() {
     assert!(never.is_empty(), "commands that never changed anything: {never:?}");
 }
 
-/// The edits that are not undo steps, by design: the selected arrangement,
+/// The edits that are not undo steps, by design: the selected song,
 /// the lines auto mode makes every loop.
 #[test]
 fn some_changes_are_not_undo_steps() {
@@ -797,8 +798,8 @@ fn compacting_keeps_what_plays() {
                 let bound = lcm(period, swing);
                 let reaches = before.notes.iter().any(|n| n.beat * spb + n.step >= bound);
                 if bound < before.beat_count * spb && reaches {
-                    let loop_length = track.loop_length.unwrap();
-                    assert!(changed && loop_length <= bound, "case {case}, track {t}: loop {loop_length} > {bound}");
+                    let loop_steps = track.loop_steps.unwrap();
+                    assert!(changed && loop_steps <= bound, "case {case}, track {t}: loop {loop_steps} > {bound}");
                 }
             }
         }

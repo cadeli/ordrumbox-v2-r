@@ -1,6 +1,6 @@
-//! The song panel, in the place of the grid: the arrangement
+//! The song panel, in the place of the grid: the song
 //! across the whole width — laid out like a DAW arrangement view: a ruler of measures along X, one row per
-//! pattern the arrangement uses (named in a frozen first column), each clip a
+//! pattern the song uses (named in a frozen first column), each clip a
 //! rectangle over its measures, the cursor —, and under it the pattern list
 //! on the left, the selected pattern's description (wrapped, scrolled by the
 //! wheel) and the song's column on the right (its widgets are panel items).
@@ -37,15 +37,15 @@ const DESCRIPTION_PAD: i32 = 4;
 const TEXT_LINE: i32 = 12;
 /// Width of the description's scroll bar.
 const SCROLL_BAR: i32 = 3;
-/// Thickness of the arrangement's rows' scroll bar.
+/// Thickness of the song's rows' scroll bar.
 const GRID_BAR: i32 = 8;
 /// Thickness of the measures' scroll bar, whose thumb's ends zoom (`zoom.rs`).
 const MEASURE_BAR: i32 = 14;
 /// Shortest thumb of a scroll bar.
 const MIN_THUMB: i32 = 12;
-/// Height of what is under the arrangement: all the song column's widgets.
+/// Height of what is under the song: all the song column's widgets.
 const LOWER_HEIGHT: i32 = 138;
-/// Gap between the arrangement and what is under it, and between the list and the column.
+/// Gap between the song and what is under it, and between the list and the column.
 const GAP: i32 = 12;
 
 fn cell_color() -> Rgb {
@@ -66,13 +66,13 @@ fn selected_color() -> Rgb {
 const CURSOR: Rgb = theme::LIVE;
 const CURSOR_IDLE: Rgb = theme::FOCUS;
 
-/// One row of the arrangement: a pattern it uses.
+/// One row of the song: a pattern it uses.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Row {
     pub id: String,
     pub name: String,
     /// Its pattern is no longer in the library (the row stays, so the
-    /// arrangement does not hide part of itself).
+    /// song does not hide part of itself).
     pub orphan: bool,
 }
 
@@ -109,19 +109,19 @@ pub struct SongView<'a> {
     pub scroll: (u32, usize),
     /// A clip being dragged, and the measure it would start at.
     pub dragged_clip: Option<(usize, u32)>,
-    /// A pattern being dragged over the arrangement.
+    /// A pattern being dragged over the song.
     pub ghost: Option<SongGhost>,
     /// A row being dragged by its name, and the row it would take.
     pub row_drop: Option<(usize, usize)>,
     /// A pattern being dragged along the list, and the place it would take.
     pub list_drop: Option<(usize, usize)>,
-    /// Measures shown past the end of the arrangement, to drop on.
+    /// Measures shown past the end of the song, to drop on.
     pub room: u32,
     /// The selected pattern's description (`None` without a pattern), and
     /// its first line shown.
     pub description: Option<&'a str>,
     pub description_scroll: usize,
-    /// The selected pattern's tags, its genre first (`None` without a pattern).
+    /// The selected pattern's tags, its style first (`None` without a pattern).
     pub tags: Option<&'a [String]>,
     /// The steps of the song's loop, `first..end`, on or off.
     pub loop_region: Option<(u32, u32)>,
@@ -139,7 +139,7 @@ pub struct SongView<'a> {
 }
 
 impl SongView<'_> {
-    /// The arrangement's rows: one per pattern, then one per automation lane.
+    /// The song's rows: one per pattern, then one per automation lane.
     #[must_use]
     pub fn row_count(&self) -> usize {
         self.rows.len() + self.song.map_or(0, automation::lanes_row_count)
@@ -150,13 +150,13 @@ impl SongView<'_> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct SongGhost {
     pub name: String,
-    /// Its row; past the last one for a pattern the arrangement does not use yet.
+    /// Its row; past the last one for a pattern the song does not use yet.
     pub row: usize,
     pub measure: u32,
-    pub measure_count: f64,
+    pub length_measures: f64,
 }
 
-/// A scroll bar: across the arrangement's measures, down its rows, or down
+/// A scroll bar: across the song's measures, down its rows, or down
 /// the pattern list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Axis {
@@ -189,7 +189,7 @@ pub enum SongHit {
     Ruler(u32),
     /// An end of the song's loop, on the ruler: a drag moves it.
     LoopEnd(Edge),
-    /// A clip (its index in the arrangement).
+    /// A clip (its index in the song).
     Clip(usize),
     /// A row's pattern name.
     RowName(usize),
@@ -220,7 +220,7 @@ pub struct SongLayout {
     pub list: Rect,
     /// The selected pattern's description's title line, its frame, then its tags line.
     pub description: Rect,
-    /// The arrangement: its title line, then the ruler and the rows.
+    /// The song: its title line, then the ruler and the rows.
     pub grid: Rect,
     /// The song's column (its widgets).
     pub column: Rect,
@@ -236,7 +236,7 @@ impl SongLayout {
         let bottom = frame::footer_top(height, scale, status_lines) - margin / 2;
         let h = (bottom - top).max(0);
         let full_w = (width - 2 * margin).max(0);
-        // A short window keeps half its height for the arrangement.
+        // A short window keeps half its height for the song.
         let lower_h = (LOWER_HEIGHT * s).min(h / 2);
         let lower_y = bottom.max(top) - lower_h;
         let grid = Rect::new(margin, top, full_w, (lower_y - GAP * s - top).max(0));
@@ -402,24 +402,24 @@ impl SongLayout {
         self.body_top() + (row as i32 - first as i32) * self.row_height()
     }
 
-    /// Clip `index` of the view's arrangement, where it is drawn (clipped to
+    /// Clip `index` of the view's song, where it is drawn (clipped to
     /// the grid); `None` when its row is not shown.
     pub fn clip_rect(&self, view: &SongView, index: usize) -> Option<Rect> {
         let clip = view.song?.clips.get(index)?;
         let row = view.rows.iter().position(|r| r.id == clip.pattern_id)?;
         let start = view.dragged_clip.filter(|&(c, _)| c == index).map_or(clip.start_measure, |(_, m)| m);
-        self.span_rect(row, start, clip.measure_count, view.scroll)
+        self.span_rect(row, start, clip.length_measures, view.scroll)
     }
 
-    /// Where `measure_count` measures from `start` on `row` are drawn.
-    fn span_rect(&self, row: usize, start: u32, measure_count: f64, scroll: (u32, usize)) -> Option<Rect> {
+    /// Where `length_measures` measures from `start` on `row` are drawn.
+    fn span_rect(&self, row: usize, start: u32, length_measures: f64, scroll: (u32, usize)) -> Option<Rect> {
         if row < scroll.1 || row >= scroll.1 + self.visible_rows() {
             return None;
         }
         let s = self.scale;
         let x = self.measure_x(f64::from(start), scroll.0);
         // A clip may last a fraction of a measure: its width is not rounded to a cell.
-        let w = ((measure_count * f64::from(self.measure_width())) as i32 - CLIP_INSET * s).max(4 * s);
+        let w = ((length_measures * f64::from(self.measure_width())) as i32 - CLIP_INSET * s).max(4 * s);
         let end = self.body_left() + self.visible_measures() as i32 * self.measure_width();
         let (left, right) = (x.max(self.body_left()), (x + w).min(end));
         let y = self.row_y(row, scroll.1) + CLIP_INSET * s / 2;
@@ -460,7 +460,7 @@ impl SongLayout {
         if let Some(edge) = self.loop_end_at(view, x, y) {
             return Some(SongHit::LoopEnd(edge));
         }
-        // The grid is as wide as the arrangement.
+        // The grid is as wide as the song.
         let total = song.length_measures().max(1.0).ceil() as u32;
         if self.scroll_bar(Axis::Measures).contains(x, y) {
             let handle = scroll_thumb::handle_at(
@@ -656,7 +656,7 @@ mod tests {
                     playing,
                     scroll: (1, 0),
                     dragged_clip: song.filter(|s| !s.clips.is_empty()).map(|_| (0, 3)),
-                    ghost: Some(SongGhost { name: "c".into(), row: 2, measure: 2, measure_count: 1.0 }),
+                    ghost: Some(SongGhost { name: "c".into(), row: 2, measure: 2, length_measures: 1.0 }),
                     row_drop: Some((0, 2)),
                     list_drop: Some((39, 31)),
                     room: 8,

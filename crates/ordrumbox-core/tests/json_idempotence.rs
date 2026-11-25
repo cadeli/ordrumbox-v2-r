@@ -413,7 +413,7 @@ fn every_song_field_survives_saving() {
     assert_eq!((song.id.as_str(), song.name.as_str(), song.description.as_str()), ("intro", "Intro", "the intro"));
     assert_eq!((song.bpm, song.loop_measures), (98.0, Some(6.0)));
     let clips: Vec<(&str, u32, f64)> =
-        song.clips.iter().map(|c| (c.pattern_id.as_str(), c.start_measure, c.measure_count)).collect();
+        song.clips.iter().map(|c| (c.pattern_id.as_str(), c.start_measure, c.length_measures)).collect();
     assert_eq!(clips, [("a", 0, 0.75), ("b", 2, 2.0), ("a", 2, 1.0)]);
     assert_eq!(library.songs[1].loop_measures, None);
 

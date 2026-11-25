@@ -4,8 +4,8 @@ use super::grid::draw_grid;
 use super::kit::{KitLayout, draw_kit};
 use super::layout::{Body, HeaderControls, Layout, MACROS, header_controls, header_text};
 use super::{
-    ACCENT, ARRANGEMENT_LABEL, HELP, KIT_HELP, LOGO, MIXER_HELP, PATTERN_LABEL, PLAYING, ROLL_HELP, SONG_HELP,
-    SYNTH_HELP, View, WAITING_LABEL, WARNING, background_color,
+    ACCENT, HELP, KIT_HELP, LOGO, MIXER_HELP, PATTERN_LABEL, PLAYING, ROLL_HELP, SONG_HELP, SONG_LABEL, SYNTH_HELP,
+    View, WAITING_LABEL, WARNING, background_color,
 };
 use crate::canvas::{Canvas, chars_in};
 use crate::frame::{body_top, content_top, footer_top, margin, status_line};
@@ -26,9 +26,9 @@ pub fn draw(canvas: &mut Canvas, view: &View, scale: Scale) {
 
     // The main editor (top-left): exactly one of the song panel, the kit
     // editor, the synth editor (painted by the session), the piano roll, the grid.
-    if let Some(arrangement) = &view.arrangement {
-        let layout = SongLayout::new(body.main_w, body.editor_h, scale, view.status.len(), arrangement.zoom);
-        song_view::draw(canvas, arrangement, &layout);
+    if let Some(song) = &view.song_view {
+        let layout = SongLayout::new(body.main_w, body.editor_h, scale, view.status.len(), song.zoom);
+        song_view::draw(canvas, song, &layout);
     } else if let Some(kit) = &view.kit_view {
         let layout = KitLayout::new(body.main_w, body.editor_h, scale, view.status.len());
         draw_kit(canvas, kit, &layout);
@@ -62,7 +62,7 @@ fn draw_header(canvas: &mut Canvas, view: &View, scale: Scale) {
     let c = header_controls(scale);
     // The groups' frames, behind their widgets (panel items, drawn later).
     // The generation's only with a pattern: it has nothing to show without.
-    let song = view.arrangement.is_some();
+    let song = view.song_view.is_some();
     for (i, group) in c.groups(scale).into_iter().enumerate() {
         // The song mode has no generation.
         if (view.pattern.is_none() && i != 4) || (i == 3 && song) {
@@ -89,8 +89,8 @@ fn draw_header_labels(canvas: &mut Canvas, view: &View, c: &HeaderControls, top:
     }
     label(canvas, c.mode[0], "MODE");
     label(canvas, c.bpm, "BPM");
-    if view.arrangement.is_some() {
-        label(canvas, c.pattern, ARRANGEMENT_LABEL);
+    if view.song_view.is_some() {
+        label(canvas, c.pattern, SONG_LABEL);
         label(canvas, c.kit, "KIT");
         label(canvas, c.views[0], "VIEW");
         return;
@@ -149,7 +149,7 @@ fn draw_footer(canvas: &mut Canvas, view: &View, scale: Scale) {
         hint
     } else if view.kit_view.is_some() {
         KIT_HELP
-    } else if view.arrangement.is_some() {
+    } else if view.song_view.is_some() {
         SONG_HELP
     } else if view.piano_roll.is_some() {
         ROLL_HELP

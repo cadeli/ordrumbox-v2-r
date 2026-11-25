@@ -140,7 +140,7 @@ pub fn render_pattern(
     Some(render(library, Mode::Pattern(index), length, Output::Mix, setup, before_pass).0)
 }
 
-/// Song `index`, its whole arrangement once.
+/// Song `index`, its whole song once.
 pub fn render_song(library: &Library, index: usize, setup: &RenderSetup) -> Option<Stereo> {
     let length = song_length(library, index, setup.sample_rate)?;
     Some(render(library, Mode::Song(index), length, Output::Mix, setup, None).0)
@@ -160,7 +160,7 @@ pub fn render_pattern_stems(
     Some(render(library, Mode::Pattern(index), length, Output::Stems { track_count }, setup, before_pass).1)
 }
 
-/// Song `index`, its whole arrangement once, each track apart: as many as the
+/// Song `index`, its whole song once, each track apart: as many as the
 /// most tracks of a pattern it plays, a track being the one of that position
 /// in each pattern.
 pub fn render_song_stems(library: &Library, index: usize, setup: &RenderSetup) -> Option<Vec<Stereo>> {
@@ -186,7 +186,7 @@ mod tests {
             key: "KICK".into(),
             display_name: "k".into(),
             path: "k".into(),
-            decay: Some(200.0),
+            decay_ms: Some(200.0),
             ..Default::default()
         };
         let buffer = SampleBuffer::mono(vec![0.5; 2000], 44_100);

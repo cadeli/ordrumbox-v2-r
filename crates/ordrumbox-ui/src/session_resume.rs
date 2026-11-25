@@ -1,7 +1,7 @@
-//! Where the user left off: the pattern shown, the arrangement selected, the
+//! Where the user left off: the pattern shown, the song selected, the
 //! view under the header, the play mode and the panels shown or folded. They are kept in `settings.json` (`resume`) at quit, and before
 //! the session is loaded again, and are read back at start. The pattern and
-//! the arrangement are kept by id, so they are found again after a reorder.
+//! the song are kept by id, so they are found again after a reorder.
 
 use std::path::Path;
 
@@ -108,7 +108,7 @@ impl Session {
             Some(index) => {
                 self.editor.set_selected_song(index);
             }
-            None => wrong.push(format!("no arrangement {}, the first one selected", id.to_json())),
+            None => wrong.push(format!("no song {}, the first one selected", id.to_json())),
         }
     }
 
@@ -211,7 +211,7 @@ mod tests {
     use ordrumbox_core::Library;
     use std::path::PathBuf;
 
-    /// Three patterns, two arrangements, its settings in `path`.
+    /// Three patterns, two songs, its settings in `path`.
     fn session(path: &std::path::Path) -> Session {
         let (library, _) = Library::parse(
             r#"{"songs":[{"name":"verse"},{"name":"chorus"}],
@@ -231,7 +231,7 @@ mod tests {
         let mut s = session(&path);
         s.show_pattern(2);
         s.select_song(1);
-        s.show_mode(true);
+        s.show_mode(PlayMode::Song);
         s.show_view(0);
         s.toggle_note_editor();
         s.toggle_vus();
@@ -278,7 +278,7 @@ mod tests {
         assert_eq!(
             s.status,
             [
-                r#"settings.json: resume: no pattern "gone", the first one shown; no arrangement 3, the first one selected; noteEditor: "no" is not true or false, left as it was; view: "tape" is not a view, the grid shown; mode: "tape" is not a mode, the pattern mode used"#
+                r#"settings.json: resume: no pattern "gone", the first one shown; no song 3, the first one selected; noteEditor: "no" is not true or false, left as it was; view: "tape" is not a view, the grid shown; mode: "tape" is not a mode, the pattern mode used"#
             ]
         );
         assert_eq!((s.pattern_index, s.editor.selected_song(), s.workspace), (0, 0, Workspace::Grid));

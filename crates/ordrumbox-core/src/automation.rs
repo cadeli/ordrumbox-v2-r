@@ -1,5 +1,5 @@
 //! Song automation: lanes that set a control of an instrument along an
-//! arrangement, at the resolution of a step (a sixteenth note): switch it on
+//! song, at the resolution of a step (a sixteenth note): switch it on
 //! and off (mute, solo) or set its level (volume, pan, filter cutoff and Q,
 //! sends, effect amounts; transpose, probability and swing, which act on
 //! each note as it starts: [`AutomationTarget`]).
@@ -178,7 +178,7 @@ pub struct AutomationLane {
     target: AutomationTarget,
     /// Sorted by step, one per step at most.
     points: Vec<AutomationPoint>,
-    /// How many of the arrangement's rows it is drawn over,
+    /// How many of the song's rows it is drawn over,
     /// 1..=[`AutomationLane::MAX_ROWS`].
     row_count: u32,
 }
@@ -204,7 +204,7 @@ impl AutomationLane {
         self.target
     }
 
-    /// How many of the arrangement's rows it is drawn over.
+    /// How many of the song's rows it is drawn over.
     #[must_use]
     pub fn row_count(&self) -> u32 {
         self.row_count

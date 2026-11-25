@@ -22,7 +22,7 @@ impl Editor {
         rnd: &mut dyn FnMut() -> f64,
     ) -> usize {
         let mut pattern = self.blank_pattern(None);
-        let options = Options { genre: style.map(str::to_owned), ..Options::default() };
+        let options = Options { style: style.map(str::to_owned), ..Options::default() };
         let mut g = AutoGenerator::new(scales, styles, rnd);
         generate::restyle_pattern(&mut g, &mut pattern, &options);
         let tempo = g.tempo;
@@ -54,7 +54,7 @@ impl Editor {
         style: Option<&str>,
         rnd: &mut dyn FnMut() -> f64,
     ) -> bool {
-        let options = Options { genre: style.map(str::to_owned), ..Options::default() };
+        let options = Options { style: style.map(str::to_owned), ..Options::default() };
         let Some(pattern) = self.library.patterns.get(p) else { return false };
         let desc = format!("Generate \"{}\"", pattern_name(pattern));
         self.batch(&desc, |e| {
@@ -126,7 +126,7 @@ impl Editor {
             let on = pattern.tracks.iter().any(|t| instrument_family(&t.name).is_drum() && t.auto_mode);
             if on { "Generate drums" } else { "Drums auto off" }.to_owned()
         };
-        let options = Options { genre: style.map(str::to_owned), ..Options::default() };
+        let options = Options { style: style.map(str::to_owned), ..Options::default() };
         self.edit(p, desc, None, |pattern| {
             generate::toggle_drums(&mut AutoGenerator::new(scales, styles, rnd), pattern, &options)
         })

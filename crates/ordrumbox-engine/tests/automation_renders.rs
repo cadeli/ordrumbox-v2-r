@@ -64,7 +64,7 @@ fn setup() -> RenderSetup {
             display_name: key.to_lowercase(),
             path: format!("t/{key}.wav"),
             // To -60 dB in 100 s: flat over a measure.
-            decay: Some(100_000.0),
+            decay_ms: Some(100_000.0),
             ..Default::default()
         },
         buffer: SampleBuffer::mono(buffer, EXPORT_RATE).into(),

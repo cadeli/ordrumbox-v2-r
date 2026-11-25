@@ -26,28 +26,28 @@ pub struct KitSample {
     /// sample id tracks refer to.
     pub path: String,
     /// Decay to -60 dB, ms, when the kit sets one (see [`KitSample::decay_ms`]).
-    pub decay: Option<f64>,
+    pub decay_ms: Option<f64>,
     /// MIDI note the sample sounds at unpitched (`rootMidi`), when known:
     /// the note MIDI files map pitch 0 to.
     pub root_midi: Option<f64>,
     /// Peak level the kit measured, dB (`peakDb`), kept as written.
     pub peak_db: Option<f64>,
     /// Where reading starts, ms into the sample.
-    pub start: f64,
+    pub start_ms: f64,
     /// Where reading ends, ms into the sample, when the kit sets one: else the sample's end.
-    pub end: Option<f64>,
+    pub end_ms: Option<f64>,
     /// Read the region backwards.
     pub reverse: bool,
     /// Read the region over and over until the decay ends it (`loop`).
     pub looping: bool,
     /// Where the loop starts and ends, ms into the sample, when the kit sets
     /// them (`loopStart`, `loopEnd`): else the region's start and end.
-    pub loop_start: Option<f64>,
-    pub loop_end: Option<f64>,
+    pub loop_start_ms: Option<f64>,
+    pub loop_end_ms: Option<f64>,
     /// Attack, ms, when the kit sets one (see [`KitSample::attack_ms`]).
-    pub attack: Option<f64>,
+    pub attack_ms: Option<f64>,
     /// Time kept at the peak before the decay, ms.
-    pub hold: f64,
+    pub hold_ms: f64,
     /// Hold the peak until the note ends, the decay then being its release (`gate`).
     pub gated: bool,
     /// Gain trim, dB (`gainDb`).
@@ -61,25 +61,25 @@ pub struct KitSample {
 impl KitSample {
     /// Decay to -60 dB, ms (500 when the kit sets none).
     pub fn decay_ms(&self) -> f64 {
-        self.decay.unwrap_or(DEFAULT_DECAY_MS)
+        self.decay_ms.unwrap_or(DEFAULT_DECAY_MS)
     }
 
     /// Attack, ms (5 when the kit sets none).
     pub fn attack_ms(&self) -> f64 {
-        self.attack.unwrap_or(DEFAULT_ATTACK_MS)
+        self.attack_ms.unwrap_or(DEFAULT_ATTACK_MS)
     }
 
     /// How the sample is read and shaped.
     pub fn shape(&self) -> SampleShape {
         SampleShape {
-            start: (self.start / 1000.0) as f32,
-            end: self.end.map(|end| (end / 1000.0) as f32),
+            start: (self.start_ms / 1000.0) as f32,
+            end: self.end_ms.map(|end| (end / 1000.0) as f32),
             reverse: self.reverse,
             looping: self.looping,
-            loop_start: self.loop_start.map(|ms| (ms / 1000.0) as f32),
-            loop_end: self.loop_end.map(|ms| (ms / 1000.0) as f32),
+            loop_start: self.loop_start_ms.map(|ms| (ms / 1000.0) as f32),
+            loop_end: self.loop_end_ms.map(|ms| (ms / 1000.0) as f32),
             attack: (self.attack_ms() / 1000.0) as f32,
-            hold: (self.hold / 1000.0) as f32,
+            hold: (self.hold_ms / 1000.0) as f32,
             gated: self.gated,
         }
     }
@@ -106,15 +106,15 @@ impl KitSample {
             key: text(&["key"]).unwrap_or_default(),
             display_name: text(&["displayName", "display_name"]).unwrap_or_default(),
             path,
-            decay: number(&["decay"]),
-            start: number(&["start"]).unwrap_or(0.0),
-            end: number(&["end"]),
+            decay_ms: number(&["decay"]),
+            start_ms: number(&["start"]).unwrap_or(0.0),
+            end_ms: number(&["end"]),
             reverse: flag("reverse"),
             looping: flag("loop"),
-            loop_start: number(&["loopStart"]),
-            loop_end: number(&["loopEnd"]),
-            attack: number(&["attack"]),
-            hold: number(&["hold"]).unwrap_or(0.0),
+            loop_start_ms: number(&["loopStart"]),
+            loop_end_ms: number(&["loopEnd"]),
+            attack_ms: number(&["attack"]),
+            hold_ms: number(&["hold"]).unwrap_or(0.0),
             gated: flag("gate"),
             root_midi: number(&["rootMidi"]),
             peak_db: number(&["peakDb"]),
@@ -136,7 +136,7 @@ impl KitSample {
         if let Some(root) = self.root_midi {
             o.insert("rootMidi", Value::Number(root));
         }
-        if let Some(decay) = self.decay {
+        if let Some(decay) = self.decay_ms {
             o.insert("decay", Value::Number(decay));
         }
         self.insert_shape(&mut o);
@@ -154,10 +154,10 @@ impl KitSample {
 
     /// The playback settings that differ from the defaults, as kits.json keys.
     fn insert_shape(&self, o: &mut Object) {
-        if self.start != 0.0 {
-            o.insert("start", Value::Number(self.start));
+        if self.start_ms != 0.0 {
+            o.insert("start", Value::Number(self.start_ms));
         }
-        if let Some(end) = self.end {
+        if let Some(end) = self.end_ms {
             o.insert("end", Value::Number(end));
         }
         if self.reverse {
@@ -166,17 +166,17 @@ impl KitSample {
         if self.looping {
             o.insert("loop", Value::Bool(true));
         }
-        if let Some(start) = self.loop_start {
+        if let Some(start) = self.loop_start_ms {
             o.insert("loopStart", Value::Number(start));
         }
-        if let Some(end) = self.loop_end {
+        if let Some(end) = self.loop_end_ms {
             o.insert("loopEnd", Value::Number(end));
         }
-        if let Some(attack) = self.attack {
+        if let Some(attack) = self.attack_ms {
             o.insert("attack", Value::Number(attack));
         }
-        if self.hold != 0.0 {
-            o.insert("hold", Value::Number(self.hold));
+        if self.hold_ms != 0.0 {
+            o.insert("hold", Value::Number(self.hold_ms));
         }
         if self.gated {
             o.insert("gate", Value::Bool(true));
@@ -193,7 +193,7 @@ impl KitSample {
         o.insert("key", Value::from(self.key.as_str()));
         o.insert("rootMidi", opt(self.root_midi));
         o.insert("peakDb", opt(self.peak_db));
-        o.insert("decay", opt(self.decay));
+        o.insert("decay", opt(self.decay_ms));
         o.insert("gainDb", Value::Number(self.gain_db));
         o.insert("transpose", Value::Number(self.transpose));
         self.insert_shape(&mut o);
@@ -465,7 +465,7 @@ mod tests {
         ).unwrap().0;
         assert_eq!(kits.len(), 2);
         assert_eq!(kits[0].samples[1].decay_ms(), DEFAULT_DECAY_MS);
-        assert_eq!(kits[0].samples[0].decay, Some(5000.0));
+        assert_eq!(kits[0].samples[0].decay_ms, Some(5000.0));
         let silence = crate::wav::tests::wav(1, 1, 8_000, 16, &[0, 0]);
         let (bank, errors) = SampleBank::load(&kits, |_| Ok(silence.clone()));
         assert!(errors.is_empty());
@@ -481,7 +481,7 @@ mod tests {
                 key: "K".into(),
                 display_name: "k".into(),
                 path: "x.wav".into(),
-                decay: Some(1.0),
+                decay_ms: Some(1.0),
                 ..Default::default()
             }],
             ..Kit::default()
@@ -512,7 +512,7 @@ mod tests {
             r#"{"name":"real","samples":[{"path":"real/kick.wav","displayName":"kick","key":"KICK","rootMidi":72,"peakDb":-3,"decay":5000,"gainDb":0,"transpose":0},{"path":"s.wav","displayName":"s","key":"SNARE","rootMidi":null,"peakDb":null,"decay":null,"gainDb":-2.5,"transpose":1}]}"#
         );
         let restored = Kit::from_mapping_json(&kits[0].to_mapping_json()).unwrap();
-        assert_eq!(restored.samples[0].decay, Some(5000.0));
+        assert_eq!(restored.samples[0].decay_ms, Some(5000.0));
         assert_eq!(restored.samples[1].gain_db, -2.5);
         let missing = json::parse(r#"{"name":"n","instruments":[{"url":"a.wav"}]}"#).unwrap();
         assert_eq!(Kit::from_mapping_json(&missing), Err("No valid samples".into()));
@@ -528,14 +528,14 @@ mod tests {
         assert_eq!(plain.to_json().to_json(), r#"{"displayName":"","key":"","path":"a.wav"}"#);
         assert_eq!(plain.shape(), SampleShape::default());
         let shaped = KitSample {
-            start: 20.0,
-            end: Some(300.0),
+            start_ms: 20.0,
+            end_ms: Some(300.0),
             reverse: true,
             looping: true,
-            loop_start: Some(100.0),
-            loop_end: Some(250.0),
-            attack: Some(1.0),
-            hold: 50.0,
+            loop_start_ms: Some(100.0),
+            loop_end_ms: Some(250.0),
+            attack_ms: Some(1.0),
+            hold_ms: 50.0,
             gated: true,
             ..plain
         };

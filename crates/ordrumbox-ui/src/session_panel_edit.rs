@@ -3,6 +3,7 @@
 //! sounds assigned to a pattern's tracks. Each one is an undo step named by
 //! its control.
 
+use super::session_types::PlayMode;
 use ordrumbox_core::SetField;
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_engine::assign::synth_for;
@@ -483,7 +484,7 @@ impl Session {
             Id::Transport => self.toggle_play(),
             Id::RecordAutomation => self.toggle_automation_recording(),
             Id::View(i) => self.show_view(i),
-            Id::Mode(i) => self.show_mode(i == 1),
+            Id::Mode(i) => self.show_mode(if i == 1 { PlayMode::Song } else { PlayMode::Pattern }),
             Id::Master(_) | Id::MixerName(_) | Id::MixerToggle(..) => self.mixer_activate(id),
             Id::SynthTab(_) | Id::SynthButton(_) | Id::SynthPower(_) | Id::SynthIcon(..) | Id::SynthField(_) => {
                 self.synth_activate(id);

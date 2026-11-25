@@ -150,7 +150,7 @@ fn steps_per_beat_keeps_positions_by_percent() {
     // SNARE: beat 1 step 7 of 8 (88 %), loop at 32 > 4 beats × 3.
     assert!(e.set_steps_per_beat(0, 1, 3.0, false));
     let track = &pattern(&e).tracks[1];
-    assert_eq!((track.notes[0].step, track.loop_length), (2, Some(12)));
+    assert_eq!((track.notes[0].step, track.loop_steps), (2, Some(12)));
     assert!(e.set_steps_per_beat(0, 1, 8.0, false));
     assert_eq!(pattern(&e).tracks[1].notes[0].step, 7, "back to its step, as stepPercent is kept");
     assert!(!e.set_steps_per_beat(0, 1, 8.0, false));
@@ -199,12 +199,12 @@ fn a_moved_note_forgets_its_place_in_the_beat() {
 fn loop_point_and_clean() {
     let mut e = editor();
     assert!(e.shorten_loop(0, 0));
-    assert_eq!(pattern(&e).tracks[0].loop_length, Some(15));
+    assert_eq!(pattern(&e).tracks[0].loop_steps, Some(15));
     e.set_steps_per_beat(0, 0, 1.0, false); // 4 steps
     for _ in 0..4 {
         e.shorten_loop(0, 0);
     }
-    assert_eq!(pattern(&e).tracks[0].loop_length, Some(4), "wrapped from 1 to the track end");
+    assert_eq!(pattern(&e).tracks[0].loop_steps, Some(4), "wrapped from 1 to the track end");
     assert!(e.clean_pattern(0));
     assert!(pattern(&e).tracks.iter().all(|t| t.notes.is_empty()));
     assert_eq!(e.history().next_undo(), Some("Clean \"rock\""));
@@ -234,7 +234,7 @@ fn tracks_paste_and_remove() {
     assert_eq!(e.add_track(0, "CHH", 4), Some(3));
     let chh = &pattern(&e).tracks[3];
     assert_eq!(
-        (chh.beat_count, chh.loop_length, chh.pan),
+        (chh.beat_count, chh.loop_steps, chh.pan),
         (4, Some(16), ordrumbox_core::drum_taxonomy::pan_from_track_name("CHH"))
     );
 }
@@ -280,7 +280,7 @@ fn patterns() {
     assert_eq!(ids, ["rock", "newpat-1", "rock-2"]);
     assert!(e.set_pattern_beat_count(0, 2.0));
     assert!(pattern(&e).tracks.iter().all(|t| t.beat_count == 2));
-    assert_eq!(pattern(&e).tracks[1].loop_length, Some(16));
+    assert_eq!(pattern(&e).tracks[1].loop_steps, Some(16));
     assert!(e.set_pattern_beat_count(0, 80.0));
     assert_eq!(pattern(&e).beat_count, 4);
     // The tempo is the library's, from the file's first pattern.
@@ -464,7 +464,7 @@ fn a_song_is_renamed_in_one_step() {
     assert_eq!(e.rename_song(None, "chorus"), Ok(false));
     let song = &e.library().songs[0];
     assert_eq!((song.name.as_str(), song.id.as_str()), ("chorus", "verse"));
-    assert_eq!(e.history().next_undo(), Some("Rename arrangement → \"chorus\""));
+    assert_eq!(e.history().next_undo(), Some("Rename song → \"chorus\""));
     e.undo();
     assert_eq!(e.library().songs[0].name, "verse");
 }
@@ -472,14 +472,14 @@ fn a_song_is_renamed_in_one_step() {
 #[test]
 fn clips_are_placed_by_id_or_name_and_refused_with_a_reason() {
     let mut e = editor();
-    let no_song = Err("No arrangement to edit — create a song first".to_owned());
+    let no_song = Err("No song to edit — create a song first".to_owned());
     assert_eq!(e.add_pattern_at_measure("rock", 0, None, None), no_song);
     e.add_song("verse");
 
     let clip = e.add_pattern_at_measure("  ROCK ", 2, Some(0.75), None).unwrap();
-    assert_eq!((clip.pattern_id.as_str(), clip.start_measure, clip.measure_count), ("rock", 2, 0.75));
+    assert_eq!((clip.pattern_id.as_str(), clip.start_measure, clip.length_measures), ("rock", 2, 0.75));
     let clip = e.add_pattern_at_measure("rock", 0, Some(0.0), None).unwrap();
-    assert_eq!(clip.measure_count, 1.0, "no length given: the pattern's, 4 beats");
+    assert_eq!(clip.length_measures, 1.0, "no length given: the pattern's, 4 beats");
     assert_eq!(e.history().next_undo(), Some("Add \"rock\" at measure 1"));
     let steps = e.history().undo_len();
     assert_eq!(
@@ -495,7 +495,7 @@ fn clips_are_placed_by_id_or_name_and_refused_with_a_reason() {
 
     // Repeated right after itself, floored: 2 + 0.75 → measure 2.
     let repeat = e.repeat_pattern_at_measure(2, None).unwrap();
-    assert_eq!((repeat.start_measure, repeat.measure_count), (2, 0.75));
+    assert_eq!((repeat.start_measure, repeat.length_measures), (2, 0.75));
     assert_eq!(e.library().songs[0].loop_measures, Some(2.75));
 
     // Indices out of range and repeated count once; none left: no step.
@@ -507,14 +507,14 @@ fn clips_are_placed_by_id_or_name_and_refused_with_a_reason() {
 }
 
 #[test]
-fn arrangements_are_added_removed_and_selected_in_one_step() {
+fn songs_are_added_removed_and_selected_in_one_step() {
     let mut e = editor();
     assert_eq!(e.add_song("  New one "), 0);
     assert_eq!(e.add_song(""), 1);
     assert_eq!(e.add_song("Untitled"), 2);
     let songs: Vec<_> = e.library().songs.iter().map(|s| (s.id.as_str(), s.name.as_str())).collect();
     assert_eq!(songs, [("new-one", "New one"), ("untitled", "Untitled"), ("untitled-2", "Untitled")]);
-    assert_eq!(e.selected_song(), 2, "a new arrangement is selected");
+    assert_eq!(e.selected_song(), 2, "a new song is selected");
     assert_eq!(e.set_selected_song(99), 2, "clamped to the list");
 
     assert!(!e.remove_song(Some(42)));
@@ -522,9 +522,9 @@ fn arrangements_are_added_removed_and_selected_in_one_step() {
     assert_eq!(e.selected_song(), 1, "kept inside the list");
     assert!(e.remove_song(None));
     assert_eq!((e.library().songs.len(), e.selected_song()), (1, 0));
-    assert_eq!(e.history().next_undo(), Some("Remove arrangement \"Untitled\""));
+    assert_eq!(e.history().next_undo(), Some("Remove song \"Untitled\""));
 
-    // Undo selects the arrangement it brings back, redo the one after.
+    // Undo selects the song it brings back, redo the one after.
     e.undo();
     assert_eq!((e.library().songs.len(), e.selected_song()), (2, 1));
     e.undo();
@@ -537,7 +537,7 @@ fn arrangements_are_added_removed_and_selected_in_one_step() {
 fn a_moved_clip_takes_the_loop_along_in_one_step() {
     let mut e = editor();
     e.add_song("verse");
-    let clip = ordrumbox_core::SongClip { pattern_id: "a".into(), start_measure: 0, measure_count: 2.0 };
+    let clip = ordrumbox_core::SongClip { pattern_id: "a".into(), start_measure: 0, length_measures: 2.0 };
     assert!(e.add_song_clip(None, clip));
     assert!(!e.move_song_clip(None, 0, 0));
     assert!(!e.move_song_clip(None, 1, 3));

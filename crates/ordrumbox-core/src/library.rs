@@ -174,7 +174,7 @@ impl Library {
 
     /// A project file (`SongService.buildSongData`, the record the song panel
     /// saves and exports as `.odbox`): the header's description and date,
-    /// the session tempo, the kit, the patterns, the arrangements, what is selected, and `stamp` (key
+    /// the session tempo, the kit, the patterns, the songs, what is selected, and `stamp` (key
     /// and time in ms: `savedAt` or `exportedAt`).
     pub fn project_record(
         &self,

@@ -7,6 +7,7 @@ use super::{LIBRARY, run, session};
 use crate::control::Spec;
 use crate::menu::Command;
 use crate::panel::Id;
+use crate::session::session_types::PlayMode;
 use ordrumbox_core::automation::{AutomationTarget, volume_level};
 use ordrumbox_core::steps::TICK;
 
@@ -26,7 +27,7 @@ fn step(s: &Session) -> u32 {
 #[test]
 fn the_mixer_writes_the_lanes_while_recording_and_shows_them() {
     let (mut s, mut audio) = session(LIBRARY);
-    s.show_mode(true);
+    s.show_mode(PlayMode::Song);
     s.run(Command::RecordAutomation);
     s.toggle_play();
     run(&mut s, &mut audio, 4 * STEP);
@@ -61,7 +62,7 @@ fn the_mixer_writes_the_lanes_while_recording_and_shows_them() {
 /// The song playing, two steps in, with KICK's volume lane at half all along.
 fn playing_with_a_volume_lane() -> (Session, ordrumbox_engine::AudioSide) {
     let (mut s, mut audio) = session(LIBRARY);
-    s.show_mode(true);
+    s.show_mode(PlayMode::Song);
     s.editor.add_automation_lane(None, "KICK", AutomationTarget::Volume).unwrap();
     let base = s.song().unwrap().automations[0].clone();
     let stroke = ordrumbox_core::AutomationStroke::Fill(Some(0.5));
@@ -148,7 +149,7 @@ fn the_grid_and_the_track_editor_show_the_lanes_too() {
     use crate::panel::Kind;
     use crate::test_support::SIZE;
     let (mut s, mut audio) = session(LIBRARY);
-    s.show_mode(true);
+    s.show_mode(PlayMode::Song);
     for (target, value) in [(AutomationTarget::Volume, 0.5), (AutomationTarget::Mute, 1.0)] {
         let lane = s.editor.add_automation_lane(None, "KICK", target).unwrap();
         let base = s.song().unwrap().automations[lane].clone();
@@ -182,7 +183,7 @@ fn the_grid_and_the_track_editor_show_the_lanes_too() {
 #[test]
 fn pan_cutoff_and_q_knobs_write_show_and_take_back_their_lanes() {
     let (mut s, mut audio) = session(LIBRARY);
-    s.show_mode(true);
+    s.show_mode(PlayMode::Song);
     s.run(Command::RecordAutomation);
     s.toggle_play();
     run(&mut s, &mut audio, 4 * STEP);
@@ -226,7 +227,7 @@ fn pan_cutoff_and_q_knobs_write_show_and_take_back_their_lanes() {
 #[test]
 fn send_and_effect_knobs_write_show_and_take_back_their_lanes() {
     let (mut s, mut audio) = session(LIBRARY);
-    s.show_mode(true);
+    s.show_mode(PlayMode::Song);
     s.run(Command::RecordAutomation);
     s.toggle_play();
     run(&mut s, &mut audio, 4 * STEP);
@@ -254,7 +255,7 @@ fn send_and_effect_knobs_write_show_and_take_back_their_lanes() {
 #[test]
 fn transpose_probability_and_swing_controls_write_and_show_their_lanes() {
     let (mut s, mut audio) = session(LIBRARY);
-    s.show_mode(true);
+    s.show_mode(PlayMode::Song);
     s.run(Command::RecordAutomation);
     s.toggle_play();
     run(&mut s, &mut audio, 4 * STEP);

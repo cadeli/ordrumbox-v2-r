@@ -128,11 +128,11 @@ fn locale_order() {
 #[test]
 fn loop_point_falls_back_to_the_length() {
     let mut track = Track { beat_count: 4, steps_per_beat: 4, ..Track::default() };
-    assert_eq!(loop_length(&track), 16.0);
+    assert_eq!(loop_steps(&track), 16.0);
     track.notes.push(Note { beat: 7, step: 1, ..Note::default() });
-    assert_eq!(loop_length(&track), 30.0);
-    track.loop_length = Some(5);
-    assert_eq!(loop_length(&track), 5.0);
+    assert_eq!(loop_steps(&track), 30.0);
+    track.loop_steps = Some(5);
+    assert_eq!(loop_steps(&track), 5.0);
 }
 
 fn settings(hits: f64) -> ordrumbox_logic::compose::Settings {

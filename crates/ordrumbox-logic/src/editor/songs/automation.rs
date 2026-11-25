@@ -1,4 +1,4 @@
-//! The automation lanes of an arrangement: added, removed, and their on and
+//! The automation lanes of a song: added, removed, and their on and
 //! off points placed step by step, each edit one undo step.
 
 use ordrumbox_core::automation::{AutomationLane, AutomationStroke, AutomationTarget, step_label};
@@ -16,7 +16,7 @@ fn stroke_label(target: AutomationTarget, stroke: AutomationStroke) -> String {
 }
 
 impl Editor {
-    /// Add a lane switching `target` of `instrument` to arrangement `song`
+    /// Add a lane switching `target` of `instrument` to song `song`
     /// (else the selected one), after its other lanes; its index. An
     /// instrument has one lane per target.
     pub fn add_automation_lane(
@@ -102,7 +102,7 @@ impl Editor {
         true
     }
 
-    /// Every lane of arrangement `song` (else the selected one) removed;
+    /// Every lane of song `song` (else the selected one) removed;
     /// whether it had some.
     pub fn remove_automation_lanes(&mut self, song: Option<usize>) -> bool {
         let Some(s) = self.song_index(song).filter(|&s| !self.library.songs[s].automations.is_empty()) else {
@@ -112,7 +112,7 @@ impl Editor {
         true
     }
 
-    /// Remove lane `lane` of arrangement `song` (else the selected one);
+    /// Remove lane `lane` of song `song` (else the selected one);
     /// whether there was one.
     pub fn remove_automation_lane(&mut self, song: Option<usize>, lane: usize) -> bool {
         let Some(s) = self.song_index(song) else { return false };

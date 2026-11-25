@@ -1,5 +1,5 @@
 //! The song panel under the mouse: clicks on the pattern list and the
-//! arrangement, drags of patterns, clips and rows (one undo step on release),
+//! song, drags of patterns, clips and rows (one undo step on release),
 //! the scroll bars, the wheel, the clip tooltip, and a double-click on a
 //! clip, which opens its pattern.
 
@@ -13,7 +13,7 @@ use super::session_panel::DOUBLE_CLICK;
 use super::session_song::{DRAG_START_PX, DragSource, SongDrag};
 use super::session_song_menu::clip_label;
 use super::session_song_zoom::BarDrag;
-use super::session_types::Workspace;
+use super::session_types::{PlayMode, Workspace};
 use crate::canvas::Canvas;
 use crate::panel::{Dropdown, Id, Rect};
 use crate::song_view::{Axis, Row, SongGhost, SongHit, SongLayout};
@@ -21,7 +21,7 @@ use crate::ui_input::Button;
 use crate::view;
 
 impl Session {
-    /// A click on the song panel's list or arrangement; whether it was theirs.
+    /// A click on the song panel's list or song; whether it was theirs.
     pub fn song_click(&mut self, size: (i32, i32, Scale), x: i32, y: i32, button: Button) -> bool {
         let layout = self.song_layout(size);
         let rows = self.song_rows();
@@ -149,14 +149,14 @@ impl Session {
         match self.editor.library().pattern_index(&id) {
             Some(index) => {
                 self.show_pattern(index);
-                self.show_mode(false);
+                self.show_mode(PlayMode::Pattern);
             }
             None => self.message = format!("\"{}\" is not in the library", self.pattern_label(&id)),
         }
         true
     }
 
-    /// Row `r` of the arrangement clicked: its pattern shown.
+    /// Row `r` of the song clicked: its pattern shown.
     fn show_row_pattern(&mut self, r: usize) {
         let Some(id) = self.song_rows().get(r).map(|row| row.id.clone()) else { return };
         if let Some(index) = self.editor.library().pattern_index(&id) {
@@ -229,7 +229,7 @@ impl Session {
         Some((from, layout.list_drop_row(drag.y, self.list_scroll(layout), count)))
     }
 
-    /// Where the pattern being dragged would land, the pointer over the arrangement.
+    /// Where the pattern being dragged would land, the pointer over the song.
     pub(super) fn song_ghost(&self, layout: &SongLayout, rows: &[Row]) -> Option<SongGhost> {
         let (drag, measure) = self.song_drag_at(layout, rows.len())?;
         let DragSource::Pattern(p) = drag.source else { return None };
@@ -241,7 +241,7 @@ impl Session {
             name: pattern.name.clone().unwrap_or_else(|| pattern.id.clone()),
             row: rows.iter().position(|r| r.id == pattern.id).unwrap_or(rows.len()),
             measure,
-            measure_count: measures_for_pattern(pattern.beat_count),
+            length_measures: measures_for_pattern(pattern.beat_count),
         })
     }
 
@@ -349,7 +349,7 @@ impl Session {
         changed
     }
 
-    /// The wheel over the arrangement: measures, sideways ones too (Shift:
+    /// The wheel over the song: measures, sideways ones too (Shift:
     /// rows, which macOS turns into sideways notches); over the pattern's
     /// description: its lines; over the pattern list: its rows; whether it
     /// was theirs.
@@ -385,7 +385,7 @@ impl Session {
         true
     }
 
-    /// The mouse over the arrangement: the clip or the lane's step it is
+    /// The mouse over the song: the clip or the lane's step it is
     /// on, for its tooltip; whether it changed.
     pub fn song_hover(&mut self, size: (i32, i32, Scale), x: i32, y: i32) -> bool {
         let hover = if self.workspace == Workspace::Song
@@ -413,7 +413,7 @@ impl Session {
     }
 
     /// The tooltip of the clip under the mouse, or, while a pattern is
-    /// dragged over the arrangement, the measure it would be added at, or
+    /// dragged over the song, the measure it would be added at, or
     /// the value of the lane's step painted or under the mouse.
     pub(super) fn draw_song_tooltip(&self, canvas: &mut Canvas, scale: Scale) {
         if self.chrome.covered() {
@@ -528,7 +528,7 @@ mod tests {
         assert_eq!(s.pattern_index, 0);
         assert_eq!(clips(&s).len(), 1);
 
-        // Pattern a, not in the arrangement yet, dropped past its end.
+        // Pattern a, not in the song yet, dropped past its end.
         s.chrome.widgets.last_click = None;
         s.song_click(SIZE, list.0, list.1, Button::Left);
         s.mouse_move(SIZE, measure_x(4), row_y(1), false);
@@ -553,7 +553,7 @@ mod tests {
         s.undo();
         assert_eq!(s.editor.library().patterns[0].name.as_deref(), Some("a"));
 
-        // Dropped outside the arrangement: nothing.
+        // Dropped outside the song: nothing.
         s.chrome.widgets.last_click = None;
         s.song_click(SIZE, list.0, list.1, Button::Left);
         s.mouse_move(SIZE, l.column.x + 2, l.column.y + 2, false);

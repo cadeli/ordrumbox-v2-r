@@ -45,7 +45,7 @@ fn bank() -> Arc<SampleBank> {
                     key: key.into(),
                     display_name: key.to_lowercase(),
                     path: format!("{kit}/{key}.wav"),
-                    decay: Some(5000.0),
+                    decay_ms: Some(5000.0),
                     ..Default::default()
                 },
                 buffer: buffer.clone().into(),
@@ -228,8 +228,8 @@ fn a_song_without_a_playable_clip_is_refused() {
 }
 
 #[test]
-fn the_song_export_follows_the_arrangement_loop() {
-    // The demo arrangement is 66 measures; its loop shortened to 2.
+fn the_song_export_follows_the_song_loop() {
+    // The demo song is 66 measures; its loop shortened to 2.
     let mut library = library();
     library.songs[0].loop_measures = Some(2.0);
     let (left, _) = offline::render_song(&library, 0, &setup(1)).expect("renders");
@@ -306,8 +306,8 @@ fn starting_a_song_makes_every_pattern_it_plays_audible() {
     }
     assert!(energy > 0.0);
     assert_eq!(controller.mode(), Mode::Song(0));
-    assert!(controller.position().expect("playing").pass >= 1, "the arrangement advances");
-    // Every pattern of the arrangement, not only the selected one, has its sounds.
+    assert!(controller.position().expect("playing").pass >= 1, "the song advances");
+    // Every pattern of the song, not only the selected one, has its sounds.
     for clip in &library.songs[0].clips {
         let p = library.patterns.iter().position(|p| p.id == clip.pattern_id).expect("known pattern");
         for (t, track) in library.patterns[p].tracks.iter().enumerate() {

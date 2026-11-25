@@ -169,7 +169,7 @@ impl Session {
         match id {
             Id::KitSampleInstrument(sample) => self.kit_instrument_menu(sample, rect),
             Id::Instrument => self.instrument_menu(values.get(selected).map_or("", String::as_str), rect),
-            Id::PatternList => self.pattern_genre_menu(rect),
+            Id::PatternList => self.pattern_style_menu(rect),
             Id::Synth | Id::SynthPreset => {
                 self.synth_preset_menu(id, values.get(selected).map_or("", String::as_str), rect);
             }

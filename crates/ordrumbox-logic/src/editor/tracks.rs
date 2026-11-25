@@ -164,8 +164,8 @@ impl Editor {
                     note.step = ((percent / 100.0 * f64::from(target)).round() as i32).min(target - 1);
                 }
                 let max_steps = track.beat_count * target;
-                if track.loop_length.is_some_and(|l| l > max_steps) {
-                    track.loop_length = Some(max_steps);
+                if track.loop_steps.is_some_and(|l| l > max_steps) {
+                    track.loop_steps = Some(max_steps);
                 }
             },
         )
@@ -188,8 +188,8 @@ impl Editor {
             None,
             |track| {
                 let full = track.steps_per_beat * track.beat_count;
-                let next = track.loop_length.unwrap_or(full) - 1;
-                track.loop_length = Some(if next < 1 { full } else { next });
+                let next = track.loop_steps.unwrap_or(full) - 1;
+                track.loop_steps = Some(if next < 1 { full } else { next });
             },
         )
         .is_some()

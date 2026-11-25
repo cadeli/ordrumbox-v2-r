@@ -1,4 +1,4 @@
-//! The arrangement's zoom, as a DAW timeline has it: how wide a measure is
+//! The song grid's zoom, as a DAW timeline has it: how wide a measure is
 //! drawn, the handles at the ends of the measures' thumb that set it, and
 //! which measures the ruler numbers at that width.
 
@@ -6,7 +6,7 @@ use super::{Axis, SongLayout};
 use crate::canvas::text_width;
 use ordrumbox_core::automation::STEPS_PER_MEASURE;
 
-/// How wide a measure is drawn, in scale units: the arrangement's zoom. It
+/// How wide a measure is drawn, in scale units: the song's zoom. It
 /// starts at [`MeasureZoom::STEPS`], where each step of an automation lane
 /// can be clicked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,7 +57,7 @@ impl MeasureZoom {
 }
 
 impl SongLayout {
-    /// The zoom at which `measures` fill the arrangement's width.
+    /// The zoom at which `measures` fill the song's width.
     #[must_use]
     pub fn zoom_for(&self, measures: f64) -> MeasureZoom {
         let (across, measures) = (self.measures_width(), measures.max(1.0));
@@ -83,7 +83,7 @@ impl SongLayout {
         f64::from(x - start) / f64::from(len.max(1)) * f64::from(span)
     }
 
-    /// The measure (fractional) at `x` over the arrangement, `first` the first shown.
+    /// The measure (fractional) at `x` over the song, `first` the first shown.
     #[must_use]
     pub fn measure_under(&self, x: i32, first: u32) -> f64 {
         f64::from(first) + f64::from(x - self.body_left()) / f64::from(self.measure_width().max(1))

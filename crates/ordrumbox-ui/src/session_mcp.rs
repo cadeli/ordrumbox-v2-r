@@ -89,7 +89,7 @@ impl Session {
 
     /// The groups of tools of `session_mcp_tools.rs`, in the order they are asked.
     const TOOL_GROUPS: [ToolGroup; 5] = [
-        Session::mcp_arrangement_tool,
+        Session::mcp_song_tool,
         Session::mcp_files_tool,
         Session::mcp_synth_tool,
         Session::mcp_kit_tool,
@@ -148,7 +148,7 @@ impl Session {
         Ok(pattern_summary(self.pattern_index, pattern))
     }
 
-    /// Where a tool writes `export` of pattern `p` or arrangement `s`: the
+    /// Where a tool writes `export` of pattern `p` or song `s`: the
     /// exports folder, under the name the window would give.
     pub(super) fn mcp_export_path(&self, export: Export, p: usize, s: usize) -> Result<PathBuf, String> {
         let dir = store::exports_dir().ok_or("no user data folder to export to")?;
@@ -297,7 +297,7 @@ impl Session {
         Ok(object([("results", Value::Array(results))]))
     }
 
-    pub(super) fn mcp_remove_arrangement(&mut self, args: &Value) -> Result<Value, String> {
+    pub(super) fn mcp_remove_song(&mut self, args: &Value) -> Result<Value, String> {
         let s = find_song(&self.editor, args)?;
         if self.playback.plays(Mode::Song(s)) {
             self.playback.stop();
@@ -305,7 +305,7 @@ impl Session {
         let name = self.editor.library().songs[s].name.clone();
         self.editor.remove_song(Some(s));
         self.song_panel.scroll_to_start();
-        Ok(object([("removed", Value::from(name)), ("arrangements", count(self.editor.library().songs.len()))]))
+        Ok(object([("removed", Value::from(name)), ("songs", count(self.editor.library().songs.len()))]))
     }
 
     pub(super) fn mcp_play(&mut self, args: &Value) -> Result<Value, String> {
@@ -316,7 +316,7 @@ impl Session {
         self.playback.stop();
         if song {
             if self.editor.library().songs.is_empty() {
-                return Err("No arrangement to play: createArrangement".into());
+                return Err("No song to play: createSong".into());
             }
             self.transport.song_cursor = 0;
             self.mode = PlayMode::Song;
@@ -382,7 +382,7 @@ impl Session {
                     if s == self.editor.selected_song() { Some(self.song_cursor_measure().floor()) } else { None };
                 object([
                     ("playing", Value::Bool(true)),
-                    ("arrangement", library.songs.get(s).map_or(Value::Null, |song| Value::from(song.name.as_str()))),
+                    ("song", library.songs.get(s).map_or(Value::Null, |song| Value::from(song.name.as_str()))),
                     ("measure", measure.map_or(Value::Null, Value::from)),
                 ])
             }
@@ -438,7 +438,7 @@ impl Session {
         Ok(object([
             ("name", Value::from(name)),
             ("patterns", count(library.patterns.len())),
-            ("arrangements", count(library.songs.len())),
+            ("songs", count(library.songs.len())),
         ]))
     }
 

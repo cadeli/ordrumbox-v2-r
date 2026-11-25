@@ -119,11 +119,11 @@ impl Session {
             }
             Pending::LoadProject(path) | Pending::ImportProject(path) | Pending::ImportLibrary(path) => {
                 let name = path.file_name().unwrap_or(path.as_os_str()).to_string_lossy();
-                ("Replace the library?", format!("{name} takes the place of every pattern and arrangement."), "replace")
+                ("Replace the library?", format!("{name} takes the place of every pattern and song."), "replace")
             }
             Pending::StarterLibrary => (
                 "Load the starter library?",
-                "The starter library takes the place of every pattern and arrangement.".to_owned(),
+                "The starter library takes the place of every pattern and song.".to_owned(),
                 "load",
             ),
             Pending::RestoreUserData(path) => {

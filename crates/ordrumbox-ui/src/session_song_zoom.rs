@@ -1,5 +1,5 @@
-//! The arrangement's zoom, as on a DAW timeline: an end of the measures'
-//! thumb dragged (the other end stays), Ctrl+wheel over the arrangement
+//! The song grid's zoom, as on a DAW timeline: an end of the measures'
+//! thumb dragged (the other end stays), Ctrl+wheel over the song
 //! (the measure under the pointer stays), and what the scroll bars hold.
 
 use super::Session;
@@ -11,7 +11,7 @@ use crate::song_view::Axis;
 /// A notch of Ctrl+wheel: a measure this many times wider (or narrower).
 const ZOOM_STEP: f64 = 1.25;
 
-/// What the mouse holds on the arrangement's scroll bars.
+/// What the mouse holds on the song's scroll bars.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum BarDrag {
     /// A bar's thumb, centred on the pointer.
@@ -44,7 +44,7 @@ impl Session {
     }
 
     /// The end of the measures' thumb held at `x`: the measures from the
-    /// other end to `x` fill the arrangement; whether to redraw.
+    /// other end to `x` fill the song; whether to redraw.
     fn song_zoom_to(&mut self, size: (i32, i32, Scale), (edge, fixed, span): (Edge, u32, u32), x: i32) -> bool {
         let layout = self.song_layout(size);
         let at = layout.track_measure(x, span).max(0.0);
@@ -61,9 +61,9 @@ impl Session {
         before != (self.song_panel.zoom, self.song_panel.scroll.0)
     }
 
-    /// Ctrl+wheel over the arrangement: measures wider for notches up,
+    /// Ctrl+wheel over the song: measures wider for notches up,
     /// narrower down, the measure under the pointer kept under it; whether
-    /// it was the arrangement's.
+    /// it was the song's.
     pub fn song_zoom_wheel(&mut self, size: (i32, i32, Scale), x: i32, y: i32, lines: isize) -> bool {
         let layout = self.song_layout(size);
         if self.song().is_none() || self.workspace != Workspace::Song || lines == 0 || !layout.grid.contains(x, y) {
@@ -158,7 +158,7 @@ mod tests {
         assert!((layout.measure_under(x, first) - under).abs() < 1.0);
         assert!(s.song_zoom_wheel(SIZE, x, bar.y - 30, -6));
         assert!(s.song_panel.zoom.units() < MeasureZoom::default().units());
-        // Outside the arrangement, it is not the zoom's.
+        // Outside the song, it is not the zoom's.
         assert!(!s.song_zoom_wheel(SIZE, x, 0, 1));
     }
 }

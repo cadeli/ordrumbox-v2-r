@@ -50,7 +50,7 @@ pub fn pattern_ticks(pattern: &Pattern) -> i64 {
 /// Length of one loop of a track, in steps: `loopAtStep` when set, else the
 /// track's own `beatCount`.
 pub fn track_loop_steps(track: &Track) -> i64 {
-    match track.loop_length {
+    match track.loop_steps {
         Some(steps) if steps > 0 => i64::from(steps),
         _ => i64::from(track.beat_count) * i64::from(track.steps_per_beat),
     }
@@ -155,7 +155,7 @@ impl SpanResolver {
         Self {
             occupied: track.notes.iter().map(|n| absolute_step(n.beat, n.step, spb)).collect(),
             last: i64::from(spb) * i64::from(track.beat_count),
-            loop_at: track.loop_length.map(i64::from),
+            loop_at: track.loop_steps.map(i64::from),
             steps_per_beat: spb,
         }
     }

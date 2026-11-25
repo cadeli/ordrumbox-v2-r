@@ -245,7 +245,7 @@ pub(crate) fn set_meter(track: &mut Track, style: &Style) {
         track.steps_per_beat = style.steps_per_beat;
         track.notes.clear();
     }
-    track.loop_length = Some(track.beat_count * track.steps_per_beat);
+    track.loop_steps = Some(track.beat_count * track.steps_per_beat);
     track.swing_amount = style.swing_amount;
     track.swing_resolution = style.swing_resolution;
 }

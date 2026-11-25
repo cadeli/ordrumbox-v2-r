@@ -3,6 +3,7 @@
 
 use super::Session;
 use super::session_files::NOTHING_TO_RENDER;
+use super::session_types::PlayMode;
 use crate::store;
 use ordrumbox_core::Library;
 use ordrumbox_engine::offline::{self, Stereo};
@@ -36,10 +37,10 @@ fn track_names(library: &Library, mode: Mode) -> Vec<String> {
 }
 
 impl Session {
-    /// Ctrl-less: the selected pattern (a song with `song`) as stems in the
+    /// Ctrl-less: the selected pattern or song (`mode`) as stems in the
     /// folder at `dir`.
-    pub(super) fn export_stems(&mut self, song: bool, dir: &Path) {
-        let mode = if song { Mode::Song(self.editor.selected_song()) } else { Mode::Pattern(self.pattern_index) };
+    pub(super) fn export_stems(&mut self, mode: PlayMode, dir: &Path) {
+        let mode = self.mode_of(mode);
         self.message = self.write_stems(mode, dir).unwrap_or_else(|e| e);
     }
 

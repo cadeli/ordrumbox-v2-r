@@ -3,6 +3,7 @@
 
 use std::collections::HashMap;
 
+use crate::chance::Chance;
 use crate::drum_taxonomy::{mono_from_track_name, pan_from_track_name};
 use crate::json::{Object, Value};
 use crate::note::{Note, decode_notes, encode_notes};
@@ -26,7 +27,7 @@ json_record! {
         /// Grid subdivision: steps per beat, 1–8.
         steps_per_beat: i32 = 4 => "stepsPerBeat",
         /// Loop point in steps; `None` loops over the track length.
-        loop_length: Option<i32> = None => "loopLength" | "loopAtStep",
+        loop_steps: Option<i32> = None => "loopLength" | "loopAtStep",
         swing_resolution: i32 = 1 => "swingResolution",
         swing_amount: f64 = 0.0 => "swingAmount",
         volume: f64 = 1.0 => "volume" | "velocity",
@@ -55,17 +56,17 @@ json_record! {
         note_variation: f64 = 0.0 => "noteVariation" | "variation2",
         /// Base probability of every note, 0–1.
         probability: f64 = 1.0 => "probability",
-        /// Per-note chances of the auto engine, 0–100.
-        auto_pitch_chance: f64 = 50.0 => "autoPitchChance" | "probPitch" | "prob_pitch",
-        auto_velocity_chance: f64 = 50.0 => "autoVelocityChance" | "probVelocity" | "prob_velocity",
-        auto_silence_chance: f64 = 50.0 => "autoSilenceChance" | "probSilence" | "prob_silence",
-        auto_fill_chance: f64 = 50.0 => "autoFillChance" | "probFill" | "prob_fill",
-        auto_ghost_chance: f64 = 50.0 => "autoGhostChance" | "probGhost" | "prob_ghost",
-        auto_retrigger_chance: f64 = 50.0 => "autoRetriggerChance" | "probRetrigger" | "prob_retrig",
-        auto_euclidean_chance: f64 = 50.0 => "autoEuclideanChance" | "probEuclidean" | "prob_euclid",
-        auto_note_probability_chance: f64 = 50.0 => "autoNoteProbabilityChance" | "probNote" | "prob_note",
+        /// Per-note chances of the auto engine (files: 0–100).
+        auto_pitch_chance: Chance = Chance::new(0.5) => "autoPitchChance" | "probPitch" | "prob_pitch",
+        auto_velocity_chance: Chance = Chance::new(0.5) => "autoVelocityChance" | "probVelocity" | "prob_velocity",
+        auto_silence_chance: Chance = Chance::new(0.5) => "autoSilenceChance" | "probSilence" | "prob_silence",
+        auto_fill_chance: Chance = Chance::new(0.5) => "autoFillChance" | "probFill" | "prob_fill",
+        auto_ghost_chance: Chance = Chance::new(0.5) => "autoGhostChance" | "probGhost" | "prob_ghost",
+        auto_retrigger_chance: Chance = Chance::new(0.5) => "autoRetriggerChance" | "probRetrigger" | "prob_retrig",
+        auto_euclidean_chance: Chance = Chance::new(0.5) => "autoEuclideanChance" | "probEuclidean" | "prob_euclid",
+        auto_note_probability_chance: Chance = Chance::new(0.5) => "autoNoteProbabilityChance" | "probNote" | "prob_note",
         auto_note_probability_range: f64 = 100.0 => "autoNoteProbabilityRange" | "probNoteDepth" | "prob_note_depth",
-        auto_arp_chance: f64 = 50.0 => "autoArpChance" | "probArp" | "prob_arp",
+        auto_arp_chance: Chance = Chance::new(0.5) => "autoArpChance" | "probArp" | "prob_arp",
         /// Semitone span of pitch randomization, 1–24.
         pitch_range: f64 = 12.0 => "pitchRange" | "pitch_range",
         pitch_scale_lock: bool = false => "pitchScaleLock" | "pitch_scale_lock",
@@ -280,7 +281,7 @@ impl Track {
             name: name.to_owned(),
             beat_count,
             steps_per_beat,
-            loop_length: Some(beat_count * steps_per_beat),
+            loop_steps: Some(beat_count * steps_per_beat),
             pan: pan_from_track_name(name),
             mono: mono_from_track_name(name),
             ..Self::default()
@@ -464,7 +465,7 @@ impl Track {
         if spb <= 0 || total <= 1 || self.notes.is_empty() {
             return false;
         }
-        let current = self.loop_length.map(i64::from).filter(|&l| l > 0).unwrap_or(total);
+        let current = self.loop_steps.map(i64::from).filter(|&l| l > 0).unwrap_or(total);
         let step_of = |n: &Note| i64::from(n.beat) * i64::from(spb) + i64::from(n.step);
         let original = Self::step_signatures(self.notes.iter(), spb, |s| s);
         let Some(loop_at) = (1..current).find(|&loop_at| {
@@ -481,7 +482,7 @@ impl Track {
         }
         self.notes.retain(|n| step_of(n) < loop_at);
         self.notes.sort_by_key(step_of);
-        self.loop_length = Some(loop_at as i32);
+        self.loop_steps = Some(loop_at as i32);
         true
     }
 }
@@ -544,7 +545,7 @@ mod tests {
         let (track, issues) = load(r#"{"name":"X","custom":[1],"mono":"yes","loopAtStep":null}"#);
         assert_eq!(track.extra.get("custom"), Some(&json::parse("[1]").unwrap()));
         assert!(!track.mono);
-        assert_eq!(track.loop_length, None);
+        assert_eq!(track.loop_steps, None);
         assert_eq!(issues, [Issue::new("t.mono", "wrong type (\"yes\"), default kept")]);
         assert_eq!(track.to_json().to_json(), r#"{"name":"X","custom":[1]}"#);
     }
@@ -560,7 +561,7 @@ mod tests {
         let (track, issues) =
             load(r#"{"name":"KICK","velocity":0.5,"delayDepth":0.3,"prob_pitch":10,"sat":false,"synthSoundKey":"B1"}"#);
         assert!(issues.is_empty());
-        assert_eq!((track.volume, track.delay_mix, track.auto_pitch_chance), (0.5, 0.3, 10.0));
+        assert_eq!((track.volume, track.delay_mix, track.auto_pitch_chance), (0.5, 0.3, Chance::new(0.1)));
         assert!(!track.saturation_on);
         assert_eq!(
             track.to_json().to_json(),
@@ -599,7 +600,7 @@ mod tests {
         let mut track = with_notes(8, 5, (0..40).step_by(4));
         track.notes.iter_mut().for_each(|n| n.step_percent = Some(0.0));
         assert!(track.compact_loop());
-        assert_eq!(track.loop_length, Some(4));
+        assert_eq!(track.loop_steps, Some(4));
         assert_eq!(track.notes.len(), 1);
     }
 

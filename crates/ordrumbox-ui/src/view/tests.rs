@@ -102,7 +102,7 @@ fn draws_without_panicking_at_any_size() {
                 SoundLabel::sample("real/kick.wav"),
                 SoundLabel { source: "synth".into(), name: "BASS5".into() },
             ],
-            arrangement: None,
+            song_view: None,
             piano_roll: None,
             synth: false,
             mixer: false,

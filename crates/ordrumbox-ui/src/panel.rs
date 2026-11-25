@@ -236,7 +236,7 @@ pub enum Id {
     /// The mode switch: 0 the pattern, 1 the song.
     Mode(u8),
     // Song panel.
-    /// The arrangement select.
+    /// The song select.
     SongList,
     /// Save, load, export, import, new, delete.
     SongButton(&'static str),
@@ -248,7 +248,7 @@ pub enum Id {
     PatternDescription,
     /// The selected pattern's tags, on the song screen (their entry).
     PatternTags,
-    /// The header's PATTERN list, opened as genres and their patterns.
+    /// The header's PATTERN list, opened as styles and their patterns.
     PatternMenu,
     /// The right-click menu of the song panel.
     SongMenu,

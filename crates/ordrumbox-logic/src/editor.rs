@@ -1,6 +1,6 @@
 //! The library being edited and every edit the app makes to it (notes,
-//! tracks, patterns and songs), each one an undo step. The song (arrangement) commands are
-//! in `arrangement.rs`.
+//! tracks, patterns and songs), each one an undo step. The song commands are
+//! in `song.rs`.
 //!
 //! Patterns, tracks and notes are addressed by index. An edit that changes nothing records nothing.
 
@@ -11,9 +11,6 @@ use ordrumbox_core::num::{clamp, round2};
 use ordrumbox_core::{Library, Pattern, SetField, Track};
 
 use crate::history::{Change, History, Target};
-
-#[path = "arrangement.rs"]
-mod arrangement;
 
 /// Default length of a pattern (`PATTERN_DEFAULTS`).
 const DEFAULT_BEAT_COUNT: i32 = 4;
@@ -94,7 +91,7 @@ fn apply_updates(track: &mut Track, updates: &[(&str, Value)]) {
 pub struct Editor {
     library: Library,
     history: History,
-    /// The arrangement the song panel edits.
+    /// The song the song panel edits.
     selected_song: usize,
     /// Bumped by every change (edits, undo, redo).
     revision: u64,
@@ -254,12 +251,13 @@ impl Editor {
 /// A track cleaned: its notes removed, its loop its whole length.
 fn clean(track: &mut Track) {
     track.notes.clear();
-    track.loop_length = Some(track.beat_count * track.steps_per_beat);
+    track.loop_steps = Some(track.beat_count * track.steps_per_beat);
 }
 
 mod generation;
 mod notes;
 mod patterns;
+mod songs;
 #[cfg(test)]
 mod tests;
 mod tracks;

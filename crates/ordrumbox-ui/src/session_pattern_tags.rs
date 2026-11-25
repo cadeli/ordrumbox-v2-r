@@ -1,24 +1,24 @@
 //! A pattern's tags in the window: their line on the song screen, edited as
-//! `funk, bass` (the genre first), and the header's PATTERN list, opened as
-//! a menu of genres, each opening its patterns.
+//! `funk, bass` (the style first), and the header's PATTERN list, opened as
+//! a menu of styles, each opening its patterns.
 
 use super::Session;
 use crate::panel::{Dropdown, Id, Rect, SUBMENU_MARK};
 use ordrumbox_core::tags;
 
-/// Value prefix of a genre in the PATTERN menu (its index in the groups follows).
-const GENRE_VALUE: &str = "genre:";
-/// Value prefix of a pattern in a genre's list (its index in the library follows).
+/// Value prefix of a style in the PATTERN menu (its index in the groups follows).
+const STYLE_VALUE: &str = "style:";
+/// Value prefix of a pattern in a style's list (its index in the library follows).
 const PATTERN_VALUE: &str = "pattern:";
-/// What the patterns without a genre are listed under.
-const NO_GENRE: &str = "other";
+/// What the patterns without a style are listed under.
+const NO_STYLE: &str = "other";
 
 impl Session {
     /// The tags entry of the selected pattern, its tags as `funk, bass`.
     pub(super) fn pattern_tags_entry(&mut self) {
         let Some(pattern) = self.pattern() else { return };
         let text = tags::to_text(&pattern.tags);
-        self.show_entry(Id::PatternTags, None, "Pattern tags (genre first, then features):".into(), text);
+        self.show_entry(Id::PatternTags, None, "Pattern tags (style first, then features):".into(), text);
     }
 
     /// The tags entry confirmed with `text`: the selected pattern's tags, one
@@ -31,39 +31,39 @@ impl Session {
         }
         if self.editor.set_pattern_tags(self.pattern_index, &wanted) {
             self.edited();
-            let genre = self.pattern().and_then(|p| p.genre()).unwrap_or(NO_GENRE);
-            self.message = format!("tags set: listed under {genre}");
+            let style = self.pattern().and_then(|p| p.style_tag()).unwrap_or(NO_STYLE);
+            self.message = format!("tags set: listed under {style}");
         }
     }
 
-    /// The header's PATTERN list under `rect`: the genres, each with how
+    /// The header's PATTERN list under `rect`: the styles, each with how
     /// many patterns it has, the selected pattern's highlighted.
-    pub(super) fn pattern_genre_menu(&mut self, rect: Rect) {
-        let groups = tags::by_genre(&self.editor.library().patterns);
+    pub(super) fn pattern_style_menu(&mut self, rect: Rect) {
+        let groups = tags::by_style(&self.editor.library().patterns);
         let at = groups.iter().position(|(_, indices)| indices.contains(&self.pattern_index)).unwrap_or(0);
         let (values, labels) = groups
             .iter()
             .enumerate()
-            .map(|(i, (genre, indices))| {
-                let label = format!("{} ({}){SUBMENU_MARK}", genre.unwrap_or(NO_GENRE), indices.len());
-                (format!("{GENRE_VALUE}{i}"), label)
+            .map(|(i, (style, indices))| {
+                let label = format!("{} ({}){SUBMENU_MARK}", style.unwrap_or(NO_STYLE), indices.len());
+                (format!("{STYLE_VALUE}{i}"), label)
             })
             .unzip();
         self.chrome.widgets.dropdown = Some(Dropdown::new(Id::PatternMenu, rect, values, labels, at));
     }
 
-    /// A line of the PATTERN menus picked in `menu`: a genre opens its
+    /// A line of the PATTERN menus picked in `menu`: a style opens its
     /// patterns beside it, a pattern is shown (as the list did).
     pub(super) fn pattern_menu_pick(&mut self, value: &str, menu: Dropdown) {
         if let Some(index) = value.strip_prefix(PATTERN_VALUE).and_then(|i| i.parse::<usize>().ok()) {
             self.show_pattern(index);
             return;
         }
-        let Some(group) = value.strip_prefix(GENRE_VALUE).and_then(|i| i.parse::<usize>().ok()) else { return };
+        let Some(group) = value.strip_prefix(STYLE_VALUE).and_then(|i| i.parse::<usize>().ok()) else { return };
         let patterns = &self.editor.library().patterns;
-        let groups = tags::by_genre(patterns);
-        let Some((genre, indices)) = groups.get(group) else { return };
-        let title = genre.unwrap_or(NO_GENRE).to_owned();
+        let groups = tags::by_style(patterns);
+        let Some((style, indices)) = groups.get(group) else { return };
+        let title = style.unwrap_or(NO_STYLE).to_owned();
         let lines = indices.iter().map(|&i| {
             (format!("{PATTERN_VALUE}{i}"), patterns[i].name.clone().unwrap_or_else(|| format!("Pattern {i}")))
         });
@@ -114,15 +114,15 @@ mod tests {
     }
 
     #[test]
-    fn the_pattern_list_opens_by_genre() {
+    fn the_pattern_list_opens_by_style() {
         let mut s = session();
         s.show_pattern(2);
         let layout = s.panel_layout(SIZE.0, SIZE.1, SIZE.2);
         let list = panel::find(&layout.items, Id::PatternList).expect("the header's list").rect;
         s.mouse_down(SIZE, list.x + 2, list.y + 2, Button::Left, false);
-        let open = s.chrome.widgets.dropdown.as_ref().expect("the genres");
+        let open = s.chrome.widgets.dropdown.as_ref().expect("the styles");
         assert_eq!(open.labels, ["funk (1) >", "rock (1) >", "other (1) >"]);
-        assert_eq!(open.at, 0, "the genre of the pattern shown");
+        assert_eq!(open.at, 0, "the style of the pattern shown");
         // rock, then its pattern: `a` shown.
         choose(&mut s, 1);
         assert_eq!(menu(&s), ["pattern:0"]);

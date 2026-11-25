@@ -1,4 +1,4 @@
-//! The automation lanes of the arrangement: under the patterns' rows, each
+//! The automation lanes of the song: under the patterns' rows, each
 //! over one to four rows, named by its control and instrument in the frozen
 //! column (its bottom edge there sets how tall it is), its values drawn step
 //! by step (none where it leaves the pattern's); under the last row, the
@@ -160,7 +160,7 @@ impl SongLayout {
     }
 
     /// The add-automation button, a lane's name or one of its steps at
-    /// `(x, y)`, in an arrangement of `total` measures with clips.
+    /// `(x, y)`, in a song of `total` measures with clips.
     pub(super) fn automation_hit(&self, view: &SongView, x: i32, y: i32, total: u32) -> Option<SongHit> {
         let song = view.song.filter(|song| !song.clips.is_empty())?;
         if self.add_automation_rect(view).contains(x, y) {
@@ -328,7 +328,7 @@ fn draw_level(canvas: &mut Rows, shown: &LaneShown, layout: &SongLayout, (top, h
     }
 }
 
-/// The button that adds a lane, under the last row, once the arrangement has clips.
+/// The button that adds a lane, under the last row, once the song has clips.
 pub(super) fn draw_add_button(canvas: &mut Canvas, view: &SongView, layout: &SongLayout) {
     if view.song.is_none_or(|song| song.clips.is_empty()) {
         return;

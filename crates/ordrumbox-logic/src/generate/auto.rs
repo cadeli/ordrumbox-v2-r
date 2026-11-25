@@ -19,7 +19,7 @@ use super::structure::{SectionElement, Structure, random_key_offset, random_scal
 use crate::compose;
 
 /// The pattern's style key (in `Pattern::extra`).
-pub const GENRE: &str = "autoGenre";
+pub const STYLE_KEY: &str = "autoGenre";
 /// The synth preset a generated bass track plays.
 pub const BASS_PRESET: &str = "BASS_SQUARE";
 const KEY_OFFSET: &str = "autoKeyOffset";
@@ -108,17 +108,17 @@ fn pattern_value<'p>(pattern: &'p Pattern, key: &str) -> Option<&'p Value> {
     pattern.extra.get(key).filter(|v| !v.is_null())
 }
 
-pub(super) fn genre_of(pattern: &Pattern) -> Option<String> {
-    pattern_value(pattern, GENRE).and_then(Value::to_text).filter(|g| !g.is_empty())
+pub(super) fn style_name_of(pattern: &Pattern) -> Option<String> {
+    pattern_value(pattern, STYLE_KEY).and_then(Value::to_text).filter(|g| !g.is_empty())
 }
 
 /// The style of `pattern`: its own, else a drawn one (written to it).
 pub(super) fn pattern_style(g: &mut AutoGenerator<'_>, pattern: &mut Pattern) -> Style {
-    let name = match genre_of(pattern) {
+    let name = match style_name_of(pattern) {
         Some(name) => name,
         None => {
             let name = g.random_style_name();
-            pattern.extra.insert(GENRE, Value::from(name.as_str()));
+            pattern.extra.insert(STYLE_KEY, Value::from(name.as_str()));
             name
         }
     };
@@ -198,7 +198,7 @@ pub fn generate_track(
     density: f64,
     harmony: &Harmony,
 ) {
-    let style = g.style(&genre_of(pattern).unwrap_or_default());
+    let style = g.style(&style_name_of(pattern).unwrap_or_default());
     let Some(kind) = pattern.tracks.get(t).map(|track| instrument_family(&track.name)) else { return };
     if kind.is_drum() {
         return drum_tracks(g, pattern, &style, &[t], 1.0);
@@ -301,7 +301,7 @@ pub(super) fn drum_tracks(
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Options {
     /// A style name; `None`: the pattern's own, else a drawn one.
-    pub genre: Option<String>,
+    pub style: Option<String>,
     pub key_offset: Option<f64>,
     pub scale: Option<String>,
 }
@@ -314,12 +314,12 @@ pub struct Options {
 /// has no part for) and for the melodic tracks the style names. A BASS
 /// track (empty) is added when there is none.
 pub fn generate_pattern(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, options: &Options) {
-    let name = match options.genre.clone().or_else(|| genre_of(pattern)) {
+    let name = match options.style.clone().or_else(|| style_name_of(pattern)) {
         Some(name) => name,
         None => g.random_style_name(),
     };
     let style = g.style(&name);
-    pattern.extra.insert(GENRE, Value::from(style.name.as_str()));
+    pattern.extra.insert(STYLE_KEY, Value::from(style.name.as_str()));
     match options.key_offset {
         Some(offset) => _ = pattern.extra.insert(KEY_OFFSET, Value::Number(offset)),
         None if pattern_value(pattern, KEY_OFFSET).is_some() => {}
@@ -451,7 +451,7 @@ fn line_moves(track: &Track, style: &Style, macros: Macros, element: &SectionEle
 /// Whether any did.
 pub fn run_loop(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, index: u64) -> bool {
     let all = pattern.extra.get("autoGen").is_some_and(Value::is_true);
-    let style = g.style(&genre_of(pattern).unwrap_or_default());
+    let style = g.style(&style_name_of(pattern).unwrap_or_default());
     let element = g.structure.element(index);
     let macros = Macros::of(pattern);
     let mut changed = false;
@@ -476,7 +476,7 @@ pub fn plays_auto(pattern: &Pattern) -> bool {
 /// sound and settings and gets a new line, the others go; a locked track
 /// stays as it is, its line included.
 pub fn restyle_pattern(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, options: &Options) {
-    let name = match options.genre.clone().or_else(|| genre_of(pattern)) {
+    let name = match options.style.clone().or_else(|| style_name_of(pattern)) {
         Some(name) => name,
         None => g.random_style_name(),
     };
@@ -515,7 +515,7 @@ pub fn restyle_pattern(g: &mut AutoGenerator<'_>, pattern: &mut Pattern, options
     }
     let seed = (g.random() * SEED_RANGE).floor();
     pattern.extra.insert(PATTERN_SEED, Value::Number(seed));
-    let options = Options { genre: Some(style.name.clone()), ..options.clone() };
+    let options = Options { style: Some(style.name.clone()), ..options.clone() };
     seeded_lines(g, pattern, &options);
 }
 

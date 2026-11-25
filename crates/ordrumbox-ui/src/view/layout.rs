@@ -180,10 +180,10 @@ pub(super) const HEADER_GROUP_GAP: i32 = 14;
 pub(super) const HEADER_GROUP_PAD: i32 = 4;
 
 impl HeaderControls {
-    /// The arrangement list of the song mode, in the place of the pattern
+    /// The song list of the song mode, in the place of the pattern
     /// list and the beats.
     #[must_use]
-    pub fn arrangement(&self) -> Rect {
+    pub fn song(&self) -> Rect {
         Rect::new(self.pattern.x, self.pattern.y, self.beats.x + self.beats.w - self.pattern.x, self.pattern.h)
     }
 

@@ -18,7 +18,7 @@ use ordrumbox_logic::midi::{self, PPQN, smf};
 
 use super::Session;
 use super::session_playback::Playback;
-use super::session_types::Workspace;
+use super::session_types::{PlayMode, Workspace};
 use crate::canvas::Canvas;
 use crate::kits::KitSet;
 use crate::store;
@@ -33,7 +33,7 @@ fn bank(rate: u32) -> Arc<SampleBank> {
         key: "KICK".into(),
         display_name: "k".into(),
         path: "k".into(),
-        decay: Some(100.0),
+        decay_ms: Some(100.0),
         ..Default::default()
     };
     let buffer = SampleBuffer::mono(vec![0.5; 400], rate);
@@ -159,8 +159,8 @@ fn the_tempo_and_what_plays_follow_the_mode_not_the_view() {
         assert_pass_frames(&s, 4.0, 100.0);
     }
 
-    // The song mode plays the arrangement, from its start, at the song's tempo.
-    s.show_mode(true);
+    // The song mode plays the song, from its start, at the song's tempo.
+    s.show_mode(PlayMode::Song);
     run(&mut s, &mut audio, CALLBACK);
     assert_eq!((mode(&s), s.workspace), (Mode::Song(0), Workspace::Song));
     assert_eq!(position(&s).expect("playing").pass, 0);
@@ -172,7 +172,7 @@ fn the_tempo_and_what_plays_follow_the_mode_not_the_view() {
     assert_eq!(position(&s).expect("playing").pass, 1);
 
     // Back to the pattern mode: the pattern again, in the grid, at the song's tempo.
-    s.show_mode(false);
+    s.show_mode(PlayMode::Pattern);
     run(&mut s, &mut audio, CALLBACK);
     assert_eq!((mode(&s), s.workspace), (Mode::Pattern(0), Workspace::Grid));
     assert_pass_frames(&s, 4.0, 120.0);
@@ -189,7 +189,7 @@ fn in_song_mode_the_grid_and_the_roll_show_the_pattern_playing() {
                         {"name":"b","tracks":[{"name":"KICK","notes":[{"beat":1}]}]}]}"#,
     );
     let measure = pass_frames(4.0, 120.0) as usize;
-    s.show_mode(true);
+    s.show_mode(PlayMode::Song);
     s.show_view(0);
     s.toggle_play();
     run(&mut s, &mut audio, measure / 2);
@@ -241,7 +241,7 @@ fn space_in_song_mode_plays_the_song_and_the_song_view_alone_does_not() {
     assert_eq!(mode(&s), Mode::Pattern(0));
     s.toggle_play();
     s.show_view(0);
-    s.show_mode(true);
+    s.show_mode(PlayMode::Song);
     s.show_view(0);
     s.toggle_play();
     run(&mut s, &mut audio, 1000);
@@ -419,7 +419,7 @@ fn demo_session(samples_dir: &Path) -> (Session, AudioSide) {
                 key: key.into(),
                 display_name: key.to_lowercase(),
                 path: format!("{kit}/{key}.wav"),
-                decay: Some(100.0),
+                decay_ms: Some(100.0),
                 ..Default::default()
             };
             let buffer = SampleBuffer::mono((0..400).map(|i| level * (i as f32 * 0.3).sin()).collect(), RATE as u32);

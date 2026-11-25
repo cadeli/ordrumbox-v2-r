@@ -12,6 +12,7 @@
 
 use std::collections::HashMap;
 
+use crate::chance::Chance;
 use crate::drum_taxonomy::instrument_family;
 use crate::json::Value;
 use crate::note::Note;
@@ -22,9 +23,9 @@ use crate::scales::Scales;
 use crate::steps::{step_to_beat, step_to_tick};
 use crate::track::Track;
 
-/// Chance (0–100) every operation gets outside auto mode, where the per-kind
+/// Chance every operation gets outside auto mode, where the per-kind
 /// sliders are hidden.
-const DEFAULT_CHANCE: f64 = 50.0;
+const DEFAULT_CHANCE: Chance = Chance::new(0.5);
 
 /// Share of its velocity a generated drum note keeps at least when varied.
 const DRUM_VELOCITY_FLOOR: f64 = 0.75;
@@ -44,9 +45,9 @@ fn loop_budget(budget: i32, loop_count: i64) -> i32 {
     if budget <= 0 { 0 } else { ((f64::from(budget) / loop_count.max(1) as f64).round() as i32).max(1) }
 }
 
-/// Keep each candidate with its chance (0–100), then shuffle the survivors.
-fn select<T>(candidates: Vec<T>, chance: impl Fn(&T) -> f64, rng: &mut Rng) -> Vec<T> {
-    let mut kept: Vec<T> = candidates.into_iter().filter(|c| rng.next_f64() * 100.0 < chance(c)).collect();
+/// Keep each candidate with its chance, then shuffle the survivors.
+fn select<T>(candidates: Vec<T>, chance: impl Fn(&T) -> Chance, rng: &mut Rng) -> Vec<T> {
+    let mut kept: Vec<T> = candidates.into_iter().filter(|c| rng.next_f64() < chance(c).fraction()).collect();
     rng.shuffle(&mut kept);
     kept
 }
@@ -69,7 +70,7 @@ impl NoteOp {
         }
     }
 
-    fn chance(&self, track: &Track) -> f64 {
+    fn chance(&self, track: &Track) -> Chance {
         if !track.auto_mode {
             return DEFAULT_CHANCE;
         }
@@ -171,7 +172,7 @@ impl HitOp {
         }
     }
 
-    fn chance(&self, track: &Track) -> f64 {
+    fn chance(&self, track: &Track) -> Chance {
         if !track.auto_mode {
             return DEFAULT_CHANCE;
         }
@@ -434,9 +435,9 @@ mod tests {
         let track = Track {
             auto_mode: true,
             auto_note_variation: Some(100.0),
-            auto_retrigger_chance: 0.0,
-            auto_euclidean_chance: 0.0,
-            auto_note_probability_chance: 100.0,
+            auto_retrigger_chance: Chance::new(0.0),
+            auto_euclidean_chance: Chance::new(0.0),
+            auto_note_probability_chance: Chance::new(1.0),
             auto_note_probability_range: 100.0,
             notes: vec![Note::default(); 4],
             ..Track::default()

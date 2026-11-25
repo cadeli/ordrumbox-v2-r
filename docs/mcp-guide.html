@@ -171,7 +171,7 @@ the assistant sends, and what it may tell you back.</p>
 changes the sound of every drum track. A <strong>synth</strong> preset (<code>BASS_ACID</code>, <code>SYNTHLEAD_SAW</code>, <code>PIANO_EPIANO</code>…)
 is a sound made by the built-in synthesizer, handy for bass lines and chords.</p>
 
-<h3>An arrangement (song)</h3>
+<h3>A song</h3>
 <p>Patterns placed one after the other on a timeline, measure by measure. Measures are also counted from 0: the first
 measure is measure 0.</p>
 
@@ -287,7 +287,7 @@ selectKit      { "kit": "electro" }</code></pre>
 <div class="example">
 <h3>Example 7 — Build a short song</h3>
 <p class="say">Make a song called "Demo song": 4 measures of "Intro", then 8 measures of "First Beat", then 4 measures of "Intro" again. Play it.</p>
-<pre><code>createArrangement { "name": "Demo song", "clips": [
+<pre><code>createSong { "name": "Demo song", "clips": [
   { "patternName": "Intro",      "startMeasure": 0,  "measureCount": 4 },
   { "patternName": "First Beat", "startMeasure": 4,  "measureCount": 8 },
   { "patternName": "Intro",      "startMeasure": 12, "measureCount": 4 } ] }
@@ -301,7 +301,7 @@ play { "song": true }</code></pre>
 <p class="say">Export "First Beat" as WAV and MIDI files of 4 loops, and the song "Demo song" as WAV.</p>
 <pre><code>exportPatternWav     { "patternName": "First Beat", "loopCount": 4 }
 exportPatternMidi    { "patternName": "First Beat", "loopCount": 4 }
-exportArrangementWav { "arrangement": "Demo song" }</code></pre>
+exportSongWav { "song": "Demo song" }</code></pre>
 <p>The files go to the <code>exports</code> folder of your user data folder (see the
 <a href="user-manual.html#getting-started">user manual, section 1</a>); the assistant tells you their full path.</p>
 </div>
@@ -369,18 +369,19 @@ undo history. <code>redo</code> brings a change back.</p>
 <tr><td>Kits</td><td>add or replace a sample, normalize a kit, make a kit from a folder, load or export a kit mapping</td>
     <td><code>addSampleToKit</code>, <code>replaceKitSample</code>, <code>normalizeKit</code>, <code>importKitFolder</code>,
         <code>loadKitMapping</code>, <code>exportKitMapping</code></td></tr>
-<tr><td>Songs and projects</td><td>build and edit arrangements, move and repeat clips; name the project, save, open and export project files</td>
-    <td><code>listArrangements</code>, <code>createArrangement</code>, <code>selectArrangement</code>, <code>renameArrangement</code>,
-        <code>updateArrangement</code>, <code>removeArrangement</code>, <code>addPatternToArrangement</code>,
-        <code>removePatternFromArrangement</code>, <code>moveClip</code>, <code>repeatClip</code>, <code>setProjectInfo</code>,
+<tr><td>Songs and projects</td><td>build and edit songs, move and repeat clips; name the project, save, open and export project files</td>
+    <td><code>listSongs</code>, <code>createSong</code>, <code>selectSong</code>, <code>renameSong</code>,
+        <code>updateSong</code>, <code>removeSong</code>, <code>addPatternToSong</code>,
+        <code>removePatternFromSong</code>, <code>moveClip</code>, <code>repeatClip</code>, <code>setProjectInfo</code>,
         <code>listSavedProjects</code>, <code>saveProject</code>, <code>openProject</code>, <code>exportProject</code>
         (the earlier names <code>setSongInfo</code>, <code>listSavedSongs</code>, <code>saveSong</code>, <code>loadSong</code>,
-        <code>exportSong</code> still work)</td></tr>
+        <code>exportSong</code> still work, and so do the <code>…Arrangement…</code> names with their
+        <code>arrangement</code> argument)</td></tr>
 <tr><td>Playback</td><td>play, stop, tell what is playing</td>
     <td><code>play</code>, <code>stop</code>, <code>getPlaybackState</code></td></tr>
 <tr><td>Files</td><td>export WAV (the mix or each track apart), MIDI or JSON, import a MIDI file</td>
     <td><code>exportPatternWav</code>, <code>exportPatternMidi</code>, <code>savePatternToJson</code>,
-        <code>exportArrangementWav</code>, <code>exportPatternStems</code>, <code>exportArrangementStems</code>,
+        <code>exportSongWav</code>, <code>exportPatternStems</code>, <code>exportSongStems</code>,
         <code>importMidi</code></td></tr>
 <tr><td>Master and history</td><td>adjust the master bus and the shared echo and reverb returns, undo, redo</td>
     <td><code>getMaster</code>, <code>setMaster</code>, <code>getReturns</code>, <code>setReturns</code>, <code>undo</code>, <code>redo</code></td></tr>

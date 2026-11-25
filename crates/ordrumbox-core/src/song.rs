@@ -1,4 +1,4 @@
-//! Songs: arrangements that place patterns on a
+//! Songs: songs that place patterns on a
 //! timeline of 4/4 measures. Clips may overlap and may last a fraction of a
 //! measure (a 3-beat pattern is 0.75 measure); only positions snap to whole
 //! measures.
@@ -48,7 +48,7 @@ pub struct SongClip {
     /// 0-based measure where the clip starts.
     pub start_measure: u32,
     /// Length in measures, > 0, possibly fractional.
-    pub measure_count: f64,
+    pub length_measures: f64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -59,7 +59,7 @@ pub struct Song {
     /// One tempo for the whole song.
     pub bpm: f64,
     /// Explicit loop length in measures; `None` loops at the end of the last
-    /// clip. Whole on load; an arrangement edit sets it to the end of the
+    /// clip. Whole on load; a song edit sets it to the end of the
     /// last clip, which may be fractional.
     pub loop_measures: Option<f64>,
     pub clips: Vec<SongClip>,
@@ -84,10 +84,10 @@ pub fn measures_for_pattern(beat_count: i32) -> f64 {
 impl Song {
     /// End of the furthest clip, in measures (0 without clips).
     pub fn content_measures(&self) -> f64 {
-        self.clips.iter().map(|clip| f64::from(clip.start_measure) + clip.measure_count).fold(0.0, f64::max)
+        self.clips.iter().map(|clip| f64::from(clip.start_measure) + clip.length_measures).fold(0.0, f64::max)
     }
 
-    /// Loop length: `loop_measure_count` floored (at
+    /// Loop length: `loop_measures` floored (at
     /// least 1) when set, else [`Song::content_measures`].
     pub fn length_measures(&self) -> f64 {
         match self.loop_measures {
@@ -102,7 +102,7 @@ impl Song {
         self.length_measures().max(1.0).ceil() as u32 * STEPS_PER_MEASURE
     }
 
-    /// Where transport `tick` is in the arrangement, in measures, fractional: wrapped on `loop_measure_count` as it is (not
+    /// Where transport `tick` is in the song, in measures, fractional: wrapped on `loop_measures` as it is (not
     /// floored), else on [`Song::length_measures`]; 0 before the start.
     pub fn measure_at_tick(&self, tick: f64, ticks_per_beat: f64) -> f64 {
         let measure = tick / (ticks_per_beat * f64::from(BEATS_PER_MEASURE));
@@ -167,7 +167,7 @@ impl Song {
             clips.push(SongClip {
                 pattern_id: reference.to_owned(),
                 start_measure: start.min(f64::from(u32::MAX)) as u32,
-                measure_count: count,
+                length_measures: count,
             });
         }
 
@@ -211,7 +211,7 @@ impl Song {
             let mut object = Object::new();
             object.insert("patternId", Value::from(clip.pattern_id.as_str()));
             object.insert("startMeasure", Value::from(clip.start_measure));
-            object.insert("measureCount", Value::from(clip.measure_count));
+            object.insert("measureCount", Value::from(clip.length_measures));
             Value::Object(object)
         });
         object.insert("clips", Value::Array(clips.collect()));
@@ -250,7 +250,7 @@ impl Song {
     }
 
     /// The automation step transport `tick` is on (`ticks_per_beat` per
-    /// beat), wrapped on the arrangement as [`Song::active_clips_at`] wraps it.
+    /// beat), wrapped on the song as [`Song::active_clips_at`] wraps it.
     #[must_use]
     pub fn automation_step_at(&self, tick: u64, ticks_per_beat: u32) -> u32 {
         self.automation_position_at(tick, ticks_per_beat).floor() as u32
@@ -284,7 +284,7 @@ pub struct ActiveClip {
 
 impl Song {
     /// The clips sounding at transport `tick` (`ticks_per_beat` per beat):
-    /// the arrangement loops over [`Song::length_measures`]; a clip counts
+    /// the song loops over [`Song::length_measures`]; a clip counts
     /// its repetitions from its start on the unwrapped transport.
     pub fn active_clips_at(&self, patterns: &[crate::Pattern], tick: u64, ticks_per_beat: u32) -> Vec<ActiveClip> {
         let per_measure = f64::from(ticks_per_beat) * f64::from(BEATS_PER_MEASURE);
@@ -297,7 +297,7 @@ impl Song {
         let mut sources = Vec::new();
         for (index, clip) in self.clips.iter().enumerate() {
             let start = f64::from(clip.start_measure);
-            let count = if clip.measure_count > 0.0 { clip.measure_count } else { 1.0 };
+            let count = if clip.length_measures > 0.0 { clip.length_measures } else { 1.0 };
             if measures < start || measures >= start + count {
                 continue;
             }
@@ -375,7 +375,7 @@ mod tests {
         .unwrap();
         let mut issues = Vec::new();
         let (song, dropped) = Song::from_json(&raw, &ids(&["a"]), "s", &mut issues).unwrap();
-        assert_eq!(song.clips, [SongClip { pattern_id: "a".into(), start_measure: 9999, measure_count: 1.0 }]);
+        assert_eq!(song.clips, [SongClip { pattern_id: "a".into(), start_measure: 9999, length_measures: 1.0 }]);
         assert_eq!(dropped, vec![DroppedClip { pattern: "a".into(), reason: "clip past the longest song" }; 3]);
         assert_eq!(song.loop_measures, None);
         assert_eq!(issues, [Issue::new("s.loopMeasures", "1000000000 measures, over 10000: no loop")]);
@@ -392,7 +392,7 @@ mod tests {
         assert_eq!(song.id, "ebauche");
         assert_eq!(song.bpm, 140.0);
         assert_eq!(song.loop_measures, Some(7.0));
-        assert_eq!(song.clips, [SongClip { pattern_id: "a".into(), start_measure: 2, measure_count: 1.0 }]);
+        assert_eq!(song.clips, [SongClip { pattern_id: "a".into(), start_measure: 2, length_measures: 1.0 }]);
         // Under a measure there is no loop, rather than one of 0 measures that a save would not keep.
         let short = json::parse(r#"{"name":"s","loopMeasures":0.5}"#).unwrap();
         assert_eq!(Song::from_json(&short, &ids(&[]), "s", &mut Vec::new()).unwrap().0.loop_measures, None);
@@ -407,7 +407,7 @@ mod tests {
 
     #[test]
     fn lengths() {
-        let clip = |start, count| SongClip { pattern_id: "a".into(), start_measure: start, measure_count: count };
+        let clip = |start, count| SongClip { pattern_id: "a".into(), start_measure: start, length_measures: count };
         let mut song = Song::from_json(&json::parse("{}").unwrap(), &HashSet::new(), "s", &mut Vec::new()).unwrap().0;
         assert_eq!(song.length_measures(), 0.0);
         song.clips = vec![clip(8, 4.0), clip(2, 0.75)];
@@ -423,7 +423,7 @@ mod tests {
     fn the_transport_wraps_on_the_loop() {
         const TICKS_PER_BEAT: f64 = 32.0;
         let tick = |measures: f64| measures * f64::from(BEATS_PER_MEASURE) * TICKS_PER_BEAT;
-        let clip = |start, count| SongClip { pattern_id: "a".into(), start_measure: start, measure_count: count };
+        let clip = |start, count| SongClip { pattern_id: "a".into(), start_measure: start, length_measures: count };
         let mut song = Song::from_json(&json::parse("{}").unwrap(), &HashSet::new(), "s", &mut Vec::new()).unwrap().0;
         let at = |song: &Song, measures| song.measure_at_tick(tick(measures), TICKS_PER_BEAT);
 

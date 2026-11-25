@@ -1,5 +1,5 @@
 //! The MCP tools that only edit the library (`ordrumbox-app/src/mcp.rs`
-//! declares them): patterns, tracks, notes, arrangements and the generators,
+//! declares them): patterns, tracks, notes, songs and the generators,
 //! from JSON arguments to a JSON answer, through the [`Editor`]. A tool that
 //! edits is one undo step; its arguments are checked before anything
 //! changes, and a number brought inside its range is told in the answer.
@@ -71,12 +71,12 @@ impl Tools<'_> {
             "setPatternMacro" => self.set_macro(args),
             "regenerateTrack" => self.regenerate_track(args),
             "randomizeTrack" => self.randomize_track(args),
-            "listArrangements" => Ok(self.list_arrangements()),
-            "createArrangement" => self.create_arrangement(args),
-            "addPatternToArrangement" => self.add_clip(args),
-            "removePatternFromArrangement" => self.remove_clips(args),
-            "updateArrangement" => self.update_arrangement(args),
-            "renameArrangement" => self.rename_arrangement(args),
+            "listSongs" => Ok(self.list_songs()),
+            "createSong" => self.create_song(args),
+            "addPatternToSong" => self.add_clip(args),
+            "removePatternFromSong" => self.remove_clips(args),
+            "updateSong" => self.update_song(args),
+            "renameSong" => self.rename_song(args),
             "moveClip" => self.move_clip(args),
             "repeatClip" => self.repeat_clip(args),
             _ => return None,
@@ -437,12 +437,12 @@ pub fn learned_styles<'s>(cache: &'s mut (Styles, Option<u64>), written: &Styles
 mod answers;
 #[path = "tools/arguments.rs"]
 mod arguments;
-#[path = "tools/arrangements.rs"]
-mod arrangements;
 #[path = "tools/edits.rs"]
 mod edits;
 #[path = "tools/generation.rs"]
 mod generation;
+#[path = "tools/songs.rs"]
+mod songs;
 pub use answers::*;
 pub use arguments::*;
 use edits::*;

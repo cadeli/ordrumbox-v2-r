@@ -178,19 +178,19 @@ impl RollView<'_> {
     }
 
     /// Where the track loops: its loop point, else its end.
-    fn loop_length(&self) -> i64 {
-        self.track.loop_length.map_or(self.total_steps(), i64::from).max(1)
+    fn loop_steps(&self) -> i64 {
+        self.track.loop_steps.map_or(self.total_steps(), i64::from).max(1)
     }
 
     /// Whether note `n` sounds on `step`.
     fn sounding(&self, n: usize, step: i64) -> bool {
         let note = &self.track.notes[n];
-        let loop_length = self.loop_length();
+        let loop_steps = self.loop_steps();
         let base = absolute_step(note.beat, note.step, steps_per_beat(self.track));
-        if base >= loop_length {
+        if base >= loop_steps {
             return false;
         }
-        step % loop_length == base || self.subs[n].iter().any(|s| s.step < loop_length && step % loop_length == s.step)
+        step % loop_steps == base || self.subs[n].iter().any(|s| s.step < loop_steps && step % loop_steps == s.step)
     }
 }
 

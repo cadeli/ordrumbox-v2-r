@@ -124,11 +124,11 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   song panel, synth, mixer, and their keys) leave it as it is. In song mode the grid and
   the piano roll show the pattern the song is playing, with its playhead. Back from the
   song to the pattern, the pattern keeps the song's tempo.
-- **The PATTERN list** of the header opens on the genres, each with how many patterns it
-  has; a genre opens its patterns. A pattern's genre is its first tag that is not a feature
+- **The PATTERN list** of the header opens on the styles, each with how many patterns it
+  has; a style opens its patterns. A pattern's style is its first tag that is not a feature
   (bass, chords, lead, pad, synth, organ, strings, brass, piano, clavinet, arpeggio,
   polyrhythm, polymeter). Its tags are edited on the song screen, under its description (a
-  click), or with Pattern > Tags...: `funk, bass, chords`, the genre first. Genres teach the
+  click), or with Pattern > Tags...: `funk, bass, chords`, the style first. Style tags teach the
   learned styles; features do not.
 - **Space**: play / stop. A song stops where it is and **Space** goes on from that
   measure; **Home** (or the keypad's **Enter**) goes back to the first beat, or measure.
@@ -155,7 +155,7 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   what the mouse does on what is under the pointer, in every view. A name that has a menu
   is drawn lighter under the pointer, with a **v** at its end, and a menu line that has a
   key shows it at its right end.
-- **Automation lanes** in the song panel: **+ NEW AUTOMATION**, under the arrangement's
+- **Automation lanes** in the song panel: **+ NEW AUTOMATION**, under the song's
   rows, lists the instruments the song's patterns play; pick one, then the control: **Mute**,
   **Solo**, **Volume**, **Pan**, **Cutoff**, **Q**, **Echo send**, **Reverb send**, **Reverb mix**,
   **Delay mix**, **Delay feedback**, **Saturation**, **Bitcrush**, **Hard clip**, **Comp mix**,
@@ -203,9 +203,9 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
   writes its new state from the playhead's step to the lane's next change. Each gesture is
   one undo step.
 - **Song panel zoom**, as on a DAW timeline: drag an end of the thumb of the
-  arrangement's horizontal scroll bar (its light handles) to show more or fewer measures,
+  song's horizontal scroll bar (its light handles) to show more or fewer measures,
   the other end staying where it is; drag its middle to scroll. **Ctrl + wheel** over the
-  arrangement zooms around the measure under the pointer.
+  song zooms around the measure under the pointer.
 - **The pointer** tells what a drag does: a hand over the thumb of any scroll bar (a
   drag scrolls; it closes while held), sideways arrows over the song panel's zoom
   handles.
@@ -242,7 +242,7 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
 - **Shift + C** (View > Next colour scheme): the next of seven colour schemes, the last one
   **High contrast** (white on black, every text at least 7:1 against its ground), for low
   vision or a bright room. Kept in `settings.json` (`colorScheme`, 7 for high contrast).
-- **Where you left off**: the app starts on the pattern and the arrangement you had
+- **Where you left off**: the app starts on the pattern and the song you had
   chosen, in the mode and the view you had open (grid, piano roll, song panel, synth,
   mixer), with the track editor, the note editor, the VU meters and the kit editor shown
   or hidden as you left them. It is kept in `settings.json` (`resume`) when you quit.
@@ -317,7 +317,7 @@ that play: 1–9 (mute, Shift: solo) and Q–P (hear a track) are read by their 
 The app writes `library.json`, `kits.json`, `settings.json`, `songs/`, `samples/` and
 `exports/` in the user data folder. A **project** is the library saved under a name, as an
 `.odbox` file in `songs/` (File > Save project, Open project...); a song is one of its
-arrangements. Pattern and track settings use camelCase keys; old (JS)
+songs. Pattern and track settings use camelCase keys; old (JS)
 spellings are still read.
 
 The app holds `ordrumbox.lock` there while it runs. Started a second time, it warns that

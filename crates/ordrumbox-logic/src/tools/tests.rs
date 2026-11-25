@@ -116,7 +116,7 @@ fn notes_are_added_in_one_undo_step() {
     assert_eq!(pattern.tracks[1].name, "SNARE");
     // KICK has no loop point; SNARE, added on 4 beats, looped over them
     // and loops over the 8 now.
-    assert_eq!(pattern.tracks.iter().map(|t| t.loop_length).collect::<Vec<_>>(), [None, Some(32)]);
+    assert_eq!(pattern.tracks.iter().map(|t| t.loop_steps).collect::<Vec<_>>(), [None, Some(32)]);
     assert_eq!((pattern.tracks[0].notes[2].beat, pattern.tracks[0].notes[2].velocity), (1, 0.5));
     assert_eq!((pattern.tracks[1].notes[0].beat, pattern.tracks[1].notes[0].probability), (5, 0.5));
     assert_eq!(undo_len(&b), 1);
@@ -140,8 +140,8 @@ fn wrong_arguments_change_nothing() {
         ("updateTrack", r#"{"patternName":"rock","trackName":"KICK","updates":{"synthPreset":"B1"}}"#),
         ("setPatternBeatCount", r#"{"patternName":"rock","beatCount":65}"#),
         ("createNewPattern", r#"{"patternName":" Jazz "}"#),
-        ("createArrangement", r#"{"name":"song","clips":[{"patternName":"pop"}]}"#),
-        ("addPatternToArrangement", r#"{"patternName":"rock"}"#),
+        ("createSong", r#"{"name":"song","clips":[{"patternName":"pop"}]}"#),
+        ("addPatternToSong", r#"{"patternName":"rock"}"#),
     ];
     for (tool, args) in refused {
         assert!(call(&mut b, tool, args).is_err(), "{tool} {args}");
@@ -267,27 +267,26 @@ fn tracks_are_copied_renamed_and_compacted() {
 }
 
 #[test]
-fn arrangements_are_made_and_edited() {
+fn songs_are_made_and_edited() {
     let mut b = bench();
     let args = r#"{"name":"Song","bpm":500,"clips":[{"patternName":"rock"},{"patternName":"jazz","startMeasure":1,"measureCount":2}]}"#;
-    let made = call(&mut b, "createArrangement", args).unwrap();
+    let made = call(&mut b, "createSong", args).unwrap();
     assert_eq!(get(&made, &["bpm"]).as_f64(), Some(300.0));
     assert_eq!(get(&made, &["note"]).as_str(), Some("bpm 500 asked, 300 used (20 to 300)"));
     assert_eq!(get(&made, &["lengthMeasures"]).as_f64(), Some(3.0));
     assert_eq!(undo_len(&b), 1);
-    let added =
-        call(&mut b, "addPatternToArrangement", r#"{"patternName":"ROCK","startMeasure":3,"arrangement":"song"}"#);
+    let added = call(&mut b, "addPatternToSong", r#"{"patternName":"ROCK","startMeasure":3,"song":"song"}"#);
     assert_eq!(get(&added.unwrap(), &["clip"]).to_json(), r#"{"patternId":"rock","startMeasure":3,"measureCount":1}"#);
-    let removed = call(&mut b, "removePatternFromArrangement", r#"{"patternName":"rock","arrangement":0}"#).unwrap();
+    let removed = call(&mut b, "removePatternFromSong", r#"{"patternName":"rock","song":0}"#).unwrap();
     assert_eq!(get(&removed, &["removed"]).as_f64(), Some(2.0));
-    assert!(call(&mut b, "removePatternFromArrangement", r#"{"startMeasure":9}"#).is_err());
-    let listed = call(&mut b, "listArrangements", "{}").unwrap();
-    let clips = get(&get(&listed, &["arrangements"]).as_array().unwrap()[0], &["clips"]).to_json();
+    assert!(call(&mut b, "removePatternFromSong", r#"{"startMeasure":9}"#).is_err());
+    let listed = call(&mut b, "listSongs", "{}").unwrap();
+    let clips = get(&get(&listed, &["songs"]).as_array().unwrap()[0], &["clips"]).to_json();
     assert_eq!(clips, r#"[{"patternId":"jazz","patternName":"jazz","startMeasure":1,"measureCount":2}]"#);
-    let updated = call(&mut b, "updateArrangement", r#"{"bpm":90,"loopMeasures":2}"#).unwrap();
+    let updated = call(&mut b, "updateSong", r#"{"bpm":90,"loopMeasures":2}"#).unwrap();
     assert_eq!(get(&updated, &["bpm"]).as_f64(), Some(90.0));
     assert_eq!(b.editor.library().songs[0].loop_measures, Some(2.0));
-    assert!(call(&mut b, "updateArrangement", "{}").is_err());
+    assert!(call(&mut b, "updateSong", "{}").is_err());
 }
 
 #[test]
@@ -295,7 +294,7 @@ fn clips_are_moved_and_repeated() {
     let mut b = bench();
     let args =
         r#"{"name":"Song","clips":[{"patternName":"rock","measureCount":2},{"patternName":"jazz","startMeasure":0}]}"#;
-    call(&mut b, "createArrangement", args).unwrap();
+    call(&mut b, "createSong", args).unwrap();
     assert!(call(&mut b, "moveClip", r#"{"startMeasure":0,"toMeasure":4}"#).is_err(), "two clips start there");
     let moved = call(&mut b, "moveClip", r#"{"startMeasure":0,"toMeasure":4,"patternName":"jazz"}"#).unwrap();
     let clips = get(&moved, &["clips"]).as_array().unwrap();
@@ -308,9 +307,9 @@ fn clips_are_moved_and_repeated() {
     let repeated = call(&mut b, "repeatClip", r#"{"startMeasure":0}"#).unwrap();
     assert_eq!(get(&repeated, &["clip"]).to_json(), r#"{"patternId":"rock","startMeasure":2,"measureCount":2}"#);
     assert!(call(&mut b, "repeatClip", r#"{"startMeasure":1}"#).is_err());
-    call(&mut b, "createArrangement", r#"{"name":"Other"}"#).unwrap();
-    assert!(call(&mut b, "renameArrangement", r#"{"arrangement":"other","newName":"song"}"#).is_err());
-    let renamed = call(&mut b, "renameArrangement", r#"{"arrangement":0,"newName":"Verse"}"#).unwrap();
+    call(&mut b, "createSong", r#"{"name":"Other"}"#).unwrap();
+    assert!(call(&mut b, "renameSong", r#"{"song":"other","newName":"song"}"#).is_err());
+    let renamed = call(&mut b, "renameSong", r#"{"song":0,"newName":"Verse"}"#).unwrap();
     assert_eq!((get(&renamed, &["name"]).as_str(), get(&renamed, &["id"]).as_str()), (Some("Verse"), Some("song")));
     assert_eq!(undo_len(&b), 5);
 }

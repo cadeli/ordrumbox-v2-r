@@ -15,6 +15,9 @@ use ordrumbox_logic::tools::object;
 use crate::editors::track_select_options;
 use crate::update;
 
+mod renamed;
+use renamed::{tool_arguments, tool_name};
+
 /// Protocol versions this server speaks, newest first.
 const PROTOCOL_VERSIONS: [&str; 3] = ["2025-06-18", "2025-03-26", "2024-11-05"];
 /// JSON-RPC error codes.
@@ -49,21 +52,6 @@ const GENERATION_TOOLS: [&str; 7] = [
 /// `autoMode`, starts with.
 const GENERATION_RULE: &str = "Automatic generation: call only when the user explicitly asks for generation, \
 auto mode or random notes, never to fulfil a request for a style, a groove or a song (write the notes instead).";
-
-/// Tools renamed when a song file became a project file: the old name, still
-/// called by clients written before, and the tool it stands for.
-const RENAMED_TOOLS: [(&str, &str); 5] = [
-    ("setSongInfo", "setProjectInfo"),
-    ("saveSong", "saveProject"),
-    ("exportSong", "exportProject"),
-    ("listSavedSongs", "listSavedProjects"),
-    ("loadSong", "openProject"),
-];
-
-/// The tool `name` stands for: itself, or the new name of a renamed tool.
-fn tool_name(name: &str) -> &str {
-    RENAMED_TOOLS.iter().find(|(old, _)| *old == name).map_or(name, |(_, new)| new)
-}
 
 /// Track settings a tool may not set: the track is named by `trackName`.
 const NOT_EDITED: [&str; 1] = ["name"];
@@ -112,19 +100,19 @@ const TOOLS: &str = r#"[
      "updates": {"type": "object", "properties": {}, "additionalProperties": false},
      "noteUpdates": {"type": "object", "properties": {}, "additionalProperties": false}},
      "required": ["patternName", "trackName", "updates"]}},
-  {"name": "setBpm", "description": "The session tempo every pattern plays at, whole, 20 to 300 (an arrangement plays at its own: updateArrangement).",
+  {"name": "setBpm", "description": "The session tempo every pattern plays at, whole, 20 to 300 (a song plays at its own: updateSong).",
    "inputSchema": {"type": "object", "properties": {"bpm": {"type": "number", "minimum": 20, "maximum": 300}}, "required": ["bpm"]}},
   {"name": "setPatternBeatCount", "description": "The length of a pattern in beats; every track follows.",
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}, "beatCount": {"type": "integer", "minimum": 1, "maximum": 64}}, "required": ["patternName", "beatCount"]}},
-  {"name": "setPatternTags", "description": "The tags of a pattern, kept in lower case without repeats: its genre first (it groups the pattern in the PATTERN list and teaches the styles), then features (bass, chords, lead, pad, synth, organ, strings, brass, piano, clavinet, arpeggio, polyrhythm, polymeter), which teach no style.",
+  {"name": "setPatternTags", "description": "The tags of a pattern, kept in lower case without repeats: its style first (it groups the pattern in the PATTERN list and teaches the styles), then features (bass, chords, lead, pad, synth, organ, strings, brass, piano, clavinet, arpeggio, polyrhythm, polymeter), which teach no style.",
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}, "tags": {"type": "array", "items": {"type": "string"}}}, "required": ["patternName", "tags"]}},
   {"name": "setPatternDescription", "description": "The description of a pattern.",
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}, "description": {"type": "string"}}, "required": ["patternName", "description"]}},
-  {"name": "renamePattern", "description": "Renames a pattern; its id, which arrangements refer to, stays.",
+  {"name": "renamePattern", "description": "Renames a pattern; its id, which songs refer to, stays.",
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}, "newName": {"type": "string", "minLength": 1}}, "required": ["patternName", "newName"]}},
   {"name": "duplicatePattern", "description": "Adds a copy of a pattern at the end of the library, named newName (default: \"<name> copy\").",
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}, "newName": {"type": "string"}}, "required": ["patternName"]}},
-  {"name": "removePattern", "description": "Removes a pattern and its clips in every arrangement; the last pattern stays.",
+  {"name": "removePattern", "description": "Removes a pattern and its clips in every song; the last pattern stays.",
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}}, "required": ["patternName"]}},
   {"name": "savePatternToJson", "description": "Exports a pattern as JSON to the exports folder of the user data folder (as File > Export pattern).",
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}}, "required": ["patternName"]}},
@@ -165,13 +153,13 @@ const TOOLS: &str = r#"[
    "inputSchema": {"type": "object", "properties": {"preset": {"type": "string", "minLength": 1}}, "required": ["preset"]}},
   {"name": "analyzeSamples", "description": "Length, peak and RMS levels and pitch of samples, by their path in listKitSamples.",
    "inputSchema": {"type": "object", "properties": {"samples": {"type": "array", "items": {"type": "string"}}}, "required": ["samples"]}},
-  {"name": "listArrangements", "description": "The arrangements (songs) with their clips, and the one selected. Measures are 0-based.",
+  {"name": "listSongs", "description": "The songs with their clips, and the one selected. Measures are 0-based.",
    "inputSchema": {"type": "object", "properties": {}}},
-  {"name": "createArrangement", "description": "Adds an arrangement, selects it and fills it with clips. A clip lasts as long as its pattern unless measureCount says otherwise.",
+  {"name": "createSong", "description": "Adds a song, selects it and fills it with clips. A clip lasts as long as its pattern unless measureCount says otherwise.",
    "inputSchema": {"type": "object", "properties": {
      "name": {"type": "string", "minLength": 1},
      "description": {"type": "string"},
-     "bpm": {"type": "number", "minimum": 20, "maximum": 300, "description": "Tempo of the whole arrangement"},
+     "bpm": {"type": "number", "minimum": 20, "maximum": 300, "description": "Tempo of the whole song"},
      "loopMeasures": {"type": "number", "minimum": 0, "description": "Loop length in measures (0: up to the end of the last clip)"},
      "clips": {"type": "array", "items": {"type": "object", "properties": {
        "patternName": {"type": "string", "description": "Pattern name or id"},
@@ -179,30 +167,30 @@ const TOOLS: &str = r#"[
        "measureCount": {"type": "number", "exclusiveMinimum": 0}},
        "required": ["patternName"]}}},
      "required": ["name"]}},
-  {"name": "addPatternToArrangement", "description": "Places a pattern in an arrangement at a measure. Clips may overlap; a pattern may be placed several times.",
+  {"name": "addPatternToSong", "description": "Places a pattern in a song at a measure. Clips may overlap; a pattern may be placed several times.",
    "inputSchema": {"type": "object", "properties": {
      "patternName": {"type": "string", "description": "Pattern name or id"},
      "startMeasure": {"type": "integer", "minimum": 0, "description": "0-based measure (default 0)"},
      "measureCount": {"type": "number", "exclusiveMinimum": 0, "description": "Clip length (default: the pattern's)"},
-     "arrangement": {"type": ["string", "integer"], "description": "Arrangement name or index (default: the selected one)"}},
+     "song": {"type": ["string", "integer"], "description": "Song name or index (default: the selected one)"}},
      "required": ["patternName"]}},
-  {"name": "removePatternFromArrangement", "description": "Removes from an arrangement every clip starting at startMeasure, every clip of patternName, or both.",
+  {"name": "removePatternFromSong", "description": "Removes from a song every clip starting at startMeasure, every clip of patternName, or both.",
    "inputSchema": {"type": "object", "properties": {
      "startMeasure": {"type": "integer", "minimum": 0},
      "patternName": {"type": "string", "description": "Pattern name or id"},
-     "arrangement": {"type": ["string", "integer"], "description": "Arrangement name or index (default: the selected one)"}}}},
-  {"name": "updateArrangement", "description": "Changes the tempo, description or loop length of an arrangement; what is not given stays.",
+     "song": {"type": ["string", "integer"], "description": "Song name or index (default: the selected one)"}}}},
+  {"name": "updateSong", "description": "Changes the tempo, description or loop length of a song; what is not given stays.",
    "inputSchema": {"type": "object", "properties": {
-     "arrangement": {"type": ["string", "integer"], "description": "Arrangement name or index (default: the selected one)"},
+     "song": {"type": ["string", "integer"], "description": "Song name or index (default: the selected one)"},
      "description": {"type": "string"},
-     "bpm": {"type": "number", "minimum": 20, "maximum": 300, "description": "Tempo of the whole arrangement"},
+     "bpm": {"type": "number", "minimum": 20, "maximum": 300, "description": "Tempo of the whole song"},
      "loopMeasures": {"type": "number", "minimum": 0, "description": "Loop length in measures (0: up to the end of the last clip)"}}}},
-  {"name": "removeArrangement", "description": "Removes an arrangement and its clips (its patterns stay).",
+  {"name": "removeSong", "description": "Removes a song and its clips (its patterns stay).",
    "inputSchema": {"type": "object", "properties": {
-     "arrangement": {"type": ["string", "integer"], "description": "Arrangement name or index (default: the selected one)"}}}},
-  {"name": "renameArrangement", "description": "Renames an arrangement; its id stays.",
+     "song": {"type": ["string", "integer"], "description": "Song name or index (default: the selected one)"}}}},
+  {"name": "renameSong", "description": "Renames a song; its id stays.",
    "inputSchema": {"type": "object", "properties": {
-     "arrangement": {"type": ["string", "integer"], "description": "Arrangement name or index (default: the selected one)"},
+     "song": {"type": ["string", "integer"], "description": "Song name or index (default: the selected one)"},
      "newName": {"type": "string", "minLength": 1}},
      "required": ["newName"]}},
   {"name": "moveClip", "description": "Moves the clip starting at startMeasure to start at toMeasure.",
@@ -210,14 +198,14 @@ const TOOLS: &str = r#"[
      "startMeasure": {"type": "integer", "minimum": 0},
      "toMeasure": {"type": "integer", "minimum": 0},
      "patternName": {"type": "string", "description": "Pattern name or id, when several clips start at startMeasure"},
-     "arrangement": {"type": ["string", "integer"], "description": "Arrangement name or index (default: the selected one)"}},
+     "song": {"type": ["string", "integer"], "description": "Song name or index (default: the selected one)"}},
      "required": ["startMeasure", "toMeasure"]}},
-  {"name": "exportArrangementWav", "description": "Renders an arrangement whole to a WAV file in the exports folder of the user data folder (as File > Export song as WAV).",
+  {"name": "exportSongWav", "description": "Renders a song whole to a WAV file in the exports folder of the user data folder (as File > Export song as WAV).",
    "inputSchema": {"type": "object", "properties": {
-     "arrangement": {"type": ["string", "integer"], "description": "Arrangement name or index (default: the selected one)"}}}},
-  {"name": "exportArrangementStems", "description": "Renders each track of an arrangement whole to a WAV file of its own, in a folder of the exports folder of the user data folder (as File > Export song stems). Tracks are taken before the master bus; silent ones are left out.",
+     "song": {"type": ["string", "integer"], "description": "Song name or index (default: the selected one)"}}}},
+  {"name": "exportSongStems", "description": "Renders each track of a song whole to a WAV file of its own, in a folder of the exports folder of the user data folder (as File > Export song stems). Tracks are taken before the master bus; silent ones are left out.",
    "inputSchema": {"type": "object", "properties": {
-     "arrangement": {"type": ["string", "integer"], "description": "Arrangement name or index (default: the selected one)"}}}},
+     "song": {"type": ["string", "integer"], "description": "Song name or index (default: the selected one)"}}}},
   {"name": "getMaster", "description": "The master bus settings: volume, pre-gain, compressor, low and high cut.",
    "inputSchema": {"type": "object", "properties": {}}},
   {"name": "setMaster", "description": "Changes master bus settings; what is not given stays. Saved with the settings, not an undo step.",
@@ -230,7 +218,7 @@ const TOOLS: &str = r#"[
    "inputSchema": {"type": "object", "properties": {
      "settings": {"type": "object", "properties": {}, "additionalProperties": false}},
      "required": ["settings"]}},
-  {"name": "play", "description": "Plays the pattern shown, or with song true the selected arrangement from its start.",
+  {"name": "play", "description": "Plays the pattern shown, or with song true the selected song from its start.",
    "inputSchema": {"type": "object", "properties": {"song": {"type": "boolean"}}}},
   {"name": "stop", "description": "Stops playing.",
    "inputSchema": {"type": "object", "properties": {}}},
@@ -272,20 +260,20 @@ const TOOLS: &str = r#"[
      "required": ["patternName", "sounds"]}},
   {"name": "auditionTrack", "description": "Plays a track's sound once, as Q-P in the window.",
    "inputSchema": {"type": "object", "properties": {"patternName": {"type": "string"}, "trackName": {"type": "string"}}, "required": ["patternName", "trackName"]}},
-  {"name": "getPlaybackState", "description": "Whether the app plays, what (a pattern or an arrangement) and where: the loop of a pattern and its beat, the measure of an arrangement.",
+  {"name": "getPlaybackState", "description": "Whether the app plays, what (a pattern or a song) and where: the loop of a pattern and its beat, the measure of a song.",
    "inputSchema": {"type": "object", "properties": {}}},
-  {"name": "selectArrangement", "description": "Selects an arrangement (by name or index): the one play song plays and the arrangement tools edit by default. A song playing switches to it.",
+  {"name": "selectSong", "description": "Selects a song (by name or index): the one play song plays and the song tools edit by default. A song playing switches to it.",
    "inputSchema": {"type": "object", "properties": {
-     "arrangement": {"type": ["string", "integer"], "description": "Arrangement name or index"}},
-     "required": ["arrangement"]}},
+     "song": {"type": ["string", "integer"], "description": "Song name or index"}},
+     "required": ["song"]}},
   {"name": "repeatClip", "description": "Repeats the clip starting at startMeasure right after itself, as long.",
    "inputSchema": {"type": "object", "properties": {
      "startMeasure": {"type": "integer", "minimum": 0},
-     "arrangement": {"type": ["string", "integer"], "description": "Arrangement name or index (default: the selected one)"}},
+     "song": {"type": ["string", "integer"], "description": "Song name or index (default: the selected one)"}},
      "required": ["startMeasure"]}},
   {"name": "setProjectInfo", "description": "The name and description of the project: the library as saveProject writes it. One undo step.",
    "inputSchema": {"type": "object", "properties": {"name": {"type": "string", "minLength": 1}, "description": {"type": "string"}}}},
-  {"name": "saveProject", "description": "Saves the project (patterns, arrangements) to the songs folder of the user data folder as <name>.odbox (as File > Save project).",
+  {"name": "saveProject", "description": "Saves the project (patterns, songs) to the songs folder of the user data folder as <name>.odbox (as File > Save project).",
    "inputSchema": {"type": "object", "properties": {}}},
   {"name": "exportProject", "description": "Exports the project as <name>.odbox to the exports folder of the user data folder (as File > Export project).",
    "inputSchema": {"type": "object", "properties": {}}},
@@ -538,7 +526,7 @@ pub fn answer(line: &str, call: &mut dyn FnMut(&str, &Value) -> Result<Value, St
                 let empty = Value::Object(Object::new());
                 let arguments = params.and_then(|p| p.get("arguments")).filter(|a| !a.is_null()).unwrap_or(&empty);
                 if arguments.as_object().is_some() {
-                    Ok(tool_result(call(tool_name(name), arguments)))
+                    Ok(tool_result(call(tool_name(name), &tool_arguments(arguments))))
                 } else {
                     Err((INVALID_PARAMS, "arguments: not an object".into()))
                 }
@@ -552,6 +540,7 @@ pub fn answer(line: &str, call: &mut dyn FnMut(&str, &Value) -> Result<Value, St
 
 #[cfg(test)]
 mod tests {
+    use super::renamed::RENAMED_TOOLS;
     use super::*;
 
     fn run(line: &str) -> Value {

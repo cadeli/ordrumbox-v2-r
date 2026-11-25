@@ -35,7 +35,7 @@ fn bank() -> SampleBank {
                 key: (*key).into(),
                 display_name: key.to_lowercase(),
                 path: format!("{key}.wav"),
-                decay: Some(5000.0),
+                decay_ms: Some(5000.0),
                 ..Default::default()
             },
             buffer: buffer.clone().into(),

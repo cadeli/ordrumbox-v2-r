@@ -73,10 +73,10 @@ pub(super) fn track_fields(fields: &Object, at: &str) -> Result<Vec<(&'static st
     Ok(checked)
 }
 
-/// An arrangement's description, tempo and loop length, each when given.
+/// A song's description, tempo and loop length, each when given.
 pub(super) type SongSettings<'a> = (Option<&'a str>, Option<f64>, Option<f64>);
 
-/// The arrangement settings of `args`.
+/// The song settings of `args`.
 pub(super) fn song_settings(args: &Value) -> Result<SongSettings<'_>, String> {
     let loop_measures = optional_number(args, "loopMeasures")?;
     if loop_measures.is_some_and(|l| l < 0.0) {
@@ -104,18 +104,18 @@ pub fn find_track(library: &Library, args: &Value) -> Result<(usize, usize), Str
     Ok((p, t))
 }
 
-/// Argument `arrangement`, by name (any case) or index, else the selected one.
+/// Argument `song`, by name (any case) or index, else the selected one.
 pub fn find_song(editor: &Editor, args: &Value) -> Result<usize, String> {
     let songs = &editor.library().songs;
-    let found = match args.get("arrangement") {
+    let found = match args.get("song") {
         None | Some(Value::Null) => {
-            Some(editor.selected_song()).filter(|&s| s < songs.len()).ok_or("No arrangement: createArrangement")
+            Some(editor.selected_song()).filter(|&s| s < songs.len()).ok_or("No song: createSong")
         }
-        Some(Value::String(name)) => songs.iter().position(|s| same_name(&s.name, name)).ok_or("No such arrangement"),
+        Some(Value::String(name)) => songs.iter().position(|s| same_name(&s.name, name)).ok_or("No such song"),
         Some(Value::Number(n)) if n.fract() == 0.0 && *n >= 0.0 && (*n as usize) < songs.len() => Ok(*n as usize),
-        Some(_) => Err("No such arrangement"),
+        Some(_) => Err("No such song"),
     };
-    found.map_err(|e| format!("{e} (listArrangements gives them)"))
+    found.map_err(|e| format!("{e} (listSongs gives them)"))
 }
 
 /// The track of `pattern` named `name` (trimmed, any case).

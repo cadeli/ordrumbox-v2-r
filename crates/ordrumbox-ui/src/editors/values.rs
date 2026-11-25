@@ -99,8 +99,8 @@ pub fn shown_value(track: &Track, key: &str, state: &EditorState) -> String {
 }
 
 /// The loop length, else the track's length in steps.
-pub fn loop_length(track: &Track) -> f64 {
-    if let Some(l) = track.loop_length.filter(|&l| l > 0) {
+pub fn loop_steps(track: &Track) -> f64 {
+    if let Some(l) = track.loop_steps.filter(|&l| l > 0) {
         return f64::from(l);
     }
     let spb = track.steps_per_beat;
@@ -298,7 +298,7 @@ pub fn track_tooltip(track: &Track, sound: &str) -> Vec<String> {
         format!("beats:{}", track.beat_count),
         format!("steps/beat:{}", track.steps_per_beat),
     ];
-    if let Some(steps) = track.loop_length {
+    if let Some(steps) = track.loop_steps {
         length.push(format!("loop:{steps}"));
     }
     if track.swing_amount != 0.0 {

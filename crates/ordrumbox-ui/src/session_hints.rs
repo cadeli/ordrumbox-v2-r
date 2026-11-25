@@ -17,10 +17,10 @@ const BEATS_HINT: &str = "BEATS   drag: scroll   Shift+wheel: scroll   drag an e
 const fn song_hint(hit: SongHit) -> &'static str {
     match hit {
         SongHit::Pattern(_) => {
-            "PATTERN   click: show it   drag: move it in the list, or onto the arrangement   right-click: add, move, rename, delete"
+            "PATTERN   click: show it   drag: move it in the list, or onto the song   right-click: add, move, rename, delete"
         }
         SongHit::Description => "DESCRIPTION   click: write it   wheel: scroll",
-        SongHit::Tags => "TAGS   click: edit them, the genre first, then features (bass, chords...)",
+        SongHit::Tags => "TAGS   click: edit them, the style first, then features (bass, chords...)",
         SongHit::Ruler(_) => {
             "RULER   click: cursor   drag: the song's loop   Shift+click: loop from the cursor   right-click: loop menu"
         }
@@ -29,7 +29,7 @@ const fn song_hint(hit: SongHit) -> &'static str {
             "CLIP   click: select (DELETE: remove, Ctrl+D: repeat)   double-click: open its pattern   drag: move   right-click: menu"
         }
         SongHit::RowName(_) => "ROW   click: show its pattern   drag: move the row   right-click: add, move, delete",
-        SongHit::Cell { .. } => "ARRANGEMENT   click: add the row's pattern here   right-click: menu",
+        SongHit::Cell { .. } => "SONG   click: add the row's pattern here   right-click: menu",
         SongHit::ScrollBar(_) => "drag: scroll   click beside the thumb: a page",
         SongHit::ZoomHandle(_) => "ZOOM   drag: show more or fewer measures   Ctrl+wheel: zoom around the pointer",
         SongHit::AddAutomation => "click: add an automation lane (an instrument, then its control)",

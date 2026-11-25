@@ -188,7 +188,7 @@ send feeds the echo, a saturation adds a third harmonic; lanes of an instrument 
 the same, sample for sample. The sources are synthetic; the measures (`tests/signals/`) are shared with
 `track_effects.rs`. Idempotence: `ordrumbox-core/tests/json_idempotence.rs` saves a song with a lane of every
 control twice (the same text, the same lanes); `automation.rs` paints the same stroke twice (the same lane)
-and repaints a lane's own values (no change); `ordrumbox-logic/src/arrangement/automation.rs` undoes and redoes
+and repaints a lane's own values (no change); `ordrumbox-logic/src/song/automation.rs` undoes and redoes
 every kind of lane edit, twice over (the same library each time). No fixture, nothing to rewrite.
 
 ### Changes of behaviour
@@ -458,8 +458,19 @@ song is selected. The automation renders keep their snapshots: no snapshot chang
 A song file (`.odbox`) is now called a project, in the UI, the code (`Library::project_record`, `ProjectRecord`,
 `session_project_files.rs`, `Command::SaveProject`…) and the MCP tools (`saveProject`, `openProject`,
 `exportProject`, `listSavedProjects`, `setProjectInfo`; `mcp.rs`, `RENAMED_TOOLS`, keeps the earlier names working).
-A song is an arrangement, as before (`Song`, `library.songs`). The file format and the `songs/` folder are unchanged.
+An arrangement is a song, as before (`Song`, `library.songs`). The file format and the `songs/` folder are unchanged.
 `listSavedProjects` lists them under `projects` (`songs` before). No snapshot changed.
+
+An arrangement is now called a song everywhere, as a drum machine says it: in the UI (the song panel's labels, the
+Song menu), the code (`ordrumbox-logic/src/editor/songs.rs`, `tools/songs.rs`) and the MCP tools (`listSongs`,
+`createSong`, `selectSong`, `renameSong`, `updateSong`, `removeSong`, `addPatternToSong`, `removePatternFromSong`,
+`exportSongWav`, `exportSongStems`), whose song argument is `song`. `mcp/renamed.rs` keeps the `…Arrangement…`
+names and the `arrangement` argument working. The file format is unchanged. No snapshot changed.
+
+A genre is now called a style everywhere, the word the generation already used: a pattern's first tag that is not a
+feature is its style tag (`Pattern::style_tag`, `tags::by_style`), the header's PATTERN list opens on the styles, and
+the generation's style is `Options::style` and `generate::STYLE_KEY`. The file key stays `autoGenre`. No snapshot
+changed.
 
 A control taken back from its automation lane is marked, and each lane can be re-enabled on its own
 (`session_automation_live.rs`): `mark_taken_back` puts a `Kind::Mark` (`theme::TAKEN_BACK`) over the mixer's, the

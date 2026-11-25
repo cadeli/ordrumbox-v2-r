@@ -1,5 +1,5 @@
 //! An MCP client composing a song, end to end: what an AI client does when
-//! asked for "a 64-measure arrangement of afrobeat patterns, with a bass,
+//! asked for "a 64-measure song of afrobeat patterns, with a bass,
 //! melodic progressions and breaks". The `ordrumbox --mcp` bridge is started
 //! as a client starts it; each call goes through it to a session in this
 //! process, which answers between its "frames", and the client reads each
@@ -28,7 +28,7 @@ const LIBRARY: &str = r#"{"patterns":[{"name":"rock","bpm":100,"tracks":[{"name"
 /// How long one answer may take.
 const DEADLINE: Duration = Duration::from_secs(30);
 
-const ARRANGEMENT: &str = "afro song";
+const SONG: &str = "afro song";
 const MEASURE_COUNT: u32 = 64;
 const BPM: f64 = 112.0;
 const GROOVE_A: &str = "afro groove A";
@@ -287,7 +287,7 @@ fn a_client_composes_an_afrobeat_song_of_64_measures() {
     let tools = client.request(&mut session, "tools/list", "{}");
     let tools = tools.get("result").and_then(|r| r.get("tools")).and_then(Value::as_array).unwrap();
     let names: BTreeSet<&str> = tools.iter().filter_map(|t| t.get("name").and_then(Value::as_str)).collect();
-    for needed in ["createNewPattern", "addNotesToPattern", "createArrangement", "addPatternToArrangement"] {
+    for needed in ["createNewPattern", "addNotesToPattern", "createSong", "addPatternToSong"] {
         assert!(names.contains(needed), "no tool {needed}");
     }
 
@@ -320,7 +320,7 @@ fn a_client_composes_an_afrobeat_song_of_64_measures() {
         client.call(&mut session, "setPatternTags", &format!(r#"{{"patternName":"{name}","tags":["afrobeat"]}}"#));
     }
 
-    // The arrangement: the grooves and the harmony over them at once, the
+    // The song: the grooves and the harmony over them at once, the
     // breaks added after, as a client adds them once it hears the song.
     let clips: Vec<String> = SECTIONS
         .iter()
@@ -335,21 +335,20 @@ fn a_client_composes_an_afrobeat_song_of_64_measures() {
         })
         .collect();
     let arguments = format!(
-        r#"{{"name":"{ARRANGEMENT}","description":"afrobeat: intro, verses, choruses, breaks","bpm":{BPM},"clips":[{}]}}"#,
+        r#"{{"name":"{SONG}","description":"afrobeat: intro, verses, choruses, breaks","bpm":{BPM},"clips":[{}]}}"#,
         clips.join(",")
     );
-    client.call(&mut session, "createArrangement", &arguments);
+    client.call(&mut session, "createSong", &arguments);
     for s in SECTIONS.iter().filter(|s| s.harmony.is_none() && s.measures == 1) {
-        let arguments =
-            format!(r#"{{"patternName":"{}","startMeasure":{},"arrangement":"{ARRANGEMENT}"}}"#, s.drums, s.start);
-        let added = client.call(&mut session, "addPatternToArrangement", &arguments);
+        let arguments = format!(r#"{{"patternName":"{}","startMeasure":{},"song":"{SONG}"}}"#, s.drums, s.start);
+        let added = client.call(&mut session, "addPatternToSong", &arguments);
         assert_eq!(added.get("clip").map(|c| number_field(c, "measureCount")), Some(1.0), "{added}");
     }
 
     // What the client reads back.
-    let listed = client.call(&mut session, "listArrangements", "{}");
-    let songs = listed.get("arrangements").and_then(Value::as_array).unwrap();
-    let song = songs.iter().find(|s| str_field(s, "name") == ARRANGEMENT).unwrap_or_else(|| panic!("{listed}"));
+    let listed = client.call(&mut session, "listSongs", "{}");
+    let songs = listed.get("songs").and_then(Value::as_array).unwrap();
+    let song = songs.iter().find(|s| str_field(s, "name") == SONG).unwrap_or_else(|| panic!("{listed}"));
     assert_eq!(number_field(song, "lengthMeasures"), f64::from(MEASURE_COUNT), "{song}");
     assert_eq!(number_field(song, "bpm"), BPM);
     let groove = client.call(&mut session, "loadPattern", &format!(r#"{{"patternName":"{GROOVE_A}"}}"#));
@@ -359,9 +358,9 @@ fn a_client_composes_an_afrobeat_song_of_64_measures() {
 
     // It plays.
     let played = client.call(&mut session, "play", r#"{"song":true}"#);
-    assert_eq!(str_field(&played, "playing"), ARRANGEMENT);
+    assert_eq!(str_field(&played, "playing"), SONG);
     let state = client.call(&mut session, "getPlaybackState", "{}");
-    assert_eq!(str_field(&state, "arrangement"), ARRANGEMENT, "{state}");
+    assert_eq!(str_field(&state, "song"), SONG, "{state}");
     client.call(&mut session, "stop", "{}");
     let generated: Vec<&String> = client.called.iter().filter(|c| GENERATION_TOOLS.contains(&c.as_str())).collect();
     assert!(generated.is_empty(), "generation was not asked for: {generated:?}");
@@ -371,7 +370,7 @@ fn a_client_composes_an_afrobeat_song_of_64_measures() {
     // The song in the session, as the engine reads it.
     let (library, report) = Library::parse(&session.library_text()).unwrap();
     assert!(report.issues.is_empty(), "{:?}", report.issues);
-    let song = library.songs.iter().find(|s| s.name == ARRANGEMENT).unwrap();
+    let song = library.songs.iter().find(|s| s.name == SONG).unwrap();
     for name in [GROOVE_A, GROOVE_B] {
         let groove = pattern(&library, name);
         assert_eq!(groove.tags, ["afrobeat"]);

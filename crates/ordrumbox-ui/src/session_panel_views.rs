@@ -220,7 +220,7 @@ impl Session {
         let title = format!("Track: {}{}", track.name, info.map(|i| format!(" - {i}")).unwrap_or_default());
 
         // Sample bar: analysis text, envelope, decay end (0 without a decay).
-        let decay = instrument.and_then(|i| i.decay).unwrap_or(0.0);
+        let decay = instrument.and_then(|i| i.decay_ms).unwrap_or(0.0);
         let analysis = url.as_deref().filter(|_| !track.use_synth).and_then(|u| self.analysis_of(u));
         let duration_ms = analysis.as_ref().map_or(0.0, |a| a.duration_sec * 1000.0);
         let shape = instrument.map_or_else(Shape::default, |i| Shape::of(i, duration_ms));
@@ -283,8 +283,8 @@ impl Session {
         if !instrument_family(&track.name).is_drum() {
             return None;
         }
-        let genre = self.pattern()?.extra.get(generate::GENRE)?.as_str()?;
-        let style = self.shown_styles().get(genre)?;
+        let name = self.pattern()?.extra.get(generate::STYLE_KEY)?.as_str()?;
+        let style = self.shown_styles().get(name)?;
         let macros = Macros::of(self.pattern()?);
         let shown = compose::track_settings(track, style, macros)?;
         Some(ComposeView { style: style.name.clone(), shown })
@@ -396,7 +396,7 @@ impl Session {
             kits,
             gain: instrument.gain_db,
             transpose: instrument.transpose,
-            decay: instrument.decay.unwrap_or(0.0),
+            decay: instrument.decay_ms.unwrap_or(0.0),
             shape: Shape::of(instrument, duration_ms),
         })
     }

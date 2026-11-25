@@ -10,7 +10,7 @@ fn structure_table(name: &str) -> Option<&'static Value> {
     table("structure").get(name)
 }
 
-/// The string items of a structure list (`GENRES`, `SCALES`…).
+/// The string items of a structure list (`scales`).
 fn names(name: &str) -> Vec<&'static str> {
     structure_table(name).and_then(Value::as_array).unwrap_or_default().iter().filter_map(Value::as_str).collect()
 }

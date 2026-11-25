@@ -58,7 +58,7 @@ const TEMPO_EPSILON: f64 = 1e-6;
 pub enum Mode {
     /// Pattern `index`, looped at the library's tempo.
     Pattern(usize),
-    /// Song `index`: its arrangement, a measure per pass, at its tempo.
+    /// Song `index`: its clips, a measure per pass, at its tempo.
     Song(usize),
 }
 
@@ -639,7 +639,7 @@ impl Controller {
     }
 
     /// Start `mode` from pass `first` (a song: from measure `first`, as from
-    /// the arrangement cursor); sounds are assigned afresh.
+    /// the song cursor); sounds are assigned afresh.
     pub fn play_from(&mut self, library: &Library, mode: Mode, first: u64) {
         self.mode = mode;
         self.assigned.clear();

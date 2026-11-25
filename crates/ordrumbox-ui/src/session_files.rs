@@ -5,6 +5,7 @@
 use super::Session;
 use super::session_confirm::Pending;
 use super::session_overlay::Overlay;
+use super::session_types::PlayMode;
 use super::session_user_data;
 use crate::file_request::FileRequest;
 use crate::picker::{Export, Outcome, Picker, Purpose};
@@ -28,7 +29,7 @@ pub(super) const NO_SYNTHS: &str = "No synth sounds loaded";
 pub(super) enum WavSource {
     /// Pattern `index`, `loop_count` times (from 1).
     Pattern { index: usize, loop_count: u32 },
-    /// Song `index`, its whole arrangement once.
+    /// Song `index`, its whole song once.
     Song(usize),
 }
 
@@ -146,8 +147,8 @@ impl Session {
         match export {
             Export::PatternWav => self.export_wav(false, path),
             Export::SongWav => self.export_wav(true, path),
-            Export::PatternStems => self.export_stems(false, path),
-            Export::SongStems => self.export_stems(true, path),
+            Export::PatternStems => self.export_stems(PlayMode::Pattern, path),
+            Export::SongStems => self.export_stems(PlayMode::Song, path),
             Export::PatternMidi => self.export_midi(path),
             Export::PatternJson => self.export_pattern_json(path),
             Export::Project => self.export_project(path),

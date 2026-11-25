@@ -342,12 +342,18 @@ saying why (`// audit: allow(<rule>): <why>` for the audit).
   types; `SCREAMING_SNAKE_CASE` constants.
 - A number of things ends in `_count` (`beat_count`, `track_count`,
   `retrigger_count`), never `nb_` or `num_`. A length or a duration ends in
-  its unit (`pattern_ticks`, `decay_frames`, `delay_beats`, a song's
-  `length_measures`, a fraction computed from its clips). The whole beats a
-  pattern is made of and the whole measures a clip is given are counts, set
-  by the user: `beat_count`, `measure_count`. An index ends in `_index`
+  its unit (`pattern_ticks`, `decay_frames`, `delay_beats`, `decay_ms`, a
+  track's `loop_steps`, a clip's or a song's `length_measures`, which may be
+  fractional). The whole beats a pattern is made of are a count, set by the
+  user: `beat_count`. An index ends in `_index`
   (`pattern_index`, `kit_index`), not `_idx`; in a short scope, `p` (pattern),
   `t` (track) and `n` (note) are fine.
+- A chance or a probability is a fraction, 0–1, in the code (`probability`,
+  `rng.chance`, a style's `chance`). The generator's `auto*Chance` keys are
+  written 0–100 in the files: their fields are `Chance`
+  (`ordrumbox-core/src/chance.rs`), which converts at the file's edge only.
+  The 0–100 sliders that are amounts, not chances (variations, `compose*`),
+  stay 0–100.
 - Music vocabulary: a measure is a **measure**, never a bar (`bar` is UI
   chrome only: `bar_height`, `slider_bar`). An audio file is a **sample**, a
   soft-synth sound is a **synth** preset, a set of samples is a **kit**.

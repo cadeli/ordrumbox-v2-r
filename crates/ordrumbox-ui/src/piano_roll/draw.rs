@@ -16,8 +16,8 @@ pub fn draw(canvas: &mut Canvas, view: &RollView, layout: &RollLayout, title: &s
     draw_rows(canvas, view, layout);
     draw_columns(canvas, view, layout, grid_h);
     // The loop point.
-    if let Some(loop_length) = view.track.loop_length.map(i64::from).filter(|&l| l > start && l <= end) {
-        canvas.fill_rect(layout.step_x(view, loop_length) - s.px(), layout.grid.y, 2 * s, grid_h, LOOP_MARK);
+    if let Some(loop_steps) = view.track.loop_steps.map(i64::from).filter(|&l| l > start && l <= end) {
+        canvas.fill_rect(layout.step_x(view, loop_steps) - s.px(), layout.grid.y, 2 * s, grid_h, LOOP_MARK);
     }
     draw_ghosts(canvas, view, layout);
     for n in 0..view.track.notes.len() {

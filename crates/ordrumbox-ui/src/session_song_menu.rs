@@ -1,5 +1,5 @@
 //! The song panel's menus (a pattern of the list, opened by a click, a clip, a row
-//! name, the bare grid) and the arrangement edits they lead to.
+//! name, the bare grid) and the song edits they lead to.
 
 use ordrumbox_core::{SongClip, num};
 
@@ -127,7 +127,7 @@ impl Session {
         self.song_edit_result(result);
     }
 
-    /// Move row `from` of the arrangement to the place of row `to`. Rows
+    /// Move row `from` of the song to the place of row `to`. Rows
     /// follow the library's order, so the row's pattern takes the place of
     /// that row's pattern in the library, in one undo step.
     pub(super) fn move_row(&mut self, from: usize, to: usize) {
@@ -149,7 +149,7 @@ impl Session {
         }
     }
 
-    /// Remove pattern `p` and its clips of every arrangement, in one undo
+    /// Remove pattern `p` and its clips of every song, in one undo
     /// step; the pattern shown or playing stays the same one when it is
     /// another. Its name and the clips removed.
     pub(super) fn remove_pattern_with_clips(&mut self, p: usize) -> Result<(String, usize), String> {
@@ -189,7 +189,7 @@ impl Session {
         self.song_edit_result(result);
     }
 
-    /// Remove clip `c` of the arrangement.
+    /// Remove clip `c` of the song.
     pub(super) fn remove_clip(&mut self, c: usize) {
         let Some(clip) = self.song().and_then(|song| song.clips.get(c).cloned()) else { return };
         let label = self.pattern_label(&clip.pattern_id);
@@ -197,15 +197,14 @@ impl Session {
         self.song_edit_result(Ok(format!("Removed \"{label}\" at measure {}", clip.start_measure + 1)));
     }
 
-    /// Remove every clip of pattern `id` from the arrangement.
+    /// Remove every clip of pattern `id` from the song.
     pub(super) fn remove_row(&mut self, id: &str) {
         let label = self.pattern_label(id);
-        let result =
-            self.editor.remove_pattern_clips(id, None).map(|_| format!("Removed \"{label}\" from the arrangement"));
+        let result = self.editor.remove_pattern_clips(id, None).map(|_| format!("Removed \"{label}\" from the song"));
         self.song_edit_result(result);
     }
 
-    /// What an arrangement edit gave: its message, and the edit taken into account.
+    /// What a song edit gave: its message, and the edit taken into account.
     pub(super) fn song_edit_result(&mut self, result: Result<String, String>) {
         match result {
             Ok(message) => {
@@ -219,7 +218,7 @@ impl Session {
 
 /// A clip's description (its `title`): `PATTERN - measure N, M measure(s)`.
 pub(super) fn clip_label(label: &str, clip: &SongClip) -> String {
-    format!("{label} - measure {}, {} measure(s)", clip.start_measure + 1, num::text(clip.measure_count))
+    format!("{label} - measure {}, {} measure(s)", clip.start_measure + 1, num::text(clip.length_measures))
 }
 
 #[cfg(test)]
@@ -231,7 +230,7 @@ mod tests {
 
     #[test]
     fn clip_labels() {
-        let clip = SongClip { pattern_id: "rock".into(), start_measure: 2, measure_count: 0.75 };
+        let clip = SongClip { pattern_id: "rock".into(), start_measure: 2, length_measures: 0.75 };
         assert_eq!(clip_label("Rock", &clip), "Rock - measure 3, 0.75 measure(s)");
     }
 
@@ -268,13 +267,13 @@ mod tests {
         assert!(menu(&s).is_empty());
         assert_eq!(clips(&s)[3], ("a".into(), 0, 0.75));
         assert_eq!(s.selected_clip(), Some(3));
-        // Nothing past the arrangement's 2 measures.
+        // Nothing past the song's 2 measures.
         assert!(!click_and_release(&mut s, measure_x(2), row_y(1)));
         // Row a's name: delete the row.
         assert!(right_click(&mut s, l.grid.x + 2, row_y(0)));
         assert_eq!(menu(&s), ["add:1:a", "down:0", "row:a"]);
         choose(&mut s, 2);
-        assert_eq!(s.message, format!("Removed \"a\" from the arrangement ({}+Z: undo)", crate::menu::command_label()));
+        assert_eq!(s.message, format!("Removed \"a\" from the song ({}+Z: undo)", crate::menu::command_label()));
         assert_eq!(clips(&s), [("b".into(), 0, 2.0)]);
         s.undo();
         assert_eq!(clips(&s).len(), 4);

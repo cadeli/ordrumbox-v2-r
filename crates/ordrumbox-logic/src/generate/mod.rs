@@ -19,7 +19,7 @@ use ordrumbox_core::num::{clamp, round2};
 use ordrumbox_core::{Note, Scales, Track};
 
 pub use auto::{
-    AutoGenerator, BASS_PRESET, GENRE, Harmony, Options, change_track, generate_pattern, generate_track,
+    AutoGenerator, BASS_PRESET, Harmony, Options, STYLE_KEY, change_track, generate_pattern, generate_track,
     instrument_line, plays_auto, recompose, restyle_pattern, run_loop,
 };
 pub use auto_mode::{
@@ -392,7 +392,7 @@ pub(crate) fn loop_point(track: &Track, config: &Value, default_beats: f64) -> i
 /// The track loops after `loopBeats` beats (its length by default).
 pub(crate) fn apply_loop_point(track: &mut Track, config: &Value) {
     let beats = num(config, "loopBeats").unwrap_or(f64::from(track.beat_count));
-    track.loop_length = Some((beats * f64::from(track.steps_per_beat)) as i32);
+    track.loop_steps = Some((beats * f64::from(track.steps_per_beat)) as i32);
 }
 
 /// A test on a phrase and the step it lands on.

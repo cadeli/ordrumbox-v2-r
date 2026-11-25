@@ -8,7 +8,8 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, reason = "a test: a failed expectation fails the test")]
 
-use ordrumbox_core::{Hit, Library, Note, Pattern, Rng, Scales, Track, expand_hits};
+use ordrumbox_core::json::Value;
+use ordrumbox_core::{Hit, Library, Note, Pattern, Rng, Scales, SetField, Track, expand_hits};
 
 const GATES: [&str; 9] = [
     "prob_pitch",
@@ -49,23 +50,9 @@ fn pattern(notes: Vec<Note>, keep: &str) -> Pattern {
     pattern
 }
 
-/// A slider moved (a track setting, 0–100 or a range).
+/// A slider moved (a track setting by its key, 0–100 or a range).
 fn set(track: &mut Track, key: &str, value: f64) {
-    let field = match key {
-        "prob_pitch" => &mut track.auto_pitch_chance,
-        "prob_velocity" => &mut track.auto_velocity_chance,
-        "prob_silence" => &mut track.auto_silence_chance,
-        "prob_fill" => &mut track.auto_fill_chance,
-        "prob_ghost" => &mut track.auto_ghost_chance,
-        "prob_retrig" => &mut track.auto_retrigger_chance,
-        "prob_euclid" => &mut track.auto_euclidean_chance,
-        "prob_note" => &mut track.auto_note_probability_chance,
-        "prob_note_depth" => &mut track.auto_note_probability_range,
-        "prob_arp" => &mut track.auto_arp_chance,
-        "pitch_range" => &mut track.pitch_range,
-        _ => panic!("no slider {key}"),
-    };
-    *field = value;
+    assert_eq!(track.set_field(key, &Value::Number(value)), SetField::Set, "no slider {key}");
 }
 
 /// The notes of `rolls` projections, pooled.

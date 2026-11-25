@@ -370,24 +370,24 @@ fn sub_note_ghosts<'a>(track: &'a Track, grid: &TrackSteps) -> Vec<(i64, SubKind
     ghosts
 }
 
-/// The notes that re-trigger when the track loops at its `loop_length`, by
+/// The notes that re-trigger when the track loops at its `loop_steps`, by
 /// page step.
 fn loop_ghosts<'a>(track: &'a Track, grid: &TrackSteps) -> Vec<(i64, &'a Note)> {
     let track_total = i64::from(track.steps_per_beat) * i64::from(track.beat_count);
-    let Some(loop_length) = track.loop_length.map(i64::from).filter(|&l| l > 0) else { return Vec::new() };
+    let Some(loop_steps) = track.loop_steps.map(i64::from).filter(|&l| l > 0) else { return Vec::new() };
     let mut ghosts = Vec::new();
     for note in &track.notes {
         let base = absolute_step(note.beat, note.step, grid.steps_per_beat);
-        if base >= loop_length {
+        if base >= loop_steps {
             continue;
         }
-        let mut pos = base + loop_length;
+        let mut pos = base + loop_steps;
         while pos < track_total {
             let local = grid.local(pos);
             if grid.on_page(local) {
                 ghosts.push((local, note));
             }
-            pos += loop_length;
+            pos += loop_steps;
         }
     }
     ghosts
@@ -475,8 +475,8 @@ fn flash_playing(
 /// A line where the track's loop starts over, when it is on the page.
 fn draw_loop_mark(canvas: &mut Canvas, track: &Track, grid: &TrackSteps) {
     let total = i64::from(track.steps_per_beat) * i64::from(track.beat_count);
-    let Some(loop_length) = track.loop_length.map(i64::from).filter(|&l| l > 0 && l < total) else { return };
-    let local = grid.local(loop_length);
+    let Some(loop_steps) = track.loop_steps.map(i64::from).filter(|&l| l > 0 && l < total) else { return };
+    let local = grid.local(loop_steps);
     if grid.on_page(local) {
         let gap = grid.gap();
         canvas.fill_rect(grid.cell(local).x - gap, grid.y, gap * 2, grid.height, LOOP_MARK);
