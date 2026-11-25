@@ -2,8 +2,8 @@
 
 Drum machine and step sequencer: patterns of tracks of notes, songs arranged
 from patterns, sample kits and a soft synth, played live or rendered to WAV
-and MIDI. A native program, `ordrumbox.exe` on Windows (also runs on macOS),
-and a CLAP/VST3 plugin, both with the same software-rendered UI. `README.md`
+and MIDI. A native program (`ordrumbox.exe` on Windows, `ordrumbox` on macOS
+and Linux) and a CLAP/VST3 plugin, both with the same software-rendered UI. `README.md`
 is the user documentation: the app, its keys, and where it reads and writes
 its files. Everything for developers (building, tests, snapshots) is in
 `DEVELOPMENT.md`, never in `README.md`.
@@ -19,9 +19,10 @@ cargo xtask audit                       # the rules of this file that a tool che
 cargo xtask bundle ordrumbox-plugin --release --features vst3   # target/bundled/orDrumbox.{clap,vst3}
 ```
 
-CI (`.github/workflows/ci.yml`) runs fmt, clippy and tests on Windows and
-macOS. For a `v*` tag or a manual run (`workflow_dispatch`) only, it then
-builds the release `ordrumbox.exe` with `assets/` next to it, its Windows setup
+CI (`.github/workflows/ci.yml`) runs fmt, clippy, `cargo xtask audit
+--no-clippy` and tests on Windows, macOS and Linux. For a `v*` tag or a
+manual run (`workflow_dispatch`) only, it then builds the release program of
+each system with `assets/` next to it (`DEVELOPMENT.md`), its Windows setup
 (`installer/ordrumbox.iss`, Inno Setup), and the plugin bundles, checked by
 `clap-validator`.
 
@@ -30,25 +31,27 @@ builds the release `ordrumbox.exe` with `assets/` next to it, its Windows setup
 ```
 ordrumbox-core    data model, JSON codec, pattern engine, RNG       no deps
 ordrumbox-dsp     sample voice, synth voice, channel strip, master  no deps
-ordrumbox-logic   editor with undo/redo, generators, MIDI files     → core
-ordrumbox-engine  kits, WAV, passes, engine, UI ↔ audio link        → core, dsp
+ordrumbox-logic   editor with undo/redo, generators, MIDI format    → core
+ordrumbox-engine  kits, WAV format, passes, engine, UI ↔ audio link → core, dsp
 ordrumbox-probe   sound measurements (command line, not shipped)    → core, dsp, engine
 ordrumbox-ui      session, views, input, MCP link, update check     → core, logic, engine, fontdue
 ordrumbox-app     window, input translation, audio output, MIDI in  → core, engine, ui, winit, softbuffer, cpal, midir, rfd
 ordrumbox-plugin  CLAP/VST3 instrument following the host           → core, engine, ui, nih-plug, baseview, softbuffer
-xtask             `cargo xtask bundle`: plugin bundles, assets in   → nih_plug_xtask
+xtask             `cargo xtask bundle` (plugin bundles, assets in)  → nih_plug_xtask
+                  and `cargo xtask audit` (rules of this file)
 assets/           data/*.json and kits/**.wav, read at runtime
 ```
 
 - The four domain crates (`core`, `dsp`, `logic`, `engine`) take **no
   third-party dependency** and touch no file, socket or process: what they
-  read comes in as bytes, text or a `read` function. Only `ordrumbox-app`
-  opens a window, a sound device, a MIDI port or a file dialog, through `winit`,
-  `softbuffer`, `cpal`, `midir` and `rfd` (`dialog.rs`; the window's own
-  picker stays for the plugin and the tests). `ordrumbox-ui` reaches the OS for the
+  read comes in as bytes, text or a `read` function. In the program, only
+  `ordrumbox-app` opens a window, a sound device, a MIDI port or a file dialog,
+  through `winit`, `softbuffer`, `cpal`, `midir` and `rfd` (`dialog.rs`; the
+  window's own picker stays for the plugin and the tests); in the plugin,
+  `ordrumbox-plugin` does (below). `ordrumbox-ui` reaches the OS for the
   rest: files (`store.rs`), the MCP socket, the system font, `curl`.
   `ordrumbox-plugin` talks to a plugin host instead, through `nih-plug`
-  (pinned git revision) and `baseview`; the `vst3` feature links GPLv3
+  (pinned git revision) and `baseview`, which gives it its window; the `vst3` feature links GPLv3
   bindings (`README.md`, "License"), so it stays off by default.
 - `ordrumbox-ui` is the whole UI without a window or a sound device:
   `Session`, the views drawn into a pixel buffer, and `Ui`, which takes the
@@ -77,7 +80,8 @@ assets/           data/*.json and kits/**.wav, read at runtime
 - Dependencies only point down the table. Nothing depends on `ordrumbox-app`.
 - Workspace lints (`Cargo.toml`): `unsafe_code = "forbid"`,
   `missing_debug_implementations = "warn"`, clippy `all` (`float_cmp`
-  allowed) and the four lints of "Errors". `ordrumbox-plugin`
+  allowed) and the four lints of "Errors"; CI turns every warning into an
+  error (`-D warnings`), so `warn` there means "never merged". `ordrumbox-plugin`
   repeats them with `unsafe_code = "deny"`: only the window handle adapters
   (`editor.rs`) take an `#[expect(unsafe_code)]`, each with a `SAFETY`
   comment (the export macros' `unsafe` comes from nih-plug, which the lint
@@ -98,7 +102,8 @@ assets/           data/*.json and kits/**.wav, read at runtime
   cargo run -p ordrumbox-probe -- fix assets/kits/human --write
   ```
 
-  `fix` repairs what `kit` flags: a late start is trimmed to 1 ms before the
+  `kit` takes kit names (folders of `assets/kits/`, or of `--kits <folder>`);
+  `fix` takes files or folders. `fix` repairs what `kit` flags: a late start is trimmed to 1 ms before the
   sound, a loud end is faded out (130 ms, at most half the sample), DC is
   removed, the peak is set to −3 dB (`--peak keep` leaves it). `--highpass
   <hz>` and `--length <ms>` also filter and cut. It saves over the files only
@@ -153,8 +158,9 @@ assets/           data/*.json and kits/**.wav, read at runtime
   - Guard feedback paths (delay, filters, reverb) against denormals.
   - `#[inline]` on small functions called per sample across crates
     (`dsp` → `engine`); `#[inline(always)]` only with a measurement.
-- A change to a render path keeps the audio snapshots within 2e-5 and is
-  timed in release (`cargo test --release`, or `ordrumbox-probe`), not in
+- A change to a render path that is not meant to change the sound keeps the
+  audio snapshots within 2e-5; one that is meant to follows "Snapshots". Both
+  are timed in release (`cargo test --release`, or `ordrumbox-probe`), not in
   the `dev` profile.
 - The UI side holds a reference to everything it posted (`Arc<Pass>`,
   `Arc<SampleBank>`) until the engine is surely done with it, so the last
@@ -168,8 +174,9 @@ assets/           data/*.json and kits/**.wav, read at runtime
   `unwrap_or_default()` that turns an I/O or parse error into "nothing".
 - Where an error goes:
   - loading a library, pattern or kit: an `Issue`
-    (`ordrumbox-core/src/record.rs`) with its JSON path; the value takes its
-    default and the issue is shown;
+    (`ordrumbox-core/src/record.rs`) with its JSON path; a value that cannot
+    be read takes its default and the issue is shown (a whole file that
+    cannot be read or parsed: "Files");
   - startup: the session's `status` list; an action: `Session::message`;
   - in between: `Result<_, String>` or `io::Result`, up to the app.
 - `eprintln!` is not a report: the Windows release build has no console.
@@ -230,7 +237,7 @@ assets/           data/*.json and kits/**.wav, read at runtime
 
 - Edition 2024, `rust-version` 1.100: use what they give. `let … else`,
   `if let … && …` chains, `is_some_and`, `clamp`, `total_cmp`, `rem_euclid`
-  (through `num::wrap`; `ordrumbox-dsp` has its own `wrap`), `div_euclid`,
+  (through `wrap`, "Reuse"), `div_euclid`,
   `checked_*`/`saturating_*`.
 - No emulation of another language's numbers. No ToInt32/Uint8 tricks, no
   `((x % n) + n) % n`, no NaN as "missing": absence is an `Option`, a choice
@@ -244,14 +251,17 @@ assets/           data/*.json and kits/**.wav, read at runtime
   matters.
 - Generics and `impl Trait` over `dyn Trait`; `dyn` only where the set of
   types is open (plugin host, UI widgets), never on a render path.
-- `#[expect(lint, reason = "…")]`, never a bare `#[allow]`.
+- `#[expect(lint, reason = "…")]`, never a bare `#[allow]`; the one exception
+  is the `#![allow(…)]` at the top of each file in `tests/` ("Errors").
 - `#[must_use]` on functions that only compute a value; `const fn` and
   `const` tables where the value is known at compile time.
 
 ## Structure: do and do not
 
-Decoupling, file size, naming, reuse. A rule here is checked in review; a
-file or function that breaks one carries a comment saying why.
+Decoupling, file size, naming, reuse. A rule here is checked in review, and
+by `cargo xtask audit` where a tool can (crate graph, names, file sizes,
+nesting, duplicates); a file or function that breaks one carries a comment
+saying why (`// audit: allow(<rule>): <why>` for the audit).
 
 ### Decoupling
 
@@ -264,8 +274,8 @@ file or function that breaks one carries a comment saying why.
 - **Do** keep logic that needs no window, no sound device and no file in the
   domain crates (`core`, `dsp`, `logic`, `engine`), where it is tested without the app.
   The UI calls it; it does not re-implement it.
-- **Do** use a trait or a generic only at a seam that already exists (see
-  Modern Rust); otherwise a plain function and a struct.
+- **Do** use a trait or a generic only at a seam that already exists (an
+  open set of types, "Modern Rust": the plugin host, the UI widgets); otherwise a plain function and a struct.
 - **Do not** reach into another module's fields. Give the type a method or a
   getter instead; keep fields private (`pub(crate)` at most, never `pub` by
   habit).
@@ -282,7 +292,7 @@ file or function that breaks one carries a comment saying why.
 
 - **Do** keep a file under about 500 lines of code (tests excluded) and a
   function under about 60. Past 800 lines, or when a file holds two
-  separate ideas, split it before adding to it.
+  separate ideas, split it along a seam before adding to it.
 - **Do** split by concept, as a folder module (`foo.rs` + `foo/`), with a
   name that says what the part is: `session_roll.rs` and `session_song.rs`
   are parts of the session, not `session2.rs`. The parent keeps the type and
@@ -290,8 +300,9 @@ file or function that breaks one carries a comment saying why.
 - **Do** move tests that outgrow their file to `foo/tests.rs` or the crate's
   `tests/`; move big literal tables to a `data.rs` next to them.
 - **Do not** grow an existing large file to add a feature: put the feature in
-  a new module and call it from there. **Do not** split by size alone
-  (`part1`, `part2`, `misc`, `more`): a split must follow a seam.
+  a new module and call it from there. **Do not** cut where there is no
+  seam (`part1`, `part2`, `misc`, `more`): size says when to split, the seam
+  says where.
 - **Do not** nest deeper than three levels of `if`/`match`/loop: extract a
   function, use an early `return`, `let … else`, or `?`.
 
@@ -340,9 +351,9 @@ file or function that breaks one carries a comment saying why.
   with a few edits, `draw_row_2`, `foo_alt`); change the original, or give
   both a shared core.
 - **Do not** write a wrapper that only forwards a call, or a trait with one
-  implementation and no seam. **Do not** abstract before the second use: three
-  similar lines are better than a premature framework, but a rule repeated is
-  a bug waiting.
+  implementation and no seam. **Do not** abstract earlier than the thresholds
+  above: three similar lines are better than a premature framework, but a
+  rule repeated is a bug waiting.
 - **Do not** leave dead code, `_unused` parameters or a commented-out block
   behind: delete it; git remembers.
 
@@ -354,8 +365,9 @@ file or function that breaks one carries a comment saying why.
 - A number of things ends in `_count` (`beat_count`, `track_count`,
   `retrigger_count`), never `nb_` or `num_`. A length or a duration ends in
   its unit (`pattern_ticks`, `decay_frames`, `delay_beats`, a song's
-  `length_measures`). The beats a pattern is made of and the measures a
-  clip is given are counts: `beat_count`, `measure_count`. An index ends in `_index`
+  `length_measures`, a fraction computed from its clips). The whole beats a
+  pattern is made of and the whole measures a clip is given are counts, set
+  by the user: `beat_count`, `measure_count`. An index ends in `_index`
   (`pattern_index`, `kit_index`), not `_idx`; in a short scope, `p` (pattern),
   `t` (track) and `n` (note) are fine.
 - Music vocabulary: a measure is a **measure**, never a bar (`bar` is UI
@@ -363,8 +375,6 @@ file or function that breaks one carries a comment saying why.
   soft-synth sound is a **synth** preset, a set of samples is a **kit**.
 - Doc comments say what a thing is or does, in plain sentences; comments in
   bodies say why. Match the comment density of the surrounding code.
-- One shared function for a rule that repeats (a clamp range, a row hit
-  test, a post-to-engine sequence), from its second copy ("Reuse"); a named
-  constant instead of a repeated literal.
+- A named constant instead of a repeated literal (shared functions: "Reuse").
 - Unit tests sit with the code (`#[cfg(test)] mod tests`); snapshot and
   end-to-end tests go in each crate's `tests/`.
