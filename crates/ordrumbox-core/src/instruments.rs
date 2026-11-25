@@ -287,7 +287,7 @@ impl Catalog {
         }
     }
 
-    /// The instrument with this id (any case), `findById`.
+    /// The instrument with this id (any case).
     pub fn by_id(&self, id: &str) -> Option<&Instrument> {
         let id = id.to_uppercase();
         self.instruments.iter().find(|i| i.id.to_uppercase() == id)

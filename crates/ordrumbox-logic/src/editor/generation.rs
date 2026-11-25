@@ -213,7 +213,7 @@ impl Editor {
 
     /// The loop start of pattern `p` (loop `index` of the playback): its
     /// tracks in auto mode get new lines. Not an undo step — the lines change
-    /// every loop, as in the JS app — but a change to save.
+    /// every loop — but a change to save.
     pub fn auto_loop(
         &mut self,
         p: usize,

@@ -1,9 +1,7 @@
 //! The session's side of the editors' widgets: what the track editor, the
 //! note editor, the kit editor's controls and the grid's volume sliders show
 //! (built at every frame from the library, the kits and the player), and
-//! what a click, a drag, the wheel, a key or a typed number on them does —
-//! the JS handlers of `track_editor/*.js`, `note_editor/sync_section.js`,
-//! `drumkit_manager.js` and the pattern panel's volume sliders.
+//! what a click, a drag, the wheel, a key or a typed number on them does.
 //!
 //! This file lays the widgets out; `session_panel_views.rs` builds what they
 //! show, `session_panel_input.rs` takes the mouse and the keys, and
@@ -135,7 +133,7 @@ impl Session {
         layout
     }
 
-    /// The header's pattern and kit lists (`rebuildPatternSelect`, `rebuildDrumkitSelect`).
+    /// The header's pattern and kit lists.
     fn header_selects(&self, layout: &mut PanelLayout, scale: Scale) {
         let c = view::header_controls(scale);
         let library = self.editor.library();
@@ -263,8 +261,7 @@ impl Session {
         (volume, false)
     }
 
-    /// The header's transport and generation controls (the toolbar's
-    /// transport and the pattern settings panel of the JS).
+    /// The header's transport and generation controls.
     fn header_items(&self, layout: &mut PanelLayout, pattern: &Pattern, scale: Scale) {
         let controls = view::header_controls(scale);
         let song = self.is_song_mode();

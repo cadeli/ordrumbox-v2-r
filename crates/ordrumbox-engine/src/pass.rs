@@ -454,8 +454,8 @@ pub struct SongContext<'a> {
     pub sample_rate: f64,
 }
 
-/// One strip per track name over the song's patterns, in song order
-/// (`Mixer.strips` is keyed by track name): `(pattern, track)` of the first
+/// One strip per track name over the song's patterns, in song order (the
+/// mixer's strips are keyed by track name): `(pattern, track)` of the first
 /// track with each name.
 pub fn song_strips(song: &Song, patterns: &[Pattern]) -> Vec<(usize, usize)> {
     let mut strips: Vec<(usize, usize)> = Vec::new();

@@ -1,20 +1,18 @@
-//! What a hit sounds like once its track is applied
-//! (`src/patterns/note_params.js`): stereo position, playback ratio, swing.
+//! What a hit sounds like once its track is applied: stereo position, playback ratio, swing.
 
 use crate::pattern_engine::Hit;
 use crate::steps::semitone_ratio;
 use crate::track::Track;
 
 impl Hit {
-    /// Stereo position: the mean of the note and track pans, floored to 0.01
-    ///.
+    /// Stereo position: the mean of the note and track pans, floored to 0.01.
     pub fn playback_pan(&self, track: &Track) -> f64 {
         ((self.pan + track.pan) / 2.0 * 100.0).floor() / 100.0
     }
 
     /// Playback-rate ratio of the note pitch plus the track pitch.
     ///
-    /// Exact on purpose: `computePitch` floors the ratio to 0.01, which plays
+    /// Exact on purpose: a ratio floored to 0.01 would play
     /// every interval flat (+1 semitone: 1.0595 → 1.05, −15.5 cents; +7:
     /// 1.4983 → 1.49, −9.8 cents; octaves stay exact).
     pub fn playback_ratio(&self, track: &Track) -> f64 {

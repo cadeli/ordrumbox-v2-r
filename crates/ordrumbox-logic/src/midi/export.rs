@@ -1,4 +1,4 @@
-//! A pattern as a Standard MIDI File (`logic/midi/midi_exporter.js`): type 1,
+//! A pattern as a Standard MIDI File: type 1,
 //! 96 ticks per quarter note, a tempo track then one track per instrument,
 //! the notes the pattern engine plays (loops, every/pos, retriggers,
 //! arpeggios, euclidean fills), loop after loop.
@@ -53,7 +53,7 @@ fn chunk(tag: &[u8; 4], body: &[u8]) -> Vec<u8> {
     out
 }
 
-/// `buildMTrk`: the events, then end of track.
+/// The events, then end of track.
 fn track_chunk(mut events: Vec<u8>) -> Vec<u8> {
     events.extend([0x00, 0xff, 0x2f, 0x00]);
     chunk(b"MTrk", &events)
@@ -79,7 +79,7 @@ fn melodic_channel(index: usize) -> u8 {
     MELODIC_CHANNELS[index % MELODIC_CHANNELS.len()]
 }
 
-/// `assignChannels`: each name once, in the order the names first come.
+/// Each name once, in the order the names first come.
 fn assign(names: &[&str], roots: &[(String, f64)]) -> Vec<(String, Target)> {
     let c = catalog();
     let mut targets: Vec<(String, Target)> = Vec::new();
@@ -123,7 +123,7 @@ struct NoteEvent {
     velocity: u8,
 }
 
-/// `buildInstrumentTrackFromEvents`: name, program, then note on/off pairs.
+/// Name, program, then note on/off pairs.
 fn instrument_track(name: &str, target: Target, mut events: Vec<NoteEvent>) -> Vec<u8> {
     events.sort_by(|a, b| a.tick.total_cmp(&b.tick).then(a.key.cmp(&b.key)));
     // Notes of one key at one tick are one note, at the loudest velocity and the longest length.

@@ -1,6 +1,5 @@
-//! The output panel's spectrum (`spectrum_section.js`): what the JS master
-//! bus `AnalyserNode` gives `getByteFrequencyData()` — computed here as the
-//! Web Audio specification describes it, with the node's settings (`fftSize`
+//! The output panel's spectrum, computed as the Web Audio specification
+//! describes an `AnalyserNode`'s byte frequency data, with the node's settings (`fftSize`
 //! 4096, the default smoothing 0.8 and range -100 to -30 dB): a Blackman
 //! window, an FFT, the magnitudes smoothed over time, in dB, as bytes.
 
@@ -34,7 +33,7 @@ impl Default for Analyser {
 }
 
 impl Analyser {
-    /// `getByteFrequencyData()` of `samples` (oldest first): one byte a bin.
+    /// `getByteFrequencyData` of `samples` (oldest first): one byte a bin.
     pub fn bytes(&mut self, samples: &[f32; FFT_SIZE]) -> Vec<u8> {
         let mut re: Vec<f64> = samples.iter().zip(&self.window).map(|(&s, w)| f64::from(s) * w).collect();
         let mut im = vec![0.0; FFT_SIZE];

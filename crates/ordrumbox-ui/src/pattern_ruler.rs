@@ -8,7 +8,7 @@ use crate::panel::Rect;
 use crate::scale::Scale;
 use crate::scroll_thumb::Edge;
 use crate::theme;
-use ordrumbox_core::steps::TICK;
+use ordrumbox_core::steps::{TICK, absolute_step};
 use std::ops::Range;
 
 /// The play cursor's colour, and its width (scale units).
@@ -108,7 +108,7 @@ impl PatternRuler {
             let x = self.x_of(u32::try_from(beat).unwrap_or(0) * TICK);
             canvas.fill_rect(x, r.y, s.px(), r.h - 2 * s, theme::muted());
             for step in 1..self.steps_per_beat {
-                let at = u32::try_from(beat * self.steps_per_beat + step).unwrap_or(0);
+                let at = u32::try_from(absolute_step(beat, step, self.steps_per_beat)).unwrap_or(0);
                 let dot = self.x_of(step_tick(at, self.steps_per_beat));
                 if dot < right {
                     canvas.fill_rect(dot, r.y + r.h - 3 * s, s.px(), s.px(), theme::muted());

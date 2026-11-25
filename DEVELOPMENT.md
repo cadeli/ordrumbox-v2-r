@@ -32,7 +32,8 @@ cargo build --release -p ordrumbox-app # target/release/ordrumbox(.exe)
 
 `cargo xtask audit` checks, over every crate: the dependencies against the
 table above, the banned names (`nb_`, `num_`, `_idx`, `get_`, `ctx`, `bar` for
-a measure…), `#[allow]`, `static mut` and `thread_local`, the size of files
+a measure…), in identifiers and in file names (`helpers.rs`), a
+comment citing the web version's JS (`.js` files, "the JS"), `#[allow]`, `static mut` and `thread_local`, the size of files
 (about 500 lines of code, 800 at most), the nesting of `if`/`match`/loops
 (read from the indentation), duplicated blocks, and, through clippy, functions
 over 60 lines (`clippy.toml`) or too complex, a value taken by value and not

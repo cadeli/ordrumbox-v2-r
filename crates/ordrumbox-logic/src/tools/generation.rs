@@ -2,7 +2,8 @@
 //! styles and scales, generate or regenerate a pattern or a track, auto mode,
 //! the macros, a random track (`GENERATION_TOOLS`, used only when asked).
 
-use super::helpers::*;
+use super::answers::*;
+use super::arguments::*;
 use super::{Tools, learned_styles};
 use crate::generate::{self, MelodicKind};
 use ordrumbox_core::json::Value;

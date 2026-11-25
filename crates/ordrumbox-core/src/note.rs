@@ -1,4 +1,4 @@
-//! A note of a track (`src/core/note_schema.js`) and its compact file encoding.
+//! A note of a track and its compact file encoding.
 //!
 //! In a file, the notes of a track are arrays of values named by a `noteKeys`
 //! header (`noteKeys: ["velocity", "beat"]`, `notes: [[0.4], [0.9, 1]]`);
@@ -229,9 +229,9 @@ impl Note {
 
 /// Decode a track's notes: compact arrays named by `note_keys`, or objects.
 ///
-/// Header rule: distinct known keys (current or web-version), **in any order**. The JS loader also
-/// requires `NOTE_KEY_ORDER` order and otherwise keeps the raw arrays, which
-/// its exporter then writes back as garbage (`[[null]]`). The positional decode
+/// Header rule: distinct known keys (current or web-version), **in any order**. The web version also
+/// required `NOTE_KEY_ORDER` order and otherwise kept the raw arrays, which
+/// it then wrote back as garbage (`[[null]]`). The positional decode
 /// is unambiguous as long as each key is known and appears once.
 pub(crate) fn decode_notes(notes: &[Value], note_keys: Option<&Value>, at: &str, issues: &mut Vec<Issue>) -> Vec<Note> {
     let header = note_keys.map(|keys| parse_header(keys, at, issues));
@@ -263,7 +263,7 @@ pub(crate) fn decode_notes(notes: &[Value], note_keys: Option<&Value>, at: &str,
     decoded
 }
 
-/// An arpeggio object's `mode` (the JS key, older saves) is its `direction`.
+/// An arpeggio object's `mode` (the web version's key, older saves) is its `direction`.
 pub fn upgrade_arp(arp: &mut Value) {
     if let Value::Object(object) = arp
         && !object.contains_key("direction")
@@ -307,7 +307,7 @@ fn parse_header(keys: &Value, at: &str, issues: &mut Vec<Issue>) -> Option<Vec<S
     Some(header)
 }
 
-/// Encode notes in the compact format (`Exporter.encodeNotes`): the header
+/// Encode notes in the compact format: the header
 /// lists, in key order, every key some note holds at a non-default value; each
 /// note stops at its last non-default value. `velocity`, `pan`, `prob` and
 /// `rate` are rounded to 2 decimals. `stepPercent` comes last, held only by

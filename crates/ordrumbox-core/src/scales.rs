@@ -67,7 +67,7 @@ impl ScaleList {
         self.steps[i].as_deref()
     }
 
-    /// `getScaleIntervals`: `range` notes up the scale.
+    /// The intervals of scale `name`: `range` notes up the scale.
     pub fn intervals(&self, name: &str, range: usize) -> Vec<i32> {
         let Some(steps) = self.steps_of(name) else { return vec![0] };
         let n = steps.len();

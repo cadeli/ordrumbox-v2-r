@@ -2,7 +2,7 @@
 //! steps the pointer crossed since the press, up and down in pitch, by the
 //! rows. A press that never takes the note off its cell is a click.
 
-/// The piano roll's range and middle C (`piano_roll_constants.js`).
+/// The piano roll's range and middle C.
 pub const MIDI_MIN: f64 = 12.0;
 pub const MIDDLE_C: f64 = 60.0;
 

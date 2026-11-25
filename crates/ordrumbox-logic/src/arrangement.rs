@@ -1,10 +1,9 @@
-//! The song (arrangement) commands (`song_commands.js`): clips placed and
+//! The song (arrangement) commands: clips placed and
 //! removed, arrangements added, removed and selected, each edit one undo
 //! step.
 //!
 //! Clips reference a pattern by its id; the placement commands take an id or
-//! a name and report what they could not do (the JS `reportUserError`
-//! messages). Every clip edit moves the arrangement's loop onto the end of
+//! a name and report what they could not do. Every clip edit moves the arrangement's loop onto the end of
 //! its last clip, so the grid and the playback never show
 //! or play measures nothing is placed on.
 
@@ -34,14 +33,14 @@ impl Editor {
         self.selected_song
     }
 
-    /// Select arrangement `index`, clamped to the list (`setSelectedSongIdx`;
-    /// not an undo step); the index selected.
+    /// Select arrangement `index`, clamped to the list (not an
+    /// undo step); the index selected.
     pub fn set_selected_song(&mut self, index: usize) -> usize {
         self.selected_song = index.min(self.library.songs.len().saturating_sub(1));
         self.selected_song
     }
 
-    /// Set a field of the library header (`songInfos`: the project's
+    /// Set a field of the library header (the project's
     /// `name`, `description`), one undo step. Whether it changed.
     pub fn set_library_info(&mut self, key: &str, value: &str) -> bool {
         if self.library.info.get(key).and_then(Value::as_str) == Some(value) {
@@ -65,12 +64,12 @@ impl Editor {
         (index < self.library.songs.len()).then_some(index)
     }
 
-    /// `#requireSong`: the arrangement to edit, or what to tell the user.
+    /// The arrangement to edit, or what to tell the user.
     fn require_song(&self, song: Option<usize>) -> Result<usize, String> {
         self.song_index(song).ok_or_else(|| "No arrangement to edit — create a song first".to_owned())
     }
 
-    /// `#patternByRef`: a pattern by id, else by name (trimmed, any case).
+    /// A pattern by id, else by name (trimmed, any case).
     fn pattern_by_ref(&self, reference: &str) -> Option<&Pattern> {
         let needle = reference.trim();
         if needle.is_empty() {
@@ -169,8 +168,7 @@ impl Editor {
     }
 
     /// Place a pattern (an id or a name) at `start` (0-based measure), for
-    /// `measure_count` measures, else the pattern's own length
-    ///; the clip added.
+    /// `measure_count` measures, else the pattern's own length; the clip added.
     pub fn add_pattern_at_measure(
         &mut self,
         reference: &str,
@@ -191,20 +189,18 @@ impl Editor {
         Ok(clip)
     }
 
-    /// Repeat the clip starting at `start` right after itself, as long
-    ///; the clip added.
+    /// Repeat the clip starting at `start` right after itself, as long as it is; the clip added.
     pub fn repeat_pattern_at_measure(&mut self, start: u32, song: Option<usize>) -> Result<SongClip, String> {
         let s = self.require_song(song)?;
         let Some(clip) = self.library.songs[s].clips.iter().find(|c| c.start_measure == start).cloned() else {
             return Err(format!("No clip at measure {}", u64::from(start) + 1));
         };
-        // `startMeasure + measureCount`, floored by `addSongClip`.
+        // `startMeasure + measureCount`, floored as a clip placed.
         let next = (f64::from(clip.start_measure) + clip.measure_count).floor().min(f64::from(u32::MAX)) as u32;
         self.add_pattern_at_measure(&clip.pattern_id, next, Some(clip.measure_count), Some(s))
     }
 
-    /// Remove every clip starting at `start`, in one undo step
-    ///; the clips removed.
+    /// Remove every clip starting at `start`, in one undo step; the clips removed.
     pub fn remove_pattern_at_measure(&mut self, start: u32, song: Option<usize>) -> Result<Vec<SongClip>, String> {
         let s = self.require_song(song)?;
         let clips = &self.library.songs[s].clips;
@@ -218,8 +214,7 @@ impl Editor {
     }
 
     /// Remove every clip of a pattern (an id or a name; an id the library no
-    /// longer knows too, for an orphaned row), in one undo step
-    ///; the clips removed.
+    /// longer knows too, for an orphaned row), in one undo step; the clips removed.
     pub fn remove_pattern_clips(&mut self, reference: &str, song: Option<usize>) -> Result<Vec<SongClip>, String> {
         let s = self.require_song(song)?;
         let id = match self.pattern_by_ref(reference) {
@@ -319,7 +314,7 @@ impl Editor {
         true
     }
 
-    /// Replace the whole library (`applyToAppState`: a project opened or
+    /// Replace the whole library (a project opened or
     /// imported), arrangement `selected_song` selected (clamped); one undo step.
     pub fn load_library(&mut self, library: Library, selected_song: usize) {
         self.replace_library(library, selected_song, "Open project");

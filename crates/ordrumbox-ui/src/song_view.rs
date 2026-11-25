@@ -1,6 +1,5 @@
-//! The song panel (`song_panel.js`), in the place of the grid: the arrangement
-//! across the whole width — laid out like a DAW arrangement view
-//! (`arrangement_section.js`): a ruler of measures along X, one row per
+//! The song panel, in the place of the grid: the arrangement
+//! across the whole width — laid out like a DAW arrangement view: a ruler of measures along X, one row per
 //! pattern the arrangement uses (named in a frozen first column), each clip a
 //! rectangle over its measures, the cursor —, and under it the pattern list
 //! on the left, the selected pattern's description (wrapped, scrolled by the
@@ -17,9 +16,8 @@ use crate::frame;
 use crate::panel::{MENU_MARK, Rect, row_at};
 use crate::theme;
 
-/// The JS grid geometry (`song_panel/layout.js`), in px per scale unit, but
-/// for the frozen column: wide enough for a 16-character pattern name (8 px
-/// a glyph) and its 6 px margin, where the JS one holds 8.
+/// The grid geometry, in px per scale unit. The frozen column is wide
+/// enough for a 16-character pattern name (8 px a glyph) and its 6 px margin.
 pub const LABEL_WIDTH: i32 = 134;
 const ROW_HEIGHT: i32 = 22;
 const HEADER_HEIGHT: i32 = 18;
@@ -78,8 +76,7 @@ pub struct Row {
     pub orphan: bool,
 }
 
-/// The patterns `song` uses, in library order, then the missing ones
-///.
+/// The patterns `song` uses, in library order, then the missing ones.
 pub fn rows(song: &Song, patterns: &[Pattern]) -> Vec<Row> {
     let used = |id: &str| song.clips.iter().any(|c| c.pattern_id == id);
     let mut rows: Vec<Row> = patterns

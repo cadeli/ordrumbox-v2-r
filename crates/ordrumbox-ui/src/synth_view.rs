@@ -1,4 +1,4 @@
-//! The synth editor (`synth_editor.js` and its sections), in the place of
+//! The synth editor, in the place of
 //! the grid: the preset bar (the preset list, delete, new, duplicate,
 //! revert, tags, export, import), the tabs (OSC, FLT, MOD, ENV), and the cards of
 //! the tab — each with its title, its wave, filter type or algorithm

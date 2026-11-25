@@ -100,7 +100,7 @@ pub(super) fn header_text(scale: Scale) -> Scale {
     scale.times(2)
 }
 
-/// The header (the JS toolbar and its pattern settings panel), a row of
+/// The header, a row of
 /// labelled groups after the logo: MODE (the pattern or the song: what PLAY
 /// plays and what the main editor shows); play; BPM (the tempo knob); PATTERN;
 /// BEATS; KIT; GENERATE (drums, bass, chords); VIEW (grid, piano roll,

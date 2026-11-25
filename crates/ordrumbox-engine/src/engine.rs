@@ -24,7 +24,7 @@ use returns::Returns;
 
 /// Sample voices playing at once; the oldest is cut when a new one needs a slot.
 pub const MAX_VOICES: usize = 64;
-/// Synth voices playing at once (the JS synth voice pool size).
+/// Synth voices playing at once.
 pub const MAX_SYNTH_VOICES: usize = 16;
 pub use ordrumbox_core::track::MAX_TRACKS;
 /// Frames per render quantum (Web Audio's).

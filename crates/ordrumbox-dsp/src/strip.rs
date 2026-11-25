@@ -1,13 +1,12 @@
-//! A track's channel strip (`worklets/processors/strip_source.js`): a stereo
+//! A track's channel strip: a stereo
 //! TPT state-variable filter (12 dB/oct, or two in series for 24 dB/oct),
 //! a compressor, saturation, a bitcrusher, a hard clipper, a Freeverb reverb (with a pre-delay, a spring's dispersion and a
 //! gate), a delay (tape wow, ping-pong), then volume and compensated
 //! equal-power pan.
 //!
-//! The settings added to the JS processor default to what it does: the JS
-//! fixtures play them unset. On purpose, the reverb's tunings follow the
-//! sample rate (the JS keeps Freeverb's 44.1 kHz lengths at any rate) and the
-//! `tape` saturation is asymmetric (an `atan` in JS).
+//! The settings added since the first version default to what it did, so
+//! the fixtures play them unset. The reverb's tunings follow the sample rate (Freeverb's lengths are
+//! given at 44.1 kHz), and the `tape` saturation is asymmetric.
 //!
 //! The reverb and delay memories are allocated by [`Strip::new`];
 //! [`Strip::process`] never allocates.
@@ -57,7 +56,7 @@ const CLIP_CEILING: f64 = 0.707_945_784_384_137_9;
 const CLIP_ADAA_EPSILON: f64 = 1e-6;
 /// Longest delay, seconds (the `dlyTime*` parameters stop at 2).
 const DELAY_SECONDS: f64 = 2.1;
-/// The JS delay line always holds 2.1 s at 48 kHz, whatever the rate.
+/// The delay line is sized for 2.1 s at 48 kHz at least, whatever the rate.
 const DELAY_MIN_RATE: f64 = 48_000.0;
 /// Width of the compressor's soft knee, dB around the threshold.
 const COMP_KNEE_DB: f64 = 6.0;
@@ -283,7 +282,7 @@ impl Saturation {
     }
 }
 
-/// `#shape()`: drive, waveshape, dry/wet, output gain.
+/// `#shape`: drive, waveshape, dry/wet, output gain.
 ///
 /// The `match` runs for every sample: the curve of a block never changes, so
 /// the branch is always the same one, and a loop per curve would triple the

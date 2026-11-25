@@ -1,4 +1,4 @@
-//! The piano roll (`piano_roll_panel.js` and its sections), in the place of
+//! The piano roll, in the place of
 //! the grid: one track's notes on a grid of steps (X, 4 beats across, or as
 //! many as the scroll bar under it zooms to) and pitches (Y, MIDI 12 to 108, a keyboard on the left), with the
 //! notes' retriggers, arpeggio steps and euclidean fills as ghosts, the loop

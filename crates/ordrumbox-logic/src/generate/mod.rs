@@ -1,10 +1,9 @@
-//! Pattern generators (`src/logic/generators/`): whole patterns in a style,
+//! Pattern generators: whole patterns in a style,
 //! the bass and chord/melody lines from a variant of their table, the drum
 //! lines from the style (`crate::compose`), and the loop-by-loop regeneration
 //! of tracks in auto mode.
 //!
-//! The melodic variant tables (`data/generators.json`, first taken from the
-//! JS app, bass lines an octave higher) are read key by key with their
+//! The melodic variant tables (`data/generators.json`) are read key by key with their
 //! defaults. Every random draw goes through the `rnd` source the caller gives:
 //! with the same stream, the same notes (`tests/generators.rs`).
 
@@ -100,7 +99,7 @@ pub(crate) fn add_note(track: &mut Track, beat: i32, beat_step: i32, pitch: f64,
     &mut track.notes[last]
 }
 
-/// `applyNoteProperties`: the engine fields a config or phrase sets on a note.
+/// The engine fields a config or phrase sets on a note.
 pub(crate) fn apply_note_properties(note: &mut Note, source: &Value) {
     if let Some(n) = num(source, "retriggerCount") {
         note.retrigger_count = n as i32;
@@ -144,7 +143,7 @@ impl From<bool> for Accent {
     }
 }
 
-/// `computeVelocity`'s context.
+/// What a generated note's velocity depends on.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct VelocitySpec {
     pub accent: Accent,
@@ -200,7 +199,7 @@ impl<'a> Generator<'a> {
         self.configs.get(name)
     }
 
-    /// `resolveVariantName`: `name` when the table has it, else a random one.
+    /// The variant to play: `name` when the table has it, else a random one.
     pub fn resolve_variant(&mut self, name: Option<&str>) -> String {
         match name {
             Some(name) if !name.is_empty() && self.configs.contains_key(name) => name.to_owned(),
@@ -208,13 +207,13 @@ impl<'a> Generator<'a> {
         }
     }
 
-    /// `getRndVariantName`: a random variant, except `excluded` ones.
+    /// A random variant, except `excluded` ones.
     pub fn random_variant(&mut self, excluded: &[&str]) -> String {
         let names: Vec<&str> = self.configs.iter().map(|(k, _)| k).filter(|k| !excluded.contains(k)).collect();
         self.pick(&names).map_or_else(|| "basic".to_owned(), |n| (*n).to_owned())
     }
 
-    /// `computeVelocity`: base + accent + ghost + variation boost + a random
+    /// Base + accent + ghost + variation boost + a random
     /// spread (always drawn), scaled, clamped, rounded to 2 decimals.
     pub fn velocity(&mut self, config: Option<&Value>, context: VelocitySpec) -> f64 {
         let empty = Value::Object(Object::new());
@@ -235,19 +234,19 @@ impl<'a> Generator<'a> {
         if context.fixed { round2(result) } else { result }
     }
 
-    /// `getScaleSteps`: the scale's degrees, or the major scale.
+    /// The scale's degrees, or the major scale.
     pub fn scale_steps(&self, name: Option<&str>) -> Vec<f64> {
         let steps = name.and_then(|n| self.scales.get(n)).unwrap_or(&[0, 2, 4, 5, 7, 9, 11]);
         steps.iter().map(|&s| f64::from(s)).collect()
     }
 
-    /// `getRndTone`: a random degree, an octave down above the threshold.
+    /// A random degree, an octave down above the threshold.
     pub fn random_tone(&mut self, tones: &[f64]) -> f64 {
         let tone = self.pick(tones).copied().unwrap_or(0.0);
         if tone > f64::from(self.tone_threshold) { tone - 12.0 } else { tone }
     }
 
-    /// `resolvePhrasePitch`: the phrase's own pitch, else its source degree
+    /// The phrase's own pitch, else its source degree
     /// (`alternateSource` when its draw hits; `reuse` of an earlier pitch;
     /// `approach` from `approach_notes`), else a random tone; plus `bias`.
     pub fn phrase_pitch(
@@ -287,7 +286,7 @@ impl<'a> Generator<'a> {
         offset.unwrap_or_else(|| self.random_tone(tones) + bias)
     }
 
-    /// `getStepAdvance`: `average` steps, give or take `jitter` (never below 1).
+    /// Steps to the next note: `average` steps, give or take `jitter` (never below 1).
     pub fn step_advance(&mut self, average: i32, jitter: i32) -> i32 {
         if jitter <= 0 {
             return average;
@@ -300,7 +299,7 @@ impl<'a> Generator<'a> {
         self.pick(&choices).copied().unwrap_or(average)
     }
 
-    /// `generatePhraseVariant`: the notes of a phrase skeleton (one of
+    /// The notes of a phrase skeleton (one of
     /// `phraseSets`, or `phrases`), each kept with `density` and its own
     /// `chance`; `step: "random"` takes a free step of its beat.
     pub fn phrases(&mut self, track: &mut Track, config: &Value, density: f64, opts: Phrases<'_>) {
@@ -357,7 +356,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    /// `buildContour`: `length` degrees of `scale` walked up, down, or up and down.
+    /// A melodic contour: `length` degrees of `scale` walked up, down, or up and down.
     pub fn contour(scale: &[f64], length: usize, contour: &str, start: f64, default: &[f64]) -> Vec<f64> {
         let scale = if scale.is_empty() { default } else { scale };
         let n = scale.len() as i64;
@@ -385,12 +384,12 @@ impl<'a> Generator<'a> {
     }
 }
 
-/// `getLoopPointAbsolute`: the loop length in steps (`loopBeats` beats).
+/// The loop length in steps (`loopBeats` beats).
 pub(crate) fn loop_point(track: &Track, config: &Value, default_beats: f64) -> i32 {
     (num(config, "loopBeats").unwrap_or(default_beats) * f64::from(track.steps_per_beat)) as i32
 }
 
-/// `applyLoopPoint`: the track loops after `loopBeats` beats (its length by default).
+/// The track loops after `loopBeats` beats (its length by default).
 pub(crate) fn apply_loop_point(track: &mut Track, config: &Value) {
     let beats = num(config, "loopBeats").unwrap_or(f64::from(track.beat_count));
     track.loop_length = Some((beats * f64::from(track.steps_per_beat)) as i32);

@@ -1,8 +1,7 @@
-//! Chord progressions (`logic/composition.js`): what the piano roll's
+//! Chord progressions: what the piano roll's
 //! keyboard menu writes with "Add sequence", one chord per 4/4 measure.
 
-/// Beats in one measure: a chord per measure.
-const BEATS_PER_MEASURE: i32 = 4;
+use ordrumbox_core::song::BEATS_PER_MEASURE;
 
 /// The intervals of a chord quality, semitones from its root (`CHORD_QUALITIES`).
 fn intervals(quality: &str) -> &'static [f64] {

@@ -1,4 +1,4 @@
-//! Songs (`src/model/song_schema.js`): arrangements that place patterns on a
+//! Songs: arrangements that place patterns on a
 //! timeline of 4/4 measures. Clips may overlap and may last a fraction of a
 //! measure (a 3-beat pattern is 0.75 measure); only positions snap to whole
 //! measures.
@@ -12,7 +12,7 @@ use crate::json::{Object, Value};
 use crate::record::Issue;
 
 /// Beats in one 4/4 measure.
-pub const BEATS_PER_MEASURE: f64 = 4.0;
+pub const BEATS_PER_MEASURE: u32 = 4;
 /// Tempo bounds of the library or a song: a file or an edit outside them is
 /// brought inside, and the load or the edit says so.
 pub const MIN_BPM: f64 = 20.0;
@@ -60,7 +60,7 @@ pub struct Song {
     pub bpm: f64,
     /// Explicit loop length in measures; `None` loops at the end of the last
     /// clip. Whole on load; an arrangement edit sets it to the end of the
-    /// last clip, which may be fractional (as in the JS).
+    /// last clip, which may be fractional.
     pub loop_measures: Option<f64>,
     pub clips: Vec<SongClip>,
     /// Lanes that switch controls of its instruments along it (`automation.rs`).
@@ -78,7 +78,7 @@ pub struct DroppedClip {
 
 /// Measures a pattern occupies: `beat_count / 4`, not floored (0.75 for 3 beats).
 pub fn measures_for_pattern(beat_count: i32) -> f64 {
-    if beat_count <= 0 { 1.0 } else { f64::from(beat_count) / BEATS_PER_MEASURE }
+    if beat_count <= 0 { 1.0 } else { f64::from(beat_count) / f64::from(BEATS_PER_MEASURE) }
 }
 
 impl Song {
@@ -102,11 +102,10 @@ impl Song {
         self.length_measures().max(1.0).ceil() as u32 * STEPS_PER_MEASURE
     }
 
-    /// Where transport `tick` is in the arrangement, in measures, fractional
-    ///: wrapped on `loop_measure_count` as it is (not
+    /// Where transport `tick` is in the arrangement, in measures, fractional: wrapped on `loop_measure_count` as it is (not
     /// floored), else on [`Song::length_measures`]; 0 before the start.
     pub fn measure_at_tick(&self, tick: f64, ticks_per_beat: f64) -> f64 {
-        let measure = tick / (ticks_per_beat * BEATS_PER_MEASURE);
+        let measure = tick / (ticks_per_beat * f64::from(BEATS_PER_MEASURE));
         let total = self.loop_measures.unwrap_or_else(|| self.length_measures());
         if total <= 0.0 || measure <= 0.0 {
             return measure.max(0.0);
@@ -114,7 +113,7 @@ impl Song {
         measure.rem_euclid(total)
     }
 
-    /// Load one song as `normalizeSong()`: numbers read from numbers or
+    /// Load one song: numbers read from numbers or
     /// numeric strings (`"bpm": "140"` is 140), positions floored at 0, clips referencing an
     /// unknown pattern id dropped and reported, a tempo outside the bounds
     /// replaced by the default and reported in `issues` (at `at`). `Err` when
@@ -142,7 +141,7 @@ impl Song {
                 dropped.push(DroppedClip { pattern: format!("#{index}"), reason: "clip is not an object" });
                 continue;
             };
-            // `pattern`: the JS key, older saves.
+            // `pattern`: the web version's key, older saves.
             let reference = ["patternId", "pattern"]
                 .iter()
                 .find_map(|key| clip.get(key).filter(|v| !v.is_null()))
@@ -260,7 +259,7 @@ impl Song {
     /// [`Song::automation_step_at`] with the fraction of the step `tick` is past.
     #[must_use]
     pub fn automation_position_at(&self, tick: u64, ticks_per_beat: u32) -> f64 {
-        let per_measure = f64::from(ticks_per_beat) * BEATS_PER_MEASURE;
+        let per_measure = f64::from(ticks_per_beat) * f64::from(BEATS_PER_MEASURE);
         let total = self.length_measures();
         if per_measure <= 0.0 || total <= 0.0 {
             return 0.0;
@@ -288,7 +287,7 @@ impl Song {
     /// the arrangement loops over [`Song::length_measures`]; a clip counts
     /// its repetitions from its start on the unwrapped transport.
     pub fn active_clips_at(&self, patterns: &[crate::Pattern], tick: u64, ticks_per_beat: u32) -> Vec<ActiveClip> {
-        let per_measure = f64::from(ticks_per_beat) * BEATS_PER_MEASURE;
+        let per_measure = f64::from(ticks_per_beat) * f64::from(BEATS_PER_MEASURE);
         let total = self.length_measures();
         if per_measure <= 0.0 || total <= 0.0 {
             return Vec::new();
@@ -302,7 +301,7 @@ impl Song {
             if measures < start || measures >= start + count {
                 continue;
             }
-            // The last pattern with that id (a JS Map built in list order).
+            // The last pattern with that id: a later one wins.
             let Some(pattern) = patterns.iter().rposition(|p| p.id == clip.pattern_id) else { continue };
             let beats = if patterns[pattern].beat_count > 0 { f64::from(patterns[pattern].beat_count) } else { 4.0 };
             let pattern_ticks = beats * f64::from(ticks_per_beat);
@@ -319,7 +318,7 @@ impl Song {
     }
 }
 
-/// Load a `songs` array as `normalizeSongs()`: unusable songs skipped, a
+/// Load a `songs` array: unusable songs skipped, a
 /// repeated id renamed `<id>-alt` (then `-alt-2`…).
 pub fn songs_from_json(
     raw: &Value,
@@ -423,7 +422,7 @@ mod tests {
     #[test]
     fn the_transport_wraps_on_the_loop() {
         const TICKS_PER_BEAT: f64 = 32.0;
-        let tick = |measures: f64| measures * BEATS_PER_MEASURE * TICKS_PER_BEAT;
+        let tick = |measures: f64| measures * f64::from(BEATS_PER_MEASURE) * TICKS_PER_BEAT;
         let clip = |start, count| SongClip { pattern_id: "a".into(), start_measure: start, measure_count: count };
         let mut song = Song::from_json(&json::parse("{}").unwrap(), &HashSet::new(), "s", &mut Vec::new()).unwrap().0;
         let at = |song: &Song, measures| song.measure_at_tick(tick(measures), TICKS_PER_BEAT);

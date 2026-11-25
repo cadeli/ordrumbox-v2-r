@@ -209,7 +209,7 @@ pub fn lfo_target_named(name: &str) -> LfoTarget {
     LFO_TARGETS.iter().find(|(n, _)| *n == name).map_or(LfoTarget::Off, |&(_, target)| target)
 }
 
-/// `syncToHz()`: `None` when off, unknown, or without a tempo.
+/// The rate, Hz, of `sync` (a note value) at `bpm`: `None` when off, unknown, or without a tempo.
 pub fn sync_to_hz(sync: Option<&Value>, bpm: f64) -> Option<f64> {
     let sync = sync?.as_str()?;
     if sync == "off" || bpm.is_nan() || bpm <= 0.0 {

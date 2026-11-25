@@ -1,5 +1,4 @@
-//! The user's files: what the JS app keeps in browser storage, kept here in
-//! the user data folder — the library (`library.json`, `song.json` format,
+//! The user's files, kept in the user data folder — the library (`library.json`, `song.json` format,
 //! written a moment after each edit and on quit, with the synth presets
 //! edited), the kits once edited
 //! (`kits.json`, `drumkits.json` format) and the samples added or changed

@@ -1,14 +1,13 @@
-//! Which sound each track plays (`logic/services/auto_assign.js`).
+//! Which sound each track plays.
 //!
 //! A track with auto-assign on gets a sound by name, in tiers: its instrument
 //! (or a variant of it) in the selected kit, then the synth preset of its name,
 //! then an exact key in another kit, then the catalog's substitutes, then any
 //! sample. Each tier picks at random among
-//! its candidates; `pick(n)` makes that choice (an index below `n`), so the
-//! JS choices can be reproduced. A synth track without a valid preset gets a
+//! its candidates; `pick(n)` makes that choice (an index below `n`), so a
+//! test can reproduce the choices. A synth track without a valid preset gets a
 //! random one. The same matching picks a synth preset for a track name
-//! ([`synth_for`]), the presets standing as one kit. Departing from the JS
-//! (`DEVELOPMENT.md`, "Snapshots"), a melodic track that no sample of its
+//! ([`synth_for`]), the presets standing as one kit. A melodic track that no sample of its
 //! instrument plays gets the synth preset of its name instead of a substitute.
 
 use ordrumbox_core::drum_taxonomy::instrument_family;
@@ -120,7 +119,7 @@ impl<'a> AutoAssign<'a> {
         self.in_scope(kit, exclude).iter().filter(|(_, c)| names.contains(&normalize(c.key))).map(|(i, _)| *i).collect()
     }
 
-    /// `#resolveInstrumentId`: a catalog id for the track name, else the name.
+    /// A catalog id for the track name, else the name.
     fn resolve_instrument_id(&self, name: &str) -> String {
         if self.catalog.by_exact_id(name).is_some() {
             return name.to_owned();
@@ -131,7 +130,7 @@ impl<'a> AutoAssign<'a> {
         }
     }
 
-    /// `autoAssignTrackSounds`: the candidate for a track named `name`; `None`
+    /// The candidate for a track named `name`; `None`
     /// when there is no candidate or the selected kit does not exist.
     pub fn sample_for(&mut self, name: &str) -> Option<usize> {
         if self.kit.is_empty() {
@@ -176,7 +175,7 @@ impl<'a> AutoAssign<'a> {
         self.equivalence(&match_name)
     }
 
-    /// `findSoundEquivalence`: the catalog substitutes of `track_name`.
+    /// The catalog substitutes of `track_name`.
     fn equivalence(&mut self, track_name: &str) -> Option<usize> {
         let replacements = self.catalog.by_exact_id(track_name)?.subst.clone();
         let kit = self.kit;
@@ -204,7 +203,7 @@ impl<'a> AutoAssign<'a> {
         None
     }
 
-    /// `getSampleIdByKeyContaining`.
+    /// A sample whose key contains `search` (any case), drawn among those in scope of `kit`.
     fn by_key_containing(&mut self, kit: Option<&str>, search: &str) -> Option<usize> {
         let search = search.trim().to_uppercase();
         if search.is_empty() {
@@ -219,7 +218,7 @@ impl<'a> AutoAssign<'a> {
         self.pick_from(&ids)
     }
 
-    /// `getSampleIdFromTrackname`: exact key, else a candidate of the same
+    /// Exact key, else a candidate of the same
     /// kind (only drum sounds for a drum instrument). The kind is the catalog
     /// category of a catalog id (a conga does not take a ride), else the coarse type.
     fn by_track_name(&mut self, name: &str, kit: Option<&str>) -> Option<usize> {

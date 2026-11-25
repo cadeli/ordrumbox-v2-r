@@ -1,5 +1,5 @@
-//! The MCP tools (`mcp.rs`) run on the session: what the JS server did to
-//! `song.json`, done to the library the window shows. The tools that only
+//! The MCP tools (`mcp.rs`) run on the session, on the library the window
+//! shows. The tools that only
 //! edit the library are `ordrumbox_logic::tools`; the ones here play, read
 //! and write files, change the kits, the synth presets or the master, or
 //! change what the window shows. A tool that edits is one undo step and is

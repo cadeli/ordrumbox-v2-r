@@ -182,8 +182,7 @@ pub fn scope(draft: &Object, time: f64, bpm: f64) -> Vec<f64> {
     out
 }
 
-/// The envelope's corners as (time, level), over its plotted length
-///.
+/// The envelope's corners as (time, level), over its plotted length.
 pub fn envelope(draft: &Object) -> (Vec<(f64, f64)>, f64) {
     let v = |key: &str, default: f64| number(draft, &format!("envelope.{key}")).unwrap_or(default);
     let (a, d, s, r) = (v("attack", 0.0), v("decay", 0.12), v("sustain", 1.0), v("release", 0.05));
@@ -192,7 +191,7 @@ pub fn envelope(draft: &Object) -> (Vec<(f64, f64)>, f64) {
 }
 
 /// The filter's response, dB at `points + 1` frequencies from 20 Hz to
-/// 20 kHz (log), centred on `fc` (`#drawFilterResponse`'s `drawCurve`); a
+/// 20 kHz (log), centred on `fc`; a
 /// slope of 24 dB/oct is the product of its two stages.
 pub fn filter_response(kind: &str, fc: f64, q: f64, slope_db: f64, points: usize) -> Vec<f64> {
     let magnitude = |f: f64, q: f64| {

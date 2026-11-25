@@ -1,4 +1,4 @@
-//! The session's side of the song panel (`song_panel.js` and its sections):
+//! The session's side of the song panel:
 //! the pattern list (a click selects it and opens its menu: add at the playhead, move up or
 //! down, rename, delete; a drag drops it on the arrangement, the wheel or its
 //! scroll bar scrolls it; a drag moves it along the list, or drops it on the
@@ -10,8 +10,7 @@
 //! arrangement select, Save, Open, Export, Import, and New and Delete for
 //! arrangements) — and Space plays the song while the panel is shown.
 //!
-//! Projects are saved to `songs/` in the user data folder (the JS IndexedDB
-//! store) and, with Save as and Export, to a folder picked, as `.odbox` files.
+//! Projects are saved to `songs/` in the user data folder and, with Save as and Export, to a folder picked, as `.odbox` files.
 //!
 //! The mouse is in `session_song_mouse.rs`, the menus and the edits they
 //! lead to in `session_song_menu.rs`, project files in `session_project_files.rs`.
@@ -378,7 +377,7 @@ impl Session {
     pub(super) fn commit_text(&mut self, id: Id, text: &str) {
         let text = text.trim();
         match id {
-            // `renameSong`: an empty name keeps the old one.
+            // An empty name keeps the old one.
             Id::ProjectName if !text.is_empty() => {
                 if self.editor.set_library_info("name", text) {
                     self.edited();
@@ -473,7 +472,7 @@ impl Session {
         self.message = format!("cursor at measure {}", measure + 1);
     }
 
-    /// Play the selected song from the cursor (`#applySongCursor` at start).
+    /// Where the selected song plays from: the cursor.
     pub(super) fn song_start(&self) -> u64 {
         u64::from(self.transport.song_cursor)
     }

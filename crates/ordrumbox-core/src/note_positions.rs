@@ -1,4 +1,4 @@
-//! Where a note's sub-events fall (`patterns/note_positions.js`): its
+//! Where a note's sub-events fall: its
 //! retriggers or arpeggio steps, then its euclidean fills — what the piano
 //! roll draws as ghosts and lights while playing.
 

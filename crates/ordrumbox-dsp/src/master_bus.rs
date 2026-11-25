@@ -1,6 +1,6 @@
-//! The master bus (`worklets/processors/master_bus_source.js`): pre-gain, a
+//! The master bus: pre-gain, a
 //! peak compressor with soft knee and make-up gain, a one-pole low cut and
-//! high cut, the master gain, then a soft limit to ±1 (a hard clip in JS):
+//! high cut, the master gain, then a soft limit to ±1:
 //! untouched under 0.9, rounded above.
 
 use std::f64::consts::{LN_10, PI};
@@ -25,8 +25,7 @@ fn soft_limit(x: f64) -> f64 {
 }
 
 audio_params! {
-    /// The master bus parameters; the defaults are `MASTER_BUS_DEFAULTS`
-    /// (`core/constants.js`), which the app applies at start.
+    /// The master bus parameters; the defaults are `MASTER_BUS_DEFAULTS`, which the app applies at start.
     pub struct MasterSettings {
         /// dB.
         threshold = -18.0, -60.0, 0.0;

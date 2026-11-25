@@ -21,8 +21,7 @@
 //! The song panel (F3) and the piano roll (F4) take the grid's place:
 //! `session_song*.rs`, `session_roll.rs`.
 //!
-//! The grid follows the JS pattern panel (`pointer_section.js`,
-//! `keyboard_section.js`, `clipboard_section.js`): a click on an empty step
+//! On the grid, a click on an empty step
 //! adds a note, on a note selects it, on the selected note deletes it.
 
 use std::path::PathBuf;
@@ -345,7 +344,7 @@ impl Session {
 
     /// Keep the engine fed and the playing pass current; call every frame
     /// while playing. The next pass of a pattern is built with the new lines
-    /// of its tracks in auto mode (the JS loop start); they replace the library's
+    /// of its tracks in auto mode; they replace the library's
     /// when that pass starts.
     pub fn update(&mut self) {
         // What the library's tags teach, learned again after an edit (the header and menus read it).

@@ -1,8 +1,7 @@
-//! The track editor (`ui/track_editor.js` and its sections), the note editor
-//! (`ui/note_editor.js`, `note_editor/sync_section.js`) and the kit editor's
-//! controls (`ui/drumkit_manager/detail_section.js`), as [`panel`] items:
-//! what each shows, in the JS order, with the JS ranges, defaults and
-//! formats. What the widgets do is in the session.
+//! The track editor, the note editor
+//! and the kit editor's
+//! controls, as [`panel`] items:
+//! what each shows, with its ranges, defaults and formats. What the widgets do is in the session.
 
 use ordrumbox_core::{Note, Track};
 

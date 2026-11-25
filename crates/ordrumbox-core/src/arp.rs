@@ -1,4 +1,4 @@
-//! Arpeggios (`normalizeArp()` in pattern_engine.js): what a note's `arp`
+//! Arpeggios: what a note's `arp`
 //! field means, as a sequence of semitone offsets.
 
 use crate::json::Value;

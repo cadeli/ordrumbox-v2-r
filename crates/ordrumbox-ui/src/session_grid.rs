@@ -1,4 +1,4 @@
-//! The pattern grid's right-click menus (`context_menu_section.js`): a
+//! The pattern grid's right-click menus: a
 //! track's name or buttons open the track menu, a step the notes menu. What
 //! cannot run (paste with nothing copied, delete on an empty step) is left out.
 //! A track's name dragged up or down moves the track to another row.

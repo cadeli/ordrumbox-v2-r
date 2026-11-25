@@ -3,6 +3,7 @@
 //! own after the tracks' (a synth voice, so no sample is needed), and the audio
 //! thread plays it like any note.
 
+use ordrumbox_core::song::BEATS_PER_MEASURE;
 use ordrumbox_core::steps::TICK;
 use ordrumbox_core::track::MAX_TRACKS;
 use ordrumbox_dsp::synth::patch::Adsr;
@@ -10,8 +11,6 @@ use ordrumbox_dsp::{StripSettings, SynthPatch};
 
 use crate::pass::{Event, Pass, Sound, SynthStart};
 
-/// Beats in a measure, for the accent.
-const BEATS_PER_MEASURE: u64 = 4;
 /// Pitch of the click, Hz: on the first beat of a measure, and on the others.
 const ACCENT_HZ: f64 = 1760.0;
 const BEAT_HZ: f64 = 1175.0;
@@ -45,7 +44,7 @@ pub fn add_clicks(pass: &mut Pass) {
     // A pass of a song loop can start and end between beats.
     let end = pass.first_tick + u64::from(pass.ticks);
     for beat in pass.first_tick.div_ceil(tick)..end.div_ceil(tick) {
-        let accent = beat.is_multiple_of(BEATS_PER_MEASURE);
+        let accent = beat.is_multiple_of(u64::from(BEATS_PER_MEASURE));
         let offset = beat * tick - pass.first_tick;
         let frame = u128::from(offset) * u128::from(pass.frames) / u128::from(pass.ticks);
         pass.events.push(Event {

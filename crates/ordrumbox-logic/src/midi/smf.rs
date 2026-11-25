@@ -1,11 +1,11 @@
-//! Reading Standard MIDI Files (`logic/midi/midi_parser.js`), with its
+//! Reading Standard MIDI Files, with its
 //! leniency: chunks are walked by their declared lengths, reads past the end
 //! of the file give `None`, sysex events are skipped by their length, and only
 //! meta, program and note events are known (any other status is read as a
 //! two-byte event).
 
 /// Bytes read past the end of a track the file does not hold: beyond this,
-/// a declared length is taken as garbage (the JS would read on until it).
+/// a declared length is taken as garbage.
 const MAX_PHANTOM_BYTES: usize = 64 * 1024;
 
 /// The header chunk.
@@ -61,7 +61,7 @@ fn byte(bytes: &[u8], at: usize) -> Option<u8> {
     bytes.get(at).copied()
 }
 
-/// `decodeVLQ`: value and bytes read (a missing byte reads as 0 and ends it).
+/// Value and bytes read (a missing byte reads as 0 and ends it).
 pub fn decode_vlq(bytes: &[u8], offset: usize) -> (u32, usize) {
     let (mut value, mut read) = (0u32, 0usize);
     loop {
@@ -75,7 +75,7 @@ pub fn decode_vlq(bytes: &[u8], offset: usize) -> (u32, usize) {
     }
 }
 
-/// `encodeVLQ` (non-negative values).
+/// `value` as a MIDI variable-length quantity.
 pub fn encode_vlq(mut value: u32) -> Vec<u8> {
     let mut bytes = vec![(value & 0x7f) as u8];
     value >>= 7;
@@ -94,7 +94,7 @@ fn read_u16(bytes: &[u8], at: usize) -> u16 {
     (u16::from(byte(bytes, at).unwrap_or(0)) << 8) | u16::from(byte(bytes, at + 1).unwrap_or(0))
 }
 
-/// `parseMTrkEvents`: the events of a track chunk's `length` bytes.
+/// The events of a track chunk's `length` bytes.
 fn parse_track(bytes: &[u8], start: usize, length: usize) -> Vec<Event> {
     let end = (start + length).min(bytes.len().max(start) + MAX_PHANTOM_BYTES);
     let mut events = Vec::new();
@@ -144,7 +144,7 @@ fn parse_track(bytes: &[u8], start: usize, length: usize) -> Vec<Event> {
     events
 }
 
-/// `parseMidi`: the header and the tracks, chunk by chunk.
+/// The header and the tracks, chunk by chunk.
 pub fn parse(bytes: &[u8]) -> Midi {
     let mut header = Header { format: 0, track_count: 0, division: 96 };
     let mut tracks = Vec::new();
@@ -236,7 +236,7 @@ impl Midi {
     }
 }
 
-/// `midiVelocityToNormalized`: 0–127 to 0–1, 2 decimals.
+/// 0–127 to 0–1, 2 decimals.
 pub fn velocity_to_unit(velocity: u8) -> f64 {
     ordrumbox_core::num::round2(f64::from(velocity) / 127.0)
 }

@@ -2,13 +2,10 @@
 //! the shared returns, master bus.
 //!
 //! Rule for the whole crate: nothing in a render path allocates, locks or
-//! blocks. Ported from `src/audio/voices/` and `src/audio/worklets/processors/`
-//! of ordrumbox-v2.
+//! blocks.
 //!
-//! The processors follow the JS AudioWorklet code operation for operation:
-//! arithmetic in `f64` (JS numbers), delay and reverb memories in `f32`
-//! (`Float32Array`), parameters as `f32` (`AudioParam` values), read once per
-//! call (k-rate, a browser calls `process()` every 128 frames).
+//! Arithmetic is in `f64`, delay and reverb memories and parameters in
+//! `f32`; parameters are read once per block (k-rate).
 
 /// Parameter set of a processor: a struct of `f32` fields with their
 /// `AudioParam` default and nominal range.

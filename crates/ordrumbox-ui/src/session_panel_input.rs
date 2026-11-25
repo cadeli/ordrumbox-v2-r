@@ -249,7 +249,7 @@ impl Session {
                 drag.spec.slider_fine(drag.start, f64::from(drag.y - y) / f64::from(h))
             }
         };
-        // `commitValue`: only a value that moved.
+        // Only a value that moved.
         if self.current_value(size, drag.id) != Some(value) {
             self.set_value(drag.id, value);
             return true;

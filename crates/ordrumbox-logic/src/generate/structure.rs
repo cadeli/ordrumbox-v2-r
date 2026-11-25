@@ -1,4 +1,4 @@
-//! The song form the generation follows (`song_structure.js`): the section
+//! The song form the generation follows: the section
 //! (intro, chorus, verse, break…) a loop falls in and its harmony, the keys
 //! and scales a pattern draws. Styles are in `assets/data/styles.json`.
 
@@ -15,7 +15,7 @@ fn names(name: &str) -> Vec<&'static str> {
     structure_table(name).and_then(Value::as_array).unwrap_or_default().iter().filter_map(Value::as_str).collect()
 }
 
-/// `randomKeyOffset`: a tonal centre, 0 more often than the others.
+/// A tonal centre, 0 more often than the others.
 pub(crate) fn random_key_offset(rnd: &mut dyn FnMut() -> f64) -> f64 {
     let offsets: Vec<f64> = structure_table("keyOffsets")
         .and_then(Value::as_array)
@@ -65,7 +65,7 @@ pub struct Structure {
 }
 
 impl Default for Structure {
-    /// The JS form: intro 4, chorus 8, verse 8, break 1, chorus 8, verse 8,
+    /// The default form: intro 4, chorus 8, verse 8, break 1, chorus 8, verse 8,
     /// break 1, bridge 4, verse 8, outro 4 (54 loops).
     fn default() -> Self {
         let sections = structure_table("sections")

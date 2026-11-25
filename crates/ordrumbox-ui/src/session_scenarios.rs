@@ -333,7 +333,7 @@ fn a_pattern_built_in_the_grid_is_saved_reloaded_and_exported() {
         returns: Default::default(),
     };
     let (left, _) = offline::render_pattern(s.editor.library(), 1, 1, &setup, None).expect("renders");
-    // floor(rate × 8 beats × 60 / 100 bpm), as the JS sizes its OfflineAudioContext.
+    // floor(rate × 8 beats × 60 / 100 bpm).
     assert_eq!(left.len(), (f64::from(EXPORT_RATE) * 8.0 * 60.0 / 100.0).floor() as usize);
     assert!(left.iter().any(|s| s.abs() > 0.01));
 }

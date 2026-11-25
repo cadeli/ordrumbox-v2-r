@@ -1,4 +1,4 @@
-//! Euclidean rhythms (`src/core/euclidean.js`), shared by the engine and the
+//! Euclidean rhythms, shared by the engine and the
 //! grid views so every view and the audio place the onsets on the same steps.
 
 /// Bjorklund's algorithm: `pulses` onsets spread as evenly as possible over

@@ -131,7 +131,7 @@ pub const FILTER_ICONS: [&str; 4] = ["LP", "HP", "BP", "NT"];
 /// lowpass at 20 Hz is silence).
 pub const FILTER_ON_CUTOFF: f64 = 1_000.0;
 
-/// Delay time multipliers, in beats, and their labels (`fx_values.js`).
+/// Delay time multipliers, in beats, and their labels.
 pub(super) const DELAY_TIME_VALUES: [&str; 7] = ["0.0625", "0.125", "0.25", "0.5", "1", "2", "4"];
 pub(super) const DELAY_TIME_LABELS: [&str; 7] = ["1/16", "1/8", "1/4", "1/2", "1", "2", "4"];
 
@@ -184,7 +184,7 @@ pub struct LfoTarget {
     pub step: f64,
 }
 
-/// The settings that take an LFO, in the JS order (track props, then the knob bar's).
+/// The settings that take an LFO (track props, then the knob bar's).
 /// Target `i` of [`LFO_TARGETS`] (a widget's index).
 #[must_use]
 pub fn lfo_target(i: u8) -> Option<&'static LfoTarget> {
@@ -364,7 +364,7 @@ pub(super) const fn note_count(key: &'static str, label: &'static str, min: f64,
     NoteRow::Slider(count(key, label, min, max, Format::Fmt))
 }
 
-/// The rows of each note tab. As in the JS, the Euclidean tab's "Prob"
+/// The rows of each note tab. The Euclidean tab's "Prob"
 /// (the same setting as the Retrig tab's) never shows: both sliders share
 /// one key, and the second one takes the first one's place.
 pub const NOTE_GROUPS: [&[NoteRow]; NOTE_TABS.len()] = [

@@ -25,7 +25,7 @@ use crate::{Pattern, Song, Track};
 /// Steps of a beat on an automation lane.
 pub const STEPS_PER_BEAT: u32 = 4;
 /// Steps of a 4/4 measure on an automation lane.
-pub const STEPS_PER_MEASURE: u32 = STEPS_PER_BEAT * 4;
+pub const STEPS_PER_MEASURE: u32 = STEPS_PER_BEAT * crate::song::BEATS_PER_MEASURE;
 /// Ticks of a step of an automation lane (or of a song loop's end).
 pub const STEP_TICKS: u32 = crate::steps::TICK / STEPS_PER_BEAT;
 /// The quietest a volume lane's level sets above silence, at its bottom.

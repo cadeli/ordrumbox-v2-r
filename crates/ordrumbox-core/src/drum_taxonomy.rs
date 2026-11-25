@@ -1,4 +1,4 @@
-//! The drum taxonomy (`src/core/drum_taxonomy.js`): where a canonical drum
+//! The drum taxonomy: where a canonical drum
 //! name sits in the stereo field, and which coarse type a track name belongs to.
 
 /// Coarse instrument type of a track.
@@ -26,7 +26,7 @@ impl InstrumentFamily {
         !self.is_melodic()
     }
 
-    /// The JS type name (`"KICK"`, `"HAT"`…).
+    /// The family's name in files (`"KICK"`, `"HAT"`…).
     pub fn name(self) -> &'static str {
         match self {
             Self::Kick => "KICK",
@@ -55,7 +55,7 @@ const TRACK_KINDS: [(&str, f64, InstrumentFamily); 8] = [
 ];
 
 /// Default pan of a track from its exact name (`"KICK"`, `"OHH"`…), 0 for any
-/// other name. Case-sensitive, like `getPanFromTrackName()`.
+/// other name. Case-sensitive.
 pub fn pan_from_track_name(name: &str) -> f64 {
     TRACK_KINDS.iter().find(|(kind, _, _)| *kind == name).map_or(0.0, |&(_, pan, _)| pan)
 }

@@ -1,5 +1,4 @@
-//! Value controls (`ui/components/base_control.js`, `or_knob.js`,
-//! `or_slider.js`): the value side of a knob or a slider — its range, step
+//! Value controls: the value side of a knob or a slider — its range, step
 //! and scale, what a drag, a key, the wheel or a typed number make of the
 //! value — and the display formats of the track editor, the note editor and
 //! the kit editor.
@@ -116,7 +115,7 @@ impl Spec {
         10f64.powf(log_min + position * (self.max.log10() - log_min))
     }
 
-    /// `#clampStep`: `raw` rounded to a multiple of `step`, inside the range.
+    /// `raw` rounded to a multiple of `step`, inside the range.
     fn clamp_step(&self, raw: f64, step: f64) -> f64 {
         self.clamp((raw / step).round() * step)
     }

@@ -247,7 +247,7 @@ impl Playback {
 
     /// Keep the engine fed with `editor`'s library, pattern `pattern_index`
     /// selected. The next pass of a pattern is built with the new lines
-    /// `auto_loop` gives its tracks in auto mode (the JS loop start); they
+    /// `auto_loop` gives its tracks in auto mode; they
     /// replace the library's when that pass starts.
     pub(super) fn update(
         &mut self,

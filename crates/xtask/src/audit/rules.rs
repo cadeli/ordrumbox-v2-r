@@ -1,11 +1,13 @@
-//! The rules of AGENTS.md that a line of code can break: names, `#[allow]`,
-//! globals, and the depth of nesting (a heuristic from the indentation).
+//! The rules of AGENTS.md that a line of code can break: names (of files
+//! too), `#[allow]`, globals, references to the web version's sources, and the
+//! depth of nesting (a heuristic from the indentation).
+// audit: allow(js reference): this file holds the rule, and names what it looks for.
 
 use super::sources::Source;
 use super::{Finding, Level};
 
 /// Names AGENTS.md ("Naming") bans, as a whole identifier.
-const BANNED_NAMES: [&str; 6] = ["mgr", "ctx", "tmp", "util", "utils", "helper"];
+const BANNED_NAMES: [&str; 8] = ["mgr", "ctx", "tmp", "util", "utils", "helper", "helpers", "misc"];
 
 /// An `if`, `match` or loop deeper than this many levels is a warning.
 const MAX_NESTING: usize = 3;
@@ -14,6 +16,14 @@ const MAX_NESTING: usize = 3;
 pub(super) fn check(files: &[Source]) -> Vec<Finding> {
     let mut findings = Vec::new();
     for file in files {
+        file_name(file, &mut findings);
+        for (index, line) in file.lines.iter().enumerate() {
+            if is_js_reference(line) {
+                let place = format!("{}:{}", file.path, index + 1);
+                let message = "the web version's JS is no reference: say why in this code's own terms";
+                findings.push(Finding::new(Level::Error, "js reference", place, message));
+            }
+        }
         for (index, line) in file.code().iter().enumerate() {
             let place = format!("{}:{}", file.path, index + 1);
             let code = strip(line);
@@ -23,6 +33,22 @@ pub(super) fn check(files: &[Source]) -> Vec<Finding> {
         nesting(file, &mut findings);
     }
     findings
+}
+
+/// A file named after a word that says nothing (`helpers.rs`, `misc_*.rs`).
+fn file_name(file: &Source, findings: &mut Vec<Finding>) {
+    let stem = file.path.rsplit('/').next().unwrap_or_default().trim_end_matches(".rs");
+    if let Some(word) = stem.split('_').find(|part| BANNED_NAMES.contains(part)) {
+        let message = format!("`{word}` in a file name says nothing: name the file after what it holds");
+        findings.push(Finding::new(Level::Error, "naming", file.path.clone(), message));
+    }
+}
+
+/// A line that cites a JS source file or the JS app.
+fn is_js_reference(line: &str) -> bool {
+    let cites_file = [".js`", ".js)", ".js ", ".js,", ".js.", ".js:", ".mjs"].iter().any(|end| line.contains(end))
+        || line.trim_end().ends_with(".js");
+    cites_file || identifiers(line).any(|word| word == "JS")
 }
 
 /// `line` without its comment and the inside of its string literals.

@@ -1,7 +1,6 @@
-//! Offline renders (`audio/export/wav_exporter.js`): a pattern or a song
+//! Offline renders: a pattern or a song
 //! through the same engine as playback, as fast as it computes, at 44.1 kHz.
-//! The length is the JS one: the pattern's loops or the song's measures,
-//! without a tail.
+//! The length is the pattern's loops or the song's measures, without a tail.
 
 use std::borrow::Cow;
 use std::sync::Arc;
@@ -36,7 +35,7 @@ pub struct RenderSetup {
 }
 
 /// Frames of `ticks` ticks at `bpm`: `floor(rate × duration)` for a pattern,
-/// `ceil` for a song, as the JS sizes its `OfflineAudioContext`.
+/// `ceil` for a song.
 fn frames(ticks: f64, bpm: f64, rate: u32, round_up: bool) -> usize {
     let seconds = ticks * 60.0 / (bpm * f64::from(TICK));
     let frames = f64::from(rate) * seconds;
@@ -124,7 +123,7 @@ fn song_length(library: &Library, index: usize, rate: u32) -> Option<usize> {
         return None; // no playable clip
     }
     let measures = song.length_measures().max(1.0);
-    let ticks = (measures * BEATS_PER_MEASURE * f64::from(TICK)).ceil();
+    let ticks = (measures * f64::from(BEATS_PER_MEASURE) * f64::from(TICK)).ceil();
     Some(frames(ticks, clamp_bpm(song.bpm), rate, true))
 }
 

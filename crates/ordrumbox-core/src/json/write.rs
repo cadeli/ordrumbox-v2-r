@@ -93,7 +93,7 @@ fn write_number(out: &mut String, n: f64) {
     if n < 0.0 {
         out.push('-');
     }
-    // `{:e}` gives the shortest round-trip digits, like JS: "1.2345e2".
+    // `{:e}` gives the shortest round-trip digits: "1.2345e2".
     let sci = format!("{:e}", n.abs());
     let (mantissa, exp) = sci.split_once('e').unwrap_or((&sci, "0"));
     let digits: String = mantissa.chars().filter(|&c| c != '.').collect();

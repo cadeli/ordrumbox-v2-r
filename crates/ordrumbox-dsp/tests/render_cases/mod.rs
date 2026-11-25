@@ -1,7 +1,6 @@
 //! The cases the processors are rendered on (`processors.rs`): strip and
-//! master bus settings over noise bursts, and synth patches. They are the
-//! inputs the JS worklets were first checked on, which the snapshots of
-//! `tests/fixtures/` matched when written (`DEVELOPMENT.md`, "Snapshots").
+//! master bus settings over noise bursts, and synth patches. The snapshots of
+//! `tests/fixtures/` hold their renders (`DEVELOPMENT.md`, "Snapshots").
 
 use ordrumbox_dsp::lfo::Wave;
 use ordrumbox_dsp::slope::FilterMode;

@@ -58,8 +58,7 @@ impl Editor {
         .unwrap_or(false)
     }
 
-    /// Delete every note at `beat`/`beat_step` (one step; the JS key handler
-    /// records one per note).
+    /// Delete every note at `beat`/`beat_step` (one undo step).
     pub fn delete_step(&mut self, p: usize, t: usize, beat: i32, beat_step: i32) -> bool {
         let Some(pattern) = self.library.patterns.get(p).map(|p| pattern_name(p).to_owned()) else { return false };
         self.edit_track(
@@ -165,7 +164,7 @@ impl Editor {
         Some(accent)
     }
 
-    /// Nudge note `n` (`applyNoteNudge`: pitch ±1, one step in time; the
+    /// Nudge note `n` (pitch ±1, one step in time; the
     /// velocity ±0.05 stays for the note editor and the drag).
     pub fn nudge_note(&mut self, p: usize, t: usize, n: usize, nudge: Nudge) -> bool {
         let Some(track) = self.library.patterns.get(p).and_then(|p| p.tracks.get(t)) else { return false };

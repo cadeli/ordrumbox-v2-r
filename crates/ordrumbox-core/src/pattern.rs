@@ -1,5 +1,5 @@
-//! A pattern (`src/model/pattern_schema.js`): length, tags and tracks,
-//! loaded like `fixPattern()` and saved like `Exporter.export()`.
+//! A pattern: length, tags and tracks,
+//! loaded and saved.
 
 use crate::json::{Object, Value};
 use crate::record::{Issue, refusal};
@@ -148,7 +148,7 @@ impl Pattern {
 
 /// Tags as an array of strings, or the `{"0": "rock", "1": "70s"}` object an
 /// older save wrote by mistake (39 of the 42 demo patterns): written back as
-/// an array, which the JS app reads as well.
+/// an array, which the web version reads as well.
 fn tags_from_json(value: &Value) -> Option<Vec<String>> {
     let items: Vec<&Value> = match value {
         Value::Array(items) => items.iter().collect(),

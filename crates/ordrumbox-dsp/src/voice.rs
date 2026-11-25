@@ -1,4 +1,4 @@
-//! One playing sample (`audio/voices/sample_voice.js`): read at a pitch
+//! One playing sample: read at a pitch
 //! ratio with cubic interpolation, shaped by a 5 ms linear attack and an
 //! exponential decay to -60 dB (a [`SampleShape`] moves the start, the end,
 //! the direction, the loop, the attack and a hold at full level), placed in the stereo field like a Web Audio

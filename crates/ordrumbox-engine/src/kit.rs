@@ -200,7 +200,7 @@ impl KitSample {
     }
 }
 
-/// `display_name`, `url`, `tune`: the keys of the JS app's drumkits.json and older saves.
+/// `display_name`, `url`, `tune`: the keys of the web version's drumkits.json and older saves.
 const KNOWN_KEYS: [&str; 20] = [
     "key",
     "displayName",
@@ -224,7 +224,7 @@ const KNOWN_KEYS: [&str; 20] = [
     "tune",
 ];
 
-/// A kit's samples: `instruments` in the JS app's drumkits.json and older saves.
+/// A kit's samples: `instruments` in the web version's drumkits.json and older saves.
 fn sample_entries(value: &Value) -> Option<&[Value]> {
     ["samples", "instruments"].iter().find_map(|key| value.get(key).and_then(Value::as_array))
 }
@@ -291,7 +291,7 @@ impl Kit {
         for (key, value) in object.iter() {
             match key {
                 "name" | "samples" | "instruments" | "removed" => {}
-                "infos" => _ = extra.insert("info", value.clone()), // the JS key
+                "infos" => _ = extra.insert("info", value.clone()), // the web version's key
                 _ => _ = extra.insert(key, value.clone()),
             }
         }
@@ -494,8 +494,7 @@ mod tests {
     fn kit_files_round_trip() {
         let text = r#"[{"name":"real","infos":" kit","instruments":[{"display_name":"kick","key":"KICK","url":"real/kick.wav","peakDb":-3,"rootMidi":72,"decay":5000,"x":1},{"display_name":"s","key":"SNARE","url":"s.wav","gainDb":-2.5,"tune":1}]}]"#;
         let kits = kits_from_json(&json::parse(text).unwrap()).unwrap().0;
-        // Read under the JS key, written under the current one.
-        // Read under the JS keys, written under the current ones.
+        // Read under the web version's keys, written under the current ones.
         let current = [
             ("display_name", "displayName"),
             ("infos", "info"),

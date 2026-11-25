@@ -1,6 +1,5 @@
-//! Whole patterns and auto mode (`auto_generator.js`, the loop start of
-//! `audio/player.js`, the ↻ Drum / Bass / Chords buttons of
-//! `pattern_auto_gen.js`, and `random_generator.js`).
+//! Whole patterns and auto mode: a pattern generated, its lines drawn again
+//! at each loop start, and the ↻ Drum / Bass / Chords buttons.
 //!
 //! A pattern remembers its generation in three saved keys: `autoGenre` (its
 //! style, a key of `styles.json` or a tag the library taught), `autoKeyOffset`
@@ -126,7 +125,7 @@ pub(super) fn pattern_style(g: &mut AutoGenerator<'_>, pattern: &mut Pattern) ->
     g.style(&name)
 }
 
-/// `#resolveHarmony`: the section harmony moved to the pattern's key, in its scale.
+/// The section harmony moved to the pattern's key, in its scale.
 pub(super) fn pattern_harmony(pattern: &Pattern, style: &Style, section: &str, loop_in_element: u64) -> Harmony {
     let (root, scale) = section_harmony(&style.progression, section, loop_in_element);
     let offset = pattern_value(pattern, KEY_OFFSET).and_then(Value::to_number).unwrap_or(0.0);
@@ -134,7 +133,7 @@ pub(super) fn pattern_harmony(pattern: &Pattern, style: &Style, section: &str, l
     Harmony { root: ordrumbox_core::num::wrap(root + offset, 12.0), scale: Some(scale) }
 }
 
-/// `#randomDensity` of a melodic line: bass near full, chords vary more.
+/// A random density for a melodic line: bass near full, chords vary more.
 pub(super) fn random_density(g: &mut AutoGenerator<'_>, track: &Track) -> f64 {
     let core = instrument_family(&track.name) == InstrumentFamily::Bass;
     let (min, max) = if core { (0.85, 1.05) } else { (0.6, 1.2) };
@@ -149,7 +148,7 @@ fn apply_style_swing(g: &mut AutoGenerator<'_>, track: &mut Track, style: &Style
     track.swing_resolution = style.swing_resolution;
 }
 
-/// `#applyVariation`: the variation amounts of a generated track, when it has
+/// The variation amounts of a generated track, when it has
 /// none yet; once set they are the track's (Var Hits, Var Notes). A drum line
 /// is a written rhythm, its variation an ornament; a bass or chord line plays
 /// as written until its section ends.
@@ -189,7 +188,7 @@ pub(super) fn melodic_variant(g: &mut AutoGenerator<'_>, style: &Style, track: &
     variants[i].clone()
 }
 
-/// `generateTrack` for a melodic track: a new line with variant `variant`,
+/// A melodic track generated: a new line with variant `variant`,
 /// after its swing and variation are picked.
 pub fn generate_track(
     g: &mut AutoGenerator<'_>,
@@ -211,7 +210,7 @@ pub fn generate_track(
 
 /// The line of instrument `kind` for track `t` of `pattern`: a drum line
 /// from the pattern's style, a bass or chord line from its generator
-/// (`generateNewBass`, PIANO and ORGAN `generateNewMelody`), variant `variant`
+/// (PIANO and ORGAN as melodies), variant `variant`
 /// (random when `None` or unknown) at `density`.
 pub fn instrument_line(
     g: &mut AutoGenerator<'_>,
@@ -402,7 +401,7 @@ fn drum_variation(track: &Track, style: &Style, macros: Macros) -> f64 {
     compose::track_settings(track, style, macros).map_or(0.0, |c| c.used.variation)
 }
 
-/// `changeTrack`: the line of track `t` for loop `index` of the song form.
+/// The line of track `t` for loop `index` of the song form.
 /// A drum line: new at the start of a section, the style's fill on its last
 /// loop, varied otherwise. A melodic line: new at the section's density.
 /// A locked track stays as it is.

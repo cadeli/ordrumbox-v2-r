@@ -47,7 +47,7 @@ impl Session {
     }
 
     /// A cell: add or delete its note, add a chord on it
-    /// (`#showGridContextMenu`; what cannot run is left out).
+    /// (what cannot run is left out).
     pub(super) fn roll_grid_menu(&mut self, t: usize, step: i64, row: i32, x: i32, y: i32) {
         let Some(track) = self.track(t) else { return };
         let (beat, beat_step) = self.roll_beat(t, step);

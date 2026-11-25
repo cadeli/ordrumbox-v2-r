@@ -1,5 +1,5 @@
-//! A track of a pattern (`src/model/track_schema.js`): its parameters, its
-//! notes, and the load/save rules of `fixer.js` and `exporter.js`.
+//! A track of a pattern: its parameters, its
+//! notes, and how it is loaded and saved.
 
 use std::collections::HashMap;
 
@@ -225,7 +225,7 @@ const NOT_SETTINGS: [&str; 1] = ["scaleName"];
 const AUTO_HIT_VARIATION_FALLBACK: f64 = 60.0;
 const AUTO_NOTE_VARIATION_FALLBACK: f64 = 40.0;
 
-/// Keys written rounded to 2 decimals (`ROUND_2D` in exporter.js).
+/// Keys written rounded to 2 decimals.
 const ROUND_2D: [&str; 17] = [
     "volume",
     "pan",
@@ -322,7 +322,7 @@ impl Track {
         VALUE_RANGES.iter().find(|(k, _, _)| *k == key).map(|&(_, min, max)| (min, max))
     }
 
-    /// Load a track as `fixTrackDefaults()` does: decode compact notes, take
+    /// Load a track: decode compact notes, take
     /// the pan from the name when the file has none, fill defaults, switch
     /// auto-assign off for synth tracks, fold note steps past their beat.
     /// Values of the wrong type are reported and replaced by their default.
@@ -336,7 +336,7 @@ impl Track {
         for (key, value) in object.iter() {
             check_duplicate(&mut seen, Self::canonical_key(key), key, at, issues);
             match key {
-                // `fxSelected`: an editor tab the JS app saved with the track.
+                // `fxSelected`: an editor tab the web version saved with the track.
                 "notes" | "noteKeys" | "fxSelected" => {}
                 _ if Self::canonical_key(key)
                     .and_then(|field| LOADED_MAX.iter().find(|(k, _)| *k == field))
@@ -373,7 +373,7 @@ impl Track {
         Some(track)
     }
 
-    /// Save a track as `Exporter.cleanTrack()` does: non-default fields only
+    /// Save a track: non-default fields only
     /// (some rounded to 2 decimals), unknown keys as they came, then the notes
     /// in compact form. `pan` is also written when it differs from the pan the
     /// name implies, even at 0: a renamed track must not be re-panned on load.
@@ -432,8 +432,7 @@ impl Track {
         declared.max(last)
     }
 
-    /// The signatures of the notes on each step, `map` folding the steps
-    ///.
+    /// The signatures of the notes on each step, `map` folding the steps.
     fn step_signatures<'a>(
         notes: impl Iterator<Item = &'a Note>,
         spb: i32,
@@ -456,7 +455,7 @@ impl Track {
     }
 
     /// Shorten the track to its shortest loop, when its notes repeat one
-    /// (`addLoopToTrackIfPossible`, the tools panel's Compact Tracks): the
+    /// (the tools panel's Compact Tracks): the
     /// loop point set, the notes past it removed, the rest sorted by step.
     /// The loop is taken only when it removes a note. Whether it changed.
     pub fn compact_loop(&mut self) -> bool {

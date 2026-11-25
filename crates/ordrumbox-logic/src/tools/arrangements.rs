@@ -2,7 +2,8 @@
 //! remove, move or repeat its clips.
 
 use super::Tools;
-use super::helpers::*;
+use super::answers::*;
+use super::arguments::*;
 use ordrumbox_core::json::Value;
 
 impl Tools<'_> {

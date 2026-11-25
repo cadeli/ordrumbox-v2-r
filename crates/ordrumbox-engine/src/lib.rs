@@ -4,7 +4,6 @@
 //!
 //! Threads: the UI side ([`Controller`]) builds passes; the audio side
 //! ([`AudioSide`]) renders them without allocating, locking or blocking.
-//! Ported from `src/audio/` and `src/logic/sequencer.js` of ordrumbox-v2.
 
 pub mod analysis;
 pub mod assign;

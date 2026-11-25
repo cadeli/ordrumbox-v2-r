@@ -56,7 +56,7 @@ fn set_auto(track: &mut Track, on: bool) {
     track.extra.insert(TOOLBAR_AUTO, Value::Bool(on));
 }
 
-/// `toggleAutoGeneration`: when a track of `kinds` is in auto mode, all of
+/// When a track of `kinds` is in auto mode, all of
 /// them leave it (`false`); otherwise `generate` runs (`true`).
 fn toggle(
     pattern: &mut Pattern,

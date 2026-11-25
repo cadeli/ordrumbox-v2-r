@@ -302,9 +302,9 @@ fn patterns() {
     assert_eq!((copy.id.as_str(), copy.name.as_deref(), copy.tracks.len()), ("rock-copy", Some("rock copy"), 2));
 }
 
-/// The JS undo loses note edits once a command restored copies of the
-/// notes (removing the track, a steps-per-beat change): its closures then
-/// edit detached objects. Steps holding patterns have no such link.
+/// Note edits survive an undo that restores copies of the notes (removing
+/// the track, a steps-per-beat change): steps hold patterns, not links to
+/// the objects they edited.
 #[test]
 fn note_edits_survive_track_level_undo() {
     let mut e = editor();

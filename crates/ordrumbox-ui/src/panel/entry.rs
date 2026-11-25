@@ -5,7 +5,7 @@ use super::*;
 /// Where a text entry's field is in it (unscaled): the mouse that opened it is there.
 const ENTRY_FIELD: (i32, i32) = (12, 22);
 
-/// The number typed for a control (`promptNumericInput`, right-click or
+/// The number typed for a control (right-click or
 /// Enter), or a text (a name, a description: `spec` is `None`).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Entry {

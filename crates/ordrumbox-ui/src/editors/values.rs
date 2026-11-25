@@ -98,7 +98,7 @@ pub fn shown_value(track: &Track, key: &str, state: &EditorState) -> String {
     }
 }
 
-/// `getTrackLoopAtStep`: the loop length, else the track's length in steps.
+/// The loop length, else the track's length in steps.
 pub fn loop_length(track: &Track) -> f64 {
     if let Some(l) = track.loop_length.filter(|&l| l > 0) {
         return f64::from(l);
@@ -120,7 +120,7 @@ pub fn index_of(values: &[String], current: &str) -> usize {
     values.iter().position(|v| v == current).unwrap_or(0)
 }
 
-// ─── Arpeggio (sync_section.js) ──────────────────────────────────────────────
+// ─── Arpeggio ───────────────────────────────────────────────────────────────
 
 /// What a note's arpeggio is: scale, direction, notes.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -161,7 +161,7 @@ pub fn arp_state(note: &Note, scales: &ScaleList) -> ArpState {
     ArpState { scale, direction, range: intervals.len(), octaves }
 }
 
-/// `#arpValue`: the note's `arp` with these overrides.
+/// The note's `arp` with these overrides.
 pub fn arp_value(
     note: &Note,
     scales: &ScaleList,
@@ -189,11 +189,11 @@ pub fn arp_value(
     Value::Object(object)
 }
 
-// ─── Note tooltip (ui_utils.js) ──────────────────────────────────────────────
+// ─── Note tooltip ────────────────────────────────────────────────────────────
 
 pub(super) const NOTE_NAMES: [&str; 12] = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
-/// `pitchToNoteName`: the note at `pitch` semitones from C4 (plus the track's pitch).
+/// The note at `pitch` semitones from C4 (plus the track's pitch).
 pub(super) fn pitch_to_note_name(pitch: f64, track_pitch: f64) -> String {
     let midi = 60.0 + track_pitch + pitch;
     let index = num::wrap(midi, 12.0);
@@ -202,7 +202,7 @@ pub(super) fn pitch_to_note_name(pitch: f64, track_pitch: f64) -> String {
     format!("{name}{}", num::text((midi / 12.0).floor() - 1.0))
 }
 
-/// `formatNoteTooltip`: a note's pitch and MIDI number, then what differs from the defaults.
+/// A note's pitch and MIDI number, then what differs from the defaults.
 pub fn note_tooltip(note: &Note, track_pitch: f64) -> String {
     let fmt = crate::control::fmt;
     let midi = 60.0 + track_pitch + note.pitch;

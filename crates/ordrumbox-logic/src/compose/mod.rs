@@ -296,6 +296,7 @@ pub fn line_rng(track: &Track, salt: u64, rnd: &mut dyn FnMut() -> f64) -> Rng {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ordrumbox_core::steps::absolute_step;
     use ordrumbox_core::style::StylePart;
 
     fn style() -> Style {
@@ -319,8 +320,8 @@ mod tests {
     }
 
     fn steps_of(track: &Track) -> Vec<usize> {
-        let spb = track.steps_per_beat as usize;
-        track.notes.iter().map(|n| n.beat as usize * spb + n.step as usize).collect()
+        let at = |n: &ordrumbox_core::Note| absolute_step(n.beat, n.step, track.steps_per_beat);
+        track.notes.iter().map(|n| usize::try_from(at(n)).unwrap()).collect()
     }
 
     #[test]

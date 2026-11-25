@@ -1,11 +1,8 @@
-//! The drum kits and their editing (`ui/drumkit_manager*.js`,
-//! `logic/services/drumkit_service.js`, `audio_import_service.js`): a
-//! sample's instrument, kit, gain, tune and decay; samples added, replaced,
+//! The drum kits and their editing: a sample's instrument, kit, gain, tune and decay; samples added, replaced,
 //! removed, normalized; folders imported as kits; kit mapping files; a kit
 //! exported with its samples to a folder of its own, and imported back.
 //!
-//! Unlike the JS app, where these edits live in memory only (but for an
-//! imported folder), every change is saved: the kits to `kits.json`, the
+//! Every change is saved: the kits to `kits.json`, the
 //! audio of added, replaced or normalized samples to the user's `samples/`
 //! folder, which wins over the assets' `kits/`.
 
@@ -23,7 +20,7 @@ use ordrumbox_engine::{SampleBank, SampleBuffer, analysis, wav};
 use crate::assets::SampleSources;
 use crate::store;
 
-/// Knob ranges of the JS kit editor (`SOUND_KNOB_DEFS`).
+/// Knob ranges of the kit editor.
 pub const GAIN_RANGE: (f64, f64) = (-24.0, 6.0);
 pub const TRANSPOSE_RANGE: (f64, f64) = (-12.0, 12.0);
 pub const DECAY_RANGE: (f64, f64) = (20.0, 5000.0);
@@ -247,7 +244,7 @@ impl KitSet {
         }
     }
 
-    /// `setInstrument`: the instrument a sample is.
+    /// Set the instrument a sample is.
     pub fn set_instrument(&mut self, kit: usize, sample: usize, id: &str) -> Option<String> {
         let instrument = self.kits.get_mut(kit)?.samples.get_mut(sample)?;
         (instrument.key != id).then(|| {
@@ -283,7 +280,7 @@ impl KitSet {
         Some(format!("Kit \"{}\": {key} changed", kit.name))
     }
 
-    /// `moveToKit`: a sample into kit `target`.
+    /// A sample into kit `target`.
     pub fn move_to_kit(&mut self, kit: usize, sample: usize, target: usize) -> Option<String> {
         if target == kit || target >= self.kits.len() || sample >= self.kits.get(kit)?.samples.len() {
             return None;
@@ -294,7 +291,7 @@ impl KitSet {
         Some(message)
     }
 
-    /// `removeSample`; its path is kept as removed, so that a file of the
+    /// Its path is kept as removed, so that a file of the
     /// kit's folder is not added back when the folders are read.
     pub fn remove(&mut self, kit: usize, sample: usize) -> Option<String> {
         let kit = self.kits.get_mut(kit)?;
@@ -306,7 +303,7 @@ impl KitSet {
         })
     }
 
-    /// `normalizeAll`: the samples of kit `kit` scaled to a 0 dB peak; how many.
+    /// The samples of kit `kit` scaled to a 0 dB peak; how many.
     pub fn normalize(&mut self, kit: usize) -> Result<usize, String> {
         let urls: Vec<String> =
             self.kits.get(kit).map(|k| k.samples.iter().map(|i| i.path.clone()).collect()).unwrap_or_default();
@@ -329,7 +326,7 @@ impl KitSet {
         Ok((bytes, buffer))
     }
 
-    /// `addSample`: a WAV file into kit `kit`, its instrument guessed from
+    /// A WAV file into kit `kit`, its instrument guessed from
     /// its name; the index of the sample.
     pub fn add_sample(&mut self, kit: usize, path: &Path) -> Result<(usize, String), String> {
         let (bytes, buffer) = Self::decode(path)?;
@@ -357,7 +354,7 @@ impl KitSet {
         Ok((index, format!("Added \"{name}\" to kit \"{kit_name}\"")))
     }
 
-    /// `replaceSampleBuffer`: new audio for sample `sample`, same url.
+    /// New audio for sample `sample`, same url.
     pub fn replace_sample(&mut self, kit: usize, sample: usize, path: &Path) -> Result<String, String> {
         let url = self.sample(kit, sample).ok_or("no sample selected")?.path.clone();
         let (_, buffer) = Self::decode(path)?;
@@ -384,7 +381,7 @@ impl KitSet {
         }
     }
 
-    /// `importDirectory`: the WAV files of a folder as a kit named after it
+    /// The WAV files of a folder as a kit named after it
     /// (replacing a kit of that name); its index. A folder with a
     /// [`KIT_FILE`] is a kit exported with its samples: read as it says.
     pub fn import_folder(&mut self, dir: &Path) -> Result<(usize, String), String> {
@@ -431,7 +428,7 @@ impl KitSet {
         Ok((index, format!("Imported {count} files into kit \"{kit_name}\"{skipped}")))
     }
 
-    /// `restoreDrumkit`: a kit mapping file, replacing the kit of its name; its index.
+    /// A kit mapping file, replacing the kit of its name; its index.
     pub fn load_mapping(&mut self, path: &Path) -> Result<(usize, String), String> {
         let text = fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
         let value = ordrumbox_core::json::parse(&text).map_err(|_| "Invalid drumkit JSON".to_owned())?;
@@ -546,7 +543,7 @@ impl KitSet {
         Some(format!("ordrumbox-drumkit-{}.json", store::safe_name(&self.kits.get(kit)?.name)))
     }
 
-    /// `exportCurrentKit`: kit `kit`'s mapping (no audio) to `path`.
+    /// Kit `kit`'s mapping (no audio) to `path`.
     pub fn export_mapping(&self, kit: usize, path: &Path) -> Result<String, String> {
         let kit = self.kits.get(kit).ok_or("No drumkit selected")?;
         store::write_atomic(path, kit.to_mapping_json().to_json_pretty(2))
@@ -607,7 +604,7 @@ mod tests {
         assert!(kits.kits[0].extra.get("desc").is_none());
 
         assert_eq!(kits.normalize(0), Ok(1));
-        // The gain comes from the peak in dB to 3 decimals, as in the JS: about 0 dB.
+        // The gain comes from the peak in dB to 3 decimals: about 0 dB.
         let louder = kits.buffer("k.wav").unwrap().left.clone();
         assert!((louder[1] + 1.0).abs() < 1e-4, "{louder:?}");
         let saved = wav::decode(&fs::read(dir.join("samples").join("k.wav")).unwrap()).unwrap();

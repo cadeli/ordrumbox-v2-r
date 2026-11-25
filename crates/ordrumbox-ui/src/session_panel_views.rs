@@ -208,7 +208,7 @@ impl Session {
         let instrument = place.and_then(|(k, i)| self.kits.sample(k, i));
         let kit_name = place.and_then(|(k, _)| self.kits.kits().get(k)).map(|k| k.name.as_str());
 
-        // `getSoundInfo`.
+        // What the track plays: its synth preset or its sample.
         let info = if track.use_synth {
             track.synth_preset.clone()
         } else {

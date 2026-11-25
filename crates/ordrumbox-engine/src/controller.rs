@@ -219,7 +219,7 @@ impl Controller {
         &self.kit
     }
 
-    /// Use kit `name` (sounds are assigned again: `autoAssignSoundsForNewDrumkit`).
+    /// Use kit `name` (sounds are assigned again).
     pub fn set_kit(&mut self, name: &str) {
         self.kit = name.to_owned();
         self.assigned.clear();
@@ -272,7 +272,7 @@ impl Controller {
         }
     }
 
-    /// Master bus settings (`settings.master` of the JS app).
+    /// Master bus settings.
     pub fn master(&self) -> MasterSettings {
         self.master
     }
@@ -547,7 +547,7 @@ impl Controller {
     }
 
     /// Audition `note` (else a default note) on track `t` of pattern `p`,
-    /// whether the track has it or not (a piano roll key: `#playKey`).
+    /// whether the track has it or not (a piano roll key).
     pub fn preview_note(&mut self, library: &Library, p: usize, t: usize, note: Option<&ordrumbox_core::Note>) {
         let Some(pattern) = library.patterns.get(p) else { return };
         let sounds = self.sounds(library, p);
@@ -646,8 +646,8 @@ impl Controller {
         self.jump(library, first);
     }
 
-    /// Go on from pass `first` at once (`setSongCursor` while playing: the
-    /// measure clicked sounds right away), with the sounds already assigned.
+    /// Go on from pass `first` at once (the measure clicked while
+    /// playing sounds right away), with the sounds already assigned.
     pub fn jump(&mut self, library: &Library, first: u64) {
         self.pattern_seek = None;
         self.start_pass(library, first);

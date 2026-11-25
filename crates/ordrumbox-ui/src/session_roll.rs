@@ -1,5 +1,4 @@
-//! The session's side of the piano roll (`piano_roll_panel.js` and its
-//! sections), on the track editor's track: a click on an empty cell adds a
+//! The session's side of the piano roll, on the track editor's track: a click on an empty cell adds a
 //! note there, on a note selects it (and plays it), a double-click on a note
 //! deletes it; dragging a note moves it in time and pitch
 //! (`session_roll_move.rs`), one undo step per drag; a click on a key plays it. Right-click
@@ -465,7 +464,7 @@ impl Session {
             (Move::Down, Some((s, r))) => (s, (r - 1).rem_euclid(TOTAL_KEYS)),
         };
         self.roll.cursor = Some((step, row));
-        // `#syncCursor`: the page follows, the note there is selected.
+        // The page follows, the note there is selected.
         self.roll_reveal(step, spb);
         self.selection.selected = self.roll_note_at(t, step, row).map(|n| (t, n));
         self.roll_show_row(row);

@@ -172,8 +172,7 @@ pub fn draw_curve(canvas: &mut Canvas, master: &MasterSettings, r: Rect, s: Scal
     }
 }
 
-/// The spectrum: a grid, then the first bins (one a
-/// column of the JS canvas, 256) as a line, louder higher.
+/// The spectrum: a grid, then the first 256 bins as a line, louder higher.
 pub fn draw_spectrum(canvas: &mut Canvas, bins: &[u8], r: Rect, s: Scale) {
     canvas.fill_rect(r.x, r.y, r.w, r.h, scope_bg_color());
     for i in 1..8 {

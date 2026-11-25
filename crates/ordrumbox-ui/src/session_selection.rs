@@ -44,7 +44,7 @@ pub(super) struct Selection {
     /// What the note editor follows when no note is selected.
     pub(super) note_focus: Option<NoteFocus>,
     /// The default note the note editor shows for a track without notes
-    /// (edits stay in it, as in the JS): its track and the note.
+    /// (edits stay in it): its track and the note.
     pub(super) detached: Option<(usize, Note)>,
 }
 

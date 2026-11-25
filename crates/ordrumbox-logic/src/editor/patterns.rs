@@ -10,7 +10,7 @@ use ordrumbox_core::song::{DEFAULT_BPM, clamp_bpm};
 use std::collections::HashSet;
 
 impl Editor {
-    /// A new empty pattern (`createPattern`; default name `NewPat_<count>`)
+    /// A new empty pattern (default name `NewPat_<count>`)
     /// with an id no pattern of the library has.
     pub(super) fn blank_pattern(&self, name: Option<&str>) -> Pattern {
         let name = name.map_or_else(|| format!("NewPat_{}", self.library.patterns.len()), str::to_owned);
@@ -23,7 +23,7 @@ impl Editor {
         }
     }
 
-    /// Append an empty pattern (`addPattern`; default name `NewPat_<count>`)
+    /// Append an empty pattern (default name `NewPat_<count>`)
     /// with a unique id; its index.
     pub fn add_pattern(&mut self, name: Option<&str>) -> usize {
         let pattern = self.blank_pattern(name);

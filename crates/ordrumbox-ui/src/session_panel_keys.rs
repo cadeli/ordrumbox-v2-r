@@ -179,7 +179,7 @@ impl Session {
 
     // ─── Number entry ────────────────────────────────────────────────────────
 
-    /// `promptNumericInput`: `Enter value for LABEL (min–max unit):`.
+    /// Open the typed-number entry: `Enter value for LABEL (min–max unit):`.
     pub(super) fn open_entry(&mut self, id: Id, spec: Spec, value: f64) {
         let (label, unit) = control_name(id);
         let unit = spec.shown_unit().unwrap_or(unit);

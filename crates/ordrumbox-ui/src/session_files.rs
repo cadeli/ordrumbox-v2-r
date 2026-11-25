@@ -60,7 +60,7 @@ impl Session {
         self.message = self.write_midi(self.pattern_index, self.chrome.export_loop_count, path).unwrap_or_else(|e| e);
     }
 
-    /// Ctrl+Shift+S: the pattern as `Exporter.export()`
+    /// Ctrl+Shift+S: the pattern
     /// writes it, to `path`.
     fn export_pattern_json(&mut self, path: &Path) {
         self.message = match self.write_pattern_json(self.pattern_index, path) {

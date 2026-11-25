@@ -1,8 +1,7 @@
-//! Undo/redo (`src/logic/history_manager.js`): a bounded list of steps, each
+//! Undo/redo: a bounded list of steps, each
 //! holding what it changed as it was before and after it.
 //!
-//! The JS steps are closures that redo or undo one change in place; here a
-//! step keeps copies of what changed (one pattern, the pattern list, the
+//! A step keeps copies of what changed (one pattern, the pattern list, the
 //! arrangements, or the whole library), which needs no per-command inverse
 //! and cannot drift from the state.
 

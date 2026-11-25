@@ -1,4 +1,4 @@
-//! Bass lines and chords/melodies (`bass_generator.js`, `melody_generator.js`).
+//! Bass lines and chords/melodies.
 
 use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
 use ordrumbox_core::json::Value;
@@ -29,7 +29,7 @@ fn is_true(value: &Value, key: &str) -> bool {
 
 // ─── Bass ────────────────────────────────────────────────────────────────────
 
-/// `generateNewBass`: a line in `harmony` (the variant's scale and register
+/// A line in `harmony` (the variant's scale and register
 /// when it names none).
 pub(crate) fn bass(
     track: &mut Track,
@@ -69,7 +69,7 @@ pub(crate) fn bass(
     apply_loop_point(track, config);
 }
 
-/// `generateBassStepGridVariant`: one beat, the root then random tones, each
+/// One beat, the root then random tones, each
 /// step with its probability (one row of `probabilitySets`).
 fn bass_step_grid(g: &mut Generator<'_>, track: &mut Track, tones: &[f64], config: &Value, density: f64, root: f64) {
     let loop_point = loop_point(track, config, 2.0);
@@ -105,7 +105,7 @@ fn bass_step_grid(g: &mut Generator<'_>, track: &mut Track, tones: &[f64], confi
     }
 }
 
-/// `generateBassGrooveVariant`: each beat on its root (`rootPattern`), the
+/// Each beat on its root (`rootPattern`), the
 /// other steps by chance, mostly strong intervals, sometimes a scale degree.
 fn bass_groove(g: &mut Generator<'_>, track: &mut Track, scale: &[f64], config: &Value, density: f64, root: f64) {
     let loop_point = loop_point(track, config, 2.0);
@@ -145,7 +145,7 @@ fn bass_groove(g: &mut Generator<'_>, track: &mut Track, scale: &[f64], config: 
     }
 }
 
-/// `generateBassArpeggioVariant`: a contour over the scale from each beat's
+/// A contour over the scale from each beat's
 /// root; off-beat notes may rest and fade across the beat.
 fn bass_arpeggio(g: &mut Generator<'_>, track: &mut Track, scale: &[f64], config: &Value, density: f64, root: f64) {
     let loop_point = loop_point(track, config, 2.0);
@@ -187,7 +187,7 @@ fn bass_arpeggio(g: &mut Generator<'_>, track: &mut Track, scale: &[f64], config
 
 // ─── Chords and melodies ─────────────────────────────────────────────────────
 
-/// `#extractBassRootPitch`: the most frequent pitch of the pattern's bass
+/// The most frequent pitch of the pattern's bass
 /// track (the first to reach the top count), `None` without bass notes.
 fn bass_root(pattern: &Pattern) -> Option<f64> {
     let bass = pattern.tracks.iter().find(|t| instrument_family(&t.name) == InstrumentFamily::Bass)?;
@@ -212,7 +212,7 @@ fn bass_root(pattern: &Pattern) -> Option<f64> {
     Some(best)
 }
 
-/// `generateNewMelody` for track `t` of `pattern`: chords that avoid
+/// A melody for track `t` of `pattern`: chords that avoid
 /// doubling the bass root (an octave up), grooves and arpeggios in `harmony`.
 pub(crate) fn melody(
     pattern: &mut Pattern,
@@ -260,7 +260,7 @@ pub(crate) fn melody(
         Some("groove") => melody_groove(&mut g, track, &tones, config, density, bias),
         Some("arpeggio") => melody_arpeggio(&mut g, track, &tones, config, density, bias),
         _ => {
-            // `#resolveChordPitch`: a chord note on the bass root's pitch class goes an octave up.
+            // A chord note on the bass root's pitch class goes an octave up.
             let mut pitch = |g: &mut Generator<'_>, phrase: &Value, cached: &[f64]| {
                 let base = g.phrase_pitch(phrase, &tones, cached, 0.0, None);
                 match bass_root {
@@ -297,7 +297,7 @@ fn scale_step(g: &mut Generator<'_>, scale: &[f64], root_pitch: f64, last: f64, 
     if (pitch - last).abs() > max_leap { (root_pitch, false) } else { (pitch, true) }
 }
 
-/// `generateMelodyGrooveVariant`: strong steps on chord intervals, the
+/// Strong steps on chord intervals, the
 /// others by chance, sometimes a scale degree within `maxLeap`.
 fn melody_groove(g: &mut Generator<'_>, track: &mut Track, scale: &[f64], config: &Value, density: f64, bias: f64) {
     let loop_point = loop_point(track, config, 2.0);
@@ -337,7 +337,7 @@ fn arpeggiate(note: &mut Note, arp: Option<&Value>, count: i32, rate: f64) {
     note.retrigger_rate = rate;
 }
 
-/// `generateMelodyArpeggioVariant`: a contour over the scale, every
+/// A contour over the scale, every
 /// `noteSpacing` steps, each note an arpeggio when the variant has one.
 fn melody_arpeggio(g: &mut Generator<'_>, track: &mut Track, scale: &[f64], config: &Value, density: f64, bias: f64) {
     let loop_point = loop_point(track, config, 2.0);

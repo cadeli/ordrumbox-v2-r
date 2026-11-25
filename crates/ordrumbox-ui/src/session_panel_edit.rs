@@ -191,7 +191,7 @@ impl Session {
                 }
             }
             Id::Decay => {
-                // The sample's decay (the sound registry's in the JS): not undoable.
+                // The sample's decay, a setting of the kit: not undoable.
                 if let Some((kit, sample)) = self.track_sample_path(t).and_then(|u| self.kits.find_path(&u)) {
                     self.set_kit_sample_value(kit, sample, Field::Decay, value);
                 }
@@ -366,7 +366,7 @@ impl Session {
     fn select_shared(&mut self, id: Id, value: &str) -> bool {
         match id {
             Id::PatternList => {
-                // `onPatternSelectChange`: that pattern.
+                // Select that pattern.
                 if let Ok(index) = value.parse::<usize>() {
                     self.step_pattern(index as isize - self.pattern_index as isize);
                 }
@@ -540,7 +540,7 @@ impl Session {
             Id::LfoTypeStep(i, step) => self.step_screen(t, Id::LfoType(i), step),
             Id::NoteSelectStep(key, step) => self.step_screen(t, Id::NoteSelect(key), step),
             Id::AutoAssign => {
-                // `toggleAuto`: back on, the synth goes and the sample is picked by name.
+                // Auto-assign back on: the synth goes and the sample is picked by name.
                 let on = !track.auto_assign;
                 let mut updates = vec![("autoAssign", Value::Bool(on))];
                 if on {

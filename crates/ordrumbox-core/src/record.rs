@@ -2,10 +2,9 @@
 //!
 //! `json_record!` turns a table of `field: Type = default => "jsonKey"` rows
 //! into the struct, its `Default`, the ordered key list and a by-key setter, so
-//! a key, its type and its default are written in one place only (the JS
-//! equivalents are `NOTE_DEFAULTS` / `NOTE_KEY_ORDER` / `TRACK_DEFAULTS`).
+//! a key, its type and its default are written in one place only.
 //!
-//! A row may add the keys older files (and the JS app) use for the field:
+//! A row may add the keys older files (and the web version) use for the field:
 //! `=> "newKey" | "oldKey"`. Both are read; only the first is written.
 
 use crate::json::{Object, Value};

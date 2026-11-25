@@ -1,5 +1,4 @@
-//! The session's side of the synth editor (`synth_editor.js`,
-//! `synth_preset_model.js`, `preset_section.js`): it opens on the track
+//! The session's side of the synth editor: it opens on the track
 //! editor's track's preset (else the first one, and a line above the cards
 //! says what the track plays, with a button to put it on the preset shown)
 //! and every change goes to
@@ -104,7 +103,7 @@ impl Session {
     }
 
     /// F6, View > Synth: the synth editor in the place of the grid (on the
-    /// track's preset, else the first), or back (`showPanel`, `closePanelAndCommit`).
+    /// track's preset, else the first), or back.
     pub fn toggle_synth(&mut self) {
         if self.workspace == Workspace::Synth {
             self.synth_editor.edit = None;
@@ -287,7 +286,7 @@ impl Session {
     }
 
     /// Set `path` of the draft (a group off by default is switched on when
-    /// one of its controls is touched: `#setValue`, `#implicitEnable`).
+    /// one of its controls is touched).
     fn edit_synth(&mut self, path: &str, value: Value) {
         let Some(edit) = &mut self.synth_editor.edit else { return };
         model::implicit_enable(&mut edit.draft, path);
@@ -436,7 +435,7 @@ impl Session {
         self.put_synth(key, None, format!("Delete synth preset \"{key}\""), None);
     }
 
-    /// The preset bar's buttons (`preset_section.js`).
+    /// The preset bar's buttons.
     pub(super) fn synth_button(&mut self, button: &str) {
         match button {
             "delete" => {

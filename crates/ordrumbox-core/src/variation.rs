@@ -1,4 +1,4 @@
-//! The two variation layers of a track (`src/patterns/track_variation.js`).
+//! The two variation layers of a track.
 //!
 //! - **Notes** (`note_variation`): before expansion, some written notes get new
 //!   repeats, euclidean fill, probability or arpeggio span ([`vary_notes`]).

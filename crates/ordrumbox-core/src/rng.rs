@@ -55,7 +55,7 @@ impl Rng {
     }
 
     /// True with probability `p`, clamped to `[0, 1]`. A certain event (`p >= 1`)
-    /// draws nothing, like `isProbabilityTriggered()` in pattern_engine.js, so
+    /// draws nothing, so
     /// deterministic patterns consume no randomness.
     pub fn chance(&mut self, p: f64) -> bool {
         if p >= 1.0 {

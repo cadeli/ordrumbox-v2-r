@@ -1,6 +1,4 @@
-//! What the synth editor edits (`synth_editor/synth_preset_model.js`,
-//! `synth_editor_constants.js` and the logic of `synth_editor.js`,
-//! `groups_section.js` and `waveform_section.js`): a preset as JSON, filled
+//! What the synth editor edits: a preset as JSON, filled
 //! with the group defaults; its cards, their bypassed state and what turning
 //! one on or off does; the groups a control quietly switches on; the LFO
 //! modulation; and what the scope, the envelope and the filter curve plot.
@@ -36,9 +34,9 @@ const DEFAULTS: &str = r#"{"masterVolume":0.8,"subGain":0,"pitchPunch":0,
     "modEnvelope":{"attack":0,"decay":0.12,"sustain":0,"release":0.1,"target":"off"},
     "pitchEnv":{"amount":0,"decay":0.05}}"#;
 
-/// Fields the JS editor lacks, shown last in their card and written only once
-/// set (absent, the engine's default applies): kept out of [`DEFAULTS`] so a
-/// hydrated preset stays the JS one.
+/// Fields added since the first presets, shown last in their card and written
+/// only once set (absent, the engine's default applies): kept out of
+/// [`DEFAULTS`] so a hydrated preset keeps the keys it was written with.
 const EXTRA_FIELDS: [(&str, &str); 8] = [
     ("filter", "slope"),
     ("vco1", "width"),
@@ -82,7 +80,7 @@ const fn meta(path: &'static str, min: f64, max: f64, step: f64, unit: &'static 
     Meta { path, min, max, default: min, step, unit, label: None, log: false }
 }
 
-/// Every numeric control, in the JS order (the LFO targets follow it).
+/// Every numeric control, in the editor's order (the LFO targets follow it).
 pub const METAS: [Meta; 35] = [
     meta("masterVolume", 0.0, 1.0, 0.01, ""),
     meta("subGain", 0.0, 1.0, 0.01, ""),
@@ -417,8 +415,7 @@ pub fn toggle_card(draft: &mut Object, group: &str) {
     }
 }
 
-/// A group off by default switched on when one of its controls is touched
-///: an oscillator at gain 0 to 0.5, FM to 0.3, the noise
+/// A group off by default switched on when one of its controls is touched: an oscillator at gain 0 to 0.5, FM to 0.3, the noise
 /// to 0.15, an LFO onto the filter (depth 0.5 unless that is the depth
 /// being set), the mod envelope onto the filter. The paths it changed.
 pub fn implicit_enable(draft: &mut Object, path: &str) -> Vec<String> {
@@ -515,7 +512,7 @@ pub fn new_preset_name(keys: &[&str]) -> String {
 }
 
 /// The preset to show after deleting `deleted` from `keys` (sorted, before
-/// the deletion: `deletePreset`): the next one, else the previous.
+/// the deletion): the next one, else the previous.
 pub fn after_delete<'a>(keys: &[&'a str], deleted: &str) -> Option<&'a str> {
     let index = keys.iter().position(|k| *k == deleted)?;
     let next = if index + 1 < keys.len() { index } else { index.checked_sub(1)? };

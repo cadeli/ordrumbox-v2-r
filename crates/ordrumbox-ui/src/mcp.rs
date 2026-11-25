@@ -1,11 +1,9 @@
-//! The Model Context Protocol server (`ordrumboxMcpserver.mjs` of the JS
-//! app): JSON-RPC 2.0 messages, one per line, and the tools an AI client may
-//! call. Unlike the JS server, which edited `song.json` on its own, the tools
-//! act on the running app: `ordrumbox --mcp` (`mcp_link.rs`) answers the
+//! The Model Context Protocol server: JSON-RPC 2.0 messages, one per line, and the tools an AI client may
+//! call. The tools act on the running app: `ordrumbox --mcp` (`mcp_link.rs`) answers the
 //! protocol and passes each tool call to the window, where the session runs
 //! it (`session_mcp.rs`) as one undo step.
 //!
-//! Tool and parameter names are the JS server's; the track and note settings
+//! Tool and parameter names stay as clients know them; the track and note settings
 //! are named by their keys in the files this app writes (their `json_record!` tables).
 // audit: allow(duplicates): the tool schemas repeat their parameter shapes.
 

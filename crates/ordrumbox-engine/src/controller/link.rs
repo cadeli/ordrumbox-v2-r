@@ -34,7 +34,7 @@ pub(super) struct Inbox {
     pub(super) cue: Option<Arc<Pass>>,
 }
 
-/// Samples the scope keeps (the JS analyser's `fftSize`).
+/// Samples the scope keeps.
 pub const SCOPE_SIZE: usize = 4096;
 
 /// The last samples played, mono, as a ring (the analyser's input).

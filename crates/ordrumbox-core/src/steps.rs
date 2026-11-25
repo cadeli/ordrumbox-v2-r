@@ -1,12 +1,12 @@
-//! Grid arithmetic (`src/core/notes.js`): steps, beats and ticks.
+//! Grid arithmetic: steps, beats and ticks.
 //!
 //! A beat is [`TICK`] ticks whatever the grid; a track divides its beat into
 //! `stepsPerBeat` steps, so a step is `TICK / stepsPerBeat` ticks, rounded per
 //! step position. 96 is divided by every usual grid, triplets included (1, 2,
 //! 3, 4, 6, 8, 12, 16, 24, 32): only odd grids such as 5 or 7 round.
 
-/// Ticks per **beat** (not per step). The JS app counted 32, which rounded
-/// triplets; MIDI files are written at the same 96 PPQN.
+/// Ticks per **beat** (not per step): 32 would round triplets. MIDI files
+/// are written at the same 96 PPQN.
 pub const TICK: u32 = 96;
 /// Beats of the longest pattern or track an edit makes.
 pub const MAX_BEATS: i32 = 64;
@@ -25,7 +25,7 @@ pub fn absolute_step(beat: i32, beat_step: i32, steps_per_beat: i32) -> i64 {
     i64::from(beat) * i64::from(steps_per_beat) + i64::from(beat_step)
 }
 
-/// `(beat, beatStep)` of an absolute step, as `stepToBeat()`: the beat is
+/// `(beat, beatStep)` of an absolute step: the beat is
 /// floored, the step is `%` (it keeps the sign of `step`). `steps_per_beat > 0`.
 pub fn step_to_beat(step: i64, steps_per_beat: i32) -> (i64, i64) {
     let spb = i64::from(steps_per_beat);

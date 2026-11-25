@@ -1,4 +1,4 @@
-//! Track LFOs (`computeLfoValue()` in `src/audio/math.js`): an object
+//! Track LFOs: an object
 //! `{freq, min, max, phase, type}` read leniently (numbers or numeric strings,
 //! defaults), evaluated on the transport tick. The engine samples it once per tick.
 
@@ -45,7 +45,7 @@ pub fn value(lfo: &Object, tick: f64) -> f64 {
     crate::num::round2(min + unit * (max - min))
 }
 
-/// `getLfoWaveformValue()`: value at `phase` cycles for waveform code `wave`
+/// Value at `phase` cycles for waveform code `wave`
 /// (0 sine, 1 triangle, 2 sawtooth, 3 square, 4 random), in [-1, 1].
 pub fn waveform(phase: f64, wave: f64) -> f64 {
     let p = (phase - 0.25) - (phase - 0.25).floor();

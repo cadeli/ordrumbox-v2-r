@@ -1,10 +1,9 @@
-//! A track's settings as strip parameters (`strip_sync.js` and `strip.js`),
-//! and its LFOs as per-tick parameter values (`step_lfo.js`).
+//! A track's settings as strip parameters,
+//! and its LFOs as per-tick parameter values.
 //!
-//! It departs from the JS where the names did not hold: `slap` is one clean
-//! echo (the JS played it as `tape`), `tape` has wow and a darker feedback,
-//! `pingpong` starts on the left and alternates at one time (the JS crossed
-//! two times, 2/3 apart), `spring` disperses, `gated` is gated, `hall` and
+//! Each type does what its name says: `slap` is one clean echo, `tape` has
+//! wow and a darker feedback, `pingpong` starts on the left and alternates
+//! at one time, `spring` disperses, `gated` is gated, `hall` and
 //! `plate` have a pre-delay, and `allpass` skips the filter. A delay longer
 //! than the line plays at the longest halving of its beats that fits.
 // audit: allow(function size): `strip_settings` copies a track's fields to the strip's, one line each.
@@ -17,7 +16,7 @@ use ordrumbox_dsp::StripSettings;
 use crate::synth_preset::FILTER_TYPES;
 
 /// A reverb type's settings: room, damp and width (`REVERB_PRESETS`), then
-/// pre-delay (seconds), dispersion and gate (seconds), which the JS lacks.
+/// pre-delay (seconds), dispersion and gate (seconds).
 #[derive(Debug, Clone, Copy)]
 struct ReverbPreset {
     room: f32,
@@ -98,14 +97,14 @@ fn delay_mode(name: &str) -> Option<f32> {
     })
 }
 
-/// The strip parameters `applyTrackToStrip()` sets for `track` on a new strip
-/// at `bpm`. Unknown filter, reverb and delay types fall back as in JS
-/// (lowpass, none, tape). Solo is not a track setting: the caller silences
+/// The strip parameters set for `track` on a new strip
+/// at `bpm`. Unknown filter, reverb and delay types fall back to
+/// lowpass, none and tape. Solo is not a track setting: the caller silences
 /// the other tracks.
 pub fn strip_settings(track: &Track, bpm: f64) -> StripSettings {
     let mut s = StripSettings::default();
 
-    // Filter: `allpass` skips it (the cutoff opens as in JS).
+    // Filter: `allpass` skips it (the cutoff opens).
     if track.filter_type == "allpass" {
         s.cutoff = ordrumbox_dsp::MAX_FILTER_FREQ as f32;
         s.filter_on = 0.0;
@@ -363,7 +362,7 @@ impl StripLfo {
     }
 }
 
-/// `pushStepLfo()` for `ticks` ticks from transport tick `first_tick`; `None`
+/// The strip LFO values of `track` for `ticks` ticks from transport tick `first_tick`; `None`
 /// when the track has no strip LFO. A silent track gets no volume LFO (its
 /// strip stays at 0).
 pub fn strip_lfo(index: usize, track: &Track, silent: bool, first_tick: u64, ticks: u32) -> Option<StripLfo> {

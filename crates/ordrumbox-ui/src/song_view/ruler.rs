@@ -6,6 +6,7 @@
 use super::draw::Page;
 use super::*;
 use ordrumbox_core::automation::{STEPS_PER_BEAT, STEPS_PER_MEASURE};
+use ordrumbox_core::song::BEATS_PER_MEASURE;
 
 /// What the ruler shows inside a measure, from the least to the most: each
 /// level shows what the ones before it show.
@@ -25,7 +26,6 @@ const NUMBER_PAD: i32 = 3;
 /// Heights of the ticks, at the bottom of the ruler.
 const BEAT_TICK_HEIGHT: i32 = 5;
 const STEP_TICK_HEIGHT: i32 = 3;
-const BEATS_PER_MEASURE: u32 = STEPS_PER_MEASURE / STEPS_PER_BEAT;
 
 impl SongLayout {
     /// What the ruler shows inside a measure at this zoom: the most whose

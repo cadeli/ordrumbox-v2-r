@@ -1,10 +1,8 @@
-//! The library being edited and every edit the app makes to it
-//! (`src/logic/commands/`: note, track, pattern and song commands of the
-//! `Commander`), each one an undo step. The song (arrangement) commands are
+//! The library being edited and every edit the app makes to it (notes,
+//! tracks, patterns and songs), each one an undo step. The song (arrangement) commands are
 //! in `arrangement.rs`.
 //!
-//! Patterns, tracks and notes are addressed by index (the JS commands take
-//! object references). An edit that changes nothing records nothing.
+//! Patterns, tracks and notes are addressed by index. An edit that changes nothing records nothing.
 
 use std::time::Instant;
 
@@ -21,8 +19,7 @@ mod arrangement;
 const DEFAULT_BEAT_COUNT: i32 = 4;
 /// Step of a velocity nudge (`VELOCITY_STEP`).
 pub const VELOCITY_STEP: f64 = 0.05;
-/// Lowest and highest MIDI note of the piano roll, and middle C
-/// (`piano_roll_constants.js`): the pitch nudge stays in that range.
+/// Lowest and highest MIDI note of the piano roll, and middle C: the pitch nudge stays in that range.
 const MIDI_MIN: f64 = 12.0;
 const MIDI_MAX: f64 = 108.0;
 const MIDDLE_C: f64 = 60.0;
@@ -50,14 +47,14 @@ pub enum Nudge {
     Earlier,
 }
 
-/// `nudgeVelocity()`: ±0.05, rounded to 2 decimals, unchanged past 0–1.
+/// A velocity nudged: ±0.05, rounded to 2 decimals, unchanged past 0–1.
 pub fn nudge_velocity(velocity: f64, up: bool) -> f64 {
     let current = if velocity.is_finite() { velocity } else { 0.8 };
     let next = round2(current + if up { VELOCITY_STEP } else { -VELOCITY_STEP });
     if (0.0..=1.0).contains(&next) { next } else { current }
 }
 
-/// `nudgePitch()`: ±1 semitone (rounded first), unchanged past the piano
+/// A pitch nudged: ±1 semitone (rounded first), unchanged past the piano
 /// roll's range once the track transposition is added.
 pub fn nudge_pitch(pitch: f64, up: bool, track_pitch: f64) -> f64 {
     let current = if pitch.is_finite() { pitch.round() } else { 0.0 };
@@ -254,7 +251,7 @@ impl Editor {
     }
 }
 
-/// `cleanTrack`'s change.
+/// A track cleaned: its notes removed, its loop its whole length.
 fn clean(track: &mut Track) {
     track.notes.clear();
     track.loop_length = Some(track.beat_count * track.steps_per_beat);

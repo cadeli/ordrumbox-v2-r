@@ -112,7 +112,7 @@ impl Editor {
     }
 
     /// [`Self::update_track`] on every track of pattern `p`, `updates(t, track)`
-    /// for each, as one undo step (the JS `recordTransaction`).
+    /// for each, as one undo step.
     pub fn update_tracks(
         &mut self,
         p: usize,
@@ -141,7 +141,7 @@ impl Editor {
         self.update_track(p, t, &[(key, Value::Bool(on))], Some(&desc), false)
     }
 
-    /// `setStepsPerBeat`: clamped to 1–8; notes keep their position in the
+    /// Set the steps per beat of a track, clamped to 1–8; notes keep their position in the
     /// beat (by percent), the loop point stays inside the track.
     pub fn set_steps_per_beat(&mut self, p: usize, t: usize, value: f64, coalesce: bool) -> bool {
         let target = value.clamp(1.0, MAX_STEPS_PER_BEAT as f64).round() as i32;
@@ -196,8 +196,7 @@ impl Editor {
     }
 
     /// No notes, loop over the whole track.
-    /// Shorten track `t` to its shortest loop, when its notes repeat one
-    ///; whether it changed.
+    /// Shorten track `t` to its shortest loop, when its notes repeat one; whether it changed.
     pub fn compact_track(&mut self, p: usize, t: usize) -> bool {
         self.edit_track(p, t, |track| format!("Compact {}", track.name), None, Track::compact_loop).unwrap_or(false)
     }
@@ -213,7 +212,7 @@ impl Editor {
         self.edit_track(p, t, |track| format!("Clean {}", track.name), None, clean).is_some()
     }
 
-    /// Every track cleaned, as one step (the JS records one per track).
+    /// Every track cleaned, as one undo step.
     pub fn clean_pattern(&mut self, p: usize) -> bool {
         self.edit(
             p,

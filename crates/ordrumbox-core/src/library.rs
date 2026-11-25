@@ -86,12 +86,12 @@ impl Library {
         Ok(Self::from_json(&json::parse(text)?))
     }
 
-    /// Load as the app does (`fixPatterns` then `fixSongs`): every pattern gets
+    /// Load as the app does: every pattern gets
     /// a unique id (a missing one is made from its name), then songs are
     /// checked against those ids.
     pub fn from_json(value: &Value) -> (Self, LoadReport) {
         let mut report = LoadReport::default();
-        // `infos` in files from the JS app and older saves.
+        // `infos` in files from the web version and older saves.
         let info = ["info", "infos"]
             .into_iter()
             .find_map(|key| value.get(key).and_then(Value::as_object))
@@ -200,7 +200,7 @@ impl Library {
         Value::Object(object)
     }
 
-    /// Read a project file (`parseImportedFile`, then `applyToAppState`):
+    /// Read a project file:
     /// `None` without a `patterns` array. Its name, description and date
     /// replace those of `info`, the header kept otherwise.
     pub fn from_project_record(value: &Value, info: &Object) -> Option<ProjectRecord> {
@@ -212,7 +212,7 @@ impl Library {
         for (key, v) in [("description", text("description")), ("date", text("date"))] {
             library.info.insert(key, Value::from(v.unwrap_or_default().as_str()));
         }
-        // `selectedPatternIdx`, `selectedSongIdx`: the JS keys, older saves.
+        // `selectedPatternIdx`, `selectedSongIdx`: the web version's keys, older saves.
         let index = |keys: [&str; 2]| {
             let v = keys.iter().find_map(|key| value.get(key)).and_then(Value::to_number).unwrap_or(0.0);
             if v > 0.0 { v as usize } else { 0 }
@@ -256,7 +256,7 @@ fn synths_from_json(raw: &Value, issues: &mut Vec<Issue>) -> Object {
     synths
 }
 
-/// Give every pattern an id, in file order, as `ensurePatternId()`: an existing
+/// Give every pattern an id, in file order: an existing
 /// id is kept, a missing one is the slug of the name made unique against the
 /// ids met so far.
 fn assign_pattern_ids(patterns: &mut [Pattern]) {

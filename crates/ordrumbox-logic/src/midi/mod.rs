@@ -1,4 +1,4 @@
-//! Standard MIDI Files (`src/logic/midi/`, `midi_import_service.js`):
+//! Standard MIDI Files:
 //! reading them, patterns from them, a pattern to one.
 
 mod export;

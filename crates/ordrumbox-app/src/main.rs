@@ -1,6 +1,6 @@
 //! orDrumbox native application.
 //!
-//! Loads the ordrumbox-v2 assets (patterns, kits, samples, synth presets) and
+//! Loads the assets (patterns, kits, samples, synth presets) and
 //! the user's library, plays the selected pattern through the default audio
 //! device (per-track strips, synth tracks, master bus), and edits it with the
 //! menu bar, the mouse and the keyboard (`ordrumbox-ui`: `menu`, `view::HELP`), every

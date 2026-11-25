@@ -1,12 +1,12 @@
 //! JSON reader and writer (RFC 8259), with no dependency.
 //!
-//! Output is byte-compatible with the JS app, so a file written here and one
-//! written by `JSON.stringify` are identical:
+//! Output is byte-compatible with the files of the web version, so a file
+//! written here and one written by `JSON.stringify` are identical:
 //! - numbers use the ECMAScript `Number#toString` format (`1e+21`, `1e-7`,
 //!   `0.000001`, `-0` written `0`, non-finite written `null`);
 //! - strings are escaped like `JSON.stringify` (short escapes, `\u00xx` for
 //!   other control characters, everything else raw UTF-8);
-//! - object keys keep JS property order: integer-like keys (`"0"`, `"12"`) first
+//! - object keys keep ECMAScript property order: integer-like keys (`"0"`, `"12"`) first
 //!   in ascending order, then the other keys in insertion order;
 //! - `to_json_pretty(n)` matches `JSON.stringify(value, null, n)`.
 //!
@@ -35,7 +35,7 @@ pub enum Value {
     Object(Object),
 }
 
-/// A JSON object, keeping JS property order (see the module docs).
+/// A JSON object, keeping ECMAScript property order (see the module docs).
 ///
 /// Lookups are linear: the objects of this app have a handful of keys, where a
 /// scan beats hashing and keeps the order for free.
@@ -69,8 +69,8 @@ impl Object {
         self.get(key).is_some()
     }
 
-    /// Set `key`. An existing key keeps its position (like a JS assignment) and
-    /// its previous value is returned; a new one goes where JS would put it.
+    /// Set `key`. An existing key keeps its position and its previous
+    /// value is returned; a new one goes where ECMAScript property order puts it.
     pub fn insert(&mut self, key: impl Into<String>, value: Value) -> Option<Value> {
         let key = key.into();
         if let Some(slot) = self.get_mut(&key) {
@@ -110,7 +110,7 @@ impl FromIterator<(String, Value)> for Object {
 }
 
 /// The value of an ECMAScript array-index key (canonical decimal, 0..2^32-2),
-/// which JS orders before every other key.
+/// which ECMAScript orders before every other key.
 fn array_index(key: &str) -> Option<u32> {
     let bytes = key.as_bytes();
     let canonical = match bytes {
@@ -473,8 +473,8 @@ impl Parser<'_> {
                 return Err(self.error("digit expected in exponent"));
             }
         }
-        // The grammar is checked above; Rust's parser rounds like JS (and
-        // overflows to infinity like JS).
+        // The grammar is checked above; Rust's parser rounds to nearest (and
+        // overflows to infinity).
         self.text[start..self.pos].parse::<f64>().map(Value::Number).map_err(|_| self.error("invalid number"))
     }
 

@@ -1,4 +1,4 @@
-//! Patterns from a MIDI file (`logic/services/midi_import_service.js`).
+//! Patterns from a MIDI file.
 //!
 //! Notes are grouped by channel, and each channel becomes tracks:
 //! 1. a melodic channel whose program names a melodic instrument: one track
@@ -225,7 +225,7 @@ fn note_length(ticks: i64, division: f64) -> f64 {
     ordrumbox_core::num::round2(steps.max(0.01))
 }
 
-/// `#createPatternsFromTrackDefs`: 32-beat patterns covering the notes, every
+/// 32-beat patterns covering the notes, every
 /// track in each of them, and whether notes fall past the last one.
 fn patterns_from(defs: &[TrackDef], base_name: &str, division: f64) -> (Vec<Pattern>, bool) {
     // Each note goes to the step nearest its MIDI tick, rounded once: a note

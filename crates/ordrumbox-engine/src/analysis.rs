@@ -1,7 +1,6 @@
-//! What the kit editor shows about a sample (`audio/analyzer.js`,
-//! `audio/sample_analyzer.js`, `core/hz_to_note.js`): its envelope, length,
+//! What the kit editor shows about a sample: its envelope, length,
 //! peak and RMS levels, and the note it sounds (autocorrelation over its
-//! loudest frame), computed as the JS computes them.
+//! loudest frame).
 
 use ordrumbox_core::num::round_to;
 use ordrumbox_dsp::SampleBuffer;
@@ -25,7 +24,7 @@ pub struct NoteInfo {
 }
 
 impl std::fmt::Display for NoteInfo {
-    /// `formatNote`: "A4 +3ct".
+    /// The note and its cents: "A4 +3ct".
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let sign = if self.cents > 0 { "+" } else { "" };
         write!(f, "{}{} {sign}{}ct", self.name, self.octave, self.cents)
@@ -38,7 +37,7 @@ pub fn hz_to_midi_float(hz: f64) -> f64 {
     69.0 + 12.0 * (hz / 440.0).log2()
 }
 
-/// `hzToNote`.
+/// The note `hz` sounds, and how far off it is; `None` for no pitch.
 pub fn hz_to_note(hz: f64) -> Option<NoteInfo> {
     if !hz.is_finite() || hz <= 0.0 {
         return None;
@@ -66,7 +65,7 @@ pub struct Analysis {
     pub note: Option<NoteInfo>,
 }
 
-/// `mixToMono`, in `f32` like the `Float32Array` it fills.
+/// The sample in mono (the mean of its sides), in `f32`.
 fn mono(buffer: &SampleBuffer) -> Vec<f32> {
     match &buffer.right {
         None => buffer.left.clone(),
@@ -77,12 +76,12 @@ fn mono(buffer: &SampleBuffer) -> Vec<f32> {
     }
 }
 
-/// `linearToDb`.
+/// `value` in dB to 3 decimals; minus infinity for silence.
 fn to_db(value: f64) -> f64 {
     if !value.is_finite() || value <= 0.0 { f64::NEG_INFINITY } else { round_to(20.0 * value.log10(), 3) }
 }
 
-/// `nextPowerOfTwo`.
+/// The smallest power of two at least `value`.
 fn next_power_of_two(value: usize) -> usize {
     let mut power = 1;
     while power < value {
@@ -91,7 +90,7 @@ fn next_power_of_two(value: usize) -> usize {
     power
 }
 
-/// `selectAnalysisFrame`: the loudest `target`-sample frame (zero-padded
+/// The loudest `target`-sample frame (zero-padded
 /// when the sample is shorter).
 fn analysis_frame(samples: &[f32], target: usize) -> Vec<f32> {
     let size = next_power_of_two(target.min(samples.len())).max(32);
@@ -114,7 +113,7 @@ fn analysis_frame(samples: &[f32], target: usize) -> Vec<f32> {
     samples[best_offset..best_offset + size].to_vec()
 }
 
-/// `estimateFundamental`: the lag of the best normalized autocorrelation
+/// The lag of the best normalized autocorrelation
 /// (the first strong peak near it), as a frequency, with its confidence.
 fn fundamental(frame: &[f32], sample_rate: f64) -> (Option<f64>, f64) {
     let mean = frame.iter().fold(0.0, |sum, &v| sum + f64::from(v)) / frame.len() as f64;
@@ -201,7 +200,7 @@ pub fn analyze(buffer: &SampleBuffer) -> Analysis {
     }
 }
 
-/// `normalizeAll` for one sample: scaled to a 0 dB peak; `None` when silent.
+/// The sample scaled to a 0 dB peak; `None` when silent.
 pub fn normalized(buffer: &SampleBuffer) -> Option<SampleBuffer> {
     let analysis = analyze(buffer);
     if analysis.peak_linear <= 0.0 {
@@ -239,7 +238,7 @@ mod tests {
         assert!((analysis.peak_db + 6.02).abs() < 0.01);
         assert_eq!(analysis.envelope.len(), 128);
         let louder = normalized(&SampleBuffer::mono(vec![0.25, -0.5], 8000)).unwrap();
-        // The gain is computed from the peak in dB to 3 decimals, like the JS.
+        // The gain is computed from the peak in dB to 3 decimals.
         assert!((louder.left[1] + 1.0).abs() < 1e-4 && (louder.left[0] - 0.5).abs() < 1e-4);
     }
 }

@@ -1,4 +1,4 @@
-//! The pattern engine (`src/patterns/pattern_engine.js`): one pass of a
+//! The pattern engine: one pass of a
 //! pattern projected onto a flat timeline of ticks, with every repeat,
 //! arpeggio note, euclidean fill and variation resolved.
 //!
@@ -69,14 +69,14 @@ pub fn fires_on_pass(offset: i32, cycle: i32, pass: u32) -> bool {
 
 /// Compute pass `pass` (0-based, it selects the notes by `cycle`/`cycle_offset`) of a
 /// pattern. Within a tick, notes come in track order,
-/// then note order, then repeats, as in the JS app.
+/// then note order, then repeats.
 pub fn expand_hits(pattern: &Pattern, pass: u32, rng: &mut Rng, scales: &Scales) -> Hits {
     let mut flat = Hits::new();
     let pattern_ticks = pattern_ticks(pattern);
     let macro_factor = Macros::of(pattern).variation_factor();
     for (track_index, track) in pattern.tracks.iter().enumerate() {
         if track.steps_per_beat <= 0 {
-            continue; // no grid: JS computes NaN ticks for every note
+            continue; // no grid: no tick to place a note on
         }
         let loop_steps = track_loop_steps(track);
         let varied = variation::vary_notes(track, macro_factor, rng);
@@ -140,7 +140,7 @@ fn loop_occurrences(step: i64, loop_steps: i64, steps_per_beat: i32, pattern_tic
 
 /// End (exclusive step) of the span a note's euclidean fill covers: the next
 /// occupied step of the track, the loop point if it comes first, else the
-/// track end (`step_resolver.js`). Built once per track and pass.
+/// track end. Built once per track and pass.
 #[derive(Debug)]
 pub struct SpanResolver {
     occupied: HashSet<i64>,

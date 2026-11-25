@@ -128,7 +128,7 @@ impl Session {
     }
 
     /// Read a project file and put it in the place of the library
-    /// (`parseImportedFile`, `applyToAppState`: one undo step); its name.
+    /// (one undo step); its name.
     pub(super) fn read_project_file(&mut self, path: &Path) -> Result<String, String> {
         let text = std::fs::read_to_string(path).map_err(|e| format!("Load failed: {}: {e}", path.display()))?;
         let value = json::parse(&text).map_err(|e| format!("Load failed: {e}"))?;

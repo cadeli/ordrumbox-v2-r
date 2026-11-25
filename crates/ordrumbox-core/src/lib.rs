@@ -1,9 +1,7 @@
 //! Core of orDrumbox: data model, `song.json` compatibility layer and pattern
 //! engine. No I/O, no audio, no third-party dependency.
 //!
-//! Ported from `src/core/`, `src/model/` and `src/patterns/` of ordrumbox-v2.
-//! Loading follows `patterns/fixer.js`, saving follows `patterns/exporter.js`,
-//! checked against files produced by the JS app (`tests/fixtures/`).
+//! It reads the files of the web version as well (`tests/fixtures/`).
 
 pub mod arp;
 pub mod automation;

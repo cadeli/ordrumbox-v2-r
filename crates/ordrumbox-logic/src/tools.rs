@@ -433,13 +433,19 @@ pub fn learned_styles<'s>(cache: &'s mut (Styles, Option<u64>), written: &Styles
     &cache.0
 }
 
+#[path = "tools/answers.rs"]
+mod answers;
+#[path = "tools/arguments.rs"]
+mod arguments;
 #[path = "tools/arrangements.rs"]
 mod arrangements;
+#[path = "tools/edits.rs"]
+mod edits;
 #[path = "tools/generation.rs"]
 mod generation;
-#[path = "tools/helpers.rs"]
-mod helpers;
-pub use helpers::*;
+pub use answers::*;
+pub use arguments::*;
+use edits::*;
 
 #[cfg(test)]
 #[path = "tools/tests.rs"]
