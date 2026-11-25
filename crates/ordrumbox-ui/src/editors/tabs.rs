@@ -13,7 +13,7 @@ use crate::control::{Format, Spec};
 use crate::panel::{GenerationTab, Id, Item, Kind, LfoParam, Rect, dim, label_width};
 use crate::scale::Scale;
 use ordrumbox_core::drum_taxonomy::{InstrumentFamily, instrument_family};
-use ordrumbox_core::{Track, num};
+use ordrumbox_core::{DelayType, Track, num};
 use ordrumbox_engine::strip_settings::delay_beats_used;
 use ordrumbox_logic::generate;
 
@@ -74,7 +74,7 @@ fn fx_knob_row(rows: &mut Rows, view: &TrackView, state: &EditorState, fx: &FxDe
         let rect = rows.slot(slot, FX_SLOTS);
         slot += 1;
         // A slap is one echo: no feedback to set, its knob kept greyed out.
-        if p.key == "delayFeedback" && track.delay_type == "slap" {
+        if p.key == "delayFeedback" && track.delay_type == DelayType::Slap {
             rows.slot_choice(rect, p.label, Some(p.key), None, Kind::Disabled { label: "one echo".into() });
             continue;
         }

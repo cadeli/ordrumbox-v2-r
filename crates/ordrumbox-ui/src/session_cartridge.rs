@@ -9,8 +9,8 @@ use super::session_panel::{filter_on, number};
 use super::session_panel_views::synth_choice;
 use crate::editors::{self, EditorState, FxDef};
 use crate::panel::{Id, Step};
-use ordrumbox_core::Track;
 use ordrumbox_core::json::Value;
+use ordrumbox_core::{FilterType, Track};
 
 impl Session {
     /// Track `t` on synth preset `key`, one undo step.
@@ -87,8 +87,8 @@ const NO_SYNTH_PRESETS: &str = "No synth presets loaded.";
 pub(super) fn fx_switch(track: &Track, fx: &FxDef, state: &mut EditorState) -> Vec<(&'static str, Value)> {
     if editors::fx_on(track, fx) {
         if fx.is_filter() {
-            state.prev_filter_type = Some(track.filter_type.clone());
-            return vec![(fx.key, Value::String("allpass".into()))];
+            state.prev_filter_type = Some(track.filter_type);
+            return vec![(fx.key, Value::from(FilterType::Allpass.name()))];
         }
         return vec![(fx.key, number(0.0))];
     }

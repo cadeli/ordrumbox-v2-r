@@ -26,7 +26,7 @@ use crate::panel::{self, Item, Kind, Rect};
 use crate::panel::{EditorTab, Id, ViewButton};
 use crate::view;
 use crate::view::Layout;
-use ordrumbox_core::{Pattern, Track};
+use ordrumbox_core::{FilterType, Pattern, Track};
 use ordrumbox_logic::generate;
 use std::time::Duration;
 
@@ -421,7 +421,7 @@ fn note_slider_label(key: &str) -> Option<&'static str> {
 /// a cutoff at its 20 Hz default moves to [`editors::FILTER_ON_CUTOFF`].
 pub(super) fn filter_on(track: &Track, filter_type: String) -> Vec<(&'static str, Value)> {
     let mut updates = vec![("filterType", Value::String(filter_type))];
-    if track.filter_type == "allpass" && track.filter_cutoff <= Track::default().filter_cutoff {
+    if track.filter_type == FilterType::Allpass && track.filter_cutoff <= Track::default().filter_cutoff {
         updates.push(("filterCutoff", number(editors::FILTER_ON_CUTOFF)));
     }
     updates

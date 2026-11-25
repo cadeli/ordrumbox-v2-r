@@ -10,10 +10,9 @@
 
 use ordrumbox_core::json::Object;
 use ordrumbox_core::lfo;
-use ordrumbox_core::{AutomationTarget, Note, Track};
+use ordrumbox_core::{AutomationTarget, DelayType, FilterType, Note, Track};
 use ordrumbox_dsp::StripSettings;
-
-use crate::synth_preset::FILTER_TYPES;
+use ordrumbox_dsp::slope::FilterMode;
 
 /// A reverb type's settings: room, damp and width (`REVERB_PRESETS`), then
 /// pre-delay (seconds), dispersion and gate (seconds).
@@ -69,8 +68,16 @@ pub fn delay_beats_used(beats: f64, bpm: f64) -> f64 {
     used
 }
 
-fn filter_mode(name: &str) -> Option<f32> {
-    FILTER_TYPES.iter().position(|filter_type| *filter_type == name).map(|code| code as f32)
+/// The strip's filter mode of a track's filter type; `None` for `Allpass`,
+/// which skips the filter.
+fn filter_mode(filter_type: FilterType) -> Option<FilterMode> {
+    Some(match filter_type {
+        FilterType::Allpass => return None,
+        FilterType::Lowpass => FilterMode::Lowpass,
+        FilterType::Highpass => FilterMode::Highpass,
+        FilterType::Bandpass => FilterMode::Bandpass,
+        FilterType::Notch => FilterMode::Notch,
+    })
 }
 
 /// The strip's `filter_slope` for a track's `filterSlope`: 24 from 18 dB/oct
@@ -88,28 +95,19 @@ pub fn is_slap(s: &StripSettings) -> bool {
     s.delay_mode < 0.5
 }
 
-fn delay_mode(name: &str) -> Option<f32> {
-    Some(match name {
-        "slap" => SLAP_MODE,
-        "tape" => 1.0,
-        "pingpong" => 2.0,
-        _ => return None,
-    })
-}
+/// The strip's `delay_mode` of the tape delay, and of the ping-pong delay.
+const TAPE_MODE: f32 = 1.0;
+const PING_PONG_MODE: f32 = 2.0;
 
 /// The strip parameters set for `track` on a new strip
-/// at `bpm`. Unknown filter, reverb and delay types fall back to
-/// lowpass, none and tape. Solo is not a track setting: the caller silences
+/// at `bpm`. An unknown reverb type falls back to none. Solo is not a track setting: the caller silences
 /// the other tracks.
 pub fn strip_settings(track: &Track, bpm: f64) -> StripSettings {
     let mut s = StripSettings::default();
 
     // Filter: `allpass` skips it (the cutoff opens).
-    if track.filter_type == "allpass" {
-        s.cutoff = ordrumbox_dsp::MAX_FILTER_FREQ as f32;
-        s.filter_on = 0.0;
-    } else {
-        s.filter_mode = filter_mode(&track.filter_type).unwrap_or(0.0);
+    if let Some(mode) = filter_mode(track.filter_type) {
+        s.filter_mode = f32::from(mode.code());
         if track.filter_cutoff_lfo.is_none() {
             s.cutoff = finite_or(track.filter_cutoff, ordrumbox_dsp::MIN_FILTER_FREQ) as f32;
         }
@@ -117,6 +115,9 @@ pub fn strip_settings(track: &Track, bpm: f64) -> StripSettings {
             s.q = finite_or(track.filter_q, ordrumbox_dsp::MIN_FILTER_Q) as f32;
         }
         s.filter_slope = filter_slope(track.filter_slope);
+    } else {
+        s.cutoff = ordrumbox_dsp::MAX_FILTER_FREQ as f32;
+        s.filter_on = 0.0;
     }
 
     // Compressor: its mix is its amount, 0 skips it.
@@ -164,25 +165,23 @@ pub fn strip_settings(track: &Track, bpm: f64) -> StripSettings {
     // Delay: 'none' skips it. Without an amount it is still set up, silent,
     // for an automation lane to raise.
     let amount = if track.delay_on { finite_or(track.delay_mix, 0.0).clamp(0.0, 1.0) } else { 0.0 };
-    if track.delay_type == "none" {
-        s.delay_on = 0.0;
-        s.delay_mix = 0.0;
-    } else {
-        let mode = delay_mode(&track.delay_type).unwrap_or(1.0);
-        let beats = if track.delay_beats.is_finite() { track.delay_beats } else { 1.0 };
-        let seconds = 60.0 / bpm * delay_beats_used(beats, bpm);
-        s.delay_time_l = seconds as f32;
-        s.delay_time_r = seconds as f32;
-        s.delay_mode = mode;
-        s.delay_mix = amount as f32;
-        s.delay_feedback = finite_or(track.delay_feedback, 0.4).clamp(0.0, 0.95) as f32;
-        if is_slap(&s) {
-            // Slap: one echo.
+    match track.delay_type {
+        DelayType::None => {
+            s.delay_on = 0.0;
+            s.delay_mix = 0.0;
+        }
+        DelayType::Slap => {
+            // One echo.
+            set_delay(&mut s, track, bpm, amount, SLAP_MODE);
             s.delay_feedback = 0.0;
-        } else if mode < 1.5 {
+        }
+        DelayType::Tape => {
+            set_delay(&mut s, track, bpm, amount, TAPE_MODE);
             s.delay_wow = TAPE_WOW_SECONDS;
             s.delay_tone = TAPE_TONE;
-        } else {
+        }
+        DelayType::PingPong => {
+            set_delay(&mut s, track, bpm, amount, PING_PONG_MODE);
             s.delay_mono_in = 1.0;
         }
     }
@@ -200,6 +199,17 @@ pub fn strip_settings(track: &Track, bpm: f64) -> StripSettings {
         s.volume = 0.0;
     }
     s
+}
+
+/// The delay time, `amount`, feedback and `mode` of `track`'s delay at `bpm`.
+fn set_delay(s: &mut StripSettings, track: &Track, bpm: f64, amount: f64, mode: f32) {
+    let beats = if track.delay_beats.is_finite() { track.delay_beats } else { 1.0 };
+    let seconds = (60.0 / bpm * delay_beats_used(beats, bpm)) as f32;
+    s.delay_time_l = seconds;
+    s.delay_time_r = seconds;
+    s.delay_mode = mode;
+    s.delay_mix = amount as f32;
+    s.delay_feedback = finite_or(track.delay_feedback, 0.4).clamp(0.0, 0.95) as f32;
 }
 
 /// The saturation `amount` (0 to 1) as the strip's drive, output and mix.
@@ -400,7 +410,7 @@ mod tests {
 
     #[test]
     fn delay_follows_the_tempo() {
-        let track = Track { delay_type: "pingpong".into(), delay_beats: 0.5, delay_mix: 0.4, ..Track::default() };
+        let track = Track { delay_type: DelayType::PingPong, delay_beats: 0.5, delay_mix: 0.4, ..Track::default() };
         let s = strip_settings(&track, 120.0);
         assert_eq!((s.delay_time_l, s.delay_time_r, s.delay_mode, s.delay_mix), (0.25, 0.25, 2.0, 0.4));
         assert_eq!((s.delay_mono_in, s.delay_feedback), (1.0, 0.4));
@@ -410,7 +420,8 @@ mod tests {
     fn a_delay_without_amount_is_set_up_silent_and_none_is_off() {
         let silent = strip_settings(&Track { delay_beats: 0.5, delay_mix: 0.0, ..Track::default() }, 120.0);
         assert_eq!((silent.delay_on, silent.delay_mix, silent.delay_time_l), (1.0, 0.0, 0.25));
-        let none = Track { delay_type: "none".into(), reverb_type: "none".into(), delay_mix: 0.5, ..Track::default() };
+        let none =
+            Track { delay_type: DelayType::None, reverb_type: "none".into(), delay_mix: 0.5, ..Track::default() };
         let none = strip_settings(&none, 120.0);
         assert_eq!((none.delay_on, none.delay_mix, none.reverb_on, none.reverb_mix), (0.0, 0.0, 0.0, 0.0));
     }
@@ -443,11 +454,11 @@ mod tests {
 
     #[test]
     fn each_delay_type_sounds_its_own() {
-        let delay = |kind: &str| {
-            let track = Track { delay_type: kind.into(), delay_mix: 0.5, delay_feedback: 0.7, ..Track::default() };
+        let delay = |kind: DelayType| {
+            let track = Track { delay_type: kind, delay_mix: 0.5, delay_feedback: 0.7, ..Track::default() };
             strip_settings(&track, 120.0)
         };
-        let (slap, tape, ping_pong) = (delay("slap"), delay("tape"), delay("pingpong"));
+        let (slap, tape, ping_pong) = (delay(DelayType::Slap), delay(DelayType::Tape), delay(DelayType::PingPong));
         assert_eq!((slap.delay_feedback, slap.delay_wow), (0.0, 0.0));
         assert_eq!((tape.delay_feedback, tape.delay_wow, tape.delay_tone), (0.7, TAPE_WOW_SECONDS, TAPE_TONE));
         assert_eq!((ping_pong.delay_feedback, ping_pong.delay_mono_in), (0.7, 1.0));

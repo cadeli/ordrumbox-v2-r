@@ -4,7 +4,7 @@ use crate::panel::{EditorTab, GenerationTab, Id, Item, Rect, Step};
 use crate::scale::Scale;
 use ordrumbox_core::drum_taxonomy::instrument_family;
 use ordrumbox_core::json::Value;
-use ordrumbox_core::{RetriggerSpacing, ScaleList, json};
+use ordrumbox_core::{DelayType, FilterType, RetriggerSpacing, ScaleList, json};
 
 fn scales() -> ScaleList {
     ScaleList::from_json(
@@ -340,18 +340,18 @@ fn note_editor_hides_the_euclidean_prob() {
 fn the_fx_tab_shows_every_effect_and_moves_nothing_when_one_goes_on() {
     let area = Rect::new(700, 30, 360, 600);
     let state = EditorState { tab: EditorTab::Fx, ..EditorState::default() };
-    let off = Track { name: "KICK".into(), filter_type: "allpass".into(), ..Track::default() };
+    let off = Track { name: "KICK".into(), filter_type: FilterType::Allpass, ..Track::default() };
     let on = Track {
         name: "KICK".into(),
         reverb_mix: 0.5,
         reverb_type: "room".into(),
         delay_mix: 0.5,
-        delay_type: "slap".into(),
+        delay_type: DelayType::Slap,
         saturation_mix: 0.5,
         comp_mix: 1.0,
         duck_amount: 0.5,
         sidechain_source: "SNARE".into(),
-        filter_type: "lowpass".into(),
+        filter_type: FilterType::Lowpass,
         ..Track::default()
     };
     let mut places = Vec::new();
@@ -447,7 +447,7 @@ fn no_control_moves_whatever_the_tab_and_the_settings() {
             let track = Track {
                 name: name.into(),
                 auto_mode: auto,
-                delay_type: if slap { "slap" } else { "tape" }.into(),
+                delay_type: if slap { DelayType::Slap } else { DelayType::Tape },
                 filter_cutoff_lfo: with_lfo.then(|| lfo.as_object().cloned()).flatten(),
                 ..Track::default()
             };

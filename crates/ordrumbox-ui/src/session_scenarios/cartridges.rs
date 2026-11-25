@@ -3,8 +3,8 @@
 use super::super::Session;
 use crate::kits::KitSet;
 use crate::panel::{Id, Step};
-use ordrumbox_core::Library;
 use ordrumbox_core::json;
+use ordrumbox_core::{DelayType, FilterType, Library};
 use ordrumbox_engine::SynthPresets;
 
 /// A pattern of one KICK track, three synth presets.
@@ -95,11 +95,11 @@ fn a_type_turns_on_an_effect_with_an_amount_but_no_type() {
     assert!(s.editor.update_track(p, 0, &updates, None, false));
     let delay = |s: &Session| {
         let track = &s.pattern().unwrap().tracks[0];
-        (track.delay_type.clone(), track.delay_mix)
+        (track.delay_type, track.delay_mix)
     };
-    assert_eq!(delay(&s), ("none".into(), 0.25));
+    assert_eq!(delay(&s), (DelayType::None, 0.25));
     s.activate(Id::TrackSelectStep("delayType", Step::Next));
-    assert_eq!(delay(&s), ("pingpong".into(), 0.25), "the screen showed tape; its amount is kept");
+    assert_eq!(delay(&s), (DelayType::PingPong, 0.25), "the screen showed tape; its amount is kept");
 }
 
 #[test]
@@ -143,24 +143,24 @@ fn the_filter_s_type_is_on_its_screen() {
     let mut s = session();
     let filter = |s: &Session| {
         let track = &s.pattern().unwrap().tracks[0];
-        (track.filter_type.clone(), track.filter_cutoff)
+        (track.filter_type, track.filter_cutoff)
     };
     let (bypass, cutoff) = filter(&s);
-    assert_eq!(bypass, "allpass");
+    assert_eq!(bypass, FilterType::Allpass);
     // Off, the screen shows lowpass; an arrow turns the filter on at the next
     // type, its cutoff up from 20 Hz as its LED would.
     s.activate(Id::TrackSelectStep("filterType", Step::Next));
     let (kind, on_cutoff) = filter(&s);
-    assert_eq!(kind, "highpass");
+    assert_eq!(kind, FilterType::Highpass);
     assert!(on_cutoff > cutoff);
     s.activate(Id::TrackSelectStep("filterType", Step::Previous));
     s.activate(Id::TrackSelectStep("filterType", Step::Previous));
-    assert_eq!(filter(&s).0, "notch", "from the first type, the previous is the last");
+    assert_eq!(filter(&s).0, FilterType::Notch, "from the first type, the previous is the last");
     // The LED turns it off, then back on at the type it had.
     s.activate(Id::FxPower(5));
-    assert_eq!(filter(&s).0, "allpass");
+    assert_eq!(filter(&s).0, FilterType::Allpass);
     s.activate(Id::FxPower(5));
-    assert_eq!(filter(&s).0, "notch");
+    assert_eq!(filter(&s).0, FilterType::Notch);
 }
 
 #[test]

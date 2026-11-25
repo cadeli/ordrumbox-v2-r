@@ -14,6 +14,10 @@ pub trait JsonField: Sized {
     /// The value, or `None` when the JSON value has the wrong type.
     fn from_json(value: &Value) -> Option<Self>;
     fn to_json(&self) -> Value;
+    /// Why [`Self::from_json`] did not take `value`, for the load's `Issue`.
+    fn refusal(value: &Value) -> String {
+        refusal(value)
+    }
 }
 
 impl JsonField for bool {
@@ -86,6 +90,9 @@ impl<T: JsonField> JsonField for Option<T> {
     }
     fn to_json(&self) -> Value {
         self.as_ref().map_or(Value::Null, T::to_json)
+    }
+    fn refusal(value: &Value) -> String {
+        T::refusal(value)
     }
 }
 
@@ -196,6 +203,16 @@ macro_rules! json_record {
                         None => SetField::WrongType,
                     }, )*
                     _ => SetField::Unknown,
+                }
+            }
+
+            /// Why the field named `key` did not take `value` (its type's
+            /// [`JsonField::refusal`](crate::record::JsonField::refusal)).
+            pub fn refusal(key: &str, value: &$crate::json::Value) -> String {
+                use $crate::record::JsonField;
+                match key {
+                    $( $key $(| $web)* => <$ty as JsonField>::refusal(value), )*
+                    _ => $crate::record::refusal(value),
                 }
             }
 

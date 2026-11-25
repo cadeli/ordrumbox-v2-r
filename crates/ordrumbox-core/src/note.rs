@@ -7,7 +7,7 @@
 use crate::arp;
 use crate::json::{Object, Value};
 use crate::num::round2;
-use crate::record::{Issue, SetField, check_duplicate, json_record, past_max, refusal};
+use crate::record::{Issue, SetField, check_duplicate, json_record, past_max};
 use crate::retrigger_spacing::RetriggerSpacing;
 use crate::steps::{MAX_LOADED_BEATS, MAX_LOADED_STEPS};
 use crate::track::{MAX_FILTER_FREQ, MIN_FILTER_FREQ};
@@ -147,7 +147,7 @@ impl Note {
             .is_some_and(|&(_, max)| past_max(value, max, format!("{at}.{key}"), issues))
             && self.set_field(key, value) == SetField::WrongType
         {
-            issues.push(Issue::new(format!("{at}.{key}"), refusal(value)));
+            issues.push(Issue::new(format!("{at}.{key}"), Self::refusal(key, value)));
         }
     }
 

@@ -47,6 +47,9 @@ const EDGE_TRACKS: [&str; 15] = [
     r#"{"name":"O","mute":false,"velocity":0.3}"#,
 ];
 
+/// The settings of edge track `N` reported as unknown names.
+const UNKNOWN_TYPES: [&str; 2] = ["patterns[0].tracks[0].filterType", "patterns[0].tracks[0].delayType"];
+
 /// LFOs `song.json` does not reach: strings for numbers, every wave, the
 /// `waveform` spelling, codes and unknown names, negative values, defaults.
 const EDGE_LFOS: [&str; 9] = [
@@ -153,8 +156,11 @@ fn strip_lines(library: &Library, lines: &mut Vec<String>) {
     }
     for text in EDGE_TRACKS {
         let (edge, report) = Library::parse(&format!(r#"{{"patterns":[{{"tracks":[{text}]}}]}}"#)).unwrap();
-        assert!(report.issues.is_empty(), "{text}: {:#?}", report.issues);
         let track = edge.patterns[0].tracks[0].clone();
+        // `N` names unknown filter and delay types: reported, their defaults kept.
+        let reported: Vec<&str> = report.issues.iter().map(|issue| issue.at.as_str()).collect();
+        let expected: &[&str] = if track.name == "N" { &UNKNOWN_TYPES } else { &[] };
+        assert_eq!(reported, expected, "{text}: {:#?}", report.issues);
         cases.push((format!("edge {}", track.name), track, EDGE_BPM, true));
     }
     let mut seen = HashSet::new();

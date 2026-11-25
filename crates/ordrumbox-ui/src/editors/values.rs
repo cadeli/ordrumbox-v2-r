@@ -6,7 +6,7 @@ use crate::panel::{EditorTab, GenerationTab};
 use ordrumbox_core::arp::MAX_OCTAVES;
 use ordrumbox_core::json::Value;
 use ordrumbox_core::lfo::WAVE_TYPES;
-use ordrumbox_core::{Note, RetriggerSpacing, ScaleList, Track, num};
+use ordrumbox_core::{FilterType, Note, RetriggerSpacing, ScaleList, Track, num};
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -24,7 +24,7 @@ pub struct EditorState {
     /// The row last clicked.
     pub selected_prop: Option<&'static str>,
     /// The filter type the Filter button turns back on.
-    pub prev_filter_type: Option<String>,
+    pub prev_filter_type: Option<FilterType>,
 }
 
 // ─── Values of a track ───────────────────────────────────────────────────────
@@ -53,7 +53,7 @@ pub(super) fn has_lfo(track: &Track, key: &str) -> bool {
 /// An effect is on: its amount set, and a type (`none` plays nothing).
 pub fn fx_on(track: &Track, fx: &FxDef) -> bool {
     if fx.is_filter() {
-        return track.filter_type != "allpass";
+        return track.filter_type != FilterType::Allpass;
     }
     number(track, fx.key) > 0.0 && fx.type_key().is_none_or(|key| text_of(track, key) != "none")
 }
@@ -90,10 +90,10 @@ pub fn shown_value(track: &Track, key: &str, state: &EditorState) -> String {
     if values.contains(&value) {
         return value;
     }
-    let last = state.prev_filter_type.as_ref().filter(|last| key == "filterType" && values.contains(last));
+    let last = state.prev_filter_type.filter(|last| key == "filterType" && values.iter().any(|v| v == last.name()));
     let default = fx_of_type(key).and_then(|fx| fx.fx_type).map(|t| t.default);
     match (last, default) {
-        (Some(last), _) => last.clone(),
+        (Some(last), _) => last.name().to_owned(),
         (None, Some(default)) => default.to_owned(),
         (None, None) => value,
     }

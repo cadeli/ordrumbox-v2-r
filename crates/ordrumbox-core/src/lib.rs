@@ -7,6 +7,7 @@ pub mod arp;
 pub mod automation;
 pub mod chance;
 pub mod drum_taxonomy;
+pub mod effect_types;
 pub mod euclidean;
 pub mod ids;
 pub mod instruments;
@@ -32,6 +33,7 @@ mod variation;
 
 pub use automation::{AutomationKind, AutomationLane, AutomationPoint, AutomationStroke, AutomationTarget};
 pub use chance::Chance;
+pub use effect_types::{DelayType, FilterType};
 pub use library::{Library, LoadReport, ProjectRecord};
 pub use note::Note;
 pub use pattern::Pattern;

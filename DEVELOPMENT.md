@@ -616,3 +616,11 @@ nor a block rendered ahead of real time (`AudioSide::announce`, `receive`). `Hos
 `HostMix` stay: the MIDI clock, the MIDI controls and the stems use them. A session that never saves, for the MCP
 tests, opens a library given as text (`LibrarySource::Text`) on an output with no device (`handed_output`). No
 snapshot changed.
+
+A track's `filterType` and `delayType` are types of their own (`FilterType`, `DelayType`,
+`ordrumbox-core/src/effect_types.rs`), read and written under the same names. An unknown name is now an `Issue` that
+lists the names known, and the default is kept: an unknown `filterType` is `allpass` (the filter is skipped; it used
+to play as a lowpass, unsaid, and was saved back as it was), an unknown `delayType` is `tape` (as it played before,
+now said, and saved as `tape`). An MCP `updateTrack` with an unknown name is refused as of the wrong type. The strip's
+switches and modes stay `f32`, as the doc of `audio_params!` says why. `mapping_rust.txt` (engine) rewrote one line,
+edge track `N` (its `weird` filter now skipped: cutoff 20000), and `tests/mapping.rs` expects its two issues.

@@ -9,6 +9,15 @@
 
 /// Parameter set of a processor: a struct of `f32` fields with their
 /// `AudioParam` default and nominal range.
+///
+/// Switches (`filter_on`, `delay_on`) and modes (`filter_mode`,
+/// `delay_mode`, `saturation_type`) are `f32` too, on purpose: the table
+/// stays uniform, so [`approach`](StripSettings::approach) glides every field
+/// alike and `clamped` bounds every field alike. A processor reads a switch
+/// or a mode by its nearest code, so it flips halfway through the glide; a
+/// `bool` or an `enum` would flip at once and change the sound (the audio
+/// snapshots). The domain's types (`FilterType`, `DelayType`) stop at the
+/// engine, which writes their codes here.
 macro_rules! audio_params {
     (
         $(#[$meta:meta])*

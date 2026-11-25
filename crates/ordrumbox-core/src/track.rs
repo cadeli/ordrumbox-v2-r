@@ -5,10 +5,11 @@ use std::collections::HashMap;
 
 use crate::chance::Chance;
 use crate::drum_taxonomy::{mono_from_track_name, pan_from_track_name};
+use crate::effect_types::{DelayType, FilterType};
 use crate::json::{Object, Value};
 use crate::note::{Note, decode_notes, encode_notes};
 use crate::num::round2;
-use crate::record::{Issue, SetField, check_duplicate, json_record, past_max, refusal};
+use crate::record::{Issue, SetField, check_duplicate, json_record, past_max};
 use crate::steps::{MAX_BEATS, MAX_LOADED_BEATS, MAX_LOADED_STEPS, MAX_LOADED_STEPS_PER_BEAT};
 
 json_record! {
@@ -90,7 +91,7 @@ json_record! {
         compose_seed: f64 = 0.0 => "composeSeed",
         /// The generation leaves the track as it is (its line, its settings).
         compose_lock: bool = false => "composeLock",
-        filter_type: String = "allpass".to_owned() => "filterType",
+        filter_type: FilterType = FilterType::Allpass => "filterType",
         filter_cutoff_lfo: Option<Object> = None => "filterCutoffLfo" | "filterFreqLfo",
         /// Hz.
         filter_cutoff: f64 = MIN_FILTER_FREQ => "filterCutoff" | "filterFreq",
@@ -100,7 +101,7 @@ json_record! {
         filter_slope: f64 = 12.0 => "filterSlope",
         reverb_type: String = "none".to_owned() => "reverbType",
         reverb_mix: f64 = 0.0 => "reverbMix" | "reverbAmount",
-        delay_type: String = "tape".to_owned() => "delayType",
+        delay_type: DelayType = DelayType::Tape => "delayType",
         delay_beats: f64 = 1.0 => "delayBeats" | "delayTime",
         delay_mix: f64 = 0.0 => "delayMix" | "delayDepth",
         /// Share of each repeat fed back, 0–0.95 (not for `slap`: one echo).
@@ -353,7 +354,7 @@ impl Track {
                         issues.push(Issue::new(format!("{at}.pan"), message));
                     }
                     SetField::WrongType => {
-                        issues.push(Issue::new(format!("{at}.{key}"), refusal(value)));
+                        issues.push(Issue::new(format!("{at}.{key}"), Self::refusal(key, value)));
                     }
                     SetField::Unknown => {
                         track.extra.insert(key, value.clone());
@@ -503,6 +504,16 @@ mod tests {
         let mut issues = Vec::new();
         let track = Track::from_json(&json::parse(text).unwrap(), "t", &mut issues).unwrap();
         (track, issues)
+    }
+
+    #[test]
+    fn an_unknown_filter_or_delay_type_is_reported_and_the_default_kept() {
+        let (track, issues) = load(r#"{"filterType":"lopass","delayType":"pingpong"}"#);
+        assert_eq!((track.filter_type, track.delay_type), (FilterType::Allpass, DelayType::PingPong));
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].at, "t.filterType");
+        assert!(issues[0].message.starts_with(r#"unknown name ("lopass"), default kept; one of allpass, lowpass"#));
+        assert_eq!(load(r#"{"filterType":"notch"}"#).0.to_json().get("filterType"), Some(&Value::from("notch")));
     }
 
     #[test]
