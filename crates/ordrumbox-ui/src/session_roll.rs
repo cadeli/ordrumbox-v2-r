@@ -627,7 +627,7 @@ mod tests {
         assert_eq!(pitches, [(0, 0.0), (0, 4.0), (0, 7.0), (4, 7.0), (4, 11.0), (4, 14.0)]);
         // The next one is the next progression.
         s.roll_click(SIZE, layout.keys.x + 4, y, Button::Right);
-        assert!(s.chrome.widgets.dropdown.as_ref().unwrap().title.as_deref().unwrap().ends_with("I-vi-IV-V"));
+        assert!(s.chrome.widgets.dropdown().unwrap().title.as_deref().unwrap().ends_with("I-vi-IV-V"));
         choose(&mut s, 0); // Clear all
         s.overlay_key(OverlayKey::Enter);
         assert!(notes(&s).is_empty());

@@ -197,7 +197,7 @@ fn a_project_saved_comes_back_from_the_open_menu() {
     s.run(Command::NewGeneratedPattern);
     assert_eq!(s.editor.library().patterns.len(), count + 2);
     s.run(Command::LoadProject);
-    let menu = s.chrome.widgets.dropdown.as_ref().expect("the Open list");
+    let menu = s.chrome.widgets.dropdown().expect("the Open list");
     assert_eq!(menu.values.len(), 1);
     let value = menu.values[0].clone();
     draw(&mut s);

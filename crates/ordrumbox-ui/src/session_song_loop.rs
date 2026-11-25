@@ -88,7 +88,7 @@ impl Session {
             [("loop:toggle".to_owned(), toggle.to_owned()), ("loop:clear".to_owned(), "Remove the loop".to_owned())];
         let shortcuts = crate::menu::shown_shortcuts(&["Ctrl+L", ""]);
         let menu = Dropdown::menu(Id::SongMenu, x, y, "Loop".into(), lines);
-        self.chrome.widgets.dropdown = Some(menu.with_shortcuts(shortcuts));
+        self.chrome.widgets.open_dropdown(menu.with_shortcuts(shortcuts));
     }
 
     /// A line of the loop's menu: `toggle` or `clear`.

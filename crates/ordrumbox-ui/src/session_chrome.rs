@@ -33,8 +33,8 @@ pub(super) struct Widgets {
     pub(super) focus: Option<Id>,
     /// A knob or slider being dragged.
     pub(super) drag: Option<Drag>,
-    pub(super) dropdown: Option<Dropdown>,
-    pub(super) entry: Option<Entry>,
+    /// The drop-down list or the text entry open over the panels.
+    popup: Option<Popup>,
     /// The mouse, at its last move or press: where a text entry opens.
     pub(super) pointer: (i32, i32),
     /// Last click on a widget, for double-clicks.
@@ -42,6 +42,109 @@ pub(super) struct Widgets {
     /// A control's value copied from its right-click menu, to paste on
     /// another whose range holds it.
     pub(super) copied_value: Option<f64>,
+}
+
+/// What opens over the panels, one at a time: a drop-down list (a menu
+/// among them) or a text entry.
+#[derive(Debug)]
+enum Popup {
+    Dropdown(Dropdown),
+    Entry(Entry),
+}
+
+impl Widgets {
+    /// The drop-down list open.
+    pub(super) const fn dropdown(&self) -> Option<&Dropdown> {
+        match &self.popup {
+            Some(Popup::Dropdown(dropdown)) => Some(dropdown),
+            _ => None,
+        }
+    }
+
+    pub(super) const fn dropdown_mut(&mut self) -> Option<&mut Dropdown> {
+        match &mut self.popup {
+            Some(Popup::Dropdown(dropdown)) => Some(dropdown),
+            _ => None,
+        }
+    }
+
+    /// The text entry open.
+    pub(super) const fn entry(&self) -> Option<&Entry> {
+        match &self.popup {
+            Some(Popup::Entry(entry)) => Some(entry),
+            _ => None,
+        }
+    }
+
+    pub(super) const fn entry_mut(&mut self) -> Option<&mut Entry> {
+        match &mut self.popup {
+            Some(Popup::Entry(entry)) => Some(entry),
+            _ => None,
+        }
+    }
+
+    /// `dropdown` open, in place of any other popup.
+    pub(super) fn open_dropdown(&mut self, dropdown: Dropdown) {
+        self.popup = Some(Popup::Dropdown(dropdown));
+    }
+
+    /// `entry` open, in place of any other popup.
+    pub(super) fn open_entry(&mut self, entry: Entry) {
+        self.popup = Some(Popup::Entry(entry));
+    }
+
+    /// The drop-down list, closed; an entry stays open.
+    pub(super) fn take_dropdown(&mut self) -> Option<Dropdown> {
+        match self.popup.take() {
+            Some(Popup::Dropdown(dropdown)) => Some(dropdown),
+            other => {
+                self.popup = other;
+                None
+            }
+        }
+    }
+
+    /// The text entry, closed; a drop-down list stays open.
+    pub(super) fn take_entry(&mut self) -> Option<Entry> {
+        match self.popup.take() {
+            Some(Popup::Entry(entry)) => Some(entry),
+            other => {
+                self.popup = other;
+                None
+            }
+        }
+    }
+
+    /// The drop-down list closed; an entry stays open.
+    pub(super) fn close_dropdown(&mut self) {
+        if matches!(self.popup, Some(Popup::Dropdown(_))) {
+            self.popup = None;
+        }
+    }
+
+    /// The text entry closed; a drop-down list stays open.
+    pub(super) fn close_entry(&mut self) {
+        if matches!(self.popup, Some(Popup::Entry(_))) {
+            self.popup = None;
+        }
+    }
+
+    /// Back to the menu above the one open, or none (Escape, Left).
+    pub(super) fn dropdown_back(&mut self) {
+        if let Some(above) = self.take_dropdown().and_then(Dropdown::back) {
+            self.open_dropdown(above);
+        }
+    }
+
+    /// A drop-down list or an entry is open.
+    pub(super) const fn is_popup_open(&self) -> bool {
+        self.popup.is_some()
+    }
+
+    /// No drop-down list or entry open.
+    pub(super) fn close_popup(&mut self) {
+        self.popup = None;
+    }
 }
 
 /// What the mouse holds on the grid, from a press to its release: one
@@ -200,25 +303,19 @@ impl Chrome {
     pub(super) fn toggle_simple_view(&mut self) {
         self.panes.toggle_simple_view();
         self.widgets.focus = None;
-        self.widgets.dropdown = None;
-    }
-
-    /// A dropdown or an entry is open.
-    pub(super) fn popup_open(&self) -> bool {
-        self.widgets.dropdown.is_some() || self.widgets.entry.is_some()
+        self.widgets.close_dropdown();
     }
 
     /// A menu, a popup or an overlay takes the pointer from the panels under it.
     pub(super) fn covered(&self) -> bool {
-        self.menu.is_some() || self.popup_open() || self.overlay.is_some()
+        self.menu.is_some() || self.widgets.is_popup_open() || self.overlay.is_some()
     }
 
     /// No menu, overlay, dropdown or entry open.
     pub(super) fn close_popups(&mut self) {
         self.overlay = None;
         self.menu = None;
-        self.widgets.dropdown = None;
-        self.widgets.entry = None;
+        self.widgets.close_popup();
     }
 
     /// The VU levels after a frame that heard `raw`: each holds its peak and falls.

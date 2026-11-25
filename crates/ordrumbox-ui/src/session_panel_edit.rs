@@ -24,14 +24,14 @@ impl Session {
     pub fn toggle_track_editor(&mut self) {
         self.chrome.panes.toggle_track_editor();
         self.chrome.widgets.focus = None;
-        self.chrome.widgets.dropdown = None;
+        self.chrome.widgets.close_dropdown();
     }
 
     /// View > Note editor.
     pub fn toggle_note_editor(&mut self) {
         self.chrome.panes.toggle_note_editor();
         self.chrome.widgets.focus = None;
-        self.chrome.widgets.dropdown = None;
+        self.chrome.widgets.close_dropdown();
     }
 
     /// H: every track of pattern `p` on the synth patch that matches its name, written to the
@@ -322,7 +322,7 @@ impl Session {
 
     /// An option picked in the open list.
     pub(super) fn pick(&mut self, index: usize) {
-        let Some(mut dropdown) = self.chrome.widgets.dropdown.take() else { return };
+        let Some(mut dropdown) = self.chrome.widgets.take_dropdown() else { return };
         let Some(value) = dropdown.values.get(index).cloned() else { return };
         // A menu that opens another stays shown beside it, this line highlighted.
         dropdown.at = index;
@@ -346,7 +346,7 @@ impl Session {
         let lines = session_grid::category_lines_where(|id| sampled.contains(id));
         let title = format!("Instrument: {current}");
         let menu = Dropdown::menu(Id::InstrumentMenu, rect.x, rect.y + rect.h, title, lines);
-        self.chrome.widgets.dropdown = Some(menu);
+        self.chrome.widgets.open_dropdown(menu);
     }
 
     /// A line of the Sound tab's instrument menus, picked in `menu`: a

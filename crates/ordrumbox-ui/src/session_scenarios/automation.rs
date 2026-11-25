@@ -118,7 +118,7 @@ fn a_lane_taken_back_is_shown_and_re_enabled_on_its_own() {
     let (x, y) = find_hit(&s, |hit| hit == SongHit::LaneName(0));
     s.song_click(SIZE, x, y, crate::ui_input::Button::Right);
     assert_eq!(menu(&s).first().map(String::as_str), Some("reenable:0"));
-    s.chrome.widgets.dropdown = None;
+    s.chrome.widgets.close_dropdown();
     let (x, y) = find_hit(&s, |hit| hit == SongHit::LaneBadge(0));
     s.song_click(SIZE, x, y, crate::ui_input::Button::Left);
     assert_eq!(s.taken_back_lanes(), [false]);

@@ -79,7 +79,7 @@ mod tests {
         // The right button opens its menu, and selects it; the menu shows the keys.
         s.song_click(SIZE, x, y, Button::Right);
         assert_eq!(menu(&s), ["next:0", "delete:0"]);
-        let shortcuts = s.chrome.widgets.dropdown.as_ref().map(|d| d.shortcuts.clone()).unwrap_or_default();
+        let shortcuts = s.chrome.widgets.dropdown().map(|d| d.shortcuts.clone()).unwrap_or_default();
         assert_eq!(shortcuts, crate::menu::shown_shortcuts(&["Ctrl+D", "Delete"]));
         assert_eq!(s.selected_clip(), Some(0));
     }

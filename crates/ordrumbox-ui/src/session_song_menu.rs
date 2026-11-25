@@ -32,7 +32,7 @@ impl Session {
             (format!("rename:{p}"), "Rename".to_owned()),
             (format!("pattern-delete:{p}"), "Delete".to_owned()),
         ]);
-        self.chrome.widgets.dropdown = Some(Dropdown::menu(Id::SongMenu, x, y, title, lines));
+        self.chrome.widgets.open_dropdown(Dropdown::menu(Id::SongMenu, x, y, title, lines));
     }
 
     /// A clip: repeat it after itself, or remove it.
@@ -42,7 +42,7 @@ impl Session {
         let lines = [(format!("next:{c}"), "Next".to_owned()), (format!("delete:{c}"), "Delete".to_owned())];
         let shortcuts = crate::menu::shown_shortcuts(&["Ctrl+D", "Delete"]);
         let menu = Dropdown::menu(Id::SongMenu, x, y, title, lines);
-        self.chrome.widgets.dropdown = Some(menu.with_shortcuts(shortcuts));
+        self.chrome.widgets.open_dropdown(menu.with_shortcuts(shortcuts));
     }
 
     /// Row `r`'s name: add its pattern at the playhead, move the row up or
@@ -60,7 +60,7 @@ impl Session {
             lines.push((format!("down:{r}"), "Move down".to_owned()));
         }
         lines.push((format!("row:{}", row.id), "Delete row".to_owned()));
-        self.chrome.widgets.dropdown = Some(Dropdown::menu(Id::SongMenu, x, y, title, lines));
+        self.chrome.widgets.open_dropdown(Dropdown::menu(Id::SongMenu, x, y, title, lines));
     }
 
     /// The name a clip's pattern is shown by (its id when it is gone).
@@ -262,7 +262,7 @@ mod tests {
         // selected; a right-click offers it in a menu.
         assert!(right_click(&mut s, measure_x(0), row_y(0)));
         assert_eq!(menu(&s), ["add:0:a"]);
-        s.chrome.widgets.dropdown = None;
+        s.chrome.widgets.close_dropdown();
         assert!(click_and_release(&mut s, measure_x(0), row_y(0)));
         assert!(menu(&s).is_empty());
         assert_eq!(clips(&s)[3], ("a".into(), 0, 0.75));
@@ -346,10 +346,10 @@ mod tests {
         // The first row moves down only, the last one up only.
         assert!(right_click(&mut s, name_x, row_y(0)));
         assert!(menu(&s).contains(&"down:0".to_owned()) && !menu(&s).iter().any(|v| v.starts_with("up:")));
-        s.chrome.widgets.dropdown = None;
+        s.chrome.widgets.close_dropdown();
         assert!(right_click(&mut s, name_x, row_y(1)));
         assert!(menu(&s).contains(&"up:1".to_owned()) && !menu(&s).iter().any(|v| v.starts_with("down:")));
-        s.chrome.widgets.dropdown = None;
+        s.chrome.widgets.close_dropdown();
 
         // The pattern shown follows its row, through the undo too.
         s.song_menu_pick("down:0");
@@ -365,7 +365,7 @@ mod tests {
         assert!(s.song_click(SIZE, name_x, row_y(1), Button::Left));
         s.mouse_move(SIZE, name_x, row_y(1) + 1, false);
         assert!(s.song_release(SIZE));
-        assert!(s.chrome.widgets.dropdown.is_none());
+        assert!(s.chrome.widgets.dropdown().is_none());
         assert_eq!(s.pattern().unwrap().id, "b");
         assert_eq!(names(&s), ["a", "b"]);
         s.song_click(SIZE, name_x, row_y(1), Button::Left);

@@ -59,7 +59,7 @@ impl Session {
         let labels = files.iter().map(|f| f.file_stem().unwrap_or_default().to_string_lossy().into_owned()).collect();
         let values = files.iter().map(|f| format!("load:{}", f.display())).collect();
         let anchor = self.song_button_rect("load");
-        self.chrome.widgets.dropdown = Some(Dropdown {
+        self.chrome.widgets.open_dropdown(Dropdown {
             title: Some("Open Project".into()),
             ..Dropdown::new(Id::SongMenu, anchor, values, labels, 0)
         });

@@ -71,7 +71,7 @@ const fn control_hint(kind: &Kind) -> Option<&'static str> {
 impl Session {
     /// What the help line says for the pointer at `(x, y)`; `None`: the view's keys.
     fn hint_at(&self, size: (i32, i32, Scale), x: i32, y: i32) -> Option<&'static str> {
-        if self.overlay_open() || self.chrome.widgets.dropdown.is_some() || self.chrome.menu.is_some() {
+        if self.overlay_open() || self.chrome.widgets.dropdown().is_some() || self.chrome.menu.is_some() {
             return None;
         }
         let layout = self.panel_layout(size.0, size.1, size.2);

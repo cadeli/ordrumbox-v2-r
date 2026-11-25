@@ -155,10 +155,10 @@ impl Session {
         menu::draw(canvas, &menus, self.chrome.menu, scale);
         // In the bar, which the open menu's panel hangs under.
         menu::draw_library(canvas, &menus, &self.project_name(), self.library_state(), scale);
-        if let Some(dropdown) = &self.chrome.widgets.dropdown {
+        if let Some(dropdown) = self.chrome.widgets.dropdown() {
             dropdown.draw(canvas, scale);
         }
-        if let Some(entry) = &self.chrome.widgets.entry {
+        if let Some(entry) = self.chrome.widgets.entry() {
             entry.draw(canvas, scale);
         }
         for (rect, toast) in self.flash.rects(canvas.width(), canvas.height(), scale) {

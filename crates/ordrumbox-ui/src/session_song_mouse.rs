@@ -94,7 +94,7 @@ impl Session {
                 let title = format!("Add \"{}\" at measure {}", row.name, measure + 1);
                 let value = format!("add:{measure}:{}", row.id);
                 let menu = Dropdown::menu(Id::SongMenu, x, y, title, [(value, "Add here".to_owned())]);
-                self.chrome.widgets.dropdown = Some(menu);
+                self.chrome.widgets.open_dropdown(menu);
             }
             _ => return false,
         }
@@ -145,7 +145,7 @@ impl Session {
         }
         self.song_panel.last_clip_click = None;
         let Some(id) = self.song().and_then(|s| s.clips.get(clip)).map(|c| c.pattern_id.clone()) else { return false };
-        self.chrome.widgets.dropdown = None;
+        self.chrome.widgets.close_dropdown();
         match self.editor.library().pattern_index(&id) {
             Some(index) => {
                 self.show_pattern(index);
@@ -524,7 +524,7 @@ mod tests {
         assert!(s.song_click(SIZE, list.0, list.1, Button::Left));
         s.mouse_move(SIZE, list.0 + 1, list.1, false);
         assert!(s.song_release(SIZE));
-        assert!(s.chrome.widgets.dropdown.is_none());
+        assert!(s.chrome.widgets.dropdown().is_none());
         assert_eq!(s.pattern_index, 0);
         assert_eq!(clips(&s).len(), 1);
 
@@ -593,7 +593,7 @@ mod tests {
         assert!(s.song_release(SIZE));
         assert_eq!(s.selected_clip(), Some(0));
         assert!(s.song_click(SIZE, clip.0, clip.1, Button::Left));
-        assert!(s.chrome.widgets.dropdown.is_none());
+        assert!(s.chrome.widgets.dropdown().is_none());
         assert_eq!((s.pattern_index, s.workspace), (1, Workspace::Grid));
 
         // Two clicks too far apart are two clicks.

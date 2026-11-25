@@ -43,7 +43,7 @@ impl Session {
         let tonic = self.roll_pitch(t, midi - MIDI_MIN as i32);
         let lines =
             [("clear".to_owned(), "Clear all".to_owned()), (format!("sequence:{tonic}"), "Add sequence".to_owned())];
-        self.chrome.widgets.dropdown = Some(Dropdown::menu(Id::RollMenu, x, y, title, lines));
+        self.chrome.widgets.open_dropdown(Dropdown::menu(Id::RollMenu, x, y, title, lines));
     }
 
     /// A cell: add or delete its note, add a chord on it
@@ -60,7 +60,7 @@ impl Session {
         };
         let chords = ROLL_CHORDS.iter().map(|chord| (format!("{}:{at}", chord.key), chord.label.to_owned()));
         let lines = std::iter::once(note).chain(chords);
-        self.chrome.widgets.dropdown = Some(Dropdown::menu(Id::RollMenu, x, y, title, lines));
+        self.chrome.widgets.open_dropdown(Dropdown::menu(Id::RollMenu, x, y, title, lines));
     }
 
     /// An action of a piano roll menu.

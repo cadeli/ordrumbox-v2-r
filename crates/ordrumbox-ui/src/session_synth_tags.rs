@@ -46,7 +46,7 @@ impl Session {
         let (values, labels) = instrument_lines.chain(style_lines).unzip();
         let mut menu = Dropdown::new(Id::SynthPresetMenu, rect, values, labels, at);
         menu.control = Some(control);
-        self.chrome.widgets.dropdown = Some(menu);
+        self.chrome.widgets.open_dropdown(menu);
     }
 
     /// A line of the preset menus picked in `menu`: a group opens its
@@ -70,7 +70,7 @@ impl Session {
         if let Some(at) = at {
             submenu.highlight(at);
         }
-        self.chrome.widgets.dropdown = Some(submenu);
+        self.chrome.widgets.open_dropdown(submenu);
     }
 
     /// The preset select `control` shows.
@@ -143,13 +143,13 @@ mod tests {
         let layout = s.panel_layout(SIZE.0, SIZE.1, SIZE.2);
         let list = panel::find(&layout.items, Id::SynthPreset).expect("the preset list").rect;
         s.mouse_down(SIZE, list.x + 2, list.y + 2, Button::Left, false);
-        let open = s.chrome.widgets.dropdown.as_ref().expect("the groups");
+        let open = s.chrome.widgets.dropdown().expect("the groups");
         assert_eq!(open.labels, ["BASS (2) >", "SYNTHLEAD (1) >", "style: acid (1) >", "style: dub (1) >"]);
         assert_eq!(open.at, 0, "the instrument of the preset edited");
         // BASS, then its presets, the one edited highlighted: ACID picked.
         choose(&mut s, 0);
         assert_eq!(menu(&s), ["preset:ACID", "preset:SUB"]);
-        assert_eq!(s.chrome.widgets.dropdown.as_ref().map(|d| d.at), Some(1));
+        assert_eq!(s.chrome.widgets.dropdown().map(|d| d.at), Some(1));
         s.pick(0);
         assert_eq!(s.synth_editor.key(), Some("ACID"));
     }
@@ -166,7 +166,7 @@ mod tests {
         s.pick(0);
         s.synth_preset_menu(Id::Synth, "SUB", Rect::new(0, 0, 100, 14));
         s.pick(0);
-        assert_eq!(s.chrome.widgets.dropdown.as_ref().map(|d| d.at), Some(1), "the track's preset");
+        assert_eq!(s.chrome.widgets.dropdown().map(|d| d.at), Some(1), "the track's preset");
         s.pick(0);
         assert_eq!(s.track(0).and_then(|t| t.synth_preset.as_deref()), Some("ACID"));
     }
@@ -176,7 +176,7 @@ mod tests {
         let mut s = session();
         s.load_synth("LEAD");
         s.synth_tags_entry();
-        assert_eq!(s.chrome.widgets.entry.as_ref().map(|e| e.text.as_str()), Some("SYNTHLEAD"));
+        assert_eq!(s.chrome.widgets.entry().map(|e| e.text.as_str()), Some("SYNTHLEAD"));
         type_entry(&mut s, " bass , Dub ");
         assert_eq!(s.message, "tags set: listed under BASS");
         let groups = s.synths.presets.groups(Facet::Style);

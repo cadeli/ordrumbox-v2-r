@@ -67,7 +67,7 @@ impl Session {
             None => Some(0),
         };
         self.chrome.widgets.focus = None;
-        self.chrome.widgets.dropdown = None;
+        self.chrome.widgets.close_dropdown();
         self.update_analysis();
     }
 
@@ -250,7 +250,7 @@ impl Session {
         let lines = session_grid::category_lines();
         let title = format!("{}: {}", sample_file_name(&s.path), s.key.as_deref().unwrap_or(NO_INSTRUMENT));
         let menu = Dropdown::menu(Id::KitInstrumentMenu(sample), rect.x, rect.y + rect.h, title, lines);
-        self.chrome.widgets.dropdown = Some(menu);
+        self.chrome.widgets.open_dropdown(menu);
     }
 
     /// A line of sample `sample`'s instrument menus, picked in `menu`: a
@@ -463,7 +463,7 @@ mod tests {
     }
 
     fn pick(s: &mut Session, label: &str) {
-        let d = s.chrome.widgets.dropdown.as_ref().expect("a menu");
+        let d = s.chrome.widgets.dropdown().expect("a menu");
         let i = d.labels.iter().position(|l| l == label).unwrap_or_else(|| panic!("{label} in {:?}", d.labels));
         s.pick(i);
     }
@@ -540,7 +540,7 @@ mod tests {
         let mut s = session();
         let (x, y) = item_at(&s, Id::KitSampleInstrument(1));
         assert!(click(&mut s, x, y));
-        assert_eq!(s.chrome.widgets.dropdown.as_ref().map(|d| d.id), Some(Id::KitInstrumentMenu(1)));
+        assert_eq!(s.chrome.widgets.dropdown().map(|d| d.id), Some(Id::KitInstrumentMenu(1)));
         pick(&mut s, "Percussion >");
         pick(&mut s, "COWBELL");
         assert_eq!(s.kits.sample(0, 1).and_then(|i| i.key.as_deref()), Some("COWBELL"));
@@ -554,15 +554,15 @@ mod tests {
         s.editors.tab = crate::editors::TAB_SOUND;
         let (x, y) = item_at(&s, Id::Instrument);
         assert!(click(&mut s, x, y));
-        let menu = s.chrome.widgets.dropdown.as_ref().expect("a menu");
+        let menu = s.chrome.widgets.dropdown().expect("a menu");
         assert_eq!(menu.id, Id::InstrumentMenu);
         assert_eq!(menu.title.as_deref(), Some("Instrument: KICK"));
         assert!(!menu.labels.contains(&"Toms >".to_owned()), "no tom sampled: {:?}", menu.labels);
         pick(&mut s, "Percussion >");
-        let labels = &s.chrome.widgets.dropdown.as_ref().expect("the submenu").labels;
+        let labels = &s.chrome.widgets.dropdown().expect("the submenu").labels;
         assert_eq!(labels, &["COWBELL"], "only the sampled ones");
         pick(&mut s, "COWBELL");
-        assert!(s.chrome.widgets.dropdown.is_none());
+        assert!(s.chrome.widgets.dropdown().is_none());
         assert_eq!(s.pattern().unwrap().tracks[0].sample_path.as_deref(), Some("real/bell.wav"));
     }
 
@@ -576,9 +576,9 @@ mod tests {
         assert_eq!(title, "Played by track");
         assert!(text.contains("tracks") && text.contains("pattern"), "{text}");
         // A click on the title does nothing.
-        let before = s.chrome.widgets.dropdown.is_some() || s.chrome.widgets.entry.is_some();
+        let before = s.chrome.widgets.dropdown().is_some() || s.chrome.widgets.entry().is_some();
         click(&mut s, x, y);
-        assert_eq!(s.chrome.widgets.dropdown.is_some() || s.chrome.widgets.entry.is_some(), before);
+        assert_eq!(s.chrome.widgets.dropdown().is_some() || s.chrome.widgets.entry().is_some(), before);
     }
 
     #[test]
@@ -617,14 +617,14 @@ mod tests {
         let mut s = session();
         let (x, y) = item_at(&s, Id::KitText(KIT_DESC));
         assert!(click(&mut s, x, y));
-        let entry = s.chrome.widgets.entry.as_ref().expect("the entry");
+        let entry = s.chrome.widgets.entry().expect("the entry");
         assert_eq!(entry.id, Id::KitText(KIT_DESC));
         let r = entry.rect(SIZE.0, SIZE.1, SIZE.2);
         assert_eq!((r.x + 12, r.y + 22), (x, y), "its field starts at the mouse");
         // Near the window's edge, it stays inside.
         s.chrome.widgets.pointer = (SIZE.0 - 2, SIZE.1 - 2);
         s.kit_text_entry(KIT_TITLE);
-        let r = s.chrome.widgets.entry.as_ref().unwrap().rect(SIZE.0, SIZE.1, SIZE.2);
+        let r = s.chrome.widgets.entry().unwrap().rect(SIZE.0, SIZE.1, SIZE.2);
         assert!(r.x + r.w <= SIZE.0 && r.y + r.h <= SIZE.1);
     }
 }

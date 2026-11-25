@@ -88,7 +88,7 @@ impl Session {
         self.workspace = workspace;
         self.kit_editor.sample = None;
         self.chrome.widgets.focus = None;
-        self.chrome.widgets.dropdown = None;
+        self.chrome.widgets.close_dropdown();
         self.song_panel.hovered_clip = None;
         self.song_panel.hovered_lane = None;
         self.song_panel.drag = None;

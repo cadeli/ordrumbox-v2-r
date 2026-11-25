@@ -158,7 +158,7 @@ impl Session {
             }
             None => "Add track".to_owned(),
         };
-        self.chrome.widgets.dropdown = Some(open(Id::TrackNameMenu(target), title, lines));
+        self.chrome.widgets.open_dropdown(open(Id::TrackNameMenu(target), title, lines));
     }
 
     /// A line of the instrument menus, picked in `menu`: a category opens the
@@ -196,7 +196,7 @@ impl Session {
         let Some((category, ids)) = catalog().categories.get(index) else { return true };
         let lines = ids.iter().filter(|id| keep(id)).map(|id| (format!("{INSTRUMENT_VALUE}{id}"), id.clone()));
         let submenu = Dropdown::submenu(menu, self.chrome.panel_size, id, (*category).to_owned(), lines);
-        self.chrome.widgets.dropdown = Some(submenu);
+        self.chrome.widgets.open_dropdown(submenu);
         true
     }
 
@@ -276,7 +276,7 @@ impl Session {
         let (lines, keys): (Vec<_>, Vec<_>) = lines.map(|(value, label, key)| ((value, label.to_owned()), key)).unzip();
         let shortcuts = crate::menu::shown_shortcuts(&keys);
         let menu = Dropdown::menu(Id::GridMenu, x, y, title, lines).with_shortcuts(shortcuts);
-        self.chrome.widgets.dropdown = Some(menu);
+        self.chrome.widgets.open_dropdown(menu);
     }
 
     /// An action of a grid menu: the cursor goes to its track or step, and
@@ -488,12 +488,12 @@ mod tests {
 
     /// The menu open, its labels.
     fn labels(s: &Session) -> Vec<String> {
-        s.chrome.widgets.dropdown.as_ref().map(|d| d.labels.clone()).unwrap_or_default()
+        s.chrome.widgets.dropdown().map(|d| d.labels.clone()).unwrap_or_default()
     }
 
     /// Pick the line labelled `label` of the open menu, as a click does.
     fn pick(s: &mut Session, label: &str) {
-        let d = s.chrome.widgets.dropdown.as_ref().expect("a menu");
+        let d = s.chrome.widgets.dropdown().expect("a menu");
         let i = d.labels.iter().position(|l| l == label).unwrap_or_else(|| panic!("{label} in {:?}", d.labels));
         s.pick(i);
     }
@@ -501,7 +501,7 @@ mod tests {
     /// The titles of the menus shown, the top one last.
     fn menu_titles(s: &Session) -> Vec<String> {
         let mut titles = Vec::new();
-        let mut menu = s.chrome.widgets.dropdown.as_ref();
+        let mut menu = s.chrome.widgets.dropdown();
         while let Some(m) = menu {
             titles.insert(0, m.title.clone().unwrap_or_default());
             menu = m.parent.as_deref();
@@ -523,7 +523,7 @@ mod tests {
         assert_eq!(labels(&s), ["CHH", "CHHK", "OHH", "CYM", "CRASH", "RIDE"]);
         assert_eq!(menu_titles(&s), ["Add track", "Hats & cymbals"], "the categories stay shown");
         pick(&mut s, "OHH");
-        assert!(s.chrome.widgets.dropdown.is_none(), "every menu closes");
+        assert!(s.chrome.widgets.dropdown().is_none(), "every menu closes");
         assert_eq!(track_names(&s).len(), before + 1);
         assert_eq!(track_names(&s)[before], "OHH");
         assert_eq!(s.selection.cursor.map(|c| c.track), Some(before));
@@ -535,7 +535,7 @@ mod tests {
         let (width, height, scale) = SIZE;
         s.add_track_menu(30, 40);
         pick(&mut s, "Toms >");
-        let d = s.chrome.widgets.dropdown.as_ref().unwrap();
+        let d = s.chrome.widgets.dropdown().unwrap();
         let (parent, child) = (d.parent.as_ref().unwrap().rect(width, height, scale), d.rect(width, height, scale));
         assert_eq!(child.x, parent.x + parent.w, "on the right of the categories");
         // A click on another category of the menu above: its instruments instead.
@@ -550,11 +550,11 @@ mod tests {
         assert_eq!(menu_titles(&s), ["Add track", "Hats & cymbals"]);
         s.panel_key(SIZE, PanelKey::Escape, false, false);
         s.panel_key(SIZE, PanelKey::Escape, false, false);
-        assert!(s.chrome.widgets.dropdown.is_none());
+        assert!(s.chrome.widgets.dropdown().is_none());
         // Near the right edge, it opens on the left.
         s.add_track_menu(width, 40);
         pick(&mut s, "Toms >");
-        let d = s.chrome.widgets.dropdown.as_ref().unwrap();
+        let d = s.chrome.widgets.dropdown().unwrap();
         let (parent, child) = (d.parent.as_ref().unwrap().rect(width, height, scale), d.rect(width, height, scale));
         assert_eq!(child.x + child.w, parent.x);
     }
@@ -572,7 +572,7 @@ mod tests {
         pick(&mut s, "Bass & keys >");
         pick(&mut s, "PIANO");
         s.run(Command::AddTrack);
-        assert!(s.chrome.widgets.dropdown.is_none(), "the shortcut asks nothing");
+        assert!(s.chrome.widgets.dropdown().is_none(), "the shortcut asks nothing");
         assert_eq!(track_names(&s)[before..], ["LO_TOM", "PIANO", "KICK"]);
     }
 
@@ -590,11 +590,8 @@ mod tests {
         s.track_menu(1, 10, 10);
         pick(&mut s, "Rename track >");
         pick(&mut s, "Free name...");
-        assert!(s.chrome.widgets.dropdown.is_none());
-        assert_eq!(
-            s.chrome.widgets.entry.as_ref().map(|e| (e.id, e.text.as_str())),
-            Some((Id::TrackName(1), "COWBELL"))
-        );
+        assert!(s.chrome.widgets.dropdown().is_none());
+        assert_eq!(s.chrome.widgets.entry().map(|e| (e.id, e.text.as_str())), Some((Id::TrackName(1), "COWBELL")));
     }
 
     #[test]
@@ -762,10 +759,7 @@ mod tests {
         }
         let (x, y) = name.expect("a track name");
         assert!(s.grid_menu(SIZE, x, y));
-        assert_eq!(
-            s.chrome.widgets.dropdown.as_ref().and_then(|d| d.title.clone()),
-            Some(pattern.tracks[0].name.clone())
-        );
+        assert_eq!(s.chrome.widgets.dropdown().and_then(|d| d.title.clone()), Some(pattern.tracks[0].name.clone()));
         let (x, y) = cell.expect("a step");
         assert!(s.grid_menu(SIZE, x, y));
         assert!(labels(&s).contains(&"Add random note".to_owned()));

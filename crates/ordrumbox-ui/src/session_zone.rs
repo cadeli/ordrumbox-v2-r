@@ -272,13 +272,13 @@ mod tests {
 
     /// Pick the line labelled `label` of the open menu, as a click does.
     fn pick(s: &mut Session, label: &str) {
-        let d = s.chrome.widgets.dropdown.as_ref().expect("a menu");
+        let d = s.chrome.widgets.dropdown().expect("a menu");
         let i = d.labels.iter().position(|l| l == label).unwrap_or_else(|| panic!("{label} in {:?}", d.labels));
         s.pick(i);
     }
 
     fn labels(s: &Session) -> Vec<String> {
-        s.chrome.widgets.dropdown.as_ref().map(|d| d.labels.clone()).unwrap_or_default()
+        s.chrome.widgets.dropdown().map(|d| d.labels.clone()).unwrap_or_default()
     }
 
     /// Shift+drag from one step to another.

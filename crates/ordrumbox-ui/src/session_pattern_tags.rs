@@ -49,7 +49,7 @@ impl Session {
                 (format!("{STYLE_VALUE}{i}"), label)
             })
             .unzip();
-        self.chrome.widgets.dropdown = Some(Dropdown::new(Id::PatternMenu, rect, values, labels, at));
+        self.chrome.widgets.open_dropdown(Dropdown::new(Id::PatternMenu, rect, values, labels, at));
     }
 
     /// A line of the PATTERN menus picked in `menu`: a style opens its
@@ -72,7 +72,7 @@ impl Session {
         if let Some(at) = at {
             submenu.highlight(at);
         }
-        self.chrome.widgets.dropdown = Some(submenu);
+        self.chrome.widgets.open_dropdown(submenu);
     }
 }
 
@@ -101,7 +101,7 @@ mod tests {
         s.toggle_song_view();
         let line = s.song_layout(SIZE).tags_line();
         s.song_click(SIZE, line.x + line.w / 2, line.y + 2, Button::Left);
-        assert_eq!(s.chrome.widgets.entry.as_ref().map(|e| e.text.as_str()), Some("rock"));
+        assert_eq!(s.chrome.widgets.entry().map(|e| e.text.as_str()), Some("rock"));
         type_entry(&mut s, " Disco, BASS,disco ");
         assert_eq!(s.pattern().unwrap().tags, ["disco", "bass"]);
         assert_eq!(s.message, "tags set: listed under disco");
@@ -120,7 +120,7 @@ mod tests {
         let layout = s.panel_layout(SIZE.0, SIZE.1, SIZE.2);
         let list = panel::find(&layout.items, Id::PatternList).expect("the header's list").rect;
         s.mouse_down(SIZE, list.x + 2, list.y + 2, Button::Left, false);
-        let open = s.chrome.widgets.dropdown.as_ref().expect("the styles");
+        let open = s.chrome.widgets.dropdown().expect("the styles");
         assert_eq!(open.labels, ["funk (1) >", "rock (1) >", "other (1) >"]);
         assert_eq!(open.at, 0, "the style of the pattern shown");
         // rock, then its pattern: `a` shown.

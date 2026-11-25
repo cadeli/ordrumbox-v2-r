@@ -124,7 +124,7 @@ impl Session {
 
     /// Over an open list's scroll bar, or while its thumb is held.
     fn dropdown_pointer_shape(&self, size: (i32, i32, Scale), x: i32, y: i32) -> Option<PointerShape> {
-        let dropdown = self.chrome.widgets.dropdown.as_ref()?;
+        let dropdown = self.chrome.widgets.dropdown()?;
         if dropdown.bar_held {
             return Some(HELD_SHAPE);
         }

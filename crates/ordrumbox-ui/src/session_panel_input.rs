@@ -28,13 +28,13 @@ impl Session {
         self.chrome.panel_size = size;
         self.chrome.widgets.pointer = (x, y);
         let (width, height, scale) = size;
-        if let Some(dropdown) = self.chrome.widgets.dropdown.take() {
+        if let Some(dropdown) = self.chrome.widgets.take_dropdown() {
             self.press_dropdown(dropdown, size, (x, y), button == Button::Left);
             return true;
         }
-        if let Some(entry) = &self.chrome.widgets.entry {
+        if let Some(entry) = self.chrome.widgets.entry() {
             if !entry.rect(width, height, scale).contains(x, y) {
-                self.chrome.widgets.entry = None;
+                self.chrome.widgets.close_entry();
             }
             return true;
         }
@@ -90,15 +90,15 @@ impl Session {
                 dropdown.bar_held = true;
                 dropdown.bar_to(size, y);
             }
-            self.chrome.widgets.dropdown = Some(dropdown);
+            self.chrome.widgets.open_dropdown(dropdown);
         } else if let Some(i) = dropdown.hit(width, height, scale, x, y) {
-            self.chrome.widgets.dropdown = Some(dropdown);
+            self.chrome.widgets.open_dropdown(dropdown);
             if left {
                 self.pick(i);
             }
         } else if let Some((menu, i)) = dropdown.parent_at(width, height, scale, x, y) {
             // Back to a menu above: its submenus close, a line of it is picked.
-            self.chrome.widgets.dropdown = Some(menu);
+            self.chrome.widgets.open_dropdown(menu);
             if let (true, Some(i)) = (left, i) {
                 self.pick(i);
             }
@@ -212,7 +212,7 @@ impl Session {
             return self.song_bar_held(size, drag, x, y);
         }
         let (width, height, scale) = size;
-        if let Some(dropdown) = &mut self.chrome.widgets.dropdown {
+        if let Some(dropdown) = self.chrome.widgets.dropdown_mut() {
             if dropdown.bar_held {
                 return dropdown.bar_to(size, y);
             }
@@ -356,7 +356,7 @@ impl Session {
 
     pub fn mouse_up(&mut self) {
         self.chrome.widgets.drag = None;
-        if let Some(dropdown) = &mut self.chrome.widgets.dropdown {
+        if let Some(dropdown) = self.chrome.widgets.dropdown_mut() {
             dropdown.bar_held = false;
         }
         self.song_panel.release_bar();
@@ -380,7 +380,7 @@ impl Session {
         let (label, _) = control_name(id);
         let mut menu = Dropdown::menu(Id::ControlMenu, x, y, label.to_owned(), lines);
         menu.control = Some(id);
-        self.chrome.widgets.dropdown = Some(menu);
+        self.chrome.widgets.open_dropdown(menu);
     }
 
     /// A line of a control's right-click menu picked (`control`: whose).
@@ -420,11 +420,11 @@ impl Session {
     /// theirs. Over a control it is only theirs: the window never scrolls
     /// under a knob a wheel turn would turn, a fine delta included.
     pub fn wheel(&mut self, size: (i32, i32, Scale), x: i32, y: i32, lines: isize, shift: bool, ctrl: bool) -> bool {
-        if let Some(dropdown) = &mut self.chrome.widgets.dropdown {
+        if let Some(dropdown) = self.chrome.widgets.dropdown_mut() {
             dropdown.scroll(-lines);
             return true;
         }
-        if self.chrome.widgets.entry.is_some() {
+        if self.chrome.widgets.entry().is_some() {
             return false;
         }
         let (width, height, scale) = size;

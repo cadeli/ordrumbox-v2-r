@@ -16,11 +16,11 @@ impl Session {
     /// whether it was theirs.
     pub fn panel_key(&mut self, size: (i32, i32, Scale), key: PanelKey, shift: bool, ctrl: bool) -> bool {
         self.chrome.panel_size = size;
-        if self.chrome.widgets.entry.is_some() {
+        if self.chrome.widgets.entry().is_some() {
             self.entry_key(key);
             return true;
         }
-        if self.chrome.widgets.dropdown.is_some() {
+        if self.chrome.widgets.dropdown().is_some() {
             self.dropdown_key(key);
             return true;
         }
@@ -29,10 +29,10 @@ impl Session {
 
     /// A key while the number or text entry is open: it takes them all.
     pub(super) fn entry_key(&mut self, key: PanelKey) {
-        let Some(entry) = &mut self.chrome.widgets.entry else { return };
+        let Some(entry) = self.chrome.widgets.entry_mut() else { return };
         match key {
             PanelKey::Enter => self.commit_entry(),
-            PanelKey::Escape => self.chrome.widgets.entry = None,
+            PanelKey::Escape => self.chrome.widgets.close_entry(),
             PanelKey::Backspace => {
                 entry.text.pop();
             }
@@ -43,7 +43,7 @@ impl Session {
 
     /// A key while a drop-down list is open: it takes them all.
     pub(super) fn dropdown_key(&mut self, key: PanelKey) {
-        let Some(dropdown) = &mut self.chrome.widgets.dropdown else { return };
+        let Some(dropdown) = self.chrome.widgets.dropdown_mut() else { return };
         match key {
             PanelKey::Up => dropdown.step(-1),
             PanelKey::Down => dropdown.step(1),
@@ -61,10 +61,10 @@ impl Session {
             }
             // Back to the menu above (Escape closes the last one).
             PanelKey::Left | PanelKey::Backspace if dropdown.parent.is_some() => {
-                self.chrome.widgets.dropdown = self.chrome.widgets.dropdown.take().and_then(Dropdown::back);
+                self.chrome.widgets.dropdown_back();
             }
             PanelKey::Escape => {
-                self.chrome.widgets.dropdown = self.chrome.widgets.dropdown.take().and_then(Dropdown::back);
+                self.chrome.widgets.dropdown_back();
             }
             _ => {}
         }
@@ -136,7 +136,7 @@ impl Session {
 
     /// A typed character (the number entry, the open list's letter jump).
     pub fn panel_text(&mut self, c: char) -> bool {
-        if let Some(entry) = &mut self.chrome.widgets.entry {
+        if let Some(entry) = self.chrome.widgets.entry_mut() {
             let accepted = match entry.spec {
                 Some(_) => c.is_ascii_digit() || matches!(c, '.' | '-' | '+' | 'e' | 'E'),
                 None => !c.is_control(),
@@ -146,7 +146,7 @@ impl Session {
             }
             return true;
         }
-        if let Some(dropdown) = &mut self.chrome.widgets.dropdown {
+        if let Some(dropdown) = self.chrome.widgets.dropdown_mut() {
             if c.is_alphanumeric() {
                 dropdown.jump(c);
             }
@@ -173,7 +173,7 @@ impl Session {
             Id::Synth | Id::SynthPreset => {
                 self.synth_preset_menu(id, values.get(selected).map_or("", String::as_str), rect);
             }
-            _ => self.chrome.widgets.dropdown = Some(Dropdown::new(id, rect, values, labels, selected)),
+            _ => self.chrome.widgets.open_dropdown(Dropdown::new(id, rect, values, labels, selected)),
         }
     }
 
@@ -194,11 +194,11 @@ impl Session {
     /// holding `text`, opened at the mouse.
     pub(super) fn show_entry(&mut self, id: Id, spec: Option<Spec>, title: String, text: String) {
         let at = self.chrome.widgets.pointer;
-        self.chrome.widgets.entry = Some(Entry { id, spec, title, text, at });
+        self.chrome.widgets.open_entry(Entry { id, spec, title, text, at });
     }
 
     pub(super) fn commit_entry(&mut self) {
-        let Some(entry) = self.chrome.widgets.entry.take() else { return };
+        let Some(entry) = self.chrome.widgets.take_entry() else { return };
         let Some(spec) = entry.spec else { return self.commit_text(entry.id, &entry.text) };
         if entry.text.trim().is_empty() {
             return;

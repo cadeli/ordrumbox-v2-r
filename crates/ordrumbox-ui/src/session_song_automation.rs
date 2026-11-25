@@ -231,7 +231,7 @@ impl Session {
         }
         let lines = names.iter().map(|name| (format!("{INSTRUMENT_VALUE}{name}"), format!("{name}{SUBMENU_MARK}")));
         let menu = Dropdown::menu(Id::AutomationMenu, x, y, "New automation".into(), lines);
-        self.chrome.widgets.dropdown = Some(menu);
+        self.chrome.widgets.open_dropdown(menu);
     }
 
     /// Lane `lane`'s menu at `(x, y)`: re-enable it when a control took it
@@ -251,7 +251,7 @@ impl Session {
         ];
         let lines = reenable.into_iter().chain(lines.map(|(value, label)| (value, label.to_owned())));
         let menu = Dropdown::menu(Id::AutomationMenu, x, y, title, lines);
-        self.chrome.widgets.dropdown = Some(menu);
+        self.chrome.widgets.open_dropdown(menu);
     }
 
     /// A line of the automation menus, picked in `menu`: an instrument opens
@@ -263,7 +263,7 @@ impl Session {
                 AutomationTarget::ALL.map(|t| (format!("{LANE_VALUE}{}:{instrument}", t.key()), t.label().to_owned()));
             let size = self.chrome.panel_size;
             let submenu = Dropdown::submenu(menu, size, Id::AutomationMenu, instrument.to_owned(), lines);
-            self.chrome.widgets.dropdown = Some(submenu);
+            self.chrome.widgets.open_dropdown(submenu);
         } else if let Some((key, instrument)) = value.strip_prefix(LANE_VALUE).and_then(|v| v.split_once(':')) {
             let Some(target) = AutomationTarget::from_key(key) else { return };
             match self.editor.add_automation_lane(None, instrument, target) {

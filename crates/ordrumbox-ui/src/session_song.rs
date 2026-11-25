@@ -514,7 +514,7 @@ pub(super) mod tests {
 
     /// The menu open: its values.
     pub(crate) fn menu(session: &Session) -> Vec<String> {
-        session.chrome.widgets.dropdown.as_ref().map(|d| d.values.clone()).unwrap_or_default()
+        session.chrome.widgets.dropdown().map(|d| d.values.clone()).unwrap_or_default()
     }
 
     /// Option `i` of the open menu chosen with the keys.
@@ -527,7 +527,7 @@ pub(super) mod tests {
 
     /// `text` typed in the open entry, then Enter.
     pub(crate) fn type_entry(session: &mut Session, text: &str) {
-        session.chrome.widgets.entry.as_mut().expect("an entry").text = text.into();
+        session.chrome.widgets.entry_mut().expect("an entry").text = text.into();
         session.panel_key(SIZE, PanelKey::Enter, false, false);
     }
 
@@ -574,7 +574,7 @@ pub(super) mod tests {
         s.song_click(SIZE, row.0, row.1, Button::Right);
         let rename = menu(&s).iter().position(|v| v == "rename:1").unwrap();
         choose(&mut s, rename);
-        assert_eq!(s.chrome.widgets.entry.as_ref().map(|e| (e.id, e.text.as_str())), Some((Id::SongPattern(1), "b")));
+        assert_eq!(s.chrome.widgets.entry().map(|e| (e.id, e.text.as_str())), Some((Id::SongPattern(1), "b")));
         type_entry(&mut s, "B two");
         assert_eq!(s.editor.library().patterns[1].name.as_deref(), Some("B two"));
         // New and Delete.
@@ -604,7 +604,7 @@ pub(super) mod tests {
             panel::find(&s.panel_layout(SIZE.0, SIZE.1, Scale::ONE).items, Id::SongButton("load")).unwrap().rect
         );
         s.run(Command::RenameProject);
-        assert_eq!(s.chrome.widgets.entry.as_ref().map(|e| e.id), Some(Id::ProjectName));
+        assert_eq!(s.chrome.widgets.entry().map(|e| e.id), Some(Id::ProjectName));
         type_entry(&mut s, "From the menu");
         assert_eq!(s.project_name(), "From the menu");
         s.run(Command::NewSong);

@@ -142,7 +142,7 @@ impl Session {
             ("all".to_owned(), "Reset all notes".to_owned()),
             ("auto-height".to_owned(), "Automatic height".to_owned()),
         ];
-        self.chrome.widgets.dropdown = Some(Dropdown::menu(Id::LaneMenu, x, y, title, lines));
+        self.chrome.widgets.open_dropdown(Dropdown::menu(Id::LaneMenu, x, y, title, lines));
         true
     }
 

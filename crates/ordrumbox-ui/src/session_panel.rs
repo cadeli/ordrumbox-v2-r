@@ -329,13 +329,13 @@ impl Session {
 
     /// A drop-down list or a number entry is open (it takes every key and click).
     pub fn popup_open(&self) -> bool {
-        self.chrome.popup_open()
+        self.chrome.widgets.is_popup_open()
     }
 
     /// A number or text entry is open. It is the one place that keeps Space:
     /// a text entry types a space in it.
     pub fn entry_open(&self) -> bool {
-        self.chrome.widgets.entry.is_some()
+        self.chrome.widgets.entry().is_some()
     }
 
     /// The track editor on its Generate tab.
@@ -657,7 +657,7 @@ mod tests {
         let (x, y) = center(view::header_controls(Scale::ONE).bpm);
         s.show_mode(PlayMode::Song);
         s.run(crate::menu::Command::NewSong);
-        s.chrome.widgets.entry.as_mut().unwrap().text = "verse".into();
+        s.chrome.widgets.entry_mut().unwrap().text = "verse".into();
         s.panel_key(SIZE, PanelKey::Enter, false, false);
         assert!(s.song_view_open());
         let song_bpm = s.song().unwrap().bpm;
@@ -686,7 +686,7 @@ mod tests {
         assert_eq!(s.editor.library().bpm, 103.0);
         s.mouse_down(SIZE, x, y, Button::Right, false);
         s.pick(0);
-        s.chrome.widgets.entry.as_mut().unwrap().text = "140".into();
+        s.chrome.widgets.entry_mut().unwrap().text = "140".into();
         s.panel_key(SIZE, PanelKey::Enter, false, false);
         assert_eq!(s.editor.library().bpm, 140.0);
         // The beats list: 8.
@@ -786,11 +786,11 @@ mod tests {
     fn the_pattern_menu_renames_and_describes() {
         let mut s = session();
         s.run(Command::RenamePattern);
-        s.chrome.widgets.entry.as_mut().unwrap().text = " Verse ".into();
+        s.chrome.widgets.entry_mut().unwrap().text = " Verse ".into();
         s.panel_key(SIZE, PanelKey::Enter, false, false);
         assert_eq!(s.pattern().unwrap().name.as_deref(), Some("Verse"));
         s.run(Command::PatternDescription);
-        assert_eq!(s.chrome.widgets.entry.as_ref().map(|e| e.text.as_str()), Some(""));
+        assert_eq!(s.chrome.widgets.entry().map(|e| e.text.as_str()), Some(""));
         s.panel_text('x');
         s.panel_key(SIZE, PanelKey::Space, false, false);
         s.panel_text('y');
