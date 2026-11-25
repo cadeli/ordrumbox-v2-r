@@ -8,6 +8,7 @@ use ordrumbox_core::num;
 use ordrumbox_logic::block::{Block, StepAt, Zone};
 
 use super::Session;
+use super::session_chrome::GridHold;
 use super::session_labels::{copied_message, deleted_message, pasted_message};
 use super::session_selection::Clipboard;
 use super::session_song::is_drag_start;
@@ -31,16 +32,16 @@ impl Session {
     pub fn press_zone_drag(&mut self, t: usize, beat: i32, step: i32, x: i32, y: i32) {
         self.selection.zone = None;
         let anchor = StepAt { track: t, beat, step };
-        self.chrome.zone_drag =
-            Some(ZoneDrag { anchor, press: (x, y), started: false, revision: self.editor.revision() });
+        let drag = ZoneDrag { anchor, press: (x, y), started: false, revision: self.editor.revision() };
+        self.chrome.grid_hold = Some(GridHold::Zone(drag));
     }
 
     /// The mouse moved with a step Shift+pressed: the zone from it to the
     /// step under the mouse (the nearest of the page); whether to redraw.
     pub(super) fn zone_drag_move(&mut self, size: (i32, i32, Scale), x: i32, y: i32) -> bool {
-        let Some(drag) = &mut self.chrome.zone_drag else { return false };
+        let Some(GridHold::Zone(drag)) = &mut self.chrome.grid_hold else { return false };
         if drag.revision != self.editor.revision() {
-            self.chrome.zone_drag = None;
+            self.chrome.grid_hold = None;
             return false;
         }
         drag.started |= is_drag_start(drag.press, x, y);

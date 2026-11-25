@@ -10,6 +10,7 @@ use ordrumbox_core::num;
 use crate::panel::SUBMENU_MARK;
 
 use super::Session;
+use super::session_chrome::GridHold;
 use super::session_labels::beat_label;
 use super::session_panel::DOUBLE_CLICK;
 use super::session_selection::Clipboard;
@@ -358,13 +359,16 @@ impl Session {
 
     /// A press on the name of track `t`.
     fn press_track_drag(&mut self, t: usize, x: i32, y: i32) {
-        self.chrome.track_drag =
-            Some(TrackDrag { track: t, press: (x, y), y, started: false, revision: self.editor.revision() });
+        let drag = TrackDrag { track: t, press: (x, y), y, started: false, revision: self.editor.revision() };
+        self.chrome.grid_hold = Some(GridHold::Track(drag));
     }
 
     /// The drag under way, unless the pattern may have changed under it.
     fn live_track_drag(&self) -> Option<TrackDrag> {
-        self.chrome.track_drag.filter(|d| d.started && d.revision == self.editor.revision())
+        match self.chrome.grid_hold {
+            Some(GridHold::Track(d)) if d.started && d.revision == self.editor.revision() => Some(d),
+            _ => None,
+        }
     }
 
     /// The track dragged and the row it would take.
@@ -375,7 +379,7 @@ impl Session {
 
     /// The mouse moved with a name pressed; whether to redraw.
     pub(super) fn track_drag_move(&mut self, x: i32, y: i32) -> bool {
-        let Some(drag) = &mut self.chrome.track_drag else { return false };
+        let Some(GridHold::Track(drag)) = &mut self.chrome.grid_hold else { return false };
         drag.y = y;
         let (dx, dy) = (x - drag.press.0, y - drag.press.1);
         drag.started |= dx.abs() >= DRAG_START_PX || dy.abs() >= DRAG_START_PX;
@@ -385,7 +389,7 @@ impl Session {
     /// The press released: a drag moves its track; whether it was one.
     pub fn track_release(&mut self, size: (i32, i32, Scale)) -> bool {
         let drop = self.track_drop(size);
-        self.chrome.track_drag = None;
+        self.chrome.grid_hold = None;
         let Some((from, to)) = drop else { return false };
         self.move_track(from, to);
         true
@@ -689,7 +693,7 @@ mod tests {
         s.press_track_name(1, 10, 10);
         assert!(s.piano_roll_open());
         assert_eq!(s.roll_track(), Some(1));
-        assert!(s.chrome.track_drag.is_none(), "no drag starts");
+        assert!(s.chrome.grid_hold.is_none(), "no drag starts");
     }
 
     #[test]

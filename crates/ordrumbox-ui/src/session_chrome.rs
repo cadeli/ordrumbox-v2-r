@@ -7,7 +7,7 @@ use crate::scale::Scale;
 use std::path::PathBuf;
 
 use super::session_overlay::Overlay;
-use super::{menu, session_grid, session_lane, session_zone};
+use super::{menu, session_grid, session_lane, session_zone, session_zoom};
 use crate::panel::{Dropdown, Entry, Id};
 use std::time::Instant;
 
@@ -44,6 +44,86 @@ pub(super) struct Widgets {
     pub(super) copied_value: Option<f64>,
 }
 
+/// What the mouse holds on the grid, from a press to its release: one
+/// thing at a time.
+#[derive(Debug, Clone, Copy)]
+pub(super) enum GridHold {
+    /// A track's name, that may be dragged to another row.
+    Track(session_grid::TrackDrag),
+    /// A step Shift+pressed, that may be dragged into a zone.
+    Zone(session_zone::ZoneDrag),
+    /// The lane under the grid, pressed and painted.
+    Lane(session_lane::LaneDrag),
+    /// The lane's top edge: where, and how tall the lane was.
+    LaneResize(session_lane::LaneResize),
+    /// The grid's scroll bar.
+    Bar(crate::view::BarHold),
+}
+
+/// Which panels the window shows around the main view.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct Panes {
+    /// The track editor, on the right.
+    track_editor: bool,
+    /// The note editor, under the grid and the piano roll.
+    note_editor: bool,
+    /// The VU meter stripe.
+    vus: bool,
+}
+
+impl Default for Panes {
+    fn default() -> Self {
+        Self { track_editor: true, note_editor: true, vus: true }
+    }
+}
+
+impl Panes {
+    pub(super) const fn track_editor(self) -> bool {
+        self.track_editor
+    }
+
+    pub(super) const fn note_editor(self) -> bool {
+        self.note_editor
+    }
+
+    pub(super) const fn vus(self) -> bool {
+        self.vus
+    }
+
+    pub(super) const fn toggle_track_editor(&mut self) {
+        self.track_editor = !self.track_editor;
+    }
+
+    pub(super) const fn toggle_note_editor(&mut self) {
+        self.note_editor = !self.note_editor;
+    }
+
+    pub(super) const fn toggle_vus(&mut self) {
+        self.vus = !self.vus;
+    }
+
+    pub(super) const fn show_track_editor(&mut self) {
+        self.track_editor = true;
+    }
+
+    /// The compact view: the grid alone, the track editor and the note
+    /// editor folded away.
+    pub(super) const fn fold_editors(&mut self) {
+        self.track_editor = false;
+        self.note_editor = false;
+    }
+
+    /// The simple view, folded; again, both editors shown.
+    const fn toggle_simple_view(&mut self) {
+        if self.track_editor || self.note_editor {
+            self.fold_editors();
+        } else {
+            self.track_editor = true;
+            self.note_editor = true;
+        }
+    }
+}
+
 /// How fast a VU level falls, per frame drawn.
 const LEVEL_DECAY: f32 = 0.88;
 /// A VU level below this is silence.
@@ -69,37 +149,21 @@ pub(super) struct Chrome {
     pub(super) hint: Option<&'static str>,
     /// The control of a panel under the mouse that has a tooltip, and where it is.
     pub(super) control_hover: Option<(crate::panel::Id, crate::panel::Rect)>,
-    /// A track pressed by its name, that may be dragged to another row.
-    pub(super) track_drag: Option<session_grid::TrackDrag>,
+    /// What the mouse holds on the grid.
+    pub(super) grid_hold: Option<GridHold>,
     /// The last press on a track's name and when: a second one soon after opens the piano roll.
     pub(super) last_name_press: Option<(usize, std::time::Instant)>,
-    /// A step Shift+pressed, that may be dragged into a zone.
-    pub(super) zone_drag: Option<session_zone::ZoneDrag>,
-    /// The lane under the grid, pressed and painted.
-    pub(super) lane_drag: Option<session_lane::LaneDrag>,
     /// The lane's height set by dragging its top edge, in scale units;
     /// `None`: automatic.
     pub(super) lane_height: Option<i32>,
-    /// The lane's top edge pressed: where, and how tall the lane was.
-    pub(super) lane_resize: Option<session_lane::LaneResize>,
     /// Window size and scale of the last mouse or key event on the widgets.
     pub(super) panel_size: (i32, i32, Scale),
     /// The beats of the pattern the grid shows.
     pub(super) beat_window: crate::view::BeatWindow,
-    /// The grid's scroll bar, held by the mouse.
-    pub(super) grid_bar_drag: Option<crate::view::BarHold>,
-    /// The track editor shown on the right.
-    pub(super) show_track_editor: bool,
-    /// The note editor shown under the grid and the piano roll.
-    pub(super) show_note_editor: bool,
-    /// Whether the VU meter stripe is shown.
-    pub(super) show_vus: bool,
-    /// The display's scale factor (at least ×1), to the nearest quarter.
-    pub(super) display_scale: Scale,
-    /// Quarters of a scale unit added to the display's (Ctrl++, Ctrl+-; `session_zoom.rs`).
-    pub(super) zoom: i32,
-    /// The window's size in physical pixels, which "Zoom: fit to window" fits.
-    pub(super) window: (i32, i32),
+    /// The panels shown around the main view.
+    pub(super) panes: Panes,
+    /// The zoom of the UI (`session_zoom.rs`).
+    pub(super) zoom: session_zoom::Zoom,
     /// The colour scheme in use, from 1, set again on the thread that draws.
     pub(super) color_scheme: usize,
     /// Smoothed per-track levels for the VU meter stripe.
@@ -117,21 +181,13 @@ impl Default for Chrome {
             hover: None,
             hint: None,
             control_hover: None,
-            track_drag: None,
+            grid_hold: None,
             last_name_press: None,
-            zone_drag: None,
-            lane_drag: None,
             lane_height: None,
-            lane_resize: None,
             panel_size: (0, 0, Scale::ONE),
             beat_window: crate::view::BeatWindow::default(),
-            grid_bar_drag: None,
-            show_track_editor: true,
-            show_note_editor: true,
-            show_vus: true,
-            display_scale: Scale::ONE,
-            zoom: 0,
-            window: (0, 0),
+            panes: Panes::default(),
+            zoom: session_zoom::Zoom::default(),
             color_scheme: 1,
             track_levels: Vec::new(),
         }
@@ -139,23 +195,10 @@ impl Default for Chrome {
 }
 
 impl Chrome {
-    /// The compact view: the grid alone, the track editor and the note
-    /// editor folded away.
-    pub(super) fn fold_editors(&mut self) {
-        self.show_track_editor = false;
-        self.show_note_editor = false;
-    }
-
     /// View > Simple view: the grid alone, the track editor and the note
     /// editor folded; again, both shown.
     pub(super) fn toggle_simple_view(&mut self) {
-        let simple = !self.show_track_editor && !self.show_note_editor;
-        if simple {
-            self.show_track_editor = true;
-            self.show_note_editor = true;
-        } else {
-            self.fold_editors();
-        }
+        self.panes.toggle_simple_view();
         self.widgets.focus = None;
         self.widgets.dropdown = None;
     }

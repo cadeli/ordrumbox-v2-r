@@ -162,16 +162,16 @@ impl Session {
 
     /// The first start: the simple view, the grid alone, and how to show the rest.
     fn start_simple(&mut self) {
-        self.chrome.fold_editors();
+        self.chrome.panes.fold_editors();
         self.message = SIMPLE_START.to_owned();
     }
 
     /// Panel `key` of [`PANELS`] is shown.
     fn panel_shown(&self, key: &str) -> bool {
         match key {
-            "trackEditor" => self.chrome.show_track_editor,
-            "noteEditor" => self.chrome.show_note_editor,
-            "vuMeters" => self.chrome.show_vus,
+            "trackEditor" => self.chrome.panes.track_editor(),
+            "noteEditor" => self.chrome.panes.note_editor(),
+            "vuMeters" => self.chrome.panes.vus(),
             _ => self.kit_editor.is_open(),
         }
     }
@@ -282,7 +282,7 @@ mod tests {
             ]
         );
         assert_eq!((s.pattern_index, s.editor.selected_song(), s.workspace), (0, 0, Workspace::Grid));
-        assert!(!s.chrome.show_vus, "what is right is used");
+        assert!(!s.chrome.panes.vus(), "what is right is used");
         std::fs::write(&path, r#"{"resume":1}"#).unwrap();
         let mut s = session(&path);
         s.load_resume();

@@ -185,7 +185,7 @@ impl Session {
             clock_out,
             clock_out_was: clock_out,
             metronome: self.transport.metronome,
-            vus: self.chrome.show_vus,
+            vus: self.chrome.panes.vus(),
             toasts: !self.flash.hidden,
         }));
         if !unlisted.is_empty() {
@@ -258,7 +258,7 @@ impl Session {
     fn apply_preferences(&mut self) {
         let Some(Overlay::Preferences(prefs)) = self.chrome.overlay.take() else { return };
         self.transport.metronome = prefs.metronome;
-        if prefs.vus != self.chrome.show_vus {
+        if prefs.vus != self.chrome.panes.vus() {
             self.toggle_vus();
         }
         if prefs.toasts == self.flash.hidden {

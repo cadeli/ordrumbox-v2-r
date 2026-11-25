@@ -3,6 +3,7 @@
 //! end stays), Ctrl+wheel zooms around the pointer and Shift+wheel scrolls.
 
 use super::Session;
+use super::session_chrome::GridHold;
 use crate::scale::Scale;
 use crate::view::BarHold;
 
@@ -14,17 +15,17 @@ impl Session {
     pub fn grid_bar_press(&mut self, size: (i32, i32, Scale), x: i32, y: i32) -> bool {
         let Some(layout) = self.grid_layout(size) else { return false };
         let Some(hit) = layout.bar_hit(x, y) else { return false };
-        self.chrome.grid_bar_drag = Some(match hit {
+        self.chrome.grid_hold = Some(GridHold::Bar(match hit {
             None => BarHold::Scroll,
             Some(edge) => BarHold::zoom(edge, layout.start_beat(), layout.beats()),
-        });
+        }));
         self.grid_bar_held(size, x);
         true
     }
 
     /// The bar held, moved to `x`; whether to redraw.
     pub(super) fn grid_bar_held(&mut self, size: (i32, i32, Scale), x: i32) -> bool {
-        let (Some(hold), Some(layout)) = (self.chrome.grid_bar_drag, self.grid_layout(size)) else { return false };
+        let (Some(hold), Some(layout)) = (self.held_grid_bar(), self.grid_layout(size)) else { return false };
         let before = self.chrome.beat_window;
         let at = layout.track_beat(x).max(0.0);
         self.chrome.beat_window.hold(hold, layout.first_beat_at(x), at, layout.total_beats());
@@ -33,12 +34,10 @@ impl Session {
 
     /// The bar the mouse holds, if any.
     pub(super) fn held_grid_bar(&self) -> Option<BarHold> {
-        self.chrome.grid_bar_drag
-    }
-
-    /// The mouse let go of the grid's scroll bar.
-    pub(super) fn release_grid_bar(&mut self) {
-        self.chrome.grid_bar_drag = None;
+        match self.chrome.grid_hold {
+            Some(GridHold::Bar(hold)) => Some(hold),
+            _ => None,
+        }
     }
 
     /// The wheel over the grid's steps: Ctrl zooms around the beat under the

@@ -22,14 +22,14 @@ use std::time::Instant;
 impl Session {
     /// View > Track editor.
     pub fn toggle_track_editor(&mut self) {
-        self.chrome.show_track_editor = !self.chrome.show_track_editor;
+        self.chrome.panes.toggle_track_editor();
         self.chrome.widgets.focus = None;
         self.chrome.widgets.dropdown = None;
     }
 
     /// View > Note editor.
     pub fn toggle_note_editor(&mut self) {
-        self.chrome.show_note_editor = !self.chrome.show_note_editor;
+        self.chrome.panes.toggle_note_editor();
         self.chrome.widgets.focus = None;
         self.chrome.widgets.dropdown = None;
     }

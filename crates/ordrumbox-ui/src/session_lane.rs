@@ -14,6 +14,7 @@ use ordrumbox_core::Note;
 use ordrumbox_core::steps::absolute_step;
 
 use super::Session;
+use super::session_chrome::GridHold;
 use crate::editors::{self, LANES, Prop};
 use crate::panel::{Dropdown, Id, Rect};
 use crate::view;
@@ -46,14 +47,16 @@ impl Session {
         }
         let scale = size.2;
         let height = scale.units(layout.lane_rect().h);
-        self.chrome.lane_resize = Some(LaneResize { y, height, scale });
+        self.chrome.grid_hold = Some(GridHold::LaneResize(LaneResize { y, height, scale }));
         true
     }
 
     /// The mouse moved to `y` with the lane's top edge held: the lane as
     /// much taller as the pointer went up; whether to redraw.
     pub(super) fn grid_lane_resize_move(&mut self, y: i32) -> bool {
-        let Some(LaneResize { y: from, height, scale }) = self.chrome.lane_resize else { return false };
+        let Some(GridHold::LaneResize(LaneResize { y: from, height, scale })) = self.chrome.grid_hold else {
+            return false;
+        };
         let moved = scale.units(from - y);
         let wanted = Some((height + moved).clamp(view::lane_height(), view::MAX_LANE_SET));
         let changed = wanted != self.chrome.lane_height;
@@ -74,7 +77,7 @@ impl Session {
         let Some(track) = self.track(t) else { return false };
         let Some(step) = layout.lane_step(x, y, view::steps_per_beat(track)) else { return false };
         let value = lane_value(prop, layout.lane_fraction(y));
-        self.chrome.lane_drag = Some(LaneDrag { track: t, prop, step, value });
+        self.chrome.grid_hold = Some(GridHold::Lane(LaneDrag { track: t, prop, step, value }));
         self.lane_paint(&layout, t, prop, [(step, value), (step, value)]);
         true
     }
@@ -82,7 +85,7 @@ impl Session {
     /// The mouse moved with the lane pressed: the bars from the last step
     /// painted to the one under `(x, y)`; whether to redraw.
     pub(super) fn lane_drag_move(&mut self, size: (i32, i32, Scale), x: i32, y: i32) -> bool {
-        let Some(drag) = self.chrome.lane_drag else { return false };
+        let Some(GridHold::Lane(drag)) = self.chrome.grid_hold else { return false };
         let Some(layout) = self.grid_layout(size) else { return false };
         let Some(track) = self.track(drag.track) else { return false };
         let step = layout.lane_step_clamped(x, view::steps_per_beat(track));
@@ -90,7 +93,7 @@ impl Session {
         if (step, value) == (drag.step, drag.value) {
             return false;
         }
-        self.chrome.lane_drag = Some(LaneDrag { step, value, ..drag });
+        self.chrome.grid_hold = Some(GridHold::Lane(LaneDrag { step, value, ..drag }));
         self.lane_paint(&layout, drag.track, drag.prop, [(drag.step, drag.value), (step, value)]);
         true
     }
@@ -106,7 +109,7 @@ impl Session {
         let Some(track) = self.track(t) else { return false };
         let (x, y) = self.chrome.widgets.pointer;
         let spb = view::steps_per_beat(track);
-        let value = if let Some(drag) = self.chrome.lane_drag {
+        let value = if let Some(GridHold::Lane(drag)) = self.chrome.grid_hold {
             lane_setting(prop, drag.value)
         } else {
             let Some(step) = layout.lane_step(x, y, spb) else { return false };

@@ -222,7 +222,7 @@ fn the_preferences_keep_what_ok_applies_and_esc_leaves() {
     s.overlay_key(OverlayKey::Move(1));
     s.overlay_key(OverlayKey::Side(1));
     s.overlay_key(OverlayKey::Escape);
-    assert!(!s.overlay_open() && !s.transport.metronome && s.chrome.show_vus, "Esc leaves everything");
+    assert!(!s.overlay_open() && !s.transport.metronome && s.chrome.panes.vus(), "Esc leaves everything");
 
     s.run(Command::Preferences);
     s.overlay_key(OverlayKey::Enter);
@@ -231,7 +231,7 @@ fn the_preferences_keep_what_ok_applies_and_esc_leaves() {
     s.overlay_key(OverlayKey::Move(2));
     s.overlay_key(OverlayKey::Enter);
     assert!(!s.overlay_open());
-    assert!(s.transport.metronome && !s.chrome.show_vus);
+    assert!(s.transport.metronome && !s.chrome.panes.vus());
     assert_eq!(s.message, "preferences kept");
 }
 

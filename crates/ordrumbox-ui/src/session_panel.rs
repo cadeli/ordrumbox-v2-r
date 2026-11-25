@@ -324,7 +324,7 @@ impl Session {
     /// none). It is shown for every main editor (grid, piano roll, song, synth,
     /// the kit editor) whenever it is toggled on and the window is wide enough.
     pub fn track_editor_width(&self, width: i32, scale: Scale) -> i32 {
-        if self.chrome.show_track_editor && width >= 480 * scale { panel_width(width, scale) } else { 0 }
+        if self.chrome.panes.track_editor() && width >= 480 * scale { panel_width(width, scale) } else { 0 }
     }
 
     /// A drop-down list or a number entry is open (it takes every key and click).
@@ -340,7 +340,7 @@ impl Session {
 
     /// The track editor on its Generate tab.
     pub fn show_generation_tab(&mut self) {
-        self.chrome.show_track_editor = true;
+        self.chrome.panes.show_track_editor();
         self.editors.tab = editors::GEN_TAB;
     }
 }

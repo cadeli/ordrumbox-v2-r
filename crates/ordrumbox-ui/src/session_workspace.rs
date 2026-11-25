@@ -12,8 +12,8 @@ use ordrumbox_engine::Mode;
 impl Session {
     /// V: show/hide the VU meters on the track stripes.
     pub fn toggle_vus(&mut self) {
-        self.chrome.show_vus = !self.chrome.show_vus;
-        self.message = if self.chrome.show_vus { "VU meters on".into() } else { "VU meters off".into() };
+        self.chrome.panes.toggle_vus();
+        self.message = if self.chrome.panes.vus() { "VU meters on".into() } else { "VU meters off".into() };
     }
 
     /// A view button (`view::VIEWS`): show that view, unless it is shown.

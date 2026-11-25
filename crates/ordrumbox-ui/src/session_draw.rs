@@ -26,7 +26,7 @@ impl Session {
     /// The note editor is shown, under the grid or the piano roll: the
     /// views that edit notes.
     pub(crate) fn note_editor_shown(&self) -> bool {
-        self.chrome.show_note_editor
+        self.chrome.panes.note_editor()
             && !self.kit_editor.is_open()
             && matches!(self.workspace, Workspace::Grid | Workspace::PianoRoll)
     }
@@ -34,9 +34,9 @@ impl Session {
     /// What the window shows that sets the room the layout needs.
     pub fn shown(&self) -> view::Shown {
         view::Shown {
-            track_editor: self.chrome.show_track_editor,
+            track_editor: self.chrome.panes.track_editor(),
             grid: !self.kit_editor.is_open() && self.workspace == Workspace::Grid,
-            note_editor: self.chrome.show_note_editor,
+            note_editor: self.chrome.panes.note_editor(),
         }
     }
 
@@ -98,7 +98,7 @@ impl Session {
             lane_height: self.chrome.lane_height,
             note_editor: self.note_editor_shown(),
             levels: levels.clone(),
-            show_vus: self.chrome.show_vus,
+            show_vus: self.chrome.panes.vus(),
             live_muted: self.followed.muted,
             switches: self.shown_switches(),
             switches_taken_back: self.switches_taken_back(),

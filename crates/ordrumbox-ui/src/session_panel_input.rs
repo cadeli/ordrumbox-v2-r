@@ -6,7 +6,7 @@ use ordrumbox_core::num;
 use std::borrow::Cow;
 
 use super::Session;
-use super::session_chrome::Drag;
+use super::session_chrome::{Drag, GridHold};
 use super::session_panel::{DOUBLE_CLICK, control_name};
 use super::session_panel_keys::moved_value;
 use super::session_types::Workspace;
@@ -193,20 +193,14 @@ impl Session {
         if self.song_panel.dragging() {
             return self.song_drag_move(size, (x, y), shift);
         }
-        if self.chrome.track_drag.is_some() {
-            return self.track_drag_move(x, y);
-        }
-        if self.chrome.zone_drag.is_some() {
-            return self.zone_drag_move(size, x, y);
-        }
-        if self.chrome.lane_drag.is_some() {
-            return self.lane_drag_move(size, x, y);
-        }
-        if self.chrome.lane_resize.is_some() {
-            return self.grid_lane_resize_move(y);
-        }
-        if self.chrome.grid_bar_drag.is_some() {
-            return self.grid_bar_held(size, x);
+        if let Some(hold) = self.chrome.grid_hold {
+            return match hold {
+                GridHold::Track(_) => self.track_drag_move(x, y),
+                GridHold::Zone(_) => self.zone_drag_move(size, x, y),
+                GridHold::Lane(_) => self.lane_drag_move(size, x, y),
+                GridHold::LaneResize(_) => self.grid_lane_resize_move(y),
+                GridHold::Bar(_) => self.grid_bar_held(size, x),
+            };
         }
         if self.kit_editor.list.is_bar_held() {
             return self.kit_bar_to(size, y);
@@ -266,8 +260,7 @@ impl Session {
                 if !self.kit_editor.is_open()
                     && self.workspace == Workspace::Grid
                     && self.chrome.widgets.drag.is_none()
-                    && self.chrome.track_drag.is_none()
-                    && self.chrome.zone_drag.is_none() =>
+                    && !matches!(self.chrome.grid_hold, Some(GridHold::Track(_) | GridHold::Zone(_))) =>
             {
                 match Layout::new(
                     body.main_w,
@@ -369,11 +362,7 @@ impl Session {
         self.song_panel.release_bar();
         self.kit_editor.list.release_bar();
         self.release_mixer_bar();
-        self.chrome.track_drag = None;
-        self.chrome.zone_drag = None;
-        self.chrome.lane_drag = None;
-        self.chrome.lane_resize = None;
-        self.release_grid_bar();
+        self.chrome.grid_hold = None;
         self.roll_release();
         self.release_wave_handle();
     }

@@ -8,6 +8,7 @@
 //! sideways arrows, and its body, which a drag moves, the four arrows.
 
 use super::Session;
+use super::session_chrome::GridHold;
 use super::session_song_zoom::BarDrag;
 use crate::piano_roll::RollHit;
 use crate::scale::Scale;
@@ -30,7 +31,7 @@ impl Session {
             Some(BarHold::Scroll) => return HELD_SHAPE,
             None => {}
         }
-        if self.song_panel.lane_resize.is_some() || self.chrome.lane_resize.is_some() {
+        if self.song_panel.lane_resize.is_some() || matches!(self.chrome.grid_hold, Some(GridHold::LaneResize(_))) {
             return PointerShape::ResizeVertical;
         }
         if self.roll.length_drag.is_some() || self.is_wave_dragging() {

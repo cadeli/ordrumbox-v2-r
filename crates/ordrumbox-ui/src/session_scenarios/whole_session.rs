@@ -108,7 +108,7 @@ fn a_session_through_the_menus_draws_every_step() {
     }
     s.run(Command::TrackEditor);
     s.show_generation_tab();
-    assert!(s.chrome.show_track_editor);
+    assert!(s.chrome.panes.track_editor());
     draw(&mut s);
 
     // The kit editor, stopped (what is heard is the sample): a sample chosen

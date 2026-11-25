@@ -19,6 +19,31 @@ const KEY: &str = "uiZoom";
 /// Quarters in a scale unit, as `uiZoom` counts them.
 const QUARTERS: f64 = 4.0;
 
+/// The zoom: the display's scale, what Ctrl++ and Ctrl+- add to it, and
+/// the window "Zoom: fit to window" fits.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct Zoom {
+    /// The display's scale factor (at least ×1), to the nearest quarter.
+    display: Scale,
+    /// Quarters of a scale unit added to the display's.
+    quarters: i32,
+    /// The window's size in physical pixels.
+    window: (i32, i32),
+}
+
+impl Default for Zoom {
+    fn default() -> Self {
+        Self { display: Scale::ONE, quarters: 0, window: (0, 0) }
+    }
+}
+
+impl Zoom {
+    /// The scale the UI shows at: the display's with the zoom, from ×1 to [`Scale::MAX`].
+    fn scale(self) -> Scale {
+        self.display.step(self.quarters, Scale::ONE, Scale::MAX)
+    }
+}
+
 impl Session {
     /// The zoom of the settings file at `path`, if it has one; the zoom is
     /// saved there when changed.
@@ -31,7 +56,7 @@ impl Session {
                 value.as_f64().map(|units| units * QUARTERS).filter(|q| q.fract() == 0.0 && q.abs() <= f64::from(top));
             match quarters {
                 // Whole and within ±`top`: the cast is exact.
-                Some(quarters) => self.chrome.zoom = quarters as i32,
+                Some(quarters) => self.chrome.zoom.quarters = quarters as i32,
                 None => self.status.push(format!(
                     "settings.json: {KEY}: {} is not a zoom (a multiple of 0.25 from -{top} to {top}), none used",
                     value.to_json(),
@@ -44,25 +69,25 @@ impl Session {
 
     /// The display's scale factor (at least ×1), which the zoom starts from.
     pub fn set_display_scale(&mut self, scale: Scale) {
-        self.chrome.display_scale = scale.max(Scale::ONE);
+        self.chrome.zoom.display = scale.max(Scale::ONE);
     }
 
     /// The scale the UI shows at: the display's with the zoom, from ×1 to
     /// [`Scale::MAX`], whatever the window's size (it scrolls when too small).
     pub fn wanted_scale(&self) -> Scale {
-        self.chrome.display_scale.step(self.chrome.zoom, Scale::ONE, Scale::MAX)
+        self.chrome.zoom.scale()
     }
 
     /// The window's size in physical pixels, which "Zoom: fit to window" fits.
     pub fn set_window_size(&mut self, width: i32, height: i32) {
-        self.chrome.window = (width, height);
+        self.chrome.zoom.window = (width, height);
     }
 
     /// Ctrl++ (`step` 1), Ctrl+- (-1) and Ctrl+0 (0, the display's scale):
     /// zoom a quarter at a time, say the scale, and save the zoom.
     pub(super) fn zoom(&mut self, step: i32) {
         let before = self.wanted_scale();
-        let wanted = if step == 0 { self.chrome.display_scale } else { before.step(step, Scale::ONE, Scale::MAX) };
+        let wanted = if step == 0 { self.chrome.zoom.display } else { before.step(step, Scale::ONE, Scale::MAX) };
         let limit = if step != 0 && wanted == before { ", the limit" } else { "" };
         self.set_zoom(wanted, format!("zoom x{wanted}{limit}"));
     }
@@ -70,7 +95,7 @@ impl Session {
     /// View > Zoom: fit to window: the biggest scale whose layout the window
     /// shows whole, without scrollbars; ×1 when even that one scrolls.
     pub(super) fn zoom_to_fit(&mut self) {
-        let (width, height) = self.chrome.window;
+        let (width, height) = self.chrome.zoom.window;
         let fits = |scale: &Scale| {
             let (w, h) = view::min_window_size(*scale, self.shown());
             w <= width && h <= height
@@ -85,9 +110,9 @@ impl Session {
 
     /// Show the UI at `wanted`, say `message`, and save the zoom.
     fn set_zoom(&mut self, wanted: Scale, message: String) {
-        self.chrome.zoom = wanted.quarters() - self.chrome.display_scale.quarters();
+        self.chrome.zoom.quarters = wanted.quarters() - self.chrome.zoom.display.quarters();
         self.message = message;
-        let units = f64::from(self.chrome.zoom) / QUARTERS;
+        let units = f64::from(self.chrome.zoom.quarters) / QUARTERS;
         if let Some(path) = &self.saving.settings_file
             && let Err(e) = store::save_setting(path, KEY, json::Value::from(units))
         {
@@ -170,7 +195,7 @@ mod tests {
         hidpi.set_window_size(w, h);
         hidpi.run(Command::ZoomToFit);
         assert_eq!(hidpi.wanted_scale(), Scale::from_quarters(6));
-        assert_eq!(hidpi.chrome.zoom, -2);
+        assert_eq!(hidpi.chrome.zoom.quarters, -2);
     }
 
     #[test]
