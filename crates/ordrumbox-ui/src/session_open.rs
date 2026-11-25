@@ -18,7 +18,7 @@ use crate::audio_output::StartOutput;
 use crate::editors::EditorState;
 use crate::kits::KitSet;
 use crate::{assets, store};
-use ordrumbox_core::{Library, LoadReport, Scales};
+use ordrumbox_core::{Library, Scales};
 use ordrumbox_engine::offline;
 use ordrumbox_engine::offline::RenderSetup;
 use ordrumbox_engine::{SampleBank, SynthPresets};
@@ -63,25 +63,6 @@ impl Opened {
     }
 }
 
-/// The status line saying what loading `file` repaired, `None` when nothing:
-/// how many values took their default and song clips were dropped, and the
-/// first of each.
-fn repaired_status(file: &str, report: &LoadReport) -> Option<String> {
-    let mut parts = Vec::new();
-    if let Some(first) = report.issues.first() {
-        parts.push(format!("{} value(s) repaired, first: {}: {}", report.issues.len(), first.at, first.message));
-    }
-    if let Some(first) = report.dropped_clips.first() {
-        parts.push(format!(
-            "{} song clip(s) dropped, first: {}: {}",
-            report.dropped_clips.len(),
-            first.pattern,
-            first.reason
-        ));
-    }
-    (!parts.is_empty()).then(|| format!("{file}: {}", parts.join("; ")))
-}
-
 /// The root note of each sample of `bank` that has one (key, MIDI note), for MIDI files.
 fn root_notes(bank: &SampleBank) -> Vec<(String, f64)> {
     bank.samples.iter().filter_map(|s| Some((s.sample.key.clone(), s.sample.root_midi?))).collect()
@@ -121,7 +102,7 @@ impl Session {
             LibrarySource::Host(text) => Self::open_host_library(text, assets.library, &mut status),
         };
         if starter {
-            status.extend(repaired_status(assets::LIBRARY, &assets.report));
+            status.extend(assets.report.summary(assets::LIBRARY));
         }
 
         if let Some(e) = &assets.kits_error {
@@ -219,7 +200,7 @@ impl Session {
         };
         match store::load(&path) {
             Ok(Some((saved, report))) => {
-                status.extend(repaired_status(&path.display().to_string(), &report));
+                status.extend(report.summary(&path.display().to_string()));
                 Opened {
                     library: saved,
                     file: Some(path),
@@ -246,7 +227,7 @@ impl Session {
         if let Some(text) = text {
             return match Library::parse(&text) {
                 Ok((library, report)) => {
-                    status.extend(repaired_status("library of the host project", &report));
+                    status.extend(report.summary("library of the host project"));
                     Opened::unsaved(library, "library from the host project")
                 }
                 Err(e) => {
@@ -260,7 +241,7 @@ impl Session {
         };
         match store::load(&path) {
             Ok(Some((saved, report))) => {
-                status.extend(repaired_status(&path.display().to_string(), &report));
+                status.extend(report.summary(&path.display().to_string()));
                 Opened::unsaved(saved, "your library, copied into the host project")
             }
             Err(e) => {

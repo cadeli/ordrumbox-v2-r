@@ -95,7 +95,7 @@ impl Session {
 
     fn resume_pattern(&mut self, place: &Object, wrong: &mut Vec<String>) {
         let Some(id) = place.get("pattern") else { return };
-        let found = id.as_str().and_then(|id| self.editor.library().patterns.iter().position(|p| p.id == id));
+        let found = id.as_str().and_then(|id| self.editor.library().pattern_index(id));
         match found {
             Some(index) => self.pattern_index = index,
             None => wrong.push(format!("no pattern {}, the first one shown", id.to_json())),
@@ -104,7 +104,7 @@ impl Session {
 
     fn resume_song(&mut self, place: &Object, wrong: &mut Vec<String>) {
         let Some(id) = place.get("song") else { return };
-        let found = id.as_str().and_then(|id| self.editor.library().songs.iter().position(|s| s.id == id));
+        let found = id.as_str().and_then(|id| self.editor.library().song_index(id));
         match found {
             Some(index) => {
                 self.editor.set_selected_song(index);

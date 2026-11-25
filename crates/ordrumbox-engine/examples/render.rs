@@ -49,10 +49,10 @@ fn main() {
 
     let started = Instant::now();
     let (rendered, out) = if let Some(id) = what.strip_prefix("song:") {
-        let index = library.songs.iter().position(|s| s.id == id);
+        let index = library.song_index(id);
         (index.and_then(|i| render_song(&library, i, &setup)), rest.first())
     } else {
-        let index = library.patterns.iter().position(|p| p.id == *what);
+        let index = library.pattern_index(what);
         let loops = rest.first().map_or(1, |l| l.parse().expect("loops"));
         (index.and_then(|i| render_pattern(&library, i, loops, &setup, None)), rest.get(1))
     };

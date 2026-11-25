@@ -10,6 +10,7 @@ use ordrumbox_core::json::{self, Object, Value};
 use crate::slope;
 use crate::synth_preset::FM_DEVIATION;
 use crate::synth_preset::tags::TAG_KEYS;
+use ordrumbox_dsp::synth::patch::LfoTarget;
 pub use ordrumbox_dsp::synth::patch::MATRIX_SIZE;
 
 pub use crate::synth_preset::{FILTER_TYPES, MATRIX_SOURCES, NOISE_MODES, OSC2_SYNCS, WAVES};
@@ -203,23 +204,16 @@ pub fn lfo_targets() -> Vec<&'static str> {
         .collect()
 }
 
-/// What one unit of an LFO's wave is worth on a target (`LFO_TARGET_SCALE`).
+/// What one unit of an LFO's wave is worth on a target, in the draft's
+/// units: the synth's own swing, with an octave target in octaves (the
+/// synth moves it in cents).
+#[must_use]
 pub fn lfo_scale(target: &str) -> f64 {
+    let target = crate::synth_preset::lfo_target_named(target);
+    let swing = ordrumbox_dsp::synth::lfo_swing(target);
     match target {
-        "vco1.detune" | "vco2.detune" | "vco3.detune" => 100.0,
-        "filter.freq" => 1000.0,
-        "filter.Q" | "noise.filterQ" => 24.0,
-        "noise.filterFreq" => 10_000.0,
-        "vco1.width" | "vco2.width" | "vco3.width" => 0.5,
-        "noise.rate" => 8000.0,
-        "pitchEnv.amount" => 24.0,
-        "envelope.attack" | "envelope.release" | "modEnvelope.attack" | "modEnvelope.release" | "pitchEnv.decay" => {
-            0.25
-        }
-        "envelope.decay" | "envelope.sustain" | "modEnvelope.decay" | "modEnvelope.sustain" => 0.5,
-        "NOT" => 0.0,
-        t if find_meta(t).is_some() && !t.starts_with("lfo") => 1.0,
-        _ => 0.0,
+        LfoTarget::Osc1Octave | LfoTarget::Osc2Octave | LfoTarget::Osc3Octave => swing / 1200.0,
+        _ => swing,
     }
 }
 

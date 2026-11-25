@@ -63,7 +63,7 @@ pub(super) fn restart(
 /// `amount` (0: unchanged, 1: the product of the two).
 #[inline]
 #[must_use]
-pub(super) fn ring(value: f64, carrier: f64, amount: f64) -> f64 {
+pub fn ring(value: f64, carrier: f64, amount: f64) -> f64 {
     value * (1.0 - amount + amount * carrier)
 }
 

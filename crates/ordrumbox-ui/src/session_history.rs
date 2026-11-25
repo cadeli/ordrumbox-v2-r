@@ -45,7 +45,7 @@ impl Session {
     /// After an undo or a redo: the pattern `shown` before stays shown where
     /// it moved to (a pattern moved, added or removed).
     pub(super) fn after_history(&mut self, shown: Option<String>) {
-        if let Some(index) = shown.and_then(|id| self.editor.library().patterns.iter().position(|p| p.id == id)) {
+        if let Some(index) = shown.and_then(|id| self.editor.library().pattern_index(&id)) {
             self.pattern_index = index;
         }
         self.selection.selected = None;

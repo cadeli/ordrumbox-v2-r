@@ -27,9 +27,11 @@ pub mod patch;
 mod pitch_env;
 mod unison;
 
-use cross_mod::{Moved, cycle_starts, restart, ring};
+pub use cross_mod::ring;
+use cross_mod::{Moved, cycle_starts, restart};
 use envelope::{Envelope, FilterEnvelope, Segment};
 use filter::{coefficients, cutoff_coefficient};
+pub use modulation::lfo_swing;
 use modulation::{
     DETUNE_SLOTS, ENV_SLOTS, GAIN_SLOTS, LfoMods, LfoRoute, MOD_ENV_SLOTS, Matrix, Mods, Slot, SourceValues,
     WIDTH_SLOTS, is_moved, is_targeted, modulated, modulated_adsr,

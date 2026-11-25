@@ -3,6 +3,7 @@
 
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_core::lfo;
+use ordrumbox_dsp::synth::ring;
 
 use super::{EXTRA_METAS, FM_DEVIATION, OSC2_SYNCS, WAVES, lfo_scale, number, slope, text};
 
@@ -116,7 +117,7 @@ pub fn scope(draft: &Object, time: f64, bpm: f64) -> Vec<f64> {
     let gain: Vec<f64> = (1..=3)
         .map(|n| (vco(n, "gain", if n == 1 { 1.0 } else { 0.0 }) + modded(&format!("vco{n}.gain"))).clamp(0.0, 1.0))
         .collect();
-    let ring = (number(draft, "vco2.ring").unwrap_or(0.0) + modded("vco2.ring")).clamp(0.0, 1.0);
+    let ring_amount = (number(draft, "vco2.ring").unwrap_or(0.0) + modded("vco2.ring")).clamp(0.0, 1.0);
     let is_synced = text(draft, "vco2.sync") == Some(OSC2_SYNCS[1]);
     let fm_amount = number(draft, "fm.amount").unwrap_or(0.0);
     let fm_algo = number(draft, "fm.algo").unwrap_or(0.0);
@@ -155,7 +156,7 @@ pub fn scope(draft: &Object, time: f64, bpm: f64) -> Vec<f64> {
             0.0
         };
         let [o1, o2, o3] = [0, 1, 2].map(|i| wave_at(&waves[i], phase[i], cycle[i], width[i]));
-        let o2 = o2 * (1.0 - ring + ring * o1);
+        let o2 = ring(o2, o1, ring_amount);
         let mut sample = o1 * gain[0] + o2 * gain[1] + o3 * gain[2] + sub;
         if drive > 0.0 {
             let driven = sample * (1.0 + drive * 3.0);

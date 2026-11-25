@@ -201,6 +201,14 @@ impl Matrix {
     }
 }
 
+/// What a full swing of an LFO on `target` adds there: cents for a pitch
+/// (an octave target's included), Hz for a cutoff, seconds for an envelope
+/// time; 0 when off.
+#[must_use]
+pub fn lfo_swing(target: LfoTarget) -> f64 {
+    destination(target).map_or(0.0, |(_, swing)| swing)
+}
+
 /// The slot `target` adds to and what a full swing adds there: cents for a
 /// pitch, Hz for a cutoff, seconds for an envelope time.
 fn destination(target: LfoTarget) -> Option<(Slot, f64)> {

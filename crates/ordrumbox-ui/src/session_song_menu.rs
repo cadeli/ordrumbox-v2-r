@@ -132,10 +132,8 @@ impl Session {
     /// that row's pattern in the library, in one undo step.
     pub(super) fn move_row(&mut self, from: usize, to: usize) {
         let rows = self.song_rows();
-        let patterns = &self.editor.library().patterns;
-        let index = |r: usize| {
-            rows.get(r).filter(|row| !row.orphan).and_then(|row| patterns.iter().position(|p| p.id == row.id))
-        };
+        let library = self.editor.library();
+        let index = |r: usize| rows.get(r).filter(|row| !row.orphan).and_then(|row| library.pattern_index(&row.id));
         let (Some(from), Some(to)) = (index(from), index(to)) else { return };
         self.move_pattern(from, to);
     }

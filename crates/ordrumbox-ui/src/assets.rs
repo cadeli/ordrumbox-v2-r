@@ -150,10 +150,7 @@ fn load_demos(data: &Path, errors: &mut Vec<String>) -> Vec<DemoStyle> {
     for path in paths {
         let Ok(value) = read_json(&path).map_err(|e| errors.push(e)) else { continue };
         let (library, report) = Library::from_json(&value);
-        let repaired = report.issues.len() + report.dropped_clips.len();
-        if repaired > 0 {
-            errors.push(format!("{}: {repaired} value(s) repaired", path.display()));
-        }
+        errors.extend(report.summary(&path.display().to_string()));
         let stem = path.file_stem().map_or_else(String::new, |s| s.to_string_lossy().into_owned());
         styles.push(DemoStyle::new(library, &stem));
     }
@@ -328,11 +325,7 @@ mod tests {
             assert!(in_demos(&pattern.id), "starter pattern {} is in no demo style", pattern.id);
         }
         for song in &assets.library.songs {
-            assert!(
-                assets.demos.iter().any(|style| style.library().songs.iter().any(|s| s.id == song.id)),
-                "{}",
-                song.id
-            );
+            assert!(assets.demos.iter().any(|style| style.library().song_index(&song.id).is_some()), "{}", song.id);
         }
     }
 

@@ -105,7 +105,7 @@ pub fn copy_demo(library: &mut Library, style: &Library, item: DemoItem) -> Opti
     match item {
         DemoItem::Song(s) => {
             let song = style.songs.get(s)?;
-            if let Some(index) = library.songs.iter().position(|mine| mine.id == song.id) {
+            if let Some(index) = library.song_index(&song.id) {
                 return Some(Copied { item: DemoItem::Song(index), added_pattern_count: 0, was_there: true });
             }
             let added_pattern_count = library.add_song_from(song, style).len();
@@ -114,7 +114,7 @@ pub fn copy_demo(library: &mut Library, style: &Library, item: DemoItem) -> Opti
         }
         DemoItem::Pattern(p) => {
             let pattern = style.patterns.get(p)?;
-            if let Some(index) = library.patterns.iter().position(|mine| mine.id == pattern.id) {
+            if let Some(index) = library.pattern_index(&pattern.id) {
                 return Some(Copied { item: DemoItem::Pattern(index), added_pattern_count: 0, was_there: true });
             }
             library.patterns.push(pattern.clone());

@@ -94,10 +94,9 @@ pub(super) fn song_settings(args: &Value) -> Result<SongSettings<'_>, String> {
 
 /// A pattern by id, else by name (trimmed, any case).
 pub fn find_pattern(library: &Library, reference: &str) -> Result<usize, String> {
-    let patterns = &library.patterns;
-    let by_id = patterns.iter().position(|p| p.id == reference.trim());
-    by_id
-        .or_else(|| patterns.iter().position(|p| p.name.as_deref().is_some_and(|n| same_name(n, reference))))
+    library
+        .pattern_index(reference.trim())
+        .or_else(|| library.patterns.iter().position(|p| p.name.as_deref().is_some_and(|n| same_name(n, reference))))
         .ok_or_else(|| format!("No pattern named \"{}\" (listPatterns gives them)", reference.trim()))
 }
 

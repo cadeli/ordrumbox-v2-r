@@ -58,6 +58,28 @@ pub struct LoadReport {
     pub issues: Vec<Issue>,
 }
 
+impl LoadReport {
+    /// The status line saying what loading `file` repaired, `None` when
+    /// nothing: how many values took their default and song clips were
+    /// dropped, and the first of each.
+    #[must_use]
+    pub fn summary(&self, file: &str) -> Option<String> {
+        let mut parts = Vec::new();
+        if let Some(first) = self.issues.first() {
+            parts.push(format!("{} value(s) repaired, first: {}: {}", self.issues.len(), first.at, first.message));
+        }
+        if let Some(first) = self.dropped_clips.first() {
+            parts.push(format!(
+                "{} song clip(s) dropped, first: {}: {}",
+                self.dropped_clips.len(),
+                first.pattern,
+                first.reason
+            ));
+        }
+        (!parts.is_empty()).then(|| format!("{file}: {}", parts.join("; ")))
+    }
+}
+
 impl Library {
     /// Parse and load a library file.
     pub fn parse(text: &str) -> Result<(Self, LoadReport), ParseError> {
@@ -121,6 +143,18 @@ impl Library {
 
     pub fn pattern(&self, id: &str) -> Option<&Pattern> {
         self.patterns.iter().find(|p| p.id == id)
+    }
+
+    /// The index of the pattern of id `id`.
+    #[must_use]
+    pub fn pattern_index(&self, id: &str) -> Option<usize> {
+        self.patterns.iter().position(|p| p.id == id)
+    }
+
+    /// The index of the song of id `id`.
+    #[must_use]
+    pub fn song_index(&self, id: &str) -> Option<usize> {
+        self.songs.iter().position(|s| s.id == id)
     }
 
     /// Add `song`, with the patterns of `source` it plays that this library

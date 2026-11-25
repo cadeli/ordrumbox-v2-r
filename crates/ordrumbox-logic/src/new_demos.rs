@@ -48,7 +48,7 @@ pub fn add_new_demos(library: &mut Library, starter: &Library, known: &KnownDemo
     let mut added = AddedDemos::default();
 
     for song in &starter.songs {
-        if known_songs.contains(song.id.as_str()) || library.songs.iter().any(|s| s.id == song.id) {
+        if known_songs.contains(song.id.as_str()) || library.song_index(&song.id).is_some() {
             continue;
         }
         let brought = library.add_song_from(song, starter);

@@ -81,8 +81,7 @@ fn library() -> Library {
     for name in names {
         let style = library_file(&name);
         let new_patterns: Vec<_> = style.patterns.into_iter().filter(|p| library.pattern(&p.id).is_none()).collect();
-        let new_songs: Vec<_> =
-            style.songs.into_iter().filter(|s| !library.songs.iter().any(|t| t.id == s.id)).collect();
+        let new_songs: Vec<_> = style.songs.into_iter().filter(|s| library.song_index(&s.id).is_none()).collect();
         library.patterns.extend(new_patterns);
         library.songs.extend(new_songs);
     }

@@ -146,7 +146,7 @@ impl Session {
         self.song_panel.last_clip_click = None;
         let Some(id) = self.song().and_then(|s| s.clips.get(clip)).map(|c| c.pattern_id.clone()) else { return false };
         self.chrome.widgets.dropdown = None;
-        match self.editor.library().patterns.iter().position(|p| p.id == id) {
+        match self.editor.library().pattern_index(&id) {
             Some(index) => {
                 self.show_pattern(index);
                 self.show_mode(false);
@@ -159,7 +159,7 @@ impl Session {
     /// Row `r` of the arrangement clicked: its pattern shown.
     fn show_row_pattern(&mut self, r: usize) {
         let Some(id) = self.song_rows().get(r).map(|row| row.id.clone()) else { return };
-        if let Some(index) = self.editor.library().patterns.iter().position(|p| p.id == id) {
+        if let Some(index) = self.editor.library().pattern_index(&id) {
             self.show_pattern(index);
         }
     }

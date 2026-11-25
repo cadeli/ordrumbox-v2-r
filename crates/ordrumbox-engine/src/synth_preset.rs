@@ -195,8 +195,13 @@ fn matrix(group: Option<&Value>) -> [MatrixRoute; MATRIX_SIZE] {
 }
 
 fn lfo_target(value: Option<&Value>) -> LfoTarget {
-    let name = value.and_then(Value::as_str);
-    LFO_TARGETS.iter().find(|(n, _)| Some(*n) == name).map_or(LfoTarget::Off, |&(_, target)| target)
+    value.and_then(Value::as_str).map_or(LfoTarget::Off, lfo_target_named)
+}
+
+/// The LFO target a preset names `name`; off for an unknown one.
+#[must_use]
+pub fn lfo_target_named(name: &str) -> LfoTarget {
+    LFO_TARGETS.iter().find(|(n, _)| *n == name).map_or(LfoTarget::Off, |&(_, target)| target)
 }
 
 /// `syncToHz()`: `None` when off, unknown, or without a tempo.
