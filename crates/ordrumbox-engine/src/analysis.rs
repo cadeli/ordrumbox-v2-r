@@ -2,7 +2,7 @@
 //! peak and RMS levels, and the note it sounds (autocorrelation over its
 //! loudest frame).
 
-use ordrumbox_core::num::round_to;
+use ordrumbox_core::num::{db_to_gain, gain_to_db, round_to};
 use ordrumbox_dsp::SampleBuffer;
 
 /// Points of the envelope.
@@ -78,7 +78,7 @@ fn mono(buffer: &SampleBuffer) -> Vec<f32> {
 
 /// `value` in dB to 3 decimals; minus infinity for silence.
 fn to_db(value: f64) -> f64 {
-    if !value.is_finite() || value <= 0.0 { f64::NEG_INFINITY } else { round_to(20.0 * value.log10(), 3) }
+    if !value.is_finite() || value <= 0.0 { f64::NEG_INFINITY } else { round_to(gain_to_db(value), 3) }
 }
 
 /// The smallest power of two at least `value`.
@@ -206,7 +206,7 @@ pub fn normalized(buffer: &SampleBuffer) -> Option<SampleBuffer> {
     if analysis.peak_linear <= 0.0 {
         return None;
     }
-    let gain = 10f64.powf(-analysis.peak_db / 20.0);
+    let gain = db_to_gain(-analysis.peak_db);
     let scale = |channel: &[f32]| channel.iter().map(|&s| (f64::from(s) * gain) as f32).collect::<Vec<f32>>();
     Some(SampleBuffer {
         left: scale(&buffer.left),

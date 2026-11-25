@@ -3,6 +3,7 @@
 //! 4096, the default smoothing 0.8 and range -100 to -30 dB): a Blackman
 //! window, an FFT, the magnitudes smoothed over time, in dB, as bytes.
 
+use ordrumbox_core::num::gain_to_db;
 use std::f64::consts::PI;
 
 /// Samples per analysis (`analyser.fftSize`).
@@ -44,7 +45,7 @@ impl Analyser {
                 let magnitude = (re[k] * re[k] + im[k] * im[k]).sqrt() * scale;
                 let smoothed = SMOOTHING * self.smoothed[k] + (1.0 - SMOOTHING) * magnitude;
                 self.smoothed[k] = if smoothed.is_finite() { smoothed } else { 0.0 };
-                let db = 20.0 * self.smoothed[k].log10();
+                let db = gain_to_db(self.smoothed[k]);
                 (255.0 / (MAX_DB - MIN_DB) * (db - MIN_DB)).floor().clamp(0.0, 255.0) as u8
             })
             .collect()

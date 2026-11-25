@@ -20,6 +20,7 @@
 mod file;
 mod target;
 
+use crate::num::{db_to_gain, gain_to_db};
 use crate::{Pattern, Song, Track};
 
 /// Steps of a beat on an automation lane.
@@ -96,7 +97,7 @@ pub fn volume_db(level: f64) -> Option<f64> {
 /// The gain a volume lane's `level` sets ([`volume_db`]).
 #[must_use]
 pub fn volume_gain(level: f64) -> f64 {
-    volume_db(level).map_or(0.0, |db| 10f64.powf(db / 20.0))
+    volume_db(level).map_or(0.0, db_to_gain)
 }
 
 /// The level of a volume lane that sets `gain` (the inverse of
@@ -106,7 +107,7 @@ pub fn volume_level(gain: f64) -> f64 {
     if gain <= 0.0 {
         return 0.0;
     }
-    let db = (20.0 * gain.log10()).clamp(VOLUME_FLOOR_DB, 0.0);
+    let db = gain_to_db(gain).clamp(VOLUME_FLOOR_DB, 0.0);
     1.0 - (db / VOLUME_FLOOR_DB).sqrt()
 }
 

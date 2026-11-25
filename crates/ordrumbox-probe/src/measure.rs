@@ -1,5 +1,6 @@
 //! The measurements of one sound.
 
+use ordrumbox_core::num::gain_to_db;
 use ordrumbox_dsp::SampleBuffer;
 use ordrumbox_engine::analysis::hz_to_note;
 
@@ -187,7 +188,7 @@ pub struct Measures {
 
 /// Amplitude to dB; -∞ for silence.
 pub fn amplitude_db(value: f64) -> f64 {
-    if value > 0.0 { 20.0 * value.log10() } else { f64::NEG_INFINITY }
+    if value > 0.0 { gain_to_db(value) } else { f64::NEG_INFINITY }
 }
 
 fn power_db(power: f64, reference: f64) -> f64 {

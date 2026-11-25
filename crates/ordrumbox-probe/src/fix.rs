@@ -2,6 +2,7 @@
 //! faded out, DC removed, the peak set to the kit's level. A high-pass filter
 //! and a shorter length are applied only when asked. Each repair is listed.
 
+use ordrumbox_core::num::db_to_gain;
 use ordrumbox_dsp::SampleBuffer;
 
 use crate::kit::{DC_LIMIT, END_LEVEL_LIMIT_DB, LEAD_IN_LIMIT_MS};
@@ -159,7 +160,7 @@ fn set_peak(channels: &mut [Vec<f64>], target_db: f64) -> Option<String> {
     if !is_off {
         return None;
     }
-    let gain = 10f64.powf(target_db / 20.0) / level;
+    let gain = db_to_gain(target_db) / level;
     channels.iter_mut().flatten().for_each(|s| *s *= gain);
     Some(format!("peak {level_db:.1} dB set to {target_db:.1} dB"))
 }

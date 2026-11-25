@@ -6,6 +6,7 @@ use std::sync::Arc;
 use ordrumbox_core::Issue;
 use ordrumbox_core::instruments::NOT_FOUND;
 use ordrumbox_core::json::{Object, Value};
+use ordrumbox_core::num::db_to_gain;
 use ordrumbox_dsp::{SampleBuffer, SampleShape};
 
 use crate::wav;
@@ -85,7 +86,7 @@ impl KitSample {
 
     /// Linear gain of the trim.
     pub fn gain(&self) -> f64 {
-        10f64.powf(self.gain_db / 20.0)
+        db_to_gain(self.gain_db)
     }
 
     fn from_json(value: &Value) -> Option<Self> {

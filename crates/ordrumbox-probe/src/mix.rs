@@ -3,6 +3,7 @@
 
 use std::f64::consts::PI;
 
+use ordrumbox_core::num::db_to_gain;
 use ordrumbox_dsp::SampleBuffer;
 
 use crate::fft::power_spectrum;
@@ -101,7 +102,7 @@ fn biquad(input: &[f64], b: [f64; 3], a: [f64; 2]) -> Vec<f64> {
 fn k_weighted(channel: &[f64], rate: f64) -> Vec<f64> {
     let k = (PI * 1_681.974_450_955_533 / rate).tan();
     let q = 0.707_175_236_955_419_6;
-    let vh = 10f64.powf(3.999_843_853_973_347 / 20.0);
+    let vh = db_to_gain(3.999_843_853_973_347);
     let vb = vh.powf(0.499_666_774_154_541_6);
     let a0 = 1.0 + k / q + k * k;
     let shelf = biquad(

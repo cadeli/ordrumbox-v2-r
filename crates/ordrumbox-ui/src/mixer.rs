@@ -14,6 +14,7 @@ use crate::output;
 use crate::panel::Rect;
 use crate::scale::Scale;
 use crate::{scroll_thumb, theme};
+use ordrumbox_core::num::{db_to_gain, gain_to_db};
 use ordrumbox_engine::MasterSettings;
 
 /// Width of a strip, and the gap between two, at scale 1.
@@ -340,7 +341,7 @@ fn draw_meter(canvas: &mut Canvas, r: Rect, level: f32) {
     if lit <= 0 {
         return;
     }
-    let hot = (meter_fraction(10f64.powf(METER_HOT_DB / 20.0)) * f64::from(r.h)) as i32;
+    let hot = (meter_fraction(db_to_gain(METER_HOT_DB)) * f64::from(r.h)) as i32;
     canvas.fill_rect(r.x, r.y + r.h - lit, r.w, lit, METER);
     if lit > hot {
         canvas.fill_rect(r.x, r.y + r.h - lit, r.w, lit - hot, METER_HOT);
@@ -352,7 +353,7 @@ fn meter_fraction(level: f64) -> f64 {
     if level <= 0.0 {
         return 0.0;
     }
-    (1.0 - 20.0 * level.log10() / METER_FLOOR_DB).clamp(0.0, 1.0)
+    (1.0 - gain_to_db(level) / METER_FLOOR_DB).clamp(0.0, 1.0)
 }
 
 #[cfg(test)]

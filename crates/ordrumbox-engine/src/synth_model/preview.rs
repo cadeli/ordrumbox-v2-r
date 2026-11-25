@@ -3,6 +3,7 @@
 
 use ordrumbox_core::json::{Object, Value};
 use ordrumbox_core::lfo;
+use ordrumbox_core::num::gain_to_db;
 use ordrumbox_dsp::synth::ring;
 
 use super::{EXTRA_METAS, FM_DEVIATION, OSC2_SYNCS, WAVES, lfo_scale, number, slope, text};
@@ -218,7 +219,7 @@ pub fn filter_response(kind: &str, fc: f64, q: f64, slope_db: f64, points: usize
             } else {
                 magnitude(f, q)
             };
-            (20.0 * mag.max(1e-10).log10()).clamp(-30.0, 12.0)
+            gain_to_db(mag.max(1e-10)).clamp(-30.0, 12.0)
         })
         .collect()
 }

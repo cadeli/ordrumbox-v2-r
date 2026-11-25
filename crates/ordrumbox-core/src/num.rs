@@ -1,4 +1,4 @@
-//! Decimal rounding and wrapping shared by the crates.
+//! Decimal rounding, wrapping and decibels shared by the crates.
 
 /// `x` rounded to `decimals` decimal places, halves away from zero (as
 /// [`f64::round`]). `x` is scaled first, so a value stored just under a half
@@ -37,9 +37,33 @@ pub fn text(x: f64) -> String {
     if x == 0.0 { "0".to_owned() } else { x.to_string() }
 }
 
+/// The linear gain (amplitude ratio) of `db` decibels: 0 dB is 1.
+#[must_use]
+#[inline]
+pub fn db_to_gain(db: f64) -> f64 {
+    10f64.powf(db / 20.0)
+}
+
+/// The decibels of the linear gain (amplitude ratio) `gain`: 1 is 0 dB, 0 is
+/// minus infinity, a negative gain NaN. The caller guards what it cannot take.
+#[must_use]
+#[inline]
+pub fn gain_to_db(gain: f64) -> f64 {
+    20.0 * gain.log10()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn decibels_and_gains_convert_both_ways() {
+        assert_eq!(db_to_gain(0.0), 1.0);
+        assert_eq!(gain_to_db(1.0), 0.0);
+        assert!((db_to_gain(-6.0) - 0.501_187).abs() < 1e-6);
+        assert!((gain_to_db(db_to_gain(-23.5)) + 23.5).abs() < 1e-12);
+        assert_eq!(gain_to_db(0.0), f64::NEG_INFINITY);
+    }
 
     #[test]
     fn rounds_halves_away_from_zero() {
